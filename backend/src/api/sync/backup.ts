@@ -69,6 +69,18 @@ export const MONEY_CENTS_FIELDS = new Set<string>([
   'groupTotal',
 ]);
 
+export function storageProviderIdentity(
+  provider: Pick<UserProvider, 'providerType' | 'config'>
+): string | null {
+  const config = (provider.config ?? {}) as Record<string, unknown>;
+  if (provider.providerType === 's3') {
+    return config.endpoint && config.bucket
+      ? `s3:${String(config.endpoint)}/${String(config.bucket)}`
+      : null;
+  }
+  return config.accountEmail ? `${provider.providerType}:${String(config.accountEmail)}` : null;
+}
+
 export function isPreCentsBackup(version: string | undefined): boolean {
   const major = Number.parseInt(String(version ?? '').split('.')[0], 10);
   return Number.isFinite(major) && major < 2;
@@ -359,6 +371,10 @@ export class BackupService {
       const rows = await db.select().from(photoRefs).where(inArray(photoRefs.photoId, batch));
       userPhotoRefs.push(...rows);
     }
+    const storageProviders = await this.storageProviderIdentities(
+      userId,
+      userPhotoRefs.map((ref) => ref.providerId)
+    );
 
     const userPreferencesRows = await db
       .select()
@@ -393,6 +409,7 @@ export class BackupService {
         version: CONFIG.backup.currentVersion,
         timestamp: new Date().toISOString(),
         userId,
+        storageProviders,
       },
       vehicles: userVehicles,
       expenses: userExpenses,
@@ -412,6 +429,25 @@ export class BackupService {
       trips: userTrips,
       vehicleShares: userVehicleShares,
     };
+  }
+
+  private async storageProviderIdentities(
+    userId: string,
+    providerIds: string[]
+  ): Promise<Record<string, string>> {
+    const { userProviders } = await import('../../db/schema');
+    const identities: Record<string, string> = {};
+    for (const batch of chunk([...new Set(providerIds)])) {
+      const rows = await getDb()
+        .select()
+        .from(userProviders)
+        .where(and(inArray(userProviders.id, batch), eq(userProviders.userId, userId)));
+      for (const row of rows) {
+        const identity = storageProviderIdentity(row);
+        if (identity) identities[row.id] = identity;
+      }
+    }
+    return identities;
   }
 
   async exportAsZip(userId: string): Promise<Buffer> {

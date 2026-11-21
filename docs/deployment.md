@@ -313,22 +313,25 @@ automatically at startup; there is no manual migration step.
 **Databases created before `0000_baseline` cannot be upgraded in place.** Their migration history
 no longer matches the journal. To move one forward:
 
-1. In the old build, Settings → Backup → **Download Backup** saves a ZIP.
+1. In the old build, Settings → Storage Providers → **Download Backup** saves a ZIP.
 2. Stop the old build and move `vroom.db*` aside.
 3. Start the new build, which creates a fresh schema, and sign in with the same account. The fresh
    database gives you a new internal user id; restore re-owns every row to the signed-in account,
    so a backup made under the old id still applies.
-4. Settings → Backup → **Restore** → upload the ZIP, check the preview counts, then restore in
-   **Replace** mode.
+4. Settings → Storage Providers: reconnect the same storage accounts you used before (the same
+   Google account, or the same S3 endpoint and bucket).
+5. Settings → Storage Providers → **Restore** → **Upload file**: pick the ZIP, check the preview
+   counts, then restore in **Replace** mode.
 
-Keep the old file until the restore is verified. Anything that points at another account or a
-storage provider from the old database does not carry over:
+Keep the old file until the restore is verified. What happens to links into the old database:
 
+- **Photos**: each photo is re-linked to the reconnected provider for the same storage account, so
+  it displays again. Photos whose storage account isn't connected when you restore stay
+  unlinked; their files are still in that storage. Backups made before this release and Google
+  Sheets restores carry no storage account details, so they don't re-link.
 - **Vehicle shares**: re-invite people once they have signed in to the new instance.
-- **Backup and photo storage settings**: reconnect your storage provider and set them up again.
+- **Backup and photo storage settings**: set them up again for the reconnected providers.
   Settings you already made for a provider on the new instance are kept.
-- **Photos**: their records are restored, but the links to the stored files are not, so photos
-  added before the move do not display. The files are still in your storage provider.
 
 ### Backup
 
@@ -358,7 +361,7 @@ docker compose start backend
 
 Deleting the stale `-wal`/`-shm` matters: left behind, they belong to the replaced database.
 
-In-app restore from a Drive ZIP or Google Sheets lives in Settings → Backup → Restore.
+In-app restore from a Drive ZIP or Google Sheets lives in Settings → Storage Providers → Restore.
 
 ## Maintenance
 
