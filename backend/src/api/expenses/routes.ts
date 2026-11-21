@@ -89,6 +89,13 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
       `Location must be ${CONFIG.validation.expense.locationMaxLength} characters or less`
     )
     .nullish(),
+  fuelType: z
+    .string()
+    .max(
+      CONFIG.validation.expense.fuelTypeMaxLength,
+      `Fuel type must be ${CONFIG.validation.expense.fuelTypeMaxLength} characters or less`
+    )
+    .nullish(),
   // Insurance and reminder links bypass this route's validation, so only financing links are accepted.
   sourceType: z.literal('financing').optional(),
   sourceId: z.string().min(1).optional(),

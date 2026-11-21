@@ -19,7 +19,12 @@ import { financingRepository, withComputedBalance } from './repository';
 
 const routes = new Hono();
 
+const FINANCING_TYPES = ['loan', 'lease', 'own'] as const;
+const PAYMENT_FREQUENCIES = ['monthly', 'bi-weekly', 'weekly', 'custom'] as const;
+
 const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
+  financingType: z.enum(FINANCING_TYPES).optional(),
+  paymentFrequency: z.enum(PAYMENT_FREQUENCIES).optional(),
   provider: z
     .string()
     .min(1, 'Provider is required')
