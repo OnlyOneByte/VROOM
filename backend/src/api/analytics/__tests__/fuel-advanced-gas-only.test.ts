@@ -143,7 +143,8 @@ describe('PHEV gas fill-ups pair with gas, and kWh stays out of fuel volume', ()
         fuelType: CHARGE,
       })
     );
-    const { charging } = await repo.getFuelStats(USER.id, yearToRange(2024));
+    const stats = await repo.getFuelStats(USER.id, yearToRange(2024));
+    const { charging } = stats;
     expect(charging.sessions.currentYear).toBe(3);
     expect(charging.sessions.previousYear).toBe(1);
     expect(charging.energy.currentYear).toBeCloseTo(45, 9);
@@ -151,6 +152,9 @@ describe('PHEV gas fill-ups pair with gas, and kWh stays out of fuel volume', ()
     expect(charging.efficiency.avgEfficiency).toBeCloseTo(4, 9);
     expect(charging.averageCost.perSession).toBeCloseTo(7, 9);
     expect(charging.averageCost.perEnergyUnit).toBeCloseTo(21 / 45, 9);
+    expect(charging.sessionDetails).toEqual({ avgEnergy: 15, minEnergy: 15, maxEnergy: 15 });
+    expect(charging.priceHistory.map((p) => p.pricePerVolume)).toEqual([9 / 15, 6 / 15, 6 / 15]);
+    expect(stats.gasPriceHistory.map((g) => g.pricePerVolume)).toEqual([4, 4]);
   });
 
   test('the vehicle fuel-efficiency trend uses the gas-to-gas interval', async () => {

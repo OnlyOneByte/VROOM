@@ -76,7 +76,13 @@ export interface FuelStatsResponse {
 			bestEfficiency: number | null;
 			worstEfficiency: number | null;
 		};
+		sessionDetails: {
+			avgEnergy: number | null;
+			minEnergy: number | null;
+			maxEnergy: number | null;
+		};
 		averageCost: { perSession: number | null; perEnergyUnit: number | null };
+		priceHistory: Array<{ date: string; fuelType: string; pricePerVolume: number }>;
 	};
 	units?: UnitsMetadata;
 }

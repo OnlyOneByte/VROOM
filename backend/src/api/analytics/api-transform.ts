@@ -39,6 +39,10 @@ export function fuelStatsToApi(d: FuelStatsData): FuelStatsData {
         perSession: cn(d.charging.averageCost.perSession),
         perEnergyUnit: cn(d.charging.averageCost.perEnergyUnit),
       },
+      priceHistory: d.charging.priceHistory.map((g) => ({
+        ...g,
+        pricePerVolume: c(g.pricePerVolume),
+      })),
     },
   };
 }

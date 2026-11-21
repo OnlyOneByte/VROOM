@@ -41,7 +41,9 @@ const charging: NonNullable<FuelStatsResponse['charging']> = {
 	sessions: { currentYear: 3, previousYear: 1, currentMonth: 1, previousMonth: 0 },
 	energy: { currentYear: 45, previousYear: 50, currentMonth: 15, previousMonth: 0 },
 	efficiency: { avgEfficiency: 4, bestEfficiency: 4.5, worstEfficiency: 3.5 },
-	averageCost: { perSession: 7, perEnergyUnit: 0.47 }
+	sessionDetails: { avgEnergy: 15, minEnergy: 12, maxEnergy: 18 },
+	averageCost: { perSession: 7, perEnergyUnit: 0.467 },
+	priceHistory: [{ date: '2024-01-05', fuelType: 'Level 2 (AC)', pricePerVolume: 0.467 }]
 };
 
 describe('FuelStatsTab charging series', () => {
@@ -49,9 +51,15 @@ describe('FuelStatsTab charging series', () => {
 		render(FuelStatsTab, { fuelStats: stats({ charging }), fuelAdvanced: advanced });
 		expect(screen.queryByText('No fuel data yet')).toBeNull();
 		expect(screen.getByText('Charging Sessions')).toBeTruthy();
-		expect(screen.getByText('Energy Charged (kWh)')).toBeTruthy();
+		expect(screen.getByText('Energy (kWh)')).toBeTruthy();
 		expect(screen.getByText('Average mi/kWh')).toBeTruthy();
-		expect(screen.getByText('$0.47')).toBeTruthy();
+		expect(screen.getByText('Worst mi/kWh')).toBeTruthy();
+		expect(screen.getByText('Charging Details')).toBeTruthy();
+		expect(screen.getByText('18.0 kWh')).toBeTruthy();
+		expect(screen.getByText('$0.467')).toBeTruthy();
+		expect(screen.getByText('Average Cost')).toBeTruthy();
+		expect(screen.getByText('Per Session')).toBeTruthy();
+		expect(screen.queryByText('Per Fill-up')).toBeNull();
 		expect(screen.queryByText('Fill-ups')).toBeNull();
 		expect(screen.queryByText('Fill-up Details')).toBeNull();
 	});

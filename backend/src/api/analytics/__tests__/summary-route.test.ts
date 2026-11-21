@@ -45,7 +45,9 @@ const MOCK_SUMMARY: AnalyticsSummaryData = {
       sessions: { currentYear: 0, previousYear: 0, currentMonth: 0, previousMonth: 0 },
       energy: { currentYear: 0, previousYear: 0, currentMonth: 0, previousMonth: 0 },
       efficiency: { avgEfficiency: null, bestEfficiency: null, worstEfficiency: null },
+      sessionDetails: { avgEnergy: null, minEnergy: null, maxEnergy: null },
       averageCost: { perSession: null, perEnergyUnit: null },
+      priceHistory: [],
     },
   },
   fuelAdvanced: {

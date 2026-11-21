@@ -101,7 +101,9 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
         sessions: { currentYear: 4, previousYear: 2, currentMonth: 1, previousMonth: 1 },
         energy: { currentYear: 60, previousYear: 30, currentMonth: 15, previousMonth: 15 },
         efficiency: { avgEfficiency: 4, bestEfficiency: 5, worstEfficiency: 3 },
+        sessionDetails: { avgEnergy: 15, minEnergy: 10, maxEnergy: 20 },
         averageCost: { perSession: 900, perEnergyUnit: 60 },
+        priceHistory: [{ date: '2024-01-05', fuelType: 'Level 2 (AC)', pricePerVolume: 30 }],
       },
     } as FuelStatsData;
     const r = fuelStatsToApi(d);
@@ -118,6 +120,8 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
     expect(r.charging.averageCost.perEnergyUnit).toBe(0.6);
     expect(r.charging.energy.currentYear).toBe(60);
     expect(r.charging.efficiency.avgEfficiency).toBe(4);
+    expect(r.charging.sessionDetails.maxEnergy).toBe(20);
+    expect(r.charging.priceHistory[0].pricePerVolume).toBe(0.3);
   });
 
   test('financing: payments/balances/interest convert; apr (percent) untouched', () => {

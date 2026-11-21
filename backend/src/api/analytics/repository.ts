@@ -180,7 +180,13 @@ export interface FuelStatsData {
       bestEfficiency: number | null;
       worstEfficiency: number | null;
     };
+    sessionDetails: {
+      avgEnergy: number | null;
+      minEnergy: number | null;
+      maxEnergy: number | null;
+    };
     averageCost: { perSession: number | null; perEnergyUnit: number | null };
+    priceHistory: Array<{ date: string; fuelType: string; pricePerVolume: number }>;
   };
   costPerDistance: Array<{
     month: string;
@@ -1495,10 +1501,16 @@ export class AnalyticsRepository {
         previousMonth: energyOf(sessions.filter(months.inPrevMonth)),
       },
       efficiency: computeFuelConsumptionMetrics(efficiencyValues),
+      sessionDetails: {
+        avgEnergy: sessions.length > 0 ? totalEnergy / sessions.length : null,
+        minEnergy: sessions.length > 0 ? minOf(sessions.map((r) => r.volume as number)) : null,
+        maxEnergy: sessions.length > 0 ? maxOf(sessions.map((r) => r.volume as number)) : null,
+      },
       averageCost: {
         perSession: sessions.length > 0 ? totalCost / sessions.length : null,
         perEnergyUnit: totalEnergy > 0 ? totalCost / totalEnergy : null,
       },
+      priceHistory: buildGasPriceHistory(fuelRows, isChargeSession),
     };
   }
 

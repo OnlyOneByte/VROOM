@@ -11,6 +11,7 @@
 		TrendingUp,
 		TrendingDown,
 		BatteryCharging,
+		Plug,
 		Zap
 	} from '@lucide/svelte';
 	import { resolve } from '$app/paths';
@@ -69,6 +70,11 @@
 		!!fuelStats && (fuelStats.fillups.currentYear > 0 || fuelStats.fillups.previousYear > 0)
 	);
 	let showGasCards = $derived(hasGasData || !hasChargeData);
+	let perVisitCost = $derived(
+		showGasCards
+			? (fuelStats?.averageCost.perFillup ?? null)
+			: (charging?.averageCost.perSession ?? null)
+	);
 
 	let hasFuelData = $derived(
 		!!fuelStats &&
@@ -255,9 +261,9 @@
 		{/if}
 
 		{#if charging && hasChargeData}
-			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
+			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-4">
 				{@render periodCard('Charging Sessions', BatteryCharging, charging.sessions, 0)}
-				{@render periodCard(`Energy Charged (${chargeLabel})`, Zap, charging.energy, 1)}
+				{@render periodCard(`Energy (${chargeLabel})`, Zap, charging.energy, 1)}
 
 				<Card.Root>
 					<Card.Content class="p-6">
@@ -277,12 +283,63 @@
 							</p>
 						</div>
 
-						<div class="space-y-2 pt-3">
-							<div class="flex items-center justify-between text-sm">
-								<span class="text-muted-foreground">Best {electricEffLabel}</span>
-								<span class="font-semibold">
+						<div class="grid grid-cols-2 gap-4 pt-3">
+							<div class="text-center">
+								<span class="text-xs uppercase tracking-wide text-muted-foreground"
+									>Best {electricEffLabel}</span
+								>
+								<p class="text-xl font-bold text-chart-2">
 									{charging.efficiency.bestEfficiency != null
 										? charging.efficiency.bestEfficiency.toFixed(1)
+										: 'N/A'}
+								</p>
+							</div>
+							<div class="text-center">
+								<span class="text-xs uppercase tracking-wide text-muted-foreground"
+									>Worst {electricEffLabel}</span
+								>
+								<p class="text-xl font-bold text-destructive">
+									{charging.efficiency.worstEfficiency != null
+										? charging.efficiency.worstEfficiency.toFixed(1)
+										: 'N/A'}
+								</p>
+							</div>
+						</div>
+					</Card.Content>
+				</Card.Root>
+
+				<Card.Root>
+					<Card.Content class="p-6">
+						<div class="mb-4 flex items-center gap-2">
+							<Plug class="h-5 w-5 text-muted-foreground" />
+							<h3 class="font-semibold text-foreground">Charging Details</h3>
+						</div>
+
+						<div class="border-b pb-4 text-center">
+							<span class="text-xs uppercase tracking-wide text-muted-foreground"
+								>Average Session</span
+							>
+							<p class="text-3xl font-bold">
+								{charging.sessionDetails.avgEnergy != null
+									? charging.sessionDetails.avgEnergy.toFixed(1) + ' ' + chargeLabel
+									: 'N/A'}
+							</p>
+						</div>
+
+						<div class="space-y-2 pt-3">
+							<div class="flex items-center justify-between text-sm">
+								<span class="text-muted-foreground">Min Session</span>
+								<span class="font-semibold">
+									{charging.sessionDetails.minEnergy != null
+										? charging.sessionDetails.minEnergy.toFixed(1) + ' ' + chargeLabel
+										: 'N/A'}
+								</span>
+							</div>
+							<div class="flex items-center justify-between text-sm">
+								<span class="text-muted-foreground">Max Session</span>
+								<span class="font-semibold">
+									{charging.sessionDetails.maxEnergy != null
+										? charging.sessionDetails.maxEnergy.toFixed(1) + ' ' + chargeLabel
 										: 'N/A'}
 								</span>
 							</div>
@@ -290,7 +347,7 @@
 								<span class="text-muted-foreground">Cost per {chargeLabel}</span>
 								<span class="font-semibold">
 									{charging.averageCost.perEnergyUnit != null
-										? formatCurrency(charging.averageCost.perEnergyUnit)
+										? formatCurrency(charging.averageCost.perEnergyUnit, undefined, 3)
 										: 'N/A'}
 								</span>
 							</div>
@@ -348,52 +405,52 @@
 						</div>
 					</Card.Content>
 				</Card.Root>
-
-				<Card.Root>
-					<Card.Content class="p-6">
-						<div class="mb-4 flex items-center gap-2">
-							<DollarSign class="h-5 w-5 text-muted-foreground" />
-							<h3 class="font-semibold text-foreground">Average Cost</h3>
-						</div>
-
-						<div class="border-b pb-4 text-center">
-							<span class="text-xs uppercase tracking-wide text-muted-foreground">Per Fill-up</span>
-							<p class="text-3xl font-bold">
-								{fuelStats.averageCost.perFillup != null
-									? formatCurrency(fuelStats.averageCost.perFillup)
-									: 'N/A'}
-							</p>
-						</div>
-
-						<div class="space-y-2 pt-3">
-							<div class="flex items-center justify-between text-sm">
-								<span class="text-muted-foreground">Best {costPerDistLabel}</span>
-								<span class="font-semibold">
-									{fuelStats.averageCost.bestCostPerDistance != null
-										? formatCurrency(fuelStats.averageCost.bestCostPerDistance)
-										: 'N/A'}
-								</span>
-							</div>
-							<div class="flex items-center justify-between text-sm">
-								<span class="text-muted-foreground">Worst {costPerDistLabel}</span>
-								<span class="font-semibold">
-									{fuelStats.averageCost.worstCostPerDistance != null
-										? formatCurrency(fuelStats.averageCost.worstCostPerDistance)
-										: 'N/A'}
-								</span>
-							</div>
-							{#if fuelStats.averageCost.avgCostPerDay != null}
-								<div class="flex items-center justify-between text-sm">
-									<span class="text-muted-foreground">Avg Cost/Day</span>
-									<span class="font-semibold">
-										{formatCurrency(fuelStats.averageCost.avgCostPerDay)}
-									</span>
-								</div>
-							{/if}
-						</div>
-					</Card.Content>
-				</Card.Root>
 			{/if}
+
+			<Card.Root>
+				<Card.Content class="p-6">
+					<div class="mb-4 flex items-center gap-2">
+						<DollarSign class="h-5 w-5 text-muted-foreground" />
+						<h3 class="font-semibold text-foreground">Average Cost</h3>
+					</div>
+
+					<div class="border-b pb-4 text-center">
+						<span class="text-xs uppercase tracking-wide text-muted-foreground"
+							>{showGasCards ? 'Per Fill-up' : 'Per Session'}</span
+						>
+						<p class="text-3xl font-bold">
+							{perVisitCost != null ? formatCurrency(perVisitCost) : 'N/A'}
+						</p>
+					</div>
+
+					<div class="space-y-2 pt-3">
+						<div class="flex items-center justify-between text-sm">
+							<span class="text-muted-foreground">Best {costPerDistLabel}</span>
+							<span class="font-semibold">
+								{fuelStats.averageCost.bestCostPerDistance != null
+									? formatCurrency(fuelStats.averageCost.bestCostPerDistance)
+									: 'N/A'}
+							</span>
+						</div>
+						<div class="flex items-center justify-between text-sm">
+							<span class="text-muted-foreground">Worst {costPerDistLabel}</span>
+							<span class="font-semibold">
+								{fuelStats.averageCost.worstCostPerDistance != null
+									? formatCurrency(fuelStats.averageCost.worstCostPerDistance)
+									: 'N/A'}
+							</span>
+						</div>
+						{#if fuelStats.averageCost.avgCostPerDay != null}
+							<div class="flex items-center justify-between text-sm">
+								<span class="text-muted-foreground">Avg Cost/Day</span>
+								<span class="font-semibold">
+									{formatCurrency(fuelStats.averageCost.avgCostPerDay)}
+								</span>
+							</div>
+						{/if}
+					</div>
+				</Card.Content>
+			</Card.Root>
 
 			<Card.Root>
 				<Card.Content class="p-6">
