@@ -89,8 +89,12 @@ function modelDomainLabel(domain: string): string {
   return domain === 'llm' ? 'LLM' : 'VLM';
 }
 
+const PROVIDER_DOMAINS = ['storage', 'auth', ...MODEL_DOMAINS] as const;
+
 const createProviderSchema = z.object({
-  domain: z.string().min(1, 'Domain is required'),
+  domain: z.enum(PROVIDER_DOMAINS, {
+    message: `Domain must be one of: ${PROVIDER_DOMAINS.join(', ')}`,
+  }),
   providerType: z.enum(SUPPORTED_PROVIDER_TYPES, {
     message: `Provider type must be one of: ${SUPPORTED_PROVIDER_TYPES.join(', ')}`,
   }),

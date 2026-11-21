@@ -116,6 +116,23 @@ describe('POST /api/v1/providers — create', () => {
     expect(res.status).toBe(400);
   });
 
+  test('rejects an unknown or oversized domain (400) and stores nothing', async () => {
+    for (const domain of ['junk', 's'.repeat(10_000)]) {
+      const res = await ctx.authed('POST', '/api/v1/providers', {
+        domain,
+        providerType: 's3',
+        displayName: 'Bad',
+        credentials: { accessKeyId: 'AKIA-test', secretAccessKey: 'secret' },
+        config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
+      });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { error: { code: string } }).error.code).toBe(
+        'ValidationError'
+      );
+    }
+    expect(ctx.sqlite.query('SELECT count(*) AS n FROM user_providers').get()).toEqual({ n: 0 });
+  });
+
   test('rejects an invalid providerType (400 via zValidator)', async () => {
     const res = await ctx.authed('POST', '/api/v1/providers', {
       domain: 'storage',
