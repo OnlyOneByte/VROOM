@@ -82,6 +82,8 @@ export class ExpenseFormState {
 	effectiveDistanceUnit = $derived(
 		this.vehicle?.unitPreferences?.distanceUnit ?? this.distanceUnit
 	);
+	effectiveVolumeUnit = $derived(this.vehicle?.unitPreferences?.volumeUnit ?? this.volumeUnit);
+	effectiveChargeUnit = $derived(this.vehicle?.unitPreferences?.chargeUnit ?? this.chargeUnit);
 	distLabel = $derived(getDistanceUnitLabel(this.effectiveDistanceUnit, false));
 
 	previousFuelHint = $derived(
@@ -104,8 +106,8 @@ export class ExpenseFormState {
 		return {
 			category: this.formData.category,
 			vehicle: this.vehicle,
-			volumeUnit: this.volumeUnit,
-			chargeUnit: this.chargeUnit,
+			volumeUnit: this.effectiveVolumeUnit,
+			chargeUnit: this.effectiveChargeUnit,
 			allVehicleExpenses: this.allVehicleExpenses,
 			expenseId: this.ctx.expenseId,
 			formData: this.formData as unknown as Record<string, string | string[]>
