@@ -79,8 +79,9 @@ A green build is the floor, not "done".
 ## Hard rules
 
 - Never commit or push to `main`, and never force-push a shared branch. Work on a branch and
-  open a PR that links its issue (`Fixes #N`). An agent may merge its own PR once the checks
-  `main` requires (Backend Tests, Frontend Tests) pass and a review is posted on the PR; a UI
-  change carries before/after screenshots or a GIF in the PR.
+  open a PR that links its issue (`Fixes #N`). An agent may merge its own PR once every check
+  `main` requires passes and a reviewer other than the author has approved the latest commit
+  with no unresolved blocking findings; a UI change carries before/after screenshots or a GIF
+  in the PR.
 - Never read or commit credential files. `.env` stays local.
 - Prefer editing an existing file over adding one; delete dead code rather than parking it.
