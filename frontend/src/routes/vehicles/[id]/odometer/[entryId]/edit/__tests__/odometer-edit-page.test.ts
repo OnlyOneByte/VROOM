@@ -309,6 +309,15 @@ describe('edit odometer reading validation', () => {
 });
 
 describe('edit odometer reading save', () => {
+	test('the form actions meet the 40px tap target', async () => {
+		mount();
+		await settle();
+
+		for (const name of ['Delete', 'Cancel', 'Save']) {
+			expect(screen.getByRole('button', { name })).toHaveClass('h-10');
+		}
+	});
+
 	test('saves changed values at local noon and returns to the vehicle', async () => {
 		mount();
 		await settle();

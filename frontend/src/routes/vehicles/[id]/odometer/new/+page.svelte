@@ -239,10 +239,16 @@
 		{/if}
 
 		<div class="flex gap-3">
-			<Button type="button" variant="outline" onclick={() => gotoDynamic(returnTo)} class="flex-1">
+			<Button
+				type="button"
+				variant="outline"
+				size="lg"
+				onclick={() => gotoDynamic(returnTo)}
+				class="flex-1"
+			>
 				Cancel
 			</Button>
-			<Button type="submit" disabled={isSubmitting} class="flex-1">
+			<Button type="submit" size="lg" disabled={isSubmitting} class="flex-1">
 				{#if isSubmitting}
 					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 				{/if}
