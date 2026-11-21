@@ -79,7 +79,16 @@ describe('userFacingErrorMessage', () => {
 			new TypeError('x.fetchAll is not a function'),
 			UNEXPECTED_FAILURE_MESSAGE
 		],
-		['a plain Error', new Error('plain boom'), UNEXPECTED_FAILURE_MESSAGE],
+		[
+			'a reason the app states with a plain Error',
+			new Error('Cannot sync while offline'),
+			'Cannot sync while offline.'
+		],
+		[
+			'a runtime failure (SyntaxError)',
+			new SyntaxError('Unexpected token < in JSON'),
+			UNEXPECTED_FAILURE_MESSAGE
+		],
 		['a non-Error throw', 'a bare string', UNEXPECTED_FAILURE_MESSAGE]
 	])('%s becomes a plain sentence', (_label, error, expected) => {
 		expect(userFacingErrorMessage(error)).toBe(expected);
@@ -90,8 +99,7 @@ describe('userFacingErrorMessage', () => {
 			new ApiError('Internal server error', 500),
 			new ApiError('Bad gateway', 502),
 			new ApiError('Backup export timed out after 600000ms', 503, undefined, 'NETWORK_ERROR'),
-			new TypeError('Failed to fetch'),
-			new Error('Failed to fetch')
+			new TypeError('Failed to fetch')
 		];
 		for (const error of notNetwork) {
 			expect(userFacingErrorMessage(error)).not.toMatch(/connection/i);

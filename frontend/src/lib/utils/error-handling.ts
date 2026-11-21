@@ -85,7 +85,14 @@ export const UNEXPECTED_FAILURE_MESSAGE =
 const STATUS_ONLY_MESSAGE = /^Request failed with status \d+$/;
 
 function asSentence(text: string): string {
-	return /[.!?]$/.test(text) ? text : `${text}.`;
+	const capitalised = text.charAt(0).toUpperCase() + text.slice(1);
+	return /[.!?]$/.test(capitalised) ? capitalised : `${capitalised}.`;
+}
+
+function isAppStatedReason(error: unknown): error is Error {
+	return (
+		error instanceof Error && Object.getPrototypeOf(error) === Error.prototype && !!error.message
+	);
 }
 
 export function userFacingErrorMessage(error: unknown): string {
@@ -99,6 +106,7 @@ export function userFacingErrorMessage(error: unknown): string {
 			return asSentence(error.message);
 		}
 	}
+	if (isAppStatedReason(error)) return asSentence(error.message);
 	return UNEXPECTED_FAILURE_MESSAGE;
 }
 

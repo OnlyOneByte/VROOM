@@ -48,8 +48,7 @@ describe('expense form loader failures are reported', () => {
 		expect(addNotification).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'error',
-				message:
-					'Failed to load vehicles. Something went wrong. Try again, and reload the page if it keeps happening.'
+				message: 'Failed to load vehicles. Offline.'
 			})
 		);
 
@@ -87,8 +86,7 @@ describe('expense form loader failures are reported', () => {
 		expect(addNotification).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'error',
-				message:
-					"Failed to load this vehicle's details. Something went wrong. Try again, and reload the page if it keeps happening."
+				message: "Failed to load this vehicle's details. Offline."
 			})
 		);
 
