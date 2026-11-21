@@ -90,4 +90,12 @@ describe('VehicleForm loan payment on edit', () => {
 		});
 		expect(saved.paymentAmount).toBe(559.29);
 	});
+
+	test('splits the principal evenly when the APR is 0%', async () => {
+		const saved = await saveEditedVehicle(async () => {
+			await fireEvent.input(screen.getByLabelText(/APR/), { target: { value: '0' } });
+			await screen.findByText('Updated Loan Calculation Preview');
+		});
+		expect(saved.paymentAmount).toBe(333.33);
+	});
 });

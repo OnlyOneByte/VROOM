@@ -299,7 +299,7 @@
 			ownershipType !== 'finance' ||
 			financingForm.financingType !== 'loan' ||
 			financingForm.originalAmount <= 0 ||
-			financingForm.apr <= 0 ||
+			financingForm.apr < 0 ||
 			financingForm.termMonths <= 0
 		) {
 			amortizationPreview = null;
@@ -311,8 +311,10 @@
 		const numPayments = financingForm.termMonths;
 
 		const monthlyPayment =
-			(principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))) /
-			(Math.pow(1 + monthlyRate, numPayments) - 1);
+			monthlyRate === 0
+				? principal / numPayments
+				: (principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))) /
+					(Math.pow(1 + monthlyRate, numPayments) - 1);
 
 		const totalPayments = monthlyPayment * numPayments;
 		const totalInterest = totalPayments - principal;
