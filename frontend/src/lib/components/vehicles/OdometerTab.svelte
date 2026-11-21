@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { paramRoutes } from '#lib/routes.ts';
@@ -94,7 +95,7 @@
 			totalCount = response.pagination.totalCount;
 			offset = response.pagination.offset;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load odometer entries';
+			error = userFacingErrorMessage(e);
 		} finally {
 			isPageLoading = false;
 		}
@@ -132,7 +133,7 @@
 			deletingEntry = null;
 			await loadEntries(offset);
 		} catch (e) {
-			deleteError = e instanceof Error ? e.message : 'Failed to delete reading';
+			deleteError = `Couldn't delete the reading. ${userFacingErrorMessage(e)}`;
 		} finally {
 			isDeleting = false;
 		}
@@ -149,13 +150,13 @@
 			<Gauge class="h-12 w-12 text-muted-foreground mb-4" />
 		{/snippet}
 		{#snippet title()}
-			Failed to load odometer entries
+			Couldn't load odometer readings
 		{/snippet}
 		{#snippet description()}
 			{error}
 		{/snippet}
 		{#snippet action()}
-			<Button variant="outline" onclick={() => loadEntries(0)}>Try Again</Button>
+			<Button variant="outline" onclick={() => loadEntries(0)}>Retry</Button>
 		{/snippet}
 	</EmptyState>
 {:else if totalCount === 0}

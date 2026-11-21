@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { page } from '$app/state';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
@@ -83,7 +84,7 @@
 				latestOdometer = latest.odometer;
 			}
 		} catch (e) {
-			loadError = e instanceof Error ? e.message : 'Failed to load entry';
+			loadError = `Couldn't load the reading. ${userFacingErrorMessage(e)}`;
 		} finally {
 			isLoadingEntry = false;
 		}
@@ -127,7 +128,7 @@
 			});
 			await gotoDynamic(returnTo);
 		} catch (e) {
-			submitError = e instanceof Error ? e.message : 'Failed to update odometer reading';
+			submitError = `Couldn't update the reading. ${userFacingErrorMessage(e)}`;
 		} finally {
 			isSubmitting = false;
 		}
@@ -141,7 +142,7 @@
 			deleteDialogOpen = false;
 			await gotoDynamic(returnTo);
 		} catch (e) {
-			deleteError = e instanceof Error ? e.message : 'Failed to delete reading';
+			deleteError = `Couldn't delete the reading. ${userFacingErrorMessage(e)}`;
 		} finally {
 			isDeleting = false;
 		}

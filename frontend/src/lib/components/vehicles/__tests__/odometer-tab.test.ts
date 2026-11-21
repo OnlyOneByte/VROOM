@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { OdometerEntry, PaginatedResponse, UnitPreferences } from '#lib/types/index.ts';
+import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 vi.mock('$app/paths', () => ({
 	resolve: (path: string, params: Record<string, string> = {}) =>
@@ -108,16 +109,16 @@ describe('OdometerTab load states', () => {
 		expect(screen.queryByRole('link', { name: 'Add Reading' })).toBeNull();
 	});
 
-	test('a load failure shows the error and Try Again reloads from the first page', async () => {
+	test('a load failure shows the error and Retry reloads from the first page', async () => {
 		getEntries.mockRejectedValueOnce(new Error('Server unavailable'));
 		getEntries.mockResolvedValueOnce(page([entry()]));
 		mount();
 		await settle();
 
-		expect(screen.getByText('Failed to load odometer entries')).toBeInTheDocument();
-		expect(screen.getByText('Server unavailable')).toBeInTheDocument();
+		expect(screen.getByText("Couldn't load odometer readings")).toBeInTheDocument();
+		expect(screen.getByText('Server unavailable.')).toBeInTheDocument();
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
 
 		expect(getEntries).toHaveBeenCalledTimes(2);
@@ -130,7 +131,8 @@ describe('OdometerTab load states', () => {
 		mount();
 		await settle();
 
-		expect(screen.getAllByText('Failed to load odometer entries')).toHaveLength(2);
+		expect(screen.getByText("Couldn't load odometer readings")).toBeInTheDocument();
+		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 });
 
@@ -308,7 +310,9 @@ describe('OdometerTab delete', () => {
 		await settle();
 
 		expect(screen.getByRole('dialog')).toBeInTheDocument();
-		expect(screen.getByText('Reading is linked to a trip')).toBeInTheDocument();
+		expect(
+			screen.getByText("Couldn't delete the reading. Reading is linked to a trip.")
+		).toBeInTheDocument();
 		expect(getEntries).toHaveBeenCalledTimes(1);
 	});
 
@@ -319,7 +323,9 @@ describe('OdometerTab delete', () => {
 		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 		await settle();
 
-		expect(screen.getByText('Failed to delete reading')).toBeInTheDocument();
+		expect(
+			screen.getByText(`Couldn't delete the reading. ${UNEXPECTED_FAILURE_MESSAGE}`)
+		).toBeInTheDocument();
 	});
 
 	test('the Delete button is disabled while the delete is in flight', async () => {
