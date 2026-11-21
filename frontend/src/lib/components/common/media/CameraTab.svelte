@@ -209,7 +209,7 @@
 	>
 		<CircleAlert class="h-8 w-8 text-destructive" />
 		<p class="text-sm text-destructive">{cameraError}</p>
-		<Button variant="outline" size="sm" onclick={startCamera}>Retry</Button>
+		<Button variant="outline" size="lg" onclick={startCamera}>Retry</Button>
 	</div>
 {:else if capturedPreview}
 	<div class="relative overflow-hidden rounded-lg border border-border">
@@ -247,7 +247,7 @@
 	<div class="flex items-center justify-center gap-4">
 		<Button
 			variant="outline"
-			size="sm"
+			size="icon-lg"
 			onclick={toggleFacingMode}
 			disabled={!cameraReady}
 			aria-label="Switch camera"
@@ -263,7 +263,7 @@
 		>
 			<Circle class="h-8 w-8" />
 		</Button>
-		<Button variant="outline" size="sm" onclick={onClose} aria-label="Cancel">
+		<Button variant="outline" size="icon-lg" onclick={onClose} aria-label="Cancel">
 			<X class="h-4 w-4" />
 		</Button>
 	</div>

@@ -19,7 +19,7 @@
 </script>
 
 <div class="flex items-center justify-between border-t px-4 py-3">
-	<p class="text-sm text-muted-foreground">
+	<p class="whitespace-nowrap text-sm text-muted-foreground">
 		Page {currentPage} of {totalPages}
 	</p>
 	<div class="flex items-center gap-2">
@@ -29,6 +29,7 @@
 		<Button
 			variant="outline"
 			size="sm"
+			class="h-10"
 			disabled={isPrevDisabled || isLoading}
 			onclick={() => onPageChange(currentOffset - pageSize)}
 		>
@@ -38,6 +39,7 @@
 		<Button
 			variant="outline"
 			size="sm"
+			class="h-10"
 			disabled={isNextDisabled || isLoading}
 			onclick={() => onPageChange(currentOffset + pageSize)}
 		>
