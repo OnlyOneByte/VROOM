@@ -81,15 +81,15 @@ and reminder materializations are real rows in `expenses` tagged with `source_ty
 `source_id` rather than per-feature boolean columns or separate tables. One query path serves
 all of them, and analytics can bucket by source without knowing which features exist.
 
-**An insurance term is in force when `startDate <= now <= endDate`.** The backend has one
-definition in `src/api/insurance/in-force.ts`: `isTermInForce` for rows already loaded and
-`termInForceAt` for SQL, both comparing whole seconds as the columns store them. Analytics premium totals, the active-policy count and Fleet Health's
-insurance coverage all use it. The Insurance page asks a different question, whether a policy
-has ended: `isPolicyInForce` in `frontend/src/lib/utils/insurance.ts` lists an active policy as
-active while any term has not ended, counted in the user's local days. So a policy whose only
-term starts next month is listed as active there but adds nothing to analytics totals yet, and
-a term stays listed through its whole local end day while the backend stops counting it at the
-stored `endDate` instant.
+**An insurance term is in force on every calendar day from its start date through its end
+date, in the user's time zone** (the request's `timeZone`, UTC without one). The backend has
+one definition in `src/api/insurance/in-force.ts`: `isTermInForce` for rows already loaded and
+`termInForceAt` for SQL. Analytics premium totals, the active-policy count and Fleet Health's
+insurance coverage all use it, so a term still counts on its last day, as the Insurance page
+shows it. One difference is deliberate: the Insurance page's `isPolicyInForce`
+(`frontend/src/lib/utils/insurance.ts`) lists a policy as active while any term has not ended,
+so a policy whose only term starts next month is active there but covers and costs nothing in
+analytics until that start date.
 
 ### Providers and sync
 

@@ -35,6 +35,7 @@ const yearQuerySchema = z.object({
 
 const vehicleIdQuerySchema = z.object({
   vehicleId: z.string(),
+  timeZone,
 });
 
 const dateRangeQuerySchema = z.object({
@@ -150,9 +151,9 @@ routes.get('/fuel-advanced', zValidator('query', dateRangeVehicleQuerySchema), a
 
 routes.get('/vehicle-health', zValidator('query', vehicleIdQuerySchema), async (c) => {
   const user = c.get('user');
-  const { vehicleId } = c.req.valid('query');
+  const { vehicleId, timeZone } = c.req.valid('query');
   const scopeId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
-  const data = await analyticsRepository.getVehicleHealth(scopeId, vehicleId);
+  const data = await analyticsRepository.getVehicleHealth(scopeId, vehicleId, timeZone);
   return c.json({ success: true, data });
 });
 
