@@ -17,7 +17,8 @@
     "db:checkpoint": "bun src/db/checkpoint.ts",
     "db:checkpoint:force": "bun src/db/checkpoint.ts --force",
     "vapid:gen": "bun src/scripts/gen-vapid-keys.ts",
-    "test": "bun test",
+    "test": "bun test && bun run test:tz",
+    "test:tz": "TZ=Pacific/Auckland bun test src/api/trips src/api/odometer",
     "test:repositories": "bun src/test/run-tests.ts",
     "test:auth": "bun src/test/run-auth-tests.ts",
     "test:vehicles": "bun src/test/run-vehicle-tests.ts",
@@ -32,7 +33,7 @@
     "check:musl:fix": "./node_modules/@biomejs/cli-linux-arm64-musl/biome check --write src/",
     "type-check": "tsc --noEmit",
     "all:fix": "bun run lint:fix && bun run format:fix && bun run check:fix",
-    "validate": "bun run type-check && bun run check && bun test && bun run build",
+    "validate": "bun run type-check && bun run check && bun run test && bun run build",
     "validate:local": "bun run type-check && bun run check:musl && bun test && bun run build"
   },
   "dependencies": {
