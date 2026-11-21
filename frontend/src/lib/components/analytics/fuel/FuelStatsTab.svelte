@@ -200,7 +200,7 @@
 		{#snippet title()}<span class="block text-center">No fill-ups in the last 12 months</span
 			>{/snippet}
 		{#snippet description()}
-			Fuel and charging stats cover the last 12 months. Older fill-ups and charging sessions are
+			Fuel and charging stats cover the last 12 months. Any older fill-ups or charging sessions are
 			still in your expenses.
 		{/snippet}
 		{#snippet action()}
