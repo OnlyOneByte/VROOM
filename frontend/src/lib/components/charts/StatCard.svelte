@@ -86,25 +86,32 @@
 				<Skeleton class="h-8 w-32" />
 			</div>
 		{:else if hasDual}
-			<div class="flex items-start justify-between gap-4">
-				<div class="flex-1 space-y-1 min-w-0">
-					<span class="text-sm font-medium text-muted-foreground">{label}</span>
-					<div class="flex items-baseline gap-1 flex-wrap">
-						<!-- min-w-0 is required: grid items default to min-width auto and overflow. -->
-						<span class="text-2xl font-bold min-w-0 break-words">{value}</span>
-						{#if unit}
-							<span class="text-xs text-muted-foreground">{unit}</span>
-						{/if}
+			<div class="@container">
+				<div class="flex flex-col @sm:flex-row @sm:items-start @sm:justify-between gap-3 @sm:gap-4">
+					<div class="flex-1 space-y-1 min-w-0">
+						<span class="block text-sm font-medium text-muted-foreground break-words">{label}</span>
+						<div class="flex items-baseline gap-1 flex-wrap">
+							<span class="text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap"
+								>{value}</span
+							>
+							{#if unit}
+								<span class="text-xs text-muted-foreground">{unit}</span>
+							{/if}
+						</div>
 					</div>
-				</div>
-				<div class="w-px bg-border self-stretch my-1"></div>
-				<div class="flex-1 space-y-1 min-w-0">
-					<span class="text-sm font-medium text-muted-foreground">{secondaryLabel}</span>
-					<div class="flex items-baseline gap-1 flex-wrap">
-						<span class="text-2xl font-bold min-w-0 break-words">{secondaryValue}</span>
-						{#if secondaryUnit}
-							<span class="text-xs text-muted-foreground">{secondaryUnit}</span>
-						{/if}
+					<div class="h-px w-full @sm:h-auto @sm:w-px bg-border @sm:self-stretch @sm:my-1"></div>
+					<div class="flex-1 space-y-1 min-w-0">
+						<span class="block text-sm font-medium text-muted-foreground break-words"
+							>{secondaryLabel}</span
+						>
+						<div class="flex items-baseline gap-1 flex-wrap">
+							<span class="text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap"
+								>{secondaryValue}</span
+							>
+							{#if secondaryUnit}
+								<span class="text-xs text-muted-foreground">{secondaryUnit}</span>
+							{/if}
+						</div>
 					</div>
 				</div>
 			</div>
@@ -118,7 +125,7 @@
 				{/if}
 				<p class="text-xs sm:text-sm font-medium text-muted-foreground">{label}</p>
 			</div>
-			<p class="text-xl sm:text-2xl font-bold mt-2">{value}</p>
+			<p class="text-xl sm:text-2xl font-bold tabular-nums mt-2">{value}</p>
 			{#if unit}
 				<span class="text-xs text-muted-foreground">{unit}</span>
 			{/if}
