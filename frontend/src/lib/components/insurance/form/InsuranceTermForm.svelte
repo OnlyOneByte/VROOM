@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
@@ -7,7 +7,7 @@
 	import { resetSplitAllocations } from '#lib/utils/expense-helpers.ts';
 	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import { ArrowLeft, Check, LoaderCircle, X, FileText } from '@lucide/svelte';
+	import { ArrowLeft, Check, CircleAlert, LoaderCircle, X, FileText } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -89,7 +89,13 @@
 
 	let pageTitle = $derived(isEditMode ? 'Edit Term' : renewFrom ? 'Renew Term' : 'Add Term');
 
-	onMount(async () => {
+	let loadError = $state<string | null>(null);
+
+	onMount(loadData);
+
+	async function loadData() {
+		isLoading = true;
+		loadError = null;
 		try {
 			const [policyData, vehiclesData] = await Promise.all([
 				insuranceApi.getPolicy(policyId),
@@ -101,7 +107,7 @@
 			if (isEditMode && termId) {
 				const term = policy.terms.find(t => t.id === termId);
 				if (!term) {
-					appStore.showError('Term not found');
+					appStore.showError('That term no longer exists.');
 					gotoDynamic(returnTo);
 					return;
 				}
@@ -121,12 +127,16 @@
 			}
 		} catch (err) {
 			if (import.meta.env.DEV) console.error('Failed to load data:', err);
-			appStore.showError(`Couldn't load the policy. ${userFacingErrorMessage(err)}`);
-			gotoDynamic(returnTo);
+			if (err instanceof ApiError && err.statusCode === 404) {
+				appStore.showError('That policy no longer exists.');
+				gotoDynamic(returnTo);
+				return;
+			}
+			loadError = userFacingErrorMessage(err);
 		} finally {
 			isLoading = false;
 		}
-	});
+	}
 
 	function populateFromTerm(source: InsuranceTerm | Partial<InsuranceTerm>) {
 		if (source.startDate && typeof source.startDate === 'string') {
@@ -266,6 +276,30 @@
 	{#if isLoading}
 		<div class="flex items-center justify-center py-12">
 			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
+		</div>
+	{:else if loadError}
+		<div class="space-y-6">
+			<PageHeader title={pageTitle}>
+				{#snippet back()}
+					<Button
+						variant="ghost"
+						size="icon-lg"
+						class="shrink-0"
+						aria-label="Go back"
+						onclick={handleBack}
+					>
+						<ArrowLeft class="size-5" />
+					</Button>
+				{/snippet}
+			</PageHeader>
+			<div class="rounded-lg border bg-card p-6">
+				<div class="mb-4 flex items-center gap-3 text-destructive">
+					<CircleAlert class="h-5 w-5" />
+					<p class="font-medium">Couldn't load this policy</p>
+				</div>
+				<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
+				<Button size="lg" onclick={loadData}>Retry</Button>
+			</div>
 		</div>
 	{:else}
 		<div class="space-y-6">
