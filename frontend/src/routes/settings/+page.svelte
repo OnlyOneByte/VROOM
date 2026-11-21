@@ -299,6 +299,14 @@
 			<ModelProvidersCard domain="llm" />
 			{#await migrateCard then { default: MigrateFromTrackerCard }}
 				<MigrateFromTrackerCard />
+			{:catch}
+				<p
+					class="rounded-lg border bg-card p-6 text-sm text-destructive"
+					role="alert"
+					data-testid="migrate-load-error"
+				>
+					Couldn't load the migration tool. Check your connection and reload.
+				</p>
 			{/await}
 		</div>
 	{/if}

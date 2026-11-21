@@ -302,17 +302,19 @@ describe('Settings page backups', () => {
 		expect(showError).toHaveBeenCalledWith(message);
 	});
 
-	test.each(['stub backup now', 'stub restore'])(
-		'the dialog behind %s loads only when it is opened',
-		async trigger => {
-			await mount();
-			expect(screen.queryByTestId('stub-open')).toBeNull();
+	test.each([
+		['stub backup now', 'stub sync'],
+		['stub restore', 'stub restore']
+	])('the dialog behind %s mounts only once it is opened', async (trigger, dialogButton) => {
+		await mount();
+		const before = screen.queryAllByRole('button', { name: dialogButton }).length;
+		expect(screen.queryByTestId('stub-open')).toBeNull();
 
-			await fireEvent.click(screen.getByRole('button', { name: trigger }));
-			await settle();
-			expect(screen.getByTestId('stub-open')).toBeInTheDocument();
-		}
-	);
+		await fireEvent.click(screen.getAllByRole('button', { name: trigger })[0]!);
+		await settle();
+		expect(screen.getAllByRole('button', { name: dialogButton })).toHaveLength(before + 1);
+		expect(screen.getByTestId('stub-open')).toBeInTheDocument();
+	});
 
 	test('a failed download explains why', async () => {
 		settingsStoreFake.downloadBackup.mockRejectedValue(new ApiError('zip stream broke', 500));
