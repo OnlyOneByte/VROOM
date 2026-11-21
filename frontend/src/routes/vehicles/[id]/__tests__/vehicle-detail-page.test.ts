@@ -296,21 +296,23 @@ describe('vehicle detail page overview', () => {
 			'Failed to load expense summary'
 		);
 		expect(screen.getByText('Failed to load expense summary')).toBeInTheDocument();
-		expect(screen.getByText('Summary service down')).toBeInTheDocument();
+		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
+		expect(screen.queryByText('Summary service down')).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
 
 		expect(getExpenseSummary).toHaveBeenCalledTimes(2);
-		expect(screen.queryByText('Summary service down')).toBeNull();
+		expect(screen.queryByText('Failed to load expense summary')).toBeNull();
 		expect(captured['period']).toBeDefined();
 	});
 
-	test('a non-Error summary failure shows the generic message', async () => {
+	test('a non-Error summary failure shows the same title and hint', async () => {
 		getExpenseSummary.mockRejectedValueOnce('boom');
 		await mount();
 
-		expect(screen.getAllByText('Failed to load expense summary')).toHaveLength(2);
+		expect(screen.getAllByText('Failed to load expense summary')).toHaveLength(1);
+		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
 	});
 
 	test('with expenses the overview hands the period, trend and category data to its cards', async () => {
@@ -419,7 +421,9 @@ describe('vehicle detail page tabs', () => {
 		await openTab('Expenses');
 
 		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to load expenses');
-		expect(screen.getByText('Expenses down')).toBeInTheDocument();
+		expect(screen.getByText('Failed to load expenses')).toBeInTheDocument();
+		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
+		expect(screen.queryByText('Expenses down')).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
@@ -429,13 +433,14 @@ describe('vehicle detail page tabs', () => {
 		expect(captured['table']?.['expenses']).toEqual([EXPENSE]);
 	});
 
-	test('a non-Error expenses failure shows the generic message', async () => {
+	test('a non-Error expenses failure shows the same title and hint', async () => {
 		getExpensesByVehicle.mockRejectedValueOnce('boom');
 		await mount();
 
 		await openTab('Expenses');
 
-		expect(screen.getAllByText('Failed to load expenses')).toHaveLength(2);
+		expect(screen.getAllByText('Failed to load expenses')).toHaveLength(1);
+		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
 	});
 
 	test('paging and sorting from the table refetch with the new parameters', async () => {
