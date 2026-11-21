@@ -172,6 +172,12 @@ export class ExpenseSplitService {
       unmatchedByVehicle.set(leg.vehicleId, legs);
     }
 
+    const groupLegs = (ids: string[]) =>
+      and(
+        inArray(expenses.id, ids),
+        eq(expenses.groupId, params.groupId),
+        eq(expenses.userId, template.userId)
+      );
     const updatedAt = new Date();
     const legs = params.allocations.flatMap((allocation) => {
       const match = unmatchedByVehicle.get(allocation.vehicleId)?.shift();
@@ -199,7 +205,7 @@ export class ExpenseSplitService {
           splitMethod: params.splitMethod,
           updatedAt,
         })
-        .where(eq(expenses.id, match.id))
+        .where(groupLegs([match.id]))
         .returning()
         .all();
     });
@@ -211,7 +217,7 @@ export class ExpenseSplitService {
         .set({ entityId: survivor.id })
         .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, removedIds)))
         .run();
-      tx.delete(expenses).where(inArray(expenses.id, removedIds)).run();
+      tx.delete(expenses).where(groupLegs(removedIds)).run();
     }
 
     return legs;

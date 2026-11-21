@@ -596,7 +596,7 @@ describe('split edit updates legs in place (per-leg data survives)', () => {
     await expect(
       repo.updateSplitExpense(
         groupId,
-        { splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-missing'] }, totalAmount: 200 },
+        { splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-missing'] }, totalAmount: 300 },
         USER_ID
       )
     ).rejects.toThrow();
