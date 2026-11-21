@@ -156,10 +156,7 @@ describe('trips page load states', () => {
 		await settle();
 
 		expect(screen.getByText('No trips yet')).toBeInTheDocument();
-		const buttons = screen.getAllByRole('button', { name: 'Log Trip' });
-		expect(buttons).toHaveLength(2);
-
-		await fireEvent.click(buttons[1] as HTMLElement);
+		await fireEvent.click(screen.getByRole('button', { name: 'Log Trip' }));
 
 		expect(formProps['open']).toBe(true);
 		expect(formProps['trip']).toBeNull();

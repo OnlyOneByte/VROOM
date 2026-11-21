@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { UserProviderInfo } from '#lib/types/index.ts';
 
@@ -317,6 +317,9 @@ describe('ModelProvidersCard edit and delete', () => {
 		render(ModelProvidersCard, { props: { domain: 'llm' } });
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: 'Delete Work Claude' }));
+		await fireEvent.click(
+			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' })
+		);
 		await settle();
 		expect(deleteProvider).toHaveBeenCalledWith('llm-1');
 		expect(showSuccess).toHaveBeenCalledWith('Work Claude removed');
@@ -329,6 +332,9 @@ describe('ModelProvidersCard edit and delete', () => {
 		render(ModelProvidersCard, { props: { domain: 'llm' } });
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: 'Delete Work Claude' }));
+		await fireEvent.click(
+			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' })
+		);
 		await settle();
 		expect(showError).toHaveBeenCalledWith('Failed to delete provider');
 		expect(screen.getByText('Work Claude')).toBeInTheDocument();
