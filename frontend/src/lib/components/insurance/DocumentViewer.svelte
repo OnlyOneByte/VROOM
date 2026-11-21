@@ -125,16 +125,16 @@
 					{/if}
 					{#if !readOnly}
 						<div
-							class="absolute inset-x-0 bottom-0 flex justify-end bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+							class="absolute right-0 top-0 p-1.5 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100"
 						>
 							<Button
 								variant="destructive"
 								size="sm"
-								class="h-6 text-xs focus-visible:ring-ring"
+								class="size-10 sm:size-7 focus-visible:ring-ring dark:focus-visible:ring-ring"
 								aria-label={`Delete ${doc.fileName}`}
 								onclick={() => requestDelete(doc.id)}
 							>
-								<Trash2 class="h-3 w-3" />
+								<Trash2 class="h-4 w-4" />
 							</Button>
 						</div>
 					{/if}
