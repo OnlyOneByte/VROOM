@@ -78,7 +78,8 @@ export class PhotoRefRepository {
   private async findRevivedSinceProviderUpdate(limit: number): Promise<PhotoRef[]> {
     const [{ latest }] = await this.db
       .select({ latest: sql<number | null>`max(${userProviders.updatedAt})` })
-      .from(userProviders);
+      .from(userProviders)
+      .where(eq(userProviders.domain, 'storage'));
     if (latest === null || latest === this.providersSeenUpdatedAt) return [];
 
     const revived = await this.db
@@ -99,7 +100,7 @@ export class PhotoRefRepository {
       )
       .orderBy(asc(photoRefs.createdAt))
       .limit(limit);
-    if (revived.length < limit) this.providersSeenUpdatedAt = latest;
+    if (revived.length === 0) this.providersSeenUpdatedAt = latest;
     return revived;
   }
 

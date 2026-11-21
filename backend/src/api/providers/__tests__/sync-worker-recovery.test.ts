@@ -51,6 +51,17 @@ describe('photo refs that ran out of retries come back after a reconnect', () =>
     expect(await queuedIds()).toEqual(['ref-dead']);
   });
 
+  test('a revived ref skipped by the worker is offered again on the next poll', async () => {
+    ctx.sqlite.run("UPDATE user_providers SET updated_at = 3300 WHERE id = 'prov-target'");
+    expect(await queuedIds()).toEqual(['ref-dead']);
+    expect(await queuedIds(), 'still queued until a sync attempt records a new failure').toEqual([
+      'ref-dead',
+    ]);
+
+    ctx.sqlite.run("UPDATE photo_refs SET synced_at = 3400 WHERE id = 'ref-dead'");
+    expect(await queuedIds()).toEqual([]);
+  });
+
   test('backfill resets the provider’s failed refs to pending with no retries', async () => {
     const res = await ctx.authed('POST', '/api/v1/providers/prov-target/backfill');
     expect(res.status).toBeLessThan(300);
