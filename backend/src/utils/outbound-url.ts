@@ -24,6 +24,7 @@ const IPV4_RANGES: readonly Ipv4Range[] = [
   cidr('169.254.0.0', 16, 'forbidden'),
   cidr('100.100.100.200', 32, 'forbidden'),
   cidr('192.0.0.0', 24, 'forbidden'),
+  cidr('168.63.129.16', 32, 'forbidden'),
   cidr('224.0.0.0', 4, 'forbidden'),
   cidr('240.0.0.0', 4, 'forbidden'),
   cidr('10.0.0.0', 8, 'private'),
@@ -125,9 +126,21 @@ function assertAllowed(kind: AddressClass, label: string, allowPrivate: boolean)
   }
 }
 
+function literalAddress(hostname: string): string | null {
+  const literal = hostname.startsWith('[') ? hostname.slice(1, -1) : hostname;
+  return isIP(literal) ? literal : null;
+}
+
+export function urlForAddress(url: URL, address: string): URL {
+  const pinned = new URL(url);
+  pinned.hostname = isIP(address) === 6 ? `[${address}]` : address;
+  return pinned;
+}
+
 export const outboundResolver = {
   lookup: async (hostname: string): Promise<string[]> =>
     (await lookup(hostname, { all: true, verbatim: true })).map((r) => r.address),
+  connectUrl: urlForAddress,
 };
 
 export function assertSafeOutboundUrl(
@@ -152,20 +165,42 @@ export function assertSafeOutboundUrl(
   return url;
 }
 
-export async function assertSafeOutboundTarget(
+export interface SafeOutboundTarget {
+  url: URL;
+  address: string;
+}
+
+export async function resolveSafeOutboundTarget(
   raw: string,
   label: string,
   allowPrivate: boolean = !CONFIG.blockPrivateProviderEndpoints
-): Promise<URL> {
+): Promise<SafeOutboundTarget> {
   const url = assertSafeOutboundUrl(raw, label, allowPrivate);
-  if (classifyHostname(url.hostname)) return url;
+  const literal = literalAddress(url.hostname);
+  if (literal) return { url, address: literal };
   let addresses: string[];
   try {
     addresses = await outboundResolver.lookup(url.hostname);
   } catch {
     throw new ValidationError(`${label} host could not be resolved`);
   }
-  if (addresses.length === 0) throw new ValidationError(`${label} host could not be resolved`);
+  const [first] = addresses;
+  if (!first) throw new ValidationError(`${label} host could not be resolved`);
   for (const address of addresses) assertAllowed(classifyAddress(address), label, allowPrivate);
-  return url;
+  return { url, address: first };
+}
+
+export async function fetchOutbound(
+  raw: string,
+  init: RequestInit & { headers?: Record<string, string> },
+  label: string
+): Promise<Response> {
+  const { url, address } = await resolveSafeOutboundTarget(raw, label);
+  if (literalAddress(url.hostname)) return fetch(url, { ...init, redirect: 'manual' });
+  return fetch(outboundResolver.connectUrl(url, address), {
+    ...init,
+    headers: { ...init.headers, host: url.host },
+    redirect: 'manual',
+    tls: { serverName: url.hostname },
+  });
 }

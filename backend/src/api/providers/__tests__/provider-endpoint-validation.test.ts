@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import type { UserProvider } from '../../../db/schema';
 import { ValidationError } from '../../../errors';
 import {
   createTestApp,
@@ -8,12 +9,14 @@ import {
 } from '../../../test-helpers/http-client';
 import { blockPrivateProviderEndpoints } from '../../../test-helpers/outbound';
 import { encrypt } from '../../../utils/encryption';
-import { outboundResolver } from '../../../utils/outbound-url';
+import { outboundResolver, urlForAddress } from '../../../utils/outbound-url';
+import { resolveModelSettings } from '../domains/model/model-registry';
 import { postModelJson } from '../domains/model/model-transport';
 import { S3CompatProvider } from '../domains/storage/s3-compat-provider';
 
 let ctx: TestApp;
 const stubLookup = outboundResolver.lookup;
+const stubConnectUrl = outboundResolver.connectUrl;
 const realFetch = globalThis.fetch;
 
 beforeEach(async () => {
@@ -21,6 +24,7 @@ beforeEach(async () => {
 });
 afterEach(() => {
   outboundResolver.lookup = stubLookup;
+  outboundResolver.connectUrl = stubConnectUrl;
   globalThis.fetch = realFetch;
   ctx.close();
 });
@@ -205,5 +209,141 @@ describe('model transport', () => {
       })
     ).rejects.toThrow('HTTP 302');
     expect(redirect).toBe('manual');
+  });
+});
+
+function storedModelRow(baseUrl: string): UserProvider {
+  return {
+    id: 'stored-llm',
+    userId: 'u1',
+    domain: 'llm',
+    providerType: 'openai-compatible',
+    providerAccountId: null,
+    displayName: 'Stored',
+    credentials: encrypt(JSON.stringify({ apiKey: 'sk-test' })),
+    config: { model: 'gpt-4o-mini', baseUrl },
+    status: 'active',
+    lastSyncAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
+describe('stored model rows and model updates', () => {
+  test('a stored model row with a link-local base URL is refused when resolved', () => {
+    expect(() => resolveModelSettings(storedModelRow('http://169.254.169.254/v1'), 'LLM')).toThrow(
+      ValidationError
+    );
+    expect(resolveModelSettings(storedModelRow('http://localhost:11434/v1'), 'LLM').baseUrl).toBe(
+      'http://localhost:11434/v1'
+    );
+  });
+
+  test('an update cannot move a model base URL to a link-local host', async () => {
+    const created = await ctx.authed(
+      'POST',
+      '/api/v1/providers',
+      modelBody('https://api.openai.com/v1')
+    );
+    expect(created.status).toBe(201);
+    const { id } = (await json<DataEnvelope<{ id: string }>>(created)).data;
+    const res = await ctx.authed('PUT', `/api/v1/providers/${id}`, {
+      config: { model: 'gpt-4o-mini', baseUrl: 'http://169.254.169.254/v1' },
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+interface SeenRequest {
+  method: string;
+  host: string | null;
+  path: string;
+  body: string;
+}
+
+function startLoopbackServer(respond: (req: Request) => Response) {
+  const seen: SeenRequest[] = [];
+  const server = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    async fetch(req) {
+      const url = new URL(req.url);
+      seen.push({
+        method: req.method,
+        host: req.headers.get('host'),
+        path: `${url.pathname}${url.search}`,
+        body: await req.text(),
+      });
+      return respond(req);
+    },
+  });
+  return { seen, port: server.port, stop: () => server.stop(true) };
+}
+
+describe('outbound requests connect to the validated address', () => {
+  test('a model request reaches the validated address and keeps the original host', async () => {
+    const server = startLoopbackServer(() => Response.json({ ok: true }));
+    let lookups = 0;
+    outboundResolver.lookup = async () => {
+      lookups++;
+      return lookups === 1 ? ['127.0.0.1'] : ['169.254.169.254'];
+    };
+    outboundResolver.connectUrl = urlForAddress;
+    try {
+      const body = await postModelJson<{ ok: boolean }>({
+        domain: 'LLM',
+        providerType: 'openai-compatible',
+        model: 'm',
+        url: `http://models.pinned.test:${server.port}/v1/chat/completions`,
+        body: { hello: 'world' },
+        timeoutMs: 5000,
+      });
+      expect(body).toEqual({ ok: true });
+      expect(lookups).toBe(1);
+      expect(server.seen).toHaveLength(1);
+      expect(server.seen[0]?.host).toBe(`models.pinned.test:${server.port}`);
+      expect(server.seen[0]?.path).toBe('/v1/chat/completions');
+    } finally {
+      server.stop();
+    }
+  });
+
+  test('S3 requests reach the validated address and keep the original host', async () => {
+    const server = startLoopbackServer((req) =>
+      req.method === 'GET' ? new Response('photo-bytes') : new Response(null, { status: 200 })
+    );
+    let lookups = 0;
+    outboundResolver.lookup = async () => {
+      lookups++;
+      return ['127.0.0.1'];
+    };
+    outboundResolver.connectUrl = urlForAddress;
+    try {
+      const provider = new S3CompatProvider(
+        { accessKeyId: 'a', secretAccessKey: 'b' },
+        {
+          endpoint: `http://minio.pinned.test:${server.port}`,
+          bucket: 'photos',
+          region: 'us-east-1',
+        }
+      );
+      const ref = await provider.upload({
+        buffer: Buffer.from('uploaded'),
+        fileName: 'a b.jpg',
+        mimeType: 'image/jpeg',
+        entityType: 'vehicle',
+        entityId: 'v1',
+        pathHint: 'VROOM',
+      });
+      const bytes = await provider.download(ref);
+      expect(bytes.toString()).toBe('photo-bytes');
+      expect(server.seen.map((r) => r.method)).toEqual(['PUT', 'GET']);
+      expect(server.seen.every((r) => r.host === `minio.pinned.test:${server.port}`)).toBe(true);
+      expect(server.seen[0]?.path.startsWith('/photos/')).toBe(true);
+      expect(server.seen[0]?.body).toBe('uploaded');
+      expect(lookups).toBe(2);
+    } finally {
+      server.stop();
+    }
   });
 });
