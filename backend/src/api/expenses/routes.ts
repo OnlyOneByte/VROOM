@@ -609,6 +609,7 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
   if (vehicles.length === 0) {
     throw new ValidationError('Add a vehicle before importing expenses');
   }
+  const { currencyUnit: accountCurrency } = await preferencesRepository.getOrCreate(user.id);
 
   let importCsv = csv;
   let unmappedCategories: string[] = [];
@@ -651,7 +652,12 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
   if (dryRun) {
     return c.json({
       success: true,
-      data: { dryRun: true, imported: 0, unmappedCategories, ...summarizeImportPlan(plan) },
+      data: {
+        dryRun: true,
+        imported: 0,
+        unmappedCategories,
+        ...summarizeImportPlan(plan, accountCurrency),
+      },
     });
   }
 
@@ -662,7 +668,13 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
 
   return c.json({
     success: true,
-    data: { dryRun: false, imported, duplicates, unmappedCategories, ...summarizeImportPlan(plan) },
+    data: {
+      dryRun: false,
+      imported,
+      duplicates,
+      unmappedCategories,
+      ...summarizeImportPlan(plan, accountCurrency),
+    },
   });
 });
 
