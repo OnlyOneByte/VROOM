@@ -38,17 +38,21 @@ describe('OfflineExpenseCards — discarding an unsynced entry', () => {
 	it('asks first and names what will be lost', async () => {
 		const { onRemovePending } = renderCards();
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Delete pending expense' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Discard pending expense' }));
 
 		expect(onRemovePending).not.toHaveBeenCalled();
 		expect(await screen.findByText('Discard this unsynced expense?')).toBeInTheDocument();
-		expect(screen.getByText(/was never synced to the server/)).toBeInTheDocument();
+		expect(
+			screen.getByText(
+				'$42.00 Maintenance on Jan 5, 2026 was never synced to the server. Discarding it deletes it and any photos attached to it from this device for good.'
+			)
+		).toBeInTheDocument();
 	});
 
 	it('removes the entry only after Discard is confirmed', async () => {
 		const { onRemovePending } = renderCards();
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Delete pending expense' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Discard pending expense' }));
 		await fireEvent.click(await screen.findByRole('button', { name: 'Discard' }));
 
 		await waitFor(() => expect(onRemovePending).toHaveBeenCalledWith('pending-1'));

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Clock, CircleCheck, X, TriangleAlert } from '@lucide/svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as CardNs from '#lib/components/ui/card/index.ts';
 	import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 	import { DISPLAY_LIMITS } from '#lib/constants/limits.ts';
@@ -63,14 +64,16 @@
 					<div
 						class="flex items-center gap-3 p-3 bg-chart-5/10 border border-chart-5/20 rounded-lg"
 					>
-						<button
+						<Button
+							variant="ghost"
+							size="icon-lg"
 							onclick={() => askToDiscard(expense, onRemovePending)}
-							class="-m-2 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-destructive"
-							aria-label="Delete pending expense"
-							title="Delete pending expense"
+							class="-m-3 flex-shrink-0 text-muted-foreground hover:text-destructive"
+							aria-label="Discard pending expense"
+							title="Discard pending expense"
 						>
 							<X class="h-4 w-4" />
-						</button>
+						</Button>
 						<div class="flex-1">
 							<div class="flex items-center gap-2 mb-1">
 								<Badge variant="secondary">
@@ -122,14 +125,16 @@
 					<div
 						class="flex items-center gap-3 p-3 bg-warning/10 border border-warning/20 rounded-lg"
 					>
-						<button
+						<Button
+							variant="ghost"
+							size="icon-lg"
 							onclick={() => askToDiscard(expense, removeNeedsAttention)}
-							class="-m-2 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-destructive"
+							class="-m-3 flex-shrink-0 text-muted-foreground hover:text-destructive"
 							aria-label="Discard this entry"
 							title="Discard this entry"
 						>
 							<X class="h-4 w-4" />
-						</button>
+						</Button>
 						<div class="flex-1">
 							<div class="flex items-center gap-2 mb-1">
 								<Badge variant="secondary">{getCategoryLabel(expense.category)}</Badge>
@@ -212,6 +217,5 @@
 	confirmLabel="Discard"
 	onConfirm={() => {
 		if (discardTarget) discardTarget.remove(discardTarget.expense.id);
-		discardTarget = null;
 	}}
 />
