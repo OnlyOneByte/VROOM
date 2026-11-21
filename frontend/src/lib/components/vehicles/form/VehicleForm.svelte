@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { goto, refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
@@ -69,7 +70,7 @@
 
 	const isEditMode = $derived(!!vehicleId);
 
-	let isLoading = $state(!!vehicleId);
+	let isLoading = $state(untrack(() => !!vehicleId));
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
