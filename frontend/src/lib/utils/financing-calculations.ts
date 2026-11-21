@@ -499,12 +499,20 @@ export function calculateMinimumPayment(financing: VehicleFinancing): number | n
 		return null;
 	}
 
-	const monthlyRate = financing.apr / 100 / 12;
-	const n = financing.termMonths;
-	const factor = Math.pow(1 + monthlyRate, n);
-	const minimumPayment = (financing.originalAmount * (monthlyRate * factor)) / (factor - 1);
+	const minimumPayment = annuityPayment(
+		financing.originalAmount,
+		financing.apr,
+		financing.termMonths
+	);
 
 	return Math.round(minimumPayment * 100) / 100;
+}
+
+export function annuityPayment(principal: number, apr: number, termMonths: number): number {
+	const monthlyRate = apr / 100 / 12;
+	if (monthlyRate === 0) return principal / termMonths;
+	const factor = Math.pow(1 + monthlyRate, termMonths);
+	return (principal * (monthlyRate * factor)) / (factor - 1);
 }
 
 const MS_PER_DAY = 86_400_000;
