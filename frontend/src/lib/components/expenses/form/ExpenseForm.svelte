@@ -5,7 +5,7 @@
 	import { gotoDynamic, gotoWithQuery } from '#lib/utils/navigation.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
-	import { LoaderCircle, CreditCard } from '@lucide/svelte';
+	import { LoaderCircle, CreditCard, Info } from '@lucide/svelte';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import CategorySelector from './CategorySelector.svelte';
 	import FuelFieldsSection from './FuelFieldsSection.svelte';
@@ -207,6 +207,19 @@
 					<ReceiptScanButton onDraft={handleReceiptDraft} />
 				{/if}
 
+				{#if form.isGroupEditMode}
+					<div
+						class="flex items-start gap-3 rounded-lg border bg-muted/50 p-4"
+						data-testid="split-edit-note"
+					>
+						<Info class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+						<p class="text-sm text-foreground">
+							You can change the vehicles and amounts of a split here. To change its date, category,
+							mileage or notes, delete the split and add it again.
+						</p>
+					</div>
+				{/if}
+
 				{#if form.isSplit}
 					<SplitVehiclePicker
 						vehicles={form.vehicles}
@@ -226,12 +239,14 @@
 					/>
 				{/if}
 
-				<CategorySelector
-					value={form.formData.category}
-					error={form.errors['category']}
-					touched={form.touched['category']}
-					onSelect={form.selectCategory}
-				/>
+				<fieldset disabled={form.isGroupEditMode} class="min-w-0">
+					<CategorySelector
+						value={form.formData.category}
+						error={form.errors['category']}
+						touched={form.touched['category']}
+						onSelect={form.selectCategory}
+					/>
+				</fieldset>
 
 				{#if form.isFinancingPayment}
 					<div class="flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
@@ -247,6 +262,7 @@
 					bind:amount={form.formData.amount}
 					dateError={form.touched['date'] ? form.errors['date'] : undefined}
 					amountError={form.touched['amount'] ? form.errors['amount'] : undefined}
+					dateDisabled={form.isGroupEditMode}
 					onAmountBlur={() => form.handleBlur('amount')}
 				/>
 
@@ -261,56 +277,58 @@
 					/>
 				{/if}
 
-				{#if form.isSplit && form.selectedVehicleIds.length >= 2}
-					<SplitMileageReadings
-						vehicles={form.vehicles}
-						selectedVehicleIds={form.selectedVehicleIds}
-						mileages={form.splitMileages}
-						bind:open={form.showPerVehicleMileage}
-						onMileageInput={(vid, value) => (form.splitMileages[vid] = value)}
-					/>
-				{:else}
-					<MileageField
-						bind:value={form.formData.mileage}
-						required={form.showFuelFields}
-						error={form.touched['mileage'] ? form.errors['mileage'] : undefined}
-						previousFuelMileage={form.previousFuelHint}
-						distanceLabel={form.distLabel}
-						onInput={form.handleMileageChange}
-						onBlur={() => form.handleBlur('mileage')}
-					/>
-				{/if}
+				<fieldset disabled={form.isGroupEditMode} class="min-w-0 space-y-6">
+					{#if form.isSplit && form.selectedVehicleIds.length >= 2}
+						<SplitMileageReadings
+							vehicles={form.vehicles}
+							selectedVehicleIds={form.selectedVehicleIds}
+							mileages={form.splitMileages}
+							bind:open={form.showPerVehicleMileage}
+							onMileageInput={(vid, value) => (form.splitMileages[vid] = value)}
+						/>
+					{:else}
+						<MileageField
+							bind:value={form.formData.mileage}
+							required={form.showFuelFields}
+							error={form.touched['mileage'] ? form.errors['mileage'] : undefined}
+							previousFuelMileage={form.previousFuelHint}
+							distanceLabel={form.distLabel}
+							onInput={form.handleMileageChange}
+							onBlur={() => form.handleBlur('mileage')}
+						/>
+					{/if}
 
-				{#if form.showFuelFields && form.vehicle}
-					<FuelFieldsSection
-						trackFuel={form.vehicle.trackFuel}
-						trackCharging={form.vehicle.trackCharging}
-						bind:volume={form.formData.volume}
-						bind:charge={form.formData.charge}
-						bind:fuelType={form.formData.fuelType}
-						bind:missedFillup={form.formData.missedFillup}
-						amount={form.formData.amount}
-						volumeUnit={form.effectiveVolumeUnit}
-						chargeUnit={form.effectiveChargeUnit}
-						distanceUnit={form.effectiveDistanceUnit}
-						calculatedMpg={form.calculatedMpg}
-						calculatedEfficiency={form.calculatedEfficiency}
-						showMpgCalculation={form.showMpgCalculation && !form.formData.missedFillup}
-						errors={form.errors}
-						touched={form.touched}
-						onBlur={form.handleBlur}
-						onMileageChange={form.handleMileageChange}
-					/>
-				{/if}
+					{#if form.showFuelFields && form.vehicle}
+						<FuelFieldsSection
+							trackFuel={form.vehicle.trackFuel}
+							trackCharging={form.vehicle.trackCharging}
+							bind:volume={form.formData.volume}
+							bind:charge={form.formData.charge}
+							bind:fuelType={form.formData.fuelType}
+							bind:missedFillup={form.formData.missedFillup}
+							amount={form.formData.amount}
+							volumeUnit={form.effectiveVolumeUnit}
+							chargeUnit={form.effectiveChargeUnit}
+							distanceUnit={form.effectiveDistanceUnit}
+							calculatedMpg={form.calculatedMpg}
+							calculatedEfficiency={form.calculatedEfficiency}
+							showMpgCalculation={form.showMpgCalculation && !form.formData.missedFillup}
+							errors={form.errors}
+							touched={form.touched}
+							onBlur={form.handleBlur}
+							onMileageChange={form.handleMileageChange}
+						/>
+					{/if}
 
-				<ExpenseNotesFields
-					bind:description={form.formData.description}
-					bind:location={form.formData.location}
-					bind:tags={form.formData.tags}
-					tagError={form.errors['tags']}
-					tagTouched={form.touched['tags']}
-					tagSuggestions={form.tagSuggestions}
-				/>
+					<ExpenseNotesFields
+						bind:description={form.formData.description}
+						bind:location={form.formData.location}
+						bind:tags={form.formData.tags}
+						tagError={form.errors['tags']}
+						tagTouched={form.touched['tags']}
+						tagSuggestions={form.tagSuggestions}
+					/>
+				</fieldset>
 
 				{#if form.isGroupEditMode && form.groupId && form.originalExpense}
 					<ExpensePhotoSection entityType="expense" entityId={form.originalExpense.id} />
