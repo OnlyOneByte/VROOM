@@ -123,7 +123,9 @@
 			await reminderApi.markNotificationRead(id);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to mark notification read:', error);
-			appStore.showError(`Couldn't mark the notification as read. ${userFacingErrorMessage(error)}`);
+			appStore.showError(
+				`Couldn't mark the notification as read. ${userFacingErrorMessage(error)}`
+			);
 			await load();
 		}
 	}
@@ -136,7 +138,9 @@
 			await Promise.all(unread.map(n => reminderApi.markNotificationRead(n.id)));
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to mark all read:', error);
-			appStore.showError(`Couldn't mark the notifications as read. ${userFacingErrorMessage(error)}`);
+			appStore.showError(
+				`Couldn't mark the notifications as read. ${userFacingErrorMessage(error)}`
+			);
 			await load();
 		}
 	}
@@ -147,7 +151,9 @@
 			await load();
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to toggle reminder:', error);
-			appStore.showError(`Couldn't ${item.reminder.isActive ? 'pause' : 'resume'} the reminder. ${userFacingErrorMessage(error)}`);
+			appStore.showError(
+				`Couldn't ${item.reminder.isActive ? 'pause' : 'resume'} the reminder. ${userFacingErrorMessage(error)}`
+			);
 		}
 	}
 
@@ -160,7 +166,9 @@
 			await load();
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to mark serviced:', error);
-			appStore.showError(`Couldn't mark the reminder as serviced. ${userFacingErrorMessage(error)}`);
+			appStore.showError(
+				`Couldn't mark the reminder as serviced. ${userFacingErrorMessage(error)}`
+			);
 		} finally {
 			servicingId = null;
 		}
