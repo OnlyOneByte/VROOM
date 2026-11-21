@@ -1,9 +1,9 @@
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { vehicleFinancing } from '../../db/schema';
+import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { financingWithBalanceToApi, moneyDollarsToCents } from '../../utils/money';
 import { isValidTimeZone } from '../../utils/time-zone';
@@ -13,6 +13,7 @@ import {
   validateFinancingOwnership,
   validateLoanTerms,
   validateVehicleOwnership,
+  WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
 import { deactivateFinancing } from './hooks';
@@ -65,7 +66,7 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
     .max(CONFIG.validation.financing.maxDayOfWeek)
     .optional(),
   residualValue: moneyDollarsToCents((n) => n.min(0)).optional(),
-  mileageLimit: z.number().int().min(0).optional(),
+  mileageLimit: z.number().int(WHOLE_DISTANCE_MESSAGE).min(0).optional(),
   excessMileageFee: moneyDollarsToCents((n) => n.min(0)).optional(),
 });
 
@@ -139,10 +140,10 @@ routes.post(
       });
 
       if (validationErrors.length > 0) {
-        throw new HTTPException(400, {
-          message: `Invalid loan terms: ${validationErrors.join(', ')}`,
-          cause: validationErrors,
-        });
+        throw new ValidationError(
+          `Invalid loan terms: ${validationErrors.join(', ')}`,
+          validationErrors
+        );
       }
     }
 

@@ -71,6 +71,8 @@ export const dateInput = z
     { message: `Date must be between ${DATE_INPUT_MIN_YEAR} and ${DATE_INPUT_MAX_YEAR}` }
   );
 
+export const WHOLE_DISTANCE_MESSAGE = 'Enter whole kilometres or miles';
+
 export const commonSchemas = {
   clampedPaginationFields,
 
