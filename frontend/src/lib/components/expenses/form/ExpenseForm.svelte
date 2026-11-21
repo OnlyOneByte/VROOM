@@ -27,7 +27,7 @@
 		loadVehicles
 	} from './expense-form/expense-form-loaders';
 	import { deleteExpense, submitExpense } from './expense-form/expense-form-actions';
-	import { buildDuplicateQuery, buildInsuranceEditQuery } from './expense-form/expense-navigation';
+	import { buildDuplicateQuery } from './expense-form/expense-navigation';
 	import InsuranceManagedView from './expense-form/InsuranceManagedView.svelte';
 	import VehicleSelectField from './expense-form/VehicleSelectField.svelte';
 	import SplitVehiclePicker from './expense-form/SplitVehiclePicker.svelte';
@@ -165,13 +165,6 @@
 		gotoDynamic(returnTo);
 	}
 
-	function handleEditInsuranceTerm() {
-		gotoWithQuery(
-			resolve(routes.insurance),
-			buildInsuranceEditQuery(form.insurancePolicyId, form.sourceType, form.sourceId)
-		);
-	}
-
 	function handleDuplicate() {
 		gotoWithQuery(resolve(routes.expenseNew), buildDuplicateQuery(returnTo, form.formData));
 	}
@@ -197,11 +190,9 @@
 			date={form.formData.date}
 			description={form.formData.description}
 			tags={form.formData.tags}
-			policyId={form.insurancePolicyId}
 			photoEntityId={photoEntityIdForInsurance}
 			isDeleting={form.isDeleting}
 			onBack={handleBack}
-			onEditTerm={handleEditInsuranceTerm}
 			onForceDelete={confirmDelete}
 		/>
 	{:else if form.vehiclesError}

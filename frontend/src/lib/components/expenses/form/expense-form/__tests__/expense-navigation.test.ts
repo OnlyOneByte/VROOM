@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { createEmptyFormData } from '../expense-form-data';
-import {
-	buildDuplicateQuery,
-	buildInsuranceEditQuery,
-	parsePreselectedTags
-} from '../expense-navigation';
+import { buildDuplicateQuery, parsePreselectedTags } from '../expense-navigation';
 
 describe('parsePreselectedTags', () => {
 	test('trims each tag and drops blanks', () => {
@@ -48,22 +44,5 @@ describe('buildDuplicateQuery', () => {
 		expect(buildDuplicateQuery('/expenses', createEmptyFormData())).toEqual({
 			returnTo: '/expenses'
 		});
-	});
-});
-
-describe('buildInsuranceEditQuery', () => {
-	test('opens the policy and the term being edited', () => {
-		expect(buildInsuranceEditQuery('p1', 'insurance_term', 't1')).toEqual({
-			policy: 'p1',
-			editTerm: 't1'
-		});
-	});
-
-	test('only names the term when the expense came from an insurance term', () => {
-		expect(buildInsuranceEditQuery('p1', 'financing', 't1')).toEqual({ policy: 'p1' });
-	});
-
-	test('an expense with no policy yields no query', () => {
-		expect(buildInsuranceEditQuery(null, null, null)).toEqual({});
 	});
 });

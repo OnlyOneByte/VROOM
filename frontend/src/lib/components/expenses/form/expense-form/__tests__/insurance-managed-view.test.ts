@@ -19,11 +19,9 @@ interface ViewProps {
 	date: string;
 	description: string;
 	tags: string[];
-	policyId: string | null;
 	photoEntityId: string | null;
 	isDeleting: boolean;
 	onBack: () => void;
-	onEditTerm: () => void;
 	onForceDelete: () => void;
 }
 
@@ -34,11 +32,9 @@ function props(overrides: Partial<ViewProps> = {}): ViewProps {
 		date: '2026-03-15',
 		description: '',
 		tags: [],
-		policyId: 'pol-1',
 		photoEntityId: null,
 		isDeleting: false,
 		onBack: vi.fn(),
-		onEditTerm: vi.fn(),
 		onForceDelete: vi.fn(),
 		...overrides
 	};
@@ -71,18 +67,6 @@ describe('InsuranceManagedView', () => {
 	test('an unparseable amount is shown as zero', () => {
 		render(InsuranceManagedView, { props: props({ amount: '' }) });
 		expect(screen.getByText('$0.00')).toBeInTheDocument();
-	});
-
-	test('Edit Insurance Term is offered only when there is a policy', async () => {
-		const onEditTerm = vi.fn();
-		const { unmount } = render(InsuranceManagedView, { props: props({ onEditTerm }) });
-
-		await fireEvent.click(screen.getByRole('button', { name: 'Edit Insurance Term' }));
-		expect(onEditTerm).toHaveBeenCalledTimes(1);
-		unmount();
-
-		render(InsuranceManagedView, { props: props({ policyId: null }) });
-		expect(screen.queryByRole('button', { name: 'Edit Insurance Term' })).toBeNull();
 	});
 
 	test('shows description and tags only when present', () => {
