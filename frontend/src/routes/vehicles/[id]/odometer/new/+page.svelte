@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { onMount } from 'svelte';
 	import { z } from 'zod';
@@ -123,11 +124,20 @@
 </svelte:head>
 
 <FormLayout>
-	<div class="mb-6 flex items-center gap-3">
-		<Button variant="ghost" size="icon" aria-label="Back" onclick={() => gotoDynamic(returnTo)}>
-			<ArrowLeft class="h-5 w-5" />
-		</Button>
-		<h1 class="text-2xl font-bold text-foreground">Add Odometer Reading</h1>
+	<div class="mb-6">
+		<PageHeader title="Add Odometer Reading">
+			{#snippet back()}
+				<Button
+					variant="ghost"
+					size="icon-lg"
+					class="shrink-0"
+					aria-label="Back"
+					onclick={() => gotoDynamic(returnTo)}
+				>
+					<ArrowLeft class="size-5" />
+				</Button>
+			{/snippet}
+		</PageHeader>
 	</div>
 
 	<form
