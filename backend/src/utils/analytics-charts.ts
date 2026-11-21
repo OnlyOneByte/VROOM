@@ -8,6 +8,7 @@ import {
   minOf,
   termBillingMonths,
 } from './calculations';
+import { calendarDayIn, zonedMidnight } from './time-zone';
 import { NATIVE_SCALE, type UnitScale } from './unit-conversions';
 
 const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
@@ -149,8 +150,54 @@ export function gasEfficiencyPoint(
   return computeEfficiencyPoint(current, previous, scale);
 }
 
-export function toMonthKey(d: Date): string {
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+export interface Calendar {
+  day: (d: Date) => string;
+  yearStart: (year: number) => Date;
+}
+
+function utcDay(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+export const UTC_CALENDAR: Calendar = {
+  day: utcDay,
+  yearStart: (year) => new Date(Date.UTC(year, 0, 1)),
+};
+
+export function zonedCalendar(timeZone: string | undefined): Calendar {
+  if (!timeZone) return UTC_CALENDAR;
+  const days = new Map<number, string>();
+  return {
+    day: (d) => {
+      const t = d.getTime();
+      if (Number.isNaN(t)) return utcDay(d);
+      let key = days.get(t);
+      if (key === undefined) {
+        key = calendarDayIn(d, timeZone);
+        days.set(t, key);
+      }
+      return key;
+    },
+    yearStart: (year) => zonedMidnight(year, 0, 1, timeZone),
+  };
+}
+
+export function calendarParts(d: Date, calendar: Calendar): { year: number; month: number } {
+  const day = calendar.day(d);
+  return { year: Number(day.slice(0, 4)), month: Number(day.slice(5, 7)) - 1 };
+}
+
+export function weekdayOf(d: Date, calendar: Calendar): number {
+  return new Date(`${calendar.day(d)}T00:00:00Z`).getUTCDay();
+}
+
+export function toMonthKey(d: Date, calendar: Calendar = UTC_CALENDAR): string {
+  return calendar.day(d).slice(0, 7);
+}
+
+export function shiftedMonthKey(d: Date, months: number, calendar: Calendar): string {
+  const { year, month } = calendarParts(d, calendar);
+  return toMonthKey(new Date(Date.UTC(year, month + months, 1)));
 }
 
 export function effectiveMonthlyPremium(term: {
@@ -296,14 +343,15 @@ export function buildGasPriceHistory(
 
 export function buildFillupCostByVehicle(
   rows: FuelExpenseRow[],
-  vehicleNameMap: Map<string, string>
+  vehicleNameMap: Map<string, string>,
+  calendar: Calendar = UTC_CALENDAR
 ): Array<{ month: string; vehicleId: string; vehicleName: string; avgCost: number }> {
   const map = new Map<string, { totalCost: number; count: number }>();
   for (const row of rows) {
     if (!isFillup(row)) continue;
     const d = normalizeDate(row.date);
     if (!d) continue;
-    const key = `${toMonthKey(d)}|${row.vehicleId}`;
+    const key = `${toMonthKey(d, calendar)}|${row.vehicleId}`;
     const entry = map.get(key) ?? { totalCost: 0, count: 0 };
     entry.totalCost += row.expenseAmount;
     entry.count++;
@@ -392,7 +440,7 @@ export function buildCostPerDistanceChart(
     const miles = convert.distance(nativeMiles, vId);
     const d = normalizeDate(current.date);
     if (!d) return;
-    const key = `${toMonthKey(d)}|${current.vehicleId}`;
+    const key = `${toMonthKey(d, convert.calendar)}|${current.vehicleId}`;
     const entry = map.get(key) ?? { totalCost: 0, totalMiles: 0 };
     entry.totalCost += current.expenseAmount;
     entry.totalMiles += miles;
@@ -557,6 +605,7 @@ export interface RadarUnitConverters {
   efficiency: (value: number, vehicleId: string) => number;
   distance: (value: number, vehicleId: string) => number;
   scale?: (vehicleId: string) => UnitScale;
+  calendar?: Calendar;
 }
 
 export function buildVehicleRadar(
@@ -644,7 +693,10 @@ export function buildVehicleRadar(
   });
 }
 
-export function buildMonthlyCostHeatmap(allExpenses: GeneralExpenseRow[]): Array<{
+export function buildMonthlyCostHeatmap(
+  allExpenses: GeneralExpenseRow[],
+  calendar: Calendar = UTC_CALENDAR
+): Array<{
   month: string;
   fuel: number;
   maintenance: number;
@@ -668,7 +720,7 @@ export function buildMonthlyCostHeatmap(allExpenses: GeneralExpenseRow[]): Array
   for (const row of allExpenses) {
     const d = normalizeDate(row.date);
     if (!d) continue;
-    const key = toMonthKey(d);
+    const key = toMonthKey(d, calendar);
     const entry = monthMap.get(key) ?? {
       fuel: 0,
       maintenance: 0,
@@ -767,7 +819,8 @@ export function buildTCOMonthlyTrend(
     expenseAmount: number;
     date: Date | number | null;
     sourceType: string | null;
-  }>
+  }>,
+  calendar: Calendar = UTC_CALENDAR
 ): Array<{
   month: string;
   financing: number;
@@ -782,7 +835,7 @@ export function buildTCOMonthlyTrend(
   for (const row of rows) {
     const d = normalizeDate(row.date);
     if (!d) continue;
-    const key = toMonthKey(d);
+    const key = toMonthKey(d, calendar);
     const entry = map.get(key) ?? { financing: 0, insurance: 0, fuel: 0, maintenance: 0 };
     if (row.category === 'financial' && row.sourceType === 'financing') {
       entry.financing += row.expenseAmount;
@@ -801,14 +854,15 @@ export function buildTCOMonthlyTrend(
 }
 
 export function buildVehicleMaintenanceCosts(
-  allExpenses: GeneralExpenseRow[]
+  allExpenses: GeneralExpenseRow[],
+  calendar: Calendar = UTC_CALENDAR
 ): Array<{ month: string; cost: number }> {
   const map = new Map<string, number>();
   for (const row of allExpenses) {
     if (row.category !== 'maintenance') continue;
     const d = normalizeDate(row.date);
     if (!d) continue;
-    const key = toMonthKey(d);
+    const key = toMonthKey(d, calendar);
     map.set(key, (map.get(key) ?? 0) + row.expenseAmount);
   }
   return Array.from(map.entries())
@@ -823,11 +877,12 @@ function accumulateFuelRow(
   >,
   row: GeneralExpenseRow,
   prevRow: GeneralExpenseRow | undefined,
-  scale: UnitScale
+  scale: UnitScale,
+  calendar: Calendar
 ): void {
   const d = normalizeDate(row.date);
   if (!d) return;
-  const key = toMonthKey(d);
+  const key = toMonthKey(d, calendar);
   const entry = monthData.get(key) ?? { totalCost: 0, totalGallons: 0, totalMiles: 0, count: 0 };
   entry.totalCost += row.expenseAmount;
 
@@ -842,7 +897,8 @@ function accumulateFuelRow(
 
 export function buildFuelEfficiencyAndCost(
   fuelRows: GeneralExpenseRow[],
-  scale: UnitScale = NATIVE_SCALE
+  scale: UnitScale = NATIVE_SCALE,
+  calendar: Calendar = UTC_CALENDAR
 ): Array<{ month: string; efficiency: number | null; cost: number }> {
   const monthData = new Map<
     string,
@@ -859,10 +915,10 @@ export function buildFuelEfficiencyAndCost(
   let previousFillup: GeneralExpenseRow | undefined;
   for (const row of sorted) {
     if (isElectricFuelType(row.fuelType)) {
-      accumulateFuelRow(monthData, row, undefined, scale);
+      accumulateFuelRow(monthData, row, undefined, scale, calendar);
       continue;
     }
-    accumulateFuelRow(monthData, row, previousFillup, scale);
+    accumulateFuelRow(monthData, row, previousFillup, scale, calendar);
     previousFillup = row;
   }
 
@@ -889,13 +945,14 @@ export function buildVehicleExpenseBreakdown(
 }
 
 export function buildMonthlyExpenseTrends(
-  allExpenses: GeneralExpenseRow[]
+  allExpenses: GeneralExpenseRow[],
+  calendar: Calendar = UTC_CALENDAR
 ): Array<{ month: string; amount: number }> {
   const map = new Map<string, number>();
   for (const row of allExpenses) {
     const d = normalizeDate(row.date);
     if (!d) continue;
-    const key = toMonthKey(d);
+    const key = toMonthKey(d, calendar);
     map.set(key, (map.get(key) ?? 0) + row.expenseAmount);
   }
   return Array.from(map.entries())

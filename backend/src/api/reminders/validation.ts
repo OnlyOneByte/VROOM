@@ -3,6 +3,7 @@ import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES } from '../../db/types';
 import { logger } from '../../utils/logger';
 import { moneyDollarsToCents } from '../../utils/money';
+import { isValidTimeZone, zoneOffsetMs } from '../../utils/time-zone';
 import { buildCalendarDate } from '../expenses/local-date';
 import {
   FUEL_SPLIT_MESSAGE,
@@ -13,40 +14,6 @@ import {
 
 const PLAIN_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const REMINDER_DATE_FIELDS = ['startDate', 'endDate'] as const;
-
-export function isValidTimeZone(timeZone: string): boolean {
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function zonedParts(instant: Date, timeZone: string): Record<string, number> {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).formatToParts(instant);
-  return Object.fromEntries(parts.map((p) => [p.type, Number(p.value)]));
-}
-
-function zoneOffsetMs(instantMs: number, timeZone: string): number {
-  const p = zonedParts(new Date(instantMs), timeZone);
-  const wallAsUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
-  return wallAsUtc - Math.floor(instantMs / 1000) * 1000;
-}
-
-export function calendarDayIn(instant: Date, timeZone: string): string {
-  const p = zonedParts(instant, timeZone);
-  return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
-}
 
 function plainDateToInstant(value: string, timeZone: string | undefined): Date | null {
   const parts = PLAIN_DATE.exec(value);

@@ -20,6 +20,7 @@ const { NetworkError } = await import('#lib/utils/error-handling.ts');
 const { analyticsApi, getDefaultDateRange } = await import('../analytics-api');
 
 const mockGet = vi.mocked(apiClient.get);
+const ZONE = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
 
 const mockQuickStats: QuickStatsResponse = {
 	vehicleCount: 3,
@@ -212,6 +213,23 @@ describe('getDefaultDateRange', () => {
 		expect(new Date(getDefaultDateRange(now).ytdStart * 1000)).toEqual(new Date(2026, 0, 1));
 	});
 
+	it('every analytics request sends the browser time zone', async () => {
+		mockGet.mockResolvedValue({});
+		const range = { startDate: 1, endDate: 2 };
+		await analyticsApi.getQuickStats(range);
+		await analyticsApi.getFuelStats(range);
+		await analyticsApi.getFuelAdvanced(range);
+		await analyticsApi.getCrossVehicle(range);
+		await analyticsApi.getFinancing();
+		await analyticsApi.getInsurance();
+		await analyticsApi.getVehicleTCO('v1');
+		await analyticsApi.getVehicleExpenses('v1', range);
+		await analyticsApi.getYearEnd();
+		for (const [url] of mockGet.mock.calls.slice(-9)) {
+			expect(url).toContain(`timeZone=${ZONE}`);
+		}
+	});
+
 	it('getSummary and getQuickStats pass ytdStart to the API', async () => {
 		mockGet.mockResolvedValue(mockQuickStats);
 		await analyticsApi.getQuickStats({ startDate: 1, endDate: 2, ytdStart: 3 });
@@ -325,14 +343,14 @@ describe('analyticsApi — method→endpoint wiring', () => {
 		expect(calledUrl()).toContain('/api/v1/analytics/cross-vehicle?');
 	});
 
-	it('getFinancing: bare path, no query', async () => {
+	it('getFinancing: only the browser time zone in the query', async () => {
 		await analyticsApi.getFinancing();
-		expect(calledUrl()).toBe('/api/v1/analytics/financing');
+		expect(calledUrl()).toBe(`/api/v1/analytics/financing?timeZone=${ZONE}`);
 	});
 
-	it('getInsurance: bare path, no query', async () => {
+	it('getInsurance: only the browser time zone in the query', async () => {
 		await analyticsApi.getInsurance();
-		expect(calledUrl()).toBe('/api/v1/analytics/insurance');
+		expect(calledUrl()).toBe(`/api/v1/analytics/insurance?timeZone=${ZONE}`);
 	});
 
 	it('getVehicleHealth: appends the vehicleId', async () => {
@@ -360,14 +378,14 @@ describe('analyticsApi — method→endpoint wiring', () => {
 		expect(url).toContain('startDate=1700000000');
 	});
 
-	it('getYearEnd: no year → bare path (no "?")', async () => {
+	it('getYearEnd: no year → only the time zone', async () => {
 		await analyticsApi.getYearEnd();
-		expect(calledUrl()).toBe('/api/v1/analytics/year-end');
+		expect(calledUrl()).toBe(`/api/v1/analytics/year-end?timeZone=${ZONE}`);
 	});
 
 	it('getYearEnd: includes a provided year', async () => {
 		await analyticsApi.getYearEnd({ year: 2023 });
-		expect(calledUrl()).toBe('/api/v1/analytics/year-end?year=2023');
+		expect(calledUrl()).toBe(`/api/v1/analytics/year-end?year=2023&timeZone=${ZONE}`);
 	});
 
 	it('a wrapper returns the apiClient result verbatim (envelope already unwrapped)', async () => {
