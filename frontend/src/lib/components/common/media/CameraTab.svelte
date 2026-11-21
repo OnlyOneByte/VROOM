@@ -16,6 +16,8 @@
 	let videoEl = $state<HTMLVideoElement | null>(null);
 	let canvasEl = $state<HTMLCanvasElement | null>(null);
 	let mediaStream = $state<MediaStream | null>(null);
+	const CAMERA_UNAVAILABLE = "Couldn't access the camera. Try again.";
+
 	let cameraError = $state<string | null>(null);
 	let cameraReady = $state(false);
 	let facingMode = $state<'user' | 'environment'>('environment');
@@ -102,10 +104,10 @@
 					}
 				} catch {
 					if (thisStartId !== cameraStartId) return;
-					cameraError = 'Could not access camera. Please try again.';
+					cameraError = CAMERA_UNAVAILABLE;
 				}
 			} else {
-				cameraError = 'Could not access camera. Please try again.';
+				cameraError = CAMERA_UNAVAILABLE;
 			}
 		}
 	}
@@ -140,10 +142,7 @@
 			} catch {
 				// startCamera records its failure in cameraError.
 			}
-			if (
-				cameraError === 'Could not access camera. Please try again.' &&
-				attempt < maxRetries - 1
-			) {
+			if (cameraError === CAMERA_UNAVAILABLE && attempt < maxRetries - 1) {
 				cameraError = null;
 				await new Promise(r => setTimeout(r, 100 * (attempt + 1)));
 			} else {

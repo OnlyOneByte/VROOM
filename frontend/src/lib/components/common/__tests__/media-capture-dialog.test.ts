@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { UserProviderInfo } from '#lib/types/index.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const getProviders = vi.hoisted(() => vi.fn<(domain?: string) => Promise<UserProviderInfo[]>>());
 
@@ -192,7 +197,7 @@ describe('MediaCaptureDialog: uploading files', () => {
 
 	test('a partial failure lists the errors and how many succeeded', async () => {
 		const onUpload = vi.fn(async (file: File) => {
-			if (file.name === 'bad.jpg') throw new Error('Storage quota exceeded');
+			if (file.name === 'bad.jpg') throw new ApiError('Storage quota exceeded', 507);
 			if (file.name === 'odd.jpg') throw 'not an error object';
 			return {};
 		});
@@ -202,8 +207,12 @@ describe('MediaCaptureDialog: uploading files', () => {
 		await fireEvent.click(uploadButton());
 
 		expect(await screen.findByText('Upload complete (1 of 3 succeeded)')).toBeInTheDocument();
-		expect(screen.getByText('Storage quota exceeded')).toBeInTheDocument();
-		expect(screen.getByText('Failed to upload "odd.jpg"')).toBeInTheDocument();
+		expect(
+			screen.getByText(`Couldn't upload "bad.jpg". ${SERVER_FAILURE_MESSAGE}`)
+		).toBeInTheDocument();
+		expect(
+			screen.getByText(`Couldn't upload "odd.jpg". ${UNEXPECTED_FAILURE_MESSAGE}`)
+		).toBeInTheDocument();
 		expect(onUploadComplete).toHaveBeenCalledOnce();
 	});
 
@@ -249,7 +258,7 @@ describe('MediaCaptureDialog: camera', () => {
 	test('a failed capture upload shows the error and keeps the dialog open', async () => {
 		installCamera();
 		const onUpload = vi.fn(async () => {
-			throw new Error('Drive rejected the photo');
+			throw new ApiError('Drive rejected the photo', 422);
 		});
 		const { onClose } = mount({ onUpload });
 		const tab = await screen.findByRole('tab', { name: 'Camera' });
@@ -261,7 +270,9 @@ describe('MediaCaptureDialog: camera', () => {
 		await fireEvent.click(await screen.findByRole('button', { name: 'Use Photo' }));
 
 		const cameraPanel = await screen.findByRole('tabpanel');
-		expect(await within(cameraPanel).findByText('Drive rejected the photo')).toBeInTheDocument();
+		expect(
+			await within(cameraPanel).findByText("Couldn't upload the photo. Drive rejected the photo.")
+		).toBeInTheDocument();
 		expect(onClose).not.toHaveBeenCalled();
 		expect(screen.getByAltText('Captured preview')).toBeInTheDocument();
 	});
