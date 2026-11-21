@@ -10,6 +10,9 @@ type UpdateOdometerRequest = Parameters<typeof odometerApi.update>[1];
 const goto = vi.fn((_url: string) => Promise.resolve());
 vi.mock('$app/navigation', () => ({ goto: (url: string) => goto(url) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
+vi.mock('#lib/components/common/date-picker.svelte', async () => ({
+	default: (await import('../../../__tests__/DatePickerStub.svelte')).default
+}));
 
 const pageState = vi.hoisted(() => ({
 	url: new URL('http://localhost/vehicles/v1/odometer/o1/edit')

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
@@ -217,8 +218,14 @@
 									/>
 								</div>
 								<div class="space-y-1">
-									<Label class="text-xs text-muted-foreground">Date</Label>
-									<Input type="date" bind:value={row.date} disabled={!row.include} />
+									<Label for={`photo-${row.photoId}-date`} class="text-xs text-muted-foreground"
+										>Date</Label
+									>
+									<DatePicker
+										id={`photo-${row.photoId}-date`}
+										bind:value={() => row.date, v => (row.date = v ?? '')}
+										disabled={!row.include}
+									/>
 								</div>
 								<div class="space-y-1">
 									<Label for={`photo-${row.photoId}-category`} class="text-xs text-muted-foreground"
