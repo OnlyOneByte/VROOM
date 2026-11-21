@@ -481,7 +481,7 @@
 				</div>
 
 				{#if skippedPhotos > 0}
-					<Alert data-testid="restore-skipped-photos">
+					<Alert role="status" data-testid="restore-skipped-photos">
 						<AlertDescription>
 							{skippedPhotos === 1
 								? "1 photo won't be restored because the trip, expense or other item it belonged to was deleted before this backup was made. Everything else in the backup will still be restored."
