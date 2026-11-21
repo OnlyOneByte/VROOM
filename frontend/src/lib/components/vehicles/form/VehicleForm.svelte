@@ -77,6 +77,7 @@
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
 	let showPayoffConfirm = $state(false);
+	let financingBeingEnded = $state<VehicleFinancing | null>(null);
 	let showUnitChangeConfirm = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 
@@ -344,7 +345,7 @@
 	);
 
 	let payoffConfirmCopy = $derived.by(() => {
-		const financing = activeFinancingToEnd;
+		const financing = financingBeingEnded;
 		if (!financing) return { title: '', description: '', confirmLabel: '' };
 		const lender = financing.provider ? ` with ${financing.provider}` : '';
 		if (financing.financingType === 'lease') {
@@ -396,6 +397,7 @@
 			return;
 		}
 		if (activeFinancingToEnd) {
+			financingBeingEnded = activeFinancingToEnd;
 			showPayoffConfirm = true;
 			return;
 		}
@@ -403,15 +405,16 @@
 	}
 
 	async function payOffAndSave() {
-		if (!activeFinancingToEnd) return;
+		const financing = financingBeingEnded;
+		if (!financing) return;
 		try {
-			const ended = await vehicleApi.payOffFinancing(activeFinancingToEnd.id);
+			const ended = await vehicleApi.payOffFinancing(financing.id);
 			if (vehicle) vehicle.financing = ended;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error';
 			appStore.addNotification({
 				type: 'error',
-				message: `Couldn't mark the ${activeFinancingToEnd.financingType === 'lease' ? 'lease as ended' : 'loan as paid off'}: ${message}`
+				message: `Couldn't mark the ${financing.financingType === 'lease' ? 'lease as ended' : 'loan as paid off'}: ${message}`
 			});
 			throw error;
 		}
