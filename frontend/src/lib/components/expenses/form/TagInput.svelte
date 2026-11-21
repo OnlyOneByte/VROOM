@@ -64,7 +64,7 @@
 					<button
 						type="button"
 						onclick={() => removeTag(tag)}
-						class="hover:text-primary"
+						class="relative hover:text-primary after:absolute after:-inset-3.5 after:content-['']"
 						aria-label="Remove {tag} tag"
 					>
 						<svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">

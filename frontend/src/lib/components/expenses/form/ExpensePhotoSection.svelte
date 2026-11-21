@@ -66,7 +66,7 @@
 		<Button
 			variant="outline"
 			size="sm"
-			class="h-7 text-xs"
+			class="h-10 text-xs sm:h-7"
 			onclick={() => (showUploadDialog = true)}
 		>
 			<Upload class="mr-1 h-3 w-3" />
@@ -106,7 +106,7 @@
 					{/if}
 
 					<div
-						class="absolute inset-x-0 bottom-0 flex items-center justify-end bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100"
+						class="absolute inset-x-0 bottom-0 flex items-center justify-end bg-gradient-to-t from-black/60 to-transparent p-2 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
 					>
 						<Button
 							variant="destructive"
