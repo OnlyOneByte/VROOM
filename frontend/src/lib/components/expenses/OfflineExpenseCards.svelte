@@ -38,6 +38,12 @@
 		confirmOpen = true;
 	}
 
+	function discardDescription(expense: OfflineExpense): string {
+		return expense.serverId
+			? `${describeEntry(expense)} reached the server and stays there. Discarding removes the photos that didn't upload, which are only on this device.`
+			: `${describeEntry(expense)} was never synced to the server. Discarding it deletes it and any photos attached to it from this device for good.`;
+	}
+
 	function describeEntry(expense: OfflineExpense): string {
 		return `${formatCurrency(expense.amount)} ${getCategoryLabel(expense.category)} on ${formatDate(expense.date)}`;
 	}
@@ -110,8 +116,9 @@
 				<div>
 					<CardNs.Title>Needs attention ({needsAttentionExpenses.length})</CardNs.Title>
 					<CardNs.Description>
-						These offline entries can't sync as-is (a fuel entry needs its fuel amount — volume or
-						charge — and mileage). Edit the expense to add the missing info, or discard it.
+						These entries can't finish syncing as they are: a fuel entry needs its fuel amount
+						(volume or charge) and mileage, or the server rejected a photo. Retry them from the sync
+						panel once the cause is fixed, or discard what is left on this device.
 					</CardNs.Description>
 				</div>
 				<div class="p-2 rounded-lg bg-warning/10">
@@ -149,6 +156,14 @@
 									• {expense.description}
 								{/if}
 							</div>
+							{#if expense.serverId}
+								<div class="text-sm text-foreground mt-1">
+									The expense reached the server. {expense.attentionReason ??
+										"A photo couldn't be uploaded."}
+								</div>
+							{:else if expense.attentionReason}
+								<div class="text-sm text-foreground mt-1">{expense.attentionReason}</div>
+							{/if}
 						</div>
 						<TriangleAlert class="h-4 w-4 text-warning flex-shrink-0" />
 					</div>
@@ -210,11 +225,11 @@
 
 <ConfirmDialog
 	bind:open={confirmOpen}
-	title="Discard this unsynced expense?"
-	description={discardTarget
-		? `${describeEntry(discardTarget.expense)} was never synced to the server. Discarding it deletes it and any photos attached to it from this device for good.`
-		: ''}
-	confirmLabel="Discard"
+	title={discardTarget?.expense.serverId
+		? "Discard the photos that didn't upload?"
+		: 'Discard this unsynced expense?'}
+	description={discardTarget ? discardDescription(discardTarget.expense) : ''}
+	confirmLabel={discardTarget?.expense.serverId ? 'Discard photos' : 'Discard'}
 	onConfirm={() => {
 		if (discardTarget) discardTarget.remove(discardTarget.expense.id);
 	}}
