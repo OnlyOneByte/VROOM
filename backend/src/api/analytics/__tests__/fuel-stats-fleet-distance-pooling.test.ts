@@ -318,8 +318,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
 
     const adv = await repo.getFuelAdvanced(USER.id, rangeAll());
     const winter = adv.seasonalEfficiency.find((s) => s.season === 'Winter');
-    const expectedConvertedB = (40 / 1.609344) * 3.785411784;
-    const expectedAvg = (30 + expectedConvertedB) / 2;
+    const expectedAvg = (300 + 320 / 1.609344) / (10 + 8 / 3.785411784);
 
     expect(winter?.avgEfficiency).toBeCloseTo(expectedAvg, 1);
     expect(winter?.avgEfficiency).not.toBeCloseTo(35, 0);
@@ -418,7 +417,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
     seedExpense(testDb.sqlite, fuelOn('b2', VEH_B.id, 50_320, 8, 11));
 
     const ye = await repo.getYearEnd(USER.id, 2024);
-    const expectedAvg = (30 + (40 / 1.609344) * 3.785411784) / 2;
+    const expectedAvg = (300 + 320 / 1.609344) / (10 + 8 / 3.785411784);
 
     expect(ye.avgEfficiency).toBeCloseTo(expectedAvg, 1);
     expect(ye.efficiencyTrend).toHaveLength(1);
@@ -481,7 +480,10 @@ describe('a mixed mpg + km/L fleet pools efficiency, cost and price in the user 
     const bMpg = toMpg(15);
     expect(stats.fuelConsumption.bestEfficiency).toBeCloseTo(bMpg, 6);
     expect(stats.fuelConsumption.worstEfficiency).toBeCloseTo(30, 6);
-    expect(stats.fuelConsumption.avgEfficiency).toBeCloseTo((30 + bMpg) / 2, 6);
+    expect(stats.fuelConsumption.avgEfficiency).toBeCloseTo(
+      (300 + 375 / KM_PER_MILE) / (10 + 25 / LITERS_PER_GALLON),
+      6
+    );
     expect(stats.fuelConsumption.avgEfficiency).toBeCloseTo(quick.avgEfficiency ?? 0, 6);
 
     const bMiles = 375 / KM_PER_MILE;
@@ -499,5 +501,94 @@ describe('a mixed mpg + km/L fleet pools efficiency, cost and price in the user 
     seedMixedFleet(1200, 300);
     const stats = await repo.getFuelStats(USER.id, rangeAll());
     expect(stats.fuelConsumption.worstEfficiency).toBeCloseTo(toMpg(4), 6);
+  });
+});
+
+describe('one vehicle with a short top-up: every average is total distance over total fuel', () => {
+  const on = (day: number) => new Date(Date.UTC(2024, 0, day, 12));
+  const fill = (
+    id: string,
+    vehicleId: string,
+    mileage: number,
+    volume: number,
+    day: number,
+    fuelType = 'Regular'
+  ): TestExpense => ({
+    id,
+    vehicleId,
+    category: 'fuel',
+    expenseAmount: 40,
+    date: on(day),
+    mileage,
+    volume,
+    fuelType,
+    missedFillup: false,
+  });
+
+  test('gas: quick stats, fuel stats, monthly consumption and year-end agree on 320 / 10.5', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedExpense(testDb.sqlite, fill('a1', VEH_A.id, 10_000, 10, 5));
+    seedExpense(testDb.sqlite, fill('a2', VEH_A.id, 10_300, 10, 10));
+    seedExpense(testDb.sqlite, fill('a3', VEH_A.id, 10_320, 0.5, 12));
+
+    const pooled = 320 / 10.5;
+    const [quick, stats, yearEnd] = await Promise.all([
+      repo.getQuickStats(USER.id, rangeAll()),
+      repo.getFuelStats(USER.id, rangeAll()),
+      repo.getYearEnd(USER.id, 2024),
+    ]);
+
+    expect(quick.avgEfficiency).toBeCloseTo(pooled, 6);
+    expect(stats.fuelConsumption.avgEfficiency).toBeCloseTo(pooled, 6);
+    expect(stats.monthlyConsumption.find((m) => m.month === '2024-01')?.efficiency).toBeCloseTo(
+      pooled,
+      6
+    );
+    expect(yearEnd.avgEfficiency).toBeCloseTo(pooled, 6);
+    expect(yearEnd.efficiencyTrend[0]?.efficiency).toBeCloseTo(pooled, 6);
+  });
+
+  test('charging: the mi/kWh average pools distance over energy', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_B);
+    seedExpense(testDb.sqlite, fill('c1', VEH_B.id, 1000, 30, 5, 'Electric'));
+    seedExpense(testDb.sqlite, fill('c2', VEH_B.id, 1120, 40, 10, 'Electric'));
+    seedExpense(testDb.sqlite, fill('c3', VEH_B.id, 1130, 2, 12, 'Electric'));
+
+    const stats = await repo.getFuelStats(USER.id, rangeAll());
+    expect(stats.charging.efficiency.avgEfficiency).toBeCloseTo(130 / 42, 6);
+  });
+
+  test('a missed fill-up skips only the interval ending at it, so the next interval still counts', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedExpense(testDb.sqlite, fill('a1', VEH_A.id, 10_000, 10, 5));
+    seedExpense(testDb.sqlite, { ...fill('a2', VEH_A.id, 10_300, 15, 10), missedFillup: true });
+    seedExpense(testDb.sqlite, fill('a3', VEH_A.id, 10_600, 10, 15));
+
+    const [quick, stats] = await Promise.all([
+      repo.getQuickStats(USER.id, rangeAll()),
+      repo.getFuelStats(USER.id, rangeAll()),
+    ]);
+    expect(quick.avgEfficiency).toBeCloseTo(30, 6);
+    expect(stats.fuelConsumption.avgEfficiency).toBeCloseTo(30, 6);
+    expect(stats.fuelConsumption.worstEfficiency).toBeCloseTo(30, 6);
+  });
+
+  test('the vehicle radar ranks fuel efficiency by each vehicle’s pooled average', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedVehicle(testDb.sqlite, VEH_B);
+    seedExpense(testDb.sqlite, fill('a1', VEH_A.id, 10_000, 10, 5));
+    seedExpense(testDb.sqlite, fill('a2', VEH_A.id, 10_300, 10, 10));
+    seedExpense(testDb.sqlite, fill('a3', VEH_A.id, 10_320, 0.5, 12));
+    seedExpense(testDb.sqlite, fill('b1', VEH_B.id, 50_000, 10, 6));
+    seedExpense(testDb.sqlite, fill('b2', VEH_B.id, 50_330, 10, 11));
+
+    const adv = await repo.getFuelAdvanced(USER.id, rangeAll());
+    const a = adv.vehicleRadar.find((r) => r.vehicleId === VEH_A.id);
+    const b = adv.vehicleRadar.find((r) => r.vehicleId === VEH_B.id);
+    expect(b?.fuelEfficiency ?? 0).toBeGreaterThan(a?.fuelEfficiency ?? 0);
   });
 });

@@ -24,13 +24,13 @@ function general(over: Partial<GeneralExpenseRow> & { id: string }): GeneralExpe
 }
 
 describe('buildFuelEfficiencyAndCost — missed-fill-up does not inflate monthly MPG', () => {
-  test('a missed-fill-up pair is excluded from the month efficiency', () => {
+  test('only the interval ending at a missed fill-up is excluded from the month efficiency', () => {
     const rows: GeneralExpenseRow[] = [
       general({ id: 'a', mileage: 10000, volume: 10, date: new Date(2024, 5, 1) }),
       general({
         id: 'b',
         mileage: 10300,
-        volume: 10,
+        volume: 15,
         missedFillup: true,
         date: new Date(2024, 5, 10),
       }),
@@ -39,7 +39,7 @@ describe('buildFuelEfficiencyAndCost — missed-fill-up does not inflate monthly
     const out = buildFuelEfficiencyAndCost(rows);
     const june = out.find((m) => m.month === '2024-06');
     expect(june).toBeTruthy();
-    expect(june?.efficiency).toBeNull();
+    expect(june?.efficiency).toBeCloseTo(30, 5);
   });
 
   test('an implausibly large gap (> cap) is excluded', () => {

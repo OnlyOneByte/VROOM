@@ -462,7 +462,7 @@ describe('averageMpg excludes out-of-band outlier pairs ([5,100] band)', () => {
   test('the band is INCLUSIVE: a pair at EXACTLY 100 MPG (=MAX) is KEPT', () => {
     const atMax = makeFuelExpense({ mileage: 10500, volume: 2, missedFillup: false, index: 2 });
     const stats = calculateVehicleStats([anchor0, anchor1, atMax], 10000, true, false);
-    expect(stats.averageMpg).toBeCloseTo((30 + 100) / 2, 5);
+    expect(stats.averageMpg).toBeCloseTo((300 + 200) / (10 + 2), 5);
   });
 
   test('a below-band pair (<5 MPG) is dropped (the MIN_VALID_MPG=5 floor)', () => {

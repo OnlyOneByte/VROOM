@@ -5,11 +5,11 @@ import {
   buildMonthlyCostHeatmap,
   computeAverageCosts,
   computeEfficiencyPoint,
-  computeFuelConsumptionMetrics,
   computeMileageScore,
   computeMpgAndCostPerMile,
   computePreviousYearComparison,
   computeRegularityScore,
+  efficiencyRange,
   type FuelExpenseRow,
   type GeneralExpenseRow,
   gasEfficiencyPoint,
@@ -357,10 +357,9 @@ describe('an EV-only vehicle yields an empty gas-MPG series but a real cost-per-
     expect(costPerMileValues[0]).toBeCloseTo(9 / 240, 9);
   });
 
-  test('computeFuelConsumptionMetrics on the empty series is all-null', () => {
+  test('efficiencyRange on the empty series is all-null', () => {
     const { mpgValues } = computeMpgAndCostPerMile(evRows);
-    const fc = computeFuelConsumptionMetrics(mpgValues);
-    expect(fc.avgEfficiency).toBeNull();
+    const fc = efficiencyRange(mpgValues);
     expect(fc.bestEfficiency).toBeNull();
     expect(fc.worstEfficiency).toBeNull();
   });
