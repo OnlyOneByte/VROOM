@@ -215,12 +215,24 @@ async function processSingleRef(
       pathHint,
     });
 
-    await deps.photoRefRepository.updateStatus(ref.id, {
-      status: 'active',
-      storageRef: uploadResult.externalId,
-      externalUrl: uploadResult.externalUrl,
-      syncedAt: new Date(),
-    });
+    try {
+      await deps.photoRefRepository.updateStatus(ref.id, {
+        status: 'active',
+        storageRef: uploadResult.externalId,
+        externalUrl: uploadResult.externalUrl,
+        syncedAt: new Date(),
+      });
+    } catch (error) {
+      await targetProvider.delete(uploadResult).catch((cleanupError) => {
+        logger.warn('Sync worker: failed to clean up orphaned upload after a status save error', {
+          refId: ref.id,
+          providerId: ref.providerId,
+          storageRef: uploadResult.externalId,
+          error: extractErrorMessage(cleanupError),
+        });
+      });
+      throw error;
+    }
 
     logger.debug('Sync worker: ref synced successfully', {
       refId: ref.id,

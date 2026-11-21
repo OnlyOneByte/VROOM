@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type {
   StorageFileInfo,
   StorageProvider,
@@ -37,7 +38,7 @@ export class FakeStorageProvider implements StorageProvider {
   upload(params: UploadParams): Promise<StorageRef> {
     const key = params.rawPath
       ? `${params.rawPath}/${params.fileName}`
-      : `${params.pathHint}/${params.entityType}/${params.entityId}/${params.fileName}`;
+      : `${params.pathHint}/${params.entityType}/${params.entityId}/${randomUUID()}-${params.fileName}`;
     const now = new Date(0).toISOString();
     this.files.set(key, {
       key,
