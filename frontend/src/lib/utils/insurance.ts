@@ -17,14 +17,23 @@ export function sortTermsByEndDateDesc(terms: InsuranceTerm[]): InsuranceTerm[] 
 	return [...terms].sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
 }
 
-export function groupPoliciesByActive(policies: InsurancePolicy[]): {
+export function isPolicyInForce(policy: InsurancePolicy, now: Date = new Date()): boolean {
+	return (
+		policy.isActive && policy.terms.some(term => new Date(term.endDate).getTime() > now.getTime())
+	);
+}
+
+export function groupPoliciesByActive(
+	policies: InsurancePolicy[],
+	now: Date = new Date()
+): {
 	active: InsurancePolicy[];
 	inactive: InsurancePolicy[];
 } {
 	const active: InsurancePolicy[] = [];
 	const inactive: InsurancePolicy[] = [];
 	for (const policy of policies) {
-		if (policy.isActive) {
+		if (isPolicyInForce(policy, now)) {
 			active.push(policy);
 		} else {
 			inactive.push(policy);
