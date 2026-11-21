@@ -73,7 +73,7 @@ const EXISTING: Expense = {
 	tags: ['oil'],
 	category: 'maintenance',
 	amount: 79.99,
-	date: '2026-05-10T12:00:00.000Z',
+	date: dateOnlyToISO('2026-05-10'),
 	mileage: 31000,
 	description: 'Oil change',
 	location: 'Quick Lube',
@@ -137,7 +137,7 @@ function save(): Promise<boolean> {
 
 beforeEach(() => {
 	vi.useFakeTimers({ toFake: ['Date'] });
-	vi.setSystemTime(new Date('2026-06-15T12:00:00Z'));
+	vi.setSystemTime(new Date(2026, 5, 15, 12, 0, 0));
 	vi.clearAllMocks();
 	getVehicles.mockResolvedValue([CAMRY, LEAF]);
 	getVehicle.mockImplementation(id => Promise.resolve(id === 'v2' ? LEAF : CAMRY));

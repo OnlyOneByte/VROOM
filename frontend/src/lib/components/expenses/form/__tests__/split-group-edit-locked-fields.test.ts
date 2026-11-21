@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
+import { dateOnlyToISO } from '#lib/utils/formatters.ts';
 import { render, screen } from '@testing-library/svelte';
 import type { Expense, SplitExpenseGroup, Vehicle } from '#lib/types/index.ts';
 
@@ -31,7 +32,7 @@ function makeLeg(id: string, vehicleId: string, amount: number): Expense {
 		tags: ['parking'],
 		category: 'misc',
 		amount,
-		date: '2026-05-10T12:00:00.000Z',
+		date: dateOnlyToISO('2026-05-10'),
 		description: 'Garage pass',
 		groupId: 'g1',
 		groupTotal: 100,
