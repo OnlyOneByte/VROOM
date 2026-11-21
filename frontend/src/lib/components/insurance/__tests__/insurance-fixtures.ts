@@ -1,3 +1,4 @@
+import { dateOnlyToISO } from '#lib/utils/formatters.ts';
 import type {
 	InsuranceClaim,
 	InsurancePolicy,
@@ -63,7 +64,7 @@ export function makeClaim(overrides: Partial<InsuranceClaim> = {}): InsuranceCla
 	return {
 		id: 'c1',
 		policyId: 'p1',
-		claimDate: '2026-03-15T12:00:00.000Z',
+		claimDate: dateOnlyToISO('2026-03-15'),
 		claimType: 'collision',
 		status: 'filed',
 		createdAt: '2026-03-15T12:00:00.000Z',
