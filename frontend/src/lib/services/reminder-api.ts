@@ -12,6 +12,14 @@ import { fromBackendExpense } from './api-transformer';
 import { buildQueryString } from './api-utils';
 import { userTimeZone } from './analytics-api';
 
+function safeTimeZone(): string | undefined {
+	try {
+		return userTimeZone() || undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 interface ReminderListFilters {
 	vehicleId?: string;
 	type?: string;
@@ -46,7 +54,7 @@ export const reminderApi = {
 		data: Partial<Reminder> & { vehicleIds?: string[] }
 	): Promise<ReminderWithVehicles> {
 		return apiClient.put<ReminderWithVehicles>(`/api/v1/reminders/${id}`, {
-			timeZone: userTimeZone(),
+			timeZone: safeTimeZone(),
 			...data
 		});
 	},
@@ -57,13 +65,13 @@ export const reminderApi = {
 
 	async trigger(): Promise<TriggerResult> {
 		return apiClient.post<TriggerResult>(
-			`/api/v1/reminders/trigger${buildQueryString({ timeZone: userTimeZone() })}`
+			`/api/v1/reminders/trigger${buildQueryString({ timeZone: safeTimeZone() })}`
 		);
 	},
 
 	async markServiced(id: string): Promise<Reminder> {
 		return apiClient.post<Reminder>(
-			`/api/v1/reminders/${id}/mark-serviced${buildQueryString({ timeZone: userTimeZone() })}`
+			`/api/v1/reminders/${id}/mark-serviced${buildQueryString({ timeZone: safeTimeZone() })}`
 		);
 	},
 
