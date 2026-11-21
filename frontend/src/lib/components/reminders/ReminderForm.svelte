@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -6,6 +7,7 @@
 	import { LoaderCircle } from '@lucide/svelte';
 	import { reminderApi } from '#lib/services/reminder-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import type { ReminderWithVehicles, Vehicle } from '#lib/types/index.ts';
 	import { ReminderFormState } from './reminder-form/reminder-form-state.svelte';
 	import {
@@ -29,6 +31,8 @@
 
 	const form = new ReminderFormState();
 	let isEdit = $derived(!!reminder);
+
+	onMount(() => trackPendingSave(() => form.isSubmitting));
 
 	let lastKey = $state('');
 	$effect(() => {
