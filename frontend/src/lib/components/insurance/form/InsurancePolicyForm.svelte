@@ -285,7 +285,7 @@
 					<CardHeader>
 						<div class="flex items-center gap-2">
 							<Shield class="h-5 w-5 text-primary" />
-							<CardTitle>Policy Information</CardTitle>
+							<CardTitle level={2}>Policy Information</CardTitle>
 						</div>
 						<CardDescription>Basic details about the insurance policy</CardDescription>
 					</CardHeader>
@@ -331,7 +331,7 @@
 				{#if !isEditMode}
 					<Card>
 						<CardHeader>
-							<CardTitle>Initial Term</CardTitle>
+							<CardTitle level={2}>Initial Term</CardTitle>
 							<CardDescription
 								>Coverage period, vehicles, policy details, and costs for the first term</CardDescription
 							>
@@ -388,7 +388,7 @@
 							</div>
 
 							<div class="border-t border-border pt-6">
-								<h4 class="text-sm font-medium text-foreground mb-4">Policy Details</h4>
+								<h3 class="text-sm font-medium text-foreground mb-4">Policy Details</h3>
 								<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 									<div class="space-y-2">
 										<Label for="policy-number">Policy Number</Label>
@@ -464,7 +464,7 @@
 							</div>
 
 							<div class="border-t border-border pt-6">
-								<h4 class="text-sm font-medium text-foreground mb-4">Finance Details</h4>
+								<h3 class="text-sm font-medium text-foreground mb-4">Finance Details</h3>
 								<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 									<div class="space-y-2">
 										<Label for="total-cost">Total Cost ({currencySymbol})</Label>

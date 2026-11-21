@@ -25,6 +25,7 @@
 		onDelete?: (_policyId: string) => void;
 		onRefresh: () => Promise<void>;
 		readOnly?: boolean;
+		level?: 3 | 4;
 	}
 
 	let {
@@ -33,8 +34,11 @@
 		vehicles = [],
 		onEdit,
 		onRefresh,
-		readOnly = false
+		readOnly = false,
+		level = 3
 	}: Props = $props();
+
+	let childLevel: 4 | 5 = $derived(level === 3 ? 4 : 5);
 
 	let expanded = $state(false);
 	let latestTerm = $derived(getLatestTerm(policy.terms));
@@ -68,7 +72,9 @@
 					<Building2 class="h-4 w-4 text-primary" />
 				</div>
 				<div class="min-w-0">
-					<h4 class="text-sm font-semibold text-foreground truncate">{policy.company}</h4>
+					<svelte:element this={`h${level}`} class="text-sm font-semibold text-foreground truncate">
+						{policy.company}
+					</svelte:element>
 					{#if latestTerm?.policyNumber}
 						<p class="text-xs text-muted-foreground">
 							Policy #{latestTerm.policyNumber}
@@ -148,18 +154,19 @@
 					{onRefresh}
 					onDeleteTerm={readOnly ? undefined : handleDeleteTerm}
 					{readOnly}
+					level={childLevel}
 				/>
 			</div>
 		{/if}
 
 		{#if !readOnly}
 			<div class="mt-3 border-t border-border pt-3">
-				<DocumentViewer entityType="insurance_policy" entityId={policy.id} />
+				<DocumentViewer entityType="insurance_policy" entityId={policy.id} level={childLevel} />
 			</div>
 		{/if}
 
 		<div class="mt-3 border-t border-border pt-3">
-			<ClaimsSection policyId={policy.id} {vehicles} {readOnly} />
+			<ClaimsSection policyId={policy.id} {vehicles} {readOnly} level={childLevel} />
 		</div>
 	</CardContent>
 </Card>

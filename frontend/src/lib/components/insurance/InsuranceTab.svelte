@@ -95,7 +95,7 @@
 {:else}
 	<div class="space-y-4">
 		<div class="flex items-center justify-between">
-			<h3 class="text-lg font-semibold text-foreground">Insurance Policies</h3>
+			<h2 class="text-lg font-semibold text-foreground">Insurance Policies</h2>
 			{#if !readOnly}
 				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={handleAddPolicy}>
 					<Plus class="mr-2 h-4 w-4" />
@@ -104,6 +104,6 @@
 			{/if}
 		</div>
 
-		<PolicyList {policies} {readOnly} onEdit={handleEditPolicy} onRefresh={loadData} />
+		<PolicyList {policies} {readOnly} level={3} onEdit={handleEditPolicy} onRefresh={loadData} />
 	</div>
 {/if}
