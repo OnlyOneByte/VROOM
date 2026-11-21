@@ -16,9 +16,6 @@ import {
 	type SplitState
 } from './split-config';
 
-export const FUEL_NEEDS_VEHICLE_ERROR =
-	"Couldn't load this vehicle's details. Tap Retry, then save.";
-
 export interface ExpenseFormContext {
 	readonly expenseId: string | undefined;
 	readonly returnTo: string;
@@ -164,17 +161,16 @@ export class ExpenseFormState {
 			this.showFuelFields && !this.vehicle && !!this.vehicleError && !this.isGroupEditMode;
 		if (this.showFuelFields) {
 			fields.push('mileage');
-			if (this.showVolumeField && !fuelNeedsVehicle) fields.push('volume');
-			if (this.showChargeField && !fuelNeedsVehicle) fields.push('charge');
+			if (this.showVolumeField) fields.push('volume');
+			if (this.showChargeField) fields.push('charge');
 		}
 
 		const ctx = this.validationContext();
 		for (const field of fields) {
 			const error = validateExpenseField(field, ctx);
-			if (error) this.errors[field] = error;
-		}
-		if (fuelNeedsVehicle && !this.errors['vehicleId']) {
-			this.errors['vehicleId'] = FUEL_NEEDS_VEHICLE_ERROR;
+			if (!error) continue;
+			const hidden = fuelNeedsVehicle && (field === 'volume' || field === 'charge');
+			this.errors[hidden ? 'vehicleDetails' : field] = error;
 		}
 
 		return Object.keys(this.errors).length === 0;

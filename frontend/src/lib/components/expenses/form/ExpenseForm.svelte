@@ -292,7 +292,11 @@
 								data-testid="vehicle-load-error"
 							>
 								<CircleAlert class="h-4 w-4 shrink-0 text-destructive" />
-								<span class="text-destructive">Couldn't load this vehicle's details.</span>
+								<span class="text-destructive">
+									{form.showFuelFields
+										? "Couldn't load this vehicle's details, so this fill-up can't be saved yet."
+										: "Couldn't load this vehicle's details."}
+								</span>
 								<Button
 									variant="outline"
 									size="lg"

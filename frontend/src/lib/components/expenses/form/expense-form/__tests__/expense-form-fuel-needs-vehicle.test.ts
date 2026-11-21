@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { ExpenseFormState, FUEL_NEEDS_VEHICLE_ERROR } from '../expense-form-state.svelte';
+import { ExpenseFormState } from '../expense-form-state.svelte';
 import { makeVehicle } from './expense-form-fixtures';
 
 function fuelState() {
@@ -14,19 +14,26 @@ function fuelState() {
 }
 
 describe('a Fuel expense whose vehicle failed to load', () => {
-	test('blocks the save on the vehicle field, not on the hidden volume field', () => {
+	test('blocks an empty fill-up without an error on a hidden field', () => {
 		const state = fuelState();
 		expect(state.validateForm()).toBe(false);
-		expect(state.errors['vehicleId']).toBe(FUEL_NEEDS_VEHICLE_ERROR);
 		expect(state.errors['volume']).toBeUndefined();
+		expect(state.errors['vehicleId']).toBeUndefined();
+		expect(state.errors['vehicleDetails']).toBeDefined();
+	});
+
+	test('still saves a stored fill-up being edited', () => {
+		const state = fuelState();
+		state.formData.volume = '10';
+		expect(state.validateForm()).toBe(true);
 	});
 
 	test('validates normally once the vehicle is loaded', () => {
 		const state = fuelState();
 		state.vehicle = makeVehicle('v1');
 		state.vehicleError = null;
-		state.formData.volume = '10';
-		expect(state.validateForm()).toBe(true);
+		expect(state.validateForm()).toBe(false);
+		expect(state.errors['volume']).toBeDefined();
 	});
 
 	test('other categories save without the vehicle details', () => {
