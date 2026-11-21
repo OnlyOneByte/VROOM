@@ -14,6 +14,7 @@ vi.mock('../api-client', () => ({
 }));
 
 const { vehicleApi } = await import('../vehicle-api');
+const ZONE = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
 
 beforeEach(() => {
 	for (const fn of [get, post, put, patch, del, getPaginated]) fn.mockReset();
@@ -23,7 +24,7 @@ describe('vehicleApi.getFinancing', () => {
 	test('returns null when the backend reports no financing (data: null)', async () => {
 		get.mockResolvedValueOnce(null);
 		await expect(vehicleApi.getFinancing('v1')).resolves.toBeNull();
-		expect(get).toHaveBeenCalledWith('/api/v1/financing/vehicles/v1/financing');
+		expect(get).toHaveBeenCalledWith(`/api/v1/financing/vehicles/v1/financing?timeZone=${ZONE}`);
 	});
 
 	test.each([401, 403, 404, 500])(
@@ -63,7 +64,7 @@ describe('vehicleApi request shapes', () => {
 	test('getVehicle GETs the vehicle path', async () => {
 		get.mockResolvedValueOnce({ id: 'v1' });
 		await expect(vehicleApi.getVehicle('v1')).resolves.toEqual({ id: 'v1' });
-		expect(get).toHaveBeenCalledWith('/api/v1/vehicles/v1');
+		expect(get).toHaveBeenCalledWith(`/api/v1/vehicles/v1?timeZone=${ZONE}`);
 	});
 
 	test('getVehicles only asks for shared vehicles when requested', async () => {
@@ -72,9 +73,9 @@ describe('vehicleApi request shapes', () => {
 		await vehicleApi.getVehicles({ includeShared: false });
 		await vehicleApi.getVehicles({ includeShared: true });
 		expect(get.mock.calls.map(c => c[0])).toEqual([
-			'/api/v1/vehicles',
-			'/api/v1/vehicles',
-			'/api/v1/vehicles?include=shared'
+			`/api/v1/vehicles?timeZone=${ZONE}`,
+			`/api/v1/vehicles?timeZone=${ZONE}`,
+			`/api/v1/vehicles?include=shared&timeZone=${ZONE}`
 		]);
 	});
 

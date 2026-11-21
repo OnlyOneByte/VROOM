@@ -6,6 +6,7 @@ import { CONFIG } from '../../config';
 import { vehicleFinancing } from '../../db/schema';
 import { changeTracker, requireAuth } from '../../middleware';
 import { financingWithBalanceToApi, moneyDollarsToCents } from '../../utils/money';
+import { isValidTimeZone } from '../../utils/time-zone';
 import {
   commonSchemas,
   validateFinancingOwnership,
@@ -68,6 +69,10 @@ const createFinancingSchema = baseFinancingSchema.omit({
   updatedAt: true,
 });
 
+const timeZoneQuerySchema = z.object({
+  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
+});
+
 const financingParamsSchema = z.object({
   financingId: z.string().min(1, 'Financing ID is required'),
 });
@@ -76,9 +81,10 @@ routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
 async function enrichWithBalance(
-  financing: NonNullable<Awaited<ReturnType<typeof financingRepository.findByVehicleId>>>
+  financing: NonNullable<Awaited<ReturnType<typeof financingRepository.findByVehicleId>>>,
+  timeZone?: string
 ) {
-  const computedBalance = await financingRepository.computeBalance(financing.id);
+  const computedBalance = await financingRepository.computeBalance(financing.id, timeZone);
   return withComputedBalance(financing, computedBalance);
 }
 
@@ -87,9 +93,11 @@ const financingRowToApi = financingWithBalanceToApi;
 routes.get(
   '/vehicles/:vehicleId/financing',
   zValidator('param', commonSchemas.vehicleIdParam),
+  zValidator('query', timeZoneQuerySchema),
   async (c) => {
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
+    const { timeZone } = c.req.valid('query');
     await validateVehicleOwnership(vehicleId, user.id);
 
     const financingData = await financingRepository.findByVehicleId(vehicleId);
@@ -101,7 +109,7 @@ routes.get(
       });
     }
 
-    const enriched = await enrichWithBalance(financingData);
+    const enriched = await enrichWithBalance(financingData, timeZone);
     return c.json({ success: true, data: financingRowToApi(enriched) });
   }
 );
