@@ -88,7 +88,13 @@ function page(data: Expense[]): PaginatedResponse<Expense> {
 const LOAN_PAYMENTS = [
 	makeExpense({ id: 'p2', date: localNoon(2025, 2, 10), amount: 400 }),
 	makeExpense({ id: 'p1', date: localNoon(2025, 1, 10), amount: 400 }),
-	makeExpense({ id: 'fuel', date: localNoon(2025, 1, 20), amount: 55, sourceType: undefined })
+	makeExpense({
+		id: 'fuel',
+		date: localNoon(2025, 1, 20),
+		amount: 55,
+		sourceType: undefined,
+		sourceId: undefined
+	})
 ];
 
 function mount(

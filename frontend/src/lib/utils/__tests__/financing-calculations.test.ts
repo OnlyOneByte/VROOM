@@ -218,19 +218,19 @@ describe('calculateNextPaymentDate', () => {
 	test('after this week is paid the next weekly payment is seven days after it', () => {
 		const next = calculateNextPaymentDate(
 			makeLoan({ paymentFrequency: 'weekly' }),
-			new Date(2025, 5, 12, 12)
+			new Date(2025, 5, 13, 12)
 		);
 		expect(next.getMonth()).toBe(5);
-		expect(next.getDate()).toBe(19);
+		expect(next.getDate()).toBe(20);
 	});
 
 	test('after this fortnight is paid the next bi-weekly payment is fourteen days after it', () => {
 		const next = calculateNextPaymentDate(
 			makeLoan({ paymentFrequency: 'bi-weekly' }),
-			new Date(2025, 5, 5, 12)
+			new Date(2025, 5, 13, 12)
 		);
 		expect(next.getMonth()).toBe(5);
-		expect(next.getDate()).toBe(19);
+		expect(next.getDate()).toBe(27);
 	});
 
 	test('returns now when the last payment date cannot be coerced', () => {
