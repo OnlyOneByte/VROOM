@@ -64,6 +64,7 @@ describe('moving a financing payment to another vehicle', () => {
 
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { vehicleId: corolla });
     expect(res.status).toBe(400);
+    expect(await res.text()).toContain("linked to the current vehicle's financing");
     expect(rowOf(id)).toEqual({
       vehicle_id: civic,
       source_type: 'financing',
@@ -133,6 +134,7 @@ describe('a split leg financing link', () => {
       sourceId: null,
     });
     expect(res.status).toBe(400);
+    expect(await res.text()).toContain('financing link is set for the whole split');
     expect(rowOf(legId).source_id).toBe(financingId);
   });
 
@@ -144,5 +146,31 @@ describe('a split leg financing link', () => {
       sourceId: financingId,
     });
     expect(res.status, await res.text()).toBe(200);
+  });
+
+  test('moving a linked leg gets the split message, not the move advice', async () => {
+    const { legId } = await linkedLeg();
+    const other = await seedVehicle(ctx, { make: 'Mazda', model: '3', year: 2023 });
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${legId}`, { vehicleId: other });
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain('part of a split');
+    expect(text).not.toContain('Remove the link');
+  });
+});
+
+describe('moving with the old vehicle financing pair', () => {
+  test('is rejected because the link does not match the new vehicle', async () => {
+    const civic = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const corolla = await seedVehicle(ctx, { make: 'Toyota', model: 'Corolla', year: 2022 });
+    const financingId = await createFinancing(civic);
+    const id = await createPayment(civic, financingId);
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
+      vehicleId: corolla,
+      sourceType: 'financing',
+      sourceId: financingId,
+    });
+    expect(res.status).toBe(400);
+    expect(rowOf(id).vehicle_id).toBe(civic);
   });
 });
