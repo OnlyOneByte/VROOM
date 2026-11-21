@@ -31,13 +31,15 @@
 	let isLoadingVehicles = $state(true);
 	let isLoadingData = $state(false);
 	let error = $state<string | null>(null);
+	let vehiclesLoadError = $state<string | null>(null);
 
 	async function loadVehicles() {
 		try {
 			isLoadingVehicles = true;
+			vehiclesLoadError = null;
 			vehicles = await vehicleApi.getVehicles();
 		} catch (e) {
-			error = userFacingErrorMessage(e);
+			vehiclesLoadError = userFacingErrorMessage(e);
 		} finally {
 			isLoadingVehicles = false;
 		}
@@ -119,6 +121,15 @@
 {#if isLoadingVehicles}
 	<div class="flex justify-center p-12">
 		<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+	</div>
+{:else if vehiclesLoadError}
+	<div class="rounded-lg border bg-card p-6">
+		<div class="flex items-center gap-3 text-destructive mb-4">
+			<CircleAlert class="h-5 w-5" />
+			<p class="font-medium">Couldn't load your vehicles</p>
+		</div>
+		<p class="text-sm text-muted-foreground mb-4">{vehiclesLoadError}</p>
+		<Button size="lg" onclick={loadVehicles}>Retry</Button>
 	</div>
 {:else if vehicles.length === 0}
 	<div class="rounded-lg border bg-card p-6 text-center">
