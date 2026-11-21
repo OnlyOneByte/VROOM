@@ -668,17 +668,12 @@ export function buildMonthlyCostHeatmap(allExpenses: GeneralExpenseRow[]): Array
 }
 
 function accumulateIntervalBuckets(
-  vehicleRows: FuelExpenseRow[],
+  fuelRows: FuelExpenseRow[],
   buckets: Array<{ label: string; min: number; max: number; count: number }>
 ): void {
-  const sorted = [...vehicleRows].sort((a, b) => {
-    const da = normalizeDate(a.date);
-    const db = normalizeDate(b.date);
-    return (da?.getTime() ?? 0) - (db?.getTime() ?? 0);
-  });
-  for (let i = 1; i < sorted.length; i++) {
-    const curr = normalizeDate(sorted[i]?.date ?? null);
-    const prev = normalizeDate(sorted[i - 1]?.date ?? null);
+  for (const [current, previous] of sameEnergyPairs(sortByVehicleThenDate(fuelRows))) {
+    const curr = normalizeDate(current.date);
+    const prev = normalizeDate(previous.date);
     if (!curr || !prev) continue;
     const days = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
     if (days <= 0) continue;
@@ -690,8 +685,6 @@ function accumulateIntervalBuckets(
 export function buildFillupIntervals(
   fuelRows: FuelExpenseRow[]
 ): Array<{ intervalLabel: string; count: number }> {
-  const byVehicle = groupByVehicle(fuelRows.filter((row) => row.date != null));
-
   const buckets = [
     { label: '1-3 days', min: 1, max: 3, count: 0 },
     { label: '4-7 days', min: 4, max: 7, count: 0 },
@@ -700,9 +693,10 @@ export function buildFillupIntervals(
     { label: '22+ days', min: 22, max: Number.POSITIVE_INFINITY, count: 0 },
   ];
 
-  for (const vehicleRows of byVehicle.values()) {
-    accumulateIntervalBuckets(vehicleRows, buckets);
-  }
+  accumulateIntervalBuckets(
+    fuelRows.filter((row) => row.date != null),
+    buckets
+  );
 
   return buckets
     .filter((b) => b.count > 0)

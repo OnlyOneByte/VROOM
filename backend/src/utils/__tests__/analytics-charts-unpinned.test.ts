@@ -142,6 +142,18 @@ describe('buildFillupIntervals does not mutate its input', () => {
     expect(bucket?.count).toBe(1);
   });
 
+  test('a PHEV charge between gas fill-ups does not split the gas interval', () => {
+    const charge = 'Level 2 (AC)';
+    const out = buildFillupIntervals([
+      fuelRow({ date: d(2024, 1, 1) }),
+      fuelRow({ date: d(2024, 1, 4), fuelType: charge }),
+      fuelRow({ date: d(2024, 1, 7) }),
+      fuelRow({ date: d(2024, 1, 10), fuelType: charge }),
+      fuelRow({ date: d(2024, 1, 13) }),
+    ]);
+    expect(out).toEqual([{ intervalLabel: '4-7 days', count: 3 }]);
+  });
+
   test('a same-date split fillup creates no phantom 0-day intervals', () => {
     const out = buildFillupIntervals([
       fuelRow({ vehicleId: 'v1', date: d(2024, 1, 1), volume: 12 }),
