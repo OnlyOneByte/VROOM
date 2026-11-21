@@ -459,3 +459,38 @@ describe('GoogleSheetsService.readSpreadsheetData — restore integrity', () => 
     expect(trip.end_odometer).toBe(150);
   });
 });
+
+describe('GoogleSheetsService — tabs wider than 26 columns', () => {
+  test('columnLetter follows A1 notation past Z', async () => {
+    const { columnLetter } = await import('../google-sheets-service');
+    expect([1, 26, 27, 52, 53, 702, 703].map(columnLetter)).toEqual([
+      'A',
+      'Z',
+      'AA',
+      'AZ',
+      'BA',
+      'ZZ',
+      'AAA',
+    ]);
+  });
+
+  test('a tab with more than 26 headers writes and reads back every column', async () => {
+    await seedVehicle('Mazda', 'MX-5', 2016);
+    const sheetsModule = await import('../google-sheets-service');
+    const headers = sheetsModule.SHEET_HEADERS.vehicles as unknown as string[];
+    const originalLength = headers.length;
+    const extra = Array.from({ length: 27 - originalLength + 2 }, (_, i) => `extraColumn${i}`);
+    headers.push(...extra);
+    try {
+      const svc = makeSvc();
+      const info = await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM', 'Demo User');
+      const data = await svc.readSpreadsheetData(info.id);
+      expect(headers.length).toBeGreaterThan(26);
+      expect(data.vehicles).toHaveLength(1);
+      expect(Object.keys(data.vehicles[0])).toEqual(headers);
+      expect(data.vehicles[0].make).toBe('Mazda');
+    } finally {
+      headers.splice(originalLength);
+    }
+  });
+});
