@@ -36,6 +36,7 @@ function genRow(over: Partial<GeneralExpenseRow> = {}): GeneralExpenseRow {
     date: d(2024, 1, 15),
     mileage: null,
     volume: null,
+    fuelType: null,
     missedFillup: false,
     ...over,
   };
