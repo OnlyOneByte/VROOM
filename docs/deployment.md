@@ -190,7 +190,8 @@ tunnel hostnames (see [Cloudflare Tunnel](#cloudflare-tunnel)). The `cloudflared
 Every backend route lives under `/api`. `/health` is only used by the container healthcheck
 and needs no external exposure. So: `/api/*` to port 3001, everything else to port 3000.
 
-Do not route `/auth/*` to the backend: `/auth` and `/auth/callback` are frontend pages.
+Do not route `/auth` to the backend: it is the frontend sign-in page. OAuth providers call back to
+`/api/v1/auth/callback/*`, which the `/api/*` rule already sends to the backend.
 
 Set `CORS_ORIGINS` and `FRONTEND_URL` to the public origin, leave `PUBLIC_API_URL` empty, and
 set `TRUSTED_PROXY_IPS` to the proxy's address so rate limiting keys on the real client IP.
