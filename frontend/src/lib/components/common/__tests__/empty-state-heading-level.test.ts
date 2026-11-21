@@ -17,4 +17,14 @@ describe('the shared empty state', () => {
 		expect(heading.tagName).toBe('H2');
 		expect(heading.getAttribute('aria-level')).toBeNull();
 	});
+
+	test.each([3, 4] as const)('takes level %i when it sits under a section heading', level => {
+		const { getByRole } = render(EmptyState, {
+			title: text('No recent activity'),
+			description: text('Log an expense to see it here.'),
+			level
+		});
+
+		expect(getByRole('heading', { name: 'No recent activity' }).tagName).toBe(`H${level}`);
+	});
 });
