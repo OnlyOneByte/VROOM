@@ -225,7 +225,8 @@ describe('getDefaultDateRange', () => {
 		await analyticsApi.getVehicleTCO('v1');
 		await analyticsApi.getVehicleExpenses('v1', range);
 		await analyticsApi.getYearEnd();
-		for (const [url] of mockGet.mock.calls.slice(-9)) {
+		await analyticsApi.getVehicleHealth('v1');
+		for (const [url] of mockGet.mock.calls.slice(-10)) {
 			expect(url).toContain(`timeZone=${ZONE}`);
 		}
 	});
@@ -353,9 +354,9 @@ describe('analyticsApi — method→endpoint wiring', () => {
 		expect(calledUrl()).toBe(`/api/v1/analytics/insurance?timeZone=${ZONE}`);
 	});
 
-	it('getVehicleHealth: appends the vehicleId', async () => {
+	it('getVehicleHealth: appends the vehicleId and the browser time zone', async () => {
 		await analyticsApi.getVehicleHealth('veh-2');
-		expect(calledUrl()).toBe('/api/v1/analytics/vehicle-health?vehicleId=veh-2');
+		expect(calledUrl()).toBe(`/api/v1/analytics/vehicle-health?vehicleId=veh-2&timeZone=${ZONE}`);
 	});
 
 	it('getVehicleTCO: vehicleId only when no year', async () => {
