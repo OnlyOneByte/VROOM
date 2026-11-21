@@ -7,7 +7,6 @@ import {
   isNotNull,
   isNull,
   lt,
-  lte,
   notInArray,
   or,
   sql,
@@ -75,6 +74,7 @@ import {
   type UnitScale,
 } from '../../utils/unit-conversions';
 import { FinancingRepository } from '../financing/repository';
+import { isTermInForce, termInForceAt } from '../insurance/in-force';
 
 export type { FuelEfficiencyPoint } from '../../utils/analytics-charts';
 
@@ -108,18 +108,6 @@ export function yearToDateSpending(
     if (row.date != null && toDate(row.date).getTime() >= yearStart) total += row.expenseAmount;
   }
   return total;
-}
-
-export function isTermInForce(
-  term: { startDate: Date | null; endDate: Date | null },
-  now: number
-): boolean {
-  return (
-    term.startDate instanceof Date &&
-    term.endDate instanceof Date &&
-    term.startDate.getTime() <= now &&
-    now <= term.endDate.getTime()
-  );
 }
 
 export function calendarYearRange(year: number): { start: Date; end: Date } {
@@ -1084,7 +1072,7 @@ export class AnalyticsRepository {
     const monthlyMap = new Map<string, number>();
     const currentPolicyIds = new Set<string>();
 
-    const now = Date.now();
+    const now = new Date();
     for (const policy of activePolicies) {
       const policyTerms = termRows
         .filter((t) => t.policyId === policy.id)
@@ -1387,8 +1375,7 @@ export class AnalyticsRepository {
           inArray(insuranceTermVehicles.vehicleId, vehicleIds),
           eq(insurancePolicies.isActive, true),
           eq(insurancePolicies.userId, userId),
-          lte(insuranceTerms.startDate, now),
-          gte(insuranceTerms.endDate, now)
+          termInForceAt(now)
         )
       );
 
