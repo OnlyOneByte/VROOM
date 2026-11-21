@@ -323,7 +323,7 @@ describe('ShareVehicleDialog managing existing shares', () => {
 
 	test('a failed level change shows an error toast', async () => {
 		listGranted.mockResolvedValue([share()]);
-		changeLevel.mockRejectedValue(new Error('nope'));
+		changeLevel.mockRejectedValue(new ApiError('Internal server error', 500));
 		mount();
 		await settle();
 
@@ -332,7 +332,9 @@ describe('ShareVehicleDialog managing existing shares', () => {
 			'Editor'
 		);
 
-		expect(toastError).toHaveBeenCalledWith('Could not change the level. Try again.');
+		expect(toastError).toHaveBeenCalledWith(
+			`Couldn't change the access level. ${SERVER_FAILURE_MESSAGE}`
+		);
 	});
 
 	test('revoking access calls the API, confirms and reloads', async () => {
@@ -356,7 +358,7 @@ describe('ShareVehicleDialog managing existing shares', () => {
 
 	test('a failed revoke shows an error toast and keeps the row', async () => {
 		listGranted.mockResolvedValue([share()]);
-		revoke.mockRejectedValue(new Error('nope'));
+		revoke.mockRejectedValue(new ApiError('Internal server error', 500));
 		mount();
 		await settle();
 
@@ -368,7 +370,7 @@ describe('ShareVehicleDialog managing existing shares', () => {
 		);
 		await settle();
 
-		expect(toastError).toHaveBeenCalledWith('Could not revoke access. Try again.');
+		expect(toastError).toHaveBeenCalledWith(`Couldn't revoke access. ${SERVER_FAILURE_MESSAGE}`);
 		expect(screen.getByText('friend@example.com')).toBeInTheDocument();
 	});
 });

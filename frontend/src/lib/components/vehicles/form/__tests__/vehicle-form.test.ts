@@ -3,7 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { UpdateVehicleRequest, Vehicle, VehicleFinancing } from '#lib/types/index.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { dateOnlyToISO } from '#lib/utils/formatters.ts';
-import { ApiError } from '#lib/utils/error-handling.ts';
+import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 const goto = vi.fn(() => Promise.resolve());
 const refreshAll = vi.fn(() => Promise.resolve());
@@ -272,14 +272,16 @@ describe('VehicleForm create mode', () => {
 	});
 
 	test('a failed create keeps the user on the form with an error notification', async () => {
-		createVehicle.mockRejectedValue(new Error('boom'));
+		createVehicle.mockRejectedValue(new ApiError('Internal server error', 500));
 		await renderCreate();
 		await fillRequired();
 
 		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
 
 		await vi.waitFor(() =>
-			expect(notificationMessages()).toContain('Error adding vehicle. Please try again.')
+			expect(notificationMessages()).toContain(
+				`Couldn't add the vehicle. ${SERVER_FAILURE_MESSAGE}`
+			)
 		);
 		expect(goto).not.toHaveBeenCalled();
 		expect(appStore.vehicles).toEqual([]);
@@ -404,11 +406,11 @@ describe('VehicleForm edit mode', () => {
 	});
 
 	test('a vehicle that fails to load is reported and the user is sent to the dashboard', async () => {
-		getVehicle.mockRejectedValue(new Error('not found'));
+		getVehicle.mockRejectedValue(new ApiError('Vehicle not found', 404));
 		render(VehicleForm, { props: { vehicleId: 'gone' } });
 
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
-		expect(notificationMessages()).toContain('Error loading vehicle');
+		expect(notificationMessages()).toContain("Couldn't load the vehicle. Vehicle not found.");
 	});
 
 	test('update sends edited fields and nulls for optionals the user emptied', async () => {
@@ -454,13 +456,15 @@ describe('VehicleForm edit mode', () => {
 	});
 
 	test('a failed update reports an updating error and stays on the form', async () => {
-		updateVehicle.mockRejectedValue(new Error('conflict'));
+		updateVehicle.mockRejectedValue(new ApiError('Internal server error', 500));
 		await renderEdit();
 
 		await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
 
 		await vi.waitFor(() =>
-			expect(notificationMessages()).toContain('Error updating vehicle. Please try again.')
+			expect(notificationMessages()).toContain(
+				`Couldn't update the vehicle. ${SERVER_FAILURE_MESSAGE}`
+			)
 		);
 		expect(goto).not.toHaveBeenCalled();
 		expect(refreshAll).not.toHaveBeenCalled();
@@ -504,7 +508,7 @@ describe('VehicleForm edit mode', () => {
 	});
 
 	test('a failed delete surfaces the error message and keeps the vehicle', async () => {
-		deleteVehicle.mockRejectedValue(new Error('Vehicle is shared'));
+		deleteVehicle.mockRejectedValue(new ApiError('Vehicle is shared with other people', 409));
 		appStore.setVehicles([EXISTING]);
 		await renderEdit();
 
@@ -512,7 +516,11 @@ describe('VehicleForm edit mode', () => {
 		await screen.findByRole('alertdialog');
 		await fireEvent.click(screen.getByRole('button', { name: /delete vehicle/i }));
 
-		await vi.waitFor(() => expect(notificationMessages()).toContain('Vehicle is shared'));
+		await vi.waitFor(() =>
+			expect(notificationMessages()).toContain(
+				"Couldn't delete the vehicle. Vehicle is shared with other people."
+			)
+		);
 		expect(goto).not.toHaveBeenCalled();
 		expect(appStore.vehicles).toHaveLength(1);
 	});

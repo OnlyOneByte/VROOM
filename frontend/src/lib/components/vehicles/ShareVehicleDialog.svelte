@@ -91,8 +91,8 @@
 			await shareApi.changeLevel(share.id, next);
 			toast.success(`Changed to ${shareLevelLabel(next).toLowerCase()}`);
 			await load();
-		} catch {
-			toast.error('Could not change the level. Try again.');
+		} catch (error) {
+			toast.error(`Couldn't change the access level. ${userFacingErrorMessage(error)}`);
 		}
 	}
 
@@ -107,7 +107,7 @@
 			await shareApi.revoke(revokingShare.id);
 			toast.success('Access revoked');
 		} catch (error) {
-			toast.error('Could not revoke access. Try again.');
+			toast.error(`Couldn't revoke access. ${userFacingErrorMessage(error)}`);
 			throw error;
 		}
 		await load();
