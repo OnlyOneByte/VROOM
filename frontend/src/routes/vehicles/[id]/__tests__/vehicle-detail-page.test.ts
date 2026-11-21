@@ -237,6 +237,18 @@ describe('vehicle detail page overview', () => {
 		expect(captured['share']?.['vehicleId']).toBe('v1');
 	});
 
+	test('the first Upload Photos tap mounts the upload dialog open', async () => {
+		await mount();
+		expect(captured['media']).toBeUndefined();
+		expect(captured['photos']?.['onUpload']).toBeTypeOf('function');
+
+		(captured['photos']?.['onUpload'] as () => void)();
+		await settle();
+
+		expect(captured['media']?.['open']).toBe(true);
+		expect(captured['media']?.['title']).toBe('Upload Vehicle Photos');
+	});
+
 	test('a vehicle with no expenses shows the no-expenses empty state', async () => {
 		await mount();
 
