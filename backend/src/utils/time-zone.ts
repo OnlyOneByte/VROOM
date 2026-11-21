@@ -7,6 +7,8 @@ export function isValidTimeZone(timeZone: string): boolean {
   }
 }
 
+const DAY_MS = 86_400_000;
+
 const zonedFormatters = new Map<string, Intl.DateTimeFormat>();
 
 function zonedFormatter(timeZone: string): Intl.DateTimeFormat {
@@ -57,6 +59,10 @@ export function zonedMidnight(
 ): Date {
   const wall = Date.UTC(year, monthIndex, day);
   const guess = wall - zoneOffsetMs(wall, timeZone);
+  const exact = [guess - DAY_MS, guess, guess + DAY_MS]
+    .map((probe) => wall - zoneOffsetMs(probe, timeZone))
+    .filter((candidate) => wall - zoneOffsetMs(candidate, timeZone) === candidate);
+  if (exact.length > 0) return new Date(Math.min(...exact));
   const settled = new Date(wall - zoneOffsetMs(guess, timeZone));
   const requestedDay = new Date(wall).toISOString().slice(0, 10);
   return calendarDayIn(settled, timeZone) === requestedDay ? settled : new Date(guess);

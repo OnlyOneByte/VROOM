@@ -27,6 +27,19 @@ describe('zonedMidnight', () => {
     );
   });
 
+  test('a day whose DST change repeats midnight starts at the first midnight', () => {
+    expect(zonedMidnight(1976, 8, 26, 'Europe/Lisbon').toISOString()).toBe(
+      '1976-09-25T23:00:00.000Z'
+    );
+    expect(zonedMidnight(1995, 8, 15, 'Asia/Amman').toISOString()).toBe('1995-09-14T21:00:00.000Z');
+  });
+
+  test('the day before a repeated midnight ends at the first midnight', () => {
+    const { dayStart, nextDay } = zonedDayWindow(new Date('1976-09-25T12:00:00Z'), 'Europe/Lisbon');
+    expect(dayStart.toISOString()).toBe('1976-09-24T23:00:00.000Z');
+    expect(nextDay.toISOString()).toBe('1976-09-25T23:00:00.000Z');
+  });
+
   test('the day before a skipped midnight keeps its last hour', () => {
     const { dayStart, nextDay } = zonedDayWindow(
       new Date('2025-09-07T03:30:00Z'),
