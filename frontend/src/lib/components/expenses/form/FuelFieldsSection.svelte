@@ -184,10 +184,10 @@
 	<div class="flex items-center gap-2 text-primary">
 		{#if energyMode === 'charging'}
 			<Zap class="h-5 w-5" />
-			<h3 class="font-medium">Charging Details</h3>
+			<h2 class="font-medium">Charging Details</h2>
 		{:else}
 			<Fuel class="h-5 w-5" />
-			<h3 class="font-medium">Fuel Details</h3>
+			<h2 class="font-medium">Fuel Details</h2>
 		{/if}
 	</div>
 
