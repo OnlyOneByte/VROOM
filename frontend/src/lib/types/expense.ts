@@ -81,7 +81,7 @@ export interface BackendExpenseResponse {
 	date: string;
 	mileage?: number;
 	volume?: number;
-	fuelType?: string;
+	fuelType?: string | null;
 	description?: string | null;
 	location?: string | null;
 	missedFillup?: boolean;
