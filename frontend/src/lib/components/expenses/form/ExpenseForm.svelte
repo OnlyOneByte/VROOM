@@ -290,9 +290,9 @@
 						bind:fuelType={form.formData.fuelType}
 						bind:missedFillup={form.formData.missedFillup}
 						amount={form.formData.amount}
-						volumeUnit={form.volumeUnit}
-						chargeUnit={form.chargeUnit}
-						distanceUnit={form.distanceUnit}
+						volumeUnit={form.effectiveVolumeUnit}
+						chargeUnit={form.effectiveChargeUnit}
+						distanceUnit={form.effectiveDistanceUnit}
 						calculatedMpg={form.calculatedMpg}
 						calculatedEfficiency={form.calculatedEfficiency}
 						showMpgCalculation={form.showMpgCalculation && !form.formData.missedFillup}
