@@ -1,15 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		LoaderCircle,
-		CircleAlert,
-		ChartBar,
-		Car,
-		DollarSign,
-		Activity,
-		TrendingUp
-	} from '@lucide/svelte';
+	import { LoaderCircle, CircleAlert, Car, DollarSign, Activity, TrendingUp } from '@lucide/svelte';
 	import * as Tabs from '#lib/components/ui/tabs/index.ts';
+	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import FuelStatsTab from '#lib/components/analytics/fuel/FuelStatsTab.svelte';
@@ -87,15 +80,10 @@
 </svelte:head>
 
 <div class="min-h-screen space-y-4 md:space-y-6">
-	<div class="space-y-2">
-		<h1 class="flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
-			<ChartBar class="h-6 w-6 sm:h-8 sm:w-8" />
-			<span class="truncate">Analytics Dashboard</span>
-		</h1>
-		<p class="text-sm text-muted-foreground sm:text-base">
-			Comprehensive insights into your vehicle spending patterns and trends
-		</p>
-	</div>
+	<PageHeader
+		title="Analytics Dashboard"
+		description="Comprehensive insights into your vehicle spending patterns and trends"
+	/>
 
 	{#if isLoading}
 		<div class="flex justify-center p-8">
