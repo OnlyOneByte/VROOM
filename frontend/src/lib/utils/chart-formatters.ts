@@ -52,7 +52,7 @@ export function getTrendLineProps(dataLength: number) {
 	if (dataLength <= 1) {
 		return {
 			spline: { curve: SMOOTH_CURVE },
-			points: { r: 6, class: 'fill-primary stroke-primary stroke-2' }
+			points: { r: 6, class: 'stroke-2' }
 		};
 	}
 	return TREND_LINE_PROPS;
