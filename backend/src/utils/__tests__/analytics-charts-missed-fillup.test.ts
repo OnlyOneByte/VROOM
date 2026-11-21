@@ -17,6 +17,7 @@ function general(over: Partial<GeneralExpenseRow> & { id: string }): GeneralExpe
     date: new Date(2024, 0, 1),
     mileage: null,
     volume: null,
+    fuelType: null,
     missedFillup: false,
     ...over,
   };

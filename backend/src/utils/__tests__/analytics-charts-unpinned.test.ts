@@ -43,6 +43,7 @@ function genRow(over: Partial<GeneralExpenseRow> = {}): GeneralExpenseRow {
     date: d(2024, 1, 15),
     mileage: null,
     volume: null,
+    fuelType: null,
     missedFillup: false,
     ...over,
   };
@@ -227,7 +228,7 @@ describe('sortByVehicleThenDate', () => {
   });
 });
 
-describe('computeMpgAndCostPerMile — charge rows excluded from MPG, kept in cost-per-mile', () => {
+describe('computeMpgAndCostPerMile — charge rows excluded from MPG and paired only with charges', () => {
   const rows: FuelExpenseRow[] = [
     fuelRow({
       vehicleId: 'v1',
@@ -262,10 +263,28 @@ describe('computeMpgAndCostPerMile — charge rows excluded from MPG, kept in co
     expect(mpgValues.some((v) => v < 10)).toBe(false);
   });
 
-  test('costPerMileValues still includes the charge interval (cost spans all energy)', () => {
+  test('a charge with no earlier charge adds no cost-per-mile interval against a gas row', () => {
     const { costPerMileValues } = computeMpgAndCostPerMile(rows);
-    expect(costPerMileValues).toHaveLength(2);
-    expect(costPerMileValues.some((v) => Math.abs(v - 9 / 60) < 1e-9)).toBe(true);
+    expect(costPerMileValues).toHaveLength(1);
+    expect(costPerMileValues[0]).toBeCloseTo(40 / 300, 9);
+  });
+
+  test('a PHEV gas fill-up after a charge pairs with the previous gas fill-up', () => {
+    const phev: FuelExpenseRow[] = [
+      fuelRow({ date: d(2024, 1, 1), mileage: 10000, volume: 10, expenseAmount: 40 }),
+      fuelRow({
+        date: d(2024, 1, 5),
+        mileage: 10250,
+        volume: 15,
+        expenseAmount: 9,
+        fuelType: 'Level 2 (AC)',
+      }),
+      fuelRow({ date: d(2024, 1, 8), mileage: 10300, volume: 10, expenseAmount: 40 }),
+    ];
+    const { mpgValues, costPerMileValues } = computeMpgAndCostPerMile(phev);
+    expect(mpgValues).toHaveLength(1);
+    expect(mpgValues[0]).toBeCloseTo(30, 5);
+    expect(costPerMileValues).toEqual([40 / 300]);
   });
 
   test('a gas-only vehicle is unaffected (control)', () => {
