@@ -178,3 +178,9 @@ export function validateLoanTerms(terms: {
   if (terms.termMonths <= 0) errors.push('Term must be at least 1 month');
   return errors;
 }
+
+export const DUPLICATE_VEHICLE_MESSAGE = 'Each vehicle can only appear once';
+
+export function hasUniqueVehicleIds(vehicleIds: readonly string[]): boolean {
+  return new Set(vehicleIds).size === vehicleIds.length;
+}

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES, type SplitConfig } from '../../db/types';
 import { expenseDollarsToCents } from '../../utils/money';
-import { dateInput } from '../../utils/validation';
+import { DUPLICATE_VEHICLE_MESSAGE, dateInput, hasUniqueVehicleIds } from '../../utils/validation';
 
 export const FUEL_SPLIT_MESSAGE = 'Fuel expenses cannot be split. Log the fill-up on one vehicle.';
 
@@ -33,9 +33,16 @@ export function clearFuelFieldsIfNotFuel<
 
 const centsAmount = expenseDollarsToCents((n) => n.positive('Amount must be positive'));
 
+function allocationVehiclesAreUnique(allocations: { vehicleId: string }[]): boolean {
+  return hasUniqueVehicleIds(allocations.map((a) => a.vehicleId));
+}
+
 const evenSplitSchema = z.object({
   method: z.literal('even'),
-  vehicleIds: z.array(z.string().min(1)).min(1),
+  vehicleIds: z
+    .array(z.string().min(1))
+    .min(1)
+    .refine(hasUniqueVehicleIds, DUPLICATE_VEHICLE_MESSAGE),
 });
 
 const absoluteAllocationSchema = z.object({
@@ -45,7 +52,10 @@ const absoluteAllocationSchema = z.object({
 
 const absoluteSplitSchema = z.object({
   method: z.literal('absolute'),
-  allocations: z.array(absoluteAllocationSchema).min(1),
+  allocations: z
+    .array(absoluteAllocationSchema)
+    .min(1)
+    .refine(allocationVehiclesAreUnique, DUPLICATE_VEHICLE_MESSAGE),
 });
 
 const percentageAllocationSchema = z.object({
@@ -55,7 +65,10 @@ const percentageAllocationSchema = z.object({
 
 const percentageSplitSchema = z.object({
   method: z.literal('percentage'),
-  allocations: z.array(percentageAllocationSchema).min(1),
+  allocations: z
+    .array(percentageAllocationSchema)
+    .min(1)
+    .refine(allocationVehiclesAreUnique, DUPLICATE_VEHICLE_MESSAGE),
 });
 
 export const splitConfigSchema = z.discriminatedUnion('method', [
@@ -74,7 +87,10 @@ export const splitConfigStructuralSchema = z.discriminatedUnion('method', [
   evenSplitSchema,
   z.object({
     method: z.literal('absolute'),
-    allocations: z.array(absoluteAllocationStructuralSchema).min(1),
+    allocations: z
+      .array(absoluteAllocationStructuralSchema)
+      .min(1)
+      .refine(allocationVehiclesAreUnique, DUPLICATE_VEHICLE_MESSAGE),
   }),
   percentageSplitSchema,
 ]);
