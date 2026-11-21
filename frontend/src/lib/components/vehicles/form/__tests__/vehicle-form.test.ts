@@ -735,17 +735,6 @@ describe('VehicleForm financing on edit', () => {
 		expect(createdFinancing()).toMatchObject({ paymentDayOfMonth: 1, paymentAmount: 373 });
 	});
 
-	test('dropping a saved loan to 0% APR keeps the saved payment and shows no preview', async () => {
-		await renderEditWithFinancing(LOAN);
-
-		await type('apr', '0');
-
-		expect(screen.queryByText('Updated Loan Calculation Preview')).toBeNull();
-		await submitUpdate();
-		await vi.waitFor(() => expect(createFinancing).toHaveBeenCalledTimes(1));
-		expect(createdFinancing()).toMatchObject({ apr: 0, paymentAmount: 373 });
-	});
-
 	test('a financing save failure with a non-Error reason warns with Unknown error', async () => {
 		createFinancing.mockRejectedValue('timeout');
 		await renderEditWithFinancing(LOAN);

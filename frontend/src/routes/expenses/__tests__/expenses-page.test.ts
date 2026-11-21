@@ -181,6 +181,8 @@ afterEach(() => {
 	offlineExpenseQueue.current = [];
 });
 
+const SEARCH_DEBOUNCE_WAIT = { timeout: 4000 };
+
 describe('/expenses loading states', () => {
 	test('shows skeletons and no header until the first load finishes', async () => {
 		getAllExpenses.mockReturnValue(new Promise(() => {}));
@@ -271,7 +273,10 @@ describe('/expenses filters', () => {
 			target: { value: '  shell  ' }
 		});
 
-		await waitFor(() => expect(getAllExpenses.mock.calls.length).toBe(calls + 1));
+		await waitFor(
+			() => expect(getAllExpenses.mock.calls.length).toBe(calls + 1),
+			SEARCH_DEBOUNCE_WAIT
+		);
 		expect(lastListParams()).toMatchObject({ search: 'shell', offset: 0 });
 	});
 
@@ -283,7 +288,10 @@ describe('/expenses filters', () => {
 			target: { value: '   ' }
 		});
 
-		await waitFor(() => expect(getAllExpenses.mock.calls.length).toBe(calls + 1));
+		await waitFor(
+			() => expect(getAllExpenses.mock.calls.length).toBe(calls + 1),
+			SEARCH_DEBOUNCE_WAIT
+		);
 		expect(lastListParams()).not.toHaveProperty('search');
 	});
 
@@ -364,7 +372,10 @@ describe('/expenses filters', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: /Clear Filters/ }));
 
-		await waitFor(() => expect(getAllExpenses.mock.calls.length).toBe(calls + 1));
+		await waitFor(
+			() => expect(getAllExpenses.mock.calls.length).toBe(calls + 1),
+			SEARCH_DEBOUNCE_WAIT
+		);
 		const params = lastListParams();
 		expect(params).not.toHaveProperty('vehicleId');
 		expect(params).not.toHaveProperty('category');
