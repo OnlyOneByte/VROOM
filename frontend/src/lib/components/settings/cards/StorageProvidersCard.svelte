@@ -103,6 +103,14 @@
 		goto(resolve(paramRoutes.settingsProviderEdit, { id: provider.id }));
 	}
 
+	let deleteConfirmOpen = $state(false);
+	let pendingDelete = $state<UserProviderInfo | null>(null);
+
+	function requestProviderDelete(provider: UserProviderInfo) {
+		pendingDelete = provider;
+		deleteConfirmOpen = true;
+	}
+
 	let photoLossConfirmOpen = $state(false);
 	let photoLossConfirm = $state<{ provider: UserProviderInfo; message: string } | null>(null);
 
@@ -328,7 +336,7 @@
 								sheetsSyncEnabled={backupConfig.providers[provider.id]?.sheetsSyncEnabled ?? false}
 								lastBackupAt={backupConfig.providers[provider.id]?.lastBackupAt}
 								onEdit={handleProviderEdit}
-								onDelete={handleProviderDelete}
+								onDelete={requestProviderDelete}
 								onBackupToggle={handleBackupToggle}
 								onSheetsSyncToggle={handleSheetsSyncToggle}
 							/>
@@ -339,6 +347,15 @@
 		{/if}
 	</CardContent>
 </Card>
+
+<ConfirmDialog
+	bind:open={deleteConfirmOpen}
+	title="Delete {pendingDelete?.displayName ?? 'provider'}?"
+	description="Backups to this provider stop and its settings are removed from VROOM. Your files stay in the provider itself."
+	onConfirm={async () => {
+		if (pendingDelete) await handleProviderDelete(pendingDelete);
+	}}
+/>
 
 <ConfirmDialog
 	bind:open={photoLossConfirmOpen}
