@@ -35,7 +35,7 @@
 	<Card.Header>
 		<div class="flex items-center justify-between">
 			<div>
-				<Card.Title level={2}>Recent Activity</Card.Title>
+				<Card.Title>Recent Activity</Card.Title>
 				<Card.Description>Latest expenses across all vehicles</Card.Description>
 			</div>
 			<div class="p-2 rounded-lg bg-accent">
