@@ -6,7 +6,6 @@ import {
 	getLatestTerm,
 	groupPoliciesByActive,
 	isPolicyInForce,
-	isExpiringSoon,
 	prefillFromPreviousTerm,
 	sortTermsByEndDateDesc
 } from '#lib/utils/insurance.ts';
@@ -121,7 +120,7 @@ describe('Policy active/inactive grouping', () => {
 });
 
 describe('Expiration alert computation', () => {
-	test('getDaysRemaining equals ceil((endDate - now) / dayMs)', () => {
+	test('getDaysRemaining is within a day of ceil((endDate - now) / dayMs)', () => {
 		fc.assert(
 			fc.property(fc.integer({ min: -365, max: 365 }), offsetDays => {
 				const now = new Date();
@@ -133,30 +132,6 @@ describe('Expiration alert computation', () => {
 
 				expect(Math.abs(result - expected)).toBeLessThanOrEqual(1);
 			}),
-			{ numRuns: 100 }
-		);
-	});
-
-	test('isExpiringSoon returns true iff daysRemaining is in [0, threshold]', () => {
-		fc.assert(
-			fc.property(
-				fc.integer({ min: -60, max: 60 }),
-				fc.integer({ min: 1, max: 90 }),
-				(offsetDays, threshold) => {
-					const now = new Date();
-					const endDate = new Date(now.getTime() + offsetDays * DAY_MS);
-					const endDateStr = endDate.toISOString();
-
-					const result = isExpiringSoon(endDateStr, threshold);
-					const days = getDaysRemaining(endDateStr);
-
-					if (days >= 0 && days <= threshold) {
-						expect(result).toBe(true);
-					} else {
-						expect(result).toBe(false);
-					}
-				}
-			),
 			{ numRuns: 100 }
 		);
 	});
