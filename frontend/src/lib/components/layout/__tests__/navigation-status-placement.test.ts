@@ -124,6 +124,36 @@ describe('the sync status indicator lives in the navigation, never floating over
 		expect(sync).toBeDefined();
 	});
 
+	it('the sidebar action under the pointer survives the hover that expands the sidebar', async () => {
+		authStore.setUser(alice);
+		offlineExpenseQueue.current = [
+			{
+				id: 'p1',
+				vehicleId: 'v1',
+				tags: [],
+				category: 'misc',
+				amount: 1,
+				date: '2024-06-01',
+				timestamp: 0,
+				synced: false,
+				version: '3.0'
+			}
+		];
+		render(Navigation);
+		const sidebar = document.querySelector<HTMLElement>('div.lg\\:inset-y-0');
+		const sync = screen
+			.getAllByRole('button', { name: 'Sync 1' })
+			.find(button => !mobileHeader().contains(button))!;
+
+		await fireEvent.mouseEnter(sidebar!);
+
+		expect(sync.isConnected).toBe(true);
+		expect(sync).toHaveTextContent('Sync Now');
+		await fireEvent.click(sync);
+		const { syncManager } = await import('#lib/utils/sync/sync-manager.ts');
+		expect(syncManager.syncAll).toHaveBeenCalled();
+	});
+
 	it('the sidebar status is announced as a status with its text', async () => {
 		await startWithUnreachableServer();
 		render(Navigation);
