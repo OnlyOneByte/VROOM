@@ -884,4 +884,17 @@ describe('VehicleForm edit mode delete dialog', () => {
 
 		await vi.waitFor(() => expect(hasPendingSave()).toBe(true));
 	});
+
+	test('ending a lease before the update counts as unsaved changes', async () => {
+		payOffFinancing.mockReturnValue(new Promise(() => {}));
+		await renderEditWithFinancing(LEASE);
+		await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
+		await submitUpdate();
+		const dialog = await screen.findByRole('alertdialog');
+
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'End Lease' }));
+
+		await vi.waitFor(() => expect(hasPendingSave()).toBe(true));
+		expect(updateVehicle).not.toHaveBeenCalled();
+	});
 });

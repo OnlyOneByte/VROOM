@@ -77,7 +77,9 @@
 	let isLoading = $state(untrack(() => !!vehicleId));
 	let isSubmitting = $state(false);
 
-	onMount(() => trackPendingSave(() => isSubmitting));
+	let isPayingOff = $state(false);
+
+	onMount(() => trackPendingSave(() => isSubmitting || isPayingOff));
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
 	let showPayoffConfirm = $state(false);
@@ -419,17 +421,23 @@
 	async function payOffAndSave() {
 		const financing = financingBeingEnded;
 		if (!financing) return;
+		isPayingOff = true;
 		try {
 			const ended = await vehicleApi.payOffFinancing(financing.id);
 			if (vehicle) vehicle.financing = ended;
 		} catch (error) {
+			isPayingOff = false;
 			appStore.addNotification({
 				type: 'error',
 				message: `Couldn't mark the ${financing.financingType === 'lease' ? 'lease as ended' : 'loan as paid off'}. ${userFacingErrorMessage(error)}`
 			});
 			throw error;
 		}
-		await saveVehicle();
+		try {
+			await saveVehicle();
+		} finally {
+			isPayingOff = false;
+		}
 	}
 
 	async function saveVehicle(confirmUnitChange = false) {
