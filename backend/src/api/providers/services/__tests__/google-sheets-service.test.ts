@@ -494,3 +494,20 @@ describe('GoogleSheetsService — tabs wider than 26 columns', () => {
     }
   });
 });
+
+describe('GoogleSheetsService — user-edited tabs', () => {
+  test('a column the user inserts into a tab does not push a real column out of the read', async () => {
+    await seedVehicle('Skoda', 'Octavia', 2018);
+    const svc = makeSvc();
+    const info = await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM', 'Demo User');
+    const grid = store.spreadsheets.get(info.id)?.values.get('Vehicles');
+    if (!grid) throw new Error('Vehicles tab missing');
+    for (const row of grid) row.splice(1, 0, row === grid[0] ? 'My notes' : 'scratch');
+    const lastHeader = String(grid[0][grid[0].length - 1]);
+
+    const data = await svc.readSpreadsheetData(info.id);
+    expect(data.vehicles).toHaveLength(1);
+    expect(Object.keys(data.vehicles[0])).toContain(lastHeader);
+    expect(data.vehicles[0].make).toBe('Skoda');
+  });
+});
