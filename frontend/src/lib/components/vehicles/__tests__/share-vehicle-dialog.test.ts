@@ -327,6 +327,7 @@ describe('ShareVehicleDialog managing existing shares', () => {
 		await fireEvent.click(
 			screen.getByRole('button', { name: 'Revoke access for friend@example.com' })
 		);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Revoke' }));
 		await settle();
 
 		expect(revoke).toHaveBeenCalledWith('s1');
@@ -343,6 +344,7 @@ describe('ShareVehicleDialog managing existing shares', () => {
 		await fireEvent.click(
 			screen.getByRole('button', { name: 'Revoke access for friend@example.com' })
 		);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Revoke' }));
 		await settle();
 
 		expect(toastError).toHaveBeenCalledWith('Could not revoke access. Try again.');

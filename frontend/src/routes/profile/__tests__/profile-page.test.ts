@@ -251,6 +251,7 @@ describe('Profile connected accounts', () => {
 		]);
 		await mount();
 		await fireEvent.click(screen.getByRole('button', { name: 'Unlink GitHub' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Unlink' }));
 		await settle();
 		expect(authApi.unlinkAccount).toHaveBeenCalledWith('a2');
 		expect(screen.queryByText('ada@gh.test')).toBeNull();
@@ -272,6 +273,7 @@ describe('Profile connected accounts', () => {
 		authApi.unlinkAccount.mockRejectedValue(failure);
 		await mount();
 		await fireEvent.click(screen.getByRole('button', { name: 'Unlink GitHub' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Unlink' }));
 		await settle();
 		expect(screen.getByText(message)).toBeInTheDocument();
 		expect(screen.getByText('ada@gh.test')).toBeInTheDocument();

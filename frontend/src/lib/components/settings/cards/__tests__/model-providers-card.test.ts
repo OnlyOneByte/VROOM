@@ -317,6 +317,7 @@ describe('ModelProvidersCard edit and delete', () => {
 		render(ModelProvidersCard, { props: { domain: 'llm' } });
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: 'Delete Work Claude' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
 		await settle();
 		expect(deleteProvider).toHaveBeenCalledWith('llm-1');
 		expect(showSuccess).toHaveBeenCalledWith('Work Claude removed');
@@ -329,6 +330,7 @@ describe('ModelProvidersCard edit and delete', () => {
 		render(ModelProvidersCard, { props: { domain: 'llm' } });
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: 'Delete Work Claude' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
 		await settle();
 		expect(showError).toHaveBeenCalledWith('Failed to delete provider');
 		expect(screen.getByText('Work Claude')).toBeInTheDocument();
