@@ -102,10 +102,10 @@ describe('reminder dates as plain calendar dates', () => {
   });
 
   test('a plain date without a time zone is stored as UTC noon of that day', async () => {
-    const id = await createId({ startDate: '2099-06-15', endDate: '2101-01-31' });
+    const id = await createId({ startDate: '2099-06-15', endDate: '2100-01-31' });
     expect(stored(id)).toMatchObject({
       start: Date.parse('2099-06-15T12:00:00.000Z'),
-      end: Date.parse('2101-01-31T12:00:00.000Z'),
+      end: Date.parse('2100-01-31T12:00:00.000Z'),
     });
   });
 
@@ -122,7 +122,7 @@ describe('reminder dates as plain calendar dates', () => {
         error: { details: { issues: { path: string[]; message: string }[] } };
       };
       expect(body.error.details.issues).toContainEqual(
-        expect.objectContaining({ path: ['startDate'], message: 'Invalid date' })
+        expect.objectContaining({ path: ['startDate'], message: 'Enter a valid date' })
       );
     }
   });
@@ -130,7 +130,7 @@ describe('reminder dates as plain calendar dates', () => {
   test('resending the stored days as plain dates keeps both stored timestamps and the due date', async () => {
     const id = await createId({
       startDate: '2099-03-09T04:00:00.000Z',
-      endDate: '2105-11-02T23:30:00.000Z',
+      endDate: '2100-11-02T23:30:00.000Z',
     });
     expect((await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`)).status).toBe(200);
     const before = stored(id);
@@ -139,7 +139,7 @@ describe('reminder dates as plain calendar dates', () => {
       name: 'Renamed',
       frequency: 'yearly',
       startDate: '2099-03-09',
-      endDate: '2105-11-02',
+      endDate: '2100-11-02',
     });
 
     expect(stored(id)).toEqual(before);
@@ -155,7 +155,7 @@ describe('reminder dates as plain calendar dates', () => {
   });
 
   test('clearing the end date still clears it', async () => {
-    const id = await createId({ startDate: '2099-06-15', endDate: '2101-01-31' });
+    const id = await createId({ startDate: '2099-06-15', endDate: '2100-01-31' });
     await put(id, { endDate: null });
     expect(stored(id).end).toBeNull();
   });

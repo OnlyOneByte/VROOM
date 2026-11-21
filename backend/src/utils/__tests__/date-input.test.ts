@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../test-helpers/http-client';
 import { seedVehicle } from '../../test-helpers/seed';
 import { dateInput } from '../validation';
 
@@ -74,25 +79,99 @@ describe('date fields reject values that would be saved as 1970', () => {
         apr: 5,
       }),
     ],
+    ['insurance term startDate', '/api/v1/insurance', (date, id) => policyBody(id, date)],
+    [
+      'insurance claim claimDate',
+      '/api/v1/insurance/:policyId/claims',
+      (date) => ({ claimDate: date, claimType: 'collision' }),
+    ],
+    [
+      'reminder startDate',
+      '/api/v1/reminders',
+      (date, id) => ({
+        name: 'Inspection',
+        type: 'notification',
+        frequency: 'yearly',
+        startDate: date,
+        vehicleIds: [id],
+      }),
+    ],
+    [
+      'vehicle purchaseDate',
+      '/api/v1/vehicles',
+      (date) => ({ make: 'Honda', model: 'Fit', year: 2020, purchaseDate: date }),
+    ],
   ];
+
+  function policyBody(id: string, startDate: unknown): unknown {
+    return {
+      company: 'Acme Mutual',
+      terms: [
+        {
+          startDate,
+          endDate: '2025-01-01T00:00:00.000Z',
+          vehicleCoverage: { vehicleIds: [id] },
+        },
+      ],
+    };
+  }
+
+  async function resolve(route: string): Promise<string> {
+    if (!route.includes(':policyId')) return route.replace(':vehicleId', vehicleId);
+    const res = await ctx.authed('POST', '/api/v1/insurance', policyBody(vehicleId, '2024-01-01'));
+    const body = await json<DataEnvelope<{ id: string }>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(201);
+    return route.replace(':policyId', body.data.id);
+  }
 
   for (const [label, route, body] of bodies) {
     test(`${label} accepts a real date`, async () => {
       const res = await ctx.authed(
         'POST',
-        route.replace(':vehicleId', vehicleId),
+        await resolve(route),
         body('2024-02-01T12:00:00.000Z', vehicleId)
       );
       expect(res.status, await res.text()).toBe(201);
     });
 
     test.each([null, true, 0])(`${label} rejects %p`, async (date) => {
-      const res = await ctx.authed(
-        'POST',
-        route.replace(':vehicleId', vehicleId),
-        body(date, vehicleId)
-      );
+      const res = await ctx.authed('POST', await resolve(route), body(date, vehicleId));
       expect(res.status, await res.text()).toBe(400);
     });
   }
+
+  async function createdId(path: string, body: unknown): Promise<string> {
+    const res = await ctx.authed('POST', path, body);
+    const parsed = await json<DataEnvelope<{ id: string }>>(res);
+    expect(res.status, JSON.stringify(parsed)).toBe(201);
+    return parsed.data.id;
+  }
+
+  test('updates reject the same values', async () => {
+    const expenseId = await createdId('/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 10,
+      date: '2024-02-01T12:00:00.000Z',
+    });
+    const readingId = await createdId(`/api/v1/odometer/${vehicleId}`, {
+      odometer: 100,
+      recordedAt: '2024-02-01T12:00:00.000Z',
+    });
+    for (const date of [null, true, 0]) {
+      for (const [path, body] of [
+        [`/api/v1/expenses/${expenseId}`, { date }],
+        [`/api/v1/odometer/${readingId}`, { recordedAt: date }],
+        [`/api/v1/vehicles/${vehicleId}`, { purchaseDate: date === null ? true : date }],
+      ] as const) {
+        const res = await ctx.authed('PUT', path, body);
+        expect(res.status, `${path} ${JSON.stringify(body)}: ${await res.text()}`).toBe(400);
+      }
+    }
+  });
+
+  test('a vehicle purchaseDate can still be cleared with null', async () => {
+    const res = await ctx.authed('PUT', `/api/v1/vehicles/${vehicleId}`, { purchaseDate: null });
+    expect(res.status, await res.text()).toBe(200);
+  });
 });
