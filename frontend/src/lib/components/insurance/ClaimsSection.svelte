@@ -12,7 +12,10 @@
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
-	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import {
+		handleErrorWithNotification,
+		userFacingErrorMessage
+	} from '#lib/utils/error-handling.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import {
 		capitalize,
@@ -92,8 +95,8 @@
 		try {
 			claims = await insuranceApi.getClaims(policyId);
 		} catch (err) {
-			loadError = err instanceof Error ? err.message : 'Failed to load claims';
-			handleErrorWithNotification(err, 'Failed to load claims');
+			loadError = userFacingErrorMessage(err);
+			handleErrorWithNotification(err, "Couldn't load claims");
 		} finally {
 			isLoading = false;
 		}

@@ -2,7 +2,15 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Expense } from '#lib/types/index.ts';
 import { expenseApi } from '#lib/services/expense-api.ts';
 import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
+import {
+	EXPENSE_DELETED_MESSAGE,
+	REFRESH_AFTER_DELETE_FAILED,
 	blockedReasonId,
+	deleteAndRefresh,
 	deleteExpenseRecord,
 	deleteFailureMessage,
 	expenseEditHref,
@@ -83,12 +91,61 @@ describe('deleteExpenseRecord', () => {
 });
 
 describe('deleteFailureMessage', () => {
-	test('surfaces the message of an Error', () => {
-		expect(deleteFailureMessage(new Error('Conflict'))).toBe('Conflict');
+	test('a server failure says what failed without the raw error text', () => {
+		const message = deleteFailureMessage(new ApiError('SQLITE_BUSY: database is locked', 500));
+		expect(message).toBe(`Couldn't delete the expense. ${SERVER_FAILURE_MESSAGE}`);
+		expect(message).not.toContain('SQLITE_BUSY');
 	});
 
-	test('falls back to a generic message for anything else', () => {
-		expect(deleteFailureMessage('boom')).toBe('Failed to delete expense');
-		expect(deleteFailureMessage(undefined)).toBe('Failed to delete expense');
+	test('an unexpected error never shows its own text', () => {
+		const message = deleteFailureMessage(
+			new TypeError("Cannot read properties of undefined (reading 'id')")
+		);
+		expect(message).toBe(`Couldn't delete the expense. ${UNEXPECTED_FAILURE_MESSAGE}`);
+		expect(message).not.toContain('Cannot read properties');
+	});
+
+	test('falls back to the generic sentence for anything else', () => {
+		expect(deleteFailureMessage('boom')).toBe(
+			`Couldn't delete the expense. ${UNEXPECTED_FAILURE_MESSAGE}`
+		);
+		expect(deleteFailureMessage(undefined)).toBe(
+			`Couldn't delete the expense. ${UNEXPECTED_FAILURE_MESSAGE}`
+		);
+	});
+});
+
+describe('deleteAndRefresh', () => {
+	beforeEach(() => {
+		vi.mocked(expenseApi.deleteExpense).mockReset().mockResolvedValue(undefined);
+	});
+
+	test('a delete that works and refreshes reports success', async () => {
+		const refresh = vi.fn(() => Promise.resolve());
+		const notice = await deleteAndRefresh(expense({ id: 'e1' }), refresh);
+		expect(notice).toEqual({ type: 'success', message: EXPENSE_DELETED_MESSAGE });
+		expect(refresh).toHaveBeenCalledTimes(1);
+	});
+
+	test('a failed refresh after a successful delete is a soft warning, not a failed delete', async () => {
+		const refresh = vi.fn(() =>
+			Promise.reject(new ApiError('SQLITE_BUSY: database is locked', 500))
+		);
+		const notice = await deleteAndRefresh(expense({ id: 'e1' }), refresh);
+		expect(expenseApi.deleteExpense).toHaveBeenCalledWith('e1');
+		expect(notice).toEqual({ type: 'warning', message: REFRESH_AFTER_DELETE_FAILED });
+		expect(notice.message).not.toContain("Couldn't delete");
+		expect(notice.message).not.toContain('SQLITE_BUSY');
+	});
+
+	test('a failed delete is an error and skips the refresh', async () => {
+		vi.mocked(expenseApi.deleteExpense).mockRejectedValue(new ApiError('boom', 500));
+		const refresh = vi.fn(() => Promise.resolve());
+		const notice = await deleteAndRefresh(expense({ id: 'e1' }), refresh);
+		expect(notice).toEqual({
+			type: 'error',
+			message: `Couldn't delete the expense. ${SERVER_FAILURE_MESSAGE}`
+		});
+		expect(refresh).not.toHaveBeenCalled();
 	});
 });

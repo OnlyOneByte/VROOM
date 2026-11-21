@@ -762,3 +762,169 @@ describe('calculatePayoffDateFromStart', () => {
 		expect(payoff.getDate()).toBe(15);
 	});
 });
+
+describe('calculateNextPaymentDate iteration cap', () => {
+	test('a weekly schedule more than a thousand payments old falls back to now', () => {
+		const next = calculateNextPaymentDate(
+			makeLoan({ paymentFrequency: 'weekly', startDate: '2000-01-03T12:00:00' })
+		);
+		expect(next.getTime()).toBe(NOW.getTime());
+	});
+
+	test('a weekly schedule just under the cap still finds the current due date', () => {
+		const next = calculateNextPaymentDate(
+			makeLoan({ paymentFrequency: 'weekly', startDate: '2008-01-07T12:00:00' })
+		);
+		expect(next.getTime()).toBeLessThanOrEqual(NOW.getTime());
+		expect(NOW.getTime() - next.getTime()).toBeLessThan(7 * DAY);
+	});
+});
+
+describe('calculateNextPaymentDate before the first due date', () => {
+	test('a loan that started this month returns its first due date', () => {
+		const next = calculateNextPaymentDate(makeLoan({ startDate: '2025-06-01T12:00:00' }));
+		expect(next.getMonth()).toBe(6);
+		expect(next.getDate()).toBe(1);
+	});
+
+	test('assuming the last due date was paid skips to the following one', () => {
+		const next = calculateNextPaymentDate(makeLoan(), undefined, true);
+		expect(next.getMonth()).toBe(6);
+		expect(next.getDate()).toBe(10);
+	});
+
+	test('without a recorded payment the overdue due date is returned', () => {
+		const next = calculateNextPaymentDate(makeLoan());
+		expect(next.getMonth()).toBe(5);
+		expect(next.getDate()).toBe(10);
+	});
+});
+
+describe('calculateExtraPaymentImpact when payments do not cover interest', () => {
+	test('reports no savings but a real payoff date when only the extra payment covers interest', () => {
+		const impact = calculateExtraPaymentImpact(
+			makeLoan({ originalAmount: 100_000, computedBalance: 100_000, apr: 12, paymentAmount: 500 }),
+			1_000
+		);
+		expect(impact.monthsSaved).toBe(0);
+		expect(impact.interestSaved).toBe(0);
+		expect(impact.newPayoffDate.getTime()).toBeGreaterThan(NOW.getTime() + 365 * DAY);
+	});
+});
+
+describe('calculateLeaseMetrics guards and defaults', () => {
+	test('returns null for a loan', () => {
+		expect(calculateLeaseMetrics(makeLoan(), 100, 0)).toBeNull();
+	});
+
+	test('returns null for a lease without a start date', () => {
+		expect(calculateLeaseMetrics(makeLease({ startDate: '' }), 100, 0)).toBeNull();
+	});
+
+	test('returns null for an unparseable start date', () => {
+		expect(calculateLeaseMetrics(makeLease({ startDate: 'nope' }), 100, 0)).toBeNull();
+	});
+
+	test('a missing excess-mileage fee projects excess miles at no cost', () => {
+		const metrics = calculateLeaseMetrics(
+			makeLease({ excessMileageFee: undefined, mileageLimit: 1_000 }),
+			20_000,
+			0
+		);
+		expect(metrics?.isOverMileage).toBe(true);
+		expect(metrics?.projectedExcessMiles).toBeGreaterThan(0);
+		expect(metrics?.projectedExcessFee).toBe(0);
+	});
+});
+
+describe('production builds', () => {
+	type Calculations = typeof import('#lib/utils/financing-calculations.ts');
+	let prod: Calculations;
+
+	beforeEach(async () => {
+		vi.stubEnv('DEV', false);
+		vi.resetModules();
+		prod = await import('#lib/utils/financing-calculations.ts');
+	});
+
+	afterEach(() => {
+		vi.unstubAllEnvs();
+		vi.resetModules();
+	});
+
+	function expectSilent() {
+		expect(console.warn).not.toHaveBeenCalled();
+		expect(console.error).not.toHaveBeenCalled();
+	}
+
+	test('invalid amortization inputs return an empty schedule without logging', () => {
+		const cases: Array<VehicleFinancing> = [
+			null as unknown as VehicleFinancing,
+			makeLoan({ originalAmount: 0 }),
+			makeLoan({ paymentAmount: 0 }),
+			makeLoan({ termMonths: 0 }),
+			makeLoan({ startDate: '' }),
+			makeLoan({ startDate: 'not-a-date' }),
+			makeLoan({ startDate: throwingPrimitive() }),
+			makeLoan({ originalAmount: 100_000, apr: 24, paymentAmount: 50 })
+		];
+		for (const financing of cases) {
+			expect(prod.calculateAmortizationSchedule(financing)).toEqual([]);
+		}
+		expectSilent();
+	});
+
+	test('invalid next-payment inputs fall back to now without logging', () => {
+		const cases: Array<[VehicleFinancing, Date | undefined]> = [
+			[null as unknown as VehicleFinancing, undefined],
+			[makeLoan({ startDate: 'garbage' }), undefined],
+			[makeLoan({ paymentFrequency: 'weekly', startDate: '2000-01-03T12:00:00' }), undefined],
+			[makeLoan(), throwingPrimitive() as unknown as Date]
+		];
+		for (const [financing, lastPaid] of cases) {
+			expect(prod.calculateNextPaymentDate(financing, lastPaid).getTime()).toBe(NOW.getTime());
+		}
+		expectSilent();
+	});
+
+	test('invalid payoff inputs fall back to now without logging', () => {
+		const cases: VehicleFinancing[] = [
+			null as unknown as VehicleFinancing,
+			makeLoan({ paymentAmount: 0 }),
+			makeLoan({ originalAmount: 100_000, computedBalance: 100_000, apr: 24, paymentAmount: 50 }),
+			makeLoan({ termMonths: throwingPrimitive() as unknown as number })
+		];
+		for (const financing of cases) {
+			expect(prod.calculatePayoffDate(financing).getTime()).toBe(NOW.getTime());
+		}
+		expectSilent();
+	});
+
+	test('invalid extra-payment inputs return the inert default without logging', () => {
+		const inert = { monthsSaved: 0, interestSaved: 0, totalSavings: 0, extraPaymentAmount: 100 };
+		expect(
+			prod.calculateExtraPaymentImpact(null as unknown as VehicleFinancing, 100)
+		).toMatchObject(inert);
+		expect(
+			prod.calculateExtraPaymentImpact(
+				makeLoan({ termMonths: throwingPrimitive() as unknown as number }),
+				100
+			)
+		).toMatchObject(inert);
+		expectSilent();
+	});
+
+	test('invalid lease inputs return null without logging', () => {
+		const cases: VehicleFinancing[] = [
+			null as unknown as VehicleFinancing,
+			makeLease({ startDate: '' }),
+			makeLease({ startDate: 'nope' }),
+			makeLease({ endDate: 'nope' }),
+			makeLease({ startDate: throwingPrimitive() })
+		];
+		for (const financing of cases) {
+			expect(prod.calculateLeaseMetrics(financing, 100, 0)).toBeNull();
+		}
+		expectSilent();
+	});
+});

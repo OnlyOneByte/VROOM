@@ -9,6 +9,11 @@ import type {
 	Vehicle
 } from '#lib/types/index.ts';
 import { VEHICLES, makeClaim as claim, photoPage, settle } from './insurance-fixtures.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
@@ -38,7 +43,8 @@ vi.mock('#lib/services/insurance-api.ts', () => ({
 }));
 
 const handleErrorWithNotification = vi.fn<(error: unknown, context?: string) => void>();
-vi.mock('#lib/utils/error-handling.ts', () => ({
+vi.mock('#lib/utils/error-handling.ts', async importOriginal => ({
+	...(await importOriginal<typeof import('#lib/utils/error-handling.ts')>()),
 	handleErrorWithNotification: (error: unknown, context?: string) =>
 		handleErrorWithNotification(error, context)
 }));
@@ -112,19 +118,20 @@ describe('ClaimsSection load states', () => {
 	});
 
 	test('shows the error message and notifies when loading fails', async () => {
-		const failure = new Error('Network down');
+		const failure = new ApiError('Network down', 503);
 		getClaims.mockRejectedValueOnce(failure);
 		mount();
 		await settle();
-		expect(screen.getByText('Network down')).toBeInTheDocument();
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to load claims');
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
+		expect(screen.queryByText('Network down')).toBeNull();
+		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't load claims");
 	});
 
 	test('falls back to a generic message when the rejection is not an Error', async () => {
 		getClaims.mockRejectedValueOnce('boom');
 		mount();
 		await settle();
-		expect(screen.getByText('Failed to load claims')).toBeInTheDocument();
+		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 
 	test('retry after a failed load refetches and renders the claims', async () => {

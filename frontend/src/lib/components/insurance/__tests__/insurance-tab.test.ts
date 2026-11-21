@@ -7,6 +7,11 @@ import type {
 	Photo
 } from '#lib/types/index.ts';
 import { makePolicy, makeTerm, photoPage, settle } from './insurance-fixtures.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const goto = vi.fn<(url: string) => Promise<void>>(() => Promise.resolve());
 vi.mock('$app/navigation', () => ({ goto: (url: string) => goto(url) }));
@@ -34,7 +39,8 @@ vi.mock('#lib/services/insurance-api.ts', () => ({
 }));
 
 const handleErrorWithNotification = vi.fn<(error: unknown, context?: string) => void>();
-vi.mock('#lib/utils/error-handling.ts', () => ({
+vi.mock('#lib/utils/error-handling.ts', async importOriginal => ({
+	...(await importOriginal<typeof import('#lib/utils/error-handling.ts')>()),
 	handleErrorWithNotification: (error: unknown, context?: string) =>
 		handleErrorWithNotification(error, context)
 }));
@@ -73,15 +79,16 @@ describe('InsuranceTab load states', () => {
 	});
 
 	test('shows the error with a retry that reloads successfully', async () => {
-		const failure = new Error('Server unavailable');
+		const failure = new ApiError('Server unavailable', 503);
 		getPoliciesForVehicle.mockRejectedValueOnce(failure);
 		getPoliciesForVehicle.mockResolvedValueOnce([makePolicy()]);
 		mount();
 		await settle();
-		expect(screen.getByText('Server unavailable')).toBeInTheDocument();
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
+		expect(screen.queryByText('Server unavailable')).toBeNull();
 		expect(handleErrorWithNotification).toHaveBeenCalledWith(
 			failure,
-			'Failed to load insurance policies'
+			"Couldn't load insurance policies"
 		);
 		await fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
 		await settle();
@@ -94,7 +101,7 @@ describe('InsuranceTab load states', () => {
 		getPoliciesForVehicle.mockRejectedValueOnce({ status: 500 });
 		mount();
 		await settle();
-		expect(screen.getByText('Failed to load insurance policies')).toBeInTheDocument();
+		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 });
 

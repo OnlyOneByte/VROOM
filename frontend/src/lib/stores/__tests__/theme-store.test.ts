@@ -126,3 +126,83 @@ describe('getSystemTheme — the shared OS color-scheme resolver (dedup anchor)'
 		expect(spy).toHaveBeenCalledWith('(prefers-color-scheme: dark)');
 	});
 });
+
+describe('themeStore on the server', () => {
+	type ThemeModule = typeof import('../theme.svelte');
+	const updateSettings = vi.fn(() => Promise.resolve());
+	let server: ThemeModule;
+
+	beforeEach(async () => {
+		vi.resetModules();
+		vi.doMock('$app/env', () => ({
+			browser: false,
+			dev: false,
+			building: false,
+			version: '1.0.0'
+		}));
+		vi.doMock('#lib/services/settings-api.ts', () => ({ settingsApi: { updateSettings } }));
+		localStorage.setItem(STORAGE_KEY, 'dark');
+		localStorage.setItem('vroom-theme-id', 'aurora');
+		server = await import('../theme.svelte');
+		vi.mocked(localStorage.getItem).mockClear();
+		vi.mocked(localStorage.setItem).mockClear();
+		vi.mocked(window.matchMedia).mockClear();
+	});
+
+	afterEach(() => {
+		vi.doUnmock('$app/env');
+		vi.doUnmock('#lib/services/settings-api.ts');
+		vi.resetModules();
+	});
+
+	test('starts from the system preference and default theme without reading storage', () => {
+		expect(server.themeStore.current).toBe('system');
+		expect(server.themeStore.themeId).toBe('default');
+		expect(server.getSystemTheme()).toBe('light');
+		expect(window.matchMedia).not.toHaveBeenCalled();
+	});
+
+	test('initialize touches neither the document nor matchMedia', () => {
+		server.themeStore.initialize();
+		expect(htmlIsDark()).toBe(false);
+		expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
+		expect(window.matchMedia).not.toHaveBeenCalled();
+	});
+
+	test('setPreference and setTheme update the store without storage, DOM or server writes', () => {
+		server.themeStore.setPreference('dark');
+		server.themeStore.setTheme('aurora');
+		expect(server.themeStore.current).toBe('dark');
+		expect(server.themeStore.themeId).toBe('aurora');
+		expect(localStorage.setItem).not.toHaveBeenCalled();
+		expect(htmlIsDark()).toBe(false);
+		expect(updateSettings).not.toHaveBeenCalled();
+	});
+
+	test('reconcileServerTheme adopts the server theme without writing storage', () => {
+		server.themeStore.reconcileServerTheme('aurora');
+		expect(server.themeStore.themeId).toBe('aurora');
+		expect(localStorage.setItem).not.toHaveBeenCalled();
+	});
+});
+
+describe('theme-color without a registry entry', () => {
+	afterEach(() => {
+		vi.doUnmock('#lib/theme/theme-chrome.ts');
+		vi.resetModules();
+	});
+
+	test.each([
+		['light', '#2563eb'],
+		['dark', '#1a1a2e']
+	] as const)('a %s preference falls back to the built-in brand colour', async (mode, colour) => {
+		vi.resetModules();
+		vi.doMock('#lib/theme/theme-chrome.ts', () => ({
+			DEFAULT_THEME_ID: 'default',
+			THEME_BACKGROUND_HEX: {}
+		}));
+		const { themeStore: isolated } = await import('../theme.svelte');
+		isolated.setPreference(mode);
+		expect(themeColor()).toBe(colour);
+	});
+});
