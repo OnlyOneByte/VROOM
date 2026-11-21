@@ -21,7 +21,7 @@ function meOk(user: User): Response {
 	return new Response(
 		JSON.stringify({
 			success: true,
-			data: { user, session: { id: 's', expiresAt: '2099-01-01' } }
+			data: { user, session: { expiresAt: '2099-01-01' } }
 		}),
 		{ status: 200, headers: { 'content-type': 'application/json' } }
 	);
