@@ -12,7 +12,7 @@ import type { InsurancePolicy, Trip, Vehicle, VehicleFinancing } from '../db/sch
 import { isElectricFuelType } from '../db/types';
 import { createErrorResponse, NotFoundError, ValidationError } from '../errors';
 
-export const MAX_ODOMETER_READING = 10_000_000;
+export const MAX_ODOMETER_READING = CONFIG.validation.vehicle.maxOdometerReading;
 export const ODOMETER_TOO_HIGH_MESSAGE = `Odometer must be ${MAX_ODOMETER_READING.toLocaleString('en-US')} or less`;
 
 function describeIssue(issue: ZodError['issues'][number]): string {

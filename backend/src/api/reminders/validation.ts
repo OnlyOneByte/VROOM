@@ -18,7 +18,7 @@ import {
 } from '../expenses/validation';
 
 const PLAIN_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
-const MAX_INTERVAL_YEARS = 100;
+const MAX_INTERVAL_YEARS = CONFIG.validation.reminder.maxIntervalYears;
 const MAX_INTERVAL_BY_UNIT = {
   day: Math.ceil(MAX_INTERVAL_YEARS * 365.25),
   week: Math.ceil((MAX_INTERVAL_YEARS * 365.25) / 7),
