@@ -206,7 +206,7 @@
 			vehicle = await vehicleApi.getVehicle(vehicleId);
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load vehicle');
-			if (error instanceof ApiError && error.statusCode === 404) {
+			if (error instanceof ApiError && (error.statusCode === 404 || error.statusCode === 400)) {
 				goto(resolve(routes.dashboard));
 				return;
 			}

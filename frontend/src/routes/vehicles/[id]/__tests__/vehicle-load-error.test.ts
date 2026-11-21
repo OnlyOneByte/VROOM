@@ -72,12 +72,16 @@ function renderPage() {
 }
 
 describe('vehicle page — a failed vehicle load', () => {
-	test('a 404 sends the user back to the dashboard', async () => {
-		getVehicle.mockRejectedValue(new ApiError('Vehicle not found', 404));
+	test.each([
+		['a 404', new ApiError('Vehicle not found', 404)],
+		['a malformed id (400)', new ApiError('Invalid vehicle id', 400)]
+	])('%s sends the user back to the dashboard without a dead-end Retry', async (_label, error) => {
+		getVehicle.mockRejectedValue(error);
 
-		renderPage();
+		const screen = renderPage();
 
 		await waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
+		expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
 	});
 
 	test.each([
