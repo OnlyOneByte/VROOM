@@ -6,6 +6,7 @@ import {
   MIN_VALID_MPG,
   maxOf,
   minOf,
+  termBillingMonths,
 } from './calculations';
 
 const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
@@ -134,19 +135,6 @@ export function toMonthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-// setMonth on days 29-31 skips short months, so the cursor stays on day 1.
-export function monthKeysInRange(start: Date | null, end: Date | null): string[] {
-  if (!start || !end) return [];
-  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
-  const last = new Date(end.getFullYear(), end.getMonth(), 1);
-  const keys: string[] = [];
-  while (cursor <= last) {
-    keys.push(toMonthKey(cursor));
-    cursor.setMonth(cursor.getMonth() + 1);
-  }
-  return keys;
-}
-
 export function effectiveMonthlyPremium(term: {
   startDate: Date | null;
   endDate: Date | null;
@@ -156,9 +144,8 @@ export function effectiveMonthlyPremium(term: {
   if (term.monthlyCost != null) return term.monthlyCost;
   if (term.totalCost == null) return 0;
 
-  const monthsInTerm = monthKeysInRange(term.startDate, term.endDate).length;
-  if (monthsInTerm === 0) return 0;
-  return term.totalCost / monthsInTerm;
+  if (!term.startDate || !term.endDate) return 0;
+  return term.totalCost / termBillingMonths(term.startDate, term.endDate);
 }
 
 export interface AmortizationLoan {

@@ -137,3 +137,23 @@ export function minOf(values: number[]): number {
   }
   return min;
 }
+
+function utcDayClampedToMonth(year: number, month: number, day: number): number {
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return Date.UTC(year, month, Math.min(day, daysInMonth));
+}
+
+export function termBillingMonths(startDate: Date, endDate: Date): number {
+  const startYear = startDate.getUTCFullYear();
+  const startMonth = startDate.getUTCMonth();
+  const endDay = Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate());
+  const wholeCalendarMonths =
+    (endDate.getUTCFullYear() - startYear) * 12 + (endDate.getUTCMonth() - startMonth);
+  const lastBillingDay = utcDayClampedToMonth(
+    startYear,
+    startMonth + wholeCalendarMonths,
+    startDate.getUTCDate()
+  );
+  const months = wholeCalendarMonths + (lastBillingDay < endDay ? 1 : 0);
+  return Math.max(1, months);
+}
