@@ -262,6 +262,13 @@ export const SHEET_TABS = {
 
 type SheetTableKey = keyof typeof SHEET_TABS;
 
+const REQUIRED_SHEET_TABS = new Set<SheetTableKey>([
+  'vehicles',
+  'expenses',
+  'insurance',
+  'financing',
+]);
+
 // Order matters: the backup swap indexes each tab by position.
 export const SHEET_NAMES = Object.values(SHEET_TABS);
 
@@ -635,112 +642,30 @@ export class GoogleSheetsService {
     return response.data.values || [];
   }
 
-  private readTab(
-    spreadsheetId: string,
-    key: SheetTableKey,
-    optional = false
-  ): Promise<(string | number | boolean)[][]> {
-    const read = this.readSheetData(spreadsheetId, `${SHEET_TABS[key]}!A:Z`);
-    return optional ? read.catch(() => []) : read;
-  }
+  async readSpreadsheetData(
+    spreadsheetId: string
+  ): Promise<
+    { metadata: { version: string; timestamp: string; userId: string } } & Record<
+      SheetTableKey,
+      Record<string, unknown>[]
+    >
+  > {
+    const info = await this.getSpreadsheetInfo(spreadsheetId);
+    const presentTabs = new Set(info.sheets.map((sheet) => sheet.title));
+    const records = {} as Record<SheetTableKey, Record<string, unknown>[]>;
+    for (const key of Object.keys(SHEET_TABS) as SheetTableKey[]) {
+      const title = SHEET_TABS[key];
+      const absentOptionalTab = !REQUIRED_SHEET_TABS.has(key) && !presentTabs.has(title);
+      records[key] = absentOptionalTab
+        ? []
+        : this.parseSheetData(await this.readSheetData(spreadsheetId, `${title}!A:Z`));
+    }
 
-  async readSpreadsheetData(spreadsheetId: string): Promise<{
-    metadata: { version: string; timestamp: string; userId: string };
-    vehicles: Record<string, unknown>[];
-    expenses: Record<string, unknown>[];
-    financing: Record<string, unknown>[];
-    insurance: Record<string, unknown>[];
-    insuranceTerms: Record<string, unknown>[];
-    insuranceTermVehicles: Record<string, unknown>[];
-    insuranceClaims: Record<string, unknown>[];
-    photos: Record<string, unknown>[];
-    odometer: Record<string, unknown>[];
-    photoRefs: Record<string, unknown>[];
-    userPreferences: Record<string, unknown>[];
-    syncState: Record<string, unknown>[];
-    reminders: Record<string, unknown>[];
-    reminderVehicles: Record<string, unknown>[];
-    reminderNotifications: Record<string, unknown>[];
-    trips: Record<string, unknown>[];
-    vehicleShares: Record<string, unknown>[];
-  }> {
-    const [
-      vehiclesData,
-      expensesData,
-      insuranceData,
-      insuranceTermsData,
-      insuranceTermVehiclesData,
-      insuranceClaimsData,
-      financingData,
-      photosData,
-      odometerData,
-      photoRefsData,
-      userPreferencesData,
-      syncStateData,
-      remindersData,
-      reminderVehiclesData,
-      reminderNotificationsData,
-      tripsData,
-      vehicleSharesData,
-    ] = await Promise.all([
-      this.readTab(spreadsheetId, 'vehicles'),
-      this.readTab(spreadsheetId, 'expenses'),
-      this.readTab(spreadsheetId, 'insurance'),
-      this.readTab(spreadsheetId, 'insuranceTerms', true),
-      this.readTab(spreadsheetId, 'insuranceTermVehicles', true),
-      this.readTab(spreadsheetId, 'insuranceClaims', true),
-      this.readTab(spreadsheetId, 'financing'),
-      this.readTab(spreadsheetId, 'photos', true),
-      this.readTab(spreadsheetId, 'odometer', true),
-      this.readTab(spreadsheetId, 'photoRefs', true),
-      this.readTab(spreadsheetId, 'userPreferences', true),
-      this.readTab(spreadsheetId, 'syncState', true),
-      this.readTab(spreadsheetId, 'reminders', true),
-      this.readTab(spreadsheetId, 'reminderVehicles', true),
-      this.readTab(spreadsheetId, 'reminderNotifications', true),
-      this.readTab(spreadsheetId, 'trips', true),
-      this.readTab(spreadsheetId, 'vehicleShares', true),
-    ]);
-
-    const vehicleRecords = this.parseSheetData(vehiclesData);
-    const expenseRecords = this.parseSheetData(expensesData);
-    const insurance = this.parseSheetData(insuranceData);
-    const insuranceTermsRecords = this.parseSheetData(insuranceTermsData);
-    const insuranceTermVehiclesRecords = this.parseSheetData(insuranceTermVehiclesData);
-    const insuranceClaimsRecords = this.parseSheetData(insuranceClaimsData);
-    const financing = this.parseSheetData(financingData);
-    const photoRecords = this.parseSheetData(photosData);
-    const odometer = this.parseSheetData(odometerData);
-    const photoRefs = this.parseSheetData(photoRefsData);
-    const userPreferencesRecords = this.parseSheetData(userPreferencesData);
-    const syncStateRecords = this.parseSheetData(syncStateData);
-    const remindersRecords = this.parseSheetData(remindersData);
-    const reminderVehiclesRecords = this.parseSheetData(reminderVehiclesData);
-    const reminderNotificationsRecords = this.parseSheetData(reminderNotificationsData);
-    const tripsRecords = this.parseSheetData(tripsData);
-    const vehicleSharesRecords = this.parseSheetData(vehicleSharesData);
-
-    const userId = vehicleRecords.length > 0 ? (vehicleRecords[0].userId as string) : '';
+    const userId = records.vehicles.length > 0 ? String(records.vehicles[0].userId) : '';
 
     return {
       metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId },
-      vehicles: vehicleRecords,
-      expenses: expenseRecords,
-      financing,
-      insurance,
-      insuranceTerms: insuranceTermsRecords,
-      insuranceTermVehicles: insuranceTermVehiclesRecords,
-      insuranceClaims: insuranceClaimsRecords,
-      photos: photoRecords,
-      odometer,
-      photoRefs,
-      userPreferences: userPreferencesRecords,
-      syncState: syncStateRecords,
-      reminders: remindersRecords,
-      reminderVehicles: reminderVehiclesRecords,
-      reminderNotifications: reminderNotificationsRecords,
-      trips: tripsRecords,
-      vehicleShares: vehicleSharesRecords,
+      ...records,
     };
   }
 
@@ -753,21 +678,11 @@ export class GoogleSheetsService {
     return rows.map((row) => {
       const obj: Record<string, unknown> = {};
       for (let i = 0; i < headers.length; i++) {
-        obj[headers[i]] = this.parseValue(row[i]);
+        const cell = row[i];
+        obj[headers[i]] = cell === undefined || cell === '' ? null : String(cell);
       }
       return obj;
     });
-  }
-
-  private parseValue(value: string | number | boolean | undefined): unknown {
-    if (value === '' || value === null || value === undefined) return null;
-    if (value === 'true' || value === 'false') return value === 'true';
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') {
-      if (!Number.isNaN(Number(value)) && value.trim() !== '') return Number(value);
-      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) return new Date(value);
-    }
-    return value;
   }
 }
 
