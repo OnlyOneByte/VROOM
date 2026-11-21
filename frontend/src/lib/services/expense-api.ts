@@ -36,6 +36,7 @@ export interface ExpenseImportResult {
 	rows: ExpenseImportRow[];
 	duplicates?: number;
 	unmappedCategories?: string[];
+	currencyWarning?: string;
 }
 
 export type ExpenseSortBy = 'date' | 'amount' | 'category';

@@ -120,4 +120,22 @@ describe('ImportPreviewSummary', () => {
 
 		expect(text(container)).toBe('Click outside the box to preview.');
 	});
+
+	test('shows the currency warning from the preview as a polite status', () => {
+		const warning = 'This file is in EUR; amounts will be imported as JPY without conversion.';
+		render(ImportPreviewSummary, {
+			...IDLE,
+			preview: { ...preview(9, 0), currencyWarning: warning }
+		});
+
+		const alert = screen.getByTestId('import-currency-warning');
+		expect(alert.getAttribute('role')).toBe('status');
+		expect(alert.textContent?.trim()).toBe(warning);
+	});
+
+	test('shows no currency warning when the preview has none', () => {
+		render(ImportPreviewSummary, { ...IDLE, preview: preview(9, 0) });
+
+		expect(screen.queryByTestId('import-currency-warning')).toBeNull();
+	});
 });
