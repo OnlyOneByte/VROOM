@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { UserProviderInfo } from '#lib/types/index.ts';
 
@@ -121,6 +122,20 @@ describe('ProviderForm — an edit-save preserves config the form does not manag
 		await vi.waitFor(() => expect(updateProvider).toHaveBeenCalled());
 
 		expect(sentConfig()['accountEmail']).toBe('owner@example.com');
+	});
+
+	test('a provider save in flight counts as unsaved changes until the form closes', async () => {
+		updateProvider.mockReturnValue(new Promise(() => {}));
+		const { unmount } = renderEdit();
+		await awaitLoaded();
+		expect(hasPendingSave()).toBe(false);
+
+		await fireEvent.click(saveButton());
+		await vi.waitFor(() => expect(updateProvider).toHaveBeenCalled());
+
+		expect(hasPendingSave()).toBe(true);
+		unmount();
+		expect(hasPendingSave()).toBe(false);
 	});
 
 	test('the stored photo root path is shown, and saved back unchanged', async () => {

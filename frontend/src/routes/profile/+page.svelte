@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { page } from '$app/state';
 	import { browser } from '$app/env';
@@ -84,6 +85,8 @@
 	let isEditingName = $state(false);
 	let nameDraft = $state('');
 	let isSavingName = $state(false);
+
+	onMount(() => trackPendingSave(() => isSavingName));
 
 	function startEditName() {
 		nameDraft = user?.displayName ?? '';
