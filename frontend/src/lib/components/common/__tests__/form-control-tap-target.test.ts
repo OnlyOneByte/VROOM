@@ -22,6 +22,17 @@ describe('form controls meet the 40px tap target on mobile', () => {
 		expect(trigger).toContain('data-[size=default]:h-10 sm:data-[size=default]:h-9');
 	});
 
+	test('DateRangePicker trigger is 40px below sm and 36px from sm up', () => {
+		expect(source('common/date-range-picker.svelte')).toContain(
+			"'h-10 w-full justify-start text-left font-normal sm:h-9'"
+		);
+	});
+
+	test('compact expense list sort buttons match the category select', () => {
+		const list = source('expenses/expenses-table/ExpensesCompactList.svelte');
+		expect(list.match(/class="h-10 px-2 text-xs sm:h-9"/g)).toHaveLength(2);
+	});
+
 	test('DatePicker trigger is 40px below sm and 36px from sm up', () => {
 		expect(source('common/date-picker.svelte')).toContain(
 			"'h-10 w-full justify-start text-left font-normal sm:h-9'"
