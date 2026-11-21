@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { LinkedAuthProvider, User } from '#lib/types/index.ts';
@@ -194,13 +195,15 @@ describe('Profile display-name editing', () => {
 	});
 
 	test('a failed save reports the error and keeps the editor open', async () => {
-		authApi.updateProfile.mockRejectedValue(new Error('500'));
+		authApi.updateProfile.mockRejectedValue(new ApiError('Internal server error', 500));
 		await mount();
 		const input = await startEditing();
 		await fireEvent.input(input, { target: { value: 'New Name' } });
 		await fireEvent.click(screen.getByRole('button', { name: 'Save display name' }));
 		await settle();
-		expect(showError).toHaveBeenCalledWith('Failed to update display name');
+		expect(showError).toHaveBeenCalledWith(
+			`Couldn't update your display name. ${SERVER_FAILURE_MESSAGE}`
+		);
 		expect(screen.getByRole('textbox', { name: 'Display name' })).not.toBeDisabled();
 	});
 
@@ -282,7 +285,11 @@ describe('Profile connected accounts', () => {
 			Object.assign(new Error('x'), { code: 'LAST_ACCOUNT' }),
 			'Cannot unlink your last sign-in method.'
 		],
-		['other', new Error('boom'), 'Failed to unlink account. Please try again.']
+		[
+			'other',
+			new ApiError('Internal server error', 500),
+			`Couldn't unlink the account. ${SERVER_FAILURE_MESSAGE}`
+		]
 	])('an unlink failure with %s code shows its message', async (_label, failure, message) => {
 		authApi.getLinkedAccounts.mockResolvedValue([
 			account(),

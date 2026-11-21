@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 const { goto, page, get, showError } = vi.hoisted(() => ({
 	goto: vi.fn(),
@@ -160,11 +161,11 @@ describe('handleOAuthReturn', () => {
 
 	test('a failed pending-email lookup shows an error but still cleans the URL', async () => {
 		setPageUrl('https://app.example/settings/providers/p1/edit?provider_connected=true&nonce=n-3');
-		get.mockRejectedValue(new Error('expired'));
+		get.mockRejectedValue(new ApiError('Internal server error', 500));
 		const oauth = createOAuth();
 		await oauth.handleOAuthReturn();
 		expect(showError).toHaveBeenCalledWith(
-			'Failed to retrieve connected Google account. Please try again.'
+			`Couldn't find the Google account you connected. ${SERVER_FAILURE_MESSAGE}`
 		);
 		expect(oauth.pendingEmail).toBe('');
 		expect(goto).toHaveBeenCalledWith('/settings/providers/p1/edit', { replace: true });
@@ -179,7 +180,7 @@ describe('handleOAuthReturn', () => {
 
 	test.each([
 		['cancelled', 'Google account connection was cancelled.'],
-		['exchange_failed', 'Failed to connect Google account. Please try again.'],
+		['exchange_failed', 'Couldn’t connect your Google account. Please try again.'],
 		['no_refresh_token', 'Google did not grant offline access. Please try again.'],
 		['session_expired', 'Your session expired. Please log in and try again.'],
 		['invalid_state', 'The Google connection expired. Please try again.'],

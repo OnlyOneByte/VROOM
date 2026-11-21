@@ -3,6 +3,7 @@ import { page } from '$app/state';
 import { browser } from '$app/env';
 import { apiClient, getApiBaseUrl } from '#lib/services/api-client.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
+import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
 interface GoogleOAuthOptions {
 	isEditMode: boolean;
@@ -100,8 +101,10 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 					`/api/v1/providers/pending/${nonceParam}`
 				);
 				pendingEmail = result.email;
-			} catch {
-				appStore.showError('Failed to retrieve connected Google account. Please try again.');
+			} catch (error) {
+				appStore.showError(
+					`Couldn't find the Google account you connected. ${userFacingErrorMessage(error)}`
+				);
 			}
 
 			// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic runtime path from current URL
@@ -113,7 +116,7 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 		if (providerError) {
 			const errorMessages: Record<string, string> = {
 				cancelled: 'Google account connection was cancelled.',
-				exchange_failed: 'Failed to connect Google account. Please try again.',
+				exchange_failed: 'Couldn’t connect your Google account. Please try again.',
 				no_refresh_token: 'Google did not grant offline access. Please try again.',
 				session_expired: 'Your session expired. Please log in and try again.',
 				invalid_state: 'The Google connection expired. Please try again.',

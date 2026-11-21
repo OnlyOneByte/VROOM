@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { authApi } from '#lib/services/auth-api.ts';
 	import { routes } from '#lib/routes.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -49,8 +50,8 @@
 	onMount(async () => {
 		try {
 			providers = await authApi.getProviders();
-		} catch {
-			fetchError = 'Failed to load sign-in options. Please refresh the page.';
+		} catch (err) {
+			fetchError = `Couldn't load the sign-in options. ${userFacingErrorMessage(err)}`;
 		} finally {
 			isLoadingProviders = false;
 		}
