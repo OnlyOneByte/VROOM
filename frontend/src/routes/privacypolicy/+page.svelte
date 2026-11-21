@@ -12,7 +12,7 @@
 	<div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16">
 		<a
 			href={resolve(routes.home)}
-			class="inline-flex items-center gap-2 text-sm text-muted-foreground mb-8 hover:text-foreground transition-colors"
+			class="inline-flex min-h-10 items-center gap-2 text-sm text-muted-foreground mb-8 hover:text-foreground transition-colors sm:min-h-0"
 		>
 			<span>←</span> Back to home
 		</a>

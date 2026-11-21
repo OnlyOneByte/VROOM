@@ -108,6 +108,16 @@ describe('ModelProvidersCard', () => {
 		}
 	);
 
+	test('both Add Provider buttons are 40px tap targets on phones', async () => {
+		getProviders.mockResolvedValue([]);
+		render(ModelProvidersCard, { props: { domain: 'llm' } });
+
+		await screen.findByText('No assistant provider configured');
+		const addButtons = screen.getAllByRole('button', { name: 'Add Provider' });
+		expect(addButtons).toHaveLength(2);
+		for (const button of addButtons) expect(button.className).toMatch(/(^|\s)h-10(\s|$)/);
+	});
+
 	test('lists the providers returned for the domain', async () => {
 		getProviders.mockResolvedValue([provider('llm', 'Work Claude')]);
 		render(ModelProvidersCard, { props: { domain: 'llm' } });
