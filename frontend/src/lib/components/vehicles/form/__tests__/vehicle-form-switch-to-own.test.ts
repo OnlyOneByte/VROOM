@@ -145,4 +145,21 @@ describe('VehicleForm switching a financed vehicle to Own', () => {
 		await waitFor(() => expect(updateVehicle).toHaveBeenCalledTimes(1));
 		expect(screen.queryByRole('alertdialog')).toBeNull();
 	});
+
+	test('the dialog keeps its title and text while the vehicle save is still running', async () => {
+		let finishSave: (v: Vehicle) => void = () => {};
+		updateVehicle.mockReturnValueOnce(new Promise<Vehicle>(resolve => (finishSave = resolve)));
+		await renderEditAndSwitchToOwn();
+		const dialog = await screen.findByRole('alertdialog');
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Mark Paid Off' }));
+
+		await waitFor(() => expect(updateVehicle).toHaveBeenCalledTimes(1));
+		expect(payOffFinancing).toHaveBeenCalledTimes(1);
+		const working = screen.getByRole('alertdialog');
+		expect(working.textContent).toContain('Mark the loan as paid off?');
+		expect(working.textContent).toContain('Credit Union');
+
+		finishSave(VEHICLE);
+		await waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/veh-1'));
+	});
 });
