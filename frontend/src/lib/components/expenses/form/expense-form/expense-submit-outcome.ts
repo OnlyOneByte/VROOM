@@ -1,5 +1,5 @@
 import type { SyncFailureKind } from '#lib/utils/sync/classify-failure.ts';
-import { extractErrorMessage } from '#lib/utils/error-handling.ts';
+import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
 export const UNQUEUED_SAVE_MESSAGE =
 	'This device could not store the expense — storage is full or site data is blocked. ' +
@@ -12,7 +12,7 @@ export const UNQUEUED_AFTER_SESSION_END_MESSAGE =
 export function submitFailureMessage(kind: SyncFailureKind, error: unknown): string {
 	if (kind === 'auth') return 'Your session has expired. Please sign in again.';
 	if (kind === 'transient') return 'Network error. Please try again.';
-	return extractErrorMessage(error, 'Could not save this expense. Please try again.');
+	return `Couldn't save this expense. ${userFacingErrorMessage(error)}`;
 }
 
 export function canQueueFailedSave(input: {
