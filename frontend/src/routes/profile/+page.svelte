@@ -239,7 +239,8 @@
 									}}
 								/>
 								<Button
-									size="sm"
+									size="icon-lg"
+									class="sm:size-8"
 									variant="ghost"
 									onclick={saveDisplayName}
 									disabled={isSavingName}
@@ -252,7 +253,8 @@
 									{/if}
 								</Button>
 								<Button
-									size="sm"
+									size="icon-lg"
+									class="sm:size-8"
 									variant="ghost"
 									onclick={cancelEditName}
 									disabled={isSavingName}
@@ -265,7 +267,8 @@
 							<div class="flex items-center gap-2">
 								<span class="text-sm">{user?.displayName ?? '—'}</span>
 								<Button
-									size="sm"
+									size="icon-lg"
+									class="sm:size-8"
 									variant="ghost"
 									onclick={startEditName}
 									aria-label="Edit display name"
@@ -349,7 +352,8 @@
 								</div>
 								<Button
 									variant="ghost"
-									size="sm"
+									size="icon-lg"
+									class="sm:size-8"
 									aria-label="Unlink {account.displayName}"
 									disabled={accounts.length <= 1 || unlinkingId !== null}
 									onclick={() => handleUnlink(account.id)}
@@ -372,7 +376,7 @@
 									<Button
 										variant="outline"
 										size="sm"
-										class="w-full justify-start"
+										class="h-10 w-full justify-start sm:h-8"
 										disabled={linkingProvider !== null}
 										onclick={() => handleLink(provider.id)}
 									>
@@ -426,7 +430,13 @@
 							</p>
 						</div>
 					</div>
-					<Button variant="outline" size="sm" onclick={handleExportData} disabled={isExporting}>
+					<Button
+						variant="outline"
+						size="sm"
+						class="h-10 sm:h-8"
+						onclick={handleExportData}
+						disabled={isExporting}
+					>
 						{#if isExporting}
 							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 							Exporting...

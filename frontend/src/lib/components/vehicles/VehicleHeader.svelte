@@ -18,7 +18,8 @@
 <div class="flex items-center gap-4">
 	<Button
 		variant="outline"
-		size="icon"
+		size="icon-lg"
+		class="shrink-0 sm:size-9"
 		onclick={() => goto(resolve(routes.dashboard))}
 		aria-label="Back to dashboard"
 	>
