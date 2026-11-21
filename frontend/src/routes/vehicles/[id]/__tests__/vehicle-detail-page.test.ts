@@ -223,7 +223,7 @@ describe('vehicle detail page overview', () => {
 
 		expect(document.title).toBe('Daily Driver - VROOM Car Tracker');
 		expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
-		expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Share' })).toHaveClass('w-10', 'sm:w-auto');
 		expect(captured['share']?.['vehicleName']).toBe('Daily Driver');
 		expect(screen.getAllByRole('link', { name: /Add Expense/ })[0]).toHaveAttribute(
 			'href',

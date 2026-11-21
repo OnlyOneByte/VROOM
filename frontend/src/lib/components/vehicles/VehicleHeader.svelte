@@ -31,10 +31,12 @@
 			<img
 				src={coverPhotoUrl}
 				alt="{vehicle.year} {vehicle.make} {vehicle.model}"
-				class="h-12 w-12 shrink-0 rounded-lg object-cover"
+				class="hidden h-12 w-12 shrink-0 rounded-lg object-cover sm:block"
 			/>
 		{:else}
-			<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted">
+			<div
+				class="hidden h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted sm:flex"
+			>
 				<Car class="h-6 w-6 text-muted-foreground" />
 			</div>
 		{/if}
