@@ -416,6 +416,12 @@ export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
       get(params: sheets_v4.Params$Resource$Spreadsheets$Values$Get = {}) {
         store.maybeFail('spreadsheets.values.get');
         const ss = params.spreadsheetId ? store.spreadsheets.get(params.spreadsheetId) : undefined;
+        if (ss && params.range) {
+          const title = sheetTitleFromRange(params.range);
+          if (!ss.sheets.some((s) => s.title === title)) {
+            return Promise.reject(googleApiError(400, `Unable to parse range: ${params.range}`));
+          }
+        }
         const values =
           ss && params.range ? ss.values.get(sheetTitleFromRange(params.range)) : undefined;
         return Promise.resolve({ data: { values: values ?? [] } });
