@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type { ReceivedShare } from '#lib/types/index.ts';
-import { ApiError } from '#lib/utils/error-handling.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const { listReceived, accept, decline, toastSuccess, toastError } = vi.hoisted(() => ({
 	listReceived: vi.fn<() => Promise<ReceivedShare[]>>(),
@@ -95,11 +99,12 @@ describe('SharedWithMeCard listing', () => {
 	});
 
 	test('a load failure shows the error and Retry reloads', async () => {
-		listReceived.mockRejectedValueOnce(new Error('Server unavailable'));
+		listReceived.mockRejectedValueOnce(new ApiError('Server unavailable', 503));
 		await mount();
 
 		expect(screen.getByText('Could not load your invitations')).toBeInTheDocument();
-		expect(screen.getByText('Server unavailable')).toBeInTheDocument();
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
+		expect(screen.queryByText('Server unavailable')).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
@@ -112,7 +117,7 @@ describe('SharedWithMeCard listing', () => {
 	test('a non-Error rejection shows a generic load message', async () => {
 		listReceived.mockRejectedValueOnce('nope');
 		await mount();
-		expect(screen.getByText('Failed to load invitations')).toBeInTheDocument();
+		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 });
 
@@ -156,7 +161,7 @@ describe('SharedWithMeCard accepting and declining', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Accept access to Family Van' }));
 		await settle();
 
-		expect(toastError).toHaveBeenCalledWith('Invitation expired');
+		expect(toastError).toHaveBeenCalledWith("Couldn't accept the invitation. Invitation expired.");
 		expect(onAccepted).not.toHaveBeenCalled();
 		expect(screen.getByText('Family Van')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Accept access to Family Van' })).toBeEnabled();
@@ -168,7 +173,9 @@ describe('SharedWithMeCard accepting and declining', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Accept access to Family Van' }));
 		await settle();
 
-		expect(toastError).toHaveBeenCalledWith('Could not accept the invitation. Try again.');
+		expect(toastError).toHaveBeenCalledWith(
+			`Couldn't accept the invitation. ${UNEXPECTED_FAILURE_MESSAGE}`
+		);
 	});
 
 	test('declining removes the invitation without notifying the parent', async () => {
@@ -196,18 +203,20 @@ describe('SharedWithMeCard accepting and declining', () => {
 		);
 		await settle();
 
-		expect(toastError).toHaveBeenCalledWith('Not found');
+		expect(toastError).toHaveBeenCalledWith("Couldn't decline the invitation. Not found.");
 		expect(screen.getByText('Family Van')).toBeInTheDocument();
 	});
 
 	test('an unexpected error on decline shows a generic retry message', async () => {
-		decline.mockRejectedValue(new Error('boom'));
+		decline.mockRejectedValue(new TypeError('boom'));
 		await mount();
 		await fireEvent.click(
 			screen.getByRole('button', { name: 'Decline the invitation to Family Van' })
 		);
 		await settle();
 
-		expect(toastError).toHaveBeenCalledWith('Could not decline the invitation. Try again.');
+		expect(toastError).toHaveBeenCalledWith(
+			`Couldn't decline the invitation. ${UNEXPECTED_FAILURE_MESSAGE}`
+		);
 	});
 });

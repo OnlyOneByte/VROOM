@@ -6,7 +6,11 @@ import type {
 	ShareLevel,
 	VehicleShare
 } from '#lib/types/index.ts';
-import { ApiError } from '#lib/utils/error-handling.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const listGranted = vi.fn<() => Promise<GrantedShare[]>>();
 const invite = vi.fn<(data: CreateShareRequest) => Promise<VehicleShare>>();
@@ -143,13 +147,14 @@ describe('ShareVehicleDialog loading the share list', () => {
 	});
 
 	test('a load failure shows the error and Retry refetches', async () => {
-		listGranted.mockRejectedValueOnce(new Error('Server unavailable'));
+		listGranted.mockRejectedValueOnce(new ApiError('Server unavailable', 503));
 		listGranted.mockResolvedValueOnce([share()]);
 		mount();
 		await settle();
 
 		expect(screen.getByText('Failed to load shares')).toBeInTheDocument();
-		expect(screen.getByText('Server unavailable')).toBeInTheDocument();
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
+		expect(screen.queryByText('Server unavailable')).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
@@ -163,7 +168,8 @@ describe('ShareVehicleDialog loading the share list', () => {
 		mount();
 		await settle();
 
-		expect(screen.getAllByText('Failed to load shares')).toHaveLength(2);
+		expect(screen.getAllByText('Failed to load shares')).toHaveLength(1);
+		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 });
 
@@ -261,13 +267,15 @@ describe('ShareVehicleDialog inviting', () => {
 		await fireEvent.click(sendButton());
 		await settle();
 
-		expect(toastError).toHaveBeenCalledWith('No VROOM user with that email');
+		expect(toastError).toHaveBeenCalledWith(
+			"Couldn't send the invitation. No VROOM user with that email."
+		);
 		expect(toastSuccess).not.toHaveBeenCalled();
 		expect(emailInput().value).toBe('nobody@example.com');
 	});
 
 	test('a non-API failure shows a generic retry message', async () => {
-		invite.mockRejectedValue(new Error('socket hang up'));
+		invite.mockRejectedValue(new TypeError('socket hang up'));
 		mount();
 		await settle();
 
@@ -275,7 +283,9 @@ describe('ShareVehicleDialog inviting', () => {
 		await fireEvent.click(sendButton());
 		await settle();
 
-		expect(toastError).toHaveBeenCalledWith('Could not send the invitation. Try again.');
+		expect(toastError).toHaveBeenCalledWith(
+			`Couldn't send the invitation. ${UNEXPECTED_FAILURE_MESSAGE}`
+		);
 	});
 });
 
