@@ -220,6 +220,7 @@
 					<Button
 						variant="outline"
 						size="sm"
+						class="h-10 sm:h-8"
 						onclick={openCreate}
 						data-testid="{domain}-add-provider"
 					>
@@ -233,7 +234,7 @@
 						<Icon class="h-10 w-10 text-muted-foreground mx-auto mb-2" />
 						<p class="text-sm font-medium">No {copy.noun} configured</p>
 						<p class="text-xs text-muted-foreground mt-1">{copy.emptyHint}</p>
-						<Button variant="outline" size="sm" class="mt-3" onclick={openCreate}>
+						<Button variant="outline" size="sm" class="mt-3 h-10 sm:h-8" onclick={openCreate}>
 							<Plus class="h-4 w-4 mr-1" />
 							Add Provider
 						</Button>

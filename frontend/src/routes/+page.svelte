@@ -54,7 +54,7 @@
 					</div>
 					<span class="text-xl font-bold text-foreground">VROOM</span>
 				</div>
-				<Button variant="outline" onclick={() => goto(resolve(routes.auth))}>
+				<Button variant="outline" class="h-10 sm:h-9" onclick={() => goto(resolve(routes.auth))}>
 					Sign In
 					<ChevronRight class="ml-1 h-4 w-4" />
 				</Button>

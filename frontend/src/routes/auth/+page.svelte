@@ -75,7 +75,7 @@
 		<Button
 			variant="ghost"
 			size="sm"
-			class="text-muted-foreground"
+			class="h-10 text-muted-foreground sm:h-8"
 			onclick={() => goto(resolve(routes.home))}
 		>
 			<ArrowLeft class="mr-1 h-4 w-4" />
