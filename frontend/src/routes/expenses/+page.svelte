@@ -178,16 +178,25 @@
 		const isCurrentSummary = nextSummaryRequest();
 		isLoadingPage = true;
 		try {
-			const [pageResult, summaryResult] = await Promise.all([
+			const [pageResult, summaryResult] = await Promise.allSettled([
 				expenseApi.getAllExpenses(buildListParams(offset)),
 				expenseApi.getExpenseSummary(buildSummaryParams())
 			]);
+			if (isLoading) {
+				if (pageResult.status === 'rejected') throw pageResult.reason;
+				if (summaryResult.status === 'rejected') throw summaryResult.reason;
+			}
 
-			if (isCurrentList()) applyPage(pageResult, offset);
-			if (isCurrentSummary()) summary = summaryResult;
-		} catch (error) {
-			if (isLoading) throw error;
-			if (isCurrentList()) failPage(error, offset);
+			const listReported = isCurrentList();
+			if (listReported) {
+				if (pageResult.status === 'fulfilled') applyPage(pageResult.value, offset);
+				else failPage(pageResult.reason, offset);
+			}
+			if (isCurrentSummary()) {
+				if (summaryResult.status === 'fulfilled') summary = summaryResult.value;
+				else if (!listReported || pageResult.status === 'fulfilled')
+					handleErrorWithNotification(summaryResult.reason, 'Failed to load expense summary');
+			}
 		} finally {
 			if (isCurrentList()) isLoadingPage = false;
 		}
@@ -455,7 +464,7 @@
 			</CardNs.Header>
 			<CardNs.Content>
 				{#if pageError}
-					<div class="py-6" data-testid="expenses-page-error">
+					<div class="py-6" role="alert" data-testid="expenses-page-error">
 						<div class="mb-4 flex items-center gap-3 text-destructive">
 							<CircleAlert class="h-5 w-5" />
 							<p class="font-medium">Failed to load expenses</p>
