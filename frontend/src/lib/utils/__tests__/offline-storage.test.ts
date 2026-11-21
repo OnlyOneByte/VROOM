@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
 	addOfflineExpense,
 	loadOfflineExpenses,
@@ -13,6 +13,11 @@ import {
 	markExpenseAsSynced,
 	clearSyncedExpenses,
 	offlineExpenseToBackend,
+	savePendingPhotos,
+	loadPendingPhotos,
+	deletePendingPhotos,
+	setOfflineQueueOwner,
+	currentOfflineQueueOwner,
 	type OfflineExpense
 } from '../offline-storage';
 import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
@@ -705,5 +710,436 @@ describe('isIncompleteFuelExpense', () => {
 		expect(isIncompleteFuelExpense(fuel({ volume: undefined, charge: 25, mileage: 30000 }))).toBe(
 			false
 		);
+	});
+});
+
+type PhotoDbFailure = 'none' | 'open' | 'abort';
+
+function fakePhotoDb(failure: { mode: PhotoDbFailure } = { mode: 'none' }) {
+	const photos = new Map<unknown, unknown>();
+	let created = false;
+	const database = {
+		createObjectStore: () => {
+			created = true;
+		},
+		transaction: () => {
+			const transaction: {
+				error: DOMException | null;
+				oncomplete?: () => void;
+				onabort?: () => void;
+				objectStore: () => unknown;
+			} = {
+				error: null,
+				objectStore: () => ({
+					put: (value: unknown, key: unknown) => (photos.set(key, value), { result: key }),
+					get: (key: unknown) => ({ result: photos.get(key) }),
+					delete: (key: unknown) => (photos.delete(key), { result: undefined })
+				})
+			};
+			queueMicrotask(() => {
+				if (failure.mode === 'abort') {
+					transaction.error = new DOMException('quota', 'QuotaExceededError');
+					transaction.onabort?.();
+				} else {
+					transaction.oncomplete?.();
+				}
+			});
+			return transaction;
+		},
+		close: vi.fn()
+	};
+	const factory = {
+		photos,
+		database,
+		open: () => {
+			const request: {
+				result?: unknown;
+				error?: DOMException;
+				onupgradeneeded?: () => void;
+				onsuccess?: () => void;
+				onerror?: () => void;
+			} = {};
+			queueMicrotask(() => {
+				if (failure.mode === 'open') {
+					request.error = new DOMException('blocked', 'SecurityError');
+					request.onerror?.();
+					return;
+				}
+				request.result = database;
+				if (!created) request.onupgradeneeded?.();
+				request.onsuccess?.();
+			});
+			return request;
+		}
+	};
+	return factory;
+}
+
+const photo = () => new File(['jpeg'], 'receipt.jpg', { type: 'image/jpeg' });
+
+const queuedRow = (overrides: Partial<OfflineExpense> = {}): OfflineExpense => ({
+	id: 'row-1',
+	clientId: 'cid-1',
+	vehicleId: 'vehicle-1',
+	tags: [],
+	category: 'misc',
+	amount: 12,
+	date: '2024-01-01',
+	timestamp: 0,
+	synced: false,
+	version: '3.0',
+	...overrides
+});
+
+describe('pending photo store', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		localStorageMock.getItem.mockReturnValue(null);
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.restoreAllMocks();
+	});
+
+	it('round-trips photos saved under a client id', async () => {
+		const db = fakePhotoDb();
+		vi.stubGlobal('indexedDB', db);
+		const files = [photo()];
+
+		expect(await savePendingPhotos('cid-1', files)).toBe(true);
+		expect(await loadPendingPhotos('cid-1')).toEqual(files);
+		expect(db.database.close).toHaveBeenCalled();
+	});
+
+	it('loads an empty list for an unknown client id', async () => {
+		vi.stubGlobal('indexedDB', fakePhotoDb());
+		expect(await loadPendingPhotos('missing')).toEqual([]);
+	});
+
+	it('loads an empty list when the stored value is not a photo list', async () => {
+		const db = fakePhotoDb();
+		db.photos.set('cid-odd', 'not-an-array');
+		vi.stubGlobal('indexedDB', db);
+		expect(await loadPendingPhotos('cid-odd')).toEqual([]);
+	});
+
+	it('loads an empty list and deletes nothing when IndexedDB is unavailable', async () => {
+		vi.stubGlobal('indexedDB', undefined);
+		expect(await loadPendingPhotos('cid-1')).toEqual([]);
+		await expect(deletePendingPhotos('cid-1')).resolves.toBeUndefined();
+	});
+
+	it('saving an empty photo list clears photos previously stored for that client', async () => {
+		const db = fakePhotoDb();
+		db.photos.set('cid-1', [photo()]);
+		vi.stubGlobal('indexedDB', db);
+
+		expect(await savePendingPhotos('cid-1', [])).toBe(true);
+		expect(db.photos.has('cid-1')).toBe(false);
+	});
+
+	it('saving an empty photo list succeeds even when IndexedDB is unavailable', async () => {
+		vi.stubGlobal('indexedDB', undefined);
+		expect(await savePendingPhotos('cid-1', [])).toBe(true);
+	});
+
+	it('reports failure when the photo database cannot be opened', async () => {
+		vi.stubGlobal('indexedDB', fakePhotoDb({ mode: 'open' }));
+		expect(await savePendingPhotos('cid-1', [photo()])).toBe(false);
+	});
+
+	it('reports failure when the photo write transaction aborts', async () => {
+		const db = fakePhotoDb({ mode: 'abort' });
+		vi.stubGlobal('indexedDB', db);
+		expect(await savePendingPhotos('cid-1', [photo()])).toBe(false);
+		expect(db.database.close).toHaveBeenCalled();
+	});
+
+	it('addOfflineExpense removes the photos it stored when the queue write then fails', async () => {
+		const db = fakePhotoDb();
+		vi.stubGlobal('indexedDB', db);
+		localStorageMock.setItem.mockImplementationOnce(() => {
+			throw new DOMException('exceeded the quota', 'QuotaExceededError');
+		});
+
+		const queued = await addOfflineExpense(
+			{ vehicleId: 'vehicle-1', tags: [], category: 'misc', amount: 9, date: '2024-01-01' },
+			[photo()],
+			'cid-rollback'
+		);
+
+		expect(queued).toBe(false);
+		expect(db.photos.has('cid-rollback')).toBe(false);
+	});
+
+	it('addOfflineExpense keeps its photos when the queue write lands', async () => {
+		const db = fakePhotoDb();
+		vi.stubGlobal('indexedDB', db);
+
+		const queued = await addOfflineExpense(
+			{ vehicleId: 'vehicle-1', tags: [], category: 'misc', amount: 9, date: '2024-01-01' },
+			[photo()],
+			'cid-kept'
+		);
+
+		expect(queued).toBe(true);
+		expect(db.photos.get('cid-kept')).toHaveLength(1);
+	});
+
+	it('removeOfflineExpense deletes the removed row photos', async () => {
+		const db = fakePhotoDb();
+		db.photos.set('cid-1', [photo()]);
+		vi.stubGlobal('indexedDB', db);
+		localStorageMock.getItem.mockReturnValue(JSON.stringify([queuedRow()]));
+
+		removeOfflineExpense('row-1');
+
+		await vi.waitFor(() => expect(db.photos.has('cid-1')).toBe(false));
+	});
+
+	it('removeOfflineExpense keeps photos when the queue write fails', async () => {
+		const db = fakePhotoDb();
+		db.photos.set('cid-1', [photo()]);
+		const open = vi.spyOn(db, 'open');
+		vi.stubGlobal('indexedDB', db);
+		localStorageMock.getItem.mockReturnValue(JSON.stringify([queuedRow()]));
+		localStorageMock.setItem.mockImplementationOnce(() => {
+			throw new DOMException('site data is blocked', 'SecurityError');
+		});
+
+		removeOfflineExpense('row-1');
+
+		expect(open).not.toHaveBeenCalled();
+		expect(db.photos.has('cid-1')).toBe(true);
+	});
+
+	it('removeOfflineExpense of an unknown id leaves the photo store untouched', () => {
+		const db = fakePhotoDb();
+		const open = vi.spyOn(db, 'open');
+		vi.stubGlobal('indexedDB', db);
+		localStorageMock.getItem.mockReturnValue(JSON.stringify([queuedRow()]));
+
+		removeOfflineExpense('row-unknown');
+
+		expect(open).not.toHaveBeenCalled();
+		const saved = JSON.parse(localStorageMock.setItem.mock.calls.at(-1)[1]) as OfflineExpense[];
+		expect(saved.map(e => e.id)).toEqual(['row-1']);
+	});
+});
+
+describe('unreadable outbox', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		localStorageMock.getItem.mockReset();
+		localStorageMock.getItem.mockReturnValue(null);
+		vi.restoreAllMocks();
+	});
+
+	it('a storage security error on read yields an empty queue and stashes nothing', () => {
+		localStorageMock.getItem.mockImplementation(() => {
+			throw new DOMException('site data is blocked', 'SecurityError');
+		});
+
+		expect(loadOfflineExpenses()).toEqual([]);
+		expect(localStorageMock.setItem).not.toHaveBeenCalled();
+	});
+
+	it('a read error with nothing left to stash writes no corrupt copy', () => {
+		localStorageMock.getItem
+			.mockImplementationOnce(() => {
+				throw new DOMException('site data is blocked', 'SecurityError');
+			})
+			.mockImplementationOnce(() => null);
+
+		expect(loadOfflineExpenses()).toEqual([]);
+		expect(localStorageMock.setItem).not.toHaveBeenCalled();
+	});
+
+	it('a stored value that is valid JSON but not a list yields an empty queue', () => {
+		localStorageMock.getItem.mockReturnValue(JSON.stringify({ id: 'not-a-list' }));
+
+		expect(loadOfflineExpenses()).toEqual([]);
+		expect(localStorageMock.setItem).toHaveBeenCalledWith(
+			'vroom_offline_expenses.corrupt',
+			JSON.stringify({ id: 'not-a-list' })
+		);
+	});
+});
+
+describe('offlineExpenseToBackend for an edit replay', () => {
+	const sparse: OfflineExpense = {
+		id: 'off-edit',
+		vehicleId: 'vehicle-1',
+		tags: [],
+		category: 'misc',
+		amount: 10,
+		date: '2024-03-01',
+		timestamp: 0,
+		synced: false
+	};
+
+	it('clears emptied optional fields and defaults missedFillup to false', () => {
+		const out = offlineExpenseToBackend(sparse, { clearEmptyFields: true });
+		expect(out.description).toBeNull();
+		expect(out.location).toBeNull();
+		expect(out.fuelType).toBeNull();
+		expect(out.missedFillup).toBe(false);
+	});
+
+	it('keeps an explicit missedFillup on an edit replay', () => {
+		const out = offlineExpenseToBackend(
+			{ ...sparse, missedFillup: true },
+			{ clearEmptyFields: true }
+		);
+		expect(out.missedFillup).toBe(true);
+	});
+
+	it('a create replay omits emptied optional fields instead of clearing them', () => {
+		const out = offlineExpenseToBackend(sparse);
+		expect(out).not.toHaveProperty('description');
+		expect(out).not.toHaveProperty('missedFillup');
+	});
+});
+
+describe('markExpenseNeedsAttention server id', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	afterEach(() => {
+		localStorageMock.getItem.mockReturnValue(null);
+	});
+
+	it('records the server id of a row that reached the server before parking', () => {
+		localStorageMock.getItem.mockReturnValue(JSON.stringify([queuedRow()]));
+
+		markExpenseNeedsAttention('row-1', 'conflict', 'server-9');
+
+		const saved = JSON.parse(localStorageMock.setItem.mock.calls.at(-1)[1]) as OfflineExpense[];
+		expect(saved[0]).toMatchObject({
+			needsAttention: true,
+			attentionReason: 'conflict',
+			serverId: 'server-9'
+		});
+	});
+
+	it('leaves the reason and server id unset when neither is given', () => {
+		localStorageMock.getItem.mockReturnValue(JSON.stringify([queuedRow()]));
+
+		markExpenseNeedsAttention('row-1');
+
+		const saved = JSON.parse(localStorageMock.setItem.mock.calls.at(-1)[1]) as OfflineExpense[];
+		expect(saved[0]?.needsAttention).toBe(true);
+		expect(saved[0]).not.toHaveProperty('attentionReason');
+		expect(saved[0]).not.toHaveProperty('serverId');
+	});
+});
+
+describe('queue owner scoping', () => {
+	const UNSCOPED = 'vroom_offline_expenses';
+	const scoped = (owner: string) => `${UNSCOPED}:${owner}`;
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		setOfflineQueueOwner(null);
+		localStorageMock.getItem.mockReset();
+		localStorageMock.setItem.mockReset();
+		localStorageMock.removeItem.mockReset();
+		localStorageMock.getItem.mockReturnValue(null);
+		vi.restoreAllMocks();
+	});
+
+	function useStore(entries: Record<string, string>) {
+		const store = new Map(Object.entries(entries));
+		localStorageMock.getItem.mockImplementation((key: string) => store.get(key) ?? null);
+		localStorageMock.setItem.mockImplementation((key: string, value: string) => {
+			store.set(key, value);
+		});
+		localStorageMock.removeItem.mockImplementation((key: string) => {
+			store.delete(key);
+		});
+		return store;
+	}
+
+	it('signing in adopts the unscoped queue into the owner key, skipping ids it already has', () => {
+		const store = useStore({
+			[UNSCOPED]: JSON.stringify([queuedRow({ id: 'shared' }), queuedRow({ id: 'guest-only' })]),
+			[scoped('user-1')]: JSON.stringify([queuedRow({ id: 'shared', amount: 99 })])
+		});
+
+		setOfflineQueueOwner('user-1');
+
+		expect(currentOfflineQueueOwner()).toBe('user-1');
+		expect(store.has(UNSCOPED)).toBe(false);
+		const owned = JSON.parse(store.get(scoped('user-1'))!) as OfflineExpense[];
+		expect(owned.map(e => [e.id, e.amount])).toEqual([
+			['shared', 99],
+			['guest-only', 12]
+		]);
+		expect(offlineExpenseQueue.current.map(e => e.id)).toEqual(['shared', 'guest-only']);
+	});
+
+	it('signing in with no unscoped queue writes nothing', () => {
+		useStore({ [scoped('user-2')]: JSON.stringify([queuedRow({ id: 'mine' })]) });
+
+		setOfflineQueueOwner('user-2');
+
+		expect(localStorageMock.setItem).not.toHaveBeenCalled();
+		expect(offlineExpenseQueue.current.map(e => e.id)).toEqual(['mine']);
+	});
+
+	it('a corrupt unscoped queue is left in place rather than adopted', () => {
+		const store = useStore({ [UNSCOPED]: '{broken' });
+
+		setOfflineQueueOwner('user-3');
+
+		expect(store.get(UNSCOPED)).toBe('{broken');
+		expect(store.has(scoped('user-3'))).toBe(false);
+		expect(offlineExpenseQueue.current).toEqual([]);
+	});
+
+	it('setting the same owner again does not reload or re-adopt', () => {
+		useStore({});
+		setOfflineQueueOwner('user-4');
+		localStorageMock.getItem.mockClear();
+
+		setOfflineQueueOwner('user-4');
+
+		expect(localStorageMock.getItem).not.toHaveBeenCalled();
+	});
+
+	it('signing out switches back to the unscoped queue without adopting', () => {
+		useStore({
+			[scoped('user-5')]: JSON.stringify([queuedRow({ id: 'owned' })]),
+			[UNSCOPED]: JSON.stringify([queuedRow({ id: 'guest' })])
+		});
+		setOfflineQueueOwner('user-5');
+		useStore({ [UNSCOPED]: JSON.stringify([queuedRow({ id: 'guest-after' })]) });
+
+		setOfflineQueueOwner(null);
+
+		expect(currentOfflineQueueOwner()).toBeNull();
+		expect(offlineExpenseQueue.current.map(e => e.id)).toEqual(['guest-after']);
+	});
+
+	it('saving another owner queue writes its key without touching the in-memory queue', () => {
+		const store = useStore({});
+		setOfflineQueueOwner('user-6');
+		offlineExpenseQueue.current = [];
+
+		expect(saveOfflineExpenses([queuedRow({ id: 'other' })], 'user-7')).toBe(true);
+
+		expect(JSON.parse(store.get(scoped('user-7'))!)).toHaveLength(1);
+		expect(offlineExpenseQueue.current).toEqual([]);
 	});
 });
