@@ -6,7 +6,11 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
-import { effectiveTermCost, termBillingMonths } from '../hooks';
+import {
+  effectiveTermCost,
+  recalculateOvercountedMonthlyPremiums,
+  termBillingMonths,
+} from '../hooks';
 
 let ctx: TestApp;
 
@@ -251,5 +255,101 @@ describe('termBillingMonths: start inclusive, end exclusive, one month per start
     expect(
       effectiveTermCost({ totalCost: 0, monthlyCost: 100, startDate: utcNoon('2026-03-15') })
     ).toBe(0);
+  });
+});
+
+describe('recalculating premiums written before the billing-month fix', () => {
+  const YEAR_START = '2024-01-01T12:00:00.000Z';
+  const YEAR_END = '2025-01-01T12:00:00.000Z';
+
+  function writeOvercountedPremium(termId: string, perVehicleCents: number[]): void {
+    const rows = autoExpensesForTerm(termId).sort((a, b) => a.id.localeCompare(b.id));
+    const groupTotal = perVehicleCents.reduce((sum, cents) => sum + cents, 0);
+    rows.forEach((row, index) => {
+      ctx.sqlite
+        .query('UPDATE expenses SET expense_amount = ?, group_total = ? WHERE id = ?')
+        .run(perVehicleCents[index] ?? 0, groupTotal, row.id);
+    });
+  }
+
+  function groupIdsForTerm(termId: string): string[] {
+    return (
+      ctx.sqlite
+        .query('SELECT DISTINCT group_id FROM expenses WHERE source_type = ? AND source_id = ?')
+        .all('insurance_term', termId) as { group_id: string }[]
+    ).map((row) => row.group_id);
+  }
+
+  test('rewrites an over-counted split premium once and leaves it alone on the next run', async () => {
+    const v1 = await seedVehicle('Honda');
+    const v2 = await seedVehicle('Toyota');
+    const { termId } = await createMonthlyPolicy([v1, v2], 100, YEAR_START, YEAR_END);
+    const groupBefore = groupIdsForTerm(termId);
+    writeOvercountedPremium(termId, [65000, 65000]);
+
+    expect(await recalculateOvercountedMonthlyPremiums()).toBe(1);
+
+    const rows = autoExpensesForTerm(termId);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.expense_amount)).toEqual([60000, 60000]);
+    expect(new Set(rows.map((r) => r.vehicle_id))).toEqual(new Set([v1, v2]));
+    expect(groupIdsForTerm(termId)).toEqual(groupBefore);
+
+    expect(await recalculateOvercountedMonthlyPremiums()).toBe(0);
+    expect(autoExpensesForTerm(termId).map((r) => r.expense_amount)).toEqual([60000, 60000]);
+  });
+
+  test('a premium whose amount matches neither count is treated as a user edit and kept', async () => {
+    const v1 = await seedVehicle('Honda');
+    const { termId } = await createMonthlyPolicy([v1], 100, YEAR_START, YEAR_END);
+    writeOvercountedPremium(termId, [99900]);
+
+    expect(await recalculateOvercountedMonthlyPremiums()).toBe(0);
+    expect(autoExpensesForTerm(termId)[0]?.expense_amount).toBe(99900);
+  });
+
+  test('a term priced by totalCost is never rewritten', async () => {
+    const v1 = await seedVehicle('Honda');
+    const { termId } = await createPolicy([v1], 1300);
+
+    expect(await recalculateOvercountedMonthlyPremiums()).toBe(0);
+    expect(autoExpensesForTerm(termId)[0]?.expense_amount).toBe(130000);
+  });
+});
+
+describe('term update date validation against the stored dates', () => {
+  test('an endDate-only update before the stored start date is rejected and the premium kept', async () => {
+    const v1 = await seedVehicle('Honda');
+    const { policyId, termId } = await createMonthlyPolicy([v1], 100);
+
+    const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
+      endDate: '2023-06-01T00:00:00.000Z',
+    });
+
+    expect(res.status, await res.text()).toBe(400);
+    expect(autoExpensesForTerm(termId)[0]?.expense_amount).toBe(120000);
+  });
+
+  test('a startDate-only update after the stored end date is rejected', async () => {
+    const v1 = await seedVehicle('Honda');
+    const { policyId, termId } = await createMonthlyPolicy([v1], 100);
+
+    const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
+      startDate: '2025-01-01T00:00:00.000Z',
+    });
+
+    expect(res.status, await res.text()).toBe(400);
+  });
+
+  test('an endDate-only update after the stored start date still succeeds', async () => {
+    const v1 = await seedVehicle('Honda');
+    const { policyId, termId } = await createMonthlyPolicy([v1], 100);
+
+    const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
+      endDate: '2024-07-01T00:00:00.000Z',
+    });
+
+    expect(res.status, await res.text()).toBeLessThan(300);
+    expect(autoExpensesForTerm(termId)[0]?.expense_amount).toBe(60000);
   });
 });

@@ -1,11 +1,11 @@
 import { createId } from '@paralleldrive/cuid2';
-import { and, between, desc, eq, inArray } from 'drizzle-orm';
+import { and, between, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { InsurancePolicy, InsuranceTerm } from '../../db/schema';
 import { insurancePolicies, insuranceTerms, insuranceTermVehicles } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
-import { DatabaseError, NotFoundError } from '../../errors';
+import { DatabaseError, NotFoundError, ValidationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { assertVehiclesOwned } from '../../utils/vehicle-ownership';
 
@@ -428,8 +428,15 @@ export class InsurancePolicyRepository {
           .limit(1)
           .all();
 
-        if (termRows.length === 0) {
+        const storedTerm = termRows[0];
+        if (!storedTerm) {
           throw new NotFoundError('Term');
+        }
+
+        const nextStartDate = termFields.startDate ?? storedTerm.startDate;
+        const nextEndDate = termFields.endDate ?? storedTerm.endDate;
+        if (nextEndDate <= nextStartDate) {
+          throw new ValidationError('End date must be after start date');
         }
 
         const setFields: Record<string, unknown> = { updatedAt: new Date() };
@@ -475,7 +482,7 @@ export class InsurancePolicyRepository {
 
       return { ...updatedPolicy[0], ...coverage };
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
+      if (error instanceof NotFoundError || error instanceof ValidationError) throw error;
       logger.error('Failed to update term in insurance policy', {
         policyId,
         termId,
@@ -538,6 +545,20 @@ export class InsurancePolicyRepository {
       });
       throw new DatabaseError('Failed to delete term from insurance policy', error);
     }
+  }
+
+  async findMonthlyPricedTerms(): Promise<(InsuranceTerm & { userId: string })[]> {
+    const rows = await this.db
+      .select({ term: insuranceTerms, userId: insurancePolicies.userId })
+      .from(insuranceTerms)
+      .innerJoin(insurancePolicies, eq(insuranceTerms.policyId, insurancePolicies.id))
+      .where(
+        and(
+          gt(insuranceTerms.monthlyCost, 0),
+          or(isNull(insuranceTerms.totalCost), eq(insuranceTerms.totalCost, 0))
+        )
+      );
+    return rows.map((r) => ({ ...r.term, userId: r.userId }));
   }
 
   async findExpiringTerms(
