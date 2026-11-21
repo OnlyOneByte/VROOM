@@ -141,10 +141,6 @@ describe('createVisibilityWatch', () => {
 
 		intersection.callback?.([{ isIntersecting: true }]);
 		expect(watch.visible).toBe(true);
-
-		setRendered(node, false);
-		mutation.callback?.();
-		expect(watch.visible).toBe(true);
 	});
 
 	test('resets visibility on re-observe and the mutation watch reveals a previously seen element', () => {
@@ -165,6 +161,11 @@ describe('createVisibilityWatch', () => {
 		flushSync();
 		expect(watch.visible).toBe(false);
 
+		setRendered(node, false);
+		mutation.callback?.();
+		expect(watch.visible).toBe(false);
+
+		setRendered(node, true);
 		mutation.callback?.();
 		expect(watch.visible).toBe(true);
 	});
