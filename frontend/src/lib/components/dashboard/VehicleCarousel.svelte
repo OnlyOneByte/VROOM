@@ -35,7 +35,7 @@
 	<Card.Header>
 		<div class="flex items-center justify-between">
 			<div>
-				<Card.Title>Your Fleet</Card.Title>
+				<Card.Title level={2}>Your Fleet</Card.Title>
 				<Card.Description>Click on a vehicle to view details</Card.Description>
 			</div>
 			<div class="p-2 rounded-lg bg-chart-2/10">

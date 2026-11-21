@@ -50,6 +50,14 @@ describe('RecentActivityCard', () => {
 		expect(screen.queryByRole('link', { name: /View All Expenses/ })).toBeNull();
 	});
 
+	test('an empty card has one heading, so its empty state is not a peer of its own title', () => {
+		render(RecentActivityCard, { expenses: [] });
+
+		expect(screen.getAllByRole('heading').map(h => h.textContent?.trim())).toEqual([
+			'No recent activity'
+		]);
+	});
+
 	test('each row shows category, vehicle, description, relative date and amount', () => {
 		render(RecentActivityCard, {
 			expenses: [

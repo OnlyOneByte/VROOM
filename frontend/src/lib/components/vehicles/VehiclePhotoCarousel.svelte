@@ -55,7 +55,7 @@
 
 <Card.Root>
 	<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-3">
-		<Card.Title class="text-lg font-semibold">Photos</Card.Title>
+		<Card.Title level={2} class="text-lg font-semibold">Photos</Card.Title>
 		{#if isOwner}
 			<Button variant="outline" size="lg" onclick={onUpload}>
 				<Upload class="mr-2 h-4 w-4" />

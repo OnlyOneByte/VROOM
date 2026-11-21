@@ -82,7 +82,7 @@
 		<Card.Header>
 			<div class="flex items-center justify-between">
 				<div>
-					<Card.Title>Shared with you</Card.Title>
+					<Card.Title level={2}>Shared with you</Card.Title>
 					<Card.Description>Vehicles other people invited you to</Card.Description>
 				</div>
 				<div class="p-2 rounded-lg bg-accent">

@@ -20,7 +20,7 @@
 <Card>
 	<CardHeader>
 		<div class="flex items-center justify-between">
-			<CardTitle class="flex items-center gap-2">
+			<CardTitle level={2} class="flex items-center gap-2">
 				<Car class="h-5 w-5" />
 				Vehicle Information
 			</CardTitle>
