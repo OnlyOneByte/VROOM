@@ -6,7 +6,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { toast } from 'svelte-sonner';
 	import { shareApi } from '#lib/services/share-api.ts';
-	import { ApiError } from '#lib/utils/error-handling.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { shareLevelLabel } from '#lib/utils/share-helpers.ts';
 	import type { ReceivedShare } from '#lib/types/index.ts';
 
@@ -31,7 +31,7 @@
 			pending = received.filter(s => s.status === 'pending');
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load invitations:', error);
-			loadError = error instanceof Error ? error.message : 'Failed to load invitations';
+			loadError = userFacingErrorMessage(error);
 		} finally {
 			isLoading = false;
 		}
@@ -45,9 +45,7 @@
 			pending = pending.filter(s => s.id !== share.id);
 			onAccepted?.();
 		} catch (error) {
-			const msg =
-				error instanceof ApiError ? error.message : 'Could not accept the invitation. Try again.';
-			toast.error(msg);
+			toast.error(`Couldn't accept the invitation. ${userFacingErrorMessage(error)}`);
 		} finally {
 			acting = null;
 		}
@@ -60,9 +58,7 @@
 			toast.success(`Declined the invitation to ${share.vehicleName}`);
 			pending = pending.filter(s => s.id !== share.id);
 		} catch (error) {
-			const msg =
-				error instanceof ApiError ? error.message : 'Could not decline the invitation. Try again.';
-			toast.error(msg);
+			toast.error(`Couldn't decline the invitation. ${userFacingErrorMessage(error)}`);
 		} finally {
 			acting = null;
 		}
