@@ -97,6 +97,13 @@ describe('ExpensePhotoSection: loading', () => {
 		expect(screen.queryByAltText('receipt.pdf')).toBeNull();
 	});
 
+	test('each photo delete button is 40px square below sm and 28px from sm up', async () => {
+		mocks.getPhotos.mockResolvedValue(page([photo('p1')]));
+		mount();
+		await screen.findByAltText('p1.jpg');
+		expect(deleteButtons()[0]).toHaveClass('size-10', 'sm:size-7');
+	});
+
 	test('a failed load notifies the user and falls back to the empty state', async () => {
 		mocks.getPhotos.mockRejectedValue(new Error('offline'));
 		mount();

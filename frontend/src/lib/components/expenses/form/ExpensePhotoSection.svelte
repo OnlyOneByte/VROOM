@@ -111,7 +111,7 @@
 						<Button
 							variant="outline"
 							size="sm"
-							class="h-7 text-xs"
+							class="size-10 text-xs sm:size-7"
 							aria-label="Delete {photo.fileName}"
 							onclick={() => requestDelete(photo.id)}
 						>
