@@ -40,6 +40,7 @@ export function occurrencesPerYear(
 
 export function monthlyRunRate(reminder: Reminder): number {
   if (reminder.type !== 'expense' || !reminder.isActive) return 0;
+  if (reminder.triggerMode === 'mileage') return 0;
   const amount = reminder.expenseAmount ?? 0;
   if (amount <= 0) return 0;
   const perYear = occurrencesPerYear(
