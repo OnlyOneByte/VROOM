@@ -213,3 +213,36 @@ describe('a photo on every upload-accepted entity type survives backup→restore
     expect(byType.get('odometer_entry')).toBe(odometerId);
   });
 });
+
+describe('backup → restore keeps the order a term’s vehicles were chosen in', () => {
+  test('a term covering two vehicles, chosen out of id order, reads back in that order after restore', async () => {
+    const ids = [
+      await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 }),
+      await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 }),
+    ].sort();
+    const chosen = [ids[1] as string, ids[0] as string];
+    const res = await ctx.authed('POST', '/api/v1/insurance', {
+      company: 'Acme Mutual',
+      terms: [
+        {
+          startDate: '2024-01-01T00:00:00.000Z',
+          endDate: '2025-01-01T00:00:00.000Z',
+          vehicleCoverage: { vehicleIds: chosen },
+        },
+      ],
+    });
+    const created = await json<DataEnvelope<{ id: string }>>(res);
+    expect(res.status, JSON.stringify(created)).toBe(201);
+
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+    const zip = await backupService.exportAsZip(ctx.user.id);
+    const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    const after = await json<DataEnvelope<{ termVehicleCoverage: { vehicleId: string }[] }>>(
+      await ctx.authed('GET', `/api/v1/insurance/${created.data.id}`)
+    );
+    expect(after.data.termVehicleCoverage.map((c) => c.vehicleId)).toEqual(chosen);
+  });
+});
