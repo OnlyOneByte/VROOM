@@ -422,3 +422,34 @@ describe('elapsedMonths', () => {
     );
   });
 });
+
+describe('elapsed months on the user calendar day', () => {
+  test('UTC+13 in daylight time: 15 Jan to 15 Apr at local noon is exactly 3 months', () => {
+    const start = new Date('2025-01-14T23:00:00Z');
+    const payment = new Date('2025-04-15T00:00:00Z');
+    expect(elapsedMonths(start, payment, 'Pacific/Auckland')).toBe(3);
+    expect(elapsedMonths(start, payment)).not.toBe(3);
+  });
+
+  test('UTC-10: 15 Jan to 15 Apr at local noon is exactly 3 months', () => {
+    const start = new Date('2025-01-15T22:00:00Z');
+    const payment = new Date('2025-04-15T22:00:00Z');
+    expect(elapsedMonths(start, payment, 'Pacific/Honolulu')).toBe(3);
+  });
+
+  test('the balance accrues whole months of interest in the user zone', () => {
+    const terms = {
+      originalAmount: 1_000_000,
+      apr: 12,
+      startDate: new Date('2025-01-14T23:00:00Z'),
+      financingType: 'loan',
+    };
+    const payments: DatedPayment[] = [
+      { date: new Date('2025-03-14T23:00:00Z'), amount: 0 },
+      { date: new Date('2025-04-15T00:00:00Z'), amount: 0 },
+    ];
+    const zoned = amortizedBalance(terms, payments, 'Pacific/Auckland');
+    expect(zoned).toBe(1_020_100);
+    expect(amortizedBalance(terms, payments)).toBeGreaterThan(zoned);
+  });
+});

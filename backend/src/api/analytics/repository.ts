@@ -912,10 +912,12 @@ export class AnalyticsRepository {
   }
 
   private async computeActiveBalances(
-    financingRows: Array<{ id: string; isActive: boolean }>
+    financingRows: Array<{ id: string; isActive: boolean }>,
+    timeZone: string | undefined
   ): Promise<Map<string, number>> {
     return new FinancingRepository(this.db).computeBalances(
-      financingRows.filter((fin) => fin.isActive).map((fin) => fin.id)
+      financingRows.filter((fin) => fin.isActive).map((fin) => fin.id),
+      timeZone
     );
   }
 
@@ -1772,7 +1774,7 @@ export class AnalyticsRepository {
         .select()
         .from(vehicleFinancing)
         .where(inArray(vehicleFinancing.vehicleId, userVehicleIds));
-      const balances = await this.computeActiveBalances(financingRows);
+      const balances = await this.computeActiveBalances(financingRows, timeZone);
       const {
         vehicleDetails,
         totalMonthlyPayments,
