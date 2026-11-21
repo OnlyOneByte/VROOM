@@ -48,6 +48,7 @@ describe('RestoreDialog skipped photos', () => {
 			skipped: { photos: 2 }
 		});
 
+		expect(screen.getByTestId('restore-skipped-photos')).toHaveAttribute('role', 'status');
 		expect(screen.getByTestId('restore-skipped-photos')).toHaveTextContent(
 			"2 photos won't be restored because the trips, expenses or other items they belonged to were deleted before this backup was made."
 		);

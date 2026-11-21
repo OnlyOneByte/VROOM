@@ -88,7 +88,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 | Field error | `import { FormFieldError } from '#lib/components/ui/form-field'` | renders `role="alert"`; wire via `aria-describedby` (`FormFieldDescription` for hints) |
 | Card | `import * as Card from '#lib/components/ui/card'` | Root/Header/Title/Description/Action/Content/Footer |
 | Badge | `import { Badge } from '#lib/components/ui/badge'` | variants: default/secondary/destructive/outline |
-| Alert | `import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert'` | `default` / `destructive` / `warning` / `success`, all themed |
+| Alert | `import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert'` | `variant`: `default` / `destructive` / `warning` / `success`, all themed; `role?`: `'alert'` (default, announced at once) or `'status'` (polite, for non-urgent notices such as the restore dialog's skipped-photos note) |
 | Skeleton | `import { Skeleton } from '#lib/components/ui/skeleton'` | loading placeholder |
 | Tabs | `import * as Tabs from '#lib/components/ui/tabs'` | |
 | Dialog | `import * as Dialog from '#lib/components/ui/dialog'` / `* as AlertDialog` | AlertDialog backs destructive confirms — prefer `common/ConfirmDialog.svelte` |
