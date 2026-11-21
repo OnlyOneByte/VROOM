@@ -12,11 +12,9 @@
 		date: string;
 		description: string;
 		tags: string[];
-		policyId: string | null;
 		photoEntityId: string | null;
 		isDeleting: boolean;
 		onBack: () => void;
-		onEditTerm: () => void;
 		onForceDelete: () => void;
 	}
 
@@ -26,11 +24,9 @@
 		date,
 		description,
 		tags,
-		policyId,
 		photoEntityId,
 		isDeleting,
 		onBack,
-		onEditTerm,
 		onForceDelete
 	}: Props = $props();
 </script>
@@ -48,12 +44,6 @@
 				This expense was automatically created from an insurance term. To change the amount or
 				split, edit the insurance policy term.
 			</p>
-			{#if policyId}
-				<Button variant="outline" size="sm" class="mt-3" onclick={onEditTerm}>
-					<Shield class="mr-2 h-4 w-4" />
-					Edit Insurance Term
-				</Button>
-			{/if}
 		</div>
 	</div>
 
