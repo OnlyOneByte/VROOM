@@ -40,7 +40,7 @@
 
 	function discardDescription(expense: OfflineExpense): string {
 		return expense.serverId
-			? `${describeEntry(expense)} is saved on the server. Discarding deletes only the photos that didn't upload from this device.`
+			? `${describeEntry(expense)} reached the server and stays there. Discarding removes the photos that didn't upload, which are only on this device.`
 			: `${describeEntry(expense)} was never synced to the server. Discarding it deletes it and any photos attached to it from this device for good.`;
 	}
 
@@ -117,8 +117,8 @@
 					<CardNs.Title>Needs attention ({needsAttentionExpenses.length})</CardNs.Title>
 					<CardNs.Description>
 						These entries can't finish syncing as they are: a fuel entry needs its fuel amount
-						(volume or charge) and mileage, or the server rejected a photo. Each one says why. Fix
-						the expense, or discard what is left on this device.
+						(volume or charge) and mileage, or the server rejected a photo. Retry them from the sync
+						panel once the cause is fixed, or discard what is left on this device.
 					</CardNs.Description>
 				</div>
 				<div class="p-2 rounded-lg bg-warning/10">
@@ -158,7 +158,8 @@
 							</div>
 							{#if expense.serverId}
 								<div class="text-sm text-foreground mt-1">
-									Saved on the server. {expense.attentionReason ?? "A photo couldn't be uploaded."}
+									The expense reached the server. {expense.attentionReason ??
+										"A photo couldn't be uploaded."}
 								</div>
 							{:else if expense.attentionReason}
 								<div class="text-sm text-foreground mt-1">{expense.attentionReason}</div>

@@ -419,8 +419,12 @@ class SyncManager {
 				resolution === 'keep_local'
 					? (await this.postExpense(local, true)).id
 					: conflict.serverExpense.id;
-			await this.uploadQueuedPhotos(local, serverId);
-			markExpenseAsSynced(local.id);
+			const delivered = await this.deliverQueuedPhotos(local, serverId);
+			if (delivered.success) {
+				markExpenseAsSynced(local.id);
+			} else {
+				markExpenseNeedsAttention(local.id, delivered.error, serverId);
+			}
 			return true;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to resolve conflict:', error);

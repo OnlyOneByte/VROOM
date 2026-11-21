@@ -20,7 +20,7 @@ const savedWithRejectedPhoto: OfflineExpense = {
 };
 
 describe('OfflineExpenseCards — an expense that synced but whose photo was rejected', () => {
-	it('says the expense is saved and why the photo is waiting', () => {
+	it('says the expense reached the server and why the photo is waiting', () => {
 		render(OfflineExpenseCards, {
 			props: {
 				pendingExpenses: [],
@@ -31,7 +31,9 @@ describe('OfflineExpenseCards — an expense that synced but whose photo was rej
 		});
 
 		expect(
-			screen.getByText("Saved on the server. A photo couldn't be uploaded: File too large")
+			screen.getByText(
+				"The expense reached the server. A photo couldn't be uploaded: File too large"
+			)
 		).toBeInTheDocument();
 	});
 
@@ -50,7 +52,7 @@ describe('OfflineExpenseCards — an expense that synced but whose photo was rej
 		await fireEvent.click(screen.getByRole('button', { name: 'Discard this entry' }));
 
 		expect(await screen.findByText("Discard the photos that didn't upload?")).toBeInTheDocument();
-		expect(screen.getByText(/is saved on the server/)).toBeInTheDocument();
+		expect(screen.getByText(/reached the server and stays there/)).toBeInTheDocument();
 		await fireEvent.click(screen.getByRole('button', { name: 'Discard photos' }));
 		await waitFor(() => expect(onRemoveNeedsAttention).toHaveBeenCalledWith('parked-photo'));
 	});

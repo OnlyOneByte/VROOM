@@ -52,7 +52,9 @@ export function offlineExpenseToBackend(
 			volume: expense.volume,
 			charge: expense.charge,
 			fuelType: expense.fuelType,
-			missedFillup: expense.missedFillup,
+			missedFillup: options.clearEmptyFields
+				? (expense.missedFillup ?? false)
+				: expense.missedFillup,
 			description: expense.description,
 			location: expense.location,
 			sourceType: expense.sourceType,

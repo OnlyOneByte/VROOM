@@ -281,6 +281,16 @@ describe('conflicts the day-window lookup cannot see', () => {
 		expect(result.conflicts).toHaveLength(1);
 	});
 
+	it('does not flag a row the server normalised on create, as long as nobody edited it', async () => {
+		storage.saveOfflineExpenses([queued()]);
+		serveLookupThenCreate(serverRow({ description: 'trimmed by the server' }));
+
+		const result = await syncManager.syncAll();
+
+		expect(result.conflicts).toHaveLength(0);
+		expect(result.synced).toBe(1);
+	});
+
 	it('does not flag the row the create just made', async () => {
 		storage.saveOfflineExpenses([queued()]);
 		serveLookupThenCreate(serverRow());
@@ -289,6 +299,26 @@ describe('conflicts the day-window lookup cannot see', () => {
 
 		expect(result.conflicts).toHaveLength(0);
 		expect(result.synced).toBe(1);
+	});
+
+	it('parks a photo the server rejects while a conflict is resolved, and still resolves it', async () => {
+		storage.saveOfflineExpenses([queued()]);
+		vi.stubGlobal('indexedDB', inMemoryIndexedDB());
+		await storage.savePendingPhotos('cid-1', [photo('huge.jpg')]);
+		const { ApiError } = await import('../../error-handling');
+		uploadPhoto.mockRejectedValueOnce(new ApiError('File too large', 413));
+		const conflict: SyncConflict = {
+			id: 'e1',
+			localExpense: queued(),
+			serverExpense: { id: 'server-1', amount: 20, date: '2024-06-01', tags: [] }
+		};
+
+		expect(await syncManager.resolveConflict(conflict, 'keep_server')).toBe(true);
+
+		const [parked] = storage.getNeedsAttentionExpenses();
+		expect(parked?.serverId).toBe('server-1');
+		expect(parked?.attentionReason).toContain("A photo couldn't be uploaded");
+		vi.unstubAllGlobals();
 	});
 
 	it('Keep My Version clears the fields the server copy gained', async () => {
@@ -307,6 +337,11 @@ describe('conflicts the day-window lookup cannot see', () => {
 
 		await syncManager.resolveConflict(conflict, 'keep_local');
 
-		expect(posts()[0]).toMatchObject({ forceOverwrite: true, description: null, location: null });
+		expect(posts()[0]).toMatchObject({
+			forceOverwrite: true,
+			description: null,
+			location: null,
+			missedFillup: false
+		});
 	});
 });
