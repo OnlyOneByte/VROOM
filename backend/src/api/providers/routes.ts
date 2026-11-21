@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { photoRefs, photos, type UserProvider, userProviders } from '../../db/schema';
-import { ConflictError, NotFoundError, ValidationError } from '../../errors';
+import { AppError, ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import type { CategorySetting, PhotoCategory, StorageConfig } from '../../types';
 import { DEFAULT_STORAGE_CONFIG, PHOTO_CATEGORIES } from '../../types';
@@ -442,38 +442,62 @@ async function cleanupBackupConfig(userId: string, providerId: string): Promise<
   });
 }
 
-routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
+async function assertNoPhotosOnlyHere(providerId: string, force: boolean): Promise<void> {
+  if (force) return;
+  const photosOnlyHere = await photoRefRepository.countPhotosOnlyOnProvider(providerId);
+  if (photosOnlyHere === 0) return;
+  const one = photosOnlyHere === 1;
+  throw new AppError(
+    `${photosOnlyHere} ${one ? 'photo is' : 'photos are'} stored only in this provider. Deleting it means ${one ? 'that photo' : 'those photos'} can no longer be shown.`,
+    409,
+    true,
+    { photosOnlyHere }
+  );
+}
 
-  const db = getDb();
-
-  const existing = await findOwnedProviderOrThrow(db, id, user.id);
-
-  if (existing.domain === 'auth') {
-    throw new ValidationError('Auth providers cannot be modified through this endpoint');
-  }
-
-  if (existing.domain === 'storage') {
-    await cleanupStorageConfig(user.id, id);
-    await cleanupBackupConfig(user.id, id);
-
-    try {
-      await photoRefRepository.deleteByProvider(id);
-    } catch (err) {
-      logger.warn('Failed to delete photo refs during provider cleanup', {
-        providerId: id,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
-
-  await db
-    .delete(userProviders)
-    .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)));
-
-  return c.body(null, 204);
+const deleteProviderQuerySchema = z.object({
+  force: z.enum(['true', 'false']).optional(),
 });
+
+routes.delete(
+  '/:id',
+  zValidator('param', commonSchemas.idParam),
+  zValidator('query', deleteProviderQuerySchema),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    const force = c.req.valid('query').force === 'true';
+
+    const db = getDb();
+
+    const existing = await findOwnedProviderOrThrow(db, id, user.id);
+
+    if (existing.domain === 'auth') {
+      throw new ValidationError('Auth providers cannot be modified through this endpoint');
+    }
+
+    if (existing.domain === 'storage') {
+      await assertNoPhotosOnlyHere(id, force);
+      await cleanupStorageConfig(user.id, id);
+      await cleanupBackupConfig(user.id, id);
+
+      try {
+        await photoRefRepository.deleteByProvider(id);
+      } catch (err) {
+        logger.warn('Failed to delete photo refs during provider cleanup', {
+          providerId: id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    await db
+      .delete(userProviders)
+      .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)));
+
+    return c.body(null, 204);
+  }
+);
 
 routes.post('/:id/test', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');

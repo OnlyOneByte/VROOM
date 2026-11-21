@@ -16,7 +16,8 @@
 	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import DefaultPhotoSources from '../storage-provider/DefaultPhotoSources.svelte';
 	import ProviderCard from '../storage-provider/ProviderInfoCard.svelte';
-	import { providerApi } from '#lib/services/provider-api.ts';
+	import { photosOnlyOnProvider, providerApi } from '#lib/services/provider-api.ts';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { settingsApi } from '#lib/services/settings-api.ts';
 	import { fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
@@ -102,12 +103,20 @@
 		goto(resolve(paramRoutes.settingsProviderEdit, { id: provider.id }));
 	}
 
-	async function handleProviderDelete(provider: UserProviderInfo) {
+	let photoLossConfirmOpen = $state(false);
+	let photoLossConfirm = $state<{ provider: UserProviderInfo; message: string } | null>(null);
+
+	async function handleProviderDelete(provider: UserProviderInfo, force = false) {
 		try {
-			await providerApi.deleteProvider(provider.id);
+			await providerApi.deleteProvider(provider.id, { force });
 			appStore.showSuccess(`${provider.displayName} removed`);
 			await loadData();
-		} catch {
+		} catch (error) {
+			if (photosOnlyOnProvider(error) !== null && error instanceof Error) {
+				photoLossConfirm = { provider, message: error.message };
+				photoLossConfirmOpen = true;
+				return;
+			}
 			appStore.showError('Failed to delete provider');
 		}
 	}
@@ -330,3 +339,13 @@
 		{/if}
 	</CardContent>
 </Card>
+
+<ConfirmDialog
+	bind:open={photoLossConfirmOpen}
+	title="Delete {photoLossConfirm?.provider.displayName ?? 'provider'}?"
+	description={photoLossConfirm?.message ?? ''}
+	confirmLabel="Delete anyway"
+	onConfirm={async () => {
+		if (photoLossConfirm) await handleProviderDelete(photoLossConfirm.provider, true);
+	}}
+/>
