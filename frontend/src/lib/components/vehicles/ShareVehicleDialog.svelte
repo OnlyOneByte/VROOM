@@ -6,6 +6,7 @@
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { Users, CircleAlert, Trash2 } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { shareApi } from '#lib/services/share-api.ts';
@@ -28,6 +29,8 @@
 	let isLoading = $state(false);
 	let loadError = $state<string | null>(null);
 	let shares = $state<VehicleShare[]>([]);
+	let revokeConfirmOpen = $state(false);
+	let revokingShare = $state<VehicleShare | null>(null);
 
 	let lastKey = $state('');
 	$effect(() => {
@@ -83,14 +86,21 @@
 		}
 	}
 
-	async function revoke(share: VehicleShare) {
+	function confirmRevoke(share: VehicleShare) {
+		revokingShare = share;
+		revokeConfirmOpen = true;
+	}
+
+	async function revoke() {
+		if (!revokingShare) return;
 		try {
-			await shareApi.revoke(share.id);
+			await shareApi.revoke(revokingShare.id);
 			toast.success('Access revoked');
-			await load();
-		} catch {
+		} catch (error) {
 			toast.error('Could not revoke access. Try again.');
+			throw error;
 		}
+		await load();
 	}
 </script>
 
@@ -181,7 +191,7 @@
 								<Button
 									variant="ghost"
 									size="icon"
-									onclick={() => revoke(share)}
+									onclick={() => confirmRevoke(share)}
 									aria-label="Revoke access for {share.sharedWithId}"
 								>
 									<Trash2 class="h-4 w-4 text-destructive" />
@@ -206,3 +216,13 @@
 		</div>
 	</Dialog.Content>
 </Dialog.Root>
+
+<ConfirmDialog
+	bind:open={revokeConfirmOpen}
+	title="Revoke access?"
+	description={revokingShare
+		? `${revokingShare.sharedWithId} will no longer see “${vehicleName}” or its expenses. You can invite them again later.`
+		: ''}
+	confirmLabel="Revoke"
+	onConfirm={revoke}
+/>
