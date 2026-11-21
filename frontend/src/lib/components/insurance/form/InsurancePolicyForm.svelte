@@ -106,7 +106,7 @@
 			}
 		} catch (err) {
 			if (import.meta.env.DEV) console.error('Failed to load data:', err);
-			appStore.showError('Failed to load data');
+			appStore.showError(`Couldn't load your vehicles. ${userFacingErrorMessage(err)}`);
 			gotoDynamic(returnTo);
 		} finally {
 			isLoading = false;
@@ -122,7 +122,7 @@
 			isActive = policy.isActive;
 		} catch (err) {
 			if (import.meta.env.DEV) console.error('Failed to load policy:', err);
-			appStore.showError('Failed to load policy');
+			appStore.showError(`Couldn't load the policy. ${userFacingErrorMessage(err)}`);
 			gotoDynamic(returnTo);
 		}
 	}

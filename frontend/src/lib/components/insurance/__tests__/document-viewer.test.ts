@@ -105,7 +105,10 @@ describe('DocumentViewer loading', () => {
 		getEntityDocuments.mockRejectedValue(failure);
 		mount();
 		await settle();
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to load documents');
+		expect(handleErrorWithNotification).toHaveBeenCalledWith(
+			failure,
+			"Couldn't load the documents"
+		);
 		expect(screen.getByText('No documents uploaded yet.')).toBeInTheDocument();
 	});
 });
@@ -229,7 +232,10 @@ describe('DocumentViewer deletion', () => {
 			within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' })
 		);
 		await settle();
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to delete document');
+		expect(handleErrorWithNotification).toHaveBeenCalledWith(
+			failure,
+			"Couldn't delete the document"
+		);
 		expect(screen.getByRole('img', { name: 'card.jpg' })).toBeInTheDocument();
 		expect(screen.getByRole('alertdialog')).toBeInTheDocument();
 	});

@@ -121,7 +121,7 @@
 			}
 		} catch (err) {
 			if (import.meta.env.DEV) console.error('Failed to load data:', err);
-			appStore.showError('Failed to load data');
+			appStore.showError(`Couldn't load the policy. ${userFacingErrorMessage(err)}`);
 			gotoDynamic(returnTo);
 		} finally {
 			isLoading = false;

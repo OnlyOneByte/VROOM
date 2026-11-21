@@ -278,9 +278,9 @@ describe('InsuranceTermForm add mode', () => {
 	});
 
 	test('a load failure reports and navigates back', async () => {
-		getPolicy.mockRejectedValue(new Error('404'));
+		getPolicy.mockRejectedValue(new ApiError('Policy not found', 404));
 		await mount({ returnTo: '/insurance' });
-		expect(showError).toHaveBeenCalledWith('Failed to load data');
+		expect(showError).toHaveBeenCalledWith("Couldn't load the policy. Policy not found.");
 		expect(gotoDynamic).toHaveBeenCalledWith('/insurance');
 	});
 
