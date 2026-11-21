@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { LinkedAuthProvider, User } from '#lib/types/index.ts';
 
@@ -212,6 +213,21 @@ describe('Profile display-name editing', () => {
 		await settle();
 		expect(input).toBeDisabled();
 		expect(screen.getByRole('button', { name: 'Cancel editing' })).toBeDisabled();
+	});
+
+	test('a name save in flight counts as unsaved changes until the page closes', async () => {
+		authApi.updateProfile.mockReturnValue(new Promise(() => {}));
+		const { unmount } = await mount();
+		const input = await startEditing();
+		await fireEvent.input(input, { target: { value: 'New Name' } });
+		expect(hasPendingSave()).toBe(false);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Save display name' }));
+		await settle();
+
+		expect(hasPendingSave()).toBe(true);
+		unmount();
+		expect(hasPendingSave()).toBe(false);
 	});
 });
 

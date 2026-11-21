@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { resolve } from '$app/paths';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
@@ -44,6 +45,8 @@
 	let loadError = $derived(settingsStore.error && !settings ? settingsStore.error : null);
 
 	let isSaving = $state(false);
+
+	onMount(() => trackPendingSave(() => isSaving));
 	let isBackingUp = $state(false);
 
 	let distanceUnit = $state<'miles' | 'kilometers'>('miles');

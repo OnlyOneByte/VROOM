@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type { User, UserProviderInfo, UserSettings } from '#lib/types/index.ts';
 import { fakeSettingsState, settingsStoreFake } from './settings-store-fake.svelte.ts';
@@ -265,6 +266,18 @@ describe('Settings page preferences', () => {
 		await mount();
 		await save();
 		expect(screen.getByRole('button', { name: /Saving/ })).toBeDisabled();
+	});
+
+	test('a settings save in flight counts as unsaved changes until the page closes', async () => {
+		settingsStoreFake.update.mockReturnValue(new Promise(() => {}));
+		const { unmount } = await mount();
+		expect(hasPendingSave()).toBe(false);
+
+		await save();
+
+		expect(hasPendingSave()).toBe(true);
+		unmount();
+		expect(hasPendingSave()).toBe(false);
 	});
 });
 
