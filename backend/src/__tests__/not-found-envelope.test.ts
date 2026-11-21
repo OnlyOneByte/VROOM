@@ -1,12 +1,12 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../test-helpers/http-client';
 
 let ctx: TestApp;
 
-beforeEach(async () => {
+beforeAll(async () => {
   ctx = await createTestApp();
-});
-afterEach(() => ctx.close());
+}, 30_000);
+afterAll(() => ctx.close());
 
 interface ErrorBody {
   success: boolean;
