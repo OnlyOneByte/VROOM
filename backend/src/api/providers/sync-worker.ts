@@ -102,6 +102,32 @@ function endBatch(startedAt: number): void {
   if (processingSince === startedAt) processingSince = null;
 }
 
+async function processRefs(
+  pendingRefs: PhotoRef[],
+  startedAt: number,
+  now: Date,
+  deps: SyncWorkerDeps
+): Promise<void> {
+  const providerCache = new Map<string, StorageProvider>();
+  for (const ref of pendingRefs) {
+    if (processingSince !== startedAt) break;
+    if (!shouldProcessRef(ref, now)) continue;
+
+    inFlightRefs.set(ref.id, Date.now());
+    try {
+      await processSingleRef(ref, providerCache, deps);
+    } catch (error) {
+      logger.warn('Sync worker: failed to process ref', {
+        refId: ref.id,
+        photoId: ref.photoId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      inFlightRefs.delete(ref.id);
+    }
+  }
+}
+
 export async function processBatch(deps: SyncWorkerDeps = defaultDeps): Promise<void> {
   const startedAt = Date.now();
   if (previousBatchBlocks(startedAt)) return;
@@ -116,27 +142,9 @@ export async function processBatch(deps: SyncWorkerDeps = defaultDeps): Promise<
     logger.debug(`Sync worker: processing ${pendingRefs.length} pending refs`);
     const nowMs = Date.now();
     const now = new Date(nowMs);
-    const providerCache = new Map<string, StorageProvider>();
-
     evictStaleInFlightRefs(nowMs);
 
-    for (const ref of pendingRefs) {
-      if (processingSince !== startedAt) break;
-      if (!shouldProcessRef(ref, now)) continue;
-
-      inFlightRefs.set(ref.id, Date.now());
-      try {
-        await processSingleRef(ref, providerCache, deps);
-      } catch (error) {
-        logger.warn('Sync worker: failed to process ref', {
-          refId: ref.id,
-          photoId: ref.photoId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      } finally {
-        inFlightRefs.delete(ref.id);
-      }
-    }
+    await processRefs(pendingRefs, startedAt, now, deps);
   } catch (error) {
     logger.error('Sync worker: batch processing error', {
       error: error instanceof Error ? error.message : String(error),
