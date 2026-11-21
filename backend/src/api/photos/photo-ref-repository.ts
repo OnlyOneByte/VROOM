@@ -111,6 +111,25 @@ export class PhotoRefRepository {
       .where(and(eq(photoRefs.providerId, providerId), eq(photoRefs.status, 'failed')));
   }
 
+  async countPhotosOnlyOnProvider(providerId: string): Promise<number> {
+    const [row] = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(photoRefs)
+      .where(
+        and(
+          eq(photoRefs.providerId, providerId),
+          eq(photoRefs.status, 'active'),
+          sql`NOT EXISTS (
+            SELECT 1 FROM photo_refs AS other
+            WHERE other.photo_id = ${photoRefs.photoId}
+              AND other.provider_id != ${providerId}
+              AND other.status = 'active'
+          )`
+        )
+      );
+    return Number(row?.count ?? 0);
+  }
+
   async deleteByProvider(providerId: string): Promise<void> {
     await this.db.delete(photoRefs).where(eq(photoRefs.providerId, providerId));
   }
