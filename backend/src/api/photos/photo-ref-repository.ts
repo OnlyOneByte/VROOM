@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import { type NewPhotoRef, type PhotoRef, photoRefs } from '../../db/schema';
@@ -61,14 +61,31 @@ export class PhotoRefRepository {
   }
 
   async findPendingOrFailed(limit: number): Promise<PhotoRef[]> {
+    const providerUpdatedSinceLastAttempt = sql`EXISTS (
+      SELECT 1 FROM photo_refs AS involved
+      JOIN user_providers AS provider ON provider.id = involved.provider_id
+      WHERE (involved.id = ${photoRefs.id}
+          OR (involved.photo_id = ${photoRefs.photoId} AND involved.status = 'active'))
+        AND provider.updated_at > COALESCE(${photoRefs.syncedAt}, ${photoRefs.createdAt}, 0)
+    )`;
     return this.db
       .select()
       .from(photoRefs)
       .where(
-        and(inArray(photoRefs.status, ['pending', 'failed']), sql`${photoRefs.retryCount} < 3`)
+        and(
+          inArray(photoRefs.status, ['pending', 'failed']),
+          or(sql`${photoRefs.retryCount} < 3`, providerUpdatedSinceLastAttempt)
+        )
       )
       .orderBy(asc(photoRefs.createdAt))
       .limit(limit);
+  }
+
+  async resetFailedForProvider(providerId: string): Promise<void> {
+    await this.db
+      .update(photoRefs)
+      .set({ status: 'pending', retryCount: 0, errorMessage: null })
+      .where(and(eq(photoRefs.providerId, providerId), eq(photoRefs.status, 'failed')));
   }
 
   async deleteByProvider(providerId: string): Promise<void> {

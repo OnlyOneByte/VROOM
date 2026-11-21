@@ -3,6 +3,7 @@ import type { PhotoRef } from '../../db/schema';
 import { isSyncError, SyncErrorCode } from '../../errors';
 import { extractErrorMessage } from '../../utils/error-handling';
 import { logger } from '../../utils/logger';
+import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
 import { photoRefRepository } from '../photos/photo-ref-repository';
 import { photoRepository } from '../photos/photo-repository';
 import { storageProviderRegistry } from './domains/storage/registry';
@@ -29,7 +30,9 @@ const defaultDeps: SyncWorkerDeps = {
 };
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
-let isProcessing = false;
+let processingSince: number | null = null;
+
+const BATCH_WATCHDOG_MS = 3 * OPERATION_TIMEOUTS.DOWNLOAD;
 
 const inFlightRefs = new Map<string, number>();
 
@@ -42,13 +45,17 @@ const BASE_BACKOFF_SECONDS = 30;
 // Must match the retry bound in photoRefRepository.findPendingOrFailed.
 export const MAX_RETRY_COUNT = 3;
 
+function priorRetries(ref: PhotoRef): number {
+  return ref.retryCount >= MAX_RETRY_COUNT ? 0 : ref.retryCount;
+}
+
 export function shouldSkipDueToBackoff(ref: PhotoRef, now: Date): boolean {
   if (ref.status !== 'failed') return false;
 
   const lastAttempt = ref.syncedAt ?? ref.createdAt;
   if (!lastAttempt) return false;
 
-  const backoffMs = BASE_BACKOFF_SECONDS * 2 ** ref.retryCount * 1000;
+  const backoffMs = BASE_BACKOFF_SECONDS * 2 ** priorRetries(ref) * 1000;
   const elapsed = now.getTime() - lastAttempt.getTime();
 
   return elapsed < backoffMs;
@@ -82,9 +89,23 @@ function shouldProcessRef(ref: PhotoRef, now: Date): boolean {
   return true;
 }
 
+function previousBatchBlocks(now: number): boolean {
+  if (processingSince === null) return false;
+  if (now - processingSince < BATCH_WATCHDOG_MS) return true;
+  logger.warn('Sync worker: previous batch is still running past the watchdog, starting anyway', {
+    runningForMs: now - processingSince,
+  });
+  return false;
+}
+
+function endBatch(startedAt: number): void {
+  if (processingSince === startedAt) processingSince = null;
+}
+
 export async function processBatch(deps: SyncWorkerDeps = defaultDeps): Promise<void> {
-  if (isProcessing) return;
-  isProcessing = true;
+  const startedAt = Date.now();
+  if (previousBatchBlocks(startedAt)) return;
+  processingSince = startedAt;
 
   try {
     const pendingRefs = await deps.photoRefRepository.findPendingOrFailed(
@@ -120,7 +141,7 @@ export async function processBatch(deps: SyncWorkerDeps = defaultDeps): Promise<
       error: error instanceof Error ? error.message : String(error),
     });
   } finally {
-    isProcessing = false;
+    endBatch(startedAt);
   }
 }
 
@@ -143,7 +164,7 @@ async function recordUnsyncableRef(
   reason: string,
   deps: SyncWorkerDeps
 ): Promise<void> {
-  const retryCount = ref.retryCount + 1;
+  const retryCount = priorRetries(ref) + 1;
 
   await deps.photoRefRepository.updateStatus(ref.id, {
     status: 'failed',
@@ -183,10 +204,14 @@ async function processSingleRef(
       providerCache,
       deps.registry
     );
-    const buffer = await sourceProvider.download({
-      providerType: sourceProvider.type,
-      externalId: sourceRef.storageRef,
-    });
+    const buffer = await withTimeout(
+      sourceProvider.download({
+        providerType: sourceProvider.type,
+        externalId: sourceRef.storageRef,
+      }),
+      OPERATION_TIMEOUTS.DOWNLOAD,
+      'Photo sync download'
+    );
 
     const category = ENTITY_TO_CATEGORY[photo.entityType] as PhotoCategory | undefined;
     let pathHint = '';
@@ -206,14 +231,18 @@ async function processSingleRef(
     }
 
     const targetProvider = await getCachedProvider(ref.providerId, providerCache, deps.registry);
-    const uploadResult = await targetProvider.upload({
-      fileName: photo.fileName,
-      buffer,
-      mimeType: photo.mimeType,
-      entityType: photo.entityType,
-      entityId: photo.entityId,
-      pathHint,
-    });
+    const uploadResult = await withTimeout(
+      targetProvider.upload({
+        fileName: photo.fileName,
+        buffer,
+        mimeType: photo.mimeType,
+        entityType: photo.entityType,
+        entityId: photo.entityId,
+        pathHint,
+      }),
+      OPERATION_TIMEOUTS.DOWNLOAD,
+      'Photo sync upload'
+    );
 
     try {
       await deps.photoRefRepository.updateStatus(ref.id, {
@@ -246,7 +275,7 @@ async function processSingleRef(
     const isTerminalAuth =
       isSyncError(error) &&
       (error.code === SyncErrorCode.AUTH_INVALID || error.code === SyncErrorCode.PERMISSION_DENIED);
-    const retryCount = isTerminalAuth ? MAX_RETRY_COUNT : ref.retryCount + 1;
+    const retryCount = isTerminalAuth ? MAX_RETRY_COUNT : priorRetries(ref) + 1;
 
     await deps.photoRefRepository.updateStatus(ref.id, {
       status: 'failed',
