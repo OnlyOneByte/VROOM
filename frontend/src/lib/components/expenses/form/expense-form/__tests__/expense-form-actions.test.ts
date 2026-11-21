@@ -235,10 +235,20 @@ describe('submitExpense — offline and failure queuing', () => {
 		await submitExpense(state);
 		expect(expenseApiMock.createExpense).not.toHaveBeenCalled();
 		expect(addOfflineExpense).toHaveBeenCalledWith(
-			expect.objectContaining({ vehicleId: 'v1', amount: 120.5, category: 'maintenance' })
+			expect.objectContaining({ vehicleId: 'v1', amount: 120.5, category: 'maintenance' }),
+			[]
 		);
 		notified('info', 'Expense saved offline. Will sync when online.');
 		expect(gotoDynamic).toHaveBeenCalledWith('/expenses');
+	});
+
+	test('offline saves queue the pending photos with the expense', async () => {
+		online.current = false;
+		const photo = new File(['jpeg'], 'receipt.jpg', { type: 'image/jpeg' });
+		const state = createState();
+		state.pendingFiles = [photo];
+		await submitExpense(state);
+		expect(addOfflineExpense).toHaveBeenCalledWith(expect.anything(), [photo]);
 	});
 
 	test('offline save that cannot be stored keeps the user on the form', async () => {
