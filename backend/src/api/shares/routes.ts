@@ -57,6 +57,7 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
     sharedWithId: invitee.id,
     level,
     status: 'pending',
+    invitedEmail: email,
   });
 
   const response: ApiResponse<VehicleShare> = {
