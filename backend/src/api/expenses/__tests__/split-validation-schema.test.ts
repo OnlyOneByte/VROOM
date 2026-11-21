@@ -216,23 +216,21 @@ describe('updateSplitSchema — shares the same refinement', () => {
 });
 
 describe('split totalAmount is converted to integer cents', () => {
-  test('a dollar totalAmount with a sub-cent tail rounds to whole cents on create', () => {
+  test('a dollar totalAmount with a sub-cent tail is rejected on create', () => {
     const r = createSplitExpenseSchema.safeParse({
       ...baseCreate,
       splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
       totalAmount: 100.005,
     });
-    expect(r.success).toBe(true);
-    if (r.success) expect(r.data.totalAmount).toBe(10001);
+    expect(r.success).toBe(false);
   });
 
-  test('a dollar totalAmount with a sub-cent tail rounds on update too', () => {
+  test('a dollar totalAmount with a sub-cent tail is rejected on update too', () => {
     const r = updateSplitSchema.safeParse({
       splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
       totalAmount: 49.999,
     });
-    expect(r.success).toBe(true);
-    if (r.success) expect(r.data.totalAmount).toBe(5000);
+    expect(r.success).toBe(false);
   });
 
   test('a clean 2-decimal dollar totalAmount converts to its exact cent value', () => {

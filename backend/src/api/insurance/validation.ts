@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { moneyDollarsToCents } from '../../utils/money';
+import { expenseDollarsToCents, moneyDollarsToCents } from '../../utils/money';
 import { dateInput } from '../../utils/validation';
 
 const ins = CONFIG.validation.insurance;
@@ -23,10 +23,12 @@ const baseTermFields = {
   agentName: z.string().max(ins.agentNameMaxLength).optional(),
   agentPhone: z.string().max(ins.agentPhoneMaxLength).optional(),
   agentEmail: z.string().email().max(ins.agentEmailMaxLength).optional(),
-  totalCost: moneyDollarsToCents((n) => n.min(0, 'Total cost must be non-negative')).optional(),
-  monthlyCost: moneyDollarsToCents((n) => n.min(0, 'Monthly cost must be non-negative')).optional(),
+  totalCost: expenseDollarsToCents((n) => n.min(0, 'Total cost must be non-negative')).optional(),
+  monthlyCost: expenseDollarsToCents((n) =>
+    n.min(0, 'Monthly cost must be non-negative')
+  ).optional(),
   premiumFrequency: z.string().max(ins.premiumFrequencyMaxLength).optional(),
-  paymentAmount: moneyDollarsToCents((n) =>
+  paymentAmount: expenseDollarsToCents((n) =>
     n.min(0, 'Payment amount must be non-negative')
   ).optional(),
 };
@@ -55,12 +57,12 @@ export const updateTermSchema = z
     agentName: z.string().max(ins.agentNameMaxLength).nullish(),
     agentPhone: z.string().max(ins.agentPhoneMaxLength).nullish(),
     agentEmail: z.string().email().max(ins.agentEmailMaxLength).nullish(),
-    totalCost: moneyDollarsToCents((n) => n.min(0, 'Total cost must be non-negative')).nullish(),
-    monthlyCost: moneyDollarsToCents((n) =>
+    totalCost: expenseDollarsToCents((n) => n.min(0, 'Total cost must be non-negative')).nullish(),
+    monthlyCost: expenseDollarsToCents((n) =>
       n.min(0, 'Monthly cost must be non-negative')
     ).nullish(),
     premiumFrequency: z.string().max(ins.premiumFrequencyMaxLength).nullish(),
-    paymentAmount: moneyDollarsToCents((n) =>
+    paymentAmount: expenseDollarsToCents((n) =>
       n.min(0, 'Payment amount must be non-negative')
     ).nullish(),
     vehicleCoverage: termVehicleCoverageSchema.optional(),

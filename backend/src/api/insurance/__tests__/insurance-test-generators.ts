@@ -10,12 +10,7 @@ const positiveAmountArb = fc.double({
   noDefaultInfinity: true,
 });
 
-const nonNegativeAmountArb = fc.double({
-  min: 0,
-  max: 999_999,
-  noNaN: true,
-  noDefaultInfinity: true,
-});
+const nonNegativeAmountArb = fc.integer({ min: 0, max: 99_999_900 }).map((cents) => cents / 100);
 
 export const companyNameArb = fc
   .stringMatching(/^[A-Za-z][A-Za-z0-9 ]{0,49}$/)
