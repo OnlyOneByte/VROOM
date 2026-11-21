@@ -244,6 +244,7 @@ export const expenseQuerySchema = z.object({
   category: expenseCategorySchema.optional(),
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
+  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
   search: z.string().trim().min(1).max(100).optional(),
   limit: z
     .string()
@@ -454,6 +455,7 @@ const exportQuerySchema = z.object({
   category: expenseCategorySchema.optional(),
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
+  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
   search: z.string().trim().min(1).max(100).optional(),
   tags: z
     .string()
@@ -479,7 +481,7 @@ export const EXPORT_COLUMNS = [
 
 routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
   const user = c.get('user');
-  const { vehicleId, category, startDate, endDate, search, tags } = c.req.valid('query');
+  const { vehicleId, category, startDate, endDate, timeZone, search, tags } = c.req.valid('query');
 
   let exportUserId = user.id;
   if (vehicleId) {
@@ -495,6 +497,7 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
       category,
       startDate,
       endDate,
+      timeZone,
       search,
       tags,
     }),
@@ -700,6 +703,7 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
     category: query.category,
     startDate: query.startDate,
     endDate: query.endDate,
+    timeZone: query.timeZone,
     tags: query.tags,
     search: query.search,
     sortBy: query.sortBy,

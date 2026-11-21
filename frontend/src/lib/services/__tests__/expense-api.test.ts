@@ -84,6 +84,17 @@ describe('list methods (getPaginated passthrough + per-row transform)', () => {
 		expect(url).toContain('vehicleId=v1');
 		expect(url).toContain('limit=20');
 	});
+
+	test('a date range sends the user time zone so the backend filters on their calendar days', async () => {
+		getPaginated.mockResolvedValueOnce({
+			data: [],
+			pagination: { totalCount: 0, limit: 20, offset: 0, hasMore: false }
+		});
+		await expenseApi.getAllExpenses({ startDate: '2026-03-01', endDate: '2026-03-31' });
+		const url = getPaginated.mock.calls[0]?.[0] as string;
+		const zone = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
+		expect(url).toContain(`endDate=2026-03-31&timeZone=${zone}`);
+	});
 });
 
 describe('createExpense / updateExpense (frontend→backend transform + isEdit)', () => {

@@ -14,6 +14,7 @@ vi.mock('../api-client', () => ({
 }));
 
 const { tripApi } = await import('../trip-api');
+const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const TRIP: Trip = {
 	id: 't1',
@@ -119,19 +120,27 @@ describe('tripApi CRUD wiring', () => {
 			tripDate: '2024-06-20T12:00:00.000Z'
 		};
 		await tripApi.create(body);
-		expect(post).toHaveBeenCalledWith('/api/v1/trips', body);
+		expect(post).toHaveBeenCalledWith('/api/v1/trips', { ...body, timeZone: ZONE });
 	});
 
 	test('update PUTs to /api/v1/trips/:id', async () => {
 		put.mockResolvedValueOnce(TRIP);
 		await tripApi.update('t1', { note: 'updated' });
-		expect(put).toHaveBeenCalledWith('/api/v1/trips/t1', { note: 'updated' });
+		expect(put).toHaveBeenCalledWith('/api/v1/trips/t1', { note: 'updated', timeZone: ZONE });
 	});
 
 	test('delete DELETEs /api/v1/trips/:id', async () => {
 		del.mockResolvedValueOnce(undefined);
 		await tripApi.delete('t1');
 		expect(del).toHaveBeenCalledWith('/api/v1/trips/t1');
+	});
+
+	test('delete without keeping the odometer sends the user time zone for the same-day match', async () => {
+		del.mockResolvedValueOnce(undefined);
+		await tripApi.delete('t1', false);
+		expect(del).toHaveBeenCalledWith(
+			`/api/v1/trips/t1?keepOdometer=false&timeZone=${encodeURIComponent(ZONE)}`
+		);
 	});
 });
 

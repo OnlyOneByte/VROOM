@@ -309,6 +309,40 @@ describe('trip edit and delete keep the linked odometer entry in sync', () => {
     expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(500);
   });
 
+  test('create, edit and delete match the linked odometer entry on the user’s day in their time zone', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: '3', year: 2020 });
+    const timeZone = 'America/Los_Angeles';
+    const trip = async (tripDate: string) => {
+      const res = await ctx.authed('POST', '/api/v1/trips', {
+        ...VALID(vehicleId, { startOdometer: 4800, endOdometer: 5000, tripDate }),
+        timeZone,
+      });
+      expect(res.status).toBe(201);
+      return (await json<DataEnvelope<{ id: string }>>(res)).data.id;
+    };
+    const evening = await trip('2024-06-21T03:00:00.000Z');
+    const morning = await trip('2024-06-20T08:00:00.000Z');
+    expect(odoCount(ctx, vehicleId), 'both trips fall on 20 June in Los Angeles').toBe(1);
+
+    const put = await ctx.authed('PUT', `/api/v1/trips/${morning}`, { note: 'Commute', timeZone });
+    expect(put.status).toBe(200);
+
+    const query = `?keepOdometer=false&timeZone=${encodeURIComponent(timeZone)}`;
+    await ctx.authed('DELETE', `/api/v1/trips/${evening}${query}`);
+    expect(odoCount(ctx, vehicleId), 'the morning trip still holds the entry').toBe(1);
+    await ctx.authed('DELETE', `/api/v1/trips/${morning}${query}`);
+    expect(odoCount(ctx, vehicleId)).toBe(0);
+  });
+
+  test('an unknown time zone is rejected', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: '3', year: 2020 });
+    const res = await ctx.authed('POST', '/api/v1/trips', {
+      ...VALID(vehicleId),
+      timeZone: 'Mars/Olympus',
+    });
+    expect(res.status).toBe(400);
+  });
+
   test('deleting a trip keeps the linked odometer entry by default', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const created = await ctx.authed(

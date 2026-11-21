@@ -59,3 +59,11 @@ export function zonedMidnight(
   const guess = wall - zoneOffsetMs(wall, timeZone);
   return new Date(wall - zoneOffsetMs(guess, timeZone));
 }
+
+export function zonedDayWindow(instant: Date, timeZone: string): { dayStart: Date; nextDay: Date } {
+  const p = zonedParts(instant, timeZone);
+  return {
+    dayStart: zonedMidnight(p.year, p.month - 1, p.day, timeZone),
+    nextDay: zonedMidnight(p.year, p.month - 1, p.day + 1, timeZone),
+  };
+}

@@ -73,6 +73,7 @@ export function buildExpenseQuery(params?: ExpenseListParams, vehicleId?: string
 		category: params?.category || undefined,
 		startDate: params?.startDate || undefined,
 		endDate: params?.endDate || undefined,
+		timeZone: params?.startDate || params?.endDate ? userTimeZone() : undefined,
 		period: params?.period || undefined,
 		search: params?.search?.trim() || undefined,
 		sortBy: params?.sortBy,

@@ -91,6 +91,29 @@ describe('expenses HTTP search/pagination', () => {
     expect(b2.data[0].id).not.toBe(b1.data[0].id);
   });
 
+  test('?startDate=&endDate= cover the user’s day in ?timeZone=, for the list and the export', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    await createExpense(vehicleId, 'misc', 5, 'tonga noon', '2026-03-30T23:00:00.000Z');
+    await createExpense(vehicleId, 'misc', 6, 'tonga next day', '2026-03-31T11:30:00.000Z');
+
+    const qs = '?startDate=2026-03-31&endDate=2026-03-31&timeZone=Pacific%2FTongatapu';
+    const res = await ctx.authed('GET', `/api/v1/expenses${qs}`);
+    const body = await json<PaginatedEnvelope<ExpenseRow>>(res);
+    expect(body.data.map((e) => e.description)).toEqual(['tonga noon']);
+
+    const csv = await (await ctx.authed('GET', `/api/v1/expenses/export${qs}`)).text();
+    expect(csv).toContain('tonga noon');
+    expect(csv).not.toContain('tonga next day');
+  });
+
+  test('an unknown ?timeZone= is rejected', async () => {
+    const res = await ctx.authed(
+      'GET',
+      '/api/v1/expenses?endDate=2026-03-31&timeZone=Mars%2FOlympus'
+    );
+    expect(res.status).toBe(400);
+  });
+
   test('search is user-scoped (no cross-user leakage via the route)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     await createExpense(vehicleId, 'misc', 5, 'unique-marker-xyz', '2026-01-10T12:00:00.000Z');

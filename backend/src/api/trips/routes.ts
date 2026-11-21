@@ -16,7 +16,12 @@ import { deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
 import { preferencesRepository } from '../settings/repository';
 import { tripRepository } from './repository';
-import { createTripSchema, TRIP_PURPOSES, updateTripSchema } from './validation';
+import {
+  createTripSchema,
+  TRIP_PURPOSES,
+  tripTimeZoneSchema,
+  updateTripSchema,
+} from './validation';
 
 const routes = new Hono();
 
@@ -32,6 +37,7 @@ const deleteQuerySchema = z.object({
     .enum(['true', 'false'])
     .optional()
     .transform((v) => v !== 'false'),
+  timeZone: tripTimeZoneSchema,
 });
 
 const PHOTO_CLEANUP_ATTEMPTS = 3;
@@ -93,6 +99,7 @@ routes.post('/', zValidator('json', createTripSchema), async (c) => {
       userId: user.id,
       odometer: data.endOdometer,
       recordedAt: data.tripDate,
+      timeZone: data.timeZone,
     });
     await reminderTriggerService.recheckMileageReminders(user.id, data.vehicleId);
   } catch (error) {
@@ -167,7 +174,7 @@ routes.put(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
-    const data = c.req.valid('json');
+    const { timeZone, ...data } = c.req.valid('json');
 
     const existing = await validateTripOwnership(id, user.id);
 
@@ -190,6 +197,7 @@ routes.put(
           userId: user.id,
           endOdometer: existing.endOdometer,
           tripDate: existing.tripDate,
+          timeZone,
         });
         if (othersAtOld === 0) {
           const removedEntryIds = await odometerRepository.deleteLinkedTripEntry({
@@ -197,6 +205,7 @@ routes.put(
             userId: user.id,
             odometer: existing.endOdometer,
             recordedAt: existing.tripDate,
+            timeZone,
           });
           await deleteEntryPhotosWithRetry(removedEntryIds, user.id, {
             tripId: id,
@@ -208,6 +217,7 @@ routes.put(
           userId: user.id,
           odometer: end,
           recordedAt: data.tripDate ?? existing.tripDate,
+          timeZone,
         });
         await reminderTriggerService.recheckMileageReminders(user.id, existing.vehicleId);
       } catch (error) {
@@ -230,7 +240,7 @@ routes.delete(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
-    const { keepOdometer } = c.req.valid('query');
+    const { keepOdometer, timeZone } = c.req.valid('query');
 
     const existing = await tripRepository.findByIdAndUserId(id, user.id);
     if (!existing) {
@@ -250,6 +260,7 @@ routes.delete(
           userId: user.id,
           endOdometer: existing.endOdometer,
           tripDate: existing.tripDate,
+          timeZone,
         });
         if (others === 0) {
           const removedEntryIds = await odometerRepository.deleteLinkedTripEntry({
@@ -257,6 +268,7 @@ routes.delete(
             userId: user.id,
             odometer: existing.endOdometer,
             recordedAt: existing.tripDate,
+            timeZone,
           });
           await deleteEntryPhotosWithRetry(removedEntryIds, user.id, {
             tripId: id,

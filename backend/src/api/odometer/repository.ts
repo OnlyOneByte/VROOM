@@ -6,6 +6,7 @@ import { odometerEntries } from '../../db/schema';
 import { DatabaseError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
+import { zonedDayWindow } from '../../utils/time-zone';
 
 interface OdometerHistoryEntry {
   odometer: number;
@@ -21,7 +22,11 @@ interface OdometerHistoryResult {
 }
 
 // Shared with trips: changing this window breaks trip/odometer dedup.
-export function localDayWindow(recordedAt: Date): { dayStart: Date; nextDay: Date } {
+export function localDayWindow(
+  recordedAt: Date,
+  timeZone?: string
+): { dayStart: Date; nextDay: Date } {
+  if (timeZone) return zonedDayWindow(recordedAt, timeZone);
   const dayStart = new Date(recordedAt.getFullYear(), recordedAt.getMonth(), recordedAt.getDate());
   const nextDay = new Date(dayStart);
   nextDay.setDate(nextDay.getDate() + 1);
@@ -43,8 +48,9 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     odometer: number;
     recordedAt: Date;
     note?: string;
+    timeZone?: string;
   }): Promise<OdometerEntry | null> {
-    const { dayStart, nextDay } = localDayWindow(entry.recordedAt);
+    const { dayStart, nextDay } = localDayWindow(entry.recordedAt, entry.timeZone);
 
     const existing = await this.db
       .select({ id: odometerEntries.id })
@@ -77,8 +83,9 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     userId: string;
     odometer: number;
     recordedAt: Date;
+    timeZone?: string;
   }): Promise<string[]> {
-    const { dayStart, nextDay } = localDayWindow(entry.recordedAt);
+    const { dayStart, nextDay } = localDayWindow(entry.recordedAt, entry.timeZone);
 
     const removed = await this.db
       .delete(odometerEntries)
