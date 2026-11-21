@@ -103,6 +103,48 @@ describe('an orphaned photo row does not make backups unrestorable', () => {
     expect(photoIds()).toEqual(['p-ok']);
   });
 
+  test("a shared-vehicle editor's receipt on the owner's expense survives the editor's replace restore", async () => {
+    const ownerVehicle = await ctx.authed('POST', '/api/v1/vehicles', {
+      make: 'Volvo',
+      model: 'V60',
+      year: 2020,
+    });
+    const vehicle = await json<DataEnvelope<{ id: string }>>(ownerVehicle);
+    expect(ownerVehicle.status, JSON.stringify(vehicle)).toBe(201);
+    const editorId = 'editor-user';
+    ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+      editorId,
+      'editor@test.com',
+      'Editor',
+    ]);
+    ctx.sqlite.run(
+      `INSERT INTO expenses (id, vehicle_id, user_id, created_by, category, date, expense_amount)
+       VALUES ('exp-shared', ?, ?, ?, 'fuel', 1700000000, 3000)`,
+      [vehicle.data.id, ctx.user.id, editorId]
+    );
+    ctx.sqlite.run(
+      `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v-editor', ?, 'Mini', 'Cooper', 2019)`,
+      [editorId]
+    );
+    ctx.sqlite.run(
+      `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
+       VALUES ('photo-receipt', ?, 'expense', 'exp-shared', 'r.jpg', 'image/jpeg', 1),
+              ('photo-own', ?, 'vehicle', 'v-editor', 'c.jpg', 'image/jpeg', 1)`,
+      [editorId, editorId]
+    );
+
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+    const zip = await backupService.exportAsZip(editorId);
+    const result = await restoreService.restoreFromBackup(editorId, zip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    expect(photoIds(), "the owner's receipt is not wiped by the editor's restore").toEqual([
+      'photo-own',
+      'photo-receipt',
+    ]);
+  });
+
   test('a photo with an unknown entity type still fails validation', async () => {
     const { backupService } = await import('../backup');
     const backup = {
