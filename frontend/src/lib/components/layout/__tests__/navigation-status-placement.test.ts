@@ -101,7 +101,7 @@ describe('the sync status indicator lives in the navigation, never floating over
 		await waitFor(() => expect(authStore.sessionUnverified).toBe(false));
 	});
 
-	it('the collapsed sidebar offers Sync N for pending entries without a hover', async () => {
+	it('the collapsed sidebar offers Sync Now, with the pending count only on the status badge', async () => {
 		authStore.setUser(alice);
 		offlineExpenseQueue.current = [
 			{
@@ -119,9 +119,13 @@ describe('the sync status indicator lives in the navigation, never floating over
 		render(Navigation);
 
 		const sync = screen
-			.getAllByRole('button', { name: 'Sync 1' })
+			.getAllByRole('button', { name: 'Sync Now' })
 			.find(button => !mobileHeader().contains(button));
 		expect(sync).toBeDefined();
+		const status = screen
+			.getAllByRole('status', { name: 'Sync status: 1 pending' })
+			.find(element => !mobileHeader().contains(element));
+		expect(status?.querySelector('[data-slot="badge"]')).toHaveTextContent('1');
 	});
 
 	it('the sidebar action under the pointer survives the hover that expands the sidebar', async () => {
@@ -142,7 +146,7 @@ describe('the sync status indicator lives in the navigation, never floating over
 		render(Navigation);
 		const sidebar = document.querySelector<HTMLElement>('div.lg\\:inset-y-0');
 		const sync = screen
-			.getAllByRole('button', { name: 'Sync 1' })
+			.getAllByRole('button', { name: 'Sync Now' })
 			.find(button => !mobileHeader().contains(button))!;
 
 		await fireEvent.mouseEnter(sidebar!);
