@@ -16,6 +16,7 @@
 
 	const DISCLOSURE_KEY = 'vroom.llm.assistant-disclosed';
 	const MAX_HISTORY_TURNS = 12;
+	const MAX_MESSAGE_CHARS = 2000;
 
 	interface ChatMessage {
 		role: 'user' | 'assistant';
@@ -69,8 +70,14 @@
 		if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
 	}
 
-	function buildHistory(): AssistantTurn[] {
-		return messages.slice(-MAX_HISTORY_TURNS).map(m => ({ role: m.role, content: m.content }));
+	function toHistory(turns: ChatMessage[]): AssistantTurn[] {
+		return turns.slice(-MAX_HISTORY_TURNS).map(m => ({
+			role: m.role,
+			content:
+				m.content.length > MAX_MESSAGE_CHARS
+					? `${m.content.slice(0, MAX_MESSAGE_CHARS - 1)}…`
+					: m.content
+		}));
 	}
 
 	async function send() {
@@ -82,7 +89,7 @@
 		}
 
 		sendError = null;
-		const history = buildHistory();
+		const history = toHistory(messages);
 		messages = [...messages, { role: 'user', content: text }];
 		input = '';
 		isSending = true;
@@ -106,13 +113,7 @@
 		const last = messages[messages.length - 1];
 		if (!last || last.role !== 'user' || isSending) return;
 		sendError = null;
-		const history = messages
-			.slice(0, -1)
-			.slice(-MAX_HISTORY_TURNS)
-			.map(m => ({
-				role: m.role,
-				content: m.content
-			}));
+		const history = toHistory(messages.slice(0, -1));
 		isSending = true;
 		try {
 			const reply = await assistantApi.sendMessage(last.content, history);
@@ -269,6 +270,7 @@
 					bind:value={input}
 					placeholder="Ask about your vehicles and costs…"
 					rows={1}
+					maxlength={MAX_MESSAGE_CHARS}
 					class="min-h-[2.5rem] resize-none"
 					disabled={isSending}
 					onkeydown={onKeydown}
