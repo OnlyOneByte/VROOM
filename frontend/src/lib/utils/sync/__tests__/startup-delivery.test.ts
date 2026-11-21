@@ -50,22 +50,27 @@ async function freshGraph() {
 	return { storage, onlineStatus, syncManager };
 }
 
+const MODULE_LOAD_TIMEOUT_MS = 60_000;
+
 describe('setupAutoSync — delivery at app open', () => {
-	beforeEach(() => {
+	let graph: Awaited<ReturnType<typeof freshGraph>>;
+
+	beforeEach(async () => {
 		vi.clearAllMocks();
 		ls.clear();
 		mockFetch.mockImplementation((_url: string, init?: { method?: string }) =>
 			Promise.resolve(apiOk((init?.method ?? 'GET') === 'GET' ? [] : { id: 'server-1' }))
 		);
+		graph = await freshGraph();
 		vi.useFakeTimers();
-	});
+	}, MODULE_LOAD_TIMEOUT_MS);
 
 	afterEach(() => {
 		vi.useRealTimers();
 	});
 
 	it('delivers a queued expense on mount, with no online transition', async () => {
-		const { storage, onlineStatus, syncManager } = await freshGraph();
+		const { storage, onlineStatus, syncManager } = graph;
 		onlineStatus.current = true;
 		expect(storage.saveOfflineExpenses([pending('queued')])).toBe(true);
 
@@ -77,7 +82,7 @@ describe('setupAutoSync — delivery at app open', () => {
 	});
 
 	it('stays quiet on mount when the outbox is empty', async () => {
-		const { onlineStatus, syncManager } = await freshGraph();
+		const { onlineStatus, syncManager } = graph;
 		onlineStatus.current = true;
 
 		syncManager.setupAutoSync();
@@ -87,7 +92,7 @@ describe('setupAutoSync — delivery at app open', () => {
 	});
 
 	it('stays quiet on mount while offline — the transition listener owns that case', async () => {
-		const { storage, onlineStatus, syncManager } = await freshGraph();
+		const { storage, onlineStatus, syncManager } = graph;
 		onlineStatus.current = false;
 		storage.saveOfflineExpenses([pending('queued')]);
 
