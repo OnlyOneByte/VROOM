@@ -18,6 +18,8 @@ vi.mock('../offline-storage', async () => {
 		markExpenseAsSynced: vi.fn(),
 		markExpenseNeedsAttention: vi.fn(),
 		clearSyncedExpenses: vi.fn(),
+		loadPendingPhotos: vi.fn(async () => []),
+		savePendingPhotos: vi.fn(async () => true),
 		getPendingExpenses: () =>
 			(loadOfflineExpenses() as ReturnType<typeof actual.loadOfflineExpenses>).filter(
 				e => !e.synced && !e.needsAttention
@@ -25,7 +27,18 @@ vi.mock('../offline-storage', async () => {
 	};
 });
 
-import { loadOfflineExpenses, markExpenseNeedsAttention } from '../offline-storage';
+vi.mock('#lib/services/expense-api.ts', () => ({
+	expenseApi: { uploadPhoto: vi.fn(async () => ({ id: 'photo-1' })) }
+}));
+
+import {
+	loadOfflineExpenses,
+	loadPendingPhotos,
+	markExpenseAsSynced,
+	markExpenseNeedsAttention,
+	savePendingPhotos
+} from '../offline-storage';
+import { expenseApi } from '#lib/services/expense-api.ts';
 
 function apiOk(data: unknown) {
 	return new Response(JSON.stringify({ success: true, data }), {
@@ -39,6 +52,24 @@ function apiError(status: number, message = 'Error') {
 		status,
 		headers: { 'content-type': 'application/json' }
 	});
+}
+
+function serverRow(id: string, clientId: string | null) {
+	return {
+		id,
+		clientId,
+		vehicleId: 'vehicle-1',
+		userId: 'user-1',
+		tags: ['fuel'],
+		category: 'fuel',
+		expenseAmount: 50.0,
+		mileage: 50000,
+		volume: 10.5,
+		fuelType: '87 (Regular)',
+		date: '2024-01-01',
+		createdAt: '2024-01-01T00:00:00.000Z',
+		updatedAt: '2024-01-01T00:00:00.000Z'
+	};
 }
 
 describe('Sync Manager', () => {
@@ -142,10 +173,75 @@ describe('Sync Manager', () => {
 			expect(result.failed).toBe(1);
 		});
 
-		it('should detect and report conflicts', async () => {
-			const mockExpenses: OfflineExpense[] = [
+		it('reports a conflict only when the server copy of the SAME record was changed', async () => {
+			const local: OfflineExpense = {
+				id: 'test-1',
+				clientId: 'cid-test-1',
+				vehicleId: 'vehicle-1',
+				tags: ['fuel'],
+				category: 'fuel',
+				amount: 50.0,
+				date: '2024-01-01',
+				mileage: 50000,
+				volume: 10.5,
+				timestamp: Date.now(),
+				synced: false
+			};
+			vi.mocked(loadOfflineExpenses).mockReturnValue([local]);
+			mockFetch.mockResolvedValueOnce(
+				apiOk([{ ...serverRow('server-1', 'cid-test-1'), expenseAmount: 45 }])
+			);
+
+			const result = await syncManager.syncAll();
+
+			expect(result.success).toBe(false);
+			expect(result.synced).toBe(0);
+			expect(result.conflicts).toHaveLength(1);
+			expect(result.conflicts[0]?.serverExpense.id).toBe('server-1');
+			expect(result.conflicts[0]?.serverExpense.amount).toBe(45);
+		});
+
+		it('syncs a distinct same-day, same-tag expense instead of calling it a conflict', async () => {
+			vi.mocked(loadOfflineExpenses).mockReturnValue([
+				{
+					id: 'b',
+					clientId: 'cid-b',
+					vehicleId: 'vehicle-1',
+					tags: ['parking'],
+					category: 'misc',
+					amount: 25,
+					date: '2024-01-01',
+					timestamp: Date.now(),
+					synced: false
+				}
+			]);
+			mockFetch
+				.mockResolvedValueOnce(
+					apiOk([
+						{
+							...serverRow('server-a', null),
+							tags: ['parking'],
+							category: 'misc',
+							expenseAmount: 12
+						}
+					])
+				)
+				.mockResolvedValueOnce(apiOk({ id: 'server-b' }));
+
+			const result = await syncManager.syncAll();
+
+			expect(result.conflicts).toHaveLength(0);
+			expect(result.synced).toBe(1);
+			const post = mockFetch.mock.calls[1] as [string, { method: string; body: string }];
+			expect(post[1].method).toBe('POST');
+			expect(JSON.parse(post[1].body).clientId).toBe('cid-b');
+		});
+
+		it('treats an unchanged server copy as already delivered: no POST, no conflict', async () => {
+			vi.mocked(loadOfflineExpenses).mockReturnValue([
 				{
 					id: 'test-1',
+					clientId: 'cid-test-1',
 					vehicleId: 'vehicle-1',
 					tags: ['fuel'],
 					category: 'fuel',
@@ -153,36 +249,75 @@ describe('Sync Manager', () => {
 					date: '2024-01-01',
 					mileage: 50000,
 					volume: 10.5,
+					fuelType: '87 (Regular)',
 					timestamp: Date.now(),
 					synced: false
 				}
-			];
-
-			const existingExpense = {
-				id: 'server-1',
-				vehicleId: 'vehicle-1',
-				userId: 'user-1',
-				tags: ['fuel'],
-				category: 'fuel',
-				expenseAmount: 50.0,
-				volume: 10.5,
-				fuelType: '87 (Regular)',
-				date: '2024-01-01',
-				createdAt: '2024-01-01T00:00:00.000Z',
-				updatedAt: '2024-01-01T00:00:00.000Z'
-			};
-
-			vi.mocked(loadOfflineExpenses).mockReturnValue(mockExpenses);
-
-			mockFetch.mockResolvedValueOnce(apiOk([existingExpense]));
+			]);
+			mockFetch.mockResolvedValueOnce(apiOk([serverRow('server-1', 'cid-test-1')]));
 
 			const result = await syncManager.syncAll();
 
-			expect(result.success).toBe(false);
-			expect(result.synced).toBe(0);
-			expect(result.conflicts).toHaveLength(1);
-			expect(result.conflicts[0]?.conflictType).toBe('duplicate');
-			expect(result.conflicts[0]?.serverExpense?.amount).toBe(50.0);
+			expect(result.conflicts).toHaveLength(0);
+			expect(result.synced).toBe(1);
+			expect(mockFetch).toHaveBeenCalledTimes(1);
+		});
+
+		it('uploads the photos queued with an offline expense once it reaches the server', async () => {
+			const photo = new File(['jpeg'], 'receipt.jpg', { type: 'image/jpeg' });
+			vi.mocked(loadOfflineExpenses).mockReturnValue([
+				{
+					id: 'p',
+					clientId: 'cid-p',
+					vehicleId: 'vehicle-1',
+					tags: [],
+					category: 'misc',
+					amount: 9,
+					date: '2024-01-01',
+					timestamp: Date.now(),
+					synced: false
+				}
+			]);
+			vi.mocked(loadPendingPhotos).mockResolvedValueOnce([photo]);
+			mockFetch.mockResolvedValueOnce(apiOk([])).mockResolvedValueOnce(apiOk({ id: 'server-p' }));
+
+			const result = await syncManager.syncAll();
+
+			expect(result.synced).toBe(1);
+			expect(expenseApi.uploadPhoto).toHaveBeenCalledWith('expense', 'server-p', photo);
+			expect(savePendingPhotos).toHaveBeenCalledWith('cid-p', []);
+		});
+
+		it('keeps the row pending when a queued photo fails to upload, so the photo is not lost', async () => {
+			const photo = new File(['jpeg'], 'receipt.jpg', { type: 'image/jpeg' });
+			vi.mocked(loadOfflineExpenses).mockReturnValue([
+				{
+					id: 'p',
+					clientId: 'cid-p',
+					vehicleId: 'vehicle-1',
+					tags: [],
+					category: 'misc',
+					amount: 9,
+					date: '2024-01-01',
+					timestamp: Date.now(),
+					synced: false
+				}
+			]);
+			vi.mocked(loadPendingPhotos).mockResolvedValueOnce([photo]);
+			vi.mocked(expenseApi.uploadPhoto).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+			mockFetch.mockResolvedValueOnce(apiOk([])).mockResolvedValueOnce(apiOk({ id: 'server-p' }));
+
+			vi.useFakeTimers();
+			try {
+				const result = await syncManager.syncAll();
+
+				expect(result.synced).toBe(0);
+				expect(result.failed).toBe(1);
+				expect(markExpenseAsSynced).not.toHaveBeenCalled();
+				expect(savePendingPhotos).not.toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+			}
 		});
 	});
 
@@ -202,8 +337,7 @@ describe('Sync Manager', () => {
 					timestamp: Date.now(),
 					synced: false
 				},
-				serverExpense: { tags: ['fuel'], amount: 45.0, date: '2024-01-01' },
-				conflictType: 'modified'
+				serverExpense: { id: 'server-1', tags: ['fuel'], amount: 45.0, date: '2024-01-01' }
 			};
 
 			mockFetch.mockResolvedValueOnce(apiOk({ id: 'server-1' }));
@@ -227,8 +361,7 @@ describe('Sync Manager', () => {
 					timestamp: Date.now(),
 					synced: false
 				},
-				serverExpense: { tags: ['fuel'], amount: 45.0, date: '2024-01-01' },
-				conflictType: 'duplicate'
+				serverExpense: { id: 'server-1', tags: ['fuel'], amount: 45.0, date: '2024-01-01' }
 			};
 
 			const result = await syncManager.resolveConflict(conflict, 'keep_server');
@@ -251,8 +384,7 @@ describe('Sync Manager', () => {
 					timestamp: Date.now(),
 					synced: false
 				},
-				serverExpense: { tags: ['fuel'], amount: 45.0, date: '2024-01-01' },
-				conflictType: 'modified'
+				serverExpense: { id: 'server-1', tags: ['fuel'], amount: 45.0, date: '2024-01-01' }
 			};
 		}
 
@@ -282,14 +414,26 @@ describe('Sync Manager', () => {
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
-		it('merge: delegates to keep_local (documented behavior — local wins via a forceOverwrite POST)', async () => {
-			mockFetch.mockResolvedValueOnce(apiOk({ id: 'server-1' }));
+		it('keep_server discards only this local copy and still delivers its queued photos', async () => {
+			const photo = new File(['jpeg'], 'receipt.jpg', { type: 'image/jpeg' });
+			vi.mocked(loadPendingPhotos).mockResolvedValueOnce([photo]);
 
-			const result = await syncManager.resolveConflict(modifiedConflict(), 'merge');
+			const result = await syncManager.resolveConflict(modifiedConflict(), 'keep_server');
 
 			expect(result).toBe(true);
-			const body = JSON.parse((mockFetch.mock.calls[0]![1] as { body: string }).body);
-			expect(body.forceOverwrite).toBe(true);
+			expect(expenseApi.uploadPhoto).toHaveBeenCalledWith('expense', 'server-1', photo);
+			expect(markExpenseAsSynced).toHaveBeenCalledTimes(1);
+			expect(markExpenseAsSynced).toHaveBeenCalledWith('c-1');
+		});
+
+		it('keep_local uploads queued photos to the overwritten record', async () => {
+			const photo = new File(['jpeg'], 'receipt.jpg', { type: 'image/jpeg' });
+			vi.mocked(loadPendingPhotos).mockResolvedValueOnce([photo]);
+			mockFetch.mockResolvedValueOnce(apiOk({ id: 'server-1' }));
+
+			await syncManager.resolveConflict(modifiedConflict(), 'keep_local');
+
+			expect(expenseApi.uploadPhoto).toHaveBeenCalledWith('expense', 'server-1', photo);
 		});
 
 		it('keep_local POSTs forceOverwrite and the local clientId to the create route', async () => {
@@ -433,9 +577,7 @@ describe('Sync Manager', () => {
 				expect(syncConflicts.current).toHaveLength(0);
 
 				mockFetch.mockResolvedValueOnce(
-					apiOk([
-						{ id: 'server-x', tags: ['fuel'], category: 'fuel', amount: 50.0, date: '2024-01-01' }
-					])
+					apiOk([{ ...serverRow('server-x', 'cid-retry-conf-1'), expenseAmount: 75 }])
 				);
 				await vi.advanceTimersByTimeAsync(200);
 
@@ -485,7 +627,7 @@ describe('Sync Manager', () => {
 	});
 });
 
-describe('Sync Manager — conflict classification (determineConflictType)', () => {
+describe('Sync Manager — same-record conflict detection', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		onlineStatus.current = true;
@@ -498,67 +640,56 @@ describe('Sync Manager — conflict classification (determineConflictType)', () 
 		};
 	});
 
-	async function classifyAgainst(
+	async function conflictsAgainst(
 		local: Partial<OfflineExpense>,
-		server: { amount: number; tags: string[]; date: string }
-	): Promise<SyncConflict | undefined> {
+		server: Partial<ReturnType<typeof serverRow>>
+	): Promise<SyncConflict[]> {
 		const localExpense: OfflineExpense = {
 			id: 'local-1',
+			clientId: 'cid-local-1',
 			vehicleId: 'vehicle-1',
 			tags: ['fuel'],
 			category: 'fuel',
 			amount: 50.0,
 			date: '2024-01-01',
+			mileage: 50000,
+			volume: 10.5,
+			fuelType: '87 (Regular)',
 			timestamp: Date.now(),
 			synced: false,
 			...local
 		};
 		vi.mocked(loadOfflineExpenses).mockReturnValue([localExpense]);
-		const backendRow = {
-			id: 'server-1',
-			vehicleId: 'vehicle-1',
-			userId: 'user-1',
-			tags: server.tags,
-			category: 'fuel',
-			expenseAmount: server.amount,
-			date: server.date,
-			createdAt: '2024-01-01T00:00:00.000Z',
-			updatedAt: '2024-01-01T00:00:00.000Z'
-		};
-		mockFetch.mockResolvedValueOnce(apiOk([backendRow]));
+		mockFetch
+			.mockReset()
+			.mockResolvedValueOnce(apiOk([{ ...serverRow('server-1', 'cid-local-1'), ...server }]))
+			.mockResolvedValueOnce(apiOk({ id: 'server-2' }));
 		const result = await syncManager.syncAll();
-		return result.conflicts[0];
+		return result.conflicts;
 	}
 
-	it("amount+tags+date all match → 'duplicate'", async () => {
-		const c = await classifyAgainst(
-			{ amount: 50, date: '2024-01-01', tags: ['fuel'] },
-			{ amount: 50, date: '2024-01-01', tags: ['fuel'] }
-		);
-		expect(c?.conflictType).toBe('duplicate');
+	it('an identical server copy is not a conflict', async () => {
+		expect(await conflictsAgainst({}, {})).toHaveLength(0);
 	});
 
-	it("a DIFFERENT amount (tag still matches so it's found) → 'modified', not a silent duplicate", async () => {
-		const c = await classifyAgainst(
-			{ amount: 50, date: '2024-01-01', tags: ['fuel'] },
-			{ amount: 75, date: '2024-01-01', tags: ['fuel'] }
-		);
-		expect(c?.conflictType).toBe('modified');
+	it('a changed amount on the server copy is a conflict', async () => {
+		expect(await conflictsAgainst({}, { expenseAmount: 75 })).toHaveLength(1);
 	});
 
-	it("a DIFFERENT date → 'modified'", async () => {
-		const c = await classifyAgainst(
-			{ amount: 50, date: '2024-01-01', tags: ['fuel'] },
-			{ amount: 50, date: '2024-02-01', tags: ['fuel'] }
-		);
-		expect(c?.conflictType).toBe('modified');
+	it('a changed date on the server copy is a conflict', async () => {
+		expect(await conflictsAgainst({}, { date: '2024-02-01' })).toHaveLength(1);
 	});
 
-	it("an amount within the <0.01 epsilon still counts as matching → 'duplicate'", async () => {
-		const c = await classifyAgainst(
-			{ amount: 50.0, date: '2024-01-01', tags: ['fuel'] },
-			{ amount: 50.009, date: '2024-01-01', tags: ['fuel'] }
-		);
-		expect(c?.conflictType).toBe('duplicate');
+	it('a changed description on the server copy is a conflict', async () => {
+		expect(await conflictsAgainst({ description: 'Costco' }, {})).toHaveLength(1);
+	});
+
+	it('an amount within the cent-rounding epsilon still matches', async () => {
+		expect(await conflictsAgainst({ amount: 50.0 }, { expenseAmount: 50.004 })).toHaveLength(0);
+	});
+
+	it('a different record that merely matches on day, tags and amount is never a conflict', async () => {
+		expect(await conflictsAgainst({}, { clientId: 'someone-else' })).toHaveLength(0);
+		expect(await conflictsAgainst({}, { clientId: null })).toHaveLength(0);
 	});
 });

@@ -90,6 +90,7 @@ export interface BackendExpenseResponse {
 	groupId?: string;
 	groupTotal?: number;
 	splitMethod?: string;
+	clientId?: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

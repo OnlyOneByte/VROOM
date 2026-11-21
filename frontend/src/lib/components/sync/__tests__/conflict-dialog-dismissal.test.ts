@@ -14,7 +14,7 @@ const SyncConflictResolver = (await import('../SyncConflictResolver.svelte')).de
 function conflict(id: string): SyncConflict {
 	return {
 		id,
-		conflictType: 'duplicate',
+		serverExpense: { id: `server-${id}`, tags: [], amount: 40, date: '2026-01-05' },
 		localExpense: {
 			id,
 			vehicleId: 'v1',

@@ -18,14 +18,17 @@ import {
 	getPendingExpenses,
 	INCOMPLETE_FUEL_REASON,
 	isIncompleteFuelExpense,
+	loadPendingPhotos,
 	markExpenseAsSynced,
 	markExpenseNeedsAttention,
 	offlineExpenseToBackend,
+	savePendingPhotos,
 	type OfflineExpense
 } from '../offline-storage';
 import { extractErrorMessage } from '#lib/utils/error-handling.ts';
 import { classifySyncFailure, type SyncFailureKind } from './classify-failure';
 import { apiClient } from '#lib/services/api-client.ts';
+import { expenseApi } from '#lib/services/expense-api.ts';
 import { fromBackendExpense } from '#lib/services/api-transformer.ts';
 import type { BackendExpenseResponse } from '#lib/types/index.ts';
 import { browser } from '$app/env';
@@ -88,6 +91,33 @@ export async function fetchLastSyncTime(): Promise<void> {
 	} catch (error) {
 		if (import.meta.env.DEV) console.error('Failed to fetch last sync time:', error);
 	}
+}
+
+const AMOUNT_EPSILON = 0.005;
+
+function toEpochSeconds(date: string): number {
+	return Math.floor(new Date(date).getTime() / 1000);
+}
+
+function serverCopyDiffers(local: OfflineExpense, server: BackendExpenseResponse): boolean {
+	const sent = offlineExpenseToBackend(local);
+	const sameTags =
+		JSON.stringify([...sent.tags].sort()) === JSON.stringify([...(server.tags ?? [])].sort());
+	const fuelMatches =
+		sent.category !== 'fuel' ||
+		((sent.mileage ?? null) === (server.mileage ?? null) &&
+			(sent.volume ?? null) === (server.volume ?? null) &&
+			(sent.fuelType ?? null) === (server.fuelType ?? null));
+	return !(
+		Math.abs(sent.expenseAmount - server.expenseAmount) < AMOUNT_EPSILON &&
+		toEpochSeconds(sent.date) === toEpochSeconds(server.date) &&
+		sent.category === server.category &&
+		sameTags &&
+		(sent.description || '') === (server.description || '') &&
+		(sent.location || '') === (server.location || '') &&
+		(sent.sourceId ?? null) === (server.sourceId ?? null) &&
+		fuelMatches
+	);
 }
 
 class SyncManager {
@@ -218,25 +248,23 @@ class SyncManager {
 		failureKind?: SyncFailureKind;
 	}> {
 		try {
-			const existingExpense = await this.checkForExistingExpense(expense);
+			const serverCopy = await this.findServerCopy(expense);
 
-			if (existingExpense) {
+			if (serverCopy && serverCopyDiffers(expense, serverCopy)) {
 				const conflict: SyncConflict = {
 					id: expense.id,
 					localExpense: expense,
-					serverExpense: existingExpense,
-					conflictType: this.determineConflictType(expense, existingExpense)
+					serverExpense: fromBackendExpense(serverCopy)
 				};
 				return { success: false, conflict };
 			}
 
-			if (isIncompleteFuelExpense(expense)) {
+			if (!serverCopy && isIncompleteFuelExpense(expense)) {
 				return { success: false, failureKind: 'terminal', error: INCOMPLETE_FUEL_REASON };
 			}
 
-			const backendExpense = offlineExpenseToBackend(expense);
-
-			await apiClient.post('/api/v1/expenses', { ...backendExpense, clientId: expense.clientId });
+			const serverId = serverCopy?.id ?? (await this.postExpense(expense, false)).id;
+			await this.uploadQueuedPhotos(expense, serverId);
 			return { success: true };
 		} catch (error) {
 			return {
@@ -247,9 +275,7 @@ class SyncManager {
 		}
 	}
 
-	private async checkForExistingExpense(
-		expense: OfflineExpense
-	): Promise<{ date: string; amount: number; tags: string[] } | null> {
+	private async findServerCopy(expense: OfflineExpense): Promise<BackendExpenseResponse | null> {
 		try {
 			const filters = new URLSearchParams({
 				vehicleId: expense.vehicleId,
@@ -259,25 +285,30 @@ class SyncManager {
 			const rows = await apiClient.get<BackendExpenseResponse[]>(
 				`/api/v1/expenses?${filters.toString()}`
 			);
-			const expenseList = Array.isArray(rows) ? rows.map(fromBackendExpense) : [];
-
-			return (
-				expenseList.find(existing => expense.tags.some(tag => existing.tags?.includes(tag))) || null
-			);
+			const isSameRecord = (row: BackendExpenseResponse) =>
+				!!expense.clientId && row.clientId === expense.clientId;
+			return (Array.isArray(rows) && rows.find(isSameRecord)) || null;
 		} catch (error) {
 			if (import.meta.env.DEV) console.warn('Failed to check for existing expense:', error);
 			return null;
 		}
 	}
 
-	private determineConflictType(
-		local: OfflineExpense,
-		server: { amount: number; tags: string[]; date: string }
-	): SyncConflict['conflictType'] {
-		const tagsMatch = local.tags.some(tag => server.tags?.includes(tag));
-		const amountMatch = Math.abs(local.amount - server.amount) < 0.01;
-		const dateMatch = local.date === server.date;
-		return amountMatch && tagsMatch && dateMatch ? 'duplicate' : 'modified';
+	private postExpense(expense: OfflineExpense, forceOverwrite: boolean) {
+		return apiClient.post<BackendExpenseResponse>('/api/v1/expenses', {
+			...offlineExpenseToBackend(expense),
+			clientId: expense.clientId,
+			...(forceOverwrite && { forceOverwrite })
+		});
+	}
+
+	private async uploadQueuedPhotos(expense: OfflineExpense, serverId: string): Promise<void> {
+		if (!expense.clientId) return;
+		const photos = await loadPendingPhotos(expense.clientId);
+		for (const [index, photo] of photos.entries()) {
+			await expenseApi.uploadPhoto('expense', serverId, photo);
+			await savePendingPhotos(expense.clientId, photos.slice(index + 1));
+		}
 	}
 
 	private async retrySingleExpense(expense: OfflineExpense): Promise<void> {
@@ -317,34 +348,21 @@ class SyncManager {
 
 	async resolveConflict(
 		conflict: SyncConflict,
-		resolution: 'keep_local' | 'keep_server' | 'merge'
+		resolution: 'keep_local' | 'keep_server'
 	): Promise<boolean> {
+		const local = conflict.localExpense;
 		try {
-			switch (resolution) {
-				case 'keep_local': {
-					const backendExpense = offlineExpenseToBackend(conflict.localExpense);
-					try {
-						await apiClient.post('/api/v1/expenses', {
-							...backendExpense,
-							clientId: conflict.localExpense.clientId,
-							forceOverwrite: true
-						});
-						markExpenseAsSynced(conflict.localExpense.id);
-						return true;
-					} catch {
-						break;
-					}
-				}
-				case 'keep_server':
-					markExpenseAsSynced(conflict.localExpense.id);
-					return true;
-				case 'merge':
-					return await this.resolveConflict(conflict, 'keep_local');
-			}
+			const serverId =
+				resolution === 'keep_local'
+					? (await this.postExpense(local, true)).id
+					: conflict.serverExpense.id;
+			await this.uploadQueuedPhotos(local, serverId);
+			markExpenseAsSynced(local.id);
+			return true;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to resolve conflict:', error);
+			return false;
 		}
-		return false;
 	}
 
 	setupAutoSync(): void {

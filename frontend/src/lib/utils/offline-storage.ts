@@ -6,6 +6,8 @@ import type { ExpenseCategory } from '#lib/types/index.ts';
 const OFFLINE_STORAGE_KEY = 'vroom_offline_expenses';
 const CORRUPT_STORAGE_KEY = 'vroom_offline_expenses.corrupt';
 const OFFLINE_STORAGE_VERSION = '3.0';
+const PHOTO_DB_NAME = 'vroom_offline_photos';
+const PHOTO_STORE = 'photos';
 
 export interface OfflineExpense {
 	id: string;
@@ -26,6 +28,8 @@ export interface OfflineExpense {
 	missedFillup?: boolean;
 	description?: string;
 	location?: string;
+	sourceType?: string;
+	sourceId?: string;
 	timestamp: number;
 	synced: boolean;
 	needsAttention?: boolean;
@@ -48,7 +52,9 @@ export function offlineExpenseToBackend(
 		fuelType: expense.fuelType,
 		missedFillup: expense.missedFillup,
 		description: expense.description,
-		location: expense.location
+		location: expense.location,
+		sourceType: expense.sourceType,
+		sourceId: expense.sourceId
 	});
 }
 
@@ -108,27 +114,92 @@ export function saveOfflineExpenses(expenses: OfflineExpense[]): boolean {
 	return true;
 }
 
-export function addOfflineExpense(
-	expense: Omit<OfflineExpense, 'id' | 'clientId' | 'timestamp' | 'synced' | 'version'>
-): boolean {
+export async function addOfflineExpense(
+	expense: Omit<OfflineExpense, 'id' | 'clientId' | 'timestamp' | 'synced' | 'version'>,
+	photos: File[] = []
+): Promise<boolean> {
+	const clientId = crypto.randomUUID();
 	const offlineExpense: OfflineExpense = {
 		...expense,
 		id: `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-		clientId: crypto.randomUUID(),
+		clientId,
 		timestamp: Date.now(),
 		synced: false,
 		version: OFFLINE_STORAGE_VERSION
 	};
 
+	if (!(await savePendingPhotos(clientId, photos))) return false;
+
 	const currentExpenses = loadOfflineExpenses();
-	const updatedExpenses = [...currentExpenses, offlineExpense];
-	return saveOfflineExpenses(updatedExpenses);
+	const queued = saveOfflineExpenses([...currentExpenses, offlineExpense]);
+	if (!queued && photos.length > 0) await deletePendingPhotos(clientId).catch(() => undefined);
+	return queued;
 }
 
 export function removeOfflineExpense(id: string): void {
 	const currentExpenses = loadOfflineExpenses();
+	const removed = currentExpenses.find(expense => expense.id === id);
 	const updatedExpenses = currentExpenses.filter(expense => expense.id !== id);
-	saveOfflineExpenses(updatedExpenses);
+	if (saveOfflineExpenses(updatedExpenses) && removed?.clientId) {
+		deletePendingPhotos(removed.clientId).catch(() => undefined);
+	}
+}
+
+function hasPhotoStore(): boolean {
+	return browser && typeof indexedDB !== 'undefined';
+}
+
+function openPhotoDb(): Promise<IDBDatabase> {
+	return new Promise((resolve, reject) => {
+		const request = indexedDB.open(PHOTO_DB_NAME, 1);
+		request.onupgradeneeded = () => request.result.createObjectStore(PHOTO_STORE);
+		request.onsuccess = () => resolve(request.result);
+		request.onerror = () => reject(request.error);
+	});
+}
+
+async function runPhotoStore<T>(
+	mode: 'readonly' | 'readwrite',
+	operation: (store: IDBObjectStore) => IDBRequest<T>
+): Promise<T> {
+	const db = await openPhotoDb();
+	try {
+		return await new Promise<T>((resolve, reject) => {
+			const transaction = db.transaction(PHOTO_STORE, mode);
+			const request = operation(transaction.objectStore(PHOTO_STORE));
+			transaction.oncomplete = () => resolve(request.result);
+			transaction.onerror = () => reject(transaction.error);
+			transaction.onabort = () => reject(transaction.error);
+		});
+	} finally {
+		db.close();
+	}
+}
+
+export async function savePendingPhotos(clientId: string, photos: File[]): Promise<boolean> {
+	if (photos.length === 0) {
+		if (hasPhotoStore()) await deletePendingPhotos(clientId).catch(() => undefined);
+		return true;
+	}
+	if (!hasPhotoStore()) return false;
+	try {
+		await runPhotoStore('readwrite', store => store.put(photos, clientId));
+		return true;
+	} catch (error) {
+		if (import.meta.env.DEV) console.error('Failed to save offline photos:', error);
+		return false;
+	}
+}
+
+export async function loadPendingPhotos(clientId: string): Promise<File[]> {
+	if (!hasPhotoStore()) return [];
+	const photos = await runPhotoStore<unknown>('readonly', store => store.get(clientId));
+	return Array.isArray(photos) ? photos : [];
+}
+
+export async function deletePendingPhotos(clientId: string): Promise<void> {
+	if (!hasPhotoStore()) return;
+	await runPhotoStore('readwrite', store => store.delete(clientId));
 }
 
 export function getPendingExpenses(): OfflineExpense[] {
