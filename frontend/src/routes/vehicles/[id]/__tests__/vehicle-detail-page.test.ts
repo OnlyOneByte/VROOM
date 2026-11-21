@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Expense, ExpenseSummary, Vehicle } from '#lib/types/index.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
 
 const goto = vi.fn((_url: string) => Promise.resolve());
 vi.mock('$app/navigation', () => ({ goto: (url: string) => goto(url) }));
@@ -182,8 +183,8 @@ describe('vehicle detail page loading and not-found', () => {
 		expect(screen.queryByRole('tab', { name: 'Overview' })).toBeNull();
 	});
 
-	test('a failed vehicle load notifies, redirects to the dashboard and shows not-found', async () => {
-		const failure = new Error('Not found');
+	test('a missing vehicle notifies, redirects to the dashboard and shows not-found', async () => {
+		const failure = new ApiError('Vehicle not found', 404);
 		getVehicle.mockRejectedValue(failure);
 		await mount();
 
@@ -195,7 +196,7 @@ describe('vehicle detail page loading and not-found', () => {
 	});
 
 	test('Back to Dashboard on the not-found state navigates to the dashboard', async () => {
-		getVehicle.mockRejectedValue(new Error('Not found'));
+		getVehicle.mockRejectedValue(new ApiError('Vehicle not found', 404));
 		await mount();
 		goto.mockClear();
 
