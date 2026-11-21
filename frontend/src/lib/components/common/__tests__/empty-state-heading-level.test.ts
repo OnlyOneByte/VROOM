@@ -18,6 +18,17 @@ describe('the shared empty state', () => {
 		expect(heading.getAttribute('aria-level')).toBeNull();
 	});
 
+	test('centres its title like its description, so a wrapped title stays under the icon', () => {
+		const { getByRole } = render(EmptyState, {
+			title: text('No fill-ups in the last 12 months'),
+			description: text('Log a fill-up to see your fuel stats.')
+		});
+
+		expect(getByRole('heading', { name: 'No fill-ups in the last 12 months' })).toHaveClass(
+			'text-center'
+		);
+	});
+
 	test.each([3, 4] as const)('takes level %i when it sits under a section heading', level => {
 		const { getByRole } = render(EmptyState, {
 			title: text('No recent activity'),

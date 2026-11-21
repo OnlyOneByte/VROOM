@@ -216,7 +216,7 @@
 		{/snippet}
 		{#snippet title()}
 			{#if hasOlderFuel}
-				<span class="block text-center">No fill-ups in the last 12 months</span>
+				No fill-ups in the last 12 months
 			{:else}
 				No fuel data yet
 			{/if}
