@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Expense } from '#lib/types/index.ts';
 import { makeExpense, makeSplitGroup, makeVehicle } from './expense-form-fixtures';
+import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 const { expenseApiMock, vehicleApiMock, addNotification, gotoDynamic } = vi.hoisted(() => ({
 	expenseApiMock: {
@@ -166,25 +167,46 @@ describe('loadExpense — single expense', () => {
 		});
 	});
 
-	test('a missing expense notifies and navigates back', async () => {
-		expenseApiMock.getExpense.mockResolvedValue(null);
+	test('a deleted expense (404) says it no longer exists and navigates back', async () => {
+		expenseApiMock.getExpense.mockRejectedValue(new ApiError('Expense not found', 404));
 		const state = createState('e404');
-		await loadExpense(state);
-		expect(addNotification).toHaveBeenCalledWith({ type: 'error', message: 'Expense not found' });
-		expect(gotoDynamic).toHaveBeenCalledWith('/expenses');
-		expect(state.isLoading).toBe(false);
-	});
-
-	test('a request failure notifies and navigates back', async () => {
-		expenseApiMock.getExpense.mockRejectedValue(new Error('boom'));
-		const state = createState('e1');
 		await loadExpense(state);
 		expect(addNotification).toHaveBeenCalledWith({
 			type: 'error',
-			message: 'Error loading expense'
+			message: 'That expense no longer exists.'
 		});
 		expect(gotoDynamic).toHaveBeenCalledWith('/expenses');
+		expect(state.expenseError).toBeNull();
 		expect(state.isLoading).toBe(false);
+	});
+
+	test('a server failure stays on the page with an inline error; a retry clears it', async () => {
+		expenseApiMock.getExpense.mockRejectedValueOnce(new ApiError('Internal server error', 500));
+		const state = createState('e1');
+		await loadExpense(state);
+		expect(gotoDynamic).not.toHaveBeenCalled();
+		expect(state.expenseError).toBe(SERVER_FAILURE_MESSAGE);
+		expect(addNotification).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: 'error',
+				message: `Couldn't load this expense. ${SERVER_FAILURE_MESSAGE}`
+			})
+		);
+		expect(state.isLoading).toBe(false);
+
+		expenseApiMock.getExpense.mockResolvedValueOnce(makeExpense('e1', { vehicleId: 'v1' }));
+		await loadExpense(state);
+		expect(state.expenseError).toBeNull();
+		expect(state.formData.vehicleId).toBe('v1');
+		expect(gotoDynamic).not.toHaveBeenCalled();
+	});
+
+	test('a network failure stays on the page with an inline error', async () => {
+		expenseApiMock.getExpense.mockRejectedValue(new Error('offline'));
+		const state = createState('e1');
+		await loadExpense(state);
+		expect(gotoDynamic).not.toHaveBeenCalled();
+		expect(state.expenseError).toBe('Offline.');
 	});
 });
 
@@ -265,29 +287,39 @@ describe('loadExpense — split groups', () => {
 		expect(state.isLoading).toBe(false);
 	});
 
-	test('an empty split group notifies and navigates back', async () => {
+	test('an empty split group says it no longer exists and navigates back', async () => {
 		expenseApiMock.getExpense.mockResolvedValue(makeExpense('s1', { groupId: 'g1' }));
 		expenseApiMock.getSplitExpense.mockResolvedValue(makeSplitGroup([]));
 		const state = createState('s1');
 		await loadExpense(state);
 		expect(addNotification).toHaveBeenCalledWith({
 			type: 'error',
-			message: 'Failed to load split expense group'
+			message: 'That split expense no longer exists.'
 		});
 		expect(gotoDynamic).toHaveBeenCalledWith('/expenses');
 		expect(state.isGroupEditMode).toBe(false);
 	});
 
-	test('a split group request failure notifies and navigates back', async () => {
+	test('a deleted split group (404) navigates back', async () => {
 		expenseApiMock.getExpense.mockResolvedValue(makeExpense('s1', { groupId: 'g1' }));
-		expenseApiMock.getSplitExpense.mockRejectedValue(new Error('500'));
+		expenseApiMock.getSplitExpense.mockRejectedValue(new ApiError('Not found', 404));
 		const state = createState('s1');
 		await loadExpense(state);
 		expect(addNotification).toHaveBeenCalledWith({
 			type: 'error',
-			message: 'Failed to load split expense group'
+			message: 'That split expense no longer exists.'
 		});
 		expect(gotoDynamic).toHaveBeenCalledTimes(1);
+	});
+
+	test('a split group server failure stays on the page with an inline error', async () => {
+		expenseApiMock.getExpense.mockResolvedValue(makeExpense('s1', { groupId: 'g1' }));
+		expenseApiMock.getSplitExpense.mockRejectedValue(new ApiError('Internal server error', 500));
+		const state = createState('s1');
+		await loadExpense(state);
+		expect(gotoDynamic).not.toHaveBeenCalled();
+		expect(state.expenseError).toBe(SERVER_FAILURE_MESSAGE);
+		expect(state.isGroupEditMode).toBe(false);
 		expect(state.isLoading).toBe(false);
 	});
 });

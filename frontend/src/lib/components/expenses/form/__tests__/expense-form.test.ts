@@ -350,20 +350,28 @@ describe('ExpenseForm edit mode', () => {
 		expect(screen.getByRole('button', { name: /duplicate/i })).toBeTruthy();
 	});
 
-	test('a missing expense is reported and the user is sent back', async () => {
-		getExpense.mockResolvedValue(null);
+	test('a deleted expense is reported and the user is sent back', async () => {
+		getExpense.mockRejectedValue(new ApiError('Expense not found', 404));
 		render(ExpenseForm, { props: { expenseId: 'gone', returnTo: '/vehicles/v1' } });
 
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/v1'));
-		expect(notificationMessages()).toContain('Expense not found');
+		expect(notificationMessages()).toContain('That expense no longer exists.');
 	});
 
-	test('a failed load is reported and the user is sent back', async () => {
-		getExpense.mockRejectedValue(new Error('network'));
+	test('a failed load stays on the page with Retry, and Retry loads the expense', async () => {
+		getExpense.mockRejectedValueOnce(new ApiError('Internal server error', 500));
 		render(ExpenseForm, { props: { expenseId: 'exp-1' } });
 
-		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/expenses'));
-		expect(notificationMessages()).toContain('Error loading expense');
+		const card = await screen.findByTestId('expense-load-error');
+		expect(within(card).getByText("Couldn't load this expense")).toBeTruthy();
+		expect(goto).not.toHaveBeenCalled();
+
+		getExpense.mockResolvedValueOnce(EXISTING);
+		await fireEvent.click(within(card).getByRole('button', { name: 'Retry' }));
+
+		await vi.waitFor(() => expect(field('amount').value).toBe('79.99'));
+		expect(screen.queryByTestId('expense-load-error')).toBeNull();
+		expect(goto).not.toHaveBeenCalled();
 	});
 
 	test('saving sends the edited expense to updateExpense and returns', async () => {
