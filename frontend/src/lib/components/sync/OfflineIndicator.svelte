@@ -43,7 +43,7 @@
 			class="px-2 py-2 shadow-lg text-xs gap-1 lg:px-3 lg:text-sm lg:gap-2"
 		>
 			<WifiOff size={16} class="hidden lg:block" />
-			<span class="font-medium" class:max-[359px]:sr-only={pendingCount > 0}>Offline</span>
+			<span class="font-medium" class:max-[389px]:sr-only={pendingCount > 0}>Offline</span>
 			{#if pendingCount > 0}
 				<Badge variant="destructive" class="text-xs px-2 py-1">
 					{pendingCount} pending
@@ -56,19 +56,19 @@
 			role="status"
 			class="py-0 pl-2 pr-0 shadow-lg text-xs gap-1 bg-background lg:px-3 lg:py-2 lg:text-sm lg:gap-2"
 		>
-			<ServerOff size={16} class="hidden lg:block" />
+			<ServerOff size={16} />
 			<span class="font-medium max-[359px]:sr-only"
-				>Can't reach <span class="sr-only lg:not-sr-only">VROOM</span></span
+				>Can't reach <span class="max-lg:sr-only">VROOM</span></span
 			>
 			<Button
-				variant="ghost"
+				variant="secondary"
 				size="icon-lg"
 				onclick={recheckSession}
 				disabled={recheckingSession}
 				class="lg:h-auto lg:w-auto lg:px-2 lg:py-1 lg:text-xs lg:gap-1"
 			>
 				<RefreshCw size={14} class={recheckingSession ? 'animate-spin' : ''} />
-				<span class="sr-only lg:not-sr-only">Retry</span>
+				<span class="max-lg:sr-only">Retry</span>
 			</Button>
 		</Badge>
 	{:else if syncState.current === 'syncing'}
@@ -101,11 +101,11 @@
 				class="lg:h-auto lg:w-auto lg:px-2 lg:py-1 lg:text-xs"
 			>
 				<RefreshCw size={14} class="lg:hidden" />
-				<span class="sr-only lg:not-sr-only">Retry</span>
+				<span class="max-lg:sr-only">Retry</span>
 			</Button>
 		</Badge>
 	{:else if pendingCount > 0}
-		<Badge variant="outline" class="p-0 shadow-lg text-sm gap-2 bg-background lg:px-3 lg:py-2">
+		<Badge variant="outline" class="p-0 shadow-lg text-sm gap-2 lg:px-3 lg:py-2">
 			<Wifi size={16} class="hidden lg:block" />
 			<span class="font-medium hidden lg:inline">Online</span>
 			<Button
