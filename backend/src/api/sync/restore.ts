@@ -25,7 +25,12 @@ import {
   vehicles,
 } from '../../db/schema';
 import { AppError, SyncError, SyncErrorCode, ValidationError } from '../../errors';
-import type { BackupConfig, ParsedBackupData } from '../../types';
+import {
+  type BackupConfig,
+  DEFAULT_STORAGE_CONFIG,
+  type ParsedBackupData,
+  type StorageConfig,
+} from '../../types';
 import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { preferencesRepository } from '../settings/repository';
@@ -74,6 +79,11 @@ const clampShareLevel = (level: unknown): string => (level === 'editor' ? 'edito
 
 type RestoreMode = 'replace' | 'merge' | 'preview';
 
+type ProviderScopedPrefs = Pick<
+  typeof userPreferences.$inferSelect,
+  'backupConfig' | 'storageConfig'
+>;
+
 function summarizeBackup(data: ParsedBackupData): ImportSummary {
   return {
     vehicles: data.vehicles.length,
@@ -109,14 +119,6 @@ class RestoreService {
     mode: RestoreMode
   ): Promise<RestoreResponse> {
     const parsedBackup = await this.parseOrReject(file);
-
-    const userIdValidation = backupService.validateUserId(parsedBackup.metadata.userId, userId);
-    if (!userIdValidation.valid) {
-      throw new SyncError(
-        SyncErrorCode.VALIDATION_ERROR,
-        userIdValidation.errors[0] || 'User ID mismatch'
-      );
-    }
 
     const validation = backupService.validateBackupData(parsedBackup);
     if (!validation.valid) {
@@ -154,10 +156,11 @@ class RestoreService {
     this.db.transaction((tx) => {
       // Read before the wipe: deleteUserData cascades vehicle_shares.
       const consented = this.consentedShareKeys(tx, userId);
+      const currentPrefs = this.currentProviderPrefs(tx, userId);
       if (mode === 'replace') {
         this.deleteUserData(tx, userId);
       }
-      this.insertBackupData(tx, data, userId, consented);
+      this.insertBackupData(tx, data, userId, consented, currentPrefs);
     });
 
     return { success: true, imported: summary };
@@ -239,10 +242,6 @@ class RestoreService {
       trips: coerceRows(sheet.trips, TABLE_SCHEMA_MAP.trips),
       vehicleShares: coerceRows(sheet.vehicleShares, TABLE_SCHEMA_MAP.vehicleShares),
     };
-
-    if (sheetData.metadata.userId !== userId) {
-      throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Spreadsheet belongs to different user');
-    }
 
     const validation = backupService.validateBackupData(sheetData);
     if (!validation.valid) {
@@ -458,7 +457,8 @@ class RestoreService {
     tx: DrizzleTransaction,
     data: ParsedBackupData,
     userId: string,
-    consentedShares: Set<string>
+    consentedShares: Set<string>,
+    currentPrefs: ProviderScopedPrefs | undefined
   ): void {
     const knownUserIds = new Set(
       tx
@@ -501,7 +501,14 @@ class RestoreService {
           status: this.resolveShareStatus(share, consentedShares),
         }))
     );
-    this.insertRows(tx, userPreferences, this.stampUserId(data.userPreferences, userId));
+    const ownedProviders = this.ownedProviderIds(tx, userId);
+    this.insertRows(
+      tx,
+      userPreferences,
+      this.stampUserId(data.userPreferences, userId).map((row) =>
+        this.keepOwnedProviderSettings(row, currentPrefs, ownedProviders)
+      )
+    );
     this.insertRows(tx, syncState, this.stampUserId(data.syncState, userId));
     this.insertRows(tx, photos, this.stampUserId(data.photos, userId));
     const refRows = (data.photoRefs ?? []) as Record<string, unknown>[];
@@ -511,6 +518,70 @@ class RestoreService {
       photoRefs,
       refRows.filter((ref) => knownProviders.has(String(ref.providerId)))
     );
+  }
+
+  private currentProviderPrefs(
+    tx: DrizzleTransaction,
+    userId: string
+  ): ProviderScopedPrefs | undefined {
+    return tx
+      .select({
+        backupConfig: userPreferences.backupConfig,
+        storageConfig: userPreferences.storageConfig,
+      })
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId))
+      .get();
+  }
+
+  private ownedProviderIds(tx: DrizzleTransaction, userId: string): Set<string> {
+    return new Set(
+      tx
+        .select({ id: userProviders.id })
+        .from(userProviders)
+        .where(eq(userProviders.userId, userId))
+        .all()
+        .map((row) => row.id)
+    );
+  }
+
+  private keepOwnedProviderSettings<T extends Record<string, unknown>>(
+    row: T,
+    current: ProviderScopedPrefs | undefined,
+    owned: Set<string>
+  ): T {
+    const ownedEntries = <V>(entries: Record<string, V> | undefined): Record<string, V> =>
+      Object.fromEntries(Object.entries(entries ?? {}).filter(([id]) => owned.has(id)));
+    const restoredBackup = row.backupConfig as BackupConfig | null | undefined;
+    const restoredStorage = row.storageConfig as StorageConfig | null | undefined;
+    const currentStorage = current?.storageConfig;
+    const categories = Object.keys(
+      DEFAULT_STORAGE_CONFIG.defaults
+    ) as (keyof StorageConfig['defaults'])[];
+    const defaults = Object.fromEntries(
+      categories.map((category) => [
+        category,
+        [currentStorage?.defaults?.[category], restoredStorage?.defaults?.[category]].find(
+          (id) => id != null && owned.has(id)
+        ) ?? null,
+      ])
+    ) as StorageConfig['defaults'];
+    return {
+      ...row,
+      backupConfig: {
+        providers: {
+          ...ownedEntries(restoredBackup?.providers),
+          ...ownedEntries(current?.backupConfig?.providers),
+        },
+      },
+      storageConfig: {
+        defaults,
+        providerCategories: {
+          ...ownedEntries(restoredStorage?.providerCategories),
+          ...ownedEntries(currentStorage?.providerCategories),
+        },
+      },
+    };
   }
 
   private consentedShareKeys(tx: DrizzleTransaction, userId: string): Set<string> {
