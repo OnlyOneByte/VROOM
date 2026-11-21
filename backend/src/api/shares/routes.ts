@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { getDb } from '../../db/connection';
 import { users, type VehicleShare } from '../../db/schema';
 import type { ApiResponse } from '../../errors';
-import { ConflictError, NotFoundError, ValidationError } from '../../errors';
+import { AppError, ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { commonSchemas, validateVehicleOwnership, zValidator } from '../../utils/validation';
 import { type GrantedShare, type ReceivedShare, vehicleShareRepository } from './repository';
@@ -39,7 +39,7 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
     .where(eq(users.email, email))
     .limit(1);
   if (!invitee) {
-    throw new NotFoundError('No VROOM account with that email');
+    throw new AppError('No VROOM account uses that email.', 404);
   }
 
   if (invitee.id === user.id) {

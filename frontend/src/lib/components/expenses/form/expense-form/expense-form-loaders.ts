@@ -2,7 +2,11 @@ import { expenseApi } from '#lib/services/expense-api.ts';
 import { vehicleApi } from '#lib/services/vehicle-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { gotoDynamic } from '#lib/utils/navigation.ts';
-import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+import {
+	handleErrorWithNotification,
+	toError,
+	userFacingErrorMessage
+} from '#lib/utils/error-handling.ts';
 import { toDateInputValue } from '#lib/utils/formatters.ts';
 import { parsePreselectedTags } from './expense-navigation';
 import { splitStateFromGroup } from './split-config';
@@ -16,10 +20,6 @@ export interface PreselectedValues {
 	tags: string | null;
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-	return error instanceof Error && error.message ? error.message : fallback;
-}
-
 export async function loadVehicles(state: ExpenseFormState): Promise<void> {
 	try {
 		state.vehicles = await vehicleApi.getVehicles();
@@ -29,7 +29,7 @@ export async function loadVehicles(state: ExpenseFormState): Promise<void> {
 			if (firstVehicle) state.formData.vehicleId = firstVehicle.id;
 		}
 	} catch (error) {
-		state.vehiclesError = errorMessage(error, 'Failed to load vehicles');
+		state.vehiclesError = userFacingErrorMessage(error);
 		handleErrorWithNotification(error, 'Failed to load vehicles');
 	}
 }
@@ -122,10 +122,6 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 	}
 }
 
-function toError(error: unknown): Error {
-	return error instanceof Error ? error : new Error(String(error));
-}
-
 export async function loadVehicle(state: ExpenseFormState): Promise<Error | null> {
 	const isCurrent = state.nextVehicleRequest();
 	try {
@@ -179,8 +175,6 @@ export async function loadVehicleContext(state: ExpenseFormState): Promise<void>
 	]);
 	const failure = failures.find(error => error !== null);
 	if (!isCurrent()) return;
-	state.vehicleError = failure
-		? errorMessage(failure, "Failed to load this vehicle's details")
-		: null;
+	state.vehicleError = failure ? userFacingErrorMessage(failure) : null;
 	if (failure) handleErrorWithNotification(failure, "Failed to load this vehicle's details");
 }
