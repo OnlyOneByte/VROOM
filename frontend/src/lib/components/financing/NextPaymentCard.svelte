@@ -7,6 +7,7 @@
 	import { formatCurrency } from '#lib/utils/formatters.ts';
 	import {
 		calculateNextPaymentDate,
+		remainingBalance,
 		calculateDaysUntil,
 		calculateMinimumPayment,
 		formatPaymentFrequency
@@ -111,9 +112,7 @@
 		minimumPayment !== null && financing.paymentAmount > minimumPayment + 0.01
 	);
 
-	let amountPaid = $derived(
-		Math.max(0, financing.originalAmount - (financing.computedBalance ?? 0))
-	);
+	let amountPaid = $derived(Math.max(0, financing.originalAmount - remainingBalance(financing)));
 </script>
 
 <Card class="border-2 {cardBorderClass}" role="region" aria-labelledby="next-payment-heading">
@@ -219,7 +218,7 @@
 					<div>
 						<p class="text-xs text-muted-foreground">Remaining</p>
 						<p class="text-sm sm:text-base font-semibold">
-							{formatCurrency(financing.computedBalance ?? 0)}
+							{formatCurrency(remainingBalance(financing))}
 						</p>
 					</div>
 				</div>

@@ -193,3 +193,14 @@ describe('NextPaymentCard actions', () => {
 		expect(screen.queryByRole('button')).toBeNull();
 	});
 });
+
+describe('NextPaymentCard with no computed balance', () => {
+	test('treats an unknown balance as nothing paid yet, matching the Finance tab progress', () => {
+		mount({ financing: makeLoan({ computedBalance: undefined }), progressPercentage: 0 });
+
+		const paid = screen.getByText('Principal paid').nextElementSibling;
+		const remaining = screen.getByText('Remaining').nextElementSibling;
+		expect(paid?.textContent?.trim()).toBe('$0.00');
+		expect(remaining?.textContent?.trim()).toBe('$20,000.00');
+	});
+});
