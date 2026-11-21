@@ -150,7 +150,8 @@
 		{:else if loadError}
 			<div class="space-y-3" data-testid="migrate-error">
 				<p class="text-sm text-destructive">{loadError}</p>
-				<Button variant="outline" size="sm" onclick={loadVehicles}>Retry</Button>
+				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={loadVehicles}>Retry</Button
+				>
 			</div>
 		{:else if vehicles.length === 0}
 			<p class="text-sm text-muted-foreground" data-testid="migrate-no-vehicle">
