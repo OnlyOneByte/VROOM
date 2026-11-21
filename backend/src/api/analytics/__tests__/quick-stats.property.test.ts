@@ -228,3 +228,42 @@ describe('Fleet health score is bounded weighted average', () => {
     expect(two.fleetHealthScore).toBe(38);
   });
 });
+
+describe('YTD spending counts only the year the range ends in', () => {
+  test('a trailing 12-month window across Jan 1 sums only the new year', async () => {
+    testDb.sqlite.close();
+    testDb = createTestDb();
+    repo = new AnalyticsRepository(testDb.drizzle);
+    seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
+    seedVehicle(testDb.sqlite, {
+      id: 'veh-1',
+      userId: 'user-1',
+      make: 'Toyota',
+      model: 'Camry',
+      year: 2022,
+    });
+    const expense = (id: string, date: Date, expenseAmount: number): TestExpense => ({
+      id,
+      vehicleId: 'veh-1',
+      category: 'maintenance',
+      expenseAmount,
+      date,
+      mileage: null,
+      volume: null,
+      fuelType: null,
+      missedFillup: false,
+    });
+    seedExpense(testDb.sqlite, expense('last-year', new Date(Date.UTC(2024, 11, 20, 12)), 30000));
+    seedExpense(testDb.sqlite, expense('this-year', new Date(Date.UTC(2025, 0, 10, 12)), 4500));
+
+    const trailing = {
+      start: Math.floor(Date.UTC(2024, 1, 1) / 1000),
+      end: Math.floor(Date.UTC(2025, 1, 1) / 1000),
+    };
+    const result = await repo.getQuickStats('user-1', trailing);
+    expect(result.ytdSpending).toBe(4500);
+
+    const summary = await repo.getSummary('user-1', trailing);
+    expect(summary.quickStats.ytdSpending).toBe(4500);
+  });
+});

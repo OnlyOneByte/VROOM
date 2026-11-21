@@ -88,6 +88,19 @@ export function toDate(value: Date | number | string): Date {
   return value instanceof Date ? value : new Date(value);
 }
 
+export function yearToDateSpending(
+  rows: Array<{ date: Date | number | null; expenseAmount: number }>,
+  range: DateRange
+): number {
+  const lastInstant = new Date(range.end * 1000 - 1);
+  const yearStart = Date.UTC(lastInstant.getUTCFullYear(), 0, 1);
+  let total = 0;
+  for (const row of rows) {
+    if (row.date != null && toDate(row.date).getTime() >= yearStart) total += row.expenseAmount;
+  }
+  return total;
+}
+
 export function calendarYearRange(year: number): { start: Date; end: Date } {
   return { start: new Date(Date.UTC(year, 0, 1)), end: new Date(Date.UTC(year + 1, 0, 1)) };
 }
@@ -1245,7 +1258,7 @@ export class AnalyticsRepository {
         this.getAllVehicleUnits(userId),
       ]);
 
-      const ytdSpending = allExpenses.reduce((sum, e) => sum + e.expenseAmount, 0);
+      const ytdSpending = yearToDateSpending(allExpenses, range);
       const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits);
       const avgEfficiency = this.computeAverageEfficiency(fuelRows, convert);
 
@@ -2020,7 +2033,7 @@ export class AnalyticsRepository {
 
       const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits);
       const avgEfficiency = this.computeAverageEfficiency(fuelRows, convert);
-      const ytdSpending = allExpenses.reduce((sum, e) => sum + e.expenseAmount, 0);
+      const ytdSpending = yearToDateSpending(allExpenses, range);
       const fleetHealthScore =
         vehicleRows.length > 0 ? await this.computeFleetHealthScore(vehicleRows, userId) : 0;
 
