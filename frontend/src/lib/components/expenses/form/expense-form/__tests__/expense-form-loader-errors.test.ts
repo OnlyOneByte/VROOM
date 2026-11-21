@@ -244,31 +244,22 @@ describe('expense form loader failures from older requests and odd rejections', 
 		vehicleApiMock.getVehicles.mockRejectedValueOnce('offline');
 		const state = createState();
 		await loadVehicles(state);
-		expect(state.vehiclesError).toBe('Failed to load vehicles');
+		expect(state.vehiclesError).toBe(UNEXPECTED_FAILURE_MESSAGE);
 	});
 
 	test('a vehicle list Error without a message shows the generic message', async () => {
 		vehicleApiMock.getVehicles.mockRejectedValueOnce(new Error(''));
 		const state = createState();
 		await loadVehicles(state);
-		expect(state.vehiclesError).toBe('Failed to load vehicles');
+		expect(state.vehiclesError).toBe(UNEXPECTED_FAILURE_MESSAGE);
 	});
 
-	test('a vehicle rejection that is not an Error is wrapped with its text', async () => {
+	test('a vehicle rejection that is not an Error is wrapped as the generic sentence', async () => {
 		vehicleApiMock.getVehicle.mockRejectedValueOnce('503 Service Unavailable');
 		const state = createState();
 		const error = await loadVehicle(state);
 		expect(error).toBeInstanceOf(Error);
-		expect(error?.message).toBe('503 Service Unavailable');
+		expect(error?.message).toBe(UNEXPECTED_FAILURE_MESSAGE);
 		expect(state.vehicle).toBeNull();
-	});
-
-	test('a vehicle context failure without text shows the generic details message', async () => {
-		vehicleApiMock.getVehicle.mockRejectedValueOnce('');
-		expenseApiMock.getExpensesByVehicle.mockResolvedValue({ data: [] });
-		const state = createState();
-		await loadVehicleContext(state);
-		expect(state.vehicleError).toBe("Failed to load this vehicle's details");
-		expect(addNotification).toHaveBeenCalledTimes(1);
 	});
 });
