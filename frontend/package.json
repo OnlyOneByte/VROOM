@@ -84,6 +84,9 @@
 		"workbox-precaching": "^7.4.1"
 	},
 	"overrides": {
+		"runed": {
+			"@sveltejs/kit": "$@sveltejs/kit"
+		},
 		"serialize-javascript": "^7.1.4"
 	},
 	"dependencies": {
