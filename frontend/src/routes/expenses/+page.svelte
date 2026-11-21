@@ -98,7 +98,7 @@
 			iconColor: 'chart-2'
 		},
 		{
-			label: EXPENSE_MESSAGES.LAST_EXPENSE,
+			label: 'Last 30 Days',
 			value: formatCurrency(summary?.recentAmount ?? 0),
 			icon: Calendar,
 			iconColor: 'chart-5'
