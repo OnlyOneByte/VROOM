@@ -124,7 +124,13 @@ describe('findPaginated endDate boundary includes the whole end day', () => {
 });
 
 describe('date-only filters follow the client time zone', () => {
-  const descriptions = async (filters: { startDate: Date; endDate: Date; timeZone: string }) =>
+  const descriptions = async (filters: {
+    startDate: Date;
+    endDate: Date;
+    timeZone: string;
+    startDateIsDay?: boolean;
+    endDateIsDay?: boolean;
+  }) =>
     (await repo.findPaginated({ userId: USER_A, ...filters })).data
       .map((e) => e.description)
       .sort();
@@ -139,6 +145,8 @@ describe('date-only filters follow the client time zone', () => {
       startDate: new Date('2026-03-31'),
       endDate: new Date('2026-03-31'),
       timeZone: 'Pacific/Tongatapu',
+      startDateIsDay: true,
+      endDateIsDay: true,
     });
     expect(got).toEqual(['late', 'noon']);
   });
@@ -151,6 +159,8 @@ describe('date-only filters follow the client time zone', () => {
       startDate: new Date('2026-03-01'),
       endDate: new Date('2026-03-31'),
       timeZone: 'Pacific/Honolulu',
+      startDateIsDay: true,
+      endDateIsDay: true,
     });
     expect(got).toEqual(['evening']);
   });

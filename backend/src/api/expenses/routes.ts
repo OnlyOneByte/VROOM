@@ -235,6 +235,18 @@ async function requireSplitWriteAccess(
   return { ownerId, createdBy: ownerId === actingUserId ? null : actingUserId };
 }
 
+const PLAIN_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+function plainDayFilters(
+  startDate: string | undefined,
+  endDate: string | undefined
+): { startDateIsDay: boolean; endDateIsDay: boolean } {
+  return {
+    startDateIsDay: startDate !== undefined && PLAIN_DAY.test(startDate),
+    endDateIsDay: endDate !== undefined && PLAIN_DAY.test(endDate),
+  };
+}
+
 export const expenseQuerySchema = z.object({
   vehicleId: z.string().optional(),
   tags: z
@@ -482,6 +494,7 @@ export const EXPORT_COLUMNS = [
 routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, category, startDate, endDate, timeZone, search, tags } = c.req.valid('query');
+  const plainDays = plainDayFilters(c.req.query('startDate'), c.req.query('endDate'));
 
   let exportUserId = user.id;
   if (vehicleId) {
@@ -498,6 +511,7 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
       startDate,
       endDate,
       timeZone,
+      ...plainDays,
       search,
       tags,
     }),
@@ -706,6 +720,7 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
     startDate: query.startDate,
     endDate: query.endDate,
     timeZone: query.timeZone,
+    ...plainDayFilters(c.req.query('startDate'), c.req.query('endDate')),
     tags: query.tags,
     search: query.search,
     sortBy: query.sortBy,

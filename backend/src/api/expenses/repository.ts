@@ -24,6 +24,8 @@ export interface ExpenseFilters {
   tags?: string[];
   search?: string;
   timeZone?: string;
+  startDateIsDay?: boolean;
+  endDateIsDay?: boolean;
 }
 
 type ExpenseSortBy = 'date' | 'amount' | 'category';
@@ -43,18 +45,14 @@ const EXPENSE_SORT_COLUMNS = {
   category: expenses.category,
 } as const;
 
-function isUtcMidnight(d: Date): boolean {
-  return d.getTime() % 86_400_000 === 0;
-}
-
-function startOfDayIfDateOnly(d: Date, timeZone: string | undefined): Date {
-  if (!timeZone || !isUtcMidnight(d)) return d;
+function startOfDayIfDateOnly(d: Date, timeZone: string | undefined, isDay: boolean): Date {
+  if (!timeZone || !isDay) return d;
   return zonedMidnight(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), timeZone);
 }
 
-function endOfDayIfDateOnly(d: Date, timeZone: string | undefined): Date {
+function endOfDayIfDateOnly(d: Date, timeZone: string | undefined, isDay: boolean): Date {
   if (timeZone) {
-    if (!isUtcMidnight(d)) return d;
+    if (!isDay) return d;
     const nextDay = zonedMidnight(
       d.getUTCFullYear(),
       d.getUTCMonth(),
@@ -79,10 +77,20 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
     conditions.push(eq(expenses.category, filters.category));
   }
   if (filters.startDate) {
-    conditions.push(gte(expenses.date, startOfDayIfDateOnly(filters.startDate, filters.timeZone)));
+    conditions.push(
+      gte(
+        expenses.date,
+        startOfDayIfDateOnly(filters.startDate, filters.timeZone, filters.startDateIsDay === true)
+      )
+    );
   }
   if (filters.endDate) {
-    conditions.push(lte(expenses.date, endOfDayIfDateOnly(filters.endDate, filters.timeZone)));
+    conditions.push(
+      lte(
+        expenses.date,
+        endOfDayIfDateOnly(filters.endDate, filters.timeZone, filters.endDateIsDay === true)
+      )
+    );
   }
   if (filters.tags?.length) {
     for (const tag of filters.tags) {
