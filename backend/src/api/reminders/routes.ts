@@ -126,15 +126,22 @@ export function isSameSubmittedDay(stored: Date, submitted: Date): boolean {
   return dayOf(stored) === dayOf(submitted);
 }
 
-function keepStoredStartDateOnSameDay<T extends { startDate?: Date }>(
+function isUnchangedDay(stored: Date | null, submitted: Date | null | undefined): boolean {
+  return stored !== null && submitted != null && isSameSubmittedDay(stored, submitted);
+}
+
+function keepStoredDatesOnSameDay<T extends { startDate?: Date; endDate?: Date | null }>(
   update: T,
   existing: Reminder
 ): T {
-  if (!update.startDate || !isSameSubmittedDay(existing.startDate, update.startDate)) {
-    return update;
-  }
-  const { startDate: _sameDay, ...rest } = update;
-  return rest as T;
+  const { startDate, endDate, ...rest } = update;
+  return {
+    ...rest,
+    ...(startDate !== undefined && !isUnchangedDay(existing.startDate, startDate)
+      ? { startDate }
+      : {}),
+    ...(endDate !== undefined && !isUnchangedDay(existing.endDate, endDate) ? { endDate } : {}),
+  } as T;
 }
 
 type MergedSchedule = ReminderSchedule & { triggerMode: string; endDate?: Date | null };
@@ -322,7 +329,7 @@ routes.put(
     const existing = await reminderRepository.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
     const { ownerId } = await requireExistingReminderWrite(existing, user.id);
-    const partialUpdate = keepStoredStartDateOnSameDay(c.req.valid('json'), existing.reminder);
+    const partialUpdate = keepStoredDatesOnSameDay(c.req.valid('json'), existing.reminder);
 
     if (partialUpdate.vehicleIds) {
       const { ownerId: newOwnerId } = await requireReminderVehiclesWrite(

@@ -25,9 +25,17 @@ describe('buildReminderPayload', () => {
 		});
 	});
 
-	test('start date round-trips as the same calendar day regardless of timezone', () => {
-		const payload = buildReminderPayload(validDraft({ startDate: '2026-03-01' }));
-		expect(toDateInputValue(payload.startDate ?? '')).toBe('2026-03-01');
+	test('sends start and end dates as plain calendar dates', () => {
+		const payload = buildReminderPayload(
+			validDraft({ startDate: '2026-03-01', endDate: '2026-12-31' })
+		);
+		expect(payload.startDate).toBe('2026-03-01');
+		expect(payload.endDate).toBe('2026-12-31');
+	});
+
+	test('falls back to today when the start date is blank', () => {
+		const payload = buildReminderPayload(validDraft({ startDate: '' }));
+		expect(payload.startDate).toBe(toDateInputValue(new Date()));
 	});
 
 	test('a custom frequency sends the parsed interval and unit; other frequencies send nulls', () => {

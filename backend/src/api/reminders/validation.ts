@@ -2,12 +2,23 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES } from '../../db/types';
 import { moneyDollarsToCents } from '../../utils/money';
+import { buildCalendarDate } from '../expenses/local-date';
 import {
   FUEL_SPLIT_MESSAGE,
   splitConfigSchema,
   splitConfigStructuralSchema,
   splitConfigVehicleIds,
 } from '../expenses/validation';
+
+const PLAIN_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+const reminderDateSchema = z.preprocess((value) => {
+  const parts = typeof value === 'string' ? PLAIN_DATE.exec(value) : null;
+  if (!parts) return value;
+  return (
+    buildCalendarDate(Number(parts[1]), Number(parts[2]), Number(parts[3])) ?? new Date(Number.NaN)
+  );
+}, z.coerce.date());
 
 const reminderTypeSchema = z.enum(['expense', 'notification']);
 const frequencySchema = z.enum(['weekly', 'monthly', 'yearly', 'custom']);
@@ -32,8 +43,8 @@ const reminderBaseSchema = z.object({
     .max(CONFIG.validation.reminder.maxIntervalMileage)
     .nullish(),
   lastServiceOdometer: z.number().int().min(0).nullish(),
-  startDate: z.coerce.date(),
-  endDate: z.coerce.date().nullish(),
+  startDate: reminderDateSchema,
+  endDate: reminderDateSchema.nullish(),
   // Zod strips unlisted keys: isActive must stay listed or the pause toggle silently no-ops.
   isActive: z.boolean().optional(),
   vehicleIds: z.array(z.string().min(1)).min(1),
