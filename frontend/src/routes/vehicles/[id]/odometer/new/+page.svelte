@@ -8,6 +8,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import { Textarea } from '#lib/components/ui/textarea/index.ts';
 	import PendingPhotoPreview from '#lib/components/expenses/form/PendingPhotoPreview.svelte';
 	import { odometerApi } from '#lib/services/odometer-api.ts';
@@ -152,19 +153,24 @@
 		}}
 	>
 		<div class="space-y-2">
-			<Label for="odometer">Odometer Reading</Label>
+			<Label for="odometer">Odometer Reading *</Label>
 			<Input
 				id="odometer"
 				type="number"
 				placeholder="e.g. 45000"
 				bind:value={odometer}
 				class={fieldErrors.odometer ? 'border-destructive' : ''}
+				aria-invalid={!!fieldErrors.odometer}
+				aria-describedby={fieldErrors.odometer ? 'odometer-error' : undefined}
 			/>
 			{#if fieldErrors.odometer}
-				<p class="text-sm text-destructive">{fieldErrors.odometer}</p>
+				<FormFieldError id="odometer-error">{fieldErrors.odometer}</FormFieldError>
 			{/if}
 			{#if showWarning}
-				<div class="flex items-center gap-2 rounded-md bg-chart-5/10 p-3 text-sm text-chart-5">
+				<div
+					role="status"
+					class="flex items-center gap-2 rounded-md bg-warning/10 p-3 text-sm text-warning"
+				>
 					<TriangleAlert class="h-4 w-4 shrink-0" />
 					<span>
 						This reading ({Number(odometer).toLocaleString()}) is lower than the latest recorded
@@ -175,15 +181,17 @@
 		</div>
 
 		<div class="space-y-2">
-			<Label for="date">Date</Label>
+			<Label for="date">Date *</Label>
 			<Input
 				id="date"
 				type="date"
 				bind:value={date}
 				class={fieldErrors.date ? 'border-destructive' : ''}
+				aria-invalid={!!fieldErrors.date}
+				aria-describedby={fieldErrors.date ? 'date-error' : undefined}
 			/>
 			{#if fieldErrors.date}
-				<p class="text-sm text-destructive">{fieldErrors.date}</p>
+				<FormFieldError id="date-error">{fieldErrors.date}</FormFieldError>
 			{/if}
 		</div>
 
@@ -195,9 +203,11 @@
 				bind:value={note}
 				rows={3}
 				class={fieldErrors.note ? 'border-destructive' : ''}
+				aria-invalid={!!fieldErrors.note}
+				aria-describedby={fieldErrors.note ? 'note-error' : undefined}
 			/>
 			{#if fieldErrors.note}
-				<p class="text-sm text-destructive">{fieldErrors.note}</p>
+				<FormFieldError id="note-error">{fieldErrors.note}</FormFieldError>
 			{/if}
 			<p class="text-xs text-muted-foreground">{note.length}/500</p>
 		</div>
