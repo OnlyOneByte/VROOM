@@ -493,7 +493,7 @@ describe('GET /api/v1/trips/summary (mileage rollup)', () => {
     expect(body.data.milesByPurpose.personal).toBe(30);
   });
 
-  test('cross-fleet summary sums raw deltas across mixed-unit vehicles', async () => {
+  async function seedMixedUnitBusinessTrips(): Promise<void> {
     const miVehicle = await seedVehicle(ctx, {
       make: 'Toyota',
       model: 'Camry',
@@ -520,12 +520,34 @@ describe('GET /api/v1/trips/summary (mileage rollup)', () => {
       '/api/v1/trips',
       VALID(kmVehicle, { startOdometer: 5000, endOdometer: 5200, purpose: 'business' })
     );
+  }
+
+  test('cross-fleet summary converts each vehicle’s distance to the user’s miles', async () => {
+    await seedMixedUnitBusinessTrips();
+
+    const res = await ctx.authed('GET', '/api/v1/trips/summary?rate=0.5');
+    const body =
+      await json<
+        DataEnvelope<{ totalMiles: number; businessMiles: number; businessMileageValue: number }>
+      >(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.totalMiles).toBeCloseTo(100 + 200 / 1.609344, 6);
+    expect(body.data.businessMiles).toBeCloseTo(100 + 200 / 1.609344, 6);
+    expect(body.data.businessMileageValue).toBeCloseTo((100 + 200 / 1.609344) * 0.5, 6);
+  });
+
+  test('cross-fleet summary converts each vehicle’s distance to the user’s kilometres', async () => {
+    const settingsRes = await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' },
+    });
+    expect(settingsRes.status).toBe(200);
+    await seedMixedUnitBusinessTrips();
 
     const res = await ctx.authed('GET', '/api/v1/trips/summary');
-    const body = await json<DataEnvelope<{ totalMiles: number; businessMiles: number }>>(res);
+    const body = await json<DataEnvelope<{ totalMiles: number; averageTripMiles: number }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
-    expect(body.data.totalMiles).toBe(300);
-    expect(body.data.businessMiles).toBe(300);
+    expect(body.data.totalMiles).toBeCloseTo(100 * 1.609344 + 200, 6);
+    expect(body.data.averageTripMiles).toBeCloseTo((100 * 1.609344 + 200) / 2, 6);
   });
 
   test('summary scoped to a vehicle counts only that vehicle’s trips', async () => {

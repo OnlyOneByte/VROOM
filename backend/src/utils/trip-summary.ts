@@ -18,12 +18,20 @@ function zeroMilesByPurpose(): MilesByPurpose {
   return Object.fromEntries(TRIP_PURPOSES.map((p) => [p, 0])) as MilesByPurpose;
 }
 
-export function buildTripSummary(trips: Trip[], rate = 0): TripSummary {
+export type TripDistanceConverter = (distance: number, vehicleId: string) => number;
+
+const sameUnit: TripDistanceConverter = (distance) => distance;
+
+export function buildTripSummary(
+  trips: Trip[],
+  rate = 0,
+  toUserDistance: TripDistanceConverter = sameUnit
+): TripSummary {
   const milesByPurpose = zeroMilesByPurpose();
   let totalMiles = 0;
 
   for (const trip of trips) {
-    const miles = tripDistance(trip);
+    const miles = toUserDistance(tripDistance(trip), trip.vehicleId);
     totalMiles += miles;
     const purpose: TripPurpose = (TRIP_PURPOSES as readonly string[]).includes(trip.purpose)
       ? (trip.purpose as TripPurpose)
