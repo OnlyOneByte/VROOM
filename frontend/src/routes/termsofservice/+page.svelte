@@ -4,7 +4,7 @@
 </script>
 
 <svelte:head>
-	<title>Terms of Service — VROOM</title>
+	<title>Terms of Service - VROOM Car Tracker</title>
 	<meta
 		name="description"
 		content="VROOM terms of service — conditions for using the application."
