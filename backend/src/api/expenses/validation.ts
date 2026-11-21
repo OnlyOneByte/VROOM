@@ -37,12 +37,11 @@ function allocationVehiclesAreUnique(allocations: { vehicleId: string }[]): bool
   return hasUniqueVehicleIds(allocations.map((a) => a.vehicleId));
 }
 
+const evenSplitVehicleIdsSchema = z.array(z.string().min(1)).min(1);
+
 const evenSplitSchema = z.object({
   method: z.literal('even'),
-  vehicleIds: z
-    .array(z.string().min(1))
-    .min(1)
-    .refine(hasUniqueVehicleIds, DUPLICATE_VEHICLE_MESSAGE),
+  vehicleIds: evenSplitVehicleIdsSchema.refine(hasUniqueVehicleIds, DUPLICATE_VEHICLE_MESSAGE),
 });
 
 const absoluteAllocationSchema = z.object({
@@ -84,15 +83,15 @@ const absoluteAllocationStructuralSchema = z.object({
 });
 
 export const splitConfigStructuralSchema = z.discriminatedUnion('method', [
-  evenSplitSchema,
+  z.object({ method: z.literal('even'), vehicleIds: evenSplitVehicleIdsSchema }),
   z.object({
     method: z.literal('absolute'),
-    allocations: z
-      .array(absoluteAllocationStructuralSchema)
-      .min(1)
-      .refine(allocationVehiclesAreUnique, DUPLICATE_VEHICLE_MESSAGE),
+    allocations: z.array(absoluteAllocationStructuralSchema).min(1),
   }),
-  percentageSplitSchema,
+  z.object({
+    method: z.literal('percentage'),
+    allocations: z.array(percentageAllocationSchema).min(1),
+  }),
 ]);
 
 export type { SplitConfig };

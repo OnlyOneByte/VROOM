@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../test-helpers/http-client';
 import { seedVehicle } from '../../test-helpers/seed';
 import { DUPLICATE_VEHICLE_MESSAGE } from '../validation';
 
@@ -88,4 +93,32 @@ describe('a vehicle listed twice', () => {
       expect(saved.n).toBe(0);
     });
   }
+});
+
+describe('a stored reminder split that already lists a vehicle twice', () => {
+  test('can still be paused and renamed', async () => {
+    const other = await seedVehicle(ctx, { make: 'Toyota', model: 'Corolla', year: 2022 });
+    const created = await ctx.authed('POST', '/api/v1/reminders', {
+      name: 'Shared cost',
+      type: 'expense',
+      frequency: 'monthly',
+      startDate: '2024-01-01T00:00:00.000Z',
+      vehicleIds: [vehicleId, other],
+      expenseCategory: 'maintenance',
+      expenseAmount: 100,
+      expenseSplitConfig: { method: 'even', vehicleIds: [vehicleId, other] },
+    });
+    const body = await json<DataEnvelope<{ reminder: { id: string } }>>(created);
+    expect(created.status, JSON.stringify(body)).toBe(201);
+    const id = body.data.reminder.id;
+    ctx.sqlite
+      .query('UPDATE reminders SET expense_split_config = ? WHERE id = ?')
+      .run(JSON.stringify({ method: 'even', vehicleIds: [vehicleId, other, other] }), id);
+
+    const pause = await ctx.authed('PUT', `/api/v1/reminders/${id}`, { isActive: false });
+    const rename = await ctx.authed('PUT', `/api/v1/reminders/${id}`, { name: 'Old split' });
+
+    expect(pause.status, await pause.text()).toBe(200);
+    expect(rename.status, await rename.text()).toBe(200);
+  });
 });
