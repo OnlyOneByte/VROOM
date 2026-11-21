@@ -70,7 +70,7 @@
 		<Card.Content class="p-4">
 			<div class="mb-2 flex items-center gap-2 text-destructive">
 				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Could not load your invitations</p>
+				<p class="font-medium">Couldn't load your invitations</p>
 			</div>
 			<p class="mb-3 text-sm text-muted-foreground">{loadError}</p>
 			<Button onclick={load}>Retry</Button>

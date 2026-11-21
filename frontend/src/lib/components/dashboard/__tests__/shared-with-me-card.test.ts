@@ -102,7 +102,7 @@ describe('SharedWithMeCard listing', () => {
 		listReceived.mockRejectedValueOnce(new ApiError('Server unavailable', 503));
 		await mount();
 
-		expect(screen.getByText('Could not load your invitations')).toBeInTheDocument();
+		expect(screen.getByText("Couldn't load your invitations")).toBeInTheDocument();
 		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText('Server unavailable')).toBeNull();
 
@@ -110,7 +110,7 @@ describe('SharedWithMeCard listing', () => {
 		await settle();
 
 		expect(listReceived).toHaveBeenCalledTimes(2);
-		expect(screen.queryByText('Could not load your invitations')).toBeNull();
+		expect(screen.queryByText("Couldn't load your invitations")).toBeNull();
 		expect(screen.getByText('Family Van')).toBeInTheDocument();
 	});
 
