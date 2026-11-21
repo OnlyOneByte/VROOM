@@ -38,7 +38,7 @@ const HARDCODED_CURRENCY_TEXT = />\s*[$€£]\s*</;
 
 ratchet({
 	name: 'no hardcoded currency symbols as amount prefixes',
-	tolerated: ['lib/components/financing/PaymentPlannerDialog.svelte'],
+	tolerated: [],
 	guidance:
 		'Hardcoded currency symbol text node(s). Render getCurrencySymbol() instead so EUR/GBP ' +
 		'users see the right unit:',
