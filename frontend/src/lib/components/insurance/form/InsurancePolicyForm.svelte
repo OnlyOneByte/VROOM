@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { goto } from '$app/navigation';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { resolve } from '$app/paths';
@@ -8,7 +8,7 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { routes } from '#lib/routes.ts';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
-	import { ArrowLeft, Shield, Trash2, X, Check, LoaderCircle } from '@lucide/svelte';
+	import { ArrowLeft, CircleAlert, Shield, Trash2, X, Check, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -94,37 +94,40 @@
 	}
 	let errors = $state<FormErrors>({});
 
-	onMount(async () => {
+	let loadError = $state<string | null>(null);
+	let pageTitle = $derived(isEditMode ? 'Edit Policy' : 'New Insurance Policy');
+
+	onMount(loadData);
+
+	async function loadData() {
+		isLoading = true;
+		loadError = null;
 		try {
 			vehicles = await vehicleApi.getVehicles();
 			if (isEditMode && policyId) {
 				await loadPolicy();
-			} else {
-				if (preselectedVehicleId) {
-					selectedVehicleIds = [preselectedVehicleId];
-				}
+			} else if (preselectedVehicleId) {
+				selectedVehicleIds = [preselectedVehicleId];
 			}
 		} catch (err) {
 			if (import.meta.env.DEV) console.error('Failed to load data:', err);
-			appStore.showError(`Couldn't load your vehicles. ${userFacingErrorMessage(err)}`);
-			gotoDynamic(returnTo);
+			if (isEditMode && err instanceof ApiError && err.statusCode === 404) {
+				appStore.showError('That policy no longer exists.');
+				gotoDynamic(returnTo);
+				return;
+			}
+			loadError = userFacingErrorMessage(err);
 		} finally {
 			isLoading = false;
 		}
-	});
+	}
 
 	async function loadPolicy() {
-		try {
-			policy = await insuranceApi.getPolicy(policyId!);
-			company = policy.company;
-			selectedVehicleIds = [...policy.vehicleIds];
-			notes = policy.notes ?? '';
-			isActive = policy.isActive;
-		} catch (err) {
-			if (import.meta.env.DEV) console.error('Failed to load policy:', err);
-			appStore.showError(`Couldn't load the policy. ${userFacingErrorMessage(err)}`);
-			gotoDynamic(returnTo);
-		}
+		policy = await insuranceApi.getPolicy(policyId!);
+		company = policy.company;
+		selectedVehicleIds = [...policy.vehicleIds];
+		notes = policy.notes ?? '';
+		isActive = policy.isActive;
 	}
 
 	function toggleVehicle(id: string) {
@@ -259,10 +262,36 @@
 		<div class="flex items-center justify-center py-12">
 			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
 		</div>
+	{:else if loadError}
+		<div class="space-y-6">
+			<PageHeader title={pageTitle}>
+				{#snippet back()}
+					<Button
+						variant="ghost"
+						size="icon-lg"
+						class="shrink-0"
+						aria-label="Go back"
+						onclick={handleBack}
+					>
+						<ArrowLeft class="size-5" />
+					</Button>
+				{/snippet}
+			</PageHeader>
+			<div class="rounded-lg border bg-card p-6">
+				<div class="mb-4 flex items-center gap-3 text-destructive">
+					<CircleAlert class="h-5 w-5" />
+					<p class="font-medium">
+						{isEditMode ? "Couldn't load this policy" : "Couldn't load your vehicles"}
+					</p>
+				</div>
+				<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
+				<Button size="lg" onclick={loadData}>Retry</Button>
+			</div>
+		</div>
 	{:else}
 		<div class="space-y-6">
 			<PageHeader
-				title={isEditMode ? 'Edit Policy' : 'New Insurance Policy'}
+				title={pageTitle}
 				description={isEditMode
 					? company || undefined
 					: 'Add a new insurance policy with an initial term'}
