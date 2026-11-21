@@ -64,10 +64,8 @@
 				<div class="flex justify-between text-xs sm:text-sm">
 					<span class="text-muted-foreground">
 						{leaseMetrics.mileageUsed.toLocaleString()}
-						<span class="text-muted-foreground/60">
-							/ {totalMileageAllowance.toLocaleString()}
-							{distLabel}
-						</span>
+						/ {totalMileageAllowance.toLocaleString()}
+						{distLabel}
 					</span>
 					<span class="font-medium">{Math.round(mileageUsagePercentage)}%</span>
 				</div>
@@ -86,9 +84,8 @@
 					Odometer: <span class="font-medium text-foreground"
 						>{currentOdometer.toLocaleString()}</span
 					>
-					<span class="text-muted-foreground/60"
-						>/ {limitOdometer.toLocaleString()} {distLabel}</span
-					>
+					/ {limitOdometer.toLocaleString()}
+					{distLabel}
 				</span>
 				<span class="font-medium text-foreground">
 					{leaseMetrics.mileageRemaining.toLocaleString()} left

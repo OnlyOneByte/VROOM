@@ -80,9 +80,10 @@ describe('BackupOrchestrator.execute() real skip paths', () => {
     expect((await first).status).toBeUndefined();
   });
 
-  test('a mutex held past the 5-minute TTL does not block a new run', async () => {
+  test('a mutex held past its TTL (twice the backup timeout) does not block a new run', async () => {
     const { backupOrchestrator } = await import('../backup-orchestrator');
-    const TTL_MS = 5 * 60 * 1000;
+    const { OPERATION_TIMEOUTS } = await import('../../../utils/timeout');
+    const TTL_MS = 2 * OPERATION_TIMEOUTS.BACKUP;
     const clock = spyOn(Date, 'now').mockReturnValue(1_000_000);
     try {
       const stuck = backupOrchestrator.execute(ctx.user.id, 'Test User', true);
