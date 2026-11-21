@@ -71,7 +71,17 @@ export default defineConfig({
 		coverage: {
 			provider: 'v8',
 			reporter: ['text', 'json-summary'],
-			reportsDirectory: './coverage'
+			reportsDirectory: './coverage',
+			include: ['src/**/*.{ts,svelte}'],
+			exclude: [
+				'src/**/__tests__/**',
+				'src/**/*.{test,spec}.ts',
+				'src/**/*.d.ts',
+				'src/test-setup.ts',
+				'src/test-env-mock.ts',
+				'src/test-utils/**',
+				'src/lib/components/ui/**'
+			]
 		},
 		alias: {
 			'$app/env/public': new URL('./src/test-env-mock.ts', import.meta.url).pathname
