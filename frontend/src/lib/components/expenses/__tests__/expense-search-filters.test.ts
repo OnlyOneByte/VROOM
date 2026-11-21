@@ -219,24 +219,17 @@ describe('ExpenseSearchFilters: tag picking', () => {
 		expect(tagInput().placeholder).toBe('Search and add tags...');
 	});
 
-	test('the any/all switch appears only with two or more tags and toggles', async () => {
+	test('offers no Any/All switch and says every selected tag must match', async () => {
 		renderFilters();
 
 		await fireEvent.focus(tagInput());
 		await fireEvent.click(screen.getByRole('button', { name: 'tolls' }));
-		expect(screen.queryByRole('radiogroup', { name: 'Tag match mode' })).toBeNull();
+		expect(screen.queryByText('Matching all selected tags')).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'parking' }));
-		const any = screen.getByRole('radio', { name: 'Any' });
-		const all = screen.getByRole('radio', { name: 'All' });
-		expect(any).toHaveAttribute('aria-checked', 'true');
-
-		await fireEvent.click(all);
-		expect(all).toHaveAttribute('aria-checked', 'true');
-		expect(any).toHaveAttribute('aria-checked', 'false');
-
-		await fireEvent.click(any);
-		expect(any).toHaveAttribute('aria-checked', 'true');
+		expect(screen.queryByRole('radiogroup')).toBeNull();
+		expect(screen.queryByRole('radio', { name: 'Any' })).toBeNull();
+		expect(screen.getByText('Matching all selected tags')).toBeInTheDocument();
 	});
 });
 
