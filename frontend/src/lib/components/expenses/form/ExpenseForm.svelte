@@ -257,7 +257,7 @@
 						<Info class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
 						<p class="text-sm text-foreground">
 							You can change the vehicles and amounts of a split here. To change its date, category,
-							mileage or notes, delete the split and add it again.
+							mileage, description, location or tags, delete the split and add it again.
 						</p>
 					</div>
 				{/if}
