@@ -85,6 +85,15 @@ describe('FuelStatsTab with nothing in the window', () => {
 		expect(screen.getByRole('button', { name: 'Log a Fill-up' })).toBeTruthy();
 	});
 
+	test('shows neither empty state until the history check answers', async () => {
+		getAllExpenses.mockReturnValue(new Promise(() => {}));
+		render(FuelStatsTab, { fuelStats: stats({}), fuelAdvanced: advanced });
+		await vi.waitFor(() => expect(getAllExpenses).toHaveBeenCalled());
+		expect(screen.queryByText('No fuel data yet')).toBeNull();
+		expect(screen.queryByText('No fill-ups in the last 12 months')).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Log a Fill-up' })).toBeNull();
+	});
+
 	test('when the history check fails, falls back to the 12-month wording, which is always true', async () => {
 		getAllExpenses.mockRejectedValue(new ApiError('boom', 500));
 		render(FuelStatsTab, { fuelStats: stats({}), fuelAdvanced: advanced });
