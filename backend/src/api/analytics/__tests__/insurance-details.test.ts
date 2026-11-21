@@ -359,11 +359,29 @@ describe('getInsurance — monthlyPremiumTrend bucketing', () => {
     const byMonth = new Map(result.monthlyPremiumTrend.map((p) => [p.month, p.premiums]));
     expect(byMonth.get('2024-01')).toBeCloseTo(100, 2);
     expect(byMonth.get('2024-02')).toBeCloseTo(130, 2);
-    expect(byMonth.get('2024-03')).toBeCloseTo(30, 2);
+    expect(result.monthlyPremiumTrend.map((p) => p.month)).toEqual(['2024-01', '2024-02']);
+  });
+
+  test('a six-month term ending on its anniversary day charges six months, not seven', async () => {
+    policy('p1', 'GEICO');
+    termSeconds({
+      id: 't1',
+      policyId: 'p1',
+      startMs: Date.UTC(2024, 0, 1, 12),
+      endMs: Date.UTC(2024, 6, 1, 12),
+      totalCost: 600,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+
+    const result = await repo.getInsurance(USER);
+    expect(result.summary.totalMonthlyPremiums).toBe(100);
     expect(result.monthlyPremiumTrend.map((p) => p.month)).toEqual([
       '2024-01',
       '2024-02',
       '2024-03',
+      '2024-04',
+      '2024-05',
+      '2024-06',
     ]);
   });
 

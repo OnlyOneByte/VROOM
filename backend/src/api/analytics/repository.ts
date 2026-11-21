@@ -55,7 +55,6 @@ import {
   type GeneralExpenseRow,
   gasEfficiencyPoint,
   isFillup,
-  monthKeysInRange,
   normalizeDate,
   type RadarUnitConverters,
   SEASON_MAP,
@@ -63,7 +62,7 @@ import {
   sortByVehicleThenDate,
   toMonthKey,
 } from '../../utils/analytics-charts';
-import { maxOf, minOf } from '../../utils/calculations';
+import { maxOf, minOf, termBillingMonths } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { convertDistance, convertEfficiency, convertVolume } from '../../utils/unit-conversions';
 import { FinancingRepository } from '../financing/repository';
@@ -1080,8 +1079,9 @@ export class AnalyticsRepository {
   ): void {
     if (!term.startDate || !term.endDate) return;
     const start = toDate(term.startDate);
-    const end = toDate(term.endDate);
-    for (const key of monthKeysInRange(start, end)) {
+    const months = termBillingMonths(start, toDate(term.endDate));
+    for (let i = 0; i < months; i++) {
+      const key = toMonthKey(new Date(start.getFullYear(), start.getMonth() + i, 1));
       monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + monthlyPremium);
     }
   }

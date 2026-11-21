@@ -6,11 +6,8 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
-import {
-  effectiveTermCost,
-  recalculateOvercountedMonthlyPremiums,
-  termBillingMonths,
-} from '../hooks';
+import { termBillingMonths } from '../../../utils/calculations';
+import { effectiveTermCost, recalculateOvercountedMonthlyPremiums } from '../hooks';
 
 let ctx: TestApp;
 

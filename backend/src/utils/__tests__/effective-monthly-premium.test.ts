@@ -35,7 +35,7 @@ describe('effectiveMonthlyPremium', () => {
     ).toBe(200);
   });
 
-  test('totalCost amortization is day-1 anchored — a day-31 start does not skip a month', () => {
+  test('a day-31 start counts the billing periods it starts, clamped to short months', () => {
     expect(
       effectiveMonthlyPremium({
         startDate: new Date('2024-01-31'),
@@ -43,7 +43,18 @@ describe('effectiveMonthlyPremium', () => {
         monthlyCost: null,
         totalCost: 300,
       })
-    ).toBe(100);
+    ).toBe(150);
+  });
+
+  test('a six-month term ending on its anniversary day amortizes over six months, not seven', () => {
+    expect(
+      effectiveMonthlyPremium({
+        startDate: new Date('2024-01-01'),
+        endDate: new Date('2024-07-01'),
+        monthlyCost: null,
+        totalCost: 1200,
+      })
+    ).toBe(200);
   });
 
   test('single-month term: totalCost maps to that one month', () => {
