@@ -114,7 +114,10 @@
 			await load();
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to run reminders:', error);
-			appStore.addNotification({ type: 'error', message: 'Failed to run due reminders' });
+			appStore.addNotification({
+				type: 'error',
+				message: 'Failed to run due reminders. Please try again.'
+			});
 		} finally {
 			isTriggering = false;
 		}
@@ -126,7 +129,10 @@
 			await reminderApi.markNotificationRead(id);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to mark notification read:', error);
-			appStore.addNotification({ type: 'error', message: 'Failed to mark as read' });
+			appStore.addNotification({
+				type: 'error',
+				message: 'Failed to mark as read. Please try again.'
+			});
 			await load();
 		}
 	}
@@ -139,7 +145,10 @@
 			await Promise.all(unread.map(n => reminderApi.markNotificationRead(n.id)));
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to mark all read:', error);
-			appStore.addNotification({ type: 'error', message: 'Failed to mark all as read' });
+			appStore.addNotification({
+				type: 'error',
+				message: 'Failed to mark all as read. Please try again.'
+			});
 			await load();
 		}
 	}
@@ -150,7 +159,10 @@
 			await load();
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to toggle reminder:', error);
-			appStore.addNotification({ type: 'error', message: 'Failed to update reminder' });
+			appStore.addNotification({
+				type: 'error',
+				message: 'Failed to update reminder. Please try again.'
+			});
 		}
 	}
 
@@ -163,7 +175,10 @@
 			await load();
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to mark serviced:', error);
-			appStore.addNotification({ type: 'error', message: 'Failed to mark serviced' });
+			appStore.addNotification({
+				type: 'error',
+				message: 'Failed to mark serviced. Please try again.'
+			});
 		} finally {
 			servicingId = null;
 		}
@@ -185,7 +200,10 @@
 			await load();
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to delete reminder:', error);
-			appStore.addNotification({ type: 'error', message: 'Failed to delete reminder' });
+			appStore.addNotification({
+				type: 'error',
+				message: 'Failed to delete reminder. Please try again.'
+			});
 			throw error;
 		}
 	}
@@ -224,7 +242,7 @@
 		<div class="rounded-lg border bg-card p-6">
 			<div class="mb-4 flex items-center gap-3 text-destructive">
 				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Failed to load reminders</p>
+				<p class="font-medium">Failed to Load Reminders</p>
 			</div>
 			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
 			<Button onclick={load}>Retry</Button>
