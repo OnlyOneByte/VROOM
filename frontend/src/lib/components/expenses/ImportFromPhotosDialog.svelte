@@ -208,7 +208,7 @@
 
 							<div class="grid flex-1 grid-cols-2 gap-2">
 								<div class="space-y-1">
-									<Label class="text-[11px] text-muted-foreground">Amount</Label>
+									<Label class="text-xs text-muted-foreground">Amount</Label>
 									<Input
 										type="number"
 										step="0.01"
@@ -219,13 +219,12 @@
 									/>
 								</div>
 								<div class="space-y-1">
-									<Label class="text-[11px] text-muted-foreground">Date</Label>
+									<Label class="text-xs text-muted-foreground">Date</Label>
 									<Input type="date" bind:value={row.date} disabled={!row.include} />
 								</div>
 								<div class="space-y-1">
-									<Label
-										for={`photo-${row.photoId}-category`}
-										class="text-[11px] text-muted-foreground">Category</Label
+									<Label for={`photo-${row.photoId}-category`} class="text-xs text-muted-foreground"
+										>Category</Label
 									>
 									<Select.Root
 										type="single"
@@ -248,9 +247,8 @@
 									</Select.Root>
 								</div>
 								<div class="space-y-1">
-									<Label
-										for={`photo-${row.photoId}-vehicle`}
-										class="text-[11px] text-muted-foreground">Vehicle</Label
+									<Label for={`photo-${row.photoId}-vehicle`} class="text-xs text-muted-foreground"
+										>Vehicle</Label
 									>
 									<Select.Root
 										type="single"

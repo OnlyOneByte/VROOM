@@ -123,8 +123,33 @@ describe('new odometer reading validation', () => {
 
 		await save();
 
+		expect(screen.getByText('Odometer reading is required')).toBeInTheDocument();
 		expect(odometerInput()).toHaveClass('border-destructive');
 		expect(create).not.toHaveBeenCalled();
+	});
+
+	test('a reading typed and then cleared is required instead of being saved as 0', async () => {
+		mount();
+		await settle();
+
+		await fireEvent.input(odometerInput(), { target: { value: '100' } });
+		await fireEvent.input(odometerInput(), { target: { value: '' } });
+		await save();
+
+		expect(screen.getByText('Odometer reading is required')).toBeInTheDocument();
+		expect(create).not.toHaveBeenCalled();
+	});
+
+	test('a cleared reading does not warn that it is lower than the latest', async () => {
+		getEntries.mockResolvedValue(latest([entry({ odometer: 50000 })]));
+		mount();
+		await settle();
+
+		await fireEvent.input(odometerInput(), { target: { value: '49000' } });
+		expect(screen.queryByText(/is lower than the latest recorded/)).not.toBeNull();
+
+		await fireEvent.input(odometerInput(), { target: { value: '' } });
+		expect(screen.queryByText(/is lower than the latest recorded/)).toBeNull();
 	});
 
 	test('a negative reading is rejected', async () => {

@@ -14,7 +14,7 @@
 	import { AppLineChart } from '#lib/components/charts/index.ts';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
-	import { Inbox, DollarSign, TrendingUp, Car, Plus } from '@lucide/svelte';
+	import { Inbox, DollarSign, TrendingUp, Car, Plus, ArrowLeft } from '@lucide/svelte';
 
 	const buttonVariants = [
 		'default',
@@ -81,6 +81,20 @@
 				{/each}
 				<Button disabled>disabled</Button>
 			</div>
+		</section>
+
+		<section class="space-y-3">
+			<h2 class="text-lg font-semibold">Page header with back</h2>
+			<p class="text-sm text-muted-foreground">
+				Detail and form pages pass a <code>back</code> snippet; the title stays the same size.
+			</p>
+			<PageHeader title="Edit Odometer Reading" description="2020 Toyota Camry">
+				{#snippet back()}
+					<Button variant="ghost" size="icon-lg" class="shrink-0" aria-label="Back">
+						<ArrowLeft class="size-5" />
+					</Button>
+				{/snippet}
+			</PageHeader>
 		</section>
 
 		<section class="space-y-3">

@@ -14,7 +14,8 @@
 		Download,
 		Upload,
 		Images,
-		Ellipsis
+		Ellipsis,
+		LoaderCircle
 	} from '@lucide/svelte';
 	import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 	import { removeOfflineExpense } from '#lib/utils/offline-storage.ts';
@@ -64,7 +65,6 @@
 	let endDate = $state<string | undefined>(undefined);
 
 	let selectedTags = $state<string[]>([]);
-	let tagMatchMode = $state<'any' | 'all'>('any');
 
 	let sortBy = $state<'date' | 'amount'>('date');
 	let sortDir = $state<'asc' | 'desc'>('desc');
@@ -250,7 +250,6 @@
 
 	function clearFilters() {
 		searchTerm = '';
-		tagMatchMode = 'any';
 		selectedVehicleId = undefined;
 		selectedTags = [];
 		startDate = undefined;
@@ -297,10 +296,6 @@
 	function handleTagsChange(tags: string[]) {
 		selectedTags = tags;
 		handleFilterChange();
-	}
-
-	function handleMatchModeChange(mode: 'any' | 'all') {
-		tagMatchMode = mode;
 	}
 
 	async function handleDeleteExpense(_deletedExpense: ExpenseWithVehicle) {
@@ -356,7 +351,7 @@
 				<p class="font-medium">Failed to load expenses</p>
 			</div>
 			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
-			<Button onclick={loadInitial}>Retry</Button>
+			<Button size="lg" onclick={loadInitial}>Retry</Button>
 		</div>
 	</div>
 {:else}
@@ -453,13 +448,7 @@
 					</div>
 				</div>
 
-				<ExpenseTagFilter
-					{allTags}
-					{selectedTags}
-					{tagMatchMode}
-					onTagsChange={handleTagsChange}
-					onMatchModeChange={handleMatchModeChange}
-				/>
+				<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={handleTagsChange} />
 
 				{#if searchTerm || selectedVehicleId || selectedTags.length > 0 || startDate || endDate || categoryFilter}
 					<div class="flex justify-end pt-2">
@@ -502,7 +491,14 @@
 							<p class="font-medium">Failed to load expenses</p>
 						</div>
 						<p class="mb-4 text-sm text-muted-foreground">{pageError.message}</p>
-						<Button onclick={retryPage} disabled={isLoadingPage}>Retry</Button>
+						<Button size="lg" onclick={retryPage} disabled={isLoadingPage}>
+							{#if isLoadingPage}
+								<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+								Retrying…
+							{:else}
+								Retry
+							{/if}
+						</Button>
 					</div>
 				{:else}
 					<ExpensesTable

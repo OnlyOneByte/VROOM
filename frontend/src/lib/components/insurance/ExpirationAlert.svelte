@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { getDaysRemaining } from '#lib/utils/insurance.ts';
 
 	interface Props {
 		latestTermEnd: string;
@@ -7,21 +8,10 @@
 
 	let { latestTermEnd }: Props = $props();
 
-	const DAY_MS = 24 * 60 * 60 * 1000;
-	const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 	const EXPIRING_SOON_DAYS = 30;
 	const URGENT_DAYS = 7;
 
-	function localDayNumber(date: Date): number {
-		return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS;
-	}
-
-	function calendarDaysUntil(value: string): number {
-		const end = DATE_ONLY.test(value) ? new Date(`${value}T00:00:00`) : new Date(value);
-		return localDayNumber(end) - localDayNumber(new Date());
-	}
-
-	let daysRemaining = $derived(calendarDaysUntil(latestTermEnd));
+	let daysRemaining = $derived(getDaysRemaining(latestTermEnd));
 	let isUrgent = $derived(daysRemaining <= URGENT_DAYS);
 </script>
 

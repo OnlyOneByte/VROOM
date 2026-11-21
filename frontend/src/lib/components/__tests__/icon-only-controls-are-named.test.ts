@@ -43,7 +43,7 @@ describe('the offline expense cards', () => {
 			).toBeTruthy();
 		}
 
-		expect(container.querySelector('button[aria-label="Delete pending expense"]')).not.toBeNull();
+		expect(container.querySelector('button[aria-label="Discard pending expense"]')).not.toBeNull();
 		expect(container.querySelector('button[aria-label="Discard this entry"]')).not.toBeNull();
 	});
 });

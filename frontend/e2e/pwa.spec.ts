@@ -141,6 +141,10 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 	'/': { anonymous: true, debt: [], ready: signInControl },
 	'/auth': { anonymous: true, debt: [], ready: signInControl },
 	'/dashboard': { debt: [], ready: pageHeading('Dashboard') },
+	'/expenses': {
+		debt: [],
+		ready: page => page.getByText('$45.50').filter({ visible: true }).first()
+	},
 	'/expenses/new': { debt: [], ready: pageHeading('Add Expense') },
 	'/vehicles/new': { debt: [], ready: pageHeading('Add New Vehicle') },
 	'/analytics': { debt: [], ready: pageHeading('Analytics Dashboard') },
@@ -203,7 +207,9 @@ test.describe('Accessibility (axe) — theme palettes', () => {
 	);
 
 	for (const mode of ['dark', 'light'] as const) {
-		for (const themeId of NON_DEFAULT_THEMES) {
+		for (const themeId of mode === 'dark'
+			? [DEFAULT_THEME_ID, ...NON_DEFAULT_THEMES]
+			: NON_DEFAULT_THEMES) {
 			test(`the ${themeId} theme in ${mode} mode has no axe violations`, async ({
 				page,
 				context
@@ -225,7 +231,11 @@ test.describe('Accessibility (axe) — theme palettes', () => {
 
 				await page.goto('/dashboard');
 				await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-				await expect(page.locator('html')).toHaveAttribute('data-theme', themeId);
+				if (themeId === DEFAULT_THEME_ID) {
+					await expect(page.locator('html')).not.toHaveAttribute('data-theme');
+				} else {
+					await expect(page.locator('html')).toHaveAttribute('data-theme', themeId);
+				}
 				if (mode === 'dark') {
 					await expect(page.locator('html')).toHaveClass(/dark/);
 				} else {

@@ -94,6 +94,9 @@ export async function fetchLastSyncTime(): Promise<void> {
 }
 
 const AMOUNT_EPSILON = 0.005;
+const AUTO_SYNC_DELAY_MS = 2000;
+const AUTO_SYNC_RETRY_BASE_MS = 30_000;
+const AUTO_SYNC_RETRY_MAX_MS = 15 * 60_000;
 
 function toEpochSeconds(date: string): number {
 	return Math.floor(new Date(date).getTime() / 1000);
@@ -120,12 +123,19 @@ function serverCopyDiffers(local: OfflineExpense, server: BackendExpenseResponse
 	);
 }
 
+function retryableExpenses(): OfflineExpense[] {
+	const conflicted = new Set(syncConflicts.current.map(conflict => conflict.localExpense.id));
+	return getPendingExpenses().filter(expense => !conflicted.has(expense.id));
+}
+
 class SyncManager {
 	private retryCount = new Map<string, number>();
 	private syncInProgress = false;
 	private autoSyncSetup = false;
+	private autoSyncTimer: ReturnType<typeof setTimeout> | null = null;
+	private autoSyncAttempt = 0;
 
-	async syncAll(): Promise<SyncResult> {
+	async syncAll(options: { skipConflicted?: boolean } = {}): Promise<SyncResult> {
 		if (this.syncInProgress) {
 			throw new Error('Sync already in progress');
 		}
@@ -138,7 +148,7 @@ class SyncManager {
 		syncState.current = 'syncing';
 
 		try {
-			const pendingExpenses = getPendingExpenses();
+			const pendingExpenses = options.skipConflicted ? retryableExpenses() : getPendingExpenses();
 			const result = await this.syncExpenses(pendingExpenses);
 
 			clearSyncedExpenses();
@@ -162,6 +172,7 @@ class SyncManager {
 			return result;
 		} finally {
 			this.syncInProgress = false;
+			this.continueAutoSync();
 		}
 	}
 
@@ -371,28 +382,63 @@ class SyncManager {
 
 		fetchLastSyncTime();
 
-		if (browser) {
-			if (onlineStatus.current && getPendingExpenses().length > 0) {
-				setTimeout(() => {
-					this.syncAll().catch(error => {
-						if (import.meta.env.DEV) console.error('Startup sync failed:', error);
-					});
-				}, 2000);
-			}
+		if (!browser) return;
 
-			window.addEventListener('online', () => {
-				if (!this.syncInProgress) {
-					fetchLastSyncTime();
-					const pendingExpenses = getPendingExpenses();
-					if (pendingExpenses.length > 0) {
-						setTimeout(() => {
-							this.syncAll().catch(error => {
-								if (import.meta.env.DEV) console.error('Auto-sync failed:', error);
-							});
-						}, 2000);
-					}
-				}
-			});
+		if (onlineStatus.current && getPendingExpenses().length > 0) this.restartAutoSync();
+
+		window.addEventListener('online', () => {
+			fetchLastSyncTime();
+			this.restartAutoSync();
+		});
+
+		document.addEventListener('visibilitychange', () => {
+			if (document.visibilityState === 'visible') this.restartAutoSync();
+		});
+	}
+
+	private restartAutoSync(): void {
+		this.autoSyncAttempt = 0;
+		this.scheduleAutoSync(AUTO_SYNC_DELAY_MS);
+	}
+
+	private scheduleAutoSync(delay: number): void {
+		if (this.autoSyncTimer) clearTimeout(this.autoSyncTimer);
+		this.autoSyncTimer = setTimeout(() => {
+			this.autoSyncTimer = null;
+			void this.runAutoSync();
+		}, delay);
+	}
+
+	requestAutoSync(): void {
+		this.continueAutoSync();
+	}
+
+	private continueAutoSync(): void {
+		if (!this.autoSyncSetup) return;
+		if (!onlineStatus.current || retryableExpenses().length === 0) {
+			this.autoSyncAttempt = 0;
+			return;
+		}
+		if (this.autoSyncTimer) return;
+		const delay = Math.min(
+			AUTO_SYNC_RETRY_BASE_MS * 2 ** this.autoSyncAttempt,
+			AUTO_SYNC_RETRY_MAX_MS
+		);
+		this.autoSyncAttempt++;
+		this.scheduleAutoSync(delay);
+	}
+
+	private async runAutoSync(): Promise<void> {
+		if (!onlineStatus.current || retryableExpenses().length === 0) return;
+		if (this.syncInProgress) {
+			this.scheduleAutoSync(AUTO_SYNC_DELAY_MS);
+			return;
+		}
+
+		try {
+			await this.syncAll({ skipConflicted: true });
+		} catch (error) {
+			if (import.meta.env.DEV) console.error('Auto-sync failed:', error);
 		}
 	}
 }

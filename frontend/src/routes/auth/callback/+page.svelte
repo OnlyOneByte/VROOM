@@ -7,6 +7,7 @@
 	import { routes } from '#lib/routes.ts';
 	import { LoaderCircle, Check, X } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import BrandMark from '#lib/components/common/BrandMark.svelte';
 
 	let status = $state('processing');
 	let error = $state('');
@@ -61,7 +62,7 @@
 <div class="min-h-screen flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
 	<div class="max-w-md w-full space-y-8">
 		<div class="text-center">
-			<div class="text-6xl mb-4">🚗</div>
+			<BrandMark class="h-14 w-14 mx-auto mb-4" />
 			<h2 class="text-3xl font-bold text-foreground mb-2">VROOM Car Tracker</h2>
 		</div>
 

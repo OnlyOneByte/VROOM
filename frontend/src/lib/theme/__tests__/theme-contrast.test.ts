@@ -121,11 +121,12 @@ const TINTED_TEXT_PAIRS: ReadonlyArray<readonly [ThemeTokenKey, ThemeTokenKey]> 
 	['primary', 'background'],
 	['primary', 'card'],
 	['warning', 'card'],
+	['warning', 'background'],
 	['chart-5', 'background'],
 	['chart-5', 'card']
 ];
 
-describe('every built-in light theme clears WCAG AA on text over its own /10 tint', () => {
+describe('every built-in theme clears WCAG AA on text over its own /10 tint', () => {
 	test('the tint is composited over its surface (non-vacuous)', () => {
 		expect(tintLuminance('oklch(0 0 0)', 'oklch(1 0 0)', 0)).toBeCloseTo(1, 5);
 		expect(tintLuminance('oklch(0 0 0)', 'oklch(1 0 0)', 0.1)).toBeCloseTo(0.787, 3);
@@ -135,13 +136,15 @@ describe('every built-in light theme clears WCAG AA on text over its own /10 tin
 	});
 
 	describe.each(Object.values(THEME_REGISTRY))('theme "$id"', theme => {
-		const tokens = theme.light;
-		test.each(TINTED_TEXT_PAIRS)('%s on its /10 tint over %s ≥ AA 4.5', (fg, surface) => {
-			const ratio = tintContrast(tokens[fg], tokens[surface]);
-			expect(
-				ratio,
-				`${theme.id}.light: ${fg} on ${fg}/10 over ${surface} = ${ratio.toFixed(2)}:1 (need ≥ ${AA_NORMAL})`
-			).toBeGreaterThanOrEqual(AA_NORMAL);
+		describe.each(['light', 'dark'] as const)('%s variant', variant => {
+			const tokens = theme[variant] as ThemeTokens;
+			test.each(TINTED_TEXT_PAIRS)('%s on its /10 tint over %s ≥ AA 4.5', (fg, surface) => {
+				const ratio = tintContrast(tokens[fg], tokens[surface]);
+				expect(
+					ratio,
+					`${theme.id}.${variant}: ${fg} on ${fg}/10 over ${surface} = ${ratio.toFixed(2)}:1 (need ≥ ${AA_NORMAL})`
+				).toBeGreaterThanOrEqual(AA_NORMAL);
+			});
 		});
 	});
 });

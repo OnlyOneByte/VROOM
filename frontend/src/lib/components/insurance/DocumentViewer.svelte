@@ -75,10 +75,10 @@
 			<Button
 				variant="outline"
 				size="sm"
-				class="h-7 text-xs"
+				class="h-10 sm:h-8"
 				onclick={() => (showUploadDialog = true)}
 			>
-				<Upload class="mr-1 h-3 w-3" />
+				<Upload />
 				Upload
 			</Button>
 		{/if}

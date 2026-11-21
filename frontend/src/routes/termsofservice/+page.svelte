@@ -23,7 +23,7 @@
 		<h1 class="text-4xl font-bold text-foreground mb-2">Terms of Service</h1>
 		<p class="text-muted-foreground mb-10">Last updated: March 2026</p>
 
-		<div class="space-y-8 text-foreground/90 leading-relaxed">
+		<div class="space-y-8 text-foreground leading-relaxed">
 			<section class="space-y-3">
 				<h2 class="text-xl font-semibold text-foreground">Acceptance of Terms</h2>
 				<p>
@@ -71,7 +71,7 @@
 			<section class="space-y-3">
 				<h2 class="text-xl font-semibold text-foreground">Acceptable Use</h2>
 				<p>You agree not to:</p>
-				<ul class="list-disc pl-6 space-y-1 text-foreground/80">
+				<ul class="list-disc pl-6 space-y-1 text-foreground">
 					<li>Use the Service for any unlawful purpose</li>
 					<li>Attempt to gain unauthorized access to the Service or its infrastructure</li>
 					<li>Interfere with or disrupt the Service or servers connected to it</li>
@@ -95,14 +95,14 @@
 					VROOM is open-source software released under the
 					<a
 						href="https://github.com/OnlyOneByte/vroom/blob/main/LICENSE"
-						class="text-primary underline underline-offset-4 hover:text-primary/80"
+						class="text-primary underline underline-offset-4 hover:decoration-2"
 						target="_blank"
 						rel="noopener noreferrer">MIT License</a
 					>. You are free to fork, modify, and self-host your own instance. The source code is
 					available on
 					<a
 						href="https://github.com/OnlyOneByte/vroom"
-						class="text-primary underline underline-offset-4 hover:text-primary/80"
+						class="text-primary underline underline-offset-4 hover:decoration-2"
 						target="_blank"
 						rel="noopener noreferrer">GitHub</a
 					>.
@@ -147,7 +147,7 @@
 					If you have questions about these terms, please open an issue on the
 					<a
 						href="https://github.com/OnlyOneByte/vroom"
-						class="text-primary underline underline-offset-4 hover:text-primary/80"
+						class="text-primary underline underline-offset-4 hover:decoration-2"
 						target="_blank"
 						rel="noopener noreferrer">GitHub repository</a
 					>

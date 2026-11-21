@@ -387,7 +387,7 @@
 
 	{#if !isLoading && !loadError && notifications.length > 0}
 		<section class="space-y-3">
-			<div class="flex items-center justify-between gap-2">
+			<div class="flex flex-wrap items-center justify-between gap-2">
 				<h2 class="text-lg font-semibold flex items-center gap-2">
 					<History class="h-5 w-5 text-muted-foreground" />
 					Notifications
@@ -396,7 +396,12 @@
 					{/if}
 				</h2>
 				{#if unreadNotifications.length > 0}
-					<Button variant="ghost" size="sm" onclick={markAllNotificationsRead}>
+					<Button
+						variant="ghost"
+						size="sm"
+						class="ml-auto h-10 sm:h-8"
+						onclick={markAllNotificationsRead}
+					>
 						<Check class="mr-2 h-4 w-4" />
 						Mark all read
 					</Button>
@@ -435,7 +440,7 @@
 							{#if !n.isRead}
 								<Button
 									variant="ghost"
-									size="sm"
+									size="icon-lg"
 									onclick={() => markNotificationRead(n.id)}
 									aria-label="Mark as read"
 								>
