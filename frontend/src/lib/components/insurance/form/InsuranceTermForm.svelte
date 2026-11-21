@@ -71,9 +71,7 @@
 	let splitAllocations = $state<Array<{ vehicleId: string; amount?: number; percentage?: number }>>(
 		[]
 	);
-	let splitVehicles = $derived(
-		selectedVehicleIds.flatMap(id => vehicles.find(v => v.id === id) ?? [])
-	);
+	let splitVehicles = $derived(vehicles.filter(v => selectedVehicleIds.includes(v.id)));
 	let parsedTotalCost = $derived(parseFloat(totalCost) || 0);
 	let showSplitEditor = $derived(parsedTotalCost > 0 && selectedVehicleIds.length >= 2);
 
