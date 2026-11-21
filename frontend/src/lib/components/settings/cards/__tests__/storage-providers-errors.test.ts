@@ -62,7 +62,10 @@ describe('Storage Providers card errors read as plain sentences', () => {
 		render(StorageProvidersCard, { props: {} });
 
 		expect(await screen.findByText("Couldn't load your storage providers")).toBeInTheDocument();
-		expect(screen.queryByText('boom')).toBeNull();
+		expect(
+			screen.getByText('Something went wrong on our side. Try again in a moment.')
+		).toBeInTheDocument();
+		expect(screen.queryByText(/boom/)).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		expect(await screen.findByText('Providers')).toBeInTheDocument();
@@ -82,5 +85,19 @@ describe('Storage Providers card errors read as plain sentences', () => {
 		const message = showError.mock.calls[0]?.[0] as string;
 		expect(message).toMatch(/^Couldn't remove the provider\. /);
 		expect(message).not.toContain('boom');
+	});
+
+	test('a successful removal reloads the card in place, without the loading spinner', async () => {
+		getSettings.mockResolvedValue(SETTINGS);
+		providers.mockResolvedValueOnce([DRIVE]).mockReturnValueOnce(new Promise(() => {}));
+		deleteProvider.mockResolvedValue(undefined);
+		render(StorageProvidersCard, { props: {} });
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Delete Family Drive' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+		await waitFor(() => expect(providers).toHaveBeenCalledTimes(2));
+		expect(screen.getByText('Providers')).toBeInTheDocument();
+		expect(screen.getByText('Family Drive')).toBeInTheDocument();
 	});
 });

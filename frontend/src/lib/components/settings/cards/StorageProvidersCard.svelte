@@ -80,8 +80,6 @@
 	let error = $state<string | null>(null);
 
 	async function loadData() {
-		isLoading = true;
-		error = null;
 		try {
 			const [providerList, settings] = await Promise.all([
 				providerApi.getProviders('storage'),
@@ -130,6 +128,12 @@
 		} finally {
 			await loadOrphanCount();
 		}
+	}
+
+	async function retryLoad() {
+		isLoading = true;
+		error = null;
+		await loadData();
 	}
 
 	onMount(() => {
@@ -279,7 +283,7 @@
 					<p class="font-medium">Couldn't load your storage providers</p>
 				</div>
 				<p class="mb-3 text-sm text-muted-foreground">{error}</p>
-				<Button onclick={loadData}>Retry</Button>
+				<Button class="h-10 sm:h-9" onclick={retryLoad}>Retry</Button>
 			</div>
 		{:else}
 			<div class="space-y-4">
