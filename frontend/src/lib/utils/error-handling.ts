@@ -42,10 +42,11 @@ export class ApiError extends VroomError {
 	}
 }
 
-// requireAuth's code. Other 401s (a storage provider's AUTH_INVALID) leave the VROOM session alone.
+const SESSION_EXPIRY_CODE = 'AuthenticationError';
+
 export function isSessionExpiryError(error: unknown): boolean {
 	return (
-		error instanceof ApiError && error.statusCode === 401 && error.code === 'AuthenticationError'
+		error instanceof ApiError && error.statusCode === 401 && error.code === SESSION_EXPIRY_CODE
 	);
 }
 

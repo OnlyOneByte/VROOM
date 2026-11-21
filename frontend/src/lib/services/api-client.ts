@@ -38,7 +38,6 @@ async function endSession(): Promise<void> {
 			message: 'Your session has expired. Please sign in again.',
 			duration: 5000
 		});
-		// The notice stands in for the error toasts of the requests that hit the same expiry.
 		appStore.muteErrors(SESSION_EXPIRY_WINDOW_MS);
 
 		const [{ goto }, { resolve }, { routes }] = await Promise.all([
@@ -108,7 +107,6 @@ async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response>
 			// Non-JSON error body: keep the status-based message.
 		}
 		const error = new ApiError(message, response.status, details, code);
-		// shortcut: a 401 without a JSON code (e.g. from a proxy) is not treated as a session end; no VROOM route sends one.
 		if (isSessionExpiryError(error)) await handleSessionExpiry(fullUrl);
 		throw error;
 	}
