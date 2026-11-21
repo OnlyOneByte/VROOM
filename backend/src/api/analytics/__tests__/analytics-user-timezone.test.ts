@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { zonedCalendar } from '../../../utils/analytics-charts';
-import { zonedMidnight } from '../../../utils/time-zone';
+import { cachedTimeZoneCount, calendarDayIn, zonedMidnight } from '../../../utils/time-zone';
 import { AnalyticsRepository, calendarYearRange } from '../repository';
 import {
   createTestDb,
@@ -49,6 +49,20 @@ describe('zoned calendar helpers', () => {
   test('Auckland local noon on Jan 1 is Jan 1 there and Dec 31 in UTC', () => {
     expect(zonedCalendar(AUCKLAND).day(JAN_1_NOON_AUCKLAND)).toBe('2025-01-01');
     expect(zonedCalendar(undefined).day(JAN_1_NOON_AUCKLAND)).toBe('2024-12-31');
+  });
+
+  test('the formatter cache keys by canonical zone, so case variants cannot grow it', () => {
+    const before = cachedTimeZoneCount();
+    calendarDayIn(JAN_1_NOON_AUCKLAND, 'Asia/Kathmandu');
+    for (const variant of [
+      'asia/kathmandu',
+      'ASIA/KATHMANDU',
+      'aSiA/kAtHmAnDu',
+      'Asia/kathmandu',
+    ]) {
+      expect(calendarDayIn(JAN_1_NOON_AUCKLAND, variant)).toBe('2025-01-01');
+    }
+    expect(cachedTimeZoneCount()).toBe(before + 1);
   });
 
   test('zonedMidnight gives the instant local midnight starts, across DST', () => {

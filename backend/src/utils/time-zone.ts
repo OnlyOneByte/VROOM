@@ -10,21 +10,27 @@ export function isValidTimeZone(timeZone: string): boolean {
 const zonedFormatters = new Map<string, Intl.DateTimeFormat>();
 
 function zonedFormatter(timeZone: string): Intl.DateTimeFormat {
-  let formatter = zonedFormatters.get(timeZone);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      hourCycle: 'h23',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-    zonedFormatters.set(timeZone, formatter);
-  }
+  const cached = zonedFormatters.get(timeZone);
+  if (cached) return cached;
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+  const canonical = formatter.resolvedOptions().timeZone;
+  const existing = zonedFormatters.get(canonical);
+  if (existing) return existing;
+  zonedFormatters.set(canonical, formatter);
   return formatter;
+}
+
+export function cachedTimeZoneCount(): number {
+  return zonedFormatters.size;
 }
 
 export function zonedParts(instant: Date, timeZone: string): Record<string, number> {
