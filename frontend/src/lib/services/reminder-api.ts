@@ -10,6 +10,7 @@ import type {
 import { apiClient } from './api-client';
 import { fromBackendExpense } from './api-transformer';
 import { buildQueryString } from './api-utils';
+import { userTimeZone } from './analytics-api';
 
 interface ReminderListFilters {
 	vehicleId?: string;
@@ -44,7 +45,10 @@ export const reminderApi = {
 		id: string,
 		data: Partial<Reminder> & { vehicleIds?: string[] }
 	): Promise<ReminderWithVehicles> {
-		return apiClient.put<ReminderWithVehicles>(`/api/v1/reminders/${id}`, data);
+		return apiClient.put<ReminderWithVehicles>(`/api/v1/reminders/${id}`, {
+			timeZone: userTimeZone(),
+			...data
+		});
 	},
 
 	async delete(id: string): Promise<void> {
@@ -52,11 +56,15 @@ export const reminderApi = {
 	},
 
 	async trigger(): Promise<TriggerResult> {
-		return apiClient.post<TriggerResult>('/api/v1/reminders/trigger');
+		return apiClient.post<TriggerResult>(
+			`/api/v1/reminders/trigger${buildQueryString({ timeZone: userTimeZone() })}`
+		);
 	},
 
 	async markServiced(id: string): Promise<Reminder> {
-		return apiClient.post<Reminder>(`/api/v1/reminders/${id}/mark-serviced`);
+		return apiClient.post<Reminder>(
+			`/api/v1/reminders/${id}/mark-serviced${buildQueryString({ timeZone: userTimeZone() })}`
+		);
 	},
 
 	async getMaterializedExpenses(id: string): Promise<Expense[]> {
