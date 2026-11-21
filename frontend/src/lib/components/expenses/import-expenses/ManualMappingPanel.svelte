@@ -55,15 +55,19 @@
 	<div class="space-y-2">
 		{#each MAPPABLE_FIELDS as f (f.field)}
 			<div class="flex items-center gap-2">
-				<span class="w-28 shrink-0 text-xs text-muted-foreground">
+				<label for="map-field-{f.field}" class="w-28 shrink-0 text-xs text-muted-foreground">
 					{f.label}{f.required ? ' *' : ''}
-				</span>
+				</label>
 				<Select.Root
 					type="single"
 					value={form.manualColumns[f.field] ?? ''}
 					onValueChange={v => form.setManualColumn(f.field, v)}
 				>
-					<Select.Trigger class="h-8 flex-1 text-xs" data-testid="map-field-{f.field}">
+					<Select.Trigger
+						id="map-field-{f.field}"
+						class="h-8 flex-1 text-xs"
+						data-testid="map-field-{f.field}"
+					>
 						{form.manualColumns[f.field] || '— not mapped —'}
 					</Select.Trigger>
 					<Select.Content>
@@ -78,13 +82,15 @@
 	</div>
 
 	<div class="flex items-center gap-2">
-		<span class="w-28 shrink-0 text-xs text-muted-foreground">Date format</span>
+		<label for="manual-date-format" class="w-28 shrink-0 text-xs text-muted-foreground"
+			>Date format</label
+		>
 		<Select.Root
 			type="single"
 			value={form.manualDateFormat}
 			onValueChange={v => form.setManualDateFormat(v as ImportDateFormat)}
 		>
-			<Select.Trigger class="h-8 flex-1 text-xs">
+			<Select.Trigger id="manual-date-format" class="h-8 flex-1 text-xs">
 				{DATE_FORMATS.find(d => d.value === form.manualDateFormat)?.label ?? form.manualDateFormat}
 			</Select.Trigger>
 			<Select.Content>
@@ -97,13 +103,19 @@
 
 	{#if form.manualColumns.mileage}
 		<div class="flex items-center gap-2">
-			<span class="w-28 shrink-0 text-xs text-muted-foreground">Odometer unit</span>
+			<label for="manual-distance-unit" class="w-28 shrink-0 text-xs text-muted-foreground"
+				>Odometer unit</label
+			>
 			<Select.Root
 				type="single"
 				value={form.manualDistanceUnit}
 				onValueChange={v => form.setManualDistanceUnit(v as DistanceUnit)}
 			>
-				<Select.Trigger class="h-8 flex-1 text-xs" data-testid="map-distance-unit">
+				<Select.Trigger
+					id="manual-distance-unit"
+					class="h-8 flex-1 text-xs"
+					data-testid="map-distance-unit"
+				>
 					{getDistanceUnitLabel(form.manualDistanceUnit)}
 				</Select.Trigger>
 				<Select.Content>
@@ -119,13 +131,19 @@
 
 	{#if form.manualColumns.volume}
 		<div class="flex items-center gap-2">
-			<span class="w-28 shrink-0 text-xs text-muted-foreground">Volume unit</span>
+			<label for="manual-volume-unit" class="w-28 shrink-0 text-xs text-muted-foreground"
+				>Volume unit</label
+			>
 			<Select.Root
 				type="single"
 				value={form.manualVolumeUnit}
 				onValueChange={v => form.setManualVolumeUnit(v as VolumeUnit)}
 			>
-				<Select.Trigger class="h-8 flex-1 text-xs" data-testid="map-volume-unit">
+				<Select.Trigger
+					id="manual-volume-unit"
+					class="h-8 flex-1 text-xs"
+					data-testid="map-volume-unit"
+				>
 					{getVolumeUnitLabel(form.manualVolumeUnit)}
 				</Select.Trigger>
 				<Select.Content>

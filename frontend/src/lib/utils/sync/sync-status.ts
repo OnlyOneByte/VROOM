@@ -39,7 +39,7 @@ export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
 	}
 
 	if (syncStatus === 'success') {
-		return { color: 'text-chart-2', icon: CircleCheck, text: 'Synced' };
+		return { color: 'text-success', icon: CircleCheck, text: 'Synced' };
 	}
 
 	if (pendingCount > 0) {
@@ -50,5 +50,5 @@ export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
 		};
 	}
 
-	return { color: 'text-chart-2', icon: Wifi, text: 'Up to date' };
+	return { color: 'text-success', icon: Wifi, text: 'Up to date' };
 }

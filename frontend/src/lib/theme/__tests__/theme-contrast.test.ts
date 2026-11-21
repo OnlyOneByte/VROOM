@@ -62,7 +62,13 @@ const TEXT_PAIRS: ReadonlyArray<readonly [ThemeTokenKey, ThemeTokenKey]> = [
 	['destructive', 'card'],
 	['destructive', 'background'],
 	['destructive', 'popover'],
-	['destructive', 'muted']
+	['destructive', 'muted'],
+	['primary', 'background'],
+	['success', 'background'],
+	['success', 'card'],
+	['success', 'popover'],
+	['success', 'muted'],
+	['success', 'sidebar']
 ];
 
 describe('every built-in theme clears WCAG AA on text pairs', () => {

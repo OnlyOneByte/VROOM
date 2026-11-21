@@ -17,7 +17,15 @@ const restrictedChartsBarrelPaths = chartsBarrelSpecifiers.map(name => ({
 export default [
 	js.configs.recommended,
 	{
-		ignores: ['.svelte-kit/**', 'build/**', 'dist/**', 'node_modules/**', 'static/sw.js']
+		ignores: [
+			'.svelte-kit/**',
+			'build/**',
+			'dist/**',
+			'node_modules/**',
+			'playwright-report/**',
+			'test-results/**',
+			'static/sw.js'
+		]
 	},
 	{
 		files: ['src/service-worker/**/*.ts'],

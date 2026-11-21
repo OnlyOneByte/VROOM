@@ -89,7 +89,10 @@
 					</div>
 				</div>
 				<Select.Root type="single" value={String(selectedYear)} onValueChange={handleYearChange}>
-					<Select.Trigger class="w-fit gap-2 border bg-secondary text-base sm:text-lg font-medium">
+					<Select.Trigger
+						aria-label="Report year"
+						class="w-fit gap-2 border bg-secondary text-base sm:text-lg font-medium"
+					>
 						<Calendar class="h-3.5 w-3.5 sm:h-4 sm:w-4" />
 						{selectedYear}
 					</Select.Trigger>

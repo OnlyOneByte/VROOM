@@ -2,6 +2,8 @@
 .svelte-kit/
 build/
 dist/
+playwright-report/
+test-results/
 
 # Dependencies
 node_modules/
