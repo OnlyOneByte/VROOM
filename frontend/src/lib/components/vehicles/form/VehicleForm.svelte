@@ -803,7 +803,7 @@
 							</div>
 						</div>
 
-						<div class="mt-6 space-y-2">
+						<div class="mt-6 space-y-3">
 							<Label class="text-sm font-medium text-foreground">Energy Tracking</Label>
 							<div class="flex items-center gap-4">
 								<label for="trackFuel" class="flex items-center gap-1.5 cursor-pointer">
