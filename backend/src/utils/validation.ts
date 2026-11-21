@@ -48,6 +48,29 @@ export function noonAnchoredDateIsNotInTheFuture(date: Date): boolean {
   return date.getTime() <= Date.now() + NOON_ANCHOR_LEEWAY_MS;
 }
 
+const DATE_INPUT_MIN_YEAR = 1900;
+const DATE_INPUT_MAX_YEAR = 2100;
+const ISO_DATE_PREFIX = /^\d{4}-\d{2}-\d{2}/;
+const INVALID_DATE_MESSAGE = 'Enter a valid date';
+
+export const dateInput = z
+  .union(
+    [
+      z.string().trim().regex(ISO_DATE_PREFIX, INVALID_DATE_MESSAGE),
+      z.number().positive(),
+      z.date(),
+    ],
+    { error: INVALID_DATE_MESSAGE }
+  )
+  .pipe(z.coerce.date({ error: INVALID_DATE_MESSAGE }))
+  .refine(
+    (date) => {
+      const year = date.getUTCFullYear();
+      return year >= DATE_INPUT_MIN_YEAR && year <= DATE_INPUT_MAX_YEAR;
+    },
+    { message: `Date must be between ${DATE_INPUT_MIN_YEAR} and ${DATE_INPUT_MAX_YEAR}` }
+  );
+
 export const commonSchemas = {
   clampedPaginationFields,
 

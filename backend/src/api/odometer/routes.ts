@@ -10,6 +10,7 @@ import {
 } from '../../utils/sharing';
 import {
   commonSchemas,
+  dateInput,
   noonAnchoredDateIsNotInTheFuture,
   zValidator,
 } from '../../utils/validation';
@@ -21,9 +22,9 @@ const routes = new Hono();
 
 export const odometerCreateSchema = z.object({
   odometer: z.number().int().min(0, 'Odometer must be a non-negative integer'),
-  recordedAt: z.coerce
-    .date()
-    .refine(noonAnchoredDateIsNotInTheFuture, { message: 'Date cannot be in the future' }),
+  recordedAt: dateInput.refine(noonAnchoredDateIsNotInTheFuture, {
+    message: 'Date cannot be in the future',
+  }),
   note: z.string().max(500).optional(),
 });
 
