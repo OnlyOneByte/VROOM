@@ -81,7 +81,9 @@ describe('photo access on owner-stamped rows of a shared vehicle', () => {
     expect(res.status, 'authorization must not be the thing that rejects the editor').not.toBe(404);
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error?: { message?: string } };
-    expect(body.error?.message ?? '').toContain("This vehicle's owner hasn't set up photo storage");
+    expect(body.error?.message ?? '').toContain(
+      "This vehicle's owner doesn't have an active photo storage provider"
+    );
   });
 
   test('an EDITOR can list the photos of an odometer reading they logged', async () => {

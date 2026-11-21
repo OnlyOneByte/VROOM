@@ -342,8 +342,8 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
     splitGroupIdsForVehicle(id, user.id),
   ]);
   await deleteAllPhotosForEntity('vehicle', id, user.id);
-  await deletePhotosForEntities('expense', expenseIds);
-  await deletePhotosForEntities('odometer_entry', odometerIds);
+  await deletePhotosForEntities('expense', expenseIds, user.id);
+  await deletePhotosForEntities('odometer_entry', odometerIds, user.id);
 
   await vehicleRepository.delete(id);
 

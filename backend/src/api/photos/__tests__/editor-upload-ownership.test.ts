@@ -83,10 +83,40 @@ describe("an editor's photo on a shared vehicle belongs to the vehicle owner", (
     ).rejects.toThrow();
   });
 
+  test("an older editor-owned photo stays private to that editor's storage", async () => {
+    storage = installFakePhotoStorage(ctx);
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
+       VALUES ('prov-editor', ?, 'storage', 'fake', 'Editor storage', 'unused', 'active')`,
+      [editor.id]
+    );
+    ctx.sqlite.run(
+      `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
+       VALUES ('photo-legacy', ?, 'expense', 'exp-shared', 'old.png', 'image/png', 4)`,
+      [editor.id]
+    );
+    ctx.sqlite.run(
+      `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
+       VALUES ('ref-legacy', 'photo-legacy', 'prov-editor', 'editor-file', 'active')`
+    );
+    const secondEditor = await createInvitee(ctx, 'editor2');
+    await secondEditor.acceptShare('veh-shared', 'editor');
+
+    for (const other of [ctx.user.id, secondEditor.id]) {
+      await expect(
+        getPhotoThumbnailForEntity('expense', 'exp-shared', 'photo-legacy', other)
+      ).rejects.toThrow('Photo');
+      await expect(
+        deletePhotoForEntity('expense', 'exp-shared', 'photo-legacy', other)
+      ).rejects.toThrow('Photo');
+    }
+    expect(ctx.sqlite.query('SELECT id FROM photo_refs').all()).toEqual([{ id: 'ref-legacy' }]);
+  });
+
   test('an owner without photo storage gets a clear error, not a silent fallback', async () => {
     await expect(
       uploadPhotoForEntity('expense', 'exp-shared', editor.id, receipt())
-    ).rejects.toThrow("This vehicle's owner hasn't set up photo storage");
+    ).rejects.toThrow("This vehicle's owner doesn't have an active photo storage provider");
     expect(ctx.sqlite.query('SELECT id FROM photos').all()).toEqual([]);
   });
 });

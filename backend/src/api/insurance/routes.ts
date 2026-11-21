@@ -201,7 +201,7 @@ routes.delete('/:id', zValidator('param', idParamSchema), async (c) => {
   const claims = await insuranceClaimRepository.findByPolicyId(id);
   const claimIds = claims.map((claim) => claim.id);
   await deleteAllPhotosForEntity('insurance_policy', id, user.id);
-  await deletePhotosForEntities('insurance_claim', claimIds);
+  await deletePhotosForEntities('insurance_claim', claimIds, user.id);
 
   // Premium expenses link to terms by text, not FK, so they must be deleted explicitly before the cascade.
   const policyToDelete = await insurancePolicyRepository.findById(id);

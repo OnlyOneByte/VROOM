@@ -95,7 +95,7 @@ async function ownerDefaultProvider(
     const missingProvider = error instanceof ValidationError || error instanceof NotFoundError;
     if (ownerId === uploaderId || !missingProvider) throw error;
     throw new ValidationError(
-      "This vehicle's owner hasn't set up photo storage, so photos can't be added to it yet. Ask the owner to connect a storage provider in Settings."
+      "This vehicle's owner doesn't have an active photo storage provider, so photos can't be added to it yet. Ask the owner to connect one in Settings."
     );
   }
 }
@@ -213,10 +213,15 @@ async function requireEntityPhoto(
   photoId: string,
   userId: string
 ): Promise<Photo> {
-  await validateEntityOwnership(entityType, entityId, userId);
+  const ownerId = await validateEntityOwnership(entityType, entityId, userId);
 
   const photo = await photoRepository.findById(photoId);
-  if (!photo || photo.entityType !== entityType || photo.entityId !== entityId) {
+  if (
+    !photo ||
+    photo.entityType !== entityType ||
+    photo.entityId !== entityId ||
+    (photo.userId !== ownerId && photo.userId !== userId)
+  ) {
     throw new NotFoundError('Photo');
   }
   return photo;
@@ -319,7 +324,7 @@ export async function deletePhotoForEntity(
 
   const wasCover = photo.isCover;
 
-  await deletePhotoRowsAndObjects([photo]);
+  await deletePhotoRowsAndObjects([photoId], photo.userId);
   await photoRepository.delete(photoId);
 
   if (wasCover) {
@@ -330,28 +335,15 @@ export async function deletePhotoForEntity(
   }
 }
 
-async function deletePhotoRowsAndObjects(entityPhotos: Photo[]): Promise<void> {
-  if (entityPhotos.length === 0) return;
+async function deletePhotoRowsAndObjects(photoIds: string[], userId: string): Promise<void> {
+  if (photoIds.length === 0) return;
 
-  const photoIds = entityPhotos.map((p) => p.id);
-  const ownerOf = new Map(entityPhotos.map((p) => [p.id, p.userId]));
   const refs = await photoRefRepository.findAllByPhotos(photoIds);
-  for (const [ownerId, ownerRefs] of groupBy(refs, (ref) => ownerOf.get(ref.photoId) ?? '')) {
-    for (const [providerId, providerRefs] of groupActiveRefsByProvider(ownerRefs)) {
-      await deleteObjectsFromProvider(providerId, providerRefs, ownerId);
-    }
+  for (const [providerId, providerRefs] of groupActiveRefsByProvider(refs)) {
+    await deleteObjectsFromProvider(providerId, providerRefs, userId);
   }
 
   await photoRefRepository.deleteByPhotos(photoIds);
-}
-
-function groupBy<T>(items: T[], keyOf: (item: T) => string): Map<string, T[]> {
-  const groups = new Map<string, T[]>();
-  for (const item of items) {
-    const key = keyOf(item);
-    groups.set(key, [...(groups.get(key) ?? []), item]);
-  }
-  return groups;
 }
 
 function groupActiveRefsByProvider(refs: PhotoRef[]): Map<string, PhotoRef[]> {
@@ -405,20 +397,27 @@ export async function deleteAllPhotosForEntity(
   const entityPhotos = await photoRepository.findByEntity(entityType, entityId);
   if (entityPhotos.length === 0) return;
 
-  await deletePhotoRowsAndObjects(entityPhotos);
+  await deletePhotoRowsAndObjects(
+    entityPhotos.map((p) => p.id),
+    userId
+  );
   await photoRepository.deleteByEntity(entityType, entityId);
 }
 
 // Photos have no FK to their entity, so children must be deleted explicitly here.
 export async function deletePhotosForEntities(
   entityType: string,
-  entityIds: string[]
+  entityIds: string[],
+  userId: string
 ): Promise<void> {
   if (entityIds.length === 0) return;
 
   const entityPhotos = await photoRepository.findByEntities(entityType, entityIds);
   if (entityPhotos.length === 0) return;
 
-  await deletePhotoRowsAndObjects(entityPhotos);
+  await deletePhotoRowsAndObjects(
+    entityPhotos.map((p) => p.id),
+    userId
+  );
   await photoRepository.deleteByEntities(entityType, entityIds);
 }
