@@ -91,8 +91,11 @@
 			notifications = notificationList;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load reminders:', error);
-			loadError = error instanceof Error ? error.message : 'Failed to load reminders';
-			appStore.addNotification({ type: 'error', message: 'Failed to load reminders' });
+			loadError = 'Check your connection, then select Retry.';
+			appStore.addNotification({
+				type: 'error',
+				message: 'Failed to load reminders. Please try again.'
+			});
 		} finally {
 			isLoading = false;
 		}
