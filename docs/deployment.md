@@ -311,9 +311,24 @@ plus `vroom.db-wal` and `vroom.db-shm`. The migrations in `backend/drizzle/` are
 automatically at startup; there is no manual migration step.
 
 **Databases created before `0000_baseline` cannot be upgraded in place.** Their migration history
-no longer matches the journal. To move one forward: export a backup from the old build, stop it,
-move `vroom.db*` aside, start the new build (which creates a fresh schema), then restore the backup
-through the UI. Keep the old file until the restore is verified.
+no longer matches the journal. To move one forward:
+
+1. In the old build, Settings → Backup → **Download Backup** saves a ZIP.
+2. Stop the old build and move `vroom.db*` aside.
+3. Start the new build, which creates a fresh schema, and sign in with the same account. The fresh
+   database gives you a new internal user id; restore re-owns every row to the signed-in account,
+   so a backup made under the old id still applies.
+4. Settings → Backup → **Restore** → upload the ZIP, check the preview counts, then restore in
+   **Replace** mode.
+
+Keep the old file until the restore is verified. Anything that points at another account or a
+storage provider from the old database does not carry over:
+
+- **Vehicle shares**: re-invite people once they have signed in to the new instance.
+- **Backup and photo storage settings**: reconnect your storage provider and set them up again.
+  Settings you already made for a provider on the new instance are kept.
+- **Photos**: their records are restored, but the links to the stored files are not, so photos
+  added before the move do not display. The files are still in your storage provider.
 
 ### Backup
 

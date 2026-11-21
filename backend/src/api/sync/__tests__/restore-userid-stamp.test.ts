@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import AdmZip from 'adm-zip';
 import {
   createTestApp,
   type DataEnvelope,
@@ -215,5 +216,189 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     expect(rows[0].id).toBe(vehicleId);
     expect(rows[0].user_id).toBe(ctx.user.id);
     expect(rows[0].make).toBe('Toyota');
+  });
+});
+
+describe('restore after the account record is recreated (same person, new user id)', () => {
+  async function seedOwnerData(): Promise<string> {
+    const created = await ctx.authed('POST', '/api/v1/vehicles', {
+      make: 'Mazda',
+      model: '3',
+      year: 2018,
+    });
+    const body = await json<DataEnvelope<{ id: string }>>(created);
+    expect(created.status, JSON.stringify(body)).toBeLessThan(300);
+    ctx.sqlite.run(
+      `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount)
+       VALUES ('exp-reinstall-1', ?, ?, 'fuel', 1700000000, 4200)`,
+      [body.data.id, ctx.user.id]
+    );
+    return body.data.id;
+  }
+
+  function reinstallAsNewAccount(): string {
+    const newId = `${ctx.user.id}-reinstalled`;
+    ctx.sqlite.run('DELETE FROM users WHERE id = ?', [ctx.user.id]);
+    ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+      newId,
+      ctx.user.email,
+      ctx.user.displayName,
+    ]);
+    return newId;
+  }
+
+  test('a ZIP exported by the old account record restores into the new one', async () => {
+    const vehicleId = await seedOwnerData();
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+    const zip = await backupService.exportAsZip(ctx.user.id);
+
+    const newId = reinstallAsNewAccount();
+    expect(vehicleRows(), 'reinstall starts from an empty account').toHaveLength(0);
+
+    const preview = await restoreService.restoreFromBackup(newId, zip, 'preview');
+    expect(preview.preview?.vehicles).toBe(1);
+
+    const result = await restoreService.restoreFromBackup(newId, zip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    const rows = vehicleRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(vehicleId);
+    expect(rows[0].user_id).toBe(newId);
+    const expense = ctx.sqlite
+      .query('SELECT user_id, expense_amount FROM expenses WHERE id = ?')
+      .get('exp-reinstall-1') as { user_id: string; expense_amount: number };
+    expect(expense).toEqual({ user_id: newId, expense_amount: 4200 });
+  });
+
+  test('a pre-cents 1.0.0 ZIP from an old account record restores into the new one', async () => {
+    const oldId = ctx.user.id;
+    const zip = new AdmZip();
+    zip.addFile(
+      'metadata.json',
+      Buffer.from(
+        JSON.stringify({ version: '1.0.0', timestamp: new Date(0).toISOString(), userId: oldId }),
+        'utf-8'
+      )
+    );
+    zip.addFile(
+      'vehicles.csv',
+      Buffer.from(`id,userId,make,model,year\n"v-old","${oldId}","Ford","Focus","2012"\n`, 'utf-8')
+    );
+    zip.addFile(
+      'expenses.csv',
+      Buffer.from(
+        `id,vehicleId,userId,category,date,expenseAmount\n"e-old","v-old","${oldId}","fuel","${new Date(1600000000000).toISOString()}","12.34"\n`,
+        'utf-8'
+      )
+    );
+    for (const f of ['vehicle_financing.csv', 'insurance_policies.csv']) {
+      zip.addFile(f, Buffer.from('id\n', 'utf-8'));
+    }
+
+    const newId = reinstallAsNewAccount();
+    const { restoreService } = await import('../restore');
+    const result = await restoreService.restoreFromBackup(newId, zip.toBuffer(), 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    const expense = ctx.sqlite
+      .query('SELECT user_id, expense_amount FROM expenses WHERE id = ?')
+      .get('e-old') as { user_id: string; expense_amount: number };
+    expect(expense).toEqual({ user_id: newId, expense_amount: 1234 });
+  });
+
+  test('a Sheets mirror written by the old account record restores into the new one', async () => {
+    const vehicleId = await seedOwnerData();
+    const { FakeGoogleStore, makeFakeSheetsClients } = await import(
+      '../../../test-helpers/fake-google-clients'
+    );
+    const sheetsModule = await import('../../providers/services/google-sheets-service');
+    const svc = new sheetsModule.GoogleSheetsService(
+      'fake-refresh-token',
+      makeFakeSheetsClients(new FakeGoogleStore())
+    );
+    ctx.sqlite.run(
+      `INSERT INTO user_preferences (user_id, backup_config, storage_config) VALUES (?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET backup_config = excluded.backup_config, storage_config = excluded.storage_config`,
+      [
+        ctx.user.id,
+        JSON.stringify({
+          providers: { 'prov-old': { enabled: true, sheetsSpreadsheetId: 'old' } },
+        }),
+        JSON.stringify({
+          defaults: {
+            vehicle_photos: 'prov-old',
+            expense_receipts: null,
+            insurance_docs: null,
+            odometer_readings: null,
+          },
+          providerCategories: { 'prov-old': {} },
+        }),
+      ]
+    );
+    const info = await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM', 'Owner');
+
+    const newId = reinstallAsNewAccount();
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
+       VALUES ('prov-reinstall', ?, 'storage', 'google-drive', 'Drive', 'x', 'active')`,
+      [newId]
+    );
+    ctx.sqlite.run('INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
+      newId,
+      JSON.stringify({ providers: { 'prov-reinstall': { sheetsSpreadsheetId: info.id } } }),
+    ]);
+
+    const spy = spyOn(sheetsModule, 'createSheetsServiceForProvider').mockResolvedValue(svc);
+    try {
+      const { restoreService } = await import('../restore');
+      const result = await restoreService.restoreFromSheets(newId, 'prov-reinstall', 'replace');
+      expect(result.success, JSON.stringify(result)).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+
+    const rows = vehicleRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(vehicleId);
+    expect(rows[0].user_id).toBe(newId);
+
+    const prefs = ctx.sqlite
+      .query('SELECT backup_config, storage_config FROM user_preferences WHERE user_id = ?')
+      .get(newId) as { backup_config: string; storage_config: string };
+    expect(
+      JSON.parse(prefs.backup_config),
+      'the new provider keeps its backup settings; the old one is dropped'
+    ).toEqual({ providers: { 'prov-reinstall': { sheetsSpreadsheetId: info.id } } });
+    const storage = JSON.parse(prefs.storage_config);
+    expect(storage.defaults.vehicle_photos).toBeNull();
+    expect(storage.providerCategories).toEqual({});
+  });
+
+  test("another tenant's backup cannot overwrite or steal that tenant's live rows", async () => {
+    const vehicleId = await seedOwnerData();
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+    const zip = await backupService.exportAsZip(ctx.user.id);
+
+    const intruderId = 'intruder-user';
+    ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+      intruderId,
+      'intruder@test.com',
+      'Intruder',
+    ]);
+
+    await expect(restoreService.restoreFromBackup(intruderId, zip, 'replace')).rejects.toThrow(
+      'UNIQUE constraint failed'
+    );
+    await expect(restoreService.restoreFromBackup(intruderId, zip, 'merge')).rejects.toThrow(
+      'UNIQUE constraint failed'
+    );
+
+    const rows = vehicleRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(vehicleId);
+    expect(rows[0].user_id, 'the live owner keeps their vehicle').toBe(ctx.user.id);
   });
 });
