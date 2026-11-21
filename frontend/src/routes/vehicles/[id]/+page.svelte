@@ -54,6 +54,7 @@
 	let isLoadingStats = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 	let activeTab = $state('overview');
+	let visitedTabs = $state<Record<string, boolean>>({ overview: true });
 	let vehicleStatsData = $state<VehicleStats | null>(null);
 	let selectedStatsPeriod = $state<TimePeriod>('all');
 
@@ -80,12 +81,18 @@
 	const CATEGORY_CHART_TITLE = 'Expense by Category';
 	const CATEGORY_CHART_DESCRIPTION = 'Distribution across all vehicles';
 	const CHARTS_LOAD_ERROR = 'Charts could not be loaded. Check your connection and reload.';
-	const loadCharts = () =>
+	const chartsLoading = Promise.all([
+		import('#lib/components/charts/ExpenseTrendChart.svelte'),
+		import('#lib/components/charts/FuelEfficiencyTrendChart.svelte'),
+		import('#lib/components/charts/index.ts')
+	]);
+	const loadExpensesTab = () =>
 		Promise.all([
-			import('#lib/components/charts/ExpenseTrendChart.svelte'),
-			import('#lib/components/charts/FuelEfficiencyTrendChart.svelte'),
-			import('#lib/components/charts/index.ts')
+			import('#lib/components/expenses/ExpenseSearchFilters.svelte'),
+			import('#lib/components/expenses/ExpensesTable.svelte')
 		]);
+	const loadOdometerTab = () => import('#lib/components/vehicles/OdometerTab.svelte');
+	const loadFinanceTab = () => import('#lib/components/vehicles/FinanceTab.svelte');
 
 	let searchTerm = $state('');
 	let filters = $state<ExpenseFilters>({});
@@ -195,6 +202,17 @@
 			void loadSummary();
 		}
 		previousStatsPeriod = selectedStatsPeriod;
+	});
+
+	$effect(() => {
+		visitedTabs[activeTab] = true;
+	});
+
+	let hasPrefetchedTabs = false;
+	$effect(() => {
+		if (isLoading || hasPrefetchedTabs) return;
+		hasPrefetchedTabs = true;
+		void Promise.allSettled([loadExpensesTab(), loadOdometerTab(), loadFinanceTab()]);
 	});
 
 	$effect(() => {
@@ -392,10 +410,22 @@
 
 {#snippet chartPlaceholders(error: string | null)}
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-		<ChartCard title="Expense Trends" description={trendDescription} isLoading={!error} {error}>
+		<ChartCard
+			title="Expense Trends"
+			description={trendDescription}
+			height={300}
+			isLoading={!error}
+			{error}
+		>
 			{null}
 		</ChartCard>
-		<ChartCard title={fuelChartTitle} description={fuelChartDescription} isLoading={!error} {error}>
+		<ChartCard
+			title={fuelChartTitle}
+			description={fuelChartDescription}
+			height={280}
+			isLoading={!error}
+			{error}
+		>
 			{null}
 		</ChartCard>
 	</div>
@@ -566,7 +596,7 @@
 						{selectedStatsPeriod}
 					/>
 
-					{#await loadCharts()}
+					{#await chartsLoading}
 						{@render chartPlaceholders(null)}
 					{:then [{ default: ExpenseTrendChart }, { default: FuelEfficiencyTrendChart }, { AppPieChart }]}
 						<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -598,93 +628,99 @@
 			</TabsContent>
 
 			<TabsContent value="expenses" class="space-y-6">
-				{#await Promise.all( [import('#lib/components/expenses/ExpenseSearchFilters.svelte'), import('#lib/components/expenses/ExpensesTable.svelte')] )}
-					{@render tabLoading()}
-				{:then [{ default: ExpenseSearchFilters }, { default: ExpensesTable }]}
-					<ExpenseSearchFilters
-						{searchTerm}
-						bind:filters
-						{expenses}
-						onSearchChange={v => (searchTerm = v)}
-						onClearFilters={clearFilters}
-					/>
+				{#if visitedTabs['expenses']}
+					{#await loadExpensesTab()}
+						{@render tabLoading()}
+					{:then [{ default: ExpenseSearchFilters }, { default: ExpensesTable }]}
+						<ExpenseSearchFilters
+							{searchTerm}
+							bind:filters
+							{expenses}
+							onSearchChange={v => (searchTerm = v)}
+							onClearFilters={clearFilters}
+						/>
 
-					<CardFull.Root>
-						<CardFull.Header class="flex flex-row items-center justify-between gap-2 space-y-0">
-							<CardFull.Title>All Expenses ({totalCount})</CardFull.Title>
-							{#if totalCount > 0 && isOwner}
-								<Button
-									variant="outline"
-									size="sm"
-									onclick={handleExportCsv}
-									disabled={isExporting}
-								>
-									<Download class="mr-2 h-4 w-4" />
-									{isExporting ? 'Exporting…' : 'Export CSV'}
-								</Button>
-							{/if}
-						</CardFull.Header>
-						<CardFull.Content>
-							{#if expensesLoadError && !isLoadingPage}
-								<div class="flex flex-col items-center gap-3 py-8 text-center">
-									<CircleAlert class="h-8 w-8 text-destructive" />
-									<p class="font-medium">Failed to load expenses</p>
-									<p class="text-sm text-muted-foreground">{expensesLoadError}</p>
-									<Button variant="outline" onclick={() => fetchExpensesPage(currentOffset)}>
-										Retry
+						<CardFull.Root>
+							<CardFull.Header class="flex flex-row items-center justify-between gap-2 space-y-0">
+								<CardFull.Title>All Expenses ({totalCount})</CardFull.Title>
+								{#if totalCount > 0 && isOwner}
+									<Button
+										variant="outline"
+										size="sm"
+										onclick={handleExportCsv}
+										disabled={isExporting}
+									>
+										<Download class="mr-2 h-4 w-4" />
+										{isExporting ? 'Exporting…' : 'Export CSV'}
 									</Button>
-								</div>
-							{:else}
-								<ExpensesTable
-									{expenses}
-									showVehicleColumn={false}
-									{canWrite}
-									returnTo={resolve(paramRoutes.vehicle, { id: vehicleId })}
-									onDelete={handleDeleteExpense}
-									emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
-									emptyDescription="Start tracking expenses for this vehicle"
-									emptyActionLabel={COMMON_MESSAGES.ADD_EXPENSE}
-									emptyActionHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
-									scrollHeight={SCROLL_HEIGHTS.TABLE_DEFAULT}
-									onClearFilters={clearFilters}
-									{hasActiveFilters}
-									{totalCount}
-									{currentOffset}
-									{pageSize}
-									{isLoadingPage}
-									onPageChange={handlePageChange}
-									activeSortBy={expenseSortBy}
-									activeSortDir={expenseSortDir}
-									onSortChange={handleExpenseSortChange}
-									activeCategory={expenseCategoryFilter}
-									onCategoryChange={handleExpenseCategoryChange}
-								/>
-							{/if}
-						</CardFull.Content>
-					</CardFull.Root>
-				{:catch}
-					{@render tabLoadError()}
-				{/await}
+								{/if}
+							</CardFull.Header>
+							<CardFull.Content>
+								{#if expensesLoadError && !isLoadingPage}
+									<div class="flex flex-col items-center gap-3 py-8 text-center">
+										<CircleAlert class="h-8 w-8 text-destructive" />
+										<p class="font-medium">Failed to load expenses</p>
+										<p class="text-sm text-muted-foreground">{expensesLoadError}</p>
+										<Button variant="outline" onclick={() => fetchExpensesPage(currentOffset)}>
+											Retry
+										</Button>
+									</div>
+								{:else}
+									<ExpensesTable
+										{expenses}
+										showVehicleColumn={false}
+										{canWrite}
+										returnTo={resolve(paramRoutes.vehicle, { id: vehicleId })}
+										onDelete={handleDeleteExpense}
+										emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
+										emptyDescription="Start tracking expenses for this vehicle"
+										emptyActionLabel={COMMON_MESSAGES.ADD_EXPENSE}
+										emptyActionHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
+										scrollHeight={SCROLL_HEIGHTS.TABLE_DEFAULT}
+										onClearFilters={clearFilters}
+										{hasActiveFilters}
+										{totalCount}
+										{currentOffset}
+										{pageSize}
+										{isLoadingPage}
+										onPageChange={handlePageChange}
+										activeSortBy={expenseSortBy}
+										activeSortDir={expenseSortDir}
+										onSortChange={handleExpenseSortChange}
+										activeCategory={expenseCategoryFilter}
+										onCategoryChange={handleExpenseCategoryChange}
+									/>
+								{/if}
+							</CardFull.Content>
+						</CardFull.Root>
+					{:catch}
+						{@render tabLoadError()}
+					{/await}
+				{/if}
 			</TabsContent>
 
 			<TabsContent value="odometer" class="space-y-6">
-				{#await import('#lib/components/vehicles/OdometerTab.svelte')}
-					{@render tabLoading()}
-				{:then { default: OdometerTab }}
-					<OdometerTab {vehicleId} {canWrite} unitPreferences={vehicle?.unitPreferences} />
-				{:catch}
-					{@render tabLoadError()}
-				{/await}
+				{#if visitedTabs['odometer']}
+					{#await loadOdometerTab()}
+						{@render tabLoading()}
+					{:then { default: OdometerTab }}
+						<OdometerTab {vehicleId} {canWrite} unitPreferences={vehicle?.unitPreferences} />
+					{:catch}
+						{@render tabLoadError()}
+					{/await}
+				{/if}
 			</TabsContent>
 
 			<TabsContent value="loan" class="space-y-4 sm:space-y-6">
-				{#await import('#lib/components/vehicles/FinanceTab.svelte')}
-					{@render tabLoading()}
-				{:then { default: FinanceTab }}
-					<FinanceTab {vehicle} {vehicleId} {isOwner} {vehicleStatsData} />
-				{:catch}
-					{@render tabLoadError()}
-				{/await}
+				{#if visitedTabs['loan']}
+					{#await loadFinanceTab()}
+						{@render tabLoading()}
+					{:then { default: FinanceTab }}
+						<FinanceTab {vehicle} {vehicleId} {isOwner} {vehicleStatsData} />
+					{:catch}
+						{@render tabLoadError()}
+					{/await}
+				{/if}
 			</TabsContent>
 		</Tabs>
 

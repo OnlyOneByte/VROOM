@@ -23,19 +23,29 @@ const LAZY_MODULES = [
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
+const requested = vi.hoisted(() => new Set<string>());
 let financeProps: Record<string, unknown> | null = null;
 let odometerProps: Record<string, unknown> | null = null;
-vi.mock('#lib/components/vehicles/FinanceTab.svelte', () => ({
-	default: (_anchor: unknown, props: Record<string, unknown>) => {
-		financeProps = props;
-	}
-}));
-vi.mock('#lib/components/vehicles/OdometerTab.svelte', () => ({
-	default: (_anchor: unknown, props: Record<string, unknown>) => {
-		odometerProps = props;
-	}
-}));
-vi.mock('#lib/components/expenses/ExpensesTable.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/vehicles/FinanceTab.svelte', () => {
+	requested.add('finance');
+	return {
+		default: (_anchor: unknown, props: Record<string, unknown>) => {
+			financeProps = props;
+		}
+	};
+});
+vi.mock('#lib/components/vehicles/OdometerTab.svelte', () => {
+	requested.add('odometer');
+	return {
+		default: (_anchor: unknown, props: Record<string, unknown>) => {
+			odometerProps = props;
+		}
+	};
+});
+vi.mock('#lib/components/expenses/ExpensesTable.svelte', () => {
+	requested.add('expenses');
+	return { default: () => {} };
+});
 vi.mock('#lib/components/charts/index.ts', () => ({ AppPieChart: () => {} }));
 vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/charts/FuelEfficiencyTrendChart.svelte', () => ({ default: () => {} }));
@@ -70,9 +80,10 @@ const VEHICLE = {
 	updatedAt: '2024-01-01T00:00:00.000Z'
 } as unknown as Vehicle;
 
+const getVehicle = vi.fn(() => Promise.resolve(VEHICLE));
 vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: {
-		getVehicle: () => Promise.resolve(VEHICLE),
+		getVehicle: () => getVehicle(),
 		getVehicleStats: () => Promise.resolve(null),
 		getPhotos: () => Promise.resolve({ data: [] }),
 		getPhotoThumbnailUrl: () => ''
@@ -95,12 +106,30 @@ describe('vehicle page — tab, chart and dialog code loads on demand', () => {
 		expect(SRC).toContain(`import('${module}')`);
 	});
 
-	test('the Finance and Odometer tabs render once their chunk arrives', async () => {
+	test('tab code waits for the page data, and each tab mounts only when first opened', async () => {
+		let releaseVehicle: (vehicle: Vehicle) => void = () => {};
+		getVehicle.mockImplementationOnce(
+			() =>
+				new Promise<Vehicle>(resolve => {
+					releaseVehicle = resolve;
+				})
+		);
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 
-		await fireEvent.click(await screen.findByRole('tab', { name: 'Finance' }));
+		await new Promise(resolve => setTimeout(resolve, 100));
+		expect([...requested]).toEqual([]);
+
+		releaseVehicle(VEHICLE);
+		const financeTab = await screen.findByRole('tab', { name: 'Finance' });
+		await waitFor(() => expect(requested).toEqual(new Set(['expenses', 'odometer', 'finance'])));
+		await new Promise(resolve => setTimeout(resolve, 100));
+		expect(financeProps).toBeNull();
+		expect(odometerProps).toBeNull();
+
+		await fireEvent.click(financeTab);
 		await waitFor(() => expect(financeProps).not.toBeNull());
 		expect(financeProps?.['vehicleId']).toBe('v1');
+		expect(odometerProps).toBeNull();
 
 		await fireEvent.click(screen.getByRole('tab', { name: 'Odometer' }));
 		await waitFor(() => expect(odometerProps).not.toBeNull());
