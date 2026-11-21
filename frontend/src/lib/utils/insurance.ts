@@ -1,16 +1,18 @@
 import type { InsurancePolicy, InsuranceTerm } from '#lib/types/index.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
-export function getDaysRemaining(currentTermEnd: string | Date): number {
-	const endDate = currentTermEnd instanceof Date ? currentTermEnd : new Date(currentTermEnd);
-	const now = new Date();
-	return Math.ceil((endDate.getTime() - now.getTime()) / DAY_MS);
+function localDayNumber(date: Date): number {
+	return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS;
 }
 
-export function isExpiringSoon(currentTermEnd: string | Date, thresholdDays = 30): boolean {
-	const days = getDaysRemaining(currentTermEnd);
-	return days >= 0 && days <= thresholdDays;
+export function getDaysRemaining(termEnd: string | Date, now: Date = new Date()): number {
+	const end =
+		termEnd instanceof Date
+			? termEnd
+			: new Date(DATE_ONLY.test(termEnd) ? `${termEnd}T00:00:00` : termEnd);
+	return localDayNumber(end) - localDayNumber(now);
 }
 
 export function sortTermsByEndDateDesc(terms: InsuranceTerm[]): InsuranceTerm[] {
@@ -21,7 +23,7 @@ export function hasTermEnded(
 	term: Pick<InsuranceTerm, 'endDate'>,
 	now: Date = new Date()
 ): boolean {
-	return new Date(term.endDate).getTime() <= now.getTime();
+	return getDaysRemaining(term.endDate, now) < 0;
 }
 
 export function isPolicyInForce(policy: InsurancePolicy, now: Date = new Date()): boolean {
