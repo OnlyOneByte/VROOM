@@ -229,9 +229,9 @@ describe('restore after the account record is recreated (same person, new user i
     const body = await json<DataEnvelope<{ id: string }>>(created);
     expect(created.status, JSON.stringify(body)).toBeLessThan(300);
     ctx.sqlite.run(
-      `INSERT INTO expenses (id, vehicle_id, user_id, created_by, category, date, expense_amount)
-       VALUES ('exp-reinstall-1', ?, ?, ?, 'fuel', 1700000000, 4200)`,
-      [body.data.id, ctx.user.id, ctx.user.id]
+      `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount)
+       VALUES ('exp-reinstall-1', ?, ?, 'fuel', 1700000000, 4200)`,
+      [body.data.id, ctx.user.id]
     );
     return body.data.id;
   }
@@ -267,10 +267,9 @@ describe('restore after the account record is recreated (same person, new user i
     expect(rows[0].id).toBe(vehicleId);
     expect(rows[0].user_id).toBe(newId);
     const expense = ctx.sqlite
-      .query('SELECT user_id, created_by FROM expenses WHERE id = ?')
-      .get('exp-reinstall-1') as { user_id: string; created_by: string | null };
-    expect(expense.user_id).toBe(newId);
-    expect(expense.created_by, 'the owner keeps authorship of their own expenses').toBe(newId);
+      .query('SELECT user_id, expense_amount FROM expenses WHERE id = ?')
+      .get('exp-reinstall-1') as { user_id: string; expense_amount: number };
+    expect(expense).toEqual({ user_id: newId, expense_amount: 4200 });
   });
 
   test('a pre-cents 1.0.0 ZIP from an old account record restores into the new one', async () => {
@@ -290,7 +289,7 @@ describe('restore after the account record is recreated (same person, new user i
     zip.addFile(
       'expenses.csv',
       Buffer.from(
-        `id,vehicleId,userId,createdBy,category,date,expenseAmount\n"e-old","v-old","${oldId}","${oldId}","fuel","${new Date(1600000000000).toISOString()}","12.34"\n`,
+        `id,vehicleId,userId,category,date,expenseAmount\n"e-old","v-old","${oldId}","fuel","${new Date(1600000000000).toISOString()}","12.34"\n`,
         'utf-8'
       )
     );
@@ -304,9 +303,9 @@ describe('restore after the account record is recreated (same person, new user i
     expect(result.success, JSON.stringify(result)).toBe(true);
 
     const expense = ctx.sqlite
-      .query('SELECT user_id, created_by, expense_amount FROM expenses WHERE id = ?')
-      .get('e-old') as { user_id: string; created_by: string | null; expense_amount: number };
-    expect(expense).toEqual({ user_id: newId, created_by: newId, expense_amount: 1234 });
+      .query('SELECT user_id, expense_amount FROM expenses WHERE id = ?')
+      .get('e-old') as { user_id: string; expense_amount: number };
+    expect(expense).toEqual({ user_id: newId, expense_amount: 1234 });
   });
 
   test('a Sheets mirror written by the old account record restores into the new one', async () => {
@@ -318,6 +317,25 @@ describe('restore after the account record is recreated (same person, new user i
     const svc = new sheetsModule.GoogleSheetsService(
       'fake-refresh-token',
       makeFakeSheetsClients(new FakeGoogleStore())
+    );
+    ctx.sqlite.run(
+      `INSERT INTO user_preferences (user_id, backup_config, storage_config) VALUES (?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET backup_config = excluded.backup_config, storage_config = excluded.storage_config`,
+      [
+        ctx.user.id,
+        JSON.stringify({
+          providers: { 'prov-old': { enabled: true, sheetsSpreadsheetId: 'old' } },
+        }),
+        JSON.stringify({
+          defaults: {
+            vehicle_photos: 'prov-old',
+            expense_receipts: null,
+            insurance_docs: null,
+            odometer_readings: null,
+          },
+          providerCategories: { 'prov-old': {} },
+        }),
+      ]
     );
     const info = await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM', 'Owner');
 
@@ -345,6 +363,17 @@ describe('restore after the account record is recreated (same person, new user i
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
     expect(rows[0].user_id).toBe(newId);
+
+    const prefs = ctx.sqlite
+      .query('SELECT backup_config, storage_config FROM user_preferences WHERE user_id = ?')
+      .get(newId) as { backup_config: string; storage_config: string };
+    expect(
+      JSON.parse(prefs.backup_config),
+      'the new provider keeps its backup settings; the old one is dropped'
+    ).toEqual({ providers: { 'prov-reinstall': { sheetsSpreadsheetId: info.id } } });
+    const storage = JSON.parse(prefs.storage_config);
+    expect(storage.defaults.vehicle_photos).toBeNull();
+    expect(storage.providerCategories).toEqual({});
   });
 
   test("another tenant's backup cannot overwrite or steal that tenant's live rows", async () => {
@@ -360,8 +389,12 @@ describe('restore after the account record is recreated (same person, new user i
       'Intruder',
     ]);
 
-    await expect(restoreService.restoreFromBackup(intruderId, zip, 'replace')).rejects.toThrow();
-    await expect(restoreService.restoreFromBackup(intruderId, zip, 'merge')).rejects.toThrow();
+    await expect(restoreService.restoreFromBackup(intruderId, zip, 'replace')).rejects.toThrow(
+      'UNIQUE constraint failed'
+    );
+    await expect(restoreService.restoreFromBackup(intruderId, zip, 'merge')).rejects.toThrow(
+      'UNIQUE constraint failed'
+    );
 
     const rows = vehicleRows();
     expect(rows).toHaveLength(1);

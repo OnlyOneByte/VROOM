@@ -321,9 +321,14 @@ no longer matches the journal. To move one forward:
 4. Settings → Backup → **Restore** → upload the ZIP, check the preview counts, then restore in
    **Replace** mode.
 
-Keep the old file until the restore is verified. Vehicle shares and photo storage links point at
-accounts and providers from the old database, so they do not carry over: re-invite people and
-reconnect your storage provider afterwards.
+Keep the old file until the restore is verified. Anything that points at another account or a
+storage provider from the old database does not carry over:
+
+- **Vehicle shares**: re-invite people once they have signed in to the new instance.
+- **Backup and photo storage settings**: reconnect your storage provider and set them up again.
+  Settings you already made for a provider on the new instance are kept.
+- **Photos**: their records are restored, but the links to the stored files are not, so photos
+  added before the move do not display. The files are still in your storage provider.
 
 ### Backup
 
