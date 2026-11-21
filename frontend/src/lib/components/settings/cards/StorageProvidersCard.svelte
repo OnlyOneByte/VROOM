@@ -379,6 +379,7 @@
 					<Button
 						variant="outline"
 						size="sm"
+						class="h-10 sm:h-8"
 						onclick={() => goto(resolve(routes.settingsProviderNew))}
 					>
 						<Plus class="h-4 w-4 mr-1" />
@@ -396,7 +397,7 @@
 						<Button
 							variant="outline"
 							size="sm"
-							class="mt-3"
+							class="mt-3 h-10 sm:h-8"
 							onclick={() => goto(resolve(routes.settingsProviderNew))}
 						>
 							<Plus class="h-4 w-4 mr-1" />

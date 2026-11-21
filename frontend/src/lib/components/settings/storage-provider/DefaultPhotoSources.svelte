@@ -251,7 +251,7 @@
 
 	<Collapsible.Root bind:open={advancedOpen}>
 		<Collapsible.Trigger
-			class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
+			class="flex min-h-10 w-full items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground sm:min-h-0"
 		>
 			<ChevronDown
 				class="h-4 w-4 transition-transform duration-200 {advancedOpen ? 'rotate-180' : ''}"
