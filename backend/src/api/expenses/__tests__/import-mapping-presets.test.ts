@@ -79,10 +79,10 @@ describe('presetToMapping feeds applyMapping', () => {
     const csv = ['Data,Odo (km),Fuel (litres),Price', '15/03/2024,160.9344,37.854,52.40'].join(
       '\n'
     );
-    const { csv: native } = applyMapping(csv, mapping, {
+    const { csv: native } = applyMapping(csv, mapping, () => ({
       distanceUnit: DistanceUnit.MILES,
       volumeUnit: VolumeUnit.GALLONS_US,
-    });
+    }));
     const [header, row] = native.split('\n');
     const cells = Object.fromEntries(header.split(',').map((h, i) => [h, row.split(',')[i]]));
     expect(cells.vehicle).toBe('Daily Driver');
@@ -123,10 +123,10 @@ describe('fuel-log presets import rows as fuel', () => {
       const csv = PRESET_ROWS[preset.id];
       expect(csv, `add a sample row for preset ${preset.id}`).toBeDefined();
 
-      const native = applyMapping(csv, mapping, {
+      const native = applyMapping(csv, mapping, () => ({
         distanceUnit: DistanceUnit.MILES,
         volumeUnit: VolumeUnit.GALLONS_US,
-      });
+      }));
       const plan = buildImportPlan(native.csv, vehicles);
 
       expect(plan.errorCount, `${preset.id} errors: ${plan.rows[0]?.message}`).toBe(0);
