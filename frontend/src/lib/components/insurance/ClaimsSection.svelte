@@ -20,6 +20,7 @@
 		dateOnlyToISO,
 		toDateInputValue
 	} from '#lib/utils/formatters.ts';
+	import { enteredAmount } from '#lib/utils/insurance.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import {
 		CLAIM_TYPES,
@@ -147,7 +148,7 @@
 				await insuranceApi.updateClaim(policyId, editingId, {
 					...common,
 					description: description.trim() || null,
-					payoutAmount: payoutAmount ? Number(payoutAmount) : null,
+					payoutAmount: enteredAmount(payoutAmount) ?? null,
 					faultDesignation: faultDesignation || null,
 					vehicleId: vehicleId || null
 				});
@@ -155,7 +156,7 @@
 				await insuranceApi.createClaim(policyId, {
 					...common,
 					description: description.trim() || undefined,
-					payoutAmount: payoutAmount ? Number(payoutAmount) : undefined,
+					payoutAmount: enteredAmount(payoutAmount),
 					faultDesignation: faultDesignation || undefined,
 					vehicleId: vehicleId || undefined
 				});
