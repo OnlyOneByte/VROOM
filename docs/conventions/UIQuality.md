@@ -92,9 +92,10 @@ token table and the role of each token live in `DesignSystem.md` → *Design tok
 
 - **Only tokens.** `bg-*`/`text-*`/`border-*` from the token set. No hex, `rgb()`, `gray-*`,
   `white`, `black` or other palette classes in components or `app.css`.
-  `no-theme-clashing-colors.test.ts` catches palette classes in `.svelte` files and raw
-  `rgb()`/`hsl()`/hex literals in `app.css`; reviewers catch the rest (for example a palette
-  class built in a `.ts` file).
+  `no-theme-clashing-colors.test.ts` catches `bg-`/`text-`/`border-` palette classes in `.svelte`
+  files and `rgb()`/`hsl()`/hex literals in `app.css`; reviewers catch the rest (other prefixes
+  such as `ring-`/`fill-`/`from-`, arbitrary values like `bg-[#fff]`, classes built in a `.ts`
+  file, named CSS colours).
 - **Contrast is WCAG 2.1 AA in every theme and both modes.** Text ≥ 4.5:1 against its surface;
   large text (≥ 24px, or ≥ 18.66px bold) and meaningful non-text UI (icons that carry meaning,
   input borders, focus rings) ≥ 3:1.

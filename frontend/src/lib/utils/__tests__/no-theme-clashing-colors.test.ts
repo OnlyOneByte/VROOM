@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
@@ -7,8 +8,14 @@ import { collectSvelteFiles } from './_helpers/collect-svelte-files';
 
 const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-const PALETTE_FAMILIES =
-	'gray|slate|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
+const TAILWIND_THEME_CSS = readFileSync(
+	createRequire(import.meta.url).resolve('tailwindcss/theme.css'),
+	'utf-8'
+);
+
+const PALETTE_FAMILIES = [
+	...new Set([...TAILWIND_THEME_CSS.matchAll(/--color-([a-z]+)-\d+:/g)].map(m => m[1]))
+].join('|');
 
 const THEME_CLASH = new RegExp(
 	`(?<!dark:)\\b(?:bg|text|border)-(?:white|black|(?:${PALETTE_FAMILIES})-\\d+)(?:\\/\\d+)?\\b`
@@ -61,6 +68,8 @@ ratchet({
 		expect(THEME_CLASH.test('<div class="border-border">')).toBe(false);
 		expect(THEME_CLASH.test('<div class="bg-yellow-50 text-green-800">')).toBe(true);
 		expect(THEME_CLASH.test('<div class="border-rose-200/50">')).toBe(true);
+		expect(THEME_CLASH.test('<div class="bg-mauve-50">')).toBe(true);
+		expect(PALETTE_FAMILIES.split('|').length).toBeGreaterThan(20);
 		expect(
 			files.length,
 			'the .svelte walk found almost nothing — SRC_ROOT is wrong'
@@ -74,6 +83,7 @@ describe('app.css paints only with theme tokens', () => {
 	test('no raw rgb()/hsl()/hex colour literals', () => {
 		const offending = APP_CSS.split('\n')
 			.map((line, index) => ({ line: line.trim(), number: index + 1 }))
+			.filter(({ line }) => !line.endsWith('{') && !line.endsWith(','))
 			.filter(({ line }) => RAW_CSS_COLOR.test(line))
 			.map(({ line, number }) => `app.css:${number} → ${line}`);
 		expect(offending, 'use var(--token) instead of a literal colour').toEqual([]);

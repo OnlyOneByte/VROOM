@@ -196,6 +196,12 @@
 		animation: toast-progress var(--toast-duration, 5000ms) linear forwards;
 	}
 
+	[data-sonner-toast][data-type] [data-close-button] {
+		background-color: var(--card) !important;
+		border-color: currentColor !important;
+		color: inherit !important;
+	}
+
 	[data-sonner-toast][data-type='success'] {
 		background-color: var(--card) !important;
 		border-color: var(--success) !important;

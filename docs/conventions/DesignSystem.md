@@ -45,11 +45,12 @@ Notes:
   real text. `theme/__tests__/theme-contrast.test.ts` gates every theme's text pairs at AA
   (`warning` included) and the chart tokens at 3:1; `border`, `input` and `ring` are not gated
   yet (see `UIQuality.md`, *Colour and theme tokens*).
-- Status surfaces: use `Alert` (`default`, `destructive`, `warning` or `success`) rather than a
-  hand-tinted div. Every variant paints `bg-card` with its status token as the text colour, so
-  each one is AA-gated and follows the theme and dark mode. Toasts (`app.css`, sonner block)
-  do the same: a `--card` surface with a `--destructive` / `--success` / `--warning` /
-  `--primary` border, text and progress bar.
+- Status surfaces: use `Alert` (`default`, `destructive`, `warning` or `success`), or a
+  `bg-warning/10` + `text-warning` tint, rather than a hand-tinted div. The three status variants
+  paint `bg-card` with their status token as the text colour (AA-gated on `card`); `default` is
+  `bg-card text-card-foreground`. All four follow the theme and dark mode. Toasts (`app.css`,
+  sonner block) do the same: a `--card` surface with a `--destructive` / `--success` /
+  `--warning` / `--primary` border, text, close button and progress bar.
 - `text-chart-*` is for chart marks and icons, not words: chart tokens are gated at 3:1, on
   `card` and as an icon on their own `/10` tint over `card` and `background` (the category badges
   and `StatCard` chips). Put the label in `text-foreground` beside the tinted icon. Status text
