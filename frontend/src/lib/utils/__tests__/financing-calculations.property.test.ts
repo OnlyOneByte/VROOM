@@ -406,6 +406,21 @@ describe('amortized remaining balance', () => {
 		expect(entries.every(e => e.interestAmount === 0)).toBe(true);
 	});
 
+	test('a loan added years after its start accrues interest from one month before the first logged payment', () => {
+		const late = makeFinancing({
+			originalAmount: 20_000,
+			apr: 4.5,
+			paymentAmount: 372.86,
+			startDate: '2020-03-15'
+		});
+		const entry = derivePaymentEntries(
+			[{ ...makeExpense(372.86, 1), date: '2026-11-15T12:00:00.000Z' }],
+			late
+		)[0]!;
+		expect(entry.interestAmount).toBe(75);
+		expect(entry.remainingBalance).toBe(19_702.14);
+	});
+
 	test('a payment smaller than the interest grows the balance and is all interest', () => {
 		const entry = derivePaymentEntries(scheduledPayments(1, 100), loan)[0]!;
 		expect(entry.interestAmount).toBe(100);

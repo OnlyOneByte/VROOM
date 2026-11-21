@@ -48,7 +48,7 @@ async function getBalance(vehicleId: string): Promise<number> {
 }
 
 describe('financing-sourced split expense balance round-trip', () => {
-  test('a financing-sourced split REDUCES the displayed balance by the split total', async () => {
+  test('a financing-sourced split is applied to the displayed balance as a loan payment', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const financingId = await seedFinancing(vehicleId, 20000);
 

@@ -525,7 +525,8 @@ export function derivePaymentEntries(
 			: 0;
 
 	let balanceCents = toCents(financing.originalAmount);
-	let accruedMonths = 0;
+	const first = sorted[0];
+	let accruedMonths = first ? Math.max(0, elapsedMonths(startDate, new Date(first.date)) - 1) : 0;
 
 	return sorted.map((expense, index) => {
 		const paymentCents = toCents(expense.amount);

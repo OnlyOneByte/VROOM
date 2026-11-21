@@ -347,9 +347,18 @@ describe('amortized loan balance', () => {
   test('a missed month accrues two months of interest on the next payment', () => {
     const terms = loan(1_200_000, 12);
     const balance = amortizedBalance(terms, [
-      { date: new Date('2024-03-15T12:00:00Z'), amount: 50_000 },
+      { date: new Date('2024-02-15T12:00:00Z'), amount: 12_000 },
+      { date: new Date('2024-04-15T12:00:00Z'), amount: 50_000 },
     ]);
     expect(balance).toBe(1_200_000 + 2 * 12_000 - 50_000);
+  });
+
+  test('a loan added years after its start accrues interest from one month before the first logged payment', () => {
+    const terms = { ...loan(2_000_000, 4.5), startDate: new Date('2020-03-15T12:00:00Z') };
+    const balance = amortizedBalance(terms, [
+      { date: new Date('2026-11-15T12:00:00Z'), amount: 37_286 },
+    ]);
+    expect(balance).toBe(2_000_000 + 7_500 - 37_286);
   });
 
   test('a payment smaller than the interest grows the balance', () => {

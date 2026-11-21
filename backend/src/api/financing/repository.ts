@@ -68,7 +68,8 @@ export function amortizedBalance(terms: AmortizationTerms, payments: DatedPaymen
     terms.financingType === 'loan' && terms.apr && terms.apr > 0 ? terms.apr / 100 / 12 : 0;
   const ordered = [...payments].sort((a, b) => a.date.getTime() - b.date.getTime());
   let balance = terms.originalAmount;
-  let accruedMonths = 0;
+  const first = ordered[0];
+  let accruedMonths = first ? Math.max(0, elapsedMonths(terms.startDate, first.date) - 1) : 0;
   for (const payment of ordered) {
     const months = Math.max(accruedMonths, elapsedMonths(terms.startDate, payment.date));
     const interest = Math.round(balance * monthlyRate * (months - accruedMonths));
