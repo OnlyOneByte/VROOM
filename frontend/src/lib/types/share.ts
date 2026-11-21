@@ -13,8 +13,8 @@ export interface VehicleShare {
 }
 
 export interface GrantedShare extends VehicleShare {
-	sharedWithEmail: string;
-	sharedWithName: string;
+	sharedWithEmail: string | null;
+	sharedWithName: string | null;
 }
 
 export interface CreateShareRequest {

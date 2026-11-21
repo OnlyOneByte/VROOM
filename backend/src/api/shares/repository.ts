@@ -16,8 +16,8 @@ export interface AcceptedShareAccess {
 }
 
 export interface GrantedShare extends VehicleShare {
-  sharedWithEmail: string;
-  sharedWithName: string;
+  sharedWithEmail: string | null;
+  sharedWithName: string | null;
 }
 
 export interface ReceivedShare extends VehicleShare {
@@ -63,11 +63,15 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
       .innerJoin(users, eq(users.id, vehicleShares.sharedWithId))
       .where(eq(vehicleShares.ownerId, ownerId))
       .orderBy(vehicleShares.createdAt);
-    return rows.map((r) => ({
-      ...r.share,
-      sharedWithEmail: r.sharedWithEmail,
-      sharedWithName: r.sharedWithName,
-    }));
+    return rows.map((r) => {
+      // Only an accept proves the invitee agreed to be identified; a restored backup can plant pending rows for any user id.
+      const identified = r.share.status === 'accepted';
+      return {
+        ...r.share,
+        sharedWithEmail: identified ? r.sharedWithEmail : null,
+        sharedWithName: identified ? r.sharedWithName : null,
+      };
+    });
   }
 
   async findByIdAndOwner(id: string, ownerId: string): Promise<VehicleShare | null> {

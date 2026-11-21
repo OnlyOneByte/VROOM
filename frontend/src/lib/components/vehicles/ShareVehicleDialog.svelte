@@ -12,6 +12,7 @@
 	import { shareApi } from '#lib/services/share-api.ts';
 	import { ApiError } from '#lib/utils/error-handling.ts';
 	import { shareLevelLabel } from '#lib/utils/share-helpers.ts';
+	import { formatDate } from '#lib/utils/formatters.ts';
 	import type { GrantedShare, ShareLevel, VehicleShare } from '#lib/types/index.ts';
 
 	interface Props {
@@ -32,7 +33,14 @@
 	const SHARE_STATUSES_WITH_ACCESS: VehicleShare['status'][] = ['pending', 'accepted'];
 	let revokeConfirmOpen = $state(false);
 	let revokingShare = $state<GrantedShare | null>(null);
-	const personLabel = (share: GrantedShare) => share.sharedWithName || share.sharedWithEmail;
+	const personName = (share: GrantedShare) =>
+		share.sharedWithName?.trim() || share.sharedWithEmail || null;
+	const personLabel = (share: GrantedShare) =>
+		personName(share) ?? `the invitation sent ${formatDate(share.createdAt)}`;
+	const revokeDescription = (share: GrantedShare) =>
+		personName(share)
+			? `${personName(share)} will no longer see “${vehicleName}” or its expenses. You can invite them again later.`
+			: `The invitation sent ${formatDate(share.createdAt)} will be cancelled, so it can't be accepted. You can invite them again later.`;
 
 	let lastKey = $state('');
 	$effect(() => {
@@ -172,10 +180,13 @@
 					{#each shares as share (share.id)}
 						<div class="flex items-center justify-between gap-3 px-3 py-2.5">
 							<div class="min-w-0">
-								<p class="truncate text-sm font-medium">{personLabel(share)}</p>
+								<p class="truncate text-sm font-medium">
+									{personName(share) ?? 'Pending invitation'}
+								</p>
 								<p class="truncate text-xs text-muted-foreground">
-									{#if share.sharedWithName}{share.sharedWithEmail} ·
-									{/if}<span class="capitalize">{share.status}</span>
+									<span class="capitalize">{share.status}</span>{share.sharedWithEmail
+										? ` · ${share.sharedWithEmail}`
+										: ` · sent ${formatDate(share.createdAt)}`}
 								</p>
 							</div>
 							<div class="flex items-center gap-2">
@@ -228,9 +239,7 @@
 <ConfirmDialog
 	bind:open={revokeConfirmOpen}
 	title="Revoke access?"
-	description={revokingShare
-		? `${personLabel(revokingShare)} will no longer see “${vehicleName}” or its expenses. You can invite them again later.`
-		: ''}
+	description={revokingShare ? revokeDescription(revokingShare) : ''}
 	confirmLabel="Revoke"
 	onConfirm={revoke}
 />
