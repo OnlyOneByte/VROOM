@@ -146,8 +146,15 @@ async function mount() {
 	return view;
 }
 
+const TAB_CONTENT_MOUNTED: Record<string, () => unknown> = {
+	Overview: () => true,
+	Expenses: () => screen.queryByRole('textbox', { name: 'Search expenses' }),
+	Odometer: () => captured['odometer']
+};
+
 async function openTab(name: string) {
 	await fireEvent.click(screen.getByRole('tab', { name }));
+	await waitFor(() => expect(TAB_CONTENT_MOUNTED[name]?.()).toBeTruthy());
 	await settle();
 }
 
