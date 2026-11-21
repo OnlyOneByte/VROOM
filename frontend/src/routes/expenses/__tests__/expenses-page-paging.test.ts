@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Expense, UserSettings } from '#lib/types/index.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
@@ -102,7 +103,7 @@ describe('/expenses paging', () => {
 				params.offset === 20 &&
 				getAllExpenses.mock.calls.filter(c => offsetOf(c) === 20).length === 1
 			)
-				return Promise.reject(new Error('Network down'));
+				return Promise.reject(new ApiError('SQLITE_BUSY: database is locked', 500));
 			return Promise.resolve(pageAt(params.offset));
 		});
 		render(Page);
@@ -110,8 +111,9 @@ describe('/expenses paging', () => {
 
 		goToPage(20);
 		const error = await screen.findByTestId('expenses-page-error');
-		expect(error).toHaveTextContent('Failed to load expenses');
-		expect(error).toHaveTextContent('Network down');
+		expect(error).toHaveTextContent("Couldn't load expenses");
+		expect(error).toHaveTextContent('Something went wrong on our side.');
+		expect(error).not.toHaveTextContent('SQLITE_BUSY');
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 

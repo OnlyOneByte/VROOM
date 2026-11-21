@@ -27,7 +27,10 @@
 
 	type ExpenseWithVehicle = Expense & { vehicle?: Vehicle };
 	import { formatCurrency } from '#lib/utils/formatters.ts';
-	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import {
+		handleErrorWithNotification,
+		userFacingErrorMessage
+	} from '#lib/utils/error-handling.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { extractUniqueTags } from '#lib/utils/expense-filters.ts';
 	import { COMMON_MESSAGES, EXPENSE_MESSAGES } from '#lib/constants/messages.ts';
@@ -128,8 +131,8 @@
 			]);
 			vehicles = loadedVehicles;
 		} catch (error) {
-			loadError = error instanceof Error ? error.message : 'Failed to load expenses';
-			handleErrorWithNotification(error, 'Failed to load expenses');
+			loadError = userFacingErrorMessage(error);
+			handleErrorWithNotification(error, "Couldn't load expenses");
 		} finally {
 			isLoading = false;
 		}
@@ -169,10 +172,10 @@
 
 	function failPage(error: unknown, offset: number) {
 		pageError = {
-			message: error instanceof Error ? error.message : 'Failed to load expenses',
+			message: userFacingErrorMessage(error),
 			offset
 		};
-		handleErrorWithNotification(error, 'Failed to load expenses');
+		handleErrorWithNotification(error, "Couldn't load expenses");
 	}
 
 	async function fetchPageAndSummary(offset = 0) {
@@ -348,7 +351,7 @@
 		<div class="rounded-lg border bg-card p-6">
 			<div class="mb-4 flex items-center gap-3 text-destructive">
 				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Failed to load expenses</p>
+				<p class="font-medium">Couldn't load expenses</p>
 			</div>
 			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
 			<Button size="lg" onclick={loadInitial}>Retry</Button>
@@ -488,7 +491,7 @@
 					<div class="py-6" role="alert" data-testid="expenses-page-error">
 						<div class="mb-4 flex items-center gap-3 text-destructive">
 							<CircleAlert class="h-5 w-5" />
-							<p class="font-medium">Failed to load expenses</p>
+							<p class="font-medium">Couldn't load expenses</p>
 						</div>
 						<p class="mb-4 text-sm text-muted-foreground">{pageError.message}</p>
 						<Button size="lg" onclick={retryPage} disabled={isLoadingPage}>
