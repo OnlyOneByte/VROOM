@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { ValidationError } from '../../../errors';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { logger } from '../../../utils/logger';
-import type { StorageRef } from '../../providers/domains/storage/storage-provider';
+import { FULL_CRUD, type StorageRef } from '../../providers/domains/storage/storage-provider';
 import { photoRefRepository } from '../photo-ref-repository';
 import { uploadPhotoForEntity } from '../photo-service';
 import { type FakePhotoStorage, installFakePhotoStorage } from './fake-photo-storage';
@@ -70,5 +71,24 @@ describe('upload compensates when the DB write fails after the provider upload',
     warnSpy.mockRestore();
     deleteSpy.mockRestore();
     refSpy.mockRestore();
+  });
+});
+
+describe('upload refusals are validation errors', () => {
+  test('an unsupported file type is a 400 ValidationError and stores nothing', async () => {
+    const gif = new File([new Uint8Array([1])], 'a.gif', { type: 'image/gif' });
+    const upload = uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, gif);
+    await expect(upload).rejects.toBeInstanceOf(ValidationError);
+    await expect(upload).rejects.toMatchObject({ statusCode: 400 });
+    expect(photoRowCount()).toBe(0);
+  });
+
+  test('a PDF to an images-only provider is a 400 ValidationError and stores nothing', async () => {
+    Object.assign(storage.provider, { capabilities: { ...FULL_CRUD, arbitraryFiles: false } });
+    const pdf = new File([new Uint8Array([1])], 'policy.pdf', { type: 'application/pdf' });
+    const upload = uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, pdf);
+    await expect(upload).rejects.toBeInstanceOf(ValidationError);
+    await expect(upload).rejects.toMatchObject({ statusCode: 400 });
+    expect(photoRowCount()).toBe(0);
   });
 });
