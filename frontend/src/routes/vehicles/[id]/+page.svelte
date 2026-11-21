@@ -4,32 +4,26 @@
 	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
 	import { onMount, type Component } from 'svelte';
-	import { Plus, FileText, Download, CircleAlert, Users } from '@lucide/svelte';
+	import { Plus, FileText, Download, CircleAlert, Users, LoaderCircle } from '@lucide/svelte';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
 	import * as CardFull from '#lib/components/ui/card/index.ts';
-	import ExpensesTable from '#lib/components/expenses/ExpensesTable.svelte';
-	import ExpenseSearchFilters from '#lib/components/expenses/ExpenseSearchFilters.svelte';
-	import ExpenseTrendChart from '#lib/components/charts/ExpenseTrendChart.svelte';
-	import FuelEfficiencyTrendChart from '#lib/components/charts/FuelEfficiencyTrendChart.svelte';
-	import { AppPieChart } from '#lib/components/charts/index.ts';
+	import ChartCard from '#lib/components/charts/ChartCard.svelte';
 	import VehicleHeader from '#lib/components/vehicles/VehicleHeader.svelte';
-	import ShareVehicleDialog from '#lib/components/vehicles/ShareVehicleDialog.svelte';
 	import VehiclePhotoCarousel from '#lib/components/vehicles/VehiclePhotoCarousel.svelte';
-	import MediaCaptureDialog from '#lib/components/common/MediaCaptureDialog.svelte';
 	import VehicleInfoCard from '#lib/components/vehicles/VehicleInfoCard.svelte';
 	import ExpenseOverviewCard from '#lib/components/vehicles/ExpenseOverviewCard.svelte';
 	import FuelEfficiencyStatsCard from '#lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
 	import PeriodSelector from '#lib/components/common/period-selector.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
-	import FinanceTab from '#lib/components/vehicles/FinanceTab.svelte';
-	import OdometerTab from '#lib/components/vehicles/OdometerTab.svelte';
 	let InsuranceTab = $state<Component<{ vehicleId: string; readOnly?: boolean }> | null>(null);
 	let hasLoadedInsurance = $state(false);
 	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
+	import { getFuelEfficiencyLabel, getElectricEfficiencyLabel } from '#lib/utils/units.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { getCategoryChartColor } from '#lib/utils/chart-colors.ts';
 	import { hasActiveFilters as checkActiveFilters } from '#lib/utils/expense-filters.ts';
 	import { COMMON_MESSAGES, VEHICLE_MESSAGES } from '#lib/constants/messages.ts';
@@ -60,6 +54,7 @@
 	let isLoadingStats = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 	let activeTab = $state('overview');
+	let visitedTabs = $state<Record<string, boolean>>({ overview: true });
 	let vehicleStatsData = $state<VehicleStats | null>(null);
 	let selectedStatsPeriod = $state<TimePeriod>('all');
 
@@ -81,6 +76,23 @@
 	let showUploadDialog = $state(false);
 
 	let shareOpen = $state(false);
+	let hasOpenedUpload = $state(false);
+
+	const CATEGORY_CHART_TITLE = 'Expense by Category';
+	const CATEGORY_CHART_DESCRIPTION = 'Distribution across all vehicles';
+	const CHARTS_LOAD_ERROR = 'Charts could not be loaded. Check your connection and reload.';
+	const chartsLoading = Promise.all([
+		import('#lib/components/charts/ExpenseTrendChart.svelte'),
+		import('#lib/components/charts/FuelEfficiencyTrendChart.svelte'),
+		import('#lib/components/charts/index.ts')
+	]);
+	const loadExpensesTab = () =>
+		Promise.all([
+			import('#lib/components/expenses/ExpenseSearchFilters.svelte'),
+			import('#lib/components/expenses/ExpensesTable.svelte')
+		]);
+	const loadOdometerTab = () => import('#lib/components/vehicles/OdometerTab.svelte');
+	const loadFinanceTab = () => import('#lib/components/vehicles/FinanceTab.svelte');
 
 	let searchTerm = $state('');
 	let filters = $state<ExpenseFilters>({});
@@ -134,6 +146,21 @@
 		vehicle ? vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}` : ''
 	);
 
+	let trendDescription = $derived(
+		selectedStatsPeriod === 'all' ? 'All Time' : `Last ${selectedStatsPeriod}`
+	);
+	let fuelChartTitle = $derived(
+		vehicle?.vehicleType === 'electric' ? 'Electric Efficiency' : 'Fuel Efficiency'
+	);
+	let fuelChartDescription = $derived.by(() => {
+		const units = vehicle?.unitPreferences ?? settingsStore.unitPreferences;
+		return `Measured in ${
+			vehicle?.vehicleType === 'electric'
+				? getElectricEfficiencyLabel(units.distanceUnit, units.chargeUnit)
+				: getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit)
+		}`;
+	});
+
 	let isOwner = $derived(!vehicle?.sharedAccess);
 	let canWrite = $derived(!vehicle?.sharedAccess || vehicle.sharedAccess.level === 'editor');
 
@@ -175,6 +202,17 @@
 			void loadSummary();
 		}
 		previousStatsPeriod = selectedStatsPeriod;
+	});
+
+	$effect(() => {
+		visitedTabs[activeTab] = true;
+	});
+
+	let hasPrefetchedTabs = false;
+	$effect(() => {
+		if (isLoading || hasPrefetchedTabs) return;
+		hasPrefetchedTabs = true;
+		void Promise.allSettled([loadExpensesTab(), loadOdometerTab(), loadFinanceTab()]);
 	});
 
 	$effect(() => {
@@ -370,6 +408,55 @@
 	}
 </script>
 
+{#snippet chartPlaceholders(error: string | null)}
+	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+		<ChartCard
+			title="Expense Trends"
+			description={trendDescription}
+			height={300}
+			isLoading={!error}
+			{error}
+		>
+			{null}
+		</ChartCard>
+		<ChartCard
+			title={fuelChartTitle}
+			description={fuelChartDescription}
+			height={280}
+			isLoading={!error}
+			{error}
+		>
+			{null}
+		</ChartCard>
+	</div>
+	{#if categoryChartData.length > 0}
+		<ChartCard
+			title={CATEGORY_CHART_TITLE}
+			description={CATEGORY_CHART_DESCRIPTION}
+			isLoading={!error}
+			{error}
+		>
+			{null}
+		</ChartCard>
+	{/if}
+{/snippet}
+
+{#snippet tabLoading()}
+	<div class="flex justify-center p-8">
+		<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+	</div>
+{/snippet}
+
+{#snippet tabLoadError()}
+	<div class="rounded-lg border bg-card p-6">
+		<div class="mb-4 flex items-center gap-3 text-destructive">
+			<CircleAlert class="h-5 w-5" />
+			<p class="font-medium">This tab could not be loaded</p>
+		</div>
+		<p class="text-sm text-muted-foreground">Check your connection and reload the page.</p>
+	</div>
+{/snippet}
+
 <svelte:head>
 	<title>{vehicleDisplayName} - VROOM Car Tracker</title>
 	<meta name="description" content="Vehicle details and expense tracking" />
@@ -429,7 +516,9 @@
 			{/if}
 		</div>
 		{#if isOwner}
-			<ShareVehicleDialog bind:open={shareOpen} {vehicleId} vehicleName={vehicleDisplayName} />
+			{#await import('#lib/components/vehicles/ShareVehicleDialog.svelte') then { default: ShareVehicleDialog }}
+				<ShareVehicleDialog bind:open={shareOpen} {vehicleId} vehicleName={vehicleDisplayName} />
+			{/await}
 		{/if}
 
 		<Tabs bind:value={activeTab} class="space-y-6">
@@ -447,7 +536,10 @@
 						{vehicleId}
 						photos={vehiclePhotos}
 						{isOwner}
-						onUpload={() => (showUploadDialog = true)}
+						onUpload={() => {
+							hasOpenedUpload = true;
+							showUploadDialog = true;
+						}}
 						onDelete={handleDeletePhoto}
 						onSetCover={handleSetCover}
 					/>
@@ -504,114 +596,146 @@
 						{selectedStatsPeriod}
 					/>
 
-					<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-						<ExpenseTrendChart
-							data={expenseTrendData}
-							description={selectedStatsPeriod === 'all'
-								? 'All Time'
-								: `Last ${selectedStatsPeriod}`}
-							isLoading={isLoadingStats}
-						/>
-
-						{#if vehicle}
+					{#await chartsLoading}
+						{@render chartPlaceholders(null)}
+					{:then [{ default: ExpenseTrendChart }, { default: FuelEfficiencyTrendChart }, { AppPieChart }]}
+						<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+							<ExpenseTrendChart
+								data={expenseTrendData}
+								description={trendDescription}
+								isLoading={isLoadingStats}
+							/>
 							<FuelEfficiencyTrendChart
 								data={fuelEfficiencyData}
 								fuelType={vehicle.vehicleType || 'gas'}
 								unitPreferences={vehicle.unitPreferences}
 								isLoading={false}
 							/>
-						{/if}
-					</div>
+						</div>
 
-					{#if categoryChartData.length > 0}
-						<AppPieChart
-							title="Expense by Category"
-							description="Distribution across all vehicles"
-							data={categoryChartData}
-							isLoading={isLoadingStats}
-						/>
-					{/if}
+						{#if categoryChartData.length > 0}
+							<AppPieChart
+								title={CATEGORY_CHART_TITLE}
+								description={CATEGORY_CHART_DESCRIPTION}
+								data={categoryChartData}
+								isLoading={isLoadingStats}
+							/>
+						{/if}
+					{:catch}
+						{@render chartPlaceholders(CHARTS_LOAD_ERROR)}
+					{/await}
 				{/if}
 			</TabsContent>
 
 			<TabsContent value="expenses" class="space-y-6">
-				<ExpenseSearchFilters
-					{searchTerm}
-					bind:filters
-					{expenses}
-					onSearchChange={v => (searchTerm = v)}
-					onClearFilters={clearFilters}
-				/>
+				{#if visitedTabs['expenses']}
+					{#await loadExpensesTab()}
+						{@render tabLoading()}
+					{:then [{ default: ExpenseSearchFilters }, { default: ExpensesTable }]}
+						<ExpenseSearchFilters
+							{searchTerm}
+							bind:filters
+							{expenses}
+							onSearchChange={v => (searchTerm = v)}
+							onClearFilters={clearFilters}
+						/>
 
-				<CardFull.Root>
-					<CardFull.Header class="flex flex-row items-center justify-between gap-2 space-y-0">
-						<CardFull.Title>All Expenses ({totalCount})</CardFull.Title>
-						{#if totalCount > 0 && isOwner}
-							<Button variant="outline" size="sm" onclick={handleExportCsv} disabled={isExporting}>
-								<Download class="mr-2 h-4 w-4" />
-								{isExporting ? 'Exporting…' : 'Export CSV'}
-							</Button>
-						{/if}
-					</CardFull.Header>
-					<CardFull.Content>
-						{#if expensesLoadError && !isLoadingPage}
-							<div class="flex flex-col items-center gap-3 py-8 text-center">
-								<CircleAlert class="h-8 w-8 text-destructive" />
-								<p class="font-medium">Failed to load expenses</p>
-								<p class="text-sm text-muted-foreground">{expensesLoadError}</p>
-								<Button variant="outline" onclick={() => fetchExpensesPage(currentOffset)}>
-									Retry
-								</Button>
-							</div>
-						{:else}
-							<ExpensesTable
-								{expenses}
-								showVehicleColumn={false}
-								{canWrite}
-								returnTo={resolve(paramRoutes.vehicle, { id: vehicleId })}
-								onDelete={handleDeleteExpense}
-								emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
-								emptyDescription="Start tracking expenses for this vehicle"
-								emptyActionLabel={COMMON_MESSAGES.ADD_EXPENSE}
-								emptyActionHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
-								scrollHeight={SCROLL_HEIGHTS.TABLE_DEFAULT}
-								onClearFilters={clearFilters}
-								{hasActiveFilters}
-								{totalCount}
-								{currentOffset}
-								{pageSize}
-								{isLoadingPage}
-								onPageChange={handlePageChange}
-								activeSortBy={expenseSortBy}
-								activeSortDir={expenseSortDir}
-								onSortChange={handleExpenseSortChange}
-								activeCategory={expenseCategoryFilter}
-								onCategoryChange={handleExpenseCategoryChange}
-							/>
-						{/if}
-					</CardFull.Content>
-				</CardFull.Root>
+						<CardFull.Root>
+							<CardFull.Header class="flex flex-row items-center justify-between gap-2 space-y-0">
+								<CardFull.Title>All Expenses ({totalCount})</CardFull.Title>
+								{#if totalCount > 0 && isOwner}
+									<Button
+										variant="outline"
+										size="sm"
+										onclick={handleExportCsv}
+										disabled={isExporting}
+									>
+										<Download class="mr-2 h-4 w-4" />
+										{isExporting ? 'Exporting…' : 'Export CSV'}
+									</Button>
+								{/if}
+							</CardFull.Header>
+							<CardFull.Content>
+								{#if expensesLoadError && !isLoadingPage}
+									<div class="flex flex-col items-center gap-3 py-8 text-center">
+										<CircleAlert class="h-8 w-8 text-destructive" />
+										<p class="font-medium">Failed to load expenses</p>
+										<p class="text-sm text-muted-foreground">{expensesLoadError}</p>
+										<Button variant="outline" onclick={() => fetchExpensesPage(currentOffset)}>
+											Retry
+										</Button>
+									</div>
+								{:else}
+									<ExpensesTable
+										{expenses}
+										showVehicleColumn={false}
+										{canWrite}
+										returnTo={resolve(paramRoutes.vehicle, { id: vehicleId })}
+										onDelete={handleDeleteExpense}
+										emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
+										emptyDescription="Start tracking expenses for this vehicle"
+										emptyActionLabel={COMMON_MESSAGES.ADD_EXPENSE}
+										emptyActionHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
+										scrollHeight={SCROLL_HEIGHTS.TABLE_DEFAULT}
+										onClearFilters={clearFilters}
+										{hasActiveFilters}
+										{totalCount}
+										{currentOffset}
+										{pageSize}
+										{isLoadingPage}
+										onPageChange={handlePageChange}
+										activeSortBy={expenseSortBy}
+										activeSortDir={expenseSortDir}
+										onSortChange={handleExpenseSortChange}
+										activeCategory={expenseCategoryFilter}
+										onCategoryChange={handleExpenseCategoryChange}
+									/>
+								{/if}
+							</CardFull.Content>
+						</CardFull.Root>
+					{:catch}
+						{@render tabLoadError()}
+					{/await}
+				{/if}
 			</TabsContent>
 
 			<TabsContent value="odometer" class="space-y-6">
-				<OdometerTab {vehicleId} {canWrite} unitPreferences={vehicle?.unitPreferences} />
+				{#if visitedTabs['odometer']}
+					{#await loadOdometerTab()}
+						{@render tabLoading()}
+					{:then { default: OdometerTab }}
+						<OdometerTab {vehicleId} {canWrite} unitPreferences={vehicle?.unitPreferences} />
+					{:catch}
+						{@render tabLoadError()}
+					{/await}
+				{/if}
 			</TabsContent>
 
 			<TabsContent value="loan" class="space-y-4 sm:space-y-6">
-				{#if vehicle}
-					<FinanceTab {vehicle} {vehicleId} {isOwner} {vehicleStatsData} />
+				{#if visitedTabs['loan']}
+					{#await loadFinanceTab()}
+						{@render tabLoading()}
+					{:then { default: FinanceTab }}
+						<FinanceTab {vehicle} {vehicleId} {isOwner} {vehicleStatsData} />
+					{:catch}
+						{@render tabLoadError()}
+					{/await}
 				{/if}
 			</TabsContent>
 		</Tabs>
 
-		<MediaCaptureDialog
-			bind:open={showUploadDialog}
-			title="Upload Vehicle Photos"
-			description="Upload or capture photos of your vehicle (JPEG, PNG, WebP up to 10MB)"
-			onUpload={file => vehicleApi.uploadPhoto(vehicleId, file)}
-			onUploadComplete={result => handlePhotoUploadComplete(result as Photo)}
-			onClose={() => (showUploadDialog = false)}
-		/>
+		{#if hasOpenedUpload}
+			{#await import('#lib/components/common/MediaCaptureDialog.svelte') then { default: MediaCaptureDialog }}
+				<MediaCaptureDialog
+					bind:open={showUploadDialog}
+					title="Upload Vehicle Photos"
+					description="Upload or capture photos of your vehicle (JPEG, PNG, WebP up to 10MB)"
+					onUpload={file => vehicleApi.uploadPhoto(vehicleId, file)}
+					onUploadComplete={result => handlePhotoUploadComplete(result as Photo)}
+					onClose={() => (showUploadDialog = false)}
+				/>
+			{/await}
+		{/if}
 	</div>
 {:else}
 	<EmptyState>

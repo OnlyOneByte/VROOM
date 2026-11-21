@@ -128,6 +128,7 @@ async function renderExpensesTab() {
 	const tab = await waitFor(() => screen.getByRole('tab', { name: 'Expenses' }));
 	await fireEvent.click(tab);
 	await waitFor(() => expect(getExpensesByVehicle).toHaveBeenCalled());
+	await screen.findByRole('textbox', { name: 'Search expenses' });
 	return screen;
 }
 
