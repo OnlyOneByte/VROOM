@@ -46,15 +46,15 @@ function term(opts: {
     [
       opts.id,
       opts.policyId,
-      opts.startMs,
-      opts.endMs,
+      Math.floor(opts.startMs / 1000),
+      Math.floor(opts.endMs / 1000),
       opts.monthlyCost ?? null,
       opts.totalCost ?? null,
     ]
   );
 }
 
-const now = Date.UTC(2024, 5, 15);
+const now = Date.now();
 
 describe('getInsurance — cost-shape handling', () => {
   test('an explicit monthlyCost flows straight into the monthly + annual totals', async () => {
@@ -223,8 +223,8 @@ describe('getInsurance — per-vehicle attribution scopes to the LATEST term, no
   });
 });
 
-describe('getInsurance — an expired latest term still counts (product decision pending)', () => {
-  test('an active policy whose only term already EXPIRED still adds its premium to the total', async () => {
+describe('getInsurance — only a term in force today counts toward the totals', () => {
+  test('an active policy whose only term already EXPIRED adds no premium, vehicle or carrier', async () => {
     policy('p1', 'GEICO');
     term({
       id: 'lapsed',
@@ -236,7 +236,34 @@ describe('getInsurance — an expired latest term still counts (product decision
     seedInsuranceTermVehicle(testDb.sqlite, { termId: 'lapsed', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
-    expect(result.summary.totalMonthlyPremiums).toBeCloseTo(90, 2);
+    expect(result.summary.totalMonthlyPremiums).toBe(0);
+    expect(result.summary.activePoliciesCount).toBe(0);
+    expect(result.vehicleDetails).toEqual([]);
+    expect(result.costByCarrier).toEqual([]);
+    expect(result.monthlyPremiumTrend.length).toBeGreaterThan(0);
+  });
+
+  test('a policy renewed for a future term counts its current term, not the future one', async () => {
+    policy('p1', 'GEICO');
+    term({
+      id: 'current',
+      policyId: 'p1',
+      startMs: now - 100 * MS_DAY,
+      endMs: now + 30 * MS_DAY,
+      monthlyCost: 80,
+    });
+    term({
+      id: 'next',
+      policyId: 'p1',
+      startMs: now + 31 * MS_DAY,
+      endMs: now + 395 * MS_DAY,
+      monthlyCost: 95,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'current', vehicleId: 'veh-1' });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'next', vehicleId: 'veh-1' });
+
+    const result = await repo.getInsurance(USER);
+    expect(result.summary.totalMonthlyPremiums).toBeCloseTo(80, 2);
     expect(result.summary.activePoliciesCount).toBe(1);
   });
 });
@@ -374,7 +401,6 @@ describe('getInsurance — monthlyPremiumTrend bucketing', () => {
     seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
-    expect(result.summary.totalMonthlyPremiums).toBe(100);
     expect(result.monthlyPremiumTrend.map((p) => p.month)).toEqual([
       '2024-01',
       '2024-02',
