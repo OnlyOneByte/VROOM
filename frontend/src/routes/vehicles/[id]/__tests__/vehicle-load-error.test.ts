@@ -101,7 +101,7 @@ describe('vehicle page — a failed vehicle load', () => {
 		const screen = renderPage();
 
 		const retry = await screen.findByRole('button', { name: 'Retry' });
-		expect(screen.getByText('Failed to load vehicle')).toBeInTheDocument();
+		expect(screen.getByText("Couldn't load this vehicle")).toBeInTheDocument();
 		expect(screen.getByText(hint)).toBeInTheDocument();
 		expect(screen.queryByText('Internal server error')).not.toBeInTheDocument();
 		expect(goto).not.toHaveBeenCalled();
@@ -110,7 +110,7 @@ describe('vehicle page — a failed vehicle load', () => {
 
 		await waitFor(() => expect(screen.getByRole('tab', { name: 'Overview' })).toBeInTheDocument());
 		expect(getVehicle).toHaveBeenCalledTimes(2);
-		expect(screen.queryByText('Failed to load vehicle')).not.toBeInTheDocument();
+		expect(screen.queryByText("Couldn't load this vehicle")).not.toBeInTheDocument();
 		expect(goto).not.toHaveBeenCalled();
 	});
 });
