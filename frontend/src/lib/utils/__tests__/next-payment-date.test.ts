@@ -80,6 +80,32 @@ describe('calculateNextPaymentDate — due date and overdue', () => {
 		expect(next).toEqual(new Date(storedDate(2026, 4, 15)));
 	});
 
+	test('a payment on its due date counts whatever time of day it was stored', () => {
+		const financing = makeFinancing({ startDate: storedDate(2024, 1, 15) });
+		for (const hour of [0, 12, 14, 23]) {
+			const next = calculateNextPaymentDate(financing, new Date(2026, 2, 15, hour, 30));
+			expect(next).toEqual(new Date(storedDate(2026, 4, 15)));
+		}
+	});
+
+	test('a payment one day late for an older due date is credited to that due date', () => {
+		const next = calculateNextPaymentDate(
+			makeFinancing({ startDate: storedDate(2024, 1, 15) }),
+			new Date(storedDate(2026, 3, 16))
+		);
+		expect(next).toEqual(new Date(storedDate(2026, 4, 15)));
+		expect(calculateDaysUntil(next)).toBe(-66);
+	});
+
+	test('a payment made just before an upcoming due date covers it', () => {
+		vi.setSystemTime(new Date(2026, 5, 14, 9, 0, 0));
+		const next = calculateNextPaymentDate(
+			makeFinancing({ startDate: storedDate(2024, 1, 15) }),
+			new Date(storedDate(2026, 6, 13))
+		);
+		expect(next).toEqual(new Date(storedDate(2026, 7, 15)));
+	});
+
 	test('the due day follows paymentDayOfMonth, not the day the payment was made', () => {
 		const next = calculateNextPaymentDate(
 			makeFinancing({ startDate: storedDate(2024, 1, 3), paymentDayOfMonth: 10 }),
