@@ -64,6 +64,12 @@ const TEXT_PAIRS: ReadonlyArray<readonly [ThemeTokenKey, ThemeTokenKey]> = [
 	['destructive', 'popover'],
 	['destructive', 'muted'],
 	['primary', 'background'],
+	['primary', 'card'],
+	['warning', 'background'],
+	['warning', 'card'],
+	['warning', 'popover'],
+	['chart-5', 'background'],
+	['chart-5', 'card'],
 	['success', 'background'],
 	['success', 'card'],
 	['success', 'popover'],
@@ -91,6 +97,52 @@ describe('every built-in theme clears WCAG AA on text pairs', () => {
 
 	test('a known low-contrast pair is correctly rejected (non-vacuous)', () => {
 		expect(contrast('oklch(0.7 0 0)', 'oklch(0.75 0 0)')).toBeLessThan(AA_NORMAL);
+	});
+});
+
+const encodeSrgb = (x: number) => (x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055);
+const decodeSrgb = (x: number) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4);
+
+function tintLuminance(fg: string, surface: string, alpha: number): number {
+	const f = oklchToLinearRGB(fg);
+	const s = oklchToLinearRGB(surface);
+	const mix = (a: number, b: number) =>
+		decodeSrgb(alpha * encodeSrgb(clamp01(a)) + (1 - alpha) * encodeSrgb(clamp01(b)));
+	return 0.2126 * mix(f.r, s.r) + 0.7152 * mix(f.g, s.g) + 0.0722 * mix(f.b, s.b);
+}
+
+function tintContrast(fg: string, surface: string, alpha = 0.1): number {
+	const a = luminance(fg);
+	const b = tintLuminance(fg, surface, alpha);
+	return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+const TINTED_TEXT_PAIRS: ReadonlyArray<readonly [ThemeTokenKey, ThemeTokenKey]> = [
+	['primary', 'background'],
+	['primary', 'card'],
+	['warning', 'card'],
+	['chart-5', 'background'],
+	['chart-5', 'card']
+];
+
+describe('every built-in light theme clears WCAG AA on text over its own /10 tint', () => {
+	test('the tint is composited over its surface (non-vacuous)', () => {
+		expect(tintLuminance('oklch(0 0 0)', 'oklch(1 0 0)', 0)).toBeCloseTo(1, 5);
+		expect(tintLuminance('oklch(0 0 0)', 'oklch(1 0 0)', 0.1)).toBeCloseTo(0.787, 3);
+		expect(tintContrast('oklch(0.5 0 0)', 'oklch(1 0 0)')).toBeLessThan(
+			contrast('oklch(0.5 0 0)', 'oklch(1 0 0)')
+		);
+	});
+
+	describe.each(Object.values(THEME_REGISTRY))('theme "$id"', theme => {
+		const tokens = theme.light;
+		test.each(TINTED_TEXT_PAIRS)('%s on its /10 tint over %s ≥ AA 4.5', (fg, surface) => {
+			const ratio = tintContrast(tokens[fg], tokens[surface]);
+			expect(
+				ratio,
+				`${theme.id}.light: ${fg} on ${fg}/10 over ${surface} = ${ratio.toFixed(2)}:1 (need ≥ ${AA_NORMAL})`
+			).toBeGreaterThanOrEqual(AA_NORMAL);
+		});
 	});
 });
 
