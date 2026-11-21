@@ -100,6 +100,13 @@
 		activeFinancing: ownedVehicles.filter(v => v.financing?.isActive).length
 	}));
 
+	let pageDescription = $derived.by(() => {
+		const count = stats.totalVehicles;
+		if (loadError || (isLoading && count === 0)) return 'Overview of your vehicles';
+		if (count === 0) return 'Welcome! Get started by adding your first vehicle';
+		return `Overview of your ${count} vehicle${count !== 1 ? 's' : ''}`;
+	});
+
 	let trendChartData = $derived.by(() => {
 		if (!periodSummary?.monthlyTrend) return [];
 		return periodSummary.monthlyTrend.map(t => ({
@@ -289,16 +296,7 @@
 </svelte:head>
 
 <div class="space-y-6 pb-24">
-	<PageHeader
-		title="Dashboard"
-		description={loadError
-			? 'Overview of your vehicles'
-			: stats.totalVehicles > 0
-				? `Overview of your ${stats.totalVehicles} vehicle${stats.totalVehicles !== 1 ? 's' : ''}`
-				: isLoading
-					? 'Overview of your vehicles'
-					: 'Welcome! Get started by adding your first vehicle'}
-	>
+	<PageHeader title="Dashboard" description={pageDescription}>
 		{#snippet actions()}
 			{#if canLogFillup}
 				<Button variant="outline" size="lg" href={resolve(routes.vehicleNew)}>

@@ -77,7 +77,7 @@ describe('assistant history', () => {
 
 		sendMessage.mockRejectedValueOnce(new ApiError('upstream', 502));
 		await say('And last month?');
-		await fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
 
 		const [, history] = sendMessage.mock.calls.at(-1)!;
 		expect(history.map(turn => turn.content.length)).toEqual([23, 2000]);

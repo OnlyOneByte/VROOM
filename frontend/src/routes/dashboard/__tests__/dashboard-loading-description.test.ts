@@ -60,4 +60,30 @@ describe('dashboard description while loading', () => {
 			await screen.findByText('Welcome! Get started by adding your first vehicle')
 		).toBeInTheDocument();
 	});
+
+	test.each([
+		[1, 'Overview of your 1 vehicle'],
+		[2, 'Overview of your 2 vehicles']
+	])('counts %i owned vehicle(s) once loaded', async (count, description) => {
+		getVehicles.mockResolvedValue(
+			Array.from({ length: count }, (_, i) => ({
+				id: `v${i}`,
+				make: 'Toyota',
+				model: 'Camry',
+				year: 2020
+			}))
+		);
+		render(Page);
+
+		expect(await screen.findByText(description)).toBeInTheDocument();
+	});
+
+	test('stays neutral after a load failure', async () => {
+		getVehicles.mockRejectedValue(new Error('offline'));
+		render(Page);
+
+		expect(await screen.findByText("Couldn't load the dashboard")).toBeInTheDocument();
+		expect(screen.getByText('Overview of your vehicles')).toBeInTheDocument();
+		expect(screen.queryByText(/Welcome!/)).toBeNull();
+	});
 });
