@@ -603,7 +603,8 @@ describe('ExpenseForm loading and load failures', () => {
 
 		const card = await screen.findByTestId('vehicles-load-error');
 		expect(screen.getByRole('heading', { name: 'Edit Expense' })).toBeTruthy();
-		expect(card.textContent).toContain('offline');
+		expect(card).toHaveTextContent('Failed to load vehicles');
+		expect(card).toHaveTextContent(/offline/i);
 
 		await fireEvent.click(within(card).getByRole('button', { name: 'Retry' }));
 
