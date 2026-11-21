@@ -151,13 +151,24 @@ describe('monthly advancement clamps to the last day of the target month', () =>
   });
 });
 
-describe('weekly advancement adds exactly 7 days', () => {
-  test('the difference in milliseconds equals exactly 7 * 24 * 60 * 60 * 1000', () => {
+describe('weekly advancement adds exactly 7 calendar days', () => {
+  test('lands 7 local days later at the same local time, and exactly 7 * 24h when no DST change falls between', () => {
     fc.assert(
       fc.property(reasonableDate, (date) => {
         const result = computeNextDueDate(date, 'weekly');
-        const diffMs = result.getTime() - date.getTime();
-        expect(diffMs).toBe(SEVEN_DAYS_MS);
+        const sevenLocalDaysLater = new Date(
+          date.getFullYear(),
+          date.getMonth(),
+          date.getDate() + 7,
+          date.getHours(),
+          date.getMinutes(),
+          date.getSeconds(),
+          date.getMilliseconds()
+        );
+        expect(result.getTime()).toBe(sevenLocalDaysLater.getTime());
+        if (result.getTimezoneOffset() === date.getTimezoneOffset()) {
+          expect(result.getTime() - date.getTime()).toBe(SEVEN_DAYS_MS);
+        }
       }),
       { numRuns: 200 }
     );
