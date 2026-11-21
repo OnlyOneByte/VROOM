@@ -5,6 +5,7 @@ import type { Expense, Reminder, ReminderNotification } from '../../db/schema';
 import { expenses, reminderNotifications } from '../../db/schema';
 import type { DrizzleTransaction, SplitConfig } from '../../db/types';
 import { ValidationError } from '../../errors';
+import { logger } from '../../utils/logger';
 import { zonedParts, zoneOffsetMs } from '../../utils/time-zone';
 import { expenseSplitService } from '../expenses/split-service';
 import { odometerRepository } from '../odometer/repository';
@@ -18,12 +19,28 @@ export interface TriggerResult {
   skipped: Array<{ reminderId: string; reason: string; message?: string }>;
 }
 
-function pushReminderSkipError(result: TriggerResult, reminderId: string, error: unknown): void {
+const SKIP_ERROR_MESSAGE = 'This reminder could not be processed. Try again later.';
+
+function pushSkipError(
+  result: TriggerResult,
+  reminderId: string,
+  reason: string,
+  error: unknown
+): void {
+  logger.error('Reminder trigger skipped a reminder after an error', {
+    reminderId,
+    reason,
+    error: error instanceof Error ? error.message : String(error),
+  });
   result.skipped.push({
     reminderId,
-    reason: 'error',
-    message: error instanceof Error ? error.message : 'Unknown error',
+    reason,
+    message: error instanceof ValidationError ? error.message : SKIP_ERROR_MESSAGE,
   });
+}
+
+function pushReminderSkipError(result: TriggerResult, reminderId: string, error: unknown): void {
+  pushSkipError(result, reminderId, 'error', error);
 }
 
 function pushConcurrentTriggerSkip(result: TriggerResult, reminderId: string): void {
@@ -393,11 +410,7 @@ class ReminderTriggerService {
     try {
       mileageReminders = await reminderRepository.findMileageTracking(userId);
     } catch (error) {
-      result.skipped.push({
-        reminderId: 'all',
-        reason: 'recheck_query_failed',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      });
+      pushSkipError(result, 'all', 'recheck_query_failed', error);
       return result;
     }
     await this.processMileageReminders(
