@@ -201,3 +201,131 @@ describe('ImportExpensesForm: reset', () => {
 		expect(form.categoryRemap).toEqual({});
 	});
 });
+
+describe('ImportExpensesForm: pasted text and detection failures', () => {
+	test('blurring pasted CSV detects the source and previews it', async () => {
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		form.csvText = FUEL_CSV;
+
+		await form.handlePasteBlur();
+
+		expect(mocks.detectImportSource).toHaveBeenCalledWith(['Date', 'Cost']);
+		expect(form.detectedPreset).toEqual(FUELLY);
+		expect(form.preview?.readyCount).toBe(2);
+	});
+
+	test('blank pasted text clears the preview without calling the API', async () => {
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		form.preview = previewResult();
+		form.csvText = '   ';
+
+		await form.handlePasteBlur();
+
+		expect(form.preview).toBeNull();
+		expect(form.fileHeaders).toEqual([]);
+		expect(mocks.detectImportSource).not.toHaveBeenCalled();
+		expect(mocks.importExpensesCsv).not.toHaveBeenCalled();
+	});
+
+	test('a failed source detection falls back to no preset and stops detecting', async () => {
+		mocks.detectImportSource.mockRejectedValue(new Error('offline'));
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		form.csvText = FUEL_CSV;
+
+		await form.detectSource();
+
+		expect(form.detectedPreset).toBeNull();
+		expect(form.isDetecting).toBe(false);
+		expect(form.manualMapping).toBe(false);
+		expect(form.fileHeaders).toEqual(['Date', 'Cost']);
+	});
+
+	test('a failed preview notifies the user and clears the previewing flag', async () => {
+		mocks.importExpensesCsv.mockRejectedValue(new Error('bad csv'));
+		const form = new ImportExpensesForm(() => [CAMRY]);
+
+		await form.loadFile(
+			new File(['date,vehicle,category,amount\n2026-01-02,Camry,fuel,40'], 'x.csv')
+		);
+
+		expect(form.preview).toBeNull();
+		expect(form.isPreviewing).toBe(false);
+		expect(mocks.addNotification).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: 'error',
+				message: expect.stringContaining('Could not read that CSV')
+			})
+		);
+	});
+
+	test('a single imported expense is announced in the singular', async () => {
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		await form.loadFile(new File([FUEL_CSV], 'fuel.csv'));
+		mocks.importExpensesCsv.mockResolvedValueOnce(previewResult({ dryRun: false, imported: 1 }));
+
+		await form.commit(vi.fn());
+
+		expect(mocks.addNotification).toHaveBeenCalledWith({
+			type: 'success',
+			message: 'Imported 1 expense'
+		});
+	});
+});
+
+describe('ImportExpensesForm: manual mapping settings', () => {
+	const METRIC_RAV4: Vehicle = {
+		...RAV4,
+		unitPreferences: { distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }
+	};
+
+	test('picking a target vehicle during manual mapping adopts its distance and volume units', async () => {
+		const form = new ImportExpensesForm(() => [CAMRY, METRIC_RAV4]);
+		await form.loadFile(new File([FOREIGN_CSV], 'bank.csv'));
+		expect(form.manualDistanceUnit).toBe('miles');
+
+		form.changeTargetVehicle('v2');
+		await flush();
+
+		expect(form.manualDistanceUnit).toBe('kilometers');
+		expect(form.manualVolumeUnit).toBe('liters');
+	});
+
+	test('a sole metric vehicle seeds the manual units as soon as the file is detected', async () => {
+		const form = new ImportExpensesForm(() => [METRIC_RAV4]);
+
+		await form.loadFile(new File([FOREIGN_CSV], 'bank.csv'));
+
+		expect(form.targetVehicleId).toBe('v2');
+		expect(form.manualDistanceUnit).toBe('kilometers');
+		expect(form.manualVolumeUnit).toBe('liters');
+	});
+
+	test('changing the date format, units or a category remap re-previews with the new mapping', async () => {
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		await form.loadFile(new File([FOREIGN_CSV], 'bank.csv'));
+
+		form.setManualDateFormat('dmy');
+		await flush();
+		expect(mocks.importExpensesCsv).toHaveBeenLastCalledWith(
+			FOREIGN_CSV,
+			true,
+			expect.objectContaining({ dateFormat: 'dmy' })
+		);
+
+		form.setManualDistanceUnit('kilometers');
+		form.setManualVolumeUnit('liters');
+		form.setCategoryRemap('gas', 'fuel');
+		await flush();
+
+		expect(form.manualDistanceUnit).toBe('kilometers');
+		expect(form.manualVolumeUnit).toBe('liters');
+		expect(form.categoryRemap).toEqual({ gas: 'fuel' });
+		expect(mocks.importExpensesCsv).toHaveBeenLastCalledWith(
+			FOREIGN_CSV,
+			true,
+			expect.objectContaining({ categoryMap: expect.objectContaining({ gas: 'fuel' }) })
+		);
+	});
+});
