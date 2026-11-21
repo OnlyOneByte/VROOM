@@ -529,9 +529,7 @@ export const vehicleShares = sqliteTable(
     ownerId: text('owner_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    sharedWithId: text('shared_with_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    sharedWithId: text('shared_with_id').references(() => users.id, { onDelete: 'cascade' }),
     level: text('level').notNull(),
     status: text('status').notNull().default('pending'),
     invitedEmail: text('invited_email'),

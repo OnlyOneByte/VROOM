@@ -48,16 +48,19 @@ describe('POST /api/v1/shares: owner invites an existing user', () => {
     const res = await invite(vehicleId, bEmail, 'viewer');
     const body = await json<DataEnvelope<Share>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
-    expect(body.data.sharedWithId).toBe(bId);
+    expect(body.data.sharedWithId).toBeNull();
+    expect(
+      ctx.sqlite.query('SELECT shared_with_id FROM vehicle_shares WHERE id = ?').get(body.data.id)
+    ).toEqual({ shared_with_id: bId });
     expect(body.data.ownerId).toBe(ctx.user.id);
     expect(body.data.level).toBe('viewer');
     expect(body.data.status).toBe('pending');
   });
 
-  test('inviting an unknown email → 404 (no VROOM account)', async () => {
+  test('inviting an unknown email → 201 pending invite, like any other email', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const res = await invite(vehicleId, 'nobody@nowhere.com', 'viewer');
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(201);
   });
 
   test('self-invite is rejected with a client error', async () => {

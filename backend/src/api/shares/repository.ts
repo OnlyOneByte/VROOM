@@ -1,6 +1,6 @@
 // vehicle_shares.ownerId is a denormalized copy for listing only; never use it as the access gate.
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewVehicleShare, VehicleShare } from '../../db/schema';
@@ -34,22 +34,63 @@ export function isActiveShareStatus(status: string): status is ActiveShareStatus
   return ACTIVE_SHARE_STATUSES.includes(status as ActiveShareStatus);
 }
 
+// Only a share the invitee accepted identifies them to the owner; every other status stays anonymous.
+export function toOwnerView(
+  share: VehicleShare,
+  invitee: { sharedWithEmail: string | null; sharedWithName: string | null } = {
+    sharedWithEmail: null,
+    sharedWithName: null,
+  }
+): GrantedShare {
+  const identified = share.status === 'accepted';
+  return {
+    ...share,
+    sharedWithId: identified ? share.sharedWithId : null,
+    sharedWithEmail: identified ? invitee.sharedWithEmail : share.invitedEmail,
+    sharedWithName: identified ? invitee.sharedWithName : null,
+  };
+}
+
+export function attachPendingInvites(
+  tx: Pick<AppDatabase, 'update'>,
+  userId: string,
+  email: string
+): void {
+  tx.update(vehicleShares)
+    .set({ sharedWithId: userId, updatedAt: new Date() })
+    .where(
+      and(
+        isNull(vehicleShares.sharedWithId),
+        eq(vehicleShares.status, 'pending'),
+        sql`lower(${vehicleShares.invitedEmail}) = ${email.toLowerCase()}`
+      )
+    )
+    .run();
+}
+
 export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehicleShare> {
   constructor(db: AppDatabase = getDb()) {
     super(db, vehicleShares);
   }
 
-  async findActiveForVehicleAndUser(
+  async findActiveInvite(
     vehicleId: string,
-    sharedWithId: string
+    email: string,
+    inviteeId: string | null
   ): Promise<VehicleShare | null> {
-    const rows = await this.db
+    const sameInvitee = sql`lower(${vehicleShares.invitedEmail}) = ${email}`;
+    const [row] = await this.db
       .select()
       .from(vehicleShares)
       .where(
-        and(eq(vehicleShares.vehicleId, vehicleId), eq(vehicleShares.sharedWithId, sharedWithId))
-      );
-    return rows.find((r) => isActiveShareStatus(r.status)) ?? null;
+        and(
+          eq(vehicleShares.vehicleId, vehicleId),
+          inArray(vehicleShares.status, [...ACTIVE_SHARE_STATUSES]),
+          inviteeId ? or(eq(vehicleShares.sharedWithId, inviteeId), sameInvitee) : sameInvitee
+        )
+      )
+      .limit(1);
+    return row ?? null;
   }
 
   async findByOwner(ownerId: string): Promise<GrantedShare[]> {
@@ -60,18 +101,10 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
         sharedWithName: users.displayName,
       })
       .from(vehicleShares)
-      .innerJoin(users, eq(users.id, vehicleShares.sharedWithId))
+      .leftJoin(users, eq(users.id, vehicleShares.sharedWithId))
       .where(eq(vehicleShares.ownerId, ownerId))
       .orderBy(vehicleShares.createdAt);
-    return rows.map((r) => {
-      // Only a share the invitee accepted identifies them to the owner; every other status stays anonymous.
-      const identified = r.share.status === 'accepted';
-      return {
-        ...r.share,
-        sharedWithEmail: identified ? r.sharedWithEmail : r.share.invitedEmail,
-        sharedWithName: identified ? r.sharedWithName : null,
-      };
-    });
+    return rows.map((r) => toOwnerView(r.share, r));
   }
 
   async findByIdAndOwner(id: string, ownerId: string): Promise<VehicleShare | null> {
