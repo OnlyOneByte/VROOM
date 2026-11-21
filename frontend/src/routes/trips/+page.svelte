@@ -150,8 +150,7 @@
 				Add a vehicle first
 			{/snippet}
 			{#snippet description()}
-				Every trip belongs to a vehicle. Add your car, then log trips with their start and end
-				odometer.
+				Every trip belongs to a vehicle. Add one, then log trips with their start and end odometer.
 			{/snippet}
 			{#snippet action()}
 				<Button size="lg" href={resolve(routes.vehicleNew)}>
