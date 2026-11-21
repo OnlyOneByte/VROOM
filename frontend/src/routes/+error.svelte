@@ -8,15 +8,15 @@
 	import PageHeader from '#lib/components/common/page-header.svelte';
 
 	let notFound = $derived(page.status === 404);
-	let title = $derived(notFound ? 'Page Not Found' : 'Page Unavailable');
+	let pageTitle = $derived(notFound ? 'Page Not Found' : 'Page Unavailable');
 </script>
 
 <svelte:head>
-	<title>{title} - VROOM Car Tracker</title>
+	<title>{pageTitle} - VROOM Car Tracker</title>
 </svelte:head>
 
 <div class="space-y-6">
-	<PageHeader {title} />
+	<PageHeader title={pageTitle} />
 
 	<EmptyState>
 		{#snippet icon()}
@@ -32,14 +32,14 @@
 		{#snippet description()}
 			{notFound
 				? 'The link may be old or the address mistyped. Your dashboard lists all your vehicles.'
-				: 'Check your connection and try again, or go back to your dashboard.'}
+				: 'Try again in a moment, or go back to your dashboard.'}
 		{/snippet}
 		{#snippet action()}
 			<div class="flex flex-col sm:flex-row gap-3">
 				{#if !notFound}
-					<Button variant="outline" onclick={() => location.reload()}>Try Again</Button>
+					<Button variant="outline" size="lg" onclick={() => location.reload()}>Try Again</Button>
 				{/if}
-				<Button href={resolve(routes.dashboard)}>Go to Dashboard</Button>
+				<Button size="lg" href={resolve(routes.dashboard)}>Go to Dashboard</Button>
 			</div>
 		{/snippet}
 	</EmptyState>
