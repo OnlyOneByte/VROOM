@@ -15,7 +15,7 @@
 	import { AppLineChart } from '#lib/components/charts/index.ts';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
-	import { Inbox, DollarSign, TrendingUp, Car, Plus, ArrowLeft } from '@lucide/svelte';
+	import { Inbox, DollarSign, TrendingUp, Car, Plus } from '@lucide/svelte';
 
 	const buttonVariants = [
 		'default',
@@ -35,6 +35,14 @@
 		{ date: new Date(2026, 2, 1), amount: 180 }
 	];
 	const trendConfig = { amount: { label: 'Amount', color: 'var(--primary)' } };
+
+	const pageHeaderWithBack = `<PageHeader title="Edit Odometer Reading" description="2020 Toyota Camry">
+	{#snippet back()}
+		<Button variant="ghost" size="icon-lg" class="shrink-0" aria-label="Back">
+			<ArrowLeft class="size-5" />
+		</Button>
+	{/snippet}
+</PageHeader>`;
 
 	const statItems = [
 		{ label: 'Total Vehicles', value: '2', icon: Car, iconColor: 'primary' as const },
@@ -110,15 +118,9 @@
 			<p class="text-sm text-muted-foreground">
 				Detail and form pages pass a <code>back</code> snippet; the title stays the same size.
 			</p>
-			<div aria-hidden="true" inert>
-				<PageHeader title="Edit Odometer Reading" description="2020 Toyota Camry">
-					{#snippet back()}
-						<Button variant="ghost" size="icon-lg" class="shrink-0" aria-label="Back">
-							<ArrowLeft class="size-5" />
-						</Button>
-					{/snippet}
-				</PageHeader>
-			</div>
+			<pre class="whitespace-pre-wrap break-words rounded-md border bg-muted p-4 text-xs"><code
+					>{pageHeaderWithBack}</code
+				></pre>
 		</section>
 
 		<section class="space-y-3">
