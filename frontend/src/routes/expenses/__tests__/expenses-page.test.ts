@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Expense, ExpenseSummary, UserSettings, Vehicle } from '#lib/types/index.ts';
 import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
@@ -197,30 +198,30 @@ describe('/expenses loading states', () => {
 		getAllExpenses.mockRejectedValueOnce(new Error('Server unavailable'));
 		render(Page);
 
-		expect(await screen.findByText('Server unavailable')).toBeTruthy();
-		expect(screen.getByText('Failed to load expenses')).toBeTruthy();
+		expect(await screen.findByText("Couldn't load expenses")).toBeTruthy();
+		expect(screen.getByText('Server unavailable.')).toBeTruthy();
 		expect(captured.table['expenses']).toBeUndefined();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
 		await waitFor(() => expect(captured.table['totalCount']).toBe(1));
-		expect(screen.queryByText('Server unavailable')).toBeNull();
+		expect(screen.queryByText('Server unavailable.')).toBeNull();
 	});
 
 	test('a failed first summary also fails the first load', async () => {
 		getExpenseSummary.mockRejectedValueOnce(new Error('Summary down'));
 		render(Page);
 
-		expect(await screen.findByText('Summary down')).toBeTruthy();
+		expect(await screen.findByText("Couldn't load expenses")).toBeTruthy();
+		expect(screen.getByText('Summary down.')).toBeTruthy();
 	});
 
 	test('a non-Error first-load failure falls back to a generic reason', async () => {
 		getVehicles.mockRejectedValueOnce('offline');
 		render(Page);
 
-		await waitFor(() =>
-			expect(screen.getAllByText('Failed to load expenses').length).toBeGreaterThanOrEqual(2)
-		);
+		expect(await screen.findByText("Couldn't load expenses")).toBeTruthy();
+		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeTruthy();
 	});
 
 	test('splits the offline queue into pending, needs attention and synced', async () => {
@@ -419,7 +420,8 @@ describe('/expenses reloads and failures after the first load', () => {
 		callTable('onPageChange', 20);
 
 		const error = await screen.findByTestId('expenses-page-error');
-		expect(error.textContent).toContain('Failed to load expenses');
+		expect(error).toHaveTextContent("Couldn't load expenses");
+		expect(error).toHaveTextContent(UNEXPECTED_FAILURE_MESSAGE);
 	});
 
 	test('deleting an expense reloads the current page and the summary', async () => {
