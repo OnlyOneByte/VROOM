@@ -135,14 +135,14 @@ describe('findByEntityPaginated is userId-scoped', () => {
     await repo.create(makePhotoData(USER_A, 'vehicle', SHARED_ENTITY));
     await repo.create(makePhotoData(USER_B, 'vehicle', SHARED_ENTITY));
 
-    const resultA = await repo.findByEntityPaginated('vehicle', SHARED_ENTITY, USER_A, 50, 0);
+    const resultA = await repo.findByEntityPaginated('vehicle', SHARED_ENTITY, [USER_A], 50, 0);
     expect(resultA.totalCount).toBe(2);
     expect(resultA.data).toHaveLength(2);
     for (const p of resultA.data) {
       expect(p.userId).toBe(USER_A);
     }
 
-    const resultB = await repo.findByEntityPaginated('vehicle', SHARED_ENTITY, USER_B, 50, 0);
+    const resultB = await repo.findByEntityPaginated('vehicle', SHARED_ENTITY, [USER_B], 50, 0);
     expect(resultB.totalCount).toBe(1);
     expect(resultB.data[0]?.userId).toBe(USER_B);
   });
@@ -151,7 +151,7 @@ describe('findByEntityPaginated is userId-scoped', () => {
     await repo.create(makePhotoData(USER_A, 'vehicle', VEHICLE_A));
     await repo.create(makePhotoData(USER_A, 'vehicle', VEHICLE_A));
 
-    const result = await repo.findByEntityPaginated('vehicle', VEHICLE_A, USER_A, 50, 0);
+    const result = await repo.findByEntityPaginated('vehicle', VEHICLE_A, [USER_A], 50, 0);
     expect(result.totalCount).toBe(2);
     expect(result.data).toHaveLength(2);
   });

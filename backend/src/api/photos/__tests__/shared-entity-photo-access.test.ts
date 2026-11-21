@@ -73,7 +73,7 @@ describe('photo access on owner-stamped rows of a shared vehicle', () => {
     expect(body.data).toHaveLength(0);
   });
 
-  test('an EDITOR passes the upload gate for that expense (fails later, on storage config only)', async () => {
+  test("an EDITOR passes the upload gate for that expense (fails later, on the owner's storage config only)", async () => {
     const vehicleId = await shareAccepted('editor');
     const expenseId = await expenseByB(vehicleId);
 
@@ -81,7 +81,9 @@ describe('photo access on owner-stamped rows of a shared vehicle', () => {
     expect(res.status, 'authorization must not be the thing that rejects the editor').not.toBe(404);
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error?: { message?: string } };
-    expect(body.error?.message ?? '').toContain('No storage provider configured');
+    expect(body.error?.message ?? '').toContain(
+      "This vehicle's owner doesn't have an active photo storage provider"
+    );
   });
 
   test('an EDITOR can list the photos of an odometer reading they logged', async () => {

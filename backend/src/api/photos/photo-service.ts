@@ -7,6 +7,7 @@ import {
   capabilitiesOf,
   ENTITY_TO_CATEGORY,
   isImageMimeType,
+  type PhotoCategory,
   type StorageProvider,
   type StorageRef,
 } from '../providers/domains/storage/storage-provider';
@@ -83,13 +84,29 @@ async function persistUploadedPhotoOrCleanup(
   }
 }
 
+async function ownerDefaultProvider(
+  ownerId: string,
+  uploaderId: string,
+  category: PhotoCategory
+): ReturnType<typeof storageProviderRegistry.getDefaultProvider> {
+  try {
+    return await storageProviderRegistry.getDefaultProvider(ownerId, category);
+  } catch (error) {
+    const missingProvider = error instanceof ValidationError || error instanceof NotFoundError;
+    if (ownerId === uploaderId || !missingProvider) throw error;
+    throw new ValidationError(
+      "This vehicle's owner doesn't have an active photo storage provider, so photos can't be added to it yet. Ask the owner to connect one in Settings."
+    );
+  }
+}
+
 export async function uploadPhotoForEntity(
   entityType: string,
   entityId: string,
   userId: string,
   file: File
 ): Promise<Photo> {
-  await validateEntityOwnership(entityType, entityId, userId);
+  const ownerId = await validateEntityOwnership(entityType, entityId, userId);
 
   if (!ALLOWED_MIME_TYPES.includes(file.type)) {
     throw new AppError('Only JPEG, PNG, WebP images and PDF files are allowed', 400);
@@ -103,7 +120,8 @@ export async function uploadPhotoForEntity(
     throw new AppError(`No photo category mapping for entity type: ${entityType}`, 400);
   }
 
-  const { provider, providerId, folderPath } = await storageProviderRegistry.getDefaultProvider(
+  const { provider, providerId, folderPath } = await ownerDefaultProvider(
+    ownerId,
     userId,
     category
   );
@@ -127,7 +145,7 @@ export async function uploadPhotoForEntity(
   });
 
   const photo = await persistUploadedPhotoOrCleanup(provider, providerId, storageRef, {
-    userId,
+    userId: ownerId,
     entityType,
     entityId,
     fileName: file.name,
@@ -135,7 +153,7 @@ export async function uploadPhotoForEntity(
     fileSize: file.size,
   });
 
-  const backups = await storageProviderRegistry.getBackupProviders(userId, category);
+  const backups = await storageProviderRegistry.getBackupProviders(ownerId, category);
   for (const backup of backups) {
     if (!capabilitiesOf(backup.provider).arbitraryFiles && !isImageMimeType(file.type)) {
       continue;
@@ -162,11 +180,11 @@ export async function listPhotosForEntity(
   userId: string,
   pagination: { limit: number; offset: number }
 ): Promise<PaginatedResult<Photo>> {
-  await validateEntityOwnership(entityType, entityId, userId);
+  const ownerId = await validateEntityOwnership(entityType, entityId, userId);
   return photoRepository.findByEntityPaginated(
     entityType,
     entityId,
-    userId,
+    [...new Set([ownerId, userId])],
     pagination.limit,
     pagination.offset
   );
@@ -195,10 +213,15 @@ async function requireEntityPhoto(
   photoId: string,
   userId: string
 ): Promise<Photo> {
-  await validateEntityOwnership(entityType, entityId, userId);
+  const ownerId = await validateEntityOwnership(entityType, entityId, userId);
 
   const photo = await photoRepository.findById(photoId);
-  if (!photo || photo.entityType !== entityType || photo.entityId !== entityId) {
+  if (
+    !photo ||
+    photo.entityType !== entityType ||
+    photo.entityId !== entityId ||
+    (photo.userId !== ownerId && photo.userId !== userId)
+  ) {
     throw new NotFoundError('Photo');
   }
   return photo;
@@ -249,7 +272,7 @@ export async function getPhotoThumbnailForEntity(
   if (category) {
     try {
       const { providerId: defaultProviderId } = await storageProviderRegistry.getDefaultProvider(
-        userId,
+        photo.userId,
         category
       );
       ref = await photoRefRepository.findActiveByPhotoAndProvider(photoId, defaultProviderId);
@@ -271,7 +294,7 @@ export async function getPhotoThumbnailForEntity(
     );
   }
 
-  const provider = await storageProviderRegistry.getProvider(ref.providerId, userId);
+  const provider = await storageProviderRegistry.getProvider(ref.providerId, photo.userId);
   const buffer = await provider.download({
     providerType: provider.type,
     externalId: ref.storageRef,
@@ -301,7 +324,7 @@ export async function deletePhotoForEntity(
 
   const wasCover = photo.isCover;
 
-  await deletePhotoRowsAndObjects([photoId], userId);
+  await deletePhotoRowsAndObjects([photoId], photo.userId);
   await photoRepository.delete(photoId);
 
   if (wasCover) {

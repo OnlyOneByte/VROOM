@@ -21,7 +21,7 @@ function photoIds(): string[] {
 }
 
 describe('an orphaned photo row does not make backups unrestorable', () => {
-  test('deleting a trip orphans its odometer photo; the next backup still restores', async () => {
+  test('a legacy orphaned odometer photo does not stop the next backup from restoring', async () => {
     const vehRes = await ctx.authed('POST', '/api/v1/vehicles', {
       make: 'Kia',
       model: 'Niro',
