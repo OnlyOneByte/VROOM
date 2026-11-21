@@ -35,6 +35,7 @@ import {
 } from '../../utils/unit-preferences-schema';
 import {
   commonSchemas,
+  dateInput,
   validateVehicleOwnership,
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
@@ -115,7 +116,7 @@ const baseVehicleSchema = createInsertSchema(vehiclesTable, {
   purchasePrice: moneyDollarsToCents((n) =>
     n.min(0, 'Purchase price cannot be negative')
   ).optional(),
-  purchaseDate: z.coerce.date().optional(),
+  purchaseDate: dateInput.optional(),
 });
 
 const createVehicleSchema = baseVehicleSchema

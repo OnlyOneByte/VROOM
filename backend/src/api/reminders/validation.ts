@@ -3,7 +3,7 @@ import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES } from '../../db/types';
 import { moneyDollarsToCents } from '../../utils/money';
 import { isValidTimeZone, zoneOffsetMs } from '../../utils/time-zone';
-import { WHOLE_DISTANCE_MESSAGE } from '../../utils/validation';
+import { dateInput, WHOLE_DISTANCE_MESSAGE } from '../../utils/validation';
 import { buildCalendarDate } from '../expenses/local-date';
 import {
   FUEL_SPLIT_MESSAGE,
@@ -27,7 +27,7 @@ function plainDateToInstant(value: string, timeZone: string | undefined): Date |
 
 const reminderDateSchema = z.preprocess(
   (value) => (typeof value === 'string' ? (plainDateToInstant(value, undefined) ?? value) : value),
-  z.coerce.date({ error: 'Invalid date' })
+  dateInput
 );
 
 function withZonedPlainDates(value: unknown): unknown {
@@ -231,6 +231,8 @@ const reminderMergeGateSchema = reminderBaseSchema
   .extend({
     expenseAmount: z.number().nonnegative().nullish(),
     expenseSplitConfig: splitConfigStructuralSchema.nullish(),
+    startDate: z.coerce.date(),
+    endDate: z.coerce.date().nullish(),
   })
   .superRefine((data, ctx) => {
     refineCustomFrequency(data, ctx);
