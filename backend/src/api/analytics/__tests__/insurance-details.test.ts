@@ -458,7 +458,7 @@ describe('getInsurance — response shape matches the frontend contract', () => 
 });
 
 describe('getInsurance — month buckets do not depend on the server timezone', () => {
-  const originalTz = process.env.TZ;
+  const originalTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   afterEach(() => {
     process.env.TZ = originalTz;
   });

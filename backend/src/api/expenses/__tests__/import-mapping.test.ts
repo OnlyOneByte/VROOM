@@ -162,7 +162,7 @@ describe('applyMapping — no vehicle column injects targetVehicle', () => {
 describe('normalizeForeignDate — local-time handling across formats', () => {
   function localParts(iso: string) {
     const d = new Date(iso);
-    return { y: d.getFullYear(), m: d.getMonth() + 1, day: d.getDate() };
+    return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, day: d.getUTCDate() };
   }
 
   test('iso (no timezone) preserves the calendar day', () => {
@@ -218,7 +218,7 @@ describe('normalizeForeignDate — out-of-range parts do NOT silently roll over'
 
   test('a valid in-range date still normalizes (the guard does not over-reject)', () => {
     const d = new Date(normalizeForeignDate('12/31/2024', 'mdy'));
-    expect({ y: d.getFullYear(), m: d.getMonth() + 1, day: d.getDate() }).toEqual({
+    expect({ y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, day: d.getUTCDate() }).toEqual({
       y: 2024,
       m: 12,
       day: 31,
@@ -274,9 +274,9 @@ describe('applyMapping output imports through buildImportPlan', () => {
     expect(exp.expenseAmount).toBe(5240);
     expect(exp.mileage).toBe(100);
     expect(exp.volume).toBeCloseTo(10, 2);
-    expect(exp.date.getFullYear()).toBe(2024);
-    expect(exp.date.getMonth() + 1).toBe(3);
-    expect(exp.date.getDate()).toBe(15);
+    expect(exp.date.getUTCFullYear()).toBe(2024);
+    expect(exp.date.getUTCMonth() + 1).toBe(3);
+    expect(exp.date.getUTCDate()).toBe(15);
   });
 });
 
