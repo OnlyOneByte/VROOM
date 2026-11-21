@@ -42,9 +42,9 @@ palette class. Every token has a light and a dark variant.
 Notes:
 - `--muted-foreground` and `--destructive` are deliberately darkened to clear WCAG AA 4.5:1
   on white/card — do NOT lighten them, and avoid `text-muted-foreground/40`-style opacity on
-  real text. `theme/__tests__/theme-contrast.test.ts` gates every theme's text pairs at AA and
-  the chart tokens at 3:1; `warning`, `border`, `input` and `ring` are not gated yet (see
-  `UIQuality.md`, *Colour and theme tokens*).
+  real text. `theme/__tests__/theme-contrast.test.ts` gates every theme's text pairs at AA
+  (`warning` included) and the chart tokens at 3:1; `border`, `input` and `ring` are not gated
+  yet (see `UIQuality.md`, *Colour and theme tokens*).
 - Status surfaces: use `Alert` with `default` or `destructive`, or a `bg-warning/10` +
   `text-warning` tint, rather than a hand-tinted div. Do NOT reach for `Alert`'s `warning` or
   `success` variants yet — both hardcode palette classes (`bg-yellow-50 border-yellow-200
@@ -52,10 +52,14 @@ Notes:
   and dark mode. `no-theme-clashing-colors.test.ts` does not catch them (its regex covers only
   white/black/gray/slate/zinc/neutral); `/dev/gallery` renders all four if you want to see the gap.
   `--success` is themed and AA-gated, but `Alert`'s `success` variant does not use it yet.
-- `text-chart-*` is for chart marks, not words: the chart gate is only 3:1. Status text uses
-  `text-success` / `text-warning` / `text-destructive`. `--primary` is gated at AA on
-  `--background`; a `bg-primary/10` tint (the active nav item) costs about 10% of that, which only
-  the axe e2e scans catch.
+- `text-chart-*` is for chart marks and icons, not words: chart tokens are gated at 3:1, on
+  `card` and as an icon on their own `/10` tint over `card` and `background` (the category badges
+  and `StatCard` chips). Put the label in `text-foreground` beside the tinted icon. Status text
+  uses `text-success` / `text-warning` / `text-destructive`.
+- `text-primary` on a `bg-primary/10` tint (the active nav item, chips, avatars) is gated at AA
+  in every light theme over `background` and `card`, as are `text-warning` on `bg-warning/10` and
+  `text-chart-5` on `bg-chart-5/10`. The axe e2e scans cover every route in the default light
+  theme and every other theme's dashboard in light and dark mode.
 - Chart colors come from `utils/chart-colors`: series `CHART_COLORS[i % CHART_COLORS.length]`
   (8 colors), category `getCategoryChartColor` (badges use `getCategoryBadgeClasses` from
   `utils/expense-helpers`; both derive from the one `CATEGORY_COLOR_TOKENS` assignment), chart

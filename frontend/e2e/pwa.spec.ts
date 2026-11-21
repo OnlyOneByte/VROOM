@@ -202,27 +202,38 @@ test.describe('Accessibility (axe) — theme palettes', () => {
 		'palette contrast is engine-independent'
 	);
 
-	for (const themeId of NON_DEFAULT_THEMES) {
-		test(`the ${themeId} theme in dark mode has no axe violations`, async ({
-			page,
-			context
-		}, testInfo) => {
-			await addSessionCookie(context);
-			await page.addInitScript(
-				({ modeKey, idKey, id }) => {
-					localStorage.setItem(modeKey, 'dark');
-					localStorage.setItem(idKey, id);
-				},
-				{ modeKey: 'vroom-theme-preference', idKey: 'vroom-theme-id', id: themeId }
-			);
-			await mockApi(page);
+	for (const mode of ['dark', 'light'] as const) {
+		for (const themeId of NON_DEFAULT_THEMES) {
+			test(`the ${themeId} theme in ${mode} mode has no axe violations`, async ({
+				page,
+				context
+			}, testInfo) => {
+				await addSessionCookie(context);
+				await page.addInitScript(
+					({ modeKey, idKey, id, preference }) => {
+						localStorage.setItem(modeKey, preference);
+						localStorage.setItem(idKey, id);
+					},
+					{
+						modeKey: 'vroom-theme-preference',
+						idKey: 'vroom-theme-id',
+						id: themeId,
+						preference: mode
+					}
+				);
+				await mockApi(page);
 
-			await page.goto('/dashboard');
-			await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-			await expect(page.locator('html')).toHaveAttribute('data-theme', themeId);
-			await expect(page.locator('html')).toHaveClass(/dark/);
+				await page.goto('/dashboard');
+				await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+				await expect(page.locator('html')).toHaveAttribute('data-theme', themeId);
+				if (mode === 'dark') {
+					await expect(page.locator('html')).toHaveClass(/dark/);
+				} else {
+					await expect(page.locator('html')).not.toHaveClass(/dark/);
+				}
 
-			await expectNoNewViolations(page, testInfo, `dashboard-dark-${themeId}`, []);
-		});
+				await expectNoNewViolations(page, testInfo, `dashboard-${mode}-${themeId}`, []);
+			});
+		}
 	}
 });
