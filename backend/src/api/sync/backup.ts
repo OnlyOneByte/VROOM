@@ -29,6 +29,7 @@ import {
   syncState,
   trips,
   userPreferences,
+  userProviders,
   vehicleFinancing,
   vehicleShares,
   vehicles,
@@ -298,18 +299,18 @@ export class BackupService {
       .filter(([, settings]) => hasZipBackup(settings))
       .map(([providerId]) => providerId);
     const results: ProviderBackupList[] = [];
+    if (zipProviderIds.length === 0) return results;
+
+    const providerRows = await getDb()
+      .select()
+      .from(userProviders)
+      .where(and(inArray(userProviders.id, zipProviderIds), eq(userProviders.userId, userId)));
+    const providersById = new Map(providerRows.map((row) => [row.id, row]));
 
     for (const providerId of zipProviderIds) {
       try {
         const backups = await this.listBackups(userId, providerId);
-
-        const db = getDb();
-        const { userProviders } = await import('../../db/schema');
-        const providerRow = await db
-          .select()
-          .from(userProviders)
-          .where(and(eq(userProviders.id, providerId), eq(userProviders.userId, userId)))
-          .get();
+        const providerRow = providersById.get(providerId);
 
         results.push({
           providerId,

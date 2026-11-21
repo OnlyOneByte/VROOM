@@ -1,4 +1,4 @@
-import { and, eq, notExists, sql } from 'drizzle-orm';
+import { and, eq, inArray, notExists, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
@@ -16,7 +16,7 @@ import { commonSchemas, zValidator } from '../../utils/validation';
 import { photoRefRepository } from '../photos/photo-ref-repository';
 import { preferencesRepository } from '../settings/repository';
 import { storageProviderRegistry } from './domains/storage/registry';
-import { CATEGORY_TO_ENTITY_TYPES } from './domains/storage/storage-provider';
+import { CATEGORY_TO_ENTITY_TYPES, ENTITY_TO_CATEGORY } from './domains/storage/storage-provider';
 
 function isPhotoCategory(value: string): value is PhotoCategory {
   return (PHOTO_CATEGORIES as readonly string[]).includes(value);
@@ -43,47 +43,6 @@ async function findOwnedProviderOrThrow(
     throw new NotFoundError('Provider');
   }
   return existing[0];
-}
-
-async function countUserPhotos(
-  db: DbInstance,
-  entityType: string,
-  userId: string,
-  extraConditions?: ReturnType<typeof and>
-): Promise<number> {
-  const conditions = [eq(photos.entityType, entityType), eq(photos.userId, userId)];
-  if (extraConditions) conditions.push(extraConditions);
-
-  const result = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(photos)
-    .where(and(...conditions));
-
-  return result[0]?.count ?? 0;
-}
-
-async function countPhotoRefsByStatus(
-  db: DbInstance,
-  providerId: string,
-  status: 'active' | 'pending' | 'failed',
-  entityTypes: string[]
-): Promise<number> {
-  const result = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(photoRefs)
-    .innerJoin(photos, eq(photoRefs.photoId, photos.id))
-    .where(
-      and(
-        eq(photoRefs.providerId, providerId),
-        eq(photoRefs.status, status),
-        sql`${photos.entityType} IN (${sql.join(
-          entityTypes.map((t) => sql`${t}`),
-          sql`, `
-        )})`
-      )
-    );
-
-  return result[0]?.count ?? 0;
 }
 
 function formatProviderResponse(row: UserProvider) {
@@ -581,20 +540,35 @@ routes.get('/:id/sync-status', zValidator('param', commonSchemas.idParam), async
 
   await findOwnedProviderOrThrow(db, id, user.id);
 
-  const result: Record<string, { total: number; synced: number; failed: number }> = {};
+  const result = Object.fromEntries(
+    PHOTO_CATEGORIES.map((category) => [category, { total: 0, synced: 0, failed: 0 }])
+  ) as Record<PhotoCategory, { total: number; synced: number; failed: number }>;
 
-  for (const category of PHOTO_CATEGORIES) {
-    const entityTypes = CATEGORY_TO_ENTITY_TYPES[category];
-    let total = 0;
-    for (const entityType of entityTypes) {
-      total += await countUserPhotos(db, entityType, user.id);
-    }
+  const photoTotals = await db
+    .select({ entityType: photos.entityType, count: sql<number>`count(*)` })
+    .from(photos)
+    .where(eq(photos.userId, user.id))
+    .groupBy(photos.entityType);
+  for (const row of photoTotals) {
+    const category = ENTITY_TO_CATEGORY[row.entityType];
+    if (category) result[category].total += row.count;
+  }
 
-    result[category] = {
-      total,
-      synced: await countPhotoRefsByStatus(db, id, 'active', entityTypes),
-      failed: await countPhotoRefsByStatus(db, id, 'failed', entityTypes),
-    };
+  const refCounts = await db
+    .select({
+      entityType: photos.entityType,
+      status: photoRefs.status,
+      count: sql<number>`count(*)`,
+    })
+    .from(photoRefs)
+    .innerJoin(photos, eq(photoRefs.photoId, photos.id))
+    .where(and(eq(photoRefs.providerId, id), inArray(photoRefs.status, ['active', 'failed'])))
+    .groupBy(photos.entityType, photoRefs.status);
+  for (const row of refCounts) {
+    const category = ENTITY_TO_CATEGORY[row.entityType];
+    if (!category) continue;
+    if (row.status === 'active') result[category].synced += row.count;
+    else result[category].failed += row.count;
   }
 
   return c.json({ success: true, data: result });
