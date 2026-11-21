@@ -10,6 +10,7 @@
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.ts';
 	import { AppLineChart } from '#lib/components/charts/index.ts';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
@@ -80,6 +81,29 @@
 				{/each}
 				<Button disabled>disabled</Button>
 			</div>
+		</section>
+
+		<section class="space-y-3">
+			<h2 class="text-lg font-semibold">Tabs</h2>
+			<p class="text-sm text-muted-foreground">
+				Triggers are 40px tall below <code>sm</code> so they clear the mobile tap target.
+			</p>
+			<Tabs value="overview">
+				<TabsList class="grid w-full grid-cols-3">
+					<TabsTrigger value="overview">Overview</TabsTrigger>
+					<TabsTrigger value="expenses">Expenses</TabsTrigger>
+					<TabsTrigger value="finance">Finance</TabsTrigger>
+				</TabsList>
+				<TabsContent value="overview" class="text-sm text-muted-foreground"
+					>Overview panel</TabsContent
+				>
+				<TabsContent value="expenses" class="text-sm text-muted-foreground"
+					>Expenses panel</TabsContent
+				>
+				<TabsContent value="finance" class="text-sm text-muted-foreground"
+					>Finance panel</TabsContent
+				>
+			</Tabs>
 		</section>
 
 		<section class="space-y-3">

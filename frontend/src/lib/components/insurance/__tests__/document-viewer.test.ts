@@ -188,6 +188,16 @@ describe('DocumentViewer uploads', () => {
 });
 
 describe('DocumentViewer deletion', () => {
+	test('names each delete button after the document it removes', async () => {
+		getEntityDocuments.mockResolvedValue(
+			page([photo(), photo({ id: 'd2', fileName: 'policy.pdf', mimeType: 'application/pdf' })])
+		);
+		mount();
+		await settle();
+		expect(screen.getByRole('button', { name: 'Delete card.jpg' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Delete policy.pdf' })).toBeInTheDocument();
+	});
+
 	test('confirming the dialog deletes the document and removes its tile', async () => {
 		getEntityDocuments.mockResolvedValue(
 			page([photo(), photo({ id: 'd2', fileName: 'other.jpg' })])
@@ -195,8 +205,7 @@ describe('DocumentViewer deletion', () => {
 		deleteEntityDocument.mockResolvedValue();
 		mount();
 		await settle();
-		const tile = screen.getByRole('img', { name: 'card.jpg' }).parentElement as HTMLElement;
-		await fireEvent.click(within(tile).getByRole('button'));
+		await fireEvent.click(screen.getByRole('button', { name: 'Delete card.jpg' }));
 		await settle();
 		const dialog = screen.getByRole('alertdialog');
 		expect(within(dialog).getByText('Delete document?')).toBeInTheDocument();
@@ -214,8 +223,7 @@ describe('DocumentViewer deletion', () => {
 		deleteEntityDocument.mockRejectedValue(failure);
 		mount();
 		await settle();
-		const tile = screen.getByRole('img', { name: 'card.jpg' }).parentElement as HTMLElement;
-		await fireEvent.click(within(tile).getByRole('button'));
+		await fireEvent.click(screen.getByRole('button', { name: 'Delete card.jpg' }));
 		await settle();
 		await fireEvent.click(
 			within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' })

@@ -31,6 +31,7 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
+	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import ReminderForm from '#lib/components/reminders/ReminderForm.svelte';
 	import MaterializedExpensesDialog from '#lib/components/reminders/MaterializedExpensesDialog.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
@@ -198,21 +199,15 @@
 	<meta name="description" content="Recurring expenses and maintenance reminders" />
 </svelte:head>
 
-<div class="space-y-6">
+<div class="space-y-6 pb-24">
 	<PageHeader title="Reminders" description="Recurring expenses and maintenance reminders">
 		{#snippet actions()}
-			<Button
-				variant="outline"
-				onclick={runDueReminders}
-				disabled={isTriggering || dueReminders.length === 0}
-			>
-				<RefreshCw class="mr-2 h-4 w-4 {isTriggering ? 'animate-spin' : ''}" />
-				Run due reminders
-			</Button>
-			<Button onclick={openCreate}>
-				<Plus class="mr-2 h-4 w-4" />
-				New Reminder
-			</Button>
+			{#if dueReminders.length > 0}
+				<Button variant="outline" size="lg" onclick={runDueReminders} disabled={isTriggering}>
+					<RefreshCw class="mr-2 h-4 w-4 {isTriggering ? 'animate-spin' : ''}" />
+					Run due reminders
+				</Button>
+			{/if}
 		{/snippet}
 	</PageHeader>
 
@@ -244,7 +239,7 @@
 				schedules, and VROOM will track when they're due.
 			{/snippet}
 			{#snippet action()}
-				<Button onclick={openCreate}>
+				<Button size="lg" onclick={openCreate}>
 					<Plus class="mr-2 h-4 w-4" />
 					New Reminder
 				</Button>
@@ -452,6 +447,10 @@
 				</CardNs.CardContent>
 			</CardNs.Card>
 		</section>
+	{/if}
+
+	{#if !isLoading && !loadError && reminders.length > 0}
+		<FloatingActionButton label="New Reminder" onclick={openCreate} />
 	{/if}
 
 	<ReminderForm bind:open={formOpen} reminder={editingReminder} {vehicles} onSaved={load} />

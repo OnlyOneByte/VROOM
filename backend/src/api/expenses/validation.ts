@@ -3,6 +3,8 @@ import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES, type SplitConfig } from '../../db/types';
 import { dollarsToCents } from '../../utils/money';
 
+export const FUEL_SPLIT_MESSAGE = 'Fuel expenses cannot be split. Log the fill-up on one vehicle.';
+
 // Tags cannot contain ';' or ',': the CSV export joins tags with '; ' and the importer splits on /[;,]/.
 export const tagElementSchema = z
   .string()
@@ -119,7 +121,7 @@ export const createSplitExpenseSchema = z
   .object({
     splitConfig: splitConfigSchema,
     category: z.enum(EXPENSE_CATEGORIES).refine((category) => category !== 'fuel', {
-      message: 'Fuel expenses cannot be split. Log the fill-up on one vehicle.',
+      message: FUEL_SPLIT_MESSAGE,
     }),
     tags: z.array(tagElementSchema).max(CONFIG.validation.expense.maxTags).optional(),
     date: z.coerce.date(),

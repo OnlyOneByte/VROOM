@@ -496,6 +496,7 @@ routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (
   const db = getDb();
 
   await findOwnedProviderOrThrow(db, id, user.id);
+  await photoRefRepository.resetFailedForProvider(id);
 
   const prefs = await preferencesRepository.getOrCreate(user.id);
   const storageConfig = prefs.storageConfig as StorageConfig | null;

@@ -91,3 +91,41 @@ describe('PUT /settings backupConfig is merged per provider, not replaced wholes
     expect(body.data.backupConfig.providers['drive-a']?.sheetsSyncEnabled).toBeUndefined();
   });
 });
+
+describe('PUT /settings never overwrites server-owned backup fields', () => {
+  test('a stale page-load copy keeps the server-written lastBackupAt and sheetsSpreadsheetId', async () => {
+    seedProvider('drive-s', 'Drive S');
+    await ctx.authed('PUT', '/api/v1/settings', {
+      backupConfig: { providers: { 'drive-s': providerSettings('drive-s') } },
+    });
+    const { preferencesRepository } = await import('../repository');
+    await preferencesRepository.mergeJsonField(ctx.user.id, 'backupConfig', {
+      providers: {
+        'drive-s': { lastBackupAt: '2026-11-20T10:00:00.000Z', sheetsSpreadsheetId: 'sheet-live' },
+      },
+    });
+
+    const res = await ctx.authed('PUT', '/api/v1/settings', {
+      backupConfig: {
+        providers: {
+          'drive-s': providerSettings('drive-s', {
+            retentionCount: 3,
+            lastBackupAt: '2026-01-01T00:00:00.000Z',
+          }),
+        },
+      },
+    });
+    expect(res.status).toBe(200);
+
+    const stored = ctx.sqlite
+      .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
+      .get(ctx.user.id) as { backup_config: string };
+    expect(JSON.parse(stored.backup_config).providers['drive-s']).toEqual({
+      enabled: true,
+      folderPath: '/Backups/drive-s',
+      retentionCount: 3,
+      lastBackupAt: '2026-11-20T10:00:00.000Z',
+      sheetsSpreadsheetId: 'sheet-live',
+    });
+  });
+});

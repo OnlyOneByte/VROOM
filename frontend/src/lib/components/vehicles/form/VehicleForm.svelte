@@ -61,6 +61,7 @@
 	import { validateVehicleFields, validateFinancingFields } from './vehicle-form-validation';
 	import { calculatePayoffDateFromStart } from '#lib/utils/financing-calculations.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 
 	interface Props {
 		vehicleId?: string;
@@ -74,6 +75,7 @@
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
+	let showPayoffConfirm = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 
 	let trackFuel = $state(true);
@@ -305,6 +307,28 @@
 		);
 	});
 
+	let activeFinancingToEnd = $derived(
+		isEditMode && ownershipType === 'own' && vehicle?.financing?.isActive ? vehicle.financing : null
+	);
+
+	let payoffConfirmCopy = $derived.by(() => {
+		const financing = activeFinancingToEnd;
+		if (!financing) return { title: '', description: '', confirmLabel: '' };
+		const lender = financing.provider ? ` with ${financing.provider}` : '';
+		if (financing.financingType === 'lease') {
+			return {
+				title: 'End the lease?',
+				description: `Switching to Own ends the lease${lender}. It will no longer show on the Finance tab. Lease payments you already logged stay in your expenses.`,
+				confirmLabel: 'End Lease'
+			};
+		}
+		return {
+			title: 'Mark the loan as paid off?',
+			description: `Switching to Own marks the loan${lender} as paid off. It will no longer show on the Finance tab. Loan payments you already logged stay in your expenses.`,
+			confirmLabel: 'Mark Paid Off'
+		};
+	});
+
 	let paymentToSave = $derived(
 		financingForm.financingType === 'loan' && amortizationPreview && loanTermsChanged
 			? amortizationPreview.monthlyPayment
@@ -339,7 +363,29 @@
 		if (!validateVehicleForm() || !validateFinancingForm()) {
 			return;
 		}
+		if (activeFinancingToEnd) {
+			showPayoffConfirm = true;
+			return;
+		}
+		await saveVehicle();
+	}
 
+	async function payOffAndSave() {
+		if (!activeFinancingToEnd) return;
+		try {
+			await vehicleApi.payOffFinancing(activeFinancingToEnd.id);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Unknown error';
+			appStore.addNotification({
+				type: 'error',
+				message: `Couldn't mark the ${activeFinancingToEnd.financingType === 'lease' ? 'lease as ended' : 'loan as paid off'}: ${message}`
+			});
+			throw error;
+		}
+		await saveVehicle();
+	}
+
+	async function saveVehicle() {
 		isSubmitting = true;
 
 		try {
@@ -930,5 +976,14 @@
 				</AlertDialogFooter>
 			</AlertDialogContent>
 		</AlertDialog>
+
+		<ConfirmDialog
+			bind:open={showPayoffConfirm}
+			title={payoffConfirmCopy.title}
+			description={payoffConfirmCopy.description}
+			confirmLabel={payoffConfirmCopy.confirmLabel}
+			destructive={false}
+			onConfirm={payOffAndSave}
+		/>
 	{/if}
 </FormLayout>
