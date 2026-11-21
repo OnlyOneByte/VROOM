@@ -25,6 +25,10 @@ function meOk(user: User): Response {
 	);
 }
 
+afterEach(() => {
+	vi.restoreAllMocks();
+});
+
 describe('authStore.recheckSession', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -58,14 +62,11 @@ describe('authStore.recheckSession', () => {
 	});
 
 	it('clears the in-flight flag when the recheck throws', async () => {
-		const initialize = vi
-			.spyOn(authStore, 'initialize')
-			.mockRejectedValueOnce(new Error('unexpected'));
+		vi.spyOn(authStore, 'initialize').mockRejectedValueOnce(new Error('unexpected'));
 
 		await expect(authStore.recheckSession()).rejects.toThrow('unexpected');
 
 		expect(authStore.recheckingSession).toBe(false);
-		initialize.mockRestore();
 	});
 });
 
@@ -74,10 +75,6 @@ describe('authStore remembered user', () => {
 		vi.clearAllMocks();
 		authStore.clearUser();
 		ls.clear();
-	});
-
-	afterEach(() => {
-		vi.restoreAllMocks();
 	});
 
 	it('signs out when the remembered user is unreadable and the server is unreachable', async () => {
