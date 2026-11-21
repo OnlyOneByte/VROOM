@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { goto, refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		ArrowLeft,
@@ -75,6 +76,10 @@
 
 	let isLoading = $state(untrack(() => !!vehicleId));
 	let isSubmitting = $state(false);
+
+	let isPayingOff = $state(false);
+
+	onMount(() => trackPendingSave(() => isSubmitting || isPayingOff));
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
 	let showPayoffConfirm = $state(false);
@@ -416,17 +421,23 @@
 	async function payOffAndSave() {
 		const financing = financingBeingEnded;
 		if (!financing) return;
+		isPayingOff = true;
 		try {
 			const ended = await vehicleApi.payOffFinancing(financing.id);
 			if (vehicle) vehicle.financing = ended;
 		} catch (error) {
+			isPayingOff = false;
 			appStore.addNotification({
 				type: 'error',
 				message: `Couldn't mark the ${financing.financingType === 'lease' ? 'lease as ended' : 'loan as paid off'}. ${userFacingErrorMessage(error)}`
 			});
 			throw error;
 		}
-		await saveVehicle();
+		try {
+			await saveVehicle();
+		} finally {
+			isPayingOff = false;
+		}
 	}
 
 	async function saveVehicle(confirmUnitChange = false) {
