@@ -171,6 +171,15 @@ describe('handleOAuthReturn', () => {
 		expect(goto).toHaveBeenCalledWith('/settings/providers/p1/edit', { replace: true });
 	});
 
+	test('an expired pending-email lookup asks to connect again, not the server text', async () => {
+		setPageUrl('https://app.example/settings/providers/p1/edit?provider_connected=true&nonce=n-4');
+		get.mockRejectedValue(new ApiError('Pending provider credentials not found', 404));
+		await createOAuth().handleOAuthReturn();
+		expect(showError).toHaveBeenCalledWith(
+			"Couldn't find the Google account you connected. Connect it again."
+		);
+	});
+
 	test('provider_connected without a nonce is ignored', async () => {
 		setPageUrl('https://app.example/settings/providers/new?provider_connected=true');
 		await expect(createOAuth().handleOAuthReturn()).resolves.toEqual({});
@@ -180,7 +189,7 @@ describe('handleOAuthReturn', () => {
 
 	test.each([
 		['cancelled', 'Google account connection was cancelled.'],
-		['exchange_failed', 'Couldn’t connect your Google account. Please try again.'],
+		['exchange_failed', "Couldn't connect your Google account. Try again."],
 		['no_refresh_token', 'Google did not grant offline access. Please try again.'],
 		['session_expired', 'Your session expired. Please log in and try again.'],
 		['invalid_state', 'The Google connection expired. Please try again.'],
@@ -188,7 +197,7 @@ describe('handleOAuthReturn', () => {
 			'session_mismatch',
 			'You were signed in as someone else when Google finished connecting. Sign in again and retry.'
 		],
-		['something_else', 'Couldn’t connect your Google account. Please try again.']
+		['something_else', "Couldn't connect your Google account. Try again."]
 	])('provider_error=%s shows a specific message and cleans the URL', async (code, message) => {
 		setPageUrl(`https://app.example/settings/providers/new?provider_error=${code}`);
 		await expect(createOAuth().handleOAuthReturn()).resolves.toEqual({});

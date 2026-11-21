@@ -3,7 +3,7 @@ import { page } from '$app/state';
 import { browser } from '$app/env';
 import { apiClient, getApiBaseUrl } from '#lib/services/api-client.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
-import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
 interface GoogleOAuthOptions {
 	isEditMode: boolean;
@@ -102,9 +102,11 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 				);
 				pendingEmail = result.email;
 			} catch (error) {
-				appStore.showError(
-					`Couldn't find the Google account you connected. ${userFacingErrorMessage(error)}`
-				);
+				const reason =
+					error instanceof ApiError && error.statusCode === 404
+						? 'Connect it again.'
+						: userFacingErrorMessage(error);
+				appStore.showError(`Couldn't find the Google account you connected. ${reason}`);
 			}
 
 			// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic runtime path from current URL
@@ -116,7 +118,7 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 		if (providerError) {
 			const errorMessages: Record<string, string> = {
 				cancelled: 'Google account connection was cancelled.',
-				exchange_failed: 'Couldn’t connect your Google account. Please try again.',
+				exchange_failed: "Couldn't connect your Google account. Try again.",
 				no_refresh_token: 'Google did not grant offline access. Please try again.',
 				session_expired: 'Your session expired. Please log in and try again.',
 				invalid_state: 'The Google connection expired. Please try again.',
@@ -124,7 +126,7 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 					'You were signed in as someone else when Google finished connecting. Sign in again and retry.'
 			};
 			appStore.showError(
-				errorMessages[providerError] ?? 'Couldn’t connect your Google account. Please try again.'
+				errorMessages[providerError] ?? "Couldn't connect your Google account. Try again."
 			);
 			// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic runtime path from current URL
 			goto(page.url.pathname, { replace: true });

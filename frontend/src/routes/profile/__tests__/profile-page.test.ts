@@ -283,7 +283,7 @@ describe('Profile connected accounts', () => {
 		[
 			'LAST_ACCOUNT',
 			Object.assign(new Error('x'), { code: 'LAST_ACCOUNT' }),
-			'Cannot unlink your last sign-in method.'
+			"You can't unlink your last sign-in method."
 		],
 		[
 			'other',

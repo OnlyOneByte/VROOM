@@ -176,7 +176,7 @@
 		} catch (err) {
 			const code = err instanceof Error && 'code' in err ? (err as { code: string }).code : '';
 			if (code === 'LAST_ACCOUNT') {
-				unlinkError = 'Cannot unlink your last sign-in method.';
+				unlinkError = "You can't unlink your last sign-in method.";
 			} else {
 				unlinkError = `Couldn't unlink the account. ${userFacingErrorMessage(err)}`;
 			}
