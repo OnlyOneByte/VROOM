@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/svelte';
-import { makePolicy, makeTerm, photoPage } from './insurance-fixtures.ts';
+import { makePolicy, makeTerm, photoPage, settle } from './insurance-fixtures.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$app/paths', async () => ({
@@ -8,6 +8,7 @@ vi.mock('$app/paths', async () => ({
 }));
 vi.mock('#lib/services/insurance-api.ts', () => ({
 	insuranceApi: {
+		getPoliciesForVehicle: () => Promise.resolve([makePolicy({ terms: [makeTerm()] })]),
 		getClaims: () => Promise.resolve([]),
 		getEntityDocuments: () => Promise.resolve(photoPage([])),
 		getEntityDocumentThumbnailUrl: () => '/thumb',
@@ -17,8 +18,13 @@ vi.mock('#lib/services/insurance-api.ts', () => ({
 	}
 }));
 
+vi.mock('#lib/services/provider-api.ts', () => ({
+	providerApi: { getProviders: () => Promise.resolve([]) }
+}));
+
 const PolicyTermCard = (await import('../PolicyTermCard.svelte')).default;
 const PolicyCard = (await import('../PolicyCard.svelte')).default;
+const InsuranceTab = (await import('../InsuranceTab.svelte')).default;
 
 afterEach(() => {
 	cleanup();
@@ -60,5 +66,12 @@ describe('insurance action buttons', () => {
 		const settings = screen.getByRole('button', { name: 'Policy settings' });
 		expect(settings).toHaveAttribute('aria-label', 'Policy settings');
 		expectTouchSized(settings);
+	});
+
+	test('Add Policy on the vehicle page is 40px tall on mobile', async () => {
+		render(InsuranceTab, { props: { vehicleId: 'v1' } });
+		await settle();
+
+		expect(screen.getByRole('button', { name: 'Add Policy' }).className).toContain('h-10');
 	});
 });
