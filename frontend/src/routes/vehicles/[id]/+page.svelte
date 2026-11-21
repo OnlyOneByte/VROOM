@@ -253,7 +253,7 @@
 		try {
 			vehicle = await vehicleApi.getVehicle(vehicleId);
 		} catch (error) {
-			handleErrorWithNotification(error, 'Failed to load vehicle');
+			handleErrorWithNotification(error, "Couldn't load the vehicle");
 			if (error instanceof ApiError && (error.statusCode === 404 || error.statusCode === 400)) {
 				goto(resolve(routes.dashboard));
 				return;
@@ -271,7 +271,7 @@
 				period: selectedStatsPeriod
 			});
 		} catch (error) {
-			handleErrorWithNotification(error, 'Failed to load expense summary');
+			handleErrorWithNotification(error, "Couldn't load the expense summary");
 			summaryLoadError = userFacingErrorMessage(error);
 		} finally {
 			isLoadingStats = false;
@@ -283,7 +283,7 @@
 			const result = await analyticsApi.getFuelEfficiency({ vehicleId });
 			fuelEfficiencyPoints = result.fuelEfficiencyTrend;
 		} catch (error) {
-			handleErrorWithNotification(error, 'Failed to load fuel efficiency data');
+			handleErrorWithNotification(error, "Couldn't load fuel efficiency");
 		}
 	}
 
@@ -313,7 +313,7 @@
 			totalCount = result.pagination.totalCount;
 			currentOffset = offset;
 		} catch (error) {
-			handleErrorWithNotification(error, 'Failed to load expenses');
+			handleErrorWithNotification(error, "Couldn't load expenses");
 			expensesLoadError = userFacingErrorMessage(error);
 		} finally {
 			isLoadingPage = false;
@@ -336,7 +336,7 @@
 		try {
 			vehicleStatsData = await vehicleApi.getVehicleStats(vehicleId, selectedStatsPeriod);
 		} catch (error) {
-			handleErrorWithNotification(error, 'Failed to load vehicle statistics');
+			handleErrorWithNotification(error, "Couldn't load the vehicle's stats");
 		} finally {
 			isLoadingStats = false;
 		}
@@ -373,7 +373,7 @@
 				tags: filters.tags?.length ? filters.tags : undefined
 			});
 		} catch (err) {
-			handleErrorWithNotification(err, 'Failed to export expenses');
+			handleErrorWithNotification(err, "Couldn't export expenses");
 		} finally {
 			isExporting = false;
 		}
@@ -388,7 +388,7 @@
 			const photosResult = await vehicleApi.getPhotos(vehicleId);
 			vehiclePhotos = photosResult.data;
 		} catch (error) {
-			handleErrorWithNotification(error, 'Failed to load photos');
+			handleErrorWithNotification(error, "Couldn't load photos");
 		}
 	}
 
@@ -401,7 +401,7 @@
 			await vehicleApi.deletePhoto(vehicleId, photoId);
 			vehiclePhotos = vehiclePhotos.filter(p => p.id !== photoId);
 		} catch (error) {
-			handleErrorWithNotification(error, 'Failed to delete photo');
+			handleErrorWithNotification(error, "Couldn't delete the photo");
 		}
 	}
 
@@ -413,7 +413,7 @@
 				isCover: p.id === updated.id
 			}));
 		} catch (error) {
-			handleErrorWithNotification(error, 'Failed to set cover photo');
+			handleErrorWithNotification(error, "Couldn't set the cover photo");
 		}
 	}
 </script>
@@ -504,7 +504,7 @@
 	<div class="rounded-lg border bg-card p-6">
 		<div class="mb-4 flex items-center gap-3 text-destructive">
 			<CircleAlert class="h-5 w-5" />
-			<p class="font-medium">Failed to load vehicle</p>
+			<p class="font-medium">Couldn't load this vehicle</p>
 		</div>
 		<p class="mb-4 text-sm text-muted-foreground">{vehicleLoadError}</p>
 		<Button size="lg" onclick={loadPage}>Retry</Button>
@@ -564,7 +564,7 @@
 					<div class="rounded-lg border bg-card p-6">
 						<div class="mb-4 flex items-center gap-3 text-destructive">
 							<CircleAlert class="h-5 w-5" />
-							<p class="font-medium">Failed to load expense summary</p>
+							<p class="font-medium">Couldn't load the expense summary</p>
 						</div>
 						<p class="mb-4 text-sm text-muted-foreground">{summaryLoadError}</p>
 						<Button onclick={loadSummary}>Retry</Button>
@@ -671,7 +671,7 @@
 								{#if expensesLoadError && !isLoadingPage}
 									<div class="flex flex-col items-center gap-3 py-8 text-center">
 										<CircleAlert class="h-8 w-8 text-destructive" />
-										<p class="font-medium">Failed to load expenses</p>
+										<p class="font-medium">Couldn't load expenses</p>
 										<p class="text-sm text-muted-foreground">{expensesLoadError}</p>
 										<Button variant="outline" onclick={() => fetchExpensesPage(currentOffset)}>
 											Retry

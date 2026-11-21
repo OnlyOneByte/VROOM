@@ -199,7 +199,7 @@ describe('vehicle detail page loading and not-found', () => {
 		getVehicle.mockRejectedValue(failure);
 		await mount();
 
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to load vehicle');
+		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't load the vehicle");
 		expect(goto).toHaveBeenCalledWith('/dashboard');
 		expect(screen.getByText('Vehicle not found')).toBeInTheDocument();
 		expect(screen.queryByRole('tab', { name: 'Overview' })).toBeNull();
@@ -331,9 +331,9 @@ describe('vehicle detail page overview', () => {
 
 		expect(handleErrorWithNotification).toHaveBeenCalledWith(
 			failure,
-			'Failed to load expense summary'
+			"Couldn't load the expense summary"
 		);
-		expect(screen.getByText('Failed to load expense summary')).toBeInTheDocument();
+		expect(screen.getByText("Couldn't load the expense summary")).toBeInTheDocument();
 		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText('Summary service down')).toBeNull();
 
@@ -341,7 +341,7 @@ describe('vehicle detail page overview', () => {
 		await settle();
 
 		expect(getExpenseSummary).toHaveBeenCalledTimes(2);
-		expect(screen.queryByText('Failed to load expense summary')).toBeNull();
+		expect(screen.queryByText("Couldn't load the expense summary")).toBeNull();
 		expect(captured['period']).toBeDefined();
 	});
 
@@ -349,7 +349,7 @@ describe('vehicle detail page overview', () => {
 		getExpenseSummary.mockRejectedValueOnce('boom');
 		await mount();
 
-		expect(screen.getAllByText('Failed to load expense summary')).toHaveLength(1);
+		expect(screen.getAllByText("Couldn't load the expense summary")).toHaveLength(1);
 		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 
@@ -402,9 +402,9 @@ describe('vehicle detail page overview', () => {
 		const contexts = handleErrorWithNotification.mock.calls.map(call => call[1]);
 		expect(contexts).toEqual(
 			expect.arrayContaining([
-				'Failed to load fuel efficiency data',
-				'Failed to load vehicle statistics',
-				'Failed to load photos'
+				"Couldn't load fuel efficiency",
+				"Couldn't load the vehicle's stats",
+				"Couldn't load photos"
 			])
 		);
 		expect(screen.getByRole('tab', { name: 'Overview' })).toBeInTheDocument();
@@ -458,8 +458,8 @@ describe('vehicle detail page tabs', () => {
 
 		await openTab('Expenses');
 
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to load expenses');
-		expect(screen.getByText('Failed to load expenses')).toBeInTheDocument();
+		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't load expenses");
+		expect(screen.getByText("Couldn't load expenses")).toBeInTheDocument();
 		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText('Expenses down')).toBeNull();
 
@@ -477,7 +477,7 @@ describe('vehicle detail page tabs', () => {
 
 		await openTab('Expenses');
 
-		expect(screen.getAllByText('Failed to load expenses')).toHaveLength(1);
+		expect(screen.getAllByText("Couldn't load expenses")).toHaveLength(1);
 		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 
@@ -536,7 +536,7 @@ describe('vehicle detail page tabs', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /export csv/i }));
 		await settle();
 
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to export expenses');
+		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't export expenses");
 		expect(screen.getByRole('button', { name: /export csv/i })).toBeEnabled();
 	});
 
