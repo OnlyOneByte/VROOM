@@ -9,6 +9,7 @@
 	import { providerApi } from '#lib/services/provider-api.ts';
 	import { settingsApi } from '#lib/services/settings-api.ts';
 	import { routes } from '#lib/routes.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import type {
 		PhotoCategory,
 		CategorySetting,
@@ -66,7 +67,7 @@
 				if (pid === id) defaultCategories.add(cat as PhotoCategory);
 			}
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load provider';
+			error = `Couldn't load the provider. ${userFacingErrorMessage(e)}`;
 		} finally {
 			isLoading = false;
 		}
