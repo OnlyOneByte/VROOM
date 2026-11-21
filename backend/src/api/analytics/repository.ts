@@ -44,13 +44,13 @@ import {
   calendarParts,
   computeAverageCosts,
   computeEfficiencyPoint,
-  computeFuelConsumptionMetrics,
   computeMileageScore,
   computeMpgAndCostPerMile,
   computePreviousYearComparison,
   computeRegularityScore,
   DAY_NAMES,
   effectiveMonthlyPremium,
+  efficiencyRange,
   type FuelEfficiencyPoint,
   type FuelExpenseRow,
   type FuelRow,
@@ -1524,7 +1524,7 @@ export class AnalyticsRepository {
 
     const { mpgValues, costPerMileValues } = computeMpgAndCostPerMile(fuelRowsByVehicle, convert);
     const fuelConsumption = {
-      ...computeFuelConsumptionMetrics(mpgValues),
+      ...efficiencyRange(mpgValues),
       avgEfficiency: this.computeAverageEfficiency(fuelRowsByVehicle, convert),
     };
 
@@ -1624,7 +1624,7 @@ export class AnalyticsRepository {
         previousMonth: energyOf(sessions.filter(months.inPrevMonth)),
       },
       efficiency: {
-        ...computeFuelConsumptionMetrics(efficiencyValues),
+        ...efficiencyRange(efficiencyValues),
         avgEfficiency: this.computeAverageEfficiency(fuelRowsByVehicle, convert, true),
       },
       sessionDetails: {

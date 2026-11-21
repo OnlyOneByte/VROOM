@@ -37,7 +37,7 @@ export function averageConsecutiveMpg(
     const current = sortedExpenses[i];
     const previous = sortedExpenses[i - 1];
 
-    if (current.missedFillup || previous.missedFillup) {
+    if (current.missedFillup) {
       continue;
     }
 
@@ -81,7 +81,7 @@ export function calculateAverageMilesPerKwh(
     const current = sortedExpenses[i];
     const previous = sortedExpenses[i - 1];
 
-    if (current.missedFillup || previous.missedFillup) {
+    if (current.missedFillup) {
       continue;
     }
 

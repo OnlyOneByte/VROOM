@@ -64,13 +64,13 @@ describe('calculateAverageMilesPerKwh', () => {
     expect(result).toBeCloseTo(100 / 30, 5);
   });
 
-  test('excludes pairs with missedFillup', () => {
+  test('skips only the interval ending at a missed fill-up', () => {
     const expenses = [
       makeChargeExpense({ mileage: 1000, volume: 30, index: 0 }),
       makeChargeExpense({ mileage: 1100, volume: 30, missedFillup: true, index: 1 }),
       makeChargeExpense({ mileage: 1200, volume: 25, index: 2 }),
     ];
-    expect(calculateAverageMilesPerKwh(expenses)).toBeNull();
+    expect(calculateAverageMilesPerKwh(expenses)).toBeCloseTo(100 / 25, 5);
   });
 
   test('filters out unrealistic values > 10 mi/kWh', () => {

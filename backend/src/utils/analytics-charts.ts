@@ -120,7 +120,7 @@ export function computeEfficiencyPoint(
   previous: FuelRow,
   scale: UnitScale = NATIVE_SCALE
 ): FuelEfficiencyPoint | null {
-  if (current.missedFillup || previous.missedFillup) return null;
+  if (current.missedFillup) return null;
   if (!current.mileage || !previous.mileage) return null;
 
   const milesDriven = current.mileage - previous.mileage;
@@ -371,15 +371,12 @@ export function buildFillupCostByVehicle(
     .slice(-120);
 }
 
-export function computeFuelConsumptionMetrics(efficiencyValues: number[]): {
-  avgEfficiency: number | null;
+export function efficiencyRange(efficiencyValues: number[]): {
   bestEfficiency: number | null;
   worstEfficiency: number | null;
 } {
-  if (efficiencyValues.length === 0)
-    return { avgEfficiency: null, bestEfficiency: null, worstEfficiency: null };
+  if (efficiencyValues.length === 0) return { bestEfficiency: null, worstEfficiency: null };
   return {
-    avgEfficiency: efficiencyValues.reduce((a, b) => a + b, 0) / efficiencyValues.length,
     bestEfficiency: maxOf(efficiencyValues),
     worstEfficiency: minOf(efficiencyValues),
   };
@@ -419,7 +416,7 @@ function validMilesBetween(
   previous: { mileage: number | null; missedFillup: boolean },
   scale: UnitScale = NATIVE_SCALE
 ): number | null {
-  if (current.missedFillup || previous.missedFillup) return null;
+  if (current.missedFillup) return null;
   if (!current.mileage || !previous.mileage) return null;
   const miles = current.mileage - previous.mileage;
   if (miles <= 0 || miles * scale.distance > MAX_REASONABLE_MILES_BETWEEN_FILLUPS) return null;
@@ -586,18 +583,18 @@ function computePerVehicleFuelEfficiency(
   metrics: Map<string, VehicleMetrics>,
   convert?: RadarUnitConverters
 ): void {
-  const totals = new Map<string, { sum: number; count: number }>();
+  const totals = new Map<string, { miles: number; volume: number }>();
   for (const [current, previous] of sameEnergyPairs(fuelRows)) {
     const point = gasEfficiencyPoint(current, previous, scaleOf(convert, current.vehicleId));
     if (!point) continue;
-    const entry = totals.get(current.vehicleId) ?? { sum: 0, count: 0 };
-    entry.sum += point.efficiency;
-    entry.count++;
+    const entry = totals.get(current.vehicleId) ?? { miles: 0, volume: 0 };
+    entry.miles += (current.mileage as number) - (previous.mileage as number);
+    entry.volume += current.volume as number;
     totals.set(current.vehicleId, entry);
   }
-  for (const [vId, { sum, count }] of totals) {
+  for (const [vId, { miles, volume }] of totals) {
     const m = metrics.get(vId);
-    if (m) m.fuelEfficiency = sum / count;
+    if (m) m.fuelEfficiency = miles / volume;
   }
 }
 

@@ -559,4 +559,20 @@ describe('one vehicle with a short top-up: every average is total distance over 
     const stats = await repo.getFuelStats(USER.id, rangeAll());
     expect(stats.charging.efficiency.avgEfficiency).toBeCloseTo(130 / 42, 6);
   });
+
+  test('the vehicle radar ranks fuel efficiency by each vehicle’s pooled average', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedVehicle(testDb.sqlite, VEH_B);
+    seedExpense(testDb.sqlite, fill('a1', VEH_A.id, 10_000, 10, 5));
+    seedExpense(testDb.sqlite, fill('a2', VEH_A.id, 10_300, 10, 10));
+    seedExpense(testDb.sqlite, fill('a3', VEH_A.id, 10_320, 0.5, 12));
+    seedExpense(testDb.sqlite, fill('b1', VEH_B.id, 50_000, 10, 6));
+    seedExpense(testDb.sqlite, fill('b2', VEH_B.id, 50_330, 10, 11));
+
+    const adv = await repo.getFuelAdvanced(USER.id, rangeAll());
+    const a = adv.vehicleRadar.find((r) => r.vehicleId === VEH_A.id);
+    const b = adv.vehicleRadar.find((r) => r.vehicleId === VEH_B.id);
+    expect(b?.fuelEfficiency ?? 0).toBeGreaterThan(a?.fuelEfficiency ?? 0);
+  });
 });
