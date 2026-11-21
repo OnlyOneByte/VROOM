@@ -529,6 +529,17 @@ describe('restore after the account record is recreated (same person, new user i
     );
   });
 
+  test('an S3 endpoint saved without a scheme still matches when only its host case differs', async () => {
+    const { storageProviderIdentity } = await import('../backup');
+    const identity = (endpoint: string): string | null =>
+      storageProviderIdentity({
+        providerType: 's3',
+        config: { endpoint, bucket: 'b', region: 'auto' },
+      });
+    expect(identity('S3.Example.com/')).toBe(identity('s3.example.com'));
+    expect(identity('s3.example.com/Store')).not.toBe(identity('s3.example.com/store'));
+  });
+
   test('refs from two old providers for the same account collapse to one link', async () => {
     const zip = await backupWithDrivePhoto();
     const archive = new AdmZip(zip);

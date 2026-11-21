@@ -75,7 +75,8 @@ function normalizeEndpoint(endpoint: string): string {
     const url = new URL(trimmed);
     return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, '')}`;
   } catch {
-    return trimmed.replace(/\/+$/, '');
+    const [host = '', ...path] = trimmed.split('/');
+    return [host.toLowerCase(), ...path].join('/').replace(/\/+$/, '');
   }
 }
 
