@@ -62,7 +62,7 @@ async function choose(id: string, name: string): Promise<void> {
 async function renderEditAndSwitchToKilometers(): Promise<void> {
 	getVehicle.mockResolvedValue(EXISTING);
 	render(VehicleForm, { props: { vehicleId: EXISTING.id } });
-	await screen.findByRole('heading', { name: 'Edit Vehicle' });
+	await screen.findByRole('button', { name: /update vehicle/i });
 	await fireEvent.click(screen.getByRole('button', { name: 'Toggle unit preferences' }));
 	await choose('distanceUnit', 'Kilometers');
 	await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
@@ -96,7 +96,7 @@ async function renderFinancedEditOwnAndKilometers(): Promise<void> {
 	getFinancing.mockResolvedValue(LOAN);
 	payOffFinancing.mockResolvedValue({ ...LOAN, isActive: false });
 	render(VehicleForm, { props: { vehicleId: EXISTING.id } });
-	await screen.findByRole('heading', { name: 'Edit Vehicle' });
+	await screen.findByRole('button', { name: /update vehicle/i });
 	await fireEvent.click(screen.getByRole('button', { name: 'Toggle unit preferences' }));
 	await choose('distanceUnit', 'Kilometers');
 	await fireEvent.click(screen.getByRole('button', { name: 'Own' }));

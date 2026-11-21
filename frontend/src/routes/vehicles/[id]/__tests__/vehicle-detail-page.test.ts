@@ -199,7 +199,7 @@ describe('vehicle detail page loading and not-found', () => {
 		getVehicle.mockRejectedValue(failure);
 		await mount();
 
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't load the vehicle");
+		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't load this vehicle");
 		expect(goto).toHaveBeenCalledWith('/dashboard');
 		expect(screen.getByText('Vehicle not found')).toBeInTheDocument();
 		expect(screen.queryByRole('tab', { name: 'Overview' })).toBeNull();

@@ -11,9 +11,10 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: { getVehicles: () => getVehicles() }
 }));
 
+const getVehicleHealth = vi.fn(() => new Promise(() => {}));
 vi.mock('#lib/services/analytics-api.ts', () => ({
 	analyticsApi: {
-		getVehicleHealth: () => new Promise(() => {}),
+		getVehicleHealth: () => getVehicleHealth(),
 		getVehicleTCO: () => new Promise(() => {}),
 		getVehicleExpenses: () => new Promise(() => {})
 	},
@@ -49,5 +50,16 @@ describe('PerVehicleTab when the vehicles fail to load', () => {
 		expect(await screen.findByRole('combobox', { name: 'Select vehicle' })).toBeInTheDocument();
 		expect(getVehicles).toHaveBeenCalledTimes(2);
 		expect(screen.queryByText("Couldn't load your vehicles")).toBeNull();
+	});
+});
+
+describe('PerVehicleTab when the vehicle analytics fail to load', () => {
+	test('offers a 40px Retry', async () => {
+		getVehicles.mockResolvedValueOnce([VEHICLE]);
+		getVehicleHealth.mockRejectedValueOnce(new ApiError('boom', 500));
+		render(PerVehicleTab);
+
+		expect(await screen.findByText("Couldn't load vehicle analytics")).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Retry' })).toHaveClass('h-10');
 	});
 });

@@ -59,7 +59,7 @@ describe('VehicleForm page title', () => {
 			updatedAt: '2024-01-01T00:00:00.000Z'
 		});
 		render(VehicleForm, { props: { vehicleId: 'veh-1' } });
-		await screen.findByRole('heading', { name: 'Edit Vehicle' });
+		await screen.findByRole('button', { name: /update vehicle/i });
 
 		expectSharedPageTitle('Edit Vehicle');
 		expect(screen.getByText('Weekend Car')).toBeTruthy();
