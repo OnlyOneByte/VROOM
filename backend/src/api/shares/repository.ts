@@ -64,7 +64,7 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
       .where(eq(vehicleShares.ownerId, ownerId))
       .orderBy(vehicleShares.createdAt);
     return rows.map((r) => {
-      // Only an accept proves the invitee agreed to be identified; a restored backup can plant pending rows for any user id.
+      // Only a share the invitee accepted identifies them to the owner; every other status stays anonymous.
       const identified = r.share.status === 'accepted';
       return {
         ...r.share,
