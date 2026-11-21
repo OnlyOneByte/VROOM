@@ -257,7 +257,7 @@ describe('PolicyCard term actions', () => {
 		await settle();
 		await fireEvent.click(screen.getByTitle('Delete term'));
 		await confirmDelete();
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to delete term');
+		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't delete the term");
 		expect(onRefresh).not.toHaveBeenCalled();
 	});
 });

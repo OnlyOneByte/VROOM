@@ -33,7 +33,7 @@
 			const docsResult = await insuranceApi.getEntityDocuments(entityType, entityId);
 			documents = docsResult.data;
 		} catch (err) {
-			handleErrorWithNotification(err, 'Failed to load documents');
+			handleErrorWithNotification(err, "Couldn't load the documents");
 		} finally {
 			isLoading = false;
 		}
@@ -62,7 +62,7 @@
 			await insuranceApi.deleteEntityDocument(entityType, entityId, docId);
 			documents = documents.filter(d => d.id !== docId);
 		} catch (err) {
-			handleErrorWithNotification(err, 'Failed to delete document');
+			handleErrorWithNotification(err, "Couldn't delete the document");
 			throw err;
 		}
 	}

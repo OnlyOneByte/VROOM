@@ -55,7 +55,7 @@
 			await insuranceApi.deleteTerm(policy.id, term.id);
 			await onRefresh();
 		} catch (error) {
-			handleErrorWithNotification(error, 'Failed to delete term');
+			handleErrorWithNotification(error, "Couldn't delete the term");
 		}
 	}
 </script>

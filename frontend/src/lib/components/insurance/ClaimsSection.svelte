@@ -168,7 +168,7 @@
 			await loadClaims();
 			closeForm();
 		} catch (err) {
-			handleErrorWithNotification(err, `Failed to ${editingId ? 'update' : 'file'} claim`);
+			handleErrorWithNotification(err, `Couldn't ${editingId ? 'update' : 'file'} the claim`);
 		} finally {
 			isSaving = false;
 		}
@@ -189,7 +189,7 @@
 			await insuranceApi.deleteClaim(policyId, claimId);
 			claims = claims.filter(c => c.id !== claimId);
 		} catch (err) {
-			handleErrorWithNotification(err, 'Failed to delete claim');
+			handleErrorWithNotification(err, "Couldn't delete the claim");
 			throw err;
 		}
 	}
