@@ -47,7 +47,25 @@ import { vehicleRepository } from './repository';
 
 const routes = new Hono();
 
+const VEHICLE_TYPES = ['gas', 'electric', 'hybrid'] as const;
+const VIN_PATTERN = new RegExp(
+  `^[A-Z0-9]{${CONFIG.validation.vehicle.vinMinLength},${CONFIG.validation.vehicle.vinMaxLength}}$`,
+  'i'
+);
+
 const baseVehicleSchema = createInsertSchema(vehiclesTable, {
+  vehicleType: z.enum(VEHICLE_TYPES).optional(),
+  vin: z
+    .union([
+      z.literal(''),
+      z
+        .string()
+        .regex(
+          VIN_PATTERN,
+          `VIN must be ${CONFIG.validation.vehicle.vinMinLength}-${CONFIG.validation.vehicle.vinMaxLength} letters and numbers`
+        ),
+    ])
+    .nullish(),
   make: z
     .string()
     .min(1, 'Make is required')

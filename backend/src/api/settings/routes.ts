@@ -111,7 +111,13 @@ const routes = new Hono();
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
+const SUPPORTED_CURRENCIES = new Set(Intl.supportedValuesOf('currency'));
+
 const baseSettingsSchema = createInsertSchema(userPreferences, {
+  currencyUnit: z
+    .string()
+    .refine((code) => SUPPORTED_CURRENCIES.has(code), 'Unknown currency code')
+    .optional(),
   syncInactivityMinutes: z
     .number()
     .min(1)
