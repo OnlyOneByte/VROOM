@@ -81,7 +81,8 @@ describe('Expense Form Logic', () => {
 
 			const vehicles = await vehicleApi.getVehicles();
 
-			expect(requestedUrl(0)).toBe('/api/v1/vehicles');
+			const zone = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
+			expect(requestedUrl(0)).toBe(`/api/v1/vehicles?timeZone=${zone}`);
 			expect(vehicles).toEqual(mockVehicles);
 		});
 
