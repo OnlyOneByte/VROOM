@@ -40,8 +40,8 @@ describe('route classification (deny-by-default)', () => {
 		}
 	});
 
-	it('treats sub-paths of public routes as public (e.g. OAuth callback)', () => {
-		expect(isPublicRoute('/auth/callback')).toBe(true);
+	it('treats sub-paths of public routes as public', () => {
+		expect(isPublicRoute('/auth/anything')).toBe(true);
 	});
 
 	it("does NOT let the root '/' make every path public", () => {

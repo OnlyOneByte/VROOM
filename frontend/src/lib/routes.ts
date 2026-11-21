@@ -2,7 +2,6 @@ export const routes = {
 	home: '/',
 	dashboard: '/dashboard',
 	auth: '/auth',
-	authCallback: '/auth/callback',
 	expenses: '/expenses',
 	expenseNew: '/expenses/new',
 	insurance: '/insurance',
