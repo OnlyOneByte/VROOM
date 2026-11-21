@@ -686,7 +686,9 @@ class RestoreService {
         .from(vehicleShares)
         .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')))
         .all()
-        .map((row) => shareConsentKey(row.vehicleId, row.sharedWithId))
+        .flatMap((row) =>
+          row.sharedWithId ? [shareConsentKey(row.vehicleId, row.sharedWithId)] : []
+        )
     );
   }
 

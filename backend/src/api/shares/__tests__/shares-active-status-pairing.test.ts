@@ -76,7 +76,11 @@ describe('active-share status pairing', () => {
       seedInvitee(invitee);
       seedShare(`share-${status}`, status, 'veh-1', invitee);
 
-      const found = await vehicleShareRepository.findActiveForVehicleAndUser('veh-1', invitee);
+      const found = await vehicleShareRepository.findActiveInvite(
+        'veh-1',
+        `${invitee}@example.com`,
+        invitee
+      );
       expect(found !== null).toBe(slotHolders.includes(status));
     }
   });

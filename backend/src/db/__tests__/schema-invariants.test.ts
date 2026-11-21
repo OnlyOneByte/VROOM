@@ -257,6 +257,40 @@ describe('vehicle sharing: vehicle_shares_active_idx', () => {
   });
 });
 
+describe('vehicle sharing: vehicle_shares_pending_invite_idx', () => {
+  let db: Database;
+  beforeEach(() => {
+    db = seeded();
+    for (const migration of migrations.slice(1)) applyMigration(db, migration);
+  });
+  afterEach(() => db.close());
+
+  function invite(id: string, status = 'pending', sharedWith: string | null = null): void {
+    db.run(
+      'INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, invited_email) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, 'v1', 'u1', sharedWith, 'viewer', status, 'later@test.com']
+    );
+  }
+
+  test('a second pending invite with no account behind it for the same (vehicle, email) is rejected', () => {
+    invite('s1');
+    expect(() => invite('s2')).toThrow(/UNIQUE constraint failed/);
+  });
+
+  test('a revoked unattached invite does not block inviting that email again', () => {
+    invite('s1', 'revoked');
+    invite('s2');
+    expect(countRows(db, 'vehicle_shares')).toBe(2);
+  });
+
+  test('attached shares are left to vehicle_shares_active_idx', () => {
+    db.run("INSERT INTO users (id, email, display_name) VALUES ('u2', 'later@test.com', 'Later')");
+    invite('s1', 'accepted', 'u2');
+    invite('s2');
+    expect(countRows(db, 'vehicle_shares')).toBe(2);
+  });
+});
+
 describe('expense provenance: created_by', () => {
   let db: Database;
   beforeEach(() => {

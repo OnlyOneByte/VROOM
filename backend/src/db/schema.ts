@@ -529,9 +529,7 @@ export const vehicleShares = sqliteTable(
     ownerId: text('owner_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    sharedWithId: text('shared_with_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    sharedWithId: text('shared_with_id').references(() => users.id, { onDelete: 'cascade' }),
     level: text('level').notNull(),
     status: text('status').notNull().default('pending'),
     invitedEmail: text('invited_email'),
@@ -542,6 +540,9 @@ export const vehicleShares = sqliteTable(
     activeShareIdx: uniqueIndex('vehicle_shares_active_idx')
       .on(table.vehicleId, table.sharedWithId)
       .where(sql`status in ('pending','accepted')`),
+    pendingInviteIdx: uniqueIndex('vehicle_shares_pending_invite_idx')
+      .on(table.vehicleId, table.invitedEmail)
+      .where(sql`shared_with_id is null and status = 'pending'`),
     sharedWithIdx: index('vehicle_shares_shared_with_idx').on(table.sharedWithId, table.status),
     ownerIdx: index('vehicle_shares_owner_idx').on(table.ownerId),
   })
