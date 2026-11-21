@@ -86,7 +86,9 @@
 	});
 
 	let ownedVehicles = $derived(vehicles.filter(v => !v.sharedAccess));
-	let canLogFillup = $derived(!isLoading && !loadError && ownedVehicles.length > 0);
+	let hasLoaded = $state(false);
+	let showFab = $derived(hasLoaded && !loadError);
+	let canLogFillup = $derived(showFab && ownedVehicles.length > 0);
 
 	let stats = $derived.by(() => ({
 		totalVehicles: ownedVehicles.length,
@@ -216,6 +218,7 @@
 			}
 			vehiclePhotosMap = photosMap;
 			vehicleStatsMap = statsMap;
+			hasLoaded = true;
 		} catch (error) {
 			loadError = error instanceof Error ? error.message : 'Failed to load dashboard data';
 			handleErrorWithNotification(error, 'Failed to load dashboard data');
@@ -308,7 +311,7 @@
 				<p class="font-medium">Failed to load dashboard data</p>
 			</div>
 			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
-			<Button onclick={loadDashboardData}>Retry</Button>
+			<Button size="lg" onclick={loadDashboardData}>Retry</Button>
 		</div>
 	{:else}
 		<DashboardStatsCards
@@ -377,6 +380,6 @@
 
 {#if canLogFillup}
 	<FloatingActionButton label="Log Fill-up" onclick={handleLogFillup} />
-{:else if !isLoading}
+{:else if showFab}
 	<FloatingActionButton href={resolve(routes.vehicleNew)} label="Add Vehicle" />
 {/if}

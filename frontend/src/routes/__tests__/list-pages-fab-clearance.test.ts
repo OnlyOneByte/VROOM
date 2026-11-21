@@ -12,16 +12,17 @@ describe('pages with a floating action button leave room for it', () => {
 		page => {
 			const src = readFileSync(join(ROUTES, page, '+page.svelte'), 'utf8');
 			expect(src).toMatch(/<FloatingActionButton/);
-			expect(src).toMatch(/<div class="space-y-6 pb-24">/);
+			expect(src).toMatch(/<div class="[^"]*\bpb-24\b[^"]*">/);
 		}
 	);
 
-	test('the FAB itself stays 64px tall, 16px off the bottom on mobile', () => {
+	test('the FAB stays 64px tall, 16px off the bottom on mobile and 32px from sm: up', () => {
 		const fab = readFileSync(
 			join(ROUTES, '..', 'lib', 'components', 'common', 'floating-action-button.svelte'),
 			'utf8'
 		);
 		expect(fab).toMatch(/\bbottom-4\b/);
 		expect(fab).toMatch(/\bh-16\b/);
+		expect(fab).toMatch(/\bsm:bottom-8\b/);
 	});
 });

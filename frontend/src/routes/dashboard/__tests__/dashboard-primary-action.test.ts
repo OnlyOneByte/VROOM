@@ -63,7 +63,7 @@ describe('dashboard primary action', () => {
 		const addVehicle = controls('Add Vehicle');
 		expect(addVehicle).toHaveLength(1);
 		expect(addVehicle[0]).not.toHaveClass('fixed');
-		expect(addVehicle[0]).not.toHaveClass('bg-primary');
+		expect(addVehicle[0]).toHaveClass('border', 'bg-background');
 	});
 
 	test('with no vehicles, Add Vehicle is the single floating primary and there is no Log Fill-up', async () => {
@@ -72,6 +72,36 @@ describe('dashboard primary action', () => {
 
 		await waitFor(() => expect(controls('Add Vehicle')).toHaveLength(1));
 		expect(controls('Add Vehicle')[0]).toHaveClass('fixed');
+		expect(controls('Log Fill-up')).toHaveLength(0);
+	});
+
+	test('with only vehicles shared with me, Add Vehicle is the floating primary and there is no Log Fill-up', async () => {
+		getVehicles.mockImplementation(() =>
+			Promise.resolve([{ ...OWNED, sharedAccess: { sharedBy: 'Sam' } } as unknown as Vehicle])
+		);
+		render(Page);
+
+		await waitFor(() => expect(controls('Add Vehicle')).toHaveLength(1));
+		expect(controls('Add Vehicle')[0]).toHaveClass('fixed');
+		expect(controls('Log Fill-up')).toHaveLength(0);
+	});
+
+	test('no floating action while the first load is in flight', async () => {
+		getVehicles.mockImplementation(() => new Promise<Vehicle[]>(() => {}));
+		render(Page);
+		await new Promise(resolve => setTimeout(resolve, 0));
+
+		expect(controls('Add Vehicle')).toHaveLength(0);
+		expect(controls('Log Fill-up')).toHaveLength(0);
+	});
+
+	test('a failed load offers only a 40px Retry, with no floating action', async () => {
+		getVehicles.mockImplementation(() => Promise.reject(new Error('Server down')));
+		render(Page);
+
+		const retry = await screen.findByRole('button', { name: 'Retry' });
+		expect(retry).toHaveClass('h-10');
+		expect(controls('Add Vehicle')).toHaveLength(0);
 		expect(controls('Log Fill-up')).toHaveLength(0);
 	});
 });
