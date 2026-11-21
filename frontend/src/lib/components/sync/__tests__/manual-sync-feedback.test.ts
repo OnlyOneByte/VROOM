@@ -77,22 +77,42 @@ beforeEach(() => {
 });
 
 describe('SyncStatusInline — Sync Now tells the user what happened', () => {
-	it('reports a failed delivery with its reason', async () => {
+	it('reports a failed delivery', async () => {
 		syncAll.mockResolvedValueOnce(result({ success: false, failed: 1, errors: ['Server Error'] }));
 		await syncNow();
 
 		await waitFor(() =>
-			expect(messages()).toContain(
-				"error: 1 expense couldn't sync: Server Error. VROOM will retry."
-			)
+			expect(messages()).toContain("error: 1 expense couldn't sync. VROOM will retry.")
 		);
 	});
 
-	it('reports a sync that could not start at all', async () => {
+	it('reports every outcome of a mixed run, and no success', async () => {
+		syncAll.mockResolvedValueOnce(
+			result({ success: false, synced: 1, failed: 2, needsAttention: 2, conflicts: [{}] })
+		);
+		await syncNow();
+
+		await waitFor(() =>
+			expect(messages()).toEqual(
+				expect.arrayContaining([
+					"error: 2 expenses couldn't sync. VROOM will retry.",
+					'warning: 2 expenses need attention — open expenses to fix them',
+					'warning: 1 sync conflict to resolve'
+				])
+			)
+		);
+		expect(messages().some(m => m.startsWith('success:'))).toBe(false);
+	});
+
+	it('reports a sync that could not start at all, with its reason', async () => {
 		syncAll.mockRejectedValueOnce(new Error('Sync already in progress'));
 		await syncNow();
 
-		await waitFor(() => expect(messages().some(m => m.startsWith('error:'))).toBe(true));
+		await waitFor(() =>
+			expect(
+				messages().some(m => m.startsWith('error:') && m.includes('Sync already in progress'))
+			).toBe(true)
+		);
 	});
 
 	it('confirms a successful delivery', async () => {

@@ -59,8 +59,18 @@ async function freshGraph() {
 	return { storage, onlineStatus, syncManager };
 }
 
+type Listener = Parameters<typeof document.removeEventListener>;
+
 describe('auto-sync triggers', () => {
 	let graph: Awaited<ReturnType<typeof freshGraph>>;
+	const documentListeners: Listener[] = [];
+	const realAddDocumentListener = document.addEventListener.bind(document);
+
+	function onlineHandler(): () => void {
+		const calls = vi.mocked(window.addEventListener).mock.calls;
+		const handler = calls.filter(([type]) => type === 'online').at(-1)?.[1];
+		return handler as () => void;
+	}
 
 	beforeEach(async () => {
 		vi.clearAllMocks();
@@ -72,11 +82,19 @@ describe('auto-sync triggers', () => {
 		});
 		graph = await freshGraph();
 		graph.onlineStatus.current = true;
+		vi.spyOn(document, 'addEventListener').mockImplementation((type, listener, options) => {
+			documentListeners.push([type, listener]);
+			realAddDocumentListener(type, listener, options);
+		});
 		vi.useFakeTimers();
 	}, MODULE_LOAD_TIMEOUT_MS);
 
 	afterEach(() => {
 		vi.useRealTimers();
+		for (const [type, listener] of documentListeners.splice(0)) {
+			document.removeEventListener(type, listener);
+		}
+		vi.restoreAllMocks();
 	});
 
 	it('syncs when the app becomes visible again', async () => {
@@ -129,5 +147,67 @@ describe('auto-sync triggers', () => {
 		onlineStatus.current = false;
 		await vi.advanceTimersByTimeAsync(20 * 60_000);
 		expect(deliveries()).toBe(1);
+	});
+
+	it('syncs when the device comes back online', async () => {
+		const { storage, syncManager } = graph;
+		syncManager.setupAutoSync();
+		storage.saveOfflineExpenses([queued('a')]);
+
+		onlineHandler()();
+		await vi.advanceTimersByTimeAsync(2500);
+
+		expect(deliveries()).toBe(1);
+	});
+
+	it('starts retrying an entry queued after setup, once the form asks for it', async () => {
+		const { storage, syncManager } = graph;
+		syncManager.setupAutoSync();
+		serverUp = false;
+		storage.saveOfflineExpenses([queued('a')]);
+
+		syncManager.requestAutoSync();
+		await vi.advanceTimersByTimeAsync(30_000);
+		expect(deliveries()).toBe(1);
+
+		serverUp = true;
+		await vi.advanceTimersByTimeAsync(60_000);
+		expect(deliveries()).toBe(2);
+		expect(storage.getPendingExpenses()).toHaveLength(0);
+	});
+
+	it('retries after a failed manual sync', async () => {
+		const { storage, syncManager } = graph;
+		syncManager.setupAutoSync();
+		serverUp = false;
+		storage.saveOfflineExpenses([queued('a')]);
+
+		await syncManager.syncAll();
+		expect(deliveries()).toBe(1);
+
+		serverUp = true;
+		await vi.advanceTimersByTimeAsync(30_000);
+		expect(deliveries()).toBe(2);
+	});
+
+	it('stops retrying while a sync conflict waits for the user', async () => {
+		const { storage, syncManager } = graph;
+		const { syncConflicts } = await import('../sync-state.svelte');
+		syncManager.setupAutoSync();
+		serverUp = false;
+		storage.saveOfflineExpenses([queued('a')]);
+		syncConflicts.current = [
+			{
+				id: 'c',
+				localExpense: queued('c'),
+				serverExpense: { id: 's', amount: 1, date: '2024-06-01', tags: [] }
+			}
+		];
+
+		syncManager.requestAutoSync();
+		await vi.advanceTimersByTimeAsync(20 * 60_000);
+
+		expect(deliveries()).toBe(0);
+		syncConflicts.current = [];
 	});
 });

@@ -87,16 +87,20 @@
 		try {
 			const result = await syncManager.syncAll();
 			if (result.failed > 0) {
-				appStore.showError(
-					`${plural(result.failed, 'expense')} couldn't sync: ${result.errors[0] ?? 'unknown error'}. VROOM will retry.`
-				);
-			} else if (result.needsAttention > 0) {
+				appStore.showError(`${plural(result.failed, 'expense')} couldn't sync. VROOM will retry.`);
+			}
+			if (result.needsAttention > 0) {
 				appStore.showWarning(
 					`${plural(result.needsAttention, 'expense')} need${result.needsAttention === 1 ? 's' : ''} attention — open expenses to fix ${result.needsAttention === 1 ? 'it' : 'them'}`
 				);
-			} else if (result.conflicts.length > 0) {
+			}
+			if (result.conflicts.length > 0) {
 				appStore.showWarning(`${plural(result.conflicts.length, 'sync conflict')} to resolve`);
-			} else if (result.synced > 0) {
+			}
+			if (
+				result.synced > 0 &&
+				result.failed + result.needsAttention + result.conflicts.length === 0
+			) {
 				appStore.showSuccess(`${plural(result.synced, 'expense')} synced`);
 			}
 		} catch (error) {

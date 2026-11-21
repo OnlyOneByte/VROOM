@@ -167,6 +167,7 @@ class SyncManager {
 			return result;
 		} finally {
 			this.syncInProgress = false;
+			this.continueAutoSync();
 		}
 	}
 
@@ -403,6 +404,29 @@ class SyncManager {
 		}, delay);
 	}
 
+	requestAutoSync(): void {
+		this.continueAutoSync();
+	}
+
+	private continueAutoSync(): void {
+		if (!this.autoSyncSetup) return;
+		if (
+			!onlineStatus.current ||
+			getPendingExpenses().length === 0 ||
+			syncConflicts.current.length > 0
+		) {
+			this.autoSyncAttempt = 0;
+			return;
+		}
+		if (this.autoSyncTimer) return;
+		const delay = Math.min(
+			AUTO_SYNC_RETRY_BASE_MS * 2 ** this.autoSyncAttempt,
+			AUTO_SYNC_RETRY_MAX_MS
+		);
+		this.autoSyncAttempt++;
+		this.scheduleAutoSync(delay);
+	}
+
 	private async runAutoSync(): Promise<void> {
 		if (!onlineStatus.current || getPendingExpenses().length === 0) return;
 		if (this.syncInProgress) {
@@ -415,17 +439,6 @@ class SyncManager {
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Auto-sync failed:', error);
 		}
-
-		if (!onlineStatus.current || getPendingExpenses().length === 0) {
-			this.autoSyncAttempt = 0;
-			return;
-		}
-		const delay = Math.min(
-			AUTO_SYNC_RETRY_BASE_MS * 2 ** this.autoSyncAttempt,
-			AUTO_SYNC_RETRY_MAX_MS
-		);
-		this.autoSyncAttempt++;
-		this.scheduleAutoSync(delay);
 	}
 }
 

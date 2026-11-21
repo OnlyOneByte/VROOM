@@ -3,6 +3,7 @@ import { appStore } from '#lib/stores/app.svelte.ts';
 import { onlineStatus } from '#lib/stores/offline.svelte.ts';
 import { addOfflineExpense } from '#lib/utils/offline-storage.ts';
 import { classifySyncFailure } from '#lib/utils/sync/classify-failure.ts';
+import { syncManager } from '#lib/utils/sync/sync-manager.ts';
 import { buildSplitConfig } from '#lib/utils/expense-helpers.ts';
 import { gotoDynamic } from '#lib/utils/navigation.ts';
 import type { ExpenseCategory } from '#lib/types/index.ts';
@@ -155,6 +156,7 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 				type: 'warning',
 				message: offlineQueuedMessage(failureKind)
 			});
+			syncManager.requestAutoSync();
 
 			gotoDynamic(returnTo);
 		} else {
