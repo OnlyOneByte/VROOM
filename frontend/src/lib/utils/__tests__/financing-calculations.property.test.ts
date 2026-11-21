@@ -23,7 +23,7 @@ function makeExpense(amount: number, dateIndex: number): Expense {
 		tags: [],
 		category: 'financial',
 		amount,
-		date: `${year}-${month}-${day}`,
+		date: `${year}-${month}-${day}T12:00:00`,
 		sourceType: 'financing' as const,
 		sourceId: 'fin-test',
 		createdAt: '2024-01-01T00:00:00.000Z',
@@ -41,7 +41,7 @@ function makeFinancing(overrides: Partial<VehicleFinancing> = {}): VehicleFinanc
 		computedBalance: 20000,
 		apr: 5.0,
 		termMonths: 60,
-		startDate: '2024-01-01',
+		startDate: '2024-01-01T12:00:00',
 		paymentAmount: 400,
 		paymentFrequency: 'monthly',
 		isActive: true,
@@ -355,7 +355,7 @@ describe('Principal and Interest Derivation', () => {
 function scheduledPayments(count: number, amount: number): Expense[] {
 	return Array.from({ length: count }, (_, i) => ({
 		...makeExpense(amount, 1),
-		date: new Date(Date.UTC(2024, i + 1, 1, 12)).toISOString()
+		date: new Date(2024, i + 1, 1, 12).toISOString()
 	}));
 }
 
@@ -365,7 +365,7 @@ describe('amortized remaining balance', () => {
 		apr: 6,
 		termMonths: 60,
 		paymentAmount: 579.98,
-		startDate: '2024-01-01'
+		startDate: '2024-01-01T12:00:00'
 	});
 
 	test('matches the $30,000 / 6% / 60-month amortization table', () => {
@@ -411,7 +411,7 @@ describe('amortized remaining balance', () => {
 			originalAmount: 20_000,
 			apr: 4.5,
 			paymentAmount: 372.86,
-			startDate: '2020-03-15'
+			startDate: '2020-03-15T12:00:00'
 		});
 		const entry = derivePaymentEntries(
 			[{ ...makeExpense(372.86, 1), date: '2026-11-15T12:00:00.000Z' }],
@@ -431,10 +431,12 @@ describe('amortized remaining balance', () => {
 
 describe('elapsedMonths', () => {
 	test('counts whole calendar months and day-fractions, clamping month ends', () => {
-		expect(elapsedMonths(new Date('2024-01-15'), new Date('2024-03-15'))).toBe(2);
-		expect(elapsedMonths(new Date('2024-01-31'), new Date('2024-02-29'))).toBe(1);
-		expect(elapsedMonths(new Date('2024-01-15'), new Date('2024-01-30'))).toBeCloseTo(15 / 31);
-		expect(elapsedMonths(new Date('2024-01-15'), new Date('2023-12-01'))).toBe(0);
+		expect(elapsedMonths(new Date(2024, 0, 15, 12), new Date(2024, 2, 15, 12))).toBe(2);
+		expect(elapsedMonths(new Date(2024, 0, 31, 12), new Date(2024, 1, 29, 12))).toBe(1);
+		expect(elapsedMonths(new Date(2024, 0, 15, 12), new Date(2024, 0, 30, 12))).toBeCloseTo(
+			15 / 31
+		);
+		expect(elapsedMonths(new Date(2024, 0, 15, 12), new Date(2023, 11, 1, 12))).toBe(0);
 	});
 });
 
