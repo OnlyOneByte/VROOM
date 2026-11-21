@@ -279,9 +279,9 @@ routes.post('/split', zValidator('json', createSplitExpenseSchema), async (c) =>
   const user = c.get('user');
   const data = c.req.valid('json');
 
+  const { ownerId, createdBy } = await requireSplitWriteAccess(data.splitConfig, user.id);
   await assertSplitFinancingSourceValid(data.sourceType, data.sourceId, data.splitConfig);
 
-  const { ownerId, createdBy } = await requireSplitWriteAccess(data.splitConfig, user.id);
   const siblings = await expenseRepository.createSplitExpense(data, { ownerId, createdBy });
   const first = siblings[0];
   if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
