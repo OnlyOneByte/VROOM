@@ -40,11 +40,11 @@
 	const CATEGORY_TITLE = 'Expense by Category';
 	const CATEGORY_DESCRIPTION = 'Distribution across all vehicles';
 
-	const loadCharts = () =>
-		Promise.all([
-			import('#lib/components/charts/ExpenseTrendChart.svelte'),
-			import('#lib/components/charts/index.ts')
-		]);
+	const chartModules = Promise.all([
+		import('#lib/components/charts/ExpenseTrendChart.svelte'),
+		import('#lib/components/charts/index.ts')
+	]);
+	chartModules.catch(() => undefined);
 
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
@@ -324,10 +324,15 @@
 
 		{#if stats.totalVehicles > 0}
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-				{#await loadCharts()}
+				{#await chartModules}
 					{@render chartPlaceholders(null)}
 				{:then [{ default: ExpenseTrendChart }, { AppPieChart }]}
-					<ExpenseTrendChart data={trendChartData} title={TREND_TITLE} {isLoading}>
+					<ExpenseTrendChart
+						data={trendChartData}
+						title={TREND_TITLE}
+						description={TREND_DESCRIPTION}
+						{isLoading}
+					>
 						{#snippet icon()}
 							{@render trendIcon()}
 						{/snippet}
