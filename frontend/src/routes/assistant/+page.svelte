@@ -70,14 +70,17 @@
 		if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
 	}
 
+	function trimTurn(text: string): string {
+		if (text.length <= MAX_MESSAGE_CHARS) return text;
+		let end = MAX_MESSAGE_CHARS - 1;
+		if (/[\uD800-\uDBFF]/.test(text.charAt(end - 1))) end -= 1;
+		return `${text.slice(0, end)}…`;
+	}
+
 	function toHistory(turns: ChatMessage[]): AssistantTurn[] {
-		return turns.slice(-MAX_HISTORY_TURNS).map(m => ({
-			role: m.role,
-			content:
-				m.content.length > MAX_MESSAGE_CHARS
-					? `${m.content.slice(0, MAX_MESSAGE_CHARS - 1)}…`
-					: m.content
-		}));
+		return turns
+			.slice(-MAX_HISTORY_TURNS)
+			.map(m => ({ role: m.role, content: trimTurn(m.content) }));
 	}
 
 	async function send() {

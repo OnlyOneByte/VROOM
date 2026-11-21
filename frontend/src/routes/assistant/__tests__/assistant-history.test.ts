@@ -54,6 +54,21 @@ describe('assistant history', () => {
 		expect(history.every(turn => turn.content.length <= 2000)).toBe(true);
 	});
 
+	test('the trim never splits an emoji in half', async () => {
+		sendMessage.mockResolvedValue({ reply: `${'a'.repeat(1998)}🚗🚗`, toolsUsed: [] });
+		render(Page);
+		await screen.findByPlaceholderText('Ask about your vehicles and costs…');
+
+		await say('Summarize my fuel costs');
+		await screen.findByText(/aaaa/);
+		await say('And last month?');
+
+		const [, history] = sendMessage.mock.calls.at(-1)!;
+		const reply = history.find(turn => turn.role === 'assistant')!;
+		expect(reply.content).toBe(`${'a'.repeat(1998)}…`);
+		expect(reply.content.length).toBeLessThanOrEqual(2000);
+	});
+
 	test('a retry sends the same trimmed history', async () => {
 		render(Page);
 		await screen.findByPlaceholderText('Ask about your vehicles and costs…');
