@@ -1,5 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import { and, between, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
+import { and, between, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { InsurancePolicy, InsuranceTerm } from '../../db/schema';
@@ -72,6 +72,8 @@ type PolicyCoverage = {
 
 export type InsurancePolicyWithVehicles = InsurancePolicy & PolicyCoverage;
 
+const VEHICLE_SELECTION_ORDER = sql`${insuranceTermVehicles}.rowid`;
+
 // Owner-scoped lookups keep writes safe even if a caller skips the route ownership check.
 function ownedPolicy(policyId: string, userId: string) {
   return and(eq(insurancePolicies.id, policyId), eq(insurancePolicies.userId, userId));
@@ -126,7 +128,8 @@ export class InsurancePolicyRepository {
           vehicleId: insuranceTermVehicles.vehicleId,
         })
         .from(insuranceTermVehicles)
-        .where(inArray(insuranceTermVehicles.termId, ids));
+        .where(inArray(insuranceTermVehicles.termId, ids))
+        .orderBy(VEHICLE_SELECTION_ORDER);
       for (const row of rows) {
         coverageByTerm.set(row.termId, [...(coverageByTerm.get(row.termId) ?? []), row]);
       }
