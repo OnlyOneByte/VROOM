@@ -7,17 +7,28 @@ export function isValidTimeZone(timeZone: string): boolean {
   }
 }
 
+const zonedFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function zonedFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = zonedFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    zonedFormatters.set(timeZone, formatter);
+  }
+  return formatter;
+}
+
 export function zonedParts(instant: Date, timeZone: string): Record<string, number> {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).formatToParts(instant);
+  const parts = zonedFormatter(timeZone).formatToParts(instant);
   return Object.fromEntries(parts.map((p) => [p.type, Number(p.value)]));
 }
 
