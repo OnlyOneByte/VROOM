@@ -935,13 +935,13 @@
 					{#if isEditMode}
 						<Button
 							type="button"
-							variant="destructive"
+							variant="outline"
 							size="lg"
 							onclick={confirmDelete}
 							disabled={isDeleting || isSubmitting}
 							class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
 						>
-							<Trash2 class="h-5 w-5 sm:mr-2" />
+							<Trash2 class="h-5 w-5 sm:mr-2 text-destructive" />
 							<!-- Clip, not hidden, below sm: sr-only would outrank sm:not-sr-only at every width. -->
 							<span class="max-sm:sr-only font-semibold">Delete</span>
 						</Button>
