@@ -1,4 +1,5 @@
 <script lang="ts">
+	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { page } from '$app/state';
 	import PageHeader from '#lib/components/common/page-header.svelte';
@@ -221,13 +222,18 @@
 
 			<div class="space-y-2">
 				<Label for="date">Date *</Label>
-				<Input
+				<DatePicker
 					id="date"
-					type="date"
-					bind:value={date}
+					bind:value={
+						() => date,
+						v => {
+							date = v ?? '';
+							clearFieldError('date');
+						}
+					}
+					placeholder="Pick a date"
 					class={fieldErrors.date ? 'border-destructive' : ''}
 					aria-invalid={!!fieldErrors.date}
-					oninput={() => clearFieldError('date')}
 					aria-describedby={fieldErrors.date ? 'date-error' : undefined}
 				/>
 				{#if fieldErrors.date}
