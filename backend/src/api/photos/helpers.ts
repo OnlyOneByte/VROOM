@@ -58,7 +58,9 @@ export async function validateEntityOwnership(
 }
 
 export async function parseUploadedPhoto(c: Context): Promise<File> {
-  const body = await c.req.parseBody();
+  const body = await c.req.parseBody().catch(() => {
+    throw new ValidationError('Upload the photo as multipart/form-data');
+  });
   const file = body.photo;
   if (!file || !(file instanceof File)) {
     throw new AppError('No photo file provided', 400);

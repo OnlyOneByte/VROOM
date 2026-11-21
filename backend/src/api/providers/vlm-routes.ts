@@ -41,7 +41,9 @@ routes.post('/parse', async (c) => {
     );
   }
 
-  const body = await c.req.parseBody();
+  const body = await c.req.parseBody().catch(() => {
+    throw new ValidationError('Upload the receipt image as multipart/form-data');
+  });
   const file = body.image;
   if (!file || !(file instanceof File)) {
     throw new AppError('No image file provided', 400);
