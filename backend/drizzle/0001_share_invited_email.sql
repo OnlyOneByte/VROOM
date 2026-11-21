@@ -1,0 +1,1 @@
+ALTER TABLE `vehicle_shares` ADD `invited_email` text;

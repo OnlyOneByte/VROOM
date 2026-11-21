@@ -52,6 +52,23 @@ describe('ShareVehicleDialog revoke', () => {
 		await waitFor(() => expect(revoke).toHaveBeenCalledWith('s1'));
 	});
 
+	test('revoking a pending invitation says it will be cancelled, not that they lose access', async () => {
+		listGranted.mockResolvedValueOnce([{ ...SHARE, status: 'pending' }]);
+		render(ShareVehicleDialog, {
+			props: { open: true, vehicleId: 'v1', vehicleName: 'Daily Driver' }
+		});
+
+		await fireEvent.click(
+			await screen.findByRole('button', { name: 'Revoke access for friend@example.com' })
+		);
+
+		const dialog = await screen.findByRole('alertdialog');
+		expect(dialog).toHaveTextContent(
+			"The invitation to friend@example.com will be cancelled, so it can't be accepted."
+		);
+		expect(dialog).not.toHaveTextContent('will no longer see');
+	});
+
 	test('a failed revoke keeps the dialog open so the user can retry', async () => {
 		revoke.mockRejectedValueOnce(new Error('boom'));
 		render(ShareVehicleDialog, {

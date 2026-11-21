@@ -48,10 +48,28 @@ describe('GET /api/v1/shares/granted names the invitee', () => {
     ]);
   });
 
-  test('a pending share names nobody, so a planted pending row cannot turn a user id into an email', async () => {
+  test('a pending share shows the email the owner typed, but not the invitee name', async () => {
     const b = await createInvitee(ctx, 'granted-pending', 'Victim Person');
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: '3', year: 2019 });
     await ctx.authed('POST', '/api/v1/shares', { vehicleId, email: b.email, level: 'viewer' });
+
+    const [row] = await granted();
+    expect(row).toMatchObject({
+      status: 'pending',
+      sharedWithEmail: b.email,
+      sharedWithName: null,
+    });
+    expect(JSON.stringify(row)).not.toContain('Victim Person');
+  });
+
+  test('a planted pending row with no invited email names nobody, so a user id cannot turn into an email', async () => {
+    const b = await createInvitee(ctx, 'granted-planted', 'Victim Person');
+    const vehicleId = await seedVehicle(ctx, { make: 'Kia', model: 'Rio', year: 2018 });
+    ctx.sqlite.run(
+      `INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, created_at, updated_at)
+       VALUES ('planted', ?, ?, ?, 'viewer', 'pending', 0, 0)`,
+      [vehicleId, ctx.user.id, b.id]
+    );
 
     const [row] = await granted();
     expect(row).toMatchObject({ status: 'pending', sharedWithEmail: null, sharedWithName: null });

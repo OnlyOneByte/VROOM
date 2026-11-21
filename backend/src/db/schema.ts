@@ -523,6 +523,7 @@ export const vehicleShares = sqliteTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     level: text('level').notNull(),
     status: text('status').notNull().default('pending'),
+    invitedEmail: text('invited_email'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },

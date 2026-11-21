@@ -20,7 +20,10 @@ vi.mock('#lib/services/share-api.ts', () => ({
 	shareApi: {
 		listGranted: () =>
 			Promise.resolve([
-				share('s1', 'pending@example.com', 'pending'),
+				{
+					...share('s1', 'pending@example.com', 'pending'),
+					createdAt: new Date(2026, 0, 15, 12, 0, 0).toISOString()
+				},
 				share('s2', 'accepted@example.com', 'accepted'),
 				share('s3', 'revoked@example.com', 'revoked'),
 				share('s4', 'declined@example.com', 'declined'),
@@ -79,6 +82,15 @@ describe('ShareVehicleDialog "People with access"', () => {
 		expect(
 			await screen.findByRole('button', { name: 'Revoke access for blank-name@example.com' })
 		).toBeInTheDocument();
+	});
+
+	test('a pending invitation shows the email the owner typed and when it was sent', async () => {
+		render(ShareVehicleDialog, {
+			props: { open: true, vehicleId: 'v1', vehicleName: 'Daily Driver' }
+		});
+
+		expect(await screen.findByText('pending@example.com')).toBeInTheDocument();
+		expect(screen.getByText(rowDetail('pending · sent Jan 15, 2026'))).toBeInTheDocument();
 	});
 
 	test('a pending invitation the API does not name is shown by when it was sent, never by id', async () => {

@@ -237,6 +237,7 @@ export const SHEET_HEADERS = {
     'sharedWithId',
     'level',
     'status',
+    'invitedEmail',
     'createdAt',
     'updatedAt',
   ],

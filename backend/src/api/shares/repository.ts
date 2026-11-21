@@ -68,7 +68,7 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
       const identified = r.share.status === 'accepted';
       return {
         ...r.share,
-        sharedWithEmail: identified ? r.sharedWithEmail : null,
+        sharedWithEmail: identified ? r.sharedWithEmail : r.share.invitedEmail,
         sharedWithName: identified ? r.sharedWithName : null,
       };
     });
