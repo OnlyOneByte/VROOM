@@ -212,7 +212,7 @@
 
 	let hasPrefetchedTabs = false;
 	$effect(() => {
-		if (isLoading || hasPrefetchedTabs) return;
+		if (isLoading || !vehicle || hasPrefetchedTabs) return;
 		hasPrefetchedTabs = true;
 		void Promise.allSettled([
 			loadExpensesTab(),
