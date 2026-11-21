@@ -212,3 +212,19 @@ describe('buildReminderPayload schedule fields', () => {
 		expect(payload).toMatchObject({ intervalValue: 3, intervalUnit: 'week' });
 	});
 });
+
+describe('buildReminderPayload hidden dates', () => {
+	test('a mileage-only reminder sends no end date, even if one was picked for a time schedule', () => {
+		const payload = buildReminderPayload(
+			validDraft({ triggerMode: 'mileage', intervalMileage: '5000', endDate: '2026-12-31' })
+		);
+		expect(payload.endDate).toBeNull();
+	});
+
+	test('a reminder on a time schedule keeps its end date', () => {
+		const payload = buildReminderPayload(
+			validDraft({ triggerMode: 'both', intervalMileage: '5000', endDate: '2026-12-31' })
+		);
+		expect(payload.endDate).toBe('2026-12-31');
+	});
+});
