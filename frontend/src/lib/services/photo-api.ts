@@ -32,7 +32,7 @@ export const orphanedPhotosApi = {
 		return (await apiClient.get<{ count: number }>('/api/v1/photos/orphans')).count;
 	},
 
-	async remove(): Promise<number> {
-		return (await apiClient.delete<{ removed: number }>('/api/v1/photos/orphans')).removed;
+	remove(): Promise<{ removed: number; failed: number }> {
+		return apiClient.delete<{ removed: number; failed: number }>('/api/v1/photos/orphans');
 	}
 };

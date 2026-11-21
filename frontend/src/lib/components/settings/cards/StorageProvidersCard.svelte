@@ -107,11 +107,17 @@
 
 	async function removeOrphanedPhotos() {
 		try {
-			const removed = await orphanedPhotosApi.remove();
-			appStore.showSuccess(`Removed ${photosNoun(removed)}`);
-			await loadOrphanCount();
+			const { removed, failed } = await orphanedPhotosApi.remove();
+			if (removed > 0) appStore.showSuccess(`Removed ${photosNoun(removed)}`);
+			if (failed > 0) {
+				appStore.showError(
+					`Couldn't delete ${photosNoun(failed)} from your storage providers. ${failed === 1 ? 'It stays' : 'They stay'} listed here so you can try again later.`
+				);
+			}
 		} catch (e) {
 			appStore.showError(`Couldn't remove the photos. ${userFacingErrorMessage(e)}`);
+		} finally {
+			await loadOrphanCount();
 		}
 	}
 

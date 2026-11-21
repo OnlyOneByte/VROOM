@@ -41,8 +41,8 @@ routes.get('/orphans', async (c) => {
 
 routes.delete('/orphans', async (c) => {
   const user = c.get('user');
-  const removed = await removeOrphanedPhotos(user.id);
-  return c.json({ success: true, data: { removed } });
+  const result = await removeOrphanedPhotos(user.id);
+  return c.json({ success: true, data: result });
 });
 
 routes.get('/:entityType/:entityId', zValidator('query', commonSchemas.pagination), async (c) => {

@@ -361,7 +361,7 @@ async function deleteObjectsFromProvider(
   providerId: string,
   refs: PhotoRef[],
   userId: string
-): Promise<void> {
+): Promise<PhotoRef[]> {
   let provider: StorageProvider;
   try {
     provider = await storageProviderRegistry.getProvider(providerId, userId);
@@ -370,13 +370,15 @@ async function deleteObjectsFromProvider(
       providerId,
       error: error instanceof Error ? error.message : String(error),
     });
-    return;
+    return refs;
   }
 
+  const failed: PhotoRef[] = [];
   for (const ref of refs) {
     try {
       await provider.delete({ providerType: provider.type, externalId: ref.storageRef });
     } catch (error) {
+      failed.push(ref);
       logger.warn('Failed to delete photo from storage provider', {
         photoId: ref.photoId,
         providerId,
@@ -385,6 +387,7 @@ async function deleteObjectsFromProvider(
       });
     }
   }
+  return failed;
 }
 
 export async function deleteAllPhotosForEntity(
@@ -408,13 +411,29 @@ export async function countOrphanedPhotos(userId: string): Promise<number> {
   return (await photoRepository.findOrphanedByUser(userId)).length;
 }
 
-export async function removeOrphanedPhotos(userId: string): Promise<number> {
-  const orphanIds = (await photoRepository.findOrphanedByUser(userId)).map((p) => p.id);
-  if (orphanIds.length === 0) return 0;
+export interface OrphanRemoval {
+  removed: number;
+  failed: number;
+}
 
-  await deletePhotoRowsAndObjects(orphanIds, userId);
-  await photoRepository.deleteByIds(orphanIds);
-  return orphanIds.length;
+export async function removeOrphanedPhotos(userId: string): Promise<OrphanRemoval> {
+  const orphanIds = (await photoRepository.findOrphanedByUser(userId)).map((p) => p.id);
+  if (orphanIds.length === 0) return { removed: 0, failed: 0 };
+
+  const refs = await photoRefRepository.findAllByPhotos(orphanIds);
+  const failedRefs: PhotoRef[] = [];
+  for (const [providerId, providerRefs] of groupActiveRefsByProvider(refs)) {
+    failedRefs.push(...(await deleteObjectsFromProvider(providerId, providerRefs, userId)));
+  }
+  const failedRefIds = new Set(failedRefs.map((ref) => ref.id));
+  const keptPhotoIds = new Set(failedRefs.map((ref) => ref.photoId));
+  const removedIds = orphanIds.filter((id) => !keptPhotoIds.has(id));
+
+  await photoRefRepository.deleteByIds(
+    refs.filter((ref) => !failedRefIds.has(ref.id)).map((ref) => ref.id)
+  );
+  await photoRepository.deleteByIds(removedIds);
+  return { removed: removedIds.length, failed: keptPhotoIds.size };
 }
 
 // Photos have no FK to their entity, so children must be deleted explicitly here.

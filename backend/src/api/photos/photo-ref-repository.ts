@@ -144,6 +144,12 @@ export class PhotoRefRepository {
     return results;
   }
 
+  async deleteByIds(refIds: string[]): Promise<void> {
+    for (const batch of chunk(refIds)) {
+      await this.db.delete(photoRefs).where(inArray(photoRefs.id, batch));
+    }
+  }
+
   async deleteByPhotos(photoIds: string[]): Promise<void> {
     if (photoIds.length === 0) return;
     for (const batch of chunk(photoIds)) {

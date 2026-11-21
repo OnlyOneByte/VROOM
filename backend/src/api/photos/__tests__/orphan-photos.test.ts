@@ -109,6 +109,11 @@ describe('GET /api/v1/photos/orphans', () => {
   });
 });
 
+interface Removal {
+  removed: number;
+  failed: number;
+}
+
 describe('DELETE /api/v1/photos/orphans', () => {
   async function storeFile(photoId: string): Promise<string> {
     if (!storage) throw new Error('storage not installed');
@@ -142,7 +147,7 @@ describe('DELETE /api/v1/photos/orphans', () => {
 
     const res = await ctx.authed('DELETE', '/api/v1/photos/orphans');
     expect(res.status).toBe(200);
-    expect((await json<DataEnvelope<{ removed: number }>>(res)).data.removed).toBe(1);
+    expect((await json<DataEnvelope<Removal>>(res)).data).toEqual({ removed: 1, failed: 0 });
 
     const ids = (
       ctx.sqlite.query('SELECT id FROM photos ORDER BY id').all() as { id: string }[]
@@ -167,7 +172,7 @@ describe('DELETE /api/v1/photos/orphans', () => {
     }
 
     const res = await ctx.authed('DELETE', '/api/v1/photos/orphans');
-    expect((await json<DataEnvelope<{ removed: number }>>(res)).data.removed).toBe(
+    expect((await json<DataEnvelope<Removal>>(res)).data.removed).toBe(
       Object.keys(PHOTO_ENTITY_TABLES).length
     );
     const ids = (
@@ -180,10 +185,32 @@ describe('DELETE /api/v1/photos/orphans', () => {
     );
   });
 
+  test('keeps a photo whose provider file could not be deleted, so the user can retry', async () => {
+    storage = installFakePhotoStorage(ctx);
+    seedPhoto('stuck', ctx.user.id, 'odometer_entry', 'missing-a');
+    const stuckKey = await storeFile('stuck');
+    seedPhoto('gone', ctx.user.id, 'odometer_entry', 'missing-b');
+    await storeFile('gone');
+    const provider = storage.provider;
+    const deleteFile = provider.delete.bind(provider);
+    provider.delete = (ref) =>
+      ref.externalId === stuckKey ? Promise.reject(new Error('provider down')) : deleteFile(ref);
+
+    const res = await ctx.authed('DELETE', '/api/v1/photos/orphans');
+    expect((await json<DataEnvelope<Removal>>(res)).data).toEqual({ removed: 1, failed: 1 });
+
+    expect(ctx.sqlite.query('SELECT id FROM photos').all()).toEqual([{ id: 'stuck' }]);
+    expect(ctx.sqlite.query('SELECT id FROM photo_refs').all()).toEqual([{ id: 'ref-stuck' }]);
+    expect(
+      await provider.getExternalUrl({ providerType: 'fake', externalId: stuckKey })
+    ).not.toBeNull();
+    expect(await orphanCount()).toBe(1);
+  });
+
   test('removes nothing when there are no orphans', async () => {
     const res = await ctx.authed('DELETE', '/api/v1/photos/orphans');
     expect(res.status).toBe(200);
-    expect((await json<DataEnvelope<{ removed: number }>>(res)).data.removed).toBe(0);
+    expect((await json<DataEnvelope<Removal>>(res)).data).toEqual({ removed: 0, failed: 0 });
   });
 
   test('401 without a session', async () => {

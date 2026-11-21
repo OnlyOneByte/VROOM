@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const count = vi.fn(() => Promise.resolve(0));
-const remove = vi.fn(() => Promise.resolve(0));
+const remove = vi.fn(() => Promise.resolve({ removed: 0, failed: 0 }));
 const showSuccess = vi.fn();
 const showError = vi.fn();
 
@@ -69,7 +69,7 @@ describe('Storage Providers: photos no longer attached to anything', () => {
 
 	test('confirming removes them, says how many, and hides the notice', async () => {
 		count.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
-		remove.mockResolvedValue(1);
+		remove.mockResolvedValue({ removed: 1, failed: 0 });
 		render(StorageProvidersCard, { props: {} });
 
 		expect(
@@ -80,6 +80,23 @@ describe('Storage Providers: photos no longer attached to anything', () => {
 
 		await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('Removed 1 photo'));
 		await waitFor(() => expect(screen.queryByText(/no longer attached/)).toBeNull());
+	});
+
+	test('photos whose files could not be deleted stay listed, and the user is told why', async () => {
+		count.mockResolvedValueOnce(3).mockResolvedValueOnce(1);
+		remove.mockResolvedValue({ removed: 2, failed: 1 });
+		render(StorageProvidersCard, { props: {} });
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Remove them' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Remove' }));
+
+		await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('Removed 2 photos'));
+		expect(showError).toHaveBeenCalledWith(
+			"Couldn't delete 1 photo from your storage providers. It stays listed here so you can try again later."
+		);
+		expect(
+			await screen.findByText('1 photo is no longer attached to anything.')
+		).toBeInTheDocument();
 	});
 
 	test('a failed removal explains it in a sentence and keeps the notice', async () => {
