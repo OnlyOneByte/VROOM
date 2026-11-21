@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, setSystemTime, test } from 'bun:test';
 import {
   createTestApp,
   type DataEnvelope,
@@ -14,7 +14,10 @@ beforeEach(async () => {
   ctx = await createTestApp();
   vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
 });
-afterEach(() => ctx.close());
+afterEach(() => {
+  setSystemTime();
+  ctx.close();
+});
 
 interface StoredSchedule {
   trigger_mode: string;
@@ -70,6 +73,7 @@ describe('a stored mileage-only reminder with a custom frequency and no interval
 
   test('switches once the interval is supplied', async () => {
     const id = await createMileageOnlyCustom();
+    setSystemTime(new Date('2026-03-15T12:00:00.000Z'));
 
     const res = await ctx.authed('PUT', `/api/v1/reminders/${id}`, {
       triggerMode: 'both',
@@ -85,7 +89,9 @@ describe('a stored mileage-only reminder with a custom frequency and no interval
       interval_value: 3,
       interval_unit: 'month',
     });
-    expect(saved.next_due_date, 'a date-based reminder gets a due date').not.toBeNull();
+    expect(saved.next_due_date, 'the first 3-monthly date from 2024-01-01 on or after today').toBe(
+      Date.parse('2026-04-01T12:00:00.000Z') / 1000
+    );
   });
 
   test('adds nothing to the recurring cost', async () => {
