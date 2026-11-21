@@ -29,6 +29,7 @@
 	let isLoading = $state(false);
 	let loadError = $state<string | null>(null);
 	let shares = $state<VehicleShare[]>([]);
+	const SHARE_STATUSES_WITH_ACCESS: VehicleShare['status'][] = ['pending', 'accepted'];
 	let revokeConfirmOpen = $state(false);
 	let revokingShare = $state<VehicleShare | null>(null);
 
@@ -47,7 +48,9 @@
 		loadError = null;
 		try {
 			const all = await shareApi.listGranted();
-			shares = all.filter(s => s.vehicleId === vehicleId);
+			shares = all.filter(
+				s => s.vehicleId === vehicleId && SHARE_STATUSES_WITH_ACCESS.includes(s.status)
+			);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load shares:', error);
 			loadError = error instanceof Error ? error.message : 'Failed to load shares';
@@ -146,7 +149,7 @@
 			</Button>
 		</form>
 
-		<div class="mt-2">
+		<div class="mt-2 min-w-0">
 			<h3 class="mb-2 text-sm font-medium text-muted-foreground">People with access</h3>
 			{#if isLoading}
 				<div class="space-y-2">
