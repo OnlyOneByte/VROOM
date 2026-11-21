@@ -198,15 +198,15 @@ export class BackupOrchestrator {
         if (result.success) {
           anySuccess = true;
           configPatch[providerId] = { lastBackupAt: timestamp };
-
-          const sheetsId = result.capabilities.sheets?.metadata?.spreadsheetId as
-            | string
-            | undefined;
-          if (sheetsId) {
-            configPatch[providerId].sheetsSpreadsheetId = sheetsId;
-          }
         } else {
           failedProviders.push(providerId);
+        }
+
+        const sheetsId = result.capabilities.sheets?.success
+          ? (result.capabilities.sheets.metadata?.spreadsheetId as string | undefined)
+          : undefined;
+        if (sheetsId) {
+          configPatch[providerId] = { ...configPatch[providerId], sheetsSpreadsheetId: sheetsId };
         }
       }
 
@@ -222,7 +222,7 @@ export class BackupOrchestrator {
         runOutcome = 'failed';
       }
 
-      if (anySuccess) {
+      if (Object.keys(configPatch).length > 0) {
         await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
           providers: configPatch,
         });
