@@ -1,5 +1,9 @@
 # Design System — compose from the kit, don't invent
 
+This is the kit's inventory: tokens, components and import paths. The rules for using them —
+principles, layout, typography, states, motion, accessibility, copy and the UI review
+checklist — are in the UI design guide, `UIQuality.md`.
+
 VROOM has a real component kit (shadcn-svelte primitives + app-level patterns). The single
 biggest source of "AI-junk" UI is **reinventing** what already exists — a hand-rolled card,
 an ad-hoc grey, a bespoke empty state. The rule:
@@ -38,7 +42,9 @@ palette class. Every token has a light and a dark variant.
 Notes:
 - `--muted-foreground` and `--destructive` are deliberately darkened to clear WCAG AA 4.5:1
   on white/card — do NOT lighten them, and avoid `text-muted-foreground/40`-style opacity on
-  real text. `theme/__tests__/theme-contrast.test.ts` gates every theme's token pairs at AA.
+  real text. `theme/__tests__/theme-contrast.test.ts` gates every theme's text pairs at AA and
+  the chart tokens at 3:1; `warning`, `border`, `input` and `ring` are not gated yet (see
+  `UIQuality.md`, *Colour and theme tokens*).
 - Status surfaces: use `Alert` with `default` or `destructive`, or a `bg-warning/10` +
   `text-warning` tint, rather than a hand-tinted div. Do NOT reach for `Alert`'s `warning` or
   `success` variants yet — both hardcode palette classes (`bg-yellow-50 border-yellow-200
@@ -57,16 +63,8 @@ Notes:
 
 ## Spacing, typography, layout scale
 
-Match neighbors; don't invent values. The conventions in this codebase:
-- **Page sections**: `space-y-6`. Inline groups: `gap-2` / `gap-3`.
-- **Card padding** comes from the primitive (`py-6` on Root, `px-6` on Header/Content);
-  override only for dense tiles (`StatCard` uses `p-4 sm:p-6`).
-- **Page width**: forms use `FormLayout` (centered, `max-w-2xl`). List/detail pages are
-  full-width inside the app shell (`px-4 sm:px-6 lg:px-8 py-6`).
-- **Headings**: page title via `PageHeader` (renders the `<h1>`). Section titles `text-lg
-  font-semibold`. Don't hand-roll page `<h1>`s.
-- **Mobile**: mobile-first (see `UIQuality.md`). Tap targets ≥ 40px — `Button` default is
-  h-9/36px, so use `size="lg"` (h-10) or full-width for primary mobile actions.
+These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *Typography*,
+*Mobile-first*), together with how to use every component below.
 
 ## Component inventory (import paths are real — use them)
 
@@ -110,10 +108,10 @@ Match neighbors; don't invent values. The conventions in this codebase:
 | KPI tiles | `import { StatCard, StatCardGrid } from '#lib/components/charts'` | `iconColor` (`StatCardIconColor`): `primary` · `chart-1`…`chart-8` · `destructive` · `muted`. An unknown token still falls back to the primary tint, but warns under `import.meta.env.DEV`; `category-color-label-convergence.test.ts` fails if the map stops covering a theme token |
 | Custom chart container | `import ChartCard from '#lib/components/charts/ChartCard.svelte'` | not in the barrel; pass `isLoading`/`error`/`isEmpty`/`emptyTitle` — never render a raw chart in a bare div |
 
-## The Four-States contract (cross-ref UIQuality.md)
+## The Four-States contract (cross-ref UIQuality.md, *States*)
 
 Any data view = loading (`Skeleton`) + empty (`EmptyState`) + error (visible message) +
-populated. `ChartCard` encodes all four (`isLoading`/`isEmpty`/`error`); `StatCard` and
+populated, and every mutation adds success feedback. `ChartCard` encodes all four (`isLoading`/`isEmpty`/`error`); `StatCard` and
 `PaginationControls` take `isLoading` only, so you still own their empty/error states.
 
 `utils/formatters` for currency/dates and `#lib/routes` + `resolve()` for links are the other
