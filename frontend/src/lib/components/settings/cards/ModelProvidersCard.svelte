@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
@@ -74,6 +75,8 @@
 	let formModel = $state('');
 	let formBaseUrl = $state('');
 	let isSaving = $state(false);
+
+	onMount(() => trackPendingSave(() => isSaving));
 	let deleteConfirmOpen = $state(false);
 	let deletingProvider = $state<UserProviderInfo | null>(null);
 	let deletingProviderLosesKey = $derived(

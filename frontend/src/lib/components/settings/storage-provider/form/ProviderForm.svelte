@@ -44,6 +44,7 @@
 		ProviderBackupSettings
 	} from '#lib/types/index.ts';
 	import { onMount } from 'svelte';
+	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 
 	const PROVIDER_TYPES: ProviderTypeOption[] = [
 		{
@@ -93,6 +94,8 @@
 	let selectedType = $state<string | null>(null);
 	let displayName = $state('');
 	let isSaving = $state(false);
+
+	onMount(() => trackPendingSave(() => isSaving));
 	let isDeleting = $state(false);
 
 	const oauth = useGoogleOAuth(() => ({

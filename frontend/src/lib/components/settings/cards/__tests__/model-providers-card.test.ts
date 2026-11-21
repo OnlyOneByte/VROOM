@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
+import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { UserProviderInfo } from '#lib/types/index.ts';
 
@@ -218,6 +219,21 @@ describe('ModelProvidersCard add provider', () => {
 		await settle();
 		expect(saveButton('llm')).toHaveTextContent('Saving...');
 		expect(saveButton('llm')).toBeDisabled();
+	});
+
+	test('a provider save in flight counts as unsaved changes until the card closes', async () => {
+		createProvider.mockReturnValueOnce(new Promise(() => {}));
+		await openCreate('llm');
+		await type('llm-name', 'Slow');
+		await type('llm-key', 'sk-slow');
+		expect(hasPendingSave()).toBe(false);
+
+		await fireEvent.click(saveButton('llm'));
+		await settle();
+
+		expect(hasPendingSave()).toBe(true);
+		cleanup();
+		expect(hasPendingSave()).toBe(false);
 	});
 
 	test('cancel closes the dialog without saving', async () => {
