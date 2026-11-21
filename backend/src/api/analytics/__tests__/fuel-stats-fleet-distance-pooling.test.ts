@@ -503,3 +503,60 @@ describe('a mixed mpg + km/L fleet pools efficiency, cost and price in the user 
     expect(stats.fuelConsumption.worstEfficiency).toBeCloseTo(toMpg(4), 6);
   });
 });
+
+describe('one vehicle with a short top-up: every average is total distance over total fuel', () => {
+  const on = (day: number) => new Date(Date.UTC(2024, 0, day, 12));
+  const fill = (
+    id: string,
+    vehicleId: string,
+    mileage: number,
+    volume: number,
+    day: number,
+    fuelType = 'Regular'
+  ): TestExpense => ({
+    id,
+    vehicleId,
+    category: 'fuel',
+    expenseAmount: 40,
+    date: on(day),
+    mileage,
+    volume,
+    fuelType,
+    missedFillup: false,
+  });
+
+  test('gas: quick stats, fuel stats, monthly consumption and year-end agree on 320 / 10.5', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedExpense(testDb.sqlite, fill('a1', VEH_A.id, 10_000, 10, 5));
+    seedExpense(testDb.sqlite, fill('a2', VEH_A.id, 10_300, 10, 10));
+    seedExpense(testDb.sqlite, fill('a3', VEH_A.id, 10_320, 0.5, 12));
+
+    const pooled = 320 / 10.5;
+    const [quick, stats, yearEnd] = await Promise.all([
+      repo.getQuickStats(USER.id, rangeAll()),
+      repo.getFuelStats(USER.id, rangeAll()),
+      repo.getYearEnd(USER.id, 2024),
+    ]);
+
+    expect(quick.avgEfficiency).toBeCloseTo(pooled, 6);
+    expect(stats.fuelConsumption.avgEfficiency).toBeCloseTo(pooled, 6);
+    expect(stats.monthlyConsumption.find((m) => m.month === '2024-01')?.efficiency).toBeCloseTo(
+      pooled,
+      6
+    );
+    expect(yearEnd.avgEfficiency).toBeCloseTo(pooled, 6);
+    expect(yearEnd.efficiencyTrend[0]?.efficiency).toBeCloseTo(pooled, 6);
+  });
+
+  test('charging: the mi/kWh average pools distance over energy', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_B);
+    seedExpense(testDb.sqlite, fill('c1', VEH_B.id, 1000, 30, 5, 'Electric'));
+    seedExpense(testDb.sqlite, fill('c2', VEH_B.id, 1120, 40, 10, 'Electric'));
+    seedExpense(testDb.sqlite, fill('c3', VEH_B.id, 1130, 2, 12, 'Electric'));
+
+    const stats = await repo.getFuelStats(USER.id, rangeAll());
+    expect(stats.charging.efficiency.avgEfficiency).toBeCloseTo(130 / 42, 6);
+  });
+});
