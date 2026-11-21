@@ -138,7 +138,7 @@
 		{:else if status === 'error'}
 			<div class="space-y-3" data-testid="push-error">
 				<p class="text-sm text-destructive">{loadError}</p>
-				<Button variant="outline" size="sm" onclick={loadStatus}>Retry</Button>
+				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={loadStatus}>Retry</Button>
 			</div>
 		{:else}
 			<div class="flex items-center justify-between gap-4" data-testid="push-card">

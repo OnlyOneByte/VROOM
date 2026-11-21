@@ -122,7 +122,9 @@ describe('PushNotificationsCard status', () => {
 			`Couldn't check notification status. ${NETWORK_FAILURE_MESSAGE}`
 		);
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		const retry = screen.getByRole('button', { name: 'Retry' });
+		expect(retry.className).toMatch(/(^|\s)h-10(\s|$)/);
+		await fireEvent.click(retry);
 		await settle();
 		expect(statusText()).toBe(OFF);
 		expect(getVapidPublicKey).toHaveBeenCalledTimes(2);
