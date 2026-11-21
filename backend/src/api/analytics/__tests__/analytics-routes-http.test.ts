@@ -30,6 +30,19 @@ describe('analytics routes (real HTTP stack)', () => {
     }
   });
 
+  test('an IANA timeZone is accepted and an unknown one is a 400', async () => {
+    const ok = await ctx.authed('GET', '/api/v1/analytics/insurance?timeZone=Pacific%2FAuckland');
+    expect(ok.status, await ok.text()).toBe(200);
+    for (const path of [
+      '/api/v1/analytics/insurance?timeZone=Mars%2FOlympus',
+      '/api/v1/analytics/year-end?timeZone=Mars%2FOlympus',
+      '/api/v1/analytics/cross-vehicle?startDate=1&endDate=2&timeZone=Mars%2FOlympus',
+    ]) {
+      const bad = await ctx.authed('GET', path);
+      expect(bad.status, path).toBe(400);
+    }
+  });
+
   test('vehicle-tco serves an OWNED vehicle (200 + envelope)', async () => {
     const vehicleId = await seedVehicle(ctx, { nickname: 'Daily Driver' });
     const res = await ctx.authed('GET', `/api/v1/analytics/vehicle-tco?vehicleId=${vehicleId}`);

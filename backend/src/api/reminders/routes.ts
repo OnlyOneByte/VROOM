@@ -10,6 +10,7 @@ import {
   reminderWithVehiclesToApi,
 } from '../../utils/money';
 import { requireVehicleOwnerScope } from '../../utils/sharing';
+import { calendarDayIn } from '../../utils/time-zone';
 import { commonSchemas, validateReminderOwnership, zValidator } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
@@ -24,7 +25,6 @@ import {
 } from './trigger-service';
 import {
   assertMergedReminderValid,
-  calendarDayIn,
   createReminderSchema,
   updateReminderSchema,
 } from './validation';
