@@ -28,6 +28,9 @@ vi.mock('#lib/services/share-api.ts', () => ({
 
 const toastSuccess = vi.fn<(message: string) => void>();
 const toastError = vi.fn<(message: string) => void>();
+vi.mock('#lib/stores/app.svelte.ts', () => ({
+	appStore: { showError: (message: string) => toastError(message) }
+}));
 vi.mock('svelte-sonner', () => ({
 	toast: {
 		success: (message: string) => toastSuccess(message),
