@@ -255,6 +255,24 @@ describe('reminders HTTP routes', () => {
     expect(body.data.skipped).toHaveLength(0);
   });
 
+  test('POST /trigger accepts the user time zone and rejects an unknown one', async () => {
+    const ok = await ctx.authed('POST', '/api/v1/reminders/trigger?timeZone=Pacific%2FTongatapu');
+    expect(ok.status).toBe(200);
+    const bad = await ctx.authed('POST', '/api/v1/reminders/trigger?timeZone=Mars%2FOlympus');
+    expect(bad.status).toBe(400);
+  });
+
+  test('POST /:id/mark-serviced rejects an unknown time zone', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const created = await createNotificationReminder(vehicleId);
+    const { data } = await json<DataEnvelope<ReminderWithJoins>>(created);
+    const res = await ctx.authed(
+      'POST',
+      `/api/v1/reminders/${data.reminder.id}/mark-serviced?timeZone=Mars%2FOlympus`
+    );
+    expect(res.status).toBe(400);
+  });
+
   test('POST /trigger is unauthorized when anonymous', async () => {
     const res = await ctx.anon('POST', '/api/v1/reminders/trigger');
     expect(res.status).toBe(401);

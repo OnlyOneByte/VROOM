@@ -5,6 +5,7 @@ import type { Expense, Reminder, ReminderNotification } from '../../db/schema';
 import { expenses, reminderNotifications } from '../../db/schema';
 import type { DrizzleTransaction, SplitConfig } from '../../db/types';
 import { ValidationError } from '../../errors';
+import { zonedParts, zoneOffsetMs } from '../../utils/time-zone';
 import { expenseSplitService } from '../expenses/split-service';
 import { odometerRepository } from '../odometer/repository';
 import { notifyUser, type PushPayload } from '../push/push-service';
@@ -45,17 +46,59 @@ async function firePushForNotification(
   await notifyUser(reminder.userId, payloadFromReminder(reminder, notification));
 }
 
-function clampToAnchorDay(next: Date, anchorDay: number): void {
-  const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
-  next.setDate(Math.min(anchorDay, lastDay));
+interface WallClock {
+  year: number;
+  month: number;
+  day: number;
+  timeOfDayMs: number;
+}
+
+function wallClockOf(instant: Date, timeZone: string | undefined): WallClock {
+  if (!timeZone) {
+    return {
+      year: instant.getFullYear(),
+      month: instant.getMonth(),
+      day: instant.getDate(),
+      timeOfDayMs:
+        ((instant.getHours() * 60 + instant.getMinutes()) * 60 + instant.getSeconds()) * 1000 +
+        instant.getMilliseconds(),
+    };
+  }
+  const p = zonedParts(instant, timeZone);
+  return {
+    year: p.year,
+    month: p.month - 1,
+    day: p.day,
+    timeOfDayMs: ((p.hour * 60 + p.minute) * 60 + p.second) * 1000 + instant.getUTCMilliseconds(),
+  };
+}
+
+function fromWallClock(w: WallClock, timeZone: string | undefined): Date {
+  if (!timeZone) {
+    return new Date(w.year, w.month, w.day, 0, 0, 0, w.timeOfDayMs);
+  }
+  const wall = Date.UTC(w.year, w.month, w.day) + w.timeOfDayMs;
+  const guess = wall - zoneOffsetMs(wall, timeZone);
+  return new Date(wall - zoneOffsetMs(guess, timeZone));
+}
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+}
+
+function addMonths(w: WallClock, months: number, anchorDay: number): WallClock {
+  const total = w.year * 12 + w.month + months;
+  const year = Math.floor(total / 12);
+  const month = total - year * 12;
+  return { ...w, year, month, day: Math.min(anchorDay, daysInMonth(year, month)) };
 }
 
 function advanceCustom(
-  next: Date,
+  w: WallClock,
   intervalValue: number,
   intervalUnit: string,
   anchorDay: number
-): void {
+): WallClock {
   if (intervalValue <= 0) {
     throw new ValidationError(
       `Invalid reminder intervalValue ${intervalValue} (must be a positive integer)`
@@ -63,21 +106,13 @@ function advanceCustom(
   }
   switch (intervalUnit) {
     case 'day':
-      next.setDate(next.getDate() + intervalValue);
-      break;
+      return { ...w, day: w.day + intervalValue };
     case 'week':
-      next.setDate(next.getDate() + intervalValue * 7);
-      break;
+      return { ...w, day: w.day + intervalValue * 7 };
     case 'month':
-      next.setDate(1);
-      next.setMonth(next.getMonth() + intervalValue);
-      clampToAnchorDay(next, anchorDay);
-      break;
+      return addMonths(w, intervalValue, anchorDay);
     case 'year':
-      next.setDate(1);
-      next.setFullYear(next.getFullYear() + intervalValue);
-      clampToAnchorDay(next, anchorDay);
-      break;
+      return addMonths(w, intervalValue * 12, anchorDay);
     default:
       throw new ValidationError(
         `Invalid reminder intervalUnit "${intervalUnit}" (expected day|week|month|year)`
@@ -90,27 +125,25 @@ export function computeNextDueDate(
   frequency: string,
   intervalValue?: number | null,
   intervalUnit?: string | null,
-  anchorDay?: number
+  anchorDay?: number,
+  timeZone?: string
 ): Date {
-  const next = new Date(currentDueDate.getTime());
-  const dayTarget = anchorDay ?? currentDueDate.getDate();
+  const current = wallClockOf(currentDueDate, timeZone);
+  const dayTarget = anchorDay ?? current.day;
+  let next: WallClock;
 
   switch (frequency) {
     case 'weekly':
-      next.setDate(next.getDate() + 7);
+      next = { ...current, day: current.day + 7 };
       break;
     case 'monthly':
-      next.setDate(1);
-      next.setMonth(next.getMonth() + 1);
-      clampToAnchorDay(next, dayTarget);
+      next = addMonths(current, 1, dayTarget);
       break;
     case 'yearly':
-      next.setDate(1);
-      next.setFullYear(next.getFullYear() + 1);
-      clampToAnchorDay(next, dayTarget);
+      next = addMonths(current, 12, dayTarget);
       break;
     case 'custom':
-      advanceCustom(next, intervalValue ?? 1, intervalUnit ?? 'day', dayTarget);
+      next = advanceCustom(current, intervalValue ?? 1, intervalUnit ?? 'day', dayTarget);
       break;
     default:
       throw new ValidationError(
@@ -118,7 +151,7 @@ export function computeNextDueDate(
       );
   }
 
-  return next;
+  return fromWallClock(next, timeZone);
 }
 
 export type ReminderSchedule = Pick<
@@ -126,18 +159,23 @@ export type ReminderSchedule = Pick<
   'id' | 'frequency' | 'intervalValue' | 'intervalUnit' | 'startDate'
 >;
 
-export function advanceReminderDueDate(reminder: ReminderSchedule, from: Date): Date {
+export function advanceReminderDueDate(
+  reminder: ReminderSchedule,
+  from: Date,
+  timeZone?: string
+): Date {
   return computeNextDueDate(
     from,
     reminder.frequency,
     reminder.intervalValue,
     reminder.intervalUnit,
-    getAnchorDay(reminder)
+    getAnchorDay(reminder, timeZone),
+    timeZone
   );
 }
 
-function advanceStrictly(reminder: ReminderSchedule, from: Date): Date {
-  const next = advanceReminderDueDate(reminder, from);
+function advanceStrictly(reminder: ReminderSchedule, from: Date, timeZone?: string): Date {
+  const next = advanceReminderDueDate(reminder, from, timeZone);
   if (next <= from) {
     throw new ValidationError(
       `Reminder ${reminder.id} did not advance (frequency "${reminder.frequency}")`
@@ -146,18 +184,26 @@ function advanceStrictly(reminder: ReminderSchedule, from: Date): Date {
   return next;
 }
 
-export function firstDueOnOrAfter(reminder: ReminderSchedule, floor: Date): Date {
+export function firstDueOnOrAfter(
+  reminder: ReminderSchedule,
+  floor: Date,
+  timeZone?: string
+): Date {
   let due = reminder.startDate;
-  while (due < floor) due = advanceStrictly(reminder, due);
+  while (due < floor) due = advanceStrictly(reminder, due, timeZone);
   return due;
 }
 
-export function previousDueBefore(reminder: ReminderSchedule, due: Date): Date | null {
+export function previousDueBefore(
+  reminder: ReminderSchedule,
+  due: Date,
+  timeZone?: string
+): Date | null {
   let previous: Date | null = null;
   let candidate = reminder.startDate;
   while (candidate < due) {
     previous = candidate;
-    candidate = advanceStrictly(reminder, candidate);
+    candidate = advanceStrictly(reminder, candidate, timeZone);
   }
   return previous;
 }
@@ -218,8 +264,8 @@ function createExpenseFromReminder(
   });
 }
 
-function getAnchorDay(reminder: ReminderSchedule): number {
-  return reminder.startDate.getDate();
+function getAnchorDay(reminder: ReminderSchedule, timeZone: string | undefined): number {
+  return wallClockOf(reminder.startDate, timeZone).day;
 }
 
 function hasReminderEndedBy(reminder: Reminder, nextDue: Date): boolean {
@@ -230,9 +276,10 @@ async function processExpensePeriod(
   reminder: Reminder,
   vehicleIds: string[],
   nextDue: Date,
-  now: Date
+  now: Date,
+  timeZone: string | undefined
 ): Promise<{ created: Expense[]; advancedDue: Date } | null> {
-  const advancedDue = advanceReminderDueDate(reminder, nextDue);
+  const advancedDue = advanceReminderDueDate(reminder, nextDue, timeZone);
   return transaction((tx) => {
     if (!reminderRepository.claimPeriodSync(tx, reminder.id, nextDue, advancedDue, now)) {
       return null;
@@ -247,9 +294,10 @@ async function processExpensePeriod(
 async function processNotificationPeriod(
   reminder: Reminder,
   nextDue: Date,
-  now: Date
+  now: Date,
+  timeZone: string | undefined
 ): Promise<{ created: ReminderNotification; advancedDue: Date } | null> {
-  const advancedDue = advanceReminderDueDate(reminder, nextDue);
+  const advancedDue = advanceReminderDueDate(reminder, nextDue, timeZone);
   return transaction((tx) => {
     if (!reminderRepository.claimPeriodSync(tx, reminder.id, nextDue, advancedDue, now)) {
       return null;
@@ -274,23 +322,29 @@ async function processPeriod(
   vehicleIds: string[],
   nextDue: Date,
   now: Date,
-  result: TriggerResult
+  result: TriggerResult,
+  timeZone: string | undefined
 ): Promise<Date | null> {
   if (reminder.type === 'expense') {
-    const period = await processExpensePeriod(reminder, vehicleIds, nextDue, now);
+    const period = await processExpensePeriod(reminder, vehicleIds, nextDue, now, timeZone);
     if (!period) return null;
     result.createdExpenses.push(...period.created);
     return period.advancedDue;
   }
 
-  const period = await processNotificationPeriod(reminder, nextDue, now);
+  const period = await processNotificationPeriod(reminder, nextDue, now, timeZone);
   if (!period) return null;
   result.notifications.push(period.created);
   await firePushForNotification(reminder, period.created);
   return period.advancedDue;
 }
 
-async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Date): Promise<void> {
+async function fastForwardPastNow(
+  reminder: Reminder,
+  currentDue: Date,
+  now: Date,
+  timeZone: string | undefined
+): Promise<void> {
   const previousDue = currentDue;
   let nextDue = currentDue;
   while (nextDue <= now) {
@@ -298,7 +352,7 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
       await reminderRepository.deactivate(reminder.id, reminder.userId);
       return;
     }
-    const advanced = advanceReminderDueDate(reminder, nextDue);
+    const advanced = advanceReminderDueDate(reminder, nextDue, timeZone);
     if (advanced <= nextDue) {
       throw new ValidationError(
         `Reminder ${reminder.id} did not advance (frequency "${reminder.frequency}") — aborting fast-forward`
@@ -314,14 +368,14 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
 }
 
 class ReminderTriggerService {
-  async processOverdueReminders(userId: string): Promise<TriggerResult> {
+  async processOverdueReminders(userId: string, timeZone?: string): Promise<TriggerResult> {
     const now = new Date();
     const result: TriggerResult = { createdExpenses: [], notifications: [], skipped: [] };
 
     const overdueReminders = await reminderRepository.findOverdue(userId, now);
     for (const { reminder, vehicleIds } of overdueReminders) {
       try {
-        await this.processReminder(reminder, vehicleIds, now, result);
+        await this.processReminder(reminder, vehicleIds, now, result, timeZone);
       } catch (error) {
         pushReminderSkipError(result, reminder.id, error);
       }
@@ -401,7 +455,8 @@ class ReminderTriggerService {
     reminder: Reminder,
     vehicleIds: string[],
     now: Date,
-    result: TriggerResult
+    result: TriggerResult,
+    timeZone: string | undefined
   ): Promise<void> {
     if (vehicleIds.length === 0) {
       result.skipped.push({ reminderId: reminder.id, reason: 'no_vehicles' });
@@ -421,7 +476,7 @@ class ReminderTriggerService {
         break;
       }
 
-      const advancedDue = await processPeriod(reminder, vehicleIds, nextDue, now, result);
+      const advancedDue = await processPeriod(reminder, vehicleIds, nextDue, now, result, timeZone);
       if (advancedDue === null) {
         pushConcurrentTriggerSkip(result, reminder.id);
         return;
@@ -437,7 +492,7 @@ class ReminderTriggerService {
     }
 
     if (catchUpCount >= maxCatchUp && nextDue <= now) {
-      await fastForwardPastNow(reminder, nextDue, now);
+      await fastForwardPastNow(reminder, nextDue, now, timeZone);
       result.skipped.push({ reminderId: reminder.id, reason: 'catch_up_limit_reached' });
     }
   }
