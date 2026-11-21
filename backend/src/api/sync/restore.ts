@@ -1,4 +1,4 @@
-import { and, eq, getTableColumns, inArray, type Table } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, ne, type Table } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { CONFIG, TABLE_SCHEMA_MAP } from '../../config';
 import type { AppDatabase } from '../../db/connection';
@@ -118,7 +118,7 @@ class RestoreService {
     file: Buffer,
     mode: RestoreMode
   ): Promise<RestoreResponse> {
-    const parsedBackup = await this.parseOrReject(file);
+    const parsedBackup = backupService.dropOrphanPhotos(await this.parseOrReject(file));
 
     const validation = backupService.validateBackupData(parsedBackup);
     if (!validation.valid) {
@@ -215,7 +215,7 @@ class RestoreService {
     const sheetsService = await createSheetsServiceForProvider(providerId, userId);
     const sheet = await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
 
-    const sheetData: ParsedBackupData = {
+    const sheetData: ParsedBackupData = backupService.dropOrphanPhotos({
       ...sheet,
       metadata: { ...sheet.metadata, version: CONFIG.backup.currentVersion },
       vehicles: coerceRows(sheet.vehicles, TABLE_SCHEMA_MAP.vehicles),
@@ -241,7 +241,7 @@ class RestoreService {
       ),
       trips: coerceRows(sheet.trips, TABLE_SCHEMA_MAP.trips),
       vehicleShares: coerceRows(sheet.vehicleShares, TABLE_SCHEMA_MAP.vehicleShares),
-    };
+    });
 
     const validation = backupService.validateBackupData(sheetData);
     if (!validation.valid) {
@@ -396,7 +396,17 @@ class RestoreService {
       .all();
     const vehicleIds = userVehicles.map((v) => v.id);
 
-    tx.delete(photos).where(eq(photos.userId, userId)).run();
+    const keptPhotoIds = new Set(this.photosOnOtherOwnersVehicles(tx, userId));
+    const wipedPhotoIds = tx
+      .select({ id: photos.id })
+      .from(photos)
+      .where(eq(photos.userId, userId))
+      .all()
+      .map((p) => p.id)
+      .filter((id) => !keptPhotoIds.has(id));
+    for (const idBatch of chunk(wipedPhotoIds)) {
+      tx.delete(photos).where(inArray(photos.id, idBatch)).run();
+    }
     tx.delete(expenses).where(eq(expenses.userId, userId)).run();
     tx.delete(trips).where(eq(trips.userId, userId)).run();
 
@@ -413,6 +423,36 @@ class RestoreService {
     tx.delete(syncState).where(eq(syncState.userId, userId)).run();
 
     tx.delete(vehicles).where(eq(vehicles.userId, userId)).run();
+  }
+
+  private photosOnOtherOwnersVehicles(tx: DrizzleTransaction, userId: string): string[] {
+    const onExpenses = tx
+      .select({ id: photos.id })
+      .from(photos)
+      .innerJoin(expenses, eq(expenses.id, photos.entityId))
+      .innerJoin(vehicles, eq(vehicles.id, expenses.vehicleId))
+      .where(
+        and(
+          eq(photos.userId, userId),
+          eq(photos.entityType, 'expense'),
+          ne(vehicles.userId, userId)
+        )
+      )
+      .all();
+    const onOdometer = tx
+      .select({ id: photos.id })
+      .from(photos)
+      .innerJoin(odometerEntries, eq(odometerEntries.id, photos.entityId))
+      .innerJoin(vehicles, eq(vehicles.id, odometerEntries.vehicleId))
+      .where(
+        and(
+          eq(photos.userId, userId),
+          eq(photos.entityType, 'odometer_entry'),
+          ne(vehicles.userId, userId)
+        )
+      )
+      .all();
+    return [...onExpenses, ...onOdometer].map((p) => p.id);
   }
 
   // Backup files are untrusted; this is the chokepoint against cross-tenant writes.
