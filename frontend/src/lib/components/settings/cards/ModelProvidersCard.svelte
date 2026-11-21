@@ -76,6 +76,10 @@
 	let isSaving = $state(false);
 	let deleteConfirmOpen = $state(false);
 	let deletingProvider = $state<UserProviderInfo | null>(null);
+	let deletingProviderLosesKey = $derived(
+		deletingProvider !== null &&
+			!providerTypes.find(t => t.id === deletingProvider?.providerType)?.keyless
+	);
 
 	let fallbackType = $derived(providerTypes[0] as ModelProviderTypeOption);
 	let selectedTypeOption = $derived<ModelProviderTypeOption>(
@@ -363,7 +367,7 @@
 	bind:open={deleteConfirmOpen}
 	title="Delete {copy.noun}?"
 	description={deletingProvider
-		? `"${deletingProvider.displayName}" and its saved API key will be permanently deleted. ${copy.feature} stops using it. This cannot be undone.`
+		? `"${deletingProvider.displayName}"${deletingProviderLosesKey ? ' and its saved API key' : ''} will be permanently deleted. ${copy.feature} stops using it. This cannot be undone.`
 		: ''}
 	onConfirm={handleDelete}
 />

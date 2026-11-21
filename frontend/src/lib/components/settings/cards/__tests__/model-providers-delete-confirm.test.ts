@@ -48,6 +48,32 @@ describe('ModelProvidersCard delete', () => {
 		await waitFor(() => expect(deleteProvider).toHaveBeenCalledWith('llm-1'));
 	});
 
+	test('a keyless provider is not said to lose an API key', async () => {
+		getProviders.mockResolvedValue([
+			{ ...WORK_CLAUDE, id: 'llm-2', providerType: 'ollama', displayName: 'Home Ollama' }
+		]);
+		render(ModelProvidersCard, { props: { domain: 'llm' } });
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Delete Home Ollama' }));
+
+		const dialog = await screen.findByRole('alertdialog');
+		expect(dialog).toHaveTextContent('"Home Ollama" will be permanently deleted');
+		expect(dialog).not.toHaveTextContent('API key');
+	});
+
+	test('a failed delete keeps the dialog open so the user can retry', async () => {
+		deleteProvider.mockRejectedValueOnce(new Error('boom'));
+		render(ModelProvidersCard, { props: { domain: 'llm' } });
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Delete Work Claude' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+		await waitFor(() => expect(deleteProvider).toHaveBeenCalledTimes(1));
+		await waitFor(() => expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled());
+		await new Promise(resolve => setTimeout(resolve, 300));
+		expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+	});
+
 	test('Cancel keeps the provider', async () => {
 		render(ModelProvidersCard, { props: { domain: 'llm' } });
 

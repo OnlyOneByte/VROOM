@@ -221,7 +221,7 @@
 	bind:open={revokeConfirmOpen}
 	title="Revoke access?"
 	description={revokingShare
-		? `${revokingShare.sharedWithId} will no longer see "${vehicleName}" or its expenses. You can invite them again later.`
+		? `${revokingShare.sharedWithId} will no longer see “${vehicleName}” or its expenses. You can invite them again later.`
 		: ''}
 	confirmLabel="Revoke"
 	onConfirm={revoke}
