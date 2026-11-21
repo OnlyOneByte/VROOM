@@ -453,3 +453,51 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
     expect(stats.distance.totalDistance).toBeCloseTo(300 + 360 / 1.609344, 1);
   });
 });
+
+describe('a mixed mpg + km/L fleet pools efficiency, cost and price in the user units', () => {
+  const KM_PER_MILE = 1.609344;
+  const LITERS_PER_GALLON = 3.785411784;
+  const toMpg = (kmPerLiter: number) => (kmPerLiter * LITERS_PER_GALLON) / KM_PER_MILE;
+
+  function seedMixedFleet(bMileage: number, bVolume: number): void {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedVehicle(testDb.sqlite, VEH_B);
+    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+      JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
+      VEH_B.id,
+    ]);
+    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 4000, 60, 10));
+    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_300, 4000, 30, 10));
+    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 4000, 60, 25));
+    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_000 + bMileage, 4000, 30, bVolume));
+  }
+
+  test('best/avg/worst MPG, cost per mile and $/gal are converted before pooling', async () => {
+    seedMixedFleet(375, 25);
+    const stats = await repo.getFuelStats(USER.id, rangeAll());
+    const quick = await repo.getQuickStats(USER.id, rangeAll());
+
+    const bMpg = toMpg(15);
+    expect(stats.fuelConsumption.bestEfficiency).toBeCloseTo(bMpg, 6);
+    expect(stats.fuelConsumption.worstEfficiency).toBeCloseTo(30, 6);
+    expect(stats.fuelConsumption.avgEfficiency).toBeCloseTo((30 + bMpg) / 2, 6);
+    expect(stats.fuelConsumption.avgEfficiency).toBeCloseTo(quick.avgEfficiency ?? 0, 6);
+
+    const bMiles = 375 / KM_PER_MILE;
+    expect(stats.averageCost.bestCostPerDistance).toBeCloseTo(4000 / 300, 6);
+    expect(stats.averageCost.worstCostPerDistance).toBeCloseTo(4000 / bMiles, 6);
+    const bChart = stats.costPerDistance.find((r) => r.vehicleId === VEH_B.id);
+    expect(bChart?.costPerDistance).toBeCloseTo(4000 / bMiles, 6);
+
+    const prices = stats.gasPriceHistory.map((g) => g.pricePerVolume).sort((x, y) => x - y);
+    expect(prices[0]).toBeCloseTo(400, 6);
+    expect(prices[prices.length - 1]).toBeCloseTo(4000 / (25 / LITERS_PER_GALLON), 6);
+  });
+
+  test('sanity bands run in mpg and miles: a 4 km/L fill-up 1200 km later is kept', async () => {
+    seedMixedFleet(1200, 300);
+    const stats = await repo.getFuelStats(USER.id, rangeAll());
+    expect(stats.fuelConsumption.worstEfficiency).toBeCloseTo(toMpg(4), 6);
+  });
+});
