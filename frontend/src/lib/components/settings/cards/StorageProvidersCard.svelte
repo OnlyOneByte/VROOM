@@ -2,7 +2,15 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { HardDrive, Plus, LoaderCircle, Download, Upload, RefreshCw } from '@lucide/svelte';
+	import {
+		CircleAlert,
+		HardDrive,
+		Plus,
+		LoaderCircle,
+		Download,
+		Upload,
+		RefreshCw
+	} from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
@@ -81,7 +89,8 @@
 			storageConfig = settings.storageConfig ?? DEFAULT_STORAGE_CONFIG;
 			backupConfig = settings.backupConfig ?? { providers: {} };
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load photo storage settings';
+			if (import.meta.env.DEV) console.error('Failed to load storage providers:', e);
+			error = userFacingErrorMessage(e);
 		} finally {
 			isLoading = false;
 		}
@@ -121,6 +130,12 @@
 		}
 	}
 
+	async function retryLoad() {
+		isLoading = true;
+		error = null;
+		await loadData();
+	}
+
 	onMount(() => {
 		loadData();
 		loadOrphanCount();
@@ -131,8 +146,8 @@
 			await settingsApi.updateSettings({ storageConfig: config });
 			storageConfig = config;
 			appStore.showSuccess('Photo storage settings updated');
-		} catch {
-			appStore.showError('Failed to update photo storage settings');
+		} catch (e) {
+			appStore.showError(`Couldn't save the photo storage settings. ${userFacingErrorMessage(e)}`);
 		}
 	}
 
@@ -162,7 +177,7 @@
 				photoLossConfirmOpen = true;
 				return;
 			}
-			appStore.showError('Failed to delete provider');
+			appStore.showError(`Couldn't remove the provider. ${userFacingErrorMessage(error)}`);
 		}
 	}
 
@@ -215,8 +230,8 @@
 			appStore.showSuccess(
 				enabled ? 'ZIP backup enabled for provider' : 'ZIP backup disabled for provider'
 			);
-		} catch {
-			appStore.showError('Failed to update backup settings');
+		} catch (e) {
+			appStore.showError(`Couldn't save the backup settings. ${userFacingErrorMessage(e)}`);
 		}
 	}
 
@@ -242,8 +257,8 @@
 			appStore.showSuccess(
 				enabled ? 'Sheets sync enabled for provider' : 'Sheets sync disabled for provider'
 			);
-		} catch {
-			appStore.showError('Failed to update backup settings');
+		} catch (e) {
+			appStore.showError(`Couldn't save the backup settings. ${userFacingErrorMessage(e)}`);
 		}
 	}
 </script>
@@ -262,7 +277,14 @@
 				<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 			</div>
 		{:else if error}
-			<p class="text-sm text-destructive">{error}</p>
+			<div class="rounded-lg border bg-card p-4">
+				<div class="mb-2 flex items-center gap-2 text-destructive">
+					<CircleAlert class="h-5 w-5 shrink-0" />
+					<p class="font-medium">Couldn't load your storage providers</p>
+				</div>
+				<p class="mb-3 text-sm text-muted-foreground">{error}</p>
+				<Button class="h-10 sm:h-9" onclick={retryLoad}>Retry</Button>
+			</div>
 		{:else}
 			<div class="space-y-4">
 				<p class="text-sm font-medium">Data Backups</p>
