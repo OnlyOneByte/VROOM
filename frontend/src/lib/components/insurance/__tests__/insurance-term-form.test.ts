@@ -8,6 +8,11 @@ import type {
 } from '#lib/types/index.ts';
 import { dateOnlyToISO } from '#lib/utils/formatters.ts';
 import { VEHICLES, makePolicy, makeTerm, settle } from './insurance-fixtures.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const gotoDynamic = vi.fn<(url: string) => void>();
 vi.mock('#lib/utils/navigation.ts', () => ({ gotoDynamic: (url: string) => gotoDynamic(url) }));
@@ -222,11 +227,13 @@ describe('InsuranceTermForm add mode', () => {
 	});
 
 	test('an add failure reports the API message and stays on the form', async () => {
-		addTerm.mockRejectedValue(new Error('overlap'));
+		addTerm.mockRejectedValue(new ApiError('This term overlaps another term', 409));
 		await mount();
 		await fillDatesAndVehicle();
 		await clickSave();
-		expect(showError).toHaveBeenCalledWith('Failed to add term: overlap');
+		expect(showError).toHaveBeenCalledWith(
+			"Couldn't add the term. This term overlaps another term."
+		);
 		expect(gotoDynamic).not.toHaveBeenCalled();
 	});
 
@@ -235,7 +242,7 @@ describe('InsuranceTermForm add mode', () => {
 		await mount();
 		await fillDatesAndVehicle();
 		await clickSave();
-		expect(showError).toHaveBeenCalledWith('Failed to add term: Unknown error');
+		expect(showError).toHaveBeenCalledWith(`Couldn't add the term. ${UNEXPECTED_FAILURE_MESSAGE}`);
 	});
 
 	test('the save button shows a saving state while the request is pending', async () => {
@@ -355,10 +362,10 @@ describe('InsuranceTermForm edit mode', () => {
 	});
 
 	test('an update failure reports with the update verb', async () => {
-		updateTerm.mockRejectedValue(new Error('stale'));
+		updateTerm.mockRejectedValue(new ApiError('Internal server error', 500));
 		await mount({ termId: 't1' });
 		await clickSave(/Update Term/);
-		expect(showError).toHaveBeenCalledWith('Failed to update term: stale');
+		expect(showError).toHaveBeenCalledWith(`Couldn't update the term. ${SERVER_FAILURE_MESSAGE}`);
 	});
 });
 

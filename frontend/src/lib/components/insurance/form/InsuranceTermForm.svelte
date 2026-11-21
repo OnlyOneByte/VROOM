@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
@@ -245,8 +246,9 @@
 			}
 			gotoDynamic(returnTo);
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Unknown error';
-			appStore.showError(`Failed to ${isEditMode ? 'update' : 'add'} term: ${message}`);
+			appStore.showError(
+				`Couldn't ${isEditMode ? 'update' : 'add'} the term. ${userFacingErrorMessage(err)}`
+			);
 		} finally {
 			isSubmitting = false;
 		}
