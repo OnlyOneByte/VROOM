@@ -583,63 +583,32 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     userId: string,
     createdBy: string | null = null
   ): Promise<Expense[]> {
-    const oldSiblings = await this.db
-      .select()
-      .from(expenses)
-      .where(this.groupOwnedBy(groupId, userId));
-
-    if (oldSiblings.length === 0) {
-      throw new NotFoundError('Split expense');
-    }
-
     try {
-      const firstOld = oldSiblings[0];
-      if (!firstOld) {
-        throw new NotFoundError('Split expense');
-      }
-      const totalAmount =
-        data.splitConfig.method === 'absolute'
-          ? data.splitConfig.allocations.reduce((sum, a) => sum + a.amount, 0)
-          : (data.totalAmount ?? firstOld.groupTotal ?? firstOld.expenseAmount);
-      const allocations = expenseSplitService.computeAllocations(data.splitConfig, totalAmount);
-      const splitMethod: SplitMethod = data.splitConfig.method;
-      const oldSiblingIds = oldSiblings.map((s) => s.id);
-
       // bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.
       return this.db.transaction((tx) => {
-        const oldPhotos = tx
-          .select({ id: photos.id })
-          .from(photos)
-          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, oldSiblingIds)))
+        const [firstOld, ...restOld] = tx
+          .select()
+          .from(expenses)
+          .where(this.groupOwnedBy(groupId, userId))
+          .orderBy(asc(expenses.createdAt), asc(expenses.id))
           .all();
-
-        const photoIds = oldPhotos.map((p) => p.id);
-
-        tx.delete(expenses).where(this.groupOwnedBy(groupId, userId)).run();
-
-        const newSiblings = expenseSplitService.createSiblingsSync(tx, {
-          groupId,
-          userId,
-          createdBy,
-          splitMethod,
-          groupTotal: totalAmount,
-          allocations,
-          category: firstOld.category,
-          date: firstOld.date,
-          tags: firstOld.tags ?? undefined,
-          description: firstOld.description ?? undefined,
-          sourceType: firstOld.sourceType ?? undefined,
-          sourceId: firstOld.sourceId ?? undefined,
-        });
-
-        if (photoIds.length > 0 && newSiblings[0]) {
-          tx.update(photos)
-            .set({ entityId: newSiblings[0].id })
-            .where(inArray(photos.id, photoIds))
-            .run();
+        if (!firstOld) {
+          throw new NotFoundError('Split expense');
         }
 
-        return newSiblings;
+        const totalAmount =
+          data.splitConfig.method === 'absolute'
+            ? data.splitConfig.allocations.reduce((sum, a) => sum + a.amount, 0)
+            : (data.totalAmount ?? firstOld.groupTotal ?? firstOld.expenseAmount);
+
+        return expenseSplitService.updateSiblingsSync(tx, {
+          groupId,
+          existing: [firstOld, ...restOld],
+          createdBy,
+          splitMethod: data.splitConfig.method,
+          groupTotal: totalAmount,
+          allocations: expenseSplitService.computeAllocations(data.splitConfig, totalAmount),
+        });
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
