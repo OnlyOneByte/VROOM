@@ -327,7 +327,7 @@ routes.delete('/split/:id', zValidator('param', commonSchemas.idParam), async (c
   await requireSplitWriteAccess({ method: 'even', vehicleIds: groupInfo.vehicleIds }, user.id);
 
   const siblingIds = await expenseRepository.findIdsByGroupId(id, groupInfo.ownerId);
-  await deletePhotosForEntities('expense', siblingIds, groupInfo.ownerId);
+  await deletePhotosForEntities('expense', siblingIds);
 
   await expenseRepository.deleteSplitExpense(id, groupInfo.ownerId);
 

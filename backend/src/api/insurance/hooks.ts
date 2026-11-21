@@ -146,8 +146,7 @@ export async function updateTermExpenses(params: TermExpenseParams): Promise<voi
   const linked = await expenseRepository.findBySource('insurance_term', termId, userId);
   await deletePhotosForEntities(
     'expense',
-    linked.map((expense) => expense.id),
-    userId
+    linked.map((expense) => expense.id)
   );
 
   const deleted = await expenseRepository.deleteBySource('insurance_term', termId, userId);

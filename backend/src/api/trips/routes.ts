@@ -172,7 +172,7 @@ routes.put(
             odometer: existing.endOdometer,
             recordedAt: existing.tripDate,
           });
-          await deletePhotosForEntities('odometer_entry', removedEntryIds, user.id);
+          await deletePhotosForEntities('odometer_entry', removedEntryIds);
         }
         await odometerRepository.createFromTrip({
           vehicleId: existing.vehicleId,
@@ -229,7 +229,7 @@ routes.delete(
             odometer: existing.endOdometer,
             recordedAt: existing.tripDate,
           });
-          await deletePhotosForEntities('odometer_entry', removedEntryIds, user.id);
+          await deletePhotosForEntities('odometer_entry', removedEntryIds);
           await reminderTriggerService.recheckMileageReminders(user.id, existing.vehicleId);
         }
       } catch (error) {
