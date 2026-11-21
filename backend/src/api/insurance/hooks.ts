@@ -2,7 +2,11 @@ import { AppError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { expenseRepository } from '../expenses/repository';
 import { deletePhotosForEntities } from '../photos/photo-service';
-import type { TermCoverageRow } from './repository';
+import {
+  insurancePolicyRepository,
+  type MonthlyPricedTerm,
+  type TermCoverageRow,
+} from './repository';
 
 export function vehicleIdsForTerm(
   termVehicleCoverage: readonly TermCoverageRow[],
@@ -40,6 +44,60 @@ export function termBillingMonths(startDate: Date, endDate: Date): number {
   );
   const months = wholeCalendarMonths + (lastBillingDay < endDay ? 1 : 0);
   return Math.max(1, months);
+}
+
+function calendarMonthsTouched(startDate: Date, endDate: Date): number {
+  return Math.max(
+    0,
+    (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+      (endDate.getMonth() - startDate.getMonth()) +
+      1
+  );
+}
+
+async function recalculateTermPremium(term: MonthlyPricedTerm): Promise<boolean> {
+  const monthlyCost = term.monthlyCost ?? 0;
+  const overcounted = monthlyCost * calendarMonthsTouched(term.startDate, term.endDate);
+  const corrected = monthlyCost * termBillingMonths(term.startDate, term.endDate);
+  if (overcounted === corrected) return false;
+
+  const linked = await expenseRepository.findBySource('insurance_term', term.id, term.userId);
+  const groupIds = new Set(linked.map((expense) => expense.groupId));
+  const first = linked[0];
+  if (!first?.groupId || groupIds.size !== 1 || first.splitMethod !== 'even') return false;
+  const rowsTotal = linked.reduce((sum, expense) => sum + expense.expenseAmount, 0);
+  if (first.groupTotal !== overcounted || rowsTotal !== overcounted) return false;
+
+  await expenseRepository.updateSplitExpense(
+    first.groupId,
+    {
+      splitConfig: { method: 'even', vehicleIds: linked.map((expense) => expense.vehicleId) },
+      totalAmount: corrected,
+    },
+    term.userId
+  );
+  return true;
+}
+
+export async function recalculateOvercountedMonthlyPremiums(): Promise<number> {
+  const terms = await insurancePolicyRepository.findMonthlyPricedTerms();
+  let recalculated = 0;
+
+  for (const term of terms) {
+    try {
+      if (await recalculateTermPremium(term)) recalculated++;
+    } catch (error) {
+      logger.error('Failed to recalculate monthly insurance premium', {
+        termId: term.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  if (recalculated > 0) {
+    logger.info('Recalculated over-counted monthly insurance premiums', { recalculated });
+  }
+  return recalculated;
 }
 
 export function effectiveTermCost(params: {
