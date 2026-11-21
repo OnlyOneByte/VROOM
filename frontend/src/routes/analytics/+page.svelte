@@ -24,6 +24,8 @@
 	let error = $state<string | null>(null);
 	let activeTab = $state('fuel-stats');
 
+	const TAB_TRIGGER_CLASS = 'h-10 sm:h-[30px]';
+
 	async function loadSummary() {
 		try {
 			isLoading = true;
@@ -115,11 +117,11 @@
 	{/if}
 
 	<Tabs.Root bind:value={activeTab} class="space-y-4 md:space-y-6">
-		<Tabs.List class="grid w-full grid-cols-2 lg:grid-cols-4">
-			<Tabs.Trigger value="fuel-stats">Fuel & Stats</Tabs.Trigger>
-			<Tabs.Trigger value="cross-vehicle">Cross-Vehicle</Tabs.Trigger>
-			<Tabs.Trigger value="per-vehicle">Per-Vehicle</Tabs.Trigger>
-			<Tabs.Trigger value="year-end">Year-End</Tabs.Trigger>
+		<Tabs.List class="grid h-auto w-full grid-cols-2 lg:grid-cols-4">
+			<Tabs.Trigger value="fuel-stats" class={TAB_TRIGGER_CLASS}>Fuel & Stats</Tabs.Trigger>
+			<Tabs.Trigger value="cross-vehicle" class={TAB_TRIGGER_CLASS}>Cross-Vehicle</Tabs.Trigger>
+			<Tabs.Trigger value="per-vehicle" class={TAB_TRIGGER_CLASS}>Per-Vehicle</Tabs.Trigger>
+			<Tabs.Trigger value="year-end" class={TAB_TRIGGER_CLASS}>Year-End</Tabs.Trigger>
 		</Tabs.List>
 
 		{#if activeTab === 'fuel-stats'}
