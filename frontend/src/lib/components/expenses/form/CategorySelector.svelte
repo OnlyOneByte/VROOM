@@ -64,9 +64,11 @@
 				aria-pressed={value === category.value}
 			>
 				<div class="flex flex-col gap-2">
-					<div class="flex items-center gap-2">
+					<div class="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
 						<Icon
-							class="h-5 w-5 {value === category.value ? 'text-primary' : 'text-muted-foreground'}"
+							class="h-5 w-5 shrink-0 {value === category.value
+								? 'text-primary'
+								: 'text-muted-foreground'}"
 						/>
 						<span class="font-medium text-sm text-foreground">
 							{category.label}
