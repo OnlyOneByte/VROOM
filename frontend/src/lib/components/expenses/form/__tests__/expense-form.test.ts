@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/svelte';
-import type { Expense, Vehicle } from '#lib/types/index.ts';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import type { Expense, SplitExpenseGroup, Vehicle } from '#lib/types/index.ts';
+import type { ReceiptDraft } from '#lib/services/vlm-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { ApiError } from '#lib/utils/error-handling.ts';
 import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
@@ -50,10 +51,12 @@ const getExpense = vi.fn<(id: string) => Promise<Expense | null>>();
 const updateExpense = vi.fn();
 const deleteExpense = vi.fn();
 const getExpensesByVehicle = vi.fn(() => Promise.resolve({ data: [] as Expense[] }));
+const getSplitExpense = vi.fn<(groupId: string) => Promise<SplitExpenseGroup>>();
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		createExpense,
 		getExpense,
+		getSplitExpense,
 		updateExpense,
 		deleteExpense,
 		getExpensesByVehicle,
@@ -63,6 +66,9 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 		deletePhoto: vi.fn()
 	}
 }));
+
+const parseReceipt = vi.fn<(image: File) => Promise<ReceiptDraft>>();
+vi.mock('#lib/services/vlm-api.ts', () => ({ vlmApi: { parseReceipt } }));
 
 const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
 
@@ -147,6 +153,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.useRealTimers();
+	localStorage.clear();
 });
 
 describe('ExpenseForm create mode', () => {
@@ -448,5 +455,234 @@ describe('ExpenseForm edit mode', () => {
 			expect(notificationMessages()).toContain('Failed to delete expense. Please try again.')
 		);
 		expect(goto).not.toHaveBeenCalled();
+	});
+});
+
+async function scanReceipt(draft: ReceiptDraft): Promise<File> {
+	localStorage.setItem('vroom.vlm.receipt-scan-disclosed', '1');
+	parseReceipt.mockResolvedValue(draft);
+	const file = new File(['jpg'], 'receipt.jpg', { type: 'image/jpeg' });
+	const picker = screen.getByTestId('receipt-scan-input');
+	Object.defineProperty(picker, 'files', { value: [file], configurable: true });
+	await fireEvent.change(picker);
+	await vi.waitFor(() => expect(parseReceipt).toHaveBeenCalledWith(file));
+	return file;
+}
+
+function insuranceLeg(id: string, vehicleId: string, amount: number): Expense {
+	return {
+		...EXISTING,
+		id,
+		vehicleId,
+		amount,
+		tags: ['insurance'],
+		category: 'financial',
+		description: 'Six-month premium',
+		mileage: undefined,
+		location: undefined,
+		groupId: 'g-ins',
+		groupTotal: 600,
+		splitMethod: 'even'
+	};
+}
+
+describe('ExpenseForm receipt scanning', () => {
+	test('a scanned receipt fills the form, queues the photo and is saved as entered', async () => {
+		createExpense.mockResolvedValue({ ...EXISTING, id: 'new-1' });
+		await renderCreate();
+
+		await scanReceipt({
+			amount: 64.2,
+			date: '2026-03-01',
+			category: 'maintenance',
+			vendor: 'Jiffy Lube'
+		});
+
+		await vi.waitFor(() => expect(field('amount').value).toBe('64.2'));
+		expect(field('description').value).toBe('Jiffy Lube');
+		expect(categoryButton('Maintenance').getAttribute('aria-pressed')).toBe('true');
+		expect(screen.getByText('1 file queued. Will upload on save.')).toBeTruthy();
+		expect(notificationMessages()).toContain('Receipt scanned — review the details and save.');
+
+		await save();
+		await vi.waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1));
+		expect(createExpense.mock.calls[0]?.[0]).toMatchObject({
+			category: 'maintenance',
+			amount: 64.2,
+			date: dateOnlyToISO('2026-03-01'),
+			description: 'Jiffy Lube'
+		});
+	});
+
+	test('a scanned fuel receipt keeps its odometer reading as the mileage', async () => {
+		await renderCreate();
+
+		await scanReceipt({ amount: 48, odometer: 30210, category: 'fuel' });
+
+		await vi.waitFor(() => expect(field('mileage').value).toBe('30210'));
+		expect(categoryButton('Fuel').getAttribute('aria-pressed')).toBe('true');
+		expect(document.getElementById('volume')).not.toBeNull();
+	});
+
+	test('an odometer reading on a receipt with no category fills the mileage', async () => {
+		await renderCreate({ preselectedCategory: 'misc' });
+
+		await scanReceipt({ odometer: 30210 });
+
+		await vi.waitFor(() => expect(field('mileage').value).toBe('30210'));
+	});
+
+	test('a partial draft leaves the fields it has no value for untouched', async () => {
+		await renderCreate({
+			preselectedCategory: 'misc',
+			preselectedAmount: '12',
+			preselectedDescription: 'Car wash'
+		});
+
+		await scanReceipt({ vendor: 'Shell' });
+
+		await vi.waitFor(() =>
+			expect(screen.getByText('1 file queued. Will upload on save.')).toBeTruthy()
+		);
+		expect(field('amount').value).toBe('12');
+		expect(field('description').value).toBe('Car wash');
+		expect(field('mileage').value).toBe('');
+		expect(categoryButton('Misc').getAttribute('aria-pressed')).toBe('true');
+	});
+
+	test('the queued receipt photo can be removed before saving', async () => {
+		await renderCreate();
+		await scanReceipt({ amount: 5 });
+		await vi.waitFor(() =>
+			expect(screen.getByText('1 file queued. Will upload on save.')).toBeTruthy()
+		);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Remove receipt.jpg' }));
+
+		expect(screen.queryByText(/file queued/)).toBeNull();
+	});
+
+	test('editing an expense offers no receipt scan', async () => {
+		await renderEdit();
+
+		expect(screen.queryByTestId('receipt-scan-button')).toBeNull();
+	});
+});
+
+describe('ExpenseForm loading and load failures', () => {
+	test('shows a spinner while the expense being edited is still loading', async () => {
+		getExpense.mockReturnValue(new Promise(() => {}));
+		const { container } = render(ExpenseForm, { props: { expenseId: 'exp-1' } });
+
+		await vi.waitFor(() => expect(getExpense).toHaveBeenCalled());
+		expect(container.querySelector('.animate-spin')).not.toBeNull();
+		expect(screen.queryByRole('heading', { name: 'Edit Expense' })).toBeNull();
+	});
+
+	test('a vehicle detail failure on a non-fuel expense offers a retry that recovers', async () => {
+		getVehicle.mockRejectedValue(new Error('offline'));
+		render(ExpenseForm, { props: { preselectedCategory: 'misc' } });
+
+		const alert = await screen.findByTestId('vehicle-load-error');
+		expect(document.getElementById('vehicle-load-message')?.textContent?.trim()).toBe(
+			"Couldn't load this vehicle's details."
+		);
+		const failedCalls = getVehicle.mock.calls.length;
+		getVehicle.mockResolvedValue(CAMRY);
+
+		await fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
+
+		await vi.waitFor(() => expect(screen.queryByTestId('vehicle-load-error')).toBeNull());
+		expect(getVehicle).toHaveBeenCalledTimes(failedCalls + 1);
+	});
+
+	test('a vehicle list failure while editing keeps the edit title and retry loads the form', async () => {
+		getVehicles.mockRejectedValueOnce(new Error('offline'));
+		getExpense.mockResolvedValue(EXISTING);
+		render(ExpenseForm, { props: { expenseId: 'exp-1' } });
+
+		const card = await screen.findByTestId('vehicles-load-error');
+		expect(screen.getByRole('heading', { name: 'Edit Expense' })).toBeTruthy();
+		expect(card).toHaveTextContent('Failed to load vehicles');
+		expect(card).toHaveTextContent(/offline/i);
+
+		await fireEvent.click(within(card).getByRole('button', { name: 'Retry' }));
+
+		await vi.waitFor(() => expect(screen.queryByTestId('vehicles-load-error')).toBeNull());
+		expect(field('amount').value).toBe('79.99');
+	});
+
+	test('a vehicle list failure while editing a split keeps the split title', async () => {
+		getVehicles.mockRejectedValueOnce(new Error('offline'));
+		const legs = [
+			{ ...EXISTING, id: 'e1', groupId: 'g1', groupTotal: 100, splitMethod: 'even' as const },
+			{
+				...EXISTING,
+				id: 'e2',
+				vehicleId: 'v2',
+				groupId: 'g1',
+				groupTotal: 100,
+				splitMethod: 'even' as const
+			}
+		];
+		getExpense.mockResolvedValue(legs[0]!);
+		getSplitExpense.mockResolvedValue({
+			groupId: 'g1',
+			groupTotal: 100,
+			splitMethod: 'even',
+			siblings: legs
+		});
+		render(ExpenseForm, { props: { expenseId: 'e1' } });
+
+		await screen.findByTestId('vehicles-load-error');
+		expect(screen.getByRole('heading', { name: 'Edit Split Expense' })).toBeTruthy();
+	});
+});
+
+describe('ExpenseForm financing and insurance links', () => {
+	test('a new expense opened for a financing payment is marked as one and saved with its source', async () => {
+		createExpense.mockResolvedValue({ ...EXISTING, id: 'new-1' });
+		await renderCreate({
+			preselectedCategory: 'financial',
+			preselectedAmount: '373',
+			preselectedFinancingId: 'fin-1'
+		});
+
+		await vi.waitFor(() => expect(screen.getByText('Financing payment')).toBeTruthy());
+		await save();
+
+		await vi.waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1));
+		expect(createExpense.mock.calls[0]?.[0]).toMatchObject({
+			sourceType: 'financing',
+			sourceId: 'fin-1'
+		});
+	});
+
+	test('an ordinary new expense is not marked as a financing payment', async () => {
+		await renderCreate({ preselectedCategory: 'financial' });
+
+		expect(screen.queryByText('Financing payment')).toBeNull();
+	});
+
+	test('an insurance-managed split opens read-only and can still be force deleted', async () => {
+		const legs = [insuranceLeg('ins-1', 'v1', 300), insuranceLeg('ins-2', 'v2', 300)];
+		getExpense.mockResolvedValue(legs[0]!);
+		getSplitExpense.mockResolvedValue({
+			groupId: 'g-ins',
+			groupTotal: 600,
+			splitMethod: 'even',
+			siblings: legs
+		});
+		render(ExpenseForm, { props: { expenseId: 'ins-1', returnTo: '/vehicles/v1' } });
+
+		await screen.findByRole('heading', { name: 'Insurance Expense' });
+		expect(screen.getByText('Managed by insurance policy')).toBeTruthy();
+		expect(screen.queryByRole('button', { name: /update expense/i })).toBeNull();
+
+		await fireEvent.click(screen.getByRole('button', { name: /Force Delete/ }));
+		expect(await screen.findByRole('alertdialog')).toBeTruthy();
+
+		await fireEvent.click(screen.getByRole('button', { name: /Back to Expenses/ }));
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/v1'));
 	});
 });
