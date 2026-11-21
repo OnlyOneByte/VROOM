@@ -10,11 +10,15 @@ import {
   validateVehicleOwnership,
   zValidator,
 } from '../../utils/validation';
-import { expenseRepository } from '../expenses/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { insuranceClaimRepository } from './claims-repository';
 import { createClaimSchema, updateClaimSchema } from './claims-validation';
-import { createTermExpenses, updateTermExpenses, vehicleIdsForTerm } from './hooks';
+import {
+  createTermExpenses,
+  deleteTermExpenses,
+  updateTermExpenses,
+  vehicleIdsForTerm,
+} from './hooks';
 import { insurancePolicyRepository } from './repository';
 import {
   addTermSchema,
@@ -66,6 +70,30 @@ async function requirePolicyReadVehicles(
   }
   if (readableVehicleIds.size === 0) throw new NotFoundError('Insurance policy');
   return { isOwner: false, readableVehicleIds };
+}
+
+function termExpenseParams(
+  policy: { termVehicleCoverage: Array<{ termId: string; vehicleId: string }> },
+  term: {
+    id: string;
+    totalCost: number | null;
+    monthlyCost: number | null;
+    startDate: Date;
+    endDate: Date;
+    policyNumber: string | null;
+  },
+  userId: string
+) {
+  return {
+    termId: term.id,
+    vehicleIds: vehicleIdsForTerm(policy.termVehicleCoverage, term.id),
+    totalCost: term.totalCost ?? 0,
+    monthlyCost: term.monthlyCost,
+    startDate: term.startDate,
+    endDate: term.endDate,
+    policyNumber: term.policyNumber ?? undefined,
+    userId,
+  };
 }
 
 const idParamSchema = z.object({
@@ -148,17 +176,7 @@ routes.post('/', zValidator('json', createPolicySchema), async (c) => {
   const policy = await insurancePolicyRepository.create(data, user.id);
 
   for (const term of policy.terms) {
-    const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, term.id);
-    await createTermExpenses({
-      termId: term.id,
-      vehicleIds: termVehicleIds,
-      totalCost: term.totalCost ?? 0,
-      monthlyCost: term.monthlyCost,
-      startDate: term.startDate,
-      endDate: term.endDate,
-      policyNumber: term.policyNumber ?? undefined,
-      userId: user.id,
-    });
+    await createTermExpenses(termExpenseParams(policy, term, user.id));
   }
 
   return c.json(
@@ -206,7 +224,7 @@ routes.delete('/:id', zValidator('param', idParamSchema), async (c) => {
   // Premium expenses link to terms by text, not FK, so they must be deleted explicitly before the cascade.
   const policyToDelete = await insurancePolicyRepository.findById(id);
   for (const term of policyToDelete?.terms ?? []) {
-    await expenseRepository.deleteBySource('insurance_term', term.id, user.id);
+    await deleteTermExpenses(term.id, user.id);
   }
 
   await insurancePolicyRepository.delete(id, user.id);
@@ -252,21 +270,15 @@ routes.put(
     const { id, termId } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
     const updates = c.req.valid('json');
+    const existing = await insurancePolicyRepository.findById(id);
+    const previousTerm = existing?.terms.find((t) => t.id === termId);
+    const previous =
+      existing && previousTerm ? termExpenseParams(existing, previousTerm, user.id) : undefined;
     const policy = await insurancePolicyRepository.updateTerm(id, termId, updates, user.id);
 
     const updatedTerm = policy.terms.find((t) => t.id === termId);
     if (updatedTerm) {
-      const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, termId);
-      await updateTermExpenses({
-        termId,
-        vehicleIds: termVehicleIds,
-        totalCost: updatedTerm.totalCost ?? 0,
-        monthlyCost: updatedTerm.monthlyCost,
-        startDate: updatedTerm.startDate,
-        endDate: updatedTerm.endDate,
-        policyNumber: updatedTerm.policyNumber ?? undefined,
-        userId: user.id,
-      });
+      await updateTermExpenses(termExpenseParams(policy, updatedTerm, user.id), previous);
     }
 
     return c.json({
@@ -283,7 +295,7 @@ routes.delete('/:id/terms/:termId', zValidator('param', termParamsSchema), async
   await validateInsuranceOwnership(id, user.id);
 
   // Premium expenses link to terms by text, not FK, so they must be deleted explicitly.
-  await expenseRepository.deleteBySource('insurance_term', termId, user.id);
+  await deleteTermExpenses(termId, user.id);
 
   const policy = await insurancePolicyRepository.deleteTerm(id, termId, user.id);
   return c.json({ success: true, data: policyToApi(policy), message: 'Term deleted successfully' });

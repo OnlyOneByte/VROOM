@@ -153,14 +153,15 @@ export async function createTermExpenses(params: TermExpenseParams): Promise<voi
       termId: params.termId,
       error: error instanceof Error ? error.message : String(error),
     });
+    throw new AppError(
+      'The insurance term was saved, but its premium expense could not be created. ' +
+        'Re-save the term to retry.',
+      500
+    );
   }
 }
 
-// Delete and recreate are not atomic: a failed recreate must throw rather than silently drop the premium.
-export async function updateTermExpenses(params: TermExpenseParams): Promise<void> {
-  const { termId, vehicleIds, userId } = params;
-  const totalCost = effectiveTermCost(params);
-
+export async function deleteTermExpenses(termId: string, userId: string): Promise<number> {
   // Photo files must be removed first: deleteBySource drops photo rows with raw SQL and orphans the files.
   const linked = await expenseRepository.findBySource('insurance_term', termId, userId);
   await deletePhotosForEntities(
@@ -168,8 +169,55 @@ export async function updateTermExpenses(params: TermExpenseParams): Promise<voi
     linked.map((expense) => expense.id),
     userId
   );
+  return expenseRepository.deleteBySource('insurance_term', termId, userId);
+}
 
-  const deleted = await expenseRepository.deleteBySource('insurance_term', termId, userId);
+function sameTime(a: Date | null | undefined, b: Date | null | undefined): boolean {
+  return (a?.getTime() ?? null) === (b?.getTime() ?? null);
+}
+
+export function termExpenseInputsChanged(
+  previous: TermExpenseParams,
+  next: TermExpenseParams
+): boolean {
+  const previousVehicles = [...previous.vehicleIds].sort().join(',');
+  const nextVehicles = [...next.vehicleIds].sort().join(',');
+  return (
+    previous.totalCost !== next.totalCost ||
+    (previous.monthlyCost ?? null) !== (next.monthlyCost ?? null) ||
+    !sameTime(previous.startDate, next.startDate) ||
+    !sameTime(previous.endDate, next.endDate) ||
+    previousVehicles !== nextVehicles
+  );
+}
+
+async function termExpensesInSync(params: TermExpenseParams): Promise<boolean> {
+  const expectsExpenses = effectiveTermCost(params) > 0 && params.vehicleIds.length > 0;
+  const linked = await expenseRepository.findBySource(
+    'insurance_term',
+    params.termId,
+    params.userId
+  );
+  return expectsExpenses === linked.length > 0;
+}
+
+// Delete and recreate are not atomic: a failed recreate must throw rather than silently drop the premium.
+export async function updateTermExpenses(
+  params: TermExpenseParams,
+  previous?: TermExpenseParams
+): Promise<void> {
+  if (
+    previous &&
+    !termExpenseInputsChanged(previous, params) &&
+    (await termExpensesInSync(params))
+  ) {
+    return;
+  }
+
+  const { termId, vehicleIds, userId } = params;
+  const totalCost = effectiveTermCost(params);
+
+  const deleted = await deleteTermExpenses(termId, userId);
   if (deleted > 0) {
     logger.info('Deleted old insurance expenses for term update', { termId, deleted });
   }
