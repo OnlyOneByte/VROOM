@@ -5,6 +5,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { createInvitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
@@ -156,6 +157,32 @@ describe('a split leg financing link', () => {
     const text = await res.text();
     expect(text).toContain('part of a split');
     expect(text).not.toContain('Remove the link');
+  });
+});
+
+describe('a financing-linked split on a vehicle the caller cannot access', () => {
+  test('answers 404 whatever the vehicle financing state', async () => {
+    const owned = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const unfinanced = await seedVehicle(ctx, { make: 'Toyota', model: 'Corolla', year: 2022 });
+    const financingId = await createFinancing(owned);
+    const outsider = await createInvitee(ctx, 'outsider');
+
+    const attempts = [
+      { vehicleId: owned, sourceId: financingId },
+      { vehicleId: owned, sourceId: 'not-the-financing-id' },
+      { vehicleId: unfinanced, sourceId: financingId },
+    ];
+    for (const { vehicleId, sourceId } of attempts) {
+      const res = await outsider.request('POST', '/api/v1/expenses/split', {
+        splitConfig: { method: 'even', vehicleIds: [vehicleId] },
+        category: 'financial',
+        date: '2024-02-01',
+        totalAmount: 30,
+        sourceType: 'financing',
+        sourceId,
+      });
+      expect(res.status, await res.text()).toBe(404);
+    }
   });
 });
 
