@@ -518,10 +518,11 @@
 					variant="outline"
 					size="sm"
 					onclick={() => (shareOpen = true)}
-					class="h-10 shrink-0 sm:h-8"
+					aria-label="Share"
+					class="h-10 w-10 shrink-0 sm:h-8 sm:w-auto"
 				>
-					<Users class="mr-2 h-4 w-4" />
-					Share
+					<Users class="h-4 w-4 sm:mr-2" aria-hidden="true" />
+					<span class="hidden sm:inline">Share</span>
 				</Button>
 			{/if}
 		</div>
