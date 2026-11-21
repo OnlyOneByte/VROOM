@@ -309,11 +309,19 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     return claimed.length > 0;
   }
 
-  async deactivate(id: string): Promise<void> {
+  async deactivate(id: string, userId: string): Promise<void> {
     await this.db
       .update(reminders)
       .set({ isActive: false, updatedAt: new Date() })
-      .where(eq(reminders.id, id));
+      .where(and(eq(reminders.id, id), eq(reminders.userId, userId)));
+  }
+
+  async deleteOwned(id: string, userId: string): Promise<void> {
+    const result = await this.db
+      .delete(reminders)
+      .where(and(eq(reminders.id, id), eq(reminders.userId, userId)))
+      .returning({ id: reminders.id });
+    if (result.length === 0) throw new NotFoundError('Reminder');
   }
 
   async deactivateVehicleless(userId: string): Promise<number> {

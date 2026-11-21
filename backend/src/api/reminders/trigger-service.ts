@@ -264,7 +264,7 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
   let nextDue = currentDue;
   while (nextDue <= now) {
     if (hasReminderEndedBy(reminder, nextDue)) {
-      await reminderRepository.deactivate(reminder.id);
+      await reminderRepository.deactivate(reminder.id, reminder.userId);
       return;
     }
     const advanced = advanceReminderDueDate(reminder, nextDue);
@@ -276,7 +276,7 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
     nextDue = advanced;
   }
   if (hasReminderEndedBy(reminder, nextDue)) {
-    await reminderRepository.deactivate(reminder.id);
+    await reminderRepository.deactivate(reminder.id, reminder.userId);
     return;
   }
   await reminderRepository.advanceNextDueDate(reminder.id, previousDue, nextDue);
@@ -401,7 +401,7 @@ class ReminderTriggerService {
     }
 
     if (hasReminderEndedBy(reminder, nextDue)) {
-      await reminderRepository.deactivate(reminder.id);
+      await reminderRepository.deactivate(reminder.id, reminder.userId);
       return;
     }
 

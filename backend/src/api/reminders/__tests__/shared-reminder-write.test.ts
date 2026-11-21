@@ -181,3 +181,60 @@ describe('reminder writes on shared vehicles', () => {
     expect(ctx.sqlite.query('SELECT id FROM reminders WHERE id = ?').get(rid)).not.toBeNull();
   });
 });
+
+describe('reminder writes after the reminder lost its vehicles', () => {
+  async function vehiclelessReminder(): Promise<string> {
+    const vehicleId = await seedVehicle(ctx, { make: 'Gone', model: 'Car', year: 2019 });
+    const created = await ctx.authed('POST', '/api/v1/reminders', {
+      name: 'Orphaned reminder',
+      type: 'notification',
+      frequency: 'monthly',
+      startDate: '2024-06-01T00:00:00.000Z',
+      endDate: '2024-06-15T00:00:00.000Z',
+      vehicleIds: [vehicleId],
+    });
+    const body = await json<DataEnvelope<ReminderEnvelope>>(created);
+    expect(created.status, JSON.stringify(body)).toBe(201);
+    expect((await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`)).status).toBe(200);
+    expect(
+      ctx.sqlite
+        .query('SELECT 1 FROM reminder_vehicles WHERE reminder_id = ?')
+        .get(body.data.reminder.id)
+    ).toBeNull();
+    return body.data.reminder.id;
+  }
+
+  function storedReminder(rid: string): { name: string; is_active: number } | null {
+    return ctx.sqlite.query('SELECT name, is_active FROM reminders WHERE id = ?').get(rid) as {
+      name: string;
+      is_active: number;
+    } | null;
+  }
+
+  test('another user cannot read, edit, service or delete it', async () => {
+    const rid = await vehiclelessReminder();
+    const before = storedReminder(rid);
+
+    const serviced = await b.request('POST', `/api/v1/reminders/${rid}/mark-serviced`);
+    expect(serviced.status, 'mark-serviced').toBe(404);
+    expect(await serviced.text()).not.toContain('Orphaned reminder');
+    expect((await b.request('DELETE', `/api/v1/reminders/${rid}`)).status, 'DELETE').toBe(404);
+    expect((await b.request('GET', `/api/v1/reminders/${rid}`)).status, 'GET').toBe(404);
+    expect(
+      (await b.request('PUT', `/api/v1/reminders/${rid}`, { name: 'taken' })).status,
+      'PUT'
+    ).toBe(404);
+
+    expect(storedReminder(rid)).toEqual(before);
+  });
+
+  test('its owner can still service and delete it', async () => {
+    const rid = await vehiclelessReminder();
+
+    expect((await ctx.authed('POST', `/api/v1/reminders/${rid}/mark-serviced`)).status).toBe(200);
+    expect(storedReminder(rid)?.is_active).toBe(0);
+
+    expect((await ctx.authed('DELETE', `/api/v1/reminders/${rid}`)).status).toBe(200);
+    expect(storedReminder(rid)).toBeNull();
+  });
+});
