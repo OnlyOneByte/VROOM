@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/svelte';
 import StatCard from '../StatCard.svelte';
 
 describe('StatCard keeps numbers whole', () => {
-	test('dual values never break mid-number and the halves stack below sm', () => {
+	test('dual values never break mid-number and the halves stack until the tile itself is wide', () => {
 		const { container } = render(StatCard, {
 			props: {
 				label: 'Current Odometer',
@@ -23,8 +23,11 @@ describe('StatCard keeps numbers whole', () => {
 		for (const text of ['Current Odometer', 'Distance Driven']) {
 			expect(screen.getByText(text)).toHaveClass('break-words');
 		}
-		const halves = container.querySelector('[data-slot="card-content"] > div');
-		expect(halves).toHaveClass('flex-col', 'sm:flex-row');
+		const halves = container.querySelector('[class~="@sm:flex-row"]');
+		expect(halves).toHaveClass('flex-col');
+		expect(halves?.parentElement).toHaveClass('@container');
+		expect(halves?.textContent).toContain('25,850');
+		expect(halves?.textContent).toContain('850');
 	});
 
 	test('a single value uses tabular figures', () => {

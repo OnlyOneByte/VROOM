@@ -86,29 +86,32 @@
 				<Skeleton class="h-8 w-32" />
 			</div>
 		{:else if hasDual}
-			<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-				<div class="flex-1 space-y-1 min-w-0">
-					<span class="block text-sm font-medium text-muted-foreground break-words">{label}</span>
-					<div class="flex items-baseline gap-1 flex-wrap">
-						<span class="text-xl sm:text-2xl font-bold tabular-nums whitespace-nowrap">{value}</span
-						>
-						{#if unit}
-							<span class="text-xs text-muted-foreground">{unit}</span>
-						{/if}
+			<div class="@container">
+				<div class="flex flex-col @sm:flex-row @sm:items-start @sm:justify-between gap-3 @sm:gap-4">
+					<div class="flex-1 space-y-1 min-w-0">
+						<span class="block text-sm font-medium text-muted-foreground break-words">{label}</span>
+						<div class="flex items-baseline gap-1 flex-wrap">
+							<span class="text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap"
+								>{value}</span
+							>
+							{#if unit}
+								<span class="text-xs text-muted-foreground">{unit}</span>
+							{/if}
+						</div>
 					</div>
-				</div>
-				<div class="h-px w-full sm:h-auto sm:w-px bg-border sm:self-stretch sm:my-1"></div>
-				<div class="flex-1 space-y-1 min-w-0">
-					<span class="block text-sm font-medium text-muted-foreground break-words"
-						>{secondaryLabel}</span
-					>
-					<div class="flex items-baseline gap-1 flex-wrap">
-						<span class="text-xl sm:text-2xl font-bold tabular-nums whitespace-nowrap"
-							>{secondaryValue}</span
+					<div class="h-px w-full @sm:h-auto @sm:w-px bg-border @sm:self-stretch @sm:my-1"></div>
+					<div class="flex-1 space-y-1 min-w-0">
+						<span class="block text-sm font-medium text-muted-foreground break-words"
+							>{secondaryLabel}</span
 						>
-						{#if secondaryUnit}
-							<span class="text-xs text-muted-foreground">{secondaryUnit}</span>
-						{/if}
+						<div class="flex items-baseline gap-1 flex-wrap">
+							<span class="text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap"
+								>{secondaryValue}</span
+							>
+							{#if secondaryUnit}
+								<span class="text-xs text-muted-foreground">{secondaryUnit}</span>
+							{/if}
+						</div>
 					</div>
 				</div>
 			</div>
