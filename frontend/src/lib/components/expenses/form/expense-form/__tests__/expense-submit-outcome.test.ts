@@ -19,15 +19,24 @@ describe('submitFailureMessage', () => {
 		);
 	});
 
-	test('a terminal failure shows the server reason', () => {
+	test('a terminal failure says the save failed, then gives the reason as a sentence', () => {
 		expect(
 			submitFailureMessage('terminal', new ApiError('Amount must be greater than 0', 400))
-		).toBe('Amount must be greater than 0');
+		).toBe("Couldn't save this expense. Amount must be greater than 0.");
 	});
 
-	test('a terminal failure with no usable reason falls back to a generic save message', () => {
+	test('a schema rejection names the fields instead of the schema wording', () => {
+		const error = new ApiError('Validation failed', 400, {
+			issues: [{ path: ['amount'], message: 'Too small: expected number to be >0' }]
+		});
+		expect(submitFailureMessage('terminal', error)).toBe(
+			"Couldn't save this expense. Check the amount, then try again."
+		);
+	});
+
+	test('a terminal failure with no usable reason falls back to a generic message', () => {
 		expect(submitFailureMessage('terminal', 'boom')).toBe(
-			'Could not save this expense. Please try again.'
+			"Couldn't save this expense. Something went wrong. Try again, and reload the page if it keeps happening."
 		);
 	});
 });

@@ -399,7 +399,7 @@ describe('ExpenseForm edit mode', () => {
 
 		await vi.waitFor(() =>
 			expect(document.querySelector('[data-testid="submit-error"]')?.textContent?.trim()).toBe(
-				'Amount exceeds the allowed maximum'
+				"Couldn't save this expense. Amount exceeds the allowed maximum."
 			)
 		);
 		expect(goto).not.toHaveBeenCalled();

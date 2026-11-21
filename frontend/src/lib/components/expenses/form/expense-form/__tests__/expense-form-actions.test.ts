@@ -168,8 +168,8 @@ describe('submitExpense — edit modes', () => {
 		const state = createState('e1');
 		await submitExpense(state);
 		expect(addOfflineExpense).not.toHaveBeenCalled();
-		expect(state.submitError).toBe('Mileage conflict');
-		notified('error', 'Mileage conflict');
+		expect(state.submitError).toBe("Couldn't save this expense. Mileage conflict.");
+		notified('error', "Couldn't save this expense. Mileage conflict.");
 		expect(gotoDynamic).not.toHaveBeenCalled();
 		expect(state.isSubmitting).toBe(false);
 	});
@@ -329,8 +329,8 @@ describe('submitExpense — offline and failure queuing', () => {
 		const state = createState();
 		await submitExpense(state);
 		expect(addOfflineExpense).not.toHaveBeenCalled();
-		expect(state.submitError).toBe('Invalid category');
-		notified('error', 'Invalid category');
+		expect(state.submitError).toBe("Couldn't save this expense. Invalid category.");
+		notified('error', "Couldn't save this expense. Invalid category.");
 	});
 
 	test('a transient split create failure is not queued', async () => {
