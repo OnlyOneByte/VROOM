@@ -21,11 +21,11 @@ export interface SyncStatusParams {
 	syncStatus: 'idle' | 'syncing' | 'error' | 'success';
 	pendingCount: number;
 	conflictsCount: number;
-	serverReachable?: boolean;
+	serverReachable: boolean;
 }
 
 export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
-	const { isOnline, syncStatus, pendingCount, conflictsCount, serverReachable = true } = params;
+	const { isOnline, syncStatus, pendingCount, conflictsCount, serverReachable } = params;
 
 	if (!isOnline) {
 		return { color: 'text-destructive', icon: WifiOff, text: 'Offline' };

@@ -8,6 +8,7 @@ function params(overrides: Partial<SyncStatusParams> = {}): SyncStatusParams {
 		syncStatus: 'idle',
 		pendingCount: 0,
 		conflictsCount: 0,
+		serverReachable: true,
 		...overrides
 	};
 }
@@ -73,7 +74,8 @@ describe('getSyncStatusInfo — precedence cascade (the load-bearing part)', () 
 			isOnline: false,
 			syncStatus: 'syncing',
 			pendingCount: 5,
-			conflictsCount: 4
+			conflictsCount: 4,
+			serverReachable: true
 		});
 		expect(info.text).toBe('Offline');
 	});

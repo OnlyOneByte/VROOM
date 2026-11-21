@@ -31,6 +31,12 @@ function me(): Response {
 	);
 }
 
+function serverStaysDown(): void {
+	mockFetch.mockImplementation(
+		() => new Promise((_, reject) => setTimeout(() => reject(new TypeError('Failed to fetch')), 0))
+	);
+}
+
 async function startWithUnreachableServer(): Promise<void> {
 	localStorage.setItem('vroom_last_user', JSON.stringify(alice));
 	mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
@@ -45,7 +51,7 @@ describe('OfflineIndicator — unverified session', () => {
 
 	it('says the server is unreachable while online and offers a retry that re-checks the session', async () => {
 		onlineStatus.current = true;
-		mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+		serverStaysDown();
 		await startWithUnreachableServer();
 
 		render(OfflineIndicator);
@@ -77,12 +83,13 @@ describe('OfflineIndicator — unverified session', () => {
 	it('checks the session once per reconnect, not in a loop while the server stays down', async () => {
 		onlineStatus.current = false;
 		await startWithUnreachableServer();
-		render(OfflineIndicator);
+		const { unmount } = render(OfflineIndicator);
 		mockFetch.mockReset();
-		mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+		serverStaysDown();
 
 		onlineStatus.current = true;
 		await new Promise(resolve => setTimeout(resolve, 300));
+		unmount();
 
 		expect(mockFetch).toHaveBeenCalledTimes(1);
 	});
