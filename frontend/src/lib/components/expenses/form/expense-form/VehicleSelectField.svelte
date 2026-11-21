@@ -35,7 +35,9 @@
 		>
 			<Select.Trigger
 				id="vehicle"
-				class="w-full min-w-0 data-[size=default]:h-10 {error ? 'border-destructive' : ''}"
+				class="w-full min-w-0 data-[size=default]:h-10 sm:data-[size=default]:h-10 {error
+					? 'border-destructive'
+					: ''}"
 				aria-invalid={!!error}
 				aria-describedby={ariaDescribedBy}
 			>
