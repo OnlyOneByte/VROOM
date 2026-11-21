@@ -25,7 +25,7 @@ import {
 	savePendingPhotos,
 	type OfflineExpense
 } from '../offline-storage';
-import { extractErrorMessage } from '#lib/utils/error-handling.ts';
+import { ApiError, extractErrorMessage } from '#lib/utils/error-handling.ts';
 import { classifySyncFailure, type SyncFailureKind } from './classify-failure';
 import { apiClient } from '#lib/services/api-client.ts';
 import { expenseApi } from '#lib/services/expense-api.ts';
@@ -295,7 +295,7 @@ class SyncManager {
 				if (serverCopy) {
 					serverId = serverCopy.id;
 				} else {
-					const saved = await this.postExpense(expense, false);
+					const saved = await this.postExpense(expense);
 					if (wasEditedOnServer(saved) && serverCopyDiffers(expense, saved)) {
 						return { success: false, conflict: conflictWith(expense, saved) };
 					}
@@ -350,11 +350,28 @@ class SyncManager {
 		}
 	}
 
-	private postExpense(expense: OfflineExpense, forceOverwrite: boolean) {
+	private postExpense(expense: OfflineExpense) {
 		return apiClient.post<BackendExpenseResponse>('/api/v1/expenses', {
-			...offlineExpenseToBackend(expense, { clearEmptyFields: forceOverwrite }),
-			clientId: expense.clientId,
-			...(forceOverwrite && { forceOverwrite })
+			...offlineExpenseToBackend(expense),
+			clientId: expense.clientId
+		});
+	}
+
+	private async keepLocalCopy(expense: OfflineExpense, serverId: string): Promise<string> {
+		try {
+			return (await this.overwriteServerCopy(expense, serverId)).id;
+		} catch (error) {
+			if (!(error instanceof ApiError && error.statusCode === 404)) throw error;
+			const recreated = await this.postExpense(expense);
+			if (recreated.id === serverId) throw error;
+			return recreated.id;
+		}
+	}
+
+	private overwriteServerCopy(expense: OfflineExpense, serverId: string) {
+		return apiClient.put<BackendExpenseResponse>(`/api/v1/expenses/${serverId}`, {
+			...offlineExpenseToBackend(expense, { clearEmptyFields: true }),
+			...(!expense.sourceId && { sourceType: null, sourceId: null })
 		});
 	}
 
@@ -417,7 +434,7 @@ class SyncManager {
 		try {
 			const serverId =
 				resolution === 'keep_local'
-					? (await this.postExpense(local, true)).id
+					? await this.keepLocalCopy(local, conflict.serverExpense.id)
 					: conflict.serverExpense.id;
 			const delivered = await this.deliverQueuedPhotos(local, serverId);
 			if (delivered.success) {

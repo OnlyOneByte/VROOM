@@ -95,6 +95,16 @@ function photo(name: string): File {
 	return new File([name], name, { type: 'image/jpeg' });
 }
 
+function overwrites(): Array<Record<string, unknown>> {
+	return mockFetch.mock.calls
+		.filter(
+			([url, init]) =>
+				(init as { method?: string } | undefined)?.method === 'PUT' &&
+				String(url).endsWith('/api/v1/expenses/server-1')
+		)
+		.map(([, init]) => JSON.parse((init as { body: string }).body));
+}
+
 function posts(): Array<Record<string, unknown>> {
 	return mockFetch.mock.calls
 		.filter(([, init]) => (init as { method?: string } | undefined)?.method === 'POST')
@@ -337,11 +347,77 @@ describe('conflicts the day-window lookup cannot see', () => {
 
 		await syncManager.resolveConflict(conflict, 'keep_local');
 
-		expect(posts()[0]).toMatchObject({
-			forceOverwrite: true,
+		expect(overwrites()[0]).toMatchObject({
+			vehicleId: 'v1',
+			tags: [],
 			description: null,
 			location: null,
-			missedFillup: false
+			missedFillup: false,
+			sourceType: null,
+			sourceId: null
 		});
+	});
+
+	it('Keep My Version recreates the expense when the server copy was deleted meanwhile', async () => {
+		storage.saveOfflineExpenses([queued()]);
+		mockFetch.mockImplementation((_url: string, init?: { method?: string }) =>
+			Promise.resolve(
+				init?.method === 'PUT'
+					? respond(404, 'Expense not found')
+					: respond(201, serverRow({ id: 'server-2' }))
+			)
+		);
+		const conflict: SyncConflict = {
+			id: 'e1',
+			localExpense: queued(),
+			serverExpense: { id: 'server-1', amount: 20, date: '2024-06-01', tags: [] }
+		};
+
+		expect(await syncManager.resolveConflict(conflict, 'keep_local')).toBe(true);
+
+		expect(posts()).toEqual([expect.objectContaining({ clientId: 'cid-1', expenseAmount: 12.5 })]);
+		expect(storage.loadOfflineExpenses()[0]?.synced).toBe(true);
+	});
+
+	it('Keep My Version keeps the conflict when the 404 hides a record that still exists', async () => {
+		storage.saveOfflineExpenses([queued()]);
+		mockFetch.mockImplementation((_url: string, init?: { method?: string }) =>
+			Promise.resolve(
+				init?.method === 'PUT' ? respond(404, 'Vehicle not found') : respond(201, serverRow())
+			)
+		);
+		const conflict: SyncConflict = {
+			id: 'e1',
+			localExpense: queued(),
+			serverExpense: { id: 'server-1', amount: 20, date: '2024-06-01', tags: [] }
+		};
+
+		expect(await syncManager.resolveConflict(conflict, 'keep_local')).toBe(false);
+		expect(storage.loadOfflineExpenses()[0]?.synced).toBe(false);
+	});
+
+	it('Keep My Version still fails, and keeps the conflict, when the overwrite is refused', async () => {
+		mockFetch.mockResolvedValue(respond(403, 'Forbidden'));
+		const conflict: SyncConflict = {
+			id: 'e1',
+			localExpense: queued(),
+			serverExpense: { id: 'server-1', amount: 20, date: '2024-06-01', tags: [] }
+		};
+
+		expect(await syncManager.resolveConflict(conflict, 'keep_local')).toBe(false);
+		expect(posts()).toHaveLength(0);
+	});
+
+	it('Keep My Version keeps a financing link the local copy has', async () => {
+		mockFetch.mockResolvedValue(respond(200, serverRow()));
+		const conflict: SyncConflict = {
+			id: 'e1',
+			localExpense: queued({ sourceType: 'financing', sourceId: 'loan-1' }),
+			serverExpense: { id: 'server-1', amount: 20, date: '2024-06-01', tags: [] }
+		};
+
+		await syncManager.resolveConflict(conflict, 'keep_local');
+
+		expect(overwrites()[0]).toMatchObject({ sourceType: 'financing', sourceId: 'loan-1' });
 	});
 });
