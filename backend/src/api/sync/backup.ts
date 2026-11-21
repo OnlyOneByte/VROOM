@@ -81,14 +81,6 @@ export function storageProviderIdentity(
   return config.accountEmail ? `${provider.providerType}:${String(config.accountEmail)}` : null;
 }
 
-export function hasFractionalMoneyCells(tables: Record<string, unknown>[][]): boolean {
-  return tables.some((rows) =>
-    rows.some((row) =>
-      [...MONEY_CENTS_FIELDS].some((field) => /^-?[\d,]*\.\d+$/.test(String(row[field] ?? '')))
-    )
-  );
-}
-
 export function isPreCentsBackup(version: string | undefined): boolean {
   const major = Number.parseInt(String(version ?? '').split('.')[0], 10);
   return Number.isFinite(major) && major < 2;

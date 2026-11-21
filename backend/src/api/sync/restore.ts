@@ -34,13 +34,7 @@ import {
 import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { preferencesRepository } from '../settings/repository';
-import {
-  backupService,
-  coerceRow,
-  hasFractionalMoneyCells,
-  isPreCentsBackup,
-  storageProviderIdentity,
-} from './backup';
+import { backupService, coerceRow, isPreCentsBackup, storageProviderIdentity } from './backup';
 
 type DrizzleTransaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
 
@@ -240,12 +234,7 @@ class RestoreService {
     );
     const sheetsService = await createSheetsServiceForProvider(providerId, userId);
     const sheet = await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
-    const { metadata: sheetMetadata, ...sheetTables } = sheet;
-    const shim = {
-      shimMoneyToCents: sheetMetadata.version
-        ? isPreCentsBackup(sheetMetadata.version)
-        : hasFractionalMoneyCells(Object.values(sheetTables)),
-    };
+    const shim = { shimMoneyToCents: isPreCentsBackup(sheet.metadata.version) };
 
     const { data: sheetData, skippedPhotos } = this.withoutOrphanPhotos({
       ...sheet,

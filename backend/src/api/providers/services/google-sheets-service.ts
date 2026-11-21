@@ -281,7 +281,11 @@ export function columnLetter(columnNumber: number): string {
 const SHEET_READ_LAST_COLUMN = 'ZZ';
 
 export const SHEET_METADATA_TAB = 'Metadata';
+const CENTS_FORMAT_VERSION = '2.0.0';
+const PRE_CENTS_FORMAT_VERSION = '1.0.0';
 const SHEET_METADATA_HEADERS = ['version', 'timestamp', 'userId'] as const;
+
+const CENTS_ERA_EXPENSE_HEADER = 'createdBy';
 
 // Order matters: the backup swap indexes each tab by position.
 export const SHEET_NAMES: string[] = [...Object.values(SHEET_TABS), SHEET_METADATA_TAB];
@@ -678,14 +682,15 @@ export class GoogleSheetsService {
     const info = await this.getSpreadsheetInfo(spreadsheetId);
     const presentTabs = new Set(info.sheets.map((sheet) => sheet.title));
     const records = {} as Record<SheetTableKey, Record<string, unknown>[]>;
+    let expenseHeaders: unknown[] = [];
     for (const key of Object.keys(SHEET_TABS) as SheetTableKey[]) {
       const title = SHEET_TABS[key];
       const absentOptionalTab = !REQUIRED_SHEET_TABS.has(key) && !presentTabs.has(title);
-      records[key] = absentOptionalTab
+      const grid = absentOptionalTab
         ? []
-        : this.parseSheetData(
-            await this.readSheetData(spreadsheetId, `${title}!A:${SHEET_READ_LAST_COLUMN}`)
-          );
+        : await this.readSheetData(spreadsheetId, `${title}!A:${SHEET_READ_LAST_COLUMN}`);
+      if (key === 'expenses') expenseHeaders = grid[0] ?? [];
+      records[key] = this.parseSheetData(grid);
     }
 
     const [written] = presentTabs.has(SHEET_METADATA_TAB)
@@ -701,9 +706,13 @@ export class GoogleSheetsService {
         ? String(records.vehicles[0].userId)
         : String(written?.userId ?? '');
 
+    const inferredVersion = expenseHeaders.includes(CENTS_ERA_EXPENSE_HEADER)
+      ? CENTS_FORMAT_VERSION
+      : PRE_CENTS_FORMAT_VERSION;
+
     return {
       metadata: {
-        version: String(written?.version ?? ''),
+        version: String(written?.version || inferredVersion),
         timestamp: String(written?.timestamp ?? new Date().toISOString()),
         userId,
       },
