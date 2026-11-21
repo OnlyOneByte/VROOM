@@ -45,6 +45,7 @@
 	} from '#lib/types/index.ts';
 	import { onMount } from 'svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
 	const PROVIDER_TYPES: ProviderTypeOption[] = [
 		{
@@ -345,14 +346,16 @@
 			const verb = isEditMode ? 'updated' : 'added';
 			if (unsaved.length > 0) {
 				appStore.showWarning(
-					`${name} ${verb}, but its ${unsaved.join(' and ')} could not be saved. Re-open the provider to try again.`
+					`${name} ${verb}, but its ${unsaved.join(' and ')} couldn't be saved. Re-open the provider to try again.`
 				);
 			} else {
 				appStore.showSuccess(`${name} ${verb} successfully`);
 			}
 			navigateBack();
-		} catch {
-			appStore.showError(isEditMode ? 'Failed to update provider' : 'Failed to add provider');
+		} catch (error) {
+			appStore.showError(
+				`Couldn't ${isEditMode ? 'update' : 'add'} the provider. ${userFacingErrorMessage(error)}`
+			);
 		} finally {
 			isSaving = false;
 		}
@@ -375,7 +378,7 @@
 				photoLossConfirmOpen = true;
 				return;
 			}
-			appStore.showError('Failed to delete provider');
+			appStore.showError(`Couldn't remove the provider. ${userFacingErrorMessage(error)}`);
 		} finally {
 			isDeleting = false;
 		}

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 const { goto, page, get, showError } = vi.hoisted(() => ({
 	goto: vi.fn(),
@@ -160,14 +161,23 @@ describe('handleOAuthReturn', () => {
 
 	test('a failed pending-email lookup shows an error but still cleans the URL', async () => {
 		setPageUrl('https://app.example/settings/providers/p1/edit?provider_connected=true&nonce=n-3');
-		get.mockRejectedValue(new Error('expired'));
+		get.mockRejectedValue(new ApiError('Internal server error', 500));
 		const oauth = createOAuth();
 		await oauth.handleOAuthReturn();
 		expect(showError).toHaveBeenCalledWith(
-			'Failed to retrieve connected Google account. Please try again.'
+			`Couldn't find the Google account you connected. ${SERVER_FAILURE_MESSAGE}`
 		);
 		expect(oauth.pendingEmail).toBe('');
 		expect(goto).toHaveBeenCalledWith('/settings/providers/p1/edit', { replace: true });
+	});
+
+	test('an expired pending-email lookup asks to connect again, not the server text', async () => {
+		setPageUrl('https://app.example/settings/providers/p1/edit?provider_connected=true&nonce=n-4');
+		get.mockRejectedValue(new ApiError('Pending provider credentials not found', 404));
+		await createOAuth().handleOAuthReturn();
+		expect(showError).toHaveBeenCalledWith(
+			"Couldn't find the Google account you connected. Connect it again."
+		);
 	});
 
 	test('provider_connected without a nonce is ignored', async () => {
@@ -179,7 +189,7 @@ describe('handleOAuthReturn', () => {
 
 	test.each([
 		['cancelled', 'Google account connection was cancelled.'],
-		['exchange_failed', 'Failed to connect Google account. Please try again.'],
+		['exchange_failed', "Couldn't connect your Google account. Try again."],
 		['no_refresh_token', 'Google did not grant offline access. Please try again.'],
 		['session_expired', 'Your session expired. Please log in and try again.'],
 		['invalid_state', 'The Google connection expired. Please try again.'],
@@ -187,7 +197,7 @@ describe('handleOAuthReturn', () => {
 			'session_mismatch',
 			'You were signed in as someone else when Google finished connecting. Sign in again and retry.'
 		],
-		['something_else', 'Couldn’t connect your Google account. Please try again.']
+		['something_else', "Couldn't connect your Google account. Try again."]
 	])('provider_error=%s shows a specific message and cleans the URL', async (code, message) => {
 		setPageUrl(`https://app.example/settings/providers/new?provider_error=${code}`);
 		await expect(createOAuth().handleOAuthReturn()).resolves.toEqual({});
