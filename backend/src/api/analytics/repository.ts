@@ -90,10 +90,12 @@ export function toDate(value: Date | number | string): Date {
 
 export function yearToDateSpending(
   rows: Array<{ date: Date | number | null; expenseAmount: number }>,
-  range: DateRange
+  range: DateRange,
+  ytdStart?: number
 ): number {
   const lastInstant = new Date(range.end * 1000 - 1);
-  const yearStart = Date.UTC(lastInstant.getUTCFullYear(), 0, 1);
+  const yearStart =
+    ytdStart != null ? ytdStart * 1000 : Date.UTC(lastInstant.getUTCFullYear(), 0, 1);
   let total = 0;
   for (const row of rows) {
     if (row.date != null && toDate(row.date).getTime() >= yearStart) total += row.expenseAmount;
@@ -1240,7 +1242,11 @@ export class AnalyticsRepository {
     }
   }
 
-  async getQuickStats(userId: string, range: DateRange): Promise<QuickStatsData> {
+  async getQuickStats(
+    userId: string,
+    range: DateRange,
+    ytdStart?: number
+  ): Promise<QuickStatsData> {
     try {
       const vehicleRows = await this.db
         .select({
@@ -1258,7 +1264,7 @@ export class AnalyticsRepository {
         this.getAllVehicleUnits(userId),
       ]);
 
-      const ytdSpending = yearToDateSpending(allExpenses, range);
+      const ytdSpending = yearToDateSpending(allExpenses, range, ytdStart);
       const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits);
       const avgEfficiency = this.computeAverageEfficiency(fuelRows, convert);
 
@@ -1999,7 +2005,11 @@ export class AnalyticsRepository {
     }
   }
 
-  async getSummary(userId: string, range: DateRange): Promise<AnalyticsSummaryData> {
+  async getSummary(
+    userId: string,
+    range: DateRange,
+    ytdStart?: number
+  ): Promise<AnalyticsSummaryData> {
     try {
       const prevRange: DateRange = {
         start: range.start - (range.end - range.start),
@@ -2033,7 +2043,7 @@ export class AnalyticsRepository {
 
       const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits);
       const avgEfficiency = this.computeAverageEfficiency(fuelRows, convert);
-      const ytdSpending = yearToDateSpending(allExpenses, range);
+      const ytdSpending = yearToDateSpending(allExpenses, range, ytdStart);
       const fleetHealthScore =
         vehicleRows.length > 0 ? await this.computeFleetHealthScore(vehicleRows, userId) : 0;
 

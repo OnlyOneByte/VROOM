@@ -205,6 +205,20 @@ describe('getDefaultDateRange', () => {
 		return at;
 	}
 
+	it('ytdStart is local midnight on Jan 1 of the current local year', () => {
+		const now = new Date(2026, 11, 31, 22, 15);
+		expect(new Date(getDefaultDateRange(now).ytdStart * 1000)).toEqual(new Date(2026, 0, 1));
+	});
+
+	it('getSummary and getQuickStats pass ytdStart to the API', async () => {
+		mockGet.mockResolvedValue(mockQuickStats);
+		await analyticsApi.getQuickStats({ startDate: 1, endDate: 2, ytdStart: 3 });
+		expect(mockGet).toHaveBeenLastCalledWith(expect.stringContaining('ytdStart=3'));
+		mockGet.mockResolvedValue(mockSummaryResponse);
+		await analyticsApi.getSummary({ startDate: 1, endDate: 2, ytdStart: 3 });
+		expect(mockGet).toHaveBeenLastCalledWith(expect.stringContaining('ytdStart=3'));
+	});
+
 	it('returns unix-SECONDS (not ms) — both bounds are ~10-digit, not ~13', () => {
 		const { startDate, endDate } = getDefaultDateRange();
 		expect(endDate).toBeLessThan(1e12);
