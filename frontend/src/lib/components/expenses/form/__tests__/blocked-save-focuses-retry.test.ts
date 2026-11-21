@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { Vehicle } from '#lib/types/index.ts';
 
@@ -40,7 +40,11 @@ const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
 beforeEach(() => {
 	getVehicle.mockReset();
 	getVehicle.mockRejectedValue(new Error('offline'));
-	Element.prototype.scrollIntoView = vi.fn();
+	vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+});
+
+afterEach(() => {
+	vi.restoreAllMocks();
 });
 
 function saveBarButton(): HTMLButtonElement {
@@ -74,10 +78,22 @@ describe('a Save blocked by a failed vehicle load', () => {
 });
 
 describe('a Save blocked by another validation error', () => {
-	test('leaves focus where it was and does not scroll', async () => {
-		getVehicle.mockResolvedValue(vehicle);
+	test('keeps focus on Save while the vehicle alert and its Retry are on screen', async () => {
 		render(ExpenseForm, { props: { preselectedCategory: 'maintenance' } });
-		await vi.waitFor(() => expect(getVehicle).toHaveBeenCalled());
+		await screen.findByTestId('vehicle-load-error');
+		const save = saveBarButton();
+		save.focus();
+
+		await fireEvent.click(save);
+		await vi.waitFor(() => expect(document.getElementById('amount-error')).not.toBeNull());
+		expect(document.activeElement).toBe(save);
+		expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+	});
+
+	test('with the vehicle loaded, leaves focus on Save and does not scroll', async () => {
+		getVehicle.mockResolvedValue(vehicle);
+		render(ExpenseForm, { props: { preselectedCategory: 'fuel' } });
+		await screen.findByLabelText(/Gallons|Liters/);
 		const save = saveBarButton();
 		save.focus();
 
