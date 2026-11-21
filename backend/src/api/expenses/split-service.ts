@@ -1,6 +1,7 @@
 import { createId } from '@paralleldrive/cuid2';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
-import { expenses } from '../../db/schema';
+import { expenses, photos } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
 import type { SplitConfig } from './validation';
 
@@ -150,6 +151,76 @@ export class ExpenseSplitService {
     }
 
     return siblings;
+  }
+
+  updateSiblingsSync(
+    tx: DrizzleTransaction,
+    params: {
+      groupId: string;
+      existing: [Expense, ...Expense[]];
+      splitMethod: SplitMethod;
+      groupTotal: number;
+      allocations: Array<{ vehicleId: string; amount: number }>;
+      createdBy: string | null;
+    }
+  ): Expense[] {
+    const [template] = params.existing;
+    const unmatchedByVehicle = new Map<string, Expense[]>();
+    for (const leg of params.existing) {
+      const legs = unmatchedByVehicle.get(leg.vehicleId) ?? [];
+      legs.push(leg);
+      unmatchedByVehicle.set(leg.vehicleId, legs);
+    }
+
+    const groupLegs = (ids: string[]) =>
+      and(
+        inArray(expenses.id, ids),
+        eq(expenses.groupId, params.groupId),
+        eq(expenses.userId, template.userId)
+      );
+    const updatedAt = new Date();
+    const legs = params.allocations.flatMap((allocation) => {
+      const match = unmatchedByVehicle.get(allocation.vehicleId)?.shift();
+      if (!match) {
+        return this.createSiblingsSync(tx, {
+          groupId: params.groupId,
+          userId: template.userId,
+          createdBy: params.createdBy,
+          splitMethod: params.splitMethod,
+          groupTotal: params.groupTotal,
+          allocations: [allocation],
+          category: template.category,
+          date: template.date,
+          tags: template.tags ?? undefined,
+          description: template.description ?? undefined,
+          sourceType: template.sourceType ?? undefined,
+          sourceId: template.sourceId ?? undefined,
+        });
+      }
+      return tx
+        .update(expenses)
+        .set({
+          expenseAmount: allocation.amount,
+          groupTotal: params.groupTotal,
+          splitMethod: params.splitMethod,
+          updatedAt,
+        })
+        .where(groupLegs([match.id]))
+        .returning()
+        .all();
+    });
+
+    const removedIds = [...unmatchedByVehicle.values()].flat().map((leg) => leg.id);
+    const [survivor] = legs;
+    if (removedIds.length > 0 && survivor) {
+      tx.update(photos)
+        .set({ entityId: survivor.id })
+        .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, removedIds)))
+        .run();
+      tx.delete(expenses).where(groupLegs(removedIds)).run();
+    }
+
+    return legs;
   }
 }
 

@@ -231,7 +231,7 @@ describe('Split expense update preserves groupId and migrates photos', () => {
     }
   });
 
-  test('photos from old siblings migrate to the first new sibling', async () => {
+  test('photos stay on surviving legs; photos of removed legs move to the first leg', async () => {
     await fc.assert(
       fc.asyncProperty(
         dbConfigAndTotalArb,
@@ -254,6 +254,7 @@ describe('Split expense update preserves groupId and migrates photos', () => {
           const oldSiblingIds = oldSiblings.map((s) => s.id);
 
           const insertedPhotoIds = await insertPhotos(db, oldSiblingIds, photoCount);
+          const photosBefore = await db.select().from(photos);
 
           const newSiblings = await repo.updateSplitExpense(
             originalGroupId as string,
@@ -261,27 +262,19 @@ describe('Split expense update preserves groupId and migrates photos', () => {
             USER_ID
           );
 
-          const firstNewSiblingId = newSiblings[0]?.id;
+          const newSiblingIds = new Set(newSiblings.map((s) => s.id));
+          const photosAfter = (await db.select().from(photos)).filter((p) =>
+            insertedPhotoIds.includes(p.id)
+          );
+          expect(photosAfter.length).toBe(insertedPhotoIds.length);
 
-          if (insertedPhotoIds.length > 0) {
-            const migratedPhotos = await db
-              .select()
-              .from(photos)
-              .where(eq(photos.entityType, 'expense'));
-
-            const relevantPhotos = migratedPhotos.filter((p) => insertedPhotoIds.includes(p.id));
-
-            expect(relevantPhotos.length).toBe(insertedPhotoIds.length);
-
-            for (const photo of relevantPhotos) {
-              expect(photo.entityId).toBe(firstNewSiblingId);
-              expect(photo.entityType).toBe('expense');
-            }
-          }
-
-          for (const oldId of oldSiblingIds) {
-            const orphaned = await db.select().from(photos).where(eq(photos.entityId, oldId));
-            expect(orphaned.length).toBe(0);
+          for (const photo of photosAfter) {
+            const before = photosBefore.find((p) => p.id === photo.id);
+            const expectedOwner = newSiblingIds.has(before?.entityId as string)
+              ? before?.entityId
+              : newSiblings[0]?.id;
+            expect(photo.entityId).toBe(expectedOwner as string);
+            expect(photo.entityType).toBe('expense');
           }
         }
       ),
@@ -454,5 +447,161 @@ describe('absolute split edit recomputes groupTotal from allocations (no stale h
       expect(s.groupTotal).toBe(60);
     }
     expect(newSiblings.reduce((s, r) => s + r.expenseAmount, 0)).toBe(60);
+  });
+});
+
+describe('split edit updates legs in place (per-leg data survives)', () => {
+  const CREATED_AT = new Date(2024, 0, 2);
+  const EDITOR_ID = 'editor-1';
+
+  beforeEach(() => {
+    sqliteDb.run(
+      `INSERT INTO users (id, email, display_name) VALUES ('${EDITOR_ID}', 'editor@test.com', 'Editor')`
+    );
+  });
+
+  async function createDetailedSplit(vehicleIds: string[]): Promise<{
+    groupId: string;
+    legIdByVehicle: Map<string, string>;
+  }> {
+    const siblings = await repo.createSplitExpense(
+      {
+        splitConfig: { method: 'even', vehicleIds },
+        category: 'maintenance',
+        date: new Date(2024, 5, 15),
+        totalAmount: 100 * vehicleIds.length,
+        description: 'group note',
+      },
+      { ownerId: USER_ID, createdBy: null }
+    );
+    for (const [i, leg] of siblings.entries()) {
+      await db
+        .update(expenses)
+        .set({
+          mileage: 1000 + i,
+          location: `Shop ${i}`,
+          description: `leg note ${i}`,
+          volume: 10 + i,
+          createdBy: USER_ID,
+          createdAt: CREATED_AT,
+        })
+        .where(eq(expenses.id, leg.id));
+    }
+    return {
+      groupId: siblings[0]?.groupId as string,
+      legIdByVehicle: new Map(siblings.map((s) => [s.vehicleId, s.id])),
+    };
+  }
+
+  function legRow(id: string) {
+    return db.select().from(expenses).where(eq(expenses.id, id)).get();
+  }
+
+  test('an edit that changes nothing keeps every leg id and per-leg field', async () => {
+    const { groupId, legIdByVehicle } = await createDetailedSplit(['v-1', 'v-2']);
+    const before = await db.select().from(expenses).where(eq(expenses.groupId, groupId));
+
+    const result = await repo.updateSplitExpense(
+      groupId,
+      { splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-2'] }, totalAmount: 200 },
+      USER_ID,
+      EDITOR_ID
+    );
+
+    expect(result.map((s) => s.id)).toEqual([
+      legIdByVehicle.get('v-1') as string,
+      legIdByVehicle.get('v-2') as string,
+    ]);
+    for (const old of before) {
+      const after = legRow(old.id);
+      expect(after).toEqual({ ...old, updatedAt: after?.updatedAt ?? null });
+    }
+  });
+
+  test('reordering vehicles keeps each leg bound to its vehicle and its data', async () => {
+    const { groupId, legIdByVehicle } = await createDetailedSplit(['v-1', 'v-2', 'v-3']);
+    const before = new Map(
+      (await db.select().from(expenses).where(eq(expenses.groupId, groupId))).map((r) => [
+        r.vehicleId,
+        r,
+      ])
+    );
+
+    const result = await repo.updateSplitExpense(
+      groupId,
+      {
+        splitConfig: {
+          method: 'absolute',
+          allocations: [
+            { vehicleId: 'v-3', amount: 150 },
+            { vehicleId: 'v-1', amount: 100 },
+            { vehicleId: 'v-2', amount: 50 },
+          ],
+        },
+      },
+      USER_ID
+    );
+
+    expect(result.map((s) => s.vehicleId)).toEqual(['v-3', 'v-1', 'v-2']);
+    for (const leg of result) {
+      const old = before.get(leg.vehicleId);
+      expect(leg.id).toBe(legIdByVehicle.get(leg.vehicleId) as string);
+      expect(leg.mileage).toBe(old?.mileage as number);
+      expect(leg.location).toBe(old?.location as string);
+      expect(leg.description).toBe(old?.description as string);
+      expect(leg.createdAt).toEqual(CREATED_AT);
+      expect(leg.splitMethod).toBe('absolute');
+      expect(leg.groupTotal).toBe(300);
+    }
+    expect(result.map((s) => s.expenseAmount)).toEqual([150, 100, 50]);
+  });
+
+  test('adding and removing a leg touches only those legs; photos are kept', async () => {
+    const { groupId, legIdByVehicle } = await createDetailedSplit(['v-1', 'v-2']);
+    const keptId = legIdByVehicle.get('v-1') as string;
+    const removedId = legIdByVehicle.get('v-2') as string;
+    const [keptPhoto] = await insertPhotos(db, [keptId], 1);
+    const [removedPhoto] = await insertPhotos(db, [removedId], 1);
+    const keptBefore = legRow(keptId);
+
+    const result = await repo.updateSplitExpense(
+      groupId,
+      { splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-3'] }, totalAmount: 200 },
+      USER_ID,
+      EDITOR_ID
+    );
+
+    expect(result.length).toBe(2);
+    const [kept, added] = result;
+    expect(kept?.id).toBe(keptId);
+    expect(kept?.mileage).toBe(keptBefore?.mileage as number);
+    expect(kept?.description).toBe(keptBefore?.description as string);
+    expect(kept?.createdBy).toBe(USER_ID);
+    expect(added?.vehicleId).toBe('v-3');
+    expect(added?.id).not.toBe(removedId);
+    expect(added?.createdBy).toBe(EDITOR_ID);
+    expect(added?.category).toBe('maintenance');
+    expect(added?.groupId).toBe(groupId);
+    expect(legRow(removedId)).toBeUndefined();
+
+    const photoRows = await db.select().from(photos);
+    expect(photoRows.find((p) => p.id === keptPhoto)?.entityId).toBe(keptId);
+    expect(photoRows.find((p) => p.id === removedPhoto)?.entityId).toBe(keptId);
+  });
+
+  test('a failure mid-edit rolls back every leg change', async () => {
+    const { groupId } = await createDetailedSplit(['v-1', 'v-2']);
+    const before = await db.select().from(expenses).where(eq(expenses.groupId, groupId));
+
+    await expect(
+      repo.updateSplitExpense(
+        groupId,
+        { splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-missing'] }, totalAmount: 300 },
+        USER_ID
+      )
+    ).rejects.toThrow();
+
+    const after = await db.select().from(expenses).where(eq(expenses.groupId, groupId));
+    expect(after).toEqual(before);
   });
 });
