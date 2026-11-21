@@ -34,7 +34,7 @@ import {
 import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { preferencesRepository } from '../settings/repository';
-import { backupService, coerceRow } from './backup';
+import { backupService, coerceRow, storageProviderIdentity } from './backup';
 
 type DrizzleTransaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
 
@@ -573,7 +573,12 @@ class RestoreService {
     );
     this.insertRows(tx, syncState, this.stampUserId(data.syncState, userId));
     this.insertRows(tx, photos, this.stampUserId(data.photos, userId));
-    const refRows = (data.photoRefs ?? []) as Record<string, unknown>[];
+    const refRows = this.relinkPhotoRefs(
+      tx,
+      (data.photoRefs ?? []) as Record<string, unknown>[],
+      data.metadata.storageProviders ?? {},
+      userId
+    );
     const knownProviders = this.knownProviderIds(tx, refRows, userId);
     this.insertRows(
       tx,
@@ -660,6 +665,46 @@ class RestoreService {
   private resolveShareStatus(share: Record<string, unknown>, consented: Set<string>): string {
     const key = shareConsentKey(String(share.vehicleId), String(share.sharedWithId));
     return consented.has(key) ? 'accepted' : 'pending';
+  }
+
+  private relinkPhotoRefs(
+    tx: DrizzleTransaction,
+    refRows: Record<string, unknown>[],
+    backupProviders: Record<string, string>,
+    userId: string
+  ): Record<string, unknown>[] {
+    const ownedByIdentity = new Map<string, string | null>();
+    const ownedIds = new Set<string>();
+    for (const provider of tx
+      .select()
+      .from(userProviders)
+      .where(and(eq(userProviders.userId, userId), eq(userProviders.domain, 'storage')))
+      .all()) {
+      ownedIds.add(provider.id);
+      const identity = storageProviderIdentity(provider);
+      if (identity) {
+        ownedByIdentity.set(identity, ownedByIdentity.has(identity) ? null : provider.id);
+      }
+    }
+    const targetOf = (providerId: string): string | null | undefined => {
+      if (ownedIds.has(providerId)) return providerId;
+      const identity = backupProviders[providerId];
+      return identity ? ownedByIdentity.get(identity) : undefined;
+    };
+    const seen = new Set<string>();
+    const relinked: Record<string, unknown>[] = [];
+    for (const ref of refRows) {
+      const target = targetOf(String(ref.providerId));
+      if (!target) {
+        relinked.push(ref);
+        continue;
+      }
+      const key = `${String(ref.photoId)}\u0000${target}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      relinked.push({ ...ref, providerId: target });
+    }
+    return relinked;
   }
 
   private knownProviderIds(

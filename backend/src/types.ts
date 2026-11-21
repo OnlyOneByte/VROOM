@@ -125,6 +125,7 @@ export interface BackupMetadata {
   version: string;
   timestamp: string;
   userId: string;
+  storageProviders?: Record<string, string>;
 }
 
 export interface BackupData {
