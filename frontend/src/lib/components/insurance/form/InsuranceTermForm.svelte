@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
+	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { resetSplitAllocations } from '#lib/utils/expense-helpers.ts';
@@ -46,6 +47,8 @@
 
 	let isLoading = $state(true);
 	let isSubmitting = $state(false);
+
+	onMount(() => trackPendingSave(() => isSubmitting));
 	let policy = $state<InsurancePolicy | null>(null);
 	let vehicles = $state<Vehicle[]>([]);
 
