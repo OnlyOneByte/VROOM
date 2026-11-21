@@ -194,7 +194,7 @@
 									onValueChange={v => changeLevel(share, v as ShareLevel)}
 								>
 									<Select.Trigger
-										class="w-[110px] data-[size=default]:h-10 sm:data-[size=default]:h-9"
+										class="w-[110px]"
 										aria-label="Change access level for {personLabel(share)}"
 									>
 										{shareLevelLabel(share.level)}
