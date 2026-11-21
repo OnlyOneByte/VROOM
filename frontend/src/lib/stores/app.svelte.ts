@@ -8,6 +8,7 @@ const initialState: AppState = {
 
 function createAppStore() {
 	let state = $state<AppState>({ ...initialState });
+	let errorsMutedUntil = 0;
 
 	return {
 		get vehicles() {
@@ -45,6 +46,7 @@ function createAppStore() {
 		},
 
 		addNotification(notification: Omit<Notification, 'id'>) {
+			if (notification.type === 'error' && Date.now() < errorsMutedUntil) return;
 			const newNotification: Notification = {
 				...notification,
 				id: crypto.randomUUID(),
@@ -60,6 +62,10 @@ function createAppStore() {
 
 		clearNotifications() {
 			state.notifications = [];
+		},
+
+		muteErrors(ms: number) {
+			errorsMutedUntil = Date.now() + ms;
 		},
 
 		showSuccess(message: string, duration?: number) {
@@ -80,6 +86,7 @@ function createAppStore() {
 
 		reset() {
 			state = { ...initialState };
+			errorsMutedUntil = 0;
 		}
 	};
 }

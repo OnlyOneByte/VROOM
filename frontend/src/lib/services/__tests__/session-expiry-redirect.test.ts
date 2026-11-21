@@ -3,6 +3,7 @@ import { goto } from '$app/navigation';
 import { apiClient } from '../api-client';
 import { authStore } from '../../stores/auth.svelte';
 import { appStore } from '../../stores/app.svelte';
+import { handleErrorWithNotification } from '../../utils/error-handling';
 import type { User } from '../../types/index.js';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
@@ -19,8 +20,8 @@ const mockUser: User = {
 	updatedAt: '2024-01-01T00:00:00Z'
 };
 
-function unauthorized(): Response {
-	return new Response(JSON.stringify({ error: { message: 'Unauthorized' } }), {
+function unauthorized(code = 'AuthenticationError'): Response {
+	return new Response(JSON.stringify({ error: { code, message: 'Invalid or expired session' } }), {
 		status: 401,
 		headers: { 'content-type': 'application/json' }
 	});
@@ -34,9 +35,9 @@ describe('api client — global session expiry on 401', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		vi.useFakeTimers();
-		appStore.clearNotifications();
+		appStore.reset();
 		authStore.setUser(mockUser);
-		mockFetch.mockResolvedValue(unauthorized());
+		mockFetch.mockImplementation(() => Promise.resolve(unauthorized()));
 	});
 
 	afterEach(() => {
@@ -76,5 +77,41 @@ describe('api client — global session expiry on 401', () => {
 		expect(
 			appStore.notifications.filter(n => n.message.includes('session has expired'))
 		).toHaveLength(1);
+	});
+
+	it('keeps the user signed in when a storage provider rejects its credentials', async () => {
+		mockFetch.mockResolvedValue(unauthorized('AUTH_INVALID'));
+
+		const error = await apiClient.get('/api/v1/providers/p1/photos').catch((e: unknown) => e);
+		handleErrorWithNotification(error, "Couldn't load the photos");
+
+		expect(authStore.isAuthenticated).toBe(true);
+		expect(expiryWarningShown()).toBe(false);
+		expect(goto).not.toHaveBeenCalled();
+		expect(appStore.notifications.map(n => n.message)).toEqual([
+			"Couldn't load the photos. Your storage account needs to be reconnected. Reconnect it in Settings."
+		]);
+	});
+
+	it('shows only the expiry notice when the failed requests also report their errors', async () => {
+		await Promise.all(
+			['/api/v1/expenses', '/api/v1/vehicles'].map(url =>
+				apiClient.get(url).catch((error: unknown) => {
+					handleErrorWithNotification(error, "Couldn't load the page");
+				})
+			)
+		);
+
+		expect(appStore.notifications).toHaveLength(1);
+		expect(expiryWarningShown()).toBe(true);
+	});
+
+	it('shows error toasts again once the expiry has been handled', async () => {
+		await expect(apiClient.get('/api/v1/expenses')).rejects.toThrow();
+		vi.advanceTimersByTime(1000);
+
+		appStore.showError("Couldn't save the trip.");
+
+		expect(appStore.notifications.map(n => n.message)).toContain("Couldn't save the trip.");
 	});
 });

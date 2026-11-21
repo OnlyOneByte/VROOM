@@ -27,10 +27,13 @@ function user(id: string): User {
 }
 
 function unauthorized(): Response {
-	return new Response(JSON.stringify({ error: { message: 'Session expired' } }), {
-		status: 401,
-		headers: { 'content-type': 'application/json' }
-	});
+	return new Response(
+		JSON.stringify({ error: { code: 'AuthenticationError', message: 'Session expired' } }),
+		{
+			status: 401,
+			headers: { 'content-type': 'application/json' }
+		}
+	);
 }
 
 function aliceForm() {
