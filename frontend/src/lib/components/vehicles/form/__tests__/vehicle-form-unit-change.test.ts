@@ -75,48 +75,65 @@ beforeEach(() => {
 	appStore.setVehicles([EXISTING]);
 });
 
+const LOAN = {
+	id: 'fin-1',
+	vehicleId: EXISTING.id,
+	financingType: 'loan',
+	provider: 'Credit Union',
+	originalAmount: 20000,
+	apr: 4.5,
+	termMonths: 60,
+	startDate: '2024-01-15T12:00:00.000Z',
+	paymentAmount: 373,
+	paymentFrequency: 'monthly',
+	isActive: true,
+	createdAt: '2024-01-15T12:00:00.000Z',
+	updatedAt: '2024-01-15T12:00:00.000Z'
+} satisfies VehicleFinancing;
+
+async function renderFinancedEditOwnAndKilometers(): Promise<void> {
+	getVehicle.mockResolvedValue(EXISTING);
+	getFinancing.mockResolvedValue(LOAN);
+	payOffFinancing.mockResolvedValue({ ...LOAN, isActive: false });
+	render(VehicleForm, { props: { vehicleId: EXISTING.id } });
+	await screen.findByRole('heading', { name: 'Edit Vehicle' });
+	await fireEvent.click(screen.getByRole('button', { name: 'Toggle unit preferences' }));
+	await choose('distanceUnit', 'Kilometers');
+	await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
+	await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+	const payoff = await screen.findByRole('alertdialog');
+	await fireEvent.click(within(payoff).getByRole('button', { name: 'Mark Paid Off' }));
+	await waitFor(() =>
+		expect(screen.getByRole('alertdialog').textContent).toContain('Change units for this vehicle?')
+	);
+}
+
 describe('VehicleForm unit change together with paying off the loan', () => {
 	test('switching to Own and changing units asks for both, pays off once and saves with the flag', async () => {
-		const loan = {
-			id: 'fin-1',
-			vehicleId: EXISTING.id,
-			financingType: 'loan',
-			provider: 'Credit Union',
-			originalAmount: 20000,
-			apr: 4.5,
-			termMonths: 60,
-			startDate: '2024-01-15T12:00:00.000Z',
-			paymentAmount: 373,
-			paymentFrequency: 'monthly',
-			isActive: true,
-			createdAt: '2024-01-15T12:00:00.000Z',
-			updatedAt: '2024-01-15T12:00:00.000Z'
-		} satisfies VehicleFinancing;
-		getVehicle.mockResolvedValue(EXISTING);
-		getFinancing.mockResolvedValue(loan);
-		payOffFinancing.mockResolvedValue({ ...loan, isActive: false });
 		updateVehicle.mockRejectedValueOnce(unitChangeRejection()).mockResolvedValueOnce(EXISTING);
-
-		render(VehicleForm, { props: { vehicleId: EXISTING.id } });
-		await screen.findByRole('heading', { name: 'Edit Vehicle' });
-		await fireEvent.click(screen.getByRole('button', { name: 'Toggle unit preferences' }));
-		await choose('distanceUnit', 'Kilometers');
-		await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
-		await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
-
-		const payoff = await screen.findByRole('alertdialog');
-		await fireEvent.click(within(payoff).getByRole('button', { name: 'Mark Paid Off' }));
-		await waitFor(() =>
-			expect(screen.getByRole('alertdialog').textContent).toContain(
-				'Change units for this vehicle?'
-			)
-		);
+		await renderFinancedEditOwnAndKilometers();
 		await fireEvent.click(screen.getByRole('button', { name: 'Change Units' }));
 
 		await waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/veh-1'));
 		expect(payOffFinancing).toHaveBeenCalledTimes(1);
 		expect(updateVehicle).toHaveBeenCalledTimes(2);
 		expect(updateVehicle.mock.calls[1]?.[1].confirmUnitChange).toBe(true);
+	});
+
+	test('cancelling the unit dialog after the payoff never pays off a second time', async () => {
+		updateVehicle.mockRejectedValue(unitChangeRejection());
+		await renderFinancedEditOwnAndKilometers();
+
+		await fireEvent.click(
+			within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' })
+		);
+		await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+		await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+
+		const dialog = await screen.findByRole('alertdialog');
+		expect(dialog.textContent).toContain('Change units for this vehicle?');
+		expect(payOffFinancing).toHaveBeenCalledTimes(1);
+		expect(updateVehicle).toHaveBeenCalledTimes(2);
 	});
 });
 

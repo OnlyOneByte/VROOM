@@ -405,7 +405,8 @@
 	async function payOffAndSave() {
 		if (!activeFinancingToEnd) return;
 		try {
-			await vehicleApi.payOffFinancing(activeFinancingToEnd.id);
+			const ended = await vehicleApi.payOffFinancing(activeFinancingToEnd.id);
+			if (vehicle) vehicle.financing = ended;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error';
 			appStore.addNotification({
