@@ -114,4 +114,19 @@ describe('api client — global session expiry on 401', () => {
 
 		expect(appStore.notifications.map(n => n.message)).toContain("Couldn't save the trip.");
 	});
+
+	it('lets an urgent error through while the expiry mutes the others', async () => {
+		await expect(apiClient.get('/api/v1/expenses')).rejects.toThrow();
+
+		appStore.addNotification({ type: 'error', message: 'cascade' });
+		appStore.addNotification({
+			type: 'error',
+			message: 'The expense was not saved.',
+			urgent: true
+		});
+
+		const messages = appStore.notifications.map(n => n.message);
+		expect(messages).toContain('The expense was not saved.');
+		expect(messages).not.toContain('cascade');
+	});
 });

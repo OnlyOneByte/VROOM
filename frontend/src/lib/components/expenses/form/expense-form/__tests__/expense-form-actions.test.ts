@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { ApiError } from '#lib/utils/error-handling.ts';
-import { UNQUEUED_SAVE_MESSAGE } from '../expense-submit-outcome';
+import {
+	UNQUEUED_AFTER_SESSION_END_MESSAGE,
+	UNQUEUED_SAVE_MESSAGE
+} from '../expense-submit-outcome';
 import { makeExpense, makeSplitGroup } from './expense-form-fixtures';
 
 const { expenseApiMock, addNotification, gotoDynamic, addOfflineExpense, online } = vi.hoisted(
@@ -270,7 +273,9 @@ describe('submitExpense — offline and failure queuing', () => {
 		const state = createState();
 		await submitExpense(state);
 		expect(state.submitError).toBe(UNQUEUED_SAVE_MESSAGE);
-		notified('error', UNQUEUED_SAVE_MESSAGE);
+		expect(addNotification).toHaveBeenCalledWith(
+			expect.objectContaining({ type: 'error', message: UNQUEUED_SAVE_MESSAGE, urgent: true })
+		);
 		expect(gotoDynamic).not.toHaveBeenCalled();
 		expect(state.isSubmitting).toBe(false);
 	});
@@ -291,6 +296,23 @@ describe('submitExpense — offline and failure queuing', () => {
 		const state = createState();
 		await submitExpense(state);
 		notified('warning', 'Signed out — saved on this device. Sign in to sync it.');
+	});
+
+	test('an expired session whose save cannot be stored says the expense was not saved', async () => {
+		expenseApiMock.createExpense.mockRejectedValue(
+			new ApiError('Unauthorized', 401, undefined, 'AuthenticationError')
+		);
+		addOfflineExpense.mockReturnValue(false);
+		const state = createState();
+		await submitExpense(state);
+		expect(state.submitError).toBe(UNQUEUED_AFTER_SESSION_END_MESSAGE);
+		expect(addNotification).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: 'error',
+				message: UNQUEUED_AFTER_SESSION_END_MESSAGE,
+				urgent: true
+			})
+		);
 	});
 
 	test('a queued failure that cannot be stored reports the unqueued message', async () => {

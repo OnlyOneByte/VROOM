@@ -13,6 +13,7 @@ import {
 	canQueueFailedSave,
 	offlineQueuedMessage,
 	submitFailureMessage,
+	UNQUEUED_AFTER_SESSION_END_MESSAGE,
 	UNQUEUED_SAVE_MESSAGE
 } from './expense-submit-outcome';
 import type { ExpenseFormState } from './expense-form-state.svelte';
@@ -28,9 +29,14 @@ function saveClientId(state: ExpenseFormState): string {
 	return clientId;
 }
 
-function reportUnqueuedSave(state: ExpenseFormState): void {
-	state.submitError = UNQUEUED_SAVE_MESSAGE;
-	appStore.addNotification({ type: 'error', message: state.submitError });
+function reportUnqueuedSave(state: ExpenseFormState, sessionEnded = false): void {
+	state.submitError = sessionEnded ? UNQUEUED_AFTER_SESSION_END_MESSAGE : UNQUEUED_SAVE_MESSAGE;
+	appStore.addNotification({
+		type: 'error',
+		message: state.submitError,
+		urgent: true,
+		duration: 15000
+	});
 }
 
 async function uploadPendingPhotos(state: ExpenseFormState, entityId: string): Promise<void> {
@@ -171,7 +177,7 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			);
 
 			if (!queued) {
-				reportUnqueuedSave(state);
+				reportUnqueuedSave(state, failureKind === 'auth');
 				return;
 			}
 
