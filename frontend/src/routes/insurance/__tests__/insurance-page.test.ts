@@ -106,7 +106,7 @@ describe('insurance page loading and errors', () => {
 		expect(screen.queryByRole('heading', { name: 'Insurance' })).toBeNull();
 	});
 
-	test('a load failure shows the message, notifies, and Try Again recovers', async () => {
+	test('a load failure shows the message, notifies, and Retry recovers', async () => {
 		const error = new ApiError('Gateway timeout', 504);
 		getAllPolicies.mockRejectedValueOnce(error);
 		await mount();
@@ -116,7 +116,7 @@ describe('insurance page loading and errors', () => {
 		expect(notifyError).toHaveBeenCalledWith(error, "Couldn't load insurance data");
 		expect(screen.queryByRole('button', { name: 'New Policy' })).toBeNull();
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
 
 		expect(getAllPolicies).toHaveBeenCalledTimes(2);

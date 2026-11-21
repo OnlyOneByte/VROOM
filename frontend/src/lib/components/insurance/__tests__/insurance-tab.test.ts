@@ -90,7 +90,7 @@ describe('InsuranceTab load states', () => {
 			failure,
 			"Couldn't load insurance policies"
 		);
-		await fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
 		expect(getPoliciesForVehicle).toHaveBeenCalledTimes(2);
 		expect(screen.queryByText('Server unavailable')).toBeNull();
