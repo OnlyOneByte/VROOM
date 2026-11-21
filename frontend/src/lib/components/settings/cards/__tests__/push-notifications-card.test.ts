@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { PushEnableOutcome } from '#lib/utils/push.ts';
+import type { VapidKeyStatus } from '#lib/services/push-api.ts';
 import {
 	ApiError,
 	NETWORK_FAILURE_MESSAGE,
@@ -17,7 +18,7 @@ const { push, getVapidPublicKey, showError, showSuccess } = vi.hoisted(() => ({
 		enablePush: vi.fn<() => Promise<PushEnableOutcome>>(),
 		disablePush: vi.fn<() => Promise<void>>()
 	},
-	getVapidPublicKey: vi.fn<() => Promise<{ publicKey: string }>>(),
+	getVapidPublicKey: vi.fn<() => Promise<VapidKeyStatus>>(),
 	showError: vi.fn<(message: string) => void>(),
 	showSuccess: vi.fn<(message: string) => void>()
 }));
@@ -64,7 +65,7 @@ beforeEach(() => {
 	push.getExistingSubscription.mockResolvedValue(null);
 	push.enablePush.mockResolvedValue({ ok: true });
 	push.disablePush.mockResolvedValue();
-	getVapidPublicKey.mockResolvedValue({ publicKey: 'key' });
+	getVapidPublicKey.mockResolvedValue({ enabled: true, publicKey: 'key' });
 });
 
 afterEach(() => {
@@ -86,14 +87,12 @@ describe('PushNotificationsCard status', () => {
 		expect(getVapidPublicKey).not.toHaveBeenCalled();
 	});
 
-	test.each([
-		['a PUSH_NOT_CONFIGURED code', new ApiError('nope', 400, undefined, 'PUSH_NOT_CONFIGURED')],
-		['a 503 status', new ApiError('down', 503)]
-	])('a VAPID error with %s marks push unconfigured', async (_label, failure) => {
-		getVapidPublicKey.mockRejectedValue(failure);
+	test('a server with push off shows it is not set up, with no toggle, after one key check', async () => {
+		getVapidPublicKey.mockResolvedValue({ enabled: false, publicKey: null });
 		await mount();
 		expect(statusText()).toBe("Push notifications aren't set up on this server.");
 		expect(screen.queryByTestId('push-toggle')).toBeNull();
+		expect(getVapidPublicKey).toHaveBeenCalledTimes(1);
 	});
 
 	test('denied permission shows the blocked message with no toggle', async () => {
