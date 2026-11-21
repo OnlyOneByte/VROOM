@@ -62,6 +62,7 @@
 			x="date"
 			y="amount"
 			{series}
+			points={data.length === 1}
 			padding={CHART_PADDING}
 			props={{
 				...getTrendLineProps(data.length),
