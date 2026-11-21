@@ -125,12 +125,12 @@
 					{/if}
 					{#if !readOnly}
 						<div
-							class="absolute right-0 top-0 p-1.5 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100"
+							class="absolute right-0 top-0 p-1.5 motion-safe:transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100"
 						>
 							<Button
 								variant="destructive"
-								size="sm"
-								class="size-10 sm:size-7 focus-visible:ring-ring dark:focus-visible:ring-ring"
+								size="icon-lg"
+								class="pointer-fine:size-7 focus-visible:ring-ring dark:focus-visible:ring-ring"
 								aria-label={`Delete ${doc.fileName}`}
 								onclick={() => requestDelete(doc.id)}
 							>
