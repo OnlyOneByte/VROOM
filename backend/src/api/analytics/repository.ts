@@ -210,7 +210,7 @@ export interface FuelStatsData {
     avgPerDay: number | null;
     avgPerMonth: number | null;
   };
-  monthlyConsumption: Array<{ month: string; efficiency: number; volume: number }>;
+  monthlyConsumption: Array<{ month: string; efficiency: number | null; volume: number }>;
   gasPriceHistory: Array<{ date: string; fuelType: string; pricePerVolume: number }>;
   fillupCostByVehicle: Array<{
     month: string;
@@ -608,7 +608,7 @@ export class AnalyticsRepository {
   private buildMonthlyConsumption(
     rows: FuelExpenseRow[],
     convert: FleetUnitConverter
-  ): Array<{ month: string; efficiency: number; volume: number }> {
+  ): Array<{ month: string; efficiency: number | null; volume: number }> {
     const map = new Map<string, { efficiency: EfficiencyTotals; volume: number }>();
 
     for (const row of rows) {
@@ -630,7 +630,7 @@ export class AnalyticsRepository {
       .slice(-12)
       .map(([month, data]) => ({
         month,
-        efficiency: pooledEfficiency(data.efficiency) ?? 0,
+        efficiency: pooledEfficiency(data.efficiency),
         volume: data.volume,
       }));
   }
