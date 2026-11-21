@@ -72,7 +72,7 @@ describe('backend/.env.example matches the backend', () => {
 
     beforeAll(async () => {
       ctx = await createTestApp();
-    }, 30_000);
+    });
 
     const statusFor = async (path: string) => (await ctx.app.request(path)).status;
 

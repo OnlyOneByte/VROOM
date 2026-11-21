@@ -15,7 +15,7 @@ describe('reported version comes from the package, not a literal', () => {
 
   beforeAll(async () => {
     ctx = await createTestApp();
-  }, 30_000);
+  });
 
   test('GET /health reports the package version', async () => {
     const res = await ctx.app.request('/health');

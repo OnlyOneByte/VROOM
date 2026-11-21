@@ -212,7 +212,6 @@
   "backend/src/middleware/rate-limit.ts: In-memory and per process: with several instances, each one enforces its own limit.",
   "backend/src/scripts/gen-vapid-keys.ts: Rotating the keypair invalidates every existing push subscription.",
   "backend/src/test-helpers/preload.ts: Bun loads .env before any test imports config, so the test environment is pinned here or a real database can be opened.",
-  "backend/src/utils/__tests__/request-body.test.ts: A cold module load can exceed bun's 5s hook budget, which bunfig's test timeout does not raise.",
   "backend/src/utils/calculations.ts: Spreading into Math.max overflows the call stack on large arrays, so these loop.",
   "backend/src/utils/chunk.ts: bun-sqlite stores the bind count in 16 bits, so a larger statement fails with a misleading error.",
   "backend/src/utils/client-ip.ts: X-Forwarded-For is client-controlled: honor it only from trusted proxy sockets, or a limiter keyed on it is bypassable.",

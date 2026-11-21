@@ -71,13 +71,13 @@ constraints/indexes exist, and that data seeded by `seedCoreData` after
 `applyMigrationsUpTo(db, migrations, N - 1)` survives `applyMigration(db, migrations[N])`.
 
 ```bash
-bun test src/db/__tests__/          # or the whole suite via `bun run validate`
+bun test --timeout 30000 src/db/__tests__/         # or the whole suite via `bun run validate`
 ```
 
 ## Backup / restore / sync impact
 
 Every table and column is exported, validated, and restored through hand-maintained lists. Run
-`bun test src/api/sync src/api/providers` after a schema change — drift guards
+`bun test --timeout 30000 src/api/sync src/api/providers` after a schema change — drift guards
 (`backup-table-coverage`, `restore-table-coverage`, `sheets-header-coverage`) fail by name on each
 list you missed. What they point at:
 
