@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { resetSplitAllocations } from '#lib/utils/expense-helpers.ts';
 	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
@@ -259,17 +260,19 @@
 		</div>
 	{:else}
 		<div class="space-y-6">
-			<div class="flex items-center gap-4">
-				<Button variant="outline" size="icon" aria-label="Go back" onclick={handleBack}>
-					<ArrowLeft class="h-4 w-4" />
-				</Button>
-				<div>
-					<h1 class="text-3xl font-bold tracking-tight">{pageTitle}</h1>
-					{#if policy}
-						<p class="text-muted-foreground mt-1">{policy.company}</p>
-					{/if}
-				</div>
-			</div>
+			<PageHeader title={pageTitle} description={policy?.company}>
+				{#snippet back()}
+					<Button
+						variant="ghost"
+						size="icon-lg"
+						class="shrink-0"
+						aria-label="Go back"
+						onclick={handleBack}
+					>
+						<ArrowLeft class="size-5" />
+					</Button>
+				{/snippet}
+			</PageHeader>
 
 			<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24">
 				<Card>
