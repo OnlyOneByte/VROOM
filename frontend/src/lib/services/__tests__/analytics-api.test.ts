@@ -55,6 +55,8 @@ const mockFuelStats: FuelStatsResponse = {
 const mockFuelAdvanced: FuelAdvancedResponse = {
 	maintenanceTimeline: [
 		{
+			vehicleId: 'v1',
+			vehicleName: 'Civic',
 			service: 'Oil Change',
 			lastServiceDate: '2024-01-15',
 			nextDueDate: '2024-07-15',

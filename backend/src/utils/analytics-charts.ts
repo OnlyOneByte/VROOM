@@ -446,33 +446,39 @@ function buildTimelineEntry(
 
 export function buildMaintenanceTimeline(
   maintenanceRows: GeneralExpenseRow[],
-  now: Date
+  now: Date,
+  vehicleNameMap: Map<string, string>
 ): Array<{
+  vehicleId: string;
+  vehicleName: string;
   service: string;
   lastServiceDate: string;
   nextDueDate: string;
   daysRemaining: number;
   status: 'good' | 'warning' | 'overdue';
 }> {
-  const serviceGroups = new Map<string, GeneralExpenseRow[]>();
+  const serviceGroups = new Map<
+    string,
+    { vehicleId: string; service: string; rows: GeneralExpenseRow[] }
+  >();
   for (const row of maintenanceRows) {
-    const key = (row.description ?? 'general maintenance').toLowerCase().trim();
-    const group = serviceGroups.get(key) ?? [];
-    group.push(row);
+    const service = (row.description ?? 'general maintenance').toLowerCase().trim();
+    const key = `${row.vehicleId}|${service}`;
+    const group = serviceGroups.get(key) ?? { vehicleId: row.vehicleId, service, rows: [] };
+    group.rows.push(row);
     serviceGroups.set(key, group);
   }
 
-  const timeline: Array<{
-    service: string;
-    lastServiceDate: string;
-    nextDueDate: string;
-    daysRemaining: number;
-    status: 'good' | 'warning' | 'overdue';
-  }> = [];
-  for (const [service, rows] of serviceGroups) {
-    if (rows.length === 0) continue;
+  const timeline: ReturnType<typeof buildMaintenanceTimeline> = [];
+  for (const { vehicleId, service, rows } of serviceGroups.values()) {
     const entry = buildTimelineEntry(service, rows, now);
-    if (entry) timeline.push(entry);
+    if (entry) {
+      timeline.push({
+        vehicleId,
+        vehicleName: vehicleNameMap.get(vehicleId) ?? 'Unknown',
+        ...entry,
+      });
+    }
   }
 
   return timeline.sort((a, b) => a.daysRemaining - b.daysRemaining).slice(0, 50);

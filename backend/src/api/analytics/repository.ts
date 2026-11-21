@@ -199,6 +199,8 @@ export interface FuelStatsData {
 
 export interface FuelAdvancedData {
   maintenanceTimeline: Array<{
+    vehicleId: string;
+    vehicleName: string;
     service: string;
     lastServiceDate: string;
     nextDueDate: string;
@@ -1564,7 +1566,7 @@ export class AnalyticsRepository {
   ): FuelAdvancedData {
     const maintenanceRows = allExpenses.filter((e) => e.category === 'maintenance');
     return {
-      maintenanceTimeline: buildMaintenanceTimeline(maintenanceRows, new Date()),
+      maintenanceTimeline: buildMaintenanceTimeline(maintenanceRows, new Date(), vehicleNameMap),
       seasonalEfficiency: this.buildSeasonalEfficiency(fuelRowsByVehicle, convert),
       vehicleRadar: buildVehicleRadar(allExpenses, fuelRowsByVehicle, vehicleNameMap, convert),
       dayOfWeekPatterns: this.buildDayOfWeekPatterns(fuelRows, convert),
