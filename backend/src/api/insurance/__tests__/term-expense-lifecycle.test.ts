@@ -87,7 +87,7 @@ async function seedCostedTerm(): Promise<{ policyId: string; termId: string; exp
 }
 
 describe('insurance term premium expense lifecycle', () => {
-  test('a failed premium create is reported instead of answering 201', async () => {
+  test('a failed premium create rolls the new policy back instead of answering 201', async () => {
     const vehicleId = await seedVehicle(ctx);
     const { expenseRepository } = await import('../../expenses/repository');
     const spy = spyOn(expenseRepository, 'createSplitExpense').mockImplementation(() => {
@@ -98,7 +98,36 @@ describe('insurance term premium expense lifecycle', () => {
       const res = await createPolicy(vehicleId);
       const body = await json<{ success: boolean; error?: { message: string } }>(res);
       expect(res.status, JSON.stringify(body)).toBe(500);
-      expect(body.error?.message).toContain('premium expense could not be created');
+      expect(body.error?.message).toContain('nothing was saved');
+      const policies = ctx.sqlite.query('SELECT COUNT(*) AS n FROM insurance_policies').get() as {
+        n: number;
+      };
+      expect(policies.n, 'a retry must not leave a duplicate policy behind').toBe(0);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('a failed premium create on an added term removes that term', async () => {
+    const { policyId } = await seedCostedTerm();
+    const vehicleId = await seedVehicle(ctx, { nickname: 'Second' });
+    const { expenseRepository } = await import('../../expenses/repository');
+    const spy = spyOn(expenseRepository, 'createSplitExpense').mockImplementation(() => {
+      throw new Error('forced create failure');
+    });
+
+    try {
+      const res = await ctx.authed('POST', `/api/v1/insurance/${policyId}/terms`, {
+        startDate: '2025-01-01T00:00:00.000Z',
+        endDate: '2026-01-01T00:00:00.000Z',
+        totalCost: 1300,
+        vehicleCoverage: { vehicleIds: [vehicleId] },
+      });
+      expect(res.status, await res.text()).toBe(500);
+      const terms = ctx.sqlite
+        .query('SELECT COUNT(*) AS n FROM insurance_terms WHERE policy_id = ?')
+        .get(policyId) as { n: number };
+      expect(terms.n).toBe(1);
     } finally {
       spy.mockRestore();
     }

@@ -154,8 +154,8 @@ export async function createTermExpenses(params: TermExpenseParams): Promise<voi
       error: error instanceof Error ? error.message : String(error),
     });
     throw new AppError(
-      'The insurance term was saved, but its premium expense could not be created. ' +
-        'Re-save the term to retry.',
+      'The premium expense for this insurance term could not be created, so nothing was saved. ' +
+        'Try again.',
       500
     );
   }

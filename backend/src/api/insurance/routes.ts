@@ -175,8 +175,16 @@ routes.post('/', zValidator('json', createPolicySchema), async (c) => {
   const data = c.req.valid('json');
   const policy = await insurancePolicyRepository.create(data, user.id);
 
-  for (const term of policy.terms) {
-    await createTermExpenses(termExpenseParams(policy, term, user.id));
+  try {
+    for (const term of policy.terms) {
+      await createTermExpenses(termExpenseParams(policy, term, user.id));
+    }
+  } catch (error) {
+    for (const term of policy.terms) {
+      await deleteTermExpenses(term.id, user.id);
+    }
+    await insurancePolicyRepository.delete(policy.id, user.id);
+    throw error;
   }
 
   return c.json(
@@ -243,16 +251,21 @@ routes.post(
     const policy = await insurancePolicyRepository.addTerm(id, termData, user.id);
 
     const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, policy.newTermId);
-    await createTermExpenses({
-      termId: policy.newTermId,
-      vehicleIds: termVehicleIds,
-      totalCost: termData.totalCost ?? 0,
-      monthlyCost: termData.monthlyCost,
-      startDate: termData.startDate,
-      endDate: termData.endDate,
-      policyNumber: termData.policyNumber,
-      userId: user.id,
-    });
+    try {
+      await createTermExpenses({
+        termId: policy.newTermId,
+        vehicleIds: termVehicleIds,
+        totalCost: termData.totalCost ?? 0,
+        monthlyCost: termData.monthlyCost,
+        startDate: termData.startDate,
+        endDate: termData.endDate,
+        policyNumber: termData.policyNumber,
+        userId: user.id,
+      });
+    } catch (error) {
+      await insurancePolicyRepository.deleteTerm(id, policy.newTermId, user.id);
+      throw error;
+    }
 
     return c.json(
       { success: true, data: policyToApi(policy), message: 'Term added successfully' },
