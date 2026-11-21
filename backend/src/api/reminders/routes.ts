@@ -15,7 +15,13 @@ import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
 import { recurringCostSummary } from './reminder-cost';
 import { type ReminderWithVehicles, reminderRepository } from './repository';
-import { advanceReminderDueDate, reminderTriggerService } from './trigger-service';
+import {
+  advanceReminderDueDate,
+  firstDueOnOrAfter,
+  previousDueBefore,
+  type ReminderSchedule,
+  reminderTriggerService,
+} from './trigger-service';
 import {
   assertMergedReminderValid,
   createReminderSchema,
@@ -100,6 +106,38 @@ function advanceToFirstFutureDue(reminder: Reminder, from: Date): Date {
   return nextDue;
 }
 
+function nextDueAfterService(reminder: Reminder, due: Date, now: Date): Date {
+  if (due <= now) return advanceToFirstFutureDue(reminder, due);
+  const periodStart = previousDueBefore(reminder, due);
+  const alreadyAdvanced =
+    periodStart !== null &&
+    (periodStart > now ||
+      (reminder.lastTriggeredAt !== null && reminder.lastTriggeredAt >= periodStart));
+  return alreadyAdvanced ? due : advanceReminderDueDate(reminder, due);
+}
+
+function scheduleChanged(existing: Reminder, update: Partial<NewReminder>): boolean {
+  return (
+    (update.startDate !== undefined &&
+      update.startDate.getTime() !== existing.startDate.getTime()) ||
+    (update.frequency !== undefined && update.frequency !== existing.frequency) ||
+    (update.intervalValue !== undefined && update.intervalValue !== existing.intervalValue) ||
+    (update.intervalUnit !== undefined && update.intervalUnit !== existing.intervalUnit) ||
+    (update.triggerMode !== undefined && update.triggerMode !== existing.triggerMode)
+  );
+}
+
+function recomputedNextDue(
+  existing: Reminder,
+  update: Partial<NewReminder>,
+  merged: ReminderSchedule & { triggerMode: string }
+): Date | null {
+  if (merged.triggerMode === 'mileage') return null;
+  const resumed = update.isActive === true && !existing.isActive;
+  if (!resumed && !scheduleChanged(existing, update)) return null;
+  return firstDueOnOrAfter(merged, new Date());
+}
+
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
@@ -159,7 +197,7 @@ routes.post(
       (reminder.triggerMode === 'time' || reminder.triggerMode === 'both') &&
       reminder.nextDueDate
     ) {
-      const nextDue = advanceToFirstFutureDue(reminder, reminder.nextDueDate);
+      const nextDue = nextDueAfterService(reminder, reminder.nextDueDate, new Date());
       if (reminder.endDate && nextDue > reminder.endDate) {
         await reminderRepository.deactivate(id, ownerId);
         return c.json({ success: true, data: reminderToApi({ ...reminder, isActive: false }) });
@@ -297,6 +335,9 @@ routes.put(
         updateFields.nextDueDate = merged.nextDueDate ?? merged.startDate;
       }
     }
+
+    const recomputedDue = recomputedNextDue(existing.reminder, reminderFields, merged);
+    if (recomputedDue) updateFields.nextDueDate = recomputedDue;
 
     const result = await reminderRepository.updateWithVehicles(
       id,

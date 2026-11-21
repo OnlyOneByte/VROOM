@@ -121,7 +121,12 @@ export function computeNextDueDate(
   return next;
 }
 
-export function advanceReminderDueDate(reminder: Reminder, from: Date): Date {
+export type ReminderSchedule = Pick<
+  Reminder,
+  'id' | 'frequency' | 'intervalValue' | 'intervalUnit' | 'startDate'
+>;
+
+export function advanceReminderDueDate(reminder: ReminderSchedule, from: Date): Date {
   return computeNextDueDate(
     from,
     reminder.frequency,
@@ -129,6 +134,32 @@ export function advanceReminderDueDate(reminder: Reminder, from: Date): Date {
     reminder.intervalUnit,
     getAnchorDay(reminder)
   );
+}
+
+function advanceStrictly(reminder: ReminderSchedule, from: Date): Date {
+  const next = advanceReminderDueDate(reminder, from);
+  if (next <= from) {
+    throw new ValidationError(
+      `Reminder ${reminder.id} did not advance (frequency "${reminder.frequency}")`
+    );
+  }
+  return next;
+}
+
+export function firstDueOnOrAfter(reminder: ReminderSchedule, floor: Date): Date {
+  let due = reminder.startDate;
+  while (due < floor) due = advanceStrictly(reminder, due);
+  return due;
+}
+
+export function previousDueBefore(reminder: ReminderSchedule, due: Date): Date | null {
+  let previous: Date | null = null;
+  let candidate = reminder.startDate;
+  while (candidate < due) {
+    previous = candidate;
+    candidate = advanceStrictly(reminder, candidate);
+  }
+  return previous;
 }
 
 // bun:sqlite: keep transaction bodies synchronous; awaited statements autocommit separately.
@@ -187,7 +218,7 @@ function createExpenseFromReminder(
   });
 }
 
-function getAnchorDay(reminder: Reminder): number {
+function getAnchorDay(reminder: ReminderSchedule): number {
   return reminder.startDate.getDate();
 }
 
