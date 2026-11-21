@@ -15,6 +15,13 @@
       "when": 1795261762927,
       "tag": "0001_share_invited_email",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1795297609098,
+      "tag": "0002_lookup_indexes",
+      "breakpoints": true
     }
   ]
 }

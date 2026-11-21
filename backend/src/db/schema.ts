@@ -185,6 +185,7 @@ export const insuranceClaims = sqliteTable(
     policyIdIdx: index('ic_policy_id_idx').on(table.policyId),
     policyStatusIdx: index('ic_policy_status_idx').on(table.policyId, table.status),
     vehicleIdx: index('ic_vehicle_idx').on(table.vehicleId),
+    termIdx: index('ic_term_idx').on(table.termId),
   })
 );
 
@@ -238,6 +239,7 @@ export const expenses = sqliteTable(
     ),
     groupIdx: index('expenses_group_idx').on(table.groupId),
     sourceIdx: index('expenses_source_idx').on(table.sourceType, table.sourceId),
+    createdByIdx: index('expenses_created_by_idx').on(table.createdBy),
     userClientIdx: uniqueIndex('expenses_user_client_idx')
       .on(table.userId, table.clientId)
       .where(sql`${table.clientId} IS NOT NULL`),
@@ -306,13 +308,19 @@ export const syncState = sqliteTable('sync_state', {
   lastBackupDate: integer('last_backup_date', { mode: 'timestamp' }),
 });
 
-export const sessions = sqliteTable('sessions', {
-  id: text('id').notNull().primaryKey(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  expiresAt: integer('expires_at').notNull(),
-});
+export const sessions = sqliteTable(
+  'sessions',
+  {
+    id: text('id').notNull().primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: integer('expires_at').notNull(),
+  },
+  (table) => ({
+    userIdx: index('sessions_user_idx').on(table.userId),
+  })
+);
 
 export const odometerEntries = sqliteTable(
   'odometer_entries',
@@ -334,6 +342,7 @@ export const odometerEntries = sqliteTable(
   },
   (table) => ({
     vehicleDateIdx: index('odometer_vehicle_date_idx').on(table.vehicleId, table.recordedAt),
+    userDateIdx: index('odometer_user_date_idx').on(table.userId, table.recordedAt),
   })
 );
 
@@ -361,6 +370,7 @@ export const trips = sqliteTable(
   },
   (table) => ({
     vehicleDateIdx: index('trips_vehicle_date_idx').on(table.vehicleId, table.tripDate),
+    userDateIdx: index('trips_user_date_idx').on(table.userId, table.tripDate),
   })
 );
 
@@ -412,6 +422,7 @@ export const photoRefs = sqliteTable(
   },
   (table) => ({
     photoProviderIdx: uniqueIndex('pr_photo_provider_idx').on(table.photoId, table.providerId),
+    providerStatusIdx: index('pr_provider_status_idx').on(table.providerId, table.status),
     pendingIdx: index('pr_pending_idx')
       .on(table.status, table.createdAt)
       .where(sql`${table.status} IN ('pending', 'failed') AND ${table.retryCount} < 3`),
