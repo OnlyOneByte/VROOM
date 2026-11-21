@@ -133,7 +133,7 @@ describe('AppPieChart', () => {
 
 	test('an error replaces the chart with the error message', async () => {
 		await mount({ error: 'Analytics unavailable' });
-		expect(screen.getByText('Failed to load chart')).toBeInTheDocument();
+		expect(screen.getByText("Couldn't load the chart")).toBeInTheDocument();
 		expect(screen.getByText('Analytics unavailable')).toBeInTheDocument();
 		expect(screen.queryByRole('list', { name: 'Categories' })).toBeNull();
 	});

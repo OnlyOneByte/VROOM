@@ -70,7 +70,7 @@
 			<div style="height: {placeholderHeight}px">
 				<EmptyState class="h-full">
 					{#snippet title()}
-						Failed to load chart
+						Couldn't load the chart
 					{/snippet}
 					{#snippet description()}
 						{error}
