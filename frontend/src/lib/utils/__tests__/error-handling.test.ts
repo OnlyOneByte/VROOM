@@ -89,6 +89,7 @@ describe('userFacingErrorMessage', () => {
 		const notNetwork = [
 			new ApiError('Internal server error', 500),
 			new ApiError('Bad gateway', 502),
+			new ApiError('Backup export timed out after 600000ms', 503, undefined, 'NETWORK_ERROR'),
 			new TypeError('Failed to fetch'),
 			new Error('Failed to fetch')
 		];

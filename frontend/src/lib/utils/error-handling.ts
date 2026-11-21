@@ -58,17 +58,17 @@ function isNetworkError(error: unknown): boolean {
 }
 
 const ERROR_CODE_MESSAGES: Record<string, string> = {
-	VALIDATION_ERROR: 'Please check your input and try again',
-	NOT_FOUND: 'The requested resource was not found',
-	UNAUTHORIZED: 'You need to be logged in to perform this action',
-	FORBIDDEN: 'You do not have permission to perform this action',
-	CONFLICT: 'This resource already exists or conflicts with existing data',
-	RATE_LIMIT_EXCEEDED: 'Too many requests. Please wait a moment and try again',
-	DATABASE_ERROR: 'A database error occurred. Please try again',
-	NETWORK_ERROR: 'Check your connection and try again',
-	AUTH_INVALID: 'Your session has expired. Please log in again',
-	SYNC_IN_PROGRESS: 'A sync operation is already in progress',
-	QUOTA_EXCEEDED: 'Storage quota exceeded',
+	VALIDATION_ERROR: 'Please check your input and try again.',
+	NOT_FOUND: 'The requested resource was not found.',
+	UNAUTHORIZED: 'You need to be logged in to perform this action.',
+	FORBIDDEN: 'You do not have permission to perform this action.',
+	CONFLICT: 'This resource already exists or conflicts with existing data.',
+	RATE_LIMIT_EXCEEDED: 'Too many requests. Please wait a moment and try again.',
+	DATABASE_ERROR: 'A database error occurred. Please try again.',
+	NETWORK_ERROR: 'Check your connection and try again.',
+	AUTH_INVALID: 'Your session has expired. Please log in again.',
+	SYNC_IN_PROGRESS: 'A sync operation is already in progress.',
+	QUOTA_EXCEEDED: 'Storage quota exceeded.',
 	PERMISSION_DENIED: 'Permission denied'
 };
 
@@ -91,10 +91,10 @@ function asSentence(text: string): string {
 export function userFacingErrorMessage(error: unknown): string {
 	if (isNetworkError(error)) return NETWORK_FAILURE_MESSAGE;
 	if (isVroomError(error)) {
-		const friendlyMessage = getUserFriendlyMessage(error.code);
-		if (friendlyMessage) return asSentence(friendlyMessage);
 		const status = error.statusCode ?? 0;
 		if (status >= 500) return SERVER_FAILURE_MESSAGE;
+		const friendlyMessage = getUserFriendlyMessage(error.code);
+		if (friendlyMessage) return asSentence(friendlyMessage);
 		if (status >= 400 && error.message && !STATUS_ONLY_MESSAGE.test(error.message)) {
 			return asSentence(error.message);
 		}
