@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ExpenseSummary } from '../api/expenses/repository';
+import { CONFIG } from '../config';
 import type { SplitConfig } from '../db/types';
 
 // Round before truncating: 12.34 * 100 is 1233.9999… in binary floating point.
@@ -118,4 +119,22 @@ export function expenseSummaryToApi(summary: ExpenseSummary): ExpenseSummary {
 // Refinements apply to the dollar value, so compose them before the cents transform.
 export function moneyDollarsToCents(build: (base: z.ZodNumber) => z.ZodNumber = (n) => n) {
   return build(z.number()).transform(dollarsToCents);
+}
+
+const CENT_TOLERANCE = 1e-6;
+const MAX_EXPENSE_AMOUNT = CONFIG.validation.expense.maxAmount;
+
+export function hasAtMostTwoDecimals(dollars: number): boolean {
+  return Math.abs(dollars * 100 - Math.round(dollars * 100)) < CENT_TOLERANCE;
+}
+
+export function expenseDollarsToCents(build: (base: z.ZodNumber) => z.ZodNumber = (n) => n) {
+  return moneyDollarsToCents((n) =>
+    build(n)
+      .max(
+        MAX_EXPENSE_AMOUNT,
+        `Amount must be ${MAX_EXPENSE_AMOUNT.toLocaleString('en-US')} or less`
+      )
+      .refine(hasAtMostTwoDecimals, 'Amount can have at most 2 decimal places')
+  );
 }

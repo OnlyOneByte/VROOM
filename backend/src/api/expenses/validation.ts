@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES, type SplitConfig } from '../../db/types';
-import { dollarsToCents } from '../../utils/money';
+import { expenseDollarsToCents } from '../../utils/money';
 import { dateInput } from '../../utils/validation';
 
 export const FUEL_SPLIT_MESSAGE = 'Fuel expenses cannot be split. Log the fill-up on one vehicle.';
@@ -31,7 +31,7 @@ export function clearFuelFieldsIfNotFuel<
   return { ...data, volume: null, fuelType: null, mileage: null, missedFillup: false };
 }
 
-const centsAmount = z.number().positive('Amount must be positive').transform(dollarsToCents);
+const centsAmount = expenseDollarsToCents((n) => n.positive('Amount must be positive'));
 
 const evenSplitSchema = z.object({
   method: z.literal('even'),
@@ -40,7 +40,7 @@ const evenSplitSchema = z.object({
 
 const absoluteAllocationSchema = z.object({
   vehicleId: z.string().min(1),
-  amount: z.number().min(0, 'Amount must be non-negative').transform(dollarsToCents),
+  amount: expenseDollarsToCents((n) => n.min(0, 'Amount must be non-negative')),
 });
 
 const absoluteSplitSchema = z.object({
