@@ -3,7 +3,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
 	import { vlmApi, type ReceiptDraft } from '#lib/services/vlm-api.ts';
-	import { ApiError } from '#lib/utils/error-handling.ts';
+	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
 	interface Props {
 		onDraft: (_draft: ReceiptDraft, _image: File) => void;
@@ -61,10 +61,9 @@
 					'No receipt-parsing provider is set up yet. Add one in Settings → Receipt Parsing.';
 			} else if (err instanceof ApiError && err.statusCode === 502) {
 				errorMessage =
-					'The AI provider could not be reached. Check the key/model, or fill it in manually.';
+					"Couldn't reach the AI provider. Check the key and model, or fill it in manually.";
 			} else {
-				errorMessage =
-					err instanceof Error ? err.message : 'Could not read the receipt. Fill it in manually.';
+				errorMessage = `Couldn't read the receipt. ${userFacingErrorMessage(err)} Or fill it in manually.`;
 			}
 		} finally {
 			isScanning = false;

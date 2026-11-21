@@ -155,10 +155,18 @@ describe('ReceiptScanButton: errors', () => {
 		[
 			'unreachable provider (502)',
 			new ApiError('Bad Gateway', 502),
-			'The AI provider could not be reached. Check the key/model, or fill it in manually.'
+			"Couldn't reach the AI provider. Check the key and model, or fill it in manually."
 		],
-		['other API', new ApiError('Image too blurry', 422), 'Image too blurry'],
-		['non-Error', 'weird', 'Could not read the receipt. Fill it in manually.']
+		[
+			'other API',
+			new ApiError('Image too blurry', 422),
+			"Couldn't read the receipt. Image too blurry. Or fill it in manually."
+		],
+		[
+			'non-Error',
+			'weird',
+			"Couldn't read the receipt. Something went wrong. Try again, and reload the page if it keeps happening. Or fill it in manually."
+		]
 	])('a %s failure explains what to do', async (_label, error, message) => {
 		parseReceipt.mockRejectedValue(error);
 		const { onDraft } = mount();
@@ -167,6 +175,17 @@ describe('ReceiptScanButton: errors', () => {
 
 		expect(await screen.findByTestId('receipt-scan-error')).toHaveTextContent(message);
 		expect(onDraft).not.toHaveBeenCalled();
+	});
+
+	test('a server failure hides the raw error text', async () => {
+		parseReceipt.mockRejectedValue(new ApiError('ECONNRESET upstream vlm worker', 500));
+		mount();
+
+		await pickReceipt();
+
+		const error = await screen.findByTestId('receipt-scan-error');
+		expect(error).toHaveTextContent("Couldn't read the receipt. Something went wrong on our side.");
+		expect(error).not.toHaveTextContent('ECONNRESET');
 	});
 
 	test('Try again re-scans the same image and clears the error on success', async () => {
