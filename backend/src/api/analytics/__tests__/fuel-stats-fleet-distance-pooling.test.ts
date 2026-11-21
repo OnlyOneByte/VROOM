@@ -560,6 +560,22 @@ describe('one vehicle with a short top-up: every average is total distance over 
     expect(stats.charging.efficiency.avgEfficiency).toBeCloseTo(130 / 42, 6);
   });
 
+  test('a missed fill-up skips only the interval ending at it, so the next interval still counts', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedExpense(testDb.sqlite, fill('a1', VEH_A.id, 10_000, 10, 5));
+    seedExpense(testDb.sqlite, { ...fill('a2', VEH_A.id, 10_300, 15, 10), missedFillup: true });
+    seedExpense(testDb.sqlite, fill('a3', VEH_A.id, 10_600, 10, 15));
+
+    const [quick, stats] = await Promise.all([
+      repo.getQuickStats(USER.id, rangeAll()),
+      repo.getFuelStats(USER.id, rangeAll()),
+    ]);
+    expect(quick.avgEfficiency).toBeCloseTo(30, 6);
+    expect(stats.fuelConsumption.avgEfficiency).toBeCloseTo(30, 6);
+    expect(stats.fuelConsumption.worstEfficiency).toBeCloseTo(30, 6);
+  });
+
   test('the vehicle radar ranks fuel efficiency by each vehicle’s pooled average', async () => {
     seedUser(testDb.sqlite, USER);
     seedVehicle(testDb.sqlite, VEH_A);

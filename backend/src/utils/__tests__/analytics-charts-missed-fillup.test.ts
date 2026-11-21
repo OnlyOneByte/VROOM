@@ -30,7 +30,7 @@ describe('buildFuelEfficiencyAndCost — missed-fill-up does not inflate monthly
       general({
         id: 'b',
         mileage: 10300,
-        volume: 10,
+        volume: 15,
         missedFillup: true,
         date: new Date(2024, 5, 10),
       }),
