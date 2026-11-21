@@ -19,9 +19,7 @@ describe('createSplitExpenseSchema category and description', () => {
   });
 
   test('rejects a category outside the known list', () => {
-    expect(createSplitExpenseSchema.safeParse({ ...base, category: 'snacks' }).success).toBe(
-      false
-    );
+    expect(createSplitExpenseSchema.safeParse({ ...base, category: 'snacks' }).success).toBe(false);
   });
 
   test('rejects fuel, which needs per-vehicle volume and mileage', () => {

@@ -118,11 +118,9 @@ function refineSplitConfig(
 export const createSplitExpenseSchema = z
   .object({
     splitConfig: splitConfigSchema,
-    category: z
-      .enum(EXPENSE_CATEGORIES)
-      .refine((category) => category !== 'fuel', {
-        message: 'Fuel expenses cannot be split. Log the fill-up on one vehicle.',
-      }),
+    category: z.enum(EXPENSE_CATEGORIES).refine((category) => category !== 'fuel', {
+      message: 'Fuel expenses cannot be split. Log the fill-up on one vehicle.',
+    }),
     tags: z.array(tagElementSchema).max(CONFIG.validation.expense.maxTags).optional(),
     date: z.coerce.date(),
     description: z
