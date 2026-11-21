@@ -141,7 +141,10 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 	'/': { anonymous: true, debt: [], ready: signInControl },
 	'/auth': { anonymous: true, debt: [], ready: signInControl },
 	'/dashboard': { debt: [], ready: pageHeading('Dashboard') },
-	'/expenses': { debt: [], ready: pageHeading('All Expenses') },
+	'/expenses': {
+		debt: [],
+		ready: page => page.getByText('$45.50').filter({ visible: true }).first()
+	},
 	'/expenses/new': { debt: [], ready: pageHeading('Add Expense') },
 	'/vehicles/new': { debt: [], ready: pageHeading('Add New Vehicle') },
 	'/analytics': { debt: [], ready: pageHeading('Analytics Dashboard') },
