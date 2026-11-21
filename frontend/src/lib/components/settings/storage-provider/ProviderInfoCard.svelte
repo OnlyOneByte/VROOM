@@ -165,7 +165,7 @@
 					<Icon class="h-5 w-5 text-muted-foreground" />
 				</div>
 				<div class="min-w-0">
-					<div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+					<div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 sm:flex-nowrap">
 						<p class="text-sm font-semibold truncate min-w-0">{provider.displayName}</p>
 						<Badge variant={getStatusVariant(provider.status)} class="text-xs shrink-0">
 							{getStatusLabel(provider.status)}
@@ -179,7 +179,7 @@
 					</p>
 				</div>
 			</div>
-			<div class="flex shrink-0 items-center gap-1 self-end sm:self-auto">
+			<div class="flex shrink-0 items-center gap-2 self-end sm:gap-1 sm:self-auto">
 				<Button
 					variant="ghost"
 					size="icon"
