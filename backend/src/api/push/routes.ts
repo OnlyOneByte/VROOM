@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { createErrorResponse, ValidationError } from '../../errors';
+import { ValidationError } from '../../errors';
 import { requireAuth } from '../../middleware';
 import { zValidator } from '../../utils/validation';
 import { isAllowedPushEndpoint } from './push-endpoint';
@@ -30,16 +30,13 @@ const unsubscribeSchema = z.object({
 
 routes.get('/vapid-public-key', (c) => {
   if (!CONFIG.push.enabled) {
-    return c.json(
-      createErrorResponse(
-        'PUSH_NOT_CONFIGURED',
-        'Push notifications are not configured on this server.'
-      ),
-      503
-    );
+    return c.json({ success: true, data: { enabled: false, publicKey: null } });
   }
   // The private VAPID key must never be returned.
-  return c.json({ success: true, data: { publicKey: CONFIG.push.vapidPublicKey } });
+  return c.json({
+    success: true,
+    data: { enabled: true, publicKey: CONFIG.push.vapidPublicKey },
+  });
 });
 
 routes.post('/subscribe', zValidator('json', subscribeSchema), async (c) => {
