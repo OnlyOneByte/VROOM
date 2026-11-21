@@ -170,7 +170,7 @@ function assertSingleExpenseEditAllowed(update: Record<string, unknown>, existin
   }
   if (existing.groupId && changed.some((field) => SPLIT_LEG_LOCKED_FIELDS.has(field))) {
     throw new ValidationError(
-      'This expense is part of a split. Change its amount, vehicles, date or category by editing the whole split.'
+      'This expense is part of a split, so its amount, vehicle, date and category are set for the whole split. Edit the split to change the amount or vehicles, or delete and re-create it to change the date or category.'
     );
   }
 }

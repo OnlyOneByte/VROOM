@@ -277,7 +277,7 @@ routes.put(
       vehicleIds: partialUpdate.vehicleIds ?? existing.vehicleIds,
     };
 
-    assertMergedReminderValid(merged);
+    assertMergedReminderValid(merged, partialUpdate);
 
     const { vehicleIds: mergedVehicleIds, ...reminderFields } = partialUpdate;
     const updateFields: Partial<NewReminder> = { ...reminderFields };
