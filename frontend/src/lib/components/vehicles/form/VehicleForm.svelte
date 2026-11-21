@@ -835,7 +835,7 @@
 									</div>
 								</div>
 								<Collapsible.Trigger
-									class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted hover:text-muted-foreground h-9 w-9"
+									class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted hover:text-muted-foreground size-10 shrink-0 sm:size-9"
 								>
 									<ChevronsUpDown class="h-4 w-4" />
 									<span class="sr-only">Toggle unit preferences</span>

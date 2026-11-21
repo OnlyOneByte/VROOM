@@ -89,7 +89,7 @@
 	<Button
 		type="button"
 		variant="outline"
-		class="w-full"
+		class="h-10 w-full sm:h-9"
 		onclick={onScanClick}
 		disabled={isScanning}
 		data-testid="receipt-scan-button"
@@ -112,7 +112,7 @@
 			{#if pendingFile}
 				<button
 					type="button"
-					class="self-start text-xs underline hover:text-foreground"
+					class="inline-flex min-h-10 items-center self-start text-xs underline hover:text-foreground sm:min-h-0"
 					onclick={retry}
 				>
 					Try again

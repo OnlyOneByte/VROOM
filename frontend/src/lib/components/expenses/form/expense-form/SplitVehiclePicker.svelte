@@ -32,7 +32,7 @@
 		<button
 			type="button"
 			onclick={onRemoveSplit}
-			class="text-xs text-muted-foreground underline hover:text-foreground"
+			class="inline-flex min-h-10 items-center text-xs text-muted-foreground underline hover:text-foreground sm:min-h-0"
 		>
 			Remove split
 		</button>
