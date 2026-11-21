@@ -59,9 +59,11 @@ describe('an orphaned photo row does not make backups unrestorable', () => {
 
     const preview = await restoreService.restoreFromBackup(ctx.user.id, zip, 'preview');
     expect(preview.preview?.photos).toBe(1);
+    expect(preview.skipped, 'the user is told before confirming').toEqual({ photos: 1 });
 
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(result.skipped).toEqual({ photos: 1 });
     expect(photoIds()).toEqual(['photo-car']);
   });
 
