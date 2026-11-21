@@ -518,12 +518,7 @@
 
 					<div class="space-y-2 border-t border-border pt-4">
 						<Label for="provider-root-path" class="text-sm">Provider root path</Label>
-						<Input
-							id="provider-root-path"
-							bind:value={providerRootPath}
-							placeholder="VROOM"
-							class="h-9"
-						/>
+						<Input id="provider-root-path" bind:value={providerRootPath} placeholder="VROOM" />
 						<p class="text-xs text-muted-foreground">
 							Top-level folder on the provider. All other paths are relative to this.
 						</p>

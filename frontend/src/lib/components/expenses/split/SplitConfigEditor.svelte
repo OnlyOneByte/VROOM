@@ -112,7 +112,7 @@
 								const target = e.currentTarget as HTMLInputElement;
 								updateAllocation(vehicle.id, 'amount', parseFloat(target.value) || 0);
 							}}
-							class="h-8 text-sm {absoluteError ? 'border-destructive' : ''}"
+							class="h-10 text-sm sm:h-8 {absoluteError ? 'border-destructive' : ''}"
 							aria-label="Amount for {vehicleLabel(vehicle)}"
 						/>
 					</div>
@@ -129,7 +129,7 @@
 								const target = e.currentTarget as HTMLInputElement;
 								updateAllocation(vehicle.id, 'percentage', parseFloat(target.value) || 0);
 							}}
-							class="h-8 text-sm {percentageError ? 'border-destructive' : ''}"
+							class="h-10 text-sm sm:h-8 {percentageError ? 'border-destructive' : ''}"
 							aria-label="Percentage for {vehicleLabel(vehicle)}"
 						/>
 						<span class="text-xs text-muted-foreground">%</span>

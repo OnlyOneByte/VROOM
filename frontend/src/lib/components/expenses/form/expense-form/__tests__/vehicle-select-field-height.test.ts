@@ -17,6 +17,8 @@ describe('VehicleSelectField height', () => {
 		const trigger = container.querySelector('#vehicle') as HTMLElement;
 		expect(trigger.classList.contains('data-[size=default]:h-10')).toBe(true);
 		expect(trigger.classList.contains('data-[size=default]:h-9')).toBe(false);
+		expect(trigger.classList.contains('sm:data-[size=default]:h-10')).toBe(true);
+		expect(trigger.classList.contains('sm:data-[size=default]:h-9')).toBe(false);
 		const split = container.querySelector('button[aria-label="Split cost across vehicles"]');
 		expect(split?.classList.contains('size-10')).toBe(true);
 	});
