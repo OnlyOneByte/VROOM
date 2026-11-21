@@ -313,7 +313,8 @@ automatically at startup; there is no manual migration step.
 **Databases created before `0000_baseline` cannot be upgraded in place.** Their migration history
 no longer matches the journal. To move one forward:
 
-1. In the old build, Settings → Storage Providers → **Download Backup** saves a ZIP.
+1. In the old build, Settings → Storage Providers → **Download Backup** saves a ZIP (builds from
+   before 2026-03-12 have the button on the **Data Backups** card).
 2. Stop the old build and move `vroom.db*` aside.
 3. Start the new build, which creates a fresh schema, and sign in with the same account. The fresh
    database gives you a new internal user id; restore re-owns every row to the signed-in account,
@@ -321,14 +322,16 @@ no longer matches the journal. To move one forward:
 4. Settings → Storage Providers: reconnect the same storage accounts you used before (the same
    Google account, or the same S3 endpoint and bucket).
 5. Settings → Storage Providers → **Restore** → **Upload file**: pick the ZIP, check the preview
-   counts, then restore in **Replace** mode.
+   counts, then restore with **Replace All**.
 
 Keep the old file until the restore is verified. What happens to links into the old database:
 
 - **Photos**: each photo is re-linked to the reconnected provider for the same storage account, so
   it displays again. Photos whose storage account isn't connected when you restore stay
-  unlinked; their files are still in that storage. Backups made before this release and Google
-  Sheets restores carry no storage account details, so they don't re-link.
+  unlinked; their files are still in that storage. Google Drive only lets an app open files that
+  same app created, so Drive photos display again only when the new instance uses the same Google
+  OAuth client ID. Backups made before this release and Google Sheets restores carry no storage
+  account details, so they don't re-link.
 - **Vehicle shares**: re-invite people once they have signed in to the new instance.
 - **Backup and photo storage settings**: set them up again for the reconnected providers.
   Settings you already made for a provider on the new instance are kept.
