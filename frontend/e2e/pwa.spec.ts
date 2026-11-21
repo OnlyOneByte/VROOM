@@ -136,6 +136,7 @@ interface A11yRoute {
 const signInControl = (page: Page) =>
 	page.getByRole('button', { name: /Sign In|Continue with/i }).first();
 const pageHeading = (name: string) => (page: Page) => page.getByRole('heading', { name }).first();
+const expiredPolicy = (page: Page) => page.getByText('Policy #SF-1001').first();
 
 const A11Y_ROUTES: Record<string, A11yRoute> = {
 	'/': { anonymous: true, debt: [], ready: signInControl },
@@ -147,8 +148,9 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 	},
 	'/expenses/new': { debt: [], ready: pageHeading('Add Expense') },
 	'/vehicles/new': { debt: [], ready: pageHeading('Add New Vehicle') },
+	'/vehicles/vehicle-camry': { debt: [], ready: expiredPolicy },
 	'/analytics': { debt: [], ready: pageHeading('Analytics Dashboard') },
-	'/insurance': { debt: [], ready: pageHeading('Insurance') },
+	'/insurance': { debt: [], ready: expiredPolicy },
 	'/reminders': { debt: [], ready: pageHeading('Reminders') },
 	'/trips': { debt: [], ready: pageHeading('Trips') },
 	'/settings': { debt: [], ready: pageHeading('Settings') },

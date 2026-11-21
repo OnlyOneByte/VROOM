@@ -60,7 +60,7 @@
 	}
 </script>
 
-<Card class={isPolicyInForce(policy) ? '' : 'opacity-70'}>
+<Card class={isPolicyInForce(policy) ? '' : 'bg-muted/30'}>
 	<CardContent class="p-4">
 		<div class="flex items-center justify-between gap-2">
 			<div class="flex items-center gap-2.5 min-w-0">
