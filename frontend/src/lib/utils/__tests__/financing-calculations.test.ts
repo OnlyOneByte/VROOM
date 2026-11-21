@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Expense, VehicleFinancing } from '#lib/types/index.ts';
 import {
+	annuityPayment,
 	calculateAmortizationSchedule,
 	calculateDaysUntil,
 	calculateExtraPaymentImpact,
@@ -571,6 +572,16 @@ describe('calculateMinimumPayment', () => {
 		['zero term', { termMonths: 0 }]
 	])('returns null for %s', (_label, overrides) => {
 		expect(calculateMinimumPayment(makeLoan(overrides))).toBeNull();
+	});
+});
+
+describe('annuityPayment', () => {
+	test('returns the unrounded annuity payment', () => {
+		expect(annuityPayment(20_000, 6, 60)).toBeCloseTo(386.6560306, 6);
+	});
+
+	test('divides the principal evenly at zero apr', () => {
+		expect(annuityPayment(12_000, 0, 48)).toBe(250);
 	});
 });
 
