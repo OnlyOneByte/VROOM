@@ -30,7 +30,7 @@
 	<Card.Header>
 		<div class="flex items-center justify-between">
 			<div>
-				<Card.Title>Upcoming Reminders</Card.Title>
+				<Card.Title level={2}>Upcoming Reminders</Card.Title>
 				<Card.Description>Recurring expenses and maintenance due soon</Card.Description>
 			</div>
 			<div class="p-2 rounded-lg bg-accent">

@@ -119,7 +119,7 @@
 	<div class="space-y-3">
 		<div class="flex items-center gap-2">
 			<Gauge class="h-5 w-5" />
-			<h3 class="text-lg font-semibold">Mileage & Fuel Statistics</h3>
+			<h2 class="text-lg font-semibold">Mileage & Fuel Statistics</h2>
 		</div>
 		<StatCardGrid
 			items={isLoadingStats ? Array(3).fill({ label: '', value: '' }) : statItems}

@@ -21,7 +21,7 @@
 	<Card.Header>
 		<div class="flex items-center justify-between">
 			<div>
-				<Card.Title>Recurring Costs</Card.Title>
+				<Card.Title level={2}>Recurring Costs</Card.Title>
 				<Card.Description>Monthly run-rate from your recurring expenses</Card.Description>
 			</div>
 			<div class="p-2 rounded-lg bg-accent">

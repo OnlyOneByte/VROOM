@@ -231,6 +231,21 @@ describe('vehicle detail page overview', () => {
 		);
 	});
 
+	test('the overview headings go in order from the page h1', async () => {
+		await mount();
+
+		const levels = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'), h =>
+			Number(h.tagName[1])
+		);
+		expect(levels[0]).toBe(1);
+		levels.forEach((level, i) => {
+			if (i > 0) expect(level - (levels[i - 1] ?? 1)).toBeLessThanOrEqual(1);
+		});
+		expect(
+			screen.getByRole('heading', { level: 2, name: /Vehicle Information/ })
+		).toBeInTheDocument();
+	});
+
 	test('without a nickname the title is year, make and model', async () => {
 		getVehicle.mockResolvedValue({ ...VEHICLE, nickname: null });
 		await mount();
