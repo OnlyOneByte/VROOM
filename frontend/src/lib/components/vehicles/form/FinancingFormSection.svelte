@@ -299,10 +299,13 @@
 									</p>
 								</div>
 								<div>
-									<p class="text-muted-foreground">Amount Paid</p>
+									<p class="text-muted-foreground">Principal Paid</p>
 									<p class="font-semibold text-lg">
 										{formatCurrency(
-											vehicle.financing.originalAmount - (vehicle.financing.computedBalance ?? 0)
+											Math.max(
+												0,
+												vehicle.financing.originalAmount - (vehicle.financing.computedBalance ?? 0)
+											)
 										)}
 									</p>
 								</div>

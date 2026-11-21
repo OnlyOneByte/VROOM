@@ -48,7 +48,7 @@ async function getBalance(vehicleId: string): Promise<number> {
 }
 
 describe('financing-sourced split expense balance round-trip', () => {
-  test('a financing-sourced split REDUCES the displayed balance by the split total', async () => {
+  test('a financing-sourced split is applied to the displayed balance as a loan payment', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const financingId = await seedFinancing(vehicleId, 20000);
 
@@ -65,7 +65,7 @@ describe('financing-sourced split expense balance round-trip', () => {
     const body = await json<DataEnvelope<SplitData>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
 
-    expect(await getBalance(vehicleId)).toBe(19600);
+    expect(await getBalance(vehicleId)).toBe(19683.33);
   });
 
   test('reallocating the split (PUT /split, same financed vehicle) keeps attribution correct', async () => {
@@ -82,7 +82,7 @@ describe('financing-sourced split expense balance round-trip', () => {
     });
     const created = await json<DataEnvelope<SplitData>>(createRes);
     expect(createRes.status, JSON.stringify(created)).toBe(201);
-    expect(await getBalance(vehicleId)).toBe(19600);
+    expect(await getBalance(vehicleId)).toBe(19683.33);
 
     const putRes = await ctx.authed('PUT', `/api/v1/expenses/split/${created.data.groupId}`, {
       splitConfig: { method: 'even', vehicleIds: [vehicleId] },
@@ -90,7 +90,7 @@ describe('financing-sourced split expense balance round-trip', () => {
     });
     expect(putRes.status, await putRes.clone().text()).toBe(200);
 
-    expect(await getBalance(vehicleId)).toBe(19500);
+    expect(await getBalance(vehicleId)).toBe(19583.33);
   });
 
   test('a SOURCE-LESS split does NOT touch the financing balance', async () => {
