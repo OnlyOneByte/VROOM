@@ -12,8 +12,6 @@
 	import PWAInstallPrompt from '#lib/components/layout/PWAInstallPrompt.svelte';
 	import { syncConflicts } from '#lib/utils/sync/sync-state.svelte.ts';
 	import { pwaInfo } from 'virtual:pwa-info';
-	import { loadOfflineExpenses } from '#lib/utils/offline-storage.ts';
-	import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 	import '../app.css';
 	// Theme overrides must load after app.css, or non-default themes flash the default palette.
 	import '#lib/theme/themes.css';
@@ -63,7 +61,6 @@
 	onMount(async () => {
 		themeStore.initialize();
 		authStore.initialize();
-		offlineExpenseQueue.current = loadOfflineExpenses();
 
 		if (pwaInfo) {
 			const pwaRegister: typeof import('virtual:pwa-register') =
