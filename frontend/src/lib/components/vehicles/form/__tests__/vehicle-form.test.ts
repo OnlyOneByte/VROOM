@@ -622,6 +622,38 @@ describe('VehicleForm financing on create', () => {
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
 	});
 
+	test('a new 0% APR loan saves the principal split evenly over the term', async () => {
+		createVehicle.mockResolvedValue({ ...EXISTING, id: 'new-1' });
+		createFinancing.mockResolvedValue({ ...LOAN, vehicleId: 'new-1' });
+		await renderCreate();
+		await fillRequired();
+		await fireEvent.click(screen.getByRole('button', { name: 'Finance' }));
+		await type('provider', 'Honda Financial');
+		await type('originalAmount', '30000');
+		await type('apr', '0');
+		await pickStartDate('2026-06-01');
+
+		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+
+		await vi.waitFor(() => expect(createFinancing).toHaveBeenCalledTimes(1));
+		expect(createdFinancing()).toMatchObject({ apr: 0, paymentAmount: 500 });
+	});
+
+	test('a loan with the APR cleared is not saved', async () => {
+		await renderCreate();
+		await fillRequired();
+		await fireEvent.click(screen.getByRole('button', { name: 'Finance' }));
+		await type('provider', 'Chase');
+		await type('originalAmount', '30000');
+		await type('apr', '');
+		await pickStartDate('2026-06-01');
+
+		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+
+		expect(errorText('apr')).toBe('APR is required');
+		expect(createVehicle).not.toHaveBeenCalled();
+	});
+
 	test('a financed vehicle missing lender and start date is not saved', async () => {
 		await renderCreate();
 		await fillRequired();

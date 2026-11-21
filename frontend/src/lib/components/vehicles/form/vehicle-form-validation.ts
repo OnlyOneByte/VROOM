@@ -62,7 +62,9 @@ export function validateFinancingFields(
 	}
 
 	if (financingForm.financingType === 'loan') {
-		if (financingForm.apr < 0 || financingForm.apr > 50) {
+		if (!Number.isFinite(financingForm.apr)) {
+			errors['apr'] = 'APR is required';
+		} else if (financingForm.apr < 0 || financingForm.apr > 50) {
 			errors['apr'] = 'APR must be between 0% and 50%';
 		}
 	}
