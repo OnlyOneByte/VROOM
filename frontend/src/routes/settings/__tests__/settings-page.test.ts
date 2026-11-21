@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type { User, UserProviderInfo, UserSettings } from '#lib/types/index.ts';
 import { fakeSettingsState, settingsStoreFake } from './settings-store-fake.svelte.ts';
+import { toast } from 'svelte-sonner';
+import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 const { showError, showSuccess, getProviders, fetchLastSyncTime } = vi.hoisted(() => ({
 	showError: vi.fn<(message: string) => void>(),
@@ -27,7 +29,7 @@ vi.mock('#lib/utils/sync/sync-manager.ts', () => ({
 	fetchLastSyncTime: () => fetchLastSyncTime()
 }));
 vi.mock('svelte-sonner', () => ({
-	toast: { loading: vi.fn(), error: vi.fn(), info: vi.fn(), success: vi.fn() }
+	toast: { loading: vi.fn(), error: vi.fn(), info: vi.fn(), success: vi.fn(), dismiss: vi.fn() }
 }));
 
 const { stub } = vi.hoisted(() => ({
@@ -138,18 +140,18 @@ describe('Settings page loading', () => {
 
 	test('a load failure shows the error and retry reloads everything', async () => {
 		settingsStoreFake.load.mockImplementationOnce(async () => {
-			fakeSettingsState.error = 'Server unavailable';
+			fakeSettingsState.error = SERVER_FAILURE_MESSAGE;
 		});
 		await mount();
-		expect(screen.getByText('Failed to load settings')).toBeInTheDocument();
-		expect(screen.getByText('Server unavailable')).toBeInTheDocument();
+		expect(screen.getByText("Couldn't load settings")).toBeInTheDocument();
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: /Save Settings/ })).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
 		expect(settingsStoreFake.load).toHaveBeenCalledTimes(2);
 		expect(getProviders).toHaveBeenCalledTimes(2);
-		expect(screen.queryByText('Failed to load settings')).toBeNull();
+		expect(screen.queryByText("Couldn't load settings")).toBeNull();
 		expect(screen.getByRole('button', { name: /Save Settings/ })).toBeInTheDocument();
 	});
 
@@ -250,10 +252,10 @@ describe('Settings page preferences', () => {
 	});
 
 	test('a save failure reports an error', async () => {
-		settingsStoreFake.update.mockRejectedValue(new Error('500'));
+		settingsStoreFake.update.mockRejectedValue(new ApiError('SQLITE_BUSY', 500));
 		await mount();
 		await save();
-		expect(showError).toHaveBeenCalledWith('Failed to save settings');
+		expect(showError).toHaveBeenCalledWith(`Couldn't save settings. ${SERVER_FAILURE_MESSAGE}`);
 		expect(showSuccess).not.toHaveBeenCalled();
 		expect(screen.getByRole('button', { name: /Save Settings/ })).not.toBeDisabled();
 	});
@@ -263,5 +265,35 @@ describe('Settings page preferences', () => {
 		await mount();
 		await save();
 		expect(screen.getByRole('button', { name: /Saving/ })).toBeDisabled();
+	});
+});
+
+describe('Settings page backups', () => {
+	test.each([
+		[
+			new ApiError('A backup is already in progress', 409, undefined, 'BACKUP_IN_PROGRESS'),
+			"Couldn't back up. A backup is already running. Try again once it finishes."
+		],
+		[
+			new ApiError('ENOSPC: no space left on device', 500),
+			`Couldn't back up. ${SERVER_FAILURE_MESSAGE}`
+		]
+	])('a failed backup explains %s in a plain sentence', async (error, message) => {
+		settingsStoreFake.executeSync.mockRejectedValue(error);
+		await mount();
+		await fireEvent.click(screen.getByRole('button', { name: 'stub sync' }));
+		await settle();
+		expect(toast.dismiss).toHaveBeenCalled();
+		expect(showError).toHaveBeenCalledWith(message);
+	});
+
+	test('a failed download explains why', async () => {
+		settingsStoreFake.downloadBackup.mockRejectedValue(new ApiError('zip stream broke', 500));
+		await mount();
+		await fireEvent.click(screen.getByRole('button', { name: 'stub download' }));
+		await settle();
+		expect(showError).toHaveBeenCalledWith(
+			`Couldn't download the backup. ${SERVER_FAILURE_MESSAGE}`
+		);
 	});
 });

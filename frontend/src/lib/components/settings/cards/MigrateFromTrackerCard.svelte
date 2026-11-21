@@ -15,7 +15,10 @@
 	import { expenseApi, type ExpenseImportResult } from '#lib/services/expense-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
-	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import {
+		handleErrorWithNotification,
+		userFacingErrorMessage
+	} from '#lib/utils/error-handling.ts';
 	import type { ImportColumnMapping, Vehicle } from '#lib/types/index.ts';
 
 	const TRACKER_LABEL = 'Fuelio';
@@ -44,7 +47,7 @@
 			vehicles = await vehicleApi.getVehicles();
 			if (vehicles.length === 1 && vehicles[0]) targetVehicleId = vehicles[0].id;
 		} catch (e) {
-			loadError = e instanceof Error ? e.message : 'Failed to load vehicles';
+			loadError = `Couldn't load your vehicles. ${userFacingErrorMessage(e)}`;
 		} finally {
 			isLoading = false;
 		}
@@ -76,7 +79,7 @@
 			if (seq === previewSeq) preview = result;
 		} catch (err) {
 			if (seq === previewSeq) {
-				handleErrorWithNotification(err, `Could not read that ${TRACKER_LABEL} file`);
+				handleErrorWithNotification(err, `Couldn't read that ${TRACKER_LABEL} file`);
 			}
 		} finally {
 			if (seq === previewSeq) isPreviewing = false;
@@ -110,7 +113,7 @@
 			);
 			dialogOpen = false;
 		} catch (err) {
-			handleErrorWithNotification(err, `Failed to migrate from ${TRACKER_LABEL}`);
+			handleErrorWithNotification(err, `Couldn't migrate from ${TRACKER_LABEL}`);
 		} finally {
 			isImporting = false;
 		}

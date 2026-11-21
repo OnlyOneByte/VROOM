@@ -1,6 +1,6 @@
 import { browser } from '$app/env';
 import { pushApi, type PushSubscribeInput } from '#lib/services/push-api.ts';
-import { ApiError } from '#lib/utils/error-handling.ts';
+import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
 export type PushStatus = 'unsupported' | 'unconfigured' | 'denied' | 'subscribed' | 'off' | 'error';
 
@@ -31,7 +31,7 @@ export function pushStatusLabel(status: PushStatus): string {
 		case 'off':
 			return 'Off — turn on to get a notification when a reminder comes due.';
 		case 'error':
-			return 'Could not check notification status. Try again.';
+			return "Couldn't check notification status. Try again.";
 	}
 }
 
@@ -107,7 +107,7 @@ export async function enablePush(): Promise<PushEnableOutcome> {
 		if (e instanceof ApiError && e.code === 'PUSH_NOT_CONFIGURED') {
 			return { ok: false, reason: 'unconfigured' };
 		}
-		return { ok: false, reason: 'error', message: e instanceof Error ? e.message : undefined };
+		return { ok: false, reason: 'error', message: userFacingErrorMessage(e) };
 	}
 }
 
