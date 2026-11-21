@@ -70,14 +70,16 @@ import { FinancingRepository } from '../financing/repository';
 export type { FuelEfficiencyPoint } from '../../utils/analytics-charts';
 
 export function monthsOwnedInYear(ownershipStart: Date, now: Date, year: number): number {
-  const yearStartMonth = ownershipStart.getFullYear() < year ? 0 : ownershipStart.getMonth();
-  const yearEndMonth = now.getFullYear() > year ? 11 : now.getMonth();
-  if (ownershipStart.getFullYear() > year || now.getFullYear() < year) return 0;
+  const yearStartMonth = ownershipStart.getUTCFullYear() < year ? 0 : ownershipStart.getUTCMonth();
+  const yearEndMonth = now.getUTCFullYear() > year ? 11 : now.getUTCMonth();
+  if (ownershipStart.getUTCFullYear() > year || now.getUTCFullYear() < year) return 0;
   return Math.max(0, yearEndMonth - yearStartMonth + 1);
 }
 
 export function monthsBetween(from: Date, to: Date): number {
-  return (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+  return (
+    (to.getUTCFullYear() - from.getUTCFullYear()) * 12 + (to.getUTCMonth() - from.getUTCMonth())
+  );
 }
 
 export function toDate(value: Date | number | string): Date {
@@ -85,7 +87,7 @@ export function toDate(value: Date | number | string): Date {
 }
 
 export function calendarYearRange(year: number): { start: Date; end: Date } {
-  return { start: new Date(year, 0, 1), end: new Date(year + 1, 0, 1) };
+  return { start: new Date(Date.UTC(year, 0, 1)), end: new Date(Date.UTC(year + 1, 0, 1)) };
 }
 
 interface FleetUnitConverter extends RadarUnitConverters {
@@ -542,14 +544,14 @@ export class AnalyticsRepository {
       const d = normalizeDate(row.date);
       if (!d) continue;
       if (!isFillup(row)) continue;
-      const season = SEASON_MAP[d.getMonth()] ?? 'Winter';
+      const season = SEASON_MAP[d.getUTCMonth()] ?? 'Winter';
       const entry = seasonData.get(season) ?? { effSum: 0, effCount: 0, fillupCount: 0 };
       entry.fillupCount++;
       seasonData.set(season, entry);
     }
 
     for (const { efficiency, date } of this.gasEfficiencyPoints(fuelRows, convert)) {
-      const season = SEASON_MAP[new Date(date).getMonth()] ?? 'Winter';
+      const season = SEASON_MAP[new Date(date).getUTCMonth()] ?? 'Winter';
       const entry = seasonData.get(season);
       if (entry) {
         entry.effSum += efficiency;
@@ -577,7 +579,7 @@ export class AnalyticsRepository {
       const d = normalizeDate(row.date);
       if (!d) continue;
       if (!isFillup(row)) continue;
-      const dayName = DAY_NAMES[d.getDay()] ?? 'Sunday';
+      const dayName = DAY_NAMES[d.getUTCDay()] ?? 'Sunday';
       const entry = dayData.get(dayName) ?? { count: 0, totalCost: 0, totalVolume: 0 };
       entry.count++;
       entry.totalCost += row.expenseAmount;
@@ -929,7 +931,9 @@ export class AnalyticsRepository {
     );
     const timeline: FinancingData['monthlyTimeline'] = [];
     for (let m = 0; m < Math.min(maxMonths, 24); m++) {
-      const monthKey = toMonthKey(new Date(now.getFullYear(), now.getMonth() + m, 1));
+      const monthKey = toMonthKey(
+        new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + m, 1))
+      );
       const monthVehicles = vehicleDetails
         .filter((d) => d.monthsRemaining > m && d.monthlyPayment > 0)
         .map((d) => ({
@@ -964,7 +968,7 @@ export class AnalyticsRepository {
       paymentAmount: loan.paymentAmount,
     }));
     const monthKeys = Array.from({ length: 12 }, (_, m) =>
-      toMonthKey(new Date(now.getFullYear(), now.getMonth() + m, 1))
+      toMonthKey(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + m, 1)))
     );
 
     return buildAmortizationSchedule(loans, monthKeys);
@@ -1081,7 +1085,9 @@ export class AnalyticsRepository {
     const start = toDate(term.startDate);
     const months = termBillingMonths(start, toDate(term.endDate));
     for (let i = 0; i < months; i++) {
-      const key = toMonthKey(new Date(start.getFullYear(), start.getMonth() + i, 1));
+      const key = toMonthKey(
+        new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i, 1))
+      );
       monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + monthlyPremium);
     }
   }
@@ -1330,8 +1336,8 @@ export class AnalyticsRepository {
     convert: FleetUnitConverter
   ): FuelStatsData {
     const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+    const currentMonth = now.getUTCMonth();
+    const currentYear = now.getUTCFullYear();
     const rangeStartDate = new Date(range.start * 1000);
     const rangeEndDate = new Date(range.end * 1000);
 
@@ -1341,11 +1347,11 @@ export class AnalyticsRepository {
     const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
     const inCurrentMonth = (r: FuelExpenseRow) => {
       const d = toDate(r.date ?? 0);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      return d.getUTCMonth() === currentMonth && d.getUTCFullYear() === currentYear;
     };
     const inPrevMonth = (r: FuelExpenseRow) => {
       const d = toDate(r.date ?? 0);
-      return d.getMonth() === prevMonth && d.getFullYear() === prevMonthYear;
+      return d.getUTCMonth() === prevMonth && d.getUTCFullYear() === prevMonthYear;
     };
     const currentMonthFillups = fuelRows.filter((r) => isFillup(r) && inCurrentMonth(r)).length;
     const prevMonthFillups = fuelRows.filter((r) => isFillup(r) && inPrevMonth(r)).length;

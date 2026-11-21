@@ -30,7 +30,7 @@ function fillup(id: string, year: number, month: number, volume: number): TestEx
     vehicleId: VEHICLE.id,
     category: 'fuel',
     expenseAmount: 50,
-    date: new Date(year, month, 1, 0, 0, 0),
+    date: new Date(Date.UTC(year, month, 1, 0, 0, 0)),
     mileage: null,
     volume,
     fuelType: 'Regular',
@@ -40,7 +40,7 @@ function fillup(id: string, year: number, month: number, volume: number): TestEx
 
 function rangeFrom(startYear: number) {
   return {
-    start: Math.floor(new Date(startYear, 0, 1).getTime() / 1000),
+    start: Math.floor(new Date(Date.UTC(startYear, 0, 1)).getTime() / 1000),
     end: Math.floor(Date.now() / 1000) + 86_400,
   };
 }
@@ -48,8 +48,8 @@ function rangeFrom(startYear: number) {
 describe('fuel-stats This/Last Month are calendar months (year-scoped)', () => {
   test('a prior-year same-month fillup does NOT contaminate "This Month"', async () => {
     const now = new Date();
-    const curMonth = now.getMonth();
-    const curYear = now.getFullYear();
+    const curMonth = now.getUTCMonth();
+    const curYear = now.getUTCFullYear();
 
     seedUser(testDb.sqlite, USER);
     seedVehicle(testDb.sqlite, VEHICLE);
@@ -67,8 +67,8 @@ describe('fuel-stats This/Last Month are calendar months (year-scoped)', () => {
 
   test('"Last Month" rolls into the previous YEAR when now is January', async () => {
     const now = new Date();
-    const curMonth = now.getMonth();
-    const curYear = now.getFullYear();
+    const curMonth = now.getUTCMonth();
+    const curYear = now.getUTCFullYear();
 
     const prevMonth = curMonth === 0 ? 11 : curMonth - 1;
     const prevMonthYear = curMonth === 0 ? curYear - 1 : curYear;

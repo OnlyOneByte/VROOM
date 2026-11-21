@@ -456,3 +456,32 @@ describe('getInsurance — response shape matches the frontend contract', () => 
     expect(Object.keys(result.monthlyPremiumTrend[0]).sort()).toEqual(['month', 'premiums'].sort());
   });
 });
+
+describe('getInsurance — month buckets do not depend on the server timezone', () => {
+  const originalTz = process.env.TZ;
+  afterEach(() => {
+    process.env.TZ = originalTz;
+  });
+
+  for (const tz of ['America/Los_Angeles', 'Pacific/Auckland']) {
+    test(`a Jan–Mar term charts Jan, Feb and Mar with TZ=${tz}`, async () => {
+      process.env.TZ = tz;
+      policy('p1', 'GEICO');
+      termSeconds({
+        id: 't1',
+        policyId: 'p1',
+        startMs: Date.UTC(2024, 0, 1),
+        endMs: Date.UTC(2024, 2, 31),
+        monthlyCost: 100,
+      });
+      seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+
+      const result = await repo.getInsurance(USER);
+      expect(result.monthlyPremiumTrend.map((p) => p.month)).toEqual([
+        '2024-01',
+        '2024-02',
+        '2024-03',
+      ]);
+    });
+  }
+});

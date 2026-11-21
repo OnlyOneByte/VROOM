@@ -76,7 +76,7 @@ function seedFinancingForVehicles(vList: TestVehicle[], count: number): void {
       originalAmount: 30000,
       apr: i % 2 === 0 ? 5.5 : null,
       termMonths: 60,
-      startDate: new Date(2023, 0, 1),
+      startDate: new Date(Date.UTC(2023, 0, 1)),
       paymentAmount: 500,
       isActive: true,
     };
@@ -237,8 +237,8 @@ describe('fleet fuel-efficiency trend never pairs across vehicles', () => {
   test('two cars with CLOSE odometers + interleaved dates produce NO cross-vehicle phantom point', async () => {
     const { userId } = setupUserAndVehicles(2);
     const [v0, v1] = ['vehicle-user-1-0', 'vehicle-user-1-1'];
-    seedFuel(v0, 'f-v0', new Date(2024, 0, 1), 12_000, 10);
-    seedFuel(v1, 'f-v1', new Date(2024, 0, 8), 12_100, 10);
+    seedFuel(v0, 'f-v0', new Date(Date.UTC(2024, 0, 1)), 12_000, 10);
+    seedFuel(v1, 'f-v1', new Date(Date.UTC(2024, 0, 8)), 12_100, 10);
 
     const trend = await repo.getFuelEfficiencyTrend(userId);
     expect(trend).toEqual([]);
@@ -247,10 +247,10 @@ describe('fleet fuel-efficiency trend never pairs across vehicles', () => {
   test('each vehicle still gets its OWN valid trend points (per-vehicle pairing preserved)', async () => {
     const { userId } = setupUserAndVehicles(2);
     const [v0, v1] = ['vehicle-user-1-0', 'vehicle-user-1-1'];
-    seedFuel(v0, 'f-v0-a', new Date(2024, 0, 1), 10_000, 10);
-    seedFuel(v1, 'f-v1-a', new Date(2024, 0, 3), 50_000, 10);
-    seedFuel(v0, 'f-v0-b', new Date(2024, 0, 5), 10_300, 10);
-    seedFuel(v1, 'f-v1-b', new Date(2024, 0, 7), 50_250, 10);
+    seedFuel(v0, 'f-v0-a', new Date(Date.UTC(2024, 0, 1)), 10_000, 10);
+    seedFuel(v1, 'f-v1-a', new Date(Date.UTC(2024, 0, 3)), 50_000, 10);
+    seedFuel(v0, 'f-v0-b', new Date(Date.UTC(2024, 0, 5)), 10_300, 10);
+    seedFuel(v1, 'f-v1-b', new Date(Date.UTC(2024, 0, 7)), 50_250, 10);
 
     const trend = await repo.getFuelEfficiencyTrend(userId);
     expect(trend.length).toBe(2);
@@ -262,8 +262,8 @@ describe('fleet fuel-efficiency trend never pairs across vehicles', () => {
   test('scoping to a single vehicleId is unaffected (per-vehicle path unchanged)', async () => {
     const { userId } = setupUserAndVehicles(2);
     const v0 = 'vehicle-user-1-0';
-    seedFuel(v0, 'f-v0-a', new Date(2024, 0, 1), 10_000, 10);
-    seedFuel(v0, 'f-v0-b', new Date(2024, 0, 5), 10_300, 10);
+    seedFuel(v0, 'f-v0-a', new Date(Date.UTC(2024, 0, 1)), 10_000, 10);
+    seedFuel(v0, 'f-v0-b', new Date(Date.UTC(2024, 0, 5)), 10_300, 10);
 
     const trend = await repo.getFuelEfficiencyTrend(userId, v0);
     expect(trend.length).toBe(1);
@@ -273,10 +273,10 @@ describe('fleet fuel-efficiency trend never pairs across vehicles', () => {
   test('a plug-in hybrid efficiency trend excludes its CHARGE sessions (gas MPG only)', async () => {
     const { userId } = setupUserAndVehicles(1);
     const v0 = 'vehicle-user-1-0';
-    seedFuel(v0, 'g-1', new Date(2024, 0, 1), 10_000, 10);
-    seedFuel(v0, 'g-2', new Date(2024, 0, 5), 10_300, 10);
-    seedCharge(v0, 'c-1', new Date(2024, 0, 10), 20_000, 15);
-    seedCharge(v0, 'c-2', new Date(2024, 0, 15), 20_060, 15);
+    seedFuel(v0, 'g-1', new Date(Date.UTC(2024, 0, 1)), 10_000, 10);
+    seedFuel(v0, 'g-2', new Date(Date.UTC(2024, 0, 5)), 10_300, 10);
+    seedCharge(v0, 'c-1', new Date(Date.UTC(2024, 0, 10)), 20_000, 15);
+    seedCharge(v0, 'c-2', new Date(Date.UTC(2024, 0, 15)), 20_060, 15);
 
     const trend = await repo.getFuelEfficiencyTrend(userId);
     expect(trend.length).toBe(1);
@@ -291,10 +291,10 @@ describe('fleet fuel-efficiency trend never pairs across vehicles', () => {
       JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
       v0,
     ]);
-    seedFuel(v0, 'g-1', new Date(2024, 0, 1), 10_000, 10);
-    seedFuel(v0, 'g-2', new Date(2024, 0, 5), 10_300, 10);
-    seedCharge(v0, 'c-1', new Date(2024, 0, 10), 20_000, 15);
-    seedCharge(v0, 'c-2', new Date(2024, 0, 15), 20_060, 15);
+    seedFuel(v0, 'g-1', new Date(Date.UTC(2024, 0, 1)), 10_000, 10);
+    seedFuel(v0, 'g-2', new Date(Date.UTC(2024, 0, 5)), 10_300, 10);
+    seedCharge(v0, 'c-1', new Date(Date.UTC(2024, 0, 10)), 20_000, 15);
+    seedCharge(v0, 'c-2', new Date(Date.UTC(2024, 0, 15)), 20_060, 15);
 
     const stats = await repo.getQuickStats(userId, yearToRange(TEST_YEAR));
     const expectedGasMpg = (30 / 1.609344) * 3.785411784;
