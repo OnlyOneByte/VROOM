@@ -4,8 +4,8 @@ Svelte 5 component mechanics for this project. Not repeated here — defer to:
 **MainSteering.md** "Svelte 5 Runes Mode" for runes, the no-`$effect`-for-async-data-loading rule,
 forbidden syntax (`$:`, `on:`, `|modifier`, `$app/stores`, directives on components) and
 "Navigation" for routing (`resolve()` / `#lib/routes`), then "UI Components" for icon imports;
-**DesignSystem.md** for the component inventory, import paths, tokens and spacing;
-**UIQuality.md** for the four-states bar.
+**DesignSystem.md** for the component inventory, import paths and tokens;
+**UIQuality.md**, the UI design guide, for spacing, typography, states, a11y and the review bar.
 
 ## Component Structure
 
