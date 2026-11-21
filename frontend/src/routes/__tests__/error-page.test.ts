@@ -20,7 +20,7 @@ describe('the app error page', () => {
 		const dashboardLink = screen.getByRole('link', { name: 'Go to Dashboard' });
 		expect(dashboardLink).toHaveAttribute('href', '/dashboard');
 		expect(dashboardLink).toHaveClass('h-10');
-		expect(screen.queryByRole('button', { name: 'Try Again' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
 	});
 
 	test('a failed page offers a retry as well as the dashboard', () => {
@@ -28,7 +28,7 @@ describe('the app error page', () => {
 		render(ErrorPage);
 
 		expect(screen.getByRole('heading', { level: 1, name: 'Page Unavailable' })).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Try Again' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: 'Go to Dashboard' })).toBeInTheDocument();
 	});
 });
