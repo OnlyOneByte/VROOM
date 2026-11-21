@@ -48,14 +48,20 @@ const TREND_LINE_PROPS = {
 	}
 } as const;
 
+export const SINGLE_POINT_PROPS = { r: 6, class: 'stroke-2' } as const;
+
 export function getTrendLineProps(dataLength: number) {
 	if (dataLength <= 1) {
 		return {
 			spline: { curve: SMOOTH_CURVE },
-			points: { r: 6, class: 'stroke-2' }
+			points: SINGLE_POINT_PROPS
 		};
 	}
 	return TREND_LINE_PROPS;
+}
+
+export function singleValueSeriesKeys(data: Record<string, unknown>[], keys: string[]): string[] {
+	return keys.filter(key => data.filter(row => row[key] != null).length === 1);
 }
 
 export function parseMonthToDate(month: string): Date {

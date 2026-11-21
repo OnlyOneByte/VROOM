@@ -5,6 +5,7 @@ import {
 	formatDateTick,
 	formatDecimalAxis,
 	getTrendLineProps,
+	singleValueSeriesKeys,
 	getXTickCount,
 	monthlyXAxisProps,
 	parseMonthToDate
@@ -101,5 +102,26 @@ describe('getTrendLineProps (single-point visibility branch)', () => {
 	test('two or more points use the standard trend dot (r:4)', () => {
 		expect(getTrendLineProps(2).points.r).toBe(4);
 		expect(getTrendLineProps(12).points.r).toBe(4);
+	});
+});
+
+describe('singleValueSeriesKeys (which series need a marker)', () => {
+	const rows = [
+		{ month: '2025-01', civic: 40, tesla: null, bike: 0 },
+		{ month: '2025-02', civic: 42, bike: 0 },
+		{ month: '2025-03', civic: 41, tesla: 12 }
+	];
+
+	test('names a series with exactly one non-null value among several rows', () => {
+		expect(singleValueSeriesKeys(rows, ['civic', 'tesla', 'bike'])).toEqual(['tesla']);
+	});
+
+	test('treats 0 as a value and a missing or null cell as no value', () => {
+		expect(singleValueSeriesKeys([{ a: 0 }, { a: null }, {}], ['a'])).toEqual(['a']);
+	});
+
+	test('one row marks every series that has a value in it, and none for an empty series', () => {
+		expect(singleValueSeriesKeys([{ a: 1, b: 2, c: null }], ['a', 'b', 'c'])).toEqual(['a', 'b']);
+		expect(singleValueSeriesKeys([], ['a'])).toEqual([]);
 	});
 });

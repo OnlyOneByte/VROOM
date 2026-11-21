@@ -1,6 +1,6 @@
 <script lang="ts">
 	import './line-chart-animations.css';
-	import { LineChart } from 'layerchart';
+	import { LineChart, Points } from 'layerchart';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import ChartCard from './ChartCard.svelte';
 	import ChartLegend from './ChartLegend.svelte';
@@ -8,7 +8,9 @@
 		formatCurrencyAxis,
 		CHART_PADDING,
 		getTrendLineProps,
-		monthlyXAxisProps
+		monthlyXAxisProps,
+		SINGLE_POINT_PROPS,
+		singleValueSeriesKeys
 	} from '#lib/utils/chart-formatters.ts';
 	import type { Snippet } from 'svelte';
 
@@ -56,6 +58,12 @@
 
 	let isEmpty = $derived(data.length === 0);
 	let resolvedXAxisProps = $derived(xAxisProps ?? monthlyXAxisProps(data.length));
+	let singleValueKeys = $derived(
+		singleValueSeriesKeys(
+			data,
+			series.map(s => s.key)
+		)
+	);
 </script>
 
 <ChartCard
@@ -75,7 +83,6 @@
 			{x}
 			{y}
 			{series}
-			points={data.length === 1}
 			padding={CHART_PADDING}
 			props={{
 				...getTrendLineProps(data.length),
@@ -84,6 +91,16 @@
 				yAxis: { format: yAxisFormat }
 			}}
 		>
+			{#snippet points()}
+				{#each singleValueKeys as key (key)}
+					<Points
+						seriesKey={key}
+						data={data.filter(row => row[key] != null)}
+						stroke="var(--color-surface-100, light-dark(white, black))"
+						{...SINGLE_POINT_PROPS}
+					/>
+				{/each}
+			{/snippet}
 			{#snippet tooltip()}
 				<Chart.Tooltip hideLabel />
 			{/snippet}
