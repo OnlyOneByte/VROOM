@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import type { VehicleFinancing } from '#lib/types/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
@@ -42,9 +43,7 @@
 			savedAmount = inputAmount;
 			open = false;
 		} catch (err: unknown) {
-			const message =
-				err instanceof Error ? err.message : 'Failed to save payment amount. Please try again.';
-			saveError = message;
+			saveError = `Couldn't save the payment amount. ${userFacingErrorMessage(err)}`;
 			if (import.meta.env.DEV) {
 				console.error('Payment save failed:', err);
 			}
