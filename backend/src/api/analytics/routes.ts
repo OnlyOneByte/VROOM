@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware';
+import { calendarParts, zonedCalendar } from '../../utils/analytics-charts';
 import { requireVehicleOwnerScope } from '../../utils/sharing';
+import { isValidTimeZone } from '../../utils/time-zone';
 import { zValidator } from '../../utils/validation';
 import {
   analyticsSummaryToApi,
@@ -19,12 +21,16 @@ import { analyticsRepository } from './repository';
 
 const routes = new Hono();
 
+const timeZone = z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional();
+const timeZoneQuerySchema = z.object({ timeZone });
+
 const fuelEfficiencyQuerySchema = z.object({
   vehicleId: z.string().optional(),
 });
 
 const yearQuerySchema = z.object({
   year: z.coerce.number().int().positive().optional(),
+  timeZone,
 });
 
 const vehicleIdQuerySchema = z.object({
@@ -34,6 +40,7 @@ const vehicleIdQuerySchema = z.object({
 const dateRangeQuerySchema = z.object({
   startDate: z.coerce.number().int().positive(),
   endDate: z.coerce.number().int().positive(),
+  timeZone,
 });
 
 const yearToDateQuerySchema = dateRangeQuerySchema.extend({
@@ -44,89 +51,99 @@ const dateRangeVehicleQuerySchema = z.object({
   startDate: z.coerce.number().int().positive(),
   endDate: z.coerce.number().int().positive(),
   vehicleId: z.string().optional(),
+  timeZone,
 });
 
 const dateRangeRequiredVehicleQuerySchema = z.object({
   startDate: z.coerce.number().int().positive(),
   endDate: z.coerce.number().int().positive(),
   vehicleId: z.string(),
+  timeZone,
 });
 
 const yearVehicleQuerySchema = z.object({
   year: z.coerce.number().int().positive().optional(),
   vehicleId: z.string(),
+  timeZone,
 });
 
 routes.use('*', requireAuth);
 
 routes.get('/summary', zValidator('query', yearToDateQuerySchema), async (c) => {
   const user = c.get('user');
-  const { startDate, endDate, ytdStart } = c.req.valid('query');
+  const { startDate, endDate, ytdStart, timeZone } = c.req.valid('query');
   const data = await analyticsRepository.getSummary(
     user.id,
     { start: startDate, end: endDate },
-    ytdStart
+    ytdStart,
+    timeZone
   );
   return c.json({ success: true, data: analyticsSummaryToApi(data) });
 });
 
 routes.get('/quick-stats', zValidator('query', yearToDateQuerySchema), async (c) => {
   const user = c.get('user');
-  const { startDate, endDate, ytdStart } = c.req.valid('query');
+  const { startDate, endDate, ytdStart, timeZone } = c.req.valid('query');
   const data = await analyticsRepository.getQuickStats(
     user.id,
     { start: startDate, end: endDate },
-    ytdStart
+    ytdStart,
+    timeZone
   );
   return c.json({ success: true, data: quickStatsToApi(data) });
 });
 
 routes.get('/fuel-stats', zValidator('query', dateRangeVehicleQuerySchema), async (c) => {
   const user = c.get('user');
-  const { startDate, endDate, vehicleId } = c.req.valid('query');
+  const { startDate, endDate, vehicleId, timeZone } = c.req.valid('query');
 
   const scopeId = vehicleId ? await requireVehicleOwnerScope(vehicleId, user.id, 'read') : user.id;
 
   const data = await analyticsRepository.getFuelStats(
     scopeId,
     { start: startDate, end: endDate },
-    vehicleId
+    vehicleId,
+    timeZone
   );
   return c.json({ success: true, data: fuelStatsToApi(data) });
 });
 
 routes.get('/cross-vehicle', zValidator('query', dateRangeQuerySchema), async (c) => {
   const user = c.get('user');
-  const { startDate, endDate } = c.req.valid('query');
-  const data = await analyticsRepository.getCrossVehicle(user.id, {
-    start: startDate,
-    end: endDate,
-  });
+  const { startDate, endDate, timeZone } = c.req.valid('query');
+  const data = await analyticsRepository.getCrossVehicle(
+    user.id,
+    { start: startDate, end: endDate },
+    timeZone
+  );
   return c.json({ success: true, data: crossVehicleToApi(data) });
 });
 
-routes.get('/financing', async (c) => {
+routes.get('/financing', zValidator('query', timeZoneQuerySchema), async (c) => {
   const user = c.get('user');
-  const data = await analyticsRepository.getFinancing(user.id);
+  const { timeZone } = c.req.valid('query');
+  const data = await analyticsRepository.getFinancing(user.id, timeZone);
   return c.json({ success: true, data: financingToApi(data) });
 });
 
-routes.get('/insurance', async (c) => {
+routes.get('/insurance', zValidator('query', timeZoneQuerySchema), async (c) => {
   const user = c.get('user');
-  const data = await analyticsRepository.getInsurance(user.id);
+  const { timeZone } = c.req.valid('query');
+  const data = await analyticsRepository.getInsurance(user.id, timeZone);
   return c.json({ success: true, data: insuranceToApi(data) });
 });
 
 routes.get('/fuel-advanced', zValidator('query', dateRangeVehicleQuerySchema), async (c) => {
   const user = c.get('user');
-  const { startDate, endDate, vehicleId } = c.req.valid('query');
+  const { startDate, endDate, vehicleId, timeZone } = c.req.valid('query');
 
   const scopeId = vehicleId ? await requireVehicleOwnerScope(vehicleId, user.id, 'read') : user.id;
 
   const data = await analyticsRepository.getFuelAdvanced(
     scopeId,
     { start: startDate, end: endDate },
-    vehicleId
+    vehicleId,
+    timeZone
   );
   return c.json({ success: true, data: fuelAdvancedToApi(data) });
 });
@@ -141,9 +158,9 @@ routes.get('/vehicle-health', zValidator('query', vehicleIdQuerySchema), async (
 
 routes.get('/vehicle-tco', zValidator('query', yearVehicleQuerySchema), async (c) => {
   const user = c.get('user');
-  const { vehicleId, year } = c.req.valid('query');
+  const { vehicleId, year, timeZone } = c.req.valid('query');
   const scopeId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
-  const data = await analyticsRepository.getVehicleTCO(scopeId, vehicleId, year);
+  const data = await analyticsRepository.getVehicleTCO(scopeId, vehicleId, year, timeZone);
   return c.json({ success: true, data: vehicleTcoToApi(data) });
 });
 
@@ -152,21 +169,23 @@ routes.get(
   zValidator('query', dateRangeRequiredVehicleQuerySchema),
   async (c) => {
     const user = c.get('user');
-    const { vehicleId, startDate, endDate } = c.req.valid('query');
+    const { vehicleId, startDate, endDate, timeZone } = c.req.valid('query');
     const scopeId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
-    const data = await analyticsRepository.getVehicleExpenses(scopeId, vehicleId, {
-      start: startDate,
-      end: endDate,
-    });
+    const data = await analyticsRepository.getVehicleExpenses(
+      scopeId,
+      vehicleId,
+      { start: startDate, end: endDate },
+      timeZone
+    );
     return c.json({ success: true, data: vehicleExpensesToApi(data) });
   }
 );
 
 routes.get('/year-end', zValidator('query', yearQuerySchema), async (c) => {
   const user = c.get('user');
-  const { year } = c.req.valid('query');
-  const currentYear = year ?? new Date().getUTCFullYear();
-  const data = await analyticsRepository.getYearEnd(user.id, currentYear);
+  const { year, timeZone } = c.req.valid('query');
+  const currentYear = year ?? calendarParts(new Date(), zonedCalendar(timeZone)).year;
+  const data = await analyticsRepository.getYearEnd(user.id, currentYear, timeZone);
   return c.json({ success: true, data: yearEndToApi(data) });
 });
 

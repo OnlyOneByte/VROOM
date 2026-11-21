@@ -40,6 +40,8 @@ import {
   buildVehicleExpenseBreakdown,
   buildVehicleMaintenanceCosts,
   buildVehicleRadar,
+  type Calendar,
+  calendarParts,
   computeAverageCosts,
   computeEfficiencyPoint,
   computeFuelConsumptionMetrics,
@@ -61,8 +63,12 @@ import {
   type RadarUnitConverters,
   SEASON_MAP,
   sameEnergyPairs,
+  shiftedMonthKey,
   sortByVehicleThenDate,
   toMonthKey,
+  UTC_CALENDAR,
+  weekdayOf,
+  zonedCalendar,
 } from '../../utils/analytics-charts';
 import { maxOf, minOf, termBillingMonths } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
@@ -78,17 +84,24 @@ import { isTermInForce, termInForceAt } from '../insurance/in-force';
 
 export type { FuelEfficiencyPoint } from '../../utils/analytics-charts';
 
-export function monthsOwnedInYear(ownershipStart: Date, now: Date, year: number): number {
-  const yearStartMonth = ownershipStart.getUTCFullYear() < year ? 0 : ownershipStart.getUTCMonth();
-  const yearEndMonth = now.getUTCFullYear() > year ? 11 : now.getUTCMonth();
-  if (ownershipStart.getUTCFullYear() > year || now.getUTCFullYear() < year) return 0;
+export function monthsOwnedInYear(
+  ownershipStart: Date,
+  now: Date,
+  year: number,
+  calendar: Calendar = UTC_CALENDAR
+): number {
+  const start = calendarParts(ownershipStart, calendar);
+  const end = calendarParts(now, calendar);
+  const yearStartMonth = start.year < year ? 0 : start.month;
+  const yearEndMonth = end.year > year ? 11 : end.month;
+  if (start.year > year || end.year < year) return 0;
   return Math.max(0, yearEndMonth - yearStartMonth + 1);
 }
 
-export function monthsBetween(from: Date, to: Date): number {
-  return (
-    (to.getUTCFullYear() - from.getUTCFullYear()) * 12 + (to.getUTCMonth() - from.getUTCMonth())
-  );
+export function monthsBetween(from: Date, to: Date, calendar: Calendar = UTC_CALENDAR): number {
+  const a = calendarParts(from, calendar);
+  const b = calendarParts(to, calendar);
+  return (b.year - a.year) * 12 + (b.month - a.month);
 }
 
 export function toDate(value: Date | number | string): Date {
@@ -110,13 +123,17 @@ export function yearToDateSpending(
   return total;
 }
 
-export function calendarYearRange(year: number): { start: Date; end: Date } {
-  return { start: new Date(Date.UTC(year, 0, 1)), end: new Date(Date.UTC(year + 1, 0, 1)) };
+export function calendarYearRange(
+  year: number,
+  calendar: Calendar = UTC_CALENDAR
+): { start: Date; end: Date } {
+  return { start: calendar.yearStart(year), end: calendar.yearStart(year + 1) };
 }
 
 interface FleetUnitConverter extends RadarUnitConverters {
   volume: (value: number, vehicleId: string) => number;
   scale: (vehicleId: string) => UnitScale;
+  calendar: Calendar;
 }
 
 const identity = (value: number) => value;
@@ -484,15 +501,17 @@ export class AnalyticsRepository {
 
   private fleetUnitConverter(
     vehicleUnitsMap: Map<string, UnitPreferences>,
-    userUnits: UnitPreferences
+    userUnits: UnitPreferences,
+    calendar: Calendar = UTC_CALENDAR
   ): FleetUnitConverter {
     const scale = (vehicleId: string) =>
       canonicalScale(this.vehicleUnitsFor(vehicleUnitsMap, vehicleId));
     if (this.allVehiclesMatchUnits(vehicleUnitsMap, userUnits)) {
-      return { efficiency: identity, distance: identity, volume: identity, scale };
+      return { efficiency: identity, distance: identity, volume: identity, scale, calendar };
     }
     return {
       scale,
+      calendar,
       efficiency: (value, vehicleId) => {
         const v = this.vehicleUnitsFor(vehicleUnitsMap, vehicleId);
         return convertEfficiency(
@@ -567,14 +586,14 @@ export class AnalyticsRepository {
     for (const row of rows) {
       const d = normalizeDate(row.date);
       if (!d) continue;
-      const key = toMonthKey(d);
+      const key = toMonthKey(d, convert.calendar);
       const entry = map.get(key) ?? { effSum: 0, effCount: 0, volume: 0 };
       entry.volume += this.rowVolume(row, convert);
       map.set(key, entry);
     }
 
     for (const { efficiency, date } of this.gasEfficiencyPoints(rows, convert)) {
-      const entry = map.get(toMonthKey(new Date(date)));
+      const entry = map.get(toMonthKey(new Date(date), convert.calendar));
       if (entry) {
         entry.effSum += efficiency;
         entry.effCount++;
@@ -601,14 +620,14 @@ export class AnalyticsRepository {
       const d = normalizeDate(row.date);
       if (!d) continue;
       if (!isFillup(row)) continue;
-      const season = SEASON_MAP[d.getUTCMonth()] ?? 'Winter';
+      const season = SEASON_MAP[calendarParts(d, convert.calendar).month] ?? 'Winter';
       const entry = seasonData.get(season) ?? { effSum: 0, effCount: 0, fillupCount: 0 };
       entry.fillupCount++;
       seasonData.set(season, entry);
     }
 
     for (const { efficiency, date } of this.gasEfficiencyPoints(fuelRows, convert)) {
-      const season = SEASON_MAP[new Date(date).getUTCMonth()] ?? 'Winter';
+      const season = SEASON_MAP[calendarParts(new Date(date), convert.calendar).month] ?? 'Winter';
       const entry = seasonData.get(season);
       if (entry) {
         entry.effSum += efficiency;
@@ -636,7 +655,7 @@ export class AnalyticsRepository {
       const d = normalizeDate(row.date);
       if (!d) continue;
       if (!isFillup(row)) continue;
-      const dayName = DAY_NAMES[d.getUTCDay()] ?? 'Sunday';
+      const dayName = DAY_NAMES[weekdayOf(d, convert.calendar)] ?? 'Sunday';
       const entry = dayData.get(dayName) ?? { count: 0, totalCost: 0, totalVolume: 0 };
       entry.count++;
       entry.totalCost += row.expenseAmount;
@@ -662,7 +681,7 @@ export class AnalyticsRepository {
     const monthMap = new Map<string, { effSum: number; effCount: number }>();
 
     for (const { efficiency, date } of this.gasEfficiencyPoints(fuelRows, convert)) {
-      const month = toMonthKey(new Date(date));
+      const month = toMonthKey(new Date(date), convert.calendar);
       const entry = monthMap.get(month) ?? { effSum: 0, effCount: 0 };
       entry.effSum += efficiency;
       entry.effCount++;
@@ -688,7 +707,7 @@ export class AnalyticsRepository {
       fuelRows,
       convert
     )) {
-      const month = toMonthKey(new Date(date));
+      const month = toMonthKey(new Date(date), convert.calendar);
       if (!monthVehicleEff.has(month)) monthVehicleEff.set(month, new Map());
       const vehicleMap = monthVehicleEff.get(month) as Map<string, { sum: number; count: number }>;
       const entry = vehicleMap.get(vId) ?? { sum: 0, count: 0 };
@@ -805,8 +824,12 @@ export class AnalyticsRepository {
       .orderBy(asc(expenses.date));
   }
 
-  private async queryTotalSpending(userId: string, year: number): Promise<number> {
-    const { start: yearStart, end: yearEnd } = calendarYearRange(year);
+  private async queryTotalSpending(
+    userId: string,
+    year: number,
+    calendar: Calendar
+  ): Promise<number> {
+    const { start: yearStart, end: yearEnd } = calendarYearRange(year, calendar);
     const result = await this.db
       .select({ total: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)` })
       .from(expenses)
@@ -861,13 +884,14 @@ export class AnalyticsRepository {
 
   private buildOdometerProgression(
     fuelRows: FuelExpenseRow[],
-    vehicleNameMap: Map<string, string>
+    vehicleNameMap: Map<string, string>,
+    calendar: Calendar
   ): Array<{ month: string; vehicleId: string; vehicleName: string; mileage: number }> {
     const map = new Map<string, { mileage: number }>();
     for (const row of fuelRows) {
       if (row.mileage == null || !row.date) continue;
       const d = toDate(row.date);
-      const key = `${toMonthKey(d)}|${row.vehicleId}`;
+      const key = `${toMonthKey(d, calendar)}|${row.vehicleId}`;
       const existing = map.get(key);
       if (!existing || row.mileage > existing.mileage) {
         map.set(key, { mileage: row.mileage });
@@ -908,7 +932,8 @@ export class AnalyticsRepository {
       startDate: Date | null;
     }>,
     vehicleNameMap: Map<string, string>,
-    balances: Map<string, number>
+    balances: Map<string, number>,
+    calendar: Calendar
   ): {
     vehicleDetails: FinancingData['vehicleDetails'];
     totalMonthlyPayments: number;
@@ -932,7 +957,9 @@ export class AnalyticsRepository {
       remainingBalance += computedBalance;
       if (fin.financingType === 'loan') loanCount++;
       if (fin.financingType === 'lease') leaseCount++;
-      vehicleDetails.push(this.buildSingleFinancingDetail(fin, vehicleNameMap, computedBalance));
+      vehicleDetails.push(
+        this.buildSingleFinancingDetail(fin, vehicleNameMap, computedBalance, calendar)
+      );
     }
 
     for (const [vId, vName] of vehicleNameMap) {
@@ -971,13 +998,14 @@ export class AnalyticsRepository {
       startDate: Date | null;
     },
     vehicleNameMap: Map<string, string>,
-    computedBalance: number
+    computedBalance: number,
+    calendar: Calendar
   ): FinancingData['vehicleDetails'][number] {
     const monthlyInterestEstimate =
       fin.financingType === 'loan' && fin.apr ? (computedBalance * (fin.apr / 100)) / 12 : 0;
     const startDate = toDate(fin.startDate ?? 0);
     const now = new Date();
-    const monthsElapsed = Math.max(0, monthsBetween(startDate, now));
+    const monthsElapsed = Math.max(0, monthsBetween(startDate, now, calendar));
     return {
       vehicleId: fin.vehicleId,
       vehicleName: vehicleNameMap.get(fin.vehicleId) ?? 'Unknown',
@@ -991,7 +1019,8 @@ export class AnalyticsRepository {
   }
 
   private buildFinancingTimeline(
-    vehicleDetails: FinancingData['vehicleDetails']
+    vehicleDetails: FinancingData['vehicleDetails'],
+    calendar: Calendar
   ): FinancingData['monthlyTimeline'] {
     const now = new Date();
     const maxMonths = Math.max(
@@ -1000,9 +1029,7 @@ export class AnalyticsRepository {
     );
     const timeline: FinancingData['monthlyTimeline'] = [];
     for (let m = 0; m < Math.min(maxMonths, 24); m++) {
-      const monthKey = toMonthKey(
-        new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + m, 1))
-      );
+      const monthKey = shiftedMonthKey(now, m, calendar);
       const monthVehicles = vehicleDetails
         .filter((d) => d.monthsRemaining > m && d.monthlyPayment > 0)
         .map((d) => ({
@@ -1024,7 +1051,8 @@ export class AnalyticsRepository {
       originalAmount: number;
       paymentAmount: number;
     }>,
-    balances: Map<string, number>
+    balances: Map<string, number>,
+    calendar: Calendar
   ): FinancingData['loanBreakdown'] {
     const activeLoans = financingRows.filter((f) => f.isActive && f.financingType === 'loan');
     if (activeLoans.length === 0) return [];
@@ -1036,9 +1064,7 @@ export class AnalyticsRepository {
       apr: loan.apr ?? 0,
       paymentAmount: loan.paymentAmount,
     }));
-    const monthKeys = Array.from({ length: 12 }, (_, m) =>
-      toMonthKey(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + m, 1)))
-    );
+    const monthKeys = Array.from({ length: 12 }, (_, m) => shiftedMonthKey(now, m, calendar));
 
     return buildAmortizationSchedule(loans, monthKeys);
   }
@@ -1056,7 +1082,8 @@ export class AnalyticsRepository {
       coverageDescription: string | null;
     }>,
     junctionRows: Array<{ termId: string; vehicleId: string }>,
-    vehicleNameMap: Map<string, string>
+    vehicleNameMap: Map<string, string>,
+    calendar: Calendar
   ): {
     vehicleDetails: InsuranceData['vehicleDetails'];
     totalMonthlyPremiums: number;
@@ -1086,7 +1113,12 @@ export class AnalyticsRepository {
         });
       const latestTerm = policyTerms[0];
       if (!latestTerm) continue;
-      this.accumulateMonthlyPremiums(monthlyMap, latestTerm, effectiveMonthlyPremium(latestTerm));
+      this.accumulateMonthlyPremiums(
+        monthlyMap,
+        latestTerm,
+        effectiveMonthlyPremium(latestTerm),
+        calendar
+      );
 
       const currentTerm = policyTerms.find((t) => isTermInForce(t, now));
       if (!currentTerm) continue;
@@ -1164,15 +1196,14 @@ export class AnalyticsRepository {
   private accumulateMonthlyPremiums(
     monthlyMap: Map<string, number>,
     term: { startDate: Date | null; endDate: Date | null },
-    monthlyPremium: number
+    monthlyPremium: number,
+    calendar: Calendar
   ): void {
     if (!term.startDate || !term.endDate) return;
     const start = toDate(term.startDate);
     const months = termBillingMonths(start, toDate(term.endDate));
     for (let i = 0; i < months; i++) {
-      const key = toMonthKey(
-        new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i, 1))
-      );
+      const key = shiftedMonthKey(start, i, calendar);
       monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + monthlyPremium);
     }
   }
@@ -1273,7 +1304,8 @@ export class AnalyticsRepository {
   async getQuickStats(
     userId: string,
     range: DateRange,
-    ytdStart?: number
+    ytdStart?: number,
+    timeZone?: string
   ): Promise<QuickStatsData> {
     try {
       const vehicleRows = await this.db
@@ -1293,7 +1325,7 @@ export class AnalyticsRepository {
       ]);
 
       const ytdSpending = yearToDateSpending(allExpenses, range, ytdStart);
-      const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits);
+      const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits, zonedCalendar(timeZone));
       const avgEfficiency = this.computeAverageEfficiency(fuelRows, convert);
 
       const fleetHealthScore =
@@ -1382,7 +1414,12 @@ export class AnalyticsRepository {
     return new Set(rows.map((r) => r.vehicleId));
   }
 
-  async getFuelStats(userId: string, range: DateRange, vehicleId?: string): Promise<FuelStatsData> {
+  async getFuelStats(
+    userId: string,
+    range: DateRange,
+    vehicleId?: string,
+    timeZone?: string
+  ): Promise<FuelStatsData> {
     try {
       const prevRange: DateRange = {
         start: range.start - (range.end - range.start),
@@ -1406,7 +1443,7 @@ export class AnalyticsRepository {
         vehicleNameMap,
         range,
         prevYearAgg,
-        this.fleetUnitConverter(vehicleUnitsMap, userUnits)
+        this.fleetUnitConverter(vehicleUnitsMap, userUnits, zonedCalendar(timeZone))
       );
     } catch (error) {
       if (error instanceof ValidationError) throw error;
@@ -1429,8 +1466,7 @@ export class AnalyticsRepository {
     convert: FleetUnitConverter
   ): FuelStatsData {
     const now = new Date();
-    const currentMonth = now.getUTCMonth();
-    const currentYear = now.getUTCFullYear();
+    const { month: currentMonth, year: currentYear } = calendarParts(now, convert.calendar);
     const rangeStartDate = new Date(range.start * 1000);
     const rangeEndDate = new Date(range.end * 1000);
 
@@ -1440,11 +1476,13 @@ export class AnalyticsRepository {
     const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
     const inCurrentMonth = (r: FuelExpenseRow) => {
       const d = toDate(r.date ?? 0);
-      return d.getUTCMonth() === currentMonth && d.getUTCFullYear() === currentYear;
+      const p = calendarParts(d, convert.calendar);
+      return p.month === currentMonth && p.year === currentYear;
     };
     const inPrevMonth = (r: FuelExpenseRow) => {
       const d = toDate(r.date ?? 0);
-      return d.getUTCMonth() === prevMonth && d.getUTCFullYear() === prevMonthYear;
+      const p = calendarParts(d, convert.calendar);
+      return p.month === prevMonth && p.year === prevMonthYear;
     };
     const currentMonthFillups = fuelRows.filter((r) => isFillup(r) && inCurrentMonth(r)).length;
     const prevMonthFillups = fuelRows.filter((r) => isFillup(r) && inPrevMonth(r)).length;
@@ -1510,8 +1548,12 @@ export class AnalyticsRepository {
       distance,
       monthlyConsumption: this.buildMonthlyConsumption(fuelRowsByVehicle, convert),
       gasPriceHistory: buildGasPriceHistory(fuelRows, isFillup, convert.volume),
-      fillupCostByVehicle: buildFillupCostByVehicle(fuelRows, vehicleNameMap),
-      odometerProgression: this.buildOdometerProgression(fuelRows, vehicleNameMap),
+      fillupCostByVehicle: buildFillupCostByVehicle(fuelRows, vehicleNameMap, convert.calendar),
+      odometerProgression: this.buildOdometerProgression(
+        fuelRows,
+        vehicleNameMap,
+        convert.calendar
+      ),
       costPerDistance: buildCostPerDistanceChart(fuelRowsByVehicle, vehicleNameMap, convert),
       charging: this.buildChargingStats(fuelRows, fuelRowsByVehicle, prevYearAgg, convert, {
         inCurrentMonth,
@@ -1572,7 +1614,8 @@ export class AnalyticsRepository {
   async getFuelAdvanced(
     userId: string,
     range: DateRange,
-    vehicleId?: string
+    vehicleId?: string,
+    timeZone?: string
   ): Promise<FuelAdvancedData> {
     try {
       const [vehicleNameMap, fuelRows, allExpenses, userUnits, vehicleUnitsMap] = await Promise.all(
@@ -1590,7 +1633,7 @@ export class AnalyticsRepository {
         sortByVehicleThenDate(fuelRows),
         allExpenses,
         vehicleNameMap,
-        this.fleetUnitConverter(vehicleUnitsMap, userUnits)
+        this.fleetUnitConverter(vehicleUnitsMap, userUnits, zonedCalendar(timeZone))
       );
     } catch (error) {
       if (error instanceof ValidationError) throw error;
@@ -1617,12 +1660,16 @@ export class AnalyticsRepository {
       seasonalEfficiency: this.buildSeasonalEfficiency(fuelRowsByVehicle, convert),
       vehicleRadar: buildVehicleRadar(allExpenses, fuelRowsByVehicle, vehicleNameMap, convert),
       dayOfWeekPatterns: this.buildDayOfWeekPatterns(fuelRows, convert),
-      monthlyCostHeatmap: buildMonthlyCostHeatmap(allExpenses),
+      monthlyCostHeatmap: buildMonthlyCostHeatmap(allExpenses, convert.calendar),
       fillupIntervals: buildFillupIntervals(fuelRows),
     };
   }
 
-  async getCrossVehicle(userId: string, range: DateRange): Promise<CrossVehicleData> {
+  async getCrossVehicle(
+    userId: string,
+    range: DateRange,
+    timeZone?: string
+  ): Promise<CrossVehicleData> {
     try {
       const [vehicleNameMap, allExpenses, fuelRows, userUnits, vehicleUnitsMap] = await Promise.all(
         [
@@ -1634,7 +1681,7 @@ export class AnalyticsRepository {
         ]
       );
 
-      const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits);
+      const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits, zonedCalendar(timeZone));
 
       const vehicleCosts = new Map<
         string,
@@ -1672,7 +1719,7 @@ export class AnalyticsRepository {
       });
 
       return {
-        monthlyExpenseTrends: buildMonthlyExpenseTrends(allExpenses),
+        monthlyExpenseTrends: buildMonthlyExpenseTrends(allExpenses, convert.calendar),
         expenseByCategory: buildExpenseByCategory(allExpenses),
         vehicleCostComparison,
         fuelEfficiencyComparison: this.buildFuelEfficiencyComparison(
@@ -1693,7 +1740,8 @@ export class AnalyticsRepository {
     }
   }
 
-  async getFinancing(userId: string): Promise<FinancingData> {
+  async getFinancing(userId: string, timeZone?: string): Promise<FinancingData> {
+    const calendar = zonedCalendar(timeZone);
     try {
       const vehicleNameMap = await this.queryVehicleNameMap(userId);
       const userVehicleIds = [...vehicleNameMap.keys()];
@@ -1726,9 +1774,9 @@ export class AnalyticsRepository {
         loanCount,
         leaseCount,
         activeIds,
-      } = this.buildFinancingVehicleDetails(financingRows, vehicleNameMap, balances);
+      } = this.buildFinancingVehicleDetails(financingRows, vehicleNameMap, balances, calendar);
 
-      const monthlyTimeline = this.buildFinancingTimeline(vehicleDetails);
+      const monthlyTimeline = this.buildFinancingTimeline(vehicleDetails, calendar);
 
       const typeMap = new Map<string, { value: number; count: number }>();
       for (const d of vehicleDetails) {
@@ -1758,7 +1806,7 @@ export class AnalyticsRepository {
         vehicleDetails,
         monthlyTimeline,
         typeDistribution,
-        loanBreakdown: this.buildLoanBreakdown(financingRows, balances),
+        loanBreakdown: this.buildLoanBreakdown(financingRows, balances, calendar),
       };
     } catch (error) {
       logger.error('Failed to compute financing analytics', {
@@ -1769,7 +1817,8 @@ export class AnalyticsRepository {
     }
   }
 
-  async getInsurance(userId: string): Promise<InsuranceData> {
+  async getInsurance(userId: string, timeZone?: string): Promise<InsuranceData> {
+    const calendar = zonedCalendar(timeZone);
     try {
       const vehicleNameMap = await this.queryVehicleNameMap(userId);
       const emptyResult: InsuranceData = {
@@ -1825,7 +1874,13 @@ export class AnalyticsRepository {
         carrierMap,
         monthlyMap,
         currentPolicyIds,
-      } = this.buildInsuranceDetails(activePolicies, termRows, junctionRows, vehicleNameMap);
+      } = this.buildInsuranceDetails(
+        activePolicies,
+        termRows,
+        junctionRows,
+        vehicleNameMap,
+        calendar
+      );
 
       return {
         summary: {
@@ -1892,7 +1947,13 @@ export class AnalyticsRepository {
     }
   }
 
-  async getVehicleTCO(userId: string, vehicleId: string, year?: number): Promise<VehicleTCOData> {
+  async getVehicleTCO(
+    userId: string,
+    vehicleId: string,
+    year?: number,
+    timeZone?: string
+  ): Promise<VehicleTCOData> {
+    const calendar = zonedCalendar(timeZone);
     try {
       const [vehicleNameMap, vehicleRows] = await Promise.all([
         this.queryVehicleNameMap(userId, vehicleId),
@@ -1909,7 +1970,7 @@ export class AnalyticsRepository {
 
       const conditions = [eq(expenses.vehicleId, vehicleId), eq(vehicles.userId, userId)];
       if (year) {
-        const { start: yearStart, end: yearEnd } = calendarYearRange(year);
+        const { start: yearStart, end: yearEnd } = calendarYearRange(year, calendar);
         conditions.push(gte(expenses.date, yearStart));
         conditions.push(lt(expenses.date, yearEnd));
       }
@@ -1936,8 +1997,8 @@ export class AnalyticsRepository {
       const now = new Date();
       const ownershipStart = purchaseDate ? toDate(purchaseDate) : now;
       const ownershipMonths = year
-        ? Math.max(1, monthsOwnedInYear(ownershipStart, now, year))
-        : Math.max(1, monthsBetween(ownershipStart, now));
+        ? Math.max(1, monthsOwnedInYear(ownershipStart, now, year, calendar))
+        : Math.max(1, monthsBetween(ownershipStart, now, calendar));
       const mileages = detailedExpenses
         .filter((r) => r.mileage != null)
         .map((r) => r.mileage as number);
@@ -1954,7 +2015,7 @@ export class AnalyticsRepository {
         totalDistance,
         costPerDistance: totalDistance > 0 ? totalCost / totalDistance : null,
         costPerMonth: totalCost / ownershipMonths,
-        monthlyTrend: buildTCOMonthlyTrend(detailedExpenses),
+        monthlyTrend: buildTCOMonthlyTrend(detailedExpenses, calendar),
       };
     } catch (error) {
       logger.error('Failed to compute vehicle TCO', {
@@ -1970,8 +2031,10 @@ export class AnalyticsRepository {
   async getVehicleExpenses(
     userId: string,
     vehicleId: string,
-    range: DateRange
+    range: DateRange,
+    timeZone?: string
   ): Promise<VehicleExpensesData> {
+    const calendar = zonedCalendar(timeZone);
     try {
       const [allExpenses, vehicleUnitsMap] = await Promise.all([
         this.queryAllExpenses(userId, range, vehicleId),
@@ -1980,8 +2043,8 @@ export class AnalyticsRepository {
       const fuelRows = allExpenses.filter((e) => e.category === 'fuel');
       const scale = canonicalScale(this.vehicleUnitsFor(vehicleUnitsMap, vehicleId));
       return {
-        maintenanceCosts: buildVehicleMaintenanceCosts(allExpenses),
-        fuelEfficiencyAndCost: buildFuelEfficiencyAndCost(fuelRows, scale),
+        maintenanceCosts: buildVehicleMaintenanceCosts(allExpenses, calendar),
+        fuelEfficiencyAndCost: buildFuelEfficiencyAndCost(fuelRows, scale, calendar),
         expenseBreakdown: buildVehicleExpenseBreakdown(allExpenses),
       };
     } catch (error) {
@@ -1995,9 +2058,10 @@ export class AnalyticsRepository {
     }
   }
 
-  async getYearEnd(userId: string, year: number): Promise<YearEndData> {
+  async getYearEnd(userId: string, year: number, timeZone?: string): Promise<YearEndData> {
+    const calendar = zonedCalendar(timeZone);
     try {
-      const { start: yearStart, end: yearEnd } = calendarYearRange(year);
+      const { start: yearStart, end: yearEnd } = calendarYearRange(year, calendar);
       const yearRange: DateRange = {
         start: Math.floor(yearStart.getTime() / 1000),
         end: Math.floor(yearEnd.getTime() / 1000),
@@ -2007,13 +2071,13 @@ export class AnalyticsRepository {
           this.queryVehicleNameMap(userId),
           this.queryAllExpenses(userId, yearRange),
           this.queryFuelExpenses(userId, yearRange),
-          this.queryTotalSpending(userId, year - 1),
+          this.queryTotalSpending(userId, year - 1, calendar),
           this.getUserUnits(userId),
           this.getAllVehicleUnits(userId),
         ]);
 
       const totalSpent = allExpenses.reduce((s, e) => s + e.expenseAmount, 0);
-      const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits);
+      const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits, zonedCalendar(timeZone));
       const totalDistance = this.computeTotalDistance(fuelRows, convert);
       const avgEfficiency = this.computeAverageEfficiency(fuelRows, convert);
       const efficiencyTrend = this.buildEfficiencyTrend(fuelRows, convert);
@@ -2045,7 +2109,8 @@ export class AnalyticsRepository {
   async getSummary(
     userId: string,
     range: DateRange,
-    ytdStart?: number
+    ytdStart?: number,
+    timeZone?: string
   ): Promise<AnalyticsSummaryData> {
     try {
       const prevRange: DateRange = {
@@ -2078,7 +2143,7 @@ export class AnalyticsRepository {
 
       const fuelRowsByVehicle = sortByVehicleThenDate(fuelRows);
 
-      const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits);
+      const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits, zonedCalendar(timeZone));
       const avgEfficiency = this.computeAverageEfficiency(fuelRows, convert);
       const ytdSpending = yearToDateSpending(allExpenses, range, ytdStart);
       const fleetHealthScore =

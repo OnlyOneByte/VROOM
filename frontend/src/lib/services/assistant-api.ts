@@ -1,3 +1,4 @@
+import { userTimeZone } from './analytics-api';
 import { apiClient } from './api-client';
 
 export interface AssistantTurn {
@@ -12,6 +13,10 @@ export interface AssistantReply {
 
 export const assistantApi = {
 	async sendMessage(message: string, history: AssistantTurn[] = []): Promise<AssistantReply> {
-		return apiClient.post<AssistantReply>('/api/v1/assistant/chat', { message, history });
+		return apiClient.post<AssistantReply>('/api/v1/assistant/chat', {
+			message,
+			history,
+			timeZone: userTimeZone()
+		});
 	}
 };

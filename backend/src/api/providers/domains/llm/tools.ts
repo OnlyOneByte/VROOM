@@ -1,6 +1,7 @@
 // userId always comes from the session, never from model arguments.
 
 import { z } from 'zod';
+import { calendarParts, zonedCalendar } from '../../../../utils/analytics-charts';
 import {
   expenseSummaryToApi,
   reminderWithVehiclesToApi,
@@ -25,7 +26,11 @@ export type RangeValue = (typeof RANGE_VALUES)[number];
 
 const DAY_SECONDS = 86_400;
 
-export function resolveRange(range: RangeValue, nowMs: number): { start: number; end: number } {
+export function resolveRange(
+  range: RangeValue,
+  nowMs: number,
+  timeZone?: string
+): { start: number; end: number } {
   const end = Math.floor(nowMs / 1000);
   switch (range) {
     case '30d':
@@ -35,9 +40,9 @@ export function resolveRange(range: RangeValue, nowMs: number): { start: number;
     case '12mo':
       return { start: end - 365 * DAY_SECONDS, end };
     case 'ytd': {
-      const d = new Date(nowMs);
-      const jan1 = Date.UTC(d.getUTCFullYear(), 0, 1);
-      return { start: Math.floor(jan1 / 1000), end };
+      const calendar = zonedCalendar(timeZone);
+      const jan1 = calendar.yearStart(calendarParts(new Date(nowMs), calendar).year);
+      return { start: Math.floor(jan1.getTime() / 1000), end };
     }
     case 'all':
       return { start: 0, end };
@@ -75,14 +80,14 @@ export interface AssistantTool<A = unknown> {
   description: string;
   schema: z.ZodType<A>;
   parameters: Record<string, unknown>;
-  run(args: A, userId: string, nowMs: number): Promise<unknown>;
+  run(args: A, userId: string, nowMs: number, timeZone?: string): Promise<unknown>;
 }
 
 interface AssistantToolSpec<A, R> {
   name: string;
   description: string;
   schema: z.ZodType<A>;
-  read(args: A, userId: string, nowMs: number): Promise<R>;
+  read(args: A, userId: string, nowMs: number, timeZone?: string): Promise<R>;
   toApi(data: R): unknown;
 }
 
@@ -92,7 +97,8 @@ function defineTool<A, R>(spec: AssistantToolSpec<A, R>): AssistantTool<A> {
     description: spec.description,
     schema: spec.schema,
     parameters: toToolParameters(spec.schema),
-    run: async (args, userId, nowMs) => spec.toApi(await spec.read(args, userId, nowMs)),
+    run: async (args, userId, nowMs, timeZone) =>
+      spec.toApi(await spec.read(args, userId, nowMs, timeZone)),
   };
 }
 
@@ -133,12 +139,13 @@ const TOOL_LIST: AssistantTool[] = [
       'Fuel/efficiency statistics (MPG or mi/kWh, cost per mile, fill-up counts) over a time range. ' +
       'Optionally scoped to one vehicle.',
     schema: rangeVehicleArgs,
-    read: async (args, userId, nowMs) => {
+    read: async (args, userId, nowMs, timeZone) => {
       const scopeId = await resolveScope(args.vehicleId, userId);
       return analyticsRepository.getFuelStats(
         scopeId,
-        resolveRange(args.range, nowMs),
-        args.vehicleId
+        resolveRange(args.range, nowMs, timeZone),
+        args.vehicleId,
+        timeZone
       );
     },
     toApi: fuelStatsToApi,
@@ -148,8 +155,13 @@ const TOOL_LIST: AssistantTool[] = [
     description:
       'A combined quick-stats + fuel-stats overview across all vehicles over a time range.',
     schema: rangeArgs,
-    read: async (args, userId, nowMs) =>
-      analyticsRepository.getSummary(userId, resolveRange(args.range, nowMs)),
+    read: async (args, userId, nowMs, timeZone) =>
+      analyticsRepository.getSummary(
+        userId,
+        resolveRange(args.range, nowMs, timeZone),
+        resolveRange('ytd', nowMs, timeZone).start,
+        timeZone
+      ),
     toApi: analyticsSummaryToApi,
   }),
   defineTool({
@@ -157,22 +169,28 @@ const TOOL_LIST: AssistantTool[] = [
     description:
       'Compare all vehicles head-to-head over a time range (spend, efficiency, cost-per-mile per vehicle).',
     schema: rangeArgs,
-    read: async (args, userId, nowMs) =>
-      analyticsRepository.getCrossVehicle(userId, resolveRange(args.range, nowMs)),
+    read: async (args, userId, nowMs, timeZone) =>
+      analyticsRepository.getCrossVehicle(
+        userId,
+        resolveRange(args.range, nowMs, timeZone),
+        timeZone
+      ),
     toApi: crossVehicleToApi,
   }),
   defineTool({
     name: 'getFinancingState',
     description: "The user's loan/lease state per vehicle: balances, payments, payoff progress.",
     schema: emptyArgs,
-    read: async (_args, userId) => analyticsRepository.getFinancing(userId),
+    read: async (_args, userId, _nowMs, timeZone) =>
+      analyticsRepository.getFinancing(userId, timeZone),
     toApi: financingAnalyticsToApi,
   }),
   defineTool({
     name: 'getInsuranceState',
     description: "The user's insurance policies/terms per vehicle and upcoming expirations.",
     schema: emptyArgs,
-    read: async (_args, userId) => analyticsRepository.getInsurance(userId),
+    read: async (_args, userId, _nowMs, timeZone) =>
+      analyticsRepository.getInsurance(userId, timeZone),
     toApi: insuranceToApi,
   }),
   defineTool({

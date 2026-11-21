@@ -105,6 +105,51 @@ describe('POST /api/v1/assistant/chat', () => {
     expect(res.status).toBe(400);
   });
 
+  test('analytics tools group by the timeZone the client sends', async () => {
+    await seedLlmProvider(ctx);
+    const vehicleId = await seedVehicle(ctx);
+    ctx.sqlite.run(
+      'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date) VALUES (?, ?, ?, ?, ?, ?)',
+      [
+        'jan-1-auckland',
+        vehicleId,
+        ctx.user.id,
+        'maintenance',
+        5000,
+        Math.floor(Date.parse('2024-12-31T23:00:00.000Z') / 1000),
+      ]
+    );
+    const toolResultMonths = async (timeZone?: string) => {
+      const sent = stubScript([
+        callTurn('getCrossVehicle', '{"range":"all"}'),
+        answerTurn('Done.'),
+      ]);
+      const res = await ctx.authed('POST', '/api/v1/assistant/chat', {
+        message: 'monthly spend?',
+        ...(timeZone ? { timeZone } : {}),
+      });
+      expect(res.status, await res.clone().text()).toBe(200);
+      const toolMessage = sent[1]?.messages.find((m) => m.role === 'tool');
+      const out = JSON.parse(String(toolMessage?.content)) as {
+        monthlyExpenseTrends: Array<{ month: string }>;
+      };
+      return out.monthlyExpenseTrends.map((t) => t.month);
+    };
+
+    expect(await toolResultMonths('Pacific/Auckland')).toEqual(['2025-01']);
+    expect(await toolResultMonths()).toEqual(['2024-12']);
+  });
+
+  test('an unknown timeZone is rejected (400)', async () => {
+    await seedLlmProvider(ctx);
+    stubScript([answerTurn('hi')]);
+    const res = await ctx.authed('POST', '/api/v1/assistant/chat', {
+      message: 'hi',
+      timeZone: 'Mars/Olympus_Mons',
+    });
+    expect(res.status).toBe(400);
+  });
+
   test('an unauthenticated request is rejected (401)', async () => {
     const res = await ctx.anon('POST', '/api/v1/assistant/chat', { message: 'hi' });
     expect(res.status).toBe(401);

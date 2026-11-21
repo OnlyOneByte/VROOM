@@ -7,13 +7,14 @@ vi.mock('../api-client', () => ({
 }));
 
 const { assistantApi } = await import('../assistant-api');
+const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 beforeEach(() => {
 	post.mockReset();
 });
 
 describe('assistantApi.sendMessage', () => {
-	test('POSTs { message, history } to /api/v1/assistant/chat and returns the reply envelope', async () => {
+	test('POSTs { message, history, timeZone } to /api/v1/assistant/chat and returns the reply envelope', async () => {
 		post.mockResolvedValue({ reply: 'You spent $50 on fuel.', toolsUsed: ['getExpenseSummary'] });
 
 		const out = await assistantApi.sendMessage('How much on fuel?', [
@@ -29,7 +30,8 @@ describe('assistantApi.sendMessage', () => {
 			history: [
 				{ role: 'user', content: 'hi' },
 				{ role: 'assistant', content: 'Hello!' }
-			]
+			],
+			timeZone
 		});
 		expect(out).toEqual({ reply: 'You spent $50 on fuel.', toolsUsed: ['getExpenseSummary'] });
 	});
@@ -37,7 +39,7 @@ describe('assistantApi.sendMessage', () => {
 	test('defaults history to an empty array when omitted', async () => {
 		post.mockResolvedValue({ reply: 'Hi!', toolsUsed: [] });
 		await assistantApi.sendMessage('hello');
-		expect(post.mock.calls[0]?.[1]).toEqual({ message: 'hello', history: [] });
+		expect(post.mock.calls[0]?.[1]).toEqual({ message: 'hello', history: [], timeZone });
 	});
 
 	test('propagates a client error (e.g. no provider configured / provider unreachable)', async () => {
