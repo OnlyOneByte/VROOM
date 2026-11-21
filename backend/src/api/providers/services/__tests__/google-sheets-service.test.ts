@@ -511,3 +511,100 @@ describe('GoogleSheetsService — user-edited tabs', () => {
     expect(data.vehicles[0].make).toBe('Skoda');
   });
 });
+
+describe('GoogleSheetsService — Sheets mirror version (Metadata tab)', () => {
+  async function mirrorWithExpense(): Promise<{
+    svc: InstanceType<GoogleSheetsServiceCtor>;
+    spreadsheetId: string;
+  }> {
+    await seedVehicle('Opel', 'Astra', 2011);
+    const vehicle = ctx.sqlite.query('SELECT id FROM vehicles').get() as { id: string };
+    ctx.sqlite.run(
+      `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount)
+       VALUES ('exp-sheet', ?, ?, 'fuel', 1700000000, 4550)`,
+      [vehicle.id, ctx.user.id]
+    );
+    const svc = makeSvc();
+    const info = await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM', 'Demo User');
+    return { svc, spreadsheetId: info.id };
+  }
+
+  function setExpenseAmountCell(spreadsheetId: string, value: string): void {
+    const grid = store.spreadsheets.get(spreadsheetId)?.values.get('Expenses');
+    if (!grid) throw new Error('Expenses tab missing');
+    grid[1][grid[0].indexOf('expenseAmount')] = value;
+  }
+
+  function dropMetadataTab(spreadsheetId: string): void {
+    const ss = store.spreadsheets.get(spreadsheetId);
+    if (!ss) throw new Error('spreadsheet missing');
+    ss.sheets = ss.sheets.filter((s) => s.title !== 'Metadata');
+    ss.values.delete('Metadata');
+  }
+
+  async function restoredExpenseAmount(
+    svc: InstanceType<GoogleSheetsServiceCtor>,
+    spreadsheetId: string
+  ): Promise<number> {
+    ctx.sqlite.run(
+      `INSERT OR IGNORE INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
+       VALUES ('prov-meta', ?, 'storage', 'google-drive', 'Drive', 'x', 'active')`,
+      [ctx.user.id]
+    );
+    ctx.sqlite.run(
+      'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET backup_config = excluded.backup_config',
+      [
+        ctx.user.id,
+        JSON.stringify({ providers: { 'prov-meta': { sheetsSpreadsheetId: spreadsheetId } } }),
+      ]
+    );
+    const sheetsModule = await import('../google-sheets-service');
+    const spy = spyOn(sheetsModule, 'createSheetsServiceForProvider').mockResolvedValue(svc);
+    try {
+      const { restoreService } = await import('../../../sync/restore');
+      const result = await restoreService.restoreFromSheets(ctx.user.id, 'prov-meta', 'replace');
+      expect(result.success, JSON.stringify(result)).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+    return (
+      ctx.sqlite.query("SELECT expense_amount FROM expenses WHERE id = 'exp-sheet'").get() as {
+        expense_amount: number;
+      }
+    ).expense_amount;
+  }
+
+  test('every sync writes a Metadata tab with the backup version and owner', async () => {
+    const { spreadsheetId } = await mirrorWithExpense();
+    const grid = store.spreadsheets.get(spreadsheetId)?.values.get('Metadata');
+    const { CONFIG } = await import('../../../../config');
+    expect(grid?.[0]).toEqual(['version', 'timestamp', 'userId']);
+    expect(grid?.[1]?.[0]).toBe(CONFIG.backup.currentVersion);
+    expect(grid?.[1]?.[2]).toBe(ctx.user.id);
+  });
+
+  test('a mirror whose Metadata says 1.x is restored from dollars to cents', async () => {
+    const { svc, spreadsheetId } = await mirrorWithExpense();
+    const grid = store.spreadsheets.get(spreadsheetId)?.values.get('Metadata');
+    if (!grid) throw new Error('Metadata tab missing');
+    grid[1][0] = '1.0.0';
+    setExpenseAmountCell(spreadsheetId, '12');
+
+    expect(await restoredExpenseAmount(svc, spreadsheetId)).toBe(1200);
+  });
+
+  test('a mirror without a Metadata tab and with dollar amounts is restored to cents', async () => {
+    const { svc, spreadsheetId } = await mirrorWithExpense();
+    dropMetadataTab(spreadsheetId);
+    setExpenseAmountCell(spreadsheetId, '12.34');
+
+    expect(await restoredExpenseAmount(svc, spreadsheetId)).toBe(1234);
+  });
+
+  test('a mirror without a Metadata tab written in cents restores unchanged', async () => {
+    const { svc, spreadsheetId } = await mirrorWithExpense();
+    dropMetadataTab(spreadsheetId);
+
+    expect(await restoredExpenseAmount(svc, spreadsheetId)).toBe(4550);
+  });
+});

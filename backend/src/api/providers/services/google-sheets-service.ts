@@ -1,5 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { google, type sheets_v4 } from 'googleapis';
+import { CONFIG } from '../../../config';
 import { getDb } from '../../../db/connection';
 import {
   expenses,
@@ -279,8 +280,11 @@ export function columnLetter(columnNumber: number): string {
 
 const SHEET_READ_LAST_COLUMN = 'ZZ';
 
+export const SHEET_METADATA_TAB = 'Metadata';
+const SHEET_METADATA_HEADERS = ['version', 'timestamp', 'userId'] as const;
+
 // Order matters: the backup swap indexes each tab by position.
-export const SHEET_NAMES = Object.values(SHEET_TABS);
+export const SHEET_NAMES: string[] = [...Object.values(SHEET_TABS), SHEET_METADATA_TAB];
 
 // Keep titles space-free: ranges would otherwise need A1 quoting.
 export const SHEET_STAGING_SUFFIX = '__vroom_staging';
@@ -544,10 +548,21 @@ export class GoogleSheetsService {
     };
 
     const tables = (Object.keys(SHEET_TABS) as SheetTableKey[]).map((key) => ({
-      title: SHEET_TABS[key],
+      title: SHEET_TABS[key] as string,
       rows: rowsByTable[key],
-      headers: SHEET_HEADERS[key],
+      headers: SHEET_HEADERS[key] as readonly string[],
     }));
+    tables.push({
+      title: SHEET_METADATA_TAB,
+      rows: [
+        {
+          version: CONFIG.backup.currentVersion,
+          timestamp: new Date().toISOString(),
+          userId,
+        },
+      ],
+      headers: SHEET_METADATA_HEADERS,
+    });
 
     await this.writeAllSheetsAtomically(spreadsheetId, tables);
   }
@@ -673,10 +688,25 @@ export class GoogleSheetsService {
           );
     }
 
-    const userId = records.vehicles.length > 0 ? String(records.vehicles[0].userId) : '';
+    const [written] = presentTabs.has(SHEET_METADATA_TAB)
+      ? this.parseSheetData(
+          await this.readSheetData(
+            spreadsheetId,
+            `${SHEET_METADATA_TAB}!A:${SHEET_READ_LAST_COLUMN}`
+          )
+        )
+      : [];
+    const userId =
+      records.vehicles.length > 0
+        ? String(records.vehicles[0].userId)
+        : String(written?.userId ?? '');
 
     return {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId },
+      metadata: {
+        version: String(written?.version ?? ''),
+        timestamp: String(written?.timestamp ?? new Date().toISOString()),
+        userId,
+      },
       ...records,
     };
   }
