@@ -42,6 +42,10 @@
 		return val < latestOdometer;
 	});
 
+	function clearFieldError(field: 'odometer' | 'date' | 'note') {
+		if (fieldErrors[field]) fieldErrors = { ...fieldErrors, [field]: undefined };
+	}
+
 	function enteredOdometer(): number | undefined {
 		return odometer === '' || odometer === null ? undefined : Number(odometer);
 	}
@@ -188,23 +192,27 @@
 					bind:value={odometer}
 					class={fieldErrors.odometer ? 'border-destructive' : ''}
 					aria-invalid={!!fieldErrors.odometer}
+					oninput={() => clearFieldError('odometer')}
 					aria-describedby={fieldErrors.odometer ? 'odometer-error' : undefined}
 				/>
 				{#if fieldErrors.odometer}
 					<FormFieldError id="odometer-error">{fieldErrors.odometer}</FormFieldError>
 				{/if}
-				{#if showWarning}
-					<div
-						role="status"
-						class="flex items-center gap-2 rounded-md bg-warning/10 p-3 text-sm text-warning"
-					>
-						<TriangleAlert class="h-4 w-4 shrink-0" />
-						<span>
-							This reading ({Number(odometer).toLocaleString()}) is lower than the latest recorded
-							value ({latestOdometer?.toLocaleString()}). Are you sure?
-						</span>
-					</div>
-				{/if}
+				<div role="status">
+					{#if showWarning}
+						<div class="flex items-center gap-2 rounded-md bg-warning/10 p-3 text-sm text-warning">
+							<TriangleAlert class="h-4 w-4 shrink-0" />
+							<span aria-hidden="true">
+								This reading ({Number(odometer).toLocaleString()}) is lower than the latest recorded
+								value ({latestOdometer?.toLocaleString()}). Are you sure?
+							</span>
+							<span class="sr-only">
+								This reading is lower than the latest recorded value of {latestOdometer?.toLocaleString()}.
+								Are you sure?
+							</span>
+						</div>
+					{/if}
+				</div>
 			</div>
 
 			<div class="space-y-2">
@@ -215,6 +223,7 @@
 					bind:value={date}
 					class={fieldErrors.date ? 'border-destructive' : ''}
 					aria-invalid={!!fieldErrors.date}
+					oninput={() => clearFieldError('date')}
 					aria-describedby={fieldErrors.date ? 'date-error' : undefined}
 				/>
 				{#if fieldErrors.date}
@@ -223,7 +232,7 @@
 			</div>
 
 			<div class="space-y-2">
-				<Label for="note">Note (optional)</Label>
+				<Label for="note">Note (Optional)</Label>
 				<Textarea
 					id="note"
 					placeholder="e.g. Oil change visit"
@@ -231,6 +240,7 @@
 					rows={3}
 					class={fieldErrors.note ? 'border-destructive' : ''}
 					aria-invalid={!!fieldErrors.note}
+					oninput={() => clearFieldError('note')}
 					aria-describedby={fieldErrors.note ? 'note-error' : undefined}
 				/>
 				{#if fieldErrors.note}
