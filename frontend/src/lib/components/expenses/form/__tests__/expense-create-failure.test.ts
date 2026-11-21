@@ -62,7 +62,9 @@ describe('ExpenseForm — a failed create is classified before anything is queue
 
 		await fillAndSave();
 
-		await vi.waitFor(() => expect(submitError()).toBe('Amount must be greater than 0'));
+		await vi.waitFor(() =>
+			expect(submitError()).toBe("Couldn't save this expense. Amount must be greater than 0.")
+		);
 		expect(loadOfflineExpenses()).toEqual([]);
 		expect(goto).not.toHaveBeenCalled();
 	});
@@ -72,7 +74,9 @@ describe('ExpenseForm — a failed create is classified before anything is queue
 
 		await fillAndSave();
 
-		await vi.waitFor(() => expect(submitError()).toBe('Vehicle not found'));
+		await vi.waitFor(() =>
+			expect(submitError()).toBe("Couldn't save this expense. Vehicle not found.")
+		);
 		expect(loadOfflineExpenses()).toEqual([]);
 		expect(goto).not.toHaveBeenCalled();
 	});
