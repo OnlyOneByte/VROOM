@@ -32,13 +32,13 @@ describe('expense and vehicle form controls meet the 40px tap target on mobile',
 			"relative hover:text-primary after:absolute after:-inset-3.5 after:content-['']"
 		);
 		expect(source('expenses/form/PendingPhotoPreview.svelte')).toContain(
-			"after:absolute after:-inset-2.5 after:content-['']"
+			"after:absolute after:-top-1 after:-right-1 after:-bottom-4 after:-left-4 after:content-['']"
 		);
 	});
 
 	test('text and toggle buttons are at least 40px tall below sm', () => {
 		expect(source('expenses/form/TagInput.svelte')).toContain(
-			'class="w-full min-h-10 text-left px-3 py-2 hover:bg-accent text-sm sm:min-h-0"'
+			'class="flex w-full min-h-10 items-center text-left px-3 py-2 hover:bg-accent text-sm sm:min-h-0"'
 		);
 		expect(
 			source('expenses/form/FuelFieldsSection.svelte').match(/class="h-10 flex-1 gap-1\.5 sm:h-8"/g)

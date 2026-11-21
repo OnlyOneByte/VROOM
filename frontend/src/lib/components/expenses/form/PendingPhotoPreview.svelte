@@ -70,7 +70,7 @@
 					<button
 						type="button"
 						onclick={() => onRemove(i)}
-						class="absolute right-1 top-1 rounded-full bg-background/80 p-1 text-muted-foreground opacity-100 transition-opacity hover:text-foreground lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100 after:absolute after:-inset-2.5 after:content-['']"
+						class="absolute right-1 top-1 rounded-full bg-background/80 p-1 text-muted-foreground opacity-100 transition-opacity hover:text-foreground lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100 after:absolute after:-top-1 after:-right-1 after:-bottom-4 after:-left-4 after:content-['']"
 						aria-label="Remove {preview.name}"
 					>
 						<X class="h-3 w-3" />
