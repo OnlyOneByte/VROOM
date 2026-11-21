@@ -11,6 +11,7 @@
 	import { LoaderCircle, ArrowLeft, LogIn, CircleAlert } from '@lucide/svelte';
 	import GoogleLogo from '#lib/components/icons/GoogleLogo.svelte';
 	import GitHubLogo from '#lib/components/icons/GitHubLogo.svelte';
+	import BrandMark from '#lib/components/common/BrandMark.svelte';
 	import type { Component } from 'svelte';
 
 	const iconMap: Record<string, Component<{ class?: string }>> = {
@@ -84,7 +85,7 @@
 			<div
 				class="inline-flex items-center justify-center w-20 h-20 bg-primary rounded-3xl shadow-lg mb-4"
 			>
-				<span class="text-5xl">🚗</span>
+				<BrandMark class="h-12 w-12 text-primary-foreground" />
 			</div>
 			<h1 class="text-3xl font-bold tracking-tight text-foreground">Welcome back</h1>
 			<p class="text-muted-foreground">Sign in to continue to your dashboard</p>

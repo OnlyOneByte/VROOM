@@ -25,6 +25,7 @@
 	import { onlineStatus } from '#lib/stores/offline.svelte.ts';
 	import { themeStore } from '#lib/stores/theme.svelte.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import BrandMark from '#lib/components/common/BrandMark.svelte';
 
 	let { children } = $props();
 
@@ -148,7 +149,7 @@
 {#if authState.isLoading}
 	<div class="min-h-screen bg-background flex items-center justify-center">
 		<div class="text-center">
-			<div class="text-6xl mb-4">🚗</div>
+			<BrandMark class="h-14 w-14 mx-auto mb-4" />
 			<LoaderCircle class="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
 			<p class="text-muted-foreground">Loading VROOM...</p>
 		</div>
