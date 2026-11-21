@@ -23,7 +23,7 @@ export function pushStatusLabel(status: PushStatus): string {
 		case 'unsupported':
 			return 'This browser does not support push notifications.';
 		case 'unconfigured':
-			return 'Push notifications are not configured on this server.';
+			return "Push notifications aren't set up on this server.";
 		case 'denied':
 			return 'Notifications are blocked. Allow them for this site in your browser settings, then try again.';
 		case 'subscribed':
@@ -106,6 +106,9 @@ export async function enablePush(): Promise<PushEnableOutcome> {
 	} catch (e) {
 		if (e instanceof ApiError && e.code === 'PUSH_NOT_CONFIGURED') {
 			return { ok: false, reason: 'unconfigured' };
+		}
+		if (e instanceof DOMException && e.name === 'NotAllowedError') {
+			return { ok: false, reason: 'denied' };
 		}
 		return { ok: false, reason: 'error', message: userFacingErrorMessage(e) };
 	}

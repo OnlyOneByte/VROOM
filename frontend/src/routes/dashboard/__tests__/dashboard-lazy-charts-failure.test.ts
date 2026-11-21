@@ -50,7 +50,7 @@ describe('dashboard chart row when the chart chunk fails to load', () => {
 		render(Page);
 
 		await waitFor(() =>
-			expect(screen.getAllByText('Charts could not be loaded', { exact: false })).toHaveLength(2)
+			expect(screen.getAllByText("Charts couldn't be loaded", { exact: false })).toHaveLength(2)
 		);
 		expect(screen.getByText('Monthly Expense Trends')).toBeInTheDocument();
 		expect(screen.getByText('Expense by Category')).toBeInTheDocument();
