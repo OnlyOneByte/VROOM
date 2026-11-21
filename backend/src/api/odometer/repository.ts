@@ -77,7 +77,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     userId: string;
     odometer: number;
     recordedAt: Date;
-  }): Promise<number> {
+  }): Promise<string[]> {
     const { dayStart, nextDay } = localDayWindow(entry.recordedAt);
 
     const removed = await this.db
@@ -92,8 +92,8 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
           lt(odometerEntries.recordedAt, nextDay)
         )
       )
-      .returning();
-    return removed.length;
+      .returning({ id: odometerEntries.id });
+    return removed.map((row) => row.id);
   }
 
   // Every raw-SQL leg must keep the user_id predicate or rows leak across users.
