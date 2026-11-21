@@ -632,6 +632,7 @@
 				aria-label="Loading vehicle"
 				data-testid="vehicle-form-loading"
 			>
+				<span class="sr-only">Loading vehicle</span>
 				<Card>
 					<CardHeader>
 						<Skeleton class="h-5 w-48" />
@@ -650,13 +651,18 @@
 				</Card>
 			</div>
 			<div
-				class="fixed bottom-4 left-4 right-4 z-50 flex justify-center gap-3 sm:bottom-8 sm:right-8 sm:left-auto sm:gap-4"
+				class="fixed bottom-4 left-4 right-4 z-50 sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto"
 				aria-hidden="true"
+				data-testid="vehicle-form-loading-actions"
 			>
-				{#each Array(2) as _, i (i)}
-					<Skeleton class="h-14 w-14 rounded-full sm:w-28" />
-				{/each}
-				<Skeleton class="h-14 flex-1 rounded-full sm:w-44 sm:flex-none" />
+				<div
+					class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none border sm:border-0"
+				>
+					{#each Array(2) as _, i (i)}
+						<Skeleton class="h-14 w-12.5 shrink-0 rounded-full sm:w-29.5" />
+					{/each}
+					<Skeleton class="h-14 flex-1 rounded-full sm:w-46 sm:flex-initial" />
+				</div>
 			</div>
 		</div>
 	{:else if loadError}

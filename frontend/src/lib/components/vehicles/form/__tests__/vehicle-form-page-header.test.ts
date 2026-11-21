@@ -51,8 +51,14 @@ describe('VehicleForm page title', () => {
 
 		const loading = await screen.findByRole('status', { name: 'Loading vehicle' });
 		expectSharedPageTitle('Edit Vehicle');
+		expect(loading).toHaveTextContent('Loading vehicle');
 		expect(loading.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThanOrEqual(10);
 		expect(container.querySelector('.animate-spin')).toBeNull();
+
+		const actions = screen.getByTestId('vehicle-form-loading-actions');
+		expect(actions).toHaveAttribute('aria-hidden', 'true');
+		expect(actions).toHaveClass('fixed', 'bottom-4', 'sm:bottom-8');
+		expect(actions.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(3);
 	});
 
 	test('edit mode names the vehicle under the title', async () => {
