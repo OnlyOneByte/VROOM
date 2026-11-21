@@ -5,7 +5,7 @@ let ctx: TestApp;
 
 beforeAll(async () => {
   ctx = await createTestApp();
-}, 30_000);
+});
 afterAll(() => ctx.close());
 
 interface ErrorBody {
