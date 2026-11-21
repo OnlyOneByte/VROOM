@@ -198,16 +198,18 @@ export function calculateNextPaymentDate(
 			return new Date();
 		}
 
-		const maxIterations = 1000;
-		let index = 1;
-		while (index < maxIterations && scheduledDueDate(financing, start, index + 1) <= now) {
-			index++;
-		}
-
-		if (index >= maxIterations) {
-			if (DEV) console.warn('calculateNextPaymentDate: max iterations reached');
-			return new Date();
-		}
+		const periodDays =
+			financing.paymentFrequency === 'weekly'
+				? 7
+				: financing.paymentFrequency === 'bi-weekly'
+					? 14
+					: 365.25 / 12;
+		let index = Math.max(
+			1,
+			Math.floor((now.getTime() - start.getTime()) / (periodDays * MS_PER_DAY))
+		);
+		while (index > 1 && scheduledDueDate(financing, start, index) > now) index--;
+		while (scheduledDueDate(financing, start, index + 1) <= now) index++;
 
 		const lastDue = scheduledDueDate(financing, start, index);
 		if (lastDue > now) return lastDue;

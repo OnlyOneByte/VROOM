@@ -763,15 +763,35 @@ describe('calculatePayoffDateFromStart', () => {
 	});
 });
 
-describe('calculateNextPaymentDate iteration cap', () => {
-	test('a weekly schedule more than a thousand payments old falls back to now', () => {
+describe('calculateNextPaymentDate for long-running schedules', () => {
+	test('a weekly schedule more than a thousand payments old finds the current due date', () => {
 		const next = calculateNextPaymentDate(
 			makeLoan({ paymentFrequency: 'weekly', startDate: '2000-01-03T12:00:00' })
 		);
-		expect(next.getTime()).toBe(NOW.getTime());
+		expect(next.getFullYear()).toBe(2025);
+		expect(next.getMonth()).toBe(5);
+		expect(next.getDate()).toBe(9);
 	});
 
-	test('a weekly schedule just under the cap still finds the current due date', () => {
+	test('a bi-weekly schedule decades old lands on its own cadence', () => {
+		const next = calculateNextPaymentDate(
+			makeLoan({ paymentFrequency: 'bi-weekly', startDate: '1985-01-07T12:00:00' })
+		);
+		expect(next.getFullYear()).toBe(2025);
+		expect(next.getMonth()).toBe(5);
+		expect(next.getDate()).toBe(2);
+	});
+
+	test('a monthly schedule decades old keeps its payment day', () => {
+		const next = calculateNextPaymentDate(
+			makeLoan({ startDate: '1990-01-31T12:00:00', paymentDayOfMonth: 31 })
+		);
+		expect(next.getFullYear()).toBe(2025);
+		expect(next.getMonth()).toBe(4);
+		expect(next.getDate()).toBe(31);
+	});
+
+	test('a weekly schedule of under a thousand payments still finds the current due date', () => {
 		const next = calculateNextPaymentDate(
 			makeLoan({ paymentFrequency: 'weekly', startDate: '2008-01-07T12:00:00' })
 		);
@@ -878,7 +898,6 @@ describe('production builds', () => {
 		const cases: Array<[VehicleFinancing, Date | undefined]> = [
 			[null as unknown as VehicleFinancing, undefined],
 			[makeLoan({ startDate: 'garbage' }), undefined],
-			[makeLoan({ paymentFrequency: 'weekly', startDate: '2000-01-03T12:00:00' }), undefined],
 			[makeLoan(), throwingPrimitive() as unknown as Date]
 		];
 		for (const [financing, lastPaid] of cases) {
