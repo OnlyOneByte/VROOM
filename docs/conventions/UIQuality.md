@@ -147,6 +147,10 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   "(Optional)".
 - Validation errors render under the field with `FormFieldError`, wired by `aria-describedby`
   and `aria-invalid`. Validate on submit and on blur, not on every keystroke.
+- After a failed submit, move focus to the first invalid field in DOM order, so keyboard and
+  screen-reader users land on what needs fixing instead of staying on Save. Focusing the field
+  is enough: its wired error is announced with it. Existing forms adopt this one by one; a PR
+  that changes a form for another reason isn't blocked on it.
 - Use the right control: `DatePicker` for dates, `Select` for a short fixed list, a tile grid for
   a handful of illustrated choices (expense category), `Switch` for settings that apply
   instantly, `Checkbox` for choices saved with a form.
@@ -240,7 +244,8 @@ verify by hand:
 - **Keyboard.** Every action is reachable and operable by keyboard in a sensible order. Enter
   submits, Escape cancels inline editors and closes dialogs.
 - **Focus.** Never remove outlines. Primitives show `focus-visible:ring-[3px]` in `ring-ring/50`;
-  a custom control shows the same ring. Focus moves into a dialog on open and back on close.
+  a custom control shows the same ring. Focus moves into a dialog on open and back on close, and
+  after a failed submit it moves to the first invalid field (see *Forms*).
 - **Colour is never the only signal** — see *Colour and theme tokens* for contrast.
 - **Semantics.** Lists are lists, tables are `Table`, headings are headings. Updates that matter
   (sync status, form errors) use `role="status"` / `role="alert"`.
@@ -344,8 +349,9 @@ failed step; nits can be follow-up issues.
 - [ ] Every state handled (loading / empty / error / populated / success feedback).
 - [ ] No overflow at 375px; tap targets ≥ 40px; primary action in thumb reach.
 - [ ] Tokens only; AA contrast checked in Default plus two other theme families, light and dark.
-- [ ] Icon-only controls have `aria-label`; forms have labels + wired errors; no nested
-      interactive elements; keyboard and focus work.
+- [ ] Icon-only controls have `aria-label`; forms have labels + wired errors, and a failed
+      submit focuses the first invalid field; no nested interactive elements; keyboard and focus
+      work.
 - [ ] Reuses the kit + formatters + routes (no hardcoded colours, paths, or number formatting).
 - [ ] Destructive actions confirmed; in-flight mutations disable + spinner.
 - [ ] Copy follows *Copy and voice*.
