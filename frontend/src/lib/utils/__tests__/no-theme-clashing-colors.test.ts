@@ -1,14 +1,20 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { ratchet } from './_helpers/debt-ratchet';
 import { collectSvelteFiles } from './_helpers/collect-svelte-files';
 
 const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-const THEME_CLASH =
-	/(?<!dark:)\b(?:bg|text|border)-(?:white|black|gray-\d+|slate-\d+|zinc-\d+|neutral-\d+)(?:\/\d+)?\b/;
+const PALETTE_FAMILIES =
+	'gray|slate|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
+
+const THEME_CLASH = new RegExp(
+	`(?<!dark:)\\b(?:bg|text|border)-(?:white|black|(?:${PALETTE_FAMILIES})-\\d+)(?:\\/\\d+)?\\b`
+);
+
+const RAW_CSS_COLOR = /\b(?:rgba?|hsla?)\(|#[0-9a-fA-F]{3,8}\b/;
 
 const files = collectSvelteFiles(SRC_ROOT);
 const rel = (file: string) => relative(SRC_ROOT, file).replace(/\\/g, '/');
@@ -53,9 +59,30 @@ ratchet({
 		expect(THEME_CLASH.test('<div class="dark:bg-gray-800">')).toBe(false);
 		expect(THEME_CLASH.test('<div class="bg-background text-muted-foreground">')).toBe(false);
 		expect(THEME_CLASH.test('<div class="border-border">')).toBe(false);
+		expect(THEME_CLASH.test('<div class="bg-yellow-50 text-green-800">')).toBe(true);
+		expect(THEME_CLASH.test('<div class="border-rose-200/50">')).toBe(true);
 		expect(
 			files.length,
 			'the .svelte walk found almost nothing — SRC_ROOT is wrong'
 		).toBeGreaterThan(20);
 	}
+});
+
+describe('app.css paints only with theme tokens', () => {
+	const APP_CSS = readFileSync(join(SRC_ROOT, 'app.css'), 'utf-8');
+
+	test('no raw rgb()/hsl()/hex colour literals', () => {
+		const offending = APP_CSS.split('\n')
+			.map((line, index) => ({ line: line.trim(), number: index + 1 }))
+			.filter(({ line }) => RAW_CSS_COLOR.test(line))
+			.map(({ line, number }) => `app.css:${number} → ${line}`);
+		expect(offending, 'use var(--token) instead of a literal colour').toEqual([]);
+	});
+
+	test('the literal detector is non-vacuous', () => {
+		expect(RAW_CSS_COLOR.test('background-color: rgb(254 242 242) !important;')).toBe(true);
+		expect(RAW_CSS_COLOR.test('color: #fff;')).toBe(true);
+		expect(RAW_CSS_COLOR.test('background-color: var(--card) !important;')).toBe(false);
+		expect(RAW_CSS_COLOR.test('--chart-1: oklch(0.646 0.222 41.116);')).toBe(false);
+	});
 });

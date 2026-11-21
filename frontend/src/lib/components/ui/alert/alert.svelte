@@ -9,9 +9,9 @@
 				destructive:
 					'text-destructive bg-card *:data-[slot=alert-description]:text-destructive/90 [&>svg]:text-current',
 				warning:
-					'bg-yellow-50 border-yellow-200 text-yellow-800 *:data-[slot=alert-description]:text-yellow-800/90 [&>svg]:text-current',
+					'text-warning bg-card *:data-[slot=alert-description]:text-warning [&>svg]:text-current',
 				success:
-					'bg-green-50 border-green-200 text-green-800 *:data-[slot=alert-description]:text-green-800/90 [&>svg]:text-current'
+					'text-success bg-card *:data-[slot=alert-description]:text-success [&>svg]:text-current'
 			}
 		},
 		defaultVariants: {

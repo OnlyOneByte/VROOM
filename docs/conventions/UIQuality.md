@@ -92,9 +92,9 @@ token table and the role of each token live in `DesignSystem.md` → *Design tok
 
 - **Only tokens.** `bg-*`/`text-*`/`border-*` from the token set. No hex, `rgb()`, `gray-*`,
   `white`, `black` or other palette classes in components or `app.css`.
-  `no-theme-clashing-colors.test.ts` catches the common ones; reviewers catch the rest. Known
-  gaps: the sonner toast colours in `app.css` and `Alert`'s `warning`/`success` variants are
-  hardcoded and ignore the theme; don't copy them.
+  `no-theme-clashing-colors.test.ts` catches palette classes in `.svelte` files and raw
+  `rgb()`/`hsl()`/hex literals in `app.css`; reviewers catch the rest (for example a palette
+  class built in a `.ts` file).
 - **Contrast is WCAG 2.1 AA in every theme and both modes.** Text ≥ 4.5:1 against its surface;
   large text (≥ 24px, or ≥ 18.66px bold) and meaningful non-text UI (icons that carry meaning,
   input borders, focus rings) ≥ 3:1.
