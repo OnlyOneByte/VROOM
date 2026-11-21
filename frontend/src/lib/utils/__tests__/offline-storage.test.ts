@@ -230,6 +230,42 @@ describe('Offline Storage', () => {
 		});
 	});
 
+	describe('amounts are kept to whole cents', () => {
+		it('a new entry is queued rounded to 2 decimals', async () => {
+			await addOfflineExpense({
+				vehicleId: 'vehicle-1',
+				tags: [],
+				category: 'misc',
+				amount: 12.345,
+				date: '2024-01-01'
+			});
+
+			const savedData = JSON.parse(localStorageMock.setItem.mock.calls[0][1]);
+			expect(savedData[0].amount).toBe(12.35);
+		});
+
+		it('an entry queued before rounding loads rounded, so it can still sync', () => {
+			localStorageMock.getItem.mockReturnValue(
+				JSON.stringify([
+					{
+						id: 'old',
+						clientId: 'old',
+						vehicleId: 'vehicle-1',
+						tags: [],
+						category: 'misc',
+						amount: 1.005,
+						date: '2024-01-01',
+						timestamp: 1,
+						synced: false,
+						version: '3.0'
+					}
+				])
+			);
+
+			expect(loadOfflineExpenses()[0]?.amount).toBe(1.01);
+		});
+	});
+
 	describe('addOfflineExpense', () => {
 		it('should add new expense with generated ID and timestamp', async () => {
 			const expenseData = {
