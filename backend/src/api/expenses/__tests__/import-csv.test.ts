@@ -572,4 +572,18 @@ describe('import currency check', () => {
     expect(noColumn.data.readyCount).toBe(1);
     expect(noColumn.data.currencyWarning).toBeUndefined();
   });
+
+  test('only three-letter codes count, so free text in the column never reaches the warning', async () => {
+    await seedCivic('Daily Driver');
+
+    const res = await json<ImportResponse>(
+      await ctx.authed('POST', '/api/v1/expenses/import', {
+        csv: csvIn('euros please', 'X', 'GBP', 'TOOLONG'),
+        dryRun: true,
+      })
+    );
+    expect(res.data.currencyWarning).toBe(
+      'This file is in GBP; amounts will be imported as USD without conversion.'
+    );
+  });
 });

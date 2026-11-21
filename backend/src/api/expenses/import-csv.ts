@@ -52,6 +52,7 @@ export interface ImportPlan {
 export class CsvImportError extends Error {}
 
 const EXP = CONFIG.validation.expense;
+const CURRENCY_CODE = /^[A-Z]{3}$/;
 
 type CellGetter = (key: string) => string;
 
@@ -310,7 +311,7 @@ export function buildImportPlan(
     ...new Set(
       records.map((record) => denormalizeCsvCell((record.currency ?? '').trim()).toUpperCase())
     ),
-  ].filter(Boolean);
+  ].filter((code) => CURRENCY_CODE.test(code));
 
   const readyCount = rows.filter((r) => r.status === 'ready').length;
   return { rows, readyCount, errorCount: rows.length - readyCount, fileCurrencies };

@@ -42,7 +42,7 @@ describe('CSV export and import column-name contract', () => {
     ).toEqual([]);
   });
 
-  test('the export-only metadata columns (currency, createdAt) are intentionally NOT read by the importer', () => {
+  test('the export-only metadata columns (currency, createdAt) are never imported as expense fields', () => {
     const src = readFileSync(IMPORTER, 'utf8');
     const readKeys = new Set<string>();
     for (const m of src.matchAll(GET_CALL)) {
