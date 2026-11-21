@@ -276,12 +276,17 @@
 							vehicles={form.vehicles}
 							value={form.formData.vehicleId}
 							error={form.touched['vehicleId'] ? form.errors['vehicleId'] : undefined}
+							describedBy={form.showFuelSplitHint ? 'fuel-split-hint' : undefined}
 							canSplit={form.canSplit}
 							onSelect={form.handleVehicleSelect}
 							onSplit={() => form.handleSplitToggle(true)}
 						/>
 						{#if form.showFuelSplitHint}
-							<p class="text-xs text-muted-foreground" data-testid="fuel-split-hint">
+							<p
+								id="fuel-split-hint"
+								class="text-xs text-muted-foreground"
+								data-testid="fuel-split-hint"
+							>
 								Fill-ups can't be split across vehicles. Log each one on the vehicle you filled.
 							</p>
 						{/if}
