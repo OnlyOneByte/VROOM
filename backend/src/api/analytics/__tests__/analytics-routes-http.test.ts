@@ -224,3 +224,62 @@ describe('analytics routes (real HTTP stack)', () => {
     expect(body.data.loanBreakdown.some((m) => m.principal > 0)).toBe(true);
   });
 });
+
+describe('analytics date range and year parameters', () => {
+  const JAN_2025 = 1_735_689_600;
+  const JAN_2026 = 1_767_225_600;
+
+  test('a seconds range in order is accepted on every range route', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    const range = `startDate=${JAN_2025}&endDate=${JAN_2026}`;
+    for (const path of [
+      `/api/v1/analytics/summary?${range}&ytdStart=${JAN_2026}`,
+      `/api/v1/analytics/quick-stats?${range}`,
+      `/api/v1/analytics/fuel-stats?${range}`,
+      `/api/v1/analytics/cross-vehicle?${range}`,
+      `/api/v1/analytics/fuel-advanced?${range}`,
+      `/api/v1/analytics/vehicle-expenses?${range}&vehicleId=${vehicleId}`,
+    ]) {
+      const res = await ctx.authed('GET', path);
+      expect(res.status, `${path}: ${await res.text()}`).toBe(200);
+    }
+  });
+
+  const rangeRoutes = ['/api/v1/analytics/summary', '/api/v1/analytics/fuel-stats'];
+
+  test.each([
+    ['milliseconds', `startDate=${JAN_2025 * 1000}&endDate=${JAN_2026 * 1000}`, rangeRoutes],
+    ['a reversed range', `startDate=${JAN_2026}&endDate=${JAN_2025}`, rangeRoutes],
+    ['an empty range', `startDate=${JAN_2025}&endDate=${JAN_2025}`, rangeRoutes],
+    [
+      'a millisecond ytdStart',
+      `startDate=${JAN_2025}&endDate=${JAN_2026}&ytdStart=${JAN_2026 * 1000}`,
+      ['/api/v1/analytics/summary'],
+    ],
+  ])('%s is a 400', async (_label, query, paths) => {
+    for (const path of paths) {
+      const res = await ctx.authed('GET', `${path}?${query}`);
+      expect(res.status, `${path}?${query}: ${await res.text()}`).toBe(400);
+    }
+  });
+
+  test('year must be between 1900 and next year', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    const nextYear = new Date().getUTCFullYear() + 1;
+    for (const [query, expected] of [
+      [`year=${nextYear}`, 200],
+      ['year=1900', 200],
+      ['year=999999', 400],
+      [`year=${nextYear + 1}`, 400],
+      ['year=1899', 400],
+    ] as const) {
+      const yearEnd = await ctx.authed('GET', `/api/v1/analytics/year-end?${query}`);
+      expect(yearEnd.status, `year-end ${query}: ${await yearEnd.text()}`).toBe(expected);
+      const tco = await ctx.authed(
+        'GET',
+        `/api/v1/analytics/vehicle-tco?${query}&vehicleId=${vehicleId}`
+      );
+      expect(tco.status, `vehicle-tco ${query}: ${await tco.text()}`).toBe(expected);
+    }
+  });
+});

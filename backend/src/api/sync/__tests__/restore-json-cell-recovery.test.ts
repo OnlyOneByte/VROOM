@@ -122,7 +122,7 @@ describe('a backup whose unit_preferences cell parses but is not valid unit pref
 
     const stats = await ctx.authed(
       'GET',
-      '/api/v1/analytics/fuel-stats?startDate=1600000000000&endDate=1800000000000'
+      '/api/v1/analytics/fuel-stats?startDate=1600000000&endDate=1800000000'
     );
     expect(stats.status, await stats.text()).toBe(200);
 
