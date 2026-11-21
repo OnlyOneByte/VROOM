@@ -114,11 +114,22 @@ describe('PolicyCard header', () => {
 		expect(screen.queryByText('Inactive')).toBeNull();
 	});
 
-	test('an inactive policy is dimmed and badged', async () => {
-		const { container } = mount({ policy: makePolicy({ isActive: false, terms: [CURRENT] }) });
+	test.each([
+		['an inactive', 'Inactive', makePolicy({ isActive: false, terms: [CURRENT] })],
+		['an expired', 'Expired', makePolicy({ terms: [PAST] })]
+	])('%s policy is badged on a muted surface without fading its text', async (_, badge, policy) => {
+		const { container } = mount({ policy });
 		await settle();
-		expect(screen.getByText('Inactive')).toBeInTheDocument();
-		expect(container.querySelector('.opacity-70')).not.toBeNull();
+		expect(screen.getByText(badge)).toBeInTheDocument();
+		const card = container.querySelector('[data-slot="card"]');
+		expect(card).toHaveClass('bg-muted/30');
+		expect(card?.className).not.toMatch(/opacity-/);
+	});
+
+	test('a policy in force keeps the plain card surface', async () => {
+		const { container } = mount();
+		await settle();
+		expect(container.querySelector('[data-slot="card"]')).not.toHaveClass('bg-muted/30');
 	});
 
 	test('a policy with no terms shows no term card, number or countdown', async () => {

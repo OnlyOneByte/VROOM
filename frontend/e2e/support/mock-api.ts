@@ -82,6 +82,31 @@ export const BACKEND_EXPENSES = [
 	}
 ];
 
+export const POLICY_EXPIRED = {
+	id: 'policy-expired',
+	company: 'State Farm',
+	isActive: true,
+	notes: 'Switched carriers',
+	vehicleIds: [VEHICLE_CAMRY.id],
+	terms: [
+		{
+			id: 'term-expired',
+			policyId: 'policy-expired',
+			startDate: '2023-07-01',
+			endDate: '2024-06-30',
+			policyNumber: 'SF-1001',
+			coverageDescription: 'Full coverage',
+			deductibleAmount: 500,
+			totalCost: 1200,
+			createdAt: '2023-07-01T12:00:00.000Z',
+			updatedAt: '2023-07-01T12:00:00.000Z'
+		}
+	],
+	termVehicleCoverage: [{ termId: 'term-expired', vehicleId: VEHICLE_CAMRY.id }],
+	createdAt: '2023-07-01T12:00:00.000Z',
+	updatedAt: '2023-07-01T12:00:00.000Z'
+};
+
 const EXPENSE_SUMMARY = {
 	totalAmount: 135.49,
 	expenseCount: 2,
@@ -278,7 +303,15 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 		if (path === '/photos') return fulfillData(route, {});
 		if (/^\/photos\/[^/]+\/[^/]+$/.test(path)) return fulfillPage(route, []);
 
-		if (path === '/insurance') return fulfillData(route, []);
+		if (path === '/insurance') return fulfillData(route, [POLICY_EXPIRED]);
+		const insuredVehicleId = /^\/insurance\/vehicles\/([^/]+)\/policies$/.exec(path)?.[1];
+		if (insuredVehicleId) {
+			return fulfillData(
+				route,
+				POLICY_EXPIRED.vehicleIds.includes(insuredVehicleId) ? [POLICY_EXPIRED] : []
+			);
+		}
+		if (/^\/insurance\/[^/]+\/claims$/.test(path)) return fulfillData(route, []);
 
 		if (path === '/trips/summary') {
 			return fulfillData(route, {
