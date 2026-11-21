@@ -7,6 +7,7 @@ import {
   isNotNull,
   isNull,
   lt,
+  lte,
   notInArray,
   or,
   sql,
@@ -1346,6 +1347,7 @@ export class AnalyticsRepository {
 
   private async queryCoveredVehicleIds(vehicleIds: string[], userId: string): Promise<Set<string>> {
     if (vehicleIds.length === 0) return new Set();
+    const now = new Date();
 
     const rows = await this.db
       .select({ vehicleId: insuranceTermVehicles.vehicleId })
@@ -1356,7 +1358,9 @@ export class AnalyticsRepository {
         and(
           inArray(insuranceTermVehicles.vehicleId, vehicleIds),
           eq(insurancePolicies.isActive, true),
-          eq(insurancePolicies.userId, userId)
+          eq(insurancePolicies.userId, userId),
+          lte(insuranceTerms.startDate, now),
+          gte(insuranceTerms.endDate, now)
         )
       );
 
