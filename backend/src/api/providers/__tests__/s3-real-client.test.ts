@@ -31,6 +31,7 @@ describe('the real S3 client through the outbound request handler', () => {
       },
       stdout: 'pipe',
       stderr: 'pipe',
+      timeout: 20_000,
     });
     const [stdout, stderr, code] = await Promise.all([
       new Response(proc.stdout).text(),
