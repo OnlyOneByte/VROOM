@@ -46,7 +46,8 @@ function createAppStore() {
 		},
 
 		addNotification(notification: Omit<Notification, 'id'>) {
-			if (notification.type === 'error' && Date.now() < errorsMutedUntil) return;
+			if (notification.type === 'error' && !notification.urgent && Date.now() < errorsMutedUntil)
+				return;
 			const newNotification: Notification = {
 				...notification,
 				id: crypto.randomUUID(),

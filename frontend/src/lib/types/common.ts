@@ -6,6 +6,7 @@ export interface Notification {
 	message: string;
 	duration?: number;
 	timestamp?: number;
+	urgent?: boolean;
 }
 
 export interface AppState {
