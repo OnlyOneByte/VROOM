@@ -107,7 +107,7 @@ describe('CameraTab: camera access errors', () => {
 	test.each([
 		['NotAllowedError', 'Camera access was denied. Please allow camera permissions and try again.'],
 		['NotFoundError', 'No camera found on this device.'],
-		['AbortError', 'Could not access camera. Please try again.']
+		['AbortError', "Couldn't access the camera. Try again."]
 	])('a %s is reported as a readable message', async (name, message) => {
 		getUserMedia.mockRejectedValue(new DOMException('nope', name));
 		mount();
@@ -120,9 +120,7 @@ describe('CameraTab: camera access errors', () => {
 		getUserMedia.mockRejectedValue(new Error('boom'));
 		mount();
 
-		expect(
-			await screen.findByText('Could not access camera. Please try again.')
-		).toBeInTheDocument();
+		expect(await screen.findByText("Couldn't access the camera. Try again.")).toBeInTheDocument();
 	});
 
 	test.each(['OverconstrainedError', 'NotReadableError'])(
@@ -147,9 +145,7 @@ describe('CameraTab: camera access errors', () => {
 			.mockRejectedValueOnce(new Error('still no'));
 		mount();
 
-		expect(
-			await screen.findByText('Could not access camera. Please try again.')
-		).toBeInTheDocument();
+		expect(await screen.findByText("Couldn't access the camera. Try again.")).toBeInTheDocument();
 	});
 
 	test('Try Again reopens the camera after an error', async () => {
@@ -280,7 +276,7 @@ describe('CameraTab: controls and errors', () => {
 			await vi.advanceTimersByTimeAsync(50);
 
 			expect(screen.getByRole('button', { name: 'Take photo' })).toBeEnabled();
-			expect(screen.queryByText('Could not access camera. Please try again.')).toBeNull();
+			expect(screen.queryByText("Couldn't access the camera. Try again.")).toBeNull();
 		} finally {
 			vi.useRealTimers();
 		}
@@ -296,7 +292,7 @@ describe('CameraTab: controls and errors', () => {
 			await fireEvent.click(screen.getByRole('button', { name: 'Switch camera' }));
 			await vi.advanceTimersByTimeAsync(300);
 			expect(getUserMedia).toHaveBeenCalledTimes(4);
-			expect(screen.getByText('Could not access camera. Please try again.')).toBeInTheDocument();
+			expect(screen.getByText("Couldn't access the camera. Try again.")).toBeInTheDocument();
 
 			await vi.advanceTimersByTimeAsync(10_000);
 			expect(getUserMedia).toHaveBeenCalledTimes(4);

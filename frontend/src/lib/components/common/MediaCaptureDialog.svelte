@@ -8,6 +8,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { routes } from '#lib/routes.ts';
 	import { providerApi } from '#lib/services/provider-api.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import UploadTab from './media/UploadTab.svelte';
 	import CameraTab from './media/CameraTab.svelte';
 
@@ -96,8 +97,10 @@
 				const result = await onUpload(file);
 				onUploadComplete?.(result);
 			} catch (err: unknown) {
-				const message = err instanceof Error ? err.message : `Failed to upload "${file.name}"`;
-				uploadErrors = [...uploadErrors, message];
+				uploadErrors = [
+					...uploadErrors,
+					`Couldn't upload "${file.name}". ${userFacingErrorMessage(err)}`
+				];
 			}
 		}
 		uploadIndex = files.length;
@@ -110,8 +113,7 @@
 			onUploadComplete?.(result);
 			handleClose();
 		} catch (err: unknown) {
-			const message = err instanceof Error ? err.message : 'Failed to upload captured photo';
-			uploadErrors = [message];
+			uploadErrors = [`Couldn't upload the photo. ${userFacingErrorMessage(err)}`];
 			throw err;
 		}
 	}
