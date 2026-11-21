@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, setSystemTime, test } from 'bun:test';
 import { AnalyticsRepository } from '../repository';
 import {
   createTestDb,
@@ -25,7 +25,10 @@ beforeEach(() => {
     year: 2022,
   });
 });
-afterEach(() => testDb.sqlite.close());
+afterEach(() => {
+  setSystemTime();
+  testDb.sqlite.close();
+});
 
 const MS_DAY = 24 * 60 * 60 * 1000;
 
@@ -268,8 +271,9 @@ describe('getInsurance — only a term in force today counts toward the totals',
   });
 
   test('a term whose end date is today still counts, in totals and in vehicle coverage', async () => {
-    const today = new Date(now);
-    const startOfToday = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+    const lateToday = new Date('2026-06-15T23:59:59.000Z');
+    const startOfToday = Date.UTC(2026, 5, 15);
+    setSystemTime(lateToday);
     policy('p1', 'GEICO');
     term({
       id: 'ends-today',
