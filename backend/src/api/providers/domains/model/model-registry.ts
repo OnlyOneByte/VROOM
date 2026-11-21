@@ -1,6 +1,7 @@
 import type { UserProvider } from '../../../../db/schema';
 import { ValidationError } from '../../../../errors';
 import { decrypt } from '../../../../utils/encryption';
+import { assertSafeOutboundUrl } from '../../../../utils/outbound-url';
 import type { ModelDomainLabel } from './model-transport';
 
 export interface ModelProviderSettings {
@@ -28,6 +29,7 @@ export function resolveModelSettings(
     throw new ValidationError(`${domain} provider config is missing a model name`);
   }
   const baseUrl = typeof config.baseUrl === 'string' ? config.baseUrl : undefined;
+  if (baseUrl) assertSafeOutboundUrl(baseUrl, `${domain} base URL`);
 
   const credentials = JSON.parse(decrypt(row.credentials)) as Record<string, unknown>;
   const apiKey = typeof credentials.apiKey === 'string' ? credentials.apiKey : undefined;

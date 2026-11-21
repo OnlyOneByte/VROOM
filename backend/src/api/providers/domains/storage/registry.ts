@@ -7,6 +7,7 @@ import { NotFoundError, ValidationError } from '../../../../errors';
 import type { PhotoCategory, StorageConfig } from '../../../../types';
 import { DEFAULT_STORAGE_CONFIG } from '../../../../types';
 import { decrypt } from '../../../../utils/encryption';
+import { assertSafeOutboundUrl } from '../../../../utils/outbound-url';
 import { joinStoragePath } from '../../../../utils/paths';
 import { FakeStorageProvider } from './fake-provider';
 import { GoogleDriveProvider } from './google-drive-provider';
@@ -50,6 +51,7 @@ function buildS3Provider(credentials: Record<string, unknown>, config: unknown):
   if (!s3Config?.endpoint || !s3Config?.bucket || !s3Config?.region) {
     throw new ValidationError('Invalid S3 config: missing endpoint, bucket, or region');
   }
+  assertSafeOutboundUrl(s3Config.endpoint, 'S3 endpoint');
   return new S3CompatProvider(
     { accessKeyId, secretAccessKey },
     { endpoint: s3Config.endpoint, bucket: s3Config.bucket, region: s3Config.region }
