@@ -59,17 +59,19 @@ afterEach(() => {
 });
 
 describe('PolicyList grouping', () => {
+	const inForce = [makeTerm({ id: 't-now', endDate: '2030-01-01' })];
+
 	test('splits policies into active and inactive sections in that order', async () => {
 		mount([
 			makePolicy({ id: 'p-old', company: 'Old Co', isActive: false }),
-			makePolicy({ id: 'p-new', company: 'New Co', isActive: true })
+			makePolicy({ id: 'p-new', company: 'New Co', isActive: true, terms: inForce })
 		]);
 		await settle();
 		expect(sectionHeadings()).toEqual(['Active Policies', 'New Co', 'Inactive Policies', 'Old Co']);
 	});
 
 	test('omits the inactive section when every policy is active', async () => {
-		mount([makePolicy({ company: 'Only Co' })]);
+		mount([makePolicy({ company: 'Only Co', terms: inForce })]);
 		await settle();
 		expect(screen.getByText('Active Policies')).toBeInTheDocument();
 		expect(screen.queryByText('Inactive Policies')).toBeNull();
@@ -80,6 +82,18 @@ describe('PolicyList grouping', () => {
 		await settle();
 		expect(screen.queryByText('Active Policies')).toBeNull();
 		expect(screen.getByText('Inactive Policies')).toBeInTheDocument();
+	});
+
+	test('an active policy whose terms have all ended is listed as inactive', async () => {
+		mount([
+			makePolicy({
+				company: 'Lapsed Co',
+				terms: [makeTerm({ startDate: '2023-07-01', endDate: '2024-06-30' })]
+			})
+		]);
+		await settle();
+		expect(screen.queryByText('Active Policies')).toBeNull();
+		expect(sectionHeadings()).toEqual(['Inactive Policies', 'Lapsed Co']);
 	});
 
 	test('renders nothing for an empty list', () => {

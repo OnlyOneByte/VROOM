@@ -15,10 +15,10 @@ afterEach(() => {
 
 describe('PolicyTermCard content', () => {
 	test('a current term shows only its expiry date', () => {
-		render(PolicyTermCard, { props: { term: term(), isCurrent: true } });
+		render(PolicyTermCard, { props: { term: term({ endDate: '2099-06-01' }), isCurrent: true } });
 		expect(screen.getByText('Current Term')).toBeInTheDocument();
 		expect(screen.getByText('Expires')).toBeInTheDocument();
-		expect(screen.getByText('Jun 1, 2026')).toBeInTheDocument();
+		expect(screen.getByText('Jun 1, 2099')).toBeInTheDocument();
 		expect(screen.queryByText('Start')).toBeNull();
 	});
 

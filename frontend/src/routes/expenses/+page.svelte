@@ -13,14 +13,16 @@
 		CircleAlert,
 		Download,
 		Upload,
-		Images
+		Images,
+		Ellipsis
 	} from '@lucide/svelte';
 	import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 	import { removeOfflineExpense } from '#lib/utils/offline-storage.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { expenseApi } from '#lib/services/expense-api.ts';
-	import type { Expense, Vehicle, ExpenseSummary } from '#lib/types/index.ts';
+	import type { Expense, Vehicle, ExpenseSummary, PaginatedResponse } from '#lib/types/index.ts';
+	import { latest } from '#lib/utils/latest-request.ts';
 
 	type ExpenseWithVehicle = Expense & { vehicle?: Vehicle };
 	import { formatCurrency } from '#lib/utils/formatters.ts';
@@ -42,6 +44,7 @@
 	import ImportExpensesDialog from '#lib/components/expenses/ImportExpensesDialog.svelte';
 	import ImportFromPhotosDialog from '#lib/components/expenses/ImportFromPhotosDialog.svelte';
 	import * as Select from '#lib/components/ui/select/index.ts';
+	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import { useExpenseListReload } from './expense-list-reload.svelte';
 
 	let isLoading = $state(true);
@@ -98,7 +101,7 @@
 			iconColor: 'chart-2'
 		},
 		{
-			label: EXPENSE_MESSAGES.LAST_EXPENSE,
+			label: EXPENSE_MESSAGES.LAST_30_DAYS,
 			value: formatCurrency(summary?.recentAmount ?? 0),
 			icon: Calendar,
 			iconColor: 'chart-5'
@@ -153,38 +156,69 @@
 		};
 	}
 
+	const nextListRequest = latest();
+	const nextSummaryRequest = latest();
+	let pageError = $state<{ message: string; offset: number } | null>(null);
+
+	function applyPage(pageResult: PaginatedResponse<Expense>, offset: number) {
+		expenses = pageResult.data;
+		totalCount = pageResult.pagination.totalCount;
+		currentOffset = offset;
+		pageError = null;
+	}
+
+	function failPage(error: unknown, offset: number) {
+		pageError = {
+			message: error instanceof Error ? error.message : 'Failed to load expenses',
+			offset
+		};
+		handleErrorWithNotification(error, 'Failed to load expenses');
+	}
+
 	async function fetchPageAndSummary(offset = 0) {
+		const isCurrentList = nextListRequest();
+		const isCurrentSummary = nextSummaryRequest();
 		isLoadingPage = true;
 		try {
-			const [pageResult, summaryResult] = await Promise.all([
+			const [pageResult, summaryResult] = await Promise.allSettled([
 				expenseApi.getAllExpenses(buildListParams(offset)),
 				expenseApi.getExpenseSummary(buildSummaryParams())
 			]);
+			if (isLoading) {
+				if (pageResult.status === 'rejected') throw pageResult.reason;
+				if (summaryResult.status === 'rejected') throw summaryResult.reason;
+			}
 
-			expenses = pageResult.data;
-			totalCount = pageResult.pagination.totalCount;
-			currentOffset = offset;
-			summary = summaryResult;
-		} catch (error) {
-			if (isLoading) throw error;
-			handleErrorWithNotification(error, 'Failed to load expenses');
+			const listReported = isCurrentList();
+			if (listReported) {
+				if (pageResult.status === 'fulfilled') applyPage(pageResult.value, offset);
+				else failPage(pageResult.reason, offset);
+			}
+			if (isCurrentSummary()) {
+				if (summaryResult.status === 'fulfilled') summary = summaryResult.value;
+				else if (!listReported || pageResult.status === 'fulfilled')
+					handleErrorWithNotification(summaryResult.reason, 'Failed to load expense summary');
+			}
 		} finally {
-			isLoadingPage = false;
+			if (isCurrentList()) isLoadingPage = false;
 		}
 	}
 
 	async function fetchPage(offset: number) {
+		const isCurrent = nextListRequest();
 		isLoadingPage = true;
 		try {
 			const pageResult = await expenseApi.getAllExpenses(buildListParams(offset));
-			expenses = pageResult.data;
-			totalCount = pageResult.pagination.totalCount;
-			currentOffset = offset;
+			if (isCurrent()) applyPage(pageResult, offset);
 		} catch (error) {
-			if (import.meta.env.DEV) console.error('Failed to load expenses page:', error);
+			if (isCurrent()) failPage(error, offset);
 		} finally {
-			isLoadingPage = false;
+			if (isCurrent()) isLoadingPage = false;
 		}
+	}
+
+	function retryPage() {
+		fetchPageAndSummary(pageError?.offset ?? currentOffset);
 	}
 
 	function handleFilterChange() {
@@ -246,6 +280,15 @@
 
 	let importOpen = $state(false);
 	let photosImportOpen = $state(false);
+	let toolsMenuOpen = $state(false);
+	function openTool(open: () => void) {
+		toolsMenuOpen = false;
+		open();
+	}
+	async function exportFromTools() {
+		await handleExportCsv();
+		toolsMenuOpen = false;
+	}
 	function handleImported() {
 		currentOffset = 0;
 		fetchPageAndSummary(0);
@@ -269,6 +312,23 @@
 		expenses.map(expense => ({ ...expense, vehicle: vehicleById.get(expense.vehicleId) }))
 	);
 </script>
+
+{#snippet importExportActions(variant: 'outline' | 'ghost', buttonClass: string)}
+	<Button {variant} class={buttonClass} onclick={() => openTool(() => (photosImportOpen = true))}>
+		<Images class="mr-2 h-4 w-4" />
+		Import from Photos
+	</Button>
+	<Button {variant} class={buttonClass} onclick={() => openTool(() => (importOpen = true))}>
+		<Upload class="mr-2 h-4 w-4" />
+		Import CSV
+	</Button>
+	{#if totalCount > 0}
+		<Button {variant} class={buttonClass} onclick={exportFromTools} disabled={isExporting}>
+			<Download class="mr-2 h-4 w-4" />
+			{isExporting ? 'Exporting…' : 'Export CSV'}
+		</Button>
+	{/if}
+{/snippet}
 
 <svelte:head>
 	<title>Expenses - VROOM Car Tracker</title>
@@ -306,20 +366,24 @@
 			description="Track and categorize expenses across all vehicles"
 		>
 			{#snippet actions()}
-				<Button variant="outline" onclick={() => (photosImportOpen = true)}>
-					<Images class="mr-2 h-4 w-4" />
-					Import from Photos
-				</Button>
-				<Button variant="outline" onclick={() => (importOpen = true)}>
-					<Upload class="mr-2 h-4 w-4" />
-					Import CSV
-				</Button>
-				{#if totalCount > 0}
-					<Button variant="outline" onclick={handleExportCsv} disabled={isExporting}>
-						<Download class="mr-2 h-4 w-4" />
-						{isExporting ? 'Exporting…' : 'Export CSV'}
-					</Button>
-				{/if}
+				<div class="hidden sm:flex sm:items-center sm:gap-2">
+					{@render importExportActions('outline', '')}
+				</div>
+				<div class="sm:hidden">
+					<Popover.Root bind:open={toolsMenuOpen}>
+						<Popover.Trigger>
+							{#snippet child({ props })}
+								<Button {...props} variant="outline" size="lg">
+									<Ellipsis class="mr-2 h-4 w-4" />
+									Import & export
+								</Button>
+							{/snippet}
+						</Popover.Trigger>
+						<Popover.Content align="start" class="flex w-56 flex-col gap-2 p-1">
+							{@render importExportActions('ghost', 'h-10 w-full justify-start')}
+						</Popover.Content>
+					</Popover.Root>
+				</div>
 			{/snippet}
 		</PageHeader>
 
@@ -431,37 +495,48 @@
 				</div>
 			</CardNs.Header>
 			<CardNs.Content>
-				<ExpensesTable
-					expenses={displayExpenses}
-					{vehicles}
-					showVehicleColumn={true}
-					returnTo={resolve(routes.expenses)}
-					onDelete={handleDeleteExpense}
-					emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
-					emptyDescription={EXPENSE_MESSAGES.NO_EXPENSES_DESC}
-					emptyActionLabel={COMMON_MESSAGES.ADD_FIRST_EXPENSE}
-					emptyActionHref={resolve(routes.expenseNew)}
-					scrollHeight="600px"
-					onClearFilters={clearFilters}
-					hasActiveFilters={!!(
-						searchTerm ||
-						selectedVehicleId ||
-						selectedTags.length > 0 ||
-						startDate ||
-						endDate ||
-						categoryFilter
-					)}
-					{totalCount}
-					{currentOffset}
-					{pageSize}
-					{isLoadingPage}
-					onPageChange={handlePageChange}
-					activeSortBy={sortBy}
-					activeSortDir={sortDir}
-					onSortChange={handleSortChange}
-					activeCategory={categoryFilter}
-					onCategoryChange={handleCategoryChange}
-				/>
+				{#if pageError}
+					<div class="py-6" role="alert" data-testid="expenses-page-error">
+						<div class="mb-4 flex items-center gap-3 text-destructive">
+							<CircleAlert class="h-5 w-5" />
+							<p class="font-medium">Failed to load expenses</p>
+						</div>
+						<p class="mb-4 text-sm text-muted-foreground">{pageError.message}</p>
+						<Button onclick={retryPage} disabled={isLoadingPage}>Retry</Button>
+					</div>
+				{:else}
+					<ExpensesTable
+						expenses={displayExpenses}
+						{vehicles}
+						showVehicleColumn={true}
+						returnTo={resolve(routes.expenses)}
+						onDelete={handleDeleteExpense}
+						emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
+						emptyDescription={EXPENSE_MESSAGES.NO_EXPENSES_DESC}
+						emptyActionLabel={COMMON_MESSAGES.ADD_FIRST_EXPENSE}
+						emptyActionHref={resolve(routes.expenseNew)}
+						scrollHeight="600px"
+						onClearFilters={clearFilters}
+						hasActiveFilters={!!(
+							searchTerm ||
+							selectedVehicleId ||
+							selectedTags.length > 0 ||
+							startDate ||
+							endDate ||
+							categoryFilter
+						)}
+						{totalCount}
+						{currentOffset}
+						{pageSize}
+						{isLoadingPage}
+						onPageChange={handlePageChange}
+						activeSortBy={sortBy}
+						activeSortDir={sortDir}
+						onSortChange={handleSortChange}
+						activeCategory={categoryFilter}
+						onCategoryChange={handleCategoryChange}
+					/>
+				{/if}
 			</CardNs.Content>
 		</CardNs.Root>
 	</div>

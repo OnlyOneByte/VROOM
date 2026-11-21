@@ -9,7 +9,7 @@ interface BackendExpenseRequest {
 	date: string;
 	mileage?: number;
 	volume?: number;
-	fuelType?: string;
+	fuelType?: string | null;
 	description?: string | null;
 	location?: string | null;
 	missedFillup?: boolean;
@@ -52,6 +52,8 @@ export function toBackendExpense(
 	}
 	if (frontendExpense.fuelType) {
 		backendExpense.fuelType = frontendExpense.fuelType;
+	} else if (options.isEdit) {
+		backendExpense.fuelType = null;
 	}
 	if (frontendExpense.description) {
 		backendExpense.description = frontendExpense.description;

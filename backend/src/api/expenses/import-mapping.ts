@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
 import { convertDistance, convertVolume } from '../../utils/unit-conversions';
-import { buildLocalDate } from './local-date';
+import { buildCalendarDate, buildLocalDate } from './local-date';
 
 export type NativeField =
   | 'date'
@@ -188,7 +188,9 @@ export function normalizeForeignDate(raw: string, format: ImportDateFormat): str
   const [hh = 0, mm = 0, ss = 0] = timePart.split(':').map((t) => Number.parseInt(t, 10) || 0);
 
   // new Date("YYYY-MM-DD") would shift the day; buildLocalDate keeps the calendar day.
-  const dt = buildLocalDate(year, month, day, hh, mm, ss);
+  const dt = timePart
+    ? buildLocalDate(year, month, day, hh, mm, ss)
+    : buildCalendarDate(year, month, day);
   return dt ? dt.toISOString() : s;
 }
 

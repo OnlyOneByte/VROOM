@@ -58,7 +58,17 @@ async function loginRoundTrip(): Promise<Response> {
   expect(start.status).toBe(302);
   const state = new URL(start.headers.get('location') ?? '').searchParams.get('state');
   expect(state, 'the authorize redirect must carry a state').toBeTruthy();
-  return ctx.anon('GET', `/api/v1/auth/callback/github?code=auth-code&state=${state}`);
+  return callbackWithCookie(`code=auth-code&state=${state}`, loginStateCookieFrom(start));
+}
+
+function loginStateCookieFrom(res: Response): string | undefined {
+  return res.headers.get('set-cookie')?.match(/oauth_login_state=[^;]*/)?.[0];
+}
+
+async function callbackWithCookie(query: string, cookie: string | undefined): Promise<Response> {
+  const headers: Record<string, string> = { 'Sec-Fetch-Site': 'same-origin' };
+  if (cookie) headers.Cookie = cookie;
+  return ctx.app.request(`/api/v1/auth/callback/github?${query}`, { headers });
 }
 
 function sessionUserIdFrom(res: Response): string | undefined {
@@ -146,11 +156,59 @@ describe('GET /auth/callback/:authProvider — login', () => {
     });
     const start = await ctx.anon('GET', '/api/v1/auth/login/github');
     const state = new URL(start.headers.get('location') ?? '').searchParams.get('state');
-    const callback = `/api/v1/auth/callback/github?code=auth-code&state=${state}`;
+    const query = `code=auth-code&state=${state}`;
+    const cookie = loginStateCookieFrom(start);
 
-    await ctx.anon('GET', callback);
-    const replay = await ctx.anon('GET', callback);
+    const first = await callbackWithCookie(query, cookie);
+    expect(first.headers.get('location')).toBe(`${frontendUrl()}/dashboard`);
+    const replay = await callbackWithCookie(query, cookie);
 
     expect(replay.headers.get('location')).toBe(`${frontendUrl()}/auth?auth_error=invalid_state`);
+  });
+});
+
+describe('GET /auth/callback/:authProvider — browser binding', () => {
+  const identity = { providerAccountId: 'gh-4004', email: 'bound@example.com', displayName: 'B' };
+
+  test('the login start sets a short-lived httpOnly state cookie', async () => {
+    const start = await ctx.anon('GET', '/api/v1/auth/login/github');
+    const setCookie = start.headers.get('set-cookie') ?? '';
+    const state = new URL(start.headers.get('location') ?? '').searchParams.get('state');
+    expect(setCookie).toContain(`oauth_login_state=${state}`);
+    expect(setCookie).toContain('HttpOnly');
+    expect(setCookie).toContain('SameSite=Lax');
+    expect(setCookie).toContain('Max-Age=600');
+  });
+
+  test('a callback from a browser without the state cookie opens no session', async () => {
+    providerReturns(identity);
+    const start = await ctx.anon('GET', '/api/v1/auth/login/github');
+    const state = new URL(start.headers.get('location') ?? '').searchParams.get('state');
+
+    const res = await callbackWithCookie(`code=auth-code&state=${state}`, undefined);
+
+    expect(res.headers.get('location')).toBe(`${frontendUrl()}/auth?auth_error=invalid_state`);
+    expect(sessionUserIdFrom(res)).toBeUndefined();
+  });
+
+  test('a state cookie from a different login start is refused', async () => {
+    providerReturns(identity);
+    const mine = await ctx.anon('GET', '/api/v1/auth/login/github');
+    const other = await ctx.anon('GET', '/api/v1/auth/login/github');
+    const otherState = new URL(other.headers.get('location') ?? '').searchParams.get('state');
+
+    const res = await callbackWithCookie(
+      `code=auth-code&state=${otherState}`,
+      loginStateCookieFrom(mine)
+    );
+
+    expect(res.headers.get('location')).toBe(`${frontendUrl()}/auth?auth_error=invalid_state`);
+    expect(sessionUserIdFrom(res)).toBeUndefined();
+  });
+
+  test('the callback clears the state cookie', async () => {
+    providerReturns(identity);
+    const res = await loginRoundTrip();
+    expect(res.headers.get('set-cookie') ?? '').toMatch(/oauth_login_state=;[^,]*Max-Age=0/);
   });
 });

@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import type { SplitConfig } from '../../db/types';
+import { EXPENSE_CATEGORIES, type SplitConfig } from '../../db/types';
 import { dollarsToCents } from '../../utils/money';
+
+export const FUEL_SPLIT_MESSAGE = 'Fuel expenses cannot be split. Log the fill-up on one vehicle.';
 
 // Tags cannot contain ';' or ',': the CSV export joins tags with '; ' and the importer splits on /[;,]/.
 export const tagElementSchema = z
@@ -118,10 +120,18 @@ function refineSplitConfig(
 export const createSplitExpenseSchema = z
   .object({
     splitConfig: splitConfigSchema,
-    category: z.string().min(1),
+    category: z.enum(EXPENSE_CATEGORIES).refine((category) => category !== 'fuel', {
+      message: FUEL_SPLIT_MESSAGE,
+    }),
     tags: z.array(tagElementSchema).max(CONFIG.validation.expense.maxTags).optional(),
     date: z.coerce.date(),
-    description: z.string().optional(),
+    description: z
+      .string()
+      .max(
+        CONFIG.validation.expense.descriptionMaxLength,
+        `Description must be ${CONFIG.validation.expense.descriptionMaxLength} characters or less`
+      )
+      .optional(),
     totalAmount: centsAmount,
     // Insurance and reminder splits bypass this route, so only financing links are accepted from the API.
     sourceType: z.literal('financing').optional(),

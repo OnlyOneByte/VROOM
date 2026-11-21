@@ -5,7 +5,7 @@ import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES, isElectricFuelType } from '../../db/types';
 import { denormalizeCsvCell } from '../../utils/csv-safety';
 import { dollarsToCents } from '../../utils/money';
-import { buildLocalDate } from './local-date';
+import { buildCalendarDate } from './local-date';
 import { clearFuelFieldsIfNotFuel } from './validation';
 
 export interface ImportVehicle {
@@ -96,7 +96,7 @@ function parseDate(raw: string): { value: Date } | { error: string } {
   // new Date("YYYY-MM-DD") parses as UTC and would shift the day west of UTC.
   const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim());
   if (dateOnly) {
-    const date = buildLocalDate(Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3]));
+    const date = buildCalendarDate(Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3]));
     if (!date) return { error: `Invalid date "${raw}"` };
     return { value: date };
   }

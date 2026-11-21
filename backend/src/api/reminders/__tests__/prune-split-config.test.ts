@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { SplitConfig } from '../../../db/types';
-import { pruneVehicleFromSplitConfig } from '../split-config-helpers';
+import { absoluteTotalAfterPrune, pruneVehicleFromSplitConfig } from '../split-config-helpers';
 
 describe('pruneVehicleFromSplitConfig — even', () => {
   test('drops the deleted id and keeps the split when two or more legs remain', () => {
@@ -99,5 +99,41 @@ describe('pruneVehicleFromSplitConfig — percentage (rescale to 100)', () => {
       ],
     };
     expect(pruneVehicleFromSplitConfig(config, 'a')).toBeNull();
+  });
+});
+
+describe('absoluteTotalAfterPrune', () => {
+  test('is the sum of the surviving absolute allocations', () => {
+    const config: SplitConfig = {
+      method: 'absolute',
+      allocations: [
+        { vehicleId: 'a', amount: 30 },
+        { vehicleId: 'b', amount: 20 },
+        { vehicleId: 'c', amount: 50 },
+      ],
+    };
+    const pruned = pruneVehicleFromSplitConfig(config, 'b');
+    const total = absoluteTotalAfterPrune(config, 'b');
+    expect(total).toBe(80);
+    const legs = (pruned as { allocations: { amount: number }[] }).allocations;
+    expect(legs.reduce((s, a) => s + a.amount, 0)).toBe(total ?? -1);
+  });
+
+  test('is null for even and percentage splits, which need no amount change', () => {
+    expect(
+      absoluteTotalAfterPrune({ method: 'even', vehicleIds: ['a', 'b', 'c'] }, 'a')
+    ).toBeNull();
+    expect(
+      absoluteTotalAfterPrune(
+        {
+          method: 'percentage',
+          allocations: [
+            { vehicleId: 'a', percentage: 50 },
+            { vehicleId: 'b', percentage: 50 },
+          ],
+        },
+        'a'
+      )
+    ).toBeNull();
   });
 });

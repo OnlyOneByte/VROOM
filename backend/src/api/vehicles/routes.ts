@@ -1,13 +1,22 @@
-import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
-import { expenses, vehicles as vehiclesTable } from '../../db/schema';
+import {
+  expenses,
+  odometerEntries,
+  reminders,
+  reminderVehicles,
+  trips,
+  vehicleFinancing,
+  vehicles as vehiclesTable,
+} from '../../db/schema';
 import type { ApiResponse } from '../../errors';
-import { ConflictError, NotFoundError } from '../../errors';
+import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } from '../../types';
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
@@ -17,6 +26,7 @@ import {
   resolveVehicleAccess,
   resolveVehicleOwnerId,
 } from '../../utils/sharing';
+import { canonicalScale } from '../../utils/unit-conversions';
 import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
@@ -108,6 +118,7 @@ export const updateVehicleSchema = baseVehicleSchema
     initialMileage: baseVehicleSchema.shape.initialMileage.nullish(),
     purchasePrice: baseVehicleSchema.shape.purchasePrice.nullish(),
     purchaseDate: baseVehicleSchema.shape.purchaseDate.nullish(),
+    confirmUnitChange: z.boolean().optional(),
   })
   .partial();
 
@@ -115,6 +126,67 @@ routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
 routes.route('/:vehicleId/photos', photoRoutes);
+
+function changedUnits(existing: UnitPreferences, merged: UnitPreferences | undefined): string[] {
+  if (!merged) return [];
+  return (Object.keys(merged) as Array<keyof UnitPreferences>).filter(
+    (unit) => merged[unit] !== existing[unit]
+  );
+}
+
+async function vehicleHasMeasuredHistory(vehicleId: string): Promise<boolean> {
+  const db = getDb();
+  const [expense, odometer, trip, mileageReminder, leaseLimit] = await Promise.all([
+    db
+      .select({ id: expenses.id })
+      .from(expenses)
+      .where(
+        and(
+          eq(expenses.vehicleId, vehicleId),
+          or(isNotNull(expenses.mileage), isNotNull(expenses.volume))
+        )
+      )
+      .limit(1)
+      .get(),
+    db
+      .select({ id: odometerEntries.id })
+      .from(odometerEntries)
+      .where(eq(odometerEntries.vehicleId, vehicleId))
+      .limit(1)
+      .get(),
+    db.select({ id: trips.id }).from(trips).where(eq(trips.vehicleId, vehicleId)).limit(1).get(),
+    db
+      .select({ id: reminders.id })
+      .from(reminders)
+      .innerJoin(reminderVehicles, eq(reminderVehicles.reminderId, reminders.id))
+      .where(and(eq(reminderVehicles.vehicleId, vehicleId), isNotNull(reminders.intervalMileage)))
+      .limit(1)
+      .get(),
+    db
+      .select({ id: vehicleFinancing.id })
+      .from(vehicleFinancing)
+      .where(
+        and(eq(vehicleFinancing.vehicleId, vehicleId), isNotNull(vehicleFinancing.mileageLimit))
+      )
+      .limit(1)
+      .get(),
+  ]);
+  return Boolean(expense || odometer || trip || mileageReminder || leaseLimit);
+}
+
+async function assertUnitChangeConfirmed(
+  vehicle: { id: string; initialMileage: number | null; unitPreferences: UnitPreferences },
+  merged: UnitPreferences | undefined,
+  confirmed: boolean | undefined
+): Promise<void> {
+  const changed = changedUnits(vehicle.unitPreferences, merged);
+  if (changed.length === 0 || confirmed) return;
+  if (vehicle.initialMileage == null && !(await vehicleHasMeasuredHistory(vehicle.id))) return;
+  throw new ValidationError(
+    'Changing units does not convert readings already saved for this vehicle; they will be shown in the new units as entered. Confirm the change to continue.',
+    { requiresUnitChangeConfirmation: true, changedUnits: changed }
+  );
+}
 
 async function assertLicensePlateAvailable(
   licensePlate: string,
@@ -280,11 +352,12 @@ routes.put(
       await assertLicensePlateAvailable(updateData.licensePlate, user.id, id);
     }
 
-    const { unitPreferences: partialUnitPrefs, ...restUpdateData } = updateData;
+    const { unitPreferences: partialUnitPrefs, confirmUnitChange, ...restUpdateData } = updateData;
     const mergedUnitPreferences = mergeUnitPreferences(
       existingVehicle.unitPreferences,
       partialUnitPrefs
     );
+    await assertUnitChangeConfirmed(existingVehicle, mergedUnitPreferences, confirmUnitChange);
 
     const updatedVehicle = await vehicleRepository.update(id, {
       ...restUpdateData,
@@ -423,7 +496,8 @@ routes.get(
       sortedExpenses,
       periodBaselineMileage(fuelExpenses, startDate, vehicle.initialMileage || 0),
       vehicle.trackFuel,
-      vehicle.trackCharging
+      vehicle.trackCharging,
+      canonicalScale(parseUnitPreferences(vehicle.unitPreferences) ?? DEFAULT_UNIT_PREFERENCES)
     );
 
     const currentOdometer = await odometerRepository.getCurrentOdometer(id, ownerId);

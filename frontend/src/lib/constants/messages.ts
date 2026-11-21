@@ -21,7 +21,7 @@ export const EXPENSE_MESSAGES = {
 	TOTAL_EXPENSES: 'Total Expenses',
 	TOTAL_COUNT: 'Total Count',
 	MONTHLY_AVERAGE: 'Monthly Average',
-	LAST_EXPENSE: 'Last Expense',
+	LAST_30_DAYS: 'Last 30 Days',
 	EXPENSES_BY_CATEGORY: 'Expenses by Category',
 	PENDING_SYNC: 'Pending Sync',
 	RECENTLY_SYNCED: 'Recently Synced',

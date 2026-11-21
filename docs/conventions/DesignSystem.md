@@ -42,20 +42,26 @@ palette class. Every token has a light and a dark variant.
 Notes:
 - `--muted-foreground` and `--destructive` are deliberately darkened to clear WCAG AA 4.5:1
   on white/card — do NOT lighten them, and avoid `text-muted-foreground/40`-style opacity on
-  real text. `theme/__tests__/theme-contrast.test.ts` gates every theme's text pairs at AA and
-  the chart tokens at 3:1; `warning`, `border`, `input` and `ring` are not gated yet (see
-  `UIQuality.md`, *Colour and theme tokens*).
-- Status surfaces: use `Alert` with `default` or `destructive`, or a `bg-warning/10` +
-  `text-warning` tint, rather than a hand-tinted div. Do NOT reach for `Alert`'s `warning` or
-  `success` variants yet — both hardcode palette classes (`bg-yellow-50 border-yellow-200
-  text-yellow-800`, and the green equivalent) in `ui/alert/alert.svelte`, so they ignore the theme
-  and dark mode. `no-theme-clashing-colors.test.ts` does not catch them (its regex covers only
-  white/black/gray/slate/zinc/neutral); `/dev/gallery` renders all four if you want to see the gap.
-  `--success` is themed and AA-gated, but `Alert`'s `success` variant does not use it yet.
-- `text-chart-*` is for chart marks, not words: the chart gate is only 3:1. Status text uses
-  `text-success` / `text-warning` / `text-destructive`. `--primary` is gated at AA on
-  `--background`; a `bg-primary/10` tint (the active nav item) costs about 10% of that, which only
-  the axe e2e scans catch.
+  real text. `theme/__tests__/theme-contrast.test.ts` gates every theme's text pairs at AA
+  (`warning` included) and the chart tokens at 3:1; `border`, `input` and `ring` are not gated
+  yet (see `UIQuality.md`, *Colour and theme tokens*).
+- Status surfaces: use `Alert` (`default`, `destructive`, `warning` or `success`), or a
+  `bg-warning/10` + `text-warning` tint, rather than a hand-tinted div. The three status variants
+  paint `bg-card` with their status token as the text colour (AA-gated on `card`); `default` is
+  `bg-card text-card-foreground`. All four follow the theme and dark mode. Toasts (`app.css`,
+  sonner block) do the same: a `--card` surface with a `--destructive` / `--success` /
+  `--warning` / `--primary` border, text, close button and progress bar.
+- `text-chart-*` is for chart marks and icons, not words: chart tokens are gated at 3:1, on
+  `card` and as an icon on their own `/10` tint over `card` and `background` (the category badges
+  and `StatCard` chips). Put the label in `text-foreground` beside the tinted icon. Status text
+  uses `text-success` / `text-warning` / `text-destructive`. `chart-5` is the one exception
+  still used for words on a few screens, so it is also gated as text at AA on `background` and
+  `card`; new status text uses `text-warning` instead.
+- In every light theme these tinted text pairs are gated at AA: `text-primary` on
+  `bg-primary/10` (the active nav item, chips, avatars) and `text-chart-5` on `bg-chart-5/10` over
+  `background` and `card`, and `text-warning` on `bg-warning/10` over `card` only. The axe e2e
+  scans cover the `A11Y_ROUTES` pages in `e2e/pwa.spec.ts` in the default light theme, and every
+  other theme's dashboard in light and dark mode.
 - Chart colors come from `utils/chart-colors`: series `CHART_COLORS[i % CHART_COLORS.length]`
   (8 colors), category `getCategoryChartColor` (badges use `getCategoryBadgeClasses` from
   `utils/expense-helpers`; both derive from the one `CATEGORY_COLOR_TOKENS` assignment), chart
@@ -80,7 +86,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 | Field error | `import { FormFieldError } from '#lib/components/ui/form-field'` | renders `role="alert"`; wire via `aria-describedby` (`FormFieldDescription` for hints) |
 | Card | `import * as Card from '#lib/components/ui/card'` | Root/Header/Title/Description/Action/Content/Footer |
 | Badge | `import { Badge } from '#lib/components/ui/badge'` | variants: default/secondary/destructive/outline |
-| Alert | `import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert'` | use `default` / `destructive`; the local `warning` / `success` variants hardcode palette colors — see Design tokens |
+| Alert | `import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert'` | `default` / `destructive` / `warning` / `success`, all themed |
 | Skeleton | `import { Skeleton } from '#lib/components/ui/skeleton'` | loading placeholder |
 | Tabs | `import * as Tabs from '#lib/components/ui/tabs'` | |
 | Dialog | `import * as Dialog from '#lib/components/ui/dialog'` / `* as AlertDialog` | AlertDialog backs destructive confirms — prefer `common/ConfirmDialog.svelte` |

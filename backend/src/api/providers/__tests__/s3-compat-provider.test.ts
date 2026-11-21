@@ -22,6 +22,9 @@ mock.module('@aws-sdk/client-s3', () => {
     HeadBucketCommand: class {
       constructor(public input: unknown) {}
     },
+    ListObjectsV2Command: class {
+      constructor(public input: unknown) {}
+    },
   };
 });
 
@@ -253,5 +256,51 @@ describe('S3CompatProvider', () => {
       const result = await provider.healthCheck();
       expect(result).toBe(false);
     });
+  });
+});
+
+describe('S3CompatProvider list', () => {
+  const bucketKeys = [
+    'Backups/vroom-backup-1.zip',
+    'Backups/vroom-backup-2.zip',
+    'Backups/old/vroom-backup-0.zip',
+    'Backups2/vroom-backup-other-user.zip',
+    'vroom-backup-root.zip',
+  ];
+
+  function listLikeS3(command: unknown): Promise<unknown> {
+    const { Prefix = '', Delimiter } = (
+      command as { input: { Prefix?: string; Delimiter?: string } }
+    ).input;
+    const matching = bucketKeys.filter((key) => key.startsWith(Prefix));
+    const direct = Delimiter
+      ? matching.filter((key) => !key.slice(Prefix.length).includes(Delimiter))
+      : matching;
+    return Promise.resolve({
+      Contents: direct.map((Key) => ({ Key, Size: 1, LastModified: new Date(0) })),
+      IsTruncated: false,
+    });
+  }
+
+  let provider: S3CompatProvider;
+  beforeEach(() => {
+    provider = new S3CompatProvider(credentials, config);
+    mockSend.mockReset();
+    mockSend.mockImplementation(listLikeS3);
+  });
+
+  test('lists only the files directly in the folder, not a sibling folder sharing its name prefix', async () => {
+    const keys = (await provider.list('Backups')).map((f) => f.key);
+    expect(keys).toEqual(['Backups/vroom-backup-1.zip', 'Backups/vroom-backup-2.zip']);
+  });
+
+  test('leading and trailing slashes on the folder path are ignored', async () => {
+    const keys = (await provider.list('/Backups/')).map((f) => f.key);
+    expect(keys).toEqual(['Backups/vroom-backup-1.zip', 'Backups/vroom-backup-2.zip']);
+  });
+
+  test('the bucket root lists only root-level files', async () => {
+    const keys = (await provider.list('')).map((f) => f.key);
+    expect(keys).toEqual(['vroom-backup-root.zip']);
   });
 });

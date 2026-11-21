@@ -29,6 +29,17 @@ export interface S3Config {
 
 const PRESIGNED_URL_EXPIRY_SECONDS = 3600;
 
+function toFileInfo(key: string, size?: number, lastModified?: Date): StorageFileInfo {
+  const timestamp = lastModified?.toISOString() ?? new Date(0).toISOString();
+  return {
+    key,
+    name: key.split('/').pop() ?? key,
+    size: size ?? 0,
+    createdTime: timestamp,
+    lastModified: timestamp,
+  };
+}
+
 export class S3CompatProvider implements StorageProvider {
   readonly type = 's3';
   private client: S3Client;
@@ -125,7 +136,8 @@ export class S3CompatProvider implements StorageProvider {
   }
 
   async list(folderPath: string): Promise<StorageFileInfo[]> {
-    const prefix = folderPath.replace(/^\/+/, '');
+    const folder = folderPath.replace(/^\/+|\/+$/g, '');
+    const prefix = folder ? `${folder}/` : '';
     const results: StorageFileInfo[] = [];
     let continuationToken: string | undefined;
 
@@ -134,23 +146,13 @@ export class S3CompatProvider implements StorageProvider {
         new ListObjectsV2Command({
           Bucket: this.bucket,
           Prefix: prefix,
+          Delimiter: '/',
           ContinuationToken: continuationToken,
         })
       );
 
-      if (response.Contents) {
-        for (const obj of response.Contents) {
-          if (!obj.Key) continue;
-          const name = obj.Key.split('/').pop() ?? obj.Key;
-          const timestamp = obj.LastModified?.toISOString() ?? new Date(0).toISOString();
-          results.push({
-            key: obj.Key,
-            name,
-            size: obj.Size ?? 0,
-            createdTime: timestamp,
-            lastModified: timestamp,
-          });
-        }
+      for (const obj of response.Contents ?? []) {
+        if (obj.Key) results.push(toFileInfo(obj.Key, obj.Size, obj.LastModified));
       }
 
       continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;

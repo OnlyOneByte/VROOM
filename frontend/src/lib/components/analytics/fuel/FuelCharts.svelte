@@ -14,7 +14,8 @@
 	import {
 		getFuelEfficiencyLabel,
 		getLongFormLabel,
-		getCostPerDistanceLabel
+		getCostPerDistanceLabel,
+		getChargeUnitLabel
 	} from '#lib/utils/units.ts';
 
 	interface Props {
@@ -44,12 +45,12 @@
 
 	let consumptionConfig = $derived(buildChartConfig(consumptionSeries));
 
-	let gasPriceFuelTypes = $derived([...new Set(fuelStats.gasPriceHistory.map(d => d.fuelType))]);
+	type PriceHistory = FuelStatsResponse['gasPriceHistory'];
 
-	let gasPriceData = $derived.by(() => {
+	function priceRows(history: PriceHistory) {
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map used within $derived computation, not mutated reactively
 		const byDate = new Map<string, Record<string, number | string | Date>>();
-		for (const item of fuelStats.gasPriceHistory) {
+		for (const item of history) {
 			if (!byDate.has(item.date))
 				byDate.set(item.date, { dateStr: item.date, date: parseDateString(item.date) });
 			const row = byDate.get(item.date)!;
@@ -58,17 +59,29 @@
 		return Array.from(byDate.values()).sort((a, b) =>
 			String(a['dateStr']).localeCompare(String(b['dateStr']))
 		);
-	});
+	}
 
-	let gasPriceSeries = $derived(
-		gasPriceFuelTypes.map((name, i) => ({
+	function priceSeries(history: PriceHistory) {
+		return [...new Set(history.map(d => d.fuelType))].map((name, i) => ({
 			key: name,
 			label: name,
 			color: CHART_COLORS[i % CHART_COLORS.length] as string
-		}))
-	);
+		}));
+	}
 
+	let gasPriceData = $derived(priceRows(fuelStats.gasPriceHistory));
+	let gasPriceSeries = $derived(priceSeries(fuelStats.gasPriceHistory));
+	let gasPriceFuelTypes = $derived(gasPriceSeries.map(s => s.key));
 	let gasPriceConfig = $derived(buildChartConfig(gasPriceSeries));
+
+	let chargePriceHistory = $derived(fuelStats.charging?.priceHistory ?? []);
+	let chargePriceData = $derived(priceRows(chargePriceHistory));
+	let chargePriceSeries = $derived(priceSeries(chargePriceHistory));
+	let chargePriceTypes = $derived(chargePriceSeries.map(s => s.key));
+	let chargePriceConfig = $derived(buildChartConfig(chargePriceSeries));
+	let pricePerChargeDesc = $derived(
+		`Price per ${getChargeUnitLabel(units.chargeUnit, true)} by charger type over time`
+	);
 
 	let costVehicleNames = $derived([
 		...new Set(fuelStats.fillupCostByVehicle.map(d => d.vehicleName))
@@ -193,6 +206,22 @@
 			xAxisProps={{ ticks: getXTickCount(gasPriceData.length, 6), format: formatDateTick }}
 		/>
 	</div>
+
+	{#if chargePriceData.length > 0}
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+			<AppLineChart
+				title="Charging Price"
+				description={pricePerChargeDesc}
+				data={chargePriceData}
+				x="date"
+				y={chargePriceTypes}
+				series={chargePriceSeries}
+				config={chargePriceConfig}
+				yAxisFormat={formatCentsAxis}
+				xAxisProps={{ ticks: getXTickCount(chargePriceData.length, 6), format: formatDateTick }}
+			/>
+		</div>
+	{/if}
 
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
 		<AppLineChart
