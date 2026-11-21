@@ -3,6 +3,7 @@ import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { OdometerEntry, PaginatedResponse } from '#lib/types/index.ts';
 import type { odometerApi } from '#lib/services/odometer-api.ts';
+import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 type UpdateOdometerRequest = Parameters<typeof odometerApi.update>[1];
 
@@ -148,7 +149,7 @@ describe('edit odometer reading load states', () => {
 		mount();
 		await settle();
 
-		expect(screen.getByText('Forbidden')).toBeInTheDocument();
+		expect(screen.getByText("Couldn't load the reading. Forbidden.")).toBeInTheDocument();
 		expect(screen.queryByLabelText('Odometer Reading')).toBeNull();
 	});
 
@@ -157,7 +158,9 @@ describe('edit odometer reading load states', () => {
 		mount();
 		await settle();
 
-		expect(screen.getByText('Failed to load entry')).toBeInTheDocument();
+		expect(
+			screen.getByText(`Couldn't load the reading. ${UNEXPECTED_FAILURE_MESSAGE}`)
+		).toBeInTheDocument();
 	});
 });
 
@@ -340,7 +343,9 @@ describe('edit odometer reading save', () => {
 
 		await save();
 
-		expect(screen.getByText('Reading conflicts with a later trip')).toBeInTheDocument();
+		expect(
+			screen.getByText("Couldn't update the reading. Reading conflicts with a later trip.")
+		).toBeInTheDocument();
 		expect(goto).not.toHaveBeenCalled();
 	});
 
@@ -351,7 +356,9 @@ describe('edit odometer reading save', () => {
 
 		await save();
 
-		expect(screen.getByText('Failed to update odometer reading')).toBeInTheDocument();
+		expect(
+			screen.getByText(`Couldn't update the reading. ${UNEXPECTED_FAILURE_MESSAGE}`)
+		).toBeInTheDocument();
 	});
 
 	test('Save is disabled while saving', async () => {
@@ -412,7 +419,9 @@ describe('edit odometer reading delete', () => {
 		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 		await settle();
 
-		expect(within(screen.getByRole('dialog')).getByText('Linked to a trip')).toBeInTheDocument();
+		expect(
+			within(screen.getByRole('dialog')).getByText("Couldn't delete the reading. Linked to a trip.")
+		).toBeInTheDocument();
 		expect(goto).not.toHaveBeenCalled();
 	});
 
@@ -425,7 +434,9 @@ describe('edit odometer reading delete', () => {
 		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 		await settle();
 
-		expect(screen.getByText('Failed to delete reading')).toBeInTheDocument();
+		expect(
+			screen.getByText(`Couldn't delete the reading. ${UNEXPECTED_FAILURE_MESSAGE}`)
+		).toBeInTheDocument();
 	});
 
 	test('the confirm button is disabled while deleting', async () => {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { page } from '$app/state';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
@@ -123,7 +124,7 @@
 
 			await gotoDynamic(returnTo);
 		} catch (e) {
-			submitError = e instanceof Error ? e.message : 'Failed to save odometer reading';
+			submitError = `Couldn't save the reading. ${userFacingErrorMessage(e)}`;
 		} finally {
 			isSubmitting = false;
 		}

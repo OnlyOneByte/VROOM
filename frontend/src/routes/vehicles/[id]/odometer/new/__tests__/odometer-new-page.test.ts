@@ -3,6 +3,7 @@ import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type { OdometerEntry, PaginatedResponse } from '#lib/types/index.ts';
 import type { odometerApi } from '#lib/services/odometer-api.ts';
+import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 type CreateOdometerRequest = Parameters<typeof odometerApi.create>[1];
 
@@ -413,7 +414,9 @@ describe('new odometer reading submit', () => {
 		await fireEvent.input(odometerInput(), { target: { value: '100' } });
 		await save();
 
-		expect(screen.getByText('Reading must not decrease')).toBeInTheDocument();
+		expect(
+			screen.getByText("Couldn't save the reading. Reading must not decrease.")
+		).toBeInTheDocument();
 		expect(goto).not.toHaveBeenCalled();
 		expect(screen.getByRole('button', { name: 'Save Reading' })).toBeEnabled();
 	});
@@ -426,7 +429,9 @@ describe('new odometer reading submit', () => {
 		await fireEvent.input(odometerInput(), { target: { value: '100' } });
 		await save();
 
-		expect(screen.getByText('Failed to save odometer reading')).toBeInTheDocument();
+		expect(
+			screen.getByText(`Couldn't save the reading. ${UNEXPECTED_FAILURE_MESSAGE}`)
+		).toBeInTheDocument();
 	});
 
 	test('Save is disabled while the reading is being saved', async () => {
