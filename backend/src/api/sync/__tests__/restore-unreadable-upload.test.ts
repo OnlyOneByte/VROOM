@@ -77,3 +77,41 @@ describe('an unreadable restore upload is a 400, not a 500', () => {
     expect(body.error?.message).toContain('Missing required files');
   });
 });
+
+describe('a restore request that is not a multipart file upload is a 400, not a 500', () => {
+  async function post(body: FormData | string, contentType?: string): Promise<Response> {
+    return ctx.app.request(RESTORE_PATH, {
+      method: 'POST',
+      headers: {
+        cookie: ctx.cookie,
+        origin: TEST_ORIGIN,
+        'idempotency-key': `not-multipart-${++keyCounter}`,
+        ...(contentType ? { 'content-type': contentType } : {}),
+      },
+      body,
+    });
+  }
+
+  test('JSON, urlencoded and boundary-less multipart bodies are refused', async () => {
+    const cases: Array<{ body: string; contentType: string }> = [
+      { body: JSON.stringify({ file: 'x' }), contentType: 'application/json' },
+      { body: 'file=x&mode=preview', contentType: 'application/x-www-form-urlencoded' },
+      { body: 'no boundary here', contentType: 'multipart/form-data' },
+    ];
+    for (const { body, contentType } of cases) {
+      const res = await post(body, contentType);
+      const json = (await res.json()) as ErrorBody;
+      expect(res.status, `${contentType}: ${JSON.stringify(json)}`).toBe(400);
+      expect(json.success).toBe(false);
+    }
+  });
+
+  test('a file field sent as text is refused as a missing file', async () => {
+    const form = new FormData();
+    form.append('file', 'not-a-file');
+    const res = await post(form);
+    const json = (await res.json()) as ErrorBody;
+    expect(res.status).toBe(400);
+    expect(json.error?.message).toBe('No file provided');
+  });
+});

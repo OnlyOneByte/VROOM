@@ -216,11 +216,17 @@ routes.post(
   idempotency({ required: true }),
   async (c) => {
     const user = c.get('user');
-    const formData = await c.req.formData();
-    const file = formData.get('file') as File | null;
-    const mode = (formData.get('mode') as string) || 'preview';
+    const formData = await c.req.formData().catch(() => {
+      throw new SyncError(
+        SyncErrorCode.VALIDATION_ERROR,
+        'Upload the backup as multipart/form-data with a file field'
+      );
+    });
+    const file = formData.get('file');
+    const modeField = formData.get('mode');
+    const mode = typeof modeField === 'string' && modeField ? modeField : 'preview';
 
-    if (!file) {
+    if (!(file instanceof File)) {
       throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'No file provided');
     }
 

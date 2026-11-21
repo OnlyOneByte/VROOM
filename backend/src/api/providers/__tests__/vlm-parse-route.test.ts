@@ -139,6 +139,21 @@ describe('POST /api/v1/receipts/parse', () => {
     expect(res.status).toBe(400);
   });
 
+  test('a body that is not readable multipart → 400', async () => {
+    await seedVlmProvider();
+    stubModel('{"amount": 1}');
+    const res = await ctx.app.request('/api/v1/receipts/parse', {
+      method: 'POST',
+      headers: {
+        Cookie: ctx.cookie,
+        'Sec-Fetch-Site': 'same-origin',
+        'content-type': 'multipart/form-data',
+      },
+      body: 'no boundary here',
+    });
+    expect(res.status).toBe(400);
+  });
+
   test('the api key is never echoed in the response', async () => {
     await seedVlmProvider();
     stubModel('{"amount": 9.99}');
