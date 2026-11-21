@@ -73,6 +73,29 @@ describe('POST /api/v1/trips (create)', () => {
     expect(res.status).toBe(400);
   });
 
+  test('rejects a null, boolean or zero tripDate instead of saving 1970', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    for (const tripDate of [null, true, 0]) {
+      const res = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { tripDate }));
+      expect(res.status, `tripDate=${JSON.stringify(tripDate)}`).toBe(400);
+    }
+    const list = await json<{ data: unknown[] }>(await ctx.authed('GET', '/api/v1/trips'));
+    expect(list.data).toHaveLength(0);
+  });
+
+  test('an update with a null tripDate is rejected and keeps the stored date', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const created = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId));
+    const { data } = await json<DataEnvelope<{ id: string; tripDate: string }>>(created);
+
+    const res = await ctx.authed('PUT', `/api/v1/trips/${data.id}`, { tripDate: null });
+    expect(res.status).toBe(400);
+    const after = await json<DataEnvelope<{ tripDate: string }>>(
+      await ctx.authed('GET', `/api/v1/trips/${data.id}`)
+    );
+    expect(after.data.tripDate).toBe(data.tripDate);
+  });
+
   test('accepts a trip dated today sent as noon local time', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const now = new Date();
