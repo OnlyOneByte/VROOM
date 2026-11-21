@@ -20,7 +20,8 @@
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { expenseApi } from '#lib/services/expense-api.ts';
-	import type { Expense, Vehicle, ExpenseSummary } from '#lib/types/index.ts';
+	import type { Expense, Vehicle, ExpenseSummary, PaginatedResponse } from '#lib/types/index.ts';
+	import { latest } from '#lib/utils/latest-request.ts';
 
 	type ExpenseWithVehicle = Expense & { vehicle?: Vehicle };
 	import { formatCurrency } from '#lib/utils/formatters.ts';
@@ -153,38 +154,69 @@
 		};
 	}
 
+	const nextListRequest = latest();
+	const nextSummaryRequest = latest();
+	let pageError = $state<{ message: string; offset: number } | null>(null);
+
+	function applyPage(pageResult: PaginatedResponse<Expense>, offset: number) {
+		expenses = pageResult.data;
+		totalCount = pageResult.pagination.totalCount;
+		currentOffset = offset;
+		pageError = null;
+	}
+
+	function failPage(error: unknown, offset: number) {
+		pageError = {
+			message: error instanceof Error ? error.message : 'Failed to load expenses',
+			offset
+		};
+		handleErrorWithNotification(error, 'Failed to load expenses');
+	}
+
 	async function fetchPageAndSummary(offset = 0) {
+		const isCurrentList = nextListRequest();
+		const isCurrentSummary = nextSummaryRequest();
 		isLoadingPage = true;
 		try {
-			const [pageResult, summaryResult] = await Promise.all([
+			const [pageResult, summaryResult] = await Promise.allSettled([
 				expenseApi.getAllExpenses(buildListParams(offset)),
 				expenseApi.getExpenseSummary(buildSummaryParams())
 			]);
+			if (isLoading) {
+				if (pageResult.status === 'rejected') throw pageResult.reason;
+				if (summaryResult.status === 'rejected') throw summaryResult.reason;
+			}
 
-			expenses = pageResult.data;
-			totalCount = pageResult.pagination.totalCount;
-			currentOffset = offset;
-			summary = summaryResult;
-		} catch (error) {
-			if (isLoading) throw error;
-			handleErrorWithNotification(error, 'Failed to load expenses');
+			const listReported = isCurrentList();
+			if (listReported) {
+				if (pageResult.status === 'fulfilled') applyPage(pageResult.value, offset);
+				else failPage(pageResult.reason, offset);
+			}
+			if (isCurrentSummary()) {
+				if (summaryResult.status === 'fulfilled') summary = summaryResult.value;
+				else if (!listReported || pageResult.status === 'fulfilled')
+					handleErrorWithNotification(summaryResult.reason, 'Failed to load expense summary');
+			}
 		} finally {
-			isLoadingPage = false;
+			if (isCurrentList()) isLoadingPage = false;
 		}
 	}
 
 	async function fetchPage(offset: number) {
+		const isCurrent = nextListRequest();
 		isLoadingPage = true;
 		try {
 			const pageResult = await expenseApi.getAllExpenses(buildListParams(offset));
-			expenses = pageResult.data;
-			totalCount = pageResult.pagination.totalCount;
-			currentOffset = offset;
+			if (isCurrent()) applyPage(pageResult, offset);
 		} catch (error) {
-			if (import.meta.env.DEV) console.error('Failed to load expenses page:', error);
+			if (isCurrent()) failPage(error, offset);
 		} finally {
-			isLoadingPage = false;
+			if (isCurrent()) isLoadingPage = false;
 		}
+	}
+
+	function retryPage() {
+		fetchPageAndSummary(pageError?.offset ?? currentOffset);
 	}
 
 	function handleFilterChange() {
@@ -431,37 +463,48 @@
 				</div>
 			</CardNs.Header>
 			<CardNs.Content>
-				<ExpensesTable
-					expenses={displayExpenses}
-					{vehicles}
-					showVehicleColumn={true}
-					returnTo={resolve(routes.expenses)}
-					onDelete={handleDeleteExpense}
-					emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
-					emptyDescription={EXPENSE_MESSAGES.NO_EXPENSES_DESC}
-					emptyActionLabel={COMMON_MESSAGES.ADD_FIRST_EXPENSE}
-					emptyActionHref={resolve(routes.expenseNew)}
-					scrollHeight="600px"
-					onClearFilters={clearFilters}
-					hasActiveFilters={!!(
-						searchTerm ||
-						selectedVehicleId ||
-						selectedTags.length > 0 ||
-						startDate ||
-						endDate ||
-						categoryFilter
-					)}
-					{totalCount}
-					{currentOffset}
-					{pageSize}
-					{isLoadingPage}
-					onPageChange={handlePageChange}
-					activeSortBy={sortBy}
-					activeSortDir={sortDir}
-					onSortChange={handleSortChange}
-					activeCategory={categoryFilter}
-					onCategoryChange={handleCategoryChange}
-				/>
+				{#if pageError}
+					<div class="py-6" role="alert" data-testid="expenses-page-error">
+						<div class="mb-4 flex items-center gap-3 text-destructive">
+							<CircleAlert class="h-5 w-5" />
+							<p class="font-medium">Failed to load expenses</p>
+						</div>
+						<p class="mb-4 text-sm text-muted-foreground">{pageError.message}</p>
+						<Button onclick={retryPage} disabled={isLoadingPage}>Retry</Button>
+					</div>
+				{:else}
+					<ExpensesTable
+						expenses={displayExpenses}
+						{vehicles}
+						showVehicleColumn={true}
+						returnTo={resolve(routes.expenses)}
+						onDelete={handleDeleteExpense}
+						emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
+						emptyDescription={EXPENSE_MESSAGES.NO_EXPENSES_DESC}
+						emptyActionLabel={COMMON_MESSAGES.ADD_FIRST_EXPENSE}
+						emptyActionHref={resolve(routes.expenseNew)}
+						scrollHeight="600px"
+						onClearFilters={clearFilters}
+						hasActiveFilters={!!(
+							searchTerm ||
+							selectedVehicleId ||
+							selectedTags.length > 0 ||
+							startDate ||
+							endDate ||
+							categoryFilter
+						)}
+						{totalCount}
+						{currentOffset}
+						{pageSize}
+						{isLoadingPage}
+						onPageChange={handlePageChange}
+						activeSortBy={sortBy}
+						activeSortDir={sortDir}
+						onSortChange={handleSortChange}
+						activeCategory={categoryFilter}
+						onCategoryChange={handleCategoryChange}
+					/>
+				{/if}
 			</CardNs.Content>
 		</CardNs.Root>
 	</div>
