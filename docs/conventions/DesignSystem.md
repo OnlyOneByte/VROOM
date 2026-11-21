@@ -55,11 +55,14 @@ Notes:
 - `text-chart-*` is for chart marks and icons, not words: chart tokens are gated at 3:1, on
   `card` and as an icon on their own `/10` tint over `card` and `background` (the category badges
   and `StatCard` chips). Put the label in `text-foreground` beside the tinted icon. Status text
-  uses `text-success` / `text-warning` / `text-destructive`.
-- `text-primary` on a `bg-primary/10` tint (the active nav item, chips, avatars) is gated at AA
-  in every light theme over `background` and `card`, as are `text-warning` on `bg-warning/10` and
-  `text-chart-5` on `bg-chart-5/10`. The axe e2e scans cover every route in the default light
-  theme and every other theme's dashboard in light and dark mode.
+  uses `text-success` / `text-warning` / `text-destructive`. `chart-5` is the one exception
+  still used for words on a few screens, so it is also gated as text at AA on `background` and
+  `card`; new status text uses `text-warning` instead.
+- In every light theme these tinted text pairs are gated at AA: `text-primary` on
+  `bg-primary/10` (the active nav item, chips, avatars) and `text-chart-5` on `bg-chart-5/10` over
+  `background` and `card`, and `text-warning` on `bg-warning/10` over `card` only. The axe e2e
+  scans cover the `A11Y_ROUTES` pages in `e2e/pwa.spec.ts` in the default light theme, and every
+  other theme's dashboard in light and dark mode.
 - Chart colors come from `utils/chart-colors`: series `CHART_COLORS[i % CHART_COLORS.length]`
   (8 colors), category `getCategoryChartColor` (badges use `getCategoryBadgeClasses` from
   `utils/expense-helpers`; both derive from the one `CATEGORY_COLOR_TOKENS` assignment), chart

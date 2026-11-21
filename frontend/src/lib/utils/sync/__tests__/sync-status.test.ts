@@ -34,6 +34,7 @@ describe('getSyncStatusInfo — each branch in isolation', () => {
 	test('syncing → RefreshCw / warning / "Syncing..."', () => {
 		const info = getSyncStatusInfo(params({ syncStatus: 'syncing' }));
 		expect(info.icon).toBe(RefreshCw);
+		expect(info.color).toBe('text-warning');
 		expect(info.text).toBe('Syncing...');
 	});
 
