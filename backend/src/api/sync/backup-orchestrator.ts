@@ -14,9 +14,9 @@ import {
 } from './backup-strategy';
 import { backupStrategyRegistry } from './backup-strategy-registry';
 
-const MUTEX_TTL_MS = 5 * 60 * 1000;
+const MUTEX_TTL_MS = 2 * OPERATION_TIMEOUTS.BACKUP;
 const MUTEX_MAX_SIZE = 500;
-const backupMutex = new Map<string, number>();
+const backupMutex = new Map<string, { token: symbol; acquiredAt: number }>();
 
 export function filterEnabledProviders(config: BackupConfig): [string, ProviderBackupSettings][] {
   return Object.entries(config.providers).filter(([, s]) => isSyncEnabled(s));
@@ -26,25 +26,28 @@ export function needsZipGeneration(enabledProviders: [string, ProviderBackupSett
   return enabledProviders.some(([, s]) => hasZipBackup(s));
 }
 
-function acquireMutex(userId: string): boolean {
+function acquireMutex(userId: string): symbol | null {
   const now = Date.now();
   const existing = backupMutex.get(userId);
-  if (existing && now - existing < MUTEX_TTL_MS) {
-    return false;
+  if (existing && now - existing.acquiredAt < MUTEX_TTL_MS) {
+    return null;
   }
   if (backupMutex.size >= MUTEX_MAX_SIZE) {
-    for (const [key, ts] of backupMutex) {
-      if (now - ts >= MUTEX_TTL_MS) {
+    for (const [key, entry] of backupMutex) {
+      if (now - entry.acquiredAt >= MUTEX_TTL_MS) {
         backupMutex.delete(key);
       }
     }
   }
-  backupMutex.set(userId, now);
-  return true;
+  const token = Symbol(userId);
+  backupMutex.set(userId, { token, acquiredAt: now });
+  return token;
 }
 
-function releaseMutex(userId: string): void {
-  backupMutex.delete(userId);
+function releaseMutex(userId: string, token: symbol): void {
+  if (backupMutex.get(userId)?.token === token) {
+    backupMutex.delete(userId);
+  }
 }
 
 function failedAttempt(message: string): BackupStrategyResult {
@@ -60,7 +63,8 @@ export class BackupOrchestrator {
   ): Promise<BackupOrchestratorResult> {
     const timestamp = new Date().toISOString();
 
-    if (!acquireMutex(userId)) {
+    const lockToken = acquireMutex(userId);
+    if (!lockToken) {
       return {
         timestamp,
         status: 'in_progress',
@@ -70,12 +74,12 @@ export class BackupOrchestrator {
       };
     }
 
+    const pendingWork = new Set<Promise<unknown>>();
     try {
       if (!force) {
         const { activityTracker } = await import('./activity-tracker');
         const hasChanges = await activityTracker.hasChangesSinceLastSync(userId);
         if (!hasChanges) {
-          releaseMutex(userId);
           return { timestamp, skipped: true, outcome: 'noop', failedProviders: [], results: {} };
         }
       }
@@ -89,7 +93,6 @@ export class BackupOrchestrator {
       const enabledProviders = filterEnabledProviders(config);
 
       if (enabledProviders.length === 0) {
-        releaseMutex(userId);
         return { timestamp, outcome: 'noop', failedProviders: [], results: {} };
       }
 
@@ -145,16 +148,22 @@ export class BackupOrchestrator {
         }
 
         try {
+          const work = strategy.execute({
+            userId,
+            displayName,
+            providerId,
+            providerRow,
+            decryptedCredentials,
+            providerConfig,
+            zipBuffer,
+          });
+          pendingWork.add(work);
+          const settle = (): void => {
+            pendingWork.delete(work);
+          };
+          work.then(settle, settle);
           const result = await withTimeout(
-            strategy.execute({
-              userId,
-              displayName,
-              providerId,
-              providerRow,
-              decryptedCredentials,
-              providerConfig,
-              zipBuffer,
-            }),
+            work,
             OPERATION_TIMEOUTS.BACKUP,
             `Backup strategy for ${providerId}`
           );
@@ -235,7 +244,11 @@ export class BackupOrchestrator {
 
       return { timestamp, outcome: runOutcome, failedProviders, results };
     } finally {
-      releaseMutex(userId);
+      if (pendingWork.size === 0) {
+        releaseMutex(userId, lockToken);
+      } else {
+        void Promise.allSettled([...pendingWork]).then(() => releaseMutex(userId, lockToken));
+      }
     }
   }
 }
