@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
 	import { gotoDynamic, gotoWithQuery } from '#lib/utils/navigation.ts';
@@ -73,7 +73,10 @@
 		}
 	};
 
-	const form = new ExpenseFormState(ctx, !!expenseId);
+	const form = new ExpenseFormState(
+		ctx,
+		untrack(() => !!expenseId)
+	);
 
 	let previousVehicleId = $state('');
 	$effect(() => {
