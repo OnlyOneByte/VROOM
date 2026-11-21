@@ -140,7 +140,7 @@ export class ImportExpensesForm {
 				this.mapping ?? undefined
 			);
 		} catch (err) {
-			handleErrorWithNotification(err, 'Could not read that CSV');
+			handleErrorWithNotification(err, "Couldn't read that CSV");
 		} finally {
 			this.isPreviewing = false;
 		}
@@ -193,7 +193,7 @@ export class ImportExpensesForm {
 			onImported();
 			return true;
 		} catch (err) {
-			handleErrorWithNotification(err, 'Failed to import expenses');
+			handleErrorWithNotification(err, "Couldn't import the expenses");
 			return false;
 		} finally {
 			this.isImporting = false;

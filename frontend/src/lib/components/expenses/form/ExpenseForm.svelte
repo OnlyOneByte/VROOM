@@ -218,7 +218,7 @@
 			<div class="rounded-lg border bg-card p-6" role="alert" data-testid="vehicles-load-error">
 				<div class="mb-4 flex items-center gap-3 text-destructive">
 					<CircleAlert class="h-5 w-5" />
-					<p class="font-medium">Failed to load vehicles</p>
+					<p class="font-medium">Couldn't load your vehicles</p>
 				</div>
 				<p class="mb-4 text-sm text-muted-foreground">{form.vehiclesError}</p>
 				<Button size="lg" disabled={isRetrying} onclick={() => retry(() => loadVehicles(form))}>

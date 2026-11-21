@@ -115,7 +115,7 @@ describe('/expenses summary during a later list change', () => {
 		pendingSummary.reject(new Error('Summary down'));
 
 		await waitFor(() =>
-			expect(notify).toHaveBeenCalledWith(expect.any(Error), 'Failed to load expense summary')
+			expect(notify).toHaveBeenCalledWith(expect.any(Error), "Couldn't load the expense summary")
 		);
 		expect(shownTotal()).toBe(1);
 	});

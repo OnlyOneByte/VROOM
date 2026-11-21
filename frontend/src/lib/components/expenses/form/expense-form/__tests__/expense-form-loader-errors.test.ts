@@ -53,7 +53,7 @@ describe('expense form loader failures are reported', () => {
 		expect(addNotification).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'error',
-				message: 'Failed to load vehicles. Offline.'
+				message: "Couldn't load your vehicles. Offline."
 			})
 		);
 
@@ -91,7 +91,7 @@ describe('expense form loader failures are reported', () => {
 		expect(addNotification).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'error',
-				message: "Failed to load this vehicle's details. Offline."
+				message: "Couldn't load this vehicle's details. Offline."
 			})
 		);
 
@@ -113,7 +113,7 @@ describe('a thrown non-Error value', () => {
 		expect(state.vehicleError).toBe(UNEXPECTED_FAILURE_MESSAGE);
 		const toast = addNotification.mock.calls[0]?.[0] as { message: string } | undefined;
 		expect(toast?.message).toBe(
-			`Failed to load this vehicle's details. ${UNEXPECTED_FAILURE_MESSAGE}`
+			`Couldn't load this vehicle's details. ${UNEXPECTED_FAILURE_MESSAGE}`
 		);
 		expect(JSON.stringify(addNotification.mock.calls)).not.toContain('[object Object]');
 	});
