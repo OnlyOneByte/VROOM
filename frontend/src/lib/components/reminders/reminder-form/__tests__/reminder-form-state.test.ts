@@ -94,4 +94,33 @@ describe('ReminderFormState', () => {
 
 		expect(form.toPayload()).toMatchObject({ name: 'Rotate tires', vehicleIds: ['v1'] });
 	});
+
+	test('editing a reminder with an absolute split saves the same dollar allocations it loaded', () => {
+		const split = {
+			method: 'absolute' as const,
+			allocations: [
+				{ vehicleId: 'v1', amount: 60.25 },
+				{ vehicleId: 'v2', amount: 39.75 }
+			]
+		};
+		const form = new ReminderFormState();
+		form.load(
+			makeReminderWithVehicles(
+				{
+					type: 'expense',
+					expenseCategory: 'financial',
+					expenseAmount: 100,
+					expenseSplitConfig: split
+				},
+				['v1', 'v2']
+			),
+			[makeVehicle('v1'), makeVehicle('v2')]
+		);
+
+		expect(form.showSplitEditor).toBe(true);
+		expect(form.values.splitAllocations).toEqual(split.allocations);
+		form.values.name = 'Shared insurance';
+		expect(form.validate()).toBe(true);
+		expect(form.toPayload()).toMatchObject({ expenseAmount: 100, expenseSplitConfig: split });
+	});
 });

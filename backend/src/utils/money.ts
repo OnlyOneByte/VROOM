@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ExpenseSummary } from '../api/expenses/repository';
+import type { SplitConfig } from '../db/types';
 
 // Round before truncating: 12.34 * 100 is 1233.9999… in binary floating point.
 export function dollarsToCents(dollars: number): number {
@@ -64,8 +65,19 @@ export const insuranceClaimToApi = <T extends Record<string, unknown>>(row: T) =
   mapMoney(row, INSURANCE_CLAIM_MONEY_FIELDS as readonly (keyof T)[]);
 const vehicleToApi = <T extends Record<string, unknown>>(row: T) =>
   mapMoney(row, VEHICLE_MONEY_FIELDS as readonly (keyof T)[]);
-export const reminderToApi = <T extends Record<string, unknown>>(row: T) =>
-  mapMoney(row, REMINDER_MONEY_FIELDS as readonly (keyof T)[]);
+function splitConfigToApi(split: SplitConfig): SplitConfig {
+  if (split.method !== 'absolute') return split;
+  return {
+    ...split,
+    allocations: split.allocations.map((a) => ({ ...a, amount: centsToDollars(a.amount) })),
+  };
+}
+
+export function reminderToApi<T extends Record<string, unknown>>(row: T): T {
+  const r = mapMoney(row, REMINDER_MONEY_FIELDS as readonly (keyof T)[]);
+  const split = r.expenseSplitConfig as SplitConfig | null | undefined;
+  return split ? { ...r, expenseSplitConfig: splitConfigToApi(split) } : r;
+}
 
 export function financingWithBalanceToApi<T extends Record<string, unknown>>(row: T): T {
   const withMoney = financingToApi(row);
