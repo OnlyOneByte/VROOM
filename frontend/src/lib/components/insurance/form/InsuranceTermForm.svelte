@@ -26,7 +26,7 @@
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
-	import { prefillFromPreviousTerm } from '#lib/utils/insurance.ts';
+	import { enteredAmount, prefillFromPreviousTerm } from '#lib/utils/insurance.ts';
 	import { getCurrencySymbol } from '#lib/utils/formatters.ts';
 	import type { InsurancePolicy, InsuranceTerm, Vehicle } from '#lib/types/index.ts';
 
@@ -172,13 +172,16 @@
 			newErrors.endDate = 'End date must be after start date';
 		}
 		if (selectedVehicleIds.length === 0) newErrors.vehicles = 'At least one vehicle is required';
-		if (deductibleAmount && Number(deductibleAmount) <= 0)
-			newErrors.deductibleAmount = 'Must be positive';
-		if (coverageLimit && Number(coverageLimit) <= 0) newErrors.coverageLimit = 'Must be positive';
-		if (totalCost && Number(totalCost) < 0) newErrors.totalCost = 'Must be non-negative';
-		if (monthlyCost && Number(monthlyCost) < 0) newErrors.monthlyCost = 'Must be non-negative';
-		if (paymentAmount && Number(paymentAmount) < 0)
-			newErrors.paymentAmount = 'Must be non-negative';
+		const isAtMost = (raw: string, bound: number) => {
+			const amount = enteredAmount(raw);
+			return amount !== undefined && amount <= bound;
+		};
+		const isNegative = (raw: string) => (enteredAmount(raw) ?? 0) < 0;
+		if (isAtMost(deductibleAmount, 0)) newErrors.deductibleAmount = 'Must be positive';
+		if (isAtMost(coverageLimit, 0)) newErrors.coverageLimit = 'Must be positive';
+		if (isNegative(totalCost)) newErrors.totalCost = 'Must be non-negative';
+		if (isNegative(monthlyCost)) newErrors.monthlyCost = 'Must be non-negative';
+		if (isNegative(paymentAmount)) newErrors.paymentAmount = 'Must be non-negative';
 		errors = newErrors;
 		return Object.keys(newErrors).length === 0;
 	}
@@ -192,7 +195,8 @@
 			else if (forEdit) data[key] = null;
 		};
 		const num = (key: string, raw: string) => {
-			if (raw) data[key] = Number(raw);
+			const amount = enteredAmount(raw);
+			if (amount !== undefined) data[key] = amount;
 			else if (forEdit) data[key] = null;
 		};
 		str('policyNumber', policyNumber);

@@ -15,6 +15,12 @@ export function getDaysRemaining(termEnd: string | Date, now: Date = new Date())
 	return localDayNumber(end) - localDayNumber(now);
 }
 
+export function enteredAmount(value: string | number | null | undefined): number | undefined {
+	if (value === null || value === undefined || value === '') return undefined;
+	const amount = Number(value);
+	return Number.isFinite(amount) ? amount : undefined;
+}
+
 export function sortTermsByEndDateDesc(terms: InsuranceTerm[]): InsuranceTerm[] {
 	return [...terms].sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
 }

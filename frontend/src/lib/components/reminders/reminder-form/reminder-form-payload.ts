@@ -7,11 +7,21 @@ import {
 	type ReminderDraft
 } from './reminder-form-model';
 
-export type ReminderPayload = Partial<Reminder> & { vehicleIds: string[]; timeZone: string };
+export type ReminderPayload = Partial<Reminder> & { vehicleIds: string[]; timeZone?: string };
+
+export function browserTimeZone(): string | undefined {
+	try {
+		const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		return typeof zone === 'string' && zone !== '' ? zone : undefined;
+	} catch {
+		return undefined;
+	}
+}
 
 export function buildReminderPayload(draft: ReminderDraft): ReminderPayload {
 	const isExpense = draft.kind === 'expense';
 	const mileage = hasMileageTrigger(draft.triggerMode);
+	const timeZone = browserTimeZone();
 	return {
 		name: draft.name.trim(),
 		description: draft.description.trim() || null,
@@ -26,7 +36,7 @@ export function buildReminderPayload(draft: ReminderDraft): ReminderPayload {
 		intervalUnit: draft.frequency === 'custom' ? draft.intervalUnit : null,
 		startDate: draft.startDate || toDateInputValue(new Date()),
 		endDate: draft.endDate || null,
-		timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+		...(timeZone ? { timeZone } : {}),
 		vehicleIds: draft.selectedVehicleIds,
 		expenseCategory: isExpense ? draft.expenseCategory : null,
 		expenseAmount: isExpense ? parseFloat(draft.expenseAmount) : null,

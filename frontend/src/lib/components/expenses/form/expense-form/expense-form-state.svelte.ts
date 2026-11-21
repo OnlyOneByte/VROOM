@@ -4,6 +4,7 @@ import type { Expense, ExpenseFormErrors, Vehicle } from '#lib/types/index.ts';
 import { extractUniqueTags } from '#lib/utils/expense-filters.ts';
 import { resetSplitAllocations, type SplitAllocationDraft } from '#lib/utils/expense-helpers.ts';
 import { getDistanceUnitLabel, isElectricFuelType } from '#lib/utils/units.ts';
+import { latest } from '#lib/utils/latest-request.ts';
 import { validateExpenseField } from '../expense-form-validation';
 import { calculateMileageEfficiency } from './mileage-efficiency';
 import { createEmptyFormData, type ExpenseFormData } from './expense-form-data';
@@ -29,6 +30,8 @@ export class ExpenseFormState {
 	isDeleting = $state(false);
 	showDeleteConfirm = $state(false);
 	vehicles = $state<Vehicle[]>([]);
+	vehiclesError = $state<string | null>(null);
+	vehicleError = $state<string | null>(null);
 	errors = $state<ExpenseFormErrors>({});
 	submitError = $state<string | null>(null);
 	touched = $state<Record<string, boolean>>({});
@@ -58,6 +61,11 @@ export class ExpenseFormState {
 	sourceId = $state<string | null>(null);
 
 	pendingFiles = $state<File[]>([]);
+
+	readonly nextVehicleRequest = latest();
+	readonly nextLastFuelRequest = latest();
+	readonly nextHistoryRequest = latest();
+	readonly nextContextRequest = latest();
 
 	get isEditMode(): boolean {
 		return !!this.ctx.expenseId;

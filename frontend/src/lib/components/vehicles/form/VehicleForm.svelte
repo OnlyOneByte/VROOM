@@ -61,6 +61,7 @@
 	import { validateVehicleFields, validateFinancingFields } from './vehicle-form-validation';
 	import { calculatePayoffDateFromStart } from '#lib/utils/financing-calculations.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import PageHeader from '#lib/components/common/page-header.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { ApiError } from '#lib/utils/error-handling.ts';
 
@@ -77,6 +78,7 @@
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
 	let showPayoffConfirm = $state(false);
+	let financingBeingEnded = $state<VehicleFinancing | null>(null);
 	let showUnitChangeConfirm = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 
@@ -143,6 +145,14 @@
 		purchasePrice: undefined,
 		purchaseDate: ''
 	});
+
+	let headerDescription = $derived(
+		!isEditMode
+			? 'Enter your vehicle information and optional financing details'
+			: vehicleForm.make && vehicleForm.model
+				? vehicleForm.nickname || `${vehicleForm.year} ${vehicleForm.make} ${vehicleForm.model}`
+				: undefined
+	);
 
 	function handleVehicleTypeChange(newType: string) {
 		vehicleForm.vehicleType = newType as VehicleType;
@@ -344,7 +354,7 @@
 	);
 
 	let payoffConfirmCopy = $derived.by(() => {
-		const financing = activeFinancingToEnd;
+		const financing = financingBeingEnded;
 		if (!financing) return { title: '', description: '', confirmLabel: '' };
 		const lender = financing.provider ? ` with ${financing.provider}` : '';
 		if (financing.financingType === 'lease') {
@@ -396,6 +406,7 @@
 			return;
 		}
 		if (activeFinancingToEnd) {
+			financingBeingEnded = activeFinancingToEnd;
 			showPayoffConfirm = true;
 			return;
 		}
@@ -403,15 +414,16 @@
 	}
 
 	async function payOffAndSave() {
-		if (!activeFinancingToEnd) return;
+		const financing = financingBeingEnded;
+		if (!financing) return;
 		try {
-			const ended = await vehicleApi.payOffFinancing(activeFinancingToEnd.id);
+			const ended = await vehicleApi.payOffFinancing(financing.id);
 			if (vehicle) vehicle.financing = ended;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error';
 			appStore.addNotification({
 				type: 'error',
-				message: `Couldn't mark the ${activeFinancingToEnd.financingType === 'lease' ? 'lease as ended' : 'loan as paid off'}: ${message}`
+				message: `Couldn't mark the ${financing.financingType === 'lease' ? 'lease as ended' : 'loan as paid off'}: ${message}`
 			});
 			throw error;
 		}
@@ -586,26 +598,22 @@
 		</div>
 	{:else}
 		<div class="space-y-6">
-			<div class="flex items-center gap-4">
-				<Button variant="outline" size="icon" aria-label="Go back" onclick={handleBack}>
-					<ArrowLeft class="h-4 w-4" />
-				</Button>
-				<div>
-					<h1 class="text-3xl font-bold tracking-tight">
-						{isEditMode ? 'Edit Vehicle' : 'Add New Vehicle'}
-					</h1>
-					{#if isEditMode && vehicleForm.make && vehicleForm.model}
-						<p class="text-muted-foreground mt-1">
-							{vehicleForm.nickname ||
-								`${vehicleForm.year} ${vehicleForm.make} ${vehicleForm.model}`}
-						</p>
-					{:else if !isEditMode}
-						<p class="text-muted-foreground mt-1">
-							Enter your vehicle information and optional financing details
-						</p>
-					{/if}
-				</div>
-			</div>
+			<PageHeader
+				title={isEditMode ? 'Edit Vehicle' : 'Add New Vehicle'}
+				description={headerDescription}
+			>
+				{#snippet back()}
+					<Button
+						variant="ghost"
+						size="icon-lg"
+						class="shrink-0"
+						aria-label="Go back"
+						onclick={handleBack}
+					>
+						<ArrowLeft class="size-5" />
+					</Button>
+				{/snippet}
+			</PageHeader>
 
 			<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24">
 				<Card>

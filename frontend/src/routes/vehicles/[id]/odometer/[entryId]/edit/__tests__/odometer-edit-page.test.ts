@@ -68,11 +68,11 @@ function mount() {
 }
 
 function odometerInput(): HTMLInputElement {
-	return screen.getByLabelText('Odometer Reading') as HTMLInputElement;
+	return screen.getByLabelText('Odometer Reading *') as HTMLInputElement;
 }
 
 function dateInput(): HTMLInputElement {
-	return screen.getByLabelText('Date') as HTMLInputElement;
+	return screen.getByLabelText('Date *') as HTMLInputElement;
 }
 
 function noteInput(): HTMLTextAreaElement {
@@ -188,6 +188,20 @@ describe('edit odometer reading lower-than-latest warning', () => {
 });
 
 describe('edit odometer reading validation', () => {
+	test('a cleared reading is announced and linked to its input', async () => {
+		mount();
+		await settle();
+
+		await fireEvent.input(odometerInput(), { target: { value: '' } });
+		await save();
+
+		const input = odometerInput();
+		expect(input).toHaveAttribute('aria-invalid', 'true');
+		const error = document.getElementById(input.getAttribute('aria-describedby') as string);
+		expect(error).toHaveTextContent('Odometer reading is required');
+		expect(error).toHaveAttribute('role', 'alert');
+	});
+
 	test('a cleared reading is required instead of being saved as 0', async () => {
 		mount();
 		await settle();

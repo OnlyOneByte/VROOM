@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import {
   createTestApp,
   type DataEnvelope,
@@ -68,5 +68,27 @@ describe("a trip's linked odometer entry takes its photos with it", () => {
     const res = await ctx.authed('DELETE', `/api/v1/trips/${tripId}`);
     expect(res.status).toBeLessThan(300);
     expect(photoCount()).toBe(1);
+  });
+});
+
+describe('a failed photo cleanup does not block the trip edit', () => {
+  test('the replacement odometer entry is still created when deleting the old photos throws', async () => {
+    const { tripId, entryId } = await tripWithOdometerPhoto();
+    const photoService = await import('../../photos/photo-service');
+    const spy = spyOn(photoService, 'deletePhotosForEntities').mockRejectedValue(
+      new Error('storage down')
+    );
+    try {
+      const res = await ctx.authed('PUT', `/api/v1/trips/${tripId}`, { endOdometer: 700 });
+      expect(res.status).toBeLessThan(300);
+    } finally {
+      spy.mockRestore();
+    }
+    const entries = ctx.sqlite.query('SELECT id, odometer FROM odometer_entries').all() as {
+      id: string;
+      odometer: number;
+    }[];
+    expect(entries.map((e) => e.odometer)).toEqual([700]);
+    expect(entries.map((e) => e.id)).not.toContain(entryId);
   });
 });

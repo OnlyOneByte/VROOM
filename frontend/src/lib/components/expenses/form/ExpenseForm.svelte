@@ -5,7 +5,8 @@
 	import { gotoDynamic, gotoWithQuery } from '#lib/utils/navigation.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
-	import { LoaderCircle, CreditCard, Info } from '@lucide/svelte';
+	import { LoaderCircle, CreditCard, Info, CircleAlert } from '@lucide/svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import CategorySelector from './CategorySelector.svelte';
 	import FuelFieldsSection from './FuelFieldsSection.svelte';
@@ -20,10 +21,7 @@
 	} from './expense-form/expense-form-state.svelte';
 	import {
 		applyPreselections,
-		loadAllVehicleExpenses,
 		loadExpense,
-		loadLastFuelExpense,
-		loadVehicle,
 		loadVehicleContext,
 		loadVehicles
 	} from './expense-form/expense-form-loaders';
@@ -80,16 +78,18 @@
 
 	let previousVehicleId = $state('');
 	$effect(() => {
-		if (form.formData.vehicleId && form.formData.vehicleId !== previousVehicleId) {
+		if (
+			form.formData.vehicleId &&
+			form.formData.vehicleId !== previousVehicleId &&
+			!form.vehiclesError
+		) {
 			previousVehicleId = form.formData.vehicleId;
 			if (form.vehicle !== null || !form.isLoading) {
 				if (!form.isEditMode || form.vehicle !== null) {
 					form.sourceType = null;
 					form.sourceId = null;
 				}
-				loadVehicle(form);
-				loadLastFuelExpense(form);
-				loadAllVehicleExpenses(form);
+				loadVehicleContext(form);
 			}
 		}
 	});
@@ -110,7 +110,7 @@
 			});
 		}
 
-		if (form.formData.vehicleId) {
+		if (form.formData.vehicleId && !form.vehiclesError) {
 			await loadVehicleContext(form);
 		}
 
@@ -119,6 +119,17 @@
 			form.sourceId = preselectedFinancingId;
 		}
 	});
+
+	let isRetrying = $state(false);
+
+	async function retry(load: () => Promise<void>) {
+		isRetrying = true;
+		try {
+			await load();
+		} finally {
+			isRetrying = false;
+		}
+	}
 
 	function handleReceiptDraft(draft: ReceiptDraft, image: File) {
 		if (typeof draft.amount === 'number') form.formData.amount = String(draft.amount);
@@ -175,6 +186,37 @@
 			onEditTerm={handleEditInsuranceTerm}
 			onForceDelete={confirmDelete}
 		/>
+	{:else if form.vehiclesError}
+		<div class="space-y-6">
+			<ExpenseFormHeader
+				title={form.isGroupEditMode
+					? 'Edit Split Expense'
+					: form.isEditMode
+						? 'Edit Expense'
+						: 'Add Expense'}
+				onBack={handleBack}
+			>
+				{#snippet subtitle()}
+					<ExpenseFormSubtitle
+						isEditMode={form.isEditMode}
+						isGroupEditMode={form.isGroupEditMode}
+						selectedVehicleIds={form.selectedVehicleIds}
+						vehicles={form.vehicles}
+						vehicle={form.vehicle}
+					/>
+				{/snippet}
+			</ExpenseFormHeader>
+			<div class="rounded-lg border bg-card p-6" role="alert" data-testid="vehicles-load-error">
+				<div class="mb-4 flex items-center gap-3 text-destructive">
+					<CircleAlert class="h-5 w-5" />
+					<p class="font-medium">Failed to load vehicles</p>
+				</div>
+				<p class="mb-4 text-sm text-muted-foreground">{form.vehiclesError}</p>
+				<Button size="lg" disabled={isRetrying} onclick={() => retry(() => loadVehicles(form))}>
+					Retry
+				</Button>
+			</div>
+		</div>
 	{:else}
 		<div class="space-y-6 pb-32 sm:pb-24">
 			<ExpenseFormHeader
@@ -242,6 +284,24 @@
 							<p class="text-xs text-muted-foreground" data-testid="fuel-split-hint">
 								Fill-ups can't be split across vehicles. Log each one on the vehicle you filled.
 							</p>
+						{/if}
+						{#if form.vehicleError}
+							<div
+								class="flex flex-wrap items-center gap-3 text-sm"
+								role="alert"
+								data-testid="vehicle-load-error"
+							>
+								<CircleAlert class="h-4 w-4 shrink-0 text-destructive" />
+								<span class="text-destructive">Couldn't load this vehicle's details.</span>
+								<Button
+									variant="outline"
+									size="lg"
+									disabled={isRetrying}
+									onclick={() => retry(() => loadVehicleContext(form))}
+								>
+									Retry
+								</Button>
+							</div>
 						{/if}
 					</div>
 				{/if}

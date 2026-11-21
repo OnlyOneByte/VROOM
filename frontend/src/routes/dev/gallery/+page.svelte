@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { dev } from '$app/env';
 	import PageHeader from '#lib/components/common/page-header.svelte';
+	import BrandMark from '#lib/components/common/BrandMark.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -67,6 +68,27 @@
 			title="Component Gallery"
 			description="The live VROOM kit — compose from these, don't reinvent. See DesignSystem.md."
 		/>
+
+		<section class="space-y-3">
+			<h2 class="text-lg font-semibold">Brand mark</h2>
+			<p class="text-sm text-muted-foreground">
+				The logo is <code>BrandMark</code>, never the car emoji. It is decorative, so keep the
+				"VROOM" wordmark beside it; pass a class to change its size or colour.
+			</p>
+			<div class="flex flex-wrap items-center gap-8">
+				<div class="flex items-center gap-3" data-testid="gallery-brand-mark">
+					<BrandMark />
+					<span class="text-xl font-bold text-foreground">VROOM</span>
+				</div>
+				<div class="inline-flex items-center justify-center w-10 h-10 bg-primary rounded-xl">
+					<BrandMark class="h-5 w-5 text-primary-foreground" />
+				</div>
+				<div class="flex items-center gap-2 text-sm text-muted-foreground">
+					<BrandMark class="h-4 w-4 text-muted-foreground" />
+					<span>VROOM</span>
+				</div>
+			</div>
+		</section>
 
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Buttons</h2>
