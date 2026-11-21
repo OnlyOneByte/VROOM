@@ -110,6 +110,18 @@ export function yearToDateSpending(
   return total;
 }
 
+export function isTermInForce(
+  term: { startDate: Date | null; endDate: Date | null },
+  now: number
+): boolean {
+  return (
+    term.startDate instanceof Date &&
+    term.endDate instanceof Date &&
+    term.startDate.getTime() <= now &&
+    now <= term.endDate.getTime()
+  );
+}
+
 export function calendarYearRange(year: number): { start: Date; end: Date } {
   return { start: new Date(Date.UTC(year, 0, 1)), end: new Date(Date.UTC(year + 1, 0, 1)) };
 }
@@ -1063,29 +1075,39 @@ export class AnalyticsRepository {
     totalAnnualPremiums: number;
     carrierMap: Map<string, { annualPremium: number; vehicleIds: Set<string> }>;
     monthlyMap: Map<string, number>;
+    currentPolicyIds: Set<string>;
   } {
     let totalMonthlyPremiums = 0;
     let totalAnnualPremiums = 0;
     const vehicleDetails: InsuranceData['vehicleDetails'] = [];
     const carrierMap = new Map<string, { annualPremium: number; vehicleIds: Set<string> }>();
     const monthlyMap = new Map<string, number>();
+    const currentPolicyIds = new Set<string>();
 
+    const now = Date.now();
     for (const policy of activePolicies) {
-      const policyTerms = termRows.filter((t) => t.policyId === policy.id);
-      const latestTerm = policyTerms.sort((a, b) => {
-        const aEnd = a.endDate instanceof Date ? a.endDate.getTime() : 0;
-        const bEnd = b.endDate instanceof Date ? b.endDate.getTime() : 0;
-        if (bEnd !== aEnd) return bEnd - aEnd;
-        const aStart = a.startDate instanceof Date ? a.startDate.getTime() : 0;
-        const bStart = b.startDate instanceof Date ? b.startDate.getTime() : 0;
-        return bStart - aStart;
-      })[0];
+      const policyTerms = termRows
+        .filter((t) => t.policyId === policy.id)
+        .sort((a, b) => {
+          const aEnd = a.endDate instanceof Date ? a.endDate.getTime() : 0;
+          const bEnd = b.endDate instanceof Date ? b.endDate.getTime() : 0;
+          if (bEnd !== aEnd) return bEnd - aEnd;
+          const aStart = a.startDate instanceof Date ? a.startDate.getTime() : 0;
+          const bStart = b.startDate instanceof Date ? b.startDate.getTime() : 0;
+          return bStart - aStart;
+        });
+      const latestTerm = policyTerms[0];
       if (!latestTerm) continue;
+      this.accumulateMonthlyPremiums(monthlyMap, latestTerm, effectiveMonthlyPremium(latestTerm));
 
-      const monthlyPremium = effectiveMonthlyPremium(latestTerm);
+      const currentTerm = policyTerms.find((t) => isTermInForce(t, now));
+      if (!currentTerm) continue;
+      currentPolicyIds.add(policy.id);
+
+      const monthlyPremium = effectiveMonthlyPremium(currentTerm);
       const annualPremium = monthlyPremium * 12;
       const coveredVehicleIds = [
-        ...new Set(junctionRows.filter((j) => j.termId === latestTerm.id).map((j) => j.vehicleId)),
+        ...new Set(junctionRows.filter((j) => j.termId === currentTerm.id).map((j) => j.vehicleId)),
       ];
 
       totalMonthlyPremiums += monthlyPremium;
@@ -1099,12 +1121,18 @@ export class AnalyticsRepository {
         policy.company,
         monthlyPremium,
         annualPremium,
-        latestTerm
+        currentTerm
       );
-      this.accumulateMonthlyPremiums(monthlyMap, latestTerm, monthlyPremium);
     }
 
-    return { vehicleDetails, totalMonthlyPremiums, totalAnnualPremiums, carrierMap, monthlyMap };
+    return {
+      vehicleDetails,
+      totalMonthlyPremiums,
+      totalAnnualPremiums,
+      carrierMap,
+      monthlyMap,
+      currentPolicyIds,
+    };
   }
 
   private accumulateCarrierData(
@@ -1803,17 +1831,20 @@ export class AnalyticsRepository {
 
       const activePolicies = policyRows.filter((p) => p.isActive);
 
-      const { vehicleDetails, totalMonthlyPremiums, totalAnnualPremiums, carrierMap, monthlyMap } =
-        this.buildInsuranceDetails(activePolicies, termRows, junctionRows, vehicleNameMap);
-
-      const policyIdsWithTerms = new Set(termRows.map((t) => t.policyId));
-      const activePoliciesWithTerms = activePolicies.filter((p) => policyIdsWithTerms.has(p.id));
+      const {
+        vehicleDetails,
+        totalMonthlyPremiums,
+        totalAnnualPremiums,
+        carrierMap,
+        monthlyMap,
+        currentPolicyIds,
+      } = this.buildInsuranceDetails(activePolicies, termRows, junctionRows, vehicleNameMap);
 
       return {
         summary: {
           totalMonthlyPremiums,
           totalAnnualPremiums,
-          activePoliciesCount: activePoliciesWithTerms.length,
+          activePoliciesCount: currentPolicyIds.size,
         },
         vehicleDetails,
         monthlyPremiumTrend: Array.from(monthlyMap.entries())
