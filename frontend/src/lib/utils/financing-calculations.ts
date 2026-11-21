@@ -474,6 +474,39 @@ export function calculateMinimumPayment(financing: VehicleFinancing): number | n
 	return Math.round(minimumPayment * 100) / 100;
 }
 
+const MS_PER_DAY = 86_400_000;
+
+function utcDayStart(date: Date): number {
+	return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
+function addUtcMonthsClamped(dayStart: number, months: number): number {
+	const start = new Date(dayStart);
+	const year = start.getUTCFullYear();
+	const month = start.getUTCMonth() + months;
+	const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+	return Date.UTC(year, month, Math.min(start.getUTCDate(), lastDay));
+}
+
+export function elapsedMonths(startDate: Date, date: Date): number {
+	const start = utcDayStart(startDate);
+	const end = utcDayStart(date);
+	if (!(end > start)) return 0;
+	const from = new Date(start);
+	const to = new Date(end);
+	let whole =
+		(to.getUTCFullYear() - from.getUTCFullYear()) * 12 + to.getUTCMonth() - from.getUTCMonth();
+	let anchor = addUtcMonthsClamped(start, whole);
+	if (anchor > end) {
+		whole--;
+		anchor = addUtcMonthsClamped(start, whole);
+	}
+	const next = addUtcMonthsClamped(start, whole + 1);
+	return whole + Math.round((end - anchor) / MS_PER_DAY) / Math.round((next - anchor) / MS_PER_DAY);
+}
+
+const toCents = (dollars: number): number => Math.round(dollars * 100);
+
 export function derivePaymentEntries(
 	expenses: Expense[],
 	financing: VehicleFinancing
@@ -482,32 +515,36 @@ export function derivePaymentEntries(
 		(a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
 	);
 
-	const isLoanWithApr =
-		financing.financingType === 'loan' && financing.apr != null && financing.apr > 0;
+	const startDate = new Date(financing.startDate);
+	const monthlyRate =
+		financing.financingType === 'loan' &&
+		financing.apr != null &&
+		financing.apr > 0 &&
+		!isNaN(startDate.getTime())
+			? financing.apr / 100 / 12
+			: 0;
 
-	const schedule = isLoanWithApr ? calculateAmortizationSchedule(financing, sorted.length) : [];
-
-	let cumulativeAmount = 0;
+	let balanceCents = toCents(financing.originalAmount);
+	const first = sorted[0];
+	let accruedMonths = first ? Math.max(0, elapsedMonths(startDate, new Date(first.date)) - 1) : 0;
 
 	return sorted.map((expense, index) => {
-		cumulativeAmount += expense.amount;
-		const paymentNumber = index + 1;
-		const remainingBalance = Math.max(0, financing.originalAmount - cumulativeAmount);
-
-		const scheduleEntry = schedule[index];
-		const principalAmount =
-			isLoanWithApr && scheduleEntry ? scheduleEntry.principalAmount : expense.amount;
-		const interestAmount = isLoanWithApr && scheduleEntry ? scheduleEntry.interestAmount : 0;
+		const paymentCents = toCents(expense.amount);
+		const months = Math.max(accruedMonths, elapsedMonths(startDate, new Date(expense.date)));
+		const interestCents = Math.round(balanceCents * monthlyRate * (months - accruedMonths));
+		accruedMonths = months;
+		const interestPaidCents = Math.min(paymentCents, interestCents);
+		balanceCents = Math.max(0, balanceCents + interestCents - paymentCents);
 
 		const paymentType: 'extra' | 'standard' =
 			expense.amount > financing.paymentAmount ? 'extra' : 'standard';
 
 		return {
 			expense,
-			paymentNumber,
-			remainingBalance,
-			principalAmount,
-			interestAmount,
+			paymentNumber: index + 1,
+			remainingBalance: balanceCents / 100,
+			principalAmount: (paymentCents - interestPaidCents) / 100,
+			interestAmount: interestPaidCents / 100,
 			paymentType
 		};
 	});
