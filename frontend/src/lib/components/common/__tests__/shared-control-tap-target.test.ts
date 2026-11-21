@@ -7,8 +7,8 @@ import { collectSvelteFiles } from '../../../utils/__tests__/_helpers/collect-sv
 import PaginationControls from '../pagination-controls.svelte';
 
 const COMPONENTS = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const CAROUSEL_ARROW_TAG = /<Carousel\.(?:Previous|Next)\b[\s\S]*?\/>/g;
-const SMALL_SIZE = /\b(?:size|h|w)-[1-9]\b/;
+const CAROUSEL_ARROW_TAG = /<Carousel\.(?:Previous|Next)\b[^>]*>/g;
+const SMALL_SIZE = /(?:^|[\s"'])(?:size|h|w)-[1-9](?=[\s"'])|\bsize="(?:icon|icon-sm|sm|default)"/;
 
 describe('shared controls meet the 40px tap target', () => {
 	test('pagination Previous and Next are 40px tall', () => {
@@ -20,14 +20,23 @@ describe('shared controls meet the 40px tap target', () => {
 		});
 
 		for (const name of ['Previous', 'Next']) {
-			expect(screen.getByRole('button', { name })).toHaveClass('h-10');
+			expect(screen.getByRole('button', { name })).toHaveClass('h-10', 'w-10', 'sm:w-auto');
 		}
+	});
+
+	test.each([
+		['size="icon"', true],
+		['class="h-8 w-8 rounded-full"', true],
+		['class="left-2 md:left-4 shadow-md"', false]
+	])('the arrow-size check flags %s: %s', (attrs, flagged) => {
+		const tag = `<Carousel.Next variant="ghost" ${attrs} />`.match(CAROUSEL_ARROW_TAG)?.[0] ?? '';
+		expect(SMALL_SIZE.test(tag)).toBe(flagged);
 	});
 
 	test.each(['previous', 'next'])('carousel %s arrow is 40px', arrow => {
 		const source = readFileSync(join(COMPONENTS, `ui/carousel/carousel-${arrow}.svelte`), 'utf8');
-		expect(source).toContain("size = 'icon-lg'");
-		expect(source).toContain("'absolute size-10 rounded-full'");
+		expect(source).toMatch(/\bsize\s*=\s*'icon-lg'/);
+		expect(source).toMatch(/'absolute\b[^']*\bsize-10\b/);
 	});
 
 	test('no page shrinks a carousel arrow below 40px', () => {

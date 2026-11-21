@@ -18,7 +18,7 @@
 	let isNextDisabled = $derived(currentOffset + pageSize >= totalCount);
 </script>
 
-<div class="flex items-center justify-between border-t px-4 py-3">
+<div class="flex items-center justify-between gap-2 border-t px-4 py-3">
 	<p class="whitespace-nowrap text-sm text-muted-foreground">
 		Page {currentPage} of {totalPages}
 	</p>
@@ -29,22 +29,24 @@
 		<Button
 			variant="outline"
 			size="sm"
-			class="h-10"
+			class="h-10 w-10 sm:w-auto"
+			aria-label="Previous"
 			disabled={isPrevDisabled || isLoading}
 			onclick={() => onPageChange(currentOffset - pageSize)}
 		>
-			<ChevronLeft class="h-4 w-4" />
-			Previous
+			<ChevronLeft class="h-4 w-4" aria-hidden="true" />
+			<span class="hidden sm:inline">Previous</span>
 		</Button>
 		<Button
 			variant="outline"
 			size="sm"
-			class="h-10"
+			class="h-10 w-10 sm:w-auto"
+			aria-label="Next"
 			disabled={isNextDisabled || isLoading}
 			onclick={() => onPageChange(currentOffset + pageSize)}
 		>
-			Next
-			<ChevronRight class="h-4 w-4" />
+			<span class="hidden sm:inline">Next</span>
+			<ChevronRight class="h-4 w-4" aria-hidden="true" />
 		</Button>
 	</div>
 </div>
