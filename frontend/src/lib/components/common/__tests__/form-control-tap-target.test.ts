@@ -28,9 +28,15 @@ describe('form controls meet the 40px tap target on mobile', () => {
 		);
 	});
 
-	test('compact expense list sort buttons match the category select', () => {
+	test('compact expense list sort buttons match the category select, 8px apart', () => {
 		const list = source('expenses/expenses-table/ExpensesCompactList.svelte');
 		expect(list.match(/class="h-10 px-2 text-xs sm:h-9"/g)).toHaveLength(2);
+		expect(list).toContain('<div class="ml-auto flex items-center gap-2">');
+	});
+
+	test('the compact category filter carries no height that the select overrides', () => {
+		const filter = source('expenses/expenses-table/ExpenseCategoryFilter.svelte');
+		expect(filter).not.toMatch(/'h-8 px-2 border-none[^']*text-xs'/);
 	});
 
 	test('DatePicker trigger is 40px below sm and 36px from sm up', () => {

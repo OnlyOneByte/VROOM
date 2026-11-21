@@ -10,8 +10,7 @@
 	import ExpenseDeleteDialog from './expenses-table/ExpenseDeleteDialog.svelte';
 	import {
 		INSURANCE_DELETE_BLOCKED,
-		deleteExpenseRecord,
-		deleteFailureMessage,
+		deleteAndRefresh,
 		isInsuranceLinked
 	} from './expenses-table/expense-table-actions';
 	import {
@@ -168,18 +167,7 @@
 		isDeleting = true;
 
 		try {
-			await deleteExpenseRecord(expenseToDelete);
-			await onDelete(expenseToDelete);
-
-			appStore.addNotification({
-				type: 'success',
-				message: 'Expense deleted successfully'
-			});
-		} catch (error) {
-			appStore.addNotification({
-				type: 'error',
-				message: deleteFailureMessage(error)
-			});
+			appStore.addNotification(await deleteAndRefresh(expenseToDelete, onDelete));
 		} finally {
 			isDeleting = false;
 			showDeleteModal = false;
