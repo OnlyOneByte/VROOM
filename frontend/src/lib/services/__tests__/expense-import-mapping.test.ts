@@ -28,14 +28,33 @@ afterEach(() => {
 });
 
 describe('expenseApi.importExpensesCsv', () => {
-	test('native path sends ONLY {csv, dryRun} — no mapping key (backward-compatible)', async () => {
+	test("sends the browser time zone so date-only rows land on the user's calendar day", async () => {
+		post.mockResolvedValueOnce(NATIVE_RESULT);
+		const spy = vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockReturnValue({
+			...new Intl.DateTimeFormat().resolvedOptions(),
+			timeZone: 'Pacific/Kiritimati'
+		});
+		try {
+			await expenseApi.importExpensesCsv('csv-text', true);
+		} finally {
+			spy.mockRestore();
+		}
+		const body = post.mock.calls[0]?.[1] as Record<string, unknown>;
+		expect(body['timeZone']).toBe('Pacific/Kiritimati');
+	});
+
+	test('native path sends csv, dryRun and the browser time zone — no mapping key', async () => {
 		post.mockResolvedValueOnce(NATIVE_RESULT);
 		await expenseApi.importExpensesCsv('date,vehicle\n2024-01-01,Civic', true);
 
 		expect(post).toHaveBeenCalledTimes(1);
 		const [url, body] = post.mock.calls[0] ?? [];
 		expect(url).toBe('/api/v1/expenses/import');
-		expect(body).toEqual({ csv: 'date,vehicle\n2024-01-01,Civic', dryRun: true });
+		expect(body).toEqual({
+			csv: 'date,vehicle\n2024-01-01,Civic',
+			dryRun: true,
+			timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+		});
 		expect('mapping' in (body as object)).toBe(false);
 	});
 
@@ -43,7 +62,11 @@ describe('expenseApi.importExpensesCsv', () => {
 		post.mockResolvedValueOnce({ ...NATIVE_RESULT, dryRun: false, imported: 2 });
 		await expenseApi.importExpensesCsv('csv-text');
 		const [, body] = post.mock.calls[0] ?? [];
-		expect(body).toEqual({ csv: 'csv-text', dryRun: false });
+		expect(body).toEqual({
+			csv: 'csv-text',
+			dryRun: false,
+			timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+		});
 	});
 
 	test('foreign-tracker path threads the mapping through verbatim and returns unmappedCategories', async () => {
@@ -62,7 +85,12 @@ describe('expenseApi.importExpensesCsv', () => {
 
 		const [url, body] = post.mock.calls[0] ?? [];
 		expect(url).toBe('/api/v1/expenses/import');
-		expect(body).toEqual({ csv: 'Date,Cost,Car\n…', dryRun: true, mapping });
+		expect(body).toEqual({
+			csv: 'Date,Cost,Car\n…',
+			dryRun: true,
+			timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+			mapping
+		});
 		expect(result.unmappedCategories).toEqual(['carwash']);
 	});
 });

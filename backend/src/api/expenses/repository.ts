@@ -6,6 +6,7 @@ import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, photos } from '../../db/schema';
 import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import { DatabaseError, NotFoundError } from '../../errors';
+import { zonedCalendar } from '../../utils/analytics-charts';
 import { getPeriodStartDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { clampPagination, type PaginatedResult } from '../../utils/pagination';
@@ -87,6 +88,7 @@ interface ExpenseSummaryFilters {
   userId: string;
   vehicleId?: string;
   period?: '7d' | '30d' | '90d' | '1y' | 'all';
+  timeZone?: string;
 }
 
 export interface ExpenseSummary {
@@ -342,6 +344,28 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     }
   }
 
+  private async zonedMonthlyTrend(
+    where: SQL | undefined,
+    timeZone: string
+  ): Promise<Array<{ period: string; amount: number; count: number }>> {
+    const rows = await this.db
+      .select({ date: expenses.date, amount: expenses.expenseAmount })
+      .from(expenses)
+      .where(where);
+    const calendar = zonedCalendar(timeZone);
+    const months = new Map<string, { amount: number; count: number }>();
+    for (const row of rows) {
+      const period = calendar.day(row.date).slice(0, 7);
+      const bucket = months.get(period) ?? { amount: 0, count: 0 };
+      bucket.amount += row.amount;
+      bucket.count += 1;
+      months.set(period, bucket);
+    }
+    return [...months.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([period, bucket]) => ({ period, ...bucket }));
+  }
+
   async getSummary(filters: ExpenseSummaryFilters): Promise<ExpenseSummary> {
     try {
       const periodConditions: SQL[] = [eq(expenses.userId, filters.userId)];
@@ -387,16 +411,18 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           .where(periodWhere)
           .groupBy(expenses.category),
 
-        this.db
-          .select({
-            period: formatYearMonth(expenses.date).as('period'),
-            amount: sql<number>`SUM(${expenses.expenseAmount})`,
-            count: sql<number>`count(*)`,
-          })
-          .from(expenses)
-          .where(periodWhere)
-          .groupBy(formatYearMonth(expenses.date))
-          .orderBy(formatYearMonth(expenses.date)),
+        filters.timeZone
+          ? this.zonedMonthlyTrend(periodWhere, filters.timeZone)
+          : this.db
+              .select({
+                period: formatYearMonth(expenses.date).as('period'),
+                amount: sql<number>`SUM(${expenses.expenseAmount})`,
+                count: sql<number>`count(*)`,
+              })
+              .from(expenses)
+              .where(periodWhere)
+              .groupBy(formatYearMonth(expenses.date))
+              .orderBy(formatYearMonth(expenses.date)),
 
         this.db
           .select({

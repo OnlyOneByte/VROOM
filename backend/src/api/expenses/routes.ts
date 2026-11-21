@@ -25,6 +25,7 @@ import {
   requireVehicleWrite,
   resolveVehicleOwnerId,
 } from '../../utils/sharing';
+import { isValidTimeZone } from '../../utils/time-zone';
 import { commonSchemas, validateFuelExpenseData, zValidator } from '../../utils/validation';
 import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
@@ -425,11 +426,12 @@ routes.get(
 const summaryQuerySchema = z.object({
   vehicleId: z.string().optional(),
   period: z.enum(['7d', '30d', '90d', '1y', 'all']).optional().default('all'),
+  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
 });
 
 routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
   const user = c.get('user');
-  const { vehicleId, period } = c.req.valid('query');
+  const { vehicleId, period, timeZone } = c.req.valid('query');
 
   let summaryUserId = user.id;
   if (vehicleId) {
@@ -441,6 +443,7 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
     userId: summaryUserId,
     vehicleId,
     period,
+    timeZone,
   });
 
   return c.json({ success: true, data: expenseSummaryToApi(summary) });
@@ -565,7 +568,7 @@ function targetUnitsResolver(
 
 routes.post('/import', zValidator('json', importBodySchema), async (c) => {
   const user = c.get('user');
-  const { csv, dryRun, mapping } = c.req.valid('json');
+  const { csv, dryRun, mapping, timeZone } = c.req.valid('json');
 
   const vehicles = await vehicleRepository.findByUserId(user.id);
   if (vehicles.length === 0) {
@@ -584,11 +587,12 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
           targetVehicle: mapping.targetVehicle ?? '',
           targetUnits: targetUnitsFor(mapping.targetVehicle ?? ''),
           includeCosts: true,
+          timeZone,
         });
         importCsv = result.csv;
         unmappedCategories = result.unmappedCategories;
       } else {
-        const result = applyMapping(csv, mapping, targetUnitsFor);
+        const result = applyMapping(csv, mapping, targetUnitsFor, timeZone);
         importCsv = result.csv;
         unmappedCategories = result.unmappedCategories;
         rowErrors = result.rowErrors;
@@ -603,7 +607,7 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
 
   let plan: ReturnType<typeof buildImportPlan>;
   try {
-    plan = buildImportPlan(importCsv, vehicles, rowErrors);
+    plan = buildImportPlan(importCsv, vehicles, rowErrors, timeZone);
   } catch (err) {
     if (err instanceof CsvImportError) throw new ValidationError(err.message);
     throw err;
