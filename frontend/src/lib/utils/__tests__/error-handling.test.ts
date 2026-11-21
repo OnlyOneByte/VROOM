@@ -11,7 +11,9 @@ const {
 	NETWORK_FAILURE_MESSAGE,
 	SERVER_FAILURE_MESSAGE,
 	UNEXPECTED_FAILURE_MESSAGE,
+	NonErrorThrownError,
 	handleErrorWithNotification,
+	toError,
 	userFacingErrorMessage
 } = await import('../error-handling');
 
@@ -54,14 +56,34 @@ describe('userFacingErrorMessage', () => {
 			NETWORK_FAILURE_MESSAGE
 		],
 		[
-			'a known error code',
-			new ApiError('Raw backend text', 400, undefined, 'VALIDATION_ERROR'),
-			'Please check your input and try again.'
+			'a code the backend sends (rate limit)',
+			new ApiError('Too many requests', 429, undefined, 'RATE_LIMIT_EXCEEDED'),
+			'That was a lot of requests at once. Wait a moment, then try again.'
+		],
+		[
+			'a signed-out request (AuthenticationError)',
+			new ApiError('Authentication required', 401, undefined, 'AuthenticationError'),
+			'Your session has ended. Sign in again to continue.'
+		],
+		[
+			'a 401 without a known code',
+			new ApiError('Invalid session', 401, undefined, 'HTTPException'),
+			'Your session has ended. Sign in again to continue.'
+		],
+		[
+			'the storage provider being unreachable (503 NETWORK_ERROR)',
+			new ApiError('Backup export timed out after 600000ms', 503, undefined, 'NETWORK_ERROR'),
+			"We couldn't reach your storage provider. Try again in a moment."
+		],
+		[
+			'a 500 DatabaseError',
+			new ApiError('SQLITE_BUSY: database is locked', 500, undefined, 'DatabaseError'),
+			SERVER_FAILURE_MESSAGE
 		],
 		[
 			'a 4xx with a written message',
-			new ApiError('No VROOM account with that email', 404),
-			'No VROOM account with that email.'
+			new ApiError('No VROOM account uses that email.', 404),
+			'No VROOM account uses that email.'
 		],
 		[
 			'a 4xx with only a status line',
@@ -108,6 +130,138 @@ describe('userFacingErrorMessage', () => {
 			NETWORK_FAILURE_MESSAGE
 		);
 	});
+});
+
+describe('the copy for each code the backend sends', () => {
+	test.each([
+		['AuthenticationError', 401],
+		['RATE_LIMIT_EXCEEDED', 429],
+		['PAYLOAD_TOO_LARGE', 413],
+		['SYNC_IN_PROGRESS', 409],
+		['BACKUP_IN_PROGRESS', 409],
+		['BACKUP_FAILED', 500],
+		['CONFLICT_DETECTED', 409],
+		['AUTH_INVALID', 401],
+		['PERMISSION_DENIED', 403],
+		['QUOTA_EXCEEDED', 429],
+		['NETWORK_ERROR', 503],
+		['PUSH_NOT_CONFIGURED', 503],
+		['LAST_ACCOUNT', 400]
+	])('%s gets its own full sentence, never the raw text or a connection hint', (code, status) => {
+		const message = userFacingErrorMessage(
+			new ApiError('raw backend text', status, undefined, code)
+		);
+		expect(message).not.toBe('Raw backend text.');
+		expect(message).toMatch(/[.!?]$/);
+		expect(message).not.toMatch(/connection/i);
+		expect([SERVER_FAILURE_MESSAGE, UNEXPECTED_FAILURE_MESSAGE]).not.toContain(message);
+	});
+});
+
+describe('userFacingErrorMessage for request validation', () => {
+	const invalid = (details: Record<string, unknown>) =>
+		new ApiError(
+			'Invalid json: odometer: Invalid input: expected number, received string',
+			400,
+			details,
+			'ValidationError'
+		);
+	const issue = (path: unknown[], message: string) => ({ path, message });
+
+	test('a schema default message names the field instead of the schema text', () => {
+		expect(
+			userFacingErrorMessage(
+				invalid({
+					issues: [issue(['odometer'], 'Invalid input: expected number, received string')]
+				})
+			)
+		).toBe('Check the odometer, then try again.');
+	});
+
+	test('several fields are listed in plain words', () => {
+		expect(
+			userFacingErrorMessage(
+				invalid({
+					issues: [
+						issue(['odometer'], 'Invalid input: expected number, received string'),
+						issue(['purchaseDate'], 'Too small: expected string to have >=1 characters'),
+						issue(['splits', 0, 'fuel_type'], 'Invalid option: expected one of "gas"|"diesel"')
+					]
+				})
+			)
+		).toBe('Check the odometer, purchase date and fuel type, then try again.');
+	});
+
+	test('more than three fields are summarised', () => {
+		const fields = ['a', 'b', 'c', 'd', 'e'].map(f =>
+			issue([f], 'Too big: expected number to be <=1')
+		);
+		expect(userFacingErrorMessage(invalid({ issues: fields }))).toBe(
+			'Check the a, b, c and 2 more, then try again.'
+		);
+	});
+
+	test('a message the schema author wrote is shown as written', () => {
+		expect(
+			userFacingErrorMessage(
+				invalid({
+					issues: [
+						issue(['odometer'], 'Invalid input: expected number, received string'),
+						issue(['amount'], 'Amount exceeds the allowed maximum')
+					]
+				})
+			)
+		).toBe('Amount exceeds the allowed maximum.');
+	});
+
+	test('issues wrapped by the API client (validationErrors) are read too', () => {
+		expect(
+			userFacingErrorMessage(
+				invalid({
+					validationErrors: [
+						issue(['vehicleId'], 'Invalid input: expected string, received undefined')
+					]
+				})
+			)
+		).toBe('Check the vehicle id, then try again.');
+	});
+
+	test('an issue with no field path gets a general sentence', () => {
+		expect(userFacingErrorMessage(invalid({ issues: [issue([], 'Invalid input')] }))).toBe(
+			"Some details aren't valid. Check them and try again."
+		);
+	});
+
+	test('a validation error without schema issues keeps its own written reason', () => {
+		expect(
+			userFacingErrorMessage(
+				new ApiError(
+					'Unsupported image type. Use JPEG, PNG, or WebP.',
+					400,
+					undefined,
+					'ValidationError'
+				)
+			)
+		).toBe('Unsupported image type. Use JPEG, PNG, or WebP.');
+	});
+});
+
+describe('toError', () => {
+	test('keeps an Error as it is', () => {
+		const error = new TypeError('boom');
+		expect(toError(error)).toBe(error);
+	});
+
+	test.each([[{ status: 'weird' }], ['a string'], [42], [null]])(
+		'wraps a thrown %j so it never reads as raw text or [object Object]',
+		thrown => {
+			const error = toError(thrown);
+			expect(error).toBeInstanceOf(NonErrorThrownError);
+			expect((error as InstanceType<typeof NonErrorThrownError>).thrown).toBe(thrown);
+			expect(userFacingErrorMessage(error)).toBe(UNEXPECTED_FAILURE_MESSAGE);
+			expect(error.message).not.toContain('[object Object]');
+		}
+	);
 });
 
 describe('handleErrorWithNotification', () => {
