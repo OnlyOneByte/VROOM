@@ -63,13 +63,22 @@ describe('SplitConfigEditor: method switcher', () => {
 });
 
 describe('SplitConfigEditor: even split', () => {
-	test('gives the leftover cent to the first vehicle so shares add up to the total', () => {
+	test('gives a single leftover cent to the first vehicle so shares add up to the total', () => {
 		renderEditor('even');
 
 		expect(rowText('2020 Toyota Camry')).toBe('2020 Toyota Camry $33.34');
 		expect(rowText('Hauler')).toBe('Hauler $33.33');
 		expect(rowText('2020 Honda Civic')).toBe('2020 Honda Civic $33.33');
 		expect(rowText('Total')).toBe('Total $100.00');
+	});
+
+	test('gives one leftover cent each to the first vehicles, as the saved split does', () => {
+		renderEditor('even', [], [CAMRY, RAV4, CIVIC], 10.01);
+
+		expect(rowText('2020 Toyota Camry')).toBe('2020 Toyota Camry $3.34');
+		expect(rowText('Hauler')).toBe('Hauler $3.34');
+		expect(rowText('2020 Honda Civic')).toBe('2020 Honda Civic $3.33');
+		expect(rowText('Total')).toBe('Total $10.01');
 	});
 
 	test('splits an evenly divisible total exactly', () => {
