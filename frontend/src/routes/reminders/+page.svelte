@@ -339,14 +339,13 @@
 								size="sm"
 								onclick={() => markServiced(item)}
 								disabled={servicingId === item.reminder.id}
-								aria-label="Mark serviced"
 							>
 								{#if servicingId === item.reminder.id}
 									<RefreshCw class="mr-1.5 h-3.5 w-3.5 animate-spin" />
 								{:else}
 									<Check class="mr-1.5 h-3.5 w-3.5" />
 								{/if}
-								Serviced
+								Mark Serviced
 							</Button>
 						{/if}
 						<Button variant="ghost" size="sm" onclick={() => toggleActive(item)}>

@@ -111,7 +111,7 @@ describe('/reminders error copy', () => {
 		await expectToast('Failed to update reminder. Please try again.');
 	});
 
-	test('a failed Mark serviced tells the user to try again', async () => {
+	test('a failed Mark Serviced tells the user to try again', async () => {
 		api.list.mockResolvedValue([
 			reminder({
 				triggerMode: 'mileage',
@@ -123,7 +123,7 @@ describe('/reminders error copy', () => {
 		api.markServiced.mockImplementation(failure);
 		render(Page);
 
-		await fireEvent.click(await screen.findByRole('button', { name: 'Mark serviced' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Mark Serviced' }));
 		await expectToast('Failed to mark serviced. Please try again.');
 	});
 
