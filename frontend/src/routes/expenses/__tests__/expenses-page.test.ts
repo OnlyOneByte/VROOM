@@ -1,0 +1,539 @@
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import type { Expense, ExpenseSummary, UserSettings, Vehicle } from '#lib/types/index.ts';
+import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
+import { appStore } from '#lib/stores/app.svelte.ts';
+import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
+
+vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
+vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
+
+const captured = vi.hoisted(() => ({
+	table: {} as Record<string, unknown>,
+	csvDialog: {} as Record<string, unknown>,
+	photosDialog: {} as Record<string, unknown>,
+	offlineCards: {} as Record<string, unknown>
+}));
+vi.mock('#lib/components/expenses/ExpensesTable.svelte', () => ({
+	default: (_anchor: unknown, props: Record<string, unknown>) => {
+		captured.table = props;
+	}
+}));
+vi.mock('#lib/components/expenses/ImportExpensesDialog.svelte', () => ({
+	default: (_anchor: unknown, props: Record<string, unknown>) => {
+		captured.csvDialog = props;
+	}
+}));
+vi.mock('#lib/components/expenses/ImportFromPhotosDialog.svelte', () => ({
+	default: (_anchor: unknown, props: Record<string, unknown>) => {
+		captured.photosDialog = props;
+	}
+}));
+vi.mock('#lib/components/expenses/OfflineExpenseCards.svelte', () => ({
+	default: (_anchor: unknown, props: Record<string, unknown>) => {
+		captured.offlineCards = props;
+	}
+}));
+
+const { getAllExpenses, getExpenseSummary, downloadExpensesCsv, getVehicles } = vi.hoisted(() => ({
+	getAllExpenses: vi.fn(),
+	getExpenseSummary: vi.fn<(params: { vehicleId?: string }) => Promise<ExpenseSummary>>(),
+	downloadExpensesCsv: vi.fn<(params: Record<string, unknown>) => Promise<void>>(),
+	getVehicles: vi.fn<() => Promise<Vehicle[]>>()
+}));
+vi.mock('#lib/services/expense-api.ts', () => ({
+	expenseApi: {
+		getAllExpenses: (...args: unknown[]) => getAllExpenses(...args),
+		getExpenseSummary: (params: { vehicleId?: string }) => getExpenseSummary(params),
+		downloadExpensesCsv: (params: Record<string, unknown>) => downloadExpensesCsv(params)
+	}
+}));
+vi.mock('#lib/services/vehicle-api.ts', () => ({
+	vehicleApi: { getVehicles: () => getVehicles() }
+}));
+vi.mock('#lib/services/settings-api.ts', () => ({
+	settingsApi: {
+		getSettings: () =>
+			Promise.resolve({
+				currencyUnit: 'USD',
+				unitPreferences: { distanceUnit: 'miles', volumeUnit: 'gallons_us', chargeUnit: 'kwh' }
+			} as unknown as UserSettings),
+		updateSettings: () => Promise.resolve({})
+	}
+}));
+
+const Page = (await import('../+page.svelte')).default;
+
+const CAMRY: Vehicle = {
+	id: 'v1',
+	make: 'Toyota',
+	model: 'Camry',
+	year: 2020,
+	vehicleType: 'gas',
+	trackFuel: true,
+	trackCharging: false,
+	nickname: 'Daily Driver',
+	createdAt: '2024-01-01T00:00:00.000Z',
+	updatedAt: '2024-01-01T00:00:00.000Z'
+};
+const LEAF: Vehicle = {
+	...CAMRY,
+	id: 'v2',
+	make: 'Nissan',
+	model: 'Leaf',
+	nickname: undefined,
+	vehicleType: 'electric'
+};
+
+const ROWS: Expense[] = [
+	{
+		id: 'e1',
+		vehicleId: 'v1',
+		userId: 'u1',
+		category: 'fuel',
+		amount: 45.5,
+		date: new Date(2026, 4, 3, 12).toISOString(),
+		tags: ['commute', 'roadtrip'],
+		createdAt: '2026-05-03T00:00:00.000Z',
+		updatedAt: '2026-05-03T00:00:00.000Z'
+	}
+];
+
+const SUMMARY: ExpenseSummary = {
+	totalAmount: 45.5,
+	expenseCount: 1,
+	monthlyAverage: 45.5,
+	recentAmount: 45.5,
+	categoryBreakdown: [],
+	monthlyTrend: []
+};
+
+function pageOf(data: Expense[], totalCount = data.length) {
+	return {
+		data,
+		pagination: { totalCount, limit: 20, offset: 0, hasMore: false }
+	};
+}
+
+function lastListParams(): Record<string, unknown> {
+	return (getAllExpenses.mock.calls.at(-1)?.[0] ?? {}) as Record<string, unknown>;
+}
+
+function notificationMessages(): string[] {
+	return appStore.notifications.map(n => n.message);
+}
+
+function offlineExpense(id: string, overrides: Partial<OfflineExpense>): OfflineExpense {
+	return {
+		id,
+		vehicleId: 'v1',
+		tags: [],
+		category: 'misc',
+		amount: 5,
+		date: '2026-05-03',
+		timestamp: 1,
+		synced: false,
+		...overrides
+	};
+}
+
+async function mountLoaded() {
+	const result = render(Page);
+	await screen.findByRole('heading', { name: 'All Expenses' });
+	await waitFor(() => expect(captured.table['expenses']).toBeDefined());
+	return result;
+}
+
+async function chooseVehicle(name: string) {
+	const trigger = screen.getByRole('combobox', { name: 'Vehicle filter' });
+	await fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' });
+	await fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' });
+	const option = await screen.findByRole('option', { name });
+	await fireEvent.pointerUp(option, { button: 0, pointerType: 'mouse' });
+	await fireEvent.click(option);
+}
+
+async function addTagFilter(tag: string) {
+	const input = screen.getByRole('textbox', { name: 'Search tags' });
+	await fireEvent.input(input, { target: { value: tag } });
+	await fireEvent.keyDown(input, { key: 'Enter' });
+}
+
+function callTable<T extends unknown[]>(name: string, ...args: T): unknown {
+	return (captured.table[name] as (...a: T) => unknown)(...args);
+}
+
+beforeEach(() => {
+	vi.clearAllMocks();
+	captured.table = {};
+	captured.csvDialog = {};
+	captured.photosDialog = {};
+	captured.offlineCards = {};
+	appStore.clearNotifications();
+	offlineExpenseQueue.current = [];
+	getVehicles.mockResolvedValue([CAMRY, LEAF]);
+	getAllExpenses.mockResolvedValue(pageOf(ROWS));
+	getExpenseSummary.mockResolvedValue(SUMMARY);
+	downloadExpensesCsv.mockResolvedValue();
+});
+
+afterEach(() => {
+	offlineExpenseQueue.current = [];
+});
+
+describe('/expenses loading states', () => {
+	test('shows skeletons and no header until the first load finishes', async () => {
+		getAllExpenses.mockReturnValue(new Promise(() => {}));
+		const { container } = render(Page);
+
+		await waitFor(() => expect(getAllExpenses).toHaveBeenCalled());
+		expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
+		expect(screen.queryByRole('heading', { name: 'All Expenses' })).toBeNull();
+	});
+
+	test('a failed first load shows the reason, and Retry loads the page', async () => {
+		getAllExpenses.mockRejectedValueOnce(new Error('Server unavailable'));
+		render(Page);
+
+		expect(await screen.findByText('Server unavailable')).toBeTruthy();
+		expect(screen.getByText('Failed to load expenses')).toBeTruthy();
+		expect(captured.table['expenses']).toBeUndefined();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+		await waitFor(() => expect(captured.table['totalCount']).toBe(1));
+		expect(screen.queryByText('Server unavailable')).toBeNull();
+	});
+
+	test('a failed first summary also fails the first load', async () => {
+		getExpenseSummary.mockRejectedValueOnce(new Error('Summary down'));
+		render(Page);
+
+		expect(await screen.findByText('Summary down')).toBeTruthy();
+	});
+
+	test('a non-Error first-load failure falls back to a generic reason', async () => {
+		getVehicles.mockRejectedValueOnce('offline');
+		render(Page);
+
+		await waitFor(() =>
+			expect(screen.getAllByText('Failed to load expenses').length).toBeGreaterThanOrEqual(2)
+		);
+	});
+
+	test('splits the offline queue into pending, needs attention and synced', async () => {
+		const pending = offlineExpense('p', {});
+		const stuck = offlineExpense('n', { needsAttention: true });
+		const done = offlineExpense('s', { synced: true });
+		offlineExpenseQueue.current = [pending, stuck, done];
+
+		await mountLoaded();
+
+		expect(captured.offlineCards['pendingExpenses']).toEqual([pending]);
+		expect(captured.offlineCards['needsAttentionExpenses']).toEqual([stuck]);
+		expect(captured.offlineCards['syncedExpenses']).toEqual([done]);
+	});
+});
+
+describe('/expenses filters', () => {
+	test('picking a vehicle filters the list and summary and offers to clear filters', async () => {
+		await mountLoaded();
+		expect(screen.queryByRole('button', { name: /Clear Filters/ })).toBeNull();
+		expect(captured.table['hasActiveFilters']).toBe(false);
+
+		await chooseVehicle('2020 Nissan Leaf');
+
+		await waitFor(() => expect(lastListParams()).toMatchObject({ vehicleId: 'v2', offset: 0 }));
+		expect(getExpenseSummary).toHaveBeenLastCalledWith({ vehicleId: 'v2' });
+		expect(screen.getByRole('combobox', { name: 'Vehicle filter' }).textContent?.trim()).toContain(
+			'2020 Nissan Leaf'
+		);
+		expect(screen.getByRole('button', { name: /Clear Filters/ })).toBeTruthy();
+		expect(captured.table['hasActiveFilters']).toBe(true);
+	});
+
+	test('picking All Vehicles drops the vehicle filter again', async () => {
+		await mountLoaded();
+		await chooseVehicle('Daily Driver');
+		await waitFor(() => expect(lastListParams()).toMatchObject({ vehicleId: 'v1' }));
+
+		await chooseVehicle('All Vehicles');
+
+		await waitFor(() => expect(lastListParams()).not.toHaveProperty('vehicleId'));
+		expect(getExpenseSummary).toHaveBeenLastCalledWith({});
+	});
+
+	test('typing a search sends the trimmed term after a pause', async () => {
+		await mountLoaded();
+		const calls = getAllExpenses.mock.calls.length;
+
+		await fireEvent.input(screen.getByRole('textbox', { name: 'Search expenses and vehicles' }), {
+			target: { value: '  shell  ' }
+		});
+
+		await waitFor(() => expect(getAllExpenses.mock.calls.length).toBe(calls + 1));
+		expect(lastListParams()).toMatchObject({ search: 'shell', offset: 0 });
+	});
+
+	test('a whitespace-only search sends no search term', async () => {
+		await mountLoaded();
+		const calls = getAllExpenses.mock.calls.length;
+
+		await fireEvent.input(screen.getByRole('textbox', { name: 'Search expenses and vehicles' }), {
+			target: { value: '   ' }
+		});
+
+		await waitFor(() => expect(getAllExpenses.mock.calls.length).toBe(calls + 1));
+		expect(lastListParams()).not.toHaveProperty('search');
+	});
+
+	test('picking a date range filters by both ends and counts as an active filter', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		vi.setSystemTime(new Date(2026, 5, 15, 12));
+		try {
+			await mountLoaded();
+
+			await fireEvent.click(screen.getByRole('button', { name: /Date range/ }));
+			const day = (value: string) =>
+				document.querySelector(`[data-bits-day][data-value="${value}"]`) as HTMLElement;
+			await waitFor(() => expect(day('2026-06-01')).not.toBeNull());
+			await fireEvent.click(day('2026-06-01'));
+			await fireEvent.click(day('2026-06-10'));
+
+			await waitFor(() =>
+				expect(lastListParams()).toMatchObject({
+					startDate: '2026-06-01',
+					endDate: '2026-06-10',
+					offset: 0
+				})
+			);
+			expect(captured.table['hasActiveFilters']).toBe(true);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	test('selecting a tag from the loaded expenses filters by it', async () => {
+		await mountLoaded();
+
+		await addTagFilter('roadtrip');
+
+		await waitFor(() => expect(lastListParams()).toMatchObject({ tags: ['roadtrip'] }));
+		expect(screen.getByRole('button', { name: 'Remove tag roadtrip' })).toBeTruthy();
+	});
+
+	test('the table category filter reloads only the list, from the first page', async () => {
+		await mountLoaded();
+		const summaryCalls = getExpenseSummary.mock.calls.length;
+
+		callTable('onCategoryChange', 'maintenance');
+
+		await waitFor(() =>
+			expect(lastListParams()).toMatchObject({ category: 'maintenance', offset: 0 })
+		);
+		expect(getExpenseSummary).toHaveBeenCalledTimes(summaryCalls);
+		await waitFor(() => expect(captured.table['activeCategory']).toBe('maintenance'));
+		expect(captured.table['hasActiveFilters']).toBe(true);
+	});
+
+	test('the table sort reloads the list with the new order', async () => {
+		await mountLoaded();
+
+		callTable('onSortChange', 'amount', 'asc');
+
+		await waitFor(() =>
+			expect(lastListParams()).toMatchObject({ sortBy: 'amount', sortDir: 'asc' })
+		);
+		await waitFor(() => expect(captured.table['activeSortBy']).toBe('amount'));
+		expect(captured.table['activeSortDir']).toBe('asc');
+	});
+
+	test('clearing filters resets every filter and reloads once', async () => {
+		await mountLoaded();
+		await chooseVehicle('Daily Driver');
+		callTable('onCategoryChange', 'fuel');
+		await addTagFilter('commute');
+		await waitFor(() =>
+			expect(lastListParams()).toMatchObject({
+				vehicleId: 'v1',
+				category: 'fuel',
+				tags: ['commute']
+			})
+		);
+		const calls = getAllExpenses.mock.calls.length;
+
+		await fireEvent.click(screen.getByRole('button', { name: /Clear Filters/ }));
+
+		await waitFor(() => expect(getAllExpenses.mock.calls.length).toBe(calls + 1));
+		const params = lastListParams();
+		expect(params).not.toHaveProperty('vehicleId');
+		expect(params).not.toHaveProperty('category');
+		expect(params).not.toHaveProperty('tags');
+		expect(screen.queryByRole('button', { name: /Clear Filters/ })).toBeNull();
+		expect(captured.table['hasActiveFilters']).toBe(false);
+	});
+});
+
+describe('/expenses reloads and failures after the first load', () => {
+	test('a summary failure on a filter change is reported while the list still updates', async () => {
+		await mountLoaded();
+		getAllExpenses.mockResolvedValue(pageOf([], 0));
+		getExpenseSummary.mockRejectedValueOnce(new Error('Summary down'));
+
+		await chooseVehicle('2020 Nissan Leaf');
+
+		await waitFor(() => expect(captured.table['totalCount']).toBe(0));
+		await waitFor(() =>
+			expect(notificationMessages().some(m => m.includes('Summary down'))).toBe(true)
+		);
+	});
+
+	test('when list and summary both fail only the list failure is surfaced', async () => {
+		await mountLoaded();
+		getAllExpenses.mockRejectedValueOnce(new Error('List down'));
+		getExpenseSummary.mockRejectedValueOnce(new Error('Summary down'));
+
+		await chooseVehicle('2020 Nissan Leaf');
+
+		const error = await screen.findByTestId('expenses-page-error');
+		expect(error.textContent).toContain('List down');
+		expect(notificationMessages().some(m => m.includes('List down'))).toBe(true);
+		expect(notificationMessages().some(m => m.includes('Summary down'))).toBe(false);
+	});
+
+	test('a non-Error page failure shows a generic message', async () => {
+		await mountLoaded();
+		getAllExpenses.mockRejectedValueOnce('boom');
+
+		callTable('onPageChange', 20);
+
+		const error = await screen.findByTestId('expenses-page-error');
+		expect(error.textContent).toContain('Failed to load expenses');
+	});
+
+	test('deleting an expense reloads the current page and the summary', async () => {
+		getAllExpenses.mockResolvedValue(pageOf(ROWS, 45));
+		await mountLoaded();
+		callTable('onPageChange', 20);
+		await waitFor(() => expect(captured.table['currentOffset']).toBe(20));
+		const summaryCalls = getExpenseSummary.mock.calls.length;
+
+		await callTable('onDelete', ROWS[0]);
+
+		expect(lastListParams()).toMatchObject({ offset: 20 });
+		expect(getExpenseSummary).toHaveBeenCalledTimes(summaryCalls + 1);
+	});
+});
+
+describe('/expenses import and export', () => {
+	test('Export CSV is offered only when there are expenses', async () => {
+		getAllExpenses.mockResolvedValue(pageOf([], 0));
+		await mountLoaded();
+
+		expect(screen.queryByRole('button', { name: 'Export CSV' })).toBeNull();
+		expect(screen.getAllByRole('button', { name: 'Import CSV' }).length).toBeGreaterThan(0);
+	});
+
+	test('exporting sends the active filters and shows progress until done', async () => {
+		let finish: () => void = () => {};
+		downloadExpensesCsv.mockReturnValue(new Promise<void>(r => (finish = r)));
+		await mountLoaded();
+		await chooseVehicle('Daily Driver');
+		await addTagFilter('commute');
+		await waitFor(() => expect(lastListParams()).toMatchObject({ tags: ['commute'] }));
+
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Export CSV' })[0]!);
+
+		expect(downloadExpensesCsv).toHaveBeenCalledWith({
+			vehicleId: 'v1',
+			category: undefined,
+			startDate: undefined,
+			endDate: undefined,
+			search: undefined,
+			tags: ['commute']
+		});
+		const busy = await screen.findAllByRole('button', { name: 'Exporting…' });
+		expect(busy[0]).toBeDisabled();
+		finish();
+		await waitFor(() =>
+			expect(screen.queryAllByRole('button', { name: 'Exporting…' })).toEqual([])
+		);
+	});
+
+	test('exporting with a category and search passes them along', async () => {
+		await mountLoaded();
+		callTable('onCategoryChange', 'fuel');
+		await fireEvent.input(screen.getByRole('textbox', { name: 'Search expenses and vehicles' }), {
+			target: { value: ' shell ' }
+		});
+
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Export CSV' })[0]!);
+
+		expect(downloadExpensesCsv).toHaveBeenCalledWith(
+			expect.objectContaining({ category: 'fuel', search: 'shell', tags: undefined })
+		);
+	});
+
+	test('a failed export is reported', async () => {
+		downloadExpensesCsv.mockRejectedValue(new Error('Disk full'));
+		await mountLoaded();
+
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Export CSV' })[0]!);
+
+		await waitFor(() =>
+			expect(notificationMessages().some(m => m.includes('Disk full'))).toBe(true)
+		);
+		expect(screen.getAllByRole('button', { name: 'Export CSV' })[0]).not.toBeDisabled();
+	});
+
+	test('Import CSV opens its dialog and a finished import reloads from the first page', async () => {
+		getAllExpenses.mockResolvedValue(pageOf(ROWS, 45));
+		await mountLoaded();
+		callTable('onPageChange', 20);
+		await waitFor(() => expect(captured.table['currentOffset']).toBe(20));
+		expect(captured.csvDialog['open']).toBe(false);
+
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Import CSV' })[0]!);
+		expect(captured.csvDialog['open']).toBe(true);
+		expect(captured.photosDialog['open']).toBe(false);
+
+		(captured.csvDialog['onImported'] as () => void)();
+
+		await waitFor(() => expect(captured.table['currentOffset']).toBe(0));
+		expect(lastListParams()).toMatchObject({ offset: 0 });
+	});
+
+	test('Import from Photos opens the photos dialog', async () => {
+		await mountLoaded();
+
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Import from Photos' })[0]!);
+
+		expect(captured.photosDialog['open']).toBe(true);
+		expect(captured.csvDialog['open']).toBe(false);
+	});
+
+	test('the mobile menu closes itself when a tool is picked', async () => {
+		await mountLoaded();
+		const trigger = screen.getByRole('button', { name: 'Import & export' });
+
+		await fireEvent.click(trigger);
+		await waitFor(() => expect(trigger.getAttribute('aria-expanded')).toBe('true'));
+		const menuImport = screen.getAllByRole('button', { name: 'Import CSV' }).at(-1)!;
+		await fireEvent.click(menuImport);
+
+		expect(captured.csvDialog['open']).toBe(true);
+		await waitFor(() => expect(trigger.getAttribute('aria-expanded')).toBe('false'));
+	});
+
+	test('exporting from the mobile menu closes it once the download finishes', async () => {
+		await mountLoaded();
+		const trigger = screen.getByRole('button', { name: 'Import & export' });
+		await fireEvent.click(trigger);
+		await waitFor(() => expect(trigger.getAttribute('aria-expanded')).toBe('true'));
+
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Export CSV' }).at(-1)!);
+
+		await waitFor(() => expect(trigger.getAttribute('aria-expanded')).toBe('false'));
+		expect(downloadExpensesCsv).toHaveBeenCalledTimes(1);
+	});
+});
