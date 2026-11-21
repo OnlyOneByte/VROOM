@@ -116,9 +116,13 @@
 			)
 			.join(' and ');
 		const [, fromUnit, toUnit] = changed[0] ?? [];
+		const inSentence = (unit: DistanceUnit | VolumeUnit | ChargeUnit) => {
+			const label = getLongFormLabel(unit);
+			return label.charAt(0).toLowerCase() + label.slice(1);
+		};
 		const example =
 			fromUnit && toUnit
-				? ` For example, a saved 100 ${getLongFormLabel(fromUnit).toLowerCase()} would read 100 ${getLongFormLabel(toUnit).toLowerCase()}.`
+				? ` For example, a saved 100 ${inSentence(fromUnit)} would read 100 ${inSentence(toUnit)}.`
 				: '';
 		return `You're changing ${summary}. Readings already saved for this vehicle, such as its initial mileage, odometer entries, trips and fill-ups, are not converted: each number stays the same and is shown in the new units.${example} Only change units if they were set wrong.`;
 	});

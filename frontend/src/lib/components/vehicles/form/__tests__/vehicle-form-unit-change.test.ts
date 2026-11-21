@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
-import type { UpdateVehicleRequest, Vehicle } from '#lib/types/index.ts';
+import type { UpdateVehicleRequest, Vehicle, VehicleFinancing } from '#lib/types/index.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { ApiError } from '#lib/utils/error-handling.ts';
 
@@ -13,14 +13,17 @@ vi.mock('$app/navigation', () => ({
 }));
 
 const getVehicle = vi.fn<(id: string) => Promise<Vehicle>>();
+const getFinancing = vi.fn<(id: string) => Promise<VehicleFinancing | null>>();
 const updateVehicle = vi.fn<(id: string, data: UpdateVehicleRequest) => Promise<Vehicle>>();
+const payOffFinancing = vi.fn<(id: string) => Promise<VehicleFinancing>>();
 vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: {
 		getVehicle,
-		getFinancing: vi.fn(() => Promise.resolve(null)),
+		getFinancing,
 		createVehicle: vi.fn(),
 		updateVehicle,
-		deleteVehicle: vi.fn()
+		deleteVehicle: vi.fn(),
+		payOffFinancing
 	}
 }));
 
@@ -67,8 +70,54 @@ async function renderEditAndSwitchToKilometers(): Promise<void> {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	getFinancing.mockResolvedValue(null);
 	appStore.clearNotifications();
 	appStore.setVehicles([EXISTING]);
+});
+
+describe('VehicleForm unit change together with paying off the loan', () => {
+	test('switching to Own and changing units asks for both, pays off once and saves with the flag', async () => {
+		const loan = {
+			id: 'fin-1',
+			vehicleId: EXISTING.id,
+			financingType: 'loan',
+			provider: 'Credit Union',
+			originalAmount: 20000,
+			apr: 4.5,
+			termMonths: 60,
+			startDate: '2024-01-15T12:00:00.000Z',
+			paymentAmount: 373,
+			paymentFrequency: 'monthly',
+			isActive: true,
+			createdAt: '2024-01-15T12:00:00.000Z',
+			updatedAt: '2024-01-15T12:00:00.000Z'
+		} satisfies VehicleFinancing;
+		getVehicle.mockResolvedValue(EXISTING);
+		getFinancing.mockResolvedValue(loan);
+		payOffFinancing.mockResolvedValue({ ...loan, isActive: false });
+		updateVehicle.mockRejectedValueOnce(unitChangeRejection()).mockResolvedValueOnce(EXISTING);
+
+		render(VehicleForm, { props: { vehicleId: EXISTING.id } });
+		await screen.findByRole('heading', { name: 'Edit Vehicle' });
+		await fireEvent.click(screen.getByRole('button', { name: 'Toggle unit preferences' }));
+		await choose('distanceUnit', 'Kilometers');
+		await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
+		await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+
+		const payoff = await screen.findByRole('alertdialog');
+		await fireEvent.click(within(payoff).getByRole('button', { name: 'Mark Paid Off' }));
+		await waitFor(() =>
+			expect(screen.getByRole('alertdialog').textContent).toContain(
+				'Change units for this vehicle?'
+			)
+		);
+		await fireEvent.click(screen.getByRole('button', { name: 'Change Units' }));
+
+		await waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/veh-1'));
+		expect(payOffFinancing).toHaveBeenCalledTimes(1);
+		expect(updateVehicle).toHaveBeenCalledTimes(2);
+		expect(updateVehicle.mock.calls[1]?.[1].confirmUnitChange).toBe(true);
+	});
 });
 
 describe('VehicleForm unit change on a vehicle with saved readings', () => {
