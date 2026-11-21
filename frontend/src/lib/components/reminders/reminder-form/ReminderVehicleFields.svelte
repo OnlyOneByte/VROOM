@@ -28,7 +28,7 @@
 			role="group"
 			aria-labelledby="reminder-vehicles-label"
 			aria-describedby={form.errors['vehicleIds'] ? 'reminder-vehicles-error' : undefined}
-			class="rounded-md border border-input p-3 space-y-2 max-h-40 overflow-y-auto"
+			class="rounded-md border border-input p-3 space-y-2 max-h-64 overflow-y-auto"
 		>
 			{#each vehicles as v (v.id)}
 				<label class="flex min-h-10 items-center gap-2 cursor-pointer">
