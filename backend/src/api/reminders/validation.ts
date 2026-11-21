@@ -2,12 +2,78 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES } from '../../db/types';
 import { moneyDollarsToCents } from '../../utils/money';
+import { buildCalendarDate } from '../expenses/local-date';
 import {
   FUEL_SPLIT_MESSAGE,
   splitConfigSchema,
   splitConfigStructuralSchema,
   splitConfigVehicleIds,
 } from '../expenses/validation';
+
+const PLAIN_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const REMINDER_DATE_FIELDS = ['startDate', 'endDate'] as const;
+
+export function isValidTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function zonedParts(instant: Date, timeZone: string): Record<string, number> {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(instant);
+  return Object.fromEntries(parts.map((p) => [p.type, Number(p.value)]));
+}
+
+function zoneOffsetMs(instantMs: number, timeZone: string): number {
+  const p = zonedParts(new Date(instantMs), timeZone);
+  const wallAsUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return wallAsUtc - Math.floor(instantMs / 1000) * 1000;
+}
+
+export function calendarDayIn(instant: Date, timeZone: string): string {
+  const p = zonedParts(instant, timeZone);
+  return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+}
+
+function plainDateToInstant(value: string, timeZone: string | undefined): Date | null {
+  const parts = PLAIN_DATE.exec(value);
+  if (!parts) return null;
+  const utcNoon = buildCalendarDate(Number(parts[1]), Number(parts[2]), Number(parts[3]));
+  if (!utcNoon) return new Date(Number.NaN);
+  if (!timeZone) return utcNoon;
+  const guess = utcNoon.getTime() - zoneOffsetMs(utcNoon.getTime(), timeZone);
+  return new Date(utcNoon.getTime() - zoneOffsetMs(guess, timeZone));
+}
+
+const reminderDateSchema = z.preprocess(
+  (value) => (typeof value === 'string' ? (plainDateToInstant(value, undefined) ?? value) : value),
+  z.coerce.date()
+);
+
+function withZonedPlainDates(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return value;
+  const input = value as Record<string, unknown>;
+  const timeZone = input.timeZone;
+  if (typeof timeZone !== 'string' || !isValidTimeZone(timeZone)) return value;
+  const zoned = { ...input };
+  for (const field of REMINDER_DATE_FIELDS) {
+    const raw = input[field];
+    if (typeof raw === 'string') zoned[field] = plainDateToInstant(raw, timeZone) ?? raw;
+  }
+  return zoned;
+}
 
 const reminderTypeSchema = z.enum(['expense', 'notification']);
 const frequencySchema = z.enum(['weekly', 'monthly', 'yearly', 'custom']);
@@ -32,10 +98,11 @@ const reminderBaseSchema = z.object({
     .max(CONFIG.validation.reminder.maxIntervalMileage)
     .nullish(),
   lastServiceOdometer: z.number().int().min(0).nullish(),
-  startDate: z.coerce.date(),
-  endDate: z.coerce.date().nullish(),
+  startDate: reminderDateSchema,
+  endDate: reminderDateSchema.nullish(),
   // Zod strips unlisted keys: isActive must stay listed or the pause toggle silently no-ops.
   isActive: z.boolean().optional(),
+  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
   vehicleIds: z.array(z.string().min(1)).min(1),
   expenseCategory: z.enum(EXPENSE_CATEGORIES).nullish(),
   expenseTags: z
@@ -166,24 +233,30 @@ function refineSplitConfig(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   }
 }
 
-export const createReminderSchema = reminderBaseSchema.superRefine((data, ctx) => {
-  refineCustomFrequency(data, ctx);
-  refineExpenseType(data, ctx);
-  refineDateRange(data, ctx);
-  refineSplitConfig(data, ctx);
-  refineFuelSplit(data, ctx);
-  refineMileageTrigger(data, ctx);
-});
+export const createReminderSchema = z.preprocess(
+  withZonedPlainDates,
+  reminderBaseSchema.superRefine((data, ctx) => {
+    refineCustomFrequency(data, ctx);
+    refineExpenseType(data, ctx);
+    refineDateRange(data, ctx);
+    refineSplitConfig(data, ctx);
+    refineFuelSplit(data, ctx);
+    refineMileageTrigger(data, ctx);
+  })
+);
 
 // Zod v4 throws on .partial() after refinements, so partialize the base object first.
-export const updateReminderSchema = reminderBaseSchema.partial().superRefine((data, ctx) => {
-  refineCustomFrequency(data, ctx);
-  refineExpenseType(data, ctx);
-  refineDateRange(data, ctx);
-  refineSplitConfig(data, ctx);
-  refineFuelSplit(data, ctx);
-  refineMileageTrigger(data, ctx);
-});
+export const updateReminderSchema = z.preprocess(
+  withZonedPlainDates,
+  reminderBaseSchema.partial().superRefine((data, ctx) => {
+    refineCustomFrequency(data, ctx);
+    refineExpenseType(data, ctx);
+    refineDateRange(data, ctx);
+    refineSplitConfig(data, ctx);
+    refineFuelSplit(data, ctx);
+    refineMileageTrigger(data, ctx);
+  })
+);
 
 // Transform-free: merged data already holds cents, so re-running the dollar transform would double-convert.
 const reminderMergeGateSchema = reminderBaseSchema
