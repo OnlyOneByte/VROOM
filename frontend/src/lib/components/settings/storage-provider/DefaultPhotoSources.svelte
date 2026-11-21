@@ -216,7 +216,7 @@
 						if (val !== 'mixed') handleGlobalChange(val);
 					}}
 				>
-					<Select.Trigger class="w-full sm:w-[220px]">
+					<Select.Trigger aria-label="Default photo source" class="w-full sm:w-[220px]">
 						{#if hasPerCategoryOverrides}
 							<span class="text-muted-foreground">Mixed</span>
 						{:else if uniformDefault}
@@ -271,7 +271,7 @@
 					<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
 						<div class="flex items-center gap-2 min-w-0">
 							<Icon class="h-4 w-4 text-muted-foreground shrink-0" />
-							<span class="text-sm truncate">{meta.label}</span>
+							<label for="default-photo-{category}" class="text-sm truncate">{meta.label}</label>
 						</div>
 						<div class="flex items-center gap-2">
 							{#if checkingCategory === category}
@@ -282,7 +282,7 @@
 								value={currentDefault ?? 'none'}
 								onValueChange={val => handleCategoryChange(category, val)}
 							>
-								<Select.Trigger class="w-full sm:w-[200px]">
+								<Select.Trigger id="default-photo-{category}" class="w-full sm:w-[200px]">
 									{#if currentDefault}
 										{@const provider = providers.find(p => p.id === currentDefault)}
 										<span class="truncate">
