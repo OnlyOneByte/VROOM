@@ -244,25 +244,32 @@ describe('Offline Storage', () => {
 			expect(savedData[0].amount).toBe(12.35);
 		});
 
-		it('an entry queued before rounding loads rounded, so it can still sync', () => {
+		it('entries queued before rounding load rounded the way the server rounds, so they still sync', () => {
+			const queued = (id: string, amount: number, version?: string) => ({
+				id,
+				clientId: id,
+				vehicleId: 'vehicle-1',
+				tags: [],
+				category: 'misc',
+				amount,
+				date: '2024-01-01',
+				timestamp: 1,
+				synced: false,
+				version
+			});
 			localStorageMock.getItem.mockReturnValue(
 				JSON.stringify([
-					{
-						id: 'old',
-						clientId: 'old',
-						vehicleId: 'vehicle-1',
-						tags: [],
-						category: 'misc',
-						amount: 1.005,
-						date: '2024-01-01',
-						timestamp: 1,
-						synced: false,
-						version: '3.0'
-					}
+					queued('current', 25.678, '3.0'),
+					queued('legacy', 1234.561),
+					queued('tie', 1.005, '3.0')
 				])
 			);
 
-			expect(loadOfflineExpenses()[0]?.amount).toBe(1.01);
+			expect(loadOfflineExpenses().map(expense => expense.amount)).toEqual([
+				25.68,
+				1234.56,
+				Math.round(1.005 * 100) / 100
+			]);
 		});
 	});
 
