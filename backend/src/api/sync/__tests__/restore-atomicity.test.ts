@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import AdmZip from 'adm-zip';
+import { ConflictError } from '../../../errors';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 
@@ -43,7 +44,9 @@ describe('replace-mode restore atomicity — a mid-insert failure rolls the wipe
       threw = err;
     }
     expect(threw, 'the colliding insert should throw, not silently swallow').not.toBeNull();
-    expect(String((threw as Error)?.message)).toContain('UNIQUE');
+    expect(threw).toBeInstanceOf(ConflictError);
+    expect(String((threw as Error)?.message)).not.toContain('UNIQUE');
+    expect(String((threw as Error)?.message)).not.toContain('vehicles.id');
 
     const rows = vehicleRows();
     expect(rows, 'the original vehicle survives the failed restore (atomic rollback)').toHaveLength(

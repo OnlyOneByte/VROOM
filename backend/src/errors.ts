@@ -101,13 +101,15 @@ export function createSuccessResponse<T>(data?: T, message?: string): SuccessRes
 
 export function formatErrorResponse(error: unknown, includeStack: boolean = false): ErrorResponse {
   if (isAppError(error)) {
-    const details = includeStack
-      ? {
-          ...(typeof error.details === 'object' && error.details !== null ? error.details : {}),
-          stack: error.stack,
-        }
-      : error.details;
+    if (includeStack) {
+      const details = {
+        ...(typeof error.details === 'object' && error.details !== null ? error.details : {}),
+        stack: error.stack,
+      };
+      return createErrorResponse(error.constructor.name, error.message, details);
+    }
 
+    const details = error.statusCode < 500 ? error.details : undefined;
     return createErrorResponse(error.constructor.name, error.message, details);
   }
 
@@ -146,13 +148,20 @@ const UNIQUE_VIOLATION_CODES = new Set([
   'SQLITE_CONSTRAINT_PRIMARYKEY',
 ]);
 
-export function isUniqueConstraintError(err: unknown): boolean {
+function sqliteErrorCode(err: unknown): string | undefined {
   for (let e: unknown = err; e instanceof Error; e = e.cause) {
     const code = (e as Error & { code?: unknown }).code;
-    if (typeof code === 'string' && UNIQUE_VIOLATION_CODES.has(code)) return true;
+    if (typeof code === 'string' && code.startsWith('SQLITE_')) return code;
   }
-  return false;
+  return undefined;
 }
+
+export function isUniqueConstraintError(err: unknown): boolean {
+  const code = sqliteErrorCode(err);
+  return code !== undefined && UNIQUE_VIOLATION_CODES.has(code);
+}
+
+export const isSqliteError = (err: unknown): boolean => sqliteErrorCode(err) !== undefined;
 
 export const handleDatabaseError = (error: unknown): AppError => {
   if (isUniqueConstraintError(error)) return new ConflictError('Resource already exists');

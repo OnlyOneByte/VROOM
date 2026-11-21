@@ -7,6 +7,7 @@ import {
   formatErrorResponse,
   handleDatabaseError,
   isAppError,
+  isSqliteError,
   isSyncError,
   syncErrorResponse,
   ValidationError,
@@ -43,7 +44,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
     );
   }
 
-  if (err instanceof Error && err.message.includes('SQLITE_')) {
+  if (isSqliteError(err) || (err instanceof Error && err.message.includes('SQLITE_'))) {
     const dbError = handleDatabaseError(err);
     return c.json(
       formatErrorResponse(dbError, isDevelopment),
