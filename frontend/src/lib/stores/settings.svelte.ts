@@ -11,7 +11,6 @@ import { settingsApi } from '#lib/services/settings-api.ts';
 import { themeStore } from '#lib/stores/theme.svelte.ts';
 import { triggerBlobDownload } from '#lib/utils/download.ts';
 import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-import { currentOfflineQueueOwner } from '#lib/utils/offline-storage.ts';
 
 const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
 	distanceUnit: 'miles',
@@ -24,27 +23,28 @@ function createSettingsStore() {
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let restoreProviders = $state<RestoreProviderInfo[]>([]);
-	let loadedFor: string | null = null;
 	let inFlight: Promise<void> | null = null;
 
 	async function fetchSettings(): Promise<void> {
 		isLoading = true;
 		error = null;
-		const owner = currentOfflineQueueOwner();
 		try {
-			const loaded = await settingsApi.getSettings();
-			if (currentOfflineQueueOwner() !== owner) return;
-			settings = loaded;
-			loadedFor = owner;
-			themeStore.reconcileServerTheme(loaded.themePreference);
+			settings = await settingsApi.getSettings();
+			themeStore.reconcileServerTheme(settings.themePreference);
+			isLoading = false;
 		} catch (err) {
 			error = userFacingErrorMessage(err);
-		} finally {
 			isLoading = false;
 		}
 	}
 
-	function refresh(): Promise<void> {
+	async function reloadAfterChange(): Promise<void> {
+		await inFlight;
+		await load();
+	}
+
+	function load(): Promise<void> {
+		if (inFlight) return inFlight;
 		const request = fetchSettings().finally(() => {
 			if (inFlight === request) inFlight = null;
 		});
@@ -66,13 +66,7 @@ function createSettingsStore() {
 			return error;
 		},
 
-		load(): Promise<void> {
-			if (inFlight) return inFlight;
-			if (settings && loadedFor === currentOfflineQueueOwner()) return Promise.resolve();
-			return refresh();
-		},
-
-		refresh,
+		load,
 
 		async update(updates: Partial<UserSettings>) {
 			isLoading = true;
@@ -111,7 +105,7 @@ function createSettingsStore() {
 				const result = await settingsApi.uploadBackup(file, mode, idempotencyKey);
 
 				if (mode !== 'preview') {
-					await refresh();
+					await reloadAfterChange();
 				}
 				return result;
 			} catch (err) {
@@ -123,9 +117,7 @@ function createSettingsStore() {
 		async executeSync(syncTypes: 'backup'[], force = false) {
 			error = null;
 			try {
-				const result = await settingsApi.executeSync(syncTypes, force);
-				await refresh();
-				return result;
+				return await settingsApi.executeSync(syncTypes, force);
 			} catch (err) {
 				error = userFacingErrorMessage(err);
 				throw err;
@@ -163,7 +155,7 @@ function createSettingsStore() {
 			try {
 				const result = await settingsApi.restoreFromProvider(opts);
 				if (opts.mode !== 'preview') {
-					await refresh();
+					await reloadAfterChange();
 				}
 				return result;
 			} catch (err) {
@@ -192,7 +184,6 @@ function createSettingsStore() {
 			isLoading = false;
 			error = null;
 			restoreProviders = [];
-			loadedFor = null;
 			inFlight = null;
 		}
 	};

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { settingsStore } from '../settings.svelte';
 import { themeStore } from '../theme.svelte';
 import { SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
-import { setOfflineQueueOwner } from '#lib/utils/offline-storage.ts';
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -51,7 +50,7 @@ describe('settings store — state-management contracts', () => {
 		expect(settingsStore.error).toBe(SERVER_FAILURE_MESSAGE);
 	});
 
-	it('a non-preview restoreFromProvider REFRESHES state (second fetch = the reload)', async () => {
+	it('a non-preview restoreFromProvider REFRESHES state via load() (second fetch = the reload)', async () => {
 		mockFetch
 			.mockResolvedValueOnce(okJson({ success: true, imported: {} }))
 			.mockResolvedValueOnce(okJson(SETTINGS));
@@ -81,7 +80,7 @@ describe('settings store — state-management contracts', () => {
 		expect(settingsStore.settings).toBeNull();
 	});
 
-	it('a non-preview uploadBackup REFRESHES state (second fetch = the reload)', async () => {
+	it('a non-preview uploadBackup REFRESHES state via load() (second fetch = the reload)', async () => {
 		mockFetch
 			.mockResolvedValueOnce(okJson({ success: true, imported: {} }))
 			.mockResolvedValueOnce(okJson(SETTINGS));
@@ -129,64 +128,37 @@ describe('settings store — state-management contracts', () => {
 		expect(settingsStore.settings).toEqual(SETTINGS);
 	});
 
-	it('load() after a successful load reuses it, and refresh() fetches again', async () => {
-		mockFetch.mockResolvedValue(okJson(SETTINGS));
-		await settingsStore.load();
-
-		await settingsStore.load();
-		expect(mockFetch).toHaveBeenCalledTimes(1);
-
-		await settingsStore.refresh();
-		expect(mockFetch).toHaveBeenCalledTimes(2);
-	});
-
-	it('load() after a failed load tries again', async () => {
-		mockFetch.mockResolvedValueOnce(errJson(500)).mockResolvedValueOnce(okJson(SETTINGS));
-		await settingsStore.load();
-		expect(settingsStore.error).toBe(SERVER_FAILURE_MESSAGE);
-
-		await settingsStore.load();
-		expect(mockFetch).toHaveBeenCalledTimes(2);
-		expect(settingsStore.settings).toEqual(SETTINGS);
-	});
-
-	it('load() fetches again for a different signed-in user', async () => {
-		mockFetch.mockResolvedValue(okJson(SETTINGS));
-		setOfflineQueueOwner('user-a');
-		await settingsStore.load();
-
-		setOfflineQueueOwner('user-b');
-		await settingsStore.load();
-
-		expect(mockFetch).toHaveBeenCalledTimes(2);
-		setOfflineQueueOwner(null);
-	});
-
-	it('a response that arrives after the user changed is dropped', async () => {
-		let answer: (value: unknown) => void = () => {};
-		mockFetch.mockImplementationOnce(() => new Promise(resolve => (answer = resolve)));
-		setOfflineQueueOwner('user-a');
-		const pending = settingsStore.load();
-
-		setOfflineQueueOwner('user-b');
-		answer(okJson(SETTINGS));
-		await pending;
-
-		expect(settingsStore.settings).toBeNull();
-		setOfflineQueueOwner(null);
-	});
-
-	it('a backup refreshes the settings it changed', async () => {
-		mockFetch.mockResolvedValue(okJson(SETTINGS));
-		await settingsStore.load();
+	it('a load() after the previous one finished fetches fresh settings', async () => {
 		mockFetch
-			.mockResolvedValueOnce(okJson({ results: {} }))
-			.mockResolvedValueOnce(okJson({ ...SETTINGS, lastBackupDate: '2026-11-21T00:00:00.000Z' }));
+			.mockResolvedValueOnce(okJson(SETTINGS))
+			.mockResolvedValueOnce(okJson({ ...SETTINGS, currencyUnit: 'GBP' }));
 
-		await settingsStore.executeSync(['backup'], true);
+		await settingsStore.load();
+		await settingsStore.load();
+
+		expect(mockFetch).toHaveBeenCalledTimes(2);
+		expect(settingsStore.settings?.currencyUnit).toBe('GBP');
+	});
+
+	it('a restore that finishes while a load is in flight still reloads afterwards', async () => {
+		let answerLoad: (value: unknown) => void = () => {};
+		mockFetch
+			.mockImplementationOnce(() => new Promise(resolve => (answerLoad = resolve)))
+			.mockResolvedValueOnce(okJson({ success: true, imported: {} }))
+			.mockResolvedValueOnce(okJson({ ...SETTINGS, currencyUnit: 'GBP' }));
+
+		const staleLoad = settingsStore.load();
+		const restore = settingsStore.restoreFromProvider({
+			providerId: 'p1',
+			sourceType: 'zip',
+			mode: 'replace',
+			idempotencyKey: 'k3'
+		});
+		answerLoad(okJson(SETTINGS));
+		await Promise.all([staleLoad, restore]);
 
 		expect(mockFetch).toHaveBeenCalledTimes(3);
-		expect(settingsStore.settings?.lastBackupDate).toBe('2026-11-21T00:00:00.000Z');
+		expect(settingsStore.settings?.currencyUnit).toBe('GBP');
 	});
 });
 
