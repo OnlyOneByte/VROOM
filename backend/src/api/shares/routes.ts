@@ -1,13 +1,23 @@
-import { eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { getDb } from '../../db/connection';
-import { users, type VehicleShare } from '../../db/schema';
+import { users } from '../../db/schema';
 import type { ApiResponse } from '../../errors';
-import { AppError, ConflictError, NotFoundError, ValidationError } from '../../errors';
+import {
+  ConflictError,
+  isUniqueConstraintError,
+  NotFoundError,
+  ValidationError,
+} from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { commonSchemas, validateVehicleOwnership, zValidator } from '../../utils/validation';
-import { type GrantedShare, type ReceivedShare, vehicleShareRepository } from './repository';
+import {
+  type GrantedShare,
+  type ReceivedShare,
+  toOwnerView,
+  vehicleShareRepository,
+} from './repository';
 
 // Non-owners and non-invitees get 404, not 403, so share existence is not revealed.
 
@@ -28,42 +38,45 @@ const levelSchema = z.object({ level: z.enum(LEVELS) });
 
 routes.post('/', zValidator('json', inviteSchema), async (c) => {
   const user = c.get('user');
-  const { vehicleId, email, level } = c.req.valid('json');
+  const { vehicleId, level } = c.req.valid('json');
+  const email = c.req.valid('json').email.trim().toLowerCase();
 
   await validateVehicleOwnership(vehicleId, user.id);
+
+  if (email === user.email.toLowerCase()) {
+    throw new ValidationError('You cannot share a vehicle with yourself');
+  }
 
   const db = getDb();
   const [invitee] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.email, email))
+    .where(sql`lower(${users.email}) = ${email}`)
     .limit(1);
-  if (!invitee) {
-    throw new AppError('No VROOM account uses that email.', 404);
+
+  const alreadyShared = new ConflictError('This vehicle is already shared with that email');
+  if (await vehicleShareRepository.findActiveInvite(vehicleId, email, invitee?.id ?? null)) {
+    throw alreadyShared;
   }
 
-  if (invitee.id === user.id) {
-    throw new ValidationError('You cannot share a vehicle with yourself');
-  }
+  const created = await vehicleShareRepository
+    .create({
+      vehicleId,
+      ownerId: user.id,
+      sharedWithId: invitee?.id ?? null,
+      level,
+      status: 'pending',
+      invitedEmail: email,
+    })
+    .catch((error: unknown) => {
+      if (isUniqueConstraintError(error)) throw alreadyShared;
+      throw error;
+    });
 
-  const existing = await vehicleShareRepository.findActiveForVehicleAndUser(vehicleId, invitee.id);
-  if (existing) {
-    throw new ConflictError('This vehicle is already shared with that user');
-  }
-
-  const created = await vehicleShareRepository.create({
-    vehicleId,
-    ownerId: user.id,
-    sharedWithId: invitee.id,
-    level,
-    status: 'pending',
-    invitedEmail: email,
-  });
-
-  const response: ApiResponse<VehicleShare> = {
+  const response: ApiResponse<GrantedShare> = {
     success: true,
-    data: created,
-    message: 'Invitation sent',
+    data: toOwnerView(created),
+    message: 'Invitation sent. They will see it when they sign in to VROOM with that email.',
   };
   return c.json(response, 201);
 });
@@ -94,7 +107,7 @@ routes.put(
     }
 
     const updated = await vehicleShareRepository.update(id, { level, updatedAt: new Date() });
-    return c.json({ success: true, data: updated, message: 'Share level updated' });
+    return c.json({ success: true, data: toOwnerView(updated), message: 'Share level updated' });
   }
 );
 

@@ -729,6 +729,12 @@ export class BackupService {
       'reminderNotification reminder+dueOdometer'
     );
     dupCheck(backup.vehicleShares, ['vehicleId', 'sharedWithId'], 'vehicleShare vehicle+invitee');
+    dupCheck(
+      backup.vehicleShares,
+      ['vehicleId', 'invitedEmail'],
+      'pending vehicleShare vehicle+invitedEmail',
+      (row) => row.sharedWithId == null && row.status === 'pending'
+    );
     dupCheck(backup.financing, ['vehicleId'], 'active financing vehicleId', (row) =>
       isTruthyFlag(row.isActive)
     );

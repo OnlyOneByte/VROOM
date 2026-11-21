@@ -14,6 +14,7 @@ import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { storePending } from '../../utils/pending-credentials';
 import { readJsonBody } from '../../utils/request-body';
+import { attachPendingInvites } from '../shares/repository';
 import { authProviderRepository, buildAuthProviderConfig } from './auth-provider-repository';
 import { lucia } from './lucia';
 import { googleStorageClient, STORAGE_SCOPES } from './providers/google';
@@ -257,6 +258,7 @@ export async function resolveNewUser(
           status: 'active',
         })
         .run();
+      attachPendingInvites(tx, newUser.id, newUser.email);
       return { userId: newUser.id };
     });
     return result;
