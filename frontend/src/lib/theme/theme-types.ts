@@ -41,6 +41,7 @@ export type ThemeTokenKey =
 	| 'sidebar-primary'
 	| 'sidebar-primary-foreground'
 	| 'sidebar-ring'
+	| 'success'
 	| 'warning';
 
 export const THEME_TOKEN_KEYS = [
@@ -79,6 +80,7 @@ export const THEME_TOKEN_KEYS = [
 	'sidebar-primary',
 	'sidebar-primary-foreground',
 	'sidebar-ring',
+	'success',
 	'warning'
 ] as const satisfies readonly ThemeTokenKey[];
 

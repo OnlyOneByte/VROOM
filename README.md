@@ -9,7 +9,7 @@ VROOM (Vehicle Record & Organization Of Maintenance) is a self-hostable car cost
 
 > ⚠️ **Under active development.** Features, APIs, and database schemas may change between releases. Back up your data regularly via Google Drive sync. Pin to a specific image tag rather than `latest` for stability.
 
-> 🤖 **AI-native development.** Much of the code is written with AI assistance. All architecture decisions, feature direction, and code review are done by a human developer.
+> 🤖 **AI-native development.** Much of the code is written with AI assistance. Architecture decisions and feature direction come from a human developer, and every change is reviewed by someone other than its author, a human or an independent review agent, before it merges.
 
 ## Why VROOM?
 

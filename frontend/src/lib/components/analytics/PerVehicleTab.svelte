@@ -133,7 +133,7 @@
 			</Card.Header>
 			<Card.Content>
 				<Select.Root type="single" value={selectedVehicleId} onValueChange={handleVehicleChange}>
-					<Select.Trigger class="w-full">
+					<Select.Trigger aria-label="Select vehicle" class="w-full">
 						{#if selectedVehicle}
 							{selectedVehicle.year}
 							{selectedVehicle.make}

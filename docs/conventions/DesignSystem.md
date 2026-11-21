@@ -31,6 +31,7 @@ palette class. Every token has a light and a dark variant.
 | `bg-accent` / `text-accent-foreground` | Hover/active surfaces |
 | `bg-destructive` / `text-destructive` | Errors, delete |
 | `text-warning` / `bg-warning/10` | "Attention" / due-now cues (reminders, offline state) |
+| `text-success` / `bg-success/10` | "All good" status text (synced, up to date) |
 | `border-border` / `border-input` / `ring-ring` | Borders, inputs, focus rings |
 | `text-chart-1`…`text-chart-8` | Categorical chart colors |
 
@@ -44,7 +45,11 @@ Notes:
   text-yellow-800`, and the green equivalent) in `ui/alert/alert.svelte`, so they ignore the theme
   and dark mode. `no-theme-clashing-colors.test.ts` does not catch them (its regex covers only
   white/black/gray/slate/zinc/neutral); `/dev/gallery` renders all four if you want to see the gap.
-  There is no `--success` token today, so a success surface needs one added before it can be themed.
+  `--success` is themed and AA-gated, but `Alert`'s `success` variant does not use it yet.
+- `text-chart-*` is for chart marks, not words: the chart gate is only 3:1. Status text uses
+  `text-success` / `text-warning` / `text-destructive`. `--primary` is gated at AA on
+  `--background`; a `bg-primary/10` tint (the active nav item) costs about 10% of that, which only
+  the axe e2e scans catch.
 - Chart colors come from `utils/chart-colors`: series `CHART_COLORS[i % CHART_COLORS.length]`
   (8 colors), category `getCategoryChartColor` (badges use `getCategoryBadgeClasses` from
   `utils/expense-helpers`; both derive from the one `CATEGORY_COLOR_TOKENS` assignment), chart
@@ -91,7 +96,7 @@ Match neighbors; don't invent values. The conventions in this codebase:
 | Empty state | `common/empty-state.svelte` | `icon?`, `title`, `description`, `action?` (all Snippets) |
 | Destructive confirm | `common/ConfirmDialog.svelte` | `bind:open`, `title`, `description`, `onConfirm` (may be async), `destructive?` — native `confirm()`/`alert()` are banned (`no-native-dialogs.test.ts`) |
 | Pagination | `common/pagination-controls.svelte` | `currentOffset`, `pageSize`, `totalCount`, `isLoading?`, `onPageChange` |
-| Mobile primary action | `common/floating-action-button.svelte` | `href`/`onclick`, `label`, `ariaLabel?` |
+| Mobile primary action | `common/floating-action-button.svelte` | `href`/`onclick`, `label` (the visible text is the accessible name) |
 | Date | `common/date-picker.svelte` | `bind:value` — a date-only `YYYY-MM-DD` string (convert with `dateOnlyToISO` / `toDateInputValue`, never a UTC `.slice(0,10)`) |
 | Date range | `common/date-range-picker.svelte` | `bind:startValue`, `bind:endValue` (same `YYYY-MM-DD` form) |
 | Time period | `common/period-selector.svelte` | `selectedPeriod`, `isLoading`, `onPeriodChange` |

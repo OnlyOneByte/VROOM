@@ -107,6 +107,7 @@ test.describe('Analytics', () => {
 		await expect(page.getByText('Failed to load analytics')).toBeVisible();
 		const retry = page.getByRole('button', { name: 'Retry' });
 		await expect(retry).toBeVisible();
+		await page.mouse.move(640, 600);
 
 		await retry.click();
 		await expect.poll(() => attempts).toBeGreaterThan(1);

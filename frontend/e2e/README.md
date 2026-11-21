@@ -137,7 +137,8 @@ So **do not run the typecheck or unit suites alongside `npm run test:e2e`.** If 
 Every scan in the suite goes through `support/axe.ts`, which pins the tag set to
 `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa` and attaches the full violation JSON to the HTML report
 whether the test passes or fails. A spec that scanned a narrower tag set would report an empty
-violation list for a page that fails WCAG.
+violation list for a page that fails WCAG. The helper also freezes CSS transitions and animations
+before the scan, so axe samples the settled colour rather than a mid-`transition-colors` frame.
 
 Three layers, each covering what the others cannot reach:
 
@@ -178,8 +179,9 @@ right after `goto` the URL is still the requested one whether or not the app is 
   fields on the way in. Unit values must be real `UnitPreferences` members (`gallons_us`, not
   `gallons`), or the label helpers throw.
 - Semantic selectors (`getByRole`, `getByLabel`, `getByText`), not CSS. The bits-ui `Select.Trigger`
-  exposes role **button**, not `combobox`, and the delete confirmation is role **alertdialog**, not
-  `dialog`. Icon-only row actions are named by their `title` ("Delete expense"), not by visible text.
+  exposes role **combobox** (the `aria-haspopup` button), and a combobox takes its name from a
+  `<label for>` or `aria-label`, never from its content, so query it as `getByRole('combobox', { name })`.
+  The delete confirmation is role **alertdialog**, not `dialog`. Icon-only row actions are named by their `title` ("Delete expense"), not by visible text.
 - `ExpensesTable` renders ONE layout at runtime (`{:else if isMobile.current}`), so the other is
   absent from the DOM, not hidden. The two carry different fields: the compact row is
   category, amount, date and vehicle, and drops the description. A test that asserts a field only

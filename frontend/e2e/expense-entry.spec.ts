@@ -225,7 +225,7 @@ test.describe('Expense list', () => {
 			);
 		});
 
-		await page.getByRole('button', { name: /Category/ }).click();
+		await page.getByRole('combobox', { name: /Category/ }).click();
 		await page.getByRole('option', { name: 'Maintenance' }).click();
 
 		await filtered;

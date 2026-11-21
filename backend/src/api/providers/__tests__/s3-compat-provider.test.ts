@@ -34,6 +34,11 @@ mock.module('@aws-sdk/s3-request-presigner', () => ({
 }));
 
 const credentials = { accessKeyId: 'test-key', secretAccessKey: 'test-secret' };
+const KEY_PATTERN = (prefix: string, fileName: string) =>
+  new RegExp(
+    `^${prefix}[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-${fileName.replace('.', '\\.')}$`
+  );
+
 const config = { endpoint: 'https://s3.example.com', bucket: 'test-bucket', region: 'us-east-1' };
 
 describe('S3CompatProvider', () => {
@@ -62,19 +67,55 @@ describe('S3CompatProvider', () => {
         pathHint: '/vroom/Vehicle',
       });
 
-      expect(result).toEqual({
-        providerType: 's3',
-        externalId: 'vroom/Vehicle/vehicle/v-123/photo.jpg',
-      });
+      expect(result.providerType).toBe('s3');
+      expect(result.externalId).toMatch(KEY_PATTERN('vroom/Vehicle/vehicle/v-123/', 'photo.jpg'));
 
       expect(mockSend).toHaveBeenCalledTimes(1);
       const command = mockSend.mock.calls[0]?.[0] as { input: Record<string, unknown> };
       expect(command.input).toEqual({
         Bucket: 'test-bucket',
-        Key: 'vroom/Vehicle/vehicle/v-123/photo.jpg',
+        Key: result.externalId,
         Body: Buffer.from('image-data'),
         ContentType: 'image/jpeg',
       });
+    });
+
+    test('two uploads with the same file name on one record get distinct keys', async () => {
+      mockSend.mockResolvedValue({});
+      const params = {
+        fileName: 'image.jpg',
+        mimeType: 'image/jpeg',
+        entityType: 'expense',
+        entityId: 'e-1',
+        pathHint: 'vroom/Receipts',
+      };
+
+      const first = await provider.upload({ ...params, buffer: Buffer.from('first') });
+      const second = await provider.upload({ ...params, buffer: Buffer.from('second') });
+
+      expect(first.externalId).not.toBe(second.externalId);
+      expect(first.externalId).toMatch(KEY_PATTERN('vroom/Receipts/expense/e-1/', 'image.jpg'));
+      expect(second.externalId).toMatch(KEY_PATTERN('vroom/Receipts/expense/e-1/', 'image.jpg'));
+      const putKeys = mockSend.mock.calls.map(
+        (call) => (call[0] as { input: { Key: string } }).input.Key
+      );
+      expect(putKeys).toEqual([first.externalId, second.externalId]);
+    });
+
+    test('rawPath uploads keep the caller-chosen key', async () => {
+      mockSend.mockResolvedValueOnce({});
+
+      const result = await provider.upload({
+        fileName: 'vroom-backup-1.zip',
+        buffer: Buffer.from('zip'),
+        mimeType: 'application/zip',
+        entityType: 'backup',
+        entityId: 'u-1',
+        pathHint: '',
+        rawPath: '/vroom/Backups/',
+      });
+
+      expect(result.externalId).toBe('vroom/Backups/vroom-backup-1.zip');
     });
 
     test('strips leading slashes from pathHint to avoid empty key segments', async () => {
@@ -89,7 +130,9 @@ describe('S3CompatProvider', () => {
         pathHint: '///vroom///Receipts///',
       });
 
-      expect(result.externalId).toBe('vroom/Receipts/expense/e-456/receipt.pdf');
+      expect(result.externalId).toMatch(
+        KEY_PATTERN('vroom/Receipts/expense/e-456/', 'receipt.pdf')
+      );
     });
 
     test('handles empty pathHint', async () => {
@@ -104,7 +147,7 @@ describe('S3CompatProvider', () => {
         pathHint: '',
       });
 
-      expect(result.externalId).toBe('insurance_policy/ip-1/doc.pdf');
+      expect(result.externalId).toMatch(KEY_PATTERN('insurance_policy/ip-1/', 'doc.pdf'));
     });
   });
 

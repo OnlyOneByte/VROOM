@@ -40,7 +40,6 @@
 				<button
 					type="button"
 					aria-pressed={selected}
-					aria-label={`Use the ${theme.label} theme`}
 					class={cn(
 						'relative flex flex-col gap-2 rounded-lg border p-3 text-left transition-colors',
 						selected

@@ -5,18 +5,16 @@
 	interface Props {
 		href?: string;
 		label: string;
-		ariaLabel?: string;
 		onclick?: () => void;
 	}
 
-	let { href, label, ariaLabel, onclick }: Props = $props();
+	let { href, label, onclick }: Props = $props();
 </script>
 
 <Button
 	{href}
 	{onclick}
 	class="fixed bottom-4 left-4 right-4 z-50 h-16 rounded-full sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto flex items-center justify-center gap-2 pl-6 pr-10 bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 border-0 group"
-	aria-label={ariaLabel ?? label}
 >
 	<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
 	<span class="font-bold text-lg">{label}</span>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import {
 		type CarouselAPI,
 		type CarouselProps,
@@ -22,12 +23,12 @@
 		api: undefined,
 		scrollPrev,
 		scrollNext,
-		orientation,
+		orientation: untrack(() => orientation),
 		canScrollNext: false,
 		canScrollPrev: false,
 		handleKeyDown,
-		options: opts,
-		plugins,
+		options: untrack(() => opts),
+		plugins: untrack(() => plugins),
 		onInit,
 		scrollSnaps: [],
 		selectedIndex: 0,
