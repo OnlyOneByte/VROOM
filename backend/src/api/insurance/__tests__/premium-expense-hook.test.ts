@@ -382,3 +382,51 @@ describe('term update date validation against the stored dates', () => {
     expect(autoExpensesForTerm(termId)[0]?.expense_amount).toBe(60000);
   });
 });
+
+describe('premium split follows the order the vehicles were chosen', () => {
+  async function twoVehiclesOutOfIdOrder(): Promise<[string, string]> {
+    const ids = [await seedVehicle('Honda'), await seedVehicle('Toyota')].sort();
+    return [ids[1] as string, ids[0] as string];
+  }
+
+  const centsByVehicle = (termId: string) =>
+    Object.fromEntries(autoExpensesForTerm(termId).map((r) => [r.vehicle_id, r.expense_amount]));
+
+  test('on create, the first chosen vehicle takes the odd cent even when its id sorts last', async () => {
+    const [first, second] = await twoVehiclesOutOfIdOrder();
+    const { termId } = await createPolicy([first, second], 100.01);
+
+    expect(centsByVehicle(termId)).toEqual({ [first]: 5001, [second]: 5000 });
+  });
+
+  test('on adding a term, the first chosen vehicle takes the odd cent even when its id sorts last', async () => {
+    const [first, second] = await twoVehiclesOutOfIdOrder();
+    const { policyId } = await createPolicy([first], 10);
+
+    const res = await ctx.authed('POST', `/api/v1/insurance/${policyId}/terms`, {
+      startDate: '2025-01-01T00:00:00.000Z',
+      endDate: '2026-01-01T00:00:00.000Z',
+      totalCost: 100.01,
+      vehicleCoverage: { vehicleIds: [first, second] },
+    });
+    const body = await json<DataEnvelope<{ terms: { id: string }[] }>>(res);
+    expect(res.status, JSON.stringify(body)).toBeLessThan(300);
+    const added = body.data.terms.find((t) => autoExpensesForTerm(t.id).length === 2);
+
+    expect(centsByVehicle(added?.id ?? '')).toEqual({ [first]: 5001, [second]: 5000 });
+  });
+
+  test('on update, re-choosing the vehicles in a new order with a new cost moves the odd cent', async () => {
+    const [first, second] = await twoVehiclesOutOfIdOrder();
+    const { policyId, termId } = await createPolicy([second, first], 100.01);
+    expect(centsByVehicle(termId)).toEqual({ [second]: 5001, [first]: 5000 });
+
+    const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
+      totalCost: 200.01,
+      vehicleCoverage: { vehicleIds: [first, second] },
+    });
+    expect(res.status, await res.text()).toBeLessThan(300);
+
+    expect(centsByVehicle(termId)).toEqual({ [first]: 10001, [second]: 10000 });
+  });
+});

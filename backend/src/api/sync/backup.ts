@@ -19,6 +19,7 @@ import {
   insuranceClaims,
   insurancePolicies,
   insuranceTerms,
+  insuranceTermVehicleSelectionOrder,
   insuranceTermVehicles,
   odometerEntries,
   photoRefs,
@@ -373,6 +374,7 @@ export class BackupService {
             .select()
             .from(insuranceTermVehicles)
             .where(inArray(insuranceTermVehicles.termId, termIds))
+            .orderBy(insuranceTermVehicleSelectionOrder)
         : [];
 
     const userInsuranceClaims =
