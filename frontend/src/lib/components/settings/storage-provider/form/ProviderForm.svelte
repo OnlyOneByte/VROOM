@@ -568,7 +568,7 @@
 					</CardHeader>
 					<CardContent>
 						<Button
-							variant="destructive"
+							variant="outline"
 							onclick={() => (deleteConfirmOpen = true)}
 							disabled={isDeleting}
 						>
@@ -576,7 +576,7 @@
 								<LoaderCircle class="h-4 w-4 animate-spin mr-1" />
 								Deleting...
 							{:else}
-								<Trash2 class="h-4 w-4 mr-1" />
+								<Trash2 class="h-4 w-4 mr-1 text-destructive" />
 								Delete Provider
 							{/if}
 						</Button>
