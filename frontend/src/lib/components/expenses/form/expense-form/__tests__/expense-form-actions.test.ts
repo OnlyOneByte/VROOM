@@ -180,7 +180,9 @@ describe('submitExpense — edit modes', () => {
 		);
 		const state = createState('e1');
 		await submitExpense(state);
-		expect(state.submitError).toBe('Your session has expired. Please sign in again.');
+		expect(state.submitError).toBe(
+			"Couldn't save this expense. Your session has ended. Sign in again to continue."
+		);
 		expect(addOfflineExpense).not.toHaveBeenCalled();
 	});
 });
@@ -340,7 +342,9 @@ describe('submitExpense — offline and failure queuing', () => {
 		state.selectedVehicleIds = ['v1', 'v2'];
 		await submitExpense(state);
 		expect(addOfflineExpense).not.toHaveBeenCalled();
-		expect(state.submitError).toBe('Network error. Please try again.');
+		expect(state.submitError).toBe(
+			"Couldn't save this expense. Something went wrong on our side. Try again in a moment."
+		);
 	});
 });
 

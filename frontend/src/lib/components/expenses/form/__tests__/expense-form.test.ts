@@ -374,6 +374,18 @@ describe('ExpenseForm edit mode', () => {
 		expect(goto).not.toHaveBeenCalled();
 	});
 
+	test('a failed split group load names the split expense on the card', async () => {
+		getExpense.mockResolvedValue({ ...EXISTING, groupId: 'g1' });
+		getSplitExpense.mockRejectedValue(new ApiError('Internal server error', 500));
+		render(ExpenseForm, { props: { expenseId: 'exp-1' } });
+
+		const card = await screen.findByTestId('expense-load-error');
+		expect(within(card).getByText("Couldn't load this split expense")).toBeTruthy();
+		expect(notificationMessages()).toContain(
+			"Couldn't load this split expense. Something went wrong on our side. Try again in a moment."
+		);
+	});
+
 	test('saving sends the edited expense to updateExpense and returns', async () => {
 		updateExpense.mockResolvedValue({ ...EXISTING, amount: 85 });
 		await renderEdit(EXISTING, '/vehicles/v1');

@@ -9,9 +9,7 @@ export const UNQUEUED_AFTER_SESSION_END_MESSAGE =
 	"Your session ended and this device couldn't store the expense, because storage is full or " +
 	"site data is blocked. The expense wasn't saved: sign in again and re-enter it.";
 
-export function submitFailureMessage(kind: SyncFailureKind, error: unknown): string {
-	if (kind === 'auth') return 'Your session has expired. Please sign in again.';
-	if (kind === 'transient') return 'Network error. Please try again.';
+export function submitFailureMessage(error: unknown): string {
 	return `Couldn't save this expense. ${userFacingErrorMessage(error)}`;
 }
 
