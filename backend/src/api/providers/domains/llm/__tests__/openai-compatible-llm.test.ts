@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { UserProvider } from '../../../../../db/schema';
+import { allowPrivateProviderEndpoints } from '../../../../../test-helpers/outbound';
 import { encrypt } from '../../../../../utils/encryption';
 import { type ModelProviderSettings, resolveModelSettings } from '../../model/model-registry';
 import type { ChatMessage, ToolDefinition } from '../llm-provider';
 import { OpenAiCompatibleLlmProvider } from '../openai-compatible';
 import { getLlmProvider } from '../registry';
+
+allowPrivateProviderEndpoints();
 
 const realFetch = globalThis.fetch;
 
