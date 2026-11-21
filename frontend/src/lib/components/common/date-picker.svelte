@@ -68,7 +68,7 @@
 </script>
 
 <Popover.Root bind:open>
-	<Popover.Trigger>
+	<Popover.Trigger {disabled}>
 		{#snippet child({ props })}
 			<Button
 				variant="outline"
@@ -77,7 +77,6 @@
 					!value && 'text-muted-foreground',
 					className
 				)}
-				{disabled}
 				{id}
 				aria-invalid={ariaInvalid}
 				aria-describedby={ariaDescribedby}
