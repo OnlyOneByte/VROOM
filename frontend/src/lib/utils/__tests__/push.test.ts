@@ -197,7 +197,7 @@ describe('push browser integration', () => {
 
 	test('enablePush subscribes with the VAPID key and registers the subscription', async () => {
 		const env = installPushEnvironment({ permission: 'default', requestResult: 'granted' });
-		pushApiMock.getVapidPublicKey.mockResolvedValue({ publicKey: 'AQID' });
+		pushApiMock.getVapidPublicKey.mockResolvedValue({ enabled: true, publicKey: 'AQID' });
 		pushApiMock.subscribe.mockResolvedValue({ id: 'sub-1' });
 		expect(await enablePush()).toEqual({ ok: true });
 		const subscribeCall = env.pushManager.subscribe.mock.calls[0] as unknown as [
@@ -216,7 +216,7 @@ describe('push browser integration', () => {
 		const existing = fakeSubscription('https://push.example/old');
 		existing.toJSON = () => ({});
 		const env = installPushEnvironment({ existing });
-		pushApiMock.getVapidPublicKey.mockResolvedValue({ publicKey: 'AQID' });
+		pushApiMock.getVapidPublicKey.mockResolvedValue({ enabled: true, publicKey: 'AQID' });
 		pushApiMock.subscribe.mockResolvedValue({ id: 'sub-2' });
 		expect(await enablePush()).toEqual({ ok: true });
 		expect(env.pushManager.subscribe).not.toHaveBeenCalled();
@@ -228,9 +228,18 @@ describe('push browser integration', () => {
 		);
 	});
 
-	test('enablePush maps PUSH_NOT_CONFIGURED to unconfigured', async () => {
+	test('enablePush reports unconfigured without subscribing when the server has push off', async () => {
+		const env = installPushEnvironment({});
+		pushApiMock.getVapidPublicKey.mockResolvedValue({ enabled: false, publicKey: null });
+		expect(await enablePush()).toEqual({ ok: false, reason: 'unconfigured' });
+		expect(env.pushManager.subscribe).not.toHaveBeenCalled();
+		expect(pushApiMock.subscribe).not.toHaveBeenCalled();
+	});
+
+	test('enablePush maps a PUSH_NOT_CONFIGURED subscribe failure to unconfigured', async () => {
 		installPushEnvironment({});
-		pushApiMock.getVapidPublicKey.mockRejectedValue(
+		pushApiMock.getVapidPublicKey.mockResolvedValue({ enabled: true, publicKey: 'AQID' });
+		pushApiMock.subscribe.mockRejectedValue(
 			new ApiError('Not configured', 503, undefined, 'PUSH_NOT_CONFIGURED')
 		);
 		expect(await enablePush()).toEqual({ ok: false, reason: 'unconfigured' });
@@ -238,7 +247,7 @@ describe('push browser integration', () => {
 
 	test('enablePush reports a server failure as a plain sentence, not its raw text', async () => {
 		installPushEnvironment({});
-		pushApiMock.getVapidPublicKey.mockResolvedValue({ publicKey: 'AQID' });
+		pushApiMock.getVapidPublicKey.mockResolvedValue({ enabled: true, publicKey: 'AQID' });
 		pushApiMock.subscribe.mockRejectedValue(new ApiError('Server exploded', 500));
 		expect(await enablePush()).toEqual({
 			ok: false,
@@ -249,7 +258,7 @@ describe('push browser integration', () => {
 
 	test('enablePush reports a browser that blocks the subscription as denied', async () => {
 		const env = installPushEnvironment({});
-		pushApiMock.getVapidPublicKey.mockResolvedValue({ publicKey: 'AQID' });
+		pushApiMock.getVapidPublicKey.mockResolvedValue({ enabled: true, publicKey: 'AQID' });
 		env.pushManager.subscribe.mockRejectedValue(
 			new DOMException('Registration failed - permission denied', 'NotAllowedError')
 		);
@@ -258,7 +267,7 @@ describe('push browser integration', () => {
 
 	test('enablePush passes an API reason through', async () => {
 		installPushEnvironment({});
-		pushApiMock.getVapidPublicKey.mockResolvedValue({ publicKey: 'AQID' });
+		pushApiMock.getVapidPublicKey.mockResolvedValue({ enabled: true, publicKey: 'AQID' });
 		pushApiMock.subscribe.mockRejectedValue(new ApiError('Endpoint must be https', 400));
 		expect(await enablePush()).toEqual({
 			ok: false,

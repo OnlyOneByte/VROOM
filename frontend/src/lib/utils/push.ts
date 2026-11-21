@@ -91,7 +91,8 @@ export async function enablePush(): Promise<PushEnableOutcome> {
 	if (permission !== 'granted') return { ok: false, reason: 'denied' };
 
 	try {
-		const { publicKey } = await pushApi.getVapidPublicKey();
+		const vapid = await pushApi.getVapidPublicKey();
+		if (!vapid.enabled) return { ok: false, reason: 'unconfigured' };
 		const registration = await navigator.serviceWorker.ready;
 		const existing = await registration.pushManager.getSubscription();
 
@@ -99,7 +100,7 @@ export async function enablePush(): Promise<PushEnableOutcome> {
 			existing ??
 			(await registration.pushManager.subscribe({
 				userVisibleOnly: true,
-				applicationServerKey: urlBase64ToUint8Array(publicKey)
+				applicationServerKey: urlBase64ToUint8Array(vapid.publicKey)
 			}));
 		await pushApi.subscribe(toSubscribePayload(sub));
 		return { ok: true };

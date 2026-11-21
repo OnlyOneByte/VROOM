@@ -14,11 +14,7 @@
 	import * as pushUtil from '#lib/utils/push.ts';
 	import { pushApi } from '#lib/services/push-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import {
-		ApiError,
-		UNEXPECTED_FAILURE_MESSAGE,
-		userFacingErrorMessage
-	} from '#lib/utils/error-handling.ts';
+	import { UNEXPECTED_FAILURE_MESSAGE, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
 	const DISCLOSURE_KEY = 'vroom.push.disclosed';
 
@@ -41,16 +37,7 @@
 				status = 'unsupported';
 				return;
 			}
-			let configured = true;
-			try {
-				await pushApi.getVapidPublicKey();
-			} catch (e) {
-				if (e instanceof ApiError && (e.code === 'PUSH_NOT_CONFIGURED' || e.statusCode === 503)) {
-					configured = false;
-				} else {
-					throw e;
-				}
-			}
+			const { enabled: configured } = await pushApi.getVapidPublicKey();
 			const permission = pushUtil.getNotificationPermission();
 			const sub = await pushUtil.getExistingSubscription();
 			status = pushUtil.derivePushStatus({ supported, configured, permission, subscribed: !!sub });
