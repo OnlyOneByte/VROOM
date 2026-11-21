@@ -14,12 +14,6 @@
 	} = $props();
 </script>
 
-<p
-	{id}
-	class={cn('text-sm font-medium text-destructive', className)}
-	role="alert"
-	aria-live="polite"
-	{...restProps}
->
+<p {id} class={cn('text-sm font-medium text-destructive', className)} role="alert" {...restProps}>
 	{@render children?.()}
 </p>

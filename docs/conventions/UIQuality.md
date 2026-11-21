@@ -250,7 +250,9 @@ verify by hand:
   after a failed submit it moves to the first invalid field (see *Forms*).
 - **Colour is never the only signal** — see *Colour and theme tokens* for contrast.
 - **Semantics.** Lists are lists, tables are `Table`, headings are headings. Updates that matter
-  (sync status, form errors) use `role="status"` / `role="alert"`.
+  use one live role, never two on the same element: sync status is `role="status"`, and form
+  errors are `FormFieldError`, which is `role="alert"` with no `aria-live`. The alert announces
+  an error once as it appears, including errors no field points to with `aria-describedby`.
 - **Zoom.** Layout survives 200% browser zoom without clipping.
 
 ## Mobile-first (this is a PWA)
