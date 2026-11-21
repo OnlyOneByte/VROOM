@@ -27,6 +27,19 @@ describe('FakeStorageProvider', () => {
     expect(got.toString()).toBe('abc123');
   });
 
+  test('two same-name uploads on one record get distinct keys and keep both files', async () => {
+    const p = new FakeStorageProvider();
+    const first = await p.upload(uploadParams({ fileName: 'image.jpg', buffer: Buffer.from('a') }));
+    const second = await p.upload(
+      uploadParams({ fileName: 'image.jpg', buffer: Buffer.from('b') })
+    );
+
+    expect(first.externalId).not.toBe(second.externalId);
+    expect(first.externalId).toMatch(/^Receipts\/expense\/exp-1\/[0-9a-f-]{36}-image\.jpg$/);
+    expect((await p.download(first)).toString()).toBe('a');
+    expect((await p.download(second)).toString()).toBe('b');
+  });
+
   test('uploaded file appears in list() under its folder', async () => {
     const p = new FakeStorageProvider();
     await p.upload(uploadParams({ rawPath: 'Vehicles/v1', fileName: 'front.jpg' }));
