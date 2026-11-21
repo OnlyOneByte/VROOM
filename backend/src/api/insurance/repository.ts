@@ -26,6 +26,8 @@ export interface CreateTermInput {
   vehicleCoverage: { vehicleIds: string[] };
 }
 
+export type MonthlyPricedTerm = InsuranceTerm & { userId: string };
+
 export interface UpdateTermInput {
   startDate?: Date;
   endDate?: Date;
@@ -547,7 +549,7 @@ export class InsurancePolicyRepository {
     }
   }
 
-  async findMonthlyPricedTerms(): Promise<(InsuranceTerm & { userId: string })[]> {
+  async findMonthlyPricedTerms(): Promise<MonthlyPricedTerm[]> {
     const rows = await this.db
       .select({ term: insuranceTerms, userId: insurancePolicies.userId })
       .from(insuranceTerms)

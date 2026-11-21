@@ -308,12 +308,44 @@ describe('recalculating premiums written before the billing-month fix', () => {
     expect(autoExpensesForTerm(termId)[0]?.expense_amount).toBe(99900);
   });
 
-  test('a term priced by totalCost is never rewritten', async () => {
+  test('a term priced by totalCost is never rewritten, even with a monthlyCost', async () => {
     const v1 = await seedVehicle('Honda');
-    const { termId } = await createPolicy([v1], 1300);
+    const res = await ctx.authed('POST', '/api/v1/insurance', {
+      company: 'Acme Mutual',
+      terms: [
+        {
+          startDate: YEAR_START,
+          endDate: YEAR_END,
+          totalCost: 1300,
+          monthlyCost: 100,
+          vehicleCoverage: { vehicleIds: [v1] },
+        },
+      ],
+    });
+    const body = await json<DataEnvelope<PolicyRow>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(201);
+    const termId = body.data.terms[0].id;
 
     expect(await recalculateOvercountedMonthlyPremiums()).toBe(0);
     expect(autoExpensesForTerm(termId)[0]?.expense_amount).toBe(130000);
+  });
+
+  test('a split whose rows no longer add up to the group total is kept', async () => {
+    const v1 = await seedVehicle('Honda');
+    const v2 = await seedVehicle('Toyota');
+    const { termId } = await createMonthlyPolicy([v1, v2], 100, YEAR_START, YEAR_END);
+    writeOvercountedPremium(termId, [65000, 65000]);
+    const [edited] = autoExpensesForTerm(termId);
+    ctx.sqlite
+      .query('UPDATE expenses SET expense_amount = 50000 WHERE id = ?')
+      .run(edited?.id ?? '');
+
+    expect(await recalculateOvercountedMonthlyPremiums()).toBe(0);
+    expect(
+      autoExpensesForTerm(termId)
+        .map((r) => r.expense_amount)
+        .sort((a, b) => a - b)
+    ).toEqual([50000, 65000]);
   });
 });
 
