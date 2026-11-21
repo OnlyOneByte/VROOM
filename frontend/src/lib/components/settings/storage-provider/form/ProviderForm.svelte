@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		ArrowLeft,
@@ -370,22 +371,24 @@
 
 <FormLayout>
 	<div class="mb-6">
-		<button
-			type="button"
-			class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
-			onclick={navigateBack}
-		>
-			<ArrowLeft class="h-4 w-4" />
-			Back to Settings
-		</button>
-		<h1 class="text-2xl font-bold tracking-tight">
-			{isEditMode ? 'Edit Provider' : 'Add Storage Provider'}
-		</h1>
-		<p class="text-muted-foreground">
-			{isEditMode
+		<PageHeader
+			title={isEditMode ? 'Edit Provider' : 'Add Storage Provider'}
+			description={isEditMode
 				? 'Update your storage provider configuration'
 				: 'Connect a new storage provider for your photos and backups'}
-		</p>
+		>
+			{#snippet back()}
+				<Button
+					variant="ghost"
+					size="icon-lg"
+					class="shrink-0"
+					aria-label="Back to Settings"
+					onclick={navigateBack}
+				>
+					<ArrowLeft class="size-5" />
+				</Button>
+			{/snippet}
+		</PageHeader>
 	</div>
 
 	<div class="space-y-6 pb-32 sm:pb-24">

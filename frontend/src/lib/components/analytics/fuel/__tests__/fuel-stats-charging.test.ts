@@ -64,6 +64,16 @@ describe('FuelStatsTab charging series', () => {
 		expect(screen.queryByText('Fill-up Details')).toBeNull();
 	});
 
+	test('an EV-only fleet does not get empty gas-only charts', () => {
+		render(FuelStatsTab, { fuelStats: stats({ charging }), fuelAdvanced: advanced });
+		expect(screen.getByText('Charging Price')).toBeTruthy();
+		expect(screen.queryByText('Gas Price on Fill-up')).toBeNull();
+		expect(screen.queryByText('Fill-up Cost by Vehicle')).toBeNull();
+		expect(screen.queryByText('Fill-up Patterns by Day of Week')).toBeNull();
+		expect(screen.queryByText('Fuel Consumption')).toBeNull();
+		expect(screen.getByText('Total Odometer')).toBeTruthy();
+	});
+
 	test('a plug-in hybrid fleet sees both the gas and the charging cards', () => {
 		render(FuelStatsTab, {
 			fuelStats: stats({
@@ -74,6 +84,8 @@ describe('FuelStatsTab charging series', () => {
 		});
 		expect(screen.getByText('Fill-ups')).toBeTruthy();
 		expect(screen.getByText('Charging Sessions')).toBeTruthy();
+		expect(screen.getByText('Gas Price on Fill-up')).toBeTruthy();
+		expect(screen.getByText('Charging Price')).toBeTruthy();
 	});
 
 	test('a gas-only fleet shows no charging cards', () => {

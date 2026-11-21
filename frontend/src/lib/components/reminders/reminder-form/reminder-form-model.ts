@@ -95,6 +95,13 @@ export function draftFromReminder(reminder: ReminderWithVehicles): ReminderDraft
 	};
 }
 
+export const FUEL_SPLIT_ERROR =
+	'Fuel can’t be split across vehicles. Pick another category, or select one vehicle.';
+
+export function isFuelAllowed(draft: ReminderDraft): boolean {
+	return draft.selectedVehicleIds.length < 2;
+}
+
 export function hasTimeTrigger(mode: TriggerMode): boolean {
 	return mode === 'time' || mode === 'both';
 }

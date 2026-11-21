@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { VEHICLE_CAMRY, addSessionCookie, mockApi } from './support/mock-api';
+import { E2E_USER, VEHICLE_CAMRY, addSessionCookie, mockApi } from './support/mock-api';
 
 const NEXT_ODOMETER = '46000';
 
@@ -122,10 +122,11 @@ test.describe('Expense form', () => {
 
 		const readOutbox = () =>
 			page.evaluate(
-				() =>
-					JSON.parse(localStorage.getItem('vroom_offline_expenses') ?? '[]') as Array<
+				userId =>
+					JSON.parse(localStorage.getItem(`vroom_offline_expenses:${userId}`) ?? '[]') as Array<
 						Record<string, unknown>
-					>
+					>,
+				E2E_USER.id
 			);
 
 		const queued = await readOutbox();

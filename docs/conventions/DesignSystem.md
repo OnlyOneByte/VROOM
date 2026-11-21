@@ -57,11 +57,11 @@ Notes:
   uses `text-success` / `text-warning` / `text-destructive`. `chart-5` is the one exception
   still used for words on a few screens, so it is also gated as text at AA on `background` and
   `card`; new status text uses `text-warning` instead.
-- In every light theme these tinted text pairs are gated at AA: `text-primary` on
-  `bg-primary/10` (the active nav item, chips, avatars) and `text-chart-5` on `bg-chart-5/10` over
-  `background` and `card`, and `text-warning` on `bg-warning/10` over `card` only. The axe e2e
-  scans cover the `A11Y_ROUTES` pages in `e2e/pwa.spec.ts` in the default light theme, and every
-  other theme's dashboard in light and dark mode.
+- In every theme and both modes these tinted text pairs are gated at AA over `background` and
+  `card`: `text-primary` on `bg-primary/10` (the active nav item, chips, avatars),
+  `text-warning` on `bg-warning/10` and `text-chart-5` on `bg-chart-5/10`. The axe e2e scans
+  cover the `A11Y_ROUTES` pages in `e2e/pwa.spec.ts` in the default light theme, the default
+  theme's dashboard in dark mode, and every other theme's dashboard in light and dark mode.
 - Chart colors come from `utils/chart-colors`: series `CHART_COLORS[i % CHART_COLORS.length]`
   (8 colors), category `getCategoryChartColor` (badges use `getCategoryBadgeClasses` from
   `utils/expense-helpers`; both derive from the one `CATEGORY_COLOR_TOKENS` assignment), chart
@@ -96,7 +96,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 ### App-level — `#lib/components/common/*` (direct `.svelte` imports)
 | Need | Import | Props |
 |---|---|---|
-| Page title + actions | `common/page-header.svelte` | `title`, `description?`, `actions?` (Snippet) |
+| Page title + actions | `common/page-header.svelte` | `title`, `description?` (string or Snippet), `back?` (Snippet: a back button, rendered before the title), `actions?` (Snippet). The page's only `<h1>`; detail and form pages pass `back` instead of hand-rolling a title row |
 | Empty state | `common/empty-state.svelte` | `icon?`, `title`, `description`, `action?` (all Snippets) |
 | Destructive confirm | `common/ConfirmDialog.svelte` | `bind:open`, `title`, `description`, `onConfirm` (may be async), `destructive?` — native `confirm()`/`alert()` are banned (`no-native-dialogs.test.ts`) |
 | Pagination | `common/pagination-controls.svelte` | `currentOffset`, `pageSize`, `totalCount`, `isLoading?`, `onPageChange` |

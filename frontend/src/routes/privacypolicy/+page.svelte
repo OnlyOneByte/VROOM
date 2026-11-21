@@ -20,7 +20,7 @@
 		<h1 class="text-4xl font-bold text-foreground mb-2">Privacy Policy</h1>
 		<p class="text-muted-foreground mb-10">Last updated: March 2026</p>
 
-		<div class="space-y-8 text-foreground/90 leading-relaxed">
+		<div class="space-y-8 text-foreground leading-relaxed">
 			<section class="space-y-3">
 				<h2 class="text-xl font-semibold text-foreground">Overview</h2>
 				<p>
@@ -38,13 +38,13 @@
 			<section class="space-y-3">
 				<h2 class="text-xl font-semibold text-foreground">Data We Collect</h2>
 				<p>When you sign in with Google, we receive and store:</p>
-				<ul class="list-disc pl-6 space-y-1 text-foreground/80">
+				<ul class="list-disc pl-6 space-y-1 text-foreground">
 					<li>Your Google account email address</li>
 					<li>Your display name</li>
 					<li>Your Google account ID (for authentication)</li>
 				</ul>
 				<p>When you use the Service, you may provide:</p>
-				<ul class="list-disc pl-6 space-y-1 text-foreground/80">
+				<ul class="list-disc pl-6 space-y-1 text-foreground">
 					<li>Vehicle information (make, model, year, VIN, license plate)</li>
 					<li>Expense records (fuel, maintenance, insurance, financing)</li>
 					<li>Odometer readings</li>
@@ -72,7 +72,7 @@
 			<section class="space-y-3">
 				<h2 class="text-xl font-semibold text-foreground">Google API Usage</h2>
 				<p>The Service uses the following Google API scopes:</p>
-				<ul class="list-disc pl-6 space-y-1 text-foreground/80">
+				<ul class="list-disc pl-6 space-y-1 text-foreground">
 					<li>Drive file access — to create and manage backup files and photos in your Drive</li>
 					<li>Drive app data — to store configuration in your Drive</li>
 					<li>Drive install — to connect the app to your Drive</li>
@@ -109,7 +109,7 @@
 			<section class="space-y-3">
 				<h2 class="text-xl font-semibold text-foreground">Third-Party Services</h2>
 				<p>The Service interacts with the following third-party services:</p>
-				<ul class="list-disc pl-6 space-y-1 text-foreground/80">
+				<ul class="list-disc pl-6 space-y-1 text-foreground">
 					<li>Google OAuth — for authentication</li>
 					<li>Google Drive API — for backup and photo storage (optional)</li>
 					<li>Google Sheets API — for data mirroring (optional)</li>
@@ -127,7 +127,7 @@
 					what data is collected and how it is handled. The source code is available on
 					<a
 						href="https://github.com/OnlyOneByte/vroom"
-						class="text-primary underline underline-offset-4 hover:text-primary/80"
+						class="text-primary underline underline-offset-4 hover:decoration-2"
 						target="_blank"
 						rel="noopener noreferrer">GitHub</a
 					>.
@@ -150,7 +150,7 @@
 					an issue on the
 					<a
 						href="https://github.com/OnlyOneByte/vroom"
-						class="text-primary underline underline-offset-4 hover:text-primary/80"
+						class="text-primary underline underline-offset-4 hover:decoration-2"
 						target="_blank"
 						rel="noopener noreferrer">GitHub repository</a
 					>
