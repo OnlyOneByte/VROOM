@@ -1,10 +1,27 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, notExists, or, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
-import { type NewPhoto, type Photo, photos } from '../../db/schema';
+import {
+  expenses,
+  insuranceClaims,
+  insurancePolicies,
+  type NewPhoto,
+  odometerEntries,
+  type Photo,
+  photos,
+  vehicles,
+} from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { chunk } from '../../utils/chunk';
 import type { PaginatedResult } from '../../utils/pagination';
+
+export const PHOTO_ENTITY_TABLES = {
+  vehicle: vehicles,
+  expense: expenses,
+  odometer_entry: odometerEntries,
+  insurance_policy: insurancePolicies,
+  insurance_claim: insuranceClaims,
+} as const;
 
 export class PhotoRepository {
   constructor(private db: AppDatabase) {}
@@ -19,6 +36,19 @@ export class PhotoRepository {
       .from(photos)
       .where(and(...conditions))
       .orderBy(asc(photos.createdAt));
+  }
+
+  async findOrphanedByUser(userId: string): Promise<Photo[]> {
+    const entityGone = Object.entries(PHOTO_ENTITY_TABLES).map(([entityType, table]) =>
+      and(
+        eq(photos.entityType, entityType),
+        notExists(this.db.select({ id: table.id }).from(table).where(eq(table.id, photos.entityId)))
+      )
+    );
+    return this.db
+      .select()
+      .from(photos)
+      .where(and(eq(photos.userId, userId), or(...entityGone)));
   }
 
   async findByEntity(entityType: string, entityId: string): Promise<Photo[]> {

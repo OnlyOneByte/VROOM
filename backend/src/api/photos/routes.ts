@@ -6,6 +6,7 @@ import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { parseUploadedPhoto, photoThumbnailResponse } from './helpers';
 import {
+  countOrphanedPhotos,
   deletePhotoForEntity,
   getPhotoServeMetadataForEntity,
   getPhotoThumbnailForEntity,
@@ -30,6 +31,12 @@ routes.get(
     return c.json({ success: true, data: grouped });
   }
 );
+
+routes.get('/orphans', async (c) => {
+  const user = c.get('user');
+  const count = await countOrphanedPhotos(user.id);
+  return c.json({ success: true, data: { count } });
+});
 
 routes.get('/:entityType/:entityId', zValidator('query', commonSchemas.pagination), async (c) => {
   const entityType = c.req.param('entityType');
