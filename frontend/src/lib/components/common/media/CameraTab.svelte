@@ -75,9 +75,10 @@
 			if (thisStartId !== cameraStartId) return;
 
 			if (err instanceof DOMException && err.name === 'NotAllowedError') {
-				cameraError = 'Camera access was denied. Please allow camera permissions and try again.';
+				cameraError =
+					'Camera access was denied. Allow it for this site in your browser settings, then try again.';
 			} else if (err instanceof DOMException && err.name === 'NotFoundError') {
-				cameraError = 'No camera found on this device.';
+				cameraError = 'No camera found on this device. Upload a photo instead.';
 			} else if (
 				err instanceof DOMException &&
 				(err.name === 'OverconstrainedError' || err.name === 'NotReadableError')
