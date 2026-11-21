@@ -15,24 +15,27 @@
 	} from '#lib/utils/units.ts';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
 	import { COMMON_MESSAGES, EXPENSE_MESSAGES } from '#lib/constants/messages.ts';
-	import type { VehicleStats } from '#lib/types/index.ts';
+	import type { UnitPreferences, VehicleStats } from '#lib/types/index.ts';
 
 	interface Props {
 		vehicleId: string;
 		vehicleStatsData: VehicleStats | null;
 		isLoadingStats: boolean;
 		selectedStatsPeriod: string;
+		unitPreferences?: UnitPreferences | undefined;
 	}
 
-	let { vehicleId, vehicleStatsData, isLoadingStats, selectedStatsPeriod }: Props = $props();
+	let { vehicleId, vehicleStatsData, isLoadingStats, selectedStatsPeriod, unitPreferences }: Props =
+		$props();
 
 	let hasFuelData = $derived(
 		vehicleStatsData &&
 			(vehicleStatsData.fuelExpenseCount > 0 || vehicleStatsData.chargeExpenseCount > 0)
 	);
-	let distanceUnit = $derived(settingsStore.unitPreferences.distanceUnit);
-	let volumeUnit = $derived(settingsStore.unitPreferences.volumeUnit);
-	let chargeUnit = $derived(settingsStore.unitPreferences.chargeUnit);
+	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
+	let distanceUnit = $derived(units.distanceUnit);
+	let volumeUnit = $derived(units.volumeUnit);
+	let chargeUnit = $derived(units.chargeUnit);
 	let isKilometers = $derived(distanceUnit === 'kilometers');
 
 	let statItems = $derived.by(() => {
