@@ -10,6 +10,7 @@ import type { CategorySetting, PhotoCategory, StorageConfig } from '../../types'
 import { DEFAULT_STORAGE_CONFIG, PHOTO_CATEGORIES } from '../../types';
 import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
+import { assertSafeOutboundUrl } from '../../utils/outbound-url';
 import { consumePending, getPendingEmail } from '../../utils/pending-credentials';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { photoRefRepository } from '../photos/photo-ref-repository';
@@ -203,6 +204,7 @@ function validateStorageProviderConfig(
     if (!c.endpoint || !c.bucket || !c.region) {
       throw new ValidationError('S3 config must include endpoint, bucket, and region');
     }
+    assertSafeOutboundUrl(String(c.endpoint), 'S3 endpoint');
   }
 }
 
@@ -222,6 +224,7 @@ function validateModelConfigShape(
   ) {
     throw new ValidationError(`Self-hosted or OpenAI-compatible ${label} requires a base URL`);
   }
+  if (typeof cfg.baseUrl === 'string') assertSafeOutboundUrl(cfg.baseUrl, `${label} base URL`);
 }
 
 function validateModelCredentials(

@@ -5,6 +5,9 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { allowPrivateProviderEndpoints } from '../../../test-helpers/outbound';
+
+allowPrivateProviderEndpoints();
 
 let ctx: TestApp;
 
