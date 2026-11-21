@@ -86,7 +86,7 @@ describe('ShareVehicleDialog "People with access"', () => {
 			props: { open: true, vehicleId: 'v1', vehicleName: 'Daily Driver' }
 		});
 
-		expect(await screen.findByText('Pending invitation')).toBeInTheDocument();
+		expect(await screen.findByText('Invited')).toBeInTheDocument();
 		expect(screen.getByText(rowDetail('pending · sent Mar 4, 2026'))).toBeInTheDocument();
 		expect(
 			screen.getByRole('button', { name: 'Revoke access for the invitation sent Mar 4, 2026' })

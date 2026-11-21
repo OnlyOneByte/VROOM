@@ -181,7 +181,7 @@
 						<div class="flex items-center justify-between gap-3 px-3 py-2.5">
 							<div class="min-w-0">
 								<p class="truncate text-sm font-medium">
-									{personName(share) ?? 'Pending invitation'}
+									{personName(share) ?? 'Invited'}
 								</p>
 								<p class="truncate text-xs text-muted-foreground">
 									<span class="capitalize">{share.status}</span>{share.sharedWithEmail
