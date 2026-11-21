@@ -33,28 +33,35 @@ export interface OfflineExpense {
 	synced: boolean;
 	needsAttention?: boolean;
 	attentionReason?: string;
+	serverId?: string;
 	version?: string;
 }
 
 export function offlineExpenseToBackend(
-	expense: OfflineExpense
+	expense: OfflineExpense,
+	options: { clearEmptyFields?: boolean } = {}
 ): ReturnType<typeof toBackendExpense> {
-	return toBackendExpense({
-		vehicleId: expense.vehicleId,
-		tags: expense.tags,
-		category: expense.category as ExpenseCategory,
-		amount: expense.amount,
-		date: expense.date,
-		mileage: expense.mileage,
-		volume: expense.volume,
-		charge: expense.charge,
-		fuelType: expense.fuelType,
-		missedFillup: expense.missedFillup,
-		description: expense.description,
-		location: expense.location,
-		sourceType: expense.sourceType,
-		sourceId: expense.sourceId
-	});
+	return toBackendExpense(
+		{
+			vehicleId: expense.vehicleId,
+			tags: expense.tags,
+			category: expense.category as ExpenseCategory,
+			amount: expense.amount,
+			date: expense.date,
+			mileage: expense.mileage,
+			volume: expense.volume,
+			charge: expense.charge,
+			fuelType: expense.fuelType,
+			missedFillup: options.clearEmptyFields
+				? (expense.missedFillup ?? false)
+				: expense.missedFillup,
+			description: expense.description,
+			location: expense.location,
+			sourceType: expense.sourceType,
+			sourceId: expense.sourceId
+		},
+		{ isEdit: options.clearEmptyFields ?? false }
+	);
 }
 
 export function isIncompleteFuelExpense(expense: OfflineExpense): boolean {
@@ -246,7 +253,7 @@ export function getNeedsAttentionExpenses(): OfflineExpense[] {
 	return loadOfflineExpenses().filter(expense => !expense.synced && expense.needsAttention);
 }
 
-export function markExpenseNeedsAttention(id: string, reason?: string): void {
+export function markExpenseNeedsAttention(id: string, reason?: string, serverId?: string): void {
 	const currentExpenses = loadOfflineExpenses();
 
 	const updatedExpenses = currentExpenses.map(expense =>
@@ -254,7 +261,8 @@ export function markExpenseNeedsAttention(id: string, reason?: string): void {
 			? {
 					...expense,
 					needsAttention: true,
-					...(reason !== undefined && { attentionReason: reason })
+					...(reason !== undefined && { attentionReason: reason }),
+					...(serverId !== undefined && { serverId })
 				}
 			: expense
 	);
