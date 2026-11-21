@@ -3,7 +3,7 @@ import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { expenses as expensesTable, type NewExpense } from '../../db/schema';
+import { type Expense, expenses as expensesTable, type NewExpense } from '../../db/schema';
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_DESCRIPTIONS,
@@ -139,6 +139,36 @@ const updateExpenseSchema = createExpenseSchemaBase
       path: ['sourceType'],
     }
   );
+
+const INSURANCE_EDITABLE_FIELDS = new Set(['description', 'tags']);
+const SPLIT_LEG_LOCKED_FIELDS = new Set(['expenseAmount', 'vehicleId']);
+
+function changedFields(update: Record<string, unknown>, existing: Expense): string[] {
+  return Object.entries(update)
+    .filter(
+      ([field, value]) =>
+        value !== undefined &&
+        JSON.stringify(value ?? null) !== JSON.stringify(existing[field as keyof Expense] ?? null)
+    )
+    .map(([field]) => field);
+}
+
+function assertSingleExpenseEditAllowed(update: Record<string, unknown>, existing: Expense): void {
+  const changed = changedFields(update, existing);
+  if (
+    existing.sourceType === 'insurance_term' &&
+    changed.some((field) => !INSURANCE_EDITABLE_FIELDS.has(field))
+  ) {
+    throw new ValidationError(
+      'This expense is managed by an insurance term. Edit the term to change it; only the description and tags can be edited here.'
+    );
+  }
+  if (existing.groupId && changed.some((field) => SPLIT_LEG_LOCKED_FIELDS.has(field))) {
+    throw new ValidationError(
+      'This expense is part of a split. Change its amount or vehicles by editing the whole split.'
+    );
+  }
+}
 
 async function assertFinancingSourceValid(
   sourceType: string | undefined,
@@ -680,6 +710,7 @@ routes.put(
     const existingExpense = await expenseRepository.findById(id);
     if (!existingExpense) throw new NotFoundError('Expense');
     await requireVehicleWrite(existingExpense.vehicleId, user.id);
+    assertSingleExpenseEditAllowed(updateData, existingExpense);
 
     if (updateData.vehicleId && updateData.vehicleId !== existingExpense.vehicleId) {
       await requireVehicleWrite(updateData.vehicleId, user.id);
@@ -732,6 +763,11 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const existingExpense = await expenseRepository.findById(id);
   if (!existingExpense) throw new NotFoundError('Expense');
   await requireVehicleWrite(existingExpense.vehicleId, user.id);
+  if (existingExpense.groupId) {
+    throw new ValidationError(
+      "This expense is part of a split. Delete the whole split instead of one vehicle's share."
+    );
+  }
 
   await deleteAllPhotosForEntity('expense', id, existingExpense.userId);
 
