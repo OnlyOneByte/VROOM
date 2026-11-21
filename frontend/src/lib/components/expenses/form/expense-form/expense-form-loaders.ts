@@ -2,6 +2,7 @@ import { expenseApi } from '#lib/services/expense-api.ts';
 import { vehicleApi } from '#lib/services/vehicle-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { gotoDynamic } from '#lib/utils/navigation.ts';
+import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
 import { toDateInputValue } from '#lib/utils/formatters.ts';
 import { parsePreselectedTags } from './expense-navigation';
 import { splitStateFromGroup } from './split-config';
@@ -15,15 +16,21 @@ export interface PreselectedValues {
 	tags: string | null;
 }
 
+function errorMessage(error: unknown, fallback: string): string {
+	return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export async function loadVehicles(state: ExpenseFormState): Promise<void> {
 	try {
 		state.vehicles = await vehicleApi.getVehicles();
+		state.vehiclesError = null;
 		if (!state.isEditMode && state.vehicles.length > 0 && !state.formData.vehicleId) {
 			const firstVehicle = state.vehicles[0];
 			if (firstVehicle) state.formData.vehicleId = firstVehicle.id;
 		}
 	} catch (error) {
-		if (import.meta.env.DEV) console.error('Failed to load vehicles:', error);
+		state.vehiclesError = errorMessage(error, 'Failed to load vehicles');
+		handleErrorWithNotification(error, 'Failed to load vehicles');
 	}
 }
 
@@ -111,38 +118,65 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 	}
 }
 
-export async function loadVehicle(state: ExpenseFormState): Promise<void> {
+function toError(error: unknown): Error {
+	return error instanceof Error ? error : new Error(String(error));
+}
+
+export async function loadVehicle(state: ExpenseFormState): Promise<Error | null> {
+	const isCurrent = state.nextVehicleRequest();
 	try {
-		state.vehicle = await vehicleApi.getVehicle(state.formData.vehicleId);
+		const vehicle = await vehicleApi.getVehicle(state.formData.vehicleId);
+		if (isCurrent()) state.vehicle = vehicle;
+		return null;
 	} catch (error) {
-		if (import.meta.env.DEV) console.error('Error loading vehicle:', error);
+		if (!isCurrent()) return null;
+		state.vehicle = null;
+		return toError(error);
 	}
 }
 
-export async function loadLastFuelExpense(state: ExpenseFormState): Promise<void> {
+export async function loadLastFuelExpense(state: ExpenseFormState): Promise<Error | null> {
+	const isCurrent = state.nextLastFuelRequest();
 	try {
 		const result = await expenseApi.getExpensesByVehicle(state.formData.vehicleId, {
 			limit: 2,
 			category: 'fuel'
 		});
+		if (!isCurrent()) return null;
 		const fuelExpenses = result.data.filter((e: { id: string }) => e.id !== state.ctx.expenseId);
 		state.lastFuelExpense = fuelExpenses[0] ?? null;
+		return null;
 	} catch (error) {
-		if (import.meta.env.DEV) console.error('Error loading last fuel expense:', error);
+		if (!isCurrent()) return null;
+		state.lastFuelExpense = null;
+		return toError(error);
 	}
 }
 
-export async function loadAllVehicleExpenses(state: ExpenseFormState): Promise<void> {
+export async function loadAllVehicleExpenses(state: ExpenseFormState): Promise<Error | null> {
+	const isCurrent = state.nextHistoryRequest();
 	try {
 		const result = await expenseApi.getExpensesByVehicle(state.formData.vehicleId, { limit: 100 });
-		state.allVehicleExpenses = result.data;
+		if (isCurrent()) state.allVehicleExpenses = result.data;
+		return null;
 	} catch (error) {
-		if (import.meta.env.DEV) console.error('Error loading vehicle expenses:', error);
+		if (!isCurrent()) return null;
+		state.allVehicleExpenses = [];
+		return toError(error);
 	}
 }
 
 export async function loadVehicleContext(state: ExpenseFormState): Promise<void> {
-	await loadVehicle(state);
-	await loadLastFuelExpense(state);
-	await loadAllVehicleExpenses(state);
+	const isCurrent = state.nextContextRequest();
+	const failures = await Promise.all([
+		loadVehicle(state),
+		loadLastFuelExpense(state),
+		loadAllVehicleExpenses(state)
+	]);
+	const failure = failures.find(error => error !== null);
+	if (!isCurrent()) return;
+	state.vehicleError = failure
+		? errorMessage(failure, "Failed to load this vehicle's details")
+		: null;
+	if (failure) handleErrorWithNotification(failure, "Failed to load this vehicle's details");
 }
