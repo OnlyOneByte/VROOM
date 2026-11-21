@@ -21,6 +21,7 @@ vi.mock('#lib/components/vehicles/OdometerTab.svelte', () => ({ default: () => {
 vi.mock('#lib/components/vehicles/ShareVehicleDialog.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/vehicles/FuelEfficiencyStatsCard.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/common/MediaCaptureDialog.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/insurance/InsuranceTab.svelte', () => ({ default: () => {} }));
 
 const getExpensesByVehicle = vi.fn();
 const getExpenseSummary = vi.fn();
