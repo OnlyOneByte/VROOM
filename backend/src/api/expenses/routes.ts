@@ -141,14 +141,19 @@ const updateExpenseSchema = createExpenseSchemaBase
   );
 
 const INSURANCE_EDITABLE_FIELDS = new Set(['description', 'tags']);
-const SPLIT_LEG_LOCKED_FIELDS = new Set(['expenseAmount', 'vehicleId']);
+const SPLIT_LEG_LOCKED_FIELDS = new Set(['expenseAmount', 'vehicleId', 'date', 'category']);
+
+function comparableValue(value: unknown): string {
+  if (value instanceof Date) return String(Math.floor(value.getTime() / 1000));
+  return JSON.stringify(value ?? null);
+}
 
 function changedFields(update: Record<string, unknown>, existing: Expense): string[] {
   return Object.entries(update)
     .filter(
       ([field, value]) =>
         value !== undefined &&
-        JSON.stringify(value ?? null) !== JSON.stringify(existing[field as keyof Expense] ?? null)
+        comparableValue(value) !== comparableValue(existing[field as keyof Expense])
     )
     .map(([field]) => field);
 }
@@ -165,7 +170,7 @@ function assertSingleExpenseEditAllowed(update: Record<string, unknown>, existin
   }
   if (existing.groupId && changed.some((field) => SPLIT_LEG_LOCKED_FIELDS.has(field))) {
     throw new ValidationError(
-      'This expense is part of a split. Change its amount or vehicles by editing the whole split.'
+      'This expense is part of a split. Change its amount, vehicles, date or category by editing the whole split.'
     );
   }
 }

@@ -119,6 +119,14 @@ function refineDateRange(data: ReminderRefineInput, ctx: z.RefinementCtx) {
 function refineSplitConfig(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   if (!data.expenseSplitConfig) return;
 
+  if (data.expenseCategory === 'fuel') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Fuel expenses cannot be split. Log the fill-up on one vehicle.',
+      path: ['expenseCategory'],
+    });
+  }
+
   if (data.vehicleIds) {
     const provided = new Set(data.vehicleIds);
     const split = new Set(splitConfigVehicleIds(data.expenseSplitConfig));
