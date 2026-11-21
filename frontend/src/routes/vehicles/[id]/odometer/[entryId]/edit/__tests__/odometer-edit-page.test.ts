@@ -76,7 +76,7 @@ function dateInput(): HTMLInputElement {
 }
 
 function noteInput(): HTMLTextAreaElement {
-	return screen.getByLabelText('Note (optional)') as HTMLTextAreaElement;
+	return screen.getByLabelText('Note (Optional)') as HTMLTextAreaElement;
 }
 
 async function save(): Promise<void> {
@@ -161,13 +161,40 @@ describe('edit odometer reading load states', () => {
 });
 
 describe('edit odometer reading lower-than-latest warning', () => {
+	test('the warning is announced through a status region that is always present', async () => {
+		getEntries.mockResolvedValue(latest([entry({ id: 'newest', odometer: 60000 })]));
+		mount();
+		await settle();
+
+		expect(screen.getByRole('status').querySelector('.sr-only')).toHaveTextContent(
+			'This reading is lower than the latest recorded value of 60,000. Are you sure?'
+		);
+
+		await fireEvent.input(odometerInput(), { target: { value: '61000' } });
+		expect(screen.getByRole('status')).toBeEmptyDOMElement();
+	});
+
+	test('editing the reading clears its error', async () => {
+		mount();
+		await settle();
+
+		await fireEvent.input(odometerInput(), { target: { value: '' } });
+		await save();
+		expect(odometerInput()).toHaveAttribute('aria-invalid', 'true');
+
+		await fireEvent.input(odometerInput(), { target: { value: '59000' } });
+
+		expect(odometerInput()).toHaveAttribute('aria-invalid', 'false');
+		expect(screen.queryByText('Odometer reading is required')).toBeNull();
+	});
+
 	test('editing the latest entry itself never warns', async () => {
 		mount();
 		await settle();
 
 		await fireEvent.input(odometerInput(), { target: { value: '100' } });
 
-		expect(screen.queryByText(/is lower than the latest recorded/)).toBeNull();
+		expect(screen.queryByText(/reading \([\d,]+\) is lower than the latest recorded/)).toBeNull();
 	});
 
 	test('warns when an older entry is edited below the newest reading', async () => {
@@ -175,13 +202,17 @@ describe('edit odometer reading lower-than-latest warning', () => {
 		mount();
 		await settle();
 
-		expect(screen.queryByText(/is lower than the latest recorded/)).not.toBeNull();
+		expect(
+			screen.queryByText(/reading \([\d,]+\) is lower than the latest recorded/)
+		).not.toBeNull();
 
 		await fireEvent.input(odometerInput(), { target: { value: '61000' } });
-		expect(screen.queryByText(/is lower than the latest recorded/)).toBeNull();
+		expect(screen.queryByText(/reading \([\d,]+\) is lower than the latest recorded/)).toBeNull();
 
 		await fireEvent.input(odometerInput(), { target: { value: '59000' } });
-		expect(screen.getByText(/is lower than the latest recorded/)).toHaveTextContent(
+		expect(
+			screen.getByText(/reading \([\d,]+\) is lower than the latest recorded/)
+		).toHaveTextContent(
 			'This reading (59,000) is lower than the latest recorded value (60,000). Are you sure?'
 		);
 	});
@@ -219,9 +250,11 @@ describe('edit odometer reading validation', () => {
 		mount();
 		await settle();
 
-		expect(screen.queryByText(/is lower than the latest recorded/)).not.toBeNull();
+		expect(
+			screen.queryByText(/reading \([\d,]+\) is lower than the latest recorded/)
+		).not.toBeNull();
 		await fireEvent.input(odometerInput(), { target: { value: '' } });
-		expect(screen.queryByText(/is lower than the latest recorded/)).toBeNull();
+		expect(screen.queryByText(/reading \([\d,]+\) is lower than the latest recorded/)).toBeNull();
 	});
 
 	test('a negative reading is rejected and nothing is saved', async () => {
