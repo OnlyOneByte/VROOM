@@ -123,12 +123,14 @@ beforeEach(() => {
 	);
 });
 
+const LAZY_TAB_WAIT = { timeout: 4000 };
+
 async function renderExpensesTab() {
 	const screen = render(Page, { props: { data: { vehicleId: 'v1' } } });
-	const tab = await waitFor(() => screen.getByRole('tab', { name: 'Expenses' }));
+	const tab = await waitFor(() => screen.getByRole('tab', { name: 'Expenses' }), LAZY_TAB_WAIT);
 	await fireEvent.click(tab);
-	await waitFor(() => expect(getExpensesByVehicle).toHaveBeenCalled());
-	await screen.findByRole('textbox', { name: 'Search expenses' });
+	await waitFor(() => expect(getExpensesByVehicle).toHaveBeenCalled(), LAZY_TAB_WAIT);
+	await screen.findByRole('textbox', { name: 'Search expenses' }, LAZY_TAB_WAIT);
 	return screen;
 }
 

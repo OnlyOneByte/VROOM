@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Expense, Vehicle } from '#lib/types/index.ts';
 import { makeExpense, makeVehicle } from './expense-form-fixtures';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const { expenseApiMock, vehicleApiMock, addNotification } = vi.hoisted(() => ({
 	expenseApiMock: { getExpensesByVehicle: vi.fn() },
@@ -44,7 +49,7 @@ describe('expense form loader failures are reported', () => {
 		vehicleApiMock.getVehicles.mockRejectedValueOnce(new Error('offline'));
 		const state = createState();
 		await loadVehicles(state);
-		expect(state.vehiclesError).toBe('offline');
+		expect(state.vehiclesError).toBe('Offline.');
 		expect(addNotification).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'error',
@@ -63,12 +68,12 @@ describe('expense form loader failures are reported', () => {
 		state.vehicle = makeVehicle('v1');
 		state.allVehicleExpenses = [makeExpense('old')];
 		state.formData.vehicleId = 'v2';
-		vehicleApiMock.getVehicle.mockRejectedValueOnce(new Error('500'));
+		vehicleApiMock.getVehicle.mockRejectedValueOnce(new ApiError('Internal server error', 500));
 		expenseApiMock.getExpensesByVehicle.mockResolvedValue({ data: [] });
 		await loadVehicleContext(state);
 		expect(state.vehicle).toBeNull();
 		expect(state.allVehicleExpenses).toEqual([]);
-		expect(state.vehicleError).toBe('500');
+		expect(state.vehicleError).toBe(SERVER_FAILURE_MESSAGE);
 		expect(addNotification).toHaveBeenCalledTimes(1);
 	});
 
@@ -95,6 +100,22 @@ describe('expense form loader failures are reported', () => {
 		await loadVehicleContext(state);
 		expect(state.vehicleError).toBeNull();
 		expect(addNotification).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('a thrown non-Error value', () => {
+	test('reads as the generic sentence, never as [object Object]', async () => {
+		const state = createState();
+		state.formData.vehicleId = 'v1';
+		vehicleApiMock.getVehicle.mockRejectedValueOnce({ status: 'weird' });
+		expenseApiMock.getExpensesByVehicle.mockResolvedValue({ data: [] });
+		await loadVehicleContext(state);
+		expect(state.vehicleError).toBe(UNEXPECTED_FAILURE_MESSAGE);
+		const toast = addNotification.mock.calls[0]?.[0] as { message: string } | undefined;
+		expect(toast?.message).toBe(
+			`Failed to load this vehicle's details. ${UNEXPECTED_FAILURE_MESSAGE}`
+		);
+		expect(JSON.stringify(addNotification.mock.calls)).not.toContain('[object Object]');
 	});
 });
 
@@ -187,7 +208,7 @@ describe('switching vehicles keeps only the latest response', () => {
 		slowVehicle.resolve(makeVehicle('v1'));
 		await Promise.all([p1, p2]);
 		expect(state.vehicle?.id).toBe('v2');
-		expect(state.vehicleError).toBe('expenses down');
+		expect(state.vehicleError).toBe('Expenses down.');
 		expect(addNotification).toHaveBeenCalledTimes(1);
 	});
 });
