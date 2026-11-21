@@ -115,7 +115,7 @@
 	{/if}
 
 	<Tabs.Root bind:value={activeTab} class="space-y-4 md:space-y-6">
-		<Tabs.List class="grid w-full grid-cols-2 lg:grid-cols-4">
+		<Tabs.List class="grid w-full grid-cols-2 sm:h-auto lg:grid-cols-4">
 			<Tabs.Trigger value="fuel-stats">Fuel & Stats</Tabs.Trigger>
 			<Tabs.Trigger value="cross-vehicle">Cross-Vehicle</Tabs.Trigger>
 			<Tabs.Trigger value="per-vehicle">Per-Vehicle</Tabs.Trigger>
