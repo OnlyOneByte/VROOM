@@ -4,7 +4,15 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
-import { expenses, odometerEntries, trips, vehicles as vehiclesTable } from '../../db/schema';
+import {
+  expenses,
+  odometerEntries,
+  reminders,
+  reminderVehicles,
+  trips,
+  vehicleFinancing,
+  vehicles as vehiclesTable,
+} from '../../db/schema';
 import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
@@ -127,7 +135,7 @@ function changedUnits(existing: UnitPreferences, merged: UnitPreferences | undef
 
 async function vehicleHasMeasuredHistory(vehicleId: string): Promise<boolean> {
   const db = getDb();
-  const [expense, odometer, trip] = await Promise.all([
+  const [expense, odometer, trip, mileageReminder, leaseLimit] = await Promise.all([
     db
       .select({ id: expenses.id })
       .from(expenses)
@@ -146,8 +154,23 @@ async function vehicleHasMeasuredHistory(vehicleId: string): Promise<boolean> {
       .limit(1)
       .get(),
     db.select({ id: trips.id }).from(trips).where(eq(trips.vehicleId, vehicleId)).limit(1).get(),
+    db
+      .select({ id: reminders.id })
+      .from(reminders)
+      .innerJoin(reminderVehicles, eq(reminderVehicles.reminderId, reminders.id))
+      .where(and(eq(reminderVehicles.vehicleId, vehicleId), isNotNull(reminders.intervalMileage)))
+      .limit(1)
+      .get(),
+    db
+      .select({ id: vehicleFinancing.id })
+      .from(vehicleFinancing)
+      .where(
+        and(eq(vehicleFinancing.vehicleId, vehicleId), isNotNull(vehicleFinancing.mileageLimit))
+      )
+      .limit(1)
+      .get(),
   ]);
-  return Boolean(expense || odometer || trip);
+  return Boolean(expense || odometer || trip || mileageReminder || leaseLimit);
 }
 
 async function assertUnitChangeConfirmed(
