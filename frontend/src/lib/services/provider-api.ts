@@ -1,5 +1,12 @@
 import type { UserProviderInfo } from '#lib/types/index.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
 import { apiClient } from './api-client';
+
+export function photosOnlyOnProvider(error: unknown): number | null {
+	if (!(error instanceof ApiError) || error.statusCode !== 409) return null;
+	const count = error.details?.['photosOnlyHere'];
+	return typeof count === 'number' ? count : null;
+}
 
 interface CreateProviderData {
 	domain: string;
@@ -30,8 +37,8 @@ export const providerApi = {
 		return apiClient.put<UserProviderInfo>(`/api/v1/providers/${id}`, data);
 	},
 
-	async deleteProvider(id: string): Promise<void> {
-		await apiClient.delete(`/api/v1/providers/${id}`);
+	async deleteProvider(id: string, options: { force?: boolean } = {}): Promise<void> {
+		await apiClient.delete(`/api/v1/providers/${id}${options.force ? '?force=true' : ''}`);
 	},
 
 	async backfillProvider(id: string): Promise<{ created: number }> {
