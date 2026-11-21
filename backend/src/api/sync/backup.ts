@@ -596,15 +596,11 @@ export class BackupService {
     return errors;
   }
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: a flat fan-out of per-table FK validators (one spread each); the count is breadth, not nesting — splitting it would only obscure the one-validator-per-table structure
   private validateReferentialIntegrity(backup: ParsedBackupData): string[] {
     const userIds = new Set([backup.metadata.userId]);
     const vehicleIds = new Set(backup.vehicles.map((v) => String(v.id)));
     const policyIds = new Set(backup.insurance.map((i) => String(i.id)));
     const termIds = new Set((backup.insuranceTerms ?? []).map((t) => String(t.id)));
-    const expenseIds = new Set(backup.expenses.map((e) => String(e.id)));
-    const odometerIds = new Set((backup.odometer ?? []).map((o) => String(o.id)));
-    const claimIds = new Set((backup.insuranceClaims ?? []).map((c) => String(c.id)));
     const photoIds = new Set((backup.photos ?? []).map((p) => String(p.id)));
     const reminderIds = new Set((backup.reminders ?? []).map((r) => String(r.id)));
 
@@ -623,13 +619,7 @@ export class BackupService {
       ...this.validateVehicleFkRefs(backup.odometer ?? [], vehicleIds, 'Odometer entry'),
       ...this.validateVehicleFkRefs(backup.trips ?? [], vehicleIds, 'Trip'),
       ...this.validateShareRefs(backup.vehicleShares ?? [], vehicleIds, userIds),
-      ...this.validatePhotoRefs(backup.photos ?? [], {
-        vehicleIds,
-        expenseIds,
-        policyIds,
-        claimIds,
-        odometerIds,
-      }),
+      ...this.validatePhotoRefs(backup.photos ?? [], this.photoEntityIdsByType(backup)),
       ...this.validatePhotoRefEntries(backup.photoRefs ?? [], photoIds),
       ...this.validateReminderRefs(backup.reminders ?? [], userIds),
       ...this.validateReminderVehicleJunctionRefs(
@@ -804,25 +794,44 @@ export class BackupService {
     return errors;
   }
 
+  private photoEntityIdsByType(backup: ParsedBackupData): Record<string, Set<string>> {
+    const idsOf = (rows: Record<string, unknown>[] | undefined): Set<string> =>
+      new Set((rows ?? []).map((row) => String(row.id)));
+    return {
+      vehicle: idsOf(backup.vehicles),
+      expense: idsOf(backup.expenses),
+      insurance_policy: idsOf(backup.insurance),
+      insurance_claim: idsOf(backup.insuranceClaims),
+      odometer_entry: idsOf(backup.odometer),
+    };
+  }
+
+  dropOrphanPhotos(backup: ParsedBackupData): ParsedBackupData {
+    const entityIdsByType = this.photoEntityIdsByType(backup);
+    const orphanIds = new Set(
+      (backup.photos ?? [])
+        .filter((photo) => {
+          const ids = entityIdsByType[String(photo.entityType)];
+          return ids !== undefined && !ids.has(String(photo.entityId));
+        })
+        .map((photo) => String(photo.id))
+    );
+    if (orphanIds.size === 0) return backup;
+    logger.warn('Restore skipped photos whose entity is not in the backup', {
+      photos: orphanIds.size,
+    });
+    return {
+      ...backup,
+      photos: (backup.photos ?? []).filter((photo) => !orphanIds.has(String(photo.id))),
+      photoRefs: (backup.photoRefs ?? []).filter((ref) => !orphanIds.has(String(ref.photoId))),
+    };
+  }
+
   private validatePhotoRefs(
     photoList: Record<string, unknown>[],
-    entityIds: {
-      vehicleIds: Set<string>;
-      expenseIds: Set<string>;
-      policyIds: Set<string>;
-      claimIds: Set<string>;
-      odometerIds: Set<string>;
-    }
+    entityTypeToIds: Record<string, Set<string>>
   ): string[] {
     const errors: string[] = [];
-    const entityTypeToIds: Record<string, Set<string>> = {
-      vehicle: entityIds.vehicleIds,
-      expense: entityIds.expenseIds,
-      insurance_policy: entityIds.policyIds,
-      insurance_claim: entityIds.claimIds,
-      odometer_entry: entityIds.odometerIds,
-    };
-
     for (const photo of photoList) {
       const entityType = String(photo.entityType);
       const entityId = String(photo.entityId);

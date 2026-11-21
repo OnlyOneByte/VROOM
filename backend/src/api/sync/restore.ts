@@ -108,7 +108,7 @@ class RestoreService {
     file: Buffer,
     mode: RestoreMode
   ): Promise<RestoreResponse> {
-    const parsedBackup = await this.parseOrReject(file);
+    const parsedBackup = backupService.dropOrphanPhotos(await this.parseOrReject(file));
 
     const userIdValidation = backupService.validateUserId(parsedBackup.metadata.userId, userId);
     if (!userIdValidation.valid) {
@@ -212,7 +212,7 @@ class RestoreService {
     const sheetsService = await createSheetsServiceForProvider(providerId, userId);
     const sheet = await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
 
-    const sheetData: ParsedBackupData = {
+    const sheetData: ParsedBackupData = backupService.dropOrphanPhotos({
       ...sheet,
       metadata: { ...sheet.metadata, version: CONFIG.backup.currentVersion },
       vehicles: coerceRows(sheet.vehicles, TABLE_SCHEMA_MAP.vehicles),
@@ -238,7 +238,7 @@ class RestoreService {
       ),
       trips: coerceRows(sheet.trips, TABLE_SCHEMA_MAP.trips),
       vehicleShares: coerceRows(sheet.vehicleShares, TABLE_SCHEMA_MAP.vehicleShares),
-    };
+    });
 
     if (sheetData.metadata.userId !== userId) {
       throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Spreadsheet belongs to different user');
