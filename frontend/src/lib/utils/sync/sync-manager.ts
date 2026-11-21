@@ -25,7 +25,7 @@ import {
 	savePendingPhotos,
 	type OfflineExpense
 } from '../offline-storage';
-import { extractErrorMessage } from '#lib/utils/error-handling.ts';
+import { ApiError, extractErrorMessage } from '#lib/utils/error-handling.ts';
 import { classifySyncFailure, type SyncFailureKind } from './classify-failure';
 import { apiClient } from '#lib/services/api-client.ts';
 import { expenseApi } from '#lib/services/expense-api.ts';
@@ -357,6 +357,15 @@ class SyncManager {
 		});
 	}
 
+	private async keepLocalCopy(expense: OfflineExpense, serverId: string): Promise<string> {
+		try {
+			return (await this.overwriteServerCopy(expense, serverId)).id;
+		} catch (error) {
+			if (!(error instanceof ApiError && error.statusCode === 404)) throw error;
+			return (await this.postExpense(expense)).id;
+		}
+	}
+
 	private overwriteServerCopy(expense: OfflineExpense, serverId: string) {
 		return apiClient.put<BackendExpenseResponse>(`/api/v1/expenses/${serverId}`, {
 			...offlineExpenseToBackend(expense, { clearEmptyFields: true }),
@@ -423,7 +432,7 @@ class SyncManager {
 		try {
 			const serverId =
 				resolution === 'keep_local'
-					? (await this.overwriteServerCopy(local, conflict.serverExpense.id)).id
+					? await this.keepLocalCopy(local, conflict.serverExpense.id)
 					: conflict.serverExpense.id;
 			const delivered = await this.deliverQueuedPhotos(local, serverId);
 			if (delivered.success) {

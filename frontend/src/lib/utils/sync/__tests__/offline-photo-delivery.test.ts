@@ -348,12 +348,47 @@ describe('conflicts the day-window lookup cannot see', () => {
 		await syncManager.resolveConflict(conflict, 'keep_local');
 
 		expect(overwrites()[0]).toMatchObject({
+			vehicleId: 'v1',
+			tags: [],
 			description: null,
 			location: null,
 			missedFillup: false,
 			sourceType: null,
 			sourceId: null
 		});
+	});
+
+	it('Keep My Version recreates the expense when the server copy was deleted meanwhile', async () => {
+		storage.saveOfflineExpenses([queued()]);
+		mockFetch.mockImplementation((_url: string, init?: { method?: string }) =>
+			Promise.resolve(
+				init?.method === 'PUT'
+					? respond(404, 'Expense not found')
+					: respond(201, serverRow({ id: 'server-2' }))
+			)
+		);
+		const conflict: SyncConflict = {
+			id: 'e1',
+			localExpense: queued(),
+			serverExpense: { id: 'server-1', amount: 20, date: '2024-06-01', tags: [] }
+		};
+
+		expect(await syncManager.resolveConflict(conflict, 'keep_local')).toBe(true);
+
+		expect(posts()).toEqual([expect.objectContaining({ clientId: 'cid-1', expenseAmount: 12.5 })]);
+		expect(storage.loadOfflineExpenses()[0]?.synced).toBe(true);
+	});
+
+	it('Keep My Version still fails, and keeps the conflict, when the overwrite is refused', async () => {
+		mockFetch.mockResolvedValue(respond(403, 'Forbidden'));
+		const conflict: SyncConflict = {
+			id: 'e1',
+			localExpense: queued(),
+			serverExpense: { id: 'server-1', amount: 20, date: '2024-06-01', tags: [] }
+		};
+
+		expect(await syncManager.resolveConflict(conflict, 'keep_local')).toBe(false);
+		expect(posts()).toHaveLength(0);
 	});
 
 	it('Keep My Version keeps a financing link the local copy has', async () => {
