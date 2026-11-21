@@ -226,7 +226,7 @@
 			{#if dueReminders.length > 0}
 				<Button variant="outline" size="lg" onclick={runDueReminders} disabled={isTriggering}>
 					<RefreshCw class="mr-2 h-4 w-4 {isTriggering ? 'animate-spin' : ''}" />
-					Run due reminders
+					Run Due Reminders
 				</Button>
 			{/if}
 		{/snippet}
@@ -424,7 +424,7 @@
 						onclick={markAllNotificationsRead}
 					>
 						<Check class="mr-2 h-4 w-4" />
-						Mark all read
+						Mark All Read
 					</Button>
 				{/if}
 			</div>
