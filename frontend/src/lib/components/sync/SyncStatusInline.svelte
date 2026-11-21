@@ -78,13 +78,33 @@
 		}
 	}
 
+	function plural(count: number, noun: string): string {
+		return `${count} ${noun}${count === 1 ? '' : 's'}`;
+	}
+
 	async function handleManualSync() {
-		if (onlineStatus.current && pendingCount > 0) {
-			try {
-				await syncManager.syncAll();
-			} catch (error) {
-				if (import.meta.env.DEV) console.error('Manual sync failed:', error);
+		if (!onlineStatus.current || pendingCount === 0) return;
+		try {
+			const result = await syncManager.syncAll();
+			if (result.failed > 0) {
+				appStore.showError(`${plural(result.failed, 'expense')} couldn't sync. VROOM will retry.`);
 			}
+			if (result.needsAttention > 0) {
+				appStore.showWarning(
+					`${plural(result.needsAttention, 'expense')} need${result.needsAttention === 1 ? 's' : ''} attention — open expenses to fix ${result.needsAttention === 1 ? 'it' : 'them'}`
+				);
+			}
+			if (result.conflicts.length > 0) {
+				appStore.showWarning(`${plural(result.conflicts.length, 'sync conflict')} to resolve`);
+			}
+			if (
+				result.synced > 0 &&
+				result.failed + result.needsAttention + result.conflicts.length === 0
+			) {
+				appStore.showSuccess(`${plural(result.synced, 'expense')} synced`);
+			}
+		} catch (error) {
+			handleErrorWithNotification(error, 'Sync failed');
 		}
 	}
 </script>
@@ -209,7 +229,7 @@
 					{#if pendingCount > 0}
 						<Badge
 							variant="secondary"
-							class="absolute -top-1 -right-1 text-[10px] font-bold h-3.5 w-3.5 p-0 flex items-center justify-center"
+							class="absolute -top-2 -right-2.5 text-xs font-bold h-4 min-w-4 px-1 py-0 flex items-center justify-center"
 						>
 							{pendingCount > 9 ? '9+' : pendingCount}
 						</Badge>
