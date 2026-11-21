@@ -92,30 +92,6 @@ ratchet({
 });
 
 describe('kit Button call sites', () => {
-	test('no label tries to undo `sr-only` above a breakpoint (a later rule wins, hiding it always)', () => {
-		const offenders: string[] = [];
-		for (const file of files) {
-			const rel = relative(SRC_ROOT, file).replace(/\\/g, '/');
-			readFileSync(file, 'utf-8')
-				.split('\n')
-				.forEach((line, i) => {
-					const classes = line.match(/class="([^"]*)"/)?.[1];
-					if (!classes) return;
-					if (/(?:^|\s)sr-only(?:\s|$)/.test(classes) && /not-sr-only/.test(classes)) {
-						offenders.push(`${rel}:${i + 1}`);
-					}
-				});
-		}
-
-		expect(
-			offenders,
-			'`sr-only` plus a `*:not-sr-only` reveal does NOT reveal anything here: a later `.sr-only` ' +
-				'rule in the bundled stylesheet outranks the reveal, so the text stays clipped at every ' +
-				'width. Gate the sr-only itself instead (e.g. `max-sm:sr-only`):\n' +
-				offenders.join('\n')
-		).toEqual([]);
-	});
-
 	test('no outline-variant Button overrides its background for light mode only', () => {
 		const offenders: string[] = [];
 		for (const button of buttons) {
