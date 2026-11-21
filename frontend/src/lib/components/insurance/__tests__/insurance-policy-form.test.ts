@@ -298,13 +298,18 @@ describe('InsurancePolicyForm create mode', () => {
 		expect(createPolicy).not.toHaveBeenCalled();
 	});
 
-	test('a vehicle load failure reports and navigates back', async () => {
-		getVehicles.mockRejectedValue(new ApiError('SQLITE_BUSY', 500));
+	test('a vehicle load failure stays on the page with a Retry that reloads', async () => {
+		getVehicles.mockRejectedValueOnce(new ApiError('SQLITE_BUSY', 500));
 		await mount({ returnTo: '/vehicles/v1' });
-		expect(showError).toHaveBeenCalledWith(
-			`Couldn't load your vehicles. ${SERVER_FAILURE_MESSAGE}`
-		);
-		expect(gotoDynamic).toHaveBeenCalledWith('/vehicles/v1');
+		expect(screen.getByText("Couldn't load your vehicles")).toBeInTheDocument();
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
+		expect(gotoDynamic).not.toHaveBeenCalled();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await settle();
+		expect(getVehicles).toHaveBeenCalledTimes(2);
+		expect(screen.queryByText("Couldn't load your vehicles")).toBeNull();
+		expect(screen.getByLabelText(/Insurance Company/)).toBeInTheDocument();
 	});
 
 	test('shows a spinner until vehicles load', async () => {
@@ -388,11 +393,26 @@ describe('InsurancePolicyForm edit mode', () => {
 		expect(gotoDynamic).not.toHaveBeenCalled();
 	});
 
-	test('a policy load failure reports and navigates back', async () => {
+	test('a policy that no longer exists is reported and the user is sent back', async () => {
 		getPolicy.mockRejectedValue(new ApiError('Policy not found', 404));
 		await mount({ policyId: 'p9', returnTo: '/insurance' });
-		expect(showError).toHaveBeenCalledWith("Couldn't load the policy. Policy not found.");
+		expect(showError).toHaveBeenCalledWith('That policy no longer exists.');
 		expect(gotoDynamic).toHaveBeenCalledWith('/insurance');
+	});
+
+	test('a policy server failure stays on the page with a Retry that reloads the policy', async () => {
+		getPolicy.mockRejectedValueOnce(new ApiError('Internal server error', 500));
+		await mount({ policyId: 'p9', returnTo: '/insurance' });
+		expect(screen.getByText("Couldn't load this policy")).toBeInTheDocument();
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
+		expect(gotoDynamic).not.toHaveBeenCalled();
+		expect(showError).not.toHaveBeenCalled();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await settle();
+		expect(getPolicy).toHaveBeenCalledTimes(2);
+		expect(screen.queryByText("Couldn't load this policy")).toBeNull();
+		expect(screen.getByRole('heading', { name: 'Edit Policy' })).toBeInTheDocument();
 	});
 
 	test('delete asks for confirmation and then deletes the policy', async () => {

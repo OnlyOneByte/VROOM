@@ -277,11 +277,24 @@ describe('InsuranceTermForm add mode', () => {
 		expect(addTerm).not.toHaveBeenCalled();
 	});
 
-	test('a load failure reports and navigates back', async () => {
+	test('a policy that no longer exists is reported and the user is sent back', async () => {
 		getPolicy.mockRejectedValue(new ApiError('Policy not found', 404));
 		await mount({ returnTo: '/insurance' });
-		expect(showError).toHaveBeenCalledWith("Couldn't load the policy. Policy not found.");
+		expect(showError).toHaveBeenCalledWith('That policy no longer exists.');
 		expect(gotoDynamic).toHaveBeenCalledWith('/insurance');
+	});
+
+	test('a server failure stays on the page with a Retry that reloads the policy', async () => {
+		getPolicy.mockRejectedValueOnce(new ApiError('Internal server error', 500));
+		await mount({ returnTo: '/insurance' });
+		expect(screen.getByText("Couldn't load this policy")).toBeInTheDocument();
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
+		expect(gotoDynamic).not.toHaveBeenCalled();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await settle();
+		expect(getPolicy).toHaveBeenCalledTimes(2);
+		expect(screen.queryByText("Couldn't load this policy")).toBeNull();
 	});
 
 	test('shows a spinner while the policy loads', async () => {
@@ -322,7 +335,7 @@ describe('InsuranceTermForm edit mode', () => {
 
 	test('an unknown term id reports and navigates back', async () => {
 		await mount({ termId: 'missing', returnTo: '/insurance/p1' });
-		expect(showError).toHaveBeenCalledWith('Term not found');
+		expect(showError).toHaveBeenCalledWith('That term no longer exists.');
 		expect(gotoDynamic).toHaveBeenCalledWith('/insurance/p1');
 	});
 
