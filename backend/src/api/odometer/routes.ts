@@ -8,7 +8,11 @@ import {
   requireVehicleRead,
   requireVehicleWrite,
 } from '../../utils/sharing';
-import { commonSchemas, noonAnchoredDateIsNotInTheFuture, zValidator } from '../../utils/validation';
+import {
+  commonSchemas,
+  noonAnchoredDateIsNotInTheFuture,
+  zValidator,
+} from '../../utils/validation';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
 import { odometerRepository } from './repository';
