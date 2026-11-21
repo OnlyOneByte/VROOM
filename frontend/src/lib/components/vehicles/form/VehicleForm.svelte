@@ -605,38 +605,48 @@
 	}
 </script>
 
+{#snippet header()}
+	<PageHeader
+		title={isEditMode ? 'Edit Vehicle' : 'Add New Vehicle'}
+		description={headerDescription}
+	>
+		{#snippet back()}
+			<Button
+				variant="ghost"
+				size="icon-lg"
+				class="shrink-0"
+				aria-label="Go back"
+				onclick={handleBack}
+			>
+				<ArrowLeft class="size-5" />
+			</Button>
+		{/snippet}
+	</PageHeader>
+{/snippet}
+
 <FormLayout>
 	{#if isLoading}
-		<div class="flex items-center justify-center py-12">
-			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
+		<div class="space-y-6">
+			{@render header()}
+			<div class="flex items-center justify-center py-12">
+				<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
+			</div>
 		</div>
 	{:else if loadError}
-		<div class="rounded-lg border bg-card p-6">
-			<div class="mb-4 flex items-center gap-3 text-destructive">
-				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Couldn't load this vehicle</p>
+		<div class="space-y-6">
+			{@render header()}
+			<div class="rounded-lg border bg-card p-6">
+				<div class="mb-4 flex items-center gap-3 text-destructive">
+					<CircleAlert class="h-5 w-5" />
+					<p class="font-medium">Couldn't load this vehicle</p>
+				</div>
+				<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
+				<Button size="lg" onclick={loadVehicle}>Retry</Button>
 			</div>
-			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
-			<Button size="lg" onclick={loadVehicle}>Retry</Button>
 		</div>
 	{:else}
 		<div class="space-y-6">
-			<PageHeader
-				title={isEditMode ? 'Edit Vehicle' : 'Add New Vehicle'}
-				description={headerDescription}
-			>
-				{#snippet back()}
-					<Button
-						variant="ghost"
-						size="icon-lg"
-						class="shrink-0"
-						aria-label="Go back"
-						onclick={handleBack}
-					>
-						<ArrowLeft class="size-5" />
-					</Button>
-				{/snippet}
-			</PageHeader>
+			{@render header()}
 
 			<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24">
 				<Card>
