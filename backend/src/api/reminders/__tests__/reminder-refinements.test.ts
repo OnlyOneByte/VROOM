@@ -40,6 +40,22 @@ describe('refineCustomFrequency', () => {
   test('a non-custom frequency does not require the interval fields', () => {
     expect(ok(validNotification({ frequency: 'weekly' }))).toBe(true);
   });
+
+  test('a mileage-only reminder does not require the time schedule interval', () => {
+    const mileage = {
+      frequency: 'custom',
+      triggerMode: 'mileage',
+      intervalMileage: 5000,
+      lastServiceOdometer: 1000,
+    };
+    expect(ok(validNotification(mileage))).toBe(true);
+    expect(
+      failsWith(
+        validNotification({ ...mileage, triggerMode: 'both' }),
+        'intervalValue required for custom frequency'
+      )
+    ).toBe(true);
+  });
 });
 
 describe('refineExpenseType', () => {
@@ -56,7 +72,7 @@ describe('refineExpenseType', () => {
     expect(
       failsWith(
         validNotification({ type: 'expense', expenseCategory: 'maintenance' }),
-        'expenseAmount required for automatic expense reminders'
+        'Enter an amount greater than 0'
       )
     ).toBe(true);
   });
@@ -157,7 +173,7 @@ describe('refineSplitConfig', () => {
         ],
       },
     });
-    expect(failsWith(bad, 'Absolute allocations must sum to expenseAmount')).toBe(true);
+    expect(failsWith(bad, 'Split amounts must total the expense amount')).toBe(true);
   });
 
   test('a matching even split across the same vehicles is accepted', () => {
