@@ -5,6 +5,8 @@ import {
   applyMapping,
   type ColumnMapping,
   CsvMappingError,
+  inferDecimalSeparator,
+  normalizeDecimal,
   normalizeForeignDate,
 } from '../import-mapping';
 
@@ -41,10 +43,10 @@ describe('applyMapping — unit conversion into the target vehicle units', () =>
       volumeUnit: VolumeUnit.LITERS,
     };
     const [row] = parseNative(
-      applyMapping(csv, mapping, {
+      applyMapping(csv, mapping, () => ({
         distanceUnit: DistanceUnit.MILES,
         volumeUnit: VolumeUnit.GALLONS_US,
-      }).csv
+      })).csv
     );
     expect(row.mileage).toBe('100');
     expect(Number(row.volume)).toBeCloseTo(10, 2);
@@ -71,7 +73,9 @@ describe('applyMapping — unit conversion into the target vehicle units', () =>
       distanceUnit: DistanceUnit.KILOMETERS,
       volumeUnit: VolumeUnit.LITERS,
     };
-    const [row] = parseNative(applyMapping(csv, mapping, { distanceUnit: DistanceUnit.MILES }).csv);
+    const [row] = parseNative(
+      applyMapping(csv, mapping, () => ({ distanceUnit: DistanceUnit.MILES })).csv
+    );
     expect(row.mileage).toBe('100');
     expect(row.volume).toBe('37.854');
   });
@@ -85,7 +89,7 @@ describe('applyMapping — unit conversion into the target vehicle units', () =>
       volumeUnit: VolumeUnit.LITERS,
     };
     const [row] = parseNative(
-      applyMapping(csv, mapping, { volumeUnit: VolumeUnit.GALLONS_US }).csv
+      applyMapping(csv, mapping, () => ({ volumeUnit: VolumeUnit.GALLONS_US })).csv
     );
     expect(row.mileage).toBe('161');
     expect(Number(row.volume)).toBeCloseTo(10, 2);
@@ -237,7 +241,7 @@ describe('applyMapping output imports through buildImportPlan', () => {
     ];
     const csv = [
       'Date,Odometer (km),Fuel (litres),Price,Type',
-      '15/03/2024,160.9344,37.854,"52,40",Gas',
+      '15/03/2024,"160,9344","37,8541","52,40",Gas',
     ].join('\n');
     const mapping: ColumnMapping = {
       source: 'fuelio',
@@ -255,10 +259,10 @@ describe('applyMapping output imports through buildImportPlan', () => {
       categoryMap: { gas: 'fuel' },
     };
 
-    const native = applyMapping(csv, mapping, {
+    const native = applyMapping(csv, mapping, () => ({
       distanceUnit: DistanceUnit.MILES,
       volumeUnit: VolumeUnit.GALLONS_US,
-    });
+    }));
     const plan = buildImportPlan(native.csv, vehicles);
 
     expect(plan.errorCount).toBe(0);
@@ -302,13 +306,169 @@ describe('applyMapping — a non-finite mapped value is passed through for build
       distanceUnit: DistanceUnit.MILES,
       volumeUnit: VolumeUnit.GALLONS_US,
     };
-    const native = applyMapping(csv, mapping, {
+    const native = applyMapping(csv, mapping, () => ({
       distanceUnit: DistanceUnit.MILES,
       volumeUnit: VolumeUnit.GALLONS_US,
-    });
+    }));
     const plan = buildImportPlan(native.csv, vehicles);
     expect(plan.readyCount).toBe(0);
     expect(plan.errorCount).toBe(1);
     expect(plan.rows[0].status).toBe('error');
+  });
+});
+
+describe('normalizeDecimal — locale number formats', () => {
+  test.each([
+    ['1,250', '.', '1250'],
+    ['1,250', ',', '1.250'],
+    ['1.250', ',', '1250'],
+    ['1.250', '.', '1.250'],
+    ['1,250,000', ',', '1250000'],
+    ['1.250.000', '.', '1250000'],
+    ['1.250,5', '.', '1250.5'],
+    ['1,250.5', ',', '1250.5'],
+    ['1 250', '.', '1250'],
+    ['1\u00a0250,5', '.', '1250.5'],
+    ['1\u202f250.75', ',', '1250.75'],
+    ["1'250.50", '.', '1250.50'],
+    ['12,5', '.', '12.5'],
+    ['0,250', '.', '0.250'],
+    ['1234,567', '.', '1234.567'],
+    ['42', ',', '42'],
+    ['  45.20 ', ',', '45.20'],
+    ['', '.', ''],
+  ] as const)('%p with decimal %p reads as %p', (raw, decimal, expected) => {
+    expect(normalizeDecimal(raw, decimal)).toBe(expected);
+  });
+
+  test.each([['abc'], ['1,2,3'], ['1,250,5']])('%p is left for the importer to reject', (raw) => {
+    expect(Number.isFinite(Number(normalizeDecimal(raw)))).toBe(false);
+  });
+});
+
+describe('inferDecimalSeparator — evidence from the whole column', () => {
+  test.each([
+    [['45.20', '1,250'], '.'],
+    [['45,20', '1.250'], ','],
+    [['1,250,000'], '.'],
+    [['1.250.000'], ','],
+    [['1.250,5'], ','],
+    [['1 250,5'], ','],
+    [['1,250', '45,120'], undefined],
+    [['1.250', '12.345'], undefined],
+    [['12.5', '12,5'], undefined],
+    [['42', ''], undefined],
+  ] as const)('%p infers %p', (values, expected) => {
+    expect(inferDecimalSeparator([...values])).toBe(expected);
+  });
+});
+
+describe('applyMapping — ambiguous numbers are flagged, never guessed', () => {
+  const vehicles: ImportVehicle[] = [
+    { id: 'veh-1', make: 'Honda', model: 'Civic', year: 2020, nickname: 'Daily Driver' },
+  ];
+  const mapping: ColumnMapping = {
+    columns: { date: 'date', amount: 'amt', mileage: 'odo', category: 'cat' },
+    targetVehicle: 'Daily Driver',
+    dateFormat: 'iso',
+  };
+
+  test.each([
+    {
+      name: 'a dot-decimal file resolves "1,250" and "45,120" as thousands',
+      rows: ['2024-03-15,"1,250",45120,misc', '2024-03-16,12.50,"45,300",misc'],
+      amounts: [125000, 1250],
+      mileages: [45120, 45300],
+    },
+    {
+      name: 'a comma-decimal file resolves "1.250" as thousands',
+      rows: ['2024-03-15,"12,50",45.120,misc', '2024-03-16,"1.250,00",45.300,misc'],
+      amounts: [1250, 125000],
+      mileages: [45120, 45300],
+    },
+    {
+      name: 'space-grouped and quoted values read the same',
+      rows: ['2024-03-15,"1 250,50","45 120",misc'],
+      amounts: [125050],
+      mileages: [45120],
+    },
+  ])('$name', ({ rows, amounts, mileages }) => {
+    const csv = ['date,amt,odo,cat', ...rows].join('\n');
+    const result = applyMapping(csv, mapping);
+    expect(result.rowErrors.size).toBe(0);
+    const plan = buildImportPlan(result.csv, vehicles, result.rowErrors);
+    expect(plan.rows.map((r) => r.expense?.expenseAmount)).toEqual([...amounts]);
+    expect(parseNative(result.csv).map((r) => Number(r.mileage))).toEqual([...mileages]);
+  });
+
+  test('"1,250" and "45,120" with no other evidence flag the row instead of importing 1.25 at 45', () => {
+    const csv = ['date,amt,odo,cat', '2024-03-15,"1,250","45,120",misc'].join('\n');
+    const result = applyMapping(csv, mapping);
+    const plan = buildImportPlan(result.csv, vehicles, result.rowErrors);
+    expect(plan.readyCount).toBe(0);
+    expect(plan.rows[0].status).toBe('error');
+    expect(plan.rows[0].message).toContain('Amount "1,250" could mean 1250 or 1.25');
+  });
+
+  test.each([
+    {
+      name: 'an odometer borrowing a comma decimal from the amount column is not read as 45.12',
+      row: '2024-03-15,"12,50","45,120",misc',
+      message: 'Odometer "45,120" could mean 45120 or 45.12',
+    },
+    {
+      name: 'an amount borrowing a comma decimal from the odometer column is not read as 1.25',
+      row: '2024-03-15,"1,250","45.120,5",misc',
+      message: 'Amount "1,250" could mean 1250 or 1.25',
+    },
+  ])('$name', ({ row, message }) => {
+    const csv = ['date,amt,odo,cat', row].join('\n');
+    const result = applyMapping(csv, mapping);
+    const plan = buildImportPlan(result.csv, vehicles, result.rowErrors);
+    expect(plan.rows[0].status).toBe('error');
+    expect(plan.rows[0].message).toContain(message);
+  });
+
+  test('every ambiguous value in a row is named in its message', () => {
+    const csv = ['date,amt,odo,cat', '2024-03-15,"1,250","45,120",misc'].join('\n');
+    const message = applyMapping(csv, mapping).rowErrors.get(0) ?? '';
+    expect(message).toContain('Amount "1,250"');
+    expect(message).toContain('Odometer "45,120"');
+  });
+
+  test('only the rows holding an ambiguous value are flagged when the file has no evidence', () => {
+    const csv = [
+      'date,amt,odo,cat',
+      '2024-03-15,20,45120,misc',
+      '2024-03-16,20,"45,300",misc',
+    ].join('\n');
+    const result = applyMapping(csv, mapping);
+    const plan = buildImportPlan(result.csv, vehicles, result.rowErrors);
+    expect(plan.rows.map((r) => r.status)).toEqual(['ready', 'error']);
+    expect(plan.rows[1].message).toContain('Odometer "45,300" could mean 45300 or 45.3');
+  });
+});
+
+describe('applyMapping — a vehicle column converts each row into its own vehicle units', () => {
+  test('rows resolve target units by their vehicle name', () => {
+    const csv = ['car,odo,litres', 'Daily Driver,160.9344,37.8541', 'Euro,160.9344,37.8541'].join(
+      '\n'
+    );
+    const mapping: ColumnMapping = {
+      columns: { vehicle: 'car', mileage: 'odo', volume: 'litres' },
+      dateFormat: 'iso',
+      distanceUnit: DistanceUnit.KILOMETERS,
+      volumeUnit: VolumeUnit.LITERS,
+    };
+    const units = {
+      'Daily Driver': { distanceUnit: DistanceUnit.MILES, volumeUnit: VolumeUnit.GALLONS_US },
+      Euro: { distanceUnit: DistanceUnit.KILOMETERS, volumeUnit: VolumeUnit.LITERS },
+    } as const;
+    const rows = parseNative(
+      applyMapping(csv, mapping, (vehicle) => units[vehicle as keyof typeof units] ?? {}).csv
+    );
+    expect(rows.map((r) => r.mileage)).toEqual(['100', '161']);
+    expect(Number(rows[0].volume)).toBeCloseTo(10, 2);
+    expect(Number(rows[1].volume)).toBeCloseTo(37.854, 3);
   });
 });
