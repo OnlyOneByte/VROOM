@@ -68,6 +68,10 @@ export function isIncompleteFuelExpense(expense: OfflineExpense): boolean {
 	return expense.category === 'fuel' && ((!expense.volume && !expense.charge) || !expense.mileage);
 }
 
+function roundToCents(amount: number): number {
+	return Math.round(amount * 100) / 100;
+}
+
 export const INCOMPLETE_FUEL_REASON =
 	'Fuel expenses require volume/charge and mileage data. Please edit the expense and add the missing information.';
 
@@ -114,14 +118,16 @@ export function loadOfflineExpenses(owner: string | null = queueOwner): OfflineE
 		const expenses: OfflineExpense[] = JSON.parse(stored);
 
 		return expenses.map(expense => {
+			const amount = roundToCents(expense.amount);
 			if (!expense.version || expense.version !== OFFLINE_STORAGE_VERSION) {
 				return {
 					...expense,
+					amount,
 					clientId: expense.clientId ?? expense.id,
 					version: OFFLINE_STORAGE_VERSION
 				};
 			}
-			return expense;
+			return amount === expense.amount ? expense : { ...expense, amount };
 		});
 	} catch (error) {
 		if (import.meta.env.DEV) console.error('Failed to load offline expenses:', error);
@@ -164,6 +170,7 @@ export async function addOfflineExpense(
 ): Promise<boolean> {
 	const offlineExpense: OfflineExpense = {
 		...expense,
+		amount: roundToCents(expense.amount),
 		id: `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
 		clientId,
 		timestamp: Date.now(),
