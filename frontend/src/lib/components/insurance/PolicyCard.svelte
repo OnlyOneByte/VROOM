@@ -12,7 +12,7 @@
 	import TermHistory from './TermHistory.svelte';
 	import DocumentViewer from './DocumentViewer.svelte';
 	import ClaimsSection from './ClaimsSection.svelte';
-	import { getLatestTerm } from '#lib/utils/insurance.ts';
+	import { getLatestTerm, isPolicyInForce } from '#lib/utils/insurance.ts';
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
 	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
 	import type { InsurancePolicy, Vehicle } from '#lib/types/index.ts';
@@ -60,7 +60,7 @@
 	}
 </script>
 
-<Card class={!policy.isActive ? 'opacity-70' : ''}>
+<Card class={isPolicyInForce(policy) ? '' : 'opacity-70'}>
 	<CardContent class="p-4">
 		<div class="flex items-center justify-between gap-2">
 			<div class="flex items-center gap-2.5 min-w-0">
