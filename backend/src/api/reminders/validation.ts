@@ -3,6 +3,7 @@ import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES } from '../../db/types';
 import { moneyDollarsToCents } from '../../utils/money';
 import {
+  FUEL_SPLIT_MESSAGE,
   splitConfigSchema,
   splitConfigStructuralSchema,
   splitConfigVehicleIds,
@@ -116,6 +117,16 @@ function refineDateRange(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   }
 }
 
+function refineFuelSplit(data: ReminderRefineInput, ctx: z.RefinementCtx) {
+  if (data.expenseCategory === 'fuel' && data.expenseSplitConfig) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: FUEL_SPLIT_MESSAGE,
+      path: ['expenseCategory'],
+    });
+  }
+}
+
 function refineSplitConfig(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   if (!data.expenseSplitConfig) return;
 
@@ -160,6 +171,7 @@ export const createReminderSchema = reminderBaseSchema.superRefine((data, ctx) =
   refineExpenseType(data, ctx);
   refineDateRange(data, ctx);
   refineSplitConfig(data, ctx);
+  refineFuelSplit(data, ctx);
   refineMileageTrigger(data, ctx);
 });
 
@@ -169,6 +181,7 @@ export const updateReminderSchema = reminderBaseSchema.partial().superRefine((da
   refineExpenseType(data, ctx);
   refineDateRange(data, ctx);
   refineSplitConfig(data, ctx);
+  refineFuelSplit(data, ctx);
   refineMileageTrigger(data, ctx);
 });
 
@@ -186,6 +199,14 @@ const reminderMergeGateSchema = reminderBaseSchema
     refineMileageTrigger(data, ctx);
   });
 
-export function assertMergedReminderValid(merged: unknown): void {
-  reminderMergeGateSchema.parse(merged);
+const reminderMergeGateWithFuelSplitSchema = reminderMergeGateSchema.superRefine(refineFuelSplit);
+
+const FUEL_SPLIT_FIELDS = ['expenseCategory', 'expenseSplitConfig', 'vehicleIds'] as const;
+
+export function assertMergedReminderValid(
+  merged: unknown,
+  update: Partial<Record<(typeof FUEL_SPLIT_FIELDS)[number], unknown>> = {}
+): void {
+  const touchesFuelSplit = FUEL_SPLIT_FIELDS.some((field) => update[field] !== undefined);
+  (touchesFuelSplit ? reminderMergeGateWithFuelSplitSchema : reminderMergeGateSchema).parse(merged);
 }
