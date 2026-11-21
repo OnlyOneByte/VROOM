@@ -107,6 +107,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 | Time period | `common/period-selector.svelte` | `selectedPeriod`, `isLoading`, `onPeriodChange` |
 | Photo capture / upload | `common/MediaCaptureDialog.svelte` | `bind:open`, `onUpload`, `onClose` — camera + upload tabs |
 | Form page wrapper | `common/form-layout.svelte` | wraps form content centered |
+| Brand mark (logo) | `common/BrandMark.svelte` | `class?` — a themed `Car` icon, `h-6 w-6 text-primary` by default, `aria-hidden` (put the "VROOM" wordmark beside it); never the car emoji (`brand-mark.test.ts`) |
 
 ### Charts — `#lib/components/charts` (barrel) — ALWAYS 4-state
 | Need | Import | Notes |

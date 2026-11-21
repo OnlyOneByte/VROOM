@@ -30,6 +30,7 @@
 	} from '#lib/components/ui/sheet/index.ts';
 	import { ScrollArea } from '#lib/components/ui/scroll-area/index.ts';
 	import { cn } from '#lib/utils.ts';
+	import BrandMark from '#lib/components/common/BrandMark.svelte';
 
 	let mobileMenuOpen = $state(false);
 
@@ -89,7 +90,7 @@
 >
 	<div class="flex items-center justify-between px-4 py-3">
 		<div class="flex items-center gap-3">
-			<span class="text-2xl">🚗</span>
+			<BrandMark />
 			<span class="font-bold text-foreground">VROOM</span>
 		</div>
 
@@ -122,7 +123,7 @@
 					<SheetHeader class="px-6 pt-6 pb-4 border-b border-border">
 						<SheetTitle>
 							<div class="flex items-center">
-								<span class="text-2xl">🚗</span>
+								<BrandMark />
 								<span class="ml-3 text-xl font-bold text-foreground">VROOM</span>
 							</div>
 						</SheetTitle>
@@ -221,8 +222,8 @@
 		)}
 	>
 		<div class={cn('flex items-center flex-shrink-0 px-6', 'transition-all duration-300')}>
-			<div class="flex items-center">
-				<span class="text-2xl">🚗</span>
+			<div class="flex h-8 items-center">
+				<BrandMark />
 				{#if isDesktopSidebarExpanded}
 					<span class={cn('ml-3 text-xl font-bold whitespace-nowrap', 'text-foreground')}
 						>VROOM</span
