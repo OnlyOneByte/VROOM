@@ -601,6 +601,7 @@
 						{vehicleStatsData}
 						{isLoadingStats}
 						{selectedStatsPeriod}
+						unitPreferences={vehicle?.unitPreferences}
 					/>
 
 					{#await chartsLoading}
