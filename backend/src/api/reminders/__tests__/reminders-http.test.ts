@@ -11,6 +11,8 @@ interface ReminderRow {
   id: string;
   isActive: boolean;
   type: string;
+  expenseAmount?: number | null;
+  expenseSplitConfig?: unknown;
 }
 interface ReminderWithJoins {
   reminder: ReminderRow;
@@ -168,6 +170,63 @@ describe('reminders HTTP routes', () => {
       .query('SELECT vehicle_id FROM reminder_vehicles WHERE reminder_id = ?')
       .all(id) as { vehicle_id: string }[];
     expect(junction.map((r) => r.vehicle_id)).toEqual([owned]);
+  });
+
+  test('absolute split allocations round-trip in dollars through create, read, edit and save', async () => {
+    const v1 = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const v2 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2023 });
+    const split = {
+      method: 'absolute',
+      allocations: [
+        { vehicleId: v1, amount: 60.25 },
+        { vehicleId: v2, amount: 39.75 },
+      ],
+    };
+    const created = await ctx.authed('POST', '/api/v1/reminders', {
+      name: 'Shared insurance',
+      type: 'expense',
+      expenseCategory: 'financial',
+      frequency: 'monthly',
+      startDate: '2024-01-01T00:00:00.000Z',
+      vehicleIds: [v1, v2],
+      expenseAmount: 100,
+      expenseSplitConfig: split,
+    });
+    expect(created.status).toBe(201);
+    const createdBody = await json<DataEnvelope<ReminderWithJoins>>(created);
+    const id = createdBody.data.reminder.id;
+    expect(createdBody.data.reminder.expenseSplitConfig).toEqual(split);
+
+    const read = await json<DataEnvelope<ReminderWithJoins>>(
+      await ctx.authed('GET', `/api/v1/reminders/${id}`)
+    );
+    expect(read.data.reminder.expenseAmount).toBe(100);
+    expect(read.data.reminder.expenseSplitConfig).toEqual(split);
+
+    const saved = await ctx.authed('PUT', `/api/v1/reminders/${id}`, {
+      name: 'Shared insurance (edited)',
+      expenseAmount: read.data.reminder.expenseAmount,
+      expenseSplitConfig: read.data.reminder.expenseSplitConfig,
+      vehicleIds: [v1, v2],
+    });
+    expect(saved.status).toBe(200);
+    const savedBody = await json<DataEnvelope<ReminderWithJoins>>(saved);
+    expect(savedBody.data.reminder.expenseAmount).toBe(100);
+    expect(savedBody.data.reminder.expenseSplitConfig).toEqual(split);
+
+    const list = await json<DataEnvelope<ReminderWithJoins[]>>(
+      await ctx.authed('GET', '/api/v1/reminders')
+    );
+    expect(list.data[0].reminder.expenseSplitConfig).toEqual(split);
+
+    const stored = ctx.sqlite
+      .query('SELECT expense_amount, expense_split_config FROM reminders WHERE id = ?')
+      .get(id) as { expense_amount: number; expense_split_config: string };
+    expect(stored.expense_amount).toBe(10000);
+    expect(JSON.parse(stored.expense_split_config).allocations).toEqual([
+      { vehicleId: v1, amount: 6025 },
+      { vehicleId: v2, amount: 3975 },
+    ]);
   });
 
   test('anonymous access is unauthorized', async () => {
