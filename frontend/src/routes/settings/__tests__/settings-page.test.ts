@@ -294,11 +294,25 @@ describe('Settings page backups', () => {
 	])('a failed backup explains %s in a plain sentence', async (error, message) => {
 		settingsStoreFake.executeSync.mockRejectedValue(error);
 		await mount();
+		await fireEvent.click(screen.getByRole('button', { name: 'stub backup now' }));
+		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: 'stub sync' }));
 		await settle();
 		expect(toast.dismiss).toHaveBeenCalled();
 		expect(showError).toHaveBeenCalledWith(message);
 	});
+
+	test.each(['stub backup now', 'stub restore'])(
+		'the dialog behind %s loads only when it is opened',
+		async trigger => {
+			await mount();
+			expect(screen.queryByTestId('stub-open')).toBeNull();
+
+			await fireEvent.click(screen.getByRole('button', { name: trigger }));
+			await settle();
+			expect(screen.getByTestId('stub-open')).toBeInTheDocument();
+		}
+	);
 
 	test('a failed download explains why', async () => {
 		settingsStoreFake.downloadBackup.mockRejectedValue(new ApiError('zip stream broke', 500));
