@@ -24,6 +24,7 @@ import {
 } from '../../../db/schema';
 import { NotFoundError, SyncError, SyncErrorCode, ValidationError } from '../../../errors';
 import { decrypt } from '../../../utils/encryption';
+import { logger } from '../../../utils/logger';
 import { GoogleDriveService } from './google-drive-service';
 
 // Hand-maintained: a schema column missing here is silently dropped from backups.
@@ -706,9 +707,15 @@ export class GoogleSheetsService {
         ? String(records.vehicles[0].userId)
         : String(written?.userId ?? '');
 
-    const inferredVersion = expenseHeaders.includes(CENTS_ERA_EXPENSE_HEADER)
-      ? CENTS_FORMAT_VERSION
-      : PRE_CENTS_FORMAT_VERSION;
+    const preCentsLayout =
+      expenseHeaders.length > 0 && !expenseHeaders.includes(CENTS_ERA_EXPENSE_HEADER);
+    const inferredVersion = preCentsLayout ? PRE_CENTS_FORMAT_VERSION : CENTS_FORMAT_VERSION;
+    if (!written?.version) {
+      logger.info('Sheets mirror has no recorded version; inferred it from its layout', {
+        spreadsheetId,
+        inferredVersion,
+      });
+    }
 
     return {
       metadata: {

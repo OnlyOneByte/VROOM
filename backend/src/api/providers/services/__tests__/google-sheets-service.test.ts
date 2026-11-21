@@ -617,6 +617,16 @@ describe('GoogleSheetsService — Sheets mirror version (Metadata tab)', () => {
     expect(await restoredExpenseAmount(svc, spreadsheetId)).toBe(1234);
   });
 
+  test('a tab-less mirror whose Expenses tab was wiped, header row included, is not rescaled', async () => {
+    const { svc, spreadsheetId } = await mirrorWithExpense();
+    dropMetadataTab(spreadsheetId);
+    const data = await svc.readSpreadsheetData(spreadsheetId);
+    expect(data.metadata.version).toBe('2.0.0');
+    store.spreadsheets.get(spreadsheetId)?.values.set('Expenses', []);
+
+    expect((await svc.readSpreadsheetData(spreadsheetId)).metadata.version).toBe('2.0.0');
+  });
+
   test('one hand-edited decimal cell in a cents mirror does not rescale every amount', async () => {
     const { svc, spreadsheetId } = await mirrorWithExpense();
     dropMetadataTab(spreadsheetId);

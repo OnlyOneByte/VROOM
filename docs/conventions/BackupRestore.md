@@ -28,9 +28,9 @@ since `validateBackupData` fail-closes on any version mismatch.
 
 A Sheets mirror records its version in a `Metadata` tab, written last on every sync.
 `restoreFromSheets` applies the same shim when that version is below 2.0.0. A mirror without the
-tab was last synced by an older build: it counts as cents when the Expenses tab has a `createdBy`
-column (added in the same release as cents) and as 1.x dollars otherwise. Never infer the unit
-from cell values: one hand-edited `45.50` would rescale every amount.
+tab was last synced by an older build: it counts as 1.x dollars only when its Expenses header row
+is present and lacks `createdBy` (added in the same release as cents), and as cents otherwise.
+Never infer the unit from cell values: one hand-edited `45.50` would rescale every amount.
 
 ## Validation Pipeline
 
