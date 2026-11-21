@@ -319,13 +319,13 @@
 			return {
 				title: 'End the lease?',
 				description: `Switching to Own ends the lease${lender}. It will no longer show on the Finance tab. Lease payments you already logged stay in your expenses.`,
-				confirmLabel: 'End lease'
+				confirmLabel: 'End Lease'
 			};
 		}
 		return {
 			title: 'Mark the loan as paid off?',
 			description: `Switching to Own marks the loan${lender} as paid off. It will no longer show on the Finance tab. Loan payments you already logged stay in your expenses.`,
-			confirmLabel: 'Mark paid off'
+			confirmLabel: 'Mark Paid Off'
 		};
 	});
 

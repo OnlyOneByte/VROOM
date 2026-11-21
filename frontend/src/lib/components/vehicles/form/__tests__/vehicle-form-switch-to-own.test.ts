@@ -91,7 +91,7 @@ describe('VehicleForm switching a financed vehicle to Own', () => {
 	test('confirming pays off the loan, then saves the vehicle and returns to it', async () => {
 		await renderEditAndSwitchToOwn();
 		const dialog = await screen.findByRole('alertdialog');
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'Mark paid off' }));
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Mark Paid Off' }));
 
 		await waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/veh-1'));
 		expect(payOffFinancing).toHaveBeenCalledWith('fin-1');
@@ -107,7 +107,7 @@ describe('VehicleForm switching a financed vehicle to Own', () => {
 
 		const dialog = await screen.findByRole('alertdialog');
 		expect(dialog.textContent).toContain('End the lease?');
-		expect(within(dialog).getByRole('button', { name: 'End lease' })).toBeTruthy();
+		expect(within(dialog).getByRole('button', { name: 'End Lease' })).toBeTruthy();
 	});
 
 	test('cancelling saves nothing and leaves the loan active', async () => {
@@ -124,7 +124,7 @@ describe('VehicleForm switching a financed vehicle to Own', () => {
 		payOffFinancing.mockRejectedValueOnce(new Error('Network down'));
 		await renderEditAndSwitchToOwn();
 		const dialog = await screen.findByRole('alertdialog');
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'Mark paid off' }));
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Mark Paid Off' }));
 
 		await waitFor(() =>
 			expect(appStore.notifications.map(n => n.message)).toContain(
