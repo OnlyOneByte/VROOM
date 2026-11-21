@@ -5,6 +5,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Runs never overlap on the force-push to coverage-badges. A superseded pending run is harmless
+# because the next one rebuilds the badges from a newer main.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 

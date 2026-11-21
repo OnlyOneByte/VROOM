@@ -6,6 +6,12 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
 
+# Pushes to main share one group so two runs never edit the draft release at once; a superseded
+# pending run is harmless because the next run rebuilds the draft from every merged PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
   pull-requests: write
