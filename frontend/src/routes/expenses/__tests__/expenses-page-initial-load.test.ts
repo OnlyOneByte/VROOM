@@ -37,6 +37,7 @@ vi.mock('#lib/services/settings-api.ts', () => ({
 }));
 
 import Page from '../+page.svelte';
+import { settingsStore } from '#lib/stores/settings.svelte.ts';
 
 const VEHICLE: Vehicle = {
 	id: 'v1',
@@ -71,6 +72,7 @@ const SETTINGS = {
 } as unknown as UserSettings;
 
 beforeEach(() => {
+	settingsStore.reset();
 	vi.clearAllMocks();
 	tableProps = {};
 	getSettings.mockImplementation(() => Promise.resolve(SETTINGS));

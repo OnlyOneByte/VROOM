@@ -118,6 +118,48 @@ describe('settings store — state-management contracts', () => {
 		expect(settingsStore.unitPreferences.distanceUnit).toBe('miles');
 		expect(settingsStore.unitPreferences.volumeUnit).toBe('gallons_us');
 	});
+
+	it('concurrent load() calls share one request', async () => {
+		mockFetch.mockResolvedValueOnce(okJson(SETTINGS));
+
+		await Promise.all([settingsStore.load(), settingsStore.load(), settingsStore.load()]);
+
+		expect(mockFetch).toHaveBeenCalledTimes(1);
+		expect(settingsStore.settings).toEqual(SETTINGS);
+	});
+
+	it('a load() after the previous one finished fetches fresh settings', async () => {
+		mockFetch
+			.mockResolvedValueOnce(okJson(SETTINGS))
+			.mockResolvedValueOnce(okJson({ ...SETTINGS, currencyUnit: 'GBP' }));
+
+		await settingsStore.load();
+		await settingsStore.load();
+
+		expect(mockFetch).toHaveBeenCalledTimes(2);
+		expect(settingsStore.settings?.currencyUnit).toBe('GBP');
+	});
+
+	it('a restore that finishes while a load is in flight still reloads afterwards', async () => {
+		let answerLoad: (value: unknown) => void = () => {};
+		mockFetch
+			.mockImplementationOnce(() => new Promise(resolve => (answerLoad = resolve)))
+			.mockResolvedValueOnce(okJson({ success: true, imported: {} }))
+			.mockResolvedValueOnce(okJson({ ...SETTINGS, currencyUnit: 'GBP' }));
+
+		const staleLoad = settingsStore.load();
+		const restore = settingsStore.restoreFromProvider({
+			providerId: 'p1',
+			sourceType: 'zip',
+			mode: 'replace',
+			idempotencyKey: 'k3'
+		});
+		answerLoad(okJson(SETTINGS));
+		await Promise.all([staleLoad, restore]);
+
+		expect(mockFetch).toHaveBeenCalledTimes(3);
+		expect(settingsStore.settings?.currencyUnit).toBe('GBP');
+	});
 });
 
 describe('settings store load() reconciles the server theme', () => {

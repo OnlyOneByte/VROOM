@@ -23,6 +23,34 @@ function createSettingsStore() {
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let restoreProviders = $state<RestoreProviderInfo[]>([]);
+	let inFlight: Promise<void> | null = null;
+
+	async function fetchSettings(): Promise<void> {
+		isLoading = true;
+		error = null;
+		try {
+			settings = await settingsApi.getSettings();
+			themeStore.reconcileServerTheme(settings.themePreference);
+			isLoading = false;
+		} catch (err) {
+			error = userFacingErrorMessage(err);
+			isLoading = false;
+		}
+	}
+
+	async function reloadAfterChange(): Promise<void> {
+		await inFlight;
+		await load();
+	}
+
+	function load(): Promise<void> {
+		if (inFlight) return inFlight;
+		const request = fetchSettings().finally(() => {
+			if (inFlight === request) inFlight = null;
+		});
+		inFlight = request;
+		return request;
+	}
 
 	return {
 		get settings() {
@@ -38,18 +66,7 @@ function createSettingsStore() {
 			return error;
 		},
 
-		async load() {
-			isLoading = true;
-			error = null;
-			try {
-				settings = await settingsApi.getSettings();
-				themeStore.reconcileServerTheme(settings.themePreference);
-				isLoading = false;
-			} catch (err) {
-				error = userFacingErrorMessage(err);
-				isLoading = false;
-			}
-		},
+		load,
 
 		async update(updates: Partial<UserSettings>) {
 			isLoading = true;
@@ -88,7 +105,7 @@ function createSettingsStore() {
 				const result = await settingsApi.uploadBackup(file, mode, idempotencyKey);
 
 				if (mode !== 'preview') {
-					await this.load();
+					await reloadAfterChange();
 				}
 				return result;
 			} catch (err) {
@@ -138,7 +155,7 @@ function createSettingsStore() {
 			try {
 				const result = await settingsApi.restoreFromProvider(opts);
 				if (opts.mode !== 'preview') {
-					await this.load();
+					await reloadAfterChange();
 				}
 				return result;
 			} catch (err) {
@@ -167,6 +184,7 @@ function createSettingsStore() {
 			isLoading = false;
 			error = null;
 			restoreProviders = [];
+			inFlight = null;
 		}
 	};
 }
