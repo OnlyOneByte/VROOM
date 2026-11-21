@@ -58,6 +58,7 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 		sourceId: state.sourceId
 	});
 	const isSplitCreate = state.isSplit && state.selectedVehicleIds.length >= 2;
+	const clientId = crypto.randomUUID();
 
 	try {
 		if (state.isGroupEditMode && state.groupId) {
@@ -110,7 +111,7 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			});
 			gotoDynamic(returnTo);
 		} else if (onlineStatus.current) {
-			const created = await expenseApi.createExpense(expenseData);
+			const created = await expenseApi.createExpense(expenseData, clientId);
 
 			await uploadPendingPhotos(state, created.id);
 
@@ -120,9 +121,11 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			});
 			gotoDynamic(returnTo);
 		} else {
-			const queued = await addOfflineExpense(toOfflineExpense(expenseData), [
-				...state.pendingFiles
-			]);
+			const queued = await addOfflineExpense(
+				toOfflineExpense(expenseData),
+				[...state.pendingFiles],
+				clientId
+			);
 
 			if (!queued) {
 				reportUnqueuedSave(state);
@@ -142,9 +145,11 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 		const failureKind = classifySyncFailure(error);
 
 		if (canQueueFailedSave({ isEditMode: state.isEditMode, isSplitCreate, failureKind })) {
-			const queued = await addOfflineExpense(toOfflineExpense(expenseData), [
-				...state.pendingFiles
-			]);
+			const queued = await addOfflineExpense(
+				toOfflineExpense(expenseData),
+				[...state.pendingFiles],
+				clientId
+			);
 
 			if (!queued) {
 				reportUnqueuedSave(state);
