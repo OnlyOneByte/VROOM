@@ -49,4 +49,19 @@ describe('parseUploadedPhoto', () => {
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe('No photo file provided');
   });
+
+  test('throws 400 when the body is not readable multipart', async () => {
+    const cases: Array<{ contentType: string; body: string }> = [
+      { contentType: 'multipart/form-data', body: 'no boundary here' },
+      { contentType: 'multipart/form-data; boundary=x', body: 'not a multipart body' },
+    ];
+    for (const { contentType, body } of cases) {
+      const res = await makeApp().request('/u', {
+        method: 'POST',
+        headers: { 'content-type': contentType },
+        body,
+      });
+      expect(res.status, contentType).toBe(400);
+    }
+  });
 });
