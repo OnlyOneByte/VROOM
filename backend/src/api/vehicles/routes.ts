@@ -26,6 +26,7 @@ import {
   resolveVehicleAccess,
   resolveVehicleOwnerId,
 } from '../../utils/sharing';
+import { isValidTimeZone } from '../../utils/time-zone';
 import { canonicalScale } from '../../utils/unit-conversions';
 import {
   mergeUnitPreferences,
@@ -199,12 +200,15 @@ async function assertLicensePlateAvailable(
   }
 }
 
+const timeZoneSchema = z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional();
+
 const listVehiclesQuerySchema = z.object({
   include: z.enum(['shared']).optional(),
+  timeZone: timeZoneSchema,
 });
 routes.get('/', zValidator('query', listVehiclesQuerySchema), async (c) => {
   const user = c.get('user');
-  const { include } = c.req.valid('query');
+  const { include, timeZone } = c.req.valid('query');
 
   const userVehicles = await vehicleRepository.findByUserId(user.id);
 
@@ -233,7 +237,7 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), async (c) => {
   const financingIds = allVehicles
     .map((v) => v.financing?.id)
     .filter((id): id is string => id !== undefined);
-  const balances = await financingRepository.computeBalances(financingIds);
+  const balances = await financingRepository.computeBalances(financingIds, timeZone);
 
   const enrichedVehicles = allVehicles.map((v) => {
     if (v.financing) {
@@ -282,57 +286,69 @@ routes.post('/', zValidator('json', createVehicleSchema), async (c) => {
   return c.json(response, 201);
 });
 
-routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
+routes.get(
+  '/:id',
+  zValidator('param', commonSchemas.idParam),
+  zValidator('query', z.object({ timeZone: timeZoneSchema })),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    const { timeZone } = c.req.valid('query');
 
-  // 404, not 403, so a non-member cannot learn that the vehicle exists.
-  const access = await resolveVehicleAccess(id, user.id);
-  if (!access) {
-    throw new NotFoundError('Vehicle');
-  }
+    // 404, not 403, so a non-member cannot learn that the vehicle exists.
+    const access = await resolveVehicleAccess(id, user.id);
+    if (!access) {
+      throw new NotFoundError('Vehicle');
+    }
 
-  const vehicle =
-    access.role === 'owner'
-      ? await vehicleRepository.findByIdWithAccess(id, user.id)
-      : ((await vehicleRepository.findByIds([id]))[0] ?? null);
+    const vehicle =
+      access.role === 'owner'
+        ? await vehicleRepository.findByIdWithAccess(id, user.id)
+        : ((await vehicleRepository.findByIds([id]))[0] ?? null);
 
-  if (!vehicle) {
-    throw new NotFoundError('Vehicle');
-  }
+    if (!vehicle) {
+      throw new NotFoundError('Vehicle');
+    }
 
-  let sharedAccess: { level: string; sharedBy: string } | undefined;
-  if (access.role !== 'owner') {
-    const grants = await vehicleShareRepository.findAcceptedAccessForUser(user.id);
-    const grant = grants.find((g) => g.vehicleId === id);
-    sharedAccess = { level: grant?.level ?? access.role, sharedBy: grant?.ownerName ?? 'Unknown' };
-  }
+    let sharedAccess: { level: string; sharedBy: string } | undefined;
+    if (access.role !== 'owner') {
+      const grants = await vehicleShareRepository.findAcceptedAccessForUser(user.id);
+      const grant = grants.find((g) => g.vehicleId === id);
+      sharedAccess = {
+        level: grant?.level ?? access.role,
+        sharedBy: grant?.ownerName ?? 'Unknown',
+      };
+    }
 
-  let responseData: typeof vehicle & {
-    financing?: (typeof vehicle)['financing'] & {
-      computedBalance?: number;
-      eligibleForPayoff?: boolean;
+    let responseData: typeof vehicle & {
+      financing?: (typeof vehicle)['financing'] & {
+        computedBalance?: number;
+        eligibleForPayoff?: boolean;
+      };
+      sharedAccess?: { level: string; sharedBy: string };
+    } = vehicle;
+    if (vehicle.financing) {
+      const computedBalance = await financingRepository.computeBalance(
+        vehicle.financing.id,
+        timeZone
+      );
+      responseData = {
+        ...vehicle,
+        financing: withComputedBalance(vehicle.financing, computedBalance),
+      };
+    }
+    if (sharedAccess) {
+      responseData = { ...responseData, sharedAccess };
+    }
+
+    const response: ApiResponse<typeof responseData> = {
+      success: true,
+      data: vehicleRowToApi(responseData),
     };
-    sharedAccess?: { level: string; sharedBy: string };
-  } = vehicle;
-  if (vehicle.financing) {
-    const computedBalance = await financingRepository.computeBalance(vehicle.financing.id);
-    responseData = {
-      ...vehicle,
-      financing: withComputedBalance(vehicle.financing, computedBalance),
-    };
-  }
-  if (sharedAccess) {
-    responseData = { ...responseData, sharedAccess };
-  }
 
-  const response: ApiResponse<typeof responseData> = {
-    success: true,
-    data: vehicleRowToApi(responseData),
-  };
-
-  return c.json(response);
-});
+    return c.json(response);
+  }
+);
 
 routes.put(
   '/:id',

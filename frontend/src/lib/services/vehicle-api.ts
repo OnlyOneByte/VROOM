@@ -8,6 +8,8 @@ import type {
 } from '#lib/types/index.ts';
 import type { TimePeriod } from '#lib/constants/time-periods.ts';
 import { apiClient } from './api-client';
+import { buildQueryString } from './api-utils';
+import { userTimeZone } from './analytics-api';
 import { photoCollection } from './photo-api';
 
 const vehiclePhotos = (vehicleId: string) =>
@@ -15,12 +17,17 @@ const vehiclePhotos = (vehicleId: string) =>
 
 export const vehicleApi = {
 	async getVehicle(vehicleId: string): Promise<Vehicle> {
-		return apiClient.get<Vehicle>(`/api/v1/vehicles/${vehicleId}`);
+		return apiClient.get<Vehicle>(
+			`/api/v1/vehicles/${vehicleId}${buildQueryString({ timeZone: userTimeZone() })}`
+		);
 	},
 
 	async getVehicles(opts?: { includeShared?: boolean }): Promise<Vehicle[]> {
-		const path = opts?.includeShared ? '/api/v1/vehicles?include=shared' : '/api/v1/vehicles';
-		return apiClient.get<Vehicle[]>(path);
+		const qs = buildQueryString({
+			include: opts?.includeShared ? 'shared' : undefined,
+			timeZone: userTimeZone()
+		});
+		return apiClient.get<Vehicle[]>(`/api/v1/vehicles${qs}`);
 	},
 
 	async createVehicle(data: Partial<Vehicle>): Promise<Vehicle> {
@@ -42,7 +49,7 @@ export const vehicleApi = {
 	// The backend answers 200 with data: null when the vehicle has no financing; any error is real.
 	async getFinancing(vehicleId: string): Promise<VehicleFinancing | null> {
 		return apiClient.get<VehicleFinancing | null>(
-			`/api/v1/financing/vehicles/${vehicleId}/financing`
+			`/api/v1/financing/vehicles/${vehicleId}/financing${buildQueryString({ timeZone: userTimeZone() })}`
 		);
 	},
 

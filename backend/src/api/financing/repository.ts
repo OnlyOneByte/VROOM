@@ -6,6 +6,7 @@ import { expenses, vehicleFinancing } from '../../db/schema';
 import { DatabaseError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
+import { calendarDayIn } from '../../utils/time-zone';
 
 export const PAYOFF_BALANCE_THRESHOLD = 100;
 
@@ -22,8 +23,10 @@ export function withComputedBalance<T>(
 
 const MS_PER_DAY = 86_400_000;
 
-function utcDayStart(date: Date): number {
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+function dayStart(date: Date, timeZone: string | undefined): number {
+  if (!timeZone) return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  const [year, month, day] = calendarDayIn(date, timeZone).split('-').map(Number);
+  return Date.UTC(year, month - 1, day);
 }
 
 function addUtcMonthsClamped(dayStart: number, months: number): number {
@@ -34,9 +37,9 @@ function addUtcMonthsClamped(dayStart: number, months: number): number {
   return Date.UTC(year, month, Math.min(start.getUTCDate(), lastDay));
 }
 
-export function elapsedMonths(startDate: Date, date: Date): number {
-  const start = utcDayStart(startDate);
-  const end = utcDayStart(date);
+export function elapsedMonths(startDate: Date, date: Date, timeZone?: string): number {
+  const start = dayStart(startDate, timeZone);
+  const end = dayStart(date, timeZone);
   if (end <= start) return 0;
   const from = new Date(start);
   const to = new Date(end);
@@ -63,15 +66,21 @@ export interface DatedPayment {
   amount: number;
 }
 
-export function amortizedBalance(terms: AmortizationTerms, payments: DatedPayment[]): number {
+export function amortizedBalance(
+  terms: AmortizationTerms,
+  payments: DatedPayment[],
+  timeZone?: string
+): number {
   const monthlyRate =
     terms.financingType === 'loan' && terms.apr && terms.apr > 0 ? terms.apr / 100 / 12 : 0;
   const ordered = [...payments].sort((a, b) => a.date.getTime() - b.date.getTime());
   let balance = terms.originalAmount;
   const first = ordered[0];
-  let accruedMonths = first ? Math.max(0, elapsedMonths(terms.startDate, first.date) - 1) : 0;
+  let accruedMonths = first
+    ? Math.max(0, elapsedMonths(terms.startDate, first.date, timeZone) - 1)
+    : 0;
   for (const payment of ordered) {
-    const months = Math.max(accruedMonths, elapsedMonths(terms.startDate, payment.date));
+    const months = Math.max(accruedMonths, elapsedMonths(terms.startDate, payment.date, timeZone));
     const interest = Math.round(balance * monthlyRate * (months - accruedMonths));
     accruedMonths = months;
     balance = Math.max(0, balance + interest - payment.amount);
@@ -93,12 +102,12 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
     return result[0] || null;
   }
 
-  async computeBalance(financingId: string): Promise<number> {
-    const balances = await this.computeBalances([financingId]);
+  async computeBalance(financingId: string, timeZone?: string): Promise<number> {
+    const balances = await this.computeBalances([financingId], timeZone);
     return balances.get(financingId) ?? 0;
   }
 
-  async computeBalances(financingIds: string[]): Promise<Map<string, number>> {
+  async computeBalances(financingIds: string[], timeZone?: string): Promise<Map<string, number>> {
     const balances = new Map<string, number>();
     if (financingIds.length === 0) {
       return balances;
@@ -135,7 +144,10 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
       }
 
       for (const record of records) {
-        balances.set(record.id, amortizedBalance(record, paymentsByFinancing.get(record.id) ?? []));
+        balances.set(
+          record.id,
+          amortizedBalance(record, paymentsByFinancing.get(record.id) ?? [], timeZone)
+        );
       }
 
       return balances;

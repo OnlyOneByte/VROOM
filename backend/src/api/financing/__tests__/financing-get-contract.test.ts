@@ -87,6 +87,24 @@ describe('GET single financing — enriched contract (FE↔BE drift guard)', () 
   });
 });
 
+describe('balance reads accept the user time zone', () => {
+  test('financing, vehicle and vehicle-list reads take ?timeZone= and reject an unknown one', async () => {
+    const vehicleId = await seedVehicle('zoned');
+    await seedLoan(vehicleId);
+    const paths = [
+      `/api/v1/financing/vehicles/${vehicleId}/financing`,
+      `/api/v1/vehicles/${vehicleId}`,
+      '/api/v1/vehicles',
+    ];
+    for (const path of paths) {
+      const ok = await ctx.authed('GET', `${path}?timeZone=Pacific%2FAuckland`);
+      expect(ok.status, path).toBe(200);
+      const bad = await ctx.authed('GET', `${path}?timeZone=Mars%2FOlympus`);
+      expect(bad.status, path).toBe(400);
+    }
+  });
+});
+
 describe('POST financing upsert re-activates a paid-off record', () => {
   test('re-financing a paid-off vehicle yields an active record', async () => {
     const id = await seedVehicle('Refinanced');
