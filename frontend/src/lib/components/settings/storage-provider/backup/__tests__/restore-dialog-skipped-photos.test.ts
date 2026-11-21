@@ -49,7 +49,7 @@ describe('RestoreDialog skipped photos', () => {
 		});
 
 		expect(screen.getByTestId('restore-skipped-photos')).toHaveTextContent(
-			"2 photos won't be restored because the records they were attached to were deleted."
+			"2 photos won't be restored because the trips, expenses or other items they belonged to were deleted before this backup was made."
 		);
 		expect(restoreFromProvider).toHaveBeenCalledWith(
 			expect.objectContaining({ sourceType: 'sheets', mode: 'preview' })
