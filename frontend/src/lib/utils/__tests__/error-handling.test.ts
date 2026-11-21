@@ -71,9 +71,9 @@ describe('userFacingErrorMessage', () => {
 			'Your session has ended. Sign in again to continue.'
 		],
 		[
-			'the storage provider being unreachable (503 NETWORK_ERROR)',
+			'a backend timeout (503 NETWORK_ERROR), which can be local work as well as an upstream call',
 			new ApiError('Backup export timed out after 600000ms', 503, undefined, 'NETWORK_ERROR'),
-			"We couldn't reach your storage provider. Try again in a moment."
+			SERVER_FAILURE_MESSAGE
 		],
 		[
 			'a 500 DatabaseError',
@@ -137,16 +137,10 @@ describe('the copy for each code the backend sends', () => {
 		['AuthenticationError', 401],
 		['RATE_LIMIT_EXCEEDED', 429],
 		['PAYLOAD_TOO_LARGE', 413],
-		['SYNC_IN_PROGRESS', 409],
 		['BACKUP_IN_PROGRESS', 409],
-		['BACKUP_FAILED', 500],
-		['CONFLICT_DETECTED', 409],
+		['BACKUP_FAILED', 502],
 		['AUTH_INVALID', 401],
-		['PERMISSION_DENIED', 403],
-		['QUOTA_EXCEEDED', 429],
-		['NETWORK_ERROR', 503],
-		['PUSH_NOT_CONFIGURED', 503],
-		['LAST_ACCOUNT', 400]
+		['PUSH_NOT_CONFIGURED', 503]
 	])('%s gets its own full sentence, never the raw text or a connection hint', (code, status) => {
 		const message = userFacingErrorMessage(
 			new ApiError('raw backend text', status, undefined, code)
@@ -190,6 +184,22 @@ describe('userFacingErrorMessage for request validation', () => {
 				})
 			)
 		).toBe('Check the odometer, purchase date and fuel type, then try again.');
+	});
+
+	test.each([
+		['agentEmail', 'Invalid email address'],
+		['nonce', 'Invalid UUID'],
+		['website', 'Invalid URL'],
+		['purchaseDate', 'Invalid ISO date'],
+		['lastBackupAt', 'Invalid ISO datetime'],
+		['type', 'Invalid discriminator value. Expected "fuel" | "split"'],
+		['volume', 'Invalid number: must be a multiple of 0.001'],
+		['slug', 'Invalid lowercase'],
+		['purchaseDate', 'Invalid date']
+	])('the built-in %s message (%s) names the field instead', (field, message) => {
+		const sentence = userFacingErrorMessage(invalid({ issues: [issue([field], message)] }));
+		expect(sentence).toMatch(/^Check the .+, then try again\.$/);
+		expect(sentence).not.toContain(message);
 	});
 
 	test('more than three fields are summarised', () => {

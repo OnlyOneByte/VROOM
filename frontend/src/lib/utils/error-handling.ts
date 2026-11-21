@@ -61,19 +61,11 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
 	AuthenticationError: 'Your session has ended. Sign in again to continue.',
 	RATE_LIMIT_EXCEEDED: 'That was a lot of requests at once. Wait a moment, then try again.',
 	PAYLOAD_TOO_LARGE: "That's too large to upload. Try a smaller file.",
-	SYNC_IN_PROGRESS: 'A sync is already running. Try again once it finishes.',
 	BACKUP_IN_PROGRESS: 'A backup is already running. Try again once it finishes.',
 	BACKUP_FAILED:
 		"The backup didn't reach any of your storage providers. Check them in Settings, then try again.",
-	CONFLICT_DETECTED:
-		'This changed somewhere else. Reload to see the latest version, then try again.',
 	AUTH_INVALID: 'Your storage account needs to be reconnected. Reconnect it in Settings.',
-	PERMISSION_DENIED:
-		"VROOM isn't allowed to do that in your storage account. Reconnect it in Settings.",
-	QUOTA_EXCEEDED: 'Your storage provider is full. Free up space there, then try again.',
-	NETWORK_ERROR: "We couldn't reach your storage provider. Try again in a moment.",
-	PUSH_NOT_CONFIGURED: "Push notifications aren't set up on this server.",
-	LAST_ACCOUNT: "You can't unlink your only sign-in method."
+	PUSH_NOT_CONFIGURED: "Push notifications aren't set up on this server."
 };
 
 const STATUS_MESSAGES: Record<number, string> = {
@@ -89,7 +81,7 @@ const INVALID_DETAILS_MESSAGE = "Some details aren't valid. Check them and try a
 
 const STATUS_ONLY_MESSAGE = /^Request failed with status \d+$/;
 const SCHEMA_DEFAULT_MESSAGE =
-	/^(Invalid (input|option|string|date|type|element|key|union|value)|Too (small|big)|Unrecognized key|Expected |Required$)/;
+	/^(Invalid\b|Too (small|big)\b|Unrecognized key|Expected |Required$)/;
 
 export class NonErrorThrownError extends Error {
 	readonly thrown: unknown;
