@@ -11,7 +11,7 @@ import { changeTracker, requireAuth } from '../../middleware';
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
-import { moneyDollarsToCents, vehicleRowToApi } from '../../utils/money';
+import { centsToDollars, moneyDollarsToCents, vehicleRowToApi } from '../../utils/money';
 import {
   requireVehicleRead,
   resolveVehicleAccess,
@@ -366,6 +366,21 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   });
 });
 
+function periodBaselineMileage(
+  fuelExpenses: { date: Date | string; mileage: number | null }[],
+  startDate: Date | null,
+  initialMileage: number
+): number {
+  if (!startDate) return initialMileage;
+  let baseline = initialMileage;
+  for (const e of fuelExpenses) {
+    if (e.mileage !== null && new Date(e.date) < startDate && e.mileage > baseline) {
+      baseline = e.mileage;
+    }
+  }
+  return baseline;
+}
+
 const statsQuerySchema = z.object({
   period: z.enum(['7d', '30d', '90d', '1y', 'all']).optional().default('all'),
 });
@@ -406,7 +421,7 @@ routes.get(
 
     const stats = calculateVehicleStats(
       sortedExpenses,
-      vehicle.initialMileage || 0,
+      periodBaselineMileage(fuelExpenses, startDate, vehicle.initialMileage || 0),
       vehicle.trackFuel,
       vehicle.trackCharging
     );
@@ -418,6 +433,9 @@ routes.get(
       data: {
         period,
         ...stats,
+        totalFuelCost: centsToDollars(stats.totalFuelCost),
+        totalChargeCost: centsToDollars(stats.totalChargeCost),
+        costPerMile: stats.costPerMile === null ? null : centsToDollars(stats.costPerMile),
         currentOdometer,
       },
     });
