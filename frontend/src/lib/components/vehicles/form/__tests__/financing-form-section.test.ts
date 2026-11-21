@@ -116,6 +116,11 @@ describe('FinancingFormSection ownership', () => {
 		expect(screen.queryByLabelText(/Mileage Limit/)).toBeNull();
 	});
 
+	test('the start date label points at the date picker button', () => {
+		mount({ ownershipType: 'finance' });
+		expect(screen.getByLabelText(/Start Date/).tagName).toBe('BUTTON');
+	});
+
 	test('a leased vehicle asks for the payment, residual and mileage terms but no APR', () => {
 		mount({ ownershipType: 'lease' });
 		expect(screen.getByText('Lease details and payment information')).toBeTruthy();
@@ -222,9 +227,9 @@ describe('FinancingFormSection validation errors', () => {
 		);
 		expect(screen.getByLabelText(/APR/)).toHaveAccessibleDescription('APR is required');
 		expect(document.getElementById('termMonths')).toHaveAccessibleDescription('Pick a term');
-		const startDate = document.querySelector('[aria-describedby="startDate-error"]');
-		expect(startDate).toHaveAccessibleDescription('Start date is required');
-		expect(startDate?.getAttribute('aria-invalid')).toBe('true');
+		const startDate = screen.getByLabelText(/Start Date/);
+		expect(startDate).toHaveAccessibleDescription('January 15, 2025 Start date is required');
+		expect(startDate.getAttribute('aria-invalid')).toBe('true');
 	});
 
 	test('shows the APR error for a loan', () => {
