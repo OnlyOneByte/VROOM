@@ -7,7 +7,7 @@ import {
 	type ReminderDraft
 } from './reminder-form-model';
 
-export type ReminderPayload = Partial<Reminder> & { vehicleIds: string[] };
+export type ReminderPayload = Partial<Reminder> & { vehicleIds: string[]; timeZone: string };
 
 export function buildReminderPayload(draft: ReminderDraft): ReminderPayload {
 	const isExpense = draft.kind === 'expense';
@@ -26,6 +26,7 @@ export function buildReminderPayload(draft: ReminderDraft): ReminderPayload {
 		intervalUnit: draft.frequency === 'custom' ? draft.intervalUnit : null,
 		startDate: draft.startDate || toDateInputValue(new Date()),
 		endDate: draft.endDate || null,
+		timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 		vehicleIds: draft.selectedVehicleIds,
 		expenseCategory: isExpense ? draft.expenseCategory : null,
 		expenseAmount: isExpense ? parseFloat(draft.expenseAmount) : null,

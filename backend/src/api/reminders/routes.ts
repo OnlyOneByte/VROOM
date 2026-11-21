@@ -24,6 +24,7 @@ import {
 } from './trigger-service';
 import {
   assertMergedReminderValid,
+  calendarDayIn,
   createReminderSchema,
   updateReminderSchema,
 } from './validation';
@@ -126,21 +127,28 @@ export function isSameSubmittedDay(stored: Date, submitted: Date): boolean {
   return dayOf(stored) === dayOf(submitted);
 }
 
-function isUnchangedDay(stored: Date | null, submitted: Date | null | undefined): boolean {
-  return stored !== null && submitted != null && isSameSubmittedDay(stored, submitted);
+function isUnchangedDay(
+  stored: Date | null,
+  submitted: Date | null | undefined,
+  timeZone: string | undefined
+): boolean {
+  if (stored === null || submitted == null) return false;
+  if (timeZone) return calendarDayIn(stored, timeZone) === calendarDayIn(submitted, timeZone);
+  return isSameSubmittedDay(stored, submitted);
 }
 
-function keepStoredDatesOnSameDay<T extends { startDate?: Date; endDate?: Date | null }>(
-  update: T,
-  existing: Reminder
-): T {
+function keepStoredDatesOnSameDay<
+  T extends { startDate?: Date; endDate?: Date | null; timeZone?: string },
+>(update: T, existing: Reminder): T {
   const { startDate, endDate, ...rest } = update;
+  const isUnchanged = (stored: Date | null, submitted: Date | null | undefined) =>
+    isUnchangedDay(stored, submitted, update.timeZone);
   return {
     ...rest,
-    ...(startDate !== undefined && !isUnchangedDay(existing.startDate, startDate)
+    ...(startDate !== undefined && !isUnchanged(existing.startDate, startDate)
       ? { startDate }
       : {}),
-    ...(endDate !== undefined && !isUnchangedDay(existing.endDate, endDate) ? { endDate } : {}),
+    ...(endDate !== undefined && !isUnchanged(existing.endDate, endDate) ? { endDate } : {}),
   } as T;
 }
 
@@ -262,7 +270,7 @@ routes.post('/', zValidator('json', createReminderSchema), async (c) => {
   const user = c.get('user');
   const data = c.req.valid('json');
 
-  const { vehicleIds, ...reminderData } = data;
+  const { vehicleIds, timeZone: _createTimeZone, ...reminderData } = data;
   const { ownerId } = await requireReminderVehiclesWrite(vehicleIds, user.id);
   const mileage = await resolveMileageFields(reminderData, vehicleIds, ownerId);
   const result = await reminderRepository.createWithVehicles(
@@ -351,7 +359,7 @@ routes.put(
 
     assertMergedReminderValid(merged, partialUpdate);
 
-    const { vehicleIds: mergedVehicleIds, ...reminderFields } = partialUpdate;
+    const { vehicleIds: mergedVehicleIds, timeZone: _timeZone, ...reminderFields } = partialUpdate;
     const updateFields: Partial<NewReminder> = { ...reminderFields };
 
     const touchesMileage =

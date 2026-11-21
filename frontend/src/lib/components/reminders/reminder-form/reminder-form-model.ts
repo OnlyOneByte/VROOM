@@ -62,10 +62,6 @@ export function emptyReminderDraft(vehicles: Vehicle[], today: Date): ReminderDr
 	};
 }
 
-function storedCalendarDate(value: string): string {
-	return new Date(value).toISOString().slice(0, 10);
-}
-
 export function draftFromReminder(reminder: ReminderWithVehicles): ReminderDraft {
 	const r = reminder.reminder;
 	const split = r.expenseSplitConfig?.method === 'even' ? null : r.expenseSplitConfig;
@@ -86,8 +82,8 @@ export function draftFromReminder(reminder: ReminderWithVehicles): ReminderDraft
 		intervalUnit: (INTERVAL_UNITS as readonly string[]).includes(r.intervalUnit ?? '')
 			? (r.intervalUnit as IntervalUnit)
 			: 'month',
-		startDate: storedCalendarDate(r.startDate),
-		endDate: r.endDate ? storedCalendarDate(r.endDate) : '',
+		startDate: toDateInputValue(r.startDate),
+		endDate: r.endDate ? toDateInputValue(r.endDate) : '',
 		selectedVehicleIds: [...reminder.vehicleIds],
 		expenseCategory: (EXPENSE_CATEGORIES as readonly string[]).includes(r.expenseCategory ?? '')
 			? (r.expenseCategory as ExpenseCategory)

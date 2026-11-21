@@ -25,12 +25,13 @@ describe('buildReminderPayload', () => {
 		});
 	});
 
-	test('sends start and end dates as plain calendar dates', () => {
+	test('sends start and end dates as plain calendar dates with the browser time zone', () => {
 		const payload = buildReminderPayload(
 			validDraft({ startDate: '2026-03-01', endDate: '2026-12-31' })
 		);
 		expect(payload.startDate).toBe('2026-03-01');
 		expect(payload.endDate).toBe('2026-12-31');
+		expect(payload.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
 	});
 
 	test('falls back to today when the start date is blank', () => {

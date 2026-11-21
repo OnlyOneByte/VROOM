@@ -47,7 +47,40 @@ async function put(id: string, body: Record<string, unknown>): Promise<void> {
 }
 
 describe('reminder dates as plain calendar dates', () => {
-  test('a plain date is stored as UTC noon of that day', async () => {
+  test('a plain date with a time zone is stored as noon on that day in that zone', async () => {
+    const auckland = await createId({
+      startDate: '2099-06-15',
+      endDate: '2100-01-15',
+      timeZone: 'Pacific/Auckland',
+    });
+    expect(stored(auckland)).toMatchObject({
+      start: Date.parse('2099-06-15T00:00:00.000Z'),
+      end: Date.parse('2100-01-14T23:00:00.000Z'),
+      due: Date.parse('2099-06-15T00:00:00.000Z'),
+    });
+
+    const newYork = await createId({ startDate: '2099-03-08', timeZone: 'America/New_York' });
+    expect(stored(newYork).start).toBe(Date.parse('2099-03-08T16:00:00.000Z'));
+  });
+
+  test('an unknown time zone is rejected', async () => {
+    expect((await create({ startDate: '2099-06-15', timeZone: 'Mars/Olympus' })).status).toBe(400);
+  });
+
+  test('with the submitter time zone, a DST-day start stored near midnight compares by its local day', async () => {
+    const id = await createId({ startDate: '2099-03-08T04:30:00.000Z' });
+    const before = stored(id);
+
+    await put(id, { name: 'Renamed', startDate: '2099-03-07', timeZone: 'America/New_York' });
+    expect(stored(id), 'same local day: kept').toEqual(before);
+
+    await put(id, { startDate: '2099-03-08', timeZone: 'America/New_York' });
+    expect(stored(id).start, 'next local day: applied').toBe(
+      Date.parse('2099-03-08T16:00:00.000Z')
+    );
+  });
+
+  test('a plain date without a time zone is stored as UTC noon of that day', async () => {
     const id = await createId({ startDate: '2099-06-15', endDate: '2101-01-31' });
     expect(stored(id)).toMatchObject({
       start: Date.parse('2099-06-15T12:00:00.000Z'),

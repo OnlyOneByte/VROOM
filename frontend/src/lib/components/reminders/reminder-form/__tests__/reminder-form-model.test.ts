@@ -38,12 +38,11 @@ describe('emptyReminderDraft', () => {
 });
 
 describe('draftFromReminder', () => {
-	test('shows stored dates as their UTC calendar day, the day the backend compares', () => {
+	test('shows stored dates as the local calendar day they were saved for', () => {
+		const start = new Date(2026, 2, 8, 12);
+		const end = new Date(2026, 10, 1, 12);
 		const draft = draftFromReminder(
-			makeReminderWithVehicles({
-				startDate: '2026-03-08T23:30:00.000Z',
-				endDate: '2026-11-01T00:30:00.000Z'
-			})
+			makeReminderWithVehicles({ startDate: start.toISOString(), endDate: end.toISOString() })
 		);
 		expect(draft.startDate).toBe('2026-03-08');
 		expect(draft.endDate).toBe('2026-11-01');
