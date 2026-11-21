@@ -4,6 +4,7 @@ import { CONFIG } from '../../config';
 import type { NewReminder, Reminder } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
+import { logger } from '../../utils/logger';
 import {
   centsToDollars,
   expenseToApi,
@@ -94,7 +95,14 @@ async function requireExistingReminderWrite(
 }
 
 const timeZoneQuerySchema = z.object({
-  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
+  timeZone: z
+    .string()
+    .optional()
+    .transform((zone) => {
+      if (zone === undefined || isValidTimeZone(zone)) return zone;
+      logger.warn('Unknown reminder time zone; using server time', { timeZone: zone.slice(0, 64) });
+      return undefined;
+    }),
 });
 
 function advanceToFirstFutureDue(

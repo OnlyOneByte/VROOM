@@ -153,6 +153,19 @@ describe('reminderApi — CRUD + trigger + mark-serviced wiring', () => {
 		);
 	});
 
+	it('trigger still works when the browser cannot report a time zone', async () => {
+		const spy = vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(() => {
+			throw new RangeError('no zone');
+		});
+		try {
+			mockPost.mockResolvedValueOnce({ createdExpenses: [], notifications: [], skipped: [] });
+			await reminderApi.trigger();
+			expect(mockPost).toHaveBeenCalledWith('/api/v1/reminders/trigger');
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
 	it('markServiced POSTs the mark-serviced path', async () => {
 		mockPost.mockResolvedValueOnce({ id: 'r1' });
 		await reminderApi.markServiced('r1');
