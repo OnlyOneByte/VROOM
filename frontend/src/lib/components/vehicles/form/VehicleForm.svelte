@@ -61,7 +61,10 @@
 		ChargeUnit
 	} from '#lib/types/index.ts';
 	import { validateVehicleFields, validateFinancingFields } from './vehicle-form-validation';
-	import { calculatePayoffDateFromStart } from '#lib/utils/financing-calculations.ts';
+	import {
+		annuityPayment,
+		calculatePayoffDateFromStart
+	} from '#lib/utils/financing-calculations.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
@@ -312,14 +315,8 @@
 		}
 
 		const principal = financingForm.originalAmount;
-		const monthlyRate = financingForm.apr / 100 / 12;
 		const numPayments = financingForm.termMonths;
-
-		const monthlyPayment =
-			monthlyRate === 0
-				? principal / numPayments
-				: (principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))) /
-					(Math.pow(1 + monthlyRate, numPayments) - 1);
+		const monthlyPayment = annuityPayment(principal, financingForm.apr, numPayments);
 
 		const totalPayments = monthlyPayment * numPayments;
 		const totalInterest = totalPayments - principal;
