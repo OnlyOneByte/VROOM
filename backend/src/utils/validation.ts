@@ -42,6 +42,12 @@ const clampedPaginationFields = {
   offset: z.coerce.number().int().min(0).optional(),
 } as const;
 
+export function onOrBeforeEndOfToday(date: Date): boolean {
+  const now = new Date();
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  return date.getTime() <= endOfToday.getTime();
+}
+
 export const commonSchemas = {
   clampedPaginationFields,
 

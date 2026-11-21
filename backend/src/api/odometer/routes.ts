@@ -8,7 +8,7 @@ import {
   requireVehicleRead,
   requireVehicleWrite,
 } from '../../utils/sharing';
-import { commonSchemas, zValidator } from '../../utils/validation';
+import { commonSchemas, onOrBeforeEndOfToday, zValidator } from '../../utils/validation';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
 import { odometerRepository } from './repository';
@@ -19,7 +19,7 @@ const createSchema = z.object({
   odometer: z.number().int().min(0, 'Odometer must be a non-negative integer'),
   recordedAt: z.coerce
     .date()
-    .refine((d) => d <= new Date(), { message: 'Date cannot be in the future' }),
+    .refine(onOrBeforeEndOfToday, { message: 'Date cannot be in the future' }),
   note: z.string().max(500).optional(),
 });
 
