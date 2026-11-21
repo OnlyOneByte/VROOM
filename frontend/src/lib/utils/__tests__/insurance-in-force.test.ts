@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'vitest';
 import type { InsurancePolicy, InsuranceTerm } from '#lib/types/index.ts';
-import { groupPoliciesByActive, isPolicyInForce } from '#lib/utils/insurance.ts';
+import {
+	getDaysRemaining,
+	groupPoliciesByActive,
+	hasTermEnded,
+	isPolicyInForce
+} from '#lib/utils/insurance.ts';
 
 const NOW = new Date('2026-11-21T12:00:00.000Z');
 
@@ -59,5 +64,25 @@ describe('groupPoliciesByActive', () => {
 		);
 		expect(active.map(p => p.id)).toEqual(['current', 'upcoming']);
 		expect(inactive.map(p => p.id)).toEqual(['expired', 'deactivated']);
+	});
+});
+
+describe('term end dates are calendar days in the local time zone', () => {
+	const lateOnEndDay = new Date(2026, 10, 21, 23, 30);
+	const justAfterEndDay = new Date(2026, 10, 22, 0, 30);
+
+	test('a term stays in force through the whole of its end date', () => {
+		expect(getDaysRemaining('2026-11-21', lateOnEndDay)).toBe(0);
+		expect(hasTermEnded({ endDate: '2026-11-21' }, lateOnEndDay)).toBe(false);
+	});
+
+	test('a term has ended once the local calendar moves past its end date', () => {
+		expect(getDaysRemaining('2026-11-21', justAfterEndDay)).toBe(-1);
+		expect(hasTermEnded({ endDate: '2026-11-21' }, justAfterEndDay)).toBe(true);
+	});
+
+	test('a policy whose term ends today is still listed as active', () => {
+		const endsToday = policy('ends-today', true, [term('t6', '2025-11-21', '2026-11-21')]);
+		expect(isPolicyInForce(endsToday, lateOnEndDay)).toBe(true);
 	});
 });
