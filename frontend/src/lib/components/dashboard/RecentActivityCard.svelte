@@ -84,7 +84,7 @@
 				{/each}
 			</div>
 			<div class="mt-4 pt-4 border-t">
-				<Button href={resolve(routes.expenses)} variant="outline" class="w-full">
+				<Button href={resolve(routes.expenses)} variant="outline" class="h-10 w-full sm:h-9">
 					View All Expenses
 					<ArrowRight class="h-4 w-4 ml-2" />
 				</Button>
