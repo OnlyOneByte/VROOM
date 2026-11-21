@@ -105,8 +105,8 @@
 			{/if}
 		</Collapsible.Trigger>
 		<Collapsible.Content class="pt-3">
-			<div class="space-y-3 rounded-lg border border-border p-3">
-				<div class="flex items-center gap-2">
+			<div class="space-y-2 rounded-lg border border-border p-3">
+				<div class="flex min-h-10 items-center gap-2">
 					<Checkbox checked={allEnabled} onCheckedChange={handleToggleAll} />
 					<span class="text-sm text-muted-foreground">
 						{allEnabled ? 'Disable All' : 'Enable All'}
@@ -116,20 +116,20 @@
 				{#each CATEGORIES as category (category)}
 					{@const setting = categorySettings[category]}
 					{@const isDefault = defaultCategories.has(category)}
-					<div class="flex items-center gap-3">
+					<div class="flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="photo-folder-row">
 						<Checkbox
 							checked={setting?.enabled ?? false}
 							disabled={isDefault}
 							onCheckedChange={checked => handleCategoryToggle(category, checked === true)}
 						/>
-						<div class="flex items-center gap-1.5 w-36 shrink-0">
+						<div class="flex min-h-10 flex-1 items-center gap-1.5 sm:w-36 sm:flex-none sm:shrink-0">
 							<span class="text-sm">{PHOTO_CATEGORY_LABELS[category]}</span>
 							{#if isDefault}
 								<Badge variant="outline" class="text-xs px-1.5 py-0">default</Badge>
 							{/if}
 						</div>
 						<div
-							class="flex items-center h-8 rounded-md border border-input bg-background text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 flex-1 {!setting?.enabled
+							class="flex items-center h-10 sm:h-8 min-w-0 basis-full sm:basis-0 rounded-md border border-input bg-background text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 flex-1 {!setting?.enabled
 								? 'opacity-50'
 								: ''}"
 						>
@@ -142,7 +142,7 @@
 								value={setting?.folderPath ?? ''}
 								oninput={e => handleFolderPathChange(category, e.currentTarget.value)}
 								placeholder="/folder"
-								class="flex-1 bg-transparent px-2 py-1 outline-none text-sm placeholder:text-muted-foreground {rootPrefix
+								class="min-w-0 flex-1 bg-transparent px-2 py-1 outline-none text-sm placeholder:text-muted-foreground {rootPrefix
 									? 'pl-0'
 									: ''}"
 								disabled={!setting?.enabled}
