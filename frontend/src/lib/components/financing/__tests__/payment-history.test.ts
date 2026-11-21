@@ -104,6 +104,14 @@ describe('PaymentHistory list', () => {
 		expect(within(standard!).queryByLabelText('Extra payment indicator')).toBeNull();
 	});
 
+	test.each([
+		['extra', 'Extra Payment'],
+		['standard', 'Standard']
+	] as const)('a %s payment is badged %s', (paymentType, label) => {
+		mount([makeEntry({ paymentType })]);
+		expect(within(paymentCards()[0]!).getByText(label)).toBeTruthy();
+	});
+
 	test('formats amounts in the user currency', () => {
 		store.currencyUnit = 'EUR';
 		mount([makeEntry({ remainingBalance: 19_700, expense: { amount: 400 } })]);
@@ -162,5 +170,36 @@ describe('PaymentHistory large history', () => {
 		expect(numbers[0]).toBe('#75');
 		expect(numbers).not.toContain('#120');
 		expect(list.getAttribute('style')).toContain(`translateY(${45 * 180}px)`);
+	});
+
+	test('the windowed view badges, flags and breaks down payments like the full list', () => {
+		const entries = monthlyEntries(120);
+		entries[119] = { ...entries[119]!, paymentType: 'extra' };
+		mount(entries);
+		const [latest, previous] = paymentCards();
+		expect(within(latest!).getByText('Extra Payment')).toBeTruthy();
+		expect(within(latest!).getByLabelText('Extra payment indicator')).toBeTruthy();
+		expect(within(latest!).getByRole('group', { name: 'Payment breakdown' })).toBeTruthy();
+		expect(within(previous!).getByText('Standard')).toBeTruthy();
+		expect(within(previous!).queryByLabelText('Extra payment indicator')).toBeNull();
+	});
+
+	test('the windowed view of a lease shows no principal and interest breakdown', () => {
+		mount(monthlyEntries(120), makeLease());
+		expect(paymentCards().length).toBeGreaterThan(0);
+		expect(screen.queryByRole('group', { name: 'Payment breakdown' })).toBeNull();
+	});
+
+	test('scrolling to the end renders the oldest payment without a connector below it', async () => {
+		mount(monthlyEntries(120));
+		const list = screen.getByRole('list', { name: 'Payment history timeline' });
+		const scroller = list.parentElement!.parentElement!;
+		scroller.scrollTop = 180 * 120;
+		await fireEvent.scroll(scroller);
+		const cards = paymentCards();
+		const oldest = cards.at(-1)!;
+		expect(within(oldest).getByLabelText(/^Payment number/).textContent).toBe('#1');
+		expect(oldest.querySelector('[aria-hidden="true"].absolute')).toBeNull();
+		expect(cards[0]!.querySelector('[aria-hidden="true"].absolute')).not.toBeNull();
 	});
 });

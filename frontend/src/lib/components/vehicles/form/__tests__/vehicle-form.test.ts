@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/svelte';
-import type { UpdateVehicleRequest, Vehicle } from '#lib/types/index.ts';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import type { UpdateVehicleRequest, Vehicle, VehicleFinancing } from '#lib/types/index.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { dateOnlyToISO } from '#lib/utils/formatters.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
 
 const goto = vi.fn(() => Promise.resolve());
 const refreshAll = vi.fn(() => Promise.resolve());
@@ -14,12 +15,23 @@ vi.mock('$app/navigation', () => ({
 }));
 
 const getVehicle = vi.fn<(id: string) => Promise<Vehicle>>();
-const getFinancing = vi.fn(() => Promise.resolve(null));
+const getFinancing = vi.fn<(id: string) => Promise<VehicleFinancing | null>>();
 const createVehicle = vi.fn<(data: Partial<Vehicle>) => Promise<Vehicle>>();
 const updateVehicle = vi.fn<(id: string, data: UpdateVehicleRequest) => Promise<Vehicle>>();
 const deleteVehicle = vi.fn<(id: string) => Promise<void>>();
+const createFinancing =
+	vi.fn<(vehicleId: string, data: Partial<VehicleFinancing>) => Promise<VehicleFinancing>>();
+const payOffFinancing = vi.fn<(id: string) => Promise<VehicleFinancing>>();
 vi.mock('#lib/services/vehicle-api.ts', () => ({
-	vehicleApi: { getVehicle, getFinancing, createVehicle, updateVehicle, deleteVehicle }
+	vehicleApi: {
+		getVehicle,
+		getFinancing,
+		createVehicle,
+		updateVehicle,
+		deleteVehicle,
+		createFinancing,
+		payOffFinancing
+	}
 }));
 
 const VehicleForm = (await import('../VehicleForm.svelte')).default;
@@ -503,5 +515,342 @@ describe('VehicleForm edit mode', () => {
 		await vi.waitFor(() => expect(notificationMessages()).toContain('Vehicle is shared'));
 		expect(goto).not.toHaveBeenCalled();
 		expect(appStore.vehicles).toHaveLength(1);
+	});
+});
+
+const LOAN: VehicleFinancing = {
+	id: 'fin-1',
+	vehicleId: 'veh-1',
+	financingType: 'loan',
+	provider: 'Credit Union',
+	originalAmount: 20000,
+	apr: 4.5,
+	termMonths: 60,
+	startDate: dateOnlyToISO('2024-01-15'),
+	paymentAmount: 373,
+	paymentFrequency: 'monthly',
+	paymentDayOfMonth: 15,
+	isActive: true,
+	createdAt: '2024-01-01T00:00:00.000Z',
+	updatedAt: '2024-01-01T00:00:00.000Z'
+};
+
+const LEASE: VehicleFinancing = {
+	...LOAN,
+	financingType: 'lease',
+	provider: 'Toyota Financial',
+	originalAmount: 12000,
+	apr: undefined,
+	termMonths: 36,
+	paymentAmount: 333
+};
+
+const unitChangeRejection = () =>
+	new ApiError('Units changed', 400, { requiresUnitChangeConfirmation: true });
+
+function createdFinancing(): Partial<VehicleFinancing> {
+	const [, payload] = createFinancing.mock.calls.at(-1) ?? [];
+	if (!payload) throw new Error('createFinancing was not called');
+	return payload;
+}
+
+async function renderEditWithFinancing(
+	financing: VehicleFinancing,
+	vehicle: Vehicle = EXISTING
+): Promise<void> {
+	getFinancing.mockResolvedValue({ ...financing });
+	await renderEdit(vehicle);
+}
+
+async function submitUpdate(): Promise<void> {
+	await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+}
+
+async function pickStartDate(dateValue: string): Promise<void> {
+	const field = document.querySelector('label[for="startDate"]')?.parentElement;
+	const trigger = field?.querySelector('button');
+	if (!trigger) throw new Error('no start date trigger');
+	await fireEvent.click(trigger);
+	const day = await vi.waitFor(() => {
+		const el = document.querySelector(`[data-bits-day][data-value="${dateValue}"]`);
+		if (!(el instanceof HTMLElement)) throw new Error(`no day ${dateValue}`);
+		return el;
+	});
+	await fireEvent.click(day);
+}
+
+describe('VehicleForm financing on create', () => {
+	test('a new financed vehicle saves the loan with the computed monthly payment', async () => {
+		createVehicle.mockResolvedValue({ ...EXISTING, id: 'new-1' });
+		createFinancing.mockResolvedValue({ ...LOAN, vehicleId: 'new-1' });
+		await renderCreate();
+		await fillRequired();
+		await fireEvent.click(screen.getByRole('button', { name: 'Finance' }));
+		await type('provider', 'Chase');
+		await type('originalAmount', '30000');
+		await type('apr', '6');
+		await pickStartDate('2026-06-01');
+
+		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+
+		await vi.waitFor(() => expect(createFinancing).toHaveBeenCalledTimes(1));
+		expect(createFinancing.mock.calls[0]?.[0]).toBe('new-1');
+		expect(createdFinancing()).toEqual({
+			financingType: 'loan',
+			provider: 'Chase',
+			originalAmount: 30000,
+			apr: 6,
+			termMonths: 60,
+			startDate: dateOnlyToISO('2026-06-01'),
+			paymentAmount: 579.98,
+			paymentFrequency: 'monthly',
+			paymentDayOfMonth: 1
+		});
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
+	});
+
+	test('a financed vehicle missing lender and start date is not saved', async () => {
+		await renderCreate();
+		await fillRequired();
+		await fireEvent.click(screen.getByRole('button', { name: 'Finance' }));
+		await type('originalAmount', '30000');
+		await type('apr', '6');
+
+		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+
+		expect(errorText('provider')).toBe('Provider is required');
+		expect(errorText('startDate')).toBe('Start date is required');
+		expect(createVehicle).not.toHaveBeenCalled();
+	});
+
+	test('a vehicle is still added when saving its financing fails, with a warning', async () => {
+		createVehicle.mockResolvedValue({ ...EXISTING, id: 'new-1' });
+		createFinancing.mockRejectedValue(new Error('lender rejected'));
+		await renderCreate();
+		await fillRequired();
+		await fireEvent.click(screen.getByRole('button', { name: 'Finance' }));
+		await type('provider', 'Chase');
+		await type('originalAmount', '30000');
+		await type('apr', '6');
+		await pickStartDate('2026-06-01');
+
+		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
+		expect(notificationMessages()).toEqual(
+			expect.arrayContaining([
+				'Vehicle saved but financing failed: lender rejected',
+				'Vehicle added successfully!'
+			])
+		);
+	});
+
+	test('a server-side unit confirmation on create re-sends the vehicle once confirmed', async () => {
+		createVehicle
+			.mockRejectedValueOnce(unitChangeRejection())
+			.mockResolvedValueOnce({ ...EXISTING, id: 'new-1' });
+		await renderCreate();
+		await fillRequired();
+
+		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		const dialog = await screen.findByRole('alertdialog');
+		expect(dialog.textContent).toContain('Change units for this vehicle?');
+		expect(dialog.textContent).not.toContain("You're changing");
+		expect(notificationMessages()).toEqual([]);
+
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Change Units' }));
+
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
+		expect(createVehicle).toHaveBeenCalledTimes(2);
+		expect(createdPayload()).not.toHaveProperty('confirmUnitChange');
+	});
+
+	test('rejects a negative purchase price', async () => {
+		await renderCreate();
+		await fillRequired();
+		await type('purchasePrice', '-1');
+
+		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+
+		expect(errorText('purchasePrice')).toBe('Purchase price cannot be negative');
+		expect(input('purchasePrice').getAttribute('aria-describedby')).toBe('purchasePrice-error');
+		expect(createVehicle).not.toHaveBeenCalled();
+	});
+});
+
+describe('VehicleForm financing on edit', () => {
+	beforeEach(() => {
+		updateVehicle.mockResolvedValue(EXISTING);
+		createFinancing.mockResolvedValue(LOAN);
+	});
+
+	test('an active lease opens as Lease and re-saves its terms without an APR', async () => {
+		await renderEditWithFinancing({
+			...LEASE,
+			residualValue: 15000,
+			mileageLimit: 12000,
+			excessMileageFee: 0.25
+		});
+
+		expect(screen.getByText('Lease details and payment information')).toBeTruthy();
+		expect(input('residualValue').value).toBe('15000');
+		await submitUpdate();
+
+		await vi.waitFor(() => expect(createFinancing).toHaveBeenCalledTimes(1));
+		expect(createdFinancing()).toEqual({
+			financingType: 'lease',
+			provider: 'Toyota Financial',
+			originalAmount: 12000,
+			termMonths: 36,
+			startDate: dateOnlyToISO('2024-01-15'),
+			paymentAmount: 333,
+			paymentFrequency: 'monthly',
+			paymentDayOfMonth: 15,
+			residualValue: 15000,
+			mileageLimit: 12000,
+			excessMileageFee: 0.25
+		});
+	});
+
+	test('a lease without residual, mileage limit or excess fee leaves them out', async () => {
+		await renderEditWithFinancing(LEASE);
+
+		await submitUpdate();
+
+		await vi.waitFor(() => expect(createFinancing).toHaveBeenCalledTimes(1));
+		const saved = createdFinancing();
+		expect(saved).not.toHaveProperty('residualValue');
+		expect(saved).not.toHaveProperty('mileageLimit');
+		expect(saved).not.toHaveProperty('excessMileageFee');
+		expect(saved).not.toHaveProperty('apr');
+	});
+
+	test('a saved loan without a payment day defaults to the 1st', async () => {
+		await renderEditWithFinancing({ ...LOAN, paymentDayOfMonth: undefined });
+
+		expect(document.getElementById('dayOfMonth')?.textContent?.trim()).toBe('1');
+		await submitUpdate();
+
+		await vi.waitFor(() => expect(createFinancing).toHaveBeenCalledTimes(1));
+		expect(createdFinancing()).toMatchObject({ paymentDayOfMonth: 1, paymentAmount: 373 });
+	});
+
+	test('a financing save failure with a non-Error reason warns with Unknown error', async () => {
+		createFinancing.mockRejectedValue('timeout');
+		await renderEditWithFinancing(LOAN);
+
+		await submitUpdate();
+
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/veh-1'));
+		expect(notificationMessages()).toContain('Vehicle saved but financing failed: Unknown error');
+		expect(notificationMessages()).toContain('Vehicle updated successfully!');
+	});
+
+	test('an inactive loan opens as Own and saves no financing', async () => {
+		await renderEditWithFinancing({ ...LOAN, isActive: false });
+
+		expect(screen.getByText('This vehicle is owned outright')).toBeTruthy();
+		expect(document.getElementById('provider')).toBeNull();
+		await submitUpdate();
+
+		await vi.waitFor(() => expect(updateVehicle).toHaveBeenCalledTimes(1));
+		expect(createFinancing).not.toHaveBeenCalled();
+		expect(screen.queryByRole('alertdialog')).toBeNull();
+	});
+
+	test('an active record of type own opens as Own', async () => {
+		await renderEditWithFinancing({ ...LOAN, financingType: 'own' });
+
+		expect(screen.getByText('This vehicle is owned outright')).toBeTruthy();
+		expect(document.getElementById('provider')).toBeNull();
+	});
+
+	test('the payoff prompt omits the lender when the loan has none', async () => {
+		await renderEditWithFinancing({ ...LOAN, provider: '' });
+		await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
+		await submitUpdate();
+
+		const dialog = await screen.findByRole('alertdialog');
+		expect(dialog.textContent).toContain('Switching to Own marks the loan as paid off.');
+	});
+
+	test('a failed lease ending names the lease and falls back to Unknown error', async () => {
+		payOffFinancing.mockRejectedValue('offline');
+		await renderEditWithFinancing(LEASE);
+		await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
+		await submitUpdate();
+
+		const dialog = await screen.findByRole('alertdialog');
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'End Lease' }));
+
+		await vi.waitFor(() =>
+			expect(notificationMessages()).toContain("Couldn't mark the lease as ended: Unknown error")
+		);
+		expect(updateVehicle).not.toHaveBeenCalled();
+	});
+});
+
+describe('VehicleForm edit mode unit confirmation', () => {
+	test('confirming sends the update again with confirmUnitChange', async () => {
+		updateVehicle.mockRejectedValueOnce(unitChangeRejection()).mockResolvedValueOnce(EXISTING);
+		await renderEdit({ ...EXISTING, unitPreferences: undefined });
+
+		await submitUpdate();
+		const dialog = await screen.findByRole('alertdialog');
+		expect(dialog.textContent).not.toContain("You're changing");
+
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Change Units' }));
+
+		await vi.waitFor(() => expect(updateVehicle).toHaveBeenCalledTimes(2));
+		expect(updatedPayload()).toMatchObject({ confirmUnitChange: true });
+	});
+
+	test('a confirmation request with no unit difference gives no conversion example', async () => {
+		updateVehicle.mockRejectedValueOnce(unitChangeRejection());
+		await renderEdit();
+
+		await submitUpdate();
+		const dialog = await screen.findByRole('alertdialog');
+
+		expect(dialog.textContent).toContain('are not converted');
+		expect(dialog.textContent).not.toContain('For example');
+	});
+
+	test('a second unit rejection after confirming is reported as an update error', async () => {
+		updateVehicle.mockRejectedValue(unitChangeRejection());
+		await renderEdit();
+		await submitUpdate();
+		const dialog = await screen.findByRole('alertdialog');
+
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Change Units' }));
+
+		await vi.waitFor(() =>
+			expect(notificationMessages()).toContain('Error updating vehicle. Please try again.')
+		);
+	});
+});
+
+describe('VehicleForm edit mode delete dialog', () => {
+	test('names the vehicle by year, make and model when it has no nickname', async () => {
+		await renderEdit({ ...EXISTING, nickname: undefined });
+
+		await fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+		const dialog = await screen.findByRole('alertdialog');
+
+		expect(
+			within(dialog).getByText('2019 Honda Civic', { selector: 'p.font-medium' })
+		).toBeTruthy();
+	});
+
+	test('a delete failure with a non-Error reason shows the generic message', async () => {
+		deleteVehicle.mockRejectedValue('nope');
+		await renderEdit();
+		await fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+		await screen.findByRole('alertdialog');
+
+		await fireEvent.click(screen.getByRole('button', { name: /delete vehicle/i }));
+
+		await vi.waitFor(() => expect(notificationMessages()).toContain('Failed to delete vehicle'));
+		expect(goto).not.toHaveBeenCalled();
 	});
 });
