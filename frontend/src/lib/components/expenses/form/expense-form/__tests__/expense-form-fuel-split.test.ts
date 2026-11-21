@@ -20,15 +20,26 @@ describe('ExpenseFormState fuel split rules', () => {
 		expect(state.showFuelSplitHint).toBe(true);
 	});
 
-	test('choosing Fuel turns an active split off and keeps the first vehicle', () => {
+	test('choosing Fuel turns an active split off and keeps the first selected vehicle', () => {
 		const state = createState();
 		state.selectCategory('maintenance');
 		state.handleSplitToggle(true);
 		state.handleSplitVehicleToggle('v2');
+		state.handleSplitVehicleToggle('v1');
 		expect(state.isSplit).toBe(true);
 		state.selectCategory('fuel');
 		expect(state.isSplit).toBe(false);
-		expect(state.formData.vehicleId).toBe('v1');
+		expect(state.formData.vehicleId).toBe('v2');
+	});
+
+	test('a group edit stays split when Fuel is picked', () => {
+		const state = createState('e1');
+		state.isGroupEditMode = true;
+		state.handleSplitToggle(true);
+		state.handleSplitVehicleToggle('v2');
+		state.selectCategory('fuel');
+		expect(state.isSplit).toBe(true);
+		expect(state.showFuelSplitHint).toBe(false);
 	});
 
 	test('no hint with a single vehicle or on a plain edit', () => {
