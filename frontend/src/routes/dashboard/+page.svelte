@@ -8,8 +8,7 @@
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import DashboardStatsCards from '#lib/components/dashboard/DashboardStatsCards.svelte';
-	import ExpenseTrendChart from '#lib/components/charts/ExpenseTrendChart.svelte';
-	import { AppPieChart } from '#lib/components/charts/index.ts';
+	import ChartCard from '#lib/components/charts/ChartCard.svelte';
 	import RecentActivityCard from '#lib/components/dashboard/RecentActivityCard.svelte';
 	import DueRemindersCard from '#lib/components/dashboard/DueRemindersCard.svelte';
 	import RecurringCostCard from '#lib/components/dashboard/RecurringCostCard.svelte';
@@ -36,6 +35,16 @@
 	import type { TimePeriod } from '#lib/constants/time-periods.ts';
 
 	const UPCOMING_WINDOW_DAYS = 14;
+	const TREND_TITLE = 'Monthly Expense Trends';
+	const TREND_DESCRIPTION = 'Spending over time';
+	const CATEGORY_TITLE = 'Expense by Category';
+	const CATEGORY_DESCRIPTION = 'Distribution across all vehicles';
+
+	const loadCharts = () =>
+		Promise.all([
+			import('#lib/components/charts/ExpenseTrendChart.svelte'),
+			import('#lib/components/charts/index.ts')
+		]);
 
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
@@ -232,6 +241,35 @@
 	}
 </script>
 
+{#snippet trendIcon()}
+	<TrendingUp class="h-5 w-5 text-primary" />
+{/snippet}
+
+{#snippet categoryIcon()}
+	<ChartPie class="h-5 w-5 text-chart-1" />
+{/snippet}
+
+{#snippet chartPlaceholders(error: string | null)}
+	<ChartCard
+		title={TREND_TITLE}
+		description={TREND_DESCRIPTION}
+		isLoading={!error}
+		{error}
+		icon={trendIcon}
+	>
+		{null}
+	</ChartCard>
+	<ChartCard
+		title={CATEGORY_TITLE}
+		description={CATEGORY_DESCRIPTION}
+		isLoading={!error}
+		{error}
+		icon={categoryIcon}
+	>
+		{null}
+	</ChartCard>
+{/snippet}
+
 <svelte:head>
 	<title>Dashboard - VROOM Car Tracker</title>
 	<meta name="description" content="Your vehicle expense dashboard" />
@@ -286,21 +324,29 @@
 
 		{#if stats.totalVehicles > 0}
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-				<ExpenseTrendChart data={trendChartData} title="Monthly Expense Trends" {isLoading}>
-					{#snippet icon()}
-						<TrendingUp class="h-5 w-5 text-primary" />
-					{/snippet}
-				</ExpenseTrendChart>
-				<AppPieChart
-					title="Expense by Category"
-					description="Distribution across all vehicles"
-					data={categoryChartData}
-					{isLoading}
-				>
-					{#snippet icon()}
-						<ChartPie class="h-5 w-5 text-chart-1" />
-					{/snippet}
-				</AppPieChart>
+				{#await loadCharts()}
+					{@render chartPlaceholders(null)}
+				{:then [{ default: ExpenseTrendChart }, { AppPieChart }]}
+					<ExpenseTrendChart data={trendChartData} title={TREND_TITLE} {isLoading}>
+						{#snippet icon()}
+							{@render trendIcon()}
+						{/snippet}
+					</ExpenseTrendChart>
+					<AppPieChart
+						title={CATEGORY_TITLE}
+						description={CATEGORY_DESCRIPTION}
+						data={categoryChartData}
+						{isLoading}
+					>
+						{#snippet icon()}
+							{@render categoryIcon()}
+						{/snippet}
+					</AppPieChart>
+				{:catch}
+					{@render chartPlaceholders(
+						'Charts could not be loaded. Check your connection and reload.'
+					)}
+				{/await}
 			</div>
 
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
