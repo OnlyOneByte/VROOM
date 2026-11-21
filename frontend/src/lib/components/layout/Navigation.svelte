@@ -80,7 +80,8 @@
 			isOnline: onlineStatus.current,
 			syncStatus: syncState.current,
 			pendingCount,
-			conflictsCount: syncConflicts.current.length
+			conflictsCount: syncConflicts.current.length,
+			serverReachable: !authStore.sessionUnverified
 		})
 	);
 </script>
