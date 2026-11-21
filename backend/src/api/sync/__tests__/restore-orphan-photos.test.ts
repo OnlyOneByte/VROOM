@@ -49,9 +49,11 @@ describe('an orphaned photo row does not make backups unrestorable', () => {
       [ctx.user.id, odometer.id, ctx.user.id, vehicle.data.id]
     );
 
-    const del = await ctx.authed('DELETE', `/api/v1/trips/${trip.data.id}?keepOdometer=false`);
-    expect(del.status).toBeLessThan(300);
-    expect(photoIds(), 'the odometer photo is now an orphan').toEqual(['photo-car', 'photo-odo']);
+    ctx.sqlite.run('DELETE FROM odometer_entries WHERE id = ?', [odometer.id]);
+    expect(photoIds(), 'a legacy orphan left by an older build').toEqual([
+      'photo-car',
+      'photo-odo',
+    ]);
 
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
