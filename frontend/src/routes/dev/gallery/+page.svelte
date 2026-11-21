@@ -118,7 +118,7 @@
 			<p class="text-sm text-muted-foreground">
 				Detail and form pages pass a <code>back</code> snippet; the title stays the same size.
 			</p>
-			<pre class="overflow-x-auto rounded-md border bg-muted p-4 text-xs"><code
+			<pre class="whitespace-pre-wrap break-words rounded-md border bg-muted p-4 text-xs"><code
 					>{pageHeaderWithBack}</code
 				></pre>
 		</section>
