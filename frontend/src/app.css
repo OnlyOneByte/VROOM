@@ -29,7 +29,7 @@
 	--input: oklch(0.92 0.004 286.32);
 	--ring: oklch(0.705 0.015 286.067);
 	--chart-1: oklch(0.646 0.222 41.116);
-	--chart-2: oklch(0.6 0.118 184.704);
+	--chart-2: oklch(0.54 0.118 184.704);
 	--chart-3: oklch(0.398 0.07 227.392);
 	--chart-4: oklch(0.633 0.189 84.429);
 	--chart-5: oklch(0.534 0.188 70.08);
@@ -166,8 +166,8 @@
 	[data-sonner-toast] {
 		@apply rounded-lg shadow-lg border;
 		overflow: hidden !important;
-		min-width: 24rem;
-		max-width: 32rem;
+		min-width: min(24rem, calc(100vw - 2rem));
+		max-width: min(32rem, calc(100vw - 2rem));
 	}
 
 	[data-sonner-toast] [data-close-button] {
@@ -200,6 +200,15 @@
 		background-color: var(--card) !important;
 		border-color: currentColor !important;
 		color: inherit !important;
+	}
+
+	[data-sonner-toast][data-type='default'],
+	[data-sonner-toast][data-type='normal'],
+	[data-sonner-toast][data-type='action'],
+	[data-sonner-toast][data-type='loading'] {
+		background-color: var(--card) !important;
+		border-color: var(--border) !important;
+		color: var(--card-foreground) !important;
 	}
 
 	[data-sonner-toast][data-type='success'] {

@@ -50,13 +50,15 @@ Notes:
   paint `bg-card` with their status token as the text colour (AA-gated on `card`); `default` is
   `bg-card text-card-foreground`. All four follow the theme and dark mode. Toasts (`app.css`,
   sonner block) do the same: a `--card` surface with a `--destructive` / `--success` /
-  `--warning` / `--primary` border, text, close button and progress bar.
+  `--warning` / `--primary` border, text, close button and progress bar; plain and loading
+  toasts use `--card-foreground` text and a `--border` edge. Toast width is capped at the
+  viewport minus 2rem (`ui/sonner/__tests__/toast-css.test.ts`).
 - `text-chart-*` is for chart marks and icons, not words: chart tokens are gated at 3:1, on
   `card` and as an icon on their own `/10` tint over `card` and `background` (the category badges
   and `StatCard` chips). Put the label in `text-foreground` beside the tinted icon. Status text
-  uses `text-success` / `text-warning` / `text-destructive`. `chart-5` is the one exception
-  still used for words on a few screens, so it is also gated as text at AA on `background` and
-  `card`; new status text uses `text-warning` instead.
+  uses `text-success` / `text-warning` / `text-destructive`. `chart-5` and `chart-2` are
+  still used for words on a few screens, so both are also gated as text at AA (`background` and
+  `card`, plus `popover` for `chart-2`); new status text uses `text-warning` / `text-success`.
 - In every theme and both modes these tinted text pairs are gated at AA over `background` and
   `card`: `text-primary` on `bg-primary/10` (the active nav item, chips, avatars),
   `text-warning` on `bg-warning/10` and `text-chart-5` on `bg-chart-5/10`. The axe e2e scans
