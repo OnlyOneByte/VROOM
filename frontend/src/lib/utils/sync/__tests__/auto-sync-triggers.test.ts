@@ -22,6 +22,12 @@ function deliveries(): number {
 	}).length;
 }
 
+function postedClientIds(): string[] {
+	return mockFetch.mock.calls
+		.filter(([, init]) => (init as { method?: string } | undefined)?.method === 'POST')
+		.map(([, init]) => JSON.parse((init as { body: string }).body).clientId);
+}
+
 function queued(id: string): OfflineExpense {
 	return {
 		id,
@@ -190,12 +196,12 @@ describe('auto-sync triggers', () => {
 		expect(deliveries()).toBe(2);
 	});
 
-	it('stops retrying while a sync conflict waits for the user', async () => {
+	it('keeps retrying other entries while a sync conflict waits, and leaves the conflicted one to the dialog', async () => {
 		const { storage, syncManager } = graph;
 		const { syncConflicts } = await import('../sync-state.svelte');
 		syncManager.setupAutoSync();
 		serverUp = false;
-		storage.saveOfflineExpenses([queued('a')]);
+		storage.saveOfflineExpenses([queued('a'), queued('c')]);
 		syncConflicts.current = [
 			{
 				id: 'c',
@@ -205,9 +211,15 @@ describe('auto-sync triggers', () => {
 		];
 
 		syncManager.requestAutoSync();
-		await vi.advanceTimersByTimeAsync(20 * 60_000);
+		await vi.advanceTimersByTimeAsync(30_000);
+		serverUp = true;
+		await vi.advanceTimersByTimeAsync(60_000);
 
-		expect(deliveries()).toBe(0);
+		expect(postedClientIds()).toEqual(['cid-a', 'cid-a']);
+		expect(storage.getPendingExpenses().map(e => e.id)).toEqual(['c']);
+
+		await vi.advanceTimersByTimeAsync(20 * 60_000);
+		expect(postedClientIds()).toEqual(['cid-a', 'cid-a']);
 		syncConflicts.current = [];
 	});
 });

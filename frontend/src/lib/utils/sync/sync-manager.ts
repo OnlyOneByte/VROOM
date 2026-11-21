@@ -123,6 +123,11 @@ function serverCopyDiffers(local: OfflineExpense, server: BackendExpenseResponse
 	);
 }
 
+function retryableExpenses(): OfflineExpense[] {
+	const conflicted = new Set(syncConflicts.current.map(conflict => conflict.localExpense.id));
+	return getPendingExpenses().filter(expense => !conflicted.has(expense.id));
+}
+
 class SyncManager {
 	private retryCount = new Map<string, number>();
 	private syncInProgress = false;
@@ -130,7 +135,7 @@ class SyncManager {
 	private autoSyncTimer: ReturnType<typeof setTimeout> | null = null;
 	private autoSyncAttempt = 0;
 
-	async syncAll(): Promise<SyncResult> {
+	async syncAll(options: { skipConflicted?: boolean } = {}): Promise<SyncResult> {
 		if (this.syncInProgress) {
 			throw new Error('Sync already in progress');
 		}
@@ -143,7 +148,7 @@ class SyncManager {
 		syncState.current = 'syncing';
 
 		try {
-			const pendingExpenses = getPendingExpenses();
+			const pendingExpenses = options.skipConflicted ? retryableExpenses() : getPendingExpenses();
 			const result = await this.syncExpenses(pendingExpenses);
 
 			clearSyncedExpenses();
@@ -410,11 +415,7 @@ class SyncManager {
 
 	private continueAutoSync(): void {
 		if (!this.autoSyncSetup) return;
-		if (
-			!onlineStatus.current ||
-			getPendingExpenses().length === 0 ||
-			syncConflicts.current.length > 0
-		) {
+		if (!onlineStatus.current || retryableExpenses().length === 0) {
 			this.autoSyncAttempt = 0;
 			return;
 		}
@@ -428,14 +429,14 @@ class SyncManager {
 	}
 
 	private async runAutoSync(): Promise<void> {
-		if (!onlineStatus.current || getPendingExpenses().length === 0) return;
+		if (!onlineStatus.current || retryableExpenses().length === 0) return;
 		if (this.syncInProgress) {
 			this.scheduleAutoSync(AUTO_SYNC_DELAY_MS);
 			return;
 		}
 
 		try {
-			await this.syncAll();
+			await this.syncAll({ skipConflicted: true });
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Auto-sync failed:', error);
 		}
