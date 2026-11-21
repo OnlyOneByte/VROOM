@@ -194,3 +194,69 @@ describe('split + delete endpoint wiring', () => {
 		expect(del).toHaveBeenCalledWith('/api/v1/expenses/split/g1');
 	});
 });
+
+describe('expenseApi query and photo wiring', () => {
+	test('detectImportSource POSTs the CSV headers and returns the preset', async () => {
+		post.mockResolvedValueOnce(null);
+		await expect(expenseApi.detectImportSource(['Date', 'Amount'])).resolves.toBeNull();
+		expect(post).toHaveBeenCalledWith('/api/v1/expenses/import/detect', {
+			headers: ['Date', 'Amount']
+		});
+	});
+
+	test('getExpenseSummary omits empty filters and encodes provided ones', async () => {
+		get.mockResolvedValue({});
+		await expenseApi.getExpenseSummary();
+		await expenseApi.getExpenseSummary({ vehicleId: '', period: '' });
+		await expenseApi.getExpenseSummary({ vehicleId: 'v1', period: '30d' });
+		expect(get.mock.calls.map(c => c[0])).toEqual([
+			'/api/v1/expenses/summary',
+			'/api/v1/expenses/summary',
+			'/api/v1/expenses/summary?vehicleId=v1&period=30d'
+		]);
+	});
+
+	test('getVehicleStats only sends recentDays when it is positive', async () => {
+		get.mockResolvedValue([]);
+		await expenseApi.getVehicleStats();
+		await expenseApi.getVehicleStats(0);
+		await expenseApi.getVehicleStats(30);
+		expect(get.mock.calls.map(c => c[0])).toEqual([
+			'/api/v1/expenses/vehicle-stats',
+			'/api/v1/expenses/vehicle-stats',
+			'/api/v1/expenses/vehicle-stats?recentDays=30'
+		]);
+	});
+
+	test('photo helpers target the expense entity photo collection', async () => {
+		getPaginated.mockResolvedValueOnce({ data: [] });
+		del.mockResolvedValueOnce(undefined);
+		await expenseApi.getPhotos('expense', 'e1');
+		await expenseApi.deletePhoto('expense', 'e1', 'p1');
+		expect(getPaginated).toHaveBeenCalledWith('/api/v1/photos/expense/e1');
+		expect(del).toHaveBeenCalledWith('/api/v1/photos/expense/e1/p1');
+		expect(expenseApi.getPhotoThumbnailUrl('expense', 'e1', 'p1')).toBe(
+			'/api/v1/photos/expense/e1/p1/thumbnail'
+		);
+	});
+
+	test('updateSplitExpense PUTs the new config to the group path', async () => {
+		put.mockResolvedValueOnce({ siblings: [], groupId: 'g1', groupTotal: 50, splitMethod: 'even' });
+		await expenseApi.updateSplitExpense('g1', {
+			splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
+			totalAmount: 50
+		});
+		expect(put).toHaveBeenCalledWith('/api/v1/expenses/split/g1', {
+			splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
+			totalAmount: 50
+		});
+	});
+
+	test('getSplitExpense GETs the group and propagates failures', async () => {
+		get.mockResolvedValueOnce({ siblings: [], groupId: 'g2', groupTotal: 0, splitMethod: 'even' });
+		await expect(expenseApi.getSplitExpense('g2')).resolves.toMatchObject({ groupId: 'g2' });
+		expect(get).toHaveBeenCalledWith('/api/v1/expenses/split/g2');
+		get.mockRejectedValueOnce(new Error('gone'));
+		await expect(expenseApi.getSplitExpense('g3')).rejects.toThrow('gone');
+	});
+});
