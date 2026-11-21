@@ -33,6 +33,12 @@ const ALL_TIME_EXPENSE_COUNT = 4;
 const nowMs = Date.now();
 const ago = (days: number): string => new Date(nowMs - days * 86_400_000).toISOString();
 const ahead = (days: number): string => new Date(nowMs + days * 86_400_000).toISOString();
+const yearStartMs = Date.UTC(new Date(nowMs).getUTCFullYear(), 0, 1);
+const inThisYear = (days: number): boolean => nowMs - days * 86_400_000 >= yearStartMs;
+const yearToDateExpenses = (): number =>
+  (inThisYear(6) ? FUEL_ONE : 0) +
+  (inThisYear(2) ? FUEL_TWO : 0) +
+  (inThisYear(4) ? MAINTENANCE : 0);
 
 function analyticsRange(): string {
   const { start, end } = tools.resolveRange('30d', nowMs);
@@ -235,7 +241,7 @@ describe('assistant tools report the SAME money as the HTTP routes (dollars, not
       `/api/v1/analytics/summary?${analyticsRange()}`
     );
 
-    expect(tool.quickStats.ytdSpending).toBeCloseTo(WINDOW_EXPENSES, 2);
+    expect(tool.quickStats.ytdSpending).toBeCloseTo(yearToDateExpenses(), 2);
     expect(tool).toEqual(route);
   });
 

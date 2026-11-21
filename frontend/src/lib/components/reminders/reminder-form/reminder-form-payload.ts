@@ -1,5 +1,5 @@
 import { buildSplitConfig } from '#lib/utils/expense-helpers.ts';
-import { dateOnlyToISO } from '#lib/utils/formatters.ts';
+import { toDateInputValue } from '#lib/utils/formatters.ts';
 import type { Reminder } from '#lib/types/reminder.ts';
 import {
 	hasMileageTrigger,
@@ -7,7 +7,7 @@ import {
 	type ReminderDraft
 } from './reminder-form-model';
 
-export type ReminderPayload = Partial<Reminder> & { vehicleIds: string[] };
+export type ReminderPayload = Partial<Reminder> & { vehicleIds: string[]; timeZone: string };
 
 export function buildReminderPayload(draft: ReminderDraft): ReminderPayload {
 	const isExpense = draft.kind === 'expense';
@@ -24,8 +24,9 @@ export function buildReminderPayload(draft: ReminderDraft): ReminderPayload {
 		frequency: draft.frequency,
 		intervalValue: draft.frequency === 'custom' ? parseInt(draft.intervalValue, 10) : null,
 		intervalUnit: draft.frequency === 'custom' ? draft.intervalUnit : null,
-		startDate: dateOnlyToISO(draft.startDate),
-		endDate: draft.endDate ? dateOnlyToISO(draft.endDate) : null,
+		startDate: draft.startDate || toDateInputValue(new Date()),
+		endDate: draft.endDate || null,
+		timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 		vehicleIds: draft.selectedVehicleIds,
 		expenseCategory: isExpense ? draft.expenseCategory : null,
 		expenseAmount: isExpense ? parseFloat(draft.expenseAmount) : null,

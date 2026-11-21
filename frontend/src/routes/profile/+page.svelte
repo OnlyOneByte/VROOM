@@ -42,6 +42,7 @@
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { Pencil, Check, X } from '@lucide/svelte';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import ComingSoonCard from '#lib/components/common/coming-soon-card.svelte';
 	import GoogleLogo from '#lib/components/icons/GoogleLogo.svelte';
 	import GitHubLogo from '#lib/components/icons/GitHubLogo.svelte';
@@ -68,6 +69,8 @@
 	let isLoadingAccounts = $state(true);
 	let unlinkingId = $state<string | null>(null);
 	let unlinkError = $state<string | null>(null);
+	let unlinkConfirmOpen = $state(false);
+	let pendingUnlink = $state<LinkedAuthProvider | null>(null);
 	let linkingProvider = $state<string | null>(null);
 
 	let isEditingName = $state(false);
@@ -146,6 +149,11 @@
 			isLoadingAccounts = false;
 		}
 	});
+
+	function confirmUnlink(account: LinkedAuthProvider) {
+		pendingUnlink = account;
+		unlinkConfirmOpen = true;
+	}
 
 	async function handleUnlink(id: string) {
 		unlinkingId = id;
@@ -230,7 +238,7 @@
 								<Input
 									bind:value={nameDraft}
 									maxlength={100}
-									class="h-8 max-w-[200px]"
+									class="h-10 max-w-[200px] sm:h-8"
 									disabled={isSavingName}
 									aria-label="Display name"
 									onkeydown={(e: KeyboardEvent) => {
@@ -239,7 +247,8 @@
 									}}
 								/>
 								<Button
-									size="sm"
+									size="icon-lg"
+									class="sm:h-8 sm:w-9"
 									variant="ghost"
 									onclick={saveDisplayName}
 									disabled={isSavingName}
@@ -252,7 +261,8 @@
 									{/if}
 								</Button>
 								<Button
-									size="sm"
+									size="icon-lg"
+									class="sm:h-8 sm:w-9"
 									variant="ghost"
 									onclick={cancelEditName}
 									disabled={isSavingName}
@@ -265,7 +275,8 @@
 							<div class="flex items-center gap-2">
 								<span class="text-sm">{user?.displayName ?? '—'}</span>
 								<Button
-									size="sm"
+									size="icon-lg"
+									class="sm:h-8 sm:w-9"
 									variant="ghost"
 									onclick={startEditName}
 									aria-label="Edit display name"
@@ -349,10 +360,11 @@
 								</div>
 								<Button
 									variant="ghost"
-									size="sm"
+									size="icon-lg"
+									class="sm:h-8 sm:w-9"
 									aria-label="Unlink {account.displayName}"
 									disabled={accounts.length <= 1 || unlinkingId !== null}
-									onclick={() => handleUnlink(account.id)}
+									onclick={() => confirmUnlink(account)}
 								>
 									{#if unlinkingId === account.id}
 										<LoaderCircle class="h-4 w-4 animate-spin" />
@@ -372,7 +384,7 @@
 									<Button
 										variant="outline"
 										size="sm"
-										class="w-full justify-start"
+										class="h-10 w-full justify-start sm:h-8"
 										disabled={linkingProvider !== null}
 										onclick={() => handleLink(provider.id)}
 									>
@@ -426,7 +438,13 @@
 							</p>
 						</div>
 					</div>
-					<Button variant="outline" size="sm" onclick={handleExportData} disabled={isExporting}>
+					<Button
+						variant="outline"
+						size="sm"
+						class="h-10 sm:h-8"
+						onclick={handleExportData}
+						disabled={isExporting}
+					>
 						{#if isExporting}
 							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 							Exporting...
@@ -469,3 +487,13 @@
 		/>
 	</div>
 </FormLayout>
+
+<ConfirmDialog
+	bind:open={unlinkConfirmOpen}
+	title="Unlink sign-in method?"
+	description={pendingUnlink
+		? `You will no longer be able to sign in with ${pendingUnlink.displayName} (${pendingUnlink.email}). Your vehicles and expenses stay. You can link it again later.`
+		: ''}
+	confirmLabel="Unlink"
+	onConfirm={() => (pendingUnlink ? handleUnlink(pendingUnlink.id) : undefined)}
+/>

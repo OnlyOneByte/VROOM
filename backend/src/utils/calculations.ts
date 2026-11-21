@@ -1,3 +1,5 @@
+import { NATIVE_SCALE, type UnitScale } from './unit-conversions';
+
 interface EfficiencyExpense {
   mileage: number | null;
   volume: number | null;
@@ -24,7 +26,10 @@ interface MpgPairRow {
   missedFillup?: boolean;
 }
 
-export function averageConsecutiveMpg(sortedExpenses: MpgPairRow[]): number | null {
+export function averageConsecutiveMpg(
+  sortedExpenses: MpgPairRow[],
+  scale: UnitScale = NATIVE_SCALE
+): number | null {
   const mpgValues: number[] = [];
 
   for (let i = 1; i < sortedExpenses.length; i++) {
@@ -38,8 +43,9 @@ export function averageConsecutiveMpg(sortedExpenses: MpgPairRow[]): number | nu
     if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
       const mpg = calculateMPG(miles, current.volume);
+      const canonicalMpg = calculateMPG(miles * scale.distance, current.volume * scale.volume);
 
-      if (mpg >= MIN_VALID_MPG && mpg <= MAX_VALID_MPG) {
+      if (canonicalMpg >= MIN_VALID_MPG && canonicalMpg <= MAX_VALID_MPG) {
         mpgValues.push(mpg);
       }
     }
@@ -57,7 +63,10 @@ function calculateMilesPerKwh(miles: number, kwh: number): number {
   return kwh > 0 ? miles / kwh : 0;
 }
 
-export function calculateAverageMilesPerKwh(chargeExpenses: EfficiencyExpense[]): number | null {
+export function calculateAverageMilesPerKwh(
+  chargeExpenses: EfficiencyExpense[],
+  scale: UnitScale = NATIVE_SCALE
+): number | null {
   if (chargeExpenses.length < 2) {
     return null;
   }
@@ -82,8 +91,9 @@ export function calculateAverageMilesPerKwh(chargeExpenses: EfficiencyExpense[])
     if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
       const milesPerKwh = calculateMilesPerKwh(miles, current.volume);
+      const canonical = calculateMilesPerKwh(miles * scale.distance, current.volume);
 
-      if (milesPerKwh >= MIN_VALID_MI_KWH && milesPerKwh <= MAX_VALID_MI_KWH) {
+      if (canonical >= MIN_VALID_MI_KWH && canonical <= MAX_VALID_MI_KWH) {
         milesPerKwhValues.push(milesPerKwh);
       }
     }
