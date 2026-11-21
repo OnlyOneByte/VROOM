@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { CONFIG } from '../../config';
 import type { NewReminder, Reminder } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
@@ -10,7 +11,7 @@ import {
   reminderWithVehiclesToApi,
 } from '../../utils/money';
 import { requireVehicleOwnerScope } from '../../utils/sharing';
-import { calendarDayIn } from '../../utils/time-zone';
+import { calendarDayIn, isValidTimeZone } from '../../utils/time-zone';
 import { commonSchemas, validateReminderOwnership, zValidator } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
@@ -92,11 +93,19 @@ async function requireExistingReminderWrite(
   return { ownerId };
 }
 
-function advanceToFirstFutureDue(reminder: Reminder, from: Date): Date {
+const timeZoneQuerySchema = z.object({
+  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
+});
+
+function advanceToFirstFutureDue(
+  reminder: Reminder,
+  from: Date,
+  timeZone: string | undefined
+): Date {
   const now = new Date();
-  let nextDue = advanceReminderDueDate(reminder, from);
+  let nextDue = advanceReminderDueDate(reminder, from, timeZone);
   while (nextDue <= now) {
-    const advanced = advanceReminderDueDate(reminder, nextDue);
+    const advanced = advanceReminderDueDate(reminder, nextDue, timeZone);
     if (advanced <= nextDue) {
       throw new ValidationError(
         `Reminder ${reminder.id} did not advance (frequency "${reminder.frequency}") — aborting re-arm`
@@ -107,14 +116,19 @@ function advanceToFirstFutureDue(reminder: Reminder, from: Date): Date {
   return nextDue;
 }
 
-function nextDueAfterService(reminder: Reminder, due: Date, now: Date): Date {
-  if (due <= now) return advanceToFirstFutureDue(reminder, due);
-  const periodStart = previousDueBefore(reminder, due);
+function nextDueAfterService(
+  reminder: Reminder,
+  due: Date,
+  now: Date,
+  timeZone: string | undefined
+): Date {
+  if (due <= now) return advanceToFirstFutureDue(reminder, due, timeZone);
+  const periodStart = previousDueBefore(reminder, due, timeZone);
   const alreadyAdvanced =
     periodStart !== null &&
     (periodStart > now ||
       (reminder.lastTriggeredAt !== null && reminder.lastTriggeredAt >= periodStart));
-  return alreadyAdvanced ? due : advanceReminderDueDate(reminder, due);
+  return alreadyAdvanced ? due : advanceReminderDueDate(reminder, due, timeZone);
 }
 
 const DAY_MS = 86_400_000;
@@ -170,12 +184,13 @@ function scheduleChanged(existing: Reminder, merged: MergedSchedule): boolean {
 function rescheduledFields(
   existing: Reminder,
   update: Partial<NewReminder>,
-  merged: MergedSchedule
+  merged: MergedSchedule,
+  timeZone: string | undefined
 ): Partial<NewReminder> {
   if (merged.triggerMode === 'mileage') return {};
   const resumed = update.isActive === true && !existing.isActive;
   if (!resumed && !scheduleChanged(existing, merged)) return {};
-  const nextDueDate = firstDueOnOrAfter(merged, new Date());
+  const nextDueDate = firstDueOnOrAfter(merged, new Date(), timeZone);
   const ended = merged.endDate != null && nextDueDate > merged.endDate;
   return ended ? { nextDueDate, isActive: false } : { nextDueDate };
 }
@@ -189,9 +204,10 @@ const triggerRateLimiter = rateLimiter({
 });
 
 // Static segments must be registered before /:id.
-routes.post('/trigger', triggerRateLimiter, async (c) => {
+routes.post('/trigger', triggerRateLimiter, zValidator('query', timeZoneQuerySchema), async (c) => {
   const user = c.get('user');
-  const result = await reminderTriggerService.processOverdueReminders(user.id);
+  const { timeZone } = c.req.valid('query');
+  const result = await reminderTriggerService.processOverdueReminders(user.id, timeZone);
   return c.json({
     success: true,
     data: { ...result, createdExpenses: result.createdExpenses.map(expenseToApi) },
@@ -212,9 +228,11 @@ routes.post(
   '/:id/mark-serviced',
   triggerRateLimiter,
   zValidator('param', commonSchemas.idParam),
+  zValidator('query', timeZoneQuerySchema),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
+    const { timeZone } = c.req.valid('query');
 
     const existing = await reminderRepository.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
@@ -239,7 +257,7 @@ routes.post(
       (reminder.triggerMode === 'time' || reminder.triggerMode === 'both') &&
       reminder.nextDueDate
     ) {
-      const nextDue = nextDueAfterService(reminder, reminder.nextDueDate, new Date());
+      const nextDue = nextDueAfterService(reminder, reminder.nextDueDate, new Date(), timeZone);
       if (reminder.endDate && nextDue > reminder.endDate) {
         await reminderRepository.deactivate(id, ownerId);
         return c.json({ success: true, data: reminderToApi({ ...reminder, isActive: false }) });
@@ -359,7 +377,7 @@ routes.put(
 
     assertMergedReminderValid(merged, partialUpdate);
 
-    const { vehicleIds: mergedVehicleIds, timeZone: _timeZone, ...reminderFields } = partialUpdate;
+    const { vehicleIds: mergedVehicleIds, timeZone, ...reminderFields } = partialUpdate;
     const updateFields: Partial<NewReminder> = { ...reminderFields };
 
     const touchesMileage =
@@ -378,7 +396,10 @@ routes.put(
       }
     }
 
-    Object.assign(updateFields, rescheduledFields(existing.reminder, reminderFields, merged));
+    Object.assign(
+      updateFields,
+      rescheduledFields(existing.reminder, reminderFields, merged, timeZone)
+    );
 
     const result = await reminderRepository.updateWithVehicles(
       id,

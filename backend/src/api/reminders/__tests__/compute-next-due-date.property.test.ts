@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import type { Reminder } from '../../../db/schema';
+import { calendarDayIn } from '../../../utils/time-zone';
 import { advanceReminderDueDate, computeNextDueDate } from '../trigger-service';
 
 function stubReminder(fields: {
@@ -286,5 +287,60 @@ describe('advanceReminderDueDate delegates to computeNextDueDate with the remind
         start
       )
     ).toThrow(/intervalValue/);
+  });
+});
+
+describe('schedule maths in the user time zone', () => {
+  const dueDays = (timeZone: string, startDate: Date, count: number) => {
+    const reminder = stubReminder({ frequency: 'monthly', startDate });
+    const days: string[] = [];
+    let due = startDate;
+    for (let i = 0; i < count; i++) {
+      due = advanceReminderDueDate(reminder, due, timeZone);
+      days.push(calendarDayIn(due, timeZone));
+    }
+    return days;
+  };
+
+  test('UTC+13: a reminder starting on 31 January stays on the month end, at local noon', () => {
+    const start = new Date('2026-01-30T23:00:00Z');
+    expect(dueDays('Pacific/Tongatapu', start, 3)).toEqual([
+      '2026-02-28',
+      '2026-03-31',
+      '2026-04-30',
+    ]);
+    const reminder = stubReminder({ frequency: 'monthly', startDate: start });
+    expect(advanceReminderDueDate(reminder, start, 'Pacific/Tongatapu').toISOString()).toBe(
+      '2026-02-27T23:00:00.000Z'
+    );
+  });
+
+  test('UTC-10: a reminder starting on 31 January keeps the 31st as its anchor', () => {
+    const start = new Date('2026-01-31T22:00:00Z');
+    expect(dueDays('Pacific/Honolulu', start, 3)).toEqual([
+      '2026-02-28',
+      '2026-03-31',
+      '2026-04-30',
+    ]);
+  });
+
+  test('weekly and custom-day steps move by whole days in the user zone', () => {
+    const start = new Date('2026-03-30T23:00:00Z');
+    const weekly = stubReminder({ frequency: 'weekly', startDate: start });
+    expect(
+      calendarDayIn(advanceReminderDueDate(weekly, start, 'Pacific/Tongatapu'), 'Pacific/Tongatapu')
+    ).toBe('2026-04-07');
+    expect(
+      calendarDayIn(
+        computeNextDueDate(start, 'custom', 10, 'day', undefined, 'Pacific/Tongatapu'),
+        'Pacific/Tongatapu'
+      )
+    ).toBe('2026-04-10');
+  });
+
+  test('a DST change keeps the local time of day', () => {
+    const start = new Date('2026-03-01T20:00:00Z');
+    const next = computeNextDueDate(start, 'monthly', null, null, undefined, 'America/New_York');
+    expect(next.toISOString()).toBe('2026-04-01T19:00:00.000Z');
   });
 });

@@ -112,6 +112,8 @@ describe('reminderApi.getRecurringCost()', () => {
 	});
 });
 
+const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 describe('reminderApi — CRUD + trigger + mark-serviced wiring', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -130,11 +132,11 @@ describe('reminderApi — CRUD + trigger + mark-serviced wiring', () => {
 		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders/r1');
 	});
 
-	it('update PUTs the id path with the body', async () => {
+	it('update PUTs the id path with the body and the user time zone', async () => {
 		mockPut.mockResolvedValueOnce({ reminder: { id: 'r1' }, vehicleIds: ['v2'] });
 		const body = { title: 'New', vehicleIds: ['v2'] };
 		await reminderApi.update('r1', body);
-		expect(mockPut).toHaveBeenCalledWith('/api/v1/reminders/r1', body);
+		expect(mockPut).toHaveBeenCalledWith('/api/v1/reminders/r1', { ...body, timeZone: ZONE });
 	});
 
 	it('delete DELETEs the id path', async () => {
@@ -146,13 +148,17 @@ describe('reminderApi — CRUD + trigger + mark-serviced wiring', () => {
 	it('trigger POSTs /reminders/trigger', async () => {
 		mockPost.mockResolvedValueOnce({ createdExpenses: [], notifications: [], skipped: [] });
 		await reminderApi.trigger();
-		expect(mockPost).toHaveBeenCalledWith('/api/v1/reminders/trigger');
+		expect(mockPost).toHaveBeenCalledWith(
+			`/api/v1/reminders/trigger?timeZone=${encodeURIComponent(ZONE)}`
+		);
 	});
 
 	it('markServiced POSTs the mark-serviced path', async () => {
 		mockPost.mockResolvedValueOnce({ id: 'r1' });
 		await reminderApi.markServiced('r1');
-		expect(mockPost).toHaveBeenCalledWith('/api/v1/reminders/r1/mark-serviced');
+		expect(mockPost).toHaveBeenCalledWith(
+			`/api/v1/reminders/r1/mark-serviced?timeZone=${encodeURIComponent(ZONE)}`
+		);
 	});
 
 	it('markNotificationRead PUTs the notification read path', async () => {
