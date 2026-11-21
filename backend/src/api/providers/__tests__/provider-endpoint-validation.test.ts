@@ -266,6 +266,7 @@ describe('stored model rows and model updates', () => {
 interface SeenRequest {
   method: string;
   host: string | null;
+  contentLength: string | null;
   path: string;
   body: string;
 }
@@ -280,6 +281,7 @@ function startLoopbackServer(respond: (req: Request) => Response) {
       seen.push({
         method: req.method,
         host: req.headers.get('host'),
+        contentLength: req.headers.get('content-length'),
         path: `${url.pathname}${url.search}`,
         body: await req.text(),
       });
@@ -359,6 +361,27 @@ describe('outbound requests connect to the validated address', () => {
         '/photos?list-type=2&prefix=VROOM%2Fit%27s%20%281%29%2A&uploads'
       );
       expect(lookups).toBe(2);
+    } finally {
+      server.stop();
+    }
+  });
+
+  test('a streamed S3 request body is sent with its content length', async () => {
+    const server = startLoopbackServer(() => new Response(null, { status: 200 }));
+    outboundResolver.lookup = async () => ['127.0.0.1'];
+    outboundResolver.connectUrl = urlForAddress;
+    try {
+      const put = await sendS3({
+        protocol: 'http:',
+        hostname: 'minio.pinned.test',
+        port: server.port,
+        method: 'PUT',
+        path: '/photos/streamed.jpg',
+        body: Readable.from([Buffer.from('up'), Buffer.from('loaded')]),
+      });
+      expect(put.response.statusCode).toBe(200);
+      expect(server.seen[0]?.body).toBe('uploaded');
+      expect(server.seen[0]?.contentLength).toBe('8');
     } finally {
       server.stop();
     }
