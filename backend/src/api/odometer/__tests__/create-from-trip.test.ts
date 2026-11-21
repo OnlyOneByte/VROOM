@@ -50,7 +50,7 @@ describe('OdometerRepository.createFromTrip', () => {
     vehicleId: VEHICLE_ID,
     userId: USER_ID,
     odometer: 5000,
-    recordedAt: new Date('2024-06-20T12:00:00.000Z'),
+    recordedAt: new Date('2024-06-20T12:00'),
     ...over,
   });
 
@@ -69,9 +69,7 @@ describe('OdometerRepository.createFromTrip', () => {
 
   test('DEDUPS a same (vehicle, day, reading) entry → returns null, no second row', async () => {
     await repo.createFromTrip(base());
-    const dup = await repo.createFromTrip(
-      base({ recordedAt: new Date('2024-06-20T20:30:00.000Z') })
-    );
+    const dup = await repo.createFromTrip(base({ recordedAt: new Date('2024-06-20T20:30') }));
     expect(dup).toBeNull();
     expect(countEntries()).toBe(1);
   });
@@ -85,10 +83,8 @@ describe('OdometerRepository.createFromTrip', () => {
   });
 
   test('the SAME reading on a DIFFERENT day DOES insert (distinct observation)', async () => {
-    await repo.createFromTrip(base({ recordedAt: new Date('2024-06-20T12:00:00.000Z') }));
-    const nextDay = await repo.createFromTrip(
-      base({ recordedAt: new Date('2024-06-21T12:00:00.000Z') })
-    );
+    await repo.createFromTrip(base({ recordedAt: new Date('2024-06-20T12:00') }));
+    const nextDay = await repo.createFromTrip(base({ recordedAt: new Date('2024-06-21T12:00') }));
     expect(nextDay).not.toBeNull();
     expect(countEntries()).toBe(2);
   });
@@ -96,7 +92,7 @@ describe('OdometerRepository.createFromTrip', () => {
   test('dedup is userId-scoped — a foreign user’s same-day-same-reading row does NOT block this insert', async () => {
     sqliteDb.run(
       `INSERT INTO odometer_entries (id, vehicle_id, user_id, odometer, recorded_at)
-       VALUES ('odo-foreign', '${VEHICLE_ID}', '${OTHER_USER}', 5000, ${Math.floor(Date.UTC(2024, 5, 20, 12) / 1000)})`
+       VALUES ('odo-foreign', '${VEHICLE_ID}', '${OTHER_USER}', 5000, ${Math.floor(new Date(2024, 5, 20, 12).getTime() / 1000)})`
     );
     const created = await repo.createFromTrip(base());
     expect(created, 'our insert is not blocked by a foreign user row').not.toBeNull();
@@ -107,18 +103,16 @@ describe('OdometerRepository.createFromTrip', () => {
       vehicleId: VEHICLE_ID,
       userId: USER_ID,
       odometer: 5000,
-      recordedAt: new Date('2024-06-20T09:00:00.000Z'),
+      recordedAt: new Date('2024-06-20T09:00'),
       note: null,
     });
-    const fromTrip = await repo.createFromTrip(
-      base({ recordedAt: new Date('2024-06-20T18:00:00.000Z') })
-    );
+    const fromTrip = await repo.createFromTrip(base({ recordedAt: new Date('2024-06-20T18:00') }));
     expect(fromTrip, 'a trip reading matching a manual entry dedups').toBeNull();
     expect(countEntries()).toBe(1);
   });
 
   test('the dedup window is the local calendar day, not a UTC slice', async () => {
-    const first = new Date('2024-06-20T12:00:00.000Z');
+    const first = new Date('2024-06-20T12:00');
     await repo.createFromTrip(base({ recordedAt: first }));
     const sameLocalDay = new Date(first.getFullYear(), first.getMonth(), first.getDate(), 23, 0, 0);
     const dup = await repo.createFromTrip(base({ recordedAt: sameLocalDay }));

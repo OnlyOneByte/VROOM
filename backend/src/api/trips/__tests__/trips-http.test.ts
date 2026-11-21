@@ -14,12 +14,14 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
+const localIso = (localDateTime: string): string => new Date(localDateTime).toISOString();
+
 const VALID = (vehicleId: string, over: Record<string, unknown> = {}) => ({
   vehicleId,
   startOdometer: 1000,
   endOdometer: 1080,
   purpose: 'business',
-  tripDate: '2024-06-20T13:30:00.000Z',
+  tripDate: localIso('2024-06-20T13:30'),
   ...over,
 });
 
@@ -128,7 +130,7 @@ describe('POST /api/v1/trips (create)', () => {
       startOdometer: 1000,
       endOdometer: 1100,
       purpose: 'personal',
-      tripDate: '2024-06-20T12:00:00.000Z',
+      tripDate: localIso('2024-06-20T12:00'),
     });
     const body = await json<DataEnvelope<{ id: string }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
@@ -184,12 +186,12 @@ describe('POST /api/v1/trips (create)', () => {
       VALID(vehicleId, {
         startOdometer: 4800,
         endOdometer: end,
-        tripDate: '2024-06-20T08:00:00.000Z',
+        tripDate: localIso('2024-06-20T08:00'),
       });
     await ctx.authed('POST', '/api/v1/trips', body(5000));
     await ctx.authed('POST', '/api/v1/trips', {
       ...body(5000),
-      tripDate: '2024-06-20T19:00:00.000Z',
+      tripDate: localIso('2024-06-20T19:00'),
     });
 
     const n = (
@@ -709,7 +711,7 @@ describe('trip-linked odometer lifecycle', () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
       odometer: 1080,
-      recordedAt: '2024-06-20T13:30:00.000Z',
+      recordedAt: localIso('2024-06-20T13:30'),
       note: 'manual log',
     });
     const created = await ctx.authed(
@@ -751,7 +753,7 @@ describe('trip-linked odometer lifecycle', () => {
     const created = await ctx.authed(
       'POST',
       '/api/v1/trips',
-      VALID(vehicleId, { endOdometer: 1080, tripDate: '2024-06-20T13:30:00.000Z' })
+      VALID(vehicleId, { endOdometer: 1080, tripDate: localIso('2024-06-20T13:30') })
     );
     const { data } = await json<DataEnvelope<{ id: string }>>(created);
 
@@ -769,7 +771,7 @@ describe('trip-linked odometer lifecycle', () => {
     expect(linkedOnDay('2024-06-20')).toBe(1);
 
     const res = await ctx.authed('PUT', `/api/v1/trips/${data.id}`, {
-      tripDate: '2024-06-25T13:30:00.000Z',
+      tripDate: localIso('2024-06-25T13:30'),
     });
     expect(res.status).toBe(200);
     expect(linkedOnDay('2024-06-20')).toBe(0);
