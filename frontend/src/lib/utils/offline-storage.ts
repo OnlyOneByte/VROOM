@@ -1,9 +1,11 @@
 import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 import { toBackendExpense } from '#lib/services/api-transformer.ts';
 import { browser } from '$app/env';
-import type { ExpenseCategory } from '#lib/types/index.ts';
+import type { Expense, ExpenseCategory, Vehicle } from '#lib/types/index.ts';
 
 const OFFLINE_STORAGE_KEY = 'vroom_offline_expenses';
+const VEHICLE_CACHE_KEY = 'vroom_offline_vehicles';
+const VEHICLE_HISTORY_CACHE_KEY = 'vroom_offline_vehicle_history';
 const OFFLINE_STORAGE_VERSION = '3.0';
 const PHOTO_DB_NAME = 'vroom_offline_photos';
 const PHOTO_STORE = 'photos';
@@ -106,6 +108,42 @@ function adoptUnscopedQueue(): void {
 
 export function currentOfflineQueueOwner(): string | null {
 	return queueOwner;
+}
+
+function writeOwnerCache(prefix: string, value: unknown): void {
+	if (!browser || !queueOwner) return;
+	try {
+		localStorage.setItem(`${prefix}:${queueOwner}`, JSON.stringify(value));
+	} catch (error) {
+		if (import.meta.env.DEV) console.error(`Failed to write ${prefix}:`, error);
+	}
+}
+
+function readOwnerCache<T>(prefix: string): T[] | null {
+	if (!browser || !queueOwner) return null;
+	try {
+		const stored = localStorage.getItem(`${prefix}:${queueOwner}`);
+		return stored ? (JSON.parse(stored) as T[]) : null;
+	} catch (error) {
+		if (import.meta.env.DEV) console.error(`Failed to read ${prefix}:`, error);
+		return null;
+	}
+}
+
+export function cacheVehicles(vehicles: Vehicle[]): void {
+	writeOwnerCache(VEHICLE_CACHE_KEY, vehicles);
+}
+
+export function loadCachedVehicles(): Vehicle[] {
+	return readOwnerCache<Vehicle>(VEHICLE_CACHE_KEY) ?? [];
+}
+
+export function cacheVehicleHistory(vehicleId: string, expenses: Expense[]): void {
+	writeOwnerCache(`${VEHICLE_HISTORY_CACHE_KEY}:${vehicleId}`, expenses);
+}
+
+export function loadCachedVehicleHistory(vehicleId: string): Expense[] | null {
+	return readOwnerCache<Expense>(`${VEHICLE_HISTORY_CACHE_KEY}:${vehicleId}`);
 }
 
 export function loadOfflineExpenses(owner: string | null = queueOwner): OfflineExpense[] {
