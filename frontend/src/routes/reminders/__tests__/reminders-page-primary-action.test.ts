@@ -45,30 +45,30 @@ beforeEach(() => {
 });
 
 describe('/reminders primary action', () => {
-	test('the empty state offers New Reminder once and no Run due reminders', async () => {
+	test('the empty state offers New Reminder once and no Run Due Reminders', async () => {
 		list.mockImplementation(() => Promise.resolve([]));
 		render(Page);
 
 		await waitFor(() => expect(screen.getByText('No reminders yet')).toBeInTheDocument());
 		expect(controls('New Reminder')).toHaveLength(1);
-		expect(controls('Run due reminders')).toHaveLength(0);
+		expect(controls('Run Due Reminders')).toHaveLength(0);
 	});
 
-	test('a populated list offers New Reminder once, and Run due reminders only when one is due', async () => {
+	test('a populated list offers New Reminder once, and Run Due Reminders only when one is due', async () => {
 		list.mockImplementation(() => Promise.resolve([reminder('2999-01-01T00:00:00.000Z')]));
 		render(Page);
 
 		await waitFor(() => expect(screen.getByText('Oil change')).toBeInTheDocument());
 		expect(controls('New Reminder')).toHaveLength(1);
 		expect(controls('New Reminder')[0]).toHaveClass('fixed');
-		expect(controls('Run due reminders')).toHaveLength(0);
+		expect(controls('Run Due Reminders')).toHaveLength(0);
 	});
 
-	test('a due reminder shows Run due reminders', async () => {
+	test('a due reminder shows Run Due Reminders', async () => {
 		list.mockImplementation(() => Promise.resolve([reminder('2000-01-01T00:00:00.000Z')]));
 		render(Page);
 
-		await waitFor(() => expect(controls('Run due reminders')).toHaveLength(1));
+		await waitFor(() => expect(controls('Run Due Reminders')).toHaveLength(1));
 		expect(controls('New Reminder')).toHaveLength(1);
 	});
 });

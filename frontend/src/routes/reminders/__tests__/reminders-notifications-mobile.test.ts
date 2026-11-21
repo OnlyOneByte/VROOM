@@ -29,10 +29,10 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 import Page from '../+page.svelte';
 
 describe('/reminders notifications on mobile', () => {
-	test('the header row wraps and Mark all read is a 40px target', async () => {
+	test('the header row wraps and Mark All Read is a 40px target', async () => {
 		render(Page);
 
-		const markAll = await screen.findByRole('button', { name: 'Mark all read' });
+		const markAll = await screen.findByRole('button', { name: 'Mark All Read' });
 		expect(markAll).toHaveClass('h-10');
 		expect(markAll.parentElement).toHaveClass('flex-wrap');
 	});
