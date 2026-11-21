@@ -177,7 +177,7 @@
 				key — the assistant is read-only and can never change your data.
 			{/snippet}
 			{#snippet action()}
-				<Button href={resolve(routes.settings)}>Go to Settings</Button>
+				<Button href={resolve(routes.settings)} class="h-10 sm:h-9">Go to Settings</Button>
 			{/snippet}
 		</EmptyState>
 	{:else}

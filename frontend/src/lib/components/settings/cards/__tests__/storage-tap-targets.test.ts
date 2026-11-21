@@ -68,4 +68,12 @@ describe('Storage Providers controls are 40px tap targets on phones', () => {
 		await fireEvent.click(expand);
 		expectTouchHeight(await screen.findByRole('button', { name: /Sync All/ }));
 	});
+
+	test('Download Backup and Restore', async () => {
+		providers.mockResolvedValue([]);
+		render(StorageProvidersCard, { props: {} });
+
+		expectTouchHeight(await screen.findByRole('button', { name: /Download Backup/ }));
+		expectTouchHeight(screen.getByRole('button', { name: /Restore/ }));
+	});
 });

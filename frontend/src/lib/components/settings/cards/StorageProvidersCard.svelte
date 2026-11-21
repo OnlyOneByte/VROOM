@@ -323,7 +323,7 @@
 
 				<div class="flex flex-col sm:flex-row gap-2">
 					{#if backupProviderCount > 0}
-						<Button variant="outline" onclick={() => onBackupNow?.()} class="flex-1">
+						<Button variant="outline" onclick={() => onBackupNow?.()} class="h-10 sm:h-9 sm:flex-1">
 							<RefreshCw class="mr-2 h-4 w-4" />
 							Backup to Cloud
 						</Button>
@@ -332,7 +332,7 @@
 						variant="outline"
 						onclick={() => onDownloadBackup?.()}
 						disabled={isBackingUp}
-						class="flex-1"
+						class="h-10 sm:h-9 sm:flex-1"
 					>
 						{#if isBackingUp}
 							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
@@ -342,7 +342,7 @@
 							Download Backup
 						{/if}
 					</Button>
-					<Button variant="outline" onclick={() => onRestore?.()} class="flex-1">
+					<Button variant="outline" onclick={() => onRestore?.()} class="h-10 sm:h-9 sm:flex-1">
 						<Upload class="mr-2 h-4 w-4" />
 						Restore
 					</Button>

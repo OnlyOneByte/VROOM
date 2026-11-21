@@ -158,7 +158,12 @@
 			</p>
 		{:else}
 			<div data-testid="migrate-card">
-				<Button variant="outline" onclick={openDialog} data-testid="migrate-open">
+				<Button
+					variant="outline"
+					class="h-10 sm:h-9"
+					onclick={openDialog}
+					data-testid="migrate-open"
+				>
 					<Upload class="mr-2 h-4 w-4" />
 					Migrate from another tracker
 				</Button>
