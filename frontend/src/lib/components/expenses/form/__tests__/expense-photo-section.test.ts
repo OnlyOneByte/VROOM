@@ -59,7 +59,7 @@ function mount() {
 }
 
 function deleteButtons(): HTMLButtonElement[] {
-	return Array.from(document.querySelectorAll('.grid button')) as HTMLButtonElement[];
+	return screen.getAllByRole('button', { name: /^Delete p\d+\.jpg$/ }) as HTMLButtonElement[];
 }
 
 beforeEach(() => {
