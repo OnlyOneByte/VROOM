@@ -63,6 +63,23 @@ describe('calculateNextPaymentDate — due date and overdue', () => {
 		expect(next).toEqual(new Date(storedDate(2026, 6, 15)));
 	});
 
+	test('with two payments missed, the oldest unpaid due date is returned', () => {
+		const next = calculateNextPaymentDate(
+			makeFinancing({ startDate: storedDate(2024, 1, 15) }),
+			new Date(storedDate(2026, 4, 15))
+		);
+		expect(next).toEqual(new Date(storedDate(2026, 5, 15)));
+		expect(calculateDaysUntil(next)).toBe(-36);
+	});
+
+	test('a payment made a few days early still covers its due date when others are missed', () => {
+		const next = calculateNextPaymentDate(
+			makeFinancing({ startDate: storedDate(2024, 1, 15) }),
+			new Date(storedDate(2026, 3, 12))
+		);
+		expect(next).toEqual(new Date(storedDate(2026, 4, 15)));
+	});
+
 	test('the due day follows paymentDayOfMonth, not the day the payment was made', () => {
 		const next = calculateNextPaymentDate(
 			makeFinancing({ startDate: storedDate(2024, 1, 3), paymentDayOfMonth: 10 }),

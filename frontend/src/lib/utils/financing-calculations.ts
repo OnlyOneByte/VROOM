@@ -202,12 +202,16 @@ export function calculateNextPaymentDate(
 		const lastDue = scheduledDueDate(financing, start, index);
 		if (lastDue > now) return lastDue;
 
-		const previousDue = index > 1 ? scheduledDueDate(financing, start, index - 1) : undefined;
-		const lastDueIsPaid =
-			assumeLastDuePaid ||
-			(lastPaymentDate !== undefined &&
-				(previousDue === undefined || lastPaymentDate > previousDue));
-		return lastDueIsPaid ? scheduledDueDate(financing, start, index + 1) : lastDue;
+		if (assumeLastDuePaid) return scheduledDueDate(financing, start, index + 1);
+		if (lastPaymentDate === undefined) return lastDue;
+
+		let paidIndex = 1;
+		while (paidIndex < index && scheduledDueDate(financing, start, paidIndex) < lastPaymentDate) {
+			paidIndex++;
+		}
+		const paidDue = scheduledDueDate(financing, start, paidIndex);
+		if (paidDue < lastPaymentDate) return scheduledDueDate(financing, start, index + 1);
+		return scheduledDueDate(financing, start, paidIndex + 1);
 	} catch (error) {
 		if (DEV) console.error('Error calculating next payment date:', error);
 		return new Date();
