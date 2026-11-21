@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { ApiError } from '#lib/utils/error-handling.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const pushApiMock = vi.hoisted(() => ({
 	getVapidPublicKey: vi.fn(),
@@ -232,21 +236,36 @@ describe('push browser integration', () => {
 		expect(await enablePush()).toEqual({ ok: false, reason: 'unconfigured' });
 	});
 
-	test('enablePush reports other API failures as errors with their message', async () => {
+	test('enablePush reports a server failure as a plain sentence, not its raw text', async () => {
 		installPushEnvironment({});
 		pushApiMock.getVapidPublicKey.mockResolvedValue({ publicKey: 'AQID' });
 		pushApiMock.subscribe.mockRejectedValue(new ApiError('Server exploded', 500));
 		expect(await enablePush()).toEqual({
 			ok: false,
 			reason: 'error',
-			message: 'Server exploded'
+			message: SERVER_FAILURE_MESSAGE
 		});
 	});
 
-	test('enablePush reports a non-Error rejection without a message', async () => {
+	test('enablePush passes an API reason through', async () => {
+		installPushEnvironment({});
+		pushApiMock.getVapidPublicKey.mockResolvedValue({ publicKey: 'AQID' });
+		pushApiMock.subscribe.mockRejectedValue(new ApiError('Endpoint must be https', 400));
+		expect(await enablePush()).toEqual({
+			ok: false,
+			reason: 'error',
+			message: 'Endpoint must be https.'
+		});
+	});
+
+	test('enablePush reports a non-Error rejection with the generic sentence', async () => {
 		installPushEnvironment({});
 		pushApiMock.getVapidPublicKey.mockRejectedValue('nope');
-		expect(await enablePush()).toEqual({ ok: false, reason: 'error', message: undefined });
+		expect(await enablePush()).toEqual({
+			ok: false,
+			reason: 'error',
+			message: UNEXPECTED_FAILURE_MESSAGE
+		});
 	});
 
 	test('disablePush does nothing when there is no subscription', async () => {

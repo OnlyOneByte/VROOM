@@ -14,7 +14,11 @@
 	import * as pushUtil from '#lib/utils/push.ts';
 	import { pushApi } from '#lib/services/push-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import { ApiError } from '#lib/utils/error-handling.ts';
+	import {
+		ApiError,
+		UNEXPECTED_FAILURE_MESSAGE,
+		userFacingErrorMessage
+	} from '#lib/utils/error-handling.ts';
 
 	const DISCLOSURE_KEY = 'vroom.push.disclosed';
 
@@ -52,7 +56,7 @@
 			status = pushUtil.derivePushStatus({ supported, configured, permission, subscribed: !!sub });
 		} catch (e) {
 			status = 'error';
-			loadError = e instanceof Error ? e.message : 'Failed to check notification status';
+			loadError = `Couldn't check notification status. ${userFacingErrorMessage(e)}`;
 		} finally {
 			isLoading = false;
 		}
@@ -104,7 +108,9 @@
 				status = 'unconfigured';
 				appStore.showError('Push notifications are not configured on this server');
 			} else {
-				appStore.showError(outcome.message ?? 'Could not enable push notifications');
+				appStore.showError(
+					`Couldn't turn on push notifications. ${outcome.message ?? UNEXPECTED_FAILURE_MESSAGE}`
+				);
 			}
 		} finally {
 			isToggling = false;
@@ -117,8 +123,8 @@
 			await pushUtil.disablePush();
 			status = 'off';
 			appStore.showSuccess('Push notifications turned off');
-		} catch {
-			appStore.showError('Could not turn off push notifications');
+		} catch (e) {
+			appStore.showError(`Couldn't turn off push notifications. ${userFacingErrorMessage(e)}`);
 		} finally {
 			isToggling = false;
 		}

@@ -13,7 +13,7 @@
 		CollapsibleTrigger
 	} from '#lib/components/ui/collapsible/index.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
-	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import ProviderPicker from './RestoreProviderPicker.svelte';
 	import type { RestoreResult, RestoreProviderInfo, BackupFileInfo } from '#lib/types/index.ts';
 
@@ -97,7 +97,7 @@
 				}
 			}
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load restore providers';
+			error = `Couldn't load your storage providers. ${userFacingErrorMessage(err)}`;
 		} finally {
 			isLoadingProviders = false;
 		}
@@ -114,7 +114,7 @@
 			try {
 				providerBackups = await settingsStore.listBackupsFromProvider(providerId);
 			} catch (err) {
-				error = err instanceof Error ? err.message : 'Failed to load backups';
+				error = `Couldn't load the backups. ${userFacingErrorMessage(err)}`;
 			} finally {
 				isLoadingBackups = false;
 			}
@@ -134,7 +134,7 @@
 				restoreConflicts = result.conflicts ?? [];
 				step = 3;
 			} catch (err) {
-				error = err instanceof Error ? err.message : 'Failed to preview sheets data';
+				error = `Couldn't preview the Sheets data. ${userFacingErrorMessage(err)}`;
 				providerSubStep = 'pick-provider';
 			} finally {
 				isProcessing = false;
@@ -160,7 +160,7 @@
 			restoreConflicts = result.conflicts ?? [];
 			step = 3;
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to preview backup';
+			error = `Couldn't preview the backup. ${userFacingErrorMessage(err)}`;
 		} finally {
 			isProcessing = false;
 		}
@@ -180,7 +180,7 @@
 			restoreConflicts = result.conflicts ?? [];
 			step = 3;
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to preview file';
+			error = `Couldn't preview the file. ${userFacingErrorMessage(err)}`;
 		} finally {
 			isProcessing = false;
 		}
@@ -221,11 +221,7 @@
 			onRestore(result);
 			open = false;
 		} catch (err) {
-			const msg = err instanceof Error ? err.message : 'Restore failed';
-			if (msg.includes('BACKUP_IN_PROGRESS') || msg.includes('backup is already in progress')) {
-				appStore.showError('A backup is currently in progress. Please try again later.');
-			}
-			error = msg;
+			error = `Couldn't restore. ${userFacingErrorMessage(err)}`;
 		} finally {
 			isProcessing = false;
 		}

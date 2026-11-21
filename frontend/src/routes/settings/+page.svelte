@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { routes } from '#lib/routes.ts';
 	import { Save, LoaderCircle, ChevronRight, CircleAlert } from '@lucide/svelte';
@@ -123,8 +124,8 @@
 			await fetchLastSyncTime();
 			isInitialized = false;
 			appStore.showSuccess('Settings saved successfully');
-		} catch {
-			appStore.showError('Failed to save settings');
+		} catch (error) {
+			appStore.showError(`Couldn't save settings. ${userFacingErrorMessage(error)}`);
 		} finally {
 			isSaving = false;
 		}
@@ -135,8 +136,8 @@
 		try {
 			await settingsStore.downloadBackup();
 			appStore.showSuccess('Backup downloaded successfully');
-		} catch {
-			appStore.showError('Failed to create backup');
+		} catch (error) {
+			appStore.showError(`Couldn't download the backup. ${userFacingErrorMessage(error)}`);
 		} finally {
 			isBackingUp = false;
 		}
@@ -185,12 +186,8 @@
 			await settingsStore.load();
 			isInitialized = false;
 		} catch (error) {
-			const msg = error instanceof Error ? error.message : 'Failed to execute backup';
-			if (msg.includes('BACKUP_IN_PROGRESS') || msg.includes('backup is already in progress')) {
-				toast.error('A backup is already in progress. Please try again later.', { id: toastId });
-			} else {
-				toast.error(msg, { id: toastId });
-			}
+			toast.dismiss(toastId);
+			appStore.showError(`Couldn't back up. ${userFacingErrorMessage(error)}`);
 		}
 	}
 
@@ -226,7 +223,7 @@
 		<div class="rounded-lg border bg-card p-6">
 			<div class="mb-4 flex items-center gap-3 text-destructive">
 				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Failed to load settings</p>
+				<p class="font-medium">Couldn't load settings</p>
 			</div>
 			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
 			<Button onclick={retryLoad}>Retry</Button>

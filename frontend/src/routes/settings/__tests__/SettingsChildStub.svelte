@@ -6,7 +6,9 @@
 		chargeUnit = $bindable(),
 		syncInactivityMinutes = $bindable(),
 		open = $bindable(),
-		domain
+		domain,
+		onSync,
+		onDownloadBackup
 	}: {
 		distanceUnit?: string;
 		volumeUnit?: string;
@@ -15,6 +17,8 @@
 		syncInactivityMinutes?: number;
 		open?: boolean;
 		domain?: string;
+		onSync?: () => void;
+		onDownloadBackup?: () => void;
 		[key: string]: unknown;
 	} = $props();
 </script>
@@ -33,4 +37,10 @@
 {/if}
 {#if open}
 	<span data-testid="stub-open"></span>
+{/if}
+{#if onSync}
+	<button onclick={onSync}>stub sync</button>
+{/if}
+{#if onDownloadBackup}
+	<button onclick={onDownloadBackup}>stub download</button>
 {/if}

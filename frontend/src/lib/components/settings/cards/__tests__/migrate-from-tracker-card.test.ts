@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type { ExpenseImportResult } from '#lib/services/expense-api.ts';
 import type { ImportColumnMapping, Vehicle } from '#lib/types/index.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const { getVehicles, importExpensesCsv, showSuccess, notifyError } = vi.hoisted(() => ({
 	getVehicles: vi.fn<() => Promise<Vehicle[]>>(),
@@ -117,9 +122,12 @@ describe('MigrateFromTrackerCard card states', () => {
 	});
 
 	test('a vehicle load failure shows the message and Retry reloads', async () => {
-		getVehicles.mockRejectedValueOnce(new Error('Server down'));
+		getVehicles.mockRejectedValueOnce(new ApiError('SQLITE_BUSY: database is locked', 500));
 		await mount();
-		expect(screen.getByTestId('migrate-error')).toHaveTextContent('Server down');
+		expect(screen.getByTestId('migrate-error')).toHaveTextContent(
+			`Couldn't load your vehicles. ${SERVER_FAILURE_MESSAGE}`
+		);
+		expect(screen.getByTestId('migrate-error')).not.toHaveTextContent('SQLITE_BUSY');
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
@@ -131,7 +139,9 @@ describe('MigrateFromTrackerCard card states', () => {
 	test('a non-Error rejection falls back to a generic load message', async () => {
 		getVehicles.mockRejectedValueOnce('boom');
 		await mount();
-		expect(screen.getByTestId('migrate-error')).toHaveTextContent('Failed to load vehicles');
+		expect(screen.getByTestId('migrate-error')).toHaveTextContent(
+			`Couldn't load your vehicles. ${UNEXPECTED_FAILURE_MESSAGE}`
+		);
 	});
 
 	test('with no vehicles it asks the user to add one first', async () => {
@@ -225,13 +235,13 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 	});
 
 	test('a preview failure notifies the user and shows no preview', async () => {
-		const error = new Error('Unparseable');
+		const error = new ApiError('Unparseable CSV', 400);
 		importExpensesCsv.mockRejectedValue(error);
 		await mount();
 		await openDialog();
 		await chooseFile();
 
-		expect(notifyError).toHaveBeenCalledWith(error, 'Could not read that Fuelio file');
+		expect(notifyError).toHaveBeenCalledWith(error, "Couldn't read that Fuelio file");
 		expect(screen.queryByTestId('migrate-preview')).toBeNull();
 		expect(commitButton()).toBeDisabled();
 	});
@@ -327,7 +337,7 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 	});
 
 	test('a commit failure notifies the user and keeps the dialog open', async () => {
-		const error = new Error('Write failed');
+		const error = new ApiError('Write failed', 500);
 		importExpensesCsv.mockResolvedValueOnce(result()).mockRejectedValueOnce(error);
 		await mount();
 		await openDialog();
@@ -335,7 +345,7 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		await fireEvent.click(commitButton());
 		await settle();
 
-		expect(notifyError).toHaveBeenCalledWith(error, 'Failed to migrate from Fuelio');
+		expect(notifyError).toHaveBeenCalledWith(error, "Couldn't migrate from Fuelio");
 		expect(showSuccess).not.toHaveBeenCalled();
 		expect(commitButton()).toBeEnabled();
 		expect(commitButton()).toHaveTextContent('Migrate 3 entries');
