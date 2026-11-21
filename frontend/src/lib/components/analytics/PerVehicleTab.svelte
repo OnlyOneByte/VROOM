@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
@@ -36,7 +37,7 @@
 			isLoadingVehicles = true;
 			vehicles = await vehicleApi.getVehicles();
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load vehicles';
+			error = userFacingErrorMessage(e);
 		} finally {
 			isLoadingVehicles = false;
 		}
@@ -55,7 +56,7 @@
 			tco = tcoData;
 			expenses = expensesData;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load vehicle data';
+			error = userFacingErrorMessage(e);
 		} finally {
 			isLoadingData = false;
 		}
@@ -163,7 +164,7 @@
 			<div class="rounded-lg border bg-card p-6">
 				<div class="flex items-center gap-3 text-destructive mb-4">
 					<CircleAlert class="h-5 w-5" />
-					<p class="font-medium">Failed to load vehicle analytics</p>
+					<p class="font-medium">Couldn't load vehicle analytics</p>
 				</div>
 				<p class="text-sm text-muted-foreground mb-4">{error}</p>
 				<Button onclick={() => selectedVehicleId && loadVehicleData(selectedVehicleId)}>

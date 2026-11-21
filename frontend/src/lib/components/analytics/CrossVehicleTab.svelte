@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import '#lib/components/charts/pie-chart-animations.css';
 	import '#lib/components/charts/bar-chart-animations.css';
 	import { animateOnView } from '#lib/utils/animate-on-view.ts';
@@ -51,7 +52,7 @@
 			financing = fin;
 			insurance = ins;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load cross-vehicle data';
+			error = userFacingErrorMessage(e);
 		} finally {
 			isLoading = false;
 		}
@@ -120,7 +121,7 @@
 	<div class="rounded-lg border bg-card p-6">
 		<div class="flex items-center gap-3 text-destructive mb-4">
 			<CircleAlert class="h-5 w-5" />
-			<p class="font-medium">Failed to load cross-vehicle analytics</p>
+			<p class="font-medium">Couldn't load cross-vehicle analytics</p>
 		</div>
 		<p class="text-sm text-muted-foreground mb-4">{error}</p>
 		<Button onclick={loadData}>Retry</Button>
