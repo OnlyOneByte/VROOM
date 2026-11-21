@@ -34,6 +34,32 @@ const deleteQuerySchema = z.object({
     .transform((v) => v !== 'false'),
 });
 
+const PHOTO_CLEANUP_ATTEMPTS = 3;
+
+async function deleteEntryPhotosWithRetry(
+  entryIds: string[],
+  userId: string,
+  context: { tripId: string; vehicleId: string }
+): Promise<void> {
+  for (let attempt = 1; attempt <= PHOTO_CLEANUP_ATTEMPTS; attempt++) {
+    try {
+      await deletePhotosForEntities('odometer_entry', entryIds, userId);
+      return;
+    } catch (error) {
+      if (attempt === PHOTO_CLEANUP_ATTEMPTS) {
+        logger.warn('Photos left on a deleted odometer entry: trip photo cleanup gave up', {
+          ...context,
+          odometerEntryIds: entryIds,
+          attempts: attempt,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return;
+      }
+      await Bun.sleep(50 * attempt);
+    }
+  }
+}
+
 const summaryQuerySchema = z.object({
   vehicleId: z.string().min(1).optional(),
   rate: z.coerce.number().min(0).optional(),
@@ -172,16 +198,10 @@ routes.put(
             odometer: existing.endOdometer,
             recordedAt: existing.tripDate,
           });
-          await deletePhotosForEntities('odometer_entry', removedEntryIds, user.id).catch(
-            (error) => {
-              logger.warn('Trip-edit photo cleanup for the replaced odometer entry failed', {
-                tripId: id,
-                vehicleId: existing.vehicleId,
-                odometerEntryIds: removedEntryIds,
-                error: error instanceof Error ? error.message : String(error),
-              });
-            }
-          );
+          await deleteEntryPhotosWithRetry(removedEntryIds, user.id, {
+            tripId: id,
+            vehicleId: existing.vehicleId,
+          });
         }
         await odometerRepository.createFromTrip({
           vehicleId: existing.vehicleId,
@@ -238,7 +258,10 @@ routes.delete(
             odometer: existing.endOdometer,
             recordedAt: existing.tripDate,
           });
-          await deletePhotosForEntities('odometer_entry', removedEntryIds, user.id);
+          await deleteEntryPhotosWithRetry(removedEntryIds, user.id, {
+            tripId: id,
+            vehicleId: existing.vehicleId,
+          });
           await reminderTriggerService.recheckMileageReminders(user.id, existing.vehicleId);
         }
       } catch (error) {
