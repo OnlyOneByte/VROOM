@@ -22,7 +22,9 @@
 		derivePaymentEntries,
 		resolveCurrentOdometer
 	} from '#lib/utils/financing-calculations.ts';
-	import type { Vehicle, VehicleStats, DerivedPaymentEntry } from '#lib/types/index.ts';
+	import type { Expense, Vehicle, VehicleStats, DerivedPaymentEntry } from '#lib/types/index.ts';
+
+	const EXPENSE_PAGE_SIZE = 100;
 
 	interface Props {
 		vehicle: Vehicle;
@@ -34,6 +36,7 @@
 	let { vehicle, vehicleId, vehicleStatsData, isOwner = true }: Props = $props();
 
 	let payments = $state<DerivedPaymentEntry[]>([]);
+	let paymentsLoaded = $state(false);
 	let isLoadingPayments = $state(false);
 	let paymentHistoryError = $state<string | null>(null);
 	let hasAttemptedPaymentLoad = $state(false);
@@ -109,12 +112,22 @@
 		hasAttemptedPaymentLoad = true;
 
 		try {
-			const result = await expenseApi.getExpensesByVehicle(vehicleId, {
-				limit: 100,
-				category: 'financial'
-			});
-			const financingExpenses = result.data.filter(e => e.sourceType === 'financing');
+			const financingId = vehicle.financing.id;
+			const financialExpenses: Expense[] = [];
+			for (let offset = 0; ; offset += EXPENSE_PAGE_SIZE) {
+				const page = await expenseApi.getExpensesByVehicle(vehicleId, {
+					limit: EXPENSE_PAGE_SIZE,
+					offset,
+					category: 'financial'
+				});
+				financialExpenses.push(...page.data);
+				if (!page.pagination.hasMore || page.data.length === 0) break;
+			}
+			const financingExpenses = financialExpenses.filter(
+				e => e.sourceType === 'financing' && e.sourceId === financingId
+			);
 			payments = derivePaymentEntries(financingExpenses, vehicle.financing);
+			paymentsLoaded = true;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error loading payment history:', error);
 			paymentHistoryError = 'Failed to load payment history. Please try again.';
@@ -135,7 +148,8 @@
 		{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
 			<NextPaymentCard
 				financing={vehicle.financing}
-				lastPayment={payments.length > 0 ? payments[0] : undefined}
+				lastPayment={payments.at(-1)}
+				{paymentsLoaded}
 				{isOwner}
 				recordPaymentHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&category=financial&financingId=${vehicle.financing.id}&amount=${vehicle.financing.paymentAmount}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
 				{progressPercentage}

@@ -63,6 +63,7 @@
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
+	import { ApiError } from '#lib/utils/error-handling.ts';
 
 	interface Props {
 		vehicleId?: string;
@@ -77,6 +78,7 @@
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
 	let showPayoffConfirm = $state(false);
+	let showUnitChangeConfirm = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 
 	let trackFuel = $state(true);
@@ -99,6 +101,36 @@
 	let distanceLabel = $derived(getLongFormLabel(distanceUnit));
 	let volumeLabel = $derived(getLongFormLabel(volumeUnit));
 	let chargeLabel = $derived(getLongFormLabel(chargeUnit));
+
+	let unitChangeDescription = $derived.by(() => {
+		const saved = vehicle?.unitPreferences;
+		if (!saved) return '';
+		const changes = [
+			['distance', saved.distanceUnit, distanceUnit],
+			['fuel volume', saved.volumeUnit, volumeUnit],
+			['charge', saved.chargeUnit, chargeUnit]
+		] as const;
+		const changed = changes.filter(([, from, to]) => from !== to);
+		const summary = changed
+			.map(
+				([name, from, to]) => `${name} from ${getLongFormLabel(from)} to ${getLongFormLabel(to)}`
+			)
+			.join(' and ');
+		const [, fromUnit, toUnit] = changed[0] ?? [];
+		const inSentence = (unit: DistanceUnit | VolumeUnit | ChargeUnit) => {
+			const label = getLongFormLabel(unit);
+			return label.charAt(0).toLowerCase() + label.slice(1);
+		};
+		const example =
+			fromUnit && toUnit
+				? ` For example, a saved 100 ${inSentence(fromUnit)} would read 100 ${inSentence(toUnit)}.`
+				: '';
+		return `You're changing ${summary}. Readings already saved for this vehicle, such as its initial mileage, odometer entries, trips and fill-ups, are not converted: each number stays the same and is shown in the new units.${example} Only change units if they were set wrong.`;
+	});
+
+	function needsUnitChangeConfirmation(error: unknown): boolean {
+		return error instanceof ApiError && error.details?.['requiresUnitChangeConfirmation'] === true;
+	}
 
 	let vehicleForm = $state<VehicleFormData>({
 		make: '',
@@ -382,7 +414,8 @@
 	async function payOffAndSave() {
 		if (!activeFinancingToEnd) return;
 		try {
-			await vehicleApi.payOffFinancing(activeFinancingToEnd.id);
+			const ended = await vehicleApi.payOffFinancing(activeFinancingToEnd.id);
+			if (vehicle) vehicle.financing = ended;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error';
 			appStore.addNotification({
@@ -394,7 +427,7 @@
 		await saveVehicle();
 	}
 
-	async function saveVehicle() {
+	async function saveVehicle(confirmUnitChange = false) {
 		isSubmitting = true;
 
 		try {
@@ -428,7 +461,8 @@
 					vin: vinVal ?? null,
 					initialMileage: mileage ?? null,
 					purchasePrice: price ?? null,
-					purchaseDate: pDate ?? null
+					purchaseDate: pDate ?? null,
+					...(confirmUnitChange ? { confirmUnitChange: true } : {})
 				});
 			} else {
 				savedVehicle = await vehicleApi.createVehicle({
@@ -503,6 +537,10 @@
 				goto(resolve(routes.dashboard));
 			}
 		} catch (error) {
+			if (!confirmUnitChange && needsUnitChangeConfirmation(error)) {
+				showUnitChangeConfirm = true;
+				return;
+			}
 			if (import.meta.env.DEV) console.error('Error submitting vehicle:', error);
 			appStore.addNotification({
 				type: 'error',
@@ -989,6 +1027,15 @@
 			confirmLabel={payoffConfirmCopy.confirmLabel}
 			destructive={false}
 			onConfirm={payOffAndSave}
+		/>
+
+		<ConfirmDialog
+			bind:open={showUnitChangeConfirm}
+			title="Change units for this vehicle?"
+			description={unitChangeDescription}
+			confirmLabel="Change Units"
+			destructive={false}
+			onConfirm={() => saveVehicle(true)}
 		/>
 	{/if}
 </FormLayout>

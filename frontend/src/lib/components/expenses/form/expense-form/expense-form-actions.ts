@@ -1,7 +1,7 @@
 import { expenseApi } from '#lib/services/expense-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { onlineStatus } from '#lib/stores/offline.svelte.ts';
-import { addOfflineExpense } from '#lib/utils/offline-storage.ts';
+import { addOfflineExpense, currentOfflineQueueOwner } from '#lib/utils/offline-storage.ts';
 import { classifySyncFailure } from '#lib/utils/sync/classify-failure.ts';
 import { syncManager } from '#lib/utils/sync/sync-manager.ts';
 import { buildSplitConfig } from '#lib/utils/expense-helpers.ts';
@@ -16,6 +16,17 @@ import {
 	UNQUEUED_SAVE_MESSAGE
 } from './expense-submit-outcome';
 import type { ExpenseFormState } from './expense-form-state.svelte';
+
+const saveClientIds = new WeakMap<ExpenseFormState, string>();
+
+function saveClientId(state: ExpenseFormState): string {
+	let clientId = saveClientIds.get(state);
+	if (!clientId) {
+		clientId = crypto.randomUUID();
+		saveClientIds.set(state, clientId);
+	}
+	return clientId;
+}
 
 function reportUnqueuedSave(state: ExpenseFormState): void {
 	state.submitError = UNQUEUED_SAVE_MESSAGE;
@@ -59,6 +70,8 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 		sourceId: state.sourceId
 	});
 	const isSplitCreate = state.isSplit && state.selectedVehicleIds.length >= 2;
+	const clientId = saveClientId(state);
+	const queueOwner = currentOfflineQueueOwner();
 
 	try {
 		if (state.isGroupEditMode && state.groupId) {
@@ -111,7 +124,7 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			});
 			gotoDynamic(returnTo);
 		} else if (onlineStatus.current) {
-			const created = await expenseApi.createExpense(expenseData);
+			const created = await expenseApi.createExpense(expenseData, clientId);
 
 			await uploadPendingPhotos(state, created.id);
 
@@ -121,9 +134,12 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			});
 			gotoDynamic(returnTo);
 		} else {
-			const queued = await addOfflineExpense(toOfflineExpense(expenseData), [
-				...state.pendingFiles
-			]);
+			const queued = await addOfflineExpense(
+				toOfflineExpense(expenseData),
+				[...state.pendingFiles],
+				clientId,
+				queueOwner
+			);
 
 			if (!queued) {
 				reportUnqueuedSave(state);
@@ -143,9 +159,12 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 		const failureKind = classifySyncFailure(error);
 
 		if (canQueueFailedSave({ isEditMode: state.isEditMode, isSplitCreate, failureKind })) {
-			const queued = await addOfflineExpense(toOfflineExpense(expenseData), [
-				...state.pendingFiles
-			]);
+			const queued = await addOfflineExpense(
+				toOfflineExpense(expenseData),
+				[...state.pendingFiles],
+				clientId,
+				queueOwner
+			);
 
 			if (!queued) {
 				reportUnqueuedSave(state);
