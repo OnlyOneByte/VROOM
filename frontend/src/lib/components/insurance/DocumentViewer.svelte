@@ -130,7 +130,7 @@
 							<Button
 								variant="destructive"
 								size="sm"
-								class="h-6 text-xs"
+								class="h-6 text-xs focus-visible:ring-ring"
 								aria-label={`Delete ${doc.fileName}`}
 								onclick={() => requestDelete(doc.id)}
 							>
