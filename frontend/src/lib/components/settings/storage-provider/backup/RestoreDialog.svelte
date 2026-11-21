@@ -484,8 +484,8 @@
 					<Alert data-testid="restore-skipped-photos">
 						<AlertDescription>
 							{skippedPhotos === 1
-								? "1 photo won't be restored because the trip, expense or other item it belonged to was deleted before this backup was made."
-								: `${skippedPhotos} photos won't be restored because the trips, expenses or other items they belonged to were deleted before this backup was made.`}
+								? "1 photo won't be restored because the trip, expense or other item it belonged to was deleted before this backup was made. Everything else in the backup will still be restored."
+								: `${skippedPhotos} photos won't be restored because the trips, expenses or other items they belonged to were deleted before this backup was made. Everything else in the backup will still be restored.`}
 						</AlertDescription>
 					</Alert>
 				{/if}
