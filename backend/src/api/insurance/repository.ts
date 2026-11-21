@@ -1,9 +1,14 @@
 import { createId } from '@paralleldrive/cuid2';
-import { and, between, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, between, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { InsurancePolicy, InsuranceTerm } from '../../db/schema';
-import { insurancePolicies, insuranceTerms, insuranceTermVehicles } from '../../db/schema';
+import {
+  insurancePolicies,
+  insuranceTerms,
+  insuranceTermVehicleSelectionOrder,
+  insuranceTermVehicles,
+} from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError, NotFoundError, ValidationError } from '../../errors';
 import { chunk } from '../../utils/chunk';
@@ -72,8 +77,6 @@ type PolicyCoverage = {
 
 export type InsurancePolicyWithVehicles = InsurancePolicy & PolicyCoverage;
 
-const VEHICLE_SELECTION_ORDER = sql`${insuranceTermVehicles}.rowid`;
-
 // Owner-scoped lookups keep writes safe even if a caller skips the route ownership check.
 function ownedPolicy(policyId: string, userId: string) {
   return and(eq(insurancePolicies.id, policyId), eq(insurancePolicies.userId, userId));
@@ -129,7 +132,7 @@ export class InsurancePolicyRepository {
         })
         .from(insuranceTermVehicles)
         .where(inArray(insuranceTermVehicles.termId, ids))
-        .orderBy(VEHICLE_SELECTION_ORDER);
+        .orderBy(insuranceTermVehicleSelectionOrder);
       for (const row of rows) {
         coverageByTerm.set(row.termId, [...(coverageByTerm.get(row.termId) ?? []), row]);
       }

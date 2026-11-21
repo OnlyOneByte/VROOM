@@ -7,6 +7,7 @@ import {
   insuranceClaims,
   insurancePolicies,
   insuranceTerms,
+  insuranceTermVehicleSelectionOrder,
   insuranceTermVehicles,
   odometerEntries,
   photoRefs,
@@ -487,7 +488,11 @@ export class GoogleSheetsService {
 
     const termIds = userInsuranceTerms.map((t) => t.id);
     const userInsuranceTermVehicles = await this.queryIfNonEmpty(termIds, () =>
-      db.select().from(insuranceTermVehicles).where(inArray(insuranceTermVehicles.termId, termIds))
+      db
+        .select()
+        .from(insuranceTermVehicles)
+        .where(inArray(insuranceTermVehicles.termId, termIds))
+        .orderBy(insuranceTermVehicleSelectionOrder)
     );
 
     const userInsuranceClaims = await this.queryIfNonEmpty(policyIds, () =>

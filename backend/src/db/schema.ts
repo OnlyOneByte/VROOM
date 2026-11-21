@@ -161,6 +161,8 @@ export const insuranceTermVehicles = sqliteTable(
   })
 );
 
+export const insuranceTermVehicleSelectionOrder = sql`${insuranceTermVehicles}.rowid`;
+
 export const insuranceClaims = sqliteTable(
   'insurance_claims',
   {
