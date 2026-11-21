@@ -411,6 +411,81 @@ describe('restore after the account record is recreated (same person, new user i
     expect(vehicleRows().map((r) => r.id)).toEqual(['v-np']);
   });
 
+  function insertDriveProvider(id: string, userId: string, accountEmail: string): void {
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+       VALUES (?, ?, 'storage', 'google-drive', 'Drive', 'x', ?, 'active')`,
+      [id, userId, JSON.stringify({ accountEmail })]
+    );
+  }
+
+  async function backupWithDrivePhoto(): Promise<Buffer> {
+    const vehicleId = await seedOwnerData();
+    insertDriveProvider('prov-before', ctx.user.id, 'owner@drive.test');
+    ctx.sqlite.run(
+      `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
+       VALUES ('photo-drive', ?, 'vehicle', ?, 'car.jpg', 'image/jpeg', 1)`,
+      [ctx.user.id, vehicleId]
+    );
+    ctx.sqlite.run(
+      `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
+       VALUES ('ref-drive', 'photo-drive', 'prov-before', 'drive-file-123', 'active')`
+    );
+    const { backupService } = await import('../backup');
+    return backupService.exportAsZip(ctx.user.id);
+  }
+
+  function photoRefRows(): { provider_id: string; storage_ref: string; status: string }[] {
+    return ctx.sqlite.query('SELECT provider_id, storage_ref, status FROM photo_refs').all() as {
+      provider_id: string;
+      storage_ref: string;
+      status: string;
+    }[];
+  }
+
+  test('photo links re-attach to the reconnected provider for the same storage account', async () => {
+    const zip = await backupWithDrivePhoto();
+    const newId = reinstallAsNewAccount();
+    insertDriveProvider('prov-after', newId, 'owner@drive.test');
+
+    const { restoreService } = await import('../restore');
+    const result = await restoreService.restoreFromBackup(newId, zip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    expect(photoRefRows()).toEqual([
+      { provider_id: 'prov-after', storage_ref: 'drive-file-123', status: 'active' },
+    ]);
+  });
+
+  test('photo links are not attached to a provider for a different storage account', async () => {
+    const zip = await backupWithDrivePhoto();
+    const newId = reinstallAsNewAccount();
+    insertDriveProvider('prov-other', newId, 'someone-else@drive.test');
+
+    const { restoreService } = await import('../restore');
+    const result = await restoreService.restoreFromBackup(newId, zip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    expect(photoRefRows()).toEqual([]);
+  });
+
+  test('a backup without provider identities restores photos without links, as before', async () => {
+    const original = new AdmZip(await backupWithDrivePhoto());
+    const metadata = JSON.parse(original.getEntry('metadata.json')?.getData().toString() ?? '{}');
+    expect(metadata.storageProviders).toEqual({ 'prov-before': 'google-drive:owner@drive.test' });
+    delete metadata.storageProviders;
+    original.updateFile('metadata.json', Buffer.from(JSON.stringify(metadata), 'utf-8'));
+    const newId = reinstallAsNewAccount();
+    insertDriveProvider('prov-after', newId, 'owner@drive.test');
+
+    const { restoreService } = await import('../restore');
+    const result = await restoreService.restoreFromBackup(newId, original.toBuffer(), 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    expect(photoRefRows()).toEqual([]);
+    expect(ctx.sqlite.query('SELECT id FROM photos').all()).toEqual([{ id: 'photo-drive' }]);
+  });
+
   test("another tenant's backup cannot overwrite or steal that tenant's live rows", async () => {
     const vehicleId = await seedOwnerData();
     const { backupService } = await import('../backup');
