@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { CreateShareRequest, ShareLevel, VehicleShare } from '#lib/types/index.ts';
 import { ApiError } from '#lib/utils/error-handling.ts';
 
@@ -327,6 +327,9 @@ describe('ShareVehicleDialog managing existing shares', () => {
 		await fireEvent.click(
 			screen.getByRole('button', { name: 'Revoke access for friend@example.com' })
 		);
+		await fireEvent.click(
+			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Revoke' })
+		);
 		await settle();
 
 		expect(revoke).toHaveBeenCalledWith('s1');
@@ -342,6 +345,9 @@ describe('ShareVehicleDialog managing existing shares', () => {
 
 		await fireEvent.click(
 			screen.getByRole('button', { name: 'Revoke access for friend@example.com' })
+		);
+		await fireEvent.click(
+			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Revoke' })
 		);
 		await settle();
 
