@@ -106,6 +106,18 @@ describe('expenses HTTP search/pagination', () => {
     expect(csv).not.toContain('tonga next day');
   });
 
+  test('a full timestamp at UTC midnight is honoured verbatim, not widened to the user day', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    await createExpense(vehicleId, 'misc', 5, 'tonga noon', '2026-03-30T23:00:00.000Z');
+    await createExpense(vehicleId, 'misc', 6, 'tonga evening', '2026-03-31T05:00:00.000Z');
+
+    const qs =
+      '?startDate=2026-03-30T12:00:00Z&endDate=2026-03-31T00:00:00Z&timeZone=Pacific%2FTongatapu';
+    const res = await ctx.authed('GET', `/api/v1/expenses${qs}`);
+    const body = await json<PaginatedEnvelope<ExpenseRow>>(res);
+    expect(body.data.map((e) => e.description)).toEqual(['tonga noon']);
+  });
+
   test('an unknown ?timeZone= is rejected', async () => {
     const res = await ctx.authed(
       'GET',
