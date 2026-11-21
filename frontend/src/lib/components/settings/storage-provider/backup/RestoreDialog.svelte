@@ -3,6 +3,7 @@
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Alert, AlertDescription } from '#lib/components/ui/alert/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import * as RadioGroup from '#lib/components/ui/radio-group/index.ts';
 	import { LoaderCircle, Upload, ArrowLeft, Cloud, Database, ChevronDown } from '@lucide/svelte';
@@ -52,6 +53,7 @@
 	let selectedFile = $state<File | null>(null);
 
 	let restorePreview = $state<Record<string, number> | null>(null);
+	let skippedPhotos = $state(0);
 	let restoreConflicts = $state<Array<{ table: string; id: string }>>([]);
 	let restoreMode = $state<'replace' | 'merge'>('replace');
 	let isProcessing = $state(false);
@@ -70,6 +72,7 @@
 		selectedBackup = null;
 		selectedFile = null;
 		restorePreview = null;
+		skippedPhotos = 0;
 		restoreConflicts = [];
 		restoreMode = 'replace';
 		isProcessing = false;
@@ -127,6 +130,7 @@
 					idempotencyKey: key
 				});
 				restorePreview = result.preview ?? null;
+				skippedPhotos = result.skipped?.photos ?? 0;
 				restoreConflicts = result.conflicts ?? [];
 				step = 3;
 			} catch (err) {
@@ -152,6 +156,7 @@
 				idempotencyKey: key
 			});
 			restorePreview = result.preview ?? null;
+			skippedPhotos = result.skipped?.photos ?? 0;
 			restoreConflicts = result.conflicts ?? [];
 			step = 3;
 		} catch (err) {
@@ -171,6 +176,7 @@
 		try {
 			const result = await settingsStore.uploadBackup(file, 'preview');
 			restorePreview = result.preview ?? null;
+			skippedPhotos = result.skipped?.photos ?? 0;
 			restoreConflicts = result.conflicts ?? [];
 			step = 3;
 		} catch (err) {
@@ -229,6 +235,7 @@
 		error = null;
 		if (step === 3) {
 			restorePreview = null;
+			skippedPhotos = 0;
 			restoreConflicts = [];
 			if (flowType === 'provider' && selectedSourceType === 'zip') {
 				selectedBackup = null;
@@ -472,6 +479,16 @@
 						</Collapsible>
 					{/if}
 				</div>
+
+				{#if skippedPhotos > 0}
+					<Alert data-testid="restore-skipped-photos">
+						<AlertDescription>
+							{skippedPhotos === 1
+								? "1 photo won't be restored because the record it was attached to was deleted."
+								: `${skippedPhotos} photos won't be restored because the records they were attached to were deleted.`}
+						</AlertDescription>
+					</Alert>
+				{/if}
 
 				{#if restoreConflicts.length > 0}
 					<div class="rounded-lg border border-chart-5/30 bg-chart-5/5 p-4">
