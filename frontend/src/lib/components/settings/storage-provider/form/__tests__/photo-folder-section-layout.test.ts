@@ -42,3 +42,29 @@ describe('PhotoFolderSection rows on phones', () => {
 		}
 	});
 });
+
+describe('PhotoFolderSection accessible names', () => {
+	test('every checkbox is named by its visible label, and every path input names its category', async () => {
+		const onUpdate = vi.fn();
+		render(PhotoFolderSection, {
+			props: { photoRootPath: 'photos', categorySettings, providerRootPath: 'VROOM', onUpdate }
+		});
+		await fireEvent.click(screen.getByText('Category paths & sync settings'));
+
+		expect(await screen.findByRole('checkbox', { name: 'Disable All' })).toBeInTheDocument();
+		for (const name of [
+			'Vehicle Photos',
+			'Expense Receipts',
+			'Insurance Docs',
+			'Odometer Readings'
+		]) {
+			expect(screen.getByRole('checkbox', { name })).toBeInTheDocument();
+			expect(screen.getByRole('textbox', { name: `${name} folder path` })).toBeInTheDocument();
+		}
+
+		await fireEvent.click(screen.getByText('Vehicle Photos'));
+		expect(onUpdate).toHaveBeenCalledWith(
+			expect.objectContaining({ vehicle_photos: { enabled: false, folderPath: '/Vehicle' } })
+		);
+	});
+});

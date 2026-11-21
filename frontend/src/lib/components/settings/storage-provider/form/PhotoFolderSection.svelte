@@ -28,6 +28,8 @@
 		onUpdate: (_settings: Record<PhotoCategory, CategorySetting>) => void;
 	} = $props();
 
+	const uid = $props.id();
+
 	let rootPrefix = $derived(providerRootPath ? `${providerRootPath.replace(/\/+$/, '')}/` : '');
 
 	let advancedOpen = $state(false);
@@ -107,10 +109,10 @@
 		<Collapsible.Content class="pt-3">
 			<div class="space-y-2 rounded-lg border border-border p-3">
 				<div class="flex min-h-10 items-center gap-2">
-					<Checkbox checked={allEnabled} onCheckedChange={handleToggleAll} />
-					<span class="text-sm text-muted-foreground">
+					<Checkbox id="{uid}-all" checked={allEnabled} onCheckedChange={handleToggleAll} />
+					<label for="{uid}-all" class="text-sm text-muted-foreground">
 						{allEnabled ? 'Disable All' : 'Enable All'}
-					</span>
+					</label>
 				</div>
 
 				{#each CATEGORIES as category (category)}
@@ -118,12 +120,14 @@
 					{@const isDefault = defaultCategories.has(category)}
 					<div class="flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="photo-folder-row">
 						<Checkbox
+							id="{uid}-{category}"
 							checked={setting?.enabled ?? false}
 							disabled={isDefault}
 							onCheckedChange={checked => handleCategoryToggle(category, checked === true)}
 						/>
 						<div class="flex min-h-10 flex-1 items-center gap-1.5 sm:w-36 sm:flex-none sm:shrink-0">
-							<span class="text-sm">{PHOTO_CATEGORY_LABELS[category]}</span>
+							<label for="{uid}-{category}" class="text-sm">{PHOTO_CATEGORY_LABELS[category]}</label
+							>
 							{#if isDefault}
 								<Badge variant="outline" class="text-xs px-1.5 py-0">default</Badge>
 							{/if}
@@ -142,6 +146,7 @@
 								value={setting?.folderPath ?? ''}
 								oninput={e => handleFolderPathChange(category, e.currentTarget.value)}
 								placeholder="/folder"
+								aria-label="{PHOTO_CATEGORY_LABELS[category]} folder path"
 								class="min-w-0 flex-1 bg-transparent px-2 py-1 outline-none text-sm placeholder:text-muted-foreground {rootPrefix
 									? 'pl-0'
 									: ''}"
