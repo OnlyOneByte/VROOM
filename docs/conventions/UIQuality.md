@@ -31,7 +31,8 @@ screen should let someone glance, trust the number, and act with one thumb.
 4. **Tokens, not colours.** A screen is painted only with theme tokens, so all 11 theme families
    in light and dark work without a second thought. If it only looks right in Default light, it
    is not done.
-5. **Every state is designed.** Loading, empty, error and populated are four screens, not one.
+5. **Every state is designed.** Loading, empty, error and populated are four screens, not one,
+   and every action gives success feedback.
    The empty state is where a new user decides whether the app is worth it.
 6. **Compose, don't reinvent.** Use the kit. A new pattern goes into the kit and `/dev/gallery`
    first, then into the route.
@@ -84,25 +85,36 @@ size and weight, not from new families or colours.
 
 ## Colour and theme tokens
 
-VROOM ships 11 theme families (Default, Blueprint, Bento, Vaporwave, Cyberpunk, Aurora,
-Solarpunk, Editorial, Terminal, Y2K, Neobrutalist), each with a light and a dark variant. The
+VROOM ships 11 theme families, each with a light and a dark variant. Their ids (used by the
+`themePreference` setting) are `default`, `blueprint`, `bento`, `vaporwave`, `cyberpunk`,
+`aurora`, `solarpunk`, `editorial`, `tui` (labelled Terminal), `y2k` and `neobrutalist`. The
 token table and the role of each token live in `DesignSystem.md` → *Design tokens*.
 
 - **Only tokens.** `bg-*`/`text-*`/`border-*` from the token set. No hex, `rgb()`, `gray-*`,
   `white`, `black` or other palette classes in components or `app.css`.
-  `no-theme-clashing-colors.test.ts` catches the common ones; reviewers catch the rest.
-- **Contrast is WCAG 2.1 AA.** Text ≥ 4.5:1 against its surface; large text (≥ 24px, or ≥ 18.66px
-  bold) and meaningful UI parts (icons that carry meaning, input borders, focus rings) ≥ 3:1.
-  This holds in **every** theme and both modes. `theme/__tests__/theme-contrast.test.ts` gates
-  the token pairs; axe in e2e gates real pages.
+  `no-theme-clashing-colors.test.ts` catches the common ones; reviewers catch the rest. Known
+  gaps: the sonner toast colours in `app.css` and `Alert`'s `warning`/`success` variants are
+  hardcoded and ignore the theme; don't copy them.
+- **Contrast is WCAG 2.1 AA in every theme and both modes.** Text ≥ 4.5:1 against its surface;
+  large text (≥ 24px, or ≥ 18.66px bold) and meaningful non-text UI (icons that carry meaning,
+  input borders, focus rings) ≥ 3:1.
+- **Know what is gated.** `theme/__tests__/theme-contrast.test.ts` gates the text pairs at 4.5:1
+  (foreground/background pairs plus `primary`, `destructive` and `success` on their surfaces)
+  and `chart-1`…`chart-8` on `card` at 3:1. axe in e2e checks text contrast on real pages, not
+  non-text contrast. Nothing gates `warning`, `border`, `input` or `ring` yet, so the reviewer
+  checks those by hand. Today `text-warning` is below 4.5:1 in the Solarpunk, Editorial and
+  Terminal light themes, `border`/`input` are below 3:1 in nearly every theme, and `ring` is
+  below 3:1 in Default light. So a border alone never marks a control or its state, and a
+  focus ring keeps its 3px width.
 - **Opacity eats contrast.** `text-foreground/60`, primary text on a `bg-primary/10` tint, and
   `text-muted-foreground/70` are the usual ways a screen fails AA. Use text tokens as-is.
 - **Status colours mean status.** `text-destructive` for errors and deletes, `text-warning` for
   "needs attention", `text-success` for "all good". Pair each with an icon or a word — colour is
   never the only signal.
 - **Chart colours are for marks.** `chart-1`…`chart-8` only clear 3:1; never use them for text.
-  Category colours come from `utils/chart-colors` / `getCategoryBadgeClasses`, so a category is
-  the same colour in every chart and badge.
+  Category colours come from `getCategoryChartColor` (`utils/chart-colors`) and
+  `getCategoryBadgeClasses` (`utils/expense-helpers`), so a category is the same colour in every
+  chart and badge.
 - **A theme is a palette, not a layout.** Theme work changes tokens only. A component never
   branches on the theme id.
 
@@ -190,7 +202,7 @@ Motion explains a change; it never decorates.
 
 - Durations: `duration-200` for hover, press and colour; `duration-300` for panels, sheets and
   accordions. Nothing over 500ms except chart entry.
-- Animate `opacity` and `transform` (`transition-colors`, `transition-opacity`,
+- Animate colour, opacity and transform (`transition-colors`, `transition-opacity`,
   `transition-transform`). New code avoids `transition-all`, which also animates layout.
 - No motion on page load beyond chart entry and the skeleton pulse. No looping animation outside
   a loading state.
@@ -309,11 +321,13 @@ failed step; nits can be follow-up issues.
 
 - Run the app on `127.0.0.1` only and capture with Playwright Chromium.
 - Move the mouse off the desktop rail first (it expands on hover), and scroll the page once
-  before a full-page shot — charts mount when they scroll into view.
+  before a full-page shot — charts mount when they scroll into view. Wait for chart entry
+  animations to finish before the shot.
 - The theme family is a user setting: set it with `PUT /api/v1/settings`
-  `{"themePreference": "<family id>"}` (or in Settings → Theme). The `vroom-theme-id`
-  `localStorage` key alone is overwritten by the server value once settings load. Light/dark is
-  the `vroom-theme-preference` key (`light` / `dark` / `system`).
+  `{"themePreference": "<family id>"}` (ids are listed under *Colour and theme tokens*; an
+  unknown id renders Default) or in Settings → Theme. If the account already has a
+  `themePreference`, it overwrites the `vroom-theme-id` `localStorage` key once settings load.
+  Light/dark is the `vroom-theme-preference` key (`light` / `dark` / `system`).
 - Before and after use the same route, viewport and data.
 
 ### Definition of human-ready (pre-merge checklist)

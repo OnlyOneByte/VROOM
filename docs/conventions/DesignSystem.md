@@ -42,7 +42,9 @@ palette class. Every token has a light and a dark variant.
 Notes:
 - `--muted-foreground` and `--destructive` are deliberately darkened to clear WCAG AA 4.5:1
   on white/card — do NOT lighten them, and avoid `text-muted-foreground/40`-style opacity on
-  real text. `theme/__tests__/theme-contrast.test.ts` gates every theme's token pairs at AA.
+  real text. `theme/__tests__/theme-contrast.test.ts` gates every theme's text pairs at AA and
+  the chart tokens at 3:1; `warning`, `border`, `input` and `ring` are not gated yet (see
+  `UIQuality.md`, *Colour and theme tokens*).
 - Status surfaces: use `Alert` with `default` or `destructive`, or a `bg-warning/10` +
   `text-warning` tint, rather than a hand-tinted div. Do NOT reach for `Alert`'s `warning` or
   `success` variants yet — both hardcode palette classes (`bg-yellow-50 border-yellow-200
@@ -106,10 +108,10 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 | KPI tiles | `import { StatCard, StatCardGrid } from '#lib/components/charts'` | `iconColor` (`StatCardIconColor`): `primary` · `chart-1`…`chart-8` · `destructive` · `muted`. An unknown token still falls back to the primary tint, but warns under `import.meta.env.DEV`; `category-color-label-convergence.test.ts` fails if the map stops covering a theme token |
 | Custom chart container | `import ChartCard from '#lib/components/charts/ChartCard.svelte'` | not in the barrel; pass `isLoading`/`error`/`isEmpty`/`emptyTitle` — never render a raw chart in a bare div |
 
-## The Four-States contract (cross-ref UIQuality.md)
+## The Four-States contract (cross-ref UIQuality.md, *States*)
 
 Any data view = loading (`Skeleton`) + empty (`EmptyState`) + error (visible message) +
-populated. `ChartCard` encodes all four (`isLoading`/`isEmpty`/`error`); `StatCard` and
+populated, and every mutation adds success feedback. `ChartCard` encodes all four (`isLoading`/`isEmpty`/`error`); `StatCard` and
 `PaginationControls` take `isLoading` only, so you still own their empty/error states.
 
 `utils/formatters` for currency/dates and `#lib/routes` + `resolve()` for links are the other

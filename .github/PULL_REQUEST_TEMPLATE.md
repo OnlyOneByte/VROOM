@@ -31,8 +31,10 @@ Fixes #
 
 | | Before | After |
 |---|---|---|
-| Desktop 1280px | | |
-| Mobile 375px | | |
+| Desktop 1280px, light | | |
+| Desktop 1280px, dark | | |
+| Mobile 375px, light | | |
+| Mobile 375px, dark | | |
 
 - [ ] Before/after screenshots above at desktop and mobile, or a GIF for motion and multi-step flows
 - [ ] Checked against the UI design guide (`docs/conventions/UIQuality.md`): layout, typography, tokens, components, copy
