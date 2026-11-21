@@ -17,7 +17,7 @@ describe('FuelStatsTab keeps its empty-data four-state gate', () => {
 
 	test('gates the EmptyState on !hasFuelData (so empty data shows one empty state, not ~10 N/A cards)', () => {
 		expect(SRC).toMatch(/!hasFuelData/);
-		expect(SRC).toContain('No fuel data yet');
+		expect(SRC).toContain('No fill-ups in the last 12 months');
 	});
 
 	test('renders the full four-state set (loading / error+Retry / empty / data)', () => {

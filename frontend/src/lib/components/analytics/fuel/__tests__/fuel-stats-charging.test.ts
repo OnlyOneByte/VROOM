@@ -46,10 +46,23 @@ const charging: NonNullable<FuelStatsResponse['charging']> = {
 	priceHistory: [{ date: '2024-01-05', fuelType: 'Level 2 (AC)', pricePerVolume: 0.467 }]
 };
 
+describe('FuelStatsTab with nothing in the window', () => {
+	test('says the window is 12 months and points to the expenses that are still there', () => {
+		render(FuelStatsTab, { fuelStats: stats({}), fuelAdvanced: advanced });
+		expect(screen.getByText('No fill-ups in the last 12 months')).toBeTruthy();
+		expect(screen.queryByText(/No fuel data yet/)).toBeNull();
+		expect(screen.getByRole('link', { name: 'View Expenses' })).toHaveAttribute(
+			'href',
+			'/expenses'
+		);
+		expect(screen.getByRole('button', { name: 'Log a Fill-up' })).toBeTruthy();
+	});
+});
+
 describe('FuelStatsTab charging series', () => {
 	test('an EV-only fleet sees its charging cards instead of the empty state or zeroed gas cards', () => {
 		render(FuelStatsTab, { fuelStats: stats({ charging }), fuelAdvanced: advanced });
-		expect(screen.queryByText('No fuel data yet')).toBeNull();
+		expect(screen.queryByText('No fill-ups in the last 12 months')).toBeNull();
 		expect(screen.getByText('Charging Sessions')).toBeTruthy();
 		expect(screen.getByText('Energy (kWh)')).toBeTruthy();
 		expect(screen.getByText('Average mi/kWh')).toBeTruthy();

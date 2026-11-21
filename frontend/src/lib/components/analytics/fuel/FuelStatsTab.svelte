@@ -197,16 +197,20 @@
 				<Fuel class="h-8 w-8 text-muted-foreground" />
 			</div>
 		{/snippet}
-		{#snippet title()}No fuel data yet{/snippet}
+		{#snippet title()}<span class="block text-center">No fill-ups in the last 12 months</span
+			>{/snippet}
 		{#snippet description()}
-			Log a fill-up to unlock fuel efficiency, cost, and consumption insights — your fill-up stats
-			and trend charts will appear here once you have data.
+			Fuel and charging stats cover the last 12 months. Older fill-ups and charging sessions are
+			still in your expenses.
 		{/snippet}
 		{#snippet action()}
-			<Button onclick={logFillup}>
-				<Fuel class="mr-2 h-4 w-4" />
-				Log a Fill-up
-			</Button>
+			<div class="flex flex-col gap-3 sm:flex-row">
+				<Button variant="outline" size="lg" href={resolve(routes.expenses)}>View Expenses</Button>
+				<Button size="lg" onclick={logFillup}>
+					<Fuel class="mr-2 h-4 w-4" />
+					Log a Fill-up
+				</Button>
+			</div>
 		{/snippet}
 	</EmptyState>
 {:else if fuelStats}
