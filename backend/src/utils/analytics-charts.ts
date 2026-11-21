@@ -69,8 +69,8 @@ export interface FuelExpenseRow {
   vehicleId: string;
 }
 
-export const isFillup = (r: Pick<FuelExpenseRow, 'volume'>): boolean =>
-  r.volume != null && r.volume > 0;
+export const isFillup = (r: Pick<FuelExpenseRow, 'volume' | 'fuelType'>): boolean =>
+  r.volume != null && r.volume > 0 && !isElectricFuelType(r.fuelType);
 
 export interface GeneralExpenseRow {
   id: string;
@@ -81,6 +81,7 @@ export interface GeneralExpenseRow {
   date: Date | number | null;
   mileage: number | null;
   volume: number | null;
+  fuelType: string | null;
   missedFillup: boolean;
 }
 
@@ -221,6 +222,20 @@ export function forEachVehiclePair<T extends { vehicleId: string }>(
   }
 }
 
+export function* sameEnergyPairs<T extends { vehicleId: string; fuelType: string | null }>(
+  rows: T[]
+): Generator<[current: T, previous: T]> {
+  for (const vehicleRows of groupByVehicle(rows).values()) {
+    const lastByEnergy = new Map<boolean, T>();
+    for (const current of vehicleRows) {
+      const electric = isElectricFuelType(current.fuelType);
+      const previous = lastByEnergy.get(electric);
+      if (previous) yield [current, previous];
+      lastByEnergy.set(electric, current);
+    }
+  }
+}
+
 export function sortByVehicleThenDate<T extends { vehicleId: string; date: Date | number | null }>(
   rows: T[]
 ): T[] {
@@ -239,9 +254,9 @@ export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
   const mpgValues: number[] = [];
   const costPerMileValues: number[] = [];
 
-  forEachVehiclePair(rows, (current, previous) => {
+  for (const [current, previous] of sameEnergyPairs(rows)) {
     const point = computeEfficiencyPoint(current, previous);
-    if (!point) return;
+    if (!point) continue;
 
     if (gasEfficiencyPoint(current, previous)) {
       mpgValues.push(point.efficiency);
@@ -250,7 +265,7 @@ export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
     if (milesDriven > 0 && current.expenseAmount > 0) {
       costPerMileValues.push(current.expenseAmount / milesDriven);
     }
-  });
+  }
 
   return { mpgValues, costPerMileValues };
 }
@@ -259,7 +274,7 @@ export function buildGasPriceHistory(
   rows: FuelExpenseRow[]
 ): Array<{ date: string; fuelType: string; pricePerVolume: number }> {
   return rows
-    .filter((r) => r.volume != null && r.volume > 0 && r.expenseAmount > 0 && r.date != null)
+    .filter((r) => isFillup(r) && r.expenseAmount > 0 && r.date != null)
     .map((r) => ({
       date: r.date instanceof Date ? r.date.toISOString() : String(r.date),
       fuelType: r.fuelType ?? 'Regular',
@@ -502,14 +517,14 @@ function computePerVehicleFuelEfficiency(
   metrics: Map<string, VehicleMetrics>
 ): void {
   const totals = new Map<string, { sum: number; count: number }>();
-  forEachVehiclePair(fuelRows, (current, previous) => {
+  for (const [current, previous] of sameEnergyPairs(fuelRows)) {
     const point = gasEfficiencyPoint(current, previous);
-    if (!point) return;
+    if (!point) continue;
     const entry = totals.get(current.vehicleId) ?? { sum: 0, count: 0 };
     entry.sum += point.efficiency;
     entry.count++;
     totals.set(current.vehicleId, entry);
-  });
+  }
   for (const [vId, { sum, count }] of totals) {
     const m = metrics.get(vId);
     if (m) m.fuelEfficiency = sum / count;
@@ -653,17 +668,12 @@ export function buildMonthlyCostHeatmap(allExpenses: GeneralExpenseRow[]): Array
 }
 
 function accumulateIntervalBuckets(
-  vehicleRows: FuelExpenseRow[],
+  fuelRows: FuelExpenseRow[],
   buckets: Array<{ label: string; min: number; max: number; count: number }>
 ): void {
-  const sorted = [...vehicleRows].sort((a, b) => {
-    const da = normalizeDate(a.date);
-    const db = normalizeDate(b.date);
-    return (da?.getTime() ?? 0) - (db?.getTime() ?? 0);
-  });
-  for (let i = 1; i < sorted.length; i++) {
-    const curr = normalizeDate(sorted[i]?.date ?? null);
-    const prev = normalizeDate(sorted[i - 1]?.date ?? null);
+  for (const [current, previous] of sameEnergyPairs(sortByVehicleThenDate(fuelRows))) {
+    const curr = normalizeDate(current.date);
+    const prev = normalizeDate(previous.date);
     if (!curr || !prev) continue;
     const days = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
     if (days <= 0) continue;
@@ -675,8 +685,6 @@ function accumulateIntervalBuckets(
 export function buildFillupIntervals(
   fuelRows: FuelExpenseRow[]
 ): Array<{ intervalLabel: string; count: number }> {
-  const byVehicle = groupByVehicle(fuelRows.filter((row) => row.date != null));
-
   const buckets = [
     { label: '1-3 days', min: 1, max: 3, count: 0 },
     { label: '4-7 days', min: 4, max: 7, count: 0 },
@@ -685,9 +693,10 @@ export function buildFillupIntervals(
     { label: '22+ days', min: 22, max: Number.POSITIVE_INFINITY, count: 0 },
   ];
 
-  for (const vehicleRows of byVehicle.values()) {
-    accumulateIntervalBuckets(vehicleRows, buckets);
-  }
+  accumulateIntervalBuckets(
+    fuelRows.filter((row) => row.date != null),
+    buckets
+  );
 
   return buckets
     .filter((b) => b.count > 0)
@@ -822,10 +831,14 @@ export function buildFuelEfficiencyAndCost(
     return da.getTime() - db.getTime();
   });
 
-  for (let i = 0; i < sorted.length; i++) {
-    const row = sorted[i];
-    if (!row) continue;
-    accumulateFuelRow(monthData, row, i > 0 ? sorted[i - 1] : undefined);
+  let previousFillup: GeneralExpenseRow | undefined;
+  for (const row of sorted) {
+    if (isElectricFuelType(row.fuelType)) {
+      accumulateFuelRow(monthData, row, undefined);
+      continue;
+    }
+    accumulateFuelRow(monthData, row, previousFillup);
+    previousFillup = row;
   }
 
   return Array.from(monthData.entries())

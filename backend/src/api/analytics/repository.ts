@@ -1,4 +1,16 @@
-import { and, asc, eq, gte, inArray, isNotNull, lt, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import {
@@ -10,6 +22,7 @@ import {
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
+import { ELECTRIC_FUEL_TYPES } from '../../db/types';
 import { DatabaseError, ValidationError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } from '../../types';
 import {
@@ -39,15 +52,14 @@ import {
   type FuelExpenseRow,
   type FuelRow,
   findBiggestExpense,
-  forEachVehiclePair,
   type GeneralExpenseRow,
   gasEfficiencyPoint,
-  groupByVehicle,
   isFillup,
   monthKeysInRange,
   normalizeDate,
   type RadarUnitConverters,
   SEASON_MAP,
+  sameEnergyPairs,
   sortByVehicleThenDate,
   toMonthKey,
 } from '../../utils/analytics-charts';
@@ -445,27 +457,21 @@ export class AnalyticsRepository {
   }
 
   private rowVolume(row: FuelExpenseRow, convert: FleetUnitConverter): number {
-    const v = row.volume ?? 0;
-    return v === 0 ? 0 : convert.volume(v, row.vehicleId);
+    return isFillup(row) ? convert.volume(row.volume as number, row.vehicleId) : 0;
   }
 
   private *gasEfficiencyPoints(
     fuelRows: FuelExpenseRow[],
     convert: FleetUnitConverter
   ): Generator<{ vehicleId: string; efficiency: number; date: string }> {
-    for (const [vehicleId, rows] of groupByVehicle(fuelRows)) {
-      for (let i = 1; i < rows.length; i++) {
-        const current = rows[i];
-        const previous = rows[i - 1];
-        if (!current || !previous) continue;
-        const point = gasEfficiencyPoint(current, previous);
-        if (!point) continue;
-        yield {
-          vehicleId,
-          efficiency: convert.efficiency(point.efficiency, vehicleId),
-          date: point.date,
-        };
-      }
+    for (const [current, previous] of sameEnergyPairs(fuelRows)) {
+      const point = gasEfficiencyPoint(current, previous);
+      if (!point) continue;
+      yield {
+        vehicleId: current.vehicleId,
+        efficiency: convert.efficiency(point.efficiency, current.vehicleId),
+        date: point.date,
+      };
     }
   }
 
@@ -733,6 +739,7 @@ export class AnalyticsRepository {
         date: expenses.date,
         mileage: expenses.mileage,
         volume: expenses.volume,
+        fuelType: expenses.fuelType,
         missedFillup: expenses.missedFillup,
       })
       .from(expenses)
@@ -761,6 +768,7 @@ export class AnalyticsRepository {
       eq(expenses.category, 'fuel'),
       gte(expenses.date, new Date(range.start * 1000)),
       lt(expenses.date, new Date(range.end * 1000)),
+      or(isNull(expenses.fuelType), notInArray(expenses.fuelType, [...ELECTRIC_FUEL_TYPES])),
     ];
     if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
     const rows = await this.db
@@ -1154,10 +1162,10 @@ export class AnalyticsRepository {
         .orderBy(asc(expenses.vehicleId), asc(expenses.date));
       if (rows.length < 2) return [];
       const points: FuelEfficiencyPoint[] = [];
-      forEachVehiclePair(rows, (current, previous) => {
+      for (const [current, previous] of sameEnergyPairs(rows)) {
         const point = gasEfficiencyPoint(current as FuelRow, previous as FuelRow);
         if (point) points.push(point);
-      });
+      }
       return points;
     } catch (error) {
       logger.error('Failed to compute fuel efficiency trend', {
@@ -1355,9 +1363,7 @@ export class AnalyticsRepository {
     const { mpgValues, costPerMileValues } = computeMpgAndCostPerMile(fuelRowsByVehicle);
     const fuelConsumption = computeFuelConsumptionMetrics(mpgValues);
 
-    const volumes = fuelRows
-      .filter((r) => r.volume != null && r.volume > 0)
-      .map((r) => this.rowVolume(r, convert));
+    const volumes = fuelRows.filter(isFillup).map((r) => this.rowVolume(r, convert));
     const fillupDetails = {
       avgVolume: volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : null,
       minVolume: volumes.length > 0 ? minOf(volumes) : null,

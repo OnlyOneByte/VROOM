@@ -84,3 +84,51 @@ describe('a split fuel expense counts as one fill-up', () => {
     expect(weekday?.avgVolume).toBe(10);
   });
 });
+
+describe('PHEV gas fill-ups pair with gas, and kWh stays out of fuel volume', () => {
+  const CHARGE = 'Level 2 (AC)';
+
+  beforeEach(() => {
+    seedExpense(testDb.sqlite, fuel({ id: 'g1', date: new Date(2024, 0, 1), mileage: 10_000 }));
+    seedExpense(
+      testDb.sqlite,
+      fuel({
+        id: 'c1',
+        date: new Date(2024, 0, 5),
+        mileage: 10_250,
+        volume: 15,
+        expenseAmount: 9,
+        fuelType: CHARGE,
+      })
+    );
+    seedExpense(testDb.sqlite, fuel({ id: 'g2', date: new Date(2024, 0, 8), mileage: 10_300 }));
+    seedExpense(testDb.sqlite, fuel({ id: 'p1', date: new Date(2023, 5, 1), mileage: 5_000 }));
+    seedExpense(
+      testDb.sqlite,
+      fuel({ id: 'pc', date: new Date(2023, 5, 5), mileage: 5_100, volume: 50, fuelType: CHARGE })
+    );
+  });
+
+  test('fuel stats count only gas fill-ups and gallons, and MPG is gas-to-gas', async () => {
+    const stats = await repo.getFuelStats(USER.id, yearToRange(2024));
+    expect(stats.fillups.currentYear).toBe(2);
+    expect(stats.fillups.previousYear).toBe(1);
+    expect(stats.volume.currentYear).toBeCloseTo(20, 9);
+    expect(stats.volume.previousYear).toBeCloseTo(10, 9);
+    expect(stats.fillupDetails.maxVolume).toBeCloseTo(10, 9);
+    expect(stats.fuelConsumption.avgEfficiency).toBeCloseTo(30, 5);
+    expect(stats.gasPriceHistory.map((g) => g.pricePerVolume)).toEqual([4, 4]);
+  });
+
+  test('the vehicle fuel-efficiency trend uses the gas-to-gas interval', async () => {
+    const points = await repo.getFuelEfficiencyTrend(USER.id, VEHICLE.id);
+    expect(points.map((p) => p.efficiency)).toEqual([30]);
+  });
+
+  test('vehicle expenses efficiency divides gas miles by gallons only', async () => {
+    const data = await repo.getVehicleExpenses(USER.id, VEHICLE.id, yearToRange(2024));
+    const jan = data.fuelEfficiencyAndCost.find((m) => m.month === '2024-01');
+    expect(jan?.efficiency).toBeCloseTo(30, 5);
+    expect(jan?.cost).toBe(89);
+  });
+});
