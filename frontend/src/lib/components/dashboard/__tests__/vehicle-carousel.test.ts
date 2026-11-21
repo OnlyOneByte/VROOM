@@ -123,6 +123,13 @@ describe('VehicleCarousel vehicle card', () => {
 		expect(screen.getByRole('button', { name: 'Add Expense' })).toHaveClass('h-10');
 	});
 
+	test('the fleet is an h2 and each vehicle name an h3 beneath it', () => {
+		render(VehicleCarousel, { vehicles: [overview({ nickname: 'Daily Driver' })] });
+
+		expect(screen.getByRole('heading', { level: 2, name: 'Your Fleet' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { level: 3, name: 'Daily Driver' })).toBeInTheDocument();
+	});
+
 	test('a vehicle with no activity says so', () => {
 		render(VehicleCarousel, { vehicles: [overview({ lastActivity: null })] });
 

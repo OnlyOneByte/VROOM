@@ -207,7 +207,7 @@
 
 		<Card.Root>
 			<Card.Header>
-				<Card.Title>Readings ({totalCount})</Card.Title>
+				<Card.Title level={2}>Readings ({totalCount})</Card.Title>
 			</Card.Header>
 			<Card.Content class="space-y-3">
 				{#if isPageLoading}
