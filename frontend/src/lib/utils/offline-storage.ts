@@ -146,6 +146,24 @@ export function loadCachedVehicleHistory(vehicleId: string): Expense[] | null {
 	return readOwnerCache<Expense>(`${VEHICLE_HISTORY_CACHE_KEY}:${vehicleId}`);
 }
 
+export function clearOfflineCaches(owner: string | null = queueOwner): void {
+	if (!browser || !owner) return;
+	try {
+		const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i));
+		for (const key of keys) {
+			if (!key?.endsWith(`:${owner}`)) continue;
+			if (
+				key.startsWith(`${VEHICLE_CACHE_KEY}:`) ||
+				key.startsWith(`${VEHICLE_HISTORY_CACHE_KEY}:`)
+			) {
+				localStorage.removeItem(key);
+			}
+		}
+	} catch (error) {
+		if (import.meta.env.DEV) console.error('Failed to clear the offline caches:', error);
+	}
+}
+
 export function loadOfflineExpenses(owner: string | null = queueOwner): OfflineExpense[] {
 	if (!browser) return [];
 

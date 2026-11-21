@@ -1,7 +1,7 @@
 import type { User } from '../types/index.js';
 import { apiClient, getApiBaseUrl } from '#lib/services/api-client.ts';
 import { ApiError, extractErrorMessage } from '#lib/utils/error-handling.ts';
-import { setOfflineQueueOwner } from '#lib/utils/offline-storage.ts';
+import { clearOfflineCaches, setOfflineQueueOwner } from '#lib/utils/offline-storage.ts';
 import { browser } from '$app/env';
 
 const LAST_USER_KEY = 'vroom_last_user';
@@ -166,7 +166,9 @@ function createAuthStore() {
 		async logout() {
 			try {
 				await apiClient.post('/api/v1/auth/logout');
+				const signedOutUserId = user?.id ?? null;
 				signOut();
+				clearOfflineCaches(signedOutUserId);
 
 				// Import appStore dynamically to avoid circular dependency
 				const { appStore } = await import('./app.svelte');
