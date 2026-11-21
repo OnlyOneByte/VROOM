@@ -211,7 +211,7 @@ export class InsurancePolicyRepository {
       logger.error('Failed to create insurance policy', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new DatabaseError('Failed to create insurance policy', error);
+      throw new DatabaseError('Failed to create insurance policy');
     }
   }
 
@@ -238,7 +238,7 @@ export class InsurancePolicyRepository {
       return Promise.all(policies.map((p) => this.attachTermsAndCoverage(p)));
     } catch (error) {
       logger.error('Error finding insurance policies for user', { error });
-      throw new DatabaseError('Failed to find insurance policies for user', error);
+      throw new DatabaseError('Failed to find insurance policies for user');
     }
   }
 
@@ -256,7 +256,7 @@ export class InsurancePolicyRepository {
       return Promise.all(policies.map((p) => this.attachTermsAndCoverage(p)));
     } catch (error) {
       logger.error('Error finding insurance policies for vehicle', { vehicleId, error });
-      throw new DatabaseError('Failed to find insurance policies for vehicle', error);
+      throw new DatabaseError('Failed to find insurance policies for vehicle');
     }
   }
 
@@ -298,7 +298,7 @@ export class InsurancePolicyRepository {
         id,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new DatabaseError('Failed to update insurance policy', error);
+      throw new DatabaseError('Failed to update insurance policy');
     }
   }
 
@@ -323,7 +323,7 @@ export class InsurancePolicyRepository {
         id,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new DatabaseError('Failed to delete insurance policy', error);
+      throw new DatabaseError('Failed to delete insurance policy');
     }
   }
 
@@ -394,7 +394,7 @@ export class InsurancePolicyRepository {
         policyId,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new DatabaseError('Failed to add term to insurance policy', error);
+      throw new DatabaseError('Failed to add term to insurance policy');
     }
   }
 
@@ -490,7 +490,7 @@ export class InsurancePolicyRepository {
         termId,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new DatabaseError('Failed to update term in insurance policy', error);
+      throw new DatabaseError('Failed to update term in insurance policy');
     }
   }
 
@@ -545,7 +545,7 @@ export class InsurancePolicyRepository {
         termId,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new DatabaseError('Failed to delete term from insurance policy', error);
+      throw new DatabaseError('Failed to delete term from insurance policy');
     }
   }
 
@@ -586,7 +586,7 @@ export class InsurancePolicyRepository {
         .then((rows) => rows.map((r) => r.term));
     } catch (error) {
       logger.error('Error finding expiring insurance terms', { error });
-      throw new DatabaseError('Failed to find expiring insurance terms', error);
+      throw new DatabaseError('Failed to find expiring insurance terms');
     }
   }
 }
