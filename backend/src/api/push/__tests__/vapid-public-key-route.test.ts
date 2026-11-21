@@ -16,14 +16,12 @@ afterEach(() => {
 });
 
 describe('push VAPID public-key route', () => {
-  test('unconfigured server → 503 PUSH_NOT_CONFIGURED (honest, not 500/blank)', async () => {
+  test('unconfigured server → 200 with enabled:false (push off is a normal setup, not an outage)', async () => {
     stubPushConfig({ enabled: false });
     const ctx = await createTestApp();
     const res = await ctx.authed('GET', '/api/v1/push/vapid-public-key');
-    expect(res.status).toBe(503);
-    const body = (await res.json()) as { success: boolean; error?: { code?: string } };
-    expect(body.success).toBe(false);
-    expect(body.error?.code).toBe('PUSH_NOT_CONFIGURED');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, data: { enabled: false, publicKey: null } });
     ctx.close();
   });
 
@@ -33,7 +31,10 @@ describe('push VAPID public-key route', () => {
     const res = await ctx.authed('GET', '/api/v1/push/vapid-public-key');
     const raw = await res.text();
     expect(res.status).toBe(200);
-    expect(JSON.parse(raw)).toEqual({ success: true, data: { publicKey: PUBLIC_KEY } });
+    expect(JSON.parse(raw)).toEqual({
+      success: true,
+      data: { enabled: true, publicKey: PUBLIC_KEY },
+    });
     expect(raw).not.toContain(PRIVATE_KEY);
     ctx.close();
   });
