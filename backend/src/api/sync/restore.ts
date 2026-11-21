@@ -24,7 +24,14 @@ import {
   vehicleShares,
   vehicles,
 } from '../../db/schema';
-import { AppError, SyncError, SyncErrorCode, ValidationError } from '../../errors';
+import {
+  AppError,
+  ConflictError,
+  isUniqueConstraintError,
+  SyncError,
+  SyncErrorCode,
+  ValidationError,
+} from '../../errors';
 import {
   type BackupConfig,
   DEFAULT_STORAGE_CONFIG,
@@ -179,15 +186,23 @@ class RestoreService {
     this.assertReplaceNotEmpty(summary, mode);
 
     // bun:sqlite transactions must be synchronous: an async callback autocommits each statement.
-    this.db.transaction((tx) => {
-      // Read before the wipe: deleteUserData cascades vehicle_shares.
-      const consented = this.consentedShareKeys(tx, userId);
-      const currentPrefs = this.currentProviderPrefs(tx, userId);
-      if (mode === 'replace') {
-        this.deleteUserData(tx, userId, { keepPreferences: !data.userPreferences?.length });
-      }
-      this.insertBackupData(tx, data, userId, consented, currentPrefs);
-    });
+    try {
+      this.db.transaction((tx) => {
+        // Read before the wipe: deleteUserData cascades vehicle_shares.
+        const consented = this.consentedShareKeys(tx, userId);
+        const currentPrefs = this.currentProviderPrefs(tx, userId);
+        if (mode === 'replace') {
+          this.deleteUserData(tx, userId, { keepPreferences: !data.userPreferences?.length });
+        }
+        this.insertBackupData(tx, data, userId, consented, currentPrefs);
+      });
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) throw error;
+      logger.warn('Restore rolled back on a record conflict', { error });
+      throw new ConflictError(
+        'This backup contains records that conflict with existing data, so nothing was restored.'
+      );
+    }
 
     return { success: true, imported: summary, ...skipped };
   }

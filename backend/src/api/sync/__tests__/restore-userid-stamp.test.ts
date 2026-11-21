@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import AdmZip from 'adm-zip';
+import { ConflictError } from '../../../errors';
 import {
   createTestApp,
   type DataEnvelope,
@@ -615,11 +616,11 @@ describe('restore after the account record is recreated (same person, new user i
       'Intruder',
     ]);
 
-    await expect(restoreService.restoreFromBackup(intruderId, zip, 'replace')).rejects.toThrow(
-      'UNIQUE constraint failed'
-    );
-    await expect(restoreService.restoreFromBackup(intruderId, zip, 'merge')).rejects.toThrow(
-      'UNIQUE constraint failed'
+    await expect(
+      restoreService.restoreFromBackup(intruderId, zip, 'replace')
+    ).rejects.toBeInstanceOf(ConflictError);
+    await expect(restoreService.restoreFromBackup(intruderId, zip, 'merge')).rejects.toBeInstanceOf(
+      ConflictError
     );
 
     const rows = vehicleRows();

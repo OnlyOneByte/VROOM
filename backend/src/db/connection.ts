@@ -4,7 +4,7 @@ import { dirname } from 'node:path';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { CONFIG } from '../config';
-import { DatabaseError } from '../errors';
+import { handleDatabaseError, isAppError, isSyncError } from '../errors';
 import { extractErrorMessage } from '../utils/error-handling';
 import { logger } from '../utils/logger';
 import * as schema from './schema.js';
@@ -44,9 +44,9 @@ export async function transaction<T>(
   try {
     return (await getDb().transaction(callback as Parameters<typeof db.transaction>[0])) as T;
   } catch (error) {
-    const message = `Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-    logger.error(message, { error });
-    throw new DatabaseError(message, error);
+    if (isAppError(error) || isSyncError(error)) throw error;
+    logger.error('Transaction failed', { error });
+    throw handleDatabaseError(error);
   }
 }
 
