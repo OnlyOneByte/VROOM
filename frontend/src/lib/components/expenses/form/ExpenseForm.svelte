@@ -286,17 +286,13 @@
 							</p>
 						{/if}
 						{#if form.vehicleError}
-							<div
-								class="flex flex-wrap items-center gap-3 text-sm"
-								role="alert"
-								data-testid="vehicle-load-error"
-							>
-								<CircleAlert class="h-4 w-4 shrink-0 text-destructive" />
-								<span class="text-destructive">
+							<div class="space-y-2 text-sm" role="alert" data-testid="vehicle-load-error">
+								<p class="flex items-start gap-2 text-destructive">
+									<CircleAlert class="mt-0.5 h-4 w-4 shrink-0" />
 									{form.showFuelFields
 										? "Couldn't load this vehicle's details, so this fill-up can't be saved yet."
 										: "Couldn't load this vehicle's details."}
-								</span>
+								</p>
 								<Button
 									variant="outline"
 									size="lg"
