@@ -158,15 +158,54 @@ describe('date fields reject values that would be saved as 1970', () => {
       odometer: 100,
       recordedAt: '2024-02-01T12:00:00.000Z',
     });
+    const policyRes = await ctx.authed(
+      'POST',
+      '/api/v1/insurance',
+      policyBody(vehicleId, '2024-01-01')
+    );
+    const policy = await json<DataEnvelope<{ id: string; terms: { id: string }[] }>>(policyRes);
+    expect(policyRes.status, JSON.stringify(policy)).toBe(201);
+    const termId = policy.data.terms[0]?.id;
+    const claimId = await createdId(`/api/v1/insurance/${policy.data.id}/claims`, {
+      claimDate: '2024-06-15T00:00:00.000Z',
+      claimType: 'collision',
+    });
+    const paths: [string, string][] = [
+      [`/api/v1/expenses/${expenseId}`, 'date'],
+      [`/api/v1/odometer/${readingId}`, 'recordedAt'],
+      [`/api/v1/insurance/${policy.data.id}/terms/${termId}`, 'startDate'],
+      [`/api/v1/insurance/${policy.data.id}/claims/${claimId}`, 'claimDate'],
+    ];
     for (const date of [null, true, 0]) {
-      for (const [path, body] of [
-        [`/api/v1/expenses/${expenseId}`, { date }],
-        [`/api/v1/odometer/${readingId}`, { recordedAt: date }],
-        [`/api/v1/vehicles/${vehicleId}`, { purchaseDate: date === null ? true : date }],
-      ] as const) {
-        const res = await ctx.authed('PUT', path, body);
-        expect(res.status, `${path} ${JSON.stringify(body)}: ${await res.text()}`).toBe(400);
+      for (const [path, field] of paths) {
+        const res = await ctx.authed('PUT', path, { [field]: date });
+        expect(res.status, `${path} ${field}=${date}: ${await res.text()}`).toBe(400);
       }
+    }
+    for (const date of [true, 0]) {
+      const res = await ctx.authed('PUT', `/api/v1/vehicles/${vehicleId}`, { purchaseDate: date });
+      expect(res.status, `purchaseDate=${date}: ${await res.text()}`).toBe(400);
+    }
+  });
+
+  test('a stored reminder dated outside the range can still be paused and renamed', async () => {
+    const created = await ctx.authed('POST', '/api/v1/reminders', {
+      name: 'Inspection',
+      type: 'notification',
+      frequency: 'yearly',
+      startDate: '2099-06-15',
+      vehicleIds: [vehicleId],
+    });
+    const reminder = await json<DataEnvelope<{ reminder: { id: string } }>>(created);
+    expect(created.status, JSON.stringify(reminder)).toBe(201);
+    const id = reminder.data.reminder.id;
+    const farFuture = Date.UTC(2160, 0, 1) / 1000;
+    ctx.sqlite
+      .query('UPDATE reminders SET start_date = ?, end_date = ? WHERE id = ?')
+      .run(farFuture - 1, farFuture, id);
+    for (const body of [{ isActive: false }, { name: 'Old reminder' }]) {
+      const res = await ctx.authed('PUT', `/api/v1/reminders/${id}`, body);
+      expect(res.status, `${JSON.stringify(body)}: ${await res.text()}`).toBe(200);
     }
   });
 
