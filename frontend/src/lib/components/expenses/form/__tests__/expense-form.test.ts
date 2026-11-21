@@ -532,6 +532,17 @@ describe('ExpenseForm receipt scanning', () => {
 		await vi.waitFor(() => expect(field('mileage').value).toBe('30210'));
 	});
 
+	test('a scanned non-fuel receipt keeps its odometer reading as the mileage', async () => {
+		await renderCreate();
+
+		await scanReceipt({ odometer: 30210, category: 'maintenance' });
+
+		await vi.waitFor(() =>
+			expect(categoryButton('Maintenance').getAttribute('aria-pressed')).toBe('true')
+		);
+		expect(field('mileage').value).toBe('30210');
+	});
+
 	test('a partial draft leaves the fields it has no value for untouched', async () => {
 		await renderCreate({
 			preselectedCategory: 'misc',
