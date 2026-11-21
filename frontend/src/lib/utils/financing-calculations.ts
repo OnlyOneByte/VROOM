@@ -149,6 +149,27 @@ function calculatePaymentDate(startDate: Date, paymentNumber: number, frequency:
 	}
 }
 
+function scheduledDueDate(financing: VehicleFinancing, start: Date, index: number): Date {
+	switch (financing.paymentFrequency) {
+		case 'bi-weekly':
+		case 'weekly': {
+			const due = new Date(start);
+			due.setDate(due.getDate() + index * (financing.paymentFrequency === 'weekly' ? 7 : 14));
+			return due;
+		}
+		default: {
+			const anchorDay = financing.paymentDayOfMonth ?? start.getDate();
+			const firstMonthOffset = anchorDay < start.getDate() ? 1 : 0;
+			const due = new Date(start);
+			due.setDate(1);
+			due.setMonth(due.getMonth() + index + firstMonthOffset);
+			const daysInMonth = new Date(due.getFullYear(), due.getMonth() + 1, 0).getDate();
+			due.setDate(Math.min(anchorDay, daysInMonth));
+			return due;
+		}
+	}
+}
+
 export function calculateNextPaymentDate(
 	financing: VehicleFinancing,
 	lastPaymentDate?: Date
@@ -159,40 +180,32 @@ export function calculateNextPaymentDate(
 			return new Date();
 		}
 
-		const baseDate = lastPaymentDate || new Date(financing.startDate);
-		const today = new Date();
-		let nextDate = new Date(baseDate);
+		const start = new Date(financing.startDate);
+		const now = new Date();
 
-		if (isNaN(nextDate.getTime())) {
-			if (DEV) console.warn('calculateNextPaymentDate: invalid base date');
+		if (isNaN(start.getTime())) {
+			if (DEV) console.warn('calculateNextPaymentDate: invalid start date');
 			return new Date();
 		}
 
-		let iterations = 0;
 		const maxIterations = 1000;
-		let monthsAdded = 0;
-
-		while (nextDate <= today && iterations < maxIterations) {
-			switch (financing.paymentFrequency) {
-				case 'bi-weekly':
-					nextDate.setDate(nextDate.getDate() + 14);
-					break;
-				case 'weekly':
-					nextDate.setDate(nextDate.getDate() + 7);
-					break;
-				default:
-					monthsAdded++;
-					nextDate = addMonthsClamped(baseDate, monthsAdded);
-			}
-			iterations++;
+		let index = 0;
+		while (index < maxIterations && scheduledDueDate(financing, start, index + 1) <= now) {
+			index++;
 		}
 
-		if (iterations >= maxIterations) {
+		if (index >= maxIterations) {
 			if (DEV) console.warn('calculateNextPaymentDate: max iterations reached');
 			return new Date();
 		}
 
-		return nextDate;
+		const lastDue = scheduledDueDate(financing, start, index);
+		if (lastDue > now) return lastDue;
+
+		const previousDue = index > 0 ? scheduledDueDate(financing, start, index - 1) : undefined;
+		const lastDueIsPaid =
+			lastPaymentDate !== undefined && (previousDue === undefined || lastPaymentDate > previousDue);
+		return lastDueIsPaid ? scheduledDueDate(financing, start, index + 1) : lastDue;
 	} catch (error) {
 		if (DEV) console.error('Error calculating next payment date:', error);
 		return new Date();
