@@ -215,10 +215,31 @@ describe('POST /api/v1/expenses — the retired forceOverwrite path', () => {
       forceOverwrite: true,
     });
     expect(stale.status).toBe(400);
+    const error = await json<{ error: { message: string } }>(stale);
+    expect(error.error.message).toContain('PUT /api/v1/expenses/:id');
 
     const list = await ctx.authed('GET', `/api/v1/expenses?vehicleId=${vehicleId}`);
     const listBody = await json<PaginatedEnvelope<ExpenseRow & { expenseAmount: number }>>(list);
     expect(listBody.data.map((e) => e.expenseAmount)).toEqual([10]);
+  });
+
+  test('forceOverwrite: false is the plain idempotent create', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const body = {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 10,
+      date: '2026-04-03T12:00:00.000Z',
+      clientId: 'c51-false',
+      forceOverwrite: false,
+    };
+    const first = await postExpense(body);
+    expect(first.res.status, JSON.stringify(first.body)).toBe(201);
+
+    const repeat = await postExpense({ ...body, expenseAmount: 77 });
+    expect(repeat.res.status).toBe(201);
+    expect(repeat.body.data.id).toBe(first.body.data.id);
+    expect(repeat.body.data.expenseAmount, 'the stored row is unchanged').toBe(10);
   });
 
   test('a collision WITHOUT forceOverwrite is the idempotent no-op (original amount kept)', async () => {
