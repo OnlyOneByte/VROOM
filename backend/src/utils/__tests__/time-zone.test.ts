@@ -21,6 +21,15 @@ describe('zonedMidnight', () => {
     expect(calendarDayIn(havana, 'America/Havana')).toBe('2025-03-09');
   });
 
+  test('a half-hour DST change that skips midnight starts the day at the transition', () => {
+    for (const zone of ['America/Toronto', 'America/Nassau']) {
+      const start = zonedMidnight(1919, 2, 31, zone);
+      expect(start.toISOString()).toBe('1919-03-31T04:30:00.000Z');
+      expect(calendarDayIn(start, zone)).toBe('1919-03-31');
+      expect(calendarDayIn(new Date(start.getTime() - 1000), zone)).toBe('1919-03-30');
+    }
+  });
+
   test('a day whose DST change repeats the hour before midnight still starts at midnight', () => {
     expect(zonedMidnight(2025, 3, 6, 'America/Santiago').toISOString()).toBe(
       '2025-04-06T04:00:00.000Z'
