@@ -36,8 +36,9 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
     userId: string;
     endOdometer: number;
     tripDate: Date;
+    timeZone?: string;
   }): Promise<number> {
-    const { dayStart, nextDay } = localDayWindow(args.tripDate);
+    const { dayStart, nextDay } = localDayWindow(args.tripDate, args.timeZone);
     const [result] = await this.db
       .select({ count: count() })
       .from(trips)

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isValidTimeZone } from '../../utils/time-zone';
 import { noonAnchoredDateIsNotInTheFuture } from '../../utils/validation';
 
 // The mileage summary buckets miles by these values: a new purpose needs a bucket there too.
@@ -17,6 +18,12 @@ const REFINE_MSG = {
 
 const FUTURE_MSG = { message: 'tripDate cannot be in the future' };
 
+export const tripTimeZoneSchema = z
+  .string()
+  .max(64)
+  .refine(isValidTimeZone, 'Unknown time zone')
+  .optional();
+
 // Zod refined schemas cannot be .extend()ed, so vehicleId is declared here; the route checks ownership.
 export const createTripSchema = z
   .object({
@@ -28,6 +35,7 @@ export const createTripSchema = z
     startLocation: z.string().max(200).optional(),
     endLocation: z.string().max(200).optional(),
     note: z.string().max(500).optional(),
+    timeZone: tripTimeZoneSchema,
   })
   .refine(startEndRefine, REFINE_MSG);
 
@@ -40,5 +48,6 @@ export const updateTripSchema = z
     startLocation: z.string().max(200).nullish(),
     endLocation: z.string().max(200).nullish(),
     note: z.string().max(500).nullish(),
+    timeZone: tripTimeZoneSchema,
   })
   .refine(startEndRefine, REFINE_MSG);

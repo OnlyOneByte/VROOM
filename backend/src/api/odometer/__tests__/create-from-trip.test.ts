@@ -129,4 +129,37 @@ describe('OdometerRepository.createFromTrip', () => {
     expect(next, 'next local day inserts').not.toBeNull();
     expect(countEntries()).toBe(2);
   });
+
+  test('with a client time zone, the dedup window is the user’s calendar day, whatever the server zone', async () => {
+    const timeZone = 'America/Los_Angeles';
+    await repo.createFromTrip({
+      ...base({ recordedAt: new Date('2024-06-20T08:00:00Z') }),
+      timeZone,
+    });
+    const sameUserDay = await repo.createFromTrip({
+      ...base({ recordedAt: new Date('2024-06-21T03:00:00Z') }),
+      timeZone,
+    });
+    expect(sameUserDay, '01:00 and 20:00 on 20 June in Los Angeles dedup').toBeNull();
+    const previousUserDay = await repo.createFromTrip({
+      ...base({ recordedAt: new Date('2024-06-20T06:00:00Z') }),
+      timeZone,
+    });
+    expect(previousUserDay, '23:00 on 19 June in Los Angeles is another day').not.toBeNull();
+    expect(countEntries()).toBe(2);
+  });
+
+  test('deleteLinkedTripEntry removes the trip entry on the user’s calendar day', async () => {
+    const timeZone = 'America/Los_Angeles';
+    await repo.createFromTrip({
+      ...base({ recordedAt: new Date('2024-06-21T03:00:00Z') }),
+      timeZone,
+    });
+    const removed = await repo.deleteLinkedTripEntry({
+      ...base({ recordedAt: new Date('2024-06-20T08:00:00Z') }),
+      timeZone,
+    });
+    expect(removed).toHaveLength(1);
+    expect(countEntries()).toBe(0);
+  });
 });
