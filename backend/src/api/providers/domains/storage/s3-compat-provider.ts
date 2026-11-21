@@ -74,12 +74,14 @@ function buildQuery(query: S3WireRequest['query']): string {
   return parts.length ? `?${parts.join('&')}` : '';
 }
 
-function requestBody(body: unknown): { body?: RequestInit['body']; duplex?: 'half' } {
-  if (body === undefined || body === null) return {};
+async function requestBody(body: unknown): Promise<RequestInit['body'] | undefined> {
+  if (body === undefined || body === null) return undefined;
   if (body instanceof Readable) {
-    return { body: Readable.toWeb(body) as ReadableStream, duplex: 'half' };
+    const chunks: Buffer[] = [];
+    for await (const chunk of body) chunks.push(Buffer.from(chunk));
+    return Buffer.concat(chunks);
   }
-  return { body: body as RequestInit['body'] };
+  return body as RequestInit['body'];
 }
 
 export const s3RequestHandler = {
@@ -92,7 +94,7 @@ export const s3RequestHandler = {
         method: request.method,
         headers: request.headers,
         signal: options?.abortSignal as AbortSignal | undefined,
-        ...requestBody(request.body),
+        body: await requestBody(request.body),
       },
       'S3 endpoint'
     );
