@@ -7,7 +7,10 @@ import {
 	UNEXPECTED_FAILURE_MESSAGE
 } from '#lib/utils/error-handling.ts';
 import {
+	EXPENSE_DELETED_MESSAGE,
+	REFRESH_AFTER_DELETE_FAILED,
 	blockedReasonId,
+	deleteAndRefresh,
 	deleteExpenseRecord,
 	deleteFailureMessage,
 	expenseEditHref,
@@ -109,5 +112,40 @@ describe('deleteFailureMessage', () => {
 		expect(deleteFailureMessage(undefined)).toBe(
 			`Couldn't delete the expense. ${UNEXPECTED_FAILURE_MESSAGE}`
 		);
+	});
+});
+
+describe('deleteAndRefresh', () => {
+	beforeEach(() => {
+		vi.mocked(expenseApi.deleteExpense).mockReset().mockResolvedValue(undefined);
+	});
+
+	test('a delete that works and refreshes reports success', async () => {
+		const refresh = vi.fn(() => Promise.resolve());
+		const notice = await deleteAndRefresh(expense({ id: 'e1' }), refresh);
+		expect(notice).toEqual({ type: 'success', message: EXPENSE_DELETED_MESSAGE });
+		expect(refresh).toHaveBeenCalledTimes(1);
+	});
+
+	test('a failed refresh after a successful delete is a soft warning, not a failed delete', async () => {
+		const refresh = vi.fn(() =>
+			Promise.reject(new ApiError('SQLITE_BUSY: database is locked', 500))
+		);
+		const notice = await deleteAndRefresh(expense({ id: 'e1' }), refresh);
+		expect(expenseApi.deleteExpense).toHaveBeenCalledWith('e1');
+		expect(notice).toEqual({ type: 'warning', message: REFRESH_AFTER_DELETE_FAILED });
+		expect(notice.message).not.toContain("Couldn't delete");
+		expect(notice.message).not.toContain('SQLITE_BUSY');
+	});
+
+	test('a failed delete is an error and skips the refresh', async () => {
+		vi.mocked(expenseApi.deleteExpense).mockRejectedValue(new ApiError('boom', 500));
+		const refresh = vi.fn(() => Promise.resolve());
+		const notice = await deleteAndRefresh(expense({ id: 'e1' }), refresh);
+		expect(notice).toEqual({
+			type: 'error',
+			message: `Couldn't delete the expense. ${SERVER_FAILURE_MESSAGE}`
+		});
+		expect(refresh).not.toHaveBeenCalled();
 	});
 });
