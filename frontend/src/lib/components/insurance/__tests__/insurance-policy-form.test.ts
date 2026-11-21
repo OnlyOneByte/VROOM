@@ -8,6 +8,11 @@ import type {
 } from '#lib/types/index.ts';
 import { dateOnlyToISO } from '#lib/utils/formatters.ts';
 import { VEHICLES, makePolicy, settle } from './insurance-fixtures.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const goto = vi.fn<(url: string) => Promise<void>>(() => Promise.resolve());
 vi.mock('$app/navigation', () => ({ goto: (url: string) => goto(url) }));
@@ -230,11 +235,11 @@ describe('InsurancePolicyForm create mode', () => {
 	});
 
 	test('a create failure reports the API message and keeps the user on the form', async () => {
-		createPolicy.mockRejectedValue(new Error('Server exploded'));
+		createPolicy.mockRejectedValue(new ApiError('Server exploded', 500));
 		await mount();
 		await fillRequiredCreateFields();
 		await clickCreate();
-		expect(showError).toHaveBeenCalledWith('Failed to create policy: Server exploded');
+		expect(showError).toHaveBeenCalledWith(`Couldn't create the policy. ${SERVER_FAILURE_MESSAGE}`);
 		expect(goto).not.toHaveBeenCalled();
 		expect(screen.getByRole('button', { name: /Create Policy/ })).not.toBeDisabled();
 	});
@@ -244,7 +249,9 @@ describe('InsurancePolicyForm create mode', () => {
 		await mount();
 		await fillRequiredCreateFields();
 		await clickCreate();
-		expect(showError).toHaveBeenCalledWith('Failed to create policy: Unknown error');
+		expect(showError).toHaveBeenCalledWith(
+			`Couldn't create the policy. ${UNEXPECTED_FAILURE_MESSAGE}`
+		);
 	});
 
 	test('the submit button shows a creating state while the request is pending', async () => {
@@ -343,11 +350,13 @@ describe('InsurancePolicyForm edit mode', () => {
 	});
 
 	test('an update failure reports with the update verb', async () => {
-		updatePolicy.mockRejectedValue(new Error('conflict'));
+		updatePolicy.mockRejectedValue(new ApiError('Policy number already in use', 409));
 		await mount({ policyId: 'p9' });
 		await fireEvent.click(screen.getByRole('button', { name: /Update Policy/ }));
 		await settle();
-		expect(showError).toHaveBeenCalledWith('Failed to update policy: conflict');
+		expect(showError).toHaveBeenCalledWith(
+			"Couldn't update the policy. Policy number already in use."
+		);
 		expect(gotoDynamic).not.toHaveBeenCalled();
 	});
 
@@ -381,13 +390,15 @@ describe('InsurancePolicyForm edit mode', () => {
 	});
 
 	test('a delete failure reports the API message and closes the dialog', async () => {
-		deletePolicy.mockRejectedValue(new Error('has claims'));
+		deletePolicy.mockRejectedValue(new ApiError('This policy still has claims', 409));
 		await mount({ policyId: 'p9' });
 		await fireEvent.click(screen.getByRole('button', { name: /^Delete$/ }));
 		await screen.findByRole('alertdialog');
 		await fireEvent.click(screen.getByRole('button', { name: /Delete Policy/ }));
 		await settle();
-		expect(showError).toHaveBeenCalledWith('has claims');
+		expect(showError).toHaveBeenCalledWith(
+			"Couldn't delete the policy. This policy still has claims."
+		);
 		expect(goto).not.toHaveBeenCalled();
 		await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
 	});
@@ -399,6 +410,8 @@ describe('InsurancePolicyForm edit mode', () => {
 		await screen.findByRole('alertdialog');
 		await fireEvent.click(screen.getByRole('button', { name: /Delete Policy/ }));
 		await settle();
-		expect(showError).toHaveBeenCalledWith('Failed to delete policy');
+		expect(showError).toHaveBeenCalledWith(
+			`Couldn't delete the policy. ${UNEXPECTED_FAILURE_MESSAGE}`
+		);
 	});
 });
