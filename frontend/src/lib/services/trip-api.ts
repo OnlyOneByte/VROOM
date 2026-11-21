@@ -1,6 +1,7 @@
 import type { PaginatedResponse, Trip, TripPurpose, TripSummary } from '#lib/types/index.ts';
 import { apiClient } from './api-client';
 import { buildQueryString } from './api-utils';
+import { userTimeZone } from './analytics-api';
 
 interface TripListFilters {
 	vehicleId?: string;
@@ -50,15 +51,17 @@ export const tripApi = {
 	},
 
 	async create(data: CreateTripRequest): Promise<Trip> {
-		return apiClient.post<Trip>('/api/v1/trips', data);
+		return apiClient.post<Trip>('/api/v1/trips', { ...data, timeZone: userTimeZone() });
 	},
 
 	async update(id: string, data: UpdateTripRequest): Promise<Trip> {
-		return apiClient.put<Trip>(`/api/v1/trips/${id}`, data);
+		return apiClient.put<Trip>(`/api/v1/trips/${id}`, { ...data, timeZone: userTimeZone() });
 	},
 
 	async delete(id: string, keepOdometer = true): Promise<void> {
-		const qs = keepOdometer ? '' : '?keepOdometer=false';
+		const qs = keepOdometer
+			? ''
+			: buildQueryString({ keepOdometer: 'false', timeZone: userTimeZone() });
 		await apiClient.delete(`/api/v1/trips/${id}${qs}`);
 	}
 };

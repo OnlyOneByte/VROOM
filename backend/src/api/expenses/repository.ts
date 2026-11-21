@@ -11,6 +11,7 @@ import { getPeriodStartDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
+import { zonedMidnight } from '../../utils/time-zone';
 import { expenseSplitService } from './split-service';
 import type { SplitConfig } from './validation';
 
@@ -22,6 +23,7 @@ export interface ExpenseFilters {
   endDate?: Date;
   tags?: string[];
   search?: string;
+  timeZone?: string;
 }
 
 type ExpenseSortBy = 'date' | 'amount' | 'category';
@@ -41,7 +43,26 @@ const EXPENSE_SORT_COLUMNS = {
   category: expenses.category,
 } as const;
 
-function endOfDayIfDateOnly(d: Date): Date {
+function isUtcMidnight(d: Date): boolean {
+  return d.getTime() % 86_400_000 === 0;
+}
+
+function startOfDayIfDateOnly(d: Date, timeZone: string | undefined): Date {
+  if (!timeZone || !isUtcMidnight(d)) return d;
+  return zonedMidnight(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), timeZone);
+}
+
+function endOfDayIfDateOnly(d: Date, timeZone: string | undefined): Date {
+  if (timeZone) {
+    if (!isUtcMidnight(d)) return d;
+    const nextDay = zonedMidnight(
+      d.getUTCFullYear(),
+      d.getUTCMonth(),
+      d.getUTCDate() + 1,
+      timeZone
+    );
+    return new Date(nextDay.getTime() - 1);
+  }
   const isLocalMidnight =
     d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0 && d.getMilliseconds() === 0;
   if (!isLocalMidnight) return d;
@@ -58,10 +79,10 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
     conditions.push(eq(expenses.category, filters.category));
   }
   if (filters.startDate) {
-    conditions.push(gte(expenses.date, filters.startDate));
+    conditions.push(gte(expenses.date, startOfDayIfDateOnly(filters.startDate, filters.timeZone)));
   }
   if (filters.endDate) {
-    conditions.push(lte(expenses.date, endOfDayIfDateOnly(filters.endDate)));
+    conditions.push(lte(expenses.date, endOfDayIfDateOnly(filters.endDate, filters.timeZone)));
   }
   if (filters.tags?.length) {
     for (const tag of filters.tags) {
