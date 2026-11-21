@@ -60,6 +60,7 @@ describe('/reminders primary action', () => {
 
 		await waitFor(() => expect(screen.getByText('Oil change')).toBeInTheDocument());
 		expect(controls('New Reminder')).toHaveLength(1);
+		expect(controls('New Reminder')[0]).toHaveClass('fixed');
 		expect(controls('Run due reminders')).toHaveLength(0);
 	});
 

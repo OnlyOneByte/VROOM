@@ -60,5 +60,6 @@ describe('/trips primary action', () => {
 
 		await waitFor(() => expect(screen.getByTestId('trip-card-t1')).toBeInTheDocument());
 		expect(logTripControls()).toHaveLength(1);
+		expect(logTripControls()[0]).toHaveClass('fixed');
 	});
 });

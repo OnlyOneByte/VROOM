@@ -15,5 +15,6 @@ describe('/expenses import and export tools on mobile', () => {
 		expect(SRC).toMatch(/<div class="sm:hidden">\s*<Popover\.Root/);
 		expect(SRC).toMatch(/variant="outline" size="lg">\s*<Ellipsis[^>]*\/>\s*Import & export/);
 		expect(SRC).toMatch(/<Popover\.Content[\s\S]{0,120}\{@render importExportActions\('ghost'/);
+		expect(SRC).toMatch(/<Popover\.Content[^>]*gap-2/);
 	});
 });

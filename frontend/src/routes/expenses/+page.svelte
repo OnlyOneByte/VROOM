@@ -253,6 +253,10 @@
 		toolsMenuOpen = false;
 		open();
 	}
+	async function exportFromTools() {
+		await handleExportCsv();
+		toolsMenuOpen = false;
+	}
 	function handleImported() {
 		currentOffset = 0;
 		fetchPageAndSummary(0);
@@ -287,12 +291,7 @@
 		Import CSV
 	</Button>
 	{#if totalCount > 0}
-		<Button
-			{variant}
-			class={buttonClass}
-			onclick={() => openTool(handleExportCsv)}
-			disabled={isExporting}
-		>
+		<Button {variant} class={buttonClass} onclick={exportFromTools} disabled={isExporting}>
 			<Download class="mr-2 h-4 w-4" />
 			{isExporting ? 'Exporting…' : 'Export CSV'}
 		</Button>
@@ -348,7 +347,7 @@
 								</Button>
 							{/snippet}
 						</Popover.Trigger>
-						<Popover.Content align="start" class="flex w-56 flex-col gap-1 p-1">
+						<Popover.Content align="start" class="flex w-56 flex-col gap-2 p-1">
 							{@render importExportActions('ghost', 'h-10 w-full justify-start')}
 						</Popover.Content>
 					</Popover.Root>
