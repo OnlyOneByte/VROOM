@@ -38,7 +38,7 @@ interface ImportResponse {
 
 const FLAT_TRACKER_CSV = [
   'Data,Odo (km),Fuel (litres),Price,Type',
-  '15/03/2024,160.9344,37.854,"52,40",Gas',
+  '15/03/2024,"160,9344","37,854","52,40",Gas',
 ].join('\n');
 
 const FLAT_TRACKER_MAPPING = {
@@ -247,6 +247,62 @@ describe('POST /import — fuel-tracker defaultCategory commits through the rout
     const body = await json<ImportResponse>(res);
     expect(body.data.readyCount).toBe(1);
     expect(body.data.imported).toBe(0);
+    expect((await listExpenses()).length).toBe(0);
+  });
+});
+
+describe('POST /import — mapped files with a vehicle column and locale numbers', () => {
+  test('a km/liter file with a vehicle column is converted into that vehicle units', async () => {
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
+    const csv = [
+      'Date,Car,Odo,Litres,Price',
+      '2024-03-15,Daily Driver,"160,9344","37,854","1.250,00"',
+    ].join('\n');
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', {
+      csv,
+      mapping: {
+        columns: {
+          date: 'Date',
+          vehicle: 'Car',
+          mileage: 'Odo',
+          volume: 'Litres',
+          amount: 'Price',
+        },
+        dateFormat: 'iso',
+        distanceUnit: 'kilometers',
+        volumeUnit: 'liters',
+        defaultCategory: 'fuel',
+      },
+    });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported, JSON.stringify(body.data.rows)).toBe(1);
+
+    const [row] = await listExpenses();
+    expect(row.expenseAmount).toBeCloseTo(1250, 2);
+    expect(row.mileage).toBe(100);
+    expect(row.volume).toBeCloseTo(10, 2);
+  });
+
+  test('the preview flags an ambiguous "1,250" and nothing is written', async () => {
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
+    const csv = ['Date,Price,Odo', '2024-03-15,"1,250","45,120"'].join('\n');
+    const mapping = {
+      columns: { date: 'Date', amount: 'Price', mileage: 'Odo' },
+      targetVehicle: 'Daily Driver',
+      dateFormat: 'iso',
+      distanceUnit: 'miles',
+    };
+    const preview = await json<ImportResponse>(
+      await ctx.authed('POST', '/api/v1/expenses/import', { csv, mapping, dryRun: true })
+    );
+    expect(preview.data.readyCount).toBe(0);
+    expect(preview.data.rows[0].message).toContain('could mean 1250 or 1.25');
+
+    const commit = await json<ImportResponse>(
+      await ctx.authed('POST', '/api/v1/expenses/import', { csv, mapping })
+    );
+    expect(commit.data.imported).toBe(0);
     expect((await listExpenses()).length).toBe(0);
   });
 });

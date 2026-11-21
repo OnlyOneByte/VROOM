@@ -239,7 +239,11 @@ export const importCsvSchema = z.object({
   dryRun: z.boolean().optional().default(false),
 });
 
-export function buildImportPlan(csv: string, vehicles: ImportVehicle[]): ImportPlan {
+export function buildImportPlan(
+  csv: string,
+  vehicles: ImportVehicle[],
+  rowErrors: ReadonlyMap<number, string> = new Map()
+): ImportPlan {
   let records: Record<string, string>[];
   try {
     records = parse(csv, {
@@ -283,7 +287,8 @@ export function buildImportPlan(csv: string, vehicles: ImportVehicle[]): ImportP
       amount: denormalizeCsvCell((record.amount ?? '').trim()),
       date: denormalizeCsvCell((record.date ?? '').trim()),
     };
-    const result = parseRow(record, vehicleByName);
+    const preError = rowErrors.get(i);
+    const result = preError ? { error: preError } : parseRow(record, vehicleByName);
     const rowNum = i + 2;
     if ('error' in result) {
       return { row: rowNum, status: 'error' as const, message: result.error, raw };
