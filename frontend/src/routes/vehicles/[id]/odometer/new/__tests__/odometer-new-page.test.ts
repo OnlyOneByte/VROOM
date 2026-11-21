@@ -66,11 +66,11 @@ function mount() {
 }
 
 function odometerInput(): HTMLInputElement {
-	return screen.getByLabelText('Odometer Reading') as HTMLInputElement;
+	return screen.getByLabelText('Odometer Reading *') as HTMLInputElement;
 }
 
 function dateInput(): HTMLInputElement {
-	return screen.getByLabelText('Date') as HTMLInputElement;
+	return screen.getByLabelText('Date *') as HTMLInputElement;
 }
 
 function noteInput(): HTMLTextAreaElement {
@@ -117,6 +117,45 @@ describe('new odometer reading page defaults', () => {
 });
 
 describe('new odometer reading validation', () => {
+	test('a field error is announced and linked to its input', async () => {
+		mount();
+		await settle();
+
+		expect(odometerInput()).toHaveAttribute('aria-invalid', 'false');
+		await save();
+
+		const input = odometerInput();
+		expect(input).toHaveAttribute('aria-invalid', 'true');
+		const describedBy = input.getAttribute('aria-describedby');
+		expect(describedBy).toBeTruthy();
+		const error = document.getElementById(describedBy as string);
+		expect(error).toHaveTextContent('Odometer reading is required');
+		expect(error).toHaveAttribute('role', 'alert');
+	});
+
+	test('a cleared date error is linked to the date input', async () => {
+		mount();
+		await settle();
+
+		await fireEvent.input(odometerInput(), { target: { value: '100' } });
+		await fireEvent.input(dateInput(), { target: { value: '' } });
+		await save();
+
+		const describedBy = dateInput().getAttribute('aria-describedby');
+		expect(document.getElementById(describedBy as string)).toHaveTextContent('Date is required');
+		expect(odometerInput()).not.toHaveAttribute('aria-describedby');
+	});
+
+	test('the lower-than-latest warning is a status message', async () => {
+		getEntries.mockResolvedValue(latest([entry({ odometer: 50000 })]));
+		mount();
+		await settle();
+
+		await fireEvent.input(odometerInput(), { target: { value: '49000' } });
+
+		expect(screen.getByRole('status')).toHaveTextContent(/is lower than the latest recorded/);
+	});
+
 	test('an empty reading is required and nothing is saved', async () => {
 		mount();
 		await settle();
