@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { Clock, CircleCheck, X, TriangleAlert } from '@lucide/svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as CardNs from '#lib/components/ui/card/index.ts';
 	import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 	import { DISPLAY_LIMITS } from '#lib/constants/limits.ts';
 	import { EXPENSE_MESSAGES } from '#lib/constants/messages.ts';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
 	import { getCategoryLabel } from '#lib/utils/chart-colors.ts';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 
 	interface Props {
 		pendingExpenses: OfflineExpense[];
@@ -25,6 +27,20 @@
 	}: Props = $props();
 
 	const removeNeedsAttention = $derived(onRemoveNeedsAttention ?? onRemovePending);
+
+	let discardTarget = $state<{ expense: OfflineExpense; remove: (_id: string) => void } | null>(
+		null
+	);
+	let confirmOpen = $state(false);
+
+	function askToDiscard(expense: OfflineExpense, remove: (_id: string) => void) {
+		discardTarget = { expense, remove };
+		confirmOpen = true;
+	}
+
+	function describeEntry(expense: OfflineExpense): string {
+		return `${formatCurrency(expense.amount)} ${getCategoryLabel(expense.category)} on ${formatDate(expense.date)}`;
+	}
 </script>
 
 {#if pendingExpenses.length > 0}
@@ -48,14 +64,16 @@
 					<div
 						class="flex items-center gap-3 p-3 bg-chart-5/10 border border-chart-5/20 rounded-lg"
 					>
-						<button
-							onclick={() => onRemovePending(expense.id)}
-							class="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
-							aria-label="Delete pending expense"
-							title="Delete pending expense"
+						<Button
+							variant="ghost"
+							size="icon-lg"
+							onclick={() => askToDiscard(expense, onRemovePending)}
+							class="-m-3 flex-shrink-0 text-muted-foreground hover:text-destructive"
+							aria-label="Discard pending expense"
+							title="Discard pending expense"
 						>
 							<X class="h-4 w-4" />
-						</button>
+						</Button>
 						<div class="flex-1">
 							<div class="flex items-center gap-2 mb-1">
 								<Badge variant="secondary">
@@ -107,14 +125,16 @@
 					<div
 						class="flex items-center gap-3 p-3 bg-warning/10 border border-warning/20 rounded-lg"
 					>
-						<button
-							onclick={() => removeNeedsAttention(expense.id)}
-							class="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+						<Button
+							variant="ghost"
+							size="icon-lg"
+							onclick={() => askToDiscard(expense, removeNeedsAttention)}
+							class="-m-3 flex-shrink-0 text-muted-foreground hover:text-destructive"
 							aria-label="Discard this entry"
 							title="Discard this entry"
 						>
 							<X class="h-4 w-4" />
-						</button>
+						</Button>
 						<div class="flex-1">
 							<div class="flex items-center gap-2 mb-1">
 								<Badge variant="secondary">{getCategoryLabel(expense.category)}</Badge>
@@ -187,3 +207,15 @@
 		</CardNs.Content>
 	</CardNs.Root>
 {/if}
+
+<ConfirmDialog
+	bind:open={confirmOpen}
+	title="Discard this unsynced expense?"
+	description={discardTarget
+		? `${describeEntry(discardTarget.expense)} was never synced to the server. Discarding it deletes it and any photos attached to it from this device for good.`
+		: ''}
+	confirmLabel="Discard"
+	onConfirm={() => {
+		if (discardTarget) discardTarget.remove(discardTarget.expense.id);
+	}}
+/>
