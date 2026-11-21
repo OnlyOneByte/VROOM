@@ -42,9 +42,10 @@
 		policyId: string;
 		vehicles?: Vehicle[];
 		readOnly?: boolean;
+		level?: 4 | 5;
 	}
 
-	let { policyId, vehicles = [], readOnly = false }: Props = $props();
+	let { policyId, vehicles = [], readOnly = false, level = 4 }: Props = $props();
 
 	let vehicleNameMap = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 
@@ -200,7 +201,9 @@
 
 <div class="space-y-3">
 	<div class="flex items-center justify-between">
-		<h5 class="text-sm font-medium text-foreground">Claims</h5>
+		<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground"
+			>Claims</svelte:element
+		>
 		{#if !showForm && !readOnly}
 			<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={openNew}>
 				<Plus />
@@ -293,7 +296,12 @@
 						</div>
 						{#if expandedDocs.has(claim.id)}
 							<div class="mt-3 border-t border-border pt-3">
-								<DocumentViewer entityType="insurance_claim" entityId={claim.id} {readOnly} />
+								<DocumentViewer
+									entityType="insurance_claim"
+									entityId={claim.id}
+									{readOnly}
+									level={level === 4 ? 5 : 6}
+								/>
 							</div>
 						{/if}
 					</div>

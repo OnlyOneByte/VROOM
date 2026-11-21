@@ -47,7 +47,9 @@ function mount(policies: InsurancePolicy[], vehicleNameMap?: Map<string, string>
 }
 
 function sectionHeadings(): string[] {
-	return screen.getAllByRole('heading', { level: 4 }).map(h => h.textContent ?? '');
+	return headingOutline()
+		.filter(([level]) => level <= 3)
+		.map(([, text]) => text);
 }
 
 beforeEach(() => {
@@ -145,3 +147,44 @@ describe('PolicyList vehicle names', () => {
 		expect(screen.queryByText('Vehicles')).toBeNull();
 	});
 });
+
+describe('PolicyList heading levels', () => {
+	test('on its own page sections are h2, each company h3 and its parts h4', async () => {
+		mount([makePolicy({ company: 'Acme Mutual', terms: [makeTerm({ endDate: '2030-01-01' })] })]);
+		await settle();
+
+		expect(headingOutline()).toEqual([
+			[2, 'Active Policies'],
+			[3, 'Acme Mutual'],
+			[4, 'Documents'],
+			[4, 'Claims']
+		]);
+	});
+
+	test('under a page section the whole outline moves down one level', async () => {
+		render(PolicyList, {
+			props: {
+				policies: [
+					makePolicy({ company: 'Acme Mutual', terms: [makeTerm({ endDate: '2030-01-01' })] })
+				],
+				level: 3,
+				onEdit: vi.fn(),
+				onRefresh: vi.fn(() => Promise.resolve())
+			}
+		});
+		await settle();
+
+		expect(headingOutline()).toEqual([
+			[3, 'Active Policies'],
+			[4, 'Acme Mutual'],
+			[5, 'Documents'],
+			[5, 'Claims']
+		]);
+	});
+});
+
+function headingOutline(): Array<[number, string]> {
+	return screen
+		.getAllByRole('heading')
+		.map(h => [Number(h.tagName.slice(1)), h.textContent?.trim() ?? '']);
+}

@@ -15,9 +15,10 @@
 		entityId: string;
 		entityType?: string;
 		readOnly?: boolean;
+		level?: 4 | 5 | 6;
 	}
 
-	let { entityId, entityType = 'insurance_policy', readOnly = false }: Props = $props();
+	let { entityId, entityType = 'insurance_policy', readOnly = false, level = 4 }: Props = $props();
 
 	let documents = $state<Photo[]>([]);
 	let isLoading = $state(true);
@@ -70,7 +71,9 @@
 
 <div class="space-y-3">
 	<div class="flex items-center justify-between">
-		<h5 class="text-sm font-medium text-foreground">Documents</h5>
+		<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground"
+			>Documents</svelte:element
+		>
 		{#if !readOnly}
 			<Button
 				variant="outline"

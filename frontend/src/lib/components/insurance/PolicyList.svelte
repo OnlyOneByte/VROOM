@@ -10,6 +10,7 @@
 		onEdit: (_policy: InsurancePolicy) => void;
 		onRefresh: () => Promise<void>;
 		readOnly?: boolean;
+		level?: 2 | 3;
 	}
 
 	let {
@@ -18,7 +19,8 @@
 		vehicles = [],
 		onEdit,
 		onRefresh,
-		readOnly = false
+		readOnly = false,
+		level = 2
 	}: Props = $props();
 
 	let grouped = $derived(groupPoliciesByActive(policies));
@@ -34,7 +36,9 @@
 <div class="space-y-6">
 	{#if grouped.active.length > 0}
 		<div class="space-y-3">
-			<h4 class="text-sm font-medium text-muted-foreground">Active Policies</h4>
+			<svelte:element this={`h${level}`} class="text-sm font-medium text-muted-foreground">
+				Active Policies
+			</svelte:element>
 			{#each grouped.active as policy (policy.id)}
 				<PolicyCard
 					{policy}
@@ -43,6 +47,7 @@
 					{onEdit}
 					{onRefresh}
 					{readOnly}
+					level={level === 2 ? 3 : 4}
 				/>
 			{/each}
 		</div>
@@ -50,7 +55,9 @@
 
 	{#if grouped.inactive.length > 0}
 		<div class="space-y-3">
-			<h4 class="text-sm font-medium text-muted-foreground">Inactive Policies</h4>
+			<svelte:element this={`h${level}`} class="text-sm font-medium text-muted-foreground">
+				Inactive Policies
+			</svelte:element>
 			{#each grouped.inactive as policy (policy.id)}
 				<PolicyCard
 					{policy}
@@ -59,6 +66,7 @@
 					{onEdit}
 					{onRefresh}
 					{readOnly}
+					level={level === 2 ? 3 : 4}
 				/>
 			{/each}
 		</div>

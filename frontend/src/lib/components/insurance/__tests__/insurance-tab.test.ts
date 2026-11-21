@@ -138,6 +138,20 @@ describe('InsuranceTab policy list', () => {
 		expect(goto).toHaveBeenCalledWith(`/insurance/new?vehicleId=v1&returnTo=${RETURN_TO}`);
 	});
 
+	test('on the vehicle page the outline runs h2 to h5 without skipping a level', async () => {
+		getPoliciesForVehicle.mockResolvedValue([policy]);
+		mount();
+		await settle();
+
+		expect(screen.getAllByRole('heading').map(h => [h.tagName, h.textContent?.trim()])).toEqual([
+			['H2', 'Insurance Policies'],
+			['H3', 'Active Policies'],
+			['H4', 'Acme Mutual'],
+			['H5', 'Documents'],
+			['H5', 'Claims']
+		]);
+	});
+
 	test('editing a policy navigates to its edit page with a return path', async () => {
 		getPoliciesForVehicle.mockResolvedValue([policy]);
 		mount();
