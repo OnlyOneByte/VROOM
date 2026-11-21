@@ -3,7 +3,11 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { UpdateVehicleRequest, Vehicle, VehicleFinancing } from '#lib/types/index.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { dateOnlyToISO } from '#lib/utils/formatters.ts';
-import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const goto = vi.fn(() => Promise.resolve());
 const refreshAll = vi.fn(() => Promise.resolve());
@@ -633,7 +637,7 @@ describe('VehicleForm financing on create', () => {
 
 	test('a vehicle is still added when saving its financing fails, with a warning', async () => {
 		createVehicle.mockResolvedValue({ ...EXISTING, id: 'new-1' });
-		createFinancing.mockRejectedValue(new Error('lender rejected'));
+		createFinancing.mockRejectedValue(new ApiError('lender rejected', 500));
 		await renderCreate();
 		await fillRequired();
 		await fireEvent.click(screen.getByRole('button', { name: 'Finance' }));
@@ -647,7 +651,7 @@ describe('VehicleForm financing on create', () => {
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
 		expect(notificationMessages()).toEqual(
 			expect.arrayContaining([
-				'Vehicle saved but financing failed: lender rejected',
+				`The vehicle was saved, but its financing couldn't be saved. ${SERVER_FAILURE_MESSAGE}`,
 				'Vehicle added successfully!'
 			])
 		);
@@ -743,14 +747,16 @@ describe('VehicleForm financing on edit', () => {
 		expect(createdFinancing()).toMatchObject({ paymentDayOfMonth: 1, paymentAmount: 373 });
 	});
 
-	test('a financing save failure with a non-Error reason warns with Unknown error', async () => {
+	test('a financing save failure with a non-Error reason warns with the generic sentence', async () => {
 		createFinancing.mockRejectedValue('timeout');
 		await renderEditWithFinancing(LOAN);
 
 		await submitUpdate();
 
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/veh-1'));
-		expect(notificationMessages()).toContain('Vehicle saved but financing failed: Unknown error');
+		expect(notificationMessages()).toContain(
+			`The vehicle was saved, but its financing couldn't be saved. ${UNEXPECTED_FAILURE_MESSAGE}`
+		);
 		expect(notificationMessages()).toContain('Vehicle updated successfully!');
 	});
 
@@ -782,7 +788,7 @@ describe('VehicleForm financing on edit', () => {
 		expect(dialog.textContent).toContain('Switching to Own marks the loan as paid off.');
 	});
 
-	test('a failed lease ending names the lease and falls back to Unknown error', async () => {
+	test('a failed lease ending names the lease and falls back to the generic sentence', async () => {
 		payOffFinancing.mockRejectedValue('offline');
 		await renderEditWithFinancing(LEASE);
 		await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
@@ -792,7 +798,9 @@ describe('VehicleForm financing on edit', () => {
 		await fireEvent.click(within(dialog).getByRole('button', { name: 'End Lease' }));
 
 		await vi.waitFor(() =>
-			expect(notificationMessages()).toContain("Couldn't mark the lease as ended: Unknown error")
+			expect(notificationMessages()).toContain(
+				`Couldn't mark the lease as ended. ${UNEXPECTED_FAILURE_MESSAGE}`
+			)
 		);
 		expect(updateVehicle).not.toHaveBeenCalled();
 	});
@@ -833,7 +841,7 @@ describe('VehicleForm edit mode unit confirmation', () => {
 		await fireEvent.click(within(dialog).getByRole('button', { name: 'Change Units' }));
 
 		await vi.waitFor(() =>
-			expect(notificationMessages()).toContain('Error updating vehicle. Please try again.')
+			expect(notificationMessages()).toContain("Couldn't update the vehicle. Units changed.")
 		);
 	});
 });
@@ -858,7 +866,11 @@ describe('VehicleForm edit mode delete dialog', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: /delete vehicle/i }));
 
-		await vi.waitFor(() => expect(notificationMessages()).toContain('Failed to delete vehicle'));
+		await vi.waitFor(() =>
+			expect(notificationMessages()).toContain(
+				`Couldn't delete the vehicle. ${UNEXPECTED_FAILURE_MESSAGE}`
+			)
+		);
 		expect(goto).not.toHaveBeenCalled();
 	});
 });
