@@ -128,8 +128,10 @@ describe('MigrateFromTrackerCard card states', () => {
 			`Couldn't load your vehicles. ${SERVER_FAILURE_MESSAGE}`
 		);
 		expect(screen.getByTestId('migrate-error')).not.toHaveTextContent('SQLITE_BUSY');
+		const retry = screen.getByRole('button', { name: 'Retry' });
+		expect(retry.className).toMatch(/(^|\s)h-10(\s|$)/);
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await fireEvent.click(retry);
 		await settle();
 
 		expect(getVehicles).toHaveBeenCalledTimes(2);

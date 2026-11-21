@@ -47,7 +47,9 @@
 		}
 	});
 
-	onMount(async () => {
+	async function loadProviders() {
+		isLoadingProviders = true;
+		fetchError = null;
 		try {
 			providers = await authApi.getProviders();
 		} catch (err) {
@@ -55,7 +57,9 @@
 		} finally {
 			isLoadingProviders = false;
 		}
-	});
+	}
+
+	onMount(loadProviders);
 
 	function handleLogin(providerId: string) {
 		signingInProvider = providerId;
@@ -111,6 +115,7 @@
 					<div class="text-center py-6 space-y-2">
 						<CircleAlert class="h-8 w-8 text-destructive mx-auto" />
 						<p class="text-sm text-destructive">{fetchError}</p>
+						<Button variant="outline" size="lg" onclick={loadProviders}>Retry</Button>
 					</div>
 				{:else if providers.length === 0}
 					<div class="text-center py-6">

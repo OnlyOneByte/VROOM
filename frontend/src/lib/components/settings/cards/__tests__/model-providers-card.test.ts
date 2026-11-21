@@ -129,6 +129,16 @@ describe('ModelProvidersCard', () => {
 		expect(screen.getByText(/Anthropic \(Claude\)/)).toBeInTheDocument();
 	});
 
+	test('a provider’s edit and delete icons are 40px tap targets on phones, 8px apart', async () => {
+		getProviders.mockResolvedValue([provider('llm', 'Work Claude')]);
+		render(ModelProvidersCard, { props: { domain: 'llm' } });
+
+		const edit = await screen.findByRole('button', { name: 'Edit Work Claude' });
+		const del = screen.getByRole('button', { name: 'Delete Work Claude' });
+		for (const button of [edit, del]) expect(button.className).toMatch(/(^|\s)size-10(\s|$)/);
+		expect(edit.parentElement?.className).toMatch(/(^|\s)gap-2(\s|$)/);
+	});
+
 	test('a provider with an unknown type and no model shows the raw type id', async () => {
 		getProviders.mockResolvedValue([
 			provider('llm', 'Custom', { providerType: 'mystery', config: {} })
