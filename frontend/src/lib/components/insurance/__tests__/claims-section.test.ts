@@ -336,7 +336,7 @@ describe('ClaimsSection filing a claim', () => {
 		await pickClaimDate('2026-03-10');
 		await fireEvent.submit(document.querySelector('form') as HTMLFormElement);
 		await settle();
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to file claim');
+		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't file the claim");
 		expect(screen.getByText('File a claim')).toBeInTheDocument();
 		expect(getClaims).toHaveBeenCalledTimes(1);
 	});
@@ -429,7 +429,7 @@ describe('ClaimsSection editing a claim', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Edit claim' }));
 		await fireEvent.submit(document.querySelector('form') as HTMLFormElement);
 		await settle();
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to update claim');
+		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't update the claim");
 		expect(screen.getByText('Edit claim')).toBeInTheDocument();
 	});
 
@@ -476,7 +476,7 @@ describe('ClaimsSection deleting a claim', () => {
 			within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' })
 		);
 		await settle();
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to delete claim');
+		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't delete the claim");
 		expect(screen.getByText('Collision')).toBeInTheDocument();
 		expect(screen.getByRole('alertdialog')).toBeInTheDocument();
 	});

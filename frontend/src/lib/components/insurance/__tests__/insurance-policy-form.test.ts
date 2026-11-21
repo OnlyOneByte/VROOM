@@ -287,9 +287,11 @@ describe('InsurancePolicyForm create mode', () => {
 	});
 
 	test('a vehicle load failure reports and navigates back', async () => {
-		getVehicles.mockRejectedValue(new Error('offline'));
+		getVehicles.mockRejectedValue(new ApiError('SQLITE_BUSY', 500));
 		await mount({ returnTo: '/vehicles/v1' });
-		expect(showError).toHaveBeenCalledWith('Failed to load data');
+		expect(showError).toHaveBeenCalledWith(
+			`Couldn't load your vehicles. ${SERVER_FAILURE_MESSAGE}`
+		);
 		expect(gotoDynamic).toHaveBeenCalledWith('/vehicles/v1');
 	});
 
@@ -375,9 +377,9 @@ describe('InsurancePolicyForm edit mode', () => {
 	});
 
 	test('a policy load failure reports and navigates back', async () => {
-		getPolicy.mockRejectedValue(new Error('404'));
+		getPolicy.mockRejectedValue(new ApiError('Policy not found', 404));
 		await mount({ policyId: 'p9', returnTo: '/insurance' });
-		expect(showError).toHaveBeenCalledWith('Failed to load policy');
+		expect(showError).toHaveBeenCalledWith("Couldn't load the policy. Policy not found.");
 		expect(gotoDynamic).toHaveBeenCalledWith('/insurance');
 	});
 
