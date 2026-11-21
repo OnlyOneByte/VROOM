@@ -86,7 +86,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 | Dropdown | `import * as Select from '#lib/components/ui/select'` | compound; `Select.Root` takes `type="single"` + `onValueChange` |
 | Label | `import { Label } from '#lib/components/ui/label'` | `for=` ties to input id |
 | Field error | `import { FormFieldError } from '#lib/components/ui/form-field'` | renders `role="alert"`; wire via `aria-describedby` (`FormFieldDescription` for hints) |
-| Card | `import * as Card from '#lib/components/ui/card'` | Root/Header/Title/Description/Action/Content/Footer |
+| Card | `import * as Card from '#lib/components/ui/card'` | Root/Header/Title/Description/Action/Content/Footer. `Title` takes `level?` (`2`/`3`/`4`) to render a heading; without it, it renders a `div` |
 | Badge | `import { Badge } from '#lib/components/ui/badge'` | variants: default/secondary/destructive/outline |
 | Alert | `import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert'` | `variant`: `default` / `destructive` / `warning` / `success`, all themed; `role?`: `'alert'` (default, announced at once) or `'status'` (polite, for non-urgent notices such as the restore dialog's skipped-photos note) |
 | Skeleton | `import { Skeleton } from '#lib/components/ui/skeleton'` | loading placeholder |
@@ -99,7 +99,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 | Need | Import | Props |
 |---|---|---|
 | Page title + actions | `common/page-header.svelte` | `title`, `description?` (string or Snippet), `back?` (Snippet: a back button, rendered before the title), `actions?` (Snippet). The page's only `<h1>`; detail and form pages pass `back` instead of hand-rolling a title row |
-| Empty state | `common/empty-state.svelte` | `icon?`, `title`, `description`, `action?` (all Snippets) |
+| Empty state | `common/empty-state.svelte` | `icon?`, `title`, `description`, `action?` (all Snippets), `level?` (`2`/`3`/`4`, default `2`): the title's heading level. Use `3` inside a card whose `Card.Title` is the `h2` |
 | Destructive confirm | `common/ConfirmDialog.svelte` | `bind:open`, `title`, `description`, `onConfirm` (may be async), `destructive?` — native `confirm()`/`alert()` are banned (`no-native-dialogs.test.ts`) |
 | Pagination | `common/pagination-controls.svelte` | `currentOffset`, `pageSize`, `totalCount`, `isLoading?`, `onPageChange` |
 | Mobile primary action | `common/floating-action-button.svelte` | `href`/`onclick`, `label` (the visible text is the accessible name) |

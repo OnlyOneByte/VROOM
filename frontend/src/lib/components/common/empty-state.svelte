@@ -7,10 +7,11 @@
 		title: Snippet;
 		description: Snippet;
 		action?: Snippet;
+		level?: 2 | 3 | 4;
 		class?: string;
 	}
 
-	let { icon, title, description, action, class: className = '' }: Props = $props();
+	let { icon, title, description, action, level = 2, class: className = '' }: Props = $props();
 </script>
 
 <Card class={className}>
@@ -18,9 +19,9 @@
 		{#if icon}
 			{@render icon()}
 		{/if}
-		<h2 class="text-lg font-semibold mb-2">
+		<svelte:element this={`h${level}`} class="text-lg font-semibold mb-2">
 			{@render title()}
-		</h2>
+		</svelte:element>
 		<p class="text-muted-foreground text-center mb-4">
 			{@render description()}
 		</p>
