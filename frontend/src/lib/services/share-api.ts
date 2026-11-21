@@ -1,5 +1,6 @@
 import type {
 	CreateShareRequest,
+	GrantedShare,
 	ReceivedShare,
 	ShareLevel,
 	VehicleShare
@@ -11,8 +12,8 @@ export const shareApi = {
 		return apiClient.post<VehicleShare>('/api/v1/shares', data);
 	},
 
-	async listGranted(): Promise<VehicleShare[]> {
-		return apiClient.get<VehicleShare[]>('/api/v1/shares/granted');
+	async listGranted(): Promise<GrantedShare[]> {
+		return apiClient.get<GrantedShare[]>('/api/v1/shares/granted');
 	},
 
 	async changeLevel(id: string, level: ShareLevel): Promise<VehicleShare> {
