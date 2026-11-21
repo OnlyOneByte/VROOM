@@ -86,6 +86,7 @@ describe('VehicleInfoCard', () => {
 			'href',
 			'/vehicles/veh-7/edit'
 		);
+		expect(screen.getByRole('link', { name: 'Edit vehicle' })).toHaveClass('size-10');
 	});
 
 	test('non-owners get no edit link', () => {

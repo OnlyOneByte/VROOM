@@ -146,7 +146,7 @@
 
 										<Button
 											variant="outline"
-											size="sm"
+											size="lg"
 											class="relative z-10 w-full mt-3"
 											onclick={() => {
 												gotoWithQuery(resolve(routes.expenseNew), {

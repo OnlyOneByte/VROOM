@@ -57,7 +57,7 @@
 	<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-3">
 		<Card.Title class="text-lg font-semibold">Photos</Card.Title>
 		{#if isOwner}
-			<Button variant="outline" size="sm" onclick={onUpload}>
+			<Button variant="outline" size="lg" onclick={onUpload}>
 				<Upload class="mr-2 h-4 w-4" />
 				Upload
 			</Button>
@@ -88,13 +88,13 @@
 
 								{#if isOwner}
 									<div
-										class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 lg:opacity-0 transition-opacity lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
+										class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-2 lg:gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 lg:opacity-0 transition-opacity lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
 									>
 										{#if !photo.isCover}
 											<Button
 												variant="secondary"
 												size="sm"
-												class="h-7 bg-background/80 text-xs backdrop-blur-sm"
+												class="h-10 bg-background/80 text-xs backdrop-blur-sm lg:h-7"
 												onclick={() => onSetCover(photo.id)}
 											>
 												<Star class="mr-1 h-3 w-3" />
@@ -104,7 +104,8 @@
 										<Button
 											variant="destructive"
 											size="sm"
-											class="h-7 text-xs"
+											class="h-10 w-10 text-xs lg:h-7 lg:w-auto"
+											aria-label="Delete photo"
 											disabled={deletingPhotoId === photo.id}
 											onclick={() => requestDelete(photo.id)}
 										>
@@ -155,7 +156,7 @@
 				</div>
 				<p class="text-sm text-muted-foreground">No photos yet</p>
 				{#if isOwner}
-					<Button variant="outline" size="sm" class="mt-3" onclick={onUpload}>
+					<Button variant="outline" size="lg" class="mt-3" onclick={onUpload}>
 						<Upload class="mr-2 h-4 w-4" />
 						Upload Photos
 					</Button>

@@ -27,7 +27,7 @@
 			{#if isOwner}
 				<Button
 					variant="outline"
-					size="icon"
+					size="icon-lg"
 					href={resolve(paramRoutes.vehicleEdit, { id: vehicle.id })}
 					aria-label="Edit vehicle"
 				>

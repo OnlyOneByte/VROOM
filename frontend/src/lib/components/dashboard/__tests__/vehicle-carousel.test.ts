@@ -117,6 +117,12 @@ describe('VehicleCarousel vehicle card', () => {
 		expect(screen.getByText('$4,500.00')).toBeInTheDocument();
 	});
 
+	test('the card Add Expense button is 40px tall', () => {
+		render(VehicleCarousel, { vehicles: [overview()] });
+
+		expect(screen.getByRole('button', { name: 'Add Expense' })).toHaveClass('h-10');
+	});
+
 	test('a vehicle with no activity says so', () => {
 		render(VehicleCarousel, { vehicles: [overview({ lastActivity: null })] });
 
