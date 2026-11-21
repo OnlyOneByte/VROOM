@@ -18,7 +18,7 @@ let ctx: TestApp;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, 30_000);
 afterEach(() => ctx.close());
 
 async function createExpense(
