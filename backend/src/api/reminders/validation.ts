@@ -4,7 +4,9 @@ import { EXPENSE_CATEGORIES } from '../../db/types';
 import { expenseDollarsToCents } from '../../utils/money';
 import { isValidTimeZone, zoneOffsetMs } from '../../utils/time-zone';
 import {
+  DUPLICATE_VEHICLE_MESSAGE,
   dateInput,
+  hasUniqueVehicleIds,
   MAX_ODOMETER_READING,
   ODOMETER_TOO_HIGH_MESSAGE,
   WHOLE_DISTANCE_MESSAGE,
@@ -94,7 +96,10 @@ const reminderBaseSchema = z.object({
   // Zod strips unlisted keys: isActive must stay listed or the pause toggle silently no-ops.
   isActive: z.boolean().optional(),
   timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
-  vehicleIds: z.array(z.string().min(1)).min(1),
+  vehicleIds: z
+    .array(z.string().min(1))
+    .min(1)
+    .refine(hasUniqueVehicleIds, DUPLICATE_VEHICLE_MESSAGE),
   expenseCategory: z.enum(EXPENSE_CATEGORIES).nullish(),
   expenseTags: z
     .array(z.string().min(1).max(CONFIG.validation.reminder.tagMaxLength))

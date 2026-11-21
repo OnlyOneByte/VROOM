@@ -1,12 +1,15 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { expenseDollarsToCents, moneyDollarsToCents } from '../../utils/money';
-import { dateInput } from '../../utils/validation';
+import { DUPLICATE_VEHICLE_MESSAGE, dateInput, hasUniqueVehicleIds } from '../../utils/validation';
 
 const ins = CONFIG.validation.insurance;
 
 export const termVehicleCoverageSchema = z.object({
-  vehicleIds: z.array(z.string().min(1)).min(1, 'At least one vehicle required'),
+  vehicleIds: z
+    .array(z.string().min(1))
+    .min(1, 'At least one vehicle required')
+    .refine(hasUniqueVehicleIds, DUPLICATE_VEHICLE_MESSAGE),
 });
 
 const baseTermFields = {
