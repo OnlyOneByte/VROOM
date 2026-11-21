@@ -5,7 +5,15 @@ vi.mock('#lib/stores/app.svelte.ts', () => ({
 	appStore: { addNotification }
 }));
 
-const { ApiError, NetworkError, handleErrorWithNotification } = await import('../error-handling');
+const {
+	ApiError,
+	NetworkError,
+	NETWORK_FAILURE_MESSAGE,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE,
+	handleErrorWithNotification,
+	userFacingErrorMessage
+} = await import('../error-handling');
 
 interface NotificationArg {
 	type: string;
@@ -38,7 +46,62 @@ describe('ApiError', () => {
 	});
 });
 
-describe('handleErrorWithNotification (drives handleApiError)', () => {
+describe('userFacingErrorMessage', () => {
+	test.each([
+		[
+			'a network failure',
+			new NetworkError(new TypeError('Failed to fetch')),
+			NETWORK_FAILURE_MESSAGE
+		],
+		[
+			'a known error code',
+			new ApiError('Raw backend text', 400, undefined, 'VALIDATION_ERROR'),
+			'Please check your input and try again.'
+		],
+		[
+			'a 4xx with a written message',
+			new ApiError('No VROOM account with that email', 404),
+			'No VROOM account with that email.'
+		],
+		[
+			'a 4xx with only a status line',
+			new ApiError('Request failed with status 404', 404),
+			UNEXPECTED_FAILURE_MESSAGE
+		],
+		[
+			'a 500 with raw server text',
+			new ApiError('Internal server error', 500),
+			SERVER_FAILURE_MESSAGE
+		],
+		['a 503', new ApiError('Service Unavailable', 503), SERVER_FAILURE_MESSAGE],
+		[
+			'a bare TypeError (a bug, not the network)',
+			new TypeError('x.fetchAll is not a function'),
+			UNEXPECTED_FAILURE_MESSAGE
+		],
+		['a plain Error', new Error('plain boom'), UNEXPECTED_FAILURE_MESSAGE],
+		['a non-Error throw', 'a bare string', UNEXPECTED_FAILURE_MESSAGE]
+	])('%s becomes a plain sentence', (_label, error, expected) => {
+		expect(userFacingErrorMessage(error)).toBe(expected);
+	});
+
+	test('only a real network failure is told to check the connection', () => {
+		const notNetwork = [
+			new ApiError('Internal server error', 500),
+			new ApiError('Bad gateway', 502),
+			new TypeError('Failed to fetch'),
+			new Error('Failed to fetch')
+		];
+		for (const error of notNetwork) {
+			expect(userFacingErrorMessage(error)).not.toMatch(/connection/i);
+		}
+		expect(userFacingErrorMessage(new NetworkError(new TypeError('Load failed')))).toBe(
+			NETWORK_FAILURE_MESSAGE
+		);
+	});
+});
+
+describe('handleErrorWithNotification', () => {
 	beforeEach(() => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 	});
@@ -47,47 +110,28 @@ describe('handleErrorWithNotification (drives handleApiError)', () => {
 		vi.restoreAllMocks();
 	});
 
-	test('a known error code maps to its user-friendly message (not the raw message)', () => {
-		handleErrorWithNotification(
-			new ApiError('Raw backend text', 400, undefined, 'VALIDATION_ERROR')
-		);
+	test('the toast carries the plain sentence, never the raw message', () => {
+		handleErrorWithNotification(new ApiError('Internal server error', 500));
 		expect(notified()).toMatchObject({
 			type: 'error',
-			message: 'Please check your input and try again',
+			message: SERVER_FAILURE_MESSAGE,
 			duration: 5000
 		});
 	});
 
-	test('an unmapped code falls back to the error’s own message', () => {
-		handleErrorWithNotification(new ApiError('Specific failure detail', 500));
-		expect(notified().message).toBe('Specific failure detail');
+	test('a context becomes its own sentence ahead of the plain sentence', () => {
+		handleErrorWithNotification(
+			new ApiError('Internal server error', 500),
+			'Failed to load vehicle'
+		);
+		expect(notified().message).toBe(`Failed to load vehicle. ${SERVER_FAILURE_MESSAGE}`);
 	});
 
-	test.each(['Failed to fetch', 'Load failed'])(
-		'a NetworkError (%s) maps to the connection message',
-		browserMessage => {
-			handleErrorWithNotification(new NetworkError(new TypeError(browserMessage)));
-			expect(notified().message).toBe('Network error. Please check your connection and try again.');
-		}
-	);
-
-	test('a bare TypeError is a bug, not a network failure', () => {
-		handleErrorWithNotification(new TypeError('x.fetchAll is not a function'));
-		expect(notified().message).toBe('x.fetchAll is not a function');
-	});
-
-	test('a plain Error (not Vroom, not network) surfaces its own message under UNKNOWN_ERROR', () => {
-		handleErrorWithNotification(new Error('plain boom'));
-		expect(notified().message).toBe('plain boom');
-	});
-
-	test('a non-Error throw uses the generic unexpected-error copy', () => {
-		handleErrorWithNotification('a bare string');
-		expect(notified().message).toBe('An unexpected error occurred');
-	});
-
-	test('a context prefix is prepended to the resolved message', () => {
-		handleErrorWithNotification(new ApiError('boom', 500), 'Saving expense');
-		expect(notified().message).toBe('Saving expense: boom');
+	test('a network failure toast tells the user to check the connection', () => {
+		handleErrorWithNotification(
+			new NetworkError(new TypeError('Failed to fetch')),
+			'Saving expense'
+		);
+		expect(notified().message).toBe(`Saving expense. ${NETWORK_FAILURE_MESSAGE}`);
 	});
 });

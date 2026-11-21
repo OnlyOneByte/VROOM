@@ -85,16 +85,25 @@ describe('vehicle page — a failed vehicle load', () => {
 	});
 
 	test.each([
-		['a server error', new ApiError('Internal server error', 500)],
-		['a network failure', new NetworkError(new Error('Failed to fetch'))]
-	])('%s keeps the user on the page with a Retry that reloads it', async (_label, error) => {
+		[
+			'a server error',
+			new ApiError('Internal server error', 500),
+			'Something went wrong on our side. Try again in a moment.'
+		],
+		[
+			'a network failure',
+			new NetworkError(new Error('Failed to fetch')),
+			'Check your connection and try again.'
+		]
+	])('%s keeps the user on the page with a Retry that reloads it', async (_label, error, hint) => {
 		getVehicle.mockRejectedValueOnce(error).mockResolvedValueOnce(VEHICLE);
 
 		const screen = renderPage();
 
 		const retry = await screen.findByRole('button', { name: 'Retry' });
 		expect(screen.getByText('Failed to load vehicle')).toBeInTheDocument();
-		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
+		expect(screen.getByText(hint)).toBeInTheDocument();
+		expect(screen.queryByText('Internal server error')).not.toBeInTheDocument();
 		expect(goto).not.toHaveBeenCalled();
 
 		await fireEvent.click(retry);
