@@ -51,7 +51,8 @@
 <div class="space-y-2">
 	<Label for="tags">Tags (Optional)</Label>
 	<div
-		class="border rounded-lg p-2 min-h-[42px] bg-background {touched && error
+		class="border rounded-lg p-2 min-h-[42px] bg-background has-[input:disabled]:cursor-not-allowed has-[input:disabled]:opacity-50 {touched &&
+		error
 			? 'border-destructive'
 			: 'border-input'}"
 	>
