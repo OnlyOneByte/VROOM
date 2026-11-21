@@ -72,3 +72,16 @@ describe('/reminders primary action', () => {
 		expect(controls('New Reminder')).toHaveLength(1);
 	});
 });
+
+describe('/reminders load failure', () => {
+	test('the error card never shows the server text', async () => {
+		list.mockImplementation(() => Promise.reject(new Error('Request failed with status 500')));
+		render(Page);
+
+		await waitFor(() =>
+			expect(screen.getByText('Check your connection, then select Retry.')).toBeInTheDocument()
+		);
+		expect(screen.queryByText(/status 500/)).toBeNull();
+		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+	});
+});

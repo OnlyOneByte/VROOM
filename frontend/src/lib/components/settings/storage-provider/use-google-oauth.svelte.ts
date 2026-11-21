@@ -116,12 +116,12 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 				exchange_failed: 'Failed to connect Google account. Please try again.',
 				no_refresh_token: 'Google did not grant offline access. Please try again.',
 				session_expired: 'Your session expired. Please log in and try again.',
-				invalid_state: 'The Google connection took too long. Please try again.',
+				invalid_state: 'The Google connection expired. Please try again.',
 				session_mismatch:
 					'You were signed in as someone else when Google finished connecting. Sign in again and retry.'
 			};
 			appStore.showError(
-				errorMessages[providerError] ?? 'An error occurred connecting your Google account.'
+				errorMessages[providerError] ?? 'Couldn’t connect your Google account. Please try again.'
 			);
 			// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic runtime path from current URL
 			goto(page.url.pathname, { replace: true });
