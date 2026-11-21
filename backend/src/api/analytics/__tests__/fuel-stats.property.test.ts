@@ -454,3 +454,36 @@ describe('monthlyConsumption keeps the most recent 12 months', () => {
     expect(months.at(-1)).toBe('2024-02');
   });
 });
+
+describe('monthlyConsumption efficiency without an interval', () => {
+  test('a month with a fill-up but no efficiency interval reports null, not 0', async () => {
+    seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
+    seedVehicle(testDb.sqlite, {
+      id: 'vehicle-1',
+      userId: 'user-1',
+      make: 'Toyota',
+      model: 'Camry',
+      year: 2022,
+    });
+    for (const [i, day] of [10, 10, 20].entries()) {
+      seedExpense(testDb.sqlite, {
+        id: `fuel-${i}`,
+        vehicleId: 'vehicle-1',
+        category: 'fuel',
+        expenseAmount: 40,
+        date: new Date(2024, i === 0 ? 0 : 1, day),
+        mileage: 10000 + i * 300,
+        volume: 10,
+        fuelType: 'Regular',
+        missedFillup: false,
+      });
+    }
+
+    const stats = await repo.getFuelStats('user-1', yearToRange(2024));
+    const byMonth = new Map(stats.monthlyConsumption.map((m) => [m.month, m.efficiency]));
+
+    expect(byMonth.has('2024-01')).toBe(true);
+    expect(byMonth.get('2024-01')).toBeNull();
+    expect(byMonth.get('2024-02')).toBeCloseTo(30, 5);
+  });
+});
