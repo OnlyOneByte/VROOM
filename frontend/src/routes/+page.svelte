@@ -5,6 +5,7 @@
 	import { routes } from '#lib/routes.ts';
 	import { onMount } from 'svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import BrandMark from '#lib/components/common/BrandMark.svelte';
 	import {
 		Car,
 		ChartBar,
@@ -49,7 +50,7 @@
 			<nav class="flex items-center justify-between py-6">
 				<div class="flex items-center gap-3">
 					<div class="inline-flex items-center justify-center w-10 h-10 bg-primary rounded-xl">
-						<span class="text-xl">🚗</span>
+						<BrandMark class="h-5 w-5 text-primary-foreground" />
 					</div>
 					<span class="text-xl font-bold text-foreground">VROOM</span>
 				</div>
@@ -216,7 +217,7 @@
 		<div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
 			<div class="flex flex-col sm:flex-row items-center justify-between gap-4">
 				<div class="flex items-center gap-2 text-sm text-muted-foreground">
-					<span>🚗</span>
+					<BrandMark class="h-4 w-4 text-muted-foreground" />
 					<span>VROOM — Vehicle Record & Organization Of Maintenance</span>
 				</div>
 				<div class="flex items-center gap-4 text-sm text-muted-foreground">
