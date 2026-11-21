@@ -138,14 +138,14 @@ describe('resolveSafeOutboundTarget', () => {
   });
 
   test('accepts a name that resolves only to public addresses', async () => {
-    outboundResolver.lookup = async () => ['93.184.215.14'];
+    outboundResolver.lookup = async () => ['93.184.215.14', '2606:4700::1111'];
     const target = await resolveSafeOutboundTarget(
       'https://files.example.com',
       'S3 endpoint',
       false
     );
     expect(target.url.hostname).toBe('files.example.com');
-    expect(target.address).toBe('93.184.215.14');
+    expect(target.addresses).toEqual(['93.184.215.14', '2606:4700::1111']);
   });
 });
 
@@ -209,6 +209,46 @@ describe('fetchOutbound', () => {
     await fetchOutbound('https://93.184.215.14/v1', { method: 'GET' }, 'LLM');
     expect(calls[0]?.url).toBe('https://93.184.215.14/v1');
     expect(calls[0]?.init.tls).toBeUndefined();
+  });
+
+  function failingFetch(codes: (string | null)[]): string[] {
+    const urls: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const code = codes[urls.length];
+      urls.push(String(input));
+      if (code) throw Object.assign(new Error(code), { code });
+      return new Response('ok');
+    }) as typeof fetch;
+    return urls;
+  }
+
+  test('a refused connection falls back to the next validated address', async () => {
+    outboundResolver.lookup = async () => ['93.184.215.14', '93.184.215.15'];
+    outboundResolver.connectUrl = urlForAddress;
+    const urls = failingFetch(['ConnectionRefused', null]);
+    const res = await fetchOutbound('https://s3.example.com/b', { method: 'GET' }, 'S3');
+    expect(await res.text()).toBe('ok');
+    expect(urls).toEqual(['https://93.184.215.14/b', 'https://93.184.215.15/b']);
+  });
+
+  test('a failure after connecting is not retried on another address', async () => {
+    outboundResolver.lookup = async () => ['93.184.215.14', '93.184.215.15'];
+    outboundResolver.connectUrl = urlForAddress;
+    const urls = failingFetch(['ECONNRESET', null]);
+    await expect(
+      fetchOutbound('https://models.example.com/v1', { method: 'POST' }, 'LLM')
+    ).rejects.toThrow('ECONNRESET');
+    expect(urls).toHaveLength(1);
+  });
+
+  test('when every address refuses, the last connection error is thrown', async () => {
+    outboundResolver.lookup = async () => ['93.184.215.14', '93.184.215.15'];
+    outboundResolver.connectUrl = urlForAddress;
+    const urls = failingFetch(['ConnectionRefused', 'EHOSTUNREACH']);
+    await expect(fetchOutbound('https://s3.example.com/', { method: 'GET' }, 'S3')).rejects.toThrow(
+      'EHOSTUNREACH'
+    );
+    expect(urls).toHaveLength(2);
   });
 
   test('an IPv6 metadata address is refused before any request', async () => {
