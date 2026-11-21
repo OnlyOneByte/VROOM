@@ -258,34 +258,51 @@ describe('CameraTab: controls and errors', () => {
 		expect(stream.getTracks()[0]?.stop).toHaveBeenCalled();
 	});
 
-	test('switching cameras retries a transient failure before giving up', async () => {
+	test('switching cameras retries a transient failure with a growing backoff', async () => {
 		mount();
 		await waitForViewfinder();
-		getUserMedia
-			.mockRejectedValueOnce(new Error('busy'))
-			.mockRejectedValueOnce(new Error('busy'))
-			.mockImplementation(async () => fakeStream());
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+		try {
+			getUserMedia
+				.mockRejectedValueOnce(new Error('busy'))
+				.mockRejectedValueOnce(new Error('busy'))
+				.mockImplementation(async () => fakeStream());
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Switch camera' }));
+			await fireEvent.click(screen.getByRole('button', { name: 'Switch camera' }));
+			await vi.advanceTimersByTimeAsync(99);
+			expect(getUserMedia).toHaveBeenCalledTimes(2);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(getUserMedia).toHaveBeenCalledTimes(3);
+			await vi.advanceTimersByTimeAsync(199);
+			expect(getUserMedia).toHaveBeenCalledTimes(3);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(getUserMedia).toHaveBeenCalledTimes(4);
+			await vi.advanceTimersByTimeAsync(50);
 
-		await waitForViewfinder();
-		expect(getUserMedia).toHaveBeenCalledTimes(4);
-		expect(screen.queryByText('Could not access camera. Please try again.')).toBeNull();
+			expect(screen.getByRole('button', { name: 'Take photo' })).toBeEnabled();
+			expect(screen.queryByText('Could not access camera. Please try again.')).toBeNull();
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	test('switching cameras stops retrying after three transient failures', async () => {
 		mount();
 		await waitForViewfinder();
-		getUserMedia.mockRejectedValue(new Error('busy'));
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+		try {
+			getUserMedia.mockRejectedValue(new Error('busy'));
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Switch camera' }));
+			await fireEvent.click(screen.getByRole('button', { name: 'Switch camera' }));
+			await vi.advanceTimersByTimeAsync(300);
+			expect(getUserMedia).toHaveBeenCalledTimes(4);
+			expect(screen.getByText('Could not access camera. Please try again.')).toBeInTheDocument();
 
-		await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(4), { timeout: 2000 });
-		await waitFor(() =>
-			expect(screen.getByText('Could not access camera. Please try again.')).toBeInTheDocument()
-		);
-		await new Promise(resolve => setTimeout(resolve, 400));
-		expect(getUserMedia).toHaveBeenCalledTimes(4);
+			await vi.advanceTimersByTimeAsync(10_000);
+			expect(getUserMedia).toHaveBeenCalledTimes(4);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	test('switching cameras gives up at once on a permission error', async () => {

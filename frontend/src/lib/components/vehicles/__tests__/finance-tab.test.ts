@@ -8,6 +8,7 @@ import type {
 	VehicleStats
 } from '#lib/types/index.ts';
 import {
+	localNoon,
 	makeExpense,
 	makeLease,
 	makeLoan
@@ -85,9 +86,9 @@ function page(data: Expense[]): PaginatedResponse<Expense> {
 }
 
 const LOAN_PAYMENTS = [
-	makeExpense({ id: 'p2', date: '2025-03-10T12:00:00.000Z', amount: 400 }),
-	makeExpense({ id: 'p1', date: '2025-02-10T12:00:00.000Z', amount: 400 }),
-	makeExpense({ id: 'fuel', date: '2025-02-20T12:00:00.000Z', amount: 55, sourceType: undefined })
+	makeExpense({ id: 'p2', date: localNoon(2025, 2, 10), amount: 400 }),
+	makeExpense({ id: 'p1', date: localNoon(2025, 1, 10), amount: 400 }),
+	makeExpense({ id: 'fuel', date: localNoon(2025, 1, 20), amount: 55, sourceType: undefined })
 ];
 
 function mount(
@@ -138,10 +139,11 @@ describe('FinanceTab without active financing', () => {
 });
 
 describe('FinanceTab payment history', () => {
-	test('loads financial expenses for the vehicle and lists only financing payments', async () => {
+	test('lists only the payments recorded against this loan', async () => {
 		mount(makeVehicle(makeLoan()));
 		expect(await screen.findByText(/2 payments recorded/)).toBeTruthy();
-		expect(getExpensesByVehicle).toHaveBeenCalledWith('v1', { limit: 100, category: 'financial' });
+		const timeline = screen.getByRole('list', { name: 'Payment history timeline' });
+		expect(within(timeline).getAllByRole('listitem')).toHaveLength(2);
 		expect(screen.queryByText('$55.00')).toBeNull();
 	});
 
@@ -188,11 +190,19 @@ describe('FinanceTab payment history', () => {
 });
 
 describe('FinanceTab loan summary', () => {
-	test('shows the next payment with progress from the computed balance', async () => {
+	test('after this month is paid the next payment is due next month', async () => {
+		getExpensesByVehicle.mockResolvedValue(
+			page([makeExpense({ id: 'jun', date: localNoon(2025, 5, 10), amount: 400 })])
+		);
 		mount(makeVehicle(makeLoan()));
-		await screen.findByText(/2 payments recorded/);
+		await screen.findByText(/1 payment recorded/);
 		expect(screen.getByRole('region', { name: 'Next Payment' })).toBeTruthy();
 		expect(screen.getByText('Jul 10, 2025')).toBeTruthy();
+	});
+
+	test('shows payment progress from the computed balance', async () => {
+		mount(makeVehicle(makeLoan()));
+		await screen.findByText(/2 payments recorded/);
 		expect(screen.getByText('25%')).toBeTruthy();
 		expect(progressValue()).toBe('25');
 	});

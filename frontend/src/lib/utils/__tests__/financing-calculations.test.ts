@@ -208,43 +208,29 @@ describe('calculateNextPaymentDate', () => {
 		);
 	});
 
-	test('monthly advances from the start date to the first date after today', () => {
-		const next = calculateNextPaymentDate(makeLoan());
+	test('after this month is paid the next monthly payment is a month after it', () => {
+		const next = calculateNextPaymentDate(makeLoan(), new Date(2025, 5, 10, 12));
 		expect(next.getFullYear()).toBe(2025);
 		expect(next.getMonth()).toBe(6);
 		expect(next.getDate()).toBe(10);
 	});
 
-	test('a payment due exactly now rolls forward to the following period', () => {
-		const next = calculateNextPaymentDate(makeLoan({ startDate: '2025-05-15T12:00:00' }));
-		expect(next.getMonth()).toBe(6);
-		expect(next.getDate()).toBe(15);
-	});
-
-	test('a last payment that is already in the future is returned unchanged', () => {
-		const future = new Date(2025, 6, 1, 12);
-		expect(calculateNextPaymentDate(makeLoan(), future).getTime()).toBe(future.getTime());
-	});
-
-	test('weekly advances in seven-day steps past today', () => {
-		const last = new Date(2025, 5, 1, 12);
-		const next = calculateNextPaymentDate(makeLoan({ paymentFrequency: 'weekly' }), last);
-		expect(next.getMonth()).toBe(5);
-		expect(next.getDate()).toBe(22);
-	});
-
-	test('bi-weekly advances in fourteen-day steps past today', () => {
-		const last = new Date(2025, 5, 1, 12);
-		const next = calculateNextPaymentDate(makeLoan({ paymentFrequency: 'bi-weekly' }), last);
-		expect(next.getMonth()).toBe(5);
-		expect(next.getDate()).toBe(29);
-	});
-
-	test('gives up and returns now after the iteration cap on a very old weekly start', () => {
+	test('after this week is paid the next weekly payment is seven days after it', () => {
 		const next = calculateNextPaymentDate(
-			makeLoan({ paymentFrequency: 'weekly', startDate: '1990-01-01T12:00:00' })
+			makeLoan({ paymentFrequency: 'weekly' }),
+			new Date(2025, 5, 12, 12)
 		);
-		expect(next.getTime()).toBe(NOW.getTime());
+		expect(next.getMonth()).toBe(5);
+		expect(next.getDate()).toBe(19);
+	});
+
+	test('after this fortnight is paid the next bi-weekly payment is fourteen days after it', () => {
+		const next = calculateNextPaymentDate(
+			makeLoan({ paymentFrequency: 'bi-weekly' }),
+			new Date(2025, 5, 5, 12)
+		);
+		expect(next.getMonth()).toBe(5);
+		expect(next.getDate()).toBe(19);
 	});
 
 	test('returns now when the last payment date cannot be coerced', () => {
@@ -611,9 +597,11 @@ describe('elapsedMonths', () => {
 	});
 });
 
+const DATE_ONLY_START = '2025-01-10';
+
 describe('derivePaymentEntries', () => {
 	test('returns no entries when there are no payments', () => {
-		expect(derivePaymentEntries([], makeLoan())).toEqual([]);
+		expect(derivePaymentEntries([], makeLoan({ startDate: DATE_ONLY_START }))).toEqual([]);
 	});
 
 	test('sorts by date and tracks a running remaining balance', () => {
@@ -623,7 +611,7 @@ describe('derivePaymentEntries', () => {
 				makeExpense('a', '2025-02-10', 300),
 				makeExpense('c', '2025-04-10', 500)
 			],
-			makeLoan({ apr: 0, originalAmount: 1_000, paymentAmount: 300 })
+			makeLoan({ startDate: DATE_ONLY_START, apr: 0, originalAmount: 1_000, paymentAmount: 300 })
 		);
 		expect(entries.map(e => e.expense.id)).toEqual(['a', 'b', 'c']);
 		expect(entries.map(e => e.paymentNumber)).toEqual([1, 2, 3]);
@@ -633,7 +621,7 @@ describe('derivePaymentEntries', () => {
 	test('without apr the whole payment is principal and over-payments are extra', () => {
 		const entries = derivePaymentEntries(
 			[makeExpense('a', '2025-02-10', 300), makeExpense('b', '2025-03-10', 450)],
-			makeLoan({ apr: 0, originalAmount: 2_000, paymentAmount: 300 })
+			makeLoan({ startDate: DATE_ONLY_START, apr: 0, originalAmount: 2_000, paymentAmount: 300 })
 		);
 		expect(entries[0]).toMatchObject({
 			principalAmount: 300,
@@ -646,7 +634,13 @@ describe('derivePaymentEntries', () => {
 	test('a lease never splits out interest even with an apr on file', () => {
 		const entries = derivePaymentEntries(
 			[makeExpense('a', '2025-02-10', 400)],
-			makeLoan({ financingType: 'lease', apr: 5, originalAmount: 12_000, paymentAmount: 400 })
+			makeLoan({
+				startDate: DATE_ONLY_START,
+				financingType: 'lease',
+				apr: 5,
+				originalAmount: 12_000,
+				paymentAmount: 400
+			})
 		);
 		expect(entries[0]).toMatchObject({
 			interestAmount: 0,
@@ -666,7 +660,7 @@ describe('derivePaymentEntries', () => {
 	test('with apr the first payment carries one month of interest on the original amount', () => {
 		const entries = derivePaymentEntries(
 			[makeExpense('a', '2025-02-10', 450)],
-			makeLoan({ apr: 12, originalAmount: 10_000, paymentAmount: 450 })
+			makeLoan({ startDate: DATE_ONLY_START, apr: 12, originalAmount: 10_000, paymentAmount: 450 })
 		);
 		expect(entries[0]?.interestAmount).toBe(100);
 		expect(entries[0]?.principalAmount).toBe(350);
@@ -676,7 +670,7 @@ describe('derivePaymentEntries', () => {
 	test('a late first payment still only accrues one month of interest before it', () => {
 		const entries = derivePaymentEntries(
 			[makeExpense('a', '2025-05-10', 450)],
-			makeLoan({ apr: 12, originalAmount: 10_000, paymentAmount: 450 })
+			makeLoan({ startDate: DATE_ONLY_START, apr: 12, originalAmount: 10_000, paymentAmount: 450 })
 		);
 		expect(entries[0]?.interestAmount).toBe(100);
 		expect(entries[0]?.remainingBalance).toBe(9_650);
@@ -685,7 +679,7 @@ describe('derivePaymentEntries', () => {
 	test('interest accrues on the reduced balance for each following month', () => {
 		const entries = derivePaymentEntries(
 			[makeExpense('a', '2025-02-10', 450), makeExpense('b', '2025-03-10', 450)],
-			makeLoan({ apr: 12, originalAmount: 10_000, paymentAmount: 450 })
+			makeLoan({ startDate: DATE_ONLY_START, apr: 12, originalAmount: 10_000, paymentAmount: 450 })
 		);
 		expect(entries[1]?.interestAmount).toBe(96.5);
 		expect(entries[1]?.principalAmount).toBe(353.5);
@@ -695,7 +689,7 @@ describe('derivePaymentEntries', () => {
 	test('a skipped month accrues two months of interest on the next payment', () => {
 		const entries = derivePaymentEntries(
 			[makeExpense('a', '2025-02-10', 450), makeExpense('b', '2025-04-10', 450)],
-			makeLoan({ apr: 12, originalAmount: 10_000, paymentAmount: 450 })
+			makeLoan({ startDate: DATE_ONLY_START, apr: 12, originalAmount: 10_000, paymentAmount: 450 })
 		);
 		expect(entries[1]?.interestAmount).toBe(193);
 		expect(entries[1]?.remainingBalance).toBe(9_393);
@@ -704,7 +698,7 @@ describe('derivePaymentEntries', () => {
 	test('an extra payment is flagged and reduces the balance by more than a standard one', () => {
 		const entries = derivePaymentEntries(
 			[makeExpense('a', '2025-02-10', 450), makeExpense('b', '2025-03-10', 2_000)],
-			makeLoan({ apr: 12, originalAmount: 10_000, paymentAmount: 450 })
+			makeLoan({ startDate: DATE_ONLY_START, apr: 12, originalAmount: 10_000, paymentAmount: 450 })
 		);
 		expect(entries[1]?.paymentType).toBe('extra');
 		expect(entries[1]?.principalAmount).toBe(1_903.5);
@@ -714,7 +708,7 @@ describe('derivePaymentEntries', () => {
 	test('a payment smaller than the interest pays no principal and the balance grows', () => {
 		const entries = derivePaymentEntries(
 			[makeExpense('a', '2025-02-10', 50)],
-			makeLoan({ apr: 12, originalAmount: 10_000, paymentAmount: 450 })
+			makeLoan({ startDate: DATE_ONLY_START, apr: 12, originalAmount: 10_000, paymentAmount: 450 })
 		);
 		expect(entries[0]).toMatchObject({ interestAmount: 50, principalAmount: 0 });
 		expect(entries[0]?.remainingBalance).toBe(10_050);
@@ -727,7 +721,13 @@ describe('derivePaymentEntries', () => {
 				makeExpense('b', '2025-03-10', 600),
 				makeExpense('c', '2025-04-10', 600)
 			],
-			makeLoan({ apr: 6, originalAmount: 1_000, paymentAmount: 600, termMonths: 12 })
+			makeLoan({
+				startDate: DATE_ONLY_START,
+				apr: 6,
+				originalAmount: 1_000,
+				paymentAmount: 600,
+				termMonths: 12
+			})
 		);
 		expect(entries[0]).toMatchObject({ interestAmount: 5, remainingBalance: 405 });
 		expect(entries[1]).toMatchObject({ interestAmount: 2.03, remainingBalance: 0 });

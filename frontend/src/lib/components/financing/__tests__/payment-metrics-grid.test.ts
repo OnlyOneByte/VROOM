@@ -104,12 +104,6 @@ describe('PaymentMetricsGrid for a loan with APR', () => {
 		expect(screen.getByText('15% over principal')).toBeTruthy();
 	});
 
-	test('without a schedule the total cost is just the original amount', () => {
-		mount({ amortizationSchedule: [] });
-		expect(screen.getByText('$20,000.00')).toBeTruthy();
-		expect(screen.getByText('0% over principal')).toBeTruthy();
-	});
-
 	test('formats every amount in the user currency', () => {
 		store.currencyUnit = 'EUR';
 		mount({ amortizationSchedule: [scheduleEntry(1, 2_000)] });

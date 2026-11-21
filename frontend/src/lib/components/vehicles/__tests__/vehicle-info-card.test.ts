@@ -59,7 +59,7 @@ describe('VehicleInfoCard', () => {
 					licensePlate: 'ABC-123',
 					vin: '1HGCM82633A004352',
 					initialMileage: 45210,
-					purchaseDate: '2021-06-15T12:00:00.000Z',
+					purchaseDate: new Date(2021, 5, 15, 12).toISOString(),
 					purchasePrice: 27999.5
 				})
 			}

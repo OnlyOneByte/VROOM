@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { DerivedPaymentEntry, VehicleFinancing } from '#lib/types/index.ts';
 import { derivePaymentEntries } from '#lib/utils/financing-calculations.ts';
-import { makeEntry, makeExpense, makeLease, makeLoan } from './financing-fixtures';
+import { localNoon, makeEntry, makeExpense, makeLease, makeLoan } from './financing-fixtures';
 
 const store = vi.hoisted(() => ({ currencyUnit: 'USD' }));
 
@@ -30,7 +30,7 @@ function monthlyEntries(count: number): DerivedPaymentEntry[] {
 			paymentNumber: i + 1,
 			expense: {
 				id: `e${i + 1}`,
-				date: new Date(Date.UTC(2015, i, 10, 12)).toISOString()
+				date: localNoon(2015, i, 10)
 			}
 		})
 	);
@@ -52,9 +52,9 @@ describe('PaymentHistory empty state', () => {
 describe('PaymentHistory list', () => {
 	test('lists payments newest first with a recorded count', () => {
 		mount([
-			makeEntry({ paymentNumber: 1, expense: { id: 'a', date: '2025-02-10T12:00:00.000Z' } }),
-			makeEntry({ paymentNumber: 3, expense: { id: 'c', date: '2025-04-10T12:00:00.000Z' } }),
-			makeEntry({ paymentNumber: 2, expense: { id: 'b', date: '2025-03-10T12:00:00.000Z' } })
+			makeEntry({ paymentNumber: 1, expense: { id: 'a', date: localNoon(2025, 1, 10) } }),
+			makeEntry({ paymentNumber: 3, expense: { id: 'c', date: localNoon(2025, 3, 10) } }),
+			makeEntry({ paymentNumber: 2, expense: { id: 'b', date: localNoon(2025, 2, 10) } })
 		]);
 		expect(screen.getByText(/3 payments recorded/)).toBeTruthy();
 		const labels = paymentCards().map(
@@ -74,7 +74,7 @@ describe('PaymentHistory list', () => {
 		mount([makeEntry({ remainingBalance: 19_700, expense: { amount: 400 } })]);
 		const card = paymentCards()[0]!;
 		const time = within(card).getByText('Feb 10, 2025');
-		expect(time.getAttribute('datetime')).toBe('2025-02-10T12:00:00.000Z');
+		expect(time.getAttribute('datetime')).toBe(localNoon(2025, 1, 10));
 		expect(within(card).getByLabelText('Payment amount').textContent).toBe('$400.00');
 		expect(within(card).getByText('$19,700.00')).toBeTruthy();
 	});
@@ -96,7 +96,7 @@ describe('PaymentHistory list', () => {
 
 	test('flags extra payments and leaves standard ones unflagged', () => {
 		mount([
-			makeEntry({ paymentType: 'extra', expense: { id: 'x', date: '2025-03-10T12:00:00.000Z' } }),
+			makeEntry({ paymentType: 'extra', expense: { id: 'x', date: localNoon(2025, 2, 10) } }),
 			makeEntry({ paymentType: 'standard', expense: { id: 's' } })
 		]);
 		const [extra, standard] = paymentCards();
@@ -117,8 +117,8 @@ describe('PaymentHistory list', () => {
 		const financing = makeLoan({ apr: 12, originalAmount: 10_000, paymentAmount: 450 });
 		const entries = derivePaymentEntries(
 			[
-				makeExpense({ id: 'p1', date: '2025-02-10T12:00:00.000Z', amount: 450 }),
-				makeExpense({ id: 'p2', date: '2025-03-10T12:00:00.000Z', amount: 2_000 })
+				makeExpense({ id: 'p1', date: localNoon(2025, 1, 10), amount: 450 }),
+				makeExpense({ id: 'p2', date: localNoon(2025, 2, 10), amount: 2_000 })
 			],
 			financing
 		);

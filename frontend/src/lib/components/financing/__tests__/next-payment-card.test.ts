@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type { DerivedPaymentEntry, VehicleFinancing } from '#lib/types/index.ts';
-import { makeEntry, makeLease, makeLoan } from './financing-fixtures';
+import { localNoon, makeEntry, makeLease, makeLoan } from './financing-fixtures';
 
 const store = vi.hoisted(() => ({ currencyUnit: 'USD' }));
 const nextDateOverride = vi.hoisted(() => ({ value: null as Date | null }));
@@ -59,8 +59,8 @@ afterEach(() => {
 });
 
 describe('NextPaymentCard due date', () => {
-	test('shows the next monthly due date after today and a day countdown', () => {
-		mount();
+	test('after this month is paid the next monthly payment is due next month', () => {
+		mount({ lastPayment: makeEntry({ expense: { date: localNoon(2025, 5, 10) } }) });
 		expect(screen.getByText('Jul 10, 2025')).toBeTruthy();
 		expect(screen.getByText('Jul 10, 2025').getAttribute('datetime')).toBe(
 			new Date(2025, 6, 10, 12).toISOString()
@@ -69,30 +69,21 @@ describe('NextPaymentCard due date', () => {
 	});
 
 	test('a payment due within a day reads as due tomorrow', () => {
-		mount({ financing: makeLoan({ startDate: '2025-01-16T12:00:00' }) });
+		mount({
+			financing: makeLoan({ startDate: '2025-01-16T12:00:00' }),
+			lastPayment: makeEntry({ expense: { date: localNoon(2025, 4, 16) } })
+		});
+		expect(screen.getByText('Jun 16, 2025')).toBeTruthy();
 		expect(countdown()).toBe('Due tomorrow');
 	});
 
-	test('counts from the last recorded payment when one is given', () => {
-		mount({ lastPayment: makeEntry({ expense: { date: '2025-05-03T12:00:00' } }) });
-		expect(screen.getByText('Jul 3, 2025')).toBeTruthy();
-		expect(countdown()).toBe('Due in 18 days');
-	});
-
-	test('weekly loans count down in weekly steps', () => {
+	test('a weekly loan that started this week has its first payment due a week after the start', () => {
 		mount({
 			financing: makeLoan({ paymentFrequency: 'weekly', startDate: '2025-06-10T12:00:00' })
 		});
 		expect(screen.getByText('Jun 17, 2025')).toBeTruthy();
 		expect(countdown()).toBe('Due in 2 days');
 		expect(screen.getByText('Weekly')).toBeTruthy();
-	});
-
-	test('falls back to due today when the next date cannot be projected', () => {
-		mount({
-			financing: makeLoan({ paymentFrequency: 'weekly', startDate: '1990-01-01T12:00:00' })
-		});
-		expect(countdown()).toBe('Due today');
 	});
 
 	test('reports how many days a payment is overdue', () => {

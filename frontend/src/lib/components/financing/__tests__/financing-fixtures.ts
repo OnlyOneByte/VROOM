@@ -1,5 +1,9 @@
 import type { DerivedPaymentEntry, Expense, VehicleFinancing } from '#lib/types/index.ts';
 
+export function localNoon(year: number, monthIndex: number, day: number): string {
+	return new Date(year, monthIndex, day, 12).toISOString();
+}
+
 export function makeLoan(overrides: Partial<VehicleFinancing> = {}): VehicleFinancing {
 	return {
 		id: 'fin-1',
@@ -43,11 +47,12 @@ export function makeExpense(overrides: Partial<Expense> = {}): Expense {
 		userId: 'u1',
 		tags: [],
 		category: 'financial',
-		date: '2025-02-10T12:00:00.000Z',
+		date: localNoon(2025, 1, 10),
 		amount: 400,
 		sourceType: 'financing',
-		createdAt: '2025-02-10T12:00:00.000Z',
-		updatedAt: '2025-02-10T12:00:00.000Z',
+		sourceId: 'fin-1',
+		createdAt: localNoon(2025, 1, 10),
+		updatedAt: localNoon(2025, 1, 10),
 		...overrides
 	};
 }
