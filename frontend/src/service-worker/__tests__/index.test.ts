@@ -212,30 +212,29 @@ describe('notificationclick', () => {
 	});
 });
 
+const ORIGIN = 'https://vroom.test';
+
 function createPageCache() {
 	const pages = new Map<string, Response>();
-	const keyOf = (request: Request | string) =>
-		new URL(typeof request === 'string' ? request : request.url).pathname;
+	const keyOf = (entry: Request | string) => (typeof entry === 'string' ? entry : entry.url);
 	const cache = {
 		pages,
-		match: vi.fn(async (request: Request) => pages.get(keyOf(request))?.clone()),
-		put: vi.fn(async (request: Request, response: Response) => {
-			pages.set(keyOf(request), response);
+		put: vi.fn(async (key: string, response: Response) => {
+			pages.set(keyOf(key), response);
 		}),
-		keys: vi.fn(async () =>
-			[...pages.keys()].map(path => new Request(`https://vroom.test${path}`))
-		),
-		delete: vi.fn(async (request: Request) => pages.delete(keyOf(request)))
+		keys: vi.fn(async () => [...pages.keys()].map(url => new Request(url))),
+		delete: vi.fn(async (entry: Request) => pages.delete(keyOf(entry)))
 	};
 	const storage = {
 		open: vi.fn(async () => cache),
+		match: vi.fn(async (key: string) => pages.get(keyOf(key))?.clone()),
 		delete: vi.fn(async () => true)
 	};
 	return { cache, storage };
 }
 
 function navigation(path: string, mode: Request['mode'] = 'navigate') {
-	return { url: `https://vroom.test${path}`, mode, method: 'GET' } as unknown as Request;
+	return { url: `${ORIGIN}${path}`, mode, method: 'GET' } as unknown as Request;
 }
 
 function dispatchFetch(request: Request) {
@@ -282,7 +281,7 @@ describe('navigation (network first)', () => {
 		const response = await dispatchFetch(navigation('/expenses')).settled();
 
 		expect(await response?.text()).toBe('<p>fresh</p>');
-		expect(pageCache.cache.pages.has('/expenses')).toBe(true);
+		expect(pageCache.cache.pages.has(`${ORIGIN}/expenses`)).toBe(true);
 	});
 
 	test('a failed page is not cached', async () => {
@@ -295,7 +294,7 @@ describe('navigation (network first)', () => {
 	});
 
 	test('offline, it serves the cached copy of a visited page, whatever its query string', async () => {
-		pageCache.cache.pages.set('/expenses/new', new Response('<p>cached form</p>'));
+		pageCache.cache.pages.set(`${ORIGIN}/expenses/new`, new Response('<p>cached form</p>'));
 		fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
 
 		const response = await dispatchFetch(navigation('/expenses/new?vehicleId=v1')).settled();
@@ -315,9 +314,43 @@ describe('navigation (network first)', () => {
 		expect(html).toContain('href="/dashboard"');
 	});
 
+	test('a page is cached once under its path, whatever its query string', async () => {
+		fetchMock.mockImplementation(async () => new Response('<p>form</p>', { status: 200 }));
+
+		await dispatchFetch(navigation('/expenses/new?vehicleId=v1')).settled();
+		await dispatchFetch(navigation('/expenses/new?vehicleId=v2')).settled();
+
+		expect([...pageCache.cache.pages.keys()]).toEqual([`${ORIGIN}/expenses/new`]);
+	});
+
+	test('when the timeout serves the cached copy, the late network page still refreshes it', async () => {
+		vi.useFakeTimers();
+		pageCache.cache.pages.set(`${ORIGIN}/dashboard`, new Response('<p>old</p>'));
+		let answer: (response: Response) => void = () => {};
+		fetchMock.mockReturnValue(new Promise<Response>(resolve => (answer = resolve)));
+
+		const { responded, settled } = dispatchFetch(navigation('/dashboard'));
+		await vi.advanceTimersByTimeAsync(3000);
+		expect(await (await responded)?.text()).toBe('<p>old</p>');
+		answer(new Response('<p>new</p>', { status: 200 }));
+		await settled();
+
+		expect(await pageCache.cache.pages.get(`${ORIGIN}/dashboard`)?.text()).toBe('<p>new</p>');
+	});
+
+	test('a cache storage failure does not break pages online', async () => {
+		pageCache.storage.match.mockRejectedValue(new Error('quota'));
+		pageCache.storage.open.mockRejectedValue(new Error('quota'));
+		fetchMock.mockResolvedValue(new Response('<p>fresh</p>', { status: 200 }));
+
+		const response = await dispatchFetch(navigation('/expenses')).settled();
+
+		expect(await response?.text()).toBe('<p>fresh</p>');
+	});
+
 	test('a network slower than the timeout falls back to the cached copy', async () => {
 		vi.useFakeTimers();
-		pageCache.cache.pages.set('/dashboard', new Response('<p>cached dashboard</p>'));
+		pageCache.cache.pages.set(`${ORIGIN}/dashboard`, new Response('<p>cached dashboard</p>'));
 		fetchMock.mockReturnValue(new Promise<Response>(() => {}));
 
 		const { responded } = dispatchFetch(navigation('/dashboard'));
@@ -327,14 +360,15 @@ describe('navigation (network first)', () => {
 	});
 
 	test('keeps at most 50 pages, dropping the oldest', async () => {
-		for (let i = 0; i < 50; i++) pageCache.cache.pages.set(`/vehicles/v${i}`, new Response(''));
+		for (let i = 0; i < 50; i++)
+			pageCache.cache.pages.set(`${ORIGIN}/vehicles/v${i}`, new Response(''));
 		fetchMock.mockResolvedValue(new Response('<p>new</p>', { status: 200 }));
 
 		await dispatchFetch(navigation('/vehicles/v50')).settled();
 
 		expect(pageCache.cache.pages.size).toBe(50);
-		expect(pageCache.cache.pages.has('/vehicles/v0')).toBe(false);
-		expect(pageCache.cache.pages.has('/vehicles/v50')).toBe(true);
+		expect(pageCache.cache.pages.has(`${ORIGIN}/vehicles/v0`)).toBe(false);
+		expect(pageCache.cache.pages.has(`${ORIGIN}/vehicles/v50`)).toBe(true);
 	});
 
 	test('leaves requests that are not page navigations alone', () => {

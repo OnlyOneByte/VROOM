@@ -49,34 +49,49 @@ function offlineResponse(): Response {
 	});
 }
 
-async function rememberPage(cache: Cache, request: Request, response: Response): Promise<void> {
-	await cache.put(request, response);
-	const keys = await cache.keys();
-	const overflow = keys.slice(0, Math.max(0, keys.length - MAX_CACHED_PAGES));
-	await Promise.all(overflow.map(key => cache.delete(key)));
+function pageKey(request: Request): string {
+	const url = new URL(request.url);
+	url.search = '';
+	url.hash = '';
+	return url.href;
 }
 
-async function networkFirstNavigation(event: FetchEvent): Promise<Response> {
+async function rememberPage(key: string, response: Response): Promise<void> {
 	const cache = await caches.open(PAGE_CACHE);
-	const cached = () => cache.match(event.request, { ignoreSearch: true });
-	const network = fetch(event.request).then(response => {
-		if (response.ok) event.waitUntil(rememberPage(cache, event.request, response.clone()));
-		return response;
-	});
-	network.catch(() => undefined);
+	await cache.put(key, response);
+	const keys = await cache.keys();
+	const overflow = keys.slice(0, Math.max(0, keys.length - MAX_CACHED_PAGES));
+	await Promise.all(overflow.map(entry => cache.delete(entry)));
+}
+
+function cachedPage(key: string): Promise<Response | undefined> {
+	return caches.match(key, { cacheName: PAGE_CACHE }).catch(() => undefined);
+}
+
+async function networkFirstNavigation(key: string, network: Promise<Response>): Promise<Response> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
 	const cachedAfterTimeout = new Promise<Response | undefined>(resolve => {
-		setTimeout(() => resolve(cached()), NETWORK_TIMEOUT_MS);
+		timer = setTimeout(() => resolve(cachedPage(key)), NETWORK_TIMEOUT_MS);
 	});
 	try {
 		return (await Promise.race([network, cachedAfterTimeout])) ?? (await network);
 	} catch {
-		return (await cached()) ?? offlineResponse();
+		return (await cachedPage(key)) ?? offlineResponse();
+	} finally {
+		clearTimeout(timer);
 	}
 }
 
 sw.addEventListener('fetch', (event: FetchEvent) => {
 	if (event.request.mode !== 'navigate' || event.request.method !== 'GET') return;
-	event.respondWith(networkFirstNavigation(event));
+	const key = pageKey(event.request);
+	const network = fetch(event.request);
+	event.waitUntil(
+		network
+			.then(response => (response.ok ? rememberPage(key, response.clone()) : undefined))
+			.catch(() => undefined)
+	);
+	event.respondWith(networkFirstNavigation(key, network));
 });
 
 sw.addEventListener('activate', (event: ExtendableEvent) => {
