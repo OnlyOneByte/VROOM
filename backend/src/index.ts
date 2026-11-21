@@ -79,5 +79,4 @@ export default {
   // Bun binds every interface when no hostname is given, so HOST must always be passed through.
   hostname: CONFIG.server.host,
   fetch: app.fetch,
-  reusePort: true,
 };

@@ -39,4 +39,13 @@ describe('Bun server options honor the configured HOST', () => {
   test('port is still passed from CONFIG.server.port (the sibling setting)', () => {
     expect(/port\s*:\s*CONFIG\.server\.port\b/.test(serverOptions())).toBe(true);
   });
+
+  test('reusePort is off so a second backend on the same port fails to bind', () => {
+    expect(
+      /reusePort\s*:\s*true/.test(serverOptions()),
+      'index.ts must not set `reusePort: true`. With it a second backend binds the same port ' +
+        'without error and the kernel splits requests between the two processes. ' +
+        `Found: ${serverOptions().trim()}`
+    ).toBe(false);
+  });
 });
