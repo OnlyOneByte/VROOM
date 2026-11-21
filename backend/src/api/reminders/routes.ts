@@ -14,7 +14,7 @@ import { commonSchemas, validateReminderOwnership, zValidator } from '../../util
 import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
 import { recurringCostSummary } from './reminder-cost';
-import { reminderRepository } from './repository';
+import { type ReminderWithVehicles, reminderRepository } from './repository';
 import { advanceReminderDueDate, reminderTriggerService } from './trigger-service';
 import {
   assertMergedReminderValid,
@@ -65,7 +65,24 @@ async function requireReminderVehiclesWrite(
       throw new ValidationError('A reminder cannot span vehicles owned by different users');
     }
   }
-  return { ownerId: ownerId ?? actingUserId };
+  if (ownerId === undefined) {
+    throw new ValidationError('A reminder needs at least one vehicle');
+  }
+  return { ownerId };
+}
+
+async function requireExistingReminderWrite(
+  existing: ReminderWithVehicles,
+  actingUserId: string
+): Promise<{ ownerId: string }> {
+  const { reminder, vehicleIds } = existing;
+  if (vehicleIds.length === 0) {
+    if (reminder.userId !== actingUserId) throw new NotFoundError('Reminder');
+    return { ownerId: actingUserId };
+  }
+  const { ownerId } = await requireReminderVehiclesWrite(vehicleIds, actingUserId);
+  if (ownerId !== reminder.userId) throw new NotFoundError('Reminder');
+  return { ownerId };
 }
 
 function advanceToFirstFutureDue(reminder: Reminder, from: Date): Date {
@@ -122,7 +139,7 @@ routes.post(
     const existing = await reminderRepository.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
     const { reminder, vehicleIds } = existing;
-    const { ownerId } = await requireReminderVehiclesWrite(vehicleIds, user.id);
+    const { ownerId } = await requireExistingReminderWrite(existing, user.id);
 
     const fields: { lastServiceOdometer?: number; nextDueOdometer?: number; nextDueDate?: Date } =
       {};
@@ -144,7 +161,7 @@ routes.post(
     ) {
       const nextDue = advanceToFirstFutureDue(reminder, reminder.nextDueDate);
       if (reminder.endDate && nextDue > reminder.endDate) {
-        await reminderRepository.deactivate(id);
+        await reminderRepository.deactivate(id, ownerId);
         return c.json({ success: true, data: reminderToApi({ ...reminder, isActive: false }) });
       }
       fields.nextDueDate = nextDue;
@@ -240,7 +257,7 @@ routes.put(
 
     const existing = await reminderRepository.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
-    const { ownerId } = await requireReminderVehiclesWrite(existing.vehicleIds, user.id);
+    const { ownerId } = await requireExistingReminderWrite(existing, user.id);
 
     if (partialUpdate.vehicleIds) {
       const { ownerId: newOwnerId } = await requireReminderVehiclesWrite(
@@ -298,12 +315,12 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   const existing = await reminderRepository.findByIdWithVehicles(id);
   if (!existing) throw new NotFoundError('Reminder');
-  const { ownerId } = await requireReminderVehiclesWrite(existing.vehicleIds, user.id);
+  const { ownerId } = await requireExistingReminderWrite(existing, user.id);
 
   // clearSource must run before the delete: a dangling sourceId fails backup validation on restore.
   await expenseRepository.clearSource('reminder', id, ownerId);
 
-  await reminderRepository.delete(id);
+  await reminderRepository.deleteOwned(id, ownerId);
   return c.json({ success: true, message: 'Reminder deleted successfully' });
 });
 
