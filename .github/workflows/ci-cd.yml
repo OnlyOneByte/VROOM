@@ -55,7 +55,7 @@ jobs:
         run: bun run type-check && bun run check
 
       - name: Run unit tests
-        run: bun test
+        run: bun run test
 
       - name: Build application
         run: bun run build

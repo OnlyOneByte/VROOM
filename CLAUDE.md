@@ -16,7 +16,7 @@ Coding conventions live in `docs/conventions/*.md`. Read `MainSteering.md`, `Sve
 |---|---|---|
 | Install | `bun install` | `npm ci` |
 | Dev server | `bun run dev` | `npm run dev` |
-| Tests | `bun test` | `npm run test` |
+| Tests | `bun run test` | `npm run test` |
 | Full gate | `bun run all:fix && bun run validate` | `npm run all:fix && npm run validate` |
 
 `validate` = lint, format, type-check, tests, build. Run it in every subfolder you modified
