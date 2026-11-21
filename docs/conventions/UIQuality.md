@@ -310,8 +310,10 @@ failed step; nits can be follow-up issues.
 - Run the app on `127.0.0.1` only and capture with Playwright Chromium.
 - Move the mouse off the desktop rail first (it expands on hover), and scroll the page once
   before a full-page shot — charts mount when they scroll into view.
-- Pick the theme by setting the `localStorage` keys `vroom-theme-id` (family id) and
-  `vroom-theme-preference` (`light` / `dark` / `system`) before navigating.
+- The theme family is a user setting: set it with `PUT /api/v1/settings`
+  `{"themePreference": "<family id>"}` (or in Settings → Theme). The `vroom-theme-id`
+  `localStorage` key alone is overwritten by the server value once settings load. Light/dark is
+  the `vroom-theme-preference` key (`light` / `dark` / `system`).
 - Before and after use the same route, viewport and data.
 
 ### Definition of human-ready (pre-merge checklist)
