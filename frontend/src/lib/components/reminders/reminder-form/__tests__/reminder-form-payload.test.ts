@@ -184,3 +184,31 @@ describe('buildReminderPayload time zone', () => {
 		expect(buildReminderPayload(validDraft()).timeZone).toBe('Pacific/Auckland');
 	});
 });
+
+describe('buildReminderPayload schedule fields', () => {
+	test('a mileage-only reminder sends no custom interval, even if one was typed for a time schedule', () => {
+		const payload = buildReminderPayload(
+			validDraft({
+				triggerMode: 'mileage',
+				intervalMileage: '5000',
+				frequency: 'custom',
+				intervalValue: '',
+				intervalUnit: 'week'
+			})
+		);
+		expect(payload).toMatchObject({ intervalValue: null, intervalUnit: null });
+	});
+
+	test('a reminder that also runs on a time schedule keeps its custom interval', () => {
+		const payload = buildReminderPayload(
+			validDraft({
+				triggerMode: 'both',
+				intervalMileage: '5000',
+				frequency: 'custom',
+				intervalValue: '3',
+				intervalUnit: 'week'
+			})
+		);
+		expect(payload).toMatchObject({ intervalValue: 3, intervalUnit: 'week' });
+	});
+});

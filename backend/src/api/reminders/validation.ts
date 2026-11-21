@@ -128,7 +128,7 @@ type ReminderInput = z.infer<typeof reminderBaseSchema>;
 type ReminderRefineInput = Partial<ReminderInput>;
 
 function refineCustomFrequency(data: ReminderRefineInput, ctx: z.RefinementCtx) {
-  if (data.frequency !== 'custom') return;
+  if (data.frequency !== 'custom' || data.triggerMode === 'mileage') return;
   if (!data.intervalValue) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -157,7 +157,7 @@ function refineExpenseType(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   if (!data.expenseAmount) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'expenseAmount required for automatic expense reminders',
+      message: 'Enter an amount greater than 0',
       path: ['expenseAmount'],
     });
   }
@@ -234,7 +234,7 @@ function refineSplitConfig(data: ReminderRefineInput, ctx: z.RefinementCtx) {
     if (Math.abs(sum - data.expenseAmount) >= 0.001) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Absolute allocations must sum to expenseAmount',
+        message: 'Split amounts must total the expense amount',
         path: ['expenseSplitConfig', 'allocations'],
       });
     }
