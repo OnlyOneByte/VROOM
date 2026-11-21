@@ -158,7 +158,7 @@ class RestoreService {
       const consented = this.consentedShareKeys(tx, userId);
       const currentPrefs = this.currentProviderPrefs(tx, userId);
       if (mode === 'replace') {
-        this.deleteUserData(tx, userId);
+        this.deleteUserData(tx, userId, { keepPreferences: !data.userPreferences?.length });
       }
       this.insertBackupData(tx, data, userId, consented, currentPrefs);
     });
@@ -388,7 +388,11 @@ class RestoreService {
     return conflicts;
   }
 
-  private deleteUserData(tx: DrizzleTransaction, userId: string): void {
+  private deleteUserData(
+    tx: DrizzleTransaction,
+    userId: string,
+    { keepPreferences }: { keepPreferences: boolean }
+  ): void {
     const userVehicles = tx
       .select({ id: vehicles.id })
       .from(vehicles)
@@ -419,7 +423,9 @@ class RestoreService {
 
     tx.delete(reminders).where(eq(reminders.userId, userId)).run();
 
-    tx.delete(userPreferences).where(eq(userPreferences.userId, userId)).run();
+    if (!keepPreferences) {
+      tx.delete(userPreferences).where(eq(userPreferences.userId, userId)).run();
+    }
     tx.delete(syncState).where(eq(syncState.userId, userId)).run();
 
     tx.delete(vehicles).where(eq(vehicles.userId, userId)).run();

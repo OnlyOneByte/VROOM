@@ -376,6 +376,41 @@ describe('restore after the account record is recreated (same person, new user i
     expect(storage.providerCategories).toEqual({});
   });
 
+  test('a Replace restore of a backup without preferences keeps the account settings', async () => {
+    const newId = reinstallAsNewAccount();
+    const backupConfig = { providers: { 'prov-live': { enabled: true, folderPath: 'VROOM' } } };
+    ctx.sqlite.run(
+      'INSERT INTO user_preferences (user_id, currency_unit, backup_config) VALUES (?, ?, ?)',
+      [newId, 'EUR', JSON.stringify(backupConfig)]
+    );
+    const zip = new AdmZip();
+    zip.addFile(
+      'metadata.json',
+      Buffer.from(
+        JSON.stringify({ version: '1.0.0', timestamp: new Date(0).toISOString(), userId: 'old' }),
+        'utf-8'
+      )
+    );
+    zip.addFile(
+      'vehicles.csv',
+      Buffer.from('id,userId,make,model,year\n"v-np","old","Fiat","Panda","2010"\n', 'utf-8')
+    );
+    for (const f of ['expenses.csv', 'vehicle_financing.csv', 'insurance_policies.csv']) {
+      zip.addFile(f, Buffer.from('id\n', 'utf-8'));
+    }
+
+    const { restoreService } = await import('../restore');
+    const result = await restoreService.restoreFromBackup(newId, zip.toBuffer(), 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    const prefs = ctx.sqlite
+      .query('SELECT currency_unit, backup_config FROM user_preferences WHERE user_id = ?')
+      .get(newId) as { currency_unit: string; backup_config: string } | null;
+    expect(prefs?.currency_unit).toBe('EUR');
+    expect(JSON.parse(prefs?.backup_config ?? 'null')).toEqual(backupConfig);
+    expect(vehicleRows().map((r) => r.id)).toEqual(['v-np']);
+  });
+
   test("another tenant's backup cannot overwrite or steal that tenant's live rows", async () => {
     const vehicleId = await seedOwnerData();
     const { backupService } = await import('../backup');
