@@ -151,6 +151,12 @@ async function openTab(name: string) {
 	await settle();
 }
 
+async function openExpensesTable(): Promise<Record<string, unknown>> {
+	await openTab('Expenses');
+	await vi.waitFor(() => expect(captured['table']).toBeDefined());
+	return captured['table'] as Record<string, unknown>;
+}
+
 function lastListParams(): Record<string, unknown> {
 	return getExpensesByVehicle.mock.calls.at(-1)?.[1] as Record<string, unknown>;
 }
@@ -412,7 +418,7 @@ describe('vehicle detail page tabs', () => {
 
 		await openTab('Expenses');
 		await openTab('Overview');
-		await openTab('Expenses');
+		await openExpensesTable();
 
 		expect(getExpensesByVehicle).toHaveBeenCalledTimes(1);
 		expect(lastListParams()).toMatchObject({
@@ -421,7 +427,7 @@ describe('vehicle detail page tabs', () => {
 			sortBy: 'date',
 			sortDir: 'desc'
 		});
-		expect(screen.getByText('All Expenses (1)')).toBeInTheDocument();
+		expect(await screen.findByText('All Expenses (1)')).toBeInTheDocument();
 		expect(captured['table']?.['expenses']).toEqual([EXPENSE]);
 	});
 
@@ -432,8 +438,8 @@ describe('vehicle detail page tabs', () => {
 
 		await openTab('Expenses');
 
+		expect(await screen.findByText('Failed to load expenses')).toBeInTheDocument();
 		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to load expenses');
-		expect(screen.getByText('Failed to load expenses')).toBeInTheDocument();
 		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
 		expect(screen.queryByText('Expenses down')).toBeNull();
 
@@ -451,13 +457,13 @@ describe('vehicle detail page tabs', () => {
 
 		await openTab('Expenses');
 
-		expect(screen.getAllByText('Failed to load expenses')).toHaveLength(1);
+		expect(await screen.findAllByText('Failed to load expenses')).toHaveLength(1);
 		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
 	});
 
 	test('paging and sorting from the table refetch with the new parameters', async () => {
 		await mount();
-		await openTab('Expenses');
+		await openExpensesTable();
 
 		(captured['table']?.['onPageChange'] as (offset: number) => void)(20);
 		await settle();
@@ -475,7 +481,7 @@ describe('vehicle detail page tabs', () => {
 			pagination: { totalCount: 21, limit: 20, offset: 20, hasMore: false }
 		});
 		await mount();
-		await openTab('Expenses');
+		await openExpensesTable();
 		(captured['table']?.['onPageChange'] as (offset: number) => void)(20);
 		await settle();
 		const summaryCalls = getExpenseSummary.mock.calls.length;
@@ -489,7 +495,7 @@ describe('vehicle detail page tabs', () => {
 
 	test('clearing filters resets the category and reloads from the first page', async () => {
 		await mount();
-		await openTab('Expenses');
+		await openExpensesTable();
 		(captured['table']?.['onCategoryChange'] as (c: string) => void)('fuel');
 		await settle();
 		expect(lastListParams()).toMatchObject({ category: 'fuel' });
@@ -507,7 +513,7 @@ describe('vehicle detail page tabs', () => {
 		await mount();
 		await openTab('Expenses');
 
-		await fireEvent.click(screen.getByRole('button', { name: /export csv/i }));
+		await fireEvent.click(await screen.findByRole('button', { name: /export csv/i }));
 		await settle();
 
 		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to export expenses');
@@ -517,7 +523,7 @@ describe('vehicle detail page tabs', () => {
 	test('shared users cannot export CSV', async () => {
 		getVehicle.mockResolvedValue(EDITOR_VEHICLE);
 		await mount();
-		await openTab('Expenses');
+		await openExpensesTable();
 
 		expect(screen.queryByRole('button', { name: /export csv/i })).toBeNull();
 		expect(captured['table']?.['canWrite']).toBe(true);

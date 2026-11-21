@@ -31,7 +31,7 @@ vi.mock('#lib/services/share-api.ts', () => ({
 					...share('s8', '', 'pending'),
 					sharedWithEmail: null,
 					sharedWithName: null,
-					createdAt: '2026-03-04T12:00:00.000Z'
+					createdAt: new Date(2026, 2, 4, 12, 0, 0).toISOString()
 				}
 			]),
 		invite: vi.fn(),
