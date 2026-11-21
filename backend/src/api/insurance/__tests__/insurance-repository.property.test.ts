@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import fc from 'fast-check';
@@ -453,5 +453,67 @@ describe('writes are scoped to the policy owner', () => {
     const termId = created.terms[0].id;
     await expect(repo.deleteTerm(created.id, termId, OTHER_USER_ID)).rejects.toThrow(NotFoundError);
     expect((await repo.findById(created.id))?.terms.map((t) => t.id)).toEqual([termId]);
+  });
+});
+
+describe('policy lists load terms and coverage in batches', () => {
+  async function createPolicies(count: number): Promise<string[]> {
+    const ids: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const created = await repo.create(
+        {
+          company: `Insurer ${i}`,
+          terms: [
+            {
+              startDate: new Date('2024-01-01T00:00:00Z'),
+              endDate: new Date('2024-12-31T00:00:00Z'),
+              vehicleCoverage: { vehicleIds: [VEHICLE_IDS[i % VEHICLE_IDS.length] as string] },
+            },
+            {
+              startDate: new Date('2025-01-01T00:00:00Z'),
+              endDate: new Date('2025-12-31T00:00:00Z'),
+              vehicleCoverage: { vehicleIds: ['v-1', 'v-2'] },
+            },
+          ],
+        },
+        USER_ID
+      );
+      ids.push(created.id);
+    }
+    return ids;
+  }
+
+  test('findByUserId runs the same number of queries for 1 or 6 policies, with the same data as findById', async () => {
+    await createPolicies(1);
+    const prepare = spyOn(sqliteDb, 'prepare');
+    await repo.findByUserId(USER_ID);
+    const queriesForOne = prepare.mock.calls.length;
+
+    const ids = await createPolicies(5);
+    prepare.mockClear();
+    const policies = await repo.findByUserId(USER_ID);
+    expect(prepare.mock.calls.length).toBe(queriesForOne);
+    prepare.mockRestore();
+
+    expect(policies).toHaveLength(6);
+    for (const id of ids) {
+      const listed = policies.find((p) => p.id === id);
+      const single = await repo.findById(id);
+      expect(listed?.terms.map((t) => t.id)).toEqual(single?.terms.map((t) => t.id) ?? []);
+      expect(listed?.terms.map((t) => t.endDate)).toEqual([
+        new Date('2025-12-31T00:00:00Z'),
+        new Date('2024-12-31T00:00:00Z'),
+      ]);
+      expect(new Set(listed?.vehicleIds)).toEqual(new Set(single?.vehicleIds));
+      expect(listed?.termVehicleCoverage).toHaveLength(3);
+    }
+  });
+
+  test('findByVehicleId groups each policy’s own terms', async () => {
+    await createPolicies(3);
+    const policies = await repo.findByVehicleId('v-3');
+    expect(policies).toHaveLength(1);
+    expect(policies[0]?.terms).toHaveLength(2);
+    expect(policies[0]?.terms.every((t) => t.policyId === policies[0]?.id)).toBe(true);
   });
 });
