@@ -38,7 +38,7 @@
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { expenseApi } from '#lib/services/expense-api.ts';
 	import { analyticsApi } from '#lib/services/analytics-api.ts';
-	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import { ApiError, handleErrorWithNotification } from '#lib/utils/error-handling.ts';
 	import type {
 		Vehicle,
 		Expense,
@@ -56,6 +56,7 @@
 	let vehicleId = $derived(data.vehicleId);
 
 	let isLoading = $state(true);
+	let vehicleLoadError = $state<string | null>(null);
 	let isLoadingStats = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 	let activeTab = $state('overview');
@@ -151,13 +152,16 @@
 		}
 	});
 
-	onMount(async () => {
+	async function loadPage() {
+		isLoading = true;
 		await Promise.all([loadVehicle(), loadSummary(), loadFuelEfficiency(), loadVehicleStats()]);
 		if (vehicle && isOwner) {
 			await loadPhotos();
 		}
 		isLoading = false;
-	});
+	}
+
+	onMount(loadPage);
 
 	let previousStatsPeriod = $state<TimePeriod | null>(null);
 	$effect(() => {
@@ -197,11 +201,16 @@
 	});
 
 	async function loadVehicle() {
+		vehicleLoadError = null;
 		try {
 			vehicle = await vehicleApi.getVehicle(vehicleId);
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load vehicle');
-			goto(resolve(routes.dashboard));
+			if (error instanceof ApiError && (error.statusCode === 404 || error.statusCode === 400)) {
+				goto(resolve(routes.dashboard));
+				return;
+			}
+			vehicleLoadError = error instanceof Error ? error.message : 'Failed to load vehicle';
 		}
 	}
 
@@ -393,6 +402,15 @@
 				{/each}
 			</div>
 		</div>
+	</div>
+{:else if vehicleLoadError}
+	<div class="rounded-lg border bg-card p-6">
+		<div class="mb-4 flex items-center gap-3 text-destructive">
+			<CircleAlert class="h-5 w-5" />
+			<p class="font-medium">Failed to load vehicle</p>
+		</div>
+		<p class="mb-4 text-sm text-muted-foreground">{vehicleLoadError}</p>
+		<Button size="lg" onclick={loadPage}>Retry</Button>
 	</div>
 {:else if vehicle}
 	<div class="space-y-6 pb-24">
