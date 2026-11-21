@@ -50,6 +50,14 @@ describe('toOfflineExpense', () => {
 		expect(offlineExpenseToBackend(stored).location).toBe('Shell on Main St');
 	});
 
+	test('carries the financing link through the queue to the synced request', () => {
+		const queued = toOfflineExpense({ ...BASE, sourceType: 'financing', sourceId: 'loan-1' });
+		const stored: OfflineExpense = { ...queued, id: 'o1', timestamp: 0, synced: false };
+		const sent = offlineExpenseToBackend(stored);
+		expect(sent.sourceType).toBe('financing');
+		expect(sent.sourceId).toBe('loan-1');
+	});
+
 	test('omits unentered optional fields and defaults description to empty', () => {
 		expect(toOfflineExpense(BASE)).toEqual({ ...BASE, description: '' });
 	});

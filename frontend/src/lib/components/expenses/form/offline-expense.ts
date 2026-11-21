@@ -18,6 +18,8 @@ export interface ParsedExpenseForm {
 	description?: string | undefined;
 	location?: string | undefined;
 	missedFillup?: boolean | undefined;
+	sourceType?: string | undefined;
+	sourceId?: string | undefined;
 }
 
 export function toOfflineExpense(expense: ParsedExpenseForm): QueuedExpenseInput {
@@ -33,6 +35,8 @@ export function toOfflineExpense(expense: ParsedExpenseForm): QueuedExpenseInput
 		...(expense.charge !== undefined && { charge: expense.charge }),
 		...(expense.fuelType !== undefined && { fuelType: expense.fuelType }),
 		...(expense.location !== undefined && { location: expense.location }),
-		...(expense.missedFillup !== undefined && { missedFillup: expense.missedFillup })
+		...(expense.missedFillup !== undefined && { missedFillup: expense.missedFillup }),
+		...(expense.sourceType !== undefined && { sourceType: expense.sourceType }),
+		...(expense.sourceId !== undefined && { sourceId: expense.sourceId })
 	};
 }

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { onlineStatus, syncState } from '../../../stores/offline.svelte';
 import { type OfflineExpense, saveOfflineExpenses } from '../../offline-storage';
 import { syncConfig, syncManager } from '../sync-manager';
+import type { BackendExpenseResponse } from '#lib/types/index.ts';
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -15,7 +16,7 @@ function apiOk(data: unknown): Response {
 	});
 }
 
-function serverRow(date: string, amount: number) {
+function serverRow(date: string, amount: number): BackendExpenseResponse {
 	return {
 		id: 'server-1',
 		vehicleId: 'v1',
@@ -32,7 +33,7 @@ function serverRow(date: string, amount: number) {
 const getQueries: URLSearchParams[] = [];
 const posts: string[] = [];
 
-function serveFiltered(rows: ReturnType<typeof serverRow>[]): void {
+function serveFiltered(rows: BackendExpenseResponse[]): void {
 	mockFetch.mockImplementation((url: string, init?: { method?: string }) => {
 		const method = init?.method ?? 'GET';
 		if (method !== 'GET') {
@@ -116,14 +117,25 @@ describe('offline sync duplicate check — day window', () => {
 		expect(query?.has('amount')).toBe(false);
 	});
 
-	it('still catches a genuine same-day duplicate, so the check is narrowed and not disabled', async () => {
+	it('still catches a changed server copy of the same record, so the check is narrowed and not disabled', async () => {
+		saveOfflineExpenses([localFillUp()]);
+		serveFiltered([{ ...serverRow('2024-06-02', 999), clientId: 'cid-local-1' }]);
+
+		const result = await syncManager.syncAll();
+
+		expect(result.conflicts).toHaveLength(1);
+		expect(result.conflicts[0]?.serverExpense.amount).toBe(999);
+		expect(posts).toHaveLength(0);
+	});
+
+	it('syncs a different same-day expense with the same tag instead of flagging it', async () => {
 		saveOfflineExpenses([localFillUp()]);
 		serveFiltered([serverRow('2024-06-02', 50)]);
 
 		const result = await syncManager.syncAll();
 
-		expect(result.conflicts).toHaveLength(1);
-		expect(result.conflicts[0]?.conflictType).toBe('duplicate');
-		expect(posts).toHaveLength(0);
+		expect(result.conflicts).toHaveLength(0);
+		expect(result.synced).toBe(1);
+		expect(posts).toHaveLength(1);
 	});
 });

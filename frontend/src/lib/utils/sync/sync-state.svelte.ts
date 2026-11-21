@@ -3,7 +3,8 @@ import type { OfflineExpense } from '../offline-storage';
 export interface SyncConflict {
 	id: string;
 	localExpense: OfflineExpense;
-	serverExpense?: {
+	serverExpense: {
+		id: string;
 		date: string;
 		amount: number;
 		tags: string[];
@@ -12,8 +13,6 @@ export interface SyncConflict {
 		volume?: number;
 		charge?: number;
 	};
-	conflictType: 'duplicate' | 'modified' | 'deleted';
-	resolution?: 'keep_local' | 'keep_server' | 'merge';
 }
 
 export interface SyncConfig {

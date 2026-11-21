@@ -120,7 +120,9 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			});
 			gotoDynamic(returnTo);
 		} else {
-			const queued = addOfflineExpense(toOfflineExpense(expenseData));
+			const queued = await addOfflineExpense(toOfflineExpense(expenseData), [
+				...state.pendingFiles
+			]);
 
 			if (!queued) {
 				reportUnqueuedSave(state);
@@ -140,7 +142,9 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 		const failureKind = classifySyncFailure(error);
 
 		if (canQueueFailedSave({ isEditMode: state.isEditMode, isSplitCreate, failureKind })) {
-			const queued = addOfflineExpense(toOfflineExpense(expenseData));
+			const queued = await addOfflineExpense(toOfflineExpense(expenseData), [
+				...state.pendingFiles
+			]);
 
 			if (!queued) {
 				reportUnqueuedSave(state);

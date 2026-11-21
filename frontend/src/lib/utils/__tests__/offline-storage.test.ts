@@ -162,10 +162,10 @@ describe('Offline Storage', () => {
 			expect(saveOfflineExpenses([row])).toBe(true);
 		});
 
-		it('addOfflineExpense propagates the failure to its caller (the save-offline toast depends on it)', () => {
+		it('addOfflineExpense propagates the failure to its caller (the save-offline toast depends on it)', async () => {
 			blockNextWrite(new DOMException('site data is blocked', 'SecurityError'));
 
-			const queued = addOfflineExpense({
+			const queued = await addOfflineExpense({
 				vehicleId: 'vehicle-1',
 				tags: ['fuel'],
 				category: 'fuel',
@@ -176,8 +176,8 @@ describe('Offline Storage', () => {
 			expect(queued).toBe(false);
 		});
 
-		it('addOfflineExpense returns true on a successful queue', () => {
-			const queued = addOfflineExpense({
+		it('addOfflineExpense returns true on a successful queue', async () => {
+			const queued = await addOfflineExpense({
 				vehicleId: 'vehicle-1',
 				tags: ['fuel'],
 				category: 'fuel',
@@ -186,6 +186,21 @@ describe('Offline Storage', () => {
 			});
 
 			expect(queued).toBe(true);
+		});
+
+		it('addOfflineExpense refuses to queue when its photos cannot be stored, instead of dropping them', async () => {
+			vi.stubGlobal('indexedDB', undefined);
+			try {
+				const queued = await addOfflineExpense(
+					{ vehicleId: 'vehicle-1', tags: [], category: 'misc', amount: 9, date: '2024-01-01' },
+					[new File(['jpeg'], 'receipt.jpg', { type: 'image/jpeg' })]
+				);
+
+				expect(queued).toBe(false);
+				expect(localStorageMock.setItem).not.toHaveBeenCalled();
+			} finally {
+				vi.unstubAllGlobals();
+			}
 		});
 
 		it('the in-memory queue is NOT mirrored when the write failed (no phantom pending row)', () => {
@@ -211,7 +226,7 @@ describe('Offline Storage', () => {
 	});
 
 	describe('addOfflineExpense', () => {
-		it('should add new expense with generated ID and timestamp', () => {
+		it('should add new expense with generated ID and timestamp', async () => {
 			const expenseData = {
 				vehicleId: 'vehicle-1',
 				type: 'fuel',
@@ -221,7 +236,7 @@ describe('Offline Storage', () => {
 				date: '2024-01-01'
 			};
 
-			addOfflineExpense(expenseData);
+			await addOfflineExpense(expenseData);
 
 			expect(localStorageMock.setItem).toHaveBeenCalled();
 			const savedData = JSON.parse(localStorageMock.setItem.mock.calls[0][1]);
@@ -235,8 +250,8 @@ describe('Offline Storage', () => {
 			expect(savedData[0].timestamp).toBeTypeOf('number');
 		});
 
-		it('persists fuelType into the outbox so an electric charge survives sync', () => {
-			addOfflineExpense({
+		it('persists fuelType into the outbox so an electric charge survives sync', async () => {
+			await addOfflineExpense({
 				vehicleId: 'vehicle-1',
 				tags: ['fuel'],
 				category: 'fuel',
@@ -251,7 +266,7 @@ describe('Offline Storage', () => {
 			expect(savedData[0].charge).toBe(42);
 		});
 
-		it('should append to existing expenses', () => {
+		it('should append to existing expenses', async () => {
 			const existingExpenses: OfflineExpense[] = [
 				{
 					id: 'existing-1',
@@ -277,7 +292,7 @@ describe('Offline Storage', () => {
 				date: '2024-01-02'
 			};
 
-			addOfflineExpense(newExpenseData);
+			await addOfflineExpense(newExpenseData);
 
 			const savedData = JSON.parse(localStorageMock.setItem.mock.calls[0][1]);
 			expect(savedData).toHaveLength(2);
