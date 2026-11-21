@@ -110,14 +110,6 @@ class RestoreService {
   ): Promise<RestoreResponse> {
     const parsedBackup = await this.parseOrReject(file);
 
-    const userIdValidation = backupService.validateUserId(parsedBackup.metadata.userId, userId);
-    if (!userIdValidation.valid) {
-      throw new SyncError(
-        SyncErrorCode.VALIDATION_ERROR,
-        userIdValidation.errors[0] || 'User ID mismatch'
-      );
-    }
-
     const validation = backupService.validateBackupData(parsedBackup);
     if (!validation.valid) {
       throw new SyncError(
@@ -239,10 +231,6 @@ class RestoreService {
       trips: coerceRows(sheet.trips, TABLE_SCHEMA_MAP.trips),
       vehicleShares: coerceRows(sheet.vehicleShares, TABLE_SCHEMA_MAP.vehicleShares),
     };
-
-    if (sheetData.metadata.userId !== userId) {
-      throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Spreadsheet belongs to different user');
-    }
 
     const validation = backupService.validateBackupData(sheetData);
     if (!validation.valid) {
@@ -424,6 +412,18 @@ class RestoreService {
     return (rows ?? []).map((row) => ({ ...row, userId }));
   }
 
+  private reassignBackupOwnerAuthorship<T extends Record<string, unknown>>(
+    rows: T[],
+    backupOwnerId: string,
+    userId: string
+  ): T[] {
+    return rows.map((row) =>
+      row.createdBy != null && String(row.createdBy) === backupOwnerId
+        ? { ...row, createdBy: userId }
+        : row
+    );
+  }
+
   private dropUnknownAuthors<T extends Record<string, unknown>>(
     rows: T[],
     knownUserIds: Set<string>
@@ -485,7 +485,14 @@ class RestoreService {
     this.insertRows(
       tx,
       expenses,
-      this.dropUnknownAuthors(this.stampUserId(data.expenses, userId), knownUserIds)
+      this.dropUnknownAuthors(
+        this.reassignBackupOwnerAuthorship(
+          this.stampUserId(data.expenses, userId),
+          String(data.metadata.userId),
+          userId
+        ),
+        knownUserIds
+      )
     );
     this.insertRows(tx, odometerEntries, this.stampUserId(data.odometer, userId));
     this.insertRows(tx, trips, this.stampUserId(data.trips, userId));

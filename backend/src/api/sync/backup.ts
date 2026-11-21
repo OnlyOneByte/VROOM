@@ -930,12 +930,6 @@ export class BackupService {
         }
       : { valid: true, errors: [] };
   }
-
-  validateUserId(backupUserId: string, requestUserId: string): ValidationResult {
-    return backupUserId !== requestUserId
-      ? { valid: false, errors: ['Backup belongs to different user'] }
-      : { valid: true, errors: [] };
-  }
 }
 
 export const backupService = new BackupService();
