@@ -474,7 +474,8 @@ describe('Sync Manager', () => {
 				expect(result.failed).toBe(0);
 				expect(vi.mocked(markExpenseNeedsAttention)).toHaveBeenCalledWith(
 					'malformed-1',
-					expect.stringContaining('volume/charge and mileage')
+					expect.stringContaining('volume/charge and mileage'),
+					undefined
 				);
 				const RETRY_DELAYS = new Set([100, 200, 400, 800]);
 				const retryScheduled = setTimeoutSpy.mock.calls.some(

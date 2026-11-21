@@ -114,6 +114,7 @@ function serverCopyDiffers(local: OfflineExpense, server: BackendExpenseResponse
 	return !(
 		Math.abs(sent.expenseAmount - server.expenseAmount) < AMOUNT_EPSILON &&
 		toEpochSeconds(sent.date) === toEpochSeconds(server.date) &&
+		sent.vehicleId === server.vehicleId &&
 		sent.category === server.category &&
 		sameTags &&
 		(sent.description || '') === (server.description || '') &&
@@ -123,6 +124,30 @@ function serverCopyDiffers(local: OfflineExpense, server: BackendExpenseResponse
 	);
 }
 
+type SingleSyncResult = {
+	success: boolean;
+	conflict?: SyncConflict;
+	error?: string;
+	failureKind?: SyncFailureKind;
+	serverId?: string;
+};
+
+function conflictWith(local: OfflineExpense, server: BackendExpenseResponse): SyncConflict {
+	return { id: local.id, localExpense: local, serverExpense: fromBackendExpense(server) };
+}
+
+function wasEditedOnServer(row: BackendExpenseResponse): boolean {
+	return !!row.createdAt && !!row.updatedAt && row.createdAt !== row.updatedAt;
+}
+
+async function uploadPhotosInOrder(clientId: string, serverId: string): Promise<void> {
+	const photos = await loadPendingPhotos(clientId);
+	for (const [index, photo] of photos.entries()) {
+		await expenseApi.uploadPhoto('expense', serverId, photo);
+		await savePendingPhotos(clientId, photos.slice(index + 1));
+	}
+}
+
 function retryableExpenses(): OfflineExpense[] {
 	const conflicted = new Set(syncConflicts.current.map(conflict => conflict.localExpense.id));
 	return getPendingExpenses().filter(expense => !conflicted.has(expense.id));
@@ -130,6 +155,7 @@ function retryableExpenses(): OfflineExpense[] {
 
 class SyncManager {
 	private retryCount = new Map<string, number>();
+	private photoUploads = new Map<string, Promise<void>>();
 	private syncInProgress = false;
 	private autoSyncSetup = false;
 	private autoSyncTimer: ReturnType<typeof setTimeout> | null = null;
@@ -219,7 +245,7 @@ class SyncManager {
 						result.conflicts.push(syncResult.conflict);
 					} else if (syncResult.failureKind === 'terminal') {
 						const reason = syncResult.error || 'Entry needs attention';
-						markExpenseNeedsAttention(expense.id, reason);
+						markExpenseNeedsAttention(expense.id, reason, syncResult.serverId);
 						this.retryCount.delete(expense.id);
 						result.needsAttention++;
 						result.errors.push(reason);
@@ -252,36 +278,55 @@ class SyncManager {
 		return result;
 	}
 
-	private async syncSingleExpense(expense: OfflineExpense): Promise<{
-		success: boolean;
-		conflict?: SyncConflict;
-		error?: string;
-		failureKind?: SyncFailureKind;
-	}> {
+	private async syncSingleExpense(expense: OfflineExpense): Promise<SingleSyncResult> {
 		try {
-			const serverCopy = await this.findServerCopy(expense);
+			let serverId = expense.serverId;
+			if (!serverId) {
+				const serverCopy = await this.findServerCopy(expense);
 
-			if (serverCopy && serverCopyDiffers(expense, serverCopy)) {
-				const conflict: SyncConflict = {
-					id: expense.id,
-					localExpense: expense,
-					serverExpense: fromBackendExpense(serverCopy)
-				};
-				return { success: false, conflict };
+				if (serverCopy && serverCopyDiffers(expense, serverCopy)) {
+					return { success: false, conflict: conflictWith(expense, serverCopy) };
+				}
+
+				if (!serverCopy && isIncompleteFuelExpense(expense)) {
+					return { success: false, failureKind: 'terminal', error: INCOMPLETE_FUEL_REASON };
+				}
+
+				if (serverCopy) {
+					serverId = serverCopy.id;
+				} else {
+					const saved = await this.postExpense(expense, false);
+					if (wasEditedOnServer(saved) && serverCopyDiffers(expense, saved)) {
+						return { success: false, conflict: conflictWith(expense, saved) };
+					}
+					serverId = saved.id;
+				}
 			}
 
-			if (!serverCopy && isIncompleteFuelExpense(expense)) {
-				return { success: false, failureKind: 'terminal', error: INCOMPLETE_FUEL_REASON };
-			}
-
-			const serverId = serverCopy?.id ?? (await this.postExpense(expense, false)).id;
-			await this.uploadQueuedPhotos(expense, serverId);
-			return { success: true };
+			return await this.deliverQueuedPhotos(expense, serverId);
 		} catch (error) {
 			return {
 				success: false,
 				failureKind: classifySyncFailure(error),
 				error: extractErrorMessage(error, 'Unknown error')
+			};
+		}
+	}
+
+	private async deliverQueuedPhotos(
+		expense: OfflineExpense,
+		serverId: string
+	): Promise<SingleSyncResult> {
+		try {
+			await this.uploadQueuedPhotos(expense, serverId);
+			return { success: true };
+		} catch (error) {
+			if (classifySyncFailure(error) !== 'terminal') throw error;
+			return {
+				success: false,
+				failureKind: 'terminal',
+				error: `A photo couldn't be uploaded: ${extractErrorMessage(error, 'Unknown error')}`,
+				serverId
 			};
 		}
 	}
@@ -307,19 +352,22 @@ class SyncManager {
 
 	private postExpense(expense: OfflineExpense, forceOverwrite: boolean) {
 		return apiClient.post<BackendExpenseResponse>('/api/v1/expenses', {
-			...offlineExpenseToBackend(expense),
+			...offlineExpenseToBackend(expense, { clearEmptyFields: forceOverwrite }),
 			clientId: expense.clientId,
 			...(forceOverwrite && { forceOverwrite })
 		});
 	}
 
-	private async uploadQueuedPhotos(expense: OfflineExpense, serverId: string): Promise<void> {
-		if (!expense.clientId) return;
-		const photos = await loadPendingPhotos(expense.clientId);
-		for (const [index, photo] of photos.entries()) {
-			await expenseApi.uploadPhoto('expense', serverId, photo);
-			await savePendingPhotos(expense.clientId, photos.slice(index + 1));
-		}
+	private uploadQueuedPhotos(expense: OfflineExpense, serverId: string): Promise<void> {
+		const clientId = expense.clientId;
+		if (!clientId) return Promise.resolve();
+		const inFlight = this.photoUploads.get(clientId);
+		if (inFlight) return inFlight;
+		const upload = uploadPhotosInOrder(clientId, serverId).finally(() =>
+			this.photoUploads.delete(clientId)
+		);
+		this.photoUploads.set(clientId, upload);
+		return upload;
 	}
 
 	private async retrySingleExpense(expense: OfflineExpense): Promise<void> {
@@ -349,7 +397,11 @@ class SyncManager {
 					syncState.current = 'error';
 				}
 			} else if (result.failureKind === 'terminal') {
-				markExpenseNeedsAttention(expense.id, result.error || 'Entry needs attention');
+				markExpenseNeedsAttention(
+					expense.id,
+					result.error || 'Entry needs attention',
+					result.serverId
+				);
 				this.retryCount.delete(expense.id);
 			}
 		} catch (error) {
