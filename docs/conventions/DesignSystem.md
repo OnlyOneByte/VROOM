@@ -96,7 +96,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 ### App-level — `#lib/components/common/*` (direct `.svelte` imports)
 | Need | Import | Props |
 |---|---|---|
-| Page title + actions | `common/page-header.svelte` | `title`, `description?`, `actions?` (Snippet) |
+| Page title + actions | `common/page-header.svelte` | `title`, `description?` (string or Snippet), `back?` (Snippet: a back button, rendered before the title), `actions?` (Snippet). The page's only `<h1>`; detail and form pages pass `back` instead of hand-rolling a title row |
 | Empty state | `common/empty-state.svelte` | `icon?`, `title`, `description`, `action?` (all Snippets) |
 | Destructive confirm | `common/ConfirmDialog.svelte` | `bind:open`, `title`, `description`, `onConfirm` (may be async), `destructive?` — native `confirm()`/`alert()` are banned (`no-native-dialogs.test.ts`) |
 | Pagination | `common/pagination-controls.svelte` | `currentOffset`, `pageSize`, `totalCount`, `isLoading?`, `onPageChange` |
