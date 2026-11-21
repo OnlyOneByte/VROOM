@@ -42,6 +42,7 @@
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { Pencil, Check, X } from '@lucide/svelte';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import ComingSoonCard from '#lib/components/common/coming-soon-card.svelte';
 	import GoogleLogo from '#lib/components/icons/GoogleLogo.svelte';
 	import GitHubLogo from '#lib/components/icons/GitHubLogo.svelte';
@@ -68,6 +69,8 @@
 	let isLoadingAccounts = $state(true);
 	let unlinkingId = $state<string | null>(null);
 	let unlinkError = $state<string | null>(null);
+	let unlinkConfirmOpen = $state(false);
+	let pendingUnlink = $state<LinkedAuthProvider | null>(null);
 	let linkingProvider = $state<string | null>(null);
 
 	let isEditingName = $state(false);
@@ -146,6 +149,11 @@
 			isLoadingAccounts = false;
 		}
 	});
+
+	function confirmUnlink(account: LinkedAuthProvider) {
+		pendingUnlink = account;
+		unlinkConfirmOpen = true;
+	}
 
 	async function handleUnlink(id: string) {
 		unlinkingId = id;
@@ -356,7 +364,7 @@
 									class="sm:h-8 sm:w-9"
 									aria-label="Unlink {account.displayName}"
 									disabled={accounts.length <= 1 || unlinkingId !== null}
-									onclick={() => handleUnlink(account.id)}
+									onclick={() => confirmUnlink(account)}
 								>
 									{#if unlinkingId === account.id}
 										<LoaderCircle class="h-4 w-4 animate-spin" />
@@ -479,3 +487,13 @@
 		/>
 	</div>
 </FormLayout>
+
+<ConfirmDialog
+	bind:open={unlinkConfirmOpen}
+	title="Unlink sign-in method?"
+	description={pendingUnlink
+		? `You will no longer be able to sign in with ${pendingUnlink.displayName} (${pendingUnlink.email}). Your vehicles and expenses stay. You can link it again later.`
+		: ''}
+	confirmLabel="Unlink"
+	onConfirm={() => (pendingUnlink ? handleUnlink(pendingUnlink.id) : undefined)}
+/>

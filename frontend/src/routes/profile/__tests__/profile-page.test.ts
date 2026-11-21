@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { LinkedAuthProvider, User } from '#lib/types/index.ts';
 
 const { page, showError, showSuccess, authApi } = vi.hoisted(() => ({
@@ -251,6 +251,9 @@ describe('Profile connected accounts', () => {
 		]);
 		await mount();
 		await fireEvent.click(screen.getByRole('button', { name: 'Unlink GitHub' }));
+		await fireEvent.click(
+			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Unlink' })
+		);
 		await settle();
 		expect(authApi.unlinkAccount).toHaveBeenCalledWith('a2');
 		expect(screen.queryByText('ada@gh.test')).toBeNull();
@@ -272,6 +275,9 @@ describe('Profile connected accounts', () => {
 		authApi.unlinkAccount.mockRejectedValue(failure);
 		await mount();
 		await fireEvent.click(screen.getByRole('button', { name: 'Unlink GitHub' }));
+		await fireEvent.click(
+			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Unlink' })
+		);
 		await settle();
 		expect(screen.getByText(message)).toBeInTheDocument();
 		expect(screen.getByText('ada@gh.test')).toBeInTheDocument();

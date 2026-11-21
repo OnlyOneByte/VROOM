@@ -6,6 +6,7 @@
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import {
 		Card,
 		CardContent,
@@ -37,6 +38,7 @@
 			dialogNote:
 				'The API key is stored encrypted and never shown again. Your receipt image is sent only to this provider when you scan.',
 			namePlaceholder: 'My receipt parser',
+			feature: 'Receipt scanning',
 			loadError: 'Failed to load receipt-parsing providers',
 			types: VLM_PROVIDER_TYPES
 		},
@@ -50,6 +52,7 @@
 			dialogNote:
 				'The API key is stored encrypted and never shown again. Your questions are sent only to this provider when you chat.',
 			namePlaceholder: 'My assistant',
+			feature: 'The assistant',
 			loadError: 'Failed to load assistant providers',
 			types: LLM_PROVIDER_TYPES
 		}
@@ -71,6 +74,12 @@
 	let formModel = $state('');
 	let formBaseUrl = $state('');
 	let isSaving = $state(false);
+	let deleteConfirmOpen = $state(false);
+	let deletingProvider = $state<UserProviderInfo | null>(null);
+	let deletingProviderLosesKey = $derived(
+		deletingProvider !== null &&
+			!providerTypes.find(t => t.id === deletingProvider?.providerType)?.keyless
+	);
 
 	let fallbackType = $derived(providerTypes[0] as ModelProviderTypeOption);
 	let selectedTypeOption = $derived<ModelProviderTypeOption>(
@@ -162,14 +171,22 @@
 		}
 	}
 
-	async function handleDelete(p: UserProviderInfo) {
+	function confirmDelete(p: UserProviderInfo) {
+		deletingProvider = p;
+		deleteConfirmOpen = true;
+	}
+
+	async function handleDelete() {
+		const p = deletingProvider;
+		if (!p) return;
 		try {
 			await providerApi.deleteProvider(p.id);
 			appStore.showSuccess(`${p.displayName} removed`);
-			await loadData();
-		} catch {
+		} catch (error) {
 			appStore.showError('Failed to delete provider');
+			throw error;
 		}
+		await loadData();
 	}
 
 	function labelFor(typeId: string): string {
@@ -246,7 +263,7 @@
 										variant="ghost"
 										size="icon"
 										aria-label="Delete {provider.displayName}"
-										onclick={() => handleDelete(provider)}
+										onclick={() => confirmDelete(provider)}
 									>
 										<Trash2 class="h-4 w-4 text-destructive" />
 									</Button>
@@ -345,3 +362,12 @@
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
+
+<ConfirmDialog
+	bind:open={deleteConfirmOpen}
+	title="Delete {copy.noun}?"
+	description={deletingProvider
+		? `"${deletingProvider.displayName}"${deletingProviderLosesKey ? ' and its saved API key' : ''} will be permanently deleted. ${copy.feature} stops using it. This cannot be undone.`
+		: ''}
+	onConfirm={handleDelete}
+/>
