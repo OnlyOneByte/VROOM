@@ -123,10 +123,10 @@
 
 				{#if photos.length > 1}
 					<Carousel.Previous
-						class="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm"
+						class="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-background/80 backdrop-blur-sm"
 					/>
 					<Carousel.Next
-						class="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm"
+						class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-background/80 backdrop-blur-sm"
 					/>
 				{/if}
 			</Carousel.Root>
