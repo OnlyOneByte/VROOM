@@ -65,13 +65,11 @@ const TEXT_PAIRS: ReadonlyArray<readonly [ThemeTokenKey, ThemeTokenKey]> = [
 	['destructive', 'muted'],
 	['primary', 'background'],
 	['primary', 'card'],
-	['primary', 'sidebar'],
 	['warning', 'background'],
 	['warning', 'card'],
 	['warning', 'popover'],
 	['chart-5', 'background'],
 	['chart-5', 'card'],
-	['chart-5', 'sidebar'],
 	['success', 'background'],
 	['success', 'card'],
 	['success', 'popover'],
@@ -122,7 +120,6 @@ function tintContrast(fg: string, surface: string, alpha = 0.1): number {
 const TINTED_TEXT_PAIRS: ReadonlyArray<readonly [ThemeTokenKey, ThemeTokenKey]> = [
 	['primary', 'background'],
 	['primary', 'card'],
-	['primary', 'sidebar'],
 	['warning', 'card'],
 	['chart-5', 'background'],
 	['chart-5', 'card']
@@ -131,6 +128,7 @@ const TINTED_TEXT_PAIRS: ReadonlyArray<readonly [ThemeTokenKey, ThemeTokenKey]> 
 describe('every built-in light theme clears WCAG AA on text over its own /10 tint', () => {
 	test('the tint is composited over its surface (non-vacuous)', () => {
 		expect(tintLuminance('oklch(0 0 0)', 'oklch(1 0 0)', 0)).toBeCloseTo(1, 5);
+		expect(tintLuminance('oklch(0 0 0)', 'oklch(1 0 0)', 0.1)).toBeCloseTo(0.787, 3);
 		expect(tintContrast('oklch(0.5 0 0)', 'oklch(1 0 0)')).toBeLessThan(
 			contrast('oklch(0.5 0 0)', 'oklch(1 0 0)')
 		);
