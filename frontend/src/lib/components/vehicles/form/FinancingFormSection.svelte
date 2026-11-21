@@ -118,6 +118,7 @@
 							placeholder="e.g., Chase Bank, Toyota Financial"
 							bind:value={financingForm.provider}
 							aria-invalid={!!errors['provider']}
+							aria-describedby={errors['provider'] ? 'provider-error' : undefined}
 							required
 						/>
 						{#if errors['provider']}
@@ -139,6 +140,7 @@
 							placeholder="0.00"
 							bind:value={financingForm.originalAmount}
 							aria-invalid={!!errors['originalAmount']}
+							aria-describedby={errors['originalAmount'] ? 'originalAmount-error' : undefined}
 							required
 						/>
 						{#if errors['originalAmount']}
@@ -158,6 +160,7 @@
 								placeholder="e.g., 4.5"
 								bind:value={financingForm.apr}
 								aria-invalid={!!errors['apr']}
+								aria-describedby={errors['apr'] ? 'apr-error' : undefined}
 								required
 							/>
 							{#if errors['apr']}
@@ -175,7 +178,12 @@
 								if (v) financingForm.termMonths = Number(v);
 							}}
 						>
-							<Select.Trigger id="termMonths" class="w-full">
+							<Select.Trigger
+								id="termMonths"
+								class="w-full"
+								aria-invalid={!!errors['termMonths']}
+								aria-describedby={errors['termMonths'] ? 'termMonths-error' : undefined}
+							>
 								{financingForm.termMonths} months ({Math.floor(financingForm.termMonths / 12)} years)
 							</Select.Trigger>
 							<Select.Content>
@@ -197,6 +205,8 @@
 							id="startDate"
 							bind:value={financingForm.startDate}
 							placeholder="Select start date"
+							aria-invalid={!!errors['startDate']}
+							aria-describedby={errors['startDate'] ? 'startDate-error' : undefined}
 						/>
 						{#if errors['startDate']}
 							<FormFieldError id="startDate-error">{errors['startDate']}</FormFieldError>

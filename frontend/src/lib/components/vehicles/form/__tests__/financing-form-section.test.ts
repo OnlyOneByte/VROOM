@@ -206,6 +206,27 @@ describe('FinancingFormSection validation errors', () => {
 		expect(screen.getByLabelText(/Leasing Company/).getAttribute('aria-invalid')).toBe('true');
 	});
 
+	test('each invalid field is described by its own error', () => {
+		mount({
+			errors: {
+				provider: 'Provider is required',
+				originalAmount: 'Amount must be positive',
+				apr: 'APR is required',
+				termMonths: 'Pick a term',
+				startDate: 'Start date is required'
+			}
+		});
+		expect(screen.getByLabelText(/Lender/)).toHaveAccessibleDescription('Provider is required');
+		expect(screen.getByLabelText(/^Loan Amount/)).toHaveAccessibleDescription(
+			'Amount must be positive'
+		);
+		expect(screen.getByLabelText(/APR/)).toHaveAccessibleDescription('APR is required');
+		expect(document.getElementById('termMonths')).toHaveAccessibleDescription('Pick a term');
+		const startDate = document.querySelector('[aria-describedby="startDate-error"]');
+		expect(startDate).toHaveAccessibleDescription('Start date is required');
+		expect(startDate?.getAttribute('aria-invalid')).toBe('true');
+	});
+
 	test('shows the APR error for a loan', () => {
 		mount({ errors: { apr: 'APR must be between 0 and 50' } });
 		expect(screen.getByText('APR must be between 0 and 50')).toBeTruthy();
