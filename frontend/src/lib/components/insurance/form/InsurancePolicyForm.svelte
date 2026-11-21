@@ -4,6 +4,7 @@
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
+	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { routes } from '#lib/routes.ts';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
@@ -56,6 +57,8 @@
 
 	let isLoading = $state(true);
 	let isSubmitting = $state(false);
+
+	onMount(() => trackPendingSave(() => isSubmitting));
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
 	let vehicles = $state<Vehicle[]>([]);
