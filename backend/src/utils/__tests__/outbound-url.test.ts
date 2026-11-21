@@ -3,14 +3,20 @@ import { ValidationError } from '../../errors';
 import {
   assertSafeOutboundUrl,
   classifyAddress,
+  fetchOutbound,
   outboundResolver,
   resolveSafeOutboundTarget,
+  urlForAddress,
 } from '../outbound-url';
 
 const stubLookup = outboundResolver.lookup;
+const stubConnectUrl = outboundResolver.connectUrl;
+const realFetch = globalThis.fetch;
 
 afterEach(() => {
   outboundResolver.lookup = stubLookup;
+  outboundResolver.connectUrl = stubConnectUrl;
+  globalThis.fetch = realFetch;
 });
 
 describe('classifyAddress', () => {
@@ -140,5 +146,77 @@ describe('resolveSafeOutboundTarget', () => {
     );
     expect(target.url.hostname).toBe('files.example.com');
     expect(target.address).toBe('93.184.215.14');
+  });
+});
+
+describe('urlForAddress', () => {
+  test('puts an IPv4 address in place of the host and keeps the rest', () => {
+    expect(
+      urlForAddress(new URL('https://s3.example.com:9000/b/k?x=1'), '93.184.215.14').href
+    ).toBe('https://93.184.215.14:9000/b/k?x=1');
+  });
+
+  test('brackets an IPv6 address', () => {
+    expect(urlForAddress(new URL('https://s3.example.com:9000/b/k'), '2606:4700::1111').href).toBe(
+      'https://[2606:4700::1111]:9000/b/k'
+    );
+  });
+});
+
+describe('fetchOutbound', () => {
+  interface CapturedCall {
+    url: string;
+    init: RequestInit & { tls?: { serverName?: string }; headers?: Record<string, string> };
+  }
+
+  function captureFetch(): CapturedCall[] {
+    const calls: CapturedCall[] = [];
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(input), init: (init ?? {}) as CapturedCall['init'] });
+      return new Response('{}');
+    }) as typeof fetch;
+    return calls;
+  }
+
+  test('an https request connects to the validated address and verifies the original hostname', async () => {
+    outboundResolver.lookup = async () => ['93.184.215.14'];
+    outboundResolver.connectUrl = urlForAddress;
+    const calls = captureFetch();
+    await fetchOutbound(
+      'https://models.example.com/v1/chat',
+      { method: 'POST', headers: { a: 'b' } },
+      'LLM'
+    );
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe('https://93.184.215.14/v1/chat');
+    expect(calls[0]?.init.tls?.serverName).toBe('models.example.com');
+    expect(calls[0]?.init.headers).toEqual({ a: 'b', host: 'models.example.com' });
+    expect(calls[0]?.init.redirect).toBe('manual');
+  });
+
+  test('an IPv6 validated address is bracketed and the host header keeps the port', async () => {
+    outboundResolver.lookup = async () => ['2606:4700::1111'];
+    outboundResolver.connectUrl = urlForAddress;
+    const calls = captureFetch();
+    await fetchOutbound('https://s3.example.com:9000/photos', { method: 'GET' }, 'S3 endpoint');
+    expect(calls[0]?.url).toBe('https://[2606:4700::1111]:9000/photos');
+    expect(calls[0]?.init.tls?.serverName).toBe('s3.example.com');
+    expect(calls[0]?.init.headers?.host).toBe('s3.example.com:9000');
+  });
+
+  test('an IP-literal URL is fetched as is, without a TLS name override', async () => {
+    const calls = captureFetch();
+    await fetchOutbound('https://93.184.215.14/v1', { method: 'GET' }, 'LLM');
+    expect(calls[0]?.url).toBe('https://93.184.215.14/v1');
+    expect(calls[0]?.init.tls).toBeUndefined();
+  });
+
+  test('an IPv6 metadata address is refused before any request', async () => {
+    outboundResolver.lookup = async () => ['fd00:ec2::254'];
+    const calls = captureFetch();
+    await expect(fetchOutbound('https://s3.example.com/', { method: 'GET' }, 'S3')).rejects.toThrow(
+      ValidationError
+    );
+    expect(calls).toHaveLength(0);
   });
 });
