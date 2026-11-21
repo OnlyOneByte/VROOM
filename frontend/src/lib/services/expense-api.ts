@@ -10,7 +10,7 @@ import type {
 	SplitExpenseGroup
 } from '#lib/types/index.ts';
 import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
-import { fromBackendExpense, toBackendExpense } from './api-transformer';
+import { fromBackendExpense, toBackendExpense, type ExpenseInput } from './api-transformer';
 import { apiClient } from './api-client';
 import { buildQueryString } from './api-utils';
 import { entityPhotos } from './photo-api';
@@ -165,7 +165,7 @@ export const expenseApi = {
 
 	async updateExpense(
 		expenseId: string,
-		expense: Partial<Expense> & { vehicleId: string; category: ExpenseCategory; amount: number }
+		expense: ExpenseInput & { vehicleId: string; category: ExpenseCategory; amount: number }
 	): Promise<Expense> {
 		const backendExpense = toBackendExpense(expense, { isEdit: true });
 		const data = await apiClient.put<BackendExpenseResponse>(

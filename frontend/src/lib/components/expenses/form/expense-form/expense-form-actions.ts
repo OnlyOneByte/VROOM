@@ -91,7 +91,11 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			});
 			gotoDynamic(returnTo);
 		} else if (state.isEditMode) {
-			await expenseApi.updateExpense(expenseId!, expenseData);
+			await expenseApi.updateExpense(expenseId!, {
+				...expenseData,
+				sourceType: state.clearsFinancingLink ? null : undefined,
+				sourceId: state.clearsFinancingLink ? null : undefined
+			});
 
 			appStore.addNotification({
 				type: 'success',
