@@ -118,6 +118,18 @@ describe('validateFinancingFields', () => {
 		).toBeUndefined();
 	});
 
+	test('a loan with no APR is flagged as missing, and 0% is accepted', () => {
+		expect(
+			validateFinancingFields(
+				financing({ financingType: 'loan', apr: null as unknown as number }),
+				'finance'
+			).apr
+		).toBe('APR is required');
+		expect(
+			validateFinancingFields(financing({ financingType: 'loan', apr: 0 }), 'finance').apr
+		).toBeUndefined();
+	});
+
 	test('term boundary 1..600 inclusive is valid', () => {
 		expect(
 			validateFinancingFields(financing({ termMonths: 1 }), 'finance').termMonths
