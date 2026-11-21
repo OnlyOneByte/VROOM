@@ -1,11 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { allowPrivateProviderEndpoints } from '../../../../../test-helpers/outbound';
 import { encrypt } from '../../../../../utils/encryption';
 import { resolveModelSettings } from '../../model/model-registry';
 import { parseExtraction, receiptExtractionSchema } from '../prompt';
 import { getVlmProvider } from '../registry';
-
-allowPrivateProviderEndpoints();
 
 describe('parseExtraction — clean inputs map to a trusted draft', () => {
   test('a well-formed JSON object maps every field', () => {

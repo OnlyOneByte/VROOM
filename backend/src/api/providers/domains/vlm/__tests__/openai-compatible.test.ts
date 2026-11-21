@@ -1,10 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { allowPrivateProviderEndpoints } from '../../../../../test-helpers/outbound';
 import { OpenAiCompatibleVlmProvider } from '../openai-compatible';
 import { RECEIPT_EXTRACTION_PROMPT } from '../prompt';
 import type { ReceiptImage } from '../vlm-provider';
-
-allowPrivateProviderEndpoints();
 
 const realFetch = globalThis.fetch;
 

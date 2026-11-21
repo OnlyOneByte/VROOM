@@ -62,7 +62,7 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((val) => val === '1' || val === 'true'),
-  ALLOW_PRIVATE_PROVIDER_ENDPOINTS: z
+  BLOCK_PRIVATE_PROVIDER_ENDPOINTS: z
     .string()
     .optional()
     .transform((val) => val === '1' || val === 'true'),
@@ -114,7 +114,7 @@ export const CONFIG = {
   version: packageJson.version,
   allowFakeStorageProvider:
     env.ALLOW_FAKE_STORAGE && (env.NODE_ENV as Environment) !== 'production',
-  allowPrivateProviderEndpoints: env.ALLOW_PRIVATE_PROVIDER_ENDPOINTS,
+  blockPrivateProviderEndpoints: env.BLOCK_PRIVATE_PROVIDER_ENDPOINTS,
   disableRateLimit: env.DISABLE_RATE_LIMIT && (env.NODE_ENV as Environment) !== 'production',
   server: { port: env.PORT, host: env.HOST },
   database: {

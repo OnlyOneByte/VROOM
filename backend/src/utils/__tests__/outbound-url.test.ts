@@ -72,16 +72,28 @@ describe('assertSafeOutboundUrl', () => {
     'https://169.254.169.254',
     'https://metadata.google.internal',
     'not a url',
-  ])('rejects %s by default', (raw) => {
+  ])('rejects %s when private hosts are blocked', (raw) => {
     expect(() => assertSafeOutboundUrl(raw, 'S3 endpoint', false)).toThrow(ValidationError);
   });
 
-  test('the operator opt-in allows http and private hosts', () => {
+  test('by default, http and LAN or loopback hosts are allowed', () => {
+    expect(() => assertSafeOutboundUrl('http://localhost:11434/v1', 'LLM')).not.toThrow();
+    expect(() => assertSafeOutboundUrl('http://192.168.1.20:9000', 'S3')).not.toThrow();
+  });
+
+  test('by default, metadata and link-local hosts are rejected', () => {
+    expect(() => assertSafeOutboundUrl('http://169.254.169.254', 'S3')).toThrow(ValidationError);
+    expect(() => assertSafeOutboundUrl('http://metadata.google.internal', 'S3')).toThrow(
+      ValidationError
+    );
+  });
+
+  test('allowing private hosts permits http and LAN hosts', () => {
     expect(() => assertSafeOutboundUrl('http://localhost:11434/v1', 'LLM', true)).not.toThrow();
     expect(() => assertSafeOutboundUrl('http://192.168.1.20:9000', 'S3', true)).not.toThrow();
   });
 
-  test('the operator opt-in still rejects metadata and link-local hosts', () => {
+  test('allowing private hosts still rejects metadata and link-local hosts', () => {
     expect(() => assertSafeOutboundUrl('http://169.254.169.254', 'S3', true)).toThrow(
       ValidationError
     );

@@ -6,6 +6,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { blockPrivateProviderEndpoints } from '../../../test-helpers/outbound';
 import { encrypt } from '../../../utils/encryption';
 import { outboundResolver } from '../../../utils/outbound-url';
 import { postModelJson } from '../domains/model/model-transport';
@@ -59,33 +60,47 @@ function insertStoredS3Provider(endpoint: string): string {
   return id;
 }
 
-describe('provider create and update reject disallowed endpoints', () => {
+describe('provider endpoints by default', () => {
   test.each([
     'http://169.254.169.254',
-    'https://127.0.0.1:9000',
-    'https://10.0.0.5',
-    'http://s3.example.com',
-    'https://localhost:9000',
+    'http://[fe80::1]',
+    'http://[fd00:ec2::254]',
+    'http://metadata.google.internal',
   ])('storage endpoint %s is rejected', async (endpoint) => {
     const res = await ctx.authed('POST', '/api/v1/providers', s3Body(endpoint));
     expect(res.status).toBe(400);
     expect(ctx.sqlite.query('SELECT COUNT(*) AS n FROM user_providers').get()).toEqual({ n: 0 });
   });
 
-  test.each(['http://169.254.169.254/v1', 'https://192.168.0.10/v1', 'https://[::1]/v1'])(
-    'model base URL %s is rejected',
-    async (baseUrl) => {
-      const res = await ctx.authed('POST', '/api/v1/providers', modelBody(baseUrl));
-      expect(res.status).toBe(400);
-    }
-  );
+  test('a model base URL on a link-local address is rejected', async () => {
+    const res = await ctx.authed(
+      'POST',
+      '/api/v1/providers',
+      modelBody('http://169.254.169.254/v1')
+    );
+    expect(res.status).toBe(400);
+  });
 
-  test('a public https endpoint is still accepted', async () => {
-    const res = await ctx.authed('POST', '/api/v1/providers', s3Body('https://s3.example.com'));
+  test.each([
+    'http://localhost:9000',
+    'http://192.168.1.20:9000',
+    'https://10.0.0.5',
+    'https://s3.example.com',
+  ])('storage endpoint %s is accepted', async (endpoint) => {
+    const res = await ctx.authed('POST', '/api/v1/providers', s3Body(endpoint));
     expect(res.status).toBe(201);
   });
 
-  test('an update cannot move an endpoint to a disallowed host', async () => {
+  test('a self-hosted model base URL is accepted', async () => {
+    const res = await ctx.authed(
+      'POST',
+      '/api/v1/providers',
+      modelBody('http://localhost:11434/v1')
+    );
+    expect(res.status).toBe(201);
+  });
+
+  test('an update cannot move an endpoint to a link-local host', async () => {
     const created = await ctx.authed('POST', '/api/v1/providers', s3Body('https://s3.example.com'));
     const { id } = (await json<DataEnvelope<{ id: string }>>(created)).data;
     const res = await ctx.authed('PUT', `/api/v1/providers/${id}`, {
@@ -95,15 +110,53 @@ describe('provider create and update reject disallowed endpoints', () => {
   });
 });
 
+describe('provider endpoints with private endpoints blocked', () => {
+  blockPrivateProviderEndpoints();
+
+  test.each([
+    'https://127.0.0.1:9000',
+    'https://10.0.0.5',
+    'http://s3.example.com',
+    'https://localhost:9000',
+  ])('storage endpoint %s is rejected', async (endpoint) => {
+    const res = await ctx.authed('POST', '/api/v1/providers', s3Body(endpoint));
+    expect(res.status).toBe(400);
+  });
+
+  test.each(['https://192.168.0.10/v1', 'https://[::1]/v1', 'http://localhost:11434/v1'])(
+    'model base URL %s is rejected',
+    async (baseUrl) => {
+      const res = await ctx.authed('POST', '/api/v1/providers', modelBody(baseUrl));
+      expect(res.status).toBe(400);
+    }
+  );
+
+  test('a public https endpoint is accepted', async () => {
+    const res = await ctx.authed('POST', '/api/v1/providers', s3Body('https://s3.example.com'));
+    expect(res.status).toBe(201);
+  });
+
+  test('an S3 provider whose host resolves to a private address never sends', async () => {
+    outboundResolver.lookup = async () => ['10.0.0.9'];
+    const provider = new S3CompatProvider(
+      { accessKeyId: 'a', secretAccessKey: 'b' },
+      { endpoint: 'https://files.example.com', bucket: 'photos', region: 'us-east-1' }
+    );
+    await expect(
+      provider.download({ providerType: 's3', externalId: 'k', storageRef: 'k' } as never)
+    ).rejects.toThrow(ValidationError);
+  });
+});
+
 describe('stored provider rows are checked when used', () => {
-  test('a stored row with a disallowed endpoint is refused by the health check', async () => {
+  test('a stored row with a link-local endpoint is refused by the health check', async () => {
     const id = insertStoredS3Provider('http://169.254.169.254');
     const res = await ctx.authed('POST', `/api/v1/providers/${id}/test`);
     expect(res.status).toBe(400);
   });
 
-  test('an S3 provider whose host resolves to a private address never sends', async () => {
-    outboundResolver.lookup = async () => ['10.0.0.9'];
+  test('an S3 provider whose host resolves to a link-local address never sends', async () => {
+    outboundResolver.lookup = async () => ['169.254.169.254'];
     const provider = new S3CompatProvider(
       { accessKeyId: 'a', secretAccessKey: 'b' },
       { endpoint: 'https://files.example.com', bucket: 'photos', region: 'us-east-1' }

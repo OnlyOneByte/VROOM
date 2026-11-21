@@ -133,7 +133,7 @@ export const outboundResolver = {
 export function assertSafeOutboundUrl(
   raw: string,
   label: string,
-  allowPrivate: boolean = CONFIG.allowPrivateProviderEndpoints
+  allowPrivate: boolean = !CONFIG.blockPrivateProviderEndpoints
 ): URL {
   let url: URL;
   try {
@@ -155,7 +155,7 @@ export function assertSafeOutboundUrl(
 export async function assertSafeOutboundTarget(
   raw: string,
   label: string,
-  allowPrivate: boolean = CONFIG.allowPrivateProviderEndpoints
+  allowPrivate: boolean = !CONFIG.blockPrivateProviderEndpoints
 ): Promise<URL> {
   const url = assertSafeOutboundUrl(raw, label, allowPrivate);
   if (classifyHostname(url.hostname)) return url;
