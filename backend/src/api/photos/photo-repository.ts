@@ -46,7 +46,7 @@ export class PhotoRepository {
   async findByEntityPaginated(
     entityType: string,
     entityId: string,
-    userId: string,
+    userIds: string[],
     limit: number,
     offset: number
   ): Promise<PaginatedResult<Photo>> {
@@ -54,7 +54,7 @@ export class PhotoRepository {
     const whereClause = and(
       eq(photos.entityType, entityType),
       eq(photos.entityId, entityId),
-      eq(photos.userId, userId)
+      inArray(photos.userId, userIds)
     );
 
     const [countResult, data] = await Promise.all([
