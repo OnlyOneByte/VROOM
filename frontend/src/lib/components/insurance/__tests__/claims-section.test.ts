@@ -68,7 +68,7 @@ async function pickOption(triggerId: string, optionName: string): Promise<void> 
 }
 
 function claimDateTrigger(): HTMLElement {
-	const field = document.querySelector('label[for="claim-date"]')?.parentElement;
+	const field = document.querySelector('label[for="claim-date-p1"]')?.parentElement;
 	return field?.querySelector('button') as HTMLElement;
 }
 
@@ -230,12 +230,24 @@ describe('ClaimsSection filing a claim', () => {
 		expect(createClaim).not.toHaveBeenCalled();
 	});
 
+	test('claim forms on two policies keep their field ids apart', async () => {
+		render(ClaimsSection, { props: { policyId: 'p1' } });
+		render(ClaimsSection, { props: { policyId: 'p2' } });
+		await settle();
+		for (const button of screen.getAllByRole('button', { name: /file claim/i })) {
+			await fireEvent.click(button);
+		}
+		expect(document.querySelectorAll('[id="claim-date-p1"]')).toHaveLength(1);
+		expect(document.querySelectorAll('[id="claim-date-p2"]')).toHaveLength(1);
+		expect(document.querySelectorAll('[id="claim-date-p1-value"]')).toHaveLength(1);
+	});
+
 	test('hides the vehicle picker when no vehicles are provided', async () => {
 		mount();
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));
-		expect(document.getElementById('claim-vehicle')).toBeNull();
-		expect(document.getElementById('claim-fault')).toHaveTextContent('Not specified');
+		expect(document.getElementById('claim-vehicle-p1')).toBeNull();
+		expect(document.getElementById('claim-fault-p1')).toHaveTextContent('Not specified');
 	});
 
 	test('files a fully populated claim, refetches and closes the form', async () => {
@@ -244,18 +256,18 @@ describe('ClaimsSection filing a claim', () => {
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));
 		await pickClaimDate('2026-03-15');
-		await pickOption('claim-type', 'Theft');
-		await pickOption('claim-status', 'Settled');
-		await pickOption('claim-fault', 'Shared fault');
-		await pickOption('claim-vehicle', '2019 Honda Civic');
-		expect(document.getElementById('claim-type')).toHaveTextContent('Theft');
-		expect(document.getElementById('claim-status')).toHaveTextContent('Settled');
-		expect(document.getElementById('claim-fault')).toHaveTextContent('Shared fault');
-		expect(document.getElementById('claim-vehicle')).toHaveTextContent('2019 Honda Civic');
-		await fireEvent.input(document.getElementById('claim-payout') as HTMLInputElement, {
+		await pickOption('claim-type-p1', 'Theft');
+		await pickOption('claim-status-p1', 'Settled');
+		await pickOption('claim-fault-p1', 'Shared fault');
+		await pickOption('claim-vehicle-p1', '2019 Honda Civic');
+		expect(document.getElementById('claim-type-p1')).toHaveTextContent('Theft');
+		expect(document.getElementById('claim-status-p1')).toHaveTextContent('Settled');
+		expect(document.getElementById('claim-fault-p1')).toHaveTextContent('Shared fault');
+		expect(document.getElementById('claim-vehicle-p1')).toHaveTextContent('2019 Honda Civic');
+		await fireEvent.input(document.getElementById('claim-payout-p1') as HTMLInputElement, {
 			target: { value: '500.25' }
 		});
-		await fireEvent.input(document.getElementById('claim-desc') as HTMLTextAreaElement, {
+		await fireEvent.input(document.getElementById('claim-desc-p1') as HTMLTextAreaElement, {
 			target: { value: '  Stolen overnight  ' }
 		});
 		const submitButton = screen.getAllByRole('button', { name: /file claim/i }).at(-1);
@@ -281,7 +293,7 @@ describe('ClaimsSection filing a claim', () => {
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));
 		await pickClaimDate('2026-03-10');
-		await fireEvent.input(document.getElementById('claim-desc') as HTMLTextAreaElement, {
+		await fireEvent.input(document.getElementById('claim-desc-p1') as HTMLTextAreaElement, {
 			target: { value: '   ' }
 		});
 		await fireEvent.submit(document.querySelector('form') as HTMLFormElement);
@@ -371,17 +383,17 @@ describe('ClaimsSection editing a claim', () => {
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: 'Edit claim' }));
 		expect(screen.getByText('Edit claim')).toBeInTheDocument();
-		expect(document.getElementById('claim-type')).toHaveTextContent('Vandalism');
-		expect(document.getElementById('claim-status')).toHaveTextContent('In progress');
-		expect(document.getElementById('claim-fault')).toHaveTextContent('At fault');
-		expect(document.getElementById('claim-vehicle')).toHaveTextContent('Daily');
-		expect(document.getElementById('claim-payout')).toHaveValue(300);
-		expect(document.getElementById('claim-desc')).toHaveValue('Keyed door');
+		expect(document.getElementById('claim-type-p1')).toHaveTextContent('Vandalism');
+		expect(document.getElementById('claim-status-p1')).toHaveTextContent('In progress');
+		expect(document.getElementById('claim-fault-p1')).toHaveTextContent('At fault');
+		expect(document.getElementById('claim-vehicle-p1')).toHaveTextContent('Daily');
+		expect(document.getElementById('claim-payout-p1')).toHaveValue(300);
+		expect(document.getElementById('claim-desc-p1')).toHaveValue('Keyed door');
 		expect(claimDateTrigger()).toHaveTextContent('March 15, 2026');
-		await fireEvent.input(document.getElementById('claim-payout') as HTMLInputElement, {
+		await fireEvent.input(document.getElementById('claim-payout-p1') as HTMLInputElement, {
 			target: { value: '' }
 		});
-		await fireEvent.input(document.getElementById('claim-desc') as HTMLTextAreaElement, {
+		await fireEvent.input(document.getElementById('claim-desc-p1') as HTMLTextAreaElement, {
 			target: { value: '' }
 		});
 		expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('type', 'submit');
@@ -405,7 +417,7 @@ describe('ClaimsSection editing a claim', () => {
 		mount({ vehicles: VEHICLES });
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: 'Edit claim' }));
-		expect(document.getElementById('claim-vehicle')).toHaveTextContent('Not specified');
+		expect(document.getElementById('claim-vehicle-p1')).toHaveTextContent('Not specified');
 		await fireEvent.submit(document.querySelector('form') as HTMLFormElement);
 		await settle();
 		expect(updateClaim).toHaveBeenCalledWith(
@@ -441,8 +453,8 @@ describe('ClaimsSection editing a claim', () => {
 		await fireEvent.click(screen.getAllByRole('button', { name: 'Cancel' })[0]!);
 		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));
 		expect(screen.getByText('File a claim')).toBeInTheDocument();
-		expect(document.getElementById('claim-type')).toHaveTextContent('Collision');
-		expect(document.getElementById('claim-desc')).toHaveValue('');
+		expect(document.getElementById('claim-type-p1')).toHaveTextContent('Collision');
+		expect(document.getElementById('claim-desc-p1')).toHaveValue('');
 	});
 });
 

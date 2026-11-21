@@ -333,17 +333,22 @@
 
 				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 					<div class="space-y-1">
-						<Label for="claim-date">Date *</Label>
-						<DatePicker id="claim-date" bind:value={claimDate} placeholder="Claim date" />
+						<Label for={`claim-date-${policyId}`}>Date *</Label>
+						<DatePicker
+							id={`claim-date-${policyId}`}
+							bind:value={claimDate}
+							placeholder="Claim date"
+						/>
 					</div>
 					<div class="space-y-1">
-						<Label for="claim-type">Type</Label>
+						<Label for={`claim-type-${policyId}`}>Type</Label>
 						<Select.Root
 							type="single"
 							value={claimType}
 							onValueChange={v => (claimType = v as ClaimType)}
 						>
-							<Select.Trigger id="claim-type" class="w-full">{capitalize(claimType)}</Select.Trigger
+							<Select.Trigger id={`claim-type-${policyId}`} class="w-full"
+								>{capitalize(claimType)}</Select.Trigger
 							>
 							<Select.Content>
 								{#each CLAIM_TYPES as t (t)}
@@ -353,13 +358,13 @@
 						</Select.Root>
 					</div>
 					<div class="space-y-1">
-						<Label for="claim-status">Status</Label>
+						<Label for={`claim-status-${policyId}`}>Status</Label>
 						<Select.Root
 							type="single"
 							value={status}
 							onValueChange={v => (status = v as ClaimStatus)}
 						>
-							<Select.Trigger id="claim-status" class="w-full"
+							<Select.Trigger id={`claim-status-${policyId}`} class="w-full"
 								>{STATUS_LABELS[status]}</Select.Trigger
 							>
 							<Select.Content>
@@ -370,9 +375,9 @@
 						</Select.Root>
 					</div>
 					<div class="space-y-1">
-						<Label for="claim-payout">Payout amount</Label>
+						<Label for={`claim-payout-${policyId}`}>Payout amount</Label>
 						<Input
-							id="claim-payout"
+							id={`claim-payout-${policyId}`}
 							type="number"
 							step="0.01"
 							min="0"
@@ -381,13 +386,13 @@
 						/>
 					</div>
 					<div class="space-y-1 sm:col-span-2">
-						<Label for="claim-fault">Fault</Label>
+						<Label for={`claim-fault-${policyId}`}>Fault</Label>
 						<Select.Root
 							type="single"
 							value={faultDesignation}
 							onValueChange={v => (faultDesignation = (v ?? '') as FaultDesignation | '')}
 						>
-							<Select.Trigger id="claim-fault" class="w-full">
+							<Select.Trigger id={`claim-fault-${policyId}`} class="w-full">
 								{faultDesignation ? FAULT_LABELS[faultDesignation] : 'Not specified'}
 							</Select.Trigger>
 							<Select.Content>
@@ -399,13 +404,13 @@
 					</div>
 					{#if vehicles.length > 0}
 						<div class="space-y-1 sm:col-span-2">
-							<Label for="claim-vehicle">Vehicle (optional)</Label>
+							<Label for={`claim-vehicle-${policyId}`}>Vehicle (optional)</Label>
 							<Select.Root
 								type="single"
 								value={vehicleId}
 								onValueChange={v => (vehicleId = v ?? '')}
 							>
-								<Select.Trigger id="claim-vehicle" class="w-full">
+								<Select.Trigger id={`claim-vehicle-${policyId}`} class="w-full">
 									{vehicleId && vehicleNameMap.has(vehicleId)
 										? vehicleNameMap.get(vehicleId)
 										: 'Not specified'}
@@ -423,9 +428,9 @@
 				</div>
 
 				<div class="space-y-1">
-					<Label for="claim-desc">Description</Label>
+					<Label for={`claim-desc-${policyId}`}>Description</Label>
 					<Textarea
-						id="claim-desc"
+						id={`claim-desc-${policyId}`}
 						bind:value={description}
 						rows={2}
 						placeholder="What happened?"
