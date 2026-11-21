@@ -8,7 +8,9 @@
 		open = $bindable(),
 		domain,
 		onSync,
-		onDownloadBackup
+		onDownloadBackup,
+		onBackupNow,
+		onRestore
 	}: {
 		distanceUnit?: string;
 		volumeUnit?: string;
@@ -19,6 +21,8 @@
 		domain?: string;
 		onSync?: () => void;
 		onDownloadBackup?: () => void;
+		onBackupNow?: () => void;
+		onRestore?: () => void;
 		[key: string]: unknown;
 	} = $props();
 </script>
@@ -43,4 +47,10 @@
 {/if}
 {#if onDownloadBackup}
 	<button onclick={onDownloadBackup}>stub download</button>
+{/if}
+{#if onBackupNow}
+	<button onclick={onBackupNow}>stub backup now</button>
+{/if}
+{#if onRestore}
+	<button onclick={onRestore}>stub restore</button>
 {/if}
