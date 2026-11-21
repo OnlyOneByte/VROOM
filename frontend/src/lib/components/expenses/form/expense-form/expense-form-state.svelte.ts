@@ -206,7 +206,9 @@ export class ExpenseFormState {
 			previousMileage: this.lastFuelExpense?.mileage,
 			fuelType: this.formData.fuelType,
 			volume: this.formData.volume,
-			charge: this.formData.charge
+			charge: this.formData.charge,
+			distanceUnit: this.effectiveDistanceUnit,
+			volumeUnit: this.effectiveVolumeUnit
 		});
 		if (!result) return;
 		this.calculatedMpg = result.calculatedMpg;
