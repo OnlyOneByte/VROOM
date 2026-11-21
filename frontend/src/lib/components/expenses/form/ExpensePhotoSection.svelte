@@ -29,7 +29,7 @@
 			const photosResult = await expenseApi.getPhotos(entityType, entityId);
 			photos = photosResult.data;
 		} catch (err) {
-			handleErrorWithNotification(err, 'Failed to load photos');
+			handleErrorWithNotification(err, "Couldn't load the photos");
 		} finally {
 			isLoading = false;
 		}
@@ -54,7 +54,7 @@
 			await expenseApi.deletePhoto(entityType, entityId, photoId);
 			photos = photos.filter(p => p.id !== photoId);
 		} catch (err) {
-			handleErrorWithNotification(err, 'Failed to delete photo');
+			handleErrorWithNotification(err, "Couldn't delete the photo");
 			throw err;
 		}
 	}

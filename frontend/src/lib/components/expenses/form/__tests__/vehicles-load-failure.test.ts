@@ -28,7 +28,7 @@ describe('a failed vehicle list on the expense form', () => {
 	test('shows one inline error with Retry, one toast, and skips the vehicle loads', async () => {
 		render(ExpenseForm, { props: { preselectedVehicleId: 'v1' } });
 		const card = await screen.findByTestId('vehicles-load-error');
-		expect(card.textContent).toContain('Failed to load vehicles');
+		expect(card.textContent).toContain("Couldn't load your vehicles");
 		expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
 		await new Promise(resolve => setTimeout(resolve, 50));
 		expect(addNotification).toHaveBeenCalledTimes(1);

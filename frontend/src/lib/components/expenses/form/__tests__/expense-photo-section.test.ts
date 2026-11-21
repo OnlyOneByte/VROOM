@@ -112,7 +112,7 @@ describe('ExpensePhotoSection: loading', () => {
 		expect(mocks.addNotification).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'error',
-				message: expect.stringContaining('Failed to load photos')
+				message: expect.stringContaining("Couldn't load the photos")
 			})
 		);
 	});
@@ -167,7 +167,7 @@ describe('ExpensePhotoSection: deleting', () => {
 
 		await waitFor(() =>
 			expect(mocks.addNotification).toHaveBeenCalledWith(
-				expect.objectContaining({ message: expect.stringContaining('Failed to delete photo') })
+				expect.objectContaining({ message: expect.stringContaining("Couldn't delete the photo") })
 			)
 		);
 		expect(screen.getByAltText('p1.jpg')).toBeInTheDocument();

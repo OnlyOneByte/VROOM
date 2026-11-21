@@ -200,7 +200,7 @@
 			if (isCurrentSummary()) {
 				if (summaryResult.status === 'fulfilled') summary = summaryResult.value;
 				else if (!listReported || pageResult.status === 'fulfilled')
-					handleErrorWithNotification(summaryResult.reason, 'Failed to load expense summary');
+					handleErrorWithNotification(summaryResult.reason, "Couldn't load the expense summary");
 			}
 		} finally {
 			if (isCurrentList()) isLoadingPage = false;
@@ -274,7 +274,7 @@
 				tags: selectedTags.length > 0 ? selectedTags : undefined
 			});
 		} catch (err) {
-			handleErrorWithNotification(err, 'Failed to export expenses');
+			handleErrorWithNotification(err, "Couldn't export the expenses");
 		} finally {
 			isExporting = false;
 		}

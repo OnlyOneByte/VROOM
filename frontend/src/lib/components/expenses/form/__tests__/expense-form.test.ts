@@ -462,7 +462,7 @@ describe('ExpenseForm edit mode', () => {
 	});
 
 	test('a failed delete is reported and the user stays on the form', async () => {
-		deleteExpense.mockRejectedValue(new Error('server down'));
+		deleteExpense.mockRejectedValue(new ApiError('Internal server error', 500));
 		await renderEdit();
 
 		await fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
@@ -470,7 +470,9 @@ describe('ExpenseForm edit mode', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /delete expense/i }));
 
 		await vi.waitFor(() =>
-			expect(notificationMessages()).toContain('Failed to delete expense. Please try again.')
+			expect(notificationMessages()).toContain(
+				"Couldn't delete this expense. Something went wrong on our side. Try again in a moment."
+			)
 		);
 		expect(goto).not.toHaveBeenCalled();
 	});
@@ -632,7 +634,7 @@ describe('ExpenseForm loading and load failures', () => {
 
 		const card = await screen.findByTestId('vehicles-load-error');
 		expect(screen.getByRole('heading', { name: 'Edit Expense' })).toBeTruthy();
-		expect(card).toHaveTextContent('Failed to load vehicles');
+		expect(card).toHaveTextContent("Couldn't load your vehicles");
 		expect(card).toHaveTextContent(/offline/i);
 
 		await fireEvent.click(within(card).getByRole('button', { name: 'Retry' }));

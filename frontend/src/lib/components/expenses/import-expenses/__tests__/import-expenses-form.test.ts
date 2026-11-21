@@ -254,7 +254,7 @@ describe('ImportExpensesForm: pasted text and detection failures', () => {
 		expect(mocks.addNotification).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'error',
-				message: expect.stringContaining('Could not read that CSV')
+				message: expect.stringContaining("Couldn't read that CSV")
 			})
 		);
 	});
