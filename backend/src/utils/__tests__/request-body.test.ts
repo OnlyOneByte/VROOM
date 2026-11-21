@@ -6,10 +6,9 @@ import { createTestApp, json, type TestApp } from '../../test-helpers/http-clien
 
 let ctx: TestApp;
 
-// A cold module load can exceed bun's 5s hook budget, which bunfig's test timeout does not raise.
 beforeEach(async () => {
   ctx = await createTestApp();
-}, 20_000);
+});
 afterEach(() => ctx.close());
 
 interface ErrorBody {
