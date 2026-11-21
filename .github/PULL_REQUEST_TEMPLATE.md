@@ -15,7 +15,7 @@ Fixes #
 
 ## Test evidence
 
-<!-- Commands you ran and their result (e.g. `npm run validate` ✓, `bun test` 2492 pass), plus any manual check. -->
+<!-- Commands you ran and their result (e.g. `npm run validate` ✓, `bun test --timeout 30000` 2492 pass), plus any manual check. -->
 
 ## Checklist
 

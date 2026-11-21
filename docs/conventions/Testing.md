@@ -4,7 +4,7 @@
 
 | Layer | Framework | Runner | Location |
 |---|---|---|---|
-| Backend unit/integration | `bun:test` | `bun run test` (`bun test`, then the trips, odometer and expense tests again under `TZ=Pacific/Auckland`) | `backend/src/**/__tests__/` |
+| Backend unit/integration | `bun:test` | `bun run test` (`bun test --timeout 30000`, then the trips, odometer and expense tests again under `TZ=Pacific/Auckland`) | `backend/src/**/__tests__/` |
 | Frontend unit/component | Vitest + `@testing-library/svelte` | `npm run test` (`vitest --run`, then the date-sensitive suites again under `TZ=Pacific/Auckland`) | `frontend/src/**/__tests__/` |
 | Frontend coverage floor | Vitest v8 coverage | `npm run test:coverage` (CI runs it in place of `vitest --run`; fails below `coverage.thresholds` in `vite.config.ts`) | all `frontend/src/**/*.{ts,svelte}` except `ui/` |
 | Frontend e2e | Playwright | `npm run test:e2e` | `frontend/e2e/` (config `frontend/playwright.config.ts`) |
