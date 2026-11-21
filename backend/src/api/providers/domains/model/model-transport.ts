@@ -1,4 +1,5 @@
 import { logger } from '../../../../utils/logger';
+import { assertSafeOutboundTarget } from '../../../../utils/outbound-url';
 
 export type ModelDomainLabel = 'LLM' | 'VLM';
 
@@ -19,6 +20,7 @@ export function trimBaseUrl(url: string): string {
 // Never log the url (Gemini puts the API key in the query string), headers, or request body.
 export async function postModelJson<T>(req: ModelRequest): Promise<T | null> {
   const label = `${req.domain} ${req.providerType}`;
+  await assertSafeOutboundTarget(req.url, `${req.domain} provider URL`);
 
   let res: Response;
   try {
@@ -27,6 +29,7 @@ export async function postModelJson<T>(req: ModelRequest): Promise<T | null> {
       headers: { 'Content-Type': 'application/json', ...req.headers },
       body: JSON.stringify(req.body),
       signal: AbortSignal.timeout(req.timeoutMs),
+      redirect: 'manual',
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'network error';

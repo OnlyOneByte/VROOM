@@ -9,6 +9,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { logger } from '../../../../utils/logger';
+import { assertSafeOutboundTarget } from '../../../../utils/outbound-url';
 import type {
   StorageFileInfo,
   StorageProvider,
@@ -44,9 +45,11 @@ export class S3CompatProvider implements StorageProvider {
   readonly type = 's3';
   private client: S3Client;
   private bucket: string;
+  private endpoint: string;
 
   constructor(credentials: S3Credentials, config: S3Config) {
     this.bucket = config.bucket;
+    this.endpoint = config.endpoint;
     this.client = new S3Client({
       endpoint: config.endpoint,
       region: config.region,
@@ -63,6 +66,7 @@ export class S3CompatProvider implements StorageProvider {
       ? this.buildRawKey(params.rawPath, params.fileName)
       : this.buildKey(params.pathHint, params.entityType, params.entityId, params.fileName);
 
+    await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
@@ -79,6 +83,7 @@ export class S3CompatProvider implements StorageProvider {
   }
 
   async download(ref: StorageRef): Promise<Buffer> {
+    await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
     const response = await this.client.send(
       new GetObjectCommand({
         Bucket: this.bucket,
@@ -94,6 +99,7 @@ export class S3CompatProvider implements StorageProvider {
   }
 
   async delete(ref: StorageRef): Promise<void> {
+    await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
     await this.client.send(
       new DeleteObjectCommand({
         Bucket: this.bucket,
@@ -124,6 +130,7 @@ export class S3CompatProvider implements StorageProvider {
 
   async healthCheck(): Promise<boolean> {
     try {
+      await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
       await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
       return true;
     } catch (error) {
@@ -142,6 +149,7 @@ export class S3CompatProvider implements StorageProvider {
     let continuationToken: string | undefined;
 
     do {
+      await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
       const response = await this.client.send(
         new ListObjectsV2Command({
           Bucket: this.bucket,
