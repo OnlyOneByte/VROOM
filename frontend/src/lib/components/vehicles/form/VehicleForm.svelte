@@ -16,6 +16,7 @@
 		Fuel,
 		Zap,
 		ChevronsUpDown,
+		CircleAlert,
 		Ruler
 	} from '@lucide/svelte';
 	import Button from '#lib/components/ui/button/button.svelte';
@@ -86,6 +87,7 @@
 	let financingBeingEnded = $state<VehicleFinancing | null>(null);
 	let showUnitChangeConfirm = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
+	let loadError = $state<string | null>(null);
 
 	let trackFuel = $state(true);
 	let trackCharging = $state(false);
@@ -207,6 +209,7 @@
 
 	async function loadVehicle() {
 		isLoading = true;
+		loadError = null;
 		try {
 			vehicle = await vehicleApi.getVehicle(vehicleId!);
 
@@ -217,11 +220,12 @@
 
 			populateForm();
 		} catch (error) {
-			appStore.addNotification({
-				type: 'error',
-				message: `Couldn't load the vehicle. ${userFacingErrorMessage(error)}`
-			});
-			goto(resolve(routes.dashboard));
+			if (error instanceof ApiError && error.statusCode === 404) {
+				appStore.addNotification({ type: 'error', message: 'That vehicle no longer exists.' });
+				goto(resolve(routes.dashboard));
+				return;
+			}
+			loadError = userFacingErrorMessage(error);
 		} finally {
 			isLoading = false;
 		}
@@ -605,6 +609,15 @@
 	{#if isLoading}
 		<div class="flex items-center justify-center py-12">
 			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
+		</div>
+	{:else if loadError}
+		<div class="rounded-lg border bg-card p-6">
+			<div class="mb-4 flex items-center gap-3 text-destructive">
+				<CircleAlert class="h-5 w-5" />
+				<p class="font-medium">Couldn't load this vehicle</p>
+			</div>
+			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
+			<Button size="lg" onclick={loadVehicle}>Retry</Button>
 		</div>
 	{:else}
 		<div class="space-y-6">
