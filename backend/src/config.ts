@@ -190,6 +190,7 @@ export const CONFIG = {
       minYear: 1900,
       vinMinLength: 11,
       vinMaxLength: 17,
+      maxOdometerReading: 10_000_000,
     },
     expense: {
       descriptionMaxLength: 500,
@@ -229,6 +230,7 @@ export const CONFIG = {
       maxTags: 10,
       tagMaxLength: 50,
       maxIntervalMileage: 1_000_000,
+      maxIntervalYears: 100,
       notificationsHistoryLimit: 100,
     },
     settings: { maxBackupRetention: 100, maxSyncInactivityMinutes: 30 },

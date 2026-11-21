@@ -11,7 +11,9 @@ import {
 import {
   commonSchemas,
   dateInput,
+  MAX_ODOMETER_READING,
   noonAnchoredDateIsNotInTheFuture,
+  ODOMETER_TOO_HIGH_MESSAGE,
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
@@ -22,7 +24,11 @@ import { odometerRepository } from './repository';
 const routes = new Hono();
 
 export const odometerCreateSchema = z.object({
-  odometer: z.number().int(WHOLE_DISTANCE_MESSAGE).min(0, 'Odometer cannot be negative'),
+  odometer: z
+    .number()
+    .int(WHOLE_DISTANCE_MESSAGE)
+    .min(0, 'Odometer cannot be negative')
+    .max(MAX_ODOMETER_READING, ODOMETER_TOO_HIGH_MESSAGE),
   recordedAt: dateInput.refine(noonAnchoredDateIsNotInTheFuture, {
     message: 'Date cannot be in the future',
   }),

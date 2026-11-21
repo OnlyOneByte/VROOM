@@ -36,6 +36,8 @@ import {
 import {
   commonSchemas,
   dateInput,
+  MAX_ODOMETER_READING,
+  ODOMETER_TOO_HIGH_MESSAGE,
   validateVehicleOwnership,
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
@@ -112,6 +114,7 @@ const baseVehicleSchema = createInsertSchema(vehiclesTable, {
     .number()
     .int(WHOLE_DISTANCE_MESSAGE)
     .min(0, 'Initial mileage cannot be negative')
+    .max(MAX_ODOMETER_READING, ODOMETER_TOO_HIGH_MESSAGE)
     .optional(),
   purchasePrice: moneyDollarsToCents((n) =>
     n.min(0, 'Purchase price cannot be negative')

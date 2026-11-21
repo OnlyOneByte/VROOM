@@ -14,9 +14,9 @@ import { changeTracker, requireAuth } from '../../middleware';
 import { neutralizeCsvRow } from '../../utils/csv-safety';
 import {
   centsToDollars,
+  expenseDollarsToCents,
   expenseSummaryToApi,
   expenseToApi,
-  moneyDollarsToCents,
 } from '../../utils/money';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import {
@@ -29,6 +29,8 @@ import { isValidTimeZone } from '../../utils/time-zone';
 import {
   commonSchemas,
   dateInput,
+  MAX_ODOMETER_READING,
+  ODOMETER_TOO_HIGH_MESSAGE,
   validateFuelExpenseData,
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
@@ -77,13 +79,14 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
     .optional()
     .default([]),
   category: expenseCategorySchema,
-  expenseAmount: moneyDollarsToCents((n) => n.positive('Expense amount must be positive')),
+  expenseAmount: expenseDollarsToCents((n) => n.positive('Expense amount must be positive')),
   volume: z.number().positive('Volume must be positive').nullable().optional(),
   date: dateInput,
   mileage: z
     .number()
     .int(WHOLE_DISTANCE_MESSAGE)
     .min(0, 'Mileage cannot be negative')
+    .max(MAX_ODOMETER_READING, ODOMETER_TOO_HIGH_MESSAGE)
     .nullable()
     .optional(),
   description: z

@@ -1,9 +1,14 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES } from '../../db/types';
-import { moneyDollarsToCents } from '../../utils/money';
+import { expenseDollarsToCents } from '../../utils/money';
 import { isValidTimeZone, zoneOffsetMs } from '../../utils/time-zone';
-import { dateInput, WHOLE_DISTANCE_MESSAGE } from '../../utils/validation';
+import {
+  dateInput,
+  MAX_ODOMETER_READING,
+  ODOMETER_TOO_HIGH_MESSAGE,
+  WHOLE_DISTANCE_MESSAGE,
+} from '../../utils/validation';
 import { buildCalendarDate } from '../expenses/local-date';
 import {
   FUEL_SPLIT_MESSAGE,
@@ -13,6 +18,14 @@ import {
 } from '../expenses/validation';
 
 const PLAIN_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const MAX_INTERVAL_YEARS = CONFIG.validation.reminder.maxIntervalYears;
+const MAX_INTERVAL_BY_UNIT = {
+  day: Math.ceil(MAX_INTERVAL_YEARS * 365.25),
+  week: Math.ceil((MAX_INTERVAL_YEARS * 365.25) / 7),
+  month: MAX_INTERVAL_YEARS * 12,
+  year: MAX_INTERVAL_YEARS,
+} as const;
+const MAX_INTERVAL_MESSAGE = `The interval can be at most ${MAX_INTERVAL_YEARS} years`;
 const REMINDER_DATE_FIELDS = ['startDate', 'endDate'] as const;
 
 function plainDateToInstant(value: string, timeZone: string | undefined): Date | null {
@@ -55,7 +68,12 @@ const reminderBaseSchema = z.object({
   type: reminderTypeSchema,
   actionMode: z.literal('automatic').default('automatic'),
   frequency: frequencySchema,
-  intervalValue: z.number().int().positive().nullish(),
+  intervalValue: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_INTERVAL_BY_UNIT.day, MAX_INTERVAL_MESSAGE)
+    .nullish(),
   intervalUnit: intervalUnitSchema.nullish(),
   // Not defaulted: a default survives .partial() and flips existing mileage reminders to 'time'.
   triggerMode: triggerModeSchema.optional(),
@@ -65,7 +83,12 @@ const reminderBaseSchema = z.object({
     .positive()
     .max(CONFIG.validation.reminder.maxIntervalMileage)
     .nullish(),
-  lastServiceOdometer: z.number().int(WHOLE_DISTANCE_MESSAGE).min(0).nullish(),
+  lastServiceOdometer: z
+    .number()
+    .int(WHOLE_DISTANCE_MESSAGE)
+    .min(0)
+    .max(MAX_ODOMETER_READING, ODOMETER_TOO_HIGH_MESSAGE)
+    .nullish(),
   startDate: reminderDateSchema,
   endDate: reminderDateSchema.nullish(),
   // Zod strips unlisted keys: isActive must stay listed or the pause toggle silently no-ops.
@@ -77,7 +100,7 @@ const reminderBaseSchema = z.object({
     .array(z.string().min(1).max(CONFIG.validation.reminder.tagMaxLength))
     .max(CONFIG.validation.reminder.maxTags)
     .nullish(),
-  expenseAmount: moneyDollarsToCents((n) =>
+  expenseAmount: expenseDollarsToCents((n) =>
     n.positive().max(CONFIG.validation.reminder.maxExpenseAmount)
   ).nullish(),
   expenseDescription: z.string().max(CONFIG.validation.reminder.descriptionMaxLength).nullish(),
@@ -101,6 +124,20 @@ function refineCustomFrequency(data: ReminderRefineInput, ctx: z.RefinementCtx) 
       code: z.ZodIssueCode.custom,
       message: 'intervalUnit required for custom frequency',
       path: ['intervalUnit'],
+    });
+  }
+}
+
+function refineIntervalBound(data: ReminderRefineInput, ctx: z.RefinementCtx) {
+  if (
+    data.intervalValue &&
+    data.intervalUnit &&
+    data.intervalValue > MAX_INTERVAL_BY_UNIT[data.intervalUnit]
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: MAX_INTERVAL_MESSAGE,
+      path: ['intervalValue'],
     });
   }
 }
@@ -205,6 +242,7 @@ export const createReminderSchema = z.preprocess(
   withZonedPlainDates,
   reminderBaseSchema.superRefine((data, ctx) => {
     refineCustomFrequency(data, ctx);
+    refineIntervalBound(data, ctx);
     refineExpenseType(data, ctx);
     refineDateRange(data, ctx);
     refineSplitConfig(data, ctx);
@@ -218,6 +256,7 @@ export const updateReminderSchema = z.preprocess(
   withZonedPlainDates,
   reminderBaseSchema.partial().superRefine((data, ctx) => {
     refineCustomFrequency(data, ctx);
+    refineIntervalBound(data, ctx);
     refineExpenseType(data, ctx);
     refineDateRange(data, ctx);
     refineSplitConfig(data, ctx);
@@ -233,6 +272,8 @@ const reminderMergeGateSchema = reminderBaseSchema
     expenseSplitConfig: splitConfigStructuralSchema.nullish(),
     startDate: z.coerce.date(),
     endDate: z.coerce.date().nullish(),
+    intervalValue: z.number().int().positive().nullish(),
+    lastServiceOdometer: z.number().int().min(0).nullish(),
   })
   .superRefine((data, ctx) => {
     refineCustomFrequency(data, ctx);
@@ -244,12 +285,22 @@ const reminderMergeGateSchema = reminderBaseSchema
 
 const reminderMergeGateWithFuelSplitSchema = reminderMergeGateSchema.superRefine(refineFuelSplit);
 
+const reminderIntervalBoundSchema = z
+  .object({ intervalValue: z.number().nullish(), intervalUnit: intervalUnitSchema.nullish() })
+  .superRefine(refineIntervalBound);
+
 const FUEL_SPLIT_FIELDS = ['expenseCategory', 'expenseSplitConfig', 'vehicleIds'] as const;
+const INTERVAL_FIELDS = ['intervalValue', 'intervalUnit'] as const;
 
 export function assertMergedReminderValid(
   merged: unknown,
-  update: Partial<Record<(typeof FUEL_SPLIT_FIELDS)[number], unknown>> = {}
+  update: Partial<
+    Record<(typeof FUEL_SPLIT_FIELDS)[number] | (typeof INTERVAL_FIELDS)[number], unknown>
+  > = {}
 ): void {
   const touchesFuelSplit = FUEL_SPLIT_FIELDS.some((field) => update[field] !== undefined);
   (touchesFuelSplit ? reminderMergeGateWithFuelSplitSchema : reminderMergeGateSchema).parse(merged);
+  if (INTERVAL_FIELDS.some((field) => update[field] !== undefined)) {
+    reminderIntervalBoundSchema.parse(merged);
+  }
 }
