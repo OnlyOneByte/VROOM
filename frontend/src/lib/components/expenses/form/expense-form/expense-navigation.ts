@@ -20,14 +20,3 @@ export function buildDuplicateQuery(
 	if (form.tags.length > 0) query['tags'] = form.tags.join(',');
 	return query;
 }
-
-export function buildInsuranceEditQuery(
-	policyId: string | null,
-	sourceType: string | null,
-	sourceId: string | null
-): Record<string, string> {
-	const query: Record<string, string> = {};
-	if (policyId) query['policy'] = policyId;
-	if (sourceType === 'insurance_term' && sourceId) query['editTerm'] = sourceId;
-	return query;
-}

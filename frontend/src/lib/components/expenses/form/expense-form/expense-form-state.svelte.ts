@@ -55,7 +55,6 @@ export class ExpenseFormState {
 	splitMileages = $state<Record<string, string>>({});
 
 	isInsuranceManaged = $state(false);
-	insurancePolicyId = $state<string | null>(null);
 
 	sourceType = $state<string | null>(null);
 	sourceId = $state<string | null>(null);
