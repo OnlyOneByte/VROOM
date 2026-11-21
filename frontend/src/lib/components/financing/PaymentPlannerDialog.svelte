@@ -4,7 +4,7 @@
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { calculateMinimumPayment } from '#lib/utils/financing-calculations.ts';
-	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatDate, getCurrencySymbol } from '#lib/utils/formatters.ts';
 	import { debounce } from '#lib/utils/memoize.ts';
 	import {
 		computePlannerState,
@@ -31,6 +31,8 @@
 	}
 
 	let { financing, open = $bindable(false), onPaymentAmountSaved }: Props = $props();
+
+	const currencySymbol = $derived(getCurrencySymbol());
 
 	async function handleSave() {
 		isSaving = true;
@@ -99,18 +101,8 @@
 
 		<div class="space-y-4 py-2">
 			<div class="space-y-2">
-				<Label for="payment-input">Monthly Payment</Label>
-				<div class="relative">
-					<span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-					<Input
-						id="payment-input"
-						type="number"
-						step="0.01"
-						min="0"
-						class="pl-7"
-						bind:value={inputValue}
-					/>
-				</div>
+				<Label for="payment-input">Monthly Payment ({currencySymbol})</Label>
+				<Input id="payment-input" type="number" step="0.01" min="0" bind:value={inputValue} />
 				<p class="text-xs text-muted-foreground">
 					Min: {formatCurrency(minimumPayment ?? 0)} · Current: {formatCurrency(savedAmount)}
 				</p>
