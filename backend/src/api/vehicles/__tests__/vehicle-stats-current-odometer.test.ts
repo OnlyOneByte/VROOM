@@ -41,7 +41,15 @@ async function addOdometerEntry(
 }
 
 interface StatsResponse {
-  data: { period: string; currentMileage: number | null; currentOdometer: number | null };
+  data: {
+    period: string;
+    currentMileage: number | null;
+    currentOdometer: number | null;
+    totalMileage: number;
+    totalFuelCost: number;
+    totalChargeCost: number;
+    costPerMile: number | null;
+  };
 }
 
 async function getStats(vehicleId: string, period: string): Promise<StatsResponse['data']> {
@@ -90,6 +98,36 @@ describe('GET /vehicles/:id/stats — currentOdometer', () => {
     const all = await getStats(id, 'all');
     expect(all.currentMileage).toBeNull();
     expect(all.currentOdometer).toBeNull();
+  });
+});
+
+describe('GET /vehicles/:id/stats — money is in dollars and distance matches the period', () => {
+  test('fuel cost and cost per mile come back in dollars, matching the expense list', async () => {
+    const id = await seedVehicleAtInitialMileage();
+    await addFuelExpense(id, 10100, '2020-01-01T00:00:00.000Z');
+    await addFuelExpense(id, 10200, '2020-02-01T00:00:00.000Z');
+    await addFuelExpense(id, 10300, '2020-03-01T00:00:00.000Z');
+
+    const all = await getStats(id, 'all');
+    expect(all.totalFuelCost).toBe(120);
+    expect(all.totalChargeCost).toBe(0);
+    expect(all.totalMileage).toBe(300);
+    expect(all.costPerMile).toBeCloseTo(0.4, 10);
+  });
+
+  test('a bounded period divides its cost by the distance driven in that period', async () => {
+    const id = await seedVehicleAtInitialMileage();
+    await addFuelExpense(id, 12000, '2020-01-01T00:00:00.000Z');
+    await addFuelExpense(id, 12600, new Date().toISOString());
+
+    const week = await getStats(id, '7d');
+    expect(week.totalFuelCost).toBe(40);
+    expect(week.totalMileage).toBe(600);
+    expect(week.costPerMile).toBeCloseTo(40 / 600, 10);
+
+    const all = await getStats(id, 'all');
+    expect(all.totalFuelCost).toBe(80);
+    expect(all.totalMileage).toBe(2600);
   });
 });
 
