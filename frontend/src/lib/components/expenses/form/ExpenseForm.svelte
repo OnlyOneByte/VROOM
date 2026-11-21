@@ -196,7 +196,9 @@
 			<div class="rounded-lg border bg-card p-6" role="alert" data-testid="expense-load-error">
 				<div class="mb-4 flex items-center gap-3 text-destructive">
 					<CircleAlert class="h-5 w-5" />
-					<p class="font-medium">Couldn't load this expense</p>
+					<p class="font-medium">
+						Couldn't load this {form.groupId ? 'split expense' : 'expense'}
+					</p>
 				</div>
 				<p class="mb-4 text-sm text-muted-foreground">{form.expenseError}</p>
 				<Button size="lg" disabled={isRetrying} onclick={() => retry(reloadExpense)}>Retry</Button>

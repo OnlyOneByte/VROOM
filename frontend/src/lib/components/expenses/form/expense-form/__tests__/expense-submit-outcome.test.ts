@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { ApiError } from '#lib/utils/error-handling.ts';
+import { ApiError, NetworkError } from '#lib/utils/error-handling.ts';
 import {
 	canQueueFailedSave,
 	offlineQueuedMessage,
@@ -8,34 +8,40 @@ import {
 
 describe('submitFailureMessage', () => {
 	test('an expired session asks the user to sign in again', () => {
-		expect(submitFailureMessage('auth', new ApiError('x', 401))).toBe(
-			'Your session has expired. Please sign in again.'
+		expect(
+			submitFailureMessage(new ApiError('Unauthorized', 401, undefined, 'AuthenticationError'))
+		).toBe("Couldn't save this expense. Your session has ended. Sign in again to continue.");
+	});
+
+	test('a dropped connection asks the user to check it', () => {
+		expect(submitFailureMessage(new NetworkError(new TypeError('fetch failed')))).toBe(
+			"Couldn't save this expense. Check your connection and try again."
 		);
 	});
 
-	test('a transient failure reads as a network error', () => {
-		expect(submitFailureMessage('transient', new ApiError('x', 503))).toBe(
-			'Network error. Please try again.'
+	test('a server outage says so instead of blaming the network', () => {
+		expect(submitFailureMessage(new ApiError('x', 503))).toBe(
+			"Couldn't save this expense. Something went wrong on our side. Try again in a moment."
 		);
 	});
 
 	test('a terminal failure says the save failed, then gives the reason as a sentence', () => {
-		expect(
-			submitFailureMessage('terminal', new ApiError('Amount must be greater than 0', 400))
-		).toBe("Couldn't save this expense. Amount must be greater than 0.");
+		expect(submitFailureMessage(new ApiError('Amount must be greater than 0', 400))).toBe(
+			"Couldn't save this expense. Amount must be greater than 0."
+		);
 	});
 
 	test('a schema rejection names the fields instead of the schema wording', () => {
 		const error = new ApiError('Validation failed', 400, {
 			issues: [{ path: ['amount'], message: 'Too small: expected number to be >0' }]
 		});
-		expect(submitFailureMessage('terminal', error)).toBe(
+		expect(submitFailureMessage(error)).toBe(
 			"Couldn't save this expense. Check the amount, then try again."
 		);
 	});
 
 	test('a terminal failure with no usable reason falls back to a generic message', () => {
-		expect(submitFailureMessage('terminal', 'boom')).toBe(
+		expect(submitFailureMessage('boom')).toBe(
 			"Couldn't save this expense. Something went wrong. Try again, and reload the page if it keeps happening."
 		);
 	});

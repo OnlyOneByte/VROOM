@@ -74,7 +74,7 @@
 </script>
 
 <div class="space-y-3">
-	<div class="flex rounded-lg border border-input p-0.5">
+	<div class="flex gap-2 rounded-lg border border-input p-0.5">
 		{#each methods as m (m.value)}
 			<Button
 				type="button"
