@@ -334,6 +334,28 @@ describe('trip edit and delete keep the linked odometer entry in sync', () => {
     expect(odoCount(ctx, vehicleId)).toBe(0);
   });
 
+  test('editing a trip onto the next day in the user’s zone keeps the entry the other trip on its old day still needs', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: '3', year: 2020 });
+    const timeZone = 'America/Los_Angeles';
+    const trip = async (tripDate: string) => {
+      const res = await ctx.authed('POST', '/api/v1/trips', {
+        ...VALID(vehicleId, { startOdometer: 4800, endOdometer: 5000, tripDate }),
+        timeZone,
+      });
+      return (await json<DataEnvelope<{ id: string }>>(res)).data.id;
+    };
+    const evening = await trip('2024-06-21T03:00:00.000Z');
+    await trip('2024-06-20T08:00:00.000Z');
+    expect(odoCount(ctx, vehicleId)).toBe(1);
+
+    const put = await ctx.authed('PUT', `/api/v1/trips/${evening}`, {
+      tripDate: '2024-06-21T08:00:00.000Z',
+      timeZone,
+    });
+    expect(put.status).toBe(200);
+    expect(odoCount(ctx, vehicleId), '20 June keeps its entry and 21 June gets one').toBe(2);
+  });
+
   test('an unknown time zone is rejected', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: '3', year: 2020 });
     const res = await ctx.authed('POST', '/api/v1/trips', {
