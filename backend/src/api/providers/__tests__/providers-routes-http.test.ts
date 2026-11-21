@@ -277,6 +277,50 @@ describe('GET /api/v1/providers/:id/sync-status — owned read + tenant isolatio
     }
   });
 
+  test('counts each category from the user’s photos and this provider’s refs', async () => {
+    const created = await createProvider();
+    ctx.sqlite.run(
+      `INSERT INTO users (id, email, display_name) VALUES ('u-other-778', 'o778@test.com', 'Other')`
+    );
+    const photoRows: Array<[string, string, string]> = [
+      ['p1', ctx.user.id, 'vehicle'],
+      ['p2', ctx.user.id, 'vehicle'],
+      ['p3', ctx.user.id, 'expense'],
+      ['p4', ctx.user.id, 'insurance_policy'],
+      ['p5', 'u-other-778', 'vehicle'],
+    ];
+    for (const [id, userId, entityType] of photoRows) {
+      ctx.sqlite.run(
+        `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
+         VALUES (?, ?, ?, 'e', 'f.jpg', 'image/jpeg', 1)`,
+        [id, userId, entityType]
+      );
+    }
+    const refRows: Array<[string, string]> = [
+      ['p1', 'active'],
+      ['p2', 'failed'],
+      ['p3', 'pending'],
+      ['p4', 'active'],
+    ];
+    for (const [photoId, status] of refRows) {
+      ctx.sqlite.run(
+        `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
+         VALUES (?, ?, ?, '', ?)`,
+        [`ref-${photoId}`, photoId, created.id, status]
+      );
+    }
+
+    const res = await ctx.authed('GET', `/api/v1/providers/${created.id}/sync-status`);
+    expect(res.status).toBe(200);
+    const data = (await json<DataEnvelope<Record<string, Record<string, number>>>>(res)).data;
+    expect(data).toEqual({
+      vehicle_photos: { total: 2, synced: 1, failed: 1 },
+      expense_receipts: { total: 1, synced: 0, failed: 0 },
+      insurance_docs: { total: 1, synced: 1, failed: 0 },
+      odometer_readings: { total: 0, synced: 0, failed: 0 },
+    });
+  });
+
   test("404s another user's provider id (the ownership chokepoint — no sync-status leak)", async () => {
     const created = await createProvider();
     const other = await createTestApp();
