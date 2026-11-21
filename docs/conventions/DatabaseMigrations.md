@@ -71,7 +71,7 @@ constraints/indexes exist, and that data seeded by `seedCoreData` after
 `applyMigrationsUpTo(db, migrations, N - 1)` survives `applyMigration(db, migrations[N])`.
 
 ```bash
-bun test --timeout 30000 src/db/__tests__/         # or the whole suite via `bun run validate`
+bun test --timeout 30000 src/db/__tests__/          # or the whole suite via `bun run validate`
 ```
 
 ## Backup / restore / sync impact

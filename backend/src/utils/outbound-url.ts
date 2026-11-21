@@ -189,13 +189,7 @@ export async function resolveSafeOutboundTarget(
   return { url, addresses };
 }
 
-const CONNECT_FAILURE_CODES = new Set([
-  'ConnectionRefused',
-  'FailedToOpenSocket',
-  'ECONNREFUSED',
-  'EHOSTUNREACH',
-  'ENETUNREACH',
-]);
+const CONNECT_FAILURE_CODES = new Set(['ConnectionRefused', 'FailedToOpenSocket']);
 
 function isConnectFailure(err: unknown): boolean {
   const code = (err as { code?: unknown } | null)?.code;

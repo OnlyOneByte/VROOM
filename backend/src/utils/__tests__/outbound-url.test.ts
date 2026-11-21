@@ -244,9 +244,9 @@ describe('fetchOutbound', () => {
   test('when every address refuses, the last connection error is thrown', async () => {
     outboundResolver.lookup = async () => ['93.184.215.14', '93.184.215.15'];
     outboundResolver.connectUrl = urlForAddress;
-    const urls = failingFetch(['ConnectionRefused', 'EHOSTUNREACH']);
+    const urls = failingFetch(['FailedToOpenSocket', 'ConnectionRefused']);
     await expect(fetchOutbound('https://s3.example.com/', { method: 'GET' }, 'S3')).rejects.toThrow(
-      'EHOSTUNREACH'
+      'ConnectionRefused'
     );
     expect(urls).toHaveLength(2);
   });
