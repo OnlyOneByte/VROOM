@@ -34,11 +34,16 @@
 	}
 </script>
 
-<div class="fixed top-[calc(5rem+env(safe-area-inset-top))] right-4 z-50 lg:top-4">
+<div
+	class="fixed top-[calc(0.75rem+env(safe-area-inset-top))] right-[5.75rem] z-50 lg:top-4 lg:right-4"
+>
 	{#if !onlineStatus.current}
-		<Badge variant="destructive" class="px-3 py-2 shadow-lg text-sm gap-2">
-			<WifiOff size={16} />
-			<span class="font-medium">Offline</span>
+		<Badge
+			variant="destructive"
+			class="px-2 py-2 shadow-lg text-xs gap-1 lg:px-3 lg:text-sm lg:gap-2"
+		>
+			<WifiOff size={16} class="hidden lg:block" />
+			<span class="font-medium" class:max-[359px]:sr-only={pendingCount > 0}>Offline</span>
 			{#if pendingCount > 0}
 				<Badge variant="destructive" class="text-xs px-2 py-1">
 					{pendingCount} pending
@@ -46,50 +51,68 @@
 			{/if}
 		</Badge>
 	{:else if authStore.sessionUnverified}
-		<Badge variant="outline" role="status" class="px-3 py-2 shadow-lg text-sm gap-2 bg-background">
-			<ServerOff size={16} />
-			<span class="font-medium">Can't reach VROOM</span>
+		<Badge
+			variant="outline"
+			role="status"
+			class="py-0 pl-2 pr-0 shadow-lg text-xs gap-1 bg-background lg:px-3 lg:py-2 lg:text-sm lg:gap-2"
+		>
+			<ServerOff size={16} class="hidden lg:block" />
+			<span class="font-medium max-[359px]:sr-only"
+				>Can't reach <span class="sr-only lg:not-sr-only">VROOM</span></span
+			>
 			<Button
-				variant="secondary"
-				size="sm"
+				variant="ghost"
+				size="icon-lg"
 				onclick={recheckSession}
 				disabled={recheckingSession}
-				class="h-10 px-3 text-xs gap-1 lg:h-auto lg:px-2 lg:py-1"
+				class="lg:h-auto lg:w-auto lg:px-2 lg:py-1 lg:text-xs lg:gap-1"
 			>
-				<RefreshCw size={12} class={recheckingSession ? 'animate-spin' : ''} />
-				Retry
+				<RefreshCw size={14} class={recheckingSession ? 'animate-spin' : ''} />
+				<span class="sr-only lg:not-sr-only">Retry</span>
 			</Button>
 		</Badge>
 	{:else if syncState.current === 'syncing'}
 		<Badge
 			variant="secondary"
-			class="px-3 py-2 shadow-lg text-sm gap-2 bg-primary text-primary-foreground border-transparent"
+			class="px-2 py-2 shadow-lg text-xs gap-1 bg-primary text-primary-foreground border-transparent lg:px-3 lg:text-sm lg:gap-2"
 		>
 			<RefreshCw size={16} class="animate-spin" />
 			<span class="font-medium">Syncing...</span>
 		</Badge>
 	{:else if syncState.current === 'success'}
-		<Badge variant="default" class="px-3 py-2 shadow-lg text-sm gap-2 border-transparent">
+		<Badge
+			variant="default"
+			class="px-2 py-2 shadow-lg text-xs gap-1 border-transparent lg:px-3 lg:text-sm lg:gap-2"
+		>
 			<CircleCheck size={16} />
 			<span class="font-medium">Synced</span>
 		</Badge>
 	{:else if syncState.current === 'error'}
-		<Badge variant="destructive" class="px-3 py-2 shadow-lg text-sm gap-2">
-			<CircleAlert size={16} />
-			<span class="font-medium">Sync failed</span>
-			<Button variant="destructive" size="sm" onclick={handleSync} class="h-auto px-2 py-1 text-xs">
-				Retry
+		<Badge
+			variant="destructive"
+			class="py-0 pl-2 pr-0 shadow-lg text-xs gap-1 lg:px-3 lg:py-2 lg:text-sm lg:gap-2"
+		>
+			<CircleAlert size={16} class="hidden lg:block" />
+			<span class="font-medium max-[359px]:sr-only">Sync failed</span>
+			<Button
+				variant="destructive"
+				size="icon-lg"
+				onclick={handleSync}
+				class="lg:h-auto lg:w-auto lg:px-2 lg:py-1 lg:text-xs"
+			>
+				<RefreshCw size={14} class="lg:hidden" />
+				<span class="sr-only lg:not-sr-only">Retry</span>
 			</Button>
 		</Badge>
 	{:else if pendingCount > 0}
-		<Badge variant="outline" class="px-3 py-2 shadow-lg text-sm gap-2">
-			<Wifi size={16} />
-			<span class="font-medium">Online</span>
+		<Badge variant="outline" class="p-0 shadow-lg text-sm gap-2 bg-background lg:px-3 lg:py-2">
+			<Wifi size={16} class="hidden lg:block" />
+			<span class="font-medium hidden lg:inline">Online</span>
 			<Button
 				variant="secondary"
 				size="sm"
 				onclick={handleSync}
-				class="h-auto px-2 py-1 text-xs gap-1"
+				class="h-10 px-3 text-xs gap-1 lg:h-auto lg:px-2 lg:py-1"
 			>
 				<RefreshCw size={12} />
 				Sync {pendingCount}
