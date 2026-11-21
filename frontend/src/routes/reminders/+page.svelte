@@ -25,6 +25,7 @@
 		frequencyLabel as reminderFrequencyLabel
 	} from '#lib/utils/reminder-helpers.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import * as CardNs from '#lib/components/ui/card/index.ts';
@@ -91,11 +92,7 @@
 			notifications = notificationList;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load reminders:', error);
-			loadError = 'Check your connection, then select Retry.';
-			appStore.addNotification({
-				type: 'error',
-				message: 'Failed to load reminders. Please try again.'
-			});
+			loadError = userFacingErrorMessage(error);
 		} finally {
 			isLoading = false;
 		}
@@ -114,10 +111,7 @@
 			await load();
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to run reminders:', error);
-			appStore.addNotification({
-				type: 'error',
-				message: 'Failed to run due reminders. Please try again.'
-			});
+			appStore.showError(`Couldn't run the due reminders. ${userFacingErrorMessage(error)}`);
 		} finally {
 			isTriggering = false;
 		}
@@ -129,10 +123,9 @@
 			await reminderApi.markNotificationRead(id);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to mark notification read:', error);
-			appStore.addNotification({
-				type: 'error',
-				message: 'Failed to mark as read. Please try again.'
-			});
+			appStore.showError(
+				`Couldn't mark the notification as read. ${userFacingErrorMessage(error)}`
+			);
 			await load();
 		}
 	}
@@ -145,10 +138,9 @@
 			await Promise.all(unread.map(n => reminderApi.markNotificationRead(n.id)));
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to mark all read:', error);
-			appStore.addNotification({
-				type: 'error',
-				message: 'Failed to mark all as read. Please try again.'
-			});
+			appStore.showError(
+				`Couldn't mark the notifications as read. ${userFacingErrorMessage(error)}`
+			);
 			await load();
 		}
 	}
@@ -159,10 +151,9 @@
 			await load();
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to toggle reminder:', error);
-			appStore.addNotification({
-				type: 'error',
-				message: 'Failed to update reminder. Please try again.'
-			});
+			appStore.showError(
+				`Couldn't ${item.reminder.isActive ? 'pause' : 'resume'} the reminder. ${userFacingErrorMessage(error)}`
+			);
 		}
 	}
 
@@ -175,10 +166,9 @@
 			await load();
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to mark serviced:', error);
-			appStore.addNotification({
-				type: 'error',
-				message: 'Failed to mark serviced. Please try again.'
-			});
+			appStore.showError(
+				`Couldn't mark the reminder as serviced. ${userFacingErrorMessage(error)}`
+			);
 		} finally {
 			servicingId = null;
 		}
@@ -200,10 +190,7 @@
 			await load();
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to delete reminder:', error);
-			appStore.addNotification({
-				type: 'error',
-				message: 'Failed to delete reminder. Please try again.'
-			});
+			appStore.showError(`Couldn't delete the reminder. ${userFacingErrorMessage(error)}`);
 			throw error;
 		}
 	}
@@ -242,7 +229,7 @@
 		<div class="rounded-lg border bg-card p-6">
 			<div class="mb-4 flex items-center gap-3 text-destructive">
 				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Failed to Load Reminders</p>
+				<p class="font-medium">Couldn't load reminders</p>
 			</div>
 			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
 			<Button onclick={load}>Retry</Button>
