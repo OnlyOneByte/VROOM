@@ -362,7 +362,9 @@ class SyncManager {
 			return (await this.overwriteServerCopy(expense, serverId)).id;
 		} catch (error) {
 			if (!(error instanceof ApiError && error.statusCode === 404)) throw error;
-			return (await this.postExpense(expense)).id;
+			const recreated = await this.postExpense(expense);
+			if (recreated.id === serverId) throw error;
+			return recreated.id;
 		}
 	}
 

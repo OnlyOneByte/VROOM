@@ -379,6 +379,23 @@ describe('conflicts the day-window lookup cannot see', () => {
 		expect(storage.loadOfflineExpenses()[0]?.synced).toBe(true);
 	});
 
+	it('Keep My Version keeps the conflict when the 404 hides a record that still exists', async () => {
+		storage.saveOfflineExpenses([queued()]);
+		mockFetch.mockImplementation((_url: string, init?: { method?: string }) =>
+			Promise.resolve(
+				init?.method === 'PUT' ? respond(404, 'Vehicle not found') : respond(201, serverRow())
+			)
+		);
+		const conflict: SyncConflict = {
+			id: 'e1',
+			localExpense: queued(),
+			serverExpense: { id: 'server-1', amount: 20, date: '2024-06-01', tags: [] }
+		};
+
+		expect(await syncManager.resolveConflict(conflict, 'keep_local')).toBe(false);
+		expect(storage.loadOfflineExpenses()[0]?.synced).toBe(false);
+	});
+
 	it('Keep My Version still fails, and keeps the conflict, when the overwrite is refused', async () => {
 		mockFetch.mockResolvedValue(respond(403, 'Forbidden'));
 		const conflict: SyncConflict = {
