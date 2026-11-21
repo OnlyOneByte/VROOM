@@ -116,26 +116,53 @@ function nextDueAfterService(reminder: Reminder, due: Date, now: Date): Date {
   return alreadyAdvanced ? due : advanceReminderDueDate(reminder, due);
 }
 
-function scheduleChanged(existing: Reminder, update: Partial<NewReminder>): boolean {
+const DAY_MS = 86_400_000;
+const NOON_MS = 12 * 3_600_000;
+
+export function isSameSubmittedDay(stored: Date, submitted: Date): boolean {
+  const submittedTimeOfDay = ((submitted.getTime() % DAY_MS) + DAY_MS) % DAY_MS;
+  const submitterOffset = NOON_MS - submittedTimeOfDay;
+  const dayOf = (d: Date) => Math.floor((d.getTime() + submitterOffset) / DAY_MS);
+  return dayOf(stored) === dayOf(submitted);
+}
+
+function keepStoredStartDateOnSameDay<T extends { startDate?: Date }>(
+  update: T,
+  existing: Reminder
+): T {
+  if (!update.startDate || !isSameSubmittedDay(existing.startDate, update.startDate)) {
+    return update;
+  }
+  const { startDate: _sameDay, ...rest } = update;
+  return rest as T;
+}
+
+type MergedSchedule = ReminderSchedule & { triggerMode: string; endDate?: Date | null };
+
+function scheduleChanged(existing: Reminder, merged: MergedSchedule): boolean {
+  const customIntervalChanged =
+    merged.frequency === 'custom' &&
+    (merged.intervalValue !== existing.intervalValue ||
+      merged.intervalUnit !== existing.intervalUnit);
   return (
-    (update.startDate !== undefined &&
-      update.startDate.getTime() !== existing.startDate.getTime()) ||
-    (update.frequency !== undefined && update.frequency !== existing.frequency) ||
-    (update.intervalValue !== undefined && update.intervalValue !== existing.intervalValue) ||
-    (update.intervalUnit !== undefined && update.intervalUnit !== existing.intervalUnit) ||
-    (update.triggerMode !== undefined && update.triggerMode !== existing.triggerMode)
+    merged.startDate.getTime() !== existing.startDate.getTime() ||
+    merged.frequency !== existing.frequency ||
+    customIntervalChanged ||
+    (merged.triggerMode === 'mileage') !== (existing.triggerMode === 'mileage')
   );
 }
 
-function recomputedNextDue(
+function rescheduledFields(
   existing: Reminder,
   update: Partial<NewReminder>,
-  merged: ReminderSchedule & { triggerMode: string }
-): Date | null {
-  if (merged.triggerMode === 'mileage') return null;
+  merged: MergedSchedule
+): Partial<NewReminder> {
+  if (merged.triggerMode === 'mileage') return {};
   const resumed = update.isActive === true && !existing.isActive;
-  if (!resumed && !scheduleChanged(existing, update)) return null;
-  return firstDueOnOrAfter(merged, new Date());
+  if (!resumed && !scheduleChanged(existing, merged)) return {};
+  const nextDueDate = firstDueOnOrAfter(merged, new Date());
+  const ended = merged.endDate != null && nextDueDate > merged.endDate;
+  return ended ? { nextDueDate, isActive: false } : { nextDueDate };
 }
 
 routes.use('*', requireAuth);
@@ -291,11 +318,11 @@ routes.put(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
-    const partialUpdate = c.req.valid('json');
 
     const existing = await reminderRepository.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
     const { ownerId } = await requireExistingReminderWrite(existing, user.id);
+    const partialUpdate = keepStoredStartDateOnSameDay(c.req.valid('json'), existing.reminder);
 
     if (partialUpdate.vehicleIds) {
       const { ownerId: newOwnerId } = await requireReminderVehiclesWrite(
@@ -336,8 +363,7 @@ routes.put(
       }
     }
 
-    const recomputedDue = recomputedNextDue(existing.reminder, reminderFields, merged);
-    if (recomputedDue) updateFields.nextDueDate = recomputedDue;
+    Object.assign(updateFields, rescheduledFields(existing.reminder, reminderFields, merged));
 
     const result = await reminderRepository.updateWithVehicles(
       id,
