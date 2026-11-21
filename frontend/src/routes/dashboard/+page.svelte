@@ -17,6 +17,7 @@
 	import VehicleCarousel from '#lib/components/dashboard/VehicleCarousel.svelte';
 	import PeriodSelector from '#lib/components/common/period-selector.svelte';
 	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import { latest } from '#lib/utils/latest-request.ts';
 	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
 	import { getCategoryChartColor } from '#lib/utils/chart-colors.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
@@ -148,9 +149,12 @@
 
 	onMount(loadDashboardData);
 
+	const nextPeriodRequest = latest();
+
 	async function loadDashboardData() {
 		isLoading = true;
 		loadError = null;
+		const isCurrentPeriod = nextPeriodRequest();
 		try {
 			const [
 				loadedVehicles,
@@ -175,7 +179,7 @@
 			]);
 			vehicles = loadedVehicles;
 			allTimeSummary = allTimeData;
-			periodSummary = periodData ?? allTimeData;
+			if (isCurrentPeriod()) periodSummary = periodData ?? allTimeData;
 			recentExpensesList = recentResponse.data;
 			remindersList = loadedReminders;
 			recurringCost = loadedRecurringCost;
@@ -220,14 +224,16 @@
 
 	async function handlePeriodChange(period: TimePeriod) {
 		selectedPeriod = period;
+		const isCurrent = nextPeriodRequest();
 		try {
 			if (period === 'all' && allTimeSummary) {
 				periodSummary = allTimeSummary;
 			} else {
-				periodSummary = await expenseApi.getExpenseSummary({ period });
+				const summary = await expenseApi.getExpenseSummary({ period });
+				if (isCurrent()) periodSummary = summary;
 			}
 		} catch (error) {
-			handleErrorWithNotification(error, 'Failed to load expense summary');
+			if (isCurrent()) handleErrorWithNotification(error, 'Failed to load expense summary');
 		}
 	}
 </script>
