@@ -387,6 +387,66 @@ describe('processBatch', () => {
     });
   });
 
+  test('deletes the uploaded copy and records a failure when the status save fails', async () => {
+    const uploaded = { providerType: 's3', externalId: 'vroom/expense/e-1/uuid-image.jpg' };
+    mockFindPendingOrFailed.mockResolvedValue([makePhotoRef()]);
+    mockFindActiveByPhoto.mockResolvedValue(makeActiveRef());
+    mockFindById.mockResolvedValue(makePhoto());
+    mockDownload.mockResolvedValue(Buffer.from('photo-data'));
+    mockUpload.mockResolvedValue(uploaded);
+    mockUpdateStatus
+      .mockRejectedValueOnce(new Error('database is locked'))
+      .mockResolvedValueOnce(undefined);
+
+    const sourceProvider = makeMockProvider('google-drive');
+    const targetProvider = makeMockProvider('s3');
+    mockGetProvider.mockResolvedValueOnce(sourceProvider).mockResolvedValueOnce(targetProvider);
+
+    await processBatch(makeDeps());
+
+    expect(targetProvider.delete).toHaveBeenCalledWith(uploaded);
+    expect(sourceProvider.delete).not.toHaveBeenCalled();
+    expect(mockUpdateStatus).toHaveBeenLastCalledWith('ref-1', {
+      status: 'failed',
+      errorMessage: 'database is locked',
+      retryCount: 1,
+      syncedAt: expect.any(Date),
+    });
+  });
+
+  test('a failed cleanup delete is logged and the ref is still marked failed', async () => {
+    const warnSpy = spyOn(logger, 'warn').mockImplementation(() => {});
+    mockFindPendingOrFailed.mockResolvedValue([makePhotoRef()]);
+    mockFindActiveByPhoto.mockResolvedValue(makeActiveRef());
+    mockFindById.mockResolvedValue(makePhoto());
+    mockDownload.mockResolvedValue(Buffer.from('photo-data'));
+    mockUpload.mockResolvedValue({ providerType: 's3', externalId: 'k' });
+    mockUpdateStatus
+      .mockRejectedValueOnce(new Error('database is locked'))
+      .mockResolvedValueOnce(undefined);
+
+    const targetProvider = makeMockProvider('s3');
+    targetProvider.delete.mockRejectedValue(new Error('AccessDenied'));
+    mockGetProvider
+      .mockResolvedValueOnce(makeMockProvider('google-drive'))
+      .mockResolvedValueOnce(targetProvider);
+
+    try {
+      await processBatch(makeDeps());
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Sync worker: failed to clean up orphaned upload after a status save error',
+        expect.objectContaining({ refId: 'ref-1', storageRef: 'k', error: 'AccessDenied' })
+      );
+      expect(mockUpdateStatus).toHaveBeenLastCalledWith(
+        'ref-1',
+        expect.objectContaining({ status: 'failed', errorMessage: 'database is locked' })
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   test('marks ref as failed with incremented retryCount on download error', async () => {
     const pendingRef = makePhotoRef({ status: 'pending', retryCount: 1 });
     const activeRef = makeActiveRef();
