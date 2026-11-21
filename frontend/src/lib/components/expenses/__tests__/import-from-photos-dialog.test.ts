@@ -173,7 +173,7 @@ describe('ImportFromPhotosDialog: loading drafts', () => {
 		await waitFor(() => expect(rows()).toHaveLength(2));
 		const [first] = rows();
 		expect(first?.querySelector('input[type="number"]')).toHaveValue(42);
-		expect(first?.querySelector('input[type="date"]')).toHaveValue('2026-01-05');
+		expect(first).toHaveTextContent('January 5, 2026');
 		expect(first).toHaveTextContent('Maintenance');
 		expect(first).toHaveTextContent('2020 Toyota Camry');
 		expect(screen.getAllByAltText('Receipt')).toHaveLength(1);
@@ -189,7 +189,7 @@ describe('ImportFromPhotosDialog: loading drafts', () => {
 		await waitFor(() => expect(rows()).toHaveLength(1));
 		const row = rows()[0] as HTMLElement;
 		expect(row.querySelector('input[type="number"]')).toHaveValue(null);
-		expect(row.querySelector('input[type="date"]')).toHaveValue('2026-05-09');
+		expect(row).toHaveTextContent('May 9, 2026');
 		expect(row).toHaveTextContent('Misc');
 		expect(confirmButton()).toHaveTextContent('Add 0 expenses');
 		expect(confirmButton()).toBeDisabled();
