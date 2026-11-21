@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { onlineStatus, syncState, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { syncManager } from '#lib/utils/sync/sync-manager.ts';
@@ -11,19 +12,9 @@
 	let { floating = true }: { floating?: boolean } = $props();
 
 	let pendingCount = $derived(countPendingSync(offlineExpenseQueue.current));
-	let recheckingSession = $state(false);
-
-	async function recheckSession() {
-		recheckingSession = true;
-		try {
-			await authStore.initialize();
-		} finally {
-			recheckingSession = false;
-		}
-	}
-
 	$effect(() => {
-		if (onlineStatus.current && authStore.sessionUnverified) void recheckSession();
+		if (onlineStatus.current && authStore.sessionUnverified)
+			untrack(() => void authStore.recheckSession());
 	});
 
 	async function handleSync() {
@@ -36,7 +27,11 @@
 	}
 </script>
 
-<div class={floating ? 'fixed top-4 right-4 z-50' : 'flex items-center'}>
+<div
+	class={floating
+		? 'fixed top-[calc(1rem+env(safe-area-inset-top))] right-4 z-50'
+		: 'flex items-center'}
+>
 	{#if !onlineStatus.current}
 		<Badge
 			variant="destructive"
@@ -63,11 +58,11 @@
 			<Button
 				variant="secondary"
 				size="icon-lg"
-				onclick={recheckSession}
-				disabled={recheckingSession}
+				onclick={() => authStore.recheckSession()}
+				disabled={authStore.recheckingSession}
 				class="lg:h-auto lg:w-auto lg:px-2 lg:py-1 lg:text-xs lg:gap-1"
 			>
-				<RefreshCw size={14} class={recheckingSession ? 'animate-spin' : ''} />
+				<RefreshCw size={14} class={authStore.recheckingSession ? 'animate-spin' : ''} />
 				<span class="max-lg:sr-only">Retry</span>
 			</Button>
 		</Badge>

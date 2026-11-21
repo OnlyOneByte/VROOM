@@ -56,16 +56,6 @@
 	});
 
 	let isRetryingParked = $state(false);
-	let recheckingSession = $state(false);
-
-	async function handleRecheckSession() {
-		recheckingSession = true;
-		try {
-			await authStore.initialize();
-		} finally {
-			recheckingSession = false;
-		}
-	}
 
 	async function handleRetryParked() {
 		if (!onlineStatus.current || parkedCount === 0 || isRetryingParked) return;
@@ -127,7 +117,7 @@
 			<div class="flex items-center justify-between">
 				{#snippet statusHeader()}
 					{@const StatusIcon = statusInfo.icon}
-					<div class="flex items-center gap-2 {statusInfo.color}">
+					<div class="flex items-center gap-2 {statusInfo.color}" role="status">
 						<StatusIcon class="h-4 w-4 {syncState.current === 'syncing' ? 'animate-spin' : ''}" />
 						<span class="text-xs font-medium">{statusInfo.text}</span>
 					</div>
@@ -208,13 +198,13 @@
 				<Button
 					size="sm"
 					variant="outline"
-					onclick={handleRecheckSession}
-					disabled={recheckingSession}
-					aria-busy={recheckingSession}
-					class="w-full h-7 text-xs"
+					onclick={() => authStore.recheckSession()}
+					disabled={authStore.recheckingSession}
+					aria-busy={authStore.recheckingSession}
+					class="w-full h-7 text-xs max-lg:h-10"
 				>
-					<RefreshCw class="h-3 w-3 mr-1.5 {recheckingSession ? 'animate-spin' : ''}" />
-					{recheckingSession ? 'Checking...' : 'Retry connection'}
+					<RefreshCw class="h-3 w-3 mr-1.5 {authStore.recheckingSession ? 'animate-spin' : ''}" />
+					{authStore.recheckingSession ? 'Checking...' : 'Retry connection'}
 				</Button>
 			{/if}
 
@@ -225,7 +215,7 @@
 					onclick={handleRetryParked}
 					disabled={isRetryingParked || syncState.current === 'syncing'}
 					aria-busy={isRetryingParked}
-					class="w-full h-7 text-xs"
+					class="w-full h-7 text-xs max-lg:h-10"
 				>
 					<RefreshCw class="h-3 w-3 mr-1.5 {isRetryingParked ? 'animate-spin' : ''}" />
 					{isRetryingParked ? 'Retrying...' : `Retry ${parkedCount} needing attention`}
@@ -237,7 +227,7 @@
 					size="sm"
 					onclick={handleManualSync}
 					disabled={syncState.current === 'syncing'}
-					class="w-full h-7 text-xs"
+					class="w-full h-7 text-xs max-lg:h-10"
 				>
 					<RefreshCw
 						class="h-3 w-3 mr-1.5 {syncState.current === 'syncing' ? 'animate-spin' : ''}"
@@ -250,7 +240,12 @@
 		{#snippet collapsedIcon()}
 			{@const StatusIcon = statusInfo.icon}
 			<div class="flex justify-center px-3">
-				<div class="{statusInfo.color} relative" title={statusInfo.text}>
+				<div
+					class="{statusInfo.color} relative"
+					title={statusInfo.text}
+					role="status"
+					aria-label="Sync status: {statusInfo.text}"
+				>
 					<StatusIcon class="h-5 w-5 {syncState.current === 'syncing' ? 'animate-spin' : ''}" />
 					{#if pendingCount > 0}
 						<Badge
@@ -262,17 +257,31 @@
 					{/if}
 				</div>
 			</div>
+			{#if onlineStatus.current && pendingCount > 0 && !authStore.sessionUnverified}
+				<div class="flex justify-center mt-2">
+					<Button
+						variant="ghost"
+						size="icon-lg"
+						onclick={handleManualSync}
+						disabled={syncState.current === 'syncing'}
+						aria-label="Sync {pendingCount}"
+						title="Sync {pendingCount} pending {pendingCount === 1 ? 'expense' : 'expenses'}"
+					>
+						<RefreshCw class="h-4 w-4 {syncState.current === 'syncing' ? 'animate-spin' : ''}" />
+					</Button>
+				</div>
+			{/if}
 			{#if onlineStatus.current && authStore.sessionUnverified}
 				<div class="flex justify-center mt-2">
 					<Button
 						variant="ghost"
 						size="icon-lg"
-						onclick={handleRecheckSession}
-						disabled={recheckingSession}
+						onclick={() => authStore.recheckSession()}
+						disabled={authStore.recheckingSession}
 						aria-label="Retry connection"
 						title="Can't reach VROOM. Retry connection"
 					>
-						<RefreshCw class="h-4 w-4 {recheckingSession ? 'animate-spin' : ''}" />
+						<RefreshCw class="h-4 w-4 {authStore.recheckingSession ? 'animate-spin' : ''}" />
 					</Button>
 				</div>
 			{/if}

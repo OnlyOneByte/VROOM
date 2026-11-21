@@ -73,4 +73,17 @@ describe('OfflineIndicator — unverified session', () => {
 		await vi.waitFor(() => expect(authStore.sessionUnverified).toBe(false));
 		expect(authStore.isAuthenticated).toBe(true);
 	});
+
+	it('checks the session once per reconnect, not in a loop while the server stays down', async () => {
+		onlineStatus.current = false;
+		await startWithUnreachableServer();
+		render(OfflineIndicator);
+		mockFetch.mockReset();
+		mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+
+		onlineStatus.current = true;
+		await new Promise(resolve => setTimeout(resolve, 300));
+
+		expect(mockFetch).toHaveBeenCalledTimes(1);
+	});
 });

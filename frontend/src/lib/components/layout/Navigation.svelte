@@ -105,7 +105,7 @@
 					{#if pendingCount > 0}
 						<Badge
 							variant="secondary"
-							class="absolute -top-2 -right-3 text-xs font-bold h-4 min-w-4 px-0.5 py-0 flex items-center justify-center"
+							class="absolute -top-2 -right-2 text-xs font-bold h-4 min-w-4 px-0.5 py-0 flex items-center justify-center"
 							aria-label="{pendingCount} pending items"
 						>
 							{pendingCount > 9 ? '9+' : pendingCount}

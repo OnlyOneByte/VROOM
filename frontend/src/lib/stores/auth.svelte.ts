@@ -37,6 +37,7 @@ function createAuthStore() {
 	let error = $state<string | null>(null);
 	let token = $state<string | null>(null);
 	let sessionUnverified = $state(false);
+	let recheckingSession = $state(false);
 
 	function signIn(nextUser: User): void {
 		user = nextUser;
@@ -77,6 +78,19 @@ function createAuthStore() {
 		},
 		get sessionUnverified() {
 			return sessionUnverified;
+		},
+		get recheckingSession() {
+			return recheckingSession;
+		},
+
+		async recheckSession() {
+			if (recheckingSession) return;
+			recheckingSession = true;
+			try {
+				await this.initialize();
+			} finally {
+				recheckingSession = false;
+			}
 		},
 
 		setUser(newUser: User, newToken?: string) {

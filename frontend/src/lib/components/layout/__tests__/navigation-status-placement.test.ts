@@ -101,6 +101,41 @@ describe('the sync status indicator lives in the navigation, never floating over
 		await waitFor(() => expect(authStore.sessionUnverified).toBe(false));
 	});
 
+	it('the collapsed sidebar offers Sync N for pending entries without a hover', async () => {
+		authStore.setUser(alice);
+		offlineExpenseQueue.current = [
+			{
+				id: 'p1',
+				vehicleId: 'v1',
+				tags: [],
+				category: 'misc',
+				amount: 1,
+				date: '2024-06-01',
+				timestamp: 0,
+				synced: false,
+				version: '3.0'
+			}
+		];
+		render(Navigation);
+
+		const sync = screen
+			.getAllByRole('button', { name: 'Sync 1' })
+			.find(button => !mobileHeader().contains(button));
+		expect(sync).toBeDefined();
+	});
+
+	it('the sidebar status is announced as a status with its text', async () => {
+		await startWithUnreachableServer();
+		render(Navigation);
+
+		const statuses = screen
+			.getAllByRole('status')
+			.filter(status => !mobileHeader().contains(status));
+		expect(
+			statuses.some(status => status.getAttribute('aria-label')?.includes("Can't reach VROOM"))
+		).toBe(true);
+	});
+
 	it('the root layout floats the indicator only on pages without the navigation', () => {
 		expect(LAYOUT_SRC).toMatch(/\{#if !showNavigation\}\s*<OfflineIndicator \/>\s*\{\/if\}/);
 	});
