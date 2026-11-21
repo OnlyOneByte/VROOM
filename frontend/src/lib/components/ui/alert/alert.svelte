@@ -30,10 +30,12 @@
 		ref = $bindable(null),
 		class: className,
 		variant = 'default',
+		role = 'alert',
 		children,
 		...restProps
 	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
 		variant?: AlertVariant;
+		role?: 'alert' | 'status';
 	} = $props();
 </script>
 
@@ -42,7 +44,7 @@
 	data-slot="alert"
 	class={cn(alertVariants({ variant }), className)}
 	{...restProps}
-	role="alert"
+	{role}
 >
 	{@render children?.()}
 </div>
