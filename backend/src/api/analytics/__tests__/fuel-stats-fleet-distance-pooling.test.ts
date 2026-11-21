@@ -50,7 +50,7 @@ function fillup(
 
 function rangeAll() {
   return {
-    start: Math.floor(new Date(2020, 0, 1).getTime() / 1000),
+    start: Math.floor(new Date(Date.UTC(2020, 0, 1)).getTime() / 1000),
     end: Math.floor(Date.now() / 1000) + 86_400,
   };
 }
@@ -146,7 +146,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       vehicleId: VEH_A.id,
       category: 'fuel',
       expenseAmount: 40,
-      date: new Date(2023, mo, day),
+      date: new Date(Date.UTC(2023, mo, day)),
       mileage: 10_000 + mo * 100,
       volume: 20,
       fuelType: 'Regular',
@@ -159,7 +159,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       vehicleId: VEH_B.id,
       category: 'fuel',
       expenseAmount: 40,
-      date: new Date(2023, 2, 2),
+      date: new Date(Date.UTC(2023, 2, 2)),
       mileage: 50_000,
       volume: 5,
       fuelType: 'Regular',
@@ -170,7 +170,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       vehicleId: VEH_B.id,
       category: 'fuel',
       expenseAmount: 40,
-      date: new Date(2023, 5, 2),
+      date: new Date(Date.UTC(2023, 5, 2)),
       mileage: 50_200,
       volume: 5,
       fuelType: 'Regular',
@@ -178,8 +178,8 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
     });
 
     const range = {
-      start: Math.floor(new Date(2024, 0, 1).getTime() / 1000),
-      end: Math.floor(new Date(2025, 0, 1).getTime() / 1000),
+      start: Math.floor(new Date(Date.UTC(2024, 0, 1)).getTime() / 1000),
+      end: Math.floor(new Date(Date.UTC(2025, 0, 1)).getTime() / 1000),
     };
     const stats = await repo.getFuelStats(USER.id, range);
 
@@ -197,7 +197,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       vehicleId: VEH_A.id,
       category: 'fuel',
       expenseAmount: 40,
-      date: new Date(2023, 2, 10),
+      date: new Date(Date.UTC(2023, 2, 10)),
       mileage: 10_000,
       volume: 10,
       fuelType: 'Regular',
@@ -208,7 +208,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       vehicleId: VEH_B.id,
       category: 'fuel',
       expenseAmount: 38,
-      date: new Date(2023, 2, 12),
+      date: new Date(Date.UTC(2023, 2, 12)),
       mileage: 50_000,
       volume: 9,
       fuelType: 'Regular',
@@ -219,7 +219,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       vehicleId: VEH_A.id,
       category: 'fuel',
       expenseAmount: 12.5,
-      date: new Date(2023, 4, 1),
+      date: new Date(Date.UTC(2023, 4, 1)),
       mileage: null,
       volume: null,
       fuelType: null,
@@ -230,7 +230,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       vehicleId: VEH_B.id,
       category: 'fuel',
       expenseAmount: 12.5,
-      date: new Date(2023, 4, 1),
+      date: new Date(Date.UTC(2023, 4, 1)),
       mileage: null,
       volume: null,
       fuelType: null,
@@ -238,8 +238,8 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
     });
 
     const range = {
-      start: Math.floor(new Date(2024, 0, 1).getTime() / 1000),
-      end: Math.floor(new Date(2025, 0, 1).getTime() / 1000),
+      start: Math.floor(new Date(Date.UTC(2024, 0, 1)).getTime() / 1000),
+      end: Math.floor(new Date(Date.UTC(2025, 0, 1)).getTime() / 1000),
     };
     const stats = await repo.getFuelStats(USER.id, range);
 
@@ -293,7 +293,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       VEH_B.id,
     ]);
 
-    const jan = (day: number) => new Date(2024, 0, day);
+    const jan = (day: number) => new Date(Date.UTC(2024, 0, day));
     const fuelOn = (
       id: string,
       vid: string,
@@ -335,7 +335,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       VEH_B.id,
     ]);
 
-    const mon = (day: number) => new Date(2024, 0, day);
+    const mon = (day: number) => new Date(Date.UTC(2024, 0, day));
     const fuelOn = (
       id: string,
       vid: string,
@@ -400,7 +400,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
       VEH_B.id,
     ]);
-    const jan = (day: number) => new Date(2024, 0, day);
+    const jan = (day: number) => new Date(Date.UTC(2024, 0, day));
     const fuelOn = (id: string, vid: string, mileage: number, vol: number, day: number) => ({
       id,
       vehicleId: vid,

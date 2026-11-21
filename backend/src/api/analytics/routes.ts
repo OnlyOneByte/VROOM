@@ -153,7 +153,7 @@ routes.get(
 routes.get('/year-end', zValidator('query', yearQuerySchema), async (c) => {
   const user = c.get('user');
   const { year } = c.req.valid('query');
-  const currentYear = year ?? new Date().getFullYear();
+  const currentYear = year ?? new Date().getUTCFullYear();
   const data = await analyticsRepository.getYearEnd(user.id, currentYear);
   return c.json({ success: true, data: yearEndToApi(data) });
 });

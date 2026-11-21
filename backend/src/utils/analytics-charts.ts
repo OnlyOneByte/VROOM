@@ -135,7 +135,7 @@ export function gasEfficiencyPoint(
 }
 
 export function toMonthKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 export function effectiveMonthlyPremium(term: {

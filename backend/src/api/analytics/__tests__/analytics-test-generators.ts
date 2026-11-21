@@ -72,11 +72,11 @@ export function expenseArb(
   yearConstraint?: number
 ): fc.Arbitrary<TestExpense> {
   const minTs = yearConstraint
-    ? new Date(yearConstraint, 0, 2).getTime()
-    : new Date(2020, 0, 2).getTime();
+    ? new Date(Date.UTC(yearConstraint, 0, 2)).getTime()
+    : new Date(Date.UTC(2020, 0, 2)).getTime();
   const maxTs = yearConstraint
-    ? new Date(yearConstraint, 11, 30).getTime()
-    : new Date(2025, 11, 30).getTime();
+    ? new Date(Date.UTC(yearConstraint, 11, 30)).getTime()
+    : new Date(Date.UTC(2025, 11, 30)).getTime();
 
   return fc.record({
     id: fc.constant(`expense-${vehicleId}-${expenseIndex}`),
@@ -224,7 +224,7 @@ export function seedInsuranceTermVehicle(db: Database, row: TestInsuranceTermVeh
 
 export function yearToRange(year: number): { start: number; end: number } {
   return {
-    start: Math.floor(new Date(year, 0, 1).getTime() / 1000),
-    end: Math.floor(new Date(year + 1, 0, 1).getTime() / 1000),
+    start: Math.floor(new Date(Date.UTC(year, 0, 1)).getTime() / 1000),
+    end: Math.floor(new Date(Date.UTC(year + 1, 0, 1)).getTime() / 1000),
   };
 }

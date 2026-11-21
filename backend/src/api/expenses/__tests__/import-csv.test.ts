@@ -189,7 +189,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect((await listExpenses()).length).toBe(1);
   });
 
-  test('a DATE-ONLY cell keeps its calendar day in local time (no UTC-midnight day-shift)', async () => {
+  test('a DATE-ONLY cell keeps its calendar day (stored at UTC noon, no midnight day-shift)', async () => {
     await seedCivic('Daily Driver');
     const csv = ['date,vehicle,category,amount', '2024-03-15,Daily Driver,misc,20.00'].join('\n');
 
@@ -200,9 +200,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
 
     const [row] = await listExpenses();
     const stored = new Date(row.date);
-    expect(stored.getFullYear()).toBe(2024);
-    expect(stored.getMonth() + 1).toBe(3);
-    expect(stored.getDate()).toBe(15);
+    expect(stored.toISOString()).toBe('2024-03-15T12:00:00.000Z');
   });
 
   test('an OUT-OF-RANGE date-only cell is REJECTED, not silently rolled forward', async () => {
