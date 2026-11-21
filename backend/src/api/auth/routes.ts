@@ -639,8 +639,8 @@ async function fetchGoogleEmail(accessToken: string): Promise<string | null> {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!resp.ok) return null;
-  const data = (await resp.json()) as { email: string };
-  return data.email;
+  const data = (await resp.json()) as { email: string; email_verified?: boolean };
+  return data.email_verified === true ? data.email : null;
 }
 
 async function updateExistingProvider(

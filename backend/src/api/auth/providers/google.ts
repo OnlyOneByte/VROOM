@@ -1,6 +1,6 @@
 import { Google } from 'arctic';
 import { CONFIG } from '../../../config';
-import type { OAuthProviderConfig } from './types';
+import { NoVerifiedEmailError, type OAuthProviderConfig } from './types';
 
 // Google requires the token exchange to repeat the authorize step's redirect URI.
 function createGoogleClient(redirectUri: string): Google {
@@ -50,9 +50,11 @@ export const googleAuthProvider: OAuthProviderConfig = {
     const data = (await res.json()) as {
       sub: string;
       email: string;
+      email_verified?: boolean;
       name: string;
       picture?: string;
     };
+    if (data.email_verified !== true) throw new NoVerifiedEmailError('Google');
     return {
       providerAccountId: data.sub,
       email: data.email,
