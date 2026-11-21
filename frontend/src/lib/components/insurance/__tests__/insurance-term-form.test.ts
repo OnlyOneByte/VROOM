@@ -148,6 +148,19 @@ describe('InsuranceTermForm add mode', () => {
 		expect(addTerm).not.toHaveBeenCalled();
 	});
 
+	test('the even split preview lists vehicles in the order they were ticked, as the saved split does', async () => {
+		await mount();
+		await fireEvent.click(screen.getByRole('checkbox', { name: '2019 Honda Civic' }));
+		await fireEvent.click(screen.getByRole('checkbox', { name: 'Daily' }));
+		await type('total-cost', '10.01');
+		await settle();
+
+		const rowText = (name: string) =>
+			screen.getAllByText(name).at(-1)?.parentElement?.textContent?.replace(/\s+/g, ' ').trim();
+		expect(rowText('2019 Honda Civic')).toBe('2019 Honda Civic $5.01');
+		expect(rowText('Daily')).toBe('Daily $5.00');
+	});
+
 	test('rejects an end date that is not after the start date', async () => {
 		await mount();
 		await type('start-date', '2026-07-01');

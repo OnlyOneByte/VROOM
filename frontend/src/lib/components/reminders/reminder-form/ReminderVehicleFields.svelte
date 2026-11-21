@@ -15,7 +15,9 @@
 
 	let { form, vehicles }: Props = $props();
 
-	let splitVehicles = $derived(vehicles.filter(v => form.values.selectedVehicleIds.includes(v.id)));
+	let splitVehicles = $derived(
+		form.values.selectedVehicleIds.flatMap(id => vehicles.find(v => v.id === id) ?? [])
+	);
 	let totalAmount = $derived(parsedExpenseAmount(form.values.expenseAmount));
 </script>
 
