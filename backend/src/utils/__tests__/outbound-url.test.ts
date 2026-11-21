@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { ValidationError } from '../../errors';
 import {
-  assertSafeOutboundTarget,
   assertSafeOutboundUrl,
   classifyAddress,
   outboundResolver,
+  resolveSafeOutboundTarget,
 } from '../outbound-url';
 
 const stubLookup = outboundResolver.lookup;
@@ -29,6 +29,7 @@ describe('classifyAddress', () => {
     ['::ffff:7f00:1', 'private'],
     ['169.254.169.254', 'forbidden'],
     ['100.100.100.200', 'forbidden'],
+    ['168.63.129.16', 'forbidden'],
     ['0.0.0.0', 'forbidden'],
     ['::', 'forbidden'],
     ['fe80::1', 'forbidden'],
@@ -106,18 +107,18 @@ describe('assertSafeOutboundUrl', () => {
   });
 });
 
-describe('assertSafeOutboundTarget', () => {
+describe('resolveSafeOutboundTarget', () => {
   test('rejects a public-looking name that resolves to a private address', async () => {
     outboundResolver.lookup = async () => ['10.0.0.7'];
     await expect(
-      assertSafeOutboundTarget('https://files.example.com', 'S3 endpoint', false)
+      resolveSafeOutboundTarget('https://files.example.com', 'S3 endpoint', false)
     ).rejects.toThrow(ValidationError);
   });
 
   test('rejects when any resolved address is disallowed', async () => {
     outboundResolver.lookup = async () => ['93.184.215.14', '169.254.169.254'];
     await expect(
-      assertSafeOutboundTarget('https://files.example.com', 'S3 endpoint', true)
+      resolveSafeOutboundTarget('https://files.example.com', 'S3 endpoint', true)
     ).rejects.toThrow(ValidationError);
   });
 
@@ -126,13 +127,18 @@ describe('assertSafeOutboundTarget', () => {
       throw new Error('ENOTFOUND');
     };
     await expect(
-      assertSafeOutboundTarget('https://files.example.com', 'S3 endpoint', false)
+      resolveSafeOutboundTarget('https://files.example.com', 'S3 endpoint', false)
     ).rejects.toThrow(ValidationError);
   });
 
   test('accepts a name that resolves only to public addresses', async () => {
     outboundResolver.lookup = async () => ['93.184.215.14'];
-    const url = await assertSafeOutboundTarget('https://files.example.com', 'S3 endpoint', false);
-    expect(url.hostname).toBe('files.example.com');
+    const target = await resolveSafeOutboundTarget(
+      'https://files.example.com',
+      'S3 endpoint',
+      false
+    );
+    expect(target.url.hostname).toBe('files.example.com');
+    expect(target.address).toBe('93.184.215.14');
   });
 });

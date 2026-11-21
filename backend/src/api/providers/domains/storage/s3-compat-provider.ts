@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { Readable } from 'node:stream';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -6,10 +7,11 @@ import {
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
+  type S3ClientConfig,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { logger } from '../../../../utils/logger';
-import { assertSafeOutboundTarget } from '../../../../utils/outbound-url';
+import { fetchOutbound } from '../../../../utils/outbound-url';
 import type {
   StorageFileInfo,
   StorageProvider,
@@ -41,15 +43,79 @@ function toFileInfo(key: string, size?: number, lastModified?: Date): StorageFil
   };
 }
 
+interface S3WireRequest {
+  protocol: string;
+  hostname: string;
+  port?: number;
+  path: string;
+  query?: Record<string, string | string[] | null>;
+  method: string;
+  headers: Record<string, string>;
+  body?: unknown;
+}
+
+function encodeQueryPart(value: string): string {
+  return encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+}
+
+function buildQuery(query: S3WireRequest['query']): string {
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(query ?? {})) {
+    const values = Array.isArray(value) ? value : [value];
+    for (const v of values) {
+      parts.push(
+        v === null ? encodeQueryPart(key) : `${encodeQueryPart(key)}=${encodeQueryPart(v)}`
+      );
+    }
+  }
+  return parts.length ? `?${parts.join('&')}` : '';
+}
+
+function requestBody(body: unknown): { body?: RequestInit['body']; duplex?: 'half' } {
+  if (body === undefined || body === null) return {};
+  if (body instanceof Readable) {
+    return { body: Readable.toWeb(body) as ReadableStream, duplex: 'half' };
+  }
+  return { body: body as RequestInit['body'] };
+}
+
+export const s3RequestHandler = {
+  async handle(request: S3WireRequest, options?: { abortSignal?: unknown }) {
+    const port = request.port ? `:${request.port}` : '';
+    const url = `${request.protocol}//${request.hostname}${port}${request.path}${buildQuery(request.query)}`;
+    const res = await fetchOutbound(
+      url,
+      {
+        method: request.method,
+        headers: request.headers,
+        signal: options?.abortSignal as AbortSignal | undefined,
+        ...requestBody(request.body),
+      },
+      'S3 endpoint'
+    );
+    return {
+      response: {
+        statusCode: res.status,
+        reason: res.statusText,
+        headers: Object.fromEntries(res.headers),
+        body: res.body
+          ? Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0])
+          : Readable.from([]),
+      },
+    };
+  },
+} as unknown as S3ClientConfig['requestHandler'];
+
 export class S3CompatProvider implements StorageProvider {
   readonly type = 's3';
   private client: S3Client;
   private bucket: string;
-  private endpoint: string;
 
   constructor(credentials: S3Credentials, config: S3Config) {
     this.bucket = config.bucket;
-    this.endpoint = config.endpoint;
     this.client = new S3Client({
       endpoint: config.endpoint,
       region: config.region,
@@ -58,6 +124,7 @@ export class S3CompatProvider implements StorageProvider {
         secretAccessKey: credentials.secretAccessKey,
       },
       forcePathStyle: true,
+      requestHandler: s3RequestHandler,
     });
   }
 
@@ -66,7 +133,6 @@ export class S3CompatProvider implements StorageProvider {
       ? this.buildRawKey(params.rawPath, params.fileName)
       : this.buildKey(params.pathHint, params.entityType, params.entityId, params.fileName);
 
-    await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
@@ -83,7 +149,6 @@ export class S3CompatProvider implements StorageProvider {
   }
 
   async download(ref: StorageRef): Promise<Buffer> {
-    await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
     const response = await this.client.send(
       new GetObjectCommand({
         Bucket: this.bucket,
@@ -99,7 +164,6 @@ export class S3CompatProvider implements StorageProvider {
   }
 
   async delete(ref: StorageRef): Promise<void> {
-    await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
     await this.client.send(
       new DeleteObjectCommand({
         Bucket: this.bucket,
@@ -130,7 +194,6 @@ export class S3CompatProvider implements StorageProvider {
 
   async healthCheck(): Promise<boolean> {
     try {
-      await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
       await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
       return true;
     } catch (error) {
@@ -149,7 +212,6 @@ export class S3CompatProvider implements StorageProvider {
     let continuationToken: string | undefined;
 
     do {
-      await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
       const response = await this.client.send(
         new ListObjectsV2Command({
           Bucket: this.bucket,

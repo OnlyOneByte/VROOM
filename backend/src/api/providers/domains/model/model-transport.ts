@@ -1,5 +1,6 @@
+import { ValidationError } from '../../../../errors';
 import { logger } from '../../../../utils/logger';
-import { assertSafeOutboundTarget } from '../../../../utils/outbound-url';
+import { fetchOutbound } from '../../../../utils/outbound-url';
 
 export type ModelDomainLabel = 'LLM' | 'VLM';
 
@@ -20,18 +21,21 @@ export function trimBaseUrl(url: string): string {
 // Never log the url (Gemini puts the API key in the query string), headers, or request body.
 export async function postModelJson<T>(req: ModelRequest): Promise<T | null> {
   const label = `${req.domain} ${req.providerType}`;
-  await assertSafeOutboundTarget(req.url, `${req.domain} provider URL`);
 
   let res: Response;
   try {
-    res = await fetch(req.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...req.headers },
-      body: JSON.stringify(req.body),
-      signal: AbortSignal.timeout(req.timeoutMs),
-      redirect: 'manual',
-    });
+    res = await fetchOutbound(
+      req.url,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...req.headers },
+        body: JSON.stringify(req.body),
+        signal: AbortSignal.timeout(req.timeoutMs),
+      },
+      `${req.domain} provider URL`
+    );
   } catch (err) {
+    if (err instanceof ValidationError) throw err;
     const message = err instanceof Error ? err.message : 'network error';
     logger.warn(`${label} request failed`, { model: req.model, error: message });
     throw new Error(`${req.domain} request failed: ${message}`);

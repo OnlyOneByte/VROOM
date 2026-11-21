@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
-import { S3CompatProvider } from '../domains/storage/s3-compat-provider';
+import { S3CompatProvider, s3RequestHandler } from '../domains/storage/s3-compat-provider';
 import type { StorageRef } from '../domains/storage/storage-provider';
 
 const mockSend = mock<(command: unknown) => Promise<unknown>>(() => Promise.resolve({}));
@@ -7,6 +7,7 @@ const mockSend = mock<(command: unknown) => Promise<unknown>>(() => Promise.reso
 mock.module('@aws-sdk/client-s3', () => {
   class MockS3Client {
     send = mockSend;
+    constructor(public config: unknown) {}
   }
   return {
     S3Client: MockS3Client,
@@ -55,6 +56,12 @@ describe('S3CompatProvider', () => {
 
   test('type is s3', () => {
     expect(provider.type).toBe('s3');
+  });
+
+  test('sends every request through the outbound request handler', () => {
+    const client = (provider as unknown as { client: { config: { requestHandler: unknown } } })
+      .client;
+    expect(client.config.requestHandler).toBe(s3RequestHandler);
   });
 
   describe('upload', () => {
