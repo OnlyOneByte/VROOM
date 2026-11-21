@@ -1,5 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { google, type sheets_v4 } from 'googleapis';
+import { CONFIG } from '../../../config';
 import { getDb } from '../../../db/connection';
 import {
   expenses,
@@ -23,6 +24,7 @@ import {
 } from '../../../db/schema';
 import { NotFoundError, SyncError, SyncErrorCode, ValidationError } from '../../../errors';
 import { decrypt } from '../../../utils/encryption';
+import { logger } from '../../../utils/logger';
 import { GoogleDriveService } from './google-drive-service';
 
 // Hand-maintained: a schema column missing here is silently dropped from backups.
@@ -279,8 +281,15 @@ export function columnLetter(columnNumber: number): string {
 
 const SHEET_READ_LAST_COLUMN = 'ZZ';
 
+export const SHEET_METADATA_TAB = 'Metadata';
+const CENTS_FORMAT_VERSION = '2.0.0';
+const PRE_CENTS_FORMAT_VERSION = '1.0.0';
+const SHEET_METADATA_HEADERS = ['version', 'timestamp', 'userId'] as const;
+
+const CENTS_ERA_EXPENSE_HEADER = 'createdBy';
+
 // Order matters: the backup swap indexes each tab by position.
-export const SHEET_NAMES = Object.values(SHEET_TABS);
+export const SHEET_NAMES: string[] = [...Object.values(SHEET_TABS), SHEET_METADATA_TAB];
 
 // Keep titles space-free: ranges would otherwise need A1 quoting.
 export const SHEET_STAGING_SUFFIX = '__vroom_staging';
@@ -544,10 +553,21 @@ export class GoogleSheetsService {
     };
 
     const tables = (Object.keys(SHEET_TABS) as SheetTableKey[]).map((key) => ({
-      title: SHEET_TABS[key],
+      title: SHEET_TABS[key] as string,
       rows: rowsByTable[key],
-      headers: SHEET_HEADERS[key],
+      headers: SHEET_HEADERS[key] as readonly string[],
     }));
+    tables.push({
+      title: SHEET_METADATA_TAB,
+      rows: [
+        {
+          version: CONFIG.backup.currentVersion,
+          timestamp: new Date().toISOString(),
+          userId,
+        },
+      ],
+      headers: SHEET_METADATA_HEADERS,
+    });
 
     await this.writeAllSheetsAtomically(spreadsheetId, tables);
   }
@@ -663,20 +683,46 @@ export class GoogleSheetsService {
     const info = await this.getSpreadsheetInfo(spreadsheetId);
     const presentTabs = new Set(info.sheets.map((sheet) => sheet.title));
     const records = {} as Record<SheetTableKey, Record<string, unknown>[]>;
+    let expenseHeaders: unknown[] = [];
     for (const key of Object.keys(SHEET_TABS) as SheetTableKey[]) {
       const title = SHEET_TABS[key];
       const absentOptionalTab = !REQUIRED_SHEET_TABS.has(key) && !presentTabs.has(title);
-      records[key] = absentOptionalTab
+      const grid = absentOptionalTab
         ? []
-        : this.parseSheetData(
-            await this.readSheetData(spreadsheetId, `${title}!A:${SHEET_READ_LAST_COLUMN}`)
-          );
+        : await this.readSheetData(spreadsheetId, `${title}!A:${SHEET_READ_LAST_COLUMN}`);
+      if (key === 'expenses') expenseHeaders = grid[0] ?? [];
+      records[key] = this.parseSheetData(grid);
     }
 
-    const userId = records.vehicles.length > 0 ? String(records.vehicles[0].userId) : '';
+    const [written] = presentTabs.has(SHEET_METADATA_TAB)
+      ? this.parseSheetData(
+          await this.readSheetData(
+            spreadsheetId,
+            `${SHEET_METADATA_TAB}!A:${SHEET_READ_LAST_COLUMN}`
+          )
+        )
+      : [];
+    const userId =
+      records.vehicles.length > 0
+        ? String(records.vehicles[0].userId)
+        : String(written?.userId ?? '');
+
+    const preCentsLayout =
+      expenseHeaders.length > 0 && !expenseHeaders.includes(CENTS_ERA_EXPENSE_HEADER);
+    const inferredVersion = preCentsLayout ? PRE_CENTS_FORMAT_VERSION : CENTS_FORMAT_VERSION;
+    if (!written?.version) {
+      logger.info('Sheets mirror has no recorded version; inferred it from its layout', {
+        spreadsheetId,
+        inferredVersion,
+      });
+    }
 
     return {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId },
+      metadata: {
+        version: String(written?.version || inferredVersion),
+        timestamp: String(written?.timestamp ?? new Date().toISOString()),
+        userId,
+      },
       ...records,
     };
   }

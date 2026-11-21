@@ -9,6 +9,7 @@ import { createTestApp, type TestApp } from '../../../../test-helpers/http-clien
 import {
   GoogleSheetsService,
   SHEET_HEADERS,
+  SHEET_METADATA_TAB,
   SHEET_NAMES,
   SHEET_TABS,
 } from '../google-sheets-service';
@@ -62,9 +63,10 @@ describe('Google Sheets header coverage (column drift guard)', () => {
 });
 
 describe('Google Sheets tab roster (SHEET_NAMES drift guard)', () => {
-  test('SHEET_NAMES has exactly one tab per SHEET_HEADERS table (no missing/extra tab)', () => {
+  test('SHEET_NAMES has one tab per SHEET_HEADERS table, then the Metadata tab (no missing/extra tab)', () => {
     const tabCount: number = SHEET_NAMES.length;
-    expect(tabCount).toBe(Object.keys(SHEET_HEADERS).length);
+    expect(tabCount).toBe(Object.keys(SHEET_HEADERS).length + 1);
+    expect(SHEET_NAMES[tabCount - 1]).toBe(SHEET_METADATA_TAB);
   });
 
   test('SHEET_NAMES entries are all distinct + non-empty (no dup/blank tab title)', () => {
