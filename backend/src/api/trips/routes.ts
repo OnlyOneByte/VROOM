@@ -12,6 +12,7 @@ import {
   zValidator,
 } from '../../utils/validation';
 import { odometerRepository } from '../odometer/repository';
+import { deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
 import { preferencesRepository } from '../settings/repository';
 import { tripRepository } from './repository';
@@ -165,12 +166,13 @@ routes.put(
           tripDate: existing.tripDate,
         });
         if (othersAtOld === 0) {
-          await odometerRepository.deleteLinkedTripEntry({
+          const removedEntryIds = await odometerRepository.deleteLinkedTripEntry({
             vehicleId: existing.vehicleId,
             userId: user.id,
             odometer: existing.endOdometer,
             recordedAt: existing.tripDate,
           });
+          await deletePhotosForEntities('odometer_entry', removedEntryIds, user.id);
         }
         await odometerRepository.createFromTrip({
           vehicleId: existing.vehicleId,
@@ -221,12 +223,13 @@ routes.delete(
           tripDate: existing.tripDate,
         });
         if (others === 0) {
-          await odometerRepository.deleteLinkedTripEntry({
+          const removedEntryIds = await odometerRepository.deleteLinkedTripEntry({
             vehicleId: existing.vehicleId,
             userId: user.id,
             odometer: existing.endOdometer,
             recordedAt: existing.tripDate,
           });
+          await deletePhotosForEntities('odometer_entry', removedEntryIds, user.id);
           await reminderTriggerService.recheckMileageReminders(user.id, existing.vehicleId);
         }
       } catch (error) {
