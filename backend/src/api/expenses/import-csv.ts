@@ -5,7 +5,8 @@ import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES, isElectricFuelType } from '../../db/types';
 import { denormalizeCsvCell } from '../../utils/csv-safety';
 import { dollarsToCents } from '../../utils/money';
-import { buildCalendarDate } from './local-date';
+import { isValidTimeZone } from '../../utils/time-zone';
+import { buildImportDate } from './local-date';
 import { clearFuelFieldsIfNotFuel } from './validation';
 
 export interface ImportVehicle {
@@ -91,12 +92,13 @@ function parseCategory(
   return { value: category as (typeof EXPENSE_CATEGORIES)[number] };
 }
 
-function parseDate(raw: string): { value: Date } | { error: string } {
+function parseDate(raw: string, timeZone?: string): { value: Date } | { error: string } {
   if (!raw) return { error: `Invalid date "${raw}"` };
   // new Date("YYYY-MM-DD") parses as UTC and would shift the day west of UTC.
   const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim());
   if (dateOnly) {
-    const date = buildCalendarDate(Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3]));
+    const [year, month, day] = [Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3])];
+    const date = buildImportDate(year, month, day, timeZone);
     if (!date) return { error: `Invalid date "${raw}"` };
     return { value: date };
   }
@@ -153,7 +155,8 @@ function resolveImportVehicleId(
 
 function parseRow(
   record: Record<string, string>,
-  vehicleByName: Map<string, string | null>
+  vehicleByName: Map<string, string | null>,
+  timeZone?: string
 ): { expense: ImportableExpense } | { error: string } {
   const get = makeCellGetter(record);
 
@@ -165,7 +168,7 @@ function parseRow(
   if ('error' in categoryResult) return categoryResult;
   const amountResult = parseAmount(get('amount'));
   if ('error' in amountResult) return amountResult;
-  const dateResult = parseDate(get('date'));
+  const dateResult = parseDate(get('date'), timeZone);
   if ('error' in dateResult) return dateResult;
   const mileageResult = parseMileage(get('mileage'));
   if ('error' in mileageResult) return mileageResult;
@@ -237,12 +240,14 @@ export function deriveImportClientId(expense: ImportableExpense, occurrence: num
 export const importCsvSchema = z.object({
   csv: z.string().min(1, 'CSV content is required').max(5_000_000, 'CSV file is too large'),
   dryRun: z.boolean().optional().default(false),
+  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
 });
 
 export function buildImportPlan(
   csv: string,
   vehicles: ImportVehicle[],
-  rowErrors: ReadonlyMap<number, string> = new Map()
+  rowErrors: ReadonlyMap<number, string> = new Map(),
+  timeZone?: string
 ): ImportPlan {
   let records: Record<string, string>[];
   try {
@@ -288,7 +293,7 @@ export function buildImportPlan(
       date: denormalizeCsvCell((record.date ?? '').trim()),
     };
     const preError = rowErrors.get(i);
-    const result = preError ? { error: preError } : parseRow(record, vehicleByName);
+    const result = preError ? { error: preError } : parseRow(record, vehicleByName, timeZone);
     const rowNum = i + 2;
     if ('error' in result) {
       return { row: rowNum, status: 'error' as const, message: result.error, raw };

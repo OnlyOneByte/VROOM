@@ -51,11 +51,12 @@ describe('no UTC-midnight date construction on the CSV-import paths', () => {
     ).toEqual([]);
   });
 
-  test('import-mapping still constructs dates with buildLocalDate', () => {
-    const src = readFileSync(join(HERE, '..', 'import-mapping.ts'), 'utf8');
-    expect(
-      src.includes('buildLocalDate'),
-      'import-mapping must build dates via buildLocalDate'
-    ).toBe(true);
+  test('both import paths construct dates with buildImportDate, outside comments', () => {
+    for (const file of ['import-mapping.ts', 'import-csv.ts']) {
+      const src = stripComments(readFileSync(join(HERE, '..', file), 'utf8'));
+      expect(src.includes('buildImportDate('), `${file} must build dates via buildImportDate`).toBe(
+        true
+      );
+    }
   });
 });

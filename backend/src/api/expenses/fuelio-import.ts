@@ -23,6 +23,7 @@ export interface FuelioParseOptions {
   targetVehicle: string;
   targetUnits: TargetUnits;
   includeCosts?: boolean;
+  timeZone?: string;
 }
 
 const FUELIO_COST_CATEGORY_MAP: Record<string, ExpenseCategory> = {
@@ -132,7 +133,7 @@ function buildLogRows(
   const fileVolumeUnit = detectVolumeUnit(fuelKey);
 
   return logRecords.map((rec) => ({
-    date: normalizeForeignDate(cell(rec, dateKey), dateFormat),
+    date: normalizeForeignDate(cell(rec, dateKey), dateFormat, opts.timeZone),
     vehicle: opts.targetVehicle,
     category: 'fuel',
     amount: normalizeDecimal(cell(rec, priceKey)),
@@ -176,7 +177,7 @@ function buildCostRows(
     const title = cell(rec, cTitleKey).trim();
     const note = cell(rec, cNotesKey).trim();
     return {
-      date: normalizeForeignDate(cell(rec, cDateKey), dateFormat),
+      date: normalizeForeignDate(cell(rec, cDateKey), dateFormat, opts.timeZone),
       vehicle: opts.targetVehicle,
       category: mapped ?? 'misc',
       amount: normalizeDecimal(cell(rec, cCostKey)),
