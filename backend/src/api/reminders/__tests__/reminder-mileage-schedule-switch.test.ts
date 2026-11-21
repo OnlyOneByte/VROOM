@@ -16,6 +16,21 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
+interface StoredSchedule {
+  trigger_mode: string;
+  next_due_date: number | null;
+  interval_value: number | null;
+  interval_unit: string | null;
+}
+
+function storedSchedule(id: string): StoredSchedule {
+  return ctx.sqlite
+    .query(
+      'SELECT trigger_mode, next_due_date, interval_value, interval_unit FROM reminders WHERE id = ?'
+    )
+    .get(id) as StoredSchedule;
+}
+
 async function createMileageOnlyCustom(): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/reminders', {
     name: 'Tire rotation',
@@ -45,10 +60,12 @@ describe('a stored mileage-only reminder with a custom frequency and no interval
 
     expect(res.status).toBe(400);
     expect(await res.text()).toContain('intervalValue');
-    const row = ctx.sqlite.query('SELECT trigger_mode FROM reminders WHERE id = ?').get(id) as {
-      trigger_mode: string;
-    };
-    expect(row.trigger_mode).toBe('mileage');
+    expect(storedSchedule(id)).toEqual({
+      trigger_mode: 'mileage',
+      next_due_date: null,
+      interval_value: null,
+      interval_unit: null,
+    });
   });
 
   test('switches once the interval is supplied', async () => {
@@ -62,6 +79,13 @@ describe('a stored mileage-only reminder with a custom frequency and no interval
     });
 
     expect(res.status, await res.text()).toBe(200);
+    const saved = storedSchedule(id);
+    expect(saved).toMatchObject({
+      trigger_mode: 'both',
+      interval_value: 3,
+      interval_unit: 'month',
+    });
+    expect(saved.next_due_date, 'a date-based reminder gets a due date').not.toBeNull();
   });
 
   test('adds nothing to the recurring cost', async () => {

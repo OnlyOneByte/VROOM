@@ -81,6 +81,9 @@ describe('split group edit locks the fields the split API does not save', () => 
 		expect(screen.getByTestId('split-edit-note').textContent).toContain(
 			'delete the split and add it again'
 		);
+		expect(screen.getByTestId('split-edit-note').textContent).toContain(
+			'description, location or tags'
+		);
 		expect(screen.getByRole('button', { name: /Misc/ })).toBeDisabled();
 		expect(screen.getByRole('button', { name: /May 10, 2026/ })).toBeDisabled();
 		expect(document.getElementById('description')).toBeDisabled();

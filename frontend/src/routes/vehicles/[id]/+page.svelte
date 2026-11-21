@@ -32,7 +32,11 @@
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { expenseApi } from '#lib/services/expense-api.ts';
 	import { analyticsApi } from '#lib/services/analytics-api.ts';
-	import { ApiError, handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import {
+		ApiError,
+		handleErrorWithNotification,
+		userFacingErrorMessage
+	} from '#lib/utils/error-handling.ts';
 	import type {
 		Vehicle,
 		Expense,
@@ -50,7 +54,7 @@
 	let vehicleId = $derived(data.vehicleId);
 
 	let isLoading = $state(true);
-	let vehicleLoadFailed = $state(false);
+	let vehicleLoadError = $state<string | null>(null);
 	let isLoadingStats = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 	let activeTab = $state('overview');
@@ -60,7 +64,7 @@
 
 	let summary = $state<ExpenseSummary | null>(null);
 	let fuelEfficiencyPoints = $state<FuelEfficiencyPoint[]>([]);
-	let summaryLoadFailed = $state(false);
+	let summaryLoadError = $state<string | null>(null);
 
 	let expenses = $state<Expense[]>([]);
 	let currentOffset = $state(0);
@@ -68,7 +72,7 @@
 	let totalCount = $state(0);
 	let isLoadingPage = $state(false);
 	let hasLoadedExpensesTab = $state(false);
-	let expensesLoadFailed = $state(false);
+	let expensesLoadError = $state<string | null>(null);
 	let expenseSortBy = $state<'date' | 'amount'>('date');
 	let expenseSortDir = $state<'asc' | 'desc'>('desc');
 
@@ -80,7 +84,6 @@
 
 	const CATEGORY_CHART_TITLE = 'Expense by Category';
 	const CATEGORY_CHART_DESCRIPTION = 'Distribution across all vehicles';
-	const LOAD_FAILED_HINT = 'Check your connection and try again.';
 	const CHARTS_LOAD_ERROR = 'Charts could not be loaded. Check your connection and reload.';
 	const chartsLoading = Promise.all([
 		import('#lib/components/charts/ExpenseTrendChart.svelte'),
@@ -246,7 +249,7 @@
 	});
 
 	async function loadVehicle() {
-		vehicleLoadFailed = false;
+		vehicleLoadError = null;
 		try {
 			vehicle = await vehicleApi.getVehicle(vehicleId);
 		} catch (error) {
@@ -255,13 +258,13 @@
 				goto(resolve(routes.dashboard));
 				return;
 			}
-			vehicleLoadFailed = true;
+			vehicleLoadError = userFacingErrorMessage(error);
 		}
 	}
 
 	async function loadSummary() {
 		isLoadingStats = true;
-		summaryLoadFailed = false;
+		summaryLoadError = null;
 		try {
 			summary = await expenseApi.getExpenseSummary({
 				vehicleId,
@@ -269,7 +272,7 @@
 			});
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load expense summary');
-			summaryLoadFailed = true;
+			summaryLoadError = userFacingErrorMessage(error);
 		} finally {
 			isLoadingStats = false;
 		}
@@ -300,7 +303,7 @@
 
 	async function fetchExpensesPage(offset: number) {
 		isLoadingPage = true;
-		expensesLoadFailed = false;
+		expensesLoadError = null;
 		try {
 			const result = await expenseApi.getExpensesByVehicle(
 				vehicleId,
@@ -311,7 +314,7 @@
 			currentOffset = offset;
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load expenses');
-			expensesLoadFailed = true;
+			expensesLoadError = userFacingErrorMessage(error);
 		} finally {
 			isLoadingPage = false;
 		}
@@ -497,13 +500,13 @@
 			</div>
 		</div>
 	</div>
-{:else if vehicleLoadFailed}
+{:else if vehicleLoadError}
 	<div class="rounded-lg border bg-card p-6">
 		<div class="mb-4 flex items-center gap-3 text-destructive">
 			<CircleAlert class="h-5 w-5" />
 			<p class="font-medium">Failed to load vehicle</p>
 		</div>
-		<p class="mb-4 text-sm text-muted-foreground">{LOAD_FAILED_HINT}</p>
+		<p class="mb-4 text-sm text-muted-foreground">{vehicleLoadError}</p>
 		<Button size="lg" onclick={loadPage}>Retry</Button>
 	</div>
 {:else if vehicle}
@@ -556,13 +559,13 @@
 					<InsuranceTab {vehicleId} readOnly={!isOwner} />
 				{/if}
 
-				{#if summaryLoadFailed && !isLoadingStats}
+				{#if summaryLoadError && !isLoadingStats}
 					<div class="rounded-lg border bg-card p-6">
 						<div class="mb-4 flex items-center gap-3 text-destructive">
 							<CircleAlert class="h-5 w-5" />
 							<p class="font-medium">Failed to load expense summary</p>
 						</div>
-						<p class="mb-4 text-sm text-muted-foreground">{LOAD_FAILED_HINT}</p>
+						<p class="mb-4 text-sm text-muted-foreground">{summaryLoadError}</p>
 						<Button onclick={loadSummary}>Retry</Button>
 					</div>
 				{:else if !hasExpenseData}
@@ -601,6 +604,7 @@
 						{vehicleStatsData}
 						{isLoadingStats}
 						{selectedStatsPeriod}
+						unitPreferences={vehicle?.unitPreferences}
 					/>
 
 					{#await chartsLoading}
@@ -663,11 +667,11 @@
 								{/if}
 							</CardFull.Header>
 							<CardFull.Content>
-								{#if expensesLoadFailed && !isLoadingPage}
+								{#if expensesLoadError && !isLoadingPage}
 									<div class="flex flex-col items-center gap-3 py-8 text-center">
 										<CircleAlert class="h-8 w-8 text-destructive" />
 										<p class="font-medium">Failed to load expenses</p>
-										<p class="text-sm text-muted-foreground">{LOAD_FAILED_HINT}</p>
+										<p class="text-sm text-muted-foreground">{expensesLoadError}</p>
 										<Button variant="outline" onclick={() => fetchExpensesPage(currentOffset)}>
 											Retry
 										</Button>

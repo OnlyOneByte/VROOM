@@ -157,6 +157,8 @@ export class ExpenseFormState {
 		const fields: string[] = this.isGroupEditMode
 			? ['category', 'amount', 'date']
 			: ['vehicleId', 'category', 'amount', 'date'];
+		const fuelNeedsVehicle =
+			this.showFuelFields && !this.vehicle && !!this.vehicleError && !this.isGroupEditMode;
 		if (this.showFuelFields) {
 			fields.push('mileage');
 			if (this.showVolumeField) fields.push('volume');
@@ -166,7 +168,9 @@ export class ExpenseFormState {
 		const ctx = this.validationContext();
 		for (const field of fields) {
 			const error = validateExpenseField(field, ctx);
-			if (error) this.errors[field] = error;
+			if (!error) continue;
+			const hidden = fuelNeedsVehicle && (field === 'volume' || field === 'charge');
+			this.errors[hidden ? 'vehicleDetails' : field] = error;
 		}
 
 		return Object.keys(this.errors).length === 0;

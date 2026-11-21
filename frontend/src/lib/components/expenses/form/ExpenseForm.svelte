@@ -121,6 +121,15 @@
 	});
 
 	let isRetrying = $state(false);
+	let retryButton = $state<HTMLButtonElement | null>(null);
+
+	async function save() {
+		await submitExpense(form);
+		if (form.errors['vehicleDetails'] && retryButton) {
+			retryButton.scrollIntoView({ block: 'center' });
+			retryButton.focus({ preventScroll: true });
+		}
+	}
 
 	async function retry(load: () => Promise<void>) {
 		isRetrying = true;
@@ -241,7 +250,7 @@
 			<form
 				onsubmit={e => {
 					e.preventDefault();
-					submitExpense(form);
+					save();
 				}}
 				class="rounded-lg border bg-card p-6 space-y-6"
 			>
@@ -257,7 +266,7 @@
 						<Info class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
 						<p class="text-sm text-foreground">
 							You can change the vehicles and amounts of a split here. To change its date, category,
-							mileage or notes, delete the split and add it again.
+							mileage, description, location or tags, delete the split and add it again.
 						</p>
 					</div>
 				{/if}
@@ -291,16 +300,18 @@
 							</p>
 						{/if}
 						{#if form.vehicleError}
-							<div
-								class="flex flex-wrap items-center gap-3 text-sm"
-								role="alert"
-								data-testid="vehicle-load-error"
-							>
-								<CircleAlert class="h-4 w-4 shrink-0 text-destructive" />
-								<span class="text-destructive">Couldn't load this vehicle's details.</span>
+							<div class="space-y-2 text-sm" role="alert" data-testid="vehicle-load-error">
+								<p id="vehicle-load-message" class="flex items-start gap-2 text-destructive">
+									<CircleAlert class="mt-0.5 h-4 w-4 shrink-0" />
+									{form.showFuelFields
+										? "Couldn't load this vehicle's details, so this fill-up can't be saved yet."
+										: "Couldn't load this vehicle's details."}
+								</p>
 								<Button
+									bind:ref={retryButton}
 									variant="outline"
 									size="lg"
+									aria-describedby="vehicle-load-message"
 									disabled={isRetrying}
 									onclick={() => retry(() => loadVehicleContext(form))}
 								>
@@ -435,7 +446,7 @@
 				onDelete={confirmDelete}
 				onDuplicate={handleDuplicate}
 				onCancel={handleBack}
-				onSave={() => submitExpense(form)}
+				onSave={save}
 			/>
 		</div>
 	{/if}

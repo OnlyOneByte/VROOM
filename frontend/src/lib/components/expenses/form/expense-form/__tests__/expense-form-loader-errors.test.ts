@@ -46,7 +46,10 @@ describe('expense form loader failures are reported', () => {
 		await loadVehicles(state);
 		expect(state.vehiclesError).toBe('offline');
 		expect(addNotification).toHaveBeenCalledWith(
-			expect.objectContaining({ type: 'error', message: 'Failed to load vehicles: offline' })
+			expect.objectContaining({
+				type: 'error',
+				message: 'Failed to load vehicles. Offline.'
+			})
 		);
 
 		vehicleApiMock.getVehicles.mockResolvedValueOnce([makeVehicle('v1')]);
@@ -83,7 +86,7 @@ describe('expense form loader failures are reported', () => {
 		expect(addNotification).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'error',
-				message: "Failed to load this vehicle's details: offline"
+				message: "Failed to load this vehicle's details. Offline."
 			})
 		);
 

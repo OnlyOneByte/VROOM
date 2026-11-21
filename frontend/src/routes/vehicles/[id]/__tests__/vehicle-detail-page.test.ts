@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Expense, ExpenseSummary, Vehicle } from '#lib/types/index.ts';
-import { ApiError } from '#lib/utils/error-handling.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const goto = vi.fn((_url: string) => Promise.resolve());
 vi.mock('$app/navigation', () => ({ goto: (url: string) => goto(url) }));
@@ -146,15 +150,16 @@ async function mount() {
 	return view;
 }
 
+const TAB_CONTENT_MOUNTED: Record<string, () => unknown> = {
+	Overview: () => true,
+	Expenses: () => screen.queryByRole('textbox', { name: 'Search expenses' }),
+	Odometer: () => captured['odometer']
+};
+
 async function openTab(name: string) {
 	await fireEvent.click(screen.getByRole('tab', { name }));
+	await waitFor(() => expect(TAB_CONTENT_MOUNTED[name]?.()).toBeTruthy());
 	await settle();
-}
-
-async function openExpensesTable(): Promise<Record<string, unknown>> {
-	await openTab('Expenses');
-	await vi.waitFor(() => expect(captured['table']).toBeDefined());
-	return captured['table'] as Record<string, unknown>;
 }
 
 function lastListParams(): Record<string, unknown> {
@@ -304,7 +309,7 @@ describe('vehicle detail page overview', () => {
 	});
 
 	test('a summary failure shows the error and Retry reloads into the data view', async () => {
-		const failure = new Error('Summary service down');
+		const failure = new ApiError('Summary service down', 500);
 		getExpenseSummary.mockRejectedValueOnce(failure);
 		getExpenseSummary.mockResolvedValueOnce(DATA_SUMMARY);
 		await mount();
@@ -314,7 +319,7 @@ describe('vehicle detail page overview', () => {
 			'Failed to load expense summary'
 		);
 		expect(screen.getByText('Failed to load expense summary')).toBeInTheDocument();
-		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText('Summary service down')).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
@@ -330,7 +335,7 @@ describe('vehicle detail page overview', () => {
 		await mount();
 
 		expect(screen.getAllByText('Failed to load expense summary')).toHaveLength(1);
-		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
+		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 
 	test('with expenses the overview hands the period, trend and category data to its cards', async () => {
@@ -418,7 +423,7 @@ describe('vehicle detail page tabs', () => {
 
 		await openTab('Expenses');
 		await openTab('Overview');
-		await openExpensesTable();
+		await openTab('Expenses');
 
 		expect(getExpensesByVehicle).toHaveBeenCalledTimes(1);
 		expect(lastListParams()).toMatchObject({
@@ -427,20 +432,20 @@ describe('vehicle detail page tabs', () => {
 			sortBy: 'date',
 			sortDir: 'desc'
 		});
-		expect(await screen.findByText('All Expenses (1)')).toBeInTheDocument();
+		expect(screen.getByText('All Expenses (1)')).toBeInTheDocument();
 		expect(captured['table']?.['expenses']).toEqual([EXPENSE]);
 	});
 
 	test('an expenses load failure shows the error and Retry refetches the same page', async () => {
-		const failure = new Error('Expenses down');
+		const failure = new ApiError('Expenses down', 500);
 		getExpensesByVehicle.mockRejectedValueOnce(failure);
 		await mount();
 
 		await openTab('Expenses');
 
-		expect(await screen.findByText('Failed to load expenses')).toBeInTheDocument();
 		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to load expenses');
-		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
+		expect(screen.getByText('Failed to load expenses')).toBeInTheDocument();
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText('Expenses down')).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
@@ -457,13 +462,13 @@ describe('vehicle detail page tabs', () => {
 
 		await openTab('Expenses');
 
-		expect(await screen.findAllByText('Failed to load expenses')).toHaveLength(1);
-		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
+		expect(screen.getAllByText('Failed to load expenses')).toHaveLength(1);
+		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 
 	test('paging and sorting from the table refetch with the new parameters', async () => {
 		await mount();
-		await openExpensesTable();
+		await openTab('Expenses');
 
 		(captured['table']?.['onPageChange'] as (offset: number) => void)(20);
 		await settle();
@@ -481,7 +486,7 @@ describe('vehicle detail page tabs', () => {
 			pagination: { totalCount: 21, limit: 20, offset: 20, hasMore: false }
 		});
 		await mount();
-		await openExpensesTable();
+		await openTab('Expenses');
 		(captured['table']?.['onPageChange'] as (offset: number) => void)(20);
 		await settle();
 		const summaryCalls = getExpenseSummary.mock.calls.length;
@@ -495,7 +500,7 @@ describe('vehicle detail page tabs', () => {
 
 	test('clearing filters resets the category and reloads from the first page', async () => {
 		await mount();
-		await openExpensesTable();
+		await openTab('Expenses');
 		(captured['table']?.['onCategoryChange'] as (c: string) => void)('fuel');
 		await settle();
 		expect(lastListParams()).toMatchObject({ category: 'fuel' });
@@ -513,7 +518,7 @@ describe('vehicle detail page tabs', () => {
 		await mount();
 		await openTab('Expenses');
 
-		await fireEvent.click(await screen.findByRole('button', { name: /export csv/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /export csv/i }));
 		await settle();
 
 		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to export expenses');
@@ -523,8 +528,7 @@ describe('vehicle detail page tabs', () => {
 	test('shared users cannot export CSV', async () => {
 		getVehicle.mockResolvedValue(EDITOR_VEHICLE);
 		await mount();
-		await openExpensesTable();
-		expect(await screen.findByText('All Expenses (1)')).toBeInTheDocument();
+		await openTab('Expenses');
 
 		expect(screen.queryByRole('button', { name: /export csv/i })).toBeNull();
 		expect(captured['table']?.['canWrite']).toBe(true);

@@ -9,6 +9,10 @@ global.fetch = mockFetch;
 
 const OfflineIndicator = (await import('../OfflineIndicator.svelte')).default;
 
+const unreachableLabel = (_: string, element: Element | null) =>
+	element?.tagName === 'SPAN' &&
+	element.textContent?.replace(/\s+/g, ' ').trim() === "Can't reach VROOM";
+
 const alice: User = {
 	id: 'alice',
 	email: 'alice@example.com',
@@ -46,7 +50,7 @@ describe('OfflineIndicator — unverified session', () => {
 
 		render(OfflineIndicator);
 
-		expect(await screen.findByText("Can't reach VROOM")).toBeInTheDocument();
+		expect(await screen.findByText(unreachableLabel)).toBeInTheDocument();
 
 		const retry = screen.getByRole('button', { name: 'Retry' });
 		await vi.waitFor(() => expect(retry).toBeEnabled());
@@ -55,7 +59,7 @@ describe('OfflineIndicator — unverified session', () => {
 		await fireEvent.click(retry);
 
 		await vi.waitFor(() => expect(authStore.sessionUnverified).toBe(false));
-		expect(screen.queryByText("Can't reach VROOM")).not.toBeInTheDocument();
+		expect(screen.queryByText(unreachableLabel)).not.toBeInTheDocument();
 	});
 
 	it('re-checks the session by itself when the device comes back online', async () => {

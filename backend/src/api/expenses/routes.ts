@@ -168,9 +168,24 @@ function assertSingleExpenseEditAllowed(update: Record<string, unknown>, existin
       'This expense is managed by an insurance term. Edit the term to change it; only the description and tags can be edited here.'
     );
   }
+  if (existing.groupId && changed.some((field) => field === 'sourceType' || field === 'sourceId')) {
+    throw new ValidationError(
+      'This expense is part of a split, so its financing link is set for the whole split.'
+    );
+  }
   if (existing.groupId && changed.some((field) => SPLIT_LEG_LOCKED_FIELDS.has(field))) {
     throw new ValidationError(
       'This expense is part of a split, so its amount, vehicle, date and category are set for the whole split. Edit the split to change the amount or vehicles, or delete and re-create it to change the date or category.'
+    );
+  }
+  if (
+    existing.sourceType === 'financing' &&
+    update.vehicleId !== undefined &&
+    update.vehicleId !== existing.vehicleId &&
+    update.sourceType === undefined
+  ) {
+    throw new ValidationError(
+      "This payment is linked to the current vehicle's financing. Remove the link, or link the new vehicle's financing, to move it."
     );
   }
 }
