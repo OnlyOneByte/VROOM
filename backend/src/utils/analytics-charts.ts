@@ -73,6 +73,9 @@ export interface FuelExpenseRow {
 export const isFillup = (r: Pick<FuelExpenseRow, 'volume' | 'fuelType'>): boolean =>
   r.volume != null && r.volume > 0 && !isElectricFuelType(r.fuelType);
 
+export const isChargeSession = (r: Pick<FuelExpenseRow, 'volume' | 'fuelType'>): boolean =>
+  r.volume != null && r.volume > 0 && isElectricFuelType(r.fuelType);
+
 export interface GeneralExpenseRow {
   id: string;
   vehicleId: string;
@@ -258,10 +261,11 @@ export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
 }
 
 export function buildGasPriceHistory(
-  rows: FuelExpenseRow[]
+  rows: FuelExpenseRow[],
+  include: (r: FuelExpenseRow) => boolean = isFillup
 ): Array<{ date: string; fuelType: string; pricePerVolume: number }> {
   return rows
-    .filter((r) => isFillup(r) && r.expenseAmount > 0 && r.date != null)
+    .filter((r) => include(r) && r.expenseAmount > 0 && r.date != null)
     .map((r) => ({
       date: r.date instanceof Date ? r.date.toISOString() : String(r.date),
       fuelType: r.fuelType ?? 'Regular',
