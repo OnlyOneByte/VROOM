@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Expense, ExpenseSummary, Vehicle } from '#lib/types/index.ts';
-import { ApiError } from '#lib/utils/error-handling.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const goto = vi.fn((_url: string) => Promise.resolve());
 vi.mock('$app/navigation', () => ({ goto: (url: string) => goto(url) }));
@@ -305,7 +309,7 @@ describe('vehicle detail page overview', () => {
 	});
 
 	test('a summary failure shows the error and Retry reloads into the data view', async () => {
-		const failure = new Error('Summary service down');
+		const failure = new ApiError('Summary service down', 500);
 		getExpenseSummary.mockRejectedValueOnce(failure);
 		getExpenseSummary.mockResolvedValueOnce(DATA_SUMMARY);
 		await mount();
@@ -315,7 +319,7 @@ describe('vehicle detail page overview', () => {
 			'Failed to load expense summary'
 		);
 		expect(screen.getByText('Failed to load expense summary')).toBeInTheDocument();
-		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText('Summary service down')).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
@@ -331,7 +335,7 @@ describe('vehicle detail page overview', () => {
 		await mount();
 
 		expect(screen.getAllByText('Failed to load expense summary')).toHaveLength(1);
-		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
+		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 
 	test('with expenses the overview hands the period, trend and category data to its cards', async () => {
@@ -433,7 +437,7 @@ describe('vehicle detail page tabs', () => {
 	});
 
 	test('an expenses load failure shows the error and Retry refetches the same page', async () => {
-		const failure = new Error('Expenses down');
+		const failure = new ApiError('Expenses down', 500);
 		getExpensesByVehicle.mockRejectedValueOnce(failure);
 		await mount();
 
@@ -441,7 +445,7 @@ describe('vehicle detail page tabs', () => {
 
 		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, 'Failed to load expenses');
 		expect(screen.getByText('Failed to load expenses')).toBeInTheDocument();
-		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText('Expenses down')).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
@@ -459,7 +463,7 @@ describe('vehicle detail page tabs', () => {
 		await openTab('Expenses');
 
 		expect(screen.getAllByText('Failed to load expenses')).toHaveLength(1);
-		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
+		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 
 	test('paging and sorting from the table refetch with the new parameters', async () => {

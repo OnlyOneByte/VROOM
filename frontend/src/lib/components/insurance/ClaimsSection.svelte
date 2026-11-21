@@ -13,6 +13,7 @@
 	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
 	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
 	import {
 		capitalize,
 		formatCurrency,
@@ -133,7 +134,7 @@
 
 	async function handleSubmit() {
 		if (!claimDate) {
-			handleErrorWithNotification(new Error('Claim date is required'), 'Claim date is required');
+			appStore.showError('Enter a claim date.');
 			return;
 		}
 		isSaving = true;
