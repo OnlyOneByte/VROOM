@@ -116,7 +116,7 @@ async function renderCreate(): Promise<void> {
 async function renderEdit(vehicle: Vehicle = EXISTING): Promise<void> {
 	getVehicle.mockResolvedValue(vehicle);
 	render(VehicleForm, { props: { vehicleId: vehicle.id } });
-	await screen.findByRole('heading', { name: 'Edit Vehicle' });
+	await screen.findByRole('button', { name: /update vehicle/i });
 }
 
 async function fillRequired(): Promise<void> {
@@ -425,13 +425,22 @@ describe('VehicleForm edit mode', () => {
 
 		await screen.findByText("Couldn't load this vehicle");
 		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeTruthy();
+		expect(screen.getByRole('heading', { level: 1, name: 'Edit Vehicle' })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Go back' })).toBeTruthy();
 		expect(goto).not.toHaveBeenCalled();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
-		await screen.findByRole('heading', { name: 'Edit Vehicle' });
+		await screen.findByDisplayValue('Honda');
 		expect(getVehicle).toHaveBeenCalledTimes(2);
-		expect(input('make').value).toBe('Honda');
+	});
+
+	test('the page keeps its title while the vehicle loads', async () => {
+		getVehicle.mockReturnValueOnce(new Promise(() => {}));
+		render(VehicleForm, { props: { vehicleId: EXISTING.id } });
+
+		expect(await screen.findByRole('heading', { level: 1, name: 'Edit Vehicle' })).toBeTruthy();
+		expect(document.getElementById('make')).toBeNull();
 	});
 
 	test('update sends edited fields and nulls for optionals the user emptied', async () => {

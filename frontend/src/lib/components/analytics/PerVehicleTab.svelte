@@ -178,7 +178,7 @@
 					<p class="font-medium">Couldn't load vehicle analytics</p>
 				</div>
 				<p class="text-sm text-muted-foreground mb-4">{error}</p>
-				<Button onclick={() => selectedVehicleId && loadVehicleData(selectedVehicleId)}>
+				<Button size="lg" onclick={() => selectedVehicleId && loadVehicleData(selectedVehicleId)}>
 					Retry
 				</Button>
 			</div>
