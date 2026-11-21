@@ -163,13 +163,13 @@ describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership', () => {
   });
 });
 
-describe('POST /api/v1/expenses — forceOverwrite keep-local resolution', () => {
+describe('POST /api/v1/expenses — the retired forceOverwrite path', () => {
   async function postExpense(body: Record<string, unknown>) {
     const res = await ctx.authed('POST', '/api/v1/expenses', body);
     return { res, body: await json<DataEnvelope<{ id: string; expenseAmount: number }>>(res) };
   }
 
-  test('a collision WITH forceOverwrite applies the local edit in place (same id, new amount)', async () => {
+  test('forceOverwrite is rejected with a 400 and leaves the stored row untouched', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const clientId = 'c51-overwrite';
     const first = await postExpense({
@@ -182,7 +182,7 @@ describe('POST /api/v1/expenses — forceOverwrite keep-local resolution', () =>
     });
     expect(first.res.status, JSON.stringify(first.body)).toBe(201);
 
-    const resolved = await postExpense({
+    const stale = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'misc',
       expenseAmount: 88,
@@ -191,13 +191,11 @@ describe('POST /api/v1/expenses — forceOverwrite keep-local resolution', () =>
       clientId,
       forceOverwrite: true,
     });
-    expect(resolved.res.status, JSON.stringify(resolved.body)).toBeLessThan(300);
-    expect(resolved.body.data.id, 'same row updated in place').toBe(first.body.data.id);
-    expect(resolved.body.data.expenseAmount, 'local edit applied').toBe(88);
+    expect(stale.status).toBe(400);
 
     const list = await ctx.authed('GET', `/api/v1/expenses?vehicleId=${vehicleId}`);
-    const listBody = await json<PaginatedEnvelope<ExpenseRow>>(list);
-    expect(listBody.data.length).toBe(1);
+    const listBody = await json<PaginatedEnvelope<ExpenseRow & { expenseAmount: number }>>(list);
+    expect(listBody.data.map((e) => e.expenseAmount)).toEqual([10]);
   });
 
   test('a collision WITHOUT forceOverwrite is the idempotent no-op (original amount kept)', async () => {
@@ -225,9 +223,8 @@ describe('POST /api/v1/expenses — forceOverwrite keep-local resolution', () =>
 });
 
 describe('a keep-local overwrite that switches fuel→non-fuel clears the stale fuel fields', () => {
-  test('overwriting a fuel row with a maintenance edit nulls volume/mileage/fuelType', async () => {
+  test('overwriting a fuel row with a maintenance edit over PUT nulls volume/mileage/fuelType', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    const clientId = 'c52-fuel-switch';
 
     const first = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
@@ -237,19 +234,17 @@ describe('a keep-local overwrite that switches fuel→non-fuel clears the stale 
       volume: 12,
       mileage: 41000,
       fuelType: '87 (Regular)',
-      clientId,
+      clientId: 'c52-fuel-switch',
     });
     const firstBody = await json<DataEnvelope<{ id: string; mileage: number | null }>>(first);
     expect(first.status, JSON.stringify(firstBody)).toBe(201);
     expect(firstBody.data.mileage).toBe(41000);
 
-    const resolved = await ctx.authed('POST', '/api/v1/expenses', {
+    const resolved = await ctx.authed('PUT', `/api/v1/expenses/${firstBody.data.id}`, {
       vehicleId,
       category: 'maintenance',
       expenseAmount: 40,
       date: '2026-05-03T12:00:00.000Z',
-      clientId,
-      forceOverwrite: true,
     });
     const resolvedBody =
       await json<
@@ -261,7 +256,7 @@ describe('a keep-local overwrite that switches fuel→non-fuel clears the stale 
           fuelType: string | null;
         }>
       >(resolved);
-    expect(resolved.status, JSON.stringify(resolvedBody)).toBeLessThan(300);
+    expect(resolved.status, JSON.stringify(resolvedBody)).toBe(200);
 
     expect(resolvedBody.data.id).toBe(firstBody.data.id);
     expect(resolvedBody.data.category).toBe('maintenance');

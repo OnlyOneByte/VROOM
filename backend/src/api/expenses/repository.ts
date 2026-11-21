@@ -180,29 +180,20 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return result[0] ?? null;
   }
 
-  async createIdempotent(data: NewExpense, overwrite = false): Promise<Expense> {
+  async createIdempotent(data: NewExpense): Promise<Expense> {
     if (!data.clientId) {
       return this.create(data);
     }
     const existing = await this.findByClientId(data.clientId, data.userId);
-    if (existing) {
-      return overwrite ? this.applyLocalOverwrite(existing.id, data) : existing;
-    }
+    if (existing) return existing;
 
     try {
       return await this.create(data);
     } catch (error) {
       const raced = await this.findByClientId(data.clientId, data.userId);
-      if (raced) {
-        return overwrite ? this.applyLocalOverwrite(raced.id, data) : raced;
-      }
+      if (raced) return raced;
       throw error;
     }
-  }
-
-  private applyLocalOverwrite(rowId: string, data: NewExpense): Promise<Expense> {
-    const { clientId: _clientId, userId: _userId, ...patch } = data;
-    return this.update(rowId, patch);
   }
 
   // bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.
