@@ -8,7 +8,10 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import type { ReminderWithVehicles, Vehicle } from '#lib/types/index.ts';
 	import { ReminderFormState } from './reminder-form/reminder-form-state.svelte';
-	import { serverFieldErrors } from './reminder-form/reminder-form-validation';
+	import {
+		SERVER_FIELD_ERRORS_TOAST,
+		serverFieldErrors
+	} from './reminder-form/reminder-form-validation';
 	import ReminderBasicsFields from './reminder-form/ReminderBasicsFields.svelte';
 	import ReminderExpenseFields from './reminder-form/ReminderExpenseFields.svelte';
 	import ReminderMileageFields from './reminder-form/ReminderMileageFields.svelte';
@@ -53,11 +56,13 @@
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to save reminder:', error);
 			const fieldErrors = serverFieldErrors(error);
-			if (Object.keys(fieldErrors).length > 0) form.errors = fieldErrors;
+			const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+			if (hasFieldErrors) form.errors = fieldErrors;
 			appStore.addNotification({
 				type: 'error',
-				message:
-					Object.values(fieldErrors)[0] ?? `Failed to ${isEdit ? 'update' : 'create'} reminder`
+				message: hasFieldErrors
+					? SERVER_FIELD_ERRORS_TOAST
+					: `Failed to ${isEdit ? 'update' : 'create'} reminder`
 			});
 		} finally {
 			form.isSubmitting = false;

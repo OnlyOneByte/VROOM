@@ -20,6 +20,9 @@ describe('fuel on a reminder that spans vehicles', () => {
 		const errors = validateReminderDraft(
 			validDraft({ ...fuelExpense, selectedVehicleIds: ['v1', 'v2'] })
 		);
+		expect(FUEL_SPLIT_ERROR).toBe(
+			'Fuel can’t be split across vehicles. Pick another category, or select one vehicle.'
+		);
 		expect(errors['expenseCategory']).toBe(FUEL_SPLIT_ERROR);
 	});
 
@@ -29,19 +32,35 @@ describe('fuel on a reminder that spans vehicles', () => {
 });
 
 describe('serverFieldErrors', () => {
-	test('maps the server validation issues onto the form fields', () => {
-		const error = new ApiError('Invalid json', 400, {
-			target: 'json',
-			issues: [
-				{ path: ['expenseCategory'], message: 'Fuel expenses cannot be split.' },
-				{ path: ['expenseSplitConfig', 'allocations'], message: 'Allocations must sum to 100' },
-				{ path: ['expenseCategory'], message: 'A second message for the same field' }
-			]
-		});
+	const apiError = (issues: unknown[]) =>
+		new ApiError('Invalid json', 400, { target: 'json', issues });
+
+	test('maps the app’s own validation messages onto fields the form shows', () => {
+		const error = apiError([
+			{ code: 'custom', path: ['expenseCategory'], message: 'Fuel expenses cannot be split.' },
+			{
+				code: 'custom',
+				path: ['expenseSplitConfig', 'allocations'],
+				message: 'Percentage allocations must sum to 100'
+			},
+			{ code: 'custom', path: ['expenseCategory'], message: 'A second message for the field' }
+		]);
 		expect(serverFieldErrors(error)).toEqual({
 			expenseCategory: 'Fuel expenses cannot be split.',
-			split: 'Allocations must sum to 100'
+			split: 'Percentage allocations must sum to 100'
 		});
+	});
+
+	test('drops raw schema messages and fields the form has no error slot for', () => {
+		const error = apiError([
+			{
+				code: 'too_big',
+				path: ['name'],
+				message: 'Too big: expected string to have <=100 characters'
+			},
+			{ code: 'custom', path: ['expenseTags'], message: 'Tag problem' }
+		]);
+		expect(serverFieldErrors(error)).toEqual({});
 	});
 
 	test('returns nothing for errors without validation issues', () => {

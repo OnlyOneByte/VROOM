@@ -35,8 +35,8 @@
 					{#each EXPENSE_CATEGORIES as c (c)}
 						{@const unavailable = c === 'fuel' && !fuelAllowed}
 						<Select.Item value={c} label={categoryLabels[c]} disabled={unavailable}>
-							{categoryLabels[c]}{#if unavailable}<span class="text-xs text-muted-foreground"
-									>One vehicle only</span
+							{categoryLabels[c]}{#if unavailable}<span class="sr-only">, </span><span
+									class="text-xs text-muted-foreground">One vehicle only</span
 								>{/if}
 						</Select.Item>
 					{/each}

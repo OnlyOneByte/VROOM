@@ -53,16 +53,37 @@ export function validateReminderDraft(draft: ReminderDraft): Record<string, stri
 }
 
 const SERVER_FIELD_TO_FORM_FIELD: Record<string, string> = { expenseSplitConfig: 'split' };
+const FIELDS_WITH_ERROR_SLOT = new Set([
+	'name',
+	'vehicleIds',
+	'intervalValue',
+	'intervalMileage',
+	'lastServiceOdometer',
+	'endDate',
+	'expenseAmount',
+	'expenseCategory',
+	'split'
+]);
+
+export const SERVER_FIELD_ERRORS_TOAST =
+	'Couldn’t save the reminder. Check the highlighted fields.';
+
+interface ServerIssue {
+	code?: unknown;
+	path?: unknown[];
+	message?: unknown;
+}
 
 export function serverFieldErrors(error: unknown): Record<string, string> {
 	const issues = error instanceof ApiError ? error.details?.['issues'] : undefined;
 	if (!Array.isArray(issues)) return {};
 	const errors: Record<string, string> = {};
-	for (const issue of issues as Array<{ path?: unknown[]; message?: unknown }>) {
+	for (const issue of issues as ServerIssue[]) {
 		const field = issue.path?.[0];
-		if (typeof field !== 'string' || typeof issue.message !== 'string') continue;
+		if (issue.code !== 'custom' || typeof field !== 'string') continue;
+		if (typeof issue.message !== 'string') continue;
 		const key = SERVER_FIELD_TO_FORM_FIELD[field] ?? field;
-		errors[key] ??= issue.message;
+		if (FIELDS_WITH_ERROR_SLOT.has(key)) errors[key] ??= issue.message;
 	}
 	return errors;
 }
