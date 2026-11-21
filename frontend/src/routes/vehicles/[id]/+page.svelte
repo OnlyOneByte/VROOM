@@ -50,7 +50,7 @@
 	let vehicleId = $derived(data.vehicleId);
 
 	let isLoading = $state(true);
-	let vehicleLoadError = $state<string | null>(null);
+	let vehicleLoadFailed = $state(false);
 	let isLoadingStats = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 	let activeTab = $state('overview');
@@ -60,7 +60,7 @@
 
 	let summary = $state<ExpenseSummary | null>(null);
 	let fuelEfficiencyPoints = $state<FuelEfficiencyPoint[]>([]);
-	let summaryLoadError = $state<string | null>(null);
+	let summaryLoadFailed = $state(false);
 
 	let expenses = $state<Expense[]>([]);
 	let currentOffset = $state(0);
@@ -68,7 +68,7 @@
 	let totalCount = $state(0);
 	let isLoadingPage = $state(false);
 	let hasLoadedExpensesTab = $state(false);
-	let expensesLoadError = $state<string | null>(null);
+	let expensesLoadFailed = $state(false);
 	let expenseSortBy = $state<'date' | 'amount'>('date');
 	let expenseSortDir = $state<'asc' | 'desc'>('desc');
 
@@ -80,6 +80,7 @@
 
 	const CATEGORY_CHART_TITLE = 'Expense by Category';
 	const CATEGORY_CHART_DESCRIPTION = 'Distribution across all vehicles';
+	const LOAD_FAILED_HINT = 'Check your connection and try again.';
 	const CHARTS_LOAD_ERROR = 'Charts could not be loaded. Check your connection and reload.';
 	const chartsLoading = Promise.all([
 		import('#lib/components/charts/ExpenseTrendChart.svelte'),
@@ -93,6 +94,7 @@
 		]);
 	const loadOdometerTab = () => import('#lib/components/vehicles/OdometerTab.svelte');
 	const loadFinanceTab = () => import('#lib/components/vehicles/FinanceTab.svelte');
+	const loadUploadDialog = () => import('#lib/components/common/MediaCaptureDialog.svelte');
 
 	let searchTerm = $state('');
 	let filters = $state<ExpenseFilters>({});
@@ -210,9 +212,14 @@
 
 	let hasPrefetchedTabs = false;
 	$effect(() => {
-		if (isLoading || hasPrefetchedTabs) return;
+		if (isLoading || !vehicle || hasPrefetchedTabs) return;
 		hasPrefetchedTabs = true;
-		void Promise.allSettled([loadExpensesTab(), loadOdometerTab(), loadFinanceTab()]);
+		void Promise.allSettled([
+			loadExpensesTab(),
+			loadOdometerTab(),
+			loadFinanceTab(),
+			...(isOwner ? [loadUploadDialog()] : [])
+		]);
 	});
 
 	$effect(() => {
@@ -239,7 +246,7 @@
 	});
 
 	async function loadVehicle() {
-		vehicleLoadError = null;
+		vehicleLoadFailed = false;
 		try {
 			vehicle = await vehicleApi.getVehicle(vehicleId);
 		} catch (error) {
@@ -248,13 +255,13 @@
 				goto(resolve(routes.dashboard));
 				return;
 			}
-			vehicleLoadError = error instanceof Error ? error.message : 'Failed to load vehicle';
+			vehicleLoadFailed = true;
 		}
 	}
 
 	async function loadSummary() {
 		isLoadingStats = true;
-		summaryLoadError = null;
+		summaryLoadFailed = false;
 		try {
 			summary = await expenseApi.getExpenseSummary({
 				vehicleId,
@@ -262,7 +269,7 @@
 			});
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load expense summary');
-			summaryLoadError = error instanceof Error ? error.message : 'Failed to load expense summary';
+			summaryLoadFailed = true;
 		} finally {
 			isLoadingStats = false;
 		}
@@ -293,7 +300,7 @@
 
 	async function fetchExpensesPage(offset: number) {
 		isLoadingPage = true;
-		expensesLoadError = null;
+		expensesLoadFailed = false;
 		try {
 			const result = await expenseApi.getExpensesByVehicle(
 				vehicleId,
@@ -304,7 +311,7 @@
 			currentOffset = offset;
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load expenses');
-			expensesLoadError = error instanceof Error ? error.message : 'Failed to load expenses';
+			expensesLoadFailed = true;
 		} finally {
 			isLoadingPage = false;
 		}
@@ -490,13 +497,13 @@
 			</div>
 		</div>
 	</div>
-{:else if vehicleLoadError}
+{:else if vehicleLoadFailed}
 	<div class="rounded-lg border bg-card p-6">
 		<div class="mb-4 flex items-center gap-3 text-destructive">
 			<CircleAlert class="h-5 w-5" />
 			<p class="font-medium">Failed to load vehicle</p>
 		</div>
-		<p class="mb-4 text-sm text-muted-foreground">{vehicleLoadError}</p>
+		<p class="mb-4 text-sm text-muted-foreground">{LOAD_FAILED_HINT}</p>
 		<Button size="lg" onclick={loadPage}>Retry</Button>
 	</div>
 {:else if vehicle}
@@ -549,13 +556,13 @@
 					<InsuranceTab {vehicleId} readOnly={!isOwner} />
 				{/if}
 
-				{#if summaryLoadError && !isLoadingStats}
+				{#if summaryLoadFailed && !isLoadingStats}
 					<div class="rounded-lg border bg-card p-6">
 						<div class="mb-4 flex items-center gap-3 text-destructive">
 							<CircleAlert class="h-5 w-5" />
 							<p class="font-medium">Failed to load expense summary</p>
 						</div>
-						<p class="mb-4 text-sm text-muted-foreground">{summaryLoadError}</p>
+						<p class="mb-4 text-sm text-muted-foreground">{LOAD_FAILED_HINT}</p>
 						<Button onclick={loadSummary}>Retry</Button>
 					</div>
 				{:else if !hasExpenseData}
@@ -656,11 +663,11 @@
 								{/if}
 							</CardFull.Header>
 							<CardFull.Content>
-								{#if expensesLoadError && !isLoadingPage}
+								{#if expensesLoadFailed && !isLoadingPage}
 									<div class="flex flex-col items-center gap-3 py-8 text-center">
 										<CircleAlert class="h-8 w-8 text-destructive" />
 										<p class="font-medium">Failed to load expenses</p>
-										<p class="text-sm text-muted-foreground">{expensesLoadError}</p>
+										<p class="text-sm text-muted-foreground">{LOAD_FAILED_HINT}</p>
 										<Button variant="outline" onclick={() => fetchExpensesPage(currentOffset)}>
 											Retry
 										</Button>
@@ -725,7 +732,7 @@
 		</Tabs>
 
 		{#if hasOpenedUpload}
-			{#await import('#lib/components/common/MediaCaptureDialog.svelte') then { default: MediaCaptureDialog }}
+			{#await loadUploadDialog() then { default: MediaCaptureDialog }}
 				<MediaCaptureDialog
 					bind:open={showUploadDialog}
 					title="Upload Vehicle Photos"

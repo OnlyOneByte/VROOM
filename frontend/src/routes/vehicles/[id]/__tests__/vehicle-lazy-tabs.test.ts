@@ -42,6 +42,15 @@ vi.mock('#lib/components/vehicles/OdometerTab.svelte', () => {
 		}
 	};
 });
+let uploadMounted = false;
+vi.mock('#lib/components/common/MediaCaptureDialog.svelte', () => {
+	requested.add('upload');
+	return {
+		default: () => {
+			uploadMounted = true;
+		}
+	};
+});
 vi.mock('#lib/components/expenses/ExpensesTable.svelte', () => {
 	requested.add('expenses');
 	return { default: () => {} };
@@ -121,10 +130,13 @@ describe('vehicle page — tab, chart and dialog code loads on demand', () => {
 
 		releaseVehicle(VEHICLE);
 		const financeTab = await screen.findByRole('tab', { name: 'Finance' });
-		await waitFor(() => expect(requested).toEqual(new Set(['expenses', 'odometer', 'finance'])));
+		await waitFor(() =>
+			expect(requested).toEqual(new Set(['expenses', 'odometer', 'finance', 'upload']))
+		);
 		await new Promise(resolve => setTimeout(resolve, 100));
 		expect(financeProps).toBeNull();
 		expect(odometerProps).toBeNull();
+		expect(uploadMounted).toBe(false);
 
 		await fireEvent.click(financeTab);
 		await waitFor(() => expect(financeProps).not.toBeNull());
