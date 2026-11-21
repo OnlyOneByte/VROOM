@@ -4,6 +4,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { hasTermEnded } from '#lib/utils/insurance.ts';
 	import type { InsuranceTerm } from '#lib/types/index.ts';
 
 	interface Props {
@@ -18,12 +19,14 @@
 	let { term, isCurrent = false, vehicleNames = [], onEdit, onDelete, onRenew }: Props = $props();
 
 	let confirmOpen = $state(false);
+	let ended = $derived(hasTermEnded(term));
+	let termLabel = $derived(isCurrent ? (ended ? 'Latest Term' : 'Current Term') : 'Past Term');
 </script>
 
 <div class="rounded-lg border p-3 space-y-2 {isCurrent ? 'bg-muted/30' : 'bg-background'}">
 	<div class="flex items-center justify-between">
 		<Badge variant="secondary" class="text-xs">
-			{isCurrent ? 'Current Term' : 'Past Term'}
+			{termLabel}
 		</Badge>
 		<div class="flex items-center gap-2">
 			{#if onEdit}
@@ -61,7 +64,7 @@
 
 	<div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
 		{#if isCurrent}
-			<div class="text-muted-foreground">Expires</div>
+			<div class="text-muted-foreground">{ended ? 'Ended' : 'Expires'}</div>
 			<div class="font-medium text-foreground">{formatDate(term.endDate)}</div>
 		{:else}
 			<div class="text-muted-foreground">Start</div>

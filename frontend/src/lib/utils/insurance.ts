@@ -17,10 +17,15 @@ export function sortTermsByEndDateDesc(terms: InsuranceTerm[]): InsuranceTerm[] 
 	return [...terms].sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
 }
 
+export function hasTermEnded(
+	term: Pick<InsuranceTerm, 'endDate'>,
+	now: Date = new Date()
+): boolean {
+	return new Date(term.endDate).getTime() <= now.getTime();
+}
+
 export function isPolicyInForce(policy: InsurancePolicy, now: Date = new Date()): boolean {
-	return (
-		policy.isActive && policy.terms.some(term => new Date(term.endDate).getTime() > now.getTime())
-	);
+	return policy.isActive && policy.terms.some(term => !hasTermEnded(term, now));
 }
 
 export function groupPoliciesByActive(

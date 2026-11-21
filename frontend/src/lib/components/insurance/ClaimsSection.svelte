@@ -194,8 +194,8 @@
 	<div class="flex items-center justify-between">
 		<h5 class="text-sm font-medium text-foreground">Claims</h5>
 		{#if !showForm && !readOnly}
-			<Button variant="outline" size="sm" class="h-7 text-xs" onclick={openNew}>
-				<Plus class="mr-1 h-3 w-3" />
+			<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={openNew}>
+				<Plus />
 				File Claim
 			</Button>
 		{/if}
@@ -208,7 +208,7 @@
 	{:else if loadError}
 		<div class="rounded-md border border-destructive/40 bg-destructive/10 p-3">
 			<p class="text-xs text-destructive">{loadError}</p>
-			<Button variant="outline" size="sm" class="mt-2 h-7 text-xs" onclick={loadClaims}>
+			<Button variant="outline" size="sm" class="mt-2 h-10 sm:h-8" onclick={loadClaims}>
 				Retry
 			</Button>
 		</div>
@@ -250,34 +250,35 @@
 									<p class="mt-1 truncate text-xs text-muted-foreground">{claim.description}</p>
 								{/if}
 							</div>
-							<div class="flex shrink-0 items-center gap-0.5">
+							<div class="flex shrink-0 items-center gap-2">
 								{#if !readOnly}
 									<Button
 										variant="ghost"
 										size="icon"
-										class="h-7 w-7"
+										class="size-10 sm:size-9"
 										aria-label="Claim documents"
+										aria-expanded={expandedDocs.has(claim.id)}
 										onclick={() => toggleDocs(claim.id)}
 									>
-										<Paperclip class="h-3.5 w-3.5" />
+										<Paperclip />
 									</Button>
 									<Button
 										variant="ghost"
 										size="icon"
-										class="h-7 w-7"
+										class="size-10 sm:size-9"
 										aria-label="Edit claim"
 										onclick={() => openEdit(claim)}
 									>
-										<Pencil class="h-3.5 w-3.5" />
+										<Pencil />
 									</Button>
 									<Button
 										variant="ghost"
 										size="icon"
-										class="h-7 w-7"
+										class="size-10 sm:size-9"
 										aria-label="Delete claim"
 										onclick={() => requestDelete(claim.id)}
 									>
-										<Trash2 class="h-3.5 w-3.5 text-destructive" />
+										<Trash2 class="text-destructive" />
 									</Button>
 								{/if}
 							</div>
@@ -306,11 +307,11 @@
 						type="button"
 						variant="ghost"
 						size="icon"
-						class="h-7 w-7"
+						class="size-10 sm:size-9"
 						aria-label="Cancel"
 						onclick={closeForm}
 					>
-						<X class="h-3.5 w-3.5" />
+						<X />
 					</Button>
 				</div>
 
@@ -416,10 +417,17 @@
 				</div>
 
 				<div class="flex justify-end gap-2">
-					<Button type="button" variant="ghost" size="sm" onclick={closeForm} disabled={isSaving}>
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						class="h-10 sm:h-8"
+						onclick={closeForm}
+						disabled={isSaving}
+					>
 						Cancel
 					</Button>
-					<Button type="submit" size="sm" disabled={isSaving}>
+					<Button type="submit" size="sm" class="h-10 sm:h-8" disabled={isSaving}>
 						{#if isSaving}
 							<LoaderCircle class="mr-1 h-3.5 w-3.5 animate-spin" />
 						{/if}
