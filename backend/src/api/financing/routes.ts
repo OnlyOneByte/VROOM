@@ -9,6 +9,7 @@ import { financingWithBalanceToApi, moneyDollarsToCents } from '../../utils/mone
 import { isValidTimeZone } from '../../utils/time-zone';
 import {
   commonSchemas,
+  dateInput,
   validateFinancingOwnership,
   validateLoanTerms,
   validateVehicleOwnership,
@@ -44,7 +45,7 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
       CONFIG.validation.financing.maxTermMonths,
       `Term cannot exceed ${CONFIG.validation.financing.maxTermMonths} months`
     ),
-  startDate: z.coerce.date(),
+  startDate: dateInput,
   paymentAmount: moneyDollarsToCents((n) => n.min(0.01, 'Payment amount must be greater than 0')),
   paymentDayOfMonth: z
     .number()

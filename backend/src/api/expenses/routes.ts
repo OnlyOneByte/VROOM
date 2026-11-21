@@ -26,7 +26,12 @@ import {
   resolveVehicleOwnerId,
 } from '../../utils/sharing';
 import { isValidTimeZone } from '../../utils/time-zone';
-import { commonSchemas, validateFuelExpenseData, zValidator } from '../../utils/validation';
+import {
+  commonSchemas,
+  dateInput,
+  validateFuelExpenseData,
+  zValidator,
+} from '../../utils/validation';
 import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
@@ -73,7 +78,7 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
   category: expenseCategorySchema,
   expenseAmount: moneyDollarsToCents((n) => n.positive('Expense amount must be positive')),
   volume: z.number().positive('Volume must be positive').nullable().optional(),
-  date: z.coerce.date(),
+  date: dateInput,
   mileage: z.number().int().min(0, 'Mileage cannot be negative').nullable().optional(),
   description: z
     .string()
