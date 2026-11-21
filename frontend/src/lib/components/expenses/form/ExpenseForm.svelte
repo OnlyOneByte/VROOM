@@ -150,10 +150,10 @@
 	}
 
 	function handleReceiptDraft(draft: ReceiptDraft, image: File) {
+		if (draft.category) form.selectCategory(draft.category);
 		if (typeof draft.amount === 'number') form.formData.amount = String(draft.amount);
 		if (draft.date) form.formData.date = draft.date;
 		if (typeof draft.odometer === 'number') form.formData.mileage = String(draft.odometer);
-		if (draft.category) form.selectCategory(draft.category);
 		if (draft.vendor && !form.formData.description.trim()) {
 			form.formData.description = draft.vendor;
 		}
