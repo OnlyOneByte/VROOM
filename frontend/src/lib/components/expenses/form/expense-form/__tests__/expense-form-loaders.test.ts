@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Expense } from '#lib/types/index.ts';
 import { makeExpense, makeSplitGroup, makeVehicle } from './expense-form-fixtures';
-import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
+import {
+	ApiError,
+	NETWORK_FAILURE_MESSAGE,
+	NetworkError,
+	SERVER_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const { expenseApiMock, vehicleApiMock, addNotification, gotoDynamic } = vi.hoisted(() => ({
 	expenseApiMock: {
@@ -202,11 +207,11 @@ describe('loadExpense — single expense', () => {
 	});
 
 	test('a network failure stays on the page with an inline error', async () => {
-		expenseApiMock.getExpense.mockRejectedValue(new Error('offline'));
+		expenseApiMock.getExpense.mockRejectedValue(new NetworkError(new TypeError('fetch failed')));
 		const state = createState('e1');
 		await loadExpense(state);
 		expect(gotoDynamic).not.toHaveBeenCalled();
-		expect(state.expenseError).toBe('Offline.');
+		expect(state.expenseError).toBe(NETWORK_FAILURE_MESSAGE);
 	});
 });
 

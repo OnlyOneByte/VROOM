@@ -70,7 +70,11 @@ describe('ExpenseForm — a failed split create is never queued', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /save expense/i }));
 
 		await vi.waitFor(() => expect(createSplitExpense).toHaveBeenCalled());
-		await vi.waitFor(() => expect(submitError()).toBe('Network error. Please try again.'));
+		await vi.waitFor(() =>
+			expect(submitError()).toBe(
+				"Couldn't save this expense. Something went wrong on our side. Try again in a moment."
+			)
+		);
 		expect(loadOfflineExpenses()).toEqual([]);
 		expect(createExpense).not.toHaveBeenCalled();
 		expect(goto).not.toHaveBeenCalled();
