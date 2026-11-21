@@ -6,6 +6,7 @@ import { classifySyncFailure } from '#lib/utils/sync/classify-failure.ts';
 import { syncManager } from '#lib/utils/sync/sync-manager.ts';
 import { buildSplitConfig } from '#lib/utils/expense-helpers.ts';
 import { gotoDynamic } from '#lib/utils/navigation.ts';
+import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
 import type { ExpenseCategory } from '#lib/types/index.ts';
 import { toOfflineExpense } from '../offline-expense';
 import { buildExpenseData } from './expense-payload';
@@ -216,11 +217,7 @@ export async function deleteExpense(state: ExpenseFormState): Promise<void> {
 		});
 		gotoDynamic(returnTo);
 	} catch (error) {
-		if (import.meta.env.DEV) console.error('Failed to delete expense:', error);
-		appStore.addNotification({
-			type: 'error',
-			message: 'Failed to delete expense. Please try again.'
-		});
+		handleErrorWithNotification(error, "Couldn't delete this expense");
 	} finally {
 		state.isDeleting = false;
 		state.showDeleteConfirm = false;

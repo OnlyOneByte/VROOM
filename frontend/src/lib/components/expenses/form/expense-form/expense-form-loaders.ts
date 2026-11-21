@@ -31,7 +31,7 @@ export async function loadVehicles(state: ExpenseFormState): Promise<void> {
 		}
 	} catch (error) {
 		state.vehiclesError = userFacingErrorMessage(error);
-		handleErrorWithNotification(error, 'Failed to load vehicles');
+		handleErrorWithNotification(error, "Couldn't load your vehicles");
 	}
 }
 
@@ -188,5 +188,5 @@ export async function loadVehicleContext(state: ExpenseFormState): Promise<void>
 	const failure = failures.find(error => error !== null);
 	if (!isCurrent()) return;
 	state.vehicleError = failure ? userFacingErrorMessage(failure) : null;
-	if (failure) handleErrorWithNotification(failure, "Failed to load this vehicle's details");
+	if (failure) handleErrorWithNotification(failure, "Couldn't load this vehicle's details");
 }

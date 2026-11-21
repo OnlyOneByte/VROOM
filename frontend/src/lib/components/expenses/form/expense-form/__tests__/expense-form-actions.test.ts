@@ -374,11 +374,17 @@ describe('deleteExpense', () => {
 	});
 
 	test('a delete failure notifies, stays on the page and closes the confirm dialog', async () => {
-		expenseApiMock.deleteExpense.mockRejectedValue(new Error('500'));
+		expenseApiMock.deleteExpense.mockRejectedValue(new ApiError('Internal server error', 500));
 		const state = createState('e1');
 		state.showDeleteConfirm = true;
 		await deleteExpense(state);
-		notified('error', 'Failed to delete expense. Please try again.');
+		expect(addNotification).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: 'error',
+				message:
+					"Couldn't delete this expense. Something went wrong on our side. Try again in a moment."
+			})
+		);
 		expect(gotoDynamic).not.toHaveBeenCalled();
 		expect(state.isDeleting).toBe(false);
 		expect(state.showDeleteConfirm).toBe(false);
