@@ -27,6 +27,7 @@
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import * as Collapsible from '#lib/components/ui/collapsible/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import {
 		Card,
 		CardContent,
@@ -625,8 +626,37 @@
 	{#if isLoading}
 		<div class="space-y-6">
 			{@render header()}
-			<div class="flex items-center justify-center py-12">
-				<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
+			<div
+				class="space-y-6 pb-32 sm:pb-24"
+				role="status"
+				aria-label="Loading vehicle"
+				data-testid="vehicle-form-loading"
+			>
+				<Card>
+					<CardHeader>
+						<Skeleton class="h-5 w-48" />
+						<Skeleton class="h-4 w-64 max-w-full" />
+					</CardHeader>
+					<CardContent>
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+							{#each Array(4) as _, i (i)}
+								<div class="space-y-2">
+									<Skeleton class="h-4 w-24" />
+									<Skeleton class="h-9 w-full" />
+								</div>
+							{/each}
+						</div>
+					</CardContent>
+				</Card>
+			</div>
+			<div
+				class="fixed bottom-4 left-4 right-4 z-50 flex justify-center gap-3 sm:bottom-8 sm:right-8 sm:left-auto sm:gap-4"
+				aria-hidden="true"
+			>
+				{#each Array(2) as _, i (i)}
+					<Skeleton class="h-14 w-14 rounded-full sm:w-28" />
+				{/each}
+				<Skeleton class="h-14 flex-1 rounded-full sm:w-44 sm:flex-none" />
 			</div>
 		</div>
 	{:else if loadError}

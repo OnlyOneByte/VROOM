@@ -45,6 +45,16 @@ describe('VehicleForm page title', () => {
 		).toBeTruthy();
 	});
 
+	test('edit mode shows a form-shaped skeleton under the title while the vehicle loads', async () => {
+		getVehicle.mockReturnValue(new Promise(() => {}));
+		const { container } = render(VehicleForm, { props: { vehicleId: 'veh-1' } });
+
+		const loading = await screen.findByRole('status', { name: 'Loading vehicle' });
+		expectSharedPageTitle('Edit Vehicle');
+		expect(loading.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThanOrEqual(10);
+		expect(container.querySelector('.animate-spin')).toBeNull();
+	});
+
 	test('edit mode names the vehicle under the title', async () => {
 		getVehicle.mockResolvedValue({
 			id: 'veh-1',
