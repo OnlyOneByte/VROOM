@@ -93,11 +93,15 @@ function adoptUnscopedQueue(): void {
 	}
 }
 
-export function loadOfflineExpenses(): OfflineExpense[] {
+export function currentOfflineQueueOwner(): string | null {
+	return queueOwner;
+}
+
+export function loadOfflineExpenses(owner: string | null = queueOwner): OfflineExpense[] {
 	if (!browser) return [];
 
 	try {
-		const stored = localStorage.getItem(queueStorageKey());
+		const stored = localStorage.getItem(queueStorageKey(owner));
 		if (!stored) return [];
 
 		const expenses: OfflineExpense[] = JSON.parse(stored);
@@ -114,38 +118,42 @@ export function loadOfflineExpenses(): OfflineExpense[] {
 		});
 	} catch (error) {
 		if (import.meta.env.DEV) console.error('Failed to load offline expenses:', error);
-		stashCorruptedBlob();
+		stashCorruptedBlob(owner);
 		return [];
 	}
 }
 
-function stashCorruptedBlob(): void {
+function stashCorruptedBlob(owner: string | null): void {
 	try {
-		const raw = localStorage.getItem(queueStorageKey());
-		if (raw) localStorage.setItem(`${queueStorageKey()}.corrupt`, raw);
+		const raw = localStorage.getItem(queueStorageKey(owner));
+		if (raw) localStorage.setItem(`${queueStorageKey(owner)}.corrupt`, raw);
 	} catch {
 		// Best-effort: a failed stash must not block startup.
 	}
 }
 
-export function saveOfflineExpenses(expenses: OfflineExpense[]): boolean {
+export function saveOfflineExpenses(
+	expenses: OfflineExpense[],
+	owner: string | null = queueOwner
+): boolean {
 	if (!browser) return false;
 
 	try {
-		localStorage.setItem(queueStorageKey(), JSON.stringify(expenses));
+		localStorage.setItem(queueStorageKey(owner), JSON.stringify(expenses));
 	} catch (error) {
 		if (import.meta.env.DEV) console.error('Failed to save offline expenses:', error);
 		return false;
 	}
 
-	offlineExpenseQueue.current = expenses;
+	if (owner === queueOwner) offlineExpenseQueue.current = expenses;
 	return true;
 }
 
 export async function addOfflineExpense(
 	expense: Omit<OfflineExpense, 'id' | 'clientId' | 'timestamp' | 'synced' | 'version'>,
 	photos: File[] = [],
-	clientId: string = crypto.randomUUID()
+	clientId: string = crypto.randomUUID(),
+	owner: string | null = queueOwner
 ): Promise<boolean> {
 	const offlineExpense: OfflineExpense = {
 		...expense,
@@ -158,8 +166,8 @@ export async function addOfflineExpense(
 
 	if (!(await savePendingPhotos(clientId, photos))) return false;
 
-	const currentExpenses = loadOfflineExpenses();
-	const queued = saveOfflineExpenses([...currentExpenses, offlineExpense]);
+	const currentExpenses = loadOfflineExpenses(owner);
+	const queued = saveOfflineExpenses([...currentExpenses, offlineExpense], owner);
 	if (!queued && photos.length > 0) await deletePendingPhotos(clientId).catch(() => undefined);
 	return queued;
 }

@@ -23,7 +23,10 @@ const { expenseApiMock, addNotification, gotoDynamic, addOfflineExpense, online 
 vi.mock('#lib/services/expense-api.ts', () => ({ expenseApi: expenseApiMock }));
 vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore: { addNotification } }));
 vi.mock('#lib/utils/navigation.ts', () => ({ gotoDynamic }));
-vi.mock('#lib/utils/offline-storage.ts', () => ({ addOfflineExpense }));
+vi.mock('#lib/utils/offline-storage.ts', () => ({
+	addOfflineExpense,
+	currentOfflineQueueOwner: () => 'alice'
+}));
 vi.mock('#lib/stores/offline.svelte.ts', () => ({ onlineStatus: online }));
 
 const { ExpenseFormState } = await import('../expense-form-state.svelte');
@@ -55,7 +58,7 @@ describe('submitExpense — one clientId per save', () => {
 
 		const sentClientId = expenseApiMock.createExpense.mock.calls[0]?.[1];
 		expect(sentClientId).toEqual(expect.any(String));
-		expect(addOfflineExpense).toHaveBeenCalledWith(expect.anything(), [], sentClientId);
+		expect(addOfflineExpense).toHaveBeenCalledWith(expect.anything(), [], sentClientId, 'alice');
 	});
 
 	test('each save gets its own clientId', async () => {

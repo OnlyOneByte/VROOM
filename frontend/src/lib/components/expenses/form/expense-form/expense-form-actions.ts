@@ -1,7 +1,7 @@
 import { expenseApi } from '#lib/services/expense-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { onlineStatus } from '#lib/stores/offline.svelte.ts';
-import { addOfflineExpense } from '#lib/utils/offline-storage.ts';
+import { addOfflineExpense, currentOfflineQueueOwner } from '#lib/utils/offline-storage.ts';
 import { classifySyncFailure } from '#lib/utils/sync/classify-failure.ts';
 import { buildSplitConfig } from '#lib/utils/expense-helpers.ts';
 import { gotoDynamic } from '#lib/utils/navigation.ts';
@@ -15,6 +15,17 @@ import {
 	UNQUEUED_SAVE_MESSAGE
 } from './expense-submit-outcome';
 import type { ExpenseFormState } from './expense-form-state.svelte';
+
+const saveClientIds = new WeakMap<ExpenseFormState, string>();
+
+function saveClientId(state: ExpenseFormState): string {
+	let clientId = saveClientIds.get(state);
+	if (!clientId) {
+		clientId = crypto.randomUUID();
+		saveClientIds.set(state, clientId);
+	}
+	return clientId;
+}
 
 function reportUnqueuedSave(state: ExpenseFormState): void {
 	state.submitError = UNQUEUED_SAVE_MESSAGE;
@@ -58,7 +69,8 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 		sourceId: state.sourceId
 	});
 	const isSplitCreate = state.isSplit && state.selectedVehicleIds.length >= 2;
-	const clientId = crypto.randomUUID();
+	const clientId = saveClientId(state);
+	const queueOwner = currentOfflineQueueOwner();
 
 	try {
 		if (state.isGroupEditMode && state.groupId) {
@@ -124,7 +136,8 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			const queued = await addOfflineExpense(
 				toOfflineExpense(expenseData),
 				[...state.pendingFiles],
-				clientId
+				clientId,
+				queueOwner
 			);
 
 			if (!queued) {
@@ -148,7 +161,8 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			const queued = await addOfflineExpense(
 				toOfflineExpense(expenseData),
 				[...state.pendingFiles],
-				clientId
+				clientId,
+				queueOwner
 			);
 
 			if (!queued) {

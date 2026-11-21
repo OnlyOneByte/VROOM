@@ -24,7 +24,10 @@ const { expenseApiMock, addNotification, gotoDynamic, addOfflineExpense, online 
 vi.mock('#lib/services/expense-api.ts', () => ({ expenseApi: expenseApiMock }));
 vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore: { addNotification } }));
 vi.mock('#lib/utils/navigation.ts', () => ({ gotoDynamic }));
-vi.mock('#lib/utils/offline-storage.ts', () => ({ addOfflineExpense }));
+vi.mock('#lib/utils/offline-storage.ts', () => ({
+	addOfflineExpense,
+	currentOfflineQueueOwner: () => 'alice'
+}));
 vi.mock('#lib/stores/offline.svelte.ts', () => ({ onlineStatus: online }));
 
 const { ExpenseFormState } = await import('../expense-form-state.svelte');
@@ -238,7 +241,8 @@ describe('submitExpense — offline and failure queuing', () => {
 		expect(addOfflineExpense).toHaveBeenCalledWith(
 			expect.objectContaining({ vehicleId: 'v1', amount: 120.5, category: 'maintenance' }),
 			[],
-			expect.any(String)
+			expect.any(String),
+			'alice'
 		);
 		notified('info', 'Expense saved offline. Will sync when online.');
 		expect(gotoDynamic).toHaveBeenCalledWith('/expenses');
@@ -250,7 +254,12 @@ describe('submitExpense — offline and failure queuing', () => {
 		const state = createState();
 		state.pendingFiles = [photo];
 		await submitExpense(state);
-		expect(addOfflineExpense).toHaveBeenCalledWith(expect.anything(), [photo], expect.any(String));
+		expect(addOfflineExpense).toHaveBeenCalledWith(
+			expect.anything(),
+			[photo],
+			expect.any(String),
+			'alice'
+		);
 	});
 
 	test('offline save that cannot be stored keeps the user on the form', async () => {

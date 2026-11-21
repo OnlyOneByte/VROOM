@@ -155,6 +155,36 @@ describe('the offline queue follows the signed-in user', () => {
 
 		await authStore.initialize();
 
+		expect(authStore.isAuthenticated).toBe(true);
 		expect(offlineExpenseQueue.current.map(e => e.id)).toEqual(['alice-1']);
+	});
+
+	it("stashes a corrupt queue under the user's own key", async () => {
+		localStorage.setItem('vroom_offline_expenses:alice', '{not json');
+
+		await signInOnline(alice);
+
+		expect(offlineExpenseQueue.current).toEqual([]);
+		expect(localStorage.getItem('vroom_offline_expenses:alice.corrupt')).toBe('{not json');
+	});
+
+	it('keeps the unscoped queue when copying it to the user fails', async () => {
+		localStorage.setItem('vroom_offline_expenses', JSON.stringify([queued('legacy-1')]));
+		const setItem = vi.mocked(window.localStorage.setItem);
+		const writeThrough = setItem.getMockImplementation()!;
+		setItem.mockImplementation((key, value) => {
+			if (key === 'vroom_offline_expenses:alice') {
+				throw new DOMException('exceeded the quota', 'QuotaExceededError');
+			}
+			writeThrough(key, value);
+		});
+
+		try {
+			await signInOnline(alice);
+		} finally {
+			setItem.mockImplementation(writeThrough);
+		}
+
+		expect(localStorage.getItem('vroom_offline_expenses')).not.toBeNull();
 	});
 });
