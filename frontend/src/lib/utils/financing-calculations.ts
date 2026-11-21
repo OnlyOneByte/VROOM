@@ -505,8 +505,8 @@ export function calculateMinimumPayment(financing: VehicleFinancing): number | n
 
 const MS_PER_DAY = 86_400_000;
 
-function utcDayStart(date: Date): number {
-	return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+function localCalendarDayStart(date: Date): number {
+	return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function addUtcMonthsClamped(dayStart: number, months: number): number {
@@ -518,8 +518,8 @@ function addUtcMonthsClamped(dayStart: number, months: number): number {
 }
 
 export function elapsedMonths(startDate: Date, date: Date): number {
-	const start = utcDayStart(startDate);
-	const end = utcDayStart(date);
+	const start = localCalendarDayStart(startDate);
+	const end = localCalendarDayStart(date);
 	if (!(end > start)) return 0;
 	const from = new Date(start);
 	const to = new Date(end);

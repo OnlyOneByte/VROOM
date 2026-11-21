@@ -573,24 +573,24 @@ describe('calculateMinimumPayment', () => {
 
 describe('elapsedMonths', () => {
 	test('returns zero when the date is on or before the start', () => {
-		expect(elapsedMonths(new Date('2025-03-10'), new Date('2025-03-10'))).toBe(0);
-		expect(elapsedMonths(new Date('2025-03-10'), new Date('2025-01-10'))).toBe(0);
+		expect(elapsedMonths(new Date(2025, 2, 10, 12), new Date(2025, 2, 10, 12))).toBe(0);
+		expect(elapsedMonths(new Date(2025, 2, 10, 12), new Date(2025, 0, 10, 12))).toBe(0);
 	});
 
 	test('counts whole calendar months exactly', () => {
-		expect(elapsedMonths(new Date('2025-01-10'), new Date('2025-04-10'))).toBe(3);
+		expect(elapsedMonths(new Date(2025, 0, 10, 12), new Date(2025, 3, 10, 12))).toBe(3);
 	});
 
 	test('adds the fraction of the current month that has elapsed', () => {
-		expect(elapsedMonths(new Date('2025-01-10'), new Date('2025-02-24'))).toBeCloseTo(
+		expect(elapsedMonths(new Date(2025, 0, 10, 12), new Date(2025, 1, 24, 12))).toBeCloseTo(
 			1 + 14 / 28,
 			10
 		);
 	});
 
 	test('a month-end start anchors to the clamped end of shorter months', () => {
-		expect(elapsedMonths(new Date('2025-01-31'), new Date('2025-02-28'))).toBe(1);
-		expect(elapsedMonths(new Date('2025-01-31'), new Date('2025-03-15'))).toBeCloseTo(
+		expect(elapsedMonths(new Date(2025, 0, 31, 12), new Date(2025, 1, 28, 12))).toBe(1);
+		expect(elapsedMonths(new Date(2025, 0, 31, 12), new Date(2025, 2, 15, 12))).toBeCloseTo(
 			1 + 15 / 31,
 			10
 		);
