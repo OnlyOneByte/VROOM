@@ -79,7 +79,7 @@
 											<div
 												class="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 group-hover:scale-110 transition-transform duration-300"
 											></div>
-											<ImageIcon class="h-16 w-16 text-muted-foreground/40 relative z-10" />
+											<ImageIcon class="h-16 w-16 text-muted-foreground relative z-10" />
 										{/if}
 										{#if vehicle.hasActiveFinancing}
 											<Badge
