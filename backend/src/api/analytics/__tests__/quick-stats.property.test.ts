@@ -228,3 +228,92 @@ describe('Fleet health score is bounded weighted average', () => {
     expect(two.fleetHealthScore).toBe(38);
   });
 });
+
+describe('YTD spending counts only the year the range ends in', () => {
+  test('a trailing 12-month window across Jan 1 sums only the new year', async () => {
+    testDb.sqlite.close();
+    testDb = createTestDb();
+    repo = new AnalyticsRepository(testDb.drizzle);
+    seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
+    seedVehicle(testDb.sqlite, {
+      id: 'veh-1',
+      userId: 'user-1',
+      make: 'Toyota',
+      model: 'Camry',
+      year: 2022,
+    });
+    const expense = (id: string, date: Date, expenseAmount: number): TestExpense => ({
+      id,
+      vehicleId: 'veh-1',
+      category: 'maintenance',
+      expenseAmount,
+      date,
+      mileage: null,
+      volume: null,
+      fuelType: null,
+      missedFillup: false,
+    });
+    seedExpense(testDb.sqlite, expense('last-year', new Date(Date.UTC(2024, 11, 20, 12)), 30000));
+    seedExpense(testDb.sqlite, expense('this-year', new Date(Date.UTC(2025, 0, 10, 12)), 4500));
+
+    const trailing = {
+      start: Math.floor(Date.UTC(2024, 1, 1) / 1000),
+      end: Math.floor(Date.UTC(2025, 1, 1) / 1000),
+    };
+    const result = await repo.getQuickStats('user-1', trailing);
+    expect(result.ytdSpending).toBe(4500);
+
+    const summary = await repo.getSummary('user-1', trailing);
+    expect(summary.quickStats.ytdSpending).toBe(4500);
+  });
+
+  test("the client's local Jan 1 (ytdStart) decides the year at either edge of UTC", async () => {
+    testDb.sqlite.close();
+    testDb = createTestDb();
+    repo = new AnalyticsRepository(testDb.drizzle);
+    seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
+    seedVehicle(testDb.sqlite, {
+      id: 'veh-1',
+      userId: 'user-1',
+      make: 'Toyota',
+      model: 'Camry',
+      year: 2022,
+    });
+    const seed = (id: string, iso: string, expenseAmount: number) =>
+      seedExpense(testDb.sqlite, {
+        id,
+        vehicleId: 'veh-1',
+        category: 'maintenance',
+        expenseAmount,
+        date: new Date(iso),
+        mileage: null,
+        volume: null,
+        fuelType: null,
+        missedFillup: false,
+      });
+    const seconds = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
+
+    seed('ny-dec31-noon', '2024-12-31T17:00:00.000Z', 1200);
+    seed('ny-last-year', '2023-12-31T17:00:00.000Z', 99);
+    const newYorkDec31 = {
+      start: seconds('2023-12-31T05:00:00.000Z'),
+      end: seconds('2025-01-01T05:00:00.000Z'),
+    };
+    const ny = await repo.getQuickStats(
+      'user-1',
+      newYorkDec31,
+      seconds('2024-01-01T05:00:00.000Z')
+    );
+    expect(ny.ytdSpending).toBe(1200);
+
+    testDb.sqlite.run("DELETE FROM expenses WHERE id IN ('ny-dec31-noon', 'ny-last-year')");
+    seed('akl-jan1-noon', '2024-12-31T23:00:00.000Z', 800);
+    seed('akl-last-year', '2024-06-15T00:00:00.000Z', 99);
+    const aucklandJan1 = {
+      start: seconds('2023-12-31T11:00:00.000Z'),
+      end: seconds('2025-01-01T11:00:00.000Z'),
+    };
+    const akl = await repo.getSummary('user-1', aucklandJan1, seconds('2024-12-31T11:00:00.000Z'));
+    expect(akl.quickStats.ytdSpending).toBe(800);
+  });
+});
