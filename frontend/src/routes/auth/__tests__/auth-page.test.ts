@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { ApiError } from '#lib/utils/error-handling.ts';
 
 const { page, authApi } = vi.hoisted(() => ({
@@ -29,5 +29,18 @@ describe('sign-in page', () => {
 		expect(await screen.findByRole('button', { name: 'Continue with Google' })).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
 		expect(authApi.getProviders).toHaveBeenCalledTimes(2);
+		await waitFor(() =>
+			expect(screen.getByRole('button', { name: 'Continue with Google' })).toHaveFocus()
+		);
+	});
+
+	test('a failed Retry announces the error and keeps focus on the new Retry', async () => {
+		authApi.getProviders.mockRejectedValue(new ApiError('Network error', 0));
+		render(AuthPage);
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+		await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus());
+		expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load the sign-in options");
 	});
 });
