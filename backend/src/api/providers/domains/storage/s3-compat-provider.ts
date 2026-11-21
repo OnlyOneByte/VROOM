@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -164,7 +165,7 @@ export class S3CompatProvider implements StorageProvider {
     entityId: string,
     fileName: string
   ): string {
-    const segments = [pathHint, entityType, entityId, fileName]
+    const segments = [pathHint, entityType, entityId, `${randomUUID()}-${fileName}`]
       .join('/')
       .split('/')
       .filter(Boolean);
