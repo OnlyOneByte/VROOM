@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { moneyDollarsToCents } from '../../utils/money';
+import { dateInput } from '../../utils/validation';
 
 const ins = CONFIG.validation.insurance;
 
@@ -9,7 +10,7 @@ const CLAIM_STATUSES = ['filed', 'in_progress', 'settled', 'denied'] as const;
 const FAULT_DESIGNATIONS = ['at_fault', 'not_at_fault', 'shared'] as const;
 
 export const createClaimSchema = z.object({
-  claimDate: z.coerce.date(),
+  claimDate: dateInput,
   claimType: z.enum(CLAIM_TYPES),
   description: z.string().max(ins.coverageDescriptionMaxLength).optional(),
   status: z.enum(CLAIM_STATUSES).optional().default('filed'),
@@ -21,7 +22,7 @@ export const createClaimSchema = z.object({
 
 export const updateClaimSchema = z
   .object({
-    claimDate: z.coerce.date().optional(),
+    claimDate: dateInput.optional(),
     claimType: z.enum(CLAIM_TYPES).optional(),
     // Use nullish, not optional: JSON drops undefined, so null is the only way to clear a column.
     description: z.string().max(ins.coverageDescriptionMaxLength).nullish(),

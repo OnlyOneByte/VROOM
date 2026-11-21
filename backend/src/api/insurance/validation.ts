@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { moneyDollarsToCents } from '../../utils/money';
+import { dateInput } from '../../utils/validation';
 
 const ins = CONFIG.validation.insurance;
 
@@ -9,8 +10,8 @@ export const termVehicleCoverageSchema = z.object({
 });
 
 const baseTermFields = {
-  startDate: z.coerce.date(),
-  endDate: z.coerce.date(),
+  startDate: dateInput,
+  endDate: dateInput,
   policyNumber: z.string().max(ins.policyNumberMaxLength).optional(),
   coverageDescription: z.string().max(ins.coverageDescriptionMaxLength).optional(),
   deductibleAmount: moneyDollarsToCents((n) =>
@@ -41,8 +42,8 @@ export const createTermSchema = z
 
 export const updateTermSchema = z
   .object({
-    startDate: z.coerce.date().optional(),
-    endDate: z.coerce.date().optional(),
+    startDate: dateInput.optional(),
+    endDate: dateInput.optional(),
     policyNumber: z.string().max(ins.policyNumberMaxLength).nullish(),
     coverageDescription: z.string().max(ins.coverageDescriptionMaxLength).nullish(),
     deductibleAmount: moneyDollarsToCents((n) =>

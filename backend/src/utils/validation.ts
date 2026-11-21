@@ -57,7 +57,7 @@ export const dateInput = z
   .union(
     [
       z.string().trim().regex(ISO_DATE_PREFIX, INVALID_DATE_MESSAGE),
-      z.number().positive(),
+      z.number().positive(INVALID_DATE_MESSAGE),
       z.date(),
     ],
     { error: INVALID_DATE_MESSAGE }
