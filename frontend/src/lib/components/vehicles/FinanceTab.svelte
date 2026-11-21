@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { onMount } from 'svelte';
@@ -131,7 +132,7 @@
 			paymentsLoaded = true;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error loading payment history:', error);
-			paymentHistoryError = 'Failed to load payment history. Please try again.';
+			paymentHistoryError = userFacingErrorMessage(error);
 		} finally {
 			isLoadingPayments = false;
 		}
@@ -245,7 +246,7 @@
 	{:else if paymentHistoryError}
 		<Alert variant="destructive">
 			<CircleAlert class="h-4 w-4" />
-			<AlertTitle>Error Loading Payment History</AlertTitle>
+			<AlertTitle>Couldn't load payment history</AlertTitle>
 			<AlertDescription>
 				{paymentHistoryError}
 				<Button
@@ -257,7 +258,7 @@
 						loadPaymentHistory();
 					}}
 				>
-					Try Again
+					Retry
 				</Button>
 			</AlertDescription>
 		</Alert>

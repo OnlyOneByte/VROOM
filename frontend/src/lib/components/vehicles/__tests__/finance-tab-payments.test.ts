@@ -125,9 +125,7 @@ describe('FinanceTab payment history', () => {
 
 		render(FinanceTab, { props: { vehicle: VEHICLE, vehicleId: 'veh-1', vehicleStatsData: null } });
 
-		expect(
-			await screen.findByText('Failed to load payment history. Please try again.')
-		).toBeTruthy();
+		expect(await screen.findByText("Couldn't load payment history")).toBeTruthy();
 		expect(screen.queryByText(/Overdue/)).toBeNull();
 		expect(screen.getByText(/Due in 25 days/)).toBeTruthy();
 	});

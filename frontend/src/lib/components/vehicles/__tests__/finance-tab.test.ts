@@ -187,9 +187,9 @@ describe('FinanceTab payment history', () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		getExpensesByVehicle.mockRejectedValueOnce(new Error('offline'));
 		mount(makeVehicle(makeLoan()));
-		expect(await screen.findByText('Error Loading Payment History')).toBeTruthy();
-		expect(screen.getByText(/Failed to load payment history/)).toBeTruthy();
-		await fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+		expect(await screen.findByText("Couldn't load payment history")).toBeTruthy();
+		expect(screen.getByText('Offline.')).toBeTruthy();
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		expect(await screen.findByText(/2 payments recorded/)).toBeTruthy();
 		expect(getExpensesByVehicle).toHaveBeenCalledTimes(2);
 	});

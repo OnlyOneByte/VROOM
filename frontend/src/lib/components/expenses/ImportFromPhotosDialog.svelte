@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
@@ -92,10 +93,7 @@
 			const drafts = await photosImportApi.getReceiptDrafts();
 			rows = drafts.map(toRow);
 		} catch (e) {
-			loadError =
-				e instanceof Error
-					? e.message
-					: 'Could not read your Google Photos receipts. Check the connection and try again.';
+			loadError = userFacingErrorMessage(e);
 		} finally {
 			isLoading = false;
 		}
@@ -121,7 +119,7 @@
 			rows = [];
 			onImported();
 		} catch (e) {
-			appStore.showError(e instanceof Error ? e.message : 'Failed to add some expenses');
+			appStore.showError(`Couldn't add some expenses. ${userFacingErrorMessage(e)}`);
 		} finally {
 			isImporting = false;
 		}
@@ -163,10 +161,10 @@
 				<div class="rounded-lg border bg-card p-6" data-testid="photos-import-error">
 					<div class="mb-3 flex items-center gap-3 text-destructive">
 						<CircleAlert class="h-5 w-5" />
-						<p class="font-medium">Could not load Photos receipts</p>
+						<p class="font-medium">Couldn't load Photos receipts</p>
 					</div>
 					<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
-					<Button onclick={retry}>Try again</Button>
+					<Button onclick={retry}>Retry</Button>
 				</div>
 			{:else if rows.length === 0}
 				<div

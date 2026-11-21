@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { ConfirmDraftInput, ReceiptDraftItem } from '#lib/services/photos-import-api.ts';
 import type { Vehicle } from '#lib/types/index.ts';
+import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 const mocks = vi.hoisted(() => ({
 	getReceiptDrafts: vi.fn<() => Promise<ReceiptDraftItem[]>>(),
@@ -147,7 +148,7 @@ describe('ImportFromPhotosDialog: loading drafts', () => {
 		);
 		expect(screen.queryByTestId('photos-import-confirm')).toBeNull();
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
 		await waitFor(() => expect(rows()).toHaveLength(1));
 		expect(mocks.getReceiptDrafts).toHaveBeenCalledTimes(2);
@@ -158,7 +159,7 @@ describe('ImportFromPhotosDialog: loading drafts', () => {
 		mount();
 
 		expect(await screen.findByTestId('photos-import-error')).toHaveTextContent(
-			'Could not read your Google Photos receipts. Check the connection and try again.'
+			UNEXPECTED_FAILURE_MESSAGE
 		);
 	});
 
@@ -273,7 +274,9 @@ describe('ImportFromPhotosDialog: reviewing and importing', () => {
 
 		await fireEvent.click(confirmButton());
 
-		await waitFor(() => expect(mocks.showError).toHaveBeenCalledWith('Vehicle not found'));
+		await waitFor(() =>
+			expect(mocks.showError).toHaveBeenCalledWith("Couldn't add some expenses. Vehicle not found.")
+		);
 		expect(onImported).not.toHaveBeenCalled();
 		expect(rows()).toHaveLength(2);
 		expect(confirmButton()).toBeEnabled();
@@ -288,7 +291,9 @@ describe('ImportFromPhotosDialog: reviewing and importing', () => {
 		await fireEvent.click(confirmButton());
 
 		await waitFor(() =>
-			expect(mocks.showError).toHaveBeenCalledWith('Failed to add some expenses')
+			expect(mocks.showError).toHaveBeenCalledWith(
+				`Couldn't add some expenses. ${UNEXPECTED_FAILURE_MESSAGE}`
+			)
 		);
 	});
 
