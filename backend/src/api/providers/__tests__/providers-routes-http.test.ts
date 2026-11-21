@@ -284,7 +284,7 @@ describe('GET /api/v1/providers/:id/sync-status — owned read + tenant isolatio
     ctx.sqlite.run(
       `INSERT INTO users (id, email, display_name) VALUES ('u-other-778', 'o778@test.com', 'Other')`
     );
-    const photoRows: Array<[string, string, string]> = [
+    const photoRows: [string, string, string][] = [
       ['p1', ctx.user.id, 'vehicle'],
       ['p2', ctx.user.id, 'vehicle'],
       ['p3', ctx.user.id, 'expense'],
@@ -298,7 +298,7 @@ describe('GET /api/v1/providers/:id/sync-status — owned read + tenant isolatio
         [id, userId, entityType]
       );
     }
-    const refRows: Array<[string, string]> = [
+    const refRows: [string, string][] = [
       ['p1', 'active'],
       ['p2', 'failed'],
       ['p3', 'pending'],
