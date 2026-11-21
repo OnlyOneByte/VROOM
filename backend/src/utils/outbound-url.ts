@@ -167,7 +167,7 @@ export function assertSafeOutboundUrl(
 
 export interface SafeOutboundTarget {
   url: URL;
-  address: string;
+  addresses: string[];
 }
 
 export async function resolveSafeOutboundTarget(
@@ -177,17 +177,29 @@ export async function resolveSafeOutboundTarget(
 ): Promise<SafeOutboundTarget> {
   const url = assertSafeOutboundUrl(raw, label, allowPrivate);
   const literal = literalAddress(url.hostname);
-  if (literal) return { url, address: literal };
+  if (literal) return { url, addresses: [literal] };
   let addresses: string[];
   try {
     addresses = await outboundResolver.lookup(url.hostname);
   } catch {
     throw new ValidationError(`${label} host could not be resolved`);
   }
-  const [first] = addresses;
-  if (!first) throw new ValidationError(`${label} host could not be resolved`);
+  if (addresses.length === 0) throw new ValidationError(`${label} host could not be resolved`);
   for (const address of addresses) assertAllowed(classifyAddress(address), label, allowPrivate);
-  return { url, address: first };
+  return { url, addresses };
+}
+
+const CONNECT_FAILURE_CODES = new Set([
+  'ConnectionRefused',
+  'FailedToOpenSocket',
+  'ECONNREFUSED',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+]);
+
+function isConnectFailure(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && CONNECT_FAILURE_CODES.has(code);
 }
 
 export async function fetchOutbound(
@@ -195,12 +207,21 @@ export async function fetchOutbound(
   init: RequestInit & { headers?: Record<string, string> },
   label: string
 ): Promise<Response> {
-  const { url, address } = await resolveSafeOutboundTarget(raw, label);
+  const { url, addresses } = await resolveSafeOutboundTarget(raw, label);
   if (literalAddress(url.hostname)) return fetch(url, { ...init, redirect: 'manual' });
-  return fetch(outboundResolver.connectUrl(url, address), {
-    ...init,
-    headers: { ...init.headers, host: url.host },
-    redirect: 'manual',
-    tls: { serverName: url.hostname },
-  });
+  let lastError: unknown;
+  for (const address of addresses) {
+    try {
+      return await fetch(outboundResolver.connectUrl(url, address), {
+        ...init,
+        headers: { ...init.headers, host: url.host },
+        redirect: 'manual',
+        tls: { serverName: url.hostname },
+      });
+    } catch (err) {
+      if (!isConnectFailure(err)) throw err;
+      lastError = err;
+    }
+  }
+  throw lastError;
 }
