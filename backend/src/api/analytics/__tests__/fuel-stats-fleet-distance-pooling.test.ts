@@ -318,8 +318,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
 
     const adv = await repo.getFuelAdvanced(USER.id, rangeAll());
     const winter = adv.seasonalEfficiency.find((s) => s.season === 'Winter');
-    const expectedConvertedB = (40 / 1.609344) * 3.785411784;
-    const expectedAvg = (30 + expectedConvertedB) / 2;
+    const expectedAvg = (300 + 320 / 1.609344) / (10 + 8 / 3.785411784);
 
     expect(winter?.avgEfficiency).toBeCloseTo(expectedAvg, 1);
     expect(winter?.avgEfficiency).not.toBeCloseTo(35, 0);
@@ -418,7 +417,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
     seedExpense(testDb.sqlite, fuelOn('b2', VEH_B.id, 50_320, 8, 11));
 
     const ye = await repo.getYearEnd(USER.id, 2024);
-    const expectedAvg = (30 + (40 / 1.609344) * 3.785411784) / 2;
+    const expectedAvg = (300 + 320 / 1.609344) / (10 + 8 / 3.785411784);
 
     expect(ye.avgEfficiency).toBeCloseTo(expectedAvg, 1);
     expect(ye.efficiencyTrend).toHaveLength(1);
@@ -481,7 +480,10 @@ describe('a mixed mpg + km/L fleet pools efficiency, cost and price in the user 
     const bMpg = toMpg(15);
     expect(stats.fuelConsumption.bestEfficiency).toBeCloseTo(bMpg, 6);
     expect(stats.fuelConsumption.worstEfficiency).toBeCloseTo(30, 6);
-    expect(stats.fuelConsumption.avgEfficiency).toBeCloseTo((30 + bMpg) / 2, 6);
+    expect(stats.fuelConsumption.avgEfficiency).toBeCloseTo(
+      (300 + 375 / KM_PER_MILE) / (10 + 25 / LITERS_PER_GALLON),
+      6
+    );
     expect(stats.fuelConsumption.avgEfficiency).toBeCloseTo(quick.avgEfficiency ?? 0, 6);
 
     const bMiles = 375 / KM_PER_MILE;

@@ -30,7 +30,8 @@ export function averageConsecutiveMpg(
   sortedExpenses: MpgPairRow[],
   scale: UnitScale = NATIVE_SCALE
 ): number | null {
-  const mpgValues: number[] = [];
+  let totalMiles = 0;
+  let totalFuel = 0;
 
   for (let i = 1; i < sortedExpenses.length; i++) {
     const current = sortedExpenses[i];
@@ -42,21 +43,16 @@ export function averageConsecutiveMpg(
 
     if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
-      const mpg = calculateMPG(miles, current.volume);
       const canonicalMpg = calculateMPG(miles * scale.distance, current.volume * scale.volume);
 
       if (canonicalMpg >= MIN_VALID_MPG && canonicalMpg <= MAX_VALID_MPG) {
-        mpgValues.push(mpg);
+        totalMiles += miles;
+        totalFuel += current.volume;
       }
     }
   }
 
-  if (mpgValues.length === 0) {
-    return null;
-  }
-
-  const sum = mpgValues.reduce((acc, mpg) => acc + mpg, 0);
-  return sum / mpgValues.length;
+  return totalFuel > 0 ? totalMiles / totalFuel : null;
 }
 
 function calculateMilesPerKwh(miles: number, kwh: number): number {
@@ -78,7 +74,8 @@ export function calculateAverageMilesPerKwh(
     return null;
   }
 
-  const milesPerKwhValues: number[] = [];
+  let totalMiles = 0;
+  let totalKwh = 0;
 
   for (let i = 1; i < sortedExpenses.length; i++) {
     const current = sortedExpenses[i];
@@ -90,21 +87,16 @@ export function calculateAverageMilesPerKwh(
 
     if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
-      const milesPerKwh = calculateMilesPerKwh(miles, current.volume);
       const canonical = calculateMilesPerKwh(miles * scale.distance, current.volume);
 
       if (canonical >= MIN_VALID_MI_KWH && canonical <= MAX_VALID_MI_KWH) {
-        milesPerKwhValues.push(milesPerKwh);
+        totalMiles += miles;
+        totalKwh += current.volume;
       }
     }
   }
 
-  if (milesPerKwhValues.length === 0) {
-    return null;
-  }
-
-  const sum = milesPerKwhValues.reduce((acc, val) => acc + val, 0);
-  return sum / milesPerKwhValues.length;
+  return totalKwh > 0 ? totalMiles / totalKwh : null;
 }
 
 export type StatsPeriod = '7d' | '30d' | '90d' | '1y' | 'all';

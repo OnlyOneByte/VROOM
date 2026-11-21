@@ -90,7 +90,7 @@ describe('calculateAverageMilesPerKwh', () => {
     expect(calculateAverageMilesPerKwh(expenses)).toBeNull();
   });
 
-  test('averages multiple valid pairs', () => {
+  test('pools distance and energy over multiple valid pairs', () => {
     const expenses = [
       makeChargeExpense({ mileage: 1000, volume: 30, index: 0 }),
       makeChargeExpense({ mileage: 1120, volume: 40, index: 1 }),
@@ -98,7 +98,7 @@ describe('calculateAverageMilesPerKwh', () => {
     ];
     const result = calculateAverageMilesPerKwh(expenses);
     expect(result).not.toBeNull();
-    expect(result).toBeCloseTo((3.0 + 4.0) / 2, 5);
+    expect(result).toBeCloseTo((120 + 120) / (40 + 30), 5);
   });
 
   test('sorts expenses by date before calculating', () => {
@@ -121,6 +121,16 @@ describe('averageConsecutiveMpg', () => {
         { mileage: 2100, volume: 20, missedFillup: false },
       ])
     ).toBeCloseTo((500 / 20 + 600 / 20) / 2, 5);
+  });
+
+  test('is total distance over total fuel, so one short top-up does not skew it', () => {
+    expect(
+      averageConsecutiveMpg([
+        { mileage: 1000, volume: 10, missedFillup: false },
+        { mileage: 1300, volume: 10, missedFillup: false },
+        { mileage: 1320, volume: 0.5, missedFillup: false },
+      ])
+    ).toBeCloseTo(320 / 10.5, 5);
   });
 
   test('a km/L vehicle is banded in mpg: 4 km/L (about 9.4 mpg) is kept in its own unit', () => {
