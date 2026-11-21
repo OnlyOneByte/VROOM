@@ -33,3 +33,22 @@ ratchet({
 		).toBeGreaterThan(20);
 	}
 });
+
+const HARDCODED_CURRENCY_TEXT = />\s*[$€£]\s*</;
+
+ratchet({
+	name: 'no hardcoded currency symbols as amount prefixes',
+	tolerated: ['lib/components/financing/PaymentPlannerDialog.svelte'],
+	guidance:
+		'Hardcoded currency symbol text node(s). Render getCurrencySymbol() instead so EUR/GBP ' +
+		'users see the right unit:',
+	scan: () =>
+		files.filter(file => HARDCODED_CURRENCY_TEXT.test(readFileSync(file, 'utf8'))).map(rel),
+	probe: () => {
+		expect(HARDCODED_CURRENCY_TEXT.test('<span class="text-muted-foreground">$</span>')).toBe(true);
+		expect(HARDCODED_CURRENCY_TEXT.test('<span>\n\t€\n</span>')).toBe(true);
+		expect(HARDCODED_CURRENCY_TEXT.test('<span> £ </span>')).toBe(true);
+		expect(HARDCODED_CURRENCY_TEXT.test('<span>{currencySymbol}</span>')).toBe(false);
+		expect(HARDCODED_CURRENCY_TEXT.test('<span>$5 off</span>')).toBe(false);
+	}
+});
