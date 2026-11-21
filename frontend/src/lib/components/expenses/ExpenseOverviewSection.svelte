@@ -30,7 +30,7 @@
 <CardNs.Root>
 	<Collapsible bind:open={overviewOpen}>
 		<CardNs.Header class="pb-0">
-			<CollapsibleTrigger class="flex items-center justify-between w-full">
+			<CollapsibleTrigger class="flex min-h-10 items-center justify-between w-full">
 				<div class="flex items-center gap-3">
 					<div class="p-2 rounded-lg bg-chart-1/10">
 						<TrendingUp class="h-5 w-5 text-chart-1" />

@@ -80,7 +80,9 @@
 				type="button"
 				variant={splitMethod === m.value ? 'default' : 'ghost'}
 				size="sm"
-				class="flex-1 rounded-md text-xs {splitMethod === m.value ? '' : 'text-muted-foreground'}"
+				class="h-10 flex-1 rounded-md text-xs sm:h-8 {splitMethod === m.value
+					? ''
+					: 'text-muted-foreground'}"
 				onclick={() => onMethodChange(m.value)}
 			>
 				{m.label}
