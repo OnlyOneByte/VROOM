@@ -9,7 +9,7 @@ import {
   requireVehicleRead,
   requireVehicleWrite,
 } from '../../utils/sharing';
-import { isValidTimeZone } from '../../utils/time-zone';
+import { isValidTimeZone, zonedDayWindow } from '../../utils/time-zone';
 import {
   commonSchemas,
   dateInput,
@@ -176,8 +176,9 @@ routes.put(
     const { timeZone, ...changes } = data;
     const odometer = changes.odometer ?? existing.odometer;
     const recordedAt = changes.recordedAt ?? existing.recordedAt;
+    const dayOf = (at: Date) => zonedDayWindow(at, timeZone ?? 'UTC').dayStart.getTime();
     const moved =
-      odometer !== existing.odometer || recordedAt.getTime() !== existing.recordedAt.getTime();
+      odometer !== existing.odometer || dayOf(recordedAt) !== dayOf(existing.recordedAt);
     const updated = await odometerRepository.updateChecked(
       id,
       changes,

@@ -382,6 +382,16 @@ describe('manual odometer readings share the order check with expenses', () => {
 
     const res = await ctx.authed('PUT', `/api/v1/odometer/${id}`, { note: 'checked' });
     expect(res.status).toBe(200);
+
+    ctx.sqlite
+      .query('UPDATE odometer_entries SET recorded_at = ? WHERE id = ?')
+      .run(Math.floor(Date.parse('2024-03-10T03:00:00.000Z') / 1000), id);
+    const resent = await ctx.authed('PUT', `/api/v1/odometer/${id}`, {
+      odometer: 9_000,
+      recordedAt: '2024-03-10',
+      note: 'checked again',
+    });
+    expect(resent.status).toBe(200);
   });
 
   test('days are local to the sender when it sends its time zone', async () => {
