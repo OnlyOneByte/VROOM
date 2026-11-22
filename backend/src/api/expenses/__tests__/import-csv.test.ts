@@ -223,6 +223,35 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(await listExpenses()).toHaveLength(0);
   });
 
+  test('a date that is not ISO, or outside 1900-2100, is rejected instead of guessed', async () => {
+    await seedCivic('Daily Driver');
+    const csv = [
+      'date,vehicle,category,amount',
+      '1,Daily Driver,misc,10',
+      '0,Daily Driver,misc,10',
+      'March 5,Daily Driver,misc,10',
+      '1850-01-01,Daily Driver,misc,10',
+      '9999-12-31,Daily Driver,misc,10',
+      '2101-01-01T00:00:00.000Z,Daily Driver,misc,10',
+      '1900-01-01,Daily Driver,misc,10',
+      '2100-12-31T12:00:00.000Z,Daily Driver,misc,10',
+    ].join('\n');
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv, dryRun: true });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.rows.map((r) => [r.status, r.message])).toEqual([
+      ['error', 'Invalid date "1". Use YYYY-MM-DD'],
+      ['error', 'Invalid date "0". Use YYYY-MM-DD'],
+      ['error', 'Invalid date "March 5". Use YYYY-MM-DD'],
+      ['error', 'Date must be between 1900 and 2100'],
+      ['error', 'Date must be between 1900 and 2100'],
+      ['error', 'Date must be between 1900 and 2100'],
+      ['ready', undefined],
+      ['ready', undefined],
+    ]);
+  });
+
   test('a full-ISO timestamp keeps its absolute instant', async () => {
     await seedCivic('Daily Driver');
     const iso = '2024-06-01T13:30:00.000Z';

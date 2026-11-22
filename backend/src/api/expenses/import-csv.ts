@@ -6,7 +6,13 @@ import { EXPENSE_CATEGORIES, isElectricFuelType } from '../../db/types';
 import { denormalizeCsvCell } from '../../utils/csv-safety';
 import { dollarsToCents, hasAtMostTwoDecimals } from '../../utils/money';
 import { isValidTimeZone } from '../../utils/time-zone';
-import { MAX_ODOMETER_READING, ODOMETER_TOO_HIGH_MESSAGE } from '../../utils/validation';
+import {
+  DATE_OUT_OF_RANGE_MESSAGE,
+  dateInput,
+  isDateInputYear,
+  MAX_ODOMETER_READING,
+  ODOMETER_TOO_HIGH_MESSAGE,
+} from '../../utils/validation';
 import { buildImportDate } from './local-date';
 import { clearFuelFieldsIfNotFuel } from './validation';
 
@@ -100,18 +106,20 @@ function parseCategory(
 }
 
 function parseDate(raw: string, timeZone?: string): { value: Date } | { error: string } {
-  if (!raw) return { error: `Invalid date "${raw}"` };
+  const invalid = { error: `Invalid date "${raw}". Use YYYY-MM-DD` };
   // new Date("YYYY-MM-DD") parses as UTC and would shift the day west of UTC.
   const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim());
   if (dateOnly) {
     const [year, month, day] = [Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3])];
+    if (!isDateInputYear(year)) return { error: DATE_OUT_OF_RANGE_MESSAGE };
     const date = buildImportDate(year, month, day, timeZone);
-    if (!date) return { error: `Invalid date "${raw}"` };
-    return { value: date };
+    return date ? { value: date } : invalid;
   }
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return { error: `Invalid date "${raw}"` };
-  return { value: date };
+  const parsed = dateInput.safeParse(raw);
+  if (parsed.success) return { value: parsed.data };
+  return parsed.error.issues[0]?.message === DATE_OUT_OF_RANGE_MESSAGE
+    ? { error: DATE_OUT_OF_RANGE_MESSAGE }
+    : invalid;
 }
 
 function parseBoundedString(
