@@ -58,13 +58,22 @@ async function status(method: string, path: string, body: unknown): Promise<numb
 
 describe('hasAtMostTwoDecimals', () => {
   test('accepts whole and two-decimal amounts despite binary rounding', () => {
-    for (const n of [1, 10.99, 0.1, 0.07, 12.34, 999_999.99]) {
+    for (const n of [1, 10.99, 0.1, 0.07, 12.34, 999_999.99, 0.1 + 0.2, 10_000_000.01, -4.2]) {
       expect(hasAtMostTwoDecimals(n), String(n)).toBe(true);
     }
   });
 
-  test('rejects sub-cent amounts', () => {
-    for (const n of [0.005, 10.999, 1.001, 1e-9, -1e-9]) {
+  test('accepts two-decimal amounts computed in floating point', () => {
+    const tenCentsHundredTimes = Array.from({ length: 100 }, () => 0.1).reduce((a, b) => a + b);
+    for (const n of [1234.56 - 1000.01, tenCentsHundredTimes, 19.99 * 3, 999_999.99 - 0.01]) {
+      expect(hasAtMostTwoDecimals(n), String(n)).toBe(true);
+    }
+  });
+
+  test('rejects sub-cent amounts, even within a millionth of a cent', () => {
+    for (const n of [
+      0.005, 10.999, 1.001, 1e-9, -1e-9, 1.999999999, 2.000000001, 1.0000001, 9_999_999.999, 5e-324,
+    ]) {
       expect(hasAtMostTwoDecimals(n), String(n)).toBe(false);
     }
   });
@@ -80,11 +89,14 @@ describe('expense amounts', () => {
     );
   });
 
-  test.each([1_000_000.01, 1e13, 1e300, 0.005, 10.999])('reject %p on create', async (amount) => {
-    expect(await status('POST', '/api/v1/expenses', expenseBody({ expenseAmount: amount }))).toBe(
-      400
-    );
-  });
+  test.each([1_000_000.01, 1e13, 1e300, 0.005, 10.999, 1.999999999])(
+    'reject %p on create',
+    async (amount) => {
+      expect(await status('POST', '/api/v1/expenses', expenseBody({ expenseAmount: amount }))).toBe(
+        400
+      );
+    }
+  );
 
   test('reject an out-of-range amount on update', async () => {
     const res = await ctx.authed('POST', '/api/v1/expenses', expenseBody({}));
