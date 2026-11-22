@@ -60,7 +60,6 @@ import { expenseRepository } from './repository';
 import {
   clearFuelFieldsIfNotFuel,
   createSplitExpenseSchema,
-  ODOMETER_HISTORY_WINDOW,
   odometerOrderError,
   type SplitConfig,
   splitConfigVehicleIds,
@@ -77,12 +76,11 @@ async function assertOdometerInOrder(
   excludeId?: string
 ): Promise<void> {
   if (mileage == null) return;
-  const [vehicle, readings] = await Promise.all([
+  const [vehicle, neighbours] = await Promise.all([
     vehicleRepository.findById(vehicleId),
-    expenseRepository.findRecentOdometerReadings(vehicleId, ODOMETER_HISTORY_WINDOW),
+    expenseRepository.findOdometerNeighbours(vehicleId, date, 'UTC', excludeId),
   ]);
-  const others = readings.filter((r) => r.id !== excludeId);
-  const error = odometerOrderError(mileage, date, others, vehicle?.initialMileage);
+  const error = odometerOrderError(mileage, neighbours, vehicle?.initialMileage);
   if (error) throw new ValidationError(error);
 }
 

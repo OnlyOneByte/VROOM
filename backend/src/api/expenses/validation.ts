@@ -4,42 +4,24 @@ import { EXPENSE_CATEGORIES, type SplitConfig } from '../../db/types';
 import { dollarsToCents, expenseDollarsToCents } from '../../utils/money';
 import { DUPLICATE_VEHICLE_MESSAGE, dateInput, hasUniqueVehicleIds } from '../../utils/validation';
 
-export const ODOMETER_HISTORY_WINDOW = 100;
-
-export interface OdometerReading {
-  id: string;
-  date: Date;
-  mileage: number | null;
+export interface OdometerNeighbours {
+  before: number | null;
+  after: number | null;
 }
-
-const dayKey = (date: Date) => date.toISOString().slice(0, 10);
 
 export function odometerOrderError(
   mileage: number,
-  date: Date,
-  others: readonly OdometerReading[],
+  { before, after }: OdometerNeighbours,
   initialMileage?: number | null
 ): string | null {
   if (initialMileage && mileage < initialMileage) {
     return 'Mileage cannot be less than initial mileage';
   }
-  const day = dayKey(date);
-  const readings = others.filter(
-    (o): o is OdometerReading & { mileage: number } => o.mileage != null
-  );
-  const before = readings.filter((o) => dayKey(o.date) < day).map((o) => o.mileage);
-  if (before.length > 0) {
-    const maxBefore = Math.max(...before);
-    if (mileage <= maxBefore) {
-      return `Mileage must be greater than ${maxBefore.toLocaleString('en-US')} (from earlier entry)`;
-    }
+  if (before != null && mileage <= before) {
+    return `Mileage must be greater than ${before.toLocaleString('en-US')} (from earlier entry)`;
   }
-  const after = readings.filter((o) => dayKey(o.date) > day).map((o) => o.mileage);
-  if (after.length > 0) {
-    const minAfter = Math.min(...after);
-    if (mileage >= minAfter) {
-      return `Mileage must be less than ${minAfter.toLocaleString('en-US')} (from later entry)`;
-    }
+  if (after != null && mileage >= after) {
+    return `Mileage must be less than ${after.toLocaleString('en-US')} (from later entry)`;
   }
   return null;
 }

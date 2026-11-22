@@ -71,6 +71,25 @@ describe('the odometer reading must fit between the entries around its date', ()
     await created('2024-03-10', 10_100);
   });
 
+  test('every reading on the nearest earlier and later day bounds it, whatever its time', async () => {
+    await created('2024-03-10T11:00:00.000Z', 10_400);
+    await created('2024-03-10T17:00:00.000Z', 10_100);
+    await created('2024-03-20T08:00:00.000Z', 11_000);
+    await created('2024-03-20T20:00:00.000Z', 11_500);
+
+    expect(await rejection(await fillUp('2024-03-15', 10_200))).toContain('greater than 10,400');
+    expect(await rejection(await fillUp('2024-03-15', 11_200))).toContain('less than 11,000');
+    await created('2024-03-15', 10_500);
+  });
+
+  test('only the nearest earlier day is compared, so an old bad reading does not block new fill-ups', async () => {
+    const old = await created('2020-01-01', 1);
+    await created('2021-01-01', 5_000);
+    ctx.sqlite.query('UPDATE expenses SET mileage = 999999 WHERE id = ?').run(old);
+
+    await created('2024-03-10', 10_400);
+  });
+
   test('the first reading for a vehicle is accepted', async () => {
     await created('2024-03-10', 1);
   });
@@ -130,16 +149,18 @@ describe('the odometer check sees what the form sees', () => {
     await misc('2024-03-10', 5);
   });
 
-  test('only the newest 100 entries are compared, so an old bad imported reading does not block new fill-ups', async () => {
-    const old = await created('2020-01-01', 1);
-    ctx.sqlite.query('UPDATE expenses SET mileage = 999999 WHERE id = ?').run(old);
-    for (let day = 1; day <= 100; day++) {
+  test('readings are found however many entries without a mileage sit between them', async () => {
+    await created('2022-12-01', 10_000);
+    await created('2024-06-01', 12_000);
+    for (let day = 1; day <= 101; day++) {
       await misc(
         `2023-${String(Math.ceil(day / 28)).padStart(2, '0')}-${String(((day - 1) % 28) + 1).padStart(2, '0')}`
       );
     }
 
-    await created('2024-03-10', 10_400);
+    expect(await rejection(await fillUp('2024-03-10', 9_500))).toContain('greater than 10,000');
+    expect(await rejection(await fillUp('2023-01-10', 12_500))).toContain('less than 12,000');
+    await created('2024-03-10', 11_000);
   });
 
   test('moving a fill-up to another vehicle is checked against that vehicle', async () => {
@@ -180,31 +201,23 @@ describe('the odometer check sees what the form sees', () => {
 });
 
 describe('odometerOrderError', () => {
-  const at = (day: string) => new Date(`${day}T12:00:00.000Z`);
+  const none = { before: null, after: null };
 
-  test('no other readings, or only readings without a value, means no error', () => {
-    expect(odometerOrderError(5, at('2024-01-01'), [])).toBeNull();
-    expect(
-      odometerOrderError(5, at('2024-01-01'), [{ id: 'a', date: at('2023-01-01'), mileage: null }])
-    ).toBeNull();
+  test('no neighbouring readings means no error', () => {
+    expect(odometerOrderError(5, none)).toBeNull();
   });
 
   test('a reading below the vehicle initial mileage is refused', () => {
-    expect(odometerOrderError(900, at('2024-01-01'), [], 1_000)).toBe(
+    expect(odometerOrderError(900, none, 1_000)).toBe(
       'Mileage cannot be less than initial mileage'
     );
-    expect(odometerOrderError(1_000, at('2024-01-01'), [], 1_000)).toBeNull();
+    expect(odometerOrderError(1_000, none, 1_000)).toBeNull();
   });
 
-  test('the highest earlier and lowest later readings bound it, exclusive', () => {
-    const others = [
-      { id: 'a', date: at('2024-01-01'), mileage: 100 },
-      { id: 'b', date: at('2024-01-05'), mileage: 300 },
-      { id: 'c', date: at('2024-02-01'), mileage: 900 },
-      { id: 'd', date: at('2024-03-01'), mileage: 700 },
-    ];
-    expect(odometerOrderError(301, at('2024-01-10'), others)).toBeNull();
-    expect(odometerOrderError(300, at('2024-01-10'), others)).toContain('greater than 300');
-    expect(odometerOrderError(700, at('2024-01-10'), others)).toContain('less than 700');
+  test('the earlier and later readings bound it, exclusive', () => {
+    const neighbours = { before: 300, after: 700 };
+    expect(odometerOrderError(301, neighbours)).toBeNull();
+    expect(odometerOrderError(300, neighbours)).toContain('greater than 300');
+    expect(odometerOrderError(700, neighbours)).toContain('less than 700');
   });
 });
