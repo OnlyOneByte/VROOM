@@ -157,7 +157,6 @@ developer contact), set the Audience, and submit for verification. VROOM ships c
 |---|---|
 | `latest`, `X.Y.Z`, `X.Y` | a GitHub release |
 | `dev`, `main`, `main-<sha>` | every push to `main` |
-| `develop`, `develop-<sha>` | every push to `develop` |
 
 Both example stacks pin `:latest`, i.e. the newest release. Switch them to `:dev` to track
 `main`.
