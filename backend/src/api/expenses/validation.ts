@@ -4,6 +4,8 @@ import { EXPENSE_CATEGORIES, type SplitConfig } from '../../db/types';
 import { dollarsToCents, expenseDollarsToCents } from '../../utils/money';
 import { DUPLICATE_VEHICLE_MESSAGE, dateInput, hasUniqueVehicleIds } from '../../utils/validation';
 
+export const ODOMETER_HISTORY_WINDOW = 100;
+
 export interface OdometerReading {
   id: string;
   date: Date;

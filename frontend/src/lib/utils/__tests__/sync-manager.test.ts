@@ -407,6 +407,21 @@ describe('Sync Manager', () => {
 			expect(result).toBe(false);
 		});
 
+		it('keep_local: an overwrite the server refuses parks the entry with the reason instead of failing silently', async () => {
+			mockFetch.mockResolvedValueOnce(
+				apiError(400, 'Mileage must be greater than 60,000 (from earlier entry)')
+			);
+
+			const result = await syncManager.resolveConflict(modifiedConflict(), 'keep_local');
+
+			expect(result).toBe(true);
+			expect(vi.mocked(markExpenseNeedsAttention)).toHaveBeenCalledWith(
+				'c-1',
+				expect.stringContaining('Mileage must be greater than 60,000')
+			);
+			expect(vi.mocked(markExpenseAsSynced)).not.toHaveBeenCalled();
+		});
+
 		it('keep_server: returns true WITHOUT any POST (server version wins, no overwrite sent)', async () => {
 			const result = await syncManager.resolveConflict(modifiedConflict(), 'keep_server');
 

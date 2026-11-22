@@ -113,6 +113,72 @@ describe('the odometer reading must fit between the entries around its date', ()
   });
 });
 
+describe('the odometer check sees what the form sees', () => {
+  async function misc(date: string, mileage?: number) {
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 5,
+      date,
+      ...(mileage !== undefined && { mileage }),
+    });
+    expect(res.status).toBe(201);
+  }
+
+  test('a non-fuel entry carrying a mileage is never checked', async () => {
+    await created('2024-03-01', 10_000);
+    await misc('2024-03-10', 5);
+  });
+
+  test('only the newest 100 entries are compared, so an old bad imported reading does not block new fill-ups', async () => {
+    const old = await created('2020-01-01', 1);
+    ctx.sqlite.query('UPDATE expenses SET mileage = 999999 WHERE id = ?').run(old);
+    for (let day = 1; day <= 100; day++) {
+      await misc(
+        `2023-${String(Math.ceil(day / 28)).padStart(2, '0')}-${String(((day - 1) % 28) + 1).padStart(2, '0')}`
+      );
+    }
+
+    await created('2024-03-10', 10_400);
+  });
+
+  test('moving a fill-up to another vehicle is checked against that vehicle', async () => {
+    const id = await created('2024-03-10', 10_400);
+    const other = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2020 });
+    const theirs = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId: other,
+      category: 'fuel',
+      expenseAmount: 40,
+      date: '2024-03-01',
+      volume: 10,
+      fuelType: 'Regular',
+      mileage: 50_000,
+    });
+    expect(theirs.status).toBe(201);
+
+    const moved = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { vehicleId: other });
+    expect(await rejection(moved)).toBe('Mileage must be greater than 50,000 (from earlier entry)');
+  });
+
+  test('turning an entry into a fill-up checks its reading', async () => {
+    await created('2024-03-01', 10_000);
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 5,
+      date: '2024-03-10',
+    });
+    const body = await json<DataEnvelope<{ id: string }>>(res);
+    const turned = await ctx.authed('PUT', `/api/v1/expenses/${body.data.id}`, {
+      category: 'fuel',
+      volume: 10,
+      fuelType: 'Regular',
+      mileage: 9_000,
+    });
+    expect(await rejection(turned)).toContain('greater than 10,000');
+  });
+});
+
 describe('odometerOrderError', () => {
   const at = (day: string) => new Date(`${day}T12:00:00.000Z`);
 
