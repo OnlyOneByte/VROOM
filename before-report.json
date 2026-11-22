@@ -1,0 +1,82 @@
+[
+ {
+  "theme": "default",
+  "dark": false,
+  "width": 1280,
+  "errors": [
+   {
+    "id": "category-error",
+    "role": "alert",
+    "ariaLive": "polite",
+    "text": "Please select a category"
+   },
+   {
+    "id": "amount-error",
+    "role": "alert",
+    "ariaLive": "polite",
+    "text": "Amount must be greater than 0"
+   }
+  ],
+  "tree": "- alert: Please select a category"
+ },
+ {
+  "theme": "default",
+  "dark": false,
+  "width": 375,
+  "errors": [
+   {
+    "id": "category-error",
+    "role": "alert",
+    "ariaLive": "polite",
+    "text": "Please select a category"
+   },
+   {
+    "id": "amount-error",
+    "role": "alert",
+    "ariaLive": "polite",
+    "text": "Amount must be greater than 0"
+   }
+  ],
+  "tree": "- alert: Please select a category"
+ },
+ {
+  "theme": "default",
+  "dark": true,
+  "width": 1280,
+  "errors": [
+   {
+    "id": "category-error",
+    "role": "alert",
+    "ariaLive": "polite",
+    "text": "Please select a category"
+   },
+   {
+    "id": "amount-error",
+    "role": "alert",
+    "ariaLive": "polite",
+    "text": "Amount must be greater than 0"
+   }
+  ],
+  "tree": "- alert: Please select a category"
+ },
+ {
+  "theme": "default",
+  "dark": true,
+  "width": 375,
+  "errors": [
+   {
+    "id": "category-error",
+    "role": "alert",
+    "ariaLive": "polite",
+    "text": "Please select a category"
+   },
+   {
+    "id": "amount-error",
+    "role": "alert",
+    "ariaLive": "polite",
+    "text": "Amount must be greater than 0"
+   }
+  ],
+  "tree": "- alert: Please select a category"
+ }
+]
