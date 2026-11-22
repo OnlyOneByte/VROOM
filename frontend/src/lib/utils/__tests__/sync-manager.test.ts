@@ -484,6 +484,32 @@ describe('Sync Manager', () => {
 			}
 		});
 
+		it('a fill-up whose odometer the server refuses is parked with the server message', async () => {
+			const queued: OfflineExpense = {
+				...malformedFuel,
+				id: 'odometer-1',
+				clientId: 'cid-odometer-1',
+				mileage: 9000,
+				volume: 10
+			};
+			vi.mocked(loadOfflineExpenses).mockReturnValue([queued]);
+			mockFetch
+				.mockResolvedValueOnce(apiOk([]))
+				.mockResolvedValueOnce(
+					apiError(400, 'Mileage must be greater than 10,000 (from earlier entry)')
+				);
+
+			const result = await syncManager.syncAll();
+
+			expect(result.needsAttention).toBe(1);
+			expect(vi.mocked(markExpenseNeedsAttention)).toHaveBeenCalledWith(
+				'odometer-1',
+				expect.stringContaining('Mileage must be greater than 10,000 (from earlier entry)'),
+				undefined
+			);
+			expect(vi.mocked(markExpenseAsSynced)).not.toHaveBeenCalled();
+		});
+
 		it('an already-parked row is NOT re-attempted by a later syncAll (no POST, no re-count)', async () => {
 			vi.mocked(loadOfflineExpenses).mockReturnValue([{ ...malformedFuel, needsAttention: true }]);
 			mockFetch.mockResolvedValue(apiOk([]));

@@ -17,6 +17,8 @@ const seedCivic = (nickname?: string): Promise<string> =>
     ...(nickname ? { nickname } : {}),
   });
 
+let nextMileage = 30_000;
+
 async function createExpense(
   vehicleId: string,
   category: string,
@@ -24,7 +26,8 @@ async function createExpense(
   description: string,
   date: string
 ) {
-  const fuelFields = category === 'fuel' ? { volume: 10, mileage: 30_000 } : {};
+  if (category === 'fuel') nextMileage += 100;
+  const fuelFields = category === 'fuel' ? { volume: 10, mileage: nextMileage } : {};
   const res = await ctx.authed('POST', '/api/v1/expenses', {
     vehicleId,
     category,

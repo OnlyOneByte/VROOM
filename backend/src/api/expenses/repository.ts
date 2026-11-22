@@ -200,6 +200,13 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return { vehicleIds: [...new Set(rows.map((r) => r.vehicleId))], ownerId: rows[0].userId };
   }
 
+  async findOdometerReadings(vehicleId: string) {
+    return this.db
+      .select({ id: expenses.id, date: expenses.date, mileage: expenses.mileage })
+      .from(expenses)
+      .where(and(eq(expenses.vehicleId, vehicleId), isNotNull(expenses.mileage)));
+  }
+
   async findByClientId(clientId: string, userId: string): Promise<Expense | null> {
     const result = await this.db
       .select()
