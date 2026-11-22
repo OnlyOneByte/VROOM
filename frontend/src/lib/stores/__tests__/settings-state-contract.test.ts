@@ -44,6 +44,21 @@ describe('settings store — state-management contracts', () => {
 		expect(settingsStore.error).toBe(null);
 	});
 
+	it('ensureLoaded() shares an in-flight load and then reuses the loaded settings', async () => {
+		mockFetch.mockResolvedValueOnce(okJson(SETTINGS));
+		const [, first] = await Promise.all([settingsStore.load(), settingsStore.ensureLoaded()]);
+		const second = await settingsStore.ensureLoaded();
+		expect(first).toEqual(SETTINGS);
+		expect(second).toBe(first);
+		expect(mockFetch).toHaveBeenCalledTimes(1);
+	});
+
+	it('ensureLoaded() rejects with the load error when nothing is loaded', async () => {
+		mockFetch.mockResolvedValueOnce(errJson(500, 'load failed'));
+		await expect(settingsStore.ensureLoaded()).rejects.toMatchObject({ statusCode: 500 });
+		expect(settingsStore.error).toBe(SERVER_FAILURE_MESSAGE);
+	});
+
 	it('update() RE-THROWS on failure (and records the error) so the caller await rejects', async () => {
 		mockFetch.mockResolvedValueOnce(errJson(500, 'update failed'));
 		await expect(settingsStore.update({ currencyUnit: 'EUR' })).rejects.toBeDefined();

@@ -42,6 +42,7 @@ vi.mock('#lib/services/settings-api.ts', () => ({
 }));
 
 const { appStore } = await import('#lib/stores/app.svelte.ts');
+const { settingsStore } = await import('#lib/stores/settings.svelte.ts');
 const ProviderForm = (await import('../ProviderForm.svelte')).default;
 
 const STORED_PROVIDER: UserProviderInfo = {
@@ -94,6 +95,8 @@ const saveButton = () => screen.getByRole('button', { name: /update provider|sav
 
 async function awaitLoaded() {
 	await vi.waitFor(() => expect(displayNameInput().value).toBe('My Drive'));
+	await vi.waitFor(() => expect(settingsStore.settings).not.toBeNull());
+	await new Promise(r => setTimeout(r, 0));
 }
 
 function sentConfig(call = 0): Record<string, unknown> {
@@ -108,6 +111,7 @@ describe('ProviderForm — an edit-save preserves config the form does not manag
 	beforeEach(() => {
 		vi.clearAllMocks();
 		appStore.clearNotifications();
+		settingsStore.reset();
 		getSettings.mockResolvedValue(SETTINGS_RESPONSE);
 		updateSettings.mockResolvedValue({});
 		updateProvider.mockResolvedValue({} as UserProviderInfo);
@@ -223,6 +227,7 @@ describe('ProviderForm — a settings save that fails is reported, not announced
 	beforeEach(() => {
 		vi.clearAllMocks();
 		appStore.clearNotifications();
+		settingsStore.reset();
 		getSettings.mockResolvedValue(SETTINGS_RESPONSE);
 		updateProvider.mockResolvedValue({} as UserProviderInfo);
 	});

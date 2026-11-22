@@ -45,9 +45,11 @@ vi.mock('#lib/stores/app.svelte.ts', () => ({
 }));
 
 const StorageProvidersCard = (await import('../StorageProvidersCard.svelte')).default;
+const { settingsStore } = await import('#lib/stores/settings.svelte.ts');
 const SETTINGS = { storageConfig: null, backupConfig: { providers: {} } };
 
 beforeEach(() => {
+	settingsStore.reset();
 	getSettings.mockReset();
 	updateSettings.mockReset();
 	showError.mockReset();
@@ -99,5 +101,28 @@ describe('Storage Providers card errors read as plain sentences', () => {
 		await waitFor(() => expect(providers).toHaveBeenCalledTimes(2));
 		expect(screen.getByText('Providers')).toBeInTheDocument();
 		expect(screen.getByText('Family Drive')).toBeInTheDocument();
+	});
+});
+
+describe('Storage Providers card reads and writes settings through the store', () => {
+	test('it reuses the loaded settings and a backup toggle updates the store', async () => {
+		const enabled = {
+			providers: { 'prov-1': { enabled: true, folderPath: 'Backups', retentionCount: 10 } }
+		};
+		getSettings.mockResolvedValue(SETTINGS);
+		updateSettings.mockResolvedValue({ ...SETTINGS, backupConfig: enabled });
+		providers.mockResolvedValue([DRIVE]);
+		await settingsStore.load();
+		render(StorageProvidersCard, { props: {} });
+
+		await fireEvent.click(await screen.findByRole('switch', { name: 'ZIP backup' }));
+
+		await waitFor(() => expect(settingsStore.settings?.backupConfig).toEqual(enabled));
+		expect(updateSettings).toHaveBeenCalledWith({ backupConfig: enabled });
+		expect(screen.getByRole('switch', { name: 'ZIP backup' })).toHaveAttribute(
+			'aria-checked',
+			'true'
+		);
+		expect(getSettings).toHaveBeenCalledTimes(1);
 	});
 });

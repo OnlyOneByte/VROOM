@@ -28,7 +28,7 @@
 	import { orphanedPhotosApi } from '#lib/services/photo-api.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
-	import { settingsApi } from '#lib/services/settings-api.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { routes, paramRoutes } from '#lib/routes.ts';
@@ -74,20 +74,22 @@
 	};
 
 	let providers = $state<UserProviderInfo[]>([]);
-	let storageConfig = $state<StorageConfig>(DEFAULT_STORAGE_CONFIG);
-	let backupConfig = $state<BackupConfig>({ providers: {} });
+	let storageConfig = $derived<StorageConfig>(
+		settingsStore.settings?.storageConfig ?? DEFAULT_STORAGE_CONFIG
+	);
+	let backupConfig = $derived<BackupConfig>(
+		settingsStore.settings?.backupConfig ?? { providers: {} }
+	);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 
 	async function loadData() {
 		try {
-			const [providerList, settings] = await Promise.all([
+			const [providerList] = await Promise.all([
 				providerApi.getProviders('storage'),
-				settingsApi.getSettings()
+				settingsStore.ensureLoaded()
 			]);
 			providers = providerList;
-			storageConfig = settings.storageConfig ?? DEFAULT_STORAGE_CONFIG;
-			backupConfig = settings.backupConfig ?? { providers: {} };
 		} catch (e) {
 			if (import.meta.env.DEV) console.error('Failed to load storage providers:', e);
 			error = userFacingErrorMessage(e);
@@ -143,8 +145,7 @@
 
 	async function handleConfigUpdate(config: StorageConfig) {
 		try {
-			await settingsApi.updateSettings({ storageConfig: config });
-			storageConfig = config;
+			await settingsStore.update({ storageConfig: config });
 			appStore.showSuccess('Photo storage settings updated');
 		} catch (e) {
 			appStore.showError(`Couldn't save the photo storage settings. ${userFacingErrorMessage(e)}`);
@@ -170,7 +171,7 @@
 		try {
 			await providerApi.deleteProvider(provider.id, { force });
 			appStore.showSuccess(`${provider.displayName} removed`);
-			await loadData();
+			await Promise.all([loadData(), settingsStore.load()]);
 		} catch (error) {
 			if (photosOnlyOnProvider(error) !== null && error instanceof Error) {
 				photoLossConfirm = { provider, message: error.message };
@@ -224,8 +225,7 @@
 			}
 		};
 		try {
-			await settingsApi.updateSettings({ backupConfig: updatedConfig });
-			backupConfig = updatedConfig;
+			await settingsStore.update({ backupConfig: updatedConfig });
 			await fetchLastSyncTime();
 			appStore.showSuccess(
 				enabled ? 'ZIP backup enabled for provider' : 'ZIP backup disabled for provider'
@@ -251,8 +251,7 @@
 			}
 		};
 		try {
-			await settingsApi.updateSettings({ backupConfig: updatedConfig });
-			backupConfig = updatedConfig;
+			await settingsStore.update({ backupConfig: updatedConfig });
 			await fetchLastSyncTime();
 			appStore.showSuccess(
 				enabled ? 'Sheets sync enabled for provider' : 'Sheets sync disabled for provider'

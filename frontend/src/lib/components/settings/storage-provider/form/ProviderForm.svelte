@@ -30,7 +30,7 @@
 	import { useGoogleOAuth } from '../use-google-oauth.svelte';
 	import { photosOnlyOnProvider, providerApi } from '#lib/services/provider-api.ts';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
-	import { settingsApi } from '#lib/services/settings-api.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import { routes } from '#lib/routes.ts';
@@ -180,7 +180,7 @@
 
 	async function loadSettings() {
 		try {
-			const settings = await settingsApi.getSettings();
+			const settings = await settingsStore.ensureLoaded();
 			backupConfig = settings.backupConfig ?? { providers: {} };
 			storageDefaults = settings.storageConfig?.defaults ?? {};
 			if (providerId) {
@@ -303,7 +303,7 @@
 			const unsaved: string[] = [];
 
 			try {
-				await settingsApi.updateSettings({
+				await settingsStore.update({
 					storageConfig: {
 						defaults: storageDefaults as StorageConfig['defaults'],
 						providerCategories: {
@@ -336,7 +336,7 @@
 							[resultId]: providerBackup
 						}
 					};
-					await settingsApi.updateSettings({ backupConfig: updatedBackupConfig });
+					await settingsStore.update({ backupConfig: updatedBackupConfig });
 				} catch {
 					unsaved.push('backup settings');
 				}
