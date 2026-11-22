@@ -155,5 +155,9 @@ test.describe('Opening the app offline', () => {
 		await expect(coldStart.getByRole('heading', { name: 'Add Expense' })).toBeVisible();
 		await expect(coldStart.getByText(`${VEHICLE_CAMRY.year} Toyota Camry`)).toBeVisible();
 		await expect(coldStart.getByText("Couldn't load your vehicles")).toHaveCount(0);
+
+		await coldStart.getByRole('button', { name: /^Fuel/ }).click();
+		await expect(coldStart.getByTestId('odometer-check-deferred')).toBeVisible();
+		await expect(coldStart.getByText("this fill-up can't be saved yet")).toHaveCount(0);
 	});
 });

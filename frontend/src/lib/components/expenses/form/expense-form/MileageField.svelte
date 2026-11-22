@@ -10,6 +10,7 @@
 		error?: string;
 		previousFuelMileage: number | null;
 		distanceLabel: string;
+		describedBy?: string;
 		onInput: () => void;
 		onBlur: () => void;
 	}
@@ -20,6 +21,7 @@
 		error,
 		previousFuelMileage,
 		distanceLabel,
+		describedBy,
 		onInput,
 		onBlur
 	}: Props = $props();
@@ -43,7 +45,8 @@
 			oninput={onInput}
 			onblur={onBlur}
 			aria-invalid={!!error}
-			aria-describedby={error ? 'mileage-error' : undefined}
+			aria-describedby={[error ? 'mileage-error' : null, describedBy].filter(Boolean).join(' ') ||
+				undefined}
 		/>
 	</div>
 	{#if previousFuelMileage}
