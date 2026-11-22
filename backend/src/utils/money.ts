@@ -121,13 +121,16 @@ export function moneyDollarsToCents(build: (base: z.ZodNumber) => z.ZodNumber = 
   return build(z.number()).transform(dollarsToCents);
 }
 
-const ONE_FLOAT_STEP = Number.EPSILON;
+const RELATIVE_DRIFT_TOLERANCE = 1e-12;
 const MAX_EXPENSE_AMOUNT = CONFIG.validation.expense.maxAmount;
 
 export function hasAtMostTwoDecimals(dollars: number): boolean {
   const cents = Math.round(dollars * 100);
   const drift = Math.abs(dollars - cents / 100);
-  return drift <= ONE_FLOAT_STEP * Math.max(1, Math.abs(dollars)) && (cents !== 0 || dollars === 0);
+  return (
+    drift <= RELATIVE_DRIFT_TOLERANCE * Math.max(1, Math.abs(dollars)) &&
+    (cents !== 0 || dollars === 0)
+  );
 }
 
 export function expenseDollarsToCents(build: (base: z.ZodNumber) => z.ZodNumber = (n) => n) {

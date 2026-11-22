@@ -63,8 +63,17 @@ describe('hasAtMostTwoDecimals', () => {
     }
   });
 
+  test('accepts two-decimal amounts computed in floating point', () => {
+    const tenCentsHundredTimes = Array.from({ length: 100 }, () => 0.1).reduce((a, b) => a + b);
+    for (const n of [1234.56 - 1000.01, tenCentsHundredTimes, 19.99 * 3, 999_999.99 - 0.01]) {
+      expect(hasAtMostTwoDecimals(n), String(n)).toBe(true);
+    }
+  });
+
   test('rejects sub-cent amounts, even within a millionth of a cent', () => {
-    for (const n of [0.005, 10.999, 1.001, 1e-9, -1e-9, 1.999999999, 2.000000001, 5e-324]) {
+    for (const n of [
+      0.005, 10.999, 1.001, 1e-9, -1e-9, 1.999999999, 2.000000001, 1.0000001, 9_999_999.999, 5e-324,
+    ]) {
       expect(hasAtMostTwoDecimals(n), String(n)).toBe(false);
     }
   });
