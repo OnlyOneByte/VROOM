@@ -264,11 +264,11 @@ describe('POST /api/v1/trips (create)', () => {
     expect(n).toBe(1);
   });
 
-  test('a failing odometer side effect does not fail the create; the trip persists', async () => {
+  test('a failing odometer write rolls the trip back, so a retry cannot duplicate it', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const { odometerRepository } = await import('../../odometer/repository');
     const original = odometerRepository.createFromTrip;
-    odometerRepository.createFromTrip = async () => {
+    odometerRepository.createFromTrip = () => {
       throw new Error('simulated DB hiccup in createFromTrip');
     };
     try {
@@ -277,16 +277,101 @@ describe('POST /api/v1/trips (create)', () => {
         '/api/v1/trips',
         VALID(vehicleId, { startOdometer: 1000, endOdometer: 1100 })
       );
-      expect(res.status, await res.text()).toBe(201);
+      expect(res.status, await res.text()).toBe(500);
       const n = (
         ctx.sqlite.query('SELECT COUNT(*) AS n FROM trips WHERE vehicle_id = ?').get(vehicleId) as {
           n: number;
         }
       ).n;
-      expect(n).toBe(1);
+      expect(n).toBe(0);
     } finally {
       odometerRepository.createFromTrip = original;
     }
+  });
+});
+
+describe('a trip’s end reading must fit the odometer timeline', () => {
+  const tripCount = (vehicleId: string): number =>
+    (
+      ctx.sqlite.query('SELECT COUNT(*) AS n FROM trips WHERE vehicle_id = ?').get(vehicleId) as {
+        n: number;
+      }
+    ).n;
+
+  async function seedReading(vehicleId: string, odometer: number, recordedAt: string) {
+    const res = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
+      odometer,
+      recordedAt,
+      timeZone: 'UTC',
+    });
+    expect(res.status, await res.text()).toBe(201);
+  }
+
+  test('a trip ending below an earlier reading is refused and saves nothing', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    await seedReading(vehicleId, 41_000, '2024-06-10T12:00:00.000Z');
+
+    const res = await ctx.authed('POST', '/api/v1/trips', {
+      ...VALID(vehicleId, {
+        startOdometer: 39_900,
+        endOdometer: 40_000,
+        tripDate: '2024-06-20T12:00:00.000Z',
+      }),
+      timeZone: 'UTC',
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('Mileage must be greater than 41,000 (from earlier entry)');
+    expect(tripCount(vehicleId)).toBe(0);
+    expect(odoCount(ctx, vehicleId)).toBe(1);
+  });
+
+  test('a trip ending above a later reading is refused', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    await seedReading(vehicleId, 41_000, '2024-06-25T12:00:00.000Z');
+
+    const res = await ctx.authed('POST', '/api/v1/trips', {
+      ...VALID(vehicleId, {
+        startOdometer: 41_000,
+        endOdometer: 41_200,
+        tripDate: '2024-06-20T12:00:00.000Z',
+      }),
+      timeZone: 'UTC',
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('Mileage must be less than 41,000 (from later entry)');
+    expect(tripCount(vehicleId)).toBe(0);
+  });
+
+  test('an edit that moves the end reading out of order is refused and keeps the trip and its entry', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    await seedReading(vehicleId, 41_000, '2024-06-25T12:00:00.000Z');
+    const created = await ctx.authed('POST', '/api/v1/trips', {
+      ...VALID(vehicleId, {
+        startOdometer: 40_000,
+        endOdometer: 40_500,
+        tripDate: '2024-06-20T12:00:00.000Z',
+      }),
+      timeZone: 'UTC',
+    });
+    expect(created.status, await created.clone().text()).toBe(201);
+    const { data } = await json<DataEnvelope<{ id: string }>>(created);
+
+    const put = await ctx.authed('PUT', `/api/v1/trips/${data.id}`, {
+      endOdometer: 41_500,
+      note: 'Should not stick',
+      timeZone: 'UTC',
+    });
+    expect(put.status).toBe(400);
+    expect(await put.text()).toContain('Mileage must be less than 41,000 (from later entry)');
+
+    const trip = ctx.sqlite
+      .query('SELECT end_odometer AS end, note FROM trips WHERE id = ?')
+      .get(data.id) as { end: number; note: string | null };
+    expect(trip).toEqual({ end: 40_500, note: null });
+    const readings = ctx.sqlite
+      .query('SELECT odometer FROM odometer_entries WHERE vehicle_id = ? ORDER BY odometer')
+      .all(vehicleId) as { odometer: number }[];
+    expect(readings.map((r) => r.odometer)).toEqual([40_500, 41_000]);
   });
 });
 
@@ -409,6 +494,7 @@ describe('trip edit and delete keep the linked odometer entry in sync', () => {
     expect(odoCount(ctx, vehicleId)).toBe(1);
 
     const put = await ctx.authed('PUT', `/api/v1/trips/${evening}`, {
+      endOdometer: 5100,
       tripDate: '2024-06-21T08:00:00.000Z',
       timeZone,
     });
@@ -455,7 +541,11 @@ describe('GET /api/v1/trips (list)', () => {
     await ctx.authed(
       'POST',
       '/api/v1/trips',
-      VALID(vehicleId, { tripDate: '2024-06-20T00:00:00.000Z' })
+      VALID(vehicleId, {
+        startOdometer: 1100,
+        endOdometer: 1200,
+        tripDate: '2024-06-20T00:00:00.000Z',
+      })
     );
 
     const res = await ctx.authed('GET', '/api/v1/trips');

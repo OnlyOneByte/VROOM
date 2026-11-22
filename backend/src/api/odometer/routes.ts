@@ -23,8 +23,7 @@ import { assertOdometerInOrder } from '../expenses/repository';
 import type { OdometerCheck } from '../expenses/validation';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
-import { vehicleRepository } from '../vehicles/repository';
-import { odometerRepository } from './repository';
+import { odometerRepository, readingCheck } from './repository';
 
 const routes = new Hono();
 
@@ -48,24 +47,6 @@ const updateSchema = createBodySchema.partial();
 
 function inOrder(check: OdometerCheck | null) {
   return (tx: DrizzleTransaction) => assertOdometerInOrder(tx, check);
-}
-
-async function readingCheck(
-  vehicleId: string,
-  odometer: number,
-  recordedAt: Date,
-  timeZone: string | undefined,
-  excludeId?: string
-): Promise<OdometerCheck> {
-  const vehicle = await vehicleRepository.findById(vehicleId);
-  return {
-    vehicleId,
-    mileage: odometer,
-    date: recordedAt,
-    timeZone: timeZone ?? 'UTC',
-    excludeId,
-    initialMileage: vehicle?.initialMileage,
-  };
 }
 
 const listQuerySchema = z.object({

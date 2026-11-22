@@ -8,6 +8,8 @@ import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 import { zonedDayWindow } from '../../utils/time-zone';
+import type { OdometerCheck } from '../expenses/validation';
+import { vehicleRepository } from '../vehicles/repository';
 
 interface OdometerHistoryEntry {
   odometer: number;
@@ -32,6 +34,24 @@ export function localDayWindow(
   const nextDay = new Date(dayStart);
   nextDay.setDate(nextDay.getDate() + 1);
   return { dayStart, nextDay };
+}
+
+export async function readingCheck(
+  vehicleId: string,
+  odometer: number,
+  recordedAt: Date,
+  timeZone: string | undefined,
+  excludeId?: string
+): Promise<OdometerCheck> {
+  const vehicle = await vehicleRepository.findById(vehicleId);
+  return {
+    vehicleId,
+    mileage: odometer,
+    date: recordedAt,
+    timeZone: timeZone ?? 'UTC',
+    excludeId,
+    initialMileage: vehicle?.initialMileage,
+  };
 }
 
 export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdometerEntry> {
@@ -71,17 +91,20 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     return this.findIdsByColumn(odometerEntries.vehicleId, vehicleId);
   }
 
-  async createFromTrip(entry: {
-    vehicleId: string;
-    userId: string;
-    odometer: number;
-    recordedAt: Date;
-    note?: string;
-    timeZone?: string;
-  }): Promise<OdometerEntry | null> {
+  createFromTrip(
+    entry: {
+      vehicleId: string;
+      userId: string;
+      odometer: number;
+      recordedAt: Date;
+      note?: string;
+      timeZone?: string;
+    },
+    db: AppDatabase | DrizzleTransaction = this.db
+  ): OdometerEntry | null {
     const { dayStart, nextDay } = localDayWindow(entry.recordedAt, entry.timeZone);
 
-    const existing = await this.db
+    const existing = db
       .select({ id: odometerEntries.id })
       .from(odometerEntries)
       .where(
@@ -93,30 +116,37 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
           lt(odometerEntries.recordedAt, nextDay)
         )
       )
-      .limit(1);
-    if (existing.length > 0) return null;
+      .get();
+    if (existing) return null;
 
-    return this.create({
-      vehicleId: entry.vehicleId,
-      userId: entry.userId,
-      odometer: entry.odometer,
-      recordedAt: entry.recordedAt,
-      note: entry.note ?? OdometerRepository.TRIP_PROVENANCE_NOTE,
-    });
+    return db
+      .insert(odometerEntries)
+      .values({
+        vehicleId: entry.vehicleId,
+        userId: entry.userId,
+        odometer: entry.odometer,
+        recordedAt: entry.recordedAt,
+        note: entry.note ?? OdometerRepository.TRIP_PROVENANCE_NOTE,
+      })
+      .returning()
+      .get();
   }
 
   static readonly TRIP_PROVENANCE_NOTE = 'From trip';
 
-  async deleteLinkedTripEntry(entry: {
-    vehicleId: string;
-    userId: string;
-    odometer: number;
-    recordedAt: Date;
-    timeZone?: string;
-  }): Promise<string[]> {
+  deleteLinkedTripEntry(
+    entry: {
+      vehicleId: string;
+      userId: string;
+      odometer: number;
+      recordedAt: Date;
+      timeZone?: string;
+    },
+    db: AppDatabase | DrizzleTransaction = this.db
+  ): string[] {
     const { dayStart, nextDay } = localDayWindow(entry.recordedAt, entry.timeZone);
 
-    const removed = await this.db
+    const removed = db
       .delete(odometerEntries)
       .where(
         and(
@@ -128,7 +158,8 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
           lt(odometerEntries.recordedAt, nextDay)
         )
       )
-      .returning({ id: odometerEntries.id });
+      .returning({ id: odometerEntries.id })
+      .all();
     return removed.map((row) => row.id);
   }
 
