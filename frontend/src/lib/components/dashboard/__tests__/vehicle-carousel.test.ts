@@ -8,6 +8,55 @@ vi.mock('$app/paths', () => ({
 		path.replace(/\[(\w+)\]/g, (_m, key: string) => params[key] ?? '')
 }));
 
+const { embla } = vi.hoisted(() => {
+	type Listener = () => void;
+	const listeners = new Map<string, Listener[]>();
+	const range = { index: 0, last: 1 };
+	const emit = (event: string) => listeners.get(event)?.forEach(listener => listener());
+	const api = {
+		canScrollPrev: () => range.index > 0,
+		canScrollNext: () => range.index < range.last,
+		scrollPrev: () => {
+			range.index = Math.max(0, range.index - 1);
+			emit('select');
+		},
+		scrollNext: () => {
+			range.index = Math.min(range.last, range.index + 1);
+			emit('select');
+		},
+		scrollTo: () => {},
+		scrollSnapList: () => Array.from({ length: range.last + 1 }, (_, i) => i),
+		selectedScrollSnap: () => range.index,
+		on: (event: string, listener: Listener) => {
+			listeners.set(event, [...(listeners.get(event) ?? []), listener]);
+			return api;
+		},
+		off: () => api
+	};
+	return {
+		embla: {
+			api,
+			reset(last: number) {
+				listeners.clear();
+				range.index = 0;
+				range.last = last;
+			},
+			resize(last: number) {
+				range.last = last;
+				range.index = Math.min(range.index, last);
+				emit('reInit');
+			}
+		}
+	};
+});
+
+vi.mock('embla-carousel-svelte', () => ({
+	default: (node: HTMLElement) => {
+		queueMicrotask(() => node.dispatchEvent(new CustomEvent('emblaInit', { detail: embla.api })));
+		return { update: () => {}, destroy: () => {} };
+	}
+}));
+
 import VehicleCarousel from '../VehicleCarousel.svelte';
 
 interface Overview {
@@ -81,33 +130,60 @@ describe('VehicleCarousel states', () => {
 		expect(screen.queryByRole('button', { name: 'Next slide' })).toBeNull();
 	});
 
-	test('more than one vehicle adds previous and next navigation buttons', async () => {
+	test('when every card fits there are no arrows, even with two vehicles', async () => {
+		embla.reset(0);
 		render(VehicleCarousel, {
 			vehicles: [overview(), overview({ id: 'v2', name: '2019 Honda Civic' })]
 		});
+		await vi.waitFor(() => expect(screen.getByText('2019 Honda Civic')).toBeInTheDocument());
 
-		const previous = screen.getByRole('button', { name: 'Previous slide' });
-		const next = screen.getByRole('button', { name: 'Next slide' });
-		expect(previous).toBeInTheDocument();
-		expect(next).toBeInTheDocument();
-
-		await fireEvent.click(next);
-		await fireEvent.click(previous);
-		await fireEvent.keyDown(next, { key: 'ArrowLeft' });
-		await fireEvent.keyDown(next, { key: 'ArrowRight' });
-
-		expect(screen.getByRole('link', { name: '2019 Honda Civic' })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Previous slide' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Next slide' })).toBeNull();
 	});
 
-	test('an arrow that cannot page is hidden, and both sit over the photo, not the title', () => {
+	test('the arrow that cannot page is dimmed and keeps focus at the end of the fleet', async () => {
+		embla.reset(1);
 		render(VehicleCarousel, {
 			vehicles: [overview(), overview({ id: 'v2', name: '2019 Honda Civic' })]
 		});
+		const next = await screen.findByRole('button', { name: 'Next slide' });
+		const previous = screen.getByRole('button', { name: 'Previous slide' });
+		expect(previous).toHaveClass('opacity-40');
+		expect(next).not.toHaveClass('opacity-40');
 
-		for (const name of ['Previous slide', 'Next slide']) {
-			const arrow = screen.getByRole('button', { name });
-			expect(arrow).toHaveAttribute('aria-disabled', 'true');
-			expect(arrow).toHaveClass('aria-disabled:hidden', 'top-28');
+		next.focus();
+		await fireEvent.click(next);
+
+		expect(next).toHaveClass('opacity-40');
+		expect(previous).not.toHaveClass('opacity-40');
+		expect(document.activeElement).toBe(next);
+
+		await fireEvent.keyDown(next, { key: 'ArrowLeft' });
+		expect(next).not.toHaveClass('opacity-40');
+	});
+
+	test('arrows appear when a resize makes the cards overflow', async () => {
+		embla.reset(0);
+		render(VehicleCarousel, {
+			vehicles: [overview(), overview({ id: 'v2', name: '2019 Honda Civic' })]
+		});
+		await vi.waitFor(() => expect(screen.getByText('2019 Honda Civic')).toBeInTheDocument());
+		expect(screen.queryByRole('button', { name: 'Next slide' })).toBeNull();
+
+		embla.resize(1);
+
+		expect(await screen.findByRole('button', { name: 'Next slide' })).toBeInTheDocument();
+	});
+
+	test('the arrows sit over the photo, not over the card title', async () => {
+		embla.reset(1);
+		render(VehicleCarousel, {
+			vehicles: [overview(), overview({ id: 'v2', name: '2019 Honda Civic' })]
+		});
+		const next = await screen.findByRole('button', { name: 'Next slide' });
+
+		for (const arrow of [next, screen.getByRole('button', { name: 'Previous slide' })]) {
+			expect(arrow).toHaveClass('top-28');
 			expect(arrow).not.toHaveClass('top-1/2');
 		}
 	});
