@@ -13,6 +13,7 @@ import { userTimeZone } from './analytics-api';
 import { photoCollection } from './photo-api';
 import {
 	cacheVehicles,
+	currentOfflineQueueOwner,
 	removeCachedVehicle,
 	updateCachedVehicle
 } from '#lib/utils/offline-storage.ts';
@@ -32,8 +33,12 @@ export const vehicleApi = {
 			include: opts?.includeShared ? 'shared' : undefined,
 			timeZone: userTimeZone()
 		});
+		const requestedFor = currentOfflineQueueOwner();
 		const vehicles = await apiClient.get<Vehicle[]>(`/api/v1/vehicles${qs}`);
-		cacheVehicles(vehicles.filter(v => !v.sharedAccess));
+		cacheVehicles(
+			vehicles.filter(v => !v.sharedAccess),
+			requestedFor
+		);
 		return vehicles;
 	},
 
@@ -42,8 +47,9 @@ export const vehicleApi = {
 	},
 
 	async updateVehicle(vehicleId: string, data: UpdateVehicleRequest): Promise<Vehicle> {
+		const requestedFor = currentOfflineQueueOwner();
 		const vehicle = await apiClient.put<Vehicle>(`/api/v1/vehicles/${vehicleId}`, data);
-		updateCachedVehicle(vehicle);
+		updateCachedVehicle(vehicle, requestedFor);
 		return vehicle;
 	},
 
@@ -52,8 +58,9 @@ export const vehicleApi = {
 	},
 
 	async deleteVehicle(vehicleId: string): Promise<void> {
+		const requestedFor = currentOfflineQueueOwner();
 		await apiClient.delete(`/api/v1/vehicles/${vehicleId}`);
-		removeCachedVehicle(vehicleId);
+		removeCachedVehicle(vehicleId, requestedFor);
 	},
 
 	// The backend answers 200 with data: null when the vehicle has no financing; any error is real.

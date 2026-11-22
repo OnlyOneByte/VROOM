@@ -110,8 +110,8 @@ export function currentOfflineQueueOwner(): string | null {
 	return queueOwner;
 }
 
-function writeOwnerCache(prefix: string, value: unknown): void {
-	if (!browser || !queueOwner) return;
+function writeOwnerCache(prefix: string, value: unknown, owner: string | null = queueOwner): void {
+	if (!browser || !queueOwner || owner !== queueOwner) return;
 	try {
 		localStorage.setItem(`${prefix}:${queueOwner}`, JSON.stringify(value));
 	} catch (error) {
@@ -130,24 +130,26 @@ function readOwnerCache<T>(prefix: string): T[] | null {
 	}
 }
 
-export function cacheVehicles(vehicles: Vehicle[]): void {
-	writeOwnerCache(VEHICLE_CACHE_KEY, vehicles);
+export function cacheVehicles(vehicles: Vehicle[], requestedFor: string | null): void {
+	writeOwnerCache(VEHICLE_CACHE_KEY, vehicles, requestedFor);
 }
 
 export function loadCachedVehicles(): Vehicle[] {
 	return readOwnerCache<Vehicle>(VEHICLE_CACHE_KEY) ?? [];
 }
 
-export function updateCachedVehicle(vehicle: Vehicle): void {
+export function updateCachedVehicle(vehicle: Vehicle, requestedFor: string | null): void {
 	const cached = readOwnerCache<Vehicle>(VEHICLE_CACHE_KEY);
 	if (!cached?.some(v => v.id === vehicle.id)) return;
 	writeOwnerCache(
 		VEHICLE_CACHE_KEY,
-		cached.map(v => (v.id === vehicle.id ? { ...v, ...vehicle } : v))
+		cached.map(v => (v.id === vehicle.id ? { ...v, ...vehicle } : v)),
+		requestedFor
 	);
 }
 
-export function removeCachedVehicle(vehicleId: string): void {
+export function removeCachedVehicle(vehicleId: string, requestedFor: string | null): void {
+	if (requestedFor !== queueOwner) return;
 	const cached = readOwnerCache<Vehicle>(VEHICLE_CACHE_KEY);
 	if (cached)
 		writeOwnerCache(
@@ -162,8 +164,12 @@ export function removeCachedVehicle(vehicleId: string): void {
 	}
 }
 
-export function cacheVehicleHistory(vehicleId: string, expenses: Expense[]): void {
-	writeOwnerCache(`${VEHICLE_HISTORY_CACHE_KEY}:${vehicleId}`, expenses);
+export function cacheVehicleHistory(
+	vehicleId: string,
+	expenses: Expense[],
+	requestedFor: string | null
+): void {
+	writeOwnerCache(`${VEHICLE_HISTORY_CACHE_KEY}:${vehicleId}`, expenses, requestedFor);
 }
 
 export function loadCachedVehicleHistory(vehicleId: string): Expense[] | null {

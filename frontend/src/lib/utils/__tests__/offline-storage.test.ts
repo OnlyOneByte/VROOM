@@ -1202,12 +1202,15 @@ describe('queue owner scoping', () => {
 	it('an edited vehicle replaces its cached copy, keeping fields the save response leaves out', () => {
 		useStore({});
 		setOfflineQueueOwner('user-8');
-		cacheVehicles([
-			{ ...vehicle('v1', 'Old'), financing: { id: 'f1' } } as unknown as Vehicle,
-			vehicle('v2', 'Other')
-		]);
+		cacheVehicles(
+			[
+				{ ...vehicle('v1', 'Old'), financing: { id: 'f1' } } as unknown as Vehicle,
+				vehicle('v2', 'Other')
+			],
+			'user-8'
+		);
 
-		updateCachedVehicle(vehicle('v1', 'New'));
+		updateCachedVehicle(vehicle('v1', 'New'), 'user-8');
 
 		const cached = loadCachedVehicles();
 		expect(cached.map(v => [v.id, v.nickname])).toEqual([
@@ -1220,21 +1223,38 @@ describe('queue owner scoping', () => {
 	it('an edited vehicle that was never cached is not added', () => {
 		useStore({});
 		setOfflineQueueOwner('user-9');
-		cacheVehicles([vehicle('v1', 'Mine')]);
+		cacheVehicles([vehicle('v1', 'Mine')], 'user-9');
 
-		updateCachedVehicle(vehicle('shared', 'Theirs'));
+		updateCachedVehicle(vehicle('shared', 'Theirs'), 'user-9');
 
 		expect(loadCachedVehicles().map(v => v.id)).toEqual(['v1']);
+	});
+
+	it('a cache write requested for one account is dropped once another account is signed in', () => {
+		const store = useStore({});
+		setOfflineQueueOwner('user-a');
+		cacheVehicles([vehicle('v1', 'Mine')], 'user-a');
+		setOfflineQueueOwner('user-b');
+
+		cacheVehicles([vehicle('v1', 'Theirs')], 'user-b');
+		cacheVehicles([vehicle('v1', 'Late')], 'user-a');
+		cacheVehicleHistory('v1', [], 'user-a');
+		updateCachedVehicle(vehicle('v1', 'Late edit'), 'user-a');
+		removeCachedVehicle('v1', 'user-a');
+
+		expect(loadCachedVehicles().map(v => v.nickname)).toEqual(['Theirs']);
+		expect(loadCachedVehicleHistory('v1')).toBeNull();
+		expect(JSON.parse(store.get('vroom_offline_vehicles:user-a')!)[0].nickname).toBe('Mine');
 	});
 
 	it('a deleted vehicle leaves the cached list and takes its history with it', () => {
 		useStore({});
 		setOfflineQueueOwner('user-10');
-		cacheVehicles([vehicle('v1', 'Gone'), vehicle('v2', 'Kept')]);
-		cacheVehicleHistory('v1', []);
-		cacheVehicleHistory('v2', []);
+		cacheVehicles([vehicle('v1', 'Gone'), vehicle('v2', 'Kept')], 'user-10');
+		cacheVehicleHistory('v1', [], 'user-10');
+		cacheVehicleHistory('v2', [], 'user-10');
 
-		removeCachedVehicle('v1');
+		removeCachedVehicle('v1', 'user-10');
 
 		expect(loadCachedVehicles().map(v => v.id)).toEqual(['v2']);
 		expect(loadCachedVehicleHistory('v1')).toBeNull();

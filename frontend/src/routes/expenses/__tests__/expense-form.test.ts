@@ -12,7 +12,8 @@ vi.mock('$app/state', () => ({
 
 vi.mock('#lib/utils/offline-storage.ts', () => ({
 	addOfflineExpense: vi.fn(),
-	cacheVehicles: vi.fn()
+	cacheVehicles: vi.fn(),
+	currentOfflineQueueOwner: vi.fn(() => null)
 }));
 
 const mockFetch = vi.fn();
