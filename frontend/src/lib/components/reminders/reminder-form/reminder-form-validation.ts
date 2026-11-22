@@ -1,5 +1,9 @@
 import { ApiError } from '#lib/utils/error-handling.ts';
 import {
+	splitAmountsMatchTotal,
+	splitPercentagesTotal100
+} from '#lib/components/expenses/split/SplitConfigEditor.svelte';
+import {
 	FUEL_SPLIT_ERROR,
 	hasMileageTrigger,
 	isFuelAllowed,
@@ -46,13 +50,20 @@ export function validateReminderDraft(draft: ReminderDraft): Record<string, stri
 		const amt = parseFloat(draft.expenseAmount);
 		if (!(amt > 0)) e['expenseAmount'] = 'Enter an amount greater than 0';
 		const showSplit = shouldShowSplitEditor(draft);
-		if (showSplit && draft.splitMethod === 'percentage') {
-			const sum = draft.splitAllocations.reduce((s, a) => s + (a.percentage ?? 0), 0);
-			if (Math.abs(sum - 100) > 0.01) e['split'] = 'Split percentages must total 100%';
+		if (
+			showSplit &&
+			draft.splitMethod === 'percentage' &&
+			!splitPercentagesTotal100(draft.splitAllocations)
+		) {
+			e['split'] = 'Split percentages must total 100%';
 		}
-		if (showSplit && draft.splitMethod === 'absolute' && amt > 0) {
-			const sum = draft.splitAllocations.reduce((s, a) => s + (a.amount ?? 0), 0);
-			if (Math.abs(sum - amt) > 0.01) e['split'] = 'Split amounts must total the expense amount';
+		if (
+			showSplit &&
+			draft.splitMethod === 'absolute' &&
+			amt > 0 &&
+			!splitAmountsMatchTotal(draft.splitAllocations, amt)
+		) {
+			e['split'] = 'Split amounts must total the expense amount';
 		}
 	}
 	return e;

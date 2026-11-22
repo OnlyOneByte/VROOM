@@ -87,7 +87,7 @@ describe('validateReminderDraft', () => {
 		}
 	});
 
-	test('percentage splits must total exactly 100 within a cent of tolerance', () => {
+	test('percentage splits must round to exactly 100.00%, as the editor and the API require', () => {
 		const split = (percentages: number[]) =>
 			validateReminderDraft(
 				validDraft({
@@ -103,23 +103,28 @@ describe('validateReminderDraft', () => {
 			);
 
 		expect(split([60, 40])['split']).toBeUndefined();
+		expect(split([33.33, 33.33, 33.34])['split']).toBeUndefined();
 		expect(split([60, 39])['split']).toBe('Split percentages must total 100%');
+		expect(split([60, 39.99])['split']).toBe('Split percentages must total 100%');
+		expect(split([60, 40.01])['split']).toBe('Split percentages must total 100%');
 	});
 
-	test('absolute splits must total the expense amount', () => {
-		const errors = validateReminderDraft(
-			validDraft({
-				kind: 'expense',
-				expenseAmount: '100.00',
-				selectedVehicleIds: ['v1', 'v2'],
-				splitMethod: 'absolute',
-				splitAllocations: [
-					{ vehicleId: 'v1', amount: 60 },
-					{ vehicleId: 'v2', amount: 30 }
-				]
-			})
-		);
-		expect(errors['split']).toBe('Split amounts must total the expense amount');
+	test('absolute splits must total the expense amount to the cent', () => {
+		const split = (amounts: number[]) =>
+			validateReminderDraft(
+				validDraft({
+					kind: 'expense',
+					expenseAmount: '100.00',
+					selectedVehicleIds: ['v1', 'v2'],
+					splitMethod: 'absolute',
+					splitAllocations: amounts.map((amount, i) => ({ vehicleId: `v${i + 1}`, amount }))
+				})
+			);
+
+		expect(split([60.1, 39.9])['split']).toBeUndefined();
+		expect(split([60, 30])['split']).toBe('Split amounts must total the expense amount');
+		expect(split([60, 39.99])['split']).toBe('Split amounts must total the expense amount');
+		expect(split([60, 40.01])['split']).toBe('Split amounts must total the expense amount');
 	});
 
 	test('split totals are not checked when the editor is hidden (one vehicle)', () => {

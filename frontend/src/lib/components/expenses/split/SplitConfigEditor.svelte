@@ -1,3 +1,24 @@
+<script module lang="ts">
+	interface Allocation {
+		vehicleId: string;
+		amount?: number;
+		percentage?: number;
+	}
+
+	export function splitPercentageBasisPoints(allocations: Allocation[]): number {
+		return Math.round(allocations.reduce((sum, a) => sum + (a.percentage ?? 0), 0) * 100);
+	}
+
+	export function splitPercentagesTotal100(allocations: Allocation[]): boolean {
+		return splitPercentageBasisPoints(allocations) === 10_000;
+	}
+
+	export function splitAmountsMatchTotal(allocations: Allocation[], totalAmount: number): boolean {
+		const sum = allocations.reduce((s, a) => s + (a.amount ?? 0), 0);
+		return Math.round(sum * 100) === Math.round(totalAmount * 100);
+	}
+</script>
+
 <script lang="ts">
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -5,11 +26,6 @@
 	import type { Vehicle } from '#lib/types/index.ts';
 
 	type SplitMethod = 'even' | 'absolute' | 'percentage';
-	interface Allocation {
-		vehicleId: string;
-		amount?: number;
-		percentage?: number;
-	}
 
 	interface Props {
 		vehicles: Vehicle[];
@@ -46,19 +62,17 @@
 	});
 
 	let absoluteSum = $derived(allocations.reduce((sum, a) => sum + (a.amount ?? 0), 0));
-	let percentageSumBasisPoints = $derived(
-		Math.round(allocations.reduce((sum, a) => sum + (a.percentage ?? 0), 0) * 100)
-	);
+	let percentageSumBasisPoints = $derived(splitPercentageBasisPoints(allocations));
 	let percentageSumLabel = $derived(`${(percentageSumBasisPoints / 100).toFixed(2)}%`);
 
 	let absoluteError = $derived(
-		splitMethod === 'absolute' && Math.round(absoluteSum * 100) !== Math.round(totalAmount * 100)
+		splitMethod === 'absolute' && !splitAmountsMatchTotal(allocations, totalAmount)
 			? `Sum (${formatCurrency(absoluteSum)}) must equal total (${formatCurrency(totalAmount)})`
 			: undefined
 	);
 
 	let percentageError = $derived(
-		splitMethod === 'percentage' && percentageSumBasisPoints !== 10_000
+		splitMethod === 'percentage' && !splitPercentagesTotal100(allocations)
 			? `Sum (${percentageSumLabel}) must equal 100%`
 			: undefined
 	);
