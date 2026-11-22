@@ -15,6 +15,10 @@ export class AppError extends Error {
     this.details = details;
     Error.captureStackTrace(this, this.constructor);
   }
+
+  get code(): string {
+    return this.constructor.name;
+  }
 }
 
 export class ValidationError extends AppError {
@@ -38,6 +42,16 @@ export class NotFoundError extends AppError {
 export class ConflictError extends AppError {
   constructor(message: string) {
     super(message, 409, true);
+  }
+}
+
+export class PayloadTooLargeError extends AppError {
+  constructor(message: string) {
+    super(message, 413, true);
+  }
+
+  override get code(): string {
+    return 'PAYLOAD_TOO_LARGE';
   }
 }
 
@@ -111,11 +125,11 @@ export function formatErrorResponse(error: unknown, includeStack: boolean = fals
         ...(typeof error.details === 'object' && error.details !== null ? error.details : {}),
         stack: error.stack,
       };
-      return createErrorResponse(error.constructor.name, error.message, details);
+      return createErrorResponse(error.code, error.message, details);
     }
 
     const details = error.statusCode < 500 ? error.details : undefined;
-    return createErrorResponse(error.constructor.name, error.message, details);
+    return createErrorResponse(error.code, error.message, details);
   }
 
   if (error instanceof Error) {

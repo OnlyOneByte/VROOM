@@ -1,5 +1,10 @@
 import type { Photo, PhotoRef } from '../../db/schema';
-import { AppError, NotFoundError, ValidationError } from '../../errors';
+import {
+  NotFoundError,
+  PayloadTooLargeError,
+  UnprocessableEntityError,
+  ValidationError,
+} from '../../errors';
 import { logger } from '../../utils/logger';
 import type { PaginatedResult } from '../../utils/pagination';
 import { storageProviderRegistry } from '../providers/domains/storage/registry';
@@ -112,7 +117,7 @@ export async function uploadPhotoForEntity(
     throw new ValidationError('Only JPEG, PNG, WebP images and PDF files are allowed');
   }
   if (file.size > MAX_FILE_SIZE) {
-    throw new AppError('Photo must be under 10MB', 413);
+    throw new PayloadTooLargeError('Photo must be under 10MB');
   }
 
   const category = ENTITY_TO_CATEGORY[entityType];
@@ -287,9 +292,8 @@ export async function getPhotoThumbnailForEntity(
   }
 
   if (!ref) {
-    throw new AppError(
-      'Photo exists but no storage provider is configured to serve it. Please configure a storage provider in Settings.',
-      422
+    throw new UnprocessableEntityError(
+      'Photo exists but no storage provider is configured to serve it. Please configure a storage provider in Settings.'
     );
   }
 

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
-import { AppError, NotFoundError } from '../../../errors';
+import { AppError, formatErrorResponse, NotFoundError } from '../../../errors';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import {
   ALLOWED_MIME_TYPES,
@@ -101,6 +101,25 @@ describe('upload validation (before any storage work)', () => {
       { numRuns: 100 }
     );
     expect(photoCount('veh-1')).toBe(0);
+  });
+
+  test('a photo over the limit answers with the PAYLOAD_TOO_LARGE code the app has a message for', async () => {
+    const file = {
+      name: 'big.jpg',
+      type: 'image/jpeg',
+      size: MAX_FILE_SIZE + 1,
+      arrayBuffer: async () => new ArrayBuffer(0),
+    };
+    const error = await uploadPhotoForEntity(
+      'vehicle',
+      'veh-1',
+      ctx.user.id,
+      file as unknown as File
+    ).catch((e: unknown) => e);
+    expect(formatErrorResponse(error).error).toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: 'Photo must be under 10MB',
+    });
   });
 
   test('an allowed type at or under the size limit is accepted', async () => {
