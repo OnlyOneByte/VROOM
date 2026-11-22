@@ -7,6 +7,7 @@ import {
   insurancePolicies,
   insuranceTerms,
   insuranceTermVehicles,
+  type NewExpense,
   syncState,
   userPreferences,
   userProviders,
@@ -14,6 +15,113 @@ import {
   vehicleFinancing,
   vehicles,
 } from './schema.js';
+
+function daysAgo(days: number): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() - days, 12);
+}
+
+interface DrivingPattern {
+  vehicleId: string;
+  userId: string;
+  mileageAYearAgo: number;
+  milesPerDay: number;
+}
+
+function mileageOn(pattern: DrivingPattern, days: number): number {
+  return Math.round(pattern.mileageAYearAgo + pattern.milesPerDay * (365 - days));
+}
+
+function fillUps(
+  pattern: DrivingPattern,
+  everyDays: number,
+  mpg: number,
+  stations: string[]
+): NewExpense[] {
+  const rows: NewExpense[] = [];
+  for (let i = 0, days = 360; days >= 2; i++, days -= everyDays) {
+    const efficiency = mpg + (((i * 7) % 5) - 2) * 0.6;
+    const volume = Math.round(((pattern.milesPerDay * everyDays) / efficiency) * 100) / 100;
+    const pricePerGallon = 3.45 + ((i * 3) % 7) * 0.06;
+    rows.push({
+      vehicleId: pattern.vehicleId,
+      userId: pattern.userId,
+      tags: ['fuel'],
+      category: 'fuel',
+      expenseAmount: dollarsToCents(volume * pricePerGallon),
+      date: daysAgo(days),
+      mileage: mileageOn(pattern, days),
+      volume,
+      description: stations[i % stations.length],
+    });
+  }
+  return rows;
+}
+
+function serviceVisit(
+  pattern: DrivingPattern,
+  days: number,
+  dollars: number,
+  category: string,
+  tags: string[],
+  description: string
+): NewExpense {
+  return {
+    vehicleId: pattern.vehicleId,
+    userId: pattern.userId,
+    tags,
+    category,
+    expenseAmount: dollarsToCents(dollars),
+    date: daysAgo(days),
+    mileage: mileageOn(pattern, days),
+    description,
+  };
+}
+
+function plainExpense(
+  pattern: DrivingPattern,
+  days: number,
+  dollars: number,
+  category: string,
+  tags: string[],
+  description: string
+): NewExpense {
+  return {
+    vehicleId: pattern.vehicleId,
+    userId: pattern.userId,
+    tags,
+    category,
+    expenseAmount: dollarsToCents(dollars),
+    date: daysAgo(days),
+    description,
+  };
+}
+
+function loanPayments(
+  financingId: string,
+  pattern: DrivingPattern,
+  start: Date,
+  dollars: number
+): NewExpense[] {
+  const rows: NewExpense[] = [];
+  const today = daysAgo(0);
+  for (let month = 1; ; month++) {
+    const due = new Date(start.getFullYear(), start.getMonth() + month, 15, 12);
+    if (due > today) break;
+    rows.push({
+      vehicleId: pattern.vehicleId,
+      userId: pattern.userId,
+      tags: ['loan'],
+      category: 'financial',
+      expenseAmount: dollarsToCents(dollars),
+      date: due,
+      description: 'Loan payment',
+      sourceType: 'financing',
+      sourceId: financingId,
+    });
+  }
+  return rows;
+}
 
 export async function seedDatabase() {
   try {
@@ -56,9 +164,9 @@ export async function seedDatabase() {
         year: 2020,
         licensePlate: 'ABC123',
         nickname: 'Daily Driver',
-        initialMileage: 25000,
+        initialMileage: 18000,
         purchasePrice: dollarsToCents(22000),
-        purchaseDate: new Date('2020-03-15'),
+        purchaseDate: daysAgo(730),
       })
       .returning();
 
@@ -71,26 +179,29 @@ export async function seedDatabase() {
         year: 2019,
         licensePlate: 'XYZ789',
         nickname: 'Weekend Car',
-        initialMileage: 15000,
+        initialMileage: 9000,
         purchasePrice: dollarsToCents(18000),
-        purchaseDate: new Date('2019-08-20'),
+        purchaseDate: daysAgo(1400),
       })
       .returning();
 
     logger.info('Created sample vehicles', { vehicle1Id: vehicle1.id, vehicle2Id: vehicle2.id });
 
-    await db.insert(vehicleFinancing).values({
-      vehicleId: vehicle1.id,
-      financingType: 'loan',
-      provider: 'Bank of America',
-      originalAmount: dollarsToCents(20000),
-      apr: 4.5,
-      termMonths: 60,
-      startDate: new Date('2020-03-15'),
-      paymentAmount: dollarsToCents(372.86),
-      paymentFrequency: 'monthly',
-      paymentDayOfMonth: 15,
-    });
+    const [loan] = await db
+      .insert(vehicleFinancing)
+      .values({
+        vehicleId: vehicle1.id,
+        financingType: 'loan',
+        provider: 'Bank of America',
+        originalAmount: dollarsToCents(20000),
+        apr: 4.5,
+        termMonths: 60,
+        startDate: daysAgo(730),
+        paymentAmount: dollarsToCents(372.86),
+        paymentFrequency: 'monthly',
+        paymentDayOfMonth: 15,
+      })
+      .returning();
 
     const [policy1] = await db
       .insert(insurancePolicies)
@@ -117,8 +228,8 @@ export async function seedDatabase() {
       {
         id: termSf1Id,
         policyId: policy1.id,
-        startDate: new Date('2024-01-01'),
-        endDate: new Date('2024-06-30'),
+        startDate: daysAgo(120),
+        endDate: daysAgo(-62),
         policyNumber: 'SF123456789',
         totalCost: dollarsToCents(1200),
         monthlyCost: dollarsToCents(200),
@@ -126,8 +237,8 @@ export async function seedDatabase() {
       {
         id: termGe1Id,
         policyId: policy2.id,
-        startDate: new Date('2024-01-01'),
-        endDate: new Date('2024-06-30'),
+        startDate: daysAgo(120),
+        endDate: daysAgo(-62),
         policyNumber: 'GE987654321',
         totalCost: dollarsToCents(900),
         monthlyCost: dollarsToCents(150),
@@ -139,83 +250,47 @@ export async function seedDatabase() {
       { termId: termGe1Id, vehicleId: vehicle2.id },
     ]);
 
-    const sampleExpenses = [
-      {
-        vehicleId: vehicle1.id,
-        userId: sampleUser.id,
-        tags: ['fuel', 'gas'],
-        category: 'fuel',
-        expenseAmount: dollarsToCents(45.5),
-        date: new Date('2024-01-15'),
-        mileage: 25500,
-        volume: 12.5,
-        description: 'Shell Gas Station',
-      },
-      {
-        vehicleId: vehicle1.id,
-        userId: sampleUser.id,
-        tags: ['fuel', 'gas'],
-        category: 'fuel',
-        expenseAmount: dollarsToCents(52.3),
-        date: new Date('2024-01-28'),
-        mileage: 25850,
-        volume: 14.2,
-        description: 'Chevron Gas Station',
-      },
-      {
-        vehicleId: vehicle1.id,
-        userId: sampleUser.id,
-        tags: ['oil-change', 'maintenance'],
-        category: 'maintenance',
-        expenseAmount: dollarsToCents(75.0),
-        date: new Date('2024-01-10'),
-        mileage: 25400,
-        description: 'Jiffy Lube - Full synthetic oil change',
-      },
-      {
-        vehicleId: vehicle2.id,
-        userId: sampleUser.id,
-        tags: ['brakes', 'maintenance'],
-        category: 'maintenance',
-        expenseAmount: dollarsToCents(150.0),
-        date: new Date('2024-01-20'),
-        mileage: 15200,
-        description: 'Brake pad replacement',
-      },
-      {
-        vehicleId: vehicle1.id,
-        userId: sampleUser.id,
-        tags: ['insurance', 'monthly'],
-        category: 'financial',
-        expenseAmount: dollarsToCents(200.0),
-        date: new Date('2024-01-01'),
-        description: 'State Farm - Monthly premium',
-      },
-      {
-        vehicleId: vehicle1.id,
-        userId: sampleUser.id,
-        tags: ['parking'],
-        category: 'misc',
-        expenseAmount: dollarsToCents(15.0),
-        date: new Date('2024-01-12'),
-        description: 'Downtown parking garage',
-      },
-      {
-        vehicleId: vehicle1.id,
-        userId: sampleUser.id,
-        tags: ['tolls'],
-        category: 'misc',
-        expenseAmount: dollarsToCents(8.5),
-        date: new Date('2024-01-18'),
-        description: 'Highway toll',
-      },
+    const camry: DrivingPattern = {
+      vehicleId: vehicle1.id,
+      userId: sampleUser.id,
+      mileageAYearAgo: 29000,
+      milesPerDay: 32,
+    };
+    const civic: DrivingPattern = {
+      vehicleId: vehicle2.id,
+      userId: sampleUser.id,
+      mileageAYearAgo: 24000,
+      milesPerDay: 14,
+    };
+
+    const sampleExpenses: NewExpense[] = [
+      ...fillUps(camry, 10, 31, ['Shell', 'Chevron', 'Costco Gas']),
+      ...fillUps(civic, 21, 35, ['Chevron', 'Arco']),
+      serviceVisit(camry, 340, 75, 'maintenance', ['oil-change'], 'Full synthetic oil change'),
+      serviceVisit(camry, 220, 75, 'maintenance', ['oil-change'], 'Full synthetic oil change'),
+      serviceVisit(camry, 100, 79, 'maintenance', ['oil-change'], 'Full synthetic oil change'),
+      serviceVisit(camry, 160, 640, 'maintenance', ['tires'], 'Four new all-season tires'),
+      serviceVisit(camry, 45, 35, 'maintenance', ['tire-rotation'], 'Tire rotation'),
+      serviceVisit(civic, 250, 150, 'maintenance', ['brakes'], 'Brake pad replacement'),
+      serviceVisit(civic, 70, 69, 'maintenance', ['oil-change'], 'Oil change'),
+      plainExpense(camry, 300, 185, 'regulatory', ['registration'], 'Annual registration'),
+      plainExpense(civic, 200, 160, 'regulatory', ['registration'], 'Annual registration'),
+      plainExpense(camry, 130, 420, 'enhancement', ['dash-cam'], 'Dash cam install'),
+      plainExpense(camry, 25, 15, 'misc', ['parking'], 'Downtown parking garage'),
+      plainExpense(camry, 18, 8.5, 'misc', ['tolls'], 'Highway toll'),
+      plainExpense(civic, 9, 12, 'misc', ['parking'], 'Airport parking'),
+      ...loanPayments(loan.id, camry, daysAgo(730), 372.86),
+      ...[105, 75, 45, 15].flatMap((days) => [
+        plainExpense(camry, days, 200, 'financial', ['insurance'], 'State Farm - Monthly premium'),
+        plainExpense(civic, days, 150, 'financial', ['insurance'], 'Geico - Monthly premium'),
+      ]),
     ];
 
     await db.insert(expenses).values(sampleExpenses);
 
     const splitGroupId = createId();
     const splitGroupTotal = dollarsToCents(60.0);
-    const splitDate = new Date('2024-02-01');
+    const splitDate = daysAgo(12);
 
     await db.insert(expenses).values([
       {
