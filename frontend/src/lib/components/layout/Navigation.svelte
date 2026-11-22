@@ -31,6 +31,7 @@
 	} from '#lib/components/ui/sheet/index.ts';
 	import { ScrollArea } from '#lib/components/ui/scroll-area/index.ts';
 	import { cn } from '#lib/utils.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
 	import BrandMark from '#lib/components/common/BrandMark.svelte';
 
 	let mobileMenuOpen = $state(false);
@@ -56,9 +57,13 @@
 		return currentPath.startsWith(href);
 	}
 
-	function handleLogout() {
-		authStore.logout();
+	async function handleLogout() {
 		mobileMenuOpen = false;
+		try {
+			await authStore.logout();
+		} catch (error) {
+			handleErrorWithNotification(error, "Couldn't sign out");
+		}
 	}
 
 	function closeMobileMenu() {

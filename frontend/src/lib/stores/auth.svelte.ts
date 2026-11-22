@@ -175,6 +175,7 @@ function createAuthStore() {
 				appStore.reset();
 			} catch (err) {
 				error = extractErrorMessage(err, 'Logout failed');
+				throw err;
 			}
 		}
 	};
