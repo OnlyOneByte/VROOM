@@ -1,12 +1,12 @@
-export type ReminderFrequency = 'weekly' | 'monthly' | 'yearly' | 'custom';
+type ReminderFrequency = 'weekly' | 'monthly' | 'yearly' | 'custom';
 
 export type IntervalUnit = 'day' | 'week' | 'month' | 'year';
 
-export type ReminderType = 'expense' | 'notification';
+type ReminderType = 'expense' | 'notification';
 
 export type TriggerMode = 'time' | 'mileage' | 'both';
 
-export type ReminderSplitConfig =
+type ReminderSplitConfig =
 	| { method: 'even'; vehicleIds: string[] }
 	| { method: 'absolute'; allocations: { vehicleId: string; amount: number }[] }
 	| { method: 'percentage'; allocations: { vehicleId: string; percentage: number }[] };

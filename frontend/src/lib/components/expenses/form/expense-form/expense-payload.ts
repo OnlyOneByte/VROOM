@@ -2,7 +2,7 @@ import { dateOnlyToISO } from '#lib/utils/formatters.ts';
 import type { ExpenseCategory } from '#lib/types/index.ts';
 import type { ExpenseFormData } from './expense-form-data';
 
-export interface ExpensePayloadContext {
+interface ExpensePayloadContext {
 	currency: string;
 	sourceType: string | null;
 	sourceId: string | null;
@@ -27,5 +27,3 @@ export function buildExpenseData(form: ExpenseFormData, ctx: ExpensePayloadConte
 		missedFillup: form.missedFillup
 	};
 }
-
-export type ExpensePayload = ReturnType<typeof buildExpenseData>;

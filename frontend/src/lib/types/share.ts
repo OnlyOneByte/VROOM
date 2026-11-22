@@ -1,5 +1,5 @@
 export type ShareLevel = 'viewer' | 'editor';
-export type ShareStatus = 'pending' | 'accepted' | 'declined' | 'revoked';
+type ShareStatus = 'pending' | 'accepted' | 'declined' | 'revoked';
 
 export interface VehicleShare {
 	id: string;

@@ -12,7 +12,7 @@ export interface AmortizationEntry {
 	isPaid: boolean;
 }
 
-export interface LeaseMetrics {
+interface LeaseMetrics {
 	monthsRemaining: number;
 	daysRemaining: number;
 	mileageUsed: number;

@@ -27,7 +27,7 @@ export type DisplayRow = ExpenseRow | GroupRow;
 
 export type SortField = 'date' | 'amount';
 
-export interface SortOptions {
+interface SortOptions {
 	sortBy: SortField;
 	sortOrder: SortDirection;
 }

@@ -86,12 +86,12 @@ export const THEME_TOKEN_KEYS = [
 
 export type ThemeTokens = Record<ThemeTokenKey, string>;
 
-export interface ThemeVariant {
+interface ThemeVariant {
 	light: ThemeTokens;
 	dark: ThemeTokens;
 }
 
-export type ThemeSource = 'builtin' | 'custom';
+type ThemeSource = 'builtin' | 'custom';
 
 export interface ThemeDefinition extends ThemeVariant {
 	id: ThemeId;

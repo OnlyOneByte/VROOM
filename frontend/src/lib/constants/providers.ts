@@ -16,7 +16,7 @@ export const DEFAULT_FOLDER_SETTINGS: Record<PhotoCategory, CategorySetting> = {
 	odometer_readings: { enabled: true, folderPath: 'Odometer' }
 };
 
-export interface VlmProviderTypeOption {
+interface VlmProviderTypeOption {
 	id: string;
 	label: string;
 	keyless: boolean;

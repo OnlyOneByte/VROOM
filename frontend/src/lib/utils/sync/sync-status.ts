@@ -10,7 +10,7 @@ import {
 
 type LucideIcon = typeof Wifi;
 
-export interface SyncStatusInfo {
+interface SyncStatusInfo {
 	color: string;
 	icon: LucideIcon;
 	text: string;

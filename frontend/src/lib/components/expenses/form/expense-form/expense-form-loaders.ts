@@ -21,7 +21,7 @@ import { parsePreselectedTags } from './expense-navigation';
 import { splitStateFromGroup } from './split-config';
 import type { ExpenseFormState } from './expense-form-state.svelte';
 
-export interface PreselectedValues {
+interface PreselectedValues {
 	vehicleId: string | null;
 	category: string | null;
 	amount: string | null;
