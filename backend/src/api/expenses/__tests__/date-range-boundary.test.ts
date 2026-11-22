@@ -80,7 +80,7 @@ describe('findPaginated endDate boundary includes the whole end day', () => {
     expect(result.data[0]?.description).toBe('edge last ms');
   });
 
-  test('startDate still excludes the day before (lower bound unaffected by the fix)', async () => {
+  test('startDate excludes the day before the range', async () => {
     await repo.create(input({ description: 'feb 28', date: new Date(2026, 1, 28, 12, 0) }));
     await repo.create(input({ description: 'mar 1 morning', date: new Date(2026, 2, 1, 8, 0) }));
 
