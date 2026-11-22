@@ -2,17 +2,20 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 import { makeVehicle } from './expense-form-fixtures';
 
-const { addNotification, gotoDynamic, requestAutoSync, online, storage } = vi.hoisted(() => ({
-	addNotification: vi.fn(),
-	gotoDynamic: vi.fn(() => Promise.resolve()),
-	requestAutoSync: vi.fn(),
-	online: { current: true },
-	storage: {
-		findOfflineExpense: vi.fn(),
-		replaceOfflineExpense: vi.fn(() => Promise.resolve(true)),
-		loadPendingPhotos: vi.fn(() => Promise.resolve([] as File[]))
-	}
-}));
+const { addNotification, gotoDynamic, requestAutoSync, syncAll, online, storage } = vi.hoisted(
+	() => ({
+		addNotification: vi.fn(),
+		gotoDynamic: vi.fn(() => Promise.resolve()),
+		requestAutoSync: vi.fn(),
+		syncAll: vi.fn(() => Promise.resolve({})),
+		online: { current: true },
+		storage: {
+			findOfflineExpense: vi.fn(),
+			replaceOfflineExpense: vi.fn(() => Promise.resolve(true)),
+			loadPendingPhotos: vi.fn(() => Promise.resolve([] as File[]))
+		}
+	})
+);
 
 vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore: { addNotification } }));
 vi.mock('#lib/utils/navigation.ts', () => ({ gotoDynamic }));
@@ -20,7 +23,7 @@ vi.mock('#lib/stores/offline.svelte.ts', () => ({
 	onlineStatus: online,
 	offlineExpenseQueue: { current: [] }
 }));
-vi.mock('#lib/utils/sync/sync-manager.ts', () => ({ syncManager: { requestAutoSync } }));
+vi.mock('#lib/utils/sync/sync-manager.ts', () => ({ syncManager: { requestAutoSync, syncAll } }));
 vi.mock('#lib/utils/offline-storage.ts', () => ({
 	...storage,
 	cacheVehicleHistory: vi.fn(),
@@ -129,7 +132,7 @@ describe('saveQueuedExpense', () => {
 			expect.objectContaining({ vehicleId: 'v1', category: 'fuel', amount: 45.1, volume: 12.5 }),
 			[]
 		);
-		expect(requestAutoSync).toHaveBeenCalled();
+		expect(syncAll).toHaveBeenCalledWith({ skipConflicted: true });
 		expect(addNotification).toHaveBeenCalledWith({
 			type: 'success',
 			message: 'Entry updated. Syncing it now.'
@@ -149,6 +152,17 @@ describe('saveQueuedExpense', () => {
 			type: 'success',
 			message: "Entry updated. It will sync when you're back online."
 		});
+		expect(syncAll).not.toHaveBeenCalled();
+		expect(requestAutoSync).toHaveBeenCalled();
+	});
+
+	test('a sync already running hands the entry to the auto-sync instead', async () => {
+		syncAll.mockRejectedValueOnce(new Error('Sync already in progress'));
+		const state = await loadedState();
+		state.formData.amount = '45.10';
+
+		await saveQueuedExpense(state);
+		await vi.waitFor(() => expect(requestAutoSync).toHaveBeenCalled());
 	});
 
 	test('a failed write stays on the form with an error', async () => {
@@ -160,6 +174,6 @@ describe('saveQueuedExpense', () => {
 
 		expect(state.submitError).toBe(REQUEUE_FAILED_MESSAGE);
 		expect(gotoDynamic).not.toHaveBeenCalled();
-		expect(requestAutoSync).not.toHaveBeenCalled();
+		expect(syncAll).not.toHaveBeenCalled();
 	});
 });

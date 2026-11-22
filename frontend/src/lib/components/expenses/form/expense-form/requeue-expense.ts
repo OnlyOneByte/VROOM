@@ -42,7 +42,11 @@ export async function saveQueuedExpense(state: ExpenseFormState): Promise<void> 
 				? 'Entry updated. Syncing it now.'
 				: "Entry updated. It will sync when you're back online."
 		});
-		syncManager.requestAutoSync();
+		if (onlineStatus.current) {
+			void syncManager.syncAll({ skipConflicted: true }).catch(() => syncManager.requestAutoSync());
+		} else {
+			syncManager.requestAutoSync();
+		}
 		gotoDynamic(state.ctx.returnTo);
 	} finally {
 		state.isSubmitting = false;
