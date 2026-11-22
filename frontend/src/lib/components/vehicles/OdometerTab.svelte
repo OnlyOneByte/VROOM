@@ -28,7 +28,7 @@
 					(tick: Date) => scale(tick) >= TIME_X_PADDING[0]
 				);
 				const labels = ticks.map(format);
-				return ticks.filter((_tick, i) => labels.indexOf(labels[i] as string) === i);
+				return ticks.filter((_tick, i) => i === 0 || labels[i] !== labels[i - 1]);
 			}
 		};
 	}
@@ -308,7 +308,7 @@
 									aria-label="Open expense"
 									title="Open expense"
 									href={resolve(paramRoutes.expenseEdit, { id: entry.sourceId }) +
-										`?returnTo=/vehicles/${vehicleId}`}
+										`?returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
 								>
 									<Receipt class="h-3.5 w-3.5" />
 								</Button>
@@ -323,7 +323,7 @@
 										href={resolve(paramRoutes.vehicleOdometerEntryEdit, {
 											id: vehicleId,
 											entryId: entry.sourceId
-										}) + `?returnTo=/vehicles/${vehicleId}`}
+										}) + `?returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
 									>
 										<Pencil class="h-3.5 w-3.5" />
 									</Button>

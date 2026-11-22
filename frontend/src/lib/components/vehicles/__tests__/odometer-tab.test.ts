@@ -277,14 +277,26 @@ describe('mileage chart axes', () => {
 		expect(mileageYDomain([10, 1000])[0]).toBe(0);
 	});
 
-	function tickLabels(dates: Date[], width = 300): string[] {
+	function tickLabels(dates: Date[], rangeStart = 0): string[] {
 		const axis = mileageXAxisProps(dates);
 		const times = dates.map(d => d.getTime());
 		const scale = scaleTime()
 			.domain([new Date(Math.min(...times)), new Date(Math.max(...times))])
-			.range([0, width]);
+			.range([rangeStart, 300]);
 		return (axis.ticks(scale as never) as Date[]).map(tick => axis.format(tick));
 	}
+
+	test('a span over a year keeps every month tick, even when a month name comes back', () => {
+		const dates = Array.from({ length: 20 }, (_, i) => new Date(2025, 0, 1 + i * 28));
+		const labels = tickLabels(dates);
+		expect(labels).toEqual(['Apr', 'Jul', 'Oct', '2026', 'Apr']);
+	});
+
+	test('a tick inside the left inset under the y labels is dropped', () => {
+		const dates = [new Date(2025, 11, 15), new Date(2026, 3, 1), new Date(2026, 6, 1)];
+		expect(tickLabels(dates)).toContain('2026');
+		expect(tickLabels(dates, -20)).not.toContain('2026');
+	});
 
 	test('readings days apart get day labels, none repeated', () => {
 		const labels = tickLabels([new Date(2026, 10, 15), new Date(2026, 10, 20)]);
