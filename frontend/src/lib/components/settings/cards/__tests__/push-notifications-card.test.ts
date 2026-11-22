@@ -131,6 +131,19 @@ describe('PushNotificationsCard status', () => {
 		expect(screen.getByTestId('push-toggle')).toHaveFocus();
 	});
 
+	test('a Retry that loads a card with no button moves focus to the card content', async () => {
+		getVapidPublicKey
+			.mockRejectedValueOnce(new NetworkError(new TypeError('Failed to fetch')))
+			.mockResolvedValueOnce({ enabled: false, publicKey: null });
+		await mount();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await settle();
+
+		expect(statusText()).toBe("Push notifications aren't set up on this server.");
+		expect(screen.getByTestId('push-card').parentElement).toHaveFocus();
+	});
+
 	test('a failed Retry announces the error and keeps focus on the new Retry', async () => {
 		getVapidPublicKey.mockRejectedValue(new NetworkError(new TypeError('Failed to fetch')));
 		await mount();

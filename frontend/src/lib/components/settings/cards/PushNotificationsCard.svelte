@@ -55,7 +55,7 @@
 	async function retryStatus() {
 		await loadStatus();
 		await tick();
-		content?.querySelector('button')?.focus();
+		(content?.querySelector('button') ?? content)?.focus();
 	}
 
 	function isDisclosed(): boolean {
@@ -137,7 +137,7 @@
 			schedule.
 		</CardDescription>
 	</CardHeader>
-	<CardContent bind:ref={content}>
+	<CardContent bind:ref={content} tabindex={-1}>
 		{#if isLoading}
 			<div class="flex items-center justify-center py-6" data-testid="push-loading">
 				<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />

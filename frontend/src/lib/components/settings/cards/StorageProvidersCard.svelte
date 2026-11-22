@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import {
@@ -82,6 +82,7 @@
 	);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
+	let content = $state<HTMLElement | null>(null);
 
 	async function loadData() {
 		try {
@@ -136,6 +137,8 @@
 		isLoading = true;
 		error = null;
 		await loadData();
+		await tick();
+		(content?.querySelector('button') ?? content)?.focus();
 	}
 
 	onMount(() => {
@@ -270,7 +273,7 @@
 		</div>
 		<CardDescription>Configure storage providers for photos and backups</CardDescription>
 	</CardHeader>
-	<CardContent>
+	<CardContent bind:ref={content} tabindex={-1}>
 		{#if isLoading}
 			<div class="flex items-center justify-center py-8">
 				<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
