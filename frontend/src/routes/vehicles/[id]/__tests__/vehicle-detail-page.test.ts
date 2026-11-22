@@ -405,6 +405,27 @@ describe('vehicle detail page overview', () => {
 		expect(captured['pie']).toBeUndefined();
 	});
 
+	test('the stats stay loading until both the summary and the stats for a new period arrive', async () => {
+		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
+		await mount();
+		const onPeriodChange = captured['period']?.['onPeriodChange'] as (p: string) => void;
+		let resolveStats: (stats: null) => void = () => {};
+		getVehicleStats.mockImplementationOnce(() => new Promise(r => (resolveStats = r)));
+
+		onPeriodChange('30d');
+		await settle();
+
+		expect(getExpenseSummary).toHaveBeenLastCalledWith({ vehicleId: 'v1', period: '30d' });
+		expect(captured['fuelStats']?.['isLoadingStats']).toBe(true);
+		expect(captured['period']?.['isLoading']).toBe(true);
+
+		resolveStats(null);
+		await settle();
+
+		expect(captured['fuelStats']?.['isLoadingStats']).toBe(false);
+		expect(captured['period']?.['isLoading']).toBe(false);
+	});
+
 	test('changing the period refetches stats and summary for that period', async () => {
 		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
 		await mount();
