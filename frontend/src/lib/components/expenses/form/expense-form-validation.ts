@@ -87,10 +87,14 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 }
 
 function validateMileage(value: string, ctx: ValidationContext): string | null {
-	if (ctx.category !== 'fuel') return null;
+	if (!value && ctx.category !== 'fuel') return null;
 
 	const mileage = parseInt(value);
-	if (!value || mileage <= 0) return 'Mileage required for fuel expenses';
+	if (!value || mileage <= 0) {
+		return ctx.category === 'fuel'
+			? 'Mileage required for fuel expenses'
+			: 'Mileage must be greater than 0';
+	}
 
 	if (ctx.vehicle?.initialMileage && mileage < ctx.vehicle.initialMileage) {
 		return 'Mileage cannot be less than initial mileage';

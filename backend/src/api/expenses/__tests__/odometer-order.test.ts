@@ -90,6 +90,30 @@ describe('the odometer reading must fit between the entries around its date', ()
     await created('2024-03-10', 10_400);
   });
 
+  test('a non-fuel entry keeps its mileage, which is checked like a fill-up', async () => {
+    await created('2024-03-01', 10_000);
+    const service = (mileage: number) =>
+      ctx.authed('POST', '/api/v1/expenses', {
+        vehicleId,
+        category: 'maintenance',
+        expenseAmount: 120,
+        date: '2024-03-10',
+        mileage,
+      });
+
+    expect(await rejection(await service(9_000))).toContain('greater than 10,000');
+    const res = await service(10_500);
+    const body = await json<DataEnvelope<{ id: string; mileage: number | null }>>(res);
+    expect(res.status).toBe(201);
+    expect(body.data.mileage).toBe(10_500);
+    expect(await rejection(await fillUp('2024-03-20', 10_400))).toContain('greater than 10,500');
+
+    const edited = await ctx.authed('PUT', `/api/v1/expenses/${body.data.id}`, { mileage: 9_500 });
+    expect(await rejection(edited)).toContain('greater than 10,000');
+    const read = await ctx.authed('GET', `/api/v1/expenses/${body.data.id}`);
+    expect((await json<DataEnvelope<{ mileage: number | null }>>(read)).data.mileage).toBe(10_500);
+  });
+
   test('the first reading for a vehicle is accepted', async () => {
     await created('2024-03-10', 1);
   });
@@ -215,11 +239,6 @@ describe('the odometer check sees what the form sees', () => {
     });
     expect(res.status).toBe(201);
   }
-
-  test('a non-fuel entry carrying a mileage is never checked', async () => {
-    await created('2024-03-01', 10_000);
-    await misc('2024-03-10', 5);
-  });
 
   test('readings are found however many entries without a mileage sit between them', async () => {
     await created('2022-12-01', 10_000);

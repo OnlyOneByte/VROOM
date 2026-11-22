@@ -35,7 +35,6 @@
 	import VehicleSelectField from './expense-form/VehicleSelectField.svelte';
 	import SplitVehiclePicker from './expense-form/SplitVehiclePicker.svelte';
 	import MileageField from './expense-form/MileageField.svelte';
-	import SplitMileageReadings from './expense-form/SplitMileageReadings.svelte';
 	import ExpenseFormHeader from './expense-form/ExpenseFormHeader.svelte';
 	import ExpenseActionBar from './expense-form/ExpenseActionBar.svelte';
 	import ExpenseDeleteDialog from './expense-form/ExpenseDeleteDialog.svelte';
@@ -439,15 +438,7 @@
 					disabled={form.isGroupEditMode}
 					class="min-w-0 space-y-6 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50"
 				>
-					{#if form.isSplit && form.selectedVehicleIds.length >= 2}
-						<SplitMileageReadings
-							vehicles={form.vehicles}
-							selectedVehicleIds={form.selectedVehicleIds}
-							mileages={form.splitMileages}
-							bind:open={form.showPerVehicleMileage}
-							onMileageInput={(vid, value) => (form.splitMileages[vid] = value)}
-						/>
-					{:else}
+					{#if form.asksForMileage}
 						<MileageField
 							bind:value={form.formData.mileage}
 							required={form.showFuelFields}

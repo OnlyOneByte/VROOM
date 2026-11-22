@@ -127,6 +127,25 @@ describe('ExpenseFormState — validation', () => {
 		expect(state.errors['volume']).toMatch(/required for fuel expenses/);
 	});
 
+	test('a non-fuel mileage is checked on save once entered, and never for a split', () => {
+		const state = createState();
+		state.formData.vehicleId = 'v1';
+		state.formData.category = 'maintenance';
+		state.formData.amount = '120';
+		state.formData.date = '2025-03-10';
+		state.allVehicleExpenses = [makeExpense('a', { date: '2025-03-01', mileage: 10_000 })];
+		expect(state.validateForm()).toBe(true);
+
+		state.formData.mileage = '9000';
+		expect(state.validateForm()).toBe(false);
+		expect(state.errors['mileage']).toContain('greater than 10,000');
+
+		state.isSplit = true;
+		state.selectedVehicleIds = ['v1', 'v2'];
+		expect(state.asksForMileage).toBe(false);
+		expect(state.validateForm()).toBe(true);
+	});
+
 	test('electric fuel expenses validate charge instead of volume', () => {
 		const state = createState();
 		fillValidFuel(state);
@@ -167,7 +186,7 @@ describe('ExpenseFormState — validation', () => {
 });
 
 describe('ExpenseFormState — handlers', () => {
-	test('selecting a non-fuel, non-financial category clears fuel fields and source', () => {
+	test('selecting a non-fuel, non-financial category clears fuel fields and source, keeping the mileage', () => {
 		const state = createState();
 		fillValidFuel(state);
 		state.formData.charge = '3';
@@ -181,7 +200,7 @@ describe('ExpenseFormState — handlers', () => {
 			volume: '',
 			charge: '',
 			fuelType: '',
-			mileage: '',
+			mileage: '1000',
 			missedFillup: false
 		});
 		expect(state.sourceType).toBeNull();

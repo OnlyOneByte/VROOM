@@ -299,7 +299,7 @@ describe('POST /api/v1/expenses — the retired forceOverwrite path', () => {
 });
 
 describe('a keep-local overwrite that switches fuel→non-fuel clears the stale fuel fields', () => {
-  test('overwriting a fuel row with a maintenance edit over PUT nulls volume/mileage/fuelType', async () => {
+  test('overwriting a fuel row with a maintenance edit over PUT nulls volume/fuelType and keeps the mileage', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
 
     const first = await ctx.authed('POST', '/api/v1/expenses', {
@@ -337,7 +337,7 @@ describe('a keep-local overwrite that switches fuel→non-fuel clears the stale 
     expect(resolvedBody.data.id).toBe(firstBody.data.id);
     expect(resolvedBody.data.category).toBe('maintenance');
     expect(resolvedBody.data.volume, 'stale volume nulled').toBeNull();
-    expect(resolvedBody.data.mileage, 'stale mileage nulled').toBeNull();
+    expect(resolvedBody.data.mileage, 'mileage kept').toBe(41000);
     expect(resolvedBody.data.fuelType, 'stale fuelType nulled').toBeNull();
   });
 });

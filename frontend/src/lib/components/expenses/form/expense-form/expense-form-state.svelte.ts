@@ -57,9 +57,6 @@ export class ExpenseFormState {
 	isGroupEditMode = $state(false);
 	groupId = $state<string | null>(null);
 
-	showPerVehicleMileage = $state(false);
-	splitMileages = $state<Record<string, string>>({});
-
 	isInsuranceManaged = $state(false);
 
 	sourceType = $state<string | null>(null);
@@ -109,6 +106,7 @@ export class ExpenseFormState {
 	);
 
 	showFuelFields = $derived(this.formData.category === 'fuel');
+	asksForMileage = $derived(!this.isSplit || this.selectedVehicleIds.length < 2);
 	isFinancingPayment = $derived(this.sourceType === 'financing' && !!this.sourceId);
 	clearsFinancingLink = $derived(
 		this.isEditMode && this.originalExpense?.sourceType === 'financing' && !this.isFinancingPayment
@@ -166,8 +164,10 @@ export class ExpenseFormState {
 			? ['category', 'amount', 'date']
 			: ['vehicleId', 'category', 'amount', 'date'];
 		const fuelNeedsVehicle = this.showFuelFields && !!this.vehicleError && !this.isGroupEditMode;
-		if (this.showFuelFields) {
+		if (this.showFuelFields || (this.asksForMileage && this.formData.mileage)) {
 			fields.push('mileage');
+		}
+		if (this.showFuelFields) {
 			if (this.showVolumeField) fields.push('volume');
 			if (this.showChargeField) fields.push('charge');
 		}
@@ -201,7 +201,6 @@ export class ExpenseFormState {
 			this.formData.volume = '';
 			this.formData.charge = '';
 			this.formData.fuelType = '';
-			this.formData.mileage = '';
 			this.formData.missedFillup = false;
 		}
 	};

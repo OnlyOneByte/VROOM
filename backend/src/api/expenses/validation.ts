@@ -54,12 +54,11 @@ export function clearFuelFieldsIfNotFuel<
     category?: string;
     volume?: number | null;
     fuelType?: string | null;
-    mileage?: number | null;
     missedFillup?: boolean;
   },
 >(data: T, effectiveCategory: string | undefined = data.category): T {
   if (effectiveCategory === undefined || effectiveCategory === 'fuel') return data;
-  return { ...data, volume: null, fuelType: null, mileage: null, missedFillup: false };
+  return { ...data, volume: null, fuelType: null, missedFillup: false };
 }
 
 const centsAmount = expenseDollarsToCents((n) => n.positive('Amount must be positive'));
