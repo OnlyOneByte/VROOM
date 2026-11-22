@@ -119,6 +119,7 @@ So **do not run the typecheck or unit suites alongside `npm run test:e2e`.** If 
 | `analytics.spec.ts`          | summary load, quick stats, fuel tab, tab switching, zero-data state, error + retry                                                                                                          |
 | `pwa.spec.ts`                | install meta tags, offline badge, responsive overflow, mobile nav, the route and theme axe ratchets, and three preview-only tests (manifest, service worker, precache)                      |
 | `expenses-a11y.spec.ts`      | the expense list's axe-clean states: split group collapsed and expanded, row actions revealed by tap, insurance-blocked delete, keyboard reach into a split row's actions                   |
+| `offline.spec.ts`            | an expense saved offline shows on the list and the form reopens with the cached vehicles; preview-only: a visited page reloads offline, and an unvisited one shows the offline page         |
 
 ### Known gaps
 
