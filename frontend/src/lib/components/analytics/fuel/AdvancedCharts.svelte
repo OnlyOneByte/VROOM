@@ -44,7 +44,8 @@
 		return radarMetrics.map(metric => {
 			const row: Record<string, string | number> = { metric: metric.label };
 			for (const vehicle of fuelAdvanced.vehicleRadar) {
-				row[vehicle.vehicleId] = vehicle[metric.key];
+				const score = vehicle[metric.key];
+				if (score !== null) row[vehicle.vehicleId] = score;
 			}
 			return row;
 		});
@@ -59,6 +60,16 @@
 	);
 
 	let radarConfig = $derived(buildChartConfig(radarVehicleSeries));
+
+	let radarDescription = $derived.by(() => {
+		const base = 'Normalized 0–100 scores by metric (higher is better).';
+		const missing = fuelAdvanced.vehicleRadar.filter(v => v.fuelEfficiency === null);
+		if (missing.length === 0) return base;
+		if (missing.length === fuelAdvanced.vehicleRadar.length) {
+			return `${base} Fuel Efficiency: No data.`;
+		}
+		return `${base} Fuel Efficiency: No data for ${missing.map(v => v.vehicleName).join(', ')}.`;
+	});
 
 	const heatmapCategories = [
 		'fuel',
@@ -123,7 +134,7 @@
 
 		<AppBarChart
 			title="Vehicle Performance Comparison"
-			description="Normalized 0–100 scores by metric (higher is better)"
+			description={radarDescription}
 			data={radarData}
 			x="metric"
 			y={radarVehicleSeries.map(s => s.key)}

@@ -112,7 +112,7 @@ export interface FuelAdvancedResponse {
 	vehicleRadar: Array<{
 		vehicleId: string;
 		vehicleName: string;
-		fuelEfficiency: number;
+		fuelEfficiency: number | null;
 		maintenanceCost: number;
 		reliability: number;
 		annualCost: number;
