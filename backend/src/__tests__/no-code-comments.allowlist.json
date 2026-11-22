@@ -223,6 +223,9 @@
   "backend/src/utils/sharing.ts: Owner-only actions must use validateVehicleOwnership: an editor passes this gate.",
   "backend/src/utils/vehicle-ownership.ts: Keep the userId predicate: without it a write can reach another user's vehicle.",
   "frontend/e2e/support/mock-api.ts: Playwright runs route handlers in reverse registration order, so specs override these defaults by calling page.route() after mockApi().",
+  "frontend/playwright.config.ts: A preview server can serve a stale bundle, so it is never reused.",
+  "frontend/playwright.config.ts: The html reporter's default open mode starts a server that never returns, hanging CI.",
+  "frontend/postcss.config.js: Tailwind v4 runs through @tailwindcss/vite; the PostCSS plugin breaks @import 'tailwindcss' under Vite 8.",
   "frontend/scripts/type-check.mjs: Must mirror svelte-check's own --tsgo resolution order.",
   "frontend/scripts/type-check.mjs: The parent treats an unwritable report as a missing report.",
   "frontend/scripts/type-check.mjs: svelte-check --tsgo never prunes its shadow .ts files, so stale ones would keep reporting errors.",
@@ -314,5 +317,8 @@
   "frontend/src/routes/profile/+page.svelte: Accounts section falls back to empty.",
   "frontend/src/routes/settings/+page.svelte: Leave the list empty; the page already renders its empty state.",
   "frontend/src/routes/vehicles/[id]/odometer/new/+page.svelte: The soft warning is optional; ignore failures.",
-  "frontend/src/service-worker/index.ts: No sync listener: the offline outbox lives in localStorage, which workers cannot read."
+  "frontend/src/service-worker/index.ts: No sync listener: the offline outbox lives in localStorage, which workers cannot read.",
+  "frontend/vite.config.ts: Vitest's default conditions omit 'browser'; without it inlined svelte loads its server entry, where mount() throws.",
+  "frontend/vite.config.ts: Without strictPort a busy port silently shifts, leaving callers waiting on the pinned one.",
+  "frontend/vite.config.ts: withPwa appends a prerendered/ pattern that this app never matches; strict globbing would fail the build."
 ]
