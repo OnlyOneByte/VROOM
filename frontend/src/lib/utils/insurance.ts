@@ -1,4 +1,5 @@
 import type { InsurancePolicy, InsuranceTerm } from '#lib/types/index.ts';
+import { dateOnlyToISO } from '#lib/utils/formatters.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
@@ -19,6 +20,43 @@ export function enteredAmount(value: string | number | null | undefined): number
 	if (value === null || value === undefined || value === '') return undefined;
 	const amount = Number(value);
 	return Number.isFinite(amount) ? amount : undefined;
+}
+
+function utcDayClampedToMonth(year: number, month: number, day: number): number {
+	const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+	return Date.UTC(year, month, Math.min(day, daysInMonth));
+}
+
+export function termBillingMonths(startDate: Date, endDate: Date): number {
+	const startYear = startDate.getUTCFullYear();
+	const startMonth = startDate.getUTCMonth();
+	const endDay = Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate());
+	const wholeCalendarMonths =
+		(endDate.getUTCFullYear() - startYear) * 12 + (endDate.getUTCMonth() - startMonth);
+	const lastBillingDay = utcDayClampedToMonth(
+		startYear,
+		startMonth + wholeCalendarMonths,
+		startDate.getUTCDate()
+	);
+	const months = wholeCalendarMonths + (lastBillingDay < endDay ? 1 : 0);
+	return Math.max(1, months);
+}
+
+export function effectiveTermCost(term: {
+	totalCost: string;
+	monthlyCost: string;
+	startDate: string;
+	endDate: string;
+}): number {
+	const totalCost = enteredAmount(term.totalCost) ?? 0;
+	if (totalCost > 0) return totalCost;
+	const monthlyCost = enteredAmount(term.monthlyCost) ?? 0;
+	if (monthlyCost <= 0 || !term.startDate || !term.endDate) return 0;
+	const months = termBillingMonths(
+		new Date(dateOnlyToISO(term.startDate)),
+		new Date(dateOnlyToISO(term.endDate))
+	);
+	return (Math.round(monthlyCost * 100) * months) / 100;
 }
 
 export function sortTermsByEndDateDesc(terms: InsuranceTerm[]): InsuranceTerm[] {
