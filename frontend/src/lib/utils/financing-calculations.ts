@@ -195,10 +195,15 @@ function lastDueIndex(financing: VehicleFinancing, start: Date, now: Date): numb
 	return index;
 }
 
+export interface NextPaymentBasis {
+	lastPaymentDate?: Date;
+	assumeLastDuePaid?: boolean;
+}
+
 function dueDateOfLastRemainingPayment(
 	financing: VehicleFinancing,
 	paymentsRemaining: number,
-	nextPayment: { lastPaymentDate?: Date; assumeLastDuePaid?: boolean }
+	nextPayment: NextPaymentBasis
 ): Date {
 	const start = new Date(financing.startDate);
 	if (isNaN(start.getTime())) {
@@ -260,7 +265,7 @@ export function calculateNextPaymentDate(
 
 export function calculatePayoffDate(
 	financing: VehicleFinancing,
-	nextPayment: { lastPaymentDate?: Date; assumeLastDuePaid?: boolean } = {}
+	nextPayment: NextPaymentBasis = {}
 ): Date {
 	try {
 		if (!financing) {
@@ -337,7 +342,8 @@ function simulateAmortization(
 
 function calculateExtraPaymentImpactImpl(
 	financing: VehicleFinancing,
-	extraPaymentAmount: number
+	extraPaymentAmount: number,
+	nextPayment: NextPaymentBasis = {}
 ): ExtraPaymentImpact {
 	const defaultResult: ExtraPaymentImpact = {
 		extraPaymentAmount,
@@ -354,11 +360,11 @@ function calculateExtraPaymentImpactImpl(
 		}
 
 		if (financing.financingType !== 'loan') {
-			return { ...defaultResult, newPayoffDate: calculatePayoffDate(financing) };
+			return { ...defaultResult, newPayoffDate: calculatePayoffDate(financing, nextPayment) };
 		}
 
 		if (extraPaymentAmount <= 0) {
-			return { ...defaultResult, newPayoffDate: calculatePayoffDate(financing) };
+			return { ...defaultResult, newPayoffDate: calculatePayoffDate(financing, nextPayment) };
 		}
 
 		const monthlyRate = financing.apr && financing.apr > 0 ? financing.apr / 100 / 12 : 0;
@@ -371,10 +377,10 @@ function calculateExtraPaymentImpactImpl(
 
 		const monthsSaved = Math.max(0, original.months - accelerated.months);
 		const interestSaved = Math.max(0, original.totalInterest - accelerated.totalInterest);
-		const newPayoffDate = calculatePaymentDate(
-			new Date(),
-			accelerated.months,
-			financing.paymentFrequency
+		const newPayoffDate = dueDateOfLastRemainingPayment(
+			financing,
+			Math.max(1, accelerated.months),
+			nextPayment
 		);
 
 		return {
