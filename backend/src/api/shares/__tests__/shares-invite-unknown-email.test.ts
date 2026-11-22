@@ -65,7 +65,7 @@ describe('POST /api/v1/shares answers the same way for every email', () => {
     expect(shareRow(unknown.body.data.id).shared_with_id).toBeNull();
   });
 
-  test('the account lookup ignores case and the stored email is lowercased', async () => {
+  test('the stored email is lowercased and only an exact account match is used', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     seedUser('u-mixed', 'Mixed.Case@Example.com');
 
@@ -73,7 +73,7 @@ describe('POST /api/v1/shares answers the same way for every email', () => {
 
     expect(status).toBe(201);
     expect(shareRow(body.data.id)).toEqual({
-      shared_with_id: 'u-mixed',
+      shared_with_id: null,
       invited_email: 'mixed.case@example.com',
     });
   });
@@ -141,7 +141,7 @@ describe('a pending invite attaches when that email signs up', () => {
   });
 });
 
-describe('an invite only reaches an account its email identifies', () => {
+describe('an invite only reaches the account with exactly its email', () => {
   async function signUp(email: string, providerAccountId: string) {
     const { resolveNewUser } = await import('../../auth/routes');
     const result = await resolveNewUser('google', {
@@ -153,56 +153,49 @@ describe('an invite only reaches an account its email identifies', () => {
     return result.userId;
   }
 
-  function insertPendingInvite(id: string, vehicleId: string, email: string): void {
-    ctx.sqlite.run(
-      "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, level, status, invited_email) VALUES (?, ?, ?, 'viewer', 'pending', ?)",
-      [id, vehicleId, ctx.user.id, email]
-    );
-  }
-
   test('with two accounts that differ only by case, the exact one gets the invite', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    seedUser('u-exact', 'twin@example.com');
     seedUser('u-other', 'Twin@Example.com');
+    seedUser('u-exact', 'twin@example.com');
 
     const { body } = await invite(vehicleId, 'TWIN@example.com');
 
     expect(shareRow(body.data.id).shared_with_id).toBe('u-exact');
   });
 
-  test('with two accounts and no exact match, the invite stays unattached', async () => {
+  test('an account that matches only by case never gets the invite, and the exact account does when it signs up', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    seedUser('u-one', 'Pair@Example.com');
-    seedUser('u-two', 'PAIR@example.com');
-
-    const { body } = await invite(vehicleId, 'pair@example.com');
-
+    seedUser('u-variant', 'Later.Twin@Example.com');
+    const { body } = await invite(vehicleId, 'later.twin@example.com');
     expect(shareRow(body.data.id).shared_with_id).toBeNull();
+
+    const { attachPendingInvitesOnSignIn } = await import('../../auth/routes');
+    await attachPendingInvitesOnSignIn('u-variant');
+    expect(shareRow(body.data.id).shared_with_id).toBeNull();
+
+    const userId = await signUp('later.twin@example.com', 'g-later-twin');
+    expect(shareRow(body.data.id).shared_with_id).toBe(userId);
   });
 
-  test('a signup whose email matches another account only by case attaches nothing', async () => {
-    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    seedUser('u-first', 'Dup@Example.com');
-    const { body } = await invite(vehicleId, 'dup@example.com');
-    expect(shareRow(body.data.id).shared_with_id).toBe('u-first');
-    insertPendingInvite('share-loose', vehicleId, 'dup@example.com');
-
-    await signUp('DUP@example.com', 'g-dup');
-
-    expect(shareRow('share-loose').shared_with_id).toBeNull();
+  test('a signup stores its email lowercased', async () => {
+    const userId = await signUp('New.Person@Example.com', 'g-new');
+    expect(ctx.sqlite.query('SELECT email FROM users WHERE id = ?').get(userId)).toEqual({
+      email: 'new.person@example.com',
+    });
   });
 
-  test('a signup still succeeds when its invites cannot all attach', async () => {
+  test('a signup still succeeds when its invites cannot be attached', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    insertPendingInvite('share-lower', vehicleId, 'late@example.com');
-    insertPendingInvite('share-mixed', vehicleId, 'Late@example.com');
+    const { body } = await invite(vehicleId, 'blocked@example.com');
+    ctx.sqlite.run(
+      "CREATE TRIGGER refuse_attach BEFORE UPDATE OF shared_with_id ON vehicle_shares BEGIN SELECT RAISE(ABORT, 'refused'); END"
+    );
 
-    const userId = await signUp('Late@example.com', 'g-late');
+    const userId = await signUp('blocked@example.com', 'g-blocked');
 
-    expect(
-      ctx.sqlite.query('SELECT id FROM users WHERE id = ?').get(userId) as { id: string }
-    ).toEqual({ id: userId });
-    expect(shareRow('share-lower').shared_with_id).toBeNull();
-    expect(shareRow('share-mixed').shared_with_id).toBeNull();
+    expect(ctx.sqlite.query('SELECT id FROM users WHERE id = ?').get(userId)).toEqual({
+      id: userId,
+    });
+    expect(shareRow(body.data.id).shared_with_id).toBeNull();
   });
 });

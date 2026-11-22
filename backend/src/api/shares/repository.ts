@@ -55,13 +55,12 @@ export async function findInviteeId(
   db: Pick<AppDatabase, 'select'>,
   email: string
 ): Promise<string | null> {
-  const matches = await db
-    .select({ id: users.id, email: users.email })
+  const [match] = await db
+    .select({ id: users.id })
     .from(users)
-    .where(sql`lower(${users.email}) = ${email.toLowerCase()}`);
-  const exact = matches.find((m) => m.email === email);
-  if (exact) return exact.id;
-  return matches.length === 1 ? (matches[0]?.id ?? null) : null;
+    .where(eq(users.email, email))
+    .limit(1);
+  return match?.id ?? null;
 }
 
 export function attachPendingInvites(
@@ -75,8 +74,7 @@ export function attachPendingInvites(
       and(
         isNull(vehicleShares.sharedWithId),
         eq(vehicleShares.status, 'pending'),
-        sql`lower(${vehicleShares.invitedEmail}) = ${email.toLowerCase()}`,
-        sql`(${vehicleShares.invitedEmail} = ${email} or not exists (select 1 from users u where lower(u.email) = ${email.toLowerCase()} and u.id <> ${userId}))`,
+        eq(vehicleShares.invitedEmail, email),
         sql`${vehicleShares.vehicleId} not in (select v.id from vehicles v where v.user_id = ${userId})`,
         sql`${vehicleShares.vehicleId} not in (select s.vehicle_id from vehicle_shares s where s.shared_with_id = ${userId} and s.status in (${sql.join(
           ACTIVE_SHARE_STATUSES.map((status) => sql`${status}`),
