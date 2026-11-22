@@ -113,6 +113,31 @@ describe('dashboard primary action', () => {
 		expect(controls('Add Vehicle')[0]).toHaveClass('h-10');
 	});
 
+	function headerPlaceholder() {
+		const header = screen
+			.getByRole('heading', { level: 1, name: 'Dashboard' })
+			.closest('.flex-col');
+		return header?.querySelector(':scope > [data-slot="skeleton"]') ?? null;
+	}
+
+	test('with no owned vehicles the header placeholder is gone once the load settles', async () => {
+		getVehicles.mockImplementation(() => Promise.resolve([]));
+		render(Page);
+
+		await waitFor(() => expect(controls('Add Vehicle')).toHaveLength(1));
+		expect(controls('Add Vehicle')[0]).toHaveClass('fixed');
+		expect(headerPlaceholder()).toBeNull();
+	});
+
+	test('a failed load leaves no header placeholder beside the Retry', async () => {
+		getVehicles.mockImplementation(() => Promise.reject(new Error('Server down')));
+		render(Page);
+
+		await screen.findByRole('button', { name: 'Retry' });
+		expect(headerPlaceholder()).toBeNull();
+		expect(controls('Add Vehicle')).toHaveLength(0);
+	});
+
 	test('a failed load offers only a 40px Retry, with no floating action', async () => {
 		getVehicles.mockImplementation(() => Promise.reject(new Error('Server down')));
 		render(Page);
