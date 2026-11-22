@@ -40,6 +40,18 @@ export function formatDecimalAxis(value: number, decimals = 1): string {
 	return value.toFixed(decimals);
 }
 
+const TICK_CHAR_WIDTH = 7;
+const TICK_LABEL_GAP = 8;
+const BAR_CHART_BAND_PADDING = 0.4;
+
+export function fitBandTickLabel(label: string, plotWidth: number, bandCount: number): string {
+	if (plotWidth <= 0 || bandCount <= 0) return label;
+	const step = plotWidth / (bandCount + BAR_CHART_BAND_PADDING);
+	const maxChars = Math.floor((step - TICK_LABEL_GAP) / TICK_CHAR_WIDTH);
+	if (label.length <= maxChars) return label;
+	return `${label.slice(0, Math.max(maxChars - 1, 1)).trimEnd()}…`;
+}
+
 export function getXTickCount(dataLength: number, maxTicks = 6): number {
 	return Math.min(dataLength, maxTicks);
 }
