@@ -3,6 +3,8 @@ import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
+import { foldUserEmailCase } from '../connection';
+import * as schema from '../schema';
 import { applyMigration, countRows, getTables, loadMigrations } from './migration-helpers';
 
 const MIGRATIONS_FOLDER = join(import.meta.dir, '../../../drizzle');
@@ -41,6 +43,75 @@ describe('startup migrations', () => {
     }
     expect(failure).toBeInstanceOf(Error);
     expect(String((failure as Error).cause)).toContain('already exists');
+    sqlite.close();
+  });
+});
+
+describe('startup email case fold', () => {
+  function migratedDb() {
+    const sqlite = freshDb();
+    const db = drizzle(sqlite, { schema });
+    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    return { sqlite, db };
+  }
+
+  function addUser(sqlite: Database, id: string, email: string): void {
+    sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [id, email, id]);
+  }
+
+  function emails(sqlite: Database): string[] {
+    return (sqlite.query('SELECT email FROM users ORDER BY id').all() as { email: string }[]).map(
+      (row) => row.email
+    );
+  }
+
+  test('a non-ASCII case clash stops startup, lists the user ids, and changes nothing', () => {
+    const { sqlite, db } = migratedDb();
+    addUser(sqlite, 'u1', 'élodie@example.com');
+    addUser(sqlite, 'u2', 'Élodie@example.com');
+    addUser(sqlite, 'u3', 'ÖMER@example.com');
+
+    expect(() => foldUserEmailCase(db)).toThrow(
+      /differ only by letter case\. Nothing was changed\..*u1, u2/
+    );
+    expect(emails(sqlite)).toEqual([
+      'élodie@example.com',
+      'Élodie@example.com',
+      'ÖMER@example.com',
+    ]);
+    sqlite.close();
+  });
+
+  test('without a clash, every email is folded the way signup folds it, in one transaction', () => {
+    const { sqlite, db } = migratedDb();
+    addUser(sqlite, 'u1', 'ÉLODIE@example.com');
+    addUser(sqlite, 'u2', 'ÖMER@example.com');
+    addUser(sqlite, 'u3', 'plain@example.com');
+
+    foldUserEmailCase(db);
+    expect(emails(sqlite)).toEqual(['élodie@example.com', 'ömer@example.com', 'plain@example.com']);
+
+    addUser(sqlite, 'u4', 'ZOË@example.com');
+    addUser(sqlite, 'u5', 'ŁUKASZ@example.com');
+    sqlite.run(
+      "CREATE TEMP TRIGGER reject_u5 BEFORE UPDATE ON users WHEN OLD.id = 'u5' BEGIN SELECT RAISE(ABORT, 'simulated failure'); END"
+    );
+    expect(() => foldUserEmailCase(db)).toThrow(/simulated failure/);
+    expect(emails(sqlite).slice(3)).toEqual(['ZOË@example.com', 'ŁUKASZ@example.com']);
+    sqlite.close();
+  });
+
+  test('running it twice changes nothing the second time', () => {
+    const { sqlite, db } = migratedDb();
+    addUser(sqlite, 'u1', 'ÉLODIE@example.com');
+    foldUserEmailCase(db);
+    const once = sqlite.query('SELECT id, email, updated_at FROM users ORDER BY id').all();
+    const changesBefore = sqlite.query('SELECT total_changes() AS n').get();
+
+    foldUserEmailCase(db);
+
+    expect(sqlite.query('SELECT id, email, updated_at FROM users ORDER BY id').all()).toEqual(once);
+    expect(sqlite.query('SELECT total_changes() AS n').get()).toEqual(changesBefore);
     sqlite.close();
   });
 });

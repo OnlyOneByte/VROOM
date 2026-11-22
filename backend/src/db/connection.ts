@@ -1,6 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { CONFIG } from '../config';
@@ -50,10 +51,41 @@ export async function transaction<T>(
   }
 }
 
+export function foldUserEmailCase(database: AppDatabase): void {
+  const rows = database
+    .select({ id: schema.users.id, email: schema.users.email })
+    .from(schema.users)
+    .all();
+  const idsByFoldedEmail = new Map<string, string[]>();
+  for (const { id, email } of rows) {
+    const folded = email.toLowerCase();
+    idsByFoldedEmail.set(folded, [...(idsByFoldedEmail.get(folded) ?? []), id]);
+  }
+  const clashes = [...idsByFoldedEmail.values()].filter((ids) => ids.length > 1);
+  if (clashes.length > 0) {
+    throw new Error(
+      `Startup stopped: some accounts have emails that differ only by letter case. Nothing was changed. Change or remove one email in each group of these user ids by hand, then restart: ${clashes.map((ids) => ids.join(', ')).join('; ')}`
+    );
+  }
+
+  const unfolded = rows.filter(({ email }) => email !== email.toLowerCase());
+  if (unfolded.length === 0) return;
+  database.transaction((tx) => {
+    for (const { id, email } of unfolded) {
+      tx.update(schema.users)
+        .set({ email: email.toLowerCase() })
+        .where(eq(schema.users.id, id))
+        .run();
+    }
+  });
+  logger.info(`Lowercased ${unfolded.length} user email(s)`);
+}
+
 export function runMigrations(): void {
   try {
     logger.info('Running database migrations...');
     migrate(db, { migrationsFolder: './drizzle' });
+    foldUserEmailCase(db);
     logger.info('Database migrations completed successfully');
   } catch (error) {
     const message = extractErrorMessage(error);
