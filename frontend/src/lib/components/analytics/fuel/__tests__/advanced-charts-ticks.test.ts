@@ -14,7 +14,7 @@ vi.mock('#lib/components/charts/index.ts', () => ({
 	}
 }));
 
-import AdvancedCharts from '../AdvancedCharts.svelte';
+import AdvancedCharts, { radarTickLabel } from '../AdvancedCharts.svelte';
 
 const fuelAdvanced: FuelAdvancedResponse = {
 	maintenanceTimeline: [],
@@ -41,6 +41,16 @@ describe('Vehicle Performance Comparison x-axis', () => {
 		render(AdvancedCharts, { props: { fuelAdvanced } });
 		const axis = charts.find(c => c.title === 'Vehicle Performance Comparison')?.xAxisProps;
 		const labels = axis?.ticks?.map(tick => axis.format?.(tick));
-		expect(labels).toEqual(['Fuel', 'Maint.', 'Reliab.', 'Cost', 'Miles']);
+		expect(labels).toEqual(['Fuel', 'Upkeep', 'Fixes', 'Spend', 'Driven']);
+	});
+
+	test('a card 500px or wider switches to the longer names', () => {
+		expect(radarTickLabel('Maintenance Cost', 499)).toBe('Upkeep');
+		expect(radarTickLabel('Maintenance Cost', 500)).toBe('Maintenance');
+		expect(radarTickLabel('Annual Cost', 500)).toBe('Annual Cost');
+	});
+
+	test('an unknown metric keeps its own name', () => {
+		expect(radarTickLabel('Something Else', 0)).toBe('Something Else');
 	});
 });

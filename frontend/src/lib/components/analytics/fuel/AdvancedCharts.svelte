@@ -1,3 +1,31 @@
+<script module lang="ts">
+	const RADAR_WIDE_TICKS_MIN_WIDTH = 500;
+
+	const radarMetrics = [
+		{
+			key: 'fuelEfficiency',
+			label: 'Fuel Efficiency',
+			tick: 'Efficiency',
+			shortTick: 'Fuel'
+		},
+		{
+			key: 'maintenanceCost',
+			label: 'Maintenance Cost',
+			tick: 'Maintenance',
+			shortTick: 'Upkeep'
+		},
+		{ key: 'reliability', label: 'Reliability', tick: 'Reliability', shortTick: 'Fixes' },
+		{ key: 'annualCost', label: 'Annual Cost', tick: 'Annual Cost', shortTick: 'Spend' },
+		{ key: 'mileage', label: 'Mileage', tick: 'Mileage', shortTick: 'Driven' }
+	] as const;
+
+	export function radarTickLabel(label: string, cardWidth: number): string {
+		const metric = radarMetrics.find(m => m.label === label);
+		if (!metric) return label;
+		return cardWidth >= RADAR_WIDE_TICKS_MIN_WIDTH ? metric.tick : metric.shortTick;
+	}
+</script>
+
 <script lang="ts">
 	import '#lib/components/charts/bar-chart-animations.css';
 	import { formatDecimalAxis, parseMonthToDate } from '#lib/utils/chart-formatters.ts';
@@ -32,22 +60,8 @@
 			: []
 	);
 
-	const radarMetrics = [
-		{ key: 'fuelEfficiency', label: 'Fuel Efficiency', tick: 'Efficiency', shortTick: 'Fuel' },
-		{ key: 'maintenanceCost', label: 'Maintenance Cost', tick: 'Maintenance', shortTick: 'Maint.' },
-		{ key: 'reliability', label: 'Reliability', tick: 'Reliability', shortTick: 'Reliab.' },
-		{ key: 'annualCost', label: 'Annual Cost', tick: 'Annual Cost', shortTick: 'Cost' },
-		{ key: 'mileage', label: 'Mileage', tick: 'Mileage', shortTick: 'Miles' }
-	] as const;
-
-	const RADAR_WIDE_TICKS_MIN_WIDTH = 500;
-
 	let radarCardWidth = $state(0);
-	let radarTickFormat = $derived((label: string) => {
-		const metric = radarMetrics.find(m => m.label === label);
-		if (!metric) return label;
-		return radarCardWidth >= RADAR_WIDE_TICKS_MIN_WIDTH ? metric.tick : metric.shortTick;
-	});
+	let radarTickFormat = $derived((label: string) => radarTickLabel(label, radarCardWidth));
 
 	let radarData = $derived.by(() => {
 		return radarMetrics.map(metric => {
@@ -143,6 +157,7 @@
 
 		<div class="min-w-0" bind:clientWidth={radarCardWidth}>
 			<AppBarChart
+				class="h-full"
 				title="Vehicle Performance Comparison"
 				description={radarDescription}
 				data={radarData}
