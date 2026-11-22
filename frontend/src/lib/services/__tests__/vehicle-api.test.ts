@@ -14,10 +14,12 @@ vi.mock('../api-client', () => ({
 }));
 
 const cacheVehicles = vi.fn();
+const currentOfflineQueueOwner = vi.fn(() => 'u1');
 const updateCachedVehicle = vi.fn();
 const removeCachedVehicle = vi.fn();
 vi.mock('#lib/utils/offline-storage.ts', () => ({
 	cacheVehicles,
+	currentOfflineQueueOwner,
 	updateCachedVehicle,
 	removeCachedVehicle
 }));
@@ -146,7 +148,19 @@ describe('vehicleApi keeps the offline vehicle cache current', () => {
 		const shared = { id: 'v2', sharedAccess: { level: 'viewer', sharedBy: 'Sam' } };
 		get.mockResolvedValueOnce([owned, shared]);
 		await expect(vehicleApi.getVehicles({ includeShared: true })).resolves.toEqual([owned, shared]);
-		expect(cacheVehicles).toHaveBeenCalledWith([owned]);
+		expect(cacheVehicles).toHaveBeenCalledWith([owned], 'u1');
+	});
+
+	test('the cache write is tagged with the account that asked, not the one signed in at reply', async () => {
+		let reply!: (value: unknown) => void;
+		get.mockReturnValueOnce(new Promise(resolve => (reply = resolve)));
+		currentOfflineQueueOwner.mockReturnValueOnce('u1');
+		const pending = vehicleApi.getVehicles();
+		currentOfflineQueueOwner.mockReturnValue('u2');
+		reply([{ id: 'v1' }]);
+		await pending;
+		expect(cacheVehicles).toHaveBeenCalledWith([{ id: 'v1' }], 'u1');
+		currentOfflineQueueOwner.mockReturnValue('u1');
 	});
 
 	test('a failed list leaves the cache alone', async () => {

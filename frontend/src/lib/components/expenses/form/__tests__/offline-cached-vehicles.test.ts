@@ -28,7 +28,8 @@ const { onlineStatus } = await import('#lib/stores/offline.svelte.ts');
 const { setOfflineQueueOwner } = await import('#lib/utils/offline-storage.ts');
 const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
 const { offlineExpenseQueue } = await import('#lib/stores/offline.svelte.ts');
-const { loadVehicleContext } = await import('../expense-form/expense-form-loaders.ts');
+const { loadAllVehicleExpenses, loadVehicleContext } =
+	await import('../expense-form/expense-form-loaders.ts');
 type FormState = import('../expense-form/expense-form-state.svelte').ExpenseFormState;
 
 function fakeState(vehicleId: string): FormState {
@@ -145,6 +146,19 @@ describe('the expense form offline', () => {
 
 		expect(state.vehicle?.id).toBe('v1');
 		expect(state.vehicleError).not.toBeNull();
+	});
+
+	test('a history that arrives after the account changed is not cached for the new account', async () => {
+		let reply!: (value: unknown) => void;
+		getExpensesByVehicle.mockReturnValueOnce(new Promise(resolve => (reply = resolve)));
+		const state = fakeState('v1');
+		const pending = loadAllVehicleExpenses(state);
+		setOfflineQueueOwner('u2');
+		reply({ data: [{ id: 'e1', vehicleId: 'v1', date: '2024-03-01', mileage: 1 }] });
+		await pending;
+
+		expect(storage.has('vroom_offline_vehicle_history:v1:u2')).toBe(false);
+		expect(storage.has('vroom_offline_vehicle_history:v1:u1')).toBe(false);
 	});
 
 	test("never reads another user's cached vehicles", async () => {

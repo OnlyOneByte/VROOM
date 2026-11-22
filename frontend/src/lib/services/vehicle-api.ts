@@ -13,6 +13,7 @@ import { userTimeZone } from './analytics-api';
 import { photoCollection } from './photo-api';
 import {
 	cacheVehicles,
+	currentOfflineQueueOwner,
 	removeCachedVehicle,
 	updateCachedVehicle
 } from '#lib/utils/offline-storage.ts';
@@ -32,8 +33,12 @@ export const vehicleApi = {
 			include: opts?.includeShared ? 'shared' : undefined,
 			timeZone: userTimeZone()
 		});
+		const requestedFor = currentOfflineQueueOwner();
 		const vehicles = await apiClient.get<Vehicle[]>(`/api/v1/vehicles${qs}`);
-		cacheVehicles(vehicles.filter(v => !v.sharedAccess));
+		cacheVehicles(
+			vehicles.filter(v => !v.sharedAccess),
+			requestedFor
+		);
 		return vehicles;
 	},
 

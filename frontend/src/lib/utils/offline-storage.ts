@@ -110,8 +110,8 @@ export function currentOfflineQueueOwner(): string | null {
 	return queueOwner;
 }
 
-function writeOwnerCache(prefix: string, value: unknown): void {
-	if (!browser || !queueOwner) return;
+function writeOwnerCache(prefix: string, value: unknown, owner: string | null = queueOwner): void {
+	if (!browser || !queueOwner || owner !== queueOwner) return;
 	try {
 		localStorage.setItem(`${prefix}:${queueOwner}`, JSON.stringify(value));
 	} catch (error) {
@@ -130,8 +130,8 @@ function readOwnerCache<T>(prefix: string): T[] | null {
 	}
 }
 
-export function cacheVehicles(vehicles: Vehicle[]): void {
-	writeOwnerCache(VEHICLE_CACHE_KEY, vehicles);
+export function cacheVehicles(vehicles: Vehicle[], requestedFor: string | null): void {
+	writeOwnerCache(VEHICLE_CACHE_KEY, vehicles, requestedFor);
 }
 
 export function loadCachedVehicles(): Vehicle[] {
@@ -162,8 +162,12 @@ export function removeCachedVehicle(vehicleId: string): void {
 	}
 }
 
-export function cacheVehicleHistory(vehicleId: string, expenses: Expense[]): void {
-	writeOwnerCache(`${VEHICLE_HISTORY_CACHE_KEY}:${vehicleId}`, expenses);
+export function cacheVehicleHistory(
+	vehicleId: string,
+	expenses: Expense[],
+	requestedFor: string | null
+): void {
+	writeOwnerCache(`${VEHICLE_HISTORY_CACHE_KEY}:${vehicleId}`, expenses, requestedFor);
 }
 
 export function loadCachedVehicleHistory(vehicleId: string): Expense[] | null {
