@@ -10,6 +10,7 @@
 		unitTooltip,
 		CHART_PADDING,
 		TIME_X_PADDING,
+		insetTimeTicks,
 		getTrendLineProps,
 		monthlyXAxisProps
 	} from '#lib/utils/chart-formatters.ts';
@@ -61,6 +62,7 @@
 			color: chartConfig['efficiency']?.color || 'var(--chart-2)'
 		}
 	]);
+	let xAxisProps = $derived(monthlyXAxisProps(data.length));
 </script>
 
 <ChartCard
@@ -86,7 +88,7 @@
 			xPadding={TIME_X_PADDING}
 			props={{
 				...getTrendLineProps(data.length),
-				xAxis: monthlyXAxisProps(data.length),
+				xAxis: { ...xAxisProps, ticks: insetTimeTicks(xAxisProps.ticks) },
 				yAxis: {
 					format: formatDecimalAxis
 				}

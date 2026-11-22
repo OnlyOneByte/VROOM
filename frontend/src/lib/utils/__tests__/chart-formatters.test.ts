@@ -11,10 +11,12 @@ import {
 	unitTooltip,
 	formatDecimalAxis,
 	getTrendLineProps,
+	insetTimeTicks,
 	isolatedValueRows,
 	getXTickCount,
 	monthlyXAxisProps,
-	parseMonthToDate
+	parseMonthToDate,
+	TIME_X_PADDING
 } from '#lib/utils/chart-formatters.ts';
 
 describe('chart money axis formatters', () => {
@@ -194,5 +196,25 @@ describe('chart tooltip formatters (full precision, in the axis unit)', () => {
 		expect(formatDayLabel('Winter')).toBe('Winter');
 		expect(formatMonthLabel(undefined)).toBe('');
 		expect(formatDayLabel(new Date('nope'))).toBe('');
+	});
+});
+
+describe('insetTimeTicks (no x label inside the inset under the y labels)', () => {
+	const scale = scaleTime()
+		.domain([new Date(2024, 11, 28), new Date(2025, 3, 5)])
+		.range([0, 241]);
+
+	test('drops a tick the inset pulled under the y axis and keeps the rest', () => {
+		const ticks = insetTimeTicks(4) as (s: typeof scale) => Date[];
+		expect(scale(new Date(2025, 0, 1))).toBeLessThan(TIME_X_PADDING[0]);
+		const kept = ticks(scale);
+		expect(kept.map(t => t.getMonth())).toEqual([1, 2, 3]);
+		expect(kept.every(t => scale(t) >= TIME_X_PADDING[0])).toBe(true);
+	});
+
+	test('explicit tick lists and missing counts pass through unchanged', () => {
+		const list = [new Date(2025, 0, 1)];
+		expect(insetTimeTicks(list)).toBe(list);
+		expect(insetTimeTicks(undefined)).toBeUndefined();
 	});
 });

@@ -11,6 +11,7 @@
 		type TooltipValueFormat,
 		CHART_PADDING,
 		TIME_X_PADDING,
+		insetTimeTicks,
 		getTrendLineProps,
 		monthlyXAxisProps,
 		SINGLE_POINT_PROPS,
@@ -96,7 +97,7 @@
 			props={{
 				...getTrendLineProps(data.length),
 				...lineProps,
-				xAxis: resolvedXAxisProps,
+				xAxis: { ...resolvedXAxisProps, ticks: insetTimeTicks(resolvedXAxisProps['ticks']) },
 				yAxis: { format: yAxisFormat }
 			}}
 		>

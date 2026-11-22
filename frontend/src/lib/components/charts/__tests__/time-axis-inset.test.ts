@@ -12,7 +12,9 @@ describe('time-series charts keep the first x label off the y labels', () => {
 		'AppAreaChart.svelte',
 		'ExpenseTrendChart.svelte',
 		'FuelEfficiencyTrendChart.svelte'
-	])('%s insets its x scale from the y axis', file => {
-		expect(read(file)).toMatch(/padding=\{CHART_PADDING\}\s+xPadding=\{TIME_X_PADDING\}/);
+	])('%s insets its x scale and drops ticks inside the inset', file => {
+		const src = read(file);
+		expect(src).toContain('xPadding={TIME_X_PADDING}');
+		expect(src).toMatch(/xAxis: \{ \.\.\.\w+, ticks: insetTimeTicks\(/);
 	});
 });

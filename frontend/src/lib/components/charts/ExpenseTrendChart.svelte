@@ -9,6 +9,7 @@
 		formatMonthLabel,
 		CHART_PADDING,
 		TIME_X_PADDING,
+		insetTimeTicks,
 		getTrendLineProps,
 		monthlyXAxisProps
 	} from '#lib/utils/chart-formatters.ts';
@@ -45,6 +46,7 @@
 	}: Props = $props();
 
 	const series = [{ key: 'amount', label: 'Amount', color: 'var(--primary)' }];
+	let xAxisProps = $derived(monthlyXAxisProps(data.length));
 </script>
 
 <ChartCard
@@ -70,7 +72,7 @@
 			xPadding={TIME_X_PADDING}
 			props={{
 				...getTrendLineProps(data.length),
-				xAxis: monthlyXAxisProps(data.length),
+				xAxis: { ...xAxisProps, ticks: insetTimeTicks(xAxisProps.ticks) },
 				yAxis: { format: formatCurrencyAxis }
 			}}
 		>
