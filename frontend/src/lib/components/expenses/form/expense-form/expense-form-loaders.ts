@@ -221,21 +221,18 @@ export async function loadLastFuelExpense(state: ExpenseFormState): Promise<void
 
 export async function loadAllVehicleExpenses(state: ExpenseFormState): Promise<Error | null> {
 	const isCurrent = state.nextHistoryRequest();
+	state.historyCheckDeferred = false;
 	try {
 		const vehicleId = state.formData.vehicleId;
 		const requestedFor = currentOfflineQueueOwner();
 		const result = await expenseApi.getExpensesByVehicle(vehicleId, { limit: 100 });
 		cacheVehicleHistory(vehicleId, result.data, requestedFor);
-		if (isCurrent()) {
-			state.allVehicleExpenses = result.data;
-			state.historyCheckDeferred = false;
-		}
+		if (isCurrent()) state.allVehicleExpenses = result.data;
 		return null;
 	} catch (error) {
 		if (!isCurrent()) return null;
 		if (onlineStatus.current) {
 			state.allVehicleExpenses = [];
-			state.historyCheckDeferred = false;
 			return toError(error);
 		}
 		const cached = loadCachedVehicleHistory(state.formData.vehicleId);

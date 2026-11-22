@@ -140,6 +140,9 @@
 		}
 	});
 
+	const showsOdometerCheckDeferred = $derived(
+		form.historyCheckDeferred && form.showFuelFields && !form.vehicleError
+	);
 	let isRetrying = $state(false);
 	let retryButton = $state<HTMLButtonElement | null>(null);
 
@@ -355,9 +358,13 @@
 								Fill-ups can't be split across vehicles. Log each one on the vehicle you filled.
 							</p>
 						{/if}
-						{#if form.historyCheckDeferred && form.showFuelFields && !form.vehicleError}
-							<p class="text-xs text-muted-foreground" data-testid="odometer-check-deferred">
-								This vehicle's past fill-ups aren't on this device, so the odometer reading is
+						{#if showsOdometerCheckDeferred}
+							<p
+								id="odometer-check-deferred"
+								class="text-xs text-muted-foreground"
+								data-testid="odometer-check-deferred"
+							>
+								This vehicle's past entries aren't on this device, so the odometer reading is
 								checked when this entry syncs. If it doesn't fit, the entry waits under Needs
 								attention for you to fix.
 							</p>
@@ -447,6 +454,7 @@
 							error={form.touched['mileage'] ? form.errors['mileage'] : undefined}
 							previousFuelMileage={form.previousFuelHint}
 							distanceLabel={form.distLabel}
+							describedBy={showsOdometerCheckDeferred ? 'odometer-check-deferred' : undefined}
 							onInput={form.handleMileageChange}
 							onBlur={() => form.handleBlur('mileage')}
 						/>

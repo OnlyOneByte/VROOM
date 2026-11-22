@@ -181,6 +181,23 @@ describe('the expense form offline', () => {
 		expect(storage.has('vroom_offline_vehicle_history:v1:u1')).toBe(false);
 	});
 
+	test('the deferred-check note clears as soon as a new history load starts, and stays clear once it loads', async () => {
+		storage.set('vroom_offline_vehicles:u1', JSON.stringify([CAMRY]));
+		onlineStatus.current = false;
+		const state = fakeState('v1');
+		await loadVehicleContext(state);
+		expect(state.historyCheckDeferred).toBe(true);
+
+		onlineStatus.current = true;
+		let reply!: (value: unknown) => void;
+		getExpensesByVehicle.mockReturnValueOnce(new Promise(resolve => (reply = resolve)));
+		const pending = loadAllVehicleExpenses(state);
+		expect(state.historyCheckDeferred).toBe(false);
+		reply({ data: [] });
+		await pending;
+		expect(state.historyCheckDeferred).toBe(false);
+	});
+
 	test("never reads another user's cached vehicles", async () => {
 		storage.set('vroom_offline_vehicles:someone-else', JSON.stringify([CAMRY]));
 		onlineStatus.current = false;
