@@ -486,6 +486,23 @@ describe('ExpenseForm edit mode', () => {
 		);
 	});
 
+	test('an out-of-order update refusal lands on the Mileage field and focuses it', async () => {
+		updateExpense.mockRejectedValue(
+			new ApiError('Mileage must be less than 30,500 (from later entry)', 400)
+		);
+		await renderEdit();
+
+		await save();
+
+		const mileage = field('mileage');
+		await vi.waitFor(() => expect(document.activeElement).toBe(mileage));
+		expect(mileage).toHaveAttribute('aria-invalid', 'true');
+		expect(errorText('mileage')).toBe('Mileage must be less than 30,500 (from later entry).');
+		expect(document.getElementById('mileage-error')).toHaveAttribute('role', 'alert');
+		expect(document.querySelector('[data-testid="submit-error"]')).toBeNull();
+		expect(goto).not.toHaveBeenCalled();
+	});
+
 	test('validation guards updates too', async () => {
 		await renderEdit();
 		await type('amount', '');
