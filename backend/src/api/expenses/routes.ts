@@ -69,10 +69,17 @@ import {
 
 const routes = new Hono();
 
+interface OdometerReadingInput {
+  vehicleId: string;
+  mileage?: number | null;
+  date: Date;
+  timeZone?: string;
+}
+
+const timeZoneSchema = z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional();
+
 async function odometerCheck(
-  vehicleId: string,
-  mileage: number | null | undefined,
-  date: Date,
+  { vehicleId, mileage, date, timeZone }: OdometerReadingInput,
   excludeId?: string
 ): Promise<OdometerCheck | null> {
   if (mileage == null) return null;
@@ -81,7 +88,7 @@ async function odometerCheck(
     vehicleId,
     mileage,
     date,
-    timeZone: 'UTC',
+    timeZone: timeZone ?? 'UTC',
     excludeId,
     initialMileage: vehicle?.initialMileage,
   };
@@ -89,7 +96,7 @@ async function odometerCheck(
 
 async function editedOdometerCheck(
   existing: Expense,
-  next: { vehicleId: string; date: Date; mileage: number | null | undefined; category: string }
+  next: OdometerReadingInput & { category: string }
 ): Promise<OdometerCheck | null> {
   if (next.category !== 'fuel') return null;
   const unchanged =
@@ -98,7 +105,7 @@ async function editedOdometerCheck(
     next.mileage === existing.mileage &&
     next.category === existing.category;
   if (unchanged) return null;
-  return odometerCheck(next.vehicleId, next.mileage, next.date, existing.id);
+  return odometerCheck(next, existing.id);
 }
 
 const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
@@ -168,7 +175,7 @@ const createExpenseSchemaBase = baseExpenseSchema.omit({
 });
 
 const createExpenseSchema = createExpenseSchemaBase
-  .extend({ forceOverwrite: z.boolean().optional() })
+  .extend({ forceOverwrite: z.boolean().optional(), timeZone: timeZoneSchema })
   .refine(
     (data) => {
       const hasType = !!data.sourceType;
@@ -189,6 +196,7 @@ const updateExpenseSchema = createExpenseSchemaBase
     tags: z.array(tagElementSchema).max(CONFIG.validation.expense.maxTags).optional(),
     sourceType: z.literal('financing').nullable().optional(),
     sourceId: z.string().min(1).nullable().optional(),
+    timeZone: timeZoneSchema,
   })
   // Zod refinements do not survive .partial().
   .refine(
@@ -316,7 +324,7 @@ export const expenseQuerySchema = z.object({
   category: expenseCategorySchema.optional(),
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
-  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
+  timeZone: timeZoneSchema,
   search: z.string().trim().min(1).max(100).optional(),
   limit: z
     .string()
@@ -499,7 +507,7 @@ routes.get(
 const summaryQuerySchema = z.object({
   vehicleId: z.string().optional(),
   period: z.enum(['7d', '30d', '90d', '1y', 'all']).optional().default('all'),
-  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
+  timeZone: timeZoneSchema,
 });
 
 routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
@@ -527,7 +535,7 @@ const exportQuerySchema = z.object({
   category: expenseCategorySchema.optional(),
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
-  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
+  timeZone: timeZoneSchema,
   search: z.string().trim().min(1).max(100).optional(),
   tags: z
     .string()
@@ -731,7 +739,7 @@ routes.post('/import/detect', zValidator('json', detectSourceSchema), (c) => {
 
 routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   const user = c.get('user');
-  const { forceOverwrite, ...body } = c.req.valid('json');
+  const { forceOverwrite, timeZone, ...body } = c.req.valid('json');
   if (forceOverwrite) {
     throw new ValidationError(
       'forceOverwrite is no longer supported. Overwrite the expense with PUT /api/v1/expenses/:id.'
@@ -757,7 +765,7 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
 
   const createdExpense = await expenseRepository.createIdempotent(
     { ...expenseData, userId: ownerId, createdBy },
-    await odometerCheck(expenseData.vehicleId, expenseData.mileage, expenseData.date)
+    await odometerCheck({ ...expenseData, timeZone })
   );
 
   if (createdExpense.mileage != null) {
@@ -821,7 +829,7 @@ routes.put(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
-    const updateData = c.req.valid('json');
+    const { timeZone, ...updateData } = c.req.valid('json');
 
     const existingExpense = await expenseRepository.findById(id);
     if (!existingExpense) throw new NotFoundError('Expense');
@@ -866,6 +874,7 @@ routes.put(
       date: updateData.date ?? existingExpense.date,
       mileage: finalMileage,
       category: finalCategory,
+      timeZone,
     });
 
     const updatedExpense = await expenseRepository.update(id, normalizedUpdate, odometer);

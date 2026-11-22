@@ -29,6 +29,7 @@ import { ApiError, extractErrorMessage } from '#lib/utils/error-handling.ts';
 import { classifySyncFailure, type SyncFailureKind } from './classify-failure';
 import { apiClient } from '#lib/services/api-client.ts';
 import { expenseApi } from '#lib/services/expense-api.ts';
+import { userTimeZone } from '#lib/services/analytics-api.ts';
 import { fromBackendExpense } from '#lib/services/api-transformer.ts';
 import type { BackendExpenseResponse } from '#lib/types/index.ts';
 import { browser } from '$app/env';
@@ -353,7 +354,8 @@ class SyncManager {
 	private postExpense(expense: OfflineExpense) {
 		return apiClient.post<BackendExpenseResponse>('/api/v1/expenses', {
 			...offlineExpenseToBackend(expense),
-			clientId: expense.clientId
+			clientId: expense.clientId,
+			timeZone: userTimeZone()
 		});
 	}
 
@@ -371,7 +373,8 @@ class SyncManager {
 	private overwriteServerCopy(expense: OfflineExpense, serverId: string) {
 		return apiClient.put<BackendExpenseResponse>(`/api/v1/expenses/${serverId}`, {
 			...offlineExpenseToBackend(expense, { clearEmptyFields: true }),
-			...(!expense.sourceId && { sourceType: null, sourceId: null })
+			...(!expense.sourceId && { sourceType: null, sourceId: null }),
+			timeZone: userTimeZone()
 		});
 	}
 

@@ -234,7 +234,10 @@ describe('Sync Manager', () => {
 			expect(result.synced).toBe(1);
 			const post = mockFetch.mock.calls[1] as [string, { method: string; body: string }];
 			expect(post[1].method).toBe('POST');
-			expect(JSON.parse(post[1].body).clientId).toBe('cid-b');
+			expect(JSON.parse(post[1].body)).toMatchObject({
+				clientId: 'cid-b',
+				timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+			});
 		});
 
 		it('treats an unchanged server copy as already delivered: no POST, no conflict', async () => {

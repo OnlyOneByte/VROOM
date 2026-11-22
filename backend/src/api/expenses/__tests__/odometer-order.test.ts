@@ -131,6 +131,40 @@ describe('the odometer reading must fit between the entries around its date', ()
     expect(replayBody.data.id).toBe(firstBody.data.id);
   });
 
+  test('days are local to the sender when it sends its time zone', async () => {
+    await created('2024-03-10T12:00:00.000Z', 10_000);
+    const lateEvening = '2024-03-10T10:00:00.000Z';
+
+    expect(
+      await rejection(await fillUp(lateEvening, 10_500, { timeZone: 'Pacific/Auckland' }))
+    ).toBe('Mileage must be less than 10,000 (from later entry)');
+    expect((await fillUp(lateEvening, 10_500)).status).toBe(201);
+  });
+
+  test('two entries on one local day are not compared, even across a UTC midnight', async () => {
+    await created('2024-02-10T20:00:00.000Z', 10_000);
+    const sameEvening = '2024-02-11T06:00:00.000Z';
+
+    expect(await rejection(await fillUp(sameEvening, 9_900))).toContain('greater than 10,000');
+    const res = await fillUp(sameEvening, 9_900, { timeZone: 'America/Los_Angeles' });
+    const body = await json<DataEnvelope<{ id: string }>>(res);
+    expect(res.status).toBe(201);
+
+    const edited = await ctx.authed('PUT', `/api/v1/expenses/${body.data.id}`, {
+      mileage: 9_800,
+      timeZone: 'America/Los_Angeles',
+    });
+    expect(edited.status).toBe(200);
+    const unzoned = await ctx.authed('PUT', `/api/v1/expenses/${body.data.id}`, { mileage: 9_700 });
+    expect(await rejection(unzoned)).toContain('greater than 10,000');
+  });
+
+  test('an unknown time zone is refused', async () => {
+    expect(
+      await rejection(await fillUp('2024-03-10', 10_000, { timeZone: 'Mars/Olympus' }))
+    ).toContain('Unknown time zone');
+  });
+
   test('two conflicting saves sent at once cannot both be stored', async () => {
     const statuses = await Promise.all([
       fillUp('2024-03-01', 10_000).then((r) => r.status),
