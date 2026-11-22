@@ -101,7 +101,7 @@
 </svelte:head>
 
 {#snippet header()}
-	<PageHeader title="Edit Provider">
+	<PageHeader title="Edit Provider" description="Update your storage provider configuration">
 		{#snippet back()}
 			<Button
 				variant="ghost"
@@ -127,19 +127,22 @@
 				</div>
 			{:else}
 				<div class="rounded-lg border bg-card p-6" bind:this={stateCard}>
-					<div class="mb-4 flex items-center gap-3 text-destructive">
-						<CircleAlert class="h-5 w-5" aria-hidden="true" />
-						<p class="font-medium">
-							{notFound ? 'Provider not found' : "Couldn't load this provider"}
+					<div role={notFound ? undefined : 'alert'}>
+						<div class="mb-4 flex items-center gap-3 text-destructive">
+							<CircleAlert class="h-5 w-5" aria-hidden="true" />
+							<p class="font-medium">
+								{notFound ? 'Provider not found' : "Couldn't load this provider"}
+							</p>
+						</div>
+						<p class="mb-4 text-sm text-muted-foreground">
+							{notFound
+								? 'It may have been removed. Go back to Settings to see your storage providers.'
+								: error}
 						</p>
 					</div>
 					{#if notFound}
-						<p class="mb-4 text-sm text-muted-foreground">
-							It may have been removed. Go back to Settings to see your storage providers.
-						</p>
 						<Button size="lg" variant="outline" onclick={backToSettings}>Back to Settings</Button>
 					{:else}
-						<p class="mb-4 text-sm text-muted-foreground" role="alert">{error}</p>
 						<Button size="lg" onclick={retryLoad}>Retry</Button>
 					{/if}
 				</div>

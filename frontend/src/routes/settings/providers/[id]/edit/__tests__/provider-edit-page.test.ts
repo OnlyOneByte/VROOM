@@ -69,8 +69,9 @@ describe('storage provider edit page states', () => {
 		getProviders.mockRejectedValue(new ApiError('boom', 500));
 		render(EditPage);
 
-		expect(await screen.findByRole('alert')).toHaveTextContent(SERVER_FAILURE_MESSAGE);
-		expect(screen.getByText("Couldn't load this provider")).toBeInTheDocument();
+		const alert = await screen.findByRole('alert');
+		expect(alert).toHaveTextContent("Couldn't load this provider");
+		expect(alert).toHaveTextContent(SERVER_FAILURE_MESSAGE);
 		expect(screen.getByRole('heading', { level: 1, name: 'Edit Provider' })).toBeInTheDocument();
 		expect(screen.queryByText(/boom/)).toBeNull();
 
@@ -88,5 +89,19 @@ describe('storage provider edit page states', () => {
 
 		expect(await screen.findByDisplayValue('Test Bucket')).toBeInTheDocument();
 		expect(screen.queryByRole('alert')).toBeNull();
+	});
+
+	test('the header is the same while loading and once the form loads, so it does not jump', async () => {
+		let resolveProviders: (list: UserProviderInfo[]) => void = () => {};
+		getProviders.mockReturnValue(new Promise(r => (resolveProviders = r)));
+		render(EditPage);
+		const headerText = () => screen.getByRole('heading', { level: 1 }).parentElement?.textContent;
+		const loadingHeader = headerText();
+
+		resolveProviders([S3]);
+		await screen.findByDisplayValue('Test Bucket');
+
+		expect(loadingHeader).toContain('Update your storage provider configuration');
+		expect(headerText()).toBe(loadingHeader);
 	});
 });
