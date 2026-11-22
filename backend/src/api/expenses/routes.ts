@@ -60,6 +60,7 @@ import { expenseRepository } from './repository';
 import {
   clearFuelFieldsIfNotFuel,
   createSplitExpenseSchema,
+  MILEAGE_NOT_POSITIVE_MESSAGE,
   type OdometerCheck,
   type SplitConfig,
   splitConfigVehicleIds,
@@ -129,7 +130,7 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
   mileage: z
     .number()
     .int(WHOLE_DISTANCE_MESSAGE)
-    .min(0, 'Mileage cannot be negative')
+    .positive(MILEAGE_NOT_POSITIVE_MESSAGE)
     .max(MAX_ODOMETER_READING, ODOMETER_TOO_HIGH_MESSAGE)
     .nullable()
     .optional(),

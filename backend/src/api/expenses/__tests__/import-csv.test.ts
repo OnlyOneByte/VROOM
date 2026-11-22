@@ -400,6 +400,26 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect((await listExpenses()).map((r) => r.expenseAmount)).toEqual([12.34]);
   });
 
+  test('a mileage of 0 is rejected for every category, not stored as a reading', async () => {
+    await seedCivic('Daily Driver');
+    const csv = [
+      'date,vehicle,category,amount,mileage,volume',
+      '2024-06-01T00:00:00.000Z,Daily Driver,misc,5,0,',
+      '2024-06-02T00:00:00.000Z,Daily Driver,fuel,40,0,10',
+      '2024-06-03T00:00:00.000Z,Daily Driver,misc,5,1,',
+    ].join('\n');
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(res);
+    expect(res.status).toBe(200);
+    expect(body.data.rows.map((r) => [r.status, r.message])).toEqual([
+      ['error', 'Mileage must be greater than 0'],
+      ['error', 'Mileage must be greater than 0'],
+      ['ready', undefined],
+    ]);
+    expect(listExpensesRaw().map((r) => r.mileage)).toEqual([1]);
+  });
+
   test('matches a vehicle by its "year make model" name too (not just nickname)', async () => {
     await seedCivic('Daily Driver');
     const csv = [
