@@ -6,7 +6,7 @@ import { syncStateRepository } from '../settings/repository';
 
 import { backupOrchestrator } from './backup-orchestrator';
 
-export interface UserActivity {
+interface UserActivity {
   userId: string;
   lastActivity: Date;
   inactivityTimer?: NodeJS.Timeout;

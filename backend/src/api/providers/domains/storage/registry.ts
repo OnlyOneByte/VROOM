@@ -15,7 +15,7 @@ import { GooglePhotosProvider } from './google-photos-provider';
 import { S3CompatProvider } from './s3-compat-provider';
 import type { StorageProvider } from './storage-provider';
 
-export interface ResolvedProvider {
+interface ResolvedProvider {
   provider: StorageProvider;
   providerId: string;
   folderPath: string;

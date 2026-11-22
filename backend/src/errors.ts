@@ -76,12 +76,12 @@ export class SyncError extends Error {
 export const isAppError = (error: unknown): error is AppError => error instanceof AppError;
 export const isSyncError = (error: unknown): error is SyncError => error instanceof SyncError;
 
-export interface ErrorResponse {
+interface ErrorResponse {
   success: false;
   error: { code: string; message: string; details?: unknown };
 }
 
-export interface SuccessResponse<T = unknown> {
+interface SuccessResponse<T = unknown> {
   success: true;
   data?: T;
   message?: string;

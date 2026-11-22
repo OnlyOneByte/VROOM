@@ -15,7 +15,7 @@ import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { assertVehiclesOwned } from '../../utils/vehicle-ownership';
 
-export interface CreateTermInput {
+interface CreateTermInput {
   startDate: Date;
   endDate: Date;
   policyNumber?: string;
@@ -34,7 +34,7 @@ export interface CreateTermInput {
 
 export type MonthlyPricedTerm = InsuranceTerm & { userId: string };
 
-export interface UpdateTermInput {
+interface UpdateTermInput {
   startDate?: Date;
   endDate?: Date;
   policyNumber?: string | null;
@@ -51,14 +51,14 @@ export interface UpdateTermInput {
   vehicleCoverage?: { vehicleIds: string[] };
 }
 
-export interface CreatePolicyData {
+interface CreatePolicyData {
   company: string;
   terms: CreateTermInput[];
   notes?: string;
   isActive?: boolean;
 }
 
-export interface UpdatePolicyData {
+interface UpdatePolicyData {
   company?: string;
   notes?: string | null;
   isActive?: boolean;
@@ -75,7 +75,7 @@ type PolicyCoverage = {
   vehicleIds: string[];
 };
 
-export type InsurancePolicyWithVehicles = InsurancePolicy & PolicyCoverage;
+type InsurancePolicyWithVehicles = InsurancePolicy & PolicyCoverage;
 
 // Owner-scoped lookups keep writes safe even if a caller skips the route ownership check.
 function ownedPolicy(policyId: string, userId: string) {

@@ -5,7 +5,7 @@ import type { Lucia, Session, User } from 'lucia';
 import { CONFIG } from '../../config';
 import { logger } from '../../utils/logger';
 
-export interface SessionRefreshResult {
+interface SessionRefreshResult {
   session: Session;
   user: User;
   refreshed: boolean;

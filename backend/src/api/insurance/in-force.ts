@@ -2,7 +2,7 @@ import { and, gte, lt, type SQL } from 'drizzle-orm';
 import { insuranceTerms } from '../../db/schema';
 import { calendarDayIn, zonedMidnight } from '../../utils/time-zone';
 
-export function coveredDay(now: Date, timeZone = 'UTC'): { start: Date; end: Date } {
+function coveredDay(now: Date, timeZone = 'UTC'): { start: Date; end: Date } {
   const [year, month, day] = calendarDayIn(now, timeZone).split('-').map(Number) as [
     number,
     number,

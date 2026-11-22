@@ -5,7 +5,7 @@ import { DUPLICATE_VEHICLE_MESSAGE, dateInput, hasUniqueVehicleIds } from '../..
 
 const ins = CONFIG.validation.insurance;
 
-export const termVehicleCoverageSchema = z.object({
+const termVehicleCoverageSchema = z.object({
   vehicleIds: z
     .array(z.string().min(1))
     .min(1, 'At least one vehicle required')

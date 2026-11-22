@@ -1,24 +1,10 @@
-import { eq } from 'drizzle-orm';
 import type { Context } from 'hono';
-import { getDb } from '../../db/connection';
-import { photos } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { requireVehicleWrite, resolveVehicleOwnerId } from '../../utils/sharing';
 import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { insuranceClaimRepository } from '../insurance/claims-repository';
 import { odometerRepository } from '../odometer/repository';
-
-export async function validatePhotoOwnership(photoId: string, userId: string): Promise<void> {
-  const db = getDb();
-  const rows = await db
-    .select({ userId: photos.userId })
-    .from(photos)
-    .where(eq(photos.id, photoId))
-    .limit(1);
-  const photo = rows[0];
-  if (!photo || photo.userId !== userId) throw new NotFoundError('Photo');
-}
 
 export async function validateEntityOwnership(
   entityType: string,

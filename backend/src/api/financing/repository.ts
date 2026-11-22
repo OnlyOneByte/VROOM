@@ -54,7 +54,7 @@ export function elapsedMonths(startDate: Date, date: Date, timeZone?: string): n
   return whole + Math.round((end - anchor) / MS_PER_DAY) / Math.round((next - anchor) / MS_PER_DAY);
 }
 
-export interface AmortizationTerms {
+interface AmortizationTerms {
   originalAmount: number;
   apr: number | null;
   startDate: Date;

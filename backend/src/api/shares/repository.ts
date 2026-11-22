@@ -7,7 +7,7 @@ import type { NewVehicleShare, VehicleShare } from '../../db/schema';
 import { users, vehicleShares, vehicles } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
 
-export interface AcceptedShareAccess {
+interface AcceptedShareAccess {
   shareId: string;
   vehicleId: string;
   level: string;
@@ -28,7 +28,7 @@ export interface ReceivedShare extends VehicleShare {
 // Must match the partial unique index vehicle_shares_active_idx in db/schema.ts; changing either requires a migration.
 export const ACTIVE_SHARE_STATUSES = ['pending', 'accepted'] as const;
 
-export type ActiveShareStatus = (typeof ACTIVE_SHARE_STATUSES)[number];
+type ActiveShareStatus = (typeof ACTIVE_SHARE_STATUSES)[number];
 
 export function isActiveShareStatus(status: string): status is ActiveShareStatus {
   return ACTIVE_SHARE_STATUSES.includes(status as ActiveShareStatus);
@@ -68,7 +68,7 @@ export function attachPendingInvites(
     .run();
 }
 
-export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehicleShare> {
+class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehicleShare> {
   constructor(db: AppDatabase = getDb()) {
     super(db, vehicleShares);
   }

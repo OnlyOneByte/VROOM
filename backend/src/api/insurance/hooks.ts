@@ -157,10 +157,7 @@ function sameTime(a: Date | null | undefined, b: Date | null | undefined): boole
   return (a?.getTime() ?? null) === (b?.getTime() ?? null);
 }
 
-export function termExpenseInputsChanged(
-  previous: TermExpenseParams,
-  next: TermExpenseParams
-): boolean {
+function termExpenseInputsChanged(previous: TermExpenseParams, next: TermExpenseParams): boolean {
   const previousVehicles = [...previous.vehicleIds].sort().join(',');
   const nextVehicles = [...next.vehicleIds].sort().join(',');
   return (

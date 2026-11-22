@@ -2,9 +2,9 @@ import type { ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
 import type { ColumnMapping, ImportDateFormat, NativeField } from './import-mapping';
 
-export type PresetId = 'fuelly' | 'fuelio' | 'drivvo';
+type PresetId = 'fuelly' | 'fuelio' | 'drivvo';
 
-export interface MappingPreset {
+interface MappingPreset {
   id: PresetId;
   label: string;
   signature: string[];
