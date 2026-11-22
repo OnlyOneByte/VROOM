@@ -1353,6 +1353,93 @@ describe('queue owner scoping', () => {
 		expect(db.photos.get('c1')).toEqual([before]);
 	});
 
+	function parkedWithPhoto(owner: string, overrides: Partial<OfflineExpense> = {}) {
+		const db = fakePhotoDb();
+		vi.stubGlobal('indexedDB', db);
+		const before = new File(['old'], 'before.jpg', { type: 'image/jpeg' });
+		db.photos.set('c1', [before]);
+		const parked = queuedRow({
+			id: 'parked',
+			clientId: 'c1',
+			vehicleId: 'v1',
+			date: '2026-01-06',
+			needsAttention: true,
+			...overrides
+		});
+		const store = useStore({ [scoped(owner)]: JSON.stringify([parked]) });
+		setOfflineQueueOwner(owner);
+		const edited = new File(['new'], 'edited.jpg', { type: 'image/jpeg' });
+		return { db, store, parked, before, edited };
+	}
+
+	function failQueueWrites(owner: string) {
+		localStorageMock.setItem.mockImplementation((key: string) => {
+			if (key === scoped(owner)) throw new DOMException('quota', 'QuotaExceededError');
+		});
+	}
+
+	it('a queue write that fails puts the previous photos back', async () => {
+		const { db, store, parked, before, edited } = parkedWithPhoto('user-14');
+		failQueueWrites('user-14');
+
+		expect(await replaceParkedExpense('parked', requeueInput, [edited])).toBe('failed');
+
+		expect(db.photos.get('c1')).toEqual([before]);
+		expect(JSON.parse(store.get(scoped('user-14'))!)).toEqual([parked]);
+	});
+
+	it('a queue write that fails for a moved entry drops the new photos and keeps the old ones', async () => {
+		const { db, before, edited } = parkedWithPhoto('user-15', { vehicleId: 'v2' });
+		failQueueWrites('user-15');
+
+		expect(await replaceParkedExpense('parked', requeueInput, [edited])).toBe('failed');
+
+		expect([...db.photos.keys()]).toEqual(['c1']);
+		expect(db.photos.get('c1')).toEqual([before]);
+	});
+
+	it('a refused edit for a moved entry drops the new photos and keeps the old ones', async () => {
+		const { db, store, parked, before, edited } = parkedWithPhoto('user-16', {
+			date: '2026-01-05'
+		});
+
+		const pending = replaceParkedExpense('parked', requeueInput, [edited]);
+		store.set(scoped('user-16'), JSON.stringify([{ ...parked, needsAttention: false }]));
+
+		expect(await pending).toBe('not-parked');
+		expect([...db.photos.keys()]).toEqual(['c1']);
+		expect(db.photos.get('c1')).toEqual([before]);
+	});
+
+	it('an edit that moves the entry to another vehicle on the same day gets a fresh client id', async () => {
+		const { store, edited } = parkedWithPhoto('user-17', { vehicleId: 'v2' });
+
+		expect(await replaceParkedExpense('parked', requeueInput, [edited])).toBe('saved');
+
+		const [row] = JSON.parse(store.get(scoped('user-17'))!) as OfflineExpense[];
+		expect(row?.clientId).toBeDefined();
+		expect(row?.clientId).not.toBe('c1');
+	});
+
+	it('a photo read that fails still lets the edit through', async () => {
+		const { db, store, edited } = parkedWithPhoto('user-18');
+		const transaction = db.database.transaction;
+		let first = true;
+		db.database.transaction = (...args: Parameters<typeof transaction>) => {
+			if (first) {
+				first = false;
+				throw new DOMException('broken', 'InvalidStateError');
+			}
+			return transaction(...args);
+		};
+
+		expect(await replaceParkedExpense('parked', requeueInput, [edited])).toBe('saved');
+
+		expect(db.photos.get('c1')).toEqual([edited]);
+		const [row] = JSON.parse(store.get(scoped('user-18'))!) as OfflineExpense[];
+		expect(row?.clientId).toBe('c1');
+	});
+
 	it('an edit that moves the entry to another vehicle or day gets a fresh client id, and its photos move with it', async () => {
 		const db = fakePhotoDb();
 		vi.stubGlobal('indexedDB', db);
