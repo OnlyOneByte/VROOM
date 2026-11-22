@@ -83,6 +83,11 @@ describe('monthlyXAxisProps (monthly time-series axis wiring)', () => {
 		expect(typeof monthlyXAxisProps(3).format).toBe('function');
 	});
 
+	test('a caller can lower the tick budget for a crowded chart', () => {
+		expect(monthlyXAxisProps(13, 6).ticks).toBe(6);
+		expect(monthlyXAxisProps(4, 6).ticks).toBe(4);
+	});
+
 	test('the wired format callback renders a 3-letter month and guards unknown input', () => {
 		const format = monthlyXAxisProps(6).format;
 		expect(format(new Date(2024, 2, 15))).toBe('Mar');
