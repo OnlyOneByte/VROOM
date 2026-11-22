@@ -3,8 +3,8 @@ import { postModelJson, trimBaseUrl } from '../model/model-transport';
 import { RECEIPT_EXTRACTION_PROMPT } from './prompt';
 import type { RawExtraction, ReceiptImage, VlmProvider } from './vlm-provider';
 
-const REQUEST_TIMEOUT_MS = 30_000;
-const MAX_TOKENS = 1024;
+const REQUEST_TIMEOUT_MS = 60_000;
+const MAX_TOKENS = 16_000;
 const ANTHROPIC_VERSION = '2023-06-01';
 const DEFAULT_BASE_URL = 'https://api.anthropic.com';
 
@@ -37,7 +37,6 @@ export class AnthropicVlmProvider implements VlmProvider {
       body: {
         model: this.model,
         max_tokens: MAX_TOKENS,
-        temperature: 0,
         messages: [
           {
             role: 'user',

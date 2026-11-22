@@ -39,7 +39,7 @@ export const VLM_PROVIDER_TYPES: VlmProviderTypeOption[] = [
 		label: 'Anthropic (Claude)',
 		keyless: false,
 		needsBaseUrl: false,
-		defaultModel: 'claude-3-5-sonnet-latest'
+		defaultModel: 'claude-opus-5-5'
 	},
 	{
 		id: 'gemini',
@@ -74,7 +74,7 @@ export const LLM_PROVIDER_TYPES: ModelProviderTypeOption[] = [
 		label: 'Anthropic (Claude)',
 		keyless: false,
 		needsBaseUrl: false,
-		defaultModel: 'claude-3-5-sonnet-latest'
+		defaultModel: 'claude-opus-5-5'
 	},
 	{
 		id: 'gemini',

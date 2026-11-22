@@ -1,5 +1,5 @@
 import { logger } from '../../../../utils/logger';
-import type { ChatMessage, LlmProvider, ToolCall } from './llm-provider';
+import type { ChatMessage, ChatResult, LlmProvider, ToolCall } from './llm-provider';
 import { ASSISTANT_TOOLS, toolDefinitions } from './tools';
 
 export const MAX_TOOL_CALLS = 5;
@@ -67,13 +67,18 @@ async function runOneToolCall(
 async function appendToolTurn(
   messages: ChatMessage[],
   toolsUsed: string[],
-  text: string,
+  result: ChatResult,
   batch: ToolCall[],
   userId: string,
   nowMs: number,
   timeZone?: string
 ): Promise<void> {
-  messages.push({ role: 'assistant', content: text, toolCalls: batch });
+  messages.push({
+    role: 'assistant',
+    content: result.text ?? '',
+    toolCalls: batch,
+    ...(result.rawContent ? { rawContent: result.rawContent } : {}),
+  });
   for (const call of batch) {
     const { message, ran } = await runOneToolCall(call, userId, nowMs, timeZone);
     if (ran) toolsUsed.push(call.name);
@@ -116,7 +121,7 @@ export async function runAssistant(
     if (batch.length === 0) break;
     toolCallBudget -= batch.length;
 
-    await appendToolTurn(messages, toolsUsed, result.text ?? '', batch, userId, nowMs, timeZone);
+    await appendToolTurn(messages, toolsUsed, result, batch, userId, nowMs, timeZone);
   }
 
   return {

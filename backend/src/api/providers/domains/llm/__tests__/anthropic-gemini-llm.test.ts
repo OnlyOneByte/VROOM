@@ -142,8 +142,7 @@ describe('AnthropicLlmProvider.chat', () => {
 
     expect(captured?.body).toEqual({
       model: 'claude-3-5-sonnet',
-      max_tokens: 1024,
-      temperature: 0,
+      max_tokens: 16_000,
       system: 'You are a car-data assistant.',
       messages: [
         { role: 'user', content: 'How much did I spend on fuel?' },
@@ -202,6 +201,57 @@ describe('AnthropicLlmProvider.chat', () => {
 
   test('the constructor requires an API key', () => {
     expect(() => new AnthropicLlmProvider({ model: 'claude-3-5-sonnet' })).toThrow(/API key/);
+  });
+
+  const THINKING = { type: 'thinking', thinking: '', signature: 'sig-123' };
+  const TOOL_USE_A = { type: 'tool_use', id: 'tu_a', name: 'listVehicles', input: {} };
+  const TOOL_USE_B = { type: 'tool_use', id: 'tu_b', name: 'getExpenseSummary', input: {} };
+
+  function transcriptWith(rawContent: Record<string, unknown>[]): ChatMessage[] {
+    return [
+      ...MESSAGES,
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [{ id: 'tu_a', name: 'listVehicles', argumentsJson: '{}' }],
+        rawContent,
+      },
+      { role: 'tool', content: '[]', toolName: 'listVehicles', toolCallId: 'tu_a' },
+    ];
+  }
+
+  test('a tool-use reply keeps its raw blocks, thinking included, and they are replayed unchanged', async () => {
+    stubFetch(
+      () =>
+        new Response(JSON.stringify({ content: [THINKING, TOOL_USE_A] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    const first = await new AnthropicLlmProvider(SETTINGS).chat({
+      messages: MESSAGES,
+      tools: TOOLS,
+    });
+    expect(first.rawContent).toEqual([THINKING, TOOL_USE_A]);
+
+    stubFetch(() => anthropicText('done'));
+    await new AnthropicLlmProvider(SETTINGS).chat({
+      messages: transcriptWith(first.rawContent ?? []),
+      tools: TOOLS,
+    });
+    const msgs = captured?.body.messages as Array<{ role: string; content: unknown }>;
+    expect(msgs[1]).toEqual({ role: 'assistant', content: [THINKING, TOOL_USE_A] });
+    expect(captured?.body).not.toHaveProperty('temperature');
+  });
+
+  test('a replayed turn drops tool_use blocks the tool budget cut, and keeps its thinking', async () => {
+    stubFetch(() => anthropicText('done'));
+    await new AnthropicLlmProvider(SETTINGS).chat({
+      messages: transcriptWith([THINKING, TOOL_USE_A, TOOL_USE_B]),
+      tools: TOOLS,
+    });
+    const msgs = captured?.body.messages as Array<{ role: string; content: unknown }>;
+    expect(msgs[1]).toEqual({ role: 'assistant', content: [THINKING, TOOL_USE_A] });
   });
 });
 
