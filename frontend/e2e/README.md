@@ -56,10 +56,11 @@ can never serve a stale bundle, and it needs neither the backend nor a database.
 is the PWA surface. `vite dev` serves no service worker and no web app manifest, so the four
 tests that need them skip with that reason on the dev target and run on the preview target:
 `serves a valid web app manifest`, `registers a service worker`, `the service worker precaches
-the static assets for offline use`, and `offline.spec.ts`'s "Opening the app offline". Run the preview target when you change
-`vite.config.ts`, the service worker, or the manifest.
+the static assets for offline use`, and `a visited page reloads offline, and an unvisited one
+shows the offline page`. Run the preview target when you change `vite.config.ts`, the service
+worker, or the manifest.
 
-Turning on `devOptions` would make those three pass against a dev service worker, which is a
+Turning on `devOptions` would make those four pass against a dev service worker, which is a
 different artifact from the one that ships. That would be green without testing what matters,
 which is why the preview target exists.
 
