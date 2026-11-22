@@ -556,10 +556,6 @@
 					/>
 				</div>
 
-				{#if InsuranceTab}
-					<InsuranceTab {vehicleId} readOnly={!isOwner} />
-				{/if}
-
 				{#if summaryLoadError && !isLoadingStats}
 					<div class="rounded-lg border bg-card p-6">
 						<div class="mb-4 flex items-center gap-3 text-destructive">
@@ -636,6 +632,10 @@
 					{:catch}
 						{@render chartPlaceholders(CHARTS_LOAD_ERROR)}
 					{/await}
+				{/if}
+
+				{#if InsuranceTab}
+					<InsuranceTab {vehicleId} readOnly={!isOwner} />
 				{/if}
 			</TabsContent>
 
