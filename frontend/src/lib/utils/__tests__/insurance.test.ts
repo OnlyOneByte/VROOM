@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
@@ -17,13 +17,15 @@ import {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');
-const TERM_BILLING_CASES = JSON.parse(
-	readFileSync(
-		join(REPO_ROOT, 'backend/src/utils/__tests__/term-billing-months.cases.json'),
-		'utf8'
-	)
-) as { start: string; end: string; months: number }[];
+const TERM_BILLING_CASES_PATH = resolve(
+	dirname(fileURLToPath(import.meta.url)),
+	'../../../../../backend/src/utils/__tests__/term-billing-months.cases.json'
+);
+const TERM_BILLING_CASES = JSON.parse(readFileSync(TERM_BILLING_CASES_PATH, 'utf8')) as {
+	start: string;
+	end: string;
+	months: number;
+}[];
 
 let idCounter = 0;
 
@@ -229,6 +231,10 @@ describe('Renew pre-fill from previous term', () => {
 });
 
 describe('term premium matches what the API charges', () => {
+	test('the shared case table has rows', () => {
+		expect(TERM_BILLING_CASES.length).toBeGreaterThan(0);
+	});
+
 	test.each(TERM_BILLING_CASES)(
 		'$start -> $end is $months billed months',
 		({ start, end, months }) => {

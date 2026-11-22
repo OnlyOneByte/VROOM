@@ -219,6 +219,10 @@ describe('insurance premium → expense hook lifecycle', () => {
 const utcNoon = (iso: string): Date => new Date(`${iso}T12:00:00.000Z`);
 
 describe('termBillingMonths: start inclusive, end exclusive, one month per started billing period', () => {
+  test('the shared case table has rows', () => {
+    expect(TERM_BILLING_CASES.length).toBeGreaterThan(0);
+  });
+
   test.each(TERM_BILLING_CASES)('$start -> $end is $months months', ({ start, end, months }) => {
     expect(termBillingMonths(new Date(start), new Date(end))).toBe(months);
   });
