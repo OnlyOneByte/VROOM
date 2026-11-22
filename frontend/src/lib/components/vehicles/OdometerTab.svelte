@@ -146,6 +146,7 @@
 			chartError = null;
 		} catch (e) {
 			chartEntries = [];
+			chartIsCapped = false;
 			chartError = userFacingErrorMessage(e);
 		}
 	}
@@ -271,6 +272,7 @@
 				config={chartConfig}
 				height={280}
 				error={chartError}
+				onRetry={loadChartEntries}
 				yDomain={mileageYDomain(chartData.map(d => d.odometer))}
 				xAxisProps={mileageXAxisProps(chartData.map(d => d.date))}
 				yAxisFormat={v => formatNumber(v, 0)}
