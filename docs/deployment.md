@@ -164,9 +164,14 @@ Both example stacks pin `:latest`, i.e. the newest release. Switch them to `:dev
 
 ### Build from source
 
+The example compose file only names images, so `docker compose build` has nothing to build.
+Build both images from the repo root under the names the compose file uses, then start the
+stack without pulling:
+
 ```bash
-docker compose build
-docker compose up -d
+docker build -t ghcr.io/onlyonebyte/vroom/backend:latest backend
+docker build -t ghcr.io/onlyonebyte/vroom/frontend:latest frontend
+docker compose up -d --pull never
 ```
 
 ### Without Docker

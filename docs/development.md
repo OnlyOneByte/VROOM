@@ -3,7 +3,8 @@
 ## Prerequisites
 
 - [Bun](https://bun.sh/) — backend runtime
-- Node.js 22+ — frontend (see `.nvmrc`)
+- Node.js — frontend. Use the version in `.nvmrc` (`nvm use` reads it); `npm ci` fails with
+  `EBADENGINE` on Node older than 22.22.2
 
 ## Setup
 

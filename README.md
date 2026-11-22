@@ -5,7 +5,10 @@
 ![Backend Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OnlyOneByte/VROOM/coverage-badges/backend-coverage.json)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20VROOM-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/onemorebyte)
 
-VROOM (Vehicle Record & Organization Of Maintenance) is a self-hostable car cost tracking app with mobile-first design, comprehensive expense analytics, and Google Drive backup.
+VROOM (Vehicle Record & Organization Of Maintenance) is a self-hostable app for tracking what your cars really cost: fuel, maintenance, insurance, financing and trips, with mobile-first design, analytics and backups to your own Google Drive.
+
+<!-- screenshots -->
+
 
 > ⚠️ **Under active development.** Features, APIs, and database schemas may change between releases. Back up your data regularly via Google Drive sync. Pin to a specific image tag rather than `latest` for stability.
 
@@ -14,21 +17,27 @@ VROOM (Vehicle Record & Organization Of Maintenance) is a self-hostable car cost
 ## Why VROOM?
 
 - **Open Source** — fork, customize, and host it yourself with full control over your data
-- **Open Format** — data stored in standard CSV format via Google Drive backup, zero lock-in
-- **Google Drive Integration** — your data syncs directly to your Google Drive
-- **Privacy First** — no third-party data storage; everything lives on your server and your Drive
+- **Open Format** — backups are ZIP files of plain CSV, so there's zero lock-in
+- **Google Drive Integration** — backups and an optional Google Sheets copy go straight to your Drive
+- **Privacy First** — your data lives on your server and in the storage you connect. AI features are opt-in and use your own API key
 
 ## Features
 
-- 📱 Mobile-first PWA with offline support
-- 🚗 Multi-vehicle tracking (gas, electric, hybrid)
-- 📊 Interactive analytics and cost visualization
-- ⛽ Fuel efficiency tracking with fill-up history
-- 💰 Financing and insurance management
-- 📷 Photo attachments for receipts and documents
-- 🔐 OAuth authentication (Google, GitHub)
-- 💾 Google Drive backup + Google Sheets sync
-- 🐳 Docker-ready self-hosting
+- 📱 Mobile-first PWA that installs on your phone and works offline
+- 🚗 Multi-vehicle tracking for gas, electric and hybrid cars, with odometer history
+- ⛽ Fuel and charging logs with efficiency tracking
+- 📊 Interactive analytics: cost breakdowns, trends and cross-vehicle comparisons
+- 💰 Financing (loans and leases) and insurance policies, with premiums split across vehicles
+- 🗺️ Trip logging
+- ⏰ Reminders for maintenance and recurring expenses, with optional web push notifications
+- 👥 Vehicle sharing with other VROOM users
+- 📥 CSV import from Fuelio, Fuelly and Drivvo, or any CSV with manual column mapping
+- 📷 Photo attachments for receipts and documents, stored in Google Drive, Google Photos or S3-compatible storage
+- 🧾 Receipt scanning that fills in the expense form, using an AI vision model you configure
+- 💬 An assistant that answers questions about your vehicles and costs, using Anthropic, Gemini or any OpenAI-compatible model
+- 💾 Google Drive ZIP backups, Google Sheets sync, and restore from a backup file
+- 🔐 Sign-in with Google or GitHub (OAuth)
+- 🐳 Docker images for self-hosting
 
 ## Tech Stack
 
@@ -40,35 +49,25 @@ VROOM (Vehicle Record & Organization Of Maintenance) is a self-hostable car cost
 
 ## Quick Start
 
-### Prerequisites
+### Before you start: OAuth
 
-- [Bun](https://bun.sh/) (backend runtime)
-- Node.js 22.22.2+ (frontend) — the lockfile needs `^22.22.2 || ^24.15.0 || >=26.0.0`;
-  `npm ci` fails with `EBADENGINE` on anything older. `nvm use` reads `.nvmrc`
-- Docker 20.10+ with Compose v2 (optional, for containerized deployment)
+There is no demo account. Sign-in is OAuth only, so you need your own OAuth app before
+anyone can sign in: Google (required for production) or GitHub (enough for local
+development). The [Development Guide](docs/development.md#signing-in) has the callback URLs,
+and the [Deployment Guide](docs/deployment.md#google-oauth-setup) covers production.
 
 ### Local Development
 
-```bash
-nvm use
+You need [Bun](https://bun.sh/) for the backend and the Node.js version in `.nvmrc` for the
+frontend. Run the backend (`bun run dev`, port 3001) and the frontend (`npm run dev`, port
+5173) side by side; the [Development Guide](docs/development.md) has the full setup.
 
-# Backend
-cd backend
-bun install
-cp .env.example .env   # configure OAuth credentials
-bun run db:init         # apply migrations (add --seed for sample data)
-bun run dev             # http://localhost:3001
+### Docker
 
-# Frontend (separate terminal)
-cd frontend
-npm ci                  # not `npm install` — see the Development Guide
-npm run dev             # http://localhost:5173, proxies /api to :3001
-```
-
-### Docker (Production)
+You need Docker 20.10+ with Compose v2.
 
 ```bash
-cp docs/examples/.env.example .env
+cp docs/examples/.env.example .env             # fill in the Google OAuth values and PROVIDER_ENCRYPTION_KEY
 cp docs/examples/docker-compose.yml .
 mkdir -p data                                  # the DATA_PATH bind mount; Docker won't create it
 docker compose up -d
@@ -76,7 +75,9 @@ docker compose up -d
 # Backend:  http://localhost:3001
 ```
 
-See the [Deployment Guide](docs/deployment.md) for full instructions.
+Without a Cloudflare tunnel, delete the `cloudflared` service from `docker-compose.yml`
+first: with an empty token it restarts forever. See the [Deployment Guide](docs/deployment.md)
+for full instructions.
 
 ## Project Structure
 
@@ -98,16 +99,15 @@ vroom/
 | [Architecture](docs/architecture.md) | System design, data flow, and the reasoning behind it |
 | [Development Guide](docs/development.md) | Local setup, workflow, and testing |
 | [Deployment Guide](docs/deployment.md) | Docker, self-hosting, reverse proxy, and SSL |
+| [Conventions](docs/conventions/) | Coding rules for each area: code quality, Svelte, API, migrations, testing, design system, UI |
+| [Contributing](CONTRIBUTING.md) | How to propose and submit a change |
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/your-feature`)
-3. Follow [conventional commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, etc.)
-4. Run validation before pushing:
-   - Backend: `bun run all:fix && bun run validate`
-   - Frontend: `npm run all:fix && npm run validate`
-5. Open a pull request
+Contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the workflow: one issue
+per pull request, `Fixes #N` in the PR, the coding rules in [`docs/conventions/`](docs/conventions/),
+and the validation to run before you push. To report a security problem, see
+[SECURITY.md](SECURITY.md).
 
 ## Support
 
