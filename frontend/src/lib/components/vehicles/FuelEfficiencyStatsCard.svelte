@@ -38,6 +38,13 @@
 	let chargeUnit = $derived(units.chargeUnit);
 	let isKilometers = $derived(distanceUnit === 'kilometers');
 
+	const LOADING_ITEMS = ['distance', 'fuel', 'efficiency'].map(label => ({
+		label,
+		value: '',
+		secondaryLabel: '',
+		secondaryValue: ''
+	}));
+
 	let statItems = $derived.by(() => {
 		if (!vehicleStatsData || !hasFuelData) return [];
 
@@ -122,7 +129,7 @@
 			<h2 class="text-lg font-semibold">Mileage & Fuel Statistics</h2>
 		</div>
 		<StatCardGrid
-			items={isLoadingStats ? Array(3).fill({ label: '', value: '' }) : statItems}
+			items={isLoadingStats && statItems.length === 0 ? LOADING_ITEMS : statItems}
 			columns={3}
 			isLoading={isLoadingStats}
 		/>
