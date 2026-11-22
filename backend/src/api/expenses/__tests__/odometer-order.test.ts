@@ -71,6 +71,25 @@ describe('the odometer reading must fit between the entries around its date', ()
     await created('2024-03-10', 10_100);
   });
 
+  test('every reading on the nearest earlier and later day bounds it, whatever its time', async () => {
+    await created('2024-03-10T11:00:00.000Z', 10_400);
+    await created('2024-03-10T17:00:00.000Z', 10_100);
+    await created('2024-03-20T08:00:00.000Z', 11_000);
+    await created('2024-03-20T20:00:00.000Z', 11_500);
+
+    expect(await rejection(await fillUp('2024-03-15', 10_200))).toContain('greater than 10,400');
+    expect(await rejection(await fillUp('2024-03-15', 11_200))).toContain('less than 11,000');
+    await created('2024-03-15', 10_500);
+  });
+
+  test('only the nearest earlier day is compared, so an old bad reading does not block new fill-ups', async () => {
+    const old = await created('2020-01-01', 1);
+    await created('2021-01-01', 5_000);
+    ctx.sqlite.query('UPDATE expenses SET mileage = 999999 WHERE id = ?').run(old);
+
+    await created('2024-03-10', 10_400);
+  });
+
   test('the first reading for a vehicle is accepted', async () => {
     await created('2024-03-10', 1);
   });
@@ -142,14 +161,6 @@ describe('the odometer check sees what the form sees', () => {
     expect(await rejection(await fillUp('2024-03-10', 9_500))).toContain('greater than 10,000');
     expect(await rejection(await fillUp('2023-01-10', 12_500))).toContain('less than 12,000');
     await created('2024-03-10', 11_000);
-  });
-
-  test('only the nearest reading on each side is compared, so an old bad reading does not block new fill-ups', async () => {
-    const old = await created('2020-01-01', 1);
-    await created('2021-01-01', 5_000);
-    ctx.sqlite.query('UPDATE expenses SET mileage = 999999 WHERE id = ?').run(old);
-
-    await created('2024-03-10', 10_400);
   });
 
   test('moving a fill-up to another vehicle is checked against that vehicle', async () => {

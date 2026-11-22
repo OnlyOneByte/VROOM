@@ -9,6 +9,8 @@ import {
   isNotNull,
   lt,
   lte,
+  max,
+  min,
   ne,
   type SQL,
   sql,
@@ -24,7 +26,7 @@ import { getPeriodStartDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
-import { zonedMidnight } from '../../utils/time-zone';
+import { zonedDayWindow, zonedMidnight } from '../../utils/time-zone';
 import { expenseSplitService } from './split-service';
 import type { OdometerNeighbours, SplitConfig } from './validation';
 
@@ -215,29 +217,51 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
   async findOdometerNeighbours(
     vehicleId: string,
-    day: { dayStart: Date; nextDay: Date },
+    date: Date,
+    timeZone: string,
     excludeId?: string
   ): Promise<OdometerNeighbours> {
-    const readingsWhere = (bound: SQL) =>
+    const day = zonedDayWindow(date, timeZone);
+    const readingsWhere = (...bounds: SQL[]) =>
       and(
         eq(expenses.vehicleId, vehicleId),
         isNotNull(expenses.mileage),
-        bound,
+        ...bounds,
         excludeId ? ne(expenses.id, excludeId) : undefined
       );
+    const nearestDate = async (bound: SQL, order: SQL) => {
+      const [row] = await this.db
+        .select({ date: expenses.date })
+        .from(expenses)
+        .where(readingsWhere(bound))
+        .orderBy(order)
+        .limit(1);
+      return row ? zonedDayWindow(row.date, timeZone) : null;
+    };
+    const [earlierDay, laterDay] = await Promise.all([
+      nearestDate(lt(expenses.date, day.dayStart), desc(expenses.date)),
+      nearestDate(gte(expenses.date, day.nextDay), asc(expenses.date)),
+    ]);
     const [before, after] = await Promise.all([
-      this.db
-        .select({ mileage: expenses.mileage })
-        .from(expenses)
-        .where(readingsWhere(lt(expenses.date, day.dayStart)))
-        .orderBy(desc(expenses.date), desc(expenses.mileage))
-        .limit(1),
-      this.db
-        .select({ mileage: expenses.mileage })
-        .from(expenses)
-        .where(readingsWhere(gte(expenses.date, day.nextDay)))
-        .orderBy(asc(expenses.date), asc(expenses.mileage))
-        .limit(1),
+      earlierDay
+        ? this.db
+            .select({ mileage: max(expenses.mileage) })
+            .from(expenses)
+            .where(
+              readingsWhere(
+                gte(expenses.date, earlierDay.dayStart),
+                lt(expenses.date, day.dayStart)
+              )
+            )
+        : [],
+      laterDay
+        ? this.db
+            .select({ mileage: min(expenses.mileage) })
+            .from(expenses)
+            .where(
+              readingsWhere(gte(expenses.date, day.nextDay), lt(expenses.date, laterDay.nextDay))
+            )
+        : [],
     ]);
     return { before: before[0]?.mileage ?? null, after: after[0]?.mileage ?? null };
   }

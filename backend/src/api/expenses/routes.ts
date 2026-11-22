@@ -25,7 +25,7 @@ import {
   requireVehicleWrite,
   resolveVehicleOwnerId,
 } from '../../utils/sharing';
-import { isValidTimeZone, zonedDayWindow } from '../../utils/time-zone';
+import { isValidTimeZone } from '../../utils/time-zone';
 import {
   commonSchemas,
   dateInput,
@@ -78,7 +78,7 @@ async function assertOdometerInOrder(
   if (mileage == null) return;
   const [vehicle, neighbours] = await Promise.all([
     vehicleRepository.findById(vehicleId),
-    expenseRepository.findOdometerNeighbours(vehicleId, zonedDayWindow(date, 'UTC'), excludeId),
+    expenseRepository.findOdometerNeighbours(vehicleId, date, 'UTC', excludeId),
   ]);
   const error = odometerOrderError(mileage, neighbours, vehicle?.initialMileage);
   if (error) throw new ValidationError(error);
