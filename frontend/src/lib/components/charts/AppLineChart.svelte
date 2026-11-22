@@ -42,6 +42,7 @@
 		tooltipFormat?: TooltipValueFormat;
 		tooltipLabelFormat?: (_v: unknown) => string;
 		lineProps?: Record<string, unknown>;
+		yDomain?: [number, number];
 		class?: string;
 	}
 
@@ -62,6 +63,7 @@
 		tooltipFormat = formatCurrencyTooltip,
 		tooltipLabelFormat = formatMonthLabel,
 		lineProps,
+		yDomain,
 		class: className
 	}: Props = $props();
 
@@ -92,6 +94,7 @@
 			{x}
 			{y}
 			{series}
+			{yDomain}
 			padding={CHART_PADDING}
 			xPadding={TIME_X_PADDING}
 			props={{

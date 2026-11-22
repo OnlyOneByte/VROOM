@@ -57,3 +57,11 @@ export interface OdometerEntry {
 	createdAt: string;
 	updatedAt: string;
 }
+
+export interface OdometerHistoryEntry {
+	odometer: number;
+	recordedAt: string;
+	source: 'expense' | 'manual';
+	sourceId: string;
+	note: string | null;
+}
