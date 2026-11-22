@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { scaleTime } from 'd3-scale';
 import {
 	formatCentsAxis,
 	formatCurrencyAxis,
@@ -77,11 +78,19 @@ describe('formatDateTick (date X-axis label with unknown-input guard)', () => {
 });
 
 describe('monthlyXAxisProps (monthly time-series axis wiring)', () => {
-	test('wires a 6-tick budget so a year of months fits a 375px axis, and clamps to data length', () => {
-		expect(monthlyXAxisProps(13).ticks).toBe(6);
+	test('wires a 4-tick budget and clamps to data length', () => {
+		expect(monthlyXAxisProps(13).ticks).toBe(4);
 		expect(monthlyXAxisProps(3).ticks).toBe(3);
 		expect(typeof monthlyXAxisProps(3).format).toBe('function');
 	});
+
+	test.each([10, 11, 12, 13])(
+		'%i months of points draw at most 5 month labels on a time scale',
+		months => {
+			const scale = scaleTime().domain([new Date(2025, 0, 1), new Date(2025, months - 1, 1)]);
+			expect(scale.ticks(monthlyXAxisProps(months).ticks).length).toBeLessThanOrEqual(5);
+		}
+	);
 
 	test('a caller can set its own tick budget', () => {
 		expect(monthlyXAxisProps(24, 12).ticks).toBe(12);

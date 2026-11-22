@@ -31,7 +31,7 @@ export function formatDateTick(value: unknown): string {
 	return value.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export function monthlyXAxisProps(dataLength: number, maxTicks?: number) {
+export function monthlyXAxisProps(dataLength: number, maxTicks = 4) {
 	return {
 		ticks: getXTickCount(dataLength, maxTicks),
 		format: formatMonthTick
