@@ -73,7 +73,7 @@ describe('GET /trips/summary uses the stored businessMileageRate as the default'
   }
 
   interface SummaryBody {
-    businessMiles: number;
+    businessDistance: number;
     businessMileageValue: number;
   }
 
@@ -84,7 +84,7 @@ describe('GET /trips/summary uses the stored businessMileageRate as the default'
     const res = await ctx.authed('GET', '/api/v1/trips/summary');
     const body = await json<DataEnvelope<SummaryBody>>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
-    expect(body.data.businessMiles).toBe(100);
+    expect(body.data.businessDistance).toBe(100);
     expect(body.data.businessMileageValue).toBe(50);
   });
 

@@ -316,10 +316,10 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 		if (path === '/trips/summary') {
 			return fulfillData(route, {
 				tripCount: 0,
-				totalMiles: 0,
-				milesByPurpose: { business: 0, personal: 0, commute: 0, other: 0 },
-				averageTripMiles: 0,
-				businessMiles: 0,
+				totalDistance: 0,
+				distanceByPurpose: { business: 0, personal: 0, commute: 0, other: 0 },
+				averageTripDistance: 0,
+				businessDistance: 0,
 				businessMileageValue: 0,
 				rate: 0.67
 			});

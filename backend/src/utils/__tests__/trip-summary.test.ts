@@ -28,20 +28,20 @@ describe('buildTripSummary', () => {
   test('empty trips → all zeros, never NaN', () => {
     const s = buildTripSummary([], 0.67);
     expect(s.tripCount).toBe(0);
-    expect(s.totalMiles).toBe(0);
-    expect(s.averageTripMiles).toBe(0);
-    expect(s.businessMiles).toBe(0);
+    expect(s.totalDistance).toBe(0);
+    expect(s.averageTripDistance).toBe(0);
+    expect(s.businessDistance).toBe(0);
     expect(s.businessMileageValue).toBe(0);
-    for (const p of TRIP_PURPOSES) expect(s.milesByPurpose[p]).toBe(0);
-    expect(Number.isNaN(s.averageTripMiles)).toBe(false);
+    for (const p of TRIP_PURPOSES) expect(s.distanceByPurpose[p]).toBe(0);
+    expect(Number.isNaN(s.averageTripDistance)).toBe(false);
   });
 
   test('every purpose key is present even when no trips of that purpose', () => {
     const s = buildTripSummary([trip({ purpose: 'business' })]);
-    expect(Object.keys(s.milesByPurpose).sort()).toEqual([...TRIP_PURPOSES].sort());
+    expect(Object.keys(s.distanceByPurpose).sort()).toEqual([...TRIP_PURPOSES].sort());
   });
 
-  test('totalMiles + per-purpose split + business-$ are correct for a mixed set', () => {
+  test('totalDistance + per-purpose split + business-$ are correct for a mixed set', () => {
     const trips = [
       trip({ startOdometer: 1000, endOdometer: 1100, purpose: 'business' }),
       trip({ startOdometer: 2000, endOdometer: 2050, purpose: 'business' }),
@@ -50,13 +50,13 @@ describe('buildTripSummary', () => {
     ];
     const s = buildTripSummary(trips, 0.67);
     expect(s.tripCount).toBe(4);
-    expect(s.totalMiles).toBe(200);
-    expect(s.milesByPurpose.business).toBe(150);
-    expect(s.milesByPurpose.personal).toBe(30);
-    expect(s.milesByPurpose.commute).toBe(20);
-    expect(s.milesByPurpose.other).toBe(0);
-    expect(s.averageTripMiles).toBe(50);
-    expect(s.businessMiles).toBe(150);
+    expect(s.totalDistance).toBe(200);
+    expect(s.distanceByPurpose.business).toBe(150);
+    expect(s.distanceByPurpose.personal).toBe(30);
+    expect(s.distanceByPurpose.commute).toBe(20);
+    expect(s.distanceByPurpose.other).toBe(0);
+    expect(s.averageTripDistance).toBe(50);
+    expect(s.businessDistance).toBe(150);
     expect(s.businessMileageValue).toBeCloseTo(100.5, 5);
     expect(s.rate).toBe(0.67);
   });
@@ -65,25 +65,25 @@ describe('buildTripSummary', () => {
     const s = buildTripSummary([
       trip({ startOdometer: 5000, endOdometer: 4000, purpose: 'business' }),
     ]);
-    expect(s.totalMiles).toBe(0);
-    expect(s.milesByPurpose.business).toBe(0);
+    expect(s.totalDistance).toBe(0);
+    expect(s.distanceByPurpose.business).toBe(0);
   });
 
   test('an unexpected purpose buckets under "other" (no crash, no dropped miles)', () => {
     const s = buildTripSummary([
       trip({ startOdometer: 0, endOdometer: 42, purpose: 'joyride' as never }),
     ]);
-    expect(s.totalMiles).toBe(42);
-    expect(s.milesByPurpose.other).toBe(42);
+    expect(s.totalDistance).toBe(42);
+    expect(s.distanceByPurpose.other).toBe(42);
   });
 
   test('rate defaults to 0, so businessMileageValue is 0', () => {
     const s = buildTripSummary([trip({ startOdometer: 0, endOdometer: 100, purpose: 'business' })]);
-    expect(s.businessMiles).toBe(100);
+    expect(s.businessDistance).toBe(100);
     expect(s.businessMileageValue).toBe(0);
   });
 
-  test('property: Σ milesByPurpose == totalMiles AND businessMileageValue == businessMiles × rate', () => {
+  test('property: Σ distanceByPurpose == totalDistance AND businessMileageValue == businessDistance × rate', () => {
     const tripArb = fc.record({
       start: fc.integer({ min: 0, max: 1_000_000 }),
       delta: fc.integer({ min: -5000, max: 5000 }),
@@ -99,10 +99,10 @@ describe('buildTripSummary', () => {
           })
         );
         const s = buildTripSummary(trips, rate);
-        const sumByPurpose = TRIP_PURPOSES.reduce((acc, p) => acc + s.milesByPurpose[p], 0);
-        expect(sumByPurpose).toBe(s.totalMiles);
-        expect(s.businessMileageValue).toBeCloseTo(s.businessMiles * rate, 5);
-        expect(Number.isNaN(s.averageTripMiles)).toBe(false);
+        const sumByPurpose = TRIP_PURPOSES.reduce((acc, p) => acc + s.distanceByPurpose[p], 0);
+        expect(sumByPurpose).toBe(s.totalDistance);
+        expect(s.businessMileageValue).toBeCloseTo(s.businessDistance * rate, 5);
+        expect(Number.isNaN(s.averageTripDistance)).toBe(false);
       })
     );
   });

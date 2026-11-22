@@ -9,7 +9,12 @@ vi.mock('#lib/services/trip-api.ts', () => ({
 	tripApi: {
 		list: (...args: unknown[]) => listTrips(...args),
 		getSummary: () =>
-			Promise.resolve({ totalMiles: 10, tripCount: 1, businessMiles: 0, averageTripMiles: 10 })
+			Promise.resolve({
+				totalDistance: 10,
+				tripCount: 1,
+				businessDistance: 0,
+				averageTripDistance: 10
+			})
 	}
 }));
 vi.mock('#lib/services/vehicle-api.ts', () => ({

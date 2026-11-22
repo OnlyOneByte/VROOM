@@ -8,7 +8,7 @@ import {
   WHOLE_DISTANCE_MESSAGE,
 } from '../../utils/validation';
 
-// The mileage summary buckets miles by these values: a new purpose needs a bucket there too.
+// The trip summary buckets distance by these values: a new purpose needs a bucket there too.
 export const TRIP_PURPOSES = ['business', 'personal', 'commute', 'other'] as const;
 export type TripPurpose = (typeof TRIP_PURPOSES)[number];
 

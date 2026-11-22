@@ -64,10 +64,10 @@ describe('tripApi.list (paginated + filter-drop)', () => {
 describe('tripApi.getSummary', () => {
 	const SUMMARY: TripSummary = {
 		tripCount: 2,
-		totalMiles: 150,
-		milesByPurpose: { business: 100, personal: 50, commute: 0, other: 0 },
-		averageTripMiles: 75,
-		businessMiles: 100,
+		totalDistance: 150,
+		distanceByPurpose: { business: 100, personal: 50, commute: 0, other: 0 },
+		averageTripDistance: 75,
+		businessDistance: 100,
 		businessMileageValue: 67,
 		rate: 0.67
 	};

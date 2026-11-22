@@ -62,10 +62,10 @@ const CIVIC = {
 
 const SUMMARY: TripSummary = {
 	tripCount: 2,
-	totalMiles: 1234,
-	milesByPurpose: { business: 900, personal: 334, commute: 0, other: 0 },
-	averageTripMiles: 617.4,
-	businessMiles: 900,
+	totalDistance: 1234,
+	distanceByPurpose: { business: 900, personal: 334, commute: 0, other: 0 },
+	averageTripDistance: 617.4,
+	businessDistance: 900,
 	businessMileageValue: 603,
 	rate: 0.67
 };
