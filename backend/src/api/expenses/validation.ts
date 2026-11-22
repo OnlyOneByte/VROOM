@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES, type SplitConfig } from '../../db/types';
-import { expenseDollarsToCents } from '../../utils/money';
+import { dollarsToCents, expenseDollarsToCents } from '../../utils/money';
 import { DUPLICATE_VEHICLE_MESSAGE, dateInput, hasUniqueVehicleIds } from '../../utils/validation';
 
 export const FUEL_SPLIT_MESSAGE = 'Fuel expenses cannot be split. Log the fill-up on one vehicle.';
@@ -169,4 +169,16 @@ export const updateSplitSchema = z
     splitConfig: splitConfigSchema,
     totalAmount: centsAmount.optional(),
   })
-  .superRefine(refineSplitConfig);
+  .superRefine((data, ctx) => {
+    refineSplitConfig(data, ctx);
+    if (data.splitConfig.method !== 'absolute' || data.totalAmount !== undefined) return;
+    const total = data.splitConfig.allocations.reduce((acc, a) => acc + a.amount, 0);
+    const max = CONFIG.validation.expense.maxAmount;
+    if (total <= 0 || total > dollarsToCents(max)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `The split total must be more than 0 and at most ${max.toLocaleString('en-US')}`,
+        path: ['splitConfig', 'allocations'],
+      });
+    }
+  });

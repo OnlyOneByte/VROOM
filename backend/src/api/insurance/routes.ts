@@ -14,6 +14,7 @@ import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/pho
 import { insuranceClaimRepository } from './claims-repository';
 import { createClaimSchema, updateClaimSchema } from './claims-validation';
 import {
+  assertTermPremiumWithinCap,
   createTermExpenses,
   deleteTermExpenses,
   updateTermExpenses,
@@ -173,6 +174,9 @@ routes.get(
 routes.post('/', zValidator('json', createPolicySchema), async (c) => {
   const user = c.get('user');
   const data = c.req.valid('json');
+  for (const term of data.terms) {
+    assertTermPremiumWithinCap({ ...term, totalCost: term.totalCost ?? 0 });
+  }
   const policy = await insurancePolicyRepository.create(data, user.id);
 
   try {
@@ -248,6 +252,7 @@ routes.post(
     const { id } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
     const termData = c.req.valid('json');
+    assertTermPremiumWithinCap({ ...termData, totalCost: termData.totalCost ?? 0 });
     const policy = await insurancePolicyRepository.addTerm(id, termData, user.id);
 
     const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, policy.newTermId);
@@ -287,6 +292,14 @@ routes.put(
     const previousTerm = existing?.terms.find((t) => t.id === termId);
     const previous =
       existing && previousTerm ? termExpenseParams(existing, previousTerm, user.id) : undefined;
+    if (previous) {
+      assertTermPremiumWithinCap({
+        totalCost: (updates.totalCost === undefined ? previous.totalCost : updates.totalCost) ?? 0,
+        monthlyCost: updates.monthlyCost === undefined ? previous.monthlyCost : updates.monthlyCost,
+        startDate: updates.startDate ?? previous.startDate,
+        endDate: updates.endDate ?? previous.endDate,
+      });
+    }
     const policy = await insurancePolicyRepository.updateTerm(id, termId, updates, user.id);
 
     const updatedTerm = policy.terms.find((t) => t.id === termId);

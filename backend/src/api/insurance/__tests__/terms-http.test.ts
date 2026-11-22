@@ -232,3 +232,73 @@ describe('a term cost update replaces its premium expense', () => {
     expect(after.total).toBe(180000);
   });
 });
+
+describe("a monthly-priced term's premium is capped like an expense", () => {
+  const CAP_MESSAGE = "A term's premium can be at most 1,000,000";
+  const yearTerm = (vehicleId: string, monthlyCost: number) => ({
+    startDate: '2024-01-01T00:00:00.000Z',
+    endDate: '2025-01-01T00:00:00.000Z',
+    monthlyCost,
+    vehicleCoverage: { vehicleIds: [vehicleId] },
+  });
+  const premiumCount = (termId: string) =>
+    (
+      ctx.sqlite
+        .query(
+          "SELECT COUNT(*) AS n FROM expenses WHERE source_type = 'insurance_term' AND source_id = ?"
+        )
+        .get(termId) as { n: number }
+    ).n;
+
+  test('creating a policy or adding a term over the cap is rejected and saves nothing', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    const create = await ctx.authed('POST', '/api/v1/insurance', {
+      company: 'Acme Mutual',
+      terms: [yearTerm(vehicleId, 999_999)],
+    });
+    expect(create.status).toBe(400);
+    expect(await create.text()).toContain(CAP_MESSAGE);
+    const policies = await json<DataEnvelope<PolicyRow[]>>(
+      await ctx.authed('GET', '/api/v1/insurance')
+    );
+    expect(policies.data).toHaveLength(0);
+
+    const { policyId } = await seedPolicyWithTerm(vehicleId);
+    const add = await ctx.authed(
+      'POST',
+      `/api/v1/insurance/${policyId}/terms`,
+      yearTerm(vehicleId, 999_999)
+    );
+    expect(add.status).toBe(400);
+    expect(await add.text()).toContain(CAP_MESSAGE);
+
+    const underCap = await ctx.authed('POST', `/api/v1/insurance/${policyId}/terms`, {
+      ...yearTerm(vehicleId, 80_000),
+      startDate: '2025-01-01T00:00:00.000Z',
+      endDate: '2026-01-01T00:00:00.000Z',
+    });
+    expect(underCap.status).toBe(201);
+  });
+
+  test('an update that pushes the premium over the cap is rejected and keeps the term as it was', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    const create = await ctx.authed('POST', '/api/v1/insurance', {
+      company: 'Acme Mutual',
+      terms: [yearTerm(vehicleId, 100)],
+    });
+    const { data } = await json<DataEnvelope<PolicyRow>>(create);
+    const termId = data.terms[0].id;
+
+    const res = await ctx.authed('PUT', `/api/v1/insurance/${data.id}/terms/${termId}`, {
+      monthlyCost: 999_999,
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain(CAP_MESSAGE);
+
+    const after = await json<
+      DataEnvelope<PolicyRow & { terms: Array<TermRow & { monthlyCost: number }> }>
+    >(await ctx.authed('GET', `/api/v1/insurance/${data.id}`));
+    expect(after.data.terms[0].monthlyCost).toBe(100);
+    expect(premiumCount(termId)).toBe(1);
+  });
+});
