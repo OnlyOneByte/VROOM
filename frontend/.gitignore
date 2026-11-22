@@ -29,7 +29,7 @@ blob-report/
 .playwright-artifacts-*/
 
 # Local-only e2e specs, screenshots and config
-e2e/*.meshclaw.e2e.ts
-e2e/*.meshclaw.e2e.ts-snapshots/
+e2e/*.e2e.ts
+e2e/*.e2e.ts-snapshots/
 e2e/__screenshots__/
-playwright.meshclaw.config.ts
+playwright.*.config.ts
