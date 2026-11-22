@@ -17,6 +17,7 @@ import {
 	leaseTotalMileageAllowance,
 	resolveCurrentOdometer
 } from '#lib/utils/financing-calculations.ts';
+import { computePlannerState } from '#lib/utils/payment-planner.ts';
 
 const NOW = new Date(2025, 5, 15, 12, 0, 0);
 const DAY = 86_400_000;
@@ -421,8 +422,42 @@ describe('calculateExtraPaymentImpact', () => {
 		expect(impact.monthsSaved).toBe(1);
 		expect(impact.interestSaved).toBeCloseTo(9.648_75, 6);
 		expect(impact.totalSavings).toBe(impact.interestSaved);
-		expect(impact.newPayoffDate.getMonth()).toBe(8);
-		expect(impact.newPayoffDate.getDate()).toBe(15);
+		expect(impact.newPayoffDate.getMonth()).toBe(7);
+		expect(impact.newPayoffDate.getDate()).toBe(10);
+	});
+
+	test.each<[string, number]>([
+		['at the current payment', 0],
+		['with an extra $50 a month', 50]
+	])('the planner counts its payoff from the Next Payment date %s', (_label, extra) => {
+		vi.setSystemTime(new Date(2026, 10, 22, 12));
+		const financing = makeLoan({
+			apr: 4.5,
+			originalAmount: 20_000,
+			computedBalance: 12_515.8,
+			startDate: '2024-11-22T12:00:00',
+			termMonths: 60,
+			paymentDayOfMonth: 15,
+			paymentAmount: 450
+		});
+		const nextPayment = { lastPaymentDate: new Date(2026, 10, 15) };
+		const minimum = calculateMinimumPayment(financing) ?? 0;
+		const planner = computePlannerState(
+			financing,
+			financing.paymentAmount + extra,
+			minimum,
+			financing.paymentAmount,
+			nextPayment
+		);
+		if (!('primaryImpact' in planner)) throw new Error(`unexpected state ${planner.state}`);
+		const payoff = planner.primaryImpact.newPayoffDate;
+
+		expect(payoff.getDate()).toBe(15);
+		if (extra === 0) {
+			expect(payoff.getTime()).toBe(calculatePayoffDate(financing, nextPayment).getTime());
+		} else {
+			expect(payoff.getTime()).toBeLessThan(calculatePayoffDate(financing, nextPayment).getTime());
+		}
 	});
 
 	test('an extra payment on a zero-apr loan saves months but no interest', () => {

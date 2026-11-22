@@ -78,15 +78,19 @@
 		}
 	});
 
+	let nextPayment = $derived.by(() => {
+		const lastPayment = payments.at(-1);
+		return {
+			lastPaymentDate: lastPayment ? new Date(lastPayment.expense.date) : undefined,
+			assumeLastDuePaid: !paymentsLoaded
+		};
+	});
+
 	let estimatedPayoffDate = $derived.by(() => {
 		try {
 			const financing = vehicle?.financing;
 			if (!financing || !financing.isActive) return new Date();
-			const lastPayment = payments.at(-1);
-			return calculatePayoffDate(financing, {
-				lastPaymentDate: lastPayment ? new Date(lastPayment.expense.date) : undefined,
-				assumeLastDuePaid: !paymentsLoaded
-			});
+			return calculatePayoffDate(financing, nextPayment);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error calculating payoff date:', error);
 			return new Date();
@@ -224,6 +228,7 @@
 			financing={vehicle.financing}
 			bind:open={showPaymentPlanner}
 			onPaymentAmountSaved={handlePaymentAmountChange}
+			{nextPayment}
 		/>
 	{/if}
 

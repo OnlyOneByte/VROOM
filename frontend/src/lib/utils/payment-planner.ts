@@ -1,7 +1,8 @@
 import type { VehicleFinancing } from '#lib/types/index.ts';
 import {
 	calculateExtraPaymentImpact,
-	type ExtraPaymentImpact
+	type ExtraPaymentImpact,
+	type NextPaymentBasis
 } from '#lib/utils/financing-calculations.ts';
 import { formatCurrency } from '#lib/utils/formatters.ts';
 
@@ -25,7 +26,8 @@ export function computePlannerState(
 	financing: VehicleFinancing,
 	inputAmount: number,
 	minimumPayment: number,
-	savedAmount: number
+	savedAmount: number,
+	nextPayment: NextPaymentBasis = {}
 ): PlannerState {
 	if (inputAmount < minimumPayment - 0.01) {
 		return {
@@ -45,11 +47,19 @@ export function computePlannerState(
 
 	const extraVsMinimum = inputAmount - baselinePayment;
 	const financingAtMinimum = { ...financing, paymentAmount: baselinePayment };
-	const primaryImpact = calculateExtraPaymentImpact(financingAtMinimum, extraVsMinimum);
+	const primaryImpact = calculateExtraPaymentImpact(
+		financingAtMinimum,
+		extraVsMinimum,
+		nextPayment
+	);
 
 	if (Math.abs(inputAmount - savedAmount) > 0.01) {
 		const extraSavedVsMinimum = savedAmount - baselinePayment;
-		const savedImpact = calculateExtraPaymentImpact(financingAtMinimum, extraSavedVsMinimum);
+		const savedImpact = calculateExtraPaymentImpact(
+			financingAtMinimum,
+			extraSavedVsMinimum,
+			nextPayment
+		);
 
 		const secondaryDelta: SecondaryDelta = {
 			monthsDelta: primaryImpact.monthsSaved - savedImpact.monthsSaved,

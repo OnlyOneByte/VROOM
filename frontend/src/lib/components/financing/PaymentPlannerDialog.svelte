@@ -6,7 +6,10 @@
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
-	import { calculateMinimumPayment } from '#lib/utils/financing-calculations.ts';
+	import {
+		calculateMinimumPayment,
+		type NextPaymentBasis
+	} from '#lib/utils/financing-calculations.ts';
 	import { formatCurrency, formatDate, getCurrencySymbol } from '#lib/utils/formatters.ts';
 	import { debounce } from '#lib/utils/memoize.ts';
 	import {
@@ -31,9 +34,15 @@
 		financing: VehicleFinancing;
 		open: boolean;
 		onPaymentAmountSaved: (_newAmount: number) => Promise<void>;
+		nextPayment?: NextPaymentBasis;
 	}
 
-	let { financing, open = $bindable(false), onPaymentAmountSaved }: Props = $props();
+	let {
+		financing,
+		open = $bindable(false),
+		onPaymentAmountSaved,
+		nextPayment = {}
+	}: Props = $props();
 
 	const currencySymbol = $derived(getCurrencySymbol());
 
@@ -84,7 +93,7 @@
 	});
 
 	let plannerState: PlannerState = $derived.by(() =>
-		computePlannerState(financing, debouncedInput, minimumPayment ?? 0, savedAmount)
+		computePlannerState(financing, debouncedInput, minimumPayment ?? 0, savedAmount, nextPayment)
 	);
 
 	let saveEnabled = $derived(canSaveCheck(inputAmount, minimumPayment ?? 0, savedAmount, isSaving));
