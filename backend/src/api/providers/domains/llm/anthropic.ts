@@ -11,7 +11,7 @@ import {
 } from './llm-provider';
 
 const REQUEST_TIMEOUT_MS = 60_000;
-const MAX_TOKENS = 1024;
+const MAX_TOKENS = 16_000;
 const ANTHROPIC_VERSION = '2023-06-01';
 const DEFAULT_BASE_URL = 'https://api.anthropic.com';
 
@@ -61,7 +61,6 @@ export class AnthropicLlmProvider implements LlmProvider {
       body: {
         model: this.model,
         max_tokens: MAX_TOKENS,
-        temperature: 0,
         ...(system ? { system } : {}),
         messages: toAnthropicMessages(request.messages),
         ...(request.tools.length > 0 ? { tools: request.tools.map(toAnthropicTool) } : {}),
@@ -89,21 +88,35 @@ function toAnthropicMessages(messages: ChatMessage[]): AnthropicMessage[] {
     if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
       out.push({
         role: 'assistant',
-        content: [
-          ...(m.content.length > 0 ? [{ type: 'text', text: m.content }] : []),
-          ...m.toolCalls.map((c) => ({
-            type: 'tool_use',
-            id: c.id,
-            name: c.name,
-            input: parseToolArguments(c.argumentsJson),
-          })),
-        ],
+        content: toolTurnContent(m.content, m.toolCalls, m.rawContent),
       });
       continue;
     }
     out.push({ role: m.role, content: m.content });
   }
   return out;
+}
+
+function toolTurnContent(
+  text: string,
+  toolCalls: ToolCall[],
+  rawContent: Record<string, unknown>[] | undefined
+): Record<string, unknown>[] {
+  if (rawContent) {
+    const kept = new Set(toolCalls.map((c) => c.id));
+    return rawContent.filter(
+      (b) => b.type !== 'tool_use' || (typeof b.id === 'string' && kept.has(b.id))
+    );
+  }
+  return [
+    ...(text.length > 0 ? [{ type: 'text', text }] : []),
+    ...toolCalls.map((c) => ({
+      type: 'tool_use',
+      id: c.id,
+      name: c.name,
+      input: parseToolArguments(c.argumentsJson),
+    })),
+  ];
 }
 
 function isToolResults(blocks: Record<string, unknown>[]): boolean {
@@ -127,7 +140,8 @@ function normalizeResponse(json: AnthropicResponse | null): ChatResult {
       name: typeof b.name === 'string' ? b.name : '',
       argumentsJson: JSON.stringify(b.input ?? {}),
     }));
-    return text ? { text, toolCalls } : { toolCalls };
+    const rawContent = blocks as Record<string, unknown>[];
+    return text ? { text, toolCalls, rawContent } : { toolCalls, rawContent };
   }
   return { text };
 }

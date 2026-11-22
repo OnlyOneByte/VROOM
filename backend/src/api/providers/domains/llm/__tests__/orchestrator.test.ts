@@ -68,6 +68,22 @@ describe('runAssistant tool-call transcript', () => {
     expectWellFormedToolProtocol(second);
   });
 
+  test("the assistant turn keeps the provider's raw blocks so its thinking is replayed", async () => {
+    const call: ToolCall = { id: 'call_x', name: 'listVehicles', argumentsJson: '{}' };
+    const rawContent = [
+      { type: 'thinking', thinking: '', signature: 'sig' },
+      { type: 'tool_use', id: 'call_x', name: 'listVehicles', input: {} },
+    ];
+    const { provider, sent } = scriptedProvider([
+      { toolCalls: [call], rawContent },
+      { text: 'You have no vehicles.' },
+    ]);
+
+    await orchestrator.runAssistant(provider, ctx.user.id, 'cars?', [], NOW_MS);
+    const second = sent[1] ?? [];
+    expect(second[2]).toEqual({ role: 'assistant', content: '', toolCalls: [call], rawContent });
+  });
+
   test('calls past the budget are dropped from the assistant turn, so none is left unanswered', async () => {
     const { MAX_TOOL_CALLS } = orchestrator;
     const { provider, sent } = scriptedProvider([
