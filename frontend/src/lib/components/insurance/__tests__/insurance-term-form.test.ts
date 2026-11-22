@@ -189,6 +189,27 @@ describe('InsuranceTermForm add mode', () => {
 		expect(addTerm.mock.calls[0]?.[1].vehicleCoverage).toStrictEqual({ vehicleIds: ['v1', 'v2'] });
 	});
 
+	test('a monthly-only term previews the monthly cost times its billed months, as the API charges', async () => {
+		await mount();
+		await type('start-date', '2026-07-01');
+		await type('end-date', '2027-01-01');
+		await fireEvent.click(screen.getByRole('checkbox', { name: '2019 Honda Civic' }));
+		await fireEvent.click(screen.getByRole('checkbox', { name: 'Daily' }));
+		await type('monthly-cost', '100.01');
+		await settle();
+
+		expect(
+			screen.getByText(
+				'The premium is the monthly cost for each billed month of the term, split evenly between the covered vehicles.'
+			)
+		).toBeInTheDocument();
+		const rowText = (name: string) =>
+			screen.getAllByText(name).at(-1)?.parentElement?.textContent?.replace(/\s+/g, ' ').trim();
+		expect(rowText('2019 Honda Civic')).toBe('2019 Honda Civic $300.03');
+		expect(rowText('Daily')).toBe('Daily $300.03');
+		expect(screen.getByText('$600.06')).toBeInTheDocument();
+	});
+
 	test('rejects an end date that is not after the start date', async () => {
 		await mount();
 		await type('start-date', '2026-07-01');

@@ -27,7 +27,11 @@
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
-	import { enteredAmount, prefillFromPreviousTerm } from '#lib/utils/insurance.ts';
+	import {
+		effectiveTermCost,
+		enteredAmount,
+		prefillFromPreviousTerm
+	} from '#lib/utils/insurance.ts';
 	import { getCurrencySymbol } from '#lib/utils/formatters.ts';
 	import type { InsurancePolicy, InsuranceTerm, Vehicle } from '#lib/types/index.ts';
 
@@ -69,8 +73,9 @@
 	let splitVehicles = $derived(
 		selectedVehicleIds.flatMap(id => vehicles.find(v => v.id === id) ?? [])
 	);
-	let parsedTotalCost = $derived(parseFloat(totalCost) || 0);
-	let showSplitEditor = $derived(parsedTotalCost > 0 && selectedVehicleIds.length >= 2);
+	let premiumTotal = $derived(effectiveTermCost({ totalCost, monthlyCost, startDate, endDate }));
+	let premiumFromMonthlyCost = $derived((enteredAmount(totalCost) ?? 0) <= 0);
+	let showSplitEditor = $derived(premiumTotal > 0 && selectedVehicleIds.length >= 2);
 
 	interface FormErrors {
 		startDate?: string;
@@ -443,11 +448,13 @@
 						{#if showSplitEditor}
 							<div class="mt-4 space-y-2">
 								<p class="text-xs text-muted-foreground">
-									The premium is split evenly between the covered vehicles.
+									{premiumFromMonthlyCost
+										? 'The premium is the monthly cost for each billed month of the term, split evenly between the covered vehicles.'
+										: 'The premium is split evenly between the covered vehicles.'}
 								</p>
 								<SplitConfigEditor
 									vehicles={splitVehicles}
-									totalAmount={parsedTotalCost}
+									totalAmount={premiumTotal}
 									splitMethod="even"
 									allocations={[]}
 								/>

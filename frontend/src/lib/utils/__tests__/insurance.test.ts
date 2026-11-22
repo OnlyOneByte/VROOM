@@ -2,12 +2,14 @@ import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
 import type { InsuranceTerm, InsurancePolicy } from '#lib/types/index.ts';
 import {
+	effectiveTermCost,
 	getDaysRemaining,
 	getLatestTerm,
 	groupPoliciesByActive,
 	isPolicyInForce,
 	prefillFromPreviousTerm,
-	sortTermsByEndDateDesc
+	sortTermsByEndDateDesc,
+	termBillingMonths
 } from '#lib/utils/insurance.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -212,5 +214,55 @@ describe('Renew pre-fill from previous term', () => {
 
 		expect(getLatestTerm([termA, termB])?.id).toBe('term-A');
 		expect(getLatestTerm([termB, termA])?.id).toBe('term-B');
+	});
+});
+
+describe('term premium matches what the API charges', () => {
+	const utcNoon = (date: string) => new Date(`${date}T12:00:00.000Z`);
+
+	test.each([
+		['2024-01-01', '2025-01-01', 12],
+		['2026-03-15', '2026-09-15', 6],
+		['2026-03-15', '2026-04-14', 1],
+		['2026-03-15', '2026-04-16', 2],
+		['2026-01-31', '2026-02-28', 1],
+		['2026-01-31', '2026-03-01', 2],
+		['2024-02-29', '2025-03-01', 13],
+		['2026-03-15', '2026-03-15', 1]
+	])('%s -> %s is %i billed months', (start, end, months) => {
+		expect(termBillingMonths(utcNoon(start), utcNoon(end))).toBe(months);
+	});
+
+	test('a monthly-only term costs the monthly cost times its billed months', () => {
+		expect(
+			effectiveTermCost({
+				totalCost: '',
+				monthlyCost: '100.01',
+				startDate: '2026-03-15',
+				endDate: '2026-09-15'
+			})
+		).toBe(600.06);
+	});
+
+	test('a total cost takes precedence over the monthly cost', () => {
+		expect(
+			effectiveTermCost({
+				totalCost: '1300',
+				monthlyCost: '100',
+				startDate: '2024-01-01',
+				endDate: '2025-01-01'
+			})
+		).toBe(1300);
+	});
+
+	test('a monthly cost without an end date has no premium yet', () => {
+		expect(
+			effectiveTermCost({
+				totalCost: '0',
+				monthlyCost: '100',
+				startDate: '2024-01-01',
+				endDate: ''
+			})
+		).toBe(0);
 	});
 });
