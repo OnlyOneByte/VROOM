@@ -13,7 +13,7 @@ vi.mock('../api-client', async importOriginal => ({
 
 vi.mock('../analytics-api', () => ({ userTimeZone: () => 'Pacific/Auckland' }));
 
-const { odometerApi } = await import('../odometer-api');
+const { isOdometerOrderError, odometerApi } = await import('../odometer-api');
 
 beforeEach(() => {
 	for (const fn of [get, post, put, del, getPaginated]) fn.mockReset();
@@ -72,5 +72,24 @@ describe('odometerApi', () => {
 		await expect(
 			odometerApi.create('v1', { odometer: 1, recordedAt: '2025-03-01T00:00:00.000Z' })
 		).rejects.toBe(failure);
+	});
+});
+
+describe('isOdometerOrderError', () => {
+	test.each([
+		'Mileage must be greater than 41,010 (from earlier entry)',
+		'Mileage must be less than 50,000 (from later entry)',
+		'Mileage cannot be less than initial mileage'
+	])('recognises the server order refusal "%s"', message => {
+		expect(isOdometerOrderError(new ApiError(message, 400))).toBe(true);
+	});
+
+	test.each([
+		['another mileage message', new ApiError('Mileage must be greater than 0', 400)],
+		['a mismatched pair', new ApiError('Mileage must be greater than 5 (from later entry)', 400)],
+		['another status', new ApiError('Mileage must be greater than 5 (from earlier entry)', 409)],
+		['a plain Error', new Error('Mileage must be greater than 5 (from earlier entry)')]
+	])('ignores %s', (_label, error) => {
+		expect(isOdometerOrderError(error)).toBe(false);
 	});
 });

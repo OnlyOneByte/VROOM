@@ -167,6 +167,11 @@
 			const submitError = document.getElementById('submit-error');
 			submitError?.scrollIntoView({ block: 'center' });
 			submitError?.focus({ preventScroll: true });
+		} else if (form.errors['mileage'] && Object.keys(form.errors).length === 1) {
+			await tick();
+			const mileage = document.getElementById('mileage');
+			mileage?.scrollIntoView({ block: 'center' });
+			mileage?.focus({ preventScroll: true });
 		}
 	}
 
