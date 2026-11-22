@@ -70,6 +70,11 @@
 			: []
 	);
 
+	const QUICK_STAT_SKELETONS = ['vehicles', 'spending', 'efficiency', 'health'].map(label => ({
+		label,
+		value: ''
+	}));
+
 	onMount(() => {
 		loadSummary();
 	});
@@ -87,9 +92,7 @@
 	/>
 
 	{#if isLoading}
-		<div class="flex justify-center p-8">
-			<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
-		</div>
+		<StatCardGrid items={QUICK_STAT_SKELETONS} columns={4} isLoading />
 	{:else if error}
 		<div class="rounded-lg border bg-card p-6">
 			<div class="mb-4 flex items-center gap-3 text-destructive">
