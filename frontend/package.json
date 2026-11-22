@@ -2,7 +2,13 @@
 	"name": "vroom-frontend",
 	"private": true,
 	"version": "1.0.0",
-	"description": "VROOM Car Tracker Frontend PWA",
+	"description": "Frontend PWA for VROOM, a self-hosted vehicle cost and maintenance tracker",
+	"license": "AGPL-3.0-or-later",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/OnlyOneByte/VROOM.git",
+		"directory": "frontend"
+	},
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -27,7 +33,7 @@
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"type-check": "node scripts/type-check.mjs --threshold error && tsc -p src/service-worker/tsconfig.json --noEmit",
-		"all:fix": "npm run lint:fix && npm run format ",
+		"all:fix": "npm run lint:fix && npm run format",
 		"validate": "npm run lint && npm run format:check && npm run type-check && npm run test",
 		"validate:local": "npm run type-check && npm run lint && npm run build && npm run test"
 	},

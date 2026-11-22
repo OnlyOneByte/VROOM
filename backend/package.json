@@ -1,12 +1,18 @@
 {
   "name": "vroom-backend",
+  "private": true,
   "version": "1.0.0",
-  "description": "VROOM Car Tracker Backend API",
+  "description": "Backend API for VROOM, a self-hosted vehicle cost and maintenance tracker",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OnlyOneByte/VROOM.git",
+    "directory": "backend"
+  },
   "main": "src/index.ts",
   "type": "module",
   "scripts": {
     "dev": "bun --hot src/index.ts",
-    "dev:kill": "lsof -ti :3001 | xargs kill -9 2>/dev/null || echo 'No process on port 3001'",
     "build": "bun build src/index.ts --outdir ./dist --target bun",
     "start": "bun dist/index.js",
     "db:generate": "drizzle-kit generate",
@@ -19,10 +25,6 @@
     "vapid:gen": "bun src/scripts/gen-vapid-keys.ts",
     "test": "bun test --timeout 30000 && bun run test:tz",
     "test:tz": "TZ=Pacific/Auckland bun test --timeout 30000 src/api/trips src/api/odometer src/api/expenses",
-    "test:repositories": "bun src/test/run-tests.ts",
-    "test:auth": "bun src/test/run-auth-tests.ts",
-    "test:vehicles": "bun src/test/run-vehicle-tests.ts",
-    "test:deployment": "bun src/test/run-deployment-tests.ts",
     "lint": "biome lint src/",
     "lint:fix": "biome lint --write src/",
     "format": "biome format src/",
