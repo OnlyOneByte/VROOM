@@ -270,6 +270,16 @@ describe('ExpenseForm create mode', () => {
 		expect(field('mileage').value).toBe('12000');
 	});
 
+	test('a mileage of 0 on a non-fuel expense is refused, not dropped', async () => {
+		await renderCreate({ preselectedCategory: 'misc', preselectedAmount: '12' });
+		await type('mileage', '0');
+
+		await save();
+
+		expect(errorText('mileage')).toBe('Mileage must be greater than 0');
+		expect(createExpense).not.toHaveBeenCalled();
+	});
+
 	test('a split across vehicles asks for no mileage, since a split saves none', async () => {
 		await renderCreate({ preselectedCategory: 'maintenance' });
 		expect(document.getElementById('mileage')).not.toBeNull();
