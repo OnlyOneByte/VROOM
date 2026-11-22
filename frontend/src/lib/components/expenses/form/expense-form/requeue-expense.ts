@@ -1,6 +1,6 @@
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { onlineStatus } from '#lib/stores/offline.svelte.ts';
-import { replaceOfflineExpense } from '#lib/utils/offline-storage.ts';
+import { replaceParkedExpense } from '#lib/utils/offline-storage.ts';
 import { syncManager } from '#lib/utils/sync/sync-manager.ts';
 import { gotoDynamic } from '#lib/utils/navigation.ts';
 import { toOfflineExpense } from '../offline-expense';
@@ -9,6 +9,9 @@ import type { ExpenseFormState } from './expense-form-state.svelte';
 
 export const REQUEUE_FAILED_MESSAGE =
 	"Couldn't update this entry on this device. Check your device's free storage and try again.";
+
+export const REQUEUE_NOT_PARKED_MESSAGE =
+	"This entry started syncing or was removed while you were editing, so your changes weren't saved. Check it in the expenses list.";
 
 export async function saveQueuedExpense(state: ExpenseFormState): Promise<void> {
 	const queued = state.queuedExpense;
@@ -28,12 +31,13 @@ export async function saveQueuedExpense(state: ExpenseFormState): Promise<void> 
 			sourceType: state.sourceType,
 			sourceId: state.sourceId
 		});
-		const saved = await replaceOfflineExpense(queued.id, toOfflineExpense(expenseData), [
+		const result = await replaceParkedExpense(queued.id, toOfflineExpense(expenseData), [
 			...state.pendingFiles
 		]);
-		if (!saved) {
-			state.submitError = REQUEUE_FAILED_MESSAGE;
-			appStore.addNotification({ type: 'error', message: REQUEUE_FAILED_MESSAGE });
+		if (result !== 'saved') {
+			state.submitError =
+				result === 'not-parked' ? REQUEUE_NOT_PARKED_MESSAGE : REQUEUE_FAILED_MESSAGE;
+			appStore.addNotification({ type: 'error', message: state.submitError });
 			return;
 		}
 		appStore.addNotification({

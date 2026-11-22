@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
+import { INCOMPLETE_FUEL_REASON, type OfflineExpense } from '#lib/utils/offline-storage.ts';
 
 const OfflineExpenseCards = (await import('../OfflineExpenseCards.svelte')).default;
 
@@ -53,10 +53,10 @@ describe('OfflineExpenseCards — an entry the server rejected', () => {
 
 	it('keeps an incomplete fill-up reason as it is', () => {
 		renderCards([
-			{ ...rejected, category: 'fuel', amount: 40, attentionReason: 'Add the fuel amount' }
+			{ ...rejected, category: 'fuel', amount: 40, attentionReason: INCOMPLETE_FUEL_REASON }
 		]);
 
-		expect(screen.getByText('Add the fuel amount')).toBeInTheDocument();
+		expect(screen.getByText(INCOMPLETE_FUEL_REASON)).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: /^Edit / })).toBeInTheDocument();
 	});
 });

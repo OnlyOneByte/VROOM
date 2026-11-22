@@ -6,7 +6,7 @@ import { offlineExpenseQueue, onlineStatus } from '#lib/stores/offline.svelte.ts
 import {
 	cacheVehicleHistory,
 	cacheVehicles,
-	findOfflineExpense,
+	findParkedExpense,
 	loadCachedVehicleHistory,
 	loadCachedVehicles,
 	loadPendingPhotos
@@ -57,7 +57,7 @@ export async function loadVehicles(state: ExpenseFormState): Promise<void> {
 }
 
 export async function loadQueuedExpense(state: ExpenseFormState, id: string): Promise<void> {
-	const queued = findOfflineExpense(id);
+	const queued = findParkedExpense(id);
 	if (!queued) {
 		appStore.addNotification({
 			type: 'error',

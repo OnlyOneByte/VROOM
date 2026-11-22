@@ -266,18 +266,32 @@ export async function addOfflineExpense(
 	return queued;
 }
 
-export function findOfflineExpense(id: string): OfflineExpense | undefined {
-	return loadOfflineExpenses().find(expense => expense.id === id && !expense.synced);
+function isEditableParked(expense: OfflineExpense): boolean {
+	return !expense.synced && !!expense.needsAttention && !expense.serverId;
 }
 
-export async function replaceOfflineExpense(
+export function findParkedExpense(id: string): OfflineExpense | undefined {
+	return loadOfflineExpenses().find(expense => expense.id === id && isEditableParked(expense));
+}
+
+export type ReplaceParkedResult = 'saved' | 'not-parked' | 'failed';
+
+export async function replaceParkedExpense(
 	id: string,
 	expense: Omit<OfflineExpense, 'id' | 'clientId' | 'timestamp' | 'synced' | 'version'>,
 	photos: File[]
-): Promise<boolean> {
+): Promise<ReplaceParkedResult> {
+	const parked = findParkedExpense(id);
+	if (!parked) return 'not-parked';
+	if (parked.clientId) {
+		if (!(await savePendingPhotos(parked.clientId, photos))) return 'failed';
+	} else if (photos.length > 0) {
+		return 'failed';
+	}
+
 	const currentExpenses = loadOfflineExpenses();
-	const existing = currentExpenses.find(entry => entry.id === id && !entry.synced);
-	if (!existing) return false;
+	const existing = currentExpenses.find(entry => entry.id === id);
+	if (!existing || !isEditableParked(existing)) return 'not-parked';
 	const replaced: OfflineExpense = {
 		...expense,
 		amount: roundToCents(expense.amount),
@@ -287,10 +301,10 @@ export async function replaceOfflineExpense(
 		synced: false,
 		version: OFFLINE_STORAGE_VERSION
 	};
-	if (!saveOfflineExpenses(currentExpenses.map(entry => (entry.id === id ? replaced : entry)))) {
-		return false;
-	}
-	return existing.clientId ? savePendingPhotos(existing.clientId, photos) : photos.length === 0;
+	const saved = saveOfflineExpenses(
+		currentExpenses.map(entry => (entry.id === id ? replaced : entry))
+	);
+	return saved ? 'saved' : 'failed';
 }
 
 export function removeOfflineExpense(id: string): void {

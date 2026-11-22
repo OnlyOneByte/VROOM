@@ -10,8 +10,8 @@ const { addNotification, gotoDynamic, requestAutoSync, syncAll, online, storage 
 		syncAll: vi.fn(() => Promise.resolve({})),
 		online: { current: true },
 		storage: {
-			findOfflineExpense: vi.fn(),
-			replaceOfflineExpense: vi.fn(() => Promise.resolve(true)),
+			findParkedExpense: vi.fn(),
+			replaceParkedExpense: vi.fn(() => Promise.resolve('saved')),
 			loadPendingPhotos: vi.fn(() => Promise.resolve([] as File[]))
 		}
 	})
@@ -34,7 +34,8 @@ vi.mock('#lib/utils/offline-storage.ts', () => ({
 
 const { ExpenseFormState } = await import('../expense-form-state.svelte');
 const { loadQueuedExpense } = await import('../expense-form-loaders');
-const { saveQueuedExpense, REQUEUE_FAILED_MESSAGE } = await import('../requeue-expense');
+const { saveQueuedExpense, REQUEUE_FAILED_MESSAGE, REQUEUE_NOT_PARKED_MESSAGE } =
+	await import('../requeue-expense');
 
 const parked: OfflineExpense = {
 	id: 'offline_1',
@@ -61,8 +62,8 @@ function newState() {
 beforeEach(() => {
 	vi.clearAllMocks();
 	online.current = true;
-	storage.findOfflineExpense.mockReturnValue(parked);
-	storage.replaceOfflineExpense.mockResolvedValue(true);
+	storage.findParkedExpense.mockReturnValue(parked);
+	storage.replaceParkedExpense.mockResolvedValue('saved');
 });
 
 describe('loadQueuedExpense', () => {
@@ -89,7 +90,7 @@ describe('loadQueuedExpense', () => {
 	});
 
 	test('an entry that is gone says so and goes back', async () => {
-		storage.findOfflineExpense.mockReturnValue(undefined);
+		storage.findParkedExpense.mockReturnValue(undefined);
 		const state = newState();
 
 		await loadQueuedExpense(state, 'offline_gone');
@@ -118,7 +119,7 @@ describe('saveQueuedExpense', () => {
 		await saveQueuedExpense(state);
 
 		expect(state.errors['amount']).toBe('Amount must be 1,000,000 or less');
-		expect(storage.replaceOfflineExpense).not.toHaveBeenCalled();
+		expect(storage.replaceParkedExpense).not.toHaveBeenCalled();
 	});
 
 	test('a fixed entry replaces the parked one, asks for a sync and goes back', async () => {
@@ -127,7 +128,7 @@ describe('saveQueuedExpense', () => {
 
 		await saveQueuedExpense(state);
 
-		expect(storage.replaceOfflineExpense).toHaveBeenCalledWith(
+		expect(storage.replaceParkedExpense).toHaveBeenCalledWith(
 			'offline_1',
 			expect.objectContaining({ vehicleId: 'v1', category: 'fuel', amount: 45.1, volume: 12.5 }),
 			[]
@@ -166,7 +167,7 @@ describe('saveQueuedExpense', () => {
 	});
 
 	test('a failed write stays on the form with an error', async () => {
-		storage.replaceOfflineExpense.mockResolvedValue(false);
+		storage.replaceParkedExpense.mockResolvedValue('failed');
 		const state = await loadedState();
 		state.formData.amount = '45.10';
 
@@ -175,5 +176,38 @@ describe('saveQueuedExpense', () => {
 		expect(state.submitError).toBe(REQUEUE_FAILED_MESSAGE);
 		expect(gotoDynamic).not.toHaveBeenCalled();
 		expect(syncAll).not.toHaveBeenCalled();
+	});
+
+	test('an entry that started syncing meanwhile keeps the form open and says so', async () => {
+		storage.replaceParkedExpense.mockResolvedValue('not-parked');
+		const state = await loadedState();
+		state.formData.amount = '45.10';
+
+		await saveQueuedExpense(state);
+
+		expect(state.submitError).toBe(REQUEUE_NOT_PARKED_MESSAGE);
+		expect(addNotification).toHaveBeenCalledWith({
+			type: 'error',
+			message: REQUEUE_NOT_PARKED_MESSAGE
+		});
+		expect(gotoDynamic).not.toHaveBeenCalled();
+		expect(syncAll).not.toHaveBeenCalled();
+	});
+
+	test("offline, the entry's own queued copy doesn't block a new date or mileage", async () => {
+		const state = await loadedState();
+		state.formData.amount = '45.10';
+		state.formData.date = '2025-03-12';
+		state.formData.mileage = '30900';
+		state.allVehicleExpenses = [
+			{ ...parked, date: '2025-03-10', tags: [] } as never,
+			{ id: 'earlier', date: '2025-03-01', mileage: 30000 } as never
+		];
+
+		expect(state.validateForm()).toBe(true);
+
+		state.formData.mileage = '29000';
+		expect(state.validateForm()).toBe(false);
+		expect(state.errors['mileage']).toContain('greater than 30,000');
 	});
 });

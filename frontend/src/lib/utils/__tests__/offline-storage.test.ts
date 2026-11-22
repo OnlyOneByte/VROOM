@@ -24,8 +24,8 @@ import {
 	loadCachedVehicleHistory,
 	updateCachedVehicle,
 	removeCachedVehicle,
-	findOfflineExpense,
-	replaceOfflineExpense,
+	findParkedExpense,
+	replaceParkedExpense,
 	type OfflineExpense
 } from '../offline-storage';
 import type { Vehicle } from '#lib/types/index.ts';
@@ -1258,13 +1258,13 @@ describe('queue owner scoping', () => {
 		});
 		setOfflineQueueOwner('user-8');
 
-		const saved = await replaceOfflineExpense(
+		const saved = await replaceParkedExpense(
 			'parked',
 			{ vehicleId: 'v1', tags: [], category: 'misc', amount: 999.999, date: '2026-01-06' },
 			[]
 		);
 
-		expect(saved).toBe(true);
+		expect(saved).toBe('saved');
 		const rows = JSON.parse(store.get(scoped('user-8'))!) as OfflineExpense[];
 		expect(rows.map(r => r.id)).toEqual(['parked', 'other']);
 		expect(rows[0]).toMatchObject({
@@ -1281,13 +1281,51 @@ describe('queue owner scoping', () => {
 		expect(getPendingExpenses().map(r => r.id)).toContain('parked');
 	});
 
-	it('a missing or already synced entry is not requeued', async () => {
-		useStore({ [scoped('user-9')]: JSON.stringify([queuedRow({ id: 'done', synced: true })]) });
-		setOfflineQueueOwner('user-9');
-		const input = { vehicleId: 'v1', tags: [], category: 'misc', amount: 5, date: '2026-01-06' };
+	const requeueInput = {
+		vehicleId: 'v1',
+		tags: [],
+		category: 'misc',
+		amount: 5,
+		date: '2026-01-06'
+	};
 
-		expect(await replaceOfflineExpense('done', input, [])).toBe(false);
-		expect(await replaceOfflineExpense('gone', input, [])).toBe(false);
-		expect(findOfflineExpense('done')).toBeUndefined();
+	it('only a parked entry that never reached the server can be replaced', async () => {
+		const rows = [
+			queuedRow({ id: 'done', synced: true, needsAttention: true }),
+			queuedRow({ id: 'syncing' }),
+			queuedRow({ id: 'photo-only', needsAttention: true, serverId: 's1' })
+		];
+		const store = useStore({ [scoped('user-9')]: JSON.stringify(rows) });
+		setOfflineQueueOwner('user-9');
+
+		for (const id of ['done', 'syncing', 'photo-only', 'gone']) {
+			expect(await replaceParkedExpense(id, requeueInput, [])).toBe('not-parked');
+			expect(findParkedExpense(id)).toBeUndefined();
+		}
+		expect(JSON.parse(store.get(scoped('user-9'))!)).toEqual(rows);
+	});
+
+	it('a retry that unparks the entry while it is being edited wins, and the edit is refused', async () => {
+		const parked = queuedRow({ id: 'parked', needsAttention: true, amount: 1_000_001 });
+		const store = useStore({ [scoped('user-10')]: JSON.stringify([parked]) });
+		setOfflineQueueOwner('user-10');
+		expect(findParkedExpense('parked')).toBeDefined();
+		store.set(scoped('user-10'), JSON.stringify([{ ...parked, needsAttention: false }]));
+
+		expect(await replaceParkedExpense('parked', requeueInput, [])).toBe('not-parked');
+		expect(JSON.parse(store.get(scoped('user-10'))!)[0].amount).toBe(1_000_001);
+	});
+
+	it('a photo write that fails leaves the parked entry as it was', async () => {
+		const originalIndexedDb = globalThis.indexedDB;
+		vi.stubGlobal('indexedDB', undefined);
+		const parked = queuedRow({ id: 'parked', clientId: 'c1', needsAttention: true });
+		const store = useStore({ [scoped('user-11')]: JSON.stringify([parked]) });
+		setOfflineQueueOwner('user-11');
+		const photo = new File(['x'], 'receipt.jpg', { type: 'image/jpeg' });
+
+		expect(await replaceParkedExpense('parked', requeueInput, [photo])).toBe('failed');
+		expect(JSON.parse(store.get(scoped('user-11'))!)).toEqual([parked]);
+		vi.stubGlobal('indexedDB', originalIndexedDb);
 	});
 });

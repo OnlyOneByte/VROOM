@@ -5,7 +5,7 @@
 	import * as CardNs from '#lib/components/ui/card/index.ts';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { isIncompleteFuelExpense, type OfflineExpense } from '#lib/utils/offline-storage.ts';
+	import { INCOMPLETE_FUEL_REASON, type OfflineExpense } from '#lib/utils/offline-storage.ts';
 	import { DISPLAY_LIMITS } from '#lib/constants/limits.ts';
 	import { EXPENSE_MESSAGES } from '#lib/constants/messages.ts';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
@@ -166,7 +166,7 @@
 								</div>
 							{:else if expense.attentionReason}
 								<div class="text-sm text-foreground mt-1">
-									{isIncompleteFuelExpense(expense)
+									{expense.attentionReason === INCOMPLETE_FUEL_REASON
 										? expense.attentionReason
 										: `The server didn't accept this entry: ${expense.attentionReason}`}
 								</div>
