@@ -37,7 +37,8 @@ backend drivable in-process from tests via `app.request()`.
 
 ### Middleware order
 
-Composed in `src/app.ts`, in this order: error handler → body limit (10MB) → secure headers
+Composed in `src/app.ts`, in this order: error handler → body limit (10MB; 50MB for the
+backup restore upload) → secure headers
 (CSP, HSTS, `X-Frame-Options`) → optional auth (`/api/*` only) → rate limiter → CORS → CSRF
 → request logging → activity tracking.
 
@@ -54,9 +55,9 @@ at the route.
 ### Errors
 
 `AppError` is the base (500) with `ValidationError` (400), `AuthenticationError` (401),
-`NotFoundError` (404), `ConflictError` (409), and `DatabaseError` (500). Sync and provider
-failures use a separate `SyncError` carrying a `SyncErrorCode`
-(`AUTH_INVALID`, `NETWORK_ERROR`, `QUOTA_EXCEEDED`, `PERMISSION_DENIED`, `VALIDATION_ERROR`,
+`NotFoundError` (404), `ConflictError` (409), `UnprocessableEntityError` (422), and
+`DatabaseError` (500). Sync and provider failures use a separate `SyncError` carrying a
+`SyncErrorCode` (`AUTH_INVALID`, `NETWORK_ERROR`, `QUOTA_EXCEEDED`, `PERMISSION_DENIED`,
 `CONFLICT_DETECTED`, `SYNC_IN_PROGRESS`), so callers can tell a revoked token from a
 transient network blip and avoid retrying what will never succeed.
 

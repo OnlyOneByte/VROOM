@@ -19,14 +19,16 @@ Coding conventions live in `docs/conventions/*.md`. Read `MainSteering.md`, `Sve
 | Tests | `bun run test` | `npm run test` |
 | Full gate | `bun run all:fix && bun run validate` | `npm run all:fix && npm run validate` |
 
-`validate` = lint, format, type-check, tests, build. Run it in every subfolder you modified
-and fix everything it reports, including pre-existing findings. CI runs the same commands,
-regrouped into job steps — the backend pairs `type-check` and `check` into one step, the
-frontend keeps type-check, lint, tests, and build separate — and skips only the frontend
-format check.
+`validate` runs lint, format check, type-check and tests in both apps; the backend's also
+builds (the frontend's `validate:local` adds the build). Run it in every subfolder you modified
+and fix everything it reports, including pre-existing findings. CI runs the same checks as
+separate job steps, skips only the frontend format check, and also builds the frontend and
+runs the Chromium e2e suite.
 
 First-time backend setup: copy `.env.example` to `.env`, then `bun run db:init` (add
-`--seed`, or `bun run db:seed`, for sample data — seeded login is `demo@example.com`).
+`--seed`, or `bun run db:seed`, for sample data). There is no demo login: sign-in needs a
+Google or GitHub OAuth app, and nobody can sign in as the seeded `demo@example.com` user. See
+`docs/development.md` § Signing in.
 Use `db:init`, not `db:push`: init applies the committed `drizzle/` migrations, while
 `drizzle-kit push` diffs the schema straight onto the DB and will offer to drop columns.
 

@@ -23,8 +23,6 @@ npm ci
 npm run dev             # http://localhost:5173, proxies /api to :3001
 ```
 
-Seeded login is `demo@example.com`.
-
 Use `db:init` rather than `db:push`. Init applies the committed migrations in
 `backend/drizzle/`, matching what the server does on startup; `drizzle-kit push` diffs the
 schema onto the database directly and will offer to drop columns.
@@ -32,6 +30,25 @@ schema onto the database directly and will offer to drop columns.
 Install the frontend with `npm ci`, not `npm install`. Re-resolving the lockfile changes
 which `@rolldown/binding-*` platform package gets installed, and the WASM fallback parser
 fails on TypeScript optional parameters in `.svelte` files.
+
+### Signing in
+
+There is no demo login. Sign-in is OAuth only, so set up at least one provider in
+`backend/.env` before you open the app:
+
+- **GitHub:** create an OAuth app at https://github.com/settings/developers with the callback
+  URL `http://localhost:3001/api/v1/auth/callback/github`, then fill in `GITHUB_CLIENT_ID` and
+  `GITHUB_CLIENT_SECRET`.
+- **Google:** create an OAuth client in the Google Cloud Console with the redirect URI
+  `http://localhost:3001/api/v1/auth/callback/google`, then fill in `GOOGLE_CLIENT_ID` and
+  `GOOGLE_CLIENT_SECRET`. Production requires Google.
+
+A provider shows on the sign-in page once both its client ID and secret are set, so blank the
+Google placeholder values if you use GitHub only. The first sign-in creates your account.
+
+`--seed` (or `bun run db:seed`) adds a sample user, `demo@example.com`, with vehicles and
+expenses. Its Google ID is made up, so nobody can sign in as it. To look at its data, open
+`backend/data/vroom.db` in any SQLite client.
 
 ## Validation
 
@@ -45,7 +62,9 @@ cd frontend && npm run all:fix && npm run validate
 `all:fix` auto-fixes lint and formatting. `validate` runs the checks: the backend also builds,
 while the frontend runs lint, format check, type check, and tests (`npm run validate:local` adds
 the build). CI runs the same checks as separate steps and skips only the frontend format check.
-The backend's `bun run check` covers formatting too.
+The backend's `bun run check` covers formatting too. On a Linux arm64 host where Biome's default
+binary won't start, use `bun run check:musl` and `bun run validate:local`, which run the musl
+build of Biome instead.
 
 The frontend type check runs through `frontend/scripts/type-check.mjs`, a guarded wrapper around
 svelte-check. Exit code 2 means the guard failed, so the result cannot be trusted. It does not
