@@ -118,6 +118,28 @@ describe('the odometer reading must fit between the entries around its date', ()
     await created('2024-03-10', 1);
   });
 
+  test('a mileage of 0 is refused on create and edit, whatever the category', async () => {
+    const misc = (mileage: number) =>
+      ctx.authed('POST', '/api/v1/expenses', {
+        vehicleId,
+        category: 'misc',
+        expenseAmount: 5,
+        date: '2024-03-10',
+        mileage,
+      });
+
+    expect(await rejection(await misc(0))).toContain('Mileage must be greater than 0');
+    expect(await rejection(await fillUp('2024-03-10', 0))).toContain(
+      'Mileage must be greater than 0'
+    );
+
+    const res = await misc(10_000);
+    const body = await json<DataEnvelope<{ id: string }>>(res);
+    expect(res.status).toBe(201);
+    const edited = await ctx.authed('PUT', `/api/v1/expenses/${body.data.id}`, { mileage: 0 });
+    expect(await rejection(edited)).toContain('Mileage must be greater than 0');
+  });
+
   test('an update that moves the date across other entries is checked at its new date', async () => {
     await created('2024-03-01', 10_000);
     await created('2024-03-20', 10_800);

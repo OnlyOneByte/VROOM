@@ -15,7 +15,7 @@ import {
   VOLUME_TOO_HIGH_MESSAGE,
 } from '../../utils/validation';
 import { buildImportDate } from './local-date';
-import { clearFuelFieldsIfNotFuel } from './validation';
+import { clearFuelFieldsIfNotFuel, MILEAGE_NOT_POSITIVE_MESSAGE } from './validation';
 
 export interface ImportVehicle {
   id: string;
@@ -87,6 +87,7 @@ function parseMileage(raw: string): { value: number | null } | { error: string }
   if (!raw) return { value: null };
   const m = Number(raw);
   if (!Number.isInteger(m) || m < 0) return { error: `Invalid mileage "${raw}"` };
+  if (m === 0) return { error: MILEAGE_NOT_POSITIVE_MESSAGE };
   if (m > MAX_ODOMETER_READING) return { error: ODOMETER_TOO_HIGH_MESSAGE };
   return { value: m };
 }

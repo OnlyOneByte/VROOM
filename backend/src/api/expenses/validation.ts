@@ -4,6 +4,8 @@ import { EXPENSE_CATEGORIES, type SplitConfig } from '../../db/types';
 import { dollarsToCents, expenseDollarsToCents } from '../../utils/money';
 import { DUPLICATE_VEHICLE_MESSAGE, dateInput, hasUniqueVehicleIds } from '../../utils/validation';
 
+export const MILEAGE_NOT_POSITIVE_MESSAGE = 'Mileage must be greater than 0';
+
 export interface OdometerNeighbours {
   before: number | null;
   after: number | null;
