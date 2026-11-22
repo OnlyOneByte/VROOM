@@ -84,6 +84,7 @@
 	let entries = $state<OdometerHistoryEntry[]>([]);
 	let chartEntries = $state<OdometerHistoryEntry[]>([]);
 	let chartIsCapped = $state(false);
+	let chartError = $state<string | null>(null);
 	let totalCount = $state(0);
 	let offset = $state(0);
 	let isLoading = $state(true);
@@ -142,8 +143,10 @@
 			});
 			chartEntries = response.data;
 			chartIsCapped = response.pagination.totalCount > response.data.length;
-		} catch {
+			chartError = null;
+		} catch (e) {
 			chartEntries = [];
+			chartError = userFacingErrorMessage(e);
 		}
 	}
 
@@ -255,7 +258,7 @@
 			</div>
 		{/if}
 
-		{#if chartData.length >= MIN_CHART_POINTS}
+		{#if chartError || chartData.length >= MIN_CHART_POINTS}
 			<AppLineChart
 				title="Mileage Over Time"
 				description={chartIsCapped
@@ -267,6 +270,7 @@
 				{series}
 				config={chartConfig}
 				height={280}
+				error={chartError}
 				yDomain={mileageYDomain(chartData.map(d => d.odometer))}
 				xAxisProps={mileageXAxisProps(chartData.map(d => d.date))}
 				yAxisFormat={v => formatNumber(v, 0)}

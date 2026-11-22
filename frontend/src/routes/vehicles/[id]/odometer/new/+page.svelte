@@ -241,6 +241,7 @@
 		</div>
 
 		<PendingPhotoPreview
+			entityNoun="reading"
 			files={pendingFiles}
 			onAdd={file => (pendingFiles = [...pendingFiles, file])}
 			onRemove={i => (pendingFiles = pendingFiles.filter((_, idx) => idx !== i))}

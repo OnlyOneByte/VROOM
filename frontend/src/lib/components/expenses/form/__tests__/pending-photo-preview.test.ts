@@ -41,10 +41,10 @@ afterEach(() => {
 	URL.revokeObjectURL = realRevokeObjectURL;
 });
 
-function mount(files: File[]) {
+function mount(files: File[], entityNoun?: string) {
 	const onAdd = vi.fn<(file: File) => void>();
 	const onRemove = vi.fn<(index: number) => void>();
-	const view = render(PendingPhotoPreview, { files, onAdd, onRemove });
+	const view = render(PendingPhotoPreview, { files, onAdd, onRemove, entityNoun });
 	return { ...view, onAdd, onRemove };
 }
 
@@ -110,5 +110,26 @@ describe('PendingPhotoPreview', () => {
 		expect(onAdd).toHaveBeenNthCalledWith(1, photo);
 		expect(onAdd).toHaveBeenNthCalledWith(2, receipt);
 		expect(await screen.findByText('Upload complete')).toBeInTheDocument();
+	});
+
+	test('the add dialog names an expense by default', async () => {
+		mount([]);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+		expect(
+			await screen.findByText('Select photos or receipts to attach to this expense')
+		).toBeInTheDocument();
+	});
+
+	test('the add dialog names the entity it is given', async () => {
+		mount([], 'reading');
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+		expect(
+			await screen.findByText('Select photos or receipts to attach to this reading')
+		).toBeInTheDocument();
+		expect(screen.queryByText(/attach to this expense/)).toBeNull();
 	});
 });
