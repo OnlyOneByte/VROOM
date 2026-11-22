@@ -1,0 +1,12 @@
+375 | Fuel Consumption | card 444 -> 444 (grow 0)
+375 | Gas Price on Fill-up | card 436 -> 436 (grow 0)
+375 | Charging Price | card 472 -> 472 (grow 0)
+375 | Fill-up Cost by Vehicle | card 472 -> 472 (grow 0)
+375 | Cost/mi | card 500 -> 500 (grow 0)
+375 | Total Odometer | card 500 -> 500 (grow 0)
+375 | Fill-up Patterns by Day of Week | card 466 -> 466 (grow 0)
+375 | Seasonal Efficiency | card 416 -> 416 (grow 0)
+375 | Vehicle Performance Comparison | card 576 -> 576 (grow 0)
+375 | Monthly Cost Heatmap | card 500 -> 500 (grow 0)
+375 | Time Between Fill-ups | card 416 -> 416 (grow 0)
+375 layout shift while scrolling (no input): 0.0000
