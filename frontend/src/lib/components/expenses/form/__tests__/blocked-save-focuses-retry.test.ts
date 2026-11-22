@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import type { Vehicle } from '#lib/types/index.ts';
 
 const vehicle: Vehicle = {
@@ -121,7 +122,8 @@ describe("a fill-up when the vehicle loads but its history doesn't", () => {
 		);
 		render(ExpenseForm, { props: { preselectedCategory: 'fuel' } });
 		await screen.findByLabelText(/Gallons|Liters/);
-		await new Promise(resolve => setTimeout(resolve, 50));
+		await Promise.allSettled(getExpensesByVehicle.mock.results.map(r => r.value));
+		await tick();
 
 		expect(screen.queryByTestId('vehicle-load-error')).toBeNull();
 	});

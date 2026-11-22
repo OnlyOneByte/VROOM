@@ -207,9 +207,50 @@ describe('switching vehicles keeps only the latest response', () => {
 		const p2 = loadVehicleContext(state);
 		slowVehicle.resolve(makeVehicle('v1'));
 		await Promise.all([p1, p2]);
-		expect(state.vehicle).toBeNull();
+		expect(state.vehicle?.id).toBe('v2');
 		expect(state.vehicleError).toBe('Expenses down.');
 		expect(addNotification).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('a vehicle whose history fails to load', () => {
+	function failOnly(category: 'fuel' | undefined) {
+		vehicleApiMock.getVehicle.mockResolvedValueOnce(makeVehicle('v1'));
+		expenseApiMock.getExpensesByVehicle.mockImplementation(
+			(_id: string, opts: { category?: string }) =>
+				opts.category === category
+					? Promise.reject(new Error('expenses down'))
+					: Promise.resolve({ data: [] })
+		);
+	}
+
+	test('keeps the loaded vehicle and blocks only a fill-up', async () => {
+		failOnly(undefined);
+		const state = createState();
+		state.formData.vehicleId = 'v1';
+		await loadVehicleContext(state);
+		expect(state.vehicle?.id).toBe('v1');
+		expect(state.vehicleError).toBe('Expenses down.');
+
+		state.formData.category = 'misc';
+		state.formData.amount = '12';
+		expect(state.validateForm()).toBe(true);
+		state.formData.category = 'fuel';
+		state.formData.mileage = '45000';
+		state.formData.volume = '10';
+		expect(state.validateForm()).toBe(false);
+		expect(state.errors['vehicleDetails']).toBeDefined();
+	});
+
+	test('a failed last fill-up alone reports nothing', async () => {
+		failOnly('fuel');
+		const state = createState();
+		state.formData.vehicleId = 'v1';
+		await loadVehicleContext(state);
+		expect(state.vehicle?.id).toBe('v1');
+		expect(state.lastFuelExpense).toBeNull();
+		expect(state.vehicleError).toBeNull();
+		expect(addNotification).not.toHaveBeenCalled();
 	});
 });
 
@@ -236,7 +277,7 @@ describe('expense form loader failures from older requests and odd rejections', 
 		const p1 = loadLastFuelExpense(state);
 		await loadLastFuelExpense(state);
 		first.reject(new Error('stale'));
-		await expect(p1).resolves.toBeNull();
+		await expect(p1).resolves.toBeUndefined();
 		expect(state.lastFuelExpense?.id).toBe('new-fill');
 	});
 

@@ -143,14 +143,14 @@ describe('the expense form offline', () => {
 		offlineExpenseQueue.current = [];
 	});
 
-	test('offline without a cached history, the vehicle is held back so a fill-up stays blocked', async () => {
+	test('offline without a cached history, the cached vehicle is kept but reported as not fully loaded', async () => {
 		storage.set('vroom_offline_vehicles:u1', JSON.stringify([CAMRY]));
 		onlineStatus.current = false;
 		const state = fakeState('v1');
 
 		await loadVehicleContext(state);
 
-		expect(state.vehicle).toBeNull();
+		expect(state.vehicle?.id).toBe('v1');
 		expect(state.vehicleError).not.toBeNull();
 	});
 

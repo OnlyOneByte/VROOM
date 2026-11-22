@@ -201,21 +201,18 @@ export async function loadVehicle(state: ExpenseFormState): Promise<Error | null
 	}
 }
 
-export async function loadLastFuelExpense(state: ExpenseFormState): Promise<Error | null> {
+export async function loadLastFuelExpense(state: ExpenseFormState): Promise<void> {
 	const isCurrent = state.nextLastFuelRequest();
 	try {
 		const result = await expenseApi.getExpensesByVehicle(state.formData.vehicleId, {
 			limit: 2,
 			category: 'fuel'
 		});
-		if (!isCurrent()) return null;
+		if (!isCurrent()) return;
 		const fuelExpenses = result.data.filter((e: { id: string }) => e.id !== state.ctx.expenseId);
 		state.lastFuelExpense = fuelExpenses[0] ?? null;
-		return null;
-	} catch (error) {
-		if (!isCurrent()) return null;
-		state.lastFuelExpense = null;
-		return toError(error);
+	} catch {
+		if (isCurrent()) state.lastFuelExpense = null;
 	}
 }
 
@@ -249,7 +246,6 @@ export async function loadVehicleContext(state: ExpenseFormState): Promise<void>
 		loadAllVehicleExpenses(state)
 	]);
 	if (!isCurrent()) return;
-	if (historyFailure) state.vehicle = null;
 	const failure = vehicleFailure ?? historyFailure;
 	state.vehicleError = failure ? userFacingErrorMessage(failure) : null;
 	if (failure) handleErrorWithNotification(failure, "Couldn't load this vehicle's details");
