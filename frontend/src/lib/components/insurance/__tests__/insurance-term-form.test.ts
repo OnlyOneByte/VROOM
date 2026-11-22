@@ -180,6 +180,10 @@ describe('InsuranceTermForm add mode', () => {
 			expect(screen.queryByRole('button', { name: label })).toBeNull();
 		}
 		expect(screen.queryByRole('spinbutton', { name: /Percentage for|Amount for/ })).toBeNull();
+		const rowText = (name: string) =>
+			screen.getAllByText(name).at(-1)?.parentElement?.textContent?.replace(/\s+/g, ' ').trim();
+		expect(rowText('Daily')).toBe('Daily $500.00');
+		expect(rowText('2019 Honda Civic')).toBe('2019 Honda Civic $500.00');
 
 		await clickSave();
 		expect(addTerm.mock.calls[0]?.[1].vehicleCoverage).toStrictEqual({ vehicleIds: ['v1', 'v2'] });
