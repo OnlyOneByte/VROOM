@@ -2,27 +2,19 @@
 	const RADAR_WIDE_TICKS_MIN_WIDTH = 500;
 
 	const radarMetrics = [
-		{
-			key: 'fuelEfficiency',
-			label: 'Fuel Efficiency',
-			tick: 'Efficiency',
-			shortTick: 'Fuel'
-		},
-		{
-			key: 'maintenanceCost',
-			label: 'Maintenance Cost',
-			tick: 'Maintenance',
-			shortTick: 'Upkeep'
-		},
-		{ key: 'reliability', label: 'Reliability', tick: 'Reliability', shortTick: 'Fixes' },
-		{ key: 'annualCost', label: 'Annual Cost', tick: 'Annual Cost', shortTick: 'Spend' },
-		{ key: 'mileage', label: 'Mileage', tick: 'Mileage', shortTick: 'Driven' }
+		{ key: 'fuelEfficiency', label: 'Fuel Efficiency', tick: 'Efficiency' },
+		{ key: 'maintenanceCost', label: 'Maintenance Cost', tick: 'Maintenance' },
+		{ key: 'reliability', label: 'Reliability', tick: 'Reliability' },
+		{ key: 'annualCost', label: 'Annual Cost', tick: 'Annual Cost' },
+		{ key: 'mileage', label: 'Mileage', tick: 'Mileage' }
 	] as const;
 
 	export function radarTickLabel(label: string, cardWidth: number): string {
-		const metric = radarMetrics.find(m => m.label === label);
+		const index = radarMetrics.findIndex(m => m.label === label);
+		const metric = radarMetrics[index];
 		if (!metric) return label;
-		return cardWidth >= RADAR_WIDE_TICKS_MIN_WIDTH ? metric.tick : metric.shortTick;
+		const staggered = cardWidth < RADAR_WIDE_TICKS_MIN_WIDTH && index % 2 === 1;
+		return staggered ? `\u00a0\n${metric.tick}` : metric.tick;
 	}
 </script>
 

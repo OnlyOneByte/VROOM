@@ -36,16 +36,22 @@ const fuelAdvanced: FuelAdvancedResponse = {
 };
 
 describe('Vehicle Performance Comparison x-axis', () => {
-	test('a narrow card labels the metric groups with short names', () => {
+	test('a narrow card staggers every other metric name onto a second line', () => {
 		charts.length = 0;
 		render(AdvancedCharts, { props: { fuelAdvanced } });
 		const axis = charts.find(c => c.title === 'Vehicle Performance Comparison')?.xAxisProps;
 		const labels = axis?.ticks?.map(tick => axis.format?.(tick));
-		expect(labels).toEqual(['Fuel', 'Upkeep', 'Fixes', 'Spend', 'Driven']);
+		expect(labels).toEqual([
+			'Efficiency',
+			'\u00a0\nMaintenance',
+			'Reliability',
+			'\u00a0\nAnnual Cost',
+			'Mileage'
+		]);
 	});
 
-	test('a card 500px or wider switches to the longer names', () => {
-		expect(radarTickLabel('Maintenance Cost', 499)).toBe('Upkeep');
+	test('a card 500px or wider keeps every name on one line', () => {
+		expect(radarTickLabel('Maintenance Cost', 499)).toBe('\u00a0\nMaintenance');
 		expect(radarTickLabel('Maintenance Cost', 500)).toBe('Maintenance');
 		expect(radarTickLabel('Annual Cost', 500)).toBe('Annual Cost');
 	});
