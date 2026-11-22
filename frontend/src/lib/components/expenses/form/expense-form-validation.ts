@@ -1,6 +1,13 @@
 import { getVolumeUnitLabel, getChargeUnitLabel, isElectricFuelType } from '#lib/utils/units.ts';
 import { toDateInputValue } from '#lib/utils/formatters.ts';
 import type { Vehicle, VolumeUnit, ChargeUnit } from '#lib/types/index.ts';
+import { EXPENSE_LIMITS } from '#lib/constants/limits.ts';
+
+const CENT_TOLERANCE = 1e-6;
+
+function hasAtMostTwoDecimals(amount: number): boolean {
+	return Math.abs(amount * 100 - Math.round(amount * 100)) < CENT_TOLERANCE;
+}
 
 interface ValidationContext {
 	category: string;
@@ -29,7 +36,10 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 		case 'amount': {
 			const amount = parseFloat(value as string);
 			if (!value || amount <= 0) return 'Amount must be greater than 0';
-			if (amount > 999999) return 'Amount seems too large';
+			if (amount > EXPENSE_LIMITS.MAX_AMOUNT) {
+				return `Amount must be ${EXPENSE_LIMITS.MAX_AMOUNT.toLocaleString('en-US')} or less`;
+			}
+			if (!hasAtMostTwoDecimals(amount)) return 'Amount can have at most 2 decimal places';
 			break;
 		}
 		case 'date': {
