@@ -91,7 +91,9 @@ function validateMileage(value: string, ctx: ValidationContext): string | null {
 
 	const mileage = parseInt(value);
 	if (!value || mileage <= 0) {
-		return ctx.category === 'fuel' ? 'Mileage required for fuel expenses' : null;
+		return ctx.category === 'fuel'
+			? 'Mileage required for fuel expenses'
+			: 'Mileage must be greater than 0';
 	}
 
 	if (ctx.vehicle?.initialMileage && mileage < ctx.vehicle.initialMileage) {

@@ -169,6 +169,7 @@ describe('validateMileage (via the mileage field) — odometer order', () => {
 				})
 			);
 		expect(misc('')).toBeNull();
+		expect(misc('0')).toBe('Mileage must be greater than 0');
 		expect(misc('11000')).toBeNull();
 		expect(misc('9000')).toBe('Mileage must be greater than 10,000 (from earlier entry)');
 		expect(misc('12500')).toBe('Mileage must be less than 12,000 (from later entry)');
