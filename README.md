@@ -7,7 +7,20 @@
 
 VROOM (Vehicle Record & Organization Of Maintenance) is a self-hostable app for tracking what your cars really cost: fuel, maintenance, insurance, financing and trips, with mobile-first design, analytics and backups to your own Google Drive.
 
-<!-- screenshots -->
+![VROOM dashboard: total and monthly spending, active financing, and a card per vehicle](docs/screenshots/dashboard.png)
+
+| Vehicle loan | Fuel analytics | On a phone |
+|---|---|---|
+| ![A vehicle's Finance tab: next payment, payment progress and loan totals](docs/screenshots/vehicle-finance.png) | ![Analytics: fill-ups, gallons and fuel economy for the year](docs/screenshots/analytics.png) | ![The dashboard on a 375px-wide phone screen](docs/screenshots/dashboard-mobile.png) |
+
+<details>
+<summary>Adding an expense (GIF)</summary>
+
+![Adding a maintenance expense: pick the category, enter amount and mileage, save, and it appears at the top of the list](docs/screenshots/add-expense.gif)
+
+</details>
+
+Screenshots show the demo data from `bun run db:seed`.
 
 > ⚠️ **Under active development.** Features, APIs, and database schemas may change between releases. Back up your data regularly via Google Drive sync. Pin to a specific image tag rather than `latest` for stability.
 
