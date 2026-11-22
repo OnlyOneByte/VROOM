@@ -1,0 +1,734 @@
+[
+ {
+  "view": "dashboard-novehicles",
+  "dark": false,
+  "width": 1280,
+  "titles": []
+ },
+ {
+  "view": "dashboard-empty",
+  "dark": false,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No expense data available",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "No data available",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "No recent activity",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "Nothing due soon",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "No recurring costs",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "insurance",
+  "dark": false,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "trips",
+  "dark": false,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No trips yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "reminders",
+  "dark": false,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No reminders yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "assistant",
+  "dark": false,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No assistant provider configured",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "analytics-fuel",
+  "dark": false,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No fuel data yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "analytics-fuel-older",
+  "dark": false,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No fill-ups in the last 12 months",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "vehicle-overview",
+  "dark": false,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "No expenses yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "vehicle-finance",
+  "dark": false,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No expenses yet",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No active financing",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "vehicle-odometer",
+  "dark": false,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No expenses yet",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No odometer readings yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "not-found",
+  "dark": false,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "This page doesn't exist",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "dashboard-novehicles",
+  "dark": false,
+  "width": 375,
+  "titles": []
+ },
+ {
+  "view": "dashboard-empty",
+  "dark": false,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No expense data available",
+    "lines": 2,
+    "align": "center"
+   },
+   {
+    "text": "No data available",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "No recent activity",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "Nothing due soon",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "No recurring costs",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "insurance",
+  "dark": false,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "trips",
+  "dark": false,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No trips yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "reminders",
+  "dark": false,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No reminders yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "assistant",
+  "dark": false,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No assistant provider configured",
+    "lines": 2,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "analytics-fuel",
+  "dark": false,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No fuel data yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "analytics-fuel-older",
+  "dark": false,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No fill-ups in the last 12 months",
+    "lines": 2,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "vehicle-overview",
+  "dark": false,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "No expenses yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "vehicle-finance",
+  "dark": false,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No expenses yet",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No active financing",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "vehicle-odometer",
+  "dark": false,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No expenses yet",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No odometer readings yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "not-found",
+  "dark": false,
+  "width": 375,
+  "titles": [
+   {
+    "text": "This page doesn't exist",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "dashboard-novehicles",
+  "dark": true,
+  "width": 1280,
+  "titles": []
+ },
+ {
+  "view": "dashboard-empty",
+  "dark": true,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No expense data available",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "No data available",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "No recent activity",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "Nothing due soon",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "No recurring costs",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "insurance",
+  "dark": true,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "trips",
+  "dark": true,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No trips yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "reminders",
+  "dark": true,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No reminders yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "assistant",
+  "dark": true,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No assistant provider configured",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "analytics-fuel",
+  "dark": true,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No fuel data yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "analytics-fuel-older",
+  "dark": true,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No fill-ups in the last 12 months",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "vehicle-overview",
+  "dark": true,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "No expenses yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "vehicle-finance",
+  "dark": true,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No expenses yet",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No active financing",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "vehicle-odometer",
+  "dark": true,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No expenses yet",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No odometer readings yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "not-found",
+  "dark": true,
+  "width": 1280,
+  "titles": [
+   {
+    "text": "This page doesn't exist",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "dashboard-novehicles",
+  "dark": true,
+  "width": 375,
+  "titles": []
+ },
+ {
+  "view": "dashboard-empty",
+  "dark": true,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No expense data available",
+    "lines": 2,
+    "align": "center"
+   },
+   {
+    "text": "No data available",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "No recent activity",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "Nothing due soon",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "No recurring costs",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "insurance",
+  "dark": true,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "trips",
+  "dark": true,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No trips yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "reminders",
+  "dark": true,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No reminders yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "assistant",
+  "dark": true,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No assistant provider configured",
+    "lines": 2,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "analytics-fuel",
+  "dark": true,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No fuel data yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "analytics-fuel-older",
+  "dark": true,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No fill-ups in the last 12 months",
+    "lines": 2,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "vehicle-overview",
+  "dark": true,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 1,
+    "align": "center"
+   },
+   {
+    "text": "No expenses yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "vehicle-finance",
+  "dark": true,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No expenses yet",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No active financing",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "vehicle-odometer",
+  "dark": true,
+  "width": 375,
+  "titles": [
+   {
+    "text": "No insurance policies",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No expenses yet",
+    "lines": 0,
+    "align": "center"
+   },
+   {
+    "text": "No odometer readings yet",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ },
+ {
+  "view": "not-found",
+  "dark": true,
+  "width": 375,
+  "titles": [
+   {
+    "text": "This page doesn't exist",
+    "lines": 1,
+    "align": "center"
+   }
+  ]
+ }
+]
