@@ -200,14 +200,14 @@ describe('switching vehicles keeps only the latest response', () => {
 		expenseApiMock.getExpensesByVehicle
 			.mockResolvedValueOnce({ data: [] })
 			.mockResolvedValueOnce({ data: [] })
-			.mockRejectedValueOnce(new Error('expenses down'))
-			.mockResolvedValueOnce({ data: [] });
+			.mockResolvedValueOnce({ data: [] })
+			.mockRejectedValueOnce(new Error('expenses down'));
 		const state = createState();
 		const p1 = loadVehicleContext(state);
 		const p2 = loadVehicleContext(state);
 		slowVehicle.resolve(makeVehicle('v1'));
 		await Promise.all([p1, p2]);
-		expect(state.vehicle?.id).toBe('v2');
+		expect(state.vehicle).toBeNull();
 		expect(state.vehicleError).toBe('Expenses down.');
 		expect(addNotification).toHaveBeenCalledTimes(1);
 	});

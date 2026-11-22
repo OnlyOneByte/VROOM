@@ -243,17 +243,14 @@ function queuedExpensesFor(state: ExpenseFormState): Expense[] {
 
 export async function loadVehicleContext(state: ExpenseFormState): Promise<void> {
 	const isCurrent = state.nextContextRequest();
-	const [vehicleFailure, lastFuelFailure, historyFailure] = await Promise.all([
+	const [vehicleFailure, , historyFailure] = await Promise.all([
 		loadVehicle(state),
 		loadLastFuelExpense(state),
 		loadAllVehicleExpenses(state)
 	]);
 	if (!isCurrent()) return;
-	const offline = !onlineStatus.current;
-	if (offline && historyFailure) state.vehicle = null;
-	const failure = offline
-		? (vehicleFailure ?? historyFailure)
-		: (vehicleFailure ?? lastFuelFailure ?? historyFailure);
+	if (historyFailure) state.vehicle = null;
+	const failure = vehicleFailure ?? historyFailure;
 	state.vehicleError = failure ? userFacingErrorMessage(failure) : null;
 	if (failure) handleErrorWithNotification(failure, "Couldn't load this vehicle's details");
 }
