@@ -1,0 +1,24 @@
+/analytics - 1280 CLS(no-input)=0.0243 entries=23
+  0.0006  DIV.flex-shrink-0 px-3 pb-3 "Settings  Sign out" dy=-42 dh=0 ; DIV.flex-shrink-0 px-3 pb-4 "Up to date Connection  Online" dy=-42 dh=42 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0.0186  DIV.flex flex-col gap-2 space-y-4 md:space-y-6 "Fuel & Stats Cross-Vehicle Per-Vehicle Year-End  F" dy=24 dh=298 ; DIV.flex-shrink-0 px-3 pb-3 "Settings  Sign out" dy=-40 dh=0 ; DIV.flex-shrink-0 px-3 pb-4 "Up to date Connection  Online     Last change Just" dy=-40 dh=40
+  0.0001  SPAN.text-xs font-medium "Up to date" dy=0 dh=0 ; SPAN.whitespace-nowrap "Sign out" dy=0 dh=0 ; SPAN.text-foreground "Just now" dy=0 dh=0
+  0.0004  DIV.flex-shrink-0 px-3 pb-4 "Up to date Connection  Online     Last change Just" dy=16 dh=-16 ; DIV.flex-shrink-0 px-3 pb-3 "Settings  Sign out" dy=16 dh=0
+  0.0005  DIV.flex-shrink-0 px-3 pb-4 "Up to date Connection  Online     Last change Just" dy=16 dh=-16 ; DIV.flex-shrink-0 px-3 pb-3 "Settings  Sign out" dy=16 dh=0
+  0  SPAN.focus-visible:border-ring focus-visible:ring-ring/50 aria-in "Online" dy=0 dh=0 ; SPAN.text-foreground "Just now" dy=0 dh=0
+  0  SPAN.focus-visible:border-ring focus-visible:ring-ring/50 aria-in "Online" dy=0 dh=0 ; SPAN.text-foreground "Just now" dy=0 dh=0
+  0  SPAN.focus-visible:border-ring focus-visible:ring-ring/50 aria-in "Online" dy=0 dh=0 ; SPAN.text-foreground "Just now" dy=0 dh=0
+  0  SPAN.focus-visible:border-ring focus-visible:ring-ring/50 aria-in "Online" dy=0 dh=0 ; SPAN.text-foreground "Just now" dy=0 dh=0
+  0  SPAN.focus-visible:border-ring focus-visible:ring-ring/50 aria-in "Online" dy=0 dh=0 ; SPAN.text-foreground "Just now" dy=0 dh=0
+  0  SPAN.focus-visible:border-ring focus-visible:ring-ring/50 aria-in "Online" dy=0 dh=0 ; SPAN.text-foreground "Just now" dy=0 dh=0
+  0  SPAN.focus-visible:border-ring focus-visible:ring-ring/50 aria-in "Online" dy=0 dh=0 ; SPAN.text-foreground "Just now" dy=0 dh=0
+  0.0038  DIV.flex-shrink-0 px-3 pb-3 "" dy=50 dh=0 ; DIV.flex-shrink-0 px-3 pb-4 "" dy=50 dh=-50 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0.0001  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0.0001  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0.0001  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
