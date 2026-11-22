@@ -16,6 +16,9 @@ import {
 	type SplitState
 } from './split-config';
 
+export const FUEL_NEEDS_VEHICLE_MESSAGE =
+	"Couldn't load this vehicle's details, so this fill-up can't be saved yet.";
+
 export interface ExpenseFormContext {
 	readonly expenseId: string | undefined;
 	readonly returnTo: string;
@@ -167,11 +170,11 @@ export class ExpenseFormState {
 
 		const ctx = this.validationContext();
 		for (const field of fields) {
+			if (fuelNeedsVehicle && (field === 'volume' || field === 'charge')) continue;
 			const error = validateExpenseField(field, ctx);
-			if (!error) continue;
-			const hidden = fuelNeedsVehicle && (field === 'volume' || field === 'charge');
-			this.errors[hidden ? 'vehicleDetails' : field] = error;
+			if (error) this.errors[field] = error;
 		}
+		if (fuelNeedsVehicle) this.errors['vehicleDetails'] = FUEL_NEEDS_VEHICLE_MESSAGE;
 
 		return Object.keys(this.errors).length === 0;
 	};

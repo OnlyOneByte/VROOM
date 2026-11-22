@@ -4,7 +4,7 @@ import {
 	UNQUEUED_AFTER_SESSION_END_MESSAGE,
 	UNQUEUED_SAVE_MESSAGE
 } from '../expense-submit-outcome';
-import { makeExpense, makeSplitGroup } from './expense-form-fixtures';
+import { makeExpense, makeSplitGroup, makeVehicle } from './expense-form-fixtures';
 
 const { expenseApiMock, addNotification, gotoDynamic, addOfflineExpense, online } = vi.hoisted(
 	() => ({
@@ -67,6 +67,32 @@ describe('submitExpense — validation', () => {
 		expect(Object.values(state.touched).every(Boolean)).toBe(true);
 		expect(expenseApiMock.createExpense).not.toHaveBeenCalled();
 		expect(state.isSubmitting).toBe(false);
+	});
+
+	function filledFillUp() {
+		const state = createState();
+		state.formData.category = 'fuel';
+		state.formData.volume = '10';
+		state.formData.mileage = '900';
+		return state;
+	}
+
+	test('a filled-in fill-up for a vehicle whose details failed to load makes no request', async () => {
+		const state = filledFillUp();
+		state.vehicleError = 'offline';
+		await submitExpense(state);
+		expect(state.errors['vehicleDetails']).toBeDefined();
+		expect(expenseApiMock.createExpense).not.toHaveBeenCalled();
+		expect(addOfflineExpense).not.toHaveBeenCalled();
+	});
+
+	test('once the vehicle loads, a reading below an earlier fill-up is rejected', async () => {
+		const state = filledFillUp();
+		state.vehicle = makeVehicle('v1');
+		state.allVehicleExpenses = [makeExpense('old', { date: '2025-03-01', mileage: 1000 })];
+		await submitExpense(state);
+		expect(state.errors['mileage']).toContain('greater than 1,000');
+		expect(expenseApiMock.createExpense).not.toHaveBeenCalled();
 	});
 });
 

@@ -22,10 +22,19 @@ describe('a Fuel expense whose vehicle failed to load', () => {
 		expect(state.errors['vehicleDetails']).toBeDefined();
 	});
 
-	test('still saves a stored fill-up being edited', () => {
+	test('blocks a fill-up whose volume was typed before switching to the unloaded vehicle', () => {
 		const state = fuelState();
 		state.formData.volume = '10';
-		expect(state.validateForm()).toBe(true);
+		expect(state.validateForm()).toBe(false);
+		expect(state.errors['vehicleDetails']).toBeDefined();
+	});
+
+	test('blocks a filled-in charging session too', () => {
+		const state = fuelState();
+		state.formData.fuelType = 'Electric';
+		state.formData.charge = '30';
+		expect(state.validateForm()).toBe(false);
+		expect(state.errors['vehicleDetails']).toBeDefined();
 	});
 
 	test('validates normally once the vehicle is loaded', () => {
