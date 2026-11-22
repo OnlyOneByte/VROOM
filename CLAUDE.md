@@ -20,7 +20,7 @@ Coding conventions live in `docs/conventions/*.md`. Read `MainSteering.md`, `Sve
 | Full gate | `bun run all:fix && bun run validate` | `npm run all:fix && npm run validate` |
 
 `validate` runs lint, format check, type-check and tests in both apps; the backend's also
-builds (the frontend's `validate:local` adds the build). Run it in every subfolder you modified
+builds. Run it in every subfolder you modified
 and fix everything it reports, including pre-existing findings. CI runs the same checks as
 separate job steps, skips only the frontend format check, and also builds the frontend and
 runs the Chromium e2e suite.

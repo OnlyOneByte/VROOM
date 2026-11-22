@@ -41,7 +41,8 @@ There is no demo login. Sign-in is OAuth only, so set up at least one provider i
   `GITHUB_CLIENT_SECRET`.
 - **Google:** create an OAuth client in the Google Cloud Console with the redirect URI
   `http://localhost:3001/api/v1/auth/callback/google`, then fill in `GOOGLE_CLIENT_ID` and
-  `GOOGLE_CLIENT_SECRET`. Production requires Google.
+  `GOOGLE_CLIENT_SECRET`. Production requires Google. To use Google Drive storage too, add
+  `http://localhost:3001/api/v1/auth/callback/provider/google` as a second redirect URI.
 
 A provider shows on the sign-in page once both its client ID and secret are set, so blank the
 Google placeholder values if you use GitHub only. The first sign-in creates your account.
@@ -60,11 +61,14 @@ cd frontend && npm run all:fix && npm run validate
 ```
 
 `all:fix` auto-fixes lint and formatting. `validate` runs the checks: the backend also builds,
-while the frontend runs lint, format check, type check, and tests (`npm run validate:local` adds
-the build). CI runs the same checks as separate steps and skips only the frontend format check.
-The backend's `bun run check` covers formatting too. On a Linux arm64 host where Biome's default
-binary won't start, use `bun run check:musl` and `bun run validate:local`, which run the musl
-build of Biome instead.
+while the frontend runs lint, format check, type check, and tests. The frontend's
+`npm run validate:local` runs the build instead of the format check. CI runs the same checks as
+separate steps and skips only the frontend format check. The backend's `bun run check` covers
+formatting too.
+
+On a Linux arm64 host where Biome's default binary won't start, the backend's `all:fix`,
+`check` and `validate` fail too. Use `bun run check:musl:fix` and `bun run validate:local`
+instead, which run the musl build of Biome.
 
 The frontend type check runs through `frontend/scripts/type-check.mjs`, a guarded wrapper around
 svelte-check. Exit code 2 means the guard failed, so the result cannot be trusted. It does not

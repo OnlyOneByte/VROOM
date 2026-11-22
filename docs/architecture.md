@@ -38,9 +38,8 @@ backend drivable in-process from tests via `app.request()`.
 ### Middleware order
 
 Composed in `src/app.ts`, in this order: error handler → body limit (10MB; 50MB for the
-backup restore upload) → secure headers
-(CSP, HSTS, `X-Frame-Options`) → optional auth (`/api/*` only) → rate limiter → CORS → CSRF
-→ request logging → activity tracking.
+backup restore upload) → secure headers (CSP, HSTS, `X-Frame-Options`) → optional auth
+(`/api/*` only) → rate limiter → CORS → CSRF → request logging → activity tracking.
 
 Optional auth runs *before* the rate limiter on purpose: it populates the user context, so
 authenticated callers are rate-limited per user instead of sharing an IP bucket.
