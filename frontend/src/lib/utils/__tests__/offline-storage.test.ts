@@ -1440,6 +1440,45 @@ describe('queue owner scoping', () => {
 		expect(row?.clientId).toBe('c1');
 	});
 
+	it('an edit saved without its photos keeps the stored photos untouched', async () => {
+		const { db, store, before } = parkedWithPhoto('user-19');
+
+		expect(await replaceParkedExpense('parked', requeueInput, null)).toBe('saved');
+
+		expect(db.photos.get('c1')).toEqual([before]);
+		const [row] = JSON.parse(store.get(scoped('user-19'))!) as OfflineExpense[];
+		expect(row?.clientId).toBe('c1');
+	});
+
+	it('a moved entry saved without its photos carries the stored photos to its new id', async () => {
+		const { db, store, before } = parkedWithPhoto('user-20', { vehicleId: 'v2' });
+
+		expect(await replaceParkedExpense('parked', requeueInput, null)).toBe('saved');
+
+		const [row] = JSON.parse(store.get(scoped('user-20'))!) as OfflineExpense[];
+		expect(row?.clientId).not.toBe('c1');
+		expect(db.photos.get(row!.clientId!)).toEqual([before]);
+		expect(db.photos.has('c1')).toBe(false);
+	});
+
+	it('a moved entry whose stored photos still cannot be read is refused, keeping them', async () => {
+		const { db, store, parked, before } = parkedWithPhoto('user-21', { vehicleId: 'v2' });
+		const transaction = db.database.transaction;
+		let first = true;
+		db.database.transaction = (...args: Parameters<typeof transaction>) => {
+			if (first) {
+				first = false;
+				throw new DOMException('broken', 'InvalidStateError');
+			}
+			return transaction(...args);
+		};
+
+		expect(await replaceParkedExpense('parked', requeueInput, null)).toBe('failed');
+
+		expect(db.photos.get('c1')).toEqual([before]);
+		expect(JSON.parse(store.get(scoped('user-21'))!)).toEqual([parked]);
+	});
+
 	it('an edit that moves the entry to another vehicle or day gets a fresh client id, and its photos move with it', async () => {
 		const db = fakePhotoDb();
 		vi.stubGlobal('indexedDB', db);

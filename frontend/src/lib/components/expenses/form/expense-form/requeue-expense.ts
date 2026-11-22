@@ -31,9 +31,11 @@ export async function saveQueuedExpense(state: ExpenseFormState): Promise<void> 
 			sourceType: state.sourceType,
 			sourceId: state.sourceId
 		});
-		const result = await replaceParkedExpense(queued.id, toOfflineExpense(expenseData), [
-			...state.pendingFiles
-		]);
+		const result = await replaceParkedExpense(
+			queued.id,
+			toOfflineExpense(expenseData),
+			state.queuedPhotosUnreadable ? null : [...state.pendingFiles]
+		);
 		if (result !== 'saved') {
 			state.submitError =
 				result === 'not-parked' ? REQUEUE_NOT_PARKED_MESSAGE : REQUEUE_FAILED_MESSAGE;

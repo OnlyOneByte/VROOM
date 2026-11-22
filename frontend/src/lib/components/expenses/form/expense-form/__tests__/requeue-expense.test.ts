@@ -143,6 +143,24 @@ describe('saveQueuedExpense', () => {
 		expect(state.isSubmitting).toBe(false);
 	});
 
+	test('when its photos could not be read, saving leaves the stored photos as they are', async () => {
+		storage.loadPendingPhotos.mockRejectedValueOnce(new Error('photo store unavailable'));
+		const state = newState();
+		await loadQueuedExpense(state, 'offline_1');
+		state.vehicle = makeVehicle('v1');
+		state.isLoading = false;
+		expect(state.queuedPhotosUnreadable).toBe(true);
+		state.formData.amount = '45.10';
+
+		await saveQueuedExpense(state);
+
+		expect(storage.replaceParkedExpense).toHaveBeenCalledWith(
+			'offline_1',
+			expect.objectContaining({ amount: 45.1 }),
+			null
+		);
+	});
+
 	test('offline, it says the entry will sync later', async () => {
 		online.current = false;
 		const state = await loadedState();
