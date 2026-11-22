@@ -3,7 +3,7 @@ import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { OdometerEntry, PaginatedResponse } from '#lib/types/index.ts';
 import type { odometerApi } from '#lib/services/odometer-api.ts';
-import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
+import { ApiError, UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 type UpdateOdometerRequest = Parameters<typeof odometerApi.update>[1];
 
@@ -30,7 +30,8 @@ const getEntries =
 const update = vi.fn<(entryId: string, data: UpdateOdometerRequest) => Promise<OdometerEntry>>();
 const deleteEntry = vi.fn<(entryId: string) => Promise<void>>();
 
-vi.mock('#lib/services/odometer-api.ts', () => ({
+vi.mock('#lib/services/odometer-api.ts', async importOriginal => ({
+	...(await importOriginal<typeof import('#lib/services/odometer-api.ts')>()),
 	odometerApi: {
 		getEntry: (entryId: string) => getEntry(entryId),
 		getEntries: (vehicleId: string, params: { limit: number; offset: number }) =>
@@ -41,6 +42,8 @@ vi.mock('#lib/services/odometer-api.ts', () => ({
 }));
 
 import Page from '../+page.svelte';
+
+const LATEST_NOTE = /^Your latest reading is [\d,]+\.$/;
 
 function entry(overrides: Partial<OdometerEntry> = {}): OdometerEntry {
 	return {
@@ -127,6 +130,7 @@ describe('edit odometer reading load states', () => {
 		expect(odometerInput().value).toBe('45000');
 		expect(dateInput().value).toBe('2026-03-15');
 		expect(noteInput().value).toBe('Oil change visit');
+		expect(odometerInput()).toHaveAttribute('inputmode', 'numeric');
 		expect(screen.getByText('16/500')).toBeInTheDocument();
 	});
 
@@ -167,15 +171,14 @@ describe('edit odometer reading load states', () => {
 	});
 });
 
-describe('edit odometer reading lower-than-latest warning', () => {
-	test('the warning is announced through a status region that is always present', async () => {
+describe('edit odometer reading latest-reading note', () => {
+	test('the note is announced through a status region that is always present', async () => {
 		getEntries.mockResolvedValue(latest([entry({ id: 'newest', odometer: 60000 })]));
 		mount();
 		await settle();
 
-		expect(screen.getByRole('status').querySelector('.sr-only')).toHaveTextContent(
-			'This reading is lower than the latest recorded value of 60,000. Are you sure?'
-		);
+		expect(screen.getByRole('status')).toHaveTextContent('Your latest reading is 60,000.');
+		expect(screen.getByRole('status')).not.toHaveTextContent('Are you sure');
 
 		await fireEvent.input(odometerInput(), { target: { value: '61000' } });
 		expect(screen.getByRole('status')).toBeEmptyDOMElement();
@@ -195,33 +198,43 @@ describe('edit odometer reading lower-than-latest warning', () => {
 		expect(screen.queryByText('Odometer reading is required')).toBeNull();
 	});
 
-	test('editing the latest entry itself never warns', async () => {
+	test('editing the latest entry itself never shows the note', async () => {
 		mount();
 		await settle();
 
 		await fireEvent.input(odometerInput(), { target: { value: '100' } });
 
-		expect(screen.queryByText(/reading \([\d,]+\) is lower than the latest recorded/)).toBeNull();
+		expect(screen.queryByText(LATEST_NOTE)).toBeNull();
 	});
 
-	test('warns when an older entry is edited below the newest reading', async () => {
+	test('no note when the entry is dated before the newest reading', async () => {
+		getEntries.mockResolvedValue(
+			latest([
+				entry({ id: 'newest', odometer: 60000, recordedAt: new Date(2026, 3, 1, 12).toISOString() })
+			])
+		);
+		mount();
+		await settle();
+
+		await fireEvent.input(odometerInput(), { target: { value: '44000' } });
+		expect(screen.queryByText(LATEST_NOTE)).toBeNull();
+
+		await fireEvent.input(dateInput(), { target: { value: '2026-04-02' } });
+		expect(screen.queryByText(LATEST_NOTE)).not.toBeNull();
+	});
+
+	test('shows the note when a same-day entry is edited at or below the newest reading', async () => {
 		getEntries.mockResolvedValue(latest([entry({ id: 'newest', odometer: 60000 })]));
 		mount();
 		await settle();
 
-		expect(
-			screen.queryByText(/reading \([\d,]+\) is lower than the latest recorded/)
-		).not.toBeNull();
+		expect(screen.queryByText(LATEST_NOTE)).not.toBeNull();
 
 		await fireEvent.input(odometerInput(), { target: { value: '61000' } });
-		expect(screen.queryByText(/reading \([\d,]+\) is lower than the latest recorded/)).toBeNull();
+		expect(screen.queryByText(LATEST_NOTE)).toBeNull();
 
 		await fireEvent.input(odometerInput(), { target: { value: '59000' } });
-		expect(
-			screen.getByText(/reading \([\d,]+\) is lower than the latest recorded/)
-		).toHaveTextContent(
-			'This reading (59,000) is lower than the latest recorded value (60,000). Are you sure?'
-		);
+		expect(screen.getByText(LATEST_NOTE)).toHaveTextContent('Your latest reading is 60,000.');
 	});
 });
 
@@ -252,16 +265,14 @@ describe('edit odometer reading validation', () => {
 		expect(update).not.toHaveBeenCalled();
 	});
 
-	test('a cleared reading does not warn that it is lower than the latest', async () => {
+	test('a cleared reading does not show the latest reading', async () => {
 		getEntries.mockResolvedValue(latest([entry({ id: 'newest', odometer: 60000 })]));
 		mount();
 		await settle();
 
-		expect(
-			screen.queryByText(/reading \([\d,]+\) is lower than the latest recorded/)
-		).not.toBeNull();
+		expect(screen.queryByText(LATEST_NOTE)).not.toBeNull();
 		await fireEvent.input(odometerInput(), { target: { value: '' } });
-		expect(screen.queryByText(/reading \([\d,]+\) is lower than the latest recorded/)).toBeNull();
+		expect(screen.queryByText(LATEST_NOTE)).toBeNull();
 	});
 
 	test('a negative reading is rejected and nothing is saved', async () => {
@@ -355,10 +366,44 @@ describe('edit odometer reading save', () => {
 
 		await save();
 
-		expect(
-			screen.getByText("Couldn't update the reading. Reading conflicts with a later trip.")
-		).toBeInTheDocument();
+		const error = screen.getByText(
+			"Couldn't update the reading. Reading conflicts with a later trip."
+		);
+		expect(error).toHaveAttribute('role', 'alert');
+		expect(document.activeElement).toBe(error);
 		expect(goto).not.toHaveBeenCalled();
+	});
+
+	test('an out-of-order refusal is shown on the odometer field and focuses it', async () => {
+		getEntries.mockResolvedValue(latest([entry({ id: 'newest', odometer: 60000 })]));
+		update.mockRejectedValue(
+			new ApiError('Mileage must be less than 50,000 (from later entry)', 400)
+		);
+		mount();
+		await settle();
+
+		await fireEvent.input(odometerInput(), { target: { value: '55000' } });
+		await save();
+
+		const input = odometerInput();
+		expect(input).toHaveAttribute('aria-invalid', 'true');
+		const error = document.getElementById(input.getAttribute('aria-describedby') as string);
+		expect(error).toHaveTextContent('Mileage must be less than 50,000 (from later entry).');
+		expect(error).toHaveAttribute('role', 'alert');
+		expect(document.activeElement).toBe(input);
+		expect(screen.queryByText(/Couldn't update the reading/)).toBeNull();
+		expect(screen.queryByText(LATEST_NOTE)).toBeNull();
+	});
+
+	test('a failed check moves focus to the first invalid field', async () => {
+		mount();
+		await settle();
+
+		await fireEvent.input(dateInput(), { target: { value: '' } });
+		await fireEvent.input(noteInput(), { target: { value: 'y'.repeat(501) } });
+		await save();
+
+		expect(document.activeElement).toBe(dateInput());
 	});
 
 	test('a non-Error save failure shows the generic message', async () => {

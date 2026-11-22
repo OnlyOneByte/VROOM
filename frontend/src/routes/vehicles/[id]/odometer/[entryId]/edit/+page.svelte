@@ -4,17 +4,17 @@
 	import { page } from '$app/state';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { z } from 'zod';
-	import { ArrowLeft, LoaderCircle, Trash2, TriangleAlert } from '@lucide/svelte';
+	import { ArrowLeft, Info, LoaderCircle, Trash2 } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import { Textarea } from '#lib/components/ui/textarea/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
-	import { odometerApi } from '#lib/services/odometer-api.ts';
+	import { isOdometerOrderError, odometerApi } from '#lib/services/odometer-api.ts';
 	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import type { PageData } from './$types';
@@ -38,14 +38,22 @@
 	let submitError = $state<string | null>(null);
 	let deleteDialogOpen = $state(false);
 	let deleteError = $state<string | null>(null);
-	let latestOdometer = $state<number | null>(null);
+	let latest = $state<{ odometer: number; date: string } | null>(null);
+	let formElement = $state<HTMLFormElement | null>(null);
 
-	let showWarning = $derived.by(() => {
-		if (latestOdometer === null) return false;
+	let showLatest = $derived.by(() => {
+		if (latest === null || fieldErrors.odometer) return false;
 		const val = enteredOdometer();
 		if (val === undefined || Number.isNaN(val)) return false;
-		return val < latestOdometer;
+		return val <= latest.odometer && date >= latest.date;
 	});
+
+	async function focusFirstProblem() {
+		await tick();
+		const target = formElement?.querySelector<HTMLElement>('[aria-invalid="true"], #submit-error');
+		target?.scrollIntoView({ block: 'center' });
+		target?.focus({ preventScroll: true });
+	}
 
 	function clearFieldError(field: 'odometer' | 'date' | 'note') {
 		if (fieldErrors[field]) fieldErrors = { ...fieldErrors, [field]: undefined };
@@ -80,9 +88,9 @@
 			date = toDateInputValue(entry.recordedAt);
 			note = entry.note ?? '';
 
-			const latest = latestResponse.data[0];
-			if (latest && latest.id !== entryId) {
-				latestOdometer = latest.odometer;
+			const newest = latestResponse.data[0];
+			if (newest && newest.id !== entryId) {
+				latest = { odometer: newest.odometer, date: toDateInputValue(newest.recordedAt) };
 			}
 		} catch (e) {
 			loadError = `Couldn't load the reading. ${userFacingErrorMessage(e)}`;
@@ -118,7 +126,10 @@
 
 	async function handleSubmit() {
 		submitError = null;
-		if (!validate()) return;
+		if (!validate()) {
+			await focusFirstProblem();
+			return;
+		}
 
 		isSubmitting = true;
 		try {
@@ -129,7 +140,9 @@
 			});
 			await gotoDynamic(returnTo);
 		} catch (e) {
-			submitError = `Couldn't update the reading. ${userFacingErrorMessage(e)}`;
+			if (isOdometerOrderError(e)) fieldErrors = { odometer: userFacingErrorMessage(e) };
+			else submitError = `Couldn't update the reading. ${userFacingErrorMessage(e)}`;
+			await focusFirstProblem();
 		} finally {
 			isSubmitting = false;
 		}
@@ -182,6 +195,7 @@
 		</div>
 	{:else}
 		<form
+			bind:this={formElement}
 			class="space-y-6 rounded-lg border bg-card p-6"
 			onsubmit={e => {
 				e.preventDefault();
@@ -193,6 +207,7 @@
 				<Input
 					id="odometer"
 					type="number"
+					inputmode="numeric"
 					placeholder="e.g. 45000"
 					bind:value={odometer}
 					class={fieldErrors.odometer ? 'border-destructive' : ''}
@@ -204,18 +219,11 @@
 					<FormFieldError id="odometer-error">{fieldErrors.odometer}</FormFieldError>
 				{/if}
 				<div role="status">
-					{#if showWarning}
-						<div class="flex items-center gap-2 rounded-md bg-warning/10 p-3 text-sm text-warning">
-							<TriangleAlert class="h-4 w-4 shrink-0" />
-							<span aria-hidden="true">
-								This reading ({Number(odometer).toLocaleString()}) is lower than the latest recorded
-								value ({latestOdometer?.toLocaleString()}). Are you sure?
-							</span>
-							<span class="sr-only">
-								This reading is lower than the latest recorded value of {latestOdometer?.toLocaleString()}.
-								Are you sure?
-							</span>
-						</div>
+					{#if showLatest}
+						<p class="flex items-center gap-2 text-sm text-muted-foreground">
+							<Info class="h-4 w-4 shrink-0" aria-hidden="true" />
+							Your latest reading is {latest?.odometer.toLocaleString()}.
+						</p>
 					{/if}
 				</div>
 			</div>
@@ -260,9 +268,9 @@
 			</div>
 
 			{#if submitError}
-				<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+				<FormFieldError id="submit-error" tabindex={-1} class="rounded-md bg-destructive/10 p-3">
 					{submitError}
-				</div>
+				</FormFieldError>
 			{/if}
 
 			<div class="flex gap-3">
