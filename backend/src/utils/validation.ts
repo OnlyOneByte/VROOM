@@ -14,6 +14,7 @@ import { createErrorResponse, NotFoundError, ValidationError } from '../errors';
 
 export const MAX_ODOMETER_READING = CONFIG.validation.vehicle.maxOdometerReading;
 export const ODOMETER_TOO_HIGH_MESSAGE = `Odometer must be ${MAX_ODOMETER_READING.toLocaleString('en-US')} or less`;
+export const VOLUME_TOO_HIGH_MESSAGE = `Volume must be ${CONFIG.validation.expense.maxVolume.toLocaleString('en-US')} or less`;
 
 function describeIssue(issue: ZodError['issues'][number]): string {
   const path = issue.path.join('.');

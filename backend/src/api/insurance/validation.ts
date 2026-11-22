@@ -1,9 +1,16 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { expenseDollarsToCents, moneyDollarsToCents } from '../../utils/money';
+import { boundedDollarsToCents, expenseDollarsToCents } from '../../utils/money';
 import { DUPLICATE_VEHICLE_MESSAGE, dateInput, hasUniqueVehicleIds } from '../../utils/validation';
 
 const ins = CONFIG.validation.insurance;
+
+const deductibleAmount = boundedDollarsToCents('Deductible', ins.maxDeductible, (n) =>
+  n.positive('Deductible must be positive')
+);
+const coverageLimit = boundedDollarsToCents('Coverage limit', ins.maxCoverageLimit, (n) =>
+  n.positive('Coverage limit must be positive')
+);
 
 const termVehicleCoverageSchema = z.object({
   vehicleIds: z
@@ -17,12 +24,8 @@ const baseTermFields = {
   endDate: dateInput,
   policyNumber: z.string().max(ins.policyNumberMaxLength).optional(),
   coverageDescription: z.string().max(ins.coverageDescriptionMaxLength).optional(),
-  deductibleAmount: moneyDollarsToCents((n) =>
-    n.positive('Deductible must be positive')
-  ).optional(),
-  coverageLimit: moneyDollarsToCents((n) =>
-    n.positive('Coverage limit must be positive')
-  ).optional(),
+  deductibleAmount: deductibleAmount.optional(),
+  coverageLimit: coverageLimit.optional(),
   agentName: z.string().max(ins.agentNameMaxLength).optional(),
   agentPhone: z.string().max(ins.agentPhoneMaxLength).optional(),
   agentEmail: z.string().email().max(ins.agentEmailMaxLength).optional(),
@@ -51,12 +54,8 @@ export const updateTermSchema = z
     endDate: dateInput.optional(),
     policyNumber: z.string().max(ins.policyNumberMaxLength).nullish(),
     coverageDescription: z.string().max(ins.coverageDescriptionMaxLength).nullish(),
-    deductibleAmount: moneyDollarsToCents((n) =>
-      n.positive('Deductible must be positive')
-    ).nullish(),
-    coverageLimit: moneyDollarsToCents((n) =>
-      n.positive('Coverage limit must be positive')
-    ).nullish(),
+    deductibleAmount: deductibleAmount.nullish(),
+    coverageLimit: coverageLimit.nullish(),
     agentName: z.string().max(ins.agentNameMaxLength).nullish(),
     agentPhone: z.string().max(ins.agentPhoneMaxLength).nullish(),
     agentEmail: z.string().email().max(ins.agentEmailMaxLength).nullish(),

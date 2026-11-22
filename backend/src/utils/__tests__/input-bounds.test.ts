@@ -172,6 +172,119 @@ describe('expense amounts', () => {
   });
 });
 
+describe('financing, vehicle, insurance and fill-up bounds', () => {
+  const financing = (extra: Record<string, unknown>) => ({
+    financingType: 'lease',
+    provider: 'TestBank',
+    originalAmount: 20000,
+    termMonths: 36,
+    startDate: '2024-01-01T00:00:00.000Z',
+    paymentAmount: 400,
+    ...extra,
+  });
+  const financingPath = () => `/api/v1/financing/vehicles/${vehicleId}/financing`;
+
+  test.each([
+    [{ originalAmount: 10_000_000, paymentAmount: 1_000_000 }, 201],
+    [{ residualValue: 10_000_000, excessMileageFee: 1000, mileageLimit: 10_000_000 }, 201],
+    [{ originalAmount: 10_000_000.01 }, 400],
+    [{ originalAmount: 5_000_000.123 }, 400],
+    [{ paymentAmount: 1_000_000.01 }, 400],
+    [{ paymentAmount: 400.555 }, 400],
+    [{ residualValue: 10_000_001 }, 400],
+    [{ excessMileageFee: 1000.01 }, 400],
+    [{ excessMileageFee: 0.255 }, 400],
+    [{ mileageLimit: 9e15 }, 400],
+  ])('financing %p gives %p', async (extra, expected) => {
+    expect(await status('POST', financingPath(), financing(extra))).toBe(expected);
+  });
+
+  test('the payment-amount update has the same bound and a readable message', async () => {
+    const res = await ctx.authed('POST', financingPath(), financing({}));
+    const created = await json<DataEnvelope<{ id: string }>>(res);
+    expect(res.status).toBe(201);
+    const path = `/api/v1/financing/${created.data.id}/payment-amount`;
+    const rejected = await ctx.authed('PATCH', path, { paymentAmount: 2_500_000.555 });
+    expect(rejected.status).toBe(400);
+    expect(JSON.stringify(await rejected.json())).toContain(
+      'Payment amount must be 1,000,000 or less'
+    );
+    expect(await status('PATCH', path, { paymentAmount: 1_000_000 })).toBe(200);
+  });
+
+  test.each([
+    [10_000_000, 200],
+    [10_000_000.01, 400],
+    [1e14, 400],
+    [25_000.005, 400],
+  ])('vehicle purchasePrice %p gives %p', async (purchasePrice, expected) => {
+    expect(await status('PUT', `/api/v1/vehicles/${vehicleId}`, { purchasePrice })).toBe(expected);
+  });
+
+  const policy = (extra: Record<string, unknown>) => ({
+    company: 'Acme Mutual',
+    terms: [
+      {
+        startDate: '2024-01-01T00:00:00.000Z',
+        endDate: '2025-01-01T00:00:00.000Z',
+        vehicleCoverage: { vehicleIds: [vehicleId] },
+        ...extra,
+      },
+    ],
+  });
+
+  test.each([
+    [{ deductibleAmount: 1_000_000, coverageLimit: 100_000_000 }, 201],
+    [{ deductibleAmount: 1_000_000.01 }, 400],
+    [{ deductibleAmount: 500.555 }, 400],
+    [{ coverageLimit: 100_000_000.01 }, 400],
+    [{ coverageLimit: 1e14 }, 400],
+  ])('insurance term %p gives %p', async (extra, expected) => {
+    expect(await status('POST', '/api/v1/insurance', policy(extra))).toBe(expected);
+  });
+
+  test('a term update and a claim payout are bounded too', async () => {
+    const res = await ctx.authed('POST', '/api/v1/insurance', policy({}));
+    const created = await json<DataEnvelope<{ id: string; terms: Array<{ id: string }> }>>(res);
+    expect(res.status, JSON.stringify(created)).toBe(201);
+    const policyId = created.data.id;
+    const termPath = `/api/v1/insurance/${policyId}/terms/${created.data.terms[0]?.id}`;
+    expect(await status('PUT', termPath, { coverageLimit: 100_000_001 })).toBe(400);
+    expect(await status('PUT', termPath, { deductibleAmount: 0.001 })).toBe(400);
+
+    const claimsPath = `/api/v1/insurance/${policyId}/claims`;
+    const claim = (payoutAmount: number) => ({
+      claimDate: '2024-06-01T00:00:00.000Z',
+      claimType: 'collision',
+      payoutAmount,
+    });
+    expect(await status('POST', claimsPath, claim(10_000_000))).toBe(201);
+    expect(await status('POST', claimsPath, claim(10_000_000.01))).toBe(400);
+    expect(await status('POST', claimsPath, claim(1500.555))).toBe(400);
+  });
+
+  test('fill-up volume is capped at 1,000 in the API and the CSV import', async () => {
+    const fillUp = (volume: number) =>
+      expenseBody({ category: 'fuel', mileage: 1000, volume, fuelType: 'regular' });
+    expect(await status('POST', '/api/v1/expenses', fillUp(1000))).toBe(201);
+    expect(await status('POST', '/api/v1/expenses', fillUp(1000.01))).toBe(400);
+
+    const csv = [
+      'date,vehicle,category,amount,mileage,volume',
+      '2024-06-01T00:00:00.000Z,2022 Toyota Camry,fuel,40,1200,1000',
+      '2024-06-02T00:00:00.000Z,2022 Toyota Camry,fuel,40,1300,1001',
+    ].join('\n');
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv, dryRun: true });
+    const body =
+      await json<DataEnvelope<{ rows: Array<{ status: string; message?: string }> }>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.rows.map((r) => [r.status, r.message])).toEqual([
+      ['ready', undefined],
+      ['error', 'Volume must be 1,000 or less'],
+    ]);
+  });
+});
+
 describe('odometer readings', () => {
   test('accept up to 10,000,000 and reject more', async () => {
     const path = `/api/v1/odometer/${vehicleId}`;
