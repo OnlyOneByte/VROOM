@@ -153,27 +153,48 @@ describe('an invite only reaches the account with exactly its email', () => {
     return result.userId;
   }
 
-  test('with two accounts that differ only by case, the exact one gets the invite', async () => {
+  test('a second account whose email differs only by case is refused and gets no invite', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    seedUser('u-other', 'Twin@Example.com');
     seedUser('u-exact', 'twin@example.com');
 
-    const { body } = await invite(vehicleId, 'TWIN@example.com');
+    const { resolveNewUser } = await import('../../auth/routes');
+    const result = await resolveNewUser('google', {
+      providerAccountId: 'g-twin',
+      email: 'Twin@Example.com',
+      displayName: 'Someone',
+    });
+    const { body } = await invite(vehicleId, 'twin@example.com');
 
+    expect(result).toEqual({ redirect: expect.stringContaining('auth_error=email_exists') });
+    expect(
+      ctx.sqlite.query("SELECT id FROM users WHERE lower(email) = 'twin@example.com'").all()
+    ).toEqual([{ id: 'u-exact' }]);
     expect(shareRow(body.data.id).shared_with_id).toBe('u-exact');
   });
 
-  test('an account that matches only by case never gets the invite, and the exact account does when it signs up', async () => {
+  test('an invite reaches only the account with the exact lowercased email', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    seedUser('u-variant', 'Later.Twin@Example.com');
-    const { body } = await invite(vehicleId, 'later.twin@example.com');
+    seedUser('u-exact', 'twin@example.com');
+    seedUser('u-near', 'twin.other@example.com');
+
+    const { body } = await invite(vehicleId, 'TWIN@example.com');
+
+    expect(shareRow(body.data.id)).toEqual({
+      shared_with_id: 'u-exact',
+      invited_email: 'twin@example.com',
+    });
+  });
+
+  test('a mixed-case signup is stored lowercased and still receives its invite', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const { body } = await invite(vehicleId, 'Later.Twin@Example.com');
     expect(shareRow(body.data.id).shared_with_id).toBeNull();
 
-    const { attachPendingInvitesOnSignIn } = await import('../../auth/routes');
-    await attachPendingInvitesOnSignIn('u-variant');
-    expect(shareRow(body.data.id).shared_with_id).toBeNull();
+    const userId = await signUp('LATER.twin@example.COM', 'g-later-twin');
 
-    const userId = await signUp('later.twin@example.com', 'g-later-twin');
+    expect(ctx.sqlite.query('SELECT email FROM users WHERE id = ?').get(userId)).toEqual({
+      email: 'later.twin@example.com',
+    });
     expect(shareRow(body.data.id).shared_with_id).toBe(userId);
   });
 
