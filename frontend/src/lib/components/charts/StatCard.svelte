@@ -80,7 +80,7 @@
 
 <Card class={className}>
 	<CardContent class="p-4 sm:p-6">
-		{#if isLoading}
+		{#if isLoading && !hasDual}
 			<div class="flex items-center gap-2">
 				{#if icon}
 					<Skeleton class="size-8 sm:size-11 rounded-xl shrink-0" />
@@ -92,29 +92,41 @@
 			<div class="@container">
 				<div class="flex flex-col @sm:flex-row @sm:items-start @sm:justify-between gap-3 @sm:gap-4">
 					<div class="flex-1 space-y-1 min-w-0">
-						<span class="block text-sm font-medium text-muted-foreground break-words">{label}</span>
-						<div class="flex items-baseline gap-1 flex-wrap">
-							<span class="text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
-								{value}
+						{#if isLoading}
+							<Skeleton class="h-5 w-24" />
+							<Skeleton class="h-7 @sm:h-8 w-20" />
+						{:else}
+							<span class="block text-sm font-medium text-muted-foreground break-words">
+								{label}
 							</span>
-							{#if unit}
-								<span class="text-xs text-muted-foreground">{unit}</span>
-							{/if}
-						</div>
+							<div class="flex items-baseline gap-1 flex-wrap">
+								<span class="text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
+									{value}
+								</span>
+								{#if unit}
+									<span class="text-xs text-muted-foreground">{unit}</span>
+								{/if}
+							</div>
+						{/if}
 					</div>
 					<div class="h-px w-full @sm:h-auto @sm:w-px bg-border @sm:self-stretch @sm:my-1"></div>
 					<div class="flex-1 space-y-1 min-w-0">
-						<span class="block text-sm font-medium text-muted-foreground break-words">
-							{secondaryLabel}
-						</span>
-						<div class="flex items-baseline gap-1 flex-wrap">
-							<span class="text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
-								{secondaryValue}
+						{#if isLoading}
+							<Skeleton class="h-5 w-24" />
+							<Skeleton class="h-7 @sm:h-8 w-20" />
+						{:else}
+							<span class="block text-sm font-medium text-muted-foreground break-words">
+								{secondaryLabel}
 							</span>
-							{#if secondaryUnit}
-								<span class="text-xs text-muted-foreground">{secondaryUnit}</span>
-							{/if}
-						</div>
+							<div class="flex items-baseline gap-1 flex-wrap">
+								<span class="text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
+									{secondaryValue}
+								</span>
+								{#if secondaryUnit}
+									<span class="text-xs text-muted-foreground">{secondaryUnit}</span>
+								{/if}
+							</div>
+						{/if}
 					</div>
 				</div>
 			</div>
