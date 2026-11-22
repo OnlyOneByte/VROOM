@@ -35,7 +35,7 @@ function ensureVapidConfigured(): void {
   vapidConfigured = true;
 }
 
-export const webPushSender: PushSender = {
+const webPushSender: PushSender = {
   async send(subscription, payload) {
     if (!isAllowedPushEndpoint(subscription.endpoint)) {
       logger.warn('Push send: refusing a non-allowlisted endpoint host (SSRF guard)', {

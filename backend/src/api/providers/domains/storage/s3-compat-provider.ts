@@ -19,12 +19,12 @@ import type {
   UploadParams,
 } from './storage-provider';
 
-export interface S3Credentials {
+interface S3Credentials {
   accessKeyId: string;
   secretAccessKey: string;
 }
 
-export interface S3Config {
+interface S3Config {
   endpoint: string;
   bucket: string;
   region: string;

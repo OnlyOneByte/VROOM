@@ -12,7 +12,7 @@ export interface ModelProviderSettings {
 
 type AdapterCtor<P> = new (settings: ModelProviderSettings) => P;
 
-export interface ModelAdapters<P> {
+interface ModelAdapters<P> {
   'openai-compatible': AdapterCtor<P>;
   anthropic: AdapterCtor<P>;
   gemini: AdapterCtor<P>;

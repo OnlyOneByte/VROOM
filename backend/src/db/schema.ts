@@ -574,7 +574,6 @@ export const pushSubscriptions = sqliteTable(
 );
 
 export type User = typeof users.$inferSelect;
-export type NewUser = typeof users.$inferInsert;
 
 export type Vehicle = typeof vehicles.$inferSelect;
 export type NewVehicle = typeof vehicles.$inferInsert;
@@ -587,16 +586,12 @@ export type VehicleFinancing = typeof vehicleFinancing.$inferSelect;
 export type NewVehicleFinancing = typeof vehicleFinancing.$inferInsert;
 
 export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
-export type NewInsurancePolicy = typeof insurancePolicies.$inferInsert;
 
 export type InsuranceTerm = typeof insuranceTerms.$inferSelect;
-export type NewInsuranceTerm = typeof insuranceTerms.$inferInsert;
 
 export type InsuranceTermVehicle = typeof insuranceTermVehicles.$inferSelect;
-export type NewInsuranceTermVehicle = typeof insuranceTermVehicles.$inferInsert;
 
 export type InsuranceClaim = typeof insuranceClaims.$inferSelect;
-export type NewInsuranceClaim = typeof insuranceClaims.$inferInsert;
 
 export type Expense = typeof expenses.$inferSelect;
 export type NewExpense = typeof expenses.$inferInsert;
@@ -605,13 +600,10 @@ export type UserPreferences = typeof userPreferences.$inferSelect;
 export type NewUserPreferences = typeof userPreferences.$inferInsert;
 
 export type SyncState = typeof syncState.$inferSelect;
-export type NewSyncState = typeof syncState.$inferInsert;
 
 export type UserProvider = typeof userProviders.$inferSelect;
-export type NewUserProvider = typeof userProviders.$inferInsert;
 
 export type Session = typeof sessions.$inferSelect;
-export type NewSession = typeof sessions.$inferInsert;
 
 export type OdometerEntry = typeof odometerEntries.$inferSelect;
 export type NewOdometerEntry = typeof odometerEntries.$inferInsert;

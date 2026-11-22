@@ -11,7 +11,7 @@ export function tripDistance(trip: Pick<Trip, 'startOdometer' | 'endOdometer'>):
   return Math.max(0, trip.endOdometer - trip.startOdometer);
 }
 
-export interface TripFilters {
+interface TripFilters {
   vehicleId?: string;
   purpose?: string;
 }

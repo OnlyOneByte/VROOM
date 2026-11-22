@@ -3,7 +3,7 @@ import type { ChatMessage, LlmProvider, ToolCall } from './llm-provider';
 import { ASSISTANT_TOOLS, toolDefinitions } from './tools';
 
 export const MAX_TOOL_CALLS = 5;
-export const MAX_TURNS = 4;
+const MAX_TURNS = 4;
 
 // Never build this allowlist from user input.
 const SYSTEM_PROMPT = [
@@ -14,7 +14,7 @@ const SYSTEM_PROMPT = [
   'the available tools, say so honestly rather than guessing. All amounts are in the user currency.',
 ].join(' ');
 
-export interface AssistantChatResult {
+interface AssistantChatResult {
   reply: string;
   toolsUsed: string[];
 }

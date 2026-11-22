@@ -296,7 +296,7 @@ export const SHEET_NAMES: string[] = [...Object.values(SHEET_TABS), SHEET_METADA
 // Keep titles space-free: ranges would otherwise need A1 quoting.
 export const SHEET_STAGING_SUFFIX = '__vroom_staging';
 
-export interface SpreadsheetInfo {
+interface SpreadsheetInfo {
   id: string;
   name: string;
   webViewLink: string;

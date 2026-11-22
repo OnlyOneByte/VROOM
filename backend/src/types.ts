@@ -49,11 +49,11 @@ export enum ChargeUnit {
   KWH = 'kwh',
 }
 
-export const isDistanceUnit = (value: string): value is DistanceUnit =>
+const isDistanceUnit = (value: string): value is DistanceUnit =>
   Object.values(DistanceUnit).includes(value as DistanceUnit);
-export const isVolumeUnit = (value: string): value is VolumeUnit =>
+const isVolumeUnit = (value: string): value is VolumeUnit =>
   Object.values(VolumeUnit).includes(value as VolumeUnit);
-export const isChargeUnit = (value: string): value is ChargeUnit =>
+const isChargeUnit = (value: string): value is ChargeUnit =>
   Object.values(ChargeUnit).includes(value as ChargeUnit);
 
 export interface UnitPreferences {

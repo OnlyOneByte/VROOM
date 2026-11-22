@@ -4,7 +4,7 @@ import { fetchOutbound } from '../../../../utils/outbound-url';
 
 export type ModelDomainLabel = 'LLM' | 'VLM';
 
-export interface ModelRequest {
+interface ModelRequest {
   domain: ModelDomainLabel;
   providerType: string;
   model: string;

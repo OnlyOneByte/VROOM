@@ -51,7 +51,7 @@ import { joinStoragePath } from '../../utils/paths';
 import { unitPreferencesSchema } from '../../utils/unit-preferences-schema';
 import { hasZipBackup } from './backup-strategy';
 
-export interface ValidationResult {
+interface ValidationResult {
   valid: boolean;
   errors: string[];
 }
@@ -107,8 +107,7 @@ export function isPreCentsBackup(version: string | undefined): boolean {
   return Number.isFinite(major) && major < 2;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Zod schema type is complex
-const TABLE_SCHEMAS: Record<string, z.ZodObject<any>> = {};
+const TABLE_SCHEMAS: Record<string, z.ZodObject> = {};
 for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
   TABLE_SCHEMAS[key] = createInsertSchema(table);
 }
@@ -130,9 +129,7 @@ export function coerceRow(
   const REAL_TYPES = new Set(['SQLiteReal', 'PgDoublePrecision', 'PgNumeric', 'PgReal']);
   const TEXT_TYPES = new Set(['SQLiteText', 'PgText', 'PgVarchar']);
 
-  for (const [columnName, column] of Object.entries(columns)) {
-    // biome-ignore lint/suspicious/noExplicitAny: Drizzle column type is not fully exposed
-    const col = column as any;
+  for (const [columnName, col] of Object.entries(columns)) {
     const val = coerced[columnName];
 
     const hasStaticDefault = col.notNull && col.hasDefault && col.default !== undefined;
@@ -205,7 +202,7 @@ export function resolveBackupFolderPath(
   return joinStoragePath(providerRootPath, settings.folderPath);
 }
 
-export class BackupService {
+class BackupService {
   async loadBackupConfig(userId: string): Promise<BackupConfig> {
     const { preferencesRepository } = await import('../settings/repository');
     const prefs = await preferencesRepository.getOrCreate(userId);
@@ -568,8 +565,7 @@ export class BackupService {
       const coercedRows = table
         ? rawRows.map((row) => coerceRow(row, table, { shimMoneyToCents }))
         : rawRows;
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic key assignment
-      parsedData[key as keyof ParsedBackupData] = coercedRows as any;
+      parsedData[key as Exclude<keyof ParsedBackupData, 'metadata'>] = coercedRows;
     }
 
     if (shimMoneyToCents) {
@@ -639,8 +635,7 @@ export class BackupService {
 
   private validateArray(
     records: Record<string, unknown>[],
-    // biome-ignore lint/suspicious/noExplicitAny: Zod schema type
-    schema: z.ZodObject<any>,
+    schema: z.ZodObject,
     tableName: string
   ): string[] {
     const errors: string[] = [];

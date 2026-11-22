@@ -213,7 +213,7 @@ export function effectiveMonthlyPremium(term: {
   return term.totalCost / termBillingMonths(term.startDate, term.endDate);
 }
 
-export interface AmortizationLoan {
+interface AmortizationLoan {
   balance: number;
   apr: number;
   paymentAmount: number;
@@ -260,7 +260,7 @@ export function groupByVehicle<T extends { vehicleId: string }>(rows: T[]): Map<
   return byVehicle;
 }
 
-export function forEachVehiclePair<T extends { vehicleId: string }>(
+function forEachVehiclePair<T extends { vehicleId: string }>(
   rows: T[],
   callback: (current: T, previous: T) => void
 ): void {

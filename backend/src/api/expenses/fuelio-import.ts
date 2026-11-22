@@ -14,12 +14,12 @@ import {
 
 export class FuelioParseError extends Error {}
 
-export interface FuelioParseResult {
+interface FuelioParseResult {
   csv: string;
   unmappedCategories: string[];
 }
 
-export interface FuelioParseOptions {
+interface FuelioParseOptions {
   targetVehicle: string;
   targetUnits: TargetUnits;
   includeCosts?: boolean;

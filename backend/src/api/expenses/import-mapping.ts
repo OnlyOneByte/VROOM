@@ -59,7 +59,7 @@ export interface TargetUnits {
   volumeUnit?: VolumeUnit;
 }
 
-export interface ApplyMappingResult {
+interface ApplyMappingResult {
   csv: string;
   unmappedCategories: string[];
   rowErrors: Map<number, string>;
@@ -82,7 +82,7 @@ const NATIVE_HEADER: NativeField[] = [
   'missedFillup',
 ];
 
-export type DecimalSeparator = '.' | ',';
+type DecimalSeparator = '.' | ',';
 
 type NumberShape =
   | { kind: 'plain' }
