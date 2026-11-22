@@ -66,4 +66,36 @@ describe('SyncStatusInline expanded — Retry connection', () => {
 
 		await waitFor(() => expect(authStore.sessionUnverified).toBe(false));
 	});
+
+	it('keeps focus on Retry connection while it checks, and ignores a second press', async () => {
+		localStorage.setItem('vroom_last_user', JSON.stringify(alice));
+		mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+		await authStore.initialize();
+		render(SyncStatusInline, { props: { isExpanded: true } });
+
+		let answer: (response: Response) => void = () => {};
+		mockFetch.mockReset();
+		mockFetch.mockImplementation(() => new Promise<Response>(resolve => (answer = resolve)));
+		const retry = screen.getByRole('button', { name: 'Retry connection' });
+		retry.focus();
+		await fireEvent.click(retry);
+
+		await waitFor(() => expect(retry).toHaveAttribute('aria-disabled', 'true'));
+		expect(retry).toHaveTextContent('Checking...');
+		expect(retry).toBeEnabled();
+		expect(retry).toHaveFocus();
+		await fireEvent.click(retry);
+		expect(mockFetch).toHaveBeenCalledTimes(1);
+
+		answer(
+			new Response(
+				JSON.stringify({
+					success: true,
+					data: { user: alice, session: { id: 's', expiresAt: '2099' } }
+				}),
+				{ status: 200, headers: { 'content-type': 'application/json' } }
+			)
+		);
+		await waitFor(() => expect(authStore.sessionUnverified).toBe(false));
+	});
 });
