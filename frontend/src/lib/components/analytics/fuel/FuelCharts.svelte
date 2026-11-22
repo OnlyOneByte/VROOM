@@ -18,7 +18,8 @@
 		formatDecimalAxis,
 		formatCentsAxis,
 		formatDateTick,
-		getXTickCount
+		getXTickCount,
+		monthlyXAxisProps
 	} from '#lib/utils/chart-formatters.ts';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import type { FuelAdvancedResponse, UnitsMetadata } from '#lib/types/index.ts';
@@ -204,6 +205,7 @@
 			series={consumptionSeries}
 			config={consumptionConfig}
 			yAxisFormat={formatDecimalAxis}
+			xAxisProps={monthlyXAxisProps(consumptionData.length, 6)}
 		/>
 
 		<AppLineChart
@@ -241,6 +243,7 @@
 			y={costVehicleNames}
 			series={fillupCostSeries}
 			config={fillupCostConfig}
+			xAxisProps={monthlyXAxisProps(fillupCostData.length, 6)}
 		/>
 	{/if}
 
@@ -253,6 +256,7 @@
 		series={costPerMileSeries}
 		config={costPerMileConfig}
 		yAxisFormat={formatCentsAxis}
+		xAxisProps={monthlyXAxisProps(costPerMileData.length, 6)}
 	/>
 
 	<AppAreaChart
@@ -264,6 +268,7 @@
 		series={odometerSeries}
 		config={odometerConfig}
 		yAxisFormat={v => v.toLocaleString()}
+		xAxisProps={monthlyXAxisProps(odometerData.length, 6)}
 	/>
 
 	{#if showGasCharts}
