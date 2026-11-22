@@ -153,4 +153,46 @@ describe('/expenses paging', () => {
 		await waitFor(() => expect(screen.queryByTestId('expenses-page-error')).toBeNull());
 		expect(shownIds()).toEqual(['e20']);
 	});
+
+	function failSecondPageOnce() {
+		getAllExpenses.mockImplementation((params: { offset: number }) => {
+			const attempts = getAllExpenses.mock.calls.filter(c => offsetOf(c) === 20).length;
+			if (params.offset === 20 && attempts === 1) return Promise.reject(new Error('Network down'));
+			return Promise.resolve(pageAt(params.offset));
+		});
+	}
+
+	test('a successful Retry moves focus from the Retry to the expenses heading', async () => {
+		failSecondPageOnce();
+		render(Page);
+		await waitFor(() => expect(shownIds()).toEqual(['e0']));
+
+		goToPage(20);
+		await screen.findByTestId('expenses-page-error');
+		const retry = screen.getByRole('button', { name: 'Retry' });
+		retry.focus();
+		await fireEvent.click(retry);
+
+		await waitFor(() => expect(screen.queryByTestId('expenses-page-error')).toBeNull());
+		await waitFor(() => expect(screen.getByText('Expenses (100)')).toHaveFocus());
+	});
+
+	test('a successful Retry leaves focus alone when the user moved it during the load', async () => {
+		failSecondPageOnce();
+		render(Page);
+		await waitFor(() => expect(shownIds()).toEqual(['e0']));
+
+		goToPage(20);
+		await screen.findByTestId('expenses-page-error');
+		const retry = screen.getByRole('button', { name: 'Retry' });
+		retry.focus();
+		const search = screen.getByRole('textbox', { name: 'Search expenses and vehicles' });
+		const click = fireEvent.click(retry);
+		search.focus();
+		await click;
+
+		await waitFor(() => expect(screen.queryByTestId('expenses-page-error')).toBeNull());
+		await new Promise(resolve => setTimeout(resolve, 0));
+		expect(search).toHaveFocus();
+	});
 });

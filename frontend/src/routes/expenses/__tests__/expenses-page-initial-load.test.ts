@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Expense, UserSettings, Vehicle } from '#lib/types/index.ts';
 import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
@@ -227,5 +227,46 @@ describe('/expenses initial load', () => {
 
 		expect(input).toHaveAccessibleName('Search expenses and vehicles');
 		expect(input.getAttribute('aria-label')).not.toBe(input.getAttribute('placeholder'));
+	});
+
+	test('the first-load Retry keeps focus while it loads and after a repeat failure', async () => {
+		let failRetry: (reason: unknown) => void = () => {};
+		getAllExpenses
+			.mockImplementationOnce(() => Promise.reject(new ApiError('down', 503)))
+			.mockImplementationOnce(() => new Promise((_resolve, reject) => (failRetry = reject)));
+		render(Page);
+
+		const retry = await screen.findByRole('button', { name: 'Retry' });
+		const firstAlert = within(screen.getByTestId('expenses-load-error')).getByRole('alert');
+		const firstReason = firstAlert.querySelector('p.text-sm');
+		retry.focus();
+		await fireEvent.click(retry);
+
+		const retrying = await screen.findByRole('button', { name: 'Retrying…' });
+		expect(retrying).toBe(retry);
+		expect(retrying).toHaveAttribute('aria-disabled', 'true');
+		expect(retrying).toHaveFocus();
+		await fireEvent.click(retrying);
+		expect(getAllExpenses).toHaveBeenCalledTimes(2);
+
+		failRetry(new ApiError('down', 503));
+
+		await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).toBe(retry));
+		expect(retry).toHaveFocus();
+		const alert = within(screen.getByTestId('expenses-load-error')).getByRole('alert');
+		expect(alert).toHaveTextContent("Couldn't load expenses");
+		expect(alert.querySelector('p.text-sm')).not.toBe(firstReason);
+	});
+
+	test('a successful first-load Retry moves focus from the Retry to the expenses heading', async () => {
+		getAllExpenses.mockImplementationOnce(() => Promise.reject(new ApiError('down', 503)));
+		render(Page);
+
+		const retry = await screen.findByRole('button', { name: 'Retry' });
+		retry.focus();
+		await fireEvent.click(retry);
+
+		await waitFor(() => expect(screen.queryByTestId('expenses-load-error')).toBeNull());
+		await waitFor(() => expect(screen.getByText('Expenses (1)')).toHaveFocus());
 	});
 });
