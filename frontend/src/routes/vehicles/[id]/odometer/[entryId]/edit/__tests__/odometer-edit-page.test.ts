@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
-import type { OdometerEntry, PaginatedResponse } from '#lib/types/index.ts';
+import type { OdometerEntry, PaginatedResponse, Photo } from '#lib/types/index.ts';
 import type { odometerApi } from '#lib/services/odometer-api.ts';
 import { ApiError, UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
@@ -41,6 +41,21 @@ vi.mock('#lib/services/odometer-api.ts', async importOriginal => ({
 	}
 }));
 
+const photoMocks = vi.hoisted(() => ({
+	getPhotos: vi.fn<(entityType: string, entityId: string) => Promise<PaginatedResponse<Photo>>>(),
+	deletePhoto: vi.fn<(entityType: string, entityId: string, photoId: string) => Promise<void>>()
+}));
+
+vi.mock('#lib/services/expense-api.ts', () => ({
+	expenseApi: {
+		getPhotos: photoMocks.getPhotos,
+		deletePhoto: photoMocks.deletePhoto,
+		uploadPhoto: vi.fn(),
+		getPhotoThumbnailUrl: (entityType: string, entityId: string, photoId: string) =>
+			`/thumbs/${entityType}/${entityId}/${photoId}`
+	}
+}));
+
 import Page from '../+page.svelte';
 
 const LATEST_NOTE = /^Your latest reading is [\d,]+\.$/;
@@ -56,6 +71,24 @@ function entry(overrides: Partial<OdometerEntry> = {}): OdometerEntry {
 		updatedAt: '2026-03-15T12:00:00.000Z',
 		...overrides
 	};
+}
+
+function photo(id: string): Photo {
+	return {
+		id,
+		entityType: 'odometer_entry',
+		entityId: 'o1',
+		fileName: `${id}.jpg`,
+		mimeType: 'image/jpeg',
+		fileSize: 1024,
+		isCover: false,
+		sortOrder: 0,
+		createdAt: '2026-03-15T12:00:00.000Z'
+	};
+}
+
+function photoPage(data: Photo[]): PaginatedResponse<Photo> {
+	return { data, pagination: { totalCount: data.length, limit: 50, offset: 0, hasMore: false } };
 }
 
 function latest(entries: OdometerEntry[]): PaginatedResponse<OdometerEntry> {
@@ -105,6 +138,8 @@ beforeEach(() => {
 	getEntries.mockResolvedValue(latest([entry()]));
 	update.mockResolvedValue(entry());
 	deleteEntry.mockResolvedValue();
+	photoMocks.getPhotos.mockResolvedValue(photoPage([]));
+	photoMocks.deletePhoto.mockResolvedValue();
 });
 
 afterEach(() => {
@@ -518,5 +553,44 @@ describe('edit odometer reading delete', () => {
 		await save();
 
 		expect(hasPendingSave()).toBe(true);
+	});
+});
+
+describe('edit odometer reading photos', () => {
+	test("shows the reading's photos", async () => {
+		photoMocks.getPhotos.mockResolvedValue(photoPage([photo('p1'), photo('p2')]));
+		mount();
+		await settle();
+
+		expect(photoMocks.getPhotos).toHaveBeenCalledWith('odometer_entry', 'o1');
+		expect(screen.getByAltText('p1.jpg')).toHaveAttribute('src', '/thumbs/odometer_entry/o1/p1');
+		expect(screen.getByAltText('p2.jpg')).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Upload' })).toBeInTheDocument();
+	});
+
+	test('a reading without photos shows the empty state', async () => {
+		mount();
+		await settle();
+
+		expect(screen.getByText('No photos or receipts yet.')).toBeInTheDocument();
+	});
+
+	test('a confirmed photo delete removes only that photo and keeps the reading', async () => {
+		photoMocks.getPhotos.mockResolvedValue(photoPage([photo('p1'), photo('p2')]));
+		mount();
+		await settle();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Delete p2.jpg' }));
+		await settle();
+		const confirm = screen.getByRole('alertdialog');
+		expect(within(confirm).getByText('Delete photo?')).toBeInTheDocument();
+		await fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
+		await settle();
+
+		expect(photoMocks.deletePhoto).toHaveBeenCalledWith('odometer_entry', 'o1', 'p2');
+		expect(screen.queryByAltText('p2.jpg')).toBeNull();
+		expect(screen.getByAltText('p1.jpg')).toBeInTheDocument();
+		expect(deleteEntry).not.toHaveBeenCalled();
+		expect(update).not.toHaveBeenCalled();
 	});
 });
