@@ -387,7 +387,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
     const b = adv.vehicleRadar.find((r) => r.vehicleId === VEH_B.id);
 
     expect(b?.fuelEfficiency).toBe(100);
-    expect(a?.fuelEfficiency).toBe(0);
+    expect(a?.fuelEfficiency).toBe(10);
     expect(a?.fuelEfficiency).not.toBe(100);
   });
 

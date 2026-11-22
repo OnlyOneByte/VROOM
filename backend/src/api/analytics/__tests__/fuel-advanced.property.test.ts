@@ -93,7 +93,7 @@ function seedMixedExpenses(vehicleList: TestVehicle[], perVehicle: number): void
 }
 
 function assertScoreBounded(value: number): void {
-  expect(value).toBeGreaterThanOrEqual(0);
+  expect(value).toBeGreaterThanOrEqual(10);
   expect(value).toBeLessThanOrEqual(100);
 }
 

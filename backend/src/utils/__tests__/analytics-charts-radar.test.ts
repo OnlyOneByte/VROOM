@@ -54,9 +54,9 @@ describe('buildVehicleRadar fuel efficiency', () => {
     expect(score('ev')).toBeNull();
   });
 
-  test('vehicles with data are scored only against each other', () => {
+  test('vehicles with data are scored only against each other, and the worst still draws a bar', () => {
     expect(score('gas-a')).toBe(100);
-    expect(score('gas-b')).toBe(0);
+    expect(score('gas-b')).toBe(10);
   });
 
   test('a single vehicle with data gets the midpoint', () => {

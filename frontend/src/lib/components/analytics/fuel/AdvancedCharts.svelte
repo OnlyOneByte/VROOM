@@ -62,7 +62,7 @@
 	let radarConfig = $derived(buildChartConfig(radarVehicleSeries));
 
 	let radarDescription = $derived.by(() => {
-		const base = 'Normalized 0–100 scores by metric (higher is better).';
+		const base = 'Scores from 10 (worst in your fleet) to 100 (best), by metric.';
 		const missing = fuelAdvanced.vehicleRadar.filter(v => v.fuelEfficiency === null);
 		if (missing.length === 0) return base;
 		if (missing.length === fuelAdvanced.vehicleRadar.length) {
