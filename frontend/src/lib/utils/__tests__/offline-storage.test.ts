@@ -1483,10 +1483,17 @@ describe('queue owner scoping', () => {
 
 	it('a queue write that fails for a moved entry drops the copied photos and keeps the originals', async () => {
 		const { db, store, parked, before } = parkedWithPhoto('user-22', { vehicleId: 'v2' });
-		failQueueWrites('user-22');
+		let photosAtQueueWrite = new Map<string, File[]>();
+		localStorageMock.setItem.mockImplementation((key: string) => {
+			if (key !== scoped('user-22')) return;
+			photosAtQueueWrite = new Map(db.photos);
+			throw new DOMException('quota', 'QuotaExceededError');
+		});
 
 		expect(await replaceParkedExpense('parked', requeueInput, null)).toBe('failed');
 
+		const copies = [...photosAtQueueWrite].filter(([key]) => key !== 'c1');
+		expect(copies).toEqual([[expect.any(String), [before]]]);
 		expect([...db.photos.keys()]).toEqual(['c1']);
 		expect(db.photos.get('c1')).toEqual([before]);
 		expect(JSON.parse(store.get(scoped('user-22'))!)).toEqual([parked]);
