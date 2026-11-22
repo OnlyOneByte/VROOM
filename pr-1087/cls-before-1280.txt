@@ -1,0 +1,23 @@
+/vehicles/h8yvqjun8ctt6g6s92gazqn9 - 1280 CLS(no-input)=0.1411 entries=22
+  0.0006  DIV.flex-shrink-0 px-3 pb-3 "Settings  Sign out" dy=-42 dh=0 ; DIV.flex-shrink-0 px-3 pb-4 "Up to date Connection  Online" dy=-42 dh=42 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0.0006  DIV.flex-shrink-0 px-3 pb-3 "Settings  Sign out" dy=-40 dh=0 ; DIV.flex-shrink-0 px-3 pb-4 "Up to date Connection  Online     Last change 4m a" dy=-40 dh=40
+  0.0013  DIV.flex-shrink-0 px-3 pb-4 "Up to date Connection  Online     Last change 4m a" dy=32 dh=-32 ; DIV.flex-shrink-0 px-3 pb-3 "Settings  Sign out" dy=32 dh=0
+  0  SPAN.focus-visible:border-ring focus-visible:ring-ring/50 aria-in "Online" dy=0 dh=0 ; SPAN.text-foreground "4m ago" dy=0 dh=0
+  0  SPAN.focus-visible:border-ring focus-visible:ring-ring/50 aria-in "Online" dy=0 dh=0 ; SPAN.text-foreground "4m ago" dy=0 dh=0
+  0  SPAN.focus-visible:border-ring focus-visible:ring-ring/50 aria-in "Online" dy=0 dh=0 ; SPAN.text-foreground "4m ago" dy=0 dh=0
+  0  SPAN.focus-visible:border-ring focus-visible:ring-ring/50 aria-in "Online" dy=0 dh=0 ; SPAN.text-foreground "4m ago" dy=0 dh=0
+  0  SPAN.focus-visible:border-ring focus-visible:ring-ring/50 aria-in "Online" dy=0 dh=0 ; SPAN.text-foreground "4m ago" dy=0 dh=0
+  0  SPAN.focus-visible:border-ring focus-visible:ring-ring/50 aria-in "Online" dy=0 dh=0 ; SPAN.text-foreground "4m ago" dy=0 dh=0
+  0  SPAN.focus-visible:border-ring focus-visible:ring-ring/50 aria-in "Online" dy=0 dh=0 ; SPAN.text-foreground "4m ago" dy=0 dh=0
+  0.1345  DIV.grid grid-cols-2 lg:grid-cols-3 gap-4  "Total Expenses $13,060.88 all time  Last 30 Days $" dy=-582 dh=-216 ; DIV.flex justify-end "All Time" dy=-524 dh=-42
+  0.0038  DIV.flex-shrink-0 px-3 pb-3 "" dy=50 dh=0 ; DIV.flex-shrink-0 px-3 pb-4 "" dy=50 dh=-50 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0.0001  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0.0001  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0.0001  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
+  0  svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0 ; svg.[object SVGAnimatedString] "" dy=0 dh=0
