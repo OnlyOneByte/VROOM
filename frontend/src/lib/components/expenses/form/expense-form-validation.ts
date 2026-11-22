@@ -9,6 +9,10 @@ function hasAtMostTwoDecimals(amount: number): boolean {
 	return Math.abs(amount * 100 - Math.round(amount * 100)) < CENT_TOLERANCE;
 }
 
+export function hasMileageEntry(value: unknown): boolean {
+	return value != null && value !== '';
+}
+
 interface ValidationContext {
 	category: string;
 	vehicle: Vehicle | null;
@@ -87,10 +91,10 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 }
 
 function validateMileage(value: string, ctx: ValidationContext): string | null {
-	if (!value && ctx.category !== 'fuel') return null;
+	if (!hasMileageEntry(value) && ctx.category !== 'fuel') return null;
 
 	const mileage = parseInt(value);
-	if (!value || mileage <= 0) {
+	if (!hasMileageEntry(value) || mileage <= 0) {
 		return ctx.category === 'fuel'
 			? 'Mileage required for fuel expenses'
 			: 'Mileage must be greater than 0';

@@ -39,7 +39,7 @@
 			id="mileage"
 			type="number"
 			min="0"
-			bind:value={() => value, v => (value = v == null ? '' : String(v))}
+			bind:value
 			placeholder="123456"
 			class="pl-10"
 			oninput={onInput}

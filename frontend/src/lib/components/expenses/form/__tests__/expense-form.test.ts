@@ -280,6 +280,26 @@ describe('ExpenseForm create mode', () => {
 		expect(createExpense).not.toHaveBeenCalled();
 	});
 
+	test('the mileage field keeps what the user types instead of rewriting it', async () => {
+		await renderCreate({ preselectedCategory: 'misc' });
+		const input = field('mileage');
+		const native = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+		const writes: string[] = [];
+		Object.defineProperty(input, 'value', {
+			configurable: true,
+			get: () => native?.get?.call(input),
+			set: (v: string) => {
+				writes.push(v);
+				native?.set?.call(input, v);
+			}
+		});
+
+		await type('mileage', '007');
+
+		expect(writes).toEqual([]);
+		expect(input.value).toBe('007');
+	});
+
 	test('a split across vehicles asks for no mileage, since a split saves none', async () => {
 		await renderCreate({ preselectedCategory: 'maintenance' });
 		expect(document.getElementById('mileage')).not.toBeNull();
