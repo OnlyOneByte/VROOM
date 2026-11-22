@@ -127,6 +127,11 @@ jobs:
         # /api/v1 call is mocked in-browser.
         run: npm run test:e2e:chromium
 
+      - name: Run preview-only E2E tests (service worker, manifest, offline reload)
+        env:
+          E2E_TARGET: preview
+        run: npx playwright test --project=chromium --grep "PWA surface|Opening the app offline"
+
       - name: Upload Playwright report
         # The axe scans attach their full violation JSON to the report; without this the
         # report dies with the runner and a red a11y gate says only "expected [] to equal".
