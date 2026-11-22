@@ -95,7 +95,7 @@ describe('the sync status indicator lives in the navigation, never floating over
 
 		mockFetch.mockReset();
 		mockFetch.mockResolvedValue(me());
-		await waitFor(() => expect(sidebarRetry).toBeEnabled());
+		await waitFor(() => expect(sidebarRetry).not.toHaveAttribute('aria-disabled', 'true'));
 		await fireEvent.click(sidebarRetry!);
 
 		await waitFor(() => expect(authStore.sessionUnverified).toBe(false));
