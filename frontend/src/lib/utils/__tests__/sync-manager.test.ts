@@ -400,6 +400,7 @@ describe('Sync Manager', () => {
 			const body = JSON.parse((mockFetch.mock.calls[0]![1] as { body: string }).body);
 			expect(body.expenseAmount).toBe(50);
 			expect(body.forceOverwrite).toBeUndefined();
+			expect(body.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
 		});
 
 		it('keep_local: a FAILED overwrite returns false (the edit survives to retry, not silently lost)', async () => {

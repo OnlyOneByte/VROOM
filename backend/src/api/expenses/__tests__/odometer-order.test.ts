@@ -165,6 +165,26 @@ describe('the odometer reading must fit between the entries around its date', ()
     ).toContain('Unknown time zone');
   });
 
+  test('the time zone is not an edited field, so locked insurance and split entries still take a description', async () => {
+    const id = await created('2024-03-10', 10_000);
+    const editDescription = (description: string) =>
+      ctx.authed('PUT', `/api/v1/expenses/${id}`, { description, timeZone: 'Pacific/Auckland' });
+
+    ctx.sqlite
+      .query(
+        "UPDATE expenses SET source_type = 'insurance_term', source_id = 'term-1' WHERE id = ?"
+      )
+      .run(id);
+    expect((await editDescription('Premium')).status).toBe(200);
+
+    ctx.sqlite
+      .query(
+        "UPDATE expenses SET source_type = NULL, source_id = NULL, group_id = 'g-1' WHERE id = ?"
+      )
+      .run(id);
+    expect((await editDescription('Shared')).status).toBe(200);
+  });
+
   test('two conflicting saves sent at once cannot both be stored', async () => {
     const statuses = await Promise.all([
       fillUp('2024-03-01', 10_000).then((r) => r.status),
