@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, untrack } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
 	import {
@@ -121,6 +121,9 @@
 	});
 
 	let offlineLoad = $state(false);
+	let isRetryingLoad = $state(false);
+	let loadFailures = $state(0);
+	let expensesHeading = $state<HTMLElement | null>(null);
 
 	onMount(loadInitial);
 
@@ -129,8 +132,7 @@
 	});
 
 	async function loadInitial() {
-		isLoading = true;
-		loadError = null;
+		isLoading = loadError === null;
 		offlineLoad = false;
 		try {
 			const [, loadedVehicles] = await Promise.all([
@@ -139,11 +141,14 @@
 				fetchPageAndSummary(0, { throwOnFailure: true })
 			]);
 			vehicles = loadedVehicles;
+			loadError = null;
 		} catch (error) {
 			if (onlineStatus.current) {
 				loadError = userFacingErrorMessage(error);
+				loadFailures += 1;
 				handleErrorWithNotification(error, "Couldn't load expenses");
 			} else {
+				loadError = null;
 				offlineLoad = true;
 			}
 		} finally {
@@ -233,9 +238,33 @@
 		}
 	}
 
-	function retryPage() {
+	function focusLeftOn(origin: Element | null): boolean {
+		const active = document.activeElement;
+		return active === origin || active === null || active === document.body;
+	}
+
+	async function focusExpensesAfter(origin: Element | null) {
+		await tick();
+		if (focusLeftOn(origin)) expensesHeading?.focus();
+	}
+
+	async function retryLoad() {
+		if (isRetryingLoad) return;
+		const origin = document.activeElement;
+		isRetryingLoad = true;
+		try {
+			await loadInitial();
+		} finally {
+			isRetryingLoad = false;
+		}
+		if (!loadError && !offlineLoad) await focusExpensesAfter(origin);
+	}
+
+	async function retryPage() {
 		if (isLoadingPage) return;
-		fetchPageAndSummary(pageError?.offset ?? currentOffset);
+		const origin = document.activeElement;
+		await fetchPageAndSummary(pageError?.offset ?? currentOffset);
+		if (!pageError) await focusExpensesAfter(origin);
 	}
 
 	function handleFilterChange() {
@@ -362,13 +391,24 @@
 			title="All Expenses"
 			description="Track and categorize expenses across all vehicles"
 		/>
-		<div class="rounded-lg border bg-card p-6">
-			<div class="mb-4 flex items-center gap-3 text-destructive">
-				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Couldn't load expenses</p>
+		<div class="rounded-lg border bg-card p-6" data-testid="expenses-load-error">
+			<div role="alert">
+				{#key loadFailures}
+					<div class="mb-4 flex items-center gap-3 text-destructive">
+						<CircleAlert class="h-5 w-5" />
+						<p class="font-medium">Couldn't load expenses</p>
+					</div>
+					<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
+				{/key}
 			</div>
-			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
-			<Button size="lg" onclick={loadInitial}>Retry</Button>
+			<Button size="lg" onclick={retryLoad} aria-disabled={isRetryingLoad}>
+				{#if isRetryingLoad}
+					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+					Retrying…
+				{:else}
+					Retry
+				{/if}
+			</Button>
 		</div>
 	</div>
 {:else if offlineLoad}
@@ -516,7 +556,9 @@
 			<CardNs.Header>
 				<div class="flex items-center justify-between">
 					<div>
-						<CardNs.Title>Expenses ({totalCount})</CardNs.Title>
+						<CardNs.Title bind:ref={expensesHeading} tabindex={-1}>
+							Expenses ({totalCount})
+						</CardNs.Title>
 						<CardNs.Description>All recorded expenses</CardNs.Description>
 					</div>
 					<div class="p-2 rounded-lg bg-primary/10">
