@@ -135,7 +135,19 @@ describe('MigrateFromTrackerCard card states', () => {
 		await settle();
 
 		expect(getVehicles).toHaveBeenCalledTimes(2);
-		expect(screen.getByTestId('migrate-open')).toBeInTheDocument();
+		expect(screen.getByTestId('migrate-open')).toHaveFocus();
+	});
+
+	test('a failed Retry announces the error and keeps focus on the new Retry', async () => {
+		getVehicles.mockRejectedValue(new ApiError('boom', 500));
+		await mount();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await settle();
+
+		expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus();
+		expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load your vehicles.");
+		expect(getVehicles).toHaveBeenCalledTimes(2);
 	});
 
 	test('a non-Error rejection falls back to a generic load message', async () => {

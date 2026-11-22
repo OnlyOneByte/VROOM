@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { DatabaseZap, Upload, LoaderCircle, CircleCheck, CircleAlert } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
@@ -26,6 +26,7 @@
 	let vehicles = $state<Vehicle[]>([]);
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
+	let content = $state<HTMLElement | null>(null);
 
 	let dialogOpen = $state(false);
 	let targetVehicleId = $state('');
@@ -54,6 +55,12 @@
 	}
 
 	onMount(loadVehicles);
+
+	async function retryVehicles() {
+		await loadVehicles();
+		await tick();
+		content?.querySelector('button')?.focus();
+	}
 
 	function buildMapping(): ImportColumnMapping | null {
 		if (!targetVehicle) return null;
@@ -142,15 +149,16 @@
 			re-running it won't create duplicates.
 		</CardDescription>
 	</CardHeader>
-	<CardContent>
+	<CardContent bind:ref={content}>
 		{#if isLoading}
 			<div class="flex items-center justify-center py-6" data-testid="migrate-loading">
 				<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
 			</div>
 		{:else if loadError}
 			<div class="space-y-3" data-testid="migrate-error">
-				<p class="text-sm text-destructive">{loadError}</p>
-				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={loadVehicles}>Retry</Button
+				<p class="text-sm text-destructive" role="alert">{loadError}</p>
+				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={retryVehicles}
+					>Retry</Button
 				>
 			</div>
 		{:else if vehicles.length === 0}

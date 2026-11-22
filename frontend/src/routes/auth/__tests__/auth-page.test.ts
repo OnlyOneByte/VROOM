@@ -43,4 +43,17 @@ describe('sign-in page', () => {
 		await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus());
 		expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load the sign-in options");
 	});
+
+	test('a Retry that finds no enabled providers announces that sign-in is unavailable', async () => {
+		authApi.getProviders
+			.mockRejectedValueOnce(new ApiError('Network error', 0))
+			.mockResolvedValueOnce([]);
+		render(AuthPage);
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+		expect(await screen.findByRole('status')).toHaveTextContent(
+			'Sign-in is currently unavailable. No providers are enabled.'
+		);
+	});
 });

@@ -128,6 +128,19 @@ describe('PushNotificationsCard status', () => {
 		await settle();
 		expect(statusText()).toBe(OFF);
 		expect(getVapidPublicKey).toHaveBeenCalledTimes(2);
+		expect(screen.getByTestId('push-toggle')).toHaveFocus();
+	});
+
+	test('a failed Retry announces the error and keeps focus on the new Retry', async () => {
+		getVapidPublicKey.mockRejectedValue(new NetworkError(new TypeError('Failed to fetch')));
+		await mount();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await settle();
+
+		expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus();
+		expect(screen.getByRole('alert')).toHaveTextContent("Couldn't check notification status.");
+		expect(getVapidPublicKey).toHaveBeenCalledTimes(2);
 	});
 
 	test('a non-Error failure falls back to a generic message', async () => {
