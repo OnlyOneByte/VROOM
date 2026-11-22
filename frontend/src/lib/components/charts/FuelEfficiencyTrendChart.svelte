@@ -76,27 +76,29 @@
 	height={CHART_HEIGHT}
 	animationClass="chart-line-animated"
 >
-	<Chart.Container config={chartConfig} class="h-[{CHART_HEIGHT}px] w-full">
-		<LineChart
-			{data}
-			x="date"
-			xScale={scaleTime()}
-			y="efficiency"
-			{series}
-			points={data.length === 1}
-			padding={CHART_PADDING}
-			xPadding={TIME_X_PADDING}
-			props={{
-				...getTrendLineProps(data.length),
-				xAxis: { ...xAxisProps, ticks: insetTimeTicks(xAxisProps.ticks) },
-				yAxis: {
-					format: formatDecimalAxis
-				}
-			}}
-		>
-			{#snippet tooltip()}
-				<Chart.Tooltip labelFormatter={formatDayLabel} valueFormatter={tooltipFormat} />
-			{/snippet}
-		</LineChart>
-	</Chart.Container>
+	<div style="height: {CHART_HEIGHT}px">
+		<Chart.Container config={chartConfig} class="h-full w-full">
+			<LineChart
+				{data}
+				x="date"
+				xScale={scaleTime()}
+				y="efficiency"
+				{series}
+				points={data.length === 1}
+				padding={CHART_PADDING}
+				xPadding={TIME_X_PADDING}
+				props={{
+					...getTrendLineProps(data.length),
+					xAxis: { ...xAxisProps, ticks: insetTimeTicks(xAxisProps.ticks) },
+					yAxis: {
+						format: formatDecimalAxis
+					}
+				}}
+			>
+				{#snippet tooltip()}
+					<Chart.Tooltip labelFormatter={formatDayLabel} valueFormatter={tooltipFormat} />
+				{/snippet}
+			</LineChart>
+		</Chart.Container>
+	</div>
 </ChartCard>

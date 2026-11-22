@@ -86,36 +86,38 @@
 	animationClass="chart-line-animated"
 	class={className}
 >
-	<Chart.Container {config} class="h-full w-full">
-		<AreaChart
-			{data}
-			{x}
-			{y}
-			{series}
-			{seriesLayout}
-			padding={CHART_PADDING}
-			xPadding={TIME_X_PADDING}
-			props={{
-				area: { curve: SMOOTH_CURVE, opacity: 0.3 },
-				xAxis: { ...resolvedXAxisProps, ticks: insetTimeTicks(resolvedXAxisProps['ticks']) },
-				yAxis: { format: yAxisFormat }
-			}}
-		>
-			{#snippet points()}
-				{#each isolatedValues as isolated (isolated.key)}
-					<Points
-						seriesKey={isolated.key}
-						data={isolated.rows}
-						stroke="var(--color-surface-100, light-dark(white, black))"
-						{...SINGLE_POINT_PROPS}
-					/>
-				{/each}
-			{/snippet}
-			{#snippet tooltip()}
-				<Chart.Tooltip labelFormatter={tooltipLabelFormat} valueFormatter={tooltipFormat} />
-			{/snippet}
-		</AreaChart>
-	</Chart.Container>
+	<div style="height: {height}px">
+		<Chart.Container {config} class="h-full w-full">
+			<AreaChart
+				{data}
+				{x}
+				{y}
+				{series}
+				{seriesLayout}
+				padding={CHART_PADDING}
+				xPadding={TIME_X_PADDING}
+				props={{
+					area: { curve: SMOOTH_CURVE, opacity: 0.3 },
+					xAxis: { ...resolvedXAxisProps, ticks: insetTimeTicks(resolvedXAxisProps['ticks']) },
+					yAxis: { format: yAxisFormat }
+				}}
+			>
+				{#snippet points()}
+					{#each isolatedValues as isolated (isolated.key)}
+						<Points
+							seriesKey={isolated.key}
+							data={isolated.rows}
+							stroke="var(--color-surface-100, light-dark(white, black))"
+							{...SINGLE_POINT_PROPS}
+						/>
+					{/each}
+				{/snippet}
+				{#snippet tooltip()}
+					<Chart.Tooltip labelFormatter={tooltipLabelFormat} valueFormatter={tooltipFormat} />
+				{/snippet}
+			</AreaChart>
+		</Chart.Container>
+	</div>
 	{#if series.length > 1}
 		<ChartLegend items={series} class="mt-3 justify-center" />
 	{/if}
