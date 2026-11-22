@@ -58,17 +58,21 @@
 						class="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
 					>
 						<div class="flex-1 min-w-0">
-							<div class="flex items-center gap-2 mb-1">
+							<div
+								class="mb-1 flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2"
+							>
 								<!-- Tinted label text fails WCAG AA; only the icon chip takes the category colour. -->
 								<span
-									class="flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium {getCategoryBadgeClasses(
+									class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium {getCategoryBadgeClasses(
 										expense.category
 									)}"
 								>
 									<CategoryIcon class="h-3 w-3" />
 									<span class="text-foreground">{categoryLabels[expense.category]}</span>
 								</span>
-								<span class="text-sm font-medium truncate">{expense.vehicleName}</span>
+								<span class="min-w-0 max-w-full truncate text-sm font-medium">
+									{expense.vehicleName}
+								</span>
 							</div>
 							{#if expense.description}
 								<p class="text-sm text-muted-foreground truncate">{expense.description}</p>
