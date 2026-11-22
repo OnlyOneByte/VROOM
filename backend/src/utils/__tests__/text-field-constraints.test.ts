@@ -35,7 +35,7 @@ describe('vehicle text fields', () => {
   });
 });
 
-describe('financing type and payment frequency', () => {
+describe('financing type, payment frequency and loan terms', () => {
   const financing = (extra: Record<string, unknown>) => ({
     financingType: 'loan',
     provider: 'TestBank',
@@ -51,6 +51,12 @@ describe('financing type and payment frequency', () => {
     [{ financingType: 'lease', paymentFrequency: 'bi-weekly' }, 201],
     [{ financingType: 'gift' }, 400],
     [{ paymentFrequency: 'hourly' }, 400],
+    [{ apr: 0 }, 201],
+    [{ apr: 50 }, 201],
+    [{ apr: 50.01 }, 400],
+    [{ apr: -1 }, 400],
+    [{ termMonths: 0 }, 400],
+    [{ originalAmount: 0 }, 400],
   ])('%p gives %p', async (extra, expected) => {
     const vehicleId = await seedVehicle(ctx);
     const path = `/api/v1/financing/vehicles/${vehicleId}/financing`;

@@ -176,14 +176,22 @@ describe('date fields reject values that would be saved as 1970', () => {
       [`/api/v1/expenses/${expenseId}`, 'date'],
       [`/api/v1/odometer/${readingId}`, 'recordedAt'],
       [`/api/v1/insurance/${policy.data.id}/terms/${termId}`, 'startDate'],
+      [`/api/v1/insurance/${policy.data.id}/terms/${termId}`, 'endDate'],
       [`/api/v1/insurance/${policy.data.id}/claims/${claimId}`, 'claimDate'],
     ];
-    for (const date of [null, true, 0]) {
+    for (const date of [null, true, 0, '2101-01-01']) {
       for (const [path, field] of paths) {
         const res = await ctx.authed('PUT', path, { [field]: date });
         expect(res.status, `${path} ${field}=${date}: ${await res.text()}`).toBe(400);
       }
     }
+    const termPath = `/api/v1/insurance/${policy.data.id}/terms/${termId}`;
+    const moved = await ctx.authed('PUT', termPath, { endDate: '2025-06-30T00:00:00.000Z' });
+    const movedBody = await json<DataEnvelope<{ terms: { id: string; endDate: string }[] }>>(moved);
+    expect(moved.status, JSON.stringify(movedBody)).toBe(200);
+    expect(movedBody.data.terms.find((t) => t.id === termId)?.endDate).toBe(
+      '2025-06-30T00:00:00.000Z'
+    );
     for (const date of [true, 0]) {
       const res = await ctx.authed('PUT', `/api/v1/vehicles/${vehicleId}`, { purchaseDate: date });
       expect(res.status, `purchaseDate=${date}: ${await res.text()}`).toBe(400);
