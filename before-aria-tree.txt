@@ -1,0 +1,15 @@
+- checkbox [checked]
+- text: Disable All
+- checkbox [checked]
+- text: Vehicle Photos VROOM/vroom/photos/
+- textbox "/folder": Vehicle
+- checkbox [checked]
+- text: Expense Receipts VROOM/vroom/photos/
+- textbox "/folder": Receipts
+- checkbox [checked]
+- text: Insurance Docs VROOM/vroom/photos/
+- textbox "/folder": Insurance
+- checkbox [checked]
+- text: Odometer Readings VROOM/vroom/photos/
+- textbox "/folder": Odometer
+- paragraph: Subfolder paths are relative to the root path above.
