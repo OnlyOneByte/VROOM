@@ -10,6 +10,7 @@
 		formatMonthLabel,
 		type TooltipValueFormat,
 		CHART_PADDING,
+		TIME_X_PADDING,
 		getTrendLineProps,
 		monthlyXAxisProps,
 		SINGLE_POINT_PROPS,
@@ -91,6 +92,7 @@
 			{y}
 			{series}
 			padding={CHART_PADDING}
+			xPadding={TIME_X_PADDING}
 			props={{
 				...getTrendLineProps(data.length),
 				...lineProps,

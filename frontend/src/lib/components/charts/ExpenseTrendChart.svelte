@@ -8,6 +8,7 @@
 		formatCurrencyTooltip,
 		formatMonthLabel,
 		CHART_PADDING,
+		TIME_X_PADDING,
 		getTrendLineProps,
 		monthlyXAxisProps
 	} from '#lib/utils/chart-formatters.ts';
@@ -66,6 +67,7 @@
 			{series}
 			points={data.length === 1}
 			padding={CHART_PADDING}
+			xPadding={TIME_X_PADDING}
 			props={{
 				...getTrendLineProps(data.length),
 				xAxis: monthlyXAxisProps(data.length),
