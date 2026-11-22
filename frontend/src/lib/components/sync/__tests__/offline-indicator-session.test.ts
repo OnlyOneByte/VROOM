@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { authStore } from '#lib/stores/auth.svelte.ts';
 import { onlineStatus } from '#lib/stores/offline.svelte.ts';
@@ -44,6 +44,12 @@ async function startWithUnreachableServer(): Promise<void> {
 }
 
 describe('OfflineIndicator — unverified session', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
+		document.querySelectorAll('main').forEach(main => main.remove());
+	});
+
 	beforeEach(() => {
 		vi.clearAllMocks();
 		authStore.clearUser();
@@ -138,7 +144,60 @@ describe('OfflineIndicator — unverified session', () => {
 		await vi.waitFor(() => expect(heading).toHaveFocus());
 		expect(heading).toHaveAttribute('tabindex', '-1');
 		expect(screen.getByText('Connected to VROOM again')).toHaveAttribute('role', 'status');
-		main.remove();
+	});
+
+	it('focuses the heading without scrolling and clears the announcement after 5s', async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		onlineStatus.current = true;
+		serverStaysDown();
+		await startWithUnreachableServer();
+		const main = document.createElement('main');
+		main.innerHTML = '<h1>Dashboard</h1>';
+		document.body.appendChild(main);
+		render(OfflineIndicator);
+
+		const retry = await screen.findByRole('button', { name: 'Retry' });
+		await vi.waitFor(() => expect(retry).not.toHaveAttribute('aria-disabled', 'true'));
+		mockFetch.mockReset();
+		mockFetch.mockResolvedValue(me());
+		const heading = main.querySelector('h1')!;
+		const focus = vi.spyOn(heading, 'focus');
+		retry.focus();
+		await fireEvent.click(retry);
+
+		await vi.waitFor(() => expect(heading).toHaveFocus());
+		expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+		const status = screen.getByRole('status');
+		expect(status).toHaveTextContent('Connected to VROOM again');
+		await vi.advanceTimersByTimeAsync(5000);
+		expect(status).toHaveTextContent('');
+	});
+
+	it('a recheck that signs the user out moves no focus and announces nothing', async () => {
+		onlineStatus.current = true;
+		serverStaysDown();
+		await startWithUnreachableServer();
+		const main = document.createElement('main');
+		main.innerHTML = '<h1>Dashboard</h1>';
+		document.body.appendChild(main);
+		render(OfflineIndicator);
+
+		const retry = await screen.findByRole('button', { name: 'Retry' });
+		await vi.waitFor(() => expect(retry).not.toHaveAttribute('aria-disabled', 'true'));
+		mockFetch.mockReset();
+		mockFetch.mockResolvedValue(
+			new Response(JSON.stringify({ success: false, error: { message: 'Unauthorized' } }), {
+				status: 401,
+				headers: { 'content-type': 'application/json' }
+			})
+		);
+		retry.focus();
+		await fireEvent.click(retry);
+
+		await vi.waitFor(() => expect(authStore.isAuthenticated).toBe(false));
+		await new Promise(resolve => setTimeout(resolve, 0));
+		expect(main.querySelector('h1')).not.toHaveFocus();
+		expect(screen.queryByText('Connected to VROOM again')).toBeNull();
 	});
 
 	it('a successful Retry leaves focus alone when the user moved it during the check', async () => {
@@ -164,6 +223,5 @@ describe('OfflineIndicator — unverified session', () => {
 		await vi.waitFor(() => expect(authStore.sessionUnverified).toBe(false));
 		await new Promise(resolve => setTimeout(resolve, 0));
 		expect(elsewhere).toHaveFocus();
-		main.remove();
 	});
 });

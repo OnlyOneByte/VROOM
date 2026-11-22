@@ -556,7 +556,11 @@
 			<CardNs.Header>
 				<div class="flex items-center justify-between">
 					<div>
-						<CardNs.Title bind:ref={expensesHeading} tabindex={-1}>
+						<CardNs.Title
+							bind:ref={expensesHeading}
+							tabindex={-1}
+							class="w-fit rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+						>
 							Expenses ({totalCount})
 						</CardNs.Title>
 						<CardNs.Description>All recorded expenses</CardNs.Description>

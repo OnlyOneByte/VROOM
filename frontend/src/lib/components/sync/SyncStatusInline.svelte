@@ -56,7 +56,6 @@
 	});
 
 	let statusPanel = $state<HTMLElement | null>(null);
-	let reconnected = $state(false);
 
 	function focusLeftOn(origin: Element | null): boolean {
 		const active = document.activeElement;
@@ -66,12 +65,10 @@
 	async function retrySession() {
 		if (authStore.recheckingSession) return;
 		const origin = document.activeElement;
-		reconnected = false;
 		await authStore.recheckSession();
 		if (authStore.sessionUnverified || !authStore.isAuthenticated) return;
-		reconnected = true;
 		await tick();
-		if (focusLeftOn(origin)) statusPanel?.focus();
+		if (focusLeftOn(origin)) statusPanel?.focus({ preventScroll: true });
 	}
 
 	let isRetryingParked = $state(false);
@@ -141,15 +138,15 @@
 	tabindex="-1"
 	role="group"
 	aria-label="Sync status"
-	class="border-t border-border pt-3 space-y-2"
+	class="border-t border-border pt-3 space-y-2 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50"
 >
-	<span class="sr-only" role="status">{reconnected ? 'Connected to VROOM again' : ''}</span>
+	<span class="sr-only" role="status">{statusInfo.text}</span>
 	{#if isExpanded}
 		<div class="px-3 space-y-2">
 			<div class="flex items-center justify-between">
 				{#snippet statusHeader()}
 					{@const StatusIcon = statusInfo.icon}
-					<div class="flex items-center gap-2 {statusInfo.color}" role="status">
+					<div class="flex items-center gap-2 {statusInfo.color}" aria-hidden="true">
 						<StatusIcon class="h-4 w-4 {syncState.current === 'syncing' ? 'animate-spin' : ''}" />
 						<span class="text-xs font-medium">{statusInfo.text}</span>
 					</div>
@@ -244,12 +241,7 @@
 		{#snippet collapsedIcon()}
 			{@const StatusIcon = statusInfo.icon}
 			<div class="flex justify-center px-3">
-				<div
-					class="{statusInfo.color} relative"
-					title={statusInfo.text}
-					role="status"
-					aria-label="Sync status: {statusInfo.text}"
-				>
+				<div class="{statusInfo.color} relative" title={statusInfo.text} aria-hidden="true">
 					<StatusIcon class="h-5 w-5 {syncState.current === 'syncing' ? 'animate-spin' : ''}" />
 					{#if pendingCount > 0}
 						<Badge

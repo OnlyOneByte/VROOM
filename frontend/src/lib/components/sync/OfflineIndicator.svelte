@@ -18,6 +18,11 @@
 	});
 
 	let reconnected = $state(false);
+	$effect(() => {
+		if (!reconnected) return;
+		const clear = setTimeout(() => (reconnected = false), 5000);
+		return () => clearTimeout(clear);
+	});
 
 	function focusLeftOn(origin: Element | null): boolean {
 		const active = document.activeElement;
@@ -28,7 +33,7 @@
 		const heading = document.querySelector<HTMLElement>('main h1');
 		if (!heading) return;
 		if (!heading.hasAttribute('tabindex')) heading.tabIndex = -1;
-		heading.focus();
+		heading.focus({ preventScroll: true });
 	}
 
 	async function retrySession() {
@@ -37,9 +42,9 @@
 		reconnected = false;
 		await authStore.recheckSession();
 		if (authStore.sessionUnverified || !authStore.isAuthenticated) return;
-		reconnected = true;
 		await tick();
 		if (focusLeftOn(origin)) focusMainHeading();
+		reconnected = true;
 	}
 
 	async function handleSync() {

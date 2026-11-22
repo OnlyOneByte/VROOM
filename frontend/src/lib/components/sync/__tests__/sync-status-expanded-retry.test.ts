@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { onlineStatus, syncState, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 import { authStore } from '#lib/stores/auth.svelte.ts';
@@ -36,6 +36,11 @@ const alice: User = {
 };
 
 describe('SyncStatusInline expanded — Retry connection', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+		document.querySelectorAll('[data-testid="elsewhere"]').forEach(el => el.remove());
+	});
+
 	beforeEach(() => {
 		vi.clearAllMocks();
 		authStore.clearUser();
@@ -116,24 +121,47 @@ describe('SyncStatusInline expanded — Retry connection', () => {
 	}
 
 	it.each([true, false])(
-		'a successful Retry moves focus to the sync status and announces it (expanded: %s)',
+		'a successful Retry moves focus, without scrolling, to the sync status that names the result (expanded: %s)',
 		async isExpanded => {
 			await startUnreachable();
 			render(SyncStatusInline, { props: { isExpanded } });
 			const retry = screen.getByRole('button', { name: 'Retry connection' });
 			mockFetch.mockResolvedValueOnce(meResponse());
+			const focus = vi.spyOn(HTMLElement.prototype, 'focus');
 			retry.focus();
 			await fireEvent.click(retry);
 
 			await waitFor(() => expect(screen.getByRole('group', { name: 'Sync status' })).toHaveFocus());
+			expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
 			expect(screen.queryByRole('button', { name: 'Retry connection' })).toBeNull();
-			expect(screen.getByText('Connected to VROOM again')).toHaveAttribute('role', 'status');
+			expect(screen.queryByText('Connected to VROOM again')).toBeNull();
+			expect(screen.getAllByRole('status')).toHaveLength(1);
+			expect(screen.getByRole('status')).toHaveTextContent('Up to date');
 		}
 	);
+
+	it('a recheck that signs the user out moves no focus', async () => {
+		await startUnreachable();
+		render(SyncStatusInline, { props: { isExpanded: true } });
+		const retry = screen.getByRole('button', { name: 'Retry connection' });
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ success: false, error: { message: 'Unauthorized' } }), {
+				status: 401,
+				headers: { 'content-type': 'application/json' }
+			})
+		);
+		retry.focus();
+		await fireEvent.click(retry);
+
+		await waitFor(() => expect(authStore.isAuthenticated).toBe(false));
+		await new Promise(resolve => setTimeout(resolve, 0));
+		expect(screen.getByRole('group', { name: /^Sync status/ })).not.toHaveFocus();
+	});
 
 	it('a successful Retry leaves focus alone when the user moved it during the check', async () => {
 		await startUnreachable();
 		const elsewhere = document.createElement('button');
+		elsewhere.setAttribute('data-testid', 'elsewhere');
 		document.body.appendChild(elsewhere);
 		render(SyncStatusInline, { props: { isExpanded: true } });
 		let answer: (response: Response) => void = () => {};
@@ -147,6 +175,26 @@ describe('SyncStatusInline expanded — Retry connection', () => {
 		await waitFor(() => expect(authStore.sessionUnverified).toBe(false));
 		await new Promise(resolve => setTimeout(resolve, 0));
 		expect(elsewhere).toHaveFocus();
-		elsewhere.remove();
+	});
+
+	it('the collapsed rail announces the result as text when the user moved focus away', async () => {
+		await startUnreachable();
+		const elsewhere = document.createElement('button');
+		elsewhere.setAttribute('data-testid', 'elsewhere');
+		document.body.appendChild(elsewhere);
+		render(SyncStatusInline, { props: { isExpanded: false } });
+		let answer: (response: Response) => void = () => {};
+		mockFetch.mockImplementationOnce(() => new Promise<Response>(resolve => (answer = resolve)));
+		const retry = screen.getByRole('button', { name: 'Retry connection' });
+		const status = screen.getByRole('status');
+		expect(status).toHaveTextContent("Can't reach VROOM");
+		retry.focus();
+		await fireEvent.click(retry);
+		elsewhere.focus();
+
+		answer(meResponse());
+		await waitFor(() => expect(status).toHaveTextContent('Up to date'));
+		expect(screen.getByRole('status')).toBe(status);
+		expect(elsewhere).toHaveFocus();
 	});
 });

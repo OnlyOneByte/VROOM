@@ -122,10 +122,11 @@ describe('the sync status indicator lives in the navigation, never floating over
 			.getAllByRole('button', { name: 'Sync Now' })
 			.find(button => !mobileHeader().contains(button));
 		expect(sync).toBeDefined();
-		const status = screen
-			.getAllByRole('status', { name: 'Sync status: 1 pending' })
+		const panel = screen
+			.getAllByRole('group', { name: 'Sync status' })
 			.find(element => !mobileHeader().contains(element));
-		expect(status?.querySelector('[data-slot="badge"]')).toHaveTextContent('1');
+		expect(within(panel!).getByRole('status')).toHaveTextContent('1 pending');
+		expect(panel?.querySelector('[data-slot="badge"]')).toHaveTextContent('1');
 	});
 
 	it('the sidebar action under the pointer survives the hover that expands the sidebar', async () => {
@@ -165,9 +166,7 @@ describe('the sync status indicator lives in the navigation, never floating over
 		const statuses = screen
 			.getAllByRole('status')
 			.filter(status => !mobileHeader().contains(status));
-		expect(
-			statuses.some(status => status.getAttribute('aria-label')?.includes("Can't reach VROOM"))
-		).toBe(true);
+		expect(statuses.some(status => status.textContent === "Can't reach VROOM")).toBe(true);
 	});
 
 	it('the root layout floats the indicator only on pages without the navigation', () => {
