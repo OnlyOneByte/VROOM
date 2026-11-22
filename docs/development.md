@@ -49,7 +49,8 @@ A provider shows on the sign-in page once both its client ID and secret are set,
 Google placeholder values if you use GitHub only. The first sign-in creates your account.
 
 `--seed` (or `bun run db:seed`) adds a sample user, `demo@example.com`, with vehicles and
-expenses. Its Google ID is made up, so nobody can sign in as it. To look at its data, open
+expenses. Its Google ID is made up, so nobody can sign in as it. To look at its data, run
+`bun run db:studio` in `backend/` (Drizzle Studio on the database in `DATABASE_URL`), or open
 `backend/data/vroom.db` in any SQLite client.
 
 ## Validation
