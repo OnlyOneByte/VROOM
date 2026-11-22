@@ -274,7 +274,7 @@ export function findParkedExpense(id: string): OfflineExpense | undefined {
 	return loadOfflineExpenses().find(expense => expense.id === id && isEditableParked(expense));
 }
 
-export type ReplaceParkedResult = 'saved' | 'not-parked' | 'failed';
+export type ReplaceParkedResult = 'saved' | 'not-parked' | 'photos-unreadable' | 'failed';
 
 function sameVehicleAndDay(a: Pick<OfflineExpense, 'vehicleId' | 'date'>, b: typeof a): boolean {
 	return a.vehicleId === b.vehicleId && a.date.slice(0, 10) === b.date.slice(0, 10);
@@ -294,7 +294,7 @@ export async function replaceParkedExpense(
 	const photosToSave =
 		photos ??
 		(keepsStoredPhotos ? null : await loadPendingPhotos(parked.clientId!).catch(() => null));
-	if (!keepsStoredPhotos && photosToSave === null) return 'failed';
+	if (!keepsStoredPhotos && photosToSave === null) return 'photos-unreadable';
 	const previousPhotos =
 		!keepsStoredPhotos && clientId === parked.clientId && clientId
 			? await loadPendingPhotos(clientId).catch(() => null)

@@ -1473,7 +1473,7 @@ describe('queue owner scoping', () => {
 			return transaction(...args);
 		};
 
-		expect(await replaceParkedExpense('parked', requeueInput, null)).toBe('failed');
+		expect(await replaceParkedExpense('parked', requeueInput, null)).toBe('photos-unreadable');
 
 		expect(db.photos.get('c1')).toEqual([before]);
 		expect(JSON.parse(store.get(scoped('user-21'))!)).toEqual([parked]);

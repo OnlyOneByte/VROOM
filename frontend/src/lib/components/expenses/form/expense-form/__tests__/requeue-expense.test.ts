@@ -35,8 +35,12 @@ vi.mock('#lib/utils/offline-storage.ts', () => ({
 
 const { ExpenseFormState } = await import('../expense-form-state.svelte');
 const { loadQueuedExpense } = await import('../expense-form-loaders');
-const { saveQueuedExpense, REQUEUE_FAILED_MESSAGE, REQUEUE_NOT_PARKED_MESSAGE } =
-	await import('../requeue-expense');
+const {
+	saveQueuedExpense,
+	REQUEUE_FAILED_MESSAGE,
+	REQUEUE_NOT_PARKED_MESSAGE,
+	REQUEUE_PHOTOS_UNREADABLE_MESSAGE
+} = await import('../requeue-expense');
 
 const parked: OfflineExpense = {
 	id: 'offline_1',
@@ -209,6 +213,17 @@ describe('saveQueuedExpense', () => {
 
 		expect(state.submitError).toBeNull();
 		expect(storage.replaceParkedExpense).toHaveBeenCalledTimes(1);
+	});
+
+	test('a move refused because its photos cannot be read says so, not "check storage"', async () => {
+		storage.replaceParkedExpense.mockResolvedValue('photos-unreadable');
+		const state = await loadedState();
+		state.formData.amount = '45.10';
+
+		await saveQueuedExpense(state);
+
+		expect(state.submitError).toBe(REQUEUE_PHOTOS_UNREADABLE_MESSAGE);
+		expect(gotoDynamic).not.toHaveBeenCalled();
 	});
 
 	test('an entry that started syncing meanwhile keeps the form open and says so', async () => {
