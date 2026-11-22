@@ -55,7 +55,9 @@
 
 	let isLoading = $state(true);
 	let vehicleLoadError = $state<string | null>(null);
-	let isLoadingStats = $state(false);
+	let isLoadingSummary = $state(false);
+	let isLoadingVehicleStats = $state(false);
+	let isLoadingStats = $derived(isLoadingSummary || isLoadingVehicleStats);
 	let vehicle = $state<Vehicle | null>(null);
 	let activeTab = $state('overview');
 	let visitedTabs = $state<Record<string, boolean>>({ overview: true });
@@ -263,7 +265,7 @@
 	}
 
 	async function loadSummary() {
-		isLoadingStats = true;
+		isLoadingSummary = true;
 		summaryLoadError = null;
 		try {
 			summary = await expenseApi.getExpenseSummary({
@@ -274,7 +276,7 @@
 			handleErrorWithNotification(error, "Couldn't load the expense summary");
 			summaryLoadError = userFacingErrorMessage(error);
 		} finally {
-			isLoadingStats = false;
+			isLoadingSummary = false;
 		}
 	}
 
@@ -332,13 +334,13 @@
 	}
 
 	async function loadVehicleStats() {
-		isLoadingStats = true;
+		isLoadingVehicleStats = true;
 		try {
 			vehicleStatsData = await vehicleApi.getVehicleStats(vehicleId, selectedStatsPeriod);
 		} catch (error) {
 			handleErrorWithNotification(error, "Couldn't load the vehicle's stats");
 		} finally {
-			isLoadingStats = false;
+			isLoadingVehicleStats = false;
 		}
 	}
 
