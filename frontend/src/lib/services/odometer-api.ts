@@ -5,7 +5,7 @@ import { apiClient, withPagination } from './api-client';
 import { entityPhotos } from './photo-api';
 
 const ODOMETER_ORDER_MESSAGE =
-	/^Mileage (must be (greater|less) than [\d,]+ \(from (earlier|later) entry\)|cannot be less than initial mileage)$/;
+	/^Mileage (must be greater than [\d,]+ \(from earlier entry\)|must be less than [\d,]+ \(from later entry\)|cannot be less than initial mileage)$/;
 
 export function isOdometerOrderError(error: unknown): error is ApiError {
 	return (

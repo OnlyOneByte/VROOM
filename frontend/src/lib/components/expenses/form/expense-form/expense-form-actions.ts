@@ -1,4 +1,5 @@
 import { expenseApi } from '#lib/services/expense-api.ts';
+import { isOdometerOrderError } from '#lib/services/odometer-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { onlineStatus } from '#lib/stores/offline.svelte.ts';
 import { addOfflineExpense, currentOfflineQueueOwner } from '#lib/utils/offline-storage.ts';
@@ -6,7 +7,7 @@ import { classifySyncFailure } from '#lib/utils/sync/classify-failure.ts';
 import { syncManager } from '#lib/utils/sync/sync-manager.ts';
 import { buildSplitConfig } from '#lib/utils/expense-helpers.ts';
 import { gotoDynamic } from '#lib/utils/navigation.ts';
-import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+import { handleErrorWithNotification, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 import type { ExpenseCategory } from '#lib/types/index.ts';
 import { toOfflineExpense } from '../offline-expense';
 import { buildExpenseData } from './expense-payload';
@@ -189,6 +190,8 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			syncManager.requestAutoSync();
 
 			gotoDynamic(returnTo);
+		} else if (isOdometerOrderError(error)) {
+			state.refuseMileage(userFacingErrorMessage(error));
 		} else {
 			state.submitError = submitFailureMessage(error);
 		}

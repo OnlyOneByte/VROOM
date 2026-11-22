@@ -158,6 +158,11 @@ export class ExpenseFormState {
 		}
 	};
 
+	refuseMileage = (message: string) => {
+		this.touched['mileage'] = true;
+		this.errors = { ...this.errors, mileage: message };
+	};
+
 	validateForm = (): boolean => {
 		this.errors = {};
 		const fields: string[] = this.isGroupEditMode
