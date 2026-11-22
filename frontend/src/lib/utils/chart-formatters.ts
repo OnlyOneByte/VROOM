@@ -23,6 +23,7 @@ export const SMOOTH_CURVE = curveMonotoneX;
 
 function formatMonthTick(value: unknown): string {
 	if (!(value instanceof Date) || isNaN(value.getTime())) return '';
+	if (value.getMonth() === 0) return String(value.getFullYear());
 	return value.toLocaleDateString('en-US', { month: 'short' });
 }
 
@@ -31,7 +32,7 @@ export function formatDateTick(value: unknown): string {
 	return value.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export function monthlyXAxisProps(dataLength: number, maxTicks = 12) {
+export function monthlyXAxisProps(dataLength: number, maxTicks = 4) {
 	return {
 		ticks: getXTickCount(dataLength, maxTicks),
 		format: formatMonthTick

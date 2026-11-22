@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { scaleTime } from 'd3-scale';
 import {
 	formatCentsAxis,
 	formatCurrencyAxis,
@@ -77,15 +78,35 @@ describe('formatDateTick (date X-axis label with unknown-input guard)', () => {
 });
 
 describe('monthlyXAxisProps (monthly time-series axis wiring)', () => {
-	test('wires a 12-tick budget (not the 6 default) and clamps to data length', () => {
-		expect(monthlyXAxisProps(24).ticks).toBe(12);
+	test('wires a 4-tick budget and clamps to data length', () => {
+		expect(monthlyXAxisProps(13).ticks).toBe(4);
 		expect(monthlyXAxisProps(3).ticks).toBe(3);
 		expect(typeof monthlyXAxisProps(3).format).toBe('function');
 	});
 
-	test('a caller can lower the tick budget for a crowded chart', () => {
-		expect(monthlyXAxisProps(13, 6).ticks).toBe(6);
-		expect(monthlyXAxisProps(4, 6).ticks).toBe(4);
+	test.each([10, 11, 12, 13])(
+		'%i months of points draw at most 5 month labels on a time scale',
+		months => {
+			const scale = scaleTime().domain([new Date(2025, 0, 1), new Date(2025, months - 1, 1)]);
+			expect(scale.ticks(monthlyXAxisProps(months).ticks).length).toBeLessThanOrEqual(5);
+		}
+	);
+
+	test.each([13, 25, 36, 48])('%i months of points never repeat a label back to back', months => {
+		const { ticks, format } = monthlyXAxisProps(months);
+		const scale = scaleTime().domain([new Date(2022, 0, 1), new Date(2022, months - 1, 1)]);
+		const labels = scale.ticks(ticks).map(format);
+		expect(labels.length).toBeGreaterThan(1);
+		labels.slice(1).forEach((label, i) => expect(label).not.toBe(labels[i]));
+	});
+
+	test('a January tick shows its year', () => {
+		expect(monthlyXAxisProps(6).format(new Date(2025, 0, 1))).toBe('2025');
+	});
+
+	test('a caller can set its own tick budget', () => {
+		expect(monthlyXAxisProps(24, 12).ticks).toBe(12);
+		expect(monthlyXAxisProps(4, 12).ticks).toBe(4);
 	});
 
 	test('the wired format callback renders a 3-letter month and guards unknown input', () => {
