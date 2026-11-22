@@ -134,15 +134,15 @@
 					<TabsTrigger value="expenses">Expenses</TabsTrigger>
 					<TabsTrigger value="finance">Finance</TabsTrigger>
 				</TabsList>
-				<TabsContent value="overview" class="text-sm text-muted-foreground"
-					>Overview panel</TabsContent
-				>
-				<TabsContent value="expenses" class="text-sm text-muted-foreground"
-					>Expenses panel</TabsContent
-				>
-				<TabsContent value="finance" class="text-sm text-muted-foreground"
-					>Finance panel</TabsContent
-				>
+				<TabsContent value="overview" class="text-sm text-muted-foreground">
+					Overview panel
+				</TabsContent>
+				<TabsContent value="expenses" class="text-sm text-muted-foreground">
+					Expenses panel
+				</TabsContent>
+				<TabsContent value="finance" class="text-sm text-muted-foreground">
+					Finance panel
+				</TabsContent>
 			</Tabs>
 		</section>
 
@@ -160,9 +160,9 @@
 			{#each alertVariants as v (v)}
 				<Alert variant={v}>
 					<AlertTitle>{v} alert</AlertTitle>
-					<AlertDescription
-						>Use Alert variants for status — never hand-tinted divs.</AlertDescription
-					>
+					<AlertDescription>
+						Use Alert variants for status — never hand-tinted divs.
+					</AlertDescription>
 				</Alert>
 			{/each}
 		</section>
@@ -219,9 +219,9 @@
 					<Card.Content>
 						<Alert variant="destructive">
 							<AlertTitle>Couldn't load</AlertTitle>
-							<AlertDescription
-								>Show a visible, recoverable message — never a silent catch.</AlertDescription
-							>
+							<AlertDescription>
+								Show a visible, recoverable message — never a silent catch.
+							</AlertDescription>
 						</Alert>
 					</Card.Content>
 				</Card.Root>

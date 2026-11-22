@@ -434,42 +434,54 @@
 					<div class="space-y-2 text-sm">
 						<div class="flex justify-between">
 							<span class="text-muted-foreground">Vehicles:</span><span
-								class="font-medium text-foreground">{restorePreview['vehicles'] || 0}</span
+								class="font-medium text-foreground"
 							>
+								{restorePreview['vehicles'] || 0}
+							</span>
 						</div>
 						<div class="flex justify-between">
 							<span class="text-muted-foreground">Expenses:</span><span
-								class="font-medium text-foreground">{restorePreview['expenses'] || 0}</span
+								class="font-medium text-foreground"
 							>
+								{restorePreview['expenses'] || 0}
+							</span>
 						</div>
 						<div class="flex justify-between">
 							<span class="text-muted-foreground">Insurance:</span><span
-								class="font-medium text-foreground">{restorePreview['insurance'] || 0}</span
+								class="font-medium text-foreground"
 							>
+								{restorePreview['insurance'] || 0}
+							</span>
 						</div>
 						{#if restorePreview['photos']}<div class="flex justify-between">
 								<span class="text-muted-foreground">Photos:</span><span
-									class="font-medium text-foreground">{restorePreview['photos']}</span
+									class="font-medium text-foreground"
 								>
+									{restorePreview['photos']}
+								</span>
 							</div>{/if}
 					</div>
 					{#if restorePreview['financing'] || restorePreview['insurancePolicyVehicles']}
 						<Collapsible class="mt-3">
 							<CollapsibleTrigger
 								class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-								><ChevronDown class="h-3 w-3" />Details</CollapsibleTrigger
 							>
+								<ChevronDown class="h-3 w-3" />Details
+							</CollapsibleTrigger>
 							<CollapsibleContent class="mt-2 space-y-2 text-sm">
 								{#if restorePreview['financing']}<div class="flex justify-between">
 										<span class="text-muted-foreground">Financing:</span><span
-											class="font-medium text-foreground">{restorePreview['financing']}</span
+											class="font-medium text-foreground"
 										>
+											{restorePreview['financing']}
+										</span>
 									</div>{/if}
 								{#if restorePreview['insurancePolicyVehicles']}<div class="flex justify-between">
 										<span class="text-muted-foreground">Policy-Vehicle Links:</span><span
 											class="font-medium text-foreground"
-											>{restorePreview['insurancePolicyVehicles']}</span
 										>
+											{restorePreview['insurancePolicyVehicles']}
+										</span>
 									</div>{/if}
 							</CollapsibleContent>
 						</Collapsible>
@@ -509,23 +521,23 @@
 					<RadioGroup.Root bind:value={restoreMode}>
 						<div class="flex items-center space-x-2">
 							<RadioGroup.Item value="replace" id="mode-replace" />
-							<Label for="mode-replace" class="cursor-pointer font-normal"
-								><div>
+							<Label for="mode-replace" class="cursor-pointer font-normal">
+								<div>
 									<div class="font-medium">Replace All</div>
 									<div class="text-sm text-muted-foreground">
 										Delete existing data and import from backup
 									</div>
-								</div></Label
-							>
+								</div>
+							</Label>
 						</div>
 						<div class="flex items-center space-x-2 opacity-50">
 							<RadioGroup.Item value="merge" id="mode-merge" disabled />
-							<Label for="mode-merge" class="cursor-not-allowed font-normal"
-								><div>
+							<Label for="mode-merge" class="cursor-not-allowed font-normal">
+								<div>
 									<div class="font-medium">Merge (Coming Soon)</div>
 									<div class="text-sm text-muted-foreground">Currently unavailable</div>
-								</div></Label
-							>
+								</div>
+							</Label>
 						</div>
 					</RadioGroup.Root>
 				</div>

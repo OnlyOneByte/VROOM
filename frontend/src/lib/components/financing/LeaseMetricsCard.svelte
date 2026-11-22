@@ -81,9 +81,9 @@
 
 			<div class="flex items-center justify-between text-xs sm:text-sm text-muted-foreground">
 				<span>
-					Odometer: <span class="font-medium text-foreground"
-						>{currentOdometer.toLocaleString()}</span
-					>
+					Odometer: <span class="font-medium text-foreground">
+						{currentOdometer.toLocaleString()}
+					</span>
 					/ {limitOdometer.toLocaleString()}
 					{distLabel}
 				</span>

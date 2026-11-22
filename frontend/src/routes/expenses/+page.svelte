@@ -475,9 +475,9 @@
 								</div>
 							</Select.Trigger>
 							<Select.Content>
-								<Select.Item value="" label={COMMON_MESSAGES.ALL_VEHICLES}
-									>{COMMON_MESSAGES.ALL_VEHICLES}</Select.Item
-								>
+								<Select.Item value="" label={COMMON_MESSAGES.ALL_VEHICLES}>
+									{COMMON_MESSAGES.ALL_VEHICLES}
+								</Select.Item>
 								{#each vehicles as vehicle (vehicle.id)}
 									<Select.Item value={vehicle.id} label={getVehicleDisplayName(vehicle)}>
 										{getVehicleDisplayName(vehicle)}

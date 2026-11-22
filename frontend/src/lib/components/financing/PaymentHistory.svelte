@@ -219,13 +219,16 @@
 													>
 														<span
 															class="text-muted-foreground"
-															id="remaining-balance-{payment.expense.id}">Remaining Balance</span
+															id="remaining-balance-{payment.expense.id}"
 														>
+															Remaining Balance
+														</span>
 														<span
 															class="font-semibold"
 															aria-labelledby="remaining-balance-{payment.expense.id}"
-															>{formatCurrency(payment.remainingBalance)}</span
 														>
+															{formatCurrency(payment.remainingBalance)}
+														</span>
 													</div>
 												</div>
 											</div>
@@ -343,13 +346,16 @@
 												>
 													<span
 														class="text-muted-foreground"
-														id="remaining-balance-{payment.expense.id}">Remaining Balance</span
+														id="remaining-balance-{payment.expense.id}"
 													>
+														Remaining Balance
+													</span>
 													<span
 														class="font-semibold"
 														aria-labelledby="remaining-balance-{payment.expense.id}"
-														>{formatCurrency(payment.remainingBalance)}</span
 													>
+														{formatCurrency(payment.remainingBalance)}
+													</span>
 												</div>
 											</div>
 										</div>
