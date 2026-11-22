@@ -138,6 +138,30 @@ export function loadCachedVehicles(): Vehicle[] {
 	return readOwnerCache<Vehicle>(VEHICLE_CACHE_KEY) ?? [];
 }
 
+export function updateCachedVehicle(vehicle: Vehicle): void {
+	const cached = readOwnerCache<Vehicle>(VEHICLE_CACHE_KEY);
+	if (!cached?.some(v => v.id === vehicle.id)) return;
+	writeOwnerCache(
+		VEHICLE_CACHE_KEY,
+		cached.map(v => (v.id === vehicle.id ? { ...v, ...vehicle } : v))
+	);
+}
+
+export function removeCachedVehicle(vehicleId: string): void {
+	const cached = readOwnerCache<Vehicle>(VEHICLE_CACHE_KEY);
+	if (cached)
+		writeOwnerCache(
+			VEHICLE_CACHE_KEY,
+			cached.filter(v => v.id !== vehicleId)
+		);
+	if (!browser || !queueOwner) return;
+	try {
+		localStorage.removeItem(`${VEHICLE_HISTORY_CACHE_KEY}:${vehicleId}:${queueOwner}`);
+	} catch (error) {
+		if (import.meta.env.DEV) console.error('Failed to clear the vehicle history cache:', error);
+	}
+}
+
 export function cacheVehicleHistory(vehicleId: string, expenses: Expense[]): void {
 	writeOwnerCache(`${VEHICLE_HISTORY_CACHE_KEY}:${vehicleId}`, expenses);
 }

@@ -13,11 +13,17 @@ vi.mock('../api-client', () => ({
 	withPagination: (url: string) => url
 }));
 
+const updateCachedVehicle = vi.fn();
+const removeCachedVehicle = vi.fn();
+vi.mock('#lib/utils/offline-storage.ts', () => ({ updateCachedVehicle, removeCachedVehicle }));
+
 const { vehicleApi } = await import('../vehicle-api');
 const ZONE = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
 
 beforeEach(() => {
 	for (const fn of [get, post, put, patch, del, getPaginated]) fn.mockReset();
+	updateCachedVehicle.mockClear();
+	removeCachedVehicle.mockClear();
 });
 
 describe('vehicleApi.getFinancing', () => {
@@ -124,5 +130,24 @@ describe('vehicleApi request shapes', () => {
 		const failure = new ApiError('Conflict', 409);
 		put.mockRejectedValueOnce(failure);
 		await expect(vehicleApi.updateVehicle('v1', { nickname: 'x' })).rejects.toBe(failure);
+		expect(updateCachedVehicle).not.toHaveBeenCalled();
+	});
+});
+
+describe('vehicleApi keeps the offline vehicle cache current', () => {
+	test('a saved edit replaces the cached vehicle with the server copy', async () => {
+		put.mockResolvedValueOnce({ id: 'v1', nickname: 'Daily' });
+		await vehicleApi.updateVehicle('v1', { nickname: 'Daily' });
+		expect(updateCachedVehicle).toHaveBeenCalledWith({ id: 'v1', nickname: 'Daily' });
+	});
+
+	test('a delete removes the vehicle from the cache only once the server agrees', async () => {
+		await vehicleApi.deleteVehicle('v1');
+		expect(removeCachedVehicle).toHaveBeenCalledWith('v1');
+
+		removeCachedVehicle.mockClear();
+		del.mockRejectedValueOnce(new ApiError('Forbidden', 403));
+		await expect(vehicleApi.deleteVehicle('v2')).rejects.toThrow();
+		expect(removeCachedVehicle).not.toHaveBeenCalled();
 	});
 });

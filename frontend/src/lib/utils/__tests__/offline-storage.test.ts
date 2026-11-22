@@ -18,8 +18,15 @@ import {
 	deletePendingPhotos,
 	setOfflineQueueOwner,
 	currentOfflineQueueOwner,
+	cacheVehicles,
+	cacheVehicleHistory,
+	loadCachedVehicles,
+	loadCachedVehicleHistory,
+	updateCachedVehicle,
+	removeCachedVehicle,
 	type OfflineExpense
 } from '../offline-storage';
+import type { Vehicle } from '#lib/types/index.ts';
 import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 
 const localStorageMock = window.localStorage as any;
@@ -1184,5 +1191,50 @@ describe('queue owner scoping', () => {
 
 		expect(JSON.parse(store.get(scoped('user-7'))!)).toHaveLength(1);
 		expect(offlineExpenseQueue.current).toEqual([]);
+	});
+
+	const vehicle = (id: string, nickname: string) =>
+		({ id, nickname, initialMileage: 1000 }) as unknown as Vehicle;
+
+	it('an edited vehicle replaces its cached copy, keeping fields the save response leaves out', () => {
+		useStore({});
+		setOfflineQueueOwner('user-8');
+		cacheVehicles([
+			{ ...vehicle('v1', 'Old'), financing: { id: 'f1' } } as unknown as Vehicle,
+			vehicle('v2', 'Other')
+		]);
+
+		updateCachedVehicle(vehicle('v1', 'New'));
+
+		const cached = loadCachedVehicles();
+		expect(cached.map(v => [v.id, v.nickname])).toEqual([
+			['v1', 'New'],
+			['v2', 'Other']
+		]);
+		expect(cached[0]?.financing).toEqual({ id: 'f1' });
+	});
+
+	it('an edited vehicle that was never cached is not added', () => {
+		useStore({});
+		setOfflineQueueOwner('user-9');
+		cacheVehicles([vehicle('v1', 'Mine')]);
+
+		updateCachedVehicle(vehicle('shared', 'Theirs'));
+
+		expect(loadCachedVehicles().map(v => v.id)).toEqual(['v1']);
+	});
+
+	it('a deleted vehicle leaves the cached list and takes its history with it', () => {
+		useStore({});
+		setOfflineQueueOwner('user-10');
+		cacheVehicles([vehicle('v1', 'Gone'), vehicle('v2', 'Kept')]);
+		cacheVehicleHistory('v1', []);
+		cacheVehicleHistory('v2', []);
+
+		removeCachedVehicle('v1');
+
+		expect(loadCachedVehicles().map(v => v.id)).toEqual(['v2']);
+		expect(loadCachedVehicleHistory('v1')).toBeNull();
+		expect(loadCachedVehicleHistory('v2')).toEqual([]);
 	});
 });
