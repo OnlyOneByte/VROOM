@@ -4,6 +4,8 @@ import { join, relative } from 'node:path';
 export const REPO_ROOT = join(import.meta.dir, '../../..');
 
 const SCAN_ROOTS = ['backend/src', 'frontend/src', 'frontend/e2e', 'frontend/scripts'];
+const CONFIG_DIRS = ['backend', 'frontend'];
+const CONFIG_FILE = /\.config\.(ts|js|mjs|cjs)$/;
 const SKIP_DIRS = new Set(['node_modules', '.svelte-kit', 'build', 'dist']);
 const SCRIPT_EXT = /\.(ts|js|mjs|cjs)$/;
 const DIRECTIVE =
@@ -199,6 +201,11 @@ function walk(dir: string, out: string[]): void {
 export function scanCodeComments(): string[] {
   const files: string[] = [];
   for (const root of SCAN_ROOTS) walk(join(REPO_ROOT, root), files);
+  for (const dir of CONFIG_DIRS) {
+    for (const entry of readdirSync(join(REPO_ROOT, dir))) {
+      if (CONFIG_FILE.test(entry)) files.push(join(REPO_ROOT, dir, entry));
+    }
+  }
   return files.flatMap((file) => {
     const rel = relative(REPO_ROOT, file);
     return commentsIn(file, readFileSync(file, 'utf8')).map((text) => `${rel}: ${text}`);

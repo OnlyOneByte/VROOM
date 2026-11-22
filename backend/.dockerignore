@@ -33,7 +33,6 @@ dist/
 
 # Documentation
 README.md
-TODO.md
 docs/
 
 # Database files (will be mounted as volume)
