@@ -171,6 +171,7 @@
 	}
 
 	async function retry(load: () => Promise<void>) {
+		if (isRetrying) return;
 		isRetrying = true;
 		try {
 			await load();
@@ -182,7 +183,18 @@
 	let photoPicker = $state<HTMLDivElement | null>(null);
 	let photosRetryFailed = $state(false);
 
+	async function retryVehicleContext() {
+		if (isRetrying) return;
+		await retry(() => loadVehicleContext(form));
+		if (form.vehicleError) return;
+		await tick();
+		document.getElementById('vehicle')?.focus();
+	}
+
 	async function retryQueuedPhotos(clientId: string) {
+		if (isRetrying) return;
+		photosRetryFailed = false;
+		await tick();
 		await retry(() => loadQueuedPhotos(form, clientId));
 		photosRetryFailed = form.queuedPhotosUnreadable;
 		if (photosRetryFailed) return;
@@ -242,7 +254,9 @@
 					</p>
 				</div>
 				<p class="mb-4 text-sm text-muted-foreground">{form.expenseError}</p>
-				<Button size="lg" disabled={isRetrying} onclick={() => retry(reloadExpense)}>Retry</Button>
+				<Button size="lg" aria-disabled={isRetrying} onclick={() => retry(reloadExpense)}>
+					Retry
+				</Button>
 			</div>
 		</div>
 	{:else if form.isInsuranceManaged}
@@ -276,7 +290,11 @@
 					<p class="font-medium">Couldn't load your vehicles</p>
 				</div>
 				<p class="mb-4 text-sm text-muted-foreground">{form.vehiclesError}</p>
-				<Button size="lg" disabled={isRetrying} onclick={() => retry(() => loadVehicles(form))}>
+				<Button
+					size="lg"
+					aria-disabled={isRetrying}
+					onclick={() => retry(() => loadVehicles(form))}
+				>
 					Retry
 				</Button>
 			</div>
@@ -393,8 +411,8 @@
 									variant="outline"
 									size="lg"
 									aria-describedby="vehicle-load-message"
-									disabled={isRetrying}
-									onclick={() => retry(() => loadVehicleContext(form))}
+									aria-disabled={isRetrying}
+									onclick={retryVehicleContext}
 								>
 									Retry
 								</Button>
@@ -511,7 +529,7 @@
 							variant="outline"
 							size="lg"
 							aria-describedby="queued-photos-message"
-							disabled={isRetrying}
+							aria-disabled={isRetrying}
 							onclick={() => retryQueuedPhotos(clientId)}
 						>
 							Retry
