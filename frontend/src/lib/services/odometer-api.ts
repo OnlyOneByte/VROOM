@@ -1,7 +1,19 @@
 import type { OdometerEntry, PaginatedResponse, Photo } from '#lib/types/index.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
 import { userTimeZone } from './analytics-api';
 import { apiClient, withPagination } from './api-client';
 import { entityPhotos } from './photo-api';
+
+const ODOMETER_ORDER_MESSAGE =
+	/^Mileage (must be (greater|less) than [\d,]+ \(from (earlier|later) entry\)|cannot be less than initial mileage)$/;
+
+export function isOdometerOrderError(error: unknown): error is ApiError {
+	return (
+		error instanceof ApiError &&
+		error.statusCode === 400 &&
+		ODOMETER_ORDER_MESSAGE.test(error.message)
+	);
+}
 
 interface CreateOdometerRequest {
 	odometer: number;
