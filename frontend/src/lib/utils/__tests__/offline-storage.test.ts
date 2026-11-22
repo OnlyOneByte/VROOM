@@ -1483,7 +1483,7 @@ describe('queue owner scoping', () => {
 
 	it('a queue write that fails for a moved entry drops the copied photos and keeps the originals', async () => {
 		const { db, store, parked, before } = parkedWithPhoto('user-22', { vehicleId: 'v2' });
-		let photosAtQueueWrite = new Map<string, File[]>();
+		let photosAtQueueWrite = new Map<unknown, unknown>();
 		localStorageMock.setItem.mockImplementation((key: string) => {
 			if (key !== scoped('user-22')) return;
 			photosAtQueueWrite = new Map(db.photos);
