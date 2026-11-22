@@ -4,13 +4,16 @@
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
-	import type { Snippet } from 'svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { LoaderCircle } from '@lucide/svelte';
+	import { tick, type Snippet } from 'svelte';
 
 	interface Props {
 		title: string;
 		description?: string;
 		isLoading?: boolean;
 		error?: string | null;
+		onRetry?: () => unknown;
 		isEmpty?: boolean;
 		emptyTitle?: string;
 		emptyDescription?: string;
@@ -27,6 +30,7 @@
 		description,
 		isLoading = false,
 		error = null,
+		onRetry,
 		isEmpty = false,
 		emptyTitle = 'No data available',
 		emptyDescription = 'Add data to see this chart',
@@ -49,13 +53,43 @@
 		'chart-pie-animated': 'chart-pie-animate-ready'
 	};
 	let readyClass = $derived(animationClass ? (READY_CLASS_MAP[animationClass] ?? '') : '');
+
+	let isRetrying = $state(false);
+	let titleEl = $state<HTMLElement | null>(null);
+
+	async function retry() {
+		if (isRetrying || !onRetry) return;
+		const origin = document.activeElement;
+		isRetrying = true;
+		try {
+			await onRetry();
+		} finally {
+			isRetrying = false;
+		}
+		await tick();
+		const active = document.activeElement;
+		if (!error && (active === origin || active === null || active === document.body)) {
+			titleEl?.focus();
+		}
+	}
 </script>
+
+{#snippet retryAction()}
+	<Button variant="outline" size="lg" onclick={retry} aria-disabled={isRetrying}>
+		{#if isRetrying}
+			<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+			Retrying…
+		{:else}
+			Retry
+		{/if}
+	</Button>
+{/snippet}
 
 <Card.Root class={className}>
 	<Card.Header>
 		<div class="flex items-center justify-between">
 			<div>
-				<Card.Title>{title}</Card.Title>
+				<Card.Title bind:ref={titleEl} tabindex={-1}>{title}</Card.Title>
 				{#if description}
 					<Card.Description>{description}</Card.Description>
 				{/if}
@@ -70,7 +104,7 @@
 			<Skeleton class="w-full" style="height: {placeholderHeight}px" />
 		{:else if error}
 			<div style="height: {placeholderHeight}px">
-				<EmptyState class="h-full">
+				<EmptyState class="h-full" action={onRetry ? retryAction : undefined}>
 					{#snippet title()}
 						Couldn't load the chart
 					{/snippet}

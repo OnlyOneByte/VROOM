@@ -531,6 +531,39 @@ describe('OdometerTab chart range', () => {
 		expect(chartProps?.['data']).toEqual([]);
 	});
 
+	test('Retry in the chart card reloads only the chart and clears the error', async () => {
+		getHistory.mockResolvedValue(page(dated(3)));
+		getChartHistory.mockRejectedValueOnce(new Error('Server unavailable'));
+		getChartHistory.mockResolvedValue(page(dated(3)));
+		mount();
+		await settle();
+		const listCalls = getHistory.mock.calls.length;
+
+		await (chartProps?.['onRetry'] as () => Promise<void>)();
+		await settle();
+
+		expect(getChartHistory).toHaveBeenCalledTimes(2);
+		expect(getHistory).toHaveBeenCalledTimes(listCalls);
+		expect(chartProps?.['error']).toBeNull();
+		expect((chartProps?.['data'] as unknown[]).length).toBe(3);
+	});
+
+	test('a failed reload after a capped chart drops the latest-100 description', async () => {
+		const latest = dated(CHART_LIMIT);
+		getHistory.mockResolvedValue(page(latest.slice(0, 20), 130, 0));
+		getChartHistory.mockResolvedValueOnce(page(latest, 130, 0));
+		getChartHistory.mockRejectedValue(new Error('Server unavailable'));
+		mount();
+		await settle();
+		expect(chartProps?.['description']).toBe('Your latest 100 readings');
+
+		await (chartProps?.['onRetry'] as () => Promise<void>)();
+		await settle();
+
+		expect(chartProps?.['error']).toBe('Server unavailable.');
+		expect(chartProps?.['description']).toBe('Odometer readings plotted by date');
+	});
+
 	test('a chart that loads after a failure clears the error', async () => {
 		getHistory.mockResolvedValue(page(dated(3)));
 		getChartHistory.mockRejectedValueOnce(new Error('Server unavailable'));

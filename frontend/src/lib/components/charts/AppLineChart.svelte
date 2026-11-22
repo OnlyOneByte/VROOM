@@ -35,6 +35,7 @@
 		config: Chart.ChartConfig;
 		isLoading?: boolean;
 		error?: string | null;
+		onRetry?: () => unknown;
 		icon?: Snippet;
 		height?: number;
 		xAxisProps?: Record<string, unknown>;
@@ -56,6 +57,7 @@
 		config,
 		isLoading = false,
 		error = null,
+		onRetry,
 		icon,
 		height = 300,
 		xAxisProps,
@@ -82,6 +84,7 @@
 	{description}
 	{isLoading}
 	{error}
+	{onRetry}
 	{isEmpty}
 	{icon}
 	{height}
