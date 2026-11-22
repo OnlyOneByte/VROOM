@@ -51,8 +51,8 @@ describe('SyncStatusInline — server unreachable', () => {
 
 		render(SyncStatusInline);
 
-		expect(screen.getByText("Can't reach VROOM")).toBeInTheDocument();
-		expect(screen.queryByText('Up to date')).not.toBeInTheDocument();
+		expect(screen.getByRole('status')).toHaveTextContent("Can't reach VROOM");
+		expect(screen.queryAllByText('Up to date')).toHaveLength(0);
 	});
 
 	it('says Up to date once the server answers', () => {
@@ -60,6 +60,6 @@ describe('SyncStatusInline — server unreachable', () => {
 
 		render(SyncStatusInline);
 
-		expect(screen.getByText('Up to date')).toBeInTheDocument();
+		expect(screen.getByRole('status')).toHaveTextContent('Up to date');
 	});
 });

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { onlineStatus, syncState, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 import { authStore } from '#lib/stores/auth.svelte.ts';
@@ -36,6 +36,11 @@ const alice: User = {
 };
 
 describe('SyncStatusInline expanded — Retry connection', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+		document.querySelectorAll('[data-testid="elsewhere"]').forEach(el => el.remove());
+	});
+
 	beforeEach(() => {
 		vi.clearAllMocks();
 		authStore.clearUser();
@@ -126,13 +131,12 @@ describe('SyncStatusInline expanded — Retry connection', () => {
 			retry.focus();
 			await fireEvent.click(retry);
 
-			await waitFor(() =>
-				expect(screen.getByRole('group', { name: 'Sync status: Up to date' })).toHaveFocus()
-			);
+			await waitFor(() => expect(screen.getByRole('group', { name: 'Sync status' })).toHaveFocus());
 			expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
 			expect(screen.queryByRole('button', { name: 'Retry connection' })).toBeNull();
 			expect(screen.queryByText('Connected to VROOM again')).toBeNull();
-			focus.mockRestore();
+			expect(screen.getAllByRole('status')).toHaveLength(1);
+			expect(screen.getByRole('status')).toHaveTextContent('Up to date');
 		}
 	);
 
@@ -157,6 +161,7 @@ describe('SyncStatusInline expanded — Retry connection', () => {
 	it('a successful Retry leaves focus alone when the user moved it during the check', async () => {
 		await startUnreachable();
 		const elsewhere = document.createElement('button');
+		elsewhere.setAttribute('data-testid', 'elsewhere');
 		document.body.appendChild(elsewhere);
 		render(SyncStatusInline, { props: { isExpanded: true } });
 		let answer: (response: Response) => void = () => {};
@@ -170,6 +175,26 @@ describe('SyncStatusInline expanded — Retry connection', () => {
 		await waitFor(() => expect(authStore.sessionUnverified).toBe(false));
 		await new Promise(resolve => setTimeout(resolve, 0));
 		expect(elsewhere).toHaveFocus();
-		elsewhere.remove();
+	});
+
+	it('the collapsed rail announces the result as text when the user moved focus away', async () => {
+		await startUnreachable();
+		const elsewhere = document.createElement('button');
+		elsewhere.setAttribute('data-testid', 'elsewhere');
+		document.body.appendChild(elsewhere);
+		render(SyncStatusInline, { props: { isExpanded: false } });
+		let answer: (response: Response) => void = () => {};
+		mockFetch.mockImplementationOnce(() => new Promise<Response>(resolve => (answer = resolve)));
+		const retry = screen.getByRole('button', { name: 'Retry connection' });
+		const status = screen.getByRole('status');
+		expect(status).toHaveTextContent("Can't reach VROOM");
+		retry.focus();
+		await fireEvent.click(retry);
+		elsewhere.focus();
+
+		answer(meResponse());
+		await waitFor(() => expect(status).toHaveTextContent('Up to date'));
+		expect(screen.getByRole('status')).toBe(status);
+		expect(elsewhere).toHaveFocus();
 	});
 });

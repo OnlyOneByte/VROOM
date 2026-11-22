@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { authStore } from '#lib/stores/auth.svelte.ts';
 import { onlineStatus } from '#lib/stores/offline.svelte.ts';
@@ -44,6 +44,12 @@ async function startWithUnreachableServer(): Promise<void> {
 }
 
 describe('OfflineIndicator — unverified session', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
+		document.querySelectorAll('main').forEach(main => main.remove());
+	});
+
 	beforeEach(() => {
 		vi.clearAllMocks();
 		authStore.clearUser();
@@ -138,7 +144,6 @@ describe('OfflineIndicator — unverified session', () => {
 		await vi.waitFor(() => expect(heading).toHaveFocus());
 		expect(heading).toHaveAttribute('tabindex', '-1');
 		expect(screen.getByText('Connected to VROOM again')).toHaveAttribute('role', 'status');
-		main.remove();
 	});
 
 	it('focuses the heading without scrolling and clears the announcement after 5s', async () => {
@@ -166,8 +171,6 @@ describe('OfflineIndicator — unverified session', () => {
 		expect(status).toHaveTextContent('Connected to VROOM again');
 		await vi.advanceTimersByTimeAsync(5000);
 		expect(status).toHaveTextContent('');
-		vi.useRealTimers();
-		main.remove();
 	});
 
 	it('a recheck that signs the user out moves no focus and announces nothing', async () => {
@@ -195,7 +198,6 @@ describe('OfflineIndicator — unverified session', () => {
 		await new Promise(resolve => setTimeout(resolve, 0));
 		expect(main.querySelector('h1')).not.toHaveFocus();
 		expect(screen.queryByText('Connected to VROOM again')).toBeNull();
-		main.remove();
 	});
 
 	it('a successful Retry leaves focus alone when the user moved it during the check', async () => {
@@ -221,6 +223,5 @@ describe('OfflineIndicator — unverified session', () => {
 		await vi.waitFor(() => expect(authStore.sessionUnverified).toBe(false));
 		await new Promise(resolve => setTimeout(resolve, 0));
 		expect(elsewhere).toHaveFocus();
-		main.remove();
 	});
 });
