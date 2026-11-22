@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
+import { dateOnlyToISO } from '#lib/utils/formatters.ts';
 import { makeVehicle } from './expense-form-fixtures';
 
 const { addNotification, gotoDynamic, requestAutoSync, syncAll, online, storage } = vi.hoisted(
@@ -44,7 +45,7 @@ const parked: OfflineExpense = {
 	tags: ['fuel'],
 	category: 'fuel',
 	amount: 1_000_001,
-	date: '2025-03-10T12:00:00.000Z',
+	date: dateOnlyToISO('2025-03-10'),
 	mileage: 31000,
 	volume: 12.5,
 	fuelType: '87 (Regular)',
