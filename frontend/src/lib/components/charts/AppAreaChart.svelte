@@ -10,6 +10,8 @@
 		formatMonthLabel,
 		type TooltipValueFormat,
 		CHART_PADDING,
+		TIME_X_PADDING,
+		insetTimeTicks,
 		SMOOTH_CURVE,
 		monthlyXAxisProps,
 		SINGLE_POINT_PROPS,
@@ -92,9 +94,10 @@
 			{series}
 			{seriesLayout}
 			padding={CHART_PADDING}
+			xPadding={TIME_X_PADDING}
 			props={{
 				area: { curve: SMOOTH_CURVE, opacity: 0.3 },
-				xAxis: resolvedXAxisProps,
+				xAxis: { ...resolvedXAxisProps, ticks: insetTimeTicks(resolvedXAxisProps['ticks']) },
 				yAxis: { format: yAxisFormat }
 			}}
 		>

@@ -1,3 +1,4 @@
+import type { AnyScale, TicksConfig } from 'layerchart';
 import { curveMonotoneX } from 'd3-shape';
 import { formatCurrency, formatNumber } from './formatters';
 
@@ -44,6 +45,14 @@ export function getXTickCount(dataLength: number, maxTicks = 6): number {
 }
 
 export const CHART_PADDING = { top: 4, left: 48, bottom: 20, right: 4 } as const;
+
+export const TIME_X_PADDING: [number, number] = [16, 0];
+
+export function insetTimeTicks(ticks: unknown): TicksConfig | undefined {
+	if (typeof ticks !== 'number') return ticks as TicksConfig | undefined;
+	return (scale: AnyScale) =>
+		scale.ticks?.(ticks).filter((tick: Date) => scale(tick) >= TIME_X_PADDING[0]);
+}
 
 export const SMOOTH_CURVE = curveMonotoneX;
 
