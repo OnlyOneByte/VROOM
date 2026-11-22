@@ -13,15 +13,21 @@ import type { BackupConfig, StorageConfig, UnitPreferences } from '../types';
 import { DEFAULT_BACKUP_CONFIG, DEFAULT_STORAGE_CONFIG, DEFAULT_UNIT_PREFERENCES } from '../types';
 import type { SplitConfig } from './types';
 
-export const users = sqliteTable('users', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => createId()),
-  email: text('email').notNull().unique(),
-  displayName: text('display_name').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-});
+export const users = sqliteTable(
+  'users',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    email: text('email').notNull().unique(),
+    displayName: text('display_name').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    emailLowerIdx: uniqueIndex('users_email_lower_idx').on(sql`lower(${table.email})`),
+  })
+);
 
 export const vehicles = sqliteTable(
   'vehicles',

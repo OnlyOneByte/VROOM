@@ -29,6 +29,20 @@
       "when": 1795299310610,
       "tag": "0003_share_pending_invites",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1795315800000,
+      "tag": "0004_lowercase_user_emails",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1795315865161,
+      "tag": "0005_email_case_insensitive_unique",
+      "breakpoints": true
     }
   ]
 }

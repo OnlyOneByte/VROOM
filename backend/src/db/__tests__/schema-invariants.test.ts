@@ -405,3 +405,25 @@ describe('push subscriptions', () => {
     );
   });
 });
+
+describe('accounts: users_email_lower_idx', () => {
+  let db: Database;
+  beforeEach(() => {
+    db = new Database(':memory:');
+    db.run('PRAGMA foreign_keys = ON');
+    for (const migration of migrations) applyMigration(db, migration);
+    db.run("INSERT INTO users (id, email, display_name) VALUES ('u1', 'a@test.com', 'User A')");
+  });
+  afterEach(() => db.close());
+
+  test('a second account whose email differs only by case is rejected', () => {
+    expect(() =>
+      db.run("INSERT INTO users (id, email, display_name) VALUES ('u2', 'A@Test.com', 'User B')")
+    ).toThrow(/UNIQUE constraint failed/);
+  });
+
+  test('a different email is accepted', () => {
+    db.run("INSERT INTO users (id, email, display_name) VALUES ('u2', 'b@test.com', 'User B')");
+    expect(countRows(db, 'users')).toBe(2);
+  });
+});
