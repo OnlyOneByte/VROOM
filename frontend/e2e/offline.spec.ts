@@ -105,14 +105,14 @@ test.describe('Opening the app offline', () => {
 		await page.goto('/dashboard');
 		await page.evaluate(() => navigator.serviceWorker.ready);
 		await page.reload();
-		await page.goto('/expenses');
-		await expect(page.getByRole('heading', { name: 'All Expenses' })).toBeVisible();
+		await page.goto('/reminders');
+		await expect(page.getByRole('heading', { name: 'Reminders', exact: true })).toBeVisible();
 
 		await page.route('**/api/v1/**', route => route.abort('internetdisconnected'));
 		await context.setOffline(true);
 
 		await page.reload();
-		await expect(page.getByRole('heading', { name: 'All Expenses' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Reminders', exact: true })).toBeVisible();
 
 		await page.goto('/trips');
 		await expect(page.getByRole('heading', { name: "You're offline" })).toBeVisible();
@@ -120,6 +120,22 @@ test.describe('Opening the app offline', () => {
 			'href',
 			'/dashboard'
 		);
+	});
+
+	test('the dashboard opens offline without ever being visited', async ({ page, context }) => {
+		await page.goto('/reminders');
+		await page.evaluate(() => navigator.serviceWorker.ready);
+		await expect
+			.poll(() => page.evaluate(async () => !!(await caches.match(`${location.origin}/dashboard`))))
+			.toBe(true);
+
+		await context.route('**/api/v1/**', route => route.abort('internetdisconnected'));
+		await context.setOffline(true);
+
+		const coldStart = await context.newPage();
+		await coldStart.goto('/dashboard');
+		await expect(coldStart.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+		await expect(coldStart.getByRole('heading', { name: "You're offline" })).toHaveCount(0);
 	});
 
 	test('Add Expense lists the vehicles offline even if it was never opened online', async ({
