@@ -23,7 +23,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      # --- Frontend coverage ---
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
@@ -46,7 +45,6 @@ jobs:
         working-directory: ./frontend
         run: npx vitest --run --coverage
 
-      # --- Backend coverage ---
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -69,12 +67,10 @@ jobs:
         run: |
           bun test --coverage --timeout 30000 2>&1 | tee coverage-output.txt
 
-      # --- Generate badge JSON files ---
       - name: Generate badge data
         run: |
           mkdir -p .badges
 
-          # Frontend: read from vitest json-summary
           if [ -f frontend/coverage/coverage-summary.json ]; then
             FE_PCT=$(node -e "
               const data = require('./frontend/coverage/coverage-summary.json');
@@ -86,7 +82,6 @@ jobs:
             FE_PCT="0"
           fi
 
-          # Backend: parse bun coverage text output
           if [ -f backend/coverage-output.txt ]; then
             BE_PCT=$(grep "^All files" backend/coverage-output.txt | awk -F'|' '{gsub(/ /,"",$2); print $2}')
           else
@@ -100,7 +95,6 @@ jobs:
             BE_PCT="0"
           fi
 
-          # Color based on percentage
           get_color() {
             local pct=$1
             local int_pct=$(echo "$pct" | awk '{printf "%d", $1}')
@@ -115,7 +109,6 @@ jobs:
           FE_COLOR=$(get_color "$FE_PCT")
           BE_COLOR=$(get_color "$BE_PCT")
 
-          # Write shields.io endpoint JSON
           echo "{\"schemaVersion\":1,\"label\":\"frontend coverage\",\"message\":\"${FE_PCT}%\",\"color\":\"${FE_COLOR}\"}" > .badges/frontend-coverage.json
           echo "{\"schemaVersion\":1,\"label\":\"backend coverage\",\"message\":\"${BE_PCT}%\",\"color\":\"${BE_COLOR}\"}" > .badges/backend-coverage.json
 
@@ -127,7 +120,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Copy badges to temp location
           cp -r .badges /tmp/badges
 
           # Switch to orphan branch. Nothing here reads the remote branch — the badge files are

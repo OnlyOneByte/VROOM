@@ -173,7 +173,7 @@ export function svelteComments(source: string): string[] {
 
 export function commentsIn(path: string, source: string): string[] {
   let raw: string[] = [];
-  if (path.endsWith('.svelte')) raw = svelteComments(source);
+  if (path.endsWith('.svelte') || path.endsWith('.html')) raw = svelteComments(source);
   else if (path.endsWith('.css')) raw = cssComments(source);
   else if (SCRIPT_EXT.test(path)) raw = scriptComments(source);
   return raw.map(normalize).filter((text) => !isDirective(text));
@@ -190,7 +190,7 @@ function walk(dir: string, out: string[]): void {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
       if (!SKIP_DIRS.has(entry)) walk(full, out);
-    } else if (/\.(ts|js|mjs|cjs|svelte|css)$/.test(entry)) {
+    } else if (/\.(ts|js|mjs|cjs|svelte|css|html)$/.test(entry)) {
       out.push(full);
     }
   }

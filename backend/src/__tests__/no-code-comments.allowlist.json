@@ -228,6 +228,8 @@
   "frontend/scripts/type-check.mjs: svelte-check --tsgo never prunes its shadow .ts files, so stale ones would keep reporting errors.",
   "frontend/scripts/type-check.mjs: svelte-check's CJS bundle reads child_process.spawn at call time, so the patch must land before it loads.",
   "frontend/src/app.css: Text-colored tokens must clear WCAG AA 4.5:1 on white/card; light chart ambers do not.",
+  "frontend/src/app.html: Declare viewport and theme-color only here: safe-area insets need viewport-fit=cover, and themeStore rewrites the first theme-color tag.",
+  "frontend/src/app.html: Set data-theme before first paint, as themeStore does, so a custom theme doesn't flash the default look.",
   "frontend/src/lib/components/__tests__/VehicleManagement.test.ts: Date-only strings parse as UTC midnight, which shifts by timezone.",
   "frontend/src/lib/components/__tests__/VehicleManagement.test.ts: Local noon: a fixed UTC instant formats to another day at UTC+13/+14.",
   "frontend/src/lib/components/analytics/PerVehicleTab.svelte: Tier colours fail WCAG contrast as text on their tint; the ring and a label carry the tier.",

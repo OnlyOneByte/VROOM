@@ -33,5 +33,8 @@ ratchet({
     expect(
       commentsIn('a.svelte', '<!-- svelte-ignore a11y_click_events_have_key_events -->')
     ).toEqual([]);
+    expect(
+      commentsIn('app.html', '<head><!-- in head --></head>\n<script>\n// in script\n</script>')
+    ).toEqual(['in script', 'in head']);
   },
 });
