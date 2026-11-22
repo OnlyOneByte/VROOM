@@ -5,6 +5,7 @@
 	import { Car, Calendar, TrendingUp, DollarSign, Image as ImageIcon, Users } from '@lucide/svelte';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import * as Carousel from '#lib/components/ui/carousel/index.ts';
+	import type { CarouselAPI } from '#lib/components/ui/carousel/context.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
@@ -29,6 +30,22 @@
 	}
 
 	let { vehicles, isLoading = false }: Props = $props();
+
+	const CAROUSEL_ARROW_CLASS = 'top-28 bg-background/90 hover:bg-background shadow-md';
+
+	let canScrollPrev = $state(false);
+	let canScrollNext = $state(false);
+
+	function trackScrollRange(api: CarouselAPI | undefined) {
+		if (!api) return;
+		const sync = () => {
+			canScrollPrev = api.canScrollPrev();
+			canScrollNext = api.canScrollNext();
+		};
+		sync();
+		api.on('select', sync);
+		api.on('reInit', sync);
+	}
 </script>
 
 <Card.Root>
@@ -56,6 +73,7 @@
 					align: 'start',
 					loop: false
 				}}
+				setApi={trackScrollRange}
 				class="w-full relative"
 			>
 				<Carousel.Content class="-ml-2 md:-ml-4">
@@ -163,14 +181,16 @@
 						</Carousel.Item>
 					{/each}
 				</Carousel.Content>
-				{#if vehicles.length > 1}
+				{#if canScrollPrev || canScrollNext}
 					<Carousel.Previous
 						variant="ghost"
-						class="left-2 md:left-4 bg-background/90 hover:bg-background shadow-md"
+						aria-disabled={!canScrollPrev}
+						class="{CAROUSEL_ARROW_CLASS} left-2 md:left-4"
 					/>
 					<Carousel.Next
 						variant="ghost"
-						class="right-2 md:right-4 bg-background/90 hover:bg-background shadow-md"
+						aria-disabled={!canScrollNext}
+						class="{CAROUSEL_ARROW_CLASS} right-2 md:right-4"
 					/>
 				{/if}
 			</Carousel.Root>
