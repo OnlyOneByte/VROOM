@@ -191,7 +191,19 @@ describe('VehicleCarousel states', () => {
 		embla.resize(0);
 
 		await vi.waitFor(() => expect(screen.queryByRole('button', { name: 'Next slide' })).toBeNull());
-		expect(document.activeElement).toBe(screen.getByRole('region'));
+		expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Your Fleet' }));
+	});
+
+	test('the carousel region is named after the card title and shows the kit focus ring', () => {
+		embla.reset(1);
+		render(VehicleCarousel, {
+			vehicles: [overview(), overview({ id: 'v2', name: '2019 Honda Civic' })]
+		});
+		const region = screen.getByRole('region', { name: 'Your Fleet' });
+		expect(region.getAttribute('aria-roledescription')).toBe('carousel');
+		expect(region.className).toContain('focus-visible:ring-[3px]');
+		expect(region.className).toContain('focus-visible:ring-ring/50');
+		expect(region.className).toContain('outline-none');
 	});
 
 	test('a resize that removes the arrows leaves focus elsewhere alone', async () => {

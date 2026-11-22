@@ -30,6 +30,8 @@
 	}
 
 	let { vehicles, isLoading = false }: Props = $props();
+	const uid = $props.id();
+	const titleId = `${uid}-fleet-title`;
 
 	const CAROUSEL_ARROW_CLASS = 'top-28 bg-background/90 hover:bg-background shadow-md';
 
@@ -59,7 +61,7 @@
 	<Card.Header>
 		<div class="flex items-center justify-between">
 			<div>
-				<Card.Title level={2}>Your Fleet</Card.Title>
+				<Card.Title level={2} id={titleId}>Your Fleet</Card.Title>
 				<Card.Description>Click on a vehicle to view details</Card.Description>
 			</div>
 			<div class="p-2 rounded-lg bg-chart-2/10">
@@ -83,7 +85,8 @@
 				setApi={trackScrollRange}
 				bind:ref={carousel}
 				tabindex={-1}
-				class="w-full relative"
+				aria-labelledby={titleId}
+				class="w-full relative rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 			>
 				<Carousel.Content class="-ml-2 md:-ml-4">
 					{#each vehicles as vehicle (vehicle.id)}
