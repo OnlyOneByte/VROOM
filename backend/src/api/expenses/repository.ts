@@ -20,7 +20,8 @@ import { getDb } from '../../db/connection';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, photos } from '../../db/schema';
 import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
-import { DatabaseError, NotFoundError } from '../../errors';
+import type { DrizzleTransaction } from '../../db/types';
+import { DatabaseError, NotFoundError, ValidationError } from '../../errors';
 import { zonedCalendar } from '../../utils/analytics-charts';
 import { getPeriodStartDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
@@ -28,7 +29,12 @@ import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
 import { zonedDayWindow, zonedMidnight } from '../../utils/time-zone';
 import { expenseSplitService } from './split-service';
-import type { OdometerNeighbours, SplitConfig } from './validation';
+import {
+  type OdometerCheck,
+  type OdometerNeighbours,
+  odometerOrderError,
+  type SplitConfig,
+} from './validation';
 
 export interface ExpenseFilters {
   vehicleId?: string;
@@ -215,12 +221,10 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return { vehicleIds: [...new Set(rows.map((r) => r.vehicleId))], ownerId: rows[0].userId };
   }
 
-  async findOdometerNeighbours(
-    vehicleId: string,
-    date: Date,
-    timeZone: string,
-    excludeId?: string
-  ): Promise<OdometerNeighbours> {
+  private odometerNeighbours(
+    tx: DrizzleTransaction,
+    { vehicleId, date, timeZone, excludeId }: OdometerCheck
+  ): OdometerNeighbours {
     const day = zonedDayWindow(date, timeZone);
     const readingsWhere = (...bounds: SQL[]) =>
       and(
@@ -229,41 +233,44 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         ...bounds,
         excludeId ? ne(expenses.id, excludeId) : undefined
       );
-    const nearestDate = async (bound: SQL, order: SQL) => {
-      const [row] = await this.db
+    const nearestDay = (bound: SQL, order: SQL) => {
+      const row = tx
         .select({ date: expenses.date })
         .from(expenses)
         .where(readingsWhere(bound))
         .orderBy(order)
-        .limit(1);
+        .limit(1)
+        .get();
       return row ? zonedDayWindow(row.date, timeZone) : null;
     };
-    const [earlierDay, laterDay] = await Promise.all([
-      nearestDate(lt(expenses.date, day.dayStart), desc(expenses.date)),
-      nearestDate(gte(expenses.date, day.nextDay), asc(expenses.date)),
-    ]);
-    const [before, after] = await Promise.all([
-      earlierDay
-        ? this.db
-            .select({ mileage: max(expenses.mileage) })
-            .from(expenses)
-            .where(
-              readingsWhere(
-                gte(expenses.date, earlierDay.dayStart),
-                lt(expenses.date, day.dayStart)
-              )
-            )
-        : [],
-      laterDay
-        ? this.db
-            .select({ mileage: min(expenses.mileage) })
-            .from(expenses)
-            .where(
-              readingsWhere(gte(expenses.date, day.nextDay), lt(expenses.date, laterDay.nextDay))
-            )
-        : [],
-    ]);
-    return { before: before[0]?.mileage ?? null, after: after[0]?.mileage ?? null };
+    const earlierDay = nearestDay(lt(expenses.date, day.dayStart), desc(expenses.date));
+    const laterDay = nearestDay(gte(expenses.date, day.nextDay), asc(expenses.date));
+    const before = earlierDay
+      ? tx
+          .select({ mileage: max(expenses.mileage) })
+          .from(expenses)
+          .where(
+            readingsWhere(gte(expenses.date, earlierDay.dayStart), lt(expenses.date, day.dayStart))
+          )
+          .get()
+      : undefined;
+    const after = laterDay
+      ? tx
+          .select({ mileage: min(expenses.mileage) })
+          .from(expenses)
+          .where(
+            readingsWhere(gte(expenses.date, day.nextDay), lt(expenses.date, laterDay.nextDay))
+          )
+          .get()
+      : undefined;
+    return { before: before?.mileage ?? null, after: after?.mileage ?? null };
+  }
+
+  private assertOdometerInOrder(tx: DrizzleTransaction, check: OdometerCheck | null): void {
+    if (!check) return;
+    const neighbours = this.odometerNeighbours(tx, check);
+    const error = odometerOrderError(check.mileage, neighbours, check.initialMileage);
+    if (error) throw new ValidationError(error);
   }
 
   async findByClientId(clientId: string, userId: string): Promise<Expense | null> {
@@ -275,20 +282,48 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return result[0] ?? null;
   }
 
-  async createIdempotent(data: NewExpense): Promise<Expense> {
-    if (!data.clientId) {
-      return this.create(data);
-    }
-    const existing = await this.findByClientId(data.clientId, data.userId);
-    if (existing) return existing;
-
+  async createIdempotent(
+    data: NewExpense,
+    odometer: OdometerCheck | null = null
+  ): Promise<Expense> {
+    const { clientId, userId } = data;
     try {
-      return await this.create(data);
+      return this.db.transaction((tx) => {
+        if (clientId) {
+          const existing = tx
+            .select()
+            .from(expenses)
+            .where(and(eq(expenses.clientId, clientId), eq(expenses.userId, userId)))
+            .get();
+          if (existing) return existing;
+        }
+        this.assertOdometerInOrder(tx, odometer);
+        return tx.insert(expenses).values(data).returning().get();
+      });
     } catch (error) {
-      const raced = await this.findByClientId(data.clientId, data.userId);
+      if (!clientId || error instanceof ValidationError) throw error;
+      const raced = await this.findByClientId(clientId, userId);
       if (raced) return raced;
       throw error;
     }
+  }
+
+  async update(
+    id: string,
+    data: Partial<NewExpense>,
+    odometer: OdometerCheck | null = null
+  ): Promise<Expense> {
+    return this.db.transaction((tx) => {
+      this.assertOdometerInOrder(tx, odometer);
+      const updated = tx
+        .update(expenses)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(expenses.id, id))
+        .returning()
+        .get();
+      if (!updated) throw new NotFoundError('Resource');
+      return updated;
+    });
   }
 
   // bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.

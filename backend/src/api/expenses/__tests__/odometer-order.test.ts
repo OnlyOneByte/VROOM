@@ -130,6 +130,24 @@ describe('the odometer reading must fit between the entries around its date', ()
     expect(replay.status, JSON.stringify(replayBody)).toBeLessThan(300);
     expect(replayBody.data.id).toBe(firstBody.data.id);
   });
+
+  test('two conflicting saves sent at once cannot both be stored', async () => {
+    const statuses = await Promise.all([
+      fillUp('2024-03-01', 10_000).then((r) => r.status),
+      fillUp('2024-03-20', 9_000).then((r) => r.status),
+    ]);
+    expect(statuses.sort()).toEqual([201, 400]);
+  });
+
+  test('two conflicting edits sent at once cannot both be stored', async () => {
+    const early = await created('2024-03-01', 10_000);
+    const late = await created('2024-03-20', 11_000);
+    const statuses = await Promise.all([
+      ctx.authed('PUT', `/api/v1/expenses/${early}`, { mileage: 10_500 }).then((r) => r.status),
+      ctx.authed('PUT', `/api/v1/expenses/${late}`, { mileage: 10_200 }).then((r) => r.status),
+    ]);
+    expect(statuses.sort()).toEqual([200, 400]);
+  });
 });
 
 describe('the odometer check sees what the form sees', () => {

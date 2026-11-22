@@ -60,7 +60,7 @@ import { expenseRepository } from './repository';
 import {
   clearFuelFieldsIfNotFuel,
   createSplitExpenseSchema,
-  odometerOrderError,
+  type OdometerCheck,
   type SplitConfig,
   splitConfigVehicleIds,
   tagElementSchema,
@@ -69,33 +69,36 @@ import {
 
 const routes = new Hono();
 
-async function assertOdometerInOrder(
+async function odometerCheck(
   vehicleId: string,
   mileage: number | null | undefined,
   date: Date,
   excludeId?: string
-): Promise<void> {
-  if (mileage == null) return;
-  const [vehicle, neighbours] = await Promise.all([
-    vehicleRepository.findById(vehicleId),
-    expenseRepository.findOdometerNeighbours(vehicleId, date, 'UTC', excludeId),
-  ]);
-  const error = odometerOrderError(mileage, neighbours, vehicle?.initialMileage);
-  if (error) throw new ValidationError(error);
+): Promise<OdometerCheck | null> {
+  if (mileage == null) return null;
+  const vehicle = await vehicleRepository.findById(vehicleId);
+  return {
+    vehicleId,
+    mileage,
+    date,
+    timeZone: 'UTC',
+    excludeId,
+    initialMileage: vehicle?.initialMileage,
+  };
 }
 
-async function assertEditedOdometerInOrder(
+async function editedOdometerCheck(
   existing: Expense,
   next: { vehicleId: string; date: Date; mileage: number | null | undefined; category: string }
-): Promise<void> {
-  if (next.category !== 'fuel') return;
+): Promise<OdometerCheck | null> {
+  if (next.category !== 'fuel') return null;
   const unchanged =
     next.vehicleId === existing.vehicleId &&
     next.date.getTime() === existing.date.getTime() &&
     next.mileage === existing.mileage &&
     next.category === existing.category;
-  if (unchanged) return;
-  await assertOdometerInOrder(next.vehicleId, next.mileage, next.date, existing.id);
+  if (unchanged) return null;
+  return odometerCheck(next.vehicleId, next.mileage, next.date, existing.id);
 }
 
 const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
@@ -752,18 +755,10 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
     expenseData.fuelType
   );
 
-  const replay = expenseData.clientId
-    ? await expenseRepository.findByClientId(expenseData.clientId, ownerId)
-    : null;
-  if (!replay) {
-    await assertOdometerInOrder(expenseData.vehicleId, expenseData.mileage, expenseData.date);
-  }
-
-  const createdExpense = await expenseRepository.createIdempotent({
-    ...expenseData,
-    userId: ownerId,
-    createdBy,
-  });
+  const createdExpense = await expenseRepository.createIdempotent(
+    { ...expenseData, userId: ownerId, createdBy },
+    await odometerCheck(expenseData.vehicleId, expenseData.mileage, expenseData.date)
+  );
 
   if (createdExpense.mileage != null) {
     await reminderTriggerService.recheckMileageReminders(ownerId, createdExpense.vehicleId);
@@ -866,14 +861,14 @@ routes.put(
     validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalFuelType);
 
     const normalizedUpdate = clearFuelFieldsIfNotFuel(updateData, finalCategory);
-    await assertEditedOdometerInOrder(existingExpense, {
+    const odometer = await editedOdometerCheck(existingExpense, {
       vehicleId: updateData.vehicleId ?? existingExpense.vehicleId,
       date: updateData.date ?? existingExpense.date,
       mileage: finalMileage,
       category: finalCategory,
     });
 
-    const updatedExpense = await expenseRepository.update(id, normalizedUpdate);
+    const updatedExpense = await expenseRepository.update(id, normalizedUpdate, odometer);
 
     if (updatedExpense.mileage != null) {
       await reminderTriggerService.recheckMileageReminders(

@@ -9,6 +9,15 @@ export interface OdometerNeighbours {
   after: number | null;
 }
 
+export interface OdometerCheck {
+  vehicleId: string;
+  mileage: number;
+  date: Date;
+  timeZone: string;
+  excludeId?: string;
+  initialMileage?: number | null;
+}
+
 export function odometerOrderError(
   mileage: number,
   { before, after }: OdometerNeighbours,
