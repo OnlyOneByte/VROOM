@@ -126,8 +126,9 @@
 							onCheckedChange={checked => handleCategoryToggle(category, checked === true)}
 						/>
 						<div class="flex min-h-10 flex-1 items-center gap-1.5 sm:w-36 sm:flex-none sm:shrink-0">
-							<label for="{uid}-{category}" class="text-sm">{PHOTO_CATEGORY_LABELS[category]}</label
-							>
+							<label for="{uid}-{category}" class="text-sm">
+								{PHOTO_CATEGORY_LABELS[category]}
+							</label>
 							{#if isDefault}
 								<Badge variant="outline" class="text-xs px-1.5 py-0">default</Badge>
 							{/if}
@@ -138,9 +139,9 @@
 								: ''}"
 						>
 							{#if rootPrefix}
-								<span class="pl-2 text-muted-foreground select-none shrink-0 text-xs"
-									>{rootPrefix}{photoRootPath}/</span
-								>
+								<span class="pl-2 text-muted-foreground select-none shrink-0 text-xs">
+									{rootPrefix}{photoRootPath}/
+								</span>
 							{/if}
 							<input
 								value={setting?.folderPath ?? ''}

@@ -218,9 +218,9 @@
 									/>
 								</div>
 								<div class="space-y-1">
-									<Label for={`photo-${row.photoId}-date`} class="text-xs text-muted-foreground"
-										>Date</Label
-									>
+									<Label for={`photo-${row.photoId}-date`} class="text-xs text-muted-foreground">
+										Date
+									</Label>
 									<DatePicker
 										id={`photo-${row.photoId}-date`}
 										bind:value={() => row.date, v => (row.date = v ?? '')}
@@ -228,9 +228,12 @@
 									/>
 								</div>
 								<div class="space-y-1">
-									<Label for={`photo-${row.photoId}-category`} class="text-xs text-muted-foreground"
-										>Category</Label
+									<Label
+										for={`photo-${row.photoId}-category`}
+										class="text-xs text-muted-foreground"
 									>
+										Category
+									</Label>
 									<Select.Root
 										type="single"
 										value={row.category}
@@ -239,22 +242,22 @@
 										}}
 										disabled={!row.include}
 									>
-										<Select.Trigger id={`photo-${row.photoId}-category`} class="w-full"
-											>{categoryLabels[row.category]}</Select.Trigger
-										>
+										<Select.Trigger id={`photo-${row.photoId}-category`} class="w-full">
+											{categoryLabels[row.category]}
+										</Select.Trigger>
 										<Select.Content>
 											{#each CATEGORY_VALUES as c (c)}
-												<Select.Item value={c} label={categoryLabels[c]}
-													>{categoryLabels[c]}</Select.Item
-												>
+												<Select.Item value={c} label={categoryLabels[c]}>
+													{categoryLabels[c]}
+												</Select.Item>
 											{/each}
 										</Select.Content>
 									</Select.Root>
 								</div>
 								<div class="space-y-1">
-									<Label for={`photo-${row.photoId}-vehicle`} class="text-xs text-muted-foreground"
-										>Vehicle</Label
-									>
+									<Label for={`photo-${row.photoId}-vehicle`} class="text-xs text-muted-foreground">
+										Vehicle
+									</Label>
 									<Select.Root
 										type="single"
 										value={row.vehicleId}
@@ -263,9 +266,9 @@
 										}}
 										disabled={!row.include}
 									>
-										<Select.Trigger id={`photo-${row.photoId}-vehicle`} class="w-full"
-											>{vehicleLabel(row.vehicleId)}</Select.Trigger
-										>
+										<Select.Trigger id={`photo-${row.photoId}-vehicle`} class="w-full">
+											{vehicleLabel(row.vehicleId)}
+										</Select.Trigger>
 										<Select.Content>
 											{#each vehicles as v (v.id)}
 												<Select.Item value={v.id} label={getVehicleDisplayName(v)}>
@@ -283,8 +286,9 @@
 		</div>
 
 		<Dialog.Footer>
-			<Button variant="outline" onclick={() => (open = false)} disabled={isImporting}>Cancel</Button
-			>
+			<Button variant="outline" onclick={() => (open = false)} disabled={isImporting}>
+				Cancel
+			</Button>
 			{#if rows.length > 0 && !loadError}
 				<Button
 					onclick={handleImport}

@@ -221,12 +221,12 @@
 					<span>VROOM — Vehicle Record & Organization Of Maintenance</span>
 				</div>
 				<div class="flex items-center gap-4 text-sm text-muted-foreground">
-					<a href={resolve(routes.privacyPolicy)} class="hover:text-foreground transition-colors"
-						>Privacy Policy</a
-					>
-					<a href={resolve(routes.termsOfService)} class="hover:text-foreground transition-colors"
-						>Terms of Service</a
-					>
+					<a href={resolve(routes.privacyPolicy)} class="hover:text-foreground transition-colors">
+						Privacy Policy
+					</a>
+					<a href={resolve(routes.termsOfService)} class="hover:text-foreground transition-colors">
+						Terms of Service
+					</a>
 					<span>Open source. Self-hostable. Yours.</span>
 				</div>
 			</div>

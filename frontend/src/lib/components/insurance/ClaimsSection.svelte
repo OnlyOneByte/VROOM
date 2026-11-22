@@ -201,9 +201,9 @@
 
 <div class="space-y-3">
 	<div class="flex items-center justify-between">
-		<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground"
-			>Claims</svelte:element
-		>
+		<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground">
+			Claims
+		</svelte:element>
 		{#if !showForm && !readOnly}
 			<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={openNew}>
 				<Plus />
@@ -236,9 +236,9 @@
 						<div class="flex items-start justify-between gap-3">
 							<div class="min-w-0 flex-1">
 								<div class="flex flex-wrap items-center gap-2">
-									<span class="text-sm font-medium text-foreground"
-										>{capitalize(claim.claimType)}</span
-									>
+									<span class="text-sm font-medium text-foreground">
+										{capitalize(claim.claimType)}
+									</span>
 									<Badge variant={STATUS_VARIANT[claim.status]} class="text-xs">
 										{STATUS_LABELS[claim.status]}
 									</Badge>
@@ -347,9 +347,9 @@
 							value={claimType}
 							onValueChange={v => (claimType = v as ClaimType)}
 						>
-							<Select.Trigger id={`claim-type-${policyId}`} class="w-full"
-								>{capitalize(claimType)}</Select.Trigger
-							>
+							<Select.Trigger id={`claim-type-${policyId}`} class="w-full">
+								{capitalize(claimType)}
+							</Select.Trigger>
 							<Select.Content>
 								{#each CLAIM_TYPES as t (t)}
 									<Select.Item value={t} label={capitalize(t)}>{capitalize(t)}</Select.Item>
@@ -364,9 +364,9 @@
 							value={status}
 							onValueChange={v => (status = v as ClaimStatus)}
 						>
-							<Select.Trigger id={`claim-status-${policyId}`} class="w-full"
-								>{STATUS_LABELS[status]}</Select.Trigger
-							>
+							<Select.Trigger id={`claim-status-${policyId}`} class="w-full">
+								{STATUS_LABELS[status]}
+							</Select.Trigger>
 							<Select.Content>
 								{#each CLAIM_STATUSES as s (s)}
 									<Select.Item value={s} label={STATUS_LABELS[s]}>{STATUS_LABELS[s]}</Select.Item>

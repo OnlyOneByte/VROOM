@@ -44,9 +44,9 @@
 			{/each}
 		</div>
 	{/if}
-	{#if form.errors['vehicleIds']}<FormFieldError id="reminder-vehicles-error"
-			>{form.errors['vehicleIds']}</FormFieldError
-		>{/if}
+	{#if form.errors['vehicleIds']}<FormFieldError id="reminder-vehicles-error">
+			{form.errors['vehicleIds']}
+		</FormFieldError>{/if}
 </div>
 
 {#if form.showSplitEditor}

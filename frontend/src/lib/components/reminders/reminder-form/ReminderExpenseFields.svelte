@@ -36,8 +36,10 @@
 						{@const unavailable = c === 'fuel' && !fuelAllowed}
 						<Select.Item value={c} label={categoryLabels[c]} disabled={unavailable}>
 							{categoryLabels[c]}{#if unavailable}<span class="sr-only">, </span><span
-									class="text-xs text-muted-foreground">One vehicle only</span
-								>{/if}
+									class="text-xs text-muted-foreground"
+								>
+									One vehicle only
+								</span>{/if}
 						</Select.Item>
 					{/each}
 				</Select.Content>
@@ -60,13 +62,13 @@
 					aria-invalid={!!form.errors['expenseAmount']}
 				/>
 			</div>
-			{#if form.errors['expenseAmount']}<FormFieldError
-					>{form.errors['expenseAmount']}</FormFieldError
-				>{/if}
+			{#if form.errors['expenseAmount']}<FormFieldError>
+					{form.errors['expenseAmount']}
+				</FormFieldError>{/if}
 		</div>
 	</div>
-	{#if form.errors['expenseCategory']}<FormFieldError
-			>{form.errors['expenseCategory']}</FormFieldError
-		>{/if}
+	{#if form.errors['expenseCategory']}<FormFieldError>
+			{form.errors['expenseCategory']}
+		</FormFieldError>{/if}
 </div>
 <TagInput bind:tags={form.values.expenseTags} />

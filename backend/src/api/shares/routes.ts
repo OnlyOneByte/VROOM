@@ -1,8 +1,6 @@
-import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { getDb } from '../../db/connection';
-import { users } from '../../db/schema';
 import type { ApiResponse } from '../../errors';
 import {
   ConflictError,
@@ -13,6 +11,7 @@ import {
 import { changeTracker, requireAuth } from '../../middleware';
 import { commonSchemas, validateVehicleOwnership, zValidator } from '../../utils/validation';
 import {
+  findInviteeId,
   type GrantedShare,
   isActiveShareStatus,
   type ReceivedShare,
@@ -48,15 +47,10 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
     throw new ValidationError('You cannot share a vehicle with yourself');
   }
 
-  const db = getDb();
-  const [invitee] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(sql`lower(${users.email}) = ${email}`)
-    .limit(1);
+  const inviteeId = await findInviteeId(getDb(), email);
 
   const alreadyShared = new ConflictError('This vehicle is already shared with that email');
-  if (await vehicleShareRepository.findActiveInvite(vehicleId, email, invitee?.id ?? null)) {
+  if (await vehicleShareRepository.findActiveInvite(vehicleId, email, inviteeId)) {
     throw alreadyShared;
   }
 
@@ -64,7 +58,7 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
     .create({
       vehicleId,
       ownerId: user.id,
-      sharedWithId: invitee?.id ?? null,
+      sharedWithId: inviteeId,
       level,
       status: 'pending',
       invitedEmail: email,

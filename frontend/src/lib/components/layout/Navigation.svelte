@@ -233,9 +233,9 @@
 			<div class="flex h-8 items-center">
 				<BrandMark />
 				{#if isDesktopSidebarExpanded}
-					<span class={cn('ml-3 text-xl font-bold whitespace-nowrap', 'text-foreground')}
-						>VROOM</span
-					>
+					<span class={cn('ml-3 text-xl font-bold whitespace-nowrap', 'text-foreground')}>
+						VROOM
+					</span>
 				{/if}
 			</div>
 		</div>

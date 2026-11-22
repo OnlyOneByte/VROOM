@@ -798,9 +798,9 @@
 									aria-describedby={errors['initialMileage'] ? 'initialMileage-error' : undefined}
 								/>
 								{#if errors['initialMileage']}
-									<FormFieldError id="initialMileage-error"
-										>{errors['initialMileage']}</FormFieldError
-									>
+									<FormFieldError id="initialMileage-error">
+										{errors['initialMileage']}
+									</FormFieldError>
 								{/if}
 							</div>
 
@@ -817,8 +817,9 @@
 									aria-describedby={errors['purchasePrice'] ? 'purchasePrice-error' : undefined}
 								/>
 								{#if errors['purchasePrice']}
-									<FormFieldError id="purchasePrice-error">{errors['purchasePrice']}</FormFieldError
-									>
+									<FormFieldError id="purchasePrice-error">
+										{errors['purchasePrice']}
+									</FormFieldError>
 								{/if}
 							</div>
 
@@ -943,10 +944,12 @@
 											{volumeLabel}
 										</Select.Trigger>
 										<Select.Content>
-											<Select.Item value="gallons_us" label="Gallons (US)">Gallons (US)</Select.Item
-											>
-											<Select.Item value="gallons_uk" label="Gallons (UK)">Gallons (UK)</Select.Item
-											>
+											<Select.Item value="gallons_us" label="Gallons (US)">
+												Gallons (US)
+											</Select.Item>
+											<Select.Item value="gallons_uk" label="Gallons (UK)">
+												Gallons (UK)
+											</Select.Item>
 											<Select.Item value="liters" label="Liters">Liters</Select.Item>
 										</Select.Content>
 									</Select.Root>

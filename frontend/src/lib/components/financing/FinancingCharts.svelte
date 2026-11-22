@@ -104,9 +104,9 @@
 {#if showAmortizationChart}
 	<Card>
 		<CardHeader class="p-4 sm:p-6">
-			<CardTitle class="text-base sm:text-lg" id="amortization-chart-title"
-				>Amortization Schedule</CardTitle
-			>
+			<CardTitle class="text-base sm:text-lg" id="amortization-chart-title">
+				Amortization Schedule
+			</CardTitle>
 			<p class="text-xs sm:text-sm text-muted-foreground">
 				Payment breakdown per month — principal vs interest
 			</p>

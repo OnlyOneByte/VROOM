@@ -94,8 +94,24 @@ sw.addEventListener('fetch', (event: FetchEvent) => {
 	event.respondWith(networkFirstNavigation(key, network));
 });
 
+const WARM_PAGES = ['/dashboard', '/expenses', '/expenses/new'];
+
+async function warmPage(path: string): Promise<void> {
+	const url = new URL(path, sw.location.href).href;
+	const response = await fetch(url, {
+		credentials: 'same-origin',
+		signal: AbortSignal.timeout(NETWORK_TIMEOUT_MS)
+	});
+	if (response.ok && !response.redirected) await rememberPage(url, response);
+}
+
 sw.addEventListener('activate', (event: ExtendableEvent) => {
-	event.waitUntil(caches.delete(PAGE_CACHE));
+	event.waitUntil(
+		caches
+			.delete(PAGE_CACHE)
+			.then(() => Promise.allSettled(WARM_PAGES.map(warmPage)))
+			.catch(() => undefined)
+	);
 });
 
 interface PushPayload {

@@ -31,7 +31,10 @@ A failing test uses its full 90s timeout, so a red run takes much longer than a 
 
 ## What runs in CI
 
-The `frontend-test` job runs `npm run test:e2e:chromium` after `npm run build`, and uploads
+The `frontend-test` job runs `npm run test:e2e:chromium` after `npm run build`. It then runs
+the preview-only tests on the preview target: `E2E_TARGET=preview npx playwright test
+--project=chromium --grep "PWA surface|Opening the app offline"`. That covers the service
+worker, the manifest, the precache, and reloading the app offline. It uploads
 `playwright-report/` as an artifact (the axe violation JSON is attached there). Only Chromium
 runs in CI. The five-project matrix at `workers: 1` costs roughly five times as much, for
 regressions that are rarely engine-specific, so the other engines and the mobile viewports

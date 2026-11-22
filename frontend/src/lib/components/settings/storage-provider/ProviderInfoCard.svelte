@@ -289,9 +289,9 @@
 			<div class="space-y-3">
 				<div class="flex items-center justify-between">
 					<p class="text-sm font-medium text-muted-foreground">
-						Storage · <span class="font-mono text-xs"
-							>{(provider.config?.['photoRootPath'] as string) ?? 'Photos'}</span
-						>
+						Storage · <span class="font-mono text-xs">
+							{(provider.config?.['photoRootPath'] as string) ?? 'Photos'}
+						</span>
 					</p>
 					<Button
 						variant="outline"

@@ -71,9 +71,9 @@
 
 <div class="space-y-3">
 	<div class="flex items-center justify-between">
-		<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground"
-			>Documents</svelte:element
-		>
+		<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground">
+			Documents
+		</svelte:element>
 		{#if !readOnly}
 			<Button
 				variant="outline"

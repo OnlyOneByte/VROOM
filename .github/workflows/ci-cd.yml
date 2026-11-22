@@ -23,7 +23,6 @@ env:
   FRONTEND_IMAGE_NAME: ${{ github.repository }}/frontend
 
 jobs:
-  # Backend testing and validation
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
@@ -60,7 +59,6 @@ jobs:
       - name: Build application
         run: bun run build
 
-  # Frontend testing and validation
   frontend-test:
     name: Frontend Tests
     runs-on: ubuntu-latest
@@ -129,6 +127,11 @@ jobs:
         # /api/v1 call is mocked in-browser.
         run: npm run test:e2e:chromium
 
+      - name: Run preview-only E2E tests (service worker, manifest, offline reload)
+        env:
+          E2E_TARGET: preview
+        run: npx playwright test --project=chromium --grep "PWA surface|Opening the app offline"
+
       - name: Upload Playwright report
         # The axe scans attach their full violation JSON to the report; without this the
         # report dies with the runner and a red a11y gate says only "expected [] to equal".
@@ -139,7 +142,6 @@ jobs:
           path: frontend/playwright-report/
           retention-days: 7
 
-  # Build and push Docker images
   build-backend:
     name: Build Backend Docker Image
     runs-on: ubuntu-latest
@@ -238,7 +240,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Trigger deployment for self-hosted environments
   deploy:
     name: Trigger Deployment
     runs-on: ubuntu-latest

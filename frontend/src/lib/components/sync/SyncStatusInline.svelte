@@ -179,18 +179,18 @@
 			{#if backupEnabled.current || sheetsSyncEnabled.current}
 				<div class="flex items-center justify-between text-xs">
 					<span class="text-muted-foreground">Last backup</span>
-					<span class="text-foreground"
-						>{formatCompactRelativeTime(lastBackupTime.current ?? lastSheetsSync.current)}</span
-					>
+					<span class="text-foreground">
+						{formatCompactRelativeTime(lastBackupTime.current ?? lastSheetsSync.current)}
+					</span>
 				</div>
 			{/if}
 
 			{#if lastDataChangeTime.current}
 				<div class="flex items-center justify-between text-xs">
 					<span class="text-muted-foreground">Last change</span>
-					<span class="text-foreground"
-						>{formatCompactRelativeTime(lastDataChangeTime.current)}</span
-					>
+					<span class="text-foreground">
+						{formatCompactRelativeTime(lastDataChangeTime.current)}
+					</span>
 				</div>
 			{/if}
 

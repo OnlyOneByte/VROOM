@@ -14,6 +14,7 @@ interface FakeClient {
 
 interface FakeWorker {
 	__WB_MANIFEST: Array<{ url: string; revision: string | null }>;
+	location: URL;
 	listeners: Map<string, Listener>;
 	addEventListener: (type: string, listener: Listener) => void;
 	skipWaiting: ReturnType<typeof vi.fn>;
@@ -27,6 +28,7 @@ function createWorker(clientList: FakeClient[] = []): FakeWorker {
 	const listeners = new Map<string, Listener>();
 	return {
 		__WB_MANIFEST: MANIFEST,
+		location: new URL('https://vroom.test/service-worker.js'),
 		listeners,
 		addEventListener: (type, listener) => {
 			listeners.set(type, listener);
@@ -378,7 +380,7 @@ describe('navigation (network first)', () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-	test('a new worker drops the pages cached by the old build', async () => {
+	async function activate() {
 		let waited: Promise<unknown> | undefined;
 		worker.listeners.get('activate')!({
 			waitUntil: (promise: Promise<unknown>) => {
@@ -386,7 +388,45 @@ describe('navigation (network first)', () => {
 			}
 		});
 		await waited;
+	}
+
+	test('a new worker drops the pages cached by the old build', async () => {
+		await activate();
 
 		expect(pageCache.storage.delete).toHaveBeenCalledWith('vroom-pages');
+	});
+
+	test('a new worker warms the main pages so they open offline without a full load', async () => {
+		fetchMock.mockImplementation(async () => new Response('<p>shell</p>', { status: 200 }));
+
+		await activate();
+
+		expect([...pageCache.cache.pages.keys()].sort()).toEqual([
+			`${ORIGIN}/dashboard`,
+			`${ORIGIN}/expenses`,
+			`${ORIGIN}/expenses/new`
+		]);
+		expect(pageCache.storage.delete.mock.invocationCallOrder[0]).toBeLessThan(
+			pageCache.cache.put.mock.invocationCallOrder[0]!
+		);
+
+		fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+		const response = await dispatchFetch(navigation('/expenses/new?vehicleId=v1')).settled();
+		expect(await response?.text()).toBe('<p>shell</p>');
+	});
+
+	test('warming skips failed or redirected pages, and an offline activation still completes', async () => {
+		const redirected = new Response('<p>sign in</p>', { status: 200 });
+		Object.defineProperty(redirected, 'redirected', { value: true });
+		fetchMock.mockImplementation(async input => {
+			const url = String(input);
+			if (url.endsWith('/dashboard')) return redirected;
+			if (url.endsWith('/expenses')) return new Response('down', { status: 502 });
+			throw new TypeError('Failed to fetch');
+		});
+
+		await activate();
+
+		expect(pageCache.cache.pages.size).toBe(0);
 	});
 });

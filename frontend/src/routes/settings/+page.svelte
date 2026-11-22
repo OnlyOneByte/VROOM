@@ -264,11 +264,11 @@
 			<a href={resolve(routes.profile)} class="block w-full text-left">
 				<Card class="hover:bg-accent/50 transition-colors cursor-pointer">
 					<CardContent class="flex items-center gap-4 py-5">
-						<Avatar class="h-12 w-12"
-							><AvatarFallback class="bg-primary/10 text-primary text-sm font-medium"
-								>{initials}</AvatarFallback
-							></Avatar
-						>
+						<Avatar class="h-12 w-12">
+							<AvatarFallback class="bg-primary/10 text-primary text-sm font-medium">
+								{initials}
+							</AvatarFallback>
+						</Avatar>
 						<div class="flex-1 min-w-0">
 							<p class="text-sm font-semibold text-foreground truncate">
 								{user?.displayName ?? 'User'}

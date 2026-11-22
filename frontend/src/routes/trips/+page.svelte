@@ -138,8 +138,10 @@
 			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
 			<button
 				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-				onclick={load}>Retry</button
+				onclick={load}
 			>
+				Retry
+			</button>
 		</div>
 	{:else if trips.length === 0 && vehicles.length === 0}
 		<EmptyState>
@@ -246,9 +248,9 @@
 						<div class="flex shrink-0 flex-col items-end gap-2">
 							<div class="flex items-center gap-1 text-sm text-muted-foreground">
 								<Car class="h-4 w-4" aria-hidden="true" />
-								<span class="max-w-32 truncate"
-									>{vehicleNames.get(trip.vehicleId) ?? 'Vehicle'}</span
-								>
+								<span class="max-w-32 truncate">
+									{vehicleNames.get(trip.vehicleId) ?? 'Vehicle'}
+								</span>
 							</div>
 							<div class="flex items-center gap-1">
 								<Button

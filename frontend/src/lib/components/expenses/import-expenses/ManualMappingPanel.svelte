@@ -82,9 +82,9 @@
 	</div>
 
 	<div class="flex items-center gap-2">
-		<label for="manual-date-format" class="w-28 shrink-0 text-xs text-muted-foreground"
-			>Date format</label
-		>
+		<label for="manual-date-format" class="w-28 shrink-0 text-xs text-muted-foreground">
+			Date format
+		</label>
 		<Select.Root
 			type="single"
 			value={form.manualDateFormat}
@@ -103,9 +103,9 @@
 
 	{#if form.manualColumns.mileage}
 		<div class="flex items-center gap-2">
-			<label for="manual-distance-unit" class="w-28 shrink-0 text-xs text-muted-foreground"
-				>Odometer unit</label
-			>
+			<label for="manual-distance-unit" class="w-28 shrink-0 text-xs text-muted-foreground">
+				Odometer unit
+			</label>
 			<Select.Root
 				type="single"
 				value={form.manualDistanceUnit}
@@ -131,9 +131,9 @@
 
 	{#if form.manualColumns.volume}
 		<div class="flex items-center gap-2">
-			<label for="manual-volume-unit" class="w-28 shrink-0 text-xs text-muted-foreground"
-				>Volume unit</label
-			>
+			<label for="manual-volume-unit" class="w-28 shrink-0 text-xs text-muted-foreground">
+				Volume unit
+			</label>
 			<Select.Root
 				type="single"
 				value={form.manualVolumeUnit}

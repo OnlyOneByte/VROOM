@@ -33,9 +33,9 @@
 				<span class="text-muted-foreground text-sm">{unitLabel}</span>
 			</div>
 		</div>
-		{#if form.errors['intervalMileage']}<FormFieldError
-				>{form.errors['intervalMileage']}</FormFieldError
-			>{/if}
+		{#if form.errors['intervalMileage']}<FormFieldError>
+				{form.errors['intervalMileage']}
+			</FormFieldError>{/if}
 	</div>
 	<div class="space-y-2">
 		<Label for="reminder-last-service">Last serviced at</Label>
@@ -53,9 +53,9 @@
 				<span class="text-muted-foreground text-sm">{unitLabel}</span>
 			</div>
 		</div>
-		{#if form.errors['lastServiceOdometer']}<FormFieldError
-				>{form.errors['lastServiceOdometer']}</FormFieldError
-			>{/if}
+		{#if form.errors['lastServiceOdometer']}<FormFieldError>
+				{form.errors['lastServiceOdometer']}
+			</FormFieldError>{/if}
 	</div>
 </div>
 <p class="text-xs text-muted-foreground -mt-2">

@@ -68,9 +68,9 @@
 			<Smartphone class="h-5 w-5" />
 			Install App
 		</CardTitle>
-		<CardDescription
-			>Use VROOM as a standalone app for faster access and offline support</CardDescription
-		>
+		<CardDescription>
+			Use VROOM as a standalone app for faster access and offline support
+		</CardDescription>
 	</CardHeader>
 	<CardContent>
 		{#if isStandalone}
@@ -105,8 +105,9 @@
 					<li class="flex items-start gap-3">
 						<span
 							class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
-							>1</span
 						>
+							1
+						</span>
 						<span class="text-foreground">
 							Tap the <Share class="inline h-4 w-4 text-primary align-text-bottom" />
 							<span class="font-medium">Share</span> button in Safari's toolbar
@@ -115,8 +116,9 @@
 					<li class="flex items-start gap-3">
 						<span
 							class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
-							>2</span
 						>
+							2
+						</span>
 						<span class="text-foreground">
 							Scroll down and tap <Plus class="inline h-4 w-4 text-primary align-text-bottom" />
 							<span class="font-medium">Add to Home Screen</span>
@@ -125,8 +127,9 @@
 					<li class="flex items-start gap-3">
 						<span
 							class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
-							>3</span
 						>
+							3
+						</span>
 						<span class="text-foreground">
 							Tap <span class="font-medium">Add</span> to confirm
 						</span>

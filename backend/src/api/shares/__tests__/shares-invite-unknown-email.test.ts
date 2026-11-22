@@ -65,7 +65,7 @@ describe('POST /api/v1/shares answers the same way for every email', () => {
     expect(shareRow(unknown.body.data.id).shared_with_id).toBeNull();
   });
 
-  test('the account lookup ignores case and the stored email is lowercased', async () => {
+  test('the stored email is lowercased and only an exact account match is used', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     seedUser('u-mixed', 'Mixed.Case@Example.com');
 
@@ -73,7 +73,7 @@ describe('POST /api/v1/shares answers the same way for every email', () => {
 
     expect(status).toBe(201);
     expect(shareRow(body.data.id)).toEqual({
-      shared_with_id: 'u-mixed',
+      shared_with_id: null,
       invited_email: 'mixed.case@example.com',
     });
   });
@@ -138,5 +138,89 @@ describe('a pending invite attaches when that email signs up', () => {
 
     expect(shareRow(body.data.id).shared_with_id).toBe(result.userId);
     expect(await (await ctx.authed('GET', '/api/v1/shares/granted')).text()).toBe(grantedBefore);
+  });
+});
+
+describe('an invite only reaches the account with exactly its email', () => {
+  async function signUp(email: string, providerAccountId: string) {
+    const { resolveNewUser } = await import('../../auth/routes');
+    const result = await resolveNewUser('google', {
+      providerAccountId,
+      email,
+      displayName: 'Someone',
+    });
+    if (!('userId' in result)) throw new Error('expected a new user');
+    return result.userId;
+  }
+
+  test('a second account whose email differs only by case is refused and gets no invite', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    seedUser('u-exact', 'twin@example.com');
+
+    const { resolveNewUser } = await import('../../auth/routes');
+    const result = await resolveNewUser('google', {
+      providerAccountId: 'g-twin',
+      email: 'Twin@Example.com',
+      displayName: 'Someone',
+    });
+    const { body } = await invite(vehicleId, 'twin@example.com');
+
+    expect(result).toEqual({ redirect: expect.stringContaining('auth_error=email_exists') });
+    expect(
+      ctx.sqlite.query("SELECT id FROM users WHERE lower(email) = 'twin@example.com'").all()
+    ).toEqual([{ id: 'u-exact' }]);
+    expect(shareRow(body.data.id).shared_with_id).toBe('u-exact');
+  });
+
+  test('an invite reaches only the account with the exact lowercased email', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    seedUser('u-exact', 'twin@example.com');
+    seedUser('u-near', 'twin.other@example.com');
+
+    const { body } = await invite(vehicleId, 'TWIN@example.com');
+
+    expect(shareRow(body.data.id)).toEqual({
+      shared_with_id: 'u-exact',
+      invited_email: 'twin@example.com',
+    });
+  });
+
+  test('a mixed-case signup is stored lowercased and still receives its invite', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const { body } = await invite(vehicleId, 'Later.Twin@Example.com');
+    expect(shareRow(body.data.id).shared_with_id).toBeNull();
+
+    const userId = await signUp('LATER.twin@example.COM', 'g-later-twin');
+
+    expect(ctx.sqlite.query('SELECT email FROM users WHERE id = ?').get(userId)).toEqual({
+      email: 'later.twin@example.com',
+    });
+    expect(shareRow(body.data.id).shared_with_id).toBe(userId);
+  });
+
+  test('a signup stores its email lowercased', async () => {
+    const userId = await signUp('New.Person@Example.com', 'g-new');
+    expect(ctx.sqlite.query('SELECT email FROM users WHERE id = ?').get(userId)).toEqual({
+      email: 'new.person@example.com',
+    });
+  });
+
+  test('a signup still succeeds when its invites cannot be attached', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const { body } = await invite(vehicleId, 'blocked@example.com');
+    ctx.sqlite.run(
+      "CREATE TRIGGER refuse_attach BEFORE UPDATE OF shared_with_id ON vehicle_shares BEGIN SELECT RAISE(ABORT, 'refused'); END"
+    );
+    let userId: string;
+    try {
+      userId = await signUp('blocked@example.com', 'g-blocked');
+    } finally {
+      ctx.sqlite.run('DROP TRIGGER refuse_attach');
+    }
+
+    expect(ctx.sqlite.query('SELECT id FROM users WHERE id = ?').get(userId)).toEqual({
+      id: userId,
+    });
+    expect(shareRow(body.data.id).shared_with_id).toBeNull();
   });
 });
