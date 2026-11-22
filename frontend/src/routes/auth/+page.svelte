@@ -126,7 +126,7 @@
 					</div>
 				{:else if providers.length === 0}
 					<div class="text-center py-6">
-						<p class="text-sm text-muted-foreground">
+						<p class="text-sm text-muted-foreground" role="status">
 							Sign-in is currently unavailable. No providers are enabled.
 						</p>
 					</div>

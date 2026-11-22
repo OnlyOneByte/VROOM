@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -67,6 +67,7 @@
 	let providers = $state<UserProviderInfo[]>([]);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
+	let content = $state<HTMLElement | null>(null);
 
 	let dialogOpen = $state(false);
 	let editingId = $state<string | null>(null);
@@ -104,6 +105,12 @@
 	}
 
 	onMount(loadData);
+
+	async function retryLoad() {
+		await loadData();
+		await tick();
+		content?.querySelector('button')?.focus();
+	}
 
 	function openCreate() {
 		editingId = null;
@@ -206,15 +213,15 @@
 		</div>
 		<CardDescription>{copy.description}</CardDescription>
 	</CardHeader>
-	<CardContent>
+	<CardContent bind:ref={content}>
 		{#if isLoading}
 			<div class="flex items-center justify-center py-8">
 				<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 			</div>
 		{:else if error}
 			<div class="space-y-3" data-testid="{domain}-provider-error">
-				<p class="text-sm text-destructive">{error}</p>
-				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={loadData}>Retry</Button>
+				<p class="text-sm text-destructive" role="alert">{error}</p>
+				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={retryLoad}>Retry</Button>
 			</div>
 		{:else}
 			<div class="space-y-3">

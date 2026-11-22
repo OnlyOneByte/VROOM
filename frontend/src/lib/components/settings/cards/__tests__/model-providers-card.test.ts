@@ -174,6 +174,18 @@ describe('ModelProvidersCard', () => {
 		expect(await screen.findByText('Work Claude')).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
 		expect(getProviders).toHaveBeenCalledTimes(2);
+		await waitFor(() => expect(screen.getByTestId('llm-add-provider')).toHaveFocus());
+	});
+
+	test('a failed Retry announces the error and keeps focus on the new Retry', async () => {
+		getProviders.mockRejectedValue(new ApiError('boom', 500));
+		render(ModelProvidersCard, { props: { domain: 'llm' } });
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+		await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus());
+		expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load your assistant providers.");
+		expect(getProviders).toHaveBeenCalledTimes(2);
 	});
 
 	test('a server failure on load shows a plain sentence, not the raw server message', async () => {

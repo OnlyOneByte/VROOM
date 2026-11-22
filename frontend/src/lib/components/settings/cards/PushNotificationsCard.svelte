@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { Bell, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
@@ -23,6 +23,7 @@
 	let isToggling = $state(false);
 	let loadError = $state<string | null>(null);
 	let showDisclosure = $state(false);
+	let content = $state<HTMLElement | null>(null);
 
 	let statusLine = $derived(pushUtil.pushStatusLabel(status));
 	let toggleable = $derived(status === 'off' || status === 'subscribed');
@@ -50,6 +51,12 @@
 	}
 
 	onMount(loadStatus);
+
+	async function retryStatus() {
+		await loadStatus();
+		await tick();
+		content?.querySelector('button')?.focus();
+	}
 
 	function isDisclosed(): boolean {
 		return typeof localStorage !== 'undefined' && localStorage.getItem(DISCLOSURE_KEY) === '1';
@@ -130,15 +137,15 @@
 			schedule.
 		</CardDescription>
 	</CardHeader>
-	<CardContent>
+	<CardContent bind:ref={content}>
 		{#if isLoading}
 			<div class="flex items-center justify-center py-6" data-testid="push-loading">
 				<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
 			</div>
 		{:else if status === 'error'}
 			<div class="space-y-3" data-testid="push-error">
-				<p class="text-sm text-destructive">{loadError}</p>
-				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={loadStatus}>Retry</Button>
+				<p class="text-sm text-destructive" role="alert">{loadError}</p>
+				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={retryStatus}>Retry</Button>
 			</div>
 		{:else}
 			<div class="flex items-center justify-between gap-4" data-testid="push-card">
