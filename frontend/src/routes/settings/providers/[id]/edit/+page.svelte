@@ -1,10 +1,13 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { LoaderCircle } from '@lucide/svelte';
+	import { ArrowLeft, CircleAlert, LoaderCircle } from '@lucide/svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import PageHeader from '#lib/components/common/page-header.svelte';
 	import ProviderForm from '#lib/components/settings/storage-provider/form/ProviderForm.svelte';
 	import { providerApi } from '#lib/services/provider-api.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
@@ -29,12 +32,14 @@
 	let folderSettings = $state<Record<PhotoCategory, CategorySetting> | null>(null);
 	let defaultCategories = new SvelteSet<PhotoCategory>();
 	let isLoading = $state(true);
+	let notFound = $state(false);
 	let error = $state<string | null>(null);
+	let stateCard = $state<HTMLElement | null>(null);
 
 	async function loadProvider() {
 		const id = providerId;
 		if (!id) {
-			error = 'Provider not found';
+			notFound = true;
 			isLoading = false;
 			return;
 		}
@@ -45,7 +50,7 @@
 			]);
 			const found = providers.find(p => p.id === id);
 			if (!found) {
-				error = 'Provider not found';
+				notFound = true;
 				return;
 			}
 			provider = found;
@@ -67,7 +72,7 @@
 				if (pid === id) defaultCategories.add(cat as PhotoCategory);
 			}
 		} catch (e) {
-			error = `Couldn't load the provider. ${userFacingErrorMessage(e)}`;
+			error = userFacingErrorMessage(e);
 		} finally {
 			isLoading = false;
 		}
@@ -76,6 +81,18 @@
 	onMount(() => {
 		loadProvider();
 	});
+
+	async function retryLoad() {
+		isLoading = true;
+		error = null;
+		await loadProvider();
+		await tick();
+		stateCard?.querySelector('button')?.focus();
+	}
+
+	function backToSettings() {
+		goto(resolve(routes.settings));
+	}
 </script>
 
 <svelte:head>
@@ -83,21 +100,55 @@
 	<meta name="description" content="Edit photo storage provider settings" />
 </svelte:head>
 
-{#if isLoading}
-	<div class="flex items-center justify-center py-12">
-		<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
-	</div>
-{:else if error}
-	<div class="max-w-2xl mx-auto text-center py-12">
-		<p class="text-sm text-destructive mb-4">{error}</p>
-		<button
-			type="button"
-			class="text-sm text-muted-foreground hover:text-foreground transition-colors"
-			onclick={() => goto(resolve(routes.settings))}
-		>
-			Back to Settings
-		</button>
-	</div>
+{#snippet header()}
+	<PageHeader title="Edit Provider" description="Update your storage provider configuration">
+		{#snippet back()}
+			<Button
+				variant="ghost"
+				size="icon-lg"
+				class="shrink-0"
+				aria-label="Back to Settings"
+				onclick={backToSettings}
+			>
+				<ArrowLeft class="size-5" />
+			</Button>
+		{/snippet}
+	</PageHeader>
+{/snippet}
+
+{#if isLoading || notFound || error}
+	<FormLayout>
+		<div class="space-y-6">
+			{@render header()}
+			{#if isLoading}
+				<div class="flex items-center justify-center py-12" role="status">
+					<LoaderCircle class="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
+					<span class="sr-only">Loading provider</span>
+				</div>
+			{:else}
+				<div class="rounded-lg border bg-card p-6" bind:this={stateCard}>
+					<div role={notFound ? undefined : 'alert'}>
+						<div class="mb-4 flex items-center gap-3 text-destructive">
+							<CircleAlert class="h-5 w-5" aria-hidden="true" />
+							<p class="font-medium">
+								{notFound ? 'Provider not found' : "Couldn't load this provider"}
+							</p>
+						</div>
+						<p class="mb-4 text-sm text-muted-foreground">
+							{notFound
+								? 'It may have been removed. Go back to Settings to see your storage providers.'
+								: error}
+						</p>
+					</div>
+					{#if notFound}
+						<Button size="lg" variant="outline" onclick={backToSettings}>Back to Settings</Button>
+					{:else}
+						<Button size="lg" onclick={retryLoad}>Retry</Button>
+					{/if}
+				</div>
+			{/if}
+		</div>
+	</FormLayout>
 {:else if provider && folderSettings}
 	<ProviderForm
 		{providerId}
