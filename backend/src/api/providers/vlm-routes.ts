@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { getDb } from '../../db/connection';
 import { userProviders } from '../../db/schema';
-import { AppError, ValidationError } from '../../errors';
+import { AppError, PayloadTooLargeError, ValidationError } from '../../errors';
 import { bodyLimit, changeTracker, requireAuth } from '../../middleware';
 import { logger } from '../../utils/logger';
 import { parseExtraction } from './domains/vlm/prompt';
@@ -54,7 +54,7 @@ routes.post('/parse', async (c) => {
   const bytes = Buffer.from(await file.arrayBuffer());
   // bodyLimit only checks Content-Length; a chunked upload can omit it.
   if (bytes.byteLength > MAX_IMAGE_BYTES) {
-    throw new AppError('Receipt image exceeds the 8MB limit', 413);
+    throw new PayloadTooLargeError('Receipt image exceeds the 8MB limit');
   }
 
   const provider = getVlmProvider(providerRow);

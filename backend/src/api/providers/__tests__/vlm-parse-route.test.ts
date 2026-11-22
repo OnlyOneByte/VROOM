@@ -154,6 +154,19 @@ describe('POST /api/v1/receipts/parse', () => {
     expect(res.status).toBe(400);
   });
 
+  test('an oversized image sent without Content-Length → 413 with the PAYLOAD_TOO_LARGE code', async () => {
+    await seedVlmProvider();
+    stubModel('{"amount": 1}');
+    const res = await postImage(new Uint8Array(8 * 1024 * 1024 + 1), 'image/jpeg');
+
+    expect(res.status).toBe(413);
+    const body = await json<{ error: { code: string; message: string } }>(res);
+    expect(body.error).toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: 'Receipt image exceeds the 8MB limit',
+    });
+  });
+
   test('the api key is never echoed in the response', async () => {
     await seedVlmProvider();
     stubModel('{"amount": 9.99}');
