@@ -287,7 +287,7 @@ describe('calculatePayoffDate', () => {
 			makeLoan({ apr: 0, computedBalance: 1_001, paymentAmount: 100 })
 		);
 		expect(payoff.getFullYear()).toBe(2026);
-		expect(payoff.getMonth()).toBe(4);
+		expect(payoff.getMonth()).toBe(3);
 		expect(payoff.getDate()).toBe(10);
 	});
 
@@ -300,44 +300,61 @@ describe('calculatePayoffDate', () => {
 				paymentFrequency: 'weekly'
 			})
 		);
-		expect(Math.round((payoff.getTime() - NOW.getTime()) / DAY)).toBe(19);
+		expect(Math.round((payoff.getTime() - NOW.getTime()) / DAY)).toBe(12);
 	});
 
 	test('a zero-apr bi-weekly loan counts payments in fortnights from the next due date', () => {
 		const payoff = calculatePayoffDate(
 			makeLoan({ apr: 0, computedBalance: 250, paymentAmount: 100, paymentFrequency: 'bi-weekly' })
 		);
-		expect(Math.round((payoff.getTime() - NOW.getTime()) / DAY)).toBe(40);
+		expect(Math.round((payoff.getTime() - NOW.getTime()) / DAY)).toBe(26);
 	});
 
 	test('an interest-bearing loan pays off after the simulated number of payments', () => {
 		const payoff = calculatePayoffDate(
 			makeLoan({ apr: 12, computedBalance: 1_000, paymentAmount: 510 })
 		);
-		expect(payoff.getMonth()).toBe(7);
+		expect(payoff.getMonth()).toBe(6);
 		expect(payoff.getDate()).toBe(10);
 	});
 
-	test.each([
-		['the day before the due day', new Date(2026, 10, 14, 12), new Date(2029, 9, 15)],
-		['a week after the due day', new Date(2026, 10, 22, 12), new Date(2029, 10, 15)]
-	])('opened %s, a loan pays off on its last due date', (_label, openedOn, lastDue) => {
-		vi.setSystemTime(openedOn);
-		const payoff = calculatePayoffDate(
-			makeLoan({
-				apr: 0,
-				startDate: '2024-11-15T12:00:00',
-				termMonths: 60,
-				paymentDayOfMonth: 15,
-				computedBalance: 3_600,
-				paymentAmount: 100
-			})
-		);
-		expect([payoff.getFullYear(), payoff.getMonth(), payoff.getDate()]).toEqual([
-			lastDue.getFullYear(),
-			lastDue.getMonth(),
-			lastDue.getDate()
-		]);
+	test.each<[string, Date, Date | undefined, number]>([
+		['the day before the due day', new Date(2026, 10, 14, 12), new Date(2026, 9, 15), 37],
+		['a week after the due day', new Date(2026, 10, 22, 12), new Date(2026, 10, 15), 36],
+		['after paying a few days early', new Date(2026, 10, 12, 12), new Date(2026, 10, 12), 36],
+		['with one payment overdue', new Date(2026, 10, 22, 12), new Date(2026, 9, 15), 37]
+	])(
+		'opened %s, a loan pays off on its last due date',
+		(_label, openedOn, lastPaymentDate, paymentsLeft) => {
+			vi.setSystemTime(openedOn);
+			const payoff = calculatePayoffDate(
+				makeLoan({
+					apr: 0,
+					startDate: '2024-11-22T12:00:00',
+					termMonths: 60,
+					paymentDayOfMonth: 15,
+					computedBalance: paymentsLeft * 100,
+					paymentAmount: 100
+				}),
+				{ lastPaymentDate }
+			);
+			expect([payoff.getFullYear(), payoff.getMonth(), payoff.getDate()]).toEqual([2029, 10, 15]);
+		}
+	);
+
+	test('while payments are still loading, the payoff counts from the same date as the next payment', () => {
+		vi.setSystemTime(new Date(2026, 10, 22, 12));
+		const financing = makeLoan({
+			apr: 0,
+			startDate: '2024-11-22T12:00:00',
+			termMonths: 60,
+			paymentDayOfMonth: 15,
+			computedBalance: 3_600,
+			paymentAmount: 100
+		});
+		const payoff = calculatePayoffDate(financing, { assumeLastDuePaid: true });
+		expect(calculateNextPaymentDate(financing, undefined, true).getMonth()).toBe(11);
+		expect([payoff.getFullYear(), payoff.getMonth(), payoff.getDate()]).toEqual([2029, 10, 15]);
 	});
 
 	test('interest lengthens the payoff compared with the same balance at zero apr', () => {
@@ -405,7 +422,7 @@ describe('calculateExtraPaymentImpact', () => {
 		expect(impact.interestSaved).toBeCloseTo(9.648_75, 6);
 		expect(impact.totalSavings).toBe(impact.interestSaved);
 		expect(impact.newPayoffDate.getMonth()).toBe(8);
-		expect(impact.newPayoffDate.getDate()).toBe(10);
+		expect(impact.newPayoffDate.getDate()).toBe(15);
 	});
 
 	test('an extra payment on a zero-apr loan saves months but no interest', () => {

@@ -186,22 +186,31 @@ function lastDueIndex(financing: VehicleFinancing, start: Date, now: Date): numb
 			: financing.paymentFrequency === 'bi-weekly'
 				? 14
 				: 365.25 / 12;
-	let index = Math.max(1, Math.floor((now.getTime() - start.getTime()) / (periodDays * MS_PER_DAY)));
+	let index = Math.max(
+		1,
+		Math.floor((now.getTime() - start.getTime()) / (periodDays * MS_PER_DAY))
+	);
 	while (index > 1 && scheduledDueDate(financing, start, index) > now) index--;
 	while (scheduledDueDate(financing, start, index + 1) <= now) index++;
 	return index;
 }
 
-function dueDateOfLastRemainingPayment(financing: VehicleFinancing, paymentsRemaining: number): Date {
+function dueDateOfLastRemainingPayment(
+	financing: VehicleFinancing,
+	paymentsRemaining: number,
+	nextPayment: { lastPaymentDate?: Date; assumeLastDuePaid?: boolean }
+): Date {
 	const start = new Date(financing.startDate);
-	const now = new Date();
 	if (isNaN(start.getTime())) {
-		return calculatePaymentDate(now, paymentsRemaining, financing.paymentFrequency);
+		return calculatePaymentDate(new Date(), paymentsRemaining, financing.paymentFrequency);
 	}
-	const index = lastDueIndex(financing, start, now);
-	const nextIndex =
-		calendarDay(scheduledDueDate(financing, start, index)) >= calendarDay(now) ? index : index + 1;
-	return scheduledDueDate(financing, start, nextIndex + Math.max(1, paymentsRemaining) - 1);
+	const nextDue = calculateNextPaymentDate(
+		financing,
+		nextPayment.lastPaymentDate,
+		nextPayment.assumeLastDuePaid
+	);
+	const nextIndex = lastDueIndex(financing, start, nextDue);
+	return scheduledDueDate(financing, start, nextIndex + paymentsRemaining - 1);
 }
 
 export function calculateNextPaymentDate(
@@ -249,7 +258,10 @@ export function calculateNextPaymentDate(
 	}
 }
 
-export function calculatePayoffDate(financing: VehicleFinancing): Date {
+export function calculatePayoffDate(
+	financing: VehicleFinancing,
+	nextPayment: { lastPaymentDate?: Date; assumeLastDuePaid?: boolean } = {}
+): Date {
 	try {
 		if (!financing) {
 			if (DEV) console.warn('calculatePayoffDate: financing is null or undefined');
@@ -275,7 +287,7 @@ export function calculatePayoffDate(financing: VehicleFinancing): Date {
 
 		if (!financing.apr || financing.apr <= 0) {
 			const paymentsRemaining = Math.ceil(remainingBalance(financing) / financing.paymentAmount);
-			return dueDateOfLastRemainingPayment(financing, paymentsRemaining);
+			return dueDateOfLastRemainingPayment(financing, paymentsRemaining, nextPayment);
 		}
 
 		const monthlyRate = financing.apr / 100 / 12;
@@ -295,7 +307,7 @@ export function calculatePayoffDate(financing: VehicleFinancing): Date {
 			paymentsRemaining++;
 		}
 
-		return dueDateOfLastRemainingPayment(financing, paymentsRemaining);
+		return dueDateOfLastRemainingPayment(financing, paymentsRemaining, nextPayment);
 	} catch (error) {
 		if (DEV) console.error('Error calculating payoff date:', error);
 		return new Date();
@@ -359,7 +371,11 @@ function calculateExtraPaymentImpactImpl(
 
 		const monthsSaved = Math.max(0, original.months - accelerated.months);
 		const interestSaved = Math.max(0, original.totalInterest - accelerated.totalInterest);
-		const newPayoffDate = dueDateOfLastRemainingPayment(financing, accelerated.months);
+		const newPayoffDate = calculatePaymentDate(
+			new Date(),
+			accelerated.months,
+			financing.paymentFrequency
+		);
 
 		return {
 			extraPaymentAmount,

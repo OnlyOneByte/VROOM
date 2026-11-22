@@ -82,7 +82,11 @@
 		try {
 			const financing = vehicle?.financing;
 			if (!financing || !financing.isActive) return new Date();
-			return calculatePayoffDate(financing);
+			const lastPayment = payments.at(-1);
+			return calculatePayoffDate(financing, {
+				lastPaymentDate: lastPayment ? new Date(lastPayment.expense.date) : undefined,
+				assumeLastDuePaid: !paymentsLoaded
+			});
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error calculating payoff date:', error);
 			return new Date();
