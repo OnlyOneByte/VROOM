@@ -121,7 +121,9 @@
 			</LineChart>
 		</Chart.Container>
 	</div>
-	{#if series.length > 1}
-		<ChartLegend items={series} class="mt-3 justify-center" />
-	{/if}
+	{#snippet legend()}
+		{#if series.length > 1}
+			<ChartLegend items={series} class="mt-3 justify-center" />
+		{/if}
+	{/snippet}
 </ChartCard>
