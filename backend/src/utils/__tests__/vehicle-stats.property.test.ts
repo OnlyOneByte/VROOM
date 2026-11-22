@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { ELECTRIC_FUEL_TYPES, isElectricFuelType } from '../../db/types';
+import { averageConsecutiveMpg } from '../calculations';
 import { calculateVehicleStats, type FuelExpense } from '../vehicle-stats';
 
 function makeFuelExpense(overrides: {
@@ -21,126 +22,71 @@ function makeFuelExpense(overrides: {
   };
 }
 
-function referenceMpg(expenses: FuelExpense[]): { mpgValues: number[]; avg: number | null } {
-  const mpgValues: number[] = [];
-  for (let i = 1; i < expenses.length; i++) {
-    const current = expenses[i];
-    const previous = expenses[i - 1];
-    if (current.missedFillup || previous.missedFillup) continue;
-    if (current.mileage && previous.mileage && current.volume) {
-      const miles = current.mileage - previous.mileage;
-      const mpg = miles / current.volume;
-      if (mpg >= 5 && mpg <= 100) {
-        mpgValues.push(mpg);
-      }
-    }
-  }
-  if (mpgValues.length === 0) return { mpgValues, avg: null };
-  return { mpgValues, avg: mpgValues.reduce((s, v) => s + v, 0) / mpgValues.length };
-}
-
-function countUnfilteredPairs(expenses: FuelExpense[]): number {
-  let count = 0;
-  for (let i = 1; i < expenses.length; i++) {
-    const current = expenses[i];
-    const previous = expenses[i - 1];
-    if (current.mileage && previous.mileage && current.volume) {
-      const miles = current.mileage - previous.mileage;
-      const mpg = miles / current.volume;
-      if (mpg >= 5 && mpg <= 100) count++;
-    }
-  }
-  return count;
-}
-
-const fuelExpenseListArb = fc.integer({ min: 2, max: 20 }).chain((len) =>
-  fc.tuple(
-    ...Array.from({ length: len }, (_, i) =>
-      fc.record({
-        mileage: fc.integer({ min: 10000 + i * 200, max: 10000 + i * 200 + 199 }),
-        volume: fc.double({ min: 5, max: 25, noNaN: true }),
-        missedFillup: fc.boolean(),
-        index: fc.constant(i),
-      })
-    )
+const inBandListArb = fc
+  .array(
+    fc.record({
+      miles: fc.integer({ min: 100, max: 300 }),
+      volume: fc.double({ min: 5, max: 20, noNaN: true }),
+    }),
+    { minLength: 2, maxLength: 20 }
   )
-);
+  .map((rows) => {
+    let mileage = 10000;
+    return rows.map((row, index) => {
+      mileage += row.miles;
+      return makeFuelExpense({ mileage, volume: row.volume, missedFillup: false, index });
+    });
+  });
 
-const allUnflaggedListArb = fc.integer({ min: 2, max: 20 }).chain((len) =>
-  fc.tuple(
-    ...Array.from({ length: len }, (_, i) =>
-      fc.record({
-        mileage: fc.integer({ min: 10000 + i * 200, max: 10000 + i * 200 + 199 }),
-        volume: fc.double({ min: 5, max: 25, noNaN: true }),
-        missedFillup: fc.constant(false),
-        index: fc.constant(i),
-      })
-    )
-  )
-);
-
-function verifyMpgValuesMatchReference(expenses: FuelExpense[], mpgValues: number[]): void {
-  let validIdx = 0;
+function pooledMpgSkippingIntervalsEndingAt(
+  expenses: FuelExpense[],
+  flagged: Set<number>
+): number | null {
+  let miles = 0;
+  let fuel = 0;
   for (let i = 1; i < expenses.length; i++) {
-    const current = expenses[i];
-    const previous = expenses[i - 1];
-    if (current.missedFillup || previous.missedFillup) continue;
-    if (current.mileage && previous.mileage && current.volume) {
-      const miles = current.mileage - previous.mileage;
-      const mpg = miles / current.volume;
-      if (mpg >= 5 && mpg <= 100) {
-        expect(mpgValues[validIdx]).toBeCloseTo(mpg, 5);
-        validIdx++;
-      }
-    }
+    if (flagged.has(i)) continue;
+    miles += (expenses[i].mileage as number) - (expenses[i - 1].mileage as number);
+    fuel += expenses[i].volume as number;
   }
-  expect(validIdx).toBe(mpgValues.length);
+  return fuel > 0 ? miles / fuel : null;
 }
 
-describe('missed fill-up pairs are excluded from calculations', () => {
-  test('pairs where current.missedFillup === true are never included', () => {
+function flag(expenses: FuelExpense[], indexes: Set<number>): FuelExpense[] {
+  return expenses.map((e, i) => (indexes.has(i) ? { ...e, missedFillup: true } : e));
+}
+
+describe('averageConsecutiveMpg skips only the interval that ends at a missed fill-up', () => {
+  test('flagged entries drop exactly the intervals that end at them', () => {
     fc.assert(
-      fc.property(fuelExpenseListArb, (inputs) => {
-        const expenses = inputs.map((input) => makeFuelExpense(input));
-        const { mpgValues } = referenceMpg(expenses);
-        verifyMpgValuesMatchReference(expenses, mpgValues);
+      fc.property(inBandListArb, fc.array(fc.nat(19)), (expenses, picks) => {
+        const flagged = new Set(picks.map((i) => i % expenses.length));
+        const actual = averageConsecutiveMpg(flag(expenses, flagged));
+        const expected = pooledMpgSkippingIntervalsEndingAt(expenses, flagged);
+        if (expected === null) expect(actual).toBeNull();
+        else expect(actual).toBeCloseTo(expected, 9);
       }),
       { numRuns: 100 }
     );
   });
-});
 
-describe('backward compatibility when no expenses are flagged', () => {
-  test('unflagged expenses produce same result as unfiltered calculation', () => {
+  test('a flag on the first entry changes nothing, since no interval ends there', () => {
     fc.assert(
-      fc.property(allUnflaggedListArb, (inputs) => {
-        const expenses = inputs.map((input) => makeFuelExpense(input));
-        const { mpgValues } = referenceMpg(expenses);
-        const unfilteredCount = countUnfilteredPairs(expenses);
-
-        expect(mpgValues.length).toBe(unfilteredCount);
-      }),
-      { numRuns: 100 }
-    );
-  });
-});
-
-describe('flagging expenses is monotonically non-increasing on data point count', () => {
-  test('flagging any expense never increases the number of MPG data points', () => {
-    fc.assert(
-      fc.property(allUnflaggedListArb, fc.integer({ min: 0, max: 19 }), (inputs, flagIndex) => {
-        const expenses = inputs.map((input) => makeFuelExpense(input));
-        const actualFlagIndex = flagIndex % expenses.length;
-
-        const unflaggedResult = referenceMpg(expenses);
-
-        const flaggedExpenses = expenses.map((e, i) =>
-          i === actualFlagIndex ? { ...e, missedFillup: true } : e
+      fc.property(inBandListArb, (expenses) => {
+        expect(averageConsecutiveMpg(flag(expenses, new Set([0])))).toBe(
+          averageConsecutiveMpg(expenses)
         );
-        const flaggedResult = referenceMpg(flaggedExpenses);
+      }),
+      { numRuns: 100 }
+    );
+  });
 
-        expect(flaggedResult.mpgValues.length).toBeLessThanOrEqual(
-          unflaggedResult.mpgValues.length
+  test('with no flags, the average is total distance over total fuel', () => {
+    fc.assert(
+      fc.property(inBandListArb, (expenses) => {
+        expect(averageConsecutiveMpg(expenses)).toBeCloseTo(
+          pooledMpgSkippingIntervalsEndingAt(expenses, new Set()) as number,
+          9
         );
       }),
       { numRuns: 100 }
