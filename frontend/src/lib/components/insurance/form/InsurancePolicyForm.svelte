@@ -335,7 +335,7 @@
 								{/if}
 							</div>
 
-							<div class="flex items-center justify-between md:justify-start md:gap-4 pt-6">
+							<div class="flex items-center justify-between md:justify-start md:gap-4 md:pt-6">
 								<Label for="policy-active">Active Policy</Label>
 								<Switch
 									id="policy-active"
