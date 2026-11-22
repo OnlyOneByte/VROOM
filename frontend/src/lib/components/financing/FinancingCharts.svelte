@@ -6,7 +6,7 @@
 	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
 	import type { VehicleFinancing } from '#lib/types/index.ts';
 	import type { AmortizationEntry } from '#lib/utils/financing-calculations.ts';
-	import { formatCurrencyAxis } from '#lib/utils/chart-formatters.ts';
+	import { formatCurrencyAxis, formatCurrencyTooltip } from '#lib/utils/chart-formatters.ts';
 
 	interface Props {
 		financing: VehicleFinancing;
@@ -163,7 +163,10 @@
 							}}
 						>
 							{#snippet tooltip()}
-								<ChartTooltip hideLabel />
+								<ChartTooltip
+									labelFormatter={v => `Payment #${v}`}
+									valueFormatter={formatCurrencyTooltip}
+								/>
 							{/snippet}
 						</BarChart>
 					</ChartContainer>

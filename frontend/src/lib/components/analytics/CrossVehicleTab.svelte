@@ -21,7 +21,12 @@
 		InsuranceResponse
 	} from '#lib/types/index.ts';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
-	import { formatCurrencyAxis, parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import {
+		formatCurrencyAxis,
+		formatCurrencyTooltip,
+		parseMonthToDate,
+		unitTooltip
+	} from '#lib/utils/chart-formatters.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { getFuelEfficiencyLabel, getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import FinancingAnalytics from './cross-vehicle/FinancingAnalytics.svelte';
@@ -175,7 +180,7 @@
 											}}
 										>
 											{#snippet tooltip()}
-												<Chart.Tooltip hideLabel />
+												<Chart.Tooltip valueFormatter={formatCurrencyTooltip} />
 											{/snippet}
 										</BarChart>
 									</Chart.Container>
@@ -209,6 +214,7 @@
 				series={fuelEffSeries}
 				config={fuelEffConfig}
 				yAxisFormat={v => `${v.toFixed(0)} ${efficiencyLabel}`}
+				tooltipFormat={unitTooltip(efficiencyLabel)}
 			/>
 		{/if}
 

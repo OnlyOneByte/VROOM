@@ -20,6 +20,8 @@
 		labelFormatter = defaultFormatter,
 		labelClassName,
 		formatter,
+		valueFormatter,
+		labelAxis = 'x',
 		nameKey,
 		color,
 		...restProps
@@ -31,6 +33,8 @@
 		labelKey?: string;
 		hideIndicator?: boolean;
 		labelClassName?: string;
+		valueFormatter?: (_value: number, _seriesKey: string) => string;
+		labelAxis?: 'x' | 'y';
 		labelFormatter?:
 			((_value: unknown, _payload: TooltipPayload[]) => string | number | Snippet) | null;
 		formatter?: Snippet<
@@ -61,7 +65,7 @@
 		if (!item) return null;
 		const tooltipData = chartCtx.tooltip.data;
 
-		const dataLabel = tooltipData != null ? chartCtx.x(tooltipData) : undefined;
+		const dataLabel = tooltipData != null ? chartCtx[labelAxis](tooltipData) : undefined;
 
 		const key = labelKey ?? item?.label ?? item?.key ?? 'value';
 		const itemConfig = getPayloadConfigFromPayload(
@@ -152,7 +156,7 @@
 						{/if}
 						<div
 							class={cn(
-								'flex flex-1 shrink-0 justify-between leading-none',
+								'flex flex-1 shrink-0 justify-between gap-4 leading-none',
 								nestLabel ? 'items-end' : 'items-center'
 							)}
 						>
@@ -166,7 +170,9 @@
 							</div>
 							{#if item.value !== undefined}
 								<span class="text-foreground font-mono font-medium tabular-nums">
-									{item.value.toLocaleString()}
+									{valueFormatter && typeof item.value === 'number'
+										? valueFormatter(item.value, item.key)
+										: item.value.toLocaleString()}
 								</span>
 							{/if}
 						</div>

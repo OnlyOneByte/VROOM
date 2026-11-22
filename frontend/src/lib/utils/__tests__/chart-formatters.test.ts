@@ -2,8 +2,13 @@ import { describe, expect, test } from 'vitest';
 import { scaleTime } from 'd3-scale';
 import {
 	formatCentsAxis,
+	formatCountTooltip,
 	formatCurrencyAxis,
+	formatCurrencyTooltip,
 	formatDateTick,
+	formatDayLabel,
+	formatMonthLabel,
+	unitTooltip,
 	formatDecimalAxis,
 	getTrendLineProps,
 	isolatedValueRows,
@@ -159,5 +164,35 @@ describe('isolatedValueRows (which values need a marker)', () => {
 		];
 		expect(isolatedValueRows(rows, ['civic', 'tesla']).map(s => s.key)).toEqual(['tesla']);
 		expect(isolatedValueRows([], ['a'])).toEqual([]);
+	});
+});
+
+describe('chart tooltip formatters (full precision, in the axis unit)', () => {
+	test('currency tooltips keep the symbol and cents the axis rounds away', () => {
+		expect(formatCurrencyTooltip(591.27)).toBe('$591.27');
+		expect(formatCurrencyTooltip(337.092)).toBe('$337.09');
+		expect(formatCurrencyTooltip(11336.56)).toBe('$11,336.56');
+	});
+
+	test('unit tooltips round to the requested decimals and name the unit', () => {
+		expect(unitTooltip('mi/gal')(39.416, 'avgEfficiency')).toBe('39.4 mi/gal');
+		expect(unitTooltip('mi', 0)(45210.6, 'odometer')).toBe('45,211 mi');
+	});
+
+	test('count tooltips are whole numbers', () => {
+		expect(formatCountTooltip(3)).toBe('3');
+		expect(formatCountTooltip(1200)).toBe('1,200');
+	});
+
+	test('month and day labels name the point in local time', () => {
+		expect(formatMonthLabel(parseMonthToDate('2025-11'))).toBe('Nov 2025');
+		expect(formatDayLabel(new Date(2025, 10, 21))).toBe('Nov 21, 2025');
+	});
+
+	test('category labels pass through and missing labels render empty', () => {
+		expect(formatMonthLabel('Civic')).toBe('Civic');
+		expect(formatDayLabel('Winter')).toBe('Winter');
+		expect(formatMonthLabel(undefined)).toBe('');
+		expect(formatDayLabel(new Date('nope'))).toBe('');
 	});
 });

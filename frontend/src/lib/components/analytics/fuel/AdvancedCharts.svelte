@@ -20,7 +20,12 @@
 
 <script lang="ts">
 	import '#lib/components/charts/bar-chart-animations.css';
-	import { formatDecimalAxis, parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import {
+		formatCountTooltip,
+		formatDecimalAxis,
+		parseMonthToDate,
+		unitTooltip
+	} from '#lib/utils/chart-formatters.ts';
 	import { AppBarChart } from '#lib/components/charts/index.ts';
 	import {
 		CHART_COLORS,
@@ -141,6 +146,7 @@
 			series={seasonalSeries}
 			config={seasonalConfig}
 			yAxisFormat={formatDecimalAxis}
+			tooltipFormat={unitTooltip(efficiencyLabel)}
 			xAxisProps={{
 				ticks: seasonalData.map(d => d.season),
 				format: (v: string) => (typeof v === 'string' ? v : String(v))
@@ -160,6 +166,7 @@
 				seriesLayout="group"
 				yDomain={[0, 100]}
 				yAxisFormat={(v: number) => String(v)}
+				tooltipFormat={formatCountTooltip}
 				xAxisProps={{ ticks: radarMetrics.map(m => m.label), format: radarTickFormat }}
 			/>
 		</div>
@@ -189,6 +196,7 @@
 			config={intervalConfig}
 			orientation="horizontal"
 			yAxisFormat={_v => String(_v)}
+			tooltipFormat={formatCountTooltip}
 			xAxisProps={{ format: (_v: number) => String(Math.round(_v)) }}
 		/>
 	</div>

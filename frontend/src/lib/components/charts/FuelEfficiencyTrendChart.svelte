@@ -6,6 +6,8 @@
 	import ChartCard from './ChartCard.svelte';
 	import {
 		formatDecimalAxis,
+		formatDayLabel,
+		unitTooltip,
 		CHART_PADDING,
 		getTrendLineProps,
 		monthlyXAxisProps
@@ -42,6 +44,7 @@
 			: getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit)
 	);
 	let description = $derived(`Measured in ${unitLabel}`);
+	let tooltipFormat = $derived(unitTooltip(unitLabel));
 
 	const chartConfig: Chart.ChartConfig = {
 		efficiency: {
@@ -88,7 +91,7 @@
 			}}
 		>
 			{#snippet tooltip()}
-				<Chart.Tooltip hideLabel />
+				<Chart.Tooltip labelFormatter={formatDayLabel} valueFormatter={tooltipFormat} />
 			{/snippet}
 		</LineChart>
 	</Chart.Container>

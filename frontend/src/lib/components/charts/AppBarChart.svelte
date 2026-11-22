@@ -6,6 +6,9 @@
 	import ChartLegend from './ChartLegend.svelte';
 	import {
 		formatCurrencyAxis,
+		formatCurrencyTooltip,
+		formatMonthLabel,
+		type TooltipValueFormat,
 		CHART_PADDING,
 		monthlyXAxisProps
 	} from '#lib/utils/chart-formatters.ts';
@@ -33,6 +36,8 @@
 		seriesLayout?: 'group' | 'stack';
 		xAxisProps?: Record<string, unknown>;
 		yAxisFormat?: (_v: number) => string;
+		tooltipFormat?: TooltipValueFormat;
+		tooltipLabelFormat?: (_v: unknown) => string;
 		barProps?: Record<string, unknown>;
 		yDomain?: [number, number];
 		class?: string;
@@ -54,6 +59,8 @@
 		seriesLayout,
 		xAxisProps,
 		yAxisFormat = formatCurrencyAxis,
+		tooltipFormat = formatCurrencyTooltip,
+		tooltipLabelFormat = formatMonthLabel,
 		barProps,
 		yDomain,
 		class: className
@@ -96,7 +103,11 @@
 				}}
 			>
 				{#snippet tooltip()}
-					<Chart.Tooltip hideLabel />
+					<Chart.Tooltip
+						labelAxis={orientation === 'horizontal' ? 'y' : 'x'}
+						labelFormatter={tooltipLabelFormat}
+						valueFormatter={tooltipFormat}
+					/>
 				{/snippet}
 			</BarChart>
 		</Chart.Container>
