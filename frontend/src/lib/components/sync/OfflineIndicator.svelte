@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { onlineStatus, syncState, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { syncManager } from '#lib/utils/sync/sync-manager.ts';
@@ -17,6 +17,31 @@
 			untrack(() => void authStore.recheckSession());
 	});
 
+	let reconnected = $state(false);
+
+	function focusLeftOn(origin: Element | null): boolean {
+		const active = document.activeElement;
+		return active === origin || active === null || active === document.body;
+	}
+
+	function focusMainHeading() {
+		const heading = document.querySelector<HTMLElement>('main h1');
+		if (!heading) return;
+		if (!heading.hasAttribute('tabindex')) heading.tabIndex = -1;
+		heading.focus();
+	}
+
+	async function retrySession() {
+		if (authStore.recheckingSession) return;
+		const origin = document.activeElement;
+		reconnected = false;
+		await authStore.recheckSession();
+		if (authStore.sessionUnverified || !authStore.isAuthenticated) return;
+		reconnected = true;
+		await tick();
+		if (focusLeftOn(origin)) focusMainHeading();
+	}
+
 	async function handleSync() {
 		if (!onlineStatus.current || pendingCount === 0) return;
 		try {
@@ -32,6 +57,7 @@
 		? 'fixed top-[calc(1rem+env(safe-area-inset-top))] right-4 z-50'
 		: 'flex items-center'}
 >
+	<span class="sr-only" role="status">{reconnected ? 'Connected to VROOM again' : ''}</span>
 	{#if !onlineStatus.current}
 		<Badge
 			variant="destructive"
@@ -58,7 +84,7 @@
 			<Button
 				variant="secondary"
 				size="icon-lg"
-				onclick={() => authStore.recheckSession()}
+				onclick={retrySession}
 				aria-disabled={authStore.recheckingSession}
 				class="lg:h-auto lg:w-auto lg:px-2 lg:py-1 lg:text-xs lg:gap-1"
 			>
