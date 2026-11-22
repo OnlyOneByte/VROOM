@@ -255,7 +255,7 @@ describe('termBillingMonths: start inclusive, end exclusive, one month per start
   });
 });
 
-describe('recalculating premiums written before the billing-month fix', () => {
+describe('recalculating monthly premiums that were overcounted', () => {
   const YEAR_START = '2024-01-01T12:00:00.000Z';
   const YEAR_END = '2025-01-01T12:00:00.000Z';
 

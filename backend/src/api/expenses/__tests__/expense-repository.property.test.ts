@@ -397,7 +397,7 @@ describe('absolute split edit recomputes groupTotal from allocations (no stale h
     }
   });
 
-  test('absolute edit WITH a matching totalAmount is unchanged (the fix is a no-op when total is sent)', async () => {
+  test('an absolute-split edit with a matching totalAmount leaves the amounts unchanged', async () => {
     const groupId = await createAbsolute([
       { vehicleId: 'v-1', amount: 30 },
       { vehicleId: 'v-2', amount: 30 },
@@ -424,7 +424,7 @@ describe('absolute split edit recomputes groupTotal from allocations (no stale h
     expect(newSiblings.reduce((s, r) => s + r.expenseAmount, 0)).toBe(80);
   });
 
-  test('even-split edit with NO totalAmount still falls back to the stored groupTotal (fix scoped to absolute)', async () => {
+  test('an even-split edit without totalAmount uses the stored groupTotal', async () => {
     const siblings = await repo.createSplitExpense(
       {
         splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-2'] },
