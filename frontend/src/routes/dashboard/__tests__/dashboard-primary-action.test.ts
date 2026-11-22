@@ -95,6 +95,24 @@ describe('dashboard primary action', () => {
 		expect(controls('Log Fill-up')).toHaveLength(0);
 	});
 
+	test('the header holds a 40px placeholder for Add Vehicle until the first load settles', async () => {
+		let settle: (vehicles: Vehicle[]) => void = () => {};
+		getVehicles.mockImplementation(() => new Promise<Vehicle[]>(r => (settle = r)));
+		render(Page);
+		await new Promise(resolve => setTimeout(resolve, 0));
+
+		const header = screen
+			.getByRole('heading', { level: 1, name: 'Dashboard' })
+			.closest('.flex-col');
+		const placeholder = header?.querySelector(':scope > [data-slot="skeleton"]');
+		expect(placeholder).toHaveClass('h-10');
+
+		settle([OWNED]);
+		await waitFor(() => expect(controls('Add Vehicle')).toHaveLength(1));
+		expect(header?.querySelector(':scope > [data-slot="skeleton"]')).toBeNull();
+		expect(controls('Add Vehicle')[0]).toHaveClass('h-10');
+	});
+
 	test('a failed load offers only a 40px Retry, with no floating action', async () => {
 		getVehicles.mockImplementation(() => Promise.reject(new Error('Server down')));
 		render(Page);

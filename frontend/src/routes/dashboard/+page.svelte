@@ -4,6 +4,7 @@
 	import { routes } from '#lib/routes.ts';
 	import { TrendingUp, ChartPie, CircleAlert, Car } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
@@ -303,6 +304,8 @@
 					<Car class="mr-2 h-4 w-4" />
 					Add Vehicle
 				</Button>
+			{:else if isLoading && !hasLoaded}
+				<Skeleton class="h-10 sm:w-36" />
 			{/if}
 		{/snippet}
 	</PageHeader>
