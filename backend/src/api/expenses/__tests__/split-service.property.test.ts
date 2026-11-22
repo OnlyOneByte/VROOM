@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { ExpenseSplitService } from '../split-service';
-import type { SplitConfig } from '../validation';
+import { percentagesSumTo100, type SplitConfig } from '../validation';
 
 const service = new ExpenseSplitService();
 
@@ -217,6 +217,52 @@ describe('percentage split penny-residue + over-100% clamp', () => {
       10000
     );
     expect(result.map((a) => a.amount)).toEqual([57, 9943]);
+  });
+
+  test.each([[[33.335, 33.335, 33.3299, 0]], [[33.335, 33.335, 33.325, 0.005]]])(
+    'shares of %j never add up to more than the total',
+    (percentages) => {
+      const result = service.computeAllocations(
+        {
+          method: 'percentage',
+          allocations: percentages.map((percentage, i) => ({ vehicleId: `v-${i}`, percentage })),
+        },
+        10000
+      );
+      expect(result.reduce((s, a) => s + a.amount, 0)).toBe(10000);
+      expect(result.every((a) => a.amount >= 0)).toBe(true);
+    }
+  );
+
+  test('any percentage split the schema accepts adds up to the total with no negative share', () => {
+    const acceptedBySchema = (percentages: number[]) =>
+      percentagesSumTo100(percentages.map((percentage) => ({ percentage })));
+    const nearHundredArb = fc
+      .array(fc.integer({ min: 1, max: 1000 }), { minLength: 2, maxLength: 6 })
+      .chain((weights) => {
+        const sum = weights.reduce((s, w) => s + w, 0);
+        const head = weights.slice(0, -1).map((w) => Math.floor((w / sum) * 1_000_000) / 10_000);
+        const rest = 100 - head.reduce((s, p) => s + p, 0);
+        return fc
+          .integer({ min: -49, max: 49 })
+          .map((drift) => [...head, Math.max(0, rest + drift / 10_000)]);
+      })
+      .filter(acceptedBySchema);
+
+    fc.assert(
+      fc.property(nearHundredArb, positiveAmountArb, (percentages, total) => {
+        const result = service.computeAllocations(
+          {
+            method: 'percentage',
+            allocations: percentages.map((percentage, i) => ({ vehicleId: `v-${i}`, percentage })),
+          },
+          total
+        );
+        expect(result.reduce((s, a) => s + a.amount, 0)).toBe(total);
+        expect(result.every((a) => a.amount >= 0)).toBe(true);
+      }),
+      { numRuns: 300 }
+    );
   });
 
   test('every non-last share is the exact floor of total × basis points, for 2-decimal percentages', () => {
