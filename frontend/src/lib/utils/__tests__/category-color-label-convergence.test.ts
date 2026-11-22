@@ -119,7 +119,7 @@ function tokenFromBadgeClasses(classes: string): string {
 function tokenFromChartColor(color: string): string {
 	const chart = /^var\(--(chart-\d+)\)$/.exec(color);
 	if (chart) return chart[1] as string;
-	if (color === 'var(--primary)') return 'neutral';
+	if (color === 'var(--muted-foreground)') return 'neutral';
 	return `unrecognised chart color: ${color}`;
 }
 

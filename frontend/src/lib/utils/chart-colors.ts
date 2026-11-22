@@ -33,7 +33,7 @@ export function mapCategoryColorTokens<T>(
 }
 
 function chartFillForToken(token: CategoryColorToken): string {
-	return token === 'neutral' ? 'var(--primary)' : `var(--${token})`;
+	return token === 'neutral' ? 'var(--muted-foreground)' : `var(--${token})`;
 }
 
 export const CATEGORY_COLORS: Record<ExpenseCategory, string> & Record<string, string> =
