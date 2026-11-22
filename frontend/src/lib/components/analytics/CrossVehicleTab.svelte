@@ -22,6 +22,7 @@
 	} from '#lib/types/index.ts';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
 	import {
+		fitBandTickLabel,
 		formatCurrencyAxis,
 		formatCurrencyTooltip,
 		parseMonthToDate,
@@ -83,6 +84,18 @@
 	};
 
 	const costBarSeries = [{ key: 'totalCost', label: 'Total Cost', color: 'var(--chart-1)' }];
+
+	const costBarPadding = { top: 4, left: 48, bottom: 40, right: 4 };
+	let costBarWidth = $state(0);
+	let costBarTickFormat = $derived((v: string) =>
+		typeof v === 'string'
+			? fitBandTickLabel(
+					v,
+					costBarWidth - costBarPadding.left - costBarPadding.right,
+					costBarData.length
+				)
+			: ''
+	);
 
 	let fuelEffVehicleNames = $derived.by(() => {
 		const names = new SvelteSet<string>();
@@ -158,7 +171,11 @@
 							<p class="text-xs sm:text-sm text-muted-foreground">Total costs by vehicle</p>
 						</div>
 						<div class="chart-bar-animate-ready" use:animateOnView={'chart-bar-animated'}>
-							<div bind:this={costBarGate.el} style="min-height: 250px">
+							<div
+								bind:this={costBarGate.el}
+								bind:clientWidth={costBarWidth}
+								style="min-height: 250px"
+							>
 								{#if costBarGate.visible}
 									<Chart.Container config={costBarConfig} class="h-[250px] sm:h-[300px] w-full">
 										<BarChart
@@ -166,15 +183,12 @@
 											x="vehicleName"
 											y="totalCost"
 											series={costBarSeries}
-											padding={{ top: 4, left: 48, bottom: 40, right: 4 }}
+											padding={costBarPadding}
 											props={{
 												bars: { stroke: 'none' },
 												xAxis: {
 													ticks: costBarData.map(d => d.vehicleName),
-													format: (v: string) => {
-														if (typeof v !== 'string') return '';
-														return v.length > 20 ? v.slice(0, 18) + '…' : v;
-													}
+													format: costBarTickFormat
 												},
 												yAxis: { format: formatCurrencyAxis }
 											}}

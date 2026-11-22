@@ -10,6 +10,7 @@ import {
 	formatMonthLabel,
 	unitTooltip,
 	formatDecimalAxis,
+	fitBandTickLabel,
 	getTrendLineProps,
 	insetTimeTicks,
 	isolatedValueRows,
@@ -68,6 +69,36 @@ describe('getXTickCount (X-axis tick-budget clamp)', () => {
 	test('caps at the max when data exceeds it (default max = 6)', () => {
 		expect(getXTickCount(20)).toBe(6);
 		expect(getXTickCount(20, 12)).toBe(12);
+	});
+});
+
+describe('fitBandTickLabel (band x label sized to its bar slot)', () => {
+	const camry = '2020 Toyota Camry (Daily Driver)';
+
+	test('a 375px card cuts each of two names to fit its bar slot', () => {
+		const label = fitBandTickLabel(camry, 257, 2);
+		expect(label).toBe('2020 Toyota C…');
+		expect(label.length * 7).toBeLessThanOrEqual(257 / 2.4 - 8);
+	});
+
+	test('a wide card shows more of the name, and the whole name once it fits', () => {
+		expect(fitBandTickLabel(camry, 454, 2)).toBe('2020 Toyota Camry (Daily…');
+		expect(fitBandTickLabel(camry, 600, 2)).toBe(camry);
+	});
+
+	test('more bars mean less room for each name', () => {
+		expect(fitBandTickLabel(camry, 454, 4).length).toBeLessThan(
+			fitBandTickLabel(camry, 454, 2).length
+		);
+	});
+
+	test('an unmeasured card keeps the full name', () => {
+		expect(fitBandTickLabel(camry, 0, 2)).toBe(camry);
+		expect(fitBandTickLabel(camry, 257, 0)).toBe(camry);
+	});
+
+	test('a very narrow slot still shows one character and the ellipsis', () => {
+		expect(fitBandTickLabel(camry, 40, 2)).toBe('2…');
 	});
 });
 
