@@ -190,8 +190,12 @@ describe('an invite only reaches the account with exactly its email', () => {
     ctx.sqlite.run(
       "CREATE TRIGGER refuse_attach BEFORE UPDATE OF shared_with_id ON vehicle_shares BEGIN SELECT RAISE(ABORT, 'refused'); END"
     );
-
-    const userId = await signUp('blocked@example.com', 'g-blocked');
+    let userId: string;
+    try {
+      userId = await signUp('blocked@example.com', 'g-blocked');
+    } finally {
+      ctx.sqlite.run('DROP TRIGGER refuse_attach');
+    }
 
     expect(ctx.sqlite.query('SELECT id FROM users WHERE id = ?').get(userId)).toEqual({
       id: userId,
