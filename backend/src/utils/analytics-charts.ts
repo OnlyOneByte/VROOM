@@ -13,6 +13,8 @@ import { NATIVE_SCALE, type UnitScale } from './unit-conversions';
 
 const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
 const EPOCH_MILLISECONDS_THRESHOLD = 1e12;
+const MIN_VEHICLE_SCORE = 10;
+const MAX_VEHICLE_SCORE = 100;
 
 export const DAY_NAMES = [
   'Sunday',
@@ -557,7 +559,8 @@ function normalizeScore(value: number, min: number, max: number, invert: boolean
   if (max === min) return 50;
   const ratio = (value - min) / (max - min);
   const score = invert ? 1 - ratio : ratio;
-  return Math.max(0, Math.min(100, Math.round(score * 100)));
+  const scaled = MIN_VEHICLE_SCORE + score * (MAX_VEHICLE_SCORE - MIN_VEHICLE_SCORE);
+  return Math.max(MIN_VEHICLE_SCORE, Math.min(MAX_VEHICLE_SCORE, Math.round(scaled)));
 }
 
 function accumulateExpenseMetrics(

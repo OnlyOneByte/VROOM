@@ -93,7 +93,7 @@ function seedMixedExpenses(vehicleList: TestVehicle[], perVehicle: number): void
 }
 
 function assertScoreBounded(value: number): void {
-  expect(value).toBeGreaterThanOrEqual(0);
+  expect(value).toBeGreaterThanOrEqual(10);
   expect(value).toBeLessThanOrEqual(100);
 }
 
@@ -144,8 +144,8 @@ describe('Maintenance timeline status assignment', () => {
   });
 });
 
-describe('All computed scores bounded [0, 100]', () => {
-  test('all vehicle radar scores are between 0 and 100 inclusive', async () => {
+describe('All computed scores bounded [10, 100]', () => {
+  test('all vehicle radar scores are between 10 and 100 inclusive', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.integer({ min: 1, max: 4 }),

@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { buildVehicleRadar, type FuelExpenseRow } from '../analytics-charts';
+import {
+  buildVehicleRadar,
+  type FuelExpenseRow,
+  type GeneralExpenseRow,
+} from '../analytics-charts';
 
 function fill(over: Partial<FuelExpenseRow> & { vehicleId: string }): FuelExpenseRow {
   return {
@@ -54,14 +58,55 @@ describe('buildVehicleRadar fuel efficiency', () => {
     expect(score('ev')).toBeNull();
   });
 
-  test('vehicles with data are scored only against each other', () => {
+  test('vehicles with data are scored only against each other, and the worst still draws a bar', () => {
     expect(score('gas-a')).toBe(100);
-    expect(score('gas-b')).toBe(0);
+    expect(score('gas-b')).toBe(10);
   });
 
   test('a single vehicle with data gets the midpoint', () => {
     const solo = buildVehicleRadar([], fuelRows.slice(0, 2), names);
     expect(solo.find((r) => r.vehicleId === 'gas-a')?.fuelEfficiency).toBe(50);
     expect(solo.find((r) => r.vehicleId === 'gas-b')?.fuelEfficiency).toBeNull();
+  });
+});
+
+function maintenance(vehicleId: string, expenseAmount: number): GeneralExpenseRow {
+  return {
+    id: `m-${vehicleId}`,
+    vehicleId,
+    category: 'maintenance',
+    description: null,
+    expenseAmount,
+    date: new Date(2024, 0, 1),
+    mileage: null,
+    volume: null,
+    fuelType: null,
+    missedFillup: false,
+  };
+}
+
+describe('buildVehicleRadar score scale', () => {
+  const fleet = new Map([
+    ['cheap', 'Cheap'],
+    ['middle', 'Middle'],
+    ['pricey', 'Pricey'],
+  ]);
+  const radar = buildVehicleRadar(
+    [maintenance('cheap', 100), maintenance('middle', 300), maintenance('pricey', 500)],
+    [],
+    fleet
+  );
+  const row = (id: string) => radar.find((r) => r.vehicleId === id);
+
+  test('a cost metric gives the highest cost 10 and the lowest 100', () => {
+    expect(row('pricey')?.maintenanceCost).toBe(10);
+    expect(row('cheap')?.maintenanceCost).toBe(100);
+    expect(row('pricey')?.annualCost).toBe(10);
+    expect(row('cheap')?.annualCost).toBe(100);
+  });
+
+  test('a value halfway between the worst and the best scores 55, not a clamped 50', () => {
+    expect(row('middle')?.maintenanceCost).toBe(55);
+    expect(row('middle')?.annualCost).toBe(55);
   });
 });

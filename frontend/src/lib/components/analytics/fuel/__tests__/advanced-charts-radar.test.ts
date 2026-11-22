@@ -50,10 +50,13 @@ describe('Vehicle Performance Comparison fuel efficiency', () => {
 	test('adds no note when every vehicle has a score', () => {
 		render(AdvancedCharts, {
 			fuelAdvanced: advanced([
-				radarVehicle('a', 'Daily Driver', 0),
+				radarVehicle('a', 'Daily Driver', 10),
 				radarVehicle('b', 'Weekend Car', 100)
 			])
 		});
 		expect(screen.queryByText(/Fuel Efficiency: No data/)).toBeNull();
+		expect(
+			screen.getByText('Scores from 10 (worst in your fleet) to 100 (best), by metric.')
+		).toBeTruthy();
 	});
 });
