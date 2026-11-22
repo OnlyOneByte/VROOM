@@ -443,6 +443,27 @@ describe('premium split follows the order the vehicles were chosen', () => {
     expect(centsByVehicle(termId)).toEqual({ [first]: 5001, [second]: 5000 });
   });
 
+  test('recalculating an over-counted monthly premium keeps the odd cent on the first chosen vehicle', async () => {
+    const [first, second] = await twoVehiclesOutOfIdOrder();
+    const { termId } = await createMonthlyPolicy(
+      [first, second],
+      100.01,
+      '2024-01-01T12:00:00.000Z',
+      '2024-12-01T12:00:00.000Z'
+    );
+    const firstRow = autoExpensesForTerm(termId).find((r) => r.vehicle_id === first);
+    ctx.sqlite
+      .query('UPDATE expenses SET expense_amount = 60006, group_total = 120012 WHERE source_id = ?')
+      .run(termId);
+    ctx.sqlite
+      .query('UPDATE expenses SET rowid = rowid + 1000000 WHERE id = ?')
+      .run(firstRow?.id ?? '');
+
+    expect(await recalculateOvercountedMonthlyPremiums()).toBe(1);
+
+    expect(centsByVehicle(termId)).toEqual({ [first]: 55006, [second]: 55005 });
+  });
+
   test('on update, an unchanged order keeps the premium rows as they are', async () => {
     const [first, second] = await twoVehiclesOutOfIdOrder();
     const { policyId, termId } = await createPolicy([first, second], 100.01);
