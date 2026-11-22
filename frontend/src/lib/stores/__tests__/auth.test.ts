@@ -201,6 +201,32 @@ describe('Auth Store', () => {
 			expect(authStore.token).toBe(null);
 		});
 
+		it("clears the user's cached vehicles and history but keeps their unsynced queue", async () => {
+			authStore.setUser(mockUser, 'test-token');
+			localStorage.setItem('vroom_offline_vehicles:1', '[]');
+			localStorage.setItem('vroom_offline_vehicle_history:v1:1', '[]');
+			localStorage.setItem('vroom_offline_vehicles:2', '[]');
+			localStorage.setItem('vroom_offline_expenses:1', '[]');
+			mockFetch.mockResolvedValueOnce(mockApiResponse(null));
+
+			await authStore.logout();
+
+			expect(localStorage.getItem('vroom_offline_vehicles:1')).toBeNull();
+			expect(localStorage.getItem('vroom_offline_vehicle_history:v1:1')).toBeNull();
+			expect(localStorage.getItem('vroom_offline_vehicles:2')).toBe('[]');
+			expect(localStorage.getItem('vroom_offline_expenses:1')).toBe('[]');
+		});
+
+		it('keeps the caches when the logout request fails', async () => {
+			authStore.setUser(mockUser, 'test-token');
+			localStorage.setItem('vroom_offline_vehicles:1', '[]');
+			mockFetch.mockResolvedValueOnce(mockApiError(500, 'Logout failed'));
+
+			await authStore.logout();
+
+			expect(localStorage.getItem('vroom_offline_vehicles:1')).toBe('[]');
+		});
+
 		it('sets the error (and does not throw) when the logout request fails', async () => {
 			authStore.setUser(mockUser, 'test-token');
 			mockFetch.mockResolvedValueOnce(mockApiError(500, 'Logout failed'));
