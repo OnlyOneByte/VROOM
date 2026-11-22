@@ -35,12 +35,19 @@
 
 	let canScrollPrev = $state(false);
 	let canScrollNext = $state(false);
+	let carousel = $state<HTMLElement | null>(null);
 
 	function trackScrollRange(api: CarouselAPI | undefined) {
 		if (!api) return;
 		const sync = () => {
 			canScrollPrev = api.canScrollPrev();
 			canScrollNext = api.canScrollNext();
+			const arrow = document.activeElement?.closest(
+				'[data-slot="carousel-previous"], [data-slot="carousel-next"]'
+			);
+			if (!canScrollPrev && !canScrollNext && arrow && carousel?.contains(arrow)) {
+				carousel.focus();
+			}
 		};
 		sync();
 		api.on('select', sync);
@@ -74,6 +81,8 @@
 					loop: false
 				}}
 				setApi={trackScrollRange}
+				bind:ref={carousel}
+				tabindex={-1}
 				class="w-full relative"
 			>
 				<Carousel.Content class="-ml-2 md:-ml-4">

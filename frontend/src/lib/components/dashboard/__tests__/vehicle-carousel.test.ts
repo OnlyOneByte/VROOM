@@ -180,6 +180,35 @@ describe('VehicleCarousel states', () => {
 		);
 	});
 
+	test('focus moves to the carousel when a resize removes the focused arrow', async () => {
+		embla.reset(1);
+		render(VehicleCarousel, {
+			vehicles: [overview(), overview({ id: 'v2', name: '2019 Honda Civic' })]
+		});
+		const next = await screen.findByRole('button', { name: 'Next slide' });
+		next.focus();
+
+		embla.resize(0);
+
+		await vi.waitFor(() => expect(screen.queryByRole('button', { name: 'Next slide' })).toBeNull());
+		expect(document.activeElement).toBe(screen.getByRole('region'));
+	});
+
+	test('a resize that removes the arrows leaves focus elsewhere alone', async () => {
+		embla.reset(1);
+		render(VehicleCarousel, {
+			vehicles: [overview(), overview({ id: 'v2', name: '2019 Honda Civic' })]
+		});
+		await screen.findByRole('button', { name: 'Next slide' });
+		const card = screen.getByRole('link', { name: '2019 Honda Civic' });
+		card.focus();
+
+		embla.resize(0);
+
+		await vi.waitFor(() => expect(screen.queryByRole('button', { name: 'Next slide' })).toBeNull());
+		expect(document.activeElement).toBe(card);
+	});
+
 	test('the arrows sit over the photo, not over the card title', async () => {
 		embla.reset(1);
 		render(VehicleCarousel, {
