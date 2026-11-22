@@ -126,7 +126,6 @@ networks:
 #                                # provider credentials no longer decrypt
 # FRONTEND_URL=https://yourdomain.com
 # CORS_ORIGINS=https://yourdomain.com
-# PUBLIC_API_URL=https://yourdomain.com
 # CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi...your_tunnel_token
 #
 # The backend logs the missing names and exits at startup without GOOGLE_CLIENT_ID,
@@ -140,3 +139,5 @@ networks:
 # FRONTEND_PORT=3000             # Host port for frontend
 # TUGTAINER_PORT=3002            # Host port for Tugtainer dashboard
 # LOG_LEVEL=warn                 # error, warn, info, debug
+# PUBLIC_API_URL=                # leave empty behind the tunnel or a single-domain proxy;
+#                                # set it only when frontend and backend are on different origins
