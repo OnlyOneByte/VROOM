@@ -77,15 +77,15 @@ describe('formatDateTick (date X-axis label with unknown-input guard)', () => {
 });
 
 describe('monthlyXAxisProps (monthly time-series axis wiring)', () => {
-	test('wires a 12-tick budget (not the 6 default) and clamps to data length', () => {
-		expect(monthlyXAxisProps(24).ticks).toBe(12);
+	test('wires a 6-tick budget so a year of months fits a 375px axis, and clamps to data length', () => {
+		expect(monthlyXAxisProps(13).ticks).toBe(6);
 		expect(monthlyXAxisProps(3).ticks).toBe(3);
 		expect(typeof monthlyXAxisProps(3).format).toBe('function');
 	});
 
-	test('a caller can lower the tick budget for a crowded chart', () => {
-		expect(monthlyXAxisProps(13, 6).ticks).toBe(6);
-		expect(monthlyXAxisProps(4, 6).ticks).toBe(4);
+	test('a caller can set its own tick budget', () => {
+		expect(monthlyXAxisProps(24, 12).ticks).toBe(12);
+		expect(monthlyXAxisProps(4, 12).ticks).toBe(4);
 	});
 
 	test('the wired format callback renders a 3-letter month and guards unknown input', () => {
