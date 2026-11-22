@@ -22,7 +22,7 @@ const months = Array.from({ length: 13 }, (_, i) => {
 
 const zero = { currentYear: 0, previousYear: 0, currentMonth: 0, previousMonth: 0 };
 
-const fuelStats = {
+const fuelStats: FuelStatsResponse = {
 	fillups: zero,
 	volume: zero,
 	fuelConsumption: { avgEfficiency: null, bestEfficiency: null, worstEfficiency: null },
@@ -36,11 +36,26 @@ const fuelStats = {
 	distance: { totalDistance: 0, avgPerDay: null, avgPerMonth: null },
 	monthlyConsumption: months.map(month => ({ month, efficiency: 30, volume: 40 })),
 	gasPriceHistory: [],
-	fillupCostByVehicle: months.map(month => ({ month, vehicleName: 'Civic', avgCost: 45 })),
-	odometerProgression: months.map((month, i) => ({ month, vehicleName: 'Civic', mileage: i })),
-	costPerDistance: months.map(month => ({ month, vehicleName: 'Civic', costPerDistance: 0.1 })),
+	fillupCostByVehicle: months.map(month => ({
+		month,
+		vehicleId: 'civic',
+		vehicleName: 'Civic',
+		avgCost: 45
+	})),
+	odometerProgression: months.map((month, i) => ({
+		month,
+		vehicleId: 'civic',
+		vehicleName: 'Civic',
+		mileage: i
+	})),
+	costPerDistance: months.map(month => ({
+		month,
+		vehicleId: 'civic',
+		vehicleName: 'Civic',
+		costPerDistance: 0.1
+	})),
 	units: { distanceUnit: 'miles', volumeUnit: 'gallons_us', chargeUnit: 'kwh' }
-} as unknown as FuelStatsResponse;
+};
 
 describe('FuelCharts monthly x-axis', () => {
 	test('a year of monthly data gets at most 6 x-axis ticks on every monthly chart', () => {
