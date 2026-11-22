@@ -373,6 +373,48 @@ describe('a trip’s end reading must fit the odometer timeline', () => {
       .all(vehicleId) as { odometer: number }[];
     expect(readings.map((r) => r.odometer)).toEqual([40_500, 41_000]);
   });
+
+  test('moving a trip to the next day with the same end reading is refused while another trip holds it', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    const trip = async (tripDate: string) => {
+      const res = await ctx.authed('POST', '/api/v1/trips', {
+        ...VALID(vehicleId, { startOdometer: 4800, endOdometer: 5000, tripDate }),
+        timeZone: 'UTC',
+      });
+      expect(res.status, await res.clone().text()).toBe(201);
+      return (await json<DataEnvelope<{ id: string }>>(res)).data.id;
+    };
+    await trip('2024-06-20T08:00:00.000Z');
+    const evening = await trip('2024-06-20T19:00:00.000Z');
+
+    const put = await ctx.authed('PUT', `/api/v1/trips/${evening}`, {
+      tripDate: '2024-06-21T08:00:00.000Z',
+      timeZone: 'UTC',
+    });
+    expect(put.status).toBe(400);
+    expect(await put.text()).toContain('Mileage must be greater than 5,000 (from earlier entry)');
+
+    const stored = ctx.sqlite
+      .query('SELECT trip_date AS at FROM trips WHERE id = ?')
+      .get(evening) as {
+      at: number;
+    };
+    expect(new Date(stored.at * 1000).toISOString()).toBe('2024-06-20T19:00:00.000Z');
+    expect(odoCount(ctx, vehicleId)).toBe(1);
+  });
+
+  test('a trip ending below the vehicle’s initial mileage is refused', async () => {
+    const vehicleId = await seedVehicle(ctx, { extra: { initialMileage: 50_000 } });
+
+    const res = await ctx.authed('POST', '/api/v1/trips', {
+      ...VALID(vehicleId, { startOdometer: 49_000, endOdometer: 49_500 }),
+      timeZone: 'UTC',
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('Mileage cannot be less than initial mileage');
+    expect(tripCount(vehicleId)).toBe(0);
+    expect(odoCount(ctx, vehicleId)).toBe(0);
+  });
 });
 
 describe('a trip crossing a mileage reminder milestone fires the notification', () => {

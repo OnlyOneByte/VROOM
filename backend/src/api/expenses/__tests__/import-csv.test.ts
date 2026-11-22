@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { parse } from 'csv-parse/sync';
 import {
   createTestApp,
   type DataEnvelope,
@@ -431,9 +432,8 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     const exportRes = await ctx.authed('GET', '/api/v1/expenses/export');
     expect(exportRes.status).toBe(200);
     const csv = await exportRes.text();
-    const [header = '', line = ''] = csv.trim().split('\n');
-    const cells = line.split(',');
-    expect(cells[header.split(',').indexOf('"mileage"')]).toBe('');
+    const exported = parse(csv, { columns: true }) as Record<string, string>[];
+    expect(exported.map((r) => [r.category, r.mileage])).toEqual([['maintenance', '']]);
 
     ctx.sqlite.run('DELETE FROM expenses WHERE user_id = ?', [ctx.user.id]);
     const importRes = await ctx.authed('POST', '/api/v1/expenses/import', { csv });

@@ -306,3 +306,32 @@ describe('POST /import — mapped files with a vehicle column and locale numbers
     expect((await listExpenses()).length).toBe(0);
   });
 });
+
+describe('POST /import — a mapped mileage of 0', () => {
+  test('a 0 or rounds-to-0 reading is blank on a cost row and refused on a fuel row', async () => {
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
+    const csv = [
+      'Data,Odo (km),Fuel (litres),Price,Type',
+      '15/03/2024,0,,20,Service',
+      '16/03/2024,"0,4",,30,Service',
+      '17/03/2024,"0,4","37,8541","52,40",Gas',
+    ].join('\n');
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', {
+      csv,
+      mapping: { ...FLAT_TRACKER_MAPPING, categoryMap: { gas: 'fuel', service: 'maintenance' } },
+    });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.rows.map((r) => [r.status, r.message])).toEqual([
+      ['ready', undefined],
+      ['ready', undefined],
+      ['error', 'Mileage must be greater than 0'],
+    ]);
+
+    const rows = await listExpenses();
+    expect(rows.map((r) => [r.category, r.mileage])).toEqual([
+      ['maintenance', null],
+      ['maintenance', null],
+    ]);
+  });
+});
