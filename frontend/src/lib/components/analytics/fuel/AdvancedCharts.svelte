@@ -33,12 +33,21 @@
 	);
 
 	const radarMetrics = [
-		{ key: 'fuelEfficiency', label: 'Fuel Efficiency' },
-		{ key: 'maintenanceCost', label: 'Maintenance Cost' },
-		{ key: 'reliability', label: 'Reliability' },
-		{ key: 'annualCost', label: 'Annual Cost' },
-		{ key: 'mileage', label: 'Mileage' }
+		{ key: 'fuelEfficiency', label: 'Fuel Efficiency', tick: 'Efficiency', shortTick: 'Fuel' },
+		{ key: 'maintenanceCost', label: 'Maintenance Cost', tick: 'Maintenance', shortTick: 'Maint.' },
+		{ key: 'reliability', label: 'Reliability', tick: 'Reliability', shortTick: 'Reliab.' },
+		{ key: 'annualCost', label: 'Annual Cost', tick: 'Annual Cost', shortTick: 'Cost' },
+		{ key: 'mileage', label: 'Mileage', tick: 'Mileage', shortTick: 'Miles' }
 	] as const;
+
+	const RADAR_WIDE_TICKS_MIN_WIDTH = 500;
+
+	let radarCardWidth = $state(0);
+	let radarTickFormat = $derived((label: string) => {
+		const metric = radarMetrics.find(m => m.label === label);
+		if (!metric) return label;
+		return radarCardWidth >= RADAR_WIDE_TICKS_MIN_WIDTH ? metric.tick : metric.shortTick;
+	});
 
 	let radarData = $derived.by(() => {
 		return radarMetrics.map(metric => {
@@ -132,19 +141,21 @@
 			}}
 		/>
 
-		<AppBarChart
-			title="Vehicle Performance Comparison"
-			description={radarDescription}
-			data={radarData}
-			x="metric"
-			y={radarVehicleSeries.map(s => s.key)}
-			series={radarVehicleSeries}
-			config={radarConfig}
-			seriesLayout="group"
-			yDomain={[0, 100]}
-			yAxisFormat={(v: number) => String(v)}
-			xAxisProps={{ ticks: radarMetrics.map(m => m.label) }}
-		/>
+		<div class="min-w-0" bind:clientWidth={radarCardWidth}>
+			<AppBarChart
+				title="Vehicle Performance Comparison"
+				description={radarDescription}
+				data={radarData}
+				x="metric"
+				y={radarVehicleSeries.map(s => s.key)}
+				series={radarVehicleSeries}
+				config={radarConfig}
+				seriesLayout="group"
+				yDomain={[0, 100]}
+				yAxisFormat={(v: number) => String(v)}
+				xAxisProps={{ ticks: radarMetrics.map(m => m.label), format: radarTickFormat }}
+			/>
+		</div>
 	</div>
 
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
