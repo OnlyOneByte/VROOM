@@ -178,7 +178,6 @@
 			description="Spending by category over time"
 			data={heatmapData}
 			x="date"
-			y={[...heatmapCategories]}
 			series={heatmapSeries}
 			config={heatmapConfig}
 			seriesLayout="stack"

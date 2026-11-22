@@ -25,7 +25,7 @@
 		description?: string;
 		data: Record<string, unknown>[];
 		x: string;
-		y: string | string[];
+		y?: string | string[];
 		series: LegendItem[];
 		config: Chart.ChartConfig;
 		isLoading?: boolean;
