@@ -263,6 +263,25 @@ describe('analytics date range and year parameters', () => {
     }
   });
 
+  test('milliseconds and far-future seconds get their own messages', async () => {
+    const milliseconds = 'Dates are epoch seconds, not milliseconds';
+    const tooLate = 'Dates can be at most the end of next year';
+    const farFuture = Date.UTC(new Date().getUTCFullYear() + 5, 0, 1) / 1000;
+    for (const [endDate, message, notMessage] of [
+      [JAN_2026 * 1000, milliseconds, tooLate],
+      [farFuture, tooLate, milliseconds],
+    ] as const) {
+      const res = await ctx.authed(
+        'GET',
+        `/api/v1/analytics/fuel-stats?startDate=${JAN_2025}&endDate=${endDate}`
+      );
+      const body = await res.text();
+      expect(res.status, body).toBe(400);
+      expect(body).toContain(message);
+      expect(body).not.toContain(notMessage);
+    }
+  });
+
   test('year must be between 1900 and next year', async () => {
     const vehicleId = await seedVehicle(ctx);
     const nextYear = new Date().getUTCFullYear() + 1;

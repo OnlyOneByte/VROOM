@@ -3,7 +3,6 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { vehicleFinancing } from '../../db/schema';
-import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { financingWithBalanceToApi, moneyDollarsToCents } from '../../utils/money';
 import { isValidTimeZone } from '../../utils/time-zone';
@@ -11,7 +10,6 @@ import {
   commonSchemas,
   dateInput,
   validateFinancingOwnership,
-  validateLoanTerms,
   validateVehicleOwnership,
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
@@ -131,21 +129,6 @@ routes.post(
     const financingData = c.req.valid('json');
 
     await validateVehicleOwnership(vehicleId, user.id);
-
-    if (financingData.financingType === 'loan' && financingData.apr !== undefined) {
-      const validationErrors = validateLoanTerms({
-        principal: financingData.originalAmount,
-        apr: financingData.apr,
-        termMonths: financingData.termMonths,
-      });
-
-      if (validationErrors.length > 0) {
-        throw new ValidationError(
-          `Invalid loan terms: ${validationErrors.join(', ')}`,
-          validationErrors
-        );
-      }
-    }
 
     const existingFinancing = await financingRepository.findByVehicleId(vehicleId);
 

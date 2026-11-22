@@ -39,13 +39,20 @@ function endOfLatestAllowedYearSeconds(): number {
   return Date.UTC(latestAllowedYear() + 1, 0, 1) / 1000;
 }
 
+const SMALLEST_LIKELY_MILLISECONDS = 100_000_000_000;
+
 const epochSeconds = z.coerce
   .number()
   .int()
   .positive()
   .refine(
-    (seconds) => seconds <= endOfLatestAllowedYearSeconds(),
+    (seconds) => seconds < SMALLEST_LIKELY_MILLISECONDS,
     'Dates are epoch seconds, not milliseconds'
+  )
+  .refine(
+    (seconds) =>
+      seconds >= SMALLEST_LIKELY_MILLISECONDS || seconds <= endOfLatestAllowedYearSeconds(),
+    'Dates can be at most the end of next year'
   );
 
 const year = z.coerce
