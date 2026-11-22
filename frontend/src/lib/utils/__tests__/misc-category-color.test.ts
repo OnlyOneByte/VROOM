@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { THEME_REGISTRY } from '#lib/theme/theme-registry.ts';
+import type { ThemeTokenKey } from '#lib/theme/theme-types.ts';
 import { CATEGORY_COLOR_TOKENS, getCategoryChartColor } from '../chart-colors';
 
 const CLOSEST_CATEGORY_PAIR_IN_ANY_THEME = 0.06;
@@ -14,6 +15,12 @@ function oklab(value: string): [number, number, number] {
 function distance(x: string, y: string): number {
 	const [a, b] = [oklab(x), oklab(y)];
 	return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+}
+
+function tokenOf(cssVar: string): ThemeTokenKey {
+	const m = /^var\(--([\w-]+)\)$/.exec(cssVar);
+	if (!m) throw new Error(`not a token reference: ${cssVar}`);
+	return m[1] as ThemeTokenKey;
 }
 
 const CATEGORY_CHART_TOKENS = Object.values(CATEGORY_COLOR_TOKENS).filter(
@@ -31,11 +38,11 @@ describe('the Misc category colour', () => {
 			'%s: Misc is further from every category colour than the closest category pair',
 			mode => {
 				const tokens = theme[mode];
+				const misc = tokens[tokenOf(getCategoryChartColor('misc'))];
 				for (const token of CATEGORY_CHART_TOKENS) {
-					expect(
-						distance(tokens['muted-foreground'], tokens[token]),
-						`${token} vs muted-foreground`
-					).toBeGreaterThan(CLOSEST_CATEGORY_PAIR_IN_ANY_THEME);
+					expect(distance(misc, tokens[token]), `${token} vs Misc`).toBeGreaterThan(
+						CLOSEST_CATEGORY_PAIR_IN_ANY_THEME
+					);
 				}
 			}
 		);
