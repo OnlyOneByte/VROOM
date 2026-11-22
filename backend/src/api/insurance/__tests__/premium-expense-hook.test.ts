@@ -6,6 +6,7 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
+import TERM_BILLING_CASES from '../../../utils/__tests__/term-billing-months.cases.json';
 import { termBillingMonths } from '../../../utils/calculations';
 import { effectiveTermCost, recalculateOvercountedMonthlyPremiums } from '../hooks';
 
@@ -218,34 +219,8 @@ describe('insurance premium → expense hook lifecycle', () => {
 const utcNoon = (iso: string): Date => new Date(`${iso}T12:00:00.000Z`);
 
 describe('termBillingMonths: start inclusive, end exclusive, one month per started billing period', () => {
-  test.each([
-    ['2024-01-01', '2025-01-01', 12],
-    ['2026-03-15', '2026-09-15', 6],
-    ['2026-03-15', '2026-04-15', 1],
-    ['2026-03-15', '2026-04-14', 1],
-    ['2026-03-15', '2026-04-16', 2],
-    ['2026-01-15', '2026-03-20', 3],
-    ['2026-01-31', '2026-02-28', 1],
-    ['2026-01-31', '2026-03-31', 2],
-    ['2026-01-31', '2026-03-01', 2],
-    ['2024-01-31', '2024-02-29', 1],
-    ['2024-01-31', '2024-03-01', 2],
-    ['2024-02-29', '2025-02-28', 12],
-    ['2024-02-29', '2025-03-01', 13],
-    ['2023-02-28', '2024-02-28', 12],
-    ['2023-02-28', '2024-02-29', 13],
-    ['2025-12-01', '2026-01-01', 1],
-    ['2025-11-30', '2026-05-30', 6],
-    ['2026-03-15', '2026-03-16', 1],
-    ['2026-03-15', '2026-03-15', 1],
-  ])('%s -> %s is %i months', (start, end, months) => {
-    expect(termBillingMonths(utcNoon(start), utcNoon(end))).toBe(months);
-  });
-
-  test('time of day within the end date does not add a month', () => {
-    expect(
-      termBillingMonths(new Date('2026-03-15T23:30:00.000Z'), new Date('2026-09-15T00:30:00.000Z'))
-    ).toBe(6);
+  test.each(TERM_BILLING_CASES)('$start -> $end is $months months', ({ start, end, months }) => {
+    expect(termBillingMonths(new Date(start), new Date(end))).toBe(months);
   });
 
   test('effectiveTermCost charges nothing for a monthly term with no end date', () => {
