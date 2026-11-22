@@ -66,7 +66,7 @@ export function zonedMidnight(
   return firstInstantOfDay(wall, timeZone);
 }
 
-const MAX_ZONE_OFFSET_MS = 15 * 3_600_000;
+const MAX_ZONE_OFFSET_MS = 16 * 3_600_000;
 
 function firstInstantOfDay(wall: number, timeZone: string): Date {
   const requestedDay = new Date(wall).toISOString().slice(0, 10);

@@ -58,4 +58,13 @@ describe('zonedMidnight', () => {
     expect(dayStart.toISOString()).toBe('2025-09-06T04:00:00.000Z');
     expect(nextDay.toISOString()).toBe('2025-09-07T04:00:00.000Z');
   });
+
+  test('a skipped day in a zone whose old offset was beyond 15 hours starts where the next day does', () => {
+    expect(zonedMidnight(1844, 11, 31, 'Asia/Manila').toISOString()).toBe(
+      '1844-12-31T15:56:00.000Z'
+    );
+    expect(zonedMidnight(1844, 11, 31, 'Pacific/Palau').toISOString()).toBe(
+      '1844-12-31T15:02:04.000Z'
+    );
+  });
 });
