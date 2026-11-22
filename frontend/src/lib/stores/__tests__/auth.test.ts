@@ -222,17 +222,18 @@ describe('Auth Store', () => {
 			localStorage.setItem('vroom_offline_vehicles:1', '[]');
 			mockFetch.mockResolvedValueOnce(mockApiError(500, 'Logout failed'));
 
-			await authStore.logout();
+			await expect(authStore.logout()).rejects.toThrow();
 
 			expect(localStorage.getItem('vroom_offline_vehicles:1')).toBe('[]');
 		});
 
-		it('sets the error (and does not throw) when the logout request fails', async () => {
+		it('sets the error, stays signed in and rethrows when the logout request fails', async () => {
 			authStore.setUser(mockUser, 'test-token');
 			mockFetch.mockResolvedValueOnce(mockApiError(500, 'Logout failed'));
 
-			await expect(authStore.logout()).resolves.toBeUndefined();
+			await expect(authStore.logout()).rejects.toThrow();
 			expect(authStore.error, 'a failed logout must surface its error').toBeTruthy();
+			expect(authStore.isAuthenticated).toBe(true);
 		});
 	});
 
