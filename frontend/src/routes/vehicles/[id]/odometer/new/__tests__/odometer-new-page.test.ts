@@ -343,7 +343,9 @@ describe('new odometer reading latest-reading note', () => {
 	});
 
 	test('no note for a backdated reading before the latest one', async () => {
-		getEntries.mockResolvedValue(latest([entry({ odometer: 50000 })]));
+		getEntries.mockResolvedValue(
+			latest([entry({ odometer: 50000, recordedAt: new Date(2026, 10, 1, 12).toISOString() })])
+		);
 		mount();
 		await settle();
 
