@@ -1,0 +1,662 @@
+[
+ {
+  "surface": "providers",
+  "theme": "default",
+  "dark": false,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Edit Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 902,
+    "right": 938
+   },
+   {
+    "name": "Delete Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 942,
+    "right": 978
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "migrate-retry",
+  "theme": "default",
+  "dark": false,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Retry",
+    "w": 63,
+    "h": 32,
+    "left": 369,
+    "right": 432
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "signin-error",
+  "theme": "default",
+  "dark": false,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Back to home",
+    "w": 143,
+    "h": 32,
+    "left": 416,
+    "right": 559
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "providers",
+  "theme": "default",
+  "dark": false,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Edit Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 245,
+    "right": 281
+   },
+   {
+    "name": "Delete Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 285,
+    "right": 321
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "migrate-retry",
+  "theme": "default",
+  "dark": false,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Retry",
+    "w": 63,
+    "h": 32,
+    "left": 41,
+    "right": 104
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "signin-error",
+  "theme": "default",
+  "dark": false,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Back to home",
+    "w": 143,
+    "h": 40,
+    "left": 16,
+    "right": 159
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "providers",
+  "theme": "default",
+  "dark": true,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Edit Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 902,
+    "right": 938
+   },
+   {
+    "name": "Delete Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 942,
+    "right": 978
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "migrate-retry",
+  "theme": "default",
+  "dark": true,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Retry",
+    "w": 63,
+    "h": 32,
+    "left": 369,
+    "right": 432
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "signin-error",
+  "theme": "default",
+  "dark": true,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Back to home",
+    "w": 143,
+    "h": 32,
+    "left": 416,
+    "right": 559
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "providers",
+  "theme": "default",
+  "dark": true,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Edit Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 245,
+    "right": 281
+   },
+   {
+    "name": "Delete Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 285,
+    "right": 321
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "migrate-retry",
+  "theme": "default",
+  "dark": true,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Retry",
+    "w": 63,
+    "h": 32,
+    "left": 41,
+    "right": 104
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "signin-error",
+  "theme": "default",
+  "dark": true,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Back to home",
+    "w": 143,
+    "h": 40,
+    "left": 16,
+    "right": 159
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "providers",
+  "theme": "tui",
+  "dark": false,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Edit Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 902,
+    "right": 938
+   },
+   {
+    "name": "Delete Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 942,
+    "right": 978
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "migrate-retry",
+  "theme": "tui",
+  "dark": false,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Retry",
+    "w": 63,
+    "h": 32,
+    "left": 369,
+    "right": 432
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "signin-error",
+  "theme": "tui",
+  "dark": false,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Back to home",
+    "w": 143,
+    "h": 32,
+    "left": 416,
+    "right": 559
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "providers",
+  "theme": "tui",
+  "dark": false,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Edit Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 245,
+    "right": 281
+   },
+   {
+    "name": "Delete Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 285,
+    "right": 321
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "migrate-retry",
+  "theme": "tui",
+  "dark": false,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Retry",
+    "w": 63,
+    "h": 32,
+    "left": 41,
+    "right": 104
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "signin-error",
+  "theme": "tui",
+  "dark": false,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Back to home",
+    "w": 143,
+    "h": 40,
+    "left": 16,
+    "right": 159
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "providers",
+  "theme": "tui",
+  "dark": true,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Edit Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 902,
+    "right": 938
+   },
+   {
+    "name": "Delete Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 942,
+    "right": 978
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "migrate-retry",
+  "theme": "tui",
+  "dark": true,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Retry",
+    "w": 63,
+    "h": 32,
+    "left": 369,
+    "right": 432
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "signin-error",
+  "theme": "tui",
+  "dark": true,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Back to home",
+    "w": 143,
+    "h": 32,
+    "left": 416,
+    "right": 559
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "providers",
+  "theme": "tui",
+  "dark": true,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Edit Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 245,
+    "right": 281
+   },
+   {
+    "name": "Delete Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 285,
+    "right": 321
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "migrate-retry",
+  "theme": "tui",
+  "dark": true,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Retry",
+    "w": 63,
+    "h": 32,
+    "left": 41,
+    "right": 104
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "signin-error",
+  "theme": "tui",
+  "dark": true,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Back to home",
+    "w": 143,
+    "h": 40,
+    "left": 16,
+    "right": 159
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "providers",
+  "theme": "vaporwave",
+  "dark": false,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Edit Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 902,
+    "right": 938
+   },
+   {
+    "name": "Delete Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 942,
+    "right": 978
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "migrate-retry",
+  "theme": "vaporwave",
+  "dark": false,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Retry",
+    "w": 63,
+    "h": 32,
+    "left": 369,
+    "right": 432
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "signin-error",
+  "theme": "vaporwave",
+  "dark": false,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Back to home",
+    "w": 143,
+    "h": 32,
+    "left": 416,
+    "right": 559
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "providers",
+  "theme": "vaporwave",
+  "dark": false,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Edit Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 245,
+    "right": 281
+   },
+   {
+    "name": "Delete Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 285,
+    "right": 321
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "migrate-retry",
+  "theme": "vaporwave",
+  "dark": false,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Retry",
+    "w": 63,
+    "h": 32,
+    "left": 41,
+    "right": 104
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "signin-error",
+  "theme": "vaporwave",
+  "dark": false,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Back to home",
+    "w": 143,
+    "h": 40,
+    "left": 16,
+    "right": 159
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "providers",
+  "theme": "vaporwave",
+  "dark": true,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Edit Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 902,
+    "right": 938
+   },
+   {
+    "name": "Delete Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 942,
+    "right": 978
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "migrate-retry",
+  "theme": "vaporwave",
+  "dark": true,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Retry",
+    "w": 63,
+    "h": 32,
+    "left": 369,
+    "right": 432
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "signin-error",
+  "theme": "vaporwave",
+  "dark": true,
+  "width": 1280,
+  "buttons": [
+   {
+    "name": "Back to home",
+    "w": 143,
+    "h": 32,
+    "left": 416,
+    "right": 559
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "providers",
+  "theme": "vaporwave",
+  "dark": true,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Edit Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 245,
+    "right": 281
+   },
+   {
+    "name": "Delete Work Claude",
+    "w": 36,
+    "h": 36,
+    "left": 285,
+    "right": 321
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "migrate-retry",
+  "theme": "vaporwave",
+  "dark": true,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Retry",
+    "w": 63,
+    "h": 32,
+    "left": 41,
+    "right": 104
+   }
+  ],
+  "overflow": 0
+ },
+ {
+  "surface": "signin-error",
+  "theme": "vaporwave",
+  "dark": true,
+  "width": 375,
+  "buttons": [
+   {
+    "name": "Back to home",
+    "w": 143,
+    "h": 40,
+    "left": 16,
+    "right": 159
+   }
+  ],
+  "overflow": 0
+ }
+]
