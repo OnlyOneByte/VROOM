@@ -1,5 +1,6 @@
 import { dateOnlyToISO } from '#lib/utils/formatters.ts';
 import type { ExpenseCategory } from '#lib/types/index.ts';
+import { hasMileageEntry } from '../expense-form-validation';
 import type { ExpenseFormData } from './expense-form-data';
 
 interface ExpensePayloadContext {
@@ -15,7 +16,7 @@ export function buildExpenseData(form: ExpenseFormData, ctx: ExpensePayloadConte
 		category: form.category as ExpenseCategory,
 		amount: parseFloat(form.amount),
 		date: dateOnlyToISO(form.date),
-		mileage: form.mileage ? parseInt(form.mileage) : undefined,
+		mileage: hasMileageEntry(form.mileage) ? parseInt(form.mileage) : undefined,
 		volume: form.volume ? parseFloat(form.volume) : undefined,
 		charge: form.charge ? parseFloat(form.charge) : undefined,
 		fuelType: form.fuelType || undefined,

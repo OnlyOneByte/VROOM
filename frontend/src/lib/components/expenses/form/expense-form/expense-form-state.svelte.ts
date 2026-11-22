@@ -6,7 +6,7 @@ import { resetSplitAllocations, type SplitAllocationDraft } from '#lib/utils/exp
 import { getDistanceUnitLabel, isElectricFuelType } from '#lib/utils/units.ts';
 import { latest } from '#lib/utils/latest-request.ts';
 import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
-import { validateExpenseField } from '../expense-form-validation';
+import { hasMileageEntry, validateExpenseField } from '../expense-form-validation';
 import { calculateMileageEfficiency } from './mileage-efficiency';
 import { createEmptyFormData, type ExpenseFormData } from './expense-form-data';
 import {
@@ -153,7 +153,7 @@ export class ExpenseFormState {
 			this.errors = { ...this.errors };
 		}
 
-		if (field === 'date' && this.formData.mileage) {
+		if (field === 'date' && hasMileageEntry(this.formData.mileage)) {
 			this.handleBlur('mileage');
 		}
 	};
@@ -164,7 +164,7 @@ export class ExpenseFormState {
 			? ['category', 'amount', 'date']
 			: ['vehicleId', 'category', 'amount', 'date'];
 		const fuelNeedsVehicle = this.showFuelFields && !!this.vehicleError && !this.isGroupEditMode;
-		if (this.showFuelFields || (this.asksForMileage && this.formData.mileage)) {
+		if (this.showFuelFields || (this.asksForMileage && hasMileageEntry(this.formData.mileage))) {
 			fields.push('mileage');
 		}
 		if (this.showFuelFields) {
