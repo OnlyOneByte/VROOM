@@ -21,7 +21,7 @@
 	import { analyticsApi } from '#lib/services/analytics-api.ts';
 	import type { YearEndResponse } from '#lib/types/index.ts';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
-	import { formatDecimalAxis, parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import { formatDecimalAxis, parseMonthToDate, unitTooltip } from '#lib/utils/chart-formatters.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		getFuelEfficiencyLabel,
@@ -169,6 +169,7 @@
 				series={effTrendSeries}
 				config={effTrendConfig}
 				yAxisFormat={formatDecimalAxis}
+				tooltipFormat={unitTooltip(efficiencyLabel)}
 			/>
 		</div>
 

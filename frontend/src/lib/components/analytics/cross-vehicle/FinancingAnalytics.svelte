@@ -11,7 +11,7 @@
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import type { FinancingResponse } from '#lib/types/index.ts';
 	import { capitalize, formatCurrency } from '#lib/utils/formatters.ts';
-	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import { formatCurrencyTooltip, parseMonthToDate } from '#lib/utils/chart-formatters.ts';
 
 	let { financing }: { financing: FinancingResponse } = $props();
 
@@ -207,7 +207,7 @@
 								}}
 							>
 								{#snippet tooltip()}
-									<Chart.Tooltip hideLabel />
+									<Chart.Tooltip hideLabel valueFormatter={formatCurrencyTooltip} />
 								{/snippet}
 							</PieChart>
 						</Chart.Container>

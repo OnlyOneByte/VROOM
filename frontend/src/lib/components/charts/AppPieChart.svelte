@@ -4,6 +4,7 @@
 	import ChartCard from './ChartCard.svelte';
 	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatCurrencyTooltip } from '#lib/utils/chart-formatters.ts';
 	import type { Snippet } from 'svelte';
 
 	interface PieDataItem {
@@ -76,7 +77,7 @@
 							}}
 						>
 							{#snippet tooltip()}
-								<Chart.Tooltip hideLabel />
+								<Chart.Tooltip hideLabel valueFormatter={formatCurrencyTooltip} />
 							{/snippet}
 						</PieChart>
 					</Chart.Container>

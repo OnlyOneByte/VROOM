@@ -18,8 +18,12 @@
 		formatDecimalAxis,
 		formatCentsAxis,
 		formatDateTick,
+		formatDayLabel,
+		formatCountTooltip,
 		getXTickCount,
-		monthlyXAxisProps
+		monthlyXAxisProps,
+		unitTooltip,
+		type TooltipValueFormat
 	} from '#lib/utils/chart-formatters.ts';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import type { FuelAdvancedResponse, UnitsMetadata } from '#lib/types/index.ts';
@@ -28,7 +32,9 @@
 		getFuelEfficiencyLabel,
 		getLongFormLabel,
 		getCostPerDistanceLabel,
-		getChargeUnitLabel
+		getChargeUnitLabel,
+		getDistanceUnitLabel,
+		getVolumeUnitLabel
 	} from '#lib/utils/units.ts';
 
 	interface Props {
@@ -49,6 +55,13 @@
 	);
 
 	let consumptionData = $derived(consumptionChartRows(fuelStats.monthlyConsumption));
+	let consumptionTooltip: TooltipValueFormat = $derived((value, key) =>
+		unitTooltip(key === 'volume' ? getVolumeUnitLabel(units.volumeUnit, true) : efficiencyLabel)(
+			value,
+			key
+		)
+	);
+	let odometerTooltip = $derived(unitTooltip(getDistanceUnitLabel(units.distanceUnit, true), 0));
 
 	let consumptionSeries = $derived([
 		{ key: 'efficiency', label: efficiencyLabel, color: CHART_COLORS[0] as string },
@@ -205,6 +218,7 @@
 			series={consumptionSeries}
 			config={consumptionConfig}
 			yAxisFormat={formatDecimalAxis}
+			tooltipFormat={consumptionTooltip}
 			xAxisProps={monthlyXAxisProps(consumptionData.length, 6)}
 		/>
 
@@ -216,6 +230,7 @@
 			y={gasPriceFuelTypes}
 			series={gasPriceSeries}
 			config={gasPriceConfig}
+			tooltipLabelFormat={formatDayLabel}
 			xAxisProps={{ ticks: getXTickCount(gasPriceData.length, 6), format: formatDateTick }}
 		/>
 	{/if}
@@ -230,6 +245,7 @@
 			series={chargePriceSeries}
 			config={chargePriceConfig}
 			yAxisFormat={formatCentsAxis}
+			tooltipLabelFormat={formatDayLabel}
 			xAxisProps={{ ticks: getXTickCount(chargePriceData.length, 6), format: formatDateTick }}
 		/>
 	{/if}
@@ -268,6 +284,7 @@
 		series={odometerSeries}
 		config={odometerConfig}
 		yAxisFormat={v => v.toLocaleString()}
+		tooltipFormat={odometerTooltip}
 		xAxisProps={monthlyXAxisProps(odometerData.length, 6)}
 	/>
 
@@ -282,6 +299,7 @@
 			config={dayPatternConfig}
 			height={350}
 			yAxisFormat={v => String(Math.round(v))}
+			tooltipFormat={formatCountTooltip}
 			xAxisProps={{
 				ticks: dayPatternData.map(d => d.day),
 				format: (v: string) => (typeof v === 'string' ? v.slice(0, 3) : String(v))

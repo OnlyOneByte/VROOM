@@ -17,6 +17,7 @@
 	import type { ChartConfig } from '#lib/components/ui/chart/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { AppLineChart } from '#lib/components/charts/index.ts';
+	import { formatDayLabel, unitTooltip } from '#lib/utils/chart-formatters.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { odometerApi } from '#lib/services/odometer-api.ts';
 	import { formatDate, formatNumber } from '#lib/utils/formatters.ts';
@@ -202,6 +203,8 @@
 				config={chartConfig}
 				height={280}
 				yAxisFormat={v => formatNumber(v, 0)}
+				tooltipFormat={unitTooltip(distLabel, 0)}
+				tooltipLabelFormat={formatDayLabel}
 			/>
 		{/if}
 

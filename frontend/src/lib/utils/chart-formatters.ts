@@ -1,5 +1,31 @@
 import { curveMonotoneX } from 'd3-shape';
-import { formatCurrency } from './formatters';
+import { formatCurrency, formatNumber } from './formatters';
+
+export type TooltipValueFormat = (value: number, seriesKey: string) => string;
+
+export function formatCurrencyTooltip(value: number): string {
+	return formatCurrency(value);
+}
+
+export function formatCountTooltip(value: number): string {
+	return formatNumber(value, 0);
+}
+
+export function unitTooltip(unit: string, decimals = 1): TooltipValueFormat {
+	return value => `${formatNumber(value, decimals)} ${unit}`;
+}
+
+export function formatMonthLabel(value: unknown): string {
+	if (!(value instanceof Date)) return value == null ? '' : String(value);
+	if (isNaN(value.getTime())) return '';
+	return value.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+export function formatDayLabel(value: unknown): string {
+	if (!(value instanceof Date)) return value == null ? '' : String(value);
+	if (isNaN(value.getTime())) return '';
+	return value.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 export function formatCurrencyAxis(value: number): string {
 	return formatCurrency(value, undefined, 0);

@@ -5,6 +5,8 @@
 	import ChartCard from './ChartCard.svelte';
 	import {
 		formatCurrencyAxis,
+		formatCurrencyTooltip,
+		formatMonthLabel,
 		CHART_PADDING,
 		getTrendLineProps,
 		monthlyXAxisProps
@@ -71,7 +73,7 @@
 			}}
 		>
 			{#snippet tooltip()}
-				<Chart.Tooltip hideLabel />
+				<Chart.Tooltip labelFormatter={formatMonthLabel} valueFormatter={formatCurrencyTooltip} />
 			{/snippet}
 		</LineChart>
 	</Chart.Container>

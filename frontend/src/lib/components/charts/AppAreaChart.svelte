@@ -6,6 +6,9 @@
 	import ChartLegend from './ChartLegend.svelte';
 	import {
 		formatCurrencyAxis,
+		formatCurrencyTooltip,
+		formatMonthLabel,
+		type TooltipValueFormat,
 		CHART_PADDING,
 		SMOOTH_CURVE,
 		monthlyXAxisProps,
@@ -35,6 +38,8 @@
 		seriesLayout?: 'stack' | 'overlap';
 		xAxisProps?: Record<string, unknown>;
 		yAxisFormat?: (_v: number) => string;
+		tooltipFormat?: TooltipValueFormat;
+		tooltipLabelFormat?: (_v: unknown) => string;
 		class?: string;
 	}
 
@@ -53,6 +58,8 @@
 		seriesLayout,
 		xAxisProps,
 		yAxisFormat = formatCurrencyAxis,
+		tooltipFormat = formatCurrencyTooltip,
+		tooltipLabelFormat = formatMonthLabel,
 		class: className
 	}: Props = $props();
 
@@ -102,7 +109,7 @@
 				{/each}
 			{/snippet}
 			{#snippet tooltip()}
-				<Chart.Tooltip hideLabel />
+				<Chart.Tooltip labelFormatter={tooltipLabelFormat} valueFormatter={tooltipFormat} />
 			{/snippet}
 		</AreaChart>
 	</Chart.Container>
