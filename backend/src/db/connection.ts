@@ -66,7 +66,7 @@ export function foldUserEmailCase(database: AppDatabase): void {
     const clashes = [...idsByFoldedEmail.values()].filter((ids) => ids.length > 1);
     if (clashes.length > 0) {
       throw new Error(
-        `Startup stopped: some accounts have emails that differ only by letter case. Nothing was changed. In each group of user ids below, change users.email for one id (or remove that account), then restart. See docs/conventions/DatabaseMigrations.md § Production for running SQL against the database: ${clashes.map((ids) => ids.join(', ')).join('; ')}`
+        `Startup stopped: some accounts have emails that differ only by letter case. No email was changed; migrations that already ran stay applied. In each group of user ids below, change users.email for all but one id (or remove those accounts), then restart. See docs/conventions/DatabaseMigrations.md § Production for running SQL against the database: ${clashes.map((ids) => ids.join(', ')).join('; ')}`
       );
     }
 

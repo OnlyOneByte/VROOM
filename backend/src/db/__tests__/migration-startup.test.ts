@@ -68,17 +68,19 @@ describe('startup email case fold', () => {
 
   test('a non-ASCII case clash stops startup, lists the user ids, and changes nothing', () => {
     const { sqlite, db } = migratedDb();
-    addUser(sqlite, 'u1', 'élodie@example.com');
-    addUser(sqlite, 'u2', 'Élodie@example.com');
+    addUser(sqlite, 'u1', 'élüse@example.com');
+    addUser(sqlite, 'u2', 'Élüse@example.com');
     addUser(sqlite, 'u3', 'ÖMER@example.com');
+    addUser(sqlite, 'u4', 'élÜse@example.com');
 
     expect(() => foldUserEmailCase(db)).toThrow(
-      /differ only by letter case\. Nothing was changed\..*u1, u2/
+      /differ only by letter case\. No email was changed.*all but one id.*u1, u2, u4/
     );
     expect(emails(sqlite)).toEqual([
-      'élodie@example.com',
-      'Élodie@example.com',
+      'élüse@example.com',
+      'Élüse@example.com',
       'ÖMER@example.com',
+      'élÜse@example.com',
     ]);
     sqlite.close();
   });
