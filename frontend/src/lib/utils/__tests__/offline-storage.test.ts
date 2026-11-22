@@ -1108,6 +1108,7 @@ describe('queue owner scoping', () => {
 		localStorageMock.setItem.mockReset();
 		localStorageMock.removeItem.mockReset();
 		localStorageMock.getItem.mockReturnValue(null);
+		vi.unstubAllGlobals();
 		vi.restoreAllMocks();
 	});
 
@@ -1246,6 +1247,8 @@ describe('queue owner scoping', () => {
 				queuedRow({
 					id: 'parked',
 					clientId: 'client-1',
+					vehicleId: 'v1',
+					date: '2026-01-06',
 					timestamp: 111,
 					category: 'fuel',
 					amount: 1_000_001,
@@ -1317,7 +1320,6 @@ describe('queue owner scoping', () => {
 	});
 
 	it('a photo write that fails leaves the parked entry as it was', async () => {
-		const originalIndexedDb = globalThis.indexedDB;
 		vi.stubGlobal('indexedDB', undefined);
 		const parked = queuedRow({ id: 'parked', clientId: 'c1', needsAttention: true });
 		const store = useStore({ [scoped('user-11')]: JSON.stringify([parked]) });
@@ -1326,6 +1328,55 @@ describe('queue owner scoping', () => {
 
 		expect(await replaceParkedExpense('parked', requeueInput, [photo])).toBe('failed');
 		expect(JSON.parse(store.get(scoped('user-11'))!)).toEqual([parked]);
-		vi.stubGlobal('indexedDB', originalIndexedDb);
+	});
+
+	it('an edit refused by a retry that unparked the entry puts the previous photos back', async () => {
+		const db = fakePhotoDb();
+		vi.stubGlobal('indexedDB', db);
+		const before = new File(['old'], 'before.jpg', { type: 'image/jpeg' });
+		const edited = new File(['new'], 'edited.jpg', { type: 'image/jpeg' });
+		db.photos.set('c1', [before]);
+		const parked = queuedRow({
+			id: 'parked',
+			clientId: 'c1',
+			vehicleId: 'v1',
+			date: '2026-01-06',
+			needsAttention: true
+		});
+		const store = useStore({ [scoped('user-12')]: JSON.stringify([parked]) });
+		setOfflineQueueOwner('user-12');
+
+		const pending = replaceParkedExpense('parked', requeueInput, [edited]);
+		store.set(scoped('user-12'), JSON.stringify([{ ...parked, needsAttention: false }]));
+
+		expect(await pending).toBe('not-parked');
+		expect(db.photos.get('c1')).toEqual([before]);
+	});
+
+	it('an edit that moves the entry to another vehicle or day gets a fresh client id, and its photos move with it', async () => {
+		const db = fakePhotoDb();
+		vi.stubGlobal('indexedDB', db);
+		const receipt = new File(['r'], 'receipt.jpg', { type: 'image/jpeg' });
+		db.photos.set('c1', [receipt]);
+		const store = useStore({
+			[scoped('user-13')]: JSON.stringify([
+				queuedRow({
+					id: 'parked',
+					clientId: 'c1',
+					vehicleId: 'v1',
+					date: '2026-01-05',
+					needsAttention: true
+				})
+			])
+		});
+		setOfflineQueueOwner('user-13');
+
+		expect(await replaceParkedExpense('parked', requeueInput, [receipt])).toBe('saved');
+
+		const [row] = JSON.parse(store.get(scoped('user-13'))!) as OfflineExpense[];
+		expect(row?.clientId).toBeDefined();
+		expect(row?.clientId).not.toBe('c1');
+		expect(db.photos.get(row!.clientId!)).toEqual([receipt]);
+		expect(db.photos.has('c1')).toBe(false);
 	});
 });

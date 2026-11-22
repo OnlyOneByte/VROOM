@@ -276,6 +276,10 @@ export function findParkedExpense(id: string): OfflineExpense | undefined {
 
 export type ReplaceParkedResult = 'saved' | 'not-parked' | 'failed';
 
+function sameVehicleAndDay(a: Pick<OfflineExpense, 'vehicleId' | 'date'>, b: typeof a): boolean {
+	return a.vehicleId === b.vehicleId && a.date.slice(0, 10) === b.date.slice(0, 10);
+}
+
 export async function replaceParkedExpense(
 	id: string,
 	expense: Omit<OfflineExpense, 'id' | 'clientId' | 'timestamp' | 'synced' | 'version'>,
@@ -283,20 +287,29 @@ export async function replaceParkedExpense(
 ): Promise<ReplaceParkedResult> {
 	const parked = findParkedExpense(id);
 	if (!parked) return 'not-parked';
-	if (parked.clientId) {
-		if (!(await savePendingPhotos(parked.clientId, photos))) return 'failed';
-	} else if (photos.length > 0) {
-		return 'failed';
-	}
+	if (!parked.clientId && photos.length > 0) return 'failed';
+	const clientId =
+		parked.clientId && !sameVehicleAndDay(parked, expense) ? crypto.randomUUID() : parked.clientId;
+	const previousPhotos =
+		clientId === parked.clientId && clientId
+			? await loadPendingPhotos(clientId).catch(() => null)
+			: [];
+	if (clientId && !(await savePendingPhotos(clientId, photos))) return 'failed';
+	const undoPhotos = async () => {
+		if (clientId && previousPhotos) await savePendingPhotos(clientId, previousPhotos);
+	};
 
 	const currentExpenses = loadOfflineExpenses();
 	const existing = currentExpenses.find(entry => entry.id === id);
-	if (!existing || !isEditableParked(existing)) return 'not-parked';
+	if (!existing || !isEditableParked(existing)) {
+		await undoPhotos();
+		return 'not-parked';
+	}
 	const replaced: OfflineExpense = {
 		...expense,
 		amount: roundToCents(expense.amount),
 		id: existing.id,
-		...(existing.clientId !== undefined && { clientId: existing.clientId }),
+		...(clientId !== undefined && { clientId }),
 		timestamp: existing.timestamp,
 		synced: false,
 		version: OFFLINE_STORAGE_VERSION
@@ -304,7 +317,14 @@ export async function replaceParkedExpense(
 	const saved = saveOfflineExpenses(
 		currentExpenses.map(entry => (entry.id === id ? replaced : entry))
 	);
-	return saved ? 'saved' : 'failed';
+	if (!saved) {
+		await undoPhotos();
+		return 'failed';
+	}
+	if (parked.clientId && clientId !== parked.clientId) {
+		await deletePendingPhotos(parked.clientId).catch(() => undefined);
+	}
+	return 'saved';
 }
 
 export function removeOfflineExpense(id: string): void {
