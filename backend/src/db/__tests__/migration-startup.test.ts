@@ -3,7 +3,8 @@ import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
-import { foldUserEmailCase } from '../connection';
+import { createTestApp } from '../../test-helpers/http-client';
+import { foldUserEmailCase, runMigrations } from '../connection';
 import * as schema from '../schema';
 import { applyMigration, countRows, getTables, loadMigrations } from './migration-helpers';
 
@@ -113,5 +114,22 @@ describe('startup email case fold', () => {
     expect(sqlite.query('SELECT id, email, updated_at FROM users ORDER BY id').all()).toEqual(once);
     expect(sqlite.query('SELECT total_changes() AS n').get()).toEqual(changesBefore);
     sqlite.close();
+  });
+
+  test('runMigrations runs the fold on the app database, and refuses to start on a clash', async () => {
+    const ctx = await createTestApp();
+    try {
+      addUser(ctx.sqlite, 'fold-a', 'ÉMILE@example.com');
+      runMigrations();
+      expect(
+        ctx.sqlite.query("SELECT email FROM users WHERE id = 'fold-a'").get() as { email: string }
+      ).toEqual({ email: 'émile@example.com' });
+
+      addUser(ctx.sqlite, 'fold-b', 'Émile@example.com');
+      expect(() => runMigrations()).toThrow(/differ only by letter case.*fold-a, fold-b/);
+    } finally {
+      ctx.sqlite.run("DELETE FROM users WHERE id IN ('fold-a', 'fold-b')");
+      ctx.close();
+    }
   });
 });

@@ -52,33 +52,34 @@ export async function transaction<T>(
 }
 
 export function foldUserEmailCase(database: AppDatabase): void {
-  const rows = database
-    .select({ id: schema.users.id, email: schema.users.email })
-    .from(schema.users)
-    .all();
-  const idsByFoldedEmail = new Map<string, string[]>();
-  for (const { id, email } of rows) {
-    const folded = email.toLowerCase();
-    idsByFoldedEmail.set(folded, [...(idsByFoldedEmail.get(folded) ?? []), id]);
-  }
-  const clashes = [...idsByFoldedEmail.values()].filter((ids) => ids.length > 1);
-  if (clashes.length > 0) {
-    throw new Error(
-      `Startup stopped: some accounts have emails that differ only by letter case. Nothing was changed. Change or remove one email in each group of these user ids by hand, then restart: ${clashes.map((ids) => ids.join(', ')).join('; ')}`
-    );
-  }
+  const folded = database.transaction((tx) => {
+    const rows = tx
+      .select({ id: schema.users.id, email: schema.users.email })
+      .from(schema.users)
+      .orderBy(schema.users.id)
+      .all();
+    const idsByFoldedEmail = new Map<string, string[]>();
+    for (const { id, email } of rows) {
+      const key = email.toLowerCase();
+      idsByFoldedEmail.set(key, [...(idsByFoldedEmail.get(key) ?? []), id]);
+    }
+    const clashes = [...idsByFoldedEmail.values()].filter((ids) => ids.length > 1);
+    if (clashes.length > 0) {
+      throw new Error(
+        `Startup stopped: some accounts have emails that differ only by letter case. Nothing was changed. In each group of user ids below, change users.email for one id (or remove that account), then restart. See docs/conventions/DatabaseMigrations.md § Production for running SQL against the database: ${clashes.map((ids) => ids.join(', ')).join('; ')}`
+      );
+    }
 
-  const unfolded = rows.filter(({ email }) => email !== email.toLowerCase());
-  if (unfolded.length === 0) return;
-  database.transaction((tx) => {
+    const unfolded = rows.filter(({ email }) => email !== email.toLowerCase());
     for (const { id, email } of unfolded) {
       tx.update(schema.users)
         .set({ email: email.toLowerCase() })
         .where(eq(schema.users.id, id))
         .run();
     }
+    return unfolded.length;
   });
-  logger.info(`Lowercased ${unfolded.length} user email(s)`);
+  if (folded > 0) logger.info(`Lowercased ${folded} user email(s)`);
 }
 
 export function runMigrations(): void {
