@@ -282,16 +282,16 @@ describe('calculatePayoffDate', () => {
 		).toBe(NOW.getTime());
 	});
 
-	test('a zero-apr loan pays off after ceil(balance / payment) payments from today', () => {
+	test('a zero-apr loan pays off on the due date of its last ceil(balance / payment) payment', () => {
 		const payoff = calculatePayoffDate(
 			makeLoan({ apr: 0, computedBalance: 1_001, paymentAmount: 100 })
 		);
 		expect(payoff.getFullYear()).toBe(2026);
 		expect(payoff.getMonth()).toBe(4);
-		expect(payoff.getDate()).toBe(15);
+		expect(payoff.getDate()).toBe(10);
 	});
 
-	test('a zero-apr weekly loan counts payments in weeks', () => {
+	test('a zero-apr weekly loan counts payments in weeks from the next due date', () => {
 		const payoff = calculatePayoffDate(
 			makeLoan({
 				apr: undefined,
@@ -300,14 +300,14 @@ describe('calculatePayoffDate', () => {
 				paymentFrequency: 'weekly'
 			})
 		);
-		expect(Math.round((payoff.getTime() - NOW.getTime()) / DAY)).toBe(21);
+		expect(Math.round((payoff.getTime() - NOW.getTime()) / DAY)).toBe(19);
 	});
 
-	test('a zero-apr bi-weekly loan counts payments in fortnights', () => {
+	test('a zero-apr bi-weekly loan counts payments in fortnights from the next due date', () => {
 		const payoff = calculatePayoffDate(
 			makeLoan({ apr: 0, computedBalance: 250, paymentAmount: 100, paymentFrequency: 'bi-weekly' })
 		);
-		expect(Math.round((payoff.getTime() - NOW.getTime()) / DAY)).toBe(42);
+		expect(Math.round((payoff.getTime() - NOW.getTime()) / DAY)).toBe(40);
 	});
 
 	test('an interest-bearing loan pays off after the simulated number of payments', () => {
@@ -315,7 +315,29 @@ describe('calculatePayoffDate', () => {
 			makeLoan({ apr: 12, computedBalance: 1_000, paymentAmount: 510 })
 		);
 		expect(payoff.getMonth()).toBe(7);
-		expect(payoff.getDate()).toBe(15);
+		expect(payoff.getDate()).toBe(10);
+	});
+
+	test.each([
+		['the day before the due day', new Date(2026, 10, 14, 12), new Date(2029, 9, 15)],
+		['a week after the due day', new Date(2026, 10, 22, 12), new Date(2029, 10, 15)]
+	])('opened %s, a loan pays off on its last due date', (_label, openedOn, lastDue) => {
+		vi.setSystemTime(openedOn);
+		const payoff = calculatePayoffDate(
+			makeLoan({
+				apr: 0,
+				startDate: '2024-11-15T12:00:00',
+				termMonths: 60,
+				paymentDayOfMonth: 15,
+				computedBalance: 3_600,
+				paymentAmount: 100
+			})
+		);
+		expect([payoff.getFullYear(), payoff.getMonth(), payoff.getDate()]).toEqual([
+			lastDue.getFullYear(),
+			lastDue.getMonth(),
+			lastDue.getDate()
+		]);
 	});
 
 	test('interest lengthens the payoff compared with the same balance at zero apr', () => {
@@ -383,7 +405,7 @@ describe('calculateExtraPaymentImpact', () => {
 		expect(impact.interestSaved).toBeCloseTo(9.648_75, 6);
 		expect(impact.totalSavings).toBe(impact.interestSaved);
 		expect(impact.newPayoffDate.getMonth()).toBe(8);
-		expect(impact.newPayoffDate.getDate()).toBe(15);
+		expect(impact.newPayoffDate.getDate()).toBe(10);
 	});
 
 	test('an extra payment on a zero-apr loan saves months but no interest', () => {
