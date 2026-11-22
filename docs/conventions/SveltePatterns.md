@@ -1,7 +1,7 @@
 # Svelte Component Patterns
 
 Svelte 5 component mechanics for this project. Not repeated here — defer to:
-**MainSteering.md** "Svelte 5 Runes Mode" for runes, the no-`$effect`-for-async-data-loading rule,
+**Overview.md** "Svelte 5 Runes Mode" for runes, the no-`$effect`-for-async-data-loading rule,
 forbidden syntax (`$:`, `on:`, `|modifier`, `$app/stores`, directives on components) and
 "Navigation" for routing (`resolve()` / `#lib/routes`), then "UI Components" for icon imports;
 **DesignSystem.md** for the component inventory, import paths and tokens;
@@ -54,16 +54,18 @@ Named `Snippet` props in, `{@render}` out; optional snippets are guarded.
 <!-- empty-state.svelte -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  interface Props { icon?: Snippet; title: Snippet }
-  let { icon, title }: Props = $props();
+  interface Props { icon?: Snippet; title: Snippet; description: Snippet; level?: 2 | 3 | 4 }
+  let { icon, title, description, level = 2 }: Props = $props();
 </script>
 {#if icon}{@render icon()}{/if}
-<h3>{@render title()}</h3>
+<svelte:element this={`h${level}`}>{@render title()}</svelte:element>
+<p>{@render description()}</p>
 
-<!-- Caller -->
+<!-- Caller: level defaults to 2; pass level={3} when it sits under a section heading -->
 <EmptyState>
   {#snippet icon()}<Bell class="h-8 w-8" />{/snippet}
   {#snippet title()}No reminders yet{/snippet}
+  {#snippet description()}Add one to get a nudge before it's due.{/snippet}
 </EmptyState>
 ```
 

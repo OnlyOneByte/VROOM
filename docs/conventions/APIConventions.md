@@ -84,8 +84,8 @@ need; don't reshape a repository to qualify.
   `z.object` schemas in `validation.ts` (reminders, insurance, trips). Both are current.
 - Field constraints come from `CONFIG.validation.*`, not inline literals.
 - Validate with `zValidator('json' | 'param' | 'query', schema)`; never parse the body by hand.
-  `commonSchemas` (`utils/validation.ts`) has `idParam`, `vehicleIdParam`, `pagination`,
-  `clampedPaginationFields`, `dateRange`.
+  `commonSchemas` (`utils/validation.ts`) has `idParam`, `vehicleIdParam`, `pagination` and
+  `clampedPaginationFields`.
 - `.refine()` does NOT survive `.partial()`/`.omit()` — re-add every cross-field refinement to
   the update schema, or a PUT persists what the POST rejects.
 - Nullable columns use `.nullish()`, not `.optional()`: an update that re-validates a merged DB
@@ -93,7 +93,8 @@ need; don't reshape a repository to qualify.
 
 ### Error Handling
 - Throw typed errors from `errors.ts`: `ValidationError` (400), `AuthenticationError` (401),
-  `NotFoundError` (404), `ConflictError` (409), `DatabaseError` (500). `app.onError(errorHandler)`
+  `NotFoundError` (404), `ConflictError` (409), `UnprocessableEntityError` (422),
+  `DatabaseError` (500). `app.onError(errorHandler)`
   formats them all — don't try/catch in a route just to reshape an error.
 - Provider/sync failures throw `SyncError` with a `SyncErrorCode`; the global handler maps the
   code to its status (400/401/403/409/429/503). No local catch needed.

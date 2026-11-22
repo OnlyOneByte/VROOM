@@ -87,7 +87,7 @@ list you missed. What they point at:
 | `backend/src/types.ts` | `BackupData` and `ParsedBackupData`. |
 | `backend/src/api/sync/backup.ts` | Query the table in `createBackup()`; emit its CSV in `exportAsZip()`; check its FKs in `validateReferentialIntegrity()`. |
 | `backend/src/api/sync/restore.ts` | `insertBackupData()` (FK order), `deleteUserData()`, and the per-table count in `ImportSummary`. |
-| `backend/src/api/providers/services/google-sheets-service.ts` | `SHEET_HEADERS` (one entry per table, covering every column) and `SHEET_TABS` (the title of each tab, keyed like `SHEET_HEADERS`; `SHEET_NAMES` is derived from it and consumed by `createSpreadsheet` and `ensureRequiredSheets`). The `updateSpreadsheetWithUserData()` write fan-out is typed `Record<table key, rows>` and `readSpreadsheetData()` reads through `readTab`, both keyed by `SHEET_TABS`; `sheets-header-coverage.test.ts` guards the written tabs. |
+| `backend/src/api/providers/services/google-sheets-service.ts` | `SHEET_HEADERS` (one entry per table, covering every column) and `SHEET_TABS` (the title of each tab, keyed like `SHEET_HEADERS`; `SHEET_NAMES` is derived from it and consumed by `createSpreadsheet` and `ensureRequiredSheets`). The `updateSpreadsheetWithUserData()` write fan-out is typed `Record<table key, rows>` and `readSpreadsheetData()` loops over `SHEET_TABS` and reads each tab with `readSheetData()`, both keyed by `SHEET_TABS`; `sheets-header-coverage.test.ts` guards the written tabs. |
 
 `coerceRow()` in `backup.ts` derives CSV-string → JS-value coercion from Drizzle column metadata,
 so most new columns need no mapping. Two cases to confirm with a round-trip test:

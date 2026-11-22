@@ -1,4 +1,8 @@
-# Project Conventions
+# Conventions Overview
+
+The rules shared across the codebase. The other files in this folder go deeper on one area
+each. For setup and the validation commands, see [`docs/development.md`](../development.md);
+for how the system fits together, see [`docs/architecture.md`](../architecture.md).
 
 ## Tech Stack
 
@@ -6,23 +10,11 @@
 - Frontend: SvelteKit + Svelte 5 (runes mode), Tailwind CSS v4, shadcn-svelte components on bits-ui, layerchart for charts, sveltekit-superforms + Zod for forms, Vitest + Playwright for tests, ESLint + Prettier
 - Backend: Hono on Bun, Drizzle ORM with SQLite, Lucia for auth, Biome for linting/formatting
 
-## Validation & Quality
+## Validation
 
-After finishing a task, run fix then validate in each subfolder you modified. Fix all errors and warnings, even pre-existing ones.
-
-- Backend: `bun run all:fix && bun run validate`
-- Frontend: `npm run all:fix && npm run validate`
-
-`all:fix` auto-fixes lint and formatting. `validate` runs lint, format check, type check, tests, and the build in sequence — fix any failing step before proceeding.
-
-## Git Commands
-
-Always use `--no-pager` immediately after `git` for commands with large output (e.g., `git --no-pager diff`).
-
-## Output Style
-
-- Keep task summaries to a few key bullet points. No full paragraphs.
-- Do not generate documentation files unless updating README or existing docs.
+Run `all:fix` and then `validate` in each subfolder you modified, and fix everything they
+report, including pre-existing findings. What each step covers is in
+[Development Guide § Validation](../development.md#validation).
 
 ## Svelte 5 Runes Mode
 
@@ -127,7 +119,7 @@ All monetary values are stored AND computed as **integer cents** — the 14 mone
 - **Input edge (dollars → cents):** every money Zod validator wraps the amount in `moneyDollarsToCents` / `dollarsToCents` (`backend/src/utils/money.ts`). The non-Zod CSV import does the same. Never store a client dollar amount without converting.
 - **Display edge (cents → dollars):** convert at the API RESPONSE boundary — per-entity `*ToApi` helpers (`utils/money.ts`) + `api/analytics/api-transform.ts` for analytics. The frontend dollar contract is unchanged; do NOT convert inside repositories or analytics (they read/compute cents).
 - **NOT money** (stay `real`/number): `apr` (%), `volume` (gal/kWh), `businessMileageRate` ($/mile rate), mileage, percentages, normalized scores (e.g. analytics `vehicleRadar` fields). A cost-NAMED analytics field may be a normalized score — check its builder, not its name.
-- **Backup/restore:** backup `currentVersion` is `'2.0.0'` (cents). The ZIP path version-gates a ×100 restore shim for pre-cents (`<2.0.0`) backups (`coerceRow` + `shimMoneyToCents`). The Google **Sheets** path has NO persisted version (it is a live cents-native DB mirror) → it must restore WITHOUT the shim. `MONEY_CENTS_FIELDS` (the shim allowlist) is drift-guarded by `money-cents-fields-guard.test.ts`.
+- **Backup/restore:** backup `currentVersion` is `'2.0.0'` (cents). The ZIP path version-gates a ×100 restore shim for pre-cents (`<2.0.0`) backups (`coerceRow` + `shimMoneyToCents`). The Google **Sheets** mirror records its version in a `Metadata` tab, and `restoreFromSheets` applies the same shim when that version is below 2.0.0 (see `BackupRestore.md` for mirrors that predate the tab). `MONEY_CENTS_FIELDS` (the shim allowlist) is drift-guarded by `money-cents-fields-guard.test.ts`.
 - Adding a new money column? Make it `integer`, add it to `MONEY_CENTS_FIELDS`, add its input transform + display conversion, and update the guard.
 
 ## Code Hygiene
