@@ -313,6 +313,109 @@ describe('the odometer check sees what the form sees', () => {
   });
 });
 
+describe('manual odometer readings share the order check with expenses', () => {
+  function manual(recordedAt: string, odometer: number, extra: Record<string, unknown> = {}) {
+    return ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, { odometer, recordedAt, ...extra });
+  }
+
+  async function manualCreated(recordedAt: string, odometer: number): Promise<string> {
+    const res = await manual(recordedAt, odometer);
+    const body = await json<DataEnvelope<{ id: string }>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(201);
+    return body.data.id;
+  }
+
+  test('an expense reading must fit around manual readings', async () => {
+    await manualCreated('2024-03-01', 60_000);
+    await manualCreated('2024-03-20', 61_000);
+
+    expect(await rejection(await fillUp('2024-03-10', 30_000))).toBe(
+      'Mileage must be greater than 60,000 (from earlier entry)'
+    );
+    expect(await rejection(await fillUp('2024-03-10', 61_500))).toBe(
+      'Mileage must be less than 61,000 (from later entry)'
+    );
+    await created('2024-03-10', 60_500);
+  });
+
+  test('a manual reading must fit around expense and manual readings', async () => {
+    await created('2024-03-01', 10_000);
+    await manualCreated('2024-03-20', 11_000);
+
+    expect(await rejection(await manual('2024-03-10', 9_000))).toBe(
+      'Mileage must be greater than 10,000 (from earlier entry)'
+    );
+    expect(await rejection(await manual('2024-03-10', 11_000))).toContain('less than 11,000');
+    await manualCreated('2024-03-10', 10_500);
+  });
+
+  test('a manual reading below the initial mileage is refused', async () => {
+    const car = await seedVehicle(ctx, {
+      make: 'Mazda',
+      model: '3',
+      extra: { initialMileage: 9_000 },
+    });
+    const res = await ctx.authed('POST', `/api/v1/odometer/${car}`, {
+      odometer: 100,
+      recordedAt: '2024-03-10',
+    });
+    expect(await rejection(res)).toBe('Mileage cannot be less than initial mileage');
+  });
+
+  test('editing a manual reading is checked at its new value and date, ignoring itself', async () => {
+    await created('2024-03-01', 10_000);
+    await created('2024-03-20', 11_000);
+    const id = await manualCreated('2024-03-10', 10_400);
+
+    const low = await ctx.authed('PUT', `/api/v1/odometer/${id}`, { odometer: 9_500 });
+    expect(await rejection(low)).toContain('greater than 10,000');
+    const moved = await ctx.authed('PUT', `/api/v1/odometer/${id}`, { recordedAt: '2024-03-25' });
+    expect(await rejection(moved)).toContain('greater than 11,000');
+    const fine = await ctx.authed('PUT', `/api/v1/odometer/${id}`, { odometer: 10_600 });
+    expect(fine.status).toBe(200);
+  });
+
+  test('an edit that leaves the value and date alone is not re-checked', async () => {
+    const id = await manualCreated('2024-03-10', 10_400);
+    await created('2024-03-01', 10_000);
+    ctx.sqlite.query('UPDATE odometer_entries SET odometer = 9000 WHERE id = ?').run(id);
+
+    const res = await ctx.authed('PUT', `/api/v1/odometer/${id}`, { note: 'checked' });
+    expect(res.status).toBe(200);
+
+    ctx.sqlite
+      .query('UPDATE odometer_entries SET recorded_at = ? WHERE id = ?')
+      .run(Math.floor(Date.parse('2024-03-10T03:00:00.000Z') / 1000), id);
+    const resent = await ctx.authed('PUT', `/api/v1/odometer/${id}`, {
+      odometer: 9_000,
+      recordedAt: '2024-03-10',
+      note: 'checked again',
+    });
+    expect(resent.status).toBe(200);
+  });
+
+  test('days are local to the sender when it sends its time zone', async () => {
+    await created('2024-03-10T12:00:00.000Z', 10_000);
+    const lateEvening = '2024-03-10T10:00:00.000Z';
+
+    expect(
+      await rejection(await manual(lateEvening, 10_500, { timeZone: 'Pacific/Auckland' }))
+    ).toBe('Mileage must be less than 10,000 (from later entry)');
+    expect((await manual(lateEvening, 10_500)).status).toBe(201);
+    expect(
+      await rejection(await manual(lateEvening, 10_500, { timeZone: 'Mars/Olympus' }))
+    ).toContain('Unknown time zone');
+  });
+
+  test('two conflicting manual readings sent at once cannot both be stored', async () => {
+    const statuses = await Promise.all([
+      manual('2024-03-01', 10_000).then((r) => r.status),
+      manual('2024-03-20', 9_000).then((r) => r.status),
+    ]);
+    expect(statuses.sort()).toEqual([201, 400]);
+  });
+});
+
 describe('odometerOrderError', () => {
   const none = { before: null, after: null };
 

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import type { DrizzleTransaction } from '../../db/types';
 import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
@@ -8,6 +9,7 @@ import {
   requireVehicleRead,
   requireVehicleWrite,
 } from '../../utils/sharing';
+import { isValidTimeZone, zonedDayWindow } from '../../utils/time-zone';
 import {
   commonSchemas,
   dateInput,
@@ -17,8 +19,11 @@ import {
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
+import { assertOdometerInOrder } from '../expenses/repository';
+import type { OdometerCheck } from '../expenses/validation';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
+import { vehicleRepository } from '../vehicles/repository';
 import { odometerRepository } from './repository';
 
 const routes = new Hono();
@@ -35,7 +40,33 @@ export const odometerCreateSchema = z.object({
   note: z.string().max(500).optional(),
 });
 
-const updateSchema = odometerCreateSchema.partial();
+const timeZoneSchema = z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional();
+
+const createBodySchema = odometerCreateSchema.extend({ timeZone: timeZoneSchema });
+
+const updateSchema = createBodySchema.partial();
+
+function inOrder(check: OdometerCheck | null) {
+  return (tx: DrizzleTransaction) => assertOdometerInOrder(tx, check);
+}
+
+async function readingCheck(
+  vehicleId: string,
+  odometer: number,
+  recordedAt: Date,
+  timeZone: string | undefined,
+  excludeId?: string
+): Promise<OdometerCheck> {
+  const vehicle = await vehicleRepository.findById(vehicleId);
+  return {
+    vehicleId,
+    mileage: odometer,
+    date: recordedAt,
+    timeZone: timeZone ?? 'UTC',
+    excludeId,
+    initialMileage: vehicle?.initialMileage,
+  };
+}
 
 const listQuerySchema = z.object({
   ...commonSchemas.clampedPaginationFields,
@@ -104,7 +135,7 @@ routes.get('/entry/:id', zValidator('param', commonSchemas.idParam), async (c) =
 routes.post(
   '/:vehicleId',
   zValidator('param', commonSchemas.vehicleIdParam),
-  zValidator('json', odometerCreateSchema),
+  zValidator('json', createBodySchema),
   async (c) => {
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
@@ -112,13 +143,16 @@ routes.post(
 
     const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'write');
 
-    const entry = await odometerRepository.create({
-      vehicleId,
-      userId: ownerId,
-      odometer: data.odometer,
-      recordedAt: data.recordedAt,
-      note: data.note ?? null,
-    });
+    const entry = await odometerRepository.createChecked(
+      {
+        vehicleId,
+        userId: ownerId,
+        odometer: data.odometer,
+        recordedAt: data.recordedAt,
+        note: data.note ?? null,
+      },
+      inOrder(await readingCheck(vehicleId, data.odometer, data.recordedAt, data.timeZone))
+    );
 
     await reminderTriggerService.recheckMileageReminders(ownerId, vehicleId);
 
@@ -139,10 +173,19 @@ routes.put(
     if (!existing) throw new NotFoundError('Odometer entry');
     await requireVehicleWrite(existing.vehicleId, user.id);
 
-    const updated = await odometerRepository.update(id, {
-      ...data,
-      updatedAt: new Date(),
-    });
+    const { timeZone, ...changes } = data;
+    const odometer = changes.odometer ?? existing.odometer;
+    const recordedAt = changes.recordedAt ?? existing.recordedAt;
+    const dayOf = (at: Date) => zonedDayWindow(at, timeZone ?? 'UTC').dayStart.getTime();
+    const moved =
+      odometer !== existing.odometer || dayOf(recordedAt) !== dayOf(existing.recordedAt);
+    const updated = await odometerRepository.updateChecked(
+      id,
+      changes,
+      inOrder(
+        moved ? await readingCheck(existing.vehicleId, odometer, recordedAt, timeZone, id) : null
+      )
+    );
 
     await reminderTriggerService.recheckMileageReminders(existing.userId, updated.vehicleId);
 

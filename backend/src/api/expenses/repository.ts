@@ -18,7 +18,7 @@ import {
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
-import { expenses, photos } from '../../db/schema';
+import { expenses, odometerEntries, photos } from '../../db/schema';
 import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError, NotFoundError, ValidationError } from '../../errors';
@@ -65,6 +65,110 @@ const EXPENSE_SORT_COLUMNS = {
   amount: expenses.expenseAmount,
   category: expenses.category,
 } as const;
+
+interface Readings {
+  at(tx: DrizzleTransaction, bound: 'before' | 'after', edge: Date): Date | null;
+  bound(tx: DrizzleTransaction, kind: 'max' | 'min', from: Date, to: Date): number | null;
+}
+
+function expenseReadings(vehicleId: string, excludeId?: string): Readings {
+  const where = (...bounds: SQL[]) =>
+    and(
+      eq(expenses.vehicleId, vehicleId),
+      isNotNull(expenses.mileage),
+      ...bounds,
+      excludeId ? ne(expenses.id, excludeId) : undefined
+    );
+  return {
+    at: (tx, side, edge) =>
+      tx
+        .select({ date: expenses.date })
+        .from(expenses)
+        .where(where(side === 'before' ? lt(expenses.date, edge) : gte(expenses.date, edge)))
+        .orderBy(side === 'before' ? desc(expenses.date) : asc(expenses.date))
+        .limit(1)
+        .get()?.date ?? null,
+    bound: (tx, kind, from, to) =>
+      tx
+        .select({ value: kind === 'max' ? max(expenses.mileage) : min(expenses.mileage) })
+        .from(expenses)
+        .where(where(gte(expenses.date, from), lt(expenses.date, to)))
+        .get()?.value ?? null,
+  };
+}
+
+function manualReadings(vehicleId: string, excludeId?: string): Readings {
+  const where = (...bounds: SQL[]) =>
+    and(
+      eq(odometerEntries.vehicleId, vehicleId),
+      ...bounds,
+      excludeId ? ne(odometerEntries.id, excludeId) : undefined
+    );
+  const at = odometerEntries.recordedAt;
+  return {
+    at: (tx, side, edge) =>
+      tx
+        .select({ date: at })
+        .from(odometerEntries)
+        .where(where(side === 'before' ? lt(at, edge) : gte(at, edge)))
+        .orderBy(side === 'before' ? desc(at) : asc(at))
+        .limit(1)
+        .get()?.date ?? null,
+    bound: (tx, kind, from, to) =>
+      tx
+        .select({
+          value: kind === 'max' ? max(odometerEntries.odometer) : min(odometerEntries.odometer),
+        })
+        .from(odometerEntries)
+        .where(where(gte(at, from), lt(at, to)))
+        .get()?.value ?? null,
+  };
+}
+
+function pick(values: (number | null)[], kind: 'max' | 'min'): number | null {
+  const present = values.filter((v): v is number => v != null);
+  if (present.length === 0) return null;
+  return kind === 'max' ? Math.max(...present) : Math.min(...present);
+}
+
+function odometerNeighbours(
+  tx: DrizzleTransaction,
+  { vehicleId, date, timeZone, excludeId }: OdometerCheck
+): OdometerNeighbours {
+  const sources = [expenseReadings(vehicleId, excludeId), manualReadings(vehicleId, excludeId)];
+  const day = zonedDayWindow(date, timeZone);
+  const nearest = (side: 'before' | 'after') => {
+    const times = sources
+      .map((s) => s.at(tx, side, side === 'before' ? day.dayStart : day.nextDay)?.getTime())
+      .filter((t): t is number => t != null);
+    if (times.length === 0) return null;
+    const time = side === 'before' ? Math.max(...times) : Math.min(...times);
+    return zonedDayWindow(new Date(time), timeZone);
+  };
+  const earlierDay = nearest('before');
+  const laterDay = nearest('after');
+  return {
+    before: earlierDay
+      ? pick(
+          sources.map((s) => s.bound(tx, 'max', earlierDay.dayStart, day.dayStart)),
+          'max'
+        )
+      : null,
+    after: laterDay
+      ? pick(
+          sources.map((s) => s.bound(tx, 'min', day.nextDay, laterDay.nextDay)),
+          'min'
+        )
+      : null,
+  };
+}
+
+export function assertOdometerInOrder(tx: DrizzleTransaction, check: OdometerCheck | null): void {
+  if (!check) return;
+  const neighbours = odometerNeighbours(tx, check);
+  const error = odometerOrderError(check.mileage, neighbours, check.initialMileage);
+  if (error) throw new ValidationError(error);
+}
 
 function startOfDayIfDateOnly(d: Date, timeZone: string | undefined, isDay: boolean): Date {
   if (!timeZone || !isDay) return d;
@@ -221,58 +325,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return { vehicleIds: [...new Set(rows.map((r) => r.vehicleId))], ownerId: rows[0].userId };
   }
 
-  private odometerNeighbours(
-    tx: DrizzleTransaction,
-    { vehicleId, date, timeZone, excludeId }: OdometerCheck
-  ): OdometerNeighbours {
-    const day = zonedDayWindow(date, timeZone);
-    const readingsWhere = (...bounds: SQL[]) =>
-      and(
-        eq(expenses.vehicleId, vehicleId),
-        isNotNull(expenses.mileage),
-        ...bounds,
-        excludeId ? ne(expenses.id, excludeId) : undefined
-      );
-    const nearestDay = (bound: SQL, order: SQL) => {
-      const row = tx
-        .select({ date: expenses.date })
-        .from(expenses)
-        .where(readingsWhere(bound))
-        .orderBy(order)
-        .limit(1)
-        .get();
-      return row ? zonedDayWindow(row.date, timeZone) : null;
-    };
-    const earlierDay = nearestDay(lt(expenses.date, day.dayStart), desc(expenses.date));
-    const laterDay = nearestDay(gte(expenses.date, day.nextDay), asc(expenses.date));
-    const before = earlierDay
-      ? tx
-          .select({ mileage: max(expenses.mileage) })
-          .from(expenses)
-          .where(
-            readingsWhere(gte(expenses.date, earlierDay.dayStart), lt(expenses.date, day.dayStart))
-          )
-          .get()
-      : undefined;
-    const after = laterDay
-      ? tx
-          .select({ mileage: min(expenses.mileage) })
-          .from(expenses)
-          .where(
-            readingsWhere(gte(expenses.date, day.nextDay), lt(expenses.date, laterDay.nextDay))
-          )
-          .get()
-      : undefined;
-    return { before: before?.mileage ?? null, after: after?.mileage ?? null };
-  }
-
-  private assertOdometerInOrder(tx: DrizzleTransaction, check: OdometerCheck | null): void {
-    if (!check) return;
-    const neighbours = this.odometerNeighbours(tx, check);
-    const error = odometerOrderError(check.mileage, neighbours, check.initialMileage);
-    if (error) throw new ValidationError(error);
-  }
-
   async findByClientId(clientId: string, userId: string): Promise<Expense | null> {
     const result = await this.db
       .select()
@@ -297,7 +349,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
             .get();
           if (existing) return existing;
         }
-        this.assertOdometerInOrder(tx, odometer);
+        assertOdometerInOrder(tx, odometer);
         return tx.insert(expenses).values(data).returning().get();
       });
     } catch (error) {
@@ -314,7 +366,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     odometer: OdometerCheck | null = null
   ): Promise<Expense> {
     return this.db.transaction((tx) => {
-      this.assertOdometerInOrder(tx, odometer);
+      assertOdometerInOrder(tx, odometer);
       const updated = tx
         .update(expenses)
         .set({ ...data, updatedAt: new Date() })
