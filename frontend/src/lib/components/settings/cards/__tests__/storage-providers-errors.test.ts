@@ -72,6 +72,17 @@ describe('Storage Providers card errors read as plain sentences', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		expect(await screen.findByText('Providers')).toBeInTheDocument();
 		expect(screen.queryByText("Couldn't load your storage providers")).toBeNull();
+		await waitFor(() => expect(screen.getAllByRole('button')[0]).toHaveFocus());
+	});
+
+	test('a failed Retry keeps focus on the new Retry', async () => {
+		getSettings.mockRejectedValue(new ApiError('boom', 500));
+		render(StorageProvidersCard, { props: {} });
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+		await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus());
+		expect(getSettings).toHaveBeenCalledTimes(2);
 	});
 
 	test('a failed provider removal says what could not be done, with the reason', async () => {
