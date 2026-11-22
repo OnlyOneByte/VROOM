@@ -1,6 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { CONFIG } from '../config';
@@ -50,10 +51,42 @@ export async function transaction<T>(
   }
 }
 
+export function foldUserEmailCase(database: AppDatabase): void {
+  const folded = database.transaction((tx) => {
+    const rows = tx
+      .select({ id: schema.users.id, email: schema.users.email })
+      .from(schema.users)
+      .orderBy(schema.users.id)
+      .all();
+    const idsByFoldedEmail = new Map<string, string[]>();
+    for (const { id, email } of rows) {
+      const key = email.toLowerCase();
+      idsByFoldedEmail.set(key, [...(idsByFoldedEmail.get(key) ?? []), id]);
+    }
+    const clashes = [...idsByFoldedEmail.values()].filter((ids) => ids.length > 1);
+    if (clashes.length > 0) {
+      throw new Error(
+        `Startup stopped: some accounts have emails that differ only by letter case. Nothing was changed. In each group of user ids below, change users.email for one id (or remove that account), then restart. See docs/conventions/DatabaseMigrations.md § Production for running SQL against the database: ${clashes.map((ids) => ids.join(', ')).join('; ')}`
+      );
+    }
+
+    const unfolded = rows.filter(({ email }) => email !== email.toLowerCase());
+    for (const { id, email } of unfolded) {
+      tx.update(schema.users)
+        .set({ email: email.toLowerCase() })
+        .where(eq(schema.users.id, id))
+        .run();
+    }
+    return unfolded.length;
+  });
+  if (folded > 0) logger.info(`Lowercased ${folded} user email(s)`);
+}
+
 export function runMigrations(): void {
   try {
     logger.info('Running database migrations...');
     migrate(db, { migrationsFolder: './drizzle' });
+    foldUserEmailCase(db);
     logger.info('Database migrations completed successfully');
   } catch (error) {
     const message = extractErrorMessage(error);
