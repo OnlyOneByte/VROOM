@@ -1,0 +1,165 @@
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
+import { makeVehicle } from './expense-form-fixtures';
+
+const { addNotification, gotoDynamic, requestAutoSync, online, storage } = vi.hoisted(() => ({
+	addNotification: vi.fn(),
+	gotoDynamic: vi.fn(() => Promise.resolve()),
+	requestAutoSync: vi.fn(),
+	online: { current: true },
+	storage: {
+		findOfflineExpense: vi.fn(),
+		replaceOfflineExpense: vi.fn(() => Promise.resolve(true)),
+		loadPendingPhotos: vi.fn(() => Promise.resolve([] as File[]))
+	}
+}));
+
+vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore: { addNotification } }));
+vi.mock('#lib/utils/navigation.ts', () => ({ gotoDynamic }));
+vi.mock('#lib/stores/offline.svelte.ts', () => ({
+	onlineStatus: online,
+	offlineExpenseQueue: { current: [] }
+}));
+vi.mock('#lib/utils/sync/sync-manager.ts', () => ({ syncManager: { requestAutoSync } }));
+vi.mock('#lib/utils/offline-storage.ts', () => ({
+	...storage,
+	cacheVehicleHistory: vi.fn(),
+	cacheVehicles: vi.fn(),
+	loadCachedVehicleHistory: vi.fn(() => null),
+	loadCachedVehicles: vi.fn(() => [])
+}));
+
+const { ExpenseFormState } = await import('../expense-form-state.svelte');
+const { loadQueuedExpense } = await import('../expense-form-loaders');
+const { saveQueuedExpense, REQUEUE_FAILED_MESSAGE } = await import('../requeue-expense');
+
+const parked: OfflineExpense = {
+	id: 'offline_1',
+	clientId: 'client-1',
+	vehicleId: 'v1',
+	tags: ['fuel'],
+	category: 'fuel',
+	amount: 1_000_001,
+	date: '2025-03-10T12:00:00.000Z',
+	mileage: 31000,
+	volume: 12.5,
+	fuelType: '87 (Regular)',
+	description: 'Shell',
+	timestamp: 1,
+	synced: false,
+	needsAttention: true,
+	attentionReason: 'Amount must be 1,000,000 or less'
+};
+
+function newState() {
+	return new ExpenseFormState({ expenseId: undefined, returnTo: '/expenses' }, true);
+}
+
+beforeEach(() => {
+	vi.clearAllMocks();
+	online.current = true;
+	storage.findOfflineExpense.mockReturnValue(parked);
+	storage.replaceOfflineExpense.mockResolvedValue(true);
+});
+
+describe('loadQueuedExpense', () => {
+	test('prefills the form from the parked entry and its saved photos', async () => {
+		const photo = new File(['x'], 'receipt.jpg', { type: 'image/jpeg' });
+		storage.loadPendingPhotos.mockResolvedValueOnce([photo]);
+		const state = newState();
+
+		await loadQueuedExpense(state, 'offline_1');
+
+		expect(state.queuedExpense).toEqual(parked);
+		expect(state.formData).toMatchObject({
+			vehicleId: 'v1',
+			category: 'fuel',
+			amount: '1000001',
+			date: '2025-03-10',
+			mileage: '31000',
+			volume: '12.5',
+			fuelType: '87 (Regular)',
+			description: 'Shell'
+		});
+		expect(state.pendingFiles).toEqual([photo]);
+		expect(storage.loadPendingPhotos).toHaveBeenCalledWith('client-1');
+	});
+
+	test('an entry that is gone says so and goes back', async () => {
+		storage.findOfflineExpense.mockReturnValue(undefined);
+		const state = newState();
+
+		await loadQueuedExpense(state, 'offline_gone');
+
+		expect(state.queuedExpense).toBeNull();
+		expect(addNotification).toHaveBeenCalledWith({
+			type: 'error',
+			message: 'That entry is no longer waiting to sync.'
+		});
+		expect(gotoDynamic).toHaveBeenCalledWith('/expenses');
+	});
+});
+
+describe('saveQueuedExpense', () => {
+	async function loadedState() {
+		const state = newState();
+		await loadQueuedExpense(state, 'offline_1');
+		state.vehicle = makeVehicle('v1');
+		state.isLoading = false;
+		return state;
+	}
+
+	test('the form still blocks the amount the server rejected', async () => {
+		const state = await loadedState();
+
+		await saveQueuedExpense(state);
+
+		expect(state.errors['amount']).toBe('Amount must be 1,000,000 or less');
+		expect(storage.replaceOfflineExpense).not.toHaveBeenCalled();
+	});
+
+	test('a fixed entry replaces the parked one, asks for a sync and goes back', async () => {
+		const state = await loadedState();
+		state.formData.amount = '45.10';
+
+		await saveQueuedExpense(state);
+
+		expect(storage.replaceOfflineExpense).toHaveBeenCalledWith(
+			'offline_1',
+			expect.objectContaining({ vehicleId: 'v1', category: 'fuel', amount: 45.1, volume: 12.5 }),
+			[]
+		);
+		expect(requestAutoSync).toHaveBeenCalled();
+		expect(addNotification).toHaveBeenCalledWith({
+			type: 'success',
+			message: 'Entry updated. Syncing it now.'
+		});
+		expect(gotoDynamic).toHaveBeenCalledWith('/expenses');
+		expect(state.isSubmitting).toBe(false);
+	});
+
+	test('offline, it says the entry will sync later', async () => {
+		online.current = false;
+		const state = await loadedState();
+		state.formData.amount = '45.10';
+
+		await saveQueuedExpense(state);
+
+		expect(addNotification).toHaveBeenCalledWith({
+			type: 'success',
+			message: "Entry updated. It will sync when you're back online."
+		});
+	});
+
+	test('a failed write stays on the form with an error', async () => {
+		storage.replaceOfflineExpense.mockResolvedValue(false);
+		const state = await loadedState();
+		state.formData.amount = '45.10';
+
+		await saveQueuedExpense(state);
+
+		expect(state.submitError).toBe(REQUEUE_FAILED_MESSAGE);
+		expect(gotoDynamic).not.toHaveBeenCalled();
+		expect(requestAutoSync).not.toHaveBeenCalled();
+	});
+});

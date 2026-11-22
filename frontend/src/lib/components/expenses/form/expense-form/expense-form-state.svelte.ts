@@ -5,6 +5,7 @@ import { extractUniqueTags } from '#lib/utils/expense-filters.ts';
 import { resetSplitAllocations, type SplitAllocationDraft } from '#lib/utils/expense-helpers.ts';
 import { getDistanceUnitLabel, isElectricFuelType } from '#lib/utils/units.ts';
 import { latest } from '#lib/utils/latest-request.ts';
+import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 import { validateExpenseField } from '../expense-form-validation';
 import { calculateMileageEfficiency } from './mileage-efficiency';
 import { createEmptyFormData, type ExpenseFormData } from './expense-form-data';
@@ -65,6 +66,8 @@ export class ExpenseFormState {
 
 	pendingFiles = $state<File[]>([]);
 
+	queuedExpense = $state<OfflineExpense | null>(null);
+
 	readonly nextVehicleRequest = latest();
 	readonly nextLastFuelRequest = latest();
 	readonly nextHistoryRequest = latest();
@@ -113,7 +116,7 @@ export class ExpenseFormState {
 	hasSplitVehicles = $derived(
 		(!this.isEditMode || this.isGroupEditMode) && this.vehicles.length >= 2
 	);
-	canSplit = $derived(this.hasSplitVehicles && !this.showFuelFields);
+	canSplit = $derived(this.hasSplitVehicles && !this.showFuelFields && !this.queuedExpense);
 	showFuelSplitHint = $derived(this.hasSplitVehicles && this.showFuelFields && !this.isSplit);
 
 	constructor(ctx: ExpenseFormContext, initialLoading: boolean) {
@@ -128,7 +131,7 @@ export class ExpenseFormState {
 			volumeUnit: this.effectiveVolumeUnit,
 			chargeUnit: this.effectiveChargeUnit,
 			allVehicleExpenses: this.allVehicleExpenses,
-			expenseId: this.ctx.expenseId,
+			expenseId: this.ctx.expenseId ?? this.queuedExpense?.id,
 			formData: this.formData as unknown as Record<string, string | string[]>
 		};
 	}

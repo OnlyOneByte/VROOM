@@ -6,8 +6,10 @@ import { offlineExpenseQueue, onlineStatus } from '#lib/stores/offline.svelte.ts
 import {
 	cacheVehicleHistory,
 	cacheVehicles,
+	findOfflineExpense,
 	loadCachedVehicleHistory,
-	loadCachedVehicles
+	loadCachedVehicles,
+	loadPendingPhotos
 } from '#lib/utils/offline-storage.ts';
 import type { Expense, Vehicle } from '#lib/types/index.ts';
 import {
@@ -51,6 +53,36 @@ export async function loadVehicles(state: ExpenseFormState): Promise<void> {
 		}
 		state.vehiclesError = userFacingErrorMessage(error);
 		handleErrorWithNotification(error, "Couldn't load your vehicles");
+	}
+}
+
+export async function loadQueuedExpense(state: ExpenseFormState, id: string): Promise<void> {
+	const queued = findOfflineExpense(id);
+	if (!queued) {
+		appStore.addNotification({
+			type: 'error',
+			message: 'That entry is no longer waiting to sync.'
+		});
+		gotoDynamic(state.ctx.returnTo);
+		return;
+	}
+	state.queuedExpense = queued;
+	state.formData.vehicleId = queued.vehicleId;
+	state.formData.tags = queued.tags ?? [];
+	state.formData.category = queued.category;
+	state.formData.amount = queued.amount.toString();
+	state.formData.date = toDateInputValue(queued.date);
+	state.formData.mileage = queued.mileage?.toString() ?? '';
+	state.formData.volume = queued.volume?.toString() ?? '';
+	state.formData.charge = queued.charge?.toString() ?? '';
+	state.formData.fuelType = queued.fuelType ?? '';
+	state.formData.description = queued.description ?? '';
+	state.formData.location = queued.location ?? '';
+	state.formData.missedFillup = queued.missedFillup ?? false;
+	state.sourceType = queued.sourceType ?? null;
+	state.sourceId = queued.sourceId ?? null;
+	if (queued.clientId) {
+		state.pendingFiles = await loadPendingPhotos(queued.clientId).catch(() => []);
 	}
 }
 

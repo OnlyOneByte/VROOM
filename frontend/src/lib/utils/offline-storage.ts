@@ -266,6 +266,33 @@ export async function addOfflineExpense(
 	return queued;
 }
 
+export function findOfflineExpense(id: string): OfflineExpense | undefined {
+	return loadOfflineExpenses().find(expense => expense.id === id && !expense.synced);
+}
+
+export async function replaceOfflineExpense(
+	id: string,
+	expense: Omit<OfflineExpense, 'id' | 'clientId' | 'timestamp' | 'synced' | 'version'>,
+	photos: File[]
+): Promise<boolean> {
+	const currentExpenses = loadOfflineExpenses();
+	const existing = currentExpenses.find(entry => entry.id === id && !entry.synced);
+	if (!existing) return false;
+	const replaced: OfflineExpense = {
+		...expense,
+		amount: roundToCents(expense.amount),
+		id: existing.id,
+		...(existing.clientId !== undefined && { clientId: existing.clientId }),
+		timestamp: existing.timestamp,
+		synced: false,
+		version: OFFLINE_STORAGE_VERSION
+	};
+	if (!saveOfflineExpenses(currentExpenses.map(entry => (entry.id === id ? replaced : entry)))) {
+		return false;
+	}
+	return existing.clientId ? savePendingPhotos(existing.clientId, photos) : photos.length === 0;
+}
+
 export function removeOfflineExpense(id: string): void {
 	const currentExpenses = loadOfflineExpenses();
 	const removed = currentExpenses.find(expense => expense.id === id);

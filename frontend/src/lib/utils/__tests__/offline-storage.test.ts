@@ -24,6 +24,8 @@ import {
 	loadCachedVehicleHistory,
 	updateCachedVehicle,
 	removeCachedVehicle,
+	findOfflineExpense,
+	replaceOfflineExpense,
 	type OfflineExpense
 } from '../offline-storage';
 import type { Vehicle } from '#lib/types/index.ts';
@@ -1236,5 +1238,56 @@ describe('queue owner scoping', () => {
 		expect(loadCachedVehicles().map(v => v.id)).toEqual(['v2']);
 		expect(loadCachedVehicleHistory('v1')).toBeNull();
 		expect(loadCachedVehicleHistory('v2')).toEqual([]);
+	});
+
+	it('an edited parked entry is requeued in place, keeping its identity and dropping cleared fields', async () => {
+		const store = useStore({
+			[scoped('user-8')]: JSON.stringify([
+				queuedRow({
+					id: 'parked',
+					clientId: 'client-1',
+					timestamp: 111,
+					category: 'fuel',
+					amount: 1_000_001,
+					volume: 10,
+					needsAttention: true,
+					attentionReason: 'Amount must be 1,000,000 or less'
+				}),
+				queuedRow({ id: 'other' })
+			])
+		});
+		setOfflineQueueOwner('user-8');
+
+		const saved = await replaceOfflineExpense(
+			'parked',
+			{ vehicleId: 'v1', tags: [], category: 'misc', amount: 999.999, date: '2026-01-06' },
+			[]
+		);
+
+		expect(saved).toBe(true);
+		const rows = JSON.parse(store.get(scoped('user-8'))!) as OfflineExpense[];
+		expect(rows.map(r => r.id)).toEqual(['parked', 'other']);
+		expect(rows[0]).toMatchObject({
+			id: 'parked',
+			clientId: 'client-1',
+			timestamp: 111,
+			category: 'misc',
+			amount: 1000,
+			synced: false
+		});
+		expect(rows[0]?.volume).toBeUndefined();
+		expect(rows[0]?.needsAttention).toBeUndefined();
+		expect(rows[0]?.attentionReason).toBeUndefined();
+		expect(getPendingExpenses().map(r => r.id)).toContain('parked');
+	});
+
+	it('a missing or already synced entry is not requeued', async () => {
+		useStore({ [scoped('user-9')]: JSON.stringify([queuedRow({ id: 'done', synced: true })]) });
+		setOfflineQueueOwner('user-9');
+		const input = { vehicleId: 'v1', tags: [], category: 'misc', amount: 5, date: '2026-01-06' };
+
+		expect(await replaceOfflineExpense('done', input, [])).toBe(false);
+		expect(await replaceOfflineExpense('gone', input, [])).toBe(false);
+		expect(findOfflineExpense('done')).toBeUndefined();
 	});
 });

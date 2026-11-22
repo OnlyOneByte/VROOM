@@ -9,6 +9,7 @@
 	let preselectedAmount = $derived(page.url.searchParams.get('amount'));
 	let preselectedDescription = $derived(page.url.searchParams.get('description'));
 	let preselectedTags = $derived(page.url.searchParams.get('tags'));
+	let queuedExpenseId = $derived(page.url.searchParams.get('queued'));
 </script>
 
 <svelte:head>
@@ -24,4 +25,5 @@
 	{preselectedAmount}
 	{preselectedDescription}
 	{preselectedTags}
+	{queuedExpenseId}
 />
