@@ -28,6 +28,11 @@ Review the generated SQL before committing:
 local `bun run dev`, prod, and `createTestApp()`. There is no manual apply step; `bun run db:init`
 just invokes it standalone (plus `--seed` via `bun run db:seed`).
 
+After the migrations, `runMigrations()` also folds every `users.email` with `toLowerCase()`, the
+same fold signup uses, because SQLite's `lower()` only folds A–Z. If two accounts fold to the same
+email, startup stops, writes nothing and lists their user ids; change `users.email` for one id in
+each group (see Production for running SQL) and restart.
+
 ## Rules
 
 - **Never `bun run db:push`.** It diffs the live DB and applies the diff with no row in
