@@ -69,6 +69,7 @@
 	} from '#lib/types/index.ts';
 
 	const PAGE_SIZE = 20;
+	const CHART_READING_LIMIT = 100;
 	const MIN_CHART_POINTS = 2;
 
 	let {
@@ -81,6 +82,8 @@
 	let distLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 
 	let entries = $state<OdometerHistoryEntry[]>([]);
+	let chartEntries = $state<OdometerHistoryEntry[]>([]);
+	let chartIsCapped = $state(false);
 	let totalCount = $state(0);
 	let offset = $state(0);
 	let isLoading = $state(true);
@@ -98,7 +101,7 @@
 	let hasNext = $derived(offset + entries.length < totalCount);
 
 	let chartData = $derived(
-		entries
+		chartEntries
 			.filter(e => e.recordedAt)
 			.map(e => ({
 				date: new Date(e.recordedAt),
@@ -123,9 +126,26 @@
 	];
 
 	onMount(async () => {
-		await loadEntries(0);
+		await loadAll(0);
 		isLoading = false;
 	});
+
+	async function loadAll(listOffset: number) {
+		await Promise.all([loadEntries(listOffset), loadChartEntries()]);
+	}
+
+	async function loadChartEntries() {
+		try {
+			const response = await odometerHistoryApi.getHistory(vehicleId, {
+				limit: CHART_READING_LIMIT,
+				offset: 0
+			});
+			chartEntries = response.data;
+			chartIsCapped = response.pagination.totalCount > response.data.length;
+		} catch {
+			chartEntries = [];
+		}
+	}
 
 	async function loadEntries(newOffset: number) {
 		isPageLoading = true;
@@ -175,7 +195,7 @@
 			await odometerApi.delete(deletingEntry.sourceId);
 			deleteDialogOpen = false;
 			deletingEntry = null;
-			await loadEntries(offset);
+			await loadAll(offset);
 		} catch (e) {
 			deleteError = `Couldn't delete the reading. ${userFacingErrorMessage(e)}`;
 		} finally {
@@ -200,7 +220,7 @@
 			{error}
 		{/snippet}
 		{#snippet action()}
-			<Button variant="outline" onclick={() => loadEntries(0)}>Retry</Button>
+			<Button variant="outline" onclick={() => loadAll(0)}>Retry</Button>
 		{/snippet}
 	</EmptyState>
 {:else if totalCount === 0}
@@ -238,7 +258,9 @@
 		{#if chartData.length >= MIN_CHART_POINTS}
 			<AppLineChart
 				title="Mileage Over Time"
-				description="Odometer readings plotted by date"
+				description={chartIsCapped
+					? `Your latest ${CHART_READING_LIMIT} readings`
+					: 'Odometer readings plotted by date'}
 				data={chartData}
 				x="date"
 				y="odometer"
