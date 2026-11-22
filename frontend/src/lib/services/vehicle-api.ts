@@ -11,6 +11,7 @@ import { apiClient } from './api-client';
 import { buildQueryString } from './api-utils';
 import { userTimeZone } from './analytics-api';
 import { photoCollection } from './photo-api';
+import { removeCachedVehicle, updateCachedVehicle } from '#lib/utils/offline-storage.ts';
 
 const vehiclePhotos = (vehicleId: string) =>
 	photoCollection(`/api/v1/vehicles/${vehicleId}/photos`);
@@ -35,7 +36,9 @@ export const vehicleApi = {
 	},
 
 	async updateVehicle(vehicleId: string, data: UpdateVehicleRequest): Promise<Vehicle> {
-		return apiClient.put<Vehicle>(`/api/v1/vehicles/${vehicleId}`, data);
+		const vehicle = await apiClient.put<Vehicle>(`/api/v1/vehicles/${vehicleId}`, data);
+		updateCachedVehicle(vehicle);
+		return vehicle;
 	},
 
 	async getVehicleStats(vehicleId: string, period: TimePeriod): Promise<VehicleStats> {
@@ -44,6 +47,7 @@ export const vehicleApi = {
 
 	async deleteVehicle(vehicleId: string): Promise<void> {
 		await apiClient.delete(`/api/v1/vehicles/${vehicleId}`);
+		removeCachedVehicle(vehicleId);
 	},
 
 	// The backend answers 200 with data: null when the vehicle has no financing; any error is real.
