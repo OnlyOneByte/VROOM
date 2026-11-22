@@ -76,9 +76,9 @@
 		</div>
 
 		<Dialog.Footer>
-			<Button variant="outline" onclick={() => (open = false)} disabled={form.isImporting}
-				>Cancel</Button
-			>
+			<Button variant="outline" onclick={() => (open = false)} disabled={form.isImporting}>
+				Cancel
+			</Button>
 			<Button
 				onclick={handleCommit}
 				disabled={form.isImporting || !form.preview || form.preview.readyCount === 0}

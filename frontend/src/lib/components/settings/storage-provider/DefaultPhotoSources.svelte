@@ -332,8 +332,10 @@
 			<AlertDialogCancel
 				onclick={() => {
 					pendingChange = null;
-				}}>Cancel</AlertDialogCancel
+				}}
 			>
+				Cancel
+			</AlertDialogCancel>
 			<AlertDialogAction onclick={confirmChange}>Switch Anyway</AlertDialogAction>
 		</AlertDialogFooter>
 	</AlertDialogContent>

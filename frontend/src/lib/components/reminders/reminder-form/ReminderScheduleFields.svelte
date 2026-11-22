@@ -47,9 +47,9 @@
 				placeholder="3"
 				aria-invalid={!!form.errors['intervalValue']}
 			/>
-			{#if form.errors['intervalValue']}<FormFieldError
-					>{form.errors['intervalValue']}</FormFieldError
-				>{/if}
+			{#if form.errors['intervalValue']}<FormFieldError>
+					{form.errors['intervalValue']}
+				</FormFieldError>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="reminder-interval-unit">Unit</Label>
@@ -85,7 +85,7 @@
 		aria-invalid={!!form.errors['endDate']}
 		aria-describedby={form.errors['endDate'] ? 'reminder-end-error' : undefined}
 	/>
-	{#if form.errors['endDate']}<FormFieldError id="reminder-end-error"
-			>{form.errors['endDate']}</FormFieldError
-		>{/if}
+	{#if form.errors['endDate']}<FormFieldError id="reminder-end-error">
+			{form.errors['endDate']}
+		</FormFieldError>{/if}
 </div>

@@ -361,9 +361,9 @@
 					<Card>
 						<CardHeader>
 							<CardTitle level={2}>Initial Term</CardTitle>
-							<CardDescription
-								>Coverage period, vehicles, policy details, and costs for the first term</CardDescription
-							>
+							<CardDescription>
+								Coverage period, vehicles, policy details, and costs for the first term
+							</CardDescription>
 						</CardHeader>
 						<CardContent class="space-y-6">
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -443,9 +443,9 @@
 											aria-describedby={errors.deductibleAmount ? 'deductible-error' : undefined}
 										/>
 										{#if errors.deductibleAmount}
-											<FormFieldError id="deductible-error"
-												>{errors.deductibleAmount}</FormFieldError
-											>
+											<FormFieldError id="deductible-error">
+												{errors.deductibleAmount}
+											</FormFieldError>
 										{/if}
 									</div>
 								</div>
@@ -473,9 +473,9 @@
 											aria-describedby={errors.coverageLimit ? 'coverage-limit-error' : undefined}
 										/>
 										{#if errors.coverageLimit}
-											<FormFieldError id="coverage-limit-error"
-												>{errors.coverageLimit}</FormFieldError
-											>
+											<FormFieldError id="coverage-limit-error">
+												{errors.coverageLimit}
+											</FormFieldError>
 										{/if}
 									</div>
 									<div class="space-y-2">
@@ -552,9 +552,9 @@
 											<Select.Content>
 												<Select.Item value="Monthly" label="Monthly">Monthly</Select.Item>
 												<Select.Item value="Quarterly" label="Quarterly">Quarterly</Select.Item>
-												<Select.Item value="Semi-Annual" label="Semi-Annual"
-													>Semi-Annual</Select.Item
-												>
+												<Select.Item value="Semi-Annual" label="Semi-Annual">
+													Semi-Annual
+												</Select.Item>
 												<Select.Item value="Annual" label="Annual">Annual</Select.Item>
 												<Select.Item value="One-Time" label="One-Time">One-Time</Select.Item>
 											</Select.Content>

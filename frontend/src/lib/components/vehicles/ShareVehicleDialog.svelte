@@ -147,8 +147,9 @@
 					</Select.Trigger>
 					<Select.Content>
 						<Select.Item value="viewer" label="Viewer">Viewer — can view only</Select.Item>
-						<Select.Item value="editor" label="Editor">Editor — can view + add expenses</Select.Item
-						>
+						<Select.Item value="editor" label="Editor">
+							Editor — can view + add expenses
+						</Select.Item>
 					</Select.Content>
 				</Select.Root>
 			</div>

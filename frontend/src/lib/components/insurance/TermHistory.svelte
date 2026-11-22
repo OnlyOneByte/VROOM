@@ -46,9 +46,9 @@
 </script>
 
 <div class="space-y-3">
-	<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground"
-		>Past Terms</svelte:element
-	>
+	<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground">
+		Past Terms
+	</svelte:element>
 
 	{#if sortedTerms.length === 0}
 		<p class="text-sm text-muted-foreground">No past terms.</p>

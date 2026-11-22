@@ -118,9 +118,9 @@
 								{/if}
 								<div class="flex justify-between">
 									<span class="text-muted-foreground">Amount:</span>
-									<span class="font-medium"
-										>{formatAmount(currentConflict.localExpense.amount)}</span
-									>
+									<span class="font-medium">
+										{formatAmount(currentConflict.localExpense.amount)}
+									</span>
 								</div>
 								<div class="flex justify-between">
 									<span class="text-muted-foreground">Date:</span>
@@ -166,9 +166,9 @@
 								</div>
 								<div class="flex justify-between">
 									<span class="text-muted-foreground">Amount:</span>
-									<span class="font-medium"
-										>{formatAmount(currentConflict.serverExpense.amount)}</span
-									>
+									<span class="font-medium">
+										{formatAmount(currentConflict.serverExpense.amount)}
+									</span>
 								</div>
 								<div class="flex justify-between">
 									<span class="text-muted-foreground">Date:</span>

@@ -29,9 +29,9 @@
 <Card>
 	<CardHeader>
 		<CardTitle>Theme</CardTitle>
-		<CardDescription
-			>Pick a color theme. Your light/dark choice above still applies.</CardDescription
-		>
+		<CardDescription>
+			Pick a color theme. Your light/dark choice above still applies.
+		</CardDescription>
 	</CardHeader>
 	<CardContent>
 		<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">

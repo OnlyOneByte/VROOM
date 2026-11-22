@@ -761,9 +761,9 @@
 			{VEHICLE_MESSAGES.VEHICLE_NOT_FOUND_DESC}
 		{/snippet}
 		{#snippet action()}
-			<Button onclick={() => goto(resolve(routes.dashboard))}
-				>{VEHICLE_MESSAGES.BACK_TO_DASHBOARD}</Button
-			>
+			<Button onclick={() => goto(resolve(routes.dashboard))}>
+				{VEHICLE_MESSAGES.BACK_TO_DASHBOARD}
+			</Button>
 		{/snippet}
 	</EmptyState>
 {/if}

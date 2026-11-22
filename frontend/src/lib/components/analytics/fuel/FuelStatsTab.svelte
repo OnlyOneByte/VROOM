@@ -167,9 +167,9 @@
 				<div class="flex items-center justify-between">
 					<span class="text-xs text-muted-foreground">Last Period</span>
 					<div class="flex items-center gap-2">
-						<span class="text-sm text-muted-foreground"
-							>{counts.previousYear.toFixed(decimals)}</span
-						>
+						<span class="text-sm text-muted-foreground">
+							{counts.previousYear.toFixed(decimals)}
+						</span>
 						{@render changeBadge(counts.currentYear, counts.previousYear)}
 					</div>
 				</div>
@@ -183,9 +183,9 @@
 				<div class="flex items-center justify-between">
 					<span class="text-xs text-muted-foreground">Last Month</span>
 					<div class="flex items-center gap-2">
-						<span class="text-sm text-muted-foreground"
-							>{counts.previousMonth.toFixed(decimals)}</span
-						>
+						<span class="text-sm text-muted-foreground">
+							{counts.previousMonth.toFixed(decimals)}
+						</span>
 						{@render changeBadge(counts.currentMonth, counts.previousMonth)}
 					</div>
 				</div>
@@ -262,9 +262,9 @@
 						</div>
 
 						<div class="border-b pb-3 text-center">
-							<span class="text-xs uppercase tracking-wide text-muted-foreground"
-								>Average {effLabel}</span
-							>
+							<span class="text-xs uppercase tracking-wide text-muted-foreground">
+								Average {effLabel}
+							</span>
 							<p class="text-3xl font-bold">
 								{fuelStats.fuelConsumption.avgEfficiency != null
 									? fuelStats.fuelConsumption.avgEfficiency.toFixed(1)
@@ -274,9 +274,9 @@
 
 						<div class="grid grid-cols-2 gap-4 pt-3">
 							<div class="text-center">
-								<span class="text-xs uppercase tracking-wide text-muted-foreground"
-									>Best {effLabel}</span
-								>
+								<span class="text-xs uppercase tracking-wide text-muted-foreground">
+									Best {effLabel}
+								</span>
 								<p class="text-xl font-bold text-chart-2">
 									{fuelStats.fuelConsumption.bestEfficiency != null
 										? fuelStats.fuelConsumption.bestEfficiency.toFixed(1)
@@ -284,9 +284,9 @@
 								</p>
 							</div>
 							<div class="text-center">
-								<span class="text-xs uppercase tracking-wide text-muted-foreground"
-									>Worst {effLabel}</span
-								>
+								<span class="text-xs uppercase tracking-wide text-muted-foreground">
+									Worst {effLabel}
+								</span>
 								<p class="text-xl font-bold text-destructive">
 									{fuelStats.fuelConsumption.worstEfficiency != null
 										? fuelStats.fuelConsumption.worstEfficiency.toFixed(1)
@@ -312,9 +312,9 @@
 						</div>
 
 						<div class="border-b pb-3 text-center">
-							<span class="text-xs uppercase tracking-wide text-muted-foreground"
-								>Average {electricEffLabel}</span
-							>
+							<span class="text-xs uppercase tracking-wide text-muted-foreground">
+								Average {electricEffLabel}
+							</span>
 							<p class="text-3xl font-bold">
 								{charging.efficiency.avgEfficiency != null
 									? charging.efficiency.avgEfficiency.toFixed(1)
@@ -324,9 +324,9 @@
 
 						<div class="grid grid-cols-2 gap-4 pt-3">
 							<div class="text-center">
-								<span class="text-xs uppercase tracking-wide text-muted-foreground"
-									>Best {electricEffLabel}</span
-								>
+								<span class="text-xs uppercase tracking-wide text-muted-foreground">
+									Best {electricEffLabel}
+								</span>
 								<p class="text-xl font-bold text-chart-2">
 									{charging.efficiency.bestEfficiency != null
 										? charging.efficiency.bestEfficiency.toFixed(1)
@@ -334,9 +334,9 @@
 								</p>
 							</div>
 							<div class="text-center">
-								<span class="text-xs uppercase tracking-wide text-muted-foreground"
-									>Worst {electricEffLabel}</span
-								>
+								<span class="text-xs uppercase tracking-wide text-muted-foreground">
+									Worst {electricEffLabel}
+								</span>
 								<p class="text-xl font-bold text-destructive">
 									{charging.efficiency.worstEfficiency != null
 										? charging.efficiency.worstEfficiency.toFixed(1)
@@ -355,9 +355,9 @@
 						</div>
 
 						<div class="border-b pb-4 text-center">
-							<span class="text-xs uppercase tracking-wide text-muted-foreground"
-								>Average Session</span
-							>
+							<span class="text-xs uppercase tracking-wide text-muted-foreground">
+								Average Session
+							</span>
 							<p class="text-3xl font-bold">
 								{charging.sessionDetails.avgEnergy != null
 									? charging.sessionDetails.avgEnergy.toFixed(1) + ' ' + chargeLabel
@@ -414,9 +414,9 @@
 						</div>
 
 						<div class="border-b pb-4 text-center">
-							<span class="text-xs uppercase tracking-wide text-muted-foreground"
-								>Average Fill-up</span
-							>
+							<span class="text-xs uppercase tracking-wide text-muted-foreground">
+								Average Fill-up
+							</span>
 							<p class="text-3xl font-bold">
 								{fuelStats.fillupDetails.avgVolume != null
 									? fuelStats.fillupDetails.avgVolume.toFixed(1) + ' ' + volLabelShort
@@ -454,9 +454,9 @@
 					</div>
 
 					<div class="border-b pb-4 text-center">
-						<span class="text-xs uppercase tracking-wide text-muted-foreground"
-							>{showGasCards ? 'Per Fill-up' : 'Per Session'}</span
-						>
+						<span class="text-xs uppercase tracking-wide text-muted-foreground">
+							{showGasCards ? 'Per Fill-up' : 'Per Session'}
+						</span>
 						<p class="text-3xl font-bold">
 							{perVisitCost != null ? formatCurrency(perVisitCost) : 'N/A'}
 						</p>
@@ -499,8 +499,9 @@
 					</div>
 
 					<div class="border-b pb-4 text-center">
-						<span class="text-xs uppercase tracking-wide text-muted-foreground">Total Distance</span
-						>
+						<span class="text-xs uppercase tracking-wide text-muted-foreground">
+							Total Distance
+						</span>
 						<p class="text-3xl font-bold">
 							{fuelStats.distance.totalDistance.toLocaleString()}
 							{distLabelShort}

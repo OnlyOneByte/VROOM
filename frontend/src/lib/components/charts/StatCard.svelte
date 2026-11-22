@@ -91,9 +91,9 @@
 					<div class="flex-1 space-y-1 min-w-0">
 						<span class="block text-sm font-medium text-muted-foreground break-words">{label}</span>
 						<div class="flex items-baseline gap-1 flex-wrap">
-							<span class="text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap"
-								>{value}</span
-							>
+							<span class="text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
+								{value}
+							</span>
 							{#if unit}
 								<span class="text-xs text-muted-foreground">{unit}</span>
 							{/if}
@@ -101,13 +101,13 @@
 					</div>
 					<div class="h-px w-full @sm:h-auto @sm:w-px bg-border @sm:self-stretch @sm:my-1"></div>
 					<div class="flex-1 space-y-1 min-w-0">
-						<span class="block text-sm font-medium text-muted-foreground break-words"
-							>{secondaryLabel}</span
-						>
+						<span class="block text-sm font-medium text-muted-foreground break-words">
+							{secondaryLabel}
+						</span>
 						<div class="flex items-baseline gap-1 flex-wrap">
-							<span class="text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap"
-								>{secondaryValue}</span
-							>
+							<span class="text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
+								{secondaryValue}
+							</span>
 							{#if secondaryUnit}
 								<span class="text-xs text-muted-foreground">{secondaryUnit}</span>
 							{/if}

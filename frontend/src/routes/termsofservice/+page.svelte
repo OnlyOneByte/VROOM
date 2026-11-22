@@ -97,15 +97,19 @@
 						href="https://github.com/OnlyOneByte/vroom/blob/main/LICENSE"
 						class="text-primary underline underline-offset-4 hover:decoration-2"
 						target="_blank"
-						rel="noopener noreferrer">MIT License</a
-					>. You are free to fork, modify, and self-host your own instance. The source code is
+						rel="noopener noreferrer"
+					>
+						MIT License
+					</a>. You are free to fork, modify, and self-host your own instance. The source code is
 					available on
 					<a
 						href="https://github.com/OnlyOneByte/vroom"
 						class="text-primary underline underline-offset-4 hover:decoration-2"
 						target="_blank"
-						rel="noopener noreferrer">GitHub</a
-					>.
+						rel="noopener noreferrer"
+					>
+						GitHub
+					</a>.
 				</p>
 			</section>
 
@@ -149,8 +153,10 @@
 						href="https://github.com/OnlyOneByte/vroom"
 						class="text-primary underline underline-offset-4 hover:decoration-2"
 						target="_blank"
-						rel="noopener noreferrer">GitHub repository</a
+						rel="noopener noreferrer"
 					>
+						GitHub repository
+					</a>
 					or contact the instance operator.
 				</p>
 			</section>

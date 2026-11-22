@@ -52,9 +52,9 @@
 			class="py-0 pl-2 pr-0 shadow-lg text-xs gap-1 bg-background lg:px-3 lg:py-2 lg:text-sm lg:gap-2"
 		>
 			<ServerOff size={16} />
-			<span class="font-medium max-[359px]:sr-only"
-				>Can't reach <span class="max-lg:sr-only">VROOM</span></span
-			>
+			<span class="font-medium max-[359px]:sr-only">
+				Can't reach <span class="max-lg:sr-only">VROOM</span>
+			</span>
 			<Button
 				variant="secondary"
 				size="icon-lg"
