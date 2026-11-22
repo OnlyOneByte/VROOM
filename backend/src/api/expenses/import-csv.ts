@@ -4,8 +4,9 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES, isElectricFuelType } from '../../db/types';
 import { denormalizeCsvCell } from '../../utils/csv-safety';
-import { dollarsToCents } from '../../utils/money';
+import { dollarsToCents, hasAtMostTwoDecimals } from '../../utils/money';
 import { isValidTimeZone } from '../../utils/time-zone';
+import { MAX_ODOMETER_READING, ODOMETER_TOO_HIGH_MESSAGE } from '../../utils/validation';
 import { buildImportDate } from './local-date';
 import { clearFuelFieldsIfNotFuel } from './validation';
 
@@ -67,6 +68,9 @@ function parseAmount(raw: string): { value: number } | { error: string } {
     return { error: `Invalid amount "${raw}"` };
   }
   if (amount > EXP.maxAmount) return { error: `Amount exceeds the ${EXP.maxAmount} maximum` };
+  if (!hasAtMostTwoDecimals(amount)) {
+    return { error: `Amount "${raw}" can have at most 2 decimal places` };
+  }
   return { value: dollarsToCents(amount) };
 }
 
@@ -74,6 +78,7 @@ function parseMileage(raw: string): { value: number | null } | { error: string }
   if (!raw) return { value: null };
   const m = Number(raw);
   if (!Number.isInteger(m) || m < 0) return { error: `Invalid mileage "${raw}"` };
+  if (m > MAX_ODOMETER_READING) return { error: ODOMETER_TOO_HIGH_MESSAGE };
   return { value: m };
 }
 
