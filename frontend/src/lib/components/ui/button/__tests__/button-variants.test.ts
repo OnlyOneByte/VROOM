@@ -20,7 +20,8 @@ describe('Button aria-disabled focus ring', () => {
 	function ring(classes: string[], prefix: string): { color: string; alpha: number } | null {
 		const pattern = new RegExp(`^${prefix}ring-([a-z-]+)(?:/(\\d+))?$`);
 		const match = classes.map(cls => cls.match(pattern)).findLast(Boolean);
-		return match ? { color: match[1], alpha: Number(match[2] ?? 100) } : null;
+		const color = match?.[1];
+		return color ? { color, alpha: Number(match?.[2] ?? 100) } : null;
 	}
 
 	test.each(VARIANTS)('%s still dims the whole button while aria-disabled', variant => {
