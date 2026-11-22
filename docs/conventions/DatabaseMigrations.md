@@ -29,9 +29,10 @@ local `bun run dev`, prod, and `createTestApp()`. There is no manual apply step;
 just invokes it standalone (plus `--seed` via `bun run db:seed`).
 
 After the migrations, `runMigrations()` also folds every `users.email` with `toLowerCase()`, the
-same fold signup uses, because SQLite's `lower()` only folds A–Z. If two accounts fold to the same
-email, startup stops, writes nothing and lists their user ids; change `users.email` for one id in
-each group (see Production for running SQL) and restart.
+same fold signup uses, because SQLite's `lower()` only folds A–Z. If two or more accounts fold to
+the same email, startup stops before changing any email and lists their user ids; migrations that
+already ran stay applied. Change `users.email` for all but one id in each group (see Production for
+running SQL) and restart.
 
 ## Rules
 
