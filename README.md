@@ -117,4 +117,7 @@ If VROOM is useful to you, consider buying me a coffee:
 
 ## License
 
-AGPL-3.0 — see [LICENSE](LICENSE) for details.
+VROOM is free software: you can redistribute it and/or modify it under the terms of the GNU
+Affero General Public License as published by the Free Software Foundation, either version 3
+of the License, or (at your option) any later version (`AGPL-3.0-or-later`). The full text is
+in [LICENSE](LICENSE).

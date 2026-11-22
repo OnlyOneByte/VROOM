@@ -3,7 +3,7 @@
 	"private": true,
 	"version": "1.0.0",
 	"description": "Frontend PWA for VROOM, a self-hosted vehicle cost and maintenance tracker",
-	"license": "AGPL-3.0-only",
+	"license": "AGPL-3.0-or-later",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/OnlyOneByte/VROOM.git",
