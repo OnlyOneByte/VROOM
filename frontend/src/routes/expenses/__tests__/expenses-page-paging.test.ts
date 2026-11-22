@@ -122,7 +122,7 @@ describe('/expenses paging', () => {
 		expect(tableProps['currentOffset']).toBe(20);
 	});
 
-	test('Retry shows progress and is disabled while the retry is in flight', async () => {
+	test('Retry shows progress, keeps focus and ignores a second press while in flight', async () => {
 		let resolveRetry: (v: ReturnType<typeof pageAt>) => void = () => {};
 		getAllExpenses.mockImplementation((params: { offset: number }) => {
 			const attempts = getAllExpenses.mock.calls.filter(c => offsetOf(c) === 20).length;
@@ -135,11 +135,19 @@ describe('/expenses paging', () => {
 
 		goToPage(20);
 		await screen.findByTestId('expenses-page-error');
-		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		const retry = screen.getByRole('button', { name: 'Retry' });
+		retry.focus();
+		await fireEvent.click(retry);
 
 		const retrying = await screen.findByRole('button', { name: 'Retrying…' });
-		expect(retrying).toBeDisabled();
+		expect(retrying).toBe(retry);
+		expect(retrying).toBeEnabled();
+		expect(retrying).toHaveAttribute('aria-disabled', 'true');
+		expect(retrying).toHaveFocus();
 		expect(retrying.querySelector('.animate-spin')).not.toBeNull();
+
+		await fireEvent.click(retrying);
+		expect(getAllExpenses.mock.calls.filter(c => offsetOf(c) === 20)).toHaveLength(2);
 
 		resolveRetry(pageAt(20));
 		await waitFor(() => expect(screen.queryByTestId('expenses-page-error')).toBeNull());

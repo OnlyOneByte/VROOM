@@ -58,7 +58,13 @@
 	let isRetryingParked = $state(false);
 
 	async function handleRetryParked() {
-		if (!onlineStatus.current || parkedCount === 0 || isRetryingParked) return;
+		if (
+			!onlineStatus.current ||
+			parkedCount === 0 ||
+			isRetryingParked ||
+			syncState.current === 'syncing'
+		)
+			return;
 		isRetryingParked = true;
 		try {
 			const result = await syncManager.retryParked();
@@ -199,7 +205,7 @@
 					size="sm"
 					variant="outline"
 					onclick={handleRetryParked}
-					disabled={isRetryingParked || syncState.current === 'syncing'}
+					aria-disabled={isRetryingParked || syncState.current === 'syncing'}
 					aria-busy={isRetryingParked}
 					class="w-full h-7 text-xs max-lg:h-10"
 				>
@@ -240,7 +246,7 @@
 					size={isExpanded ? 'sm' : 'icon-lg'}
 					variant={isExpanded ? 'outline' : 'ghost'}
 					onclick={() => authStore.recheckSession()}
-					disabled={authStore.recheckingSession}
+					aria-disabled={authStore.recheckingSession}
 					aria-busy={authStore.recheckingSession}
 					aria-label={isExpanded ? undefined : 'Retry connection'}
 					title={isExpanded ? undefined : "Can't reach VROOM. Retry connection"}

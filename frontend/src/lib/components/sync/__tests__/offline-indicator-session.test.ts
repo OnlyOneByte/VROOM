@@ -59,13 +59,37 @@ describe('OfflineIndicator — unverified session', () => {
 		expect(await screen.findByText(unreachableLabel)).toBeInTheDocument();
 
 		const retry = screen.getByRole('button', { name: 'Retry' });
-		await vi.waitFor(() => expect(retry).toBeEnabled());
+		await vi.waitFor(() => expect(retry).not.toHaveAttribute('aria-disabled', 'true'));
 		mockFetch.mockReset();
 		mockFetch.mockResolvedValue(me());
 		await fireEvent.click(retry);
 
 		await vi.waitFor(() => expect(authStore.sessionUnverified).toBe(false));
 		expect(screen.queryByText(unreachableLabel)).not.toBeInTheDocument();
+	});
+
+	it('keeps focus on Retry while it re-checks, and ignores a second press', async () => {
+		onlineStatus.current = true;
+		serverStaysDown();
+		await startWithUnreachableServer();
+		render(OfflineIndicator);
+
+		const retry = await screen.findByRole('button', { name: 'Retry' });
+		await vi.waitFor(() => expect(retry).not.toHaveAttribute('aria-disabled', 'true'));
+		let answer: (response: Response) => void = () => {};
+		mockFetch.mockReset();
+		mockFetch.mockImplementation(() => new Promise<Response>(resolve => (answer = resolve)));
+		retry.focus();
+		await fireEvent.click(retry);
+
+		await vi.waitFor(() => expect(retry).toHaveAttribute('aria-disabled', 'true'));
+		expect(retry).toBeEnabled();
+		expect(retry).toHaveFocus();
+		await fireEvent.click(retry);
+		expect(mockFetch).toHaveBeenCalledTimes(1);
+
+		answer(me());
+		await vi.waitFor(() => expect(authStore.sessionUnverified).toBe(false));
 	});
 
 	it('re-checks the session by itself when the device comes back online', async () => {

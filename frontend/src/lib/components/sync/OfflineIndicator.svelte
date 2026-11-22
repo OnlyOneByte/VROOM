@@ -59,7 +59,7 @@
 				variant="secondary"
 				size="icon-lg"
 				onclick={() => authStore.recheckSession()}
-				disabled={authStore.recheckingSession}
+				aria-disabled={authStore.recheckingSession}
 				class="lg:h-auto lg:w-auto lg:px-2 lg:py-1 lg:text-xs lg:gap-1"
 			>
 				<RefreshCw size={14} class={authStore.recheckingSession ? 'animate-spin' : ''} />

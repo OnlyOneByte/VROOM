@@ -138,7 +138,10 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
 - Icon-only buttons are `size="icon"` or larger and always have an `aria-label`. On touch layouts
   use `icon-lg` or pad the hit area to 40px.
 - Labels are verbs in Title Case: "Add Expense", "Log Fill-up", "Import CSV". While a mutation is
-  in flight the button is disabled and shows a spinner.
+  in flight the button is disabled and shows a spinner. That rule is for submits.
+- A Retry button that reloads data or re-sends queued work stays focusable while it runs: use
+  `aria-disabled` with a spinner, and ignore a second press in its handler. A `disabled` button
+  drops keyboard focus to the page.
 
 ### Forms
 - Wrap form pages in `FormLayout`. One column on mobile; two columns only for short paired fields

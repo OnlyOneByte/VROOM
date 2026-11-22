@@ -144,12 +144,20 @@ describe('SyncStatusInline — retrying parked rows', () => {
 		);
 		render(SyncStatusInline, { props: { isExpanded: true } });
 
-		await fireEvent.click(retryButton());
+		const retry = retryButton();
+		retry.focus();
+		await fireEvent.click(retry);
 
 		expect(retryParked).toHaveBeenCalledTimes(1);
 		const busy = screen.getByRole('button', { name: /retrying/i });
-		expect(busy).toBeDisabled();
+		expect(busy).toBe(retry);
+		expect(busy).toBeEnabled();
+		expect(busy).toHaveAttribute('aria-disabled', 'true');
 		expect(busy).toHaveAttribute('aria-busy', 'true');
+		expect(busy).toHaveFocus();
+
+		await fireEvent.click(busy);
+		expect(retryParked).toHaveBeenCalledTimes(1);
 
 		offlineExpenseQueue.current = [];
 		finish({ synced: 1, needsAttention: 0 });
@@ -175,7 +183,7 @@ describe('SyncStatusInline — retrying parked rows', () => {
 				message: expect.stringMatching(/still needs attention/i)
 			})
 		);
-		expect(retryButton()).toBeEnabled();
+		expect(retryButton()).toHaveAttribute('aria-disabled', 'false');
 	});
 
 	it('reports a failed retry and re-enables the control', async () => {
@@ -191,6 +199,17 @@ describe('SyncStatusInline — retrying parked rows', () => {
 				message: expect.stringContaining('Cannot sync while offline')
 			})
 		);
-		expect(retryButton()).toBeEnabled();
+		expect(retryButton()).toHaveAttribute('aria-disabled', 'false');
+	});
+
+	it('ignores a press while a sync is running', async () => {
+		offlineExpenseQueue.current = PARKED;
+		syncState.current = 'syncing';
+		render(SyncStatusInline, { props: { isExpanded: true } });
+
+		expect(retryButton()).toHaveAttribute('aria-disabled', 'true');
+		await fireEvent.click(retryButton());
+
+		expect(retryParked).not.toHaveBeenCalled();
 	});
 });

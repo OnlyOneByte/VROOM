@@ -234,6 +234,7 @@
 	}
 
 	function retryPage() {
+		if (isLoadingPage) return;
 		fetchPageAndSummary(pageError?.offset ?? currentOffset);
 	}
 
@@ -531,7 +532,7 @@
 							<p class="font-medium">Couldn't load expenses</p>
 						</div>
 						<p class="mb-4 text-sm text-muted-foreground">{pageError.message}</p>
-						<Button size="lg" onclick={retryPage} disabled={isLoadingPage}>
+						<Button size="lg" onclick={retryPage} aria-disabled={isLoadingPage}>
 							{#if isLoadingPage}
 								<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 								Retrying…
