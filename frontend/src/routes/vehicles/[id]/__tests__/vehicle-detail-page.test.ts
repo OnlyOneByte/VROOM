@@ -426,6 +426,80 @@ describe('vehicle detail page overview', () => {
 		expect(captured['period']?.['isLoading']).toBe(false);
 	});
 
+	function deferredByPeriod<T>() {
+		const pending = new Map<string, (value: T) => void>();
+		const call = (period: string) => new Promise<T>(r => pending.set(period, r));
+		const resolve = (period: string, value: T) => pending.get(period)?.(value);
+		return { call, resolve };
+	}
+
+	function summaryWithMonths(months: number): ExpenseSummary {
+		return {
+			...DATA_SUMMARY,
+			monthlyTrend: Array.from({ length: months }, (_, i) => ({
+				period: `2026-0${i + 1}`,
+				amount: 100,
+				count: 1
+			}))
+		} as unknown as ExpenseSummary;
+	}
+
+	const STATS_90D = { period: '90d', fuelExpenseCount: 9 };
+	const STATS_30D = { period: '30d', fuelExpenseCount: 3 };
+
+	async function changePeriodTwice() {
+		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
+		await mount();
+		const summaries = deferredByPeriod<ExpenseSummary>();
+		const stats = deferredByPeriod<unknown>();
+		getExpenseSummary.mockImplementation(({ period }: { period: string }) =>
+			summaries.call(period)
+		);
+		getVehicleStats.mockImplementation((_id: string, period: string) => stats.call(period));
+		const onPeriodChange = captured['period']?.['onPeriodChange'] as (p: string) => void;
+
+		onPeriodChange('90d');
+		await settle();
+		onPeriodChange('30d');
+		await settle();
+		return { summaries, stats };
+	}
+
+	test('an older period answering last does not replace the latest period on screen', async () => {
+		const { summaries, stats } = await changePeriodTwice();
+
+		summaries.resolve('30d', summaryWithMonths(1));
+		stats.resolve('30d', STATS_30D);
+		await settle();
+		summaries.resolve('90d', summaryWithMonths(3));
+		stats.resolve('90d', STATS_90D);
+		await settle();
+
+		expect(captured['trend']?.['description']).toBe('Last 30d');
+		expect(captured['trend']?.['data']).toHaveLength(1);
+		expect(captured['fuelStats']?.['vehicleStatsData']).toEqual(STATS_30D);
+		expect(captured['fuelStats']?.['isLoadingStats']).toBe(false);
+	});
+
+	test('an older period answering first leaves the stats loading for the latest one', async () => {
+		const { summaries, stats } = await changePeriodTwice();
+
+		summaries.resolve('90d', summaryWithMonths(3));
+		stats.resolve('90d', STATS_90D);
+		await settle();
+
+		expect(captured['fuelStats']?.['isLoadingStats']).toBe(true);
+		expect(captured['fuelStats']?.['vehicleStatsData']).not.toEqual(STATS_90D);
+
+		summaries.resolve('30d', summaryWithMonths(1));
+		stats.resolve('30d', STATS_30D);
+		await settle();
+
+		expect(captured['fuelStats']?.['isLoadingStats']).toBe(false);
+		expect(captured['fuelStats']?.['vehicleStatsData']).toEqual(STATS_30D);
+		expect(captured['trend']?.['data']).toHaveLength(1);
+	});
+
 	test('changing the period refetches stats and summary for that period', async () => {
 		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
 		await mount();

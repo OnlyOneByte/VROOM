@@ -47,6 +47,7 @@
 		FuelEfficiencyPoint,
 		ExpenseCategory
 	} from '#lib/types/index.ts';
+	import { latest } from '#lib/utils/latest-request.ts';
 	import { useExpenseListReload } from '../../expenses/expense-list-reload.svelte';
 	import type { PageData } from './$types';
 
@@ -264,19 +265,25 @@
 		}
 	}
 
+	const nextSummaryRequest = latest();
+	const nextVehicleStatsRequest = latest();
+
 	async function loadSummary() {
+		const isCurrent = nextSummaryRequest();
 		isLoadingSummary = true;
 		summaryLoadError = null;
 		try {
-			summary = await expenseApi.getExpenseSummary({
+			const loaded = await expenseApi.getExpenseSummary({
 				vehicleId,
 				period: selectedStatsPeriod
 			});
+			if (isCurrent()) summary = loaded;
 		} catch (error) {
+			if (!isCurrent()) return;
 			handleErrorWithNotification(error, "Couldn't load the expense summary");
 			summaryLoadError = userFacingErrorMessage(error);
 		} finally {
-			isLoadingSummary = false;
+			if (isCurrent()) isLoadingSummary = false;
 		}
 	}
 
@@ -334,13 +341,15 @@
 	}
 
 	async function loadVehicleStats() {
+		const isCurrent = nextVehicleStatsRequest();
 		isLoadingVehicleStats = true;
 		try {
-			vehicleStatsData = await vehicleApi.getVehicleStats(vehicleId, selectedStatsPeriod);
+			const loaded = await vehicleApi.getVehicleStats(vehicleId, selectedStatsPeriod);
+			if (isCurrent()) vehicleStatsData = loaded;
 		} catch (error) {
-			handleErrorWithNotification(error, "Couldn't load the vehicle's stats");
+			if (isCurrent()) handleErrorWithNotification(error, "Couldn't load the vehicle's stats");
 		} finally {
-			isLoadingVehicleStats = false;
+			if (isCurrent()) isLoadingVehicleStats = false;
 		}
 	}
 
