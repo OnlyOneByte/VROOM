@@ -23,8 +23,8 @@ Thanks for helping. This page is the short version; the details live in the docs
 - Run validation in every folder you changed, and fix everything it reports:
 
   ```bash
-  cd backend  && bun run all:fix && bun run validate
-  cd frontend && npm run all:fix && npm run validate
+  (cd backend  && bun run all:fix && bun run validate)
+  (cd frontend && npm run all:fix && npm run validate)
   ```
 
 ## Opening the pull request

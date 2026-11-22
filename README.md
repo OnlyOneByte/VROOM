@@ -9,7 +9,6 @@ VROOM (Vehicle Record & Organization Of Maintenance) is a self-hostable app for 
 
 <!-- screenshots -->
 
-
 > ⚠️ **Under active development.** Features, APIs, and database schemas may change between releases. Back up your data regularly via Google Drive sync. Pin to a specific image tag rather than `latest` for stability.
 
 > 🤖 **AI-native development.** Much of the code is written with AI assistance. Architecture decisions and feature direction come from a human developer, and every change is reviewed by someone other than its author, a human or an independent review agent, before it merges.
@@ -26,13 +25,14 @@ VROOM (Vehicle Record & Organization Of Maintenance) is a self-hostable app for 
 - 📱 Mobile-first PWA that installs on your phone and works offline
 - 🚗 Multi-vehicle tracking for gas, electric and hybrid cars, with odometer history
 - ⛽ Fuel and charging logs with efficiency tracking
+- 🧮 Expenses that can be split across several vehicles
 - 📊 Interactive analytics: cost breakdowns, trends and cross-vehicle comparisons
-- 💰 Financing (loans and leases) and insurance policies, with premiums split across vehicles
+- 💰 Financing (loans and leases), and insurance policies and claims, with premiums split across vehicles
 - 🗺️ Trip logging
-- ⏰ Reminders for maintenance and recurring expenses, with optional web push notifications
+- ⏰ Reminders by date, mileage or both, for maintenance and recurring expenses, with optional web push notifications
 - 👥 Vehicle sharing with other VROOM users
-- 📥 CSV import from Fuelio, Fuelly and Drivvo, or any CSV with manual column mapping
-- 📷 Photo attachments for receipts and documents, stored in Google Drive, Google Photos or S3-compatible storage
+- 📥 CSV import from Fuelio, Fuelly and Drivvo, or any CSV with manual column mapping, and CSV export of expenses
+- 📷 Photos for receipts, vehicles, odometer readings and insurance, stored in Google Drive, Google Photos or S3-compatible storage
 - 🧾 Receipt scanning that fills in the expense form, using an AI vision model you configure
 - 💬 An assistant that answers questions about your vehicles and costs, using Anthropic, Gemini or any OpenAI-compatible model
 - 💾 Google Drive ZIP backups, Google Sheets sync, and restore from a backup file
