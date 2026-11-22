@@ -24,18 +24,27 @@ function createSettingsStore() {
 	let error = $state<string | null>(null);
 	let restoreProviders = $state<RestoreProviderInfo[]>([]);
 	let inFlight: Promise<void> | null = null;
+	let loadFailure: unknown = null;
 
 	async function fetchSettings(): Promise<void> {
 		isLoading = true;
 		error = null;
+		loadFailure = null;
 		try {
 			settings = await settingsApi.getSettings();
 			themeStore.reconcileServerTheme(settings.themePreference);
 			isLoading = false;
 		} catch (err) {
+			loadFailure = err;
 			error = userFacingErrorMessage(err);
 			isLoading = false;
 		}
+	}
+
+	async function ensureLoaded(): Promise<UserSettings> {
+		if (!settings) await load();
+		if (settings) return settings;
+		throw loadFailure;
 	}
 
 	async function reloadAfterChange(): Promise<void> {
@@ -67,6 +76,7 @@ function createSettingsStore() {
 		},
 
 		load,
+		ensureLoaded,
 
 		async update(updates: Partial<UserSettings>) {
 			isLoading = true;
@@ -185,6 +195,7 @@ function createSettingsStore() {
 			error = null;
 			restoreProviders = [];
 			inFlight = null;
+			loadFailure = null;
 		}
 	};
 }

@@ -7,7 +7,7 @@
 	import { LoaderCircle } from '@lucide/svelte';
 	import ProviderForm from '#lib/components/settings/storage-provider/form/ProviderForm.svelte';
 	import { providerApi } from '#lib/services/provider-api.ts';
-	import { settingsApi } from '#lib/services/settings-api.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { routes } from '#lib/routes.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import type {
@@ -41,7 +41,7 @@
 		try {
 			const [providers, settings] = await Promise.all([
 				providerApi.getProviders('storage'),
-				settingsApi.getSettings()
+				settingsStore.ensureLoaded()
 			]);
 			const found = providers.find(p => p.id === id);
 			if (!found) {
