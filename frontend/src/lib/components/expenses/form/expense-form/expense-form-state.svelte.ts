@@ -37,6 +37,7 @@ export class ExpenseFormState {
 	vehiclesError = $state<string | null>(null);
 	expenseError = $state<string | null>(null);
 	vehicleError = $state<string | null>(null);
+	historyCheckDeferred = $state(false);
 	errors = $state<ExpenseFormErrors>({});
 	submitError = $state<string | null>(null);
 	touched = $state<Record<string, boolean>>({});

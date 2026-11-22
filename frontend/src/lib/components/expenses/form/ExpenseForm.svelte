@@ -355,6 +355,13 @@
 								Fill-ups can't be split across vehicles. Log each one on the vehicle you filled.
 							</p>
 						{/if}
+						{#if form.historyCheckDeferred && form.showFuelFields && !form.vehicleError}
+							<p class="text-xs text-muted-foreground" data-testid="odometer-check-deferred">
+								This vehicle's past fill-ups aren't on this device, so the odometer reading is
+								checked when this entry syncs. If it doesn't fit, the entry waits under Needs
+								attention for you to fix.
+							</p>
+						{/if}
 						{#if form.vehicleError}
 							<div class="space-y-2 text-sm" role="alert" data-testid="vehicle-load-error">
 								<p id="vehicle-load-message" class="flex items-start gap-2 text-destructive">

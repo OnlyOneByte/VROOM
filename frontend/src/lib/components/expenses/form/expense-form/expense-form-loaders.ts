@@ -226,13 +226,22 @@ export async function loadAllVehicleExpenses(state: ExpenseFormState): Promise<E
 		const requestedFor = currentOfflineQueueOwner();
 		const result = await expenseApi.getExpensesByVehicle(vehicleId, { limit: 100 });
 		cacheVehicleHistory(vehicleId, result.data, requestedFor);
-		if (isCurrent()) state.allVehicleExpenses = result.data;
+		if (isCurrent()) {
+			state.allVehicleExpenses = result.data;
+			state.historyCheckDeferred = false;
+		}
 		return null;
 	} catch (error) {
 		if (!isCurrent()) return null;
-		const cached = onlineStatus.current ? null : loadCachedVehicleHistory(state.formData.vehicleId);
-		state.allVehicleExpenses = cached ? [...cached, ...queuedExpensesFor(state)] : [];
-		return cached ? null : toError(error);
+		if (onlineStatus.current) {
+			state.allVehicleExpenses = [];
+			state.historyCheckDeferred = false;
+			return toError(error);
+		}
+		const cached = loadCachedVehicleHistory(state.formData.vehicleId);
+		state.allVehicleExpenses = [...(cached ?? []), ...queuedExpensesFor(state)];
+		state.historyCheckDeferred = !cached;
+		return null;
 	}
 }
 

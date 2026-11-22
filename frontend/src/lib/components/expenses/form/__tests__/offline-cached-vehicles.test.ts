@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { Vehicle } from '#lib/types/index.ts';
 
 const { addNotification, getVehicles, getVehicle, getExpensesByVehicle } = vi.hoisted(() => ({
@@ -137,7 +137,7 @@ describe('the expense form offline', () => {
 		offlineExpenseQueue.current = [];
 	});
 
-	test('offline without a cached history, the cached vehicle is kept but reported as not fully loaded', async () => {
+	test('offline without a cached history, the vehicle is usable and the odometer check waits for sync', async () => {
 		storage.set('vroom_offline_vehicles:u1', JSON.stringify([CAMRY]));
 		onlineStatus.current = false;
 		const state = fakeState('v1');
@@ -145,7 +145,27 @@ describe('the expense form offline', () => {
 		await loadVehicleContext(state);
 
 		expect(state.vehicle?.id).toBe('v1');
-		expect(state.vehicleError).not.toBeNull();
+		expect(state.vehicleError).toBeNull();
+		expect(state.historyCheckDeferred).toBe(true);
+	});
+
+	test('offline without a cached history, a fill-up saves to the queue and says the odometer is checked on sync', async () => {
+		storage.set('vroom_offline_vehicles:u1', JSON.stringify([CAMRY]));
+		onlineStatus.current = false;
+		getVehicles.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+		render(ExpenseForm, { props: { preselectedCategory: 'fuel' } });
+
+		expect(await screen.findByTestId('odometer-check-deferred')).toBeInTheDocument();
+		expect(screen.queryByTestId('vehicle-load-error')).not.toBeInTheDocument();
+		await fireEvent.input(screen.getByLabelText(/Amount/), { target: { value: '40' } });
+		await fireEvent.input(screen.getByLabelText(/Mileage/), { target: { value: '45000' } });
+		await fireEvent.input(screen.getByLabelText(/Gallons|Liters/), { target: { value: '10' } });
+		await fireEvent.click(screen.getByRole('button', { name: /Save Expense/ }));
+
+		await vi.waitFor(() =>
+			expect(JSON.parse(storage.get('vroom_offline_expenses:u1') ?? '[]')).toHaveLength(1)
+		);
+		offlineExpenseQueue.current = [];
 	});
 
 	test('a history that arrives after the account changed is not cached for the new account', async () => {
