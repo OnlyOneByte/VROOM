@@ -61,6 +61,7 @@ async function uploadPendingPhotos(state: ExpenseFormState, entityId: string): P
 
 export async function submitExpense(state: ExpenseFormState): Promise<void> {
 	const { expenseId, returnTo } = state.ctx;
+	state.submitError = null;
 	if (!state.validateForm()) {
 		Object.keys(state.formData).forEach(field => {
 			state.touched[field] = true;
@@ -69,7 +70,6 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 	}
 
 	state.isSubmitting = true;
-	state.submitError = null;
 
 	const expenseData = buildExpenseData(state.formData, {
 		currency: state.currencyUnit,
@@ -191,7 +191,6 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			gotoDynamic(returnTo);
 		} else {
 			state.submitError = submitFailureMessage(error);
-			appStore.addNotification({ type: 'error', message: state.submitError });
 		}
 	} finally {
 		state.isSubmitting = false;

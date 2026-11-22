@@ -179,6 +179,20 @@ describe('saveQueuedExpense', () => {
 		expect(syncAll).not.toHaveBeenCalled();
 	});
 
+	test('a retry that fails validation clears the earlier refusal', async () => {
+		storage.replaceParkedExpense.mockResolvedValue('failed');
+		const state = await loadedState();
+		state.formData.amount = '45.10';
+		await saveQueuedExpense(state);
+		expect(state.submitError).toBe(REQUEUE_FAILED_MESSAGE);
+
+		state.formData.amount = '';
+		await saveQueuedExpense(state);
+
+		expect(state.submitError).toBeNull();
+		expect(storage.replaceParkedExpense).toHaveBeenCalledTimes(1);
+	});
+
 	test('an entry that started syncing meanwhile keeps the form open and says so', async () => {
 		storage.replaceParkedExpense.mockResolvedValue('not-parked');
 		const state = await loadedState();
