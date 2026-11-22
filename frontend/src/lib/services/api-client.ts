@@ -10,7 +10,7 @@ export function getApiBaseUrl(): string {
 
 const SELF_REPORTED_401_PATHS = ['/api/v1/auth/me', '/api/v1/auth/refresh'];
 const SESSION_EXPIRY_WINDOW_MS = 1000;
-export const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please sign in again.';
+const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please sign in again.';
 export const UNSAVED_ON_EXPIRY_MESSAGE =
 	'Your session expired while your changes were saving, so they may not have been saved. Sign in again and check them.';
 

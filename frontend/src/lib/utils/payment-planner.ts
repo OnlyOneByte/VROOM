@@ -5,7 +5,7 @@ import {
 } from '#lib/utils/financing-calculations.ts';
 import { formatCurrency } from '#lib/utils/formatters.ts';
 
-export interface SecondaryDelta {
+interface SecondaryDelta {
 	monthsDelta: number;
 	interestDelta: number;
 	direction: 'better' | 'worse';

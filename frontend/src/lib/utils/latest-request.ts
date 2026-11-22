@@ -1,4 +1,4 @@
-export type IsCurrentRequest = () => boolean;
+type IsCurrentRequest = () => boolean;
 
 export function latest(): () => IsCurrentRequest {
 	let latestId = 0;

@@ -15,7 +15,7 @@ export type NativeImportField =
 
 export type ImportDateFormat = 'iso' | 'mdy' | 'dmy' | 'epoch';
 
-export type ImportPresetId = 'fuelly' | 'fuelio' | 'drivvo';
+type ImportPresetId = 'fuelly' | 'fuelio' | 'drivvo';
 
 export interface ImportColumnMapping {
 	source?: string;

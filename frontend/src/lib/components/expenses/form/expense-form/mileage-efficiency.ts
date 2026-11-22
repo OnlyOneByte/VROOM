@@ -1,7 +1,7 @@
 import type { DistanceUnit, VolumeUnit } from '#lib/types/index.ts';
 import { isElectricFuelType } from '#lib/utils/units.ts';
 
-export interface MileageEfficiency {
+interface MileageEfficiency {
 	calculatedMpg: number | null;
 	calculatedEfficiency: number | null;
 	showMpgCalculation: boolean;

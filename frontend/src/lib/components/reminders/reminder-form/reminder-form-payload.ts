@@ -10,7 +10,7 @@ import {
 
 export type ReminderPayload = Partial<Reminder> & { vehicleIds: string[]; timeZone?: string };
 
-export function browserTimeZone(): string | undefined {
+function browserTimeZone(): string | undefined {
 	try {
 		const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 		return typeof zone === 'string' && zone !== '' ? zone : undefined;
