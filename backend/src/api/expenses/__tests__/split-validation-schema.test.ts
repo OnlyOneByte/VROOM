@@ -207,6 +207,25 @@ describe('updateSplitSchema — shares the same refinement', () => {
     expect(skipped.success).toBe(true);
   });
 
+  test.each([
+    [[900_000, 900_000], false],
+    [[0, 0], false],
+    [[500_000, 500_000], true],
+  ])('a Fixed $ update with no totalAmount caps the summed total: %j', (amounts, valid) => {
+    const r = updateSplitSchema.safeParse({
+      splitConfig: {
+        method: 'absolute',
+        allocations: amounts.map((amount, i) => ({ vehicleId: `v${i}`, amount })),
+      },
+    });
+    expect(r.success).toBe(valid);
+    if (!r.success) {
+      expect(r.error.issues[0]?.message).toBe(
+        'The split total must be more than 0 and at most 1,000,000'
+      );
+    }
+  });
+
   test('percentage-sum refinement still applies on update', () => {
     const r = updateSplitSchema.safeParse({
       splitConfig: { method: 'percentage', allocations: [{ vehicleId: 'v1', percentage: 90 }] },
