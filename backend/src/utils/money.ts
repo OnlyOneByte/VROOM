@@ -133,13 +133,18 @@ export function hasAtMostTwoDecimals(dollars: number): boolean {
   );
 }
 
-export function expenseDollarsToCents(build: (base: z.ZodNumber) => z.ZodNumber = (n) => n) {
+export function boundedDollarsToCents(
+  label: string,
+  max: number,
+  build: (base: z.ZodNumber) => z.ZodNumber = (n) => n
+) {
   return moneyDollarsToCents((n) =>
     build(n)
-      .max(
-        MAX_EXPENSE_AMOUNT,
-        `Amount must be ${MAX_EXPENSE_AMOUNT.toLocaleString('en-US')} or less`
-      )
-      .refine(hasAtMostTwoDecimals, 'Amount can have at most 2 decimal places')
+      .max(max, `${label} must be ${max.toLocaleString('en-US')} or less`)
+      .refine(hasAtMostTwoDecimals, `${label} can have at most 2 decimal places`)
   );
+}
+
+export function expenseDollarsToCents(build: (base: z.ZodNumber) => z.ZodNumber = (n) => n) {
+  return boundedDollarsToCents('Amount', MAX_EXPENSE_AMOUNT, build);
 }

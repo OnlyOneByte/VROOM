@@ -3,12 +3,7 @@ import { CONFIG } from '../../../config';
 
 const ins = CONFIG.validation.insurance;
 
-const positiveAmountArb = fc.double({
-  min: 0.01,
-  max: 999_999,
-  noNaN: true,
-  noDefaultInfinity: true,
-});
+const positiveAmountArb = fc.integer({ min: 1, max: 99_999_900 }).map((cents) => cents / 100);
 
 const nonNegativeAmountArb = fc.integer({ min: 0, max: 99_999_900 }).map((cents) => cents / 100);
 

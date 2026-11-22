@@ -4,11 +4,12 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { vehicleFinancing } from '../../db/schema';
 import { changeTracker, requireAuth } from '../../middleware';
-import { financingWithBalanceToApi, moneyDollarsToCents } from '../../utils/money';
+import { boundedDollarsToCents, financingWithBalanceToApi } from '../../utils/money';
 import { isValidTimeZone } from '../../utils/time-zone';
 import {
   commonSchemas,
   dateInput,
+  MAX_ODOMETER_READING,
   validateFinancingOwnership,
   validateVehicleOwnership,
   WHOLE_DISTANCE_MESSAGE,
@@ -22,6 +23,15 @@ const routes = new Hono();
 const FINANCING_TYPES = ['loan', 'lease', 'own'] as const;
 const PAYMENT_FREQUENCIES = ['monthly', 'bi-weekly', 'weekly', 'custom'] as const;
 
+const fin = CONFIG.validation.financing;
+const MILEAGE_LIMIT_TOO_HIGH_MESSAGE = `Mileage limit must be ${MAX_ODOMETER_READING.toLocaleString('en-US')} or less`;
+
+const paymentAmountSchema = boundedDollarsToCents(
+  'Payment amount',
+  CONFIG.validation.expense.maxAmount,
+  (n) => n.min(0.01, 'Payment amount must be greater than 0')
+);
+
 const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
   financingType: z.enum(FINANCING_TYPES).optional(),
   paymentFrequency: z.enum(PAYMENT_FREQUENCIES).optional(),
@@ -32,7 +42,9 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
       CONFIG.validation.financing.providerMaxLength,
       `Provider must be ${CONFIG.validation.financing.providerMaxLength} characters or less`
     ),
-  originalAmount: moneyDollarsToCents((n) => n.min(0.01, 'Original amount must be greater than 0')),
+  originalAmount: boundedDollarsToCents('Original amount', fin.maxOriginalAmount, (n) =>
+    n.min(0.01, 'Original amount must be greater than 0')
+  ),
   apr: z
     .number()
     .min(0, 'APR cannot be negative')
@@ -50,7 +62,7 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
       `Term cannot exceed ${CONFIG.validation.financing.maxTermMonths} months`
     ),
   startDate: dateInput,
-  paymentAmount: moneyDollarsToCents((n) => n.min(0.01, 'Payment amount must be greater than 0')),
+  paymentAmount: paymentAmountSchema,
   paymentDayOfMonth: z
     .number()
     .int()
@@ -63,9 +75,18 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
     .min(CONFIG.validation.financing.minDayOfWeek)
     .max(CONFIG.validation.financing.maxDayOfWeek)
     .optional(),
-  residualValue: moneyDollarsToCents((n) => n.min(0)).optional(),
-  mileageLimit: z.number().int(WHOLE_DISTANCE_MESSAGE).min(0).optional(),
-  excessMileageFee: moneyDollarsToCents((n) => n.min(0)).optional(),
+  residualValue: boundedDollarsToCents('Residual value', fin.maxResidualValue, (n) =>
+    n.min(0)
+  ).optional(),
+  mileageLimit: z
+    .number()
+    .int(WHOLE_DISTANCE_MESSAGE)
+    .min(0)
+    .max(MAX_ODOMETER_READING, MILEAGE_LIMIT_TOO_HIGH_MESSAGE)
+    .optional(),
+  excessMileageFee: boundedDollarsToCents('Excess mileage fee', fin.maxExcessMileageFee, (n) =>
+    n.min(0)
+  ).optional(),
 });
 
 const createFinancingSchema = baseFinancingSchema.omit({
@@ -173,9 +194,7 @@ routes.patch(
   zValidator(
     'json',
     z.object({
-      paymentAmount: moneyDollarsToCents((n) =>
-        n.min(0.01, 'Payment amount must be greater than 0')
-      ),
+      paymentAmount: paymentAmountSchema,
     })
   ),
   async (c) => {

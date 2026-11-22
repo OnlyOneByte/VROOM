@@ -31,6 +31,7 @@ import {
   dateInput,
   MAX_ODOMETER_READING,
   ODOMETER_TOO_HIGH_MESSAGE,
+  VOLUME_TOO_HIGH_MESSAGE,
   validateFuelExpenseData,
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
@@ -80,7 +81,12 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
     .default([]),
   category: expenseCategorySchema,
   expenseAmount: expenseDollarsToCents((n) => n.positive('Expense amount must be positive')),
-  volume: z.number().positive('Volume must be positive').nullable().optional(),
+  volume: z
+    .number()
+    .positive('Volume must be positive')
+    .max(CONFIG.validation.expense.maxVolume, VOLUME_TOO_HIGH_MESSAGE)
+    .nullable()
+    .optional(),
   date: dateInput,
   mileage: z
     .number()

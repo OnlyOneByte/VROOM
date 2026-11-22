@@ -20,7 +20,7 @@ import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } 
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
-import { centsToDollars, moneyDollarsToCents, vehicleRowToApi } from '../../utils/money';
+import { boundedDollarsToCents, centsToDollars, vehicleRowToApi } from '../../utils/money';
 import {
   requireVehicleRead,
   resolveVehicleAccess,
@@ -116,8 +116,10 @@ const baseVehicleSchema = createInsertSchema(vehiclesTable, {
     .min(0, 'Initial mileage cannot be negative')
     .max(MAX_ODOMETER_READING, ODOMETER_TOO_HIGH_MESSAGE)
     .optional(),
-  purchasePrice: moneyDollarsToCents((n) =>
-    n.min(0, 'Purchase price cannot be negative')
+  purchasePrice: boundedDollarsToCents(
+    'Purchase price',
+    CONFIG.validation.vehicle.maxPurchasePrice,
+    (n) => n.min(0, 'Purchase price cannot be negative')
   ).optional(),
   purchaseDate: dateInput.optional(),
 });

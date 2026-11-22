@@ -12,6 +12,7 @@ import {
   isDateInputYear,
   MAX_ODOMETER_READING,
   ODOMETER_TOO_HIGH_MESSAGE,
+  VOLUME_TOO_HIGH_MESSAGE,
 } from '../../utils/validation';
 import { buildImportDate } from './local-date';
 import { clearFuelFieldsIfNotFuel } from './validation';
@@ -94,6 +95,7 @@ function parseVolume(raw: string): { value: number | null } | { error: string } 
   if (!raw) return { value: null };
   const v = Number(raw);
   if (!Number.isFinite(v) || v <= 0) return { error: `Invalid volume "${raw}"` };
+  if (v > EXP.maxVolume) return { error: VOLUME_TOO_HIGH_MESSAGE };
   return { value: v };
 }
 
