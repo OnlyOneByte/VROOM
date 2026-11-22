@@ -30,6 +30,8 @@ const ZONE = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone
 beforeEach(() => {
 	for (const fn of [get, post, put, patch, del, getPaginated]) fn.mockReset();
 	cacheVehicles.mockClear();
+	currentOfflineQueueOwner.mockReset();
+	currentOfflineQueueOwner.mockReturnValue('u1');
 	updateCachedVehicle.mockClear();
 	removeCachedVehicle.mockClear();
 });
@@ -154,13 +156,13 @@ describe('vehicleApi keeps the offline vehicle cache current', () => {
 	test('the cache write is tagged with the account that asked, not the one signed in at reply', async () => {
 		let reply!: (value: unknown) => void;
 		get.mockReturnValueOnce(new Promise(resolve => (reply = resolve)));
-		currentOfflineQueueOwner.mockReturnValueOnce('u1');
 		const pending = vehicleApi.getVehicles();
+		await Promise.resolve();
+		expect(currentOfflineQueueOwner).toHaveBeenCalledTimes(1);
 		currentOfflineQueueOwner.mockReturnValue('u2');
 		reply([{ id: 'v1' }]);
 		await pending;
 		expect(cacheVehicles).toHaveBeenCalledWith([{ id: 'v1' }], 'u1');
-		currentOfflineQueueOwner.mockReturnValue('u1');
 	});
 
 	test('a failed list leaves the cache alone', async () => {
@@ -172,12 +174,12 @@ describe('vehicleApi keeps the offline vehicle cache current', () => {
 	test('a saved edit replaces the cached vehicle with the server copy', async () => {
 		put.mockResolvedValueOnce({ id: 'v1', nickname: 'Daily' });
 		await vehicleApi.updateVehicle('v1', { nickname: 'Daily' });
-		expect(updateCachedVehicle).toHaveBeenCalledWith({ id: 'v1', nickname: 'Daily' });
+		expect(updateCachedVehicle).toHaveBeenCalledWith({ id: 'v1', nickname: 'Daily' }, 'u1');
 	});
 
 	test('a delete removes the vehicle from the cache only once the server agrees', async () => {
 		await vehicleApi.deleteVehicle('v1');
-		expect(removeCachedVehicle).toHaveBeenCalledWith('v1');
+		expect(removeCachedVehicle).toHaveBeenCalledWith('v1', 'u1');
 
 		removeCachedVehicle.mockClear();
 		del.mockRejectedValueOnce(new ApiError('Forbidden', 403));

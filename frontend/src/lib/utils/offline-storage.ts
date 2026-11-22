@@ -138,16 +138,18 @@ export function loadCachedVehicles(): Vehicle[] {
 	return readOwnerCache<Vehicle>(VEHICLE_CACHE_KEY) ?? [];
 }
 
-export function updateCachedVehicle(vehicle: Vehicle): void {
+export function updateCachedVehicle(vehicle: Vehicle, requestedFor: string | null): void {
 	const cached = readOwnerCache<Vehicle>(VEHICLE_CACHE_KEY);
 	if (!cached?.some(v => v.id === vehicle.id)) return;
 	writeOwnerCache(
 		VEHICLE_CACHE_KEY,
-		cached.map(v => (v.id === vehicle.id ? { ...v, ...vehicle } : v))
+		cached.map(v => (v.id === vehicle.id ? { ...v, ...vehicle } : v)),
+		requestedFor
 	);
 }
 
-export function removeCachedVehicle(vehicleId: string): void {
+export function removeCachedVehicle(vehicleId: string, requestedFor: string | null): void {
+	if (requestedFor !== queueOwner) return;
 	const cached = readOwnerCache<Vehicle>(VEHICLE_CACHE_KEY);
 	if (cached)
 		writeOwnerCache(

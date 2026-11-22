@@ -47,8 +47,9 @@ export const vehicleApi = {
 	},
 
 	async updateVehicle(vehicleId: string, data: UpdateVehicleRequest): Promise<Vehicle> {
+		const requestedFor = currentOfflineQueueOwner();
 		const vehicle = await apiClient.put<Vehicle>(`/api/v1/vehicles/${vehicleId}`, data);
-		updateCachedVehicle(vehicle);
+		updateCachedVehicle(vehicle, requestedFor);
 		return vehicle;
 	},
 
@@ -57,8 +58,9 @@ export const vehicleApi = {
 	},
 
 	async deleteVehicle(vehicleId: string): Promise<void> {
+		const requestedFor = currentOfflineQueueOwner();
 		await apiClient.delete(`/api/v1/vehicles/${vehicleId}`);
-		removeCachedVehicle(vehicleId);
+		removeCachedVehicle(vehicleId, requestedFor);
 	},
 
 	// The backend answers 200 with data: null when the vehicle has no financing; any error is real.

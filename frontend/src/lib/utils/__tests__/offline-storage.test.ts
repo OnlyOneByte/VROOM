@@ -1210,7 +1210,7 @@ describe('queue owner scoping', () => {
 			'user-8'
 		);
 
-		updateCachedVehicle(vehicle('v1', 'New'));
+		updateCachedVehicle(vehicle('v1', 'New'), 'user-8');
 
 		const cached = loadCachedVehicles();
 		expect(cached.map(v => [v.id, v.nickname])).toEqual([
@@ -1225,7 +1225,7 @@ describe('queue owner scoping', () => {
 		setOfflineQueueOwner('user-9');
 		cacheVehicles([vehicle('v1', 'Mine')], 'user-9');
 
-		updateCachedVehicle(vehicle('shared', 'Theirs'));
+		updateCachedVehicle(vehicle('shared', 'Theirs'), 'user-9');
 
 		expect(loadCachedVehicles().map(v => v.id)).toEqual(['v1']);
 	});
@@ -1236,10 +1236,13 @@ describe('queue owner scoping', () => {
 		cacheVehicles([vehicle('v1', 'Mine')], 'user-a');
 		setOfflineQueueOwner('user-b');
 
+		cacheVehicles([vehicle('v1', 'Theirs')], 'user-b');
 		cacheVehicles([vehicle('v1', 'Late')], 'user-a');
 		cacheVehicleHistory('v1', [], 'user-a');
+		updateCachedVehicle(vehicle('v1', 'Late edit'), 'user-a');
+		removeCachedVehicle('v1', 'user-a');
 
-		expect(loadCachedVehicles()).toEqual([]);
+		expect(loadCachedVehicles().map(v => v.nickname)).toEqual(['Theirs']);
 		expect(loadCachedVehicleHistory('v1')).toBeNull();
 		expect(JSON.parse(store.get('vroom_offline_vehicles:user-a')!)[0].nickname).toBe('Mine');
 	});
@@ -1251,7 +1254,7 @@ describe('queue owner scoping', () => {
 		cacheVehicleHistory('v1', [], 'user-10');
 		cacheVehicleHistory('v2', [], 'user-10');
 
-		removeCachedVehicle('v1');
+		removeCachedVehicle('v1', 'user-10');
 
 		expect(loadCachedVehicles().map(v => v.id)).toEqual(['v2']);
 		expect(loadCachedVehicleHistory('v1')).toBeNull();
