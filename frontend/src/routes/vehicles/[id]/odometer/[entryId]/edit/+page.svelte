@@ -17,6 +17,7 @@
 	import { isOdometerOrderError, odometerApi } from '#lib/services/odometer-api.ts';
 	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import ExpensePhotoSection from '#lib/components/expenses/form/ExpensePhotoSection.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -266,6 +267,8 @@
 				{/if}
 				<p class="text-xs text-muted-foreground">{note.length}/500</p>
 			</div>
+
+			<ExpensePhotoSection entityType="odometer_entry" entityId={entryId} />
 
 			{#if submitError}
 				<FormFieldError id="submit-error" tabindex={-1} class="rounded-md bg-destructive/10 p-3">

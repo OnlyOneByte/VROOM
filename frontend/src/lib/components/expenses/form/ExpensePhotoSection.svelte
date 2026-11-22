@@ -4,14 +4,19 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import MediaCaptureDialog from '#lib/components/common/MediaCaptureDialog.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
-	import { expenseApi } from '#lib/services/expense-api.ts';
+	import { expenseApi, type PhotoSectionEntityType } from '#lib/services/expense-api.ts';
 	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
 	import type { Photo } from '#lib/types/index.ts';
 
 	interface Props {
-		entityType: 'expense';
+		entityType: PhotoSectionEntityType;
 		entityId: string;
 	}
+
+	const ENTITY_NOUN: Record<PhotoSectionEntityType, string> = {
+		expense: 'expense',
+		odometer_entry: 'reading'
+	};
 
 	let { entityType, entityId }: Props = $props();
 
@@ -127,7 +132,7 @@
 <MediaCaptureDialog
 	bind:open={showUploadDialog}
 	title="Upload Photos & Receipts"
-	description="Add photos or receipt images for this expense"
+	description="Add photos or receipt images for this {ENTITY_NOUN[entityType]}"
 	acceptedTypes={['image/jpeg', 'image/png', 'image/webp', 'application/pdf']}
 	onUpload={file => expenseApi.uploadPhoto(entityType, entityId, file)}
 	onUploadComplete={handleUploadComplete}

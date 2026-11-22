@@ -39,6 +39,8 @@ export interface ExpenseImportResult {
 	currencyWarning?: string;
 }
 
+export type PhotoSectionEntityType = 'expense' | 'odometer_entry';
+
 export type ExpenseSortBy = 'date' | 'amount' | 'category';
 type ExpenseSortDir = 'asc' | 'desc';
 
@@ -192,22 +194,30 @@ export const expenseApi = {
 	},
 
 	getPhotos(
-		entityType: 'expense',
+		entityType: PhotoSectionEntityType,
 		entityId: string,
 		params?: { limit?: number; offset?: number }
 	): Promise<PaginatedResponse<Photo>> {
 		return entityPhotos(entityType, entityId).list(params);
 	},
 
-	uploadPhoto(entityType: 'expense', entityId: string, file: File): Promise<Photo> {
+	uploadPhoto(entityType: PhotoSectionEntityType, entityId: string, file: File): Promise<Photo> {
 		return entityPhotos(entityType, entityId).upload(file);
 	},
 
-	deletePhoto(entityType: 'expense', entityId: string, photoId: string): Promise<void> {
+	deletePhoto(
+		entityType: PhotoSectionEntityType,
+		entityId: string,
+		photoId: string
+	): Promise<void> {
 		return entityPhotos(entityType, entityId).remove(photoId);
 	},
 
-	getPhotoThumbnailUrl(entityType: 'expense', entityId: string, photoId: string): string {
+	getPhotoThumbnailUrl(
+		entityType: PhotoSectionEntityType,
+		entityId: string,
+		photoId: string
+	): string {
 		return entityPhotos(entityType, entityId).thumbnailUrl(photoId);
 	},
 
