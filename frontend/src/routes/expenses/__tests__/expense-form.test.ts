@@ -14,10 +14,6 @@ vi.mock('#lib/utils/offline-storage.ts', () => ({
 	addOfflineExpense: vi.fn()
 }));
 
-vi.mock('#lib/utils/pwa.ts', () => ({
-	requestBackgroundSync: vi.fn()
-}));
-
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
