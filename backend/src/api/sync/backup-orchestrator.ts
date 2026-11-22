@@ -119,18 +119,22 @@ export class BackupOrchestrator {
       const providerRowMap = new Map(providerRows.map((r) => [r.id, r]));
 
       const strategyPromises = enabledProviders.map(async ([providerId, providerConfig]) => {
-        const strategy = backupStrategyRegistry.get(
-          providerRowMap.get(providerId)?.providerType ?? ''
-        );
-        if (!strategy) {
-          logger.debug('No strategy registered for provider, skipping', { providerId });
-          return { providerId, result: null };
-        }
-
         const providerRow = providerRowMap.get(providerId);
         if (!providerRow) {
           logger.warn('Provider row not found, skipping', { providerId });
           return { providerId, result: null };
+        }
+
+        const strategy = backupStrategyRegistry.get(providerRow.providerType);
+        if (!strategy) {
+          logger.warn('No backup strategy registered for provider type', {
+            providerId,
+            providerType: providerRow.providerType,
+          });
+          return {
+            providerId,
+            result: failedAttempt(`Backups are not supported for ${providerRow.providerType}`),
+          };
         }
 
         let decryptedCredentials: Record<string, unknown>;

@@ -1,6 +1,6 @@
 import type { BackupStrategy } from './backup-strategy';
 
-class BackupStrategyRegistry {
+export class BackupStrategyRegistry {
   private strategies = new Map<string, BackupStrategy>();
 
   register(providerType: string, strategy: BackupStrategy): void {

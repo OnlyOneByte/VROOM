@@ -302,14 +302,15 @@ describe('BackupOrchestrator.execute() outcome', () => {
     }
   });
 
-  test('a provider whose type has no registered strategy is skipped, not failed', async () => {
+  test('a provider whose type has no registered strategy fails instead of being skipped', async () => {
     seedEnabledProvider(ctx, 'punreg', 'no-such-provider-type');
     const { backupOrchestrator } = await import('../backup-orchestrator');
     const result = (await backupOrchestrator.execute(ctx.user.id, 'U', true)) as OrchestratorResult;
 
-    expect(result.results).toEqual({});
-    expect(result.failedProviders).toEqual([]);
-    expect(result.outcome).toBe('noop');
+    expect(result.results.punreg?.success).toBe(false);
+    expect(result.results.punreg?.message).toContain('no-such-provider-type');
+    expect(result.failedProviders).toEqual(['punreg']);
+    expect(result.outcome).toBe('failed');
   });
 
   test('a Sheets-only provider is attempted by the run, and no ZIP is built for it', async () => {
