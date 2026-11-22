@@ -400,7 +400,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect((await listExpenses()).map((r) => r.expenseAmount)).toEqual([12.34]);
   });
 
-  test('a mileage of 0 is rejected for every category, not stored as a reading', async () => {
+  test('a mileage of 0 is blank on a non-fuel row and refused on a fuel row, never stored as a reading', async () => {
     await seedCivic('Daily Driver');
     const csv = [
       'date,vehicle,category,amount,mileage,volume',
@@ -413,11 +413,37 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     const body = await json<ImportResponse>(res);
     expect(res.status).toBe(200);
     expect(body.data.rows.map((r) => [r.status, r.message])).toEqual([
-      ['error', 'Mileage must be greater than 0'],
+      ['ready', undefined],
       ['error', 'Mileage must be greater than 0'],
       ['ready', undefined],
     ]);
-    expect(listExpensesRaw().map((r) => r.mileage)).toEqual([1]);
+    expect(listExpensesRaw().map((r) => r.mileage)).toEqual([null, 1]);
+  });
+
+  test('a stored mileage of 0 exports blank and the export re-imports cleanly', async () => {
+    const vehicleId = await seedCivic('Daily Driver');
+    ctx.sqlite.run(
+      `INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, mileage)
+       VALUES ('legacy-zero', ?, ?, 'maintenance', 4500, 1717243200, 0)`,
+      [vehicleId, ctx.user.id]
+    );
+
+    const exportRes = await ctx.authed('GET', '/api/v1/expenses/export');
+    expect(exportRes.status).toBe(200);
+    const csv = await exportRes.text();
+    const [header = '', line = ''] = csv.trim().split('\n');
+    const cells = line.split(',');
+    expect(cells[header.split(',').indexOf('"mileage"')]).toBe('');
+
+    ctx.sqlite.run('DELETE FROM expenses WHERE user_id = ?', [ctx.user.id]);
+    const importRes = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const importBody = await json<ImportResponse>(importRes);
+    expect(importRes.status, JSON.stringify(importBody)).toBe(200);
+    expect(importBody.data.errorCount).toBe(0);
+    expect(importBody.data.imported).toBe(1);
+    expect(listExpensesRaw().map((r) => [r.category, r.expense_amount, r.mileage])).toEqual([
+      ['maintenance', 4500, null],
+    ]);
   });
 
   test('matches a vehicle by its "year make model" name too (not just nickname)', async () => {

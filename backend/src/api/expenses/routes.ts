@@ -604,7 +604,7 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
       category: e.category,
       amount: centsToDollars(e.expenseAmount),
       currency,
-      mileage: e.mileage ?? '',
+      mileage: e.mileage || '',
       volume: e.volume ?? '',
       fuelType: e.fuelType ?? '',
       description: e.description ?? '',
