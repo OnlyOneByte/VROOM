@@ -1,6 +1,5 @@
 version: 2
 updates:
-  # Frontend (npm)
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
@@ -8,7 +7,6 @@ updates:
       day: "monday"
     open-pull-requests-limit: 10
     groups:
-      # Group minor/patch updates into a single PR
       frontend-minor-patch:
         update-types:
           - "minor"
@@ -17,7 +15,6 @@ updates:
       - "dependencies"
       - "frontend"
 
-  # Backend (npm/bun)
   - package-ecosystem: "bun"
     directory: "/backend"
     schedule:
@@ -33,7 +30,6 @@ updates:
       - "dependencies"
       - "backend"
 
-  # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

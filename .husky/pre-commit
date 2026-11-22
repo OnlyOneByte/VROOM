@@ -8,13 +8,11 @@ set -e
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
-# Frontend checks
 cd "$REPO_ROOT/frontend"
 npm run lint:fix
 npm run format
 npm run type-check
 
-# Backend checks
 cd "$REPO_ROOT/backend"
 bun run check:fix
 bun run test

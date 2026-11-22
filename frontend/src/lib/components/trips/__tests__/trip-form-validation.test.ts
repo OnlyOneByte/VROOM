@@ -29,7 +29,7 @@ describe('validateTripFields', () => {
 		expect(validateTripFields(form())).toEqual({});
 	});
 
-	test('a trip dated TODAY is accepted (the noon-local fix — not a future reject)', () => {
+	test('a trip dated today in local time is accepted, not rejected as a future date', () => {
 		const errors = validateTripFields(form({ tripDate: localDateOffset(0) }));
 		expect(errors.tripDate).toBeUndefined();
 	});
