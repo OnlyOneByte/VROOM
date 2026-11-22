@@ -361,7 +361,10 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     const body = await json<ImportResponse>(res);
     expect(res.status).toBe(200);
     expect(body.data.rows.map((r) => [r.status, r.message])).toEqual([
-      ['error', 'Amount "12.345" can have at most 2 decimal places'],
+      [
+        'error',
+        'Amount "12.345" can have at most 2 decimal places. VROOM stores amounts to the cent',
+      ],
       ['ready', undefined],
       ['error', 'Odometer must be 10,000,000 or less'],
     ]);

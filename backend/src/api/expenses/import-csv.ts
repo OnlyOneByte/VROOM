@@ -69,7 +69,9 @@ function parseAmount(raw: string): { value: number } | { error: string } {
   }
   if (amount > EXP.maxAmount) return { error: `Amount exceeds the ${EXP.maxAmount} maximum` };
   if (!hasAtMostTwoDecimals(amount)) {
-    return { error: `Amount "${raw}" can have at most 2 decimal places` };
+    return {
+      error: `Amount "${raw}" can have at most 2 decimal places. VROOM stores amounts to the cent`,
+    };
   }
   return { value: dollarsToCents(amount) };
 }
