@@ -51,10 +51,15 @@ async function recalculateTermPremium(term: MonthlyPricedTerm): Promise<boolean>
   const rowsTotal = linked.reduce((sum, expense) => sum + expense.expenseAmount, 0);
   if (first.groupTotal !== overcounted || rowsTotal !== overcounted) return false;
 
+  const policy = await insurancePolicyRepository.findById(term.policyId);
+  const vehicleIds = vehicleIdsForTerm(policy?.termVehicleCoverage ?? [], term.id);
+  const linkedVehicleIds = linked.map((expense) => expense.vehicleId).sort();
+  if ([...vehicleIds].sort().join(',') !== linkedVehicleIds.join(',')) return false;
+
   await expenseRepository.updateSplitExpense(
     first.groupId,
     {
-      splitConfig: { method: 'even', vehicleIds: linked.map((expense) => expense.vehicleId) },
+      splitConfig: { method: 'even', vehicleIds },
       totalAmount: corrected,
     },
     term.userId
