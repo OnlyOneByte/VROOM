@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, untrack } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
 	import { gotoDynamic, gotoWithQuery } from '#lib/utils/navigation.ts';
@@ -158,6 +158,12 @@
 		if (form.errors['vehicleDetails'] && retryButton) {
 			retryButton.scrollIntoView({ block: 'center' });
 			retryButton.focus({ preventScroll: true });
+		}
+		if (form.submitError) {
+			await tick();
+			const submitError = document.getElementById('submit-error');
+			submitError?.scrollIntoView({ block: 'center' });
+			submitError?.focus({ preventScroll: true });
 		}
 	}
 
@@ -484,7 +490,12 @@
 				{/if}
 
 				{#if form.submitError}
-					<FormFieldError data-testid="submit-error" class="rounded-md bg-destructive/10 p-3">
+					<FormFieldError
+						id="submit-error"
+						data-testid="submit-error"
+						tabindex={-1}
+						class="rounded-md bg-destructive/10 p-3"
+					>
 						{form.submitError}
 					</FormFieldError>
 				{/if}

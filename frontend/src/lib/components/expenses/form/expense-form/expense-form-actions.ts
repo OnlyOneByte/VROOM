@@ -191,7 +191,6 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			gotoDynamic(returnTo);
 		} else {
 			state.submitError = submitFailureMessage(error);
-			appStore.addNotification({ type: 'error', message: state.submitError });
 		}
 	} finally {
 		state.isSubmitting = false;
