@@ -47,6 +47,7 @@ describe('OdometerRepository.createFromTrip', () => {
   afterEach(() => sqliteDb.close());
 
   const base = (over: Partial<{ odometer: number; recordedAt: Date }> = {}) => ({
+    tripId: 't-1',
     vehicleId: VEHICLE_ID,
     userId: USER_ID,
     odometer: 5000,

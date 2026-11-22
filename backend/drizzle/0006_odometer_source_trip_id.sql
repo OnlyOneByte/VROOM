@@ -1,0 +1,1 @@
+ALTER TABLE `odometer_entries` ADD `source_trip_id` text;

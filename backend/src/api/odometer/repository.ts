@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, isNull, lt, or, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
@@ -25,6 +25,15 @@ interface OdometerHistoryResult {
 }
 
 // Shared with trips: changing this window breaks trip/odometer dedup.
+interface LinkedTripEntryKey {
+  tripId: string;
+  vehicleId: string;
+  userId: string;
+  odometer: number;
+  recordedAt: Date;
+  timeZone?: string;
+}
+
 export function localDayWindow(
   recordedAt: Date,
   timeZone?: string
@@ -93,6 +102,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
 
   createFromTrip(
     entry: {
+      tripId: string;
       vehicleId: string;
       userId: string;
       odometer: number;
@@ -127,6 +137,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
         odometer: entry.odometer,
         recordedAt: entry.recordedAt,
         note: entry.note ?? OdometerRepository.TRIP_PROVENANCE_NOTE,
+        sourceTripId: entry.tripId,
       })
       .returning()
       .get();
@@ -135,32 +146,44 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   static readonly TRIP_PROVENANCE_NOTE = 'From trip';
 
   deleteLinkedTripEntry(
-    entry: {
-      vehicleId: string;
-      userId: string;
-      odometer: number;
-      recordedAt: Date;
-      timeZone?: string;
-    },
+    entry: LinkedTripEntryKey,
     db: AppDatabase | DrizzleTransaction = this.db
   ): string[] {
-    const { dayStart, nextDay } = localDayWindow(entry.recordedAt, entry.timeZone);
-
     const removed = db
       .delete(odometerEntries)
-      .where(
+      .where(this.linkedTripEntryWhere(entry))
+      .returning({ id: odometerEntries.id })
+      .all();
+    return removed.map((row) => row.id);
+  }
+
+  handOverLinkedTripEntry(
+    entry: LinkedTripEntryKey,
+    toTripId: string,
+    db: AppDatabase | DrizzleTransaction = this.db
+  ): void {
+    db.update(odometerEntries)
+      .set({ sourceTripId: toTripId })
+      .where(this.linkedTripEntryWhere(entry))
+      .run();
+  }
+
+  private linkedTripEntryWhere(entry: LinkedTripEntryKey) {
+    const { dayStart, nextDay } = localDayWindow(entry.recordedAt, entry.timeZone);
+    return and(
+      eq(odometerEntries.vehicleId, entry.vehicleId),
+      eq(odometerEntries.userId, entry.userId),
+      or(
+        eq(odometerEntries.sourceTripId, entry.tripId),
         and(
-          eq(odometerEntries.vehicleId, entry.vehicleId),
-          eq(odometerEntries.userId, entry.userId),
+          isNull(odometerEntries.sourceTripId),
           eq(odometerEntries.odometer, entry.odometer),
           eq(odometerEntries.note, OdometerRepository.TRIP_PROVENANCE_NOTE),
           gte(odometerEntries.recordedAt, dayStart),
           lt(odometerEntries.recordedAt, nextDay)
         )
       )
-      .returning({ id: odometerEntries.id })
-      .all();
-    return removed.map((row) => row.id);
+    );
   }
 
   // Every raw-SQL leg must keep the user_id predicate or rows leak across users.
