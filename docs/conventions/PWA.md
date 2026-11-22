@@ -41,10 +41,11 @@ against `src/service-worker/tsconfig.json`, which the root tsconfig excludes. Th
 1. **Precache** — `precacheAndRoute(self.__WB_MANIFEST)`, plus `skipWaiting()` and
    `clientsClaim()`. This covers the build assets (JS, CSS, icons), not pages.
 2. **Page cache** — a `fetch` listener handles `GET` navigations network-first:
-   it waits up to 3 seconds (`NETWORK_TIMEOUT_MS`) for the network, then falls back to the
-   copy in the `vroom-pages` cache. Every successful navigation response is stored there,
-   keyed by URL without query or hash, and the cache keeps the newest 50 pages
-   (`MAX_CACHED_PAGES`). A page with no cached copy gets a built-in "You're offline" page
+   after 3 seconds (`NETWORK_TIMEOUT_MS`) without a response it serves the copy in the
+   `vroom-pages` cache if there is one, and otherwise keeps waiting for the network. Every
+   successful navigation response is stored there, keyed by URL without query or hash, and the
+   cache keeps the newest 50 pages (`MAX_CACHED_PAGES`). When the network request fails, the
+   worker serves the cached copy, or, for a page with none, a built-in "You're offline" page
    (HTTP 503) with Try Again and Go to Dashboard. On `activate`, a new worker clears
    `vroom-pages` and warms it with `WARM_PAGES` (`/dashboard`, `/expenses`, `/expenses/new`),
    so the main pages open offline even if this worker version never served them. A warm-up
@@ -66,7 +67,8 @@ When editing it:
 - `src/lib/utils/__tests__/sw-push-handlers.test.ts` scans this source and `vite.config.ts`
   to pin the push handlers, the precache call, the `buildSW` wiring, and that
   `static/sw.js` stays deleted (two registered workers would collide).
-  `src/service-worker/__tests__/index.test.ts` covers the page cache and the warm-up. Both
+  `src/service-worker/__tests__/index.test.ts` runs the worker's listeners: the page cache,
+  the warm-up, push and notification clicks, and that no `sync` listener exists. Both
   run in the unit suite. The real worker is exercised by the preview-target E2E tests
   (`pwa.spec.ts`, `offline.spec.ts`), which CI's Frontend Tests job runs.
 
@@ -89,16 +91,20 @@ carried through `toOfflineExpense()` AND `offlineExpenseToBackend()`, or it vani
 
 `sync-manager.ts` parks an entry with `markExpenseNeedsAttention()` when the server refuses
 it for good, or when a fuel entry is missing its volume/charge or mileage. A parked entry
-stays in the outbox with its reason and isn't retried. `OfflineExpenseCards.svelte` lists
-parked entries, and one the server never created (no `serverId`) gets an **Edit** link to
-`/expenses/new?queued=<id>`, which opens the expense form on that entry.
+stays in the outbox with its reason, and auto-sync skips it. The sync panel's retry
+(`syncManager.retryParked()`) clears the mark on every parked entry and sends them again,
+for when the cause was fixed elsewhere. To change an entry instead,
+`OfflineExpenseCards.svelte` lists parked entries, and one the server never created (no
+`serverId`) gets an **Edit** link to `/expenses/new?queued=<id>`, which opens the expense
+form on that entry.
 `saveQueuedExpense()` (`expense-form/requeue-expense.ts`) validates the form and calls
 `replaceParkedExpense()`, which:
 
 - replaces the entry in place, keeping its `id`, `clientId` and `timestamp`, so the server's
   `clientId` dedupe still applies, and clears the needs-attention mark;
-- returns `not-parked` if the entry started syncing or was removed during the edit, so a
-  half-edited entry is never sent;
+- returns `not-parked` if the entry stopped being parked during the edit (a sync-panel retry
+  or a sync started, or it was removed), so the edit never overwrites an entry that may
+  already be on its way to the server;
 - returns `failed` if localStorage or the photo store can't save it.
 
 After a successful requeue, the form starts a sync when online, or leaves the entry for the
