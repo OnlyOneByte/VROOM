@@ -171,6 +171,7 @@
 	}
 
 	async function retry(load: () => Promise<void>) {
+		if (isRetrying) return;
 		isRetrying = true;
 		try {
 			await load();
@@ -182,12 +183,29 @@
 	let photoPicker = $state<HTMLDivElement | null>(null);
 	let photosRetryFailed = $state(false);
 
+	function focusLeftOn(origin: Element | null): boolean {
+		const active = document.activeElement;
+		return active === origin || active === null || active === document.body;
+	}
+
+	async function retryVehicleContext() {
+		const origin = document.activeElement;
+		await retry(() => loadVehicleContext(form));
+		if (form.vehicleError) return;
+		await tick();
+		if (focusLeftOn(origin)) document.getElementById('vehicle')?.focus();
+	}
+
 	async function retryQueuedPhotos(clientId: string) {
+		if (isRetrying) return;
+		const origin = document.activeElement;
+		photosRetryFailed = false;
+		await tick();
 		await retry(() => loadQueuedPhotos(form, clientId));
 		photosRetryFailed = form.queuedPhotosUnreadable;
 		if (photosRetryFailed) return;
 		await tick();
-		photoPicker?.querySelector('button')?.focus();
+		if (focusLeftOn(origin)) photoPicker?.querySelector('button')?.focus();
 	}
 
 	async function reloadExpense() {
@@ -242,7 +260,9 @@
 					</p>
 				</div>
 				<p class="mb-4 text-sm text-muted-foreground">{form.expenseError}</p>
-				<Button size="lg" disabled={isRetrying} onclick={() => retry(reloadExpense)}>Retry</Button>
+				<Button size="lg" aria-disabled={isRetrying} onclick={() => retry(reloadExpense)}>
+					Retry
+				</Button>
 			</div>
 		</div>
 	{:else if form.isInsuranceManaged}
@@ -276,7 +296,11 @@
 					<p class="font-medium">Couldn't load your vehicles</p>
 				</div>
 				<p class="mb-4 text-sm text-muted-foreground">{form.vehiclesError}</p>
-				<Button size="lg" disabled={isRetrying} onclick={() => retry(() => loadVehicles(form))}>
+				<Button
+					size="lg"
+					aria-disabled={isRetrying}
+					onclick={() => retry(() => loadVehicles(form))}
+				>
 					Retry
 				</Button>
 			</div>
@@ -393,8 +417,8 @@
 									variant="outline"
 									size="lg"
 									aria-describedby="vehicle-load-message"
-									disabled={isRetrying}
-									onclick={() => retry(() => loadVehicleContext(form))}
+									aria-disabled={isRetrying}
+									onclick={retryVehicleContext}
 								>
 									Retry
 								</Button>
@@ -511,12 +535,12 @@
 							variant="outline"
 							size="lg"
 							aria-describedby="queued-photos-message"
-							disabled={isRetrying}
+							aria-disabled={isRetrying}
 							onclick={() => retryQueuedPhotos(clientId)}
 						>
 							Retry
 						</Button>
-						<p role="status" class="text-sm text-muted-foreground">
+						<p role="status" class="min-h-5 text-sm text-muted-foreground">
 							{#if photosRetryFailed}Still couldn't load them. Try again in a moment.{/if}
 						</p>
 					</div>

@@ -82,6 +82,54 @@ describe('Retry on the unreadable-photos note', () => {
 		expect(document.activeElement).toBe(retryButton());
 	});
 
+	test('a second failed Retry in a row is announced again', async () => {
+		render(ExpenseForm, { props: { queuedExpenseId: 'offline_1' } });
+		const retry = await vi.waitFor(retryButton);
+		loadPendingPhotos.mockRejectedValueOnce(new Error('still unavailable'));
+		await fireEvent.click(retry);
+		await screen.findByText("Still couldn't load them. Try again in a moment.");
+		const status = screen.getByRole('status');
+		const texts: string[] = [];
+		const observer = new MutationObserver(() => texts.push(status.textContent?.trim() ?? ''));
+		observer.observe(status, { childList: true, characterData: true, subtree: true });
+		loadPendingPhotos.mockRejectedValueOnce(new Error('still unavailable'));
+
+		await fireEvent.click(retryButton());
+
+		await vi.waitFor(() => expect(texts.at(-1)).toContain('Still couldn'));
+		observer.disconnect();
+		expect(texts).toContain('');
+	});
+
+	test('a Retry in progress ignores repeat presses', async () => {
+		render(ExpenseForm, { props: { queuedExpenseId: 'offline_1' } });
+		const retry = await vi.waitFor(retryButton);
+		const calls = loadPendingPhotos.mock.calls.length;
+		loadPendingPhotos.mockReturnValueOnce(new Promise(() => {}));
+
+		await fireEvent.click(retry);
+		await vi.waitFor(() => expect(retry.getAttribute('aria-disabled')).toBe('true'));
+		await fireEvent.click(retry);
+
+		expect(loadPendingPhotos).toHaveBeenCalledTimes(calls + 1);
+	});
+
+	test('a Retry that works leaves focus where the user moved it', async () => {
+		render(ExpenseForm, { props: { queuedExpenseId: 'offline_1' } });
+		const retry = await vi.waitFor(retryButton);
+		let finish: (files: File[]) => void = () => {};
+		loadPendingPhotos.mockReturnValueOnce(new Promise<File[]>(resolve => (finish = resolve)));
+		retry.focus();
+
+		await fireEvent.click(retry);
+		const amount = document.getElementById('amount') as HTMLInputElement;
+		amount.focus();
+		finish([]);
+
+		await vi.waitFor(() => expect(screen.queryByTestId('queued-photos-unreadable')).toBeNull());
+		expect(document.activeElement).toBe(amount);
+	});
+
 	test('a Retry that works brings the photo picker back and moves focus into it', async () => {
 		render(ExpenseForm, { props: { queuedExpenseId: 'offline_1' } });
 		const retry = await vi.waitFor(retryButton);
