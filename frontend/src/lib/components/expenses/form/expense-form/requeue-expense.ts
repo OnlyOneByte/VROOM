@@ -16,6 +16,7 @@ export const REQUEUE_NOT_PARKED_MESSAGE =
 export async function saveQueuedExpense(state: ExpenseFormState): Promise<void> {
 	const queued = state.queuedExpense;
 	if (!queued) return;
+	state.submitError = null;
 	if (!state.validateForm()) {
 		Object.keys(state.formData).forEach(field => {
 			state.touched[field] = true;
@@ -24,7 +25,6 @@ export async function saveQueuedExpense(state: ExpenseFormState): Promise<void> 
 	}
 
 	state.isSubmitting = true;
-	state.submitError = null;
 	try {
 		const expenseData = buildExpenseData(state.formData, {
 			currency: state.currencyUnit,

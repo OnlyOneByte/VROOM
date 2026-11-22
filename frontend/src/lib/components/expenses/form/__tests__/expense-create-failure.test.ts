@@ -77,11 +77,29 @@ describe('ExpenseForm — a failed create is classified before anything is queue
 		await fillAndSave();
 
 		const inline = await screen.findByTestId('submit-error');
+		expect(inline.textContent?.trim()).toBe(
+			"Couldn't save this expense. Amount must be greater than 0."
+		);
 		await vi.waitFor(() => expect(document.activeElement).toBe(inline));
 		expect(toast).not.toHaveBeenCalledWith(
 			expect.objectContaining({ message: expect.stringContaining("Couldn't save this expense") })
 		);
 		toast.mockRestore();
+	});
+
+	test('a retry that fails validation drops the old message and leaves focus alone', async () => {
+		createExpense.mockRejectedValue(new ApiError('Amount must be greater than 0', 400));
+		await fillAndSave();
+		await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('submit-error')));
+		const save = screen.getByRole('button', { name: /save expense/i });
+		await fireEvent.input(screen.getByLabelText(/Amount/), { target: { value: '' } });
+		save.focus();
+
+		await fireEvent.click(save);
+
+		await vi.waitFor(() => expect(submitError()).toBeNull());
+		expect(createExpense).toHaveBeenCalledTimes(1);
+		expect(document.activeElement).toBe(save);
 	});
 
 	test('a 404 (vehicle deleted elsewhere) is shown on the form and queues NOTHING', async () => {
