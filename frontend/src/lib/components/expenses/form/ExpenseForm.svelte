@@ -265,13 +265,17 @@
 		<div class="space-y-6 pb-32 sm:pb-24">
 			<ExpenseFormHeader title={formTitle} onBack={handleBack}>
 				{#snippet subtitle()}
-					<ExpenseFormSubtitle
-						isEditMode={form.isEditMode}
-						isGroupEditMode={form.isGroupEditMode}
-						selectedVehicleIds={form.selectedVehicleIds}
-						vehicles={form.vehicles}
-						vehicle={form.vehicle}
-					/>
+					{#if form.queuedExpense}
+						Saved on this device, waiting to sync
+					{:else}
+						<ExpenseFormSubtitle
+							isEditMode={form.isEditMode}
+							isGroupEditMode={form.isGroupEditMode}
+							selectedVehicleIds={form.selectedVehicleIds}
+							vehicles={form.vehicles}
+							vehicle={form.vehicle}
+						/>
+					{/if}
 				{/snippet}
 			</ExpenseFormHeader>
 

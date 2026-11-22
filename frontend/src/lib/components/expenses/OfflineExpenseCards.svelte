@@ -171,20 +171,19 @@
 										: `The server didn't accept this entry: ${expense.attentionReason}`}
 								</div>
 							{/if}
+							{#if !expense.serverId}
+								<Button
+									variant="outline"
+									size="lg"
+									href={`${resolve(routes.expenseNew)}?queued=${encodeURIComponent(expense.id)}`}
+									class="mt-2"
+									aria-label="Edit {describeEntry(expense)}"
+								>
+									Edit
+								</Button>
+							{/if}
 						</div>
-						{#if expense.serverId}
-							<TriangleAlert class="h-4 w-4 text-warning flex-shrink-0" />
-						{:else}
-							<Button
-								variant="outline"
-								size="lg"
-								href={`${resolve(routes.expenseNew)}?queued=${encodeURIComponent(expense.id)}`}
-								class="flex-shrink-0"
-								aria-label="Edit {describeEntry(expense)}"
-							>
-								Edit
-							</Button>
-						{/if}
+						<TriangleAlert class="h-4 w-4 text-warning flex-shrink-0" />
 					</div>
 				{/each}
 			</div>
