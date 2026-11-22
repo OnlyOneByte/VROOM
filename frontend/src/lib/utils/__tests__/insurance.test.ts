@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
 import type { InsuranceTerm, InsurancePolicy } from '#lib/types/index.ts';
@@ -13,6 +16,16 @@ import {
 } from '#lib/utils/insurance.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+const TERM_BILLING_CASES_PATH = resolve(
+	dirname(fileURLToPath(import.meta.url)),
+	'../../../../../backend/src/utils/__tests__/term-billing-months.cases.json'
+);
+const TERM_BILLING_CASES = JSON.parse(readFileSync(TERM_BILLING_CASES_PATH, 'utf8')) as {
+	start: string;
+	end: string;
+	months: number;
+}[];
 
 let idCounter = 0;
 
@@ -218,20 +231,16 @@ describe('Renew pre-fill from previous term', () => {
 });
 
 describe('term premium matches what the API charges', () => {
-	const utcNoon = (date: string) => new Date(`${date}T12:00:00.000Z`);
-
-	test.each([
-		['2024-01-01', '2025-01-01', 12],
-		['2026-03-15', '2026-09-15', 6],
-		['2026-03-15', '2026-04-14', 1],
-		['2026-03-15', '2026-04-16', 2],
-		['2026-01-31', '2026-02-28', 1],
-		['2026-01-31', '2026-03-01', 2],
-		['2024-02-29', '2025-03-01', 13],
-		['2026-03-15', '2026-03-15', 1]
-	])('%s -> %s is %i billed months', (start, end, months) => {
-		expect(termBillingMonths(utcNoon(start), utcNoon(end))).toBe(months);
+	test('the shared case table has rows', () => {
+		expect(TERM_BILLING_CASES.length).toBeGreaterThan(0);
 	});
+
+	test.each(TERM_BILLING_CASES)(
+		'$start -> $end is $months billed months',
+		({ start, end, months }) => {
+			expect(termBillingMonths(new Date(start), new Date(end))).toBe(months);
+		}
+	);
 
 	test('a monthly-only term costs the monthly cost times its billed months', () => {
 		expect(
