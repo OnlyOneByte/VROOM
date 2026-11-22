@@ -220,6 +220,20 @@ export async function updateExistingUserProfile(
   }
 }
 
+export async function attachPendingInvitesOnSignIn(userId: string): Promise<void> {
+  const db = getDb();
+  try {
+    const [account] = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (account?.email) attachPendingInvites(db, userId, account.email);
+  } catch (error) {
+    logger.warn('Could not attach pending invites on sign-in', { userId, error });
+  }
+}
+
 export async function resolveNewUser(
   authProviderId: string,
   userInfo: { providerAccountId: string; email: string; displayName: string; avatarUrl?: string }
@@ -428,6 +442,7 @@ routes.get('/callback/:authProvider', authRateLimiter, async (c) => {
   if (existingAuthRow) {
     userId = existingAuthRow.userId;
     await updateExistingUserProfile(userId, existingAuthRow.id, userInfo);
+    await attachPendingInvitesOnSignIn(userId);
   } else {
     const resolution = await resolveNewUser(authProviderId, userInfo);
     if ('redirect' in resolution) return c.redirect(resolution.redirect);

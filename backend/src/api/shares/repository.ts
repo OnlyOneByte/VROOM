@@ -62,7 +62,12 @@ export function attachPendingInvites(
       and(
         isNull(vehicleShares.sharedWithId),
         eq(vehicleShares.status, 'pending'),
-        sql`lower(${vehicleShares.invitedEmail}) = ${email.toLowerCase()}`
+        sql`lower(${vehicleShares.invitedEmail}) = ${email.toLowerCase()}`,
+        sql`${vehicleShares.vehicleId} not in (select v.id from vehicles v where v.user_id = ${userId})`,
+        sql`${vehicleShares.vehicleId} not in (select s.vehicle_id from vehicle_shares s where s.shared_with_id = ${userId} and s.status in (${sql.join(
+          ACTIVE_SHARE_STATUSES.map((status) => sql`${status}`),
+          sql`, `
+        )}))`
       )
     )
     .run();
