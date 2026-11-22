@@ -23,7 +23,10 @@ const getHistory =
 			params: { limit: number; offset: number }
 		) => Promise<PaginatedResponse<OdometerHistoryEntry>>
 	>();
+const getChartHistory =
+	vi.fn<(vehicleId: string) => Promise<PaginatedResponse<OdometerHistoryEntry>>>();
 const deleteEntry = vi.fn<(entryId: string) => Promise<void>>();
+const CHART_LIMIT = 100;
 
 vi.mock('#lib/services/odometer-api.ts', () => ({
 	odometerApi: {
@@ -34,7 +37,9 @@ vi.mock('#lib/services/odometer-api.ts', () => ({
 vi.mock('#lib/services/odometer-history-api.ts', () => ({
 	odometerHistoryApi: {
 		getHistory: (vehicleId: string, params: { limit: number; offset: number }) =>
-			getHistory(vehicleId, params)
+			params.limit === CHART_LIMIT && params.offset === 0
+				? getChartHistory(vehicleId)
+				: getHistory(vehicleId, params)
 	}
 }));
 
@@ -70,6 +75,11 @@ async function settle(): Promise<void> {
 	}
 }
 
+function history(data: OdometerHistoryEntry[]): void {
+	getHistory.mockResolvedValue(page(data));
+	getChartHistory.mockResolvedValue(page(data));
+}
+
 function mount(props: { canWrite?: boolean; unitPreferences?: UnitPreferences } = {}) {
 	return render(OdometerTab, { props: { vehicleId: 'v1', ...props } });
 }
@@ -78,6 +88,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	chartProps = null;
 	getHistory.mockResolvedValue(page([]));
+	getChartHistory.mockResolvedValue(page([]));
 	deleteEntry.mockResolvedValue();
 });
 
@@ -188,7 +199,7 @@ describe('OdometerTab entry list', () => {
 	});
 
 	test('a single reading does not draw the mileage chart', async () => {
-		getHistory.mockResolvedValue(page([entry()]));
+		history([entry()]);
 		mount();
 		await settle();
 
@@ -196,12 +207,10 @@ describe('OdometerTab entry list', () => {
 	});
 
 	test('two or more readings draw the chart in chronological order', async () => {
-		getHistory.mockResolvedValue(
-			page([
-				entry({ sourceId: 'b', odometer: 46000, recordedAt: '2026-04-01T12:00:00.000Z' }),
-				entry({ sourceId: 'a', odometer: 45000, recordedAt: '2026-03-01T12:00:00.000Z' })
-			])
-		);
+		history([
+			entry({ sourceId: 'b', odometer: 46000, recordedAt: '2026-04-01T12:00:00.000Z' }),
+			entry({ sourceId: 'a', odometer: 45000, recordedAt: '2026-03-01T12:00:00.000Z' })
+		]);
 		mount();
 		await settle();
 
@@ -220,7 +229,7 @@ describe('OdometerTab expense mileage', () => {
 	];
 
 	test('a vehicle with only expense mileage lists and charts it instead of the empty state', async () => {
-		getHistory.mockResolvedValue(page(fromExpenses));
+		history(fromExpenses);
 		mount();
 		await settle();
 
@@ -253,7 +262,7 @@ describe('OdometerTab expense mileage', () => {
 	});
 
 	test('the chart y axis fits the readings instead of starting at 0', async () => {
-		getHistory.mockResolvedValue(page(fromExpenses));
+		history(fromExpenses);
 		mount();
 		await settle();
 
@@ -454,5 +463,89 @@ describe('OdometerTab delete', () => {
 		expect(
 			within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' })
 		).toBeDisabled();
+	});
+});
+
+describe('OdometerTab chart range', () => {
+	function dated(count: number): OdometerHistoryEntry[] {
+		return Array.from({ length: count }, (_, i) =>
+			entry({
+				sourceId: `o${i}`,
+				odometer: 50000 - i * 100,
+				recordedAt: new Date(Date.UTC(2026, 10, 1) - i * 7 * 86400000).toISOString()
+			})
+		);
+	}
+
+	test('the chart plots the latest readings from its own request, not the list page', async () => {
+		const all = dated(25);
+		getHistory.mockResolvedValueOnce(page(all.slice(0, 20), 25, 0));
+		getChartHistory.mockResolvedValue(page(all, 25, 0));
+		mount();
+		await settle();
+
+		expect(getChartHistory).toHaveBeenCalledWith('v1');
+		const data = chartProps?.['data'] as { odometer: number }[];
+		expect(data).toHaveLength(25);
+		expect(data[0]?.odometer).toBe(47600);
+		expect(chartProps?.['description']).toBe('Odometer readings plotted by date');
+	});
+
+	test('paging the list leaves the chart as it was', async () => {
+		const all = dated(25);
+		getHistory.mockResolvedValueOnce(page(all.slice(0, 20), 25, 0));
+		getHistory.mockResolvedValueOnce(page(all.slice(20), 25, 20));
+		getChartHistory.mockResolvedValue(page(all, 25, 0));
+		mount();
+		await settle();
+		const before = chartProps?.['data'];
+
+		await fireEvent.click(screen.getByRole('button', { name: /Next/ }));
+		await settle();
+
+		expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
+		expect(getChartHistory).toHaveBeenCalledTimes(1);
+		expect(chartProps?.['data']).toEqual(before);
+		expect((chartProps?.['data'] as unknown[]).length).toBe(25);
+	});
+
+	test('a history over the chart limit says the chart shows the latest 100', async () => {
+		const latest = dated(CHART_LIMIT);
+		getHistory.mockResolvedValueOnce(page(latest.slice(0, 20), 130, 0));
+		getChartHistory.mockResolvedValue(page(latest, 130, 0));
+		mount();
+		await settle();
+
+		expect(chartProps?.['description']).toBe('Your latest 100 readings');
+		expect((chartProps?.['data'] as unknown[]).length).toBe(CHART_LIMIT);
+	});
+
+	test('a failed chart request still lists the readings, without a chart', async () => {
+		getHistory.mockResolvedValue(page(dated(3)));
+		getChartHistory.mockRejectedValue(new Error('offline'));
+		mount();
+		await settle();
+
+		expect(screen.getByText('Readings (3)')).toBeInTheDocument();
+		expect(chartProps).toBeNull();
+	});
+
+	test('deleting a reading reloads the chart', async () => {
+		history(dated(3));
+		mount();
+		await settle();
+		getChartHistory.mockResolvedValue(page(dated(2)));
+
+		await fireEvent.click(
+			screen.getAllByRole('button', { name: 'Delete reading' })[0] as HTMLElement
+		);
+		await settle();
+		await fireEvent.click(
+			within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' })
+		);
+		await settle();
+
+		expect(getChartHistory).toHaveBeenCalledTimes(2);
+		expect((chartProps?.['data'] as unknown[]).length).toBe(2);
 	});
 });
