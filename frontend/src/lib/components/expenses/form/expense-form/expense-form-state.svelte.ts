@@ -163,8 +163,7 @@ export class ExpenseFormState {
 		const fields: string[] = this.isGroupEditMode
 			? ['category', 'amount', 'date']
 			: ['vehicleId', 'category', 'amount', 'date'];
-		const fuelNeedsVehicle =
-			this.showFuelFields && !this.vehicle && !!this.vehicleError && !this.isGroupEditMode;
+		const fuelNeedsVehicle = this.showFuelFields && !!this.vehicleError && !this.isGroupEditMode;
 		if (this.showFuelFields) {
 			fields.push('mileage');
 			if (this.showVolumeField) fields.push('volume');

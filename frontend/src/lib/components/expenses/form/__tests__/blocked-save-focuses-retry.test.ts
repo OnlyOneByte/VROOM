@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import type { Vehicle } from '#lib/types/index.ts';
 
 const vehicle: Vehicle = {
@@ -20,7 +21,11 @@ vi.mock('$app/navigation', () => ({
 	afterNavigate: vi.fn(),
 	refreshAll: vi.fn()
 }));
-const { getVehicle } = vi.hoisted(() => ({ getVehicle: vi.fn() }));
+const { getVehicle, getExpensesByVehicle, createExpense } = vi.hoisted(() => ({
+	getVehicle: vi.fn(),
+	getExpensesByVehicle: vi.fn(),
+	createExpense: vi.fn()
+}));
 
 vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: {
@@ -30,8 +35,8 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 }));
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
-		getExpensesByVehicle: vi.fn(() => Promise.resolve({ data: [] })),
-		createExpense: vi.fn()
+		getExpensesByVehicle,
+		createExpense
 	}
 }));
 
@@ -40,6 +45,9 @@ const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
 beforeEach(() => {
 	getVehicle.mockReset();
 	getVehicle.mockRejectedValue(new Error('offline'));
+	getExpensesByVehicle.mockReset();
+	getExpensesByVehicle.mockResolvedValue({ data: [] });
+	createExpense.mockReset();
 	vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
 });
 
@@ -74,6 +82,50 @@ describe('a Save blocked by a failed vehicle load', () => {
 		await fireEvent.click(saveBarButton());
 		await vi.waitFor(() => expect(document.activeElement).toBe(retry));
 		expect(retry.scrollIntoView).toHaveBeenCalled();
+	});
+});
+
+function failHistoryOnly(): void {
+	getVehicle.mockResolvedValue(vehicle);
+	getExpensesByVehicle.mockImplementation((_id: string, opts: { category?: string }) =>
+		opts.category === 'fuel'
+			? Promise.resolve({ data: [] })
+			: Promise.reject(new Error('Server error'))
+	);
+}
+
+async function fillValidFuelEntry(): Promise<void> {
+	await fireEvent.input(screen.getByLabelText(/Amount/), { target: { value: '40' } });
+	await fireEvent.input(screen.getByLabelText(/Current Mileage/), { target: { value: '45000' } });
+}
+
+describe("a fill-up when the vehicle loads but its history doesn't", () => {
+	test('is blocked online, and focus moves to Retry', async () => {
+		failHistoryOnly();
+		render(ExpenseForm, { props: { preselectedCategory: 'fuel' } });
+		const alert = await screen.findByTestId('vehicle-load-error');
+		const retry = alert.querySelector('button') as HTMLButtonElement;
+		expect(alert.textContent).toContain("can't be saved yet");
+		await fillValidFuelEntry();
+
+		await fireEvent.click(saveBarButton());
+		await vi.waitFor(() => expect(document.activeElement).toBe(retry));
+		expect(createExpense).not.toHaveBeenCalled();
+	});
+
+	test('a failed last fill-up alone does not block or warn', async () => {
+		getVehicle.mockResolvedValue(vehicle);
+		getExpensesByVehicle.mockImplementation((_id: string, opts: { category?: string }) =>
+			opts.category === 'fuel'
+				? Promise.reject(new Error('Server error'))
+				: Promise.resolve({ data: [] })
+		);
+		render(ExpenseForm, { props: { preselectedCategory: 'fuel' } });
+		await screen.findByLabelText(/Gallons|Liters/);
+		await Promise.allSettled(getExpensesByVehicle.mock.results.map(r => r.value));
+		await tick();
+
+		expect(screen.queryByTestId('vehicle-load-error')).toBeNull();
 	});
 });
 
