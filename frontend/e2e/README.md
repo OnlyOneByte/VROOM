@@ -53,13 +53,14 @@ list, which covers `src/` only, so `frontend/tsconfig.e2e.json` extends the app'
 
 The dev server is the default: no build step, it recompiles from source so a reused server
 can never serve a stale bundle, and it needs neither the backend nor a database. Its one gap
-is the PWA surface. `vite dev` serves no service worker and no web app manifest, so the three
-tests that need them (`serves a valid web app manifest`, `registers a service worker`, `the
-service worker precaches the static assets for offline use`) skip with that reason on the dev
-target and run on the preview target. Run the preview target when you change
-`vite.config.ts`, the service worker, or the manifest.
+is the PWA surface. `vite dev` serves no service worker and no web app manifest, so the four
+tests that need them skip with that reason on the dev target and run on the preview target:
+`serves a valid web app manifest`, `registers a service worker`, `the service worker precaches
+the static assets for offline use`, and `a visited page reloads offline, and an unvisited one
+shows the offline page`. Run the preview target when you change `vite.config.ts`, the service
+worker, or the manifest.
 
-Turning on `devOptions` would make those three pass against a dev service worker, which is a
+Turning on `devOptions` would make those four pass against a dev service worker, which is a
 different artifact from the one that ships. That would be green without testing what matters,
 which is why the preview target exists.
 
@@ -119,6 +120,7 @@ So **do not run the typecheck or unit suites alongside `npm run test:e2e`.** If 
 | `analytics.spec.ts`          | summary load, quick stats, fuel tab, tab switching, zero-data state, error + retry                                                                                                          |
 | `pwa.spec.ts`                | install meta tags, offline badge, responsive overflow, mobile nav, the route and theme axe ratchets, and three preview-only tests (manifest, service worker, precache)                      |
 | `expenses-a11y.spec.ts`      | the expense list's axe-clean states: split group collapsed and expanded, row actions revealed by tap, insurance-blocked delete, keyboard reach into a split row's actions                   |
+| `offline.spec.ts`            | an expense saved offline shows on the list and the form reopens with the cached vehicles; preview-only: a visited page reloads offline, and an unvisited one shows the offline page         |
 
 ### Known gaps
 
