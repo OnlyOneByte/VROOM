@@ -166,6 +166,25 @@ describe('InsuranceTermForm add mode', () => {
 		expect(addTerm.mock.calls[0]?.[1].vehicleCoverage?.vehicleIds).toEqual(['v2', 'v1']);
 	});
 
+	test('offers no split method, so the even preview is what gets saved', async () => {
+		await mount();
+		await fillDatesAndVehicle();
+		await fireEvent.click(screen.getByRole('checkbox', { name: '2019 Honda Civic' }));
+		await type('total-cost', '1000');
+		await settle();
+
+		expect(
+			screen.getByText('The premium is split evenly between the covered vehicles.')
+		).toBeInTheDocument();
+		for (const label of ['Even', 'Fixed $', '%']) {
+			expect(screen.queryByRole('button', { name: label })).toBeNull();
+		}
+		expect(screen.queryByRole('spinbutton', { name: /Percentage for|Amount for/ })).toBeNull();
+
+		await clickSave();
+		expect(addTerm.mock.calls[0]?.[1].vehicleCoverage).toStrictEqual({ vehicleIds: ['v1', 'v2'] });
+	});
+
 	test('rejects an end date that is not after the start date', async () => {
 		await mount();
 		await type('start-date', '2026-07-01');
@@ -199,7 +218,7 @@ describe('InsuranceTermForm add mode', () => {
 		expect(addTerm).toHaveBeenCalledWith('p1', {
 			startDate: dateOnlyToISO('2026-07-01'),
 			endDate: dateOnlyToISO('2027-07-01'),
-			vehicleCoverage: { vehicleIds: ['v1'], splitMethod: undefined, allocations: undefined }
+			vehicleCoverage: { vehicleIds: ['v1'] }
 		});
 		expect(showSuccess).toHaveBeenCalledWith('Term added successfully');
 		expect(gotoDynamic).toHaveBeenCalledWith('/insurance/p1');
@@ -232,7 +251,7 @@ describe('InsuranceTermForm add mode', () => {
 			totalCost: 999.99,
 			monthlyCost: 83.33,
 			paymentAmount: 499.5,
-			vehicleCoverage: { vehicleIds: ['v1'], splitMethod: undefined, allocations: undefined }
+			vehicleCoverage: { vehicleIds: ['v1'] }
 		});
 	});
 
@@ -388,7 +407,7 @@ describe('InsuranceTermForm edit mode', () => {
 			monthlyCost: null,
 			premiumFrequency: null,
 			paymentAmount: null,
-			vehicleCoverage: { vehicleIds: ['v1'], splitMethod: undefined, allocations: undefined }
+			vehicleCoverage: { vehicleIds: ['v1'] }
 		});
 		expect(showSuccess).toHaveBeenCalledWith('Term updated successfully');
 		expect(gotoDynamic).toHaveBeenCalledWith('/insurance');
