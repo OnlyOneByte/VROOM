@@ -56,7 +56,6 @@
 	});
 
 	let statusPanel = $state<HTMLElement | null>(null);
-	let reconnected = $state(false);
 
 	function focusLeftOn(origin: Element | null): boolean {
 		const active = document.activeElement;
@@ -66,12 +65,10 @@
 	async function retrySession() {
 		if (authStore.recheckingSession) return;
 		const origin = document.activeElement;
-		reconnected = false;
 		await authStore.recheckSession();
 		if (authStore.sessionUnverified || !authStore.isAuthenticated) return;
-		reconnected = true;
 		await tick();
-		if (focusLeftOn(origin)) statusPanel?.focus();
+		if (focusLeftOn(origin)) statusPanel?.focus({ preventScroll: true });
 	}
 
 	let isRetryingParked = $state(false);
@@ -140,10 +137,9 @@
 	bind:this={statusPanel}
 	tabindex="-1"
 	role="group"
-	aria-label="Sync status"
-	class="border-t border-border pt-3 space-y-2"
+	aria-label="Sync status: {statusInfo.text}"
+	class="border-t border-border pt-3 space-y-2 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50"
 >
-	<span class="sr-only" role="status">{reconnected ? 'Connected to VROOM again' : ''}</span>
 	{#if isExpanded}
 		<div class="px-3 space-y-2">
 			<div class="flex items-center justify-between">

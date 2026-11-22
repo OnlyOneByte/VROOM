@@ -17,7 +17,12 @@
 			{@render back()}
 		{/if}
 		<div class="min-w-0">
-			<h1 class="text-3xl font-bold tracking-tight break-words">{title}</h1>
+			<h1
+				tabindex="-1"
+				class="text-3xl font-bold tracking-tight break-words rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+			>
+				{title}
+			</h1>
 			{#if typeof description === 'function'}
 				<p class="text-muted-foreground mt-1">{@render description()}</p>
 			{:else if description}

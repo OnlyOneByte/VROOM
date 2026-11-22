@@ -116,20 +116,43 @@ describe('SyncStatusInline expanded — Retry connection', () => {
 	}
 
 	it.each([true, false])(
-		'a successful Retry moves focus to the sync status and announces it (expanded: %s)',
+		'a successful Retry moves focus, without scrolling, to the sync status that names the result (expanded: %s)',
 		async isExpanded => {
 			await startUnreachable();
 			render(SyncStatusInline, { props: { isExpanded } });
 			const retry = screen.getByRole('button', { name: 'Retry connection' });
 			mockFetch.mockResolvedValueOnce(meResponse());
+			const focus = vi.spyOn(HTMLElement.prototype, 'focus');
 			retry.focus();
 			await fireEvent.click(retry);
 
-			await waitFor(() => expect(screen.getByRole('group', { name: 'Sync status' })).toHaveFocus());
+			await waitFor(() =>
+				expect(screen.getByRole('group', { name: 'Sync status: Up to date' })).toHaveFocus()
+			);
+			expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
 			expect(screen.queryByRole('button', { name: 'Retry connection' })).toBeNull();
-			expect(screen.getByText('Connected to VROOM again')).toHaveAttribute('role', 'status');
+			expect(screen.queryByText('Connected to VROOM again')).toBeNull();
+			focus.mockRestore();
 		}
 	);
+
+	it('a recheck that signs the user out moves no focus', async () => {
+		await startUnreachable();
+		render(SyncStatusInline, { props: { isExpanded: true } });
+		const retry = screen.getByRole('button', { name: 'Retry connection' });
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ success: false, error: { message: 'Unauthorized' } }), {
+				status: 401,
+				headers: { 'content-type': 'application/json' }
+			})
+		);
+		retry.focus();
+		await fireEvent.click(retry);
+
+		await waitFor(() => expect(authStore.isAuthenticated).toBe(false));
+		await new Promise(resolve => setTimeout(resolve, 0));
+		expect(screen.getByRole('group', { name: /^Sync status/ })).not.toHaveFocus();
+	});
 
 	it('a successful Retry leaves focus alone when the user moved it during the check', async () => {
 		await startUnreachable();
