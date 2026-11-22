@@ -11,6 +11,8 @@ vi.mock('../api-client', async importOriginal => ({
 	apiClient: { get, post, put, delete: del, getPaginated }
 }));
 
+vi.mock('../analytics-api', () => ({ userTimeZone: () => 'Pacific/Auckland' }));
+
 const { odometerApi } = await import('../odometer-api');
 
 beforeEach(() => {
@@ -34,19 +36,25 @@ describe('odometerApi', () => {
 		expect(get).toHaveBeenCalledWith('/api/v1/odometer/entry/o1');
 	});
 
-	test('create POSTs the reading to the vehicle path', async () => {
+	test('create POSTs the reading to the vehicle path with the user time zone', async () => {
 		const body = { odometer: 12_000, recordedAt: '2025-03-01T00:00:00.000Z', note: 'service' };
 		post.mockResolvedValueOnce({ id: 'o2' });
 		await odometerApi.create('v1', body);
-		expect(post).toHaveBeenCalledWith('/api/v1/odometer/v1', body);
+		expect(post).toHaveBeenCalledWith('/api/v1/odometer/v1', {
+			...body,
+			timeZone: 'Pacific/Auckland'
+		});
 	});
 
-	test('update PUTs and delete DELETEs the entry path', async () => {
+	test('update PUTs with the user time zone and delete DELETEs the entry path', async () => {
 		put.mockResolvedValueOnce({ id: 'o2' });
 		del.mockResolvedValueOnce({ deleted: true });
 		await odometerApi.update('o2', { odometer: 12_500 });
 		await expect(odometerApi.delete('o2')).resolves.toBeUndefined();
-		expect(put).toHaveBeenCalledWith('/api/v1/odometer/o2', { odometer: 12_500 });
+		expect(put).toHaveBeenCalledWith('/api/v1/odometer/o2', {
+			odometer: 12_500,
+			timeZone: 'Pacific/Auckland'
+		});
 		expect(del).toHaveBeenCalledWith('/api/v1/odometer/o2');
 	});
 
