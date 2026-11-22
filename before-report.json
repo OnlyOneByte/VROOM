@@ -1,0 +1,182 @@
+[
+ {
+  "theme": "default",
+  "dark": false,
+  "width": 1280,
+  "vapidResponses": [
+   503,
+   503
+  ],
+  "consoleErrors": [
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "default",
+  "dark": false,
+  "width": 375,
+  "vapidResponses": [
+   503,
+   503
+  ],
+  "consoleErrors": [
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "default",
+  "dark": true,
+  "width": 1280,
+  "vapidResponses": [
+   503,
+   503
+  ],
+  "consoleErrors": [
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "default",
+  "dark": true,
+  "width": 375,
+  "vapidResponses": [
+   503,
+   503
+  ],
+  "consoleErrors": [
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "tui",
+  "dark": false,
+  "width": 1280,
+  "vapidResponses": [
+   503,
+   503
+  ],
+  "consoleErrors": [
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "tui",
+  "dark": false,
+  "width": 375,
+  "vapidResponses": [
+   503,
+   503
+  ],
+  "consoleErrors": [
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "tui",
+  "dark": true,
+  "width": 1280,
+  "vapidResponses": [
+   503,
+   503
+  ],
+  "consoleErrors": [
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "tui",
+  "dark": true,
+  "width": 375,
+  "vapidResponses": [
+   503,
+   503
+  ],
+  "consoleErrors": [
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "vaporwave",
+  "dark": false,
+  "width": 1280,
+  "vapidResponses": [
+   503,
+   503
+  ],
+  "consoleErrors": [
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "vaporwave",
+  "dark": false,
+  "width": 375,
+  "vapidResponses": [
+   503,
+   503
+  ],
+  "consoleErrors": [
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "vaporwave",
+  "dark": true,
+  "width": 1280,
+  "vapidResponses": [
+   503,
+   503
+  ],
+  "consoleErrors": [
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "vaporwave",
+  "dark": true,
+  "width": 375,
+  "vapidResponses": [
+   503,
+   503
+  ],
+  "consoleErrors": [
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+   "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ }
+]

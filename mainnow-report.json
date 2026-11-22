@@ -1,0 +1,50 @@
+[
+ {
+  "theme": "default",
+  "dark": false,
+  "width": 1280,
+  "vapidResponses": [
+   200,
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Notifications are blocked. Allow them for this site in your browser settings, then try again.",
+  "toggleShown": false
+ },
+ {
+  "theme": "default",
+  "dark": false,
+  "width": 375,
+  "vapidResponses": [
+   200,
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Notifications are blocked. Allow them for this site in your browser settings, then try again.",
+  "toggleShown": false
+ },
+ {
+  "theme": "default",
+  "dark": true,
+  "width": 1280,
+  "vapidResponses": [
+   200,
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Notifications are blocked. Allow them for this site in your browser settings, then try again.",
+  "toggleShown": false
+ },
+ {
+  "theme": "default",
+  "dark": true,
+  "width": 375,
+  "vapidResponses": [
+   200,
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Notifications are blocked. Allow them for this site in your browser settings, then try again.",
+  "toggleShown": false
+ }
+]

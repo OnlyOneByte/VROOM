@@ -1,0 +1,134 @@
+[
+ {
+  "theme": "default",
+  "dark": false,
+  "width": 1280,
+  "vapidResponses": [
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "default",
+  "dark": false,
+  "width": 375,
+  "vapidResponses": [
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "default",
+  "dark": true,
+  "width": 1280,
+  "vapidResponses": [
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "default",
+  "dark": true,
+  "width": 375,
+  "vapidResponses": [
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "tui",
+  "dark": false,
+  "width": 1280,
+  "vapidResponses": [
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "tui",
+  "dark": false,
+  "width": 375,
+  "vapidResponses": [
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "tui",
+  "dark": true,
+  "width": 1280,
+  "vapidResponses": [
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "tui",
+  "dark": true,
+  "width": 375,
+  "vapidResponses": [
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "vaporwave",
+  "dark": false,
+  "width": 1280,
+  "vapidResponses": [
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "vaporwave",
+  "dark": false,
+  "width": 375,
+  "vapidResponses": [
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "vaporwave",
+  "dark": true,
+  "width": 1280,
+  "vapidResponses": [
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ },
+ {
+  "theme": "vaporwave",
+  "dark": true,
+  "width": 375,
+  "vapidResponses": [
+   200
+  ],
+  "consoleErrors": [],
+  "statusText": "Push notifications aren't set up on this server.",
+  "toggleShown": false
+ }
+]
