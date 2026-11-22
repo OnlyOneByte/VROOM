@@ -1,3 +1,23 @@
+<script module lang="ts">
+	const RADAR_WIDE_TICKS_MIN_WIDTH = 500;
+
+	const radarMetrics = [
+		{ key: 'fuelEfficiency', label: 'Fuel Efficiency', tick: 'Efficiency' },
+		{ key: 'maintenanceCost', label: 'Maintenance Cost', tick: 'Maintenance' },
+		{ key: 'reliability', label: 'Reliability', tick: 'Reliability' },
+		{ key: 'annualCost', label: 'Annual Cost', tick: 'Annual Cost' },
+		{ key: 'mileage', label: 'Mileage', tick: 'Mileage' }
+	] as const;
+
+	export function radarTickLabel(label: string, cardWidth: number): string {
+		const index = radarMetrics.findIndex(m => m.label === label);
+		const metric = radarMetrics[index];
+		if (!metric) return label;
+		const staggered = cardWidth < RADAR_WIDE_TICKS_MIN_WIDTH && index % 2 === 1;
+		return staggered ? `\u00a0\n${metric.tick}` : metric.tick;
+	}
+</script>
+
 <script lang="ts">
 	import '#lib/components/charts/bar-chart-animations.css';
 	import { formatDecimalAxis, parseMonthToDate } from '#lib/utils/chart-formatters.ts';
@@ -32,13 +52,8 @@
 			: []
 	);
 
-	const radarMetrics = [
-		{ key: 'fuelEfficiency', label: 'Fuel Efficiency' },
-		{ key: 'maintenanceCost', label: 'Maintenance Cost' },
-		{ key: 'reliability', label: 'Reliability' },
-		{ key: 'annualCost', label: 'Annual Cost' },
-		{ key: 'mileage', label: 'Mileage' }
-	] as const;
+	let radarCardWidth = $state(0);
+	let radarTickFormat = $derived((label: string) => radarTickLabel(label, radarCardWidth));
 
 	let radarData = $derived.by(() => {
 		return radarMetrics.map(metric => {
@@ -132,19 +147,22 @@
 			}}
 		/>
 
-		<AppBarChart
-			title="Vehicle Performance Comparison"
-			description={radarDescription}
-			data={radarData}
-			x="metric"
-			y={radarVehicleSeries.map(s => s.key)}
-			series={radarVehicleSeries}
-			config={radarConfig}
-			seriesLayout="group"
-			yDomain={[0, 100]}
-			yAxisFormat={(v: number) => String(v)}
-			xAxisProps={{ ticks: radarMetrics.map(m => m.label) }}
-		/>
+		<div class="min-w-0" bind:clientWidth={radarCardWidth}>
+			<AppBarChart
+				class="h-full"
+				title="Vehicle Performance Comparison"
+				description={radarDescription}
+				data={radarData}
+				x="metric"
+				y={radarVehicleSeries.map(s => s.key)}
+				series={radarVehicleSeries}
+				config={radarConfig}
+				seriesLayout="group"
+				yDomain={[0, 100]}
+				yAxisFormat={(v: number) => String(v)}
+				xAxisProps={{ ticks: radarMetrics.map(m => m.label), format: radarTickFormat }}
+			/>
+		</div>
 	</div>
 
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
