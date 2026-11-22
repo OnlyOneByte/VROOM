@@ -1,4 +1,5 @@
 import type { OdometerEntry, PaginatedResponse, Photo } from '#lib/types/index.ts';
+import { userTimeZone } from './analytics-api';
 import { apiClient, withPagination } from './api-client';
 import { entityPhotos } from './photo-api';
 
@@ -29,11 +30,17 @@ export const odometerApi = {
 	},
 
 	async create(vehicleId: string, data: CreateOdometerRequest): Promise<OdometerEntry> {
-		return apiClient.post<OdometerEntry>(`/api/v1/odometer/${vehicleId}`, data);
+		return apiClient.post<OdometerEntry>(`/api/v1/odometer/${vehicleId}`, {
+			...data,
+			timeZone: userTimeZone()
+		});
 	},
 
 	async update(entryId: string, data: UpdateOdometerRequest): Promise<OdometerEntry> {
-		return apiClient.put<OdometerEntry>(`/api/v1/odometer/${entryId}`, data);
+		return apiClient.put<OdometerEntry>(`/api/v1/odometer/${entryId}`, {
+			...data,
+			timeZone: userTimeZone()
+		});
 	},
 
 	async delete(entryId: string): Promise<void> {
