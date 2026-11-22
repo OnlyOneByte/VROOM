@@ -134,14 +134,24 @@ describe('SplitConfigEditor: fixed amounts', () => {
 		expect(screen.getByLabelText('Amount for Hauler').className).toContain('border-destructive');
 	});
 
-	test('tolerates sub-cent rounding drift', () => {
+	test('tolerates floating-point drift in amounts that add up to the cent', () => {
 		renderEditor('absolute', [
 			{ vehicleId: 'v1', amount: 33.33 },
 			{ vehicleId: 'v2', amount: 33.33 },
-			{ vehicleId: 'v3', amount: 33.335 }
+			{ vehicleId: 'v3', amount: 33.34 }
 		]);
 
 		expect(screen.queryByText(/must equal/)).toBeNull();
+	});
+
+	test('flags amounts one cent off the total, as the API does', () => {
+		renderEditor('absolute', [
+			{ vehicleId: 'v1', amount: 50 },
+			{ vehicleId: 'v2', amount: 30 },
+			{ vehicleId: 'v3', amount: 19.99 }
+		]);
+
+		expect(screen.getByText('Sum ($99.99) must equal total ($100.00)')).toBeInTheDocument();
 	});
 
 	test('editing an amount reports the updated allocations', async () => {
@@ -181,13 +191,25 @@ describe('SplitConfigEditor: percentages', () => {
 			{ vehicleId: 'v3', percentage: 25 }
 		]);
 
-		expect(rowText('Total')).toBe('Total 100.0% / 100%');
+		expect(rowText('Total')).toBe('Total 100.00% / 100%');
+		expect(screen.queryByText(/must equal/)).toBeNull();
+	});
+
+	test('accepts percentages that round to 100.00%, as the API does', () => {
+		renderEditor('percentage', [
+			{ vehicleId: 'v1', percentage: 33.333 },
+			{ vehicleId: 'v2', percentage: 33.333 },
+			{ vehicleId: 'v3', percentage: 33.333 }
+		]);
+
+		expect(rowText('Total')).toBe('Total 100.00% / 100%');
 		expect(screen.queryByText(/must equal/)).toBeNull();
 	});
 
 	test.each([
-		[[60, 30, 0], 'Sum (90.0%) must equal 100%'],
-		[[60, 30, 20], 'Sum (110.0%) must equal 100%']
+		[[60, 30, 0], 'Sum (90.00%) must equal 100%'],
+		[[60, 30, 20], 'Sum (110.00%) must equal 100%'],
+		[[49.99, 49.99, 0], 'Sum (99.98%) must equal 100%']
 	])('flags %j as not summing to 100', (percentages, message) => {
 		renderEditor(
 			'percentage',

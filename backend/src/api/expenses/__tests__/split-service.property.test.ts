@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { ExpenseSplitService } from '../split-service';
-import type { SplitConfig } from '../validation';
+import { percentagesSumTo100, type SplitConfig } from '../validation';
 
 const service = new ExpenseSplitService();
 
@@ -203,6 +203,89 @@ describe('percentage split penny-residue + over-100% clamp', () => {
     expect(result[1].amount).toBe(3333);
     expect(result[2].amount).toBe(3334);
     expect(result.reduce((s, a) => s + a.amount, 0)).toBe(10000);
+  });
+
+  test('a percentage whose product is inexact in floating point keeps its cent (0.57% of $100)', () => {
+    const result = service.computeAllocations(
+      {
+        method: 'percentage',
+        allocations: [
+          { vehicleId: 'v-1', percentage: 0.57 },
+          { vehicleId: 'v-2', percentage: 99.43 },
+        ],
+      },
+      10000
+    );
+    expect(result.map((a) => a.amount)).toEqual([57, 9943]);
+  });
+
+  test.each([[[33.335, 33.335, 33.3299, 0]], [[33.335, 33.335, 33.325, 0.005]]])(
+    'shares of %j never add up to more than the total',
+    (percentages) => {
+      const result = service.computeAllocations(
+        {
+          method: 'percentage',
+          allocations: percentages.map((percentage, i) => ({ vehicleId: `v-${i}`, percentage })),
+        },
+        10000
+      );
+      expect(result.reduce((s, a) => s + a.amount, 0)).toBe(10000);
+      expect(result.every((a) => a.amount >= 0)).toBe(true);
+    }
+  );
+
+  test('any percentage split the schema accepts adds up to the total with no negative share', () => {
+    const acceptedBySchema = (percentages: number[]) =>
+      percentagesSumTo100(percentages.map((percentage) => ({ percentage })));
+    const nearHundredArb = fc
+      .array(fc.integer({ min: 1, max: 1000 }), { minLength: 2, maxLength: 6 })
+      .chain((weights) => {
+        const sum = weights.reduce((s, w) => s + w, 0);
+        const head = weights.slice(0, -1).map((w) => Math.floor((w / sum) * 1_000_000) / 10_000);
+        const rest = 100 - head.reduce((s, p) => s + p, 0);
+        return fc
+          .integer({ min: -49, max: 49 })
+          .map((drift) => [...head, Math.max(0, rest + drift / 10_000)]);
+      })
+      .filter(acceptedBySchema);
+
+    fc.assert(
+      fc.property(nearHundredArb, positiveAmountArb, (percentages, total) => {
+        const result = service.computeAllocations(
+          {
+            method: 'percentage',
+            allocations: percentages.map((percentage, i) => ({ vehicleId: `v-${i}`, percentage })),
+          },
+          total
+        );
+        expect(result.reduce((s, a) => s + a.amount, 0)).toBe(total);
+        expect(result.every((a) => a.amount >= 0)).toBe(true);
+      }),
+      { numRuns: 300 }
+    );
+  });
+
+  test('every non-last share is the exact floor of total × basis points, for 2-decimal percentages', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 9999 }),
+        positiveAmountArb,
+        (basisPoints, totalCents) => {
+          const [first] = service.computeAllocations(
+            {
+              method: 'percentage',
+              allocations: [
+                { vehicleId: 'v-1', percentage: basisPoints / 100 },
+                { vehicleId: 'v-2', percentage: (10_000 - basisPoints) / 100 },
+              ],
+            },
+            totalCents
+          );
+          expect(first.amount).toBe(Number((BigInt(totalCents) * BigInt(basisPoints)) / 10_000n));
+        }
+      ),
+      { numRuns: 200 }
+    );
   });
 
   test('a config whose NON-LAST percentages exceed 100 clamps the last vehicle to 0 (no negative amount)', () => {

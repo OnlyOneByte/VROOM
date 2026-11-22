@@ -33,6 +33,15 @@ export function clearFuelFieldsIfNotFuel<
 
 const centsAmount = expenseDollarsToCents((n) => n.positive('Amount must be positive'));
 
+export function percentageToBasisPoints(percentage: number): number {
+  return Math.round(percentage * 100);
+}
+
+export function percentagesSumTo100(allocations: { percentage: number }[]): boolean {
+  const sum = allocations.reduce((acc, a) => acc + a.percentage, 0);
+  return percentageToBasisPoints(sum) === 10_000;
+}
+
 function allocationVehiclesAreUnique(allocations: { vehicleId: string }[]): boolean {
   return hasUniqueVehicleIds(allocations.map((a) => a.vehicleId));
 }
@@ -112,8 +121,7 @@ function refineSplitConfig(
 ) {
   const { splitConfig } = data;
   if (splitConfig.method === 'percentage') {
-    const sum = splitConfig.allocations.reduce((acc, a) => acc + a.percentage, 0);
-    if (Math.abs(sum - 100) >= 0.001) {
+    if (!percentagesSumTo100(splitConfig.allocations)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Percentages must sum to 100',

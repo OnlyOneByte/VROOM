@@ -3,7 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, photos } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
-import type { SplitConfig } from './validation';
+import { percentageToBasisPoints, type SplitConfig } from './validation';
 
 export class ExpenseSplitService {
   computeAllocations(
@@ -43,17 +43,17 @@ export class ExpenseSplitService {
   ): Array<{ vehicleId: string; amount: number }> {
     const result: Array<{ vehicleId: string; amount: number }> = [];
     let runningTotal = 0;
+    let cumulativePercentage = 0;
     const lastIndex = allocations.length - 1;
 
     for (let i = 0; i < allocations.length; i++) {
       const { vehicleId, percentage } = allocations[i];
-      let amount: number;
-
-      if (i === lastIndex) {
-        amount = Math.max(0, totalCents - runningTotal);
-      } else {
-        amount = Math.floor((totalCents * percentage) / 100);
-      }
+      cumulativePercentage += percentage;
+      const cumulativeCents =
+        i === lastIndex
+          ? totalCents
+          : Math.floor((totalCents * percentageToBasisPoints(cumulativePercentage)) / 10_000);
+      const amount = Math.max(0, cumulativeCents - runningTotal);
 
       runningTotal += amount;
       result.push({ vehicleId, amount });
