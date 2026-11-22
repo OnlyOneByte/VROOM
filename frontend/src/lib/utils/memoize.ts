@@ -1,5 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function memoizeMulti<T extends any[], R>(fn: (...args: T) => R): (...args: T) => R {
+export function memoizeMulti<T extends unknown[], R>(fn: (...args: T) => R): (...args: T) => R {
 	const cache = new Map<string, R>();
 	const MAX_CACHE_SIZE = 100;
 
@@ -22,8 +21,7 @@ export function memoizeMulti<T extends any[], R>(fn: (...args: T) => R): (...arg
 	};
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: never[]) => unknown>(
 	fn: T,
 	delay: number
 ): (...args: Parameters<T>) => void {

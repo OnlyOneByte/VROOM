@@ -20,7 +20,7 @@ import { triggerBlobDownload } from '#lib/utils/download.ts';
 
 type PaginatedExpenseResponse = PaginatedResponse<Expense>;
 
-export interface ExpenseImportRow {
+interface ExpenseImportRow {
 	row: number;
 	status: 'ready' | 'error';
 	message?: string;
@@ -40,7 +40,7 @@ export interface ExpenseImportResult {
 }
 
 export type ExpenseSortBy = 'date' | 'amount' | 'category';
-export type ExpenseSortDir = 'asc' | 'desc';
+type ExpenseSortDir = 'asc' | 'desc';
 
 interface ExpenseListParams {
 	limit?: number;

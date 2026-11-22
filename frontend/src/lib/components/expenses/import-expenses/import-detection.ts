@@ -2,7 +2,7 @@ import type { NativeImportField } from '#lib/types/index.ts';
 import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
 import { guessManualColumns, isNativeImportHeaders } from '#lib/utils/import-mapping-helpers.ts';
 
-export interface DetectionOutcome {
+interface DetectionOutcome {
 	targetVehicleId: string;
 	manualColumns: Partial<Record<NativeImportField, string>> | null;
 }

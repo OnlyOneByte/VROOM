@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '#lib/utils.js';
 
 	let {
@@ -6,12 +7,7 @@
 		class: className,
 		children,
 		...restProps
-	}: {
-		id?: string;
-		class?: string;
-		children?: any;
-		[key: string]: any;
-	} = $props();
+	}: HTMLAttributes<HTMLParagraphElement> = $props();
 </script>
 
 <p {id} class={cn('text-sm font-medium text-destructive', className)} role="alert" {...restProps}>

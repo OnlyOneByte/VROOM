@@ -6,7 +6,7 @@ export interface AssistantTurn {
 	content: string;
 }
 
-export interface AssistantReply {
+interface AssistantReply {
 	reply: string;
 	toolsUsed: string[];
 }

@@ -8,7 +8,7 @@ import {
 
 type LucideIcon = typeof Fuel;
 
-export type ExpenseSortField = 'date' | 'amount';
+type ExpenseSortField = 'date' | 'amount';
 export type SortDirection = 'asc' | 'desc';
 
 export interface SortableRow {

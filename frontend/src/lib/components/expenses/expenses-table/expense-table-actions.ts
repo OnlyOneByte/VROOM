@@ -35,7 +35,7 @@ export const EXPENSE_DELETED_MESSAGE = 'Expense deleted successfully';
 export const REFRESH_AFTER_DELETE_FAILED =
 	"Expense deleted, but the list couldn't refresh. Reload the page to see the latest.";
 
-export interface DeleteNotice {
+interface DeleteNotice {
 	type: 'success' | 'warning' | 'error';
 	message: string;
 }

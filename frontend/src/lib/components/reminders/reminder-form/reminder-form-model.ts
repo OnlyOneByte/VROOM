@@ -17,7 +17,7 @@ export const EXPENSE_CATEGORIES = [
 
 export type Frequency = (typeof FREQUENCIES)[number];
 export type IntervalUnit = (typeof INTERVAL_UNITS)[number];
-export type ReminderKind = 'notification' | 'expense';
+type ReminderKind = 'notification' | 'expense';
 export type SplitMethod = 'even' | 'absolute' | 'percentage';
 
 export interface ReminderDraft {

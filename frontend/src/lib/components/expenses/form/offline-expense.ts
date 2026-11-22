@@ -1,6 +1,6 @@
 import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 
-export type QueuedExpenseInput = Omit<
+type QueuedExpenseInput = Omit<
 	OfflineExpense,
 	'id' | 'clientId' | 'timestamp' | 'synced' | 'version'
 >;
