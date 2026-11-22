@@ -2,6 +2,7 @@ import type { ReceiptDraft } from './vlm-api';
 import type { ExpenseCategory } from '#lib/types/index.ts';
 import { apiClient } from './api-client';
 import { toBackendExpense } from './api-transformer';
+import { userTimeZone } from './analytics-api';
 
 export interface ReceiptDraftItem {
 	photoId: string;
@@ -31,7 +32,8 @@ export const photosImportApi = {
 		const backendExpense = toBackendExpense(input);
 		return apiClient.post<{ id: string }>('/api/v1/expenses', {
 			...backendExpense,
-			clientId: `photos:${photoId}`
+			clientId: `photos:${photoId}`,
+			timeZone: userTimeZone()
 		});
 	}
 };

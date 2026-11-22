@@ -53,6 +53,7 @@ describe('photosImportApi.confirmDraft', () => {
 		const [url, body] = post.mock.calls[0] ?? [];
 		expect(url).toBe('/api/v1/expenses');
 		expect(body.clientId).toBe('photos:m-1');
+		expect(body.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
 		expect(body.vehicleId).toBe('veh-1');
 		expect(body.category).toBe('fuel');
 		expect(body.expenseAmount).toBe(47.83);

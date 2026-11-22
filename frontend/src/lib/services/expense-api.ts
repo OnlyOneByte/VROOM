@@ -163,7 +163,11 @@ export const expenseApi = {
 		expense: Partial<Expense> & { vehicleId: string; category: ExpenseCategory; amount: number },
 		clientId?: string
 	): Promise<Expense> {
-		const backendExpense = { ...toBackendExpense(expense), ...(clientId && { clientId }) };
+		const backendExpense = {
+			...toBackendExpense(expense),
+			...(clientId && { clientId }),
+			timeZone: userTimeZone()
+		};
 		const data = await apiClient.post<BackendExpenseResponse>('/api/v1/expenses', backendExpense);
 		return fromBackendExpense(data);
 	},
@@ -172,7 +176,10 @@ export const expenseApi = {
 		expenseId: string,
 		expense: ExpenseInput & { vehicleId: string; category: ExpenseCategory; amount: number }
 	): Promise<Expense> {
-		const backendExpense = toBackendExpense(expense, { isEdit: true });
+		const backendExpense = {
+			...toBackendExpense(expense, { isEdit: true }),
+			timeZone: userTimeZone()
+		};
 		const data = await apiClient.put<BackendExpenseResponse>(
 			`/api/v1/expenses/${expenseId}`,
 			backendExpense

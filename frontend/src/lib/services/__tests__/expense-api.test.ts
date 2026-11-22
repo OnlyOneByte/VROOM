@@ -130,6 +130,17 @@ describe('createExpense / updateExpense (frontend→backend transform + isEdit)'
 		expect(url).toBe('/api/v1/expenses/e1');
 		expect((body as { description: string | null }).description).toBeNull();
 	});
+
+	test('create and update send the user time zone so the odometer check compares their days', async () => {
+		post.mockResolvedValueOnce(backendExpense());
+		put.mockResolvedValueOnce(backendExpense());
+		const expense = { vehicleId: 'v1', category: 'fuel' as const, amount: 50 };
+		await expenseApi.createExpense(expense);
+		await expenseApi.updateExpense('e1', expense);
+		const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		expect(post.mock.calls[0]?.[1]).toMatchObject({ timeZone: zone });
+		expect(put.mock.calls[0]?.[1]).toMatchObject({ timeZone: zone });
+	});
 });
 
 describe('downloadExpensesCsv (blob → anchor download)', () => {
