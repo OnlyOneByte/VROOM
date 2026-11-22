@@ -25,6 +25,7 @@
 		applyPreselections,
 		loadExpense,
 		loadQueuedExpense,
+		loadQueuedPhotos,
 		loadVehicleContext,
 		loadVehicles
 	} from './expense-form/expense-form-loaders';
@@ -176,6 +177,17 @@
 		} finally {
 			isRetrying = false;
 		}
+	}
+
+	let photoPicker = $state<HTMLDivElement | null>(null);
+	let photosRetryFailed = $state(false);
+
+	async function retryQueuedPhotos(clientId: string) {
+		await retry(() => loadQueuedPhotos(form, clientId));
+		photosRetryFailed = form.queuedPhotosUnreadable;
+		if (photosRetryFailed) return;
+		await tick();
+		photoPicker?.querySelector('button')?.focus();
 	}
 
 	async function reloadExpense() {
@@ -487,20 +499,35 @@
 					{#if form.originalExpense}
 						<ExpensePhotoSection entityType="expense" entityId={form.originalExpense.id} />
 					{/if}
-				{:else if form.queuedPhotosUnreadable}
-					<div class="space-y-1" data-testid="queued-photos-unreadable">
+				{:else if form.queuedPhotosUnreadable && form.queuedExpense?.clientId}
+					{@const clientId = form.queuedExpense.clientId}
+					<div class="space-y-2" data-testid="queued-photos-unreadable">
 						<h2 class="text-sm font-medium text-foreground">Photos & Receipts</h2>
-						<p class="text-sm text-muted-foreground">
+						<p id="queued-photos-message" class="text-sm text-muted-foreground">
 							Couldn't load this entry's photos, so they can't be changed here. They stay saved with
 							it and will sync as they are.
 						</p>
+						<Button
+							variant="outline"
+							size="lg"
+							aria-describedby="queued-photos-message"
+							disabled={isRetrying}
+							onclick={() => retryQueuedPhotos(clientId)}
+						>
+							Retry
+						</Button>
+						<p role="status" class="text-sm text-muted-foreground">
+							{#if photosRetryFailed}Still couldn't load them. Try again in a moment.{/if}
+						</p>
 					</div>
 				{:else}
-					<PendingPhotoPreview
-						files={form.pendingFiles}
-						onAdd={file => (form.pendingFiles = [...form.pendingFiles, file])}
-						onRemove={i => (form.pendingFiles = form.pendingFiles.filter((_, idx) => idx !== i))}
-					/>
+					<div bind:this={photoPicker}>
+						<PendingPhotoPreview
+							files={form.pendingFiles}
+							onAdd={file => (form.pendingFiles = [...form.pendingFiles, file])}
+							onRemove={i => (form.pendingFiles = form.pendingFiles.filter((_, idx) => idx !== i))}
+						/>
+					</div>
 				{/if}
 
 				{#if form.submitError}
