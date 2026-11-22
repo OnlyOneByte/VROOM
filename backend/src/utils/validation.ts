@@ -55,19 +55,20 @@ const DATE_INPUT_MIN_YEAR = 1900;
 const DATE_INPUT_MAX_YEAR = 2100;
 const ISO_DATE_PREFIX = /^\d{4}-\d{2}-\d{2}/;
 const INVALID_DATE_MESSAGE = 'Enter a valid date';
+export const DATE_OUT_OF_RANGE_MESSAGE = `Date must be between ${DATE_INPUT_MIN_YEAR} and ${DATE_INPUT_MAX_YEAR}`;
+
+export function isDateInputYear(year: number): boolean {
+  return year >= DATE_INPUT_MIN_YEAR && year <= DATE_INPUT_MAX_YEAR;
+}
 
 export const dateInput = z
   .union([z.string().trim().regex(ISO_DATE_PREFIX, INVALID_DATE_MESSAGE), z.date()], {
     error: INVALID_DATE_MESSAGE,
   })
   .pipe(z.coerce.date({ error: INVALID_DATE_MESSAGE }))
-  .refine(
-    (date) => {
-      const year = date.getUTCFullYear();
-      return year >= DATE_INPUT_MIN_YEAR && year <= DATE_INPUT_MAX_YEAR;
-    },
-    { message: `Date must be between ${DATE_INPUT_MIN_YEAR} and ${DATE_INPUT_MAX_YEAR}` }
-  );
+  .refine((date) => isDateInputYear(date.getUTCFullYear()), {
+    message: DATE_OUT_OF_RANGE_MESSAGE,
+  });
 
 export const WHOLE_DISTANCE_MESSAGE = 'Enter whole kilometres or miles';
 
