@@ -4,7 +4,6 @@
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
-	import { resetSplitAllocations } from '#lib/utils/expense-helpers.ts';
 	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { ArrowLeft, Check, CircleAlert, LoaderCircle, X, FileText } from '@lucide/svelte';
@@ -67,10 +66,6 @@
 	let paymentAmount = $state('');
 	let selectedVehicleIds = $state<string[]>([]);
 
-	let splitMethod = $state<'even' | 'absolute' | 'percentage'>('even');
-	let splitAllocations = $state<Array<{ vehicleId: string; amount?: number; percentage?: number }>>(
-		[]
-	);
 	let splitVehicles = $derived(
 		selectedVehicleIds.flatMap(id => vehicles.find(v => v.id === id) ?? [])
 	);
@@ -166,18 +161,6 @@
 		} else {
 			selectedVehicleIds = [...selectedVehicleIds, id];
 		}
-		splitAllocations = resetSplitAllocations(splitMethod, selectedVehicleIds);
-	}
-
-	function handleSplitMethodChange(method: 'even' | 'absolute' | 'percentage') {
-		splitMethod = method;
-		splitAllocations = resetSplitAllocations(method, selectedVehicleIds);
-	}
-
-	function handleAllocationsChange(
-		allocs: Array<{ vehicleId: string; amount?: number; percentage?: number }>
-	) {
-		splitAllocations = allocs;
 	}
 
 	function validate(): boolean {
@@ -236,11 +219,7 @@
 
 		isSubmitting = true;
 		try {
-			const vehicleCoverage = {
-				vehicleIds: selectedVehicleIds,
-				splitMethod: splitMethod !== 'even' ? splitMethod : undefined,
-				allocations: splitMethod !== 'even' ? splitAllocations : undefined
-			};
+			const vehicleCoverage = { vehicleIds: selectedVehicleIds };
 
 			if (isEditMode && termId) {
 				await insuranceApi.updateTerm(policyId, termId, {
@@ -462,14 +441,15 @@
 						{/if}
 
 						{#if showSplitEditor}
-							<div class="mt-4">
+							<div class="mt-4 space-y-2">
+								<p class="text-xs text-muted-foreground">
+									The premium is split evenly between the covered vehicles.
+								</p>
 								<SplitConfigEditor
 									vehicles={splitVehicles}
 									totalAmount={parsedTotalCost}
-									{splitMethod}
-									allocations={splitAllocations}
-									onMethodChange={handleSplitMethodChange}
-									onAllocationsChange={handleAllocationsChange}
+									splitMethod="even"
+									allocations={[]}
 								/>
 							</div>
 						{/if}

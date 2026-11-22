@@ -16,8 +16,8 @@
 		totalAmount: number;
 		splitMethod: SplitMethod;
 		allocations: Allocation[];
-		onMethodChange: (_method: SplitMethod) => void;
-		onAllocationsChange: (_allocations: Allocation[]) => void;
+		onMethodChange?: (_method: SplitMethod) => void;
+		onAllocationsChange?: (_allocations: Allocation[]) => void;
 	}
 
 	let {
@@ -64,7 +64,7 @@
 		const updated = allocations.map(a =>
 			a.vehicleId === vehicleId ? { ...a, [field]: value } : a
 		);
-		onAllocationsChange(updated);
+		onAllocationsChange?.(updated);
 	}
 
 	const methods: { value: SplitMethod; label: string }[] = [
@@ -75,21 +75,23 @@
 </script>
 
 <div class="space-y-3">
-	<div class="flex gap-2 rounded-lg border border-input p-0.5">
-		{#each methods as m (m.value)}
-			<Button
-				type="button"
-				variant={splitMethod === m.value ? 'default' : 'ghost'}
-				size="sm"
-				class="h-10 flex-1 rounded-md text-xs sm:h-8 {splitMethod === m.value
-					? ''
-					: 'text-muted-foreground'}"
-				onclick={() => onMethodChange(m.value)}
-			>
-				{m.label}
-			</Button>
-		{/each}
-	</div>
+	{#if onMethodChange}
+		<div class="flex gap-2 rounded-lg border border-input p-0.5">
+			{#each methods as m (m.value)}
+				<Button
+					type="button"
+					variant={splitMethod === m.value ? 'default' : 'ghost'}
+					size="sm"
+					class="h-10 flex-1 rounded-md text-xs sm:h-8 {splitMethod === m.value
+						? ''
+						: 'text-muted-foreground'}"
+					onclick={() => onMethodChange(m.value)}
+				>
+					{m.label}
+				</Button>
+			{/each}
+		</div>
+	{/if}
 
 	<div class="space-y-2">
 		{#each vehicles as vehicle (vehicle.id)}

@@ -20,8 +20,6 @@ export interface InsuranceTerm {
 
 interface TermVehicleCoverage {
 	vehicleIds: string[];
-	splitMethod?: 'even' | 'absolute' | 'percentage';
-	allocations?: Array<{ vehicleId: string; amount?: number; percentage?: number }>;
 }
 
 export interface TermCoverageRow {

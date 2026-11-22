@@ -60,6 +60,18 @@ describe('SplitConfigEditor: method switcher', () => {
 
 		expect(onMethodChange).toHaveBeenCalledWith(method);
 	});
+
+	test('without a method handler it is a read-only even preview', () => {
+		render(SplitConfigEditor, {
+			vehicles: [CAMRY, RAV4],
+			totalAmount: 50,
+			splitMethod: 'even',
+			allocations: []
+		});
+
+		expect(screen.queryByRole('button')).toBeNull();
+		expect(rowText('Hauler')).toBe('Hauler $25.00');
+	});
 });
 
 describe('SplitConfigEditor: even split', () => {
