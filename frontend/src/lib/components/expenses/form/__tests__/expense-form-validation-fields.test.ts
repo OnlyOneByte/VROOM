@@ -49,10 +49,20 @@ describe('validateExpenseField — amount bounds', () => {
 		);
 	});
 
-	test('over the 999999 cap → "Amount seems too large"', () => {
-		expect(validateExpenseField('amount', ctx({ formData: { amount: '1000000' } }))).toBe(
-			'Amount seems too large'
+	test('the API cap: 1,000,000 passes, anything over it gets the API sentence', () => {
+		expect(validateExpenseField('amount', ctx({ formData: { amount: '1000000' } }))).toBeNull();
+		expect(validateExpenseField('amount', ctx({ formData: { amount: '999999.01' } }))).toBeNull();
+		expect(validateExpenseField('amount', ctx({ formData: { amount: '1000000.01' } }))).toBe(
+			'Amount must be 1,000,000 or less'
 		);
+	});
+
+	test('more than 2 decimals → the API sentence; 1 or 2 decimals pass', () => {
+		expect(validateExpenseField('amount', ctx({ formData: { amount: '12.345' } }))).toBe(
+			'Amount can have at most 2 decimal places'
+		);
+		expect(validateExpenseField('amount', ctx({ formData: { amount: '0.29' } }))).toBeNull();
+		expect(validateExpenseField('amount', ctx({ formData: { amount: '19.9' } }))).toBeNull();
 	});
 
 	test('a normal positive amount → null', () => {

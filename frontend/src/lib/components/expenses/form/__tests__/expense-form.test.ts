@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import type { Expense, SplitExpenseGroup, Vehicle } from '#lib/types/index.ts';
 import type { ReceiptDraft } from '#lib/services/vlm-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
@@ -52,6 +53,7 @@ const updateExpense = vi.fn();
 const deleteExpense = vi.fn();
 const getExpensesByVehicle = vi.fn(() => Promise.resolve({ data: [] as Expense[] }));
 const getSplitExpense = vi.fn<(groupId: string) => Promise<SplitExpenseGroup>>();
+const getPhotos = vi.fn(() => Promise.resolve({ data: [] }));
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		createExpense,
@@ -60,7 +62,7 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 		updateExpense,
 		deleteExpense,
 		getExpensesByVehicle,
-		getPhotos: vi.fn(() => Promise.resolve({ data: [] })),
+		getPhotos,
 		getPhotoThumbnailUrl: vi.fn(() => ''),
 		uploadPhoto: vi.fn(),
 		deletePhoto: vi.fn()
@@ -191,13 +193,23 @@ describe('ExpenseForm create mode', () => {
 		expect(createExpense).not.toHaveBeenCalled();
 	});
 
-	test('rejects an implausibly large amount', async () => {
+	test('rejects an amount over the API cap with the API sentence', async () => {
 		await renderCreate({ preselectedCategory: 'misc' });
-		await type('amount', '1000000');
+		await type('amount', '1000001');
 
 		await save();
 
-		expect(errorText('amount')).toBe('Amount seems too large');
+		expect(errorText('amount')).toBe('Amount must be 1,000,000 or less');
+		expect(createExpense).not.toHaveBeenCalled();
+	});
+
+	test('rejects an amount with more than 2 decimals before sending it', async () => {
+		await renderCreate({ preselectedCategory: 'misc' });
+		await type('amount', '12.345');
+
+		await save();
+
+		expect(errorText('amount')).toBe('Amount can have at most 2 decimal places');
 		expect(createExpense).not.toHaveBeenCalled();
 	});
 
@@ -355,7 +367,9 @@ describe('ExpenseForm edit mode', () => {
 		render(ExpenseForm, { props: { expenseId: 'gone', returnTo: '/vehicles/v1' } });
 
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/v1'));
-		expect(notificationMessages()).toContain('That expense no longer exists.');
+		await tick();
+		expect(notificationMessages()).toEqual(['That expense no longer exists.']);
+		expect(getPhotos).not.toHaveBeenCalled();
 	});
 
 	test('a failed load stays on the page with Retry, and Retry loads the expense', async () => {

@@ -443,10 +443,10 @@
 					/>
 				</fieldset>
 
-				{#if form.isGroupEditMode && form.groupId && form.originalExpense}
-					<ExpensePhotoSection entityType="expense" entityId={form.originalExpense.id} />
-				{:else if form.isEditMode && expenseId}
-					<ExpensePhotoSection entityType="expense" entityId={expenseId} />
+				{#if form.isEditMode}
+					{#if form.originalExpense}
+						<ExpensePhotoSection entityType="expense" entityId={form.originalExpense.id} />
+					{/if}
 				{:else}
 					<PendingPhotoPreview
 						files={form.pendingFiles}
