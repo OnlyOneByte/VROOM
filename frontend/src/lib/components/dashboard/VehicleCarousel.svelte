@@ -29,6 +29,9 @@
 	}
 
 	let { vehicles, isLoading = false }: Props = $props();
+
+	const CAROUSEL_ARROW_CLASS =
+		'top-28 bg-background/90 hover:bg-background shadow-md aria-disabled:hidden';
 </script>
 
 <Card.Root>
@@ -164,14 +167,8 @@
 					{/each}
 				</Carousel.Content>
 				{#if vehicles.length > 1}
-					<Carousel.Previous
-						variant="ghost"
-						class="left-2 md:left-4 bg-background/90 hover:bg-background shadow-md"
-					/>
-					<Carousel.Next
-						variant="ghost"
-						class="right-2 md:right-4 bg-background/90 hover:bg-background shadow-md"
-					/>
+					<Carousel.Previous variant="ghost" class="{CAROUSEL_ARROW_CLASS} left-2 md:left-4" />
+					<Carousel.Next variant="ghost" class="{CAROUSEL_ARROW_CLASS} right-2 md:right-4" />
 				{/if}
 			</Carousel.Root>
 		{:else}

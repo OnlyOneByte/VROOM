@@ -98,6 +98,19 @@ describe('VehicleCarousel states', () => {
 
 		expect(screen.getByRole('link', { name: '2019 Honda Civic' })).toBeInTheDocument();
 	});
+
+	test('an arrow that cannot page is hidden, and both sit over the photo, not the title', () => {
+		render(VehicleCarousel, {
+			vehicles: [overview(), overview({ id: 'v2', name: '2019 Honda Civic' })]
+		});
+
+		for (const name of ['Previous slide', 'Next slide']) {
+			const arrow = screen.getByRole('button', { name });
+			expect(arrow).toHaveAttribute('aria-disabled', 'true');
+			expect(arrow).toHaveClass('aria-disabled:hidden', 'top-28');
+			expect(arrow).not.toHaveClass('top-1/2');
+		}
+	});
 });
 
 describe('VehicleCarousel vehicle card', () => {
