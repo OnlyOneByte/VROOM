@@ -61,24 +61,26 @@
 	{icon}
 	animationClass="chart-line-animated"
 >
-	<Chart.Container config={chartConfig} class="h-[{CHART_HEIGHT}px] w-full">
-		<LineChart
-			{data}
-			x="date"
-			y="amount"
-			{series}
-			points={data.length === 1}
-			padding={CHART_PADDING}
-			xPadding={TIME_X_PADDING}
-			props={{
-				...getTrendLineProps(data.length),
-				xAxis: { ...xAxisProps, ticks: insetTimeTicks(xAxisProps.ticks) },
-				yAxis: { format: formatCurrencyAxis }
-			}}
-		>
-			{#snippet tooltip()}
-				<Chart.Tooltip labelFormatter={formatMonthLabel} valueFormatter={formatCurrencyTooltip} />
-			{/snippet}
-		</LineChart>
-	</Chart.Container>
+	<div style="height: {CHART_HEIGHT}px">
+		<Chart.Container config={chartConfig} class="h-full w-full">
+			<LineChart
+				{data}
+				x="date"
+				y="amount"
+				{series}
+				points={data.length === 1}
+				padding={CHART_PADDING}
+				xPadding={TIME_X_PADDING}
+				props={{
+					...getTrendLineProps(data.length),
+					xAxis: { ...xAxisProps, ticks: insetTimeTicks(xAxisProps.ticks) },
+					yAxis: { format: formatCurrencyAxis }
+				}}
+			>
+				{#snippet tooltip()}
+					<Chart.Tooltip labelFormatter={formatMonthLabel} valueFormatter={formatCurrencyTooltip} />
+				{/snippet}
+			</LineChart>
+		</Chart.Container>
+	</div>
 </ChartCard>

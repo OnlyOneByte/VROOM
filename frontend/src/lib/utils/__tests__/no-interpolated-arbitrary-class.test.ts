@@ -8,11 +8,6 @@ const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 const INTERPOLATED_ARBITRARY = /[\w-]+-\[[^\]]*\{[^\]]*\]/;
 
-const KNOWN_MASKED = new Set([
-	'lib/components/charts/ExpenseTrendChart.svelte',
-	'lib/components/charts/FuelEfficiencyTrendChart.svelte'
-]);
-
 function stripComments(source: string): string {
 	const withoutBlocks = source.replace(/\/\*[\s\S]*?\*\//g, ' ');
 	return withoutBlocks
@@ -41,7 +36,6 @@ describe('no interpolated arbitrary Tailwind classes (dead-class guard)', () => 
 
 		for (const file of files) {
 			const rel = relative(SRC_ROOT, file).split('\\').join('/');
-			if (KNOWN_MASKED.has(rel)) continue;
 
 			const rawLines = readFileSync(file, 'utf8').split('\n');
 			const cleanLines = stripComments(rawLines.join('\n')).split('\n');
