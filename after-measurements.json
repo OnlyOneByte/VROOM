@@ -1,0 +1,94 @@
+{
+  "settings-desk": [
+    {
+      "id": "backup-shot-drive",
+      "track": "32x18",
+      "hitAt19pxAbove": true,
+      "hitAt19pxBelow": true,
+      "hitAt19pxLeft": true,
+      "hitAt19pxRight": true
+    },
+    {
+      "id": "sheets-shot-drive",
+      "track": "32x18",
+      "hitAt19pxAbove": true,
+      "hitAt19pxBelow": true,
+      "hitAt19pxLeft": true,
+      "hitAt19pxRight": true
+    }
+  ],
+  "vehicle-new-desk": [
+    {
+      "id": "trackFuel",
+      "track": "32x18",
+      "hitAt19pxAbove": true,
+      "hitAt19pxBelow": true,
+      "hitAt19pxLeft": true,
+      "hitAt19pxRight": true
+    },
+    {
+      "id": "trackCharging",
+      "track": "32x18",
+      "hitAt19pxAbove": true,
+      "hitAt19pxBelow": true,
+      "hitAt19pxLeft": true,
+      "hitAt19pxRight": true
+    }
+  ],
+  "policy-edit-desk": [
+    {
+      "id": "policy-active",
+      "track": "32x18",
+      "hitAt19pxAbove": true,
+      "hitAt19pxBelow": true,
+      "hitAt19pxLeft": true,
+      "hitAt19pxRight": true
+    }
+  ],
+  "settings-mob": [
+    {
+      "id": "backup-shot-drive",
+      "track": "32x18",
+      "hitAt19pxAbove": true,
+      "hitAt19pxBelow": true,
+      "hitAt19pxLeft": true,
+      "hitAt19pxRight": true
+    },
+    {
+      "id": "sheets-shot-drive",
+      "track": "32x18",
+      "hitAt19pxAbove": true,
+      "hitAt19pxBelow": true,
+      "hitAt19pxLeft": true,
+      "hitAt19pxRight": true
+    }
+  ],
+  "vehicle-new-mob": [
+    {
+      "id": "trackFuel",
+      "track": "32x18",
+      "hitAt19pxAbove": true,
+      "hitAt19pxBelow": true,
+      "hitAt19pxLeft": true,
+      "hitAt19pxRight": true
+    },
+    {
+      "id": "trackCharging",
+      "track": "32x18",
+      "hitAt19pxAbove": true,
+      "hitAt19pxBelow": true,
+      "hitAt19pxLeft": true,
+      "hitAt19pxRight": true
+    }
+  ],
+  "policy-edit-mob": [
+    {
+      "id": "policy-active",
+      "track": "32x18",
+      "hitAt19pxAbove": true,
+      "hitAt19pxBelow": true,
+      "hitAt19pxLeft": true,
+      "hitAt19pxRight": true
+    }
+  ]
+}
