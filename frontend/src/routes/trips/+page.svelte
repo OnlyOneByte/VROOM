@@ -191,7 +191,7 @@
 					<div>
 						<p class="text-xs text-muted-foreground">Total</p>
 						<p class="text-lg font-semibold">
-							{summary.totalMiles.toLocaleString()}
+							{summary.totalDistance.toLocaleString()}
 							<span class="text-sm font-normal">{distLabel}</span>
 						</p>
 					</div>
@@ -202,14 +202,14 @@
 					<div>
 						<p class="text-xs text-muted-foreground">Business</p>
 						<p class="text-lg font-semibold">
-							{summary.businessMiles.toLocaleString()}
+							{summary.businessDistance.toLocaleString()}
 							<span class="text-sm font-normal">{distLabel}</span>
 						</p>
 					</div>
 					<div>
 						<p class="text-xs text-muted-foreground">Avg / trip</p>
 						<p class="text-lg font-semibold">
-							{Math.round(summary.averageTripMiles).toLocaleString()}
+							{Math.round(summary.averageTripDistance).toLocaleString()}
 							<span class="text-sm font-normal">{distLabel}</span>
 						</p>
 					</div>

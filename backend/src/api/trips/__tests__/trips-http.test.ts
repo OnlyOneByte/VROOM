@@ -558,17 +558,17 @@ describe('GET /api/v1/trips/summary (mileage rollup)', () => {
     const body =
       await json<
         DataEnvelope<{
-          totalMiles: number;
-          businessMiles: number;
+          totalDistance: number;
+          businessDistance: number;
           businessMileageValue: number;
-          milesByPurpose: Record<string, number>;
+          distanceByPurpose: Record<string, number>;
         }>
       >(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
-    expect(body.data.totalMiles).toBe(130);
-    expect(body.data.businessMiles).toBe(100);
+    expect(body.data.totalDistance).toBe(130);
+    expect(body.data.businessDistance).toBe(100);
     expect(body.data.businessMileageValue).toBeCloseTo(50, 5);
-    expect(body.data.milesByPurpose.personal).toBe(30);
+    expect(body.data.distanceByPurpose.personal).toBe(30);
   });
 
   async function seedMixedUnitBusinessTrips(): Promise<void> {
@@ -606,11 +606,15 @@ describe('GET /api/v1/trips/summary (mileage rollup)', () => {
     const res = await ctx.authed('GET', '/api/v1/trips/summary?rate=0.5');
     const body =
       await json<
-        DataEnvelope<{ totalMiles: number; businessMiles: number; businessMileageValue: number }>
+        DataEnvelope<{
+          totalDistance: number;
+          businessDistance: number;
+          businessMileageValue: number;
+        }>
       >(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
-    expect(body.data.totalMiles).toBeCloseTo(100 + 200 / 1.609344, 6);
-    expect(body.data.businessMiles).toBeCloseTo(100 + 200 / 1.609344, 6);
+    expect(body.data.totalDistance).toBeCloseTo(100 + 200 / 1.609344, 6);
+    expect(body.data.businessDistance).toBeCloseTo(100 + 200 / 1.609344, 6);
     expect(body.data.businessMileageValue).toBeCloseTo((100 + 200 / 1.609344) * 0.5, 6);
   });
 
@@ -622,10 +626,11 @@ describe('GET /api/v1/trips/summary (mileage rollup)', () => {
     await seedMixedUnitBusinessTrips();
 
     const res = await ctx.authed('GET', '/api/v1/trips/summary');
-    const body = await json<DataEnvelope<{ totalMiles: number; averageTripMiles: number }>>(res);
+    const body =
+      await json<DataEnvelope<{ totalDistance: number; averageTripDistance: number }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
-    expect(body.data.totalMiles).toBeCloseTo(100 * 1.609344 + 200, 6);
-    expect(body.data.averageTripMiles).toBeCloseTo((100 * 1.609344 + 200) / 2, 6);
+    expect(body.data.totalDistance).toBeCloseTo(100 * 1.609344 + 200, 6);
+    expect(body.data.averageTripDistance).toBeCloseTo((100 * 1.609344 + 200) / 2, 6);
   });
 
   test('summary scoped to a vehicle counts only that vehicle’s trips', async () => {
@@ -643,10 +648,10 @@ describe('GET /api/v1/trips/summary (mileage rollup)', () => {
     );
 
     const res = await ctx.authed('GET', `/api/v1/trips/summary?vehicleId=${v1}`);
-    const body = await json<DataEnvelope<{ totalMiles: number; tripCount: number }>>(res);
+    const body = await json<DataEnvelope<{ totalDistance: number; tripCount: number }>>(res);
     expect(res.status).toBe(200);
     expect(body.data.tripCount).toBe(1);
-    expect(body.data.totalMiles).toBe(100);
+    expect(body.data.totalDistance).toBe(100);
   });
 
   test('summary on an UNOWNED vehicle is 404 (no cross-tenant rollup)', async () => {
@@ -657,10 +662,11 @@ describe('GET /api/v1/trips/summary (mileage rollup)', () => {
 
   test('empty fleet → zeros, not NaN', async () => {
     const res = await ctx.authed('GET', '/api/v1/trips/summary');
-    const body = await json<DataEnvelope<{ totalMiles: number; averageTripMiles: number }>>(res);
+    const body =
+      await json<DataEnvelope<{ totalDistance: number; averageTripDistance: number }>>(res);
     expect(res.status).toBe(200);
-    expect(body.data.totalMiles).toBe(0);
-    expect(body.data.averageTripMiles).toBe(0);
+    expect(body.data.totalDistance).toBe(0);
+    expect(body.data.averageTripDistance).toBe(0);
   });
 
   test('a negative rate is rejected', async () => {
@@ -696,9 +702,9 @@ describe('GET /api/v1/trips/summary (mileage rollup)', () => {
     );
     const res = await ctx.authed('GET', '/api/v1/trips/summary?rate=0.655');
     const body =
-      await json<DataEnvelope<{ businessMiles: number; businessMileageValue: number }>>(res);
+      await json<DataEnvelope<{ businessDistance: number; businessMileageValue: number }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
-    expect(body.data.businessMiles).toBe(100);
+    expect(body.data.businessDistance).toBe(100);
     expect(body.data.businessMileageValue).toBeCloseTo(65.5, 5);
     expect(Number.isFinite(body.data.businessMileageValue)).toBe(true);
   });

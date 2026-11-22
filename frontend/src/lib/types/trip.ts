@@ -16,14 +16,14 @@ export interface Trip {
 	updatedAt: string;
 }
 
-export type MilesByPurpose = Record<TripPurpose, number>;
+export type DistanceByPurpose = Record<TripPurpose, number>;
 
 export interface TripSummary {
 	tripCount: number;
-	totalMiles: number;
-	milesByPurpose: MilesByPurpose;
-	averageTripMiles: number;
-	businessMiles: number;
+	totalDistance: number;
+	distanceByPurpose: DistanceByPurpose;
+	averageTripDistance: number;
+	businessDistance: number;
 	businessMileageValue: number;
 	rate: number;
 }
