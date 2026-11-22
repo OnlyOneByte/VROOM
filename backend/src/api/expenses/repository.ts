@@ -1,5 +1,18 @@
 import { createId } from '@paralleldrive/cuid2';
-import { and, asc, desc, eq, gte, inArray, isNotNull, lte, type SQL, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  lt,
+  lte,
+  ne,
+  type SQL,
+  sql,
+} from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
@@ -13,7 +26,7 @@ import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
 import { zonedMidnight } from '../../utils/time-zone';
 import { expenseSplitService } from './split-service';
-import type { SplitConfig } from './validation';
+import type { OdometerNeighbours, SplitConfig } from './validation';
 
 export interface ExpenseFilters {
   vehicleId?: string;
@@ -200,13 +213,33 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return { vehicleIds: [...new Set(rows.map((r) => r.vehicleId))], ownerId: rows[0].userId };
   }
 
-  async findRecentOdometerReadings(vehicleId: string, window: number) {
-    return this.db
-      .select({ id: expenses.id, date: expenses.date, mileage: expenses.mileage })
-      .from(expenses)
-      .where(eq(expenses.vehicleId, vehicleId))
-      .orderBy(desc(expenses.date), desc(expenses.id))
-      .limit(window);
+  async findOdometerNeighbours(
+    vehicleId: string,
+    day: { dayStart: Date; nextDay: Date },
+    excludeId?: string
+  ): Promise<OdometerNeighbours> {
+    const readingsWhere = (bound: SQL) =>
+      and(
+        eq(expenses.vehicleId, vehicleId),
+        isNotNull(expenses.mileage),
+        bound,
+        excludeId ? ne(expenses.id, excludeId) : undefined
+      );
+    const [before, after] = await Promise.all([
+      this.db
+        .select({ mileage: expenses.mileage })
+        .from(expenses)
+        .where(readingsWhere(lt(expenses.date, day.dayStart)))
+        .orderBy(desc(expenses.date), desc(expenses.mileage))
+        .limit(1),
+      this.db
+        .select({ mileage: expenses.mileage })
+        .from(expenses)
+        .where(readingsWhere(gte(expenses.date, day.nextDay)))
+        .orderBy(asc(expenses.date), asc(expenses.mileage))
+        .limit(1),
+    ]);
+    return { before: before[0]?.mileage ?? null, after: after[0]?.mileage ?? null };
   }
 
   async findByClientId(clientId: string, userId: string): Promise<Expense | null> {
