@@ -83,11 +83,15 @@ function parseAmount(raw: string): { value: number } | { error: string } {
   return { value: dollarsToCents(amount) };
 }
 
-function parseMileage(raw: string): { value: number | null } | { error: string } {
+function parseMileage(
+  raw: string,
+  category: (typeof EXPENSE_CATEGORIES)[number]
+): { value: number | null } | { error: string } {
   if (!raw) return { value: null };
   const m = Number(raw);
   if (!Number.isInteger(m) || m < 0) return { error: `Invalid mileage "${raw}"` };
-  if (m === 0) return { error: MILEAGE_NOT_POSITIVE_MESSAGE };
+  if (m === 0)
+    return category === 'fuel' ? { error: MILEAGE_NOT_POSITIVE_MESSAGE } : { value: null };
   if (m > MAX_ODOMETER_READING) return { error: ODOMETER_TOO_HIGH_MESSAGE };
   return { value: m };
 }
@@ -190,7 +194,7 @@ function parseRow(
   if ('error' in amountResult) return amountResult;
   const dateResult = parseDate(get('date'), timeZone);
   if ('error' in dateResult) return dateResult;
-  const mileageResult = parseMileage(get('mileage'));
+  const mileageResult = parseMileage(get('mileage'), categoryResult.value);
   if ('error' in mileageResult) return mileageResult;
   const volumeResult = parseVolume(get('volume'));
   if ('error' in volumeResult) return volumeResult;
