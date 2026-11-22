@@ -226,7 +226,7 @@ async function requireEntityPhoto(
   return photo;
 }
 
-export function photoETag(photo: Pick<Photo, 'id' | 'fileSize'>): string {
+function photoETag(photo: Pick<Photo, 'id' | 'fileSize'>): string {
   return `"${photo.id}-${photo.fileSize}"`;
 }
 
@@ -242,7 +242,7 @@ export function ifNoneMatchSatisfies(header: string | undefined | null, etag: st
     .some((candidate) => candidate === '*' || strip(candidate) === target);
 }
 
-export interface PhotoServeMetadata {
+interface PhotoServeMetadata {
   etag: string;
   mimeType: string;
 }
@@ -410,7 +410,7 @@ export async function countOrphanedPhotos(userId: string): Promise<number> {
   return (await photoRepository.findOrphanedByUser(userId)).length;
 }
 
-export interface OrphanRemoval {
+interface OrphanRemoval {
   removed: number;
   failed: number;
 }

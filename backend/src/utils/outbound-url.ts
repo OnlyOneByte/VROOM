@@ -165,7 +165,7 @@ export function assertSafeOutboundUrl(
   return url;
 }
 
-export interface SafeOutboundTarget {
+interface SafeOutboundTarget {
   url: URL;
   addresses: string[];
 }

@@ -22,7 +22,7 @@ import { vehicleRepository } from '../../../vehicles/repository';
 import type { ToolDefinition } from './llm-provider';
 
 export const RANGE_VALUES = ['30d', '90d', 'ytd', '12mo', 'all'] as const;
-export type RangeValue = (typeof RANGE_VALUES)[number];
+type RangeValue = (typeof RANGE_VALUES)[number];
 
 const DAY_SECONDS = 86_400;
 
@@ -75,7 +75,7 @@ function toToolParameters(schema: z.ZodType): Record<string, unknown> {
   return jsonSchema;
 }
 
-export interface AssistantTool<A = unknown> {
+interface AssistantTool<A = unknown> {
   name: string;
   description: string;
   schema: z.ZodType<A>;

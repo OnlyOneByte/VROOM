@@ -108,7 +108,7 @@ export function toDate(value: Date | number | string): Date {
   return value instanceof Date ? value : new Date(value);
 }
 
-export function yearToDateSpending(
+function yearToDateSpending(
   rows: Array<{ date: Date | number | null; expenseAmount: number }>,
   range: DateRange,
   ytdStart?: number
@@ -348,7 +348,7 @@ export interface InsuranceData {
   costByCarrier: Array<{ carrier: string; annualPremium: number; vehicleCount: number }>;
 }
 
-export interface VehicleHealthData {
+interface VehicleHealthData {
   vehicleId: string;
   vehicleName: string;
   overallScore: number;

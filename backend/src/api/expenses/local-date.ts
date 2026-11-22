@@ -34,7 +34,7 @@ export function buildZonedDate(
   return null;
 }
 
-export type ClockTime = [hours: number, minutes: number, seconds: number];
+type ClockTime = [hours: number, minutes: number, seconds: number];
 
 export function buildImportDate(
   year: number,

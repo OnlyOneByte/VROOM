@@ -1,7 +1,7 @@
 import { type drive_v3, google } from 'googleapis';
 import { SyncError, SyncErrorCode } from '../../../errors';
 
-export interface DriveFolder {
+interface DriveFolder {
   id: string;
   name: string;
   parents?: string[];

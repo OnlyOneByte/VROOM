@@ -6,7 +6,7 @@ import { insuranceClaims, insurancePolicies } from '../../db/schema';
 import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 
-export interface CreateClaimInput {
+interface CreateClaimInput {
   claimDate: Date;
   claimType: string;
   description?: string;
@@ -17,7 +17,7 @@ export interface CreateClaimInput {
   vehicleId?: string;
 }
 
-export interface UpdateClaimInput {
+interface UpdateClaimInput {
   claimDate?: Date;
   claimType?: string;
   description?: string | null;
@@ -28,7 +28,7 @@ export interface UpdateClaimInput {
   vehicleId?: string | null;
 }
 
-export class InsuranceClaimRepository {
+class InsuranceClaimRepository {
   private db: AppDatabase;
 
   constructor(db: AppDatabase) {

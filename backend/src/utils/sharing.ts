@@ -4,7 +4,7 @@ import { getDb } from '../db/connection';
 import { vehicleShares, vehicles } from '../db/schema';
 import { NotFoundError } from '../errors';
 
-export type VehicleAccess = { role: 'owner' } | { role: 'viewer' } | { role: 'editor' };
+type VehicleAccess = { role: 'owner' } | { role: 'viewer' } | { role: 'editor' };
 
 // Authorize against vehicles.userId; vehicle_shares.ownerId is only a list key.
 export async function resolveVehicleAccess(

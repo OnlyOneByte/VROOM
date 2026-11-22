@@ -7,7 +7,7 @@ import { DatabaseError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 
-export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
+class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
   constructor(db: AppDatabase) {
     super(db, vehicles);
   }

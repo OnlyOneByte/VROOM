@@ -1,6 +1,6 @@
 // SSRF guard: the server POSTs to a user-supplied URL, so it is pinned to browser-vendor push hosts.
 
-export const ALLOWED_PUSH_HOSTS = [
+const ALLOWED_PUSH_HOSTS = [
   'fcm.googleapis.com',
   'push.services.mozilla.com',
   'push.apple.com',

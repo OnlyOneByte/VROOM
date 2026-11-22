@@ -15,13 +15,13 @@ export interface ReminderWithVehicles {
   vehicleIds: string[];
 }
 
-export interface ReminderFilters {
+interface ReminderFilters {
   vehicleId?: string;
   type?: string;
   isActive?: boolean;
 }
 
-export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
+class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   constructor(db: AppDatabase) {
     super(db, reminders);
   }

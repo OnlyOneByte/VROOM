@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
-export const photoCategoryEnum = z.enum([
+const photoCategoryEnum = z.enum([
   'vehicle_photos',
   'expense_receipts',
   'insurance_docs',
   'odometer_readings',
 ]);
 
-export const categorySettingSchema = z.object({
+const categorySettingSchema = z.object({
   enabled: z.boolean(),
   folderPath: z.string(),
 });
@@ -27,7 +27,7 @@ export const storageConfigSchema = z.object({
     .refine(providerEntryLimit, providerEntryLimitMessage),
 });
 
-export const providerBackupSettingsSchema = z.object({
+const providerBackupSettingsSchema = z.object({
   enabled: z.boolean(),
   folderPath: z
     .string()
