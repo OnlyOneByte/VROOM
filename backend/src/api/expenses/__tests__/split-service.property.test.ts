@@ -205,6 +205,43 @@ describe('percentage split penny-residue + over-100% clamp', () => {
     expect(result.reduce((s, a) => s + a.amount, 0)).toBe(10000);
   });
 
+  test('a percentage whose product is inexact in floating point keeps its cent (0.57% of $100)', () => {
+    const result = service.computeAllocations(
+      {
+        method: 'percentage',
+        allocations: [
+          { vehicleId: 'v-1', percentage: 0.57 },
+          { vehicleId: 'v-2', percentage: 99.43 },
+        ],
+      },
+      10000
+    );
+    expect(result.map((a) => a.amount)).toEqual([57, 9943]);
+  });
+
+  test('every non-last share is the exact floor of total × basis points, for 2-decimal percentages', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 9999 }),
+        positiveAmountArb,
+        (basisPoints, totalCents) => {
+          const [first] = service.computeAllocations(
+            {
+              method: 'percentage',
+              allocations: [
+                { vehicleId: 'v-1', percentage: basisPoints / 100 },
+                { vehicleId: 'v-2', percentage: (10_000 - basisPoints) / 100 },
+              ],
+            },
+            totalCents
+          );
+          expect(first.amount).toBe(Number((BigInt(totalCents) * BigInt(basisPoints)) / 10_000n));
+        }
+      ),
+      { numRuns: 200 }
+    );
+  });
+
   test('a config whose NON-LAST percentages exceed 100 clamps the last vehicle to 0 (no negative amount)', () => {
     const result = service.computeAllocations(
       {

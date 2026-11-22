@@ -14,6 +14,7 @@ import {
 import { buildCalendarDate } from '../expenses/local-date';
 import {
   FUEL_SPLIT_MESSAGE,
+  percentagesSumTo100,
   splitConfigSchema,
   splitConfigStructuralSchema,
   splitConfigVehicleIds,
@@ -221,8 +222,7 @@ function refineSplitConfig(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   }
 
   if (data.expenseSplitConfig.method === 'percentage') {
-    const sum = data.expenseSplitConfig.allocations.reduce((acc, a) => acc + a.percentage, 0);
-    if (Math.abs(sum - 100) >= 0.001) {
+    if (!percentagesSumTo100(data.expenseSplitConfig.allocations)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Percentage allocations must sum to 100',

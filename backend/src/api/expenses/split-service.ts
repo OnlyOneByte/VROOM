@@ -3,7 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, photos } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
-import type { SplitConfig } from './validation';
+import { percentageToBasisPoints, type SplitConfig } from './validation';
 
 export class ExpenseSplitService {
   computeAllocations(
@@ -52,7 +52,7 @@ export class ExpenseSplitService {
       if (i === lastIndex) {
         amount = Math.max(0, totalCents - runningTotal);
       } else {
-        amount = Math.floor((totalCents * percentage) / 100);
+        amount = Math.floor((totalCents * percentageToBasisPoints(percentage)) / 10_000);
       }
 
       runningTotal += amount;

@@ -74,6 +74,22 @@ describe('createSplitExpenseSchema — percentage-sum refinement (must total 100
       expect(r.error.issues.some((i) => i.message === 'Percentages must sum to 100')).toBe(true);
     }
   });
+
+  test.each([
+    [[33.333, 33.333, 33.333], true],
+    [[49.9995, 49.9995], true],
+    [[49.99, 50], false],
+    [[50.01, 50], false],
+  ])('%j sums to 100 only if it rounds to 100.00%: %p', (percentages, valid) => {
+    const r = createSplitExpenseSchema.safeParse({
+      ...baseCreate,
+      splitConfig: {
+        method: 'percentage',
+        allocations: percentages.map((percentage, i) => ({ vehicleId: `v${i}`, percentage })),
+      },
+    });
+    expect(r.success).toBe(valid);
+  });
 });
 
 describe('createSplitExpenseSchema — absolute-sum refinement (must equal totalAmount)', () => {

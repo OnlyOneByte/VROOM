@@ -159,6 +159,17 @@ describe('refineSplitConfig', () => {
       },
     });
     expect(failsWith(bad, 'Percentage allocations must sum to 100')).toBe(true);
+    const roundsTo100 = expenseBase({
+      vehicleIds: ['v1', 'v2'],
+      expenseSplitConfig: {
+        method: 'percentage',
+        allocations: [
+          { vehicleId: 'v1', percentage: 49.9995 },
+          { vehicleId: 'v2', percentage: 49.9995 },
+        ],
+      },
+    });
+    expect(ok(roundsTo100)).toBe(true);
   });
 
   test('absolute allocations must sum to expenseAmount', () => {

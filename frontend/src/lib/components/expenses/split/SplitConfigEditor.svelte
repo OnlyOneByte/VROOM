@@ -46,17 +46,20 @@
 	});
 
 	let absoluteSum = $derived(allocations.reduce((sum, a) => sum + (a.amount ?? 0), 0));
-	let percentageSum = $derived(allocations.reduce((sum, a) => sum + (a.percentage ?? 0), 0));
+	let percentageSumBasisPoints = $derived(
+		Math.round(allocations.reduce((sum, a) => sum + (a.percentage ?? 0), 0) * 100)
+	);
+	let percentageSumLabel = $derived(`${(percentageSumBasisPoints / 100).toFixed(2)}%`);
 
 	let absoluteError = $derived(
-		splitMethod === 'absolute' && Math.abs(absoluteSum - totalAmount) > 0.01
+		splitMethod === 'absolute' && Math.round(absoluteSum * 100) !== Math.round(totalAmount * 100)
 			? `Sum (${formatCurrency(absoluteSum)}) must equal total (${formatCurrency(totalAmount)})`
 			: undefined
 	);
 
 	let percentageError = $derived(
-		splitMethod === 'percentage' && Math.abs(percentageSum - 100) > 0.01
-			? `Sum (${percentageSum.toFixed(1)}%) must equal 100%`
+		splitMethod === 'percentage' && percentageSumBasisPoints !== 10_000
+			? `Sum (${percentageSumLabel}) must equal 100%`
 			: undefined
 	);
 
@@ -124,7 +127,7 @@
 					<div class="flex w-24 items-center gap-1">
 						<Input
 							type="number"
-							step="0.1"
+							step="0.01"
 							min="0"
 							max="100"
 							value={alloc?.percentage?.toString() ?? ''}
@@ -152,7 +155,7 @@
 			</span>
 		{:else}
 			<span class="font-medium {percentageError ? 'text-destructive' : 'text-foreground'}">
-				{percentageSum.toFixed(1)}% / 100%
+				{percentageSumLabel} / 100%
 			</span>
 		{/if}
 	</div>
