@@ -287,7 +287,10 @@ export async function resolveNewUser(
         authProviderId,
         userInfo.providerAccountId
       );
-      if (retryRow) return { userId: retryRow.userId };
+      if (retryRow) {
+        await attachPendingInvitesOnSignIn(retryRow.userId);
+        return { userId: retryRow.userId };
+      }
       return { redirect: `${CONFIG.frontend.url}/auth?auth_error=email_exists` };
     }
     throw txErr;

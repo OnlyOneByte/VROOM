@@ -79,6 +79,32 @@ describe('resolveNewUser — UNIQUE conflict inside the insert transaction', () 
     expect(userCount(), 'the rolled-back user row must not survive').toBe(before);
   });
 
+  test('the retry sign-in attaches pending invites, like the normal sign-in', async () => {
+    seedAuthUser('u-winner', 'winner@example.com', 'google', 'g-race');
+    ctx.sqlite.run(
+      `INSERT INTO vehicles (id, user_id, make, model, year, created_at, updated_at)
+       VALUES ('v-shared', ?, 'Honda', 'Civic', 2020, unixepoch(), unixepoch())`,
+      [ctx.user.id]
+    );
+    ctx.sqlite.run(
+      `INSERT INTO vehicle_shares (id, vehicle_id, owner_id, invited_email, level, status, created_at)
+       VALUES ('s-pending', 'v-shared', ?, 'winner@example.com', 'viewer', 'pending', unixepoch())`,
+      [ctx.user.id]
+    );
+
+    const result = await resolveNewUser('google', {
+      providerAccountId: 'g-race',
+      email: 'loser@example.com',
+      displayName: 'Loser',
+    });
+
+    expect(result).toEqual({ userId: 'u-winner' });
+    const share = ctx.sqlite
+      .query("SELECT shared_with_id FROM vehicle_shares WHERE id = 's-pending'")
+      .get() as { shared_with_id: string | null };
+    expect(share.shared_with_id).toBe('u-winner');
+  });
+
   test('a collision with a different identity → email_exists, never a cross-account login', async () => {
     seedAuthUser('u-other', 'other@example.com', 'github', 'shared-account-id');
     ctx.sqlite.run(
