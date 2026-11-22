@@ -16,6 +16,7 @@
 		emptyDescription?: string;
 		height?: number;
 		icon?: Snippet;
+		legend?: Snippet;
 		animationClass?: 'chart-line-animated' | 'chart-bar-animated' | 'chart-pie-animated';
 		class?: string;
 		children: Snippet;
@@ -31,6 +32,7 @@
 		emptyDescription = 'Add data to see this chart',
 		height,
 		icon,
+		legend,
 		animationClass,
 		class: className,
 		children
@@ -102,6 +104,9 @@
 					<Skeleton class="w-full" style="height: {placeholderHeight}px" />
 				{/if}
 			</div>
+			{#if legend}
+				{@render legend()}
+			{/if}
 		{/if}
 	</Card.Content>
 </Card.Root>

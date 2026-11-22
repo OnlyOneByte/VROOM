@@ -80,7 +80,7 @@
 	{error}
 	{isEmpty}
 	{icon}
-	height={series.length > 1 ? undefined : height}
+	{height}
 	animationClass="chart-bar-animated"
 	class={className}
 >
@@ -112,7 +112,9 @@
 			</BarChart>
 		</Chart.Container>
 	</div>
-	{#if series.length > 1}
-		<ChartLegend items={series} class="mt-3 justify-center" />
-	{/if}
+	{#snippet legend()}
+		{#if series.length > 1}
+			<ChartLegend items={series} class="mt-3 justify-center" />
+		{/if}
+	{/snippet}
 </ChartCard>
