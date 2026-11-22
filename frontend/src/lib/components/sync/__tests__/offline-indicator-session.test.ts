@@ -117,4 +117,53 @@ describe('OfflineIndicator — unverified session', () => {
 
 		expect(mockFetch).toHaveBeenCalledTimes(1);
 	});
+
+	it('a successful Retry moves focus to the main heading and announces the connection', async () => {
+		onlineStatus.current = true;
+		serverStaysDown();
+		await startWithUnreachableServer();
+		const main = document.createElement('main');
+		main.innerHTML = '<h1>Dashboard</h1>';
+		document.body.appendChild(main);
+		render(OfflineIndicator);
+
+		const retry = await screen.findByRole('button', { name: 'Retry' });
+		await vi.waitFor(() => expect(retry).not.toHaveAttribute('aria-disabled', 'true'));
+		mockFetch.mockReset();
+		mockFetch.mockResolvedValue(me());
+		retry.focus();
+		await fireEvent.click(retry);
+
+		const heading = main.querySelector('h1');
+		await vi.waitFor(() => expect(heading).toHaveFocus());
+		expect(heading).toHaveAttribute('tabindex', '-1');
+		expect(screen.getByText('Connected to VROOM again')).toHaveAttribute('role', 'status');
+		main.remove();
+	});
+
+	it('a successful Retry leaves focus alone when the user moved it during the check', async () => {
+		onlineStatus.current = true;
+		serverStaysDown();
+		await startWithUnreachableServer();
+		const main = document.createElement('main');
+		main.innerHTML = '<h1>Dashboard</h1><button>Elsewhere</button>';
+		document.body.appendChild(main);
+		render(OfflineIndicator);
+
+		const retry = await screen.findByRole('button', { name: 'Retry' });
+		await vi.waitFor(() => expect(retry).not.toHaveAttribute('aria-disabled', 'true'));
+		let answer: (response: Response) => void = () => {};
+		mockFetch.mockReset();
+		mockFetch.mockImplementation(() => new Promise<Response>(resolve => (answer = resolve)));
+		retry.focus();
+		await fireEvent.click(retry);
+		const elsewhere = screen.getByRole('button', { name: 'Elsewhere' });
+		elsewhere.focus();
+
+		answer(me());
+		await vi.waitFor(() => expect(authStore.sessionUnverified).toBe(false));
+		await new Promise(resolve => setTimeout(resolve, 0));
+		expect(elsewhere).toHaveFocus();
+		main.remove();
+	});
 });

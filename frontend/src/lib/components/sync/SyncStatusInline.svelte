@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { syncState, onlineStatus, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 	import {
 		syncManager,
@@ -54,6 +54,25 @@
 
 		return () => clearInterval(interval);
 	});
+
+	let statusPanel = $state<HTMLElement | null>(null);
+	let reconnected = $state(false);
+
+	function focusLeftOn(origin: Element | null): boolean {
+		const active = document.activeElement;
+		return active === origin || active === null || active === document.body;
+	}
+
+	async function retrySession() {
+		if (authStore.recheckingSession) return;
+		const origin = document.activeElement;
+		reconnected = false;
+		await authStore.recheckSession();
+		if (authStore.sessionUnverified || !authStore.isAuthenticated) return;
+		reconnected = true;
+		await tick();
+		if (focusLeftOn(origin)) statusPanel?.focus();
+	}
 
 	let isRetryingParked = $state(false);
 
@@ -117,7 +136,14 @@
 	}
 </script>
 
-<div class="border-t border-border pt-3 space-y-2">
+<div
+	bind:this={statusPanel}
+	tabindex="-1"
+	role="group"
+	aria-label="Sync status"
+	class="border-t border-border pt-3 space-y-2"
+>
+	<span class="sr-only" role="status">{reconnected ? 'Connected to VROOM again' : ''}</span>
 	{#if isExpanded}
 		<div class="px-3 space-y-2">
 			<div class="flex items-center justify-between">
@@ -245,7 +271,7 @@
 				<Button
 					size={isExpanded ? 'sm' : 'icon-lg'}
 					variant={isExpanded ? 'outline' : 'ghost'}
-					onclick={() => authStore.recheckSession()}
+					onclick={retrySession}
 					aria-disabled={authStore.recheckingSession}
 					aria-busy={authStore.recheckingSession}
 					aria-label={isExpanded ? undefined : 'Retry connection'}

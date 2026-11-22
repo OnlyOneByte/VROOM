@@ -98,4 +98,55 @@ describe('SyncStatusInline expanded — Retry connection', () => {
 		);
 		await waitFor(() => expect(authStore.sessionUnverified).toBe(false));
 	});
+
+	function meResponse(): Response {
+		return new Response(
+			JSON.stringify({
+				success: true,
+				data: { user: alice, session: { id: 's', expiresAt: '2099' } }
+			}),
+			{ status: 200, headers: { 'content-type': 'application/json' } }
+		);
+	}
+
+	async function startUnreachable(): Promise<void> {
+		localStorage.setItem('vroom_last_user', JSON.stringify(alice));
+		mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+		await authStore.initialize();
+	}
+
+	it.each([true, false])(
+		'a successful Retry moves focus to the sync status and announces it (expanded: %s)',
+		async isExpanded => {
+			await startUnreachable();
+			render(SyncStatusInline, { props: { isExpanded } });
+			const retry = screen.getByRole('button', { name: 'Retry connection' });
+			mockFetch.mockResolvedValueOnce(meResponse());
+			retry.focus();
+			await fireEvent.click(retry);
+
+			await waitFor(() => expect(screen.getByRole('group', { name: 'Sync status' })).toHaveFocus());
+			expect(screen.queryByRole('button', { name: 'Retry connection' })).toBeNull();
+			expect(screen.getByText('Connected to VROOM again')).toHaveAttribute('role', 'status');
+		}
+	);
+
+	it('a successful Retry leaves focus alone when the user moved it during the check', async () => {
+		await startUnreachable();
+		const elsewhere = document.createElement('button');
+		document.body.appendChild(elsewhere);
+		render(SyncStatusInline, { props: { isExpanded: true } });
+		let answer: (response: Response) => void = () => {};
+		mockFetch.mockImplementationOnce(() => new Promise<Response>(resolve => (answer = resolve)));
+		const retry = screen.getByRole('button', { name: 'Retry connection' });
+		retry.focus();
+		await fireEvent.click(retry);
+		elsewhere.focus();
+
+		answer(meResponse());
+		await waitFor(() => expect(authStore.sessionUnverified).toBe(false));
+		await new Promise(resolve => setTimeout(resolve, 0));
+		expect(elsewhere).toHaveFocus();
+		elsewhere.remove();
+	});
 });
