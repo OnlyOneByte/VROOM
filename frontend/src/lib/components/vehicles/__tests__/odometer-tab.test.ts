@@ -520,14 +520,35 @@ describe('OdometerTab chart range', () => {
 		expect((chartProps?.['data'] as unknown[]).length).toBe(CHART_LIMIT);
 	});
 
-	test('a failed chart request still lists the readings, without a chart', async () => {
+	test('a failed chart request shows the error in the chart card and still lists the readings', async () => {
 		getHistory.mockResolvedValue(page(dated(3)));
-		getChartHistory.mockRejectedValue(new Error('offline'));
+		getChartHistory.mockRejectedValue(new Error('Server unavailable'));
 		mount();
 		await settle();
 
 		expect(screen.getByText('Readings (3)')).toBeInTheDocument();
-		expect(chartProps).toBeNull();
+		expect(chartProps?.['error']).toBe('Server unavailable.');
+		expect(chartProps?.['data']).toEqual([]);
+	});
+
+	test('a chart that loads after a failure clears the error', async () => {
+		getHistory.mockResolvedValue(page(dated(3)));
+		getChartHistory.mockRejectedValueOnce(new Error('Server unavailable'));
+		getChartHistory.mockResolvedValue(page(dated(2)));
+		mount();
+		await settle();
+
+		await fireEvent.click(
+			screen.getAllByRole('button', { name: 'Delete reading' })[0] as HTMLElement
+		);
+		await settle();
+		await fireEvent.click(
+			within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' })
+		);
+		await settle();
+
+		expect(chartProps?.['error']).toBeNull();
+		expect((chartProps?.['data'] as unknown[]).length).toBe(2);
 	});
 
 	test('deleting a reading reloads the chart', async () => {

@@ -7,9 +7,10 @@
 		files: File[];
 		onAdd: (_file: File) => void;
 		onRemove: (_index: number) => void;
+		entityNoun?: string;
 	}
 
-	let { files, onAdd, onRemove }: Props = $props();
+	let { files, onAdd, onRemove, entityNoun = 'expense' }: Props = $props();
 
 	let showUploadDialog = $state(false);
 
@@ -87,7 +88,7 @@
 <MediaCaptureDialog
 	bind:open={showUploadDialog}
 	title="Add Photos & Receipts"
-	description="Select photos or receipts to attach to this expense"
+	description="Select photos or receipts to attach to this {entityNoun}"
 	acceptedTypes={['image/jpeg', 'image/png', 'image/webp', 'application/pdf']}
 	onUpload={async file => {
 		onAdd(file);

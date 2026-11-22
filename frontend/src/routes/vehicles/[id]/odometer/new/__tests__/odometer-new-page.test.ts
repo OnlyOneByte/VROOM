@@ -17,7 +17,12 @@ vi.mock('#lib/components/common/date-picker.svelte', async () => ({
 const pageState = vi.hoisted(() => ({ url: new URL('http://localhost/vehicles/v1/odometer/new') }));
 vi.mock('$app/state', () => ({ page: pageState }));
 
-vi.mock('#lib/components/expenses/form/PendingPhotoPreview.svelte', () => ({ default: () => {} }));
+const pendingPhotoProps = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
+vi.mock('#lib/components/expenses/form/PendingPhotoPreview.svelte', () => ({
+	default: (_anchor: unknown, props: Record<string, unknown>) => {
+		pendingPhotoProps.current = props;
+	}
+}));
 
 const getEntries =
 	vi.fn<
@@ -104,6 +109,13 @@ afterEach(() => {
 });
 
 describe('new odometer reading page defaults', () => {
+	test('the photo picker names a reading, not an expense', async () => {
+		mount();
+		await settle();
+
+		expect(pendingPhotoProps.current?.['entityNoun']).toBe('reading');
+	});
+
 	test('the date defaults to today and the note counter starts at zero', async () => {
 		mount();
 		await settle();
