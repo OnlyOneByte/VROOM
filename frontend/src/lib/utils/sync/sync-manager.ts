@@ -445,7 +445,9 @@ class SyncManager {
 			return true;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to resolve conflict:', error);
-			return false;
+			if (!(error instanceof ApiError && error.statusCode === 400)) return false;
+			markExpenseNeedsAttention(local.id, extractErrorMessage(error, 'Entry needs attention'));
+			return true;
 		}
 	}
 

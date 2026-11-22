@@ -60,6 +60,8 @@ import { expenseRepository } from './repository';
 import {
   clearFuelFieldsIfNotFuel,
   createSplitExpenseSchema,
+  ODOMETER_HISTORY_WINDOW,
+  odometerOrderError,
   type SplitConfig,
   splitConfigVehicleIds,
   tagElementSchema,
@@ -67,6 +69,36 @@ import {
 } from './validation';
 
 const routes = new Hono();
+
+async function assertOdometerInOrder(
+  vehicleId: string,
+  mileage: number | null | undefined,
+  date: Date,
+  excludeId?: string
+): Promise<void> {
+  if (mileage == null) return;
+  const [vehicle, readings] = await Promise.all([
+    vehicleRepository.findById(vehicleId),
+    expenseRepository.findRecentOdometerReadings(vehicleId, ODOMETER_HISTORY_WINDOW),
+  ]);
+  const others = readings.filter((r) => r.id !== excludeId);
+  const error = odometerOrderError(mileage, date, others, vehicle?.initialMileage);
+  if (error) throw new ValidationError(error);
+}
+
+async function assertEditedOdometerInOrder(
+  existing: Expense,
+  next: { vehicleId: string; date: Date; mileage: number | null | undefined; category: string }
+): Promise<void> {
+  if (next.category !== 'fuel') return;
+  const unchanged =
+    next.vehicleId === existing.vehicleId &&
+    next.date.getTime() === existing.date.getTime() &&
+    next.mileage === existing.mileage &&
+    next.category === existing.category;
+  if (unchanged) return;
+  await assertOdometerInOrder(next.vehicleId, next.mileage, next.date, existing.id);
+}
 
 const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
 
@@ -722,6 +754,13 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
     expenseData.fuelType
   );
 
+  const replay = expenseData.clientId
+    ? await expenseRepository.findByClientId(expenseData.clientId, ownerId)
+    : null;
+  if (!replay) {
+    await assertOdometerInOrder(expenseData.vehicleId, expenseData.mileage, expenseData.date);
+  }
+
   const createdExpense = await expenseRepository.createIdempotent({
     ...expenseData,
     userId: ownerId,
@@ -829,6 +868,12 @@ routes.put(
     validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalFuelType);
 
     const normalizedUpdate = clearFuelFieldsIfNotFuel(updateData, finalCategory);
+    await assertEditedOdometerInOrder(existingExpense, {
+      vehicleId: updateData.vehicleId ?? existingExpense.vehicleId,
+      date: updateData.date ?? existingExpense.date,
+      mileage: finalMileage,
+      category: finalCategory,
+    });
 
     const updatedExpense = await expenseRepository.update(id, normalizedUpdate);
 

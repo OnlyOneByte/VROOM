@@ -200,6 +200,15 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return { vehicleIds: [...new Set(rows.map((r) => r.vehicleId))], ownerId: rows[0].userId };
   }
 
+  async findRecentOdometerReadings(vehicleId: string, window: number) {
+    return this.db
+      .select({ id: expenses.id, date: expenses.date, mileage: expenses.mileage })
+      .from(expenses)
+      .where(eq(expenses.vehicleId, vehicleId))
+      .orderBy(desc(expenses.date), desc(expenses.id))
+      .limit(window);
+  }
+
   async findByClientId(clientId: string, userId: string): Promise<Expense | null> {
     const result = await this.db
       .select()
