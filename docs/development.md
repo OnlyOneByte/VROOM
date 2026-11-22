@@ -15,6 +15,7 @@ nvm use
 cd backend
 bun install
 cp .env.example .env   # configure OAuth credentials
+openssl rand -hex 32    # paste the output as PROVIDER_ENCRYPTION_KEY in .env
 bun run db:init         # apply migrations; add --seed for sample data
 bun run dev             # http://localhost:3001
 

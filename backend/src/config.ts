@@ -316,6 +316,8 @@ export function getRequiredBackupFiles(): string[] {
   ];
 }
 
+const ENCRYPTION_KEY_PATTERN = /^[0-9a-fA-F]{64}$/;
+
 export const validateProductionConfig = () => {
   const encryptionKey = process.env.PROVIDER_ENCRYPTION_KEY;
 
@@ -339,13 +341,17 @@ export const validateProductionConfig = () => {
       process.exit(1);
     }
 
-    if (encryptionKey && !/^[0-9a-fA-F]{64}$/.test(encryptionKey)) {
+    if (encryptionKey && !ENCRYPTION_KEY_PATTERN.test(encryptionKey)) {
       console.error('❌ PROVIDER_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)');
       process.exit(1);
     }
   } else if (!encryptionKey) {
     console.warn(
       '⚠️  PROVIDER_ENCRYPTION_KEY is not set. Provider encryption will fail until configured.'
+    );
+  } else if (!ENCRYPTION_KEY_PATTERN.test(encryptionKey)) {
+    console.warn(
+      '⚠️  PROVIDER_ENCRYPTION_KEY is not a 64-character hex string. Provider encryption will fail until it is. Generate one with: openssl rand -hex 32'
     );
   }
 };

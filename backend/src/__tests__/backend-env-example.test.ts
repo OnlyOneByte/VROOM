@@ -1,7 +1,8 @@
-import { beforeAll, describe, expect, test } from 'bun:test';
+import { afterEach, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateProductionConfig } from '../config';
 import { createTestApp, type TestApp } from '../test-helpers/http-client';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -55,6 +56,14 @@ describe('backend/.env.example matches the backend', () => {
     );
   });
 
+  test('it ends with a newline, so a line appended with >> stays its own line', () => {
+    expect(exampleEnv().endsWith('\n')).toBe(true);
+  });
+
+  test('PROVIDER_ENCRYPTION_KEY ships blank, not as a placeholder that looks configured', () => {
+    expect(assignments().find((entry) => entry.name === 'PROVIDER_ENCRYPTION_KEY')?.value).toBe('');
+  });
+
   test('it defines no variable the backend does not read', () => {
     const read = backendReadsEnvVars();
     expect(
@@ -65,6 +74,35 @@ describe('backend/.env.example matches the backend', () => {
         'indistinguishable from a live setting — and for a secret, it asks them to generate, ' +
         'protect and rotate something with no reader. Delete it here when the reader goes.'
     ).toEqual([]);
+  });
+
+  describe('startup outside production', () => {
+    const original = process.env.PROVIDER_ENCRYPTION_KEY;
+
+    afterEach(() => {
+      process.env.PROVIDER_ENCRYPTION_KEY = original;
+    });
+
+    const warningsFor = (key: string) => {
+      process.env.PROVIDER_ENCRYPTION_KEY = key;
+      const warn = spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        validateProductionConfig();
+        return warn.mock.calls.map((call) => String(call[0]));
+      } finally {
+        warn.mockRestore();
+      }
+    };
+
+    test('warns when PROVIDER_ENCRYPTION_KEY is set but is not 64 hex characters', () => {
+      expect(warningsFor('your_64_char_hex_encryption_key_here')).toEqual([
+        expect.stringContaining('not a 64-character hex string'),
+      ]);
+    });
+
+    test('stays quiet for a valid key', () => {
+      expect(warningsFor('a'.repeat(64))).toEqual([]);
+    });
   });
 
   describe('its OAuth callback URLs', () => {
