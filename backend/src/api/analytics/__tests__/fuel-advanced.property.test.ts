@@ -158,7 +158,7 @@ describe('All computed scores bounded [0, 100]', () => {
           const result = await repo.getFuelAdvanced('user-1', yearToRange(2024));
 
           for (const radar of result.vehicleRadar) {
-            assertScoreBounded(radar.fuelEfficiency);
+            if (radar.fuelEfficiency !== null) assertScoreBounded(radar.fuelEfficiency);
             assertScoreBounded(radar.maintenanceCost);
             assertScoreBounded(radar.reliability);
             assertScoreBounded(radar.annualCost);

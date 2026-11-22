@@ -92,7 +92,7 @@ export interface GeneralExpenseRow {
 }
 
 interface VehicleMetrics {
-  fuelEfficiency: number;
+  fuelEfficiency: number | null;
   maintenanceCost: number;
   maintenanceCount: number;
   annualCost: number;
@@ -613,7 +613,7 @@ export function buildVehicleRadar(
 ): Array<{
   vehicleId: string;
   vehicleName: string;
-  fuelEfficiency: number;
+  fuelEfficiency: number | null;
   maintenanceCost: number;
   reliability: number;
   annualCost: number;
@@ -625,7 +625,7 @@ export function buildVehicleRadar(
   const metrics = new Map<string, VehicleMetrics>();
   for (const vId of vehicleIds) {
     metrics.set(vId, {
-      fuelEfficiency: 0,
+      fuelEfficiency: null,
       maintenanceCost: 0,
       maintenanceCount: 0,
       annualCost: 0,
@@ -638,7 +638,7 @@ export function buildVehicleRadar(
 
   if (convert) {
     for (const [vId, m] of metrics) {
-      if (m.fuelEfficiency > 0) m.fuelEfficiency = convert.efficiency(m.fuelEfficiency, vId);
+      if (m.fuelEfficiency != null) m.fuelEfficiency = convert.efficiency(m.fuelEfficiency, vId);
       if (m.totalMileage > 0) m.totalMileage = convert.distance(m.totalMileage, vId);
     }
   }
@@ -647,7 +647,7 @@ export function buildVehicleRadar(
     const m = metrics.get(vId);
     return (
       m ?? {
-        fuelEfficiency: 0,
+        fuelEfficiency: null,
         maintenanceCost: 0,
         maintenanceCount: 0,
         annualCost: 0,
@@ -655,7 +655,7 @@ export function buildVehicleRadar(
       }
     );
   });
-  const fuelEffVals = raw.map((m) => m.fuelEfficiency);
+  const fuelEffVals = raw.flatMap((m) => (m.fuelEfficiency == null ? [] : [m.fuelEfficiency]));
   const maintCostVals = raw.map((m) => m.maintenanceCost);
   const reliabilityVals = raw.map((m) => m.maintenanceCount);
   const annualCostVals = raw.map((m) => m.annualCost);
@@ -666,12 +666,10 @@ export function buildVehicleRadar(
     return {
       vehicleId: vId,
       vehicleName: vehicleNameMap.get(vId) ?? 'Unknown',
-      fuelEfficiency: normalizeScore(
-        m.fuelEfficiency,
-        minOf(fuelEffVals),
-        maxOf(fuelEffVals),
-        false
-      ),
+      fuelEfficiency:
+        m.fuelEfficiency == null
+          ? null
+          : normalizeScore(m.fuelEfficiency, minOf(fuelEffVals), maxOf(fuelEffVals), false),
       maintenanceCost: normalizeScore(
         m.maintenanceCost,
         minOf(maintCostVals),
