@@ -130,32 +130,95 @@ describe('GET /auth/callback/:authProvider — login', () => {
     expect(count.n).toBe(1);
   });
 
-  test('an invite saved without an invitee while its email signed up attaches on the next login', async () => {
-    providerReturns({
-      providerAccountId: 'gh-3003',
-      email: 'between@example.com',
-      displayName: 'Between',
-    });
-    const userId = sessionUserIdFrom(await loginRoundTrip());
-    const vehicleId = await seedVehicle(ctx);
-    const insertPendingInvite = (id: string, email: string) =>
+  describe('pending invites saved without an invitee', () => {
+    const email = 'between@example.com';
+
+    async function signUp(): Promise<string> {
+      providerReturns({ providerAccountId: 'gh-3003', email, displayName: 'Between' });
+      return sessionUserIdFrom(await loginRoundTrip()) as string;
+    }
+
+    function insertShare(share: {
+      id: string;
+      vehicleId: string;
+      ownerId?: string;
+      invitedEmail: string | null;
+      sharedWithId?: string;
+      status?: string;
+    }): void {
       ctx.sqlite.run(
-        "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, level, status, invited_email) VALUES (?, ?, ?, 'viewer', 'pending', ?)",
-        [id, vehicleId, ctx.user.id, email]
+        "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, invited_email) VALUES (?, ?, ?, ?, 'viewer', ?, ?)",
+        [
+          share.id,
+          share.vehicleId,
+          share.ownerId ?? ctx.user.id,
+          share.sharedWithId ?? null,
+          share.status ?? 'pending',
+          share.invitedEmail,
+        ]
       );
-    insertPendingInvite('share-missed', 'between@example.com');
-    insertPendingInvite('share-other', 'someone-else@example.com');
+    }
 
-    await loginRoundTrip();
-
-    const invitee = (id: string) =>
-      (
+    function invitee(id: string): string | null {
+      return (
         ctx.sqlite.query('SELECT shared_with_id FROM vehicle_shares WHERE id = ?').get(id) as {
           shared_with_id: string | null;
         }
       ).shared_with_id;
-    expect(invitee('share-missed')).toBe(userId as string);
-    expect(invitee('share-other')).toBeNull();
+    }
+
+    test('one for that email attaches on the next login, and no other invite does', async () => {
+      const userId = await signUp();
+      const first = await seedVehicle(ctx);
+      const second = await seedVehicle(ctx, { make: 'Mazda', model: '3' });
+      insertShare({ id: 'share-missed', vehicleId: first, invitedEmail: email });
+      insertShare({
+        id: 'share-other',
+        vehicleId: first,
+        invitedEmail: 'someone-else@example.com',
+      });
+      insertShare({
+        id: 'share-declined',
+        vehicleId: second,
+        invitedEmail: email,
+        status: 'declined',
+      });
+
+      await loginRoundTrip();
+
+      expect(invitee('share-missed')).toBe(userId);
+      expect(invitee('share-other')).toBeNull();
+      expect(invitee('share-declined')).toBeNull();
+    });
+
+    test('one on a vehicle the account already has an invite for stays put, and the rest still attach', async () => {
+      const userId = await signUp();
+      const vehicleId = await seedVehicle(ctx);
+      const another = await seedVehicle(ctx, { make: 'Mazda', model: '3' });
+      insertShare({ id: 'share-attached', vehicleId, invitedEmail: email, sharedWithId: userId });
+      insertShare({ id: 'share-extra', vehicleId, invitedEmail: email });
+      insertShare({ id: 'share-another', vehicleId: another, invitedEmail: email });
+
+      const res = await loginRoundTrip();
+
+      expect(res.headers.get('location')).toBe(`${frontendUrl()}/dashboard`);
+      expect(sessionUserIdFrom(res)).toBe(userId);
+      expect(invitee('share-extra')).toBeNull();
+      expect(invitee('share-another')).toBe(userId);
+    });
+
+    test('one on a vehicle the account owns never attaches to it', async () => {
+      const userId = await signUp();
+      ctx.sqlite.run(
+        "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('own-car', ?, 'Honda', 'Fit', 2020)",
+        [userId]
+      );
+      insertShare({ id: 'share-self', vehicleId: 'own-car', ownerId: userId, invitedEmail: email });
+
+      await loginRoundTrip();
+
+      expect(invitee('share-self')).toBeNull();
+    });
   });
 
   test('a provider with no verified email redirects with no_email and opens no session', async () => {

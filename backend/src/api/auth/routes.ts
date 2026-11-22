@@ -222,12 +222,16 @@ export async function updateExistingUserProfile(
 
 export async function attachPendingInvitesOnSignIn(userId: string): Promise<void> {
   const db = getDb();
-  const [account] = await db
-    .select({ email: users.email })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  if (account?.email) attachPendingInvites(db, userId, account.email);
+  try {
+    const [account] = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (account?.email) attachPendingInvites(db, userId, account.email);
+  } catch (error) {
+    logger.warn('Could not attach pending invites on sign-in', { userId, error });
+  }
 }
 
 export async function resolveNewUser(
