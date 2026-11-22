@@ -158,14 +158,12 @@ function sameTime(a: Date | null | undefined, b: Date | null | undefined): boole
 }
 
 function termExpenseInputsChanged(previous: TermExpenseParams, next: TermExpenseParams): boolean {
-  const previousVehicles = [...previous.vehicleIds].sort().join(',');
-  const nextVehicles = [...next.vehicleIds].sort().join(',');
   return (
     previous.totalCost !== next.totalCost ||
     (previous.monthlyCost ?? null) !== (next.monthlyCost ?? null) ||
     !sameTime(previous.startDate, next.startDate) ||
     !sameTime(previous.endDate, next.endDate) ||
-    previousVehicles !== nextVehicles
+    previous.vehicleIds.join(',') !== next.vehicleIds.join(',')
   );
 }
 

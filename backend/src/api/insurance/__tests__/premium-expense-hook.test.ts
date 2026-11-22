@@ -429,4 +429,30 @@ describe('premium split follows the order the vehicles were chosen', () => {
 
     expect(centsByVehicle(termId)).toEqual({ [first]: 10001, [second]: 10000 });
   });
+
+  test('on update, reordering the same vehicles alone moves the odd cent', async () => {
+    const [first, second] = await twoVehiclesOutOfIdOrder();
+    const { policyId, termId } = await createPolicy([second, first], 100.01);
+    expect(centsByVehicle(termId)).toEqual({ [second]: 5001, [first]: 5000 });
+
+    const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
+      vehicleCoverage: { vehicleIds: [first, second] },
+    });
+    expect(res.status, await res.text()).toBeLessThan(300);
+
+    expect(centsByVehicle(termId)).toEqual({ [first]: 5001, [second]: 5000 });
+  });
+
+  test('on update, an unchanged order keeps the premium rows as they are', async () => {
+    const [first, second] = await twoVehiclesOutOfIdOrder();
+    const { policyId, termId } = await createPolicy([first, second], 100.01);
+    const before = autoExpensesForTerm(termId).map((r) => r.id);
+
+    const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
+      vehicleCoverage: { vehicleIds: [first, second] },
+    });
+    expect(res.status, await res.text()).toBeLessThan(300);
+
+    expect(autoExpensesForTerm(termId).map((r) => r.id)).toEqual(before);
+  });
 });
