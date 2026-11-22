@@ -1191,6 +1191,36 @@ describe('a trip finds its odometer entry through the link, not the note', () =>
     expect(readings(vehicleId)).toEqual([]);
   });
 
+  test('a trip re-created where a deleted trip kept its entry takes that entry over', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const deleted = await createTrip(vehicleId, { endOdometer: 1080 });
+    await ctx.authed('DELETE', `/api/v1/trips/${deleted}`);
+    const recreated = await createTrip(vehicleId, { endOdometer: 1080 });
+
+    const moved = await ctx.authed('PUT', `/api/v1/trips/${recreated}`, {
+      tripDate: localIso('2024-06-19T13:30'),
+    });
+    expect(moved.status).toBe(200);
+    expect(readings(vehicleId)).toEqual([{ odometer: 1080, note: 'From trip' }]);
+
+    await ctx.authed('DELETE', `/api/v1/trips/${recreated}?keepOdometer=false`);
+    expect(readings(vehicleId)).toEqual([]);
+  });
+
+  test('a trip created on a manual reading’s value and day leaves that reading alone', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
+      odometer: 1080,
+      recordedAt: localIso('2024-06-20T13:30'),
+      note: 'manual log',
+    });
+    const tripId = await createTrip(vehicleId, { endOdometer: 1080 });
+
+    await ctx.authed('DELETE', `/api/v1/trips/${tripId}?keepOdometer=false`);
+
+    expect(readings(vehicleId)).toEqual([{ odometer: 1080, note: 'manual log' }]);
+  });
+
   test('an entry from before the link still matches by its note, day and value', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const tripId = await createTrip(vehicleId, { endOdometer: 1080 });

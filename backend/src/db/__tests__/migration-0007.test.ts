@@ -84,6 +84,17 @@ describe('Migration 0007: trip readings are linked to their trips', () => {
     expect(links()).toEqual({ o1: 't-early' });
   });
 
+  test('prefers the trip at the reading’s exact time over another trip on the same UTC day', () => {
+    trip('t-other', 'v1', 'u1', 1080, NOON, NOON);
+    trip('t-exact', 'v1', 'u1', 1080, EVENING, EVENING);
+    entry('o-noon', 'v1', 'u1', 1080, NOON, 'From trip');
+    entry('o-evening', 'v1', 'u1', 1080, EVENING, 'From trip');
+
+    applyMigration(db, migrations[7]);
+
+    expect(links()).toEqual({ 'o-evening': 't-exact', 'o-noon': 't-other' });
+  });
+
   test('leaves manual readings, other days, other values and other users unlinked', () => {
     trip('t1', 'v1', 'u1', 1080, NOON);
     trip('t2', 'v2', 'u2', 1080, NOON);

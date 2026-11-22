@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
@@ -24,7 +24,6 @@ interface OdometerHistoryResult {
   totalCount: number;
 }
 
-// Shared with trips: changing this window breaks trip/odometer dedup.
 interface LinkedTripEntryKey {
   tripId: string;
   vehicleId: string;
@@ -34,6 +33,7 @@ interface LinkedTripEntryKey {
   timeZone?: string;
 }
 
+// Shared with trips: changing this window breaks trip/odometer dedup.
 export function localDayWindow(
   recordedAt: Date,
   timeZone?: string
@@ -114,20 +114,31 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   ): OdometerEntry | null {
     const { dayStart, nextDay } = localDayWindow(entry.recordedAt, entry.timeZone);
 
+    const sameReading = and(
+      eq(odometerEntries.vehicleId, entry.vehicleId),
+      eq(odometerEntries.userId, entry.userId),
+      eq(odometerEntries.odometer, entry.odometer),
+      gte(odometerEntries.recordedAt, dayStart),
+      lt(odometerEntries.recordedAt, nextDay)
+    );
     const existing = db
       .select({ id: odometerEntries.id })
       .from(odometerEntries)
-      .where(
-        and(
-          eq(odometerEntries.vehicleId, entry.vehicleId),
-          eq(odometerEntries.userId, entry.userId),
-          eq(odometerEntries.odometer, entry.odometer),
-          gte(odometerEntries.recordedAt, dayStart),
-          lt(odometerEntries.recordedAt, nextDay)
-        )
-      )
+      .where(sameReading)
       .get();
-    if (existing) return null;
+    if (existing) {
+      db.update(odometerEntries)
+        .set({ sourceTripId: entry.tripId })
+        .where(
+          and(
+            sameReading,
+            isNotNull(odometerEntries.sourceTripId),
+            sql`NOT EXISTS (SELECT 1 FROM trips WHERE trips.id = ${odometerEntries.sourceTripId})`
+          )
+        )
+        .run();
+      return null;
+    }
 
     return db
       .insert(odometerEntries)
