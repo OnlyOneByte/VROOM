@@ -65,6 +65,7 @@ export class ExpenseFormState {
 	sourceId = $state<string | null>(null);
 
 	pendingFiles = $state<File[]>([]);
+	queuedPhotosUnreadable = $state(false);
 
 	queuedExpense = $state<OfflineExpense | null>(null);
 

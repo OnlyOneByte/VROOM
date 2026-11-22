@@ -481,6 +481,14 @@
 					{#if form.originalExpense}
 						<ExpensePhotoSection entityType="expense" entityId={form.originalExpense.id} />
 					{/if}
+				{:else if form.queuedPhotosUnreadable}
+					<div class="space-y-1" data-testid="queued-photos-unreadable">
+						<h2 class="text-sm font-medium text-foreground">Photos & Receipts</h2>
+						<p class="text-sm text-muted-foreground">
+							Couldn't load this entry's photos, so they can't be changed here. They stay saved with
+							it and will sync as they are.
+						</p>
+					</div>
 				{:else}
 					<PendingPhotoPreview
 						files={form.pendingFiles}

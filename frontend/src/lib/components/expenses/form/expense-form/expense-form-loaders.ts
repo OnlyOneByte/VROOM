@@ -81,7 +81,11 @@ export async function loadQueuedExpense(state: ExpenseFormState, id: string): Pr
 	state.sourceType = queued.sourceType ?? null;
 	state.sourceId = queued.sourceId ?? null;
 	if (queued.clientId) {
-		state.pendingFiles = await loadPendingPhotos(queued.clientId).catch(() => []);
+		try {
+			state.pendingFiles = await loadPendingPhotos(queued.clientId);
+		} catch {
+			state.queuedPhotosUnreadable = true;
+		}
 	}
 }
 

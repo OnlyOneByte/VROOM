@@ -280,7 +280,7 @@ export function findParkedExpense(id: string): OfflineExpense | undefined {
 	return loadOfflineExpenses().find(expense => expense.id === id && isEditableParked(expense));
 }
 
-export type ReplaceParkedResult = 'saved' | 'not-parked' | 'failed';
+export type ReplaceParkedResult = 'saved' | 'not-parked' | 'photos-unreadable' | 'failed';
 
 function sameVehicleAndDay(a: Pick<OfflineExpense, 'vehicleId' | 'date'>, b: typeof a): boolean {
 	return a.vehicleId === b.vehicleId && a.date.slice(0, 10) === b.date.slice(0, 10);
@@ -289,20 +289,29 @@ function sameVehicleAndDay(a: Pick<OfflineExpense, 'vehicleId' | 'date'>, b: typ
 export async function replaceParkedExpense(
 	id: string,
 	expense: Omit<OfflineExpense, 'id' | 'clientId' | 'timestamp' | 'synced' | 'version'>,
-	photos: File[]
+	photos: File[] | null
 ): Promise<ReplaceParkedResult> {
 	const parked = findParkedExpense(id);
 	if (!parked) return 'not-parked';
-	if (!parked.clientId && photos.length > 0) return 'failed';
+	if (!parked.clientId && photos?.length) return 'failed';
 	const clientId =
 		parked.clientId && !sameVehicleAndDay(parked, expense) ? crypto.randomUUID() : parked.clientId;
+	const keepsStoredPhotos = photos === null && clientId === parked.clientId;
+	const photosToSave =
+		photos ??
+		(keepsStoredPhotos ? null : await loadPendingPhotos(parked.clientId!).catch(() => null));
+	if (!keepsStoredPhotos && photosToSave === null) return 'photos-unreadable';
 	const previousPhotos =
-		clientId === parked.clientId && clientId
+		!keepsStoredPhotos && clientId === parked.clientId && clientId
 			? await loadPendingPhotos(clientId).catch(() => null)
 			: [];
-	if (clientId && !(await savePendingPhotos(clientId, photos))) return 'failed';
+	if (clientId && photosToSave && !(await savePendingPhotos(clientId, photosToSave))) {
+		return 'failed';
+	}
 	const undoPhotos = async () => {
-		if (clientId && previousPhotos) await savePendingPhotos(clientId, previousPhotos);
+		if (clientId && photosToSave && previousPhotos) {
+			await savePendingPhotos(clientId, previousPhotos);
+		}
 	};
 
 	const currentExpenses = loadOfflineExpenses();
