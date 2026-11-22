@@ -199,7 +199,11 @@ export async function updateExistingUserProfile(
   try {
     await db
       .update(users)
-      .set({ email: userInfo.email, displayName: userInfo.displayName, updatedAt: new Date() })
+      .set({
+        email: userInfo.email.toLowerCase(),
+        displayName: userInfo.displayName,
+        updatedAt: new Date(),
+      })
       .where(eq(users.id, userId));
   } catch (emailErr) {
     if (isUniqueConstraintError(emailErr)) {
@@ -239,11 +243,8 @@ export async function resolveNewUser(
   userInfo: { providerAccountId: string; email: string; displayName: string; avatarUrl?: string }
 ): Promise<{ userId: string } | { redirect: string }> {
   const db = getDb();
-  const existingByEmail = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, userInfo.email))
-    .limit(1);
+  const email = userInfo.email.toLowerCase();
+  const existingByEmail = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
   if (existingByEmail.length > 0) {
     return { redirect: `${CONFIG.frontend.url}/auth?auth_error=email_exists` };
@@ -255,7 +256,7 @@ export async function resolveNewUser(
       const newUser = tx
         .insert(users)
         .values({
-          email: userInfo.email,
+          email,
           displayName: userInfo.displayName,
         })
         .returning()
@@ -272,7 +273,11 @@ export async function resolveNewUser(
           status: 'active',
         })
         .run();
-      attachPendingInvites(tx, newUser.id, newUser.email);
+      try {
+        attachPendingInvites(tx, newUser.id, newUser.email);
+      } catch (error) {
+        logger.warn('Could not attach pending invites on signup', { userId: newUser.id, error });
+      }
       return { userId: newUser.id };
     });
     return result;

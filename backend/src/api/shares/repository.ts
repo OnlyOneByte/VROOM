@@ -51,6 +51,18 @@ export function toOwnerView(
   };
 }
 
+export async function findInviteeId(
+  db: Pick<AppDatabase, 'select'>,
+  email: string
+): Promise<string | null> {
+  const [match] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+  return match?.id ?? null;
+}
+
 export function attachPendingInvites(
   tx: Pick<AppDatabase, 'update'>,
   userId: string,
@@ -62,7 +74,7 @@ export function attachPendingInvites(
       and(
         isNull(vehicleShares.sharedWithId),
         eq(vehicleShares.status, 'pending'),
-        sql`lower(${vehicleShares.invitedEmail}) = ${email.toLowerCase()}`,
+        eq(vehicleShares.invitedEmail, email),
         sql`${vehicleShares.vehicleId} not in (select v.id from vehicles v where v.user_id = ${userId})`,
         sql`${vehicleShares.vehicleId} not in (select s.vehicle_id from vehicle_shares s where s.shared_with_id = ${userId} and s.status in (${sql.join(
           ACTIVE_SHARE_STATUSES.map((status) => sql`${status}`),
