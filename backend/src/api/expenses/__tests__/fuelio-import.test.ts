@@ -303,3 +303,33 @@ describe('parseFuelioExport with a time zone', () => {
     expect(days).toEqual(['2024-01-05', '2024-01-10', '2024-01-19', '2024-02-01']);
   });
 });
+
+describe('a Fuelio odometer of 0', () => {
+  test('a fill-up at 0 is refused, and a cost row still imports with no mileage', () => {
+    const csv = `"## Vehicle"
+"Name","ImportCSVDateFormat"
+"Golf","yyyy-MM-dd"
+
+"## Log"
+"Data","Odo (km)","Fuel (litres)","Price","Missed"
+"2024-01-05","0","42.10","68.90",0
+
+"## CostCategories"
+"CostTypeID","Name"
+"1","Service"
+
+"## Costs"
+"CostTitle","Date","Odo","CostTypeID","Cost"
+"Oil change","2024-01-10","0","1","89.00"
+`;
+    const r = parseFuelioExport(csv, {
+      targetVehicle: TARGET_VEHICLE,
+      targetUnits: TARGET_UNITS,
+    });
+    const plan = buildImportPlan(r.csv, VEHICLES);
+    expect(plan.rows.map((row) => [row.status, row.message, row.expense?.mileage])).toEqual([
+      ['error', 'Mileage must be greater than 0', undefined],
+      ['ready', undefined, null],
+    ]);
+  });
+});
