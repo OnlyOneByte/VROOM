@@ -148,18 +148,18 @@ describe('VehicleCarousel states', () => {
 		});
 		const next = await screen.findByRole('button', { name: 'Next slide' });
 		const previous = screen.getByRole('button', { name: 'Previous slide' });
-		expect(previous).toHaveClass('opacity-40');
-		expect(next).not.toHaveClass('opacity-40');
+		expect(previous).toHaveAttribute('aria-disabled', 'true');
+		expect(next).toHaveAttribute('aria-disabled', 'false');
 
 		next.focus();
 		await fireEvent.click(next);
 
-		expect(next).toHaveClass('opacity-40');
-		expect(previous).not.toHaveClass('opacity-40');
+		expect(next).toHaveAttribute('aria-disabled', 'true');
+		expect(previous).toHaveAttribute('aria-disabled', 'false');
 		expect(document.activeElement).toBe(next);
 
 		await fireEvent.keyDown(next, { key: 'ArrowLeft' });
-		expect(next).not.toHaveClass('opacity-40');
+		expect(next).toHaveAttribute('aria-disabled', 'false');
 	});
 
 	test('arrows appear when a resize makes the cards overflow', async () => {
@@ -172,7 +172,12 @@ describe('VehicleCarousel states', () => {
 
 		embla.resize(1);
 
-		expect(await screen.findByRole('button', { name: 'Next slide' })).toBeInTheDocument();
+		const next = await screen.findByRole('button', { name: 'Next slide' });
+		expect(next).toHaveAttribute('aria-disabled', 'false');
+		expect(screen.getByRole('button', { name: 'Previous slide' })).toHaveAttribute(
+			'aria-disabled',
+			'true'
+		);
 	});
 
 	test('the arrows sit over the photo, not over the card title', async () => {

@@ -32,7 +32,6 @@
 	let { vehicles, isLoading = false }: Props = $props();
 
 	const CAROUSEL_ARROW_CLASS = 'top-28 bg-background/90 hover:bg-background shadow-md';
-	const UNAVAILABLE_ARROW_CLASS = 'opacity-40 pointer-events-none';
 
 	let canScrollPrev = $state(false);
 	let canScrollNext = $state(false);
@@ -185,15 +184,13 @@
 				{#if canScrollPrev || canScrollNext}
 					<Carousel.Previous
 						variant="ghost"
-						class="{CAROUSEL_ARROW_CLASS} left-2 md:left-4 {canScrollPrev
-							? ''
-							: UNAVAILABLE_ARROW_CLASS}"
+						aria-disabled={!canScrollPrev}
+						class="{CAROUSEL_ARROW_CLASS} left-2 md:left-4"
 					/>
 					<Carousel.Next
 						variant="ghost"
-						class="{CAROUSEL_ARROW_CLASS} right-2 md:right-4 {canScrollNext
-							? ''
-							: UNAVAILABLE_ARROW_CLASS}"
+						aria-disabled={!canScrollNext}
+						class="{CAROUSEL_ARROW_CLASS} right-2 md:right-4"
 					/>
 				{/if}
 			</Carousel.Root>
