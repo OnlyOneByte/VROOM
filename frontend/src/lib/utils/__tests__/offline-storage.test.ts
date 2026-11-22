@@ -1481,6 +1481,17 @@ describe('queue owner scoping', () => {
 		expect(db.photos.has('c1')).toBe(false);
 	});
 
+	it('a queue write that fails for a moved entry drops the copied photos and keeps the originals', async () => {
+		const { db, store, parked, before } = parkedWithPhoto('user-22', { vehicleId: 'v2' });
+		failQueueWrites('user-22');
+
+		expect(await replaceParkedExpense('parked', requeueInput, null)).toBe('failed');
+
+		expect([...db.photos.keys()]).toEqual(['c1']);
+		expect(db.photos.get('c1')).toEqual([before]);
+		expect(JSON.parse(store.get(scoped('user-22'))!)).toEqual([parked]);
+	});
+
 	it('a moved entry whose stored photos still cannot be read is refused, keeping them', async () => {
 		const { db, store, parked, before } = parkedWithPhoto('user-21', { vehicleId: 'v2' });
 		const transaction = db.database.transaction;

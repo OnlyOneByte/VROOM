@@ -34,7 +34,7 @@ vi.mock('#lib/utils/offline-storage.ts', () => ({
 }));
 
 const { ExpenseFormState } = await import('../expense-form-state.svelte');
-const { loadQueuedExpense } = await import('../expense-form-loaders');
+const { loadQueuedExpense, loadQueuedPhotos } = await import('../expense-form-loaders');
 const {
 	saveQueuedExpense,
 	REQUEUE_FAILED_MESSAGE,
@@ -163,6 +163,31 @@ describe('saveQueuedExpense', () => {
 			expect.objectContaining({ amount: 45.1 }),
 			null
 		);
+	});
+
+	test('Retry reads the photos again and, once they load, saving sends them', async () => {
+		const receipt = new File(['r'], 'receipt.jpg', { type: 'image/jpeg' });
+		storage.loadPendingPhotos.mockRejectedValueOnce(new Error('photo store unavailable'));
+		const state = newState();
+		await loadQueuedExpense(state, 'offline_1');
+		expect(state.queuedPhotosUnreadable).toBe(true);
+
+		storage.loadPendingPhotos.mockRejectedValueOnce(new Error('still unavailable'));
+		await loadQueuedPhotos(state, 'client-1');
+		expect(state.queuedPhotosUnreadable).toBe(true);
+
+		storage.loadPendingPhotos.mockResolvedValueOnce([receipt]);
+		await loadQueuedPhotos(state, 'client-1');
+		expect(state.queuedPhotosUnreadable).toBe(false);
+		expect(state.pendingFiles).toEqual([receipt]);
+
+		state.vehicle = makeVehicle('v1');
+		state.isLoading = false;
+		state.formData.amount = '45.10';
+		await saveQueuedExpense(state);
+		expect(storage.replaceParkedExpense).toHaveBeenCalledWith('offline_1', expect.anything(), [
+			receipt
+		]);
 	});
 
 	test('offline, it says the entry will sync later', async () => {

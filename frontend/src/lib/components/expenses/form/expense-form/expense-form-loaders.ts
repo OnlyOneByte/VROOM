@@ -80,12 +80,15 @@ export async function loadQueuedExpense(state: ExpenseFormState, id: string): Pr
 	state.formData.missedFillup = queued.missedFillup ?? false;
 	state.sourceType = queued.sourceType ?? null;
 	state.sourceId = queued.sourceId ?? null;
-	if (queued.clientId) {
-		try {
-			state.pendingFiles = await loadPendingPhotos(queued.clientId);
-		} catch {
-			state.queuedPhotosUnreadable = true;
-		}
+	if (queued.clientId) await loadQueuedPhotos(state, queued.clientId);
+}
+
+export async function loadQueuedPhotos(state: ExpenseFormState, clientId: string): Promise<void> {
+	try {
+		state.pendingFiles = await loadPendingPhotos(clientId);
+		state.queuedPhotosUnreadable = false;
+	} catch {
+		state.queuedPhotosUnreadable = true;
 	}
 }
 

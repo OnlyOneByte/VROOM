@@ -25,6 +25,7 @@
 		applyPreselections,
 		loadExpense,
 		loadQueuedExpense,
+		loadQueuedPhotos,
 		loadVehicleContext,
 		loadVehicles
 	} from './expense-form/expense-form-loaders';
@@ -487,13 +488,23 @@
 					{#if form.originalExpense}
 						<ExpensePhotoSection entityType="expense" entityId={form.originalExpense.id} />
 					{/if}
-				{:else if form.queuedPhotosUnreadable}
-					<div class="space-y-1" data-testid="queued-photos-unreadable">
+				{:else if form.queuedPhotosUnreadable && form.queuedExpense?.clientId}
+					{@const clientId = form.queuedExpense.clientId}
+					<div class="space-y-2" data-testid="queued-photos-unreadable">
 						<h2 class="text-sm font-medium text-foreground">Photos & Receipts</h2>
-						<p class="text-sm text-muted-foreground">
+						<p id="queued-photos-message" class="text-sm text-muted-foreground">
 							Couldn't load this entry's photos, so they can't be changed here. They stay saved with
 							it and will sync as they are.
 						</p>
+						<Button
+							variant="outline"
+							size="lg"
+							aria-describedby="queued-photos-message"
+							disabled={isRetrying}
+							onclick={() => retry(() => loadQueuedPhotos(form, clientId))}
+						>
+							Retry
+						</Button>
 					</div>
 				{:else}
 					<PendingPhotoPreview
