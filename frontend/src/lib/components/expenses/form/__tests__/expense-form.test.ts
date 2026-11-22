@@ -702,6 +702,24 @@ describe('ExpenseForm loading and load failures', () => {
 		expect(getVehicle).toHaveBeenCalledTimes(failedCalls + 1);
 	});
 
+	test('a vehicle detail retry that succeeds leaves focus where the user moved it', async () => {
+		getVehicle.mockRejectedValue(new Error('offline'));
+		render(ExpenseForm, { props: { preselectedCategory: 'misc' } });
+		const alert = await screen.findByTestId('vehicle-load-error');
+		const retry = within(alert).getByRole('button', { name: 'Retry' });
+		let finish: (v: Vehicle) => void = () => {};
+		getVehicle.mockReturnValue(new Promise<Vehicle>(resolve => (finish = resolve)));
+		retry.focus();
+
+		await fireEvent.click(retry);
+		field('amount').focus();
+		finish(CAMRY);
+
+		await vi.waitFor(() => expect(screen.queryByTestId('vehicle-load-error')).toBeNull());
+		await tick();
+		expect(document.activeElement).toBe(field('amount'));
+	});
+
 	test('a vehicle list failure while editing keeps the edit title and retry loads the form', async () => {
 		getVehicles.mockRejectedValueOnce(new Error('offline'));
 		getExpense.mockResolvedValue(EXISTING);

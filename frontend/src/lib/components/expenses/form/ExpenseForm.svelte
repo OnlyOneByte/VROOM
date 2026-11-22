@@ -183,23 +183,29 @@
 	let photoPicker = $state<HTMLDivElement | null>(null);
 	let photosRetryFailed = $state(false);
 
+	function focusLeftOn(origin: Element | null): boolean {
+		const active = document.activeElement;
+		return active === origin || active === null || active === document.body;
+	}
+
 	async function retryVehicleContext() {
-		if (isRetrying) return;
+		const origin = document.activeElement;
 		await retry(() => loadVehicleContext(form));
 		if (form.vehicleError) return;
 		await tick();
-		document.getElementById('vehicle')?.focus();
+		if (focusLeftOn(origin)) document.getElementById('vehicle')?.focus();
 	}
 
 	async function retryQueuedPhotos(clientId: string) {
 		if (isRetrying) return;
+		const origin = document.activeElement;
 		photosRetryFailed = false;
 		await tick();
 		await retry(() => loadQueuedPhotos(form, clientId));
 		photosRetryFailed = form.queuedPhotosUnreadable;
 		if (photosRetryFailed) return;
 		await tick();
-		photoPicker?.querySelector('button')?.focus();
+		if (focusLeftOn(origin)) photoPicker?.querySelector('button')?.focus();
 	}
 
 	async function reloadExpense() {
@@ -534,7 +540,7 @@
 						>
 							Retry
 						</Button>
-						<p role="status" class="text-sm text-muted-foreground">
+						<p role="status" class="min-h-5 text-sm text-muted-foreground">
 							{#if photosRetryFailed}Still couldn't load them. Try again in a moment.{/if}
 						</p>
 					</div>
