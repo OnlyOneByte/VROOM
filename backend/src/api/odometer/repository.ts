@@ -3,7 +3,8 @@ import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
 import { odometerEntries } from '../../db/schema';
-import { DatabaseError } from '../../errors';
+import type { DrizzleTransaction } from '../../db/types';
+import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 import { zonedDayWindow } from '../../utils/time-zone';
@@ -36,6 +37,34 @@ export function localDayWindow(
 export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdometerEntry> {
   constructor(db: AppDatabase) {
     super(db, odometerEntries);
+  }
+
+  async createChecked(
+    data: NewOdometerEntry,
+    check: (tx: DrizzleTransaction) => void
+  ): Promise<OdometerEntry> {
+    return this.db.transaction((tx) => {
+      check(tx);
+      return tx.insert(odometerEntries).values(data).returning().get();
+    });
+  }
+
+  async updateChecked(
+    id: string,
+    data: Partial<NewOdometerEntry>,
+    check: (tx: DrizzleTransaction) => void
+  ): Promise<OdometerEntry> {
+    return this.db.transaction((tx) => {
+      check(tx);
+      const updated = tx
+        .update(odometerEntries)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(odometerEntries.id, id))
+        .returning()
+        .get();
+      if (!updated) throw new NotFoundError('Odometer entry');
+      return updated;
+    });
   }
 
   async findIdsByVehicleId(vehicleId: string): Promise<string[]> {
