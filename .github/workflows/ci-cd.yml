@@ -23,7 +23,6 @@ env:
   FRONTEND_IMAGE_NAME: ${{ github.repository }}/frontend
 
 jobs:
-  # Backend testing and validation
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
@@ -60,7 +59,6 @@ jobs:
       - name: Build application
         run: bun run build
 
-  # Frontend testing and validation
   frontend-test:
     name: Frontend Tests
     runs-on: ubuntu-latest
@@ -139,7 +137,6 @@ jobs:
           path: frontend/playwright-report/
           retention-days: 7
 
-  # Build and push Docker images
   build-backend:
     name: Build Backend Docker Image
     runs-on: ubuntu-latest
@@ -238,7 +235,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Trigger deployment for self-hosted environments
   deploy:
     name: Trigger Deployment
     runs-on: ubuntu-latest
