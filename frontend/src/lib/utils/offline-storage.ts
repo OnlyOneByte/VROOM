@@ -266,6 +266,47 @@ export async function addOfflineExpense(
 	return queued;
 }
 
+function isEditableParked(expense: OfflineExpense): boolean {
+	return !expense.synced && !!expense.needsAttention && !expense.serverId;
+}
+
+export function findParkedExpense(id: string): OfflineExpense | undefined {
+	return loadOfflineExpenses().find(expense => expense.id === id && isEditableParked(expense));
+}
+
+export type ReplaceParkedResult = 'saved' | 'not-parked' | 'failed';
+
+export async function replaceParkedExpense(
+	id: string,
+	expense: Omit<OfflineExpense, 'id' | 'clientId' | 'timestamp' | 'synced' | 'version'>,
+	photos: File[]
+): Promise<ReplaceParkedResult> {
+	const parked = findParkedExpense(id);
+	if (!parked) return 'not-parked';
+	if (parked.clientId) {
+		if (!(await savePendingPhotos(parked.clientId, photos))) return 'failed';
+	} else if (photos.length > 0) {
+		return 'failed';
+	}
+
+	const currentExpenses = loadOfflineExpenses();
+	const existing = currentExpenses.find(entry => entry.id === id);
+	if (!existing || !isEditableParked(existing)) return 'not-parked';
+	const replaced: OfflineExpense = {
+		...expense,
+		amount: roundToCents(expense.amount),
+		id: existing.id,
+		...(existing.clientId !== undefined && { clientId: existing.clientId }),
+		timestamp: existing.timestamp,
+		synced: false,
+		version: OFFLINE_STORAGE_VERSION
+	};
+	const saved = saveOfflineExpenses(
+		currentExpenses.map(entry => (entry.id === id ? replaced : entry))
+	);
+	return saved ? 'saved' : 'failed';
+}
+
 export function removeOfflineExpense(id: string): void {
 	const currentExpenses = loadOfflineExpenses();
 	const removed = currentExpenses.find(expense => expense.id === id);

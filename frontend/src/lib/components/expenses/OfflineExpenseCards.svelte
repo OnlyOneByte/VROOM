@@ -3,7 +3,9 @@
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as CardNs from '#lib/components/ui/card/index.ts';
-	import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
+	import { resolve } from '$app/paths';
+	import { routes } from '#lib/routes.ts';
+	import { INCOMPLETE_FUEL_REASON, type OfflineExpense } from '#lib/utils/offline-storage.ts';
 	import { DISPLAY_LIMITS } from '#lib/constants/limits.ts';
 	import { EXPENSE_MESSAGES } from '#lib/constants/messages.ts';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
@@ -116,9 +118,10 @@
 				<div>
 					<CardNs.Title>Needs attention ({needsAttentionExpenses.length})</CardNs.Title>
 					<CardNs.Description>
-						These entries can't finish syncing as they are: a fuel entry needs its fuel amount
-						(volume or charge) and mileage, or the server rejected a photo. Retry them from the sync
-						panel once the cause is fixed, or discard what is left on this device.
+						These entries can't finish syncing as they are: the server didn't accept an entry, a
+						fuel entry needs its fuel amount (volume or charge) and mileage, or the server rejected
+						a photo. Edit an entry to fix it, retry from the sync panel once the cause is fixed, or
+						discard what is left on this device.
 					</CardNs.Description>
 				</div>
 				<div class="p-2 rounded-lg bg-warning/10">
@@ -162,7 +165,22 @@
 										"A photo couldn't be uploaded."}
 								</div>
 							{:else if expense.attentionReason}
-								<div class="text-sm text-foreground mt-1">{expense.attentionReason}</div>
+								<div class="text-sm text-foreground mt-1">
+									{expense.attentionReason === INCOMPLETE_FUEL_REASON
+										? expense.attentionReason
+										: `The server didn't accept this entry: ${expense.attentionReason}`}
+								</div>
+							{/if}
+							{#if !expense.serverId}
+								<Button
+									variant="outline"
+									size="lg"
+									href={`${resolve(routes.expenseNew)}?queued=${encodeURIComponent(expense.id)}`}
+									class="mt-2"
+									aria-label="Edit {describeEntry(expense)}"
+								>
+									Edit
+								</Button>
 							{/if}
 						</div>
 						<TriangleAlert class="h-4 w-4 text-warning flex-shrink-0" />

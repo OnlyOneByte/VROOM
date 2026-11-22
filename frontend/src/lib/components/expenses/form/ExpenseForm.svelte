@@ -6,7 +6,7 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
-	import { LoaderCircle, CreditCard, Info, CircleAlert } from '@lucide/svelte';
+	import { LoaderCircle, CreditCard, Info, CircleAlert, TriangleAlert } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import CategorySelector from './CategorySelector.svelte';
@@ -24,10 +24,12 @@
 	import {
 		applyPreselections,
 		loadExpense,
+		loadQueuedExpense,
 		loadVehicleContext,
 		loadVehicles
 	} from './expense-form/expense-form-loaders';
 	import { deleteExpense, submitExpense } from './expense-form/expense-form-actions';
+	import { saveQueuedExpense } from './expense-form/requeue-expense';
 	import { buildDuplicateQuery } from './expense-form/expense-navigation';
 	import InsuranceManagedView from './expense-form/InsuranceManagedView.svelte';
 	import VehicleSelectField from './expense-form/VehicleSelectField.svelte';
@@ -51,10 +53,12 @@
 		preselectedAmount?: string | null;
 		preselectedDescription?: string | null;
 		preselectedTags?: string | null;
+		queuedExpenseId?: string | null;
 	}
 
 	let {
 		expenseId,
+		queuedExpenseId = null,
 		returnTo = '/expenses',
 		preselectedVehicleId = null,
 		preselectedCategory = null,
@@ -75,7 +79,7 @@
 
 	const form = new ExpenseFormState(
 		ctx,
-		untrack(() => !!expenseId)
+		untrack(() => !!expenseId || !!queuedExpenseId)
 	);
 
 	let previousVehicleId = $state('');
@@ -87,7 +91,10 @@
 		) {
 			previousVehicleId = form.formData.vehicleId;
 			if (form.vehicle !== null || !form.isLoading) {
-				if (!form.isEditMode || form.vehicle !== null) {
+				if (
+					(!form.isEditMode || form.vehicle !== null) &&
+					form.formData.vehicleId !== form.queuedExpense?.vehicleId
+				) {
 					form.sourceType = null;
 					form.sourceId = null;
 				}
@@ -110,6 +117,9 @@
 
 		if (form.isEditMode && expenseId) {
 			await loadExpense(form);
+		} else if (queuedExpenseId) {
+			await loadQueuedExpense(form, queuedExpenseId);
+			form.isLoading = false;
 		} else {
 			applyPreselections(form, {
 				vehicleId: preselectedVehicleId,
@@ -133,8 +143,18 @@
 	let isRetrying = $state(false);
 	let retryButton = $state<HTMLButtonElement | null>(null);
 
+	const formTitle = $derived(
+		form.isGroupEditMode
+			? 'Edit Split Expense'
+			: form.isEditMode
+				? 'Edit Expense'
+				: form.queuedExpense
+					? 'Edit Queued Expense'
+					: 'Add Expense'
+	);
+
 	async function save() {
-		await submitExpense(form);
+		await (form.queuedExpense ? saveQueuedExpense(form) : submitExpense(form));
 		if (form.errors['vehicleDetails'] && retryButton) {
 			retryButton.scrollIntoView({ block: 'center' });
 			retryButton.focus({ preventScroll: true });
@@ -219,14 +239,7 @@
 		/>
 	{:else if form.vehiclesError}
 		<div class="space-y-6">
-			<ExpenseFormHeader
-				title={form.isGroupEditMode
-					? 'Edit Split Expense'
-					: form.isEditMode
-						? 'Edit Expense'
-						: 'Add Expense'}
-				onBack={handleBack}
-			>
+			<ExpenseFormHeader title={formTitle} onBack={handleBack}>
 				{#snippet subtitle()}
 					<ExpenseFormSubtitle
 						isEditMode={form.isEditMode}
@@ -250,22 +263,19 @@
 		</div>
 	{:else}
 		<div class="space-y-6 pb-32 sm:pb-24">
-			<ExpenseFormHeader
-				title={form.isGroupEditMode
-					? 'Edit Split Expense'
-					: form.isEditMode
-						? 'Edit Expense'
-						: 'Add Expense'}
-				onBack={handleBack}
-			>
+			<ExpenseFormHeader title={formTitle} onBack={handleBack}>
 				{#snippet subtitle()}
-					<ExpenseFormSubtitle
-						isEditMode={form.isEditMode}
-						isGroupEditMode={form.isGroupEditMode}
-						selectedVehicleIds={form.selectedVehicleIds}
-						vehicles={form.vehicles}
-						vehicle={form.vehicle}
-					/>
+					{#if form.queuedExpense}
+						Saved on this device, waiting to sync
+					{:else}
+						<ExpenseFormSubtitle
+							isEditMode={form.isEditMode}
+							isGroupEditMode={form.isGroupEditMode}
+							selectedVehicleIds={form.selectedVehicleIds}
+							vehicles={form.vehicles}
+							vehicle={form.vehicle}
+						/>
+					{/if}
 				{/snippet}
 			</ExpenseFormHeader>
 
@@ -276,8 +286,26 @@
 				}}
 				class="rounded-lg border bg-card p-6 space-y-6"
 			>
-				{#if !form.isEditMode && !form.isSplit && !form.isInsuranceManaged}
+				{#if !form.isEditMode && !form.isSplit && !form.isInsuranceManaged && !form.queuedExpense}
 					<ReceiptScanButton onDraft={handleReceiptDraft} />
+				{/if}
+
+				{#if form.queuedExpense}
+					<div
+						class="flex items-start gap-3 rounded-lg border bg-muted/50 p-4"
+						data-testid="queued-edit-note"
+					>
+						<TriangleAlert class="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+						<div class="space-y-1 text-sm text-foreground">
+							<p class="font-medium">This entry couldn't sync.</p>
+							{#if form.queuedExpense.attentionReason}
+								<p>{form.queuedExpense.attentionReason}</p>
+							{/if}
+							<p class="text-muted-foreground">
+								Fix it here and save, and it goes back in the queue to sync.
+							</p>
+						</div>
+					</div>
 				{/if}
 
 				{#if form.isGroupEditMode}
