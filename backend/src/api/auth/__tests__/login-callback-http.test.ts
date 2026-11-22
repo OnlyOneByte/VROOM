@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 import type { OAuthProviderConfig, OAuthUserInfo } from '../providers/types';
 
 type MutableConfig = {
@@ -127,6 +128,34 @@ describe('GET /auth/callback/:authProvider — login', () => {
       .query('SELECT COUNT(*) AS n FROM users WHERE email = ?')
       .get('returning@example.com') as { n: number };
     expect(count.n).toBe(1);
+  });
+
+  test('an invite saved without an invitee while its email signed up attaches on the next login', async () => {
+    providerReturns({
+      providerAccountId: 'gh-3003',
+      email: 'between@example.com',
+      displayName: 'Between',
+    });
+    const userId = sessionUserIdFrom(await loginRoundTrip());
+    const vehicleId = await seedVehicle(ctx);
+    const insertPendingInvite = (id: string, email: string) =>
+      ctx.sqlite.run(
+        "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, level, status, invited_email) VALUES (?, ?, ?, 'viewer', 'pending', ?)",
+        [id, vehicleId, ctx.user.id, email]
+      );
+    insertPendingInvite('share-missed', 'between@example.com');
+    insertPendingInvite('share-other', 'someone-else@example.com');
+
+    await loginRoundTrip();
+
+    const invitee = (id: string) =>
+      (
+        ctx.sqlite.query('SELECT shared_with_id FROM vehicle_shares WHERE id = ?').get(id) as {
+          shared_with_id: string | null;
+        }
+      ).shared_with_id;
+    expect(invitee('share-missed')).toBe(userId as string);
+    expect(invitee('share-other')).toBeNull();
   });
 
   test('a provider with no verified email redirects with no_email and opens no session', async () => {
