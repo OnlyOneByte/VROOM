@@ -128,4 +128,24 @@ describe('RecentActivityCard', () => {
 
 		expect(screen.getByRole('link', { name: /View All Expenses/ })).toHaveClass('h-10', 'sm:h-9');
 	});
+	test('the category badge stays on one line and the vehicle name stacks under it on mobile', () => {
+		render(RecentActivityCard, {
+			expenses: [
+				{
+					id: 'e1',
+					amount: 28.99,
+					category: 'fuel',
+					date: daysAgo(2),
+					description: 'Arco',
+					vehicleName: 'Weekend Car'
+				}
+			]
+		});
+
+		const name = screen.getByText('Weekend Car');
+		const badge = name.previousElementSibling;
+		expect(badge).toHaveClass('whitespace-nowrap', 'shrink-0');
+		expect(name.parentElement).toHaveClass('flex-col', 'sm:flex-row');
+		expect(name).toHaveClass('truncate', 'min-w-0', 'max-w-full');
+	});
 });
