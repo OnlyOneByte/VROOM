@@ -272,7 +272,11 @@ export async function resolveNewUser(
           status: 'active',
         })
         .run();
-      attachPendingInvites(tx, newUser.id, newUser.email);
+      try {
+        attachPendingInvites(tx, newUser.id, newUser.email);
+      } catch (error) {
+        logger.warn('Could not attach pending invites on signup', { userId: newUser.id, error });
+      }
       return { userId: newUser.id };
     });
     return result;
