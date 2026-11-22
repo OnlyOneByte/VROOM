@@ -348,6 +348,26 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect((await listExpenses()).length).toBe(0);
   });
 
+  test('an amount with more than 2 decimals or a mileage over 10,000,000 is rejected, not rounded', async () => {
+    await seedCivic('Daily Driver');
+    const csv = [
+      'date,vehicle,category,amount,mileage',
+      '2024-06-01T00:00:00.000Z,Daily Driver,misc,12.345,',
+      '2024-06-02T00:00:00.000Z,Daily Driver,misc,12.34,10000000',
+      '2024-06-03T00:00:00.000Z,Daily Driver,misc,5,10000001',
+    ].join('\n');
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(res);
+    expect(res.status).toBe(200);
+    expect(body.data.rows.map((r) => [r.status, r.message])).toEqual([
+      ['error', 'Amount "12.345" can have at most 2 decimal places'],
+      ['ready', undefined],
+      ['error', 'Odometer must be 10,000,000 or less'],
+    ]);
+    expect((await listExpenses()).map((r) => r.expenseAmount)).toEqual([12.34]);
+  });
+
   test('matches a vehicle by its "year make model" name too (not just nickname)', async () => {
     await seedCivic('Daily Driver');
     const csv = [
