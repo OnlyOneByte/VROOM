@@ -1,5 +1,10 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { drizzle } from 'drizzle-orm/bun-sqlite';
+import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import {
   applyMigration,
   applyMigrationsUpTo,
@@ -61,5 +66,63 @@ describe('Migration 0004: user emails are stored lowercased', () => {
   test('runs cleanly on an empty users table', () => {
     applyMigration(db, migrations[4]);
     expect(countRows(db, 'users')).toBe(0);
+  });
+});
+
+describe('Migration 0004 through the drizzle migrator', () => {
+  const MIGRATIONS_FOLDER = join(import.meta.dir, '../../../drizzle');
+  let workDir: string;
+  let sqlite: Database;
+
+  beforeEach(() => {
+    workDir = mkdtempSync(join(tmpdir(), 'vroom-migration-0004-'));
+    sqlite = new Database(join(workDir, 'vroom.db'));
+    sqlite.run('PRAGMA foreign_keys = ON');
+  });
+
+  afterEach(() => {
+    sqlite.close();
+    rmSync(workDir, { recursive: true, force: true });
+  });
+
+  function migrationsStoppingAt(lastIdx: number): string {
+    const folder = join(workDir, 'drizzle');
+    cpSync(MIGRATIONS_FOLDER, folder, { recursive: true });
+    const journalPath = join(folder, 'meta', '_journal.json');
+    const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as { entries: unknown[] };
+    journal.entries = journal.entries.slice(0, lastIdx + 1);
+    writeFileSync(journalPath, JSON.stringify(journal));
+    return folder;
+  }
+
+  test('refuses case-variant emails, rolls back cleanly, and applies once one is renamed', () => {
+    const db = drizzle(sqlite);
+    migrate(db, { migrationsFolder: migrationsStoppingAt(3) });
+    expect(countRows(sqlite, '__drizzle_migrations')).toBe(4);
+    sqlite.run(
+      "INSERT INTO users (id, email, display_name) VALUES ('u1', 'pair@example.com', 'A')"
+    );
+    sqlite.run(
+      "INSERT INTO users (id, email, display_name) VALUES ('u2', 'Pair@Example.com', 'B')"
+    );
+
+    let failure: unknown;
+    try {
+      migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(Error);
+    expect(`${(failure as Error).message} ${(failure as Error).cause}`).toContain(
+      'Migration 0004_lowercase_user_emails stopped'
+    );
+    expect(countRows(sqlite, '__drizzle_migrations')).toBe(4);
+    expect(
+      sqlite.query("SELECT name FROM sqlite_temp_master WHERE name LIKE '__email_case%'").all()
+    ).toEqual([]);
+
+    sqlite.run("UPDATE users SET email = 'pair.two@example.com' WHERE id = 'u2'");
+    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    expect(countRows(sqlite, '__drizzle_migrations')).toBe(loadMigrations().length);
   });
 });
