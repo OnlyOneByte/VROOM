@@ -179,6 +179,17 @@
 		}
 	}
 
+	let photoPicker = $state<HTMLDivElement | null>(null);
+	let photosRetryFailed = $state(false);
+
+	async function retryQueuedPhotos(clientId: string) {
+		await retry(() => loadQueuedPhotos(form, clientId));
+		photosRetryFailed = form.queuedPhotosUnreadable;
+		if (photosRetryFailed) return;
+		await tick();
+		photoPicker?.querySelector('button')?.focus();
+	}
+
 	async function reloadExpense() {
 		await loadExpense(form);
 		if (form.formData.vehicleId && !form.vehiclesError && !form.expenseError) {
@@ -501,17 +512,22 @@
 							size="lg"
 							aria-describedby="queued-photos-message"
 							disabled={isRetrying}
-							onclick={() => retry(() => loadQueuedPhotos(form, clientId))}
+							onclick={() => retryQueuedPhotos(clientId)}
 						>
 							Retry
 						</Button>
+						<p role="status" class="text-sm text-muted-foreground">
+							{#if photosRetryFailed}Still couldn't load them. Try again in a moment.{/if}
+						</p>
 					</div>
 				{:else}
-					<PendingPhotoPreview
-						files={form.pendingFiles}
-						onAdd={file => (form.pendingFiles = [...form.pendingFiles, file])}
-						onRemove={i => (form.pendingFiles = form.pendingFiles.filter((_, idx) => idx !== i))}
-					/>
+					<div bind:this={photoPicker}>
+						<PendingPhotoPreview
+							files={form.pendingFiles}
+							onAdd={file => (form.pendingFiles = [...form.pendingFiles, file])}
+							onRemove={i => (form.pendingFiles = form.pendingFiles.filter((_, idx) => idx !== i))}
+						/>
+					</div>
 				{/if}
 
 				{#if form.submitError}
