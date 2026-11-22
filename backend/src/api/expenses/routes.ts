@@ -96,14 +96,12 @@ async function odometerCheck(
 
 async function editedOdometerCheck(
   existing: Expense,
-  next: OdometerReadingInput & { category: string }
+  next: OdometerReadingInput
 ): Promise<OdometerCheck | null> {
-  if (next.category !== 'fuel') return null;
   const unchanged =
     next.vehicleId === existing.vehicleId &&
     next.date.getTime() === existing.date.getTime() &&
-    next.mileage === existing.mileage &&
-    next.category === existing.category;
+    next.mileage === existing.mileage;
   if (unchanged) return null;
   return odometerCheck(next, existing.id);
 }
@@ -873,7 +871,6 @@ routes.put(
       vehicleId: updateData.vehicleId ?? existingExpense.vehicleId,
       date: updateData.date ?? existingExpense.date,
       mileage: finalMileage,
-      category: finalCategory,
       timeZone,
     });
 

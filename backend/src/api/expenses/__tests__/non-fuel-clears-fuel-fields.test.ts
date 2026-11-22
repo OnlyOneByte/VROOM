@@ -28,8 +28,8 @@ function expenseRow(id: string): FuelCols {
     .get(id) as FuelCols;
 }
 
-describe('non-fuel expense writes null the fuel-only fields', () => {
-  test('POST a misc expense carrying stray volume/fuelType/mileage → stored with them nulled', async () => {
+describe('non-fuel expense writes clear the fuel-only fields and keep the mileage', () => {
+  test('POST a misc expense carrying volume/fuelType/mileage → stored with the fuel fields nulled and the mileage kept', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const res = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
@@ -48,11 +48,11 @@ describe('non-fuel expense writes null the fuel-only fields', () => {
     expect(row.category).toBe('misc');
     expect(row.volume).toBeNull();
     expect(row.fuel_type).toBeNull();
-    expect(row.mileage).toBeNull();
+    expect(row.mileage).toBe(99_999);
     expect(row.missed_fillup).toBe(0);
   });
 
-  test('PUT switching a fuel expense to maintenance nulls its fuel fields', async () => {
+  test('PUT switching a fuel expense to maintenance nulls its fuel fields and keeps its mileage', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
@@ -75,11 +75,11 @@ describe('non-fuel expense writes null the fuel-only fields', () => {
     expect(row.category).toBe('maintenance');
     expect(row.volume).toBeNull();
     expect(row.fuel_type).toBeNull();
-    expect(row.mileage).toBeNull();
+    expect(row.mileage).toBe(30_000);
     expect(row.missed_fillup).toBe(0);
   });
 
-  test('PUT writing a stray mileage onto an ALREADY-non-fuel row (no category sent) nulls it', async () => {
+  test('PUT adding a mileage to an already non-fuel row (no category sent) keeps it and nulls the fuel fields', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
@@ -102,10 +102,7 @@ describe('non-fuel expense writes null the fuel-only fields', () => {
 
     const row = expenseRow(id);
     expect(row.category).toBe('maintenance');
-    expect(
-      row.mileage,
-      'a stray mileage on a non-fuel row must not persist (would poison getCurrentOdometer)'
-    ).toBeNull();
+    expect(row.mileage).toBe(99_999);
     expect(row.volume).toBeNull();
     expect(row.fuel_type).toBeNull();
   });

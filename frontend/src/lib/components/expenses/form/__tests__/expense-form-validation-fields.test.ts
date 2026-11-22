@@ -151,13 +151,27 @@ describe('validateExpenseField — fuelType length', () => {
 	});
 });
 
-describe('validateMileage (via the mileage field) — fuel monotonicity', () => {
+describe('validateMileage (via the mileage field) — odometer order', () => {
 	const fuelVehicle = { initialMileage: 10000 } as Vehicle;
 
-	test('non-fuel category skips mileage validation entirely', () => {
-		expect(
-			validateExpenseField('mileage', ctx({ category: 'misc', formData: { mileage: '5' } }))
-		).toBeNull();
+	test('a non-fuel mileage is optional but, once entered, must fit between the entries around it', () => {
+		const history = [
+			{ id: 'a', date: '2026-01-01T12:00:00.000Z', mileage: 10_000 },
+			{ id: 'b', date: '2026-03-01T12:00:00.000Z', mileage: 12_000 }
+		];
+		const misc = (mileage: string) =>
+			validateExpenseField(
+				'mileage',
+				ctx({
+					category: 'misc',
+					allVehicleExpenses: history,
+					formData: { mileage, date: '2026-02-01' }
+				})
+			);
+		expect(misc('')).toBeNull();
+		expect(misc('11000')).toBeNull();
+		expect(misc('9000')).toBe('Mileage must be greater than 10,000 (from earlier entry)');
+		expect(misc('12500')).toBe('Mileage must be less than 12,000 (from later entry)');
 	});
 
 	test('fuel: empty/zero mileage is required', () => {

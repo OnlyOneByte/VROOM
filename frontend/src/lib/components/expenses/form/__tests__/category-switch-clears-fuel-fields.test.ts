@@ -13,7 +13,7 @@ function fuelEntry(): ExpenseFormState {
 }
 
 describe('category switch clears fuel fields', () => {
-	test('switching away from fuel clears volume, charge, fuelType, mileage and missedFillup', () => {
+	test('switching away from fuel clears volume, charge, fuelType and missedFillup, keeping the mileage', () => {
 		const state = fuelEntry();
 
 		state.selectCategory('misc');
@@ -23,7 +23,7 @@ describe('category switch clears fuel fields', () => {
 			volume: '',
 			charge: '',
 			fuelType: '',
-			mileage: '',
+			mileage: '1200',
 			missedFillup: false
 		});
 	});

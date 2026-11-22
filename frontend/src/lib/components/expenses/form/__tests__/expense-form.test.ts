@@ -258,7 +258,7 @@ describe('ExpenseForm create mode', () => {
 		expect(levels).toEqual([1, 2, 2]);
 	});
 
-	test('switching from fuel to another category hides the fuel fields and drops the mileage', async () => {
+	test('switching from fuel to another category hides the fuel fields and keeps the mileage', async () => {
 		await renderCreate();
 		await fireEvent.click(categoryButton('Fuel'));
 		await type('mileage', '12000');
@@ -267,7 +267,21 @@ describe('ExpenseForm create mode', () => {
 		await fireEvent.click(categoryButton('Regulatory'));
 
 		expect(document.getElementById('volume')).toBeNull();
-		expect(field('mileage').value).toBe('');
+		expect(field('mileage').value).toBe('12000');
+	});
+
+	test('a split across vehicles asks for no mileage, since a split saves none', async () => {
+		await renderCreate({ preselectedCategory: 'maintenance' });
+		expect(document.getElementById('mileage')).not.toBeNull();
+
+		await fireEvent.click(screen.getByLabelText('Split cost across vehicles'));
+		await vi.waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(2));
+		for (const box of screen.getAllByRole('checkbox', { checked: false })) {
+			await fireEvent.click(box);
+		}
+
+		await vi.waitFor(() => expect(document.getElementById('mileage')).toBeNull());
+		expect(screen.queryByText(/mileage readings/i)).toBeNull();
 	});
 
 	test('applies preselected category, amount, description and tags from the query', async () => {

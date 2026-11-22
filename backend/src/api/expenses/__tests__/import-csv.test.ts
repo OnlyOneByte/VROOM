@@ -541,7 +541,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(list.data[0]?.description).toBe(userTyped);
   });
 
-  test('a non-fuel imported row carrying mileage/volume/fuelType stores them NULL (the import write site)', async () => {
+  test('a non-fuel imported row keeps its mileage and stores volume/fuelType NULL (the import write site)', async () => {
     await seedCivic('Daily Driver');
     const csv = [
       'date,vehicle,category,amount,currency,mileage,volume,fuelType,description,tags,missedFillup,createdAt',
@@ -555,7 +555,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
 
     const row = listExpensesRaw().find((r) => r.category === 'maintenance');
     expect(row, 'the maintenance row imported').toBeTruthy();
-    expect(row?.mileage, 'a stray mileage on a non-fuel import row must not persist').toBeNull();
+    expect(row?.mileage).toBe(120000);
     expect(row?.volume).toBeNull();
     expect(row?.fuel_type).toBeNull();
     expect(row?.missed_fillup).toBe(0);

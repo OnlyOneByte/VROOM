@@ -46,9 +46,6 @@ describe('expense and vehicle form controls meet the 40px tap target on mobile',
 		const scan = source('expenses/form/ReceiptScanButton.svelte');
 		expect(scan).toContain('class="h-10 w-full sm:h-9"');
 		expect(scan).toContain('inline-flex min-h-10 items-center self-start');
-		expect(source('expenses/form/expense-form/SplitMileageReadings.svelte')).toContain(
-			'class="flex min-h-10 items-center gap-1'
-		);
 		expect(source('expenses/form/expense-form/SplitVehiclePicker.svelte')).toContain(
 			'class="inline-flex min-h-10 items-center text-xs'
 		);
