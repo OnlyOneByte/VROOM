@@ -73,6 +73,43 @@ describe('POST /api/v1/trips (create)', () => {
     expect(res.status).toBe(400);
   });
 
+  test('a decimal odometer asks for whole kilometres or miles, and one over 10,000,000 is refused', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+
+    const decimal = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 1000, endOdometer: 1080.5 })
+    );
+    expect(decimal.status).toBe(400);
+    expect(await decimal.text()).toContain('Enter whole kilometres or miles');
+
+    const tooHigh = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 9_999_990, endOdometer: 10_000_001 })
+    );
+    expect(tooHigh.status).toBe(400);
+    expect(await tooHigh.text()).toContain('Odometer must be 10,000,000 or less');
+
+    const atCap = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 9_999_990, endOdometer: 10_000_000 })
+    );
+    expect(atCap.status, await atCap.text()).toBe(201);
+  });
+
+  test('an update past the odometer cap is refused', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const created = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId));
+    const { data } = await json<DataEnvelope<{ id: string }>>(created);
+
+    const res = await ctx.authed('PUT', `/api/v1/trips/${data.id}`, { endOdometer: 10_000_001 });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('Odometer must be 10,000,000 or less');
+  });
+
   test('rejects a null, boolean or zero tripDate instead of saving 1970', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     for (const tripDate of [null, true, 0]) {

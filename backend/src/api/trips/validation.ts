@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { isValidTimeZone } from '../../utils/time-zone';
-import { dateInput, noonAnchoredDateIsNotInTheFuture } from '../../utils/validation';
+import {
+  dateInput,
+  MAX_ODOMETER_READING,
+  noonAnchoredDateIsNotInTheFuture,
+  ODOMETER_TOO_HIGH_MESSAGE,
+  WHOLE_DISTANCE_MESSAGE,
+} from '../../utils/validation';
 
 // The mileage summary buckets miles by these values: a new purpose needs a bucket there too.
 export const TRIP_PURPOSES = ['business', 'personal', 'commute', 'other'] as const;
@@ -18,6 +24,13 @@ const REFINE_MSG = {
 
 const FUTURE_MSG = { message: 'tripDate cannot be in the future' };
 
+const tripOdometer = (field: string) =>
+  z
+    .number()
+    .int(WHOLE_DISTANCE_MESSAGE)
+    .min(0, `${field} must be a non-negative integer`)
+    .max(MAX_ODOMETER_READING, ODOMETER_TOO_HIGH_MESSAGE);
+
 export const tripTimeZoneSchema = z
   .string()
   .max(64)
@@ -28,8 +41,8 @@ export const tripTimeZoneSchema = z
 export const createTripSchema = z
   .object({
     vehicleId: z.string().min(1, 'vehicleId is required'),
-    startOdometer: z.number().int().min(0, 'startOdometer must be a non-negative integer'),
-    endOdometer: z.number().int().min(0, 'endOdometer must be a non-negative integer'),
+    startOdometer: tripOdometer('startOdometer'),
+    endOdometer: tripOdometer('endOdometer'),
     purpose: z.enum(TRIP_PURPOSES),
     tripDate: dateInput.refine(noonAnchoredDateIsNotInTheFuture, FUTURE_MSG),
     startLocation: z.string().max(200).optional(),
@@ -41,8 +54,8 @@ export const createTripSchema = z
 
 export const updateTripSchema = z
   .object({
-    startOdometer: z.number().int().min(0).optional(),
-    endOdometer: z.number().int().min(0).optional(),
+    startOdometer: tripOdometer('startOdometer').optional(),
+    endOdometer: tripOdometer('endOdometer').optional(),
     purpose: z.enum(TRIP_PURPOSES).optional(),
     tripDate: dateInput.refine(noonAnchoredDateIsNotInTheFuture, FUTURE_MSG).optional(),
     startLocation: z.string().max(200).nullish(),
