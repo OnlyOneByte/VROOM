@@ -1,5 +1,42 @@
+<script module lang="ts">
+	import type { AnyScale } from 'layerchart';
+	import {
+		TIME_X_PADDING,
+		formatDateTick,
+		monthlyXAxisProps
+	} from '#lib/utils/chart-formatters.ts';
+
+	const DAY_TICKS_MAX_SPAN_MS = 90 * 24 * 60 * 60 * 1000;
+	const MAX_X_TICKS = 4;
+
+	export function mileageYDomain(values: number[]): [number, number] {
+		const min = Math.min(...values);
+		const max = Math.max(...values);
+		const pad = max > min ? (max - min) * 0.1 : Math.max(max * 0.01, 1);
+		return [Math.max(0, min - pad), max + pad];
+	}
+
+	export function mileageXAxisProps(dates: Date[]) {
+		const times = dates.map(d => d.getTime());
+		const span = Math.max(...times) - Math.min(...times);
+		const format = span < DAY_TICKS_MAX_SPAN_MS ? formatDateTick : monthlyXAxisProps(0).format;
+		const count = Math.min(dates.length, MAX_X_TICKS);
+		return {
+			format,
+			ticks: (scale: AnyScale) => {
+				const ticks: Date[] = (scale.ticks?.(count) ?? []).filter(
+					(tick: Date) => scale(tick) >= TIME_X_PADDING[0]
+				);
+				const labels = ticks.map(format);
+				return ticks.filter((_tick, i) => i === 0 || labels[i] !== labels[i - 1]);
+			}
+		};
+	}
+</script>
+
 <script lang="ts">
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { cn } from '#lib/utils.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { paramRoutes } from '#lib/routes.ts';
@@ -10,6 +47,7 @@
 		ChevronLeft,
 		ChevronRight,
 		Pencil,
+		Receipt,
 		Trash2
 	} from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -20,10 +58,15 @@
 	import { formatDayLabel, unitTooltip } from '#lib/utils/chart-formatters.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { odometerApi } from '#lib/services/odometer-api.ts';
+	import { odometerHistoryApi } from '#lib/services/odometer-history-api.ts';
 	import { formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
-	import type { OdometerEntry, PaginatedResponse, UnitPreferences } from '#lib/types/index.ts';
+	import type {
+		OdometerHistoryEntry,
+		PaginatedResponse,
+		UnitPreferences
+	} from '#lib/types/index.ts';
 
 	const PAGE_SIZE = 20;
 	const MIN_CHART_POINTS = 2;
@@ -37,7 +80,7 @@
 	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
 	let distLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 
-	let entries = $state<OdometerEntry[]>([]);
+	let entries = $state<OdometerHistoryEntry[]>([]);
 	let totalCount = $state(0);
 	let offset = $state(0);
 	let isLoading = $state(true);
@@ -45,7 +88,7 @@
 	let error = $state<string | null>(null);
 
 	let deleteDialogOpen = $state(false);
-	let deletingEntry = $state<OdometerEntry | null>(null);
+	let deletingEntry = $state<OdometerHistoryEntry | null>(null);
 	let isDeleting = $state(false);
 	let deleteError = $state<string | null>(null);
 
@@ -88,10 +131,10 @@
 		isPageLoading = true;
 		error = null;
 		try {
-			const response: PaginatedResponse<OdometerEntry> = await odometerApi.getEntries(vehicleId, {
-				limit: PAGE_SIZE,
-				offset: newOffset
-			});
+			const response: PaginatedResponse<OdometerHistoryEntry> = await odometerHistoryApi.getHistory(
+				vehicleId,
+				{ limit: PAGE_SIZE, offset: newOffset }
+			);
 			entries = response.data;
 			totalCount = response.pagination.totalCount;
 			offset = response.pagination.offset;
@@ -118,7 +161,7 @@
 		return formatNumber(value, 0);
 	}
 
-	function openDeleteDialog(entry: OdometerEntry) {
+	function openDeleteDialog(entry: OdometerHistoryEntry) {
 		deletingEntry = entry;
 		deleteError = null;
 		deleteDialogOpen = true;
@@ -129,7 +172,7 @@
 		isDeleting = true;
 		deleteError = null;
 		try {
-			await odometerApi.delete(deletingEntry.id);
+			await odometerApi.delete(deletingEntry.sourceId);
 			deleteDialogOpen = false;
 			deletingEntry = null;
 			await loadEntries(offset);
@@ -202,6 +245,8 @@
 				{series}
 				config={chartConfig}
 				height={280}
+				yDomain={mileageYDomain(chartData.map(d => d.odometer))}
+				xAxisProps={mileageXAxisProps(chartData.map(d => d.date))}
 				yAxisFormat={v => formatNumber(v, 0)}
 				tooltipFormat={unitTooltip(distLabel, 0)}
 				tooltipLabelFormat={formatDayLabel}
@@ -218,7 +263,7 @@
 						<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
 					</div>
 				{:else}
-					{#each entries as entry (entry.id)}
+					{#each entries as entry (`${entry.source}-${entry.sourceId}`)}
 						<div class="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
 							<div class="flex items-start gap-3">
 								<div
@@ -234,9 +279,14 @@
 											{distLabel}
 										</span>
 										<span
-											class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+											class={cn(
+												'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+												entry.source === 'manual'
+													? 'bg-primary/10 text-primary'
+													: 'bg-muted text-muted-foreground'
+											)}
 										>
-											manual
+											{entry.source}
 										</span>
 									</div>
 
@@ -250,7 +300,19 @@
 								</div>
 							</div>
 
-							{#if canWrite}
+							{#if canWrite && entry.source === 'expense'}
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-8 w-8 shrink-0"
+									aria-label="Open expense"
+									title="Open expense"
+									href={resolve(paramRoutes.expenseEdit, { id: entry.sourceId }) +
+										`?returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
+								>
+									<Receipt class="h-3.5 w-3.5" />
+								</Button>
+							{:else if canWrite}
 								<div class="flex shrink-0 gap-1">
 									<Button
 										variant="ghost"
@@ -260,8 +322,8 @@
 										title="Edit reading"
 										href={resolve(paramRoutes.vehicleOdometerEntryEdit, {
 											id: vehicleId,
-											entryId: entry.id
-										}) + `?returnTo=/vehicles/${vehicleId}`}
+											entryId: entry.sourceId
+										}) + `?returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
 									>
 										<Pencil class="h-3.5 w-3.5" />
 									</Button>
