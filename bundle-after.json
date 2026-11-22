@@ -1,0 +1,30 @@
+{
+ "node": "_app/immutable/nodes/19.CR5EKg5p.js",
+ "own_kb": 100.1,
+ "own_gz_kb": 24.2,
+ "closure_kb": 537.2,
+ "closure_gz_kb": 181.7,
+ "closure_files": 80,
+ "lazy_chunks": [
+  {
+   "src": "src/lib/components/settings/cards/MigrateFromTrackerCard.svelte",
+   "kb": 10.4,
+   "gz_kb": 4.1
+  },
+  {
+   "src": "src/lib/components/settings/storage-provider/backup/BackupDialog.svelte",
+   "kb": 1.8,
+   "gz_kb": 0.8
+  },
+  {
+   "src": "src/lib/components/settings/storage-provider/backup/RestoreDialog.svelte",
+   "kb": 30.5,
+   "gz_kb": 10.2
+  },
+  {
+   "src": "_ldGvndgT.js",
+   "kb": 0.3,
+   "gz_kb": 0.2
+  }
+ ]
+}

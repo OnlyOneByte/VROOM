@@ -1,0 +1,15 @@
+{
+ "node": "_app/immutable/nodes/19.DbK7YnTl.js",
+ "own_kb": 131.5,
+ "own_gz_kb": 31.7,
+ "closure_kb": 575.5,
+ "closure_gz_kb": 192.2,
+ "closure_files": 85,
+ "lazy_chunks": [
+  {
+   "src": "_ldGvndgT.js",
+   "kb": 0.3,
+   "gz_kb": 0.2
+  }
+ ]
+}

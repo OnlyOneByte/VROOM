@@ -1,0 +1,38 @@
+[
+ {
+  "dark": false,
+  "width": 1280,
+  "scriptsAtLoad": 106,
+  "scriptsOnRestoreOpen": [],
+  "migrateShown": true,
+  "focusAfterEscape": "Restore",
+  "errors": []
+ },
+ {
+  "dark": false,
+  "width": 375,
+  "scriptsAtLoad": 106,
+  "scriptsOnRestoreOpen": [],
+  "migrateShown": true,
+  "focusAfterEscape": "Restore",
+  "errors": []
+ },
+ {
+  "dark": true,
+  "width": 1280,
+  "scriptsAtLoad": 106,
+  "scriptsOnRestoreOpen": [],
+  "migrateShown": true,
+  "focusAfterEscape": "Restore",
+  "errors": []
+ },
+ {
+  "dark": true,
+  "width": 375,
+  "scriptsAtLoad": 106,
+  "scriptsOnRestoreOpen": [],
+  "migrateShown": true,
+  "focusAfterEscape": "Restore",
+  "errors": []
+ }
+]

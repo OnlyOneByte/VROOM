@@ -1,0 +1,66 @@
+[
+ {
+  "dark": false,
+  "width": 1280,
+  "scriptsAtLoad": 104,
+  "scriptsOnRestoreOpen": [
+   "B73vJKJ7.js",
+   "BVeTmIEw.js",
+   "Dy2PQgf3.js",
+   "CgjPZCDf.js",
+   "D63y4HIX.js",
+   "B5tVguwr.js"
+  ],
+  "migrateShown": true,
+  "focusAfterEscape": "Restore",
+  "errors": []
+ },
+ {
+  "dark": false,
+  "width": 375,
+  "scriptsAtLoad": 104,
+  "scriptsOnRestoreOpen": [
+   "B73vJKJ7.js",
+   "BVeTmIEw.js",
+   "Dy2PQgf3.js",
+   "CgjPZCDf.js",
+   "D63y4HIX.js",
+   "B5tVguwr.js"
+  ],
+  "migrateShown": true,
+  "focusAfterEscape": "Restore",
+  "errors": []
+ },
+ {
+  "dark": true,
+  "width": 1280,
+  "scriptsAtLoad": 104,
+  "scriptsOnRestoreOpen": [
+   "B73vJKJ7.js",
+   "BVeTmIEw.js",
+   "Dy2PQgf3.js",
+   "CgjPZCDf.js",
+   "D63y4HIX.js",
+   "B5tVguwr.js"
+  ],
+  "migrateShown": true,
+  "focusAfterEscape": "Restore",
+  "errors": []
+ },
+ {
+  "dark": true,
+  "width": 375,
+  "scriptsAtLoad": 104,
+  "scriptsOnRestoreOpen": [
+   "B73vJKJ7.js",
+   "BVeTmIEw.js",
+   "Dy2PQgf3.js",
+   "CgjPZCDf.js",
+   "D63y4HIX.js",
+   "B5tVguwr.js"
+  ],
+  "migrateShown": true,
+  "focusAfterEscape": "Restore",
+  "errors": []
+ }
+]
