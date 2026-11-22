@@ -30,13 +30,24 @@ function capture(name: string) {
 	};
 }
 
+function captureWithMarker(name: string) {
+	return {
+		default: (anchor: Comment, props: Record<string, unknown>) => {
+			captured[name] = props;
+			const marker = document.createElement('div');
+			marker.dataset['mock'] = name;
+			anchor.before(marker);
+		}
+	};
+}
+
 vi.mock('#lib/components/expenses/ExpensesTable.svelte', () => capture('table'));
 vi.mock('#lib/components/charts/index.ts', () => ({
 	AppPieChart: (_anchor: unknown, props: Record<string, unknown>) => {
 		captured['pie'] = props;
 	}
 }));
-vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => capture('trend'));
+vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => captureWithMarker('trend'));
 vi.mock('#lib/components/charts/FuelEfficiencyTrendChart.svelte', () => capture('fuelTrend'));
 vi.mock('#lib/components/vehicles/VehiclePhotoCarousel.svelte', () => capture('photos'));
 vi.mock('#lib/components/vehicles/FinanceTab.svelte', () => capture('finance'));
@@ -45,7 +56,7 @@ vi.mock('#lib/components/vehicles/ShareVehicleDialog.svelte', () => capture('sha
 vi.mock('#lib/components/vehicles/FuelEfficiencyStatsCard.svelte', () => capture('fuelStats'));
 vi.mock('#lib/components/common/MediaCaptureDialog.svelte', () => capture('media'));
 vi.mock('#lib/components/common/period-selector.svelte', () => capture('period'));
-vi.mock('#lib/components/insurance/InsuranceTab.svelte', () => capture('insurance'));
+vi.mock('#lib/components/insurance/InsuranceTab.svelte', () => captureWithMarker('insurance'));
 
 const getExpensesByVehicle = vi.fn();
 const getExpenseSummary = vi.fn();
@@ -321,6 +332,20 @@ describe('vehicle detail page overview', () => {
 		await waitFor(() => expect(captured['insurance']).toBeDefined());
 		expect(captured['insurance']?.['vehicleId']).toBe('v1');
 		expect(captured['insurance']?.['readOnly']).toBe(false);
+	});
+
+	test('the insurance section loads below the stats and charts, so it never pushes them down', async () => {
+		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
+		const { container } = await mount();
+
+		await waitFor(() => expect(captured['insurance']).toBeDefined());
+		const trend = container.querySelector('[data-mock="trend"]');
+		const insurance = container.querySelector('[data-mock="insurance"]');
+		expect(trend).not.toBeNull();
+		expect(insurance).not.toBeNull();
+		expect(
+			trend!.compareDocumentPosition(insurance!) & Node.DOCUMENT_POSITION_FOLLOWING
+		).toBeTruthy();
 	});
 
 	test('a summary failure shows the error and Retry reloads into the data view', async () => {
