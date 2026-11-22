@@ -11,7 +11,11 @@ import { apiClient } from './api-client';
 import { buildQueryString } from './api-utils';
 import { userTimeZone } from './analytics-api';
 import { photoCollection } from './photo-api';
-import { removeCachedVehicle, updateCachedVehicle } from '#lib/utils/offline-storage.ts';
+import {
+	cacheVehicles,
+	removeCachedVehicle,
+	updateCachedVehicle
+} from '#lib/utils/offline-storage.ts';
 
 const vehiclePhotos = (vehicleId: string) =>
 	photoCollection(`/api/v1/vehicles/${vehicleId}/photos`);
@@ -28,7 +32,9 @@ export const vehicleApi = {
 			include: opts?.includeShared ? 'shared' : undefined,
 			timeZone: userTimeZone()
 		});
-		return apiClient.get<Vehicle[]>(`/api/v1/vehicles${qs}`);
+		const vehicles = await apiClient.get<Vehicle[]>(`/api/v1/vehicles${qs}`);
+		cacheVehicles(vehicles.filter(v => !v.sharedAccess));
+		return vehicles;
 	},
 
 	async createVehicle(data: Partial<Vehicle>): Promise<Vehicle> {

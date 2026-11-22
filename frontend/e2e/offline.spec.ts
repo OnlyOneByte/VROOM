@@ -121,4 +121,23 @@ test.describe('Opening the app offline', () => {
 			'/dashboard'
 		);
 	});
+
+	test('Add Expense lists the vehicles offline even if it was never opened online', async ({
+		page,
+		context
+	}) => {
+		await page.goto('/dashboard');
+		await page.evaluate(() => navigator.serviceWorker.ready);
+		await page.reload();
+		await expect(page.getByText(`${VEHICLE_CAMRY.year} Toyota Camry`).first()).toBeVisible();
+
+		await context.route('**/api/v1/**', route => route.abort('internetdisconnected'));
+		await context.setOffline(true);
+
+		const coldStart = await context.newPage();
+		await coldStart.goto('/expenses/new');
+		await expect(coldStart.getByRole('heading', { name: 'Add Expense' })).toBeVisible();
+		await expect(coldStart.getByText(`${VEHICLE_CAMRY.year} Toyota Camry`)).toBeVisible();
+		await expect(coldStart.getByText("Couldn't load your vehicles")).toHaveCount(0);
+	});
 });
