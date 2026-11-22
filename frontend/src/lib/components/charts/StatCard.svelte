@@ -81,10 +81,13 @@
 <Card class={className}>
 	<CardContent class="p-4 sm:p-6">
 		{#if isLoading}
-			<div class="space-y-3">
-				<Skeleton class="h-4 w-24" />
-				<Skeleton class="h-8 w-32" />
+			<div class="flex items-center gap-2">
+				{#if icon}
+					<Skeleton class="size-8 sm:size-11 rounded-xl shrink-0" />
+				{/if}
+				<Skeleton class="h-4 sm:h-5 w-24" />
 			</div>
+			<Skeleton class="h-7 sm:h-8 w-32 mt-2" />
 		{:else if hasDual}
 			<div class="@container">
 				<div class="flex flex-col @sm:flex-row @sm:items-start @sm:justify-between gap-3 @sm:gap-4">

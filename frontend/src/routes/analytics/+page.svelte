@@ -70,10 +70,12 @@
 			: []
 	);
 
-	const QUICK_STAT_SKELETONS = ['vehicles', 'spending', 'efficiency', 'health'].map(label => ({
-		label,
-		value: ''
-	}));
+	const QUICK_STAT_SKELETONS = [
+		{ label: 'vehicles', value: '', icon: Car },
+		{ label: 'spending', value: '', icon: DollarSign },
+		{ label: 'efficiency', value: '', icon: Activity },
+		{ label: 'health', value: '', icon: TrendingUp }
+	];
 
 	onMount(() => {
 		loadSummary();
