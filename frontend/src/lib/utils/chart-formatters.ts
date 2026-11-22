@@ -23,6 +23,7 @@ export const SMOOTH_CURVE = curveMonotoneX;
 
 function formatMonthTick(value: unknown): string {
 	if (!(value instanceof Date) || isNaN(value.getTime())) return '';
+	if (value.getMonth() === 0) return String(value.getFullYear());
 	return value.toLocaleDateString('en-US', { month: 'short' });
 }
 

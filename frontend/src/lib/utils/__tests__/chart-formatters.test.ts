@@ -92,6 +92,18 @@ describe('monthlyXAxisProps (monthly time-series axis wiring)', () => {
 		}
 	);
 
+	test.each([13, 25, 36, 48])('%i months of points never repeat a label back to back', months => {
+		const { ticks, format } = monthlyXAxisProps(months);
+		const scale = scaleTime().domain([new Date(2022, 0, 1), new Date(2022, months - 1, 1)]);
+		const labels = scale.ticks(ticks).map(format);
+		expect(labels.length).toBeGreaterThan(1);
+		labels.slice(1).forEach((label, i) => expect(label).not.toBe(labels[i]));
+	});
+
+	test('a January tick shows its year', () => {
+		expect(monthlyXAxisProps(6).format(new Date(2025, 0, 1))).toBe('2025');
+	});
+
 	test('a caller can set its own tick budget', () => {
 		expect(monthlyXAxisProps(24, 12).ticks).toBe(12);
 		expect(monthlyXAxisProps(4, 12).ticks).toBe(4);
