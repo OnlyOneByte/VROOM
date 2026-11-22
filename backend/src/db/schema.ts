@@ -345,6 +345,7 @@ export const odometerEntries = sqliteTable(
     odometer: integer('odometer').notNull(),
     recordedAt: integer('recorded_at', { mode: 'timestamp' }).notNull(),
     note: text('note'),
+    sourceTripId: text('source_trip_id'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },

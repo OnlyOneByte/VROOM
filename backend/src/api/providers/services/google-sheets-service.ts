@@ -136,6 +136,7 @@ export const SHEET_HEADERS = {
     'odometer',
     'recordedAt',
     'note',
+    'sourceTripId',
     'createdAt',
     'updatedAt',
   ],

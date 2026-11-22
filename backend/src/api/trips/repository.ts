@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, lt, ne } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, lt, ne } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewTrip, Trip } from '../../db/schema';
@@ -31,17 +31,17 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
   }
 
   // Odometer dedup key: do not remove the linked odometer entry while this returns > 0.
-  async countOthersAtOdometerKey(args: {
+  async findOtherAtOdometerKey(args: {
     excludeTripId: string;
     vehicleId: string;
     userId: string;
     endOdometer: number;
     tripDate: Date;
     timeZone?: string;
-  }): Promise<number> {
+  }): Promise<string | null> {
     const { dayStart, nextDay } = localDayWindow(args.tripDate, args.timeZone);
     const [result] = await this.db
-      .select({ count: count() })
+      .select({ id: trips.id })
       .from(trips)
       .where(
         and(
@@ -52,8 +52,10 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
           gte(trips.tripDate, dayStart),
           lt(trips.tripDate, nextDay)
         )
-      );
-    return result?.count ?? 0;
+      )
+      .orderBy(asc(trips.createdAt), asc(trips.id))
+      .limit(1);
+    return result?.id ?? null;
   }
 
   async findByUserId(userId: string, filters?: TripFilters): Promise<Trip[]> {

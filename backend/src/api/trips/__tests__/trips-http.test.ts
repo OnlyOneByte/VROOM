@@ -1101,3 +1101,135 @@ describe('trip-linked odometer lifecycle', () => {
     expect(linkedEntryCount(vehicleId, 1080)).toBe(0);
   });
 });
+
+describe('a trip finds its odometer entry through the link, not the note', () => {
+  function readings(vehicleId: string): { odometer: number; note: string | null }[] {
+    return ctx.sqlite
+      .query('SELECT odometer, note FROM odometer_entries WHERE vehicle_id = ? ORDER BY odometer')
+      .all(vehicleId) as { odometer: number; note: string | null }[];
+  }
+
+  async function createTrip(vehicleId: string, over: Record<string, unknown> = {}) {
+    const res = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, over));
+    return (await json<DataEnvelope<{ id: string }>>(res)).data.id;
+  }
+
+  async function renameEntryNote(vehicleId: string, odometer: number, note: string) {
+    const { id } = ctx.sqlite
+      .query('SELECT id FROM odometer_entries WHERE vehicle_id = ? AND odometer = ?')
+      .get(vehicleId, odometer) as { id: string };
+    const res = await ctx.authed('PUT', `/api/v1/odometer/${id}`, { note });
+    expect(res.status).toBe(200);
+  }
+
+  test('the trip stores its id on the entry it creates', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const tripId = await createTrip(vehicleId);
+    const row = ctx.sqlite
+      .query('SELECT source_trip_id FROM odometer_entries WHERE vehicle_id = ?')
+      .get(vehicleId) as { source_trip_id: string };
+    expect(row.source_trip_id).toBe(tripId);
+  });
+
+  test('after the note is edited, a trip edit still moves its entry instead of leaving it behind', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const tripId = await createTrip(vehicleId, { endOdometer: 1080 });
+    await renameEntryNote(vehicleId, 1080, 'Fuel stop');
+
+    const res = await ctx.authed('PUT', `/api/v1/trips/${tripId}`, { endOdometer: 1200 });
+
+    expect(res.status).toBe(200);
+    expect(readings(vehicleId)).toEqual([{ odometer: 1200, note: 'From trip' }]);
+  });
+
+  test('after the note is edited, moving the trip a day earlier is not refused by its own old entry', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const tripId = await createTrip(vehicleId, { endOdometer: 1080 });
+    await renameEntryNote(vehicleId, 1080, 'Fuel stop');
+
+    const res = await ctx.authed('PUT', `/api/v1/trips/${tripId}`, {
+      tripDate: localIso('2024-06-19T13:30'),
+    });
+
+    expect(res.status).toBe(200);
+    expect(readings(vehicleId)).toEqual([{ odometer: 1080, note: 'From trip' }]);
+  });
+
+  test('after the note is edited, deleting the trip with keepOdometer=false removes its entry', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const tripId = await createTrip(vehicleId, { endOdometer: 1080 });
+    await renameEntryNote(vehicleId, 1080, 'Fuel stop');
+
+    const res = await ctx.authed('DELETE', `/api/v1/trips/${tripId}?keepOdometer=false`);
+
+    expect(res.status).toBe(200);
+    expect(readings(vehicleId)).toEqual([]);
+  });
+
+  test('a shared entry passes to the other trip when its first trip is deleted, kept or not', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const first = await createTrip(vehicleId, { endOdometer: 1080 });
+    const second = await createTrip(vehicleId, { endOdometer: 1080 });
+
+    await ctx.authed('DELETE', `/api/v1/trips/${first}`);
+    await renameEntryNote(vehicleId, 1080, 'Fuel stop');
+    await ctx.authed('DELETE', `/api/v1/trips/${second}?keepOdometer=false`);
+
+    expect(readings(vehicleId)).toEqual([]);
+  });
+
+  test('a shared entry stays with the other trip when its first trip moves away', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const first = await createTrip(vehicleId, { endOdometer: 1080 });
+    const second = await createTrip(vehicleId, { endOdometer: 1080 });
+
+    await ctx.authed('PUT', `/api/v1/trips/${first}`, { endOdometer: 1200 });
+    await ctx.authed('DELETE', `/api/v1/trips/${first}?keepOdometer=false`);
+    expect(readings(vehicleId)).toEqual([{ odometer: 1080, note: 'From trip' }]);
+
+    await ctx.authed('DELETE', `/api/v1/trips/${second}?keepOdometer=false`);
+    expect(readings(vehicleId)).toEqual([]);
+  });
+
+  test('a trip re-created where a deleted trip kept its entry takes that entry over', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const deleted = await createTrip(vehicleId, { endOdometer: 1080 });
+    await ctx.authed('DELETE', `/api/v1/trips/${deleted}`);
+    const recreated = await createTrip(vehicleId, { endOdometer: 1080 });
+
+    const moved = await ctx.authed('PUT', `/api/v1/trips/${recreated}`, {
+      tripDate: localIso('2024-06-19T13:30'),
+    });
+    expect(moved.status).toBe(200);
+    expect(readings(vehicleId)).toEqual([{ odometer: 1080, note: 'From trip' }]);
+
+    await ctx.authed('DELETE', `/api/v1/trips/${recreated}?keepOdometer=false`);
+    expect(readings(vehicleId)).toEqual([]);
+  });
+
+  test('a trip created on a manual reading’s value and day leaves that reading alone', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
+      odometer: 1080,
+      recordedAt: localIso('2024-06-20T13:30'),
+      note: 'manual log',
+    });
+    const tripId = await createTrip(vehicleId, { endOdometer: 1080 });
+
+    await ctx.authed('DELETE', `/api/v1/trips/${tripId}?keepOdometer=false`);
+
+    expect(readings(vehicleId)).toEqual([{ odometer: 1080, note: 'manual log' }]);
+  });
+
+  test('an entry from before the link still matches by its note, day and value', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const tripId = await createTrip(vehicleId, { endOdometer: 1080 });
+    ctx.sqlite.run('UPDATE odometer_entries SET source_trip_id = NULL WHERE vehicle_id = ?', [
+      vehicleId,
+    ]);
+
+    await ctx.authed('PUT', `/api/v1/trips/${tripId}`, { endOdometer: 1200 });
+
+    expect(readings(vehicleId)).toEqual([{ odometer: 1200, note: 'From trip' }]);
+  });
+});
