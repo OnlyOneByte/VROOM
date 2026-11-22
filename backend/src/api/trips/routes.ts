@@ -1,5 +1,8 @@
+import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { getDb } from '../../db/connection';
+import { trips } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences } from '../../types';
@@ -13,7 +16,8 @@ import {
   validateVehicleOwnership,
   zValidator,
 } from '../../utils/validation';
-import { odometerRepository } from '../odometer/repository';
+import { assertOdometerInOrder } from '../expenses/repository';
+import { odometerRepository, readingCheck } from '../odometer/repository';
 import { deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
 import { preferencesRepository } from '../settings/repository';
@@ -82,30 +86,42 @@ routes.post('/', zValidator('json', createTripSchema), async (c) => {
 
   await validateVehicleOwnership(data.vehicleId, user.id);
 
-  const trip = await tripRepository.create({
-    vehicleId: data.vehicleId,
-    userId: user.id,
-    startOdometer: data.startOdometer,
-    endOdometer: data.endOdometer,
-    purpose: data.purpose,
-    tripDate: data.tripDate,
-    startLocation: data.startLocation ?? null,
-    endLocation: data.endLocation ?? null,
-    note: data.note ?? null,
+  const check = await readingCheck(data.vehicleId, data.endOdometer, data.tripDate, data.timeZone);
+  const trip = getDb().transaction((tx) => {
+    assertOdometerInOrder(tx, check);
+    const created = tx
+      .insert(trips)
+      .values({
+        vehicleId: data.vehicleId,
+        userId: user.id,
+        startOdometer: data.startOdometer,
+        endOdometer: data.endOdometer,
+        purpose: data.purpose,
+        tripDate: data.tripDate,
+        startLocation: data.startLocation ?? null,
+        endLocation: data.endLocation ?? null,
+        note: data.note ?? null,
+      })
+      .returning()
+      .get();
+    odometerRepository.createFromTrip(
+      {
+        vehicleId: data.vehicleId,
+        userId: user.id,
+        odometer: data.endOdometer,
+        recordedAt: data.tripDate,
+        timeZone: data.timeZone,
+      },
+      tx
+    );
+    return created;
   });
 
   // Logged, not thrown: a 500 after the insert would invite a duplicate-create retry.
   try {
-    await odometerRepository.createFromTrip({
-      vehicleId: data.vehicleId,
-      userId: user.id,
-      odometer: data.endOdometer,
-      recordedAt: data.tripDate,
-      timeZone: data.timeZone,
-    });
     await reminderTriggerService.recheckMileageReminders(user.id, data.vehicleId);
   } catch (error) {
-    logger.error('Trip odometer sync or mileage reminder recheck failed (trip already persisted)', {
+    logger.error('Trip mileage reminder recheck failed (trip already persisted)', {
       tripId: trip.id,
       vehicleId: data.vehicleId,
       error: error instanceof Error ? error.message : String(error),
@@ -193,44 +209,68 @@ routes.put(
       throw new ValidationError('endOdometer must be greater than or equal to startOdometer');
     }
 
-    const updated = await tripRepository.update(id, data);
-
     const endChanged = data.endOdometer !== undefined && data.endOdometer !== existing.endOdometer;
     const dateChanged =
       data.tripDate !== undefined && data.tripDate.getTime() !== existing.tripDate.getTime();
-    if (endChanged || dateChanged) {
-      try {
-        const othersAtOld = await tripRepository.countOthersAtOdometerKey({
+    const resync = endChanged || dateChanged;
+    const tripDate = data.tripDate ?? existing.tripDate;
+    const check = resync ? await readingCheck(existing.vehicleId, end, tripDate, timeZone) : null;
+    const othersAtOld = resync
+      ? await tripRepository.countOthersAtOdometerKey({
           excludeTripId: id,
           vehicleId: existing.vehicleId,
           userId: user.id,
           endOdometer: existing.endOdometer,
           tripDate: existing.tripDate,
           timeZone,
-        });
-        if (othersAtOld === 0) {
-          const removedEntryIds = await odometerRepository.deleteLinkedTripEntry({
-            vehicleId: existing.vehicleId,
-            userId: user.id,
-            odometer: existing.endOdometer,
-            recordedAt: existing.tripDate,
-            timeZone,
-          });
-          await deleteEntryPhotosWithRetry(removedEntryIds, user.id, {
-            tripId: id,
-            vehicleId: existing.vehicleId,
-          });
-        }
-        await odometerRepository.createFromTrip({
+        })
+      : 0;
+
+    const { updated, removedEntryIds } = getDb().transaction((tx) => {
+      const row = tx
+        .update(trips)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(trips.id, id))
+        .returning()
+        .get();
+      if (!row) throw new NotFoundError('Trip');
+      if (!resync) return { updated: row, removedEntryIds: [] };
+      const removed =
+        othersAtOld === 0
+          ? odometerRepository.deleteLinkedTripEntry(
+              {
+                vehicleId: existing.vehicleId,
+                userId: user.id,
+                odometer: existing.endOdometer,
+                recordedAt: existing.tripDate,
+                timeZone,
+              },
+              tx
+            )
+          : [];
+      assertOdometerInOrder(tx, check);
+      odometerRepository.createFromTrip(
+        {
           vehicleId: existing.vehicleId,
           userId: user.id,
           odometer: end,
-          recordedAt: data.tripDate ?? existing.tripDate,
+          recordedAt: tripDate,
           timeZone,
+        },
+        tx
+      );
+      return { updated: row, removedEntryIds: removed };
+    });
+
+    if (resync) {
+      try {
+        await deleteEntryPhotosWithRetry(removedEntryIds, user.id, {
+          tripId: id,
+          vehicleId: existing.vehicleId,
         });
         await reminderTriggerService.recheckMileageReminders(user.id, existing.vehicleId);
       } catch (error) {
-        logger.error('Trip-edit linked-odometer re-sync failed (trip already updated)', {
+        logger.error('Trip-edit mileage reminder recheck failed (trip already updated)', {
           tripId: id,
           vehicleId: existing.vehicleId,
           error: error instanceof Error ? error.message : String(error),
@@ -272,7 +312,7 @@ routes.delete(
           timeZone,
         });
         if (others === 0) {
-          const removedEntryIds = await odometerRepository.deleteLinkedTripEntry({
+          const removedEntryIds = odometerRepository.deleteLinkedTripEntry({
             vehicleId: existing.vehicleId,
             userId: user.id,
             odometer: existing.endOdometer,
