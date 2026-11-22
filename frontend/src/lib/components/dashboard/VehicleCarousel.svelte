@@ -136,7 +136,7 @@
 											<h3 class="font-semibold text-lg leading-tight">
 												<a
 													href={resolve(paramRoutes.vehicle, { id: vehicle.id })}
-													class="rounded-sm after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+													class="rounded-sm after:absolute after:inset-0 after:content-[''] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 												>
 													{vehicle.nickname || vehicle.name}
 												</a>

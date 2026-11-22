@@ -243,6 +243,18 @@ describe('VehicleCarousel vehicle card', () => {
 		expect(screen.getByText('2020 Toyota Camry')).toBeInTheDocument();
 	});
 
+	test('the card link shows the kit focus ring', () => {
+		render(VehicleCarousel, { vehicles: [overview()] });
+
+		const link = screen.getByRole('link', { name: '2020 Toyota Camry' });
+		expect(link).toHaveClass(
+			'outline-none',
+			'focus-visible:ring-[3px]',
+			'focus-visible:ring-ring/50'
+		);
+		expect(link).not.toHaveClass('focus-visible:ring-2');
+	});
+
 	test('shows recent and total expenses as currency', () => {
 		render(VehicleCarousel, {
 			vehicles: [overview({ recentExpenses: 120.5, totalExpenses: 4500 })]
