@@ -397,7 +397,7 @@ describe('absolute split edit recomputes groupTotal from allocations (no stale h
     }
   });
 
-  test('an absolute-split edit with a matching totalAmount leaves the amounts unchanged', async () => {
+  test('an absolute-split edit with a matching totalAmount stores that total as groupTotal', async () => {
     const groupId = await createAbsolute([
       { vehicleId: 'v-1', amount: 30 },
       { vehicleId: 'v-2', amount: 30 },
