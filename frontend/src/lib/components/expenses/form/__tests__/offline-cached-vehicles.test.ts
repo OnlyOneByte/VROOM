@@ -82,18 +82,11 @@ afterEach(() => {
 });
 
 describe('the expense form offline', () => {
-	test('opens with the vehicles cached on the last online load, without an error', async () => {
-		getVehicles.mockResolvedValueOnce([CAMRY]);
-		getVehicle.mockResolvedValueOnce(CAMRY);
-		getExpensesByVehicle.mockResolvedValue({ data: [] });
-		const online = render(ExpenseForm);
-		await screen.findByText(/2020 Toyota Camry/);
-		online.unmount();
-
+	test('opens with the cached vehicles, without an error', async () => {
+		storage.set('vroom_offline_vehicles:u1', JSON.stringify([CAMRY]));
+		storage.set('vroom_offline_vehicle_history:v1:u1', JSON.stringify([]));
 		onlineStatus.current = false;
 		getVehicles.mockRejectedValueOnce(new TypeError('Failed to fetch'));
-		getExpensesByVehicle.mockRejectedValue(new TypeError('Failed to fetch'));
-		addNotification.mockClear();
 		render(ExpenseForm);
 
 		expect(await screen.findByText(/2020 Toyota Camry/)).toBeInTheDocument();

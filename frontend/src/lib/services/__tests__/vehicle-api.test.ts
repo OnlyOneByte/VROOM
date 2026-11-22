@@ -13,15 +13,21 @@ vi.mock('../api-client', () => ({
 	withPagination: (url: string) => url
 }));
 
+const cacheVehicles = vi.fn();
 const updateCachedVehicle = vi.fn();
 const removeCachedVehicle = vi.fn();
-vi.mock('#lib/utils/offline-storage.ts', () => ({ updateCachedVehicle, removeCachedVehicle }));
+vi.mock('#lib/utils/offline-storage.ts', () => ({
+	cacheVehicles,
+	updateCachedVehicle,
+	removeCachedVehicle
+}));
 
 const { vehicleApi } = await import('../vehicle-api');
 const ZONE = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
 
 beforeEach(() => {
 	for (const fn of [get, post, put, patch, del, getPaginated]) fn.mockReset();
+	cacheVehicles.mockClear();
 	updateCachedVehicle.mockClear();
 	removeCachedVehicle.mockClear();
 });
@@ -135,6 +141,20 @@ describe('vehicleApi request shapes', () => {
 });
 
 describe('vehicleApi keeps the offline vehicle cache current', () => {
+	test('a fetched list caches the owned vehicles, wherever the list was loaded', async () => {
+		const owned = { id: 'v1' };
+		const shared = { id: 'v2', sharedAccess: { level: 'viewer', sharedBy: 'Sam' } };
+		get.mockResolvedValueOnce([owned, shared]);
+		await expect(vehicleApi.getVehicles({ includeShared: true })).resolves.toEqual([owned, shared]);
+		expect(cacheVehicles).toHaveBeenCalledWith([owned]);
+	});
+
+	test('a failed list leaves the cache alone', async () => {
+		get.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+		await expect(vehicleApi.getVehicles()).rejects.toThrow();
+		expect(cacheVehicles).not.toHaveBeenCalled();
+	});
+
 	test('a saved edit replaces the cached vehicle with the server copy', async () => {
 		put.mockResolvedValueOnce({ id: 'v1', nickname: 'Daily' });
 		await vehicleApi.updateVehicle('v1', { nickname: 'Daily' });

@@ -5,7 +5,6 @@ import { gotoDynamic } from '#lib/utils/navigation.ts';
 import { offlineExpenseQueue, onlineStatus } from '#lib/stores/offline.svelte.ts';
 import {
 	cacheVehicleHistory,
-	cacheVehicles,
 	findParkedExpense,
 	loadCachedVehicleHistory,
 	loadCachedVehicles,
@@ -43,7 +42,6 @@ function useVehicles(state: ExpenseFormState, vehicles: Vehicle[]): void {
 export async function loadVehicles(state: ExpenseFormState): Promise<void> {
 	try {
 		const vehicles = await vehicleApi.getVehicles();
-		cacheVehicles(vehicles);
 		useVehicles(state, vehicles);
 	} catch (error) {
 		const cached = loadCachedVehicles();
