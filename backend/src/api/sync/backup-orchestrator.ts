@@ -189,11 +189,14 @@ export class BackupOrchestrator {
             unknown
           >;
         } catch (error) {
-          logger.warn('Failed to decrypt provider credentials, skipping', {
+          logger.warn('Failed to decrypt provider credentials, marking provider unusable', {
             providerId,
             error: error instanceof Error ? error.message : String(error),
           });
-          return { providerId, result: null };
+          return {
+            providerId,
+            result: { ...failedAttempt("Stored credentials can't be read"), unusable: true },
+          };
         }
 
         try {

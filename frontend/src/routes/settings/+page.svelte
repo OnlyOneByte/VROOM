@@ -5,7 +5,7 @@
 	import { resolve } from '$app/paths';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { routes } from '#lib/routes.ts';
 	import { LoaderCircle, ChevronRight, CircleAlert } from '@lucide/svelte';
@@ -25,6 +25,7 @@
 	import { toast } from 'svelte-sonner';
 	import type {
 		BackupConfig,
+		BackupOrchestratorResult,
 		RestoreResult,
 		UserProviderInfo,
 		UserSettings
@@ -218,6 +219,36 @@
 		showBackupDialog = true;
 	}
 
+	function backupProblem(
+		failedProviders: string[],
+		results: BackupOrchestratorResult['results']
+	): string {
+		const names = (ids: string[]) =>
+			ids
+				.map(id => storageProviders.find(provider => provider.id === id)?.displayName ?? id)
+				.join(', ');
+		const unusable = failedProviders.filter(id => results[id]?.unusable);
+		const failed = failedProviders.filter(id => !results[id]?.unusable);
+		const problems = [
+			...(failed.length > 0 ? [`${names(failed)} failed`] : []),
+			...(unusable.length > 0 ? [`${names(unusable)} can't be used`] : [])
+		];
+		const them = failedProviders.length === 1 ? 'it' : 'them';
+		const fix = failed.length > 0 ? 'Check' : 'Reconnect';
+		return `${problems.join(' and ')}. ${fix} ${them} under Storage Providers, then try again.`;
+	}
+
+	function failedBackupProblem(error: unknown): string | null {
+		if (!(error instanceof ApiError) || error.code !== 'BACKUP_FAILED') return null;
+		const { failedProviders, results } = error.details ?? {};
+		if (!Array.isArray(failedProviders) || failedProviders.length === 0) return null;
+		if (typeof results !== 'object' || results === null) return null;
+		return backupProblem(
+			failedProviders.map(String),
+			results as BackupOrchestratorResult['results']
+		);
+	}
+
 	async function handleBackupExecute() {
 		showBackupDialog = false;
 		const toastId = toast.loading('Backup in progress...');
@@ -225,8 +256,6 @@
 		try {
 			const data = await settingsStore.executeSync(['backup'], true);
 			const providers = (count: number) => `${count} provider${count === 1 ? '' : 's'}`;
-			const nameOf = (id: string) =>
-				storageProviders.find(provider => provider.id === id)?.displayName ?? id;
 
 			if (data.outcome === 'success') {
 				toast.success(`Backed up to ${providers(Object.keys(data.results).length)}`, {
@@ -235,13 +264,13 @@
 			} else if (data.outcome === 'partial') {
 				const succeeded = Object.values(data.results).filter(r => r.success).length;
 				toast.warning(
-					`Backed up to ${providers(succeeded)}. ${data.failedProviders.map(nameOf).join(', ')} failed.`,
+					`Backed up to ${providers(succeeded)}. ${backupProblem(data.failedProviders, data.results)}`,
 					{ id: toastId }
 				);
 			} else if (data.outcome === 'noop') {
 				toast.info('Nothing to back up: no provider has backups turned on', { id: toastId });
 			} else {
-				toast.error(`Backup failed for ${data.failedProviders.map(nameOf).join(', ')}`, {
+				toast.error(`Couldn't back up. ${backupProblem(data.failedProviders, data.results)}`, {
 					id: toastId
 				});
 			}
@@ -251,7 +280,9 @@
 			isInitialized = false;
 		} catch (error) {
 			toast.dismiss(toastId);
-			appStore.showError(`Couldn't back up. ${userFacingErrorMessage(error)}`);
+			appStore.showError(
+				`Couldn't back up. ${failedBackupProblem(error) ?? userFacingErrorMessage(error)}`
+			);
 		}
 	}
 
