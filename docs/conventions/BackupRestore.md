@@ -22,21 +22,47 @@ Branches key on Drizzle's runtime `columnType`, each set listing both SQLite and
 `columnType` is the runtime property, not the TypeScript-level `mode` config:
 `integer('col', { mode: 'timestamp' })` yields `SQLiteTimestamp`, not `SQLiteInteger`.
 
-Money columns are integer cents. A pre-2.0.0 backup stored dollar floats, so `parseZipBackup` sets
-`shimMoneyToCents` (`coerceRow` ×100s the `MONEY_CENTS_FIELDS` names) and upgrades `metadata.version`,
-since `validateBackupData` fail-closes on any version mismatch.
+## Backup Versions
 
-A Sheets mirror records its version in a `Metadata` tab, written last on every sync.
-`restoreFromSheets` applies the same shim when that version is below 2.0.0. A mirror without the
-tab was last synced by an older build: it counts as 1.x dollars only when its Expenses header row
-is present and lacks `createdBy` (added in the same release as cents), and as cents otherwise.
-Never infer the unit from cell values: one hand-edited `45.50` would rescale every amount.
+`metadata.version` records the format a backup was written in (`CONFIG.backup.currentVersion`,
+`2.0.0` today), and restore keeps it as written. `backupVersionError` in `backup.ts` accepts any
+older version, and the current major with a minor at or below the current one. It refuses a newer
+major or minor with a message telling the user to update VROOM, and a version that isn't a number.
+
+An older backup reaches the current shape through `BACKUP_UPGRADE_STEPS`, an ordered list of
+`{ to, upgrade(tables) }`. `upgradeBackupTables` runs every step whose `to` is newer than the
+backup, on the raw rows, before `coerceRow`. Both restore paths call it: `parseZipBackup`, and
+`restoreFromSheets` with the mirror's version.
+
+The one step today is the move to cents: money columns are integer cents, and a pre-2.0.0
+backup stored dollar floats, so the `2.0.0` step multiplies the `MONEY_CENTS_FIELDS` columns by
+100. `coerceRow` then rounds them, since float products such as 12.34 × 100 land just below the
+integer.
+
+A Sheets mirror records its version in a `Metadata` tab, written last on every sync. A mirror
+without the tab was last synced by an older build: it counts as 1.x dollars only when its
+Expenses header row is present and lacks `createdBy` (added in the same release as cents), and as
+cents otherwise. Never infer the unit from cell values: one hand-edited `45.50` would rescale
+every amount.
+
+### Changing the format
+
+1. Bump `currentVersion`: the minor for an addition an older backup can do without, the major
+   for anything that needs an upgrade step to read old data. Either way, older builds refuse the
+   new backups: the gate reads only up to its own minor.
+2. Add a `BACKUP_UPGRADE_STEPS` entry when old rows need changing to fit. A new column an older
+   backup lacks needs none if it is nullable or NOT NULL with a static default, since `coerceRow`
+   leaves it unset or fills the default. A NOT NULL column without one needs a step.
+3. Add a frozen fixture for the new version next to
+   `backend/src/api/sync/__tests__/fixtures/backup-2.0.0/`, and never edit an existing one:
+   `backup-format-fixture.test.ts` pins the 2.0.0 fixture's hash and checks it still restores,
+   and a new fixture gets the same two tests.
 
 ## Validation Pipeline
 
 1. `parseZipBackup` — compression-ratio and uncompressed-size guards, required-file check, CSV parse,
-   `coerceRow` per row.
-2. `validateBackupData` — metadata and version, then `createInsertSchema(table)` per row, then
+   `upgradeBackupTables`, then `coerceRow` per row.
+2. `validateBackupData` — metadata and `backupVersionError`, then `createInsertSchema(table)` per row, then
    `validateReferentialIntegrity` (which also runs `validateUniqueConstraints`).
 3. `restoreFromBackup` — wipe (replace mode only) and insert in ONE synchronous `db.transaction`.
 
@@ -49,7 +75,9 @@ deliberately bare `createInsertSchema(table)`, so both restore paths share one c
 
 ## Adding a Table to the Backup
 
-1. `TABLE_SCHEMA_MAP` and `TABLE_FILENAME_MAP` in `backend/src/config.ts`.
+1. `TABLE_SCHEMA_MAP` and `TABLE_FILENAME_MAP` in `backend/src/config.ts`, plus its file in
+   `OPTIONAL_BACKUP_FILES`: backups written before the table existed lack that CSV, and the
+   required-file check would refuse them.
 2. `ParsedBackupData` in `backend/src/types.ts`, and an `ImportSummary` count in `restore.ts`.
 3. `createBackup` query, `insertBackupData` insert (FK parents first), `deleteUserData` delete.
 4. `SHEET_HEADERS` in `google-sheets-service.ts` — hand-maintained, unlike the schema-derived CSV
