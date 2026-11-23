@@ -84,7 +84,7 @@ describe('backup types parity with the backend', () => {
 		'%s matches the backend %s, except where the backend names a type (%s)',
 		(frontendName, file, backendName, namedTypeFields) => {
 			const byName = (members: string[]) =>
-				new Map(members.map(member => [member.split(':')[0], member]));
+				new Map(members.map(member => [member.split(':')[0] ?? member, member]));
 			const backend = byName(fields(readFileSync(`${BACKEND_SYNC}/${file}`, 'utf8'), backendName));
 			const frontend = byName(fields(frontendSrc, frontendName));
 			expect(backend.size).toBeGreaterThan(0);
