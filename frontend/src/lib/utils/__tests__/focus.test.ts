@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { focusFirstButton, focusLeftOn } from '../focus.ts';
+import { focusFirstButton, focusFirstProblem, focusLeftOn } from '../focus.ts';
 
 afterEach(() => {
 	document.body.innerHTML = '';
@@ -78,6 +78,42 @@ describe('focusFirstButton', () => {
 		focusFirstButton(null);
 		focusFirstButton(undefined);
 		focusFirstButton(empty);
+
+		expect(document.activeElement).toBe(origin);
+	});
+});
+
+describe('focusFirstProblem', () => {
+	test('focuses the first invalid field in the form', async () => {
+		const form = document.createElement('form');
+		form.innerHTML =
+			'<input id="ok" /><input id="bad" aria-invalid="true" /><input id="later" aria-invalid="true" />';
+		document.body.append(form);
+
+		await focusFirstProblem(form);
+
+		expect(document.activeElement?.id).toBe('bad');
+	});
+
+	test('falls back to the submit error when no field is invalid', async () => {
+		const form = document.createElement('form');
+		form.innerHTML = '<input id="ok" /><p id="submit-error" tabindex="-1">Could not save</p>';
+		document.body.append(form);
+
+		await focusFirstProblem(form);
+
+		expect(document.activeElement?.id).toBe('submit-error');
+	});
+
+	test('leaves focus alone when nothing is wrong', async () => {
+		const origin = button('Save');
+		origin.focus();
+		const form = document.createElement('form');
+		form.innerHTML = '<input id="ok" />';
+		document.body.append(form);
+
+		await focusFirstProblem(form);
+		await focusFirstProblem(null);
 
 		expect(document.activeElement).toBe(origin);
 	});

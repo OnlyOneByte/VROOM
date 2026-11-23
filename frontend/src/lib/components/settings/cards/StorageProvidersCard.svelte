@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -138,7 +139,7 @@
 		error = null;
 		await loadData();
 		await tick();
-		(content?.querySelector('button') ?? content)?.focus();
+		focusFirstButton(content);
 	}
 
 	onMount(() => {
