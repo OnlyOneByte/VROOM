@@ -106,6 +106,39 @@ describe('FuelEfficiencyStatsCard units', () => {
 		);
 	});
 
+	test.each([
+		{
+			name: 'with no dip, names a month that rose well above the average',
+			trend: [30, 30, 30, 45],
+			sentence: /^November rose to 45\.0 .+ over 1 tank\.$/
+		},
+		{
+			name: 'says every month stayed close when none is 15% off the average',
+			trend: [30, 31, 32, 31],
+			sentence: /^Every month stayed within 15% of the 31\.0 .+ average\.$/
+		}
+	])('$name', ({ trend, sentence }) => {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		vi.setSystemTime(new Date(2026, 10, 23, 12));
+		const days = [
+			new Date(2026, 8, 3),
+			new Date(2026, 9, 3),
+			new Date(2026, 9, 20),
+			new Date(2026, 10, 3)
+		];
+		const { getByTestId } = render(FuelEfficiencyStatsCard, {
+			props: {
+				vehicleId: 'veh-1',
+				vehicleStatsData: STATS,
+				isLoadingStats: false,
+				trend: trend.map((efficiency, i) => ({ date: days[i] as Date, efficiency }))
+			}
+		});
+		vi.useRealTimers();
+
+		expect(getByTestId('fuel-economy-insight').textContent).toMatch(sentence);
+	});
+
 	test('an electric vehicle reads as Efficiency, priced per kWh', () => {
 		const { container } = render(FuelEfficiencyStatsCard, {
 			props: {
