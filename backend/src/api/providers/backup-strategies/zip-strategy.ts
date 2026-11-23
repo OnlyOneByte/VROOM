@@ -60,6 +60,7 @@ export async function uploadZipBackup(
 
 export class ZipBackupStrategy implements BackupStrategy {
   async execute(context: BackupStrategyContext): Promise<BackupStrategyResult> {
+    if (!context.providerConfig.enabled) return { success: true, capabilities: {} };
     const zip = await uploadZipBackup(context, () =>
       storageProviderRegistry.createProviderInstance(context.providerRow)
     );

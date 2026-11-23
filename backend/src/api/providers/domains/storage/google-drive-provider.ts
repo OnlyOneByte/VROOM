@@ -1,4 +1,5 @@
 import { logger } from '../../../../utils/logger';
+import { assertSafeStoragePath } from '../../../../utils/paths';
 import { GoogleDriveService } from '../../services/google-drive-service';
 import { coalesceGoogleDriveFile } from './drive-file-utils';
 import type {
@@ -17,6 +18,8 @@ export class GoogleDriveProvider implements StorageProvider {
   }
 
   async upload(params: UploadParams): Promise<StorageRef> {
+    assertSafeStoragePath(params.pathHint);
+    assertSafeStoragePath(params.rawPath);
     const folderPath = params.rawPath ?? params.pathHint;
     const folderId = await this.resolveFolderPath(folderPath);
     const driveFile = await this.driveService.uploadFile(
@@ -57,6 +60,7 @@ export class GoogleDriveProvider implements StorageProvider {
   }
 
   async list(folderPath: string): Promise<StorageFileInfo[]> {
+    assertSafeStoragePath(folderPath);
     const folderId = await this.resolveExistingFolderPath(folderPath);
     if (!folderId) return [];
 
