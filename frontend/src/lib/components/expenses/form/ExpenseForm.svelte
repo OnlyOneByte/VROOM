@@ -264,7 +264,7 @@
 </script>
 
 <FormLayout>
-	{#if form.isLoading}
+	{#if form.isLoading || !vehiclesLoaded}
 		<div class="flex items-center justify-center py-12">
 			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
 		</div>

@@ -181,6 +181,21 @@ describe('ExpenseForm create mode', () => {
 		expect(goto).not.toHaveBeenCalled();
 	});
 
+	test('while the vehicle list loads, neither the form nor the empty state shows', async () => {
+		let finish: (vehicles: Vehicle[]) => void = () => {};
+		getVehicles.mockReturnValue(new Promise(resolve => (finish = resolve)));
+		const { container } = render(ExpenseForm);
+		await tick();
+
+		expect(container.querySelector('.animate-spin')).not.toBeNull();
+		expect(screen.queryByRole('button', { name: /save expense/i })).toBeNull();
+		expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
+
+		finish([]);
+		await screen.findByRole('heading', { name: 'Add a vehicle first' });
+		expect(container.querySelector('.animate-spin')).toBeNull();
+	});
+
 	test('with no vehicles the form gives way to an Add Vehicle empty state', async () => {
 		getVehicles.mockResolvedValue([]);
 		render(ExpenseForm, { props: { preselectedCategory: 'misc', preselectedAmount: '5' } });
