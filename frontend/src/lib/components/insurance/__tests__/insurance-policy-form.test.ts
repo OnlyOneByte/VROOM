@@ -363,6 +363,16 @@ describe('InsurancePolicyForm edit mode', () => {
 		expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
 	});
 
+	test('saves a policy whose vehicles were all deleted', async () => {
+		getPolicy.mockResolvedValue({ ...existing, vehicleIds: [] });
+		await mount({ policyId: 'p9' });
+
+		await fireEvent.click(screen.getByRole('button', { name: /Update Policy/ }));
+
+		await vi.waitFor(() => expect(updatePolicy).toHaveBeenCalledTimes(1));
+		expect(screen.queryByText('At least one vehicle is required')).toBeNull();
+	});
+
 	test('sends only company, notes and active flag on update', async () => {
 		await mount({ policyId: 'p9', returnTo: '/insurance/p9' });
 		await type('company', '  Acme Renamed ');
