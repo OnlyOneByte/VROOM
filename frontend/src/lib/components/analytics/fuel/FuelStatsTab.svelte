@@ -103,7 +103,7 @@
 	);
 	let summaryItems = $derived([
 		{
-			label: `Cost per ${distLabelShort}`,
+			label: `${showGasCards ? 'Fuel' : 'Charging'} cost per ${distLabelShort}`,
 			value: costPerDistance != null ? formatCurrency(costPerDistance) : 'N/A',
 			icon: DollarSign,
 			iconColor: 'chart-1'

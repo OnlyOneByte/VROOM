@@ -17,16 +17,18 @@ import type {
 } from '../repository';
 
 describe('analytics api-transform: money cents→dollars, non-money untouched', () => {
-  test('quickStats: ytdSpending cents→dollars; counts/efficiency/score untouched', () => {
+  test('quickStats: ytdSpending and costPerDistance cents→dollars; counts/efficiency/score untouched', () => {
     const d: QuickStatsData = {
       vehicleCount: 3,
       ytdSpending: 123456,
       avgEfficiency: 28.5,
+      costPerDistance: 21,
       fleetHealthScore: 87,
       units: { distanceUnit: 'mi', volumeUnit: 'gal', chargeUnit: 'kWh' },
     };
     const r = quickStatsToApi(d);
     expect(r.ytdSpending).toBe(1234.56);
+    expect(r.costPerDistance).toBe(0.21);
     expect(r.vehicleCount).toBe(3);
     expect(r.avgEfficiency).toBe(28.5);
     expect(r.fleetHealthScore).toBe(87);

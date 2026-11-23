@@ -451,6 +451,43 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
     expect(summary.fuelAdvanced.seasonalEfficiency).toEqual(adv.seasonalEfficiency);
     expect(stats.distance.totalDistance).toBeCloseTo(300 + 360 / 1.609344, 1);
   });
+
+  test('quick stats cost per distance divides every expense by the fleet distance in user units', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedVehicle(testDb.sqlite, VEH_B);
+    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+      JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
+      VEH_B.id,
+    ]);
+    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 10));
+    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_300, 40, 30, 10));
+    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 20));
+    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_360, 40, 30, 20));
+    seedExpense(testDb.sqlite, {
+      ...fillup('m1', VEH_A.id, 0, 100, 20, 0),
+      category: 'maintenance',
+      mileage: null,
+      volume: null,
+      fuelType: null,
+    });
+
+    const quick = await repo.getQuickStats(USER.id, rangeAll());
+    const summary = await repo.getSummary(USER.id, rangeAll());
+
+    expect(quick.costPerDistance).toBeCloseTo(260 / (300 + 360 / 1.609344), 6);
+    expect(summary.quickStats.costPerDistance).toBeCloseTo(quick.costPerDistance ?? Number.NaN, 6);
+  });
+
+  test('quick stats have no cost per distance without two odometer readings', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 10));
+
+    const quick = await repo.getQuickStats(USER.id, rangeAll());
+
+    expect(quick.costPerDistance).toBeNull();
+  });
 });
 
 describe('a mixed mpg + km/L fleet pools efficiency, cost and price in the user units', () => {

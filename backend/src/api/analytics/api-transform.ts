@@ -16,7 +16,7 @@ import type {
 const cn = (v: number | null): number | null => (v == null ? v : c(v));
 
 export function quickStatsToApi(d: QuickStatsData): QuickStatsData {
-  return { ...d, ytdSpending: c(d.ytdSpending) };
+  return { ...d, ytdSpending: c(d.ytdSpending), costPerDistance: cn(d.costPerDistance) };
 }
 
 export function fuelStatsToApi(d: FuelStatsData): FuelStatsData {

@@ -183,7 +183,7 @@ describe('FuelStatsTab summary and groups', () => {
 
 	test('leads with cost per distance, monthly fuel spend and average efficiency', () => {
 		render(FuelStatsTab, { fuelStats: stats(gas), fuelAdvanced: advanced });
-		expect(screen.getByText('Cost per mi')).toBeTruthy();
+		expect(screen.getByText('Fuel cost per mi')).toBeTruthy();
 		expect(screen.getByText('$0.13')).toBeTruthy();
 		expect(screen.getByText('Fuel spend per month')).toBeTruthy();
 		expect(screen.getByText('$158.28')).toBeTruthy();

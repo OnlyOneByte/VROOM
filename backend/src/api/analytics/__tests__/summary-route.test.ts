@@ -21,6 +21,7 @@ const MOCK_SUMMARY: AnalyticsSummaryData = {
     vehicleCount: 2,
     ytdSpending: 5432.1,
     avgEfficiency: 28.5,
+    costPerDistance: 21,
     fleetHealthScore: 85,
     units: { distanceUnit: 'miles', volumeUnit: 'gallons_us', chargeUnit: 'kwh' },
   },

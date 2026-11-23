@@ -13,6 +13,7 @@ vi.mock('#lib/services/analytics-api.ts', () => ({
 					vehicleCount: vehicleCount.value,
 					ytdSpending: 0,
 					avgEfficiency: null,
+					costPerDistance: null,
 					fleetHealthScore: 0,
 					units: { distanceUnit: 'miles', volumeUnit: 'gallons_us', chargeUnit: 'kwh' }
 				},

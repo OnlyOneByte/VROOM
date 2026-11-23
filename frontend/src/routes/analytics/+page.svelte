@@ -2,15 +2,15 @@
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount, tick } from 'svelte';
-	import { LoaderCircle, Car, DollarSign, Activity, TrendingUp } from '@lucide/svelte';
+	import { LoaderCircle, Car, DollarSign, Route, TrendingUp } from '@lucide/svelte';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import * as Tabs from '#lib/components/ui/tabs/index.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import FuelStatsTab from '#lib/components/analytics/fuel/FuelStatsTab.svelte';
 	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
-	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
-	import { getFuelEfficiencyLabel } from '#lib/utils/units.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import type { AnalyticsSummaryResponse } from '#lib/types/index.ts';
 
@@ -53,9 +53,7 @@
 	let fuelAdvanced = $derived(summary?.fuelAdvanced ?? null);
 
 	let units = $derived(quickStats?.units ?? settingsStore.unitPreferences);
-	let efficiencyLabel = $derived(
-		`Avg ${getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit)}`
-	);
+	let costPerDistanceLabel = $derived(`Cost per ${getDistanceUnitLabel(units.distanceUnit, true)}`);
 
 	const FLEET_HEALTH_SUBTITLE = 'Service regularity, service mileage and insurance cover';
 
@@ -75,10 +73,12 @@
 						iconColor: 'chart-1'
 					},
 					{
-						label: efficiencyLabel,
+						label: costPerDistanceLabel,
 						value:
-							quickStats.avgEfficiency != null ? formatNumber(quickStats.avgEfficiency, 1) : 'N/A',
-						icon: Activity,
+							quickStats.costPerDistance != null
+								? formatCurrency(quickStats.costPerDistance)
+								: 'N/A',
+						icon: Route,
 						iconColor: 'chart-2'
 					},
 					{
@@ -96,7 +96,7 @@
 	const QUICK_STAT_SKELETONS = [
 		{ label: 'vehicles', value: '', icon: Car },
 		{ label: 'spending', value: '', icon: DollarSign },
-		{ label: 'efficiency', value: '', icon: Activity },
+		{ label: 'cost', value: '', icon: Route },
 		{ label: 'health', value: '', subtitle: FLEET_HEALTH_SUBTITLE, icon: TrendingUp }
 	];
 
