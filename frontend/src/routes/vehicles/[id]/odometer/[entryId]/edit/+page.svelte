@@ -293,11 +293,11 @@
 						variant="outline"
 						size="lg"
 						onclick={() => gotoDynamic(returnTo)}
-						class="flex-1"
+						class="flex-1 max-sm:px-4"
 					>
 						Cancel
 					</Button>
-					<Button type="submit" size="lg" disabled={isSubmitting} class="flex-1">
+					<Button type="submit" size="lg" disabled={isSubmitting} class="flex-1 max-sm:px-4">
 						{#if isSubmitting}
 							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 						{/if}
