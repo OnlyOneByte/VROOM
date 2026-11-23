@@ -111,6 +111,9 @@ jobs:
       - name: Build application
         run: npm run build
 
+      - name: Check per-route bundle budgets
+        run: npm run bundle-budget
+
       - name: Install Playwright browsers
         # Chromium only. The suite declares five projects (two of them mobile viewports) and
         # runs at `workers: 1` under CI, so the full matrix costs roughly 5x; chromium catches

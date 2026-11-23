@@ -92,6 +92,12 @@ mean a type error. The wrapper cannot prove the following:
 - Compiler output is captured up to 1 MiB. A failing compiler whose diagnostics fall past that
   limit is reported as a failure, not as a clean pass.
 
+After the build, `npm run bundle-budget` prints the gzip JavaScript each route loads beyond the
+shared entry and root layout, and fails when a route is over its budget in
+`frontend/bundle-budgets.json` (routes not listed there get `default`). CI runs it in Frontend
+Tests. When a change has to go over, raise that route's budget in the same PR and say in the PR
+description why the extra weight is worth it; when a route shrinks for good, lower its budget.
+
 E2E tests are separate, and need neither a backend nor a database. Playwright starts the
 frontend dev server itself and mocks every `/api/v1` call in the browser. One-time setup is
 `npx playwright install` for the browser binaries. See `frontend/e2e/README.md`.
