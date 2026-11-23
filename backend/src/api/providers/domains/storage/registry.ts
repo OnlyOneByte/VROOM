@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { CONFIG } from '../../../../config';
 import { getDb } from '../../../../db/connection';
 import type { UserProvider } from '../../../../db/schema';
@@ -9,6 +10,7 @@ import { DEFAULT_STORAGE_CONFIG } from '../../../../types';
 import { decrypt } from '../../../../utils/encryption';
 import { assertSafeOutboundUrl } from '../../../../utils/outbound-url';
 import { joinStoragePath } from '../../../../utils/paths';
+import { alwaysAvailable, type ProviderDescriptor, toCatalogEntries } from '../../descriptor';
 import { FakeStorageProvider } from './fake-provider';
 import { GoogleDriveProvider } from './google-drive-provider';
 import { GooglePhotosProvider } from './google-photos-provider';
@@ -73,13 +75,20 @@ function buildS3Provider(credentials: Record<string, unknown>, config: unknown):
   );
 }
 
-function validateS3Config(config: Record<string, unknown> | null): void {
-  const c = config ?? {};
-  if (!c.endpoint || !c.bucket || !c.region) {
-    throw new ValidationError('S3 config must include endpoint, bucket, and region');
-  }
-  assertSafeOutboundUrl(String(c.endpoint), 'S3 endpoint');
-}
+const S3_CONFIG_MESSAGE = 'S3 config must include endpoint, bucket, and region';
+const requiredS3Text = z.string({ message: S3_CONFIG_MESSAGE }).min(1, S3_CONFIG_MESSAGE);
+
+const s3ConfigSchema = z
+  .looseObject({ endpoint: requiredS3Text, bucket: requiredS3Text, region: requiredS3Text })
+  .superRefine((config, ctx) => {
+    try {
+      assertSafeOutboundUrl(config.endpoint, 'S3 endpoint');
+    } catch (error) {
+      ctx.addIssue({ code: 'custom', message: (error as Error).message, path: ['endpoint'] });
+    }
+  });
+
+const noConfig = { schema: z.looseObject({}), fields: [] };
 
 function getFakeProvider(providerId: string): StorageProvider {
   // Fakes are double-gated: only outside production and only when explicitly opted in.
@@ -100,16 +109,19 @@ export interface StorageProviderInput {
   config: Record<string, unknown> | null;
 }
 
-export interface StorageProviderDescriptor {
-  credentialKind: 'google-oauth' | 'keys' | 'none';
-  create: (input: StorageProviderInput) => StorageProvider;
-  validateConfig?: (config: Record<string, unknown> | null) => void;
+export interface StorageFeatures {
+  photoOnly: boolean;
+  backupSheets: boolean;
   defaultFolders: Record<PhotoCategory, string>;
-  identity?: (config: Record<string, unknown>) => string | null;
-  creatable?: false;
-  photoOnly?: true;
-  backupStrategy?: 'zip' | 'google-drive';
+  defaultPhotoRootPath: string;
 }
+
+export type StorageProviderDescriptor = ProviderDescriptor<
+  'storage',
+  StorageProviderInput,
+  StorageProvider,
+  StorageFeatures
+>;
 
 const GENERIC_FOLDERS: Record<PhotoCategory, string> = {
   vehicle_photos: 'vehicle-photos',
@@ -120,32 +132,93 @@ const GENERIC_FOLDERS: Record<PhotoCategory, string> = {
 
 export const STORAGE_PROVIDERS = {
   'google-drive': {
-    credentialKind: 'google-oauth',
+    capability: 'storage',
+    label: 'Google Drive',
+    description: 'Store photos in Google Drive',
+    scope: 'user',
+    availability: alwaysAvailable,
+    config: noConfig,
+    secrets: [],
+    connect: 'oauth',
     create: ({ credentials }) => buildGoogleDriveProvider(credentials),
-    backupStrategy: 'google-drive',
-    defaultFolders: {
-      vehicle_photos: 'Vehicle',
-      expense_receipts: 'Receipts',
-      insurance_docs: 'Insurance',
-      odometer_readings: 'Odometer',
+    features: {
+      photoOnly: false,
+      backupSheets: true,
+      defaultPhotoRootPath: 'Photos',
+      defaultFolders: {
+        vehicle_photos: 'Vehicle',
+        expense_receipts: 'Receipts',
+        insurance_docs: 'Insurance',
+        odometer_readings: 'Odometer',
+      },
     },
   },
   'google-photos': {
-    credentialKind: 'google-oauth',
+    capability: 'storage',
+    label: 'Google Photos',
+    description: 'Store photos in Google Photos',
+    scope: 'user',
+    availability: () => 'hidden',
+    config: noConfig,
+    secrets: [],
+    connect: 'oauth',
     create: ({ credentials, config }) => buildGooglePhotosProvider(credentials, config),
-    defaultFolders: GENERIC_FOLDERS,
-    creatable: false,
-    photoOnly: true,
+    features: {
+      photoOnly: true,
+      backupSheets: false,
+      defaultPhotoRootPath: 'photos',
+      defaultFolders: GENERIC_FOLDERS,
+    },
   },
   s3: {
-    credentialKind: 'keys',
+    capability: 'storage',
+    label: 'S3 Compatible',
+    shortLabel: 'S3 / B2 / R2',
+    description: 'S3-compatible storage',
+    scope: 'user',
+    availability: alwaysAvailable,
+    config: {
+      schema: s3ConfigSchema,
+      fields: [
+        {
+          key: 'endpoint',
+          label: 'Endpoint',
+          kind: 'url',
+          required: true,
+          placeholder: 's3.us-west-002.backblazeb2.com',
+        },
+        {
+          key: 'bucket',
+          label: 'Bucket',
+          kind: 'text',
+          required: true,
+          placeholder: 'vroom-photos',
+        },
+        {
+          key: 'region',
+          label: 'Region',
+          kind: 'text',
+          required: true,
+          placeholder: 'us-west-002',
+        },
+      ],
+    },
+    secrets: [
+      { key: 'accessKeyId', label: 'Access Key ID', required: true },
+      { key: 'secretAccessKey', label: 'Secret Access Key', required: true },
+    ],
+    connect: 'form',
     create: ({ credentials, config }) => buildS3Provider(credentials, config),
-    validateConfig: validateS3Config,
-    defaultFolders: {
-      vehicle_photos: 'vehicles',
-      expense_receipts: 'receipts',
-      insurance_docs: 'insurance',
-      odometer_readings: 'odometer',
+    features: {
+      photoOnly: false,
+      backupSheets: false,
+      defaultPhotoRootPath: 'vroom/photos',
+      defaultFolders: {
+        vehicle_photos: 'vehicles',
+        expense_receipts: 'receipts',
+        insurance_docs: 'insurance',
+        odometer_readings: 'odometer',
+      },
     },
     identity: (config) =>
       config.endpoint && config.bucket
@@ -153,9 +226,21 @@ export const STORAGE_PROVIDERS = {
         : null,
   },
   fake: {
-    credentialKind: 'none',
+    capability: 'storage',
+    label: 'Fake (testing)',
+    description: 'In-memory storage for tests',
+    scope: 'user',
+    availability: () => (CONFIG.allowFakeStorageProvider ? 'available' : 'hidden'),
+    config: noConfig,
+    secrets: [],
+    connect: 'none',
     create: ({ id }) => getFakeProvider(id),
-    defaultFolders: GENERIC_FOLDERS,
+    features: {
+      photoOnly: false,
+      backupSheets: false,
+      defaultPhotoRootPath: 'photos',
+      defaultFolders: GENERIC_FOLDERS,
+    },
   },
 } satisfies Record<string, StorageProviderDescriptor>;
 
@@ -166,9 +251,19 @@ export const STORAGE_PROVIDER_TYPES = Object.keys(STORAGE_PROVIDERS) as [
   ...StorageProviderType[],
 ];
 
-export const CREATABLE_STORAGE_PROVIDER_TYPES = STORAGE_PROVIDER_TYPES.filter(
-  (type) => (STORAGE_PROVIDERS[type] as StorageProviderDescriptor).creatable !== false
-) as [StorageProviderType, ...StorageProviderType[]];
+export function storageCatalog() {
+  return toCatalogEntries<'storage', StorageFeatures>(STORAGE_PROVIDERS);
+}
+
+export function validateStorageConfig(
+  descriptor: StorageProviderDescriptor,
+  config: Record<string, unknown> | null
+): void {
+  const parsed = descriptor.config.schema.safeParse(config ?? {});
+  if (!parsed.success) {
+    throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid provider config');
+  }
+}
 
 export function storageProviderDescriptor(
   providerType: string
@@ -291,7 +386,7 @@ export class StorageProviderRegistry {
       throw new ValidationError(`Unsupported provider type: ${row.providerType}`);
     }
     const credentials =
-      descriptor.credentialKind === 'none'
+      descriptor.connect === 'none'
         ? {}
         : (JSON.parse(decrypt(row.credentials)) as Record<string, unknown>);
     return descriptor.create({

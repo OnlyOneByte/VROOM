@@ -20,11 +20,7 @@ describe('storage provider descriptors', () => {
   test('a new type registered only in STORAGE_PROVIDERS is built by the registry', () => {
     const instance = new FakeStorageProvider();
     const providers = STORAGE_PROVIDERS as unknown as Record<string, StorageProviderDescriptor>;
-    providers.webdav = {
-      credentialKind: 'none',
-      create: () => instance,
-      defaultFolders: STORAGE_PROVIDERS.fake.defaultFolders,
-    };
+    providers.webdav = { ...STORAGE_PROVIDERS.fake, label: 'WebDAV', create: () => instance };
     try {
       const row = { id: 'p-webdav', providerType: 'webdav', credentials: '', config: null };
       const built = getStorageProviderRegistry().createProviderInstance(

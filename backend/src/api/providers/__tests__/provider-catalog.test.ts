@@ -1,0 +1,88 @@
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { CONFIG } from '../../../config';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
+
+interface CatalogEntry {
+  id: string;
+  capability: string;
+  label: string;
+  fields: { key: string; required: boolean }[];
+  secrets: { key: string }[];
+  features: Record<string, unknown>;
+}
+
+let ctx: TestApp;
+const config = CONFIG as { allowFakeStorageProvider: boolean };
+const previousFake = config.allowFakeStorageProvider;
+
+beforeEach(async () => {
+  ctx = await createTestApp();
+});
+afterEach(() => {
+  config.allowFakeStorageProvider = previousFake;
+  ctx.close();
+});
+
+async function catalog(): Promise<CatalogEntry[]> {
+  const res = await ctx.authed('GET', '/api/v1/providers/catalog');
+  expect(res.status).toBe(200);
+  return (await json<DataEnvelope<CatalogEntry[]>>(res)).data;
+}
+
+function hasFunction(value: unknown): boolean {
+  if (typeof value === 'function') return true;
+  if (value && typeof value === 'object') return Object.values(value).some(hasFunction);
+  return false;
+}
+
+describe('GET /api/v1/providers/catalog', () => {
+  test('lists Google Drive and S3 as storage providers, and hides Google Photos', async () => {
+    config.allowFakeStorageProvider = false;
+    const entries = await catalog();
+    expect(entries.map((e) => e.id)).toEqual(['google-drive', 's3']);
+    expect(entries.every((e) => e.capability === 'storage')).toBe(true);
+  });
+
+  test('lists the fake provider only when it is enabled', async () => {
+    config.allowFakeStorageProvider = true;
+    expect((await catalog()).map((e) => e.id)).toEqual(['google-drive', 's3', 'fake']);
+  });
+
+  test('carries the S3 field specs and secret names, with no functions or secret values', async () => {
+    await ctx.authed('POST', '/api/v1/providers', {
+      domain: 'storage',
+      providerType: 's3',
+      displayName: 'S3',
+      credentials: { accessKeyId: 'AKIA-catalog', secretAccessKey: 'catalog-secret-value' },
+      config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
+    });
+    const res = await ctx.authed('GET', '/api/v1/providers/catalog');
+    const raw = await res.text();
+    expect(raw).not.toContain('catalog-secret-value');
+    expect(raw).not.toContain('AKIA-catalog');
+
+    const entries = (JSON.parse(raw) as DataEnvelope<CatalogEntry[]>).data;
+    expect(hasFunction(entries)).toBe(false);
+    const s3 = entries.find((e) => e.id === 's3');
+    expect(s3?.fields.map((f) => [f.key, f.required])).toEqual([
+      ['endpoint', true],
+      ['bucket', true],
+      ['region', true],
+    ]);
+    expect(s3?.secrets.map((s) => s.key)).toEqual(['accessKeyId', 'secretAccessKey']);
+    expect(s3?.features).toMatchObject({ photoOnly: false, backupSheets: false });
+    expect(entries.find((e) => e.id === 'google-drive')?.features).toMatchObject({
+      backupSheets: true,
+    });
+  });
+
+  test('needs a signed-in user', async () => {
+    const res = await ctx.anon('GET', '/api/v1/providers/catalog');
+    expect(res.status).toBe(401);
+  });
+});

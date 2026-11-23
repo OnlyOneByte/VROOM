@@ -30,7 +30,7 @@ export interface BackupStrategy {
 }
 
 export const isPhotoOnlyProviderType = (providerType: string): boolean =>
-  storageProviderDescriptor(providerType)?.photoOnly === true;
+  storageProviderDescriptor(providerType)?.features.photoOnly === true;
 
 export const hasZipBackup = (
   settings: ProviderBackupSettings,

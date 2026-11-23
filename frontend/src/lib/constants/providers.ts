@@ -1,9 +1,10 @@
 import type { Component } from 'svelte';
-import { Cloud, Database, Image } from '@lucide/svelte';
+import { Cloud, Database, FlaskConical, Image } from '@lucide/svelte';
 import type { PhotoCategory, CategorySetting } from '#lib/types/index.ts';
 import type { GoogleOAuthReturn } from '#lib/components/settings/storage-provider/use-google-oauth.svelte.ts';
 import GoogleDriveForm from '#lib/components/settings/storage-provider/form/GoogleDriveForm.svelte';
 import S3Form from '#lib/components/settings/storage-provider/form/S3Form.svelte';
+import { providerCatalog } from '#lib/stores/provider-catalog.svelte.ts';
 
 export interface ProviderConnection {
 	ready: boolean;
@@ -22,96 +23,63 @@ export interface ProviderFormProps {
 export interface ProviderFormMeta {
 	component: Component<ProviderFormProps, Record<string, never>, 'connection'>;
 	description: string;
-	details?: (config: Record<string, unknown>) => { label: string; value: string }[];
 }
 
-export interface StorageProviderMeta {
-	label: string;
+export interface ProviderUi {
 	icon: Component<Record<string, unknown>>;
-	form: ProviderFormMeta | null;
-	option: { label: string; description: string } | null;
-	defaultPhotoRootPath: string;
-	supportsSheets: boolean;
-	photoOnly: boolean;
-	defaultFolders: Record<PhotoCategory, string>;
+	form?: ProviderFormMeta;
+	fallbackLabel?: string;
 }
 
-const GENERIC_FOLDERS: Record<PhotoCategory, string> = {
-	vehicle_photos: 'vehicle-photos',
-	expense_receipts: 'receipts',
-	insurance_docs: 'insurance',
-	odometer_readings: 'odometer'
-};
-
-export const PROVIDER_META: Record<string, StorageProviderMeta> = {
+export const PROVIDER_UI: Record<string, ProviderUi> = {
 	'google-drive': {
-		label: 'Google Drive',
 		icon: Cloud,
-		form: { component: GoogleDriveForm, description: 'Google Drive connection' },
-		option: { label: 'Google Drive', description: 'Store photos in Google Drive' },
-		defaultPhotoRootPath: 'Photos',
-		supportsSheets: true,
-		photoOnly: false,
-		defaultFolders: {
-			vehicle_photos: 'Vehicle',
-			expense_receipts: 'Receipts',
-			insurance_docs: 'Insurance',
-			odometer_readings: 'Odometer'
-		}
+		form: { component: GoogleDriveForm, description: 'Google Drive connection' }
 	},
-	'google-photos': {
-		label: 'Google Photos',
-		icon: Image,
-		form: null,
-		option: null,
-		defaultPhotoRootPath: 'photos',
-		supportsSheets: false,
-		photoOnly: true,
-		defaultFolders: GENERIC_FOLDERS
-	},
+	'google-photos': { icon: Image, fallbackLabel: 'Google Photos' },
 	s3: {
-		label: 'S3 Compatible',
 		icon: Database,
-		form: {
-			component: S3Form,
-			description: 'S3-compatible storage credentials and endpoint',
-			details: config =>
-				(['endpoint', 'bucket', 'region'] as const).map(key => ({
-					label: key.charAt(0).toUpperCase() + key.slice(1),
-					value: (config[key] as string | undefined) ?? '—'
-				}))
-		},
-		option: { label: 'S3 / B2 / R2', description: 'S3-compatible storage' },
-		defaultPhotoRootPath: 'vroom/photos',
-		supportsSheets: false,
-		photoOnly: false,
-		defaultFolders: {
-			vehicle_photos: 'vehicles',
-			expense_receipts: 'receipts',
-			insurance_docs: 'insurance',
-			odometer_readings: 'odometer'
-		}
-	}
+		form: { component: S3Form, description: 'S3-compatible storage credentials and endpoint' }
+	},
+	fake: { icon: FlaskConical }
 };
 
-export function providerMeta(providerType: string | null | undefined): StorageProviderMeta | null {
-	return providerType && Object.hasOwn(PROVIDER_META, providerType)
-		? (PROVIDER_META[providerType] ?? null)
+export function providerUi(providerType: string | null | undefined): ProviderUi | null {
+	return providerType && Object.hasOwn(PROVIDER_UI, providerType)
+		? (PROVIDER_UI[providerType] ?? null)
 		: null;
 }
 
 export function providerLabel(providerType: string): string {
-	return providerMeta(providerType)?.label ?? providerType;
+	return (
+		providerCatalog.entry(providerType)?.label ??
+		providerUi(providerType)?.fallbackLabel ??
+		providerType
+	);
 }
 
 export function supportsZipBackup(providerType: string | null | undefined): boolean {
-	return !!providerType && providerMeta(providerType)?.photoOnly !== true;
+	return providerCatalog.entry(providerType)?.features.photoOnly === false;
+}
+
+export function supportsSheetsBackup(providerType: string | null | undefined): boolean {
+	return providerCatalog.entry(providerType)?.features.backupSheets === true;
+}
+
+export function providerDetails(
+	providerType: string,
+	config: Record<string, unknown>
+): { label: string; value: string }[] {
+	return (providerCatalog.entry(providerType)?.fields ?? []).map(field => ({
+		label: field.label,
+		value: (config[field.key] as string | undefined) ?? '—'
+	}));
 }
 
 export function defaultFolderSettings(
 	providerType: string | null | undefined
 ): Record<PhotoCategory, CategorySetting> {
-	const folders = providerMeta(providerType)?.defaultFolders ?? GENERIC_FOLDERS;
+	const folders = providerCatalog.entry(providerType)?.features.defaultFolders ?? {};
 	return Object.fromEntries(
 		Object.entries(folders).map(([category, folderPath]) => [
 			category,
