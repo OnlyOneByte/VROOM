@@ -156,4 +156,78 @@ describe('findPaginated search', () => {
       expect(result.totalCount).toBe(1);
     });
   });
+
+  describe('fields beyond description and category', () => {
+    test('matches the location', async () => {
+      await repo.create(input({ description: 'fill-up', location: 'Arco, Main St' }));
+      await repo.create(input({ description: 'fill-up', location: 'Shell' }));
+
+      const result = await repo.findPaginated({ userId: USER_A, search: 'arco' });
+      expect(result.totalCount).toBe(1);
+      expect(result.data[0]?.location).toBe('Arco, Main St');
+    });
+
+    test('matches a tag, with LIKE wildcards still escaped', async () => {
+      await repo.create(input({ description: 'one', tags: ['road-trip', 'work'] }));
+      await repo.create(input({ description: 'two', tags: ['commute'] }));
+      await repo.create(input({ description: 'three', tags: ['50%_off'] }));
+
+      expect((await repo.findPaginated({ userId: USER_A, search: 'road' })).totalCount).toBe(1);
+      const literal = await repo.findPaginated({ userId: USER_A, search: '%_' });
+      expect(literal.totalCount).toBe(1);
+      expect(literal.data[0]?.description).toBe('three');
+    });
+
+    test("matches the vehicle's nickname, make and model", async () => {
+      sqliteDb.run(`UPDATE vehicles SET nickname = 'Daily Driver' WHERE id = '${VEHICLE_A}'`);
+      sqliteDb.run(
+        `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-a2', '${USER_A}', 'Tesla', 'Model 3', 2023)`
+      );
+      await repo.create(input({ description: 'camry gas' }));
+      await repo.create(input({ vehicleId: 'veh-a2', description: 'charging' }));
+
+      for (const [term, description] of [
+        ['daily', 'camry gas'],
+        ['toyota', 'camry gas'],
+        ['model 3', 'charging'],
+      ] as const) {
+        const result = await repo.findPaginated({ userId: USER_A, search: term });
+        expect(result.data.map((e) => e.description)).toEqual([description]);
+      }
+    });
+
+    test("another user's vehicle name never brings in their rows", async () => {
+      await repo.create(input({ userId: USER_B, vehicleId: VEHICLE_B, description: 'b row' }));
+
+      const result = await repo.findPaginated({ userId: USER_A, search: 'civic' });
+      expect(result.totalCount).toBe(0);
+    });
+
+    test('a decimal amount matches that exact amount', async () => {
+      await repo.create(input({ description: 'exact', expenseAmount: 4250 }));
+      await repo.create(input({ description: 'near', expenseAmount: 4205 }));
+
+      for (const term of ['42.50', '42.5', '$42.50']) {
+        const result = await repo.findPaginated({ userId: USER_A, search: term });
+        expect(result.data.map((e) => e.description)).toEqual(['exact']);
+      }
+    });
+
+    test('a whole number matches every amount in that dollar', async () => {
+      await repo.create(input({ description: 'a', expenseAmount: 4200 }));
+      await repo.create(input({ description: 'b', expenseAmount: 4299 }));
+      await repo.create(input({ description: 'c', expenseAmount: 4300 }));
+      await repo.create(input({ description: 'd', expenseAmount: 14250 }));
+
+      const result = await repo.findPaginated({ userId: USER_A, search: '42' });
+      expect(result.data.map((e) => e.description).sort()).toEqual(['a', 'b']);
+    });
+
+    test('a number still matches text that contains it', async () => {
+      await repo.create(input({ description: 'Route 42 toll', expenseAmount: 300 }));
+
+      const result = await repo.findPaginated({ userId: USER_A, search: '42' });
+      expect(result.data.map((e) => e.description)).toEqual(['Route 42 toll']);
+    });
+  });
 });

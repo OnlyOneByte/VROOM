@@ -79,7 +79,7 @@
 					type="text"
 					value={searchTerm}
 					oninput={e => onSearchChange(e.currentTarget.value)}
-					placeholder="Search expenses..."
+					placeholder="Search by name, place, tag or amount"
 					class="pl-10 w-full"
 					aria-label="Search expenses"
 				/>
