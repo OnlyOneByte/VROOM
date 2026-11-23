@@ -21,6 +21,7 @@
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { Alert, AlertDescription } from '#lib/components/ui/alert/index.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { PHOTO_CATEGORY_LABELS } from '#lib/constants/ui.ts';
 	import {
@@ -230,19 +231,12 @@
 	<CardContent class="pt-0">
 		<div class="space-y-3">
 			{#if providerCatalog.error && !providerCatalog.loaded}
-				<div role="alert" class="space-y-2">
-					<p class="text-xs text-destructive">
-						Couldn't load the backup options. {providerCatalog.error}
-					</p>
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-10 sm:h-8"
-						onclick={() => providerCatalog.load()}
-					>
-						Retry
-					</Button>
-				</div>
+				<LoadErrorCard
+					compact
+					title="Couldn't load the backup options"
+					message={providerCatalog.error}
+					onRetry={() => providerCatalog.load()}
+				/>
 			{:else if !providerCatalog.loaded}
 				<span class="sr-only">Loading backup options</span>
 			{:else if supportsZipBackup}

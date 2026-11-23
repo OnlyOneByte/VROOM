@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { resolve } from '$app/paths';
-	import { ArrowLeft, CircleAlert, Cloud, LoaderCircle, Save, Trash2 } from '@lucide/svelte';
+	import { ArrowLeft, Cloud, LoaderCircle, Save, Trash2 } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		Card,
@@ -18,6 +18,7 @@
 	import { useGoogleOAuth } from '../use-google-oauth.svelte';
 	import { photosOnlyOnProvider, providerApi } from '#lib/services/provider-api.ts';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
@@ -365,14 +366,12 @@
 				</CardHeader>
 				<CardContent>
 					{#if providerCatalog.error && !providerCatalog.loaded}
-						<div role="alert" class="space-y-3">
-							<p class="flex items-center gap-2 text-sm font-medium text-destructive">
-								<CircleAlert class="h-4 w-4" aria-hidden="true" />
-								Couldn't load the provider types
-							</p>
-							<p class="text-sm text-muted-foreground">{providerCatalog.error}</p>
-							<Button variant="outline" onclick={() => providerCatalog.load()}>Retry</Button>
-						</div>
+						<LoadErrorCard
+							compact
+							title="Couldn't load the provider types"
+							message={providerCatalog.error}
+							onRetry={() => providerCatalog.load()}
+						/>
 					{:else if !providerCatalog.loaded}
 						<div class="flex justify-center py-6" role="status">
 							<LoaderCircle class="h-6 w-6 animate-spin text-primary" aria-hidden="true" />

@@ -45,7 +45,7 @@ describe('ProviderInfoCard when the provider catalog fails to load', () => {
 		});
 
 		const alert = await screen.findByRole('alert');
-		expect(alert.textContent).toContain("Couldn't load the backup options.");
+		expect(alert.textContent).toContain("Couldn't load the backup options");
 		expect(screen.queryByLabelText('ZIP backup')).toBeNull();
 
 		getCatalog.mockResolvedValueOnce(STORAGE_CATALOG);
