@@ -1,6 +1,8 @@
 import { parse } from 'csv-parse/sync';
+import { z } from 'zod';
 import type { ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
+import { alwaysAvailable, type ProviderDescriptor } from '../providers/descriptor';
 import { fuelioFormat } from './fuelio-import';
 import {
   applyMapping,
@@ -147,6 +149,31 @@ function presetFormat(preset: MappingPreset): ImportFormat {
 }
 
 export const IMPORT_FORMATS: ImportFormat[] = [fuelioFormat, ...MAPPING_PRESETS.map(presetFormat)];
+
+export type ImportProviderDescriptor = ProviderDescriptor<
+  'import',
+  void,
+  ImportFormat,
+  { accept: string[]; detect: true }
+>;
+
+export const IMPORT_PROVIDERS: Record<string, ImportProviderDescriptor> = Object.fromEntries(
+  IMPORT_FORMATS.map((format) => [
+    format.id,
+    {
+      capability: 'import',
+      label: format.label,
+      description: `Import expenses from a ${format.label} export`,
+      scope: 'builtin',
+      availability: alwaysAvailable,
+      config: { schema: z.strictObject({}), fields: [] },
+      secrets: [],
+      connect: 'none',
+      features: { accept: format.accept, detect: true },
+      create: () => format,
+    } satisfies ImportProviderDescriptor,
+  ])
+);
 
 export function detectImportFormat(sample: string): ImportFormat | null {
   return IMPORT_FORMATS.find((format) => format.detect(sample)) ?? null;

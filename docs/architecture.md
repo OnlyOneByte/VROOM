@@ -114,7 +114,9 @@ backup settings left on them.
 
 Every provider is a `ProviderDescriptor` (`src/api/providers/descriptor.ts`): label, config
 schema and field specs, secret names, connect kind, availability and features.
-`GET /api/v1/providers/catalog` serves the available descriptors as JSON, and the frontend
+`GET /api/v1/providers/catalog` serves the available descriptors as JSON (storage, the two
+model capabilities, and the built-in import formats, which `GET /expenses/import/formats`
+still lists for the import dialog), and the frontend
 reads labels, fields and features from it (`lib/stores/provider-catalog.svelte.ts`). The
 frontend keeps only what can't travel as JSON, an icon and an optional custom form per id, in
 `PROVIDER_UI`; a test checks every backend storage id has an entry.
