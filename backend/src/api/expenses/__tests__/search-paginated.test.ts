@@ -5,7 +5,7 @@ import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-
 import type { AppDatabase } from '../../../db/connection';
 import type { NewExpense } from '../../../db/schema';
 import * as schema from '../../../db/schema';
-import { ExpenseRepository } from '../repository';
+import { ExpenseRepository, parseAmountTerm } from '../repository';
 
 let sqliteDb: Database;
 let db: AppDatabase;
@@ -229,5 +229,48 @@ describe('findPaginated search', () => {
       const result = await repo.findPaginated({ userId: USER_A, search: '42' });
       expect(result.data.map((e) => e.description)).toEqual(['Route 42 toll']);
     });
+  });
+});
+
+describe('parseAmountTerm', () => {
+  test.each([
+    ['42', { whole: 42 }],
+    ['$42.50', { whole: 42, cents: 50 }],
+    ['42.5', { whole: 42, cents: 50 }],
+    ['€42,50', { whole: 42, cents: 50 }],
+    ['42,50 €', { whole: 42, cents: 50 }],
+    ['1.234,56', { whole: 1234, cents: 56 }],
+    ['1,234.56', { whole: 1234, cents: 56 }],
+    ['1 234,56', { whole: 1234, cents: 56 }],
+    ['1\u202f234,56', { whole: 1234, cents: 56 }],
+    ['1,234', { whole: 1234 }],
+    ['£1,234,567', { whole: 1234567 }],
+    ['42.505', { whole: 42505 }],
+    ['1,23', { whole: 1, cents: 23 }],
+  ])('reads %s', (term, expected) => {
+    expect(parseAmountTerm(term)).toEqual(expected);
+  });
+
+  test.each(['oil', '1,234,56', '1.234.5', '12,34,567', '4,2,5', '$'])(
+    'does not read %s as an amount',
+    (term) => {
+      expect(parseAmountTerm(term)).toBeNull();
+    }
+  );
+});
+
+describe('findPaginated amount search across number formats', () => {
+  test('a comma-decimal or grouped amount finds its exact expense', async () => {
+    await repo.create(input({ description: 'small', expenseAmount: 4250 }));
+    await repo.create(input({ description: 'large', expenseAmount: 123456 }));
+
+    for (const [term, description] of [
+      ['€42,50', 'small'],
+      ['1.234,56', 'large'],
+      ['1,234.56', 'large'],
+    ] as const) {
+      const result = await repo.findPaginated({ userId: USER_A, search: term });
+      expect(result.data.map((e) => e.description)).toEqual([description]);
+    }
   });
 });
