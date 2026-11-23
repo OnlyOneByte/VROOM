@@ -70,7 +70,11 @@
 	let content = $state<HTMLElement | null>(null);
 
 	function focusDay(event: Event) {
-		const day = ['[data-selected]', '[data-today]', ':not([data-disabled])']
+		const day = [
+			'[data-selected]',
+			'[data-today]',
+			':not([data-disabled]):not([data-outside-month])'
+		]
 			.map(state => content?.querySelector<HTMLElement>(`[data-bits-day]${state}`))
 			.find(Boolean);
 		if (!day) return;

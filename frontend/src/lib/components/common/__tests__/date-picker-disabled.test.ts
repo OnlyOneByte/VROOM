@@ -79,6 +79,19 @@ describe('DatePicker opening focus', () => {
 		expect(document.getElementById('pick')).toHaveTextContent('No end date');
 	});
 
+	test('a selected day in the current month wins over today', async () => {
+		const now = new Date();
+		const day = now.getDate() === 1 ? 2 : now.getDate() - 1;
+		const value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+		render(DatePicker, { props: { value, id: 'pick' } });
+
+		await fireEvent.click(document.getElementById('pick') as Element);
+		await screen.findByRole('grid');
+
+		await vi.waitFor(() => expect(document.activeElement?.getAttribute('data-value')).toBe(value));
+		expect(document.activeElement).not.toHaveAttribute('data-today');
+	});
+
 	test('with no date set, opening focuses today', async () => {
 		render(DatePicker, { props: { value: undefined, placeholder: 'Pick a date' } });
 
