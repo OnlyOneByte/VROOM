@@ -340,6 +340,7 @@
 {#snippet chartPlaceholders(error: string | null)}
 	<ChartCard
 		title={TREND_TITLE}
+		level={3}
 		description={TREND_DESCRIPTION}
 		isLoading={!error}
 		{error}
@@ -349,6 +350,7 @@
 	</ChartCard>
 	<ChartCard
 		title={CATEGORY_TITLE}
+		level={3}
 		description={CATEGORY_DESCRIPTION}
 		isLoading={!error}
 		{error}
@@ -453,6 +455,7 @@
 					{@render chartPlaceholders(null)}
 				{:then [{ default: ExpenseTrendChart }, { AppPieChart }]}
 					<ExpenseTrendChart
+						level={3}
 						data={trendChartData}
 						title={TREND_TITLE}
 						description={TREND_DESCRIPTION}
@@ -463,6 +466,7 @@
 						{/snippet}
 					</ExpenseTrendChart>
 					<AppPieChart
+						level={3}
 						title={CATEGORY_TITLE}
 						description={CATEGORY_DESCRIPTION}
 						data={categoryChartData}

@@ -54,7 +54,7 @@ test.describe('Analytics', () => {
 		await page.goto('/analytics');
 
 		await openFillupDetails(page);
-		await expect(page.getByRole('heading', { name: 'Fill-ups' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Fill-ups', exact: true })).toBeVisible();
 		await expect(page.getByRole('heading', { name: 'Fuel Consumption' })).toBeVisible();
 		const fillups = ANALYTICS_SUMMARY.fuelStats.fillups.currentYear;
 		await expect(page.getByText(String(fillups), { exact: true }).first()).toBeVisible();
@@ -65,7 +65,7 @@ test.describe('Analytics', () => {
 
 		await page.goto('/analytics');
 		await openFillupDetails(page);
-		await expect(page.getByRole('heading', { name: 'Fill-ups' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Fill-ups', exact: true })).toBeVisible();
 
 		await page.getByRole('tab', { name: 'Cross-Vehicle', exact: true }).click();
 
@@ -73,7 +73,7 @@ test.describe('Analytics', () => {
 			'aria-selected',
 			'true'
 		);
-		await expect(page.getByRole('heading', { name: 'Fill-ups' })).toBeHidden();
+		await expect(page.getByRole('heading', { name: 'Fill-ups', exact: true })).toBeHidden();
 	});
 
 	test('a fleet with no vehicles shows the Add Vehicle empty state, not zeroed stats', async ({
@@ -116,7 +116,7 @@ test.describe('Analytics', () => {
 		);
 		await expect(page.getByText('$0.00')).toBeHidden();
 		await expect(page.getByRole('tablist')).toBeHidden();
-		await expect(page.getByRole('heading', { name: 'Fill-ups' })).toBeHidden();
+		await expect(page.getByRole('heading', { name: 'Fill-ups', exact: true })).toBeHidden();
 	});
 
 	test('a failed load shows an error with a retry that re-requests', async ({ page }) => {

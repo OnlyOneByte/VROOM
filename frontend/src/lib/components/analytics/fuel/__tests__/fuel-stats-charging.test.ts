@@ -210,7 +210,7 @@ describe('FuelStatsTab summary and groups', () => {
 	test('puts the details, patterns and comparisons in groups that start closed below lg', () => {
 		const { container } = render(FuelStatsTab, { fuelStats: stats(gas), fuelAdvanced: advanced });
 		const groups = [...container.querySelectorAll('details[data-slot="chart-group"]')];
-		expect(groups.map(g => g.querySelector('summary span span')?.textContent)).toEqual([
+		expect(groups.map(g => g.querySelector('summary h2')?.textContent)).toEqual([
 			'Fill-up details',
 			'Patterns',
 			'Comparisons'

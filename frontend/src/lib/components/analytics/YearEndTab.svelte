@@ -161,9 +161,15 @@
 		/>
 
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-			<AppPieChart title="Expense Breakdown" description="Spending by category" data={pieData} />
+			<AppPieChart
+				title="Expense Breakdown"
+				level={3}
+				description="Spending by category"
+				data={pieData}
+			/>
 
 			<AppLineChart
+				level={3}
 				title="{efficiencyLabel} Trend"
 				description="Fuel efficiency over the year"
 				data={effTrendData}

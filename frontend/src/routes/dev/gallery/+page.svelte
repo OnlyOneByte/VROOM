@@ -260,6 +260,7 @@
 			<h2 class="text-lg font-semibold">Charts (ChartCard 4-state wrapper)</h2>
 			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 				<AppLineChart
+					level={3}
 					title="Populated"
 					data={trend}
 					x="date"
@@ -268,6 +269,7 @@
 					series={[{ key: 'amount', label: 'Amount', color: 'var(--primary)' }]}
 				/>
 				<ChartCard
+					level={3}
 					title="Empty"
 					isEmpty
 					emptyTitle="No data yet"
@@ -275,10 +277,10 @@
 				>
 					<div></div>
 				</ChartCard>
-				<ChartCard title="Loading" isLoading>
+				<ChartCard title="Loading" level={3} isLoading>
 					<div></div>
 				</ChartCard>
-				<ChartCard title="Error" error="Couldn't load the chart data.">
+				<ChartCard title="Error" level={3} error="Couldn't load the chart data.">
 					<div></div>
 				</ChartCard>
 			</div>
