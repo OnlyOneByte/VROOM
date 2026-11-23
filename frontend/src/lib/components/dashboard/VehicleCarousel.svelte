@@ -2,7 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
-	import { Car, Calendar, TrendingUp, DollarSign, Image as ImageIcon, Users } from '@lucide/svelte';
+	import { Car, Calendar, TrendingUp, DollarSign, Plus, Users, Zap } from '@lucide/svelte';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import * as Carousel from '#lib/components/ui/carousel/index.ts';
 	import type { CarouselAPI } from '#lib/components/ui/carousel/context.ts';
@@ -22,18 +22,21 @@
 		hasActiveFinancing: boolean;
 		coverPhotoUrl?: string | null;
 		sharedBy?: string | null;
+		make?: string;
+		vehicleType?: string;
 	}
 
 	interface Props {
 		vehicles: VehicleOverview[];
 		isLoading?: boolean;
+		addVehicleHref?: string;
 	}
 
-	let { vehicles, isLoading = false }: Props = $props();
+	let { vehicles, isLoading = false, addVehicleHref }: Props = $props();
 	const uid = $props.id();
 	const titleId = `${uid}-fleet-title`;
 
-	const CAROUSEL_ARROW_CLASS = 'top-28 bg-background/90 hover:bg-background shadow-md';
+	const CAROUSEL_ARROW_CLASS = 'top-15 bg-background/90 hover:bg-background shadow-md';
 
 	let canScrollPrev = $state(false);
 	let canScrollNext = $state(false);
@@ -62,9 +65,17 @@
 		<div class="flex items-center justify-between">
 			<div>
 				<Card.Title level={2} id={titleId}>Your Fleet</Card.Title>
-				<Card.Description>Click on a vehicle to view details</Card.Description>
+				<Card.Description class="hidden sm:block">
+					Click on a vehicle to view details
+				</Card.Description>
 			</div>
-			<div class="p-2 rounded-lg bg-chart-2/10">
+			{#if addVehicleHref}
+				<Button variant="ghost" size="lg" href={addVehicleHref} class="lg:hidden">
+					<Plus class="mr-2 h-4 w-4" />
+					Add Vehicle
+				</Button>
+			{/if}
+			<div class="p-2 rounded-lg bg-chart-2/10 {addVehicleHref ? 'hidden lg:block' : ''}">
 				<Car class="h-5 w-5 text-chart-2" />
 			</div>
 		</div>
@@ -97,7 +108,10 @@
 								<!-- Not a link: a link would nest the Add-Expense button inside it. -->
 								<Card.Root class="overflow-hidden hover:shadow-lg transition-shadow group">
 									<div
-										class="relative h-40 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center overflow-hidden"
+										class="relative {vehicle.coverPhotoUrl
+											? 'h-40'
+											: 'h-16'} bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center overflow-hidden"
+										data-testid="fleet-card-header"
 									>
 										{#if vehicle.coverPhotoUrl}
 											<img
@@ -107,40 +121,55 @@
 											/>
 										{:else}
 											<div
-												class="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 group-hover:scale-110 transition-transform duration-300"
+												class="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20"
 											></div>
-											<ImageIcon class="h-16 w-16 text-muted-foreground relative z-10" />
-										{/if}
-										{#if vehicle.hasActiveFinancing}
-											<Badge
-												variant="secondary"
-												class="absolute top-3 right-3 z-20 bg-background/90 backdrop-blur-sm"
+											<span
+												class="relative z-10 flex items-center gap-1.5 text-muted-foreground"
+												aria-hidden="true"
 											>
-												Financed
-											</Badge>
-										{/if}
-										{#if vehicle.sharedBy}
-											<Badge
-												variant="secondary"
-												class="absolute top-3 left-3 z-20 bg-background/90 backdrop-blur-sm inline-flex items-center gap-1"
-											>
-												<Users class="h-3 w-3" aria-hidden="true" />
-												Shared by {vehicle.sharedBy}
-											</Badge>
+												{#if vehicle.vehicleType === 'electric'}
+													<Zap class="h-5 w-5" />
+												{:else}
+													<Car class="h-5 w-5" />
+												{/if}
+												{#if vehicle.make}
+													<span class="text-lg font-semibold">
+														{vehicle.make.charAt(0).toUpperCase()}
+													</span>
+												{/if}
+											</span>
 										{/if}
 									</div>
 
 									<Card.Content class="relative p-4 flex flex-col h-[200px]">
 										<!-- Stretched-link overlay: the action button must stay above it (z-10). -->
 										<div class="mb-3">
-											<h3 class="font-semibold text-lg leading-tight">
-												<a
-													href={resolve(paramRoutes.vehicle, { id: vehicle.id })}
-													class="rounded-sm after:absolute after:inset-0 after:content-[''] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-												>
-													{vehicle.nickname || vehicle.name}
-												</a>
-											</h3>
+											<div class="flex items-start justify-between gap-2">
+												<h3 class="min-w-0 font-semibold text-lg leading-tight">
+													<a
+														href={resolve(paramRoutes.vehicle, { id: vehicle.id })}
+														class="rounded-sm after:absolute after:inset-0 after:content-[''] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+													>
+														{vehicle.nickname || vehicle.name}
+													</a>
+												</h3>
+												{#if vehicle.hasActiveFinancing || vehicle.sharedBy}
+													<div class="flex max-w-[50%] shrink-0 flex-wrap justify-end gap-1">
+														{#if vehicle.hasActiveFinancing}
+															<Badge variant="secondary">Financed</Badge>
+														{/if}
+														{#if vehicle.sharedBy}
+															<Badge
+																variant="secondary"
+																class="inline-flex max-w-full items-center gap-1"
+															>
+																<Users class="h-3 w-3 shrink-0" aria-hidden="true" />
+																<span class="truncate">Shared by {vehicle.sharedBy}</span>
+															</Badge>
+														{/if}
+													</div>
+												{/if}
+											</div>
 											{#if vehicle.nickname}
 												<p class="text-sm text-muted-foreground">{vehicle.name}</p>
 											{/if}

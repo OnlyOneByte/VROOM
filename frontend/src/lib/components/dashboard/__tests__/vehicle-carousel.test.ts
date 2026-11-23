@@ -69,6 +69,8 @@ interface Overview {
 	hasActiveFinancing: boolean;
 	coverPhotoUrl?: string | null;
 	sharedBy?: string | null;
+	make?: string;
+	vehicleType?: string;
 }
 
 const NOW = new Date('2026-11-21T12:00:00Z');
@@ -221,7 +223,7 @@ describe('VehicleCarousel states', () => {
 		expect(document.activeElement).toBe(card);
 	});
 
-	test('the arrows sit over the photo, not over the card title', async () => {
+	test('the arrows sit on the card header band, photo or not, not over the card title', async () => {
 		embla.reset(1);
 		render(VehicleCarousel, {
 			vehicles: [overview(), overview({ id: 'v2', name: '2019 Honda Civic' })]
@@ -229,7 +231,7 @@ describe('VehicleCarousel states', () => {
 		const next = await screen.findByRole('button', { name: 'Next slide' });
 
 		for (const arrow of [next, screen.getByRole('button', { name: 'Previous slide' })]) {
-			expect(arrow).toHaveClass('top-28');
+			expect(arrow).toHaveClass('top-15');
 			expect(arrow).not.toHaveClass('top-1/2');
 		}
 	});
@@ -331,5 +333,51 @@ describe('VehicleCarousel vehicle card', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Add Expense' }));
 
 		expect(goto).toHaveBeenCalledWith('/expenses/new?vehicleId=v9&returnTo=%2Fdashboard');
+	});
+});
+
+describe('VehicleCarousel compact header', () => {
+	test('a vehicle without a cover photo gets a 64px band with its type icon and make initial', () => {
+		render(VehicleCarousel, {
+			vehicles: [overview({ make: 'Toyota', vehicleType: 'gas' })]
+		});
+		const band = screen.getByTestId('fleet-card-header');
+		expect(band).toHaveClass('h-16');
+		expect(band).not.toHaveClass('h-40');
+		expect(band).toHaveTextContent('T');
+		expect(band.querySelector('img')).toBeNull();
+	});
+
+	test('a cover photo keeps the full 160px image', () => {
+		render(VehicleCarousel, {
+			vehicles: [overview({ coverPhotoUrl: '/photo.jpg', make: 'Toyota' })]
+		});
+		const band = screen.getByTestId('fleet-card-header');
+		expect(band).toHaveClass('h-40');
+		expect(band.querySelector('img')).toHaveAttribute('src', '/photo.jpg');
+	});
+
+	test('below lg the Your Fleet header carries Add Vehicle when the page hands it a link', () => {
+		render(VehicleCarousel, { vehicles: [overview()], addVehicleHref: '/vehicles/new' });
+		const add = screen.getByRole('link', { name: 'Add Vehicle' });
+		expect(add).toHaveAttribute('href', '/vehicles/new');
+		expect(add).toHaveClass('lg:hidden');
+	});
+
+	test('the Financed and Shared badges sit beside the title, clear of the arrows on the band', () => {
+		render(VehicleCarousel, {
+			vehicles: [overview({ hasActiveFinancing: true, sharedBy: 'Sam', make: 'Toyota' })]
+		});
+		const band = screen.getByTestId('fleet-card-header');
+		const title = screen.getByRole('heading', { level: 3 });
+		for (const badge of [screen.getByText('Financed'), screen.getByText('Shared by Sam')]) {
+			expect(band).not.toContainElement(badge);
+			expect(title.parentElement?.parentElement).toContainElement(badge);
+		}
+	});
+
+	test('without a link the header shows no Add Vehicle', () => {
+		render(VehicleCarousel, { vehicles: [overview()] });
+		expect(screen.queryByRole('link', { name: 'Add Vehicle' })).toBeNull();
 	});
 });

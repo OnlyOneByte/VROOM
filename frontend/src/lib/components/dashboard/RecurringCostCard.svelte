@@ -5,7 +5,6 @@
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
-	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
 
 	interface Props {
@@ -32,7 +31,7 @@
 	<Card.Content>
 		{#if isLoading}
 			<Skeleton class="h-16 w-full" />
-		{:else if count > 0}
+		{:else}
 			<div class="flex items-baseline gap-2">
 				<span class="text-3xl font-bold">{formatCurrency(monthlyTotal)}</span>
 				<span class="text-sm text-muted-foreground">/ month</span>
@@ -47,19 +46,6 @@
 					<ArrowRight class="h-4 w-4 ml-2" />
 				</Button>
 			</div>
-		{:else}
-			<EmptyState>
-				{#snippet icon()}
-					<Repeat class="h-12 w-12 text-muted-foreground" />
-				{/snippet}
-				{#snippet title()}
-					No recurring costs
-				{/snippet}
-				{#snippet description()}
-					Create an expense-type reminder (insurance premium, loan payment) and its monthly run-rate
-					will show up here.
-				{/snippet}
-			</EmptyState>
 		{/if}
 	</Card.Content>
 </Card.Root>

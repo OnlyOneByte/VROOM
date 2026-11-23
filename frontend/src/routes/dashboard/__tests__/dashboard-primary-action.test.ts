@@ -2,13 +2,19 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import type { Vehicle } from '#lib/types/index.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
+import { routes } from '#lib/routes.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 vi.mock('#lib/components/charts/index.ts', () => ({ AppPieChart: () => {} }));
 vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
-vi.mock('#lib/components/dashboard/VehicleCarousel.svelte', () => ({ default: () => {} }));
+const carouselProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
+vi.mock('#lib/components/dashboard/VehicleCarousel.svelte', () => ({
+	default: (_anchor: unknown, props: Record<string, unknown>) => {
+		carouselProps.value = props;
+	}
+}));
 vi.mock('#lib/components/dashboard/SharedWithMeCard.svelte', () => ({ default: () => {} }));
 
 const getVehicles = vi.fn();
@@ -69,12 +75,10 @@ describe('dashboard primary action', () => {
 
 		await waitFor(() => expect(belowLg('Log Fill-up')).toHaveLength(1));
 		expect(belowLg('Log Fill-up')[0]).toHaveClass('fixed');
-		for (const visible of [belowLg, fromLg]) {
-			const addVehicle = visible('Add Vehicle');
-			expect(addVehicle).toHaveLength(1);
-			expect(addVehicle[0]).not.toHaveClass('fixed');
-			expect(addVehicle[0]).toHaveClass('border', 'bg-background');
-		}
+		expect(belowLg('Add Vehicle')).toHaveLength(0);
+		await waitFor(() => expect(carouselProps.value?.['addVehicleHref']).toBe(routes.vehicleNew));
+		expect(fromLg('Add Vehicle')).toHaveLength(1);
+		expect(fromLg('Add Vehicle')[0]).toHaveClass('border', 'bg-background');
 	});
 
 	test('from lg: up, Log Fill-up moves from the floating button to the header', async () => {
@@ -122,7 +126,7 @@ describe('dashboard primary action', () => {
 		expect(controls('Log Fill-up')).toHaveLength(0);
 	});
 
-	test('the header holds a 40px placeholder for Add Vehicle until the first load settles', async () => {
+	test('from lg the header holds a 40px placeholder for Add Vehicle until the first load settles', async () => {
 		let settle: (vehicles: Vehicle[]) => void = () => {};
 		getVehicles.mockImplementation(() => new Promise<Vehicle[]>(r => (settle = r)));
 		render(Page);
@@ -134,10 +138,12 @@ describe('dashboard primary action', () => {
 		const placeholder = header?.querySelector('[data-slot="skeleton"]');
 		expect(placeholder).toHaveClass('h-10');
 
+		expect(placeholder).toHaveClass('hidden', 'lg:block');
+
 		settle([OWNED]);
-		await waitFor(() => expect(belowLg('Add Vehicle')).toHaveLength(1));
+		await waitFor(() => expect(fromLg('Add Vehicle')).toHaveLength(1));
 		expect(header?.querySelector('[data-slot="skeleton"]')).toBeNull();
-		expect(belowLg('Add Vehicle')[0]).toHaveClass('h-10');
+		expect(fromLg('Add Vehicle')[0]).toHaveClass('h-10');
 	});
 
 	function headerPlaceholder() {
@@ -163,6 +169,18 @@ describe('dashboard primary action', () => {
 		await screen.findByRole('button', { name: 'Retry' });
 		expect(headerPlaceholder()).toBeNull();
 		expect(controls('Add Vehicle')).toHaveLength(0);
+	});
+
+	test('with nothing due or recurring, the page shows one Coming Up row and a Spending header for the period', async () => {
+		getVehicles.mockImplementation(() => Promise.resolve([OWNED]));
+		render(Page);
+
+		expect(await screen.findByRole('heading', { name: 'Coming Up' })).toBeInTheDocument();
+		expect(screen.queryByText('Recurring Costs')).toBeNull();
+		const spending = screen.getByRole('heading', { level: 2, name: 'Spending' });
+		expect(spending.parentElement).toContainElement(
+			screen.getByRole('combobox', { name: 'Select time period' })
+		);
 	});
 
 	test('a failed load shows its inline card and raises no error toast', async () => {

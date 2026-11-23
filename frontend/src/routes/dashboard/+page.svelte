@@ -80,6 +80,8 @@
 				id: v.id,
 				name: `${v.year} ${v.make} ${v.model}`,
 				nickname: v.nickname,
+				make: v.make,
+				vehicleType: v.vehicleType,
 				recentExpenses: vStats?.recentAmount ?? 0,
 				totalExpenses: vStats?.totalAmount ?? 0,
 				lastActivity: vStats?.lastActivity ?? null,
@@ -301,7 +303,12 @@
 	<PageHeader title="Dashboard" description={pageDescription}>
 		{#snippet actions()}
 			{#if canLogFillup}
-				<Button variant="outline" size="lg" href={resolve(routes.vehicleNew)}>
+				<Button
+					variant="outline"
+					size="lg"
+					class="hidden lg:inline-flex"
+					href={resolve(routes.vehicleNew)}
+				>
 					<Car class="mr-2 h-4 w-4" />
 					Add Vehicle
 				</Button>
@@ -315,7 +322,7 @@
 					Add Vehicle
 				</Button>
 			{:else if isLoading && !hasLoaded}
-				<Skeleton class="h-10 sm:w-36" />
+				<Skeleton class="hidden h-10 lg:block lg:w-36" />
 			{/if}
 		{/snippet}
 	</PageHeader>
@@ -341,14 +348,19 @@
 		<SharedWithMeCard onAccepted={loadDashboardData} />
 
 		{#if vehicleOverviews.length > 0}
-			<VehicleCarousel vehicles={vehicleOverviews} {isLoading} />
+			<VehicleCarousel
+				vehicles={vehicleOverviews}
+				{isLoading}
+				addVehicleHref={canLogFillup ? resolve(routes.vehicleNew) : undefined}
+			/>
 		{/if}
 
 		{#if stats.totalVehicles > 0}
-			<PeriodSelector {selectedPeriod} {isLoading} onPeriodChange={handlePeriodChange} />
-		{/if}
+			<div class="flex items-center justify-between gap-4">
+				<h2 class="text-lg font-semibold">Spending</h2>
+				<PeriodSelector {selectedPeriod} {isLoading} onPeriodChange={handlePeriodChange} />
+			</div>
 
-		{#if stats.totalVehicles > 0}
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 				{#await chartModules}
 					{@render chartPlaceholders(null)}
@@ -380,16 +392,18 @@
 				{/await}
 			</div>
 
-			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+			<div class="grid grid-cols-1 lg:grid-cols-2 lg:items-start gap-6">
 				<RecentActivityCard expenses={recentExpenses} {isLoading} />
 				<DueRemindersCard reminders={dueReminders} {isLoading} />
 			</div>
 
-			<RecurringCostCard
-				count={recurringCost.count}
-				monthlyTotal={recurringCost.monthlyTotal}
-				{isLoading}
-			/>
+			{#if recurringCost.count > 0}
+				<RecurringCostCard
+					count={recurringCost.count}
+					monthlyTotal={recurringCost.monthlyTotal}
+					{isLoading}
+				/>
+			{/if}
 		{/if}
 	{/if}
 </div>
