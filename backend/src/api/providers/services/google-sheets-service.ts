@@ -771,5 +771,5 @@ export async function createSheetsServiceForProvider(
     throw new NotFoundError('Provider');
   }
 
-  return new GoogleSheetsService(decryptRefreshToken(providerRow[0].credentials));
+  return new GoogleSheetsService(decryptRefreshToken(providerRow[0]));
 }

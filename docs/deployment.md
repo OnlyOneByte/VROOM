@@ -70,6 +70,9 @@ credentials no longer decrypt and every provider must be reconnected. Both examp
 it through and `docs/examples/.env.example` carries a placeholder that fails the format check,
 so an unedited copy exits with the variable named instead of encrypting with a published key.
 
+Each stored secret is bound to its provider row and names the key that sealed it, so the key
+can be rotated without reconnecting anything (see [Rotating the encryption key](#rotating-the-encryption-key)).
+
 There is no session secret: sessions are opaque ids in the database, so nothing is signed with
 a configurable key. A `SESSION_SECRET` left over in an older `.env` is ignored.
 
@@ -417,6 +420,36 @@ in the directory holding your `docker-compose.yml` and `.env`:
 ```
 
 The Portainer stack bundles Tugtainer, which does the same hourly for labelled containers.
+
+### Rotating the encryption key
+
+`PROVIDER_ENCRYPTION_KEYS` holds a comma-separated list of `id=hex` keys. The first one
+encrypts every new secret; the others are only used to read older ones. A lone
+`PROVIDER_ENCRYPTION_KEY` counts as the key with the id `default`. When both are set and the
+list already names `default`, the list wins and `PROVIDER_ENCRYPTION_KEY` is ignored.
+
+1. Generate a new key: `openssl rand -hex 32`.
+2. Put it first and keep the old one, then restart the backend:
+   `PROVIDER_ENCRYPTION_KEYS=k2=<new key>,default=<old key>` (or keep `PROVIDER_ENCRYPTION_KEY`
+   set to the old key; it is read as `default`). The example stacks list the backend's
+   environment explicitly, so add `PROVIDER_ENCRYPTION_KEYS` to the backend's `environment:`
+   block there too.
+3. Re-encrypt every stored secret under the new key:
+   - in the container: `docker compose exec backend bun dist/scripts/rotate-provider-keys.js`
+   - from a checkout, in `backend/`: `bun run providers:rotate-key`
+
+   It works in batches of 100 rows, one transaction each, and prints how many rows it
+   re-encrypted, how many were already on the current key and how many had no secret. It exits
+   non-zero and lists the ids of any row no configured key can read; those rows are left
+   unchanged.
+4. Once it reports no unreadable rows, remove the old key from both variables
+   (`PROVIDER_ENCRYPTION_KEYS` and `PROVIDER_ENCRYPTION_KEY`) and restart. Back up the new key
+   with the database.
+
+Secrets stored before key ids existed are read only with the key whose id is `default`.
+Running the command with a single key upgrades them in place, but that old format stays
+readable for as long as a `default` key is configured. Rotating to a new key id and then
+removing `default` turns it off.
 
 ## Hosting Platforms
 

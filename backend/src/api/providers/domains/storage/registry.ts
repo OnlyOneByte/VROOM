@@ -7,7 +7,7 @@ import { userPreferences, userProviders } from '../../../../db/schema';
 import { NotFoundError, ValidationError } from '../../../../errors';
 import type { PhotoCategory, StorageConfig } from '../../../../types';
 import { DEFAULT_STORAGE_CONFIG } from '../../../../types';
-import { decrypt } from '../../../../utils/encryption';
+import { decrypt, secretContextOf } from '../../../../utils/encryption';
 import { assertSafeOutboundUrl } from '../../../../utils/outbound-url';
 import { joinStoragePath, storagePathSchema } from '../../../../utils/paths';
 import {
@@ -41,10 +41,13 @@ function refreshTokenOf(credentials: Record<string, unknown>): string {
   return refreshToken;
 }
 
-export function decryptRefreshToken(encryptedCredentials: string): string {
+export function decryptRefreshToken(row: UserProvider): string {
   let credentials: Record<string, unknown>;
   try {
-    credentials = JSON.parse(decrypt(encryptedCredentials)) as Record<string, unknown>;
+    credentials = JSON.parse(decrypt(row.credentials, secretContextOf(row))) as Record<
+      string,
+      unknown
+    >;
   } catch {
     throw new ValidationError('Failed to decrypt provider credentials');
   }
@@ -397,7 +400,7 @@ export class StorageProviderRegistry {
     const credentials =
       descriptor.connect === 'none'
         ? {}
-        : (JSON.parse(decrypt(row.credentials)) as Record<string, unknown>);
+        : (JSON.parse(decrypt(row.credentials, secretContextOf(row))) as Record<string, unknown>);
     const config = row.config as Record<string, unknown> | null;
     const provider = descriptor.create({ id: row.id, credentials, config });
     validateProviderConfig(descriptor, config, Object.keys(config ?? {}));

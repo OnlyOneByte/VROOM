@@ -6,7 +6,7 @@ COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile
 
 COPY . .
-RUN bun build src/index.ts --outdir ./dist --target bun
+RUN bun build src/index.ts src/scripts/rotate-provider-keys.ts --outdir ./dist --target bun
 
 FROM oven/bun:1-alpine AS production
 
@@ -18,7 +18,8 @@ COPY --chown=bun:bun package.json bun.lock* ./
 RUN bun install --production --frozen-lockfile
 
 # dist/index.js bundles every module except bun:sqlite and node builtins, and startup migrations
-# read ./drizzle, so these two are the whole runtime. Don't copy src/: it can't run without devDependencies.
+# read ./drizzle, so these two are the whole runtime. dist/scripts/rotate-provider-keys.js is the
+# key rotation command, bundled the same way. Don't copy src/: it can't run without devDependencies.
 COPY --chown=bun:bun --from=builder /app/dist ./dist
 COPY --chown=bun:bun --from=builder /app/drizzle ./drizzle
 

@@ -267,10 +267,16 @@ describe('getLlmProvider / resolveModelSettings dispatch by provider type', () =
     over: Partial<{ providerType: string; config: unknown; credentials: unknown }> = {}
   ): UserProvider {
     return {
+      id: 'p1',
+      userId: 'u1',
       providerType: over.providerType ?? 'openai-compatible',
       domain: 'llm',
       config: over.config ?? { model: 'gpt-4o', baseUrl: 'https://api.openai.com/v1' },
-      credentials: encrypt(JSON.stringify(over.credentials ?? { apiKey: 'sk-x' })),
+      credentials: encrypt(JSON.stringify(over.credentials ?? { apiKey: 'sk-x' }), {
+        rowId: 'p1',
+        userId: 'u1',
+        domain: 'llm',
+      }),
       // biome-ignore lint/suspicious/noExplicitAny: a minimal row — the registry only reads these fields.
     } as any;
   }

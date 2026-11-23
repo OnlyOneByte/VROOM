@@ -1,3 +1,4 @@
+import { createId } from '@paralleldrive/cuid2';
 import { and, eq, inArray, notExists, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -169,6 +170,7 @@ routes.get('/', async (c) => {
 });
 
 function resolveProviderCredentials(
+  rowId: string,
   userId: string,
   domain: string,
   descriptor: AnyProviderDescriptor,
@@ -186,13 +188,17 @@ function resolveProviderCredentials(
       throw new ValidationError('Please connect your Google account first');
     }
     return {
-      encryptedCredentials: encrypt(JSON.stringify({ refreshToken: pending.refreshToken })),
+      encryptedCredentials: encrypt(JSON.stringify({ refreshToken: pending.refreshToken }), {
+        rowId,
+        userId,
+        domain,
+      }),
       resolvedConfig: { ...(config ?? {}), accountEmail: pending.email },
     };
   }
   validateProviderSecrets(descriptor, DOMAIN_LABELS[domain] ?? domain, credentials);
   return {
-    encryptedCredentials: encrypt(JSON.stringify(credentials)),
+    encryptedCredentials: encrypt(JSON.stringify(credentials), { rowId, userId, domain }),
     resolvedConfig: config,
   };
 }
@@ -218,7 +224,9 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
     );
   }
 
+  const rowId = createId();
   const { encryptedCredentials, resolvedConfig } = resolveProviderCredentials(
+    rowId,
     user.id,
     body.domain,
     descriptor,
@@ -260,6 +268,7 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
     return tx
       .insert(userProviders)
       .values({
+        id: rowId,
         userId: user.id,
         domain: body.domain,
         providerType: body.providerType,
@@ -337,7 +346,11 @@ routes.put(
           body.credentials
         );
       }
-      updates.credentials = encrypt(JSON.stringify(body.credentials));
+      updates.credentials = encrypt(JSON.stringify(body.credentials), {
+        rowId: existing.id,
+        userId: existing.userId,
+        domain: existing.domain,
+      });
     }
 
     // Scope by userId too so the write stays tenant-safe if the ownership check moves.

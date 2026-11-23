@@ -19,7 +19,7 @@ import '../init';
 let ctx: TestApp;
 let bucket: FakeStorageProvider;
 let createInstance: ReturnType<typeof spyOn>;
-let encrypt: (plain: string) => string;
+let encrypt: typeof import('../../../utils/encryption').encrypt;
 
 function seedProvider(id: string, providerType: string): void {
   ctx.sqlite.run(
@@ -29,7 +29,11 @@ function seedProvider(id: string, providerType: string): void {
       id,
       ctx.user.id,
       providerType,
-      encrypt(JSON.stringify({ accessKeyId: 'AKIA', secretAccessKey: 'secret' })),
+      encrypt(JSON.stringify({ accessKeyId: 'AKIA', secretAccessKey: 'secret' }), {
+        rowId: id,
+        userId: ctx.user.id,
+        domain: 'storage',
+      }),
       JSON.stringify({
         endpoint: 'https://s3.example.com',
         bucket: 'b',

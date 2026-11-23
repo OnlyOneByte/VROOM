@@ -1,10 +1,14 @@
 import { describe, expect, test } from 'bun:test';
+import type { UserProvider } from '../../../db/schema';
 import { decryptRefreshToken } from '../domains/storage/registry';
 
 process.env.PROVIDER_ENCRYPTION_KEY ||= '0'.repeat(64);
 const { encrypt } = await import('../../../utils/encryption');
 
-const enc = (creds: unknown): string => encrypt(JSON.stringify(creds));
+const ROW = { id: 'prov-1', userId: 'user-1', domain: 'storage' };
+const enc = (creds: unknown): string =>
+  encrypt(JSON.stringify(creds), { rowId: ROW.id, userId: ROW.userId, domain: ROW.domain });
+const row = (credentials: string) => ({ ...ROW, credentials }) as UserProvider;
 
 interface ProviderRow {
   id: string;
@@ -37,7 +41,9 @@ describe('createSheetsServiceForProvider', () => {
   const allProviders = [activeProvider];
 
   test('correct token extraction — returns decrypted refreshToken', () => {
-    expect(decryptRefreshToken(enc({ refreshToken: 'my-refresh-token' }))).toBe('my-refresh-token');
+    expect(decryptRefreshToken(row(enc({ refreshToken: 'my-refresh-token' })))).toBe(
+      'my-refresh-token'
+    );
   });
 
   test('ownership rejection — different userId returns no rows', () => {
@@ -46,14 +52,14 @@ describe('createSheetsServiceForProvider', () => {
   });
 
   test('missing token — throws ValidationError when refreshToken is absent', () => {
-    expect(() => decryptRefreshToken(enc({}))).toThrow('Provider has no refresh token');
-    expect(() => decryptRefreshToken(enc({ refreshToken: '' }))).toThrow(
+    expect(() => decryptRefreshToken(row(enc({})))).toThrow('Provider has no refresh token');
+    expect(() => decryptRefreshToken(row(enc({ refreshToken: '' })))).toThrow(
       'Provider has no refresh token'
     );
   });
 
   test('decrypt failure — throws ValidationError', () => {
-    expect(() => decryptRefreshToken('not-encrypted')).toThrow(
+    expect(() => decryptRefreshToken(row('not-encrypted'))).toThrow(
       'Failed to decrypt provider credentials'
     );
   });

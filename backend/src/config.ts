@@ -43,6 +43,7 @@ const envSchema = z.object({
   GOOGLE_PROVIDER_REDIRECT_URI: z.string().optional(),
   GOOGLE_LINK_REDIRECT_URI: z.string().optional(),
   PROVIDER_ENCRYPTION_KEY: z.string().optional(),
+  PROVIDER_ENCRYPTION_KEYS: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   GITHUB_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/github'),
@@ -131,7 +132,10 @@ export const CONFIG = {
   blockPrivateProviderEndpoints: env.BLOCK_PRIVATE_PROVIDER_ENDPOINTS,
   disableRateLimit: env.DISABLE_RATE_LIMIT && (env.NODE_ENV as Environment) !== 'production',
   server: { port: env.PORT, host: env.HOST },
-  encryption: { providerKey: env.PROVIDER_ENCRYPTION_KEY },
+  encryption: {
+    providerKey: env.PROVIDER_ENCRYPTION_KEY,
+    providerKeys: env.PROVIDER_ENCRYPTION_KEYS,
+  },
   database: {
     url: env.DATABASE_URL,
     cacheSize: 1_000_000,
@@ -338,43 +342,120 @@ export function getRequiredBackupFiles(): string[] {
 }
 
 const ENCRYPTION_KEY_PATTERN = /^[0-9a-fA-F]{64}$/;
+const ENCRYPTION_KEY_ID_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
+export const LEGACY_ENCRYPTION_KEY_ID = 'default';
+
+export interface EncryptionKeyring {
+  currentId: string;
+  keys: Map<string, Buffer>;
+}
+
+function parseKeyEntry(entry: string): [string, Buffer] {
+  const sep = entry.indexOf('=');
+  const id = entry.slice(0, sep);
+  const hex = entry.slice(sep + 1);
+  if (sep < 1 || !ENCRYPTION_KEY_ID_PATTERN.test(id)) {
+    throw new Error(
+      'PROVIDER_ENCRYPTION_KEYS entries must look like id=hex, with an id of letters, digits, - or _'
+    );
+  }
+  if (!ENCRYPTION_KEY_PATTERN.test(hex)) {
+    throw new Error(
+      `PROVIDER_ENCRYPTION_KEYS key "${id}" must be a 32-byte hex string (64 hex chars)`
+    );
+  }
+  return [id, Buffer.from(hex, 'hex')];
+}
+
+export function parseEncryptionKeys(
+  list: string | undefined,
+  legacyKey: string | undefined
+): EncryptionKeyring {
+  const keys = new Map<string, Buffer>();
+  for (const entry of (list ?? '').split(',').map((part) => part.trim())) {
+    if (entry === '') continue;
+    const [id, key] = parseKeyEntry(entry);
+    if (keys.has(id)) {
+      throw new Error(`PROVIDER_ENCRYPTION_KEYS lists the key id "${id}" twice`);
+    }
+    keys.set(id, key);
+  }
+  if (legacyKey && !keys.has(LEGACY_ENCRYPTION_KEY_ID)) {
+    if (!ENCRYPTION_KEY_PATTERN.test(legacyKey)) {
+      throw new Error('PROVIDER_ENCRYPTION_KEY must be a 32-byte hex string (64 hex chars)');
+    }
+    keys.set(LEGACY_ENCRYPTION_KEY_ID, Buffer.from(legacyKey, 'hex'));
+  }
+  const currentId = keys.keys().next().value;
+  if (currentId === undefined) {
+    throw new Error('PROVIDER_ENCRYPTION_KEY environment variable is not set');
+  }
+  return { currentId, keys };
+}
+
+function encryptionKeyListError(): string | null {
+  const { providerKeys } = CONFIG.encryption;
+  if (!providerKeys) return null;
+  try {
+    parseEncryptionKeys(providerKeys, undefined);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
 
 export const validateProductionConfig = () => {
-  const encryptionKey = CONFIG.encryption.providerKey;
-
   if (CONFIG.env === 'production') {
-    const requiredFields = [
-      { field: 'GOOGLE_CLIENT_ID', value: CONFIG.auth.googleClientId },
-      { field: 'GOOGLE_CLIENT_SECRET', value: CONFIG.auth.googleClientSecret },
-    ];
+    requireProductionConfig();
+  } else {
+    warnAboutEncryptionKey();
+  }
+};
 
-    const missing = requiredFields.filter(({ value }) => !value);
+function requireProductionConfig(): void {
+  const { providerKey, providerKeys } = CONFIG.encryption;
+  const requiredFields = [
+    { field: 'GOOGLE_CLIENT_ID', value: CONFIG.auth.googleClientId },
+    { field: 'GOOGLE_CLIENT_SECRET', value: CONFIG.auth.googleClientSecret },
+    { field: 'PROVIDER_ENCRYPTION_KEY', value: providerKey || providerKeys },
+  ];
 
-    if (!encryptionKey) {
-      missing.push({ field: 'PROVIDER_ENCRYPTION_KEY', value: undefined });
+  const missing = requiredFields.filter(({ value }) => !value);
+
+  if (missing.length > 0) {
+    console.error('❌ Missing required production configuration:');
+    for (const { field } of missing) {
+      console.error(`  - ${field}`);
     }
+    process.exit(1);
+  }
 
-    if (missing.length > 0) {
-      console.error('❌ Missing required production configuration:');
-      for (const { field } of missing) {
-        console.error(`  - ${field}`);
-      }
-      process.exit(1);
-    }
+  const keyListError = encryptionKeyListError();
+  if (keyListError) {
+    console.error(`❌ ${keyListError}`);
+    process.exit(1);
+  }
 
-    if (encryptionKey && !ENCRYPTION_KEY_PATTERN.test(encryptionKey)) {
-      console.error('❌ PROVIDER_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)');
-      process.exit(1);
-    }
-  } else if (!encryptionKey) {
+  if (providerKey && !ENCRYPTION_KEY_PATTERN.test(providerKey)) {
+    console.error('❌ PROVIDER_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)');
+    process.exit(1);
+  }
+}
+
+function warnAboutEncryptionKey(): void {
+  const { providerKey, providerKeys } = CONFIG.encryption;
+  const keyListError = encryptionKeyListError();
+  if (keyListError) {
+    console.warn(`⚠️  ${keyListError}. Provider encryption will fail until it is fixed.`);
+  } else if (!providerKey && !providerKeys) {
     console.warn(
       '⚠️  PROVIDER_ENCRYPTION_KEY is not set. Provider encryption will fail until configured.'
     );
-  } else if (!ENCRYPTION_KEY_PATTERN.test(encryptionKey)) {
+  } else if (providerKey && !ENCRYPTION_KEY_PATTERN.test(providerKey)) {
     console.warn(
       '⚠️  PROVIDER_ENCRYPTION_KEY is not a 64-character hex string. Provider encryption will fail until it is. Generate one with: openssl rand -hex 32'
     );
   }
-};
+}
 
 validateProductionConfig();

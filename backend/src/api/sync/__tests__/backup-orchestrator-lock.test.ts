@@ -13,7 +13,14 @@ beforeEach(async () => {
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES ('p-hang', ?, 'storage', 'fake-hang', 'Hang', ?, '{}', 'active')`,
-    [ctx.user.id, encrypt(JSON.stringify({ refreshToken: 'fake' }))]
+    [
+      ctx.user.id,
+      encrypt(JSON.stringify({ refreshToken: 'fake' }), {
+        rowId: 'p-hang',
+        userId: ctx.user.id,
+        domain: 'storage',
+      }),
+    ]
   );
   ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
     ctx.user.id,

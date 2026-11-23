@@ -36,7 +36,7 @@ async function findEnabledProvider(
 }
 
 function buildRealPhotosService(row: UserProvider): GooglePhotosService {
-  const refreshToken = decryptRefreshToken(row.credentials);
+  const refreshToken = decryptRefreshToken(row);
   const config = (row.config ?? {}) as Record<string, unknown>;
   const albumId = typeof config.albumId === 'string' ? config.albumId : undefined;
   return new GooglePhotosService(refreshToken, undefined, albumId);

@@ -6,8 +6,12 @@ import { StorageProviderRegistry } from '../domains/storage/registry';
 process.env.PROVIDER_ENCRYPTION_KEY ||= '0'.repeat(64);
 const { encrypt } = await import('../../../utils/encryption');
 
-function enc(creds: unknown): string {
-  return encrypt(JSON.stringify(creds));
+function enc(creds: unknown, rowId = 'provider-1'): string {
+  return encrypt(JSON.stringify(creds), {
+    rowId,
+    userId: 'user-1',
+    domain: 'storage',
+  });
 }
 
 const baseProvider: UserProvider = {
@@ -123,6 +127,7 @@ describe('StorageProviderRegistry', () => {
       const backupProvider: UserProvider = {
         ...baseProvider,
         id: 'provider-2',
+        credentials: enc({ refreshToken: 'tok-123' }, 'provider-2'),
         displayName: 'Backup Drive',
         config: { photoRootPath: 'VROOM/Photos' },
       };

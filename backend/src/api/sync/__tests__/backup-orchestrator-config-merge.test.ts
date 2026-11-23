@@ -11,7 +11,7 @@ interface ProviderConfigEntry {
 }
 
 let ctx: TestApp;
-let encrypt: (plain: string) => string;
+let encrypt: typeof import('../../../utils/encryption').encrypt;
 let register: (type: string, strategy: BackupStrategy) => void;
 let unregister: (type: string) => void;
 
@@ -50,7 +50,17 @@ function seedProviderRow(id: string, providerType: string): void {
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', ?, 'Fake', ?, ?, 'active')`,
-    [id, ctx.user.id, providerType, encrypt(JSON.stringify({ refreshToken: 'fake' })), '{}']
+    [
+      id,
+      ctx.user.id,
+      providerType,
+      encrypt(JSON.stringify({ refreshToken: 'fake' }), {
+        rowId: id,
+        userId: ctx.user.id,
+        domain: 'storage',
+      }),
+      '{}',
+    ]
   );
 }
 

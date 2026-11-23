@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { getDb } from '../../db/connection';
 import { userProviders } from '../../db/schema';
 import type { BackupConfig, ProviderBackupSettings } from '../../types';
-import { decrypt } from '../../utils/encryption';
+import { decrypt, secretContextOf } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
 import {
@@ -184,10 +184,9 @@ export class BackupOrchestrator {
 
         let decryptedCredentials: Record<string, unknown>;
         try {
-          decryptedCredentials = JSON.parse(decrypt(providerRow.credentials)) as Record<
-            string,
-            unknown
-          >;
+          decryptedCredentials = JSON.parse(
+            decrypt(providerRow.credentials, secretContextOf(providerRow))
+          ) as Record<string, unknown>;
         } catch (error) {
           logger.warn('Failed to decrypt provider credentials, marking provider unusable', {
             providerId,
