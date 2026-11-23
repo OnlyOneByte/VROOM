@@ -106,7 +106,8 @@ describe('StatCard loading tile has the filled tile shape', () => {
 				'h-7',
 				'h-4'
 			]);
-			expect(lines[2]).toHaveClass('sm:hidden');
+			expect(lines[2]).toHaveClass('mt-1', 'sm:hidden');
+			expect(lines[2]?.parentElement).toBe(lines[1]?.parentElement);
 		}
 	});
 

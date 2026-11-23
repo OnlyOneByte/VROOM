@@ -104,10 +104,12 @@
 					<div class="flex-1 space-y-1 min-w-0">
 						{#if isLoading}
 							<Skeleton class="h-5 w-24" />
-							<Skeleton class="h-7 @sm:h-8 w-20" />
-							{#if unit}
-								<Skeleton class="h-4 w-16 sm:hidden" />
-							{/if}
+							<div>
+								<Skeleton class="h-7 @sm:h-8 w-20" />
+								{#if unit}
+									<Skeleton class="mt-1 h-4 w-16 sm:hidden" />
+								{/if}
+							</div>
 						{:else}
 							<span class="block text-sm font-medium text-muted-foreground break-words">
 								{label}
@@ -130,10 +132,12 @@
 					<div class="flex-1 space-y-1 min-w-0">
 						{#if isLoading}
 							<Skeleton class="h-5 w-24" />
-							<Skeleton class="h-7 @sm:h-8 w-20" />
-							{#if secondaryUnit}
-								<Skeleton class="h-4 w-16 sm:hidden" />
-							{/if}
+							<div>
+								<Skeleton class="h-7 @sm:h-8 w-20" />
+								{#if secondaryUnit}
+									<Skeleton class="mt-1 h-4 w-16 sm:hidden" />
+								{/if}
+							</div>
 						{:else}
 							<span class="block text-sm font-medium text-muted-foreground break-words">
 								{secondaryLabel}
