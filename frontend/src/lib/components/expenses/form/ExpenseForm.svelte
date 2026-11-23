@@ -83,8 +83,10 @@
 	);
 
 	let previousVehicleId = $state('');
+	let mounted = $state(false);
 	$effect(() => {
 		if (
+			mounted &&
 			form.formData.vehicleId &&
 			form.formData.vehicleId !== previousVehicleId &&
 			!form.vehiclesError
@@ -130,9 +132,10 @@
 			});
 		}
 
-		if (form.formData.vehicleId && !form.vehiclesError) {
-			await loadVehicleContext(form);
-		}
+		const loadsContext = !!form.formData.vehicleId && !form.vehiclesError;
+		if (loadsContext) previousVehicleId = form.formData.vehicleId;
+		mounted = true;
+		if (loadsContext) await loadVehicleContext(form);
 
 		if (!form.isEditMode && preselectedFinancingId) {
 			form.sourceType = 'financing';
