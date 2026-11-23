@@ -23,6 +23,7 @@
     "db:checkpoint": "bun src/db/checkpoint.ts",
     "db:checkpoint:force": "bun src/db/checkpoint.ts --force",
     "vapid:gen": "bun src/scripts/gen-vapid-keys.ts",
+    "providers:rotate-key": "bun src/scripts/rotate-provider-keys.ts",
     "test": "bun test --timeout 30000 && bun run test:tz",
     "test:tz": "TZ=Pacific/Auckland bun test --timeout 30000 src/api/trips src/api/odometer src/api/expenses",
     "lint": "biome lint src/",

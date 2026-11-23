@@ -12,7 +12,14 @@ beforeEach(async () => {
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES ('psheets', ?, 'storage', 'fake-sheets-pause', 'Drive', ?, '{}', 'active')`,
-    [ctx.user.id, encrypt(JSON.stringify({ refreshToken: 'fake' }))]
+    [
+      ctx.user.id,
+      encrypt(JSON.stringify({ refreshToken: 'fake' }), {
+        rowId: 'psheets',
+        userId: ctx.user.id,
+        domain: 'storage',
+      }),
+    ]
   );
   const { backupStrategyRegistry } = await import('../backup-strategy-registry');
   backupStrategyRegistry.register('fake-sheets-pause', {

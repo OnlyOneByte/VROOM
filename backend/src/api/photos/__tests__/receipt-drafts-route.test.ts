@@ -53,8 +53,16 @@ async function seedVlmProvider(): Promise<void> {
   expect(res.status, await res.clone().text()).toBe(201);
 }
 
+function photosSecret(plain: unknown): string {
+  return encrypt(JSON.stringify(plain), {
+    rowId: 'photos-prov-1',
+    userId: ctx.user.id,
+    domain: 'storage',
+  });
+}
+
 function seedPhotosProvider(
-  credentials = encrypt(JSON.stringify({ refreshToken: 'refresh-token-abc' }))
+  credentials = photosSecret({ refreshToken: 'refresh-token-abc' })
 ): void {
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
@@ -88,7 +96,7 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
   test('a google-photos provider without a usable refresh token → 400 asking to reconnect', async () => {
     setPhotosServiceBuilderForTest(null);
     await seedVlmProvider();
-    for (const credentials of [encrypt(JSON.stringify({})), 'not-encrypted']) {
+    for (const credentials of [photosSecret({}), 'not-encrypted']) {
       ctx.sqlite.run(`DELETE FROM user_providers WHERE id = 'photos-prov-1'`);
       seedPhotosProvider(credentials);
       const res = await ctx.authed('GET', '/api/v1/photos/receipt-drafts');

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { UserProvider } from '../../../../db/schema';
 import { ValidationError } from '../../../../errors';
-import { decrypt } from '../../../../utils/encryption';
+import { decrypt, secretContextOf } from '../../../../utils/encryption';
 import { assertSafeOutboundUrl } from '../../../../utils/outbound-url';
 import {
   alwaysAvailable,
@@ -126,7 +126,10 @@ export function resolveModelSettings(
   const baseUrl = typeof config.baseUrl === 'string' ? config.baseUrl : undefined;
   if (baseUrl) assertSafeOutboundUrl(baseUrl, `${domain} base URL`);
 
-  const credentials = JSON.parse(decrypt(row.credentials)) as Record<string, unknown>;
+  const credentials = JSON.parse(decrypt(row.credentials, secretContextOf(row))) as Record<
+    string,
+    unknown
+  >;
   const apiKey = typeof credentials.apiKey === 'string' ? credentials.apiKey : undefined;
 
   return { apiKey, model, baseUrl };

@@ -134,7 +134,11 @@ describe('getVlmProvider / resolveModelSettings dispatch by provider type', () =
       providerType: over.providerType ?? 'openai-compatible',
       providerAccountId: null,
       displayName: 'VLM',
-      credentials: encrypt(JSON.stringify(over.credentials ?? { apiKey: 'sk-x' })),
+      credentials: encrypt(JSON.stringify(over.credentials ?? { apiKey: 'sk-x' }), {
+        rowId: 'p1',
+        userId: 'u1',
+        domain: 'vlm',
+      }),
       config: (over.config ?? {
         model: 'gpt-4o-mini',
         baseUrl: 'https://api.openai.com/v1',

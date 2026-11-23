@@ -68,6 +68,7 @@ describe('a model vendor on the OpenAI-compatible transport is one descriptor en
     >;
     const provider = getLlmProvider({
       ...row,
+      userId: row.user_id,
       providerType: row.provider_type,
       credentials: row.credentials,
       config: JSON.parse(String(row.config)),

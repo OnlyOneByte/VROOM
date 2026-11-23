@@ -55,13 +55,18 @@ async function seedVlmProvider(): Promise<void> {
 let photosProviderSeq = 0;
 function seedPhotosProvider(): void {
   photosProviderSeq += 1;
+  const id = `photos-prov-${photosProviderSeq}`;
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', 'google-photos', 'My Photos', ?, ?, 'active')`,
     [
-      `photos-prov-${photosProviderSeq}`,
+      id,
       ctx.user.id,
-      encrypt(JSON.stringify({ refreshToken: 'rt' })),
+      encrypt(JSON.stringify({ refreshToken: 'rt' }), {
+        rowId: id,
+        userId: ctx.user.id,
+        domain: 'storage',
+      }),
       JSON.stringify({ albumId: 'album-vroom' }),
     ]
   );

@@ -108,7 +108,7 @@ describe('BackupOrchestrator.execute() outcome', () => {
     ctxApp.sqlite.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
        VALUES (?, ?, 'storage', ?, 'Fake', ?, ?, 'active')`,
-      [id, ctxApp.user.id, providerType, encryptedCreds(), JSON.stringify({})]
+      [id, ctxApp.user.id, providerType, encryptedCreds(id, ctxApp.user.id), JSON.stringify({})]
     );
     const existing = ctxApp.sqlite
       .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
@@ -127,11 +127,11 @@ describe('BackupOrchestrator.execute() outcome', () => {
     );
   }
 
-  function encryptedCreds(): string {
-    return enc(JSON.stringify({ refreshToken: 'fake' }));
+  function encryptedCreds(rowId: string, userId: string): string {
+    return enc(JSON.stringify({ refreshToken: 'fake' }), { rowId, userId, domain: 'storage' });
   }
 
-  let enc: (plain: string) => string;
+  let enc: typeof import('../../../utils/encryption').encrypt;
   let registerFake: (type: string, succeed: boolean | 'partial') => void;
   let unregister: (type: string) => void;
 

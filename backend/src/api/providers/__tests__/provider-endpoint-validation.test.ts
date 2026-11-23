@@ -78,7 +78,11 @@ function insertStoredS3Provider(endpoint: string): string {
     [
       id,
       ctx.user.id,
-      encrypt(JSON.stringify({ accessKeyId: 'a', secretAccessKey: 'b' })),
+      encrypt(JSON.stringify({ accessKeyId: 'a', secretAccessKey: 'b' }), {
+        rowId: id,
+        userId: ctx.user.id,
+        domain: 'storage',
+      }),
       JSON.stringify({ endpoint, bucket: 'photos', region: 'us-east-1' }),
     ]
   );
@@ -229,7 +233,11 @@ function storedModelRow(baseUrl: string): UserProvider {
     providerType: 'openai-compatible',
     providerAccountId: null,
     displayName: 'Stored',
-    credentials: encrypt(JSON.stringify({ apiKey: 'sk-test' })),
+    credentials: encrypt(JSON.stringify({ apiKey: 'sk-test' }), {
+      rowId: 'stored-llm',
+      userId: 'u1',
+      domain: 'llm',
+    }),
     config: { model: 'gpt-4o-mini', baseUrl },
     status: 'active',
     lastSyncAt: null,

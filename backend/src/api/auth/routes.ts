@@ -713,7 +713,11 @@ async function updateExistingProvider(
 
   if (!existing[0]) return;
 
-  const encryptedCredentials = encrypt(JSON.stringify({ refreshToken }));
+  const encryptedCredentials = encrypt(JSON.stringify({ refreshToken }), {
+    rowId: existing[0].id,
+    userId: existing[0].userId,
+    domain: existing[0].domain,
+  });
   const existingConfig = (existing[0].config as Record<string, unknown>) ?? {};
   await db
     .update(userProviders)

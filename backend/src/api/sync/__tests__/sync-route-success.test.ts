@@ -147,7 +147,14 @@ describe('POST /api/v1/sync — honest HTTP status on backup failure', () => {
       ctx.sqlite.run(
         `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
          VALUES ('rf', ?, 'storage', 'fake-route-fail', 'Fake', ?, '{}', 'active')`,
-        [ctx.user.id, encrypt(JSON.stringify({ refreshToken: 'x' }))]
+        [
+          ctx.user.id,
+          encrypt(JSON.stringify({ refreshToken: 'x' }), {
+            rowId: 'rf',
+            userId: ctx.user.id,
+            domain: 'storage',
+          }),
+        ]
       );
       ctx.sqlite.run(
         'INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)',
