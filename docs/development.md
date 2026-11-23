@@ -102,18 +102,26 @@ cd frontend && npm run test:e2e
 
 The Web Vitals CI job measures LCP, TBT and CLS on six key routes (Dashboard, a vehicle page,
 Analytics, All Expenses, Add Expense, Add Odometer Reading) at 375×812 with 4× CPU throttling,
-taking the median of 3 cold loads of the production build against a seeded backend. To run it
-locally, seed a scratch database, then start the backend and `node build` on 127.0.0.1:
+taking the median of 5 cold loads of the production build against a seeded backend. To run it
+locally, use three terminals and a scratch database:
 
 ```bash
-cd backend && bun run db:seed && bun ../frontend/scripts/web-vitals-seed.mjs
+# 1. Seed (prints the session and vehicle id), then start the backend
+cd backend
+export DATABASE_URL=./data/web-vitals.db CORS_ORIGINS=http://127.0.0.1:4173 DISABLE_RATE_LIMIT=true
+bun run db:seed && bun ../frontend/scripts/web-vitals-seed.mjs
+bun src/index.ts
+
+# 2. Build and serve the frontend
 cd frontend && npm run build && PORT=4173 PUBLIC_API_URL=http://127.0.0.1:3001 node build
+
+# 3. Measure
 cd frontend && VITALS_SESSION=<session> VITALS_VEHICLE_ID=<vehicleId> npm run web-vitals
 ```
 
-`DATABASE_URL` must point at the same scratch database for the seed and the backend, and the
-backend needs `CORS_ORIGINS=http://127.0.0.1:4173`. `VITALS_CHROMIUM` selects a different
-Chromium binary. The job fails when a route is over its budget in
+Seed a fresh database each time; the seed script adds to whatever is there. `VITALS_RUNS` sets
+the number of loads per route and `VITALS_CHROMIUM` a different Chromium binary. A load whose API
+requests fail is an error, not a measurement. The job fails when a route is over its budget in
 `frontend/web-vitals-budgets.json` (LCP ≤ 1.5 s, TBT ≤ 500 ms, CLS ≤ 0.01 for every route). When a
 change has to go over, raise that route's budget in the same PR and say in the PR description why.
 The CI runner is faster than a mid-range phone, so local runs on a slower machine read higher.

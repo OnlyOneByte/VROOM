@@ -146,6 +146,8 @@ jobs:
     name: Web Vitals
     # Not a required check yet: it becomes one after 10 stable runs (#1421).
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       DATABASE_URL: ./data/web-vitals.db
       PORT: 3001

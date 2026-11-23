@@ -1,12 +1,13 @@
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 const baseUrl = process.env.VITALS_BASE_URL ?? 'http://127.0.0.1:4173';
 const session = process.env.VITALS_SESSION;
 const vehicleId = process.env.VITALS_VEHICLE_ID;
-const runs = Number(process.env.VITALS_RUNS ?? 3);
+const runs = Number(process.env.VITALS_RUNS ?? 5);
 const cpuRate = 4;
 const metrics = ['lcp', 'tbt', 'cls'];
 
@@ -44,9 +45,10 @@ function observe() {
 
 function readVitals() {
 	const fcp = performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? 0;
-	const tbt = window.__vitals.longTasks
-		.filter(([start]) => start >= fcp)
-		.reduce((sum, [, duration]) => sum + Math.max(0, duration - 50), 0);
+	const tbt = window.__vitals.longTasks.reduce(
+		(sum, [start, duration]) => sum + Math.max(0, start + duration - Math.max(start + 50, fcp)),
+		0
+	);
 	return { lcp: window.__vitals.lcp, cls: window.__vitals.cls, tbt, path: location.pathname };
 }
 
@@ -68,15 +70,26 @@ for (const [name, path] of routes) {
 		const page = await context.newPage();
 		const cdp = await context.newCDPSession(page);
 		await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpuRate });
+		const failedRequests = [];
+		page.on('response', response => {
+			if (response.url().includes('/api/') && response.status() >= 400) {
+				failedRequests.push(`${response.status()} ${response.url()}`);
+			}
+		});
 		await page.goto(baseUrl + path, { waitUntil: 'networkidle', timeout: 120000 });
 		await page.waitForTimeout(1500);
-		samples.push(await page.evaluate(readVitals));
+		samples.push({ ...(await page.evaluate(readVitals)), failedRequests });
 		await context.close();
 	}
 	const landed = samples.find(sample => sample.path !== path);
-	if (landed) {
+	const failed = samples.flatMap(sample => sample.failedRequests);
+	if (landed || failed.length > 0) {
 		await browser.close();
-		console.error(`web-vitals: ${path} ended on ${landed.path}. Is the session valid?`);
+		console.error(
+			landed
+				? `web-vitals: ${path} ended on ${landed.path}. Is the session valid?`
+				: `web-vitals: ${path} loaded with failed API requests, so its numbers would not be real:\n${[...new Set(failed)].join('\n')}`
+		);
 		process.exit(1);
 	}
 	const budget = budgets.routes[name];
