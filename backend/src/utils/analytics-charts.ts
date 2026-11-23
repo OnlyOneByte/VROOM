@@ -11,7 +11,7 @@ import {
 import { calendarDayIn, zonedMidnight } from './time-zone';
 import { NATIVE_SCALE, type UnitScale } from './unit-conversions';
 
-const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
+export const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
 const EPOCH_MILLISECONDS_THRESHOLD = 1e12;
 const MIN_VEHICLE_SCORE = 10;
 const MAX_VEHICLE_SCORE = 100;

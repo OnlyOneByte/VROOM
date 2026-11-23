@@ -384,3 +384,37 @@ describe('analyticsApi — method→endpoint wiring', () => {
 		expect(result).toBe(mockQuickStats);
 	});
 });
+
+describe('analyticsApi.query()', () => {
+	beforeEach(() => mockGet.mockReset());
+
+	it('joins list params with commas, sends the time zone and passes the abort signal', async () => {
+		mockGet.mockResolvedValueOnce({} as never);
+		const controller = new AbortController();
+		await analyticsApi.query(
+			{
+				metric: 'cost',
+				interval: 'month',
+				groupBy: 'category',
+				vehicleIds: ['a', 'b'],
+				categories: ['fuel', 'maintenance'],
+				start: 100,
+				end: 200
+			},
+			{ signal: controller.signal }
+		);
+		expect(mockGet).toHaveBeenCalledWith(
+			`/analytics/query?metric=cost&interval=month&groupBy=category&start=100&end=200&vehicleIds=a%2Cb&categories=fuel%2Cmaintenance&timeZone=${ZONE}`,
+			{ signal: controller.signal }
+		);
+	});
+
+	it('leaves out list params that were not given', async () => {
+		mockGet.mockResolvedValueOnce({} as never);
+		await analyticsApi.query({ metric: 'count' });
+		expect(mockGet).toHaveBeenCalledWith(
+			`/analytics/query?metric=count&timeZone=${ZONE}`,
+			undefined
+		);
+	});
+});

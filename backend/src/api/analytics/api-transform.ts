@@ -1,5 +1,6 @@
 import { EXPENSE_CATEGORIES } from '../../db/types';
 import { centsToDollars as c } from '../../utils/money';
+import type { AnalyticsQueryResult, QueryPeriod } from './query-repository';
 import type {
   AnalyticsSummaryData,
   CrossVehicleData,
@@ -177,5 +178,28 @@ export function analyticsSummaryToApi(d: AnalyticsSummaryData): AnalyticsSummary
     quickStats: quickStatsToApi(d.quickStats),
     fuelStats: fuelStatsToApi(d.fuelStats),
     fuelAdvanced: fuelAdvancedToApi(d.fuelAdvanced),
+  };
+}
+
+function queryPeriodToApi(d: QueryPeriod, money: boolean): QueryPeriod {
+  const value = money ? cn : (v: number | null) => v;
+  return {
+    ...d,
+    series: d.series.map((s) => ({ ...s, values: s.values.map(value) })),
+    totals: {
+      ...d.totals,
+      value: value(d.totals.value),
+      perBucket: value(d.totals.perBucket),
+      perDistance: cn(d.totals.perDistance),
+    },
+  };
+}
+
+export function analyticsQueryToApi(d: AnalyticsQueryResult): AnalyticsQueryResult {
+  const money = d.metric === 'cost' || d.metric === 'costPerDistance';
+  return {
+    ...d,
+    ...queryPeriodToApi(d, money),
+    compare: d.compare ? queryPeriodToApi(d.compare, money) : null,
   };
 }

@@ -10,7 +10,9 @@ import type {
 	VehicleTCOResponse,
 	VehicleExpensesResponse,
 	YearEndResponse,
-	AnalyticsSummaryResponse
+	AnalyticsSummaryResponse,
+	AnalyticsQueryParams,
+	AnalyticsQueryResponse
 } from '#lib/types/index.ts';
 import { ApiError } from '#lib/utils/error-handling.ts';
 import { apiClient } from './api-client';
@@ -125,6 +127,17 @@ export const analyticsApi = {
 	async getYearEnd(params?: { year?: number }): Promise<YearEndResponse> {
 		return apiClient.get<YearEndResponse>(
 			`/analytics/year-end${buildQueryString({ year: params?.year, timeZone: userTimeZone() })}`
+		);
+	},
+
+	async query(
+		params: AnalyticsQueryParams,
+		options?: { signal?: AbortSignal }
+	): Promise<AnalyticsQueryResponse> {
+		const { vehicleIds, categories, ...rest } = params;
+		return apiClient.get<AnalyticsQueryResponse>(
+			`/analytics/query${buildQueryString({ ...rest, vehicleIds: vehicleIds?.join(','), categories: categories?.join(','), timeZone: userTimeZone() })}`,
+			options
 		);
 	},
 

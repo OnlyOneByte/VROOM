@@ -186,6 +186,38 @@ describe('analytics routes (real HTTP stack)', () => {
     expect(body.data).toBeDefined();
   });
 
+  test('query: 401 anon / 400 bad params / 200 envelope with defaults', async () => {
+    expect((await ctx.anon('GET', '/api/v1/analytics/query?metric=cost')).status).toBe(401);
+    for (const bad of [
+      'metric=speed',
+      'metric=efficiency&groupBy=category',
+      'metric=distance&groupBy=tag',
+      'metric=cost&start=1735689600&end=1704067200',
+      'metric=cost&categories=fuel,petrol',
+      'metric=cost&interval=week&start=946684800&end=1735689600',
+      'metric=cost&timeZone=Mars%2FOlympus',
+      'metric=cost&vehicleIds=,,',
+      'metric=cost&categories=',
+    ]) {
+      const res = await ctx.authed('GET', `/api/v1/analytics/query?${bad}`);
+      expect(res.status, bad).toBe(400);
+    }
+    const vehicleId = await seedVehicle(ctx, { nickname: 'Daily Driver' });
+    const res = await ctx.authed(
+      'GET',
+      `/api/v1/analytics/query?metric=cost&groupBy=category&vehicleIds=${vehicleId},not-mine&categories=fuel,maintenance&${'start=1704067200&end=1735689600'}`
+    );
+    const body = await json<{
+      success: boolean;
+      data: { interval: string; buckets: string[]; series: unknown[]; compare: unknown };
+    }>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.interval).toBe('month');
+    expect(body.data.buckets).toHaveLength(12);
+    expect(body.data.series).toEqual([]);
+    expect(body.data.compare).toBeNull();
+  });
+
   test('year-end: 401 anon / 200 with NO year (defaults to current year, optional param) / 200 with a year', async () => {
     expect((await ctx.anon('GET', '/api/v1/analytics/year-end')).status).toBe(401);
     const noYear = await ctx.authed('GET', '/api/v1/analytics/year-end');

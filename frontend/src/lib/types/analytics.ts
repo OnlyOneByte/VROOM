@@ -276,3 +276,50 @@ export interface YearEndResponse {
 	costPerDistance: number | null;
 	units?: UnitsMetadata;
 }
+
+export type AnalyticsQueryMetric =
+	'cost' | 'costPerDistance' | 'distance' | 'volume' | 'efficiency' | 'count';
+export type AnalyticsQueryInterval = 'week' | 'month' | 'quarter' | 'year' | 'none';
+export type AnalyticsQueryGroupBy = 'none' | 'category' | 'vehicle' | 'fuelType' | 'tag';
+export type AnalyticsQueryInclude = 'running' | 'all';
+export type AnalyticsQueryCompare = 'none' | 'prevPeriod' | 'prevYear';
+export type AnalyticsQueryEnergy = 'fuel' | 'electric';
+
+export interface AnalyticsQueryParams {
+	metric: AnalyticsQueryMetric;
+	interval?: AnalyticsQueryInterval;
+	groupBy?: AnalyticsQueryGroupBy;
+	vehicleIds?: string[];
+	categories?: ExpenseCategory[];
+	start?: number;
+	end?: number;
+	include?: AnalyticsQueryInclude;
+	compare?: AnalyticsQueryCompare;
+	energy?: AnalyticsQueryEnergy;
+}
+
+export interface AnalyticsQuerySeries {
+	key: string;
+	label: string;
+	values: Array<number | null>;
+}
+
+export interface AnalyticsQueryPeriod {
+	range: { start: number; end: number };
+	buckets: string[];
+	series: AnalyticsQuerySeries[];
+	totals: {
+		value: number | null;
+		perBucket: number | null;
+		perDistance: number | null;
+		distance: number;
+	};
+}
+
+export interface AnalyticsQueryResponse extends AnalyticsQueryPeriod {
+	metric: AnalyticsQueryMetric;
+	unit: string;
+	interval: AnalyticsQueryInterval;
+	groupBy: AnalyticsQueryGroupBy;
+	compare: AnalyticsQueryPeriod | null;
+}
