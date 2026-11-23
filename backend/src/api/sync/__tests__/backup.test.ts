@@ -1240,7 +1240,7 @@ describe('validateBackupData: the first error is a plain reason', () => {
     }
     for (const reason of Object.values(BACKUP_CHECK_REASONS.sheets)) {
       expect(reason).not.toMatch(advice);
-      expect(reason).toContain('use File > Make a copy');
+      expect(reason).toContain('use File\u00a0>\u00a0Make a copy');
       expect(reason).not.toContain('select Cancel');
     }
   });
@@ -1249,7 +1249,7 @@ describe('validateBackupData: the first error is a plain reason', () => {
     const backup = emptyBackup();
     backup.metadata = { ...backup.metadata, userId: '' };
     expect(backupService.validateBackupData(backup, 'sheets').errors[0]).toBe(
-      "This backup is missing details VROOM needs to restore it. Only a backup that VROOM made, without edits, can be restored. If this spreadsheet is the only copy you have, open it in Google Drive and use File > Make a copy. VROOM's next backup writes over this spreadsheet."
+      'This backup is missing details VROOM needs to restore it. Only a backup that VROOM made, without edits, can be restored. If this spreadsheet is the only copy you have, open it in Google Drive and use File\u00a0>\u00a0Make a copy. VROOM has paused its automatic backups to this spreadsheet, and the next backup you start writes over it.'
     );
   });
 

@@ -181,7 +181,7 @@ export const BACKUP_CHECK_REASONS = {
     'If this is the only one you have, keep it as it is and select Cancel. VROOM keeps working without a restore.'
   ),
   sheets: reasonsFor(
-    "If this spreadsheet is the only copy you have, open it in Google Drive and use File > Make a copy. VROOM's next backup writes over this spreadsheet."
+    'If this spreadsheet is the only copy you have, open it in Google Drive and use File\u00a0>\u00a0Make a copy. VROOM has paused its automatic backups to this spreadsheet, and the next backup you start writes over it.'
   ),
 };
 

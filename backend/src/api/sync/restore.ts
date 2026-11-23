@@ -274,6 +274,9 @@ class RestoreService {
 
     const validation = backupService.validateBackupData(sheetData, 'sheets');
     if (!validation.valid) {
+      await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
+        providers: { [providerId]: { sheetsAutoPausedAt: new Date().toISOString() } },
+      });
       throw new ValidationError('Sheet data validation failed', validation.errors);
     }
 

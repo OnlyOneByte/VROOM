@@ -46,7 +46,13 @@ describe('a refused Sheets restore', () => {
       expect(refused).toBeInstanceOf(ValidationError);
       const details = (refused as ValidationError).details as string[];
       expect(details[0]).toBe(BACKUP_CHECK_REASONS.sheets.metadata);
-      expect(details[0]).toContain('use File > Make a copy');
+      expect(details[0]).toContain('use File\u00a0>\u00a0Make a copy');
+      const row = ctx.sqlite
+        .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
+        .get(ctx.user.id) as { backup_config: string };
+      const settings = JSON.parse(row.backup_config).providers['prov-sheets'];
+      expect(typeof settings.sheetsAutoPausedAt).toBe('string');
+      expect(settings.sheetsSpreadsheetId).toBe('sheet-1');
     } finally {
       spy.mockRestore();
     }
