@@ -59,6 +59,15 @@ export function getCostPerDistanceLabel(distanceUnit: DistanceUnit): string {
 	return `Cost/${getDistanceUnitLabel(distanceUnit, true)}`;
 }
 
+export function getVolumeUnitName(unit: VolumeUnit, plural = false): string {
+	const names: Record<VolumeUnit, [singular: string, plural: string]> = {
+		gallons_us: ['gallon (US)', 'gallons (US)'],
+		gallons_uk: ['gallon (UK)', 'gallons (UK)'],
+		liters: ['liter', 'liters']
+	};
+	return names[unit][plural ? 1 : 0];
+}
+
 export function getLongFormLabel(unit: DistanceUnit | VolumeUnit | ChargeUnit): string {
 	const labels: Record<DistanceUnit | VolumeUnit | ChargeUnit, string> = {
 		miles: 'Miles',

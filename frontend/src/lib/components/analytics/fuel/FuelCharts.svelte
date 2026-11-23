@@ -33,6 +33,7 @@
 	import {
 		getFuelEfficiencyLabel,
 		getLongFormLabel,
+		getVolumeUnitName,
 		getCostPerDistanceLabel,
 		getChargeUnitLabel,
 		getDistanceUnitLabel,
@@ -54,7 +55,7 @@
 	let volumeLabel = $derived(getLongFormLabel(units.volumeUnit));
 	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
 	let pricePerVolumeDesc = $derived(
-		`Price per ${getLongFormLabel(units.volumeUnit).toLowerCase()} by fuel type over time`
+		`Price per ${getVolumeUnitName(units.volumeUnit)} by fuel type over time`
 	);
 
 	let consumptionData = $derived(consumptionChartRows(fuelStats.monthlyConsumption));
@@ -179,7 +180,7 @@
 		{#if showGasCharts}
 			<AppLineChart
 				title="Fuel Consumption"
-				description="Monthly {efficiencyLabel} and {volumeLabel.toLowerCase()} used"
+				description="Monthly {efficiencyLabel} and {getVolumeUnitName(units.volumeUnit, true)} used"
 				data={consumptionData}
 				x="date"
 				y={['efficiency', 'volume']}
