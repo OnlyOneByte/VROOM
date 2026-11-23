@@ -76,7 +76,9 @@ describe('CostPerMileHero', () => {
 			logMileageHref: '/vehicles/v1/odometer/new'
 		});
 
-		expect(screen.getByText('Log a mileage to see cost per mile')).toBeInTheDocument();
+		expect(
+			screen.getByText('Log a newer odometer reading to see cost per mile')
+		).toBeInTheDocument();
 		expect(screen.queryByText('$0.00')).toBeNull();
 		expect(screen.getByRole('link', { name: 'Add an odometer reading' })).toHaveAttribute(
 			'href',
@@ -108,5 +110,33 @@ describe('CostPerMileHero', () => {
 
 		expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThanOrEqual(7);
 		expect(screen.getByText('Loading cost per mile')).toBeInTheDocument();
+	});
+
+	test('waits for the distance instead of showing the missing-mileage message', () => {
+		render(CostPerMileHero, {
+			summary: summary(),
+			distance: null,
+			distanceLoading: true,
+			distanceUnit: 'miles',
+			vehicleType: 'gas',
+			logMileageHref: '/vehicles/v1/odometer/new'
+		});
+
+		expect(screen.getByText('Loading cost per mile')).toBeInTheDocument();
+		expect(screen.queryByText(/odometer reading/)).toBeNull();
+	});
+
+	test('says when the distance could not load, without asking for a new reading', () => {
+		render(CostPerMileHero, {
+			summary: summary(),
+			distance: null,
+			distanceUnavailable: true,
+			distanceUnit: 'miles',
+			vehicleType: 'gas',
+			logMileageHref: '/vehicles/v1/odometer/new'
+		});
+
+		expect(screen.getByText("Cost per mile isn't available right now")).toBeInTheDocument();
+		expect(screen.queryByRole('link', { name: 'Add an odometer reading' })).toBeNull();
 	});
 });

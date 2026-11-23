@@ -183,9 +183,7 @@
 		vehicle ? vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}` : ''
 	);
 
-	let trendDescription = $derived(
-		selectedStatsPeriod === 'all' ? 'All Time' : `Last ${selectedStatsPeriod}`
-	);
+	const trendDescription = 'All Time';
 	let fuelChartTitle = $derived(
 		vehicle?.vehicleType === 'electric' ? 'Electric Efficiency' : 'Fuel Efficiency'
 	);
@@ -552,22 +550,12 @@
 			</div>
 		</div>
 		<Skeleton class="h-10 w-full" />
-		<div class="space-y-4 rounded-xl border bg-card p-4 sm:p-6">
-			<div class="space-y-1">
-				<Skeleton class="h-5 w-44" />
-				<Skeleton class="h-10 w-32 lg:h-12" />
-				<Skeleton class="h-4 w-56" />
-			</div>
-			<Skeleton class="h-2 w-full" />
-			<div class="grid grid-cols-3 gap-3">
-				{#each Array(3) as _, i (i)}
-					<div class="space-y-1">
-						<Skeleton class="h-4 w-16" />
-						<Skeleton class="h-6 w-20" />
-					</div>
-				{/each}
-			</div>
-		</div>
+		<CostPerMileHero
+			summary={null}
+			distance={null}
+			distanceUnit={settingsStore.unitPreferences.distanceUnit}
+			vehicleType="gas"
+		/>
 		<div class="divide-y rounded-xl border bg-card">
 			{#each Array(3) as _, i (i)}
 				<div class="flex items-center justify-between gap-3 p-4">
@@ -590,7 +578,8 @@
 					{vehicle}
 					displayName={vehicleDisplayName}
 					{coverPhotoUrl}
-					odometer={currentOdometer}
+					odometer={vehicleStatsData ? currentOdometer : null}
+					odometerLoading={isLoadingVehicleStats && vehicleStatsData === null}
 					{distanceUnit}
 				/>
 			</div>
@@ -699,6 +688,8 @@
 						<CostPerMileHero
 							{summary}
 							distance={distanceSoFar}
+							distanceLoading={isLoadingVehicleStats && vehicleStatsData === null}
+							distanceUnavailable={!isLoadingVehicleStats && vehicleStatsData === null}
 							{distanceUnit}
 							vehicleType={vehicle.vehicleType}
 							logMileageHref={canWrite

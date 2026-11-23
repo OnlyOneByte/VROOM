@@ -9,12 +9,14 @@
 	import type { DistanceUnit } from '#lib/types/settings.ts';
 	import { formatNumber } from '#lib/utils/formatters.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 
 	interface Props {
 		vehicle: Vehicle;
 		displayName: string;
 		coverPhotoUrl?: string | null;
 		odometer?: number | null;
+		odometerLoading?: boolean;
 		distanceUnit?: DistanceUnit;
 	}
 
@@ -23,21 +25,28 @@
 		displayName,
 		coverPhotoUrl = null,
 		odometer = null,
+		odometerLoading = false,
 		distanceUnit = 'miles'
 	}: Props = $props();
-
-	let description = $derived(
-		[
-			`${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-			odometer !== null
-				? `${formatNumber(odometer, 0)} ${getDistanceUnitLabel(distanceUnit, true)}`
-				: null,
-			vehicle.licensePlate || null
-		]
-			.filter(Boolean)
-			.join(' · ')
-	);
 </script>
+
+{#snippet description()}
+	<span class="whitespace-nowrap">{vehicle.year} {vehicle.make} {vehicle.model}</span>
+	{#if odometerLoading}
+		<span aria-hidden="true">·</span>
+		<Skeleton class="inline-block h-4 w-16 align-middle" />
+	{:else if odometer !== null}
+		<span aria-hidden="true">·</span>
+		<span class="whitespace-nowrap">
+			{formatNumber(odometer, 0)}
+			{getDistanceUnitLabel(distanceUnit, true)}
+		</span>
+	{/if}
+	{#if vehicle.licensePlate}
+		<span aria-hidden="true">·</span>
+		<span class="whitespace-nowrap">{vehicle.licensePlate}</span>
+	{/if}
+{/snippet}
 
 <PageHeader title={displayName} {description}>
 	{#snippet back()}

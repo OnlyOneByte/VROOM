@@ -72,8 +72,8 @@ describe('vehicle Overview puts the numbers first', () => {
 	test('the cost per distance hero comes before the vehicle details and the photos', async () => {
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 
-		const total = await screen.findByTestId('cost-per-mile-hero');
-		const recent = screen.getByText('Last 30 days');
+		const recent = await screen.findByText('Last 30 days');
+		const total = screen.getByTestId('cost-per-mile-hero');
 		const details = screen.getByRole('heading', { name: 'Vehicle Information' });
 		const photos = screen.getByRole('heading', { name: 'Photos' });
 
