@@ -376,6 +376,20 @@ describe('ExpenseForm create mode', () => {
 		expect(createExpense.mock.calls[0]?.[0]).toMatchObject({ vehicleId: 'v2', amount: 9.99 });
 	});
 
+	test.each([
+		['the first vehicle', undefined, 'v1'],
+		['a preselected vehicle', 'v2', 'v2']
+	])('opening the form loads the context of %s once', async (_label, preselected, loaded) => {
+		await renderCreate(preselected ? { preselectedVehicleId: preselected } : {});
+		await vi.waitFor(() => expect(getExpensesByVehicle).toHaveBeenCalledTimes(2));
+		await tick();
+
+		expect(getVehicle).toHaveBeenCalledTimes(1);
+		expect(getVehicle).toHaveBeenCalledWith(loaded);
+		expect(getExpensesByVehicle).toHaveBeenCalledWith(loaded, { limit: 2, category: 'fuel' });
+		expect(getExpensesByVehicle).toHaveBeenCalledWith(loaded, { limit: 100 });
+	});
+
 	test('cancel and the back button return to returnTo without saving', async () => {
 		await renderCreate({ returnTo: '/vehicles/v1' });
 
