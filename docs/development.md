@@ -125,7 +125,8 @@ cd frontend && npm run build && PORT=4173 PUBLIC_API_URL=http://127.0.0.1:3001 n
 cd frontend && VITALS_SESSION=<session> VITALS_VEHICLE_ID=<vehicleId> npm run web-vitals
 ```
 
-Seed a fresh database each time; the seed script adds to whatever is there. `VITALS_RUNS` sets
+Seed a fresh database each time: on a database that was seeded before, `db:seed` and the
+web-vitals seed both stop with a uniqueness error. `VITALS_RUNS` sets
 the number of loads per route and `VITALS_CHROMIUM` a different Chromium binary. A load whose API
 requests fail is an error, not a measurement. The job fails when a route is over its budget in
 `frontend/web-vitals-budgets.json` (LCP ≤ 1.5 s, TBT ≤ 500 ms, CLS ≤ 0.01 for every route). When a

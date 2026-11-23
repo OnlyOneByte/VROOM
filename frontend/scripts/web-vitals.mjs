@@ -76,6 +76,11 @@ for (const [name, path] of routes) {
 				failedRequests.push(`${response.status()} ${response.url()}`);
 			}
 		});
+		page.on('requestfailed', request => {
+			if (request.url().includes('/api/')) {
+				failedRequests.push(`${request.failure()?.errorText ?? 'failed'} ${request.url()}`);
+			}
+		});
 		await page.goto(baseUrl + path, { waitUntil: 'networkidle', timeout: 120000 });
 		await page.waitForTimeout(1500);
 		samples.push({ ...(await page.evaluate(readVitals)), failedRequests });
