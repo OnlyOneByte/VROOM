@@ -25,22 +25,22 @@ describe('odometerApi', () => {
 		await odometerApi.getEntries('v1');
 		await odometerApi.getEntries('v1', { limit: 20, offset: 40 });
 		expect(getPaginated.mock.calls.map(c => c[0])).toEqual([
-			'/api/v1/odometer/v1',
-			'/api/v1/odometer/v1?limit=20&offset=40'
+			'/odometer/v1',
+			'/odometer/v1?limit=20&offset=40'
 		]);
 	});
 
 	test('getEntry GETs a single entry by id', async () => {
 		get.mockResolvedValueOnce({ id: 'o1' });
 		await expect(odometerApi.getEntry('o1')).resolves.toEqual({ id: 'o1' });
-		expect(get).toHaveBeenCalledWith('/api/v1/odometer/entry/o1');
+		expect(get).toHaveBeenCalledWith('/odometer/entry/o1');
 	});
 
 	test('create POSTs the reading to the vehicle path with the user time zone', async () => {
 		const body = { odometer: 12_000, recordedAt: '2025-03-01T00:00:00.000Z', note: 'service' };
 		post.mockResolvedValueOnce({ id: 'o2' });
 		await odometerApi.create('v1', body);
-		expect(post).toHaveBeenCalledWith('/api/v1/odometer/v1', {
+		expect(post).toHaveBeenCalledWith('/odometer/v1', {
 			...body,
 			timeZone: 'Pacific/Auckland'
 		});
@@ -51,18 +51,18 @@ describe('odometerApi', () => {
 		del.mockResolvedValueOnce({ deleted: true });
 		await odometerApi.update('o2', { odometer: 12_500 });
 		await expect(odometerApi.delete('o2')).resolves.toBeUndefined();
-		expect(put).toHaveBeenCalledWith('/api/v1/odometer/o2', {
+		expect(put).toHaveBeenCalledWith('/odometer/o2', {
 			odometer: 12_500,
 			timeZone: 'Pacific/Auckland'
 		});
-		expect(del).toHaveBeenCalledWith('/api/v1/odometer/o2');
+		expect(del).toHaveBeenCalledWith('/odometer/o2');
 	});
 
 	test('uploadPhoto posts multipart data to the odometer entry collection', async () => {
 		post.mockResolvedValueOnce({ id: 'p1' });
 		await odometerApi.uploadPhoto('o2', new File(['x'], 'dash.jpg'));
 		const [url, body] = post.mock.calls[0] ?? [];
-		expect(url).toBe('/api/v1/photos/odometer_entry/o2');
+		expect(url).toBe('/photos/odometer_entry/o2');
 		expect((body as FormData).get('photo')).toBeInstanceOf(File);
 	});
 

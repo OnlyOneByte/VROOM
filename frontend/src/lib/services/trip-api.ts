@@ -31,15 +31,15 @@ export const tripApi = {
 			limit: filters?.limit,
 			offset: filters?.offset
 		});
-		return apiClient.getPaginated<Trip>(`/api/v1/trips${qs}`);
+		return apiClient.getPaginated<Trip>(`/trips${qs}`);
 	},
 
 	async getByVehicle(vehicleId: string): Promise<Trip[]> {
-		return apiClient.get<Trip[]>(`/api/v1/trips/vehicle/${vehicleId}`);
+		return apiClient.get<Trip[]>(`/trips/vehicle/${vehicleId}`);
 	},
 
 	async getById(id: string): Promise<Trip> {
-		return apiClient.get<Trip>(`/api/v1/trips/${id}`);
+		return apiClient.get<Trip>(`/trips/${id}`);
 	},
 
 	async getSummary(params?: { vehicleId?: string; rate?: number }): Promise<TripSummary> {
@@ -47,22 +47,22 @@ export const tripApi = {
 			vehicleId: params?.vehicleId || undefined,
 			rate: params?.rate
 		});
-		return apiClient.get<TripSummary>(`/api/v1/trips/summary${qs}`);
+		return apiClient.get<TripSummary>(`/trips/summary${qs}`);
 	},
 
 	async create(data: CreateTripRequest): Promise<Trip> {
-		return apiClient.post<Trip>('/api/v1/trips', { ...data, timeZone: userTimeZone() });
+		return apiClient.post<Trip>('/trips', { ...data, timeZone: userTimeZone() });
 	},
 
 	async update(id: string, data: UpdateTripRequest): Promise<Trip> {
-		return apiClient.put<Trip>(`/api/v1/trips/${id}`, { ...data, timeZone: userTimeZone() });
+		return apiClient.put<Trip>(`/trips/${id}`, { ...data, timeZone: userTimeZone() });
 	},
 
 	async delete(id: string, keepOdometer = true): Promise<void> {
 		const qs = keepOdometer
 			? ''
 			: buildQueryString({ keepOdometer: 'false', timeZone: userTimeZone() });
-		await apiClient.delete(`/api/v1/trips/${id}${qs}`);
+		await apiClient.delete(`/trips/${id}${qs}`);
 	}
 };
 

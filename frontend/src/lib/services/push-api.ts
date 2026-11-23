@@ -11,15 +11,15 @@ export type VapidKeyStatus =
 
 export const pushApi = {
 	async getVapidPublicKey(): Promise<VapidKeyStatus> {
-		return apiClient.get<VapidKeyStatus>('/api/v1/push/vapid-public-key');
+		return apiClient.get<VapidKeyStatus>('/push/vapid-public-key');
 	},
 
 	async subscribe(input: PushSubscribeInput): Promise<{ id: string }> {
-		return apiClient.post<{ id: string }>('/api/v1/push/subscribe', input);
+		return apiClient.post<{ id: string }>('/push/subscribe', input);
 	},
 
 	async unsubscribe(endpoint: string): Promise<{ removed: boolean }> {
-		return apiClient.delete<{ removed: boolean }>('/api/v1/push/subscribe', {
+		return apiClient.delete<{ removed: boolean }>('/push/subscribe', {
 			body: { endpoint }
 		});
 	}

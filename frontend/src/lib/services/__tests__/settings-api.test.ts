@@ -19,26 +19,26 @@ describe('settingsApi — settings + sync wiring', () => {
 	test('getSettings GETs /settings', async () => {
 		get.mockResolvedValueOnce({ unitPreferences: {} });
 		await settingsApi.getSettings();
-		expect(get).toHaveBeenCalledWith('/api/v1/settings');
+		expect(get).toHaveBeenCalledWith('/settings');
 	});
 
 	test('updateSettings PUTs /settings with the partial body', async () => {
 		put.mockResolvedValueOnce({});
 		const updates = { currencyUnit: 'EUR' };
 		await settingsApi.updateSettings(updates);
-		expect(put).toHaveBeenCalledWith('/api/v1/settings', updates);
+		expect(put).toHaveBeenCalledWith('/settings', updates);
 	});
 
 	test('executeSync POSTs /sync with syncTypes + force (default false)', async () => {
 		post.mockResolvedValueOnce({ success: true });
 		await settingsApi.executeSync(['backup']);
-		expect(post).toHaveBeenCalledWith('/api/v1/sync', { syncTypes: ['backup'], force: false });
+		expect(post).toHaveBeenCalledWith('/sync', { syncTypes: ['backup'], force: false });
 	});
 
 	test('executeSync passes force=true when given', async () => {
 		post.mockResolvedValueOnce({ success: true });
 		await settingsApi.executeSync(['backup'], true);
-		expect(post).toHaveBeenCalledWith('/api/v1/sync', { syncTypes: ['backup'], force: true });
+		expect(post).toHaveBeenCalledWith('/sync', { syncTypes: ['backup'], force: true });
 	});
 });
 
@@ -47,26 +47,26 @@ describe('settingsApi — backup listing', () => {
 		get.mockResolvedValueOnce([]);
 		await settingsApi.listBackupsFromProvider('prov id/with&special');
 		expect(get).toHaveBeenCalledWith(
-			'/api/v1/sync/backups/providers?providerId=prov%20id%2Fwith%26special'
+			'/sync/backups/providers?providerId=prov%20id%2Fwith%26special'
 		);
 	});
 
 	test('listAllBackups GETs the providers list (no query)', async () => {
 		get.mockResolvedValueOnce([]);
 		await settingsApi.listAllBackups();
-		expect(get).toHaveBeenCalledWith('/api/v1/sync/backups/providers');
+		expect(get).toHaveBeenCalledWith('/sync/backups/providers');
 	});
 
 	test('getRestoreProviders GETs the restore-providers list', async () => {
 		get.mockResolvedValueOnce([]);
 		await settingsApi.getRestoreProviders();
-		expect(get).toHaveBeenCalledWith('/api/v1/sync/restore/providers');
+		expect(get).toHaveBeenCalledWith('/sync/restore/providers');
 	});
 
 	test('downloadBackup uses apiClient.raw (returns the raw Response for the file)', async () => {
 		raw.mockResolvedValueOnce(new Response('zip-bytes'));
 		await settingsApi.downloadBackup();
-		expect(raw).toHaveBeenCalledWith('/api/v1/sync/backups/download');
+		expect(raw).toHaveBeenCalledWith('/sync/backups/download');
 	});
 });
 
@@ -81,7 +81,7 @@ describe('settingsApi.restoreFromProvider — body branching + idempotency', () 
 			idempotencyKey: 'idem-zip-1'
 		});
 		expect(post).toHaveBeenCalledWith(
-			'/api/v1/sync/restore/from-provider',
+			'/sync/restore/from-provider',
 			{ providerId: 'p1', sourceType: 'zip', fileRef: 'backups/2024.zip', mode: 'replace' },
 			{ headers: { 'Idempotency-Key': 'idem-zip-1' } }
 		);
@@ -109,7 +109,7 @@ describe('settingsApi.uploadBackup — FormData + idempotency', () => {
 		await settingsApi.uploadBackup(file, 'preview', 'idem-up-1');
 
 		const [url, body, opts] = post.mock.calls[0] as [string, FormData, { headers: object }];
-		expect(url).toBe('/api/v1/sync/restore/from-backup');
+		expect(url).toBe('/sync/restore/from-backup');
 		expect(body).toBeInstanceOf(FormData);
 		expect((body as FormData).get('file')).toBe(file);
 		expect((body as FormData).get('mode')).toBe('preview');

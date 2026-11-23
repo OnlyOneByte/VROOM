@@ -63,7 +63,7 @@ describe('reminderApi.getMaterializedExpenses()', () => {
 		const result = await reminderApi.getMaterializedExpenses('r1');
 
 		expect(mockGet).toHaveBeenCalledTimes(1);
-		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders/r1/expenses');
+		expect(mockGet).toHaveBeenCalledWith('/reminders/r1/expenses');
 		expect(result[0]?.amount).toBe(49.99);
 		expect(result[0]).not.toHaveProperty('expenseAmount');
 		expect(result[1]?.charge).toBe(30);
@@ -75,7 +75,7 @@ describe('reminderApi.getMaterializedExpenses()', () => {
 	it('returns the empty array for a reminder that materialized nothing', async () => {
 		mockGet.mockResolvedValueOnce([]);
 		await expect(reminderApi.getMaterializedExpenses('r9')).resolves.toEqual([]);
-		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders/r9/expenses');
+		expect(mockGet).toHaveBeenCalledWith('/reminders/r9/expenses');
 	});
 
 	it('propagates a 404 (reminder not owned / missing) rather than swallowing it', async () => {
@@ -95,7 +95,7 @@ describe('reminderApi.getRecurringCost()', () => {
 		const result = await reminderApi.getRecurringCost();
 
 		expect(mockGet).toHaveBeenCalledTimes(1);
-		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders/recurring-cost');
+		expect(mockGet).toHaveBeenCalledWith('/reminders/recurring-cost');
 		expect(result).toEqual(mockSummary);
 		expect(result.count).toBe(3);
 		expect(result.monthlyTotal).toBe(142.5);
@@ -123,33 +123,33 @@ describe('reminderApi — CRUD + trigger + mark-serviced wiring', () => {
 		mockPost.mockResolvedValueOnce({ reminder: { id: 'r1' }, vehicleIds: ['v1'] });
 		const body = { title: 'Oil change', vehicleIds: ['v1'] };
 		await reminderApi.create(body);
-		expect(mockPost).toHaveBeenCalledWith('/api/v1/reminders', body);
+		expect(mockPost).toHaveBeenCalledWith('/reminders', body);
 	});
 
 	it('getById GETs the id path', async () => {
 		mockGet.mockResolvedValueOnce({ reminder: { id: 'r1' }, vehicleIds: [] });
 		await reminderApi.getById('r1');
-		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders/r1');
+		expect(mockGet).toHaveBeenCalledWith('/reminders/r1');
 	});
 
 	it('update PUTs the id path with the body and the user time zone', async () => {
 		mockPut.mockResolvedValueOnce({ reminder: { id: 'r1' }, vehicleIds: ['v2'] });
 		const body = { title: 'New', vehicleIds: ['v2'] };
 		await reminderApi.update('r1', body);
-		expect(mockPut).toHaveBeenCalledWith('/api/v1/reminders/r1', { ...body, timeZone: ZONE });
+		expect(mockPut).toHaveBeenCalledWith('/reminders/r1', { ...body, timeZone: ZONE });
 	});
 
 	it('delete DELETEs the id path', async () => {
 		mockDelete.mockResolvedValueOnce(undefined);
 		await reminderApi.delete('r1');
-		expect(mockDelete).toHaveBeenCalledWith('/api/v1/reminders/r1');
+		expect(mockDelete).toHaveBeenCalledWith('/reminders/r1');
 	});
 
 	it('trigger POSTs /reminders/trigger', async () => {
 		mockPost.mockResolvedValueOnce({ createdExpenses: [], notifications: [], skipped: [] });
 		await reminderApi.trigger();
 		expect(mockPost).toHaveBeenCalledWith(
-			`/api/v1/reminders/trigger?timeZone=${encodeURIComponent(ZONE)}`
+			`/reminders/trigger?timeZone=${encodeURIComponent(ZONE)}`
 		);
 	});
 
@@ -160,7 +160,7 @@ describe('reminderApi — CRUD + trigger + mark-serviced wiring', () => {
 		try {
 			mockPost.mockResolvedValueOnce({ createdExpenses: [], notifications: [], skipped: [] });
 			await reminderApi.trigger();
-			expect(mockPost).toHaveBeenCalledWith('/api/v1/reminders/trigger');
+			expect(mockPost).toHaveBeenCalledWith('/reminders/trigger');
 		} finally {
 			spy.mockRestore();
 		}
@@ -170,14 +170,14 @@ describe('reminderApi — CRUD + trigger + mark-serviced wiring', () => {
 		mockPost.mockResolvedValueOnce({ id: 'r1' });
 		await reminderApi.markServiced('r1');
 		expect(mockPost).toHaveBeenCalledWith(
-			`/api/v1/reminders/r1/mark-serviced?timeZone=${encodeURIComponent(ZONE)}`
+			`/reminders/r1/mark-serviced?timeZone=${encodeURIComponent(ZONE)}`
 		);
 	});
 
 	it('markNotificationRead PUTs the notification read path', async () => {
 		mockPut.mockResolvedValueOnce({ id: 'n1', isRead: true });
 		await reminderApi.markNotificationRead('n1');
-		expect(mockPut).toHaveBeenCalledWith('/api/v1/reminders/notifications/n1/read');
+		expect(mockPut).toHaveBeenCalledWith('/reminders/notifications/n1/read');
 	});
 });
 
@@ -189,31 +189,31 @@ describe('reminderApi.list — buildReminderQuery filter construction', () => {
 	it('no filters → bare /reminders (no query string)', async () => {
 		mockGet.mockResolvedValueOnce([]);
 		await reminderApi.list();
-		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders');
+		expect(mockGet).toHaveBeenCalledWith('/reminders');
 	});
 
 	it('empty filters object → still bare (no keys set)', async () => {
 		mockGet.mockResolvedValueOnce([]);
 		await reminderApi.list({});
-		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders');
+		expect(mockGet).toHaveBeenCalledWith('/reminders');
 	});
 
 	it('vehicleId + type are appended as query params', async () => {
 		mockGet.mockResolvedValueOnce([]);
 		await reminderApi.list({ vehicleId: 'v1', type: 'expense' });
-		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders?vehicleId=v1&type=expense');
+		expect(mockGet).toHaveBeenCalledWith('/reminders?vehicleId=v1&type=expense');
 	});
 
 	it('isActive=false MUST survive (the !== undefined edge, not a truthiness check)', async () => {
 		mockGet.mockResolvedValueOnce([]);
 		await reminderApi.list({ isActive: false });
-		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders?isActive=false');
+		expect(mockGet).toHaveBeenCalledWith('/reminders?isActive=false');
 	});
 
 	it('isActive=true is serialized as the string "true"', async () => {
 		mockGet.mockResolvedValueOnce([]);
 		await reminderApi.list({ isActive: true });
-		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders?isActive=true');
+		expect(mockGet).toHaveBeenCalledWith('/reminders?isActive=true');
 	});
 });
 
@@ -225,18 +225,18 @@ describe('reminderApi.getNotifications — unreadOnly gating', () => {
 	it('no arg → bare notifications path', async () => {
 		mockGet.mockResolvedValueOnce([]);
 		await reminderApi.getNotifications();
-		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders/notifications');
+		expect(mockGet).toHaveBeenCalledWith('/reminders/notifications');
 	});
 
 	it('unreadOnly=true → ?unreadOnly=true', async () => {
 		mockGet.mockResolvedValueOnce([]);
 		await reminderApi.getNotifications(true);
-		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders/notifications?unreadOnly=true');
+		expect(mockGet).toHaveBeenCalledWith('/reminders/notifications?unreadOnly=true');
 	});
 
 	it('unreadOnly=false → bare path (falsy → no query)', async () => {
 		mockGet.mockResolvedValueOnce([]);
 		await reminderApi.getNotifications(false);
-		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders/notifications');
+		expect(mockGet).toHaveBeenCalledWith('/reminders/notifications');
 	});
 });

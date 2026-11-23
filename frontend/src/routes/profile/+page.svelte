@@ -189,7 +189,7 @@
 	function handleLink(providerId: string) {
 		if (browser) {
 			linkingProvider = providerId;
-			window.location.href = `${getApiBaseUrl()}/api/v1/auth/link/${providerId}`;
+			window.location.href = `${getApiBaseUrl()}/auth/link/${providerId}`;
 		}
 	}
 

@@ -37,59 +37,59 @@ function buildReminderQuery(filters?: ReminderListFilters): string {
 
 export const reminderApi = {
 	async create(data: Partial<Reminder> & { vehicleIds: string[] }): Promise<ReminderWithVehicles> {
-		return apiClient.post<ReminderWithVehicles>('/api/v1/reminders', data);
+		return apiClient.post<ReminderWithVehicles>('/reminders', data);
 	},
 
 	async list(filters?: ReminderListFilters): Promise<ReminderWithVehicles[]> {
 		const qs = buildReminderQuery(filters);
-		return apiClient.get<ReminderWithVehicles[]>(`/api/v1/reminders${qs}`);
+		return apiClient.get<ReminderWithVehicles[]>(`/reminders${qs}`);
 	},
 
 	async getById(id: string): Promise<ReminderWithVehicles> {
-		return apiClient.get<ReminderWithVehicles>(`/api/v1/reminders/${id}`);
+		return apiClient.get<ReminderWithVehicles>(`/reminders/${id}`);
 	},
 
 	async update(
 		id: string,
 		data: Partial<Reminder> & { vehicleIds?: string[] }
 	): Promise<ReminderWithVehicles> {
-		return apiClient.put<ReminderWithVehicles>(`/api/v1/reminders/${id}`, {
+		return apiClient.put<ReminderWithVehicles>(`/reminders/${id}`, {
 			timeZone: safeTimeZone(),
 			...data
 		});
 	},
 
 	async delete(id: string): Promise<void> {
-		await apiClient.delete(`/api/v1/reminders/${id}`);
+		await apiClient.delete(`/reminders/${id}`);
 	},
 
 	async trigger(): Promise<TriggerResult> {
 		return apiClient.post<TriggerResult>(
-			`/api/v1/reminders/trigger${buildQueryString({ timeZone: safeTimeZone() })}`
+			`/reminders/trigger${buildQueryString({ timeZone: safeTimeZone() })}`
 		);
 	},
 
 	async markServiced(id: string): Promise<Reminder> {
 		return apiClient.post<Reminder>(
-			`/api/v1/reminders/${id}/mark-serviced${buildQueryString({ timeZone: safeTimeZone() })}`
+			`/reminders/${id}/mark-serviced${buildQueryString({ timeZone: safeTimeZone() })}`
 		);
 	},
 
 	async getMaterializedExpenses(id: string): Promise<Expense[]> {
-		const data = await apiClient.get<BackendExpenseResponse[]>(`/api/v1/reminders/${id}/expenses`);
+		const data = await apiClient.get<BackendExpenseResponse[]>(`/reminders/${id}/expenses`);
 		return data.map(fromBackendExpense);
 	},
 
 	async getRecurringCost(): Promise<RecurringCostSummary> {
-		return apiClient.get<RecurringCostSummary>('/api/v1/reminders/recurring-cost');
+		return apiClient.get<RecurringCostSummary>('/reminders/recurring-cost');
 	},
 
 	async getNotifications(unreadOnly?: boolean): Promise<ReminderNotification[]> {
 		const query = unreadOnly ? '?unreadOnly=true' : '';
-		return apiClient.get<ReminderNotification[]>(`/api/v1/reminders/notifications${query}`);
+		return apiClient.get<ReminderNotification[]>(`/reminders/notifications${query}`);
 	},
 
 	async markNotificationRead(id: string): Promise<ReminderNotification> {
-		return apiClient.put<ReminderNotification>(`/api/v1/reminders/notifications/${id}/read`);
+		return apiClient.put<ReminderNotification>(`/reminders/notifications/${id}/read`);
 	}
 };

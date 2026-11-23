@@ -26,7 +26,7 @@ describe('pushApi.getVapidPublicKey', () => {
 		const out = await pushApi.getVapidPublicKey();
 
 		expect(get).toHaveBeenCalledTimes(1);
-		expect(get.mock.calls[0]?.[0]).toBe('/api/v1/push/vapid-public-key');
+		expect(get.mock.calls[0]?.[0]).toBe('/push/vapid-public-key');
 		expect(out).toEqual(status);
 	});
 });
@@ -43,7 +43,7 @@ describe('pushApi.subscribe', () => {
 
 		expect(post).toHaveBeenCalledTimes(1);
 		const [url, body] = post.mock.calls[0] ?? [];
-		expect(url).toBe('/api/v1/push/subscribe');
+		expect(url).toBe('/push/subscribe');
 		expect(body.endpoint).toBe('https://fcm.googleapis.com/fcm/send/abc');
 		expect(body.keys).toEqual({ p256dh: 'p256dh-key', auth: 'auth-secret' });
 		expect(body.userAgent).toBe('Mozilla/5.0 Test');
@@ -66,7 +66,7 @@ describe('pushApi.unsubscribe', () => {
 
 		expect(del).toHaveBeenCalledTimes(1);
 		const [url, options] = del.mock.calls[0] ?? [];
-		expect(url).toBe('/api/v1/push/subscribe');
+		expect(url).toBe('/push/subscribe');
 		expect(options?.body).toEqual({ endpoint: 'https://fcm.googleapis.com/fcm/send/abc' });
 		expect(out).toEqual({ removed: true });
 	});

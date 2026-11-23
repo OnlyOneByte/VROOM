@@ -7,7 +7,7 @@ export const odometerHistoryApi = {
 		params?: { limit?: number; offset?: number }
 	): Promise<PaginatedResponse<OdometerHistoryEntry>> {
 		return apiClient.getPaginated<OdometerHistoryEntry>(
-			withPagination(`/api/v1/odometer/${vehicleId}/history`, params)
+			withPagination(`/odometer/${vehicleId}/history`, params)
 		);
 	}
 };

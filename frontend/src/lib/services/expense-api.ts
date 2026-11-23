@@ -96,7 +96,7 @@ async function fetchPaginatedExpenses(url: string): Promise<PaginatedExpenseResp
 
 export const expenseApi = {
 	async getExpense(expenseId: string): Promise<Expense> {
-		const data = await apiClient.get<BackendExpenseResponse>(`/api/v1/expenses/${expenseId}`);
+		const data = await apiClient.get<BackendExpenseResponse>(`/expenses/${expenseId}`);
 		return fromBackendExpense(data);
 	},
 
@@ -104,18 +104,16 @@ export const expenseApi = {
 		vehicleId: string,
 		params?: ExpenseListParams
 	): Promise<PaginatedExpenseResponse> {
-		return fetchPaginatedExpenses(`/api/v1/expenses${buildExpenseQuery(params, vehicleId)}`);
+		return fetchPaginatedExpenses(`/expenses${buildExpenseQuery(params, vehicleId)}`);
 	},
 
 	async getAllExpenses(params?: ExpenseListParams): Promise<PaginatedExpenseResponse> {
-		return fetchPaginatedExpenses(`/api/v1/expenses${buildExpenseQuery(params)}`);
+		return fetchPaginatedExpenses(`/expenses${buildExpenseQuery(params)}`);
 	},
 
 	async downloadExpensesCsv(params?: ExpenseExportParams): Promise<void> {
 		const { vehicleId, ...filters } = params ?? {};
-		const res = await apiClient.raw(
-			`/api/v1/expenses/export${buildExpenseQuery(filters, vehicleId)}`
-		);
+		const res = await apiClient.raw(`/expenses/export${buildExpenseQuery(filters, vehicleId)}`);
 		const blob = await res.blob();
 		triggerBlobDownload(blob, `vroom-expenses-${toDateInputValue(new Date())}.csv`);
 	},
@@ -125,7 +123,7 @@ export const expenseApi = {
 		dryRun = false,
 		mapping?: ImportColumnMapping
 	): Promise<ExpenseImportResult> {
-		return apiClient.post<ExpenseImportResult>('/api/v1/expenses/import', {
+		return apiClient.post<ExpenseImportResult>('/expenses/import', {
 			csv,
 			dryRun,
 			timeZone: userTimeZone(),
@@ -134,7 +132,7 @@ export const expenseApi = {
 	},
 
 	async detectImportSource(sample: string): Promise<DetectedImportFormat | null> {
-		return apiClient.post<DetectedImportFormat | null>('/api/v1/expenses/import/detect', {
+		return apiClient.post<DetectedImportFormat | null>('/expenses/import/detect', {
 			sample
 		});
 	},
@@ -145,7 +143,7 @@ export const expenseApi = {
 			period: params?.period || undefined,
 			timeZone: userTimeZone()
 		});
-		return apiClient.get<ExpenseSummary>(`/api/v1/expenses/summary${qs}`);
+		return apiClient.get<ExpenseSummary>(`/expenses/summary${qs}`);
 	},
 
 	async getVehicleStats(recentDays?: number): Promise<
@@ -157,7 +155,7 @@ export const expenseApi = {
 		}>
 	> {
 		return apiClient.get(
-			`/api/v1/expenses/vehicle-stats${buildQueryString({ recentDays: recentDays || undefined })}`
+			`/expenses/vehicle-stats${buildQueryString({ recentDays: recentDays || undefined })}`
 		);
 	},
 
@@ -170,7 +168,7 @@ export const expenseApi = {
 			...(clientId && { clientId }),
 			timeZone: userTimeZone()
 		};
-		const data = await apiClient.post<BackendExpenseResponse>('/api/v1/expenses', backendExpense);
+		const data = await apiClient.post<BackendExpenseResponse>('/expenses', backendExpense);
 		return fromBackendExpense(data);
 	},
 
@@ -183,14 +181,14 @@ export const expenseApi = {
 			timeZone: userTimeZone()
 		};
 		const data = await apiClient.put<BackendExpenseResponse>(
-			`/api/v1/expenses/${expenseId}`,
+			`/expenses/${expenseId}`,
 			backendExpense
 		);
 		return fromBackendExpense(data);
 	},
 
 	async deleteExpense(expenseId: string): Promise<void> {
-		await apiClient.delete(`/api/v1/expenses/${expenseId}`);
+		await apiClient.delete(`/expenses/${expenseId}`);
 	},
 
 	getPhotos(
@@ -231,21 +229,21 @@ export const expenseApi = {
 		sourceType?: string;
 		sourceId?: string;
 	}): Promise<SplitExpenseGroup> {
-		return apiClient.post<SplitExpenseGroup>('/api/v1/expenses/split', data);
+		return apiClient.post<SplitExpenseGroup>('/expenses/split', data);
 	},
 
 	async updateSplitExpense(
 		groupId: string,
 		data: { splitConfig: SplitConfig; totalAmount?: number }
 	): Promise<SplitExpenseGroup> {
-		return apiClient.put<SplitExpenseGroup>(`/api/v1/expenses/split/${groupId}`, data);
+		return apiClient.put<SplitExpenseGroup>(`/expenses/split/${groupId}`, data);
 	},
 
 	async getSplitExpense(groupId: string): Promise<SplitExpenseGroup> {
-		return apiClient.get<SplitExpenseGroup>(`/api/v1/expenses/split/${groupId}`);
+		return apiClient.get<SplitExpenseGroup>(`/expenses/split/${groupId}`);
 	},
 
 	async deleteSplitExpense(groupId: string): Promise<void> {
-		await apiClient.delete(`/api/v1/expenses/split/${groupId}`);
+		await apiClient.delete(`/expenses/split/${groupId}`);
 	}
 };

@@ -54,7 +54,7 @@ describe('api client error responses', () => {
 	it('falls back to the status message when the error body names no message', async () => {
 		mockFetch.mockResolvedValueOnce(jsonResponse(418, { error: { code: 'Teapot' } }));
 
-		const error = await rejection(apiClient.get('/api/v1/vehicles'));
+		const error = await rejection(apiClient.get('/vehicles'));
 
 		expect(error).toBeInstanceOf(ApiError);
 		expect((error as ApiError).message).toBe('Request failed with status 418');
@@ -66,7 +66,7 @@ describe('api client error responses', () => {
 			jsonResponse(409, { error: { message: 'Conflict', details: { field: 'vin' } } })
 		);
 
-		const error = await rejection(apiClient.post('/api/v1/vehicles', { vin: 'x' }));
+		const error = await rejection(apiClient.post('/vehicles', { vin: 'x' }));
 
 		expect((error as ApiError).details).toEqual({ field: 'vin' });
 	});
@@ -74,7 +74,7 @@ describe('api client error responses', () => {
 	it('reports a non-Error fetch failure as a generic network error', async () => {
 		mockFetch.mockRejectedValueOnce('offline');
 
-		const error = await rejection(apiClient.get('/api/v1/vehicles'));
+		const error = await rejection(apiClient.get('/vehicles'));
 
 		expect(error).toBeInstanceOf(NetworkError);
 		expect((error as NetworkError).message).toBe('Network request failed');
@@ -102,7 +102,7 @@ describe('api client session expiry failures', () => {
 	it('leaves the session alone during server rendering', async () => {
 		env.browser = false;
 
-		await expect(apiClient.get('/api/v1/expenses')).rejects.toBeInstanceOf(ApiError);
+		await expect(apiClient.get('/expenses')).rejects.toBeInstanceOf(ApiError);
 
 		expect(authStore.isAuthenticated).toBe(true);
 		expect(goto).not.toHaveBeenCalled();
@@ -113,7 +113,7 @@ describe('api client session expiry failures', () => {
 		vi.mocked(goto).mockRejectedValueOnce(redirectFailure);
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-		await expect(apiClient.get('/api/v1/expenses')).rejects.toBeInstanceOf(ApiError);
+		await expect(apiClient.get('/expenses')).rejects.toBeInstanceOf(ApiError);
 		await vi.waitFor(() =>
 			expect(consoleError).toHaveBeenCalledWith('Session-expiry redirect failed:', redirectFailure)
 		);
@@ -128,7 +128,7 @@ describe('api client session expiry failures', () => {
 		});
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-		await expect(apiClient.get('/api/v1/expenses')).rejects.toBeInstanceOf(ApiError);
+		await expect(apiClient.get('/expenses')).rejects.toBeInstanceOf(ApiError);
 
 		expect(consoleError).toHaveBeenCalledWith('Failed to handle session expiry:', clearFailure);
 		expect(goto).not.toHaveBeenCalled();

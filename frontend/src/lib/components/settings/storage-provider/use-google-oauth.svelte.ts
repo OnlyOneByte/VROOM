@@ -63,7 +63,7 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 		if (opts.isEditMode && opts.existingEmail) {
 			params.set('email', opts.existingEmail);
 		}
-		window.location.href = `${getApiBaseUrl()}/api/v1/auth/providers/connect/google?${params.toString()}`;
+		window.location.href = `${getApiBaseUrl()}/auth/providers/connect/google?${params.toString()}`;
 	}
 
 	async function handleOAuthReturn(): Promise<{
@@ -97,9 +97,7 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 			}
 
 			try {
-				const result = await apiClient.get<{ email: string }>(
-					`/api/v1/providers/pending/${nonceParam}`
-				);
+				const result = await apiClient.get<{ email: string }>(`/providers/pending/${nonceParam}`);
 				pendingEmail = result.email;
 			} catch (error) {
 				const reason =

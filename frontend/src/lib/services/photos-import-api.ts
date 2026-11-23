@@ -23,14 +23,14 @@ export interface ConfirmDraftInput {
 export const photosImportApi = {
 	async getReceiptDrafts(): Promise<ReceiptDraftItem[]> {
 		const { drafts } = await apiClient.get<{ drafts: ReceiptDraftItem[] }>(
-			'/api/v1/photos/receipt-drafts'
+			'/photos/receipt-drafts'
 		);
 		return drafts;
 	},
 
 	async confirmDraft(photoId: string, input: ConfirmDraftInput): Promise<{ id: string }> {
 		const backendExpense = toBackendExpense(input);
-		return apiClient.post<{ id: string }>('/api/v1/expenses', {
+		return apiClient.post<{ id: string }>('/expenses', {
 			...backendExpense,
 			clientId: `photos:${photoId}`,
 			timeZone: userTimeZone()

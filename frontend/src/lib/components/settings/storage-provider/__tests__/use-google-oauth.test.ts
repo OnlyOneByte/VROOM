@@ -12,7 +12,7 @@ vi.mock('$app/navigation', () => ({ goto }));
 vi.mock('$app/state', () => ({ page }));
 vi.mock('#lib/services/api-client.ts', () => ({
 	apiClient: { get },
-	getApiBaseUrl: () => 'https://api.example'
+	getApiBaseUrl: () => 'https://api.example/api/v1'
 }));
 vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore: { showError } }));
 
@@ -141,7 +141,7 @@ describe('handleOAuthReturn', () => {
 			restoredSelectedType: 'google-drive',
 			restoredDisplayName: 'Backups'
 		});
-		expect(get).toHaveBeenCalledWith('/api/v1/providers/pending/n-1');
+		expect(get).toHaveBeenCalledWith('/providers/pending/n-1');
 		expect(oauth.pendingEmail).toBe('me@example.com');
 		expect(oauth.oauthNonce).toBe('n-1');
 		expect(sessionStorage.getItem(FORM_KEY)).toBeNull();

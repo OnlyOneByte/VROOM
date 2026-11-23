@@ -63,7 +63,7 @@ export async function fetchLastSyncTime(): Promise<void> {
 			lastDataChangeDate?: string;
 			sheetsSyncEnabled?: boolean;
 			backupEnabled?: boolean;
-		}>('/api/v1/sync/status');
+		}>('/sync/status');
 
 		if (result) {
 			const syncDate = result.lastSyncDate ? new Date(result.lastSyncDate) : null;
@@ -319,7 +319,7 @@ class SyncManager {
 	}
 
 	private postExpense(expense: OfflineExpense) {
-		return apiClient.post<BackendExpenseResponse>('/api/v1/expenses', {
+		return apiClient.post<BackendExpenseResponse>('/expenses', {
 			...offlineExpenseToBackend(expense),
 			clientId: expense.clientId,
 			timeZone: userTimeZone()
@@ -338,7 +338,7 @@ class SyncManager {
 	}
 
 	private overwriteServerCopy(expense: OfflineExpense, serverId: string) {
-		return apiClient.put<BackendExpenseResponse>(`/api/v1/expenses/${serverId}`, {
+		return apiClient.put<BackendExpenseResponse>(`/expenses/${serverId}`, {
 			...offlineExpenseToBackend(expense, { clearEmptyFields: true }),
 			...(!expense.sourceId && { sourceType: null, sourceId: null }),
 			timeZone: userTimeZone()

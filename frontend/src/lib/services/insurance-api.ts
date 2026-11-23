@@ -15,31 +15,31 @@ import { entityPhotos } from './photo-api';
 
 export const insuranceApi = {
 	async getAllPolicies(): Promise<InsurancePolicy[]> {
-		return apiClient.get<InsurancePolicy[]>('/api/v1/insurance');
+		return apiClient.get<InsurancePolicy[]>('/insurance');
 	},
 
 	async getPoliciesForVehicle(vehicleId: string): Promise<InsurancePolicy[]> {
-		return apiClient.get<InsurancePolicy[]>(`/api/v1/insurance/vehicles/${vehicleId}/policies`);
+		return apiClient.get<InsurancePolicy[]>(`/insurance/vehicles/${vehicleId}/policies`);
 	},
 
 	async getPolicy(policyId: string): Promise<InsurancePolicy> {
-		return apiClient.get<InsurancePolicy>(`/api/v1/insurance/${policyId}`);
+		return apiClient.get<InsurancePolicy>(`/insurance/${policyId}`);
 	},
 
 	async createPolicy(data: CreatePolicyRequest): Promise<InsurancePolicy> {
-		return apiClient.post<InsurancePolicy>('/api/v1/insurance', data);
+		return apiClient.post<InsurancePolicy>('/insurance', data);
 	},
 
 	async updatePolicy(policyId: string, data: UpdatePolicyRequest): Promise<InsurancePolicy> {
-		return apiClient.put<InsurancePolicy>(`/api/v1/insurance/${policyId}`, data);
+		return apiClient.put<InsurancePolicy>(`/insurance/${policyId}`, data);
 	},
 
 	async deletePolicy(policyId: string): Promise<void> {
-		await apiClient.delete(`/api/v1/insurance/${policyId}`);
+		await apiClient.delete(`/insurance/${policyId}`);
 	},
 
 	async addTerm(policyId: string, term: CreateTermRequest): Promise<InsurancePolicy> {
-		return apiClient.post<InsurancePolicy>(`/api/v1/insurance/${policyId}/terms`, term);
+		return apiClient.post<InsurancePolicy>(`/insurance/${policyId}/terms`, term);
 	},
 
 	async updateTerm(
@@ -47,11 +47,11 @@ export const insuranceApi = {
 		termId: string,
 		data: UpdateTermRequest
 	): Promise<InsurancePolicy> {
-		return apiClient.put<InsurancePolicy>(`/api/v1/insurance/${policyId}/terms/${termId}`, data);
+		return apiClient.put<InsurancePolicy>(`/insurance/${policyId}/terms/${termId}`, data);
 	},
 
 	async deleteTerm(policyId: string, termId: string): Promise<InsurancePolicy> {
-		return apiClient.delete<InsurancePolicy>(`/api/v1/insurance/${policyId}/terms/${termId}`);
+		return apiClient.delete<InsurancePolicy>(`/insurance/${policyId}/terms/${termId}`);
 	},
 
 	getEntityDocuments(
@@ -75,11 +75,11 @@ export const insuranceApi = {
 	},
 
 	async getClaims(policyId: string): Promise<InsuranceClaim[]> {
-		return apiClient.get<InsuranceClaim[]>(`/api/v1/insurance/${policyId}/claims`);
+		return apiClient.get<InsuranceClaim[]>(`/insurance/${policyId}/claims`);
 	},
 
 	async createClaim(policyId: string, data: CreateClaimRequest): Promise<InsuranceClaim> {
-		return apiClient.post<InsuranceClaim>(`/api/v1/insurance/${policyId}/claims`, data);
+		return apiClient.post<InsuranceClaim>(`/insurance/${policyId}/claims`, data);
 	},
 
 	async updateClaim(
@@ -87,10 +87,10 @@ export const insuranceApi = {
 		claimId: string,
 		data: UpdateClaimRequest
 	): Promise<InsuranceClaim> {
-		return apiClient.put<InsuranceClaim>(`/api/v1/insurance/${policyId}/claims/${claimId}`, data);
+		return apiClient.put<InsuranceClaim>(`/insurance/${policyId}/claims/${claimId}`, data);
 	},
 
 	async deleteClaim(policyId: string, claimId: string): Promise<void> {
-		await apiClient.delete(`/api/v1/insurance/${policyId}/claims/${claimId}`);
+		await apiClient.delete(`/insurance/${policyId}/claims/${claimId}`);
 	}
 };

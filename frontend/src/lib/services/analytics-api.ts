@@ -46,7 +46,7 @@ export function getDefaultDateRange(now: Date = new Date()): {
 export const analyticsApi = {
 	async getFuelEfficiency(params?: FuelEfficiencyParams): Promise<FuelEfficiencyResponse> {
 		return apiClient.get<FuelEfficiencyResponse>(
-			`/api/v1/analytics/fuel-efficiency${buildQueryString({ vehicleId: params?.vehicleId })}`
+			`/analytics/fuel-efficiency${buildQueryString({ vehicleId: params?.vehicleId })}`
 		);
 	},
 
@@ -56,7 +56,7 @@ export const analyticsApi = {
 		ytdStart?: number;
 	}): Promise<QuickStatsResponse> {
 		return apiClient.get<QuickStatsResponse>(
-			`/api/v1/analytics/quick-stats${buildQueryString({ startDate: params.startDate, endDate: params.endDate, ytdStart: params.ytdStart, timeZone: userTimeZone() })}`
+			`/analytics/quick-stats${buildQueryString({ startDate: params.startDate, endDate: params.endDate, ytdStart: params.ytdStart, timeZone: userTimeZone() })}`
 		);
 	},
 
@@ -66,7 +66,7 @@ export const analyticsApi = {
 		vehicleId?: string;
 	}): Promise<FuelStatsResponse> {
 		return apiClient.get<FuelStatsResponse>(
-			`/api/v1/analytics/fuel-stats${buildQueryString({ startDate: params.startDate, endDate: params.endDate, vehicleId: params.vehicleId, timeZone: userTimeZone() })}`
+			`/analytics/fuel-stats${buildQueryString({ startDate: params.startDate, endDate: params.endDate, vehicleId: params.vehicleId, timeZone: userTimeZone() })}`
 		);
 	},
 
@@ -76,7 +76,7 @@ export const analyticsApi = {
 		vehicleId?: string;
 	}): Promise<FuelAdvancedResponse> {
 		return apiClient.get<FuelAdvancedResponse>(
-			`/api/v1/analytics/fuel-advanced${buildQueryString({ startDate: params.startDate, endDate: params.endDate, vehicleId: params.vehicleId, timeZone: userTimeZone() })}`
+			`/analytics/fuel-advanced${buildQueryString({ startDate: params.startDate, endDate: params.endDate, vehicleId: params.vehicleId, timeZone: userTimeZone() })}`
 		);
 	},
 
@@ -85,31 +85,31 @@ export const analyticsApi = {
 		endDate: number;
 	}): Promise<CrossVehicleResponse> {
 		return apiClient.get<CrossVehicleResponse>(
-			`/api/v1/analytics/cross-vehicle${buildQueryString({ startDate: params.startDate, endDate: params.endDate, timeZone: userTimeZone() })}`
+			`/analytics/cross-vehicle${buildQueryString({ startDate: params.startDate, endDate: params.endDate, timeZone: userTimeZone() })}`
 		);
 	},
 
 	async getFinancing(): Promise<FinancingResponse> {
 		return apiClient.get<FinancingResponse>(
-			`/api/v1/analytics/financing${buildQueryString({ timeZone: userTimeZone() })}`
+			`/analytics/financing${buildQueryString({ timeZone: userTimeZone() })}`
 		);
 	},
 
 	async getInsurance(): Promise<InsuranceResponse> {
 		return apiClient.get<InsuranceResponse>(
-			`/api/v1/analytics/insurance${buildQueryString({ timeZone: userTimeZone() })}`
+			`/analytics/insurance${buildQueryString({ timeZone: userTimeZone() })}`
 		);
 	},
 
 	async getVehicleHealth(vehicleId: string): Promise<VehicleHealthResponse> {
 		return apiClient.get<VehicleHealthResponse>(
-			`/api/v1/analytics/vehicle-health${buildQueryString({ vehicleId, timeZone: userTimeZone() })}`
+			`/analytics/vehicle-health${buildQueryString({ vehicleId, timeZone: userTimeZone() })}`
 		);
 	},
 
 	async getVehicleTCO(vehicleId: string, params?: { year?: number }): Promise<VehicleTCOResponse> {
 		return apiClient.get<VehicleTCOResponse>(
-			`/api/v1/analytics/vehicle-tco${buildQueryString({ vehicleId, year: params?.year, timeZone: userTimeZone() })}`
+			`/analytics/vehicle-tco${buildQueryString({ vehicleId, year: params?.year, timeZone: userTimeZone() })}`
 		);
 	},
 
@@ -118,13 +118,13 @@ export const analyticsApi = {
 		params: { startDate: number; endDate: number }
 	): Promise<VehicleExpensesResponse> {
 		return apiClient.get<VehicleExpensesResponse>(
-			`/api/v1/analytics/vehicle-expenses${buildQueryString({ vehicleId, startDate: params.startDate, endDate: params.endDate, timeZone: userTimeZone() })}`
+			`/analytics/vehicle-expenses${buildQueryString({ vehicleId, startDate: params.startDate, endDate: params.endDate, timeZone: userTimeZone() })}`
 		);
 	},
 
 	async getYearEnd(params?: { year?: number }): Promise<YearEndResponse> {
 		return apiClient.get<YearEndResponse>(
-			`/api/v1/analytics/year-end${buildQueryString({ year: params?.year, timeZone: userTimeZone() })}`
+			`/analytics/year-end${buildQueryString({ year: params?.year, timeZone: userTimeZone() })}`
 		);
 	},
 
@@ -135,7 +135,7 @@ export const analyticsApi = {
 	}): Promise<AnalyticsSummaryResponse> {
 		try {
 			return await apiClient.get<AnalyticsSummaryResponse>(
-				`/api/v1/analytics/summary${buildQueryString({ startDate: params.startDate, endDate: params.endDate, ytdStart: params.ytdStart, timeZone: userTimeZone() })}`
+				`/analytics/summary${buildQueryString({ startDate: params.startDate, endDate: params.endDate, ytdStart: params.ytdStart, timeZone: userTimeZone() })}`
 			);
 		} catch (error: unknown) {
 			const is404 = error instanceof ApiError && error.statusCode === 404;

@@ -21,20 +21,20 @@ beforeEach(() => {
 describe('entityPhotos', () => {
 	test('list paginates under /photos/:entityType/:entityId', async () => {
 		await entityPhotos('expense', 'e1').list({ limit: 5, offset: 10 });
-		expect(getPaginated).toHaveBeenCalledWith('/api/v1/photos/expense/e1?limit=5&offset=10');
+		expect(getPaginated).toHaveBeenCalledWith('/photos/expense/e1?limit=5&offset=10');
 	});
 
 	test('upload posts the file as the "photo" form field', async () => {
 		const file = new File(['x'], 'r.jpg');
 		await entityPhotos('expense', 'e1').upload(file);
 		const [url, body] = post.mock.calls[0] ?? [];
-		expect(url).toBe('/api/v1/photos/expense/e1');
+		expect(url).toBe('/photos/expense/e1');
 		expect((body as FormData).get('photo')).toBeInstanceOf(File);
 	});
 
 	test('remove and thumbnailUrl address one photo', async () => {
 		await entityPhotos('insurance_claim', 'c1').remove('p1');
-		expect(del).toHaveBeenCalledWith('/api/v1/photos/insurance_claim/c1/p1');
+		expect(del).toHaveBeenCalledWith('/photos/insurance_claim/c1/p1');
 		expect(entityPhotos('insurance_claim', 'c1').thumbnailUrl('p1')).toBe(
 			'https://api.example.com/api/v1/photos/insurance_claim/c1/p1/thumbnail'
 		);
@@ -49,9 +49,9 @@ describe('domain photo wrappers route through entityPhotos', () => {
 		await odometerApi.uploadPhoto('o1', file);
 
 		expect(post.mock.calls.map(c => c[0])).toEqual([
-			'/api/v1/photos/expense/e1',
-			'/api/v1/photos/insurance_policy/pol1',
-			'/api/v1/photos/odometer_entry/o1'
+			'/photos/expense/e1',
+			'/photos/insurance_policy/pol1',
+			'/photos/odometer_entry/o1'
 		]);
 		expect(insuranceApi.getEntityDocumentThumbnailUrl('insurance_policy', 'pol1', 'd1')).toBe(
 			'https://api.example.com/api/v1/photos/insurance_policy/pol1/d1/thumbnail'

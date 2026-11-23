@@ -49,7 +49,7 @@ describe('expenseApi.importExpensesCsv', () => {
 
 		expect(post).toHaveBeenCalledTimes(1);
 		const [url, body] = post.mock.calls[0] ?? [];
-		expect(url).toBe('/api/v1/expenses/import');
+		expect(url).toBe('/expenses/import');
 		expect(body).toEqual({
 			csv: 'date,vehicle\n2024-01-01,Civic',
 			dryRun: true,
@@ -84,7 +84,7 @@ describe('expenseApi.importExpensesCsv', () => {
 		const result = await expenseApi.importExpensesCsv('Date,Cost,Car\n…', true, mapping);
 
 		const [url, body] = post.mock.calls[0] ?? [];
-		expect(url).toBe('/api/v1/expenses/import');
+		expect(url).toBe('/expenses/import');
 		expect(body).toEqual({
 			csv: 'Date,Cost,Car\n…',
 			dryRun: true,

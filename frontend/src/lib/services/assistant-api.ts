@@ -13,7 +13,7 @@ interface AssistantReply {
 
 export const assistantApi = {
 	async sendMessage(message: string, history: AssistantTurn[] = []): Promise<AssistantReply> {
-		return apiClient.post<AssistantReply>('/api/v1/assistant/chat', {
+		return apiClient.post<AssistantReply>('/assistant/chat', {
 			message,
 			history,
 			timeZone: userTimeZone()

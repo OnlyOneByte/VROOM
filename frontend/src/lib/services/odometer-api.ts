@@ -32,31 +32,29 @@ export const odometerApi = {
 		vehicleId: string,
 		params?: { limit?: number; offset?: number }
 	): Promise<PaginatedResponse<OdometerEntry>> {
-		return apiClient.getPaginated<OdometerEntry>(
-			withPagination(`/api/v1/odometer/${vehicleId}`, params)
-		);
+		return apiClient.getPaginated<OdometerEntry>(withPagination(`/odometer/${vehicleId}`, params));
 	},
 
 	async getEntry(entryId: string): Promise<OdometerEntry> {
-		return apiClient.get<OdometerEntry>(`/api/v1/odometer/entry/${entryId}`);
+		return apiClient.get<OdometerEntry>(`/odometer/entry/${entryId}`);
 	},
 
 	async create(vehicleId: string, data: CreateOdometerRequest): Promise<OdometerEntry> {
-		return apiClient.post<OdometerEntry>(`/api/v1/odometer/${vehicleId}`, {
+		return apiClient.post<OdometerEntry>(`/odometer/${vehicleId}`, {
 			...data,
 			timeZone: userTimeZone()
 		});
 	},
 
 	async update(entryId: string, data: UpdateOdometerRequest): Promise<OdometerEntry> {
-		return apiClient.put<OdometerEntry>(`/api/v1/odometer/${entryId}`, {
+		return apiClient.put<OdometerEntry>(`/odometer/${entryId}`, {
 			...data,
 			timeZone: userTimeZone()
 		});
 	},
 
 	async delete(entryId: string): Promise<void> {
-		await apiClient.delete(`/api/v1/odometer/${entryId}`);
+		await apiClient.delete(`/odometer/${entryId}`);
 	},
 
 	uploadPhoto(entryId: string, file: File): Promise<Photo> {

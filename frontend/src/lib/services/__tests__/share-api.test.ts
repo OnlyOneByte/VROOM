@@ -37,7 +37,7 @@ describe('shareApi owner-side calls', () => {
 	it('invite POSTs the {vehicleId,email,level} body to /shares', async () => {
 		mockPost.mockResolvedValue(share);
 		const res = await shareApi.invite({ vehicleId: 'v1', email: 'b@test.com', level: 'viewer' });
-		expect(mockPost).toHaveBeenCalledWith('/api/v1/shares', {
+		expect(mockPost).toHaveBeenCalledWith('/shares', {
 			vehicleId: 'v1',
 			email: 'b@test.com',
 			level: 'viewer'
@@ -48,21 +48,21 @@ describe('shareApi owner-side calls', () => {
 	it('listGranted GETs /shares/granted', async () => {
 		mockGet.mockResolvedValue([share]);
 		const res = await shareApi.listGranted();
-		expect(mockGet).toHaveBeenCalledWith('/api/v1/shares/granted');
+		expect(mockGet).toHaveBeenCalledWith('/shares/granted');
 		expect(res).toEqual([share]);
 	});
 
 	it('changeLevel PUTs the level to /shares/:id', async () => {
 		mockPut.mockResolvedValue({ ...share, level: 'editor' });
 		const res = await shareApi.changeLevel('s1', 'editor');
-		expect(mockPut).toHaveBeenCalledWith('/api/v1/shares/s1', { level: 'editor' });
+		expect(mockPut).toHaveBeenCalledWith('/shares/s1', { level: 'editor' });
 		expect(res.level).toBe('editor');
 	});
 
 	it('revoke DELETEs /shares/:id', async () => {
 		mockDelete.mockResolvedValue(undefined);
 		await shareApi.revoke('s1');
-		expect(mockDelete).toHaveBeenCalledWith('/api/v1/shares/s1');
+		expect(mockDelete).toHaveBeenCalledWith('/shares/s1');
 	});
 });
 
@@ -75,7 +75,7 @@ describe('shareApi invitee-side calls', () => {
 		};
 		mockGet.mockResolvedValue([received]);
 		const res = await shareApi.listReceived();
-		expect(mockGet).toHaveBeenCalledWith('/api/v1/shares/received');
+		expect(mockGet).toHaveBeenCalledWith('/shares/received');
 		expect(res).toEqual([received]);
 		expect(res[0]!.vehicleName).toBe('2021 Honda Civic');
 		expect(res[0]!.sharedBy).toBe('Alice');
@@ -84,13 +84,13 @@ describe('shareApi invitee-side calls', () => {
 	it('accept POSTs (no body) to /shares/:id/accept', async () => {
 		mockPost.mockResolvedValue({ ...share, status: 'accepted' });
 		const res = await shareApi.accept('s1');
-		expect(mockPost).toHaveBeenCalledWith('/api/v1/shares/s1/accept');
+		expect(mockPost).toHaveBeenCalledWith('/shares/s1/accept');
 		expect(res.status).toBe('accepted');
 	});
 
 	it('decline POSTs (no body) to /shares/:id/decline', async () => {
 		mockPost.mockResolvedValue(undefined);
 		await shareApi.decline('s1');
-		expect(mockPost).toHaveBeenCalledWith('/api/v1/shares/s1/decline');
+		expect(mockPost).toHaveBeenCalledWith('/shares/s1/decline');
 	});
 });

@@ -117,7 +117,7 @@ function createAuthStore() {
 				const result = await apiClient.get<{
 					user: User;
 					session: { expiresAt: string };
-				}>('/api/v1/auth/me');
+				}>('/auth/me');
 				signIn(result.user);
 			} catch (err) {
 				const cached = isSignedOutResponse(err) ? null : (user ?? lastKnownUser());
@@ -146,13 +146,13 @@ function createAuthStore() {
 
 		loginWith(providerId: string) {
 			if (browser) {
-				window.location.href = `${getApiBaseUrl()}/api/v1/auth/login/${providerId}`;
+				window.location.href = `${getApiBaseUrl()}/auth/login/${providerId}`;
 			}
 		},
 
 		async refreshToken() {
 			try {
-				const data = await apiClient.post<{ token: string }>('/api/v1/auth/refresh');
+				const data = await apiClient.post<{ token: string }>('/auth/refresh');
 				token = data.token;
 				error = null;
 				return data.token;
@@ -165,7 +165,7 @@ function createAuthStore() {
 
 		async logout() {
 			try {
-				await apiClient.post('/api/v1/auth/logout');
+				await apiClient.post('/auth/logout');
 				const signedOutUserId = user?.id ?? null;
 				signOut();
 				clearOfflineCaches(signedOutUserId);

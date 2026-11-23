@@ -24,15 +24,15 @@ export function photoCollection(collectionPath: string) {
 }
 
 export function entityPhotos(entityType: string, entityId: string) {
-	return photoCollection(`/api/v1/photos/${entityType}/${entityId}`);
+	return photoCollection(`/photos/${entityType}/${entityId}`);
 }
 
 export const orphanedPhotosApi = {
 	async count(): Promise<number> {
-		return (await apiClient.get<{ count: number }>('/api/v1/photos/orphans')).count;
+		return (await apiClient.get<{ count: number }>('/photos/orphans')).count;
 	},
 
 	remove(): Promise<{ removed: number; failed: number }> {
-		return apiClient.delete<{ removed: number; failed: number }>('/api/v1/photos/orphans');
+		return apiClient.delete<{ removed: number; failed: number }>('/photos/orphans');
 	}
 };
