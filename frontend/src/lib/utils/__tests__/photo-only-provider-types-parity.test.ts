@@ -14,7 +14,12 @@ function backendDescriptors(): Map<string, string> {
 	const block = src.match(/export const STORAGE_PROVIDERS = \{\n([\s\S]*?)\n\} satisfies/)?.[1];
 	if (!block) throw new Error(`STORAGE_PROVIDERS not found in ${BACKEND_REGISTRY_PATH}`);
 	const entries = [...block.matchAll(/^ {2}'?([\w-]+)'?: \{\n([\s\S]*?)^ {2}\},?$/gm)];
-	return new Map(entries.map(([, type, body]) => [type as string, body as string]));
+	const descriptors = new Map(entries.map(([, type, body]) => [type as string, body as string]));
+	const topLevelKeys = [...block.matchAll(/^ {2}'?([\w-]+)'?:/gm)].map(m => m[1]);
+	expect([...descriptors.keys()], 'every descriptor must be an inline object').toEqual(
+		topLevelKeys
+	);
+	return descriptors;
 }
 
 describe('photoOnly parity with the backend storage descriptors', () => {
@@ -24,7 +29,7 @@ describe('photoOnly parity with the backend storage descriptors', () => {
 			expect.arrayContaining(['google-drive', 'google-photos', 's3'])
 		);
 		for (const [type, body] of descriptors) {
-			const backendPhotoOnly = /^\s+photoOnly: true,$/m.test(body);
+			const backendPhotoOnly = /^\s+photoOnly:\s*true\b/m.test(body);
 			expect(providerMeta(type)?.photoOnly ?? false, type).toBe(backendPhotoOnly);
 		}
 	});

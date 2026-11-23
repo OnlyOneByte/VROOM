@@ -53,16 +53,13 @@ async function seedVlmProvider(): Promise<void> {
   expect(res.status, await res.clone().text()).toBe(201);
 }
 
-function seedPhotosProvider(): void {
+function seedPhotosProvider(
+  credentials = encrypt(JSON.stringify({ refreshToken: 'refresh-token-abc' }))
+): void {
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', 'google-photos', 'My Photos', ?, ?, 'active')`,
-    [
-      'photos-prov-1',
-      ctx.user.id,
-      encrypt(JSON.stringify({ refreshToken: 'refresh-token-abc' })),
-      JSON.stringify({ albumId: 'album-vroom' }),
-    ]
+    ['photos-prov-1', ctx.user.id, credentials, JSON.stringify({ albumId: 'album-vroom' })]
   );
 }
 
@@ -86,6 +83,18 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
     const res = await ctx.authed('GET', '/api/v1/photos/receipt-drafts');
     expect(res.status).toBe(400);
     expect(await res.text()).toMatch(/VLM|receipt-parsing|Settings/i);
+  });
+
+  test('a google-photos provider without a usable refresh token → 400 asking to reconnect', async () => {
+    setPhotosServiceBuilderForTest(null);
+    await seedVlmProvider();
+    for (const credentials of [encrypt(JSON.stringify({})), 'not-encrypted']) {
+      ctx.sqlite.run(`DELETE FROM user_providers WHERE id = 'photos-prov-1'`);
+      seedPhotosProvider(credentials);
+      const res = await ctx.authed('GET', '/api/v1/photos/receipt-drafts');
+      expect(res.status).toBe(400);
+      expect(await res.text()).toMatch(/re-connect|decrypt provider credentials/i);
+    }
   });
 
   test('both providers present → a clean sweep returns one draft per app-created photo, persists nothing', async () => {
