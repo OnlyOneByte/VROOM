@@ -15,9 +15,13 @@ vi.mock('#lib/services/reminder-api.ts', () => ({
 		getNotifications: () => Promise.resolve([])
 	}
 }));
+const getVehicles = vi.fn();
 vi.mock('#lib/services/vehicle-api.ts', () => ({
-	vehicleApi: { getVehicles: () => Promise.resolve([]) }
+	vehicleApi: { getVehicles: (...args: unknown[]) => getVehicles(...args) }
 }));
+vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
+
+const VEHICLE = { id: 'v1', make: 'Toyota', model: 'Camry', year: 2020 };
 
 import Page from '../+page.svelte';
 
@@ -51,9 +55,32 @@ function fromLg(name: string) {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	getVehicles.mockImplementation(() => Promise.resolve([VEHICLE]));
 });
 
 describe('/reminders primary action', () => {
+	test('with no vehicles it points to Add Vehicle and offers no New Reminder', async () => {
+		list.mockImplementation(() => Promise.resolve([]));
+		getVehicles.mockImplementation(() => Promise.resolve([]));
+		render(Page);
+
+		await screen.findByRole('heading', { name: 'Add a vehicle first' });
+		expect(controls('Add Vehicle')).toHaveLength(1);
+		expect(controls('Add Vehicle')[0]).toHaveAttribute('href', '/vehicles/new');
+		expect(controls('New Reminder')).toHaveLength(0);
+		expect(screen.queryByText('No reminders yet')).toBeNull();
+	});
+
+	test('reminders left without vehicles still list, with no New Reminder', async () => {
+		list.mockImplementation(() => Promise.resolve([reminder('2999-01-01T00:00:00.000Z')]));
+		getVehicles.mockImplementation(() => Promise.resolve([]));
+		render(Page);
+
+		await waitFor(() => expect(screen.getByText('Oil change')).toBeInTheDocument());
+		expect(controls('New Reminder')).toHaveLength(0);
+		expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
+	});
+
 	test('the empty state offers New Reminder once and no Run Due Reminders', async () => {
 		list.mockImplementation(() => Promise.resolve([]));
 		render(Page);
