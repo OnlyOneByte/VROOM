@@ -1,7 +1,7 @@
 # VROOM UI Design Guide — "human-ready, not junk"
 
 This is the one guide for how VROOM looks and behaves. Every UI rule lives here; when a rule
-and a screen disagree, the screen is wrong. `DesignSystem.md` is the companion *inventory*:
+and a screen disagree, the screen is wrong. `DesignSystem.md` is the companion _inventory_:
 which components and tokens exist and how to import them. This doc says how to use them and
 what a reviewer blocks on.
 
@@ -42,14 +42,14 @@ screen should let someone glance, trust the number, and act with one thumb.
 
 Tailwind's 4px scale is the only spacing scale. Match the neighbours; don't invent values.
 
-| Use | Value |
-|---|---|
-| Between page sections | `space-y-6` |
-| Inside a card / between form fields | `space-y-4` (dense groups `space-y-2`) |
-| Inline groups (icon + text, button rows) | `gap-2` / `gap-3` |
-| Grids of cards or stat tiles | `gap-4` (`gap-6` at `lg:` when cards are large) |
-| App shell page padding | `px-4 sm:px-6 lg:px-8 py-6` |
-| Card padding | from the primitive (`py-6` on Root, `px-6` on Header/Content); override only for dense tiles (`StatCard`: `p-4 sm:p-6`) |
+| Use                                      | Value                                                                                                                   |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Between page sections                    | `space-y-6`                                                                                                             |
+| Inside a card / between form fields      | `space-y-4` (dense groups `space-y-2`)                                                                                  |
+| Inline groups (icon + text, button rows) | `gap-2` / `gap-3`                                                                                                       |
+| Grids of cards or stat tiles             | `gap-4` (`gap-6` at `lg:` when cards are large)                                                                         |
+| App shell page padding                   | `px-4 sm:px-6 lg:px-8 py-6`                                                                                             |
+| Card padding                             | from the primitive (`py-6` on Root, `px-6` on Header/Content); override only for dense tiles (`StatCard`: `p-4 sm:p-6`) |
 
 - **Page width.** Forms use `FormLayout` (centred, `max-w-2xl`). List, detail and dashboard
   pages are full-width inside the app shell.
@@ -67,15 +67,15 @@ Tailwind's 4px scale is the only spacing scale. Match the neighbours; don't inve
 VROOM uses the system font stack (no web fonts), so it is fast offline. Hierarchy comes from
 size and weight, not from new families or colours.
 
-| Role | Classes |
-|---|---|
-| Page title (`<h1>`, via `PageHeader`) | `text-3xl font-bold tracking-tight` |
-| Page description | `text-muted-foreground` (base size) |
-| Card title | `Card.Title` as-is (base size, `font-semibold`) |
-| Section title outside a card | `text-lg font-semibold` |
-| Body, form labels, table cells | `text-sm` |
-| Meta, captions, helper text | `text-xs text-muted-foreground` |
-| Key figure (stat tile, total) | `text-2xl font-bold` (`text-xl` in dense lists) |
+| Role                                  | Classes                                         |
+| ------------------------------------- | ----------------------------------------------- |
+| Page title (`<h1>`, via `PageHeader`) | `text-3xl font-bold tracking-tight`             |
+| Page description                      | `text-muted-foreground` (base size)             |
+| Card title                            | `Card.Title` as-is (base size, `font-semibold`) |
+| Section title outside a card          | `text-lg font-semibold`                         |
+| Body, form labels, table cells        | `text-sm`                                       |
+| Meta, captions, helper text           | `text-xs text-muted-foreground`                 |
+| Key figure (stat tile, total)         | `text-2xl font-bold` (`text-xl` in dense lists) |
 
 - One `<h1>` per page, rendered by `PageHeader`. Don't hand-roll one, and don't put an icon in
   it — icons belong on cards and nav, not the page title.
@@ -88,7 +88,7 @@ size and weight, not from new families or colours.
 VROOM ships 11 theme families, each with a light and a dark variant. Their ids (used by the
 `themePreference` setting) are `default`, `blueprint`, `bento`, `vaporwave`, `cyberpunk`,
 `aurora`, `solarpunk`, `editorial`, `tui` (labelled Terminal), `y2k` and `neobrutalist`. The
-token table and the role of each token live in `DesignSystem.md` → *Design tokens*.
+token table and the role of each token live in `DesignSystem.md` → _Design tokens_.
 
 - **Only tokens.** `bg-*`/`text-*`/`border-*` from the token set. No hex, `rgb()`, `gray-*`,
   `white`, `black` or other palette classes in components or `app.css`.
@@ -129,6 +129,7 @@ token table and the role of each token live in `DesignSystem.md` → *Design tok
 The inventory and import paths are in `DesignSystem.md`. The usage rules:
 
 ### Buttons
+
 - **One primary (`default`) button per view or dialog.** Secondary actions are `outline`;
   tertiary and toolbar actions are `ghost`; actions that navigate use `href`.
 - `destructive` is for the final confirm of a delete inside `ConfirmDialog` — not for the button
@@ -148,6 +149,7 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   drops keyboard focus to the page.
 
 ### Forms
+
 - Wrap form pages in `FormLayout`. One column on mobile; two columns only for short paired fields
   (date + amount) at `sm:` and up.
 - Every field has a visible `Label for=`. Required fields carry ` *`; optional fields say
@@ -169,12 +171,14 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   never covers the last field: pad the form by the bar's height.
 
 ### Cards
+
 - A card is one topic: title, optional description, content, optional footer action.
 - Nest cards at most one level deep.
 - A clickable card is a real link (an `<a>` on the title or a stretched link), never
   `role="button"` on a container that holds other buttons — see `VehicleCarousel`.
 
 ### Charts
+
 - Always through `AppLineChart`/`AppBarChart`/`AppPieChart`/`AppAreaChart` or `ChartCard`, so
   loading, empty and error are handled.
 - Every chart has a title, a one-line description of what it shows, axis values formatted by
@@ -186,6 +190,7 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   scrolling.
 
 ### Dialogs, sheets and toasts
+
 - `Dialog` for short focused tasks; anything longer than one phone screen becomes a page.
 - Destructive confirms use `common/ConfirmDialog.svelte`, which names what will be deleted and
   its cascade. Native `confirm()`/`alert()` are banned (`no-native-dialogs.test.ts`).
@@ -202,6 +207,10 @@ Every view that loads or mutates data handles all of these:
 2. **Empty** — `EmptyState` (`#lib/components/common/empty-state.svelte`) with an icon, a
    sentence-case title that says what's missing, one line on why it matters, and the primary
    action that fills it. NOT a bare "No data". `/reminders` is the reference.
+   With no vehicles, every page whose content needs one shows the no-vehicle `EmptyState` with
+   Add Vehicle as its action (`/trips` is the reference). Don't render zero-value stat tiles,
+   filters or charts over no data. While an empty state shows its action, the page shows no second
+   button for the same action under another label.
 3. **Error** — a visible, recoverable message, never a silent `catch {}` that leaves the user on
    a spinner. `handleErrorWithNotification` is the shared path: it toasts via
    `appStore.addNotification` and logs to console only under `import.meta.env.DEV`. Where the view
@@ -254,8 +263,8 @@ verify by hand:
   submits, Escape cancels inline editors and closes dialogs.
 - **Focus.** Never remove outlines. Primitives show `focus-visible:ring-[3px]` in `ring-ring/50`;
   a custom control shows the same ring. Focus moves into a dialog on open and back on close, and
-  after a failed submit it moves to the first invalid field (see *Forms*).
-- **Colour is never the only signal** — see *Colour and theme tokens* for contrast.
+  after a failed submit it moves to the first invalid field (see _Forms_).
+- **Colour is never the only signal** — see _Colour and theme tokens_ for contrast.
 - **Semantics.** Lists are lists, tables are `Table`, headings are headings. Updates that matter
   use one live role, never two on the same element: sync status is `role="status"`, and form
   errors are `FormFieldError`, which is `role="alert"` with no `aria-live`. The alert announces
@@ -346,7 +355,7 @@ failed step; nits can be follow-up issues.
   before a full-page shot — charts mount when they scroll into view. Wait for chart entry
   animations to finish before the shot.
 - The theme family is a user setting: set it with `PUT /api/v1/settings`
-  `{"themePreference": "<family id>"}` (ids are listed under *Colour and theme tokens*; an
+  `{"themePreference": "<family id>"}` (ids are listed under _Colour and theme tokens_; an
   unknown id renders Default) or in Settings → Theme. If the account already has a
   `themePreference`, it overwrites the `vroom-theme-id` `localStorage` key once settings load.
   Light/dark is the `vroom-theme-preference` key (`light` / `dark` / `system`).
@@ -361,10 +370,10 @@ failed step; nits can be follow-up issues.
 - [ ] No overflow at 375px; tap targets ≥ 40px; primary action in thumb reach.
 - [ ] Tokens only; AA contrast checked in Default plus two other theme families, light and dark.
 - [ ] Icon-only controls have `aria-label`; forms have labels + wired errors, and a new form
-      focuses the first invalid field after a failed submit (existing forms: see *Forms*); no
+      focuses the first invalid field after a failed submit (existing forms: see _Forms_); no
       nested interactive elements; keyboard and focus work.
 - [ ] Reuses the kit + formatters + routes (no hardcoded colours, paths, or number formatting).
 - [ ] Destructive actions confirmed; in-flight mutations disable + spinner.
-- [ ] Copy follows *Copy and voice*.
+- [ ] Copy follows _Copy and voice_.
 - [ ] `npm run test:e2e` green locally (CI runs only the Chromium project); a new route is in
       `A11Y_ROUTES` and a new user journey has a spec in `frontend/e2e/`.

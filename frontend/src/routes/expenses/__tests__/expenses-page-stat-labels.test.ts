@@ -34,7 +34,9 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 	}
 }));
 vi.mock('#lib/services/vehicle-api.ts', () => ({
-	vehicleApi: { getVehicles: () => Promise.resolve([]) }
+	vehicleApi: {
+		getVehicles: () => Promise.resolve([{ id: 'v1', make: 'Toyota', model: 'Camry', year: 2020 }])
+	}
 }));
 vi.mock('#lib/services/settings-api.ts', () => ({
 	settingsApi: {
