@@ -239,6 +239,7 @@ describe('VehicleCarousel states', () => {
 			expect(region).not.toContainElement(arrow);
 			expect(header).toContainElement(arrow);
 			expect(arrow.className).not.toMatch(/(^|\s)absolute(\s|$)/);
+			expect(arrow).toHaveAttribute('aria-controls', region.id);
 		}
 		const add = screen.getByRole('link', { name: 'Add Vehicle' });
 		expect(header).toContainElement(add);
@@ -355,6 +356,31 @@ describe('VehicleCarousel compact header', () => {
 		const avatar = screen.getByTestId('fleet-card-avatar');
 		expect(avatar).toHaveClass('size-10', 'rounded-full');
 		expect(avatar.parentElement).toContainElement(screen.getByRole('heading', { level: 3 }));
+		expect(avatar.querySelector('.lucide-car')).not.toBeNull();
+	});
+
+	test('an electric vehicle without a photo gets the bolt avatar', () => {
+		render(VehicleCarousel, { vehicles: [overview({ vehicleType: 'electric' })] });
+		expect(screen.getByTestId('fleet-card-avatar').querySelector('.lucide-zap')).not.toBeNull();
+	});
+
+	test('the full name under a nickname spans the card, not the narrow title column', () => {
+		render(VehicleCarousel, {
+			vehicles: [
+				overview({ nickname: 'Daily Driver', name: '2020 Toyota Camry', hasActiveFinancing: true })
+			]
+		});
+		const fullName = screen.getByText('2020 Toyota Camry');
+		const avatarRow = screen.getByTestId('fleet-card-avatar').parentElement;
+		expect(avatarRow).not.toContainElement(fullName);
+		expect(avatarRow?.parentElement).toContainElement(fullName);
+	});
+
+	test('a card hovers with the quiet accent tint, not a heavy shadow', () => {
+		render(VehicleCarousel, { vehicles: [overview()] });
+		const card = screen.getByRole('heading', { level: 3 }).closest('[data-slot="card"]');
+		expect(card).toHaveClass('hover:bg-accent/50');
+		expect(card?.className).not.toMatch(/hover:shadow/);
 	});
 
 	test('a cover photo keeps the full 160px image', () => {
@@ -365,7 +391,7 @@ describe('VehicleCarousel compact header', () => {
 		expect(band).toHaveClass('h-40');
 		const img = band.querySelector('img');
 		expect(img).toHaveAttribute('src', '/photo.jpg');
-		expect(img).toHaveClass('sm:group-hover:scale-110');
+		expect(img).toHaveClass('motion-safe:sm:group-hover:scale-110');
 		expect(img?.className).not.toMatch(/(^|\s)group-hover:scale/);
 		expect(screen.queryByTestId('fleet-card-avatar')).toBeNull();
 	});

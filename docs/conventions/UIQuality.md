@@ -59,7 +59,7 @@ Tailwind's 4px scale is the only spacing scale. Match the neighbours; don't inve
 - **Grids collapse.** Stat tiles are 2-up on mobile and up to 4-up at `lg` (`StatCardGrid`).
   Side-by-side cards stack below `lg`.
 - **Radius** comes from `--radius` (`rounded-md` controls, `rounded-lg`/`rounded-xl` cards).
-  `rounded-full` is for avatars, pills and the FAB only.
+  `rounded-full` is for avatars, pills, carousel arrows and the FAB only.
 - **Reserve space** for anything that arrives late (badges, charts, counts) so nothing jumps.
 - **No photo, no image area.** With no photo, a card shows no image area; a placeholder band is
   decoration.

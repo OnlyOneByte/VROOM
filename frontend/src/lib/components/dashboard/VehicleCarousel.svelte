@@ -45,6 +45,7 @@
 	let { vehicles, isLoading = false, addVehicleHref }: Props = $props();
 	const uid = $props.id();
 	const titleId = `${uid}-fleet-title`;
+	const carouselId = `${uid}-fleet-carousel`;
 
 	let canScrollPrev = $state(false);
 	let canScrollNext = $state(false);
@@ -95,7 +96,7 @@
 						variant="ghost"
 						size="lg"
 						href={addVehicleHref}
-						class="lg:hidden {showArrows ? 'max-sm:w-10 max-sm:px-0' : ''}"
+						class="lg:hidden {showArrows ? 'max-sm:w-10' : ''}"
 					>
 						<Plus class="h-4 w-4 {showArrows ? 'sm:mr-2' : 'mr-2'}" />
 						<span class={showArrows ? 'max-sm:sr-only' : ''}>Add Vehicle</span>
@@ -107,6 +108,7 @@
 							variant="outline"
 							size="icon-lg"
 							class="rounded-full"
+							aria-controls={carouselId}
 							aria-disabled={!canScrollPrev}
 							onclick={() => carouselApi?.scrollPrev()}
 							onkeydown={pageWithKeys}
@@ -118,6 +120,7 @@
 							variant="outline"
 							size="icon-lg"
 							class="rounded-full"
+							aria-controls={carouselId}
 							aria-disabled={!canScrollNext}
 							onclick={() => carouselApi?.scrollNext()}
 							onkeydown={pageWithKeys}
@@ -149,6 +152,7 @@
 				}}
 				setApi={trackScrollRange}
 				bind:ref={carousel}
+				id={carouselId}
 				tabindex={-1}
 				aria-labelledby={titleId}
 				class="w-full relative rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
@@ -160,7 +164,7 @@
 						>
 							<div class="p-1">
 								<!-- Not a link: a link would nest the Add-Expense button inside it. -->
-								<Card.Root class="overflow-hidden hover:shadow-lg transition-shadow group">
+								<Card.Root class="overflow-hidden hover:bg-accent/50 transition-colors group">
 									{#if vehicle.coverPhotoUrl}
 										<div
 											class="relative h-40 overflow-hidden bg-muted"
@@ -169,7 +173,7 @@
 											<img
 												src={vehicle.coverPhotoUrl}
 												alt={vehicle.name}
-												class="absolute inset-0 h-full w-full object-cover sm:group-hover:scale-110 transition-transform duration-300"
+												class="absolute inset-0 h-full w-full object-cover motion-safe:sm:group-hover:scale-110 transition-transform duration-300"
 											/>
 										</div>
 									{/if}
@@ -202,9 +206,6 @@
 															</span>
 														</a>
 													</h3>
-													{#if vehicle.nickname}
-														<p class="truncate text-sm text-muted-foreground">{vehicle.name}</p>
-													{/if}
 												</div>
 												{#if vehicle.hasActiveFinancing || vehicle.sharedBy}
 													<div class="flex max-w-[50%] shrink-0 flex-wrap justify-end gap-1">
@@ -223,6 +224,9 @@
 													</div>
 												{/if}
 											</div>
+											{#if vehicle.nickname}
+												<p class="mt-1 truncate text-sm text-muted-foreground">{vehicle.name}</p>
+											{/if}
 										</div>
 
 										<div class="space-y-2 flex-1">
