@@ -43,7 +43,7 @@
 		mileageUsagePercentage > 90
 			? '[&_[data-slot=progress-indicator]]:bg-destructive'
 			: mileageUsagePercentage > 75
-				? '[&_[data-slot=progress-indicator]]:bg-chart-5'
+				? '[&_[data-slot=progress-indicator]]:bg-warning'
 				: '[&_[data-slot=progress-indicator]]:bg-chart-2'
 	);
 

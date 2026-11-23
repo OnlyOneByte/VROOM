@@ -56,9 +56,12 @@ Notes:
 - `text-chart-*` is for chart marks and icons, not words: chart tokens are gated at 3:1, on
   `card` and as an icon on their own `/10` tint over `card` and `background` (the category badges
   and `StatCard` chips). Put the label in `text-foreground` beside the tinted icon. Status text
-  uses `text-success` / `text-warning` / `text-destructive`. `chart-5` and `chart-2` are
+  uses `text-success` / `text-warning` / `text-destructive`. Warning states never use `chart-5`
+  (`status-uses-warning-token.test.ts`). `chart-5` (the Enhancement badge) and `chart-2` are
   still used for words on a few screens, so both are also gated as text at AA (`background` and
-  `card`, plus `popover` for `chart-2`); new status text uses `text-warning` / `text-success`.
+  `card`, plus `popover` for `chart-2`). `chart-2` is still the "good" / "synced" colour on some
+  screens (health tier, payment urgency, lease mileage, synced rows); that is known debt, and
+  new status text uses `text-warning` / `text-success`.
 - In every theme and both modes these tinted text pairs are gated at AA over `background` and
   `card`: `text-primary` on `bg-primary/10` (the active nav item, chips, avatars),
   `text-warning` on `bg-warning/10` and `text-chart-5` on `bg-chart-5/10`. The axe e2e scans

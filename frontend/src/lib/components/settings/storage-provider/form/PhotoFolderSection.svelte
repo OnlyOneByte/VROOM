@@ -103,7 +103,7 @@
 			/>
 			<span>Category paths & sync settings</span>
 			{#if hasCustomPaths}
-				<span class="text-xs text-chart-5">(some categories disabled)</span>
+				<span class="text-xs text-warning">(some categories disabled)</span>
 			{/if}
 		</Collapsible.Trigger>
 		<Collapsible.Content class="pt-3">

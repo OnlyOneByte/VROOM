@@ -61,8 +61,8 @@
 					</CardNs.Title>
 					<CardNs.Description>These expenses are waiting to be synced</CardNs.Description>
 				</div>
-				<div class="p-2 rounded-lg bg-chart-5/10">
-					<Clock class="h-5 w-5 text-chart-5" />
+				<div class="p-2 rounded-lg bg-warning/10">
+					<Clock class="h-5 w-5 text-warning" />
 				</div>
 			</div>
 		</CardNs.Header>
@@ -70,7 +70,7 @@
 			<div class="space-y-3">
 				{#each pendingExpenses as expense (expense.id)}
 					<div
-						class="flex items-center gap-3 p-3 bg-chart-5/10 border border-chart-5/20 rounded-lg"
+						class="flex items-center gap-3 p-3 bg-warning/10 border border-warning/20 rounded-lg"
 					>
 						<Button
 							variant="ghost"
@@ -103,7 +103,7 @@
 								{/if}
 							</div>
 						</div>
-						<Clock class="h-4 w-4 text-chart-5 flex-shrink-0" />
+						<Clock class="h-4 w-4 text-warning flex-shrink-0" />
 					</div>
 				{/each}
 			</div>
