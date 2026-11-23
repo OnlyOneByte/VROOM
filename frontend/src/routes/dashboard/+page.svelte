@@ -3,99 +3,91 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { TrendingUp, ChartPie, Car, Plus, Check, ListChecks } from '@lucide/svelte';
+	import { Car, Plus, Check, ListChecks } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
-	import DashboardStatsCards from '#lib/components/dashboard/DashboardStatsCards.svelte';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
+	import DashboardHero from '#lib/components/dashboard/DashboardHero.svelte';
+	import NeedsAttentionCard from '#lib/components/dashboard/NeedsAttentionCard.svelte';
+	import VehicleRowsCard from '#lib/components/dashboard/VehicleRowsCard.svelte';
 	import RecentActivityCard from '#lib/components/dashboard/RecentActivityCard.svelte';
-	import DueRemindersCard from '#lib/components/dashboard/DueRemindersCard.svelte';
 	import RecurringCostCard from '#lib/components/dashboard/RecurringCostCard.svelte';
 	import SharedWithMeCard from '#lib/components/dashboard/SharedWithMeCard.svelte';
-	import VehicleCarousel from '#lib/components/dashboard/VehicleCarousel.svelte';
-	import PeriodSelector from '#lib/components/common/period-selector.svelte';
+	import {
+		attentionItems,
+		combinePeriodSpend,
+		highestMonth,
+		periodStartSeconds,
+		PERIOD_PHRASES,
+		RUNNING_CATEGORIES,
+		type VehicleRow
+	} from '#lib/components/dashboard/dashboard-data.ts';
 	import {
 		handleErrorWithNotification,
 		logLoadFailure,
 		userFacingErrorMessage
 	} from '#lib/utils/error-handling.ts';
 	import { latest } from '#lib/utils/latest-request.ts';
-	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
-	import { getCategoryChartColor } from '#lib/utils/chart-colors.ts';
+	import { formatCurrency, formatDate, formatDateWith } from '#lib/utils/formatters.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
-	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import { costBucketColor } from '#lib/utils/cost-bucket.ts';
+	import { buildChartConfig } from '#lib/utils/chart-colors.ts';
+	import { formatCurrencyAxis, parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { expenseApi } from '#lib/services/expense-api.ts';
 	import { reminderApi } from '#lib/services/reminder-api.ts';
+	import { insuranceApi } from '#lib/services/insurance-api.ts';
+	import { analyticsApi } from '#lib/services/analytics-api.ts';
 	import type {
-		Vehicle,
+		AnalyticsQueryResponse,
+		DistanceUnit,
 		Expense,
-		ExpenseCategory,
 		ExpenseSummary,
-		Photo,
+		InsurancePolicy,
 		RecurringCostSummary,
-		ReminderWithVehicles
+		ReminderWithVehicles,
+		Vehicle
 	} from '#lib/types/index.ts';
 	import type { TimePeriod } from '#lib/constants/time-periods.ts';
 
-	const UPCOMING_WINDOW_DAYS = 14;
-	const TREND_TITLE = 'Monthly Expense Trends';
-	const TREND_DESCRIPTION = 'Spending over time';
-	const CATEGORY_TITLE = 'Expense by Category';
-	const CATEGORY_DESCRIPTION = 'Distribution across all vehicles';
+	const TREND_TITLE = 'Last 12 months';
+	const TREND_DESCRIPTION = 'Running costs by month';
+	const RECENT_COUNT = 4;
+	const TREND_MONTHS = 6;
 
-	const chartModules = Promise.all([
-		import('#lib/components/charts/ExpenseTrendChart.svelte'),
-		import('#lib/components/charts/index.ts')
-	]);
+	const chartModules = import('#lib/components/charts/index.ts');
 	chartModules.catch(() => undefined);
 
+	interface PeriodData {
+		summaries: ExpenseSummary[];
+		perDistance: AnalyticsQueryResponse | null;
+	}
+
 	let isLoading = $state(true);
+	let isUpdatingPeriod = $state(false);
 	let loadError = $state<string | null>(null);
-	let selectedPeriod = $state<TimePeriod>('all');
+	let period = $state<TimePeriod>('30d');
+	let shownPeriod: TimePeriod = '30d';
 
 	let vehicles = $state<Vehicle[]>([]);
 	let allTimeSummary = $state<ExpenseSummary | null>(null);
-	let periodSummary = $state<ExpenseSummary | null>(null);
-	let summaryPeriod = $state<TimePeriod>('all');
+	let periodData = $state<PeriodData>({ summaries: [], perDistance: null });
 	let recentExpensesList = $state<Expense[]>([]);
 	let remindersList = $state<ReminderWithVehicles[]>([]);
+	let policies = $state<InsurancePolicy[]>([]);
 	let recurringCost = $state<RecurringCostSummary>({ count: 0, monthlyTotal: 0 });
-	let vehiclePhotosMap = $state<Map<string, Photo[]>>(new Map());
-	let vehicleStatsMap = $state<
-		Map<string, { totalAmount: number; recentAmount: number; lastActivity: Date | null }>
-	>(new Map());
-
-	let vehicleOverviews = $derived.by(() => {
-		return vehicles.map(v => {
-			const photos = vehiclePhotosMap.get(v.id) || [];
-			const coverPhoto = photos.find(p => p.isCover);
-			const coverPhotoUrl = coverPhoto
-				? vehicleApi.getPhotoThumbnailUrl(v.id, coverPhoto.id)
-				: null;
-			const vStats = vehicleStatsMap.get(v.id);
-
-			return {
-				id: v.id,
-				name: `${v.year} ${v.make} ${v.model}`,
-				nickname: v.nickname,
-				make: v.make,
-				vehicleType: v.vehicleType,
-				recentExpenses: vStats?.recentAmount ?? 0,
-				totalExpenses: vStats?.totalAmount ?? 0,
-				lastActivity: vStats?.lastActivity ?? null,
-				hasActiveFinancing: v.financing?.isActive || false,
-				coverPhotoUrl,
-				sharedBy: v.sharedAccess?.sharedBy ?? null
-			};
-		});
-	});
+	let spendTrend = $state<AnalyticsQueryResponse | null>(null);
+	let runningByMonth = $state<AnalyticsQueryResponse | null>(null);
+	let trendFailed = $state(false);
 
 	let ownedVehicles = $derived(vehicles.filter(v => !v.sharedAccess));
+	let sharedVehicles = $derived(vehicles.filter(v => v.sharedAccess));
 	let hasLoaded = $state(false);
 	let showFab = $derived(hasLoaded && !loadError);
 	let canLogFillup = $derived(showFab && ownedVehicles.length > 0);
@@ -110,145 +102,185 @@
 	]);
 	let currentStep = $derived(onboardingSteps.findIndex(step => !step.done));
 
-	let stats = $derived.by(() => ({
-		totalVehicles: ownedVehicles.length,
-		totalExpenses: allTimeSummary?.totalAmount ?? 0,
-		monthlyAverage: allTimeSummary?.monthlyAverage ?? 0,
-		activeFinancing: ownedVehicles.filter(v => v.financing?.isActive).length
-	}));
-
 	let pageDescription = $derived.by(() => {
-		const count = stats.totalVehicles;
-		if (loadError || (isLoading && count === 0)) return 'Overview of your vehicles';
+		if (loadError || (isLoading && !hasLoaded)) return 'Overview of your vehicles';
 		if (vehicles.length === 0) return 'Welcome to VROOM';
-		if (count === 0) return 'Overview of the vehicles shared with you';
-		return `Overview of your ${count} vehicle${count !== 1 ? 's' : ''}`;
+		const count = `${vehicles.length} vehicle${vehicles.length === 1 ? '' : 's'}`;
+		return sharedVehicles.length > 0 ? `${count}, incl. ${sharedVehicles.length} shared` : count;
 	});
 
-	let trendChartData = $derived.by(() => {
-		if (!periodSummary?.monthlyTrend) return [];
-		return periodSummary.monthlyTrend.map(t => ({
-			date: parseMonthToDate(t.period),
-			amount: t.amount
-		}));
+	let spend = $derived(combinePeriodSpend(periodData.summaries));
+	let distanceUnit = $derived<DistanceUnit>(settingsStore.unitPreferences.distanceUnit);
+	let distanceLabel = $derived(getDistanceUnitLabel(distanceUnit, true));
+
+	let vehicleRows = $derived.by((): VehicleRow[] => {
+		const perVehicle = new Map(
+			(periodData.perDistance?.series ?? []).map(series => [series.key, series.values[0] ?? null])
+		);
+		const trends = new Map(
+			(spendTrend?.series ?? []).map(series => [series.key, series.values.map(v => v ?? 0)])
+		);
+		return vehicles.map(v => {
+			const model = `${v.year} ${v.make} ${v.model}`;
+			const notes = [
+				v.nickname ? model : null,
+				v.financing?.isActive ? 'Financed' : null,
+				v.sharedAccess ? `Shared by ${v.sharedAccess.sharedBy}` : null
+			].filter(Boolean);
+			return {
+				id: v.id,
+				name: v.nickname || model,
+				detail: notes.join(' · '),
+				isElectric: v.vehicleType === 'electric',
+				spend: spend.byVehicle.get(v.id) ?? 0,
+				runningPerDistance: perVehicle.get(v.id) ?? null,
+				trend: trends.get(v.id) ?? null
+			};
+		});
 	});
 
-	let categoryChartData = $derived.by(() => {
-		if (!periodSummary?.categoryBreakdown) return [];
-		const total = periodSummary.categoryBreakdown.reduce((sum, c) => sum + c.amount, 0);
-		return periodSummary.categoryBreakdown.map(c => ({
-			key: c.category,
-			label: categoryLabels[c.category as ExpenseCategory] || c.category,
-			value: c.amount,
-			percentage: total > 0 ? (c.amount / total) * 100 : 0,
-			color: getCategoryChartColor(c.category)
-		}));
-	});
+	let monthlyRunning = $derived(
+		(runningByMonth?.buckets ?? []).map((bucket, i) => ({
+			date: parseMonthToDate(bucket),
+			amount: runningByMonth?.series[0]?.values[i] ?? 0
+		}))
+	);
+	let peakMonth = $derived(highestMonth(monthlyRunning));
+	let trendData = $derived(
+		monthlyRunning.map(m => ({
+			month: formatDateWith(m.date, { month: 'short' }),
+			amount: m.amount
+		}))
+	);
+	let trendTicks = $derived(
+		trendData.map(m => m.month).filter((_, i) => (trendData.length - 1 - i) % 2 === 0)
+	);
+	const trendSeries = [{ key: 'amount', label: 'Running costs', color: costBucketColor('energy') }];
+	const trendConfig = buildChartConfig(trendSeries);
+	let trendInsight = $derived(
+		peakMonth
+			? `Highest: ${formatDateWith(peakMonth.date, { month: 'long', year: 'numeric' })}, ${formatCurrency(peakMonth.amount)}.`
+			: ''
+	);
 
 	let recentExpenses = $derived.by(() => {
-		const vehicleMap = new Map(
-			vehicles.map(v => [v.id, v.nickname || `${v.year} ${v.make} ${v.model}`])
-		);
+		const names = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
 		return recentExpensesList.map(e => ({
 			id: e.id,
 			amount: e.amount,
 			category: e.category,
 			date: new Date(e.date),
 			description: e.description,
-			vehicleName: vehicleMap.get(e.vehicleId) || 'Unknown Vehicle'
+			location: e.location,
+			vehicleName: names.get(e.vehicleId) || 'Unknown Vehicle'
 		}));
 	});
 
-	let dueReminders = $derived.by(() => {
-		const now = Date.now();
-		const horizon = now + UPCOMING_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-		const vehicleMap = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
-		return remindersList
-			.filter(r => r.reminder.isActive)
-			.filter(
-				(r): r is typeof r & { reminder: { nextDueDate: string } } =>
-					r.reminder.nextDueDate !== null
-			)
-			.filter(r => new Date(r.reminder.nextDueDate).getTime() <= horizon)
-			.sort(
-				(a, b) =>
-					new Date(a.reminder.nextDueDate).getTime() - new Date(b.reminder.nextDueDate).getTime()
-			)
-			.map(r => ({
-				id: r.reminder.id,
-				name: r.reminder.name,
-				nextDueDate: r.reminder.nextDueDate,
-				isOverdue: new Date(r.reminder.nextDueDate).getTime() <= now,
-				expenseAmount: r.reminder.expenseAmount,
-				vehicleNames: r.vehicleIds
-					.map(id => vehicleMap.get(id))
-					.filter(Boolean)
-					.join(', ')
-			}));
+	let attention = $derived.by(() => {
+		const names = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
+		return attentionItems(remindersList, policies, id => names.get(id), formatDate, Date.now());
 	});
 
 	onMount(loadDashboardData);
 
 	const nextPeriodRequest = latest();
 
+	function monthsAgoSeconds(months: number): number {
+		const now = new Date();
+		return Math.floor(new Date(now.getFullYear(), now.getMonth() - months, 1).getTime() / 1000);
+	}
+
+	function sharedSummaries(selected: TimePeriod, shared: Vehicle[]): Promise<ExpenseSummary[]> {
+		return Promise.all(
+			shared.map(v =>
+				expenseApi.getExpenseSummary({ vehicleId: v.id, period: selected }).catch(() => null)
+			)
+		).then(rows => rows.filter((row): row is ExpenseSummary => row !== null));
+	}
+
+	async function loadPeriod(selected: TimePeriod, shared: Vehicle[]): Promise<PeriodData> {
+		const nowSec = Math.floor(Date.now() / 1000);
+		const [owned, perDistance, sharedRows] = await Promise.all([
+			expenseApi.getExpenseSummary({ period: selected }),
+			analyticsApi
+				.query({
+					metric: 'costPerDistance',
+					interval: 'none',
+					groupBy: 'vehicle',
+					include: 'all',
+					categories: RUNNING_CATEGORIES,
+					start: periodStartSeconds(selected, Date.now()),
+					end: nowSec
+				})
+				.catch(() => null),
+			sharedSummaries(selected, shared)
+		]);
+		return { summaries: [owned, ...sharedRows], perDistance };
+	}
+
 	async function loadDashboardData() {
 		isLoading = true;
+		isUpdatingPeriod = false;
 		loadError = null;
 		const isCurrentPeriod = nextPeriodRequest();
+		const selected = period;
 		try {
 			const [
 				loadedVehicles,
 				allTimeData,
-				periodData,
 				recentResponse,
 				loadedReminders,
 				loadedRecurringCost,
-				photosByVehicle,
-				vehicleStats
+				loadedPolicies,
+				ownedPeriod,
+				loadedSpendTrend,
+				loadedRunningByMonth
 			] = await Promise.all([
 				vehicleApi.getVehicles({ includeShared: true }),
 				expenseApi.getExpenseSummary({ period: 'all' }),
-				selectedPeriod !== 'all'
-					? expenseApi.getExpenseSummary({ period: selectedPeriod })
-					: Promise.resolve(null),
-				expenseApi.getAllExpenses({ limit: 5 }),
+				expenseApi.getAllExpenses({ limit: RECENT_COUNT }),
 				reminderApi.list().catch(() => [] as ReminderWithVehicles[]),
 				reminderApi.getRecurringCost().catch(() => ({ count: 0, monthlyTotal: 0 })),
-				vehicleApi.getAllVehiclePhotos().catch(() => ({}) as Record<string, Photo[]>),
-				expenseApi.getVehicleStats()
+				insuranceApi.getAllPolicies().catch(() => [] as InsurancePolicy[]),
+				loadPeriod(selected, []),
+				analyticsApi
+					.query({
+						metric: 'cost',
+						interval: 'month',
+						groupBy: 'vehicle',
+						include: 'all',
+						start: monthsAgoSeconds(TREND_MONTHS - 1)
+					})
+					.catch(() => null),
+				analyticsApi
+					.query({
+						metric: 'cost',
+						interval: 'month',
+						groupBy: 'none',
+						include: 'all',
+						categories: RUNNING_CATEGORIES,
+						start: monthsAgoSeconds(11)
+					})
+					.catch(() => null)
 			]);
+			const shared = loadedVehicles.filter(v => v.sharedAccess);
+			const sharedRows = shared.length > 0 ? await sharedSummaries(selected, shared) : [];
 			vehicles = loadedVehicles;
 			allTimeSummary = allTimeData;
 			if (isCurrentPeriod()) {
-				periodSummary = periodData ?? allTimeData;
-				summaryPeriod = periodData ? selectedPeriod : 'all';
+				periodData = {
+					summaries: [...ownedPeriod.summaries, ...sharedRows],
+					perDistance: ownedPeriod.perDistance
+				};
+				shownPeriod = selected;
 			}
 			recentExpensesList = recentResponse.data;
 			remindersList = loadedReminders;
 			recurringCost = loadedRecurringCost;
-
-			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map created and consumed within async function, not reactive state
-			const photosMap = new Map<string, Photo[]>();
-			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map created and consumed within async function, not reactive state
-			const statsMap = new Map<
-				string,
-				{ totalAmount: number; recentAmount: number; lastActivity: Date | null }
-			>();
-			for (const v of loadedVehicles) {
-				const vehiclePhotos = photosByVehicle[v.id];
-				if (vehiclePhotos) {
-					photosMap.set(v.id, vehiclePhotos);
-				}
-			}
-			for (const vs of vehicleStats) {
-				statsMap.set(vs.vehicleId, {
-					totalAmount: vs.totalAmount,
-					recentAmount: vs.recentAmount,
-					lastActivity: vs.lastExpenseDate ? new Date(vs.lastExpenseDate) : null
-				});
-			}
-			vehiclePhotosMap = photosMap;
-			vehicleStatsMap = statsMap;
+			policies = loadedPolicies;
+			spendTrend = loadedSpendTrend;
+			runningByMonth = loadedRunningByMonth;
+			trendFailed = loadedRunningByMonth === null;
 			hasLoaded = true;
 		} catch (error) {
 			loadError = userFacingErrorMessage(error);
@@ -266,24 +298,22 @@
 		gotoWithQuery(resolve(routes.expenseNew), query);
 	}
 
-	async function handlePeriodChange(period: TimePeriod) {
-		selectedPeriod = period;
+	async function handlePeriodChange(next: TimePeriod) {
+		period = next;
+		isUpdatingPeriod = true;
 		const isCurrent = nextPeriodRequest();
 		try {
-			if (period === 'all' && allTimeSummary) {
-				periodSummary = allTimeSummary;
-				summaryPeriod = 'all';
-			} else {
-				const summary = await expenseApi.getExpenseSummary({ period });
-				if (isCurrent()) {
-					periodSummary = summary;
-					summaryPeriod = period;
-				}
+			const data = await loadPeriod(next, sharedVehicles);
+			if (isCurrent()) {
+				periodData = data;
+				shownPeriod = next;
 			}
 		} catch (error) {
 			if (!isCurrent()) return;
-			selectedPeriod = summaryPeriod;
+			period = shownPeriod;
 			handleErrorWithNotification(error, "Couldn't load the expense summary");
+		} finally {
+			if (isCurrent()) isUpdatingPeriod = false;
 		}
 	}
 </script>
@@ -339,37 +369,6 @@
 	</EmptyState>
 {/snippet}
 
-{#snippet trendIcon()}
-	<TrendingUp class="h-5 w-5 text-primary" />
-{/snippet}
-
-{#snippet categoryIcon()}
-	<ChartPie class="h-5 w-5 text-chart-1" />
-{/snippet}
-
-{#snippet chartPlaceholders(error: string | null)}
-	<ChartCard
-		title={TREND_TITLE}
-		level={3}
-		description={TREND_DESCRIPTION}
-		isLoading={!error}
-		{error}
-		icon={trendIcon}
-	>
-		{null}
-	</ChartCard>
-	<ChartCard
-		title={CATEGORY_TITLE}
-		level={3}
-		description={CATEGORY_DESCRIPTION}
-		isLoading={!error}
-		{error}
-		icon={categoryIcon}
-	>
-		{null}
-	</ChartCard>
-{/snippet}
-
 <svelte:head>
 	<title>Dashboard - VROOM Car Tracker</title>
 	<meta name="description" content="Your vehicle expense dashboard" />
@@ -421,17 +420,13 @@
 		{@render checklist()}
 
 		<SharedWithMeCard onAccepted={loadDashboardData} />
-
-		<VehicleCarousel
-			vehicles={vehicleOverviews}
+		<NeedsAttentionCard items={attention} />
+		<VehicleRowsCard
+			rows={vehicleRows}
+			periodLabel={PERIOD_PHRASES[period].chip}
+			{distanceLabel}
 			isLoading={false}
-			addVehicleHref={resolve(routes.vehicleNew)}
 		/>
-
-		{#if dueReminders.length > 0}
-			<DueRemindersCard reminders={dueReminders} isLoading={false} />
-		{/if}
-
 		{#if recurringCost.count > 0}
 			<RecurringCostCard
 				count={recurringCost.count}
@@ -440,76 +435,88 @@
 			/>
 		{/if}
 	{:else}
-		<DashboardStatsCards
-			totalVehicles={stats.totalVehicles}
-			totalExpenses={stats.totalExpenses}
-			monthlyAverage={stats.monthlyAverage}
-			activeFinancing={stats.activeFinancing}
-			{isLoading}
-		/>
+		<div class="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
+			<div class="lg:col-span-2">
+				<DashboardHero
+					{period}
+					total={spend.total}
+					previousTotal={spend.previousTotal}
+					buckets={spend.buckets}
+					runningPerDistance={periodData.perDistance?.totals.perDistance ?? null}
+					runningScope={sharedVehicles.length > 0 ? 'on your vehicles' : null}
+					{distanceLabel}
+					isLoading={!hasLoaded}
+					isUpdating={isUpdatingPeriod}
+					onPeriodChange={handlePeriodChange}
+				/>
+			</div>
+
+			{#if hasLoaded && attention.length > 0}
+				<NeedsAttentionCard items={attention} />
+			{/if}
+
+			{#if hasLoaded}
+				<div class="lg:col-span-2">
+					<VehicleRowsCard
+						rows={vehicleRows}
+						periodLabel={PERIOD_PHRASES[period].chip}
+						{distanceLabel}
+						isLoading={false}
+					/>
+				</div>
+
+				<RecentActivityCard expenses={recentExpenses} />
+
+				<div class="lg:col-span-2">
+					{#await chartModules}
+						<ChartCard title={TREND_TITLE} level={2} description={TREND_DESCRIPTION} isLoading>
+							{null}
+						</ChartCard>
+					{:then { AppBarChart }}
+						<AppBarChart
+							level={2}
+							title={TREND_TITLE}
+							description={TREND_DESCRIPTION}
+							data={trendData}
+							x="month"
+							y="amount"
+							series={trendSeries}
+							config={trendConfig}
+							yAxisFormat={formatCurrencyAxis}
+							xAxisProps={{ ticks: trendTicks, format: (v: string) => v }}
+							error={trendFailed ? "Couldn't load the monthly running costs." : null}
+						>
+							{#snippet footer()}
+								{#if trendInsight}
+									<p class="text-xs text-muted-foreground" data-testid="trend-insight">
+										{trendInsight}
+									</p>
+								{/if}
+							{/snippet}
+						</AppBarChart>
+					{:catch}
+						<ChartCard
+							title={TREND_TITLE}
+							level={2}
+							description={TREND_DESCRIPTION}
+							error="Charts couldn't be loaded. Check your connection and reload."
+						>
+							{null}
+						</ChartCard>
+					{/await}
+				</div>
+
+				{#if recurringCost.count > 0}
+					<RecurringCostCard
+						count={recurringCost.count}
+						monthlyTotal={recurringCost.monthlyTotal}
+						isLoading={false}
+					/>
+				{/if}
+			{/if}
+		</div>
 
 		<SharedWithMeCard onAccepted={loadDashboardData} />
-
-		{#if vehicleOverviews.length > 0}
-			<VehicleCarousel
-				vehicles={vehicleOverviews}
-				{isLoading}
-				addVehicleHref={canLogFillup ? resolve(routes.vehicleNew) : undefined}
-			/>
-		{/if}
-
-		{#if stats.totalVehicles > 0}
-			<div class="flex items-center justify-between gap-4">
-				<h2 class="text-lg font-semibold">Spending</h2>
-				<PeriodSelector {selectedPeriod} {isLoading} onPeriodChange={handlePeriodChange} />
-			</div>
-
-			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-				{#await chartModules}
-					{@render chartPlaceholders(null)}
-				{:then [{ default: ExpenseTrendChart }, { AppPieChart }]}
-					<ExpenseTrendChart
-						level={3}
-						data={trendChartData}
-						title={TREND_TITLE}
-						description={TREND_DESCRIPTION}
-						{isLoading}
-					>
-						{#snippet icon()}
-							{@render trendIcon()}
-						{/snippet}
-					</ExpenseTrendChart>
-					<AppPieChart
-						level={3}
-						title={CATEGORY_TITLE}
-						description={CATEGORY_DESCRIPTION}
-						data={categoryChartData}
-						{isLoading}
-					>
-						{#snippet icon()}
-							{@render categoryIcon()}
-						{/snippet}
-					</AppPieChart>
-				{:catch}
-					{@render chartPlaceholders(
-						"Charts couldn't be loaded. Check your connection and reload."
-					)}
-				{/await}
-			</div>
-
-			<div class="grid grid-cols-1 lg:grid-cols-2 lg:items-start gap-6">
-				<RecentActivityCard expenses={recentExpenses} {isLoading} />
-				<DueRemindersCard reminders={dueReminders} {isLoading} />
-			</div>
-
-			{#if recurringCost.count > 0}
-				<RecurringCostCard
-					count={recurringCost.count}
-					monthlyTotal={recurringCost.monthlyTotal}
-					{isLoading}
-				/>
-			{/if}
-		{/if}
 	{/if}
 </div>
 

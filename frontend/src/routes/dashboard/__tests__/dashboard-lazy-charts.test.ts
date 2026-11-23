@@ -11,23 +11,18 @@ const SRC = readFileSync(join(HERE, '..', '+page.svelte'), 'utf8');
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-let pieRendered = false;
-let trendRendered = false;
+let barRendered = false;
+let barProps: Record<string, unknown> = {};
 let chartModuleRequested = false;
-vi.mock('#lib/components/charts/index.ts', () => ({
-	AppPieChart: () => {
-		pieRendered = true;
-	}
-}));
-vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => {
+vi.mock('#lib/components/charts/index.ts', () => {
 	chartModuleRequested = true;
 	return {
-		default: () => {
-			trendRendered = true;
+		AppBarChart: (_anchor: unknown, props: Record<string, unknown>) => {
+			barRendered = true;
+			barProps = props;
 		}
 	};
 });
-vi.mock('#lib/components/dashboard/VehicleCarousel.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/dashboard/SharedWithMeCard.svelte', () => ({ default: () => {} }));
 
 vi.mock('#lib/services/vehicle-api.ts', () => ({
@@ -60,6 +55,13 @@ vi.mock('#lib/services/reminder-api.ts', () => ({
 	}
 }));
 
+vi.mock('#lib/services/insurance-api.ts', () => ({
+	insuranceApi: { getAllPolicies: () => Promise.resolve([]) }
+}));
+vi.mock('#lib/services/analytics-api.ts', () => ({
+	analyticsApi: { query: () => Promise.resolve(null) }
+}));
+
 import Page from '../+page.svelte';
 
 let releaseVehicles: () => void = () => {};
@@ -71,10 +73,6 @@ const vehiclesResponse = new Promise<Vehicle[]>(resolve => {
 describe('dashboard chart row', () => {
 	test('chart components are not imported statically, so layerchart stays out of the route chunk', () => {
 		expect(SRC).not.toMatch(/^\s*import\s[^;]*['"]#lib\/components\/charts\/index\.ts['"]/m);
-		expect(SRC).not.toMatch(
-			/^\s*import\s[^;]*['"]#lib\/components\/charts\/ExpenseTrendChart\.svelte['"]/m
-		);
-		expect(SRC).toMatch(/import\('#lib\/components\/charts\/ExpenseTrendChart\.svelte'\)/);
 		expect(SRC).toMatch(/import\('#lib\/components\/charts\/index\.ts'\)/);
 	});
 
@@ -82,15 +80,15 @@ describe('dashboard chart row', () => {
 		render(Page);
 
 		await waitFor(() => expect(chartModuleRequested).toBe(true));
-		expect(trendRendered).toBe(false);
+		expect(barRendered).toBe(false);
 	});
 
-	test('both lazily loaded charts render once the data and their module arrive', async () => {
+	test('the running-cost bars render once the data and their module arrive', async () => {
 		releaseVehicles();
 		render(Page);
 
-		await waitFor(() => expect(pieRendered).toBe(true));
-		expect(trendRendered).toBe(true);
+		await waitFor(() => expect(barRendered).toBe(true));
+		expect(barProps['title']).toBe('Last 12 months');
 		expect(screen.queryByText("Charts couldn't be loaded", { exact: false })).toBeNull();
 	});
 });

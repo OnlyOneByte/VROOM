@@ -153,19 +153,6 @@ export const expenseApi = {
 		return apiClient.get<ExpenseSummary>(`/expenses/summary${qs}`);
 	},
 
-	async getVehicleStats(recentDays?: number): Promise<
-		Array<{
-			vehicleId: string;
-			totalAmount: number;
-			recentAmount: number;
-			lastExpenseDate: string | null;
-		}>
-	> {
-		return apiClient.get(
-			`/expenses/vehicle-stats${buildQueryString({ recentDays: recentDays || undefined })}`
-		);
-	},
-
 	async createExpense(
 		expense: Partial<Expense> & { vehicleId: string; category: ExpenseCategory; amount: number },
 		clientId?: string

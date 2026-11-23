@@ -248,18 +248,6 @@ describe('expenseApi query and photo wiring', () => {
 		]);
 	});
 
-	test('getVehicleStats only sends recentDays when it is positive', async () => {
-		get.mockResolvedValue([]);
-		await expenseApi.getVehicleStats();
-		await expenseApi.getVehicleStats(0);
-		await expenseApi.getVehicleStats(30);
-		expect(get.mock.calls.map(c => c[0])).toEqual([
-			'/expenses/vehicle-stats',
-			'/expenses/vehicle-stats',
-			'/expenses/vehicle-stats?recentDays=30'
-		]);
-	});
-
 	test('photo helpers target the expense entity photo collection', async () => {
 		getPaginated.mockResolvedValueOnce({ data: [] });
 		del.mockResolvedValueOnce(undefined);
