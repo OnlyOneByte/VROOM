@@ -301,7 +301,7 @@
 						{#if isSubmitting}
 							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 						{/if}
-						Save
+						Save Reading
 					</Button>
 				</div>
 			</div>

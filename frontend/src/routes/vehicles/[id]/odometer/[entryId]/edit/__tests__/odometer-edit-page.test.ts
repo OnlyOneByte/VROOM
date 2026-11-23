@@ -121,7 +121,7 @@ function noteInput(): HTMLTextAreaElement {
 }
 
 async function save(): Promise<void> {
-	await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+	await fireEvent.click(screen.getByRole('button', { name: 'Save Reading' }));
 	await settle();
 }
 
@@ -362,7 +362,7 @@ describe('edit odometer reading save', () => {
 		mount();
 		await settle();
 
-		for (const name of ['Delete', 'Cancel', 'Save']) {
+		for (const name of ['Delete', 'Cancel', 'Save Reading']) {
 			expect(screen.getByRole('button', { name })).toHaveClass('h-10');
 		}
 	});
@@ -453,14 +453,14 @@ describe('edit odometer reading save', () => {
 		).toBeInTheDocument();
 	});
 
-	test('Save is disabled while saving', async () => {
+	test('Save Reading is disabled while saving', async () => {
 		update.mockReturnValue(new Promise(() => {}));
 		mount();
 		await settle();
 
 		await save();
 
-		expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Save Reading' })).toBeDisabled();
 	});
 
 	test('Cancel and Back return without saving', async () => {
