@@ -349,10 +349,37 @@ describe('vehicle context loaders', () => {
 		state.formData.vehicleId = 'v1';
 		await loadLastFuelExpense(state);
 		expect(expenseApiMock.getExpensesByVehicle).toHaveBeenCalledWith('v1', {
-			limit: 2,
+			limit: 10,
 			category: 'fuel'
 		});
 		expect(state.lastFuelExpense?.id).toBe('e0');
+	});
+
+	test('loadLastFuelExpense picks the highest odometer among same-day fill-ups, whatever the list order', async () => {
+		const day = '2026-11-20T00:00:00.000Z';
+		expenseApiMock.getExpensesByVehicle.mockResolvedValue({
+			data: [
+				makeExpense('zz-morning', { date: day, mileage: 41200 }),
+				makeExpense('aa-evening', { date: day, mileage: 41480 }),
+				makeExpense('older', { date: '2026-11-12T00:00:00.000Z', mileage: 40900 })
+			]
+		});
+		const state = createState();
+		await loadLastFuelExpense(state);
+		expect(state.lastFuelExpense?.id).toBe('aa-evening');
+	});
+
+	test('loadLastFuelExpense breaks a mileage tie by the later date', async () => {
+		expenseApiMock.getExpensesByVehicle.mockResolvedValue({
+			data: [
+				makeExpense('earlier', { date: '2026-11-19T00:00:00.000Z', mileage: 41480 }),
+				makeExpense('later', { date: '2026-11-20T00:00:00.000Z', mileage: 41480 }),
+				makeExpense('no-odometer', { date: '2026-11-21T00:00:00.000Z', mileage: undefined })
+			]
+		});
+		const state = createState();
+		await loadLastFuelExpense(state);
+		expect(state.lastFuelExpense?.id).toBe('later');
 	});
 
 	test('loadLastFuelExpense sets null when there is no prior fuel expense', async () => {
