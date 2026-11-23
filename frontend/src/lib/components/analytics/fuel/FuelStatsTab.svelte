@@ -39,6 +39,7 @@
 	import AdvancedCharts from './AdvancedCharts.svelte';
 	import ChartGroup from './ChartGroup.svelte';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import { CHART_COLORS } from '#lib/utils/chart-colors.ts';
 
 	let {
 		fuelStats: fuelStatsProp = null,
@@ -65,6 +66,19 @@
 	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
 	let chargeLabel = $derived(getChargeUnitLabel(units.chargeUnit, true));
 	let electricEffLabel = $derived(getElectricEfficiencyLabel(units.distanceUnit, units.chargeUnit));
+
+	let vehicleColors = $derived.by(() => {
+		const rows = [
+			...(fuelStats?.fillupCostByVehicle ?? []),
+			...(fuelStats?.odometerProgression ?? []),
+			...(fuelStats?.costPerDistance ?? []),
+			...(fuelAdvanced?.vehicleRadar ?? [])
+		];
+		const ids = [...new Set(rows.map(r => r.vehicleId))].sort();
+		return Object.fromEntries(
+			ids.map((id, i) => [id, CHART_COLORS[i % CHART_COLORS.length] as string])
+		);
+	});
 
 	let charging = $derived(fuelStats?.charging);
 	let hasChargeData = $derived(
@@ -295,6 +309,7 @@
 			{fuelStats}
 			dayOfWeekPatterns={fuelAdvanced?.dayOfWeekPatterns}
 			showGasCharts={showGasCards}
+			{vehicleColors}
 			group="primary"
 		/>
 
@@ -614,10 +629,11 @@
 						{fuelStats}
 						dayOfWeekPatterns={fuelAdvanced?.dayOfWeekPatterns}
 						showGasCharts={showGasCards}
+						{vehicleColors}
 						group="patterns"
 					/>
 					{#if fuelAdvanced}
-						<AdvancedCharts {fuelAdvanced} group="patterns" />
+						<AdvancedCharts {fuelAdvanced} {vehicleColors} group="patterns" />
 					{/if}
 				</div>
 			</ChartGroup>
@@ -628,9 +644,9 @@
 			description="Your vehicles side by side: cost per distance, odometer, performance and spending"
 		>
 			<div class="space-y-4 md:space-y-6">
-				<FuelCharts {fuelStats} showGasCharts={showGasCards} group="comparisons" />
+				<FuelCharts {fuelStats} showGasCharts={showGasCards} {vehicleColors} group="comparisons" />
 				{#if fuelAdvanced}
-					<AdvancedCharts {fuelAdvanced} group="comparisons" />
+					<AdvancedCharts {fuelAdvanced} {vehicleColors} group="comparisons" />
 				{/if}
 			</div>
 		</ChartGroup>

@@ -43,9 +43,25 @@
 		dayOfWeekPatterns?: FuelAdvancedResponse['dayOfWeekPatterns'];
 		showGasCharts?: boolean;
 		group: 'primary' | 'patterns' | 'comparisons';
+		vehicleColors?: Record<string, string>;
 	}
 
-	let { fuelStats, dayOfWeekPatterns, showGasCharts = true, group }: Props = $props();
+	let {
+		fuelStats,
+		dayOfWeekPatterns,
+		showGasCharts = true,
+		group,
+		vehicleColors = {}
+	}: Props = $props();
+
+	function vehicleSeries(rows: { vehicleId: string; vehicleName: string }[], names: string[]) {
+		const ids = new Map(rows.map(r => [r.vehicleName, r.vehicleId]));
+		return names.map((name, i) => ({
+			key: name,
+			label: name,
+			color: vehicleColors[ids.get(name) ?? ''] ?? (CHART_COLORS[i % CHART_COLORS.length] as string)
+		}));
+	}
 
 	let units: UnitsMetadata = $derived(fuelStats.units ?? settingsStore.unitPreferences);
 	let chartLevel = $derived(group === 'primary' ? (2 as const) : (3 as const));
@@ -117,13 +133,7 @@
 
 	let fillupCostData = $derived(byVehicleMonth(fuelStats.fillupCostByVehicle, d => d.avgCost));
 
-	let fillupCostSeries = $derived(
-		costVehicleNames.map((name, i) => ({
-			key: name,
-			label: name,
-			color: CHART_COLORS[i % CHART_COLORS.length] as string
-		}))
-	);
+	let fillupCostSeries = $derived(vehicleSeries(fuelStats.fillupCostByVehicle, costVehicleNames));
 
 	let fillupCostConfig = $derived(buildChartConfig(fillupCostSeries));
 
@@ -133,13 +143,7 @@
 
 	let odometerData = $derived(byVehicleMonth(fuelStats.odometerProgression, d => d.mileage));
 
-	let odometerSeries = $derived(
-		odometerVehicleNames.map((name, i) => ({
-			key: name,
-			label: name,
-			color: CHART_COLORS[i % CHART_COLORS.length] as string
-		}))
-	);
+	let odometerSeries = $derived(vehicleSeries(fuelStats.odometerProgression, odometerVehicleNames));
 
 	let odometerConfig = $derived(buildChartConfig(odometerSeries));
 
@@ -147,13 +151,7 @@
 
 	let costPerMileData = $derived(byVehicleMonth(fuelStats.costPerDistance, d => d.costPerDistance));
 
-	let costPerMileSeries = $derived(
-		cpmVehicleNames.map((name, i) => ({
-			key: name,
-			label: name,
-			color: CHART_COLORS[i % CHART_COLORS.length] as string
-		}))
-	);
+	let costPerMileSeries = $derived(vehicleSeries(fuelStats.costPerDistance, cpmVehicleNames));
 
 	let costPerMileConfig = $derived(buildChartConfig(costPerMileSeries));
 
