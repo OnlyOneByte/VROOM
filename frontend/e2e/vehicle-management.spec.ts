@@ -12,7 +12,7 @@ test.describe('Fleet overview', () => {
 		await page.goto('/dashboard');
 
 		await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-		await expect(page.getByText(/Get started by adding your first vehicle/i)).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Add your first vehicle' })).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Add Vehicle' })).toBeVisible();
 	});
 
