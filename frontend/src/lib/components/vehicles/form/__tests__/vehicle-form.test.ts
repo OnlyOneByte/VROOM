@@ -3,6 +3,8 @@ import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { UpdateVehicleRequest, Vehicle, VehicleFinancing } from '#lib/types/index.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
+import { settingsStore } from '#lib/stores/settings.svelte.ts';
+import type { UserSettings } from '#lib/types/settings.ts';
 import { dateOnlyToISO } from '#lib/utils/formatters.ts';
 import {
 	ApiError,
@@ -967,5 +969,23 @@ describe('VehicleForm edit mode delete dialog', () => {
 
 		await vi.waitFor(() => expect(hasPendingSave()).toBe(true));
 		expect(updateVehicle).not.toHaveBeenCalled();
+	});
+});
+
+describe('VehicleForm purchase price follows the currency', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	test.each([
+		['JPY', '1', '0'],
+		['USD', '0.01', '0.00']
+	])('a %s user steps the price by %s with placeholder %s', async (unit, step, placeholder) => {
+		vi.spyOn(settingsStore, 'settings', 'get').mockReturnValue({
+			currencyUnit: unit
+		} as UserSettings);
+		await renderCreate();
+		expect(input('purchasePrice')).toHaveAttribute('step', step);
+		expect(input('purchasePrice')).toHaveAttribute('placeholder', placeholder);
 	});
 });

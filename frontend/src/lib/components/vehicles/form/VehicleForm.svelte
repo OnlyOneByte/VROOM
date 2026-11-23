@@ -49,7 +49,12 @@
 	import FinancingFormSection from './FinancingFormSection.svelte';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { getLongFormLabel } from '#lib/utils/units.ts';
-	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
+	import {
+		amountPlaceholder,
+		amountStep,
+		dateOnlyToISO,
+		toDateInputValue
+	} from '#lib/utils/formatters.ts';
 	import type {
 		Vehicle,
 		VehicleFinancing,
@@ -838,8 +843,8 @@
 									id="purchasePrice"
 									type="number"
 									min="0"
-									step="0.01"
-									placeholder="0.00"
+									step={amountStep()}
+									placeholder={amountPlaceholder()}
 									bind:value={vehicleForm.purchasePrice}
 									aria-invalid={!!errors['purchasePrice']}
 									aria-describedby={errors['purchasePrice'] ? 'purchasePrice-error' : undefined}

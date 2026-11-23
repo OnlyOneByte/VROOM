@@ -161,7 +161,7 @@
 								type="number"
 								min="0"
 								max="50"
-								step="0.01"
+								step={0.01}
 								placeholder="e.g., 4.5"
 								bind:value={financingForm.apr}
 								aria-invalid={!!errors['apr']}
