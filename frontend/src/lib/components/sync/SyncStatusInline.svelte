@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { focusLeftOn } from '#lib/utils/focus.ts';
 	import { syncState, onlineStatus, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 	import {
 		syncManager,
@@ -56,11 +57,6 @@
 	});
 
 	let statusPanel = $state<HTMLElement | null>(null);
-
-	function focusLeftOn(origin: Element | null): boolean {
-		const active = document.activeElement;
-		return active === origin || active === null || active === document.body;
-	}
 
 	async function retrySession() {
 		if (authStore.recheckingSession) return;

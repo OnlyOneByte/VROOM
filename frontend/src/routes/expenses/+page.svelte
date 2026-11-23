@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick, untrack } from 'svelte';
+	import { focusLeftOn } from '#lib/utils/focus.ts';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
 	import {
@@ -236,11 +237,6 @@
 		} finally {
 			if (isCurrent()) isLoadingPage = false;
 		}
-	}
-
-	function focusLeftOn(origin: Element | null): boolean {
-		const active = document.activeElement;
-		return active === origin || active === null || active === document.body;
 	}
 
 	async function focusExpensesAfter(origin: Element | null) {

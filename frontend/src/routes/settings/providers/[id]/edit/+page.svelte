@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -87,7 +88,7 @@
 		error = null;
 		await loadProvider();
 		await tick();
-		stateCard?.querySelector('button')?.focus();
+		focusFirstButton(stateCard);
 	}
 
 	function backToSettings() {

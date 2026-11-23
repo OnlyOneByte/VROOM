@@ -7,6 +7,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { LoaderCircle } from '@lucide/svelte';
 	import { tick, type Snippet } from 'svelte';
+	import { focusLeftOn } from '#lib/utils/focus.ts';
 
 	interface Props {
 		title: string;
@@ -67,8 +68,7 @@
 			isRetrying = false;
 		}
 		await tick();
-		const active = document.activeElement;
-		if (!error && (active === origin || active === null || active === document.body)) {
+		if (!error && focusLeftOn(origin)) {
 			titleEl?.focus();
 		}
 	}
