@@ -7,6 +7,7 @@ import ImportExpensesDialog from '../../ImportExpensesDialog.svelte';
 
 const mocks = vi.hoisted(() => ({
 	detectImportSource: vi.fn(),
+	getImportFormats: vi.fn(),
 	importExpensesCsv: vi.fn(),
 	addNotification: vi.fn()
 }));
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		detectImportSource: mocks.detectImportSource,
+		getImportFormats: mocks.getImportFormats,
 		importExpensesCsv: mocks.importExpensesCsv
 	}
 }));
@@ -76,10 +78,37 @@ function importButton(): HTMLButtonElement {
 beforeEach(() => {
 	vi.clearAllMocks();
 	mocks.detectImportSource.mockResolvedValue(null);
+	mocks.getImportFormats.mockResolvedValue({
+		formats: [
+			{ id: 'fuelio', label: 'Fuelio' },
+			{ id: 'fuelly', label: 'Fuelly' }
+		],
+		accept: ['.csv', 'text/csv']
+	});
 	mocks.importExpensesCsv.mockResolvedValue(previewResult());
 });
 
 describe('ImportExpensesDialog', () => {
+	test('names the formats and file types the server lists', async () => {
+		renderDialog();
+
+		await waitFor(() =>
+			expect(
+				screen.getByText(/a fuel log from another app such as Fuelio or Fuelly/)
+			).toBeInTheDocument()
+		);
+		expect(screen.getByText('Choose a .csv file')).toBeInTheDocument();
+		expect(mocks.getImportFormats).toHaveBeenCalledTimes(1);
+	});
+
+	test('still opens when the format list cannot load', async () => {
+		mocks.getImportFormats.mockRejectedValue(new Error('offline'));
+		renderDialog();
+
+		await waitFor(() => expect(screen.getByText('Choose a file')).toBeInTheDocument());
+		expect(screen.getByText(/a fuel log from another app —/)).toBeInTheDocument();
+	});
+
 	test('starts with nothing to import and the import button disabled', () => {
 		renderDialog();
 

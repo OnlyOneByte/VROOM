@@ -2,10 +2,14 @@ import { describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import ImportCsvSource from '../ImportCsvSource.svelte';
 
-function renderSource(fileName: string | null = null, csvText = '') {
+function renderSource(
+	fileName: string | null = null,
+	csvText = '',
+	accept: string[] | undefined = ['.csv', 'text/csv']
+) {
 	const onFileChange = vi.fn();
 	const onPasteBlur = vi.fn();
-	render(ImportCsvSource, { csvText, fileName, onFileChange, onPasteBlur });
+	render(ImportCsvSource, { csvText, fileName, accept, onFileChange, onPasteBlur });
 	return { onFileChange, onPasteBlur };
 }
 
@@ -27,10 +31,29 @@ describe('ImportCsvSource', () => {
 		expect(screen.queryByText('Choose a .csv file')).toBeNull();
 	});
 
-	test('only accepts CSV files', () => {
+	test('accepts the file types the server lists', () => {
 		renderSource();
 
 		expect(fileInput().accept).toBe('.csv,text/csv');
+	});
+
+	test('names every extension the server accepts', () => {
+		renderSource(null, '', ['.csv', 'text/csv', '.json']);
+
+		expect(screen.getByText('Choose a .csv or .json file')).toBeInTheDocument();
+		expect(fileInput().accept).toBe('.csv,text/csv,.json');
+	});
+
+	test('before the list arrives, any file can be chosen', () => {
+		render(ImportCsvSource, {
+			csvText: '',
+			fileName: null,
+			onFileChange: vi.fn(),
+			onPasteBlur: vi.fn()
+		});
+
+		expect(screen.getByText('Choose a file')).toBeInTheDocument();
+		expect(fileInput().accept).toBe('');
 	});
 
 	test('passes the chosen file on', async () => {

@@ -5,6 +5,7 @@ import { fuelioFormat } from './fuelio-import';
 import {
   applyMapping,
   type ColumnMapping,
+  CSV_ACCEPT,
   type ImportDateFormat,
   type NativeField,
   type TargetUnitsResolver,
@@ -27,6 +28,7 @@ export interface NativeCsvResult {
 export interface ImportFormat {
   id: string;
   label: string;
+  accept: string[];
   detect(sample: string): boolean;
   toNativeCsv(text: string, opts: ImportFormatOptions): NativeCsvResult;
 }
@@ -129,6 +131,7 @@ function presetFormat(preset: MappingPreset): ImportFormat {
   return {
     id: preset.id,
     label: preset.label,
+    accept: CSV_ACCEPT,
     detect: (sample) => detectSource(sampleHeaders(sample))?.id === preset.id,
     toNativeCsv: (text, { mapping, targetUnitsFor, timeZone }) =>
       applyMapping(
@@ -147,6 +150,13 @@ export const IMPORT_FORMATS: ImportFormat[] = [fuelioFormat, ...MAPPING_PRESETS.
 
 export function detectImportFormat(sample: string): ImportFormat | null {
   return IMPORT_FORMATS.find((format) => format.detect(sample)) ?? null;
+}
+
+export function importFormatList(): { formats: { id: string; label: string }[]; accept: string[] } {
+  return {
+    formats: IMPORT_FORMATS.map(({ id, label }) => ({ id, label })),
+    accept: [...new Set([...CSV_ACCEPT, ...IMPORT_FORMATS.flatMap((format) => format.accept)])],
+  };
 }
 
 export function findImportFormat(id: string | undefined): ImportFormat | null {

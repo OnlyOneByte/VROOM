@@ -49,6 +49,7 @@ import {
   detectImportFormat,
   findImportFormat,
   IMPORT_DETECT_SAMPLE_LENGTH,
+  importFormatList,
 } from './import-mapping-presets';
 import { expenseRepository } from './repository';
 import {
@@ -702,6 +703,8 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
 const detectSourceSchema = z.object({
   sample: z.string().min(1).max(IMPORT_DETECT_SAMPLE_LENGTH),
 });
+routes.get('/import/formats', (c) => c.json({ success: true, data: importFormatList() }));
+
 routes.post('/import/detect', zValidator('json', detectSourceSchema), (c) => {
   const { sample } = c.req.valid('json');
   const format = detectImportFormat(sample);

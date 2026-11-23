@@ -6,7 +6,7 @@ import type {
 	Vehicle,
 	VolumeUnit
 } from '#lib/types/index.ts';
-import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
+import type { DetectedImportFormat, ImportFormatList } from '#lib/types/import-mapping.ts';
 import { expenseApi, type ExpenseImportResult } from '#lib/services/expense-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
@@ -21,6 +21,7 @@ export class ImportExpensesForm {
 	isPreviewing = $state(false);
 	isImporting = $state(false);
 
+	formats = $state<ImportFormatList | null>(null);
 	isDetecting = $state(false);
 	detectedPreset = $state<DetectedImportFormat | null>(null);
 	targetVehicleId = $state('');
@@ -76,6 +77,15 @@ export class ImportExpensesForm {
 		this.manualDistanceUnit = 'miles';
 		this.manualVolumeUnit = 'gallons_us';
 		this.categoryRemap = {};
+	}
+
+	async loadFormats() {
+		if (this.formats) return;
+		try {
+			this.formats = await expenseApi.getImportFormats();
+		} catch {
+			this.formats = null;
+		}
 	}
 
 	async loadFile(file: File) {

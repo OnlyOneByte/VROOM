@@ -9,7 +9,7 @@ import type {
 	SplitConfig,
 	SplitExpenseGroup
 } from '#lib/types/index.ts';
-import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
+import type { DetectedImportFormat, ImportFormatList } from '#lib/types/import-mapping.ts';
 import { fromBackendExpense, toBackendExpense, type ExpenseInput } from './api-transformer';
 import { apiClient } from './api-client';
 import { buildQueryString } from './api-utils';
@@ -129,6 +129,10 @@ export const expenseApi = {
 			timeZone: userTimeZone(),
 			...(mapping ? { mapping } : {})
 		});
+	},
+
+	async getImportFormats(): Promise<ImportFormatList> {
+		return apiClient.get<ImportFormatList>('/expenses/import/formats');
 	},
 
 	async detectImportSource(sample: string): Promise<DetectedImportFormat | null> {

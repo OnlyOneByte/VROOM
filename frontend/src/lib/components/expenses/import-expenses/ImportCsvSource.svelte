@@ -4,11 +4,19 @@
 	interface Props {
 		csvText: string;
 		fileName: string | null;
+		accept?: string[] | undefined;
 		onFileChange: (_file: File) => void;
 		onPasteBlur: () => void;
 	}
 
-	let { csvText = $bindable(), fileName, onFileChange, onPasteBlur }: Props = $props();
+	let { csvText = $bindable(), fileName, accept, onFileChange, onPasteBlur }: Props = $props();
+
+	let extensions = $derived(accept?.filter(type => type.startsWith('.')) ?? []);
+	let chooseLabel = $derived(
+		extensions.length
+			? `Choose a ${new Intl.ListFormat('en', { type: 'disjunction' }).format(extensions)} file`
+			: 'Choose a file'
+	);
 
 	function handleFileChange(event: Event) {
 		const input = event.target as HTMLInputElement;
@@ -23,12 +31,12 @@
 		class="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-4 py-6 text-sm text-muted-foreground transition-colors hover:bg-muted/50"
 	>
 		<Upload class="h-5 w-5" />
-		<span>{fileName ?? 'Choose a .csv file'}</span>
+		<span>{fileName ?? chooseLabel}</span>
 	</label>
 	<input
 		id="import-csv-file"
 		type="file"
-		accept=".csv,text/csv"
+		accept={accept?.join(',')}
 		class="sr-only"
 		onchange={handleFileChange}
 	/>

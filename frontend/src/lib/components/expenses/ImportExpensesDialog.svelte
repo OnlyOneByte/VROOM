@@ -21,8 +21,15 @@
 	const form = new ImportExpensesForm(() => vehicles);
 
 	$effect(() => {
-		if (!open) form.reset();
+		if (open) void form.loadFormats();
+		else form.reset();
 	});
+
+	let formatNames = $derived(
+		form.formats?.formats.length
+			? ` such as ${new Intl.ListFormat('en', { type: 'disjunction' }).format(form.formats.formats.map(f => f.label))}`
+			: ''
+	);
 
 	async function handleCommit() {
 		if (await form.commit(onImported)) open = false;
@@ -34,8 +41,8 @@
 		<Dialog.Header>
 			<Dialog.Title>Import expenses from CSV</Dialog.Title>
 			<Dialog.Description>
-				Upload a VROOM CSV export, or a fuel log from another app such as Fuelly, Fuelio, or Drivvo
-				— we'll detect the format automatically. You'll see a preview before anything is saved.
+				Upload a VROOM CSV export, or a fuel log from another app{formatNames} — we'll detect the format
+				automatically. You'll see a preview before anything is saved.
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -43,6 +50,7 @@
 			<ImportCsvSource
 				bind:csvText={form.csvText}
 				fileName={form.fileName}
+				accept={form.formats?.accept}
 				onFileChange={file => form.loadFile(file)}
 				onPasteBlur={() => form.handlePasteBlur()}
 			/>

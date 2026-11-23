@@ -19,6 +19,8 @@ export type NativeField =
 
 export type ImportDateFormat = 'iso' | 'mdy' | 'dmy' | 'epoch';
 
+export const CSV_ACCEPT = ['.csv', 'text/csv'];
+
 export interface ColumnMapping {
   source?: string;
   columns: Partial<Record<NativeField, string>>;
