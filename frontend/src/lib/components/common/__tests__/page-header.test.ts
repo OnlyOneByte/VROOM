@@ -31,4 +31,24 @@ describe('the shared page header', () => {
 		expect(back.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 		expect(getByText('Track a new vehicle expense')).toBeInTheDocument();
 	});
+
+	test('the title keeps whole words: actions wrap below it instead of squeezing it from sm: up', () => {
+		const { getByRole } = render(PageHeader, {
+			title: 'All Expenses',
+			actions: html('<button>Add Expense</button>')
+		});
+
+		const titleBlock = getByRole('heading', { level: 1 }).parentElement?.parentElement;
+		expect(titleBlock).toHaveClass('min-w-0', 'sm:min-w-min', 'sm:flex-1');
+		expect(titleBlock?.parentElement).toHaveClass('sm:flex-row', 'sm:flex-wrap');
+	});
+
+	test('a short, narrow viewport drops the description so the actions stay on the first screen', () => {
+		const { getByText } = render(PageHeader, {
+			title: 'All Expenses',
+			description: '10,000 expenses across 5 vehicles'
+		});
+
+		expect(getByText('10,000 expenses across 5 vehicles')).toHaveClass('max-sm:short:hidden');
+	});
 });

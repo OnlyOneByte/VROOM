@@ -11,8 +11,8 @@
 	let { title, description, back, actions }: Props = $props();
 </script>
 
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-	<div class="flex min-w-0 items-center gap-3">
+<div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-4">
+	<div class="flex min-w-0 items-center gap-3 sm:min-w-min sm:flex-1">
 		{#if back}
 			{@render back()}
 		{/if}
@@ -24,9 +24,9 @@
 				{title}
 			</h1>
 			{#if typeof description === 'function'}
-				<p class="text-muted-foreground mt-1">{@render description()}</p>
+				<p class="text-muted-foreground mt-1 max-sm:short:hidden">{@render description()}</p>
 			{:else if description}
-				<p class="text-muted-foreground mt-1">{description}</p>
+				<p class="text-muted-foreground mt-1 max-sm:short:hidden">{description}</p>
 			{/if}
 		</div>
 	</div>
