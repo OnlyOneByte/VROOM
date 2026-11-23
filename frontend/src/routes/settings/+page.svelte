@@ -223,34 +223,27 @@
 		const toastId = toast.loading('Backup in progress...');
 
 		try {
-			const result = await settingsStore.executeSync(['backup'], true);
-			const data = result?.data;
+			const data = await settingsStore.executeSync(['backup'], true);
+			const providers = (count: number) => `${count} provider${count === 1 ? '' : 's'}`;
+			const nameOf = (id: string) =>
+				storageProviders.find(provider => provider.id === id)?.displayName ?? id;
 
-			if (data) {
-				if (data.status === 'in_progress') {
-					toast.error('A backup is already in progress', { id: toastId });
-					return;
-				}
-
-				if (data.skipped) {
-					toast.info('No changes since last backup — skipped', { id: toastId });
-					return;
-				}
-
-				const successCount = Object.values(data.results).filter(r => r.success).length;
-				const failCount = Object.values(data.results).filter(r => !r.success).length;
-
-				if (failCount > 0) {
-					toast.error(`${failCount} provider${failCount > 1 ? 's' : ''} failed`, {
-						id: toastId
-					});
-				} else if (successCount > 0) {
-					toast.success(`Backed up to ${successCount} provider${successCount > 1 ? 's' : ''}`, {
-						id: toastId
-					});
-				}
+			if (data.outcome === 'success') {
+				toast.success(`Backed up to ${providers(Object.keys(data.results).length)}`, {
+					id: toastId
+				});
+			} else if (data.outcome === 'partial') {
+				const succeeded = Object.values(data.results).filter(r => r.success).length;
+				toast.warning(
+					`Backed up to ${providers(succeeded)}. ${data.failedProviders.map(nameOf).join(', ')} failed.`,
+					{ id: toastId }
+				);
+			} else if (data.outcome === 'noop') {
+				toast.info('Nothing to back up: no provider has backups turned on', { id: toastId });
 			} else {
-				toast.success('Backup complete', { id: toastId });
+				toast.error(`Backup failed for ${data.failedProviders.map(nameOf).join(', ')}`, {
+					id: toastId
+				});
 			}
 
 			await fetchLastSyncTime();

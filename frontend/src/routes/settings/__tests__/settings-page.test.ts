@@ -30,7 +30,14 @@ vi.mock('#lib/utils/sync/sync-manager.ts', () => ({
 	fetchLastSyncTime: () => fetchLastSyncTime()
 }));
 vi.mock('svelte-sonner', () => ({
-	toast: { loading: vi.fn(), error: vi.fn(), info: vi.fn(), success: vi.fn(), dismiss: vi.fn() }
+	toast: {
+		loading: vi.fn(() => 'toast-1'),
+		error: vi.fn(),
+		info: vi.fn(),
+		success: vi.fn(),
+		warning: vi.fn(),
+		dismiss: vi.fn()
+	}
 }));
 
 const { stub } = vi.hoisted(() => ({
@@ -468,6 +475,72 @@ describe('Settings page preferences', () => {
 });
 
 describe('Settings page backups', () => {
+	async function backUpNow() {
+		await fireEvent.click(screen.getByRole('button', { name: 'stub backup now' }));
+		await settle();
+		await fireEvent.click(screen.getByRole('button', { name: 'stub sync' }));
+		await settle();
+	}
+
+	function orchestratorResult(
+		outcome: 'success' | 'partial' | 'failed' | 'noop',
+		results: Record<string, boolean>,
+		failedProviders: string[] = []
+	) {
+		return {
+			timestamp: '2026-11-23T00:00:00.000Z',
+			outcome,
+			failedProviders,
+			results: Object.fromEntries(
+				Object.entries(results).map(([id, success]) => [id, { success, capabilities: {} }])
+			)
+		};
+	}
+
+	test('a successful run ends the loading toast with how many providers it reached', async () => {
+		settingsStoreFake.executeSync.mockResolvedValue(
+			orchestratorResult('success', { p1: true, p2: true })
+		);
+		await mount();
+		await backUpNow();
+		expect(toast.success).toHaveBeenCalledWith('Backed up to 2 providers', { id: 'toast-1' });
+	});
+
+	test('a partial run names the failed provider and says the rest succeeded', async () => {
+		getProviders.mockResolvedValue([
+			{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo,
+			{ id: 'p2', displayName: 'Office S3' } as UserProviderInfo
+		]);
+		settingsStoreFake.executeSync.mockResolvedValue(
+			orchestratorResult('partial', { p1: true, p2: false }, ['p2'])
+		);
+		await mount();
+		await backUpNow();
+		expect(toast.warning).toHaveBeenCalledWith('Backed up to 1 provider. Office S3 failed.', {
+			id: 'toast-1'
+		});
+		expect(toast.error).not.toHaveBeenCalled();
+	});
+
+	test('a run with nothing to back up ends the spinner and says why', async () => {
+		settingsStoreFake.executeSync.mockResolvedValue(orchestratorResult('noop', {}));
+		await mount();
+		await backUpNow();
+		expect(toast.info).toHaveBeenCalledWith(
+			'Nothing to back up: no provider has backups turned on',
+			{ id: 'toast-1' }
+		);
+	});
+
+	test('a failed run reported in the body ends the toast with the failed providers', async () => {
+		settingsStoreFake.executeSync.mockResolvedValue(
+			orchestratorResult('failed', { p1: false }, ['p1'])
+		);
+		await mount();
+		await backUpNow();
+		expect(toast.error).toHaveBeenCalledWith('Backup failed for p1', { id: 'toast-1' });
+	});
+
 	test.each([
 		[
 			new ApiError('A backup is already in progress', 409, undefined, 'BACKUP_IN_PROGRESS'),

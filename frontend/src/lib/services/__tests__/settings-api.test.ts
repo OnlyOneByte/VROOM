@@ -35,6 +35,12 @@ describe('settingsApi — settings + sync wiring', () => {
 		expect(post).toHaveBeenCalledWith('/sync', { syncTypes: ['backup'], force: false });
 	});
 
+	test('executeSync resolves to the orchestrator result itself, since the client unwraps data', async () => {
+		const result = { timestamp: 't', outcome: 'noop', failedProviders: [], results: {} };
+		post.mockResolvedValueOnce(result);
+		await expect(settingsApi.executeSync(['backup'], true)).resolves.toBe(result);
+	});
+
 	test('executeSync passes force=true when given', async () => {
 		post.mockResolvedValueOnce({ success: true });
 		await settingsApi.executeSync(['backup'], true);
