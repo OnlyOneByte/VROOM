@@ -11,9 +11,9 @@ import {
   reminderToApi,
   reminderWithVehiclesToApi,
 } from '../../utils/money';
-import { requireVehicleOwnerScope } from '../../utils/sharing';
 import { calendarDayIn, isValidTimeZone } from '../../utils/time-zone';
 import { commonSchemas, validateReminderOwnership, zValidator } from '../../utils/validation';
+import { requireVehicleAccess, requireVehiclesAccess } from '../../utils/vehicle-access';
 import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
 import { recurringCostSummary } from './reminder-cost';
@@ -65,17 +65,12 @@ async function requireReminderVehiclesWrite(
   vehicleIds: readonly string[],
   actingUserId: string
 ): Promise<{ ownerId: string }> {
-  let ownerId: string | undefined;
-  for (const vehicleId of vehicleIds) {
-    const vehicleOwner = await requireVehicleOwnerScope(vehicleId, actingUserId, 'write');
-    if (ownerId === undefined) {
-      ownerId = vehicleOwner;
-    } else if (ownerId !== vehicleOwner) {
-      throw new ValidationError('A reminder cannot span vehicles owned by different users');
-    }
-  }
+  const [ownerId, ...otherOwners] = await requireVehiclesAccess(vehicleIds, actingUserId, 'write');
   if (ownerId === undefined) {
     throw new ValidationError('A reminder needs at least one vehicle');
+  }
+  if (otherOwners.length > 0) {
+    throw new ValidationError('A reminder cannot span vehicles owned by different users');
   }
   return { ownerId };
 }
@@ -325,7 +320,7 @@ routes.get('/', async (c) => {
 
   let listUserId = user.id;
   if (vehicleId) {
-    const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
+    const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'read');
     listUserId = ownerId;
   }
 

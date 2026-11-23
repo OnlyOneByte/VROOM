@@ -7,6 +7,7 @@ import * as schema from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import {
   requireVehicleAccess,
+  requireVehiclesAccess,
   resolveVehicleAccess,
   type VehicleAccessMode,
 } from '../vehicle-access';
@@ -145,4 +146,34 @@ describe('requireVehicleAccess', () => {
       });
     }
   }
+});
+
+describe('requireVehiclesAccess', () => {
+  function addVehicle(id: string, owner: string): void {
+    sqlite.run('INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)', [
+      id,
+      owner,
+      'Mazda',
+      '3',
+      2020,
+    ]);
+  }
+
+  test('returns one owner id per distinct owner, ignoring repeated vehicles', async () => {
+    addVehicle('v-own', INVITEE);
+    share('accepted', 'editor');
+    const owners = await requireVehiclesAccess([VEHICLE, 'v-own', VEHICLE], INVITEE, 'write', db);
+    expect([...owners].sort()).toEqual([OWNER, INVITEE].sort());
+  });
+
+  test('an empty list passes with no owners', async () => {
+    expect((await requireVehiclesAccess([], STRANGER, 'owner', db)).size).toBe(0);
+  });
+
+  test('one inaccessible vehicle fails the whole list', async () => {
+    addVehicle('v-own', INVITEE);
+    await expect(
+      requireVehiclesAccess(['v-own', VEHICLE], INVITEE, 'read', db)
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
 });

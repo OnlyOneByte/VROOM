@@ -26,7 +26,7 @@ import {
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
-import { requireVehicleAccess } from '../../utils/vehicle-access';
+import { requireVehicleAccess, requireVehiclesAccess } from '../../utils/vehicle-access';
 import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
@@ -282,17 +282,15 @@ async function requireSplitWriteAccess(
   splitConfig: SplitConfig,
   actingUserId: string
 ): Promise<{ ownerId: string; createdBy: string | null }> {
-  const vehicleIds = splitConfigVehicleIds(splitConfig);
-  let ownerId: string | undefined;
-  for (const vehicleId of vehicleIds) {
-    const { ownerId: vehicleOwner } = await requireVehicleAccess(vehicleId, actingUserId, 'write');
-    if (ownerId === undefined) {
-      ownerId = vehicleOwner;
-    } else if (ownerId !== vehicleOwner) {
-      throw new ValidationError('A split cannot span vehicles owned by different users');
-    }
-  }
+  const [ownerId, ...otherOwners] = await requireVehiclesAccess(
+    splitConfigVehicleIds(splitConfig),
+    actingUserId,
+    'write'
+  );
   if (ownerId === undefined) throw new ValidationError('Split has no vehicles');
+  if (otherOwners.length > 0) {
+    throw new ValidationError('A split cannot span vehicles owned by different users');
+  }
   return { ownerId, createdBy: ownerId === actingUserId ? null : actingUserId };
 }
 

@@ -45,6 +45,13 @@ export async function resolveVehicleAccess(
   return { role: row.level === 'editor' ? 'editor' : 'viewer', ownerId: row.ownerId };
 }
 
+export function allowsMode(
+  access: VehicleAccess | null,
+  mode: VehicleAccessMode
+): access is VehicleAccess {
+  return access !== null && ROLES_FOR_MODE[mode].includes(access.role);
+}
+
 export async function requireVehicleAccess(
   vehicleId: string,
   userId: string,
@@ -52,11 +59,22 @@ export async function requireVehicleAccess(
   db: AppDatabase | DrizzleTransaction = getDb()
 ): Promise<VehicleAccess> {
   const access = await resolveVehicleAccess(vehicleId, userId, db);
-  if (!access || !ROLES_FOR_MODE[mode].includes(access.role)) {
-    // 404, not 403, so a non-member cannot learn that the vehicle exists.
-    throw new NotFoundError('Vehicle');
-  }
+  // 404, not 403, so a non-member cannot learn that the vehicle exists.
+  if (!allowsMode(access, mode)) throw new NotFoundError('Vehicle');
   return access;
+}
+
+export async function requireVehiclesAccess(
+  vehicleIds: readonly string[],
+  userId: string,
+  mode: VehicleAccessMode,
+  db: AppDatabase | DrizzleTransaction = getDb()
+): Promise<Set<string>> {
+  const ownerIds = new Set<string>();
+  for (const vehicleId of new Set(vehicleIds)) {
+    ownerIds.add((await requireVehicleAccess(vehicleId, userId, mode, db)).ownerId);
+  }
+  return ownerIds;
 }
 
 export function ownedVehiclesScope(userId: string): SQL {

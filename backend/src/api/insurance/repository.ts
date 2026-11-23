@@ -13,7 +13,7 @@ import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError, NotFoundError, ValidationError } from '../../errors';
 import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
-import { assertVehiclesOwned } from '../../utils/vehicle-ownership';
+import { requireVehiclesAccess } from '../../utils/vehicle-access';
 
 interface CreateTermInput {
   startDate: Date;
@@ -87,14 +87,6 @@ export class InsurancePolicyRepository {
 
   constructor(db: AppDatabase) {
     this.db = db;
-  }
-
-  private async validateVehicleOwnership(
-    dbOrTx: AppDatabase | DrizzleTransaction,
-    vehicleIds: string[],
-    userId: string
-  ): Promise<void> {
-    await assertVehiclesOwned(dbOrTx, vehicleIds, userId);
   }
 
   // bun:sqlite: an async transaction callback autocommits each write, which could leave partial coverage.
@@ -178,7 +170,7 @@ export class InsurancePolicyRepository {
   async create(data: CreatePolicyData, userId: string): Promise<InsurancePolicyWithVehicles> {
     try {
       const allVehicleIds = [...new Set(data.terms.flatMap((t) => t.vehicleCoverage.vehicleIds))];
-      await this.validateVehicleOwnership(this.db, allVehicleIds, userId);
+      await requireVehiclesAccess(allVehicleIds, userId, 'owner', this.db);
 
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Policy creation requires sequential steps within a transaction
       return this.db.transaction((tx) => {
@@ -372,7 +364,7 @@ export class InsurancePolicyRepository {
     userId: string
   ): Promise<InsurancePolicyWithVehicles & { newTermId: string }> {
     try {
-      await this.validateVehicleOwnership(this.db, term.vehicleCoverage.vehicleIds, userId);
+      await requireVehiclesAccess(term.vehicleCoverage.vehicleIds, userId, 'owner', this.db);
 
       const termId = createId();
       this.db.transaction((tx) => {
@@ -446,7 +438,7 @@ export class InsurancePolicyRepository {
     try {
       const { vehicleCoverage, ...termFields } = updates;
       if (vehicleCoverage) {
-        await this.validateVehicleOwnership(this.db, vehicleCoverage.vehicleIds, userId);
+        await requireVehiclesAccess(vehicleCoverage.vehicleIds, userId, 'owner', this.db);
       }
 
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Term update requires field-by-field mapping and junction management

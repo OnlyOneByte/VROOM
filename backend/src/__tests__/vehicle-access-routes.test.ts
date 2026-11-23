@@ -21,6 +21,7 @@ interface RouteCase {
   name: string;
   mode: VehicleAccessMode;
   request: (fx: Fixture) => [method: string, path: string, body?: unknown];
+  returnsOwnerRow?: (fx: Fixture) => string;
 }
 
 const ALLOWED: Record<VehicleAccessMode, readonly Actor[]> = {
@@ -69,6 +70,7 @@ const ROUTES: RouteCase[] = [
     name: 'GET /expenses?vehicleId',
     mode: 'read',
     request: (fx) => ['GET', `/expenses?vehicleId=${fx.vehicleId}`],
+    returnsOwnerRow: (fx) => fx.expenseId,
   },
   {
     name: 'GET /expenses/summary?vehicleId',
@@ -99,6 +101,73 @@ const ROUTES: RouteCase[] = [
     name: 'DELETE /expenses/:id',
     mode: 'write',
     request: (fx) => ['DELETE', `/expenses/${fx.expenseId}`],
+  },
+  {
+    name: 'GET /financing/vehicles/:id/financing',
+    mode: 'owner',
+    request: (fx) => ['GET', `/financing/vehicles/${fx.vehicleId}/financing`],
+  },
+  {
+    name: 'POST /financing/vehicles/:id/financing',
+    mode: 'owner',
+    request: (fx) => [
+      'POST',
+      `/financing/vehicles/${fx.vehicleId}/financing`,
+      {
+        financingType: 'loan',
+        provider: 'Bank',
+        originalAmount: 1000,
+        termMonths: 12,
+        startDate: '2024-01-01T00:00:00.000Z',
+        paymentAmount: 100,
+        paymentFrequency: 'monthly',
+      },
+    ],
+  },
+  {
+    name: 'GET /insurance/vehicles/:id/policies',
+    mode: 'read',
+    request: (fx) => ['GET', `/insurance/vehicles/${fx.vehicleId}/policies`],
+  },
+  {
+    name: 'POST /insurance',
+    mode: 'owner',
+    request: (fx) => [
+      'POST',
+      '/insurance',
+      {
+        company: 'Mutual',
+        terms: [
+          {
+            startDate: '2024-01-01T00:00:00.000Z',
+            endDate: '2025-01-01T00:00:00.000Z',
+            vehicleCoverage: { vehicleIds: [fx.vehicleId] },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    name: 'GET /reminders?vehicleId',
+    mode: 'read',
+    request: (fx) => ['GET', `/reminders?vehicleId=${fx.vehicleId}`],
+  },
+  {
+    name: 'POST /reminders',
+    mode: 'write',
+    request: (fx) => [
+      'POST',
+      '/reminders',
+      {
+        name: 'Oil change',
+        type: 'notification',
+        frequency: 'custom',
+        intervalValue: 1,
+        intervalUnit: 'month',
+        startDate: '2024-01-01T00:00:00.000Z',
+        vehicleIds: [fx.vehicleId],
+      },
+    ],
   },
 ];
 
@@ -136,7 +205,9 @@ describe('every vehicle-scoped route enforces owner / editor / viewer / stranger
         const [method, path, body] = route.request(fx);
         const res = await as[actor](method, `/api/v1${path}`, body);
         if (allowed) {
-          expect(res.status, await res.text()).toBeLessThan(300);
+          const text = await res.text();
+          expect(res.status, text).toBeLessThan(300);
+          if (route.returnsOwnerRow) expect(text).toContain(route.returnsOwnerRow(fx));
         } else {
           expect(res.status).toBe(404);
         }

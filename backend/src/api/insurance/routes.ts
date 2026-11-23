@@ -3,12 +3,8 @@ import { z } from 'zod';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { insuranceClaimToApi, insuranceTermToApi } from '../../utils/money';
-import { requireVehicleRead, resolveVehicleAccess } from '../../utils/sharing';
-import {
-  validateInsuranceOwnership,
-  validateVehicleOwnership,
-  zValidator,
-} from '../../utils/validation';
+import { validateInsuranceOwnership, zValidator } from '../../utils/validation';
+import { requireVehicleAccess, resolveVehicleAccess } from '../../utils/vehicle-access';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { insuranceClaimRepository } from './claims-repository';
 import { createClaimSchema, updateClaimSchema } from './claims-validation';
@@ -116,7 +112,7 @@ async function validateClaimRefs(
   userId: string
 ): Promise<void> {
   if (data.vehicleId) {
-    await validateVehicleOwnership(data.vehicleId, userId);
+    await requireVehicleAccess(data.vehicleId, userId, 'owner');
   }
   if (data.termId) {
     const policy = await insurancePolicyRepository.findById(policyId);
@@ -146,7 +142,7 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
-    const access = await requireVehicleRead(vehicleId, user.id);
+    const access = await requireVehicleAccess(vehicleId, user.id, 'read');
     const policies = await insurancePolicyRepository.findByVehicleId(vehicleId);
     const scoped =
       access.role === 'owner' ? policies : policies.map((p) => narrowPolicyToVehicle(p, vehicleId));

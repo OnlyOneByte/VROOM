@@ -11,6 +11,7 @@ import { CONFIG } from '../config';
 import type { InsurancePolicy, Trip, Vehicle, VehicleFinancing } from '../db/schema';
 import { isElectricFuelType } from '../db/types';
 import { createErrorResponse, NotFoundError, ValidationError } from '../errors';
+import { allowsMode, resolveVehicleAccess } from './vehicle-access';
 
 export const MAX_ODOMETER_READING = CONFIG.validation.vehicle.maxOdometerReading;
 export const ODOMETER_TOO_HIGH_MESSAGE = `Odometer must be ${MAX_ODOMETER_READING.toLocaleString('en-US')} or less`;
@@ -110,8 +111,7 @@ export async function validateFinancingOwnership(
     throw new NotFoundError('Financing');
   }
 
-  const vehicle = await vehicleRepository.findByUserIdAndId(userId, financing.vehicleId);
-  if (!vehicle) {
+  if (!allowsMode(await resolveVehicleAccess(financing.vehicleId, userId), 'owner')) {
     throw new NotFoundError('Financing');
   }
 

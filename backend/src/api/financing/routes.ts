@@ -15,10 +15,10 @@ import {
   dateInput,
   MAX_ODOMETER_READING,
   validateFinancingOwnership,
-  validateVehicleOwnership,
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
+import { requireVehicleAccess } from '../../utils/vehicle-access';
 import { deactivateFinancing } from './hooks';
 import { financingRepository, withComputedBalance } from './repository';
 
@@ -128,7 +128,7 @@ routes.get(
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
     const { timeZone } = c.req.valid('query');
-    await validateVehicleOwnership(vehicleId, user.id);
+    await requireVehicleAccess(vehicleId, user.id, 'owner');
 
     const financingData = await financingRepository.findByVehicleId(vehicleId);
     if (!financingData) {
@@ -153,7 +153,7 @@ routes.post(
     const { vehicleId } = c.req.valid('param');
     const financingData = c.req.valid('json');
 
-    await validateVehicleOwnership(vehicleId, user.id);
+    await requireVehicleAccess(vehicleId, user.id, 'owner');
 
     const existingFinancing = await financingRepository.findByVehicleId(vehicleId);
 

@@ -383,7 +383,7 @@ routes.put(
     const updateData = c.req.valid('json');
 
     await requireVehicleAccess(id, user.id, 'owner');
-    const existingVehicle = (await vehicleRepository.findByIds([id]))[0];
+    const existingVehicle = (await vehicleRepository.findByIds([id]))[0] ?? null;
     if (!existingVehicle) {
       throw new NotFoundError('Vehicle');
     }
