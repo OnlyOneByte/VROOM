@@ -40,7 +40,7 @@ describe('CostPerMileHero', () => {
 		expect(screen.getByText(/\$0\.13 running\s*\+ \$0\.45 ownership/)).toBeInTheDocument();
 		expect(screen.getByText(/over 22,360\s*mi/)).toBeInTheDocument();
 		expect(screen.getByRole('list')).toHaveTextContent(
-			/Ownership\s*\$10,154\.00.*Fuel\s*\$1,900\.00.*Upkeep and fees\s*\$1,007\.00/
+			/Ownership\s*\$10,154\.00.*Fuel\s*\$1,900\.00.*Upkeep\s*\$1,007\.00/
 		);
 		const figures = container.querySelector('dl') as HTMLElement;
 		expect(figures).toHaveTextContent(/Last 30 days\s*\$500\.79/);

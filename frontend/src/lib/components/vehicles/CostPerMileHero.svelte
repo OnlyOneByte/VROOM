@@ -55,7 +55,7 @@
 				: vehicleType === 'hybrid'
 					? 'Fuel and charging'
 					: 'Fuel',
-		upkeep: 'Upkeep and fees'
+		upkeep: 'Upkeep'
 	});
 	let shownBuckets = $derived(buckets ? COST_BUCKETS.filter(bucket => buckets[bucket] > 0) : []);
 </script>
