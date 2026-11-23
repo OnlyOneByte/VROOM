@@ -132,6 +132,18 @@ describe('dashboard getting started', () => {
 		expect(screen.getByText('Recurring Costs')).toBeInTheDocument();
 	});
 
+	test('with a vehicle but no expenses, recurring costs alone get a full-width row', async () => {
+		getVehicles.mockResolvedValue([OWNED]);
+		reminders.recurring = { count: 2, monthlyTotal: 40 };
+		const { container } = render(Page);
+
+		const title = await screen.findByText('Recurring Costs');
+		expect(screen.queryByTestId('coming-up-empty')).toBeNull();
+		expect(screen.queryByText('Upcoming Reminders')).toBeNull();
+		expect(title.closest('.lg\\:grid-cols-2')).toBeNull();
+		expect(container.querySelector('.lg\\:grid-cols-2')).toBeNull();
+	});
+
 	test('with a vehicle but no expenses and nothing due, there is no empty Coming Up row', async () => {
 		getVehicles.mockResolvedValue([OWNED]);
 		render(Page);
