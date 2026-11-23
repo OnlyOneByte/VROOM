@@ -37,6 +37,17 @@ test.describe('Analytics', () => {
 		}
 	});
 
+	test('a short landscape window opens at the top of the page', async ({ page }) => {
+		await page.setViewportSize({ width: 740, height: 360 });
+		await mockApi(page);
+
+		await page.goto('/analytics');
+		await expect(page.getByRole('tab', { name: 'Year-End', exact: true })).toBeAttached();
+		await expect(page.getByText('Fuel spend per month')).toBeAttached();
+
+		expect(await page.evaluate(() => window.scrollY)).toBe(0);
+	});
+
 	test('the fuel tab renders the figures from the summary payload', async ({ page }) => {
 		await mockApi(page);
 

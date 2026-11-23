@@ -19,13 +19,18 @@
 	let activeTab = $state('fuel-stats');
 	let tabList = $state<HTMLElement | null>(null);
 
+	function revealActiveTab() {
+		const active = tabList?.querySelector('[data-state="active"]');
+		if (!tabList || !active) return;
+		const list = tabList.getBoundingClientRect();
+		const tab = active.getBoundingClientRect();
+		if (tab.left < list.left) tabList.scrollLeft -= list.left - tab.left;
+		else if (tab.right > list.right) tabList.scrollLeft += tab.right - list.right;
+	}
+
 	$effect(() => {
 		void activeTab;
-		void tick().then(() =>
-			tabList
-				?.querySelector('[data-state="active"]')
-				?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-		);
+		void tick().then(revealActiveTab);
 	});
 
 	async function loadSummary() {
