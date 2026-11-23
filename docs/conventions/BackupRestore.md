@@ -27,7 +27,7 @@ Branches key on Drizzle's runtime `columnType`, each set listing both SQLite and
 `metadata.version` records the format a backup was written in (`CONFIG.backup.currentVersion`,
 `2.0.0` today), and restore keeps it as written. `backupVersionError` in `backup.ts` accepts any
 older version, and the current major with a minor at or below the current one. It refuses a newer
-version with a message telling the user to update VROOM.
+major or minor with a message telling the user to update VROOM, and a version that isn't a number.
 
 An older backup reaches the current shape through `BACKUP_UPGRADE_STEPS`, an ordered list of
 `{ to, upgrade(tables) }`. `upgradeBackupTables` runs every step whose `to` is newer than the
@@ -48,9 +48,11 @@ every amount.
 ### Changing the format
 
 1. Bump `currentVersion`: the minor for an addition an older backup can do without, the major
-   for anything that needs an upgrade step to read old data.
-2. Add a `BACKUP_UPGRADE_STEPS` entry when old rows need changing to fit. A column an older
-   backup lacks needs none: `coerceRow` falls back to the schema default.
+   for anything that needs an upgrade step to read old data. Either way, older builds refuse the
+   new backups: the gate reads only up to its own minor.
+2. Add a `BACKUP_UPGRADE_STEPS` entry when old rows need changing to fit. A new column an older
+   backup lacks needs none if it is nullable or NOT NULL with a static default, since `coerceRow`
+   leaves it unset or fills the default. A NOT NULL column without one needs a step.
 3. Add a frozen fixture for the new version next to
    `backend/src/api/sync/__tests__/fixtures/backup-2.0.0/`, and never edit an existing one:
    `backup-format-fixture.test.ts` pins the 2.0.0 fixture's hash and checks it still restores,
