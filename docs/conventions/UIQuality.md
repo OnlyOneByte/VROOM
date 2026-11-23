@@ -163,7 +163,9 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   screen-reader users land on what needs fixing instead of staying on Save. Focusing the field
   is enough: its wired error is announced with it. Move focus after the errors have rendered,
   to the element that carries `aria-invalid` and `aria-describedby` (the trigger, for `Select`
-  and `DatePicker`). `focusFirstProblem` in `utils/focus.ts` does this; the expense, vehicle,
+  and `DatePicker`). A tile grid's buttons can't carry `aria-invalid`, so its `role="group"`
+  takes `tabindex="-1"`, `data-invalid="true"` and the error's `aria-describedby` instead
+  (`CategorySelector`). `focusFirstProblem` in `utils/focus.ts` does this; the expense, vehicle,
   policy and odometer forms use it. New forms do this; other existing forms adopt it form by form,
   and a PR that changes a form for another reason isn't blocked on it.
 - Use the right control: `DatePicker` for dates, `Select` for a short fixed list, a tile grid for

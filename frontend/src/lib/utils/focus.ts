@@ -25,5 +25,7 @@ export function focusInView(target: HTMLElement | null | undefined): void {
 
 export async function focusFirstProblem(form: Element | null | undefined): Promise<void> {
 	await tick();
-	focusInView(form?.querySelector<HTMLElement>('[aria-invalid="true"], #submit-error'));
+	focusInView(
+		form?.querySelector<HTMLElement>('[aria-invalid="true"], [data-invalid="true"], #submit-error')
+	);
 }
