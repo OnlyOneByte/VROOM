@@ -246,6 +246,8 @@ describe('vehicle detail page overview', () => {
 
 	test('the overview headings go in order from the page h1', async () => {
 		await mount();
+		await fireEvent.click(screen.getByRole('button', { name: 'Details, insurance and photos' }));
+		await settle();
 
 		const levels = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'), h =>
 			Number(h.tagName[1])
@@ -336,18 +338,18 @@ describe('vehicle detail page overview', () => {
 		expect(captured['insurance']?.['readOnly']).toBe(false);
 	});
 
-	test('the insurance section loads below the stats and charts, so it never pushes them down', async () => {
+	test('details, insurance and photos sit behind one disclosure, closed at first', async () => {
 		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
 		const { container } = await mount();
+		const trigger = screen.getByRole('button', { name: 'Details, insurance and photos' });
+		expect(trigger).toHaveAttribute('aria-expanded', 'false');
 
-		await waitFor(() => expect(captured['insurance']).toBeDefined());
-		const trend = container.querySelector('[data-mock="trend"]');
-		const insurance = container.querySelector('[data-mock="insurance"]');
-		expect(trend).not.toBeNull();
-		expect(insurance).not.toBeNull();
-		expect(
-			trend!.compareDocumentPosition(insurance!) & Node.DOCUMENT_POSITION_FOLLOWING
-		).toBeTruthy();
+		await fireEvent.click(trigger);
+		await waitFor(() => expect(container.querySelector('[data-mock="insurance"]')).not.toBeNull());
+
+		expect(trigger).toHaveAttribute('aria-expanded', 'true');
+		expect(screen.getByRole('heading', { level: 2, name: /Vehicle Information/ })).toBeVisible();
+		expect(captured['photos']).toBeDefined();
 	});
 
 	test('a summary failure shows the error and Retry reloads into the data view', async () => {
@@ -389,10 +391,15 @@ describe('vehicle detail page overview', () => {
 
 		expect(getExpenseSummary).toHaveBeenCalledWith({ vehicleId: 'v1', period: 'all' });
 		expect(getVehicleStats).toHaveBeenCalledWith('v1', 'all');
+		expect(captured['fuelStats']?.['trend']).toHaveLength(1);
+		expect(captured['fuelStats']?.['chart']).toBeTypeOf('function');
+		expect(captured['trend']).toBeUndefined();
+		expect(captured['pie']).toBeUndefined();
+
+		await openTab('Expenses');
+		await waitFor(() => expect(captured['pie']).toBeDefined());
 		expect(captured['trend']?.['description']).toBe('All Time');
 		expect(captured['trend']?.['data']).toHaveLength(1);
-		expect(captured['fuelTrend']?.['fuelType']).toBe('gas');
-		expect(captured['fuelTrend']?.['data']).toHaveLength(1);
 		const pie = captured['pie']?.['data'] as { key: string }[];
 		expect(pie.map(slice => slice.key)).toEqual(['maintenance', 'fuel']);
 	});

@@ -13,7 +13,8 @@
 		Users,
 		LoaderCircle,
 		WifiOff,
-		Ellipsis
+		Ellipsis,
+		ChevronRight
 	} from '@lucide/svelte';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.ts';
@@ -28,6 +29,12 @@
 	import CostPerMileHero from '#lib/components/vehicles/CostPerMileHero.svelte';
 	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import { distanceDriven } from '#lib/utils/cost-per-distance.ts';
+	import { lastTwelveMonths } from '#lib/utils/fuel-economy.ts';
+	import {
+		Collapsible,
+		CollapsibleContent,
+		CollapsibleTrigger
+	} from '#lib/components/ui/collapsible/index.ts';
 	import { resolveCurrentOdometer } from '#lib/utils/financing-calculations.ts';
 	import FuelEfficiencyStatsCard from '#lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
@@ -102,6 +109,7 @@
 
 	let shareOpen = $state(false);
 	let moreMenuOpen = $state(false);
+	let detailsOpen = $state(false);
 	let hasOpenedUpload = $state(false);
 
 	const CATEGORY_CHART_TITLE = 'Expense by Category';
@@ -141,6 +149,8 @@
 			mileage: point.mileage
 		}));
 	});
+
+	let recentFuelEfficiency = $derived(lastTwelveMonths(fuelEfficiencyData));
 
 	let categoryChartData = $derived.by(() => {
 		if (!summary?.categoryBreakdown.length) return [];
@@ -495,7 +505,20 @@
 	}
 </script>
 
-{#snippet chartPlaceholders(error: string | null)}
+{#snippet fuelChartPlaceholder(error: string | null)}
+	<ChartCard
+		title={fuelChartTitle}
+		description={fuelChartDescription}
+		level={3}
+		height={280}
+		isLoading={!error}
+		{error}
+	>
+		{null}
+	</ChartCard>
+{/snippet}
+
+{#snippet spendChartPlaceholders(error: string | null)}
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 		<ChartCard
 			title="Expense Trends"
@@ -506,26 +529,18 @@
 		>
 			{null}
 		</ChartCard>
-		<ChartCard
-			title={fuelChartTitle}
-			description={fuelChartDescription}
-			height={280}
-			isLoading={!error}
-			{error}
-		>
-			{null}
-		</ChartCard>
+		{#if categoryChartData.length > 0 || summary === null}
+			<ChartCard
+				title={CATEGORY_CHART_TITLE}
+				description={CATEGORY_CHART_DESCRIPTION}
+				height={300}
+				isLoading={!error}
+				{error}
+			>
+				{null}
+			</ChartCard>
+		{/if}
 	</div>
-	{#if categoryChartData.length > 0 || summary === null}
-		<ChartCard
-			title={CATEGORY_CHART_TITLE}
-			description={CATEGORY_CHART_DESCRIPTION}
-			isLoading={!error}
-			{error}
-		>
-			{null}
-		</ChartCard>
-	{/if}
 {/snippet}
 
 {#snippet tabLoading()}
@@ -717,64 +732,84 @@
 							{vehicleId}
 							{vehicleStatsData}
 							{isLoadingStats}
-							{selectedStatsPeriod}
 							unitPreferences={vehicle?.unitPreferences}
 							vehicleType={vehicle?.vehicleType}
-						/>
+							trend={fuelEfficiencyData}
+						>
+							{#snippet chart()}
+								{#await chartsLoading}
+									{@render fuelChartPlaceholder(null)}
+								{:then [, { default: FuelEfficiencyTrendChart }]}
+									<FuelEfficiencyTrendChart
+										data={recentFuelEfficiency}
+										fuelType={vehicle?.vehicleType || 'gas'}
+										unitPreferences={vehicle?.unitPreferences}
+										isLoading={isLoadingFuelEfficiency}
+										level={3}
+									/>
+								{:catch}
+									{@render fuelChartPlaceholder(CHARTS_LOAD_ERROR)}
+								{/await}
+							{/snippet}
+						</FuelEfficiencyStatsCard>
+					{/if}
 
-						{#await chartsLoading}
-							{@render chartPlaceholders(null)}
-						{:then [{ default: ExpenseTrendChart }, { default: FuelEfficiencyTrendChart }, { AppPieChart }]}
-							<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-								<ExpenseTrendChart
-									data={expenseTrendData}
-									description={trendDescription}
-									isLoading={isLoadingStats}
-								/>
-								<FuelEfficiencyTrendChart
-									data={fuelEfficiencyData}
-									fuelType={vehicle.vehicleType || 'gas'}
-									unitPreferences={vehicle.unitPreferences}
-									isLoading={isLoadingFuelEfficiency}
-								/>
-							</div>
-
-							{#if categoryChartData.length > 0 || summary === null}
-								<AppPieChart
-									title={CATEGORY_CHART_TITLE}
-									description={CATEGORY_CHART_DESCRIPTION}
-									data={categoryChartData}
-									isLoading={isLoadingStats}
-								/>
+					<Collapsible bind:open={detailsOpen} class="rounded-xl border bg-card">
+						<CollapsibleTrigger
+							class="flex min-h-12 w-full items-center gap-2 px-4 text-left text-sm font-semibold sm:px-6"
+						>
+							<ChevronRight
+								class="h-4 w-4 shrink-0 transition-transform {detailsOpen ? 'rotate-90' : ''}"
+								aria-hidden="true"
+							/>
+							Details, insurance and photos
+						</CollapsibleTrigger>
+						<CollapsibleContent class="space-y-6 border-t p-4 sm:p-6">
+							<VehicleInfoCard {vehicle} {isOwner} />
+							{#if InsuranceTab}
+								<InsuranceTab {vehicleId} readOnly={!isOwner} />
 							{/if}
-						{:catch}
-							{@render chartPlaceholders(CHARTS_LOAD_ERROR)}
-						{/await}
-					{/if}
-
-					{#if InsuranceTab}
-						<InsuranceTab {vehicleId} readOnly={!isOwner} />
-					{/if}
-
-					<div class="grid grid-cols-1 items-start lg:grid-cols-2 gap-6">
-						<VehicleInfoCard {vehicle} {isOwner} />
-						<VehiclePhotoCarousel
-							{vehicleId}
-							photos={vehiclePhotos}
-							{isOwner}
-							isLoading={isLoadingPhotos}
-							onUpload={() => {
-								hasOpenedUpload = true;
-								showUploadDialog = true;
-							}}
-							onDelete={handleDeletePhoto}
-							onSetCover={handleSetCover}
-						/>
-					</div>
+							<VehiclePhotoCarousel
+								{vehicleId}
+								photos={vehiclePhotos}
+								{isOwner}
+								isLoading={isLoadingPhotos}
+								onUpload={() => {
+									hasOpenedUpload = true;
+									showUploadDialog = true;
+								}}
+								onDelete={handleDeletePhoto}
+								onSetCover={handleSetCover}
+							/>
+						</CollapsibleContent>
+					</Collapsible>
 				</TabsContent>
 
 				<TabsContent value="expenses" class="space-y-6">
 					{#if visitedTabs['expenses']}
+						{#if hasExpenseData}
+							{#await chartsLoading}
+								{@render spendChartPlaceholders(null)}
+							{:then [{ default: ExpenseTrendChart }, , { AppPieChart }]}
+								<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+									<ExpenseTrendChart
+										data={expenseTrendData}
+										description={trendDescription}
+										isLoading={isLoadingStats}
+									/>
+									{#if categoryChartData.length > 0 || summary === null}
+										<AppPieChart
+											title={CATEGORY_CHART_TITLE}
+											description={CATEGORY_CHART_DESCRIPTION}
+											data={categoryChartData}
+											isLoading={isLoadingStats}
+										/>
+									{/if}
+								</div>
+							{:catch}
+								{@render spendChartPlaceholders(CHARTS_LOAD_ERROR)}
+							{/await}
+						{/if}
 						{#await loadExpensesTab()}
 							{@render tabLoading()}
 						{:then [{ default: ExpenseSearchFilters }, { default: ExpensesTable }]}

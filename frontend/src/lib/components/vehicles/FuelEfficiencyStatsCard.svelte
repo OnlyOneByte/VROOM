@@ -1,19 +1,25 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { Gauge, Plus } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		getVolumeUnitLabel,
 		getChargeUnitLabel,
-		getDistanceUnitLabel,
 		getFuelEfficiencyLabel,
 		getElectricEfficiencyLabel
 	} from '#lib/utils/units.ts';
-	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatDateWith, formatNumber } from '#lib/utils/formatters.ts';
+	import {
+		bestEfficiency,
+		lastTwelveMonths,
+		monthOutlier,
+		type EconomyPoint
+	} from '#lib/utils/fuel-economy.ts';
 	import { COMMON_MESSAGES, EXPENSE_MESSAGES } from '#lib/constants/messages.ts';
 	import type { UnitPreferences, VehicleStats, VehicleType } from '#lib/types/index.ts';
 
@@ -21,132 +27,113 @@
 		vehicleId: string;
 		vehicleStatsData: VehicleStats | null;
 		isLoadingStats: boolean;
-		selectedStatsPeriod: string;
 		unitPreferences?: UnitPreferences | undefined;
 		vehicleType?: VehicleType | undefined;
+		trend?: EconomyPoint[];
+		chart?: Snippet;
 	}
 
 	let {
 		vehicleId,
 		vehicleStatsData,
 		isLoadingStats,
-		selectedStatsPeriod,
 		unitPreferences,
-		vehicleType
+		vehicleType,
+		trend = [],
+		chart
 	}: Props = $props();
 
-	let electric = $derived(vehicleType === 'electric');
+	const headingId = $props.id();
 
+	let electric = $derived(vehicleType === 'electric');
 	let hasFuelData = $derived(
 		vehicleStatsData &&
 			(vehicleStatsData.fuelExpenseCount > 0 || vehicleStatsData.chargeExpenseCount > 0)
 	);
 	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
-	let distanceUnit = $derived(units.distanceUnit);
-	let volumeUnit = $derived(units.volumeUnit);
-	let chargeUnit = $derived(units.chargeUnit);
-	let isKilometers = $derived(distanceUnit === 'kilometers');
+	let efficiencyUnit = $derived(
+		electric
+			? getElectricEfficiencyLabel(units.distanceUnit, units.chargeUnit)
+			: getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit)
+	);
+	let decimals = $derived(electric ? 2 : 1);
 
-	const LOADING_ITEMS = ['distance', 'fuel', 'efficiency'].map(label => ({
-		label,
-		value: '',
-		unit: 'unit',
-		secondaryLabel: '',
-		secondaryValue: '',
-		secondaryUnit: 'unit'
-	}));
-
-	let statItems = $derived.by(() => {
-		if (!vehicleStatsData || !hasFuelData) return [];
-
-		const items: {
-			label: string;
-			value: string | number;
-			unit?: string;
-			secondaryLabel?: string;
-			secondaryValue?: string | number;
-			secondaryUnit?: string;
-		}[] = [];
-
-		if (vehicleStatsData.currentMileage !== null) {
-			items.push({
-				label: `Current ${isKilometers ? 'Odometer' : 'Mileage'}`,
-				value: formatNumber(vehicleStatsData.currentMileage, 0),
-				unit: getDistanceUnitLabel(distanceUnit, false),
-				secondaryLabel: `${isKilometers ? 'Distance' : 'Miles'} Driven`,
-				secondaryValue: formatNumber(vehicleStatsData.totalMileage, 0),
-				secondaryUnit: selectedStatsPeriod === 'all' ? 'lifetime' : `in ${selectedStatsPeriod}`
-			});
+	let recent = $derived(lastTwelveMonths(trend));
+	let average = $derived.by(() => {
+		if (recent.length > 0) {
+			return recent.reduce((sum, point) => sum + point.efficiency, 0) / recent.length;
 		}
-
-		if (vehicleStatsData.totalFuelConsumed > 0) {
-			items.push({
-				label: 'Fuel Consumed',
-				value: formatNumber(vehicleStatsData.totalFuelConsumed, 1),
-				unit: getVolumeUnitLabel(volumeUnit, true),
-				secondaryLabel: 'Total Fuel Cost',
-				secondaryValue: formatCurrency(vehicleStatsData.totalFuelCost),
-				secondaryUnit: `${vehicleStatsData.fuelExpenseCount} fill-ups`
-			});
-		}
-
-		if (vehicleStatsData.totalChargeConsumed > 0) {
-			items.push({
-				label: 'Charge Consumed',
-				value: formatNumber(vehicleStatsData.totalChargeConsumed, 1),
-				unit: getChargeUnitLabel(chargeUnit, true),
-				secondaryLabel: 'Total Charge Cost',
-				secondaryValue: formatCurrency(vehicleStatsData.totalChargeCost),
-				secondaryUnit: `${vehicleStatsData.chargeExpenseCount} charges`
-			});
-		}
-
-		if (vehicleStatsData.averageMpg !== null) {
-			items.push({
-				label: `Average ${getFuelEfficiencyLabel(distanceUnit, volumeUnit)}`,
-				value: formatNumber(vehicleStatsData.averageMpg, 1),
-				unit: 'fuel efficiency',
-				secondaryLabel: `Cost per ${getDistanceUnitLabel(distanceUnit, true)}`,
-				secondaryValue:
-					vehicleStatsData.costPerMile !== null
-						? formatCurrency(vehicleStatsData.costPerMile)
-						: 'N/A',
-				secondaryUnit: 'fuel only'
-			});
-		}
-
-		if (vehicleStatsData.averageMilesPerKwh !== null) {
-			items.push({
-				label: 'Efficiency',
-				value: formatNumber(vehicleStatsData.averageMilesPerKwh, 2),
-				unit: getElectricEfficiencyLabel(distanceUnit, chargeUnit),
-				secondaryLabel: `Cost per ${getDistanceUnitLabel(distanceUnit, true)}`,
-				secondaryValue:
-					vehicleStatsData.costPerMile !== null
-						? formatCurrency(vehicleStatsData.costPerMile)
-						: 'N/A',
-				secondaryUnit: 'charge only'
-			});
-		}
-
-		return items;
+		return (electric ? vehicleStatsData?.averageMilesPerKwh : vehicleStatsData?.averageMpg) ?? null;
 	});
+	let best = $derived(bestEfficiency(recent));
+	let pricePerUnit = $derived.by(() => {
+		if (!vehicleStatsData) return null;
+		const [cost, amount] = electric
+			? [vehicleStatsData.totalChargeCost, vehicleStatsData.totalChargeConsumed]
+			: [vehicleStatsData.totalFuelCost, vehicleStatsData.totalFuelConsumed];
+		return amount > 0 ? cost / amount : null;
+	});
+	let perUnitLabel = $derived(
+		electric
+			? getChargeUnitLabel(units.chargeUnit, true)
+			: getVolumeUnitLabel(units.volumeUnit, true)
+	);
+
+	let insight = $derived.by(() => {
+		if (recent.length < 2 || average === null) return null;
+		const outlier = monthOutlier(recent, average);
+		if (outlier) {
+			const month = formatDateWith(outlier.month, { month: 'long' });
+			const things = electric ? 'session' : 'tank';
+			const verb = outlier.direction === 'below' ? 'dipped' : 'rose';
+			return `${month} ${verb} to ${formatNumber(outlier.efficiency, decimals)} ${efficiencyUnit} over ${outlier.count} ${outlier.count === 1 ? things : `${things}s`}.`;
+		}
+		return `Every month stayed within 15% of the ${formatNumber(average, decimals)} ${efficiencyUnit} average.`;
+	});
+
+	let figures = $derived([
+		{
+			label: `${efficiencyUnit} average`,
+			value: average !== null ? formatNumber(average, decimals) : '—'
+		},
+		{
+			label: electric ? 'best session' : 'best tank',
+			value: best !== null ? formatNumber(best, decimals) : '—'
+		},
+		{
+			label: `avg per ${perUnitLabel}`,
+			value: pricePerUnit !== null ? formatCurrency(pricePerUnit) : '—'
+		}
+	]);
 </script>
 
 {#if hasFuelData || isLoadingStats}
-	<div class="space-y-3">
-		<div class="flex items-center gap-2">
-			<Gauge class="h-5 w-5" />
-			<h2 class="text-lg font-semibold">
-				{electric ? 'Mileage & Charging Statistics' : 'Mileage & Fuel Statistics'}
+	<section aria-labelledby={headingId} class="space-y-4" data-testid="fuel-economy">
+		<div class="flex items-baseline justify-between gap-3">
+			<h2 id={headingId} class="text-lg font-semibold">
+				{electric ? 'Efficiency' : 'Fuel economy'}
 			</h2>
+			<span class="text-xs text-muted-foreground">Last 12 months</span>
 		</div>
-		<StatCardGrid
-			items={isLoadingStats && statItems.length === 0 ? LOADING_ITEMS : statItems}
-			columns={3}
-			isLoading={isLoadingStats}
-		/>
-	</div>
+		<dl class="grid grid-cols-3 gap-3">
+			{#each figures as figure (figure.label)}
+				<div class="flex flex-col-reverse">
+					<dt class="text-xs text-muted-foreground">{figure.label}</dt>
+					<dd class="text-2xl font-bold tabular-nums">
+						{#if isLoadingStats && !hasFuelData}
+							<Skeleton class="h-8 w-16" />
+						{:else}
+							{figure.value}
+						{/if}
+					</dd>
+				</div>
+			{/each}
+		</dl>
+		{@render chart?.()}
+		{#if insight}
+			<p class="text-sm text-muted-foreground" data-testid="fuel-economy-insight">{insight}</p>
+		{/if}
+	</section>
 {:else if vehicleStatsData}
 	<EmptyState>
 		{#snippet icon()}
@@ -157,7 +144,7 @@
 		{/snippet}
 		{#snippet description()}
 			{electric
-				? `Add charging sessions with mileage and ${getChargeUnitLabel(chargeUnit, true)} to see detailed charging statistics`
+				? `Add charging sessions with mileage and ${getChargeUnitLabel(units.chargeUnit, true)} to see detailed charging statistics`
 				: EXPENSE_MESSAGES.ADD_FUEL_DESC}
 		{/snippet}
 		{#snippet action()}

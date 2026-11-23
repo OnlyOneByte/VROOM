@@ -31,25 +31,27 @@
 </script>
 
 {#snippet description()}
-	<span class="block truncate sm:inline">{vehicle.year} {vehicle.make} {vehicle.model}</span>
-	{#if vehicle.licensePlate || odometerLoading || odometer !== null}
-		<span class="max-sm:hidden" aria-hidden="true">·</span>
-	{/if}
-	<span class="block min-h-6 truncate sm:inline sm:min-h-0">
-		{#if vehicle.licensePlate}
-			<span class="whitespace-nowrap">{vehicle.licensePlate}</span>
+	<span class="block sm:flex sm:min-w-0 sm:gap-1">
+		<span class="block truncate">{vehicle.year} {vehicle.make} {vehicle.model}</span>
+		{#if vehicle.licensePlate || odometerLoading || odometer !== null}
+			<span class="shrink-0 max-sm:hidden" aria-hidden="true">·</span>
 		{/if}
-		{#if vehicle.licensePlate && (odometerLoading || odometer !== null)}
-			<span aria-hidden="true">·</span>
-		{/if}
-		{#if odometerLoading}
-			<Skeleton class="inline-block h-4 w-16 align-middle" />
-		{:else if odometer !== null}
-			<span class="whitespace-nowrap">
-				{formatNumber(odometer, 0)}
-				{getDistanceUnitLabel(distanceUnit, true)}
-			</span>
-		{/if}
+		<span class="block min-h-6 truncate sm:min-h-0 sm:shrink-0">
+			{#if vehicle.licensePlate}
+				<span class="whitespace-nowrap">{vehicle.licensePlate}</span>
+			{/if}
+			{#if vehicle.licensePlate && (odometerLoading || odometer !== null)}
+				<span aria-hidden="true">·</span>
+			{/if}
+			{#if odometerLoading}
+				<Skeleton class="inline-block h-4 w-16 align-middle" />
+			{:else if odometer !== null}
+				<span class="whitespace-nowrap">
+					{formatNumber(odometer, 0)}
+					{getDistanceUnitLabel(distanceUnit, true)}
+				</span>
+			{/if}
+		</span>
 	</span>
 {/snippet}
 

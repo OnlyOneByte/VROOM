@@ -37,14 +37,15 @@ function renderCard(unitPreferences?: {
 			vehicleId: 'veh-1',
 			vehicleStatsData: STATS,
 			isLoadingStats: false,
-			selectedStatsPeriod: 'all',
 			unitPreferences
 		}
 	});
 }
 
 describe('FuelEfficiencyStatsCard units', () => {
-	test("labels a metric vehicle's stats in its own units, not the user's", () => {
+	const recentDay = (daysAgo: number) => new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+
+	test("labels a metric vehicle's economy in its own units, not the user's", () => {
 		const { container } = renderCard({
 			distanceUnit: 'kilometers',
 			volumeUnit: 'liters',
@@ -52,18 +53,85 @@ describe('FuelEfficiencyStatsCard units', () => {
 		});
 		const text = container.textContent ?? '';
 
-		expect(text).toContain('Current Odometer');
-		expect(text).toContain('Kilometers');
-		expect(text).toContain('Cost per km');
-		expect(text).not.toContain('Miles');
+		expect(text).toContain('Fuel economy');
+		expect(text).toContain('avg per L');
 		expect(text).not.toContain('gal');
 	});
 
 	test("falls back to the user's units when the vehicle has none", () => {
 		const text = renderCard().container.textContent ?? '';
 
-		expect(text).toContain('Current Mileage');
-		expect(text).toContain('Cost per mi');
+		expect(text).toContain('avg per gal');
+		expect(text).toContain('$1.65');
+	});
+
+	test('the three figures are the 12-month average, the best tank and the price per unit', () => {
+		const { container } = render(FuelEfficiencyStatsCard, {
+			props: {
+				vehicleId: 'veh-1',
+				vehicleStatsData: STATS,
+				isLoadingStats: false,
+				trend: [
+					{ date: recentDay(10), efficiency: 30 },
+					{ date: recentDay(40), efficiency: 34 },
+					{ date: recentDay(500), efficiency: 99 }
+				]
+			}
+		});
+		const figures = [...container.querySelectorAll('dd')].map(dd => dd.textContent?.trim());
+
+		expect(figures).toEqual(['32.0', '34.0', '$1.65']);
+	});
+
+	test('one sentence names a month that dipped well below the average', () => {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		vi.setSystemTime(new Date(2026, 10, 23, 12));
+		const { getByTestId } = render(FuelEfficiencyStatsCard, {
+			props: {
+				vehicleId: 'veh-1',
+				vehicleStatsData: STATS,
+				isLoadingStats: false,
+				trend: [
+					{ date: new Date(2026, 6, 4), efficiency: 19 },
+					{ date: new Date(2026, 6, 20), efficiency: 19 },
+					{ date: new Date(2026, 7, 3), efficiency: 32 },
+					{ date: new Date(2026, 8, 3), efficiency: 33 }
+				]
+			}
+		});
+		vi.useRealTimers();
+
+		expect(getByTestId('fuel-economy-insight').textContent).toMatch(
+			/^July dipped to 19\.0 .+ over 2 tanks\.$/
+		);
+	});
+
+	test('an electric vehicle reads as Efficiency, priced per kWh', () => {
+		const { container } = render(FuelEfficiencyStatsCard, {
+			props: {
+				vehicleId: 'veh-1',
+				vehicleStatsData: {
+					...STATS,
+					totalFuelConsumed: 0,
+					totalFuelCost: 0,
+					fuelExpenseCount: 0,
+					totalChargeConsumed: 100,
+					totalChargeCost: 14,
+					chargeExpenseCount: 3,
+					averageMpg: null,
+					averageMilesPerKwh: 4.1
+				},
+				isLoadingStats: false,
+				vehicleType: 'electric'
+			}
+		});
+		const text = container.textContent ?? '';
+
+		expect(text).toContain('Efficiency');
+		expect(text).toContain('best session');
+		expect(text).toContain('avg per kWh');
+		expect(text).toContain('$0.14');
+		expect(text).toContain('4.10');
 	});
 });
 
@@ -77,7 +145,6 @@ describe('FuelEfficiencyStatsCard empty state', () => {
 				vehicleId: 'veh-1',
 				vehicleStatsData: { ...STATS, fuelExpenseCount: 0, chargeExpenseCount: 0 },
 				isLoadingStats: false,
-				selectedStatsPeriod: 'all',
 				vehicleType
 			}
 		});

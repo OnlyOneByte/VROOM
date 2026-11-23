@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { Vehicle } from '#lib/types/index.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
@@ -69,23 +69,23 @@ function follows(later: Node, earlier: Node): boolean {
 }
 
 describe('vehicle Overview puts the numbers first', () => {
-	test('the cost per distance hero comes before the vehicle details and the photos', async () => {
+	test('the hero comes first, then the fuel economy, then the details disclosure', async () => {
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 
 		const recent = await screen.findByText('Last 30 days');
-		const total = screen.getByTestId('cost-per-mile-hero');
-		const details = screen.getByRole('heading', { name: 'Vehicle Information' });
-		const photos = screen.getByRole('heading', { name: 'Photos' });
+		const hero = screen.getByTestId('cost-per-mile-hero');
+		const details = screen.getByRole('button', { name: 'Details, insurance and photos' });
 
-		expect(follows(recent, total)).toBe(true);
-		expect(follows(details, recent)).toBe(true);
-		expect(follows(photos, details)).toBe(true);
+		expect(follows(recent, hero) || hero.contains(recent)).toBe(true);
+		expect(follows(details, hero)).toBe(true);
 	});
 
-	test('the category chart describes this vehicle, not the fleet', async () => {
+	test('the category chart moved to the Expenses tab and still describes this vehicle', async () => {
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 
-		await screen.findByTestId('cost-per-mile-hero');
+		await screen.findByText('Last 30 days');
+		expect(pieProps.value).toBeNull();
+		await fireEvent.click(screen.getByRole('tab', { name: 'Expenses' }));
 		await vi.waitFor(() => expect(pieProps.value).not.toBeNull());
 		expect(pieProps.value?.['description']).toBe('Distribution for this vehicle');
 	});
