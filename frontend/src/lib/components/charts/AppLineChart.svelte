@@ -35,6 +35,8 @@
 		config: Chart.ChartConfig;
 		isLoading?: boolean;
 		error?: string | null;
+		emptyTitle?: string;
+		emptyDescription?: string;
 		onRetry?: () => unknown;
 		icon?: Snippet;
 		height?: number;
@@ -57,6 +59,8 @@
 		config,
 		isLoading = false,
 		error = null,
+		emptyTitle,
+		emptyDescription,
 		onRetry,
 		icon,
 		height = 300,
@@ -86,6 +90,8 @@
 	{error}
 	{onRetry}
 	{isEmpty}
+	{emptyTitle}
+	{emptyDescription}
 	{icon}
 	{height}
 	animationClass="chart-line-animated"

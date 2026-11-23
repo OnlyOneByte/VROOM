@@ -1,25 +1,13 @@
 <script lang="ts">
-	import './line-chart-animations.css';
-	import { LineChart } from 'layerchart';
-	import * as Chart from '#lib/components/ui/chart/index.ts';
-	import ChartCard from './ChartCard.svelte';
-	import {
-		formatCurrencyAxis,
-		formatCurrencyTooltip,
-		formatMonthLabel,
-		CHART_PADDING,
-		TIME_X_PADDING,
-		insetTimeTicks,
-		getTrendLineProps,
-		monthlyXAxisProps
-	} from '#lib/utils/chart-formatters.ts';
+	import type * as Chart from '#lib/components/ui/chart/index.ts';
+	import AppLineChart from './AppLineChart.svelte';
 	import type { Snippet } from 'svelte';
-
-	const CHART_HEIGHT = 300;
 
 	const chartConfig: Chart.ChartConfig = {
 		amount: { label: 'Amount', color: 'var(--primary)' }
 	};
+
+	const series = [{ key: 'amount', label: 'Amount', color: 'var(--primary)' }];
 
 	interface TrendData {
 		date: Date;
@@ -44,43 +32,19 @@
 		error = null,
 		icon
 	}: Props = $props();
-
-	const series = [{ key: 'amount', label: 'Amount', color: 'var(--primary)' }];
-	let xAxisProps = $derived(monthlyXAxisProps(data.length));
 </script>
 
-<ChartCard
+<AppLineChart
 	{title}
 	{description}
+	{data}
+	x="date"
+	y="amount"
+	{series}
+	config={chartConfig}
 	{isLoading}
 	{error}
-	isEmpty={data.length === 0}
+	{icon}
 	emptyTitle="No expense data available"
 	emptyDescription="Add expenses to see trends"
-	height={CHART_HEIGHT}
-	{icon}
-	animationClass="chart-line-animated"
->
-	<div style="height: {CHART_HEIGHT}px">
-		<Chart.Container config={chartConfig} class="h-full w-full">
-			<LineChart
-				{data}
-				x="date"
-				y="amount"
-				{series}
-				points={data.length === 1}
-				padding={CHART_PADDING}
-				xPadding={TIME_X_PADDING}
-				props={{
-					...getTrendLineProps(data.length),
-					xAxis: { ...xAxisProps, ticks: insetTimeTicks(xAxisProps.ticks) },
-					yAxis: { format: formatCurrencyAxis }
-				}}
-			>
-				{#snippet tooltip()}
-					<Chart.Tooltip labelFormatter={formatMonthLabel} valueFormatter={formatCurrencyTooltip} />
-				{/snippet}
-			</LineChart>
-		</Chart.Container>
-	</div>
-</ChartCard>
+/>
