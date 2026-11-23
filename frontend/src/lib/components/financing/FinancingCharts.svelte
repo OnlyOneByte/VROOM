@@ -1,12 +1,8 @@
 <script lang="ts">
-	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
-	import { ChartContainer, ChartTooltip } from '#lib/components/ui/chart/index.ts';
 	import type { ChartConfig } from '#lib/components/ui/chart/index.ts';
-	import { BarChart } from 'layerchart';
-	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
+	import { AppBarChart } from '#lib/components/charts/index.ts';
 	import type { VehicleFinancing } from '#lib/types/index.ts';
 	import type { AmortizationEntry } from '#lib/utils/financing-calculations.ts';
-	import { formatCurrencyAxis, formatCurrencyTooltip } from '#lib/utils/chart-formatters.ts';
 
 	interface Props {
 		financing: VehicleFinancing;
@@ -14,8 +10,6 @@
 	}
 
 	let { financing, amortizationSchedule = [] }: Props = $props();
-
-	let chartGate = createVisibilityWatch();
 
 	let showAmortizationChart = $derived(
 		financing.financingType === 'loan' &&
@@ -102,81 +96,25 @@
 </script>
 
 {#if showAmortizationChart}
-	<Card>
-		<CardHeader class="p-4 sm:p-6">
-			<CardTitle class="text-base sm:text-lg" id="amortization-chart-title">
-				Amortization Schedule
-			</CardTitle>
-			<p class="text-xs sm:text-sm text-muted-foreground">
-				Payment breakdown per month — principal vs interest
-			</p>
-		</CardHeader>
-		<CardContent class="p-4 sm:p-6">
-			<div
-				class="mb-3 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm"
-				role="list"
-				aria-label="Amortization chart legend"
-			>
-				<div class="flex items-center gap-2" role="listitem">
-					<div
-						class="h-3 w-3 rounded-sm flex-shrink-0"
-						style="background-color: var(--chart-2)"
-						aria-hidden="true"
-					></div>
-					<span class="text-muted-foreground">Principal</span>
-				</div>
-				<div class="flex items-center gap-2" role="listitem">
-					<div
-						class="h-3 w-3 rounded-sm flex-shrink-0"
-						style="background-color: var(--chart-3)"
-						aria-hidden="true"
-					></div>
-					<span class="text-muted-foreground">Interest</span>
-				</div>
-			</div>
-
-			<div bind:this={chartGate.el} style="min-height: 300px">
-				{#if chartGate.visible}
-					<ChartContainer
-						config={amortizationChartConfig}
-						class="h-[250px] sm:h-[300px] w-full pl-6"
-						role="img"
-						aria-labelledby="amortization-chart-title"
-						aria-describedby="amortization-chart-desc"
-					>
-						<BarChart
-							data={amortizationChartData}
-							x="paymentNumber"
-							y={['principal', 'interest']}
-							series={amortizationSeries}
-							props={{
-								bars: {
-									stroke: 'none'
-								},
-								xAxis: {
-									ticks: Math.min(amortizationChartData.length, 8),
-									format: (v: number) => `#${v}`
-								},
-								yAxis: {
-									format: formatCurrencyAxis
-								}
-							}}
-						>
-							{#snippet tooltip()}
-								<ChartTooltip
-									labelFormatter={v => `Payment #${v}`}
-									valueFormatter={formatCurrencyTooltip}
-								/>
-							{/snippet}
-						</BarChart>
-					</ChartContainer>
-				{/if}
-			</div>
-
-			<div id="amortization-chart-desc" class="sr-only">
+	<AppBarChart
+		title="Amortization Schedule"
+		description="Payment breakdown per month — principal vs interest"
+		data={amortizationChartData}
+		x="paymentNumber"
+		y={['principal', 'interest']}
+		series={amortizationSeries}
+		config={amortizationChartConfig}
+		xAxisProps={{
+			ticks: Math.min(amortizationChartData.length, 8),
+			format: (v: number) => `#${v}`
+		}}
+		tooltipLabelFormat={v => `Payment #${v}`}
+	>
+		{#snippet footer()}
+			<p class="sr-only">
 				Stacked bar chart showing amortization schedule with {amortizationSchedule.length} payments. Each
 				bar shows the breakdown of principal and interest for each payment.
-			</div>
-		</CardContent>
-	</Card>
+			</p>
+		{/snippet}
+	</AppBarChart>
 {/if}

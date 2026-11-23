@@ -1,5 +1,5 @@
 <script module lang="ts">
-	import type { AnyScale } from 'layerchart';
+	import type { AnyScale } from '#lib/components/charts/index.ts';
 	import {
 		TIME_X_PADDING,
 		formatDateTick,

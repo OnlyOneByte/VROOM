@@ -3,3 +3,4 @@ export { default as AppLineChart } from './AppLineChart.svelte';
 export { default as AppBarChart } from './AppBarChart.svelte';
 export { default as AppPieChart } from './AppPieChart.svelte';
 export { default as AppAreaChart } from './AppAreaChart.svelte';
+export type { AnyScale } from 'layerchart';
