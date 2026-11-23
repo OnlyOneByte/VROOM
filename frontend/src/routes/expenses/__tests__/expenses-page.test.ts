@@ -225,11 +225,38 @@ describe('/expenses with no vehicles', () => {
 describe('/expenses first screen', () => {
 	test('the count lives in the page description, with no repeated Expenses card header', async () => {
 		await mountLoaded();
-		expect(screen.getByText(/^\d+ expenses? across \d+ vehicles?$/)).toBeInTheDocument();
+		expect(screen.getByText('1 expense across 2 vehicles')).toBeInTheDocument();
 		expect(screen.queryByText(/^Expenses \(\d+\)$/)).toBeNull();
 		expect(screen.queryByText('All recorded expenses')).toBeNull();
 		const list = screen.getByRole('region', { name: 'Expenses' });
 		expect(list).toHaveAttribute('tabindex', '-1');
+	});
+
+	test('the count uses a thousands separator and singular forms', async () => {
+		getVehicles.mockResolvedValue([CAMRY]);
+		getAllExpenses.mockResolvedValue(pageOf(ROWS.slice(0, 1), 10000));
+		await mountLoaded();
+		expect(screen.getByText('10,000 expenses across 1 vehicle')).toBeInTheDocument();
+	});
+
+	test('with expenses but no vehicles of your own, the count names no vehicles', async () => {
+		getVehicles.mockResolvedValue([]);
+		getExpenseSummary.mockResolvedValue({ ...SUMMARY, expenseCount: 1 });
+		await mountLoaded();
+		expect(screen.getByText('1 expense')).toBeInTheDocument();
+		expect(screen.queryByText(/across 0 vehicles/)).toBeNull();
+	});
+
+	test('with a filter on, the count says it matches the filters instead of naming every vehicle', async () => {
+		await mountLoaded();
+		getAllExpenses.mockResolvedValue(pageOf(ROWS.slice(0, 1), 1));
+		await fireEvent.input(screen.getByRole('textbox', { name: 'Search expenses and vehicles' }), {
+			target: { value: 'shell' }
+		});
+		expect(
+			await screen.findByText('1 expense matches your filters', {}, SEARCH_DEBOUNCE_WAIT)
+		).toBeInTheDocument();
+		expect(screen.queryByText(/across \d+ vehicles?$/)).toBeNull();
 	});
 });
 

@@ -126,9 +126,22 @@
 
 	let offlineLoad = $state(false);
 	let expensesList = $state<HTMLElement | null>(null);
-	let countLine = $derived(
-		`${formatNumber(totalCount, 0)} ${totalCount === 1 ? 'expense' : 'expenses'} across ${formatNumber(vehicles.length, 0)} ${vehicles.length === 1 ? 'vehicle' : 'vehicles'}`
+	let filtersActive = $derived(
+		Boolean(
+			searchTerm ||
+			selectedVehicleId ||
+			selectedTags.length > 0 ||
+			startDate ||
+			endDate ||
+			categoryFilter
+		)
 	);
+	let countLine = $derived.by(() => {
+		const expenses = `${formatNumber(totalCount, 0)} ${totalCount === 1 ? 'expense' : 'expenses'}`;
+		if (filtersActive) return `${expenses} ${totalCount === 1 ? 'matches' : 'match'} your filters`;
+		if (vehicles.length === 0) return expenses;
+		return `${expenses} across ${formatNumber(vehicles.length, 0)} ${vehicles.length === 1 ? 'vehicle' : 'vehicles'}`;
+	});
 
 	onMount(loadInitial);
 
@@ -535,7 +548,7 @@
 					<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={handleTagsChange} />
 				</div>
 
-				{#if searchTerm || selectedVehicleId || selectedTags.length > 0 || startDate || endDate || categoryFilter}
+				{#if filtersActive}
 					<div class="flex justify-end sm:pt-2">
 						<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={clearFilters}>
 							<X class="h-4 w-4 mr-2" />
