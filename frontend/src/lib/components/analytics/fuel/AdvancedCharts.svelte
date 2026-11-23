@@ -42,9 +42,10 @@
 	interface Props {
 		fuelAdvanced: FuelAdvancedResponse;
 		group: 'patterns' | 'comparisons';
+		vehicleColors?: Record<string, string>;
 	}
 
-	let { fuelAdvanced, group }: Props = $props();
+	let { fuelAdvanced, group, vehicleColors = {} }: Props = $props();
 
 	let units = $derived(settingsStore.unitPreferences);
 	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
@@ -78,7 +79,7 @@
 		fuelAdvanced.vehicleRadar.map((v, i) => ({
 			key: v.vehicleId,
 			label: v.vehicleName,
-			color: CHART_COLORS[i % CHART_COLORS.length] as string
+			color: vehicleColors[v.vehicleId] ?? (CHART_COLORS[i % CHART_COLORS.length] as string)
 		}))
 	);
 
