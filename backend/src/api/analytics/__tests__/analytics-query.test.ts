@@ -521,8 +521,18 @@ describe('splits, compare and shape', () => {
     );
     expect(result.buckets).toEqual(['2025-02', '2025-03', '2025-04']);
     expect(result.series[0]?.values).toEqual([1_000, 1_000, 0]);
-    expect(result.totals.distance).toBe(2_000);
-    expect(result.totals.value).toBe(2_000);
+    expect(result.totals.distance).toBe(1_000);
+    expect(result.totals.value).toBe(1_000);
+
+    const legacy = new AnalyticsRepository(testDb.drizzle);
+    const window = { start: seconds('2025-02-01T00:00:00Z'), end: seconds('2025-05-01T00:00:00Z') };
+    const summary = await legacy.getSummary(OWNER.id, window);
+    const perDistance = await repo.query(
+      OWNER.id,
+      baseQuery({ metric: 'costPerDistance', interval: 'none', ...window })
+    );
+    expect(summary.quickStats.costPerDistance).toBe(2);
+    expect(perDistance.totals.value).toBe(summary.quickStats.costPerDistance);
   });
 
   test('a tag listed twice on one expense counts it once', async () => {

@@ -445,7 +445,10 @@ function collectDistances(ctx: QueryContext, result: PeriodRows[], rows: Distanc
   for (const row of rows) {
     const period = result[row.period];
     if (!period) continue;
-    period.rangeDistance += row.distance ?? 0;
+    if (row.idx < 0) {
+      period.rangeDistance += row.distance ?? 0;
+      continue;
+    }
     const length = ctx.periods[row.period]?.length ?? 0;
     seriesFor(period.distanceByVehicle, row.vehicle_id, length, () => 0)[row.idx] =
       row.distance ?? 0;
@@ -677,6 +680,11 @@ export class AnalyticsQueryRepository {
       FROM m JOIN vu ON vu.vehicle_id = m.vehicle_id
       WHERE m.idx >= 0
       GROUP BY m.period, m.idx, m.vehicle_id
+      UNION ALL
+      SELECT m.period, -1 AS idx, m.vehicle_id, (MAX(m.mileage) - MIN(m.mileage)) * vu.dist_user AS distance
+      FROM m JOIN vu ON vu.vehicle_id = m.vehicle_id
+      WHERE m.idx >= 0
+      GROUP BY m.period, m.vehicle_id
     `);
   }
 
