@@ -238,7 +238,6 @@
   "frontend/src/lib/components/charts/StatCard.svelte: Tailwind only generates complete class names it can see; keep each class string literal.",
   "frontend/src/lib/components/charts/StatCardGrid.svelte: min-w-0 is required: grid items default to min-width auto and overflow.",
   "frontend/src/lib/components/charts/index.ts: Importing this barrel pulls layerchart and d3 into the caller's chunk; import chart-free components from their own files.",
-  "frontend/src/lib/components/charts/line-chart-animations.css: Area fill must not inherit the line's stroke-dash animation.",
   "frontend/src/lib/components/common/ConfirmDialog.svelte: AlertDialog Action auto-closes unless its default is prevented.",
   "frontend/src/lib/components/common/ConfirmDialog.svelte: Caller shows the error; stay open so the user can retry.",
   "frontend/src/lib/components/common/media/CameraTab.svelte: startCamera records its failure in cameraError.",
