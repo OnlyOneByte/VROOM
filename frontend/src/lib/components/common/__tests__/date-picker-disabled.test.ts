@@ -55,6 +55,19 @@ describe('DatePicker opening focus', () => {
 		expect(document.activeElement).toHaveAttribute('data-bits-day');
 	});
 
+	test('Enter on the focused selected day keeps the date', async () => {
+		render(DatePicker, { props: { value: '2026-05-10', id: 'pick' } });
+		await fireEvent.click(screen.getByRole('button', { name: /May 10, 2026/ }));
+		await screen.findByRole('grid');
+		await vi.waitFor(() =>
+			expect(document.activeElement?.getAttribute('data-value')).toBe('2026-05-10')
+		);
+
+		await fireEvent.keyDown(document.activeElement as Element, { key: 'Enter' });
+
+		expect(document.getElementById('pick')).toHaveTextContent('May 10, 2026');
+	});
+
 	test('with no date set, opening focuses today', async () => {
 		render(DatePicker, { props: { value: undefined, placeholder: 'Pick a date' } });
 

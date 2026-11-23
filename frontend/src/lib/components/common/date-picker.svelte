@@ -103,7 +103,7 @@
 	</Popover.Trigger>
 	<Popover.Content class="w-auto p-0" onOpenAutoFocus={focusDay}>
 		<div bind:this={content}>
-			<Calendar type="single" bind:value={calendarValue as never} />
+			<Calendar type="single" bind:value={calendarValue as never} preventDeselect />
 		</div>
 	</Popover.Content>
 </Popover.Root>
