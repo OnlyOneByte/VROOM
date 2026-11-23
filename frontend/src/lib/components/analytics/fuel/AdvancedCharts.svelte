@@ -177,7 +177,7 @@
 		</div>
 		<AppBarChart
 			level={3}
-			title="Monthly Cost Heatmap"
+			title="Monthly Spending by Category"
 			description="Spending by category over time"
 			data={heatmapData}
 			x="date"
