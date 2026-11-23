@@ -167,13 +167,13 @@ export function upgradeBackupTables(
   }).reduce((current, step) => step.upgrade(current), tables);
 }
 
-const MAKE_A_NEW_BACKUP = 'Make a new backup in Settings, then restore that one.';
+const UNEDITED_BACKUP = "Choose a backup that VROOM made and that hasn't been edited.";
 
 export const BACKUP_CHECK_REASONS = {
-  metadata: `This file isn't a complete VROOM backup. ${MAKE_A_NEW_BACKUP}`,
-  rows: `Some records in this backup aren't valid, so it can't be restored. ${MAKE_A_NEW_BACKUP}`,
-  references: `Some records in this backup point to data that isn't in it, so it can't be restored. ${MAKE_A_NEW_BACKUP}`,
-  duplicates: `Some records appear twice in this backup, so it can't be restored. ${MAKE_A_NEW_BACKUP}`,
+  metadata: `This backup is missing details VROOM needs to restore it. ${UNEDITED_BACKUP}`,
+  rows: `Some entries in this backup can't be read, so it can't be restored. ${UNEDITED_BACKUP}`,
+  references: `Some entries in this backup refer to vehicles or other items that aren't in it, so it can't be restored. ${UNEDITED_BACKUP}`,
+  duplicates: `Some entries appear twice in this backup, so it can't be restored. ${UNEDITED_BACKUP}`,
 };
 
 export function backupVersionError(version: string | undefined): string | null {
@@ -671,7 +671,10 @@ class BackupService {
         reason: BACKUP_CHECK_REASONS.metadata,
         errors: backup.metadata?.userId && backup.metadata?.version ? [] : ['Invalid metadata'],
       },
-      { reason: null, errors: versionError ? [versionError] : [] },
+      {
+        reason: parseVersion(backup.metadata?.version) ? null : BACKUP_CHECK_REASONS.metadata,
+        errors: versionError ? [versionError] : [],
+      },
       {
         reason: BACKUP_CHECK_REASONS.rows,
         errors: [...rowErrors, ...this.validateJsonColumnShapes(backup)],

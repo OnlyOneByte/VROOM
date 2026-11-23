@@ -1180,7 +1180,9 @@ describe('validateBackupData: the first error is a plain reason', () => {
     const backup = emptyBackup();
     backup.metadata = { ...backup.metadata, userId: '' };
     const { errors } = backupService.validateBackupData(backup);
-    expect(errors[0]).toBe(BACKUP_CHECK_REASONS.metadata);
+    expect(errors[0]).toBe(
+      "This backup is missing details VROOM needs to restore it. Choose a backup that VROOM made and that hasn't been edited."
+    );
     expect(errors).toContain('Invalid metadata');
   });
 
@@ -1190,30 +1192,44 @@ describe('validateBackupData: the first error is a plain reason', () => {
     expect(backupService.validateBackupData(backup).errors[0]).toMatch(/newer version of VROOM/);
   });
 
-  test('a record that fails its schema', () => {
+  test('an entry that fails its schema', () => {
     const bad = { ...vehicle(), make: 42 } as Record<string, unknown>;
     const { errors } = backupService.validateBackupData(emptyBackup({ vehicles: [bad] }));
-    expect(errors[0]).toBe(BACKUP_CHECK_REASONS.rows);
+    expect(errors[0]).toBe(
+      "Some entries in this backup can't be read, so it can't be restored. Choose a backup that VROOM made and that hasn't been edited."
+    );
     expect(errors.some((e) => e.startsWith('vehicles[0]'))).toBe(true);
   });
 
-  test('a record that points to missing data', () => {
+  test('an entry that points to missing data', () => {
     const { errors } = backupService.validateBackupData(
       emptyBackup({ expenses: [expense('ghost', 'e1')] })
     );
-    expect(errors[0]).toBe(BACKUP_CHECK_REASONS.references);
+    expect(errors[0]).toBe(
+      "Some entries in this backup refer to vehicles or other items that aren't in it, so it can't be restored. Choose a backup that VROOM made and that hasn't been edited."
+    );
     expect(errors).toContain('Expense e1 references non-existent vehicle');
   });
 
-  test('a record that appears twice', () => {
+  test('an entry that appears twice', () => {
     const v = vehicle();
     const e1 = { ...expense(v.id as string, 'e1'), clientId: 'dup' };
     const e2 = { ...expense(v.id as string, 'e2'), clientId: 'dup' };
     const { errors } = backupService.validateBackupData(
       emptyBackup({ vehicles: [v], expenses: [e1, e2] })
     );
-    expect(errors[0]).toBe(BACKUP_CHECK_REASONS.duplicates);
+    expect(errors[0]).toBe(
+      "Some entries appear twice in this backup, so it can't be restored. Choose a backup that VROOM made and that hasn't been edited."
+    );
     expect(errors.some((e) => e.includes('violates a unique constraint'))).toBe(true);
+  });
+
+  test('a version that is not a version number', () => {
+    const backup = emptyBackup();
+    backup.metadata = { ...backup.metadata, version: 'abc' };
+    const { errors } = backupService.validateBackupData(backup);
+    expect(errors[0]).toBe(BACKUP_CHECK_REASONS.metadata);
+    expect(errors).toContain('Backup version "abc" is not a version number');
   });
 
   test('a valid backup has no errors at all', () => {
