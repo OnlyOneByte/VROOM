@@ -9,6 +9,22 @@ function skeletons(container: HTMLElement): Element[] {
 	return [...container.querySelectorAll('[data-slot="skeleton"]')];
 }
 
+describe('StatCard pads once', () => {
+	test.each([false, true])(
+		'the Card root drops its py-6 so CardContent owns the padding (loading %s)',
+		isLoading => {
+			const { container } = render(StatCard, {
+				props: { label: 'Total Vehicles', value: '3', icon: Car, isLoading, class: 'min-w-0' }
+			});
+
+			const root = container.querySelector('[data-slot="card"]');
+			expect(root).toHaveClass('py-0', 'min-w-0');
+			expect(root).not.toHaveClass('py-6');
+			expect(container.querySelector('[data-slot="card-content"]')).toHaveClass('p-4', 'sm:p-6');
+		}
+	);
+});
+
 describe('StatCard loading tile has the filled tile shape', () => {
 	test('with an icon: an icon box, a label line, then the value line', () => {
 		const { container } = render(StatCard, {
