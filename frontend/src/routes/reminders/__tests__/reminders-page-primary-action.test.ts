@@ -88,7 +88,7 @@ describe('/reminders primary action', () => {
 
 		await waitFor(() => expect(screen.getByText('Oil change')).toBeInTheDocument());
 		const prompt = screen.getByTestId('reminders-no-vehicles');
-		expect(prompt).toHaveTextContent("can't file expenses until you add one");
+		expect(prompt).toHaveTextContent('edit each reminder to choose it');
 		expect(controls('Add Vehicle')).toHaveLength(1);
 		expect(controls('Add Vehicle')[0]).toHaveAttribute('href', '/vehicles/new');
 		expect(
@@ -96,6 +96,21 @@ describe('/reminders primary action', () => {
 				Node.DOCUMENT_POSITION_FOLLOWING
 		).toBeTruthy();
 		expect(controls('Run Due Reminders')).toHaveLength(0);
+	});
+
+	test('a paused reminder that lost its vehicle offers no Resume, which the server would reject', async () => {
+		const orphan = reminder('2999-01-01T00:00:00.000Z');
+		orphan.reminder.isActive = false;
+		const kept = { ...reminder('2998-01-01T00:00:00.000Z'), vehicleIds: ['v1'] };
+		kept.reminder = { ...kept.reminder, id: 'r-kept', name: 'Tyre swap', isActive: false };
+		list.mockImplementation(() => Promise.resolve([orphan, kept]));
+		render(Page);
+
+		await waitFor(() => expect(screen.getByText('Tyre swap')).toBeInTheDocument());
+		expect(controls('Resume')).toHaveLength(1);
+		expect(screen.getByTestId('reminder-card-r-kept').contains(controls('Resume')[0] ?? null)).toBe(
+			true
+		);
 	});
 
 	test('with vehicles there is no Add Vehicle prompt above the list', async () => {

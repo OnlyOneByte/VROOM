@@ -351,9 +351,11 @@
 								Mark Serviced
 							</Button>
 						{/if}
-						<Button variant="ghost" size="sm" onclick={() => toggleActive(item)}>
-							{item.reminder.isActive ? 'Pause' : 'Resume'}
-						</Button>
+						{#if item.reminder.isActive || (item.vehicleIds?.length ?? 0) > 0}
+							<Button variant="ghost" size="sm" onclick={() => toggleActive(item)}>
+								{item.reminder.isActive ? 'Pause' : 'Resume'}
+							</Button>
+						{/if}
 						<Button
 							variant="ghost"
 							size="sm"
@@ -380,7 +382,10 @@
 				<Car class="h-4 w-4" />
 				<AlertTitle>{NO_VEHICLES_TITLE}</AlertTitle>
 				<AlertDescription>
-					<p>These reminders have no vehicle, so they can't file expenses until you add one.</p>
+					<p>
+						These reminders lost their vehicle and are paused. Add a vehicle, then edit each
+						reminder to choose it.
+					</p>
 					<Button size="lg" class="mt-2" href={resolve(routes.vehicleNew)}>
 						<Plus class="mr-2 h-4 w-4" />
 						Add Vehicle
