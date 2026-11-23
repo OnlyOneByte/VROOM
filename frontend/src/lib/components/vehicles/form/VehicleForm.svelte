@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { focusFirstProblem } from '#lib/utils/focus.ts';
 	import { onMount, untrack } from 'svelte';
 	import { goto, refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -411,9 +412,12 @@
 		}
 	});
 
+	let formEl = $state<HTMLFormElement | null>(null);
+
 	async function handleSubmit(event: Event) {
 		event.preventDefault();
 		if (!validateVehicleForm() || !validateFinancingForm()) {
+			await focusFirstProblem(formEl);
 			return;
 		}
 		if (activeFinancingToEnd) {
@@ -679,7 +683,11 @@
 		<div class="space-y-6">
 			{@render header()}
 
-			<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24 lg:pb-0 short:pb-0">
+			<form
+				bind:this={formEl}
+				onsubmit={handleSubmit}
+				class="space-y-6 pb-32 sm:pb-24 lg:pb-0 short:pb-0"
+			>
 				<Card>
 					<CardHeader>
 						<div class="flex items-center gap-2">
