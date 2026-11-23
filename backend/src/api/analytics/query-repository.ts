@@ -16,6 +16,7 @@ import { logger } from '../../utils/logger';
 import { zonedMidnight, zonedParts, zoneOffsetMs } from '../../utils/time-zone';
 import { canonicalScale, convertDistance, convertVolume } from '../../utils/unit-conversions';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
+import { OWNERSHIP_CATEGORIES } from '../expenses/repository';
 
 export const QUERY_METRICS = [
   'cost',
@@ -38,7 +39,9 @@ export type QueryInclude = (typeof QUERY_INCLUDES)[number];
 export type QueryCompare = (typeof QUERY_COMPARES)[number];
 export type QueryEnergy = (typeof QUERY_ENERGIES)[number];
 
-export const RUNNING_CATEGORIES: readonly ExpenseCategory[] = ['fuel', 'maintenance', 'misc'];
+export const RUNNING_CATEGORIES: readonly ExpenseCategory[] = EXPENSE_CATEGORIES.filter(
+  (c) => !(OWNERSHIP_CATEGORIES as readonly string[]).includes(c)
+);
 
 const ALL_GROUP_BYS = QUERY_GROUP_BYS;
 
