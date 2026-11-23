@@ -50,8 +50,10 @@
 	const LOADING_ITEMS = ['distance', 'fuel', 'efficiency'].map(label => ({
 		label,
 		value: '',
+		unit: 'unit',
 		secondaryLabel: '',
-		secondaryValue: ''
+		secondaryValue: '',
+		secondaryUnit: 'unit'
 	}));
 
 	let statItems = $derived.by(() => {
