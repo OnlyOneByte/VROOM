@@ -81,6 +81,7 @@
 	let expenseSortDir = $state<'asc' | 'desc'>('desc');
 
 	let vehiclePhotos = $state<Photo[]>([]);
+	let isLoadingPhotos = $state(false);
 	let showUploadDialog = $state(false);
 
 	let shareOpen = $state(false);
@@ -197,8 +198,8 @@
 		void loadFuelEfficiency();
 		void loadVehicleStats();
 		await loadVehicle();
-		isLoading = false;
 		if (vehicle && isOwner) void loadPhotos();
+		isLoading = false;
 	}
 
 	onMount(() => {
@@ -295,15 +296,18 @@
 		}
 	}
 
+	const nextFuelEfficiencyRequest = latest();
+
 	async function loadFuelEfficiency() {
+		const isCurrent = nextFuelEfficiencyRequest();
 		isLoadingFuelEfficiency = true;
 		try {
 			const result = await analyticsApi.getFuelEfficiency({ vehicleId });
-			fuelEfficiencyPoints = result.fuelEfficiencyTrend;
+			if (isCurrent()) fuelEfficiencyPoints = result.fuelEfficiencyTrend;
 		} catch (error) {
-			handleErrorWithNotification(error, "Couldn't load fuel efficiency");
+			if (isCurrent()) handleErrorWithNotification(error, "Couldn't load fuel efficiency");
 		} finally {
-			isLoadingFuelEfficiency = false;
+			if (isCurrent()) isLoadingFuelEfficiency = false;
 		}
 	}
 
@@ -406,11 +410,14 @@
 	}
 
 	async function loadPhotos() {
+		isLoadingPhotos = true;
 		try {
 			const photosResult = await vehicleApi.getPhotos(vehicleId);
 			vehiclePhotos = photosResult.data;
 		} catch (error) {
 			handleErrorWithNotification(error, "Couldn't load photos");
+		} finally {
+			isLoadingPhotos = false;
 		}
 	}
 
@@ -461,7 +468,7 @@
 			{null}
 		</ChartCard>
 	</div>
-	{#if categoryChartData.length > 0}
+	{#if categoryChartData.length > 0 || summary === null}
 		<ChartCard
 			title={CATEGORY_CHART_TITLE}
 			description={CATEGORY_CHART_DESCRIPTION}
@@ -577,6 +584,7 @@
 						{vehicleId}
 						photos={vehiclePhotos}
 						{isOwner}
+						isLoading={isLoadingPhotos}
 						onUpload={() => {
 							hasOpenedUpload = true;
 							showUploadDialog = true;

@@ -17,7 +17,12 @@ vi.mock('#lib/components/expenses/ExpensesTable.svelte', () => ({ default: () =>
 vi.mock('#lib/components/charts/index.ts', () => ({ AppPieChart: () => {} }));
 vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/charts/FuelEfficiencyTrendChart.svelte', () => ({ default: () => {} }));
-vi.mock('#lib/components/vehicles/VehiclePhotoCarousel.svelte', () => ({ default: () => {} }));
+const carouselProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
+vi.mock('#lib/components/vehicles/VehiclePhotoCarousel.svelte', () => ({
+	default: (_anchor: unknown, props: Record<string, unknown>) => {
+		carouselProps.value = props;
+	}
+}));
 vi.mock('#lib/components/vehicles/FuelEfficiencyStatsCard.svelte', () => ({ default: () => {} }));
 
 const never = <T>() => new Promise<T>(() => {});
@@ -46,7 +51,7 @@ const VEHICLE = {
 } as unknown as Vehicle;
 
 const vehicleCall = vi.hoisted(() => ({ release: (_vehicle: Vehicle) => {} }));
-const getPhotos = vi.fn(() => Promise.resolve({ data: [] }));
+const getPhotos = vi.fn(() => Promise.resolve({ data: [] as unknown[] }));
 vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: {
 		getVehicle: () =>
@@ -78,5 +83,21 @@ describe('vehicle page draws as soon as the vehicle loads', () => {
 		expect(
 			screen.getAllByRole('tabpanel')[0]?.querySelectorAll('[data-slot="skeleton"]').length
 		).toBeGreaterThan(0);
+	});
+
+	test('the photo card shows its loading state until the photos arrive', async () => {
+		let releasePhotos: (value: { data: unknown[] }) => void = () => {};
+		getPhotos.mockImplementationOnce(
+			() =>
+				new Promise(resolve => {
+					releasePhotos = resolve;
+				})
+		);
+		render(Page, { props: { data: { vehicleId: 'v1' } } });
+		vehicleCall.release(VEHICLE);
+
+		await waitFor(() => expect(carouselProps.value?.['isLoading']).toBe(true));
+		releasePhotos({ data: [] });
+		await waitFor(() => expect(carouselProps.value?.['isLoading']).toBe(false));
 	});
 });
