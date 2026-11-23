@@ -18,6 +18,7 @@
 	} from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import CategorySelector from './CategorySelector.svelte';
 	import FuelFieldsSection from './FuelFieldsSection.svelte';
@@ -263,10 +264,43 @@
 	);
 </script>
 
+{#snippet createHeader()}
+	<ExpenseFormHeader title={formTitle} onBack={handleBack}>
+		{#snippet subtitle()}
+			<ExpenseFormSubtitle
+				isEditMode={form.isEditMode}
+				isGroupEditMode={form.isGroupEditMode}
+				selectedVehicleIds={form.selectedVehicleIds}
+				vehicles={form.vehicles}
+				vehicle={form.vehicle}
+			/>
+		{/snippet}
+	</ExpenseFormHeader>
+{/snippet}
+
 <FormLayout>
-	{#if form.isLoading || !vehiclesLoaded}
+	{#if form.isLoading}
 		<div class="flex items-center justify-center py-12">
 			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
+		</div>
+	{:else if !vehiclesLoaded}
+		<div class="space-y-6" aria-busy="true" data-testid="expense-form-skeleton">
+			{@render createHeader()}
+			<div class="space-y-6 rounded-lg border bg-card p-6">
+				<Skeleton class="h-10 w-full sm:h-9" />
+				<div class="space-y-2">
+					<Skeleton class="h-4 w-20" />
+					<Skeleton class="h-10 w-full" />
+				</div>
+				<div class="space-y-2">
+					<Skeleton class="h-4 w-24" />
+					<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+						{#each Array(6) as _, i (i)}
+							<Skeleton class="h-28 w-full" />
+						{/each}
+					</div>
+				</div>
+			</div>
 		</div>
 	{:else if form.expenseError}
 		<div class="space-y-6">
@@ -326,7 +360,7 @@
 		</div>
 	{:else if needsVehicle}
 		<div class="space-y-6">
-			<ExpenseFormHeader title={formTitle} onBack={handleBack} />
+			{@render createHeader()}
 			<EmptyState>
 				{#snippet icon()}
 					<Car class="mb-4 h-12 w-12 text-muted-foreground" />
