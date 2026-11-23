@@ -66,9 +66,10 @@ export const analyticsApi = {
 		startDate: number;
 		endDate: number;
 		vehicleId?: string;
+		vehicleIds?: string[];
 	}): Promise<FuelStatsResponse> {
 		return apiClient.get<FuelStatsResponse>(
-			`/analytics/fuel-stats${buildQueryString({ startDate: params.startDate, endDate: params.endDate, vehicleId: params.vehicleId, timeZone: userTimeZone() })}`
+			`/analytics/fuel-stats${buildQueryString({ startDate: params.startDate, endDate: params.endDate, vehicleId: params.vehicleId, vehicleIds: params.vehicleIds?.join(','), timeZone: userTimeZone() })}`
 		);
 	},
 
@@ -76,9 +77,10 @@ export const analyticsApi = {
 		startDate: number;
 		endDate: number;
 		vehicleId?: string;
+		vehicleIds?: string[];
 	}): Promise<FuelAdvancedResponse> {
 		return apiClient.get<FuelAdvancedResponse>(
-			`/analytics/fuel-advanced${buildQueryString({ startDate: params.startDate, endDate: params.endDate, vehicleId: params.vehicleId, timeZone: userTimeZone() })}`
+			`/analytics/fuel-advanced${buildQueryString({ startDate: params.startDate, endDate: params.endDate, vehicleId: params.vehicleId, vehicleIds: params.vehicleIds?.join(','), timeZone: userTimeZone() })}`
 		);
 	},
 

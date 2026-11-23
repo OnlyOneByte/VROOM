@@ -225,6 +225,8 @@ describe('analytics routes (real HTTP stack)', () => {
       `/api/v1/analytics/cross-vehicle?${RANGE}&vehicleIds=${vehicleId}`,
       `/api/v1/analytics/financing?vehicleIds=${vehicleId}`,
       `/api/v1/analytics/insurance?vehicleIds=${vehicleId}`,
+      `/api/v1/analytics/fuel-stats?${RANGE}&vehicleIds=${vehicleId}`,
+      `/api/v1/analytics/fuel-advanced?${RANGE}&vehicleIds=${vehicleId}`,
     ]) {
       const res = await ctx.authed('GET', path);
       expect(res.status, path).toBe(200);

@@ -75,6 +75,13 @@ describe('the car filter narrows every fleet endpoint', () => {
     expect(civic.fuelAdvanced.vehicleRadar.map((r) => r.vehicleId)).toEqual([CIVIC.id]);
   });
 
+  test('fuel stats and fuel patterns take a car list', async () => {
+    const stats = await repo.getFuelStats(OWNER.id, RANGE, [CIVIC.id, FORD.id]);
+    expect(stats.fillupCostByVehicle.every((r) => r.vehicleId === CIVIC.id)).toBe(true);
+    const advanced = await repo.getFuelAdvanced(OWNER.id, RANGE, [RAV4.id]);
+    expect(advanced.vehicleRadar.map((r) => r.vehicleId)).toEqual([RAV4.id]);
+  });
+
   test('cross-vehicle keeps the picked cars and drops the rest', async () => {
     const both = await repo.getCrossVehicle(OWNER.id, RANGE, undefined, [CIVIC.id, RAV4.id]);
     const rav4 = await repo.getCrossVehicle(OWNER.id, RANGE, undefined, [RAV4.id]);

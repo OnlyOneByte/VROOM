@@ -120,7 +120,7 @@ const summaryQuerySchema = z
   .refine(startBeforeEnd, RANGE_ORDER_ERROR);
 
 const dateRangeVehicleQuerySchema = z
-  .object({ ...dateRangeFields, vehicleId: z.string().optional() })
+  .object({ ...dateRangeFields, vehicleId: z.string().optional(), vehicleIds })
   .refine(startBeforeEnd, RANGE_ORDER_ERROR);
 
 const dateRangeRequiredVehicleQuerySchema = z
@@ -201,7 +201,7 @@ routes.get('/quick-stats', zValidator('query', yearToDateQuerySchema), async (c)
 
 routes.get('/fuel-stats', zValidator('query', dateRangeVehicleQuerySchema), async (c) => {
   const user = c.get('user');
-  const { startDate, endDate, vehicleId, timeZone } = c.req.valid('query');
+  const { startDate, endDate, vehicleId, vehicleIds, timeZone } = c.req.valid('query');
 
   const scopeId = vehicleId
     ? (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId
@@ -210,7 +210,7 @@ routes.get('/fuel-stats', zValidator('query', dateRangeVehicleQuerySchema), asyn
   const data = await analyticsRepository.getFuelStats(
     scopeId,
     { start: startDate, end: endDate },
-    vehicleId,
+    vehicleId ?? vehicleIds,
     timeZone
   );
   return c.json({ success: true, data: fuelStatsToApi(data) });
@@ -244,7 +244,7 @@ routes.get('/insurance', zValidator('query', timeZoneQuerySchema), async (c) => 
 
 routes.get('/fuel-advanced', zValidator('query', dateRangeVehicleQuerySchema), async (c) => {
   const user = c.get('user');
-  const { startDate, endDate, vehicleId, timeZone } = c.req.valid('query');
+  const { startDate, endDate, vehicleId, vehicleIds, timeZone } = c.req.valid('query');
 
   const scopeId = vehicleId
     ? (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId
@@ -253,7 +253,7 @@ routes.get('/fuel-advanced', zValidator('query', dateRangeVehicleQuerySchema), a
   const data = await analyticsRepository.getFuelAdvanced(
     scopeId,
     { start: startDate, end: endDate },
-    vehicleId,
+    vehicleId ?? vehicleIds,
     timeZone
   );
   return c.json({ success: true, data: fuelAdvancedToApi(data) });

@@ -224,12 +224,13 @@
 	async function loadData() {
 		try {
 			internalLoading = true;
-			const summary = await analyticsApi.getSummary({
-				...(dateRange ?? getDefaultDateRange()),
-				vehicleIds
-			});
-			localFuelStats = summary.fuelStats;
-			localFuelAdvanced = summary.fuelAdvanced;
+			const range = { ...(dateRange ?? getDefaultDateRange()), vehicleIds };
+			const [stats, advanced] = await Promise.all([
+				analyticsApi.getFuelStats(range),
+				analyticsApi.getFuelAdvanced(range)
+			]);
+			localFuelStats = stats;
+			localFuelAdvanced = advanced;
 			error = null;
 		} catch (e) {
 			error = userFacingErrorMessage(e);
