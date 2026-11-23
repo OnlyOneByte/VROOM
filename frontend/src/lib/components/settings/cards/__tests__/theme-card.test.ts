@@ -32,6 +32,13 @@ describe('ThemeCard', () => {
 		expect(screen.getByRole('button', { name: 'System' })).toBeInTheDocument();
 	});
 
+	test('labels the choice Mode, not Theme, and says it applies right away', () => {
+		render(ThemeCard);
+		expect(screen.getByText('Mode')).toBeInTheDocument();
+		expect(screen.queryByText('Theme')).toBeNull();
+		expect(screen.getByText(/Changes apply right away/)).toBeInTheDocument();
+	});
+
 	test.each(['dark', 'system', 'light'] as const)(
 		'choosing %s stores the preference',
 		async preference => {

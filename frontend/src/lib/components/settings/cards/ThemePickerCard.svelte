@@ -30,7 +30,7 @@
 	<CardHeader>
 		<CardTitle>Theme</CardTitle>
 		<CardDescription>
-			Pick a color theme. Your light/dark choice above still applies.
+			Pick a color theme. It applies right away, in the mode you chose above.
 		</CardDescription>
 	</CardHeader>
 	<CardContent>
