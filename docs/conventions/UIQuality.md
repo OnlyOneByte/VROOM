@@ -135,6 +135,10 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   that opens it.
 - Mobile primary actions are `size="lg"` (40px) or full-width. On list pages the mobile primary
   action is the `FloatingActionButton`; don't repeat the same action in the header on mobile.
+- The FAB is the mobile primary action only. At `lg` and up, the same action is the primary
+  button in `PageHeader` (`class="hidden lg:inline-flex"`). Nothing fixed covers page content at
+  rest at any width: form action bars are sticky below `lg` and a normal row at the end of the form
+  from `lg`. A tab with its own primary action hides the page FAB.
 - Icon-only buttons are `size="icon"` or larger and always have an `aria-label`. On touch layouts
   use `icon-lg` or pad the hit area to 40px.
 - Labels are verbs in Title Case: "Add Expense", "Log Fill-up", "Import CSV". While a mutation is

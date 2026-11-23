@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { TrendingUp, ChartPie, CircleAlert, Car } from '@lucide/svelte';
+	import { TrendingUp, ChartPie, CircleAlert, Car, Plus } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
@@ -302,6 +302,15 @@
 			{#if canLogFillup}
 				<Button variant="outline" size="lg" href={resolve(routes.vehicleNew)}>
 					<Car class="mr-2 h-4 w-4" />
+					Add Vehicle
+				</Button>
+				<Button size="lg" class="hidden lg:inline-flex" onclick={handleLogFillup}>
+					<Plus class="mr-2 h-4 w-4" />
+					Log Fill-up
+				</Button>
+			{:else if showFab}
+				<Button size="lg" class="hidden lg:inline-flex" href={resolve(routes.vehicleNew)}>
+					<Plus class="mr-2 h-4 w-4" />
 					Add Vehicle
 				</Button>
 			{:else if isLoading && !hasLoaded}

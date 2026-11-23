@@ -16,6 +16,7 @@
 		Images,
 		Ellipsis,
 		LoaderCircle,
+		Plus,
 		WifiOff
 	} from '@lucide/svelte';
 	import { offlineExpenseQueue, onlineStatus } from '#lib/stores/offline.svelte.ts';
@@ -371,6 +372,13 @@
 	{/if}
 {/snippet}
 
+{#snippet addExpenseHeaderAction()}
+	<Button size="lg" class="hidden lg:inline-flex" href={resolve(routes.expenseNew)}>
+		<Plus class="mr-2 h-4 w-4" />
+		{COMMON_MESSAGES.ADD_EXPENSE}
+	</Button>
+{/snippet}
+
 <svelte:head>
 	<title>Expenses - VROOM Car Tracker</title>
 	<meta name="description" content="Track and manage your vehicle expenses" />
@@ -416,7 +424,11 @@
 		<PageHeader
 			title="All Expenses"
 			description="Track and categorize expenses across all vehicles"
-		/>
+		>
+			{#snippet actions()}
+				{@render addExpenseHeaderAction()}
+			{/snippet}
+		</PageHeader>
 		<Alert variant="warning" role="status" data-testid="expenses-offline-notice">
 			<WifiOff class="h-4 w-4" />
 			<AlertTitle>You're offline</AlertTitle>
@@ -460,6 +472,7 @@
 						</Popover.Content>
 					</Popover.Root>
 				</div>
+				{@render addExpenseHeaderAction()}
 			{/snippet}
 		</PageHeader>
 

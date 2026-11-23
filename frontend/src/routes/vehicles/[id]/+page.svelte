@@ -171,6 +171,10 @@
 
 	let isOwner = $derived(!vehicle?.sharedAccess);
 	let canWrite = $derived(!vehicle?.sharedAccess || vehicle.sharedAccess.level === 'editor');
+	let showAddExpenseAction = $derived(canWrite && activeTab !== 'odometer');
+	let addExpenseHref = $derived(
+		`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`
+	);
 
 	let coverPhotoUrl = $derived.by(() => {
 		const cover = vehiclePhotos.find(p => p.isCover);
@@ -524,18 +528,26 @@
 	<div class="space-y-6 pb-24">
 		<div class="flex items-start justify-between gap-4">
 			<VehicleHeader {vehicle} displayName={vehicleDisplayName} {coverPhotoUrl} />
-			{#if isOwner}
-				<Button
-					variant="outline"
-					size="sm"
-					onclick={() => (shareOpen = true)}
-					aria-label="Share"
-					class="h-10 w-10 shrink-0 sm:h-8 sm:w-auto"
-				>
-					<Users class="h-4 w-4 sm:mr-2" aria-hidden="true" />
-					<span class="hidden sm:inline">Share</span>
-				</Button>
-			{/if}
+			<div class="flex shrink-0 items-center gap-2">
+				{#if isOwner}
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={() => (shareOpen = true)}
+						aria-label="Share"
+						class="h-10 w-10 shrink-0 sm:h-8 sm:w-auto"
+					>
+						<Users class="h-4 w-4 sm:mr-2" aria-hidden="true" />
+						<span class="hidden sm:inline">Share</span>
+					</Button>
+				{/if}
+				{#if showAddExpenseAction}
+					<Button size="lg" class="hidden lg:inline-flex" href={addExpenseHref}>
+						<Plus class="mr-2 h-4 w-4" />
+						{COMMON_MESSAGES.ADD_EXPENSE}
+					</Button>
+				{/if}
+			</div>
 		</div>
 		{#if isOwner}
 			{#await import('#lib/components/vehicles/ShareVehicleDialog.svelte') then { default: ShareVehicleDialog }}
@@ -589,9 +601,7 @@
 						{/snippet}
 						{#snippet action()}
 							{#if canWrite}
-								<Button
-									href={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
-								>
+								<Button href={addExpenseHref}>
 									<Plus class="h-4 w-4 mr-2" />
 									{COMMON_MESSAGES.ADD_EXPENSE}
 								</Button>
@@ -698,7 +708,7 @@
 										emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
 										emptyDescription="Start tracking expenses for this vehicle"
 										emptyActionLabel={COMMON_MESSAGES.ADD_EXPENSE}
-										emptyActionHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
+										emptyActionHref={addExpenseHref}
 										scrollHeight={SCROLL_HEIGHTS.TABLE_DEFAULT}
 										onClearFilters={clearFilters}
 										{hasActiveFilters}
@@ -779,9 +789,6 @@
 	</EmptyState>
 {/if}
 
-{#if vehicle && canWrite}
-	<FloatingActionButton
-		href={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
-		label={COMMON_MESSAGES.ADD_EXPENSE}
-	/>
+{#if vehicle && showAddExpenseAction}
+	<FloatingActionButton href={addExpenseHref} label={COMMON_MESSAGES.ADD_EXPENSE} />
 {/if}
