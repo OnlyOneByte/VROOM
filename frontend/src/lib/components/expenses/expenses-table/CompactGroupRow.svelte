@@ -5,12 +5,9 @@
 	import SplitExpenseBadge from '../split/SplitExpenseBadge.svelte';
 	import type { Vehicle } from '#lib/types/index.ts';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
-	import {
-		categoryLabels,
-		getCategoryBadgeClasses,
-		getCategoryIcon
-	} from '#lib/utils/expense-helpers.ts';
+	import { getCategoryBadgeClasses, getCategoryIcon } from '#lib/utils/expense-helpers.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { EXPENSE_CATEGORY_INFO } from '#lib/constants/expense-categories.ts';
 	import {
 		INSURANCE_DELETE_BLOCKED,
 		blockedReasonId,
@@ -74,17 +71,17 @@
 					{formatCurrency(row.totalAmount)}
 				</span>
 			</div>
-			<div class="flex items-center flex-wrap gap-1.5 mt-0.5 text-xs text-muted-foreground">
+			<div class="flex min-w-0 items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
 				<SplitExpenseBadge />
 				{#if heading.categoryInMeta}
 					<span>·</span>
-					<span>{categoryLabels[row.category]}</span>
+					<span class="shrink-0">{EXPENSE_CATEGORY_INFO[row.category].shortLabel}</span>
 				{/if}
 				<span>·</span>
-				<span>{formatDate(new Date(row.date))}</span>
+				<span class="shrink-0 whitespace-nowrap">{formatDate(new Date(row.date))}</span>
 				{#if showVehicleColumn && row.vehicleNames.length > 0}
 					<span>·</span>
-					<span class="truncate">{row.vehicleNames.join(', ')}</span>
+					<span class="min-w-0 truncate">{row.vehicleNames.join(', ')}</span>
 				{/if}
 			</div>
 			{#if shownTags.length > 0}

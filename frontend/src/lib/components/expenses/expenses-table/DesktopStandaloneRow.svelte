@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Car, Pencil, Trash2 } from '@lucide/svelte';
+	import { Car, MapPin, Pencil, Trash2 } from '@lucide/svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { TableCell, TableRow } from '#lib/components/ui/table/index.ts';
@@ -38,8 +38,12 @@
 	<TableCell class="max-w-[240px]">
 		<div class="truncate font-medium text-foreground">{heading.title}</div>
 		{#if expense.location}
-			<div class="truncate text-xs text-muted-foreground" title={expense.location}>
-				📍 {expense.location}
+			<div
+				class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
+				title={expense.location}
+			>
+				<MapPin class="h-3 w-3 shrink-0" aria-hidden="true" />
+				<span class="truncate">{expense.location}</span>
 			</div>
 		{/if}
 	</TableCell>

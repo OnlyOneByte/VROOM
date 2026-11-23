@@ -400,14 +400,14 @@ describe('ExpensesTable rows lead with what the user would call the expense', ()
 
 		const named = screen.getByText('Arco').closest('button') as HTMLElement;
 		expect(named.querySelector('p')).toHaveTextContent('Arco');
-		expect(named).toHaveTextContent(/Fuel & Charging\s*·\s*Mar 21, 2024\s*·\s*Daily Driver/);
+		expect(named).toHaveTextContent(/Fuel\s*·\s*Mar 21, 2024\s*·\s*Daily Driver/);
 
 		const unnamed = screen.getByText('Maintenance').closest('button') as HTMLElement;
 		expect(unnamed.querySelector('p')).toHaveTextContent('Maintenance');
 
 		const split = screen.getByText('Car wash').closest('button') as HTMLElement;
 		expect(split).toHaveTextContent(/Split/);
-		expect(split).toHaveTextContent(/Fuel & Charging/);
+		expect(split).toHaveTextContent(/Split\s*·\s*Fuel\s*·/);
 	});
 
 	test('the desktop table opens each row with the description, falling back to the category', () => {
@@ -418,6 +418,6 @@ describe('ExpensesTable rows lead with what the user would call the expense', ()
 		const firstCells = [...container.querySelectorAll('tbody tr')].map(
 			tr => tr.querySelector('td')?.textContent?.replace(/\s+/g, ' ').trim() ?? ''
 		);
-		expect(firstCells).toEqual(['Arco 📍 Main St', 'Maintenance', 'Car wash']);
+		expect(firstCells).toEqual(['Arco Main St', 'Maintenance', 'Car wash']);
 	});
 });

@@ -5,12 +5,9 @@
 	import RecurringExpenseBadge from '../RecurringExpenseBadge.svelte';
 	import type { Expense, Vehicle } from '#lib/types/index.ts';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
-	import {
-		categoryLabels,
-		getCategoryBadgeClasses,
-		getCategoryIcon
-	} from '#lib/utils/expense-helpers.ts';
+	import { getCategoryBadgeClasses, getCategoryIcon } from '#lib/utils/expense-helpers.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { EXPENSE_CATEGORY_INFO } from '#lib/constants/expense-categories.ts';
 	import { expenseEditHref } from './expense-table-actions';
 	import { rowTitle, tagsBesideCategory } from './expense-table-rows';
 	import {
@@ -62,15 +59,15 @@
 				{formatCurrency(expense.amount)}
 			</span>
 		</div>
-		<div class="flex items-center flex-wrap gap-1.5 mt-0.5 text-xs text-muted-foreground">
+		<div class="flex min-w-0 items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
 			{#if heading.categoryInMeta}
-				<span>{categoryLabels[expense.category]}</span>
+				<span class="shrink-0">{EXPENSE_CATEGORY_INFO[expense.category].shortLabel}</span>
 				<span>·</span>
 			{/if}
-			<span>{formatDate(new Date(expense.date))}</span>
+			<span class="shrink-0 whitespace-nowrap">{formatDate(new Date(expense.date))}</span>
 			{#if showVehicleColumn && vehicle}
 				<span>·</span>
-				<span class="truncate">{getVehicleDisplayName(vehicle)}</span>
+				<span class="min-w-0 truncate">{getVehicleDisplayName(vehicle)}</span>
 			{/if}
 		</div>
 		{#if expense.sourceType === 'reminder'}
