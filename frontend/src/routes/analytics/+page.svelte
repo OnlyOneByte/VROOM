@@ -1,7 +1,7 @@
 <script lang="ts">
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { LoaderCircle, Car, DollarSign, Activity, TrendingUp } from '@lucide/svelte';
 	import * as Tabs from '#lib/components/ui/tabs/index.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
@@ -17,6 +17,21 @@
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 	let activeTab = $state('fuel-stats');
+	let tabList = $state<HTMLElement | null>(null);
+
+	function revealActiveTab() {
+		const active = tabList?.querySelector('[data-state="active"]');
+		if (!tabList || !active) return;
+		const list = tabList.getBoundingClientRect();
+		const tab = active.getBoundingClientRect();
+		if (tab.left < list.left) tabList.scrollLeft -= list.left - tab.left;
+		else if (tab.right > list.right) tabList.scrollLeft += tab.right - list.right;
+	}
+
+	$effect(() => {
+		void activeTab;
+		void tick().then(revealActiveTab);
+	});
 
 	async function loadSummary() {
 		try {
@@ -62,7 +77,11 @@
 					},
 					{
 						label: 'Fleet Health',
-						value: quickStats.fleetHealthScore,
+						value: quickStats.vehicleCount > 0 ? `${quickStats.fleetHealthScore} / 100` : '—',
+						subtitle:
+							quickStats.vehicleCount > 0
+								? 'Service regularity, service mileage and insurance cover'
+								: 'Add a vehicle to get a score',
 						icon: TrendingUp,
 						iconColor: 'chart-5'
 					}
@@ -102,11 +121,22 @@
 	{/if}
 
 	<Tabs.Root bind:value={activeTab} class="space-y-4 md:space-y-6">
-		<Tabs.List class="grid w-full grid-cols-2 sm:h-auto lg:grid-cols-4">
-			<Tabs.Trigger value="fuel-stats">Fuel & Stats</Tabs.Trigger>
-			<Tabs.Trigger value="cross-vehicle">Cross-Vehicle</Tabs.Trigger>
-			<Tabs.Trigger value="per-vehicle">Per-Vehicle</Tabs.Trigger>
-			<Tabs.Trigger value="year-end">Year-End</Tabs.Trigger>
+		<Tabs.List
+			bind:ref={tabList}
+			class="w-full justify-start overflow-x-auto lg:grid lg:grid-cols-4"
+		>
+			<Tabs.Trigger value="fuel-stats" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
+				Fuel & Stats
+			</Tabs.Trigger>
+			<Tabs.Trigger value="cross-vehicle" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
+				Cross-Vehicle
+			</Tabs.Trigger>
+			<Tabs.Trigger value="per-vehicle" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
+				Per-Vehicle
+			</Tabs.Trigger>
+			<Tabs.Trigger value="year-end" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
+				Year-End
+			</Tabs.Trigger>
 		</Tabs.List>
 
 		{#if activeTab === 'fuel-stats'}

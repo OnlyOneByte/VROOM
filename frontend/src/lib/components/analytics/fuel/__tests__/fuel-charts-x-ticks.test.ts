@@ -60,7 +60,8 @@ const fuelStats: FuelStatsResponse = {
 describe('FuelCharts monthly x-axis', () => {
 	test('a year of monthly data gets at most 6 x-axis ticks on every monthly chart', () => {
 		charts.length = 0;
-		render(FuelCharts, { props: { fuelStats } });
+		render(FuelCharts, { props: { fuelStats, group: 'primary' } });
+		render(FuelCharts, { props: { fuelStats, group: 'comparisons' } });
 		const monthly = ['Fuel Consumption', 'Fill-up Cost by Vehicle', 'Cost/mi', 'Total Odometer'];
 		for (const title of monthly) {
 			const chart = charts.find(c => c.title === title);

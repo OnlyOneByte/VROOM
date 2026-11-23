@@ -1,5 +1,13 @@
-import { expect, test } from '@playwright/test';
+import { type Page, expect, test } from '@playwright/test';
 import { ANALYTICS_SUMMARY, addSessionCookie, mockApi } from './support/mock-api';
+
+async function openFillupDetails(page: Page) {
+	await expect(page.getByText('Fuel spend per month')).toBeVisible();
+	const group = page.locator('details[data-slot="chart-group"]', { hasText: 'Fill-up details' });
+	if (!(await group.evaluate(el => (el as HTMLDetailsElement).open))) {
+		await group.locator('summary').click();
+	}
+}
 
 test.describe('Analytics', () => {
 	test.beforeEach(async ({ context }) => {
@@ -18,11 +26,26 @@ test.describe('Analytics', () => {
 		await expect(page.getByText('YTD Spending')).toBeVisible();
 		await expect(page.getByText('Avg mi/gal')).toBeVisible();
 		await expect(page.getByText('Fleet Health')).toBeVisible();
+		await expect(
+			page.getByText(`${ANALYTICS_SUMMARY.quickStats.fleetHealthScore} / 100`)
+		).toBeVisible();
 		await expect(page.getByText('$5,000.00')).toBeVisible();
 
 		for (const tab of ['Fuel & Stats', 'Cross-Vehicle', 'Per-Vehicle', 'Year-End']) {
 			await expect(page.getByRole('tab', { name: tab, exact: true })).toBeVisible();
+			await expect(page.getByRole('tab', { name: tab, exact: true })).toBeInViewport({ ratio: 1 });
 		}
+	});
+
+	test('a short landscape window opens at the top of the page', async ({ page }) => {
+		await page.setViewportSize({ width: 740, height: 360 });
+		await mockApi(page);
+
+		await page.goto('/analytics');
+		await expect(page.getByRole('tab', { name: 'Year-End', exact: true })).toBeAttached();
+		await expect(page.getByText('Fuel spend per month')).toBeAttached();
+
+		expect(await page.evaluate(() => window.scrollY)).toBe(0);
 	});
 
 	test('the fuel tab renders the figures from the summary payload', async ({ page }) => {
@@ -30,6 +53,7 @@ test.describe('Analytics', () => {
 
 		await page.goto('/analytics');
 
+		await openFillupDetails(page);
 		await expect(page.getByRole('heading', { name: 'Fill-ups' })).toBeVisible();
 		await expect(page.getByRole('heading', { name: 'Fuel Consumption' })).toBeVisible();
 		const fillups = ANALYTICS_SUMMARY.fuelStats.fillups.currentYear;
@@ -40,6 +64,7 @@ test.describe('Analytics', () => {
 		await mockApi(page);
 
 		await page.goto('/analytics');
+		await openFillupDetails(page);
 		await expect(page.getByRole('heading', { name: 'Fill-ups' })).toBeVisible();
 
 		await page.getByRole('tab', { name: 'Cross-Vehicle', exact: true }).click();

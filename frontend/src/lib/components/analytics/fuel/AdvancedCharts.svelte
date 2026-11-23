@@ -41,9 +41,10 @@
 
 	interface Props {
 		fuelAdvanced: FuelAdvancedResponse;
+		group: 'patterns' | 'comparisons';
 	}
 
-	let { fuelAdvanced }: Props = $props();
+	let { fuelAdvanced, group }: Props = $props();
 
 	let units = $derived(settingsStore.unitPreferences);
 	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
@@ -123,8 +124,8 @@
 	});
 </script>
 
-<div class="space-y-6">
-	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+	{#if group === 'patterns'}
 		<AppBarChart
 			title="Seasonal Efficiency"
 			description="Average {efficiencyLabel} by season"
@@ -140,7 +141,20 @@
 				format: (v: string) => (typeof v === 'string' ? v : String(v))
 			}}
 		/>
-
+		<AppBarChart
+			title="Time Between Fill-ups"
+			description="Distribution of fill-up intervals"
+			data={fuelAdvanced.fillupIntervals}
+			x="count"
+			y="intervalLabel"
+			series={intervalSeries}
+			config={intervalConfig}
+			orientation="horizontal"
+			yAxisFormat={_v => String(_v)}
+			tooltipFormat={formatCountTooltip}
+			xAxisProps={{ format: (_v: number) => String(Math.round(_v)) }}
+		/>
+	{:else}
 		<div class="min-w-0" bind:clientWidth={radarCardWidth}>
 			<AppBarChart
 				class="h-full"
@@ -158,9 +172,6 @@
 				xAxisProps={{ ticks: radarMetrics.map(m => m.label), format: radarTickFormat }}
 			/>
 		</div>
-	</div>
-
-	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
 		<AppBarChart
 			title="Monthly Cost Heatmap"
 			description="Spending by category over time"
@@ -172,19 +183,5 @@
 			yDomain={heatmapYDomain}
 			xAxisProps={monthlyXAxisProps(heatmapData.length, 6)}
 		/>
-
-		<AppBarChart
-			title="Time Between Fill-ups"
-			description="Distribution of fill-up intervals"
-			data={fuelAdvanced.fillupIntervals}
-			x="count"
-			y="intervalLabel"
-			series={intervalSeries}
-			config={intervalConfig}
-			orientation="horizontal"
-			yAxisFormat={_v => String(_v)}
-			tooltipFormat={formatCountTooltip}
-			xAxisProps={{ format: (_v: number) => String(Math.round(_v)) }}
-		/>
-	</div>
+	{/if}
 </div>
