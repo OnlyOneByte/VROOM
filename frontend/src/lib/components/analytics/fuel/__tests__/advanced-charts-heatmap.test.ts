@@ -38,7 +38,7 @@ const fuelAdvanced: FuelAdvancedResponse = {
 describe('Monthly Cost Heatmap', () => {
 	test('stacks its series without an explicit y, which would zero every bar', () => {
 		charts.length = 0;
-		render(AdvancedCharts, { props: { fuelAdvanced } });
+		render(AdvancedCharts, { props: { fuelAdvanced, group: 'comparisons' } });
 		const heatmap = charts.find(c => c.title === 'Monthly Cost Heatmap');
 		expect(heatmap?.seriesLayout).toBe('stack');
 		expect(heatmap?.y).toBeUndefined();
@@ -47,7 +47,7 @@ describe('Monthly Cost Heatmap', () => {
 
 	test('the y domain still reaches the tallest month', () => {
 		charts.length = 0;
-		render(AdvancedCharts, { props: { fuelAdvanced } });
+		render(AdvancedCharts, { props: { fuelAdvanced, group: 'comparisons' } });
 		const heatmap = charts.find(c => c.title === 'Monthly Cost Heatmap');
 		expect(heatmap?.yDomain?.[0]).toBe(0);
 		expect(heatmap?.yDomain?.[1]).toBeCloseTo(2000 * 1.05);

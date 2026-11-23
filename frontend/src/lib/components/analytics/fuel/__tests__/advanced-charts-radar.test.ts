@@ -29,6 +29,7 @@ function advanced(vehicleRadar: FuelAdvancedResponse['vehicleRadar']): FuelAdvan
 describe('Vehicle Performance Comparison fuel efficiency', () => {
 	test('names the vehicles that have no fuel efficiency score', () => {
 		render(AdvancedCharts, {
+			group: 'comparisons',
 			fuelAdvanced: advanced([
 				radarVehicle('gas', 'Weekend Car', 50),
 				radarVehicle('ev', 'Commuter EV', null)
@@ -39,6 +40,7 @@ describe('Vehicle Performance Comparison fuel efficiency', () => {
 
 	test('says No data when no vehicle has a fuel efficiency score', () => {
 		render(AdvancedCharts, {
+			group: 'comparisons',
 			fuelAdvanced: advanced([
 				radarVehicle('a', 'Daily Driver', null),
 				radarVehicle('ev', 'Commuter EV', null)
@@ -49,6 +51,7 @@ describe('Vehicle Performance Comparison fuel efficiency', () => {
 
 	test('adds no note when every vehicle has a score', () => {
 		render(AdvancedCharts, {
+			group: 'comparisons',
 			fuelAdvanced: advanced([
 				radarVehicle('a', 'Daily Driver', 10),
 				radarVehicle('b', 'Weekend Car', 100)

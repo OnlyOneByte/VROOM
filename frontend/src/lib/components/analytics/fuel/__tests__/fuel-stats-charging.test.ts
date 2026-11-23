@@ -118,7 +118,7 @@ describe('FuelStatsTab charging series', () => {
 		expect(screen.queryByText('No fill-ups in the last 12 months')).toBeNull();
 		expect(screen.getByText('Charging Sessions')).toBeTruthy();
 		expect(screen.getByText('Energy (kWh)')).toBeTruthy();
-		expect(screen.getByText('Average mi/kWh')).toBeTruthy();
+		expect(screen.getAllByText('Average mi/kWh')).toHaveLength(2);
 		expect(screen.getByText('Worst mi/kWh')).toBeTruthy();
 		expect(screen.getByText('Charging Details')).toBeTruthy();
 		expect(screen.getByText('18.0 kWh')).toBeTruthy();
@@ -164,5 +164,56 @@ describe('FuelStatsTab charging series', () => {
 		});
 		expect(screen.getByText('Fill-ups')).toBeTruthy();
 		expect(screen.queryByText('Charging Sessions')).toBeNull();
+	});
+});
+
+describe('FuelStatsTab summary and groups', () => {
+	const gas = {
+		fillups: { currentYear: 4, previousYear: 0, currentMonth: 1, previousMonth: 2 },
+		fuelConsumption: { avgEfficiency: 32.14, bestEfficiency: 36, worstEfficiency: 29 },
+		averageCost: {
+			perFillup: 35,
+			bestCostPerDistance: 0.1,
+			worstCostPerDistance: 0.14,
+			avgCostPerDay: 5.2
+		},
+		distance: { totalDistance: 16000, avgPerDay: 40, avgPerMonth: 1200 }
+	};
+
+	test('leads with cost per distance, monthly fuel spend and average efficiency', () => {
+		render(FuelStatsTab, { fuelStats: stats(gas), fuelAdvanced: advanced });
+		expect(screen.getByText('Cost per mi')).toBeTruthy();
+		expect(screen.getByText('$0.13')).toBeTruthy();
+		expect(screen.getByText('Fuel spend per month')).toBeTruthy();
+		expect(screen.getByText('$158.28')).toBeTruthy();
+		expect(screen.getAllByText('32.1').length).toBeGreaterThan(0);
+	});
+
+	test('shows N/A in the summary when there is no daily distance to divide by', () => {
+		render(FuelStatsTab, {
+			fuelStats: stats({
+				...gas,
+				distance: { totalDistance: 0, avgPerDay: null, avgPerMonth: null }
+			}),
+			fuelAdvanced: advanced
+		});
+		expect(screen.getAllByText('N/A').length).toBeGreaterThan(0);
+	});
+
+	test('hides the Last Period row when there is nothing to compare with', () => {
+		render(FuelStatsTab, { fuelStats: stats(gas), fuelAdvanced: advanced });
+		expect(screen.queryByText('Last Period')).toBeNull();
+		expect(screen.getAllByText('Last Month').length).toBeGreaterThan(0);
+	});
+
+	test('puts the details, patterns and comparisons in groups that start closed below lg', () => {
+		const { container } = render(FuelStatsTab, { fuelStats: stats(gas), fuelAdvanced: advanced });
+		const groups = [...container.querySelectorAll('details[data-slot="chart-group"]')];
+		expect(groups.map(g => g.querySelector('summary span span')?.textContent)).toEqual([
+			'Fill-up details',
+			'Patterns',
+			'Comparisons'
+		]);
+		expect(groups.every(g => !(g as HTMLDetailsElement).open)).toBe(true);
 	});
 });

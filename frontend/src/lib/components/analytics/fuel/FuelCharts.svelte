@@ -42,9 +42,10 @@
 		fuelStats: FuelStatsResponse;
 		dayOfWeekPatterns?: FuelAdvancedResponse['dayOfWeekPatterns'];
 		showGasCharts?: boolean;
+		group: 'primary' | 'patterns' | 'comparisons';
 	}
 
-	let { fuelStats, dayOfWeekPatterns, showGasCharts = true }: Props = $props();
+	let { fuelStats, dayOfWeekPatterns, showGasCharts = true, group }: Props = $props();
 
 	let units: UnitsMetadata = $derived(fuelStats.units ?? settingsStore.unitPreferences);
 
@@ -173,102 +174,101 @@
 </script>
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-	{#if showGasCharts}
-		<AppLineChart
-			title="Fuel Consumption"
-			description="Monthly {efficiencyLabel} and {volumeLabel.toLowerCase()} used"
-			data={consumptionData}
-			x="date"
-			y={['efficiency', 'volume']}
-			series={consumptionSeries}
-			config={consumptionConfig}
-			yAxisFormat={formatDecimalAxis}
-			tooltipFormat={consumptionTooltip}
-			xAxisProps={monthlyXAxisProps(consumptionData.length, 6)}
-		/>
+	{#if group === 'primary'}
+		{#if showGasCharts}
+			<AppLineChart
+				title="Fuel Consumption"
+				description="Monthly {efficiencyLabel} and {volumeLabel.toLowerCase()} used"
+				data={consumptionData}
+				x="date"
+				y={['efficiency', 'volume']}
+				series={consumptionSeries}
+				config={consumptionConfig}
+				yAxisFormat={formatDecimalAxis}
+				tooltipFormat={consumptionTooltip}
+				xAxisProps={monthlyXAxisProps(consumptionData.length, 6)}
+			/>
 
+			<AppLineChart
+				title="Gas Price on Fill-up"
+				description={pricePerVolumeDesc}
+				data={gasPriceData}
+				x="date"
+				y={gasPriceFuelTypes}
+				series={gasPriceSeries}
+				config={gasPriceConfig}
+				tooltipLabelFormat={formatDayLabel}
+				xAxisProps={{ ticks: getXTickCount(gasPriceData.length, 6), format: formatDateTick }}
+			/>
+		{/if}
+		{#if chargePriceData.length > 0}
+			<AppLineChart
+				title="Charging Price"
+				description={pricePerChargeDesc}
+				data={chargePriceData}
+				x="date"
+				y={chargePriceTypes}
+				series={chargePriceSeries}
+				config={chargePriceConfig}
+				yAxisFormat={formatCentsAxis}
+				tooltipLabelFormat={formatDayLabel}
+				xAxisProps={{ ticks: getXTickCount(chargePriceData.length, 6), format: formatDateTick }}
+			/>
+		{/if}
+		{#if showGasCharts}
+			<AppLineChart
+				title="Fill-up Cost by Vehicle"
+				description="Average fill-up cost per vehicle over time"
+				data={fillupCostData}
+				x="date"
+				y={costVehicleNames}
+				series={fillupCostSeries}
+				config={fillupCostConfig}
+				xAxisProps={monthlyXAxisProps(fillupCostData.length, 6)}
+			/>
+		{/if}
+	{:else if group === 'patterns'}
+		{#if showGasCharts}
+			<AppBarChart
+				title="Fill-up Patterns by Day of Week"
+				description="When you typically fill up"
+				data={dayPatternData}
+				x="day"
+				y="fillupCount"
+				series={dayPatternSeries}
+				config={dayPatternConfig}
+				height={350}
+				yAxisFormat={v => String(Math.round(v))}
+				tooltipFormat={formatCountTooltip}
+				xAxisProps={{
+					ticks: dayPatternData.map(d => d.day),
+					format: (v: string) => (typeof v === 'string' ? v.slice(0, 3) : String(v))
+				}}
+			/>
+		{/if}
+	{:else}
 		<AppLineChart
-			title="Gas Price on Fill-up"
-			description={pricePerVolumeDesc}
-			data={gasPriceData}
+			title={costPerDistLabel}
+			description="{costPerDistLabel} trend by vehicle"
+			data={costPerMileData}
 			x="date"
-			y={gasPriceFuelTypes}
-			series={gasPriceSeries}
-			config={gasPriceConfig}
-			tooltipLabelFormat={formatDayLabel}
-			xAxisProps={{ ticks: getXTickCount(gasPriceData.length, 6), format: formatDateTick }}
-		/>
-	{/if}
-
-	{#if chargePriceData.length > 0}
-		<AppLineChart
-			title="Charging Price"
-			description={pricePerChargeDesc}
-			data={chargePriceData}
-			x="date"
-			y={chargePriceTypes}
-			series={chargePriceSeries}
-			config={chargePriceConfig}
+			y={cpmVehicleNames}
+			series={costPerMileSeries}
+			config={costPerMileConfig}
 			yAxisFormat={formatCentsAxis}
-			tooltipLabelFormat={formatDayLabel}
-			xAxisProps={{ ticks: getXTickCount(chargePriceData.length, 6), format: formatDateTick }}
+			xAxisProps={monthlyXAxisProps(costPerMileData.length, 6)}
 		/>
-	{/if}
-
-	{#if showGasCharts}
-		<AppLineChart
-			title="Fill-up Cost by Vehicle"
-			description="Average fill-up cost per vehicle over time"
-			data={fillupCostData}
+		<AppAreaChart
+			title="Total Odometer"
+			description="Mileage progression per vehicle"
+			data={odometerData}
 			x="date"
-			y={costVehicleNames}
-			series={fillupCostSeries}
-			config={fillupCostConfig}
-			xAxisProps={monthlyXAxisProps(fillupCostData.length, 6)}
-		/>
-	{/if}
-
-	<AppLineChart
-		title={costPerDistLabel}
-		description="{costPerDistLabel} trend by vehicle"
-		data={costPerMileData}
-		x="date"
-		y={cpmVehicleNames}
-		series={costPerMileSeries}
-		config={costPerMileConfig}
-		yAxisFormat={formatCentsAxis}
-		xAxisProps={monthlyXAxisProps(costPerMileData.length, 6)}
-	/>
-
-	<AppAreaChart
-		title="Total Odometer"
-		description="Mileage progression per vehicle"
-		data={odometerData}
-		x="date"
-		y={odometerVehicleNames}
-		series={odometerSeries}
-		config={odometerConfig}
-		yAxisFormat={v => v.toLocaleString()}
-		tooltipFormat={odometerTooltip}
-		xAxisProps={monthlyXAxisProps(odometerData.length, 6)}
-	/>
-
-	{#if showGasCharts}
-		<AppBarChart
-			title="Fill-up Patterns by Day of Week"
-			description="When you typically fill up"
-			data={dayPatternData}
-			x="day"
-			y="fillupCount"
-			series={dayPatternSeries}
-			config={dayPatternConfig}
-			height={350}
-			yAxisFormat={v => String(Math.round(v))}
-			tooltipFormat={formatCountTooltip}
-			xAxisProps={{
-				ticks: dayPatternData.map(d => d.day),
-				format: (v: string) => (typeof v === 'string' ? v.slice(0, 3) : String(v))
-			}}
+			y={odometerVehicleNames}
+			series={odometerSeries}
+			config={odometerConfig}
+			yAxisFormat={v => v.toLocaleString()}
+			tooltipFormat={odometerTooltip}
+			xAxisProps={monthlyXAxisProps(odometerData.length, 6)}
 		/>
 	{/if}
 </div>

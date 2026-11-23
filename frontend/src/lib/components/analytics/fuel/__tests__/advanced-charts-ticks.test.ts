@@ -38,7 +38,7 @@ const fuelAdvanced: FuelAdvancedResponse = {
 describe('Vehicle Performance Comparison x-axis', () => {
 	test('a narrow card staggers every other metric name onto a second line', () => {
 		charts.length = 0;
-		render(AdvancedCharts, { props: { fuelAdvanced } });
+		render(AdvancedCharts, { props: { fuelAdvanced, group: 'comparisons' } });
 		const axis = charts.find(c => c.title === 'Vehicle Performance Comparison')?.xAxisProps;
 		const labels = axis?.ticks?.map(tick => axis.format?.(tick));
 		expect(labels).toEqual([

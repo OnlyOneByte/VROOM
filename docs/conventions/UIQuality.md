@@ -61,6 +61,11 @@ Tailwind's 4px scale is the only spacing scale. Match the neighbours; don't inve
 - **Radius** comes from `--radius` (`rounded-md` controls, `rounded-lg`/`rounded-xl` cards).
   `rounded-full` is for avatars, pills and the FAB only.
 - **Reserve space** for anything that arrives late (badges, charts, counts) so nothing jumps.
+- **Four screens at 375.** A page or tab fits in about four phone screens. Lead with the
+  numbers people come for, then group secondary content behind a disclosure that is closed
+  below `lg` (Analytics → Fuel & Stats uses `ChartGroup`), or move it to its own tab. A card
+  whose only content is an empty state collapses to one line when it is not the page's main
+  content.
 
 ## Typography
 

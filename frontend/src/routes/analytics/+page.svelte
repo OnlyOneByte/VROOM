@@ -62,7 +62,8 @@
 					},
 					{
 						label: 'Fleet Health',
-						value: quickStats.fleetHealthScore,
+						value: `${quickStats.fleetHealthScore} / 100`,
+						subtitle: 'Service regularity, service mileage and insurance cover',
 						icon: TrendingUp,
 						iconColor: 'chart-5'
 					}
@@ -102,11 +103,11 @@
 	{/if}
 
 	<Tabs.Root bind:value={activeTab} class="space-y-4 md:space-y-6">
-		<Tabs.List class="grid w-full grid-cols-2 sm:h-auto lg:grid-cols-4">
-			<Tabs.Trigger value="fuel-stats">Fuel & Stats</Tabs.Trigger>
-			<Tabs.Trigger value="cross-vehicle">Cross-Vehicle</Tabs.Trigger>
-			<Tabs.Trigger value="per-vehicle">Per-Vehicle</Tabs.Trigger>
-			<Tabs.Trigger value="year-end">Year-End</Tabs.Trigger>
+		<Tabs.List class="w-full justify-start overflow-x-auto lg:grid lg:grid-cols-4">
+			<Tabs.Trigger value="fuel-stats" class="shrink-0 px-3">Fuel & Stats</Tabs.Trigger>
+			<Tabs.Trigger value="cross-vehicle" class="shrink-0 px-3">Cross-Vehicle</Tabs.Trigger>
+			<Tabs.Trigger value="per-vehicle" class="shrink-0 px-3">Per-Vehicle</Tabs.Trigger>
+			<Tabs.Trigger value="year-end" class="shrink-0 px-3">Year-End</Tabs.Trigger>
 		</Tabs.List>
 
 		{#if activeTab === 'fuel-stats'}
