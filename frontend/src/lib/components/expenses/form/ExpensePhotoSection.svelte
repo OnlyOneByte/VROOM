@@ -6,6 +6,7 @@
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { expenseApi, type PhotoSectionEntityType } from '#lib/services/expense-api.ts';
 	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import type { Photo } from '#lib/types/index.ts';
 
 	interface Props {
@@ -46,6 +47,9 @@
 
 	let confirmOpen = $state(false);
 	let pendingDeleteId = $state<string | null>(null);
+	let uploadButton = $state<HTMLButtonElement | null>(null);
+	let grid = $state<HTMLDivElement | null>(null);
+	let focusAfterDelete: number | null = null;
 
 	function requestDelete(photoId: string) {
 		pendingDeleteId = photoId;
@@ -57,11 +61,22 @@
 		const photoId = pendingDeleteId;
 		try {
 			await expenseApi.deletePhoto(entityType, entityId, photoId);
+			const index = photos.findIndex(p => p.id === photoId);
 			photos = photos.filter(p => p.id !== photoId);
+			focusAfterDelete = Math.min(index, photos.length - 1);
 		} catch (err) {
 			handleErrorWithNotification(err, "Couldn't delete the photo");
 			throw err;
 		}
+	}
+
+	function handleCloseAutoFocus(event: Event) {
+		if (focusAfterDelete === null) return;
+		const index = focusAfterDelete;
+		focusAfterDelete = null;
+		event.preventDefault();
+		if (index >= 0) focusFirstButton(grid?.children[index]);
+		else uploadButton?.focus();
 	}
 </script>
 
@@ -69,6 +84,7 @@
 	<div class="flex items-center justify-between">
 		<h2 class="text-sm font-medium text-foreground">Photos & Receipts</h2>
 		<Button
+			bind:ref={uploadButton}
 			variant="outline"
 			size="sm"
 			class="h-10 text-xs sm:h-7"
@@ -89,7 +105,7 @@
 			<p class="text-xs text-muted-foreground">No photos or receipts yet.</p>
 		</div>
 	{:else}
-		<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+		<div bind:this={grid} class="grid grid-cols-2 gap-2 sm:grid-cols-3">
 			{#each photos as photo (photo.id)}
 				<div class="group relative overflow-hidden rounded-lg border border-border bg-muted">
 					{#if photo.mimeType === 'application/pdf'}
@@ -144,4 +160,5 @@
 	title="Delete photo?"
 	description="This permanently removes the photo from storage and cannot be undone."
 	onConfirm={performDelete}
+	onCloseAutoFocus={handleCloseAutoFocus}
 />

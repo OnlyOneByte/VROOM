@@ -173,4 +173,67 @@ describe('ExpensePhotoSection: deleting', () => {
 		expect(screen.getByAltText('p1.jpg')).toBeInTheDocument();
 		expect(screen.getByText('Delete photo?')).toBeInTheDocument();
 	});
+	async function confirmDelete(index: number) {
+		const button = deleteButtons()[index] as HTMLButtonElement;
+		button.focus();
+		await fireEvent.click(button);
+		const dialog = await screen.findByRole('alertdialog');
+		await waitFor(() => expect(dialog).toContainElement(document.activeElement as HTMLElement));
+		await fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+		await waitFor(() => expect(screen.queryByText('Delete photo?')).toBeNull());
+	}
+
+	test('after a delete, focus moves to the next photo', async () => {
+		mocks.getPhotos.mockResolvedValue(page([photo('p1'), photo('p2'), photo('p3')]));
+		mocks.deletePhoto.mockResolvedValue();
+		mount();
+		await screen.findByAltText('p3.jpg');
+
+		await confirmDelete(1);
+
+		await waitFor(() =>
+			expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Delete p3.jpg' }))
+		);
+	});
+
+	test('after deleting the last photo, focus moves to the previous one', async () => {
+		mocks.getPhotos.mockResolvedValue(page([photo('p1'), photo('p2')]));
+		mocks.deletePhoto.mockResolvedValue();
+		mount();
+		await screen.findByAltText('p2.jpg');
+
+		await confirmDelete(1);
+
+		await waitFor(() =>
+			expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Delete p1.jpg' }))
+		);
+	});
+
+	test('after deleting the only photo, focus moves to Upload', async () => {
+		mocks.getPhotos.mockResolvedValue(page([photo('p1')]));
+		mocks.deletePhoto.mockResolvedValue();
+		mount();
+		await screen.findByAltText('p1.jpg');
+
+		await confirmDelete(0);
+
+		await screen.findByText('No photos or receipts yet.');
+		await waitFor(() =>
+			expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Upload' }))
+		);
+	});
+
+	test('cancelling the confirmation returns focus to the photo it was opened from', async () => {
+		mocks.getPhotos.mockResolvedValue(page([photo('p1'), photo('p2')]));
+		mount();
+		await screen.findByAltText('p2.jpg');
+		const button = deleteButtons()[1] as HTMLButtonElement;
+		button.focus();
+
+		await fireEvent.click(button);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+		await waitFor(() => expect(document.activeElement).toBe(button));
+		expect(mocks.deletePhoto).not.toHaveBeenCalled();
+	});
 });

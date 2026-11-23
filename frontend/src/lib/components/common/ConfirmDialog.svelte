@@ -20,6 +20,7 @@
 		cancelLabel?: string;
 		destructive?: boolean;
 		onConfirm: () => void | Promise<void>;
+		onCloseAutoFocus?: (_event: Event) => void;
 	}
 
 	let {
@@ -29,7 +30,8 @@
 		confirmLabel = 'Delete',
 		cancelLabel = 'Cancel',
 		destructive = true,
-		onConfirm
+		onConfirm,
+		onCloseAutoFocus
 	}: Props = $props();
 
 	let isWorking = $state(false);
@@ -51,7 +53,7 @@
 </script>
 
 <AlertDialog bind:open>
-	<AlertDialogContent>
+	<AlertDialogContent {onCloseAutoFocus}>
 		<AlertDialogHeader>
 			<AlertDialogTitle>{title}</AlertDialogTitle>
 			<AlertDialogDescription>{description}</AlertDialogDescription>
