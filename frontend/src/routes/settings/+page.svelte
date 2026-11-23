@@ -223,15 +223,12 @@
 		const toastId = toast.loading('Backup in progress...');
 
 		try {
-			const result = await settingsStore.executeSync(['backup'], true);
-			const data = result?.data;
+			const data = await settingsStore.executeSync(['backup'], true);
 			const providers = (count: number) => `${count} provider${count === 1 ? '' : 's'}`;
 			const nameOf = (id: string) =>
 				storageProviders.find(provider => provider.id === id)?.displayName ?? id;
 
-			if (!data) {
-				toast.success('Backup complete', { id: toastId });
-			} else if (data.outcome === 'success') {
+			if (data.outcome === 'success') {
 				toast.success(`Backed up to ${providers(Object.keys(data.results).length)}`, {
 					id: toastId
 				});

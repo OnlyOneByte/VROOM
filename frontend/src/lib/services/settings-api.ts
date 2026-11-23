@@ -8,11 +8,6 @@ import type {
 } from '#lib/types/settings.ts';
 import { apiClient } from './api-client';
 
-interface SyncResponse {
-	success: boolean;
-	data?: BackupOrchestratorResult;
-}
-
 export const settingsApi = {
 	async getSettings(): Promise<UserSettings> {
 		return apiClient.get<UserSettings>('/settings');
@@ -26,8 +21,8 @@ export const settingsApi = {
 		await apiClient.post(`/sync/sheets/${encodeURIComponent(providerId)}/resume`, {});
 	},
 
-	async executeSync(syncTypes: 'backup'[], force = false): Promise<SyncResponse> {
-		return apiClient.post<SyncResponse>('/sync', { syncTypes, force });
+	async executeSync(syncTypes: 'backup'[], force = false): Promise<BackupOrchestratorResult> {
+		return apiClient.post<BackupOrchestratorResult>('/sync', { syncTypes, force });
 	},
 
 	async listBackupsFromProvider(providerId: string): Promise<BackupFileInfo[]> {

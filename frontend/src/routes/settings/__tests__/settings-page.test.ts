@@ -488,14 +488,12 @@ describe('Settings page backups', () => {
 		failedProviders: string[] = []
 	) {
 		return {
-			data: {
-				timestamp: '2026-11-23T00:00:00.000Z',
-				outcome,
-				failedProviders,
-				results: Object.fromEntries(
-					Object.entries(results).map(([id, success]) => [id, { success, capabilities: {} }])
-				)
-			}
+			timestamp: '2026-11-23T00:00:00.000Z',
+			outcome,
+			failedProviders,
+			results: Object.fromEntries(
+				Object.entries(results).map(([id, success]) => [id, { success, capabilities: {} }])
+			)
 		};
 	}
 
