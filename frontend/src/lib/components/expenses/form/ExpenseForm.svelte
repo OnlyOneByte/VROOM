@@ -6,8 +6,17 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
-	import { LoaderCircle, CreditCard, Info, CircleAlert, TriangleAlert } from '@lucide/svelte';
+	import {
+		LoaderCircle,
+		CreditCard,
+		Info,
+		CircleAlert,
+		TriangleAlert,
+		Car,
+		Plus
+	} from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import CategorySelector from './CategorySelector.svelte';
 	import FuelFieldsSection from './FuelFieldsSection.svelte';
@@ -82,6 +91,11 @@
 		untrack(() => !!expenseId || !!queuedExpenseId)
 	);
 
+	let vehiclesLoaded = $state(false);
+	const needsVehicle = $derived(
+		vehiclesLoaded && form.vehicles.length === 0 && !form.isEditMode && !form.queuedExpense
+	);
+
 	let previousVehicleId = $state('');
 	let mounted = $state(false);
 	$effect(() => {
@@ -116,6 +130,7 @@
 	onMount(async () => {
 		await settingsStore.load();
 		await loadVehicles(form);
+		vehiclesLoaded = true;
 
 		if (form.isEditMode && expenseId) {
 			await loadExpense(form);
@@ -312,6 +327,27 @@
 					Retry
 				</Button>
 			</div>
+		</div>
+	{:else if needsVehicle}
+		<div class="space-y-6">
+			<ExpenseFormHeader title={formTitle} onBack={handleBack} />
+			<EmptyState>
+				{#snippet icon()}
+					<Car class="mb-4 h-12 w-12 text-muted-foreground" />
+				{/snippet}
+				{#snippet title()}
+					Add a vehicle first
+				{/snippet}
+				{#snippet description()}
+					Every expense belongs to a vehicle. Add one, then log what you spend on it.
+				{/snippet}
+				{#snippet action()}
+					<Button size="lg" href={resolve(routes.vehicleNew)}>
+						<Plus class="mr-2 h-4 w-4" />
+						Add Vehicle
+					</Button>
+				{/snippet}
+			</EmptyState>
 		</div>
 	{:else}
 		<div class="space-y-6 pb-32 sm:pb-24">

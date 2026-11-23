@@ -181,16 +181,19 @@ describe('ExpenseForm create mode', () => {
 		expect(goto).not.toHaveBeenCalled();
 	});
 
-	test('with no vehicles the vehicle field is flagged on save', async () => {
+	test('with no vehicles the form gives way to an Add Vehicle empty state', async () => {
 		getVehicles.mockResolvedValue([]);
 		render(ExpenseForm, { props: { preselectedCategory: 'misc', preselectedAmount: '5' } });
-		await screen.findByRole('heading', { name: 'Add Expense' });
 
-		await save();
+		await screen.findByRole('heading', { name: 'Add a vehicle first' });
 
-		expect(vehicleTriggerText()).toBe('Select a vehicle');
-		expect(errorText('vehicleId')).toBe('Please select a vehicle');
-		expect(createExpense).not.toHaveBeenCalled();
+		expect(screen.getByRole('heading', { name: 'Add Expense' })).toBeTruthy();
+		expect(screen.getByRole('link', { name: 'Add Vehicle' }).getAttribute('href')).toBe(
+			'/vehicles/new'
+		);
+		expect(document.getElementById('vehicle')).toBeNull();
+		expect(screen.queryByRole('button', { name: /save expense/i })).toBeNull();
+		expect(getVehicle).not.toHaveBeenCalled();
 	});
 
 	test('rejects an amount over the API cap with the API sentence', async () => {
