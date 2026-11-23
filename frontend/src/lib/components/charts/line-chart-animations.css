@@ -1,6 +1,9 @@
-@keyframes stroke-draw {
+@keyframes line-reveal {
+	from {
+		clip-path: inset(0 100% 0 0);
+	}
 	to {
-		stroke-dashoffset: 0;
+		clip-path: inset(0 0 0 0);
 	}
 }
 
@@ -13,27 +16,21 @@
 	}
 }
 
-.chart-line-animate-ready .lc-path {
-	stroke-dasharray: 5000;
-	stroke-dashoffset: 5000;
-}
+@media (prefers-reduced-motion: no-preference) {
+	.chart-line-animate-ready .lc-path {
+		clip-path: inset(0 100% 0 0);
+	}
 
-.chart-line-animate-ready circle {
-	opacity: 0;
-}
+	.chart-line-animate-ready circle {
+		opacity: 0;
+	}
 
-.chart-line-animate-ready.chart-line-animated .lc-path {
-	animation: stroke-draw 2s ease-out forwards;
-}
+	.chart-line-animate-ready.chart-line-animated .lc-path {
+		animation: line-reveal 400ms ease-out forwards;
+	}
 
-.chart-line-animate-ready.chart-line-animated circle {
-	animation: points-fade-in 0.5s ease-out forwards;
-	animation-delay: 1.5s;
-}
-
-/* Area fill must not inherit the line's stroke-dash animation. */
-.chart-line-animate-ready .lc-area {
-	stroke-dasharray: unset;
-	stroke-dashoffset: unset;
-	animation: none;
+	.chart-line-animate-ready.chart-line-animated circle {
+		animation: points-fade-in 150ms ease-out forwards;
+		animation-delay: 250ms;
+	}
 }

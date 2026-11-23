@@ -5,6 +5,7 @@
 	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
 	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import { formatCurrencyTooltip } from '#lib/utils/chart-formatters.ts';
+	import { prefersReducedMotion } from 'svelte/motion';
 	import type { Snippet } from 'svelte';
 
 	interface PieDataItem {
@@ -74,11 +75,13 @@
 							cornerRadius={4}
 							props={{
 								pie: {
-									motion: {
-										type: 'tween',
-										duration: 800,
-										easing: (t: number) => 1 - Math.pow(1 - t, 3)
-									}
+									motion: prefersReducedMotion.current
+										? 'none'
+										: {
+												type: 'tween',
+												duration: 400,
+												easing: (t: number) => 1 - Math.pow(1 - t, 3)
+											}
 								}
 							}}
 						>
