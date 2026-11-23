@@ -34,7 +34,7 @@
 		enteredAmount,
 		prefillFromPreviousTerm
 	} from '#lib/utils/insurance.ts';
-	import { getCurrencySymbol } from '#lib/utils/formatters.ts';
+	import { amountStep, getCurrencySymbol } from '#lib/utils/formatters.ts';
 	import type { InsurancePolicy, InsuranceTerm, Vehicle } from '#lib/types/index.ts';
 
 	interface Props {
@@ -350,7 +350,7 @@
 								<Input
 									id="total-cost"
 									type="number"
-									step="0.01"
+									step={amountStep()}
 									min="0"
 									bind:value={totalCost}
 									aria-invalid={!!errors.totalCost}
@@ -364,7 +364,7 @@
 								<Input
 									id="monthly-cost"
 									type="number"
-									step="0.01"
+									step={amountStep()}
 									min="0"
 									bind:value={monthlyCost}
 									aria-invalid={!!errors.monthlyCost}
@@ -381,7 +381,7 @@
 								<Input
 									id="payment-amount"
 									type="number"
-									step="0.01"
+									step={amountStep()}
 									min="0"
 									bind:value={paymentAmount}
 									aria-invalid={!!errors.paymentAmount}
@@ -479,7 +479,7 @@
 								<Input
 									id="deductible"
 									type="number"
-									step="0.01"
+									step={amountStep()}
 									min="0"
 									bind:value={deductibleAmount}
 									aria-invalid={!!errors.deductibleAmount}
@@ -506,7 +506,7 @@
 								<Input
 									id="coverage-limit"
 									type="number"
-									step="0.01"
+									step={amountStep()}
 									min="0"
 									bind:value={coverageLimit}
 									aria-invalid={!!errors.coverageLimit}
