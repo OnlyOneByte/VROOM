@@ -1,9 +1,9 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 const output = join(root, '.svelte-kit/output');
 const budgetsFile = join(root, 'bundle-budgets.json');
 
@@ -26,7 +26,13 @@ function gzipSize(file) {
 function nodeImports(index) {
 	const source = readFileSync(join(output, `server/nodes/${index}.js`), 'utf8');
 	const match = source.match(/export const imports = (\[[^\]]*\]);/);
-	return match ? JSON.parse(match[1]) : [];
+	if (!match) {
+		console.error(
+			`bundle-budget: server/nodes/${index}.js has no imports list. The SvelteKit build format changed; update this script.`
+		);
+		process.exit(1);
+	}
+	return JSON.parse(match[1]);
 }
 
 const total = files => [...files].reduce((sum, file) => sum + gzipSize(file), 0);
