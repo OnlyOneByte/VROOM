@@ -33,12 +33,12 @@ const EXCELLENT_MPG = 50;
 const LOW_MI_KWH = 2;
 const EXCELLENT_MI_KWH = 4;
 
-const MILES_PER_UNIT: Record<DistanceUnit, number> = {
+export const MILES_PER_UNIT: Record<DistanceUnit, number> = {
 	miles: 1,
 	kilometers: 1 / 1.609344
 };
 
-const US_GALLONS_PER_UNIT: Record<VolumeUnit, number> = {
+export const US_GALLONS_PER_UNIT: Record<VolumeUnit, number> = {
 	gallons_us: 1,
 	gallons_uk: 4.54609 / 3.785411784,
 	liters: 1 / 3.785411784

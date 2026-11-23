@@ -301,6 +301,10 @@ function getAnchorDay(reminder: ReminderSchedule, timeZone: string | undefined):
   return wallClockOf(reminder.startDate, timeZone).day;
 }
 
+export function isTimeDue(nextDue: Date, now: Date): boolean {
+  return nextDue <= now;
+}
+
 function hasReminderEndedBy(reminder: Reminder, nextDue: Date): boolean {
   return reminder.endDate != null && nextDue > reminder.endDate;
 }
@@ -380,7 +384,7 @@ async function fastForwardPastNow(
 ): Promise<void> {
   const previousDue = currentDue;
   let nextDue = currentDue;
-  while (nextDue <= now) {
+  while (isTimeDue(nextDue, now)) {
     if (hasReminderEndedBy(reminder, nextDue)) {
       await reminderRepository.deactivate(reminder.id, reminder.userId);
       return;
@@ -509,7 +513,7 @@ class ReminderTriggerService {
     let nextDue: Date = reminder.nextDueDate;
     let catchUpCount = 0;
 
-    while (nextDue <= now && catchUpCount < maxCatchUp) {
+    while (isTimeDue(nextDue, now) && catchUpCount < maxCatchUp) {
       if (hasReminderEndedBy(reminder, nextDue)) {
         break;
       }
@@ -529,7 +533,7 @@ class ReminderTriggerService {
       return;
     }
 
-    if (catchUpCount >= maxCatchUp && nextDue <= now) {
+    if (catchUpCount >= maxCatchUp && isTimeDue(nextDue, now)) {
       await fastForwardPastNow(reminder, nextDue, now, timeZone);
       result.skipped.push({ reminderId: reminder.id, reason: 'catch_up_limit_reached' });
     }
