@@ -20,8 +20,12 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { PHOTO_CATEGORY_LABELS } from '#lib/constants/ui.ts';
-	import { providerLabel, providerMeta } from '#lib/constants/providers.ts';
-	import { supportsZipBackup as providerSupportsZipBackup } from '#lib/constants/providers.ts';
+	import {
+		PROVIDER_META,
+		providerLabel,
+		providerMeta,
+		supportsZipBackup as providerSupportsZipBackup
+	} from '#lib/constants/providers.ts';
 	import type { PhotoCategory, CategorySetting, UserProviderInfo } from '#lib/types/index.ts';
 
 	let {
@@ -132,6 +136,12 @@
 	let Icon = $derived(getProviderIcon(provider.providerType));
 
 	let supportsZipBackup = $derived(providerSupportsZipBackup(provider.providerType));
+	let meta = $derived(providerMeta(provider.providerType));
+	let details = $derived(meta?.form?.details?.(provider.config ?? {}) ?? []);
+	const zipBackupProviders = Object.values(PROVIDER_META)
+		.filter(m => m.option && !m.photoOnly)
+		.map(m => m.label)
+		.join(' or ');
 </script>
 
 <Card>
@@ -215,11 +225,11 @@
 				{/if}
 			{:else}
 				<p class="text-xs text-muted-foreground">
-					Google Photos stores your photos only. Use a Google Drive or S3 provider for ZIP data
-					backups.
+					{providerLabel(provider.providerType)} stores your photos only. Use a {zipBackupProviders}
+					provider for ZIP data backups.
 				</p>
 			{/if}
-			{#if providerMeta(provider.providerType)?.form === 'google'}
+			{#if meta?.supportsSheets}
 				<div class="flex items-center justify-between">
 					<div class="space-y-0.5">
 						<Label for="sheets-{provider.id}" class="text-sm">Sheets sync</Label>
@@ -244,20 +254,14 @@
 
 			<div class="space-y-3 mb-4">
 				<p class="text-sm font-medium text-muted-foreground">Provider Settings</p>
-				{#if providerMeta(provider.providerType)?.form === 's3'}
+				{#if details.length > 0}
 					<div class="space-y-1 text-sm">
-						<div>
-							<span class="text-muted-foreground">Endpoint:</span>
-							<span>{(provider.config?.['endpoint'] as string) ?? '—'}</span>
-						</div>
-						<div>
-							<span class="text-muted-foreground">Bucket:</span>
-							<span>{(provider.config?.['bucket'] as string) ?? '—'}</span>
-						</div>
-						<div>
-							<span class="text-muted-foreground">Region:</span>
-							<span>{(provider.config?.['region'] as string) ?? '—'}</span>
-						</div>
+						{#each details as detail (detail.label)}
+							<div>
+								<span class="text-muted-foreground">{detail.label}:</span>
+								<span>{detail.value}</span>
+							</div>
+						{/each}
 					</div>
 				{/if}
 			</div>

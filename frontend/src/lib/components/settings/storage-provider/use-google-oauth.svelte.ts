@@ -18,7 +18,7 @@ interface GoogleOAuthState {
 	oauthNonce: string;
 }
 
-interface GoogleOAuthReturn extends GoogleOAuthState {
+export interface GoogleOAuthReturn extends GoogleOAuthState {
 	startGoogleOAuth: () => void;
 	handleOAuthReturn: () => Promise<{
 		restoredSelectedType?: string;

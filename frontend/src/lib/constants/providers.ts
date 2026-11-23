@@ -1,11 +1,34 @@
 import type { Component } from 'svelte';
 import { Cloud, Database, Image } from '@lucide/svelte';
 import type { PhotoCategory, CategorySetting } from '#lib/types/index.ts';
+import type { GoogleOAuthReturn } from '#lib/components/settings/storage-provider/use-google-oauth.svelte.ts';
+import GoogleDriveForm from '#lib/components/settings/storage-provider/form/GoogleDriveForm.svelte';
+import S3Form from '#lib/components/settings/storage-provider/form/S3Form.svelte';
+
+export interface ProviderConnection {
+	ready: boolean;
+	config: Record<string, unknown>;
+	credentials: Record<string, unknown>;
+	nonce?: string | undefined;
+}
+
+export interface ProviderFormProps {
+	existingConfig: Record<string, unknown> | undefined;
+	isEditMode: boolean;
+	oauth: GoogleOAuthReturn;
+	connection: ProviderConnection;
+}
+
+export interface ProviderFormMeta {
+	component: Component<ProviderFormProps, Record<string, never>, 'connection'>;
+	description: string;
+	details?: (config: Record<string, unknown>) => { label: string; value: string }[];
+}
 
 export interface StorageProviderMeta {
 	label: string;
 	icon: Component<Record<string, unknown>>;
-	form: 'google' | 's3' | null;
+	form: ProviderFormMeta | null;
 	option: { label: string; description: string } | null;
 	defaultPhotoRootPath: string;
 	supportsSheets: boolean;
@@ -16,7 +39,7 @@ export const PROVIDER_META: Record<string, StorageProviderMeta> = {
 	'google-drive': {
 		label: 'Google Drive',
 		icon: Cloud,
-		form: 'google',
+		form: { component: GoogleDriveForm, description: 'Google Drive connection' },
 		option: { label: 'Google Drive', description: 'Store photos in Google Drive' },
 		defaultPhotoRootPath: 'Photos',
 		supportsSheets: true,
@@ -34,7 +57,15 @@ export const PROVIDER_META: Record<string, StorageProviderMeta> = {
 	s3: {
 		label: 'S3 Compatible',
 		icon: Database,
-		form: 's3',
+		form: {
+			component: S3Form,
+			description: 'S3-compatible storage credentials and endpoint',
+			details: config =>
+				(['endpoint', 'bucket', 'region'] as const).map(key => ({
+					label: key.charAt(0).toUpperCase() + key.slice(1),
+					value: (config[key] as string | undefined) ?? '—'
+				}))
+		},
 		option: { label: 'S3 / B2 / R2', description: 'S3-compatible storage' },
 		defaultPhotoRootPath: 'vroom/photos',
 		supportsSheets: false,
