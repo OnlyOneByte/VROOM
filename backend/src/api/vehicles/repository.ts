@@ -6,6 +6,7 @@ import { vehicleFinancing, vehicles } from '../../db/schema';
 import { DatabaseError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
+import { ownedVehiclesScope } from '../../utils/vehicle-access';
 
 class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
   constructor(db: AppDatabase) {
@@ -21,7 +22,7 @@ class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
         })
         .from(vehicles)
         .leftJoin(vehicleFinancing, eq(vehicles.id, vehicleFinancing.vehicleId))
-        .where(eq(vehicles.userId, userId))
+        .where(ownedVehiclesScope(userId))
         .orderBy(vehicles.createdAt);
 
       return result.map((row) => ({
@@ -55,7 +56,7 @@ class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
     const result = await this.db
       .select()
       .from(vehicles)
-      .where(and(eq(vehicles.userId, userId), eq(vehicles.id, vehicleId)))
+      .where(and(ownedVehiclesScope(userId), eq(vehicles.id, vehicleId)))
       .limit(1);
     return result[0] || null;
   }
@@ -65,39 +66,9 @@ class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
     const result = await this.db
       .select()
       .from(vehicles)
-      .where(and(eq(vehicles.userId, userId), eq(vehicles.licensePlate, licensePlate)))
+      .where(and(ownedVehiclesScope(userId), eq(vehicles.licensePlate, licensePlate)))
       .limit(1);
     return result[0] || null;
-  }
-
-  async findByIdWithAccess(
-    vehicleId: string,
-    userId: string
-  ): Promise<VehicleWithFinancing | null> {
-    try {
-      const ownedVehicle = await this.db
-        .select({
-          vehicle: vehicles,
-          financing: vehicleFinancing,
-        })
-        .from(vehicles)
-        .leftJoin(vehicleFinancing, eq(vehicles.id, vehicleFinancing.vehicleId))
-        .where(and(eq(vehicles.id, vehicleId), eq(vehicles.userId, userId)))
-        .limit(1);
-
-      if (ownedVehicle.length > 0) {
-        const result = ownedVehicle[0];
-        return {
-          ...result.vehicle,
-          financing: result.financing || undefined,
-        } as VehicleWithFinancing;
-      }
-
-      return null;
-    } catch (error) {
-      logger.error('Error finding vehicle with access for user', { vehicleId, userId, error });
-      throw new DatabaseError('Failed to find vehicle with access', error);
-    }
   }
 }
 

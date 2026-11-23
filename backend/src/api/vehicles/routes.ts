@@ -21,11 +21,6 @@ import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations
 import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { boundedDollarsToCents, centsToDollars, vehicleRowToApi } from '../../utils/money';
-import {
-  requireVehicleRead,
-  resolveVehicleAccess,
-  resolveVehicleOwnerId,
-} from '../../utils/sharing';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { canonicalScale } from '../../utils/unit-conversions';
 import {
@@ -38,10 +33,10 @@ import {
   dateInput,
   MAX_ODOMETER_READING,
   ODOMETER_TOO_HIGH_MESSAGE,
-  validateVehicleOwnership,
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
+import { requireVehicleAccess } from '../../utils/vehicle-access';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
 import { financingRepository, withComputedBalance } from '../financing/repository';
@@ -331,16 +326,8 @@ routes.get(
     const { id } = c.req.valid('param');
     const { timeZone } = c.req.valid('query');
 
-    // 404, not 403, so a non-member cannot learn that the vehicle exists.
-    const access = await resolveVehicleAccess(id, user.id);
-    if (!access) {
-      throw new NotFoundError('Vehicle');
-    }
-
-    const vehicle =
-      access.role === 'owner'
-        ? await vehicleRepository.findByIdWithAccess(id, user.id)
-        : ((await vehicleRepository.findByIds([id]))[0] ?? null);
+    const access = await requireVehicleAccess(id, user.id, 'read');
+    const vehicle = (await vehicleRepository.findByIds([id]))[0] ?? null;
 
     if (!vehicle) {
       throw new NotFoundError('Vehicle');
@@ -395,7 +382,8 @@ routes.put(
     const { id } = c.req.valid('param');
     const updateData = c.req.valid('json');
 
-    const existingVehicle = await vehicleRepository.findByIdWithAccess(id, user.id);
+    await requireVehicleAccess(id, user.id, 'owner');
+    const existingVehicle = (await vehicleRepository.findByIds([id]))[0];
     if (!existingVehicle) {
       throw new NotFoundError('Vehicle');
     }
@@ -458,7 +446,7 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  await validateVehicleOwnership(id, user.id);
+  await requireVehicleAccess(id, user.id, 'owner');
 
   // Photos have no FK: the vehicle cascade would orphan them, so delete them before the row goes.
   const [expenseIds, odometerIds, splitGroupIds] = await Promise.all([
@@ -519,13 +507,8 @@ routes.get(
     const { id } = c.req.valid('param');
     const { period } = c.req.valid('query');
 
-    const access = await requireVehicleRead(id, user.id);
-    const ownerId =
-      access.role === 'owner' ? user.id : ((await resolveVehicleOwnerId(id)) ?? user.id);
-    const vehicle =
-      access.role === 'owner'
-        ? await vehicleRepository.findByIdWithAccess(id, user.id)
-        : ((await vehicleRepository.findByIds([id]))[0] ?? null);
+    const { ownerId } = await requireVehicleAccess(id, user.id, 'read');
+    const vehicle = (await vehicleRepository.findByIds([id]))[0] ?? null;
     if (!vehicle) {
       throw new NotFoundError('Vehicle');
     }

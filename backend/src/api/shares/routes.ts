@@ -9,7 +9,8 @@ import {
   ValidationError,
 } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
-import { commonSchemas, validateVehicleOwnership, zValidator } from '../../utils/validation';
+import { commonSchemas, zValidator } from '../../utils/validation';
+import { requireVehicleAccess } from '../../utils/vehicle-access';
 import {
   findInviteeId,
   type GrantedShare,
@@ -41,7 +42,7 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
   const { vehicleId, level } = c.req.valid('json');
   const email = c.req.valid('json').email.trim().toLowerCase();
 
-  await validateVehicleOwnership(vehicleId, user.id);
+  await requireVehicleAccess(vehicleId, user.id, 'owner');
 
   if (email === user.email.toLowerCase()) {
     throw new ValidationError('You cannot share a vehicle with yourself');

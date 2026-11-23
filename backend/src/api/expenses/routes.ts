@@ -15,12 +15,6 @@ import {
   expenseToApi,
 } from '../../utils/money';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
-import {
-  requireVehicleOwnerScope,
-  requireVehicleRead,
-  requireVehicleWrite,
-  resolveVehicleOwnerId,
-} from '../../utils/sharing';
 import { isValidTimeZone } from '../../utils/time-zone';
 import {
   commonSchemas,
@@ -32,6 +26,7 @@ import {
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
+import { requireVehicleAccess } from '../../utils/vehicle-access';
 import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
@@ -290,7 +285,7 @@ async function requireSplitWriteAccess(
   const vehicleIds = splitConfigVehicleIds(splitConfig);
   let ownerId: string | undefined;
   for (const vehicleId of vehicleIds) {
-    const vehicleOwner = await requireVehicleOwnerScope(vehicleId, actingUserId, 'write');
+    const { ownerId: vehicleOwner } = await requireVehicleAccess(vehicleId, actingUserId, 'write');
     if (ownerId === undefined) {
       ownerId = vehicleOwner;
     } else if (ownerId !== vehicleOwner) {
@@ -428,7 +423,7 @@ routes.get('/split/:id', zValidator('param', commonSchemas.idParam), async (c) =
   const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
   if (!groupInfo) throw new NotFoundError('Split expense');
   for (const vehicleId of groupInfo.vehicleIds) {
-    await requireVehicleRead(vehicleId, user.id);
+    await requireVehicleAccess(vehicleId, user.id, 'read');
   }
 
   const siblings = await expenseRepository.getSplitExpense(id, groupInfo.ownerId);
@@ -503,7 +498,7 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
 
   let summaryUserId = user.id;
   if (vehicleId) {
-    const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
+    const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'read');
     summaryUserId = ownerId;
   }
 
@@ -553,7 +548,7 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
 
   let exportUserId = user.id;
   if (vehicleId) {
-    const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
+    const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'read');
     exportUserId = ownerId;
   }
 
@@ -725,7 +720,7 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   }
   const expenseData = clearFuelFieldsIfNotFuel(body);
 
-  const ownerId = await requireVehicleOwnerScope(expenseData.vehicleId, user.id, 'write');
+  const { ownerId } = await requireVehicleAccess(expenseData.vehicleId, user.id, 'write');
   const createdBy = ownerId === user.id ? null : user.id;
 
   let createdExpense = expenseData.clientId
@@ -772,7 +767,7 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
 
   let listUserId = user.id;
   if (query.vehicleId) {
-    const ownerId = await requireVehicleOwnerScope(query.vehicleId, user.id, 'read');
+    const { ownerId } = await requireVehicleAccess(query.vehicleId, user.id, 'read');
     listUserId = ownerId;
   }
 
@@ -802,7 +797,7 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const { id } = c.req.valid('param');
   const expense = await expenseRepository.findById(id);
   if (!expense) throw new NotFoundError('Expense');
-  await requireVehicleRead(expense.vehicleId, user.id);
+  await requireVehicleAccess(expense.vehicleId, user.id, 'read');
   return c.json({ success: true, data: expenseToApi(expense) });
 });
 
@@ -817,7 +812,7 @@ routes.put(
 
     const existingExpense = await expenseRepository.findById(id);
     if (!existingExpense) throw new NotFoundError('Expense');
-    await requireVehicleWrite(existingExpense.vehicleId, user.id);
+    await requireVehicleAccess(existingExpense.vehicleId, user.id, 'write');
     assertSingleExpenseEditAllowed(updateData, existingExpense);
     if (
       updateData.sourceType === null &&
@@ -828,9 +823,8 @@ routes.put(
     }
 
     if (updateData.vehicleId && updateData.vehicleId !== existingExpense.vehicleId) {
-      await requireVehicleWrite(updateData.vehicleId, user.id);
-      const targetOwnerId = await resolveVehicleOwnerId(updateData.vehicleId);
-      if (targetOwnerId !== existingExpense.userId) {
+      const target = await requireVehicleAccess(updateData.vehicleId, user.id, 'write');
+      if (target.ownerId !== existingExpense.userId) {
         throw new ValidationError('Cannot move an expense to a vehicle owned by a different user');
       }
     }
@@ -883,7 +877,7 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   const existingExpense = await expenseRepository.findById(id);
   if (!existingExpense) throw new NotFoundError('Expense');
-  await requireVehicleWrite(existingExpense.vehicleId, user.id);
+  await requireVehicleAccess(existingExpense.vehicleId, user.id, 'write');
   if (existingExpense.groupId) {
     throw new ValidationError(
       "This expense is part of a split. Delete the whole split instead of one vehicle's share."
