@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { X, Upload, ImagePlus } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import MediaCaptureDialog from '#lib/components/common/MediaCaptureDialog.svelte';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
 
 	interface Props {
 		files: File[];
@@ -13,6 +13,20 @@
 	let { files, onAdd, onRemove, entityNoun = 'expense' }: Props = $props();
 
 	let showUploadDialog = $state(false);
+	let mediaDialog = $state<Promise<
+		typeof import('#lib/components/common/MediaCaptureDialog.svelte')
+	> | null>(null);
+
+	function openUploadDialog() {
+		mediaDialog ??= import('#lib/components/common/MediaCaptureDialog.svelte');
+		mediaDialog.then(
+			() => (showUploadDialog = true),
+			error => {
+				mediaDialog = null;
+				handleErrorWithNotification(error, "Couldn't open the upload dialog");
+			}
+		);
+	}
 
 	let previews = $derived(
 		files.map(f => ({
@@ -36,12 +50,7 @@
 <div class="space-y-3">
 	<div class="flex items-center justify-between">
 		<h2 class="text-sm font-medium text-foreground">Photos & Receipts</h2>
-		<Button
-			variant="outline"
-			size="sm"
-			class="h-10 text-xs sm:h-7"
-			onclick={() => (showUploadDialog = true)}
-		>
+		<Button variant="outline" size="sm" class="h-10 text-xs sm:h-7" onclick={openUploadDialog}>
 			<Upload class="mr-1 h-3 w-3" />
 			Add
 		</Button>
@@ -85,14 +94,18 @@
 	{/if}
 </div>
 
-<MediaCaptureDialog
-	bind:open={showUploadDialog}
-	title="Add Photos & Receipts"
-	description="Select photos or receipts to attach to this {entityNoun}"
-	acceptedTypes={['image/jpeg', 'image/png', 'image/webp', 'application/pdf']}
-	onUpload={async file => {
-		onAdd(file);
-		return file;
-	}}
-	onClose={() => (showUploadDialog = false)}
-/>
+{#if mediaDialog}
+	{#await mediaDialog then { default: MediaCaptureDialog }}
+		<MediaCaptureDialog
+			bind:open={showUploadDialog}
+			title="Add Photos & Receipts"
+			description="Select photos or receipts to attach to this {entityNoun}"
+			acceptedTypes={['image/jpeg', 'image/png', 'image/webp', 'application/pdf']}
+			onUpload={async file => {
+				onAdd(file);
+				return file;
+			}}
+			onClose={() => (showUploadDialog = false)}
+		/>
+	{/await}
+{/if}
