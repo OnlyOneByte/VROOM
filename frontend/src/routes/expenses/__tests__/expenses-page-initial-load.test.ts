@@ -166,7 +166,7 @@ describe('/expenses initial load', () => {
 		expect(rowsGivenToTable()[0]?.vehicle).toBeUndefined();
 	});
 
-	test('a failed load toasts once even when the list fails after the vehicles', async () => {
+	test('a failed load shows one inline error and no toast, even when the list fails after the vehicles', async () => {
 		getVehicles.mockRejectedValue(new ApiError('boom', 500));
 		let failList: (reason: unknown) => void = () => {};
 		getAllExpenses.mockImplementation(
@@ -181,8 +181,8 @@ describe('/expenses initial load', () => {
 		failList(new ApiError('boom', 500));
 		await new Promise(resolve => setTimeout(resolve, 0));
 
-		const errors = appStore.notifications.filter(n => n.type === 'error');
-		expect(errors).toHaveLength(1);
+		expect(screen.getAllByText("Couldn't load expenses")).toHaveLength(1);
+		expect(appStore.notifications.filter(n => n.type === 'error')).toEqual([]);
 	});
 
 	test('offline, a failed load shows the offline notice and the queued expenses without error toasts', async () => {

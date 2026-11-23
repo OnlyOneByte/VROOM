@@ -14,7 +14,7 @@ import {
 import type { Expense, Vehicle } from '#lib/types/index.ts';
 import {
 	ApiError,
-	handleErrorWithNotification,
+	logLoadFailure,
 	toError,
 	userFacingErrorMessage
 } from '#lib/utils/error-handling.ts';
@@ -51,7 +51,7 @@ export async function loadVehicles(state: ExpenseFormState): Promise<void> {
 			return;
 		}
 		state.vehiclesError = userFacingErrorMessage(error);
-		handleErrorWithNotification(error, "Couldn't load your vehicles");
+		logLoadFailure(error, "Couldn't load your vehicles");
 	}
 }
 
@@ -111,7 +111,7 @@ function reportExpenseLoadFailure(state: ExpenseFormState, error: unknown, label
 		return;
 	}
 	state.expenseError = userFacingErrorMessage(error);
-	handleErrorWithNotification(error, `Couldn't load this ${label}`);
+	logLoadFailure(error, `Couldn't load this ${label}`);
 }
 
 export async function loadExpense(state: ExpenseFormState): Promise<void> {
@@ -261,5 +261,5 @@ export async function loadVehicleContext(state: ExpenseFormState): Promise<void>
 	if (!isCurrent()) return;
 	const failure = vehicleFailure ?? historyFailure;
 	state.vehicleError = failure ? userFacingErrorMessage(failure) : null;
-	if (failure) handleErrorWithNotification(failure, "Couldn't load this vehicle's details");
+	if (failure) logLoadFailure(failure, "Couldn't load this vehicle's details");
 }

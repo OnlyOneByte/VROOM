@@ -460,7 +460,7 @@ describe('/expenses reloads and failures after the first load', () => {
 		);
 	});
 
-	test('when list and summary both fail only the list failure is surfaced', async () => {
+	test('when list and summary both fail only the inline list error shows, with no toast', async () => {
 		await mountLoaded();
 		getAllExpenses.mockRejectedValueOnce(new Error('List down'));
 		getExpenseSummary.mockRejectedValueOnce(new Error('Summary down'));
@@ -469,8 +469,7 @@ describe('/expenses reloads and failures after the first load', () => {
 
 		const error = await screen.findByTestId('expenses-page-error');
 		expect(error.textContent).toContain('List down');
-		expect(notificationMessages().some(m => m.includes('List down'))).toBe(true);
-		expect(notificationMessages().some(m => m.includes('Summary down'))).toBe(false);
+		expect(notificationMessages()).toEqual([]);
 	});
 
 	test('a non-Error page failure shows a generic message', async () => {

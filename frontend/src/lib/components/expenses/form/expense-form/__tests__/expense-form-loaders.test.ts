@@ -185,18 +185,13 @@ describe('loadExpense — single expense', () => {
 		expect(state.isLoading).toBe(false);
 	});
 
-	test('a server failure stays on the page with an inline error; a retry clears it', async () => {
+	test('a server failure stays on the page with only an inline error; a retry clears it', async () => {
 		expenseApiMock.getExpense.mockRejectedValueOnce(new ApiError('Internal server error', 500));
 		const state = createState('e1');
 		await loadExpense(state);
 		expect(gotoDynamic).not.toHaveBeenCalled();
 		expect(state.expenseError).toBe(SERVER_FAILURE_MESSAGE);
-		expect(addNotification).toHaveBeenCalledWith(
-			expect.objectContaining({
-				type: 'error',
-				message: `Couldn't load this expense. ${SERVER_FAILURE_MESSAGE}`
-			})
-		);
+		expect(addNotification).not.toHaveBeenCalled();
 		expect(state.isLoading).toBe(false);
 
 		expenseApiMock.getExpense.mockResolvedValueOnce(makeExpense('e1', { vehicleId: 'v1' }));

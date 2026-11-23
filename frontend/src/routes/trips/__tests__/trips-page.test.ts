@@ -131,7 +131,7 @@ describe('trips page load states', () => {
 		expect(list).toHaveBeenCalledWith({ limit: 100 });
 	});
 
-	test('a load failure shows the message, notifies, and Retry reloads', async () => {
+	test('a load failure shows one inline error with no toast, and Retry reloads', async () => {
 		list.mockRejectedValueOnce(new ApiError('SQLITE_BUSY: database is locked', 500));
 		list.mockResolvedValueOnce(tripPage([trip()]));
 		render(Page);
@@ -140,12 +140,7 @@ describe('trips page load states', () => {
 		expect(screen.getByText("Couldn't load trips")).toBeInTheDocument();
 		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText(/SQLITE_BUSY/)).toBeNull();
-		expect(notify).toHaveBeenCalledWith(
-			expect.objectContaining({
-				type: 'error',
-				message: `Couldn't load trips. ${SERVER_FAILURE_MESSAGE}`
-			})
-		);
+		expect(notify).not.toHaveBeenCalled();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
