@@ -12,7 +12,7 @@ describe('/expenses import and export tools on mobile', () => {
 	});
 
 	test('below sm: the same actions sit behind one 40px icon-only menu trigger', () => {
-		expect(SRC).toMatch(/<div class="sm:hidden">\s*<Popover\.Root/);
+		expect(SRC).toMatch(/<div class="shrink-0 sm:hidden">\s*<Popover\.Root/);
 		expect(SRC).toMatch(
 			/variant="outline" size="icon-lg" aria-label="Import and export">\s*<Ellipsis[^>]*\/>\s*<\/Button>/
 		);

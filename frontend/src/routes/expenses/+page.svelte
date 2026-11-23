@@ -28,7 +28,7 @@
 	import { latest } from '#lib/utils/latest-request.ts';
 
 	type ExpenseWithVehicle = Expense & { vehicle?: Vehicle };
-	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import {
 		handleErrorWithNotification,
 		logLoadFailure,
@@ -127,7 +127,7 @@
 	let offlineLoad = $state(false);
 	let expensesList = $state<HTMLElement | null>(null);
 	let countLine = $derived(
-		`${totalCount} ${totalCount === 1 ? 'expense' : 'expenses'} across ${vehicles.length} ${vehicles.length === 1 ? 'vehicle' : 'vehicles'}`
+		`${formatNumber(totalCount, 0)} ${totalCount === 1 ? 'expense' : 'expenses'} across ${formatNumber(vehicles.length, 0)} ${vehicles.length === 1 ? 'vehicle' : 'vehicles'}`
 	);
 
 	onMount(loadInitial);
@@ -464,28 +464,32 @@
 	</div>
 {:else}
 	<div class="space-y-6 pb-24">
-		<PageHeader title="All Expenses" description={countLine}>
-			{#snippet actions()}
-				<div class="hidden sm:flex sm:items-center sm:gap-2">
-					{@render importExportActions('outline', '')}
-				</div>
-				<div class="sm:hidden">
-					<Popover.Root bind:open={toolsMenuOpen}>
-						<Popover.Trigger>
-							{#snippet child({ props })}
-								<Button {...props} variant="outline" size="icon-lg" aria-label="Import and export">
-									<Ellipsis class="h-4 w-4" />
-								</Button>
-							{/snippet}
-						</Popover.Trigger>
-						<Popover.Content align="start" class="flex w-56 flex-col gap-2 p-1">
-							{@render importExportActions('ghost', 'h-10 w-full justify-start')}
-						</Popover.Content>
-					</Popover.Root>
-				</div>
-				{@render addExpenseHeaderAction()}
-			{/snippet}
-		</PageHeader>
+		<div class="flex items-start justify-between gap-3">
+			<div class="min-w-0 flex-1">
+				<PageHeader title="All Expenses" description={countLine}>
+					{#snippet actions()}
+						<div class="hidden sm:flex sm:items-center sm:gap-2">
+							{@render importExportActions('outline', '')}
+						</div>
+						{@render addExpenseHeaderAction()}
+					{/snippet}
+				</PageHeader>
+			</div>
+			<div class="shrink-0 sm:hidden">
+				<Popover.Root bind:open={toolsMenuOpen}>
+					<Popover.Trigger>
+						{#snippet child({ props })}
+							<Button {...props} variant="outline" size="icon-lg" aria-label="Import and export">
+								<Ellipsis class="h-4 w-4" />
+							</Button>
+						{/snippet}
+					</Popover.Trigger>
+					<Popover.Content align="end" class="flex w-56 flex-col gap-2 p-1">
+						{@render importExportActions('ghost', 'h-10 w-full justify-start')}
+					</Popover.Content>
+				</Popover.Root>
+			</div>
+		</div>
 
 		<CardNs.Root class="max-sm:gap-0 max-sm:py-4">
 			<CardNs.Header class="max-sm:hidden">
@@ -557,9 +561,9 @@
 			role="region"
 			aria-label="Expenses"
 			tabindex={-1}
-			class="outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+			class="outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 max-sm:border-0 max-sm:bg-transparent max-sm:py-0 max-sm:shadow-none"
 		>
-			<CardNs.Content>
+			<CardNs.Content class="max-sm:px-0">
 				{#if pageError}
 					<LoadErrorCard
 						compact
