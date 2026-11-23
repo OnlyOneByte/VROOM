@@ -76,6 +76,9 @@
 
 	let isEmpty = $derived(data.length === 0);
 	let resolvedXAxisProps = $derived(xAxisProps ?? monthlyXAxisProps(data.length));
+	let yTicks = $derived(
+		distinctYTicks(yAxisFormat, height - CHART_PADDING.top - CHART_PADDING.bottom)
+	);
 	let isolatedValues = $derived(
 		isolatedValueRows(
 			data,
@@ -112,10 +115,8 @@
 					...getTrendLineProps(data.length),
 					...lineProps,
 					xAxis: { ...resolvedXAxisProps, ticks: insetTimeTicks(resolvedXAxisProps['ticks']) },
-					yAxis: {
-						format: yAxisFormat,
-						ticks: distinctYTicks(yAxisFormat, height - CHART_PADDING.top - CHART_PADDING.bottom)
-					}
+					yAxis: { format: yAxisFormat, ticks: yTicks },
+					grid: { yTicks }
 				}}
 			>
 				{#snippet points()}
