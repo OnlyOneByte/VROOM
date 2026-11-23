@@ -29,14 +29,15 @@
 		if (key === lastKey) return;
 		lastKey = key;
 		if (!open || !reminderId) return;
+		loadError = null;
 		void load(reminderId);
 	});
 
 	async function load(id: string) {
 		isLoading = true;
-		loadError = null;
 		try {
 			expenses = await reminderApi.getMaterializedExpenses(id);
+			loadError = null;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load materialized expenses:', error);
 			loadError = userFacingErrorMessage(error);
@@ -60,7 +61,7 @@
 			</Dialog.Description>
 		</Dialog.Header>
 
-		{#if isLoading}
+		{#if isLoading && !loadError}
 			<div class="space-y-2">
 				{#each Array(3) as _, i (i)}
 					<Skeleton class="h-12 w-full" />

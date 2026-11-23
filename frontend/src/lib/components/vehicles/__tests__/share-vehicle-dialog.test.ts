@@ -166,6 +166,25 @@ describe('ShareVehicleDialog loading the share list', () => {
 		expect(screen.getByText('friend@example.com')).toBeInTheDocument();
 	});
 
+	test('a Retry that fails again keeps the error card and focus on Retry, with no skeleton in between', async () => {
+		listGranted.mockRejectedValueOnce(new ApiError('Server unavailable', 503));
+		let rejectRetry: (reason: unknown) => void = () => {};
+		listGranted.mockReturnValueOnce(new Promise((_, reject) => (rejectRetry = reject)));
+		mount();
+		await settle();
+		const retry = screen.getByRole('button', { name: 'Retry' });
+		retry.focus();
+
+		await fireEvent.click(retry);
+
+		expect(screen.getByRole('button', { name: /Retrying/ })).toBe(retry);
+		expect(document.querySelector('[data-slot="skeleton"]')).toBeNull();
+		rejectRetry(new ApiError('Server unavailable', 503));
+		await settle();
+		expect(screen.getByRole('button', { name: 'Retry' })).toBe(retry);
+		expect(document.activeElement).toBe(retry);
+	});
+
 	test('a non-Error load failure falls back to a generic message', async () => {
 		listGranted.mockRejectedValueOnce('boom');
 		mount();

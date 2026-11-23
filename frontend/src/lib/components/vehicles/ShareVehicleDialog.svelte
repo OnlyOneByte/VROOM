@@ -50,18 +50,19 @@
 		if (key === lastKey) return;
 		lastKey = key;
 		if (!open || !vehicleId) return;
+		loadError = null;
 		void load();
 	});
 
 	async function load() {
 		if (!vehicleId) return;
 		isLoading = true;
-		loadError = null;
 		try {
 			const all = await shareApi.listGranted();
 			shares = all.filter(
 				s => s.vehicleId === vehicleId && SHARE_STATUSES_WITH_ACCESS.includes(s.status)
 			);
+			loadError = null;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load shares:', error);
 			loadError = userFacingErrorMessage(error);
@@ -161,7 +162,7 @@
 
 		<div class="mt-2 min-w-0">
 			<h3 class="mb-2 text-sm font-medium text-muted-foreground">People with access</h3>
-			{#if isLoading}
+			{#if isLoading && !loadError}
 				<div class="space-y-2">
 					{#each Array(2) as _, i (i)}
 						<Skeleton class="h-12 w-full" />

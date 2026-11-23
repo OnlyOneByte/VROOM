@@ -18,7 +18,6 @@
 
 	let { onAccepted }: Props = $props();
 
-	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
 	let pending = $state<ReceivedShare[]>([]);
 	let acting = $state<string | null>(null);
@@ -26,16 +25,13 @@
 	onMount(load);
 
 	async function load() {
-		isLoading = true;
-		loadError = null;
 		try {
 			const received = await shareApi.listReceived();
 			pending = received.filter(s => s.status === 'pending');
+			loadError = null;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load invitations:', error);
 			loadError = userFacingErrorMessage(error);
-		} finally {
-			isLoading = false;
 		}
 	}
 
@@ -67,7 +63,7 @@
 	}
 </script>
 
-{#if loadError && !isLoading}
+{#if loadError}
 	<LoadErrorCard
 		compact
 		title="Couldn't load your invitations"
