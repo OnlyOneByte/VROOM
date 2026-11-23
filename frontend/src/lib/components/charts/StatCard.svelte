@@ -111,7 +111,10 @@
 			{/if}
 		{:else if hasDual}
 			<div class="@container">
-				<div class="flex flex-col @sm:flex-row @sm:items-start @sm:justify-between gap-3 @sm:gap-4">
+				<div
+					data-stat-halves
+					class="flex flex-col @[18rem]:flex-row @[18rem]:items-start @[18rem]:justify-between gap-3 @[18rem]:gap-4"
+				>
 					<div class="flex-1 space-y-1 min-w-0">
 						{#if isLoading}
 							<Skeleton class="h-5 w-24" />
@@ -139,7 +142,9 @@
 							</div>
 						{/if}
 					</div>
-					<div class="h-px w-full @sm:h-auto @sm:w-px bg-border @sm:self-stretch @sm:my-1"></div>
+					<div
+						class="h-px w-full @[18rem]:h-auto @[18rem]:w-px bg-border @[18rem]:self-stretch @[18rem]:my-1"
+					></div>
 					<div class="flex-1 space-y-1 min-w-0">
 						{#if isLoading}
 							<Skeleton class="h-5 w-24" />

@@ -23,8 +23,9 @@ describe('StatCard keeps numbers whole', () => {
 		for (const text of ['Current Odometer', 'Distance Driven']) {
 			expect(screen.getByText(text)).toHaveClass('break-words');
 		}
-		const halves = container.querySelector('[class~="@sm:flex-row"]');
+		const halves = container.querySelector('[data-stat-halves]');
 		expect(halves).toHaveClass('flex-col');
+		expect(halves?.classList.contains('@[18rem]:flex-row')).toBe(true);
 		expect(halves?.parentElement).toHaveClass('@container');
 		expect(halves?.textContent).toContain('25,850');
 		expect(halves?.textContent).toContain('850');
