@@ -23,6 +23,7 @@
 	import {
 		formatCountTooltip,
 		formatDecimalAxis,
+		monthlyXAxisProps,
 		parseMonthToDate,
 		unitTooltip
 	} from '#lib/utils/chart-formatters.ts';
@@ -105,11 +106,6 @@
 	const intervalSeries = [{ key: 'count', label: 'Count', color: CHART_COLORS[2] as string }];
 	const intervalConfig = buildChartConfig(intervalSeries);
 
-	function formatMonthLabel(value: unknown): string {
-		if (!(value instanceof Date) || isNaN(value.getTime())) return '';
-		return value.toLocaleDateString('en-US', { month: 'short' });
-	}
-
 	let heatmapData = $derived(
 		fuelAdvanced.monthlyCostHeatmap.map(d => ({ ...d, date: parseMonthToDate(d.month) }))
 	);
@@ -174,7 +170,7 @@
 			config={heatmapConfig}
 			seriesLayout="stack"
 			yDomain={heatmapYDomain}
-			xAxisProps={{ ticks: Math.min(heatmapData.length, 6), format: formatMonthLabel }}
+			xAxisProps={monthlyXAxisProps(heatmapData.length, 6)}
 		/>
 
 		<AppBarChart
