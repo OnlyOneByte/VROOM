@@ -102,9 +102,80 @@ export function storageProviderIdentity(
   return config.accountEmail ? `${provider.providerType}:${String(config.accountEmail)}` : null;
 }
 
-export function isPreCentsBackup(version: string | undefined): boolean {
-  const major = Number.parseInt(String(version ?? '').split('.')[0], 10);
-  return Number.isFinite(major) && major < 2;
+export type BackupTables = Record<string, Record<string, unknown>[]>;
+
+interface BackupUpgradeStep {
+  to: string;
+  upgrade: (tables: BackupTables) => BackupTables;
+}
+
+type Version = [major: number, minor: number, patch: number];
+
+function parseVersion(version: string | undefined): Version | null {
+  const match = /^(\d+)(?:\.(\d+))?(?:\.(\d+))?$/.exec(String(version ?? '').trim());
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2] ?? 0), Number(match[3] ?? 0)];
+}
+
+function isOlderThan(version: Version, than: Version): boolean {
+  for (let i = 0; i < 3; i++) {
+    if (version[i] !== than[i]) return version[i] < than[i];
+  }
+  return false;
+}
+
+function toNumberOrNull(value: unknown): number | null {
+  if (value === undefined || value === null) return null;
+  const text = String(value).replace(/,/g, '').trim();
+  if (text === '' || text === 'null' || text === 'NULL' || text === 'undefined') return null;
+  const num = Number(text);
+  return Number.isNaN(num) ? null : num;
+}
+
+function dollarsToCents(tables: BackupTables): BackupTables {
+  const upgraded: BackupTables = { ...tables };
+  for (const [key, rows] of Object.entries(tables)) {
+    const table = TABLE_SCHEMA_MAP[key];
+    if (!table) continue;
+    const moneyColumns = Object.keys(getTableColumns(table)).filter((name) =>
+      MONEY_CENTS_FIELDS.has(name)
+    );
+    upgraded[key] = rows.map((row) => {
+      const out = { ...row };
+      for (const column of moneyColumns) {
+        const dollars = toNumberOrNull(row[column]);
+        if (dollars !== null) out[column] = dollars * 100;
+      }
+      return out;
+    });
+  }
+  return upgraded;
+}
+
+const BACKUP_UPGRADE_STEPS: BackupUpgradeStep[] = [{ to: '2.0.0', upgrade: dollarsToCents }];
+
+export function upgradeBackupTables(
+  version: string | undefined,
+  tables: BackupTables
+): BackupTables {
+  const from = parseVersion(version);
+  if (!from) return tables;
+  return BACKUP_UPGRADE_STEPS.filter((step) => {
+    const to = parseVersion(step.to);
+    return to !== null && isOlderThan(from, to);
+  }).reduce((current, step) => step.upgrade(current), tables);
+}
+
+export function backupVersionError(version: string | undefined): string | null {
+  const backup = parseVersion(version);
+  if (!backup) return `Backup version "${String(version)}" is not a version number`;
+  const current = parseVersion(CONFIG.backup.currentVersion) as Version;
+  const newer = backup[0] > current[0] || (backup[0] === current[0] && backup[1] > current[1]);
+  if (!newer) return null;
+  return (
+    `This backup was made by a newer version of VROOM (backup format ${version}; this server ` +
+    `reads formats up to ${current[0]}.${current[1]}.x). Update VROOM, then restore it again.`
+  );
 }
 
 const TABLE_SCHEMAS: Record<string, z.ZodObject> = {};
@@ -113,14 +184,9 @@ for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Column type coercion requires checking multiple column types
-export function coerceRow(
-  row: Record<string, unknown>,
-  table: Table,
-  options?: { shimMoneyToCents?: boolean }
-): Record<string, unknown> {
+export function coerceRow(row: Record<string, unknown>, table: Table): Record<string, unknown> {
   const columns = getTableColumns(table);
   const coerced: Record<string, unknown> = { ...row };
-  const shimMoneyToCents = options?.shimMoneyToCents ?? false;
 
   const BOOLEAN_TYPES = new Set(['SQLiteBoolean', 'PgBoolean']);
   const TIMESTAMP_TYPES = new Set(['SQLiteTimestamp', 'PgTimestamp', 'PgTimestampString']);
@@ -173,14 +239,7 @@ export function coerceRow(
     } else if (INTEGER_TYPES.has(col.columnType)) {
       // Sheets exports grouped numbers such as "12,345"; parseInt would read them as 12.
       const num = Number(strVal.replace(/,/g, ''));
-      if (Number.isNaN(num)) {
-        coerced[columnName] = null;
-      } else if (shimMoneyToCents && MONEY_CENTS_FIELDS.has(columnName)) {
-        // Float products such as 12.34 * 100 land just below the integer, so round.
-        coerced[columnName] = Math.round(num * 100);
-      } else {
-        coerced[columnName] = Math.round(num);
-      }
+      coerced[columnName] = Number.isNaN(num) ? null : Math.round(num);
     } else if (REAL_TYPES.has(col.columnType)) {
       const num = Number(strVal.replace(/,/g, ''));
       coerced[columnName] = Number.isNaN(num) ? null : num;
@@ -550,26 +609,24 @@ class BackupService {
 
     const metadata = JSON.parse(metadataEntry.getData().toString('utf-8')) as BackupMetadata;
 
-    const shimMoneyToCents = isPreCentsBackup(metadata.version);
-
     const getCSVData = (fileName: string): Record<string, unknown>[] => {
       const entry = zip.getEntry(fileName);
       if (!entry) return [];
       return this.parseCSV(entry.getData().toString('utf-8'));
     };
 
-    const parsedData: ParsedBackupData = { metadata } as ParsedBackupData;
-    for (const [key, filename] of Object.entries(TABLE_FILENAME_MAP)) {
-      const table = TABLE_SCHEMA_MAP[key];
-      const rawRows = getCSVData(filename);
-      const coercedRows = table
-        ? rawRows.map((row) => coerceRow(row, table, { shimMoneyToCents }))
-        : rawRows;
-      parsedData[key as Exclude<keyof ParsedBackupData, 'metadata'>] = coercedRows;
-    }
+    const rawTables = upgradeBackupTables(
+      metadata.version,
+      Object.fromEntries(
+        Object.entries(TABLE_FILENAME_MAP).map(([key, filename]) => [key, getCSVData(filename)])
+      )
+    );
 
-    if (shimMoneyToCents) {
-      parsedData.metadata = { ...metadata, version: CONFIG.backup.currentVersion };
+    const parsedData: ParsedBackupData = { metadata } as ParsedBackupData;
+    for (const [key, rawRows] of Object.entries(rawTables)) {
+      const table = TABLE_SCHEMA_MAP[key];
+      const coercedRows = table ? rawRows.map((row) => coerceRow(row, table)) : rawRows;
+      parsedData[key as Exclude<keyof ParsedBackupData, 'metadata'>] = coercedRows;
     }
 
     return parsedData;
@@ -593,11 +650,8 @@ class BackupService {
       errors.push('Invalid metadata');
     }
 
-    if (backup.metadata.version !== CONFIG.backup.currentVersion) {
-      errors.push(
-        `Version mismatch: expected ${CONFIG.backup.currentVersion}, got ${backup.metadata.version}`
-      );
-    }
+    const versionError = backupVersionError(backup.metadata?.version);
+    if (versionError) errors.push(versionError);
 
     for (const key of getBackupTableKeys()) {
       const schema = TABLE_SCHEMAS[key];

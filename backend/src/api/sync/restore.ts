@@ -1,6 +1,6 @@
 import { and, eq, getTableColumns, inArray, ne, type Table } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
-import { CONFIG, TABLE_SCHEMA_MAP } from '../../config';
+import { TABLE_SCHEMA_MAP } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import {
@@ -43,9 +43,9 @@ import { preferencesRepository } from '../settings/repository';
 import {
   backupService,
   coerceRow,
-  isPreCentsBackup,
   normalizeStorageIdentity,
   storageProviderIdentity,
+  upgradeBackupTables,
 } from './backup';
 
 type DrizzleTransaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
@@ -119,12 +119,8 @@ function summarizeBackup(data: ParsedBackupData): ImportSummary {
   };
 }
 
-function coerceRows(
-  rows: Record<string, unknown>[],
-  table: Table,
-  options?: { shimMoneyToCents?: boolean }
-): Record<string, unknown>[] {
-  return rows.map((row) => coerceRow(row, table, options));
+function coerceRows(rows: Record<string, unknown>[], table: Table): Record<string, unknown>[] {
+  return rows.map((row) => coerceRow(row, table));
 }
 
 class RestoreService {
@@ -245,37 +241,35 @@ class RestoreService {
       '../providers/services/google-sheets-service'
     );
     const sheetsService = await createSheetsServiceForProvider(providerId, userId);
-    const sheet = await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
-    const shim = { shimMoneyToCents: isPreCentsBackup(sheet.metadata.version) };
+    const { metadata, ...sheetTables } =
+      await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
+    const sheet = upgradeBackupTables(metadata.version, sheetTables) as typeof sheetTables;
 
     const { data: sheetData, skippedPhotos } = this.withoutOrphanPhotos({
-      ...sheet,
-      metadata: { ...sheet.metadata, version: CONFIG.backup.currentVersion },
-      vehicles: coerceRows(sheet.vehicles, TABLE_SCHEMA_MAP.vehicles, shim),
-      expenses: coerceRows(sheet.expenses, TABLE_SCHEMA_MAP.expenses, shim),
-      financing: coerceRows(sheet.financing, TABLE_SCHEMA_MAP.financing, shim),
-      insurance: coerceRows(sheet.insurance, TABLE_SCHEMA_MAP.insurance, shim),
-      insuranceTerms: coerceRows(sheet.insuranceTerms, TABLE_SCHEMA_MAP.insuranceTerms, shim),
+      metadata,
+      vehicles: coerceRows(sheet.vehicles, TABLE_SCHEMA_MAP.vehicles),
+      expenses: coerceRows(sheet.expenses, TABLE_SCHEMA_MAP.expenses),
+      financing: coerceRows(sheet.financing, TABLE_SCHEMA_MAP.financing),
+      insurance: coerceRows(sheet.insurance, TABLE_SCHEMA_MAP.insurance),
+      insuranceTerms: coerceRows(sheet.insuranceTerms, TABLE_SCHEMA_MAP.insuranceTerms),
       insuranceTermVehicles: coerceRows(
         sheet.insuranceTermVehicles,
-        TABLE_SCHEMA_MAP.insuranceTermVehicles,
-        shim
+        TABLE_SCHEMA_MAP.insuranceTermVehicles
       ),
-      insuranceClaims: coerceRows(sheet.insuranceClaims, TABLE_SCHEMA_MAP.insuranceClaims, shim),
-      photos: coerceRows(sheet.photos, TABLE_SCHEMA_MAP.photos, shim),
-      odometer: coerceRows(sheet.odometer, TABLE_SCHEMA_MAP.odometer, shim),
-      photoRefs: coerceRows(sheet.photoRefs, TABLE_SCHEMA_MAP.photoRefs, shim),
-      userPreferences: coerceRows(sheet.userPreferences, TABLE_SCHEMA_MAP.userPreferences, shim),
-      syncState: coerceRows(sheet.syncState, TABLE_SCHEMA_MAP.syncState, shim),
-      reminders: coerceRows(sheet.reminders, TABLE_SCHEMA_MAP.reminders, shim),
-      reminderVehicles: coerceRows(sheet.reminderVehicles, TABLE_SCHEMA_MAP.reminderVehicles, shim),
+      insuranceClaims: coerceRows(sheet.insuranceClaims, TABLE_SCHEMA_MAP.insuranceClaims),
+      photos: coerceRows(sheet.photos, TABLE_SCHEMA_MAP.photos),
+      odometer: coerceRows(sheet.odometer, TABLE_SCHEMA_MAP.odometer),
+      photoRefs: coerceRows(sheet.photoRefs, TABLE_SCHEMA_MAP.photoRefs),
+      userPreferences: coerceRows(sheet.userPreferences, TABLE_SCHEMA_MAP.userPreferences),
+      syncState: coerceRows(sheet.syncState, TABLE_SCHEMA_MAP.syncState),
+      reminders: coerceRows(sheet.reminders, TABLE_SCHEMA_MAP.reminders),
+      reminderVehicles: coerceRows(sheet.reminderVehicles, TABLE_SCHEMA_MAP.reminderVehicles),
       reminderNotifications: coerceRows(
         sheet.reminderNotifications,
-        TABLE_SCHEMA_MAP.reminderNotifications,
-        shim
+        TABLE_SCHEMA_MAP.reminderNotifications
       ),
-      trips: coerceRows(sheet.trips, TABLE_SCHEMA_MAP.trips, shim),
-      vehicleShares: coerceRows(sheet.vehicleShares, TABLE_SCHEMA_MAP.vehicleShares, shim),
+      trips: coerceRows(sheet.trips, TABLE_SCHEMA_MAP.trips),
+      vehicleShares: coerceRows(sheet.vehicleShares, TABLE_SCHEMA_MAP.vehicleShares),
     });
 
     const validation = backupService.validateBackupData(sheetData);

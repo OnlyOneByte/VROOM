@@ -8,7 +8,7 @@ import {
   vehicleFinancing,
   vehicles,
 } from '../../../db/schema';
-import { coerceRow, MONEY_CENTS_FIELDS } from '../backup';
+import { coerceRow, MONEY_CENTS_FIELDS, upgradeBackupTables } from '../backup';
 
 const EXPECTED_MONEY_FIELDS = new Set<string>([
   'purchasePrice',
@@ -58,34 +58,32 @@ describe('MONEY_CENTS_FIELDS drift guard (restore-shim allowlist)', () => {
   });
 });
 
-describe('coerceRow money shim contract (Sheets no-shim vs ZIP pre-cents shim)', () => {
-  test('NO shim: a cents money string is preserved EXACTLY (the live-Sheets / 2.0.0-ZIP path)', () => {
-    const row = {
-      id: 'e1',
-      vehicleId: 'v1',
-      userId: 'u1',
-      category: 'fuel',
-      expenseAmount: '4550',
-    };
-    const out = coerceRow(row, expenses);
-    expect(out.expenseAmount).toBe(4550);
+function restoredExpense(version: string, row: Record<string, unknown>): Record<string, unknown> {
+  const [upgraded] = upgradeBackupTables(version, { expenses: [row] }).expenses;
+  return coerceRow(upgraded, expenses);
+}
+
+describe('pre-cents upgrade step contract (2.0.0 as-is vs 1.x dollars to cents)', () => {
+  const base = { id: 'e1', vehicleId: 'v1', userId: 'u1', category: 'fuel' };
+
+  test('a 2.0.0 cents money string is preserved EXACTLY (the live-Sheets / 2.0.0-ZIP path)', () => {
+    expect(restoredExpense('2.0.0', { ...base, expenseAmount: '4550' }).expenseAmount).toBe(4550);
   });
 
-  test('WITH shim: a pre-cents DOLLAR string is ×100-rounded to cents (the 1.0.0-ZIP recovery path)', () => {
-    const row = {
-      id: 'e1',
-      vehicleId: 'v1',
-      userId: 'u1',
-      category: 'fuel',
-      expenseAmount: '45.50',
-    };
-    const out = coerceRow(row, expenses, { shimMoneyToCents: true });
-    expect(out.expenseAmount).toBe(4550);
+  test('a 1.x DOLLAR string is ×100-rounded to cents (the 1.0.0-ZIP recovery path)', () => {
+    expect(restoredExpense('1.0.0', { ...base, expenseAmount: '45.50' }).expenseAmount).toBe(4550);
+    expect(restoredExpense('1.0.0', { ...base, expenseAmount: '1,234.56' }).expenseAmount).toBe(
+      123456
+    );
   });
 
-  test('WITH shim does NOT touch a non-money real (volume gal/kWh stays as-is)', () => {
-    const row = { id: 'e1', vehicleId: 'v1', userId: 'u1', category: 'fuel', volume: '11.5' };
-    const out = coerceRow(row, expenses, { shimMoneyToCents: true });
-    expect(out.volume).toBe(11.5);
+  test('the 1.x step does NOT touch a non-money real (volume gal/kWh stays as-is)', () => {
+    expect(restoredExpense('1.0.0', { ...base, volume: '11.5' }).volume).toBe(11.5);
+  });
+
+  test('the 1.x step leaves a blank money cell blank', () => {
+    expect(restoredExpense('1.0.0', { ...base, expenseAmount: '' }).expenseAmount).toBe(
+      restoredExpense('2.0.0', { ...base, expenseAmount: '' }).expenseAmount
+    );
   });
 });

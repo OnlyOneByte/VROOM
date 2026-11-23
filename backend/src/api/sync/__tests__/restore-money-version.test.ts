@@ -104,12 +104,23 @@ describe('backup version bump and restore shim', () => {
     expect(expenseAmountCents('e_t2')).toBeUndefined();
   });
 
-  test('isPreCentsBackup classifies versions correctly', async () => {
-    const { isPreCentsBackup } = await import('../backup');
-    expect(isPreCentsBackup('1.0.0')).toBe(true);
-    expect(isPreCentsBackup('1.5.2')).toBe(true);
-    expect(isPreCentsBackup('2.0.0')).toBe(false);
-    expect(isPreCentsBackup('3.0.0')).toBe(false);
-    expect(isPreCentsBackup(undefined)).toBe(false);
+  test('backupVersionError accepts older and same-minor versions and refuses newer ones', async () => {
+    const { backupVersionError } = await import('../backup');
+    expect(backupVersionError('1.0.0')).toBeNull();
+    expect(backupVersionError('1.5.2')).toBeNull();
+    expect(backupVersionError('2.0.0')).toBeNull();
+    expect(backupVersionError('2.0.7')).toBeNull();
+    expect(backupVersionError('2.1.0')).toMatch(/newer version of VROOM/);
+    expect(backupVersionError('3.0.0')).toMatch(/newer version of VROOM/);
+    expect(backupVersionError(undefined)).toMatch(/not a version number/);
+    expect(backupVersionError('latest')).toMatch(/not a version number/);
+  });
+
+  test('upgradeBackupTables runs the pre-cents step only for backups older than 2.0.0', async () => {
+    const { upgradeBackupTables } = await import('../backup');
+    const tables = { expenses: [{ id: 'e1', expenseAmount: '12.34' }] };
+    expect(upgradeBackupTables('1.9.9', tables).expenses[0].expenseAmount).toBeCloseTo(1234);
+    expect(upgradeBackupTables('2.0.0', tables).expenses[0].expenseAmount).toBe('12.34');
+    expect(upgradeBackupTables('3.0.0', tables).expenses[0].expenseAmount).toBe('12.34');
   });
 });
