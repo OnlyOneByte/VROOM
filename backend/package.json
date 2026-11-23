@@ -13,7 +13,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --hot src/index.ts",
-    "build": "bun build src/index.ts --outdir ./dist --target bun",
+    "build": "bun build src/index.ts src/scripts/rotate-provider-keys.ts --outdir ./dist --target bun",
     "start": "bun dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",

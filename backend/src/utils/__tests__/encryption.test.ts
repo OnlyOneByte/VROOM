@@ -90,10 +90,16 @@ describe('the v1 format is still read', () => {
     expect(isCurrentEnvelope(legacy)).toBe(false);
   });
 
-  test('a v1 value decrypts with an older key from the list', () => {
+  test('a v1 value decrypts with the "default" key from the list', () => {
+    const legacy = encryptV1('old', TEST_KEY);
+    useKeys(undefined, `new=${ALT_KEY},default=${TEST_KEY}`);
+    expect(decrypt(legacy, ROW)).toBe('old');
+  });
+
+  test('a v1 value is not tried with any other listed key', () => {
     const legacy = encryptV1('old', TEST_KEY);
     useKeys(undefined, `new=${ALT_KEY},old=${TEST_KEY}`);
-    expect(decrypt(legacy, ROW)).toBe('old');
+    expect(() => decrypt(legacy, ROW)).toThrow('needs the key with the id "default"');
   });
 
   test('a v1 value under a key that is no longer configured fails', () => {

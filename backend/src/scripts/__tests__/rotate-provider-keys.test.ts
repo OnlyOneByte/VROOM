@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createCipheriv, randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { CONFIG } from '../../config';
 import { createTestApp, type TestApp } from '../../test-helpers/http-client';
 
@@ -138,5 +140,16 @@ describe('bun run providers:rotate-key', () => {
     const { getDb } = await import('../../db/connection');
     expect(rotateProviderKeys(getDb()).failed).toEqual(['x-lost']);
     expect(rows()[0]?.credentials).toBe(before);
+  });
+
+  test('the image bundles the command the docs tell Docker users to run', () => {
+    const repo = join(import.meta.dir, '..', '..', '..', '..');
+    const dockerfile = readFileSync(join(repo, 'backend', 'Dockerfile'), 'utf8');
+    const build = dockerfile.split('\n').find((line) => line.startsWith('RUN bun build'));
+    expect(build).toContain('src/scripts/rotate-provider-keys.ts');
+    expect(build).toContain('--outdir ./dist');
+    expect(readFileSync(join(repo, 'docs', 'deployment.md'), 'utf8')).toContain(
+      'bun dist/scripts/rotate-provider-keys.js'
+    );
   });
 });

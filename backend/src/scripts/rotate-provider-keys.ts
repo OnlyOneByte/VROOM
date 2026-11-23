@@ -30,9 +30,7 @@ function rotatedSecret(row: SecretRow, report: RotationReport): string | null {
   }
   const context = secretContextOf(row);
   try {
-    const plaintext = decrypt(row.credentials, context);
-    report.rotated++;
-    return encrypt(plaintext, context);
+    return encrypt(decrypt(row.credentials, context), context);
   } catch {
     report.failed.push(row.id);
     return null;
@@ -59,10 +57,14 @@ export function rotateProviderKeys(database: AppDatabase, batchSize = BATCH_SIZE
       for (const row of rows) {
         const credentials = rotatedSecret(row, report);
         if (credentials === null) continue;
-        tx.update(userProviders)
+        const written = tx
+          .update(userProviders)
           .set({ credentials })
           .where(and(eq(userProviders.id, row.id), eq(userProviders.credentials, row.credentials)))
-          .run();
+          .returning({ id: userProviders.id })
+          .all();
+        if (written.length > 0) report.rotated++;
+        else report.unchanged++;
       }
       return rows.at(-1)?.id ?? null;
     });

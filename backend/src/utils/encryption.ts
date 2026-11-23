@@ -1,5 +1,10 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { CONFIG, type EncryptionKeyring, parseEncryptionKeys } from '../config';
+import {
+  CONFIG,
+  type EncryptionKeyring,
+  LEGACY_ENCRYPTION_KEY_ID,
+  parseEncryptionKeys,
+} from '../config';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
@@ -36,7 +41,7 @@ export function _clearKeyCache(): void {
 }
 
 function associatedData(context: SecretContext): Buffer {
-  return Buffer.from(`${context.rowId}|${context.userId}|${context.domain}`, 'utf8');
+  return Buffer.from(JSON.stringify([context.rowId, context.userId, context.domain]), 'utf8');
 }
 
 function seal(plaintext: string, key: Buffer, aad: Buffer): Buffer {
@@ -77,16 +82,13 @@ export function decrypt(ciphertext: string, context: SecretContext): string {
     if (!key) throw new Error(`Unknown encryption key id "${keyId}"`);
     return open(Buffer.from(rest.slice(sep + 1), 'base64'), key, associatedData(context));
   }
-  const combined = Buffer.from(ciphertext, 'base64');
-  let lastError: unknown = null;
-  for (const key of keys.values()) {
-    try {
-      return open(combined, key, null);
-    } catch (error) {
-      lastError = error;
-    }
+  const legacyKey = keys.get(LEGACY_ENCRYPTION_KEY_ID);
+  if (!legacyKey) {
+    throw new Error(
+      `A value in the old format needs the key with the id "${LEGACY_ENCRYPTION_KEY_ID}"`
+    );
   }
-  throw lastError instanceof Error ? lastError : new Error('Could not decrypt the secret');
+  return open(Buffer.from(ciphertext, 'base64'), legacyKey, null);
 }
 
 export function isCurrentEnvelope(ciphertext: string): boolean {
