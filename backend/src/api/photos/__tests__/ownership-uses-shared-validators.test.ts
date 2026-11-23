@@ -17,25 +17,28 @@ describe('photo entity-ownership uses the shared validators', () => {
 
   test('routes vehicle and insurance_policy through the strict shared validators', () => {
     const src = readHelpers();
-    for (const fn of ['validateVehicleOwnership', 'validateInsuranceOwnership']) {
-      expect(
-        new RegExp(`\\b${fn}\\s*\\(`).test(src),
-        `validateEntityOwnership must call the shared ${fn} from utils/validation.ts.`
-      ).toBe(true);
-    }
+    expect(
+      /\brequireVehicleAccess\s*\(\s*entityId\s*,\s*userId\s*,\s*'owner'\s*\)/.test(src),
+      "the vehicle leg must call requireVehicleAccess(entityId, userId, 'owner') from utils/vehicle-access.ts."
+    ).toBe(true);
+    expect(
+      /\bvalidateInsuranceOwnership\s*\(/.test(src),
+      'validateEntityOwnership must call the shared validateInsuranceOwnership from utils/validation.ts.'
+    ).toBe(true);
   });
 
-  test('the owner-stamped legs authorize through the vehicle-sharing seam', () => {
+  test('the owner-stamped legs authorize through the vehicle write gate', () => {
+    const writeGates = readHelpers().match(/\brequireVehicleAccess\s*\([^)]*'write'\s*\)/g) ?? [];
     expect(
-      /\brequireVehicleWrite\s*\(/.test(readHelpers()),
-      'the expense and odometer_entry legs must authorize via requireVehicleWrite (utils/sharing.ts). ' +
+      writeGates.length,
+      "the expense and odometer_entry legs must authorize via requireVehicleAccess(…, 'write'). " +
         'A userId-match check there denies an accepted editor the photo on their own owner-stamped row.'
-    ).toBe(true);
+    ).toBe(2);
   });
 
   test('does NOT locally re-declare a shared ownership validator (no shadowing duplicate)', () => {
     const localDecl =
-      /\b(?:function|const|let)\s+(validateVehicleOwnership|validateInsuranceOwnership|requireVehicleWrite)\b/;
+      /\b(?:function|const|let)\s+(requireVehicleAccess|resolveVehicleAccess|validateInsuranceOwnership)\b/;
     const match = localDecl.exec(readHelpers());
     expect(
       match,
