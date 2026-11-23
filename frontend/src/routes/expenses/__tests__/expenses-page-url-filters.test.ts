@@ -8,10 +8,10 @@ const nav = vi.hoisted(() => ({
 }));
 
 vi.mock('$app/navigation', () => ({
-	goto: vi.fn(() => Promise.resolve()),
-	replaceState: (url: string, state: unknown) => {
-		nav.replaceState(url, state);
+	goto: (url: string, opts: { shallow?: boolean; replace?: boolean; state?: unknown }) => {
+		if (opts.shallow && opts.replace) nav.replaceState(url, opts.state);
 		nav.page.url = new URL(url, nav.page.url);
+		return Promise.resolve();
 	}
 }));
 vi.mock('$app/state', () => ({

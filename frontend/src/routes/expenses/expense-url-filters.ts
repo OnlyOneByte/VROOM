@@ -46,8 +46,14 @@ export function parseExpenseUrlFilters(params: Pick<URLSearchParams, 'get'>): Ex
 	};
 }
 
-export function expenseUrlFiltersQuery(filters: ExpenseUrlFilters): string {
-	const params = new URLSearchParams();
+const FILTER_KEYS = ['vehicleId', 'category', 'startDate', 'endDate', 'tags', 'q'];
+
+export function expenseUrlFiltersQuery(
+	filters: ExpenseUrlFilters,
+	current?: Pick<URLSearchParams, 'toString'>
+): string {
+	const params = new URLSearchParams(current?.toString());
+	for (const key of FILTER_KEYS) params.delete(key);
 	if (filters.vehicleId) params.set('vehicleId', filters.vehicleId);
 	if (filters.category) params.set('category', filters.category);
 	if (filters.startDate) params.set('startDate', filters.startDate);

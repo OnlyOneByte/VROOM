@@ -67,6 +67,15 @@ describe('expenseUrlFiltersQuery', () => {
 		);
 	});
 
+	test('keeps query parameters it does not own', () => {
+		expect(
+			expenseUrlFiltersQuery(
+				{ category: 'fuel', tags: [], q: '' },
+				new URLSearchParams('from=analytics&category=misc&q=old')
+			)
+		).toBe('?from=analytics&category=fuel');
+	});
+
 	test('no filters is an empty query', () => {
 		expect(expenseUrlFiltersQuery({ tags: [], q: '' })).toBe('');
 	});

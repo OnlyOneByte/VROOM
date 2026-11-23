@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { replaceState } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { routes } from '#lib/routes.ts';
 	import {
@@ -77,6 +77,7 @@
 	let totalCountFiltered = $state(false);
 	let isLoadingPage = $state(false);
 
+	const URL_WRITE_DELAY_MS = 300;
 	const urlFilters = parseExpenseUrlFilters(page.url.searchParams);
 
 	let searchTerm = $state(urlFilters.q);
@@ -173,20 +174,30 @@
 	});
 
 	$effect(() => {
-		const query = expenseUrlFiltersQuery({
+		const filters = {
 			vehicleId: selectedVehicleId,
 			category: categoryFilter || undefined,
 			startDate,
 			endDate,
-			tags: selectedTags,
+			tags: [...selectedTags],
 			q: searchTerm
-		});
+		};
 		if (isLoading) return;
-		untrack(() => {
-			if (query === page.url.search) return;
-			// eslint-disable-next-line svelte/no-navigation-without-resolve -- the path is resolved; only the query string is added
-			replaceState(`${resolve(routes.expenses)}${query}${page.url.hash}`, page.state);
-		});
+		const timer = setTimeout(
+			() =>
+				untrack(() => {
+					const query = expenseUrlFiltersQuery(filters, page.url.searchParams);
+					if (query === page.url.search) return;
+					// eslint-disable-next-line svelte/no-navigation-without-resolve -- the path is resolved; only the query string is added
+					goto(`${resolve(routes.expenses)}${query}${page.url.hash}`, {
+						state: page.state,
+						shallow: true,
+						replace: true
+					});
+				}),
+			URL_WRITE_DELAY_MS
+		);
+		return () => clearTimeout(timer);
 	});
 
 	onMount(loadInitial);
