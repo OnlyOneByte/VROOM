@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { getDb } from '../../db/connection';
@@ -46,7 +46,7 @@ routes.post('/chat', zValidator('json', chatBodySchema), async (c) => {
       and(
         eq(userProviders.userId, user.id),
         eq(userProviders.domain, 'llm'),
-        eq(userProviders.status, 'active')
+        ne(userProviders.status, 'disabled')
       )
     );
   const providerRow = rows[0];

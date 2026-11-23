@@ -427,3 +427,25 @@ describe('accounts: users_email_lower_idx', () => {
     expect(countRows(db, 'users')).toBe(2);
   });
 });
+
+describe('provider health defaults', () => {
+  let db: Database;
+  beforeEach(() => {
+    db = seeded();
+    for (const migration of migrations.slice(1)) applyMigration(db, migration);
+  });
+  afterEach(() => db.close());
+
+  test('a new provider starts active, with no error, no check yet and no failures', () => {
+    db.run(
+      "INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials) VALUES ('p1', 'u1', 'storage', 's3', 'S3', '')"
+    );
+    expect(
+      db
+        .query(
+          "SELECT status, last_error_code, last_checked_at, failure_count FROM user_providers WHERE id = 'p1'"
+        )
+        .get()
+    ).toEqual({ status: 'active', last_error_code: null, last_checked_at: null, failure_count: 0 });
+  });
+});

@@ -24,6 +24,8 @@
 		height?: number;
 		icon?: Snippet;
 		legend?: Snippet;
+		summary?: Snippet | undefined;
+		footer?: Snippet | undefined;
 		animationClass?: 'chart-line-animated' | 'chart-bar-animated';
 		table?: ChartA11y | undefined;
 		class?: string;
@@ -43,6 +45,8 @@
 		height,
 		icon,
 		legend,
+		summary,
+		footer,
 		animationClass,
 		table,
 		class: className,
@@ -136,6 +140,9 @@
 		</div>
 	</Card.Header>
 	<Card.Content>
+		{#if summary}
+			<div class="mb-4">{@render summary()}</div>
+		{/if}
 		{#if isLoading}
 			<Skeleton class="w-full" style="height: {placeholderHeight}px" />
 		{:else if error}
@@ -211,6 +218,9 @@
 			{#if legend}
 				{@render legend()}
 			{/if}
+		{/if}
+		{#if footer}
+			<div class="mt-4">{@render footer()}</div>
 		{/if}
 	</Card.Content>
 </Card.Root>

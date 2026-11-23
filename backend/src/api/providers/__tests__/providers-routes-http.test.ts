@@ -24,6 +24,8 @@ const PROVIDER_RESPONSE_KEYS = [
   'config',
   'secretsSet',
   'lastSyncAt',
+  'lastErrorCode',
+  'lastCheckedAt',
   'createdAt',
 ].sort();
 

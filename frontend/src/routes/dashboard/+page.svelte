@@ -35,6 +35,7 @@
 	import { formatCurrency, formatDate, formatDateWith } from '#lib/utils/formatters.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
 	import { costBucketColor } from '#lib/utils/cost-bucket.ts';
 	import { buildChartConfig } from '#lib/utils/chart-colors.ts';
 	import { formatCurrencyAxis, parseMonthToDate } from '#lib/utils/chart-formatters.ts';
@@ -44,12 +45,14 @@
 	import { reminderApi } from '#lib/services/reminder-api.ts';
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
 	import { analyticsApi } from '#lib/services/analytics-api.ts';
+	import { shareApi } from '#lib/services/share-api.ts';
 	import type {
 		AnalyticsQueryResponse,
 		DistanceUnit,
 		Expense,
 		ExpenseSummary,
 		InsurancePolicy,
+		ReceivedShare,
 		RecurringCostSummary,
 		ReminderWithVehicles,
 		Vehicle
@@ -81,6 +84,9 @@
 	let recentExpensesList = $state<Expense[]>([]);
 	let remindersList = $state<ReminderWithVehicles[]>([]);
 	let policies = $state<InsurancePolicy[]>([]);
+	let invitations = $state<ReceivedShare[]>([]);
+	let invitationsError = $state<string | null>(null);
+	let pendingInvitations = $derived(invitations.filter(share => share.status === 'pending'));
 	let recurringCost = $state<RecurringCostSummary>({ count: 0, monthlyTotal: 0 });
 	let spendTrend = $state<AnalyticsQueryResponse | null>(null);
 	let runningByMonth = $state<AnalyticsQueryResponse | null>(null);
@@ -89,6 +95,7 @@
 	let ownedVehicles = $derived(vehicles.filter(v => !v.sharedAccess));
 	let sharedVehicles = $derived(vehicles.filter(v => v.sharedAccess));
 	let hasLoaded = $state(false);
+	const isNarrow = new IsMobile(1024);
 	let showFab = $derived(hasLoaded && !loadError);
 	let canLogFillup = $derived(showFab && ownedVehicles.length > 0);
 	let noVehicles = $derived(hasLoaded && !loadError && vehicles.length === 0);
@@ -218,6 +225,25 @@
 		return { summaries: [owned, ...sharedRows], perDistance };
 	}
 
+	async function fetchInvitations(): Promise<{ list: ReceivedShare[]; error: string | null }> {
+		try {
+			return { list: await shareApi.listReceived(), error: null };
+		} catch (error) {
+			logLoadFailure(error, "Couldn't load your invitations");
+			return { list: [], error: userFacingErrorMessage(error) };
+		}
+	}
+
+	async function retryInvitations() {
+		const result = await fetchInvitations();
+		invitations = result.list;
+		invitationsError = result.error;
+	}
+
+	function dropInvitation(share: ReceivedShare) {
+		invitations = invitations.filter(s => s.id !== share.id);
+	}
+
 	async function loadDashboardData() {
 		isLoading = true;
 		isUpdatingPeriod = false;
@@ -232,6 +258,7 @@
 				loadedReminders,
 				loadedRecurringCost,
 				loadedPolicies,
+				loadedInvitations,
 				ownedPeriod,
 				loadedSpendTrend,
 				loadedRunningByMonth
@@ -242,6 +269,7 @@
 				reminderApi.list().catch(() => [] as ReminderWithVehicles[]),
 				reminderApi.getRecurringCost().catch(() => ({ count: 0, monthlyTotal: 0 })),
 				insuranceApi.getAllPolicies().catch(() => [] as InsurancePolicy[]),
+				fetchInvitations(),
 				loadPeriod(selected, []),
 				analyticsApi
 					.query({
@@ -278,6 +306,8 @@
 			remindersList = loadedReminders;
 			recurringCost = loadedRecurringCost;
 			policies = loadedPolicies;
+			invitations = loadedInvitations.list;
+			invitationsError = loadedInvitations.error;
 			spendTrend = loadedSpendTrend;
 			runningByMonth = loadedRunningByMonth;
 			trendFailed = loadedRunningByMonth === null;
@@ -317,6 +347,93 @@
 		}
 	}
 </script>
+
+{#snippet invitationsCard()}
+	<SharedWithMeCard
+		pending={pendingInvitations}
+		loadError={invitationsError}
+		onRetry={retryInvitations}
+		onAccepted={loadDashboardData}
+		onDeclined={dropInvitation}
+	/>
+{/snippet}
+
+{#snippet heroSection()}
+	<DashboardHero
+		{period}
+		total={spend.total}
+		previousTotal={spend.previousTotal}
+		buckets={spend.buckets}
+		runningPerDistance={periodData.perDistance?.totals.perDistance ?? null}
+		runningScope={sharedVehicles.length > 0 ? 'on your vehicles' : null}
+		{distanceLabel}
+		isLoading={!hasLoaded}
+		isUpdating={isUpdatingPeriod}
+		onPeriodChange={handlePeriodChange}
+	/>
+{/snippet}
+
+{#snippet vehiclesSection()}
+	<VehicleRowsCard rows={vehicleRows} periodLabel={PERIOD_PHRASES[period].chip} {distanceLabel} />
+{/snippet}
+
+{#snippet chartSection()}
+	{#await chartModules}
+		<ChartCard title={TREND_TITLE} level={2} description={TREND_DESCRIPTION} isLoading>
+			{null}
+		</ChartCard>
+	{:then { AppBarChart }}
+		<AppBarChart
+			level={2}
+			title={TREND_TITLE}
+			description={TREND_DESCRIPTION}
+			data={trendData}
+			x="month"
+			y="amount"
+			series={trendSeries}
+			config={trendConfig}
+			yAxisFormat={formatCurrencyAxis}
+			xAxisProps={{ ticks: trendTicks, format: (v: string) => v }}
+			error={trendFailed ? "Couldn't load the monthly running costs." : null}
+		>
+			{#snippet footer()}
+				{#if trendInsight}
+					<p class="text-xs text-muted-foreground" data-testid="trend-insight">
+						{trendInsight}
+					</p>
+				{/if}
+			{/snippet}
+		</AppBarChart>
+	{:catch}
+		<ChartCard
+			title={TREND_TITLE}
+			level={2}
+			description={TREND_DESCRIPTION}
+			error="Charts couldn't be loaded. Check your connection and reload."
+		>
+			{null}
+		</ChartCard>
+	{/await}
+{/snippet}
+
+{#snippet attentionSection()}
+	{#if attention.length > 0}
+		<NeedsAttentionCard items={attention} />
+	{/if}
+	{#if invitationsError || pendingInvitations.length > 0}
+		{@render invitationsCard()}
+	{/if}
+{/snippet}
+
+{#snippet recentSection()}
+	<RecentActivityCard expenses={recentExpenses} />
+{/snippet}
+
+{#snippet recurringSection()}
+	{#if recurringCost.count > 0}
+		<RecurringCostCard count={recurringCost.count} monthlyTotal={recurringCost.monthlyTotal} />
+	{/if}
+{/snippet}
 
 {#snippet checklist()}
 	<EmptyState>
@@ -415,108 +532,46 @@
 	{:else if noVehicles}
 		{@render checklist()}
 
-		<SharedWithMeCard onAccepted={loadDashboardData} />
+		{@render invitationsCard()}
 	{:else if needsFirstExpense}
 		{@render checklist()}
 
-		<SharedWithMeCard onAccepted={loadDashboardData} />
+		{@render invitationsCard()}
 		<NeedsAttentionCard items={attention} />
-		<VehicleRowsCard
-			rows={vehicleRows}
-			periodLabel={PERIOD_PHRASES[period].chip}
-			{distanceLabel}
-			isLoading={false}
-		/>
+		<VehicleRowsCard rows={vehicleRows} periodLabel={PERIOD_PHRASES[period].chip} {distanceLabel} />
 		{#if recurringCost.count > 0}
-			<RecurringCostCard
-				count={recurringCost.count}
-				monthlyTotal={recurringCost.monthlyTotal}
-				isLoading={false}
-			/>
+			<RecurringCostCard count={recurringCost.count} monthlyTotal={recurringCost.monthlyTotal} />
 		{/if}
 	{:else}
-		<div class="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
-			<div class="lg:col-span-2">
-				<DashboardHero
-					{period}
-					total={spend.total}
-					previousTotal={spend.previousTotal}
-					buckets={spend.buckets}
-					runningPerDistance={periodData.perDistance?.totals.perDistance ?? null}
-					runningScope={sharedVehicles.length > 0 ? 'on your vehicles' : null}
-					{distanceLabel}
-					isLoading={!hasLoaded}
-					isUpdating={isUpdatingPeriod}
-					onPeriodChange={handlePeriodChange}
-				/>
-			</div>
-
-			{#if hasLoaded && attention.length > 0}
-				<NeedsAttentionCard items={attention} />
-			{/if}
-
-			{#if hasLoaded}
-				<div class="lg:col-span-2">
-					<VehicleRowsCard
-						rows={vehicleRows}
-						periodLabel={PERIOD_PHRASES[period].chip}
-						{distanceLabel}
-						isLoading={false}
-					/>
-				</div>
-
-				<RecentActivityCard expenses={recentExpenses} />
-
-				<div class="lg:col-span-2">
-					{#await chartModules}
-						<ChartCard title={TREND_TITLE} level={2} description={TREND_DESCRIPTION} isLoading>
-							{null}
-						</ChartCard>
-					{:then { AppBarChart }}
-						<AppBarChart
-							level={2}
-							title={TREND_TITLE}
-							description={TREND_DESCRIPTION}
-							data={trendData}
-							x="month"
-							y="amount"
-							series={trendSeries}
-							config={trendConfig}
-							yAxisFormat={formatCurrencyAxis}
-							xAxisProps={{ ticks: trendTicks, format: (v: string) => v }}
-							error={trendFailed ? "Couldn't load the monthly running costs." : null}
-						>
-							{#snippet footer()}
-								{#if trendInsight}
-									<p class="text-xs text-muted-foreground" data-testid="trend-insight">
-										{trendInsight}
-									</p>
-								{/if}
-							{/snippet}
-						</AppBarChart>
-					{:catch}
-						<ChartCard
-							title={TREND_TITLE}
-							level={2}
-							description={TREND_DESCRIPTION}
-							error="Charts couldn't be loaded. Check your connection and reload."
-						>
-							{null}
-						</ChartCard>
-					{/await}
-				</div>
-
-				{#if recurringCost.count > 0}
-					<RecurringCostCard
-						count={recurringCost.count}
-						monthlyTotal={recurringCost.monthlyTotal}
-						isLoading={false}
-					/>
+		{#if isNarrow.current}
+			<div class="space-y-6">
+				{@render heroSection()}
+				{#if hasLoaded}
+					{@render attentionSection()}
+					{@render vehiclesSection()}
+					{@render recentSection()}
+					{@render chartSection()}
+					{@render recurringSection()}
 				{/if}
-			{/if}
-		</div>
-
-		<SharedWithMeCard onAccepted={loadDashboardData} />
+			</div>
+		{:else}
+			<div class="grid grid-cols-3 items-start gap-6">
+				<div class="col-span-2 space-y-6">
+					{@render heroSection()}
+					{#if hasLoaded}
+						{@render vehiclesSection()}
+						{@render chartSection()}
+					{/if}
+				</div>
+				{#if hasLoaded}
+					<div class="space-y-6">
+						{@render attentionSection()}
+						{@render recentSection()}
+						{@render recurringSection()}
+					</div>
+				{/if}
+			</div>
+		{/if}
 	{/if}
 </div>
 

@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { getDb } from '../../db/connection';
 import { userProviders } from '../../db/schema';
@@ -31,7 +31,7 @@ routes.post('/parse', async (c) => {
       and(
         eq(userProviders.userId, user.id),
         eq(userProviders.domain, 'vlm'),
-        eq(userProviders.status, 'active')
+        ne(userProviders.status, 'disabled')
       )
     );
   const providerRow = rows[0];
