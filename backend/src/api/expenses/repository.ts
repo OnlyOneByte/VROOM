@@ -231,16 +231,36 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
   return conditions;
 }
 
-const AMOUNT_TERM = /^\$?(\d+)(?:\.(\d{1,2}))?$/;
+const CURRENCY_AROUND = /^\p{Sc}?\s*(.*?)\s*\p{Sc}?$/u;
+const DECIMAL_TAIL = /^(.*\d)[.,](\d{1,2})$/;
+const GROUPED_WHOLE = /^\d{1,3}(?<sep>[.,\s])\d{3}(?:\k<sep>\d{3})*$/;
+
+function parseWhole(digits: string, decimalMark?: string): number | null {
+  if (/^\d+$/.test(digits)) return Number(digits);
+  const grouped = GROUPED_WHOLE.exec(digits);
+  if (!grouped || grouped.groups?.sep === decimalMark) return null;
+  return Number(digits.replace(/\D/g, ''));
+}
+
+export function parseAmountTerm(term: string): { whole: number; cents?: number } | null {
+  const core = CURRENCY_AROUND.exec(term)?.[1] ?? '';
+  const decimal = DECIMAL_TAIL.exec(core);
+  if (decimal) {
+    const whole = parseWhole(decimal[1] ?? '', core.charAt(decimal[1]?.length ?? 0));
+    if (whole !== null) return { whole, cents: Number((decimal[2] ?? '').padEnd(2, '0')) };
+  }
+  const whole = parseWhole(core);
+  return whole === null ? null : { whole };
+}
 
 function amountCondition(term: string): SQL | undefined {
-  const match = AMOUNT_TERM.exec(term);
-  if (!match) return undefined;
-  const whole = Number(match[1]) * 100;
-  if (match[2] === undefined) {
+  const amount = parseAmountTerm(term);
+  if (!amount) return undefined;
+  const whole = amount.whole * 100;
+  if (amount.cents === undefined) {
     return sql`(${expenses.expenseAmount} >= ${whole} AND ${expenses.expenseAmount} < ${whole + 100})`;
   }
-  return eq(expenses.expenseAmount, whole + Number(match[2].padEnd(2, '0')));
+  return eq(expenses.expenseAmount, whole + amount.cents);
 }
 
 function searchCondition(search: string): SQL {
