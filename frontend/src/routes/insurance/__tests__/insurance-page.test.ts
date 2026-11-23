@@ -114,7 +114,7 @@ describe('insurance page loading and errors', () => {
 		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText('Gateway timeout')).toBeNull();
 		expect(notifyError).toHaveBeenCalledWith(error, "Couldn't load insurance data");
-		expect(screen.queryByRole('button', { name: 'New Policy' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Add Policy' })).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
@@ -145,8 +145,23 @@ describe('insurance page empty state', () => {
 		expect(screen.getByText('No insurance policies')).toBeInTheDocument();
 		expect(policyList.latest).toBeNull();
 
+		expect(screen.getAllByRole('button', { name: /policy/i })).toHaveLength(1);
 		await fireEvent.click(screen.getByRole('button', { name: 'Add Policy' }));
 		expect(goto).toHaveBeenCalledWith('/insurance/new');
+	});
+
+	test('with no vehicles and no policies it points to Add Vehicle and offers no policy button', async () => {
+		getAllPolicies.mockResolvedValue([]);
+		getVehicles.mockResolvedValue([]);
+		await mount();
+
+		expect(screen.getByRole('heading', { name: 'Add a vehicle first' })).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Add Vehicle' })).toHaveAttribute(
+			'href',
+			'/vehicles/new'
+		);
+		expect(screen.queryByText('No insurance policies')).toBeNull();
+		expect(screen.queryByRole('button', { name: /policy/i })).toBeNull();
 	});
 });
 
@@ -180,9 +195,9 @@ describe('insurance page with policies', () => {
 		expect(policyList.latest?.policies.map(p => p.id)).toEqual(['p1', 'p2']);
 	});
 
-	test('both New Policy buttons open the new-policy form', async () => {
+	test('both Add Policy buttons open the new-policy form', async () => {
 		await mount();
-		const buttons = screen.getAllByRole('button', { name: 'New Policy' });
+		const buttons = screen.getAllByRole('button', { name: 'Add Policy' });
 		expect(buttons).toHaveLength(2);
 
 		for (const button of buttons) await fireEvent.click(button);
