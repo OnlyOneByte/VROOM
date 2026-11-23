@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { storagePathSchema } from '../../utils/paths';
 
 const photoCategoryEnum = z.enum([
   'vehicle_photos',
@@ -9,7 +10,7 @@ const photoCategoryEnum = z.enum([
 
 const categorySettingSchema = z.object({
   enabled: z.boolean(),
-  folderPath: z.string(),
+  folderPath: storagePathSchema,
 });
 
 const MAX_PROVIDER_ENTRIES = 20;
@@ -29,11 +30,7 @@ export const storageConfigSchema = z.object({
 
 const providerBackupSettingsSchema = z.object({
   enabled: z.boolean(),
-  folderPath: z
-    .string()
-    .min(1)
-    .max(255)
-    .refine((s) => !s.includes('..'), { message: 'Path traversal not allowed' }),
+  folderPath: storagePathSchema.min(1),
   retentionCount: z.number().int().min(1).max(100),
   lastBackupAt: z.string().datetime().optional(),
   sheetsSyncEnabled: z.boolean().optional(),

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { storePending } from '../../../utils/pending-credentials';
 
 let ctx: TestApp;
 
@@ -8,18 +9,15 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-function s3Payload(accountEmail: string) {
+function drivePayload(accountEmail: string) {
+  const nonce = crypto.randomUUID();
+  storePending(ctx.user.id, nonce, `refresh-${nonce}`, accountEmail);
   return {
     domain: 'storage',
-    providerType: 's3',
+    providerType: 'google-drive',
     displayName: 'Backups',
-    credentials: { accessKeyId: 'AKIA', secretAccessKey: 'secret' },
-    config: {
-      endpoint: 'https://s3.example.com',
-      bucket: 'vroom',
-      region: 'us-east-1',
-      accountEmail,
-    },
+    credentials: {},
+    nonce,
   };
 }
 
@@ -33,8 +31,8 @@ function providerRowCount(): number {
 describe('POST /providers duplicate check is atomic with the insert', () => {
   test('two concurrent creates for the same account yield one row and one 409', async () => {
     const [first, second] = await Promise.all([
-      ctx.authed('POST', '/api/v1/providers', s3Payload('alice@example.com')),
-      ctx.authed('POST', '/api/v1/providers', s3Payload('alice@example.com')),
+      ctx.authed('POST', '/api/v1/providers', drivePayload('alice@example.com')),
+      ctx.authed('POST', '/api/v1/providers', drivePayload('alice@example.com')),
     ]);
 
     const statuses = [first.status, second.status].sort();
@@ -44,8 +42,8 @@ describe('POST /providers duplicate check is atomic with the insert', () => {
 
   test('concurrent creates for DIFFERENT accounts both persist', async () => {
     const [first, second] = await Promise.all([
-      ctx.authed('POST', '/api/v1/providers', s3Payload('alice@example.com')),
-      ctx.authed('POST', '/api/v1/providers', s3Payload('bob@example.com')),
+      ctx.authed('POST', '/api/v1/providers', drivePayload('alice@example.com')),
+      ctx.authed('POST', '/api/v1/providers', drivePayload('bob@example.com')),
     ]);
 
     expect([first.status, second.status]).toEqual([201, 201]);
@@ -53,10 +51,10 @@ describe('POST /providers duplicate check is atomic with the insert', () => {
   });
 
   test('a sequential duplicate is still a 409 (the check itself is unchanged)', async () => {
-    const first = await ctx.authed('POST', '/api/v1/providers', s3Payload('alice@example.com'));
+    const first = await ctx.authed('POST', '/api/v1/providers', drivePayload('alice@example.com'));
     expect(first.status).toBe(201);
 
-    const second = await ctx.authed('POST', '/api/v1/providers', s3Payload('alice@example.com'));
+    const second = await ctx.authed('POST', '/api/v1/providers', drivePayload('alice@example.com'));
     expect(second.status).toBe(409);
     expect(providerRowCount()).toBe(1);
   });

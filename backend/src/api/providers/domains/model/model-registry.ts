@@ -3,7 +3,12 @@ import type { UserProvider } from '../../../../db/schema';
 import { ValidationError } from '../../../../errors';
 import { decrypt } from '../../../../utils/encryption';
 import { assertSafeOutboundUrl } from '../../../../utils/outbound-url';
-import { alwaysAvailable, type FieldSpec, type ProviderDescriptor } from '../../descriptor';
+import {
+  alwaysAvailable,
+  type FieldSpec,
+  type ProviderDescriptor,
+  validateProviderConfig,
+} from '../../descriptor';
 import type { ModelDomainLabel } from './model-transport';
 
 export interface ModelProviderSettings {
@@ -44,11 +49,11 @@ function modelConfigSchema(domain: ModelDomainLabel, needsBaseUrl: boolean) {
   const modelMessage = `${domain} config must include a model name`;
   const baseUrlMessage = `Self-hosted or OpenAI-compatible ${domain} requires a base URL`;
   return z
-    .looseObject({
+    .strictObject({
       model: z.string({ message: modelMessage }).min(1, modelMessage),
       baseUrl: needsBaseUrl
         ? z.string({ message: baseUrlMessage }).min(1, baseUrlMessage)
-        : z.unknown().optional(),
+        : z.string().optional(),
     })
     .superRefine((config, ctx) => {
       if (typeof config.baseUrl !== 'string') return;
@@ -138,6 +143,9 @@ export function createModelProviderResolver<Cap extends ModelCapability, P>(
     if (!descriptor) {
       throw new ValidationError(`Unsupported ${domain} provider type: ${row.providerType}`);
     }
-    return descriptor.create(settings);
+    const provider = descriptor.create(settings);
+    const config = row.config as Record<string, unknown> | null;
+    validateProviderConfig(descriptor, config, Object.keys(config ?? {}));
+    return provider;
   };
 }

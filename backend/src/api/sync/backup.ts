@@ -44,10 +44,11 @@ import type {
   ParsedBackupData,
   ProviderBackupList,
   ProviderBackupSettings,
+  StorageConfig,
 } from '../../types';
 import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
-import { joinStoragePath } from '../../utils/paths';
+import { joinStoragePath, storagePathSchema } from '../../utils/paths';
 import { unitPreferencesSchema } from '../../utils/unit-preferences-schema';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { storageProviderDescriptor } from '../providers/domains/storage/registry';
@@ -721,6 +722,19 @@ class BackupService {
     };
     checkUnitPreferences(backup.vehicles, 'vehicles', 'id');
     checkUnitPreferences(backup.userPreferences, 'user_preferences', 'userId');
+    for (const row of backup.userPreferences ?? []) {
+      const storageConfig = row.storageConfig as StorageConfig | null | undefined;
+      for (const categories of Object.values(storageConfig?.providerCategories ?? {})) {
+        for (const [category, setting] of Object.entries(categories ?? {})) {
+          const result = storagePathSchema.safeParse(setting?.folderPath ?? '');
+          if (!result.success) {
+            errors.push(
+              `user_preferences[${row.userId}]: storageConfig ${category} folder path is invalid — ${result.error.issues[0]?.message}`
+            );
+          }
+        }
+      }
+    }
     return errors;
   }
 
