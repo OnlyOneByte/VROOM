@@ -3,7 +3,13 @@ import { ApiError } from '../../error-handling';
 import type { OfflineExpense } from '../../offline-storage';
 import { classifySyncFailure } from '../classify-failure';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
+const navigation = vi.hoisted(() => ({ onGoto: () => {} }));
+vi.mock('$app/navigation', () => ({
+	goto: vi.fn(() => {
+		navigation.onGoto();
+		return Promise.resolve();
+	})
+}));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 vi.mock('#lib/stores/auth.svelte.ts', () => ({ authStore: { clearUser: vi.fn() } }));
 
@@ -277,6 +283,96 @@ describe('SyncManager.syncAll — delivery', () => {
 		const remaining = loadOfflineExpenses();
 		expect(remaining.map(e => e.id)).toEqual(['fuel-bad']);
 		expect(remaining[0]?.needsAttention).toBe(true);
+	});
+});
+
+describe('SyncManager.syncAll — replay across vehicles', () => {
+	const ROUND_TRIP_MS = 20;
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		ls.clear();
+		syncState.current = 'idle';
+		onlineStatus.current = true;
+	});
+
+	const forVehicle = (id: string, vehicleId: string): OfflineExpense => ({
+		...pending(id),
+		vehicleId
+	});
+
+	function slowPosts(
+		respond: (clientId: string) => Response,
+		holdUntil: (clientId: string) => Promise<void> | undefined = () => undefined
+	): Array<{
+		clientId: string;
+		start: number;
+		end: number;
+	}> {
+		const posts: Array<{ clientId: string; start: number; end: number }> = [];
+		mockFetch.mockImplementation((_url: string, init?: { method?: string; body?: string }) => {
+			if ((init?.method ?? 'GET') === 'GET') return Promise.resolve(apiOk([]));
+			const clientId = JSON.parse(init?.body ?? '{}').clientId as string;
+			const post = { clientId, start: performance.now(), end: 0 };
+			posts.push(post);
+			return new Promise<void>(done => setTimeout(done, ROUND_TRIP_MS))
+				.then(() => holdUntil(clientId))
+				.then(() => {
+					post.end = performance.now();
+					return respond(clientId);
+				});
+		});
+		return posts;
+	}
+
+	it('overlaps two vehicles and keeps each vehicle in queue order', async () => {
+		saveOfflineExpenses([
+			forVehicle('a1', 'va'),
+			forVehicle('b1', 'vb'),
+			forVehicle('a2', 'va'),
+			forVehicle('b2', 'vb'),
+			forVehicle('a3', 'va'),
+			forVehicle('b3', 'vb')
+		]);
+		const posts = slowPosts(() => apiOk());
+
+		const result = await syncManager.syncAll();
+
+		expect(result).toMatchObject({ synced: 6, failed: 0, needsAttention: 0 });
+		const lane = (prefix: string) => posts.filter(p => p.clientId.startsWith(`cid-${prefix}`));
+		for (const prefix of ['a', 'b']) {
+			const own = lane(prefix);
+			expect(own.map(p => p.clientId)).toEqual([1, 2, 3].map(n => `cid-${prefix}${n}`));
+			own.slice(1).forEach((post, i) => expect(post.start).toBeGreaterThanOrEqual(own[i]!.end));
+		}
+		const [a1, b1] = [lane('a')[0]!, lane('b')[0]!];
+		expect(b1.start).toBeLessThan(a1.end);
+		expect(loadOfflineExpenses()).toHaveLength(0);
+	});
+
+	it('stops starting entries in every vehicle once the session has ended', async () => {
+		saveOfflineExpenses([
+			forVehicle('a1', 'va'),
+			forVehicle('b1', 'vb'),
+			forVehicle('a2', 'va'),
+			forVehicle('b2', 'vb'),
+			forVehicle('b3', 'vb')
+		]);
+		const sessionEnded = new Promise<void>(done => {
+			navigation.onGoto = () => setTimeout(done, 0);
+		});
+		const posts = slowPosts(
+			clientId => (clientId === 'cid-a1' ? apiError(401, 'Session expired') : apiOk()),
+			clientId => (clientId === 'cid-b1' ? sessionEnded : undefined)
+		);
+
+		const result = await syncManager.syncAll().finally(() => {
+			navigation.onGoto = () => {};
+		});
+
+		expect(posts.map(p => p.clientId).sort()).toEqual(['cid-a1', 'cid-b1']);
+		expect(result).toMatchObject({ synced: 1, failed: 4, needsAttention: 0, success: false });
+		expect(loadOfflineExpenses().map(e => e.id)).toEqual(['a1', 'a2', 'b2', 'b3']);
 	});
 });
 
