@@ -786,46 +786,6 @@ export function computeMileageScore(mileageExpenses: Array<{ mileage: number | n
   return Math.round((goodIntervals.length / mileageGaps.length) * 100);
 }
 
-export function buildTCOMonthlyTrend(
-  rows: Array<{
-    category: string;
-    expenseAmount: number;
-    date: Date | number | null;
-    sourceType: string | null;
-  }>,
-  calendar: Calendar = UTC_CALENDAR
-): Array<{
-  month: string;
-  financing: number;
-  insurance: number;
-  fuel: number;
-  maintenance: number;
-}> {
-  const map = new Map<
-    string,
-    { financing: number; insurance: number; fuel: number; maintenance: number }
-  >();
-  for (const row of rows) {
-    const d = normalizeDate(row.date);
-    if (!d) continue;
-    const key = toMonthKey(d, calendar);
-    const entry = map.get(key) ?? { financing: 0, insurance: 0, fuel: 0, maintenance: 0 };
-    if (row.category === 'financial' && row.sourceType === 'financing') {
-      entry.financing += row.expenseAmount;
-    } else if (row.category === 'financial' && row.sourceType === 'insurance_term') {
-      entry.insurance += row.expenseAmount;
-    } else if (row.category === 'fuel') {
-      entry.fuel += row.expenseAmount;
-    } else if (row.category === 'maintenance') {
-      entry.maintenance += row.expenseAmount;
-    }
-    map.set(key, entry);
-  }
-  return Array.from(map.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, data]) => ({ month, ...data }));
-}
-
 export function buildVehicleMaintenanceCosts(
   allExpenses: GeneralExpenseRow[],
   calendar: Calendar = UTC_CALENDAR

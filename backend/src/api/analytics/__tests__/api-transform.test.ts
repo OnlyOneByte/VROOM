@@ -200,16 +200,12 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
       totalDistance: 12000,
       costPerDistance: 9,
       costPerMonth: 8750,
-      monthlyTrend: [
-        { month: '2024-01', financing: 1000, insurance: 2000, fuel: 3000, maintenance: 4000 },
-      ],
     } as VehicleTCOData;
     const r = vehicleTcoToApi(d);
     expect(r.purchasePrice).toBeNull();
     expect(r.totalCost).toBe(1050);
     expect(r.costPerMonth).toBe(87.5);
     expect(r.costPerDistance).toBe(0.09);
-    expect(r.monthlyTrend[0].fuel).toBe(30);
     expect(r.ownershipMonths).toBe(12);
     expect(r.totalDistance).toBe(12000);
   });

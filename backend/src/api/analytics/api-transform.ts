@@ -131,13 +131,6 @@ export function vehicleTcoToApi(d: VehicleTCOData): VehicleTCOData {
     totalCost: c(d.totalCost),
     costPerDistance: cn(d.costPerDistance),
     costPerMonth: c(d.costPerMonth),
-    monthlyTrend: d.monthlyTrend.map((m) => ({
-      ...m,
-      financing: c(m.financing),
-      insurance: c(m.insurance),
-      fuel: c(m.fuel),
-      maintenance: c(m.maintenance),
-    })),
   };
 }
 
