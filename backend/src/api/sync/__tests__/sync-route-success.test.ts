@@ -172,6 +172,44 @@ describe('POST /api/v1/sync — honest HTTP status on backup failure', () => {
       });
     }
   });
+
+  test('the only enabled provider has unreadable credentials → 502 naming it as unusable, not a no-op', async () => {
+    const { backupStrategyRegistry } = await import('../backup-strategy-registry');
+    backupStrategyRegistry.register('fake-route-unusable', {
+      async execute() {
+        return { success: true, capabilities: {} };
+      },
+    });
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+       VALUES ('ru', ?, 'storage', 'fake-route-unusable', 'Fake', 'not-a-ciphertext', '{}', 'active')`,
+      [ctx.user.id]
+    );
+    ctx.sqlite.run(
+      'INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)',
+      [
+        ctx.user.id,
+        JSON.stringify({
+          providers: { ru: { enabled: true, folderPath: 'B', retentionCount: 5 } },
+        }),
+      ]
+    );
+
+    const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
+    const body = await json<{
+      error?: {
+        code: string;
+        details?: {
+          failedProviders: string[];
+          results: Record<string, { success: boolean; unusable?: boolean }>;
+        };
+      };
+    }>(res);
+    expect(res.status, JSON.stringify(body)).toBe(502);
+    expect(body.error?.code).toBe('BACKUP_FAILED');
+    expect(body.error?.details?.failedProviders).toEqual(['ru']);
+    expect(body.error?.details?.results.ru).toMatchObject({ success: false, unusable: true });
+  });
 });
 
 describe('GET /api/v1/sync/backups/download — the manual backup-export route', () => {

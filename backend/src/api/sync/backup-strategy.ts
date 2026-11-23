@@ -21,6 +21,7 @@ export interface BackupCapabilityResult {
 export interface BackupStrategyResult {
   success: boolean;
   message?: string;
+  unusable?: boolean;
   capabilities: Record<string, BackupCapabilityResult>;
 }
 

@@ -485,14 +485,18 @@ describe('Settings page backups', () => {
 	function orchestratorResult(
 		outcome: 'success' | 'partial' | 'failed' | 'noop',
 		results: Record<string, boolean>,
-		failedProviders: string[] = []
+		failedProviders: string[] = [],
+		unusable: string[] = []
 	) {
 		return {
 			timestamp: '2026-11-23T00:00:00.000Z',
 			outcome,
 			failedProviders,
 			results: Object.fromEntries(
-				Object.entries(results).map(([id, success]) => [id, { success, capabilities: {} }])
+				Object.entries(results).map(([id, success]) => [
+					id,
+					{ success, capabilities: {}, ...(unusable.includes(id) && { unusable: true }) }
+				])
 			)
 		};
 	}
@@ -516,9 +520,10 @@ describe('Settings page backups', () => {
 		);
 		await mount();
 		await backUpNow();
-		expect(toast.warning).toHaveBeenCalledWith('Backed up to 1 provider. Office S3 failed.', {
-			id: 'toast-1'
-		});
+		expect(toast.warning).toHaveBeenCalledWith(
+			'Backed up to 1 provider. Office S3 failed. Check it under Storage Providers, then try again.',
+			{ id: 'toast-1' }
+		);
 		expect(toast.error).not.toHaveBeenCalled();
 	});
 
@@ -538,8 +543,59 @@ describe('Settings page backups', () => {
 		);
 		await mount();
 		await backUpNow();
-		expect(toast.error).toHaveBeenCalledWith('Backup failed for p1', { id: 'toast-1' });
+		expect(toast.error).toHaveBeenCalledWith(
+			"Couldn't back up. p1 failed. Check it under Storage Providers, then try again.",
+			{ id: 'toast-1' }
+		);
 	});
+
+	test('a partial run names a provider that failed and one that cannot be used, with a next step', async () => {
+		getProviders.mockResolvedValue([
+			{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo,
+			{ id: 'p2', displayName: 'Office S3' } as UserProviderInfo,
+			{ id: 'p3', displayName: 'Old Drive' } as UserProviderInfo
+		]);
+		settingsStoreFake.executeSync.mockResolvedValue(
+			orchestratorResult('partial', { p1: true, p2: false, p3: false }, ['p2', 'p3'], ['p3'])
+		);
+		await mount();
+		await backUpNow();
+		expect(toast.warning).toHaveBeenCalledWith(
+			"Backed up to 1 provider. Office S3 failed and Old Drive can't be used. Check them under Storage Providers, then try again.",
+			{ id: 'toast-1' }
+		);
+	});
+
+	test.each([
+		[
+			{ p1: { success: false, capabilities: {} } },
+			"Couldn't back up. Family Drive failed. Check it under Storage Providers, then try again."
+		],
+		[
+			{ p1: { success: false, unusable: true, capabilities: {} } },
+			"Couldn't back up. Family Drive can't be used. Reconnect it under Storage Providers, then try again."
+		]
+	])(
+		'an all-failed 502 names the provider from the error details (%o)',
+		async (results, message) => {
+			getProviders.mockResolvedValue([
+				{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo
+			]);
+			settingsStoreFake.executeSync.mockRejectedValue(
+				new ApiError(
+					'All backup providers failed',
+					502,
+					{ failedProviders: ['p1'], results },
+					'BACKUP_FAILED'
+				)
+			);
+			await mount();
+			await backUpNow();
+			expect(toast.dismiss).toHaveBeenCalled();
+			expect(showError).toHaveBeenCalledWith(message);
+			expect(screen.queryByText(/no provider has backups turned on/)).toBeNull();
+		}
+	);
 
 	test.each([
 		[

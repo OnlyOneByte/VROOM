@@ -20,7 +20,7 @@ interface OrchestratorResult {
   status?: string;
   outcome: 'success' | 'partial' | 'failed' | 'noop';
   failedProviders: string[];
-  results: Record<string, { success: boolean; message?: string }>;
+  results: Record<string, { success: boolean; message?: string; unusable?: boolean }>;
 }
 
 describe('BackupOrchestrator.execute() real skip paths', () => {
@@ -299,6 +299,32 @@ describe('BackupOrchestrator.execute() outcome', () => {
       expect(result.outcome).toBe('success');
     } finally {
       unregister('fake-live');
+    }
+  });
+
+  test('a provider whose stored credentials cannot be read is reported unusable, not skipped', async () => {
+    registerFake('fake-readable', true);
+    try {
+      seedEnabledProvider(ctx, 'pread', 'fake-readable');
+      seedEnabledProvider(ctx, 'pbroken', 'fake-readable');
+      ctx.sqlite.run("UPDATE user_providers SET credentials = 'garbage' WHERE id = ?", ['pbroken']);
+      const { backupOrchestrator } = await import('../backup-orchestrator');
+      const result = (await backupOrchestrator.execute(
+        ctx.user.id,
+        'U',
+        true
+      )) as OrchestratorResult;
+
+      expect(result.outcome).toBe('partial');
+      expect(result.failedProviders).toEqual(['pbroken']);
+      expect(result.results.pbroken).toMatchObject({
+        success: false,
+        message: "Stored credentials can't be read",
+        unusable: true,
+      });
+      expect(result.results.pread?.unusable).toBeUndefined();
+    } finally {
+      unregister('fake-readable');
     }
   });
 
