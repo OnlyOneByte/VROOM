@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
+import { SyncErrorCode } from '../../../errors';
 import {
   FakeGoogleStore,
   googleApiError,
@@ -159,8 +160,15 @@ describe('GoogleDriveProvider', () => {
     });
 
     test('false when the Drive API errors', async () => {
-      store.injectFault('files.list', googleApiError(401, 'Invalid Credentials'));
+      store.injectFault('files.list', googleApiError(500, 'Backend Error'));
       expect(await provider.healthCheck()).toBe(false);
+    });
+
+    test('a rejected token throws AUTH_INVALID, so the check can say to reconnect', async () => {
+      store.injectFault('files.list', googleApiError(401, 'Invalid Credentials'));
+      await expect(provider.healthCheck()).rejects.toMatchObject({
+        code: SyncErrorCode.AUTH_INVALID,
+      });
     });
   });
 });

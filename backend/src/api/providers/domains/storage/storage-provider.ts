@@ -1,3 +1,4 @@
+import { isSyncError, SyncError, SyncErrorCode } from '../../../../errors';
 import { PHOTO_CATEGORIES, type PhotoCategory } from '../../../../types';
 
 export type { PhotoCategory };
@@ -70,3 +71,37 @@ export const CATEGORY_TO_ENTITY_TYPES: Record<PhotoCategory, string[]> = Object.
     ),
   ])
 ) as Record<PhotoCategory, string[]>;
+
+const AUTH_ERROR_NAMES = new Set([
+  'InvalidAccessKeyId',
+  'SignatureDoesNotMatch',
+  'ExpiredToken',
+  'InvalidToken',
+]);
+
+function statusOf(error: Record<string, unknown>): number | undefined {
+  const response = error.response as { status?: unknown } | undefined;
+  const metadata = error.$metadata as { httpStatusCode?: unknown } | undefined;
+  const status = response?.status ?? metadata?.httpStatusCode ?? error.code;
+  return typeof status === 'number' ? status : undefined;
+}
+
+export function credentialFailureOf(error: unknown): SyncError | null {
+  if (isSyncError(error)) {
+    return error.code === SyncErrorCode.AUTH_INVALID ||
+      error.code === SyncErrorCode.PERMISSION_DENIED
+      ? error
+      : null;
+  }
+  if (typeof error !== 'object' || error === null) return null;
+  const record = error as Record<string, unknown>;
+  const status = statusOf(record);
+  const text = `${String(record.name ?? '')} ${String(record.message ?? '')}`;
+  if (status === 401 || AUTH_ERROR_NAMES.has(String(record.name)) || /invalid_grant/.test(text)) {
+    return new SyncError(SyncErrorCode.AUTH_INVALID, 'The provider rejected the saved credentials');
+  }
+  if (status === 403 || record.name === 'AccessDenied') {
+    return new SyncError(SyncErrorCode.PERMISSION_DENIED, 'The provider refused access');
+  }
+  return null;
+}
