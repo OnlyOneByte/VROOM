@@ -167,6 +167,15 @@ export function upgradeBackupTables(
   }).reduce((current, step) => step.upgrade(current), tables);
 }
 
+const MAKE_A_NEW_BACKUP = 'Make a new backup in Settings, then restore that one.';
+
+export const BACKUP_CHECK_REASONS = {
+  metadata: `This file isn't a complete VROOM backup. ${MAKE_A_NEW_BACKUP}`,
+  rows: `Some records in this backup aren't valid, so it can't be restored. ${MAKE_A_NEW_BACKUP}`,
+  references: `Some records in this backup point to data that isn't in it, so it can't be restored. ${MAKE_A_NEW_BACKUP}`,
+  duplicates: `Some records appear twice in this backup, so it can't be restored. ${MAKE_A_NEW_BACKUP}`,
+};
+
 export function backupVersionError(version: string | undefined): string | null {
   const backup = parseVersion(version);
   if (!backup) return `Backup version "${String(version)}" is not a version number`;
@@ -647,26 +656,35 @@ class BackupService {
     }) as Record<string, string>[];
   }
   validateBackupData(backup: ParsedBackupData): ValidationResult {
-    const errors: string[] = [];
-
-    if (!backup.metadata?.userId || !backup.metadata?.version) {
-      errors.push('Invalid metadata');
-    }
-
-    const versionError = backupVersionError(backup.metadata?.version);
-    if (versionError) errors.push(versionError);
-
+    const rowErrors: string[] = [];
     for (const key of getBackupTableKeys()) {
       const schema = TABLE_SCHEMAS[key];
       const data = backup[key as keyof ParsedBackupData] as Record<string, unknown>[] | undefined;
       if (schema && data) {
-        errors.push(...this.validateArray(data, schema, key));
+        rowErrors.push(...this.validateArray(data, schema, key));
       }
     }
+    const versionError = backupVersionError(backup.metadata?.version);
 
-    errors.push(...this.validateReferentialIntegrity(backup));
-    errors.push(...this.validateJsonColumnShapes(backup));
-    return { valid: errors.length === 0, errors };
+    const checks: Array<{ reason: string | null; errors: string[] }> = [
+      {
+        reason: BACKUP_CHECK_REASONS.metadata,
+        errors: backup.metadata?.userId && backup.metadata?.version ? [] : ['Invalid metadata'],
+      },
+      { reason: null, errors: versionError ? [versionError] : [] },
+      {
+        reason: BACKUP_CHECK_REASONS.rows,
+        errors: [...rowErrors, ...this.validateJsonColumnShapes(backup)],
+      },
+      {
+        reason: BACKUP_CHECK_REASONS.references,
+        errors: this.validateReferentialIntegrity(backup),
+      },
+      { reason: BACKUP_CHECK_REASONS.duplicates, errors: this.validateUniqueConstraints(backup) },
+    ];
+    const errors = checks.flatMap((check) => check.errors);
+    const reason = checks.find((check) => check.errors.length > 0)?.reason;
+    return { valid: errors.length === 0, errors: reason ? [reason, ...errors] : errors };
   }
 
   private validateJsonColumnShapes(backup: ParsedBackupData): string[] {
@@ -742,7 +760,6 @@ class BackupService {
         reminderIds,
         userIds
       ),
-      ...this.validateUniqueConstraints(backup),
     ];
   }
 
