@@ -49,6 +49,7 @@ import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { joinStoragePath } from '../../utils/paths';
 import { unitPreferencesSchema } from '../../utils/unit-preferences-schema';
+import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { storageProviderDescriptor } from '../providers/domains/storage/registry';
 import { hasZipBackup } from './backup-strategy';
 
@@ -422,20 +423,20 @@ class BackupService {
     const db = getDb();
     const [userVehicles, userExpenses, userFinancing, userInsurance, userOdometer, userTrips] =
       await Promise.all([
-        db.select().from(vehicles).where(eq(vehicles.userId, userId)),
+        db.select().from(vehicles).where(ownedVehiclesScope(userId)),
         db.select().from(expenses).where(eq(expenses.userId, userId)),
         db
           .select()
           .from(vehicleFinancing)
           .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-          .where(eq(vehicles.userId, userId))
+          .where(ownedVehiclesScope(userId))
           .then((r) => r.map((x) => x.vehicle_financing)),
         db.select().from(insurancePolicies).where(eq(insurancePolicies.userId, userId)),
         db
           .select()
           .from(odometerEntries)
           .innerJoin(vehicles, eq(odometerEntries.vehicleId, vehicles.id))
-          .where(eq(vehicles.userId, userId))
+          .where(ownedVehiclesScope(userId))
           .then((r) => r.map((x) => x.odometer_entries)),
         db.select().from(trips).where(eq(trips.userId, userId)),
       ]);
