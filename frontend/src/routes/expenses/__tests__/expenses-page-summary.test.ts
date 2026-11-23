@@ -26,8 +26,11 @@ vi.mock('#lib/components/expenses/ExpenseTagFilter.svelte', () => ({
 vi.mock('#lib/components/expenses/ImportFromPhotosDialog.svelte', () => ({ default: () => {} }));
 
 const notify = vi.fn();
+const logged = vi.fn();
 vi.mock('#lib/utils/error-handling.ts', () => ({
-	handleErrorWithNotification: (...args: unknown[]) => notify(...args)
+	handleErrorWithNotification: (...args: unknown[]) => notify(...args),
+	logLoadFailure: (...args: unknown[]) => logged(...args),
+	userFacingErrorMessage: (error: unknown) => (error instanceof Error ? error.message : 'Failed')
 }));
 
 const getExpenseSummary = vi.fn();
@@ -86,6 +89,7 @@ beforeEach(() => {
 	overviewProps = {};
 	tagFilterProps = {};
 	notify.mockReset();
+	logged.mockReset();
 	getExpenseSummary.mockReset();
 	getExpenseSummary.mockImplementationOnce(() => Promise.resolve(summary(1)));
 	getExpenseSummary.mockImplementation(
@@ -108,7 +112,7 @@ describe('/expenses summary during a later list change', () => {
 		await waitFor(() => expect(shownTotal()).toBe(2));
 	});
 
-	test('a failed summary is reported even when a later sort change owns the list', async () => {
+	test('a failed summary is shown in the overview even when a later sort change owns the list', async () => {
 		render(Page);
 		await waitFor(() => expect(shownTotal()).toBe(1));
 
@@ -116,9 +120,9 @@ describe('/expenses summary during a later list change', () => {
 		sortByAmount();
 		pendingSummary.reject(new Error('Summary down'));
 
-		await waitFor(() =>
-			expect(notify).toHaveBeenCalledWith(expect.any(Error), "Couldn't load the expense summary")
-		);
+		await waitFor(() => expect(overviewProps['error']).toBe('Summary down'));
+		expect(logged).toHaveBeenCalledWith(expect.any(Error), "Couldn't load the expense summary");
+		expect(notify).not.toHaveBeenCalled();
 		expect(shownTotal()).toBe(1);
 	});
 });

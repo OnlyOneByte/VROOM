@@ -112,4 +112,37 @@ describe('dashboard period switch', () => {
 
 		expect(pieCategories()).toEqual(['misc']);
 	});
+
+	test('a failed switch puts the selector back on the period whose numbers are shown', async () => {
+		getExpenseSummary.mockImplementation(({ period }: { period: TimePeriod }) => {
+			if (period === 'all') return Promise.resolve(summaryWith('misc'));
+			if (period === '1y') return Promise.resolve(summaryWith('fuel'));
+			return Promise.reject(new Error('offline'));
+		});
+		render(Page);
+		await waitFor(() => expect(pieCategories()).toEqual(['misc']));
+		changePeriod('1y');
+		await waitFor(() => expect(pieCategories()).toEqual(['fuel']));
+
+		changePeriod('30d');
+
+		await waitFor(() => expect(periodSelectorProps['selectedPeriod']).toBe('1y'));
+		expect(pieCategories()).toEqual(['fuel']);
+	});
+
+	test('when a pending switch is overtaken by one that fails, the selector returns to the shown period', async () => {
+		getExpenseSummary.mockImplementation(({ period }: { period: TimePeriod }) => {
+			if (period === 'all') return Promise.resolve(summaryWith('misc'));
+			if (period === '7d') return new Promise<ExpenseSummary>(() => {});
+			return Promise.reject(new Error('offline'));
+		});
+		render(Page);
+		await waitFor(() => expect(pieCategories()).toEqual(['misc']));
+
+		changePeriod('7d');
+		changePeriod('30d');
+
+		await waitFor(() => expect(periodSelectorProps['selectedPeriod']).toBe('all'));
+		expect(pieCategories()).toEqual(['misc']);
+	});
 });

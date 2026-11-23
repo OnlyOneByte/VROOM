@@ -61,6 +61,7 @@
 	let vehicles = $state<Vehicle[]>([]);
 	let allTimeSummary = $state<ExpenseSummary | null>(null);
 	let periodSummary = $state<ExpenseSummary | null>(null);
+	let summaryPeriod = $state<TimePeriod>('all');
 	let recentExpensesList = $state<Expense[]>([]);
 	let remindersList = $state<ReminderWithVehicles[]>([]);
 	let recurringCost = $state<RecurringCostSummary>({ count: 0, monthlyTotal: 0 });
@@ -218,7 +219,10 @@
 			]);
 			vehicles = loadedVehicles;
 			allTimeSummary = allTimeData;
-			if (isCurrentPeriod()) periodSummary = periodData ?? allTimeData;
+			if (isCurrentPeriod()) {
+				periodSummary = periodData ?? allTimeData;
+				summaryPeriod = periodData ? selectedPeriod : 'all';
+			}
 			recentExpensesList = recentResponse.data;
 			remindersList = loadedReminders;
 			recurringCost = loadedRecurringCost;
@@ -268,12 +272,18 @@
 		try {
 			if (period === 'all' && allTimeSummary) {
 				periodSummary = allTimeSummary;
+				summaryPeriod = 'all';
 			} else {
 				const summary = await expenseApi.getExpenseSummary({ period });
-				if (isCurrent()) periodSummary = summary;
+				if (isCurrent()) {
+					periodSummary = summary;
+					summaryPeriod = period;
+				}
 			}
 		} catch (error) {
-			if (isCurrent()) handleErrorWithNotification(error, "Couldn't load the expense summary");
+			if (!isCurrent()) return;
+			selectedPeriod = summaryPeriod;
+			handleErrorWithNotification(error, "Couldn't load the expense summary");
 		}
 	}
 </script>
