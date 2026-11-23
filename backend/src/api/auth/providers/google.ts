@@ -1,6 +1,6 @@
 import { Google } from 'arctic';
 import { CONFIG } from '../../../config';
-import { NoVerifiedEmailError, type OAuthProviderConfig } from './types';
+import { NoVerifiedEmailError, type OAuthFlow, type OAuthProviderConfig } from './types';
 
 // Google requires the token exchange to repeat the authorize step's redirect URI.
 function createGoogleClient(redirectUri: string): Google {
@@ -11,7 +11,10 @@ function createGoogleClient(redirectUri: string): Google {
   );
 }
 
-const googleLoginClient = createGoogleClient(CONFIG.auth.googleLoginRedirectUri);
+const googleSignInClients: Record<OAuthFlow, Google> = {
+  login: createGoogleClient(CONFIG.auth.googleLoginRedirectUri),
+  link: createGoogleClient(CONFIG.auth.googleLinkRedirectUri),
+};
 
 export const googleStorageClient = createGoogleClient(CONFIG.auth.googleStorageRedirectUri);
 
@@ -28,15 +31,19 @@ export const googleAuthProvider: OAuthProviderConfig = {
   id: 'google',
   displayName: 'Google',
   supportsPKCE: true,
-  createAuthorizationURL: (state, codeVerifier) => {
-    // biome-ignore lint/style/noNonNullAssertion: codeVerifier is guaranteed present for PKCE providers
-    const url = googleLoginClient.createAuthorizationURL(state, codeVerifier!, LOGIN_SCOPES);
+  createAuthorizationURL: (state, codeVerifier, flow) => {
+    const url = googleSignInClients[flow].createAuthorizationURL(
+      state,
+      // biome-ignore lint/style/noNonNullAssertion: codeVerifier is guaranteed present for PKCE providers
+      codeVerifier!,
+      LOGIN_SCOPES
+    );
     url.searchParams.set('prompt', 'select_account');
     return url;
   },
-  validateAuthorizationCode: async (code, codeVerifier) => {
+  validateAuthorizationCode: async (code, codeVerifier, flow) => {
     // biome-ignore lint/style/noNonNullAssertion: codeVerifier is guaranteed present for PKCE providers
-    const tokens = await googleLoginClient.validateAuthorizationCode(code, codeVerifier!);
+    const tokens = await googleSignInClients[flow].validateAuthorizationCode(code, codeVerifier!);
     return {
       accessToken: tokens.accessToken(),
       refreshToken: tokens.hasRefreshToken() ? tokens.refreshToken() : undefined,

@@ -97,9 +97,10 @@ These have defaults, but the defaults only suit localhost.
 | `LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug` |
 | `TRUSTED_PROXY_IPS` | empty | Comma-separated proxy IPs whose `X-Forwarded-For` is honored. Left unset behind a reverse proxy, every anonymous request shares one rate-limit bucket keyed on the proxy's IP |
 | `BLOCK_PRIVATE_PROVIDER_ENDPOINTS` | off | Set to `1` to require public `https://` hosts for S3 endpoints and model base URLs. Off, `http://` and LAN or loopback hosts are allowed, so a self-hosted MinIO or Ollama works. Cloud metadata and link-local addresses are refused either way. Any signed-in user can point a provider at the server's own network while it is off, so turn it on for an instance other people can sign up to |
-| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | — | Set both to add a GitHub login button. Callback defaults to `http://localhost:3001/api/v1/auth/callback/github`; override with `GITHUB_REDIRECT_URI` |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | — | Set both to add a GitHub login button. Callback defaults to `http://localhost:3001/api/v1/auth/callback/github`; override with `GITHUB_REDIRECT_URI`. Register the OAuth app's callback URL as `https://yourdomain.com/api/v1/auth/callback`: GitHub accepts any redirect under it, so login and account linking both work |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | — | Web push. All three or the feature stays off. Generate with `bun run vapid:gen` |
 | `GOOGLE_PROVIDER_REDIRECT_URI` | derived from `GOOGLE_REDIRECT_URI` | Storage-connect callback. Override only if it must differ from the derived `.../callback/provider/google` |
+| `GOOGLE_LINK_REDIRECT_URI`, `GITHUB_LINK_REDIRECT_URI` | derived from `GOOGLE_REDIRECT_URI` / `GITHUB_REDIRECT_URI` | Callback for linking a second sign-in account on Profile. Override only if it must differ from the derived `.../callback/link/google` or `.../callback/link/github` |
 | `CLOUDFLARE_TUNNEL_TOKEN` | — | Read by the `cloudflared` service in the example stacks |
 
 ### Example production `.env`
@@ -130,11 +131,15 @@ through the proxy.
    - `../auth/drive.file` — only the Drive files VROOM creates
    - `../auth/photoslibrary.readonly.appcreateddata` — only the photos VROOM uploaded
 4. APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID, type
-   Web application, with **both** authorized redirect URIs:
+   Web application, with **all three** authorized redirect URIs:
    - `https://yourdomain.com/api/v1/auth/callback/google` — login
    - `https://yourdomain.com/api/v1/auth/callback/provider/google` — connecting Drive,
-     Sheets, or Photos. The backend derives this from `GOOGLE_REDIRECT_URI`; omitting it
-     from the console breaks provider connection with `redirect_uri_mismatch`.
+     Sheets, or Photos
+   - `https://yourdomain.com/api/v1/auth/callback/link/google` — linking a second Google
+     account on Profile
+
+   The backend derives the last two from `GOOGLE_REDIRECT_URI`. Leaving one out of the
+   console makes that flow fail with `redirect_uri_mismatch`.
 
    Copy the Client ID and Secret into `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
 

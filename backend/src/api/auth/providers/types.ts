@@ -10,12 +10,18 @@ export interface OAuthUserInfo {
   avatarUrl?: string;
 }
 
+export type OAuthFlow = 'login' | 'link';
+
 export interface OAuthProviderConfig {
   id: string;
   displayName: string;
   supportsPKCE: boolean;
-  createAuthorizationURL: (state: string, codeVerifier?: string) => URL;
-  validateAuthorizationCode: (code: string, codeVerifier?: string) => Promise<OAuthTokens>;
+  createAuthorizationURL: (state: string, codeVerifier: string | undefined, flow: OAuthFlow) => URL;
+  validateAuthorizationCode: (
+    code: string,
+    codeVerifier: string | undefined,
+    flow: OAuthFlow
+  ) => Promise<OAuthTokens>;
   fetchUserInfo: (accessToken: string) => Promise<OAuthUserInfo>;
 }
 

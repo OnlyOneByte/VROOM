@@ -19,7 +19,7 @@ import { authProviderRepository, buildAuthProviderConfig } from './auth-provider
 import { lucia } from './lucia';
 import { googleStorageClient, STORAGE_SCOPES } from './providers/google';
 import { getEnabledProvider, getEnabledProviders, getProvider } from './providers/registry';
-import { NoVerifiedEmailError } from './providers/types';
+import { NoVerifiedEmailError, type OAuthFlow } from './providers/types';
 import {
   clearSessionCookie,
   consumeOAuthState,
@@ -130,7 +130,7 @@ routes.get('/login/:authProvider', authRateLimiter, async (c) => {
     createdAt: Date.now(),
   });
 
-  const url = providerConfig.createAuthorizationURL(state, codeVerifier);
+  const url = providerConfig.createAuthorizationURL(state, codeVerifier, 'login');
   cleanupExpiredStates();
   setLoginStateCookie(c, state);
   return c.redirect(url.toString());
@@ -155,7 +155,7 @@ routes.get('/link/:authProvider', authRateLimiter, requireAuth, async (c) => {
     flowType: 'auth-link',
   });
 
-  const url = providerConfig.createAuthorizationURL(state, codeVerifier);
+  const url = providerConfig.createAuthorizationURL(state, codeVerifier, 'link');
   cleanupExpiredStates();
   return c.redirect(url.toString());
 });
@@ -163,10 +163,11 @@ routes.get('/link/:authProvider', authRateLimiter, requireAuth, async (c) => {
 async function exchangeAuthTokens(
   providerConfig: ReturnType<typeof getProvider> & object,
   code: string,
-  codeVerifier: string | undefined
+  codeVerifier: string | undefined,
+  flow: OAuthFlow
 ) {
   const cv = providerConfig.supportsPKCE ? codeVerifier : undefined;
-  const tokens = await providerConfig.validateAuthorizationCode(code, cv);
+  const tokens = await providerConfig.validateAuthorizationCode(code, cv, flow);
   const userInfo = await providerConfig.fetchUserInfo(tokens.accessToken);
   return userInfo;
 }
@@ -360,7 +361,8 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
     code,
     storedData.codeVerifier,
     authProviderId,
-    'Auth link'
+    'Auth link',
+    'link'
   );
   if ('redirect' in tokenResult)
     return c.redirect(profileRedirect(`link_error=${tokenResult.redirect}`));
@@ -395,12 +397,13 @@ async function exchangeAuthTokensOrRedirect(
   code: string,
   codeVerifier: string | undefined,
   authProviderId: string,
-  errorPrefix: string
+  errorPrefix: string,
+  flow: OAuthFlow
 ): Promise<
   { userInfo: Awaited<ReturnType<typeof providerConfig.fetchUserInfo>> } | { redirect: string }
 > {
   try {
-    const userInfo = await exchangeAuthTokens(providerConfig, code, codeVerifier);
+    const userInfo = await exchangeAuthTokens(providerConfig, code, codeVerifier, flow);
     return { userInfo };
   } catch (err) {
     logger.error(`${errorPrefix} token exchange or user info fetch failed`, {
@@ -435,7 +438,8 @@ routes.get('/callback/:authProvider', authRateLimiter, async (c) => {
     code,
     stateResult.data.codeVerifier,
     authProviderId,
-    'Auth callback'
+    'Auth callback',
+    'login'
   );
   if ('redirect' in tokenResult)
     return c.redirect(authRedirect(`auth_error=${tokenResult.redirect}`));
