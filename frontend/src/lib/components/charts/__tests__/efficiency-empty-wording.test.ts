@@ -11,13 +11,16 @@ const UNITS: UnitPreferences = {
 
 describe('FuelEfficiencyTrendChart empty state', () => {
 	test.each([
-		['electric', 'Insufficient charging data', /charging sessions with mileage and kWh/],
+		['electric', 'No efficiency trend yet', /isn't charted for electric vehicles yet/],
 		['gas', 'Insufficient fuel data', /fuel entries with mileage and volume/],
 		['hybrid', 'Insufficient fuel data', /fuel entries with mileage and volume/]
-	] as const)('a %s vehicle names its own kind of data', async (fuelType, title, description) => {
-		render(FuelEfficiencyTrendChart, { props: { data: [], fuelType, unitPreferences: UNITS } });
+	] as const)(
+		'a %s vehicle gets wording that fits its data',
+		async (fuelType, title, description) => {
+			render(FuelEfficiencyTrendChart, { props: { data: [], fuelType, unitPreferences: UNITS } });
 
-		expect(await screen.findByText(title)).toBeTruthy();
-		expect(screen.getByText(description)).toBeTruthy();
-	});
+			expect(await screen.findByText(title)).toBeTruthy();
+			expect(screen.getByText(description)).toBeTruthy();
+		}
+	);
 });
