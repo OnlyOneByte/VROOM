@@ -109,6 +109,8 @@ export function validateProviderSecrets(
   }
 }
 
+const REENTRY_FIELD_LABELS: Record<string, string> = { baseUrl: 'Base URL', endpoint: 'Endpoint' };
+
 export function assertSecretsReentered(
   descriptor: AnyProviderDescriptor,
   stored: Record<string, unknown>,
@@ -121,7 +123,10 @@ export function assertSecretsReentered(
       (key) => Object.hasOwn(changes, key) && !Object.is(changes[key], stored[key])
     );
     if (changed === undefined) continue;
-    const field = descriptor.config.fields.find((f) => f.key === changed)?.label ?? changed;
+    const field =
+      descriptor.config.fields.find((f) => f.key === changed)?.label ??
+      REENTRY_FIELD_LABELS[changed] ??
+      changed;
     throw new ValidationError(`Enter the ${secret.label} again: the ${field} changed`);
   }
 }
