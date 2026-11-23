@@ -35,8 +35,10 @@ describe('StatCard loading tile has the filled tile shape', () => {
 		expect(skeletons(container)).toHaveLength(3);
 		expect(iconBox).toHaveClass('size-8', 'sm:size-11', 'rounded-xl');
 		expect(label).toHaveClass('h-4', 'sm:h-5');
-		expect(iconBox?.parentElement).toBe(label?.parentElement);
-		expect(iconBox?.parentElement).toHaveClass('flex', 'items-center', 'gap-2');
+		const iconSlot = iconBox?.parentElement;
+		expect(iconSlot).toHaveAttribute('data-stat-icon');
+		expect(iconSlot?.parentElement).toBe(label?.parentElement);
+		expect(iconSlot?.parentElement).toHaveClass('flex', 'items-center', 'gap-2');
 		expect(value).toHaveClass('h-7', 'sm:h-8', 'mt-2');
 	});
 
