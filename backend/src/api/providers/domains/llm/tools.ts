@@ -7,7 +7,7 @@ import {
   reminderWithVehiclesToApi,
   vehicleRowToApi,
 } from '../../../../utils/money';
-import { requireVehicleOwnerScope } from '../../../../utils/sharing';
+import { requireVehicleAccess } from '../../../../utils/vehicle-access';
 import {
   analyticsSummaryToApi,
   crossVehicleToApi,
@@ -105,7 +105,7 @@ function defineTool<A, R>(spec: AssistantToolSpec<A, R>): AssistantTool<A> {
 // Without a vehicleId, scope to the user's own vehicles: shared ones would leak another user's name to the LLM provider.
 async function resolveScope(vehicleId: string | undefined, userId: string): Promise<string> {
   if (!vehicleId) return userId;
-  return requireVehicleOwnerScope(vehicleId, userId, 'read');
+  return (await requireVehicleAccess(vehicleId, userId, 'read')).ownerId;
 }
 
 const TOOL_LIST: AssistantTool[] = [
