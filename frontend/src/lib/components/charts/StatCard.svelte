@@ -84,13 +84,15 @@
 		{#if isLoading && !hasDual}
 			<div class="flex items-center gap-2">
 				{#if icon}
-					<Skeleton class="size-8 sm:size-11 rounded-xl shrink-0" />
+					<div class="shrink-0" data-stat-icon>
+						<Skeleton class="size-8 sm:size-11 rounded-xl" />
+					</div>
 				{/if}
 				<Skeleton class="h-4 sm:h-5 w-24" />
 			</div>
-			<Skeleton class="h-7 sm:h-8 w-32 mt-2" />
+			<Skeleton class="h-7 sm:h-8 w-32 mt-2" data-stat-value />
 			{#if unit}
-				<Skeleton class="inline-block h-3 w-16 align-middle" />
+				<Skeleton class="inline-block h-3 w-16 align-middle" data-stat-unit-bar />
 			{/if}
 			{#if subtitle}
 				<div class="relative text-xs mt-1" aria-hidden="true">
@@ -146,13 +148,13 @@
 			<div class="flex items-center gap-2">
 				{#if icon}
 					{@const Icon = icon}
-					<div class="p-2 sm:p-3 rounded-xl {iconClasses.bg} shrink-0">
+					<div class="p-2 sm:p-3 rounded-xl {iconClasses.bg} shrink-0" data-stat-icon>
 						<Icon class="h-4 w-4 sm:h-5 sm:w-5 {iconClasses.text}" />
 					</div>
 				{/if}
 				<p class="text-xs sm:text-sm font-medium text-muted-foreground">{label}</p>
 			</div>
-			<p class="text-xl sm:text-2xl font-bold tabular-nums mt-2">{value}</p>
+			<p class="text-xl sm:text-2xl font-bold tabular-nums mt-2" data-stat-value>{value}</p>
 			{#if unit}
 				<span class="text-xs text-muted-foreground">{unit}</span>
 			{/if}
