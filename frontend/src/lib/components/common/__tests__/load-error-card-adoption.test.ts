@@ -8,7 +8,8 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..'
 const NOT_A_LOAD_CARD: Record<string, number> = {
 	'lib/components/common/media/CameraTab.svelte': 1,
 	'lib/components/expenses/form/ExpenseForm.svelte': 1,
-	'lib/components/sync/OfflineIndicator.svelte': 1
+	'lib/components/sync/OfflineIndicator.svelte': 1,
+	'routes/+error.svelte': 1
 };
 
 const NOT_YET_MOVED: Record<string, number> = {
@@ -19,9 +20,12 @@ const NOT_YET_MOVED: Record<string, number> = {
 	'lib/components/vehicles/FinanceTab.svelte': 1,
 	'lib/components/vehicles/form/VehicleForm.svelte': 1,
 	'routes/assistant/+page.svelte': 1,
-	'routes/auth/+page.svelte': 1,
-	'routes/settings/+page.svelte': 1
+	'routes/auth/+page.svelte': 2,
+	'routes/settings/+page.svelte': 1,
+	'routes/settings/providers/[id]/edit/+page.svelte': 1
 };
+
+const RETRY_WINDOW = 30;
 
 function svelteFiles(dir: string): string[] {
 	return readdirSync(dir).flatMap(name => {
@@ -36,7 +40,7 @@ function alertWithRetryCount(source: string): number {
 	return lines.filter(
 		(line, i) =>
 			line.includes('<CircleAlert') &&
-			/>\s*Retry\b|^\s*Retry\s*$/m.test(lines.slice(i, i + 14).join('\n'))
+			/>\s*Retry\b|^\s*Retry\s*$/m.test(lines.slice(i, i + RETRY_WINDOW).join('\n'))
 	).length;
 }
 
