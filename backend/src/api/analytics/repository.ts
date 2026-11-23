@@ -36,7 +36,6 @@ import {
   buildMaintenanceTimeline,
   buildMonthlyCostHeatmap,
   buildMonthlyExpenseTrends,
-  buildTCOMonthlyTrend,
   buildVehicleExpenseBreakdown,
   buildVehicleMaintenanceCosts,
   buildVehicleRadar,
@@ -364,13 +363,6 @@ export interface VehicleTCOData {
   totalDistance: number;
   costPerDistance: number | null;
   costPerMonth: number;
-  monthlyTrend: Array<{
-    month: string;
-    financing: number;
-    insurance: number;
-    fuel: number;
-    maintenance: number;
-  }>;
 }
 
 export interface VehicleExpensesData {
@@ -2005,7 +1997,6 @@ export class AnalyticsRepository {
         .select({
           category: expenses.category,
           expenseAmount: expenses.expenseAmount,
-          date: expenses.date,
           sourceType: expenses.sourceType,
           mileage: expenses.mileage,
         })
@@ -2042,7 +2033,6 @@ export class AnalyticsRepository {
         totalDistance,
         costPerDistance: totalDistance > 0 ? totalCost / totalDistance : null,
         costPerMonth: totalCost / ownershipMonths,
-        monthlyTrend: buildTCOMonthlyTrend(detailedExpenses, calendar),
       };
     } catch (error) {
       logger.error('Failed to compute vehicle TCO', {

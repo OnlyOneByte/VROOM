@@ -235,13 +235,6 @@ export interface VehicleTCOResponse {
 	totalDistance: number;
 	costPerDistance: number | null;
 	costPerMonth: number;
-	monthlyTrend: Array<{
-		month: string;
-		financing: number;
-		insurance: number;
-		fuel: number;
-		maintenance: number;
-	}>;
 }
 
 export interface VehicleExpensesResponse {
