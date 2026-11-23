@@ -10,7 +10,10 @@
 		onSync,
 		onDownloadBackup,
 		onBackupNow,
-		onRestore
+		onRestore,
+		onUnitsChange,
+		onCurrencyChange,
+		onSyncInactivityChange
 	}: {
 		distanceUnit?: string;
 		volumeUnit?: string;
@@ -23,18 +26,30 @@
 		onDownloadBackup?: () => void;
 		onBackupNow?: () => void;
 		onRestore?: () => void;
+		onUnitsChange?: () => void;
+		onCurrencyChange?: () => void;
+		onSyncInactivityChange?: () => void;
 		[key: string]: unknown;
 	} = $props();
 </script>
 
 {#if distanceUnit !== undefined}
-	<input aria-label="stub distance" bind:value={distanceUnit} />
-	<input aria-label="stub volume" bind:value={volumeUnit} />
-	<input aria-label="stub currency" bind:value={currencyUnit} />
+	<input aria-label="stub distance" bind:value={distanceUnit} onchange={() => onUnitsChange?.()} />
+	<input aria-label="stub volume" bind:value={volumeUnit} onchange={() => onUnitsChange?.()} />
+	<input
+		aria-label="stub currency"
+		bind:value={currencyUnit}
+		onchange={() => onCurrencyChange?.()}
+	/>
 	<span data-testid="stub-charge">{chargeUnit}</span>
 {/if}
 {#if syncInactivityMinutes !== undefined}
-	<input aria-label="stub inactivity" type="number" bind:value={syncInactivityMinutes} />
+	<input
+		aria-label="stub inactivity"
+		type="number"
+		bind:value={syncInactivityMinutes}
+		onchange={() => onSyncInactivityChange?.()}
+	/>
 {/if}
 {#if domain}
 	<span data-testid="stub-model-{domain}"></span>

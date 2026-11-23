@@ -97,8 +97,10 @@ function stubInput(name: string): HTMLInputElement {
 	}) as HTMLInputElement;
 }
 
-async function save() {
-	await fireEvent.click(screen.getByRole('button', { name: /Save Settings/ }));
+async function change(name: string, value: string) {
+	const input = stubInput(name);
+	await fireEvent.input(input, { target: { value } });
+	await fireEvent.change(input);
 	await settle();
 }
 
@@ -110,7 +112,7 @@ beforeEach(() => {
 	authStore.setUser({ ...USER });
 	loadsWith(makeSettings());
 	settingsStoreFake.update.mockImplementation(async updates => {
-		const next = { ...makeSettings(), ...updates } as UserSettings;
+		const next = { ...(fakeSettingsState.settings ?? makeSettings()), ...updates } as UserSettings;
 		fakeSettingsState.settings = next;
 		return next;
 	});
@@ -130,13 +132,18 @@ describe('Settings page loading', () => {
 		expect(getProviders).toHaveBeenCalledWith('storage');
 	});
 
-	test('shows a spinner and no save button while loading', async () => {
+	test('shows a spinner while loading', async () => {
 		settingsStoreFake.load.mockImplementation(async () => {
 			fakeSettingsState.isLoading = true;
 		});
 		const { container } = await mount();
 		expect(container.querySelector('.animate-spin')).not.toBeNull();
-		expect(screen.queryByRole('button', { name: /Save Settings/ })).toBeNull();
+	});
+
+	test('has no Save Settings button: every preference saves on change', async () => {
+		await mount();
+		expect(screen.getByTestId('stub-model-llm')).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /Save/ })).toBeNull();
 	});
 
 	test('the cards mount once settings exist and stay mounted while settings reload', async () => {
@@ -169,20 +176,20 @@ describe('Settings page loading', () => {
 		await mount();
 		expect(screen.getByText("Couldn't load settings")).toBeInTheDocument();
 		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: /Save Settings/ })).toBeNull();
+		expect(screen.queryByTestId('stub-model-llm')).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
 		expect(settingsStoreFake.load).toHaveBeenCalledTimes(2);
 		expect(getProviders).toHaveBeenCalledTimes(2);
 		expect(screen.queryByText("Couldn't load settings")).toBeNull();
-		expect(screen.getByRole('button', { name: /Save Settings/ })).toBeInTheDocument();
+		expect(screen.getByTestId('stub-model-llm')).toBeInTheDocument();
 	});
 
 	test('a storage-provider load failure still renders the page', async () => {
 		getProviders.mockRejectedValue(new Error('offline'));
 		await mount();
-		expect(screen.getByRole('button', { name: /Save Settings/ })).toBeInTheDocument();
+		expect(screen.getByTestId('stub-model-llm')).toBeInTheDocument();
 	});
 
 	test('links to the profile with the user initials, name and email', async () => {
@@ -226,29 +233,35 @@ describe('Settings page preferences', () => {
 		expect(stubInput('stub inactivity')).toHaveValue(5);
 	});
 
-	test('saving sends the edited units, currency and existing backup schedule', async () => {
+	test('changing a unit saves just the units and confirms with a toast', async () => {
 		await mount();
-		await fireEvent.input(stubInput('stub distance'), { target: { value: 'miles' } });
-		await fireEvent.input(stubInput('stub volume'), { target: { value: 'gallons_uk' } });
-		await fireEvent.input(stubInput('stub currency'), { target: { value: 'GBP' } });
-		await fireEvent.input(stubInput('stub inactivity'), { target: { value: '30' } });
-		await save();
+		await change('stub distance', 'miles');
 
 		expect(settingsStoreFake.update).toHaveBeenCalledWith({
-			unitPreferences: { distanceUnit: 'miles', volumeUnit: 'gallons_uk', chargeUnit: 'kwh' },
-			currencyUnit: 'GBP',
-			autoBackupEnabled: true,
-			backupFrequency: 'daily',
-			syncOnInactivity: false,
-			syncInactivityMinutes: 30
+			unitPreferences: { distanceUnit: 'miles', volumeUnit: 'liters', chargeUnit: 'kwh' }
 		});
+		expect(showSuccess).toHaveBeenCalledWith('Units saved');
 		expect(fetchLastSyncTime).toHaveBeenCalledTimes(1);
-		expect(showSuccess).toHaveBeenCalledWith('Settings saved successfully');
 	});
 
-	test('sync-on-inactivity is requested when any provider has backup or sheets sync on', async () => {
+	test('changing the currency saves just the currency', async () => {
+		await mount();
+		await change('stub currency', 'GBP');
+		expect(settingsStoreFake.update).toHaveBeenCalledWith({ currencyUnit: 'GBP' });
+		expect(showSuccess).toHaveBeenCalledWith('Currency saved');
+	});
+
+	test('changing the inactivity window saves just that window', async () => {
+		await mount();
+		await change('stub inactivity', '30');
+		expect(settingsStoreFake.update).toHaveBeenCalledWith({ syncInactivityMinutes: 30 });
+		expect(showSuccess).toHaveBeenCalledWith('Backup timing saved');
+	});
+
+	test('sync-on-inactivity follows whether any provider has backup or sheets sync on', async () => {
 		loadsWith(
 			makeSettings({
+				syncOnInactivity: false,
 				backupConfig: {
 					providers: {
 						p1: { enabled: false, folderPath: '/', retentionCount: 5, sheetsSyncEnabled: true }
@@ -257,46 +270,45 @@ describe('Settings page preferences', () => {
 			})
 		);
 		await mount();
-		await save();
-		expect(settingsStoreFake.update).toHaveBeenCalledWith(
-			expect.objectContaining({ syncOnInactivity: true })
-		);
+		expect(settingsStoreFake.update).toHaveBeenCalledWith({ syncOnInactivity: true });
+		expect(settingsStoreFake.update).toHaveBeenCalledTimes(1);
+		expect(showSuccess).not.toHaveBeenCalled();
 	});
 
-	test('after saving the form re-syncs to what the server returned', async () => {
+	test('sync-on-inactivity is left alone when it already matches', async () => {
+		loadsWith(makeSettings({ syncOnInactivity: false }));
+		await mount();
+		expect(settingsStoreFake.update).not.toHaveBeenCalled();
+	});
+
+	test('after a save the pickers re-sync to what the server returned', async () => {
 		settingsStoreFake.update.mockImplementation(async updates => {
 			const next = makeSettings({ ...updates, currencyUnit: 'CAD' });
 			fakeSettingsState.settings = next;
 			return next;
 		});
 		await mount();
-		await fireEvent.input(stubInput('stub currency'), { target: { value: 'usd' } });
-		await save();
+		await change('stub currency', 'usd');
 		expect(stubInput('stub currency')).toHaveValue('CAD');
 	});
 
-	test('a save failure reports an error', async () => {
+	test('a save failure reports an error and puts the saved value back', async () => {
+		loadsWith(makeSettings({ syncOnInactivity: false }));
 		settingsStoreFake.update.mockRejectedValue(new ApiError('SQLITE_BUSY', 500));
 		await mount();
-		await save();
+		await change('stub currency', 'GBP');
 		expect(showError).toHaveBeenCalledWith(`Couldn't save settings. ${SERVER_FAILURE_MESSAGE}`);
 		expect(showSuccess).not.toHaveBeenCalled();
-		expect(screen.getByRole('button', { name: /Save Settings/ })).not.toBeDisabled();
-	});
-
-	test('the save button shows a saving state while the request is pending', async () => {
-		settingsStoreFake.update.mockReturnValue(new Promise(() => {}));
-		await mount();
-		await save();
-		expect(screen.getByRole('button', { name: /Saving/ })).toBeDisabled();
+		expect(stubInput('stub currency')).toHaveValue('EUR');
 	});
 
 	test('a settings save in flight counts as unsaved changes until the page closes', async () => {
+		loadsWith(makeSettings({ syncOnInactivity: false }));
 		settingsStoreFake.update.mockReturnValue(new Promise(() => {}));
 		const { unmount } = await mount();
 		expect(hasPendingSave()).toBe(false);
 
-		await save();
+		await change('stub distance', 'miles');
 
 		expect(hasPendingSave()).toBe(true);
 		unmount();

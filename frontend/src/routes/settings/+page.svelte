@@ -8,7 +8,7 @@
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { routes } from '#lib/routes.ts';
-	import { Save, LoaderCircle, ChevronRight, CircleAlert } from '@lucide/svelte';
+	import { LoaderCircle, ChevronRight, CircleAlert } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
 	import { Avatar, AvatarFallback } from '#lib/components/ui/avatar/index.ts';
@@ -23,7 +23,12 @@
 	import { providerApi } from '#lib/services/provider-api.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import { toast } from 'svelte-sonner';
-	import type { BackupConfig, RestoreResult, UserProviderInfo } from '#lib/types/index.ts';
+	import type {
+		BackupConfig,
+		RestoreResult,
+		UserProviderInfo,
+		UserSettings
+	} from '#lib/types/index.ts';
 
 	let user = $derived(authStore.user);
 
@@ -40,9 +45,9 @@
 	let settings = $derived(settingsStore.settings);
 	let loadError = $derived(settingsStore.error && !settings ? settingsStore.error : null);
 
-	let isSaving = $state(false);
+	let savesInFlight = $state(0);
 
-	onMount(() => trackPendingSave(() => isSaving));
+	onMount(() => trackPendingSave(() => savesInFlight > 0));
 	let isBackingUp = $state(false);
 
 	let distanceUnit = $state<'miles' | 'kilometers'>('miles');
@@ -50,8 +55,6 @@
 	let chargeUnit = $state<'kwh'>('kwh');
 	let currencyUnit = $state('USD');
 
-	let autoBackupEnabled = $state(false);
-	let backupFrequency = $state<'daily' | 'weekly' | 'monthly'>('weekly');
 	let syncInactivityMinutes = $state(5);
 
 	let storageProviders = $state<UserProviderInfo[]>([]);
@@ -116,33 +119,56 @@
 			volumeUnit = settings.unitPreferences.volumeUnit;
 			chargeUnit = settings.unitPreferences.chargeUnit;
 			currencyUnit = settings.currencyUnit;
-			autoBackupEnabled = settings.autoBackupEnabled;
-			backupFrequency = settings.backupFrequency;
 			syncInactivityMinutes = settings.syncInactivityMinutes || 5;
 			isInitialized = true;
 		}
 	});
 
-	async function handleSave() {
-		isSaving = true;
+	async function saveSettings(updates: Partial<UserSettings>, savedMessage: string) {
+		savesInFlight++;
 		try {
-			await settingsStore.update({
-				unitPreferences: { distanceUnit, volumeUnit, chargeUnit },
-				currencyUnit,
-				autoBackupEnabled,
-				backupFrequency,
-				syncOnInactivity: backupProvidersEnabled || sheetsSyncEnabled,
-				syncInactivityMinutes
-			});
+			await settingsStore.update(updates);
 			await fetchLastSyncTime();
-			isInitialized = false;
-			appStore.showSuccess('Settings saved successfully');
+			appStore.showSuccess(savedMessage);
 		} catch (error) {
 			appStore.showError(`Couldn't save settings. ${userFacingErrorMessage(error)}`);
 		} finally {
-			isSaving = false;
+			savesInFlight--;
+			isInitialized = false;
 		}
 	}
+
+	function saveUnits() {
+		void saveSettings({ unitPreferences: { distanceUnit, volumeUnit, chargeUnit } }, 'Units saved');
+	}
+
+	function saveCurrency() {
+		void saveSettings({ currencyUnit }, 'Currency saved');
+	}
+
+	function saveSyncInterval() {
+		void saveSettings({ syncInactivityMinutes }, 'Backup timing saved');
+	}
+
+	let syncOnInactivityRequested: boolean | null = null;
+
+	async function requestSyncOnInactivity(wanted: boolean) {
+		try {
+			await settingsStore.update({ syncOnInactivity: wanted });
+		} catch {
+			syncOnInactivityRequested = null;
+		}
+	}
+
+	$effect(() => {
+		if (!settings) return;
+		const wanted = backupProvidersEnabled || sheetsSyncEnabled;
+		if ((settings.syncOnInactivity ?? true) === wanted || syncOnInactivityRequested === wanted) {
+			return;
+		}
+		syncOnInactivityRequested = wanted;
+		void requestSyncOnInactivity(wanted);
+	});
 
 	async function handleBackup() {
 		isBackingUp = true;
@@ -260,7 +286,7 @@
 			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
 		</div>
 	{:else}
-		<div class="space-y-6 pb-32 sm:pb-24">
+		<div class="space-y-6">
 			<a href={resolve(routes.profile)} class="block w-full text-left">
 				<Card class="hover:bg-accent/50 transition-colors cursor-pointer">
 					<CardContent class="flex items-center gap-4 py-5">
@@ -284,12 +310,20 @@
 
 			<ThemeCard />
 			<ThemePickerCard />
-			<UnitPreferencesCard bind:distanceUnit bind:volumeUnit bind:chargeUnit bind:currencyUnit />
+			<UnitPreferencesCard
+				bind:distanceUnit
+				bind:volumeUnit
+				bind:chargeUnit
+				bind:currencyUnit
+				onUnitsChange={saveUnits}
+				onCurrencyChange={saveCurrency}
+			/>
 			<PWAInstallCard />
 			<PushNotificationsCard />
 			<PhotoStorageSettings
 				{isBackingUp}
 				bind:syncInactivityMinutes
+				onSyncInactivityChange={saveSyncInterval}
 				onBackupNow={handleBackupNowClick}
 				onRestore={handleRestoreClick}
 				onDownloadBackup={handleBackup}
@@ -308,22 +342,6 @@
 				</p>
 			{/await}
 		</div>
-	{/if}
-
-	{#if settings}
-		<Button
-			onclick={handleSave}
-			disabled={isSaving}
-			class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto sm:rounded-full rounded-full group bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 z-50 h-16 sm:h-16 pl-6 pr-10 border-0 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-		>
-			{#if isSaving}
-				<LoaderCircle class="h-6 w-6 animate-spin transition-transform duration-300" />
-				<span class="font-bold text-lg">Saving...</span>
-			{:else}
-				<Save class="h-6 w-6 transition-transform duration-300 group-hover:scale-110" />
-				<span class="font-bold text-lg">Save Settings</span>
-			{/if}
-		</Button>
 	{/if}
 
 	{#if backupDialog}
