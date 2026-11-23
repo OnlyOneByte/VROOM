@@ -154,11 +154,12 @@ describe('storage descriptor features hold for every type', () => {
       const zipOnly = zipTypes.filter(
         (type) => !STORAGE_PROVIDERS[type as StorageProviderType].features.backupSheets
       );
+      const uploads = spyOn(fake, 'upload');
       for (const type of zipOnly) {
         const on = await backupStrategyRegistry.get(type)?.execute(backupContext(type, true));
         expect(on?.capabilities.zip?.success, type).toBe(true);
       }
-      expect((await fake.list('Backups')).length).toBe(zipOnly.length);
+      expect(uploads).toHaveBeenCalledTimes(zipOnly.length);
     } finally {
       built.mockRestore();
     }
