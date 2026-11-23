@@ -106,6 +106,7 @@ export interface UserSettings {
 	lastSyncDate?: string;
 	storageConfig?: StorageConfig;
 	backupConfig?: BackupConfig;
+	providerDefaults?: Partial<Record<'ai.llm' | 'ai.vision', string | null>>;
 	createdAt: string;
 	updatedAt: string;
 }

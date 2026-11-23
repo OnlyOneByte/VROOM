@@ -8,16 +8,18 @@ import { userPreferences, userProviders } from '../../db/schema';
 import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import SHARED_CURRENCIES from '../../shared-currencies.json';
-import type { BackupConfig, StorageConfig } from '../../types';
+import type { BackupConfig, DefaultProviderCapability, StorageConfig } from '../../types';
 import { readJsonBody } from '../../utils/request-body';
 import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
 } from '../../utils/unit-preferences-schema';
+import { CAPABILITY_DOMAIN } from '../providers/resolve';
 import { preferencesRepository } from './repository';
 import {
   type BackupConfigUpdate,
   backupConfigSchema,
+  providerDefaultsSchema,
   type StorageConfigUpdate,
   storageConfigSchema,
 } from './validation';
@@ -33,6 +35,31 @@ async function assertProvidersOwned(providerIds: string[], userId: string): Prom
   const ownedIds = new Set(ownedProviders.map((p) => p.id));
   for (const providerId of providerIds) {
     if (!ownedIds.has(providerId)) {
+      throw new ValidationError(
+        `Provider '${providerId}' not found or does not belong to this user`
+      );
+    }
+  }
+}
+
+async function assertDefaultsOwned(
+  defaults: Partial<Record<DefaultProviderCapability, string | null>>,
+  userId: string
+): Promise<void> {
+  for (const [capability, providerId] of Object.entries(defaults)) {
+    if (providerId === null || providerId === undefined) continue;
+    const owned = await getDb()
+      .select({ id: userProviders.id })
+      .from(userProviders)
+      .where(
+        and(
+          eq(userProviders.id, providerId),
+          eq(userProviders.userId, userId),
+          eq(userProviders.domain, CAPABILITY_DOMAIN[capability as DefaultProviderCapability])
+        )
+      )
+      .get();
+    if (!owned) {
       throw new ValidationError(
         `Provider '${providerId}' not found or does not belong to this user`
       );
@@ -138,11 +165,13 @@ const updateSettingsSchema = baseSettingsSchema
     unitPreferences: true,
     storageConfig: true,
     backupConfig: true,
+    providerDefaults: true,
   })
   .extend({
     unitPreferences: partialUnitPreferencesSchema.optional(),
     storageConfig: storageConfigSchema.optional(),
     backupConfig: backupConfigSchema.optional(),
+    providerDefaults: providerDefaultsSchema.optional(),
     themePreference: z.string().min(1).max(64).optional(),
     businessMileageRate: z.number().min(0).max(100).optional(),
   })
@@ -170,6 +199,7 @@ routes.put('/', async (c) => {
     unitPreferences: partialUnitPrefs,
     storageConfig,
     backupConfig,
+    providerDefaults,
     ...restUpdates
   } = updates;
   const mergedUnitPreferences = mergeUnitPreferences(
@@ -186,11 +216,17 @@ routes.put('/', async (c) => {
   if (backupConfig) {
     await assertProvidersOwned(Object.keys(backupConfig.providers), user.id);
   }
+  if (providerDefaults) {
+    await assertDefaultsOwned(providerDefaults, user.id);
+  }
 
   let updatedSettings = await preferencesRepository.update(user.id, {
     ...restUpdates,
     ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
     ...(mergedStorageConfig && { storageConfig: mergedStorageConfig }),
+    ...(providerDefaults && {
+      providerDefaults: { ...(existingSettings.providerDefaults ?? {}), ...providerDefaults },
+    }),
   });
   if (backupConfig) {
     updatedSettings =

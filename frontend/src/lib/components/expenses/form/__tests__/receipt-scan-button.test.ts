@@ -148,9 +148,14 @@ describe('ReceiptScanButton: scanning', () => {
 describe('ReceiptScanButton: errors', () => {
 	test.each([
 		[
-			'missing provider (400)',
-			new ApiError('Bad Request', 400),
+			'missing provider (NO_PROVIDER)',
+			new ApiError('Bad Request', 400, { capability: 'ai.vision' }, 'NO_PROVIDER'),
 			'No receipt-parsing provider is set up yet. Add one in Settings → Receipt Parsing.'
+		],
+		[
+			'another 400, such as an unreadable image',
+			new ApiError('No image file provided', 400),
+			"Couldn't read the receipt. No image file provided. Or fill it in manually."
 		],
 		[
 			'unreachable provider (502)',

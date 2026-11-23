@@ -422,6 +422,21 @@ async function cleanupBackupConfig(userId: string, providerId: string): Promise<
   });
 }
 
+async function cleanupProviderDefaults(userId: string, providerId: string): Promise<void> {
+  const prefs = await preferencesRepository.getOrCreate(userId);
+  const defaults = prefs.providerDefaults ?? {};
+  if (!Object.values(defaults).includes(providerId)) return;
+  await preferencesRepository.mergeJsonField(
+    userId,
+    'providerDefaults',
+    Object.fromEntries(
+      Object.entries(defaults)
+        .filter(([, id]) => id === providerId)
+        .map(([capability]) => [capability, null])
+    )
+  );
+}
+
 async function assertNoPhotosOnlyHere(providerId: string, force: boolean): Promise<void> {
   if (force) return;
   const photosOnlyHere = await photoRefRepository.countPhotosOnlyOnProvider(providerId);
@@ -455,6 +470,8 @@ routes.delete(
     if (existing.domain === 'auth') {
       throw new ValidationError('Auth providers cannot be modified through this endpoint');
     }
+
+    await cleanupProviderDefaults(user.id, id);
 
     if (existing.domain === 'storage') {
       await assertNoPhotosOnlyHere(id, force);

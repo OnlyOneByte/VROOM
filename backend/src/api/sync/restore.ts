@@ -33,8 +33,10 @@ import {
 } from '../../errors';
 import {
   type BackupConfig,
+  DEFAULT_PROVIDER_CAPABILITIES,
   DEFAULT_STORAGE_CONFIG,
   type ParsedBackupData,
+  type ProviderDefaults,
   type StorageConfig,
 } from '../../types';
 import { chunk, rowsPerInsert } from '../../utils/chunk';
@@ -95,7 +97,7 @@ type RestoreMode = 'replace' | 'merge' | 'preview';
 
 type ProviderScopedPrefs = Pick<
   typeof userPreferences.$inferSelect,
-  'backupConfig' | 'storageConfig'
+  'backupConfig' | 'storageConfig' | 'providerDefaults'
 >;
 
 function summarizeBackup(data: ParsedBackupData): ImportSummary {
@@ -621,6 +623,7 @@ class RestoreService {
       .select({
         backupConfig: userPreferences.backupConfig,
         storageConfig: userPreferences.storageConfig,
+        providerDefaults: userPreferences.providerDefaults,
       })
       .from(userPreferences)
       .where(eq(userPreferences.userId, userId))
@@ -659,8 +662,18 @@ class RestoreService {
         ) ?? null,
       ])
     ) as StorageConfig['defaults'];
+    const restoredDefaults = row.providerDefaults as ProviderDefaults | null | undefined;
+    const providerDefaults = Object.fromEntries(
+      DEFAULT_PROVIDER_CAPABILITIES.map((capability) => [
+        capability,
+        [current?.providerDefaults?.[capability], restoredDefaults?.[capability]].find(
+          (id) => id != null && owned.has(id)
+        ) ?? null,
+      ])
+    ) as ProviderDefaults;
     return {
       ...row,
+      providerDefaults,
       backupConfig: {
         providers: {
           ...ownedEntries(restoredBackup?.providers),
