@@ -65,22 +65,26 @@
 		focusFirstButton(content);
 	}
 
-	function buildMapping(): ImportColumnMapping | null {
+	function buildMapping(): { mapping: ImportColumnMapping; label: string } | null {
 		if (!targetVehicle || !format) return null;
 		return {
-			source: format.id,
-			columns: {},
-			dateFormat: 'iso',
-			targetVehicle: getVehicleDisplayName(targetVehicle)
+			mapping: {
+				source: format.id,
+				columns: {},
+				dateFormat: 'iso',
+				targetVehicle: getVehicleDisplayName(targetVehicle)
+			},
+			label: format.label
 		};
 	}
 
 	async function runPreview() {
-		const mapping = buildMapping();
-		if (!csvText.trim() || !mapping) {
+		const built = buildMapping();
+		if (!csvText.trim() || !built) {
 			preview = null;
 			return;
 		}
+		const { mapping, label } = built;
 		const seq = ++previewSeq;
 		isPreviewing = true;
 		preview = null;
@@ -89,7 +93,7 @@
 			if (seq === previewSeq) preview = result;
 		} catch (err) {
 			if (seq === previewSeq) {
-				handleErrorWithNotification(err, `Couldn't read that ${format?.label} file`);
+				handleErrorWithNotification(err, `Couldn't read that ${label} file`);
 			}
 		} finally {
 			if (seq === previewSeq) isPreviewing = false;
@@ -104,6 +108,13 @@
 		csvText = await file.text();
 		// Clear so re-picking the same file after a cancel still fires change.
 		input.value = '';
+		if (!csvText.trim()) {
+			previewSeq++;
+			format = null;
+			unrecognized = false;
+			preview = null;
+			return;
+		}
 		if (await detectFormat()) await runPreview();
 	}
 
@@ -133,17 +144,18 @@
 	}
 
 	async function handleCommit() {
-		const mapping = buildMapping();
-		if (!preview || preview.readyCount === 0 || !mapping) return;
+		const built = buildMapping();
+		if (!preview || preview.readyCount === 0 || !built) return;
+		const { mapping, label } = built;
 		isImporting = true;
 		try {
 			const result = await expenseApi.importExpensesCsv(csvText, false, mapping);
 			appStore.showSuccess(
-				`Migrated ${result.imported} ${result.imported === 1 ? 'entry' : 'entries'} from ${format?.label}`
+				`Migrated ${result.imported} ${result.imported === 1 ? 'entry' : 'entries'} from ${label}`
 			);
 			dialogOpen = false;
 		} catch (err) {
-			handleErrorWithNotification(err, `Couldn't migrate from ${format?.label}`);
+			handleErrorWithNotification(err, `Couldn't migrate from ${label}`);
 		} finally {
 			isImporting = false;
 		}
@@ -295,7 +307,8 @@
 				</div>
 			{:else if unrecognized}
 				<p class="text-sm text-destructive" role="alert" data-testid="migrate-unrecognized">
-					We don't recognize this file. Export a full backup from your old app and try again.
+					We don't recognize this file. Check that it's the CSV export from your old app and try
+					again.
 				</p>
 			{:else if csvText.trim() && !targetVehicle}
 				<p class="text-sm text-muted-foreground">Choose a vehicle above to preview.</p>

@@ -1,11 +1,28 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import {
+	DETECT_SAMPLE_LENGTH,
 	guessManualColumns,
 	isNativeImportHeaders,
 	parseCsvHeaders,
 	presetImportMapping
 } from '#lib/utils/import-mapping-helpers.ts';
 import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
+
+describe('DETECT_SAMPLE_LENGTH parity with the backend', () => {
+	test('matches the detect route limit, so a full sample is never refused', () => {
+		const presets = resolve(
+			dirname(fileURLToPath(import.meta.url)),
+			'../../../../../backend/src/api/expenses/import-mapping-presets.ts'
+		);
+		const match = readFileSync(presets, 'utf8').match(
+			/export\s+const\s+IMPORT_DETECT_SAMPLE_LENGTH\s*=\s*(\d+)/
+		);
+		expect(Number(match?.[1])).toBe(DETECT_SAMPLE_LENGTH);
+	});
+});
 
 describe('parseCsvHeaders', () => {
 	test('splits the FIRST line on commas, trimming + de-quoting each cell', () => {

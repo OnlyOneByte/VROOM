@@ -275,7 +275,9 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		await openDialog();
 		await chooseFile('   \n  ');
 
+		expect(detectImportSource).not.toHaveBeenCalled();
 		expect(importExpensesCsv).not.toHaveBeenCalled();
+		expect(screen.queryByTestId('migrate-unrecognized')).toBeNull();
 		expect(screen.queryByTestId('migrate-preview')).toBeNull();
 	});
 
@@ -441,5 +443,35 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		);
 		expect(importExpensesCsv).not.toHaveBeenCalled();
 		expect(commitButton()).toBeDisabled();
+	});
+
+	test('a detection that resolves after a newer file is picked is discarded', async () => {
+		let resolveStale: (value: DetectedImportFormat | null) => void = () => {};
+		detectImportSource.mockReturnValueOnce(
+			new Promise<DetectedImportFormat | null>(r => {
+				resolveStale = r;
+			})
+		);
+		detectImportSource.mockResolvedValueOnce({ id: 'fuelly', label: 'Fuelly' });
+		await mount();
+		await openDialog();
+		const input = screen.getByTestId('migrate-file') as HTMLInputElement;
+		Object.defineProperty(input, 'files', {
+			value: [new File(['a,b\n1,2'], 'old.csv')],
+			configurable: true
+		});
+		await fireEvent.change(input);
+		await chooseFile(CSV, 'new.csv');
+
+		resolveStale(null);
+		await settle();
+
+		expect(screen.queryByTestId('migrate-unrecognized')).toBeNull();
+		expect(importExpensesCsv).toHaveBeenCalledTimes(1);
+		expect(importExpensesCsv).toHaveBeenCalledWith(
+			CSV,
+			true,
+			expect.objectContaining({ source: 'fuelly' })
+		);
 	});
 });
