@@ -17,7 +17,7 @@ import {
   vehicles,
 } from '../../../db/schema';
 import { DEFAULT_UNIT_PREFERENCES, type ParsedBackupData } from '../../../types';
-import { backupService, coerceRow } from '../backup';
+import { BACKUP_CHECK_REASONS, backupService, coerceRow } from '../backup';
 
 const COLUMN_TYPE_DEFAULTS: Record<string, string> = {
   SQLiteBoolean: 'false',
@@ -1143,5 +1143,96 @@ describe('coerceRow: unitPreferences JSON column on vehicles', () => {
     const row = buildMinimalStringRow(vehicles, { unitPreferences: '{broken-json' });
     const result = coerceRow(row, vehicles);
     expect(result.unitPreferences).toEqual(DEFAULT_UNIT_PREFERENCES);
+  });
+});
+
+describe('validateBackupData: the first error is a plain reason', () => {
+  const emptyBackup = (over: Partial<ParsedBackupData> = {}): ParsedBackupData => ({
+    metadata: {
+      version: CONFIG.backup.currentVersion,
+      timestamp: new Date().toISOString(),
+      userId: 'u1',
+    },
+    vehicles: [],
+    expenses: [],
+    financing: [],
+    insurance: [],
+    insuranceTerms: [],
+    insuranceTermVehicles: [],
+    userPreferences: [],
+    syncState: [],
+    photos: [],
+    odometer: [],
+    photoRefs: [],
+    ...over,
+  });
+  const vehicle = () => coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles);
+  const expense = (vehicleId: string, id: string) =>
+    ({
+      ...coerceRow(
+        buildMinimalStringRow(expenses, { vehicleId, userId: 'u1', missedFillup: '' }),
+        expenses
+      ),
+      id,
+    }) as Record<string, unknown>;
+
+  test('missing metadata', () => {
+    const backup = emptyBackup();
+    backup.metadata = { ...backup.metadata, userId: '' };
+    const { errors } = backupService.validateBackupData(backup);
+    expect(errors[0]).toBe(
+      "This backup is missing details VROOM needs to restore it. Choose a backup that VROOM made and that hasn't been edited."
+    );
+    expect(errors).toContain('Invalid metadata');
+  });
+
+  test('a newer backup keeps its own update message first', () => {
+    const backup = emptyBackup();
+    backup.metadata = { ...backup.metadata, version: '99.0.0' };
+    expect(backupService.validateBackupData(backup).errors[0]).toMatch(/newer version of VROOM/);
+  });
+
+  test('an entry that fails its schema', () => {
+    const bad = { ...vehicle(), make: 42 } as Record<string, unknown>;
+    const { errors } = backupService.validateBackupData(emptyBackup({ vehicles: [bad] }));
+    expect(errors[0]).toBe(
+      "Some entries in this backup can't be read, so it can't be restored. Choose a backup that VROOM made and that hasn't been edited."
+    );
+    expect(errors.some((e) => e.startsWith('vehicles[0]'))).toBe(true);
+  });
+
+  test('an entry that points to missing data', () => {
+    const { errors } = backupService.validateBackupData(
+      emptyBackup({ expenses: [expense('ghost', 'e1')] })
+    );
+    expect(errors[0]).toBe(
+      "Some entries in this backup refer to vehicles or other items that aren't in it, so it can't be restored. Choose a backup that VROOM made and that hasn't been edited."
+    );
+    expect(errors).toContain('Expense e1 references non-existent vehicle');
+  });
+
+  test('an entry that appears twice', () => {
+    const v = vehicle();
+    const e1 = { ...expense(v.id as string, 'e1'), clientId: 'dup' };
+    const e2 = { ...expense(v.id as string, 'e2'), clientId: 'dup' };
+    const { errors } = backupService.validateBackupData(
+      emptyBackup({ vehicles: [v], expenses: [e1, e2] })
+    );
+    expect(errors[0]).toBe(
+      "Some entries appear twice in this backup, so it can't be restored. Choose a backup that VROOM made and that hasn't been edited."
+    );
+    expect(errors.some((e) => e.includes('violates a unique constraint'))).toBe(true);
+  });
+
+  test('a version that is not a version number', () => {
+    const backup = emptyBackup();
+    backup.metadata = { ...backup.metadata, version: 'abc' };
+    const { errors } = backupService.validateBackupData(backup);
+    expect(errors[0]).toBe(BACKUP_CHECK_REASONS.metadata);
+    expect(errors).toContain('Backup version "abc" is not a version number');
+  });
+
+  test('a valid backup has no errors at all', () => {
+    expect(backupService.validateBackupData(emptyBackup()).errors).toEqual([]);
   });
 });
