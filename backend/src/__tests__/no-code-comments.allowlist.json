@@ -148,7 +148,6 @@
   "backend/src/api/sync/backup.ts: A null in a NOT NULL column aborts the restore, so blanks take the static default.",
   "backend/src/api/sync/backup.ts: CSV round-trips present booleans as true, 1, '1' or 'true'.",
   "backend/src/api/sync/backup.ts: Entry sizes are attacker-declared: check the compression ratio before inflating.",
-  "backend/src/api/sync/backup.ts: Float products such as 12.34 * 100 land just below the integer, so round.",
   "backend/src/api/sync/backup.ts: SQLite treats NULLs as distinct in UNIQUE indexes, so null-keyed rows cannot collide.",
   "backend/src/api/sync/backup.ts: Scoped by ownerId so invitees' grants stay out of this user's backup.",
   "backend/src/api/sync/backup.ts: Sheets exports grouped numbers such as \"12,345\"; parseInt would read them as 12.",
