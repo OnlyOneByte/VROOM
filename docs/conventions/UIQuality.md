@@ -212,7 +212,9 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
 Every view that loads or mutates data handles all of these:
 
 1. **Loading** — a `Skeleton` shaped like the content (or a spinner inside the control that
-   triggered the work). Never a blank flash or a layout that jumps when data arrives.
+   triggered the work). Never a blank flash or a layout that jumps when data arrives. The app
+   shell never waits on the network: for a returning user, navigation and the page render at once
+   from the remembered user while the session is checked, and only content areas show skeletons.
 2. **Empty** — `EmptyState` (`#lib/components/common/empty-state.svelte`) with an icon, a
    sentence-case title that says what's missing, one line on why it matters, and the primary
    action that fills it. NOT a bare "No data". `/reminders` is the reference.
