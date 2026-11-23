@@ -181,6 +181,29 @@ describe('ExpenseForm create mode', () => {
 		expect(goto).not.toHaveBeenCalled();
 	});
 
+	test.each([
+		['an empty state', [] as Vehicle[], 'Add a vehicle first'],
+		['the form', [CAMRY], null]
+	])(
+		'while the vehicle list loads, the page shows its header and a skeleton, then %s',
+		async (_label, vehicles, emptyHeading) => {
+			let finish: (list: Vehicle[]) => void = () => {};
+			getVehicles.mockReturnValue(new Promise(resolve => (finish = resolve)));
+			render(ExpenseForm);
+			await tick();
+
+			expect(screen.getByRole('heading', { name: 'Add Expense' })).toBeTruthy();
+			expect(screen.getByTestId('expense-form-skeleton').getAttribute('aria-busy')).toBe('true');
+			expect(screen.queryByRole('button', { name: /save expense/i })).toBeNull();
+			expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
+
+			finish(vehicles);
+			if (emptyHeading) await screen.findByRole('heading', { name: emptyHeading });
+			else await screen.findByRole('button', { name: /save expense/i });
+			expect(screen.queryByTestId('expense-form-skeleton')).toBeNull();
+		}
+	);
+
 	test('with no vehicles the form gives way to an Add Vehicle empty state', async () => {
 		getVehicles.mockResolvedValue([]);
 		render(ExpenseForm, { props: { preselectedCategory: 'misc', preselectedAmount: '5' } });
