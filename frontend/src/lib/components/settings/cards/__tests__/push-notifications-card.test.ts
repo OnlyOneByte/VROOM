@@ -79,6 +79,17 @@ describe('PushNotificationsCard status', () => {
 		expect(screen.getByTestId('push-loading')).toBeInTheDocument();
 	});
 
+	test('the delivery caveat stays on the card behind How it works', async () => {
+		getVapidPublicKey.mockReturnValue(new Promise(() => {}));
+		await mount();
+		const details = document.querySelector(
+			'[data-slot="how-it-works"]'
+		) as HTMLDetailsElement | null;
+		expect(details?.open).toBe(false);
+		expect(details?.querySelector('summary')).toHaveTextContent('How it works');
+		expect(details).toHaveTextContent(/next runs a reminder check/);
+	});
+
 	test('an unsupported browser shows the reason with no toggle', async () => {
 		push.isPushSupported.mockReturnValue(false);
 		await mount();

@@ -6,15 +6,8 @@
 		pwaInstallState,
 		getPlatformInfo
 	} from '#lib/utils/pwa.ts';
-	import {
-		Download,
-		CircleCheck,
-		Share,
-		Smartphone,
-		Plus,
-		LoaderCircle,
-		ChevronDown
-	} from '@lucide/svelte';
+	import { Download, CircleCheck, Share, Smartphone, Plus, LoaderCircle } from '@lucide/svelte';
+	import HowItWorks from '#lib/components/common/how-it-works.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		Card,
@@ -91,13 +84,7 @@
 				In Safari, tap <span class="font-medium text-foreground">Share</span>, then
 				<span class="font-medium text-foreground">Add to Home Screen</span>.
 			</p>
-			<details class="group mt-2">
-				<summary
-					class="inline-flex min-h-10 cursor-pointer list-none items-center gap-1 rounded-sm text-sm font-medium text-primary outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
-				>
-					<ChevronDown class="h-4 w-4 transition-transform group-open:rotate-180" />
-					How it works
-				</summary>
+			<HowItWorks class="mt-2">
 				<ol class="mt-2 space-y-2 text-sm text-foreground">
 					<li>
 						1. Tap the <Share class="inline h-4 w-4 text-primary align-text-bottom" />
@@ -112,7 +99,7 @@
 				<p class="mt-2 text-xs text-muted-foreground">
 					Other iOS browsers don't support Add to Home Screen.
 				</p>
-			</details>
+			</HowItWorks>
 		{:else if isChromium}
 			<p class="text-sm text-muted-foreground">
 				Use the install icon

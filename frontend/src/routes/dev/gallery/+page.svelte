@@ -3,6 +3,7 @@
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import BrandMark from '#lib/components/common/BrandMark.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import HowItWorks from '#lib/components/common/how-it-works.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert/index.ts';
@@ -179,6 +180,18 @@
 					aria-describedby="gallery-amount-error"
 				/>
 				<FormFieldError id="gallery-amount-error">Amount must be positive</FormFieldError>
+			</div>
+		</section>
+
+		<section class="space-y-3">
+			<h2 class="text-lg font-semibold">How it works disclosure</h2>
+			<div class="max-w-sm">
+				<p class="text-sm text-muted-foreground">One line that says what this does.</p>
+				<HowItWorks>
+					<p class="text-sm text-muted-foreground">
+						The longer explanation people need once, closed by default.
+					</p>
+				</HowItWorks>
 			</div>
 		</section>
 

@@ -49,6 +49,9 @@ describe('Storage Providers controls are 40px tap targets on phones', () => {
 		render(StorageProvidersCard, { props: {} });
 
 		await screen.findByText('No storage provider connected');
+		expect(
+			screen.getByRole('heading', { level: 3, name: 'Storage Providers' })
+		).toBeInTheDocument();
 		const addButtons = screen.getAllByRole('button', { name: /^Add / });
 		expect(addButtons).toHaveLength(1);
 		expect(addButtons[0]).toHaveAccessibleName('Add Storage Provider');

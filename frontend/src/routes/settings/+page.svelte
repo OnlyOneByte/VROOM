@@ -328,6 +328,17 @@
 			/>
 			<PWAInstallCard />
 			<PushNotificationsCard />
+			{#await migrateCard then { default: MigrateFromTrackerCard }}
+				<MigrateFromTrackerCard />
+			{:catch}
+				<p
+					class="rounded-lg border bg-card p-6 text-sm text-destructive"
+					role="alert"
+					data-testid="migrate-load-error"
+				>
+					Couldn't load the migration tool. Check your connection and reload.
+				</p>
+			{/await}
 			<section class="space-y-4" aria-labelledby="settings-connections">
 				<div>
 					<h2 id="settings-connections" class="text-lg font-semibold">Connections</h2>
@@ -346,17 +357,6 @@
 				<ModelProvidersCard domain="vlm" />
 				<ModelProvidersCard domain="llm" />
 			</section>
-			{#await migrateCard then { default: MigrateFromTrackerCard }}
-				<MigrateFromTrackerCard />
-			{:catch}
-				<p
-					class="rounded-lg border bg-card p-6 text-sm text-destructive"
-					role="alert"
-					data-testid="migrate-load-error"
-				>
-					Couldn't load the migration tool. Check your connection and reload.
-				</p>
-			{/await}
 		</div>
 	{/if}
 

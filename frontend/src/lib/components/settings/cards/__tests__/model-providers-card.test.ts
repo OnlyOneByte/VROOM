@@ -102,7 +102,7 @@ describe('ModelProvidersCard', () => {
 			render(ModelProvidersCard, { props: { domain } });
 
 			expect(await screen.findByText(empty)).toBeInTheDocument();
-			expect(screen.getByText(title)).toBeInTheDocument();
+			expect(screen.getByRole('heading', { level: 3, name: title })).toBeInTheDocument();
 			expect(getProviders).toHaveBeenCalledWith(domain);
 			expect(document.querySelector(`[data-testid="${domain}-add-provider"]`)).not.toBeNull();
 		}
