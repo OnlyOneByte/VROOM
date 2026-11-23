@@ -4,7 +4,12 @@ import { tick } from 'svelte';
 import type { Expense, SplitExpenseGroup, Vehicle } from '#lib/types/index.ts';
 import type { ReceiptDraft } from '#lib/services/vlm-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
-import { ApiError } from '#lib/utils/error-handling.ts';
+import {
+	ApiError,
+	NETWORK_FAILURE_MESSAGE,
+	NetworkError,
+	SERVER_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
 
 const goto = vi.fn(() => Promise.resolve());
@@ -73,6 +78,7 @@ const parseReceipt = vi.fn<(image: File) => Promise<ReceiptDraft>>();
 vi.mock('#lib/services/vlm-api.ts', () => ({ vlmApi: { parseReceipt } }));
 
 const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
+const { FUEL_NEEDS_VEHICLE_MESSAGE } = await import('../expense-form/expense-form-state.svelte.ts');
 
 const EXISTING: Expense = {
 	id: 'exp-1',
@@ -769,6 +775,31 @@ describe('ExpenseForm loading and load failures', () => {
 		);
 		expect(screen.getByRole('button', { name: 'Retry' })).toHaveAccessibleDescription(
 			"Couldn't load this vehicle's details. Something went wrong on our side. Try again in a moment."
+		);
+	});
+
+	test('an offline vehicle detail failure asks to check the connection', async () => {
+		getVehicle.mockRejectedValue(new NetworkError(new TypeError('Failed to fetch')));
+		render(ExpenseForm, { props: { preselectedCategory: 'misc' } });
+
+		await screen.findByTestId('vehicle-load-error');
+
+		expect(document.getElementById('vehicle-load-message')).toHaveTextContent(
+			`Couldn't load this vehicle's details. ${NETWORK_FAILURE_MESSAGE}`
+		);
+	});
+
+	test('a vehicle detail failure on a fill-up names the reason after the fill-up message', async () => {
+		getVehicle.mockRejectedValue(new ApiError('Internal server error', 500));
+		render(ExpenseForm, { props: { preselectedCategory: 'fuel' } });
+
+		await screen.findByTestId('vehicle-load-error');
+
+		expect(document.getElementById('vehicle-load-message')).toHaveTextContent(
+			`${FUEL_NEEDS_VEHICLE_MESSAGE} ${SERVER_FAILURE_MESSAGE}`
+		);
+		expect(screen.getByRole('button', { name: 'Retry' })).toHaveAccessibleDescription(
+			`${FUEL_NEEDS_VEHICLE_MESSAGE} ${SERVER_FAILURE_MESSAGE}`
 		);
 	});
 
