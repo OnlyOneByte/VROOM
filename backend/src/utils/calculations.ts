@@ -113,16 +113,6 @@ export function getPeriodStartDate(period: StatsPeriod, now: Date = new Date()):
   return new Date(now.getTime() - PERIOD_DAYS[period] * 24 * 60 * 60 * 1000);
 }
 
-export function parseClampedInt(
-  raw: string | undefined,
-  fallback: number,
-  min: number,
-  max: number
-): number {
-  const parsed = Number.parseInt(raw ?? '', 10);
-  return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback;
-}
-
 // Spreading into Math.max overflows the call stack on large arrays, so these loop.
 export function maxOf(values: number[]): number {
   let max = Number.NEGATIVE_INFINITY;

@@ -3,7 +3,6 @@ import type { Expense } from '../../db/schema';
 import {
   averageConsecutiveMpg,
   calculateAverageMilesPerKwh,
-  parseClampedInt,
   sortExpensesByDate,
 } from '../calculations';
 
@@ -206,34 +205,6 @@ describe('averageConsecutiveMpg', () => {
         { mileage: 109, volume: 20 },
       ])
     ).toBeNull();
-  });
-});
-
-describe('parseClampedInt', () => {
-  test('a valid in-range value parses through unchanged', () => {
-    expect(parseClampedInt('45', 30, 1, 366)).toBe(45);
-  });
-
-  test('undefined (missing param) gives the fallback', () => {
-    expect(parseClampedInt(undefined, 30, 1, 366)).toBe(30);
-  });
-
-  test('a non-numeric value gives the fallback, never NaN', () => {
-    expect(parseClampedInt('abc', 30, 1, 366)).toBe(30);
-    expect(parseClampedInt('', 30, 1, 366)).toBe(30);
-  });
-
-  test('above max clamps to the ceiling', () => {
-    expect(parseClampedInt('99999', 100, 1, 200)).toBe(200);
-  });
-
-  test('below min clamps to the floor', () => {
-    expect(parseClampedInt('-5', 100, 1, 200)).toBe(1);
-  });
-
-  test('parseInt tolerates a trailing unit but not a leading non-digit', () => {
-    expect(parseClampedInt('45px', 30, 1, 366)).toBe(45);
-    expect(parseClampedInt('px45', 30, 1, 366)).toBe(30);
   });
 });
 

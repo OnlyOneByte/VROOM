@@ -9,8 +9,6 @@ const USER_A_ID = 'google_user-a-sub';
 const USER_A_EMAIL = 'alice@gmail.com';
 const USER_A_SUB = 'user-a-sub';
 
-process.env.PROVIDER_ENCRYPTION_KEY = 'a'.repeat(64);
-
 beforeEach(() => {
   sqliteDb = new Database(':memory:');
   sqliteDb.run('PRAGMA foreign_keys = ON');

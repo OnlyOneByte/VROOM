@@ -1,5 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import { and, between, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { InsurancePolicy, InsuranceTerm } from '../../db/schema';
@@ -600,33 +600,6 @@ export class InsurancePolicyRepository {
         )
       );
     return rows.map((r) => ({ ...r.term, userId: r.userId }));
-  }
-
-  async findExpiringTerms(
-    startDate: Date,
-    endDate: Date,
-    userId: string,
-    limit = 100
-  ): Promise<InsuranceTerm[]> {
-    try {
-      return await this.db
-        .select({ term: insuranceTerms })
-        .from(insuranceTerms)
-        .innerJoin(insurancePolicies, eq(insuranceTerms.policyId, insurancePolicies.id))
-        .where(
-          and(
-            between(insuranceTerms.endDate, startDate, endDate),
-            eq(insurancePolicies.userId, userId),
-            eq(insurancePolicies.isActive, true)
-          )
-        )
-        .orderBy(insuranceTerms.endDate)
-        .limit(limit)
-        .then((rows) => rows.map((r) => r.term));
-    } catch (error) {
-      logger.error('Error finding expiring insurance terms', { error });
-      throw new DatabaseError('Failed to find expiring insurance terms');
-    }
   }
 }
 
