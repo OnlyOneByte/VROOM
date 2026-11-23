@@ -322,6 +322,54 @@ describe('Settings page preferences', () => {
 		expect(stubInput('stub volume')).toHaveValue('gallons_uk');
 	});
 
+	test('a pick made while the post-overlap reload waits is not undone by that late reply', async () => {
+		const saves: Array<() => void> = [];
+		settingsStoreFake.update.mockImplementation(
+			updates =>
+				new Promise(resolve => {
+					saves.push(() => {
+						const next = { ...fakeSettingsState.settings, ...updates } as UserSettings;
+						fakeSettingsState.settings = next;
+						resolve(next);
+					});
+				})
+		);
+		await mount();
+		await change('stub distance', 'miles');
+		await change('stub volume', 'gallons_uk');
+
+		const reloads: Array<() => void> = [];
+		const stale = makeSettings();
+		settingsStoreFake.load.mockImplementation(
+			() =>
+				new Promise<void>(resolve => {
+					reloads.push(() => {
+						fakeSettingsState.settings = { ...stale };
+						resolve();
+					});
+				})
+		);
+		saves[0]!();
+		saves[1]!();
+		await settle();
+		expect(reloads).toHaveLength(1);
+
+		await change('stub currency', 'GBP');
+		saves[2]!();
+		await settle();
+		reloads[0]!();
+		await settle();
+
+		expect(stubInput('stub currency')).toHaveValue('GBP');
+		expect(reloads).toHaveLength(2);
+
+		stale.currencyUnit = 'GBP';
+		reloads[1]!();
+		await settle();
+		expect(stubInput('stub currency')).toHaveValue('GBP');
+		expect(reloads).toHaveLength(2);
+	});
+
 	test('after a save the pickers re-sync to what the server returned', async () => {
 		settingsStoreFake.update.mockImplementation(async updates => {
 			const next = makeSettings({ ...updates, currencyUnit: 'CAD' });

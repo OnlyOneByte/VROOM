@@ -125,9 +125,11 @@
 	});
 
 	let savesOverlapped = false;
+	let saveGeneration = 0;
 
 	async function persist(updates: Partial<UserSettings>) {
 		if (savesInFlight > 0) savesOverlapped = true;
+		saveGeneration++;
 		savesInFlight++;
 		try {
 			await settingsStore.update(updates);
@@ -138,9 +140,14 @@
 	}
 
 	async function resyncAfterSaves() {
-		if (savesOverlapped) {
+		while (savesOverlapped) {
 			savesOverlapped = false;
+			const generation = saveGeneration;
 			await settingsStore.load().catch(() => undefined);
+			if (saveGeneration !== generation) {
+				savesOverlapped = true;
+				if (savesInFlight > 0) return;
+			}
 		}
 		if (savesInFlight === 0) isInitialized = false;
 	}
