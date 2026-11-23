@@ -1,6 +1,6 @@
 <script lang="ts">
 	import './line-chart-animations.css';
-	import { LineChart, Points } from 'layerchart';
+	import { LineChart, Points, Rule } from 'layerchart';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import ChartCard from './ChartCard.svelte';
 	import ChartPlot from './ChartPlot.svelte';
@@ -57,7 +57,15 @@
 		yDomain?: [number, number];
 		categoryLabel?: string;
 		onSelect?: ChartSelectHandler;
+		referenceLines?: ReferenceLine[];
+		summary?: Snippet;
+		footer?: Snippet;
 		class?: string;
+	}
+
+	interface ReferenceLine {
+		value: number;
+		label: string;
 	}
 
 	let {
@@ -86,6 +94,9 @@
 		yDomain,
 		categoryLabel,
 		onSelect,
+		referenceLines = [],
+		summary,
+		footer,
 		class: className
 	}: Props = $props();
 
@@ -104,7 +115,10 @@
 			categoryLabel,
 			series,
 			labelFormat: tooltipLabelFormat,
-			valueFormat: tooltipFormat
+			valueFormat: tooltipFormat,
+			notes: referenceLines.map(
+				line => `${line.label}: ${tooltipFormat(line.value, series[0]?.key ?? '')}.`
+			)
 		})
 	);
 
@@ -134,6 +148,8 @@
 	{height}
 	animationClass="chart-line-animated"
 	table={a11y}
+	{summary}
+	{footer}
 	class={className}
 >
 	<ChartPlot
@@ -170,6 +186,17 @@
 							/>
 						{/each}
 					{/snippet}
+					{#snippet aboveMarks()}
+						{#each referenceLines as line (line.label)}
+							<Rule
+								y={line.value}
+								dashArray="4 4"
+								class="stroke-muted-foreground"
+								strokeWidth={1.5}
+								data-reference-line
+							/>
+						{/each}
+					{/snippet}
 					{#snippet tooltip()}
 						<Chart.Tooltip labelFormatter={tooltipLabelFormat} valueFormatter={tooltipFormat} />
 					{/snippet}
@@ -178,6 +205,17 @@
 		</div>
 	</ChartPlot>
 	{#snippet legend()}
+		{#if referenceLines.length > 0}
+			<ul class="mt-3 flex flex-wrap justify-center gap-3" aria-label="Reference lines">
+				{#each referenceLines as line (line.label)}
+					<li class="flex items-center gap-1.5 text-xs text-muted-foreground">
+						<span class="w-4 border-t-2 border-dashed border-muted-foreground" aria-hidden="true"
+						></span>
+						{line.label}: {tooltipFormat(line.value, series[0]?.key ?? '')}
+					</li>
+				{/each}
+			</ul>
+		{/if}
 		{#if legendItems.length > 1}
 			<ChartLegend
 				items={legendItems}
