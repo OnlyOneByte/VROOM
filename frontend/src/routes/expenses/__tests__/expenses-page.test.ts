@@ -370,6 +370,11 @@ describe('/expenses filters', () => {
 		expect(within(sheet).getByRole('combobox', { name: 'Vehicle filter' })).toBeTruthy();
 		expect(within(sheet).getByRole('textbox', { name: 'Search tags' })).toBeTruthy();
 
+		expect(within(sheet).getByRole('button', { name: 'Close' })).toHaveClass('size-11');
+		expect(
+			within(sheet).getByRole('button', { name: 'Show results' }).parentElement?.className
+		).toContain('env(safe-area-inset-bottom)');
+
 		await fireEvent.click(within(sheet).getByRole('button', { name: 'Show results' }));
 		await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Filters' })).toBeNull());
 	});
