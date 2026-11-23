@@ -141,7 +141,12 @@ describe('StatCard loading tile has the filled tile shape', () => {
 			const row = half.children[1];
 			expect(row).toHaveClass('sm:@max-[18rem]:flex', 'sm:@max-[18rem]:items-baseline');
 			const unit = row?.children[1];
-			expect(unit).toHaveClass('block', 'mt-1', 'sm:@max-[18rem]:mt-0', 'sm:@max-[18rem]:whitespace-nowrap');
+			expect(unit).toHaveClass(
+				'block',
+				'mt-1',
+				'sm:@max-[18rem]:mt-0',
+				'sm:@max-[18rem]:whitespace-nowrap'
+			);
 		}
 	});
 });

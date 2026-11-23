@@ -6,17 +6,54 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import type { Vehicle } from '#lib/types/index.ts';
+	import type { DistanceUnit } from '#lib/types/settings.ts';
+	import { formatNumber } from '#lib/utils/formatters.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 
 	interface Props {
 		vehicle: Vehicle;
 		displayName: string;
 		coverPhotoUrl?: string | null;
+		odometer?: number | null;
+		odometerLoading?: boolean;
+		distanceUnit?: DistanceUnit;
 	}
 
-	let { vehicle, displayName, coverPhotoUrl = null }: Props = $props();
+	let {
+		vehicle,
+		displayName,
+		coverPhotoUrl = null,
+		odometer = null,
+		odometerLoading = false,
+		distanceUnit = 'miles'
+	}: Props = $props();
 </script>
 
-<PageHeader title={displayName} description="{vehicle.year} {vehicle.make} {vehicle.model}">
+{#snippet description()}
+	<span class="block truncate sm:inline">{vehicle.year} {vehicle.make} {vehicle.model}</span>
+	{#if vehicle.licensePlate || odometerLoading || odometer !== null}
+		<span class="max-sm:hidden" aria-hidden="true">·</span>
+	{/if}
+	<span class="block min-h-6 truncate sm:inline sm:min-h-0">
+		{#if vehicle.licensePlate}
+			<span class="whitespace-nowrap">{vehicle.licensePlate}</span>
+		{/if}
+		{#if vehicle.licensePlate && (odometerLoading || odometer !== null)}
+			<span aria-hidden="true">·</span>
+		{/if}
+		{#if odometerLoading}
+			<Skeleton class="inline-block h-4 w-16 align-middle" />
+		{:else if odometer !== null}
+			<span class="whitespace-nowrap">
+				{formatNumber(odometer, 0)}
+				{getDistanceUnitLabel(distanceUnit, true)}
+			</span>
+		{/if}
+	</span>
+{/snippet}
+
+<PageHeader title={displayName} {description}>
 	{#snippet back()}
 		<Button
 			variant="outline"

@@ -83,8 +83,8 @@ describe('restore provider sourceTypes', () => {
     expect(await listRestoreProviders()).toHaveLength(0);
   });
 
-  test('an inactive provider is never listed, even with a complete backup config', async () => {
-    seedProvider('prov-inactive', { status: 'inactive' });
+  test('a turned-off provider is never listed, even with a complete backup config', async () => {
+    seedProvider('prov-inactive', { status: 'disabled' });
     seedBackupConfig({
       'prov-inactive': {
         enabled: true,

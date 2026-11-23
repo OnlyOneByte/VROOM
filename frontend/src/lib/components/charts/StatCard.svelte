@@ -128,7 +128,9 @@
 							<span class="block text-sm font-medium text-muted-foreground break-words">
 								{label}
 							</span>
-							<div class="sm:@max-[18rem]:flex sm:@max-[18rem]:items-baseline sm:@max-[18rem]:gap-1">
+							<div
+								class="sm:@max-[18rem]:flex sm:@max-[18rem]:items-baseline sm:@max-[18rem]:gap-1"
+							>
 								<span class="block text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
 									{value}
 								</span>
@@ -158,7 +160,9 @@
 							<span class="block text-sm font-medium text-muted-foreground break-words">
 								{secondaryLabel}
 							</span>
-							<div class="sm:@max-[18rem]:flex sm:@max-[18rem]:items-baseline sm:@max-[18rem]:gap-1">
+							<div
+								class="sm:@max-[18rem]:flex sm:@max-[18rem]:items-baseline sm:@max-[18rem]:gap-1"
+							>
 								<span class="block text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
 									{secondaryValue}
 								</span>

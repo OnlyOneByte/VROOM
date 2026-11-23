@@ -31,7 +31,7 @@ const ROWS = [
 describe('VehicleRowsCard', () => {
 	test('every vehicle is one row in one list, each a real link to its page', () => {
 		render(VehicleRowsCard, {
-			props: { rows: ROWS, periodLabel: '30 days', distanceLabel: 'mi', isLoading: false }
+			props: { rows: ROWS, periodLabel: '30 days', distanceLabel: 'mi' }
 		});
 
 		expect(screen.getByRole('list')).toHaveClass('divide-y');
@@ -45,7 +45,7 @@ describe('VehicleRowsCard', () => {
 
 	test('a row shows its spend and running cost per distance, or says there is no distance', () => {
 		render(VehicleRowsCard, {
-			props: { rows: ROWS, periodLabel: '30 days', distanceLabel: 'mi', isLoading: false }
+			props: { rows: ROWS, periodLabel: '30 days', distanceLabel: 'mi' }
 		});
 		const [first, second] = screen.getAllByRole('listitem');
 
@@ -53,13 +53,5 @@ describe('VehicleRowsCard', () => {
 		expect(first?.textContent).toContain('$0.13/mi');
 		expect(second?.textContent).toContain('No running cost per mi for this period');
 		expect(screen.getAllByTestId('vehicle-sparkline')).toHaveLength(1);
-	});
-
-	test('while loading it reserves two rows', () => {
-		render(VehicleRowsCard, {
-			props: { rows: [], periodLabel: '30 days', distanceLabel: 'mi', isLoading: true }
-		});
-		expect(screen.getAllByRole('listitem')).toHaveLength(2);
-		expect(screen.queryByRole('link')).toBeNull();
 	});
 });
