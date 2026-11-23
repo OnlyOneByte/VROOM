@@ -37,7 +37,6 @@
   "backend/src/api/expenses/repository.ts: Sort columns are looked up here, never interpolated into SQL.",
   "backend/src/api/expenses/repository.ts: bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.",
   "backend/src/api/expenses/repository.ts: photo-service imports this module, so receipt file removal has to stay with the caller.",
-  "backend/src/api/expenses/routes.ts: Fuelio's multi-section export cannot go through the single-header column mapper.",
   "backend/src/api/expenses/routes.ts: Insurance and reminder links bypass this route's validation, so only financing links are accepted.",
   "backend/src/api/expenses/routes.ts: Safe to prefix formula characters only because nothing re-parses this export.",
   "backend/src/api/expenses/routes.ts: Zod .default() survives .partial(), so an omitted tags field would parse to [] and wipe them.",

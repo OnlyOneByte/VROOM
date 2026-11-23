@@ -7,19 +7,13 @@ import {
 	type MappingInput,
 	type TargetVehicle
 } from '../import-mapping';
-import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 
 const civic: TargetVehicle = { year: 2019, make: 'Honda', model: 'Civic' };
 
-const fuellyPreset: ImportMappingPreset = {
+const fuellyPreset: DetectedImportFormat = {
 	id: 'fuelly',
-	label: 'Fuelly',
-	signature: ['date', 'odometer'],
-	columns: { date: 'Date', amount: 'Cost', mileage: 'Odometer' },
-	dateFormat: 'mdy',
-	distanceUnit: 'miles',
-	volumeUnit: 'gallons_us',
-	categoryMap: { fuel: 'fuel' }
+	label: 'Fuelly'
 };
 
 const manualBase: ManualMappingInput = {
@@ -66,12 +60,12 @@ describe('buildImportMapping', () => {
 			})
 		);
 
-		expect(mapping).toMatchObject({
+		expect(mapping).toEqual({
 			source: 'fuelly',
-			columns: fuellyPreset.columns,
+			columns: {},
 			targetVehicle: '2019 Honda Civic',
-			dateFormat: 'mdy',
-			categoryMap: { fuel: 'fuel', gas: 'fuel' }
+			dateFormat: 'iso',
+			categoryMap: { gas: 'fuel' }
 		});
 	});
 

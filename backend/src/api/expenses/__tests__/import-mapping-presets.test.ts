@@ -3,10 +3,14 @@ import { DistanceUnit, VolumeUnit } from '../../../types';
 import { buildImportPlan, type ImportVehicle } from '../import-csv';
 import { applyMapping } from '../import-mapping';
 import {
+  detectImportFormat,
   detectSource,
+  findImportFormat,
+  IMPORT_FORMATS,
   MAPPING_PRESETS,
   normalizeHeader,
   presetToMapping,
+  sampleHeaders,
 } from '../import-mapping-presets';
 
 describe('normalizeHeader', () => {
@@ -134,5 +138,55 @@ describe('fuel-log presets import rows as fuel', () => {
       expect(plan.rows[0]?.expense?.category, `${preset.id} category`).toBe('fuel');
       expect(plan.rows[0]?.expense?.vehicleId).toBe('veh-1');
     }
+  });
+});
+
+describe('the ImportFormat registry', () => {
+  const FUELIO_SAMPLE = '"## Vehicle"\n"Name"\n"Golf"\n\n"## Log"\n"Data","Odo (km)"\n';
+
+  test('every format has a unique id and every preset is registered', () => {
+    const ids = IMPORT_FORMATS.map((f) => f.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const preset of MAPPING_PRESETS)
+      expect(findImportFormat(preset.id)?.label).toBe(preset.label);
+  });
+
+  test('detectImportFormat reads a multi-section export and a header row from the same sample input', () => {
+    expect(detectImportFormat(FUELIO_SAMPLE)?.id).toBe('fuelio');
+    expect(
+      detectImportFormat('"Date","Odometer","Fill Amount","Price"\n03/01/2026,1,2,3')?.id
+    ).toBe('fuelly');
+    expect(detectImportFormat('date,vehicle,category,amount')).toBeNull();
+    expect(detectImportFormat('')).toBeNull();
+  });
+
+  test('sampleHeaders takes the first non-blank line and unquotes it', () => {
+    expect(sampleHeaders('\n"Total price","Type of fuel"\nx,y')).toEqual([
+      'Total price',
+      'Type of fuel',
+    ]);
+    expect(sampleHeaders('')).toEqual([]);
+  });
+
+  test('a preset format fills its own columns, units and category map from the format id', () => {
+    const fuelly = findImportFormat('fuelly');
+    if (!fuelly) throw new Error('expected the Fuelly format');
+    const { csv, unmappedCategories } = fuelly.toNativeCsv(
+      'Date,Odometer,Fill Amount,Price,Fuel Type\n03/01/2026,30000,9,36.00,Gas',
+      {
+        mapping: {
+          source: 'fuelly',
+          columns: {},
+          dateFormat: 'iso',
+          targetVehicle: 'Daily Driver',
+        },
+        targetUnitsFor: () => ({}),
+      }
+    );
+    expect(unmappedCategories).toEqual([]);
+    const plan = buildImportPlan(csv, [
+      { id: 'veh-1', make: 'Honda', model: 'Civic', year: 2020, nickname: 'Daily Driver' },
+    ]);
+    expect(plan.rows[0]?.expense).toMatchObject({ category: 'fuel', mileage: 30000, volume: 9 });
   });
 });

@@ -41,7 +41,6 @@ import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/pho
 import { reminderTriggerService } from '../reminders/trigger-service';
 import { preferencesRepository } from '../settings/repository';
 import { vehicleRepository } from '../vehicles/repository';
-import { FuelioParseError, parseFuelioExport } from './fuelio-import';
 import {
   buildImportPlan,
   CsvImportError,
@@ -55,7 +54,11 @@ import {
   columnMappingSchema,
   type TargetUnitsResolver,
 } from './import-mapping';
-import { detectSource } from './import-mapping-presets';
+import {
+  detectImportFormat,
+  findImportFormat,
+  IMPORT_DETECT_SAMPLE_LENGTH,
+} from './import-mapping-presets';
 import { expenseRepository } from './repository';
 import {
   clearFuelFieldsIfNotFuel,
@@ -666,25 +669,15 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
   if (mapping) {
     const targetUnitsFor = targetUnitsResolver(vehicles);
     try {
-      if (mapping.source === 'fuelio') {
-        // Fuelio's multi-section export cannot go through the single-header column mapper.
-        const result = parseFuelioExport(csv, {
-          targetVehicle: mapping.targetVehicle ?? '',
-          targetUnits: targetUnitsFor(mapping.targetVehicle ?? ''),
-          includeCosts: true,
-          timeZone,
-          categoryMap: mapping.categoryMap,
-        });
-        importCsv = result.csv;
-        unmappedCategories = result.unmappedCategories;
-      } else {
-        const result = applyMapping(csv, mapping, targetUnitsFor, timeZone);
-        importCsv = result.csv;
-        unmappedCategories = result.unmappedCategories;
-        rowErrors = result.rowErrors;
-      }
+      const format = findImportFormat(mapping.source);
+      const result = format
+        ? format.toNativeCsv(csv, { mapping, targetUnitsFor, timeZone })
+        : applyMapping(csv, mapping, targetUnitsFor, timeZone);
+      importCsv = result.csv;
+      unmappedCategories = result.unmappedCategories;
+      rowErrors = result.rowErrors;
     } catch (err) {
-      if (err instanceof CsvMappingError || err instanceof FuelioParseError) {
+      if (err instanceof CsvMappingError) {
         throw new ValidationError(err.message);
       }
       throw err;
@@ -729,12 +722,12 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
 });
 
 const detectSourceSchema = z.object({
-  headers: z.array(z.string().max(200)).min(1).max(100),
+  sample: z.string().min(1).max(IMPORT_DETECT_SAMPLE_LENGTH),
 });
 routes.post('/import/detect', zValidator('json', detectSourceSchema), (c) => {
-  const { headers } = c.req.valid('json');
-  const preset = detectSource(headers);
-  return c.json({ success: true, data: preset });
+  const { sample } = c.req.valid('json');
+  const format = detectImportFormat(sample);
+  return c.json({ success: true, data: format ? { id: format.id, label: format.label } : null });
 });
 
 routes.post('/', zValidator('json', createExpenseSchema), async (c) => {

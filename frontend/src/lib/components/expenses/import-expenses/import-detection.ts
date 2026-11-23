@@ -1,5 +1,5 @@
 import type { NativeImportField } from '#lib/types/index.ts';
-import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 import { guessManualColumns, isNativeImportHeaders } from '#lib/utils/import-mapping-helpers.ts';
 
 interface DetectionOutcome {
@@ -9,7 +9,7 @@ interface DetectionOutcome {
 
 export function detectionOutcome(
 	headers: string[],
-	preset: ImportMappingPreset | null,
+	preset: DetectedImportFormat | null,
 	vehicleIds: string[]
 ): DetectionOutcome {
 	if (preset) {

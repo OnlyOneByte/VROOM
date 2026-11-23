@@ -7,7 +7,7 @@ import type {
 	Vehicle,
 	VolumeUnit
 } from '#lib/types/index.ts';
-import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 import { presetImportMapping } from '#lib/utils/import-mapping-helpers.ts';
 import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 
@@ -24,7 +24,7 @@ export interface ManualMappingInput {
 export type TargetVehicle = Pick<Vehicle, 'year' | 'make' | 'model' | 'nickname'>;
 
 export interface MappingInput {
-	preset: ImportMappingPreset | null;
+	preset: DetectedImportFormat | null;
 	targetVehicle: TargetVehicle | undefined;
 	manual: ManualMappingInput;
 	categoryRemap: Record<string, ExpenseCategory | undefined>;

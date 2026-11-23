@@ -1,11 +1,38 @@
+import { parse } from 'csv-parse/sync';
 import type { ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
-import type { ColumnMapping, ImportDateFormat, NativeField } from './import-mapping';
+import { fuelioFormat } from './fuelio-import';
+import {
+  applyMapping,
+  type ColumnMapping,
+  type ImportDateFormat,
+  type NativeField,
+  type TargetUnitsResolver,
+} from './import-mapping';
 
-type PresetId = 'fuelly' | 'drivvo';
+export const IMPORT_DETECT_SAMPLE_LENGTH = 8192;
+
+export interface ImportFormatOptions {
+  mapping: ColumnMapping;
+  targetUnitsFor: TargetUnitsResolver;
+  timeZone?: string;
+}
+
+export interface NativeCsvResult {
+  csv: string;
+  unmappedCategories: string[];
+  rowErrors: Map<number, string>;
+}
+
+export interface ImportFormat {
+  id: string;
+  label: string;
+  detect(sample: string): boolean;
+  toNativeCsv(text: string, opts: ImportFormatOptions): NativeCsvResult;
+}
 
 interface MappingPreset {
-  id: PresetId;
+  id: string;
   label: string;
   signature: string[];
   columns: Partial<Record<NativeField, string>>;
@@ -85,4 +112,43 @@ export function presetToMapping(preset: MappingPreset, targetVehicle?: string): 
     categoryMap: preset.categoryMap,
     defaultCategory: preset.defaultCategory,
   };
+}
+
+export function sampleHeaders(sample: string): string[] {
+  const line = sample.split(/\r?\n/).find((l) => l.trim() !== '');
+  if (!line) return [];
+  try {
+    const rows = parse(line, { bom: true, relax_quotes: true, trim: true }) as string[][];
+    return rows[0] ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function presetFormat(preset: MappingPreset): ImportFormat {
+  return {
+    id: preset.id,
+    label: preset.label,
+    detect: (sample) => detectSource(sampleHeaders(sample))?.id === preset.id,
+    toNativeCsv: (text, { mapping, targetUnitsFor, timeZone }) =>
+      applyMapping(
+        text,
+        {
+          ...presetToMapping(preset, mapping.targetVehicle),
+          categoryMap: { ...preset.categoryMap, ...mapping.categoryMap },
+        },
+        targetUnitsFor,
+        timeZone
+      ),
+  };
+}
+
+export const IMPORT_FORMATS: ImportFormat[] = [fuelioFormat, ...MAPPING_PRESETS.map(presetFormat)];
+
+export function detectImportFormat(sample: string): ImportFormat | null {
+  return IMPORT_FORMATS.find((format) => format.detect(sample)) ?? null;
+}
+
+export function findImportFormat(id: string | undefined): ImportFormat | null {
+  return IMPORT_FORMATS.find((format) => format.id === id) ?? null;
 }

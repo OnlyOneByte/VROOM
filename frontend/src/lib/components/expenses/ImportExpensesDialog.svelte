@@ -34,8 +34,8 @@
 		<Dialog.Header>
 			<Dialog.Title>Import expenses from CSV</Dialog.Title>
 			<Dialog.Description>
-				Upload a VROOM CSV export, or a fuel log from Fuelly, Fuelio, or Drivvo — we'll detect the
-				format automatically. You'll see a preview before anything is saved.
+				Upload a VROOM CSV export, or a fuel log from another app such as Fuelly, Fuelio, or Drivvo
+				— we'll detect the format automatically. You'll see a preview before anything is saved.
 			</Dialog.Description>
 		</Dialog.Header>
 

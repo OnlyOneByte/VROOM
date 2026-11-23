@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { LoaderCircle, Sparkles } from '@lucide/svelte';
-	import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+	import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 	import type { Vehicle } from '#lib/types/index.ts';
 	import TargetVehiclePicker from './TargetVehiclePicker.svelte';
 
 	interface Props {
 		isDetecting: boolean;
-		preset: ImportMappingPreset | null;
+		preset: DetectedImportFormat | null;
 		vehicles: Vehicle[];
 		targetVehicleId: string;
 		onVehicleChange: (_id: string) => void;

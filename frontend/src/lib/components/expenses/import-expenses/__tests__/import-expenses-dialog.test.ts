@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Vehicle } from '#lib/types/index.ts';
 import type { ExpenseImportResult } from '#lib/services/expense-api.ts';
-import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 import ImportExpensesDialog from '../../ImportExpensesDialog.svelte';
 
 const mocks = vi.hoisted(() => ({
@@ -34,12 +34,9 @@ const CAMRY: Vehicle = {
 	updatedAt: '2026-01-01T00:00:00Z'
 };
 
-const FUELLY: ImportMappingPreset = {
+const FUELLY: DetectedImportFormat = {
 	id: 'fuelly',
-	label: 'Fuelly',
-	signature: ['date', 'cost'],
-	columns: { date: 'Date', amount: 'Cost' },
-	dateFormat: 'mdy'
+	label: 'Fuelly'
 };
 
 const FUEL_CSV = 'Date,Cost\n01/02/2026,40.00\n01/09/2026,42.50';

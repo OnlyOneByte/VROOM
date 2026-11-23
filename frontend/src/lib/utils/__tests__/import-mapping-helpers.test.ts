@@ -1,19 +1,26 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import {
+	DETECT_SAMPLE_LENGTH,
 	guessManualColumns,
-	isFuelioExport,
 	isNativeImportHeaders,
 	parseCsvHeaders,
 	presetImportMapping
 } from '#lib/utils/import-mapping-helpers.ts';
-import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 
-describe('isFuelioExport', () => {
-	test('needs both the ## Vehicle and ## Log sections, quoted or not', () => {
-		expect(isFuelioExport('"## Vehicle"\n"Name"\n"Golf"\n\n"## Log"\n"Data"')).toBe(true);
-		expect(isFuelioExport('## Vehicle\nName\nGolf\n## Log\nData')).toBe(true);
-		expect(isFuelioExport('"## Vehicle"\n"Name"\n"Golf"')).toBe(false);
-		expect(isFuelioExport('Data,Odo (km),Fuel (litres),Price')).toBe(false);
+describe('DETECT_SAMPLE_LENGTH parity with the backend', () => {
+	test('matches the detect route limit, so a full sample is never refused', () => {
+		const presets = resolve(
+			dirname(fileURLToPath(import.meta.url)),
+			'../../../../../backend/src/api/expenses/import-mapping-presets.ts'
+		);
+		const match = readFileSync(presets, 'utf8').match(
+			/export\s+const\s+IMPORT_DETECT_SAMPLE_LENGTH\s*=\s*(\d+)/
+		);
+		expect(Number(match?.[1])).toBe(DETECT_SAMPLE_LENGTH);
 	});
 });
 
@@ -95,28 +102,18 @@ describe('guessManualColumns', () => {
 });
 
 describe('presetImportMapping', () => {
-	const preset: ImportMappingPreset = {
+	const preset: DetectedImportFormat = {
 		id: 'fuelly',
-		label: 'Fuelly',
-		signature: ['fuelup_date', 'price'],
-		columns: { date: 'fuelup_date', amount: 'price' },
-		dateFormat: 'mdy',
-		distanceUnit: 'miles',
-		volumeUnit: 'gallons_us',
-		categoryMap: { gas: 'fuel' },
-		defaultCategory: 'fuel'
+		label: 'Fuelly'
 	};
 
-	test('carries the preset default category so files without a category column still import', () => {
-		expect(presetImportMapping(preset, 'My Car', {}).defaultCategory).toBe('fuel');
-	});
-
-	test('layers the user remap over the preset category map and stamps the target vehicle', () => {
+	test('sends only the format id, the target vehicle and the user remap; the server owns the columns', () => {
 		const mapping = presetImportMapping(preset, 'My Car', { gas: 'misc', wash: 'maintenance' });
-		expect(mapping).toMatchObject({
+		expect(mapping).toEqual({
 			source: 'fuelly',
+			columns: {},
 			targetVehicle: 'My Car',
-			dateFormat: 'mdy',
+			dateFormat: 'iso',
 			categoryMap: { gas: 'misc', wash: 'maintenance' }
 		});
 	});

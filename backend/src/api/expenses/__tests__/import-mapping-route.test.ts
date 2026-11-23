@@ -42,7 +42,6 @@ const FLAT_TRACKER_CSV = [
 ].join('\n');
 
 const FLAT_TRACKER_MAPPING = {
-  source: 'fuelly',
   columns: {
     date: 'Data',
     mileage: 'Odo (km)',
@@ -213,12 +212,9 @@ describe('POST /import — fuel-tracker defaultCategory commits through the rout
   ].join('\n');
   const FUELLY_MAPPING = {
     source: 'fuelly',
-    columns: { date: 'Date', mileage: 'Odometer', volume: 'Fill Amount', amount: 'Price' },
+    columns: {},
     targetVehicle: 'Daily Driver',
-    dateFormat: 'mdy' as const,
-    distanceUnit: 'miles' as const,
-    volumeUnit: 'gallons_us' as const,
-    defaultCategory: 'fuel' as const,
+    dateFormat: 'iso' as const,
   };
 
   test('a detected fuel log with no category column commits as a fuel expense', async () => {
@@ -333,5 +329,51 @@ describe('POST /import — a mapped mileage of 0', () => {
       ['maintenance', null],
       ['maintenance', null],
     ]);
+  });
+});
+
+describe('POST /import/detect and a detected format through /import', () => {
+  const FUELIO_EXPORT = [
+    '"## Vehicle"',
+    '"Name","ImportCSVDateFormat"',
+    '"Golf","yyyy-MM-dd"',
+    '',
+    '"## Log"',
+    '"Data","Odo (km)","Fuel (litres)","Price (optional)"',
+    '"2024-01-05","45210","42.10","68.90"',
+  ].join('\n');
+
+  test('detect reads the file sample and returns only the format id and label', async () => {
+    const detect = (sample: string) =>
+      ctx.authed('POST', '/api/v1/expenses/import/detect', { sample });
+
+    const fuelio = await json<{ data: unknown }>(await detect(FUELIO_EXPORT));
+    expect(fuelio.data).toEqual({ id: 'fuelio', label: 'Fuelio' });
+
+    const fuelly = await json<{ data: unknown }>(await detect('Date,Odometer,Fill Amount,Price'));
+    expect(fuelly.data).toEqual({ id: 'fuelly', label: 'Fuelly' });
+
+    const unknown = await json<{ data: unknown }>(await detect('Date,Amount,Category,Vehicle'));
+    expect(unknown.data).toBeNull();
+  });
+
+  test('detect refuses a sample longer than the limit', async () => {
+    const res = await ctx.authed('POST', '/api/v1/expenses/import/detect', {
+      sample: 'x'.repeat(8193),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('a Fuelio import with only the format id and a category remap commits', async () => {
+    await seedVehicle(ctx, { make: 'Volkswagen', model: 'Golf', year: 2018, nickname: 'Golf' });
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', {
+      csv: FUELIO_EXPORT,
+      mapping: { source: 'fuelio', columns: {}, dateFormat: 'iso', targetVehicle: 'Golf' },
+    });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported).toBe(1);
+    const [row] = await listExpenses();
+    expect(row.category).toBe('fuel');
   });
 });

@@ -2,27 +2,36 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type { ExpenseImportResult } from '#lib/services/expense-api.ts';
 import type { ImportColumnMapping, Vehicle } from '#lib/types/index.ts';
+import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 import {
 	ApiError,
 	SERVER_FAILURE_MESSAGE,
 	UNEXPECTED_FAILURE_MESSAGE
 } from '#lib/utils/error-handling.ts';
 
-const { getVehicles, importExpensesCsv, showSuccess, notifyError } = vi.hoisted(() => ({
-	getVehicles: vi.fn<() => Promise<Vehicle[]>>(),
-	importExpensesCsv:
-		vi.fn<
-			(csv: string, dryRun: boolean, mapping?: ImportColumnMapping) => Promise<ExpenseImportResult>
-		>(),
-	showSuccess: vi.fn<(message: string) => void>(),
-	notifyError: vi.fn<(error: unknown, context?: string) => void>()
-}));
+const { getVehicles, detectImportSource, importExpensesCsv, showSuccess, notifyError } = vi.hoisted(
+	() => ({
+		getVehicles: vi.fn<() => Promise<Vehicle[]>>(),
+		detectImportSource: vi.fn<(sample: string) => Promise<DetectedImportFormat | null>>(),
+		importExpensesCsv:
+			vi.fn<
+				(
+					csv: string,
+					dryRun: boolean,
+					mapping?: ImportColumnMapping
+				) => Promise<ExpenseImportResult>
+			>(),
+		showSuccess: vi.fn<(message: string) => void>(),
+		notifyError: vi.fn<(error: unknown, context?: string) => void>()
+	})
+);
 
 vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: { getVehicles: () => getVehicles() }
 }));
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
+		detectImportSource: (sample: string) => detectImportSource(sample),
 		importExpensesCsv: (csv: string, dryRun: boolean, mapping?: ImportColumnMapping) =>
 			importExpensesCsv(csv, dryRun, mapping)
 	}
@@ -107,6 +116,7 @@ function commitButton() {
 beforeEach(() => {
 	vi.clearAllMocks();
 	getVehicles.mockResolvedValue([vehicle()]);
+	detectImportSource.mockResolvedValue({ id: 'fuelio', label: 'Fuelio' });
 	importExpensesCsv.mockResolvedValue(result());
 });
 
@@ -172,7 +182,7 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		await openDialog();
 
 		expect(screen.getByTestId('migrate-vehicle')).toHaveTextContent('2019 Toyota Corolla');
-		expect(screen.getByText('Choose your Fuelio export (.csv)')).toBeInTheDocument();
+		expect(screen.getByText('Choose your export file (.csv)')).toBeInTheDocument();
 		expect(commitButton()).toBeDisabled();
 		expect(commitButton()).toHaveTextContent('Migrate 0 entries');
 	});
@@ -200,7 +210,7 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		await openDialog();
 		await chooseFile();
 
-		expect(screen.getByText(/Reading your Fuelio file/)).toBeInTheDocument();
+		expect(screen.getByText(/Reading your file/)).toBeInTheDocument();
 		expect(commitButton()).toBeDisabled();
 	});
 
@@ -265,7 +275,9 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		await openDialog();
 		await chooseFile('   \n  ');
 
+		expect(detectImportSource).not.toHaveBeenCalled();
 		expect(importExpensesCsv).not.toHaveBeenCalled();
+		expect(screen.queryByTestId('migrate-unrecognized')).toBeNull();
 		expect(screen.queryByTestId('migrate-preview')).toBeNull();
 	});
 
@@ -278,7 +290,7 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		await settle();
 
 		expect(importExpensesCsv).not.toHaveBeenCalled();
-		expect(screen.getByText('Choose your Fuelio export (.csv)')).toBeInTheDocument();
+		expect(screen.getByText('Choose your export file (.csv)')).toBeInTheDocument();
 	});
 
 	test('with several vehicles it asks for a vehicle before previewing, then previews on pick', async () => {
@@ -377,7 +389,7 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		await openDialog();
 
 		expect(screen.queryByTestId('migrate-preview')).toBeNull();
-		expect(screen.getByText('Choose your Fuelio export (.csv)')).toBeInTheDocument();
+		expect(screen.getByText('Choose your export file (.csv)')).toBeInTheDocument();
 		expect(commitButton()).toBeDisabled();
 	});
 
@@ -400,5 +412,78 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 
 		expect(screen.queryByTestId('migrate-preview')).toBeNull();
 		expect(commitButton()).toBeDisabled();
+	});
+
+	test('the detected format drives the mapping source and the success message', async () => {
+		detectImportSource.mockResolvedValue({ id: 'fuelly', label: 'Fuelly' });
+		await mount();
+		await openDialog();
+		await chooseFile();
+
+		expect(detectImportSource).toHaveBeenCalledWith(CSV);
+		expect(importExpensesCsv).toHaveBeenCalledWith(
+			CSV,
+			true,
+			expect.objectContaining({ source: 'fuelly' })
+		);
+		importExpensesCsv.mockResolvedValueOnce(result({ dryRun: false, imported: 2 }));
+		await fireEvent.click(commitButton());
+		await settle();
+		expect(showSuccess).toHaveBeenCalledWith('Migrated 2 entries from Fuelly');
+	});
+
+	test('an unrecognized file says so and never previews', async () => {
+		detectImportSource.mockResolvedValue(null);
+		await mount();
+		await openDialog();
+		await chooseFile('a,b\n1,2', 'other.csv');
+
+		expect(screen.getByTestId('migrate-unrecognized')).toHaveTextContent(
+			"We don't recognize this file."
+		);
+		expect(importExpensesCsv).not.toHaveBeenCalled();
+		expect(commitButton()).toBeDisabled();
+	});
+
+	test('a detection that resolves after a newer file is picked is discarded', async () => {
+		let resolveStale: (value: DetectedImportFormat | null) => void = () => {};
+		detectImportSource.mockReturnValueOnce(
+			new Promise<DetectedImportFormat | null>(r => {
+				resolveStale = r;
+			})
+		);
+		detectImportSource.mockResolvedValueOnce({ id: 'fuelly', label: 'Fuelly' });
+		await mount();
+		await openDialog();
+		const input = screen.getByTestId('migrate-file') as HTMLInputElement;
+		Object.defineProperty(input, 'files', {
+			value: [new File(['a,b\n1,2'], 'old.csv')],
+			configurable: true
+		});
+		await fireEvent.change(input);
+		await chooseFile(CSV, 'new.csv');
+
+		resolveStale(null);
+		await settle();
+
+		expect(screen.queryByTestId('migrate-unrecognized')).toBeNull();
+		expect(importExpensesCsv).toHaveBeenCalledTimes(1);
+		expect(importExpensesCsv).toHaveBeenCalledWith(
+			CSV,
+			true,
+			expect.objectContaining({ source: 'fuelly' })
+		);
+	});
+
+	test('picking a blank file while a detection is in flight clears the reading state', async () => {
+		detectImportSource.mockReturnValueOnce(new Promise(() => {}));
+		await mount();
+		await openDialog();
+		await chooseFile();
+		expect(screen.getByText(/Reading your file/)).toBeInTheDocument();
+
+		await chooseFile('   \n', 'blank.csv');
+
+		expect(screen.queryByText(/Reading your file/)).toBeNull();
 	});
 });
