@@ -119,11 +119,11 @@ describe('InsurancePolicyForm create mode', () => {
 		expect(screen.getByRole('heading', { level: 3, name: 'Policy Details' })).toBeInTheDocument();
 	});
 
-	test('the save bar is fixed below lg and a normal row from lg, with a plain primary Save button', async () => {
+	test('the save bar is fixed below lg and a normal row from lg or on a short viewport, with a plain primary Save button', async () => {
 		await mount();
 		const save = screen.getByRole('button', { name: 'Create Policy' });
 
-		expect(save.closest('.fixed')).toHaveClass('fixed', 'lg:static');
+		expect(save.closest('.fixed')).toHaveClass('lg:static', 'short:static');
 		expect(save).toHaveClass('shadow-sm', 'transition-colors');
 		expect(save.className).not.toMatch(/shadow-2xl|bg-foreground|hover:scale/);
 	});

@@ -93,7 +93,7 @@
 </script>
 
 <div
-	class="lg:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b border-border pt-[env(safe-area-inset-top)]"
+	class="lg:hidden fixed short:static top-0 left-0 right-0 z-40 bg-background border-b border-border pt-[env(safe-area-inset-top)]"
 >
 	<div class="flex items-center justify-between px-4 py-3">
 		<div class="flex items-center gap-3">
@@ -328,4 +328,4 @@
 	</div>
 </div>
 
-<div class="lg:hidden h-16 pt-[env(safe-area-inset-top)]"></div>
+<div class="lg:hidden short:hidden h-16 pt-[env(safe-area-inset-top)]"></div>
