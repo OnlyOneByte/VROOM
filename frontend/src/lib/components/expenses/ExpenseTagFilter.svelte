@@ -100,7 +100,7 @@
 						<button
 							type="button"
 							onclick={() => removeTag(tag)}
-							class="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5"
+							class="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 outline-none focus-visible:ring-2 focus-visible:ring-foreground"
 							aria-label="Remove tag {tag}"
 						>
 							<X class="h-3 w-3" />

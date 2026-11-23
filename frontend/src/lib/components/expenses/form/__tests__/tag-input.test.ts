@@ -284,3 +284,14 @@ describe('TagInput: focus', () => {
 		}
 	});
 });
+
+describe('TagInput: chip focus', () => {
+	test("a chip's remove button shows the kit focus ring of its own", () => {
+		renderTagInput(['fuel']);
+		const remove = screen.getByRole('button', { name: 'Remove fuel tag' });
+
+		for (const cls of ['rounded-full', 'focus-visible:ring-2', 'focus-visible:ring-foreground']) {
+			expect(remove).toHaveClass(cls);
+		}
+	});
+});
