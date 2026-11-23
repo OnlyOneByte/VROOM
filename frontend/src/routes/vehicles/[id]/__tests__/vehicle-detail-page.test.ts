@@ -416,9 +416,12 @@ describe('vehicle detail page overview', () => {
 
 		const contexts = handleErrorWithNotification.mock.calls.map(call => call[1]);
 		expect(contexts).toEqual(
-			expect.arrayContaining(["Couldn't load fuel efficiency", "Couldn't load photos"])
+			expect.arrayContaining([
+				"Couldn't load fuel efficiency",
+				"Couldn't load the vehicle's stats",
+				"Couldn't load photos"
+			])
 		);
-		expect(contexts).not.toContain("Couldn't load the vehicle's stats");
 		expect(screen.getByRole('tab', { name: 'Overview' })).toBeInTheDocument();
 	});
 
@@ -428,12 +431,18 @@ describe('vehicle detail page overview', () => {
 		getVehicleStats.mockResolvedValueOnce({ currentOdometer: 25000, currentMileage: 25000 });
 		await mount();
 
-		expect(screen.getByText("Cost per km isn't available right now")).toBeInTheDocument();
-		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		expect(screen.getByRole('alert')).toHaveTextContent("Cost per km isn't available right now");
+		expect(handleErrorWithNotification.mock.calls.map(call => call[1])).not.toContain(
+			"Couldn't load the vehicle's stats"
+		);
+		const retry = screen.getByRole('button', { name: 'Retry' });
+		retry.focus();
+		await fireEvent.click(retry);
 		await settle();
 
 		expect(getVehicleStats).toHaveBeenCalledTimes(2);
 		expect(screen.queryByText("Cost per km isn't available right now")).toBeNull();
+		expect(screen.getByTestId('cost-per-mile-hero')).toHaveFocus();
 	});
 
 	test("an electric vehicle's failed trend load names electric efficiency", async () => {

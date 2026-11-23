@@ -31,11 +31,15 @@
 </script>
 
 {#snippet description()}
-	<span class="whitespace-nowrap">{vehicle.year} {vehicle.make} {vehicle.model}</span>
-	<span class="max-sm:hidden" aria-hidden="true">·</span>
-	<span class="max-sm:block">
+	<span class="block truncate sm:inline">{vehicle.year} {vehicle.make} {vehicle.model}</span>
+	{#if vehicle.licensePlate || odometerLoading || odometer !== null}
+		<span class="max-sm:hidden" aria-hidden="true">·</span>
+	{/if}
+	<span class="block min-h-6 truncate sm:inline sm:min-h-0">
 		{#if vehicle.licensePlate}
 			<span class="whitespace-nowrap">{vehicle.licensePlate}</span>
+		{/if}
+		{#if vehicle.licensePlate && (odometerLoading || odometer !== null)}
 			<span aria-hidden="true">·</span>
 		{/if}
 		{#if odometerLoading}

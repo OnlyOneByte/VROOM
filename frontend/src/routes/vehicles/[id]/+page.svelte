@@ -226,8 +226,8 @@
 		isLoading = true;
 		loadInsuranceTab();
 		const vehicleRequest = loadVehicle();
+		summarySettled = loadSummary();
 		vehicleSettled = vehicleRequest;
-		void loadSummary();
 		void loadFuelEfficiency();
 		void loadVehicleStats();
 		await vehicleRequest;
@@ -283,6 +283,8 @@
 	});
 
 	let vehicleSettled: Promise<void> = Promise.resolve();
+	let summarySettled: Promise<void> = Promise.resolve();
+	let statsError = $state<string | null>(null);
 
 	async function notifyUnlessPageFailed(error: unknown, context: string) {
 		await vehicleSettled;
@@ -403,9 +405,16 @@
 		isLoadingVehicleStats = true;
 		try {
 			const loaded = await vehicleApi.getVehicleStats(vehicleId, selectedStatsPeriod);
-			if (isCurrent()) vehicleStatsData = loaded;
+			if (isCurrent()) {
+				vehicleStatsData = loaded;
+				statsError = null;
+			}
 		} catch (error) {
-			if (isCurrent()) logLoadFailure(error, "Couldn't load the vehicle's stats");
+			if (!isCurrent()) return;
+			statsError = userFacingErrorMessage(error);
+			await summarySettled;
+			if (hasExpenseData) logLoadFailure(error, "Couldn't load the vehicle's stats");
+			else void notifyUnlessPageFailed(error, "Couldn't load the vehicle's stats");
 		} finally {
 			if (isCurrent()) isLoadingVehicleStats = false;
 		}
@@ -546,7 +555,7 @@
 			<Skeleton class="h-10 w-10 shrink-0 rounded-md" />
 			<div class="min-w-0">
 				<div class="flex h-9 items-center"><Skeleton class="h-8 w-48" /></div>
-				<div class="mt-1 flex h-12 flex-col justify-center gap-2 sm:h-6">
+				<div class="mt-1 flex h-12 flex-col justify-center gap-2 sm:h-6 max-sm:short:hidden">
 					<Skeleton class="h-4 w-44" />
 					<Skeleton class="h-4 w-28 sm:hidden" />
 				</div>
@@ -691,8 +700,8 @@
 						<CostPerMileHero
 							{summary}
 							distance={distanceSoFar}
-							distanceLoading={isLoadingVehicleStats && vehicleStatsData === null}
-							distanceUnavailable={!isLoadingVehicleStats && vehicleStatsData === null}
+							distanceLoading={isLoadingVehicleStats && vehicleStatsData === null && !statsError}
+							distanceError={vehicleStatsData === null ? statsError : null}
 							onRetryDistance={loadVehicleStats}
 							{distanceUnit}
 							vehicleType={vehicle.vehicleType}

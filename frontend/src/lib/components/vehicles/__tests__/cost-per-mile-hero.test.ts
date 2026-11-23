@@ -126,17 +126,20 @@ describe('CostPerMileHero', () => {
 		expect(screen.queryByText(/odometer reading/)).toBeNull();
 	});
 
-	test('says when the distance could not load, without asking for a new reading', () => {
+	test('says when the distance could not load, with Retry instead of asking for a new reading', () => {
+		const onRetryDistance = vi.fn();
 		render(CostPerMileHero, {
 			summary: summary(),
 			distance: null,
-			distanceUnavailable: true,
+			distanceError: 'Check your connection and try again.',
+			onRetryDistance,
 			distanceUnit: 'miles',
 			vehicleType: 'gas',
 			logMileageHref: '/vehicles/v1/odometer/new'
 		});
 
-		expect(screen.getByText("Cost per mile isn't available right now")).toBeInTheDocument();
+		expect(screen.getByRole('alert')).toHaveTextContent("Cost per mile isn't available right now");
+		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 		expect(screen.queryByRole('link', { name: 'Add an odometer reading' })).toBeNull();
 	});
 });

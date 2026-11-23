@@ -2,6 +2,7 @@
 	import HeroFigure from '#lib/components/common/hero-figure.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import type { ExpenseSummary, Vehicle } from '#lib/types/index.ts';
 	import type { DistanceUnit } from '#lib/types/settings.ts';
 	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
@@ -16,7 +17,7 @@
 		summary: ExpenseSummary | null;
 		distance: number | null;
 		distanceLoading?: boolean;
-		distanceUnavailable?: boolean;
+		distanceError?: string | null;
 		distanceUnit: DistanceUnit;
 		vehicleType: Vehicle['vehicleType'];
 		logMileageHref?: string | undefined;
@@ -27,7 +28,7 @@
 		summary,
 		distance,
 		distanceLoading = false,
-		distanceUnavailable = false,
+		distanceError = null,
 		distanceUnit,
 		vehicleType,
 		logMileageHref,
@@ -42,6 +43,8 @@
 		'chart-5': 'bg-chart-5'
 	};
 	const bucketBg = (bucket: CostBucket) => BG_BY_TOKEN[COST_BUCKET_COLOR_TOKENS[bucket]];
+
+	let section = $state<HTMLElement | null>(null);
 
 	let unitName = $derived(distanceUnit === 'kilometers' ? 'km' : 'mile');
 	let perDistance = $derived(summary ? costPerDistance(summary.costBuckets, distance) : null);
@@ -58,9 +61,11 @@
 </script>
 
 <section
-	class="space-y-4 rounded-xl border bg-card p-4 sm:p-6"
+	class="space-y-4 rounded-xl border bg-card p-4 outline-none sm:p-6"
 	aria-label="True cost per {unitName}"
 	data-testid="cost-per-mile-hero"
+	tabindex="-1"
+	bind:this={section}
 >
 	{#if !summary || distanceLoading}
 		<div class="space-y-1">
@@ -118,14 +123,15 @@
 		{:else}
 			<div class="space-y-1">
 				<p class="text-sm text-muted-foreground">True cost per {unitName}, all time</p>
-				{#if distanceUnavailable}
-					<p class="text-lg font-semibold">Cost per {unitName} isn't available right now</p>
-					<p class="text-xs text-muted-foreground">The odometer readings didn't load.</p>
-					{#if onRetryDistance}
-						<Button variant="outline" size="sm" class="mt-2" onclick={onRetryDistance}>
-							Retry
-						</Button>
-					{/if}
+				{#if distanceError && onRetryDistance}
+					<LoadErrorCard
+						compact
+						title="Cost per {unitName} isn't available right now"
+						message={distanceError}
+						onRetry={onRetryDistance}
+						onRecovered={() => section?.focus()}
+						data-testid="cost-per-mile-error"
+					/>
 				{:else}
 					<p class="text-lg font-semibold">
 						Log a newer odometer reading to see cost per {unitName}
