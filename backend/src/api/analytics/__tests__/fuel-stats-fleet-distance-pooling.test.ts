@@ -452,7 +452,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
     expect(stats.distance.totalDistance).toBeCloseTo(300 + 360 / 1.609344, 1);
   });
 
-  test('quick stats cost per distance divides every expense by the fleet distance in user units', async () => {
+  test('quick stats cost per distance divides the spending of vehicles with a distance by the fleet distance in user units', async () => {
     seedUser(testDb.sqlite, USER);
     seedVehicle(testDb.sqlite, VEH_A);
     seedVehicle(testDb.sqlite, VEH_B);
@@ -477,6 +477,64 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
 
     expect(quick.costPerDistance).toBeCloseTo(260 / (300 + 360 / 1.609344), 6);
     expect(summary.quickStats.costPerDistance).toBeCloseTo(quick.costPerDistance ?? Number.NaN, 6);
+  });
+
+  test('cost per distance leaves out the spending of a vehicle with no distance in the range', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedVehicle(testDb.sqlite, VEH_B);
+    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 150, 60, 10));
+    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 11_000, 150, 30, 10));
+    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 200, 40, 10));
+    seedExpense(testDb.sqlite, {
+      ...fillup('i1', VEH_B.id, 0, 500, 20, 0),
+      category: 'financial',
+      mileage: null,
+      volume: null,
+      fuelType: null,
+    });
+
+    const [quick, stats, summary] = await Promise.all([
+      repo.getQuickStats(USER.id, rangeAll()),
+      repo.getFuelStats(USER.id, rangeAll()),
+      repo.getSummary(USER.id, rangeAll()),
+    ]);
+
+    expect(quick.costPerDistance).toBeCloseTo(300 / 1000, 9);
+    expect(summary.quickStats.costPerDistance).toBeCloseTo(300 / 1000, 9);
+    expect(stats.averageCost.costPerDistance).toBeCloseTo(300 / 1000, 9);
+    expect(summary.fuelStats.averageCost.costPerDistance).toBeCloseTo(300 / 1000, 9);
+  });
+
+  test('year-end cost per distance leaves out the spending of a vehicle with no distance', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedVehicle(testDb.sqlite, VEH_B);
+    const at = (
+      id: string,
+      vehicleId: string,
+      mileage: number | null,
+      amount: number,
+      day: number
+    ) => ({
+      ...fillup(id, vehicleId, mileage ?? 0, amount, 0, 10),
+      date: new Date(Date.UTC(2024, 3, day, 12)),
+      mileage,
+    });
+    seedExpense(testDb.sqlite, at('a1', VEH_A.id, 10_000, 150, 1));
+    seedExpense(testDb.sqlite, at('a2', VEH_A.id, 11_000, 150, 20));
+    seedExpense(testDb.sqlite, at('b1', VEH_B.id, 50_000, 200, 10));
+    seedExpense(testDb.sqlite, {
+      ...at('f1', VEH_B.id, null, 500, 15),
+      category: 'financial',
+      volume: null,
+      fuelType: null,
+    });
+
+    const yearEnd = await repo.getYearEnd(USER.id, 2024);
+
+    expect(yearEnd.totalSpent).toBe(1000);
+    expect(yearEnd.costPerDistance).toBeCloseTo(300 / 1000, 9);
   });
 
   test('quick stats have no cost per distance without two odometer readings', async () => {

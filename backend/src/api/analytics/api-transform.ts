@@ -27,6 +27,7 @@ export function fuelStatsToApi(d: FuelStatsData): FuelStatsData {
       bestCostPerDistance: cn(d.averageCost.bestCostPerDistance),
       worstCostPerDistance: cn(d.averageCost.worstCostPerDistance),
       avgCostPerDay: cn(d.averageCost.avgCostPerDay),
+      costPerDistance: cn(d.averageCost.costPerDistance),
     },
     monthlySpend: d.monthlySpend && {
       months: d.monthlySpend.months,

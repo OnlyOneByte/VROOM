@@ -148,7 +148,8 @@ export const ANALYTICS_SUMMARY = {
 			perFillup: 50,
 			bestCostPerDistance: 0.15,
 			worstCostPerDistance: 0.25,
-			avgCostPerDay: 5
+			avgCostPerDay: 5,
+			costPerDistance: 0.5
 		},
 		monthlySpend: { months: 12, fuel: 152.19, charging: null },
 		distance: { totalDistance: 3000, avgPerDay: 10, avgPerMonth: 300 },

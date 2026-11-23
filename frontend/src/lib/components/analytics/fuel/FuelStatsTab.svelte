@@ -100,11 +100,7 @@
 		return formatNumber(best, 1) === formatNumber(worst, 1) ? 'text-foreground' : tone;
 	}
 
-	let costPerDistance = $derived.by(() => {
-		const spend = fuelStats?.averageCost.avgCostPerDay;
-		const distance = fuelStats?.distance.avgPerDay;
-		return spend != null && distance ? spend / distance : null;
-	});
+	let costPerDistance = $derived(fuelStats?.averageCost.costPerDistance ?? null);
 	let monthlySpend = $derived.by(() => {
 		const spend = fuelStats?.monthlySpend;
 		const fuel = spend?.fuel ?? null;

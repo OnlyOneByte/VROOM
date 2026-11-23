@@ -206,6 +206,7 @@ export interface FuelStatsData {
     bestCostPerDistance: number | null;
     worstCostPerDistance: number | null;
     avgCostPerDay: number | null;
+    costPerDistance: number | null;
   };
   monthlySpend: { months: number; fuel: number | null; charging: number | null } | null;
   previous: {
@@ -582,32 +583,48 @@ export class AnalyticsRepository {
     return pooledEfficiency(totals);
   }
 
-  private fleetCostPerDistance(
-    allExpenses: GeneralExpenseRow[],
-    convert: FleetUnitConverter
+  private costPerDistance(
+    rows: Array<{ vehicleId: string; mileage: number | null; expenseAmount: number }>,
+    convert: FleetUnitConverter,
+    distanceRows: Array<{ vehicleId: string; mileage: number | null }> = rows
   ): number | null {
-    const totalDistance = this.computeTotalDistance(allExpenses, convert);
-    if (totalDistance <= 0) return null;
-    return allExpenses.reduce((sum, r) => sum + r.expenseAmount, 0) / totalDistance;
+    const distances = this.distanceByVehicle(distanceRows, convert);
+    let distance = 0;
+    for (const d of distances.values()) distance += d;
+    if (distance <= 0) return null;
+    const spend = rows.reduce(
+      (sum, r) => (distances.has(r.vehicleId) && r.expenseAmount > 0 ? sum + r.expenseAmount : sum),
+      0
+    );
+    return spend / distance;
   }
 
-  private computeTotalDistance(
-    fuelRows: Array<{ vehicleId: string; mileage: number | null }>,
+  private distanceByVehicle(
+    rows: Array<{ vehicleId: string; mileage: number | null }>,
     convert: FleetUnitConverter
-  ): number {
+  ): Map<string, number> {
     const vehicleMileages = new Map<string, number[]>();
-    for (const row of fuelRows) {
+    for (const row of rows) {
       if (row.mileage == null) continue;
       const arr = vehicleMileages.get(row.vehicleId) ?? [];
       arr.push(row.mileage);
       vehicleMileages.set(row.vehicleId, arr);
     }
-    let total = 0;
+    const distances = new Map<string, number>();
     for (const [vId, mileages] of vehicleMileages) {
       if (mileages.length < 2) continue;
       const distance = maxOf(mileages) - minOf(mileages);
-      if (distance > 0) total += convert.distance(distance, vId);
+      if (distance > 0) distances.set(vId, convert.distance(distance, vId));
     }
+    return distances;
+  }
+
+  private computeTotalDistance(
+    rows: Array<{ vehicleId: string; mileage: number | null }>,
+    convert: FleetUnitConverter
+  ): number {
+    let total = 0;
+    for (const d of this.distanceByVehicle(rows, convert).values()) total += d;
     return total;
   }
 
@@ -1357,7 +1374,7 @@ export class AnalyticsRepository {
       const ytdSpending = yearToDateSpending(allExpenses, range, ytdStart);
       const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits, zonedCalendar(timeZone));
       const avgEfficiency = this.computeAverageEfficiency(fuelRows, convert);
-      const costPerDistance = this.fleetCostPerDistance(allExpenses, convert);
+      const costPerDistance = this.costPerDistance(allExpenses, convert);
 
       const fleetHealthScore =
         vehicleCount > 0 ? await this.computeFleetHealthScore(vehicleRows, userId, timeZone) : 0;
@@ -1549,13 +1566,10 @@ export class AnalyticsRepository {
       maxVolume: volumes.length > 0 ? maxOf(volumes) : null,
     };
 
-    const averageCost = computeAverageCosts(
-      fuelRows,
-      costPerMileValues,
-      rangeStartDate,
-      rangeEndDate,
-      now
-    );
+    const averageCost = {
+      ...computeAverageCosts(fuelRows, costPerMileValues, rangeStartDate, rangeEndDate, now),
+      costPerDistance: this.costPerDistance(fuelRows, convert),
+    };
 
     const totalDistance = this.computeTotalDistance(fuelRows, convert);
     const daysSoFar = Math.max(
@@ -1615,10 +1629,8 @@ export class AnalyticsRepository {
     convert: FleetUnitConverter
   ): FuelStatsData['previous'] {
     const byVehicle = sortByVehicleThenDate(prevFuelRows);
-    const spend = prevFuelRows.reduce((s, r) => (r.expenseAmount > 0 ? s + r.expenseAmount : s), 0);
-    const distance = this.computeTotalDistance(prevFuelRows, convert);
     return {
-      costPerDistance: spend > 0 && distance > 0 ? spend / distance : null,
+      costPerDistance: this.costPerDistance(prevFuelRows, convert),
       monthlySpend: computeMonthlySpend(prevFuelRows, prevEnd),
       avgEfficiency: this.computeAverageEfficiency(byVehicle, convert),
       chargeAvgEfficiency: this.computeAverageEfficiency(byVehicle, convert, true),
@@ -2159,7 +2171,7 @@ export class AnalyticsRepository {
         vehicleCount: vehicleNameMap.size,
         totalDistance,
         avgEfficiency,
-        costPerDistance: totalDistance > 0 ? totalSpent / totalDistance : null,
+        costPerDistance: this.costPerDistance(allExpenses, convert, fuelRows),
         units: { ...userUnits },
       };
     } catch (error) {
@@ -2224,7 +2236,7 @@ export class AnalyticsRepository {
         vehicleCount: vehicleRows.length,
         ytdSpending,
         avgEfficiency,
-        costPerDistance: this.fleetCostPerDistance(allExpenses, convert),
+        costPerDistance: this.costPerDistance(allExpenses, convert),
         fleetHealthScore,
         units: { ...userUnits },
       };

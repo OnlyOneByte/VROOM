@@ -176,7 +176,8 @@ describe('FuelStatsTab summary and groups', () => {
 			perFillup: 35,
 			bestCostPerDistance: 0.1,
 			worstCostPerDistance: 0.14,
-			avgCostPerDay: 5.2
+			avgCostPerDay: 5.2,
+			costPerDistance: 0.13
 		},
 		monthlySpend: { months: 6, fuel: 45.5, charging: null },
 		distance: { totalDistance: 16000, avgPerDay: 40, avgPerMonth: 1200 }
@@ -252,10 +253,11 @@ describe('FuelStatsTab summary and groups', () => {
 		expect(screen.getByText('Averaged over 1 month')).toBeTruthy();
 	});
 
-	test('shows N/A in the summary when there is no daily distance to divide by', () => {
+	test('shows N/A in the summary when there is no distance to divide by', () => {
 		render(FuelStatsTab, {
 			fuelStats: stats({
 				...gas,
+				averageCost: { ...gas.averageCost, costPerDistance: null },
 				distance: { totalDistance: 0, avgPerDay: null, avgPerMonth: null }
 			}),
 			fuelAdvanced: advanced

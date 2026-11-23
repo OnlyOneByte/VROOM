@@ -88,6 +88,7 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
         bestCostPerDistance: 12,
         worstCostPerDistance: 30,
         avgCostPerDay: 800,
+        costPerDistance: 13,
       },
       monthlySpend: { months: 6, fuel: 4550, charging: 1450 },
       previous: {
@@ -118,6 +119,7 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
     const r = fuelStatsToApi(d);
     expect(r.averageCost.perFillup).toBe(45);
     expect(r.averageCost.bestCostPerDistance).toBe(0.12);
+    expect(r.averageCost.costPerDistance).toBe(0.13);
     expect(r.monthlySpend).toEqual({ months: 6, fuel: 45.5, charging: 14.5 });
     expect(r.previous).toEqual({
       costPerDistance: 0.14,
