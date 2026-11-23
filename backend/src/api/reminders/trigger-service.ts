@@ -5,11 +5,14 @@ import type { Expense, Reminder, ReminderNotification } from '../../db/schema';
 import { expenses, reminderNotifications } from '../../db/schema';
 import type { DrizzleTransaction, SplitConfig } from '../../db/types';
 import { ValidationError } from '../../errors';
+import { DEFAULT_UNIT_PREFERENCES, type DistanceUnit, parseUnitPreferences } from '../../types';
 import { logger } from '../../utils/logger';
 import { zonedParts, zoneOffsetMs } from '../../utils/time-zone';
+import { DISTANCE_UNIT_SHORT_LABELS } from '../../utils/unit-conversions';
 import { expenseSplitService } from '../expenses/split-service';
 import { odometerRepository } from '../odometer/repository';
 import { notifyUser, type PushPayload } from '../push/push-service';
+import { vehicleRepository } from '../vehicles/repository';
 import type { ReminderWithVehicles } from './repository';
 import { reminderRepository } from './repository';
 
@@ -47,10 +50,14 @@ function pushConcurrentTriggerSkip(result: TriggerResult, reminderId: string): v
   result.skipped.push({ reminderId, reason: 'concurrent_trigger' });
 }
 
-function payloadFromReminder(reminder: Reminder, notification: ReminderNotification): PushPayload {
+function payloadFromReminder(
+  reminder: Reminder,
+  notification: ReminderNotification,
+  distanceUnit: DistanceUnit
+): PushPayload {
   const body =
     notification.dueOdometer !== null
-      ? `Due at ${notification.dueOdometer.toLocaleString('en-US')} mi`
+      ? `Due at ${notification.dueOdometer.toLocaleString('en-US')} ${DISTANCE_UNIT_SHORT_LABELS[distanceUnit]}`
       : 'This reminder is now due';
   return { title: `${reminder.name} due`, body, tag: reminder.id, url: '/reminders' };
 }
@@ -58,9 +65,18 @@ function payloadFromReminder(reminder: Reminder, notification: ReminderNotificat
 // notifyUser must never throw: the notification row is already committed when it runs.
 async function firePushForNotification(
   reminder: Reminder,
-  notification: ReminderNotification
+  notification: ReminderNotification,
+  distanceUnit: DistanceUnit = DEFAULT_UNIT_PREFERENCES.distanceUnit
 ): Promise<void> {
-  await notifyUser(reminder.userId, payloadFromReminder(reminder, notification));
+  await notifyUser(reminder.userId, payloadFromReminder(reminder, notification, distanceUnit));
+}
+
+async function vehicleDistanceUnit(vehicleId: string): Promise<DistanceUnit> {
+  const vehicle = await vehicleRepository.findById(vehicleId);
+  return (
+    parseUnitPreferences(vehicle?.unitPreferences)?.distanceUnit ??
+    DEFAULT_UNIT_PREFERENCES.distanceUnit
+  );
 }
 
 interface WallClock {
@@ -461,6 +477,7 @@ class ReminderTriggerService {
       return;
     }
 
+    const distanceUnit = await vehicleDistanceUnit(vehicleId);
     const created = await reminderRepository.createMileageNotification(
       reminder.id,
       reminder.userId,
@@ -468,7 +485,7 @@ class ReminderTriggerService {
     );
     if (created) {
       result.notifications.push(created);
-      await firePushForNotification(reminder, created);
+      await firePushForNotification(reminder, created, distanceUnit);
     }
   }
 

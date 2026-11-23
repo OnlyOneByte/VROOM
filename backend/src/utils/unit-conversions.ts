@@ -4,6 +4,11 @@ const MILES_TO_KM = 1.609344;
 const GALLONS_US_TO_LITERS = 3.785411784;
 const GALLONS_UK_TO_LITERS = 4.54609;
 
+export const DISTANCE_UNIT_SHORT_LABELS: Record<DistanceUnit, string> = {
+  [DistanceUnit.MILES]: 'mi',
+  [DistanceUnit.KILOMETERS]: 'km',
+};
+
 export function convertDistance(value: number, from: DistanceUnit, to: DistanceUnit): number {
   if (from === to) return value;
 
