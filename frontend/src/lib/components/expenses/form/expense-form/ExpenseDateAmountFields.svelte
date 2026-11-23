@@ -3,7 +3,7 @@
 	import Input from '#lib/components/ui/input/input.svelte';
 	import Label from '#lib/components/ui/label/label.svelte';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
-	import { getCurrencySymbol } from '#lib/utils/formatters.ts';
+	import { amountStep, getCurrencySymbol } from '#lib/utils/formatters.ts';
 
 	interface Props {
 		date: string;
@@ -50,7 +50,7 @@
 		<Input
 			id="amount"
 			type="number"
-			step="0.01"
+			step={amountStep()}
 			min="0"
 			bind:value={amount}
 			placeholder="0.00"

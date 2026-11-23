@@ -9,7 +9,7 @@
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
-	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
+	import { amountStep, dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
 	import { Images, LoaderCircle, CircleAlert, ImageOff } from '@lucide/svelte';
 	import { photosImportApi, type ReceiptDraftItem } from '#lib/services/photos-import-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
@@ -210,7 +210,7 @@
 									<Label class="text-xs text-muted-foreground">Amount</Label>
 									<Input
 										type="number"
-										step="0.01"
+										step={amountStep()}
 										min="0"
 										bind:value={row.amount}
 										placeholder="0.00"

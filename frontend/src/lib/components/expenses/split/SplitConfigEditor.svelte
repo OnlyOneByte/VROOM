@@ -22,7 +22,7 @@
 <script lang="ts">
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { amountStep, formatCurrency } from '#lib/utils/formatters.ts';
 	import type { Vehicle } from '#lib/types/index.ts';
 
 	type SplitMethod = 'even' | 'absolute' | 'percentage';
@@ -127,7 +127,7 @@
 					<div class="w-24">
 						<Input
 							type="number"
-							step="0.01"
+							step={amountStep()}
 							min="0"
 							value={alloc?.amount?.toString() ?? ''}
 							oninput={e => {

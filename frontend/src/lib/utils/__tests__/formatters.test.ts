@@ -1,6 +1,9 @@
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
+	amountStep,
 	capitalize,
+	currencyFractionDigits,
+	currentLocale,
 	dateOnlyToISO,
 	formatCompactRelativeTime,
 	formatCurrency,
@@ -210,5 +213,34 @@ describe('formatCompactRelativeTime', () => {
 
 	test('a future date clamps to "Just now" (the Math.max(0, …) guard)', () => {
 		expect(formatCompactRelativeTime(new Date(Date.now() + 10 * MIN))).toBe('Just now');
+	});
+});
+
+describe('locale and currency decimals', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	test('uses the browser language as the locale', () => {
+		vi.spyOn(navigator, 'language', 'get').mockReturnValue('de-DE');
+		expect(currentLocale()).toBe('de-DE');
+		expect(formatNumber(1234.5, 1)).toBe('1.234,5');
+	});
+
+	test('falls back to en-US when the browser reports no language', () => {
+		vi.spyOn(navigator, 'language', 'get').mockReturnValue('');
+		expect(currentLocale()).toBe('en-US');
+	});
+
+	test("reads each currency's decimal places from Intl", () => {
+		expect(currencyFractionDigits('USD')).toBe(2);
+		expect(currencyFractionDigits('JPY')).toBe(0);
+		expect(currencyFractionDigits('BHD')).toBe(3);
+	});
+
+	test('the amount input step follows the currency', () => {
+		expect(amountStep('USD')).toBe('0.01');
+		expect(amountStep('JPY')).toBe('1');
+		expect(amountStep('BHD')).toBe('0.001');
 	});
 });

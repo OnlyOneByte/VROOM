@@ -1,9 +1,35 @@
 import { settingsStore } from '#lib/stores/settings.svelte.ts';
 
-export function formatCurrency(amount: number, currency?: string, fractionDigits?: number): string {
-	const currencyToUse = currency || settingsStore.settings?.currencyUnit || 'USD';
+export function currentLocale(): string {
+	return (typeof navigator !== 'undefined' && navigator.language) || 'en-US';
+}
 
-	return new Intl.NumberFormat('en-US', {
+function userCurrency(currency?: string): string {
+	return currency || settingsStore.settings?.currencyUnit || 'USD';
+}
+
+export function currencyFractionDigits(currency?: string): number {
+	return (
+		new Intl.NumberFormat(currentLocale(), {
+			style: 'currency',
+			currency: userCurrency(currency)
+		}).resolvedOptions().maximumFractionDigits ?? 2
+	);
+}
+
+export function amountStep(currency?: string): string {
+	const digits = currencyFractionDigits(currency);
+	return digits > 0 ? (1 / 10 ** digits).toFixed(digits) : '1';
+}
+
+export function formatDateWith(date: Date, options: Intl.DateTimeFormatOptions): string {
+	return new Intl.DateTimeFormat(currentLocale(), options).format(date);
+}
+
+export function formatCurrency(amount: number, currency?: string, fractionDigits?: number): string {
+	const currencyToUse = userCurrency(currency);
+
+	return new Intl.NumberFormat(currentLocale(), {
 		style: 'currency',
 		currency: currencyToUse,
 		...(fractionDigits != null && {
@@ -14,8 +40,8 @@ export function formatCurrency(amount: number, currency?: string, fractionDigits
 }
 
 export function getCurrencySymbol(currency?: string): string {
-	const currencyToUse = currency || settingsStore.settings?.currencyUnit || 'USD';
-	const parts = new Intl.NumberFormat('en-US', {
+	const currencyToUse = userCurrency(currency);
+	const parts = new Intl.NumberFormat(currentLocale(), {
 		style: 'currency',
 		currency: currencyToUse
 	}).formatToParts(0);
@@ -23,7 +49,7 @@ export function getCurrencySymbol(currency?: string): string {
 }
 
 export function formatNumber(value: number, decimals = 2): string {
-	return new Intl.NumberFormat('en-US', {
+	return new Intl.NumberFormat(currentLocale(), {
 		minimumFractionDigits: decimals,
 		maximumFractionDigits: decimals
 	}).format(value);
@@ -48,11 +74,7 @@ function parseDateString(value: string): Date {
 
 export function formatDate(date: string | Date): string {
 	const d = typeof date === 'string' ? parseDateString(date) : date;
-	return new Intl.DateTimeFormat('en-US', {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric'
-	}).format(d);
+	return formatDateWith(d, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 // Noon local keeps the calendar day stable under every real UTC offset.
