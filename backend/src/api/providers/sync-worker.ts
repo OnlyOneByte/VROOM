@@ -9,6 +9,12 @@ import { photoRepository } from '../photos/photo-repository';
 import { storageProviderRegistry } from './domains/storage/registry';
 import type { PhotoCategory, StorageProvider } from './domains/storage/storage-provider';
 import { ENTITY_TO_CATEGORY } from './domains/storage/storage-provider';
+import {
+  type HealthResult,
+  healthCodeOf,
+  healthFailure,
+  recordProviderHealth,
+} from './provider-status';
 
 // bun mock.module leaks across test files, so tests inject fakes through deps instead.
 export interface SyncWorkerDeps {
@@ -190,6 +196,26 @@ async function recordUnsyncableRef(
   });
 }
 
+function noteHealth(providerId: string, result: HealthResult, synced = false): Promise<void> {
+  return recordProviderHealth(providerId, result, { synced }).catch((saveError) => {
+    logger.warn('Sync worker: could not record provider health', {
+      providerId,
+      error: extractErrorMessage(saveError),
+    });
+  });
+}
+
+async function withHealth<T>(providerId: string, work: Promise<T>, synced = false): Promise<T> {
+  try {
+    const result = await work;
+    await noteHealth(providerId, { ok: true, message: 'Connected' }, synced);
+    return result;
+  } catch (error) {
+    await noteHealth(providerId, healthFailure(healthCodeOf(error)));
+    throw error;
+  }
+}
+
 async function processSingleRef(
   ref: PhotoRef,
   providerCache: Map<string, StorageProvider>,
@@ -213,13 +239,16 @@ async function processSingleRef(
       providerCache,
       deps.registry
     );
-    const buffer = await withTimeout(
-      sourceProvider.download({
-        providerType: sourceProvider.type,
-        externalId: sourceRef.storageRef,
-      }),
-      OPERATION_TIMEOUTS.DOWNLOAD,
-      'Photo sync download'
+    const buffer = await withHealth(
+      sourceRef.providerId,
+      withTimeout(
+        sourceProvider.download({
+          providerType: sourceProvider.type,
+          externalId: sourceRef.storageRef,
+        }),
+        OPERATION_TIMEOUTS.DOWNLOAD,
+        'Photo sync download'
+      )
     );
 
     const category = ENTITY_TO_CATEGORY[photo.entityType] as PhotoCategory | undefined;
@@ -240,17 +269,21 @@ async function processSingleRef(
     }
 
     const targetProvider = await getCachedProvider(ref.providerId, providerCache, deps.registry);
-    const uploadResult = await withTimeout(
-      targetProvider.upload({
-        fileName: photo.fileName,
-        buffer,
-        mimeType: photo.mimeType,
-        entityType: photo.entityType,
-        entityId: photo.entityId,
-        pathHint,
-      }),
-      OPERATION_TIMEOUTS.DOWNLOAD,
-      'Photo sync upload'
+    const uploadResult = await withHealth(
+      ref.providerId,
+      withTimeout(
+        targetProvider.upload({
+          fileName: photo.fileName,
+          buffer,
+          mimeType: photo.mimeType,
+          entityType: photo.entityType,
+          entityId: photo.entityId,
+          pathHint,
+        }),
+        OPERATION_TIMEOUTS.DOWNLOAD,
+        'Photo sync upload'
+      ),
+      true
     );
 
     try {

@@ -5,6 +5,7 @@ import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { decrypt, secretContextOf } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
+import { healthFailure, recordProviderHealth } from '../providers/provider-status';
 import {
   type BackupOrchestratorResult,
   type BackupOutcome,
@@ -254,6 +255,18 @@ export class BackupOrchestrator {
 
         const { providerId, result } = outcome.value;
         results[providerId] = result;
+        if (result.success || result.unusable) {
+          await recordProviderHealth(
+            providerId,
+            result.success ? { ok: true, message: 'Connected' } : healthFailure('auth'),
+            { synced: result.success }
+          ).catch((error) => {
+            logger.warn('Could not record provider health after a backup', {
+              providerId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
+        }
 
         if (result.success) {
           anySuccess = true;

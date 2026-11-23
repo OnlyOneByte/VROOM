@@ -241,6 +241,9 @@ function storedModelRow(baseUrl: string): UserProvider {
     config: { model: 'gpt-4o-mini', baseUrl },
     status: 'active',
     lastSyncAt: null,
+    lastErrorCode: null,
+    lastCheckedAt: null,
+    failureCount: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

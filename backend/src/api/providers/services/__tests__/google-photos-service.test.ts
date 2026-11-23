@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
+import { SyncErrorCode } from '../../../../errors';
 import {
   FakePhotosStore,
   makeFakePhotosClient,
@@ -75,8 +76,10 @@ describe('GooglePhotosService — read', () => {
 
   test('healthCheck is true when albums list, false when it errors', async () => {
     expect(await svc.healthCheck()).toBe(true);
-    store.injectFault('listAlbums', photosApiError(401, 'Invalid Credentials'));
+    store.injectFault('listAlbums', photosApiError(500, 'Backend Error'));
     expect(await svc.healthCheck()).toBe(false);
+    store.injectFault('listAlbums', photosApiError(401, 'Invalid Credentials'));
+    await expect(svc.healthCheck()).rejects.toMatchObject({ code: SyncErrorCode.AUTH_INVALID });
   });
 });
 

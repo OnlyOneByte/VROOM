@@ -55,8 +55,8 @@ describe('POST /sync/restore/from-provider: provider lookup', () => {
     expect(body.error.message).toBe('Provider not found or inactive');
   });
 
-  test('an inactive provider is rejected as not found', async () => {
-    seedProvider('prov-inactive', ctx.user.id, 'inactive');
+  test('a turned-off provider is rejected as not found', async () => {
+    seedProvider('prov-inactive', ctx.user.id, 'disabled');
     const res = await postFromProvider(sheetsRestore('prov-inactive'));
     const body = await json<ErrorBody>(res);
     expect(res.status).toBe(400);
