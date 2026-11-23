@@ -15,8 +15,6 @@ export type NativeImportField =
 
 export type ImportDateFormat = 'iso' | 'mdy' | 'dmy' | 'epoch';
 
-type ImportPresetId = 'fuelly' | 'fuelio' | 'drivvo';
-
 export interface ImportColumnMapping {
 	source?: string;
 	columns: Partial<Record<NativeImportField, string>>;
@@ -28,14 +26,7 @@ export interface ImportColumnMapping {
 	defaultCategory?: ExpenseCategory;
 }
 
-export interface ImportMappingPreset {
-	id: ImportPresetId;
+export interface DetectedImportFormat {
+	id: string;
 	label: string;
-	signature: string[];
-	columns: Partial<Record<NativeImportField, string>>;
-	dateFormat: ImportDateFormat;
-	distanceUnit?: DistanceUnit;
-	volumeUnit?: VolumeUnit;
-	categoryMap?: Record<string, ExpenseCategory>;
-	defaultCategory?: ExpenseCategory;
 }

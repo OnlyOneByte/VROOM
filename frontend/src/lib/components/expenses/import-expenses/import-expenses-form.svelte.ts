@@ -6,15 +6,11 @@ import type {
 	Vehicle,
 	VolumeUnit
 } from '#lib/types/index.ts';
-import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 import { expenseApi, type ExpenseImportResult } from '#lib/services/expense-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
-import {
-	FUELIO_PRESET,
-	isFuelioExport,
-	parseCsvHeaders
-} from '#lib/utils/import-mapping-helpers.ts';
+import { DETECT_SAMPLE_LENGTH, parseCsvHeaders } from '#lib/utils/import-mapping-helpers.ts';
 import { detectionOutcome } from './import-detection';
 import { buildImportMapping, type ManualColumns } from './import-mapping';
 
@@ -26,7 +22,7 @@ export class ImportExpensesForm {
 	isImporting = $state(false);
 
 	isDetecting = $state(false);
-	detectedPreset = $state<ImportMappingPreset | null>(null);
+	detectedPreset = $state<DetectedImportFormat | null>(null);
 	targetVehicleId = $state('');
 
 	fileHeaders = $state<string[]>([]);
@@ -106,9 +102,9 @@ export class ImportExpensesForm {
 		this.fileHeaders = headers;
 		this.isDetecting = true;
 		try {
-			const preset = isFuelioExport(this.csvText)
-				? FUELIO_PRESET
-				: await expenseApi.detectImportSource(headers);
+			const preset = await expenseApi.detectImportSource(
+				this.csvText.slice(0, DETECT_SAMPLE_LENGTH)
+			);
 			this.detectedPreset = preset;
 			const outcome = detectionOutcome(
 				headers,

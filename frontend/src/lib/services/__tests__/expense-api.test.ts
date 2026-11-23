@@ -218,11 +218,11 @@ describe('split + delete endpoint wiring', () => {
 });
 
 describe('expenseApi query and photo wiring', () => {
-	test('detectImportSource POSTs the CSV headers and returns the preset', async () => {
+	test('detectImportSource POSTs the file sample and returns the detected format', async () => {
 		post.mockResolvedValueOnce(null);
-		await expect(expenseApi.detectImportSource(['Date', 'Amount'])).resolves.toBeNull();
+		await expect(expenseApi.detectImportSource('Date,Amount\n')).resolves.toBeNull();
 		expect(post).toHaveBeenCalledWith('/api/v1/expenses/import/detect', {
-			headers: ['Date', 'Amount']
+			sample: 'Date,Amount\n'
 		});
 	});
 

@@ -20,9 +20,9 @@
 		handleErrorWithNotification,
 		userFacingErrorMessage
 	} from '#lib/utils/error-handling.ts';
+	import { DETECT_SAMPLE_LENGTH } from '#lib/utils/import-mapping-helpers.ts';
 	import type { ImportColumnMapping, Vehicle } from '#lib/types/index.ts';
-
-	const TRACKER_LABEL = 'Fuelio';
+	import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 
 	let vehicles = $state<Vehicle[]>([]);
 	let isLoading = $state(true);
@@ -33,6 +33,8 @@
 	let targetVehicleId = $state('');
 	let fileName = $state<string | null>(null);
 	let csvText = $state('');
+	let format = $state<DetectedImportFormat | null>(null);
+	let unrecognized = $state(false);
 	let preview = $state<ExpenseImportResult | null>(null);
 	let isPreviewing = $state(false);
 	let isImporting = $state(false);
@@ -64,9 +66,9 @@
 	}
 
 	function buildMapping(): ImportColumnMapping | null {
-		if (!targetVehicle) return null;
+		if (!targetVehicle || !format) return null;
 		return {
-			source: 'fuelio',
+			source: format.id,
 			columns: {},
 			dateFormat: 'iso',
 			targetVehicle: getVehicleDisplayName(targetVehicle)
@@ -87,7 +89,7 @@
 			if (seq === previewSeq) preview = result;
 		} catch (err) {
 			if (seq === previewSeq) {
-				handleErrorWithNotification(err, `Couldn't read that ${TRACKER_LABEL} file`);
+				handleErrorWithNotification(err, `Couldn't read that ${format?.label} file`);
 			}
 		} finally {
 			if (seq === previewSeq) isPreviewing = false;
@@ -102,7 +104,27 @@
 		csvText = await file.text();
 		// Clear so re-picking the same file after a cancel still fires change.
 		input.value = '';
-		await runPreview();
+		if (await detectFormat()) await runPreview();
+	}
+
+	async function detectFormat(): Promise<boolean> {
+		const seq = ++previewSeq;
+		format = null;
+		unrecognized = false;
+		preview = null;
+		isPreviewing = true;
+		try {
+			const detected = await expenseApi.detectImportSource(csvText.slice(0, DETECT_SAMPLE_LENGTH));
+			if (seq !== previewSeq) return false;
+			format = detected;
+			unrecognized = !detected;
+			return !!detected;
+		} catch (err) {
+			if (seq === previewSeq) handleErrorWithNotification(err, "Couldn't read that file");
+			return false;
+		} finally {
+			if (seq === previewSeq) isPreviewing = false;
+		}
 	}
 
 	function onVehicleChange(id: string) {
@@ -117,11 +139,11 @@
 		try {
 			const result = await expenseApi.importExpensesCsv(csvText, false, mapping);
 			appStore.showSuccess(
-				`Migrated ${result.imported} ${result.imported === 1 ? 'entry' : 'entries'} from ${TRACKER_LABEL}`
+				`Migrated ${result.imported} ${result.imported === 1 ? 'entry' : 'entries'} from ${format?.label}`
 			);
 			dialogOpen = false;
 		} catch (err) {
-			handleErrorWithNotification(err, `Couldn't migrate from ${TRACKER_LABEL}`);
+			handleErrorWithNotification(err, `Couldn't migrate from ${format?.label}`);
 		} finally {
 			isImporting = false;
 		}
@@ -130,6 +152,8 @@
 	function openDialog() {
 		fileName = null;
 		csvText = '';
+		format = null;
+		unrecognized = false;
 		preview = null;
 		isPreviewing = false;
 		isImporting = false;
@@ -187,9 +211,9 @@
 		<Dialog.Header>
 			<Dialog.Title>Migrate from another tracker</Dialog.Title>
 			<Dialog.Description>
-				Pick the vehicle to import into, then upload your {TRACKER_LABEL} export file. You'll see a preview
-				before anything is saved. Units are converted to your vehicle's units automatically, and amounts
-				import in your configured currency.
+				Pick the vehicle to import into, then upload the export file from your old app. You'll see a
+				preview before anything is saved. Units are converted to your vehicle's units automatically,
+				and amounts import in your configured currency.
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -218,7 +242,7 @@
 					class="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-4 py-6 text-sm text-muted-foreground transition-colors hover:bg-muted/50"
 				>
 					<Upload class="h-5 w-5" />
-					<span>{fileName ?? `Choose your ${TRACKER_LABEL} export (.csv)`}</span>
+					<span>{fileName ?? 'Choose your export file (.csv)'}</span>
 				</label>
 				<input
 					id="migrate-file"
@@ -233,7 +257,7 @@
 			{#if isPreviewing}
 				<div class="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
 					<LoaderCircle class="h-4 w-4 animate-spin" />
-					Reading your {TRACKER_LABEL} file…
+					Reading your file…
 				</div>
 			{:else if preview}
 				<div class="rounded-lg border bg-card p-4" data-testid="migrate-preview">
@@ -269,6 +293,10 @@
 						</p>
 					{/if}
 				</div>
+			{:else if unrecognized}
+				<p class="text-sm text-destructive" role="alert" data-testid="migrate-unrecognized">
+					We don't recognize this file. Export a full backup from your old app and try again.
+				</p>
 			{:else if csvText.trim() && !targetVehicle}
 				<p class="text-sm text-muted-foreground">Choose a vehicle above to preview.</p>
 			{/if}

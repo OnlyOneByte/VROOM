@@ -1,19 +1,9 @@
 import type { ExpenseCategory, ImportColumnMapping, NativeImportField } from '#lib/types/index.ts';
-import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 
 const NATIVE_HEADERS = ['date', 'vehicle', 'category', 'amount'] as const;
 
-export const FUELIO_PRESET: ImportMappingPreset = {
-	id: 'fuelio',
-	label: 'Fuelio',
-	signature: [],
-	columns: {},
-	dateFormat: 'iso'
-};
-
-export function isFuelioExport(text: string): boolean {
-	return /^\s*"?##\s*Vehicle"?/im.test(text) && /^\s*"?##\s*Log"?/im.test(text);
-}
+export const DETECT_SAMPLE_LENGTH = 8192;
 
 export function parseCsvHeaders(csvText: string): string[] {
 	const firstLine = csvText.split('\n', 1)[0]?.trim();
@@ -46,18 +36,15 @@ export function guessManualColumns(headers: string[]): Partial<Record<NativeImpo
 }
 
 export function presetImportMapping(
-	preset: ImportMappingPreset,
+	format: DetectedImportFormat,
 	targetVehicle: string,
 	categoryRemap: Record<string, ExpenseCategory>
 ): ImportColumnMapping {
 	return {
-		source: preset.id,
-		columns: preset.columns,
+		source: format.id,
+		columns: {},
 		targetVehicle,
-		dateFormat: preset.dateFormat,
-		distanceUnit: preset.distanceUnit,
-		volumeUnit: preset.volumeUnit,
-		categoryMap: { ...preset.categoryMap, ...categoryRemap },
-		defaultCategory: preset.defaultCategory
+		dateFormat: 'iso',
+		categoryMap: categoryRemap
 	};
 }

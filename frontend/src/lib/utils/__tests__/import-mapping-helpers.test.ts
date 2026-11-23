@@ -1,21 +1,11 @@
 import { describe, expect, test } from 'vitest';
 import {
 	guessManualColumns,
-	isFuelioExport,
 	isNativeImportHeaders,
 	parseCsvHeaders,
 	presetImportMapping
 } from '#lib/utils/import-mapping-helpers.ts';
-import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
-
-describe('isFuelioExport', () => {
-	test('needs both the ## Vehicle and ## Log sections, quoted or not', () => {
-		expect(isFuelioExport('"## Vehicle"\n"Name"\n"Golf"\n\n"## Log"\n"Data"')).toBe(true);
-		expect(isFuelioExport('## Vehicle\nName\nGolf\n## Log\nData')).toBe(true);
-		expect(isFuelioExport('"## Vehicle"\n"Name"\n"Golf"')).toBe(false);
-		expect(isFuelioExport('Data,Odo (km),Fuel (litres),Price')).toBe(false);
-	});
-});
+import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 
 describe('parseCsvHeaders', () => {
 	test('splits the FIRST line on commas, trimming + de-quoting each cell', () => {
@@ -95,28 +85,18 @@ describe('guessManualColumns', () => {
 });
 
 describe('presetImportMapping', () => {
-	const preset: ImportMappingPreset = {
+	const preset: DetectedImportFormat = {
 		id: 'fuelly',
-		label: 'Fuelly',
-		signature: ['fuelup_date', 'price'],
-		columns: { date: 'fuelup_date', amount: 'price' },
-		dateFormat: 'mdy',
-		distanceUnit: 'miles',
-		volumeUnit: 'gallons_us',
-		categoryMap: { gas: 'fuel' },
-		defaultCategory: 'fuel'
+		label: 'Fuelly'
 	};
 
-	test('carries the preset default category so files without a category column still import', () => {
-		expect(presetImportMapping(preset, 'My Car', {}).defaultCategory).toBe('fuel');
-	});
-
-	test('layers the user remap over the preset category map and stamps the target vehicle', () => {
+	test('sends only the format id, the target vehicle and the user remap; the server owns the columns', () => {
 		const mapping = presetImportMapping(preset, 'My Car', { gas: 'misc', wash: 'maintenance' });
-		expect(mapping).toMatchObject({
+		expect(mapping).toEqual({
 			source: 'fuelly',
+			columns: {},
 			targetVehicle: 'My Car',
-			dateFormat: 'mdy',
+			dateFormat: 'iso',
 			categoryMap: { gas: 'misc', wash: 'maintenance' }
 		});
 	});

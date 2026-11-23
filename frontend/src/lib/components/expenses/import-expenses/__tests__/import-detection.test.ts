@@ -1,13 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import { detectionOutcome } from '../import-detection';
-import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 
-const fuellyPreset: ImportMappingPreset = {
+const fuellyPreset: DetectedImportFormat = {
 	id: 'fuelly',
-	label: 'Fuelly',
-	signature: ['date', 'odometer'],
-	columns: { date: 'Date' },
-	dateFormat: 'mdy'
+	label: 'Fuelly'
 };
 
 const NATIVE_HEADERS = ['date', 'vehicle', 'category', 'amount'];

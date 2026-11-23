@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { Vehicle } from '#lib/types/index.ts';
-import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 import ImportSourceDetection from '../ImportSourceDetection.svelte';
 
 const CAMRY: Vehicle = {
@@ -17,18 +17,15 @@ const CAMRY: Vehicle = {
 };
 const RAV4: Vehicle = { ...CAMRY, id: 'v2', model: 'RAV4' };
 
-const FUELIO: ImportMappingPreset = {
+const FUELIO: DetectedImportFormat = {
 	id: 'fuelio',
-	label: 'Fuelio',
-	signature: ['data', 'odo (km)'],
-	columns: { date: 'Data', amount: 'Price' },
-	dateFormat: 'iso'
+	label: 'Fuelio'
 };
 
 function renderDetection(
 	overrides: Partial<{
 		isDetecting: boolean;
-		preset: ImportMappingPreset | null;
+		preset: DetectedImportFormat | null;
 		vehicles: Vehicle[];
 		targetVehicleId: string;
 	}> = {}

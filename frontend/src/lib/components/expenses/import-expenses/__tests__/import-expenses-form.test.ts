@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Vehicle } from '#lib/types/index.ts';
 import type { ExpenseImportResult } from '#lib/services/expense-api.ts';
-import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 import { ImportExpensesForm } from '../import-expenses-form.svelte';
 
 const mocks = vi.hoisted(() => ({
@@ -34,12 +34,9 @@ const CAMRY: Vehicle = {
 };
 const RAV4: Vehicle = { ...CAMRY, id: 'v2', model: 'RAV4' };
 
-const FUELLY: ImportMappingPreset = {
+const FUELLY: DetectedImportFormat = {
 	id: 'fuelly',
-	label: 'Fuelly',
-	signature: ['date', 'cost'],
-	columns: { date: 'Date', amount: 'Cost' },
-	dateFormat: 'mdy'
+	label: 'Fuelly'
 };
 
 const FUEL_CSV = 'Date,Cost\n01/02/2026,40.00\n01/09/2026,42.50';
@@ -82,7 +79,7 @@ describe('ImportExpensesForm: loading a file', () => {
 		await form.loadFile(new File([FUEL_CSV], 'fuel.csv'));
 
 		expect(form.fileName).toBe('fuel.csv');
-		expect(mocks.detectImportSource).toHaveBeenCalledWith(['Date', 'Cost']);
+		expect(mocks.detectImportSource).toHaveBeenCalledWith(FUEL_CSV);
 		expect(form.targetVehicleId).toBe('v1');
 		expect(mocks.importExpensesCsv).toHaveBeenCalledWith(
 			FUEL_CSV,
@@ -135,12 +132,13 @@ describe('ImportExpensesForm: loading a file', () => {
 		expect(mocks.importExpensesCsv).toHaveBeenCalledWith(nativeCsv, true, undefined);
 	});
 
-	test('a Fuelio export goes to the Fuelio parser with no manual mapping', async () => {
+	test('a Fuelio export is detected from its sample and needs no manual mapping', async () => {
+		mocks.detectImportSource.mockResolvedValue({ id: 'fuelio', label: 'Fuelio' });
 		const form = new ImportExpensesForm(() => [CAMRY]);
 
 		await form.loadFile(new File([FUELIO_EXPORT], 'fuelio.csv'));
 
-		expect(mocks.detectImportSource).not.toHaveBeenCalled();
+		expect(mocks.detectImportSource).toHaveBeenCalledWith(FUELIO_EXPORT);
 		expect(form.detectedPreset?.label).toBe('Fuelio');
 		expect(form.manualMapping).toBe(false);
 		expect(form.targetVehicleId).toBe('v1');
@@ -235,9 +233,19 @@ describe('ImportExpensesForm: pasted text and detection failures', () => {
 
 		await form.handlePasteBlur();
 
-		expect(mocks.detectImportSource).toHaveBeenCalledWith(['Date', 'Cost']);
+		expect(mocks.detectImportSource).toHaveBeenCalledWith(FUEL_CSV);
 		expect(form.detectedPreset).toEqual(FUELLY);
 		expect(form.preview?.readyCount).toBe(2);
+	});
+
+	test('detection sends only the first 8 KB of a large file', async () => {
+		const big = `Date,Cost\n${'01/02/2026,40.00\n'.repeat(1000)}`;
+		const form = new ImportExpensesForm(() => [CAMRY]);
+
+		await form.loadFile(new File([big], 'big.csv'));
+
+		expect(mocks.detectImportSource).toHaveBeenCalledWith(big.slice(0, 8192));
+		expect(mocks.importExpensesCsv).toHaveBeenCalledWith(big, true, expect.anything());
 	});
 
 	test('blank pasted text clears the preview without calling the API', async () => {

@@ -2,6 +2,7 @@ import { parse } from 'csv-parse/sync';
 import type { ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
 import {
+  CsvMappingError,
   type ImportDateFormat,
   mapMileage,
   mapVolume,
@@ -11,8 +12,9 @@ import {
   stringifyNative,
   type TargetUnits,
 } from './import-mapping';
+import type { ImportFormat } from './import-mapping-presets';
 
-export class FuelioParseError extends Error {}
+export class FuelioParseError extends CsvMappingError {}
 
 interface FuelioParseResult {
   csv: string;
@@ -216,3 +218,19 @@ export function parseFuelioExport(text: string, opts: FuelioParseOptions): Fueli
     unmappedCategories: [...costs.unmapped].sort(),
   };
 }
+
+export const fuelioFormat: ImportFormat = {
+  id: 'fuelio',
+  label: 'Fuelio',
+  detect: isFuelioExport,
+  toNativeCsv: (text, { mapping, targetUnitsFor, timeZone }) => ({
+    ...parseFuelioExport(text, {
+      targetVehicle: mapping.targetVehicle ?? '',
+      targetUnits: targetUnitsFor(mapping.targetVehicle ?? ''),
+      includeCosts: true,
+      timeZone,
+      categoryMap: mapping.categoryMap,
+    }),
+    rowErrors: new Map(),
+  }),
+};
