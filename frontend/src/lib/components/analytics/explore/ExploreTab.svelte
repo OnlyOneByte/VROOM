@@ -298,21 +298,18 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
+		{#if error}
+			<LoadErrorCard
+				title="Couldn't update the chart"
+				message={`It still shows ${chartTitle.toLowerCase()}. ${error}`}
+				onRetry={() => load(request, requestKey, query)}
+			/>
+		{/if}
 		<div
 			class="space-y-4 transition-opacity md:space-y-6"
 			class:opacity-60={isLoading || !!error}
 			aria-busy={isLoading}
 		>
-			{#if error}
-				<div class="flex flex-wrap items-center gap-3" role="alert">
-					<p class="text-sm text-destructive">
-						Couldn't update the chart, so it still shows {chartTitle.toLowerCase()}. {error}
-					</p>
-					<Button variant="outline" size="sm" onclick={() => load(request, requestKey, query)}>
-						Retry
-					</Button>
-				</div>
-			{/if}
 			<StatCardGrid items={kpiItems} columns={3} />
 
 			{#if form === 'ranking'}

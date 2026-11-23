@@ -133,6 +133,11 @@
 			{@render field('explore-split', 'Split by', query.split, splits, v =>
 				update({ split: v as ExploreQuery['split'] })
 			)}
+			{#if query.compare !== 'none'}
+				<p class="-mt-3 text-xs text-muted-foreground">
+					A comparison draws one total line, so the split is off while comparing.
+				</p>
+			{/if}
 			{@render field('explore-compare', 'Compare with', query.compare, EXPLORE_COMPARES, v =>
 				update({ compare: v as ExploreQuery['compare'] })
 			)}

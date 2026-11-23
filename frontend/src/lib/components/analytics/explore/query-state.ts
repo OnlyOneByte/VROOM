@@ -125,7 +125,10 @@ export function allowedSplits(
 
 export function normalizeExplore(query: ExploreQuery): ExploreQuery {
 	const splits = allowedSplits(query.metric, query.compare);
-	return splits.includes(query.split) ? query : { ...query, split: 'none', hide: [] };
+	const next: ExploreQuery = splits.includes(query.split)
+		? query
+		: { ...query, split: 'none', hide: [] };
+	return next.per === 'none' && next.hide.length > 0 ? { ...next, hide: [] } : next;
 }
 
 export function parseExplore(params: Pick<URLSearchParams, 'get'>): ExploreQuery {

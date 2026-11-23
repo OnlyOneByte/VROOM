@@ -184,4 +184,11 @@ describe('Explore chart data', () => {
 			'Cost per km per month by car'
 		);
 	});
+
+	test('Whole range shows every series, so hidden series are cleared', () => {
+		const byCar = { ...applyPreset({ split: 'vehicle' }), hide: ['camry'] };
+		expect(normalizeExplore({ ...byCar, per: 'none' }).hide).toEqual([]);
+		expect(normalizeExplore(byCar).hide).toEqual(['camry']);
+		expect(parseExplore(params('per=none&split=vehicle&hide=camry')).hide).toEqual([]);
+	});
 });
