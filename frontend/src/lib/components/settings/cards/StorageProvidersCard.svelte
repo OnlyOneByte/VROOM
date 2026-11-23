@@ -378,7 +378,7 @@
 			<Separator class="my-6" />
 
 			<div class="space-y-3">
-				<div class="flex items-center justify-between">
+				<div class="flex flex-wrap items-center justify-between gap-2">
 					<p class="text-sm font-medium">Providers</p>
 					{#if providers.length > 0}
 						<Button
