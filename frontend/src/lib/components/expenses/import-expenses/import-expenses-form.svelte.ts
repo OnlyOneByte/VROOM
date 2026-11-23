@@ -80,7 +80,6 @@ export class ImportExpensesForm {
 	needsTargetVehicle = $derived(!!this.detectedPreset && !this.targetVehicle);
 	needsManualMapping = $derived(this.manualMapping && !this.mapping);
 	errorRows = $derived(this.preview?.rows.filter(r => r.status === 'error') ?? []);
-	/** Text for the surface's `role="status"` region, so a screen reader hears each result land. */
 	previewStatus = $derived(this.#previewStatus());
 
 	constructor(getVehicles: () => Vehicle[], options: ImportFormOptions = {}) {

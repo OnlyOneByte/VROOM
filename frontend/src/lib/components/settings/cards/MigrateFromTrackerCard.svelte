@@ -188,7 +188,6 @@
 				{@const preview = form.preview}
 				<div class="relative rounded-lg border bg-card p-4" data-testid="migrate-preview">
 					{#if form.isPreviewing}
-						<!-- The label sits on the top border, clear of the counts and error rows it dims. -->
 						<div class="absolute inset-0 rounded-lg bg-card/70" aria-hidden="true">
 							<span
 								class="absolute -top-2.5 right-3 flex items-center gap-1.5 rounded-full border bg-card px-2 text-xs text-muted-foreground"

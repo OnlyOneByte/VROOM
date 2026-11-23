@@ -7,7 +7,6 @@
 		isPreviewing: boolean;
 		preview: ExpenseImportResult | null;
 		errorRows: ExpenseImportResult['rows'];
-		/** Screen-reader text for the result, from `ImportExpensesForm.previewStatus`. */
 		status: string;
 		needsTargetVehicle: boolean;
 		needsManualMapping: boolean;
@@ -33,7 +32,6 @@
 {:else if preview}
 	<div class="relative rounded-lg border bg-card p-4">
 		{#if isPreviewing}
-			<!-- The label sits on the top border, clear of the counts and error rows it dims. -->
 			<div class="absolute inset-0 rounded-lg bg-card/70" aria-hidden="true">
 				<span
 					class="absolute -top-2.5 right-3 flex items-center gap-1.5 rounded-full border bg-card px-2 text-xs text-muted-foreground"
