@@ -171,13 +171,19 @@ describe('GET /analytics/query matches the existing summary aggregations', () =>
     expect(efficiency.unit).toBe('miles/gallons_us');
   });
 
-  test('running costs leave financing, regulatory and enhancement out by default', async () => {
+  test('running costs are every category except financial, as on the Dashboard', async () => {
     seedFleet();
     const running = await repo.query(
       OWNER.id,
       baseQuery({ include: 'running', interval: 'none', groupBy: 'category' })
     );
-    expect(running.series.map((s) => s.key).sort()).toEqual(['fuel', 'maintenance', 'misc']);
+    expect(running.series.map((s) => s.key).sort()).toEqual([
+      'enhancement',
+      'fuel',
+      'maintenance',
+      'misc',
+      'regulatory',
+    ]);
     const picked = await repo.query(
       OWNER.id,
       baseQuery({ interval: 'none', groupBy: 'category', categories: ['maintenance', 'financial'] })
