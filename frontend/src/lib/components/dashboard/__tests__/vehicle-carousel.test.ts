@@ -240,7 +240,10 @@ describe('VehicleCarousel states', () => {
 			expect(header).toContainElement(arrow);
 			expect(arrow.className).not.toMatch(/(^|\s)absolute(\s|$)/);
 		}
-		expect(header).toContainElement(screen.getByRole('link', { name: 'Add Vehicle' }));
+		const add = screen.getByRole('link', { name: 'Add Vehicle' });
+		expect(header).toContainElement(add);
+		expect(add).toHaveClass('max-sm:w-10');
+		expect(add.querySelector('span')).toHaveClass('max-sm:sr-only');
 	});
 });
 

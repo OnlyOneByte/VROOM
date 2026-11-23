@@ -51,6 +51,7 @@
 	let carousel = $state<HTMLElement | null>(null);
 	let arrows = $state<HTMLElement | null>(null);
 	let carouselApi = $state<CarouselAPI>();
+	let showArrows = $derived(!isLoading && (canScrollPrev || canScrollNext));
 
 	function pageWithKeys(event: KeyboardEvent) {
 		if (event.key === 'ArrowLeft') {
@@ -90,12 +91,17 @@
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
 				{#if addVehicleHref}
-					<Button variant="ghost" size="lg" href={addVehicleHref} class="lg:hidden">
-						<Plus class="mr-2 h-4 w-4" />
-						Add Vehicle
+					<Button
+						variant="ghost"
+						size="lg"
+						href={addVehicleHref}
+						class="lg:hidden {showArrows ? 'max-sm:w-10 max-sm:px-0' : ''}"
+					>
+						<Plus class="h-4 w-4 {showArrows ? 'sm:mr-2' : 'mr-2'}" />
+						<span class={showArrows ? 'max-sm:sr-only' : ''}>Add Vehicle</span>
 					</Button>
 				{/if}
-				{#if !isLoading && (canScrollPrev || canScrollNext)}
+				{#if showArrows}
 					<div bind:this={arrows} class="flex items-center gap-2" data-testid="fleet-arrows">
 						<Button
 							variant="outline"
