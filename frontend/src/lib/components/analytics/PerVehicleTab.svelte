@@ -1,10 +1,11 @@
 <script lang="ts">
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { LoaderCircle } from '@lucide/svelte';
+	import { LoaderCircle, SearchX } from '@lucide/svelte';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
@@ -23,6 +24,21 @@
 	import { formatCurrency, formatNumberUpTo } from '#lib/utils/formatters.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { getCostPerDistanceLabel, getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import type { AnalyticsDateRange } from './analytics-filters';
+
+	interface Props {
+		dateRange?: AnalyticsDateRange;
+		preferredVehicleId?: string;
+		filterLabel?: string;
+		onClearFilters?: () => void;
+	}
+
+	let {
+		dateRange = getDefaultDateRange(),
+		preferredVehicleId,
+		filterLabel,
+		onClearFilters
+	}: Props = $props();
 
 	let vehicles = $state<Vehicle[]>([]);
 	let selectedVehicleId = $state<string>('');
@@ -32,6 +48,7 @@
 	let isLoadingVehicles = $state(true);
 	let isLoadingData = $state(false);
 	let error = $state<string | null>(null);
+	let request = 0;
 	let vehiclesLoadError = $state<string | null>(null);
 
 	async function loadVehicles() {
@@ -47,21 +64,24 @@
 	}
 
 	async function loadVehicleData(vehicleId: string) {
+		const current = ++request;
 		try {
 			isLoadingData = true;
 			const [healthData, tcoData, expensesData] = await Promise.all([
 				analyticsApi.getVehicleHealth(vehicleId),
 				analyticsApi.getVehicleTCO(vehicleId),
-				analyticsApi.getVehicleExpenses(vehicleId, getDefaultDateRange())
+				analyticsApi.getVehicleExpenses(vehicleId, dateRange)
 			]);
+			if (current !== request) return;
 			health = healthData;
 			tco = tcoData;
 			expenses = expensesData;
 			error = null;
 		} catch (e) {
+			if (current !== request) return;
 			error = userFacingErrorMessage(e);
 		} finally {
-			isLoadingData = false;
+			if (current === request) isLoadingData = false;
 		}
 	}
 
@@ -69,7 +89,6 @@
 		if (value) {
 			selectedVehicleId = value;
 			error = null;
-			loadVehicleData(value);
 		}
 	}
 
@@ -78,11 +97,19 @@
 	});
 
 	$effect(() => {
-		if (!isLoadingVehicles && vehicles.length > 0 && !selectedVehicleId) {
-			const id = vehicles[0]!.id;
-			selectedVehicleId = id;
-			void loadVehicleData(id);
-		}
+		if (isLoadingVehicles || vehicles.length === 0) return;
+		const preferred = vehicles.find(v => v.id === preferredVehicleId)?.id;
+		selectedVehicleId = untrack(
+			() =>
+				preferred ??
+				(vehicles.some(v => v.id === selectedVehicleId) ? selectedVehicleId : vehicles[0]!.id)
+		);
+	});
+
+	$effect(() => {
+		void dateRange.startDate;
+		void dateRange.endDate;
+		if (selectedVehicleId) untrack(() => void loadVehicleData(selectedVehicleId));
 	});
 
 	let selectedVehicle = $derived(vehicles.find(v => v.id === selectedVehicleId));
@@ -227,13 +254,37 @@
 				</Card.Content>
 			</Card.Root>
 
+			{#if filterLabel}
+				<p class="text-sm text-muted-foreground">
+					The health score and totals cover this car's whole history. The breakdown below follows
+					the date range.
+				</p>
+			{/if}
+
 			<StatCardGrid items={tcoSummaryItems} columns={4} />
 
-			<AppPieChart
-				title="Expense Breakdown"
-				description="Category distribution"
-				data={expensePieData}
-			/>
+			{#if filterLabel && onClearFilters && expensePieData.length === 0}
+				<EmptyState level={3}>
+					{#snippet icon()}
+						<div class="mb-4 rounded-full bg-muted p-4">
+							<SearchX class="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+						</div>
+					{/snippet}
+					{#snippet title()}No expenses for {filterLabel}{/snippet}
+					{#snippet description()}
+						This car has no expenses in the chosen dates. Try a longer date range.
+					{/snippet}
+					{#snippet action()}
+						<Button variant="outline" onclick={onClearFilters}>Clear filters</Button>
+					{/snippet}
+				</EmptyState>
+			{:else}
+				<AppPieChart
+					title="Expense Breakdown"
+					description="Category distribution"
+					data={expensePieData}
+				/>
+			{/if}
 		{/if}
 	</div>
 {/if}

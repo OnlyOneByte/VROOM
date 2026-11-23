@@ -5,17 +5,17 @@ import type { OAuthProviderConfig } from './types';
 
 export type { OAuthProviderConfig, OAuthTokens, OAuthUserInfo } from './types';
 
-const providers: Record<string, OAuthProviderConfig> = {
+export const AUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
   google: googleAuthProvider,
   github: githubAuthProvider,
 };
 
 export function getProvider(id: string): OAuthProviderConfig | undefined {
-  return providers[id];
+  return AUTH_PROVIDERS[id];
 }
 
 export function getEnabledProvider(id: string): OAuthProviderConfig | undefined {
-  const provider = providers[id];
+  const provider = AUTH_PROVIDERS[id];
   if (!provider) return undefined;
   const enabledIds = new Set(getEnabledProviders().map((p) => p.id));
   return enabledIds.has(id) ? provider : undefined;
@@ -32,8 +32,8 @@ export function getEnabledProviders(): OAuthProviderConfig[] {
   };
 
   const result: OAuthProviderConfig[] = [];
-  for (const key in providers) {
-    const p = providers[key];
+  for (const key in AUTH_PROVIDERS) {
+    const p = AUTH_PROVIDERS[key];
     const id = clientIds[p.id];
     const secret = clientSecrets[p.id];
     if (

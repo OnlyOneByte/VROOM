@@ -34,7 +34,7 @@
 		labelKey?: string;
 		hideIndicator?: boolean;
 		labelClassName?: string;
-		valueFormatter?: (_value: number, _seriesKey: string) => string;
+		valueFormatter?: (_value: number, _seriesKey: string, _row?: Record<string, unknown>) => string;
 		labelAxis?: 'x' | 'y';
 		labelFormatter?:
 			((_value: unknown, _payload: TooltipPayload[]) => string | number | Snippet) | null;
@@ -172,7 +172,11 @@
 							{#if item.value !== undefined}
 								<span class="text-foreground font-mono font-medium tabular-nums">
 									{valueFormatter && typeof item.value === 'number'
-										? valueFormatter(item.value, item.key)
+										? valueFormatter(
+												item.value,
+												item.key,
+												(chartCtx.tooltip.data ?? undefined) as Record<string, unknown> | undefined
+											)
 										: typeof item.value === 'number'
 											? formatNumberUpTo(item.value, 2)
 											: item.value}

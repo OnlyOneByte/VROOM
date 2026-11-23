@@ -118,6 +118,10 @@ schema and field specs, secret names, connect kind, availability and features.
 reads labels, fields and features from it (`lib/stores/provider-catalog.svelte.ts`). The
 frontend keeps only what can't travel as JSON, an icon and an optional custom form per id, in
 `PROVIDER_UI`; a test checks every backend storage id has an entry.
+Every provider also passes the contract kit for its capability
+(`backend/src/test-helpers/provider-contracts/`: storage, model, auth and descriptor), run by
+`provider-contracts.test.ts` and `auth-provider-contracts.test.ts`; both fail when a registry
+entry has no contract subject.
 
 Auto-sync is inactivity-driven: a per-domain `changeTracker` middleware marks data changed on
 each successful write, the global activity middleware arms the inactivity timer, and when it
