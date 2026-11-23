@@ -103,10 +103,23 @@ describe('ProviderForm connection contract', () => {
 		expect(sent?.nonce).toBeUndefined();
 	});
 
+	test('S3 cannot be saved without a region, which the backend requires', async () => {
+		await startCreate(/S3 \/ B2 \/ R2/);
+		await type('Endpoint', 'https://s3.example.com');
+		await type('Bucket', 'vroom');
+		await type('Access Key ID', 'AKIA');
+		await type('Secret Access Key', 'secret');
+		expect(saveButton().disabled).toBe(true);
+
+		await type('Region', 'us-east-1');
+		expect(saveButton().disabled).toBe(false);
+	});
+
 	test('switching from a filled-in S3 form to Drive leaves Save off until Google is connected', async () => {
 		await startCreate(/S3 \/ B2 \/ R2/);
 		await type('Endpoint', 'https://s3.example.com');
 		await type('Bucket', 'vroom');
+		await type('Region', 'us-east-1');
 		await type('Access Key ID', 'AKIA');
 		await type('Secret Access Key', 'secret');
 		expect(saveButton().disabled).toBe(false);

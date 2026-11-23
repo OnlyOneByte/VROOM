@@ -20,7 +20,13 @@
 	import { providerApi } from '#lib/services/provider-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-	import { modelProviderOptions, type ModelProviderTypeOption } from '#lib/constants/providers.ts';
+	import ProviderFields, {
+		fieldConfig,
+		fieldErrorsFrom,
+		fieldSecrets,
+		fieldsReady,
+		initialFieldValues
+	} from '../ProviderFields.svelte';
 	import { providerCatalog } from '#lib/stores/provider-catalog.svelte.ts';
 	import type { UserProviderInfo } from '#lib/types/index.ts';
 
@@ -62,7 +68,7 @@
 	} as const;
 
 	let copy = $derived(COPY[domain]);
-	let providerTypes = $derived(modelProviderOptions(copy.capability));
+	let providerTypes = $derived(providerCatalog.models(copy.capability));
 	let Icon = $derived(copy.icon);
 
 	let providers = $state<UserProviderInfo[]>([]);
@@ -72,11 +78,12 @@
 
 	let dialogOpen = $state(false);
 	let editingId = $state<string | null>(null);
+	let editingConfig = $state<Record<string, unknown> | undefined>(undefined);
 	let formType = $state('');
 	let formDisplayName = $state('');
-	let formApiKey = $state('');
-	let formModel = $state('');
-	let formBaseUrl = $state('');
+	let fieldValues = $state<Record<string, string>>({});
+	let secretValues = $state<Record<string, string>>({});
+	let fieldErrors = $state<Record<string, string>>({});
 	let isSaving = $state(false);
 
 	onMount(() => trackPendingSave(() => isSaving));
@@ -84,14 +91,11 @@
 	let deletingProvider = $state<UserProviderInfo | null>(null);
 	let deletingProviderLosesKey = $derived(
 		deletingProvider !== null &&
-			!providerTypes.find(t => t.id === deletingProvider?.providerType)?.keyless
+			(providerTypes.find(t => t.id === deletingProvider?.providerType)?.secrets.length ?? 1) > 0
 	);
 
-	let fallbackType = $derived(providerTypes[0] as ModelProviderTypeOption);
-	let selectedTypeOption = $derived<ModelProviderTypeOption>(
-		providerTypes.find(t => t.id === formType) ?? fallbackType
-	);
-	let typeLabel = $derived(selectedTypeOption.label);
+	let selectedEntry = $derived(providerTypes.find(t => t.id === formType) ?? providerTypes[0]);
+	let typeLabel = $derived(selectedEntry?.label ?? '');
 
 	async function loadData() {
 		isLoading = true;
@@ -118,54 +122,54 @@
 
 	function openCreate() {
 		editingId = null;
-		formType = fallbackType.id;
-		applyTypeDefaults();
+		editingConfig = undefined;
+		formType = providerTypes[0]?.id ?? '';
+		resetFields();
 		formDisplayName = '';
-		formApiKey = '';
 		dialogOpen = true;
 	}
 
 	function openEdit(p: UserProviderInfo) {
 		editingId = p.id;
+		editingConfig = p.config;
 		formType = p.providerType;
 		formDisplayName = p.displayName;
-		formApiKey = '';
-		formModel = typeof p.config['model'] === 'string' ? p.config['model'] : '';
-		formBaseUrl = typeof p.config['baseUrl'] === 'string' ? p.config['baseUrl'] : '';
+		resetFields();
 		dialogOpen = true;
 	}
 
-	function applyTypeDefaults() {
-		formModel = selectedTypeOption.defaultModel;
-		formBaseUrl = selectedTypeOption.defaultBaseUrl ?? '';
+	function resetFields() {
+		fieldValues = selectedEntry ? initialFieldValues(selectedEntry, editingConfig) : {};
+		secretValues = {};
+		fieldErrors = {};
 	}
 
 	function onTypeChange(v: string | undefined) {
 		if (!v) return;
 		formType = v;
-		if (editingId === null) applyTypeDefaults();
+		if (editingId === null) resetFields();
 	}
 
 	let canSave = $derived(
 		formDisplayName.trim().length > 0 &&
-			formModel.trim().length > 0 &&
-			(selectedTypeOption.keyless || editingId !== null || formApiKey.trim().length > 0) &&
-			(!selectedTypeOption.needsBaseUrl || formBaseUrl.trim().length > 0)
+			!!selectedEntry &&
+			fieldsReady(selectedEntry, fieldValues, secretValues, editingConfig)
 	);
 
 	async function handleSave() {
-		if (!canSave || isSaving) return;
+		if (!canSave || isSaving || !selectedEntry) return;
+		const entry = selectedEntry;
 		isSaving = true;
 		try {
-			const config: Record<string, unknown> = { model: formModel.trim() };
-			if (selectedTypeOption.needsBaseUrl) config['baseUrl'] = formBaseUrl.trim();
+			const config = fieldConfig(entry, fieldValues);
+			const credentials = fieldSecrets(entry, secretValues);
 
 			if (editingId === null) {
 				await providerApi.createProvider({
 					domain,
 					providerType: formType,
 					displayName: formDisplayName.trim(),
-					credentials: formApiKey.trim() ? { apiKey: formApiKey.trim() } : {},
+					credentials,
 					config
 				});
 				appStore.showSuccess(`${formDisplayName.trim()} added`);
@@ -173,13 +177,14 @@
 				await providerApi.updateProvider(editingId, {
 					displayName: formDisplayName.trim(),
 					config,
-					...(formApiKey.trim() ? { credentials: { apiKey: formApiKey.trim() } } : {})
+					...(Object.keys(credentials).length > 0 && { credentials })
 				});
 				appStore.showSuccess(`${formDisplayName.trim()} updated`);
 			}
 			dialogOpen = false;
 			await loadData();
 		} catch (e) {
+			fieldErrors = fieldErrorsFrom(e, entry);
 			appStore.showError(`Couldn't save the provider. ${userFacingErrorMessage(e)}`);
 		} finally {
 			isSaving = false;
@@ -327,37 +332,15 @@
 				<Input id="{domain}-name" bind:value={formDisplayName} placeholder={copy.namePlaceholder} />
 			</div>
 
-			<div class="space-y-1.5">
-				<Label for="{domain}-model">Model</Label>
-				<Input
-					id="{domain}-model"
-					bind:value={formModel}
-					placeholder={selectedTypeOption.defaultModel}
+			{#if selectedEntry}
+				<ProviderFields
+					idPrefix={domain}
+					spec={selectedEntry}
+					stored={editingConfig}
+					bind:values={fieldValues}
+					bind:secretValues
+					errors={fieldErrors}
 				/>
-			</div>
-
-			{#if selectedTypeOption.needsBaseUrl}
-				<div class="space-y-1.5">
-					<Label for="{domain}-baseurl">Base URL</Label>
-					<Input
-						id="{domain}-baseurl"
-						bind:value={formBaseUrl}
-						placeholder={selectedTypeOption.defaultBaseUrl}
-					/>
-				</div>
-			{/if}
-
-			{#if !selectedTypeOption.keyless}
-				<div class="space-y-1.5">
-					<Label for="{domain}-key">API key</Label>
-					<Input
-						id="{domain}-key"
-						type="password"
-						bind:value={formApiKey}
-						placeholder={editingId === null ? 'sk-…' : 'Leave blank to keep current key'}
-						autocomplete="off"
-					/>
-				</div>
 			{/if}
 		</div>
 

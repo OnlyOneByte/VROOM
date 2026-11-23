@@ -49,7 +49,9 @@ export function describeDescriptorContract(name: string, descriptor: AnyProvider
         expect(hasFunction(entry)).toBe(false);
         expect(JSON.parse(JSON.stringify(entry))).toEqual(entry);
         for (const secret of entry.secrets) {
-          expect(Object.keys(secret).sort()).toEqual(['key', 'label', 'required']);
+          for (const key of Object.keys(secret)) {
+            expect(['key', 'label', 'required', 'reenterWhenChanged']).toContain(key);
+          }
         }
       }
     });

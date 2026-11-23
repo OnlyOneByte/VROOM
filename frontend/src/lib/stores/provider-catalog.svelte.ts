@@ -17,6 +17,7 @@ export interface ProviderSecretSpec {
 	key: string;
 	label: string;
 	required: boolean;
+	reenterWhenChanged?: string[];
 }
 
 export interface StorageFeatures {
