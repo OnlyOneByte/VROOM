@@ -10,7 +10,11 @@ import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
 import { expenseApi, type ExpenseImportResult } from '#lib/services/expense-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
-import { parseCsvHeaders } from '#lib/utils/import-mapping-helpers.ts';
+import {
+	FUELIO_PRESET,
+	isFuelioExport,
+	parseCsvHeaders
+} from '#lib/utils/import-mapping-helpers.ts';
 import { detectionOutcome } from './import-detection';
 import { buildImportMapping, type ManualColumns } from './import-mapping';
 
@@ -102,7 +106,9 @@ export class ImportExpensesForm {
 		this.fileHeaders = headers;
 		this.isDetecting = true;
 		try {
-			const preset = await expenseApi.detectImportSource(headers);
+			const preset = isFuelioExport(this.csvText)
+				? FUELIO_PRESET
+				: await expenseApi.detectImportSource(headers);
 			this.detectedPreset = preset;
 			const outcome = detectionOutcome(
 				headers,

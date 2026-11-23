@@ -1,11 +1,21 @@
 import { describe, expect, test } from 'vitest';
 import {
 	guessManualColumns,
+	isFuelioExport,
 	isNativeImportHeaders,
 	parseCsvHeaders,
 	presetImportMapping
 } from '#lib/utils/import-mapping-helpers.ts';
 import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+
+describe('isFuelioExport', () => {
+	test('needs both the ## Vehicle and ## Log sections, quoted or not', () => {
+		expect(isFuelioExport('"## Vehicle"\n"Name"\n"Golf"\n\n"## Log"\n"Data"')).toBe(true);
+		expect(isFuelioExport('## Vehicle\nName\nGolf\n## Log\nData')).toBe(true);
+		expect(isFuelioExport('"## Vehicle"\n"Name"\n"Golf"')).toBe(false);
+		expect(isFuelioExport('Data,Odo (km),Fuel (litres),Price')).toBe(false);
+	});
+});
 
 describe('parseCsvHeaders', () => {
 	test('splits the FIRST line on commas, trimming + de-quoting each cell', () => {

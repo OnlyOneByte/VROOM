@@ -673,6 +673,7 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
           targetUnits: targetUnitsFor(mapping.targetVehicle ?? ''),
           includeCosts: true,
           timeZone,
+          categoryMap: mapping.categoryMap,
         });
         importCsv = result.csv;
         unmappedCategories = result.unmappedCategories;
