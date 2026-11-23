@@ -124,14 +124,17 @@ need; don't reshape a repository to qualify.
 - Every route checks access *before* the repository call. Don't delegate it downstream.
   - A vehicle id goes through `requireVehicleAccess(vehicleId, userId, 'read' | 'write' | 'owner')`
     in `utils/vehicle-access.ts`: read allows the owner and accepted viewers and editors, write the
-    owner and editors, owner only the owner. A list of vehicles goes through `requireVehiclesAccess`.
-    Both return the owner id, so shared reads and writes scope to the owner's rows.
+    owner and editors, owner only the owner. It returns the vehicle's owner id, so shared reads and
+    writes scope to the owner's rows. A list of vehicles goes through `requireVehiclesAccess`, which
+    returns the set of their owner ids.
   - A record id goes through its `validate*Ownership` helper in `utils/validation.ts`, which loads
-    the record and then checks its owner or its vehicle.
+    the record and then checks it: financing through its vehicle, insurance, reminders and trips by
+    the record's own `userId`.
   - List queries over the user's own vehicles use `ownedVehiclesScope(userId)`.
 - A repository method taking `userId` must scope its query by it. Never `_`-prefix the param to
   silence `noUnusedVariables` after dropping a check.
-- Never compare `userId` by hand or add a new access helper: a denied check is a 404, never a 403.
+- Don't compare a vehicle's `userId` by hand: use the helpers above. A denied check is a 404, never
+  a 403.
 
 ### Batching & Migrations
 - Build any `inArray`/`IN (...)` clause over an unbounded id list with `chunk()`
