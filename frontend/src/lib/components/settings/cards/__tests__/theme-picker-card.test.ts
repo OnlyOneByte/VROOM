@@ -59,16 +59,29 @@ describe('ThemePickerCard', () => {
 		expect(toggle).toHaveAttribute('aria-expanded', 'false');
 		expect(toggle).toHaveClass('lg:hidden');
 		expect(grid).toHaveClass('hidden', 'lg:grid');
-		expect(screen.getByTestId('current-theme')).toHaveTextContent('Default');
-		expect(screen.getByTestId('current-theme')).toHaveClass('lg:hidden');
+		const current = screen.getByTestId('current-theme');
+		expect(current).toHaveTextContent('Current theme');
+		expect(current).toHaveTextContent('Default');
+		expect(current).toHaveClass('lg:hidden');
+		expect(current.className).not.toMatch(/(^|\s)border/);
 
 		await fireEvent.click(toggle);
 
 		expect(toggle).toHaveAttribute('aria-expanded', 'true');
 		expect(toggle).toHaveAccessibleName('Show fewer themes');
-		expect(grid).toHaveClass('grid');
+		expect(grid).toHaveClass('grid', 'lg:mt-0');
 		expect(grid).not.toHaveClass('hidden');
-		expect(screen.queryByTestId('current-theme')).toBeNull();
+		expect(screen.getByTestId('current-theme')).toBe(current);
+	});
+
+	test('the current-theme row follows the chosen theme', async () => {
+		themeStore.setTheme('vaporwave');
+		render(ThemePickerCard);
+		expect(screen.getByTestId('current-theme')).toHaveTextContent('Vaporwave');
+
+		await fireEvent.click(screen.getByRole('button', { name: /^Show all/ }));
+		await fireEvent.click(themeButton('Blueprint'));
+		expect(screen.getByTestId('current-theme')).toHaveTextContent('Blueprint');
 	});
 
 	test('marks only the active theme as pressed', () => {
