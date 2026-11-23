@@ -43,7 +43,9 @@ vi.mock('#lib/components/settings/cards/PwaInstallCard.svelte', stub);
 vi.mock('#lib/components/settings/cards/PushNotificationsCard.svelte', stub);
 vi.mock('#lib/components/settings/cards/StorageProvidersCard.svelte', stub);
 vi.mock('#lib/components/settings/cards/ModelProvidersCard.svelte', stub);
-vi.mock('#lib/components/settings/cards/MigrateFromTrackerCard.svelte', stub);
+vi.mock('#lib/components/settings/cards/MigrateFromTrackerCard.svelte', async () => ({
+	default: (await import('./MigrateStub.svelte')).default
+}));
 vi.mock('#lib/components/settings/storage-provider/backup/BackupDialog.svelte', stub);
 vi.mock('#lib/components/settings/storage-provider/backup/RestoreDialog.svelte', stub);
 
@@ -214,6 +216,11 @@ describe('Settings page loading', () => {
 		await mount();
 		const section = screen.getByRole('region', { name: 'Connections' });
 		expect(section.nextElementSibling).toBeNull();
+		const migrate = screen.getByTestId('stub-migrate');
+		expect(section).not.toContainElement(migrate);
+		expect(
+			migrate.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING
+		).toBeTruthy();
 		expect(section).toContainElement(screen.getByTestId('stub-model-vlm'));
 		expect(section).toContainElement(screen.getByTestId('stub-model-llm'));
 		expect(section).toContainElement(screen.getByRole('button', { name: 'stub download' }));
