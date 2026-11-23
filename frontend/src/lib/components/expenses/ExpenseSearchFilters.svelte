@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { Search, X, Car, Tag } from '@lucide/svelte';
+	import { Search, X, Car } from '@lucide/svelte';
 	import Input from '#lib/components/ui/input/input.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import * as CardNs from '#lib/components/ui/card/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
+	import ExpenseTagFilter from '#lib/components/expenses/ExpenseTagFilter.svelte';
 	import DateRangePicker from '#lib/components/common/date-range-picker.svelte';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { extractUniqueTags } from '#lib/utils/expense-filters.ts';
@@ -36,17 +36,7 @@
 	}: Props = $props();
 
 	let selectedTags = $derived(filters.tags ?? []);
-	let tagSearchTerm = $state('');
-	let tagSearchFocused = $state(false);
-	let tagInputEl = $state<HTMLInputElement | null>(null);
-
 	let allTags = $derived(extractUniqueTags(expenses));
-
-	let tagSuggestions = $derived.by(() => {
-		if (!tagSearchTerm.trim()) return allTags.filter(t => !selectedTags.includes(t));
-		const term = tagSearchTerm.toLowerCase();
-		return allTags.filter(t => !selectedTags.includes(t) && t.toLowerCase().includes(term));
-	});
 
 	let hasActiveFilters = $derived(
 		!!searchTerm ||
@@ -57,39 +47,8 @@
 			!!filters.endDate
 	);
 
-	function addTag(tag: string): void {
-		if (!selectedTags.includes(tag)) {
-			filters = { ...filters, tags: [...selectedTags, tag] };
-		}
-		tagSearchTerm = '';
-		tagSearchFocused = true;
-		tagInputEl?.focus();
-	}
-
-	function removeTag(tag: string): void {
-		const remaining = selectedTags.filter(t => t !== tag);
-		filters = { ...filters, tags: remaining.length > 0 ? remaining : undefined };
-	}
-
-	function handleTagKeydown(e: KeyboardEvent): void {
-		if (e.key === 'Enter') {
-			e.preventDefault();
-			const exactMatch = allTags.find(
-				t => !selectedTags.includes(t) && t.toLowerCase() === tagSearchTerm.trim().toLowerCase()
-			);
-			if (exactMatch) {
-				addTag(exactMatch);
-			} else if (tagSuggestions.length > 0) {
-				const firstSuggestion = tagSuggestions[0];
-				if (firstSuggestion) addTag(firstSuggestion);
-			}
-		} else if (e.key === 'Backspace' && !tagSearchTerm && selectedTags.length > 0) {
-			const lastTag = selectedTags[selectedTags.length - 1];
-			if (lastTag) removeTag(lastTag);
-		} else if (e.key === 'Escape') {
-			tagSearchFocused = false;
-			tagInputEl?.blur();
-		}
+	function setTags(tags: string[]): void {
+		filters = { ...filters, tags: tags.length > 0 ? tags : undefined };
 	}
 </script>
 
@@ -162,67 +121,7 @@
 			{/if}
 		</div>
 
-		<div class="space-y-2">
-			<div class="flex items-center justify-between">
-				<p class="text-sm font-medium text-muted-foreground">Tags</p>
-				{#if selectedTags.length > 1}
-					<p class="text-xs text-muted-foreground">Matching all selected tags</p>
-				{/if}
-			</div>
-			<div class="relative">
-				<div
-					class="border rounded-lg p-2 min-h-[42px] bg-background border-input focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ring-offset-background"
-				>
-					<div class="flex flex-wrap gap-1.5 items-center">
-						{#each selectedTags as tag (tag)}
-							<Badge variant="secondary" class="gap-1 pr-1">
-								{tag}
-								<button
-									type="button"
-									onclick={() => removeTag(tag)}
-									class="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5"
-									aria-label="Remove tag {tag}"
-								>
-									<X class="h-3 w-3" />
-								</button>
-							</Badge>
-						{/each}
-						<div class="flex items-center gap-1.5 flex-1 min-w-[120px]">
-							<Tag class="h-4 w-4 text-muted-foreground flex-shrink-0" />
-							<input
-								bind:this={tagInputEl}
-								bind:value={tagSearchTerm}
-								onkeydown={handleTagKeydown}
-								onfocus={() => (tagSearchFocused = true)}
-								onblur={() => setTimeout(() => (tagSearchFocused = false), 200)}
-								placeholder={selectedTags.length > 0
-									? 'Add more tags...'
-									: 'Search and add tags...'}
-								class="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
-								aria-label="Search tags"
-							/>
-						</div>
-					</div>
-				</div>
-
-				{#if tagSearchFocused && tagSuggestions.length > 0}
-					<div
-						class="absolute z-50 left-0 right-0 mt-1 border border-border rounded-lg shadow-lg bg-popover max-h-48 overflow-y-auto"
-					>
-						{#each tagSuggestions.slice(0, 8) as suggestion (suggestion)}
-							<button
-								type="button"
-								onclick={() => addTag(suggestion)}
-								class="flex w-full items-center gap-2 px-3 py-2 hover:bg-accent text-sm"
-							>
-								<Tag class="h-3.5 w-3.5 text-muted-foreground" />
-								{suggestion}
-							</button>
-						{/each}
-					</div>
-				{/if}
-			</div>
-		</div>
+		<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={setTags} />
 
 		{#if hasActiveFilters}
 			<div class="flex justify-end pt-2">

@@ -67,10 +67,7 @@ function tagInput(): HTMLInputElement {
 }
 
 function suggestionButtons(): string[] {
-	return screen
-		.queryAllByRole('button')
-		.filter(b => b.className.includes('px-3 py-2 hover:bg-accent'))
-		.map(b => b.textContent?.trim() ?? '');
+	return screen.queryAllByRole('option').map(b => b.textContent?.trim() ?? '');
 }
 
 async function pickOption(trigger: HTMLElement, name: string): Promise<void> {
@@ -135,7 +132,7 @@ describe('ExpenseSearchFilters: tag picking', () => {
 		renderFilters();
 
 		await fireEvent.focus(tagInput());
-		await fireEvent.click(screen.getByRole('button', { name: 'tolls' }));
+		await fireEvent.click(screen.getByRole('option', { name: 'tolls' }));
 
 		expect(screen.getByRole('button', { name: 'Remove tag tolls' })).toBeInTheDocument();
 		expect(suggestionButtons()).not.toContain('tolls');
@@ -178,8 +175,8 @@ describe('ExpenseSearchFilters: tag picking', () => {
 		renderFilters();
 
 		await fireEvent.focus(tagInput());
-		await fireEvent.click(screen.getByRole('button', { name: 'tolls' }));
-		await fireEvent.click(screen.getByRole('button', { name: 'parking' }));
+		await fireEvent.click(screen.getByRole('option', { name: 'tolls' }));
+		await fireEvent.click(screen.getByRole('option', { name: 'parking' }));
 		await fireEvent.keyDown(tagInput(), { key: 'Backspace' });
 
 		expect(screen.queryByRole('button', { name: 'Remove tag parking' })).toBeNull();
@@ -190,7 +187,7 @@ describe('ExpenseSearchFilters: tag picking', () => {
 		renderFilters();
 
 		await fireEvent.focus(tagInput());
-		await fireEvent.click(screen.getByRole('button', { name: 'tolls' }));
+		await fireEvent.click(screen.getByRole('option', { name: 'tolls' }));
 		await fireEvent.input(tagInput(), { target: { value: 'pa' } });
 		await fireEvent.keyDown(tagInput(), { key: 'Backspace' });
 
@@ -212,7 +209,7 @@ describe('ExpenseSearchFilters: tag picking', () => {
 		renderFilters();
 
 		await fireEvent.focus(tagInput());
-		await fireEvent.click(screen.getByRole('button', { name: 'tolls' }));
+		await fireEvent.click(screen.getByRole('option', { name: 'tolls' }));
 		await fireEvent.click(screen.getByRole('button', { name: 'Remove tag tolls' }));
 
 		expect(screen.queryByRole('button', { name: 'Clear Filters' })).toBeNull();
@@ -223,10 +220,10 @@ describe('ExpenseSearchFilters: tag picking', () => {
 		renderFilters();
 
 		await fireEvent.focus(tagInput());
-		await fireEvent.click(screen.getByRole('button', { name: 'tolls' }));
+		await fireEvent.click(screen.getByRole('option', { name: 'tolls' }));
 		expect(screen.queryByText('Matching all selected tags')).toBeNull();
 
-		await fireEvent.click(screen.getByRole('button', { name: 'parking' }));
+		await fireEvent.click(screen.getByRole('option', { name: 'parking' }));
 		expect(screen.queryByRole('radiogroup')).toBeNull();
 		expect(screen.queryByRole('radio', { name: 'Any' })).toBeNull();
 		expect(screen.getByText('Matching all selected tags')).toBeInTheDocument();

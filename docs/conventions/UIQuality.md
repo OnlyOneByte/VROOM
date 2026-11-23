@@ -261,7 +261,11 @@ verify by hand:
   while containing Edit/Delete buttons is a `nested-interactive` violation. Make the container
   non-interactive and a real link the navigation target — the pattern `VehicleCarousel` uses.
 - **Keyboard.** Every action is reachable and operable by keyboard in a sensible order. Enter
-  submits, Escape cancels inline editors and closes dialogs.
+  submits, Escape cancels inline editors and closes dialogs. A text field with a suggestion list
+  is a combobox (`TagInput`, `ExpenseTagFilter`): the field is the only tab stop, the options are
+  `tabindex="-1"`, Arrow keys move through them, Enter picks the active one, Escape closes the
+  list, and Tab moves on to the next control. Close the list on `focusout` to outside the field,
+  never on a timer, so focus is never left on a removed element.
 - **Focus.** Never remove outlines. Primitives show `focus-visible:ring-[3px]` in `ring-ring/50`;
   a custom control shows the same ring. Focus moves into a dialog on open and back on close, and
   after a failed submit it moves to the first invalid field (see *Forms*).

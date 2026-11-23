@@ -31,7 +31,7 @@ function renderFilters() {
 
 async function selectTag(tag: string) {
 	await fireEvent.focus(screen.getByLabelText('Search tags'));
-	await fireEvent.click(screen.getByRole('button', { name: tag }));
+	await fireEvent.click(screen.getByRole('option', { name: tag }));
 }
 
 describe('ExpenseSearchFilters: tags follow the filters the page applies', () => {
