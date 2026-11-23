@@ -329,13 +329,9 @@
 					</p>
 				{/if}
 
-				<div class="grid grid-cols-2 gap-2 sm:flex">
+				<div class="flex flex-col sm:flex-row gap-2">
 					{#if backupProviderCount > 0}
-						<Button
-							variant="outline"
-							onclick={() => onBackupNow?.()}
-							class="col-span-2 h-10 sm:h-9 sm:flex-1"
-						>
+						<Button variant="outline" onclick={() => onBackupNow?.()} class="h-10 sm:h-9 sm:flex-1">
 							<RefreshCw class="mr-2 h-4 w-4" />
 							Backup to Cloud
 						</Button>
