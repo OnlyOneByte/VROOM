@@ -197,6 +197,9 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   axis.
 - A chart is never the only way to read a number: pair it with a stat tile, a legend with values
   (as the category pie does), or a table.
+- Every chart can be read without seeing it: the wrappers give the plot a `role="img"` summary
+  (range, highest, lowest), one tab stop where the arrow keys step through the buckets with the
+  tooltip text read out, and a Chart/Table toggle whose table uses the tooltip's formatters.
 - On mobile, charts are full width with few enough x-axis ticks to stay legible; no horizontal
   scrolling.
 

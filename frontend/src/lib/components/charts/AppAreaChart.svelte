@@ -3,6 +3,7 @@
 	import { AreaChart, Points } from 'layerchart';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import ChartCard from './ChartCard.svelte';
+	import ChartPlot from './ChartPlot.svelte';
 	import ChartLegend from './ChartLegend.svelte';
 	import {
 		formatCurrencyAxis,
@@ -19,6 +20,8 @@
 		isolatedValueRows
 	} from '#lib/utils/chart-formatters.ts';
 	import type { Snippet } from 'svelte';
+	import type { ChartState } from 'layerchart';
+	import { buildChartA11y, type ChartSelectHandler } from './chart-a11y.ts';
 
 	interface LegendItem {
 		key: string;
@@ -44,6 +47,8 @@
 		yAxisFormat?: (_v: number) => string;
 		tooltipFormat?: TooltipValueFormat;
 		tooltipLabelFormat?: (_v: unknown) => string;
+		categoryLabel?: string;
+		onSelect?: ChartSelectHandler;
 		class?: string;
 	}
 
@@ -65,10 +70,31 @@
 		yAxisFormat = formatCurrencyAxis,
 		tooltipFormat = formatCurrencyTooltip,
 		tooltipLabelFormat = formatMonthLabel,
+		categoryLabel,
+		onSelect,
 		class: className
 	}: Props = $props();
 
 	let isEmpty = $derived(data.length === 0);
+	let context = $state<ChartState<Record<string, unknown>>>();
+	let a11y = $derived(
+		buildChartA11y({
+			title,
+			description,
+			data,
+			categoryKey: x,
+			categoryLabel,
+			series,
+			labelFormat: tooltipLabelFormat,
+			valueFormat: tooltipFormat
+		})
+	);
+
+	function showRow(index: number | null) {
+		const row = index === null ? undefined : data[index];
+		if (row) context?.tooltip.show({ data: row });
+		else context?.tooltip.hide();
+	}
 	let resolvedXAxisProps = $derived(xAxisProps ?? monthlyXAxisProps(data.length));
 	let yTicks = $derived(
 		distinctYTicks(yAxisFormat, height - CHART_PADDING.top - CHART_PADDING.bottom)
@@ -91,41 +117,49 @@
 	{icon}
 	{height}
 	animationClass="chart-line-animated"
+	table={a11y}
 	class={className}
 >
-	<div style="height: {height}px">
-		<Chart.Container {config} class="h-full w-full">
-			<AreaChart
-				{data}
-				{x}
-				{y}
-				{series}
-				{seriesLayout}
-				padding={CHART_PADDING}
-				xPadding={TIME_X_PADDING}
-				props={{
-					area: { curve: SMOOTH_CURVE, opacity: 0.3 },
-					xAxis: { ...resolvedXAxisProps, ticks: insetTimeTicks(resolvedXAxisProps['ticks']) },
-					yAxis: { format: yAxisFormat, ticks: yTicks },
-					grid: { yTicks }
-				}}
-			>
-				{#snippet points()}
-					{#each isolatedValues as isolated (isolated.key)}
-						<Points
-							seriesKey={isolated.key}
-							data={isolated.rows}
-							stroke="var(--color-surface-100, light-dark(white, black))"
-							{...SINGLE_POINT_PROPS}
-						/>
-					{/each}
-				{/snippet}
-				{#snippet tooltip()}
-					<Chart.Tooltip labelFormatter={tooltipLabelFormat} valueFormatter={tooltipFormat} />
-				{/snippet}
-			</AreaChart>
-		</Chart.Container>
-	</div>
+	<ChartPlot
+		{a11y}
+		onStep={showRow}
+		onSelect={onSelect ? i => onSelect(data[i]!, null) : undefined}
+	>
+		<div style="height: {height}px">
+			<Chart.Container {config} class="h-full w-full">
+				<AreaChart
+					bind:context
+					{data}
+					{x}
+					{y}
+					{series}
+					{seriesLayout}
+					padding={CHART_PADDING}
+					xPadding={TIME_X_PADDING}
+					props={{
+						area: { curve: SMOOTH_CURVE, opacity: 0.3 },
+						xAxis: { ...resolvedXAxisProps, ticks: insetTimeTicks(resolvedXAxisProps['ticks']) },
+						yAxis: { format: yAxisFormat, ticks: yTicks },
+						grid: { yTicks }
+					}}
+				>
+					{#snippet points()}
+						{#each isolatedValues as isolated (isolated.key)}
+							<Points
+								seriesKey={isolated.key}
+								data={isolated.rows}
+								stroke="var(--color-surface-100, light-dark(white, black))"
+								{...SINGLE_POINT_PROPS}
+							/>
+						{/each}
+					{/snippet}
+					{#snippet tooltip()}
+						<Chart.Tooltip labelFormatter={tooltipLabelFormat} valueFormatter={tooltipFormat} />
+					{/snippet}
+				</AreaChart>
+			</Chart.Container>
+		</div>
+	</ChartPlot>
 	{#snippet legend()}
 		{#if series.length > 1}
 			<ChartLegend items={series} class="mt-3 justify-center" />

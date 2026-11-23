@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 
 interface PieItem {
 	key: string;
@@ -142,6 +142,33 @@ describe('AppPieChart', () => {
 		await mount({ isLoading: true });
 		expect(screen.queryByRole('list', { name: 'Categories' })).toBeNull();
 		expect(pieChart).not.toHaveBeenCalled();
+	});
+
+	test('the pie is one tab stop with a summary, and the value list stays readable', async () => {
+		await mount();
+		const plot = screen.getByRole('img');
+		expect(plot).toHaveAttribute('tabindex', '0');
+		expect(plot).toHaveAttribute(
+			'aria-label',
+			'Spending by category: 2 categories. Highest: Fuel, $1,234.50, 61.7%. Lowest: Maintenance, $765.50, 38.3%.'
+		);
+		expect(plot.contains(screen.getByRole('list', { name: 'Categories' }))).toBe(false);
+	});
+
+	test('arrow keys step through the slices and mark the matching legend row', async () => {
+		await mount();
+		const plot = screen.getByRole('img');
+		const live = plot.parentElement!.querySelector('[aria-live="polite"]')!;
+		await fireEvent.keyDown(plot, { key: 'ArrowRight' });
+		expect(live.textContent).toBe('Fuel: $1,234.50, 61.7%. 1 of 2.');
+		const items = within(screen.getByRole('list', { name: 'Categories' })).getAllByRole('listitem');
+		expect(items[0]).toHaveClass('bg-muted');
+		await fireEvent.keyDown(plot, { key: 'ArrowRight' });
+		expect(live.textContent).toBe('Maintenance: $765.50, 38.3%. 2 of 2.');
+		expect(items[0]).not.toHaveClass('bg-muted');
+		expect(items[1]).toHaveClass('bg-muted');
+		await fireEvent.keyDown(plot, { key: 'Escape' });
+		expect(items[1]).not.toHaveClass('bg-muted');
 	});
 
 	test('nothing chart-related renders until the card scrolls into view', async () => {
