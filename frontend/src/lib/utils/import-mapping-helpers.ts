@@ -1,7 +1,7 @@
 import type { ExpenseCategory, ImportColumnMapping, NativeImportField } from '#lib/types/index.ts';
 import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 
-const NATIVE_HEADERS = ['date', 'vehicle', 'category', 'amount'] as const;
+export const NATIVE_HEADERS = ['date', 'vehicle', 'category', 'amount'] as const;
 
 export const DETECT_SAMPLE_LENGTH = 8192;
 
