@@ -7,6 +7,7 @@ import type { DrizzleTransaction, SplitConfig } from '../../db/types';
 import { ValidationError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES, type DistanceUnit, parseUnitPreferences } from '../../types';
 import { logger } from '../../utils/logger';
+import { formatNumberForMessage } from '../../utils/money';
 import { zonedParts, zoneOffsetMs } from '../../utils/time-zone';
 import { DISTANCE_UNIT_SHORT_LABELS } from '../../utils/unit-conversions';
 import { expenseSplitService } from '../expenses/split-service';
@@ -57,7 +58,7 @@ function payloadFromReminder(
 ): PushPayload {
   const body =
     notification.dueOdometer !== null
-      ? `Due at ${notification.dueOdometer.toLocaleString('en-US')} ${DISTANCE_UNIT_SHORT_LABELS[distanceUnit]}`
+      ? `Due at ${formatNumberForMessage(notification.dueOdometer)} ${DISTANCE_UNIT_SHORT_LABELS[distanceUnit]}`
       : 'This reminder is now due';
   return { title: `${reminder.name} due`, body, tag: reminder.id, url: '/reminders' };
 }

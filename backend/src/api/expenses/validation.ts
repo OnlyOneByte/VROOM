@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES, type SplitConfig } from '../../db/types';
-import { dollarsToCents, expenseDollarsToCents } from '../../utils/money';
+import { dollarsToCents, expenseDollarsToCents, formatNumberForMessage } from '../../utils/money';
 import { DUPLICATE_VEHICLE_MESSAGE, dateInput, hasUniqueVehicleIds } from '../../utils/validation';
 
 export const MILEAGE_NOT_POSITIVE_MESSAGE = 'Mileage must be greater than 0';
@@ -29,10 +29,10 @@ export function odometerOrderError(
     return 'Mileage cannot be less than initial mileage';
   }
   if (before != null && mileage <= before) {
-    return `Mileage must be greater than ${before.toLocaleString('en-US')} (from earlier entry)`;
+    return `Mileage must be greater than ${formatNumberForMessage(before)} (from earlier entry)`;
   }
   if (after != null && mileage >= after) {
-    return `Mileage must be less than ${after.toLocaleString('en-US')} (from later entry)`;
+    return `Mileage must be less than ${formatNumberForMessage(after)} (from later entry)`;
   }
   return null;
 }
@@ -217,7 +217,7 @@ export const updateSplitSchema = z
     if (total <= 0 || total > dollarsToCents(max)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: `The split total must be more than 0 and at most ${max.toLocaleString('en-US')}`,
+        message: `The split total must be more than 0 and at most ${formatNumberForMessage(max)}`,
         path: ['splitConfig', 'allocations'],
       });
     }

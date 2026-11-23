@@ -121,6 +121,10 @@ function moneyDollarsToCents(build: (base: z.ZodNumber) => z.ZodNumber = (n) => 
   return build(z.number()).transform(dollarsToCents);
 }
 
+export function formatNumberForMessage(value: number): string {
+  return value.toLocaleString('en-US');
+}
+
 const RELATIVE_DRIFT_TOLERANCE = 1e-12;
 const MAX_EXPENSE_AMOUNT = CONFIG.validation.expense.maxAmount;
 
@@ -140,7 +144,7 @@ export function boundedDollarsToCents(
 ) {
   return moneyDollarsToCents((n) =>
     build(n)
-      .max(max, `${label} must be ${max.toLocaleString('en-US')} or less`)
+      .max(max, `${label} must be ${formatNumberForMessage(max)} or less`)
       .refine(hasAtMostTwoDecimals, `${label} can have at most 2 decimal places`)
   );
 }
