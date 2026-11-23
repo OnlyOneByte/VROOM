@@ -15,6 +15,10 @@ type Actor = 'owner' | 'editor' | 'viewer' | 'stranger';
 interface Fixture {
   vehicleId: string;
   expenseId: string;
+  odometerId: string;
+  financingId: string;
+  policyId: string;
+  termId: string;
 }
 
 interface RouteCase {
@@ -35,6 +39,27 @@ const EXPENSE_BODY = {
   expenseAmount: 25,
   date: '2024-06-01T00:00:00.000Z',
 };
+
+const FINANCING_BODY = {
+  financingType: 'loan',
+  provider: 'Bank',
+  originalAmount: 1000,
+  termMonths: 12,
+  startDate: '2024-01-01T00:00:00.000Z',
+  paymentAmount: 100,
+  paymentFrequency: 'monthly',
+};
+
+const policyBody = (vehicleId: string) => ({
+  company: 'Mutual',
+  terms: [
+    {
+      startDate: '2024-01-01T00:00:00.000Z',
+      endDate: '2025-01-01T00:00:00.000Z',
+      vehicleCoverage: { vehicleIds: [vehicleId] },
+    },
+  ],
+});
 
 const ROUTES: RouteCase[] = [
   {
@@ -110,19 +135,26 @@ const ROUTES: RouteCase[] = [
   {
     name: 'POST /financing/vehicles/:id/financing',
     mode: 'owner',
+    request: (fx) => ['POST', `/financing/vehicles/${fx.vehicleId}/financing`, FINANCING_BODY],
+  },
+  {
+    name: 'PATCH /financing/:id/payment-amount',
+    mode: 'owner',
     request: (fx) => [
-      'POST',
-      `/financing/vehicles/${fx.vehicleId}/financing`,
-      {
-        financingType: 'loan',
-        provider: 'Bank',
-        originalAmount: 1000,
-        termMonths: 12,
-        startDate: '2024-01-01T00:00:00.000Z',
-        paymentAmount: 100,
-        paymentFrequency: 'monthly',
-      },
+      'PATCH',
+      `/financing/${fx.financingId}/payment-amount`,
+      { paymentAmount: 120 },
     ],
+  },
+  {
+    name: 'PUT /financing/:id/payoff',
+    mode: 'owner',
+    request: (fx) => ['PUT', `/financing/${fx.financingId}/payoff`],
+  },
+  {
+    name: 'DELETE /financing/:id',
+    mode: 'owner',
+    request: (fx) => ['DELETE', `/financing/${fx.financingId}`],
   },
   {
     name: 'GET /insurance/vehicles/:id/policies',
@@ -132,20 +164,34 @@ const ROUTES: RouteCase[] = [
   {
     name: 'POST /insurance',
     mode: 'owner',
+    request: (fx) => ['POST', '/insurance', policyBody(fx.vehicleId)],
+  },
+  {
+    name: 'POST /insurance/:id/terms',
+    mode: 'owner',
     request: (fx) => [
       'POST',
-      '/insurance',
+      `/insurance/${fx.policyId}/terms`,
       {
-        company: 'Mutual',
-        terms: [
-          {
-            startDate: '2024-01-01T00:00:00.000Z',
-            endDate: '2025-01-01T00:00:00.000Z',
-            vehicleCoverage: { vehicleIds: [fx.vehicleId] },
-          },
-        ],
+        startDate: '2025-01-01T00:00:00.000Z',
+        endDate: '2026-01-01T00:00:00.000Z',
+        vehicleCoverage: { vehicleIds: [fx.vehicleId] },
       },
     ],
+  },
+  {
+    name: 'PUT /insurance/:id/terms/:termId',
+    mode: 'owner',
+    request: (fx) => [
+      'PUT',
+      `/insurance/${fx.policyId}/terms/${fx.termId}`,
+      { policyNumber: 'P-2' },
+    ],
+  },
+  {
+    name: 'DELETE /insurance/:id/terms/:termId',
+    mode: 'owner',
+    request: (fx) => ['DELETE', `/insurance/${fx.policyId}/terms/${fx.termId}`],
   },
   {
     name: 'GET /reminders?vehicleId',
@@ -169,6 +215,41 @@ const ROUTES: RouteCase[] = [
       },
     ],
   },
+  {
+    name: 'GET /odometer/:vehicleId',
+    mode: 'read',
+    request: (fx) => ['GET', `/odometer/${fx.vehicleId}`],
+  },
+  {
+    name: 'GET /odometer/:vehicleId/history',
+    mode: 'read',
+    request: (fx) => ['GET', `/odometer/${fx.vehicleId}/history`],
+    returnsOwnerRow: (fx) => fx.odometerId,
+  },
+  {
+    name: 'GET /odometer/entry/:id',
+    mode: 'read',
+    request: (fx) => ['GET', `/odometer/entry/${fx.odometerId}`],
+  },
+  {
+    name: 'POST /odometer/:vehicleId',
+    mode: 'write',
+    request: (fx) => [
+      'POST',
+      `/odometer/${fx.vehicleId}`,
+      { odometer: 32000, recordedAt: '2024-07-01T00:00:00.000Z' },
+    ],
+  },
+  {
+    name: 'PUT /odometer/:id',
+    mode: 'write',
+    request: (fx) => ['PUT', `/odometer/${fx.odometerId}`, { odometer: 31500 }],
+  },
+  {
+    name: 'DELETE /odometer/:id',
+    mode: 'write',
+    request: (fx) => ['DELETE', `/odometer/${fx.odometerId}`],
+  },
 ];
 
 let ctx: TestApp;
@@ -181,7 +262,30 @@ beforeEach(async () => {
   const created = await ctx.authed('POST', '/api/v1/expenses', { ...EXPENSE_BODY, vehicleId });
   const expense = await json<DataEnvelope<{ id: string }>>(created);
   expect(created.status, JSON.stringify(expense)).toBe(201);
-  fx = { vehicleId, expenseId: expense.data.id };
+  const reading = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
+    odometer: 31000,
+    recordedAt: '2024-06-02T00:00:00.000Z',
+  });
+  const odometer = await json<DataEnvelope<{ id: string }>>(reading);
+  expect(reading.status, JSON.stringify(odometer)).toBe(201);
+  const financingRes = await ctx.authed(
+    'POST',
+    `/api/v1/financing/vehicles/${vehicleId}/financing`,
+    FINANCING_BODY
+  );
+  const financing = await json<DataEnvelope<{ id: string }>>(financingRes);
+  expect(financingRes.status, JSON.stringify(financing)).toBe(201);
+  const policyRes = await ctx.authed('POST', '/api/v1/insurance', policyBody(vehicleId));
+  const policy = await json<DataEnvelope<{ id: string; terms: { id: string }[] }>>(policyRes);
+  expect(policyRes.status, JSON.stringify(policy)).toBe(201);
+  fx = {
+    vehicleId,
+    expenseId: expense.data.id,
+    odometerId: odometer.data.id,
+    financingId: financing.data.id,
+    policyId: policy.data.id,
+    termId: policy.data.terms[0].id,
+  };
 
   const editor = await createInvitee(ctx, 'access-editor');
   const viewer = await createInvitee(ctx, 'access-viewer');

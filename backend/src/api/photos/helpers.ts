@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { NotFoundError, ValidationError } from '../../errors';
-import { requireVehicleWrite, resolveVehicleOwnerId } from '../../utils/sharing';
-import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
+import { validateInsuranceOwnership } from '../../utils/validation';
+import { requireVehicleAccess } from '../../utils/vehicle-access';
 import { expenseRepository } from '../expenses/repository';
 import { insuranceClaimRepository } from '../insurance/claims-repository';
 import { odometerRepository } from '../odometer/repository';
@@ -13,7 +13,7 @@ export async function validateEntityOwnership(
 ): Promise<string> {
   switch (entityType) {
     case 'vehicle': {
-      await validateVehicleOwnership(entityId, userId);
+      await requireVehicleAccess(entityId, userId, 'owner');
       return userId;
     }
     case 'insurance_policy': {
@@ -29,14 +29,12 @@ export async function validateEntityOwnership(
       // Shared-vehicle rows carry the owner's userId, so authorize through the vehicle write gate.
       const expense = await expenseRepository.findById(entityId);
       if (!expense) throw new NotFoundError('Expense');
-      await requireVehicleWrite(expense.vehicleId, userId);
-      return (await resolveVehicleOwnerId(expense.vehicleId)) ?? userId;
+      return (await requireVehicleAccess(expense.vehicleId, userId, 'write')).ownerId;
     }
     case 'odometer_entry': {
       const entry = await odometerRepository.findById(entityId);
       if (!entry) throw new NotFoundError('Odometer entry');
-      await requireVehicleWrite(entry.vehicleId, userId);
-      return (await resolveVehicleOwnerId(entry.vehicleId)) ?? userId;
+      return (await requireVehicleAccess(entry.vehicleId, userId, 'write')).ownerId;
     }
     default:
       throw new ValidationError(`Unknown entity type: ${entityType}`);

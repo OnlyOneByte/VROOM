@@ -4,11 +4,6 @@ import type { DrizzleTransaction } from '../../db/types';
 import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
-import {
-  requireVehicleOwnerScope,
-  requireVehicleRead,
-  requireVehicleWrite,
-} from '../../utils/sharing';
 import { isValidTimeZone, zonedDayWindow } from '../../utils/time-zone';
 import {
   commonSchemas,
@@ -19,6 +14,7 @@ import {
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
+import { requireVehicleAccess } from '../../utils/vehicle-access';
 import { assertOdometerInOrder } from '../expenses/repository';
 import type { OdometerCheck } from '../expenses/validation';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
@@ -65,7 +61,7 @@ routes.get(
     const { vehicleId } = c.req.valid('param');
     const query = c.req.valid('query');
 
-    const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
+    const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'read');
 
     const { limit, offset } = clampPagination(query);
 
@@ -89,7 +85,7 @@ routes.get(
     const { vehicleId } = c.req.valid('param');
     const query = c.req.valid('query');
 
-    const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
+    const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'read');
 
     const { limit, offset } = clampPagination(query);
 
@@ -108,7 +104,7 @@ routes.get('/entry/:id', zValidator('param', commonSchemas.idParam), async (c) =
 
   const entry = await odometerRepository.findById(id);
   if (!entry) throw new NotFoundError('Odometer entry');
-  await requireVehicleRead(entry.vehicleId, user.id);
+  await requireVehicleAccess(entry.vehicleId, user.id, 'read');
 
   return c.json({ success: true, data: entry });
 });
@@ -122,7 +118,7 @@ routes.post(
     const { vehicleId } = c.req.valid('param');
     const data = c.req.valid('json');
 
-    const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'write');
+    const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'write');
 
     const entry = await odometerRepository.createChecked(
       {
@@ -152,7 +148,7 @@ routes.put(
 
     const existing = await odometerRepository.findById(id);
     if (!existing) throw new NotFoundError('Odometer entry');
-    await requireVehicleWrite(existing.vehicleId, user.id);
+    await requireVehicleAccess(existing.vehicleId, user.id, 'write');
 
     const { timeZone, ...changes } = data;
     const odometer = changes.odometer ?? existing.odometer;
@@ -180,7 +176,7 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   const existing = await odometerRepository.findById(id);
   if (!existing) throw new NotFoundError('Odometer entry');
-  await requireVehicleWrite(existing.vehicleId, user.id);
+  await requireVehicleAccess(existing.vehicleId, user.id, 'write');
 
   await deleteAllPhotosForEntity('odometer_entry', id, existing.userId);
   await odometerRepository.delete(id);
