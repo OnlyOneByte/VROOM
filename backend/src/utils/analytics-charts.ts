@@ -416,6 +416,23 @@ export function computeAverageCosts(
   };
 }
 
+export function computeMonthlySpend(
+  fuelRows: FuelExpenseRow[],
+  end: Date
+): { months: number; fuel: number | null; charging: number | null } | null {
+  const withCost = fuelRows.filter((r) => r.expenseAmount > 0 && r.date != null);
+  if (withCost.length === 0) return null;
+  const first = Math.min(...withCost.map((r) => normalizeDate(r.date)?.getTime() ?? 0));
+  const months = Math.max(1, Math.round((end.getTime() - first) / 86400000 / (365.25 / 12)));
+  const perMonth = (rows: FuelExpenseRow[]) =>
+    rows.length > 0 ? rows.reduce((s, r) => s + r.expenseAmount, 0) / months : null;
+  return {
+    months,
+    fuel: perMonth(withCost.filter((r) => !isElectricFuelType(r.fuelType))),
+    charging: perMonth(withCost.filter((r) => isElectricFuelType(r.fuelType))),
+  };
+}
+
 function validMilesBetween(
   current: { mileage: number | null; missedFillup: boolean },
   previous: { mileage: number | null; missedFillup: boolean },

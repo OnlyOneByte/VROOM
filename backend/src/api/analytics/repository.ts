@@ -45,6 +45,7 @@ import {
   computeAverageCosts,
   computeEfficiencyPoint,
   computeMileageScore,
+  computeMonthlySpend,
   computeMpgAndCostPerMile,
   computePreviousYearComparison,
   computeRegularityScore,
@@ -206,6 +207,7 @@ export interface FuelStatsData {
     worstCostPerDistance: number | null;
     avgCostPerDay: number | null;
   };
+  monthlySpend: { months: number; fuel: number | null; charging: number | null } | null;
   distance: {
     totalDistance: number;
     avgPerDay: number | null;
@@ -1577,6 +1579,10 @@ export class AnalyticsRepository {
       fuelConsumption,
       fillupDetails,
       averageCost,
+      monthlySpend: computeMonthlySpend(
+        fuelRows,
+        new Date(Math.min(now.getTime(), rangeEndDate.getTime()))
+      ),
       distance,
       monthlyConsumption: this.buildMonthlyConsumption(fuelRowsByVehicle, convert),
       gasPriceHistory: buildGasPriceHistory(fuelRows, isFillup, convert.volume),

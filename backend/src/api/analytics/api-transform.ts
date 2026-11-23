@@ -28,6 +28,11 @@ export function fuelStatsToApi(d: FuelStatsData): FuelStatsData {
       worstCostPerDistance: cn(d.averageCost.worstCostPerDistance),
       avgCostPerDay: cn(d.averageCost.avgCostPerDay),
     },
+    monthlySpend: d.monthlySpend && {
+      months: d.monthlySpend.months,
+      fuel: cn(d.monthlySpend.fuel),
+      charging: cn(d.monthlySpend.charging),
+    },
     gasPriceHistory: d.gasPriceHistory.map((g) => ({ ...g, pricePerVolume: c(g.pricePerVolume) })),
     fillupCostByVehicle: d.fillupCostByVehicle.map((f) => ({ ...f, avgCost: c(f.avgCost) })),
     costPerDistance: d.costPerDistance.map((r) => ({
