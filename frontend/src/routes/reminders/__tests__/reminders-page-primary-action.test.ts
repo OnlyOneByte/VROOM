@@ -109,7 +109,7 @@ describe('/reminders primary action', () => {
 
 		await waitFor(() => expect(screen.getByText('Tyre swap')).toBeInTheDocument());
 		expect(controls('Resume')).toHaveLength(1);
-		expect(screen.getAllByText('Edit to choose a vehicle, then resume.')).toHaveLength(1);
+		expect(screen.getAllByText('No vehicle. Edit to choose one, then resume.')).toHaveLength(1);
 		expect(screen.getByTestId('reminder-card-r-kept').contains(controls('Resume')[0] ?? null)).toBe(
 			true
 		);

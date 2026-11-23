@@ -320,6 +320,11 @@
 										<Car class="h-3.5 w-3.5" />
 										{item.vehicleIds.map(id => vehicleNames.get(id) ?? 'Vehicle').join(', ')}
 									</span>
+								{:else if !item.reminder.isActive}
+									<span class="inline-flex items-center gap-1">
+										<Car class="h-3.5 w-3.5" />
+										No vehicle. Edit to choose one, then resume.
+									</span>
 								{/if}
 							</div>
 						</div>
@@ -355,8 +360,6 @@
 							<Button variant="ghost" size="sm" onclick={() => toggleActive(item)}>
 								{item.reminder.isActive ? 'Pause' : 'Resume'}
 							</Button>
-						{:else}
-							<p class="text-xs text-muted-foreground">Edit to choose a vehicle, then resume.</p>
 						{/if}
 						<Button
 							variant="ghost"
