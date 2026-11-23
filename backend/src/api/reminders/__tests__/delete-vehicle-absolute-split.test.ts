@@ -9,6 +9,7 @@ import { seedVehicle } from '../../../test-helpers/seed';
 
 interface ReminderBody {
   reminder: {
+    id: string;
     expenseAmount: number | null;
     expenseSplitConfig: { method: string; allocations?: { vehicleId: string; amount: number }[] };
   };
@@ -39,9 +40,12 @@ async function createAbsoluteReminder(
 }
 
 async function readReminder(id: string): Promise<ReminderBody['reminder']> {
-  return (
-    await json<DataEnvelope<ReminderBody>>(await ctx.authed('GET', `/api/v1/reminders/${id}`))
-  ).data.reminder;
+  const list = await json<DataEnvelope<ReminderBody[]>>(
+    await ctx.authed('GET', '/api/v1/reminders')
+  );
+  const found = list.data.find((r) => r.reminder.id === id);
+  if (!found) throw new Error(`reminder ${id} not listed`);
+  return found.reminder;
 }
 
 describe('deleting a vehicle from an absolute reminder split', () => {

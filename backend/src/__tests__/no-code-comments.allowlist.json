@@ -163,7 +163,6 @@
   "backend/src/api/sync/routes.ts: null parses as valid JSON, so the parsed body can be null and must be optional-chained.",
   "backend/src/api/trips/__tests__/trip-error-envelope.test.ts: The frontend client reads error.message, so a string-valued error would lose the reason.",
   "backend/src/api/trips/repository.ts: Odometer dedup key: do not remove the linked odometer entry while this returns > 0.",
-  "backend/src/api/trips/routes.ts: Register before /:id, or the literal 'summary' segment is captured as a trip id.",
   "backend/src/api/trips/routes.ts: z.coerce.boolean treats any non-empty string as true, so parse the enum instead.",
   "backend/src/api/trips/service.ts: Logged, not thrown: a 500 after the write would invite a duplicate retry.",
   "backend/src/api/trips/service.ts: The schema refine sees both odometers only when the body sends both, so check the merged pair here.",

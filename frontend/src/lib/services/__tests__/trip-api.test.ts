@@ -97,19 +97,6 @@ describe('tripApi.getSummary', () => {
 });
 
 describe('tripApi CRUD wiring', () => {
-	test('getByVehicle hits the vehicle sub-path', async () => {
-		get.mockResolvedValueOnce([TRIP]);
-		const res = await tripApi.getByVehicle('v1');
-		expect(get).toHaveBeenCalledWith('/trips/vehicle/v1');
-		expect(res).toEqual([TRIP]);
-	});
-
-	test('getById interpolates the id', async () => {
-		get.mockResolvedValueOnce(TRIP);
-		await tripApi.getById('t1');
-		expect(get).toHaveBeenCalledWith('/trips/t1');
-	});
-
 	test('create POSTs the body to /api/v1/trips', async () => {
 		post.mockResolvedValueOnce(TRIP);
 		const body = {

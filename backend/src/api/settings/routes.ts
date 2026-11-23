@@ -14,7 +14,7 @@ import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
 } from '../../utils/unit-preferences-schema';
-import { preferencesRepository, syncStateRepository } from './repository';
+import { preferencesRepository } from './repository';
 import {
   type BackupConfigUpdate,
   backupConfigSchema,
@@ -205,17 +205,6 @@ routes.put('/', async (c) => {
     success: true,
     data: updatedSettings,
     message: 'Settings updated successfully',
-  });
-});
-
-routes.post('/backup', async (c) => {
-  const user = c.get('user');
-  await syncStateRepository.updateBackupDate(user.id);
-
-  return c.json({
-    success: true,
-    message: 'Backup completed successfully',
-    timestamp: new Date().toISOString(),
   });
 });
 

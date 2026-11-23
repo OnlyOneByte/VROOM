@@ -577,7 +577,6 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       const rid = createdBody.data.reminder.id;
       expect(rid, 'reminder id must be extracted from data.reminder.id').toBeTruthy();
 
-      expectDenied(await ctx.authed('GET', `/api/v1/reminders/${rid}`), 'GET reminder');
       expectDenied(
         await ctx.authed('PUT', `/api/v1/reminders/${rid}`, { isActive: false }),
         'PUT reminder'
@@ -847,13 +846,11 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
         })
       );
 
-      expectDenied(await ctx.authed('GET', `/api/v1/trips/${tid}`), 'GET trip');
       expectDenied(
         await ctx.authed('PUT', `/api/v1/trips/${tid}`, { purpose: 'personal' }),
         'PUT trip'
       );
       expectDenied(await ctx.authed('DELETE', `/api/v1/trips/${tid}`), 'DELETE trip');
-      expectDenied(await ctx.authed('GET', `/api/v1/trips/vehicle/${vid}`), 'GET vehicle trips');
       expectDenied(
         await ctx.authed('GET', `/api/v1/trips/summary?vehicleId=${vid}`),
         'GET trip summary for B vehicle'
@@ -862,12 +859,9 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       const listed = await ctx.authed('GET', `/api/v1/trips?vehicleId=${vid}`);
       expect(listed.status, 'filtering the list by a foreign vehicle is 404').toBe(404);
 
-      const stillThere = await asB('GET', `/api/v1/trips/${tid}`);
-      expect(stillThere.status).toBe(200);
-      expect((await json<DataEnvelope<{ purpose: string }>>(stillThere)).data.purpose).toBe(
-        'business'
-      );
-      expect((await asB('GET', `/api/v1/trips/vehicle/${vid}`)).status).toBe(200);
+      expect(ctx.sqlite.query('SELECT purpose FROM trips WHERE id = ?').get(tid)).toEqual({
+        purpose: 'business',
+      });
       expect((await asB('GET', `/api/v1/trips/summary?vehicleId=${vid}`)).status).toBe(200);
     });
   });

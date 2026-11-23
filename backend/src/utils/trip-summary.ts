@@ -18,7 +18,7 @@ function zeroDistanceByPurpose(): DistanceByPurpose {
   return Object.fromEntries(TRIP_PURPOSES.map((p) => [p, 0])) as DistanceByPurpose;
 }
 
-export type TripDistanceConverter = (distance: number, vehicleId: string) => number;
+type TripDistanceConverter = (distance: number, vehicleId: string) => number;
 
 const sameUnit: TripDistanceConverter = (distance) => distance;
 

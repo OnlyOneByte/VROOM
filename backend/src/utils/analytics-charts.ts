@@ -43,7 +43,7 @@ export const SEASON_MAP: Record<number, string> = {
 
 export type CategoryAmounts = Record<ExpenseCategory, number>;
 
-export function emptyCategoryAmounts(): CategoryAmounts {
+function emptyCategoryAmounts(): CategoryAmounts {
   return Object.fromEntries(EXPENSE_CATEGORIES.map((c) => [c, 0])) as CategoryAmounts;
 }
 

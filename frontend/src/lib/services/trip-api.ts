@@ -34,14 +34,6 @@ export const tripApi = {
 		return apiClient.getPaginated<Trip>(`/trips${qs}`);
 	},
 
-	async getByVehicle(vehicleId: string): Promise<Trip[]> {
-		return apiClient.get<Trip[]>(`/trips/vehicle/${vehicleId}`);
-	},
-
-	async getById(id: string): Promise<Trip> {
-		return apiClient.get<Trip>(`/trips/${id}`);
-	},
-
 	async getSummary(params?: { vehicleId?: string; rate?: number }): Promise<TripSummary> {
 		const qs = buildQueryString({
 			vehicleId: params?.vehicleId || undefined,

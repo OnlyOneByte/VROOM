@@ -59,34 +59,7 @@ describe('settings route error responses', () => {
   });
 });
 
-describe('settings POST /backup', () => {
-  function backupDateRow(userId: string): { last_backup_date: number | null } | undefined {
-    return ctx.sqlite
-      .query('SELECT last_backup_date FROM sync_state WHERE user_id = ?')
-      .get(userId) as { last_backup_date: number | null } | undefined;
-  }
-
-  test('POST /settings/backup returns 200 and stamps sync_state.last_backup_date', async () => {
-    await ctx.authed('GET', '/api/v1/settings');
-    const before = backupDateRow(ctx.user.id);
-    expect(before?.last_backup_date ?? null).toBeNull();
-
-    const res = await ctx.authed('POST', '/api/v1/settings/backup');
-    expect(res.status).toBe(200);
-    const body = await json<{ success: boolean; timestamp: string }>(res);
-    expect(body.success).toBe(true);
-    expect(typeof body.timestamp).toBe('string');
-
-    const after = backupDateRow(ctx.user.id);
-    expect(after?.last_backup_date).toBeTruthy();
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    expect((after?.last_backup_date as number) <= nowSeconds + 5).toBe(true);
-  });
-
-  test('POST /settings/backup requires auth (401 when anonymous)', async () => {
-    expect((await ctx.anon('POST', '/api/v1/settings/backup')).status).toBe(401);
-  });
-
+describe('settings POST /restore', () => {
   test('POST /settings/restore is not served, so it cannot report a restore that never ran', async () => {
     expect((await ctx.authed('POST', '/api/v1/settings/restore')).status).toBe(404);
   });

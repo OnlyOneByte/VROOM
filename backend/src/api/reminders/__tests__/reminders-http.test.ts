@@ -197,16 +197,17 @@ describe('reminders HTTP routes', () => {
     const id = createdBody.data.reminder.id;
     expect(createdBody.data.reminder.expenseSplitConfig).toEqual(split);
 
-    const read = await json<DataEnvelope<ReminderWithJoins>>(
-      await ctx.authed('GET', `/api/v1/reminders/${id}`)
+    const listed = await json<DataEnvelope<ReminderWithJoins[]>>(
+      await ctx.authed('GET', '/api/v1/reminders')
     );
-    expect(read.data.reminder.expenseAmount).toBe(100);
-    expect(read.data.reminder.expenseSplitConfig).toEqual(split);
+    const read = listed.data.find((r) => r.reminder.id === id);
+    expect(read?.reminder.expenseAmount).toBe(100);
+    expect(read?.reminder.expenseSplitConfig).toEqual(split);
 
     const saved = await ctx.authed('PUT', `/api/v1/reminders/${id}`, {
       name: 'Shared insurance (edited)',
-      expenseAmount: read.data.reminder.expenseAmount,
-      expenseSplitConfig: read.data.reminder.expenseSplitConfig,
+      expenseAmount: read?.reminder.expenseAmount,
+      expenseSplitConfig: read?.reminder.expenseSplitConfig,
       vehicleIds: [v1, v2],
     });
     expect(saved.status).toBe(200);
