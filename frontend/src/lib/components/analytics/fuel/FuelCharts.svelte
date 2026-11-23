@@ -2,6 +2,40 @@
 	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
 	import type { FuelStatsResponse } from '#lib/types/index.ts';
 
+	type PriceHistory = FuelStatsResponse['gasPriceHistory'];
+
+	export interface MonthlyPrice {
+		count: number;
+		min: number;
+		max: number;
+	}
+
+	export function monthlyPriceRows(history: PriceHistory) {
+		const rows: Record<string, Record<string, unknown>> = {};
+		const sums: Record<string, number> = {};
+		for (const item of history) {
+			const month = item.date.slice(0, 7);
+			const row = (rows[month] ??= { month, date: parseMonthToDate(month) });
+			const key = `${month}|${item.fuelType}`;
+			sums[key] = (sums[key] ?? 0) + item.pricePerVolume;
+			const stats = (row[`${item.fuelType}:stats`] as MonthlyPrice | undefined) ?? {
+				count: 0,
+				min: item.pricePerVolume,
+				max: item.pricePerVolume
+			};
+			stats.count += 1;
+			stats.min = Math.min(stats.min, item.pricePerVolume);
+			stats.max = Math.max(stats.max, item.pricePerVolume);
+			row[`${item.fuelType}:stats`] = stats;
+			row[item.fuelType] = (sums[key] ?? 0) / stats.count;
+		}
+		return Object.values(rows).sort((a, b) => String(a['month']).localeCompare(String(b['month'])));
+	}
+
+	export function monthlyPriceSeries(rows: Record<string, unknown>[], types: string[]) {
+		return types.map(type => ({ key: type, data: rows.filter(row => row[type] != null) }));
+	}
+
 	export function consumptionChartRows(monthly: FuelStatsResponse['monthlyConsumption']) {
 		return monthly.map(d => ({
 			...d,
@@ -12,18 +46,17 @@
 </script>
 
 <script lang="ts">
-	import { formatNumber } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import { AppLineChart, AppAreaChart, AppBarChart } from '#lib/components/charts/index.ts';
 	import { CHART_COLORS, buildChartConfig, buildVehicleColorMap } from '#lib/utils/chart-colors.ts';
 	import {
 		formatDecimalAxis,
 		formatCentsAxis,
-		dayXAxisProps,
-		formatDayLabel,
 		formatCountTooltip,
 		byVehicleMonth,
 		monthlyXAxisProps,
-		unitTooltip
+		unitTooltip,
+		type TooltipValueFormat
 	} from '#lib/utils/chart-formatters.ts';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import type { FuelAdvancedResponse, UnitsMetadata } from '#lib/types/index.ts';
@@ -71,7 +104,7 @@
 	let volumeLabel = $derived(getLongFormLabel(units.volumeUnit));
 	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
 	let pricePerVolumeDesc = $derived(
-		`Price per ${getVolumeUnitName(units.volumeUnit)} by fuel type over time`
+		`Average price per ${getVolumeUnitName(units.volumeUnit)} by fuel type, per month`
 	);
 
 	let consumptionData = $derived(consumptionChartRows(fuelStats.monthlyConsumption));
@@ -90,42 +123,41 @@
 	]);
 	let volumeConfig = $derived(buildChartConfig(volumeSeries));
 
-	type PriceHistory = FuelStatsResponse['gasPriceHistory'];
-
-	function priceRows(history: PriceHistory) {
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map used within $derived computation, not mutated reactively
-		const byDate = new Map<string, Record<string, number | string | Date>>();
-		for (const item of history) {
-			if (!byDate.has(item.date))
-				byDate.set(item.date, { dateStr: item.date, date: parseDateString(item.date) });
-			const row = byDate.get(item.date)!;
-			row[item.fuelType] = item.pricePerVolume;
-		}
-		return Array.from(byDate.values()).sort((a, b) =>
-			String(a['dateStr']).localeCompare(String(b['dateStr']))
-		);
-	}
-
-	function priceSeries(history: PriceHistory) {
-		return [...new Set(history.map(d => d.fuelType))].map((name, i) => ({
+	function priceSeries(history: PriceHistory, rows: Record<string, unknown>[]) {
+		const types = [...new Set(history.map(d => d.fuelType))];
+		const perType = monthlyPriceSeries(rows, types);
+		return types.map((name, i) => ({
 			key: name,
 			label: name,
-			color: CHART_COLORS[i % CHART_COLORS.length] as string
+			color: CHART_COLORS[i % CHART_COLORS.length] as string,
+			value: name,
+			data: perType[i]!.data
 		}));
 	}
 
-	let gasPriceData = $derived(priceRows(fuelStats.gasPriceHistory));
-	let gasPriceSeries = $derived(priceSeries(fuelStats.gasPriceHistory));
+	function priceTooltip(noun: string): TooltipValueFormat {
+		return (value, key, row) => {
+			const stats = row?.[`${key}:stats`] as MonthlyPrice | undefined;
+			const average = `${formatCurrency(value)} avg`;
+			if (!stats) return average;
+			const count = `${stats.count} ${noun}${stats.count === 1 ? '' : 's'}`;
+			if (stats.count === 1) return `${average} · ${count}`;
+			return `${average} · ${count} · ${formatCurrency(stats.min)}–${formatCurrency(stats.max)}`;
+		};
+	}
+
+	let gasPriceData = $derived(monthlyPriceRows(fuelStats.gasPriceHistory));
+	let gasPriceSeries = $derived(priceSeries(fuelStats.gasPriceHistory, gasPriceData));
 	let gasPriceFuelTypes = $derived(gasPriceSeries.map(s => s.key));
 	let gasPriceConfig = $derived(buildChartConfig(gasPriceSeries));
 
 	let chargePriceHistory = $derived(fuelStats.charging?.priceHistory ?? []);
-	let chargePriceData = $derived(priceRows(chargePriceHistory));
-	let chargePriceSeries = $derived(priceSeries(chargePriceHistory));
+	let chargePriceData = $derived(monthlyPriceRows(chargePriceHistory));
+	let chargePriceSeries = $derived(priceSeries(chargePriceHistory, chargePriceData));
 	let chargePriceTypes = $derived(chargePriceSeries.map(s => s.key));
 	let chargePriceConfig = $derived(buildChartConfig(chargePriceSeries));
 	let pricePerChargeDesc = $derived(
-		`Price per ${getChargeUnitLabel(units.chargeUnit, true)} by charger type over time`
+		`Average price per ${getChargeUnitLabel(units.chargeUnit, true)} by charger type, per month`
 	);
 
 	let fillupCostData = $derived(byVehicleMonth(fuelStats.fillupCostByVehicle, d => d.avgCost));
@@ -157,10 +189,6 @@
 	let dayPatternData = $derived(
 		(dayOfWeekPatterns ?? []).some(d => d.fillupCount > 0) ? (dayOfWeekPatterns ?? []) : []
 	);
-
-	function parseDateString(dateStr: string): Date {
-		return new Date(dateStr);
-	}
 </script>
 
 <div
@@ -206,8 +234,7 @@
 				series={gasPriceSeries}
 				config={gasPriceConfig}
 				yAxisFormat={formatCentsAxis}
-				tooltipLabelFormat={formatDayLabel}
-				xAxisProps={dayXAxisProps(gasPriceData.length)}
+				tooltipFormat={priceTooltip('fill-up')}
 			/>
 		{/if}
 		{#if chargePriceData.length > 0}
@@ -221,8 +248,7 @@
 				series={chargePriceSeries}
 				config={chargePriceConfig}
 				yAxisFormat={formatCentsAxis}
-				tooltipLabelFormat={formatDayLabel}
-				xAxisProps={dayXAxisProps(chargePriceData.length)}
+				tooltipFormat={priceTooltip('session')}
 			/>
 		{/if}
 		{#if showGasCharts}

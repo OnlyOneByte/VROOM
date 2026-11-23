@@ -2,7 +2,11 @@ import type { AnyScale, TicksConfig } from 'layerchart';
 import { curveMonotoneX } from 'd3-shape';
 import { currencyFractionDigits, formatCurrency, formatDateWith, formatNumber } from './formatters';
 
-export type TooltipValueFormat = (value: number, seriesKey: string) => string;
+export type TooltipValueFormat = (
+	value: number,
+	seriesKey: string,
+	row?: Record<string, unknown>
+) => string;
 
 export function formatCurrencyTooltip(value: number): string {
 	return formatCurrency(value);
