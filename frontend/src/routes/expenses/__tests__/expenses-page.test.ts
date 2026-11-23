@@ -109,7 +109,8 @@ const SUMMARY: ExpenseSummary = {
 	monthlyAverage: 45.5,
 	recentAmount: 45.5,
 	categoryBreakdown: [],
-	monthlyTrend: []
+	monthlyTrend: [],
+	costBuckets: { ownershipTotal: 0, runningTotal: 45.5, previous: null, byVehicle: [] }
 };
 
 function pageOf(data: Expense[], totalCount = data.length) {

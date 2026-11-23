@@ -23,6 +23,7 @@ function summary(overrides: Partial<ExpenseSummary> = {}): ExpenseSummary {
 			{ category: 'maintenance', amount: 600, count: 4 }
 		],
 		monthlyTrend: [],
+		costBuckets: { ownershipTotal: 0, runningTotal: 1500, previous: null, byVehicle: [] },
 		...overrides
 	};
 }
