@@ -2,7 +2,11 @@
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount, tick } from 'svelte';
-	import { LoaderCircle, Car, DollarSign, Activity, TrendingUp } from '@lucide/svelte';
+	import { LoaderCircle, Car, DollarSign, Activity, TrendingUp, Plus } from '@lucide/svelte';
+	import { resolve } from '$app/paths';
+	import { routes } from '#lib/routes.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import * as Tabs from '#lib/components/ui/tabs/index.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
@@ -46,6 +50,7 @@
 	}
 
 	let quickStats = $derived(summary?.quickStats ?? null);
+	let noVehicles = $derived(!isLoading && !error && quickStats?.vehicleCount === 0);
 	let fuelStats = $derived(summary?.fuelStats ?? null);
 	let fuelAdvanced = $derived(summary?.fuelAdvanced ?? null);
 
@@ -116,63 +121,84 @@
 		<StatCardGrid items={QUICK_STAT_SKELETONS} columns={4} isLoading />
 	{:else if error}
 		<LoadErrorCard title="Couldn't load analytics" message={error} onRetry={loadSummary} />
+	{:else if noVehicles}
+		<EmptyState>
+			{#snippet icon()}
+				<Car class="h-12 w-12 text-muted-foreground mb-4" />
+			{/snippet}
+			{#snippet title()}
+				Add a vehicle first
+			{/snippet}
+			{#snippet description()}
+				Analytics compare what your vehicles cost over time. Add one and log a few expenses to see
+				them.
+			{/snippet}
+			{#snippet action()}
+				<Button size="lg" href={resolve(routes.vehicleNew)}>
+					<Plus class="mr-2 h-4 w-4" />
+					Add Vehicle
+				</Button>
+			{/snippet}
+		</EmptyState>
 	{:else if quickStats}
 		<StatCardGrid items={quickStatsItems} columns={4} />
 	{/if}
 
-	<Tabs.Root bind:value={activeTab} class="space-y-4 md:space-y-6">
-		<Tabs.List
-			bind:ref={tabList}
-			class="w-full justify-start overflow-x-auto lg:grid lg:grid-cols-4"
-		>
-			<Tabs.Trigger value="fuel-stats" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
-				Fuel & Stats
-			</Tabs.Trigger>
-			<Tabs.Trigger value="cross-vehicle" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
-				Cross-Vehicle
-			</Tabs.Trigger>
-			<Tabs.Trigger value="per-vehicle" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
-				Per-Vehicle
-			</Tabs.Trigger>
-			<Tabs.Trigger value="year-end" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
-				Year-End
-			</Tabs.Trigger>
-		</Tabs.List>
+	{#if !noVehicles}
+		<Tabs.Root bind:value={activeTab} class="space-y-4 md:space-y-6">
+			<Tabs.List
+				bind:ref={tabList}
+				class="w-full justify-start overflow-x-auto lg:grid lg:grid-cols-4"
+			>
+				<Tabs.Trigger value="fuel-stats" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
+					Fuel & Stats
+				</Tabs.Trigger>
+				<Tabs.Trigger value="cross-vehicle" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
+					Cross-Vehicle
+				</Tabs.Trigger>
+				<Tabs.Trigger value="per-vehicle" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
+					Per-Vehicle
+				</Tabs.Trigger>
+				<Tabs.Trigger value="year-end" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
+					Year-End
+				</Tabs.Trigger>
+			</Tabs.List>
 
-		{#if activeTab === 'fuel-stats'}
-			<Tabs.Content value="fuel-stats">
-				<FuelStatsTab {fuelStats} {fuelAdvanced} />
-			</Tabs.Content>
-		{:else if activeTab === 'cross-vehicle'}
-			<Tabs.Content value="cross-vehicle">
-				{#await import('#lib/components/analytics/CrossVehicleTab.svelte')}
-					<div class="flex justify-center p-8">
-						<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
-					</div>
-				{:then { default: CrossVehicleTab }}
-					<CrossVehicleTab />
-				{/await}
-			</Tabs.Content>
-		{:else if activeTab === 'per-vehicle'}
-			<Tabs.Content value="per-vehicle">
-				{#await import('#lib/components/analytics/PerVehicleTab.svelte')}
-					<div class="flex justify-center p-8">
-						<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
-					</div>
-				{:then { default: PerVehicleTab }}
-					<PerVehicleTab />
-				{/await}
-			</Tabs.Content>
-		{:else if activeTab === 'year-end'}
-			<Tabs.Content value="year-end">
-				{#await import('#lib/components/analytics/YearEndTab.svelte')}
-					<div class="flex justify-center p-8">
-						<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
-					</div>
-				{:then { default: YearEndTab }}
-					<YearEndTab />
-				{/await}
-			</Tabs.Content>
-		{/if}
-	</Tabs.Root>
+			{#if activeTab === 'fuel-stats'}
+				<Tabs.Content value="fuel-stats">
+					<FuelStatsTab {fuelStats} {fuelAdvanced} />
+				</Tabs.Content>
+			{:else if activeTab === 'cross-vehicle'}
+				<Tabs.Content value="cross-vehicle">
+					{#await import('#lib/components/analytics/CrossVehicleTab.svelte')}
+						<div class="flex justify-center p-8">
+							<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+						</div>
+					{:then { default: CrossVehicleTab }}
+						<CrossVehicleTab />
+					{/await}
+				</Tabs.Content>
+			{:else if activeTab === 'per-vehicle'}
+				<Tabs.Content value="per-vehicle">
+					{#await import('#lib/components/analytics/PerVehicleTab.svelte')}
+						<div class="flex justify-center p-8">
+							<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+						</div>
+					{:then { default: PerVehicleTab }}
+						<PerVehicleTab />
+					{/await}
+				</Tabs.Content>
+			{:else if activeTab === 'year-end'}
+				<Tabs.Content value="year-end">
+					{#await import('#lib/components/analytics/YearEndTab.svelte')}
+						<div class="flex justify-center p-8">
+							<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+						</div>
+					{:then { default: YearEndTab }}
+						<YearEndTab />
+					{/await}
+				</Tabs.Content>
+			{/if}
+		</Tabs.Root>
+	{/if}
 </div>
