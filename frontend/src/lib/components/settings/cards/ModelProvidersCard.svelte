@@ -37,6 +37,7 @@
 			description:
 				'Connect a vision-AI provider to scan receipts into expense drafts. Bring your own key — your receipt is sent only to the provider you choose. For maximum privacy, self-host with Ollama.',
 			noun: 'receipt-parsing provider',
+			addLabel: 'Add Receipt-Parsing Provider',
 			emptyHint: 'Add one to scan receipts straight into an expense.',
 			dialogNote:
 				'The API key is stored encrypted and never shown again. Your receipt image is sent only to this provider when you scan.',
@@ -51,6 +52,7 @@
 			description:
 				'Connect a chat-AI provider to ask questions about your vehicles and costs. Bring your own key — your questions are sent only to the provider you choose. The assistant is read-only and can never change your data. For maximum privacy, self-host with Ollama.',
 			noun: 'assistant provider',
+			addLabel: 'Add Assistant Provider',
 			emptyHint: 'Add one to chat with an AI about your vehicles and costs.',
 			dialogNote:
 				'The API key is stored encrypted and never shown again. Your questions are sent only to this provider when you chat.',
@@ -237,7 +239,7 @@
 							data-testid="{domain}-add-provider"
 						>
 							<Plus class="h-4 w-4 mr-1" />
-							Add {copy.noun}
+							{copy.addLabel}
 						</Button>
 					{/if}
 				</div>
@@ -255,7 +257,7 @@
 							data-testid="{domain}-add-provider"
 						>
 							<Plus class="h-4 w-4 mr-1" />
-							Add {copy.noun}
+							{copy.addLabel}
 						</Button>
 					</div>
 				{:else}

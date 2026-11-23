@@ -388,7 +388,7 @@
 							onclick={() => goto(resolve(routes.settingsProviderNew))}
 						>
 							<Plus class="h-4 w-4 mr-1" />
-							Add storage provider
+							Add Storage Provider
 						</Button>
 					{/if}
 				</div>
@@ -407,7 +407,7 @@
 							onclick={() => goto(resolve(routes.settingsProviderNew))}
 						>
 							<Plus class="h-4 w-4 mr-1" />
-							Add storage provider
+							Add Storage Provider
 						</Button>
 					</div>
 				{:else}
