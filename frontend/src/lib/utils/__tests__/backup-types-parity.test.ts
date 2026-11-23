@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const BACKEND_TYPES = resolve(here, '../../../../../backend/src/types.ts');
+const BACKEND_SYNC = resolve(here, '../../../../../backend/src/api/sync');
 const FRONTEND_TYPES = resolve(here, '../../types/settings.ts');
 const SHARED = [
 	'ProviderBackupSettings',
@@ -60,6 +61,63 @@ describe('backup types parity with the backend', () => {
 		const backend = fields(backendSrc, name);
 		expect(backend.length).toBeGreaterThan(0);
 		expect(fields(frontendSrc, name)).toEqual(backend);
+	});
+
+	it('RestoreProviderInfo matches the restore providers route exactly', () => {
+		const backend = fields(
+			readFileSync(`${BACKEND_SYNC}/routes.ts`, 'utf8'),
+			'RestoreProviderInfo'
+		);
+		expect(backend.length).toBeGreaterThan(0);
+		expect(fields(frontendSrc, 'RestoreProviderInfo')).toEqual(backend);
+	});
+
+	it.each([
+		[
+			'BackupOrchestratorResult',
+			'backup-strategy.ts',
+			'BackupOrchestratorResult',
+			['outcome', 'results']
+		],
+		['RestoreResult', 'restore.ts', 'RestoreResponse', ['preview', 'imported', 'conflicts']]
+	])(
+		'%s matches the backend %s, except where the backend names a type (%s)',
+		(frontendName, file, backendName, namedTypeFields) => {
+			const byName = (members: string[]) =>
+				new Map(members.map(member => [member.split(':')[0] ?? member, member]));
+			const backend = byName(fields(readFileSync(`${BACKEND_SYNC}/${file}`, 'utf8'), backendName));
+			const frontend = byName(fields(frontendSrc, frontendName));
+			expect(backend.size).toBeGreaterThan(0);
+			expect([...frontend.keys()]).toEqual([...backend.keys()]);
+			for (const [name, member] of backend) {
+				if (namedTypeFields.includes(name.replace('?', ''))) continue;
+				expect(frontend.get(name), name).toBe(member);
+			}
+		}
+	);
+
+	it('BackupOrchestratorResult.results entries have the backend BackupStrategyResult fields', () => {
+		const strategySrc = readFileSync(`${BACKEND_SYNC}/backup-strategy.ts`, 'utf8');
+		const backend = fields(strategySrc, 'BackupStrategyResult').map(m => m.split(':')[0]);
+		const results = fields(frontendSrc, 'BackupOrchestratorResult').find(m =>
+			m.startsWith('results:')
+		);
+		const entry = results?.match(/Record< ?string, ?\{(.*)\} ?>$/)?.[1];
+		if (!entry) throw new Error(`can't read results entry: ${results}`);
+		const frontend = fields(`export interface Entry {${entry}}`, 'Entry').map(m => m.split(':')[0]);
+		expect(frontend).toEqual(backend);
+	});
+
+	it('BackupOrchestratorResult.outcome lists the backend BackupOutcome values', () => {
+		const strategySrc = readFileSync(`${BACKEND_SYNC}/backup-strategy.ts`, 'utf8');
+		const union = strategySrc.match(/export type BackupOutcome = ([^;]+);/)?.[1];
+		if (!union) throw new Error('BackupOutcome not found');
+		const literals = (text: string) => [...text.matchAll(/'([^']+)'/g)].map(m => m[1]).sort();
+		const outcome = fields(frontendSrc, 'BackupOrchestratorResult').find(member =>
+			member.startsWith('outcome:')
+		);
+		expect(outcome).toBeDefined();
+		expect(literals(outcome as string)).toEqual(literals(union));
 	});
 
 	it('reads inline objects, wrapped unions and readonly or quoted keys, and refuses anything else', () => {
