@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 
 const goto = vi.fn((_url: string) => Promise.resolve());
 vi.mock('$app/navigation', () => ({ goto: (url: string) => goto(url) }));
@@ -420,6 +420,20 @@ describe('VehicleCarousel compact header', () => {
 			expect(band).not.toContainElement(badge);
 			expect(title.parentElement?.parentElement).toContainElement(badge);
 		}
+	});
+
+	test('a shared card keeps its name on one line with the badges on one row below it', () => {
+		render(VehicleCarousel, {
+			vehicles: [overview({ hasActiveFinancing: true, sharedBy: 'Sam', nickname: 'Daily Driver' })]
+		});
+		const title = screen.getByRole('heading', { level: 3 });
+		const name = within(title).getByText('Daily Driver');
+		expect(name).toHaveClass('truncate');
+		expect(name).not.toHaveClass('break-words');
+		const badges = screen.getByText('Financed').parentElement;
+		expect(badges).not.toHaveClass('flex-wrap');
+		expect(title.parentElement).toContainElement(badges);
+		expect(title.compareDocumentPosition(badges!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 	});
 
 	test('without a link the header shows no Add Vehicle', () => {
