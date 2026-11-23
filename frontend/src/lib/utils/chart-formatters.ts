@@ -1,6 +1,6 @@
 import type { AnyScale, TicksConfig } from 'layerchart';
 import { curveMonotoneX } from 'd3-shape';
-import { formatCurrency, formatNumber } from './formatters';
+import { currencyFractionDigits, formatCurrency, formatDateWith, formatNumber } from './formatters';
 
 export type TooltipValueFormat = (value: number, seriesKey: string) => string;
 
@@ -19,13 +19,13 @@ export function unitTooltip(unit: string, decimals = 1): TooltipValueFormat {
 export function formatMonthLabel(value: unknown): string {
 	if (!(value instanceof Date)) return value == null ? '' : String(value);
 	if (isNaN(value.getTime())) return '';
-	return value.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+	return formatDateWith(value, { month: 'short', year: 'numeric' });
 }
 
 export function formatDayLabel(value: unknown): string {
 	if (!(value instanceof Date)) return value == null ? '' : String(value);
 	if (isNaN(value.getTime())) return '';
-	return value.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+	return formatDateWith(value, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export function formatCurrencyAxis(value: number): string {
@@ -33,11 +33,11 @@ export function formatCurrencyAxis(value: number): string {
 }
 
 export function formatCentsAxis(value: number): string {
-	return formatCurrency(value, undefined, 2);
+	return formatCurrency(value, undefined, currencyFractionDigits());
 }
 
 export function formatDecimalAxis(value: number, decimals = 1): string {
-	return value.toFixed(decimals);
+	return formatNumber(value, decimals);
 }
 
 const TICK_CHAR_WIDTH = 7;
@@ -71,12 +71,12 @@ export const SMOOTH_CURVE = curveMonotoneX;
 function formatMonthTick(value: unknown): string {
 	if (!(value instanceof Date) || isNaN(value.getTime())) return '';
 	if (value.getMonth() === 0) return String(value.getFullYear());
-	return value.toLocaleDateString('en-US', { month: 'short' });
+	return formatDateWith(value, { month: 'short' });
 }
 
 export function formatDateTick(value: unknown): string {
 	if (!(value instanceof Date) || isNaN(value.getTime())) return '';
-	return value.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+	return formatDateWith(value, { month: 'short', day: 'numeric' });
 }
 
 export function monthlyXAxisProps(dataLength: number, maxTicks = 4) {

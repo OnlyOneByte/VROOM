@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { scaleTime } from 'd3-scale';
 import {
 	byVehicleMonth,
@@ -270,5 +270,19 @@ describe('byVehicleMonth', () => {
 
 	test('returns no rows for no input', () => {
 		expect(byVehicleMonth([], () => 0)).toEqual([]);
+	});
+});
+
+describe('formatCentsAxis currency decimals', () => {
+	test('a currency without minor units gets no decimals on the axis', async () => {
+		const { settingsStore } = await import('#lib/stores/settings.svelte.ts');
+		const spy = vi
+			.spyOn(settingsStore, 'settings', 'get')
+			.mockReturnValue({ currencyUnit: 'JPY' } as NonNullable<typeof settingsStore.settings>);
+		try {
+			expect(formatCentsAxis(12)).toBe('¥12');
+		} finally {
+			spy.mockRestore();
+		}
 	});
 });
