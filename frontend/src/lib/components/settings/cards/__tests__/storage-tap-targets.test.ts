@@ -44,16 +44,17 @@ function expectTouchHeight(button: HTMLElement): void {
 }
 
 describe('Storage Providers controls are 40px tap targets on phones', () => {
-	test('with no providers: the one Add Storage Provider button and Customize per photo type', async () => {
+	test('with no providers: one Add Storage Provider row and no photo-source settings yet', async () => {
 		providers.mockResolvedValue([]);
 		render(StorageProvidersCard, { props: {} });
 
-		await screen.findByText('No storage providers configured');
+		await screen.findByText('No storage provider connected');
 		const addButtons = screen.getAllByRole('button', { name: /^Add / });
 		expect(addButtons).toHaveLength(1);
 		expect(addButtons[0]).toHaveAccessibleName('Add Storage Provider');
 		expectTouchHeight(addButtons[0] as HTMLElement);
-		expectTouchHeight(screen.getByRole('button', { name: /Customize per photo type/ }));
+		expect(screen.queryByRole('button', { name: /Customize per photo type/ })).toBeNull();
+		expect(screen.queryByText(/Enable backup on a provider/)).toBeNull();
 	});
 
 	test('a provider’s edit, delete and expand icons and Sync All, spaced 8px apart', async () => {
@@ -79,7 +80,8 @@ describe('Storage Providers controls are 40px tap targets on phones', () => {
 		expect(addButtons).toHaveLength(1);
 		expect(addButtons[0]).toHaveAccessibleName('Add Storage Provider');
 		expectTouchHeight(addButtons[0] as HTMLElement);
-		expect(screen.queryByText('No storage providers configured')).toBeNull();
+		expect(screen.queryByText('No storage provider connected')).toBeNull();
+		expectTouchHeight(screen.getByRole('button', { name: /Customize per photo type/ }));
 	});
 
 	test('Download Backup and Restore, without a phone flex-basis that overrides the height', async () => {

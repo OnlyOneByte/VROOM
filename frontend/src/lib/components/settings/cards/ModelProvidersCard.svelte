@@ -2,7 +2,7 @@
 	import { onMount, tick } from 'svelte';
 	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
-	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
+	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2, ChevronDown } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -38,7 +38,7 @@
 				'Connect a vision-AI provider to scan receipts into expense drafts. Bring your own key — your receipt is sent only to the provider you choose. For maximum privacy, self-host with Ollama.',
 			noun: 'receipt-parsing provider',
 			addLabel: 'Add Receipt-Parsing Provider',
-			emptyHint: 'Add one to scan receipts straight into an expense.',
+			summary: 'Scan receipts into expense drafts with your own AI key.',
 			dialogNote:
 				'The API key is stored encrypted and never shown again. Your receipt image is sent only to this provider when you scan.',
 			namePlaceholder: 'My receipt parser',
@@ -53,7 +53,7 @@
 				'Connect a chat-AI provider to ask questions about your vehicles and costs. Bring your own key — your questions are sent only to the provider you choose. The assistant is read-only and can never change your data. For maximum privacy, self-host with Ollama.',
 			noun: 'assistant provider',
 			addLabel: 'Add Assistant Provider',
-			emptyHint: 'Add one to chat with an AI about your vehicles and costs.',
+			summary: 'Ask an AI about your vehicles and costs with your own key.',
 			dialogNote:
 				'The API key is stored encrypted and never shown again. Your questions are sent only to this provider when you chat.',
 			namePlaceholder: 'My assistant',
@@ -214,7 +214,16 @@
 			<Icon class="h-5 w-5 text-muted-foreground" />
 			<CardTitle>{copy.title}</CardTitle>
 		</div>
-		<CardDescription>{copy.description}</CardDescription>
+		<CardDescription>{copy.summary}</CardDescription>
+		<details class="group">
+			<summary
+				class="inline-flex min-h-10 cursor-pointer list-none items-center gap-1 rounded-sm text-sm font-medium text-primary outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
+			>
+				<ChevronDown class="h-4 w-4 transition-transform group-open:rotate-180" />
+				How it works
+			</summary>
+			<p class="text-sm text-muted-foreground">{copy.description}</p>
+		</details>
 	</CardHeader>
 	<CardContent bind:ref={content}>
 		{#if isLoading}
@@ -229,38 +238,24 @@
 		{:else}
 			<div class="space-y-3">
 				<div class="flex flex-wrap items-center justify-between gap-2">
-					<p class="text-sm font-medium">Providers</p>
-					{#if providers.length > 0}
-						<Button
-							variant="outline"
-							size="sm"
-							class="h-10 sm:h-8"
-							onclick={openCreate}
-							data-testid="{domain}-add-provider"
-						>
-							<Plus class="h-4 w-4 mr-1" />
-							{copy.addLabel}
-						</Button>
+					{#if providers.length === 0}
+						<p class="text-sm text-muted-foreground">No {copy.noun} connected</p>
+					{:else}
+						<p class="text-sm font-medium">Providers</p>
 					{/if}
+					<Button
+						variant="outline"
+						size="sm"
+						class="h-10 sm:h-8"
+						onclick={openCreate}
+						data-testid="{domain}-add-provider"
+					>
+						<Plus class="h-4 w-4 mr-1" />
+						{copy.addLabel}
+					</Button>
 				</div>
 
-				{#if providers.length === 0}
-					<div class="text-center py-6">
-						<Icon class="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-						<p class="text-sm font-medium">No {copy.noun} configured</p>
-						<p class="text-xs text-muted-foreground mt-1">{copy.emptyHint}</p>
-						<Button
-							variant="outline"
-							size="sm"
-							class="mt-3 h-10 sm:h-8"
-							onclick={openCreate}
-							data-testid="{domain}-add-provider"
-						>
-							<Plus class="h-4 w-4 mr-1" />
-							{copy.addLabel}
-						</Button>
-					</div>
-				{:else}
+				{#if providers.length > 0}
 					<div class="space-y-2">
 						{#each providers as provider (provider.id)}
 							<div

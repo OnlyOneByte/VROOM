@@ -54,7 +54,7 @@ describe('PwaInstallCard', () => {
 	test('in standalone mode it confirms the app is installed', async () => {
 		pwa.state.isStandalone = true;
 		await mount();
-		expect(screen.getByText(/You're using VROOM as an installed app/)).toBeInTheDocument();
+		expect(screen.getByText(/You're using the installed app/)).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: /Install VROOM/ })).toBeNull();
 	});
 
@@ -71,7 +71,7 @@ describe('PwaInstallCard', () => {
 		await vi.advanceTimersByTimeAsync(0);
 
 		expect(pwa.promptInstall).toHaveBeenCalledTimes(1);
-		expect(screen.getByText(/You're using VROOM as an installed app/)).toBeInTheDocument();
+		expect(screen.getByText(/You're using the installed app/)).toBeInTheDocument();
 	});
 
 	test('a dismissed install keeps the Install button available', async () => {
@@ -95,23 +95,27 @@ describe('PwaInstallCard', () => {
 		expect(screen.getByRole('button', { name: /Installing/ })).toBeDisabled();
 	});
 
-	test('on iOS it shows Add to Home Screen steps', async () => {
+	test('on iOS it says how in one line and keeps the steps behind How it works', async () => {
 		pwa.getPlatformInfo.mockReturnValue(platform({ platform: 'ios', isIOS: true }));
-		await mount();
-		expect(screen.getByText(/use Safari's Add to Home Screen feature/)).toBeInTheDocument();
-		expect(screen.getByText('Add to Home Screen')).toBeInTheDocument();
+		const { container } = await mount();
+		expect(screen.getByText(/In Safari, tap/)).toBeInTheDocument();
+		const details = container.querySelector('details');
+		expect(details).not.toBeNull();
+		expect(details?.open).toBe(false);
+		expect(details?.querySelector('summary')).toHaveTextContent('How it works');
+		expect(details?.querySelectorAll('ol li')).toHaveLength(3);
 		expect(screen.queryByRole('button')).toBeNull();
 	});
 
 	test('on Chromium without a prompt it points at the address-bar install icon', async () => {
 		pwa.getPlatformInfo.mockReturnValue(platform({ isChromium: true }));
 		await mount();
-		expect(screen.getByText(/Look for the install icon/)).toBeInTheDocument();
+		expect(screen.getByText(/Use the install icon/)).toBeInTheDocument();
 	});
 
 	test('on other browsers it recommends Chrome or Edge', async () => {
 		await mount();
-		expect(screen.getByText(/to install it as a desktop app/)).toBeInTheDocument();
+		expect(screen.getByText(/to install it\./)).toBeInTheDocument();
 	});
 
 	test('picks up an install prompt that arrives after mount', async () => {
@@ -128,7 +132,7 @@ describe('PwaInstallCard', () => {
 		await mount();
 		pwa.state.isStandalone = true;
 		await vi.advanceTimersByTimeAsync(500);
-		expect(screen.getByText(/You're using VROOM as an installed app/)).toBeInTheDocument();
+		expect(screen.getByText(/You're using the installed app/)).toBeInTheDocument();
 	});
 
 	test('stops polling after five seconds', async () => {
