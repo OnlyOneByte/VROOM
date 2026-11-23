@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { compress } from 'hono/compress';
 import { cors } from 'hono/cors';
 import { csrf } from 'hono/csrf';
 import { logger as honoLogger } from 'hono/logger';
@@ -50,6 +51,8 @@ const largerBodyLimits = new Map(
     bodyLimit({ maxSize, message: 'Request body too large' }),
   ])
 );
+
+app.use('/api/*', compress());
 
 app.use('*', (c, next) => (largerBodyLimits.get(c.req.path) ?? globalBodyLimit)(c, next));
 
