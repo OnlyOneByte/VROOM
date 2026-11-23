@@ -19,6 +19,7 @@ import type {
   StorageRef,
   UploadParams,
 } from './storage-provider';
+import { credentialFailureOf } from './storage-provider';
 
 interface S3Credentials {
   accessKeyId: string;
@@ -202,6 +203,8 @@ export class S3CompatProvider implements StorageProvider {
       await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
       return true;
     } catch (error) {
+      const credentialFailure = credentialFailureOf(error);
+      if (credentialFailure) throw credentialFailure;
       logger.warn('S3 health check failed', {
         bucket: this.bucket,
         error: error instanceof Error ? error.message : String(error),

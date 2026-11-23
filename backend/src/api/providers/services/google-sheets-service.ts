@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import { google, type sheets_v4 } from 'googleapis';
 import { CONFIG } from '../../../config';
 import { getDb } from '../../../db/connection';
@@ -762,7 +762,7 @@ export async function createSheetsServiceForProvider(
         eq(userProviders.id, providerId),
         eq(userProviders.userId, userId),
         eq(userProviders.domain, 'storage'),
-        eq(userProviders.status, 'active')
+        ne(userProviders.status, 'disabled')
       )
     )
     .limit(1);

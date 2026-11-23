@@ -2,6 +2,7 @@ import type { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 import { CONFIG } from '../../../config';
 import { SyncError, SyncErrorCode } from '../../../errors';
+import { credentialFailureOf } from '../domains/storage/storage-provider';
 
 const PHOTOS_API = 'https://photoslibrary.googleapis.com';
 export const VROOM_ALBUM_TITLE = 'VROOM';
@@ -98,7 +99,9 @@ export class GooglePhotosService {
     try {
       await this.client.listAlbums();
       return true;
-    } catch {
+    } catch (error) {
+      const credentialFailure = credentialFailureOf(error);
+      if (credentialFailure) throw credentialFailure;
       return false;
     }
   }

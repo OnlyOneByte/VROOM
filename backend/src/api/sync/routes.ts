@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
@@ -190,7 +190,7 @@ routes.post(
         and(
           eq(userProviders.id, body.providerId),
           eq(userProviders.userId, user.id),
-          eq(userProviders.status, 'active')
+          ne(userProviders.status, 'disabled')
         )
       )
       .limit(1);
@@ -285,7 +285,7 @@ routes.get('/restore/providers', syncRateLimiter, async (c) => {
       and(
         eq(userProviders.userId, user.id),
         eq(userProviders.domain, 'storage'),
-        eq(userProviders.status, 'active')
+        ne(userProviders.status, 'disabled')
       )
     );
 
