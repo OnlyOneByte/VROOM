@@ -18,14 +18,12 @@ export interface SyncConflict {
 export interface SyncConfig {
 	maxRetries: number;
 	retryDelay: number;
-	batchSize: number;
 	conflictResolution: 'ask_user' | 'keep_local' | 'keep_server';
 }
 
 let _syncConfig = $state<SyncConfig>({
 	maxRetries: 3,
 	retryDelay: 1000,
-	batchSize: 10,
 	conflictResolution: 'ask_user'
 });
 

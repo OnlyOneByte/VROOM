@@ -231,47 +231,43 @@ class SyncManager {
 
 		const config = syncConfig.current;
 
-		for (let i = 0; i < expenses.length; i += config.batchSize) {
-			const batch = expenses.slice(i, i + config.batchSize);
+		for (const expense of expenses) {
+			try {
+				const syncResult = await this.syncSingleExpense(expense);
 
-			for (const expense of batch) {
-				try {
-					const syncResult = await this.syncSingleExpense(expense);
-
-					if (syncResult.success) {
-						result.synced++;
-						markExpenseAsSynced(expense.id);
-						this.retryCount.delete(expense.id);
-					} else if (syncResult.conflict) {
-						result.conflicts.push(syncResult.conflict);
-					} else if (syncResult.failureKind === 'terminal') {
-						const reason = syncResult.error || 'Entry needs attention';
-						markExpenseNeedsAttention(expense.id, reason, syncResult.serverId);
-						this.retryCount.delete(expense.id);
-						result.needsAttention++;
-						result.errors.push(reason);
-					} else if (syncResult.failureKind === 'auth') {
-						result.failed++;
-						result.errors.push(syncResult.error || 'Sign in to sync this entry');
-					} else {
-						result.failed++;
-						result.errors.push(syncResult.error || 'Unknown error');
-
-						const retries = this.retryCount.get(expense.id) || 0;
-						if (retries < config.maxRetries) {
-							this.retryCount.set(expense.id, retries + 1);
-							setTimeout(
-								() => {
-									this.retrySingleExpense(expense);
-								},
-								config.retryDelay * Math.pow(2, retries)
-							);
-						}
-					}
-				} catch (error) {
+				if (syncResult.success) {
+					result.synced++;
+					markExpenseAsSynced(expense.id);
+					this.retryCount.delete(expense.id);
+				} else if (syncResult.conflict) {
+					result.conflicts.push(syncResult.conflict);
+				} else if (syncResult.failureKind === 'terminal') {
+					const reason = syncResult.error || 'Entry needs attention';
+					markExpenseNeedsAttention(expense.id, reason, syncResult.serverId);
+					this.retryCount.delete(expense.id);
+					result.needsAttention++;
+					result.errors.push(reason);
+				} else if (syncResult.failureKind === 'auth') {
 					result.failed++;
-					result.errors.push(`Failed to sync expense ${expense.id}: ${error}`);
+					result.errors.push(syncResult.error || 'Sign in to sync this entry');
+				} else {
+					result.failed++;
+					result.errors.push(syncResult.error || 'Unknown error');
+
+					const retries = this.retryCount.get(expense.id) || 0;
+					if (retries < config.maxRetries) {
+						this.retryCount.set(expense.id, retries + 1);
+						setTimeout(
+							() => {
+								this.retrySingleExpense(expense);
+							},
+							config.retryDelay * Math.pow(2, retries)
+						);
+					}
 				}
+			} catch (error) {
+				result.failed++;
+				result.errors.push(`Failed to sync expense ${expense.id}: ${error}`);
 			}
 		}
 
@@ -283,25 +279,15 @@ class SyncManager {
 		try {
 			let serverId = expense.serverId;
 			if (!serverId) {
-				const serverCopy = await this.findServerCopy(expense);
-
-				if (serverCopy && serverCopyDiffers(expense, serverCopy)) {
-					return { success: false, conflict: conflictWith(expense, serverCopy) };
-				}
-
-				if (!serverCopy && isIncompleteFuelExpense(expense)) {
+				if (isIncompleteFuelExpense(expense)) {
 					return { success: false, failureKind: 'terminal', error: INCOMPLETE_FUEL_REASON };
 				}
 
-				if (serverCopy) {
-					serverId = serverCopy.id;
-				} else {
-					const saved = await this.postExpense(expense);
-					if (wasEditedOnServer(saved) && serverCopyDiffers(expense, saved)) {
-						return { success: false, conflict: conflictWith(expense, saved) };
-					}
-					serverId = saved.id;
+				const saved = await this.postExpense(expense);
+				if (wasEditedOnServer(saved) && serverCopyDiffers(expense, saved)) {
+					return { success: false, conflict: conflictWith(expense, saved) };
 				}
+				serverId = saved.id;
 			}
 
 			return await this.deliverQueuedPhotos(expense, serverId);
@@ -329,25 +315,6 @@ class SyncManager {
 				error: `A photo couldn't be uploaded: ${extractErrorMessage(error, 'Unknown error')}`,
 				serverId
 			};
-		}
-	}
-
-	private async findServerCopy(expense: OfflineExpense): Promise<BackendExpenseResponse | null> {
-		try {
-			const filters = new URLSearchParams({
-				vehicleId: expense.vehicleId,
-				startDate: expense.date.slice(0, 10),
-				endDate: expense.date.slice(0, 10)
-			});
-			const rows = await apiClient.get<BackendExpenseResponse[]>(
-				`/api/v1/expenses?${filters.toString()}`
-			);
-			const isSameRecord = (row: BackendExpenseResponse) =>
-				!!expense.clientId && row.clientId === expense.clientId;
-			return (Array.isArray(rows) && rows.find(isSameRecord)) || null;
-		} catch (error) {
-			if (import.meta.env.DEV) console.warn('Failed to check for existing expense:', error);
-			return null;
 		}
 	}
 

@@ -44,7 +44,6 @@ async function freshGraph() {
 	syncConfig.current = {
 		maxRetries: 3,
 		retryDelay: 100,
-		batchSize: 10,
 		conflictResolution: 'ask_user'
 	};
 	return { storage, onlineStatus, syncManager };
