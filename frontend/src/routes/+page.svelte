@@ -13,10 +13,55 @@
 		Shield,
 		ChevronRight,
 		CodeXml,
-		FileSpreadsheet,
 		Lock,
 		Smartphone
 	} from '@lucide/svelte';
+
+	const FEATURES = [
+		{
+			icon: Car,
+			title: 'Multi-Vehicle Tracking',
+			description: 'Fuel, maintenance, insurance and financing for every vehicle in one place.',
+			tint: 'bg-chart-1/10',
+			color: 'text-chart-1'
+		},
+		{
+			icon: ChartBar,
+			title: 'Cost Analytics',
+			description: 'Breakdowns by category, vehicle and period show the true cost of ownership.',
+			tint: 'bg-chart-2/10',
+			color: 'text-chart-2'
+		},
+		{
+			icon: Cloud,
+			title: 'Your Own Storage',
+			description: 'Back up and sync to storage you connect, as standard CSV files.',
+			tint: 'bg-chart-3/10',
+			color: 'text-chart-3'
+		},
+		{
+			icon: Shield,
+			title: 'Privacy First',
+			description:
+				'No tracking, ads or data harvesting. Self-host and your data stays on your server.',
+			tint: 'bg-chart-4/10',
+			color: 'text-chart-4'
+		},
+		{
+			icon: Smartphone,
+			title: 'Install as an App',
+			description: 'A Progressive Web App for phone or desktop, with offline support.',
+			tint: 'bg-chart-5/10',
+			color: 'text-chart-5'
+		},
+		{
+			icon: Lock,
+			title: 'Open Source, Open Format',
+			description: 'Export everything as CSV, then fork it, customize it or self-host it.',
+			tint: 'bg-primary/10',
+			color: 'text-primary'
+		}
+	];
 
 	const authState = authStore;
 	let visible = $state(false);
@@ -36,7 +81,7 @@
 	<title>VROOM — Vehicle Record & Organization Of Maintenance</title>
 	<meta
 		name="description"
-		content="Open-source vehicle expense tracking with Google Drive sync. No lock-in, no proprietary databases."
+		content="Open-source vehicle expense tracking. Your data stays in open CSV you can take anywhere. No lock-in."
 	/>
 </svelte:head>
 
@@ -61,7 +106,7 @@
 			</nav>
 
 			<div
-				class="py-20 sm:py-32 text-center transition-all duration-700 {visible
+				class="pt-12 pb-16 sm:pt-20 sm:pb-24 text-center transition-all duration-700 {visible
 					? 'opacity-100 translate-y-0'
 					: 'opacity-0 translate-y-4'}"
 			>
@@ -80,7 +125,7 @@
 
 					<p class="mx-auto max-w-2xl text-lg sm:text-xl text-muted-foreground">
 						Track every expense, monitor maintenance, and understand what your vehicles really cost
-						— all synced to your Google Drive in open CSV format.
+						— backed up to storage you choose, in open CSV.
 					</p>
 
 					<div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
@@ -104,6 +149,29 @@
 						</Button>
 					</div>
 				</div>
+
+				<div
+					class="mx-auto mt-12 max-w-5xl overflow-hidden rounded-xl border border-border shadow-sm"
+				>
+					<img
+						src="/landing/dashboard-light.webp"
+						width="1280"
+						height="1180"
+						alt="The VROOM Dashboard with two vehicles: spending totals, the fleet and monthly cost charts"
+						loading="lazy"
+						decoding="async"
+						class="block h-auto w-full dark:hidden"
+					/>
+					<img
+						src="/landing/dashboard-dark.webp"
+						width="1280"
+						height="1180"
+						alt="The VROOM Dashboard with two vehicles: spending totals, the fleet and monthly cost charts"
+						loading="lazy"
+						decoding="async"
+						class="hidden h-auto w-full dark:block"
+					/>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -120,92 +188,31 @@
 				</p>
 			</div>
 
-			<div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-				<div class="rounded-xl border border-border bg-card p-6 space-y-3">
-					<div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-chart-1/10">
-						<Car class="h-5 w-5 text-chart-1" />
-					</div>
-					<h3 class="text-lg font-semibold text-foreground">Multi-Vehicle Tracking</h3>
-					<p class="text-muted-foreground text-sm">
-						Manage all your vehicles in one place. Track fuel, maintenance, insurance, financing,
-						and more per vehicle.
-					</p>
-				</div>
-
-				<div class="rounded-xl border border-border bg-card p-6 space-y-3">
-					<div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-chart-2/10">
-						<ChartBar class="h-5 w-5 text-chart-2" />
-					</div>
-					<h3 class="text-lg font-semibold text-foreground">Cost Analytics</h3>
-					<p class="text-muted-foreground text-sm">
-						See where your money goes with breakdowns by category, vehicle, and time period.
-						Understand true cost of ownership.
-					</p>
-				</div>
-
-				<div class="rounded-xl border border-border bg-card p-6 space-y-3">
-					<div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-chart-3/10">
-						<Cloud class="h-5 w-5 text-chart-3" />
-					</div>
-					<h3 class="text-lg font-semibold text-foreground">Google Drive Sync</h3>
-					<p class="text-muted-foreground text-sm">
-						Your data syncs directly to your Drive as standard CSVs. No proprietary databases, no
-						lock-in.
-					</p>
-				</div>
-
-				<div class="rounded-xl border border-border bg-card p-6 space-y-3">
-					<div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-chart-4/10">
-						<Shield class="h-5 w-5 text-chart-4" />
-					</div>
-					<h3 class="text-lg font-semibold text-foreground">Privacy First</h3>
-					<p class="text-muted-foreground text-sm">
-						No tracking, no ads, no data harvesting. Self-host your own instance and your data never
-						leaves your server.
-					</p>
-				</div>
-
-				<div class="rounded-xl border border-border bg-card p-6 space-y-3">
-					<div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-chart-2/10">
-						<Smartphone class="h-5 w-5 text-chart-2" />
-					</div>
-					<h3 class="text-lg font-semibold text-foreground">Install as an App</h3>
-					<p class="text-muted-foreground text-sm">
-						VROOM is a Progressive Web App. Install it on your phone or desktop for a native-like
-						experience with offline support.
-					</p>
-				</div>
-
-				<div class="rounded-xl border border-border bg-card p-6 space-y-3">
-					<div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-chart-5/10">
-						<FileSpreadsheet class="h-5 w-5 text-chart-5" />
-					</div>
-					<h3 class="text-lg font-semibold text-foreground">Open Format</h3>
-					<p class="text-muted-foreground text-sm">
-						All data exports as CSV. Migrate anywhere, anytime. Your data is always yours to take.
-					</p>
-				</div>
-
-				<div class="rounded-xl border border-border bg-card p-6 space-y-3">
-					<div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
-						<Lock class="h-5 w-5 text-primary" />
-					</div>
-					<h3 class="text-lg font-semibold text-foreground">Fully Open Source</h3>
-					<p class="text-muted-foreground text-sm">
-						Fork it, customize it, self-host it. VROOM is yours to make your own with complete
-						transparency.
-					</p>
-				</div>
-			</div>
+			<ul class="grid gap-3 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3">
+				{#each FEATURES as feature (feature.title)}
+					{@const Icon = feature.icon}
+					<li
+						class="flex items-start gap-4 rounded-xl border border-border bg-card p-4 sm:block sm:space-y-3 sm:p-6"
+					>
+						<div
+							class="inline-flex size-10 shrink-0 items-center justify-center rounded-lg {feature.tint}"
+						>
+							<Icon class="h-5 w-5 {feature.color}" />
+						</div>
+						<div class="min-w-0 space-y-1 sm:space-y-3">
+							<h3 class="text-base font-semibold text-foreground sm:text-lg">{feature.title}</h3>
+							<p class="text-sm text-muted-foreground">{feature.description}</p>
+						</div>
+					</li>
+				{/each}
+			</ul>
 		</div>
 	</div>
 
 	<div class="border-t border-border py-20 sm:py-28">
 		<div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 text-center space-y-6">
 			<h2 class="text-3xl sm:text-4xl font-bold text-foreground">Ready to take control?</h2>
-			<p class="text-lg text-muted-foreground">
-				Sign in with Google to get started. No account creation needed, no credit card required.
-			</p>
+			<p class="text-lg text-muted-foreground">Sign in to get started. No credit card required.</p>
 			<Button size="lg" class="h-12 px-8 text-base" onclick={() => goto(resolve(routes.auth))}>
 				Get Started — It's Free
 				<ChevronRight class="ml-1 h-5 w-5" />
@@ -215,12 +222,16 @@
 
 	<div class="border-t border-border py-8">
 		<div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-			<div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+			<div
+				class="flex flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-left"
+			>
 				<div class="flex items-center gap-2 text-sm text-muted-foreground">
 					<BrandMark class="h-4 w-4 text-muted-foreground" />
 					<span>VROOM — Vehicle Record & Organization Of Maintenance</span>
 				</div>
-				<div class="flex items-center gap-4 text-sm text-muted-foreground">
+				<div
+					class="flex flex-col items-center gap-2 text-sm text-muted-foreground sm:flex-row sm:gap-4"
+				>
 					<a href={resolve(routes.privacyPolicy)} class="hover:text-foreground transition-colors">
 						Privacy Policy
 					</a>
