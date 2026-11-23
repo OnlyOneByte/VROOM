@@ -5,9 +5,7 @@ import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-vi.mock('#lib/components/charts/index.ts', () => ({ AppPieChart: () => {} }));
-vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
-vi.mock('#lib/components/dashboard/VehicleCarousel.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/charts/index.ts', () => ({ AppBarChart: () => {} }));
 vi.mock('#lib/components/dashboard/SharedWithMeCard.svelte', () => ({ default: () => {} }));
 
 const getVehicles = vi.fn();
@@ -39,6 +37,13 @@ vi.mock('#lib/services/reminder-api.ts', () => ({
 		list: () => Promise.resolve([]),
 		getRecurringCost: () => Promise.resolve({ count: 0, monthlyTotal: 0 })
 	}
+}));
+
+vi.mock('#lib/services/insurance-api.ts', () => ({
+	insuranceApi: { getAllPolicies: () => Promise.resolve([]) }
+}));
+vi.mock('#lib/services/analytics-api.ts', () => ({
+	analyticsApi: { query: () => Promise.resolve(null) }
 }));
 
 import Page from '../+page.svelte';

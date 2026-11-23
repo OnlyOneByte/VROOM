@@ -19,7 +19,7 @@ import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, odometerEntries, photos, vehicles } from '../../db/schema';
-import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
+import { formatYearMonth } from '../../db/sql-helpers';
 import type { DrizzleTransaction } from '../../db/types';
 import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '../../errors';
 import { zonedCalendar } from '../../utils/analytics-charts';
@@ -28,7 +28,6 @@ import { logger } from '../../utils/logger';
 import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
 import { zonedDayWindow, zonedMidnight } from '../../utils/time-zone';
-import { readableVehiclesScope } from '../../utils/vehicle-access';
 import { expenseSplitService } from './split-service';
 import {
   type OdometerCheck,
@@ -557,45 +556,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         error: error instanceof Error ? error.message : String(error),
       });
       throw new DatabaseError('Failed to find expenses', error);
-    }
-  }
-
-  async getPerVehicleStats(
-    userId: string,
-    recentDays = 30
-  ): Promise<
-    Array<{
-      vehicleId: string;
-      totalAmount: number;
-      recentAmount: number;
-      lastExpenseDate: string | null;
-    }>
-  > {
-    try {
-      const recentCutoffSec = Math.floor((Date.now() - recentDays * 24 * 60 * 60 * 1000) / 1000);
-      const rows = await this.db
-        .select({
-          vehicleId: expenses.vehicleId,
-          totalAmount: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
-          recentAmount: sql<number>`COALESCE(SUM(CASE WHEN ${expenses.date} >= ${recentCutoffSec} THEN ${expenses.expenseAmount} ELSE 0 END), 0)`,
-          lastExpenseDate: sql<string>`MAX(${toDateTimeString(expenses.date)})`,
-        })
-        .from(expenses)
-        .where(readableVehiclesScope(expenses.vehicleId, expenses.userId, userId, this.db))
-        .groupBy(expenses.vehicleId);
-
-      return rows.map((r) => ({
-        vehicleId: r.vehicleId,
-        totalAmount: Number(r.totalAmount) || 0,
-        recentAmount: Number(r.recentAmount) || 0,
-        lastExpenseDate: r.lastExpenseDate ?? null,
-      }));
-    } catch (error) {
-      logger.error('Failed to get per-vehicle stats', {
-        userId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new DatabaseError('Failed to get per-vehicle stats', error);
     }
   }
 

@@ -5,14 +5,7 @@ import type { Vehicle } from '#lib/types/index.ts';
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-vi.mock('#lib/components/charts/index.ts', () => ({ AppPieChart: () => {} }));
-vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
-const carouselProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
-vi.mock('#lib/components/dashboard/VehicleCarousel.svelte', () => ({
-	default: (_anchor: unknown, props: Record<string, unknown>) => {
-		carouselProps.value = props;
-	}
-}));
+vi.mock('#lib/components/charts/index.ts', () => ({ AppBarChart: () => {} }));
 vi.mock('#lib/components/dashboard/SharedWithMeCard.svelte', () => ({ default: () => {} }));
 
 const getVehicles = vi.fn();
@@ -49,6 +42,13 @@ vi.mock('#lib/services/reminder-api.ts', () => ({
 		list: () => Promise.resolve(reminders.list),
 		getRecurringCost: () => Promise.resolve(reminders.recurring)
 	}
+}));
+
+vi.mock('#lib/services/insurance-api.ts', () => ({
+	insuranceApi: { getAllPolicies: () => Promise.resolve([]) }
+}));
+vi.mock('#lib/services/analytics-api.ts', () => ({
+	analyticsApi: { query: () => Promise.resolve(null) }
 }));
 
 import Page from '../+page.svelte';
@@ -128,7 +128,7 @@ describe('dashboard getting started', () => {
 		render(Page);
 
 		await screen.findByRole('heading', { name: 'Log your first expense' });
-		expect(await screen.findByText('Oil change')).toBeInTheDocument();
+		expect(await screen.findByText(/^Oil change/)).toBeInTheDocument();
 		expect(screen.getByText('Recurring Costs')).toBeInTheDocument();
 	});
 
@@ -157,7 +157,7 @@ describe('dashboard getting started', () => {
 		getVehicles.mockResolvedValue([{ ...OWNED, sharedAccess: { sharedBy: 'Sam' } }]);
 		render(Page);
 
-		await screen.findByText('Overview of the vehicles shared with you');
+		await screen.findByText('1 vehicle, incl. 1 shared');
 		expect(screen.queryByRole('list', { name: 'Getting started' })).toBeNull();
 	});
 
@@ -177,7 +177,7 @@ describe('dashboard getting started', () => {
 		summary.expenseCount = 3;
 		render(Page);
 
-		await screen.findByRole('heading', { name: 'Spending' });
+		await screen.findByTestId('dashboard-hero');
 		expect(screen.queryByRole('list', { name: 'Getting started' })).toBeNull();
 	});
 });
