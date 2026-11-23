@@ -30,6 +30,7 @@
 		if (isRetrying) return;
 		const origin = document.activeElement;
 		const container = card?.parentElement ?? null;
+		const dialog = card?.closest<HTMLElement>('[role="dialog"]') ?? null;
 		isRetrying = true;
 		try {
 			await onRetry();
@@ -42,8 +43,11 @@
 			return;
 		}
 		if (!focusLeftOn(origin)) return;
-		if (onRecovered) onRecovered();
-		else if (compact) focusFirstButton(container);
+		const scope = container?.isConnected ? container : (dialog ?? document.querySelector('main'));
+		const retryAgain = scope?.querySelector<HTMLElement>('[data-slot="load-error-card"] button');
+		if (retryAgain) retryAgain.focus();
+		else if (onRecovered) onRecovered();
+		else if (dialog) focusFirstButton(dialog);
 		else focusMainHeading();
 	}
 </script>

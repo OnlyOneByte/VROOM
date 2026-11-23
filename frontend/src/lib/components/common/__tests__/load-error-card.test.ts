@@ -115,20 +115,20 @@ describe('LoadErrorCard', () => {
 		expect(screen.getByRole('button', { name: 'Retry' })).toHaveClass('h-10');
 	});
 
-	test('a compact retry that loads moves focus to the first button around it, not the page heading', async () => {
+	test('a retry that loads inside a dialog moves focus to the dialog, not the page heading behind it', async () => {
 		const main = document.createElement('main');
-		main.innerHTML = '<h1>Vehicle</h1><div id="dialog"></div>';
+		main.innerHTML = '<h1>Vehicle</h1><div role="dialog"><div id="body"></div></div>';
 		document.body.append(main);
-		const dialog = main.querySelector('#dialog') as HTMLElement;
+		const body = main.querySelector('#body') as HTMLElement;
 		const view = render(LoadErrorCard, {
-			target: dialog,
+			target: body,
 			props: {
 				title: "Couldn't load who has access",
 				message: 'Server unavailable.',
 				compact: true,
 				onRetry: async () => {
 					view.unmount();
-					dialog.innerHTML = '<button>Invite</button>';
+					body.innerHTML = '<button>Invite</button>';
 				}
 			}
 		});
@@ -139,6 +139,59 @@ describe('LoadErrorCard', () => {
 		await vi.waitFor(() =>
 			expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Invite' }))
 		);
+	});
+
+	test('a compact card outside a dialog does not send focus to an unrelated button', async () => {
+		const main = document.createElement('main');
+		main.innerHTML = '<h1>Dashboard</h1><button>Log Fill-up</button><div id="slot"></div>';
+		document.body.append(main);
+		const slot = main.querySelector('#slot') as HTMLElement;
+		const view = render(LoadErrorCard, {
+			target: slot,
+			props: {
+				title: "Couldn't load your invitations",
+				message: 'Server unavailable.',
+				compact: true,
+				onRetry: async () => {
+					view.unmount();
+				}
+			}
+		});
+		screen.getByRole('button', { name: 'Retry' }).focus();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+		await vi.waitFor(() =>
+			expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Dashboard' }))
+		);
+	});
+
+	test('when the page swaps the card for a skeleton and the retry fails again, focus lands on the new Retry', async () => {
+		const main = document.createElement('main');
+		main.innerHTML = '<h1>Trips</h1><div id="page"></div>';
+		document.body.append(main);
+		const page = main.querySelector('#page') as HTMLElement;
+		const props = { title: "Couldn't load trips", message: 'Server unavailable.' };
+		const first = render(LoadErrorCard, {
+			target: page,
+			props: {
+				...props,
+				onRetry: async () => {
+					first.unmount();
+					render(LoadErrorCard, { target: page, props: { ...props, onRetry: () => {} } });
+				}
+			}
+		});
+		const retry = screen.getByRole('button', { name: 'Retry' });
+		retry.focus();
+
+		await fireEvent.click(retry);
+
+		await vi.waitFor(() => {
+			const again = screen.getByRole('button', { name: 'Retry' });
+			expect(again).not.toBe(retry);
+			expect(document.activeElement).toBe(again);
+		});
 	});
 
 	test('onRecovered replaces the default focus move after a retry that loads', async () => {
