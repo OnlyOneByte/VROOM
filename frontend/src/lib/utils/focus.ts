@@ -8,3 +8,10 @@ export function focusFirstButton(container: Element | null | undefined): void {
 		container?.querySelector('button') ?? (container?.hasAttribute('tabindex') ? container : null);
 	if (target instanceof HTMLElement) target.focus();
 }
+
+export function focusMainHeading(): void {
+	const heading = document.querySelector<HTMLElement>('main h1');
+	if (!heading) return;
+	if (!heading.hasAttribute('tabindex')) heading.tabIndex = -1;
+	heading.focus({ preventScroll: true });
+}

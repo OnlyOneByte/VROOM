@@ -1,0 +1,55 @@
+<script lang="ts">
+	import { tick } from 'svelte';
+	import { CircleAlert, LoaderCircle } from '@lucide/svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { focusLeftOn, focusMainHeading } from '#lib/utils/focus.ts';
+
+	interface Props {
+		title: string;
+		message: string;
+		onRetry: () => unknown;
+	}
+
+	let { title, message, onRetry }: Props = $props();
+
+	let card = $state<HTMLDivElement | null>(null);
+	let isRetrying = $state(false);
+	let failures = $state(0);
+
+	async function retry() {
+		if (isRetrying) return;
+		const origin = document.activeElement;
+		isRetrying = true;
+		try {
+			await onRetry();
+		} finally {
+			isRetrying = false;
+		}
+		await tick();
+		if (card?.isConnected) {
+			failures += 1;
+			return;
+		}
+		if (focusLeftOn(origin)) focusMainHeading();
+	}
+</script>
+
+<div bind:this={card} class="rounded-lg border bg-card p-6" data-slot="load-error-card">
+	<div role="alert">
+		{#key failures}
+			<div class="mb-4 flex items-center gap-3 text-destructive">
+				<CircleAlert class="h-5 w-5" />
+				<p class="font-medium">{title}</p>
+			</div>
+			<p class="mb-4 text-sm text-muted-foreground">{message}</p>
+		{/key}
+	</div>
+	<Button size="lg" onclick={retry} aria-disabled={isRetrying}>
+		{#if isRetrying}
+			<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+			Retrying…
+		{:else}
+			Retry
+		{/if}
+	</Button>
+</div>

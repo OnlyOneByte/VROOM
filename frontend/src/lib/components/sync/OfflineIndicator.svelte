@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
-	import { focusLeftOn } from '#lib/utils/focus.ts';
+	import { focusLeftOn, focusMainHeading } from '#lib/utils/focus.ts';
 	import { onlineStatus, syncState, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { syncManager } from '#lib/utils/sync/sync-manager.ts';
@@ -24,13 +24,6 @@
 		const clear = setTimeout(() => (reconnected = false), 5000);
 		return () => clearTimeout(clear);
 	});
-
-	function focusMainHeading() {
-		const heading = document.querySelector<HTMLElement>('main h1');
-		if (!heading) return;
-		if (!heading.hasAttribute('tabindex')) heading.tabIndex = -1;
-		heading.focus({ preventScroll: true });
-	}
 
 	async function retrySession() {
 		if (authStore.recheckingSession) return;

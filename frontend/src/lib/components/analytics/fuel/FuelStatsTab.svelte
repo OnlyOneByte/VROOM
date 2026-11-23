@@ -1,9 +1,9 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
 	import {
 		LoaderCircle,
-		CircleAlert,
 		Fuel,
 		Droplet,
 		Gauge,
@@ -114,7 +114,6 @@
 	async function loadData() {
 		try {
 			internalLoading = true;
-			error = null;
 			const range = getDefaultDateRange();
 			const [stats, advanced] = await Promise.all([
 				analyticsApi.getFuelStats(range),
@@ -122,6 +121,7 @@
 			]);
 			localFuelStats = stats;
 			localFuelAdvanced = advanced;
+			error = null;
 		} catch (e) {
 			error = userFacingErrorMessage(e);
 		} finally {
@@ -194,19 +194,12 @@
 	</Card.Root>
 {/snippet}
 
-{#if isLoading || checkingFuelHistory}
+{#if (isLoading && !error) || checkingFuelHistory}
 	<div class="flex justify-center p-12">
 		<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 	</div>
 {:else if error}
-	<div class="rounded-lg border bg-card p-6">
-		<div class="mb-4 flex items-center gap-3 text-destructive">
-			<CircleAlert class="h-5 w-5" />
-			<p class="font-medium">Couldn't load fuel statistics</p>
-		</div>
-		<p class="mb-4 text-sm text-muted-foreground">{error}</p>
-		<Button onclick={loadData}>Retry</Button>
-	</div>
+	<LoadErrorCard title="Couldn't load fuel statistics" message={error} onRetry={loadData} />
 {:else if fuelStats && !hasFuelData}
 	<EmptyState>
 		{#snippet icon()}
