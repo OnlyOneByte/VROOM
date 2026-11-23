@@ -548,7 +548,7 @@
 {:else if vehicleLoadError}
 	<LoadErrorCard title="Couldn't load this vehicle" message={vehicleLoadError} onRetry={loadPage} />
 {:else if vehicle}
-	<div class="space-y-6 pb-24">
+	<div class="space-y-6 pb-24 short:pb-0">
 		<div class="flex items-start justify-between gap-4">
 			<VehicleHeader {vehicle} displayName={vehicleDisplayName} {coverPhotoUrl} />
 			<div class="flex shrink-0 items-center gap-2">
@@ -565,7 +565,7 @@
 					</Button>
 				{/if}
 				{#if showAddExpenseAction}
-					<Button size="lg" class="hidden lg:inline-flex" href={addExpenseHref}>
+					<Button size="lg" class="hidden lg:inline-flex short:inline-flex" href={addExpenseHref}>
 						<Plus class="mr-2 h-4 w-4" />
 						{COMMON_MESSAGES.ADD_EXPENSE}
 					</Button>

@@ -213,7 +213,7 @@
 	<meta name="description" content="Recurring expenses and maintenance reminders" />
 </svelte:head>
 
-<div class="space-y-6 pb-24">
+<div class="space-y-6 pb-24 short:pb-0">
 	<PageHeader title="Reminders" description="Recurring expenses and maintenance reminders">
 		{#snippet actions()}
 			{#if dueReminders.length > 0 && vehicles.length > 0}
@@ -223,7 +223,7 @@
 				</Button>
 			{/if}
 			{#if !isLoading && !loadError && reminders.length > 0 && vehicles.length > 0}
-				<Button size="lg" class="hidden lg:inline-flex" onclick={openCreate}>
+				<Button size="lg" class="hidden lg:inline-flex short:inline-flex" onclick={openCreate}>
 					<Plus class="mr-2 h-4 w-4" />
 					New Reminder
 				</Button>

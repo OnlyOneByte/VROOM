@@ -375,7 +375,7 @@
 	<meta name="description" content="Your vehicle expense dashboard" />
 </svelte:head>
 
-<div class="space-y-6 pb-24">
+<div class="space-y-6 pb-24 short:pb-0">
 	<PageHeader title="Dashboard" description={pageDescription}>
 		{#snippet actions()}
 			{#if canLogFillup}
@@ -388,12 +388,16 @@
 					<Car class="mr-2 h-4 w-4" />
 					Add Vehicle
 				</Button>
-				<Button size="lg" class="hidden lg:inline-flex" onclick={handleLogFillup}>
+				<Button size="lg" class="hidden lg:inline-flex short:inline-flex" onclick={handleLogFillup}>
 					<Plus class="mr-2 h-4 w-4" />
 					Log Fill-up
 				</Button>
 			{:else if showFab && !noVehicles}
-				<Button size="lg" class="hidden lg:inline-flex" href={resolve(routes.vehicleNew)}>
+				<Button
+					size="lg"
+					class="hidden lg:inline-flex short:inline-flex"
+					href={resolve(routes.vehicleNew)}
+				>
 					<Plus class="mr-2 h-4 w-4" />
 					Add Vehicle
 				</Button>

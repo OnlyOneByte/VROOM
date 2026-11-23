@@ -430,7 +430,11 @@
 {/snippet}
 
 {#snippet addExpenseHeaderAction()}
-	<Button size="lg" class="hidden lg:inline-flex" href={resolve(routes.expenseNew)}>
+	<Button
+		size="lg"
+		class="hidden lg:inline-flex short:inline-flex"
+		href={resolve(routes.expenseNew)}
+	>
 		<Plus class="mr-2 h-4 w-4" />
 		{COMMON_MESSAGES.ADD_EXPENSE}
 	</Button>
@@ -465,7 +469,7 @@
 		/>
 	</div>
 {:else if offlineLoad}
-	<div class="space-y-6 pb-24">
+	<div class="space-y-6 pb-24 short:pb-0">
 		<PageHeader
 			title="All Expenses"
 			description="Track and categorize expenses across all vehicles"
@@ -503,7 +507,7 @@
 		/>
 	</div>
 {:else}
-	<div class="space-y-6 pb-24">
+	<div class="space-y-6 pb-24 short:pb-0">
 		<div class="flex items-start justify-between gap-3">
 			<div class="min-w-0 flex-1">
 				<PageHeader title="All Expenses" description={countLine}>
