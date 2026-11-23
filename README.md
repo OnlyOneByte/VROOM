@@ -5,7 +5,7 @@
 ![Backend Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OnlyOneByte/VROOM/coverage-badges/backend-coverage.json)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20VROOM-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/onemorebyte)
 
-VROOM (Vehicle Record & Organization Of Maintenance) is a self-hostable app for tracking what your cars really cost: fuel, maintenance, insurance, financing and trips, with mobile-first design, analytics and backups to your own Google Drive.
+VROOM (Vehicle Record & Organization Of Maintenance) is a self-hostable app for tracking what your cars really cost: fuel, maintenance, insurance, financing and trips, with mobile-first design, analytics and backups to your own Google Drive or S3-compatible storage.
 
 ![VROOM dashboard: total and monthly spending, active financing, and a card per vehicle](docs/screenshots/dashboard.png)
 
@@ -22,7 +22,7 @@ VROOM (Vehicle Record & Organization Of Maintenance) is a self-hostable app for 
 
 Screenshots show the demo data from `bun run db:seed`.
 
-> ⚠️ **Under active development.** Features, APIs, and database schemas may change between releases. Back up your data regularly via Google Drive sync. Pin to a specific image tag rather than `latest` for stability.
+> ⚠️ **Under active development.** Features, APIs, and database schemas may change between releases. Back up your data regularly to Google Drive or S3-compatible storage. Pin to a specific image tag rather than `latest` for stability.
 
 > 🤖 **AI-native development.** Much of the code is written with AI assistance. Architecture decisions and feature direction come from a human developer, and every change is reviewed by someone other than its author, a human or an independent review agent, before it merges.
 
@@ -30,7 +30,7 @@ Screenshots show the demo data from `bun run db:seed`.
 
 - **Open Source** — fork, customize, and host it yourself with full control over your data
 - **Open Format** — backups are ZIP files of plain CSV, so there's zero lock-in
-- **Google Drive Integration** — backups and an optional Google Sheets copy go straight to your Drive
+- **Your Own Storage** — backups go straight to your Google Drive (with an optional Google Sheets copy) or to any S3-compatible bucket, including a self-hosted MinIO
 - **Privacy First** — your data lives on your server and in the storage you connect. AI features are opt-in and use your own API key
 
 ## Features
@@ -48,7 +48,7 @@ Screenshots show the demo data from `bun run db:seed`.
 - 📷 Photos for receipts, vehicles, odometer readings and insurance, stored in Google Drive, Google Photos or S3-compatible storage
 - 🧾 Receipt scanning that fills in the expense form, using an AI vision model you configure
 - 💬 An assistant that answers questions about your vehicles and costs, using Anthropic, Gemini or any OpenAI-compatible model
-- 💾 Google Drive ZIP backups, Google Sheets sync, and restore from a backup file
+- 💾 ZIP backups to Google Drive or S3-compatible storage, Google Sheets sync, and restore from a backup file
 - 🔐 Sign-in with Google or GitHub (OAuth)
 - 🐳 Docker images for self-hosting
 
