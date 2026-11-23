@@ -62,6 +62,7 @@
 	let expenses = $state<Expense[]>([]);
 	let vehicles = $state<Vehicle[]>([]);
 	let summary = $state<ExpenseSummary | null>(null);
+	let summaryError = $state<string | null>(null);
 
 	let currentOffset = $state(0);
 	let pageSize = $state(20);
@@ -238,12 +239,32 @@
 				else failPage(pageResult.reason, offset);
 			}
 			if (isCurrentSummary()) {
-				if (summaryResult.status === 'fulfilled') summary = summaryResult.value;
-				else if (!listReported || pageResult.status === 'fulfilled')
-					handleErrorWithNotification(summaryResult.reason, "Couldn't load the expense summary");
+				if (summaryResult.status === 'fulfilled') {
+					summary = summaryResult.value;
+					summaryError = null;
+				} else if (!listReported || pageResult.status === 'fulfilled') {
+					failSummary(summaryResult.reason);
+				}
 			}
 		} finally {
 			if (isCurrentList()) isLoadingPage = false;
+		}
+	}
+
+	function failSummary(error: unknown) {
+		summaryError = userFacingErrorMessage(error);
+		logLoadFailure(error, "Couldn't load the expense summary");
+	}
+
+	async function retrySummary() {
+		const isCurrentSummary = nextSummaryRequest();
+		try {
+			const result = await expenseApi.getExpenseSummary(buildSummaryParams());
+			if (!isCurrentSummary()) return;
+			summary = result;
+			summaryError = null;
+		} catch (error) {
+			if (isCurrentSummary()) failSummary(error);
 		}
 	}
 
@@ -565,7 +586,7 @@
 			</CardNs.Content>
 		</CardNs.Root>
 
-		<ExpenseOverviewSection {summary} {statCards} />
+		<ExpenseOverviewSection {summary} {statCards} error={summaryError} onRetry={retrySummary} />
 
 		<OfflineExpenseCards
 			{pendingExpenses}

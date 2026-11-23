@@ -510,7 +510,7 @@ describe('/expenses filters', () => {
 });
 
 describe('/expenses reloads and failures after the first load', () => {
-	test('a summary failure on a filter change is reported while the list still updates', async () => {
+	test('a summary failure on a filter change shows inline in the overview, with no toast, and Retry recovers', async () => {
 		await mountLoaded();
 		getAllExpenses.mockResolvedValue(pageOf([], 0));
 		getExpenseSummary.mockRejectedValueOnce(new Error('Summary down'));
@@ -518,9 +518,17 @@ describe('/expenses reloads and failures after the first load', () => {
 		await chooseVehicle('2020 Nissan Leaf');
 
 		await waitFor(() => expect(captured.table['totalCount']).toBe(0));
-		await waitFor(() =>
-			expect(notificationMessages().some(m => m.includes('Summary down'))).toBe(true)
-		);
+		const card = await screen.findByTestId('expense-summary-error');
+		expect(card).toHaveTextContent("Couldn't load the expense summary");
+		expect(card).toHaveTextContent('Summary down.');
+		expect(screen.queryByText('Expense Overview')).toBeNull();
+		expect(notificationMessages()).toEqual([]);
+
+		await fireEvent.click(within(card).getByRole('button', { name: 'Retry' }));
+
+		await waitFor(() => expect(screen.queryByTestId('expense-summary-error')).toBeNull());
+		expect(screen.getByText('Expense Overview')).toBeInTheDocument();
+		expect(getExpenseSummary).toHaveBeenLastCalledWith({ vehicleId: 'v2' });
 	});
 
 	test('when list and summary both fail only the inline list error shows, with no toast', async () => {
