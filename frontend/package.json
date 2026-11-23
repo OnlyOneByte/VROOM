@@ -28,6 +28,7 @@
 		"test:e2e:headed": "playwright test --headed",
 		"test:e2e:chromium": "playwright test --project=chromium",
 		"test:e2e:mobile": "playwright test --project='Mobile Chrome' --project='Mobile Safari'",
+		"web-vitals": "node scripts/web-vitals.mjs",
 		"generate-pwa-assets": "pwa-assets-generator",
 		"lint": "eslint . --ext .js,.ts,.svelte",
 		"lint:fix": "eslint . --ext .js,.ts,.svelte --fix",
