@@ -21,7 +21,7 @@ vi.mock('#lib/services/provider-api.ts', async importOriginal => ({
 	providerApi: {
 		getProviders: () => getProviders(),
 		getCatalog: async () =>
-			(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).STORAGE_CATALOG
+			(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).PROVIDER_CATALOG
 	}
 }));
 vi.mock('#lib/services/settings-api.ts', () => ({

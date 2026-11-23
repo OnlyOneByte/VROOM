@@ -28,10 +28,11 @@ afterEach(() => {
   ctx.close();
 });
 
-async function catalog(): Promise<CatalogEntry[]> {
+async function catalog(capability = 'storage'): Promise<CatalogEntry[]> {
   const res = await ctx.authed('GET', '/api/v1/providers/catalog');
   expect(res.status).toBe(200);
-  return (await json<DataEnvelope<CatalogEntry[]>>(res)).data;
+  const entries = (await json<DataEnvelope<CatalogEntry[]>>(res)).data;
+  return entries.filter((e) => e.capability === capability);
 }
 
 function hasFunction(value: unknown): boolean {
@@ -45,7 +46,27 @@ describe('GET /api/v1/providers/catalog', () => {
     config.allowFakeStorageProvider = false;
     const entries = await catalog();
     expect(entries.map((e) => e.id)).toEqual(['google-drive', 's3']);
-    expect(entries.every((e) => e.capability === 'storage')).toBe(true);
+  });
+
+  test('lists the assistant and receipt-reading model providers with their defaults', async () => {
+    for (const capability of ['ai.llm', 'ai.vision']) {
+      const entries = await catalog(capability);
+      expect(entries.map((e) => e.id)).toEqual([
+        'openai-compatible',
+        'anthropic',
+        'gemini',
+        'ollama',
+      ]);
+      const ollama = entries.find((e) => e.id === 'ollama');
+      expect(ollama?.secrets).toEqual([]);
+      expect(ollama?.fields.map((f) => [f.key, f.required])).toEqual([
+        ['model', true],
+        ['baseUrl', true],
+      ]);
+      expect(entries.find((e) => e.id === 'anthropic')?.secrets.map((s) => s.key)).toEqual([
+        'apiKey',
+      ]);
+    }
   });
 
   test('lists the fake provider only when it is enabled', async () => {

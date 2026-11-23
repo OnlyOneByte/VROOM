@@ -4,7 +4,11 @@ import type { PhotoCategory, CategorySetting } from '#lib/types/index.ts';
 import type { GoogleOAuthReturn } from '#lib/components/settings/storage-provider/use-google-oauth.svelte.ts';
 import GoogleDriveForm from '#lib/components/settings/storage-provider/form/GoogleDriveForm.svelte';
 import S3Form from '#lib/components/settings/storage-provider/form/S3Form.svelte';
-import { providerCatalog } from '#lib/stores/provider-catalog.svelte.ts';
+import {
+	providerCatalog,
+	type ModelCapability,
+	type ModelCatalogEntry
+} from '#lib/stores/provider-catalog.svelte.ts';
 
 export interface ProviderConnection {
 	ready: boolean;
@@ -52,25 +56,25 @@ export function providerUi(providerType: string | null | undefined): ProviderUi 
 
 export function providerLabel(providerType: string): string {
 	return (
-		providerCatalog.entry(providerType)?.label ??
+		providerCatalog.storageEntry(providerType)?.label ??
 		providerUi(providerType)?.fallbackLabel ??
 		providerType
 	);
 }
 
 export function supportsZipBackup(providerType: string | null | undefined): boolean {
-	return providerCatalog.entry(providerType)?.features.photoOnly === false;
+	return providerCatalog.storageEntry(providerType)?.features.photoOnly === false;
 }
 
 export function supportsSheetsBackup(providerType: string | null | undefined): boolean {
-	return providerCatalog.entry(providerType)?.features.backupSheets === true;
+	return providerCatalog.storageEntry(providerType)?.features.backupSheets === true;
 }
 
 export function providerDetails(
 	providerType: string,
 	config: Record<string, unknown>
 ): { label: string; value: string }[] {
-	return (providerCatalog.entry(providerType)?.fields ?? []).map(field => ({
+	return (providerCatalog.storageEntry(providerType)?.fields ?? []).map(field => ({
 		label: field.label,
 		value: (config[field.key] as string | undefined) ?? '—'
 	}));
@@ -79,7 +83,7 @@ export function providerDetails(
 export function defaultFolderSettings(
 	providerType: string | null | undefined
 ): Record<PhotoCategory, CategorySetting> {
-	const folders = providerCatalog.entry(providerType)?.features.defaultFolders ?? {};
+	const folders = providerCatalog.storageEntry(providerType)?.features.defaultFolders ?? {};
 	return Object.fromEntries(
 		Object.entries(folders).map(([category, folderPath]) => [
 			category,
@@ -88,7 +92,7 @@ export function defaultFolderSettings(
 	) as Record<PhotoCategory, CategorySetting>;
 }
 
-interface VlmProviderTypeOption {
+export interface ModelProviderTypeOption {
 	id: string;
 	label: string;
 	keyless: boolean;
@@ -97,70 +101,21 @@ interface VlmProviderTypeOption {
 	defaultBaseUrl?: string;
 }
 
-export const VLM_PROVIDER_TYPES: VlmProviderTypeOption[] = [
-	{
-		id: 'openai-compatible',
-		label: 'OpenAI-compatible',
-		keyless: false,
-		needsBaseUrl: true,
-		defaultModel: 'gpt-4o-mini',
-		defaultBaseUrl: 'https://api.openai.com/v1'
-	},
-	{
-		id: 'anthropic',
-		label: 'Anthropic (Claude)',
-		keyless: false,
-		needsBaseUrl: false,
-		defaultModel: 'claude-opus-5-5'
-	},
-	{
-		id: 'gemini',
-		label: 'Google Gemini',
-		keyless: false,
-		needsBaseUrl: false,
-		defaultModel: 'gemini-1.5-flash'
-	},
-	{
-		id: 'ollama',
-		label: 'Ollama (self-hosted)',
-		keyless: true,
-		needsBaseUrl: true,
-		defaultModel: 'llava',
-		defaultBaseUrl: 'http://localhost:11434/v1'
-	}
-];
+function fieldDefault(entry: ModelCatalogEntry, key: string): string | undefined {
+	const value = entry.fields.find(f => f.key === key)?.default;
+	return value === undefined ? undefined : String(value);
+}
 
-export type ModelProviderTypeOption = VlmProviderTypeOption;
-
-export const LLM_PROVIDER_TYPES: ModelProviderTypeOption[] = [
-	{
-		id: 'openai-compatible',
-		label: 'OpenAI-compatible',
-		keyless: false,
-		needsBaseUrl: true,
-		defaultModel: 'gpt-4o-mini',
-		defaultBaseUrl: 'https://api.openai.com/v1'
-	},
-	{
-		id: 'anthropic',
-		label: 'Anthropic (Claude)',
-		keyless: false,
-		needsBaseUrl: false,
-		defaultModel: 'claude-opus-5-5'
-	},
-	{
-		id: 'gemini',
-		label: 'Google Gemini',
-		keyless: false,
-		needsBaseUrl: false,
-		defaultModel: 'gemini-1.5-flash'
-	},
-	{
-		id: 'ollama',
-		label: 'Ollama (self-hosted)',
-		keyless: true,
-		needsBaseUrl: true,
-		defaultModel: 'llama3.1',
-		defaultBaseUrl: 'http://localhost:11434/v1'
-	}
-];
+export function modelProviderOptions(capability: ModelCapability): ModelProviderTypeOption[] {
+	return providerCatalog.models(capability).map(entry => {
+		const defaultBaseUrl = fieldDefault(entry, 'baseUrl');
+		return {
+			id: entry.id,
+			label: entry.label,
+			keyless: !entry.secrets.some(secret => secret.required),
+			needsBaseUrl: entry.fields.some(f => f.key === 'baseUrl' && f.required),
+			defaultModel: fieldDefault(entry, 'model') ?? '',
+			...(defaultBaseUrl !== undefined && { defaultBaseUrl })
+		};
+	});
+}

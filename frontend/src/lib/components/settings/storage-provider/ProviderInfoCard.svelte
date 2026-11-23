@@ -163,7 +163,7 @@
 	let details = $derived(providerDetails(provider.providerType, provider.config ?? {}));
 	let zipBackupProviders = $derived(
 		new Intl.ListFormat('en', { type: 'disjunction' }).format(
-			providerCatalog.entries.filter(e => !e.features.photoOnly).map(e => e.label)
+			providerCatalog.storage.filter(e => !e.features.photoOnly).map(e => e.label)
 		)
 	);
 </script>

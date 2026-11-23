@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import { ValidationError } from '../../errors';
 
 export type Capability = 'storage' | 'auth' | 'ai.llm' | 'ai.vision' | 'import';
 
@@ -68,4 +69,29 @@ export function toCatalogEntries<Cap extends Capability, Features>(
       secrets: d.secrets,
       features: d.features,
     }));
+}
+
+export type AnyProviderDescriptor = ProviderDescriptor<Capability, never, unknown, unknown>;
+
+export function validateProviderConfig(
+  descriptor: AnyProviderDescriptor,
+  config: Record<string, unknown> | null
+): void {
+  const parsed = descriptor.config.schema.safeParse(config ?? {});
+  if (!parsed.success) {
+    throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid provider config');
+  }
+}
+
+export function validateProviderSecrets(
+  descriptor: AnyProviderDescriptor,
+  domainLabel: string,
+  credentials: Record<string, unknown>
+): void {
+  for (const secret of descriptor.secrets) {
+    if (secret.required && !credentials[secret.key]) {
+      const article = /^[aeiou]/i.test(secret.label) ? 'an' : 'a';
+      throw new ValidationError(`${domainLabel} provider requires ${article} ${secret.label}`);
+    }
+  }
 }

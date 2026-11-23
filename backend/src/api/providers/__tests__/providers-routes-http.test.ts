@@ -229,7 +229,7 @@ describe('PUT /api/v1/providers/:id — update', () => {
   test('PUT with new credentials re-encrypts the stored blob (never plaintext, never echoed)', async () => {
     const created = await createProvider();
     const res = await ctx.authed('PUT', `/api/v1/providers/${created.id}`, {
-      credentials: { secretAccessKey: 'rotated-secret-9999', bucket: 'b', region: 'us-east-1' },
+      credentials: { accessKeyId: 'AKIA-rotated', secretAccessKey: 'rotated-secret-9999' },
     });
     expect(res.status).toBe(200);
     const data = (await json<DataEnvelope<ProviderResponse>>(res)).data;

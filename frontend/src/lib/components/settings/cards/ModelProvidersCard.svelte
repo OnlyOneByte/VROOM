@@ -20,11 +20,8 @@
 	import { providerApi } from '#lib/services/provider-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-	import {
-		LLM_PROVIDER_TYPES,
-		VLM_PROVIDER_TYPES,
-		type ModelProviderTypeOption
-	} from '#lib/constants/providers.ts';
+	import { modelProviderOptions, type ModelProviderTypeOption } from '#lib/constants/providers.ts';
+	import { providerCatalog } from '#lib/stores/provider-catalog.svelte.ts';
 	import type { UserProviderInfo } from '#lib/types/index.ts';
 
 	type ModelDomain = 'vlm' | 'llm';
@@ -45,7 +42,7 @@
 			namePlaceholder: 'My receipt parser',
 			feature: 'Receipt scanning',
 			loadError: "Couldn't load your receipt-parsing providers.",
-			types: VLM_PROVIDER_TYPES
+			capability: 'ai.vision'
 		},
 		llm: {
 			icon: Bot,
@@ -60,12 +57,12 @@
 			namePlaceholder: 'My assistant',
 			feature: 'The assistant',
 			loadError: "Couldn't load your assistant providers.",
-			types: LLM_PROVIDER_TYPES
+			capability: 'ai.llm'
 		}
 	} as const;
 
 	let copy = $derived(COPY[domain]);
-	let providerTypes = $derived<ModelProviderTypeOption[]>(copy.types);
+	let providerTypes = $derived(modelProviderOptions(copy.capability));
 	let Icon = $derived(copy.icon);
 
 	let providers = $state<UserProviderInfo[]>([]);
@@ -75,7 +72,7 @@
 
 	let dialogOpen = $state(false);
 	let editingId = $state<string | null>(null);
-	let formType = $state<string>('openai-compatible');
+	let formType = $state('');
 	let formDisplayName = $state('');
 	let formApiKey = $state('');
 	let formModel = $state('');
@@ -99,7 +96,10 @@
 	async function loadData() {
 		isLoading = true;
 		try {
-			providers = await providerApi.getProviders(domain);
+			[providers] = await Promise.all([
+				providerApi.getProviders(domain),
+				providerCatalog.ensureLoaded()
+			]);
 			error = null;
 		} catch (e) {
 			error = `${copy.loadError} ${userFacingErrorMessage(e)}`;
@@ -118,7 +118,7 @@
 
 	function openCreate() {
 		editingId = null;
-		formType = 'openai-compatible';
+		formType = fallbackType.id;
 		applyTypeDefaults();
 		formDisplayName = '';
 		formApiKey = '';

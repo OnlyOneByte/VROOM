@@ -44,7 +44,7 @@
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
 	let providerTypes = $derived(
-		providerCatalog.entries.map(entry => ({
+		providerCatalog.storage.map(entry => ({
 			id: entry.id,
 			icon: providerUi(entry.id)?.icon ?? Cloud,
 			label: entry.shortLabel,
@@ -180,7 +180,7 @@
 	}
 
 	function getDefaultPhotoRootPath(providerType: string): string {
-		return providerCatalog.entry(providerType)?.features.defaultPhotoRootPath ?? 'photos';
+		return providerCatalog.storageEntry(providerType)?.features.defaultPhotoRootPath ?? 'photos';
 	}
 
 	let canSave = $derived.by(() => {

@@ -7,6 +7,8 @@ const deleteProvider = vi.fn((_id: string) => Promise.resolve());
 vi.mock('#lib/services/provider-api.ts', () => ({
 	providerApi: {
 		getProviders: (domain?: string) => getProviders(domain),
+		getCatalog: async () =>
+			(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).PROVIDER_CATALOG,
 		createProvider: vi.fn(),
 		updateProvider: vi.fn(),
 		deleteProvider: (id: string) => deleteProvider(id)

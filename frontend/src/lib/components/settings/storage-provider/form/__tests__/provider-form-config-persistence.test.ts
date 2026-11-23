@@ -25,7 +25,7 @@ const createProvider = vi.fn((data: ProviderPayload) =>
 vi.mock('#lib/services/provider-api.ts', () => ({
 	providerApi: {
 		getCatalog: async () =>
-			(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).STORAGE_CATALOG,
+			(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).PROVIDER_CATALOG,
 		updateProvider: (id: string, data: ProviderPayload) => updateProvider(id, data),
 		createProvider: (data: ProviderPayload) => createProvider(data),
 		deleteProvider: vi.fn()
