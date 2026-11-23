@@ -183,6 +183,24 @@ describe('PHEV gas fill-ups pair with gas, and kWh stays out of fuel volume', ()
     expect(points.map((p) => p.efficiency)).toEqual([30]);
   });
 
+  test('an electric vehicle trend uses the charge-to-charge interval', async () => {
+    const EV = { id: 'veh-ev', userId: USER.id, make: 'Tesla', model: '3', year: 2023 };
+    seedVehicle(testDb.sqlite, EV);
+    testDb.sqlite.run("UPDATE vehicles SET vehicle_type = 'electric' WHERE id = ?", [EV.id]);
+    const charge = { vehicleId: EV.id, volume: 20, fuelType: 'Level 2 (AC)' };
+    seedExpense(
+      testDb.sqlite,
+      fuel({ id: 'e1', date: new Date(Date.UTC(2024, 1, 1)), mileage: 500, ...charge })
+    );
+    seedExpense(
+      testDb.sqlite,
+      fuel({ id: 'e2', date: new Date(Date.UTC(2024, 1, 8)), mileage: 580, ...charge })
+    );
+
+    const points = await repo.getFuelEfficiencyTrend(USER.id, EV.id);
+    expect(points.map((p) => p.efficiency)).toEqual([4]);
+  });
+
   test('vehicle expenses efficiency divides gas miles by gallons only', async () => {
     const data = await repo.getVehicleExpenses(USER.id, VEHICLE.id, yearToRange(2024));
     const jan = data.fuelEfficiencyAndCost.find((m) => m.month === '2024-01');

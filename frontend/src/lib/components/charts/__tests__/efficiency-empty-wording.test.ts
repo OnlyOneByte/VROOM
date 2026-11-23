@@ -11,7 +11,7 @@ const UNITS: UnitPreferences = {
 
 describe('FuelEfficiencyTrendChart empty state', () => {
 	test.each([
-		['electric', 'No efficiency trend yet', /isn't charted for electric vehicles yet/],
+		['electric', 'Insufficient charging data', /2 charging sessions with mileage and kWh/],
 		['gas', 'Insufficient fuel data', /fuel entries with mileage and volume/],
 		['hybrid', 'Insufficient fuel data', /fuel entries with mileage and volume/]
 	] as const)(

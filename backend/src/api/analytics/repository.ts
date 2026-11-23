@@ -22,7 +22,7 @@ import {
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
-import { ELECTRIC_FUEL_TYPES } from '../../db/types';
+import { ELECTRIC_FUEL_TYPES, isElectricFuelType } from '../../db/types';
 import { DatabaseError, ValidationError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } from '../../types';
 import {
@@ -56,7 +56,6 @@ import {
   type FuelRow,
   findBiggestExpense,
   type GeneralExpenseRow,
-  gasEfficiencyPoint,
   isChargeSession,
   isFillup,
   normalizeDate,
@@ -1283,16 +1282,20 @@ export class AnalyticsRepository {
           volume: expenses.volume,
           fuelType: expenses.fuelType,
           missedFillup: expenses.missedFillup,
+          vehicleType: vehicles.vehicleType,
         })
         .from(expenses)
+        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
         .where(and(...conditions))
         .orderBy(asc(expenses.vehicleId), asc(expenses.date));
       if (rows.length < 2) return [];
       const vehicleUnitsMap = await this.getAllVehicleUnits(userId);
       const points: FuelEfficiencyPoint[] = [];
       for (const [current, previous] of sameEnergyPairs(rows)) {
+        const electricVehicle = current.vehicleType === 'electric';
+        if (isElectricFuelType(current.fuelType) !== electricVehicle) continue;
         const scale = canonicalScale(this.vehicleUnitsFor(vehicleUnitsMap, current.vehicleId));
-        const point = gasEfficiencyPoint(current as FuelRow, previous as FuelRow, scale);
+        const point = computeEfficiencyPoint(current as FuelRow, previous as FuelRow, scale);
         if (point) points.push(point);
       }
       return points;
