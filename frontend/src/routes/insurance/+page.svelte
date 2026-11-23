@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { onMount } from 'svelte';
-	import { Shield, Plus, CircleAlert } from '@lucide/svelte';
+	import { Shield, Plus, CircleAlert, Car } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
@@ -89,14 +89,34 @@
 	<div class="space-y-6 pb-24">
 		<PageHeader title="Insurance" description="Manage your insurance policies across all vehicles">
 			{#snippet actions()}
-				<Button size="lg" class="hidden lg:inline-flex" onclick={handleAddPolicy}>
-					<Plus class="mr-2 h-4 w-4" />
-					New Policy
-				</Button>
+				{#if policies.length > 0}
+					<Button size="lg" class="hidden lg:inline-flex" onclick={handleAddPolicy}>
+						<Plus class="mr-2 h-4 w-4" />
+						Add Policy
+					</Button>
+				{/if}
 			{/snippet}
 		</PageHeader>
 
-		{#if policies.length === 0}
+		{#if policies.length === 0 && vehicles.length === 0}
+			<EmptyState>
+				{#snippet icon()}
+					<Car class="h-12 w-12 text-muted-foreground mb-4" />
+				{/snippet}
+				{#snippet title()}
+					Add a vehicle first
+				{/snippet}
+				{#snippet description()}
+					Every policy covers a vehicle. Add one, then track its coverage, costs and documents here.
+				{/snippet}
+				{#snippet action()}
+					<Button size="lg" href={resolve(routes.vehicleNew)}>
+						<Plus class="mr-2 h-4 w-4" />
+						Add Vehicle
+					</Button>
+				{/snippet}
+			</EmptyState>
+		{:else if policies.length === 0}
 			<EmptyState>
 				{#snippet icon()}
 					<div class="mb-4 rounded-full bg-muted p-4">
@@ -126,5 +146,7 @@
 		{/if}
 	</div>
 
-	<FloatingActionButton onclick={handleAddPolicy} label="New Policy" />
+	{#if policies.length > 0}
+		<FloatingActionButton onclick={handleAddPolicy} label="Add Policy" />
+	{/if}
 {/if}
