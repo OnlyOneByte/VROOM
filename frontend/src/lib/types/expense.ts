@@ -70,6 +70,17 @@ export interface ExpenseSummary {
 	recentAmount: number;
 	categoryBreakdown: Array<{ category: string; amount: number; count: number }>;
 	monthlyTrend: Array<{ period: string; amount: number; count: number }>;
+	costBuckets: ExpenseCostBuckets;
+}
+
+export interface CostBucketTotals {
+	ownershipTotal: number;
+	runningTotal: number;
+}
+
+export interface ExpenseCostBuckets extends CostBucketTotals {
+	previous: CostBucketTotals | null;
+	byVehicle: Array<CostBucketTotals & { vehicleId: string; previous: CostBucketTotals | null }>;
 }
 
 export interface BackendExpenseResponse {

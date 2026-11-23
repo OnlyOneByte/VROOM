@@ -273,6 +273,34 @@ export interface ExpenseSummary {
   recentAmount: number;
   categoryBreakdown: Array<{ category: string; amount: number; count: number }>;
   monthlyTrend: Array<{ period: string; amount: number; count: number }>;
+  costBuckets: CostBuckets;
+}
+
+export const OWNERSHIP_CATEGORIES = ['financial'] as const;
+
+export interface CostBucketTotals {
+  ownershipTotal: number;
+  runningTotal: number;
+}
+
+export interface VehicleCostBuckets extends CostBucketTotals {
+  vehicleId: string;
+  previous: CostBucketTotals | null;
+}
+
+export interface CostBuckets extends CostBucketTotals {
+  previous: CostBucketTotals | null;
+  byVehicle: VehicleCostBuckets[];
+}
+
+function sumBuckets(rows: CostBucketTotals[]): CostBucketTotals {
+  return rows.reduce(
+    (acc, row) => ({
+      ownershipTotal: acc.ownershipTotal + row.ownershipTotal,
+      runningTotal: acc.runningTotal + row.runningTotal,
+    }),
+    { ownershipTotal: 0, runningTotal: 0 }
+  );
 }
 
 function computeMonthlyAverage(
@@ -599,45 +627,48 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       }
       const recentWhere = and(...recentConditions);
 
-      const [totals, categoryBreakdown, monthlyTrend, recentTotals] = await Promise.all([
-        this.db
-          .select({
-            totalAmount: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
-            expenseCount: sql<number>`count(*)`,
-          })
-          .from(expenses)
-          .where(periodWhere),
+      const [totals, categoryBreakdown, monthlyTrend, recentTotals, costBuckets] =
+        await Promise.all([
+          this.db
+            .select({
+              totalAmount: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
+              expenseCount: sql<number>`count(*)`,
+            })
+            .from(expenses)
+            .where(periodWhere),
 
-        this.db
-          .select({
-            category: expenses.category,
-            amount: sql<number>`SUM(${expenses.expenseAmount})`,
-            count: sql<number>`count(*)`,
-          })
-          .from(expenses)
-          .where(periodWhere)
-          .groupBy(expenses.category),
+          this.db
+            .select({
+              category: expenses.category,
+              amount: sql<number>`SUM(${expenses.expenseAmount})`,
+              count: sql<number>`count(*)`,
+            })
+            .from(expenses)
+            .where(periodWhere)
+            .groupBy(expenses.category),
 
-        filters.timeZone
-          ? this.zonedMonthlyTrend(periodWhere, filters.timeZone)
-          : this.db
-              .select({
-                period: formatYearMonth(expenses.date).as('period'),
-                amount: sql<number>`SUM(${expenses.expenseAmount})`,
-                count: sql<number>`count(*)`,
-              })
-              .from(expenses)
-              .where(periodWhere)
-              .groupBy(formatYearMonth(expenses.date))
-              .orderBy(formatYearMonth(expenses.date)),
+          filters.timeZone
+            ? this.zonedMonthlyTrend(periodWhere, filters.timeZone)
+            : this.db
+                .select({
+                  period: formatYearMonth(expenses.date).as('period'),
+                  amount: sql<number>`SUM(${expenses.expenseAmount})`,
+                  count: sql<number>`count(*)`,
+                })
+                .from(expenses)
+                .where(periodWhere)
+                .groupBy(formatYearMonth(expenses.date))
+                .orderBy(formatYearMonth(expenses.date)),
 
-        this.db
-          .select({
-            amount: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
-          })
-          .from(expenses)
-          .where(recentWhere),
-      ]);
+          this.db
+            .select({
+              amount: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
+            })
+            .from(expenses)
+            .where(recentWhere),
+
+          this.costBuckets(filters, period),
+        ]);
 
       const totalAmount = Number(totals[0]?.totalAmount) || 0;
       const expenseCount = Number(totals[0]?.expenseCount) || 0;
@@ -658,6 +689,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           amount: Number(row.amount) || 0,
           count: Number(row.count) || 0,
         })),
+        costBuckets,
       };
     } catch (error) {
       logger.error('Failed to get expense summary', {
@@ -666,6 +698,57 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       });
       throw new DatabaseError('Failed to get expense summary', error);
     }
+  }
+
+  private async costBuckets(
+    filters: ExpenseSummaryFilters,
+    period: NonNullable<ExpenseSummaryFilters['period']>
+  ): Promise<CostBuckets> {
+    const now = new Date();
+    const start = getPeriodStartDate(period, now);
+    const previousStart = start
+      ? new Date(start.getTime() - (now.getTime() - start.getTime()))
+      : null;
+    const conditions: SQL[] = [eq(expenses.userId, filters.userId)];
+    if (filters.vehicleId) conditions.push(eq(expenses.vehicleId, filters.vehicleId));
+    if (previousStart) conditions.push(gte(expenses.date, previousStart));
+
+    const isOwnership = inArray(expenses.category, [...OWNERSHIP_CATEGORIES]);
+    const inCurrent = start ? gte(expenses.date, start) : sql`1`;
+    const inPrevious = start ? lt(expenses.date, start) : sql`0`;
+    const bucketSum = (when: SQL) =>
+      sql<number>`COALESCE(SUM(CASE WHEN ${when} THEN ${expenses.expenseAmount} ELSE 0 END), 0)`;
+
+    const rows = await this.db
+      .select({
+        vehicleId: expenses.vehicleId,
+        ownershipTotal: bucketSum(sql`${inCurrent} AND ${isOwnership}`),
+        runningTotal: bucketSum(sql`${inCurrent} AND NOT ${isOwnership}`),
+        previousOwnershipTotal: bucketSum(sql`${inPrevious} AND ${isOwnership}`),
+        previousRunningTotal: bucketSum(sql`${inPrevious} AND NOT ${isOwnership}`),
+      })
+      .from(expenses)
+      .where(and(...conditions))
+      .groupBy(expenses.vehicleId);
+
+    const byVehicle = rows.map((row) => ({
+      vehicleId: row.vehicleId,
+      ownershipTotal: Number(row.ownershipTotal) || 0,
+      runningTotal: Number(row.runningTotal) || 0,
+      previous: start
+        ? {
+            ownershipTotal: Number(row.previousOwnershipTotal) || 0,
+            runningTotal: Number(row.previousRunningTotal) || 0,
+          }
+        : null,
+    }));
+    return {
+      ...sumBuckets(byVehicle),
+      previous: start
+        ? sumBuckets(byVehicle.map((row) => row.previous ?? { ownershipTotal: 0, runningTotal: 0 }))
+        : null,
+      byVehicle,
+    };
   }
 
   // photo-service imports this module, so receipt file removal has to stay with the caller.

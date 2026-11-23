@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ExpenseSummary } from '../api/expenses/repository';
+import type { CostBuckets, CostBucketTotals, ExpenseSummary } from '../api/expenses/repository';
 import { CONFIG } from '../config';
 import type { SplitConfig } from '../db/types';
 
@@ -113,6 +113,26 @@ export function expenseSummaryToApi(summary: ExpenseSummary): ExpenseSummary {
       amount: centsToDollars(r.amount),
     })),
     monthlyTrend: summary.monthlyTrend.map((r) => ({ ...r, amount: centsToDollars(r.amount) })),
+    costBuckets: costBucketsToApi(summary.costBuckets),
+  };
+}
+
+function bucketTotalsToApi<T extends CostBucketTotals>(totals: T): T {
+  return {
+    ...totals,
+    ownershipTotal: centsToDollars(totals.ownershipTotal),
+    runningTotal: centsToDollars(totals.runningTotal),
+  };
+}
+
+function costBucketsToApi(buckets: CostBuckets): CostBuckets {
+  return {
+    ...bucketTotalsToApi(buckets),
+    previous: buckets.previous && bucketTotalsToApi(buckets.previous),
+    byVehicle: buckets.byVehicle.map((row) => ({
+      ...bucketTotalsToApi(row),
+      previous: row.previous && bucketTotalsToApi(row.previous),
+    })),
   };
 }
 
