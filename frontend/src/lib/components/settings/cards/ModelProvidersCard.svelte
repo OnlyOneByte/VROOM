@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -109,7 +110,7 @@
 	async function retryLoad() {
 		await loadData();
 		await tick();
-		content?.querySelector('button')?.focus();
+		focusFirstButton(content);
 	}
 
 	function openCreate() {

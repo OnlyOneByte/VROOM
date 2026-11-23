@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -65,7 +66,7 @@
 	async function retryProviders() {
 		await loadProviders();
 		await tick();
-		optionsCard?.querySelector('button')?.focus();
+		focusFirstButton(optionsCard);
 	}
 
 	function handleLogin(providerId: string) {

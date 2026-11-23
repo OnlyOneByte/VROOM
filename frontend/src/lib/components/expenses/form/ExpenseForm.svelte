@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick, untrack } from 'svelte';
+	import { focusFirstButton, focusLeftOn } from '#lib/utils/focus.ts';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
 	import { gotoDynamic, gotoWithQuery } from '#lib/utils/navigation.ts';
@@ -206,11 +207,6 @@
 	let photoPicker = $state<HTMLDivElement | null>(null);
 	let photosRetryFailed = $state(false);
 
-	function focusLeftOn(origin: Element | null): boolean {
-		const active = document.activeElement;
-		return active === origin || active === null || active === document.body;
-	}
-
 	async function retryVehicleContext() {
 		const origin = document.activeElement;
 		await retry(() => loadVehicleContext(form));
@@ -228,7 +224,7 @@
 		photosRetryFailed = form.queuedPhotosUnreadable;
 		if (photosRetryFailed) return;
 		await tick();
-		if (focusLeftOn(origin)) photoPicker?.querySelector('button')?.focus();
+		if (focusLeftOn(origin)) focusFirstButton(photoPicker);
 	}
 
 	async function reloadExpense() {

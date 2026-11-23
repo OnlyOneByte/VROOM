@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import { DatabaseZap, Upload, LoaderCircle, CircleCheck, CircleAlert } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
@@ -59,7 +60,7 @@
 	async function retryVehicles() {
 		await loadVehicles();
 		await tick();
-		content?.querySelector('button')?.focus();
+		focusFirstButton(content);
 	}
 
 	function buildMapping(): ImportColumnMapping | null {
