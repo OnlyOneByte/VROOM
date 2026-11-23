@@ -27,6 +27,11 @@ export interface BackupStrategy {
   execute(context: BackupStrategyContext): Promise<BackupStrategyResult>;
 }
 
+export const PHOTO_ONLY_PROVIDER_TYPES = ['google-photos'] as const;
+
+export const isPhotoOnlyProviderType = (providerType: string): boolean =>
+  (PHOTO_ONLY_PROVIDER_TYPES as readonly string[]).includes(providerType);
+
 export const hasZipBackup = (settings: ProviderBackupSettings): boolean => settings.enabled;
 
 export const hasSheetsSync = (settings: ProviderBackupSettings): boolean =>

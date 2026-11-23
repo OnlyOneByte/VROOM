@@ -4,6 +4,7 @@ import type {
   BackupStrategyContext,
   BackupStrategyResult,
 } from '../backup-strategy';
+import { BackupStrategyRegistry } from '../backup-strategy-registry';
 
 function createMockStrategy(label: string): BackupStrategy {
   return {
@@ -14,11 +15,10 @@ function createMockStrategy(label: string): BackupStrategy {
 }
 
 describe('BackupStrategyRegistry', () => {
-  let registry: typeof import('../backup-strategy-registry')['backupStrategyRegistry'];
+  let registry: BackupStrategyRegistry;
 
-  beforeEach(async () => {
-    const mod = await import('../backup-strategy-registry');
-    registry = mod.backupStrategyRegistry;
+  beforeEach(() => {
+    registry = new BackupStrategyRegistry();
   });
 
   test('register and retrieve a strategy', () => {

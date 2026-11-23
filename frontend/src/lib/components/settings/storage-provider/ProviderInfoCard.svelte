@@ -22,6 +22,7 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { PHOTO_CATEGORY_LABELS } from '#lib/constants/ui.ts';
+	import { supportsZipBackup as providerSupportsZipBackup } from '#lib/constants/providers.ts';
 	import type { PhotoCategory, CategorySetting, UserProviderInfo } from '#lib/types/index.ts';
 
 	let {
@@ -153,7 +154,7 @@
 
 	let Icon = $derived(getProviderIcon(provider.providerType));
 
-	let supportsZipBackup = $derived(provider.providerType !== 'google-photos');
+	let supportsZipBackup = $derived(providerSupportsZipBackup(provider.providerType));
 </script>
 
 <Card>

@@ -34,7 +34,11 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import { routes } from '#lib/routes.ts';
-	import { DEFAULT_FOLDER_SETTINGS, type ProviderTypeOption } from '#lib/constants/providers.ts';
+	import {
+		DEFAULT_FOLDER_SETTINGS,
+		supportsZipBackup,
+		type ProviderTypeOption
+	} from '#lib/constants/providers.ts';
 	import type {
 		PhotoCategory,
 		CategorySetting,
@@ -318,7 +322,7 @@
 			if (backupEnabled || sheetsSyncEnabled || backupConfig.providers[resultId]) {
 				try {
 					const providerBackup: ProviderBackupSettings = {
-						enabled: backupEnabled,
+						enabled: backupEnabled && supportsZipBackup(selectedType),
 						folderPath: backupFolderPath.trim() || 'Backups',
 						retentionCount: backupRetentionCount,
 						...(selectedType === 'google-drive' && {
@@ -548,23 +552,25 @@
 				</CardContent>
 			</Card>
 
-			<Card>
-				<CardHeader>
-					<CardTitle class="text-base">Backup Settings</CardTitle>
-					<CardDescription>Configure backup storage for this provider</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<BackupSection
-						{providerRootPrefix}
-						{selectedType}
-						bind:backupFolderPath
-						bind:backupEnabled
-						bind:backupRetentionCount
-						bind:sheetsSyncEnabled
-						bind:sheetsSpreadsheetId
-					/>
-				</CardContent>
-			</Card>
+			{#if supportsZipBackup(selectedType)}
+				<Card>
+					<CardHeader>
+						<CardTitle class="text-base">Backup Settings</CardTitle>
+						<CardDescription>Configure backup storage for this provider</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<BackupSection
+							{providerRootPrefix}
+							{selectedType}
+							bind:backupFolderPath
+							bind:backupEnabled
+							bind:backupRetentionCount
+							bind:sheetsSyncEnabled
+							bind:sheetsSpreadsheetId
+						/>
+					</CardContent>
+				</Card>
+			{/if}
 
 			{#if isEditMode}
 				<Card class="border-destructive/50">

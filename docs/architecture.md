@@ -102,8 +102,14 @@ one registry per capability:
 
 Each domain defines a provider interface and a registry; adding a vendor means adding one
 file, not touching call sites. Backups go through the `BackupStrategy` interface and registry
-in `src/api/sync/`, implemented under `src/api/providers/backup-strategies/` (Google Drive
-today), and `src/api/sync/backup-orchestrator.ts` fans out to every enabled provider.
+in `src/api/sync/`, implemented under `src/api/providers/backup-strategies/`: a generic ZIP
+strategy for any storage provider (S3-compatible, fake), and a Google Drive strategy that adds
+the Sheets mirror. `src/api/sync/init.ts` registers them, and
+`src/api/sync/backup-orchestrator.ts` fans out to every enabled provider. An enabled provider
+whose type has no strategy is marked failed rather than skipped, so the run ends `failed`, or
+`partial` when another provider succeeded. Photo-only types (`PHOTO_ONLY_PROVIDER_TYPES` in
+`backup-strategy.ts`, mirrored in the frontend's `constants/providers.ts`) offer no ZIP backup,
+and the orchestrator ignores any backup settings left on them.
 
 Auto-sync is inactivity-driven: a per-domain `changeTracker` middleware marks data changed on
 each successful write, the global activity middleware arms the inactivity timer, and when it

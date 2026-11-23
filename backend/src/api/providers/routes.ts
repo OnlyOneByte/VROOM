@@ -73,11 +73,16 @@ routes.get('/pending/:nonce', async (c) => {
   return c.json({ success: true, data: { email } });
 });
 
-const MODEL_PROVIDER_TYPES = ['openai-compatible', 'anthropic', 'gemini', 'ollama'] as const;
+export const MODEL_PROVIDER_TYPES = ['openai-compatible', 'anthropic', 'gemini', 'ollama'] as const;
 type ModelProviderType = (typeof MODEL_PROVIDER_TYPES)[number];
 const MODEL_DOMAINS = ['vlm', 'llm'] as const;
 type ModelDomain = (typeof MODEL_DOMAINS)[number];
-const SUPPORTED_PROVIDER_TYPES = ['google-drive', 's3', 'fake', ...MODEL_PROVIDER_TYPES] as const;
+export const SUPPORTED_PROVIDER_TYPES = [
+  'google-drive',
+  's3',
+  'fake',
+  ...MODEL_PROVIDER_TYPES,
+] as const;
 
 function isModelProviderType(providerType: string): providerType is ModelProviderType {
   return (MODEL_PROVIDER_TYPES as readonly string[]).includes(providerType);

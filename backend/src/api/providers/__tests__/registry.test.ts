@@ -364,6 +364,33 @@ describe('StorageProviderRegistry', () => {
       );
     });
 
+    test('a fake provider keeps its files across instances for the same provider row', async () => {
+      const { CONFIG } = await import('../../../config');
+      const config = CONFIG as { allowFakeStorageProvider: boolean };
+      const previous = config.allowFakeStorageProvider;
+      config.allowFakeStorageProvider = true;
+      try {
+        const registry = new StorageProviderRegistry(createMockDb([]) as never);
+        const row = { ...baseProvider, id: 'fake-persist-1', providerType: 'fake' };
+        await registry.createProviderInstance(row).upload({
+          fileName: 'vroom-backup-1.zip',
+          buffer: Buffer.from('zip'),
+          mimeType: 'application/zip',
+          entityType: 'backup',
+          entityId: 'u',
+          pathHint: '',
+          rawPath: 'Backups',
+        });
+
+        const again = await registry.createProviderInstance(row).list('Backups');
+        expect(again.map((f) => f.name)).toEqual(['vroom-backup-1.zip']);
+        const other = registry.createProviderInstance({ ...row, id: 'fake-persist-2' });
+        expect(await other.list('Backups')).toEqual([]);
+      } finally {
+        config.allowFakeStorageProvider = previous;
+      }
+    });
+
     test('the fake gate SHORT-CIRCUITS before decrypt (a fake row with garbage creds still throws the GATE error, not a decrypt/parse error)', () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);

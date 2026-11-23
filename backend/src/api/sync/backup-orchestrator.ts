@@ -8,8 +8,10 @@ import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
 import {
   type BackupOrchestratorResult,
   type BackupOutcome,
+  type BackupStrategy,
   type BackupStrategyResult,
   hasZipBackup,
+  isPhotoOnlyProviderType,
   isSyncEnabled,
 } from './backup-strategy';
 import { backupStrategyRegistry } from './backup-strategy-registry';
@@ -52,6 +54,22 @@ function releaseMutex(userId: string, token: symbol): void {
 
 function failedAttempt(message: string): BackupStrategyResult {
   return { success: false, message, capabilities: {} };
+}
+
+function lookupStrategy(
+  providerId: string,
+  providerType: string
+): { strategy: BackupStrategy } | { result: BackupStrategyResult | null } {
+  if (isPhotoOnlyProviderType(providerType)) {
+    logger.debug('Photo-only provider has no backups, ignoring its backup settings', {
+      providerId,
+    });
+    return { result: null };
+  }
+  const strategy = backupStrategyRegistry.get(providerType);
+  if (strategy) return { strategy };
+  logger.warn('No backup strategy registered for provider type', { providerId, providerType });
+  return { result: failedAttempt(`Backups are not supported for ${providerType}`) };
 }
 
 export class BackupOrchestrator {
@@ -119,19 +137,17 @@ export class BackupOrchestrator {
       const providerRowMap = new Map(providerRows.map((r) => [r.id, r]));
 
       const strategyPromises = enabledProviders.map(async ([providerId, providerConfig]) => {
-        const strategy = backupStrategyRegistry.get(
-          providerRowMap.get(providerId)?.providerType ?? ''
-        );
-        if (!strategy) {
-          logger.debug('No strategy registered for provider, skipping', { providerId });
-          return { providerId, result: null };
-        }
-
         const providerRow = providerRowMap.get(providerId);
         if (!providerRow) {
           logger.warn('Provider row not found, skipping', { providerId });
           return { providerId, result: null };
         }
+
+        const lookup = lookupStrategy(providerId, providerRow.providerType);
+        if (!('strategy' in lookup)) {
+          return { providerId, result: lookup.result };
+        }
+        const { strategy } = lookup;
 
         let decryptedCredentials: Record<string, unknown>;
         try {
