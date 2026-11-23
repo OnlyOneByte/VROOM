@@ -94,3 +94,28 @@ describe('analytics filter bar', () => {
 		expect(mocks.goto).toHaveBeenCalledWith('/analytics?range=24m&cars=civic', { reset: false });
 	});
 });
+
+describe('analytics filter bar recovery', () => {
+	test('car ids that match none of your cars are dropped from the URL', async () => {
+		mocks.url = new URL('https://vroom.test/analytics?range=3m&cars=gone');
+		render(Page);
+
+		await waitFor(() =>
+			expect(mocks.goto).toHaveBeenCalledWith('/analytics?range=3m', {
+				replace: true,
+				reset: false
+			})
+		);
+		expect(mocks.getSummary.mock.calls.at(-1)?.[0].vehicleIds).toBeUndefined();
+	});
+
+	test('Clear filters hands focus to the date range button', async () => {
+		mocks.url = new URL('https://vroom.test/analytics?range=ytd');
+		render(Page);
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Clear filters' }));
+		await waitFor(() =>
+			expect(document.activeElement).toBe(screen.getByRole('button', { name: /Year to date/ }))
+		);
+	});
+});

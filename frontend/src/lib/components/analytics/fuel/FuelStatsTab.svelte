@@ -41,6 +41,7 @@
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import type { StatCardChange } from '#lib/components/charts/StatCard.svelte';
 	import { CHART_COLORS } from '#lib/utils/chart-colors.ts';
+	import type { AnalyticsDateRange } from '../analytics-filters';
 
 	let {
 		fuelStats: fuelStatsProp = null,
@@ -48,7 +49,9 @@
 		vehicleColors: vehicleColorsProp,
 		filterLabel,
 		onClearFilters,
-		previousPeriodLabel = 'vs the 12 months before'
+		previousPeriodLabel = 'vs the 12 months before',
+		dateRange,
+		vehicleIds
 	}: {
 		fuelStats?: FuelStatsResponse | null;
 		fuelAdvanced?: FuelAdvancedResponse | null;
@@ -56,6 +59,8 @@
 		filterLabel?: string;
 		onClearFilters?: () => void;
 		previousPeriodLabel?: string;
+		dateRange?: AnalyticsDateRange;
+		vehicleIds?: string[];
 	} = $props();
 
 	let localFuelStats = $state<FuelStatsResponse | null>(null);
@@ -219,13 +224,12 @@
 	async function loadData() {
 		try {
 			internalLoading = true;
-			const range = getDefaultDateRange();
-			const [stats, advanced] = await Promise.all([
-				analyticsApi.getFuelStats(range),
-				analyticsApi.getFuelAdvanced(range)
-			]);
-			localFuelStats = stats;
-			localFuelAdvanced = advanced;
+			const summary = await analyticsApi.getSummary({
+				...(dateRange ?? getDefaultDateRange()),
+				vehicleIds
+			});
+			localFuelStats = summary.fuelStats;
+			localFuelAdvanced = summary.fuelAdvanced;
 			error = null;
 		} catch (e) {
 			error = userFacingErrorMessage(e);
@@ -311,7 +315,7 @@
 	<EmptyState level={3}>
 		{#snippet icon()}
 			<div class="mb-4 rounded-full bg-muted p-4">
-				<Fuel class="h-8 w-8 text-muted-foreground" />
+				<Fuel class="h-8 w-8 text-muted-foreground" aria-hidden="true" />
 			</div>
 		{/snippet}
 		{#snippet title()}No fill-ups or charging for {filterLabel}{/snippet}

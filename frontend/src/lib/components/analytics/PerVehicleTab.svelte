@@ -4,7 +4,8 @@
 	import { onMount, untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { LoaderCircle } from '@lucide/svelte';
+	import { LoaderCircle, SearchX } from '@lucide/svelte';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
@@ -28,9 +29,16 @@
 	interface Props {
 		dateRange?: AnalyticsDateRange;
 		preferredVehicleId?: string;
+		filterLabel?: string;
+		onClearFilters?: () => void;
 	}
 
-	let { dateRange = getDefaultDateRange(), preferredVehicleId }: Props = $props();
+	let {
+		dateRange = getDefaultDateRange(),
+		preferredVehicleId,
+		filterLabel,
+		onClearFilters
+	}: Props = $props();
 
 	let vehicles = $state<Vehicle[]>([]);
 	let selectedVehicleId = $state<string>('');
@@ -246,13 +254,37 @@
 				</Card.Content>
 			</Card.Root>
 
+			{#if filterLabel}
+				<p class="text-sm text-muted-foreground">
+					The health score and totals cover this car's whole history. The breakdown below follows
+					the date range.
+				</p>
+			{/if}
+
 			<StatCardGrid items={tcoSummaryItems} columns={4} />
 
-			<AppPieChart
-				title="Expense Breakdown"
-				description="Category distribution"
-				data={expensePieData}
-			/>
+			{#if filterLabel && onClearFilters && expensePieData.length === 0}
+				<EmptyState level={3}>
+					{#snippet icon()}
+						<div class="mb-4 rounded-full bg-muted p-4">
+							<SearchX class="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+						</div>
+					{/snippet}
+					{#snippet title()}No expenses for {filterLabel}{/snippet}
+					{#snippet description()}
+						This car has no expenses in the chosen dates. Try a longer date range.
+					{/snippet}
+					{#snippet action()}
+						<Button variant="outline" onclick={onClearFilters}>Clear filters</Button>
+					{/snippet}
+				</EmptyState>
+			{:else}
+				<AppPieChart
+					title="Expense Breakdown"
+					description="Category distribution"
+					data={expensePieData}
+				/>
+			{/if}
 		{/if}
 	</div>
 {/if}

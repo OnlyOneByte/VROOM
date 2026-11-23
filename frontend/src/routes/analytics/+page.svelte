@@ -36,6 +36,7 @@
 	let tabList = $state<HTMLElement | null>(null);
 	let vehicles = $state<Vehicle[]>([]);
 	let vehiclesLoaded = $state(false);
+	let vehiclesError = $state<string | null>(null);
 	let summaryRequest = 0;
 
 	let filters = $derived(parseAnalyticsFilters(page.url.searchParams));
@@ -47,7 +48,7 @@
 		return known.length > 0 ? known : undefined;
 	});
 	let filtered = $derived(!isDefaultFilters(filters));
-	let customRange = $derived(filters.range !== DEFAULT_RANGE);
+	let nonDefaultRange = $derived(filters.range !== DEFAULT_RANGE);
 	let vehicleOptions = $derived(
 		vehicles.map(v => ({
 			id: v.id,
@@ -75,16 +76,26 @@
 		void goto(`${url.pathname}${url.search}`, { reset: false });
 	}
 
+	$effect(() => {
+		if (!vehiclesLoaded || vehicles.length === 0 || filters.cars.length === 0) return;
+		if (filters.cars.some(id => vehicles.some(v => v.id === id))) return;
+		const url = writeAnalyticsFilters(page.url, { ...filters, cars: [] });
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
+		void goto(`${url.pathname}${url.search}`, { replace: true, reset: false });
+	});
+
 	function clearFilters() {
-		setFilters({ range: '12m', cars: [] });
+		setFilters({ range: DEFAULT_RANGE, cars: [] });
 	}
 
 	async function loadVehicles() {
 		try {
 			const { vehicleApi } = await import('#lib/services/vehicle-api.ts');
 			vehicles = await vehicleApi.getVehicles();
-		} catch {
+			vehiclesError = null;
+		} catch (e) {
 			vehicles = [];
+			vehiclesError = userFacingErrorMessage(e);
 		} finally {
 			vehiclesLoaded = true;
 		}
@@ -110,7 +121,7 @@
 			isLoading = true;
 			const result = await analyticsApi.getSummary({
 				...dateRange,
-				ytdStart: customRange ? dateRange.startDate : dateRange.ytdStart,
+				ytdStart: nonDefaultRange ? dateRange.startDate : dateRange.ytdStart,
 				vehicleIds
 			});
 			if (request !== summaryRequest) return;
@@ -153,9 +164,9 @@
 						iconColor: 'primary'
 					},
 					{
-						label: customRange ? 'Spending' : 'YTD Spending',
+						label: nonDefaultRange ? 'Spending' : 'YTD Spending',
 						value: formatCurrency(quickStats.ytdSpending),
-						subtitle: customRange ? rangeLabel(filters, d => formatDate(d)) : undefined,
+						subtitle: nonDefaultRange ? rangeLabel(filters, d => formatDate(d)) : undefined,
 						icon: DollarSign,
 						iconColor: 'chart-1'
 					},
@@ -204,7 +215,13 @@
 	/>
 
 	{#if !noVehicles}
-		<AnalyticsFilterBar {filters} vehicles={vehicleOptions} onChange={setFilters} />
+		<AnalyticsFilterBar
+			{filters}
+			vehicles={vehicleOptions}
+			onChange={setFilters}
+			{vehiclesError}
+			onRetryVehicles={loadVehicles}
+		/>
 	{/if}
 
 	{#if isLoading && !error}
@@ -246,6 +263,8 @@
 						{fuelAdvanced}
 						{vehicleColors}
 						previousPeriodLabel={previousPeriodLabel(filters)}
+						{dateRange}
+						{vehicleIds}
 						filterLabel={filtered ? filterLabel : undefined}
 						onClearFilters={filtered ? clearFilters : undefined}
 					/>
@@ -273,7 +292,12 @@
 							<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 						</div>
 					{:then { default: PerVehicleTab }}
-						<PerVehicleTab {dateRange} preferredVehicleId={vehicleIds?.[0]} />
+						<PerVehicleTab
+							{dateRange}
+							preferredVehicleId={vehicleIds?.[0]}
+							filterLabel={filtered ? filterLabel : undefined}
+							onClearFilters={filtered ? clearFilters : undefined}
+						/>
 					{/await}
 				</Tabs.Content>
 			{:else if activeTab === 'year-end'}

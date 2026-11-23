@@ -1,9 +1,9 @@
 export const RANGE_PRESETS = [
-	{ value: '3m', label: 'Last 3 months' },
-	{ value: '12m', label: 'Last 12 months' },
-	{ value: 'ytd', label: 'Year to date' },
-	{ value: '24m', label: 'Last 24 months' },
-	{ value: 'all', label: 'All time' }
+	{ value: '3m', label: 'Last 3 months', short: '3 months' },
+	{ value: '12m', label: 'Last 12 months', short: '12 months' },
+	{ value: 'ytd', label: 'Year to date', short: 'This year' },
+	{ value: '24m', label: 'Last 24 months', short: '24 months' },
+	{ value: 'all', label: 'All time', short: 'All time' }
 ] as const;
 
 export type RangePreset = (typeof RANGE_PRESETS)[number]['value'];
@@ -108,11 +108,16 @@ export function isDefaultFilters(filters: AnalyticsFilters): boolean {
 	return filters.range === DEFAULT_RANGE && filters.cars.length === 0;
 }
 
-export function rangeLabel(filters: AnalyticsFilters, formatDay: (d: Date) => string): string {
+export function rangeLabel(
+	filters: AnalyticsFilters,
+	formatDay: (d: Date) => string,
+	short = false
+): string {
 	const from = parseDay(filters.from);
 	const to = parseDay(filters.to);
 	if (filters.range === 'custom' && from && to) return `${formatDay(from)} – ${formatDay(to)}`;
-	return RANGE_PRESETS.find(p => p.value === filters.range)?.label ?? 'Last 12 months';
+	const preset = RANGE_PRESETS.find(p => p.value === filters.range);
+	return (short ? preset?.short : preset?.label) ?? 'Last 12 months';
 }
 
 export function carsLabel(cars: string[], names: Map<string, string>): string {

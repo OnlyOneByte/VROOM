@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { CalendarRange, Car, ChevronDown, X } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
@@ -16,9 +17,12 @@
 		filters: AnalyticsFilters;
 		vehicles: Array<{ id: string; name: string }>;
 		onChange: (_filters: AnalyticsFilters) => void;
+		vehiclesError?: string | null;
+		onRetryVehicles?: () => void;
 	}
 
-	let { filters, vehicles, onChange }: Props = $props();
+	let { filters, vehicles, onChange, vehiclesError, onRetryVehicles }: Props = $props();
+	let group = $state<HTMLElement | null>(null);
 
 	const isMobile = new IsMobile();
 	const loadSheet = () => import('./AnalyticsFilterSheet.svelte');
@@ -26,7 +30,7 @@
 	let sheetRequested = $state(false);
 
 	let names = $derived(new Map(vehicles.map(v => [v.id, v.name])));
-	let currentRangeLabel = $derived(rangeLabel(filters, d => formatDate(d)));
+	let currentRangeLabel = $derived(rangeLabel(filters, d => formatDate(d), isMobile.current));
 	let currentCarsLabel = $derived(carsLabel(filters.cars, names));
 
 	function openMenu(next: FilterMenu) {
@@ -36,6 +40,12 @@
 
 	function prefetch() {
 		void loadSheet();
+	}
+
+	async function clearFilters() {
+		onChange({ range: DEFAULT_RANGE, cars: [] });
+		await tick();
+		group?.querySelector<HTMLElement>('button')?.focus();
 	}
 </script>
 
@@ -59,19 +69,26 @@
 	</Button>
 {/snippet}
 
-<div class="flex flex-wrap items-center gap-2" role="group" aria-label="Analytics filters">
+<div
+	bind:this={group}
+	class="flex items-center gap-2 sm:flex-wrap"
+	role="group"
+	aria-label="Analytics filters"
+>
 	{@render trigger('range', CalendarRange, 'Date range', currentRangeLabel)}
 	{@render trigger('cars', Car, 'Cars', currentCarsLabel)}
 
 	{#if !isDefaultFilters(filters)}
-		<Button
-			variant="ghost"
-			class={isMobile.current ? 'w-full' : ''}
-			onclick={() => onChange({ range: DEFAULT_RANGE, cars: [] })}
-		>
-			<X class="mr-1 h-4 w-4" aria-hidden="true" />
-			Clear filters
-		</Button>
+		{#if isMobile.current}
+			<Button variant="ghost" size="icon" aria-label="Clear filters" onclick={clearFilters}>
+				<X class="h-4 w-4" aria-hidden="true" />
+			</Button>
+		{:else}
+			<Button variant="ghost" onclick={clearFilters}>
+				<X class="mr-1 h-4 w-4" aria-hidden="true" />
+				Clear filters
+			</Button>
+		{/if}
 	{/if}
 </div>
 
@@ -83,6 +100,8 @@
 			{filters}
 			{vehicles}
 			{onChange}
+			{vehiclesError}
+			{onRetryVehicles}
 		/>
 	{/await}
 {/if}

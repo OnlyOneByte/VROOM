@@ -1,7 +1,8 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
-	import { Input } from '#lib/components/ui/input/index.ts';
+	import DateRangePicker from '#lib/components/common/date-range-picker.svelte';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import * as RadioGroup from '#lib/components/ui/radio-group/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
@@ -21,27 +22,41 @@
 		filters: AnalyticsFilters;
 		vehicles: Array<{ id: string; name: string }>;
 		onChange: (_filters: AnalyticsFilters) => void;
+		vehiclesError?: string | null;
+		onRetryVehicles?: () => void;
 	}
 
-	let { menu = $bindable(), side, filters, vehicles, onChange }: Props = $props();
+	let {
+		menu = $bindable(),
+		side,
+		filters,
+		vehicles,
+		onChange,
+		vehiclesError,
+		onRetryVehicles
+	}: Props = $props();
 
 	let names = $derived(new Set(vehicles.map(v => v.id)));
 	let selectedCars = $derived(filters.cars.filter(id => names.has(id)));
 
-	let customFrom = $state('');
-	let customTo = $state('');
-	let customError = $derived(
-		customFrom && customTo && customFrom > customTo
-			? 'The start date must be before the end date.'
-			: ''
-	);
+	let customFrom = $state<string | undefined>(undefined);
+	let customTo = $state<string | undefined>(undefined);
+	let seeded = '';
 
 	$effect(() => {
-		if (menu === 'range') {
+		if (menu !== 'range') return;
+		untrack(() => {
 			const range = filterDateRange(filters);
 			customFrom = filters.from ?? toDayString(new Date(range.startDate * 1000));
 			customTo = filters.to ?? toDayString(new Date((range.endDate - 1) * 1000));
-		}
+			seeded = `${customFrom}|${customTo}`;
+		});
+	});
+
+	$effect(() => {
+		const picked = `${customFrom}|${customTo}`;
+		if (menu !== 'range' || !customFrom || !customTo || picked === seeded) return;
+		untrack(() => applyCustom(customFrom as string, customTo as string));
 	});
 
 	function pickRange(value: string) {
@@ -49,9 +64,8 @@
 		menu = null;
 	}
 
-	function applyCustom() {
-		if (!customFrom || !customTo || customError) return;
-		onChange({ cars: filters.cars, range: 'custom', from: customFrom, to: customTo });
+	function applyCustom(from: string, to: string) {
+		onChange({ cars: filters.cars, range: 'custom', from, to });
 		menu = null;
 	}
 
@@ -68,10 +82,7 @@
 		if (!open) menu = null;
 	}}
 >
-	<Sheet.Content
-		{side}
-		class={side === 'bottom' ? 'max-h-[85vh] overflow-y-auto' : 'overflow-y-auto sm:max-w-sm'}
-	>
+	<Sheet.Content {side} class={side === 'bottom' ? 'max-h-[85vh]' : 'sm:max-w-sm'}>
 		<Sheet.Header>
 			<Sheet.Title>{menu === 'cars' ? 'Cars' : 'Date range'}</Sheet.Title>
 			<Sheet.Description>
@@ -80,7 +91,14 @@
 		</Sheet.Header>
 
 		<div class="px-4">
-			{#if menu === 'cars'}
+			{#if menu === 'cars' && vehiclesError}
+				<div class="space-y-3" role="alert">
+					<p class="text-sm">Couldn't load your cars. {vehiclesError}</p>
+					{#if onRetryVehicles}
+						<Button variant="outline" onclick={onRetryVehicles}>Try Again</Button>
+					{/if}
+				</div>
+			{:else if menu === 'cars'}
 				<div class="space-y-1" role="group" aria-label="Cars">
 					<Label
 						for="analytics-car-all"
@@ -124,30 +142,15 @@
 						</Label>
 					{/each}
 				</RadioGroup.Root>
-				<fieldset class="mt-3 space-y-3 border-t pt-3">
-					<legend class="text-sm font-medium">Custom range</legend>
-					<div class="grid grid-cols-2 gap-2">
-						<div class="space-y-1">
-							<Label for="analytics-range-from">From</Label>
-							<Input id="analytics-range-from" type="date" bind:value={customFrom} />
-						</div>
-						<div class="space-y-1">
-							<Label for="analytics-range-to">To</Label>
-							<Input id="analytics-range-to" type="date" bind:value={customTo} />
-						</div>
-					</div>
-					{#if customError}
-						<p class="text-sm text-destructive" role="alert">{customError}</p>
-					{/if}
-					<Button
-						class="w-full"
-						variant="secondary"
-						disabled={!customFrom || !customTo || !!customError}
-						onclick={applyCustom}
-					>
-						Apply dates
-					</Button>
-				</fieldset>
+				<div class="mt-3 space-y-2 border-t pt-3">
+					<Label for="analytics-range-custom" class="text-sm font-medium">Custom range</Label>
+					<DateRangePicker
+						id="analytics-range-custom"
+						bind:startValue={customFrom}
+						bind:endValue={customTo}
+						placeholder="Pick a start and end date"
+					/>
+				</div>
 			{/if}
 		</div>
 
