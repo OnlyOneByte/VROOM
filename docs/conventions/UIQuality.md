@@ -57,6 +57,8 @@ Tailwind's 4px scale is the only spacing scale. Match the neighbours; don't inve
   the mobile top bar + menu to the desktop rail at `lg`. Write the base (mobile) classes first
   and add `sm:`/`lg:` overrides — never the reverse.
 - **Grids collapse.** Stat tiles are 2-up on mobile and up to 4-up at `lg` (`StatCardGrid`).
+  Three single-value tiles share one card of three rows below `sm` and sit 3-up from `sm`;
+  two-value tiles take a row each below `sm`.
   Side-by-side cards stack below `lg`.
 - **Radius** comes from `--radius` (`rounded-md` controls, `rounded-lg`/`rounded-xl` cards).
   `rounded-full` is for avatars, pills, carousel arrows and the FAB only.
