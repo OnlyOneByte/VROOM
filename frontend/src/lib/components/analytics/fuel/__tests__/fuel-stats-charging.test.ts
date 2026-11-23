@@ -218,3 +218,57 @@ describe('FuelStatsTab summary and groups', () => {
 		expect(groups.every(g => !(g as HTMLDetailsElement).open)).toBe(true);
 	});
 });
+
+describe('FuelStatsTab best and worst efficiency', () => {
+	const fillups = { currentYear: 4, previousYear: 0, currentMonth: 1, previousMonth: 2 };
+
+	function tones(label: RegExp) {
+		return screen.getAllByText(label).map(span => span.nextElementSibling?.className ?? '');
+	}
+
+	test.each([
+		[
+			'gas',
+			{
+				fillups,
+				fuelConsumption: { avgEfficiency: 30.5, bestEfficiency: 30.5, worstEfficiency: 30.5 }
+			},
+			/^(Best|Worst) mi\/gal$/
+		],
+		[
+			'electric',
+			{
+				charging: {
+					...charging,
+					efficiency: { avgEfficiency: 4, bestEfficiency: 4.04, worstEfficiency: 3.96 }
+				}
+			},
+			/^(Best|Worst) mi\/kWh$/
+		]
+	] as const)('equal %s best and worst are not coloured good and bad', (_kind, over, label) => {
+		render(FuelStatsTab, {
+			fuelStats: stats(over as Partial<FuelStatsResponse>),
+			fuelAdvanced: advanced
+		});
+
+		for (const tone of tones(label)) {
+			expect(tone).toContain('text-foreground');
+			expect(tone).not.toMatch(/text-chart-2|text-destructive/);
+		}
+	});
+
+	test('different best and worst keep green and red', () => {
+		render(FuelStatsTab, {
+			fuelStats: stats({
+				fillups,
+				fuelConsumption: { avgEfficiency: 32, bestEfficiency: 36, worstEfficiency: 29 }
+			}),
+			fuelAdvanced: advanced
+		});
+
+		expect(tones(/^(Best|Worst) mi\/gal$/)).toEqual([
+			expect.stringContaining('text-chart-2'),
+			expect.stringContaining('text-destructive')
+		]);
+	});
+});

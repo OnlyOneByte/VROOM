@@ -82,6 +82,11 @@
 
 	const DAYS_PER_MONTH = 365.25 / 12;
 
+	function spreadTone(best: number | null, worst: number | null, tone: string): string {
+		if (best == null || worst == null) return 'text-foreground';
+		return formatNumber(best, 1) === formatNumber(worst, 1) ? 'text-foreground' : tone;
+	}
+
 	let costPerDistance = $derived.by(() => {
 		const spend = fuelStats?.averageCost.avgCostPerDay;
 		const distance = fuelStats?.distance.avgPerDay;
@@ -326,7 +331,13 @@
 										<span class="text-xs text-muted-foreground">
 											Best {effLabel}
 										</span>
-										<p class="text-xl font-bold text-chart-2">
+										<p
+											class="text-xl font-bold {spreadTone(
+												fuelStats.fuelConsumption.bestEfficiency,
+												fuelStats.fuelConsumption.worstEfficiency,
+												'text-chart-2'
+											)}"
+										>
 											{fuelStats.fuelConsumption.bestEfficiency != null
 												? formatNumber(fuelStats.fuelConsumption.bestEfficiency, 1)
 												: 'N/A'}
@@ -336,7 +347,13 @@
 										<span class="text-xs text-muted-foreground">
 											Worst {effLabel}
 										</span>
-										<p class="text-xl font-bold text-destructive">
+										<p
+											class="text-xl font-bold {spreadTone(
+												fuelStats.fuelConsumption.bestEfficiency,
+												fuelStats.fuelConsumption.worstEfficiency,
+												'text-destructive'
+											)}"
+										>
 											{fuelStats.fuelConsumption.worstEfficiency != null
 												? formatNumber(fuelStats.fuelConsumption.worstEfficiency, 1)
 												: 'N/A'}
@@ -376,7 +393,13 @@
 										<span class="text-xs text-muted-foreground">
 											Best {electricEffLabel}
 										</span>
-										<p class="text-xl font-bold text-chart-2">
+										<p
+											class="text-xl font-bold {spreadTone(
+												charging.efficiency.bestEfficiency,
+												charging.efficiency.worstEfficiency,
+												'text-chart-2'
+											)}"
+										>
 											{charging.efficiency.bestEfficiency != null
 												? formatNumber(charging.efficiency.bestEfficiency, 1)
 												: 'N/A'}
@@ -386,7 +409,13 @@
 										<span class="text-xs text-muted-foreground">
 											Worst {electricEffLabel}
 										</span>
-										<p class="text-xl font-bold text-destructive">
+										<p
+											class="text-xl font-bold {spreadTone(
+												charging.efficiency.bestEfficiency,
+												charging.efficiency.worstEfficiency,
+												'text-destructive'
+											)}"
+										>
 											{charging.efficiency.worstEfficiency != null
 												? formatNumber(charging.efficiency.worstEfficiency, 1)
 												: 'N/A'}
