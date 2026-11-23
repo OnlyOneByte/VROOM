@@ -246,11 +246,15 @@ describe('ExpenseTagFilter: match mode', () => {
 });
 
 describe('ExpenseTagFilter: chip focus', () => {
-	test("a chip's remove button shows the kit focus ring of its own", () => {
+	test("a chip's remove button shows a high-contrast foreground ring of its own", () => {
 		renderTagFilter(['tolls']);
 		const remove = screen.getByRole('button', { name: 'Remove tag tolls' });
 
-		for (const cls of ['rounded-full', 'focus-visible:ring-2', 'focus-visible:ring-foreground']) {
+		for (const cls of [
+			'rounded-full',
+			'focus-visible:ring-[3px]',
+			'focus-visible:ring-foreground'
+		]) {
 			expect(remove).toHaveClass(cls);
 		}
 	});
