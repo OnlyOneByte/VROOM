@@ -416,6 +416,32 @@ export function computeAverageCosts(
   };
 }
 
+/**
+ * Average fuel and charging spend per month, over the calendar months from the
+ * first costed row up to `end`'s month (both counted), so months before the
+ * first fill-up or charge don't dilute it. Both figures share that span, so
+ * they add up to the combined spend.
+ */
+export function computeMonthlySpend(
+  fuelRows: FuelExpenseRow[],
+  end: Date,
+  calendar: Calendar = UTC_CALENDAR
+): { months: number; fuel: number | null; charging: number | null } | null {
+  const withCost = fuelRows.filter((r) => r.expenseAmount > 0 && r.date != null);
+  if (withCost.length === 0) return null;
+  const first = Math.min(...withCost.map((r) => normalizeDate(r.date)?.getTime() ?? 0));
+  const from = calendarParts(new Date(first), calendar);
+  const to = calendarParts(end, calendar);
+  const months = Math.max(1, (to.year - from.year) * 12 + (to.month - from.month) + 1);
+  const perMonth = (rows: FuelExpenseRow[]) =>
+    rows.length > 0 ? rows.reduce((s, r) => s + r.expenseAmount, 0) / months : null;
+  return {
+    months,
+    fuel: perMonth(withCost.filter((r) => !isElectricFuelType(r.fuelType))),
+    charging: perMonth(withCost.filter((r) => isElectricFuelType(r.fuelType))),
+  };
+}
+
 function validMilesBetween(
   current: { mileage: number | null; missedFillup: boolean },
   previous: { mileage: number | null; missedFillup: boolean },

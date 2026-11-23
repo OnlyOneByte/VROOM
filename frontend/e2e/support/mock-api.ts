@@ -149,6 +149,7 @@ export const ANALYTICS_SUMMARY = {
 			worstCostPerDistance: 0.25,
 			avgCostPerDay: 5
 		},
+		monthlySpend: { months: 12, fuel: 152.19, charging: null },
 		distance: { totalDistance: 3000, avgPerDay: 10, avgPerMonth: 300 },
 		monthlyConsumption: [],
 		gasPriceHistory: [],

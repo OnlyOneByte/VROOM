@@ -178,6 +178,7 @@ describe('FuelStatsTab summary and groups', () => {
 			worstCostPerDistance: 0.14,
 			avgCostPerDay: 5.2
 		},
+		monthlySpend: { months: 6, fuel: 45.5, charging: null },
 		distance: { totalDistance: 16000, avgPerDay: 40, avgPerMonth: 1200 }
 	};
 
@@ -186,8 +187,28 @@ describe('FuelStatsTab summary and groups', () => {
 		expect(screen.getByText('Cost per mi')).toBeTruthy();
 		expect(screen.getByText('$0.13')).toBeTruthy();
 		expect(screen.getByText('Fuel spend per month')).toBeTruthy();
-		expect(screen.getByText('$158.28')).toBeTruthy();
+		expect(screen.getByText('$45.50')).toBeTruthy();
+		expect(screen.getByText('Averaged over 6 months')).toBeTruthy();
 		expect(screen.getAllByText('32.1').length).toBeGreaterThan(0);
+	});
+
+	test('a mixed fleet labels the monthly spend for both and splits it in the subtitle', () => {
+		render(FuelStatsTab, {
+			fuelStats: stats({ ...gas, monthlySpend: { months: 6, fuel: 45.5, charging: 14.5 } }),
+			fuelAdvanced: advanced
+		});
+		expect(screen.getByText('Fuel & charging spend per month')).toBeTruthy();
+		expect(screen.getByText('$60.00')).toBeTruthy();
+		expect(screen.getByText('Fuel $45.50, charging $14.50, over 6 months')).toBeTruthy();
+	});
+
+	test('charging alone is labelled as charging spend', () => {
+		render(FuelStatsTab, {
+			fuelStats: stats({ ...gas, monthlySpend: { months: 1, fuel: null, charging: 14.5 } }),
+			fuelAdvanced: advanced
+		});
+		expect(screen.getByText('Charging spend per month')).toBeTruthy();
+		expect(screen.getByText('Averaged over 1 month')).toBeTruthy();
 	});
 
 	test('shows N/A in the summary when there is no daily distance to divide by', () => {

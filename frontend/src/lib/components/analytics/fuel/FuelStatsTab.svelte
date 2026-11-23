@@ -94,8 +94,6 @@
 			: (charging?.averageCost.perSession ?? null)
 	);
 
-	const DAYS_PER_MONTH = 365.25 / 12;
-
 	function spreadTone(best: number | null, worst: number | null, tone: string): string {
 		if (best == null || worst == null) return 'text-foreground';
 		return formatNumber(best, 1) === formatNumber(worst, 1) ? 'text-foreground' : tone;
@@ -107,8 +105,23 @@
 		return spend != null && distance ? spend / distance : null;
 	});
 	let monthlySpend = $derived.by(() => {
-		const spend = fuelStats?.averageCost.avgCostPerDay;
-		return spend != null ? spend * DAYS_PER_MONTH : null;
+		const spend = fuelStats?.monthlySpend;
+		const fuel = spend?.fuel ?? null;
+		const charging = spend?.charging ?? null;
+		const over = spend ? `${spend.months} ${spend.months === 1 ? 'month' : 'months'}` : null;
+		if (fuel != null && charging != null) {
+			return {
+				label: 'Fuel & charging spend per month',
+				value: fuel + charging,
+				subtitle: `Fuel ${formatCurrency(fuel)}, charging ${formatCurrency(charging)}, over ${over}`
+			};
+		}
+		return {
+			label:
+				charging != null || !showGasCards ? 'Charging spend per month' : 'Fuel spend per month',
+			value: fuel ?? charging,
+			subtitle: over ? `Averaged over ${over}` : undefined
+		};
 	});
 	let summaryEfficiency = $derived(
 		showGasCards
@@ -123,9 +136,9 @@
 			iconColor: 'chart-1'
 		},
 		{
-			label: showGasCards ? 'Fuel spend per month' : 'Charging spend per month',
-			value: monthlySpend != null ? formatCurrency(monthlySpend) : 'N/A',
-			subtitle: 'Averaged over the last 12 months',
+			label: monthlySpend.label,
+			value: monthlySpend.value != null ? formatCurrency(monthlySpend.value) : 'N/A',
+			subtitle: monthlySpend.subtitle,
 			icon: Fuel,
 			iconColor: 'chart-3'
 		},
