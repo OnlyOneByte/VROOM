@@ -125,7 +125,10 @@
 	});
 
 	let offlineLoad = $state(false);
-	let expensesHeading = $state<HTMLElement | null>(null);
+	let expensesList = $state<HTMLElement | null>(null);
+	let countLine = $derived(
+		`${totalCount} ${totalCount === 1 ? 'expense' : 'expenses'} across ${vehicles.length} ${vehicles.length === 1 ? 'vehicle' : 'vehicles'}`
+	);
 
 	onMount(loadInitial);
 
@@ -418,7 +421,7 @@
 			title="Couldn't load expenses"
 			message={loadError}
 			onRetry={loadInitial}
-			onRecovered={() => expensesHeading?.focus()}
+			onRecovered={() => expensesList?.focus()}
 		/>
 	</div>
 {:else if offlineLoad}
@@ -461,10 +464,7 @@
 	</div>
 {:else}
 	<div class="space-y-6 pb-24">
-		<PageHeader
-			title="All Expenses"
-			description="Track and categorize expenses across all vehicles"
-		>
+		<PageHeader title="All Expenses" description={countLine}>
 			{#snippet actions()}
 				<div class="hidden sm:flex sm:items-center sm:gap-2">
 					{@render importExportActions('outline', '')}
@@ -473,9 +473,8 @@
 					<Popover.Root bind:open={toolsMenuOpen}>
 						<Popover.Trigger>
 							{#snippet child({ props })}
-								<Button {...props} variant="outline" size="lg">
-									<Ellipsis class="mr-2 h-4 w-4" />
-									Import & export
+								<Button {...props} variant="outline" size="icon-lg" aria-label="Import and export">
+									<Ellipsis class="h-4 w-4" />
 								</Button>
 							{/snippet}
 						</Popover.Trigger>
@@ -553,24 +552,13 @@
 			onRemoveNeedsAttention={removeOfflineExpense}
 		/>
 
-		<CardNs.Root>
-			<CardNs.Header>
-				<div class="flex items-center justify-between">
-					<div>
-						<CardNs.Title
-							bind:ref={expensesHeading}
-							tabindex={-1}
-							class="w-fit rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-						>
-							Expenses ({totalCount})
-						</CardNs.Title>
-						<CardNs.Description>All recorded expenses</CardNs.Description>
-					</div>
-					<div class="p-2 rounded-lg bg-primary/10">
-						<DollarSign class="h-5 w-5 text-primary" />
-					</div>
-				</div>
-			</CardNs.Header>
+		<CardNs.Root
+			bind:ref={expensesList}
+			role="region"
+			aria-label="Expenses"
+			tabindex={-1}
+			class="outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+		>
 			<CardNs.Content>
 				{#if pageError}
 					<LoadErrorCard
@@ -579,7 +567,7 @@
 						title="Couldn't load expenses"
 						message={pageError.message}
 						onRetry={() => fetchPageAndSummary(pageError?.offset ?? currentOffset)}
-						onRecovered={() => expensesHeading?.focus()}
+						onRecovered={() => expensesList?.focus()}
 					/>
 				{:else}
 					<ExpensesTable

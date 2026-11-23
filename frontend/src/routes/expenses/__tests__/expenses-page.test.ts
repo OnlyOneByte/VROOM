@@ -222,6 +222,17 @@ describe('/expenses with no vehicles', () => {
 	});
 });
 
+describe('/expenses first screen', () => {
+	test('the count lives in the page description, with no repeated Expenses card header', async () => {
+		await mountLoaded();
+		expect(screen.getByText(/^\d+ expenses? across \d+ vehicles?$/)).toBeInTheDocument();
+		expect(screen.queryByText(/^Expenses \(\d+\)$/)).toBeNull();
+		expect(screen.queryByText('All recorded expenses')).toBeNull();
+		const list = screen.getByRole('region', { name: 'Expenses' });
+		expect(list).toHaveAttribute('tabindex', '-1');
+	});
+});
+
 describe('/expenses loading states', () => {
 	test('shows skeletons and no header until the first load finishes', async () => {
 		getAllExpenses.mockReturnValue(new Promise(() => {}));
@@ -586,7 +597,7 @@ describe('/expenses import and export', () => {
 
 	test('the mobile menu closes itself when a tool is picked', async () => {
 		await mountLoaded();
-		const trigger = screen.getByRole('button', { name: 'Import & export' });
+		const trigger = screen.getByRole('button', { name: 'Import and export' });
 
 		await fireEvent.click(trigger);
 		await waitFor(() => expect(trigger.getAttribute('aria-expanded')).toBe('true'));
@@ -599,7 +610,7 @@ describe('/expenses import and export', () => {
 
 	test('exporting from the mobile menu closes it once the download finishes', async () => {
 		await mountLoaded();
-		const trigger = screen.getByRole('button', { name: 'Import & export' });
+		const trigger = screen.getByRole('button', { name: 'Import and export' });
 		await fireEvent.click(trigger);
 		await waitFor(() => expect(trigger.getAttribute('aria-expanded')).toBe('true'));
 

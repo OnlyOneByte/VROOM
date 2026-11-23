@@ -257,7 +257,7 @@ describe('/expenses initial load', () => {
 		expect(alert.querySelector('p.text-sm')).not.toBe(firstReason);
 	});
 
-	test('a successful first-load Retry moves focus from the Retry to the expenses heading', async () => {
+	test('a successful first-load Retry moves focus from the Retry to the expenses list', async () => {
 		getAllExpenses.mockImplementationOnce(() => Promise.reject(new ApiError('down', 503)));
 		render(Page);
 
@@ -266,6 +266,6 @@ describe('/expenses initial load', () => {
 		await fireEvent.click(retry);
 
 		await waitFor(() => expect(screen.queryByTestId('expenses-load-error')).toBeNull());
-		await waitFor(() => expect(screen.getByText('Expenses (1)')).toHaveFocus());
+		await waitFor(() => expect(screen.getByRole('region', { name: 'Expenses' })).toHaveFocus());
 	});
 });

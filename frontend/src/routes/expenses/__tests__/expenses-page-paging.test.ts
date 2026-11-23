@@ -164,7 +164,7 @@ describe('/expenses paging', () => {
 		});
 	}
 
-	test('a successful Retry moves focus from the Retry to the expenses heading', async () => {
+	test('a successful Retry moves focus from the Retry to the expenses list', async () => {
 		failSecondPageOnce();
 		render(Page);
 		await waitFor(() => expect(shownIds()).toEqual(['e0']));
@@ -176,7 +176,7 @@ describe('/expenses paging', () => {
 		await fireEvent.click(retry);
 
 		await waitFor(() => expect(screen.queryByTestId('expenses-page-error')).toBeNull());
-		await waitFor(() => expect(screen.getByText('Expenses (100)')).toHaveFocus());
+		await waitFor(() => expect(screen.getByRole('region', { name: 'Expenses' })).toHaveFocus());
 	});
 
 	test('a successful Retry leaves focus alone when the user moved it during the load', async () => {
