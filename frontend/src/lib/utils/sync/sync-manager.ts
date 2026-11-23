@@ -98,6 +98,18 @@ const AMOUNT_EPSILON = 0.005;
 const AUTO_SYNC_DELAY_MS = 2000;
 const AUTO_SYNC_RETRY_BASE_MS = 30_000;
 const AUTO_SYNC_RETRY_MAX_MS = 15 * 60_000;
+const MAX_PARALLEL_VEHICLES = 4;
+const SIGN_IN_TO_SYNC = 'Sign in to sync this entry';
+
+function groupByVehicle(expenses: OfflineExpense[]): OfflineExpense[][] {
+	const groups = new Map<string, OfflineExpense[]>();
+	for (const expense of expenses) {
+		const group = groups.get(expense.vehicleId);
+		if (group) group.push(expense);
+		else groups.set(expense.vehicleId, [expense]);
+	}
+	return [...groups.values()];
+}
 
 function toEpochSeconds(date: string): number {
 	return Math.floor(new Date(date).getTime() / 1000);
@@ -229,50 +241,71 @@ class SyncManager {
 			errors: []
 		};
 
-		const config = syncConfig.current;
-
-		for (const expense of expenses) {
-			try {
-				const syncResult = await this.syncSingleExpense(expense);
-
-				if (syncResult.success) {
-					result.synced++;
-					markExpenseAsSynced(expense.id);
-					this.retryCount.delete(expense.id);
-				} else if (syncResult.conflict) {
-					result.conflicts.push(syncResult.conflict);
-				} else if (syncResult.failureKind === 'terminal') {
-					const reason = syncResult.error || 'Entry needs attention';
-					markExpenseNeedsAttention(expense.id, reason, syncResult.serverId);
-					this.retryCount.delete(expense.id);
-					result.needsAttention++;
-					result.errors.push(reason);
-				} else if (syncResult.failureKind === 'auth') {
-					result.failed++;
-					result.errors.push(syncResult.error || 'Sign in to sync this entry');
-				} else {
-					result.failed++;
-					result.errors.push(syncResult.error || 'Unknown error');
-
-					const retries = this.retryCount.get(expense.id) || 0;
-					if (retries < config.maxRetries) {
-						this.retryCount.set(expense.id, retries + 1);
-						setTimeout(
-							() => {
-								this.retrySingleExpense(expense);
-							},
-							config.retryDelay * Math.pow(2, retries)
-						);
+		const groups = groupByVehicle(expenses);
+		let signedOut = false;
+		const replayGroups = async (): Promise<void> => {
+			for (let group = groups.shift(); group; group = groups.shift()) {
+				for (const expense of group) {
+					if (signedOut) {
+						result.failed++;
+						result.errors.push(SIGN_IN_TO_SYNC);
+						continue;
 					}
+					if ((await this.replayExpense(expense, result)) === 'auth') signedOut = true;
 				}
-			} catch (error) {
-				result.failed++;
-				result.errors.push(`Failed to sync expense ${expense.id}: ${error}`);
 			}
-		}
+		};
+		const lanes = Math.min(MAX_PARALLEL_VEHICLES, groups.length);
+		await Promise.all(Array.from({ length: lanes }, replayGroups));
 
 		result.success = result.failed === 0 && result.conflicts.length === 0;
 		return result;
+	}
+
+	private async replayExpense(
+		expense: OfflineExpense,
+		result: SyncResult
+	): Promise<SyncFailureKind | undefined> {
+		const config = syncConfig.current;
+		try {
+			const syncResult = await this.syncSingleExpense(expense);
+
+			if (syncResult.success) {
+				result.synced++;
+				markExpenseAsSynced(expense.id);
+				this.retryCount.delete(expense.id);
+			} else if (syncResult.conflict) {
+				result.conflicts.push(syncResult.conflict);
+			} else if (syncResult.failureKind === 'terminal') {
+				const reason = syncResult.error || 'Entry needs attention';
+				markExpenseNeedsAttention(expense.id, reason, syncResult.serverId);
+				this.retryCount.delete(expense.id);
+				result.needsAttention++;
+				result.errors.push(reason);
+			} else if (syncResult.failureKind === 'auth') {
+				result.failed++;
+				result.errors.push(syncResult.error || SIGN_IN_TO_SYNC);
+			} else {
+				result.failed++;
+				result.errors.push(syncResult.error || 'Unknown error');
+
+				const retries = this.retryCount.get(expense.id) || 0;
+				if (retries < config.maxRetries) {
+					this.retryCount.set(expense.id, retries + 1);
+					setTimeout(
+						() => {
+							this.retrySingleExpense(expense);
+						},
+						config.retryDelay * Math.pow(2, retries)
+					);
+				}
+			}
+			return syncResult.failureKind;
+		} catch (error) {
+			result.failed++;
+			result.errors.push(`Failed to sync expense ${expense.id}: ${error}`);
+			return undefined;
+		}
 	}
 
 	private async syncSingleExpense(expense: OfflineExpense): Promise<SingleSyncResult> {
