@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { scaleLinear, scaleTime } from 'd3-scale';
 import {
 	distinctYTicks,
+	dayXAxisProps,
 	byVehicleMonth,
 	formatCentsAxis,
 	formatCountTooltip,
@@ -304,5 +305,35 @@ describe('distinctYTicks', () => {
 		expect(new Set(labels).size).toBe(labels.length);
 		expect(ticks.every(Number.isInteger)).toBe(true);
 		expect(ticks.length).toBeGreaterThanOrEqual(2);
+	});
+});
+
+describe('dayXAxisProps (day-and-month ticks sized to the plot)', () => {
+	const sixMonths = scaleTime().domain([new Date(2026, 5, 1), new Date(2026, 10, 1)]);
+
+	function ticksAt(locale: string, width: number): string[] {
+		vi.spyOn(navigator, 'language', 'get').mockReturnValue(locale);
+		const scale = sixMonths.copy().range([TIME_X_PADDING[0], width]);
+		const { ticks, format } = dayXAxisProps(6);
+		return ticks(scale as never).map(format);
+	}
+
+	test.each([
+		['de-DE', ['1. Juni', '1. Aug.', '1. Okt.']],
+		['ja-JP', ['6月1日', '8月1日', '10月1日']],
+		['en-US', ['Jun 1', 'Jul 1', 'Aug 1', 'Sep 1', 'Oct 1', 'Nov 1']]
+	])('a phone-width plot in %s gets ticks whose labels fit', (locale, expected) => {
+		expect(ticksAt(locale, 240)).toEqual(expected);
+	});
+
+	test('a desktop-width de-DE plot keeps one tick per month', () => {
+		expect(ticksAt('de-DE', 560)).toEqual([
+			'1. Juni',
+			'1. Juli',
+			'1. Aug.',
+			'1. Sept.',
+			'1. Okt.',
+			'1. Nov.'
+		]);
 	});
 });
