@@ -6,6 +6,7 @@ import type { AppDatabase } from '../../db/connection';
 import * as schema from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import {
+  readableVehiclesScope,
   requireVehicleAccess,
   requireVehiclesAccess,
   resolveVehicleAccess,
@@ -175,5 +176,45 @@ describe('requireVehiclesAccess', () => {
     await expect(
       requireVehiclesAccess(['v-own', VEHICLE], INVITEE, 'read', db)
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('readableVehiclesScope', () => {
+  const OTHER_VEHICLE = 'v-unshared';
+
+  beforeEach(() => {
+    sqlite.run('INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)', [
+      OTHER_VEHICLE,
+      OWNER,
+      'Mazda',
+      '3',
+      2019,
+    ]);
+  });
+
+  async function readableIds(userId: string): Promise<string[]> {
+    const rows = await db
+      .select({ id: schema.vehicles.id })
+      .from(schema.vehicles)
+      .where(readableVehiclesScope(schema.vehicles.id, schema.vehicles.userId, userId, db));
+    return rows.map((row) => row.id).sort();
+  }
+
+  test('the owner reads every vehicle they own', async () => {
+    expect(await readableIds(OWNER)).toEqual([OTHER_VEHICLE, VEHICLE].sort());
+  });
+
+  test('an accepted share reads only the shared vehicle, even from a vehicles query', async () => {
+    share('accepted', 'viewer');
+    expect(await readableIds(INVITEE)).toEqual([VEHICLE]);
+  });
+
+  test('pending, declined and revoked shares and strangers read nothing', async () => {
+    for (const status of ['pending', 'declined', 'revoked']) {
+      sqlite.run('DELETE FROM vehicle_shares');
+      share(status, 'editor');
+      expect(await readableIds(INVITEE), status).toEqual([]);
+    }
+    expect(await readableIds(STRANGER)).toEqual([]);
   });
 });

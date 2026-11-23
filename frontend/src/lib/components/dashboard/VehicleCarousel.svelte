@@ -178,7 +178,7 @@
 										</div>
 									{/if}
 
-									<Card.Content class="relative p-4 flex flex-col h-[200px]">
+									<Card.Content class="relative p-4 flex flex-col min-h-[200px]">
 										<!-- Stretched-link overlay: the action button must stay above it (z-10). -->
 										<div class="mb-3">
 											<div class="flex items-start gap-3">
@@ -201,28 +201,28 @@
 															href={resolve(paramRoutes.vehicle, { id: vehicle.id })}
 															class="block rounded-sm after:absolute after:inset-0 after:content-[''] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 														>
-															<span class="line-clamp-2 break-words">
+															<span class="block truncate">
 																{vehicle.nickname || vehicle.name}
 															</span>
 														</a>
 													</h3>
+													{#if vehicle.hasActiveFinancing || vehicle.sharedBy}
+														<div class="mt-1 flex min-w-0 flex-wrap gap-1">
+															{#if vehicle.hasActiveFinancing}
+																<Badge variant="secondary">Financed</Badge>
+															{/if}
+															{#if vehicle.sharedBy}
+																<Badge
+																	variant="secondary"
+																	class="inline-flex min-w-0 max-w-full shrink items-center gap-1"
+																>
+																	<Users class="h-3 w-3 shrink-0" aria-hidden="true" />
+																	<span class="truncate">Shared by {vehicle.sharedBy}</span>
+																</Badge>
+															{/if}
+														</div>
+													{/if}
 												</div>
-												{#if vehicle.hasActiveFinancing || vehicle.sharedBy}
-													<div class="flex max-w-[50%] shrink-0 flex-wrap justify-end gap-1">
-														{#if vehicle.hasActiveFinancing}
-															<Badge variant="secondary">Financed</Badge>
-														{/if}
-														{#if vehicle.sharedBy}
-															<Badge
-																variant="secondary"
-																class="inline-flex max-w-full items-center gap-1"
-															>
-																<Users class="h-3 w-3 shrink-0" aria-hidden="true" />
-																<span class="truncate">Shared by {vehicle.sharedBy}</span>
-															</Badge>
-														{/if}
-													</div>
-												{/if}
 											</div>
 											{#if vehicle.nickname}
 												<p class="mt-1 truncate text-sm text-muted-foreground">{vehicle.name}</p>

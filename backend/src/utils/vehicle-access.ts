@@ -1,4 +1,5 @@
-import { and, eq, type SQL } from 'drizzle-orm';
+import { and, type Column, eq, exists, or, type SQL } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 import type { AppDatabase } from '../db/connection';
 import { getDb } from '../db/connection';
 import { vehicleShares, vehicles } from '../db/schema';
@@ -79,4 +80,27 @@ export async function requireVehiclesAccess(
 
 export function ownedVehiclesScope(userId: string): SQL {
   return eq(vehicles.userId, userId);
+}
+
+const sharedVehicle = alias(vehicles, 'shared_vehicle');
+
+export function readableVehiclesScope(
+  vehicleId: Column,
+  ownerId: Column,
+  userId: string,
+  db: AppDatabase | DrizzleTransaction = getDb()
+): SQL {
+  const sharedWithUser = db
+    .select({ id: sharedVehicle.id })
+    .from(sharedVehicle)
+    .innerJoin(
+      vehicleShares,
+      and(
+        eq(vehicleShares.vehicleId, sharedVehicle.id),
+        eq(vehicleShares.sharedWithId, userId),
+        eq(vehicleShares.status, 'accepted')
+      )
+    )
+    .where(and(eq(sharedVehicle.id, vehicleId), eq(sharedVehicle.userId, ownerId)));
+  return or(eq(ownerId, userId), exists(sharedWithUser)) as SQL;
 }

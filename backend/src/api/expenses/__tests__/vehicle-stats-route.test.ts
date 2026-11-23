@@ -5,6 +5,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { createInvitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
@@ -103,5 +104,79 @@ describe('GET /api/v1/expenses/vehicle-stats (per-vehicle stats route)', () => {
     const stats = await getStats();
     expect(stats.every((s) => s.vehicleId === v1)).toBe(true);
     expect(stats).toHaveLength(1);
+  });
+});
+
+describe('GET /api/v1/expenses/vehicle-stats for shared vehicles', () => {
+  async function share(vehicleId: string, level: 'editor' | 'viewer', accept: boolean) {
+    const invitee = await createInvitee(ctx, `stats-${level}-${accept}`, `Stats ${level}`);
+    const res = await ctx.authed('POST', '/api/v1/shares', {
+      vehicleId,
+      email: invitee.email,
+      level,
+    });
+    const created = await json<DataEnvelope<{ id: string }>>(res);
+    expect(res.status, JSON.stringify(created)).toBe(201);
+    if (accept) {
+      const accepted = await invitee.request('POST', `/api/v1/shares/${created.data.id}/accept`);
+      expect(accepted.status).toBe(200);
+    }
+    return { ...invitee, shareId: created.data.id };
+  }
+
+  async function statsFor(request: (method: string, path: string) => Promise<Response>) {
+    const res = await request('GET', '/api/v1/expenses/vehicle-stats');
+    expect(res.status).toBe(200);
+    return (await json<DataEnvelope<VehicleStat[]>>(res)).data;
+  }
+
+  test("an editor and a viewer see the owner's numbers; a stranger and a pending invitee see none", async () => {
+    const shared = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const unshared = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    await createExpense(shared, 120, isoDaysAgo(60));
+    await createExpense(shared, 40, isoDaysAgo(3));
+    await createExpense(unshared, 75, isoDaysAgo(2));
+    const editor = await share(shared, 'editor', true);
+    const viewer = await share(shared, 'viewer', true);
+    const pending = await share(shared, 'viewer', false);
+    const stranger = await createInvitee(ctx, 'stats-stranger', 'Stranger');
+
+    const owner = (await statsFor(ctx.authed)).find((s) => s.vehicleId === shared);
+    expect(owner).toMatchObject({ totalAmount: 160, recentAmount: 40 });
+    expect(owner?.lastExpenseDate).not.toBeNull();
+
+    for (const guest of [editor, viewer]) {
+      expect(await statsFor(guest.request)).toEqual([owner as VehicleStat]);
+    }
+    expect(await statsFor(pending.request)).toEqual([]);
+    expect(await statsFor(stranger.request)).toEqual([]);
+  });
+
+  test('a share the owner revoked gives nothing back', async () => {
+    const shared = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    await createExpense(shared, 90, isoDaysAgo(4));
+    const viewer = await share(shared, 'viewer', true);
+    expect(await statsFor(viewer.request)).toHaveLength(1);
+
+    const revoked = await ctx.authed('DELETE', `/api/v1/shares/${viewer.shareId}`);
+    expect(revoked.status).toBe(200);
+
+    expect(await statsFor(viewer.request)).toEqual([]);
+  });
+
+  test("an expense an editor logs counts toward the owner's card too", async () => {
+    const shared = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const editor = await share(shared, 'editor', true);
+    const res = await editor.request('POST', '/api/v1/expenses', {
+      vehicleId: shared,
+      category: 'maintenance',
+      expenseAmount: 55,
+      date: isoDaysAgo(1),
+    });
+    expect(res.status).toBe(201);
+
+    const owner = (await statsFor(ctx.authed)).find((s) => s.vehicleId === shared);
+    expect(owner?.totalAmount).toBeCloseTo(55, 5);
+    expect((await statsFor(editor.request))[0]?.totalAmount).toBeCloseTo(55, 5);
   });
 });

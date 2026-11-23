@@ -28,6 +28,7 @@ import { logger } from '../../utils/logger';
 import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
 import { zonedDayWindow, zonedMidnight } from '../../utils/time-zone';
+import { readableVehiclesScope } from '../../utils/vehicle-access';
 import { expenseSplitService } from './split-service';
 import {
   type OdometerCheck,
@@ -532,7 +533,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           lastExpenseDate: sql<string>`MAX(${toDateTimeString(expenses.date)})`,
         })
         .from(expenses)
-        .where(eq(expenses.userId, userId))
+        .where(readableVehiclesScope(expenses.vehicleId, expenses.userId, userId, this.db))
         .groupBy(expenses.vehicleId);
 
       return rows.map((r) => ({
