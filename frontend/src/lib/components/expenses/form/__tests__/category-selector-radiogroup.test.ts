@@ -2,7 +2,9 @@ import { describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import CategorySelector from '../CategorySelector.svelte';
 
-function mount(props: { value?: string; error?: string; touched?: boolean } = {}) {
+function mount(
+	props: { value?: string; error?: string; touched?: boolean; disabledValues?: string[] } = {}
+) {
 	const onSelect = vi.fn();
 	const view = render(CategorySelector, { props: { value: '', ...props, onSelect } });
 	return { ...view, onSelect };
@@ -54,5 +56,12 @@ describe('CategorySelector radio group', () => {
 		const group = screen.getByRole('radiogroup', { name: 'Category *' });
 		expect(group).toHaveAttribute('aria-invalid', 'true');
 		expect(group).toHaveAccessibleDescription('Please select a category');
+	});
+
+	test('a disabled category cannot be chosen', async () => {
+		const { onSelect } = mount({ disabledValues: ['fuel'] });
+		expect(radio('Fuel')).toBeDisabled();
+		await fireEvent.click(radio('Fuel'));
+		expect(onSelect).not.toHaveBeenCalled();
 	});
 });

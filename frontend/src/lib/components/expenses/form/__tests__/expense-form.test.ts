@@ -530,6 +530,29 @@ describe('ExpenseForm quick add', () => {
 		expect(categoryButton('Regulatory').getAttribute('aria-checked')).toBe('true');
 	});
 
+	test('arrowing through the categories keeps a typed fill-up', async () => {
+		await renderCreate({ preselectedCategory: 'fuel' });
+		await type('amount', '40');
+		await vi.waitFor(() => expect(document.getElementById('volume')).not.toBeNull());
+		await type('volume', '10.5');
+
+		categoryButton('Fuel').focus();
+		await fireEvent.keyDown(categoryButton('Fuel'), { key: 'ArrowRight' });
+		expect(categoryButton('Maintenance').getAttribute('aria-checked')).toBe('true');
+		await fireEvent.keyDown(categoryButton('Maintenance'), { key: 'ArrowLeft' });
+
+		expect(categoryButton('Fuel').getAttribute('aria-checked')).toBe('true');
+		await vi.waitFor(() => expect(field('volume').value).toBe('10.5'));
+	});
+
+	test('a split disables Fuel instead of undoing the split', async () => {
+		await renderCreate({ preselectedCategory: 'misc' });
+		await fireEvent.click(screen.getByRole('button', { name: 'Split cost across vehicles' }));
+
+		expect(categoryButton('Fuel')).toBeDisabled();
+		expect(categoryButton('Misc')).not.toBeDisabled();
+	});
+
 	test('More details opens when a field inside it is invalid', async () => {
 		await renderCreate({ preselectedCategory: 'misc', preselectedAmount: '5' });
 		const toggle = screen.getByRole('button', { name: /More details/ });

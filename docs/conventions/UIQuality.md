@@ -158,7 +158,8 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
 - Wrap form pages in `FormLayout`. One column on mobile; two columns only for short paired fields
   (date + amount) at `sm:` and up.
 - Every field has a visible `Label for=`. Required fields carry ` *`; optional fields say
-  "(Optional)".
+  "(Optional)". A prefilled chip (the expense form's vehicle and date) is the one exception: its
+  value is the visible text, its `sr-only` label names it, and the value is read with that name.
 - Validation errors render under the field with `FormFieldError`, wired by `aria-describedby`
   and `aria-invalid`. Validate on submit and on blur, not on every keystroke.
 - After a failed submit, move focus to the first invalid field in DOM order, so keyboard and

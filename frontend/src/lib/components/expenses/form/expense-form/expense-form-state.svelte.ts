@@ -106,7 +106,9 @@ export class ExpenseFormState {
 		this.showFuelFields && this.lastFuelExpense?.mileage ? this.lastFuelExpense.mileage : null
 	);
 	asksForMileage = $derived(!this.isSplit || this.selectedVehicleIds.length < 2);
-	isFinancingPayment = $derived(this.sourceType === 'financing' && !!this.sourceId);
+	isFinancingPayment = $derived(
+		this.sourceType === 'financing' && !!this.sourceId && this.formData.category === 'financial'
+	);
 	clearsFinancingLink = $derived(
 		this.isEditMode && this.originalExpense?.sourceType === 'financing' && !this.isFinancingPayment
 	);
@@ -206,20 +208,8 @@ export class ExpenseFormState {
 	private applyCategory(categoryValue: string) {
 		this.formData.category = categoryValue;
 
-		if (categoryValue !== 'financial') {
-			this.sourceType = null;
-			this.sourceId = null;
-		}
-
 		if (categoryValue === 'fuel' && this.isSplit && !this.isGroupEditMode) {
 			this.handleSplitToggle(false);
-		}
-
-		if (categoryValue !== 'fuel') {
-			this.formData.volume = '';
-			this.formData.charge = '';
-			this.formData.fuelType = '';
-			this.formData.missedFillup = false;
 		}
 	}
 

@@ -9,10 +9,11 @@
 		value: string;
 		error?: string;
 		touched?: boolean;
+		disabledValues?: readonly string[];
 		onSelect: (_value: string) => void;
 	}
 
-	let { value, error, touched = false, onSelect }: Props = $props();
+	let { value, error, touched = false, disabledValues = [], onSelect }: Props = $props();
 
 	let showError = $derived(touched && !!error);
 
@@ -37,6 +38,7 @@
 			{@const checked = value === category.value}
 			<RadioGroupPrimitive.Item
 				value={category.value}
+				disabled={disabledValues.includes(category.value)}
 				aria-describedby="category-{category.value}-description"
 				class="inline-flex h-10 items-center rounded-full border px-3.5 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 {checked
 					? 'border-primary bg-primary text-primary-foreground'

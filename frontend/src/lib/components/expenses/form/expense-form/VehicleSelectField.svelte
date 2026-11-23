@@ -24,7 +24,7 @@
 	);
 </script>
 
-<Label for="vehicle" class="sr-only">Vehicle *</Label>
+<Label id="vehicle-label" for="vehicle" class="sr-only">Vehicle *</Label>
 <Select.Root
 	type="single"
 	{value}
@@ -34,6 +34,7 @@
 >
 	<Select.Trigger
 		id="vehicle"
+		aria-labelledby="vehicle-label vehicle"
 		class="max-w-[14rem] min-w-0 gap-1.5 rounded-full border-primary bg-primary px-3.5 font-medium text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90 [&_svg:not([class*='text-'])]:text-primary-foreground {error
 			? 'border-destructive'
 			: ''}"

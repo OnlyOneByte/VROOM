@@ -64,6 +64,7 @@
 	import MileageField from './expense-form/MileageField.svelte';
 	import ExpenseFormHeader from './expense-form/ExpenseFormHeader.svelte';
 	import ExpenseActionBar from './expense-form/ExpenseActionBar.svelte';
+	import ExpenseSaveRow from './expense-form/ExpenseSaveRow.svelte';
 	import ExpenseDeleteDialog from './expense-form/ExpenseDeleteDialog.svelte';
 	import ExpenseAmountField from './expense-form/ExpenseAmountField.svelte';
 	import ExpenseNotesFields from './expense-form/ExpenseNotesFields.svelte';
@@ -528,7 +529,11 @@
 					{/if}
 					{#if !form.isSplit}
 						{#if form.showFuelSplitHint}
-							<p id="fuel-split-hint" class="sr-only" data-testid="fuel-split-hint">
+							<p
+								id="fuel-split-hint"
+								class="text-xs text-muted-foreground"
+								data-testid="fuel-split-hint"
+							>
 								Fill-ups can't be split across vehicles. Log each one on the vehicle you filled.
 							</p>
 						{/if}
@@ -595,6 +600,7 @@
 				>
 					<CategorySelector
 						value={form.formData.category}
+						disabledValues={form.isSplit && !form.isGroupEditMode ? ['fuel'] : []}
 						error={form.errors['category']}
 						touched={form.touched['category']}
 						onSelect={form.selectCategory}
@@ -733,17 +739,7 @@
 				{/if}
 
 				{#if quickActions}
-					<ExpenseActionBar
-						inline
-						isEditMode={false}
-						canDuplicate={false}
-						isSubmitting={form.isSubmitting}
-						isDeleting={form.isDeleting}
-						onDelete={confirmDelete}
-						onDuplicate={handleDuplicate}
-						onCancel={handleBack}
-						onSave={save}
-					/>
+					<ExpenseSaveRow isSubmitting={form.isSubmitting} onCancel={handleBack} />
 				{/if}
 			</form>
 
