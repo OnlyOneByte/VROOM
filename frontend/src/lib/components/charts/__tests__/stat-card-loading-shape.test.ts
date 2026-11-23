@@ -84,7 +84,7 @@ describe('StatCard loading tile has the filled tile shape', () => {
 		expect(subtitle?.parentElement?.tagName).toBe('DIV');
 	});
 
-	test('a two-value tile keeps a unit line under each value while loading', () => {
+	test('a two-value tile keeps a unit line under each value while loading, below sm only', () => {
 		const { container } = render(StatCard, {
 			props: {
 				label: 'Fuel Consumed',
@@ -106,10 +106,11 @@ describe('StatCard loading tile has the filled tile shape', () => {
 				'h-7',
 				'h-4'
 			]);
+			expect(lines[2]).toHaveClass('sm:hidden');
 		}
 	});
 
-	test('a filled two-value tile puts each unit on its own line under the value', () => {
+	test('a filled two-value tile stacks each unit under its value below sm, inline from sm', () => {
 		const { container } = render(StatCard, {
 			props: {
 				label: 'Fuel Consumed',
@@ -122,11 +123,22 @@ describe('StatCard loading tile has the filled tile shape', () => {
 		});
 
 		const halves = [...container.querySelectorAll('.flex-1.space-y-1')];
-		const lines = halves.map(h => [...h.children].map(c => c.textContent?.trim()));
+		const lines = halves.map(h => {
+			const [label, row] = [...h.children];
+			return [
+				label?.textContent?.trim(),
+				...[...(row?.children ?? [])].map(c => c.textContent?.trim())
+			];
+		});
 		expect(lines).toEqual([
 			['Fuel Consumed', '63.0', 'gal'],
 			['Total Fuel Cost', '$273.00', '6 fill-ups']
 		]);
-		for (const half of halves) for (const line of half.children) expect(line).toHaveClass('block');
+		for (const half of halves) {
+			const row = half.children[1];
+			expect(row).toHaveClass('sm:flex', 'sm:items-baseline');
+			const unit = row?.children[1];
+			expect(unit).toHaveClass('block', 'mt-1', 'sm:mt-0', 'sm:whitespace-nowrap');
+		}
 	});
 });

@@ -106,18 +106,24 @@
 							<Skeleton class="h-5 w-24" />
 							<Skeleton class="h-7 @sm:h-8 w-20" />
 							{#if unit}
-								<Skeleton class="h-4 w-16" />
+								<Skeleton class="h-4 w-16 sm:hidden" />
 							{/if}
 						{:else}
 							<span class="block text-sm font-medium text-muted-foreground break-words">
 								{label}
 							</span>
-							<span class="block text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
-								{value}
-							</span>
-							{#if unit}
-								<span class="block text-xs text-muted-foreground">{unit}</span>
-							{/if}
+							<div class="sm:flex sm:items-baseline sm:gap-1">
+								<span class="block text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
+									{value}
+								</span>
+								{#if unit}
+									<span
+										class="mt-1 block text-xs text-muted-foreground sm:mt-0 sm:whitespace-nowrap"
+									>
+										{unit}
+									</span>
+								{/if}
+							</div>
 						{/if}
 					</div>
 					<div class="h-px w-full @sm:h-auto @sm:w-px bg-border @sm:self-stretch @sm:my-1"></div>
@@ -126,18 +132,24 @@
 							<Skeleton class="h-5 w-24" />
 							<Skeleton class="h-7 @sm:h-8 w-20" />
 							{#if secondaryUnit}
-								<Skeleton class="h-4 w-16" />
+								<Skeleton class="h-4 w-16 sm:hidden" />
 							{/if}
 						{:else}
 							<span class="block text-sm font-medium text-muted-foreground break-words">
 								{secondaryLabel}
 							</span>
-							<span class="block text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
-								{secondaryValue}
-							</span>
-							{#if secondaryUnit}
-								<span class="block text-xs text-muted-foreground">{secondaryUnit}</span>
-							{/if}
+							<div class="sm:flex sm:items-baseline sm:gap-1">
+								<span class="block text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
+									{secondaryValue}
+								</span>
+								{#if secondaryUnit}
+									<span
+										class="mt-1 block text-xs text-muted-foreground sm:mt-0 sm:whitespace-nowrap"
+									>
+										{secondaryUnit}
+									</span>
+								{/if}
+							</div>
 						{/if}
 					</div>
 				</div>
