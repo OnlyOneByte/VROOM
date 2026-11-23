@@ -1026,13 +1026,13 @@
 						size="lg"
 						onclick={handleSubmit}
 						disabled={isSubmitting || isDeleting}
-						class="rounded-full group shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 px-6 flex-1 sm:flex-initial"
+						class="rounded-full shadow-sm transition-colors h-14 px-6 flex-1 sm:flex-initial"
 					>
 						{#if isSubmitting}
 							<LoaderCircle class="h-5 w-5 animate-spin mr-2" />
 							<span class="font-bold">{isEditMode ? 'Updating' : 'Adding'}...</span>
 						{:else}
-							<Check class="h-5 w-5 mr-2 transition-transform duration-300 group-hover:scale-110" />
+							<Check class="h-5 w-5 mr-2" />
 							<span class="font-bold">{isEditMode ? 'Update' : 'Add'} Vehicle</span>
 						{/if}
 					</Button>

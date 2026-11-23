@@ -61,6 +61,15 @@ describe('VehicleForm page title', () => {
 		expect(actions.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(3);
 	});
 
+	test('the save bar is fixed below lg and a normal row from lg, with a plain primary Save button', async () => {
+		render(VehicleForm, { props: {} });
+		const save = await screen.findByRole('button', { name: 'Add Vehicle' });
+
+		expect(save.closest('.fixed')).toHaveClass('fixed', 'lg:static');
+		expect(save).toHaveClass('shadow-sm', 'transition-colors');
+		expect(save.className).not.toMatch(/shadow-2xl|bg-foreground|hover:scale/);
+	});
+
 	test('edit mode names the vehicle under the title', async () => {
 		getVehicle.mockResolvedValue({
 			id: 'veh-1',

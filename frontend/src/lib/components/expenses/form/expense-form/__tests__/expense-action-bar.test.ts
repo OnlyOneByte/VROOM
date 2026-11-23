@@ -27,6 +27,13 @@ describe('ExpenseActionBar', () => {
 		expect(container.firstElementChild).toHaveClass('fixed', 'lg:static');
 	});
 
+	test('Save is the plain primary button, not a foreground slab with a heavy shadow', () => {
+		mount();
+		const save = screen.getByRole('button', { name: 'Update Expense' });
+		expect(save).toHaveClass('shadow-sm', 'transition-colors');
+		expect(save.className).not.toMatch(/shadow-2xl|bg-foreground|hover:scale/);
+	});
+
 	test('pressing a button does not blur the field being edited, so blur validation cannot move the row mid-click', async () => {
 		const { onSave } = mount();
 		for (const name of ['Delete', 'Duplicate', 'Cancel', 'Update Expense']) {
