@@ -32,6 +32,10 @@
 
 {#snippet description()}
 	<span class="whitespace-nowrap">{vehicle.year} {vehicle.make} {vehicle.model}</span>
+	{#if vehicle.licensePlate}
+		<span aria-hidden="true">·</span>
+		<span class="whitespace-nowrap">{vehicle.licensePlate}</span>
+	{/if}
 	{#if odometerLoading}
 		<span aria-hidden="true">·</span>
 		<Skeleton class="inline-block h-4 w-16 align-middle" />
@@ -41,10 +45,6 @@
 			{formatNumber(odometer, 0)}
 			{getDistanceUnitLabel(distanceUnit, true)}
 		</span>
-	{/if}
-	{#if vehicle.licensePlate}
-		<span aria-hidden="true">·</span>
-		<span class="whitespace-nowrap">{vehicle.licensePlate}</span>
 	{/if}
 {/snippet}
 
