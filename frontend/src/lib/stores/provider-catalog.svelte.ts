@@ -26,9 +26,8 @@ export interface StorageFeatures {
 	defaultPhotoRootPath: string;
 }
 
-export interface StorageCatalogEntry {
+interface CatalogEntryBase {
 	id: string;
-	capability: 'storage';
 	label: string;
 	shortLabel: string;
 	description: string;
@@ -36,15 +35,28 @@ export interface StorageCatalogEntry {
 	connect: 'form' | 'oauth' | 'none';
 	fields: ProviderFieldSpec[];
 	secrets: ProviderSecretSpec[];
+}
+
+export interface StorageCatalogEntry extends CatalogEntryBase {
+	capability: 'storage';
 	features: StorageFeatures;
 }
 
-function createProviderCatalogStore() {
-	let entries = $state<StorageCatalogEntry[] | null>(null);
-	let error = $state<string | null>(null);
-	let inFlight: Promise<StorageCatalogEntry[]> | null = null;
+export type ModelCapability = 'ai.llm' | 'ai.vision';
 
-	async function ensureLoaded(): Promise<StorageCatalogEntry[]> {
+export interface ModelCatalogEntry extends CatalogEntryBase {
+	capability: ModelCapability;
+	features: Record<string, never>;
+}
+
+export type CatalogEntry = StorageCatalogEntry | ModelCatalogEntry;
+
+function createProviderCatalogStore() {
+	let entries = $state<CatalogEntry[] | null>(null);
+	let error = $state<string | null>(null);
+	let inFlight: Promise<CatalogEntry[]> | null = null;
+
+	async function ensureLoaded(): Promise<CatalogEntry[]> {
 		if (entries) return entries;
 		inFlight ??= providerApi.getCatalog().finally(() => {
 			inFlight = null;
@@ -59,9 +71,16 @@ function createProviderCatalogStore() {
 		}
 	}
 
+	function storageEntries(): StorageCatalogEntry[] {
+		return (entries ?? []).filter((e): e is StorageCatalogEntry => e.capability === 'storage');
+	}
+
 	return {
-		get entries() {
-			return entries ?? [];
+		get storage() {
+			return storageEntries();
+		},
+		models(capability: ModelCapability): ModelCatalogEntry[] {
+			return (entries ?? []).filter((e): e is ModelCatalogEntry => e.capability === capability);
 		},
 		get error() {
 			return error;
@@ -69,8 +88,8 @@ function createProviderCatalogStore() {
 		get loaded() {
 			return entries !== null;
 		},
-		entry(providerType: string | null | undefined): StorageCatalogEntry | null {
-			return entries?.find(e => e.id === providerType) ?? null;
+		storageEntry(providerType: string | null | undefined): StorageCatalogEntry | null {
+			return storageEntries().find(e => e.id === providerType) ?? null;
 		},
 		ensureLoaded,
 		load(): Promise<void> {

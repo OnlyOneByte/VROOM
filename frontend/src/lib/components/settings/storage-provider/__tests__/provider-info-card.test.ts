@@ -7,7 +7,7 @@ const getSyncStatus = vi.fn<(id: string) => Promise<Record<string, never>>>();
 vi.mock('#lib/services/provider-api.ts', () => ({
 	providerApi: {
 		getCatalog: async () =>
-			(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).STORAGE_CATALOG,
+			(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).PROVIDER_CATALOG,
 		getSyncStatus: (id: string) => getSyncStatus(id),
 		backfillProvider: vi.fn()
 	}

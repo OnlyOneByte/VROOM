@@ -255,16 +255,6 @@ export function storageCatalog() {
   return toCatalogEntries<'storage', StorageFeatures>(STORAGE_PROVIDERS);
 }
 
-export function validateStorageConfig(
-  descriptor: StorageProviderDescriptor,
-  config: Record<string, unknown> | null
-): void {
-  const parsed = descriptor.config.schema.safeParse(config ?? {});
-  if (!parsed.success) {
-    throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid provider config');
-  }
-}
-
 export function storageProviderDescriptor(
   providerType: string
 ): StorageProviderDescriptor | undefined {

@@ -10,20 +10,26 @@ import type { CategorySetting, PhotoCategory, StorageConfig } from '../../types'
 import { DEFAULT_STORAGE_CONFIG, PHOTO_CATEGORIES } from '../../types';
 import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
-import { assertSafeOutboundUrl } from '../../utils/outbound-url';
 import { consumePending, getPendingEmail } from '../../utils/pending-credentials';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { photoRefRepository } from '../photos/photo-ref-repository';
 import { preferencesRepository } from '../settings/repository';
 import {
-  STORAGE_PROVIDER_TYPES,
+  type AnyProviderDescriptor,
+  toCatalogEntries,
+  validateProviderConfig,
+  validateProviderSecrets,
+} from './descriptor';
+import { LLM_PROVIDERS } from './domains/llm/registry';
+import {
+  STORAGE_PROVIDERS,
   type StorageProviderDescriptor,
   storageCatalog,
   storageProviderDescriptor,
   storageProviderRegistry,
-  validateStorageConfig,
 } from './domains/storage/registry';
 import { CATEGORY_TO_ENTITY_TYPES, ENTITY_TO_CATEGORY } from './domains/storage/storage-provider';
+import { VISION_PROVIDERS } from './domains/vlm/registry';
 
 function isPhotoCategory(value: string): value is PhotoCategory {
   return (PHOTO_CATEGORIES as readonly string[]).includes(value);
@@ -80,40 +86,35 @@ routes.get('/pending/:nonce', async (c) => {
   return c.json({ success: true, data: { email } });
 });
 
-export const MODEL_PROVIDER_TYPES = ['openai-compatible', 'anthropic', 'gemini', 'ollama'] as const;
-type ModelProviderType = (typeof MODEL_PROVIDER_TYPES)[number];
-const MODEL_DOMAINS = ['vlm', 'llm'] as const;
-type ModelDomain = (typeof MODEL_DOMAINS)[number];
-export const SUPPORTED_PROVIDER_TYPES = [
-  ...STORAGE_PROVIDER_TYPES,
-  ...MODEL_PROVIDER_TYPES,
-] as const;
+const PROVIDERS_BY_DOMAIN: Record<string, Record<string, AnyProviderDescriptor>> = {
+  storage: STORAGE_PROVIDERS,
+  llm: LLM_PROVIDERS,
+  vlm: VISION_PROVIDERS,
+};
+const DOMAIN_LABELS: Record<string, string> = { storage: 'Storage', llm: 'LLM', vlm: 'VLM' };
+const PROVIDER_DOMAINS = ['storage', 'auth', 'llm', 'vlm'] as const;
 
-function creatableProviderTypes(): string[] {
-  return SUPPORTED_PROVIDER_TYPES.filter(
-    (type) => storageProviderDescriptor(type)?.availability() !== 'hidden'
-  );
-}
-
-function isModelProviderType(providerType: string): providerType is ModelProviderType {
-  return (MODEL_PROVIDER_TYPES as readonly string[]).includes(providerType);
-}
-function isModelDomain(domain: string): domain is ModelDomain {
-  return (MODEL_DOMAINS as readonly string[]).includes(domain);
-}
-function modelDomainLabel(domain: string): string {
-  return domain === 'llm' ? 'LLM' : 'VLM';
+function providerDescriptor(
+  domain: string,
+  providerType: string
+): AnyProviderDescriptor | undefined {
+  const table = Object.hasOwn(PROVIDERS_BY_DOMAIN, domain)
+    ? PROVIDERS_BY_DOMAIN[domain]
+    : undefined;
+  return table && Object.hasOwn(table, providerType) ? table[providerType] : undefined;
 }
 
-const PROVIDER_DOMAINS = ['storage', 'auth', ...MODEL_DOMAINS] as const;
+function creatableProviderTypes(domain: string): string[] {
+  return Object.entries(PROVIDERS_BY_DOMAIN[domain] ?? {})
+    .filter(([, descriptor]) => descriptor.availability() !== 'hidden')
+    .map(([id]) => id);
+}
 
 const createProviderSchema = z.object({
   domain: z.enum(PROVIDER_DOMAINS, {
     message: `Domain must be one of: ${PROVIDER_DOMAINS.join(', ')}`,
   }),
-  providerType: z.enum(SUPPORTED_PROVIDER_TYPES, {
-    error: () => `Provider type must be one of: ${creatableProviderTypes().join(', ')}`,
-  }),
+  providerType: z.string().min(1, 'Provider type is required'),
   displayName: z
     .string()
     .min(1, 'Display name is required')
@@ -138,7 +139,16 @@ function defaultCategorySettings(
   ) as Record<PhotoCategory, CategorySetting>;
 }
 
-routes.get('/catalog', (c) => c.json({ success: true, data: storageCatalog() }));
+routes.get('/catalog', (c) =>
+  c.json({
+    success: true,
+    data: [
+      ...storageCatalog(),
+      ...toCatalogEntries(LLM_PROVIDERS),
+      ...toCatalogEntries(VISION_PROVIDERS),
+    ],
+  })
+);
 
 routes.get('/', async (c) => {
   const user = c.get('user');
@@ -157,52 +167,15 @@ routes.get('/', async (c) => {
   return c.json({ success: true, data });
 });
 
-function validateStorageProviderConfig(
-  providerType: string,
-  config: Record<string, unknown> | null
-): void {
-  const descriptor = storageProviderDescriptor(providerType);
-  if (descriptor) validateStorageConfig(descriptor, config);
-}
-
-function validateModelConfigShape(
-  domain: string,
-  providerType: ModelProviderType,
-  config: Record<string, unknown> | null
-): void {
-  const label = modelDomainLabel(domain);
-  const cfg = config ?? {};
-  if (!cfg.model || typeof cfg.model !== 'string') {
-    throw new ValidationError(`${label} config must include a model name`);
-  }
-  if (
-    (providerType === 'ollama' || providerType === 'openai-compatible') &&
-    (!cfg.baseUrl || typeof cfg.baseUrl !== 'string')
-  ) {
-    throw new ValidationError(`Self-hosted or OpenAI-compatible ${label} requires a base URL`);
-  }
-  if (typeof cfg.baseUrl === 'string') assertSafeOutboundUrl(cfg.baseUrl, `${label} base URL`);
-}
-
-function validateModelCredentials(
-  domain: string,
-  providerType: ModelProviderType,
-  credentials: Record<string, unknown>
-): void {
-  if (providerType !== 'ollama' && !credentials.apiKey) {
-    throw new ValidationError(`${modelDomainLabel(domain)} provider requires an API key`);
-  }
-}
-
 function resolveProviderCredentials(
   userId: string,
   domain: string,
-  providerType: string,
+  descriptor: AnyProviderDescriptor,
   credentials: Record<string, unknown>,
   config: Record<string, unknown> | null,
   nonce?: string
 ): { encryptedCredentials: string; resolvedConfig: Record<string, unknown> | null } {
-  if (storageProviderDescriptor(providerType)?.connect === 'oauth') {
+  if (descriptor.connect === 'oauth') {
     if (!nonce) {
       throw new ValidationError('Missing nonce — please connect your Google account');
     }
@@ -215,15 +188,8 @@ function resolveProviderCredentials(
       resolvedConfig: { ...(config ?? {}), accountEmail: pending.email },
     };
   }
-  if (isModelProviderType(providerType)) {
-    validateModelConfigShape(domain, providerType, config);
-    validateModelCredentials(domain, providerType, credentials);
-    return {
-      encryptedCredentials: encrypt(JSON.stringify(credentials)),
-      resolvedConfig: config,
-    };
-  }
-  validateStorageProviderConfig(providerType, config);
+  validateProviderConfig(descriptor, config);
+  validateProviderSecrets(descriptor, DOMAIN_LABELS[domain] ?? domain, credentials);
   return {
     encryptedCredentials: encrypt(JSON.stringify(credentials)),
     resolvedConfig: config,
@@ -244,22 +210,17 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
     throw new ValidationError('Fake storage provider is not enabled in this environment');
   }
 
-  if (storageProviderDescriptor(body.providerType)?.availability() === 'hidden') {
+  const descriptor = providerDescriptor(body.domain, body.providerType);
+  if (!descriptor || descriptor.availability() === 'hidden') {
     throw new ValidationError(
-      `Provider type must be one of: ${creatableProviderTypes().join(', ')}`
-    );
-  }
-
-  if (isModelProviderType(body.providerType) !== isModelDomain(body.domain)) {
-    throw new ValidationError(
-      'A model provider type requires domain "vlm" or "llm", and vice-versa'
+      `Provider type must be one of: ${creatableProviderTypes(body.domain).join(', ')}`
     );
   }
 
   const { encryptedCredentials, resolvedConfig } = resolveProviderCredentials(
     user.id,
     body.domain,
-    body.providerType,
+    descriptor,
     body.credentials,
     body.config ?? null,
     body.nonce
@@ -352,19 +313,19 @@ routes.put(
     if (body.displayName !== undefined) {
       updates.displayName = body.displayName;
     }
-    const existingType = existing.providerType;
+    const descriptor = providerDescriptor(existing.domain, existing.providerType);
     if (body.config !== undefined) {
-      if (isModelProviderType(existingType)) {
-        validateModelConfigShape(existing.domain, existingType, body.config);
-      } else {
-        validateStorageProviderConfig(existingType, body.config);
-      }
+      if (descriptor) validateProviderConfig(descriptor, body.config);
       // Server-written keys (accountEmail, albumId) are not sent by forms; a wholesale replace would drop them.
       updates.config = { ...(existing.config ?? {}), ...body.config };
     }
     if (body.credentials !== undefined) {
-      if (isModelProviderType(existingType)) {
-        validateModelCredentials(existing.domain, existingType, body.credentials);
+      if (descriptor) {
+        validateProviderSecrets(
+          descriptor,
+          DOMAIN_LABELS[existing.domain] ?? existing.domain,
+          body.credentials
+        );
       }
       updates.credentials = encrypt(JSON.stringify(body.credentials));
     }

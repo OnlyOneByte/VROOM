@@ -14,13 +14,13 @@ describe('providerCatalog', () => {
 		await providerCatalog.load();
 		expect(providerCatalog.loaded).toBe(false);
 		expect(providerCatalog.error).toBeTruthy();
-		expect(providerCatalog.entry('s3')).toBeNull();
+		expect(providerCatalog.storageEntry('s3')).toBeNull();
 
 		getCatalog.mockResolvedValue(STORAGE_CATALOG);
 		await Promise.all([providerCatalog.load(), providerCatalog.ensureLoaded()]);
 		expect(getCatalog).toHaveBeenCalledTimes(2);
 		expect(providerCatalog.error).toBeNull();
-		expect(providerCatalog.entry('s3')?.label).toBe('S3 Compatible');
+		expect(providerCatalog.storageEntry('s3')?.label).toBe('S3 Compatible');
 
 		await providerCatalog.ensureLoaded();
 		expect(getCatalog).toHaveBeenCalledTimes(2);

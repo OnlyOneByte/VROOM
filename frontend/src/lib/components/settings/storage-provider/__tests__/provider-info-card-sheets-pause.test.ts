@@ -12,7 +12,7 @@ const resumeSheetsBackups = vi.hoisted(() => vi.fn((_id: string) => Promise.reso
 vi.mock('#lib/services/provider-api.ts', () => ({
 	providerApi: {
 		getCatalog: async () =>
-			(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).STORAGE_CATALOG,
+			(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).PROVIDER_CATALOG,
 		getSyncStatus: vi.fn(() => Promise.resolve({})),
 		backfillProvider: vi.fn()
 	}
