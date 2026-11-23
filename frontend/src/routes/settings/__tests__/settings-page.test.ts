@@ -549,6 +549,51 @@ describe('Settings page backups', () => {
 		);
 	});
 
+	test('a partial run lists three failed providers as a sentence', async () => {
+		getProviders.mockResolvedValue([
+			{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo,
+			{ id: 'p2', displayName: 'Office S3' } as UserProviderInfo,
+			{ id: 'p3', displayName: 'Home NAS' } as UserProviderInfo,
+			{ id: 'p4', displayName: 'Cabin S3' } as UserProviderInfo
+		]);
+		settingsStoreFake.executeSync.mockResolvedValue(
+			orchestratorResult('partial', { p1: true, p2: false, p3: false, p4: false }, [
+				'p2',
+				'p3',
+				'p4'
+			])
+		);
+		await mount();
+		await backUpNow();
+		expect(toast.warning).toHaveBeenCalledWith(
+			'Backed up to 1 provider. Office S3, Home NAS, and Cabin S3 failed. Check them under Storage Providers, then try again.',
+			{ id: 'toast-1' }
+		);
+	});
+
+	test('a partial run joins two failed providers with "and" next to an unusable one', async () => {
+		getProviders.mockResolvedValue([
+			{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo,
+			{ id: 'p2', displayName: 'Office S3' } as UserProviderInfo,
+			{ id: 'p3', displayName: 'Home NAS' } as UserProviderInfo,
+			{ id: 'p4', displayName: 'Old Drive' } as UserProviderInfo
+		]);
+		settingsStoreFake.executeSync.mockResolvedValue(
+			orchestratorResult(
+				'partial',
+				{ p1: true, p2: false, p3: false, p4: false },
+				['p2', 'p3', 'p4'],
+				['p4']
+			)
+		);
+		await mount();
+		await backUpNow();
+		expect(toast.warning).toHaveBeenCalledWith(
+			"Backed up to 1 provider. Office S3 and Home NAS failed and Old Drive can't be used. Check them under Storage Providers, then try again.",
+			{ id: 'toast-1' }
+		);
+	});
+
 	test('a partial run names a provider that failed and one that cannot be used, with a next step', async () => {
 		getProviders.mockResolvedValue([
 			{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo,
