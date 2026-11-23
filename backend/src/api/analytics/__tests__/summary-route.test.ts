@@ -37,6 +37,12 @@ const MOCK_SUMMARY: AnalyticsSummaryData = {
       avgCostPerDay: 3.5,
     },
     monthlySpend: { months: 12, fuel: 106.5, charging: null },
+    previous: {
+      costPerDistance: null,
+      monthlySpend: null,
+      avgEfficiency: null,
+      chargeAvgEfficiency: null,
+    },
     distance: { totalDistance: 8500, avgPerDay: 23.3, avgPerMonth: 708.3 },
     monthlyConsumption: [],
     gasPriceHistory: [],

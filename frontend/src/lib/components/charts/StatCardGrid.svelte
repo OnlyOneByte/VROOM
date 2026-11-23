@@ -1,5 +1,5 @@
 <script lang="ts">
-	import StatCard from './StatCard.svelte';
+	import StatCard, { type StatCardChange } from './StatCard.svelte';
 	import type { AnyIcon } from './types';
 
 	export interface StatCardItem {
@@ -9,6 +9,7 @@
 		icon?: AnyIcon;
 		iconColor?: string;
 		subtitle?: string;
+		change?: StatCardChange | null;
 		secondaryLabel?: string;
 		secondaryValue?: string | number;
 		secondaryUnit?: string;
@@ -64,6 +65,7 @@
 			icon={item.icon}
 			iconColor={item.iconColor}
 			subtitle={item.subtitle}
+			change={item.change}
 			secondaryLabel={item.secondaryLabel}
 			secondaryValue={item.secondaryValue}
 			secondaryUnit={item.secondaryUnit}

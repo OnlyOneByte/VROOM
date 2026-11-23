@@ -46,6 +46,12 @@ export interface FuelStatsResponse {
 		avgCostPerDay: number | null;
 	};
 	monthlySpend?: { months: number; fuel: number | null; charging: number | null } | null;
+	previous?: {
+		costPerDistance: number | null;
+		monthlySpend: { months: number; fuel: number | null; charging: number | null } | null;
+		avgEfficiency: number | null;
+		chargeAvgEfficiency: number | null;
+	};
 	distance: {
 		totalDistance: number;
 		avgPerDay: number | null;

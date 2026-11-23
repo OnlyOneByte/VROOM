@@ -90,6 +90,12 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
         avgCostPerDay: 800,
       },
       monthlySpend: { months: 6, fuel: 4550, charging: 1450 },
+      previous: {
+        costPerDistance: 14,
+        monthlySpend: { months: 12, fuel: 4000, charging: null },
+        avgEfficiency: 27,
+        chargeAvgEfficiency: null,
+      },
       distance: { totalDistance: 1000, avgPerDay: 30, avgPerMonth: 900 },
       monthlyConsumption: [{ month: '2024-01', efficiency: 28, volume: 40 }],
       gasPriceHistory: [{ date: '2024-01-01', fuelType: 'regular', pricePerVolume: 350 }],
@@ -113,6 +119,12 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
     expect(r.averageCost.perFillup).toBe(45);
     expect(r.averageCost.bestCostPerDistance).toBe(0.12);
     expect(r.monthlySpend).toEqual({ months: 6, fuel: 45.5, charging: 14.5 });
+    expect(r.previous).toEqual({
+      costPerDistance: 0.14,
+      monthlySpend: { months: 12, fuel: 40, charging: null },
+      avgEfficiency: 27,
+      chargeAvgEfficiency: null,
+    });
     expect(r.gasPriceHistory[0].pricePerVolume).toBe(3.5);
     expect(r.fillupCostByVehicle[0].avgCost).toBe(50);
     expect(r.costPerDistance[0].costPerDistance).toBe(0.15);

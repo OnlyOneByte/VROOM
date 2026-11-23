@@ -39,6 +39,7 @@
 	import AdvancedCharts from './AdvancedCharts.svelte';
 	import ChartGroup from './ChartGroup.svelte';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import type { StatCardChange } from '#lib/components/charts/StatCard.svelte';
 	import { CHART_COLORS } from '#lib/utils/chart-colors.ts';
 
 	let {
@@ -109,10 +110,12 @@
 		const fuel = spend?.fuel ?? null;
 		const charging = spend?.charging ?? null;
 		const over = spend ? `${spend.months} ${spend.months === 1 ? 'month' : 'months'}` : null;
+		const prev = fuelStats?.previous?.monthlySpend;
 		if (fuel != null && charging != null) {
 			return {
 				label: 'Fuel & charging spend per month',
 				value: fuel + charging,
+				previous: prev ? (prev.fuel ?? 0) + (prev.charging ?? 0) : null,
 				subtitle: `Fuel ${formatCurrency(fuel)}, charging ${formatCurrency(charging)}, over ${over}`
 			};
 		}
@@ -120,6 +123,7 @@
 			label:
 				charging != null || !showGasCards ? 'Charging spend per month' : 'Fuel spend per month',
 			value: fuel ?? charging,
+			previous: (fuel != null ? prev?.fuel : prev?.charging) ?? null,
 			subtitle: over ? `Averaged over ${over}` : undefined
 		};
 	});
@@ -128,10 +132,27 @@
 			? (fuelStats?.fuelConsumption.avgEfficiency ?? null)
 			: (charging?.efficiency.avgEfficiency ?? null)
 	);
+	let previousEfficiency = $derived(
+		showGasCards
+			? (fuelStats?.previous?.avgEfficiency ?? null)
+			: (fuelStats?.previous?.chargeAvgEfficiency ?? null)
+	);
+
+	function tileChange(
+		current: number | null,
+		previous: number | null | undefined,
+		goodWhen: 'up' | 'down'
+	): StatCardChange | null {
+		if (current == null || previous == null) return null;
+		const percent = pctChange(current, previous);
+		return percent == null ? null : { percent, goodWhen, label: 'vs the 12 months before' };
+	}
+
 	let summaryItems = $derived([
 		{
 			label: `${showGasCards ? 'Fuel' : 'Charging'} cost per ${distLabelShort}`,
 			value: costPerDistance != null ? formatCurrency(costPerDistance) : 'N/A',
+			change: tileChange(costPerDistance, fuelStats?.previous?.costPerDistance, 'down'),
 			icon: DollarSign,
 			iconColor: 'chart-1'
 		},
@@ -139,12 +160,14 @@
 			label: monthlySpend.label,
 			value: monthlySpend.value != null ? formatCurrency(monthlySpend.value) : 'N/A',
 			subtitle: monthlySpend.subtitle,
+			change: tileChange(monthlySpend.value, monthlySpend.previous, 'down'),
 			icon: Fuel,
 			iconColor: 'chart-3'
 		},
 		{
 			label: `Average ${showGasCards ? effLabel : electricEffLabel}`,
 			value: summaryEfficiency != null ? formatNumber(summaryEfficiency, 1) : 'N/A',
+			change: tileChange(summaryEfficiency, previousEfficiency, 'up'),
 			icon: Gauge,
 			iconColor: 'chart-2'
 		}

@@ -192,6 +192,47 @@ describe('FuelStatsTab summary and groups', () => {
 		expect(screen.getAllByText('32.1').length).toBeGreaterThan(0);
 	});
 
+	test('each summary tile shows its change against the 12 months before', () => {
+		render(FuelStatsTab, {
+			fuelStats: stats({
+				...gas,
+				previous: {
+					costPerDistance: 0.1,
+					monthlySpend: { months: 12, fuel: 35, charging: null },
+					avgEfficiency: 30,
+					chargeAvgEfficiency: null
+				}
+			}),
+			fuelAdvanced: advanced
+		});
+		const lines = screen.getAllByText('vs the 12 months before').map(l => l.parentElement);
+		expect(lines.map(l => l?.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+			'+30% vs the 12 months before',
+			'+30% vs the 12 months before',
+			'+7% vs the 12 months before'
+		]);
+		const tones = lines.map(l => l?.querySelector('svg')?.getAttribute('class') ?? '');
+		expect(tones[0]).toContain('text-destructive');
+		expect(tones[1]).toContain('text-destructive');
+		expect(tones[2]).toContain('text-chart-2');
+	});
+
+	test('a tile shows no change without previous data', () => {
+		render(FuelStatsTab, {
+			fuelStats: stats({
+				...gas,
+				previous: {
+					costPerDistance: null,
+					monthlySpend: null,
+					avgEfficiency: null,
+					chargeAvgEfficiency: null
+				}
+			}),
+			fuelAdvanced: advanced
+		});
+		expect(screen.queryByText('vs the 12 months before')).toBeNull();
+	});
+
 	test('a mixed fleet labels the monthly spend for both and splits it in the subtitle', () => {
 		render(FuelStatsTab, {
 			fuelStats: stats({ ...gas, monthlySpend: { months: 6, fuel: 45.5, charging: 14.5 } }),

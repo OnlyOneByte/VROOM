@@ -208,6 +208,12 @@ export interface FuelStatsData {
     avgCostPerDay: number | null;
   };
   monthlySpend: { months: number; fuel: number | null; charging: number | null } | null;
+  previous: {
+    costPerDistance: number | null;
+    monthlySpend: { months: number; fuel: number | null; charging: number | null } | null;
+    avgEfficiency: number | null;
+    chargeAvgEfficiency: number | null;
+  };
   distance: {
     totalDistance: number;
     avgPerDay: number | null;
@@ -1456,15 +1462,15 @@ export class AnalyticsRepository {
         start: range.start - (range.end - range.start),
         end: range.start,
       };
-      const [vehicleNameMap, fuelRows, prevYearAgg, userUnits, vehicleUnitsMap] = await Promise.all(
-        [
+      const [vehicleNameMap, fuelRows, prevFuelRows, prevYearAgg, userUnits, vehicleUnitsMap] =
+        await Promise.all([
           this.queryVehicleNameMap(userId, vehicleId),
           this.queryFuelExpenses(userId, range, vehicleId),
+          this.queryFuelExpenses(userId, prevRange, vehicleId),
           this.queryFuelAggregates(userId, prevRange, vehicleId),
           this.getUserUnits(userId),
           this.getAllVehicleUnits(userId),
-        ]
-      );
+        ]);
 
       const fuelRowsByVehicle = sortByVehicleThenDate(fuelRows);
 
@@ -1474,6 +1480,7 @@ export class AnalyticsRepository {
         vehicleNameMap,
         range,
         prevYearAgg,
+        prevFuelRows,
         this.fleetUnitConverter(vehicleUnitsMap, userUnits, zonedCalendar(timeZone))
       );
     } catch (error) {
@@ -1494,6 +1501,7 @@ export class AnalyticsRepository {
     vehicleNameMap: Map<string, string>,
     range: DateRange,
     prevYearAgg: FuelAggregates,
+    prevFuelRows: FuelExpenseRow[],
     convert: FleetUnitConverter
   ): FuelStatsData {
     const now = new Date();
@@ -1583,6 +1591,7 @@ export class AnalyticsRepository {
         fuelRows,
         new Date(Math.min(now.getTime(), rangeEndDate.getTime()))
       ),
+      previous: this.previousWindowStats(prevFuelRows, rangeStartDate, convert),
       distance,
       monthlyConsumption: this.buildMonthlyConsumption(fuelRowsByVehicle, convert),
       gasPriceHistory: buildGasPriceHistory(fuelRows, isFillup, convert.volume),
@@ -1597,6 +1606,22 @@ export class AnalyticsRepository {
         inCurrentMonth,
         inPrevMonth,
       }),
+    };
+  }
+
+  private previousWindowStats(
+    prevFuelRows: FuelExpenseRow[],
+    prevEnd: Date,
+    convert: FleetUnitConverter
+  ): FuelStatsData['previous'] {
+    const byVehicle = sortByVehicleThenDate(prevFuelRows);
+    const spend = prevFuelRows.reduce((s, r) => (r.expenseAmount > 0 ? s + r.expenseAmount : s), 0);
+    const distance = this.computeTotalDistance(prevFuelRows, convert);
+    return {
+      costPerDistance: spend > 0 && distance > 0 ? spend / distance : null,
+      monthlySpend: computeMonthlySpend(prevFuelRows, prevEnd),
+      avgEfficiency: this.computeAverageEfficiency(byVehicle, convert),
+      chargeAvgEfficiency: this.computeAverageEfficiency(byVehicle, convert, true),
     };
   }
 
@@ -2165,6 +2190,7 @@ export class AnalyticsRepository {
         vehicleRows,
         allExpenses,
         fuelRows,
+        prevFuelRows,
         prevYearAgg,
         userUnits,
         vehicleUnitsMap,
@@ -2178,6 +2204,7 @@ export class AnalyticsRepository {
           .where(ownedVehiclesScope(userId)),
         this.queryAllExpenses(userId, range),
         this.queryFuelExpenses(userId, range),
+        this.queryFuelExpenses(userId, prevRange),
         this.queryFuelAggregates(userId, prevRange),
         this.getUserUnits(userId),
         this.getAllVehicleUnits(userId),
@@ -2208,6 +2235,7 @@ export class AnalyticsRepository {
         vehicleNameMap,
         range,
         prevYearAgg,
+        prevFuelRows,
         convert
       );
       const fuelAdvanced = this.buildFuelAdvancedFromData(

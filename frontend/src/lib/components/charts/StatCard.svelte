@@ -11,9 +11,16 @@
 		| 'chart-8'
 		| 'destructive'
 		| 'muted';
+
+	export interface StatCardChange {
+		percent: number;
+		goodWhen: 'up' | 'down';
+		label: string;
+	}
 </script>
 
 <script lang="ts">
+	import { Minus, TrendingDown, TrendingUp } from '@lucide/svelte';
 	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { cn } from '#lib/utils.js';
@@ -46,6 +53,7 @@
 		secondaryValue?: string | number;
 		secondaryUnit?: string;
 		subtitle?: string;
+		change?: StatCardChange | null;
 		isLoading?: boolean;
 		class?: string;
 	}
@@ -60,6 +68,7 @@
 		secondaryValue,
 		secondaryUnit,
 		subtitle,
+		change,
 		isLoading = false,
 		class: className
 	}: Props = $props();
@@ -176,6 +185,25 @@
 			{/if}
 			{#if subtitle}
 				<p class="text-xs text-muted-foreground mt-1">{subtitle}</p>
+			{/if}
+			{#if change}
+				{@const ChangeIcon =
+					change.percent > 0 ? TrendingUp : change.percent < 0 ? TrendingDown : Minus}
+				{@const tone =
+					change.percent === 0
+						? 'text-muted-foreground'
+						: change.percent > 0 === (change.goodWhen === 'up')
+							? 'text-chart-2'
+							: 'text-destructive'}
+				<p class="mt-1 flex items-start gap-1 text-xs text-muted-foreground">
+					<ChangeIcon class="mt-0.5 h-3 w-3 shrink-0 {tone}" aria-hidden="true" />
+					<span>
+						<span class="font-medium text-foreground">
+							{change.percent > 0 ? '+' : ''}{change.percent}%
+						</span>
+						{change.label}
+					</span>
+				</p>
 			{/if}
 		{/if}
 	</CardContent>
