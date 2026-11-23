@@ -156,16 +156,16 @@
 					{#each ['light', 'dark'] as scheme (scheme)}
 						<picture class={scheme === 'light' ? 'block dark:hidden' : 'hidden dark:block'}>
 							<source
-								media="(max-width: 639px)"
+								media="(width < 40rem)"
 								srcset="/landing/dashboard-phone-{scheme}.webp"
 								width="750"
-								height="1360"
+								height="1400"
 							/>
 							<img
 								src="/landing/dashboard-{scheme}.webp"
 								width="1280"
 								height="1180"
-								alt="The VROOM Dashboard with two vehicles: spending totals, the fleet and monthly cost charts"
+								alt="The VROOM Dashboard with two vehicles: spending totals and the fleet"
 								loading="lazy"
 								decoding="async"
 								class="block h-auto w-full"

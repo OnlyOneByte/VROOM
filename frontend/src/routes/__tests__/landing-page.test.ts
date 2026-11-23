@@ -48,9 +48,9 @@ describe('landing page', () => {
 			'/landing/dashboard-phone-dark.webp'
 		]);
 		for (const source of sources) {
-			expect(source?.getAttribute('media')).toBe('(max-width: 639px)');
+			expect(source?.getAttribute('media')).toBe('(width < 40rem)');
 			expect(source?.getAttribute('width')).toBe('750');
-			expect(source?.getAttribute('height')).toBe('1360');
+			expect(source?.getAttribute('height')).toBe('1400');
 		}
 	});
 
