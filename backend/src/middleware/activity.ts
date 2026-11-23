@@ -1,7 +1,7 @@
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import { preferencesRepository } from '../api/settings/repository';
 import { activityTracker as userActivityTracker } from '../api/sync/activity-tracker';
-import { filterEnabledProviders } from '../api/sync/backup-orchestrator';
+import { filterEnabledProviders, loadProviderTypes } from '../api/sync/backup-orchestrator';
 import type { BackupConfig } from '../types';
 import { logger } from '../utils/logger';
 
@@ -22,10 +22,9 @@ export const activityTracker: MiddlewareHandler = async (c, next) => {
 
     const settings = await preferencesRepository.getOrCreate(user.id);
     const backupConfig = settings.backupConfig as BackupConfig | null;
-    const hasSyncEnabled = backupConfig?.providers
-      ? filterEnabledProviders(backupConfig).length > 0
-      : false;
-    if (settings.syncOnInactivity && hasSyncEnabled) {
+    if (!settings.syncOnInactivity || !backupConfig?.providers) return;
+    const providerTypes = await loadProviderTypes(user.id);
+    if (filterEnabledProviders(backupConfig, providerTypes).length > 0) {
       userActivityTracker.recordActivity(user.id, settings.syncInactivityMinutes);
     }
   } catch (error) {

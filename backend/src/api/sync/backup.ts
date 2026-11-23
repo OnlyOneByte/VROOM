@@ -352,17 +352,19 @@ class BackupService {
 
   async listAllBackups(userId: string): Promise<ProviderBackupList[]> {
     const config = await this.loadBackupConfig(userId);
-    const zipProviderIds = Object.entries(config.providers)
-      .filter(([, settings]) => hasZipBackup(settings))
-      .map(([providerId]) => providerId);
     const results: ProviderBackupList[] = [];
-    if (zipProviderIds.length === 0) return results;
+    if (Object.keys(config.providers).length === 0) return results;
 
     const providerRows = await getDb()
       .select()
       .from(userProviders)
-      .where(and(inArray(userProviders.id, zipProviderIds), eq(userProviders.userId, userId)));
+      .where(eq(userProviders.userId, userId));
     const providersById = new Map(providerRows.map((row) => [row.id, row]));
+    const zipProviderIds = Object.entries(config.providers)
+      .filter(([providerId, settings]) =>
+        hasZipBackup(settings, providersById.get(providerId)?.providerType)
+      )
+      .map(([providerId]) => providerId);
 
     for (const providerId of zipProviderIds) {
       try {
