@@ -296,6 +296,26 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		expect(screen.getByTestId('migrate-vehicle')).toHaveTextContent('Weekend Car');
 	});
 
+	test('reopening keeps the vehicle picked last time, and an unrecognised file keeps it too', async () => {
+		getVehicles.mockResolvedValue([
+			vehicle(),
+			vehicle({ id: 'v2', nickname: 'Weekend Car', make: 'Mazda', model: 'MX-5' })
+		]);
+		detectImportSource.mockResolvedValue(null);
+		await mount();
+		await openDialog();
+		await pickVehicle('Weekend Car');
+		await chooseFile('foo,bar\n1,2', 'other.csv');
+
+		expect(screen.getByTestId('migrate-unrecognized')).toBeInTheDocument();
+		expect(screen.getByTestId('migrate-vehicle')).toHaveTextContent('Weekend Car');
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+		await settle();
+		await openDialog();
+		expect(screen.getByTestId('migrate-vehicle')).toHaveTextContent('Weekend Car');
+	});
+
 	test('a single bad row reads in the singular', async () => {
 		importExpensesCsv.mockResolvedValue(
 			result({

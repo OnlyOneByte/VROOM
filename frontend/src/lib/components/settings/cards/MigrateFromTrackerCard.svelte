@@ -28,7 +28,7 @@
 	const form = new ImportExpensesForm(() => vehicles, {
 		presetsOnly: true,
 		copy: {
-			previewFailed: format => `Couldn't read that ${format?.label ?? ''} file`,
+			previewFailed: format => `Couldn't read that ${format ? `${format.label} ` : ''}file`,
 			detectFailed: "Couldn't read that file",
 			done: (imported, format) =>
 				`Migrated ${imported} ${imported === 1 ? 'entry' : 'entries'} from ${format?.label ?? 'your old app'}`,
@@ -75,8 +75,9 @@
 	}
 
 	function openDialog() {
+		const lastVehicleId = form.targetVehicleId;
 		form.reset();
-		if (vehicles.length === 1 && vehicles[0]) form.targetVehicleId = vehicles[0].id;
+		form.targetVehicleId = vehicles.length === 1 && vehicles[0] ? vehicles[0].id : lastVehicleId;
 		void form.loadFormats();
 		dialogOpen = true;
 	}
@@ -218,7 +219,7 @@
 				/>
 			{:else if form.unrecognized}
 				<p class="text-sm text-destructive" role="alert" data-testid="migrate-unrecognized">
-					We don't recognize this file. Check that it's the CSV export from your old app and try
+					We don't recognize this file. Check that it's the export file from your old app and try
 					again.
 				</p>
 			{:else if form.csvText.trim() && form.needsTargetVehicle}

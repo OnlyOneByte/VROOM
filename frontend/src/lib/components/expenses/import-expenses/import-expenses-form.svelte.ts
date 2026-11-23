@@ -58,7 +58,8 @@ export class ImportExpensesForm {
 	readonly #getVehicles: () => Vehicle[];
 	readonly #presetsOnly: boolean;
 	readonly #copy: ImportCopy;
-	#flow = 0;
+	#detectFlow = 0;
+	#previewFlow = 0;
 
 	targetVehicle = $derived(this.#findTargetVehicle());
 	mapping = $derived(
@@ -87,7 +88,8 @@ export class ImportExpensesForm {
 	}
 
 	reset() {
-		this.#flow++;
+		this.#detectFlow++;
+		this.#previewFlow++;
 		this.unrecognized = false;
 		this.csvText = '';
 		this.fileName = null;
@@ -116,34 +118,34 @@ export class ImportExpensesForm {
 	}
 
 	async loadFile(file: File) {
-		const flow = ++this.#flow;
+		const flow = ++this.#detectFlow;
 		this.fileName = file.name;
 		const text = await file.text();
-		if (flow !== this.#flow) return;
+		if (flow !== this.#detectFlow) return;
 		this.csvText = text;
 		await this.#detect(flow);
-		if (flow === this.#flow) await this.#preview(flow);
+		if (flow === this.#detectFlow) await this.runPreview();
 	}
 
 	async handlePasteBlur() {
-		const flow = ++this.#flow;
+		const flow = ++this.#detectFlow;
 		await this.#detect(flow);
-		if (flow === this.#flow) await this.#preview(flow);
+		if (flow === this.#detectFlow) await this.runPreview();
 	}
 
 	detectSource() {
-		return this.#detect(++this.#flow);
+		return this.#detect(++this.#detectFlow);
 	}
 
 	runPreview() {
-		return this.#preview(++this.#flow);
+		return this.#preview(++this.#previewFlow);
 	}
 
 	async #detect(flow: number) {
-		const chosenVehicleId = this.targetVehicleId;
+		this.#previewFlow++;
 		this.detectedPreset = null;
 		this.unrecognized = false;
-		this.targetVehicleId = '';
+		if (!this.#presetsOnly) this.targetVehicleId = '';
 		this.manualMapping = false;
 		this.manualColumns = {};
 		this.categoryRemap = {};
@@ -158,7 +160,7 @@ export class ImportExpensesForm {
 		this.isDetecting = true;
 		try {
 			const preset = await expenseApi.detectImportSource(sample);
-			if (flow !== this.#flow) return;
+			if (flow !== this.#detectFlow) return;
 			this.detectedPreset = preset;
 			this.unrecognized = !preset;
 			if (!preset && (this.#presetsOnly || headers.length === 0)) return;
@@ -167,24 +169,26 @@ export class ImportExpensesForm {
 				preset,
 				this.#getVehicles().map(v => v.id)
 			);
-			const targetVehicleId = (preset && chosenVehicleId) || outcome.targetVehicleId;
-			if (targetVehicleId) this.targetVehicleId = targetVehicleId;
+			if (!this.#presetsOnly && outcome.targetVehicleId) {
+				this.targetVehicleId = outcome.targetVehicleId;
+			}
 			if (outcome.manualColumns) {
 				this.manualMapping = true;
 				this.manualColumns = outcome.manualColumns;
 				this.#seedManualUnitsFromTarget();
 			}
 		} catch (err) {
-			if (flow !== this.#flow) return;
+			if (flow !== this.#detectFlow) return;
 			this.detectedPreset = null;
 			if (this.#copy.detectFailed) handleErrorWithNotification(err, this.#copy.detectFailed);
 		} finally {
-			if (flow === this.#flow) this.isDetecting = false;
+			if (flow === this.#detectFlow) this.isDetecting = false;
 		}
 	}
 
 	async #preview(flow: number) {
 		this.preview = null;
+		this.isPreviewing = false;
 		if (!this.csvText.trim() || (this.#presetsOnly && !this.detectedPreset)) return;
 		if (this.needsTargetVehicle || this.needsManualMapping) return;
 		this.isPreviewing = true;
@@ -194,13 +198,13 @@ export class ImportExpensesForm {
 				true,
 				this.mapping ?? undefined
 			);
-			if (flow === this.#flow) this.preview = preview;
+			if (flow === this.#previewFlow) this.preview = preview;
 		} catch (err) {
-			if (flow === this.#flow) {
+			if (flow === this.#previewFlow) {
 				handleErrorWithNotification(err, this.#copy.previewFailed(this.detectedPreset));
 			}
 		} finally {
-			if (flow === this.#flow) this.isPreviewing = false;
+			if (flow === this.#previewFlow) this.isPreviewing = false;
 		}
 	}
 
@@ -237,6 +241,7 @@ export class ImportExpensesForm {
 
 	async commit(onImported: () => void): Promise<boolean> {
 		if (!this.preview || this.preview.readyCount === 0) return false;
+		const format = this.detectedPreset;
 		this.isImporting = true;
 		try {
 			const result = await expenseApi.importExpensesCsv(
@@ -244,11 +249,11 @@ export class ImportExpensesForm {
 				false,
 				this.mapping ?? undefined
 			);
-			appStore.showSuccess(this.#copy.done(result.imported, this.detectedPreset));
+			appStore.showSuccess(this.#copy.done(result.imported, format));
 			onImported();
 			return true;
 		} catch (err) {
-			handleErrorWithNotification(err, this.#copy.failed(this.detectedPreset));
+			handleErrorWithNotification(err, this.#copy.failed(format));
 			return false;
 		} finally {
 			this.isImporting = false;
