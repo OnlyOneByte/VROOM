@@ -57,6 +57,8 @@
 		`Avg ${getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit)}`
 	);
 
+	const FLEET_HEALTH_SUBTITLE = 'Service regularity, service mileage and insurance cover';
+
 	let quickStatsItems = $derived(
 		quickStats
 			? [
@@ -83,9 +85,7 @@
 						label: 'Fleet Health',
 						value: quickStats.vehicleCount > 0 ? `${quickStats.fleetHealthScore} / 100` : '—',
 						subtitle:
-							quickStats.vehicleCount > 0
-								? 'Service regularity, service mileage and insurance cover'
-								: 'Add a vehicle to get a score',
+							quickStats.vehicleCount > 0 ? FLEET_HEALTH_SUBTITLE : 'Add a vehicle to get a score',
 						icon: TrendingUp,
 						iconColor: 'chart-5'
 					}
@@ -97,7 +97,7 @@
 		{ label: 'vehicles', value: '', icon: Car },
 		{ label: 'spending', value: '', icon: DollarSign },
 		{ label: 'efficiency', value: '', icon: Activity },
-		{ label: 'health', value: '', icon: TrendingUp }
+		{ label: 'health', value: '', subtitle: FLEET_HEALTH_SUBTITLE, icon: TrendingUp }
 	];
 
 	onMount(() => {
