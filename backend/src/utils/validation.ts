@@ -10,11 +10,12 @@ import { CONFIG } from '../config';
 import type { InsurancePolicy, Trip, VehicleFinancing } from '../db/schema';
 import { isElectricFuelType } from '../db/types';
 import { createErrorResponse, NotFoundError, ValidationError } from '../errors';
+import { formatNumberForMessage } from './money';
 import { allowsMode, resolveVehicleAccess } from './vehicle-access';
 
 export const MAX_ODOMETER_READING = CONFIG.validation.vehicle.maxOdometerReading;
-export const ODOMETER_TOO_HIGH_MESSAGE = `Odometer must be ${MAX_ODOMETER_READING.toLocaleString('en-US')} or less`;
-export const VOLUME_TOO_HIGH_MESSAGE = `Volume must be ${CONFIG.validation.expense.maxVolume.toLocaleString('en-US')} or less`;
+export const ODOMETER_TOO_HIGH_MESSAGE = `Odometer must be ${formatNumberForMessage(MAX_ODOMETER_READING)} or less`;
+export const VOLUME_TOO_HIGH_MESSAGE = `Volume must be ${formatNumberForMessage(CONFIG.validation.expense.maxVolume)} or less`;
 
 function describeIssue(issue: ZodError['issues'][number]): string {
   const path = issue.path.join('.');
