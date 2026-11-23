@@ -98,7 +98,6 @@
 
 	let showDeleteModal = $state(false);
 	let expenseToDelete = $state<Expense | null>(null);
-	let isDeleting = $state(false);
 
 	let sortedExpenses = $derived(
 		visibleExpenses(expenses, {
@@ -163,16 +162,9 @@
 
 	async function deleteExpense() {
 		if (!expenseToDelete || !onDelete) return;
-
-		isDeleting = true;
-
-		try {
-			appStore.addNotification(await deleteAndRefresh(expenseToDelete, onDelete));
-		} finally {
-			isDeleting = false;
-			showDeleteModal = false;
-			expenseToDelete = null;
-		}
+		const notice = await deleteAndRefresh(expenseToDelete, onDelete);
+		appStore.addNotification(notice);
+		if (notice.type === 'error') throw new Error(notice.message);
 	}
 </script>
 
@@ -236,7 +228,6 @@
 	<ExpenseDeleteDialog
 		bind:open={showDeleteModal}
 		expense={expenseToDelete}
-		{isDeleting}
 		onConfirm={deleteExpense}
 	/>
 {/if}

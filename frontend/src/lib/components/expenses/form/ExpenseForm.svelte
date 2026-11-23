@@ -619,7 +619,6 @@
 		isGroupEditMode={form.isGroupEditMode}
 		groupId={form.groupId}
 		originalExpense={form.originalExpense}
-		isDeleting={form.isDeleting}
 		onConfirm={() => deleteExpense(form)}
 	/>
 </FormLayout>

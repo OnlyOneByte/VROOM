@@ -10,6 +10,7 @@
 		AlertDialogTitle
 	} from '#lib/components/ui/alert-dialog/index.ts';
 	import { LoaderCircle } from '@lucide/svelte';
+	import type { Snippet } from 'svelte';
 	import { buttonVariants } from '#lib/components/ui/button/index.ts';
 	import { cn } from '#lib/utils.ts';
 
@@ -22,6 +23,7 @@
 		destructive?: boolean;
 		onConfirm: () => void | Promise<void>;
 		onCloseAutoFocus?: (_event: Event) => void;
+		children?: Snippet;
 	}
 
 	let {
@@ -32,7 +34,8 @@
 		cancelLabel = 'Cancel',
 		destructive = true,
 		onConfirm,
-		onCloseAutoFocus
+		onCloseAutoFocus,
+		children
 	}: Props = $props();
 
 	let isWorking = $state(false);
@@ -59,6 +62,7 @@
 			<AlertDialogTitle>{title}</AlertDialogTitle>
 			<AlertDialogDescription>{description}</AlertDialogDescription>
 		</AlertDialogHeader>
+		{@render children?.()}
 		<AlertDialogFooter>
 			<AlertDialogCancel disabled={isWorking}>{cancelLabel}</AlertDialogCancel>
 			<AlertDialogAction
