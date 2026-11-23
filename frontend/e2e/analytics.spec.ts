@@ -24,7 +24,7 @@ test.describe('Analytics', () => {
 
 		await expect(page.getByText('Total Vehicles')).toBeVisible();
 		await expect(page.getByText('YTD Spending')).toBeVisible();
-		await expect(page.getByText('Avg mi/gal')).toBeVisible();
+		await expect(page.getByText('Cost per mi', { exact: true })).toBeVisible();
 		await expect(page.getByText('Fleet Health')).toBeVisible();
 		await expect(
 			page.getByText(`${ANALYTICS_SUMMARY.quickStats.fleetHealthScore} / 100`)
@@ -95,6 +95,7 @@ test.describe('Analytics', () => {
 								vehicleCount: 0,
 								ytdSpending: 0,
 								avgEfficiency: null,
+								costPerDistance: null,
 								fleetHealthScore: 0
 							},
 							fuelStats: {

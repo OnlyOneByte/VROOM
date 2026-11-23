@@ -11,6 +11,7 @@ export interface QuickStatsResponse {
 	vehicleCount: number;
 	ytdSpending: number;
 	avgEfficiency: number | null;
+	costPerDistance: number | null;
 	fleetHealthScore: number;
 	units: UnitsMetadata;
 }

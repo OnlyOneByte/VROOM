@@ -158,6 +158,7 @@ export interface QuickStatsData {
   vehicleCount: number;
   ytdSpending: number;
   avgEfficiency: number | null;
+  costPerDistance: number | null;
   fleetHealthScore: number;
   units: { distanceUnit: string; volumeUnit: string; chargeUnit: string };
 }
@@ -573,7 +574,19 @@ export class AnalyticsRepository {
     return pooledEfficiency(totals);
   }
 
-  private computeTotalDistance(fuelRows: FuelExpenseRow[], convert: FleetUnitConverter): number {
+  private fleetCostPerDistance(
+    allExpenses: GeneralExpenseRow[],
+    convert: FleetUnitConverter
+  ): number | null {
+    const totalDistance = this.computeTotalDistance(allExpenses, convert);
+    if (totalDistance <= 0) return null;
+    return allExpenses.reduce((sum, r) => sum + r.expenseAmount, 0) / totalDistance;
+  }
+
+  private computeTotalDistance(
+    fuelRows: Array<{ vehicleId: string; mileage: number | null }>,
+    convert: FleetUnitConverter
+  ): number {
     const vehicleMileages = new Map<string, number[]>();
     for (const row of fuelRows) {
       if (row.mileage == null) continue;
@@ -1336,6 +1349,7 @@ export class AnalyticsRepository {
       const ytdSpending = yearToDateSpending(allExpenses, range, ytdStart);
       const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits, zonedCalendar(timeZone));
       const avgEfficiency = this.computeAverageEfficiency(fuelRows, convert);
+      const costPerDistance = this.fleetCostPerDistance(allExpenses, convert);
 
       const fleetHealthScore =
         vehicleCount > 0 ? await this.computeFleetHealthScore(vehicleRows, userId, timeZone) : 0;
@@ -1344,6 +1358,7 @@ export class AnalyticsRepository {
         vehicleCount,
         ytdSpending,
         avgEfficiency,
+        costPerDistance,
         fleetHealthScore,
         units: { ...userUnits },
       };
@@ -2176,6 +2191,7 @@ export class AnalyticsRepository {
         vehicleCount: vehicleRows.length,
         ytdSpending,
         avgEfficiency,
+        costPerDistance: this.fleetCostPerDistance(allExpenses, convert),
         fleetHealthScore,
         units: { ...userUnits },
       };

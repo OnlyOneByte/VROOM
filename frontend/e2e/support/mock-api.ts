@@ -135,6 +135,7 @@ export const ANALYTICS_SUMMARY = {
 		vehicleCount: 2,
 		ytdSpending: 5000,
 		avgEfficiency: 28.5,
+		costPerDistance: 0.21,
 		fleetHealthScore: 85,
 		units: UNITS
 	},

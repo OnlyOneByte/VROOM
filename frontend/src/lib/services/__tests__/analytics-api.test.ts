@@ -26,6 +26,7 @@ const mockQuickStats: QuickStatsResponse = {
 	vehicleCount: 3,
 	ytdSpending: 4500.5,
 	avgEfficiency: 28.3,
+	costPerDistance: 0.21,
 	fleetHealthScore: 85,
 	units: { distanceUnit: 'miles', volumeUnit: 'gallons_us', chargeUnit: 'kwh' }
 };
