@@ -8,6 +8,7 @@
 	import ImportSourceDetection from './import-expenses/ImportSourceDetection.svelte';
 	import ManualMappingPanel from './import-expenses/ManualMappingPanel.svelte';
 	import ImportPreviewSummary from './import-expenses/ImportPreviewSummary.svelte';
+	import { PREVIEW_UPDATING_LABEL } from './import-expenses/PreviewUpdatingOverlay.svelte';
 	import CategoryRemapPanel from './import-expenses/CategoryRemapPanel.svelte';
 
 	interface Props {
@@ -99,7 +100,7 @@
 					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 					Importing…
 				{:else if form.isPreviewing && form.preview}
-					Updating…
+					{PREVIEW_UPDATING_LABEL}
 				{:else}
 					Import {form.preview?.readyCount ?? 0}
 					{(form.preview?.readyCount ?? 0) === 1 ? 'row' : 'rows'}

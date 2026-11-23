@@ -128,6 +128,42 @@ describe('ImportExpensesDialog', () => {
 		expect(importButton()).toBeEnabled();
 	});
 
+	test('a re-preview with the same counts announces the result once and clears Updating…', async () => {
+		let land: (value: ExpenseImportResult) => void = () => {};
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		mocks.importExpensesCsv
+			.mockResolvedValueOnce(previewResult({ unmappedCategories: ['Tolls'] }))
+			.mockReturnValue(new Promise(resolve => (land = resolve)));
+		renderDialog();
+		await chooseFile(FUEL_CSV, 'fuel.csv');
+		await waitFor(() => expect(importButton()).toBeEnabled());
+		const status = screen.getByRole('status');
+
+		const trigger = await screen.findByLabelText('Category for Tolls');
+		await fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' });
+		await fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' });
+		const option = await screen.findByRole('option', { name: 'Maintenance' });
+		await fireEvent.pointerUp(option, { button: 0, pointerType: 'mouse' });
+		await fireEvent.click(option);
+		await waitFor(() => expect(status).toHaveTextContent('Updating the preview…'));
+		expect(screen.getByTestId('preview-updating')).toBeInTheDocument();
+
+		const announced: string[] = [];
+		new MutationObserver(() => announced.push(status.textContent?.trim() ?? '')).observe(status, {
+			childList: true,
+			characterData: true,
+			subtree: true
+		});
+		land(previewResult());
+
+		await waitFor(() => expect(status).toHaveTextContent('Preview: 2 ready.'));
+		await new Promise(resolve => setTimeout(resolve, 50));
+		expect(announced.filter(text => text === 'Preview: 2 ready.')).toHaveLength(1);
+		expect(screen.queryByTestId('preview-updating')).toBeNull();
+		expect(importButton()).toHaveTextContent('Import 2 rows');
+		expect(importButton()).toBeEnabled();
+	});
+
 	test('a category remap keeps its row and keyboard focus through the re-preview', async () => {
 		mocks.detectImportSource.mockResolvedValue(FUELLY);
 		mocks.importExpensesCsv

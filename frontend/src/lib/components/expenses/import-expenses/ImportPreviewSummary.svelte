@@ -2,6 +2,7 @@
 	import { CircleAlert, CircleCheck, FileText, LoaderCircle } from '@lucide/svelte';
 	import { Alert, AlertDescription } from '#lib/components/ui/alert/index.ts';
 	import type { ExpenseImportResult } from '#lib/services/expense-api.ts';
+	import PreviewUpdatingOverlay from './PreviewUpdatingOverlay.svelte';
 
 	interface Props {
 		isPreviewing: boolean;
@@ -32,15 +33,7 @@
 {:else if preview}
 	<div class="relative rounded-lg border bg-card p-4">
 		{#if isPreviewing}
-			<div class="absolute inset-0 rounded-lg bg-card/70" aria-hidden="true">
-				<span
-					class="absolute -top-2.5 right-3 flex items-center gap-1.5 rounded-full border bg-card px-2 text-xs text-muted-foreground"
-					data-testid="preview-updating"
-				>
-					<LoaderCircle class="h-3 w-3 animate-spin" />
-					Updating…
-				</span>
-			</div>
+			<PreviewUpdatingOverlay />
 		{/if}
 		<div class="flex items-center gap-4 text-sm">
 			<span class="flex items-center gap-1.5 font-medium text-foreground">

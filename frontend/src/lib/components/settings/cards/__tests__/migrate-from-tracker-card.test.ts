@@ -114,6 +114,16 @@ async function pickVehicle(name: string) {
 	await settle();
 }
 
+function recordText(region: HTMLElement): string[] {
+	const seen: string[] = [];
+	new MutationObserver(() => seen.push(region.textContent?.trim() ?? '')).observe(region, {
+		childList: true,
+		characterData: true,
+		subtree: true
+	});
+	return seen;
+}
+
 function commitButton() {
 	return screen.getByTestId('migrate-commit') as HTMLButtonElement;
 }
@@ -331,6 +341,37 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 			'Preview: 2 ready, 1 row needs attention.'
 		);
 		expect(commitButton()).toHaveTextContent('Migrate 2 entries');
+		expect(commitButton()).toBeEnabled();
+	});
+
+	test('a re-preview with the same counts announces the result once and clears Updating…', async () => {
+		let land: (value: ExpenseImportResult) => void = () => {};
+		importExpensesCsv.mockResolvedValueOnce(result({ unmappedCategories: ['Parking'] }));
+		importExpensesCsv.mockReturnValue(new Promise(resolve => (land = resolve)));
+		await mount();
+		await openDialog();
+		await chooseFile();
+		const status = screen.getByRole('status');
+		expect(status).toHaveTextContent('Preview: 3 ready.');
+
+		const trigger = screen.getByLabelText('Category for Parking');
+		await fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' });
+		await fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' });
+		const option = await screen.findByRole('option', { name: 'Maintenance' });
+		await fireEvent.pointerUp(option, { button: 0, pointerType: 'mouse' });
+		await fireEvent.click(option);
+		await settle();
+		expect(screen.getByTestId('preview-updating')).toBeInTheDocument();
+
+		const announced = recordText(status);
+		land(result());
+		await settle();
+
+		expect(announced.filter(text => text === 'Preview: 3 ready.')).toHaveLength(1);
+		expect(status).toHaveTextContent('Preview: 3 ready.');
+		expect(screen.queryByTestId('preview-updating')).toBeNull();
+		expect(screen.queryByText('Updating…')).toBeNull();
+		expect(commitButton()).toHaveTextContent('Migrate 3 entries');
 		expect(commitButton()).toBeEnabled();
 	});
 
