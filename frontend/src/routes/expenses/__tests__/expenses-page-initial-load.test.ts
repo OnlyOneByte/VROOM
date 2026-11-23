@@ -3,7 +3,10 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import type { Expense, UserSettings, Vehicle } from '#lib/types/index.ts';
 import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
+vi.mock('$app/navigation', () => ({
+	goto: vi.fn(() => Promise.resolve()),
+	afterNavigate: vi.fn()
+}));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 let tableProps: Record<string, unknown> = {};

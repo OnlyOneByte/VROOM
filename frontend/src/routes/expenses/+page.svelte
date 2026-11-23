@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { goto } from '$app/navigation';
+	import { afterNavigate, goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { routes } from '#lib/routes.ts';
 	import {
@@ -58,7 +58,11 @@
 	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
 	import { useExpenseListReload } from './expense-list-reload.svelte';
-	import { expenseUrlFiltersQuery, parseExpenseUrlFilters } from './expense-url-filters.ts';
+	import {
+		expenseUrlFiltersQuery,
+		parseExpenseUrlFilters,
+		type ExpenseUrlFilters
+	} from './expense-url-filters.ts';
 	import {
 		EXPENSE_CATEGORY_INFO,
 		type ExpenseCategory
@@ -173,8 +177,8 @@
 		return parts.length > 0 ? `Filtered by ${parts.join(' · ')}` : '';
 	});
 
-	$effect(() => {
-		const filters = {
+	function currentUrlFilters(): ExpenseUrlFilters {
+		return {
 			vehicleId: selectedVehicleId,
 			category: categoryFilter || undefined,
 			startDate,
@@ -182,14 +186,18 @@
 			tags: [...selectedTags],
 			q: searchTerm
 		};
+	}
+
+	$effect(() => {
+		const filters = currentUrlFilters();
 		if (isLoading) return;
 		const timer = setTimeout(
 			() =>
 				untrack(() => {
-					const query = expenseUrlFiltersQuery(filters, page.url.searchParams);
-					if (query === page.url.search) return;
+					const query = expenseUrlFiltersQuery(filters, new URLSearchParams(location.search));
+					if (query === location.search) return;
 					// eslint-disable-next-line svelte/no-navigation-without-resolve -- the path is resolved; only the query string is added
-					goto(`${resolve(routes.expenses)}${query}${page.url.hash}`, {
+					goto(`${resolve(routes.expenses)}${query}${location.hash}`, {
 						state: page.state,
 						shallow: true,
 						replace: true
@@ -198,6 +206,20 @@
 			URL_WRITE_DELAY_MS
 		);
 		return () => clearTimeout(timer);
+	});
+
+	afterNavigate(({ type, to }) => {
+		if (type === 'enter' || !to) return;
+		const next = parseExpenseUrlFilters(to.url.searchParams);
+		if (next.vehicleId && !vehicles.some(v => v.id === next.vehicleId)) next.vehicleId = undefined;
+		if (expenseUrlFiltersQuery(next) === expenseUrlFiltersQuery(currentUrlFilters())) return;
+		searchTerm = next.q;
+		selectedVehicleId = next.vehicleId;
+		startDate = next.startDate;
+		endDate = next.endDate;
+		selectedTags = next.tags;
+		categoryFilter = next.category ?? '';
+		expenseListReload.reloadNow();
 	});
 
 	onMount(loadInitial);

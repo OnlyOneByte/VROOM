@@ -4,14 +4,20 @@ import type { UserSettings, Vehicle } from '#lib/types/index.ts';
 
 const nav = vi.hoisted(() => ({
 	page: { url: new URL('http://localhost/expenses'), state: {} },
-	replaceState: vi.fn()
+	replaceState: vi.fn(),
+	afterNavigate: [] as Array<(navigation: { type: string; to: { url: URL } | null }) => void>
 }));
 
 vi.mock('$app/navigation', () => ({
 	goto: (url: string, opts: { shallow?: boolean; replace?: boolean; state?: unknown }) => {
-		if (opts.shallow && opts.replace) nav.replaceState(url, opts.state);
-		nav.page.url = new URL(url, nav.page.url);
+		if (opts.shallow && opts.replace) {
+			nav.replaceState(url, opts.state);
+			history.replaceState(null, '', url);
+		}
 		return Promise.resolve();
+	},
+	afterNavigate: (callback: (typeof nav.afterNavigate)[number]) => {
+		nav.afterNavigate.push(callback);
 	}
 }));
 vi.mock('$app/state', () => ({
@@ -70,7 +76,14 @@ const VEHICLE = {
 
 function openAt(query: string) {
 	nav.page.url = new URL(`http://localhost/expenses${query}`);
+	history.replaceState(null, '', `/expenses${query}`);
 	render(Page);
+}
+
+function navigateTo(query: string) {
+	const url = new URL(`http://localhost/expenses${query}`);
+	history.pushState(null, '', `/expenses${query}`);
+	for (const callback of nav.afterNavigate) callback({ type: 'link', to: { url } });
 }
 
 function lastListParams(): Record<string, unknown> {
@@ -80,6 +93,7 @@ function lastListParams(): Record<string, unknown> {
 beforeEach(() => {
 	settingsStore.reset();
 	vi.clearAllMocks();
+	nav.afterNavigate = [];
 	tableProps = {};
 	onlineStatus.current = true;
 	offlineExpenseQueue.current = [];
@@ -156,5 +170,42 @@ describe('/expenses filters in the URL', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: /Clear Filters/ }));
 		await waitFor(() => expect(nav.replaceState).toHaveBeenLastCalledWith('/expenses', {}));
+	});
+
+	test('returning to the filters the page opened with still rewrites the URL', async () => {
+		openAt('');
+		const input = await screen.findByRole('textbox', { name: 'Search expenses and vehicles' });
+
+		await fireEvent.input(input, { target: { value: 'oil' } });
+		await waitFor(() => expect(location.search).toBe('?q=oil'));
+		await fireEvent.click(screen.getByRole('button', { name: /Clear Filters/ }));
+
+		await waitFor(() => expect(nav.replaceState).toHaveBeenLastCalledWith('/expenses', {}));
+		expect(location.search).toBe('');
+	});
+
+	test('switching a filter away and back writes the URL both times', async () => {
+		openAt('?category=fuel');
+		await waitFor(() => expect(tableProps['onCategoryChange']).toBeTypeOf('function'));
+		const setCategory = tableProps['onCategoryChange'] as (category: string) => void;
+
+		setCategory('maintenance');
+		await waitFor(() => expect(location.search).toBe('?category=maintenance'));
+		setCategory('fuel');
+
+		await waitFor(() => expect(location.search).toBe('?category=fuel'));
+	});
+
+	test('following a link to /expenses while on the page applies its filters', async () => {
+		openAt('?q=oil&category=fuel');
+		await screen.findByTestId('active-filter-summary');
+
+		navigateTo('?vehicleId=v1');
+
+		await waitFor(() => expect(getAllExpenses).toHaveBeenCalledTimes(2));
+		expect(lastListParams()).toMatchObject({ vehicleId: 'v1' });
+		expect(lastListParams()).not.toHaveProperty('search');
+		expect(lastListParams()).not.toHaveProperty('category');
+		expect(screen.getByRole('textbox', { name: 'Search expenses and vehicles' })).toHaveValue('');
 	});
 });
