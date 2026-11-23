@@ -111,8 +111,12 @@ function createAuthStore() {
 			isLoading = false;
 		},
 
-		async initialize() {
-			if (!user) isLoading = true;
+		async initialize({ fromCache = false }: { fromCache?: boolean } = {}) {
+			if (!user) {
+				user = fromCache ? lastKnownUser() : null;
+				isAuthenticated = user !== null;
+				isLoading = user === null;
+			}
 			try {
 				const result = await apiClient.get<{
 					user: User;

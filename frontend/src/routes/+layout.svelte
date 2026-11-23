@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import { handleRouteProtection } from '#lib/utils/auth.js';
+	import { handleRouteProtection, isPublicRoute } from '#lib/utils/auth.js';
 	import Navigation from '#lib/components/layout/Navigation.svelte';
 	import { Toaster } from '#lib/components/ui/sonner/index.ts';
 	import { toast } from 'svelte-sonner';
@@ -60,7 +60,7 @@
 
 	onMount(async () => {
 		themeStore.initialize();
-		authStore.initialize();
+		authStore.initialize({ fromCache: !isPublicRoute(page.url.pathname) });
 
 		if (pwaInfo) {
 			const pwaRegister: typeof import('virtual:pwa-register') =
@@ -149,7 +149,7 @@
 	{@html webManifestLink}
 </svelte:head>
 
-{#if authState.isLoading}
+{#if authState.isLoading && !isPublicRoute(currentPath)}
 	<div class="min-h-screen bg-background flex items-center justify-center">
 		<div class="text-center">
 			<BrandMark class="h-14 w-14 mx-auto mb-4" />
