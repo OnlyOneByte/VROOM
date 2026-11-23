@@ -41,6 +41,17 @@ async function tripWithOdometerPhoto(): Promise<string> {
   return trip.data.id;
 }
 
+async function addManualReading(tripId: string, odometer: number): Promise<void> {
+  const { vehicle_id } = ctx.sqlite
+    .query('SELECT vehicle_id FROM trips WHERE id = ?')
+    .get(tripId) as { vehicle_id: string };
+  const res = await ctx.authed('POST', `/api/v1/odometer/${vehicle_id}`, {
+    odometer,
+    recordedAt: '2026-05-01T12:00:00.000Z',
+  });
+  expect(res.status).toBe(201);
+}
+
 function photoCount(): number {
   return (ctx.sqlite.query('SELECT COUNT(*) AS n FROM photos').get() as { n: number }).n;
 }
@@ -54,8 +65,9 @@ function failTwiceThenRun() {
 }
 
 describe('a trip photo cleanup that fails briefly is retried', () => {
-  test('editing the trip end odometer still removes the replaced entry photo', async () => {
+  test('moving the trip end onto an existing reading still removes the replaced entry photo', async () => {
     const tripId = await tripWithOdometerPhoto();
+    await addManualReading(tripId, 650);
     const spy = failTwiceThenRun();
     try {
       const res = await ctx.authed('PUT', `/api/v1/trips/${tripId}`, { endOdometer: 650 });
@@ -84,6 +96,7 @@ describe('a trip photo cleanup that fails briefly is retried', () => {
     const tripId = await tripWithOdometerPhoto();
     const entryId = (ctx.sqlite.query('SELECT id FROM odometer_entries').get() as { id: string })
       .id;
+    await addManualReading(tripId, 700);
     const spy = spyOn(photoService, 'deletePhotosForEntities').mockRejectedValue(
       new Error('storage down')
     );

@@ -39,6 +39,17 @@ async function tripWithOdometerPhoto(): Promise<{ tripId: string; entryId: strin
   return { tripId: trip.data.id, entryId: entry.id };
 }
 
+async function addManualReading(tripId: string, odometer: number): Promise<void> {
+  const { vehicle_id } = ctx.sqlite
+    .query('SELECT vehicle_id FROM trips WHERE id = ?')
+    .get(tripId) as { vehicle_id: string };
+  const res = await ctx.authed('POST', `/api/v1/odometer/${vehicle_id}`, {
+    odometer,
+    recordedAt: '2026-05-01T12:00:00.000Z',
+  });
+  expect(res.status).toBe(201);
+}
+
 function photoCount(): number {
   return (ctx.sqlite.query('SELECT COUNT(*) AS n FROM photos').get() as { n: number }).n;
 }
@@ -52,14 +63,56 @@ describe("a trip's linked odometer entry takes its photos with it", () => {
     expect(photoCount()).toBe(0);
   });
 
-  test('editing the trip end odometer deletes the replaced entry photo', async () => {
+  test.each([
+    ['end odometer', { endOdometer: 650 }, 650, '2026-05-01T00:00:00.000Z'],
+    ['date', { tripDate: '2026-05-03T00:00:00.000Z' }, 620, '2026-05-03T00:00:00.000Z'],
+  ])(
+    'editing the trip %s keeps the entry, its note and its photo',
+    async (_, body, odometer, recordedAt) => {
+      const { tripId, entryId } = await tripWithOdometerPhoto();
+      const noteRes = await ctx.authed('PUT', `/api/v1/odometer/${entryId}`, {
+        note: 'Dash photo',
+      });
+      expect(noteRes.status).toBe(200);
+
+      const res = await ctx.authed('PUT', `/api/v1/trips/${tripId}`, body);
+
+      expect(res.status).toBeLessThan(300);
+      const entries = ctx.sqlite
+        .query('SELECT id, odometer, recorded_at, note, source_trip_id FROM odometer_entries')
+        .all() as {
+        id: string;
+        odometer: number;
+        recorded_at: number;
+        note: string;
+        source_trip_id: string;
+      }[];
+      expect(entries).toEqual([
+        {
+          id: entryId,
+          odometer,
+          recorded_at: new Date(recordedAt).getTime() / 1000,
+          note: 'Dash photo',
+          source_trip_id: tripId,
+        },
+      ]);
+      expect(photoCount()).toBe(1);
+    }
+  );
+
+  test('moving the trip end onto an existing reading deletes the replaced entry photo', async () => {
     const { tripId, entryId } = await tripWithOdometerPhoto();
+    await addManualReading(tripId, 650);
+
     const res = await ctx.authed('PUT', `/api/v1/trips/${tripId}`, { endOdometer: 650 });
+
     expect(res.status).toBeLessThan(300);
-    const ids = (ctx.sqlite.query('SELECT id FROM odometer_entries').all() as { id: string }[]).map(
-      (r) => r.id
-    );
-    expect(ids).not.toContain(entryId);
+    const entries = ctx.sqlite.query('SELECT id, odometer FROM odometer_entries').all() as {
+      id: string;
+      odometer: number;
+    }[];
+    expect(entries.map((e) => e.odometer)).toEqual([650]);
+    expect(entries.map((e) => e.id)).not.toContain(entryId);
     expect(photoCount()).toBe(0);
   });
 
@@ -72,8 +125,9 @@ describe("a trip's linked odometer entry takes its photos with it", () => {
 });
 
 describe('a failed photo cleanup does not block the trip edit', () => {
-  test('the replacement odometer entry is still created when deleting the old photos throws', async () => {
+  test('the trip still moves onto an existing reading when deleting the old photos throws', async () => {
     const { tripId, entryId } = await tripWithOdometerPhoto();
+    await addManualReading(tripId, 700);
     const photoService = await import('../../photos/photo-service');
     const spy = spyOn(photoService, 'deletePhotosForEntities').mockRejectedValue(
       new Error('storage down')
