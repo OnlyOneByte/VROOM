@@ -23,6 +23,8 @@ const PROVIDER_RESPONSE_KEYS = [
   'status',
   'config',
   'lastSyncAt',
+  'lastErrorCode',
+  'lastCheckedAt',
   'createdAt',
 ].sort();
 

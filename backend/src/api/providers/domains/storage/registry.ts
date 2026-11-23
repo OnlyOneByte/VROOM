@@ -313,8 +313,8 @@ export class StorageProviderRegistry {
       throw new NotFoundError('Storage provider');
     }
 
-    if (providerRow.status !== 'active') {
-      throw new ValidationError('Storage provider is not active');
+    if (providerRow.status === 'disabled') {
+      throw new ValidationError('Storage provider is turned off');
     }
 
     const provider = this.createProviderInstance(providerRow);
@@ -336,7 +336,7 @@ export class StorageProviderRegistry {
       if (!categorySetting?.enabled) continue;
 
       const providerRow = await this.findOwnedProvider(providerId, userId);
-      if (providerRow?.status !== 'active') continue;
+      if (!providerRow || providerRow.status === 'disabled') continue;
 
       const provider = this.createProviderInstance(providerRow);
       const folderPath = this.resolveFolderPath(providerRow, storageConfig, providerId, category);

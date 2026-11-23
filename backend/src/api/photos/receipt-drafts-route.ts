@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { getDb } from '../../db/connection';
 import type { UserProvider } from '../../db/schema';
@@ -29,7 +29,7 @@ async function findEnabledProvider(
       and(
         eq(userProviders.userId, userId),
         eq(userProviders.domain, domain),
-        eq(userProviders.status, 'active')
+        ne(userProviders.status, 'disabled')
       )
     );
   return rows[0] ?? null;
