@@ -111,7 +111,10 @@
 					<Tag class="h-4 w-4 text-muted-foreground flex-shrink-0" />
 					<input
 						bind:value={tagSearchTerm}
-						oninput={() => (activeIndex = -1)}
+						oninput={() => {
+							tagSearchFocused = true;
+							activeIndex = -1;
+						}}
 						onkeydown={handleTagKeydown}
 						onfocus={() => (tagSearchFocused = true)}
 						placeholder={selectedTags.length > 0 ? 'Add more tags...' : 'Search and add tags...'}
@@ -144,7 +147,7 @@
 						aria-selected={i === activeIndex}
 						onmousedown={e => e.preventDefault()}
 						onclick={() => addTag(suggestion)}
-						class="flex w-full items-center gap-2 px-3 py-2 hover:bg-accent text-sm aria-selected:bg-accent"
+						class="flex w-full items-center gap-2 px-3 py-2 hover:bg-accent text-sm aria-selected:bg-accent aria-selected:text-accent-foreground"
 					>
 						<Tag class="h-3.5 w-3.5 text-muted-foreground" />
 						{suggestion}

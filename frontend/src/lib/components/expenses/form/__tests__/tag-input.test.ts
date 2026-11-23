@@ -227,6 +227,30 @@ describe('TagInput: keyboard', () => {
 		expect(suggestionButtons()).toEqual([]);
 		expect(input).toHaveAttribute('aria-expanded', 'false');
 	});
+
+	test('Escape stays inside the field while the list is open, and passes on once it is closed', async () => {
+		const input = renderTagInput();
+		const pageKeydown = vi.fn();
+		document.addEventListener('keydown', pageKeydown);
+		await fireEvent.focus(input);
+
+		await fireEvent.keyDown(input, { key: 'Escape' });
+		expect(pageKeydown).not.toHaveBeenCalled();
+
+		await fireEvent.keyDown(input, { key: 'Escape' });
+		expect(pageKeydown).toHaveBeenCalledTimes(1);
+		document.removeEventListener('keydown', pageKeydown);
+	});
+
+	test('typing after Escape opens the list again', async () => {
+		const input = renderTagInput();
+		await fireEvent.focus(input);
+		await fireEvent.keyDown(input, { key: 'Escape' });
+
+		await fireEvent.input(input, { target: { value: 'par' } });
+
+		expect(suggestionButtons()).toEqual(['parking']);
+	});
 });
 
 describe('TagInput: errors', () => {

@@ -107,6 +107,40 @@ describe('ExpenseTagFilter: keyboard', () => {
 		expect(onTagsChange).toHaveBeenCalledWith(['parking']);
 	});
 
+	test('ArrowUp wraps to the last suggestion', async () => {
+		renderTagFilter();
+		await fireEvent.focus(tagInput());
+
+		await fireEvent.keyDown(tagInput(), { key: 'ArrowUp' });
+
+		expect(screen.getByRole('option', { name: 'tolls' })).toHaveAttribute('aria-selected', 'true');
+	});
+
+	test('Escape stays inside the field while the list is open, and passes on once it is closed', async () => {
+		renderTagFilter();
+		const pageKeydown = vi.fn();
+		document.addEventListener('keydown', pageKeydown);
+		await fireEvent.focus(tagInput());
+
+		await fireEvent.keyDown(tagInput(), { key: 'Escape' });
+		expect(pageKeydown).not.toHaveBeenCalled();
+		expect(tagInput()).toHaveAttribute('aria-expanded', 'false');
+
+		await fireEvent.keyDown(tagInput(), { key: 'Escape' });
+		expect(pageKeydown).toHaveBeenCalledTimes(1);
+		document.removeEventListener('keydown', pageKeydown);
+	});
+
+	test('typing after Escape opens the list again, so Enter never adds a hidden tag', async () => {
+		renderTagFilter();
+		await fireEvent.focus(tagInput());
+		await fireEvent.keyDown(tagInput(), { key: 'Escape' });
+
+		await fireEvent.input(tagInput(), { target: { value: 'ol' } });
+
+		expect(suggestionButtons()).toEqual(['tolls']);
+	});
+
 	test('pressing a suggestion keeps focus in the box', async () => {
 		renderTagFilter();
 		await fireEvent.focus(tagInput());

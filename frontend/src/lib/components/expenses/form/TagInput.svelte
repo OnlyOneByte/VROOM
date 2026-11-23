@@ -118,7 +118,10 @@
 				id="tags"
 				type="text"
 				bind:value={tagInput}
-				oninput={() => (activeIndex = -1)}
+				oninput={() => {
+					showSuggestions = true;
+					activeIndex = -1;
+				}}
 				onkeydown={handleKeydown}
 				onfocus={() => (showSuggestions = true)}
 				placeholder={tags.length === 0 ? 'Add tags (e.g., fuel, maintenance)' : ''}
@@ -150,7 +153,7 @@
 					aria-selected={i === activeIndex}
 					onmousedown={e => e.preventDefault()}
 					onclick={() => addTag(suggestion)}
-					class="flex w-full min-h-10 items-center text-left px-3 py-2 hover:bg-accent text-sm sm:min-h-0 aria-selected:bg-accent"
+					class="flex w-full min-h-10 items-center text-left px-3 py-2 hover:bg-accent text-sm sm:min-h-0 aria-selected:bg-accent aria-selected:text-accent-foreground"
 				>
 					{suggestion}
 				</button>
