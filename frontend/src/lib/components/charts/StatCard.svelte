@@ -12,7 +12,6 @@
 		| 'destructive'
 		| 'muted';
 
-	/** A whole-percent change against an earlier period, and which direction is the good one. */
 	export interface StatCardChange {
 		percent: number;
 		goodWhen: 'up' | 'down';
@@ -196,9 +195,8 @@
 						: change.percent > 0 === (change.goodWhen === 'up')
 							? 'text-chart-2'
 							: 'text-destructive'}
-				<!-- Tinted percentage text fails WCAG AA; only the icon takes the direction colour. -->
-				<p class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-					<ChangeIcon class="h-3 w-3 shrink-0 {tone}" aria-hidden="true" />
+				<p class="mt-1 flex items-start gap-1 text-xs text-muted-foreground">
+					<ChangeIcon class="mt-0.5 h-3 w-3 shrink-0 {tone}" aria-hidden="true" />
 					<span>
 						<span class="font-medium text-foreground">
 							{change.percent > 0 ? '+' : ''}{change.percent}%
