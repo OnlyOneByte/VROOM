@@ -578,9 +578,11 @@
 {:else if vehicleLoadError}
 	<LoadErrorCard title="Couldn't load this vehicle" message={vehicleLoadError} onRetry={loadPage} />
 {:else if vehicle}
-	<div class="space-y-6 pb-24">
-		<div class="flex items-start justify-between gap-4">
-			<VehicleHeader {vehicle} displayName={vehicleDisplayName} {coverPhotoUrl} />
+	<div class="space-y-6 pb-24 short:pb-0">
+		<div class="flex flex-wrap items-start justify-between gap-4">
+			<div class="flex-1">
+				<VehicleHeader {vehicle} displayName={vehicleDisplayName} {coverPhotoUrl} />
+			</div>
 			<div class="flex shrink-0 items-center gap-2">
 				{#if isOwner && !showingCachedVehicle}
 					<Button
@@ -595,9 +597,14 @@
 					</Button>
 				{/if}
 				{#if showAddExpenseAction}
-					<Button size="lg" class="hidden lg:inline-flex" href={addExpenseHref}>
-						<Plus class="mr-2 h-4 w-4" />
-						{COMMON_MESSAGES.ADD_EXPENSE}
+					<Button
+						size="lg"
+						class="hidden lg:inline-flex short:inline-flex max-sm:w-10 max-sm:has-[>svg]:px-0"
+						href={addExpenseHref}
+						aria-label={COMMON_MESSAGES.ADD_EXPENSE}
+					>
+						<Plus class="h-4 w-4 sm:mr-2" aria-hidden="true" />
+						<span class="hidden sm:inline">{COMMON_MESSAGES.ADD_EXPENSE}</span>
 					</Button>
 				{/if}
 			</div>

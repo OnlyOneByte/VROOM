@@ -27,6 +27,10 @@ describe('pages with a floating action button leave room for it', () => {
 		}
 	);
 
+	test.each(PAGES_WITH_FAB)('/%s drops the FAB clearance on a short viewport', page => {
+		expect(pageSource(page)).toMatch(/<div class="[^"]*\bpb-24 short:pb-0\b[^"]*">/);
+	});
+
 	test('the FAB is 56px tall on the primary token, 16px off the bottom on mobile and 32px from sm: up', () => {
 		const fab = readFileSync(
 			join(ROUTES, '..', 'lib', 'components', 'common', 'floating-action-button.svelte'),
@@ -48,18 +52,21 @@ describe('the FAB is the mobile primary only', () => {
 		expect(fab).toMatch(/\blg:hidden\b/);
 	});
 
-	test.each(PAGES_WITH_FAB)('/%s shows the same action as a header button from lg: up', page => {
-		const src = pageSource(page);
-		const labels = [...src.matchAll(/<FloatingActionButton[^>]*\blabel=\{?["']?([^"'}]+)/g)].map(
-			match => match[1] ?? ''
-		);
-		expect(labels.length).toBeGreaterThan(0);
-		expect(src).toMatch(/class="hidden lg:inline-flex"/);
-		for (const label of labels) {
-			const headerAction = new RegExp(
-				`class="hidden lg:inline-flex"[^>]*>\\s*<Plus[^>]*/>\\s*\\{?${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
+	test.each(PAGES_WITH_FAB)(
+		'/%s shows the same action as a header button from lg: up and on a short viewport',
+		page => {
+			const src = pageSource(page);
+			const labels = [...src.matchAll(/<FloatingActionButton[^>]*\blabel=\{?["']?([^"'}]+)/g)].map(
+				match => match[1] ?? ''
 			);
-			expect(src, `${page}: no lg header button for "${label}"`).toMatch(headerAction);
+			expect(labels.length).toBeGreaterThan(0);
+			expect(src).toMatch(/class="hidden lg:inline-flex short:inline-flex[^"]*"/);
+			for (const label of labels) {
+				const headerAction = new RegExp(
+					`class="hidden lg:inline-flex short:inline-flex[^"]*"[^>]*>\\s*<Plus[^>]*/>\\s*(?:<span[^>]*>)?\\{?${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
+				);
+				expect(src, `${page}: no lg/short header button for "${label}"`).toMatch(headerAction);
+			}
 		}
-	});
+	);
 });

@@ -116,11 +116,11 @@
 	<meta name="description" content="Track and manage your vehicle trips" />
 </svelte:head>
 
-<div class="space-y-6 pb-24">
+<div class="space-y-6 pb-24 short:pb-0">
 	<PageHeader title="Trips" description="Track mileage and trips across your vehicles">
 		{#snippet actions()}
 			{#if !isLoading && !loadError && trips.length > 0 && vehicles.length > 0}
-				<Button size="lg" class="hidden lg:inline-flex" onclick={openCreate}>
+				<Button size="lg" class="hidden lg:inline-flex short:inline-flex" onclick={openCreate}>
 					<Plus class="mr-2 h-4 w-4" />
 					Log Trip
 				</Button>

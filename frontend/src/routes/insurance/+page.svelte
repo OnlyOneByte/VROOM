@@ -79,11 +79,15 @@
 		<LoadErrorCard title="Couldn't load insurance" message={error} onRetry={loadData} />
 	</div>
 {:else}
-	<div class="space-y-6 pb-24">
+	<div class="space-y-6 pb-24 short:pb-0">
 		<PageHeader title="Insurance" description="Manage your insurance policies across all vehicles">
 			{#snippet actions()}
 				{#if policies.length > 0 && vehicles.length > 0}
-					<Button size="lg" class="hidden lg:inline-flex" onclick={handleAddPolicy}>
+					<Button
+						size="lg"
+						class="hidden lg:inline-flex short:inline-flex"
+						onclick={handleAddPolicy}
+					>
 						<Plus class="mr-2 h-4 w-4" />
 						Add Policy
 					</Button>
