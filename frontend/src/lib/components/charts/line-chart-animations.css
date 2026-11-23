@@ -21,7 +21,7 @@
 		clip-path: inset(0 100% 0 0);
 	}
 
-	.chart-line-animate-ready circle {
+	.chart-line-animate-ready circle:not(.lc-highlight-point) {
 		opacity: 0;
 	}
 
@@ -29,7 +29,7 @@
 		animation: line-reveal 400ms ease-out forwards;
 	}
 
-	.chart-line-animate-ready.chart-line-animated circle {
+	.chart-line-animate-ready.chart-line-animated circle:not(.lc-highlight-point) {
 		animation: points-fade-in 150ms ease-out forwards;
 		animation-delay: 250ms;
 	}

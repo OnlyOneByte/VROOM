@@ -105,6 +105,13 @@ describe.each(CSS_FILES)('%s', file => {
 	});
 });
 
+test('the hover highlight point never waits for the entry fade', () => {
+	const css = readFileSync(join(HERE, '..', 'line-chart-animations.css'), 'utf8');
+	const circleSelectors = [...css.matchAll(/([^{}]*circle[^{}]*)\{/g)].map(m => m[1]!.trim());
+	expect(circleSelectors.length).toBeGreaterThan(0);
+	for (const selector of circleSelectors) expect(selector).toContain(':not(.lc-highlight-point)');
+});
+
 describe('AppPieChart entry motion', () => {
 	test(`tweens for at most ${MAX_ENTRY_MS} ms`, async () => {
 		const pieMotion = (await mountPie()) as { type: string; duration: number };
