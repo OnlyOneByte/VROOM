@@ -51,6 +51,10 @@ import Page from '../+page.svelte';
 
 const OWNED = { id: 'v1', make: 'Toyota', model: 'Camry', year: 2020 } as Vehicle;
 
+function controls(name: string) {
+	return [...screen.queryAllByRole('button', { name }), ...screen.queryAllByRole('link', { name })];
+}
+
 function steps(): string[] {
 	const list = screen.getByRole('list', { name: 'Getting started' });
 	return [...list.querySelectorAll('li')].map(li =>
@@ -74,25 +78,49 @@ describe('dashboard getting started', () => {
 			'2 Log an expense or fill-up',
 			'3 See what it costs'
 		]);
-		expect(screen.getByRole('link', { name: 'Add a vehicle' })).toHaveAttribute(
-			'href',
-			'/vehicles/new'
-		);
+		expect(
+			screen.getByRole('list', { name: 'Getting started' }).querySelector('[aria-current="step"]')
+				?.textContent
+		).toContain('Add a vehicle');
+		expect(screen.queryByRole('link', { name: 'Add a vehicle' })).toBeNull();
+		expect(controls('Add Vehicle')).toHaveLength(1);
 		expect(screen.queryByText('Total Vehicles')).toBeNull();
 		expect(screen.queryByRole('heading', { name: 'Spending' })).toBeNull();
 	});
 
-	test('with a vehicle but no expenses, step 1 is ticked and the card asks for an expense', async () => {
+	test('with a vehicle but no expenses, step 1 is ticked and Log Fill-up stays the only action', async () => {
 		getVehicles.mockResolvedValue([OWNED]);
 		render(Page);
 
 		await screen.findByRole('heading', { name: 'Log your first expense' });
 		expect(steps()[0]).toBe('Add a vehicle (done)');
-		expect(screen.queryByRole('link', { name: 'Add a vehicle' })).toBeNull();
-		expect(screen.getByRole('link', { name: 'Add Expense' })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: 'See what it costs' })).toHaveAttribute(
 			'href',
-			'/expenses/new'
+			'/analytics'
 		);
+		expect(controls('Add Expense')).toHaveLength(0);
+		expect(controls('Log Fill-up').length).toBeGreaterThan(0);
+		expect(screen.queryByText('Total Expenses')).toBeNull();
+		expect(screen.queryByRole('heading', { name: 'Spending' })).toBeNull();
+	});
+
+	test('vehicles shared with me never show the checklist', async () => {
+		getVehicles.mockResolvedValue([{ ...OWNED, sharedAccess: { sharedBy: 'Sam' } }]);
+		render(Page);
+
+		await screen.findByText('Overview of the vehicles shared with you');
+		expect(screen.queryByRole('list', { name: 'Getting started' })).toBeNull();
+	});
+
+	test('no checklist while loading or after a failed load', async () => {
+		let fail: (error: Error) => void = () => {};
+		getVehicles.mockReturnValue(new Promise((_, reject) => (fail = reject)));
+		render(Page);
+		expect(screen.queryByRole('list', { name: 'Getting started' })).toBeNull();
+
+		fail(new Error('offline'));
+		await screen.findByText("Couldn't load the dashboard");
+		expect(screen.queryByRole('list', { name: 'Getting started' })).toBeNull();
 	});
 
 	test('once an expense exists the checklist is gone', async () => {

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { TrendingUp, ChartPie, CircleAlert, Car, Plus, Check } from '@lucide/svelte';
+	import { TrendingUp, ChartPie, CircleAlert, Car, Plus, Check, ListChecks } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
@@ -98,11 +98,11 @@
 	let showFab = $derived(hasLoaded && !loadError);
 	let canLogFillup = $derived(showFab && ownedVehicles.length > 0);
 	let noVehicles = $derived(hasLoaded && !loadError && vehicles.length === 0);
-	let showChecklist = $derived(
-		noVehicles || (hasLoaded && !loadError && (allTimeSummary?.expenseCount ?? 0) === 0)
+	let needsFirstExpense = $derived(
+		hasLoaded && !loadError && ownedVehicles.length > 0 && (allTimeSummary?.expenseCount ?? 0) === 0
 	);
 	let onboardingSteps = $derived([
-		{ label: 'Add a vehicle', route: routes.vehicleNew, done: vehicles.length > 0 },
+		{ label: 'Add a vehicle', route: routes.vehicleNew, done: ownedVehicles.length > 0 },
 		{ label: 'Log an expense or fill-up', route: routes.expenseNew, done: false },
 		{ label: 'See what it costs', route: routes.analytics, done: false }
 	]);
@@ -118,7 +118,8 @@
 	let pageDescription = $derived.by(() => {
 		const count = stats.totalVehicles;
 		if (loadError || (isLoading && count === 0)) return 'Overview of your vehicles';
-		if (count === 0) return 'Welcome! Get started by adding your first vehicle';
+		if (vehicles.length === 0) return 'Welcome to VROOM';
+		if (count === 0) return 'Overview of the vehicles shared with you';
 		return `Overview of your ${count} vehicle${count !== 1 ? 's' : ''}`;
 	});
 
@@ -279,18 +280,18 @@
 {#snippet checklist()}
 	<EmptyState>
 		{#snippet icon()}
-			<Car class="mb-4 h-12 w-12 text-muted-foreground" />
+			<ListChecks class="mb-4 h-12 w-12 text-muted-foreground" />
 		{/snippet}
 		{#snippet title()}
-			{vehicles.length === 0 ? 'Add your first vehicle' : 'Log your first expense'}
+			{ownedVehicles.length === 0 ? 'Add your first vehicle' : 'Log your first expense'}
 		{/snippet}
 		{#snippet description()}
 			Three steps to see what your vehicles really cost.
 		{/snippet}
 		{#snippet action()}
-			<ol class="mb-6 w-full max-w-sm space-y-3" aria-label="Getting started">
+			<ol role="list" class="w-full max-w-sm space-y-3" aria-label="Getting started">
 				{#each onboardingSteps as step, i (step.label)}
-					<li class="flex items-center gap-3">
+					<li class="flex items-center gap-3" aria-current={i === currentStep ? 'step' : undefined}>
 						<span
 							class="flex size-7 shrink-0 items-center justify-center rounded-full border text-sm font-medium {step.done
 								? 'border-primary bg-primary text-primary-foreground'
@@ -304,12 +305,12 @@
 						{#if step.done}
 							<span class="text-sm text-muted-foreground line-through">{step.label}</span>
 							<span class="sr-only">(done)</span>
+						{:else if i === currentStep}
+							<span class="text-sm font-medium text-foreground">{step.label}</span>
 						{:else}
 							<a
 								href={resolve(step.route)}
-								class="text-sm underline-offset-4 hover:underline {i === currentStep
-									? 'font-medium text-foreground'
-									: 'text-muted-foreground'}"
+								class="text-sm text-muted-foreground underline-offset-4 hover:underline"
 							>
 								{step.label}
 							</a>
@@ -317,15 +318,10 @@
 					</li>
 				{/each}
 			</ol>
-			{#if vehicles.length === 0}
-				<Button size="lg" href={resolve(routes.vehicleNew)}>
+			{#if ownedVehicles.length === 0}
+				<Button size="lg" class="mt-6" href={resolve(routes.vehicleNew)}>
 					<Plus class="mr-2 h-4 w-4" />
 					Add Vehicle
-				</Button>
-			{:else}
-				<Button size="lg" href={resolve(routes.expenseNew)}>
-					<Plus class="mr-2 h-4 w-4" />
-					Add Expense
 				</Button>
 			{/if}
 		{/snippet}
@@ -407,11 +403,17 @@
 		{@render checklist()}
 
 		<SharedWithMeCard onAccepted={loadDashboardData} />
-	{:else}
-		{#if showChecklist}
-			{@render checklist()}
-		{/if}
+	{:else if needsFirstExpense}
+		{@render checklist()}
 
+		<SharedWithMeCard onAccepted={loadDashboardData} />
+
+		<VehicleCarousel
+			vehicles={vehicleOverviews}
+			isLoading={false}
+			addVehicleHref={resolve(routes.vehicleNew)}
+		/>
+	{:else}
 		<DashboardStatsCards
 			totalVehicles={stats.totalVehicles}
 			totalExpenses={stats.totalExpenses}

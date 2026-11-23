@@ -43,7 +43,7 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 		getExpenseSummary: () =>
 			Promise.resolve({
 				totalAmount: 0,
-				expenseCount: 0,
+				expenseCount: 1,
 				recentAmount: 0,
 				monthlyAverage: 0,
 				categoryBreakdown: [],

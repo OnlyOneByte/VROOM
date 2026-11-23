@@ -53,12 +53,10 @@ describe('dashboard description while loading', () => {
 		render(Page);
 
 		expect(screen.getByText('Overview of your vehicles')).toBeInTheDocument();
-		expect(screen.queryByText(/Welcome!/)).toBeNull();
+		expect(screen.queryByText(/Welcome/)).toBeNull();
 
 		finish([]);
-		expect(
-			await screen.findByText('Welcome! Get started by adding your first vehicle')
-		).toBeInTheDocument();
+		expect(await screen.findByText('Welcome to VROOM')).toBeInTheDocument();
 	});
 
 	test.each([
@@ -84,6 +82,6 @@ describe('dashboard description while loading', () => {
 
 		expect(await screen.findByText("Couldn't load the dashboard")).toBeInTheDocument();
 		expect(screen.getByText('Overview of your vehicles')).toBeInTheDocument();
-		expect(screen.queryByText(/Welcome!/)).toBeNull();
+		expect(screen.queryByText(/Welcome/)).toBeNull();
 	});
 });
