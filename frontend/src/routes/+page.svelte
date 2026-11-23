@@ -232,10 +232,16 @@
 				<div
 					class="flex flex-col items-center gap-2 text-sm text-muted-foreground sm:flex-row sm:gap-4"
 				>
-					<a href={resolve(routes.privacyPolicy)} class="hover:text-foreground transition-colors">
+					<a
+						href={resolve(routes.privacyPolicy)}
+						class="inline-flex min-h-10 items-center transition-colors hover:text-foreground sm:min-h-0"
+					>
 						Privacy Policy
 					</a>
-					<a href={resolve(routes.termsOfService)} class="hover:text-foreground transition-colors">
+					<a
+						href={resolve(routes.termsOfService)}
+						class="inline-flex min-h-10 items-center transition-colors hover:text-foreground sm:min-h-0"
+					>
 						Terms of Service
 					</a>
 					<span>Open source. Self-hostable. Yours.</span>

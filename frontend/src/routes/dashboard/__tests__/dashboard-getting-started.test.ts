@@ -17,6 +17,10 @@ vi.mock('#lib/components/dashboard/SharedWithMeCard.svelte', () => ({ default: (
 
 const getVehicles = vi.fn();
 const summary = vi.hoisted(() => ({ expenseCount: 0 }));
+const reminders = vi.hoisted(() => ({
+	list: [] as unknown[],
+	recurring: { count: 0, monthlyTotal: 0 }
+}));
 vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: {
 		getVehicles: (...args: unknown[]) => getVehicles(...args),
@@ -42,8 +46,8 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 }));
 vi.mock('#lib/services/reminder-api.ts', () => ({
 	reminderApi: {
-		list: () => Promise.resolve([]),
-		getRecurringCost: () => Promise.resolve({ count: 0, monthlyTotal: 0 })
+		list: () => Promise.resolve(reminders.list),
+		getRecurringCost: () => Promise.resolve(reminders.recurring)
 	}
 }));
 
@@ -65,6 +69,8 @@ function steps(): string[] {
 beforeEach(() => {
 	getVehicles.mockReset();
 	summary.expenseCount = 0;
+	reminders.list = [];
+	reminders.recurring = { count: 0, monthlyTotal: 0 };
 });
 
 describe('dashboard getting started', () => {
@@ -102,6 +108,37 @@ describe('dashboard getting started', () => {
 		expect(controls('Log Fill-up').length).toBeGreaterThan(0);
 		expect(screen.queryByText('Total Expenses')).toBeNull();
 		expect(screen.queryByRole('heading', { name: 'Spending' })).toBeNull();
+	});
+
+	test('with a vehicle but no expenses, due reminders and recurring costs still show', async () => {
+		getVehicles.mockResolvedValue([OWNED]);
+		reminders.list = [
+			{
+				reminder: {
+					id: 'r1',
+					name: 'Oil change',
+					isActive: true,
+					nextDueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+					expenseAmount: 60
+				},
+				vehicleIds: ['v1']
+			}
+		];
+		reminders.recurring = { count: 1, monthlyTotal: 25 };
+		render(Page);
+
+		await screen.findByRole('heading', { name: 'Log your first expense' });
+		expect(await screen.findByText('Oil change')).toBeInTheDocument();
+		expect(screen.getByText('Recurring Costs')).toBeInTheDocument();
+	});
+
+	test('with a vehicle but no expenses and nothing due, there is no empty Coming Up row', async () => {
+		getVehicles.mockResolvedValue([OWNED]);
+		render(Page);
+
+		await screen.findByRole('heading', { name: 'Log your first expense' });
+		expect(screen.queryByTestId('coming-up-empty')).toBeNull();
+		expect(screen.queryByText('Recurring Costs')).toBeNull();
 	});
 
 	test('vehicles shared with me never show the checklist', async () => {
