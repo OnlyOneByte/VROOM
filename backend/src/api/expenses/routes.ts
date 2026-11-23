@@ -728,23 +728,29 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   const ownerId = await requireVehicleOwnerScope(expenseData.vehicleId, user.id, 'write');
   const createdBy = ownerId === user.id ? null : user.id;
 
-  await assertFinancingSourceValid(
-    expenseData.sourceType,
-    expenseData.sourceId,
-    expenseData.vehicleId
-  );
+  let createdExpense = expenseData.clientId
+    ? await expenseRepository.findByClientId(expenseData.clientId, ownerId)
+    : null;
 
-  validateFuelExpenseData(
-    expenseData.category,
-    expenseData.mileage,
-    expenseData.volume,
-    expenseData.fuelType
-  );
+  if (!createdExpense) {
+    await assertFinancingSourceValid(
+      expenseData.sourceType,
+      expenseData.sourceId,
+      expenseData.vehicleId
+    );
 
-  const createdExpense = await expenseRepository.createIdempotent(
-    { ...expenseData, userId: ownerId, createdBy },
-    await odometerCheck({ ...expenseData, timeZone })
-  );
+    validateFuelExpenseData(
+      expenseData.category,
+      expenseData.mileage,
+      expenseData.volume,
+      expenseData.fuelType
+    );
+
+    createdExpense = await expenseRepository.createIdempotent(
+      { ...expenseData, userId: ownerId, createdBy },
+      await odometerCheck({ ...expenseData, timeZone })
+    );
+  }
 
   if (createdExpense.mileage != null) {
     await reminderTriggerService.recheckMileageReminders(ownerId, createdExpense.vehicleId);
