@@ -33,7 +33,15 @@ export interface StorageProviderMeta {
 	defaultPhotoRootPath: string;
 	supportsSheets: boolean;
 	photoOnly: boolean;
+	defaultFolders: Record<PhotoCategory, string>;
 }
+
+const GENERIC_FOLDERS: Record<PhotoCategory, string> = {
+	vehicle_photos: 'vehicle-photos',
+	expense_receipts: 'receipts',
+	insurance_docs: 'insurance',
+	odometer_readings: 'odometer'
+};
 
 export const PROVIDER_META: Record<string, StorageProviderMeta> = {
 	'google-drive': {
@@ -43,7 +51,13 @@ export const PROVIDER_META: Record<string, StorageProviderMeta> = {
 		option: { label: 'Google Drive', description: 'Store photos in Google Drive' },
 		defaultPhotoRootPath: 'Photos',
 		supportsSheets: true,
-		photoOnly: false
+		photoOnly: false,
+		defaultFolders: {
+			vehicle_photos: 'Vehicle',
+			expense_receipts: 'Receipts',
+			insurance_docs: 'Insurance',
+			odometer_readings: 'Odometer'
+		}
 	},
 	'google-photos': {
 		label: 'Google Photos',
@@ -52,7 +66,8 @@ export const PROVIDER_META: Record<string, StorageProviderMeta> = {
 		option: null,
 		defaultPhotoRootPath: 'photos',
 		supportsSheets: false,
-		photoOnly: true
+		photoOnly: true,
+		defaultFolders: GENERIC_FOLDERS
 	},
 	s3: {
 		label: 'S3 Compatible',
@@ -69,7 +84,13 @@ export const PROVIDER_META: Record<string, StorageProviderMeta> = {
 		option: { label: 'S3 / B2 / R2', description: 'S3-compatible storage' },
 		defaultPhotoRootPath: 'vroom/photos',
 		supportsSheets: false,
-		photoOnly: false
+		photoOnly: false,
+		defaultFolders: {
+			vehicle_photos: 'vehicles',
+			expense_receipts: 'receipts',
+			insurance_docs: 'insurance',
+			odometer_readings: 'odometer'
+		}
 	}
 };
 
@@ -87,12 +108,17 @@ export function supportsZipBackup(providerType: string | null | undefined): bool
 	return !!providerType && providerMeta(providerType)?.photoOnly !== true;
 }
 
-export const DEFAULT_FOLDER_SETTINGS: Record<PhotoCategory, CategorySetting> = {
-	vehicle_photos: { enabled: true, folderPath: 'Vehicle' },
-	expense_receipts: { enabled: true, folderPath: 'Receipts' },
-	insurance_docs: { enabled: true, folderPath: 'Insurance' },
-	odometer_readings: { enabled: true, folderPath: 'Odometer' }
-};
+export function defaultFolderSettings(
+	providerType: string | null | undefined
+): Record<PhotoCategory, CategorySetting> {
+	const folders = providerMeta(providerType)?.defaultFolders ?? GENERIC_FOLDERS;
+	return Object.fromEntries(
+		Object.entries(folders).map(([category, folderPath]) => [
+			category,
+			{ enabled: true, folderPath }
+		])
+	) as Record<PhotoCategory, CategorySetting>;
+}
 
 interface VlmProviderTypeOption {
 	id: string;

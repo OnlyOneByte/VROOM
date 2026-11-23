@@ -24,7 +24,13 @@ describe('PROVIDER_META', () => {
 			option: null,
 			defaultPhotoRootPath: 'photos',
 			supportsSheets: false,
-			photoOnly: false
+			photoOnly: false,
+			defaultFolders: {
+				vehicle_photos: 'v',
+				expense_receipts: 'r',
+				insurance_docs: 'i',
+				odometer_readings: 'o'
+			}
 		};
 		try {
 			render(RestoreProviderPicker, {

@@ -229,6 +229,16 @@ describe('ProviderForm — a new provider stores the photo root path the user ty
 		const config = createProvider.mock.calls[0]?.[0]?.config ?? {};
 		expect(config['photoRootPath']).toBe('vroom/scans');
 		expect(rootPathInput().value).toBe('vroom/scans');
+
+		await vi.waitFor(() => expect(updateSettings).toHaveBeenCalled());
+		const sent = updateSettings.mock.calls[0]?.[0] as {
+			storageConfig?: {
+				providerCategories: Record<string, Record<string, { folderPath: string }>>;
+			};
+		};
+		const folders = sent.storageConfig?.providerCategories['drive-new'] ?? {};
+		expect(folders['vehicle_photos']?.folderPath).toBe('vehicles');
+		expect(folders['expense_receipts']?.folderPath).toBe('receipts');
 	});
 });
 

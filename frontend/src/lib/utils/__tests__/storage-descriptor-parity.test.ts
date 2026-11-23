@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { providerMeta, supportsZipBackup } from '#lib/constants/providers.ts';
+import { PROVIDER_META, providerMeta, supportsZipBackup } from '#lib/constants/providers.ts';
 
 const BACKEND_REGISTRY_PATH = resolve(
 	dirname(fileURLToPath(import.meta.url)),
@@ -22,7 +22,7 @@ function backendDescriptors(): Map<string, string> {
 	return descriptors;
 }
 
-describe('photoOnly parity with the backend storage descriptors', () => {
+describe('PROVIDER_META parity with the backend storage descriptors', () => {
 	it('marks exactly the backend photo-only types, so the UI hides ZIP backup where the backend ignores it', () => {
 		const descriptors = backendDescriptors();
 		expect([...descriptors.keys()]).toEqual(
@@ -31,6 +31,31 @@ describe('photoOnly parity with the backend storage descriptors', () => {
 		for (const [type, body] of descriptors) {
 			const backendPhotoOnly = /^\s+photoOnly:\s*true\b/m.test(body);
 			expect(providerMeta(type)?.photoOnly ?? false, type).toBe(backendPhotoOnly);
+		}
+	});
+
+	it('seeds each type the form can create with the backend default folders', () => {
+		const src = readFileSync(BACKEND_REGISTRY_PATH, 'utf8');
+		const folderMap = (text: string): Record<string, string> =>
+			Object.fromEntries(
+				[...text.matchAll(/(\w+): '([^']*)'/g)].map(([, key, value]) => [key, value])
+			);
+		const backendFolders = (body: string): Record<string, string> => {
+			const inline = body.match(/defaultFolders: \{([\s\S]*?)\}/)?.[1];
+			if (inline) return folderMap(inline);
+			const name = body.match(/defaultFolders: (\w+),/)?.[1];
+			const shared =
+				name && src.match(new RegExp(`const ${name}\\b[^=]*= \\{([\\s\\S]*?)\\};`))?.[1];
+			if (!shared) throw new Error('defaultFolders not readable');
+			return folderMap(shared);
+		};
+		const creatable = Object.entries(PROVIDER_META).filter(([, meta]) => meta.option);
+		expect(creatable.length).toBeGreaterThan(0);
+		const descriptors = backendDescriptors();
+		for (const [type, meta] of creatable) {
+			const body = descriptors.get(type);
+			expect(body, type).toBeDefined();
+			expect(meta.defaultFolders, type).toEqual(backendFolders(body as string));
 		}
 	});
 
