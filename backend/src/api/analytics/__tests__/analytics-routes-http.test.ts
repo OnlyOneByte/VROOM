@@ -196,6 +196,8 @@ describe('analytics routes (real HTTP stack)', () => {
       'metric=cost&categories=fuel,petrol',
       'metric=cost&interval=week&start=946684800&end=1735689600',
       'metric=cost&timeZone=Mars%2FOlympus',
+      'metric=cost&vehicleIds=,,',
+      'metric=cost&categories=',
     ]) {
       const res = await ctx.authed('GET', `/api/v1/analytics/query?${bad}`);
       expect(res.status, bad).toBe(400);

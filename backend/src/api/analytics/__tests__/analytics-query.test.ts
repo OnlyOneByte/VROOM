@@ -10,7 +10,7 @@ import {
   type AnalyticsQuery,
   AnalyticsQueryRepository,
   buildBuckets,
-  compareRange,
+  compareBuckets,
   MAX_QUERY_BUCKETS,
 } from '../query-repository';
 import { AnalyticsRepository } from '../repository';
@@ -247,19 +247,94 @@ describe('bucketing follows the user calendar', () => {
     expect(MAX_QUERY_BUCKETS).toBeGreaterThan(24 * 4);
   });
 
-  test('compare ranges shift back one period or one local year', () => {
-    const range = { start: seconds('2024-03-01T00:00:00Z'), end: seconds('2025-03-01T00:00:00Z') };
-    expect(compareRange(range, 'none', 'UTC')).toBeNull();
-    expect(compareRange(range, 'prevPeriod', 'UTC')).toEqual({
-      start: range.start - (range.end - range.start),
-      end: range.start,
-    });
-    expect(compareRange(range, 'prevYear', 'UTC')).toEqual({
-      start: seconds('2023-03-01T00:00:00Z'),
-      end: seconds('2024-03-01T00:00:00Z'),
-    });
-    const leap = { start: seconds('2024-02-29T00:00:00Z'), end: seconds('2024-03-29T00:00:00Z') };
-    expect(compareRange(leap, 'prevYear', 'UTC')?.start).toBe(seconds('2023-02-28T00:00:00Z'));
+  test('compare buckets shift each bucket back one period or one local year', () => {
+    const march = buildBuckets(
+      { start: seconds('2025-03-01T00:00:00Z'), end: seconds('2025-04-01T00:00:00Z') },
+      'month',
+      'UTC'
+    );
+    expect(compareBuckets(march, 'month', 'none', 'UTC')).toBeNull();
+    expect(compareBuckets(march, 'month', 'prevPeriod', 'UTC')).toEqual([
+      {
+        key: '2025-02',
+        start: seconds('2025-02-01T00:00:00Z'),
+        end: seconds('2025-03-01T00:00:00Z'),
+      },
+    ]);
+    const year = buildBuckets(
+      { start: seconds('2024-03-15T00:00:00Z'), end: seconds('2024-06-01T00:00:00Z') },
+      'month',
+      'UTC'
+    );
+    const prevYear = compareBuckets(year, 'month', 'prevYear', 'UTC');
+    expect(prevYear?.map((b) => b.key)).toEqual(['2023-03', '2023-04', '2023-05']);
+    expect(prevYear?.[0]?.start).toBe(seconds('2023-03-15T00:00:00Z'));
+    const prevQuarter = compareBuckets(year, 'month', 'prevPeriod', 'UTC');
+    expect(prevQuarter?.map((b) => b.key)).toEqual(['2023-12', '2024-01', '2024-02']);
+    expect(prevQuarter?.[0]?.start).toBe(seconds('2023-12-15T00:00:00Z'));
+
+    const weeks = buildBuckets(
+      { start: seconds('2025-03-03T00:00:00Z'), end: seconds('2025-03-17T00:00:00Z') },
+      'week',
+      'UTC'
+    );
+    expect(compareBuckets(weeks, 'week', 'prevPeriod', 'UTC')?.map((b) => b.key)).toEqual([
+      '2025-02-17',
+      '2025-02-24',
+    ]);
+    expect(compareBuckets(weeks, 'week', 'prevYear', 'UTC')?.map((b) => b.key)).toEqual([
+      '2024-03-04',
+      '2024-03-11',
+    ]);
+
+    const total = buildBuckets(
+      { start: seconds('2024-02-29T00:00:00Z'), end: seconds('2024-03-29T00:00:00Z') },
+      'none',
+      'UTC'
+    );
+    expect(compareBuckets(total, 'none', 'prevYear', 'UTC')?.[0]?.start).toBe(
+      seconds('2023-02-28T00:00:00Z')
+    );
+    expect(compareBuckets(total, 'none', 'prevPeriod', 'UTC')).toEqual([
+      {
+        key: 'total',
+        start: seconds('2024-01-31T00:00:00Z'),
+        end: seconds('2024-02-29T00:00:00Z'),
+      },
+    ]);
+    expect(compareBuckets([], 'month', 'prevYear', 'UTC')).toBeNull();
+  });
+
+  test('a previous-period comparison holds exactly the matching months', async () => {
+    for (const [id, iso, amount] of [
+      ['jan', '2025-01-30T12:00:00Z', 100],
+      ['feb', '2025-02-10T12:00:00Z', 7_000],
+      ['mar', '2025-03-10T12:00:00Z', 500],
+    ] as const) {
+      seedExpense(testDb.sqlite, {
+        id,
+        vehicleId: CAMRY.id,
+        category: 'maintenance',
+        expenseAmount: amount,
+        date: new Date(iso),
+        mileage: null,
+        volume: null,
+        fuelType: null,
+        missedFillup: false,
+      });
+    }
+    const result = await repo.query(
+      OWNER.id,
+      baseQuery({
+        start: seconds('2025-03-01T00:00:00Z'),
+        end: seconds('2025-04-01T00:00:00Z'),
+        compare: 'prevPeriod',
+      })
+    );
+    expect(result.compare?.buckets).toEqual(['2025-02']);
+    expect(result.compare?.series[0]?.values).toEqual([7_000]);
+    expect(result.compare?.totals.value).toBe(7_000);
+    expect(result.compare?.totals.perBucket).toBe(7_000);
   });
 });
 
@@ -418,6 +493,45 @@ describe('splits, compare and shape', () => {
     expect(tagged.totals.value).toBe(plain.totals.value);
   });
 
+  test('the first bucket counts the distance from the reading before the range', async () => {
+    for (const [i, iso, mileage] of [
+      [0, '2025-01-10T12:00:00Z', 1_000],
+      [1, '2025-02-10T12:00:00Z', 2_000],
+      [2, '2025-03-10T12:00:00Z', 3_000],
+    ] as const) {
+      seedExpense(testDb.sqlite, {
+        id: `odo-${i}`,
+        vehicleId: CAMRY.id,
+        category: 'maintenance',
+        expenseAmount: 1_000,
+        date: new Date(iso),
+        mileage,
+        volume: null,
+        fuelType: null,
+        missedFillup: false,
+      });
+    }
+    const result = await repo.query(
+      OWNER.id,
+      baseQuery({
+        metric: 'distance',
+        start: seconds('2025-02-01T00:00:00Z'),
+        end: seconds('2025-05-01T00:00:00Z'),
+      })
+    );
+    expect(result.buckets).toEqual(['2025-02', '2025-03', '2025-04']);
+    expect(result.series[0]?.values).toEqual([1_000, 1_000, 0]);
+    expect(result.totals.distance).toBe(2_000);
+    expect(result.totals.value).toBe(2_000);
+  });
+
+  test('a tag listed twice on one expense counts it once', async () => {
+    seedFleet();
+    testDb.sqlite.run(`UPDATE expenses SET tags = '["work","work"]' WHERE id = 'other-1'`);
+    const tagged = await repo.query(OWNER.id, baseQuery({ interval: 'none', groupBy: 'tag' }));
+    expect(tagged.series.find((s) => s.key === 'work')?.values[0]).toBe(12_345 + 12_445);
+  });
+
   test('count, per-bucket and compare periods', async () => {
     seedFleet();
     const count = await repo.query(
@@ -451,7 +565,11 @@ describe('splits, compare and shape', () => {
       })
     );
     expect(prev.compare?.series[0]?.values).toHaveLength(prev.buckets.length);
-    expect(prev.compare?.range.end).toBe(seconds('2025-01-15T00:00:00Z'));
+    expect(prev.compare?.buckets).toEqual(['2024-09', '2024-10', '2024-11', '2024-12']);
+    expect(prev.compare?.range).toEqual({
+      start: seconds('2024-09-15T00:00:00Z'),
+      end: seconds('2024-12-15T00:00:00Z'),
+    });
   });
 
   test('cost per distance split by vehicle divides each car by its own distance', async () => {

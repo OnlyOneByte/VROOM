@@ -5,6 +5,7 @@ import { userPreferences, vehicles } from '../../db/schema';
 import { ELECTRIC_FUEL_TYPES, EXPENSE_CATEGORIES, type ExpenseCategory } from '../../db/types';
 import { DatabaseError, ValidationError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } from '../../types';
+import { MAX_REASONABLE_MILES_BETWEEN_FILLUPS } from '../../utils/analytics-charts';
 import {
   MAX_VALID_MI_KWH,
   MAX_VALID_MPG,
@@ -52,7 +53,6 @@ export const GROUP_BYS_FOR_METRIC: Record<QueryMetric, readonly QueryGroupBy[]> 
 
 export const MAX_QUERY_BUCKETS = 1000;
 
-const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
 const DEFAULT_RANGE_SECONDS = 365 * 86_400;
 const TOTAL_KEY = 'total';
 
@@ -230,23 +230,54 @@ export function buildBuckets(
   return buckets;
 }
 
-function shiftYears(seconds: number, years: number, timeZone: string): number {
+function shiftLocal(seconds: number, months: number, days: number, timeZone: string): number {
   const { year, month, day } = localDate(seconds, timeZone);
   const sinceMidnight = seconds - midnight(year, month, day, timeZone);
-  const lastDay = new Date(Date.UTC(year + years, month + 1, 0)).getUTCDate();
-  return midnight(year + years, month, Math.min(day, lastDay), timeZone) + sinceMidnight;
+  const lastDay = new Date(Date.UTC(year, month + months + 1, 0)).getUTCDate();
+  const wall = normalizeWall(year, month + months, Math.min(day, lastDay) + days);
+  return midnight(wall.year, wall.month, wall.day, timeZone) + sinceMidnight;
 }
 
-export function compareRange(
-  range: { start: number; end: number },
+const MONTHS_PER_STEP: Record<Exclude<CalendarInterval, 'week'>, number> = {
+  month: 1,
+  quarter: 3,
+  year: 12,
+};
+
+function compareShift(
+  interval: QueryInterval,
+  compare: Exclude<QueryCompare, 'none'>,
+  steps: number
+): { months: number; days: number } {
+  if (compare === 'prevYear')
+    return interval === 'week' ? { months: 0, days: -364 } : { months: -12, days: 0 };
+  if (interval === 'week') return { months: 0, days: -7 * steps };
+  if (interval === 'none') return { months: 0, days: 0 };
+  return { months: -MONTHS_PER_STEP[interval] * steps, days: 0 };
+}
+
+export function compareBuckets(
+  buckets: Bucket[],
+  interval: QueryInterval,
   compare: QueryCompare,
   timeZone: string
-): { start: number; end: number } | null {
-  if (compare === 'none') return null;
-  if (compare === 'prevPeriod') {
-    return { start: range.start - (range.end - range.start), end: range.start };
+): Bucket[] | null {
+  const first = buckets[0];
+  const last = buckets.at(-1);
+  if (compare === 'none' || !first || !last) return null;
+  if (interval === 'none' && compare === 'prevPeriod') {
+    const length = last.end - first.start;
+    return [{ key: TOTAL_KEY, start: first.start - length, end: first.start }];
   }
-  return { start: shiftYears(range.start, -1, timeZone), end: shiftYears(range.end, -1, timeZone) };
+  const { months, days } = compareShift(interval, compare, buckets.length);
+  return buckets.map((b) => {
+    const start = shiftLocal(b.start, months, days, timeZone);
+    const key =
+      interval === 'none'
+        ? TOTAL_KEY
+        : bucketKey(bucketStart(localDate(start, timeZone), interval), interval);
+    return { key, start, end: shiftLocal(b.end, months, days, timeZone) };
+  });
 }
 
 function emptyAggregate(): Aggregate {
@@ -335,10 +366,6 @@ function keyExpression(groupBy: QueryGroupBy): SQL {
       return sql`e.category`;
     case 'vehicle':
       return sql`e.vehicle_id`;
-    case 'fuelType':
-      return sql`COALESCE(e.fuel_type, '')`;
-    case 'tag':
-      return sql`COALESCE(t.value, '')`;
     default:
       return sql`${TOTAL_KEY}`;
   }
@@ -418,10 +445,7 @@ function collectDistances(ctx: QueryContext, result: PeriodRows[], rows: Distanc
   for (const row of rows) {
     const period = result[row.period];
     if (!period) continue;
-    if (row.idx < 0) {
-      period.rangeDistance += row.distance ?? 0;
-      continue;
-    }
+    period.rangeDistance += row.distance ?? 0;
     const length = ctx.periods[row.period]?.length ?? 0;
     seriesFor(period.distanceByVehicle, row.vehicle_id, length, () => 0)[row.idx] =
       row.distance ?? 0;
@@ -452,8 +476,7 @@ export class AnalyticsQueryRepository {
     const { ctx, currency, range, prior } = await this.loadContext(userId, query);
     const rows = this.aggregate(ctx);
     const primary = this.shapePeriod(ctx, 0, range, rows[0]);
-    const comparePeriod =
-      prior && rows[1] ? this.shapePeriod(ctx, 1, prior, rows[1], primary.buckets.length) : null;
+    const comparePeriod = prior && rows[1] ? this.shapePeriod(ctx, 1, prior, rows[1]) : null;
 
     return {
       metric: query.metric,
@@ -496,9 +519,12 @@ export class AnalyticsQueryRepository {
     const start = query.start ?? Math.min(fallbackStart, end - 1);
     if (start >= end) throw new ValidationError('start must be before end');
     const range = { start, end };
-    const prior = compareRange(range, query.compare, timeZone);
-    const periods = [buildBuckets(range, query.interval, timeZone)];
-    if (prior) periods.push(buildBuckets(prior, query.interval, timeZone));
+    const primary = buildBuckets(range, query.interval, timeZone);
+    const shifted = compareBuckets(primary, query.interval, query.compare, timeZone);
+    const periods = shifted ? [primary, shifted] : [primary];
+    const prior = shifted
+      ? { start: shifted[0]?.start ?? start, end: shifted.at(-1)?.end ?? start }
+      : null;
 
     const ctx: QueryContext = {
       query,
@@ -556,26 +582,37 @@ export class AnalyticsQueryRepository {
   }
 
   private expenseAggregate(ctx: QueryContext): AggregateRow[] {
+    if (ctx.query.groupBy === 'tag') return this.tagAggregate(ctx);
     const key = keyExpression(ctx.query.groupBy);
-    const tagJoin = ctx.query.groupBy === 'tag' ? sql`LEFT JOIN json_each(e.tags) t` : sql``;
-    const totals =
-      ctx.query.groupBy === 'tag'
-        ? sql`UNION ALL
-          SELECT b.period, b.idx, 1 AS is_total, NULL AS key, SUM(e.expense_amount) AS cost, COUNT(*) AS n,
-            NULL AS volume, NULL AS eff_distance, NULL AS eff_energy
-          FROM b CROSS JOIN expenses e ON e.date >= b.t0 AND e.date < b.t1
-          WHERE ${this.scope(ctx)}
-          GROUP BY b.period, b.idx`
-        : sql``;
     return this.db.all<AggregateRow>(sql`
       WITH ${bucketsCte(ctx.periods)}
       SELECT b.period, b.idx, 0 AS is_total, ${key} AS key, SUM(e.expense_amount) AS cost, COUNT(*) AS n,
         NULL AS volume, NULL AS eff_distance, NULL AS eff_energy
       FROM b CROSS JOIN expenses e ON e.date >= b.t0 AND e.date < b.t1
-      ${tagJoin}
       WHERE ${this.scope(ctx)}
       GROUP BY b.period, b.idx, ${key}
-      ${totals}
+    `);
+  }
+
+  private tagAggregate(ctx: QueryContext): AggregateRow[] {
+    return this.db.all<AggregateRow>(sql`
+      WITH ${bucketsCte(ctx.periods)},
+      tagged AS (
+        SELECT DISTINCT b.period, b.idx, e.id, e.expense_amount, COALESCE(t.value, '') AS key
+        FROM b CROSS JOIN expenses e ON e.date >= b.t0 AND e.date < b.t1
+        LEFT JOIN json_each(e.tags) t
+        WHERE ${this.scope(ctx)}
+      )
+      SELECT period, idx, 0 AS is_total, key, SUM(expense_amount) AS cost, COUNT(*) AS n,
+        NULL AS volume, NULL AS eff_distance, NULL AS eff_energy
+      FROM tagged
+      GROUP BY period, idx, key
+      UNION ALL
+      SELECT b.period, b.idx, 1 AS is_total, NULL AS key, SUM(e.expense_amount) AS cost, COUNT(*) AS n,
+        NULL AS volume, NULL AS eff_distance, NULL AS eff_energy
+      FROM b CROSS JOIN expenses e ON e.date >= b.t0 AND e.date < b.t1
+      WHERE ${this.scope(ctx)}
+      GROUP BY b.period, b.idx
     `);
   }
 
@@ -617,21 +654,29 @@ export class AnalyticsQueryRepository {
   private distanceAggregate(ctx: QueryContext): DistanceRow[] {
     return this.db.all<DistanceRow>(sql`
       WITH ${bucketsCte(ctx.periods)}, ${unitsCte(ctx)},
-      m AS (
-        SELECT b.period, b.idx, e.vehicle_id, e.mileage,
-          LAG(e.mileage) OVER (PARTITION BY b.period, e.vehicle_id ORDER BY e.date, e.id) AS prev_mileage
+      p AS (SELECT period, MIN(t0) AS t0 FROM b GROUP BY period),
+      raw AS (
+        SELECT b.period, b.idx, e.vehicle_id, e.date, e.id, e.mileage
         FROM b CROSS JOIN expenses e ON e.date >= b.t0 AND e.date < b.t1
         WHERE e.user_id = ${ctx.userId} AND e.vehicle_id IN (${inList(ctx.vehicleIds)})
           AND e.mileage IS NOT NULL
+        UNION ALL
+        SELECT p.period, -2 AS idx, vu.vehicle_id, p.t0 - 1 AS date, '' AS id,
+          (SELECT x.mileage FROM expenses x
+            WHERE x.user_id = ${ctx.userId} AND x.vehicle_id = vu.vehicle_id
+              AND x.mileage IS NOT NULL AND x.date < p.t0
+            ORDER BY x.date DESC, x.id DESC LIMIT 1) AS mileage
+        FROM p CROSS JOIN vu
+      ),
+      m AS (
+        SELECT raw.*, LAG(raw.mileage) OVER (PARTITION BY raw.period, raw.vehicle_id ORDER BY raw.date, raw.id) AS prev_mileage
+        FROM raw WHERE raw.mileage IS NOT NULL
       )
       SELECT m.period, m.idx, m.vehicle_id,
         SUM(CASE WHEN m.mileage > m.prev_mileage THEN (m.mileage - m.prev_mileage) * vu.dist_user ELSE 0 END) AS distance
       FROM m JOIN vu ON vu.vehicle_id = m.vehicle_id
+      WHERE m.idx >= 0
       GROUP BY m.period, m.idx, m.vehicle_id
-      UNION ALL
-      SELECT m.period, -1 AS idx, m.vehicle_id, (MAX(m.mileage) - MIN(m.mileage)) * vu.dist_user AS distance
-      FROM m JOIN vu ON vu.vehicle_id = m.vehicle_id
-      GROUP BY m.period, m.vehicle_id
     `);
   }
 
@@ -721,13 +766,9 @@ export class AnalyticsQueryRepository {
     ctx: QueryContext,
     periodIndex: number,
     range: { start: number; end: number },
-    rows: PeriodRows,
-    alignTo?: number
+    rows: PeriodRows
   ): QueryPeriod {
     const buckets = ctx.periods[periodIndex] ?? [];
-    const length = alignTo ?? buckets.length;
-    const align = <T>(values: T[], fill: T): T[] =>
-      Array.from({ length }, (_, i) => (i < values.length ? (values[i] as T) : fill));
 
     const byKey = ctx.query.metric === 'distance' ? this.distanceSeries(ctx, rows) : rows.byKey;
     const series: Array<QuerySeries & { rank: number }> = [];
@@ -735,7 +776,7 @@ export class AnalyticsQueryRepository {
       const values = aggs.map((agg, idx) => this.valueOf(ctx, agg, rows, idx, key));
       const rank = values.reduce<number>((sum, v) => sum + (v ?? 0), 0);
       if (ctx.query.metric === 'distance' && rank === 0) continue;
-      series.push({ key, label: this.labelFor(ctx, key), values: align(values, null), rank });
+      series.push({ key, label: this.labelFor(ctx, key), values, rank });
     }
     series.sort((a, b) => b.rank - a.rank || a.label.localeCompare(b.label));
 
@@ -748,10 +789,7 @@ export class AnalyticsQueryRepository {
 
     return {
       range,
-      buckets: align(
-        buckets.map((b) => b.key),
-        ''
-      ),
+      buckets: buckets.map((b) => b.key),
       series: series.map(({ rank: _rank, ...s }) => s),
       totals: {
         value,
