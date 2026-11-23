@@ -285,7 +285,7 @@ describe('StorageProviderRegistry', () => {
       const badCreds = { ...baseProvider, credentials: enc({ noToken: true }) };
 
       expect(() => registry.createProviderInstance(badCreds)).toThrow(
-        'Invalid Google Drive credentials: missing refreshToken'
+        'Provider has no refresh token'
       );
     });
 
@@ -309,9 +309,7 @@ describe('StorageProviderRegistry', () => {
         providerType: 'google-photos',
         credentials: enc({ noToken: true }),
       };
-      expect(() => registry.createProviderInstance(row)).toThrow(
-        'Invalid Google Photos credentials: missing refreshToken'
-      );
+      expect(() => registry.createProviderInstance(row)).toThrow('Provider has no refresh token');
     });
 
     test('creates S3CompatProvider for s3 type with valid credentials + config', () => {

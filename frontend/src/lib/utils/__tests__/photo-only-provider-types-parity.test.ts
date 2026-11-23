@@ -2,26 +2,31 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { PHOTO_ONLY_PROVIDER_TYPES, supportsZipBackup } from '#lib/constants/providers.ts';
+import { providerMeta, supportsZipBackup } from '#lib/constants/providers.ts';
 
-const BACKEND_STRATEGY_PATH = resolve(
+const BACKEND_REGISTRY_PATH = resolve(
 	dirname(fileURLToPath(import.meta.url)),
-	'../../../../../backend/src/api/sync/backup-strategy.ts'
+	'../../../../../backend/src/api/providers/domains/storage/registry.ts'
 );
 
-function backendPhotoOnlyTypes(): string[] {
-	const src = readFileSync(BACKEND_STRATEGY_PATH, 'utf8');
-	const match = src.match(/export\s+const\s+PHOTO_ONLY_PROVIDER_TYPES\s*=\s*\[([\s\S]*?)\]/);
-	if (!match?.[1])
-		throw new Error(`PHOTO_ONLY_PROVIDER_TYPES not found in ${BACKEND_STRATEGY_PATH}`);
-	return [...match[1].matchAll(/(['"`])((?:\\.|(?!\1).)*)\1/g)].map(m => m[2] as string);
+function backendDescriptors(): Map<string, string> {
+	const src = readFileSync(BACKEND_REGISTRY_PATH, 'utf8');
+	const block = src.match(/export const STORAGE_PROVIDERS = \{\n([\s\S]*?)\n\} satisfies/)?.[1];
+	if (!block) throw new Error(`STORAGE_PROVIDERS not found in ${BACKEND_REGISTRY_PATH}`);
+	const entries = [...block.matchAll(/^ {2}'?([\w-]+)'?: \{\n([\s\S]*?)^ {2}\},?$/gm)];
+	return new Map(entries.map(([, type, body]) => [type as string, body as string]));
 }
 
-describe('PHOTO_ONLY_PROVIDER_TYPES parity with the backend', () => {
-	it('lists exactly the backend members, so the UI hides ZIP backup where the backend ignores it', () => {
-		const backend = backendPhotoOnlyTypes();
-		expect(backend.length).toBeGreaterThan(0);
-		expect([...PHOTO_ONLY_PROVIDER_TYPES].sort()).toEqual([...backend].sort());
+describe('photoOnly parity with the backend storage descriptors', () => {
+	it('marks exactly the backend photo-only types, so the UI hides ZIP backup where the backend ignores it', () => {
+		const descriptors = backendDescriptors();
+		expect([...descriptors.keys()]).toEqual(
+			expect.arrayContaining(['google-drive', 'google-photos', 's3'])
+		);
+		for (const [type, body] of descriptors) {
+			const backendPhotoOnly = /^\s+photoOnly: true,$/m.test(body);
+			expect(providerMeta(type)?.photoOnly ?? false, type).toBe(backendPhotoOnly);
+		}
 	});
 
 	it('offers ZIP backup for file storage providers only', () => {

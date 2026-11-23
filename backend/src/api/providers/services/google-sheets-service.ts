@@ -24,8 +24,8 @@ import {
   vehicles,
 } from '../../../db/schema';
 import { NotFoundError, SyncError, SyncErrorCode, ValidationError } from '../../../errors';
-import { decrypt } from '../../../utils/encryption';
 import { logger } from '../../../utils/logger';
+import { decryptRefreshToken } from '../domains/storage/registry';
 import { GoogleDriveService } from './google-drive-service';
 
 // Hand-maintained: a schema column missing here is silently dropped from backups.
@@ -770,18 +770,5 @@ export async function createSheetsServiceForProvider(
     throw new NotFoundError('Provider');
   }
 
-  let credentials: { refreshToken?: string };
-  try {
-    credentials = JSON.parse(decrypt(providerRow[0].credentials)) as { refreshToken?: string };
-  } catch {
-    throw new ValidationError('Failed to decrypt provider credentials');
-  }
-
-  if (!credentials.refreshToken) {
-    throw new ValidationError(
-      'Provider has no refresh token. Please re-connect your Google account.'
-    );
-  }
-
-  return new GoogleSheetsService(credentials.refreshToken);
+  return new GoogleSheetsService(decryptRefreshToken(providerRow[0].credentials));
 }
