@@ -22,4 +22,11 @@ describe('FloatingActionButton layer', () => {
 
 		expect(zLayer(fab.className)).toBeLessThan(overlayLayer);
 	});
+
+	test('floats below lg and joins the page flow on a short viewport, like the form save bars', () => {
+		render(FloatingActionButton, { label: 'Add Expense', href: '/expenses/new' });
+		const fab = screen.getByRole('link', { name: 'Add Expense' });
+
+		expect(fab).toHaveClass('fixed', 'short:static', 'short:z-auto', 'short:mt-6');
+	});
 });
