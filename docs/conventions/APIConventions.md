@@ -121,12 +121,17 @@ need; don't reshape a repository to qualify.
   (`sync/routes.ts`); a non-JSON 2xx is intentionally left uncached.
 
 ### Ownership & Authorization
-- Every POST/PUT/DELETE verifies the resource belongs to `c.get('user')` *before* the repository
-  call, via the `validate*Ownership` helpers in `utils/validation.ts`. Don't delegate it downstream.
+- Every route checks access *before* the repository call. Don't delegate it downstream.
+  - A vehicle id goes through `requireVehicleAccess(vehicleId, userId, 'read' | 'write' | 'owner')`
+    in `utils/vehicle-access.ts`: read allows the owner and accepted viewers and editors, write the
+    owner and editors, owner only the owner. A list of vehicles goes through `requireVehiclesAccess`.
+    Both return the owner id, so shared reads and writes scope to the owner's rows.
+  - A record id goes through its `validate*Ownership` helper in `utils/validation.ts`, which loads
+    the record and then checks its owner or its vehicle.
+  - List queries over the user's own vehicles use `ownedVehiclesScope(userId)`.
 - A repository method taking `userId` must scope its query by it. Never `_`-prefix the param to
   silence `noUnusedVariables` after dropping a check.
-- Shared-vehicle access goes through `utils/sharing.ts` (`resolveVehicleAccess`,
-  `requireVehicleRead`, `requireVehicleWrite`, `resolveVehicleOwnerId`), not a raw `userId` compare.
+- Never compare `userId` by hand or add a new access helper: a denied check is a 404, never a 403.
 
 ### Batching & Migrations
 - Build any `inArray`/`IN (...)` clause over an unbounded id list with `chunk()`

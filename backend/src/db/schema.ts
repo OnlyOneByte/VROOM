@@ -525,7 +525,7 @@ export const reminderNotifications = sqliteTable(
   })
 );
 
-// Every route that reads a shared vehicle must go through utils/sharing.ts.
+// Every route that reads a shared vehicle must go through utils/vehicle-access.ts.
 export const vehicleShares = sqliteTable(
   'vehicle_shares',
   {

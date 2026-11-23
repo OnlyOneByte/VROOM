@@ -19,13 +19,15 @@ interface Fixture {
   financingId: string;
   policyId: string;
   termId: string;
+  reminderId: string;
+  tripId: string;
 }
 
 interface RouteCase {
   name: string;
   mode: VehicleAccessMode;
   request: (fx: Fixture) => [method: string, path: string, body?: unknown];
-  returnsOwnerRow?: (fx: Fixture) => string;
+  expectInBody?: (fx: Fixture) => string;
 }
 
 const ALLOWED: Record<VehicleAccessMode, readonly Actor[]> = {
@@ -38,6 +40,7 @@ const EXPENSE_BODY = {
   category: 'maintenance',
   expenseAmount: 25,
   date: '2024-06-01T00:00:00.000Z',
+  description: 'access-table expense',
 };
 
 const FINANCING_BODY = {
@@ -68,6 +71,7 @@ const ROUTES: RouteCase[] = [
     name: 'GET /vehicles/:id',
     mode: 'read',
     request: (fx) => ['GET', `/vehicles/${fx.vehicleId}`],
+    expectInBody: (fx) => fx.vehicleId,
   },
   {
     name: 'GET /vehicles/:id/stats',
@@ -97,7 +101,7 @@ const ROUTES: RouteCase[] = [
     name: 'GET /expenses?vehicleId',
     mode: 'read',
     request: (fx) => ['GET', `/expenses?vehicleId=${fx.vehicleId}`],
-    returnsOwnerRow: (fx) => fx.expenseId,
+    expectInBody: (fx) => fx.expenseId,
   },
   {
     name: 'GET /expenses/summary?vehicleId',
@@ -108,11 +112,13 @@ const ROUTES: RouteCase[] = [
     name: 'GET /expenses/export?vehicleId',
     mode: 'read',
     request: (fx) => ['GET', `/expenses/export?vehicleId=${fx.vehicleId}`],
+    expectInBody: () => 'access-table expense',
   },
   {
     name: 'GET /expenses/:id',
     mode: 'read',
     request: (fx) => ['GET', `/expenses/${fx.expenseId}`],
+    expectInBody: (fx) => fx.expenseId,
   },
   {
     name: 'POST /expenses',
@@ -133,6 +139,7 @@ const ROUTES: RouteCase[] = [
     name: 'GET /financing/vehicles/:id/financing',
     mode: 'owner',
     request: (fx) => ['GET', `/financing/vehicles/${fx.vehicleId}/financing`],
+    expectInBody: (fx) => fx.financingId,
   },
   {
     name: 'POST /financing/vehicles/:id/financing',
@@ -162,6 +169,7 @@ const ROUTES: RouteCase[] = [
     name: 'GET /insurance/vehicles/:id/policies',
     mode: 'read',
     request: (fx) => ['GET', `/insurance/vehicles/${fx.vehicleId}/policies`],
+    expectInBody: (fx) => fx.policyId,
   },
   {
     name: 'POST /insurance',
@@ -199,6 +207,7 @@ const ROUTES: RouteCase[] = [
     name: 'GET /reminders?vehicleId',
     mode: 'read',
     request: (fx) => ['GET', `/reminders?vehicleId=${fx.vehicleId}`],
+    expectInBody: (fx) => fx.reminderId,
   },
   {
     name: 'POST /reminders',
@@ -226,12 +235,13 @@ const ROUTES: RouteCase[] = [
     name: 'GET /odometer/:vehicleId/history',
     mode: 'read',
     request: (fx) => ['GET', `/odometer/${fx.vehicleId}/history`],
-    returnsOwnerRow: (fx) => fx.odometerId,
+    expectInBody: (fx) => fx.odometerId,
   },
   {
     name: 'GET /odometer/entry/:id',
     mode: 'read',
     request: (fx) => ['GET', `/odometer/entry/${fx.odometerId}`],
+    expectInBody: (fx) => fx.odometerId,
   },
   {
     name: 'POST /odometer/:vehicleId',
@@ -271,16 +281,19 @@ const ROUTES: RouteCase[] = [
     name: 'GET /trips?vehicleId',
     mode: 'owner',
     request: (fx) => ['GET', `/trips?vehicleId=${fx.vehicleId}`],
+    expectInBody: (fx) => fx.tripId,
   },
   {
     name: 'GET /trips/summary?vehicleId',
     mode: 'owner',
     request: (fx) => ['GET', `/trips/summary?vehicleId=${fx.vehicleId}`],
+    expectInBody: () => '"tripCount":1',
   },
   {
     name: 'GET /trips/vehicle/:vehicleId',
     mode: 'owner',
     request: (fx) => ['GET', `/trips/vehicle/${fx.vehicleId}`],
+    expectInBody: (fx) => fx.tripId,
   },
   {
     name: 'GET /analytics/fuel-stats?vehicleId',
@@ -340,6 +353,26 @@ beforeEach(async () => {
   const policyRes = await ctx.authed('POST', '/api/v1/insurance', policyBody(vehicleId));
   const policy = await json<DataEnvelope<{ id: string; terms: { id: string }[] }>>(policyRes);
   expect(policyRes.status, JSON.stringify(policy)).toBe(201);
+  const reminderRes = await ctx.authed('POST', '/api/v1/reminders', {
+    name: 'Tyre check',
+    type: 'notification',
+    frequency: 'custom',
+    intervalValue: 1,
+    intervalUnit: 'month',
+    startDate: '2024-01-01T00:00:00.000Z',
+    vehicleIds: [vehicleId],
+  });
+  const reminder = await json<DataEnvelope<{ reminder: { id: string } }>>(reminderRes);
+  expect(reminderRes.status, JSON.stringify(reminder)).toBe(201);
+  const tripRes = await ctx.authed('POST', '/api/v1/trips', {
+    vehicleId,
+    startOdometer: 35000,
+    endOdometer: 35100,
+    tripDate: '2024-07-15T00:00:00.000Z',
+    purpose: 'business',
+  });
+  const trip = await json<DataEnvelope<{ id: string }>>(tripRes);
+  expect(tripRes.status, JSON.stringify(trip)).toBe(201);
   fx = {
     vehicleId,
     expenseId: expense.data.id,
@@ -347,6 +380,8 @@ beforeEach(async () => {
     financingId: financing.data.id,
     policyId: policy.data.id,
     termId: policy.data.terms[0].id,
+    reminderId: reminder.data.reminder.id,
+    tripId: trip.data.id,
   };
 
   const editor = await createInvitee(ctx, 'access-editor');
@@ -373,7 +408,7 @@ describe('every vehicle-scoped route enforces owner / editor / viewer / stranger
         if (allowed) {
           const text = await res.text();
           expect(res.status, text).toBeLessThan(300);
-          if (route.returnsOwnerRow) expect(text).toContain(route.returnsOwnerRow(fx));
+          if (route.expectInBody) expect(text).toContain(route.expectInBody(fx));
         } else {
           expect(res.status).toBe(404);
         }

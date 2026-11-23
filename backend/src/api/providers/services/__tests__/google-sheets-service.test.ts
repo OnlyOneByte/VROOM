@@ -119,6 +119,39 @@ describe('GoogleSheetsService.createOrUpdateVroomSpreadsheet', () => {
     expect(JSON.stringify(grid)).toContain('Toyota');
     expect(JSON.stringify(grid)).not.toContain('Tesla');
   });
+
+  test('a vehicle shared with the user stays out of their export', async () => {
+    const { db } = await import('../../../../db/connection');
+    const schema = await import('../../../../db/schema');
+    await db
+      .insert(schema.users)
+      .values({ id: 'sharing-owner', email: 'owner@x.com', displayName: 'Owner' });
+    const [shared] = await db
+      .insert(schema.vehicles)
+      .values({ userId: 'sharing-owner', make: 'Rivian', model: 'R1T', year: 2024 })
+      .returning();
+    await db.insert(schema.vehicleShares).values({
+      vehicleId: shared.id,
+      ownerId: 'sharing-owner',
+      sharedWithId: ctx.user.id,
+      level: 'editor',
+      status: 'accepted',
+    });
+    await db.insert(schema.odometerEntries).values({
+      vehicleId: shared.id,
+      userId: 'sharing-owner',
+      odometer: 424242,
+      recordedAt: new Date('2024-06-01T00:00:00.000Z'),
+    });
+    await seedVehicle('Toyota', 'Camry', 2020);
+
+    const info = await makeSvc().createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM', 'Demo User');
+    const sheet = store.spreadsheets.get(info.id);
+
+    expect(JSON.stringify(sheet?.values.get('Vehicles'))).toContain('Toyota');
+    expect(JSON.stringify(sheet?.values.get('Vehicles'))).not.toContain('Rivian');
+    expect(JSON.stringify([...(sheet?.values.values() ?? [])])).not.toContain('424242');
+  });
 });
 
 describe('GoogleSheetsService.readSpreadsheetData', () => {
