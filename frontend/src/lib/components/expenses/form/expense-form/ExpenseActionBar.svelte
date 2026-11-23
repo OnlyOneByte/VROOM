@@ -23,6 +23,10 @@
 		onCancel,
 		onSave
 	}: Props = $props();
+
+	function keepFieldFocus(event: MouseEvent) {
+		event.preventDefault();
+	}
 </script>
 
 <div
@@ -34,6 +38,7 @@
 		{#if isEditMode}
 			<Button
 				type="button"
+				onmousedown={keepFieldFocus}
 				variant="outline"
 				onclick={onDelete}
 				disabled={isDeleting || isSubmitting}
@@ -47,6 +52,7 @@
 		{#if canDuplicate}
 			<Button
 				type="button"
+				onmousedown={keepFieldFocus}
 				variant="outline"
 				onclick={onDuplicate}
 				disabled={isSubmitting || isDeleting}
@@ -59,6 +65,7 @@
 
 		<Button
 			type="button"
+			onmousedown={keepFieldFocus}
 			variant="outline"
 			onclick={onCancel}
 			disabled={isSubmitting || isDeleting}
@@ -70,6 +77,7 @@
 
 		<Button
 			type="button"
+			onmousedown={keepFieldFocus}
 			onclick={onSave}
 			disabled={isSubmitting || isDeleting}
 			class="sm:rounded-full rounded-full group bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 sm:h-14 px-6 border-0 flex-1 sm:flex-initial"
