@@ -297,7 +297,7 @@
 		<div class="space-y-6">
 			{@render titleOnlyHeader()}
 			<NoVehiclesEmptyState
-				description="Every policy covers a vehicle. Add one, then add its policy here."
+				description="Every policy covers a vehicle. Add one, then set up its policy here."
 			/>
 		</div>
 	{:else}

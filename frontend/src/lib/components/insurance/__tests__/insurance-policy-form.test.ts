@@ -356,6 +356,13 @@ describe('InsurancePolicyForm edit mode', () => {
 		expect(document.getElementById('start-date')).toBeNull();
 	});
 
+	test('still shows the form when the account has no vehicles left', async () => {
+		getVehicles.mockResolvedValue([]);
+		await mount({ policyId: 'p9' });
+		expect(field('company')).toHaveValue('Acme Mutual');
+		expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
+	});
+
 	test('sends only company, notes and active flag on update', async () => {
 		await mount({ policyId: 'p9', returnTo: '/insurance/p9' });
 		await type('company', '  Acme Renamed ');
