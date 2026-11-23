@@ -99,7 +99,9 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
       },
       distance: { totalDistance: 1000, avgPerDay: 30, avgPerMonth: 900 },
       monthlyConsumption: [{ month: '2024-01', efficiency: 28, volume: 40 }],
-      gasPriceHistory: [{ date: '2024-01-01', fuelType: 'regular', pricePerVolume: 350 }],
+      gasPriceHistory: [
+        { date: '2024-01-01', month: '2024-01', fuelType: 'regular', pricePerVolume: 350 },
+      ],
       fillupCostByVehicle: [{ month: '2024-01', vehicleId: 'v1', vehicleName: 'C', avgCost: 5000 }],
       odometerProgression: [
         { month: '2024-01', vehicleId: 'v1', vehicleName: 'C', mileage: 42000 },
@@ -113,7 +115,9 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
         efficiency: { avgEfficiency: 4, bestEfficiency: 5, worstEfficiency: 3 },
         sessionDetails: { avgEnergy: 15, minEnergy: 10, maxEnergy: 20 },
         averageCost: { perSession: 900, perEnergyUnit: 60 },
-        priceHistory: [{ date: '2024-01-05', fuelType: 'Level 2 (AC)', pricePerVolume: 30 }],
+        priceHistory: [
+          { date: '2024-01-05', month: '2024-01', fuelType: 'Level 2 (AC)', pricePerVolume: 30 },
+        ],
       },
     } as FuelStatsData;
     const r = fuelStatsToApi(d);
@@ -128,6 +132,7 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
       chargeAvgEfficiency: null,
     });
     expect(r.gasPriceHistory[0].pricePerVolume).toBe(3.5);
+    expect(r.gasPriceHistory[0].month).toBe('2024-01');
     expect(r.fillupCostByVehicle[0].avgCost).toBe(50);
     expect(r.costPerDistance[0].costPerDistance).toBe(0.15);
     expect(r.volume.currentYear).toBe(100);
@@ -140,6 +145,7 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
     expect(r.charging.efficiency.avgEfficiency).toBe(4);
     expect(r.charging.sessionDetails.maxEnergy).toBe(20);
     expect(r.charging.priceHistory[0].pricePerVolume).toBe(0.3);
+    expect(r.charging.priceHistory[0].month).toBe('2024-01');
   });
 
   test('financing: payments/balances/interest convert; apr (percent) untouched', () => {
