@@ -83,6 +83,12 @@
 	});
 	let currentPath = $derived(page.url.pathname);
 	let showNavigation = $derived(authState.isAuthenticated && !authState.isLoading);
+	let mainEl = $state<HTMLElement | null>(null);
+
+	function skipToContent(event: MouseEvent) {
+		event.preventDefault();
+		mainEl?.focus();
+	}
 	let isAuthPage = $derived(currentPath.startsWith('/auth'));
 	let isHomePage = $derived(currentPath === '/');
 
@@ -157,9 +163,21 @@
 	</main>
 {:else if showNavigation}
 	<div class="min-h-screen bg-background">
+		<a
+			href="#main"
+			onclick={skipToContent}
+			class="sr-only rounded-md border bg-background text-sm font-medium text-foreground shadow-md outline-none focus-visible:not-sr-only focus-visible:px-4 focus-visible:py-2 focus-visible:fixed focus-visible:left-4 focus-visible:top-4 focus-visible:z-[100] focus-visible:ring-[3px] focus-visible:ring-ring/50"
+		>
+			Skip to content
+		</a>
 		<Navigation />
 
-		<main class="lg:pl-20 transition-all duration-300">
+		<main
+			bind:this={mainEl}
+			id="main"
+			tabindex="-1"
+			class="lg:pl-20 transition-all duration-300 outline-none"
+		>
 			<div class="px-4 sm:px-6 lg:px-8 py-6">
 				{@render children?.()}
 			</div>

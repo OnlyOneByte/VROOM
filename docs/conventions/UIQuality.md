@@ -275,6 +275,8 @@ verify by hand:
   `tabindex="-1"`, Arrow keys move through them, Enter picks the active one, Escape closes the
   list, and Tab moves on to the next control. Close the list on `focusout` to outside the field,
   never on a timer, so focus is never left on a removed element.
+  Every signed-in page starts with a "Skip to content" link as its first Tab stop; it moves focus
+  to `<main id="main">`, past the navigation rail (`routes/+layout.svelte`).
 - **Focus.** Never remove outlines. Primitives show `focus-visible:ring-[3px]` in `ring-ring/50`;
   a custom control shows the same ring. Focus moves into a dialog on open and back on close, and
   after a failed submit it moves to the first invalid field (see *Forms*).
