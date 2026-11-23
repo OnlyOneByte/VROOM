@@ -67,6 +67,35 @@
 		calendarValue ? df.format(calendarValue.toDate(getLocalTimeZone())) : placeholder
 	);
 
+	let content = $state<HTMLElement | null>(null);
+
+	function focusDay(event: Event) {
+		const day = [
+			'[data-selected]',
+			'[data-today]',
+			':not([data-disabled]):not([data-outside-month])'
+		]
+			.map(state => content?.querySelector<HTMLElement>(`[data-bits-day]${state}`))
+			.find(Boolean);
+		if (!day) return;
+		event.preventDefault();
+		day.focus({ preventScroll: true });
+		requestAnimationFrame(() => day.scrollIntoView?.({ block: 'nearest' }));
+	}
+
+	function keepSelectedOnEnter(event: KeyboardEvent) {
+		if (event.key !== 'Enter') return;
+		if (
+			!(event.target instanceof Element) ||
+			!event.target.matches('[data-bits-day][data-selected]')
+		) {
+			return;
+		}
+		event.preventDefault();
+		event.stopPropagation();
+		open = false;
+	}
+
 	let valueId = $derived(id ? `${id}-value` : undefined);
 	let describedBy = $derived([valueId, ariaDescribedby].filter(Boolean).join(' ') || undefined);
 </script>
@@ -90,7 +119,9 @@
 			</Button>
 		{/snippet}
 	</Popover.Trigger>
-	<Popover.Content class="w-auto p-0">
-		<Calendar type="single" bind:value={calendarValue as never} initialFocus />
+	<Popover.Content class="w-auto p-0" onOpenAutoFocus={focusDay}>
+		<div bind:this={content} onkeydowncapture={keepSelectedOnEnter}>
+			<Calendar type="single" bind:value={calendarValue as never} />
+		</div>
 	</Popover.Content>
 </Popover.Root>
