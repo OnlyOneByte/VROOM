@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, render, screen } from '@testing-library/svelte';
 import type { InsuranceTerm, TermCoverageRow } from '#lib/types/index.ts';
-import { VEHICLES, makeTerm } from './insurance-fixtures.ts';
+import { VEHICLES, chooseTermAction, makeTerm, openTermActions } from './insurance-fixtures.ts';
 
 const goto = vi.fn<(url: string) => Promise<void>>(() => Promise.resolve());
 vi.mock('$app/navigation', () => ({ goto: (url: string) => goto(url) }));
@@ -71,24 +71,26 @@ describe('TermHistory', () => {
 
 	test('edit navigates to the term edit route for this policy', async () => {
 		render(TermHistory, { props: { terms: [NEWER], policyId: 'p1' } });
-		await fireEvent.click(screen.getByTitle('Edit term'));
+		await chooseTermAction('Edit term');
 		expect(goto).toHaveBeenCalledWith('/insurance/p1/terms/t-new/edit');
 	});
 
-	test('delete is offered only when a delete handler is provided', () => {
+	test('delete is offered only when a delete handler is provided', async () => {
 		const onDeleteTerm = vi.fn<(t: InsuranceTerm) => void>();
 		const { unmount } = render(TermHistory, { props: { terms: [NEWER], policyId: 'p1' } });
-		expect(screen.queryByTitle('Delete term')).toBeNull();
+		await openTermActions();
+		expect(screen.getByRole('button', { name: 'Edit term' })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Delete term' })).toBeNull();
 		unmount();
 		render(TermHistory, { props: { terms: [NEWER], policyId: 'p1', onDeleteTerm } });
-		expect(screen.getByTitle('Delete term')).toBeInTheDocument();
+		await openTermActions();
+		expect(screen.getByRole('button', { name: 'Delete term' })).toBeInTheDocument();
 	});
 
 	test('read-only mode hides edit and delete', () => {
 		render(TermHistory, {
 			props: { terms: [NEWER], policyId: 'p1', readOnly: true, onDeleteTerm: vi.fn() }
 		});
-		expect(screen.queryByTitle('Edit term')).toBeNull();
-		expect(screen.queryByTitle('Delete term')).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Term actions' })).toBeNull();
 	});
 });

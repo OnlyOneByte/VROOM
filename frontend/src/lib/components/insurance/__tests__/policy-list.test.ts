@@ -155,9 +155,7 @@ describe('PolicyList heading levels', () => {
 
 		expect(headingOutline()).toEqual([
 			[2, 'Active Policies'],
-			[3, 'Acme Mutual'],
-			[4, 'Documents'],
-			[4, 'Claims']
+			[3, 'Acme Mutual']
 		]);
 	});
 
@@ -176,9 +174,7 @@ describe('PolicyList heading levels', () => {
 
 		expect(headingOutline()).toEqual([
 			[3, 'Active Policies'],
-			[4, 'Acme Mutual'],
-			[5, 'Documents'],
-			[5, 'Claims']
+			[4, 'Acme Mutual']
 		]);
 	});
 });

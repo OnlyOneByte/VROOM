@@ -36,7 +36,7 @@ function expectTouchSized(button: HTMLElement): void {
 }
 
 describe('insurance action buttons', () => {
-	test('term edit and delete are labelled 40px icon buttons and Renew is not text-xs', () => {
+	test('the term actions menu is a labelled 40px icon button and Renew is not text-xs', () => {
 		render(PolicyTermCard, {
 			props: {
 				term: makeTerm(),
@@ -47,11 +47,9 @@ describe('insurance action buttons', () => {
 			}
 		});
 
-		for (const name of ['Edit term', 'Delete term']) {
-			const button = screen.getByRole('button', { name });
-			expect(button).toHaveAttribute('aria-label', name);
-			expectTouchSized(button);
-		}
+		const menu = screen.getByRole('button', { name: 'Term actions' });
+		expect(menu).toHaveAttribute('aria-label', 'Term actions');
+		expectTouchSized(menu);
 
 		const renew = screen.getByRole('button', { name: 'Renew' });
 		expect(renew.className).not.toContain('text-xs');
