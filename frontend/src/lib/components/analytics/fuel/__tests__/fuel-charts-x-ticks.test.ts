@@ -64,7 +64,7 @@ describe('FuelCharts monthly x-axis', () => {
 		render(FuelCharts, { props: { fuelStats, group: 'comparisons' } });
 		const monthly = [
 			'Fuel Efficiency',
-			'Fuel Used',
+			'Fuel Bought',
 			'Fill-up Cost by Vehicle',
 			'Cost/mi',
 			'Total Odometer'

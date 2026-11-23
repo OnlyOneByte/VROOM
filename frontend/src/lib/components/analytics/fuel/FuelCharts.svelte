@@ -23,8 +23,7 @@
 		formatCountTooltip,
 		byVehicleMonth,
 		monthlyXAxisProps,
-		unitTooltip,
-		formatMonthLabel
+		unitTooltip
 	} from '#lib/utils/chart-formatters.ts';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import type { FuelAdvancedResponse, UnitsMetadata } from '#lib/types/index.ts';
@@ -193,8 +192,8 @@
 			/>
 
 			<AppBarChart
-				title="Fuel Used"
-				description="Monthly {getVolumeUnitName(units.volumeUnit, true)} used"
+				title="Fuel Bought"
+				description="Monthly {getVolumeUnitName(units.volumeUnit, true)} bought"
 				data={volumeData}
 				x="date"
 				y="volume"
@@ -202,7 +201,6 @@
 				config={volumeConfig}
 				yAxisFormat={v => formatNumber(v, 0)}
 				tooltipFormat={volumeTooltip}
-				tooltipLabelFormat={formatMonthLabel}
 				xAxisProps={monthlyXAxisProps(volumeData.length, 6)}
 			/>
 

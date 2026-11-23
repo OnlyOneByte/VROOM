@@ -3,12 +3,20 @@ import { render } from '@testing-library/svelte';
 import type { FuelStatsResponse, VolumeUnit } from '#lib/types/index.ts';
 
 const { charts } = vi.hoisted(() => ({
-	charts: [] as { title: string; description?: string; y?: unknown }[]
+	charts: [] as { title: string; description?: string; y?: unknown; data?: unknown[] }[]
 }));
 
 vi.mock('#lib/components/charts/index.ts', () => {
-	const stub = (_anchor: unknown, props: { title: string; description?: string; y?: unknown }) => {
-		charts.push({ title: props.title, description: props.description, y: props.y });
+	const stub = (
+		_anchor: unknown,
+		props: { title: string; description?: string; y?: unknown; data?: unknown[] }
+	) => {
+		charts.push({
+			title: props.title,
+			description: props.description,
+			y: props.y,
+			data: props.data
+		});
 	};
 	return { AppLineChart: stub, AppAreaChart: stub, AppBarChart: stub };
 });
@@ -63,7 +71,7 @@ describe('FuelCharts unit descriptions', () => {
 		['gallons_uk', 'Price per gallon (UK)', 'mi/gal', 'gallons (UK)'],
 		['liters', 'Price per liter', 'mi/L', 'liters']
 	] as const)(
-		'%s reads "%s", "Monthly %s" and "Monthly %s used"',
+		'%s reads "%s", "Monthly %s" and "Monthly %s bought"',
 		(volumeUnit: VolumeUnit, price, efficiency, volume) => {
 			charts.length = 0;
 			const units = { distanceUnit: 'miles', volumeUnit, chargeUnit: 'kwh' } as const;
@@ -75,7 +83,9 @@ describe('FuelCharts unit descriptions', () => {
 			expect(charts.find(c => c.title === 'Fuel Efficiency')?.description).toBe(
 				`Monthly ${efficiency}`
 			);
-			expect(charts.find(c => c.title === 'Fuel Used')?.description).toBe(`Monthly ${volume} used`);
+			expect(charts.find(c => c.title === 'Fuel Bought')?.description).toBe(
+				`Monthly ${volume} bought`
+			);
 		}
 	);
 
@@ -84,7 +94,22 @@ describe('FuelCharts unit descriptions', () => {
 		render(FuelCharts, { props: { fuelStats, group: 'primary' } });
 
 		expect(charts.find(c => c.title === 'Fuel Efficiency')?.y).toBe('efficiency');
-		expect(charts.find(c => c.title === 'Fuel Used')?.y).toBe('volume');
+		expect(charts.find(c => c.title === 'Fuel Bought')?.y).toBe('volume');
 		expect(charts.some(c => c.title === 'Fuel Consumption')).toBe(false);
+	});
+
+	test('Fuel Bought leaves out months with no fuel', () => {
+		charts.length = 0;
+		const monthlyConsumption = [
+			{ month: '2026-06', efficiency: null, volume: 12 },
+			{ month: '2026-07', efficiency: 30, volume: 0 },
+			{ month: '2026-08', efficiency: 31, volume: 9 }
+		];
+		render(FuelCharts, {
+			props: { fuelStats: { ...fuelStats, monthlyConsumption }, group: 'primary' }
+		});
+
+		const bars = charts.find(c => c.title === 'Fuel Bought')?.data as { volume: number }[];
+		expect(bars.map(b => b.volume)).toEqual([12, 9]);
 	});
 });
