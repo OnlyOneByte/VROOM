@@ -75,7 +75,9 @@ async function chooseFile(content: string, name: string): Promise<void> {
 }
 
 function importButton(): HTMLButtonElement {
-	return screen.getByRole('button', { name: /^Import \d+ rows?$|Importing/ }) as HTMLButtonElement;
+	return screen.getByRole('button', {
+		name: /^Import \d+ rows?$|Importing|Updating/
+	}) as HTMLButtonElement;
 }
 
 beforeEach(() => {
@@ -92,11 +94,12 @@ beforeEach(() => {
 });
 
 describe('ImportExpensesDialog', () => {
-	test('Import is off while a re-preview updates the result, which stays on screen', async () => {
+	test('Import is off while a re-preview updates the result, and the new result is announced', async () => {
+		let land: (value: ExpenseImportResult) => void = () => {};
 		mocks.detectImportSource.mockResolvedValue(FUELLY);
 		mocks.importExpensesCsv
 			.mockResolvedValueOnce(previewResult({ unmappedCategories: ['Tolls'] }))
-			.mockReturnValue(new Promise(() => {}));
+			.mockReturnValue(new Promise(resolve => (land = resolve)));
 		renderDialog();
 		await chooseFile(FUEL_CSV, 'fuel.csv');
 		await waitFor(() => expect(importButton()).toBeEnabled());
@@ -113,6 +116,16 @@ describe('ImportExpensesDialog', () => {
 
 		expect(screen.getByText('2 ready')).toBeInTheDocument();
 		expect(importButton()).toBeDisabled();
+		expect(importButton()).toHaveTextContent('Updating…');
+
+		land(previewResult({ readyCount: 1, errorCount: 1, totalRows: 2 }));
+		await waitFor(() =>
+			expect(screen.getByRole('status')).toHaveTextContent(
+				'Preview: 1 ready, 1 row needs attention.'
+			)
+		);
+		expect(importButton()).toHaveTextContent('Import 1 row');
+		expect(importButton()).toBeEnabled();
 	});
 
 	test('a category remap keeps its row and keyboard focus through the re-preview', async () => {

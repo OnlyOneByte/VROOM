@@ -92,6 +92,25 @@ describe('ImportExpensesForm: loading a file', () => {
 		expect(form.preview?.readyCount).toBe(2);
 	});
 
+	test('the status text reads out each result, and says when one is updating', async () => {
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		expect(form.previewStatus).toBe('');
+
+		await form.loadFile(new File([FUEL_CSV], 'fuel.csv'));
+		expect(form.previewStatus).toBe('Preview: 2 ready.');
+
+		let land: (value: ExpenseImportResult) => void = () => {};
+		mocks.importExpensesCsv.mockReturnValue(new Promise(resolve => (land = resolve)));
+		form.setCategoryRemap('Tolls', 'maintenance');
+		await flush();
+		expect(form.previewStatus).toBe('Updating the preview…');
+
+		land(previewResult({ readyCount: 0, errorCount: 2 }));
+		await flush();
+		expect(form.previewStatus).toBe('Preview: 0 ready, 2 rows need attention.');
+	});
+
 	test('the server sees the raw sample even when the first line has no CSV headers', async () => {
 		mocks.detectImportSource.mockResolvedValue(FUELLY);
 		const form = new ImportExpensesForm(() => [CAMRY]);

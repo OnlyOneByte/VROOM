@@ -301,8 +301,9 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 	});
 
 	test('a re-preview after a remap keeps the result in place, marked as updating, with Migrate off', async () => {
+		let land: (value: ExpenseImportResult) => void = () => {};
 		importExpensesCsv.mockResolvedValueOnce(result({ unmappedCategories: ['Parking'] }));
-		importExpensesCsv.mockReturnValue(new Promise(() => {}));
+		importExpensesCsv.mockReturnValue(new Promise(resolve => (land = resolve)));
 		await mount();
 		await openDialog();
 		await chooseFile();
@@ -316,10 +317,21 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		await settle();
 
 		expect(screen.getByTestId('migrate-preview')).toHaveTextContent('3 ready');
-		expect(screen.getByTestId('migrate-preview')).toHaveTextContent('Updating…');
+		expect(screen.getByTestId('preview-updating')).toHaveTextContent('Updating…');
 		expect(screen.queryByText(/Reading your file/)).toBeNull();
+		expect(screen.getByRole('status')).toHaveTextContent('Updating the preview…');
 		expect(commitButton()).toBeDisabled();
+		expect(commitButton()).toHaveTextContent('Updating…');
 		expect(screen.getByTestId('remap-count')).toHaveTextContent('1 of 1 mapped');
+
+		land(result({ readyCount: 2, errorCount: 1, totalRows: 3 }));
+		await settle();
+
+		expect(screen.getByRole('status')).toHaveTextContent(
+			'Preview: 2 ready, 1 row needs attention.'
+		);
+		expect(commitButton()).toHaveTextContent('Migrate 2 entries');
+		expect(commitButton()).toBeEnabled();
 	});
 
 	test('a vehicle picked before the file is kept for the preview', async () => {

@@ -80,6 +80,8 @@ export class ImportExpensesForm {
 	needsTargetVehicle = $derived(!!this.detectedPreset && !this.targetVehicle);
 	needsManualMapping = $derived(this.manualMapping && !this.mapping);
 	errorRows = $derived(this.preview?.rows.filter(r => r.status === 'error') ?? []);
+	/** Text for the surface's `role="status"` region, so a screen reader hears each result land. */
+	previewStatus = $derived(this.#previewStatus());
 
 	constructor(getVehicles: () => Vehicle[], options: ImportFormOptions = {}) {
 		this.#getVehicles = getVehicles;
@@ -281,6 +283,17 @@ export class ImportExpensesForm {
 		} finally {
 			this.isImporting = false;
 		}
+	}
+
+	#previewStatus(): string {
+		if (!this.preview) return '';
+		if (this.isPreviewing) return 'Updating the preview…';
+		const { readyCount, errorCount } = this.preview;
+		const errors =
+			errorCount > 0
+				? `, ${errorCount} ${errorCount === 1 ? 'row needs' : 'rows need'} attention`
+				: '';
+		return `Preview: ${readyCount} ready${errors}.`;
 	}
 
 	#findTargetVehicle(): Vehicle | undefined {

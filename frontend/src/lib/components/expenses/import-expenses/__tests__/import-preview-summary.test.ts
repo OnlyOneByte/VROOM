@@ -7,6 +7,7 @@ type Props = {
 	isPreviewing: boolean;
 	preview: ExpenseImportResult | null;
 	errorRows: ExpenseImportResult['rows'];
+	status: string;
 	needsTargetVehicle: boolean;
 	needsManualMapping: boolean;
 	hasCsv: boolean;
@@ -16,6 +17,7 @@ const IDLE: Props = {
 	isPreviewing: false,
 	preview: null,
 	errorRows: [],
+	status: '',
 	needsTargetVehicle: false,
 	needsManualMapping: false,
 	hasCsv: false
@@ -57,8 +59,14 @@ describe('ImportPreviewSummary', () => {
 		});
 
 		expect(text(container)).toContain('3 ready');
-		expect(text(container)).toContain('Updating…');
+		expect(screen.getByTestId('preview-updating')).toHaveTextContent('Updating…');
 		expect(text(container)).not.toContain('Checking your file…');
+	});
+
+	test('the status region reads the status it is given', () => {
+		render(ImportPreviewSummary, { ...IDLE, preview: preview(5, 0), status: 'Preview: 5 ready.' });
+
+		expect(screen.getByRole('status')).toHaveTextContent('Preview: 5 ready.');
 	});
 
 	test('a clean preview shows only the ready count', () => {
