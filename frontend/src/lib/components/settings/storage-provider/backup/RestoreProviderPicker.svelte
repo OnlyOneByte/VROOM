@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Cloud, Database, FileArchive, FileSpreadsheet } from '@lucide/svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { providerLabel, providerMeta } from '#lib/constants/providers.ts';
 	import type { RestoreProviderInfo } from '#lib/types/index.ts';
 
 	let {
@@ -12,25 +13,7 @@
 	} = $props();
 
 	function getProviderIcon(providerType: string) {
-		switch (providerType) {
-			case 'google-drive':
-				return Cloud;
-			case 's3':
-				return Database;
-			default:
-				return Cloud;
-		}
-	}
-
-	function getProviderTypeLabel(providerType: string): string {
-		switch (providerType) {
-			case 'google-drive':
-				return 'Google Drive';
-			case 's3':
-				return 'S3 Compatible';
-			default:
-				return providerType;
-		}
+		return providerMeta(providerType)?.icon ?? Cloud;
 	}
 </script>
 
@@ -59,7 +42,7 @@
 					<div class="flex-1 min-w-0">
 						<div class="font-medium text-foreground">{provider.displayName}</div>
 						<div class="text-sm text-muted-foreground truncate">
-							{provider.accountEmail} · {getProviderTypeLabel(provider.providerType)}
+							{provider.accountEmail} · {providerLabel(provider.providerType)}
 						</div>
 					</div>
 					<Badge variant="secondary" class="text-xs">
@@ -85,7 +68,7 @@
 								{provider.displayName} — {sourceType === 'zip' ? 'ZIP Backup' : 'Google Sheets'}
 							</div>
 							<div class="text-sm text-muted-foreground truncate">
-								{provider.accountEmail} · {getProviderTypeLabel(provider.providerType)}
+								{provider.accountEmail} · {providerLabel(provider.providerType)}
 							</div>
 						</div>
 					</button>

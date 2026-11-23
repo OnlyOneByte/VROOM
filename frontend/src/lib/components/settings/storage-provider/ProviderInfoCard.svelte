@@ -6,8 +6,6 @@
 		Pencil,
 		Trash2,
 		Cloud,
-		Database,
-		Image,
 		RefreshCw,
 		LoaderCircle
 	} from '@lucide/svelte';
@@ -22,6 +20,7 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { PHOTO_CATEGORY_LABELS } from '#lib/constants/ui.ts';
+	import { providerLabel, providerMeta } from '#lib/constants/providers.ts';
 	import { supportsZipBackup as providerSupportsZipBackup } from '#lib/constants/providers.ts';
 	import type { PhotoCategory, CategorySetting, UserProviderInfo } from '#lib/types/index.ts';
 
@@ -55,29 +54,7 @@
 	let isLoadingSyncStatus = $state(false);
 
 	function getProviderIcon(providerType: string) {
-		switch (providerType) {
-			case 'google-drive':
-				return Cloud;
-			case 'google-photos':
-				return Image;
-			case 's3':
-				return Database;
-			default:
-				return Cloud;
-		}
-	}
-
-	function getProviderTypeLabel(providerType: string): string {
-		switch (providerType) {
-			case 'google-drive':
-				return 'Google Drive';
-			case 'google-photos':
-				return 'Google Photos';
-			case 's3':
-				return 'S3 Compatible';
-			default:
-				return providerType;
-		}
+		return providerMeta(providerType)?.icon ?? Cloud;
 	}
 
 	function getStatusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -176,7 +153,7 @@
 						{#if provider.config?.['accountEmail']}
 							{provider.config['accountEmail']} ·
 						{/if}
-						{getProviderTypeLabel(provider.providerType)}
+						{providerLabel(provider.providerType)}
 					</p>
 				</div>
 			</div>
@@ -242,7 +219,7 @@
 					backups.
 				</p>
 			{/if}
-			{#if provider.providerType === 'google-drive'}
+			{#if providerMeta(provider.providerType)?.form === 'google'}
 				<div class="flex items-center justify-between">
 					<div class="space-y-0.5">
 						<Label for="sheets-{provider.id}" class="text-sm">Sheets sync</Label>
@@ -267,7 +244,7 @@
 
 			<div class="space-y-3 mb-4">
 				<p class="text-sm font-medium text-muted-foreground">Provider Settings</p>
-				{#if provider.providerType === 's3'}
+				{#if providerMeta(provider.providerType)?.form === 's3'}
 					<div class="space-y-1 text-sm">
 						<div>
 							<span class="text-muted-foreground">Endpoint:</span>

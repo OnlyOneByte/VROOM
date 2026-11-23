@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { providerMeta } from '#lib/constants/providers.ts';
 	import {
 		Camera,
 		Image,
@@ -7,8 +8,6 @@
 		Gauge,
 		ChevronDown,
 		LoaderCircle,
-		Cloud,
-		Database,
 		HardDrive
 	} from '@lucide/svelte';
 	import * as Select from '#lib/components/ui/select/index.ts';
@@ -74,14 +73,7 @@
 	});
 
 	function getProviderIcon(providerType: string) {
-		switch (providerType) {
-			case 'google-drive':
-				return Cloud;
-			case 's3':
-				return Database;
-			default:
-				return HardDrive;
-		}
+		return providerMeta(providerType)?.icon ?? HardDrive;
 	}
 
 	function getEnabledProviders(category: PhotoCategory): UserProviderInfo[] {

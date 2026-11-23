@@ -2,16 +2,7 @@
 	import { goto } from '$app/navigation';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { resolve } from '$app/paths';
-	import {
-		ArrowLeft,
-		LoaderCircle,
-		Cloud,
-		Database,
-		Monitor,
-		Inbox,
-		Save,
-		Trash2
-	} from '@lucide/svelte';
+	import { ArrowLeft, LoaderCircle, Save, Trash2 } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		Card,
@@ -22,7 +13,6 @@
 	} from '#lib/components/ui/card/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
-	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import S3ProviderForm from './S3Form.svelte';
 	import GoogleDriveProviderForm from './GoogleDriveForm.svelte';
 	import ProviderFolderSettings from './PhotoFolderSection.svelte';
@@ -36,8 +26,9 @@
 	import { routes } from '#lib/routes.ts';
 	import {
 		DEFAULT_FOLDER_SETTINGS,
-		supportsZipBackup,
-		type ProviderTypeOption
+		PROVIDER_META,
+		providerMeta,
+		supportsZipBackup
 	} from '#lib/constants/providers.ts';
 	import type {
 		PhotoCategory,
@@ -51,36 +42,9 @@
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
-	const PROVIDER_TYPES: ProviderTypeOption[] = [
-		{
-			id: 'google-drive',
-			label: 'Google Drive',
-			description: 'Store photos in Google Drive',
-			icon: Cloud,
-			disabled: false
-		},
-		{
-			id: 's3',
-			label: 'S3 / B2 / R2',
-			description: 'S3-compatible storage',
-			icon: Database,
-			disabled: false
-		},
-		{
-			id: 'onedrive',
-			label: 'OneDrive',
-			description: 'Microsoft OneDrive',
-			icon: Monitor,
-			disabled: true
-		},
-		{
-			id: 'dropbox',
-			label: 'Dropbox',
-			description: 'Dropbox cloud storage',
-			icon: Inbox,
-			disabled: true
-		}
-	];
+	const PROVIDER_TYPES = Object.entries(PROVIDER_META).flatMap(([id, meta]) =>
+		meta.option ? [{ id, icon: meta.icon, ...meta.option }] : []
+	);
 
 	let {
 		providerId,
@@ -97,6 +61,7 @@
 	let isEditMode = $derived(!!providerId && !!existingProvider);
 
 	let selectedType = $state<string | null>(null);
+	let selectedForm = $derived(providerMeta(selectedType)?.form ?? null);
 	let displayName = $state('');
 	let isSaving = $state(false);
 
@@ -118,7 +83,7 @@
 	}
 
 	let googleEmail = $derived.by(() => {
-		if (selectedType !== 'google-drive') return '';
+		if (selectedForm !== 'google') return '';
 		if (isEditMode) return (existingProvider?.config?.['accountEmail'] as string) ?? '';
 		return oauth.pendingEmail;
 	});
@@ -168,7 +133,7 @@
 			photoRootPath =
 				(existingProvider.config?.['photoRootPath'] as string) ||
 				getDefaultPhotoRootPath(existingProvider.providerType);
-			if (existingProvider.providerType === 's3') {
+			if (providerMeta(existingProvider.providerType)?.form === 's3') {
 				s3Config = {
 					endpoint: (existingProvider.config?.['endpoint'] as string) ?? '',
 					bucket: (existingProvider.config?.['bucket'] as string) ?? '',
@@ -213,20 +178,13 @@
 	}
 
 	function getDefaultPhotoRootPath(providerType: string): string {
-		switch (providerType) {
-			case 'google-drive':
-				return 'Photos';
-			case 's3':
-				return 'vroom/photos';
-			default:
-				return 'photos';
-		}
+		return providerMeta(providerType)?.defaultPhotoRootPath ?? 'photos';
 	}
 
 	let canSave = $derived.by(() => {
 		if (!selectedType || !displayName.trim()) return false;
 		if (hasBackupErrors && anyBackupEnabled) return false;
-		if (selectedType === 's3') {
+		if (selectedForm === 's3') {
 			if (isEditMode) {
 				return !!(s3Config.endpoint && s3Config.bucket);
 			}
@@ -237,7 +195,7 @@
 				s3Credentials.secretAccessKey
 			);
 		}
-		if (selectedType === 'google-drive') {
+		if (selectedForm === 'google') {
 			return isEditMode || !!oauth.pendingEmail;
 		}
 		return true;
@@ -259,7 +217,7 @@
 				photoRootPath: photoRootPath.trim() || getDefaultPhotoRootPath(selectedType)
 			};
 
-			if (selectedType === 's3') {
+			if (selectedForm === 's3') {
 				if (s3Credentials.accessKeyId && s3Credentials.secretAccessKey) {
 					credentials = {
 						accessKeyId: s3Credentials.accessKeyId,
@@ -297,9 +255,7 @@
 					displayName: displayName.trim(),
 					credentials,
 					config,
-					...(selectedType === 'google-drive' && oauth.oauthNonce
-						? { nonce: oauth.oauthNonce }
-						: {})
+					...(selectedForm === 'google' && oauth.oauthNonce ? { nonce: oauth.oauthNonce } : {})
 				});
 				resultId = created.id;
 			}
@@ -325,7 +281,7 @@
 						enabled: backupEnabled && supportsZipBackup(selectedType),
 						folderPath: backupFolderPath.trim() || 'Backups',
 						retentionCount: backupRetentionCount,
-						...(selectedType === 'google-drive' && {
+						...(providerMeta(selectedType)?.supportsSheets && {
 							sheetsSyncEnabled,
 							sheetsSpreadsheetId: sheetsSpreadsheetId || undefined
 						})
@@ -438,15 +394,11 @@
 							{@const Icon = pt.icon}
 							<button
 								type="button"
-								disabled={pt.disabled}
 								class="relative flex flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors
 									{selectedType === pt.id
 									? 'border-primary bg-primary/5'
-									: pt.disabled
-										? 'border-border bg-muted opacity-50 cursor-not-allowed'
-										: 'border-border hover:border-primary/50 hover:bg-muted/50 cursor-pointer'}"
+									: 'border-border hover:border-primary/50 hover:bg-muted/50 cursor-pointer'}"
 								onclick={() => {
-									if (pt.disabled) return;
 									selectedType = pt.id;
 									photoRootPath = getDefaultPhotoRootPath(pt.id);
 								}}
@@ -457,9 +409,6 @@
 										: 'text-muted-foreground'}"
 								/>
 								<span class="text-sm font-medium">{pt.label}</span>
-								{#if pt.disabled}
-									<Badge variant="secondary" class="text-xs absolute top-1 right-1">Soon</Badge>
-								{/if}
 							</button>
 						{/each}
 					</div>
@@ -490,9 +439,9 @@
 				<CardHeader>
 					<CardTitle class="text-base">Connection Settings</CardTitle>
 					<CardDescription>
-						{#if selectedType === 's3'}
+						{#if selectedForm === 's3'}
 							S3-compatible storage credentials and endpoint
-						{:else if selectedType === 'google-drive'}
+						{:else if selectedForm === 'google'}
 							Google Drive connection
 						{:else}
 							Provider configuration
@@ -500,7 +449,7 @@
 					</CardDescription>
 				</CardHeader>
 				<CardContent class="space-y-4">
-					{#if selectedType === 's3'}
+					{#if selectedForm === 's3'}
 						<S3ProviderForm
 							config={{ ...s3Config, photoRootPath }}
 							credentials={s3Credentials}
@@ -514,7 +463,7 @@
 								Leave credentials blank to keep existing values.
 							</p>
 						{/if}
-					{:else if selectedType === 'google-drive'}
+					{:else if selectedForm === 'google'}
 						<GoogleDriveProviderForm
 							connectedEmail={googleEmail}
 							onStartOAuth={oauth.startGoogleOAuth}

@@ -197,6 +197,15 @@ describe('ProviderForm — a new provider stores the photo root path the user ty
 		updateSettings.mockResolvedValue({});
 	});
 
+	test('offers only the storage types that have a form, with no "Soon" placeholders', () => {
+		render(ProviderForm, { props: {} });
+
+		expect(screen.getByRole('button', { name: /Google Drive/i })).toBeTruthy();
+		expect(screen.getByRole('button', { name: /S3 \/ B2 \/ R2/i })).toBeTruthy();
+		expect(screen.queryByRole('button', { name: /OneDrive|Dropbox|Google Photos/i })).toBeNull();
+		expect(screen.queryByText('Soon')).toBeNull();
+	});
+
 	test('picking a type seeds its default path, and an edit of that path is what gets saved', async () => {
 		render(ProviderForm, { props: {} });
 

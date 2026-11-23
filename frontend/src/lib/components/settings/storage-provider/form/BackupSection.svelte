@@ -3,6 +3,7 @@
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
+	import { providerMeta } from '#lib/constants/providers.ts';
 
 	let {
 		providerRootPrefix = '',
@@ -103,7 +104,7 @@
 		{/if}
 	</div>
 
-	{#if selectedType === 'google-drive'}
+	{#if providerMeta(selectedType)?.supportsSheets}
 		<div class="space-y-3">
 			<div class="flex items-start gap-3">
 				<Checkbox
