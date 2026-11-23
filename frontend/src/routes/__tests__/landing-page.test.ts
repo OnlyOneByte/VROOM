@@ -38,4 +38,11 @@ describe('landing page', () => {
 			expect(img.getAttribute('height')).toBe('1180');
 		}
 	});
+
+	test('the stacked footer links are 40px tap targets on phones', () => {
+		render(Page);
+		for (const name of ['Privacy Policy', 'Terms of Service']) {
+			expect(screen.getByRole('link', { name })).toHaveClass('min-h-10');
+		}
+	});
 });

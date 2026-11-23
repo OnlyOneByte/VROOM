@@ -413,6 +413,21 @@
 			isLoading={false}
 			addVehicleHref={resolve(routes.vehicleNew)}
 		/>
+
+		{#if dueReminders.length > 0 || recurringCost.count > 0}
+			<div class="grid grid-cols-1 lg:grid-cols-2 lg:items-start gap-6">
+				{#if dueReminders.length > 0}
+					<DueRemindersCard reminders={dueReminders} isLoading={false} />
+				{/if}
+				{#if recurringCost.count > 0}
+					<RecurringCostCard
+						count={recurringCost.count}
+						monthlyTotal={recurringCost.monthlyTotal}
+						isLoading={false}
+					/>
+				{/if}
+			</div>
+		{/if}
 	{:else}
 		<DashboardStatsCards
 			totalVehicles={stats.totalVehicles}
