@@ -92,10 +92,10 @@ const CATEGORY_PAIRS = CATEGORY_SLOTS.flatMap((a, i) =>
 );
 
 function chroma(oklch: string): number {
-	const m = oklch.match(/oklch\(\s*[\d.]+\s+([\d.]+)/);
-	if (!m) throw new Error(`not an oklch() value: ${oklch}`);
-	return Number(m[1]);
+	const [, a, b] = oklab(linearRgb(oklch));
+	return Math.hypot(a, b);
 }
+
 const VARIANTS = Object.values(THEME_REGISTRY).flatMap(theme =>
 	(['light', 'dark'] as const).map(variant => ({
 		label: `${theme.id}.${variant}`,
@@ -153,7 +153,7 @@ describe.each(VARIANTS)('$label chart slots', ({ label, tokens }) => {
 		}
 	);
 
-	test.each(SLOTS)(`%s has chroma ≥ ${CHROMA_MIN}, so it never reads as grey`, slot => {
+	test.each(SLOTS)(`%s has chroma ≥ ${CHROMA_MIN}, on screen, so it never reads as grey`, slot => {
 		expect(chroma(tokens[slot]), `${label}: ${slot} ${tokens[slot]}`).toBeGreaterThanOrEqual(
 			CHROMA_MIN
 		);
