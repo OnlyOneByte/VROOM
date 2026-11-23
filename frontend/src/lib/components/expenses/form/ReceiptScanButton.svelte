@@ -75,7 +75,7 @@
 	}
 </script>
 
-<div class="space-y-2">
+<div class="contents">
 	<input
 		bind:this={fileInput}
 		type="file"
@@ -89,23 +89,23 @@
 	<Button
 		type="button"
 		variant="outline"
-		class="h-10 w-full sm:h-9"
+		class="ml-auto h-10 rounded-full px-3 sm:h-9"
 		onclick={onScanClick}
 		disabled={isScanning}
 		data-testid="receipt-scan-button"
 	>
 		{#if isScanning}
-			<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-			Reading receipt…
+			<LoaderCircle class="h-4 w-4 animate-spin" />
+			<span class="max-sm:sr-only">Reading receipt…</span>
 		{:else}
-			<Sparkles class="mr-2 h-4 w-4" />
-			Scan receipt
+			<Sparkles class="h-4 w-4" />
+			<span class="max-sm:sr-only">Scan receipt</span>
 		{/if}
 	</Button>
 
 	{#if errorMessage}
 		<div
-			class="flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+			class="flex basis-full flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
 			data-testid="receipt-scan-error"
 		>
 			<p class="text-destructive">{errorMessage}</p>

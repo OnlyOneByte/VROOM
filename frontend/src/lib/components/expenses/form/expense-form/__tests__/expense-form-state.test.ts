@@ -71,11 +71,11 @@ describe('ExpenseFormState — construction and derived flags', () => {
 		expect(state.distLabel).toBe('Kilometers');
 	});
 
-	test('previousFuelHint shows the last fuel mileage only for fuel-tagged entries', () => {
+	test('previousFuelHint shows the last fuel mileage only for fuel entries', () => {
 		const state = createState();
 		state.lastFuelExpense = makeExpense('f', { mileage: 5_000 });
 		expect(state.previousFuelHint).toBeNull();
-		state.formData.tags = ['fuel'];
+		state.formData.category = 'fuel';
 		expect(state.previousFuelHint).toBe(5_000);
 	});
 

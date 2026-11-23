@@ -12,14 +12,31 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
-	import { LoaderCircle, CreditCard, Info, CircleAlert, TriangleAlert } from '@lucide/svelte';
+	import { onlineStatus } from '#lib/stores/offline.svelte.ts';
+	import { dateOnlyToISO, formatDate, toDateInputValue } from '#lib/utils/formatters.ts';
+	import {
+		LoaderCircle,
+		CreditCard,
+		Info,
+		CircleAlert,
+		TriangleAlert,
+		ChevronDown
+	} from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import {
+		Collapsible,
+		CollapsibleContent,
+		CollapsibleTrigger
+	} from '#lib/components/ui/collapsible/index.ts';
+	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import CategorySelector from './CategorySelector.svelte';
-	import FuelFieldsSection from './FuelFieldsSection.svelte';
+	import FuelFieldsSection, { type EnergyMode } from './FuelFieldsSection.svelte';
+	import FuelTypeFields from './FuelTypeFields.svelte';
 	import ExpensePhotoSection from './ExpensePhotoSection.svelte';
 	import PendingPhotoPreview from './PendingPhotoPreview.svelte';
 	import ReceiptScanButton from './ReceiptScanButton.svelte';
@@ -48,7 +65,7 @@
 	import ExpenseFormHeader from './expense-form/ExpenseFormHeader.svelte';
 	import ExpenseActionBar from './expense-form/ExpenseActionBar.svelte';
 	import ExpenseDeleteDialog from './expense-form/ExpenseDeleteDialog.svelte';
-	import ExpenseDateAmountFields from './expense-form/ExpenseDateAmountFields.svelte';
+	import ExpenseAmountField from './expense-form/ExpenseAmountField.svelte';
 	import ExpenseNotesFields from './expense-form/ExpenseNotesFields.svelte';
 	import ExpenseSplitBreakdown from './expense-form/ExpenseSplitBreakdown.svelte';
 	import ExpenseFormSubtitle from './expense-form/ExpenseFormSubtitle.svelte';
@@ -150,6 +167,11 @@
 		const loadsContext = !!form.formData.vehicleId && !form.vehiclesError;
 		if (loadsContext) previousVehicleId = form.formData.vehicleId;
 		mounted = true;
+		detailsOpen = form.isEditMode || !!form.queuedExpense || hasDetailValues();
+		if (!form.isEditMode && !form.queuedExpense) {
+			await tick();
+			amountInput?.focus();
+		}
 		if (loadsContext) await loadVehicleContext(form);
 
 		if (!form.isEditMode && preselectedFinancingId) {
@@ -164,6 +186,59 @@
 	let isRetrying = $state(false);
 	let retryButton = $state<HTMLButtonElement | null>(null);
 	let formEl = $state<HTMLFormElement | null>(null);
+	let amountInput = $state<HTMLInputElement | null>(null);
+	let energyMode = $state<EnergyMode>('fuel');
+	let detailsOpen = $state(false);
+
+	const quickActions = $derived(!form.isEditMode);
+	const showsSubtitle = $derived(form.isEditMode || !!form.queuedExpense || !onlineStatus.current);
+	const dateLabel = $derived(
+		form.formData.date === toDateInputValue(new Date())
+			? 'Today'
+			: form.formData.date
+				? formatDate(dateOnlyToISO(form.formData.date))
+				: undefined
+	);
+	const canScanReceipt = $derived(
+		!form.isEditMode && !form.isSplit && !form.isInsuranceManaged && !form.queuedExpense
+	);
+	const vehicleError = $derived(form.touched['vehicleId'] ? form.errors['vehicleId'] : undefined);
+	const dateError = $derived(form.touched['date'] ? form.errors['date'] : undefined);
+	const detailFields = $derived([
+		'description',
+		'location',
+		'tags',
+		'fuelType',
+		...(form.showFuelFields ? [] : ['mileage'])
+	]);
+	const detailsSummary = $derived.by(() => {
+		const lead = form.showFuelFields
+			? energyMode === 'charging'
+				? 'Charging type'
+				: 'Fuel type'
+			: form.asksForMileage
+				? 'Odometer'
+				: 'Where';
+		const rest = form.showFuelFields || form.asksForMileage ? ['where'] : [];
+		return [lead, ...rest, 'note', 'tags', 'receipt'].join(', ');
+	});
+
+	function handleAmountBlur() {
+		const { amount } = form.formData;
+		if ((amount != null && amount !== '') || form.touched['amount']) form.handleBlur('amount');
+	}
+
+	function hasDetailValues(): boolean {
+		const { description, location, tags, mileage, missedFillup } = form.formData;
+		return (
+			!!description ||
+			!!location ||
+			tags.length > 0 ||
+			missedFillup ||
+			form.pendingFiles.length > 0 ||
+			(!form.showFuelFields && !!mileage)
+		);
+	}
 
 	const formTitle = $derived(
 		form.isGroupEditMode
@@ -177,9 +252,14 @@
 
 	async function save() {
 		await (form.queuedExpense ? saveQueuedExpense(form) : submitExpense(form));
-		if (form.errors['vehicleDetails']) focusInView(retryButton);
-		else if (form.submitError || Object.keys(form.errors).length > 0)
-			await focusFirstProblem(formEl);
+		if (form.errors['vehicleDetails']) {
+			focusInView(retryButton);
+			return;
+		}
+		const failed = Object.keys(form.errors);
+		if (!form.submitError && failed.length === 0) return;
+		if (failed.some(field => detailFields.includes(field))) detailsOpen = true;
+		await focusFirstProblem(formEl);
 	}
 
 	async function retry(load: () => Promise<void>) {
@@ -231,6 +311,7 @@
 			form.formData.description = draft.vendor;
 		}
 		form.pendingFiles = [...form.pendingFiles, image];
+		detailsOpen = true;
 		appStore.showSuccess('Receipt scanned — review the details and save.');
 	}
 
@@ -251,18 +332,39 @@
 	);
 </script>
 
+{#snippet mileageField()}
+	<MileageField
+		bind:value={form.formData.mileage}
+		required={form.showFuelFields}
+		error={form.touched['mileage'] ? form.errors['mileage'] : undefined}
+		previousFuelMileage={form.previousFuelHint}
+		distanceLabel={form.distLabel}
+		describedBy={showsOdometerCheckDeferred ? 'odometer-check-deferred' : undefined}
+		onInput={form.handleMileageChange}
+		onBlur={() => form.handleBlur('mileage')}
+	/>
+{/snippet}
+
+{#snippet formSubtitle()}
+	{#if form.queuedExpense}
+		Saved on this device, waiting to sync
+	{:else}
+		<ExpenseFormSubtitle
+			isEditMode={form.isEditMode}
+			isGroupEditMode={form.isGroupEditMode}
+			selectedVehicleIds={form.selectedVehicleIds}
+			vehicles={form.vehicles}
+			vehicle={form.vehicle}
+		/>
+	{/if}
+{/snippet}
+
 {#snippet createHeader()}
-	<ExpenseFormHeader title={formTitle} onBack={handleBack}>
-		{#snippet subtitle()}
-			<ExpenseFormSubtitle
-				isEditMode={form.isEditMode}
-				isGroupEditMode={form.isGroupEditMode}
-				selectedVehicleIds={form.selectedVehicleIds}
-				vehicles={form.vehicles}
-				vehicle={form.vehicle}
-			/>
-		{/snippet}
-	</ExpenseFormHeader>
+	<ExpenseFormHeader
+		title={formTitle}
+		onBack={handleBack}
+		subtitle={showsSubtitle ? formSubtitle : undefined}
+	/>
 {/snippet}
 
 <FormLayout>
@@ -313,17 +415,11 @@
 		/>
 	{:else if form.vehiclesError}
 		<div class="space-y-6">
-			<ExpenseFormHeader title={formTitle} onBack={handleBack}>
-				{#snippet subtitle()}
-					<ExpenseFormSubtitle
-						isEditMode={form.isEditMode}
-						isGroupEditMode={form.isGroupEditMode}
-						selectedVehicleIds={form.selectedVehicleIds}
-						vehicles={form.vehicles}
-						vehicle={form.vehicle}
-					/>
-				{/snippet}
-			</ExpenseFormHeader>
+			<ExpenseFormHeader
+				title={formTitle}
+				onBack={handleBack}
+				subtitle={showsSubtitle ? formSubtitle : undefined}
+			/>
 			<LoadErrorCard
 				data-testid="vehicles-load-error"
 				title="Couldn't load your vehicles"
@@ -339,35 +435,22 @@
 			/>
 		</div>
 	{:else}
-		<div class="space-y-6 pb-32 sm:pb-24 lg:pb-0 short:pb-0">
-			<ExpenseFormHeader title={formTitle} onBack={handleBack}>
-				{#snippet subtitle()}
-					{#if form.queuedExpense}
-						Saved on this device, waiting to sync
-					{:else}
-						<ExpenseFormSubtitle
-							isEditMode={form.isEditMode}
-							isGroupEditMode={form.isGroupEditMode}
-							selectedVehicleIds={form.selectedVehicleIds}
-							vehicles={form.vehicles}
-							vehicle={form.vehicle}
-						/>
-					{/if}
-				{/snippet}
-			</ExpenseFormHeader>
+		<div class="space-y-6 {quickActions ? '' : 'pb-32 sm:pb-24 lg:pb-0 short:pb-0'}">
+			<ExpenseFormHeader
+				title={formTitle}
+				onBack={handleBack}
+				subtitle={showsSubtitle ? formSubtitle : undefined}
+			/>
 
 			<form
 				bind:this={formEl}
+				novalidate
 				onsubmit={e => {
 					e.preventDefault();
 					save();
 				}}
-				class="rounded-lg border bg-card p-6 space-y-6"
+				class="space-y-5 sm:rounded-lg sm:border sm:bg-card sm:p-6"
 			>
-				{#if !form.isEditMode && !form.isSplit && !form.isInsuranceManaged && !form.queuedExpense}
-					<ReceiptScanButton onDraft={handleReceiptDraft} />
-				{/if}
-
 				{#if form.queuedExpense}
 					<div
 						class="flex items-start gap-3 rounded-lg border bg-muted/50 p-4"
@@ -407,23 +490,45 @@
 						onToggle={form.handleSplitVehicleToggle}
 						onRemoveSplit={() => form.handleSplitToggle(false)}
 					/>
-				{:else}
-					<div class="space-y-2">
-						<VehicleSelectField
-							vehicles={form.vehicles}
-							value={form.formData.vehicleId}
-							error={form.touched['vehicleId'] ? form.errors['vehicleId'] : undefined}
-							describedBy={form.showFuelSplitHint ? 'fuel-split-hint' : undefined}
-							canSplit={form.canSplit}
-							onSelect={form.handleVehicleSelect}
-							onSplit={() => form.handleSplitToggle(true)}
+				{/if}
+
+				<div class="space-y-2">
+					<div class="flex flex-wrap items-center gap-2">
+						{#if !form.isSplit}
+							<VehicleSelectField
+								vehicles={form.vehicles}
+								value={form.formData.vehicleId}
+								error={vehicleError}
+								describedBy={form.showFuelSplitHint ? 'fuel-split-hint' : undefined}
+								canSplit={form.canSplit}
+								onSelect={form.handleVehicleSelect}
+								onSplit={() => form.handleSplitToggle(true)}
+							/>
+						{/if}
+						<Label for="date" class="sr-only">Date *</Label>
+						<DatePicker
+							id="date"
+							bind:value={form.formData.date}
+							placeholder="Select date"
+							label={dateLabel}
+							disabled={form.isGroupEditMode}
+							class="w-auto rounded-full px-3.5"
+							aria-invalid={!!dateError}
+							aria-describedby={dateError ? 'date-error' : undefined}
 						/>
+						{#if canScanReceipt}
+							<ReceiptScanButton onDraft={handleReceiptDraft} />
+						{/if}
+					</div>
+					{#if vehicleError}
+						<FormFieldError id="vehicleId-error">{vehicleError}</FormFieldError>
+					{/if}
+					{#if dateError}
+						<FormFieldError id="date-error">{dateError}</FormFieldError>
+					{/if}
+					{#if !form.isSplit}
 						{#if form.showFuelSplitHint}
-							<p
-								id="fuel-split-hint"
-								class="text-xs text-muted-foreground"
-								data-testid="fuel-split-hint"
-							>
+							<p id="fuel-split-hint" class="sr-only" data-testid="fuel-split-hint">
 								Fill-ups can't be split across vehicles. Log each one on the vehicle you filled.
 							</p>
 						{/if}
@@ -461,37 +566,14 @@
 								</Button>
 							</div>
 						{/if}
-					</div>
-				{/if}
+					{/if}
+				</div>
 
-				<fieldset
-					disabled={form.isGroupEditMode}
-					class="min-w-0 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50"
-				>
-					<CategorySelector
-						value={form.formData.category}
-						error={form.errors['category']}
-						touched={form.touched['category']}
-						onSelect={form.selectCategory}
-					/>
-				</fieldset>
-
-				{#if form.isFinancingPayment}
-					<div class="flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
-						<CreditCard class="h-4 w-4 text-chart-3" />
-						<span class="text-sm font-medium leading-none text-foreground">
-							Financing payment
-						</span>
-					</div>
-				{/if}
-
-				<ExpenseDateAmountFields
-					bind:date={form.formData.date}
+				<ExpenseAmountField
+					bind:ref={amountInput}
 					bind:amount={form.formData.amount}
-					dateError={form.touched['date'] ? form.errors['date'] : undefined}
 					amountError={form.touched['amount'] ? form.errors['amount'] : undefined}
-					dateDisabled={form.isGroupEditMode}
-					onAmountBlur={() => form.handleBlur('amount')}
+					onAmountBlur={handleAmountBlur}
 				/>
 
 				{#if form.isSplit && form.selectedVehicleIds.length >= 2 && form.parsedTotalAmount > 0}
@@ -509,19 +591,22 @@
 
 				<fieldset
 					disabled={form.isGroupEditMode}
-					class="min-w-0 space-y-6 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50"
+					class="min-w-0 space-y-5 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50"
 				>
-					{#if form.asksForMileage}
-						<MileageField
-							bind:value={form.formData.mileage}
-							required={form.showFuelFields}
-							error={form.touched['mileage'] ? form.errors['mileage'] : undefined}
-							previousFuelMileage={form.previousFuelHint}
-							distanceLabel={form.distLabel}
-							describedBy={showsOdometerCheckDeferred ? 'odometer-check-deferred' : undefined}
-							onInput={form.handleMileageChange}
-							onBlur={() => form.handleBlur('mileage')}
-						/>
+					<CategorySelector
+						value={form.formData.category}
+						error={form.errors['category']}
+						touched={form.touched['category']}
+						onSelect={form.selectCategory}
+					/>
+
+					{#if form.isFinancingPayment}
+						<div class="flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
+							<CreditCard class="h-4 w-4 text-chart-3" />
+							<span class="text-sm font-medium leading-none text-foreground">
+								Financing payment
+							</span>
+						</div>
 					{/if}
 
 					{#if form.showFuelFields && form.vehicle}
@@ -531,7 +616,7 @@
 							bind:volume={form.formData.volume}
 							bind:charge={form.formData.charge}
 							bind:fuelType={form.formData.fuelType}
-							bind:missedFillup={form.formData.missedFillup}
+							bind:energyMode
 							amount={form.formData.amount}
 							volumeUnit={form.effectiveVolumeUnit}
 							chargeUnit={form.effectiveChargeUnit}
@@ -543,53 +628,98 @@
 							touched={form.touched}
 							onBlur={form.handleBlur}
 							onMileageChange={form.handleMileageChange}
-						/>
+						>
+							{#snippet odometer()}
+								{#if form.asksForMileage}
+									{@render mileageField()}
+								{/if}
+							{/snippet}
+						</FuelFieldsSection>
+					{:else if form.showFuelFields && form.asksForMileage}
+						{@render mileageField()}
 					{/if}
-
-					<ExpenseNotesFields
-						bind:description={form.formData.description}
-						bind:location={form.formData.location}
-						bind:tags={form.formData.tags}
-						tagError={form.errors['tags']}
-						tagTouched={form.touched['tags']}
-						tagSuggestions={form.tagSuggestions}
-					/>
 				</fieldset>
 
-				{#if form.isEditMode}
-					{#if form.originalExpense}
-						<ExpensePhotoSection entityType="expense" entityId={form.originalExpense.id} />
-					{/if}
-				{:else if form.queuedPhotosUnreadable && form.queuedExpense?.clientId}
-					{@const clientId = form.queuedExpense.clientId}
-					<div class="space-y-2" data-testid="queued-photos-unreadable">
-						<h2 class="text-sm font-medium text-foreground">Photos & Receipts</h2>
-						<p id="queued-photos-message" class="text-sm text-muted-foreground">
-							Couldn't load this entry's photos, so they can't be changed here. They stay saved with
-							it and will sync as they are.
-						</p>
-						<Button
-							variant="outline"
-							size="lg"
-							aria-describedby="queued-photos-message"
-							aria-disabled={isRetrying}
-							onclick={() => retryQueuedPhotos(clientId)}
+				<Collapsible bind:open={detailsOpen}>
+					<CollapsibleTrigger
+						class="flex min-h-12 w-full items-center justify-between gap-3 rounded-md border bg-background px-3 text-left text-sm font-medium outline-none transition-colors hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50"
+					>
+						<span class="shrink-0">More details</span>
+						<span class="flex min-w-0 items-center gap-1 text-xs font-normal text-muted-foreground">
+							<span class="truncate">{detailsSummary}</span>
+							<ChevronDown
+								class="size-4 shrink-0 transition-transform {detailsOpen ? 'rotate-180' : ''}"
+								aria-hidden="true"
+							/>
+						</span>
+					</CollapsibleTrigger>
+					<CollapsibleContent class="space-y-5 pt-5">
+						<fieldset
+							disabled={form.isGroupEditMode}
+							class="min-w-0 space-y-5 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50"
 						>
-							Retry
-						</Button>
-						<p role="status" class="min-h-5 text-sm text-muted-foreground">
-							{#if photosRetryFailed}Still couldn't load them. Try again in a moment.{/if}
-						</p>
-					</div>
-				{:else}
-					<div bind:this={photoPicker}>
-						<PendingPhotoPreview
-							files={form.pendingFiles}
-							onAdd={file => (form.pendingFiles = [...form.pendingFiles, file])}
-							onRemove={i => (form.pendingFiles = form.pendingFiles.filter((_, idx) => idx !== i))}
-						/>
-					</div>
-				{/if}
+							{#if !form.showFuelFields && form.asksForMileage}
+								{@render mileageField()}
+							{/if}
+
+							{#if form.showFuelFields && form.vehicle}
+								{#key energyMode}
+									<FuelTypeFields
+										{energyMode}
+										bind:fuelType={form.formData.fuelType}
+										bind:missedFillup={form.formData.missedFillup}
+										onBlur={form.handleBlur}
+									/>
+								{/key}
+							{/if}
+
+							<ExpenseNotesFields
+								bind:description={form.formData.description}
+								bind:location={form.formData.location}
+								bind:tags={form.formData.tags}
+								tagError={form.errors['tags']}
+								tagTouched={form.touched['tags']}
+								tagSuggestions={form.tagSuggestions}
+							/>
+						</fieldset>
+
+						{#if form.isEditMode}
+							{#if form.originalExpense}
+								<ExpensePhotoSection entityType="expense" entityId={form.originalExpense.id} />
+							{/if}
+						{:else if form.queuedPhotosUnreadable && form.queuedExpense?.clientId}
+							{@const clientId = form.queuedExpense.clientId}
+							<div class="space-y-2" data-testid="queued-photos-unreadable">
+								<h2 class="text-sm font-medium text-foreground">Photos & Receipts</h2>
+								<p id="queued-photos-message" class="text-sm text-muted-foreground">
+									Couldn't load this entry's photos, so they can't be changed here. They stay saved
+									with it and will sync as they are.
+								</p>
+								<Button
+									variant="outline"
+									size="lg"
+									aria-describedby="queued-photos-message"
+									aria-disabled={isRetrying}
+									onclick={() => retryQueuedPhotos(clientId)}
+								>
+									Retry
+								</Button>
+								<p role="status" class="min-h-5 text-sm text-muted-foreground">
+									{#if photosRetryFailed}Still couldn't load them. Try again in a moment.{/if}
+								</p>
+							</div>
+						{:else}
+							<div bind:this={photoPicker}>
+								<PendingPhotoPreview
+									files={form.pendingFiles}
+									onAdd={file => (form.pendingFiles = [...form.pendingFiles, file])}
+									onRemove={i =>
+										(form.pendingFiles = form.pendingFiles.filter((_, idx) => idx !== i))}
+								/>
+							</div>
+						{/if}
+					</CollapsibleContent>
+				</Collapsible>
 
 				{#if form.submitError}
 					<FormFieldError
@@ -601,18 +731,34 @@
 						{form.submitError}
 					</FormFieldError>
 				{/if}
+
+				{#if quickActions}
+					<ExpenseActionBar
+						inline
+						isEditMode={false}
+						canDuplicate={false}
+						isSubmitting={form.isSubmitting}
+						isDeleting={form.isDeleting}
+						onDelete={confirmDelete}
+						onDuplicate={handleDuplicate}
+						onCancel={handleBack}
+						onSave={save}
+					/>
+				{/if}
 			</form>
 
-			<ExpenseActionBar
-				isEditMode={form.isEditMode}
-				canDuplicate={form.canDuplicate}
-				isSubmitting={form.isSubmitting}
-				isDeleting={form.isDeleting}
-				onDelete={confirmDelete}
-				onDuplicate={handleDuplicate}
-				onCancel={handleBack}
-				onSave={save}
-			/>
+			{#if !quickActions}
+				<ExpenseActionBar
+					isEditMode={form.isEditMode}
+					canDuplicate={form.canDuplicate}
+					isSubmitting={form.isSubmitting}
+					isDeleting={form.isDeleting}
+					onDelete={confirmDelete}
+					onDuplicate={handleDuplicate}
+					onCancel={handleBack}
+					onSave={save}
+				/>
+			{/if}
 		</div>
 	{/if}
 

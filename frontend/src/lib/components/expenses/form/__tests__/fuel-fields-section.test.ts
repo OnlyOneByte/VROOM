@@ -1,7 +1,8 @@
 import { describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { reactiveState } from '../../../../../test-utils/reactive-state.svelte';
-import FuelFieldsSection from '../FuelFieldsSection.svelte';
+import FuelFieldsSection, { type EnergyMode } from '../FuelFieldsSection.svelte';
+import FuelTypeFields from '../FuelTypeFields.svelte';
 import type { DistanceUnit, VolumeUnit } from '#lib/types/index.ts';
 
 interface Options {
@@ -25,7 +26,8 @@ function mount(options: Options = {}) {
 		volume: options.volume ?? '',
 		charge: options.charge ?? '',
 		fuelType: options.fuelType ?? '',
-		missedFillup: false
+		missedFillup: false,
+		energyMode: 'fuel' as EnergyMode
 	});
 	const onBlur = vi.fn();
 	const onMileageChange = vi.fn();
@@ -50,11 +52,11 @@ function mount(options: Options = {}) {
 		set fuelType(value: string) {
 			form.fuelType = value;
 		},
-		get missedFillup() {
-			return form.missedFillup;
+		get energyMode() {
+			return form.energyMode;
 		},
-		set missedFillup(value: boolean) {
-			form.missedFillup = value;
+		set energyMode(value: EnergyMode) {
+			form.energyMode = value;
 		},
 		amount: options.amount ?? '',
 		volumeUnit: options.volumeUnit ?? 'gallons_us',
@@ -68,13 +70,31 @@ function mount(options: Options = {}) {
 		onBlur,
 		onMileageChange
 	});
+	render(FuelTypeFields, {
+		get energyMode() {
+			return form.energyMode;
+		},
+		get fuelType() {
+			return form.fuelType;
+		},
+		set fuelType(value: string) {
+			form.fuelType = value;
+		},
+		get missedFillup() {
+			return form.missedFillup;
+		},
+		set missedFillup(value: boolean) {
+			form.missedFillup = value;
+		},
+		onBlur
+	});
 	return {
 		container,
 		form,
 		onBlur,
 		onMileageChange,
-		trigger: () => container.querySelector<HTMLElement>('#fuelType')!,
-		input: (id: string) => container.querySelector<HTMLInputElement>(`#${id}`)
+		trigger: () => document.querySelector<HTMLElement>('#fuelType')!,
+		input: (id: string) => document.querySelector<HTMLInputElement>(`#${id}`)
 	};
 }
 
@@ -127,13 +147,17 @@ describe('volume field', () => {
 
 	test('shows the price per unit when both volume and amount are present', () => {
 		mount({ volume: '10', amount: '40' });
-		expect(screen.getByText('Price per gal:')).toBeInTheDocument();
-		expect(screen.getByText('Price per gal:').parentElement).toHaveTextContent('4.000');
+		expect(screen.getByTestId('energy-readout')).toHaveTextContent('$4.000/gal');
 	});
 
 	test('omits the price per unit without an amount', () => {
 		mount({ volume: '10' });
-		expect(screen.queryByText(/Price per/)).toBeNull();
+		expect(screen.queryByTestId('energy-readout')).toBeNull();
+	});
+
+	test('links the live readout to the volume input', () => {
+		const section = mount({ volume: '10', amount: '40' });
+		expect(section.input('volume')).toHaveAttribute('aria-describedby', 'energy-readout');
 	});
 });
 
@@ -240,12 +264,12 @@ describe('charging fields', () => {
 
 	test('shows the price per kWh when both charge and amount are present', () => {
 		mount({ ...EV, charge: '20', amount: '5', fuelType: 'Electric' });
-		expect(screen.getByText('Price per kWh:').parentElement).toHaveTextContent('0.250');
+		expect(screen.getByTestId('energy-readout')).toHaveTextContent('$0.250/kWh');
 	});
 
 	test('omits the price per kWh without a charge', () => {
 		mount({ ...EV, amount: '5' });
-		expect(screen.queryByText(/Price per/)).toBeNull();
+		expect(screen.queryByTestId('energy-readout')).toBeNull();
 	});
 });
 
@@ -261,23 +285,23 @@ describe('hybrid toggle', () => {
 describe('efficiency readout', () => {
 	test('is hidden when the calculation is not shown', () => {
 		mount({ calculatedMpg: 30 });
-		expect(screen.queryByText(/Calculated:/)).toBeNull();
+		expect(screen.queryByText(/since last fill-up/)).toBeNull();
 	});
 
 	test('is hidden when there is no calculated figure', () => {
 		mount({ showMpgCalculation: true });
-		expect(screen.queryByText(/Calculated:/)).toBeNull();
+		expect(screen.queryByText(/since last fill-up/)).toBeNull();
 	});
 
 	test('a low MPG suggests a maintenance check', () => {
 		mount({ showMpgCalculation: true, calculatedMpg: 12 });
-		expect(screen.getByText(/Calculated: 12/)).toHaveTextContent('mi/gal');
+		expect(screen.getByText(/12 mi\/gal since last fill-up/)).toBeInTheDocument();
 		expect(screen.getByText(/Low fuel efficiency/)).toBeInTheDocument();
 	});
 
 	test('a high MPG is called out as excellent', () => {
 		mount({ showMpgCalculation: true, calculatedMpg: 90, distanceUnit: 'kilometers' });
-		expect(screen.getByText(/Calculated: 90/)).toHaveTextContent('km/gal');
+		expect(screen.getByText(/90 km\/gal since last fill-up/)).toBeInTheDocument();
 		expect(screen.getByText(/Excellent fuel efficiency/)).toBeInTheDocument();
 	});
 
@@ -288,25 +312,26 @@ describe('efficiency readout', () => {
 			distanceUnit: 'kilometers',
 			volumeUnit: 'liters'
 		});
-		expect(screen.getByText(/Calculated: 12.5/)).toHaveTextContent('km/L');
+		expect(screen.getByText(/12\.5 km\/L since last fill-up/)).toBeInTheDocument();
 		expect(section.container).not.toHaveTextContent('Low fuel efficiency');
 	});
 
 	test('an ordinary MPG shows the figure without a verdict', () => {
 		const section = mount({ showMpgCalculation: true, calculatedMpg: 30 });
-		const readout = screen.getByText(/Calculated: 30/).closest('div')!.parentElement!;
+		const readout = screen.getByTestId('energy-readout');
+		expect(readout).toHaveTextContent('30 mi/gal since last fill-up');
 		expect(within(readout).queryByText(/efficiency/)).toBeNull();
 		expect(section.container).not.toHaveTextContent('Excellent');
 	});
 
 	test('an MPG figure is not shown while charging', () => {
 		mount({ ...EV, showMpgCalculation: true, calculatedMpg: 30 });
-		expect(screen.queryByText(/Calculated:/)).toBeNull();
+		expect(screen.queryByText(/since last fill-up/)).toBeNull();
 	});
 
 	test('a low electric efficiency suggests checking driving conditions', () => {
 		mount({ ...EV, showMpgCalculation: true, calculatedEfficiency: 1.5 });
-		expect(screen.getByText(/Calculated: 1.5/)).toHaveTextContent('mi/kWh');
+		expect(screen.getByText(/1\.5 mi\/kWh since last fill-up/)).toBeInTheDocument();
 		expect(screen.getByText(/Low efficiency - check driving conditions/)).toBeInTheDocument();
 	});
 
@@ -317,14 +342,14 @@ describe('efficiency readout', () => {
 
 	test('an ordinary electric efficiency shows the figure without a verdict', () => {
 		const section = mount({ ...EV, showMpgCalculation: true, calculatedEfficiency: 3 });
-		expect(screen.getByText(/Calculated: 3/)).toBeInTheDocument();
+		expect(screen.getByText(/3 mi\/kWh since last fill-up/)).toBeInTheDocument();
 		expect(section.container).not.toHaveTextContent('Excellent');
 		expect(section.container).not.toHaveTextContent('Low efficiency');
 	});
 
 	test('an electric efficiency is not shown in fuel mode', () => {
 		mount({ showMpgCalculation: true, calculatedEfficiency: 3 });
-		expect(screen.queryByText(/Calculated:/)).toBeNull();
+		expect(screen.queryByText(/since last fill-up/)).toBeNull();
 	});
 });
 

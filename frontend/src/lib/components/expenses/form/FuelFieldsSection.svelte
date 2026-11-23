@@ -66,12 +66,11 @@
 </script>
 
 <script lang="ts">
-	import { Fuel, Gauge, Zap } from '@lucide/svelte';
+	import type { Snippet } from 'svelte';
+	import { Fuel, Zap } from '@lucide/svelte';
 	import Input from '#lib/components/ui/input/input.svelte';
 	import Label from '#lib/components/ui/label/label.svelte';
-	import * as Select from '#lib/components/ui/select/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
-	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		getVolumeUnitLabel,
@@ -89,7 +88,7 @@
 		volume: string;
 		charge: string;
 		fuelType: string;
-		missedFillup: boolean;
+		energyMode?: EnergyMode;
 		amount: string;
 		volumeUnit: VolumeUnit;
 		chargeUnit: ChargeUnit;
@@ -101,6 +100,7 @@
 		touched: Record<string, boolean>;
 		onBlur: (_field: string) => void;
 		onMileageChange: () => void;
+		odometer?: Snippet;
 	}
 
 	let {
@@ -109,7 +109,7 @@
 		volume = $bindable(),
 		charge = $bindable(),
 		fuelType = $bindable(),
-		missedFillup = $bindable(),
+		energyMode = $bindable('fuel'),
 		amount,
 		volumeUnit,
 		chargeUnit,
@@ -120,44 +120,63 @@
 		errors,
 		touched,
 		onBlur,
-		onMileageChange
+		onMileageChange,
+		odometer
 	}: Props = $props();
 
-	let energyMode = $state<EnergyMode>('fuel');
-	let fuelRating = $derived(
-		calculatedMpg ? rateFuelEfficiency(calculatedMpg, distanceUnit, volumeUnit) : null
-	);
-	let chargeRating = $derived(
-		calculatedEfficiency ? rateChargeEfficiency(calculatedEfficiency, distanceUnit) : null
-	);
 	let seenCapabilities: EnergyCapabilities | null = null;
 
 	let showToggle = $derived(trackFuel && trackCharging);
-	let showCustomFuelType = $state(false);
+	let charging = $derived(energyMode === 'charging');
 
-	const FUEL_TYPE_OPTIONS = [
-		{ value: '87 (Regular)', label: '87 (Regular)' },
-		{ value: '89 (Mid-Grade)', label: '89 (Mid-Grade)' },
-		{ value: '91 (Premium)', label: '91 (Premium)' },
-		{ value: '93 (Super Premium)', label: '93 (Super Premium)' },
-		{ value: 'Diesel', label: 'Diesel' },
-		{ value: 'Ethanol-Free', label: 'Ethanol-Free' },
-		{ value: 'other', label: 'Other (Custom)' }
-	];
+	let pricePerUnit = $derived.by(() => {
+		const quantity = parseFloat(charging ? charge : volume);
+		const total = parseFloat(amount);
+		if (!(quantity > 0) || !(total > 0)) return null;
+		const unit = charging
+			? getChargeUnitLabel(chargeUnit, true)
+			: getVolumeUnitLabel(volumeUnit, true);
+		return `${formatCurrency(total / quantity, undefined, 3)}/${unit}`;
+	});
 
-	const CHARGING_TYPE_OPTIONS = [
-		{ value: 'Level 1 (Home)', label: 'Level 1 (Home)' },
-		{ value: 'Level 2 (AC)', label: 'Level 2 (AC)' },
-		{ value: 'DC Fast Charging', label: 'DC Fast Charging' },
-		{ value: 'Electric', label: 'Electric' }
-	];
+	let efficiency = $derived.by(() => {
+		if (!showMpgCalculation) return null;
+		if (!charging && calculatedMpg) {
+			return {
+				text: `${calculatedMpg} ${getFuelEfficiencyLabel(distanceUnit, volumeUnit)}`,
+				rating: rateFuelEfficiency(calculatedMpg, distanceUnit, volumeUnit),
+				low: 'Low fuel efficiency - consider a maintenance check.',
+				excellent: 'Excellent fuel efficiency!'
+			};
+		}
+		if (charging && calculatedEfficiency) {
+			return {
+				text: `${calculatedEfficiency} ${getElectricEfficiencyLabel(distanceUnit, chargeUnit)}`,
+				rating: rateChargeEfficiency(calculatedEfficiency, distanceUnit),
+				low: 'Low efficiency - check driving conditions.',
+				excellent: 'Excellent efficiency!'
+			};
+		}
+		return null;
+	});
+
+	let readout = $derived(
+		[pricePerUnit, efficiency ? `${efficiency.text} since last fill-up` : null]
+			.filter(Boolean)
+			.join(' · ')
+	);
+
+	function describedBy(field: 'volume' | 'charge'): string | undefined {
+		const ids = [touched[field] && errors[field] ? `${field}-error` : null];
+		if (readout) ids.push('energy-readout');
+		return ids.filter(Boolean).join(' ') || undefined;
+	}
 
 	function applyEnergyModeFields(mode: EnergyMode) {
 		const next = energyModeFields(mode, { volume, charge });
 		volume = next.volume;
 		charge = next.charge;
 		fuelType = next.fuelType;
-		showCustomFuelType = false;
 	}
 
 	function handleModeSwitch(mode: EnergyMode) {
@@ -187,23 +206,15 @@
 	});
 </script>
 
-<div class="p-4 bg-primary/10 rounded-lg space-y-4">
-	<div class="flex items-center gap-2 text-primary">
-		{#if energyMode === 'charging'}
-			<Zap class="h-5 w-5" />
-			<h2 class="font-medium">Charging Details</h2>
-		{:else}
-			<Fuel class="h-5 w-5" />
-			<h2 class="font-medium">Fuel Details</h2>
-		{/if}
-	</div>
-
+<div class="space-y-3">
+	<h2 class="sr-only">{charging ? 'Charging Details' : 'Fuel Details'}</h2>
 	{#if showToggle}
 		<div class="flex gap-1 rounded-lg bg-muted p-1">
 			<Button
 				variant={energyMode === 'fuel' ? 'default' : 'ghost'}
 				size="sm"
 				class="h-10 flex-1 gap-1.5 sm:h-8"
+				aria-pressed={energyMode === 'fuel'}
 				onclick={() => handleModeSwitch('fuel')}
 			>
 				<Fuel class="h-4 w-4" />
@@ -213,6 +224,7 @@
 				variant={energyMode === 'charging' ? 'default' : 'ghost'}
 				size="sm"
 				class="h-10 flex-1 gap-1.5 sm:h-8"
+				aria-pressed={energyMode === 'charging'}
 				onclick={() => handleModeSwitch('charging')}
 			>
 				<Zap class="h-4 w-4" />
@@ -221,176 +233,63 @@
 		</div>
 	{/if}
 
-	{#if energyMode === 'fuel'}
-		<div class="space-y-2">
-			<Label for="volume">{getVolumeUnitLabel(volumeUnit)} *</Label>
-			<Input
-				id="volume"
-				type="number"
-				step="0.001"
-				min="0"
-				bind:value={volume}
-				placeholder="0.000"
-				oninput={onMileageChange}
-				onblur={() => onBlur('volume')}
-				aria-invalid={!!(touched['volume'] && errors['volume'])}
-				aria-describedby={touched['volume'] && errors['volume'] ? 'volume-error' : undefined}
-			/>
-			{#if touched['volume'] && errors['volume']}
-				<FormFieldError id="volume-error">{errors['volume']}</FormFieldError>
-			{/if}
-		</div>
-
-		{#if volume && amount}
-			<div class="text-sm text-muted-foreground">
-				<strong>Price per {getVolumeUnitLabel(volumeUnit, true)}:</strong>
-				{formatCurrency(parseFloat(amount) / parseFloat(volume), undefined, 3)}
-			</div>
-		{/if}
-
-		<div class="space-y-2">
-			<Label for="fuelType">Fuel Type / Octane</Label>
-			<Select.Root
-				type="single"
-				value={showCustomFuelType ? 'other' : fuelType || ''}
-				onValueChange={v => {
-					if (v === 'other') {
-						showCustomFuelType = true;
-						fuelType = '';
-					} else {
-						showCustomFuelType = false;
-						fuelType = v || '';
-					}
-				}}
-			>
-				<Select.Trigger id="fuelType" class="w-full">
-					{#if showCustomFuelType}
-						Other (Custom)
-					{:else if fuelType}
-						{fuelType}
-					{:else}
-						Select fuel type (optional)
-					{/if}
-				</Select.Trigger>
-				<Select.Content>
-					{#each FUEL_TYPE_OPTIONS as option (option.value)}
-						<Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
-					{/each}
-				</Select.Content>
-			</Select.Root>
-		</div>
-
-		{#if showCustomFuelType}
-			<div class="space-y-2">
-				<Label for="customFuelType">Custom Fuel Type</Label>
+	<div class="grid grid-cols-2 gap-3">
+		{#if charging}
+			<div class="min-w-0 space-y-2">
+				<Label for="charge">{getChargeUnitLabel(chargeUnit)} *</Label>
 				<Input
-					id="customFuelType"
-					type="text"
-					placeholder="e.g., E85, E100 Race Fuel"
-					bind:value={fuelType}
-					onblur={() => onBlur('fuelType')}
+					id="charge"
+					type="number"
+					inputmode="decimal"
+					step={0.01}
+					min="0"
+					bind:value={charge}
+					placeholder="0.00"
+					oninput={onMileageChange}
+					onblur={() => onBlur('charge')}
+					aria-invalid={!!(touched['charge'] && errors['charge'])}
+					aria-describedby={describedBy('charge')}
 				/>
+				{#if touched['charge'] && errors['charge']}
+					<FormFieldError id="charge-error">{errors['charge']}</FormFieldError>
+				{/if}
+			</div>
+		{:else}
+			<div class="min-w-0 space-y-2">
+				<Label for="volume">{getVolumeUnitLabel(volumeUnit)} *</Label>
+				<Input
+					id="volume"
+					type="number"
+					inputmode="decimal"
+					step="0.001"
+					min="0"
+					bind:value={volume}
+					placeholder="0.000"
+					oninput={onMileageChange}
+					onblur={() => onBlur('volume')}
+					aria-invalid={!!(touched['volume'] && errors['volume'])}
+					aria-describedby={describedBy('volume')}
+				/>
+				{#if touched['volume'] && errors['volume']}
+					<FormFieldError id="volume-error">{errors['volume']}</FormFieldError>
+				{/if}
 			</div>
 		{/if}
-	{/if}
+		{@render odometer?.()}
+	</div>
 
-	{#if energyMode === 'charging'}
-		<div class="space-y-2">
-			<Label for="charge">{getChargeUnitLabel(chargeUnit)} *</Label>
-			<Input
-				id="charge"
-				type="number"
-				step={0.01}
-				min="0"
-				bind:value={charge}
-				placeholder="0.00"
-				oninput={onMileageChange}
-				onblur={() => onBlur('charge')}
-				aria-invalid={!!(touched['charge'] && errors['charge'])}
-				aria-describedby={touched['charge'] && errors['charge'] ? 'charge-error' : undefined}
-			/>
-			{#if touched['charge'] && errors['charge']}
-				<FormFieldError id="charge-error">{errors['charge']}</FormFieldError>
+	{#if readout}
+		<div
+			id="energy-readout"
+			class="space-y-1 text-xs text-muted-foreground"
+			data-testid="energy-readout"
+		>
+			<p class="tabular-nums">{readout}</p>
+			{#if efficiency?.rating === 'low'}
+				<p class="text-foreground">{efficiency.low}</p>
+			{:else if efficiency?.rating === 'excellent'}
+				<p class="text-foreground">{efficiency.excellent}</p>
 			{/if}
 		</div>
-
-		{#if charge && amount}
-			<div class="text-sm text-muted-foreground">
-				<strong>Price per {getChargeUnitLabel(chargeUnit, true)}:</strong>
-				{formatCurrency(parseFloat(amount) / parseFloat(charge), undefined, 3)}
-			</div>
-		{/if}
-
-		<div class="space-y-2">
-			<Label for="fuelType">Charging Type</Label>
-			<Select.Root
-				type="single"
-				value={fuelType || ''}
-				onValueChange={v => {
-					fuelType = v || '';
-				}}
-			>
-				<Select.Trigger id="fuelType" class="w-full">
-					{#if fuelType}
-						{fuelType}
-					{:else}
-						Select charging type
-					{/if}
-				</Select.Trigger>
-				<Select.Content>
-					{#each CHARGING_TYPE_OPTIONS as option (option.value)}
-						<Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
-					{/each}
-				</Select.Content>
-			</Select.Root>
-		</div>
 	{/if}
-
-	{#if showMpgCalculation}
-		{#if calculatedMpg && energyMode === 'fuel'}
-			<div class="bg-chart-2/10 border border-chart-2/20 rounded-lg p-3">
-				<div class="flex items-center gap-2 text-foreground">
-					<Gauge class="h-4 w-4 text-chart-2" />
-					<span class="text-sm font-medium">
-						Calculated: {calculatedMpg}
-						{getFuelEfficiencyLabel(distanceUnit, volumeUnit)}
-					</span>
-				</div>
-				{#if fuelRating === 'low'}
-					<p class="text-xs text-foreground mt-1">
-						⚠️ Low fuel efficiency - consider maintenance check
-					</p>
-				{:else if fuelRating === 'excellent'}
-					<p class="text-xs text-foreground mt-1">✅ Excellent fuel efficiency!</p>
-				{/if}
-			</div>
-		{:else if calculatedEfficiency && energyMode === 'charging'}
-			<div class="bg-chart-2/10 border border-chart-2/20 rounded-lg p-3">
-				<div class="flex items-center gap-2 text-foreground">
-					<Zap class="h-4 w-4 text-chart-2" />
-					<span class="text-sm font-medium">
-						Calculated: {calculatedEfficiency}
-						{getElectricEfficiencyLabel(distanceUnit, chargeUnit)}
-					</span>
-				</div>
-				{#if chargeRating === 'low'}
-					<p class="text-xs text-foreground mt-1">⚠️ Low efficiency - check driving conditions</p>
-				{:else if chargeRating === 'excellent'}
-					<p class="text-xs text-foreground mt-1">✅ Excellent efficiency!</p>
-				{/if}
-			</div>
-		{/if}
-	{/if}
-
-	<div class="flex items-center gap-3 rounded-lg border bg-muted/50 p-3">
-		<Checkbox id="missedFillup" bind:checked={missedFillup} />
-		<div>
-			<label for="missedFillup" class="cursor-pointer text-sm font-medium leading-none">
-				Missed previous fill-up
-			</label>
-			<p class="text-xs text-muted-foreground mt-1">
-				Skip this entry in fuel efficiency calculations
-			</p>
-		</div>
-	</div>
 </div>

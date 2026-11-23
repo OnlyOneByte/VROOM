@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import type { Expense, SplitExpenseGroup, Vehicle } from '#lib/types/index.ts';
 import type { ReceiptDraft } from '#lib/services/vlm-api.ts';
@@ -112,7 +112,7 @@ function errorText(id: string): string | null {
 }
 
 function categoryButton(label: string): HTMLElement {
-	return screen.getByRole('button', { name: new RegExp(`^${label}`) });
+	return screen.getByRole('radio', { name: new RegExp(`^${label}`) });
 }
 
 function vehicleTriggerText(): string {
@@ -169,11 +169,12 @@ describe('ExpenseForm create mode', () => {
 		await renderCreate();
 
 		expect(vehicleTriggerText()).toBe('2020 Toyota Camry');
-		expect(screen.getByText('Track a new vehicle expense')).toBeTruthy();
+		expect(screen.queryByText('Track a new vehicle expense')).toBeNull();
+		await vi.waitFor(() => expect(document.activeElement).toBe(field('amount')));
 		expect(screen.getByRole('button', { name: /save expense/i })).toBeTruthy();
 		expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull();
 		expect(screen.queryByRole('button', { name: /duplicate/i })).toBeNull();
-		expect(document.querySelectorAll('[aria-pressed="true"]')).toHaveLength(0);
+		expect(document.querySelectorAll('[role="radio"][aria-checked="true"]')).toHaveLength(0);
 	});
 
 	test('saving an empty form flags category and amount and sends nothing', async () => {
@@ -199,12 +200,13 @@ describe('ExpenseForm create mode', () => {
 		await vi.waitFor(() => expect(document.activeElement).toBe(firstProblem));
 	});
 
-	test('with no category chosen, a failed save focuses the category group first, described by its error', async () => {
+	test('with an amount but no category, a failed save focuses the category group, described by its error', async () => {
 		await renderCreate();
+		await type('amount', '20');
 
 		await save();
 
-		const group = screen.getByRole('group', { name: 'Category *' });
+		const group = screen.getByRole('radiogroup', { name: 'Category *' });
 		await vi.waitFor(() => expect(document.activeElement).toBe(group));
 		expect(group).toHaveAttribute('aria-describedby', 'category-error');
 		expect(document.getElementById('category-error')).toHaveTextContent('Please select a category');
@@ -268,6 +270,14 @@ describe('ExpenseForm create mode', () => {
 		expect(createExpense).not.toHaveBeenCalled();
 	});
 
+	test('leaving the amount field before typing in it shows no error', async () => {
+		await renderCreate();
+
+		await fireEvent.blur(field('amount'));
+
+		expect(errorText('amount')).toBeNull();
+	});
+
 	test('leaving the amount field with zero shows the amount error before saving', async () => {
 		await renderCreate();
 		await type('amount', '0');
@@ -277,15 +287,15 @@ describe('ExpenseForm create mode', () => {
 		expect(errorText('amount')).toBe('Amount must be greater than 0');
 	});
 
-	test('picking a category marks it pressed and clears the category error', async () => {
+	test('picking a category checks it and clears the category error', async () => {
 		await renderCreate();
 		await save();
 		expect(errorText('category')).not.toBeNull();
 
 		await fireEvent.click(categoryButton('Maintenance'));
 
-		expect(categoryButton('Maintenance').getAttribute('aria-pressed')).toBe('true');
-		expect(categoryButton('Fuel').getAttribute('aria-pressed')).toBe('false');
+		expect(categoryButton('Maintenance').getAttribute('aria-checked')).toBe('true');
+		expect(categoryButton('Fuel').getAttribute('aria-checked')).toBe('false');
 		expect(errorText('category')).toBeNull();
 	});
 
@@ -377,7 +387,7 @@ describe('ExpenseForm create mode', () => {
 			preselectedTags: 'accessories, roof'
 		});
 
-		expect(categoryButton('Enhancement').getAttribute('aria-pressed')).toBe('true');
+		expect(categoryButton('Enhancement').getAttribute('aria-checked')).toBe('true');
 		expect(field('amount').value).toBe('250');
 		expect(field('description').value).toBe('Roof rack');
 		expect(screen.getByText('accessories')).toBeTruthy();
@@ -458,13 +468,101 @@ describe('ExpenseForm create mode', () => {
 	});
 });
 
+describe('ExpenseForm quick add', () => {
+	async function saveMisc(vehicle?: string): Promise<void> {
+		createExpense.mockResolvedValue({ ...EXISTING, id: 'new-1' });
+		await renderCreate();
+		if (vehicle) await chooseVehicle(vehicle);
+		await fireEvent.click(categoryButton('Misc'));
+		await type('amount', '12');
+		await save();
+		await vi.waitFor(() => expect(createExpense).toHaveBeenCalled());
+		cleanup();
+		getVehicle.mockClear();
+	}
+
+	test('the next entry opens on the last vehicle and its last category', async () => {
+		await saveMisc('2022 Nissan Leaf');
+
+		await renderCreate();
+
+		expect(vehicleTriggerText()).toBe('2022 Nissan Leaf');
+		expect(categoryButton('Misc').getAttribute('aria-checked')).toBe('true');
+	});
+
+	test('a category in the URL wins over the remembered one', async () => {
+		await saveMisc();
+
+		await renderCreate({ preselectedCategory: 'fuel' });
+
+		expect(categoryButton('Fuel').getAttribute('aria-checked')).toBe('true');
+		expect(categoryButton('Misc').getAttribute('aria-checked')).toBe('false');
+	});
+
+	test('switching vehicle swaps a remembered category for that vehicle\u2019s own', async () => {
+		await saveMisc();
+
+		await renderCreate();
+		expect(categoryButton('Misc').getAttribute('aria-checked')).toBe('true');
+		await chooseVehicle('2022 Nissan Leaf');
+
+		expect(categoryButton('Misc').getAttribute('aria-checked')).toBe('true');
+		localStorage.setItem(
+			'vroom.expense.quick-add',
+			JSON.stringify({ vehicleId: 'v1', categoryByVehicle: { v1: 'misc', v2: 'maintenance' } })
+		);
+		await chooseVehicle('2020 Toyota Camry');
+		await chooseVehicle('2022 Nissan Leaf');
+
+		expect(categoryButton('Maintenance').getAttribute('aria-checked')).toBe('true');
+	});
+
+	test('a category the user picked survives a vehicle switch', async () => {
+		localStorage.setItem(
+			'vroom.expense.quick-add',
+			JSON.stringify({ vehicleId: 'v1', categoryByVehicle: { v2: 'maintenance' } })
+		);
+		await renderCreate();
+		await fireEvent.click(categoryButton('Regulatory'));
+
+		await chooseVehicle('2022 Nissan Leaf');
+
+		expect(categoryButton('Regulatory').getAttribute('aria-checked')).toBe('true');
+	});
+
+	test('More details opens when a field inside it is invalid', async () => {
+		await renderCreate({ preselectedCategory: 'misc', preselectedAmount: '5' });
+		const toggle = screen.getByRole('button', { name: /More details/ });
+		expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+		await fireEvent.click(toggle);
+		await type('mileage', '0');
+		await fireEvent.click(toggle);
+		expect(toggle).toHaveAttribute('aria-expanded', 'false');
+		await save();
+
+		expect(toggle).toHaveAttribute('aria-expanded', 'true');
+		await vi.waitFor(() => expect(document.activeElement).toBe(field('mileage')));
+	});
+
+	test('editing opens More details so every saved value shows', async () => {
+		await renderEdit();
+
+		expect(screen.getByRole('button', { name: /More details/ })).toHaveAttribute(
+			'aria-expanded',
+			'true'
+		);
+		expect(field('description').value).toBe('Oil change');
+	});
+});
+
 describe('ExpenseForm edit mode', () => {
 	test('prefills the form from the loaded expense and offers delete and duplicate', async () => {
 		await renderEdit();
 
 		expect(getExpense).toHaveBeenCalledWith('exp-1');
 		await vi.waitFor(() => expect(screen.getByText('2020 Toyota Camry', { selector: 'p' })));
-		expect(categoryButton('Maintenance').getAttribute('aria-pressed')).toBe('true');
+		expect(categoryButton('Maintenance').getAttribute('aria-checked')).toBe('true');
 		expect(field('amount').value).toBe('79.99');
 		expect(field('mileage').value).toBe('31000');
 		expect(field('description').value).toBe('Oil change');
@@ -674,7 +772,7 @@ describe('ExpenseForm receipt scanning', () => {
 
 		await vi.waitFor(() => expect(field('amount').value).toBe('64.2'));
 		expect(field('description').value).toBe('Jiffy Lube');
-		expect(categoryButton('Maintenance').getAttribute('aria-pressed')).toBe('true');
+		expect(categoryButton('Maintenance').getAttribute('aria-checked')).toBe('true');
 		expect(screen.getByText('1 file queued. Will upload on save.')).toBeTruthy();
 		expect(notificationMessages()).toContain('Receipt scanned — review the details and save.');
 
@@ -694,7 +792,7 @@ describe('ExpenseForm receipt scanning', () => {
 		await scanReceipt({ amount: 48, odometer: 30210, category: 'fuel' });
 
 		await vi.waitFor(() => expect(field('mileage').value).toBe('30210'));
-		expect(categoryButton('Fuel').getAttribute('aria-pressed')).toBe('true');
+		expect(categoryButton('Fuel').getAttribute('aria-checked')).toBe('true');
 		expect(document.getElementById('volume')).not.toBeNull();
 	});
 
@@ -712,7 +810,7 @@ describe('ExpenseForm receipt scanning', () => {
 		await scanReceipt({ odometer: 30210, category: 'maintenance' });
 
 		await vi.waitFor(() =>
-			expect(categoryButton('Maintenance').getAttribute('aria-pressed')).toBe('true')
+			expect(categoryButton('Maintenance').getAttribute('aria-checked')).toBe('true')
 		);
 		expect(field('mileage').value).toBe('30210');
 	});
@@ -732,7 +830,7 @@ describe('ExpenseForm receipt scanning', () => {
 		expect(field('amount').value).toBe('12');
 		expect(field('description').value).toBe('Car wash');
 		expect(field('mileage').value).toBe('');
-		expect(categoryButton('Misc').getAttribute('aria-pressed')).toBe('true');
+		expect(categoryButton('Misc').getAttribute('aria-checked')).toBe('true');
 	});
 
 	test('the queued receipt photo can be removed before saving', async () => {

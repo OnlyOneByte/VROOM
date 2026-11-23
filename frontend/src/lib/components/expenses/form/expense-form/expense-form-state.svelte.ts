@@ -9,6 +9,7 @@ import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 import { hasMileageEntry, validateExpenseField } from '../expense-form-validation';
 import { calculateMileageEfficiency } from './mileage-efficiency';
 import { createEmptyFormData, type ExpenseFormData } from './expense-form-data';
+import { readQuickAddMemory } from './quick-add-memory';
 import {
 	disableSplit,
 	enableSplit,
@@ -66,6 +67,7 @@ export class ExpenseFormState {
 	queuedPhotosUnreadable = $state(false);
 
 	queuedExpense = $state<OfflineExpense | null>(null);
+	categoryFromMemory = $state(false);
 
 	readonly nextVehicleRequest = latest();
 	readonly nextLastFuelRequest = latest();
@@ -99,13 +101,10 @@ export class ExpenseFormState {
 	effectiveChargeUnit = $derived(this.vehicle?.unitPreferences?.chargeUnit ?? this.chargeUnit);
 	distLabel = $derived(getDistanceUnitLabel(this.effectiveDistanceUnit, false));
 
-	previousFuelHint = $derived(
-		this.lastFuelExpense?.mileage && this.formData.tags.includes('fuel')
-			? this.lastFuelExpense.mileage
-			: null
-	);
-
 	showFuelFields = $derived(this.formData.category === 'fuel');
+	previousFuelHint = $derived(
+		this.showFuelFields && this.lastFuelExpense?.mileage ? this.lastFuelExpense.mileage : null
+	);
 	asksForMileage = $derived(!this.isSplit || this.selectedVehicleIds.length < 2);
 	isFinancingPayment = $derived(this.sourceType === 'financing' && !!this.sourceId);
 	clearsFinancingLink = $derived(
@@ -189,9 +188,23 @@ export class ExpenseFormState {
 	};
 
 	selectCategory = (categoryValue: string) => {
-		this.formData.category = categoryValue;
+		this.applyCategory(categoryValue);
+		this.categoryFromMemory = false;
 		this.touched['category'] = true;
 		this.handleBlur('category');
+	};
+
+	applyRememberedCategory = () => {
+		if (this.isEditMode || this.queuedExpense || this.isSplit) return;
+		if (this.formData.category && !this.categoryFromMemory) return;
+		const remembered = readQuickAddMemory().categoryByVehicle[this.formData.vehicleId];
+		if (!remembered || remembered === this.formData.category) return;
+		this.applyCategory(remembered);
+		this.categoryFromMemory = true;
+	};
+
+	private applyCategory(categoryValue: string) {
+		this.formData.category = categoryValue;
 
 		if (categoryValue !== 'financial') {
 			this.sourceType = null;
@@ -208,7 +221,7 @@ export class ExpenseFormState {
 			this.formData.fuelType = '';
 			this.formData.missedFillup = false;
 		}
-	};
+	}
 
 	handleMileageChange = () => {
 		const result = calculateMileageEfficiency({
@@ -231,6 +244,7 @@ export class ExpenseFormState {
 		this.formData.vehicleId = vehicleId;
 		this.touched['vehicleId'] = true;
 		this.handleBlur('vehicleId');
+		this.applyRememberedCategory();
 	};
 
 	handleSplitToggle = (checked: boolean) => {

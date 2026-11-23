@@ -15,6 +15,7 @@
 	interface Props {
 		value?: string | undefined;
 		placeholder?: string;
+		label?: string;
 		class?: string;
 		disabled?: boolean;
 		id?: string;
@@ -25,6 +26,7 @@
 	let {
 		value = $bindable(undefined),
 		placeholder = 'Pick a date',
+		label,
 		class: className,
 		disabled = false,
 		id,
@@ -64,7 +66,7 @@
 	});
 
 	let displayValue = $derived(
-		calendarValue ? df.format(calendarValue.toDate(getLocalTimeZone())) : placeholder
+		calendarValue ? (label ?? df.format(calendarValue.toDate(getLocalTimeZone()))) : placeholder
 	);
 
 	let content = $state<HTMLElement | null>(null);

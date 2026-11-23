@@ -15,8 +15,9 @@ test.describe('Expense form', () => {
 		await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible();
 		await expect(page.getByText('Category *', { exact: true })).toBeVisible();
 		await expect(page.getByLabel('Amount *')).toBeVisible();
-		await expect(page.getByText('Date *', { exact: true })).toBeVisible();
-		await expect(page.getByText(`${VEHICLE_CAMRY.year} Toyota Camry`)).toBeVisible();
+		await expect(page.getByLabel('Date *')).toHaveText(/Today/);
+		await expect(page.getByLabel('Vehicle *')).toHaveText(VEHICLE_CAMRY.nickname);
+		await expect(page.getByLabel('Amount *')).toBeFocused();
 
 		for (const category of [
 			'Fuel',
@@ -26,7 +27,7 @@ test.describe('Expense form', () => {
 			'Enhancement',
 			'Misc'
 		]) {
-			await expect(page.getByRole('button', { name: new RegExp(`^${category}`) })).toBeVisible();
+			await expect(page.getByRole('radio', { name: category })).toBeVisible();
 		}
 	});
 
@@ -55,22 +56,47 @@ test.describe('Expense form', () => {
 
 		await expect(page.getByLabel('Gallons (US) *')).toBeHidden();
 
-		await page.getByRole('button', { name: /^Fuel/ }).click();
+		await page.getByRole('radio', { name: 'Fuel' }).click();
 
 		await expect(page.getByLabel('Gallons (US) *')).toBeVisible();
-		await expect(page.getByLabel('Current Mileage *')).toBeVisible();
+		await expect(page.getByLabel('Odometer *')).toBeVisible();
 
-		await page.getByRole('button', { name: /^Maintenance/ }).click();
+		await page.getByRole('radio', { name: 'Maintenance' }).click();
 		await expect(page.getByLabel('Gallons (US) *')).toBeHidden();
+	});
+
+	test('the categories are one radio group: one tab stop, arrows move, Space selects', async ({
+		page
+	}) => {
+		await page.goto('/expenses/new');
+		const group = page.getByRole('radiogroup', { name: 'Category *' });
+		await expect(group.getByRole('radio')).toHaveCount(6);
+
+		await page.getByLabel('Amount *').fill('30');
+		await page.getByLabel('Amount *').press('Tab');
+		await expect(group.getByRole('radio', { name: 'Fuel' })).toBeFocused();
+
+		await page.keyboard.press('ArrowRight');
+		await expect(group.getByRole('radio', { name: 'Maintenance' })).toBeFocused();
+		await expect(group.getByRole('radio', { checked: true })).toHaveCount(0);
+
+		await page.keyboard.press('Space');
+		await expect(group.getByRole('radio', { name: 'Maintenance' })).toBeChecked();
+		await page.keyboard.press('ArrowRight');
+		await expect(group.getByRole('radio', { name: 'Financial' })).toBeChecked();
+		await expect(page.getByLabel('Gallons (US) *')).toBeHidden();
+
+		await page.keyboard.press('Tab');
+		await expect(group.getByRole('radio', { name: 'Financial' })).not.toBeFocused();
 	});
 
 	test('a fuel expense POSTs the backend field names and confirms', async ({ page }) => {
 		await page.goto('/expenses/new');
 
-		await page.getByRole('button', { name: /^Fuel/ }).click();
+		await page.getByRole('radio', { name: 'Fuel' }).click();
 		await page.getByLabel('Amount *').fill('45.50');
 		await page.getByLabel('Gallons (US) *').fill('12.5');
-		await page.getByLabel('Current Mileage *').fill(NEXT_ODOMETER);
+		await page.getByLabel('Odometer *').fill(NEXT_ODOMETER);
 
 		const postRequest = page.waitForRequest(
 			request =>
@@ -106,7 +132,7 @@ test.describe('Expense form', () => {
 
 		await page.goto('/expenses/new');
 
-		await page.getByRole('button', { name: /^Maintenance/ }).click();
+		await page.getByRole('radio', { name: 'Maintenance' }).click();
 		await page.getByLabel('Amount *').fill('25');
 
 		await expect(async () => {
@@ -160,10 +186,10 @@ test.describe('Expense form', () => {
 	test('a non-increasing odometer reading is rejected', async ({ page }) => {
 		await page.goto('/expenses/new');
 
-		await page.getByRole('button', { name: /^Fuel/ }).click();
+		await page.getByRole('radio', { name: 'Fuel' }).click();
 		await page.getByLabel('Amount *').fill('40');
 		await page.getByLabel('Gallons (US) *').fill('10');
-		await page.getByLabel('Current Mileage *').fill('44000');
+		await page.getByLabel('Odometer *').fill('44000');
 
 		await page.getByRole('button', { name: 'Save Expense' }).click();
 
