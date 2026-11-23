@@ -569,7 +569,7 @@
 				{#if showAddExpenseAction}
 					<Button
 						size="lg"
-						class="hidden lg:inline-flex short:inline-flex w-10 px-0 sm:w-auto sm:px-6"
+						class="hidden lg:inline-flex short:inline-flex max-sm:w-10 max-sm:has-[>svg]:px-0"
 						href={addExpenseHref}
 						aria-label={COMMON_MESSAGES.ADD_EXPENSE}
 					>
