@@ -106,7 +106,7 @@ describe('StatCard loading tile has the filled tile shape', () => {
 				'h-7',
 				'h-4'
 			]);
-			expect(lines[2]).toHaveClass('mt-1', 'sm:hidden');
+			expect(lines[2]).toHaveClass('mt-1', 'sm:@max-sm:hidden');
 			expect(lines[2]?.parentElement).toBe(lines[1]?.parentElement);
 		}
 	});
@@ -137,9 +137,9 @@ describe('StatCard loading tile has the filled tile shape', () => {
 		]);
 		for (const half of halves) {
 			const row = half.children[1];
-			expect(row).toHaveClass('sm:flex', 'sm:items-baseline');
+			expect(row).toHaveClass('sm:@max-sm:flex', 'sm:@max-sm:items-baseline');
 			const unit = row?.children[1];
-			expect(unit).toHaveClass('block', 'mt-1', 'sm:mt-0', 'sm:whitespace-nowrap');
+			expect(unit).toHaveClass('block', 'mt-1', 'sm:@max-sm:mt-0', 'sm:@max-sm:whitespace-nowrap');
 		}
 	});
 });

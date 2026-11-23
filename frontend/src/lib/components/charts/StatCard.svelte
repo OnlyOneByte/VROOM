@@ -107,20 +107,20 @@
 							<div>
 								<Skeleton class="h-7 @sm:h-8 w-20" />
 								{#if unit}
-									<Skeleton class="mt-1 h-4 w-16 sm:hidden" />
+									<Skeleton class="mt-1 h-4 w-16 sm:@max-sm:hidden" />
 								{/if}
 							</div>
 						{:else}
 							<span class="block text-sm font-medium text-muted-foreground break-words">
 								{label}
 							</span>
-							<div class="sm:flex sm:items-baseline sm:gap-1">
+							<div class="sm:@max-sm:flex sm:@max-sm:items-baseline sm:@max-sm:gap-1">
 								<span class="block text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
 									{value}
 								</span>
 								{#if unit}
 									<span
-										class="mt-1 block text-xs text-muted-foreground sm:mt-0 sm:whitespace-nowrap"
+										class="mt-1 block text-xs text-muted-foreground sm:@max-sm:mt-0 sm:@max-sm:whitespace-nowrap"
 									>
 										{unit}
 									</span>
@@ -135,20 +135,20 @@
 							<div>
 								<Skeleton class="h-7 @sm:h-8 w-20" />
 								{#if secondaryUnit}
-									<Skeleton class="mt-1 h-4 w-16 sm:hidden" />
+									<Skeleton class="mt-1 h-4 w-16 sm:@max-sm:hidden" />
 								{/if}
 							</div>
 						{:else}
 							<span class="block text-sm font-medium text-muted-foreground break-words">
 								{secondaryLabel}
 							</span>
-							<div class="sm:flex sm:items-baseline sm:gap-1">
+							<div class="sm:@max-sm:flex sm:@max-sm:items-baseline sm:@max-sm:gap-1">
 								<span class="block text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
 									{secondaryValue}
 								</span>
 								{#if secondaryUnit}
 									<span
-										class="mt-1 block text-xs text-muted-foreground sm:mt-0 sm:whitespace-nowrap"
+										class="mt-1 block text-xs text-muted-foreground sm:@max-sm:mt-0 sm:@max-sm:whitespace-nowrap"
 									>
 										{secondaryUnit}
 									</span>
