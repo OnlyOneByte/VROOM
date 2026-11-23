@@ -24,7 +24,7 @@
 	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
 	import { expenseApi } from '#lib/services/expense-api.ts';
 	import type { FuelStatsResponse, FuelAdvancedResponse, PeriodCounts } from '#lib/types/index.ts';
-	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatNumber, formatNumberUpTo } from '#lib/utils/formatters.ts';
 	import {
 		getDistanceUnitLabel,
 		getVolumeUnitLabel,
@@ -546,7 +546,7 @@
 							<div class="border-b pb-4 text-center">
 								<span class="text-xs text-muted-foreground"> Total Distance </span>
 								<p class="text-3xl font-bold">
-									{formatNumber(fuelStats.distance.totalDistance, 0)}
+									{formatNumberUpTo(fuelStats.distance.totalDistance, 1)}
 									{distLabelShort}
 								</p>
 							</div>

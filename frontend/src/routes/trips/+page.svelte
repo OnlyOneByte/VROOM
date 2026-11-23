@@ -7,7 +7,7 @@
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import type { Trip, TripSummary, Vehicle } from '#lib/types/index.ts';
 	import { tripDistance } from '#lib/types/index.ts';
-	import { capitalize, formatDate, formatNumber } from '#lib/utils/formatters.ts';
+	import { capitalize, formatDate, formatNumber, formatNumberUpTo } from '#lib/utils/formatters.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
@@ -202,7 +202,7 @@
 					<div>
 						<p class="text-xs text-muted-foreground">Total</p>
 						<p class="text-lg font-semibold">
-							{formatNumber(summary.totalDistance, 0)}
+							{formatNumberUpTo(summary.totalDistance, 1)}
 							<span class="text-sm font-normal">{distLabel}</span>
 						</p>
 					</div>
@@ -213,7 +213,7 @@
 					<div>
 						<p class="text-xs text-muted-foreground">Business</p>
 						<p class="text-lg font-semibold">
-							{formatNumber(summary.businessDistance, 0)}
+							{formatNumberUpTo(summary.businessDistance, 1)}
 							<span class="text-sm font-normal">{distLabel}</span>
 						</p>
 					</div>

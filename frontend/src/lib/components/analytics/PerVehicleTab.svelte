@@ -20,7 +20,7 @@
 		VehicleTCOResponse,
 		VehicleExpensesResponse
 	} from '#lib/types/index.ts';
-	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatNumberUpTo } from '#lib/utils/formatters.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { getCostPerDistanceLabel, getDistanceUnitLabel } from '#lib/utils/units.ts';
 
@@ -113,7 +113,7 @@
 				value: tco.costPerDistance != null ? formatCurrency(tco.costPerDistance) : 'N/A'
 			},
 			{ label: 'Cost per Month', value: formatCurrency(tco.costPerMonth) },
-			{ label: `Total ${distLongLabel}`, value: formatNumber(tco.totalDistance, 0) }
+			{ label: `Total ${distLongLabel}`, value: formatNumberUpTo(tco.totalDistance, 1) }
 		];
 	});
 

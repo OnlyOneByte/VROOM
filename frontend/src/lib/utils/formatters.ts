@@ -70,6 +70,12 @@ export function formatNumber(value: number, decimals = 2): string {
 	}).format(value);
 }
 
+export function formatNumberUpTo(value: number, maxDecimals: number): string {
+	return new Intl.NumberFormat(currentLocale(), { maximumFractionDigits: maxDecimals }).format(
+		value
+	);
+}
+
 export function capitalize(s: string): string {
 	return s.charAt(0).toUpperCase() + s.slice(1);
 }

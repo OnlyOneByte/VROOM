@@ -11,6 +11,7 @@
 		type NextPaymentBasis
 	} from '#lib/utils/financing-calculations.ts';
 	import {
+		amountStep,
 		formatCurrency,
 		formatDate,
 		getCurrencySymbol,
@@ -119,7 +120,13 @@
 		<div class="space-y-4 py-2">
 			<div class="space-y-2">
 				<Label for="payment-input">Monthly Payment ({currencySymbol})</Label>
-				<Input id="payment-input" type="number" step="0.01" min="0" bind:value={inputValue} />
+				<Input
+					id="payment-input"
+					type="number"
+					step={amountStep()}
+					min="0"
+					bind:value={inputValue}
+				/>
 				<p class="text-xs text-muted-foreground">
 					Min: {formatCurrency(minimumPayment ?? 0)} · Current: {formatCurrency(savedAmount)}
 				</p>
