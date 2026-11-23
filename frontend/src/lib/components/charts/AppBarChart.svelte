@@ -40,6 +40,9 @@
 		tooltipLabelFormat?: (_v: unknown) => string;
 		barProps?: Record<string, unknown>;
 		yDomain?: [number, number];
+		padding?: { top: number; left: number; bottom: number; right: number };
+		plotWidth?: number;
+		footer?: Snippet;
 		class?: string;
 	}
 
@@ -63,12 +66,15 @@
 		tooltipLabelFormat = formatMonthLabel,
 		barProps,
 		yDomain,
+		padding,
+		plotWidth = $bindable(0),
+		footer,
 		class: className
 	}: Props = $props();
 
 	let isEmpty = $derived(data.length === 0);
 	let resolvedPadding = $derived(
-		seriesLayout === 'stack' ? { ...CHART_PADDING, top: 16 } : CHART_PADDING
+		padding ?? (seriesLayout === 'stack' ? { ...CHART_PADDING, top: 16 } : CHART_PADDING)
 	);
 	let resolvedXAxisProps = $derived(xAxisProps ?? monthlyXAxisProps(data.length));
 </script>
@@ -84,7 +90,7 @@
 	animationClass="chart-bar-animated"
 	class={className}
 >
-	<div style="height: {height}px">
+	<div style="height: {height}px" bind:clientWidth={plotWidth}>
 		<Chart.Container {config} class="h-full w-full">
 			<BarChart
 				{data}
@@ -116,5 +122,6 @@
 		{#if series.length > 1}
 			<ChartLegend items={series} class="mt-3 justify-center" />
 		{/if}
+		{@render footer?.()}
 	{/snippet}
 </ChartCard>

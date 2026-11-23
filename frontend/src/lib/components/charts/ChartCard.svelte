@@ -21,7 +21,7 @@
 		height?: number;
 		icon?: Snippet;
 		legend?: Snippet;
-		animationClass?: 'chart-line-animated' | 'chart-bar-animated' | 'chart-pie-animated';
+		animationClass?: 'chart-line-animated' | 'chart-bar-animated';
 		class?: string;
 		children: Snippet;
 	}
@@ -50,8 +50,7 @@
 
 	const READY_CLASS_MAP: Record<string, string> = {
 		'chart-line-animated': 'chart-line-animate-ready',
-		'chart-bar-animated': 'chart-bar-animate-ready',
-		'chart-pie-animated': 'chart-pie-animate-ready'
+		'chart-bar-animated': 'chart-bar-animate-ready'
 	};
 	let readyClass = $derived(animationClass ? (READY_CLASS_MAP[animationClass] ?? '') : '');
 

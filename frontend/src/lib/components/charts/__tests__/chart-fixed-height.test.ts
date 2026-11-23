@@ -15,7 +15,7 @@ describe('charts draw at their height, not the container default 16:9', () => {
 		const src = read(file);
 		expect(src).toMatch(
 			new RegExp(
-				`<div style="height: \\{${heightVar}\\}px">\\s*<Chart\\.Container[^>]*class="h-full w-full"`
+				`<div style="height: \\{${heightVar}\\}px"[^>]*>\\s*<Chart\\.Container[^>]*class="h-full w-full"`
 			)
 		);
 		expect(src.match(/<Chart\.Container/g)).toHaveLength(1);

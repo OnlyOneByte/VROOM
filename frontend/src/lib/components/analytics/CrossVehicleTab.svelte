@@ -1,19 +1,13 @@
 <script lang="ts">
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-	import '#lib/components/charts/pie-chart-animations.css';
-	import '#lib/components/charts/bar-chart-animations.css';
-	import { animateOnView } from '#lib/utils/animate-on-view.ts';
-	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { BarChart } from 'layerchart';
 	import { LoaderCircle, CircleAlert, TrendingUp } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import * as Card from '#lib/components/ui/card/index.ts';
-	import * as Chart from '#lib/components/ui/chart/index.ts';
+	import type * as Chart from '#lib/components/ui/chart/index.ts';
 	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
 	import ExpenseTrendChart from '#lib/components/charts/ExpenseTrendChart.svelte';
-	import { AppLineChart, AppPieChart } from '#lib/components/charts/index.ts';
+	import { AppBarChart, AppLineChart, AppPieChart } from '#lib/components/charts/index.ts';
 	import { CHART_COLORS, buildChartConfig, buildCategoryPieData } from '#lib/utils/chart-colors.ts';
 	import type {
 		CrossVehicleResponse,
@@ -21,13 +15,7 @@
 		InsuranceResponse
 	} from '#lib/types/index.ts';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
-	import {
-		fitBandTickLabel,
-		formatCurrencyAxis,
-		formatCurrencyTooltip,
-		parseMonthToDate,
-		unitTooltip
-	} from '#lib/utils/chart-formatters.ts';
+	import { fitBandTickLabel, parseMonthToDate, unitTooltip } from '#lib/utils/chart-formatters.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { getFuelEfficiencyLabel, getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import FinancingAnalytics from './cross-vehicle/FinancingAnalytics.svelte';
@@ -38,8 +26,6 @@
 	let insurance = $state<InsuranceResponse | null>(null);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
-
-	let costBarGate = createVisibilityWatch();
 
 	let units = $derived(crossVehicle?.units ?? settingsStore.unitPreferences);
 	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
@@ -164,44 +150,20 @@
 			{/if}
 
 			{#if costBarData.length > 0}
-				<Card.Root class="p-4 sm:p-6">
-					<div class="space-y-4">
-						<div>
-							<h3 class="font-semibold text-sm sm:text-base">Vehicle Cost Comparison</h3>
-							<p class="text-xs sm:text-sm text-muted-foreground">Total costs by vehicle</p>
-						</div>
-						<div class="chart-bar-animate-ready" use:animateOnView={'chart-bar-animated'}>
-							<div
-								bind:this={costBarGate.el}
-								bind:clientWidth={costBarWidth}
-								style="min-height: 250px"
-							>
-								{#if costBarGate.visible}
-									<Chart.Container config={costBarConfig} class="h-[250px] sm:h-[300px] w-full">
-										<BarChart
-											data={costBarData}
-											x="vehicleName"
-											y="totalCost"
-											series={costBarSeries}
-											padding={costBarPadding}
-											props={{
-												bars: { stroke: 'none' },
-												xAxis: {
-													ticks: costBarData.map(d => d.vehicleName),
-													format: costBarTickFormat
-												},
-												yAxis: { format: formatCurrencyAxis }
-											}}
-										>
-											{#snippet tooltip()}
-												<Chart.Tooltip valueFormatter={formatCurrencyTooltip} />
-											{/snippet}
-										</BarChart>
-									</Chart.Container>
-								{/if}
-							</div>
-						</div>
-						<div class="space-y-2 pt-4 border-t border-border">
+				<AppBarChart
+					title="Vehicle Cost Comparison"
+					description="Total costs by vehicle"
+					data={costBarData}
+					x="vehicleName"
+					y="totalCost"
+					series={costBarSeries}
+					config={costBarConfig}
+					padding={costBarPadding}
+					xAxisProps={{ ticks: costBarData.map(d => d.vehicleName), format: costBarTickFormat }}
+					bind:plotWidth={costBarWidth}
+				>
+					{#snippet footer()}
+						<div class="mt-4 space-y-2 border-t border-border pt-4">
 							{#each costBarData as vehicle (vehicle.vehicleId)}
 								<div class="flex items-center justify-between text-sm">
 									<span>{vehicle.vehicleName}</span>
@@ -213,8 +175,8 @@
 								</div>
 							{/each}
 						</div>
-					</div>
-				</Card.Root>
+					{/snippet}
+				</AppBarChart>
 			{/if}
 		</div>
 

@@ -23,6 +23,8 @@
 		error?: string | null;
 		icon?: Snippet;
 		showLegend?: boolean;
+		legendLabel?: string;
+		formatLegendValue?: (_item: PieDataItem) => string;
 		class?: string;
 	}
 
@@ -34,6 +36,8 @@
 		error = null,
 		icon,
 		showLegend = true,
+		legendLabel = 'Categories',
+		formatLegendValue = item => formatCurrency(item.value),
 		class: className
 	}: Props = $props();
 
@@ -86,7 +90,7 @@
 		</div>
 
 		{#if showLegend}
-			<div class="flex-1 space-y-1.5 min-w-0" role="list" aria-label="Categories">
+			<div class="flex-1 space-y-1.5 min-w-0" role="list" aria-label={legendLabel}>
 				{#each data as item (item.key)}
 					<div class="flex items-center justify-between rounded-lg p-2" role="listitem">
 						<div class="flex items-center gap-2">
@@ -98,7 +102,7 @@
 							<span class="text-sm font-medium">{item.label}</span>
 						</div>
 						<div class="text-right">
-							<div class="text-sm font-bold">{formatCurrency(item.value)}</div>
+							<div class="text-sm font-bold">{formatLegendValue(item)}</div>
 							{#if item.percentage != null}
 								<div class="text-xs text-muted-foreground">
 									{item.percentage.toFixed(1)}%
