@@ -76,7 +76,9 @@ test.describe('Analytics', () => {
 		await expect(page.getByRole('heading', { name: 'Fill-ups' })).toBeHidden();
 	});
 
-	test('a fleet with no data still renders, with zeroed stats', async ({ page }) => {
+	test('a fleet with no vehicles shows the Add Vehicle empty state, not zeroed stats', async ({
+		page
+	}) => {
 		await mockApi(page, { vehicles: [], expenses: [] });
 		await page.route(
 			url => url.pathname === '/api/v1/analytics/summary',
@@ -107,8 +109,13 @@ test.describe('Analytics', () => {
 
 		await page.goto('/analytics');
 
-		await expect(page.getByText('$0.00')).toBeVisible();
-		await expect(page.getByText('N/A')).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Add a vehicle first' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Add Vehicle' })).toHaveAttribute(
+			'href',
+			'/vehicles/new'
+		);
+		await expect(page.getByText('$0.00')).toBeHidden();
+		await expect(page.getByRole('tablist')).toBeHidden();
 		await expect(page.getByRole('heading', { name: 'Fill-ups' })).toBeHidden();
 	});
 
