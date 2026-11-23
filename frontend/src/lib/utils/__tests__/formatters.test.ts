@@ -274,6 +274,20 @@ describe('Intl formatter reuse', () => {
 		vi.restoreAllMocks();
 		expect(formatNumber(1234.5, 1)).toBe('1,234.5');
 	});
+
+	test('a cached date formatter follows a change of system time zone', () => {
+		const previous = process.env['TZ'];
+		const instant = new Date('2026-06-01T12:00:00Z');
+		try {
+			process.env['TZ'] = 'Pacific/Pago_Pago';
+			expect(formatDate(instant)).toBe('Jun 1, 2026');
+			process.env['TZ'] = 'Pacific/Kiritimati';
+			expect(formatDate(instant)).toBe('Jun 2, 2026');
+		} finally {
+			if (previous === undefined) delete process.env['TZ'];
+			else process.env['TZ'] = previous;
+		}
+	});
 });
 
 describe('amountPlaceholder and formatBytes', () => {

@@ -22,9 +22,14 @@ function numberFormat(options: Intl.NumberFormatOptions): Intl.NumberFormat {
 	return format;
 }
 
+function timeZoneKey(): string {
+	const year = new Date().getFullYear();
+	return `${new Date(year, 0, 1).getTimezoneOffset()}/${new Date(year, 6, 1).getTimezoneOffset()}`;
+}
+
 function dateTimeFormat(options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
 	const locale = currentLocale();
-	const key = `${locale}|${JSON.stringify(options)}`;
+	const key = `${locale}|${timeZoneKey()}|${JSON.stringify(options)}`;
 	let format = dateTimeFormats.get(key);
 	if (!format) {
 		format = new Intl.DateTimeFormat(locale, options);
