@@ -147,11 +147,10 @@
 		if (!company.trim()) {
 			newErrors.company = 'Company name is required';
 		}
-		if (selectedVehicleIds.length === 0) {
-			newErrors.vehicles = 'At least one vehicle is required';
-		}
-
 		if (!isEditMode) {
+			if (selectedVehicleIds.length === 0) {
+				newErrors.vehicles = 'At least one vehicle is required';
+			}
 			if (!startDate) newErrors.startDate = 'Start date is required';
 			if (!endDate) newErrors.endDate = 'End date is required';
 			if (startDate && endDate && new Date(startDate) >= new Date(endDate)) {
