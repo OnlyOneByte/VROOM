@@ -31,7 +31,7 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 		getExpenseSummary: () =>
 			Promise.resolve({
 				totalAmount: 0,
-				expenseCount: 0,
+				expenseCount: 1,
 				recentAmount: 0,
 				monthlyAverage: 0,
 				categoryBreakdown: [],
@@ -93,14 +93,14 @@ describe('dashboard primary action', () => {
 		expect(header).toContainElement(fromLg('Log Fill-up')[0] ?? null);
 	});
 
-	test('with no vehicles, Add Vehicle is the single floating primary and there is no Log Fill-up', async () => {
+	test('with no vehicles, the getting-started card holds the only Add Vehicle and nothing floats', async () => {
 		getVehicles.mockImplementation(() => Promise.resolve([]));
 		render(Page);
 
-		await waitFor(() => expect(belowLg('Add Vehicle')).toHaveLength(1));
-		expect(belowLg('Add Vehicle')[0]).toHaveClass('fixed');
-		expect(fromLg('Add Vehicle')).toHaveLength(1);
-		expect(fromLg('Add Vehicle')[0]).not.toHaveClass('fixed');
+		await screen.findByRole('heading', { name: 'Add your first vehicle' });
+		expect(controls('Add Vehicle')).toHaveLength(1);
+		expect(controls('Add Vehicle')[0]).not.toHaveClass('fixed');
+		expect(controls('Add Vehicle')[0]).toHaveAttribute('href', '/vehicles/new');
 		expect(controls('Log Fill-up')).toHaveLength(0);
 	});
 
@@ -157,8 +157,7 @@ describe('dashboard primary action', () => {
 		getVehicles.mockImplementation(() => Promise.resolve([]));
 		render(Page);
 
-		await waitFor(() => expect(belowLg('Add Vehicle')).toHaveLength(1));
-		expect(belowLg('Add Vehicle')[0]).toHaveClass('fixed');
+		await screen.findByRole('heading', { name: 'Add your first vehicle' });
 		expect(headerPlaceholder()).toBeNull();
 	});
 
