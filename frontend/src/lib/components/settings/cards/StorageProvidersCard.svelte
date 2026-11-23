@@ -378,17 +378,19 @@
 			<Separator class="my-6" />
 
 			<div class="space-y-3">
-				<div class="flex items-center justify-between">
+				<div class="flex flex-wrap items-center justify-between gap-2">
 					<p class="text-sm font-medium">Providers</p>
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-10 sm:h-8"
-						onclick={() => goto(resolve(routes.settingsProviderNew))}
-					>
-						<Plus class="h-4 w-4 mr-1" />
-						Add Provider
-					</Button>
+					{#if providers.length > 0}
+						<Button
+							variant="outline"
+							size="sm"
+							class="h-10 sm:h-8"
+							onclick={() => goto(resolve(routes.settingsProviderNew))}
+						>
+							<Plus class="h-4 w-4 mr-1" />
+							Add Storage Provider
+						</Button>
+					{/if}
 				</div>
 
 				{#if providers.length === 0}
@@ -405,7 +407,7 @@
 							onclick={() => goto(resolve(routes.settingsProviderNew))}
 						>
 							<Plus class="h-4 w-4 mr-1" />
-							Add Provider
+							Add Storage Provider
 						</Button>
 					</div>
 				{:else}

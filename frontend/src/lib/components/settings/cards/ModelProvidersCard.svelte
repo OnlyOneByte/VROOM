@@ -37,6 +37,7 @@
 			description:
 				'Connect a vision-AI provider to scan receipts into expense drafts. Bring your own key — your receipt is sent only to the provider you choose. For maximum privacy, self-host with Ollama.',
 			noun: 'receipt-parsing provider',
+			addLabel: 'Add Receipt-Parsing Provider',
 			emptyHint: 'Add one to scan receipts straight into an expense.',
 			dialogNote:
 				'The API key is stored encrypted and never shown again. Your receipt image is sent only to this provider when you scan.',
@@ -51,6 +52,7 @@
 			description:
 				'Connect a chat-AI provider to ask questions about your vehicles and costs. Bring your own key — your questions are sent only to the provider you choose. The assistant is read-only and can never change your data. For maximum privacy, self-host with Ollama.',
 			noun: 'assistant provider',
+			addLabel: 'Add Assistant Provider',
 			emptyHint: 'Add one to chat with an AI about your vehicles and costs.',
 			dialogNote:
 				'The API key is stored encrypted and never shown again. Your questions are sent only to this provider when you chat.',
@@ -226,18 +228,20 @@
 			</div>
 		{:else}
 			<div class="space-y-3">
-				<div class="flex items-center justify-between">
+				<div class="flex flex-wrap items-center justify-between gap-2">
 					<p class="text-sm font-medium">Providers</p>
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-10 sm:h-8"
-						onclick={openCreate}
-						data-testid="{domain}-add-provider"
-					>
-						<Plus class="h-4 w-4 mr-1" />
-						Add Provider
-					</Button>
+					{#if providers.length > 0}
+						<Button
+							variant="outline"
+							size="sm"
+							class="h-10 sm:h-8"
+							onclick={openCreate}
+							data-testid="{domain}-add-provider"
+						>
+							<Plus class="h-4 w-4 mr-1" />
+							{copy.addLabel}
+						</Button>
+					{/if}
 				</div>
 
 				{#if providers.length === 0}
@@ -245,9 +249,15 @@
 						<Icon class="h-10 w-10 text-muted-foreground mx-auto mb-2" />
 						<p class="text-sm font-medium">No {copy.noun} configured</p>
 						<p class="text-xs text-muted-foreground mt-1">{copy.emptyHint}</p>
-						<Button variant="outline" size="sm" class="mt-3 h-10 sm:h-8" onclick={openCreate}>
+						<Button
+							variant="outline"
+							size="sm"
+							class="mt-3 h-10 sm:h-8"
+							onclick={openCreate}
+							data-testid="{domain}-add-provider"
+						>
 							<Plus class="h-4 w-4 mr-1" />
-							Add Provider
+							{copy.addLabel}
 						</Button>
 					</div>
 				{:else}
