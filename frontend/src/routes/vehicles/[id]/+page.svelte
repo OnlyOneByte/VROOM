@@ -317,7 +317,10 @@
 			const result = await analyticsApi.getFuelEfficiency({ vehicleId });
 			if (isCurrent()) fuelEfficiencyPoints = result.fuelEfficiencyTrend;
 		} catch (error) {
-			if (isCurrent()) void notifyUnlessPageFailed(error, "Couldn't load fuel efficiency");
+			if (isCurrent())
+				void vehicleSettled.then(() =>
+					notifyUnlessPageFailed(error, `Couldn't load ${fuelChartTitle.toLowerCase()}`)
+				);
 		} finally {
 			if (isCurrent()) isLoadingFuelEfficiency = false;
 		}

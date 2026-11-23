@@ -306,6 +306,14 @@ describe('distinctYTicks', () => {
 		expect(ticks.every(Number.isInteger)).toBe(true);
 		expect(ticks.length).toBeGreaterThanOrEqual(2);
 	});
+
+	test('never repeats a label, even when no tick count gives distinct ones', () => {
+		const format = (v: number) => formatNumber(v, 0);
+		const narrow = scaleLinear().domain([1, 1.25]);
+		const labels = distinctYTicks(format, 276)(narrow as never).map(format);
+		expect(labels.length).toBeGreaterThanOrEqual(1);
+		expect(new Set(labels).size).toBe(labels.length);
+	});
 });
 
 describe('dayXAxisProps (day-and-month ticks sized to the plot)', () => {

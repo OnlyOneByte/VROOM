@@ -529,6 +529,21 @@ describe('vehicle detail page overview', () => {
 		);
 		expect(screen.getByRole('tab', { name: 'Overview' })).toBeInTheDocument();
 	});
+
+	test("an electric vehicle's failed trend load names electric efficiency", async () => {
+		let resolveVehicle: (v: unknown) => void = () => {};
+		getVehicle.mockReturnValue(new Promise(resolve => (resolveVehicle = resolve)));
+		getFuelEfficiency.mockRejectedValue(new Error('a'));
+		const mounted = mount();
+		await settle();
+		resolveVehicle({ ...VEHICLE, vehicleType: 'electric' });
+		await mounted;
+		await settle();
+
+		const contexts = handleErrorWithNotification.mock.calls.map(call => call[1]);
+		expect(contexts).toContain("Couldn't load electric efficiency");
+		expect(contexts).not.toContain("Couldn't load fuel efficiency");
+	});
 });
 
 describe('vehicle detail page tabs', () => {
