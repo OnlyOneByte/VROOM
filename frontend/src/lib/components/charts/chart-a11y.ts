@@ -67,8 +67,12 @@ export function chartSummary(
 		const who = columns.length > 1 ? `${column.label}, ` : '';
 		return `${who}${pick.row.label}, ${pick.row.cells[pick.col]}`;
 	};
-	if (high) parts.push(`Highest: ${describe(high)}.`);
-	if (low && rows.length > 1) parts.push(`Lowest: ${describe(low)}.`);
+	if (high && low && high.value === low.value && rows.length > 1) {
+		parts.push(`Every value: ${high.row.cells[high.col]}.`);
+	} else {
+		if (high) parts.push(`Highest: ${describe(high)}.`);
+		if (low && rows.length > 1) parts.push(`Lowest: ${describe(low)}.`);
+	}
 	return parts.join(' ');
 }
 
