@@ -15,7 +15,7 @@
 	} from '#lib/utils/units.ts';
 	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import { COMMON_MESSAGES, EXPENSE_MESSAGES } from '#lib/constants/messages.ts';
-	import type { UnitPreferences, VehicleStats } from '#lib/types/index.ts';
+	import type { UnitPreferences, VehicleStats, VehicleType } from '#lib/types/index.ts';
 
 	interface Props {
 		vehicleId: string;
@@ -23,10 +23,19 @@
 		isLoadingStats: boolean;
 		selectedStatsPeriod: string;
 		unitPreferences?: UnitPreferences | undefined;
+		vehicleType?: VehicleType | undefined;
 	}
 
-	let { vehicleId, vehicleStatsData, isLoadingStats, selectedStatsPeriod, unitPreferences }: Props =
-		$props();
+	let {
+		vehicleId,
+		vehicleStatsData,
+		isLoadingStats,
+		selectedStatsPeriod,
+		unitPreferences,
+		vehicleType
+	}: Props = $props();
+
+	let electric = $derived(vehicleType === 'electric');
 
 	let hasFuelData = $derived(
 		vehicleStatsData &&
@@ -126,7 +135,9 @@
 	<div class="space-y-3">
 		<div class="flex items-center gap-2">
 			<Gauge class="h-5 w-5" />
-			<h2 class="text-lg font-semibold">Mileage & Fuel Statistics</h2>
+			<h2 class="text-lg font-semibold">
+				{electric ? 'Mileage & Charging Statistics' : 'Mileage & Fuel Statistics'}
+			</h2>
 		</div>
 		<StatCardGrid
 			items={isLoadingStats && statItems.length === 0 ? LOADING_ITEMS : statItems}
@@ -140,17 +151,19 @@
 			<Gauge class="h-12 w-12 text-muted-foreground mb-4" />
 		{/snippet}
 		{#snippet title()}
-			{COMMON_MESSAGES.NO_FUEL_DATA}
+			{electric ? 'No charging data yet' : COMMON_MESSAGES.NO_FUEL_DATA}
 		{/snippet}
 		{#snippet description()}
-			{EXPENSE_MESSAGES.ADD_FUEL_DESC}
+			{electric
+				? `Add charging sessions with mileage and ${getChargeUnitLabel(chargeUnit, true)} to see detailed charging statistics`
+				: EXPENSE_MESSAGES.ADD_FUEL_DESC}
 		{/snippet}
 		{#snippet action()}
 			<Button
 				href={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}&category=fuel`}
 			>
 				<Plus class="h-4 w-4 mr-2" />
-				{COMMON_MESSAGES.ADD_FUEL_EXPENSE}
+				{electric ? 'Add Charging Session' : COMMON_MESSAGES.ADD_FUEL_EXPENSE}
 			</Button>
 		{/snippet}
 	</EmptyState>

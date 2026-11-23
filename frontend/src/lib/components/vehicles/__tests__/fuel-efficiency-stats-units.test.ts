@@ -66,3 +66,25 @@ describe('FuelEfficiencyStatsCard units', () => {
 		expect(text).toContain('Cost per mi');
 	});
 });
+
+describe('FuelEfficiencyStatsCard empty state', () => {
+	test.each([
+		['electric', 'No charging data yet', 'Add Charging Session'],
+		['gas', 'No fuel data yet', 'Add Fuel Expense']
+	] as const)('a %s vehicle with no data gets matching wording', (vehicleType, title, action) => {
+		const { container } = render(FuelEfficiencyStatsCard, {
+			props: {
+				vehicleId: 'veh-1',
+				vehicleStatsData: { ...STATS, fuelExpenseCount: 0, chargeExpenseCount: 0 },
+				isLoadingStats: false,
+				selectedStatsPeriod: 'all',
+				vehicleType
+			}
+		});
+		const text = container.textContent ?? '';
+
+		expect(text).toContain(title);
+		expect(text).toContain(action);
+		if (vehicleType === 'electric') expect(text.toLowerCase()).not.toContain('fuel');
+	});
+});

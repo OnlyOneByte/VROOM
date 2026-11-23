@@ -2,7 +2,11 @@
 	import type * as Chart from '#lib/components/ui/chart/index.ts';
 	import AppLineChart from './AppLineChart.svelte';
 	import { formatDecimalAxis, formatDayLabel, unitTooltip } from '#lib/utils/chart-formatters.ts';
-	import { getFuelEfficiencyLabel, getElectricEfficiencyLabel } from '#lib/utils/units.ts';
+	import {
+		getChargeUnitLabel,
+		getFuelEfficiencyLabel,
+		getElectricEfficiencyLabel
+	} from '#lib/utils/units.ts';
 	import type { UnitPreferences, VehicleType } from '#lib/types/index.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 
@@ -34,11 +38,11 @@
 	let description = $derived(`Measured in ${unitLabel}`);
 	let tooltipFormat = $derived(unitTooltip(unitLabel));
 	let emptyTitle = $derived(
-		fuelType === 'electric' ? 'No efficiency trend yet' : 'Insufficient fuel data'
+		fuelType === 'electric' ? 'Insufficient charging data' : 'Insufficient fuel data'
 	);
 	let emptyDescription = $derived(
 		fuelType === 'electric'
-			? "Efficiency over time isn't charted for electric vehicles yet. Charging sessions still count in this vehicle's costs."
+			? `Add at least 2 charging sessions with mileage and ${getChargeUnitLabel(units.chargeUnit, true)} to calculate efficiency`
 			: 'Add at least 2 fuel entries with mileage and volume to calculate efficiency'
 	);
 
