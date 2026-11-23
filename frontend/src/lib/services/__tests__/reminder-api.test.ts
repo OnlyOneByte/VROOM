@@ -126,12 +126,6 @@ describe('reminderApi — CRUD + trigger + mark-serviced wiring', () => {
 		expect(mockPost).toHaveBeenCalledWith('/reminders', body);
 	});
 
-	it('getById GETs the id path', async () => {
-		mockGet.mockResolvedValueOnce({ reminder: { id: 'r1' }, vehicleIds: [] });
-		await reminderApi.getById('r1');
-		expect(mockGet).toHaveBeenCalledWith('/reminders/r1');
-	});
-
 	it('update PUTs the id path with the body and the user time zone', async () => {
 		mockPut.mockResolvedValueOnce({ reminder: { id: 'r1' }, vehicleIds: ['v2'] });
 		const body = { title: 'New', vehicleIds: ['v2'] };

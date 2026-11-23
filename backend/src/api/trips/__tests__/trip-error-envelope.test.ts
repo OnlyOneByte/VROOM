@@ -44,12 +44,12 @@ describe('trip error envelopes', () => {
     expect(await clientMessage(second)).toBe('Trip not found');
   });
 
-  test('a missing trip id delete matches the sibling GET envelope exactly', async () => {
+  test('a missing trip id delete matches the sibling PUT envelope exactly', async () => {
     const del = await ctx.authed('DELETE', '/api/v1/trips/does-not-exist');
-    const get = await ctx.authed('GET', '/api/v1/trips/does-not-exist');
+    const put = await ctx.authed('PUT', '/api/v1/trips/does-not-exist', { note: 'x' });
     expect(del.status).toBe(404);
-    expect(get.status).toBe(404);
-    expect(await del.json()).toEqual(await get.json());
+    expect(put.status).toBe(404);
+    expect(await del.json()).toEqual(await put.json());
   });
 
   test('an inverted odometer pair on update reports which field was wrong', async () => {

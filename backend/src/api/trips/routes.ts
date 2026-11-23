@@ -67,7 +67,6 @@ routes.get('/', zValidator('query', listQuerySchema), async (c) => {
   return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
 });
 
-// Register before /:id, or the literal 'summary' segment is captured as a trip id.
 routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, rate } = c.req.valid('query');
@@ -91,24 +90,6 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
       convertDistance(distance, vehicleUnits.get(tripVehicleId) ?? userUnit, userUnit)
   );
   return c.json({ success: true, data: summary });
-});
-
-routes.get('/vehicle/:vehicleId', zValidator('param', commonSchemas.vehicleIdParam), async (c) => {
-  const user = c.get('user');
-  const { vehicleId } = c.req.valid('param');
-
-  await requireVehicleAccess(vehicleId, user.id, 'owner');
-
-  const data = await tripRepository.findByVehicle(vehicleId, user.id);
-  return c.json({ success: true, data });
-});
-
-routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
-
-  const trip = await validateTripOwnership(id, user.id);
-  return c.json({ success: true, data: trip });
 });
 
 routes.put(

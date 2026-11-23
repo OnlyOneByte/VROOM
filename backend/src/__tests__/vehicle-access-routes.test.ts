@@ -290,12 +290,6 @@ const ROUTES: RouteCase[] = [
     expectInBody: () => '"tripCount":1',
   },
   {
-    name: 'GET /trips/vehicle/:vehicleId',
-    mode: 'owner',
-    request: (fx) => ['GET', `/trips/vehicle/${fx.vehicleId}`],
-    expectInBody: (fx) => fx.tripId,
-  },
-  {
     name: 'GET /analytics/fuel-stats?vehicleId',
     mode: 'read',
     request: (fx) => ['GET', `/analytics/fuel-stats?vehicleId=${fx.vehicleId}&${RANGE}`],

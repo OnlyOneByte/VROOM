@@ -45,10 +45,6 @@ export const reminderApi = {
 		return apiClient.get<ReminderWithVehicles[]>(`/reminders${qs}`);
 	},
 
-	async getById(id: string): Promise<ReminderWithVehicles> {
-		return apiClient.get<ReminderWithVehicles>(`/reminders/${id}`);
-	},
-
 	async update(
 		id: string,
 		data: Partial<Reminder> & { vehicleIds?: string[] }

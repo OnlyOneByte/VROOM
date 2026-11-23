@@ -219,7 +219,6 @@ describe('reminder writes after the reminder lost its vehicles', () => {
     expect(serviced.status, 'mark-serviced').toBe(404);
     expect(await serviced.text()).not.toContain('Orphaned reminder');
     expect((await b.request('DELETE', `/api/v1/reminders/${rid}`)).status, 'DELETE').toBe(404);
-    expect((await b.request('GET', `/api/v1/reminders/${rid}`)).status, 'GET').toBe(404);
     expect(
       (await b.request('PUT', `/api/v1/reminders/${rid}`, { name: 'taken' })).status,
       'PUT'

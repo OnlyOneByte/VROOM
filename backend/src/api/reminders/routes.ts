@@ -328,15 +328,6 @@ routes.get('/', async (c) => {
   return c.json({ success: true, data: reminders.map(reminderWithVehiclesToApi) });
 });
 
-routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
-
-  const result = await validateReminderOwnership(id, user.id);
-
-  return c.json({ success: true, data: reminderWithVehiclesToApi(result) });
-});
-
 routes.get('/:id/expenses', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');

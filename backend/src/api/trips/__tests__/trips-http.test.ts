@@ -127,10 +127,10 @@ describe('POST /api/v1/trips (create)', () => {
 
     const res = await ctx.authed('PUT', `/api/v1/trips/${data.id}`, { tripDate: null });
     expect(res.status).toBe(400);
-    const after = await json<DataEnvelope<{ tripDate: string }>>(
-      await ctx.authed('GET', `/api/v1/trips/${data.id}`)
+    const after = await json<DataEnvelope<{ id: string; tripDate: string }[]>>(
+      await ctx.authed('GET', `/api/v1/trips?vehicleId=${vehicleId}`)
     );
-    expect(after.data.tripDate).toBe(data.tripDate);
+    expect(after.data.find((t) => t.id === data.id)?.tripDate).toBe(data.tripDate);
   });
 
   test('accepts a trip dated today sent as noon local time', async () => {
@@ -569,40 +569,6 @@ describe('GET /api/v1/trips (list)', () => {
   });
 });
 
-describe('GET /api/v1/trips/:id', () => {
-  test('returns an owned trip', async () => {
-    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    const created = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId));
-    const { data } = await json<DataEnvelope<{ id: string }>>(created);
-
-    const res = await ctx.authed('GET', `/api/v1/trips/${data.id}`);
-    expect(res.status).toBe(200);
-  });
-
-  test('a foreign trip id is 404 (not 403)', async () => {
-    const { tripId } = seedForeignTrip();
-    const res = await ctx.authed('GET', `/api/v1/trips/${tripId}`);
-    expect(res.status).toBe(404);
-  });
-});
-
-describe('GET /api/v1/trips/vehicle/:vehicleId', () => {
-  test('returns a vehicle’s trips', async () => {
-    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId));
-    const res = await ctx.authed('GET', `/api/v1/trips/vehicle/${vehicleId}`);
-    const body = await json<{ data: unknown[] }>(res);
-    expect(res.status).toBe(200);
-    expect(body.data).toHaveLength(1);
-  });
-
-  test('an unowned vehicle is 404', async () => {
-    const { vehicleId } = seedForeignTrip();
-    const res = await ctx.authed('GET', `/api/v1/trips/vehicle/${vehicleId}`);
-    expect(res.status).toBe(404);
-  });
-});
-
 describe('GET /api/v1/trips/summary (mileage rollup)', () => {
   test('cross-fleet summary with the business-$ at the supplied rate', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
@@ -866,8 +832,7 @@ describe('DELETE /api/v1/trips/:id', () => {
 
     const res = await ctx.authed('DELETE', `/api/v1/trips/${data.id}`);
     expect(res.status).toBe(200);
-    const after = await ctx.authed('GET', `/api/v1/trips/${data.id}`);
-    expect(after.status).toBe(404);
+    expect(ctx.sqlite.query('SELECT id FROM trips WHERE id = ?').get(data.id)).toBeNull();
   });
 
   test('a foreign trip delete returns 404 and removes nothing', async () => {
