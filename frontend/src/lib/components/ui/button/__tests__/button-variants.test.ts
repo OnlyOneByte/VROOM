@@ -52,20 +52,47 @@ describe('Button aria-disabled focus ring', () => {
 		}
 	});
 
-	test.each(VARIANTS.flatMap(variant => [`${variant}:`, `${variant}:dark:`]))(
-		'%s doubles the ring alpha while focused and aria-disabled, so the busy ring stays strong',
+	test('outline halves its border in both schemes while aria-disabled', () => {
+		const classes = buttonVariants({ variant: 'outline' }).split(/\s+/);
+
+		expect(classes).toEqual(
+			expect.arrayContaining([
+				'aria-disabled:border-border/50',
+				'dark:aria-disabled:border-input/50'
+			])
+		);
+	});
+
+	test.each(VARIANTS.filter(v => v !== 'destructive').flatMap(v => [`${v}:`, `${v}:dark:`]))(
+		'%s draws the busy ring in the full foreground token, which clears 3:1 on the page in every theme',
 		key => {
 			const [variant, mode = ''] = key.split(/:(.*)/) as [(typeof VARIANTS)[number], string];
 			const classes = buttonVariants({ variant }).split(/\s+/);
-			const normal = ring(classes, `${mode}focus-visible:`) ?? ring(classes, 'focus-visible:');
-			const dimmed =
+			const busy =
 				ring(classes, `${mode}aria-disabled:focus-visible:`) ??
 				ring(classes, 'aria-disabled:focus-visible:');
 
-			expect(normal).not.toBeNull();
-			expect(dimmed).toEqual({ color: normal!.color, alpha: Math.min(100, normal!.alpha * 2) });
+			expect(busy).toEqual({ color: 'foreground', alpha: 100 });
 		}
 	);
+
+	test.each(['', 'dark:'])(
+		'destructive %sdoubles its own ring alpha while focused and aria-disabled',
+		mode => {
+			const classes = buttonVariants({ variant: 'destructive' }).split(/\s+/);
+			const normal = ring(classes, `${mode}focus-visible:`);
+			const busy = ring(classes, `${mode}aria-disabled:focus-visible:`);
+
+			expect(normal).not.toBeNull();
+			expect(busy).toEqual({ color: normal!.color, alpha: normal!.alpha * 2 });
+		}
+	);
+
+	test('the enabled focus ring stays the half-strength ring token', () => {
+		const classes = buttonVariants({ variant: 'default' }).split(/\s+/);
+
+		expect(ring(classes, 'focus-visible:')).toEqual({ color: 'ring', alpha: 50 });
+	});
 
 	test('a positioned caller keeps its position while focused and aria-disabled', () => {
 		const classes = cn(buttonVariants({ variant: 'outline' }), 'absolute top-1/2').split(/\s+/);
