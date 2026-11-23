@@ -8,8 +8,9 @@ const NOTE_MAX_LENGTH = 500;
 
 function odometerError(odometer: number | undefined): string | undefined {
 	if (odometer === undefined || !Number.isFinite(odometer)) return 'Odometer reading is required';
-	if (!Number.isSafeInteger(odometer)) return 'Odometer must be a whole number';
+	if (!Number.isInteger(odometer)) return 'Odometer must be a whole number';
 	if (odometer < 0) return 'Odometer must be 0 or greater';
+	if (!Number.isSafeInteger(odometer)) return 'Odometer must be a whole number';
 	return undefined;
 }
 
