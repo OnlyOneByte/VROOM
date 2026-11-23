@@ -85,21 +85,22 @@ export const analyticsApi = {
 	async getCrossVehicle(params: {
 		startDate: number;
 		endDate: number;
+		vehicleIds?: string[];
 	}): Promise<CrossVehicleResponse> {
 		return apiClient.get<CrossVehicleResponse>(
-			`/analytics/cross-vehicle${buildQueryString({ startDate: params.startDate, endDate: params.endDate, timeZone: userTimeZone() })}`
+			`/analytics/cross-vehicle${buildQueryString({ startDate: params.startDate, endDate: params.endDate, vehicleIds: params.vehicleIds?.join(','), timeZone: userTimeZone() })}`
 		);
 	},
 
-	async getFinancing(): Promise<FinancingResponse> {
+	async getFinancing(params?: { vehicleIds?: string[] }): Promise<FinancingResponse> {
 		return apiClient.get<FinancingResponse>(
-			`/analytics/financing${buildQueryString({ timeZone: userTimeZone() })}`
+			`/analytics/financing${buildQueryString({ vehicleIds: params?.vehicleIds?.join(','), timeZone: userTimeZone() })}`
 		);
 	},
 
-	async getInsurance(): Promise<InsuranceResponse> {
+	async getInsurance(params?: { vehicleIds?: string[] }): Promise<InsuranceResponse> {
 		return apiClient.get<InsuranceResponse>(
-			`/analytics/insurance${buildQueryString({ timeZone: userTimeZone() })}`
+			`/analytics/insurance${buildQueryString({ vehicleIds: params?.vehicleIds?.join(','), timeZone: userTimeZone() })}`
 		);
 	},
 
@@ -145,10 +146,11 @@ export const analyticsApi = {
 		startDate: number;
 		endDate: number;
 		ytdStart?: number;
+		vehicleIds?: string[];
 	}): Promise<AnalyticsSummaryResponse> {
 		try {
 			return await apiClient.get<AnalyticsSummaryResponse>(
-				`/analytics/summary${buildQueryString({ startDate: params.startDate, endDate: params.endDate, ytdStart: params.ytdStart, timeZone: userTimeZone() })}`
+				`/analytics/summary${buildQueryString({ startDate: params.startDate, endDate: params.endDate, ytdStart: params.ytdStart, vehicleIds: params.vehicleIds?.join(','), timeZone: userTimeZone() })}`
 			);
 		} catch (error: unknown) {
 			const is404 = error instanceof ApiError && error.statusCode === 404;

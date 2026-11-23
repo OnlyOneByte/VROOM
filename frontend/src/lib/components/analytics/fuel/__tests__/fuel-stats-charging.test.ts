@@ -336,3 +336,21 @@ describe('FuelStatsTab best and worst efficiency', () => {
 		]);
 	});
 });
+
+describe('FuelStatsTab under a filter that matches nothing', () => {
+	test('names the filter and offers Clear filters instead of the first-run empty state', async () => {
+		const onClearFilters = vi.fn();
+		render(FuelStatsTab, {
+			fuelStats: stats({}),
+			fuelAdvanced: advanced,
+			filterLabel: 'last 3 months, 2019 honda civic',
+			onClearFilters
+		});
+		expect(
+			await screen.findByText('No fill-ups or charging for last 3 months, 2019 honda civic')
+		).toBeTruthy();
+		expect(getAllExpenses).not.toHaveBeenCalled();
+		screen.getByRole('button', { name: 'Clear filters' }).click();
+		expect(onClearFilters).toHaveBeenCalledOnce();
+	});
+});
