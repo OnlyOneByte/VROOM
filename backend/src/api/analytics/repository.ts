@@ -78,6 +78,7 @@ import {
   convertVolume,
   type UnitScale,
 } from '../../utils/unit-conversions';
+import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { FinancingRepository } from '../financing/repository';
 import { isTermInForce, termInForceAt } from '../insurance/in-force';
 
@@ -459,7 +460,7 @@ export class AnalyticsRepository {
       const rows = await this.db
         .select({ id: vehicles.id, unitPreferences: vehicles.unitPreferences })
         .from(vehicles)
-        .where(eq(vehicles.userId, userId));
+        .where(ownedVehiclesScope(userId));
 
       const result = new Map<string, UnitPreferences>();
       for (const row of rows) {
@@ -748,7 +749,7 @@ export class AnalyticsRepository {
     const cached = this.getCachedVehicleNames(cacheKey, now);
     if (cached) return cached;
 
-    const conditions = [eq(vehicles.userId, userId)];
+    const conditions = [ownedVehiclesScope(userId)];
     if (vehicleId) conditions.push(eq(vehicles.id, vehicleId));
     const rows = await this.db
       .select({
@@ -1321,7 +1322,7 @@ export class AnalyticsRepository {
           id: vehicles.id,
         })
         .from(vehicles)
-        .where(eq(vehicles.userId, userId));
+        .where(ownedVehiclesScope(userId));
 
       const vehicleCount = vehicleRows.length;
 
@@ -1982,7 +1983,7 @@ export class AnalyticsRepository {
         this.db
           .select({ purchasePrice: vehicles.purchasePrice, purchaseDate: vehicles.purchaseDate })
           .from(vehicles)
-          .where(and(eq(vehicles.id, vehicleId), eq(vehicles.userId, userId)))
+          .where(and(eq(vehicles.id, vehicleId), ownedVehiclesScope(userId)))
           .limit(1),
       ]);
       const vehicleName = vehicleNameMap.get(vehicleId) ?? 'Unknown';
@@ -1990,7 +1991,7 @@ export class AnalyticsRepository {
       const purchasePrice = vehicle?.purchasePrice ?? null;
       const purchaseDate = vehicle?.purchaseDate ?? null;
 
-      const conditions = [eq(expenses.vehicleId, vehicleId), eq(vehicles.userId, userId)];
+      const conditions = [eq(expenses.vehicleId, vehicleId), ownedVehiclesScope(userId)];
       if (year) {
         const { start: yearStart, end: yearEnd } = calendarYearRange(year, calendar);
         conditions.push(gte(expenses.date, yearStart));
@@ -2153,7 +2154,7 @@ export class AnalyticsRepository {
             id: vehicles.id,
           })
           .from(vehicles)
-          .where(eq(vehicles.userId, userId)),
+          .where(ownedVehiclesScope(userId)),
         this.queryAllExpenses(userId, range),
         this.queryFuelExpenses(userId, range),
         this.queryFuelAggregates(userId, prevRange),

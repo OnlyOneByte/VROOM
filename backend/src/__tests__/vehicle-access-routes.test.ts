@@ -61,6 +61,8 @@ const policyBody = (vehicleId: string) => ({
   ],
 });
 
+const RANGE = 'startDate=1704067200&endDate=1735689600';
+
 const ROUTES: RouteCase[] = [
   {
     name: 'GET /vehicles/:id',
@@ -279,6 +281,36 @@ const ROUTES: RouteCase[] = [
     name: 'GET /trips/vehicle/:vehicleId',
     mode: 'owner',
     request: (fx) => ['GET', `/trips/vehicle/${fx.vehicleId}`],
+  },
+  {
+    name: 'GET /analytics/fuel-stats?vehicleId',
+    mode: 'read',
+    request: (fx) => ['GET', `/analytics/fuel-stats?vehicleId=${fx.vehicleId}&${RANGE}`],
+  },
+  {
+    name: 'GET /analytics/fuel-advanced?vehicleId',
+    mode: 'read',
+    request: (fx) => ['GET', `/analytics/fuel-advanced?vehicleId=${fx.vehicleId}&${RANGE}`],
+  },
+  {
+    name: 'GET /analytics/vehicle-health?vehicleId',
+    mode: 'read',
+    request: (fx) => ['GET', `/analytics/vehicle-health?vehicleId=${fx.vehicleId}`],
+  },
+  {
+    name: 'GET /analytics/vehicle-tco?vehicleId',
+    mode: 'read',
+    request: (fx) => ['GET', `/analytics/vehicle-tco?vehicleId=${fx.vehicleId}`],
+  },
+  {
+    name: 'GET /analytics/vehicle-expenses?vehicleId',
+    mode: 'read',
+    request: (fx) => ['GET', `/analytics/vehicle-expenses?vehicleId=${fx.vehicleId}&${RANGE}`],
+  },
+  {
+    name: 'GET /analytics/fuel-efficiency?vehicleId',
+    mode: 'read',
+    request: (fx) => ['GET', `/analytics/fuel-efficiency?vehicleId=${fx.vehicleId}`],
   },
 ];
 
