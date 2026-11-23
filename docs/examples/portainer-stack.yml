@@ -21,6 +21,7 @@ services:
     image: ghcr.io/onlyonebyte/vroom/backend:latest
     container_name: vroom-backend
     ports:
+      # Behind a reverse proxy on this host, publish on loopback only: "127.0.0.1:${BACKEND_PORT:-3001}:3001"
       - "${BACKEND_PORT:-3001}:3001"
     volumes:
       - vroom-data:/app/data
@@ -56,6 +57,7 @@ services:
     image: ghcr.io/onlyonebyte/vroom/frontend:latest
     container_name: vroom-frontend
     ports:
+      # Behind a reverse proxy on this host, publish on loopback only: "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
       NODE_ENV: production
@@ -97,6 +99,7 @@ services:
     image: quenary/tugtainer:latest
     container_name: vroom-tugtainer
     ports:
+      # Behind a reverse proxy on this host, publish on loopback only: "127.0.0.1:${TUGTAINER_PORT:-3002}:80"
       - "${TUGTAINER_PORT:-3002}:80"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

@@ -433,6 +433,7 @@ The Portainer stack bundles Tugtainer, which does the same hourly for labelled c
 - [ ] `PROVIDER_ENCRYPTION_KEY` randomly generated (`openssl rand -hex 32`) and backed up alongside the database
 - [ ] `CORS_ORIGINS` listing only your own origins
 - [ ] Only 80/443 reachable from the internet (plus 22 for SSH). Behind a proxy or tunnel, drop the `ports:` mappings for 3000/3001 so they stay on the Docker network
+- [ ] Bind to 127.0.0.1 when behind a reverse proxy on the same host: publish each port as `"127.0.0.1:3000:3000"` (the example stacks show this form above each mapping). A bare `"3000:3000"` listens on every interface, and Docker's published ports bypass host firewalls such as ufw
 - [ ] `TRUSTED_PROXY_IPS` set when behind a proxy, so rate limits key on real client IPs
 - [ ] Images updated
 - [ ] Backups configured
