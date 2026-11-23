@@ -119,6 +119,15 @@ describe('InsurancePolicyForm create mode', () => {
 		expect(screen.getByRole('heading', { level: 3, name: 'Policy Details' })).toBeInTheDocument();
 	});
 
+	test('the save bar is fixed below lg and a normal row from lg, with a plain primary Save button', async () => {
+		await mount();
+		const save = screen.getByRole('button', { name: 'Create Policy' });
+
+		expect(save.closest('.fixed')).toHaveClass('fixed', 'lg:static');
+		expect(save).toHaveClass('shadow-sm', 'transition-colors');
+		expect(save.className).not.toMatch(/shadow-2xl|bg-foreground|hover:scale/);
+	});
+
 	test('shows the empty-vehicle hint when the user has no vehicles', async () => {
 		getVehicles.mockResolvedValue([]);
 		await mount();

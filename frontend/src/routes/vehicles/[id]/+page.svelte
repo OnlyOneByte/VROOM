@@ -561,7 +561,7 @@
 						size="sm"
 						onclick={() => (shareOpen = true)}
 						aria-label="Share"
-						class="h-10 w-10 shrink-0 sm:h-8 sm:w-auto"
+						class="h-10 w-10 shrink-0 sm:w-auto"
 					>
 						<Users class="h-4 w-4 sm:mr-2" aria-hidden="true" />
 						<span class="hidden sm:inline">Share</span>
