@@ -27,6 +27,8 @@
 		vehicleId: string;
 		vehicleStatsData: VehicleStats | null;
 		isLoadingStats: boolean;
+		yearStats?: VehicleStats | null;
+		trendLoading?: boolean;
 		unitPreferences?: UnitPreferences | undefined;
 		vehicleType?: VehicleType | undefined;
 		trend?: EconomyPoint[];
@@ -37,6 +39,8 @@
 		vehicleId,
 		vehicleStatsData,
 		isLoadingStats,
+		yearStats = null,
+		trendLoading = false,
 		unitPreferences,
 		vehicleType,
 		trend = [],
@@ -59,18 +63,17 @@
 	let decimals = $derived(electric ? 2 : 1);
 
 	let recent = $derived(lastTwelveMonths(trend));
-	let average = $derived.by(() => {
-		if (recent.length > 0) {
-			return recent.reduce((sum, point) => sum + point.efficiency, 0) / recent.length;
-		}
-		return (electric ? vehicleStatsData?.averageMilesPerKwh : vehicleStatsData?.averageMpg) ?? null;
-	});
+	let average = $derived(
+		recent.length > 0
+			? recent.reduce((sum, point) => sum + point.efficiency, 0) / recent.length
+			: null
+	);
 	let best = $derived(bestEfficiency(recent));
 	let pricePerUnit = $derived.by(() => {
-		if (!vehicleStatsData) return null;
+		if (!yearStats) return null;
 		const [cost, amount] = electric
-			? [vehicleStatsData.totalChargeCost, vehicleStatsData.totalChargeConsumed]
-			: [vehicleStatsData.totalFuelCost, vehicleStatsData.totalFuelConsumed];
+			? [yearStats.totalChargeCost, yearStats.totalChargeConsumed]
+			: [yearStats.totalFuelCost, yearStats.totalFuelConsumed];
 		return amount > 0 ? cost / amount : null;
 	});
 	let perUnitLabel = $derived(
@@ -82,11 +85,17 @@
 	let insight = $derived.by(() => {
 		if (recent.length < 2 || average === null) return null;
 		const outlier = monthOutlier(recent, average);
-		if (outlier) {
-			const month = formatDateWith(outlier.month, { month: 'long' });
+		if (outlier === null) return null;
+		if (outlier !== 'steady') {
+			const month = formatDateWith(
+				outlier.month,
+				outlier.month.getFullYear() === new Date().getFullYear()
+					? { month: 'long' }
+					: { month: 'long', year: 'numeric' }
+			);
 			const things = electric ? 'session' : 'tank';
 			const verb = outlier.direction === 'below' ? 'dipped' : 'rose';
-			return `${month} ${verb} to ${formatNumber(outlier.efficiency, decimals)} ${efficiencyUnit} over ${outlier.count} ${outlier.count === 1 ? things : `${things}s`}.`;
+			return `${month} ${verb} to ${formatNumber(outlier.efficiency, decimals)} ${efficiencyUnit} over ${outlier.count} ${things}s.`;
 		}
 		return `Every month stayed within 15% of the ${formatNumber(average, decimals)} ${efficiencyUnit} average.`;
 	});
@@ -94,15 +103,18 @@
 	let figures = $derived([
 		{
 			label: `${efficiencyUnit} average`,
-			value: average !== null ? formatNumber(average, decimals) : '—'
+			value: average !== null ? formatNumber(average, decimals) : '—',
+			loading: trendLoading
 		},
 		{
 			label: electric ? 'best session' : 'best tank',
-			value: best !== null ? formatNumber(best, decimals) : '—'
+			value: best !== null ? formatNumber(best, decimals) : '—',
+			loading: trendLoading
 		},
 		{
 			label: `avg per ${perUnitLabel}`,
-			value: pricePerUnit !== null ? formatCurrency(pricePerUnit) : '—'
+			value: pricePerUnit !== null ? formatCurrency(pricePerUnit) : '—',
+			loading: trendLoading && !yearStats
 		}
 	]);
 </script>
@@ -120,7 +132,7 @@
 				<div class="flex flex-col-reverse">
 					<dt class="text-xs text-muted-foreground">{figure.label}</dt>
 					<dd class="text-2xl font-bold tabular-nums">
-						{#if isLoadingStats && !hasFuelData}
+						{#if (isLoadingStats && !hasFuelData) || figure.loading}
 							<Skeleton class="h-8 w-16" />
 						{:else}
 							{figure.value}

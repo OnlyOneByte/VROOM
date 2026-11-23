@@ -91,6 +91,7 @@
 	let summary = $state<ExpenseSummary | null>(null);
 	let fuelEfficiencyPoints = $state<FuelEfficiencyPoint[]>([]);
 	let isLoadingFuelEfficiency = $state(true);
+	let yearStats = $state<VehicleStats | null>(null);
 	let summaryLoadError = $state<string | null>(null);
 
 	let expenses = $state<Expense[]>([]);
@@ -353,6 +354,14 @@
 	async function loadFuelEfficiency() {
 		const isCurrent = nextFuelEfficiencyRequest();
 		isLoadingFuelEfficiency = true;
+		void vehicleApi.getVehicleStats(vehicleId, '1y').then(
+			loaded => {
+				if (isCurrent()) yearStats = loaded;
+			},
+			error => {
+				if (isCurrent()) logLoadFailure(error, "Couldn't load the last 12 months of fuel stats");
+			}
+		);
 		try {
 			const result = await analyticsApi.getFuelEfficiency({ vehicleId });
 			if (isCurrent()) fuelEfficiencyPoints = result.fuelEfficiencyTrend;
@@ -732,6 +741,8 @@
 							{vehicleId}
 							{vehicleStatsData}
 							{isLoadingStats}
+							{yearStats}
+							trendLoading={isLoadingFuelEfficiency}
 							unitPreferences={vehicle?.unitPreferences}
 							vehicleType={vehicle?.vehicleType}
 							trend={fuelEfficiencyData}
@@ -756,7 +767,7 @@
 
 					<Collapsible bind:open={detailsOpen} class="rounded-xl border bg-card">
 						<CollapsibleTrigger
-							class="flex min-h-12 w-full items-center gap-2 px-4 text-left text-sm font-semibold sm:px-6"
+							class="flex min-h-12 w-full items-center gap-2 rounded-xl px-4 text-left text-sm font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:px-6"
 						>
 							<ChevronRight
 								class="h-4 w-4 shrink-0 transition-transform {detailsOpen ? 'rotate-90' : ''}"

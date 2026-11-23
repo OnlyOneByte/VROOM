@@ -36,6 +36,7 @@ function renderCard(unitPreferences?: {
 		props: {
 			vehicleId: 'veh-1',
 			vehicleStatsData: STATS,
+			yearStats: STATS,
 			isLoadingStats: false,
 			unitPreferences
 		}
@@ -65,11 +66,12 @@ describe('FuelEfficiencyStatsCard units', () => {
 		expect(text).toContain('$1.65');
 	});
 
-	test('the three figures are the 12-month average, the best tank and the price per unit', () => {
+	test('the three figures all cover the last 12 months', () => {
 		const { container } = render(FuelEfficiencyStatsCard, {
 			props: {
 				vehicleId: 'veh-1',
 				vehicleStatsData: STATS,
+				yearStats: { ...STATS, totalFuelCost: 120, totalFuelConsumed: 40 },
 				isLoadingStats: false,
 				trend: [
 					{ date: recentDay(10), efficiency: 30 },
@@ -80,80 +82,109 @@ describe('FuelEfficiencyStatsCard units', () => {
 		});
 		const figures = [...container.querySelectorAll('dd')].map(dd => dd.textContent?.trim());
 
-		expect(figures).toEqual(['32.0', '34.0', '$1.65']);
+		expect(figures).toEqual(['32.0', '34.0', '$3.00']);
 	});
 
-	test('one sentence names a month that dipped well below the average', () => {
+	test('the figures hold skeletons while the trend loads, and never show an all-time average', () => {
+		const props = {
+			vehicleId: 'veh-1',
+			vehicleStatsData: STATS,
+			isLoadingStats: false,
+			trendLoading: true
+		};
+		const loading = render(FuelEfficiencyStatsCard, { props });
+
+		expect(loading.container.querySelectorAll('dd [data-slot="skeleton"]')).toHaveLength(3);
+		loading.unmount();
+
+		const loaded = render(FuelEfficiencyStatsCard, {
+			props: { ...props, trendLoading: false, yearStats: STATS }
+		});
+		const figures = [...loaded.container.querySelectorAll('dd')].map(dd => dd.textContent?.trim());
+
+		expect(figures).toEqual(['—', '—', '$1.65']);
+	});
+
+	const sentenceFor = (now: Date, trend: Array<[Date, number]>) => {
 		vi.useFakeTimers({ toFake: ['Date'] });
-		vi.setSystemTime(new Date(2026, 10, 23, 12));
-		const { getByTestId } = render(FuelEfficiencyStatsCard, {
+		vi.setSystemTime(now);
+		const { getByTestId, queryByTestId } = render(FuelEfficiencyStatsCard, {
 			props: {
 				vehicleId: 'veh-1',
 				vehicleStatsData: STATS,
 				isLoadingStats: false,
-				trend: [
-					{ date: new Date(2026, 6, 4), efficiency: 19 },
-					{ date: new Date(2026, 6, 20), efficiency: 19 },
-					{ date: new Date(2026, 7, 3), efficiency: 32 },
-					{ date: new Date(2026, 8, 3), efficiency: 33 }
-				]
+				trend: trend.map(([date, efficiency]) => ({ date, efficiency }))
 			}
 		});
 		vi.useRealTimers();
-
-		expect(getByTestId('fuel-economy-insight').textContent).toMatch(
-			/^July dipped to 19\.0 .+ over 2 tanks\.$/
-		);
-	});
+		return queryByTestId('fuel-economy-insight')
+			? getByTestId('fuel-economy-insight').textContent
+			: null;
+	};
+	const tanks = (y: number, m: number, values: number[]): Array<[Date, number]> =>
+		values.map((v, i) => [new Date(y, m, 3 + i * 10), v]);
 
 	test.each([
 		{
+			name: 'names a month that dipped well below the average',
+			trend: [
+				...tanks(2026, 6, [19, 19]),
+				...tanks(2026, 7, [32, 32]),
+				...tanks(2026, 8, [33, 33])
+			],
+			sentence: /^July dipped to 19\.0 .+ over 2 tanks\.$/
+		},
+		{
 			name: 'with no dip, names a month that rose well above the average',
-			trend: [30, 30, 30, 45],
-			sentence: /^November rose to 45\.0 .+ over 1 tank\.$/
+			trend: [
+				...tanks(2026, 8, [30, 30]),
+				...tanks(2026, 9, [30, 30]),
+				...tanks(2026, 10, [40, 44])
+			],
+			sentence: /^November rose to 42\.0 .+ over 2 tanks\.$/
 		},
 		{
 			name: 'says every month stayed close when none is 15% off the average',
-			trend: [30, 31, 32, 31],
+			trend: [...tanks(2026, 8, [30, 31]), ...tanks(2026, 9, [32, 31])],
 			sentence: /^Every month stayed within 15% of the 31\.0 .+ average\.$/
 		}
-	])('$name', ({ trend, sentence }) => {
-		vi.useFakeTimers({ toFake: ['Date'] });
-		vi.setSystemTime(new Date(2026, 10, 23, 12));
-		const days = [
-			new Date(2026, 8, 3),
-			new Date(2026, 9, 3),
-			new Date(2026, 9, 20),
-			new Date(2026, 10, 3)
-		];
-		const { getByTestId } = render(FuelEfficiencyStatsCard, {
-			props: {
-				vehicleId: 'veh-1',
-				vehicleStatsData: STATS,
-				isLoadingStats: false,
-				trend: trend.map((efficiency, i) => ({ date: days[i] as Date, efficiency }))
-			}
-		});
-		vi.useRealTimers();
+	])('one sentence $name', ({ trend, sentence }) => {
+		expect(sentenceFor(new Date(2026, 10, 23, 12), trend)).toMatch(sentence);
+	});
 
-		expect(getByTestId('fuel-economy-insight').textContent).toMatch(sentence);
+	test('a month from last year is named with its year', () => {
+		const trend = [
+			...tanks(2025, 10, [19, 19]),
+			...tanks(2025, 11, [32, 32]),
+			...tanks(2026, 0, [33, 33])
+		];
+
+		expect(sentenceFor(new Date(2026, 1, 10, 12), trend)).toMatch(/^November 2025 dipped to 19\.0/);
+	});
+
+	test('says nothing when too few months have two or more tanks', () => {
+		const trend = [...tanks(2026, 8, [30, 31]), ...tanks(2026, 9, [84])];
+
+		expect(sentenceFor(new Date(2026, 10, 23, 12), trend)).toBeNull();
 	});
 
 	test('an electric vehicle reads as Efficiency, priced per kWh', () => {
+		const charging = {
+			...STATS,
+			totalFuelConsumed: 0,
+			totalFuelCost: 0,
+			fuelExpenseCount: 0,
+			totalChargeConsumed: 100,
+			totalChargeCost: 14,
+			chargeExpenseCount: 3,
+			averageMpg: null,
+			averageMilesPerKwh: 4.1
+		};
 		const { container } = render(FuelEfficiencyStatsCard, {
 			props: {
 				vehicleId: 'veh-1',
-				vehicleStatsData: {
-					...STATS,
-					totalFuelConsumed: 0,
-					totalFuelCost: 0,
-					fuelExpenseCount: 0,
-					totalChargeConsumed: 100,
-					totalChargeCost: 14,
-					chargeExpenseCount: 3,
-					averageMpg: null,
-					averageMilesPerKwh: 4.1
-				},
+				vehicleStatsData: charging,
+				yearStats: charging,
 				isLoadingStats: false,
 				vehicleType: 'electric'
 			}
@@ -164,7 +195,6 @@ describe('FuelEfficiencyStatsCard units', () => {
 		expect(text).toContain('best session');
 		expect(text).toContain('avg per kWh');
 		expect(text).toContain('$0.14');
-		expect(text).toContain('4.10');
 	});
 });
 

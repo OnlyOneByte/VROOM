@@ -391,6 +391,7 @@ describe('vehicle detail page overview', () => {
 
 		expect(getExpenseSummary).toHaveBeenCalledWith({ vehicleId: 'v1', period: 'all' });
 		expect(getVehicleStats).toHaveBeenCalledWith('v1', 'all');
+		expect(getVehicleStats).toHaveBeenCalledWith('v1', '1y');
 		expect(captured['fuelStats']?.['trend']).toHaveLength(1);
 		expect(captured['fuelStats']?.['chart']).toBeTypeOf('function');
 		expect(captured['trend']).toBeUndefined();
@@ -434,8 +435,13 @@ describe('vehicle detail page overview', () => {
 
 	test('a stats failure is one inline message in the hero, and Retry reloads the stats', async () => {
 		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
-		getVehicleStats.mockRejectedValueOnce(new Error('b'));
-		getVehicleStats.mockResolvedValueOnce({ currentOdometer: 25000, currentMileage: 25000 });
+		let allTimeCalls = 0;
+		getVehicleStats.mockImplementation(async (_id: string, period: string) => {
+			if (period !== 'all') return { currentOdometer: 25000, currentMileage: 25000 };
+			allTimeCalls += 1;
+			if (allTimeCalls === 1) throw new Error('b');
+			return { currentOdometer: 25000, currentMileage: 25000 };
+		});
 		await mount();
 
 		expect(screen.getByRole('alert')).toHaveTextContent("Cost per km isn't available right now");
@@ -447,7 +453,7 @@ describe('vehicle detail page overview', () => {
 		await fireEvent.click(retry);
 		await settle();
 
-		expect(getVehicleStats).toHaveBeenCalledTimes(2);
+		expect(allTimeCalls).toBe(2);
 		expect(screen.queryByText("Cost per km isn't available right now")).toBeNull();
 		expect(screen.getByTestId('cost-per-mile-hero')).toHaveFocus();
 	});

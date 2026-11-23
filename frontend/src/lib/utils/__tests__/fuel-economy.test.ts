@@ -23,15 +23,13 @@ describe('bestEfficiency', () => {
 });
 
 describe('monthOutlier', () => {
-	test('names the lowest month when it is more than 15% under the average', () => {
-		const points = [
-			point(2026, 6, 4, 19),
-			point(2026, 6, 20, 19),
-			point(2026, 7, 3, 32),
-			point(2026, 8, 3, 33)
-		];
+	const months = (...perMonth: Array<[number, number[]]>) =>
+		perMonth.flatMap(([m, values]) => values.map((v, i) => point(2026, m, 3 + i * 10, v)));
 
-		expect(monthOutlier(points, 31)).toEqual({
+	test('names the lowest month when it is more than 15% under the average', () => {
+		const points = months([6, [19, 19]], [7, [32, 32]], [8, [33, 33]]);
+
+		expect(monthOutlier(points, 28)).toEqual({
 			month: new Date(2026, 6, 1),
 			efficiency: 19,
 			count: 2,
@@ -40,22 +38,29 @@ describe('monthOutlier', () => {
 	});
 
 	test('with no dip, names the highest month when it is more than 15% over', () => {
-		const points = [point(2026, 9, 4, 30), point(2026, 10, 3, 30), point(2026, 10, 20, 84)];
+		const points = months([8, [30, 30]], [9, [30, 30]], [10, [40, 44]]);
 
-		expect(monthOutlier(points, 32.5)).toEqual({
+		expect(monthOutlier(points, 34)).toEqual({
 			month: new Date(2026, 10, 1),
-			efficiency: 57,
+			efficiency: 42,
 			count: 2,
 			direction: 'above'
 		});
 	});
 
-	test('stays quiet when every month is close to the average', () => {
-		expect(monthOutlier([point(2026, 6, 4, 29), point(2026, 7, 3, 31)], 30)).toBeNull();
+	test('is steady when every judged month is close to the average', () => {
+		expect(monthOutlier(months([6, [29, 30]], [7, [31, 31]]), 30)).toBe('steady');
 	});
 
-	test('needs at least two months and an average', () => {
-		expect(monthOutlier([point(2026, 6, 4, 10), point(2026, 6, 9, 40)], 30)).toBeNull();
-		expect(monthOutlier([point(2026, 6, 4, 10), point(2026, 7, 9, 40)], null)).toBeNull();
+	test('ignores months with a single tank, so one odd fill-up is not named', () => {
+		const points = months([6, [30, 30]], [7, [31, 31]], [8, [84]]);
+
+		expect(monthOutlier(points, 41)).toEqual(expect.objectContaining({ direction: 'below' }));
+		expect(monthOutlier(months([6, [30, 30]], [7, [84]]), 48)).toBeNull();
+	});
+
+	test('needs two judged months and an average', () => {
+		expect(monthOutlier(months([6, [10, 40]]), 30)).toBeNull();
+		expect(monthOutlier(months([6, [10, 12]], [7, [40, 40]]), null)).toBeNull();
 	});
 });
