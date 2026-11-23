@@ -42,8 +42,6 @@ function fuel(over: Partial<TestExpense> & Pick<TestExpense, 'id' | 'date'>): Te
   };
 }
 
-// One fill-up and one charge a month, July to December 2024: the first half
-// of the year has no fuel spend and must not dilute the averages.
 function seedSecondHalf(withCharging: boolean): void {
   for (let month = 6; month < 12; month++) {
     seedExpense(
@@ -66,7 +64,7 @@ function seedSecondHalf(withCharging: boolean): void {
   }
 }
 
-describe('monthly fuel spend (#1336)', () => {
+describe('monthly fuel spend', () => {
   test('a mixed fleet splits fuel from charging, averaged from the first expense', async () => {
     seedSecondHalf(true);
     const { monthlySpend } = await repo.getFuelStats(USER.id, yearToRange(2024));
@@ -86,6 +84,21 @@ describe('monthly fuel spend (#1336)', () => {
     seedExpense(testDb.sqlite, fuel({ id: 'g2', date: new Date(Date.UTC(2024, 11, 5)) }));
     const { monthlySpend } = await repo.getFuelStats(USER.id, yearToRange(2024));
     expect(monthlySpend).toEqual({ months: 3, fuel: 80 / 3, charging: null });
+  });
+
+  test('a rolling year that starts mid-month counts as 12 months, not 13', async () => {
+    for (let i = 0; i < 12; i++) {
+      seedExpense(
+        testDb.sqlite,
+        fuel({ id: `r${i}`, date: new Date(Date.UTC(2024, 2 + i, 16)), expenseAmount: 6000 })
+      );
+    }
+    const range = {
+      start: Math.floor(Date.UTC(2024, 2, 15) / 1000),
+      end: Math.floor(Date.UTC(2025, 2, 16) / 1000),
+    };
+    const { monthlySpend } = await repo.getFuelStats(USER.id, range);
+    expect(monthlySpend).toEqual({ months: 12, fuel: 6000, charging: null });
   });
 
   test('no fuel expenses give no figure', async () => {

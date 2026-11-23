@@ -1566,9 +1566,7 @@ export class AnalyticsRepository {
       averageCost,
       monthlySpend: computeMonthlySpend(
         fuelRows,
-        // The range end is exclusive: midnight after its last day.
-        new Date(Math.min(now.getTime(), rangeEndDate.getTime() - 1)),
-        convert.calendar
+        new Date(Math.min(now.getTime(), rangeEndDate.getTime()))
       ),
       distance,
       monthlyConsumption: this.buildMonthlyConsumption(fuelRowsByVehicle, convert),
