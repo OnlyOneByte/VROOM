@@ -268,3 +268,19 @@ describe('TagInput: errors', () => {
 		expect(input).toHaveAttribute('aria-describedby', 'tags-error');
 	});
 });
+
+describe('TagInput: focus', () => {
+	test('the bordered box shows a ring while the input has focus', () => {
+		const input = renderTagInput();
+		const box = input.closest('.border');
+
+		for (const cls of [
+			'focus-within:ring-2',
+			'focus-within:ring-ring',
+			'focus-within:ring-offset-2',
+			'ring-offset-background'
+		]) {
+			expect(box?.className).toContain(cls);
+		}
+	});
+});
