@@ -2,11 +2,14 @@
 	import { PieChart } from 'layerchart';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import ChartCard from './ChartCard.svelte';
+	import ChartPlot from './ChartPlot.svelte';
 	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
 	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import { formatCurrencyTooltip } from '#lib/utils/chart-formatters.ts';
 	import { prefersReducedMotion } from 'svelte/motion';
 	import type { Snippet } from 'svelte';
+	import type { ChartState } from 'layerchart';
+	import { chartSummary, type ChartA11y, type ChartA11yRow } from './chart-a11y.ts';
 
 	interface PieDataItem {
 		key: string;
@@ -56,48 +59,95 @@
 
 	// Tween starts at mount, so mount only once the container is visible.
 	let pieGate = createVisibilityWatch();
+
+	let context = $state<ChartState<PieDataItem>>();
+	let activeKey = $state<string | null>(null);
+
+	function cellFor(item: PieDataItem): string {
+		const share = item.percentage == null ? '' : `, ${formatNumber(item.percentage, 1)}%`;
+		return `${formatLegendValue(item)}${share}`;
+	}
+
+	let a11y = $derived.by((): ChartA11y => {
+		const columns = [{ key: 'value', label: 'Value' }];
+		const rows: ChartA11yRow[] = data.map(item => ({
+			label: item.label,
+			values: [item.value],
+			cells: [cellFor(item)],
+			datum: item
+		}));
+		return {
+			caption: description ? `${title}. ${description}` : title,
+			categoryLabel: legendLabel,
+			columns,
+			rows,
+			summary: chartSummary(title, columns, rows, false)
+		};
+	});
+
+	function showSlice(index: number | null) {
+		const item = index === null ? undefined : data[index];
+		activeKey = item?.key ?? null;
+		if (item) context?.tooltip.show({ data: item });
+		else context?.tooltip.hide();
+	}
 </script>
 
 <ChartCard {title} {level} {description} {isLoading} {error} {isEmpty} {icon} class={className}>
 	<div class="flex flex-col md:flex-row gap-6">
 		<div class="flex-1 flex items-center justify-center overflow-hidden" bind:this={pieGate.el}>
-			<div class="mx-auto aspect-square max-h-[250px] w-full max-w-[250px]">
-				{#if pieGate.visible}
-					<Chart.Container config={chartConfig} class="aspect-square h-full w-full overflow-hidden">
-						<PieChart
-							{data}
-							key="key"
-							value="value"
-							label="label"
-							cRange={data.map(d => d.color)}
-							innerRadius={0.5}
-							padAngle={0.02}
-							cornerRadius={4}
-							props={{
-								pie: {
-									motion: prefersReducedMotion.current
-										? 'none'
-										: {
-												type: 'tween',
-												duration: 400,
-												easing: (t: number) => 1 - Math.pow(1 - t, 3)
-											}
-								}
-							}}
+			<ChartPlot
+				{a11y}
+				onStep={showSlice}
+				class="mx-auto w-full max-w-[250px] focus-visible:ring-inset"
+			>
+				<div class="mx-auto aspect-square max-h-[250px] w-full max-w-[250px]">
+					{#if pieGate.visible}
+						<Chart.Container
+							config={chartConfig}
+							class="aspect-square h-full w-full overflow-hidden"
 						>
-							{#snippet tooltip()}
-								<Chart.Tooltip hideLabel valueFormatter={formatCurrencyTooltip} />
-							{/snippet}
-						</PieChart>
-					</Chart.Container>
-				{/if}
-			</div>
+							<PieChart
+								bind:context
+								{data}
+								key="key"
+								value="value"
+								label="label"
+								cRange={data.map(d => d.color)}
+								innerRadius={0.5}
+								padAngle={0.02}
+								cornerRadius={4}
+								props={{
+									pie: {
+										motion: prefersReducedMotion.current
+											? 'none'
+											: {
+													type: 'tween',
+													duration: 400,
+													easing: (t: number) => 1 - Math.pow(1 - t, 3)
+												}
+									}
+								}}
+							>
+								{#snippet tooltip()}
+									<Chart.Tooltip hideLabel valueFormatter={formatCurrencyTooltip} />
+								{/snippet}
+							</PieChart>
+						</Chart.Container>
+					{/if}
+				</div>
+			</ChartPlot>
 		</div>
 
 		{#if showLegend}
 			<div class="flex-1 space-y-1.5 min-w-0" role="list" aria-label={legendLabel}>
 				{#each data as item (item.key)}
-					<div class="flex items-center justify-between rounded-lg p-2" role="listitem">
+					<div
+						class="flex items-center justify-between rounded-lg p-2 {activeKey === item.key
+							? 'bg-muted'
+							: ''}"
+						role="listitem"
+					>
 						<div class="flex items-center gap-2">
 							<div
 								class="h-3 w-3 rounded-full shrink-0"

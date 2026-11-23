@@ -8,6 +8,8 @@
 	import { LoaderCircle } from '@lucide/svelte';
 	import { tick, type Snippet } from 'svelte';
 	import { focusLeftOn } from '#lib/utils/focus.ts';
+	import * as Table from '#lib/components/ui/table/index.ts';
+	import type { ChartA11y } from './chart-a11y.ts';
 
 	interface Props {
 		title: string;
@@ -23,6 +25,7 @@
 		icon?: Snippet;
 		legend?: Snippet;
 		animationClass?: 'chart-line-animated' | 'chart-bar-animated';
+		table?: ChartA11y | undefined;
 		class?: string;
 		children: Snippet;
 	}
@@ -41,6 +44,7 @@
 		icon,
 		legend,
 		animationClass,
+		table,
 		class: className,
 		children
 	}: Props = $props();
@@ -56,6 +60,13 @@
 		'chart-bar-animated': 'chart-bar-animate-ready'
 	};
 	let readyClass = $derived(animationClass ? (READY_CLASS_MAP[animationClass] ?? '') : '');
+
+	const VIEW_OPTIONS = [
+		['chart', 'Chart'],
+		['table', 'Table']
+	] as const;
+	let view = $state<'chart' | 'table'>('chart');
+	let canToggle = $derived(!isLoading && !error && !isEmpty && !!table);
 
 	let isRetrying = $state(false);
 	let titleEl = $state<HTMLElement | null>(null);
@@ -96,9 +107,32 @@
 					<Card.Description>{description}</Card.Description>
 				{/if}
 			</div>
-			{#if icon}
-				{@render icon()}
-			{/if}
+			<div class="flex shrink-0 items-center gap-2">
+				{#if canToggle}
+					<div
+						role="group"
+						aria-label="Show {title} as"
+						class="bg-muted inline-flex rounded-md p-0.5"
+					>
+						{#each VIEW_OPTIONS as [option, optionLabel] (option)}
+							<button
+								type="button"
+								aria-pressed={view === option}
+								onclick={() => (view = option)}
+								class="focus-visible:ring-ring/50 min-h-10 rounded-sm px-3 text-xs font-medium outline-none focus-visible:ring-[3px] {view ===
+								option
+									? 'bg-background text-foreground shadow-xs'
+									: 'text-muted-foreground hover:text-foreground'}"
+							>
+								{optionLabel}
+							</button>
+						{/each}
+					</div>
+				{/if}
+				{#if icon}
+					{@render icon()}
+				{/if}
+			</div>
 		</div>
 	</Card.Header>
 	<Card.Content>
@@ -126,6 +160,40 @@
 					{/snippet}
 				</EmptyState>
 			</div>
+		{:else if canToggle && table && view === 'table'}
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+			<div
+				class="overflow-auto rounded-md border"
+				style="max-height: {placeholderHeight}px"
+				role="region"
+				aria-label="{title} table"
+				tabindex="0"
+			>
+				<table class="w-full text-sm">
+					<Table.Caption class="sr-only">{table.caption}</Table.Caption>
+					<Table.Header class="bg-card sticky top-0">
+						<Table.Row>
+							<Table.Head scope="col">{table.categoryLabel}</Table.Head>
+							{#each table.columns as column (column.key)}
+								<Table.Head scope="col" class="text-right">{column.label}</Table.Head>
+							{/each}
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each table.rows as row, i (i)}
+							<Table.Row>
+								<Table.Head scope="row" class="font-normal">{row.label}</Table.Head>
+								{#each row.cells as cell, c (c)}
+									<Table.Cell class="text-right tabular-nums">{cell}</Table.Cell>
+								{/each}
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</table>
+			</div>
+			{#if legend}
+				{@render legend()}
+			{/if}
 		{:else}
 			<div bind:this={gate.el} style="min-height: {placeholderHeight}px">
 				{#if gate.visible}

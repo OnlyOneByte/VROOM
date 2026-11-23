@@ -116,6 +116,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 | Any chart | `import { AppLineChart, AppBarChart, AppPieChart, AppAreaChart } from '#lib/components/charts'` | all wrap `ChartCard` → loading/empty/error handled for you |
 | KPI tiles | `import { StatCard, StatCardGrid } from '#lib/components/charts'` | `iconColor` (`StatCardIconColor`): `primary` · `chart-1`…`chart-8` · `destructive` · `muted`. An unknown token still falls back to the primary tint, but warns under `import.meta.env.DEV`; `category-color-label-convergence.test.ts` fails if the map stops covering a theme token |
 | Custom chart container | `import ChartCard from '#lib/components/charts/ChartCard.svelte'` | not in the barrel; pass `isLoading`/`error`/`isEmpty`/`emptyTitle` — never render a raw chart in a bare div |
+| Chart table, summary and keyboard | built into `AppLineChart`/`AppBarChart`/`AppAreaChart` (Chart/Table toggle, `role="img"` summary, arrow-key stepping with a live region) and `AppPieChart` (summary and stepping; its value list is the table) | name the category column with `categoryLabel` when "Month"/"Date"/"Category" is wrong; `onSelect(row, seriesKey)` fires on Enter. A custom chart builds a `ChartA11y` with `buildChartA11y` (`charts/chart-a11y.ts`), passes it to `ChartCard` as `table` and wraps its plot in `ChartPlot` |
 
 ## The Four-States contract (cross-ref UIQuality.md, *States*)
 
