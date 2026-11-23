@@ -39,6 +39,7 @@ import {
 } from '../../types';
 import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
+import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { preferencesRepository } from '../settings/repository';
 import {
   backupService,
@@ -302,7 +303,7 @@ class RestoreService {
     const userVehicleRows = await this.db
       .select({ id: vehicles.id })
       .from(vehicles)
-      .where(eq(vehicles.userId, userId));
+      .where(ownedVehiclesScope(userId));
     const userVehicleIds = userVehicleRows.map((v) => v.id);
     const userPhotoRows = await this.db
       .select({ id: photos.id })
@@ -316,7 +317,7 @@ class RestoreService {
         data: data.vehicles,
         table: vehicles,
         name: 'vehicles',
-        scope: eq(vehicles.userId, userId),
+        scope: ownedVehiclesScope(userId),
         idColumn: vehicles.id,
         idField: 'id' as const,
       },
@@ -437,7 +438,7 @@ class RestoreService {
     const userVehicles = tx
       .select({ id: vehicles.id })
       .from(vehicles)
-      .where(eq(vehicles.userId, userId))
+      .where(ownedVehiclesScope(userId))
       .all();
     const vehicleIds = userVehicles.map((v) => v.id);
 
@@ -469,7 +470,7 @@ class RestoreService {
     }
     tx.delete(syncState).where(eq(syncState.userId, userId)).run();
 
-    tx.delete(vehicles).where(eq(vehicles.userId, userId)).run();
+    tx.delete(vehicles).where(ownedVehiclesScope(userId)).run();
   }
 
   private photosOnOtherOwnersVehicles(tx: DrizzleTransaction, userId: string): string[] {
