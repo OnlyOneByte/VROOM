@@ -88,7 +88,7 @@ describe('CostPerMileHero', () => {
 
 	test.each([
 		['electric', 'Charging'],
-		['hybrid', 'Fuel and charging']
+		['hybrid', 'Energy']
 	] as const)('names the energy bucket for a %s vehicle', (vehicleType, label) => {
 		render(CostPerMileHero, {
 			summary: summary(),

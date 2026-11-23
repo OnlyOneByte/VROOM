@@ -405,7 +405,7 @@
 			const loaded = await vehicleApi.getVehicleStats(vehicleId, selectedStatsPeriod);
 			if (isCurrent()) vehicleStatsData = loaded;
 		} catch (error) {
-			if (isCurrent()) void notifyUnlessPageFailed(error, "Couldn't load the vehicle's stats");
+			if (isCurrent()) logLoadFailure(error, "Couldn't load the vehicle's stats");
 		} finally {
 			if (isCurrent()) isLoadingVehicleStats = false;
 		}
@@ -542,14 +542,17 @@
 
 {#if isLoading}
 	<div class="space-y-6" data-testid="vehicle-page-skeleton">
-		<div class="flex items-center gap-4">
-			<Skeleton class="h-10 w-10 rounded-md" />
-			<div class="space-y-2">
-				<Skeleton class="h-8 w-48" />
-				<Skeleton class="h-5 w-64" />
+		<div class="flex items-center gap-3">
+			<Skeleton class="h-10 w-10 shrink-0 rounded-md" />
+			<div class="min-w-0">
+				<div class="flex h-9 items-center"><Skeleton class="h-8 w-48" /></div>
+				<div class="mt-1 flex h-12 flex-col justify-center gap-2 sm:h-6">
+					<Skeleton class="h-4 w-44" />
+					<Skeleton class="h-4 w-28 sm:hidden" />
+				</div>
 			</div>
 		</div>
-		<Skeleton class="h-10 w-full" />
+		<Skeleton class="h-[2.875rem] w-full sm:h-9" />
 		<CostPerMileHero
 			summary={null}
 			distance={null}
@@ -690,6 +693,7 @@
 							distance={distanceSoFar}
 							distanceLoading={isLoadingVehicleStats && vehicleStatsData === null}
 							distanceUnavailable={!isLoadingVehicleStats && vehicleStatsData === null}
+							onRetryDistance={loadVehicleStats}
 							{distanceUnit}
 							vehicleType={vehicle.vehicleType}
 							logMileageHref={canWrite

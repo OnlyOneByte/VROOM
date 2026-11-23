@@ -32,20 +32,21 @@
 
 {#snippet description()}
 	<span class="whitespace-nowrap">{vehicle.year} {vehicle.make} {vehicle.model}</span>
-	{#if vehicle.licensePlate}
-		<span aria-hidden="true">·</span>
-		<span class="whitespace-nowrap">{vehicle.licensePlate}</span>
-	{/if}
-	{#if odometerLoading}
-		<span aria-hidden="true">·</span>
-		<Skeleton class="inline-block h-4 w-16 align-middle" />
-	{:else if odometer !== null}
-		<span aria-hidden="true">·</span>
-		<span class="whitespace-nowrap">
-			{formatNumber(odometer, 0)}
-			{getDistanceUnitLabel(distanceUnit, true)}
-		</span>
-	{/if}
+	<span class="max-sm:hidden" aria-hidden="true">·</span>
+	<span class="max-sm:block">
+		{#if vehicle.licensePlate}
+			<span class="whitespace-nowrap">{vehicle.licensePlate}</span>
+			<span aria-hidden="true">·</span>
+		{/if}
+		{#if odometerLoading}
+			<Skeleton class="inline-block h-4 w-16 align-middle" />
+		{:else if odometer !== null}
+			<span class="whitespace-nowrap">
+				{formatNumber(odometer, 0)}
+				{getDistanceUnitLabel(distanceUnit, true)}
+			</span>
+		{/if}
+	</span>
 {/snippet}
 
 <PageHeader title={displayName} {description}>

@@ -20,6 +20,7 @@
 		distanceUnit: DistanceUnit;
 		vehicleType: Vehicle['vehicleType'];
 		logMileageHref?: string | undefined;
+		onRetryDistance?: (() => unknown) | undefined;
 	}
 
 	let {
@@ -29,7 +30,8 @@
 		distanceUnavailable = false,
 		distanceUnit,
 		vehicleType,
-		logMileageHref
+		logMileageHref,
+		onRetryDistance
 	}: Props = $props();
 
 	const BG_BY_TOKEN: Record<(typeof COST_BUCKET_COLOR_TOKENS)[CostBucket], string> = {
@@ -49,12 +51,7 @@
 	);
 	let bucketLabels = $derived<Record<CostBucket, string>>({
 		ownership: 'Ownership',
-		energy:
-			vehicleType === 'electric'
-				? 'Charging'
-				: vehicleType === 'hybrid'
-					? 'Fuel and charging'
-					: 'Fuel',
+		energy: vehicleType === 'electric' ? 'Charging' : vehicleType === 'hybrid' ? 'Energy' : 'Fuel',
 		upkeep: 'Upkeep'
 	});
 	let shownBuckets = $derived(buckets ? COST_BUCKETS.filter(bucket => buckets[bucket] > 0) : []);
@@ -123,9 +120,12 @@
 				<p class="text-sm text-muted-foreground">True cost per {unitName}, all time</p>
 				{#if distanceUnavailable}
 					<p class="text-lg font-semibold">Cost per {unitName} isn't available right now</p>
-					<p class="text-xs text-muted-foreground">
-						The odometer readings didn't load. Reload the page to try again.
-					</p>
+					<p class="text-xs text-muted-foreground">The odometer readings didn't load.</p>
+					{#if onRetryDistance}
+						<Button variant="outline" size="sm" class="mt-2" onclick={onRetryDistance}>
+							Retry
+						</Button>
+					{/if}
 				{:else}
 					<p class="text-lg font-semibold">
 						Log a newer odometer reading to see cost per {unitName}
@@ -161,7 +161,10 @@
 								></span>
 								<span class="truncate">{bucketLabels[bucket]}</span>
 							</span>
-							<span class="block tabular-nums text-foreground">
+							<span
+								class="block truncate tabular-nums text-foreground"
+								title={formatCurrency(buckets[bucket])}
+							>
 								{formatCurrency(buckets[bucket])}
 							</span>
 						</li>
@@ -171,21 +174,21 @@
 		{/if}
 
 		<dl class="grid grid-cols-3 gap-3">
-			<div>
+			<div class="min-w-0">
 				<dt class="text-xs text-muted-foreground">Last 30 days</dt>
-				<dd class="mt-0.5 text-lg font-semibold tabular-nums">
+				<dd class="mt-0.5 truncate text-lg font-semibold tabular-nums">
 					{formatCurrency(summary.recentAmount)}
 				</dd>
 			</div>
-			<div>
+			<div class="min-w-0">
 				<dt class="text-xs text-muted-foreground">Per month</dt>
-				<dd class="mt-0.5 text-lg font-semibold tabular-nums">
+				<dd class="mt-0.5 truncate text-lg font-semibold tabular-nums">
 					{formatCurrency(summary.monthlyAverage, undefined, 0)}
 				</dd>
 			</div>
-			<div>
+			<div class="min-w-0">
 				<dt class="text-xs text-muted-foreground">All time</dt>
-				<dd class="mt-0.5 text-lg font-semibold tabular-nums">
+				<dd class="mt-0.5 truncate text-lg font-semibold tabular-nums">
 					{formatCurrency(summary.totalAmount, undefined, 0)}
 				</dd>
 			</div>

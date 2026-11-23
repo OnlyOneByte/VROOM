@@ -416,13 +416,24 @@ describe('vehicle detail page overview', () => {
 
 		const contexts = handleErrorWithNotification.mock.calls.map(call => call[1]);
 		expect(contexts).toEqual(
-			expect.arrayContaining([
-				"Couldn't load fuel efficiency",
-				"Couldn't load the vehicle's stats",
-				"Couldn't load photos"
-			])
+			expect.arrayContaining(["Couldn't load fuel efficiency", "Couldn't load photos"])
 		);
+		expect(contexts).not.toContain("Couldn't load the vehicle's stats");
 		expect(screen.getByRole('tab', { name: 'Overview' })).toBeInTheDocument();
+	});
+
+	test('a stats failure is one inline message in the hero, and Retry reloads the stats', async () => {
+		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
+		getVehicleStats.mockRejectedValueOnce(new Error('b'));
+		getVehicleStats.mockResolvedValueOnce({ currentOdometer: 25000, currentMileage: 25000 });
+		await mount();
+
+		expect(screen.getByText("Cost per km isn't available right now")).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await settle();
+
+		expect(getVehicleStats).toHaveBeenCalledTimes(2);
+		expect(screen.queryByText("Cost per km isn't available right now")).toBeNull();
 	});
 
 	test("an electric vehicle's failed trend load names electric efficiency", async () => {
