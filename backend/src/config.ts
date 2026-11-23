@@ -95,13 +95,13 @@ const parseEnv = () => {
 };
 
 export function linkRedirectFrom(loginRedirectUri: string, provider: 'google' | 'github'): string {
-  const url = new URL(loginRedirectUri);
+  const base = loginRedirectUri.split(/[?#]/)[0].replace(/\/+$/, '');
   const loginSuffix = `/callback/${provider}`;
-  url.pathname = url.pathname.endsWith(loginSuffix)
-    ? `${url.pathname.slice(0, -loginSuffix.length)}/callback/link/${provider}`
-    : `/api/v1/auth/callback/link/${provider}`;
-  url.search = '';
-  return url.toString();
+  if (base.endsWith(loginSuffix)) {
+    return `${base.slice(0, -loginSuffix.length)}/callback/link/${provider}`;
+  }
+  const origin = /^https?:\/\/[^/]+/i.exec(base)?.[0];
+  return origin ? `${origin}/api/v1/auth/callback/link/${provider}` : '';
 }
 
 const env = parseEnv();

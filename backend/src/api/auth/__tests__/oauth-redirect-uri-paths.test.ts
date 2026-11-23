@@ -83,10 +83,29 @@ describe('OAuth redirect-URI defaults resolve to mounted routes', () => {
     expect(
       linkRedirectFrom('https://cars.example.com/vroom/api/v1/auth/callback/google', 'google')
     ).toBe('https://cars.example.com/vroom/api/v1/auth/callback/link/google');
+    expect(
+      linkRedirectFrom('https://cars.example.com/vroom/api/v1/auth/callback/google/', 'google')
+    ).toBe('https://cars.example.com/vroom/api/v1/auth/callback/link/google');
+    expect(
+      linkRedirectFrom('https://cars.example.com/api/v1/auth/callback/github?x=1#top', 'github')
+    ).toBe('https://cars.example.com/api/v1/auth/callback/link/github');
     const unusual = 'https://cars.example.com/oauth/return';
     expect(linkRedirectFrom(unusual, 'google')).toBe(
       'https://cars.example.com/api/v1/auth/callback/link/google'
     );
+    for (const login of [
+      'https://cars.example.com/api/v1/auth/callback/google',
+      'https://cars.example.com/api/v1/auth/callback/google/',
+      unusual,
+    ]) {
+      expect(linkRedirectFrom(login, 'google')).not.toBe(login);
+    }
+  });
+
+  test('a blank or malformed login URI derives no link URI instead of failing startup', async () => {
+    const { linkRedirectFrom } = await import('../../../config');
+    expect(linkRedirectFrom('', 'google')).toBe('');
+    expect(linkRedirectFrom('not a url', 'github')).toBe('');
   });
 
   test('an unmounted callback path DOES 404 (the probe can tell the difference)', async () => {
