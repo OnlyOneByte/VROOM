@@ -278,6 +278,28 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		);
 	});
 
+	test('after a remap the row stays, shows the pick and keeps keyboard focus', async () => {
+		importExpensesCsv.mockResolvedValueOnce(result({ unmappedCategories: ['Parking'] }));
+		importExpensesCsv.mockResolvedValue(result({ unmappedCategories: [] }));
+		await mount();
+		await openDialog();
+		await chooseFile();
+
+		const trigger = screen.getByLabelText('Category for Parking');
+		trigger.focus();
+		await fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' });
+		await fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' });
+		const option = await screen.findByRole('option', { name: 'Maintenance' });
+		await fireEvent.pointerUp(option, { button: 0, pointerType: 'mouse' });
+		await fireEvent.click(option);
+		await settle();
+
+		const after = screen.getByLabelText('Category for Parking');
+		expect(after).toBe(trigger);
+		expect(after).toHaveTextContent('Maintenance');
+		expect(document.activeElement).toBe(trigger);
+	});
+
 	test('a vehicle picked before the file is kept for the preview', async () => {
 		getVehicles.mockResolvedValue([
 			vehicle(),

@@ -484,3 +484,36 @@ describe('ImportExpensesForm: presets-only mode and stale results', () => {
 		);
 	});
 });
+
+describe('ImportExpensesForm: a new file replaces the old preview at once', () => {
+	test('the old preview is gone before the new file has been read', async () => {
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		await form.loadFile(new File([FUEL_CSV], 'fuel.csv'));
+		expect(form.preview).not.toBeNull();
+
+		let release!: (text: string) => void;
+		const slowFile = { name: 'next.csv', text: () => new Promise<string>(r => (release = r)) };
+		const loading = form.loadFile(slowFile as unknown as File);
+
+		expect(form.fileName).toBe('next.csv');
+		expect(form.preview).toBeNull();
+		release(FUEL_CSV);
+		await loading;
+	});
+
+	test('categories mapped in a later preview stay listed for the same file', async () => {
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		mocks.importExpensesCsv.mockResolvedValueOnce(previewResult({ unmappedCategories: ['Tolls'] }));
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		await form.loadFile(new File([FUEL_CSV], 'fuel.csv'));
+		mocks.importExpensesCsv.mockResolvedValueOnce(previewResult({ unmappedCategories: [] }));
+
+		form.setCategoryRemap('Tolls', 'misc');
+		await flush();
+
+		expect(form.unmappedCategories).toEqual(['Tolls']);
+		await form.loadFile(new File([FUEL_CSV], 'other.csv'));
+		expect(form.unmappedCategories).toEqual([]);
+	});
+});

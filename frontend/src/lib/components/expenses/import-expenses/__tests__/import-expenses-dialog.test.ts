@@ -92,6 +92,28 @@ beforeEach(() => {
 });
 
 describe('ImportExpensesDialog', () => {
+	test('a category remap keeps its row and keyboard focus through the re-preview', async () => {
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		mocks.importExpensesCsv
+			.mockResolvedValueOnce(previewResult({ unmappedCategories: ['Tolls'] }))
+			.mockResolvedValue(previewResult({ unmappedCategories: [] }));
+		renderDialog();
+		await chooseFile(FUEL_CSV, 'fuel.csv');
+
+		const trigger = await screen.findByLabelText('Category for Tolls');
+		trigger.focus();
+		await fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' });
+		await fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' });
+		const option = await screen.findByRole('option', { name: 'Maintenance' });
+		await fireEvent.pointerUp(option, { button: 0, pointerType: 'mouse' });
+		await fireEvent.click(option);
+		await waitFor(() => expect(mocks.importExpensesCsv).toHaveBeenCalledTimes(2));
+
+		expect(screen.getByLabelText('Category for Tolls')).toBe(trigger);
+		expect(trigger).toHaveTextContent('Maintenance');
+		expect(document.activeElement).toBe(trigger);
+	});
+
 	test('names the formats and file types the server lists', async () => {
 		renderDialog();
 
