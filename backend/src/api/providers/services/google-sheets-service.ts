@@ -25,6 +25,7 @@ import {
 } from '../../../db/schema';
 import { NotFoundError, SyncError, SyncErrorCode, ValidationError } from '../../../errors';
 import { logger } from '../../../utils/logger';
+import { ownedVehiclesScope } from '../../../utils/vehicle-access';
 import { decryptRefreshToken } from '../domains/storage/registry';
 import { GoogleDriveService } from './google-drive-service';
 
@@ -467,19 +468,19 @@ export class GoogleSheetsService {
 
     const [userVehicles, userExpenses, userInsurance, userFinancing, userOdometer] =
       await Promise.all([
-        db.select().from(vehicles).where(eq(vehicles.userId, userId)),
+        db.select().from(vehicles).where(ownedVehiclesScope(userId)),
         db.select().from(expenses).where(eq(expenses.userId, userId)),
         db.select().from(insurancePolicies).where(eq(insurancePolicies.userId, userId)),
         db
           .select()
           .from(vehicleFinancing)
           .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-          .where(eq(vehicles.userId, userId)),
+          .where(ownedVehiclesScope(userId)),
         db
           .select()
           .from(odometerEntries)
           .innerJoin(vehicles, eq(odometerEntries.vehicleId, vehicles.id))
-          .where(eq(vehicles.userId, userId)),
+          .where(ownedVehiclesScope(userId)),
       ]);
 
     const policyIds = userInsurance.map((p) => p.id);
