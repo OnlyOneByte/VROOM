@@ -216,17 +216,6 @@ routes.put(
     const resync = endChanged || dateChanged;
     const tripDate = data.tripDate ?? existing.tripDate;
     const check = resync ? await readingCheck(existing.vehicleId, end, tripDate, timeZone) : null;
-    const otherAtOld = resync
-      ? await tripRepository.findOtherAtOdometerKey({
-          excludeTripId: id,
-          vehicleId: existing.vehicleId,
-          userId: user.id,
-          endOdometer: existing.endOdometer,
-          tripDate: existing.tripDate,
-          timeZone,
-        })
-      : null;
-
     const { updated, removedEntryIds } = getDb().transaction((tx) => {
       const row = tx
         .update(trips)
@@ -236,6 +225,17 @@ routes.put(
         .get();
       if (!row) throw new NotFoundError('Trip');
       if (!resync) return { updated: row, removedEntryIds: [] };
+      const otherAtOld = tripRepository.findOtherAtOdometerKey(
+        {
+          excludeTripId: id,
+          vehicleId: existing.vehicleId,
+          userId: user.id,
+          endOdometer: existing.endOdometer,
+          tripDate: existing.tripDate,
+          timeZone,
+        },
+        tx
+      );
       const oldKey = {
         tripId: id,
         vehicleId: existing.vehicleId,
@@ -307,14 +307,6 @@ routes.delete(
       throw new NotFoundError('Trip');
     }
 
-    const other = await tripRepository.findOtherAtOdometerKey({
-      excludeTripId: id,
-      vehicleId: existing.vehicleId,
-      userId: user.id,
-      endOdometer: existing.endOdometer,
-      tripDate: existing.tripDate,
-      timeZone,
-    });
     const key = {
       tripId: id,
       vehicleId: existing.vehicleId,
@@ -324,21 +316,36 @@ routes.delete(
       timeZone,
     };
 
-    const removedEntryIds = getDb().transaction((tx) => {
+    const { removedEntryIds, handedOver } = getDb().transaction((tx) => {
       const row = tx
         .delete(trips)
         .where(and(eq(trips.id, id), eq(trips.userId, user.id)))
         .returning({ id: trips.id })
         .get();
       if (!row) throw new NotFoundError('Trip');
+      const other = tripRepository.findOtherAtOdometerKey(
+        {
+          excludeTripId: id,
+          vehicleId: existing.vehicleId,
+          userId: user.id,
+          endOdometer: existing.endOdometer,
+          tripDate: existing.tripDate,
+          timeZone,
+        },
+        tx
+      );
       if (other) {
         odometerRepository.handOverLinkedTripEntry(key, other, tx);
-        return [];
+        return { removedEntryIds: [], handedOver: true };
       }
-      return keepOdometer === false ? odometerRepository.deleteLinkedTripEntry(key, tx) : [];
+      return {
+        removedEntryIds:
+          keepOdometer === false ? odometerRepository.deleteLinkedTripEntry(key, tx) : [],
+        handedOver: false,
+      };
     });
 
-    if (!other && keepOdometer === false) {
+    if (!handedOver && keepOdometer === false) {
       try {
         await deleteEntryPhotosWithRetry(removedEntryIds, user.id, {
           tripId: id,

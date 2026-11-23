@@ -3,6 +3,7 @@ import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewTrip, Trip } from '../../db/schema';
 import { trips, vehicles } from '../../db/schema';
+import type { DrizzleTransaction } from '../../db/types';
 import { DEFAULT_UNIT_PREFERENCES, type DistanceUnit, parseUnitPreferences } from '../../types';
 import { BaseRepository } from '../../utils/repository';
 import { localDayWindow } from '../odometer/repository';
@@ -31,16 +32,19 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
   }
 
   // Odometer dedup key: do not remove the linked odometer entry while this returns > 0.
-  async findOtherAtOdometerKey(args: {
-    excludeTripId: string;
-    vehicleId: string;
-    userId: string;
-    endOdometer: number;
-    tripDate: Date;
-    timeZone?: string;
-  }): Promise<string | null> {
+  findOtherAtOdometerKey(
+    args: {
+      excludeTripId: string;
+      vehicleId: string;
+      userId: string;
+      endOdometer: number;
+      tripDate: Date;
+      timeZone?: string;
+    },
+    db: AppDatabase | DrizzleTransaction = this.db
+  ): string | null {
     const { dayStart, nextDay } = localDayWindow(args.tripDate, args.timeZone);
-    const [result] = await this.db
+    const result = db
       .select({ id: trips.id })
       .from(trips)
       .where(
@@ -54,7 +58,7 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
         )
       )
       .orderBy(asc(trips.createdAt), asc(trips.id))
-      .limit(1);
+      .get();
     return result?.id ?? null;
   }
 
