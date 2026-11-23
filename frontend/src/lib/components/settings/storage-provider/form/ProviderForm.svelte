@@ -31,6 +31,13 @@
 		type ProviderConnection
 	} from '#lib/constants/providers.ts';
 	import { providerCatalog } from '#lib/stores/provider-catalog.svelte.ts';
+	import ProviderFields, {
+		fieldConfig,
+		fieldErrorsFrom,
+		fieldSecrets,
+		fieldsReady,
+		initialFieldValues
+	} from '../../ProviderFields.svelte';
 	import type {
 		PhotoCategory,
 		CategorySetting,
@@ -68,6 +75,19 @@
 
 	let selectedType = $state<string | null>(null);
 	let selectedForm = $derived(providerUi(selectedType)?.form ?? null);
+	let selectedEntry = $derived(providerCatalog.storageEntry(selectedType));
+	let usesFields = $derived(!selectedForm && selectedEntry?.connect === 'form');
+	let storedConfig = $derived(isEditMode ? existingProvider?.config : undefined);
+	let fieldValues = $state<Record<string, string>>({});
+	let secretValues = $state<Record<string, string>>({});
+	let fieldErrors = $state<Record<string, string>>({});
+
+	function resetFields(providerType: string, stored: Record<string, unknown> | undefined) {
+		const entry = providerCatalog.storageEntry(providerType);
+		fieldValues = entry ? initialFieldValues(entry, stored) : {};
+		secretValues = {};
+		fieldErrors = {};
+	}
 	let displayName = $state('');
 	let isSaving = $state(false);
 
@@ -135,6 +155,7 @@
 			if (existingFolderSettings) {
 				folderSettings = { ...existingFolderSettings };
 			}
+			resetFields(existingProvider.providerType, existingProvider.config);
 			initialized = true;
 		}
 	});
@@ -170,6 +191,7 @@
 			if (!isEditMode) {
 				folderSettings = defaultFolderSettings(selectedType);
 				photoRootPath = getDefaultPhotoRootPath(selectedType);
+				resetFields(selectedType, undefined);
 			}
 		}
 		if (oauthResult.restoredDisplayName) displayName = oauthResult.restoredDisplayName;
@@ -186,7 +208,11 @@
 	let canSave = $derived.by(() => {
 		if (!selectedType || !displayName.trim()) return false;
 		if (hasBackupErrors && anyBackupEnabled) return false;
-		return !selectedForm || connection.ready;
+		if (selectedForm) return connection.ready;
+		if (usesFields && selectedEntry) {
+			return fieldsReady(selectedEntry, fieldValues, secretValues, storedConfig);
+		}
+		return true;
 	});
 
 	function navigateBack() {
@@ -200,12 +226,17 @@
 		try {
 			const { credentials, nonce } = selectedForm
 				? connection
-				: { credentials: {}, nonce: undefined };
+				: {
+						credentials:
+							usesFields && selectedEntry ? fieldSecrets(selectedEntry, secretValues) : {},
+						nonce: undefined
+					};
 			const config: Record<string, unknown> = {
 				...(existingProvider?.config ?? {}),
 				providerRootPath: providerRootPath.trim(),
 				photoRootPath: photoRootPath.trim() || getDefaultPhotoRootPath(selectedType),
-				...(selectedForm && connection.config)
+				...(selectedForm && connection.config),
+				...(usesFields && selectedEntry && fieldConfig(selectedEntry, fieldValues))
 			};
 
 			let resultId: string;
@@ -289,6 +320,7 @@
 			}
 			navigateBack();
 		} catch (error) {
+			if (selectedEntry) fieldErrors = fieldErrorsFrom(error, selectedEntry);
 			appStore.showError(
 				`Couldn't ${isEditMode ? 'update' : 'add'} the provider. ${userFacingErrorMessage(error)}`
 			);
@@ -391,6 +423,7 @@
 									selectedType = pt.id;
 									photoRootPath = getDefaultPhotoRootPath(pt.id);
 									folderSettings = defaultFolderSettings(pt.id);
+									resetFields(pt.id, undefined);
 								}}
 							>
 								<Icon
@@ -427,7 +460,9 @@
 			<Card>
 				<CardHeader>
 					<CardTitle class="text-base">Connection Settings</CardTitle>
-					<CardDescription>{selectedForm?.description ?? 'Provider configuration'}</CardDescription>
+					<CardDescription>
+						{selectedForm?.description ?? selectedEntry?.description ?? 'Provider configuration'}
+					</CardDescription>
 				</CardHeader>
 				<CardContent class="space-y-4">
 					{#if selectedForm}
@@ -437,6 +472,15 @@
 							{isEditMode}
 							{oauth}
 							bind:connection
+						/>
+					{:else if usesFields && selectedEntry}
+						<ProviderFields
+							idPrefix="provider-{selectedEntry.id}"
+							spec={selectedEntry}
+							stored={storedConfig}
+							bind:values={fieldValues}
+							bind:secretValues
+							errors={fieldErrors}
 						/>
 					{/if}
 

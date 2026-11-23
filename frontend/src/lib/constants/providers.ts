@@ -3,12 +3,7 @@ import { Cloud, Database, FlaskConical, Image } from '@lucide/svelte';
 import type { PhotoCategory, CategorySetting } from '#lib/types/index.ts';
 import type { GoogleOAuthReturn } from '#lib/components/settings/storage-provider/use-google-oauth.svelte.ts';
 import GoogleDriveForm from '#lib/components/settings/storage-provider/form/GoogleDriveForm.svelte';
-import S3Form from '#lib/components/settings/storage-provider/form/S3Form.svelte';
-import {
-	providerCatalog,
-	type ModelCapability,
-	type ModelCatalogEntry
-} from '#lib/stores/provider-catalog.svelte.ts';
+import { providerCatalog } from '#lib/stores/provider-catalog.svelte.ts';
 
 export interface ProviderConnection {
 	ready: boolean;
@@ -41,10 +36,7 @@ export const PROVIDER_UI: Record<string, ProviderUi> = {
 		form: { component: GoogleDriveForm, description: 'Google Drive connection' }
 	},
 	'google-photos': { icon: Image, fallbackLabel: 'Google Photos' },
-	s3: {
-		icon: Database,
-		form: { component: S3Form, description: 'S3-compatible storage credentials and endpoint' }
-	},
+	s3: { icon: Database },
 	fake: { icon: FlaskConical }
 };
 
@@ -90,32 +82,4 @@ export function defaultFolderSettings(
 			{ enabled: true, folderPath }
 		])
 	) as Record<PhotoCategory, CategorySetting>;
-}
-
-export interface ModelProviderTypeOption {
-	id: string;
-	label: string;
-	keyless: boolean;
-	needsBaseUrl: boolean;
-	defaultModel: string;
-	defaultBaseUrl?: string;
-}
-
-function fieldDefault(entry: ModelCatalogEntry, key: string): string | undefined {
-	const value = entry.fields.find(f => f.key === key)?.default;
-	return value === undefined ? undefined : String(value);
-}
-
-export function modelProviderOptions(capability: ModelCapability): ModelProviderTypeOption[] {
-	return providerCatalog.models(capability).map(entry => {
-		const defaultBaseUrl = fieldDefault(entry, 'baseUrl');
-		return {
-			id: entry.id,
-			label: entry.label,
-			keyless: !entry.secrets.some(secret => secret.required),
-			needsBaseUrl: entry.fields.some(f => f.key === 'baseUrl' && f.required),
-			defaultModel: fieldDefault(entry, 'model') ?? '',
-			...(defaultBaseUrl !== undefined && { defaultBaseUrl })
-		};
-	});
 }

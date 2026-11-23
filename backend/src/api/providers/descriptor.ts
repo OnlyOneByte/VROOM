@@ -18,6 +18,7 @@ export interface SecretSpec {
   key: string;
   label: string;
   required: boolean;
+  reenterWhenChanged?: string[];
 }
 
 export type Availability = 'available' | 'hidden';
@@ -84,7 +85,11 @@ export function validateProviderConfig(
   const issue = parsed.error.issues.find(
     (i) => i.code !== 'unrecognized_keys' || i.keys.some((key) => !toleratedKeys.includes(key))
   );
-  if (issue) throw new ValidationError(issue.message);
+  if (issue) {
+    throw new ValidationError(issue.message, {
+      issues: [{ path: issue.path, message: issue.message }],
+    });
+  }
 }
 
 export function withoutServerState(
@@ -103,7 +108,8 @@ export function validateProviderSecrets(
   for (const secret of descriptor.secrets) {
     if (secret.required && !credentials[secret.key]) {
       const article = /^[aeiou]/i.test(secret.label) ? 'an' : 'a';
-      throw new ValidationError(`${domainLabel} provider requires ${article} ${secret.label}`);
+      const message = `${domainLabel} provider requires ${article} ${secret.label}`;
+      throw new ValidationError(message, { issues: [{ path: [secret.key], message }] });
     }
   }
 }
