@@ -77,7 +77,7 @@
 		<div class="space-y-4">
 			<h3 class="font-semibold text-sm sm:text-base">Insurance Coverage Details</h3>
 			<div class="space-y-3">
-				{#each insurance.vehicleDetails as vehicle (vehicle.vehicleId)}
+				{#each insurance.vehicleDetails as vehicle, i (`${vehicle.vehicleId}-${i}`)}
 					<div class="p-3 sm:p-4 rounded-lg border border-border">
 						<div class="flex-1 space-y-2">
 							<div class="flex flex-col sm:flex-row sm:items-center gap-2">
