@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { routes } from '#lib/routes.ts';
+	import { resolve } from '$app/paths';
 	import {
 		Bell,
 		BellRing,
@@ -216,7 +218,7 @@
 					Run Due Reminders
 				</Button>
 			{/if}
-			{#if !isLoading && !loadError && reminders.length > 0}
+			{#if !isLoading && !loadError && reminders.length > 0 && vehicles.length > 0}
 				<Button size="lg" class="hidden lg:inline-flex" onclick={openCreate}>
 					<Plus class="mr-2 h-4 w-4" />
 					New Reminder
@@ -240,6 +242,25 @@
 			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
 			<Button onclick={load}>Retry</Button>
 		</div>
+	{:else if reminders.length === 0 && vehicles.length === 0}
+		<EmptyState>
+			{#snippet icon()}
+				<Car class="h-12 w-12 text-muted-foreground mb-4" />
+			{/snippet}
+			{#snippet title()}
+				Add a vehicle first
+			{/snippet}
+			{#snippet description()}
+				Every reminder belongs to a vehicle. Add one, then set reminders for its recurring costs and
+				maintenance.
+			{/snippet}
+			{#snippet action()}
+				<Button size="lg" href={resolve(routes.vehicleNew)}>
+					<Plus class="mr-2 h-4 w-4" />
+					Add Vehicle
+				</Button>
+			{/snippet}
+		</EmptyState>
 	{:else if reminders.length === 0}
 		<EmptyState>
 			{#snippet icon()}
@@ -467,7 +488,7 @@
 		</section>
 	{/if}
 
-	{#if !isLoading && !loadError && reminders.length > 0}
+	{#if !isLoading && !loadError && reminders.length > 0 && vehicles.length > 0}
 		<FloatingActionButton label="New Reminder" onclick={openCreate} />
 	{/if}
 
