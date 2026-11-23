@@ -79,7 +79,8 @@
 			.find(Boolean);
 		if (!day) return;
 		event.preventDefault();
-		day.focus();
+		day.focus({ preventScroll: true });
+		requestAnimationFrame(() => day.scrollIntoView?.({ block: 'nearest' }));
 	}
 
 	function keepSelectedOnEnter(event: KeyboardEvent) {
