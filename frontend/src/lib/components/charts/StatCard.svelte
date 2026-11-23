@@ -93,7 +93,10 @@
 				<Skeleton class="inline-block h-3 w-16 align-middle" />
 			{/if}
 			{#if subtitle}
-				<Skeleton class="h-4 w-full mt-1" />
+				<div class="relative text-xs mt-1" aria-hidden="true">
+					<span class="invisible">{subtitle}</span>
+					<Skeleton class="absolute inset-0" />
+				</div>
 			{/if}
 		{:else if hasDual}
 			<div class="@container">

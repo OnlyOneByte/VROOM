@@ -76,6 +76,11 @@ describe('StatCard loading tile has the filled tile shape', () => {
 		const [, , unit, subtitle] = skeletons(container);
 		expect(skeletons(container)).toHaveLength(4);
 		expect(unit).toHaveClass('inline-block', 'h-3', 'align-middle');
-		expect(subtitle).toHaveClass('h-4', 'mt-1');
+		expect(subtitle?.parentElement).toHaveClass('relative', 'text-xs', 'mt-1');
+		expect(subtitle?.parentElement).toHaveTextContent('2 vehicles need attention');
+		expect(subtitle?.previousElementSibling).toHaveClass('invisible');
+		expect(subtitle).toHaveClass('absolute', 'inset-0');
+		expect(subtitle?.parentElement).toHaveAttribute('aria-hidden', 'true');
+		expect(subtitle?.parentElement?.tagName).toBe('DIV');
 	});
 });
