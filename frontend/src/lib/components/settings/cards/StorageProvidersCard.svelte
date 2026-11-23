@@ -323,15 +323,19 @@
 							</Select.Content>
 						</Select.Root>
 					</div>
-				{:else}
+				{:else if providers.length > 0}
 					<p class="text-sm text-muted-foreground">
 						Enable backup on a provider below to sync your data to the cloud.
 					</p>
 				{/if}
 
-				<div class="flex flex-col sm:flex-row gap-2">
+				<div class="grid grid-cols-2 gap-2 sm:flex">
 					{#if backupProviderCount > 0}
-						<Button variant="outline" onclick={() => onBackupNow?.()} class="h-10 sm:h-9 sm:flex-1">
+						<Button
+							variant="outline"
+							onclick={() => onBackupNow?.()}
+							class="col-span-2 h-10 sm:h-9 sm:flex-1"
+						>
 							<RefreshCw class="mr-2 h-4 w-4" />
 							Backup to Cloud
 						</Button>
@@ -357,9 +361,11 @@
 				</div>
 			</div>
 
-			<Separator class="my-6" />
+			{#if providers.length > 0}
+				<Separator class="my-6" />
 
-			<DefaultPhotoSources {storageConfig} {providers} onUpdate={handleConfigUpdate} />
+				<DefaultPhotoSources {storageConfig} {providers} onUpdate={handleConfigUpdate} />
+			{/if}
 
 			{#if orphanCount > 0}
 				<div
@@ -383,38 +389,23 @@
 
 			<div class="space-y-3">
 				<div class="flex flex-wrap items-center justify-between gap-2">
-					<p class="text-sm font-medium">Providers</p>
-					{#if providers.length > 0}
-						<Button
-							variant="outline"
-							size="sm"
-							class="h-10 sm:h-8"
-							onclick={() => goto(resolve(routes.settingsProviderNew))}
-						>
-							<Plus class="h-4 w-4 mr-1" />
-							Add Storage Provider
-						</Button>
+					{#if providers.length === 0}
+						<p class="text-sm text-muted-foreground">No storage provider connected</p>
+					{:else}
+						<p class="text-sm font-medium">Providers</p>
 					{/if}
+					<Button
+						variant="outline"
+						size="sm"
+						class="h-10 sm:h-8"
+						onclick={() => goto(resolve(routes.settingsProviderNew))}
+					>
+						<Plus class="h-4 w-4 mr-1" />
+						Add Storage Provider
+					</Button>
 				</div>
 
-				{#if providers.length === 0}
-					<div class="text-center py-6">
-						<HardDrive class="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-						<p class="text-sm font-medium">No storage providers configured</p>
-						<p class="text-xs text-muted-foreground mt-1">
-							Add a provider to start storing photos and backups
-						</p>
-						<Button
-							variant="outline"
-							size="sm"
-							class="mt-3 h-10 sm:h-8"
-							onclick={() => goto(resolve(routes.settingsProviderNew))}
-						>
-							<Plus class="h-4 w-4 mr-1" />
-							Add Storage Provider
-						</Button>
-					</div>
-				{:else}
+				{#if providers.length > 0}
 					<div class="space-y-3">
 						{#each providers as provider (provider.id)}
 							<ProviderCard

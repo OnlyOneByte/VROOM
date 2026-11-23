@@ -210,10 +210,12 @@ describe('Settings page loading', () => {
 		expect(link).toHaveTextContent('Account & profile settings');
 	});
 
-	test('renders both AI provider cards', async () => {
+	test('groups storage and both AI provider cards under one Connections section', async () => {
 		await mount();
-		expect(screen.getByTestId('stub-model-vlm')).toBeInTheDocument();
-		expect(screen.getByTestId('stub-model-llm')).toBeInTheDocument();
+		const section = screen.getByRole('region', { name: 'Connections' });
+		expect(section).toContainElement(screen.getByTestId('stub-model-vlm'));
+		expect(section).toContainElement(screen.getByTestId('stub-model-llm'));
+		expect(section).toContainElement(screen.getByRole('button', { name: 'stub download' }));
 	});
 });
 

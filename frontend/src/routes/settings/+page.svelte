@@ -328,16 +328,24 @@
 			/>
 			<PWAInstallCard />
 			<PushNotificationsCard />
-			<PhotoStorageSettings
-				{isBackingUp}
-				bind:syncInactivityMinutes
-				onSyncInactivityChange={saveSyncInterval}
-				onBackupNow={handleBackupNowClick}
-				onRestore={handleRestoreClick}
-				onDownloadBackup={handleBackup}
-			/>
-			<ModelProvidersCard domain="vlm" />
-			<ModelProvidersCard domain="llm" />
+			<section class="space-y-4" aria-labelledby="settings-connections">
+				<div>
+					<h2 id="settings-connections" class="text-lg font-semibold">Connections</h2>
+					<p class="text-sm text-muted-foreground">
+						Storage and AI services you connect with your own account or key.
+					</p>
+				</div>
+				<PhotoStorageSettings
+					{isBackingUp}
+					bind:syncInactivityMinutes
+					onSyncInactivityChange={saveSyncInterval}
+					onBackupNow={handleBackupNowClick}
+					onRestore={handleRestoreClick}
+					onDownloadBackup={handleBackup}
+				/>
+				<ModelProvidersCard domain="vlm" />
+				<ModelProvidersCard domain="llm" />
+			</section>
 			{#await migrateCard then { default: MigrateFromTrackerCard }}
 				<MigrateFromTrackerCard />
 			{:catch}

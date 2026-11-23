@@ -133,9 +133,7 @@
 			<CardTitle>Push Notifications</CardTitle>
 		</div>
 		<CardDescription>
-			Get a browser notification when a reminder comes due — even when VROOM isn't open. Delivery is
-			best-effort: a notification fires when VROOM next runs a reminder check, not on a fixed
-			schedule.
+			Get a notification when a reminder comes due, even when VROOM isn't open.
 		</CardDescription>
 	</CardHeader>
 	<CardContent bind:ref={content} tabindex={-1}>
