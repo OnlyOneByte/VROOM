@@ -4,7 +4,15 @@
 	import ExpenseSortButton from './ExpenseSortButton.svelte';
 	import CompactStandaloneRow from './CompactStandaloneRow.svelte';
 	import CompactGroupRow from './CompactGroupRow.svelte';
-	import { rowKey, type DisplayRow, type GroupRow, type SortField } from './expense-table-rows';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import {
+		monthLabel,
+		monthSections,
+		rowKey,
+		type DisplayRow,
+		type GroupRow,
+		type SortField
+	} from './expense-table-rows';
 
 	interface Props {
 		rows: DisplayRow[];
@@ -21,6 +29,7 @@
 		onCategoryChange: (_category: string) => void;
 		onDeleteExpense: (_expense: Expense) => void;
 		onDeleteGroup: (_row: GroupRow) => void;
+		monthTotals?: ReadonlyMap<string, number> | undefined;
 	}
 
 	let {
@@ -37,9 +46,42 @@
 		onSort,
 		onCategoryChange,
 		onDeleteExpense,
-		onDeleteGroup
+		onDeleteGroup,
+		monthTotals
 	}: Props = $props();
+
+	let sections = $derived(
+		sortBy === 'date' && monthTotals ? monthSections(rows) : [{ month: '', rows }]
+	);
 </script>
+
+{#snippet row(row: DisplayRow)}
+	{#if row.type === 'standalone'}
+		<CompactStandaloneRow
+			expense={row.expense}
+			{vehicleMap}
+			{showVehicleColumn}
+			{canWrite}
+			{canDelete}
+			{returnTo}
+			isSelected={selectedRowId === row.expense.id}
+			{onSelect}
+			onDelete={onDeleteExpense}
+		/>
+	{:else}
+		<CompactGroupRow
+			{row}
+			{vehicleMap}
+			{showVehicleColumn}
+			{canWrite}
+			{canDelete}
+			{returnTo}
+			isSelected={selectedRowId === row.groupId}
+			{onSelect}
+			onDelete={onDeleteGroup}
+		/>
+	{/if}
+{/snippet}
 
 <div class="rounded-md border bg-card">
 	<div class="flex items-center gap-2 border-b px-3 py-2">
@@ -71,32 +113,24 @@
 				<p class="text-muted-foreground text-sm">No expenses match this category filter.</p>
 			</div>
 		{:else}
-			{#each rows as row (rowKey(row))}
-				{#if row.type === 'standalone'}
-					<CompactStandaloneRow
-						expense={row.expense}
-						{vehicleMap}
-						{showVehicleColumn}
-						{canWrite}
-						{canDelete}
-						{returnTo}
-						isSelected={selectedRowId === row.expense.id}
-						{onSelect}
-						onDelete={onDeleteExpense}
-					/>
-				{:else}
-					<CompactGroupRow
-						{row}
-						{vehicleMap}
-						{showVehicleColumn}
-						{canWrite}
-						{canDelete}
-						{returnTo}
-						isSelected={selectedRowId === row.groupId}
-						{onSelect}
-						onDelete={onDeleteGroup}
-					/>
+			{#each sections as section (section.month)}
+				{#if section.month}
+					{@const total = monthTotals?.get(section.month)}
+					<h2
+						class="sticky top-[calc(4rem+env(safe-area-inset-top))] short:top-0 z-10 flex items-baseline justify-between gap-3 bg-muted px-3 py-2 text-sm font-semibold text-foreground"
+					>
+						<span>{monthLabel(section.month)}</span>
+						<span class="tabular-nums text-muted-foreground">
+							{#if total !== undefined}
+								<span class="sr-only">total</span>
+								{formatCurrency(total)}
+							{/if}
+						</span>
+					</h2>
 				{/if}
+				{#each section.rows as item (rowKey(item))}
+					{@render row(item)}
+				{/each}
 			{/each}
 		{/if}
 	</div>

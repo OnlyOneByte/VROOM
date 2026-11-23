@@ -36,7 +36,7 @@
 
 <TableRow class="group">
 	<TableCell class="max-w-[240px]">
-		<div class="truncate font-medium text-foreground">{heading.title}</div>
+		<div class="truncate font-medium text-foreground" title={heading.title}>{heading.title}</div>
 		{#if expense.location}
 			<div
 				class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"

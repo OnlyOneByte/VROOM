@@ -44,11 +44,13 @@ vi.mock('#lib/components/expenses/ImportFromPhotosDialog.svelte', () => ({ defau
 const getAllExpenses = vi.fn();
 const getExpenseSummary = vi.fn();
 const getVehicles = vi.fn();
+const getMonthlyTotals = vi.fn();
 
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		getAllExpenses: (...args: unknown[]) => getAllExpenses(...args),
 		getExpenseSummary: (...args: unknown[]) => getExpenseSummary(...args),
+		getMonthlyTotals: (...args: unknown[]) => getMonthlyTotals(...args),
 		downloadExpensesCsv: () => Promise.resolve()
 	}
 }));
@@ -104,6 +106,7 @@ beforeEach(() => {
 	onlineStatus.current = true;
 	offlineExpenseQueue.current = [];
 	getVehicles.mockResolvedValue([VEHICLE]);
+	getMonthlyTotals.mockResolvedValue([{ month: '2026-01', amount: 12.5, count: 1 }]);
 	getAllExpenses.mockResolvedValue({
 		data: [],
 		pagination: { totalCount: 0, limit: 20, offset: 0, hasMore: false }
@@ -240,5 +243,24 @@ describe('/expenses filters in the URL', () => {
 		expect(await screen.findByTestId('active-filter-summary')).toHaveTextContent(
 			'Filtered by Daily Driver'
 		);
+	});
+
+	test('month totals are asked for with the same filters, and again when the category changes', async () => {
+		openAt('?vehicleId=v1&category=fuel&startDate=2026-01-01&endDate=2026-01-31&q=arco');
+
+		await waitFor(() => expect(getMonthlyTotals).toHaveBeenCalledTimes(1));
+		expect(getMonthlyTotals.mock.lastCall?.[0]).toEqual({
+			vehicleId: 'v1',
+			category: 'fuel',
+			startDate: '2026-01-01',
+			endDate: '2026-01-31',
+			search: 'arco'
+		});
+		await waitFor(() => expect(tableProps['monthTotals']).toEqual(new Map([['2026-01', 12.5]])));
+
+		(tableProps['onCategoryChange'] as (category: string) => void)('maintenance');
+
+		await waitFor(() => expect(getMonthlyTotals).toHaveBeenCalledTimes(2));
+		expect(getMonthlyTotals.mock.lastCall?.[0]).toMatchObject({ category: 'maintenance' });
 	});
 });
