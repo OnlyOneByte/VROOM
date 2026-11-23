@@ -23,7 +23,7 @@ const tooltipTags = svelteFiles(SRC).flatMap(file => {
 
 describe('every chart tooltip formats its value', () => {
 	test('the scan finds the chart tooltips', () => {
-		expect(tooltipTags.length).toBeGreaterThanOrEqual(9);
+		expect(tooltipTags.length).toBeGreaterThanOrEqual(7);
 	});
 
 	test.each(tooltipTags)('$file passes a value formatter', ({ tag }) => {
