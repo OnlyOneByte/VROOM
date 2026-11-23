@@ -145,12 +145,12 @@
 										<!-- Stretched-link overlay: the action button must stay above it (z-10). -->
 										<div class="mb-3">
 											<div class="flex items-start justify-between gap-2">
-												<h3 class="min-w-0 line-clamp-2 break-words font-semibold text-lg leading-tight">
+												<h3 class="min-w-0 font-semibold text-lg leading-tight">
 													<a
 														href={resolve(paramRoutes.vehicle, { id: vehicle.id })}
-														class="rounded-sm after:absolute after:inset-0 after:content-[''] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+														class="block rounded-sm after:absolute after:inset-0 after:content-[''] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 													>
-														{vehicle.nickname || vehicle.name}
+														<span class="line-clamp-2 break-words">{vehicle.nickname || vehicle.name}</span>
 													</a>
 												</h3>
 												{#if vehicle.hasActiveFinancing || vehicle.sharedBy}
