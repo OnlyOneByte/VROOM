@@ -14,7 +14,7 @@
 		const rows: Record<string, Record<string, unknown>> = {};
 		const sums: Record<string, number> = {};
 		for (const item of history) {
-			const month = item.date.slice(0, 7);
+			const month = item.month;
 			const row = (rows[month] ??= { month, date: parseMonthToDate(month) });
 			const key = `${month}|${item.fuelType}`;
 			sums[key] = (sums[key] ?? 0) + item.pricePerVolume;
