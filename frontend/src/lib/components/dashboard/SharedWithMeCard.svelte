@@ -1,6 +1,5 @@
 <script lang="ts">
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
-	import { onMount } from 'svelte';
 	import { Check, X } from '@lucide/svelte';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -12,40 +11,23 @@
 	import type { ReceivedShare } from '#lib/types/index.ts';
 
 	interface Props {
-		received?: ReceivedShare[] | null;
-		onAccepted?: () => void;
+		pending: ReceivedShare[];
+		loadError: string | null;
+		onRetry: () => void;
+		onAccepted: (_share: ReceivedShare) => void;
+		onDeclined: (_share: ReceivedShare) => void;
 	}
 
-	let { received, onAccepted }: Props = $props();
+	let { pending, loadError, onRetry, onAccepted, onDeclined }: Props = $props();
 
-	let loadError = $state<string | null>(null);
-	let pending = $state<ReceivedShare[]>([]);
 	let acting = $state<string | null>(null);
-
-	onMount(() => {
-		if (received === undefined) void load();
-		else if (received === null) loadError = "Couldn't reach the server.";
-		else pending = received.filter(s => s.status === 'pending');
-	});
-
-	async function load() {
-		try {
-			const received = await shareApi.listReceived();
-			pending = received.filter(s => s.status === 'pending');
-			loadError = null;
-		} catch (error) {
-			if (import.meta.env.DEV) console.error('Failed to load invitations:', error);
-			loadError = userFacingErrorMessage(error);
-		}
-	}
 
 	async function accept(share: ReceivedShare) {
 		acting = share.id;
 		try {
 			await shareApi.accept(share.id);
 			toast.success(`Accepted access to ${share.vehicleName}`);
-			pending = pending.filter(s => s.id !== share.id);
-			onAccepted?.();
+			onAccepted(share);
 		} catch (error) {
 			appStore.showError(`Couldn't accept the invitation. ${userFacingErrorMessage(error)}`);
 		} finally {
@@ -58,7 +40,7 @@
 		try {
 			await shareApi.decline(share.id);
 			toast.success(`Declined the invitation to ${share.vehicleName}`);
-			pending = pending.filter(s => s.id !== share.id);
+			onDeclined(share);
 		} catch (error) {
 			appStore.showError(`Couldn't decline the invitation. ${userFacingErrorMessage(error)}`);
 		} finally {
@@ -68,12 +50,7 @@
 </script>
 
 {#if loadError}
-	<LoadErrorCard
-		compact
-		title="Couldn't load your invitations"
-		message={loadError}
-		onRetry={load}
-	/>
+	<LoadErrorCard compact title="Couldn't load your invitations" message={loadError} {onRetry} />
 {:else if pending.length > 0}
 	<Card.Root class="gap-3 py-5" data-testid="shared-with-you">
 		<Card.Header class="px-5">

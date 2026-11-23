@@ -83,10 +83,9 @@
 	let recentExpensesList = $state<Expense[]>([]);
 	let remindersList = $state<ReminderWithVehicles[]>([]);
 	let policies = $state<InsurancePolicy[]>([]);
-	let invitations = $state<ReceivedShare[] | null>([]);
-	let pendingInvitations = $derived(
-		invitations?.filter(share => share.status === 'pending').length ?? 0
-	);
+	let invitations = $state<ReceivedShare[]>([]);
+	let invitationsError = $state<string | null>(null);
+	let pendingInvitations = $derived(invitations.filter(share => share.status === 'pending'));
 	let recurringCost = $state<RecurringCostSummary>({ count: 0, monthlyTotal: 0 });
 	let spendTrend = $state<AnalyticsQueryResponse | null>(null);
 	let runningByMonth = $state<AnalyticsQueryResponse | null>(null);
@@ -186,7 +185,6 @@
 		const names = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
 		return attentionItems(remindersList, policies, id => names.get(id), formatDate, Date.now());
 	});
-	let hasAside = $derived(attention.length > 0 || invitations === null || pendingInvitations > 0);
 
 	onMount(loadDashboardData);
 
@@ -225,6 +223,25 @@
 		return { summaries: [owned, ...sharedRows], perDistance };
 	}
 
+	async function fetchInvitations(): Promise<{ list: ReceivedShare[]; error: string | null }> {
+		try {
+			return { list: await shareApi.listReceived(), error: null };
+		} catch (error) {
+			logLoadFailure(error, "Couldn't load your invitations");
+			return { list: [], error: userFacingErrorMessage(error) };
+		}
+	}
+
+	async function retryInvitations() {
+		const result = await fetchInvitations();
+		invitations = result.list;
+		invitationsError = result.error;
+	}
+
+	function dropInvitation(share: ReceivedShare) {
+		invitations = invitations.filter(s => s.id !== share.id);
+	}
+
 	async function loadDashboardData() {
 		isLoading = true;
 		isUpdatingPeriod = false;
@@ -250,7 +267,7 @@
 				reminderApi.list().catch(() => [] as ReminderWithVehicles[]),
 				reminderApi.getRecurringCost().catch(() => ({ count: 0, monthlyTotal: 0 })),
 				insuranceApi.getAllPolicies().catch(() => [] as InsurancePolicy[]),
-				shareApi.listReceived().catch(() => null),
+				fetchInvitations(),
 				loadPeriod(selected, []),
 				analyticsApi
 					.query({
@@ -287,7 +304,8 @@
 			remindersList = loadedReminders;
 			recurringCost = loadedRecurringCost;
 			policies = loadedPolicies;
-			invitations = loadedInvitations;
+			invitations = loadedInvitations.list;
+			invitationsError = loadedInvitations.error;
 			spendTrend = loadedSpendTrend;
 			runningByMonth = loadedRunningByMonth;
 			trendFailed = loadedRunningByMonth === null;
@@ -327,6 +345,16 @@
 		}
 	}
 </script>
+
+{#snippet invitationsCard()}
+	<SharedWithMeCard
+		pending={pendingInvitations}
+		loadError={invitationsError}
+		onRetry={retryInvitations}
+		onAccepted={loadDashboardData}
+		onDeclined={dropInvitation}
+	/>
+{/snippet}
 
 {#snippet checklist()}
 	<EmptyState>
@@ -425,11 +453,11 @@
 	{:else if noVehicles}
 		{@render checklist()}
 
-		<SharedWithMeCard onAccepted={loadDashboardData} />
+		{@render invitationsCard()}
 	{:else if needsFirstExpense}
 		{@render checklist()}
 
-		<SharedWithMeCard onAccepted={loadDashboardData} />
+		{@render invitationsCard()}
 		<NeedsAttentionCard items={attention} />
 		<VehicleRowsCard rows={vehicleRows} periodLabel={PERIOD_PHRASES[period].chip} {distanceLabel} />
 		{#if recurringCost.count > 0}
@@ -437,92 +465,96 @@
 		{/if}
 	{:else}
 		<div class="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
-			<div class="lg:col-span-2 lg:row-start-1">
-				<DashboardHero
-					{period}
-					total={spend.total}
-					previousTotal={spend.previousTotal}
-					buckets={spend.buckets}
-					runningPerDistance={periodData.perDistance?.totals.perDistance ?? null}
-					runningScope={sharedVehicles.length > 0 ? 'on your vehicles' : null}
-					{distanceLabel}
-					isLoading={!hasLoaded}
-					isUpdating={isUpdatingPeriod}
-					onPeriodChange={handlePeriodChange}
-				/>
-			</div>
-
-			{#if hasLoaded && hasAside}
-				<div class="space-y-6 lg:col-start-3 lg:row-span-2 lg:row-start-1">
-					{#if attention.length > 0}
-						<NeedsAttentionCard items={attention} />
-					{/if}
-					{#key invitations}
-						<SharedWithMeCard received={invitations} onAccepted={loadDashboardData} />
-					{/key}
-				</div>
-			{/if}
-
-			{#if hasLoaded}
-				<div class="lg:col-span-2 lg:col-start-1 lg:row-start-2">
-					<VehicleRowsCard
-						rows={vehicleRows}
-						periodLabel={PERIOD_PHRASES[period].chip}
+			<div class="contents lg:col-span-2 lg:flex lg:flex-col lg:gap-6">
+				<div class="order-1 lg:order-none">
+					<DashboardHero
+						{period}
+						total={spend.total}
+						previousTotal={spend.previousTotal}
+						buckets={spend.buckets}
+						runningPerDistance={periodData.perDistance?.totals.perDistance ?? null}
+						runningScope={sharedVehicles.length > 0 ? 'on your vehicles' : null}
 						{distanceLabel}
+						isLoading={!hasLoaded}
+						isUpdating={isUpdatingPeriod}
+						onPeriodChange={handlePeriodChange}
 					/>
 				</div>
 
-				<div class="lg:col-start-3 {hasAside ? 'lg:row-start-3' : 'lg:row-span-2 lg:row-start-1'}">
-					<RecentActivityCard expenses={recentExpenses} />
-				</div>
-
-				<div class="lg:col-span-2 lg:col-start-1 lg:row-start-3">
-					{#await chartModules}
-						<ChartCard title={TREND_TITLE} level={2} description={TREND_DESCRIPTION} isLoading>
-							{null}
-						</ChartCard>
-					{:then { AppBarChart }}
-						<AppBarChart
-							level={2}
-							title={TREND_TITLE}
-							description={TREND_DESCRIPTION}
-							data={trendData}
-							x="month"
-							y="amount"
-							series={trendSeries}
-							config={trendConfig}
-							yAxisFormat={formatCurrencyAxis}
-							xAxisProps={{ ticks: trendTicks, format: (v: string) => v }}
-							error={trendFailed ? "Couldn't load the monthly running costs." : null}
-						>
-							{#snippet footer()}
-								{#if trendInsight}
-									<p class="text-xs text-muted-foreground" data-testid="trend-insight">
-										{trendInsight}
-									</p>
-								{/if}
-							{/snippet}
-						</AppBarChart>
-					{:catch}
-						<ChartCard
-							title={TREND_TITLE}
-							level={2}
-							description={TREND_DESCRIPTION}
-							error="Charts couldn't be loaded. Check your connection and reload."
-						>
-							{null}
-						</ChartCard>
-					{/await}
-				</div>
-
-				{#if recurringCost.count > 0}
-					<div class="lg:col-start-3 {hasAside ? 'lg:row-start-4' : 'lg:row-start-3'}">
-						<RecurringCostCard
-							count={recurringCost.count}
-							monthlyTotal={recurringCost.monthlyTotal}
+				{#if hasLoaded}
+					<div class="order-4 lg:order-none">
+						<VehicleRowsCard
+							rows={vehicleRows}
+							periodLabel={PERIOD_PHRASES[period].chip}
+							{distanceLabel}
 						/>
 					</div>
+
+					<div class="order-6 lg:order-none">
+						{#await chartModules}
+							<ChartCard title={TREND_TITLE} level={2} description={TREND_DESCRIPTION} isLoading>
+								{null}
+							</ChartCard>
+						{:then { AppBarChart }}
+							<AppBarChart
+								level={2}
+								title={TREND_TITLE}
+								description={TREND_DESCRIPTION}
+								data={trendData}
+								x="month"
+								y="amount"
+								series={trendSeries}
+								config={trendConfig}
+								yAxisFormat={formatCurrencyAxis}
+								xAxisProps={{ ticks: trendTicks, format: (v: string) => v }}
+								error={trendFailed ? "Couldn't load the monthly running costs." : null}
+							>
+								{#snippet footer()}
+									{#if trendInsight}
+										<p class="text-xs text-muted-foreground" data-testid="trend-insight">
+											{trendInsight}
+										</p>
+									{/if}
+								{/snippet}
+							</AppBarChart>
+						{:catch}
+							<ChartCard
+								title={TREND_TITLE}
+								level={2}
+								description={TREND_DESCRIPTION}
+								error="Charts couldn't be loaded. Check your connection and reload."
+							>
+								{null}
+							</ChartCard>
+						{/await}
+					</div>
 				{/if}
+			</div>
+
+			{#if hasLoaded}
+				<div class="contents lg:flex lg:flex-col lg:gap-6">
+					{#if attention.length > 0}
+						<div class="order-2 lg:order-none">
+							<NeedsAttentionCard items={attention} />
+						</div>
+					{/if}
+					{#if invitationsError || pendingInvitations.length > 0}
+						<div class="order-3 lg:order-none">
+							{@render invitationsCard()}
+						</div>
+					{/if}
+					<div class="order-5 lg:order-none">
+						<RecentActivityCard expenses={recentExpenses} />
+					</div>
+					{#if recurringCost.count > 0}
+						<div class="order-7 lg:order-none">
+							<RecurringCostCard
+								count={recurringCost.count}
+								monthlyTotal={recurringCost.monthlyTotal}
+							/>
+						</div>
+					{/if}
+				</div>
 			{/if}
 		</div>
 	{/if}
