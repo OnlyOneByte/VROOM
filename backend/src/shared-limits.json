@@ -1,0 +1,14 @@
+{
+  "vehicle": {
+    "minYear": 1900,
+    "maxYearsAhead": 1,
+    "vinMinLength": 11,
+    "vinMaxLength": 17
+  },
+  "expense": {
+    "maxAmount": 1000000
+  },
+  "trip": {
+    "noteMaxLength": 500
+  }
+}

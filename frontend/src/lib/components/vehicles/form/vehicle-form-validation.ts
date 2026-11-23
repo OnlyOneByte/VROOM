@@ -1,3 +1,4 @@
+import { maxVehicleYear, VEHICLE_LIMITS } from '#lib/constants/limits.ts';
 import type { VehicleFormData, VehicleFormErrors, FinancingFormErrors } from '#lib/types/index.ts';
 
 interface FinancingFormData {
@@ -21,7 +22,7 @@ export function validateVehicleFields(vehicleForm: VehicleFormData): VehicleForm
 		errors['model'] = 'Model is required';
 	}
 
-	if (vehicleForm.year < 1900 || vehicleForm.year > new Date().getFullYear() + 2) {
+	if (vehicleForm.year < VEHICLE_LIMITS.MIN_YEAR || vehicleForm.year > maxVehicleYear()) {
 		errors['year'] = 'Please enter a valid year';
 	}
 
@@ -29,8 +30,12 @@ export function validateVehicleFields(vehicleForm: VehicleFormData): VehicleForm
 		const vinRegex = /^[A-Z0-9]+$/i;
 		if (!vinRegex.test(vehicleForm.vin)) {
 			errors['vin'] = 'VIN must contain only letters and numbers';
-		} else if (vehicleForm.vin.length < 11 || vehicleForm.vin.length > 17) {
-			errors['vin'] = 'VIN must be between 11 and 17 characters';
+		} else if (
+			vehicleForm.vin.length < VEHICLE_LIMITS.VIN_MIN_LENGTH ||
+			vehicleForm.vin.length > VEHICLE_LIMITS.VIN_MAX_LENGTH
+		) {
+			errors['vin'] =
+				`VIN must be between ${VEHICLE_LIMITS.VIN_MIN_LENGTH} and ${VEHICLE_LIMITS.VIN_MAX_LENGTH} characters`;
 		}
 	}
 

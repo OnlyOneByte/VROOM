@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CONFIG } from '../../config';
 import { isValidTimeZone } from '../../utils/time-zone';
 import {
   dateInput,
@@ -47,7 +48,7 @@ export const createTripSchema = z
     tripDate: dateInput.refine(noonAnchoredDateIsNotInTheFuture, FUTURE_MSG),
     startLocation: z.string().max(200).optional(),
     endLocation: z.string().max(200).optional(),
-    note: z.string().max(500).optional(),
+    note: z.string().max(CONFIG.validation.trip.noteMaxLength).optional(),
     timeZone: tripTimeZoneSchema,
   })
   .refine(startEndRefine, REFINE_MSG);
@@ -60,7 +61,7 @@ export const updateTripSchema = z
     tripDate: dateInput.refine(noonAnchoredDateIsNotInTheFuture, FUTURE_MSG).optional(),
     startLocation: z.string().max(200).nullish(),
     endLocation: z.string().max(200).nullish(),
-    note: z.string().max(500).nullish(),
+    note: z.string().max(CONFIG.validation.trip.noteMaxLength).nullish(),
     timeZone: tripTimeZoneSchema,
   })
   .refine(startEndRefine, REFINE_MSG);

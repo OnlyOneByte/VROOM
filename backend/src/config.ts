@@ -20,6 +20,7 @@ import {
   vehicleShares,
   vehicles,
 } from './db/schema';
+import SHARED_LIMITS from './shared-limits.json';
 import type { Environment } from './types';
 
 const envSchema = z.object({
@@ -187,16 +188,17 @@ export const CONFIG = {
       modelMaxLength: 50,
       nicknameMaxLength: 50,
       licensePlateMaxLength: 20,
-      minYear: 1900,
-      vinMinLength: 11,
-      vinMaxLength: 17,
+      minYear: SHARED_LIMITS.vehicle.minYear,
+      maxYearsAhead: SHARED_LIMITS.vehicle.maxYearsAhead,
+      vinMinLength: SHARED_LIMITS.vehicle.vinMinLength,
+      vinMaxLength: SHARED_LIMITS.vehicle.vinMaxLength,
       maxOdometerReading: 10_000_000,
       maxPurchasePrice: 10_000_000,
     },
     expense: {
       descriptionMaxLength: 500,
       locationMaxLength: 200,
-      maxAmount: 1_000_000,
+      maxAmount: SHARED_LIMITS.expense.maxAmount,
       maxVolume: 1_000,
       maxTags: 10,
       tagMaxLength: 50,
@@ -241,6 +243,7 @@ export const CONFIG = {
       maxIntervalYears: 100,
       notificationsHistoryLimit: 100,
     },
+    trip: { noteMaxLength: SHARED_LIMITS.trip.noteMaxLength },
     settings: { maxBackupRetention: 100, maxSyncInactivityMinutes: 30 },
     push: {
       maxConsecutiveFailures: 5,

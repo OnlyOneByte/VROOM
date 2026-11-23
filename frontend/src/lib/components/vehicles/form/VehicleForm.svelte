@@ -62,6 +62,7 @@
 		ChargeUnit
 	} from '#lib/types/index.ts';
 	import { validateVehicleFields, validateFinancingFields } from './vehicle-form-validation';
+	import { maxVehicleYear } from '#lib/constants/limits.ts';
 	import {
 		annuityPayment,
 		calculatePayoffDateFromStart
@@ -730,7 +731,7 @@
 									id="year"
 									type="number"
 									min="1900"
-									max={new Date().getFullYear() + 2}
+									max={maxVehicleYear()}
 									bind:value={vehicleForm.year}
 									aria-invalid={!!errors['year']}
 									aria-describedby={errors['year'] ? 'year-error' : undefined}

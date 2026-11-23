@@ -95,7 +95,10 @@ const baseVehicleSchema = createInsertSchema(vehiclesTable, {
       CONFIG.validation.vehicle.minYear,
       `Year must be ${CONFIG.validation.vehicle.minYear} or later`
     )
-    .max(new Date().getFullYear() + 1, 'Year cannot be in the future'),
+    .max(
+      new Date().getFullYear() + CONFIG.validation.vehicle.maxYearsAhead,
+      'Year cannot be in the future'
+    ),
   licensePlate: z
     .string()
     .max(
