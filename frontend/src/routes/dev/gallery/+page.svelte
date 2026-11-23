@@ -130,8 +130,7 @@
 						{/snippet}
 						{#snippet meta()}
 							<span>
-								<span class="font-medium text-foreground">6% less</span> than the 30 days before ·
-								{formatCurrency(0.21)} per mile running cost
+								<span class="font-medium text-foreground">6% less</span> than the 30 days before
 							</span>
 						{/snippet}
 					</HeroFigure>

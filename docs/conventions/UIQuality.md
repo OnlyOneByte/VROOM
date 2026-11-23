@@ -163,7 +163,8 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
 - Icon-only buttons are `size="icon"` or larger and always have an `aria-label`. On touch layouts
   use `icon-lg` or pad the hit area to 40px.
 - Labels are verbs in Title Case: "Add Expense", "Log Fill-up", "Import CSV". While a mutation is
-  in flight the button is disabled and shows a spinner. That rule is for submits.
+  in flight the button is disabled and shows a spinner. That rule is for submits; expense
+  create, edit and delete are optimistic instead (see *Interaction quality*).
 - A Retry button that reloads data or re-sends queued work stays focusable while it runs: use
   `aria-disabled` with a spinner, and ignore a second press in its handler. A `disabled` button
   drops keyboard focus to the page.
@@ -191,9 +192,10 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
 - Inputs set `inputmode`/`type` so phones show the right keyboard (`decimal` for money and
   volume, `numeric` for odometer).
 - **Frequent forms are quick forms.** The field people always fill (Amount) is first and focused
-  on open; fields with a sensible default (vehicle, date, category) are prefilled from the last
-  entry and shown as chips; optional fields sit under one "More details" disclosure, open when
-  editing or when a field inside it is invalid. Add Expense is the reference.
+  on open. Fields with a sensible default are prefilled: the vehicle from the last entry and the
+  date as today, both shown as chips, and the category from that vehicle's last entry, selected
+  in its chip row. Optional fields sit under one "More details" disclosure, open when editing or
+  when a field inside it is invalid. Add Expense is the reference.
 - Long forms keep Save/Cancel reachable (a sticky bar at the bottom on mobile), and that bar
   never covers the last field: pad the form by the bar's height.
 - **One save model per page.** Settings that apply instantly need no Save button; when a page
@@ -203,7 +205,8 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
 - A card is one topic: title, optional description, content, optional footer action.
 - Nest cards at most one level deep.
 - A clickable card is a real link (an `<a>` on the title or a stretched link), never
-  `role="button"` on a container that holds other buttons — see `VehicleCarousel`.
+  `role="button"` on a container that holds other buttons: put the link on the title and stretch it
+  over the card (`after:absolute after:inset-0`), keeping other buttons above it.
 
 ### Charts
 - Always through `AppLineChart`/`AppBarChart`/`AppPieChart`/`AppAreaChart` or `ChartCard`, so
@@ -240,8 +243,8 @@ Every view that loads or mutates data handles all of these:
    triggered the work). Never a blank flash or a layout that jumps when data arrives. The app
    shell never waits on the network: for a returning user, navigation and the page render at once
    from the remembered user while the session is checked, and only content areas show skeletons.
-   A skeleton has the content's shape (the hero line, a split bar, three rows) and reserves every
-   line, so CLS stays 0.
+   A skeleton has the content's shape (on the Dashboard: the hero line, a split bar, three rows)
+   and reserves every line, so CLS stays 0.
 2. **Empty** — `EmptyState` (`#lib/components/common/empty-state.svelte`) with an icon, a
    sentence-case title that says what's missing, one line on why it matters, and the primary
    action that fills it. NOT a bare "No data". `/reminders` is the reference.
@@ -304,7 +307,7 @@ verify by hand:
   (use `FormFieldError`).
 - **Never nest interactive elements.** A row or card that is itself `role="button"` + `onclick`
   while containing Edit/Delete buttons is a `nested-interactive` violation. Make the container
-  non-interactive and a real link the navigation target — the pattern `VehicleCarousel` uses.
+  non-interactive and a real link the navigation target (a stretched title link, see *Cards*).
 - **Keyboard.** Every action is reachable and operable by keyboard in a sensible order. Enter
   submits, Escape cancels inline editors and closes dialogs. A text field with a suggestion list
   is a combobox (`TagInput`, `ExpenseTagFilter`): the field is the only tab stop, the options are
@@ -347,7 +350,7 @@ VROOM installs to phones. Mobile is the primary form factor, not an afterthought
   screen. Secondary header tools move into the page's overflow menu so the row still fits.
 - Respect safe areas (`app.css` defines `.safe-top` and `.safe-bottom`).
 - Nothing depends on hover, tooltips or right-click; everything has a tap path.
-- The first screen is useful: title, the key number, the primary action. Secondary tools
+- The first screen is useful: title, the hero figure, the primary action. Secondary tools
   (import/export, filters) collapse behind a menu or disclosure on mobile.
 
 ## Copy and voice
@@ -431,8 +434,9 @@ failed step; nits can be follow-up issues.
 `.github/PULL_REQUEST_TEMPLATE.md` carries this list. A UI change is done when ALL are true:
 
 - [ ] Evidence: before/after at 1280px and 375px, light and dark (a GIF for motion or multi-step).
-- [ ] The screen's question is answered in the first 300px at 375, and a new route has a bundle
-      budget in `frontend/bundle-budgets.json`.
+- [ ] The screen's question is answered in the first 300px at 375, and a new route fits a bundle
+      budget in `frontend/bundle-budgets.json` (its own entry, or the default; the PR that raises
+      one says why).
 - [ ] Every state handled (loading / empty / error / populated / success feedback).
 - [ ] No overflow at 375px; tap targets ≥ 40px; primary action in thumb reach.
 - [ ] Tokens only; AA contrast checked in Default plus two other theme families, light and dark.
@@ -440,7 +444,8 @@ failed step; nits can be follow-up issues.
       focuses the first invalid field after a failed submit (existing forms: see *Forms*); no
       nested interactive elements; keyboard and focus work.
 - [ ] Reuses the kit + formatters + routes (no hardcoded colours, paths, or number formatting).
-- [ ] Destructive actions confirmed; in-flight mutations disable + spinner.
+- [ ] Destructive actions confirmed; in-flight mutations disable + spinner, except the optimistic
+      expense writes (*Interaction quality*).
 - [ ] Copy follows *Copy and voice*.
 - [ ] `npm run test:e2e` green locally (CI runs only the Chromium project); a new route is in
       `A11Y_ROUTES` and a new user journey has a spec in `frontend/e2e/`.

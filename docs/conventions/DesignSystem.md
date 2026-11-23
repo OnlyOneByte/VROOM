@@ -98,7 +98,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 ### App-level — `#lib/components/common/*` (direct `.svelte` imports)
 | Need | Import | Props |
 |---|---|---|
-| Hero figure | `common/hero-figure.svelte` | `label`, `value` (a formatted string), `meta?` (Snippet: the comparison line, meta voice), `action?` (Snippet: a period chip beside the label). At most one per screen (UIQuality.md, *Core principles*) |
+| Hero figure | `common/hero-figure.svelte` | `label`, `value` (a formatted string), `meta?` (Snippet: the comparison line, meta voice), `action?` (Snippet: a period chip beside the label), `class?`. At most one per screen (UIQuality.md, *Core principles*) |
 | Page title + actions | `common/page-header.svelte` | `title`, `description?` (string or Snippet), `back?` (Snippet: a back button, rendered before the title), `actions?` (Snippet). The page's only `<h1>`; detail and form pages pass `back` instead of hand-rolling a title row |
 | Empty state | `common/empty-state.svelte` | `icon?`, `title`, `description`, `action?` (all Snippets), `level?` (`2`/`3`/`4`, default `2`): the title's heading level. Use `3` inside a card whose `Card.Title` is the `h2` |
 | Destructive confirm | `common/ConfirmDialog.svelte` | `bind:open`, `title`, `description`, `onConfirm` (may be async), `destructive?`, `confirmLabel?`, `cancelLabel?`, `children?` (a snippet under the description, for a summary of what the action affects, such as the expense a delete removes) — native `confirm()`/`alert()` are banned (`no-native-dialogs.test.ts`) |
