@@ -66,6 +66,7 @@
 	let currentOffset = $state(0);
 	let pageSize = $state(20);
 	let totalCount = $state(0);
+	let totalCountFiltered = $state(false);
 	let isLoadingPage = $state(false);
 
 	let searchTerm = $state('');
@@ -128,7 +129,7 @@
 	let expensesList = $state<HTMLElement | null>(null);
 	let filtersActive = $derived(
 		Boolean(
-			searchTerm ||
+			searchTerm.trim() ||
 			selectedVehicleId ||
 			selectedTags.length > 0 ||
 			startDate ||
@@ -138,7 +139,9 @@
 	);
 	let countLine = $derived.by(() => {
 		const expenses = `${formatNumber(totalCount, 0)} ${totalCount === 1 ? 'expense' : 'expenses'}`;
-		if (filtersActive) return `${expenses} ${totalCount === 1 ? 'matches' : 'match'} your filters`;
+		if (totalCountFiltered) {
+			return `${expenses} ${totalCount === 1 ? 'matches' : 'match'} your filters`;
+		}
 		if (vehicles.length === 0) return expenses;
 		return `${expenses} across ${formatNumber(vehicles.length, 0)} ${vehicles.length === 1 ? 'vehicle' : 'vehicles'}`;
 	});
@@ -198,9 +201,10 @@
 	const nextSummaryRequest = latest();
 	let pageError = $state<{ message: string; offset: number } | null>(null);
 
-	function applyPage(pageResult: PaginatedResponse<Expense>, offset: number) {
+	function applyPage(pageResult: PaginatedResponse<Expense>, offset: number, filtered: boolean) {
 		expenses = pageResult.data;
 		totalCount = pageResult.pagination.totalCount;
+		totalCountFiltered = filtered;
 		currentOffset = offset;
 		pageError = null;
 	}
@@ -216,6 +220,7 @@
 	async function fetchPageAndSummary(offset = 0, { throwOnFailure = false } = {}) {
 		const isCurrentList = nextListRequest();
 		const isCurrentSummary = nextSummaryRequest();
+		const filtered = filtersActive;
 		isLoadingPage = true;
 		try {
 			const [pageResult, summaryResult] = await Promise.allSettled([
@@ -229,7 +234,7 @@
 
 			const listReported = isCurrentList();
 			if (listReported) {
-				if (pageResult.status === 'fulfilled') applyPage(pageResult.value, offset);
+				if (pageResult.status === 'fulfilled') applyPage(pageResult.value, offset, filtered);
 				else failPage(pageResult.reason, offset);
 			}
 			if (isCurrentSummary()) {
@@ -244,10 +249,11 @@
 
 	async function fetchPage(offset: number) {
 		const isCurrent = nextListRequest();
+		const filtered = filtersActive;
 		isLoadingPage = true;
 		try {
 			const pageResult = await expenseApi.getAllExpenses(buildListParams(offset));
-			if (isCurrent()) applyPage(pageResult, offset);
+			if (isCurrent()) applyPage(pageResult, offset, filtered);
 		} catch (error) {
 			if (isCurrent()) failPage(error, offset);
 		} finally {
@@ -599,14 +605,7 @@
 						emptyActionHref={resolve(routes.expenseNew)}
 						scrollHeight="600px"
 						onClearFilters={clearFilters}
-						hasActiveFilters={!!(
-							searchTerm ||
-							selectedVehicleId ||
-							selectedTags.length > 0 ||
-							startDate ||
-							endDate ||
-							categoryFilter
-						)}
+						hasActiveFilters={filtersActive}
 						{totalCount}
 						{currentOffset}
 						{pageSize}
