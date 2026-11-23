@@ -189,15 +189,13 @@ test.describe('Expense list', () => {
 		await expect(visibleText(page, 'Maintenance')).toBeVisible();
 	});
 
-	test('the wide layout carries the description, the compact row deliberately does not', async ({
-		page
-	}) => {
+	test('both layouts lead the row with the description', async ({ page }) => {
 		await page.setViewportSize({ width: 1280, height: 800 });
 		await page.goto('/expenses');
 		await expect(visibleText(page, 'Oil change')).toBeVisible();
 
 		await page.setViewportSize({ width: 375, height: 667 });
-		await expect(visibleText(page, 'Oil change')).toBeHidden();
+		await expect(visibleText(page, 'Oil change')).toBeVisible();
 		await expect(visibleText(page, '$89.99')).toBeVisible();
 	});
 
