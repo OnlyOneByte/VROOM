@@ -2,12 +2,13 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { TrendingUp, ChartPie, CircleAlert, Car, Plus } from '@lucide/svelte';
+	import { TrendingUp, ChartPie, CircleAlert, Car, Plus, Check } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import DashboardStatsCards from '#lib/components/dashboard/DashboardStatsCards.svelte';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
 	import RecentActivityCard from '#lib/components/dashboard/RecentActivityCard.svelte';
@@ -96,6 +97,16 @@
 	let hasLoaded = $state(false);
 	let showFab = $derived(hasLoaded && !loadError);
 	let canLogFillup = $derived(showFab && ownedVehicles.length > 0);
+	let noVehicles = $derived(hasLoaded && !loadError && vehicles.length === 0);
+	let showChecklist = $derived(
+		noVehicles || (hasLoaded && !loadError && (allTimeSummary?.expenseCount ?? 0) === 0)
+	);
+	let onboardingSteps = $derived([
+		{ label: 'Add a vehicle', route: routes.vehicleNew, done: vehicles.length > 0 },
+		{ label: 'Log an expense or fill-up', route: routes.expenseNew, done: false },
+		{ label: 'See what it costs', route: routes.analytics, done: false }
+	]);
+	let currentStep = $derived(onboardingSteps.findIndex(step => !step.done));
 
 	let stats = $derived.by(() => ({
 		totalVehicles: ownedVehicles.length,
@@ -265,6 +276,62 @@
 	}
 </script>
 
+{#snippet checklist()}
+	<EmptyState>
+		{#snippet icon()}
+			<Car class="mb-4 h-12 w-12 text-muted-foreground" />
+		{/snippet}
+		{#snippet title()}
+			{vehicles.length === 0 ? 'Add your first vehicle' : 'Log your first expense'}
+		{/snippet}
+		{#snippet description()}
+			Three steps to see what your vehicles really cost.
+		{/snippet}
+		{#snippet action()}
+			<ol class="mb-6 w-full max-w-sm space-y-3" aria-label="Getting started">
+				{#each onboardingSteps as step, i (step.label)}
+					<li class="flex items-center gap-3">
+						<span
+							class="flex size-7 shrink-0 items-center justify-center rounded-full border text-sm font-medium {step.done
+								? 'border-primary bg-primary text-primary-foreground'
+								: i === currentStep
+									? 'border-primary text-primary'
+									: 'border-border text-muted-foreground'}"
+							aria-hidden="true"
+						>
+							{#if step.done}<Check class="size-4" />{:else}{i + 1}{/if}
+						</span>
+						{#if step.done}
+							<span class="text-sm text-muted-foreground line-through">{step.label}</span>
+							<span class="sr-only">(done)</span>
+						{:else}
+							<a
+								href={resolve(step.route)}
+								class="text-sm underline-offset-4 hover:underline {i === currentStep
+									? 'font-medium text-foreground'
+									: 'text-muted-foreground'}"
+							>
+								{step.label}
+							</a>
+						{/if}
+					</li>
+				{/each}
+			</ol>
+			{#if vehicles.length === 0}
+				<Button size="lg" href={resolve(routes.vehicleNew)}>
+					<Plus class="mr-2 h-4 w-4" />
+					Add Vehicle
+				</Button>
+			{:else}
+				<Button size="lg" href={resolve(routes.expenseNew)}>
+					<Plus class="mr-2 h-4 w-4" />
+					Add Expense
+				</Button>
+			{/if}
+		{/snippet}
+	</EmptyState>
+{/snippet}
+
 {#snippet trendIcon()}
 	<TrendingUp class="h-5 w-5 text-primary" />
 {/snippet}
@@ -316,7 +383,7 @@
 					<Plus class="mr-2 h-4 w-4" />
 					Log Fill-up
 				</Button>
-			{:else if showFab}
+			{:else if showFab && !noVehicles}
 				<Button size="lg" class="hidden lg:inline-flex" href={resolve(routes.vehicleNew)}>
 					<Plus class="mr-2 h-4 w-4" />
 					Add Vehicle
@@ -336,7 +403,15 @@
 			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
 			<Button size="lg" onclick={loadDashboardData}>Retry</Button>
 		</div>
+	{:else if noVehicles}
+		{@render checklist()}
+
+		<SharedWithMeCard onAccepted={loadDashboardData} />
 	{:else}
+		{#if showChecklist}
+			{@render checklist()}
+		{/if}
+
 		<DashboardStatsCards
 			totalVehicles={stats.totalVehicles}
 			totalExpenses={stats.totalExpenses}
@@ -410,6 +485,6 @@
 
 {#if canLogFillup}
 	<FloatingActionButton label="Log Fill-up" onclick={handleLogFillup} />
-{:else if showFab}
+{:else if showFab && !noVehicles}
 	<FloatingActionButton href={resolve(routes.vehicleNew)} label="Add Vehicle" />
 {/if}
