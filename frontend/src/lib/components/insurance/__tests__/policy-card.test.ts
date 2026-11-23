@@ -224,6 +224,31 @@ describe('PolicyCard child sections', () => {
 		expect(screen.getByTestId('policy-attachments')).toHaveTextContent('1 document · 0 claims');
 	});
 
+	test.each([
+		['documents', "Couldn't load the documents."],
+		['claims', 'Something went wrong.']
+	])(
+		'Retry on a failed %s load stays on screen and focusable while it runs',
+		async (kind, message) => {
+			const failing = kind === 'documents' ? getEntityDocuments : getClaims;
+			failing.mockRejectedValueOnce(new Error('offline'));
+			mount();
+			await settle();
+			if (kind === 'documents') getEntityDocuments.mockReturnValue(new Promise(() => {}));
+			else getClaims.mockReturnValue(new Promise(() => {}));
+			const retry = screen.getByRole('button', { name: 'Retry' });
+			retry.focus();
+			await fireEvent.click(retry);
+			await settle();
+			await fireEvent.click(retry);
+
+			expect(screen.getByText(message)).toBeInTheDocument();
+			expect(retry).toHaveAttribute('aria-disabled', 'true');
+			expect(document.activeElement).toBe(retry);
+			expect(failing).toHaveBeenCalledTimes(2);
+		}
+	);
+
 	test('saving a claim keeps the claims section and the count on screen while it reloads', async () => {
 		getClaims.mockResolvedValue([makeClaim()]);
 		mount();

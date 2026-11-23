@@ -110,16 +110,20 @@
 
 	async function loadClaims() {
 		isLoading = true;
-		loadError = null;
 		try {
 			claims = await insuranceApi.getClaims(policyId);
 			hasLoaded = true;
+			loadError = null;
 		} catch (err) {
 			loadError = userFacingErrorMessage(err);
 			handleErrorWithNotification(err, "Couldn't load claims");
 		} finally {
 			isLoading = false;
 		}
+	}
+
+	function retryClaims() {
+		if (!isLoading) loadClaims();
 	}
 
 	function resetForm() {
@@ -229,16 +233,25 @@
 			{/if}
 		</div>
 
-		{#if isLoading && !hasLoaded}
-			<div class="flex items-center justify-center py-4">
-				<LoaderCircle class="h-5 w-5 animate-spin text-muted-foreground" />
-			</div>
-		{:else if loadError}
+		{#if loadError}
 			<div class="rounded-md border border-destructive/40 bg-destructive/10 p-3">
 				<p class="text-xs text-destructive">{loadError}</p>
-				<Button variant="outline" size="sm" class="mt-2 h-10 sm:h-8" onclick={loadClaims}>
+				<Button
+					variant="outline"
+					size="sm"
+					class="mt-2 h-10 sm:h-8"
+					aria-disabled={isLoading}
+					onclick={retryClaims}
+				>
+					{#if isLoading}
+						<LoaderCircle class="animate-spin" />
+					{/if}
 					Retry
 				</Button>
+			</div>
+		{:else if isLoading && !hasLoaded}
+			<div class="flex items-center justify-center py-4">
+				<LoaderCircle class="h-5 w-5 animate-spin text-muted-foreground" />
 			</div>
 		{:else}
 			{#if claims.length === 0 && !formOpen}

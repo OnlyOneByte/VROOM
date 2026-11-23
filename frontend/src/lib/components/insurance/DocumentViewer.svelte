@@ -45,16 +45,20 @@
 
 	async function loadDocuments() {
 		isLoading = true;
-		loadFailed = false;
 		try {
 			const docsResult = await insuranceApi.getEntityDocuments(entityType, entityId);
 			documents = docsResult.data;
+			loadFailed = false;
 		} catch (err) {
 			loadFailed = true;
 			handleErrorWithNotification(err, "Couldn't load the documents");
 		} finally {
 			isLoading = false;
 		}
+	}
+
+	function retryDocuments() {
+		if (!isLoading) loadDocuments();
 	}
 
 	function isImage(mimeType: string): boolean {
@@ -90,7 +94,16 @@
 	{#if loadFailed}
 		<div class="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3">
 			<p class="text-xs text-destructive">Couldn't load the documents.</p>
-			<Button variant="outline" size="sm" class="mt-2 h-10 sm:h-8" onclick={loadDocuments}>
+			<Button
+				variant="outline"
+				size="sm"
+				class="mt-2 h-10 sm:h-8"
+				aria-disabled={isLoading}
+				onclick={retryDocuments}
+			>
+				{#if isLoading}
+					<LoaderCircle class="animate-spin" />
+				{/if}
 				Retry
 			</Button>
 		</div>
