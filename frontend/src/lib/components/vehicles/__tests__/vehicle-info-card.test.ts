@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type { Vehicle } from '#lib/types/index.ts';
 
 vi.mock('$app/paths', () => ({
@@ -33,10 +33,33 @@ afterEach(() => {
 });
 
 describe('VehicleInfoCard', () => {
-	test('always shows make, model and year', () => {
+	test('shows the year and leaves make and model to the page header', () => {
 		render(VehicleInfoCard, { props: { vehicle: vehicle() } });
-		expect(valueFor('Make & Model')).toBe('Subaru Outback');
 		expect(valueFor('Year')).toBe('2018');
+		expect(screen.queryByText('Make & Model')).toBeNull();
+	});
+
+	test('below sm the details sit behind a one-line disclosure that names the plate and mileage', async () => {
+		render(VehicleInfoCard, {
+			props: { vehicle: vehicle({ licensePlate: 'ABC-123', initialMileage: 18000 }) }
+		});
+		const toggle = screen.getByRole('button', { name: /Details:/ });
+		expect(toggle).toHaveClass('sm:hidden');
+		expect(toggle).toHaveTextContent('plate ABC-123, 18,000 mi initial');
+		expect(toggle).toHaveAttribute('aria-expanded', 'false');
+		const panel = document.getElementById(toggle.getAttribute('aria-controls') ?? '');
+		expect(panel).toHaveClass('hidden', 'sm:grid');
+
+		await fireEvent.click(toggle);
+
+		expect(toggle).toHaveAttribute('aria-expanded', 'true');
+		expect(panel).not.toHaveClass('hidden');
+		expect(panel).toHaveClass('grid');
+	});
+
+	test('the disclosure falls back to the year when there is no plate or mileage', () => {
+		render(VehicleInfoCard, { props: { vehicle: vehicle() } });
+		expect(screen.getByRole('button', { name: /Details:/ })).toHaveTextContent('Details: 2018');
 	});
 
 	test('omits optional fields the vehicle does not have', () => {

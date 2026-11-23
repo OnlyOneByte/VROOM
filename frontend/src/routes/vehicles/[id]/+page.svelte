@@ -88,7 +88,7 @@
 	let hasOpenedUpload = $state(false);
 
 	const CATEGORY_CHART_TITLE = 'Expense by Category';
-	const CATEGORY_CHART_DESCRIPTION = 'Distribution across all vehicles';
+	const CATEGORY_CHART_DESCRIPTION = 'Distribution for this vehicle';
 	const CHARTS_LOAD_ERROR = "Charts couldn't be loaded. Check your connection and reload.";
 	const chartsLoading = Promise.all([
 		import('#lib/components/charts/ExpenseTrendChart.svelte'),
@@ -578,22 +578,6 @@
 			</TabsList>
 
 			<TabsContent value="overview" class="space-y-6">
-				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-					<VehicleInfoCard {vehicle} {isOwner} />
-					<VehiclePhotoCarousel
-						{vehicleId}
-						photos={vehiclePhotos}
-						{isOwner}
-						isLoading={isLoadingPhotos}
-						onUpload={() => {
-							hasOpenedUpload = true;
-							showUploadDialog = true;
-						}}
-						onDelete={handleDeletePhoto}
-						onSetCover={handleSetCover}
-					/>
-				</div>
-
 				{#if summaryLoadError && !isLoadingStats}
 					<div class="rounded-lg border bg-card p-6">
 						<div class="mb-4 flex items-center gap-3 text-destructive">
@@ -673,6 +657,22 @@
 				{#if InsuranceTab}
 					<InsuranceTab {vehicleId} readOnly={!isOwner} />
 				{/if}
+
+				<div class="grid grid-cols-1 items-start lg:grid-cols-2 gap-6">
+					<VehicleInfoCard {vehicle} {isOwner} />
+					<VehiclePhotoCarousel
+						{vehicleId}
+						photos={vehiclePhotos}
+						{isOwner}
+						isLoading={isLoadingPhotos}
+						onUpload={() => {
+							hasOpenedUpload = true;
+							showUploadDialog = true;
+						}}
+						onDelete={handleDeletePhoto}
+						onSetCover={handleSetCover}
+					/>
+				</div>
 			</TabsContent>
 
 			<TabsContent value="expenses" class="space-y-6">

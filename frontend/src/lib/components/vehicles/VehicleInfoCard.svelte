@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { paramRoutes } from '#lib/routes.ts';
-	import { Car, Settings } from '@lucide/svelte';
+	import { Car, ChevronDown, Settings } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
@@ -15,6 +15,26 @@
 	}
 
 	let { vehicle, isOwner = true }: Props = $props();
+
+	let detailsOpen = $state(false);
+	const detailsId = $props.id();
+
+	let distanceLabel = $derived(
+		getDistanceUnitLabel(
+			(vehicle.unitPreferences ?? settingsStore.unitPreferences).distanceUnit,
+			true
+		)
+	);
+
+	let detailsSummary = $derived(
+		[
+			vehicle.licensePlate && `plate ${vehicle.licensePlate}`,
+			vehicle.initialMileage &&
+				`${vehicle.initialMileage.toLocaleString()} ${distanceLabel} initial`
+		]
+			.filter(Boolean)
+			.join(', ') || String(vehicle.year)
+	);
 </script>
 
 <Card>
@@ -37,12 +57,30 @@
 		</div>
 	</CardHeader>
 	<CardContent>
-		<div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-			<div class="space-y-1">
-				<p class="text-sm font-medium text-muted-foreground">Make & Model</p>
-				<p class="text-base font-semibold">{vehicle.make} {vehicle.model}</p>
-			</div>
-
+		<button
+			type="button"
+			class="flex min-h-10 w-full items-center justify-between gap-3 rounded-md text-left text-sm sm:hidden outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+			aria-expanded={detailsOpen}
+			aria-controls={detailsId}
+			onclick={() => (detailsOpen = !detailsOpen)}
+		>
+			<span class="min-w-0">
+				<span class="font-medium">Details:</span>
+				<span class="text-muted-foreground">{detailsSummary}</span>
+			</span>
+			<ChevronDown
+				class="h-4 w-4 shrink-0 text-muted-foreground transition-transform {detailsOpen
+					? 'rotate-180'
+					: ''}"
+				aria-hidden="true"
+			/>
+		</button>
+		<div
+			id={detailsId}
+			class="{detailsOpen
+				? 'grid'
+				: 'hidden'} mt-4 grid-cols-1 gap-6 sm:mt-0 sm:grid sm:grid-cols-2"
+		>
 			<div class="space-y-1">
 				<p class="text-sm font-medium text-muted-foreground">Year</p>
 				<p class="text-base font-semibold">{vehicle.year}</p>
@@ -67,10 +105,7 @@
 					<p class="text-sm font-medium text-muted-foreground">Initial Mileage</p>
 					<p class="text-base font-semibold">
 						{vehicle.initialMileage.toLocaleString()}
-						{getDistanceUnitLabel(
-							(vehicle.unitPreferences ?? settingsStore.unitPreferences).distanceUnit,
-							true
-						)}
+						{distanceLabel}
 					</p>
 				</div>
 			{/if}

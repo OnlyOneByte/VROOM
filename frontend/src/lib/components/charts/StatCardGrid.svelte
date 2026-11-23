@@ -24,18 +24,23 @@
 	let { items, columns, isLoading = false, class: className }: Props = $props();
 
 	let gridCols = $derived.by(() => {
-		const cols = columns ?? Math.min(items.length, 4);
-		if (cols === 2) return 'lg:grid-cols-2';
+		const cols = Math.min(columns ?? 4, items.length);
+		if (cols <= 2) return 'lg:grid-cols-2';
 		if (cols === 3) return 'lg:grid-cols-3';
 		return 'lg:grid-cols-4';
 	});
+
+	function tileClass(index: number): string {
+		if (items.length % 2 === 0 || index !== items.length - 1) return 'min-w-0';
+		return items.length === 1 ? 'min-w-0 col-span-2' : 'min-w-0 col-span-2 lg:col-span-1';
+	}
 </script>
 
 <div class="grid grid-cols-2 {gridCols} gap-4 {className ?? ''}">
-	{#each items as item (item.label)}
+	{#each items as item, index (item.label)}
 		<!-- min-w-0 is required: grid items default to min-width auto and overflow. -->
 		<StatCard
-			class="min-w-0"
+			class={tileClass(index)}
 			label={item.label}
 			value={item.value}
 			unit={item.unit}

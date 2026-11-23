@@ -63,120 +63,129 @@
 	}
 </script>
 
-<Card.Root>
-	<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-3">
-		<Card.Title level={2} class="text-lg font-semibold">Photos</Card.Title>
-		{#if isOwner}
-			<Button variant="outline" size="lg" onclick={onUpload}>
-				<Upload class="mr-2 h-4 w-4" />
-				Upload
-			</Button>
-		{/if}
-	</Card.Header>
-	<Card.Content>
-		{#if isLoading}
-			<Skeleton class="aspect-video w-full rounded-lg" data-testid="vehicle-photos-loading" />
-		{:else if hasPhotos}
-			<Carousel.Root class="w-full" opts={{ loop: photos.length > 1 }} setApi={handleApiSet}>
-				<Carousel.Content>
-					{#each photos as photo, i (photo.id)}
-						<Carousel.Item>
-							<div class="group relative overflow-hidden rounded-lg border border-border bg-muted">
-								<img
-									src={vehicleApi.getPhotoThumbnailUrl(vehicleId, photo.id)}
-									alt={photo.fileName}
-									loading={i === 0 ? 'eager' : 'lazy'}
-									class="aspect-video w-full object-cover"
-								/>
+{#if !hasPhotos && !isLoading}
+	<Card.Root class="py-4" data-testid="vehicle-photos-empty">
+		<Card.Content class="flex items-center justify-between gap-3">
+			<div class="flex min-w-0 items-center gap-3">
+				<ImagePlus class="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+				<div class="min-w-0">
+					<Card.Title level={2} class="text-base font-semibold">Photos</Card.Title>
+					<p class="text-sm text-muted-foreground">No photos yet</p>
+				</div>
+			</div>
+			{#if isOwner}
+				<Button variant="outline" size="lg" class="shrink-0" onclick={onUpload}>
+					<Upload class="mr-2 h-4 w-4" />
+					Add a photo
+				</Button>
+			{/if}
+		</Card.Content>
+	</Card.Root>
+{:else}
+	<Card.Root>
+		<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-3">
+			<Card.Title level={2} class="text-lg font-semibold">Photos</Card.Title>
+			{#if isOwner}
+				<Button variant="outline" size="lg" onclick={onUpload}>
+					<Upload class="mr-2 h-4 w-4" />
+					Upload
+				</Button>
+			{/if}
+		</Card.Header>
+		<Card.Content>
+			{#if isLoading}
+				<Skeleton class="aspect-video w-full rounded-lg" data-testid="vehicle-photos-loading" />
+			{:else}
+				<Carousel.Root class="w-full" opts={{ loop: photos.length > 1 }} setApi={handleApiSet}>
+					<Carousel.Content>
+						{#each photos as photo, i (photo.id)}
+							<Carousel.Item>
+								<div
+									class="group relative overflow-hidden rounded-lg border border-border bg-muted"
+								>
+									<img
+										src={vehicleApi.getPhotoThumbnailUrl(vehicleId, photo.id)}
+										alt={photo.fileName}
+										loading={i === 0 ? 'eager' : 'lazy'}
+										class="aspect-video w-full object-cover"
+									/>
 
-								{#if photo.isCover}
-									<div class="absolute left-2 top-2">
-										<Badge variant="secondary" class="bg-background/80 backdrop-blur-sm">
-											<Star class="mr-1 h-3 w-3 fill-current" />
-											Cover
-										</Badge>
-									</div>
-								{/if}
+									{#if photo.isCover}
+										<div class="absolute left-2 top-2">
+											<Badge variant="secondary" class="bg-background/80 backdrop-blur-sm">
+												<Star class="mr-1 h-3 w-3 fill-current" />
+												Cover
+											</Badge>
+										</div>
+									{/if}
 
-								{#if isOwner}
-									<div
-										class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-2 lg:gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 lg:opacity-0 transition-opacity lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
-									>
-										{#if !photo.isCover}
-											<Button
-												variant="secondary"
-												size="sm"
-												class="h-10 bg-background/80 text-xs backdrop-blur-sm lg:h-7"
-												onclick={() => onSetCover(photo.id)}
-											>
-												<Star class="mr-1 h-3 w-3" />
-												Set as cover
-											</Button>
-										{/if}
-										<Button
-											variant="destructive"
-											size="sm"
-											class="h-10 w-10 text-xs lg:h-7 lg:w-auto"
-											aria-label="Delete photo"
-											disabled={deletingPhotoId === photo.id}
-											onclick={() => requestDelete(photo.id)}
+									{#if isOwner}
+										<div
+											class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-2 lg:gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 lg:opacity-0 transition-opacity lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
 										>
-											{#if deletingPhotoId === photo.id}
-												<LoaderCircle class="h-3 w-3 animate-spin" />
-											{:else}
-												<Trash2 class="h-3 w-3" />
+											{#if !photo.isCover}
+												<Button
+													variant="secondary"
+													size="sm"
+													class="h-10 bg-background/80 text-xs backdrop-blur-sm lg:h-7"
+													onclick={() => onSetCover(photo.id)}
+												>
+													<Star class="mr-1 h-3 w-3" />
+													Set as cover
+												</Button>
 											{/if}
-										</Button>
-									</div>
-								{/if}
-							</div>
-						</Carousel.Item>
-					{/each}
-				</Carousel.Content>
+											<Button
+												variant="destructive"
+												size="sm"
+												class="h-10 w-10 text-xs lg:h-7 lg:w-auto"
+												aria-label="Delete photo"
+												disabled={deletingPhotoId === photo.id}
+												onclick={() => requestDelete(photo.id)}
+											>
+												{#if deletingPhotoId === photo.id}
+													<LoaderCircle class="h-3 w-3 animate-spin" />
+												{:else}
+													<Trash2 class="h-3 w-3" />
+												{/if}
+											</Button>
+										</div>
+									{/if}
+								</div>
+							</Carousel.Item>
+						{/each}
+					</Carousel.Content>
+
+					{#if photos.length > 1}
+						<Carousel.Previous
+							class="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-background/80 backdrop-blur-sm"
+						/>
+						<Carousel.Next
+							class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-background/80 backdrop-blur-sm"
+						/>
+					{/if}
+				</Carousel.Root>
 
 				{#if photos.length > 1}
-					<Carousel.Previous
-						class="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-background/80 backdrop-blur-sm"
-					/>
-					<Carousel.Next
-						class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-background/80 backdrop-blur-sm"
-					/>
+					<div class="mt-2 flex items-center justify-center gap-1.5">
+						{#each photos as photo, i (photo.id)}
+							<button
+								class="h-1.5 rounded-full transition-all {i === currentIndex
+									? 'w-4 bg-foreground'
+									: 'w-1.5 bg-muted-foreground/30'}"
+								aria-label="Go to photo {i + 1}"
+								onclick={() => carouselApi?.scrollTo(i)}
+							></button>
+						{/each}
+					</div>
 				{/if}
-			</Carousel.Root>
 
-			{#if photos.length > 1}
-				<div class="mt-2 flex items-center justify-center gap-1.5">
-					{#each photos as photo, i (photo.id)}
-						<button
-							class="h-1.5 rounded-full transition-all {i === currentIndex
-								? 'w-4 bg-foreground'
-								: 'w-1.5 bg-muted-foreground/30'}"
-							aria-label="Go to photo {i + 1}"
-							onclick={() => carouselApi?.scrollTo(i)}
-						></button>
-					{/each}
-				</div>
+				<p class="mt-2 text-center text-xs text-muted-foreground">
+					{currentIndex + 1} of {photos.length} photo{photos.length !== 1 ? 's' : ''}
+				</p>
 			{/if}
-
-			<p class="mt-2 text-center text-xs text-muted-foreground">
-				{currentIndex + 1} of {photos.length} photo{photos.length !== 1 ? 's' : ''}
-			</p>
-		{:else}
-			<div class="flex flex-col items-center justify-center py-8 text-center">
-				<div class="mb-3 rounded-full bg-muted p-3">
-					<ImagePlus class="h-6 w-6 text-muted-foreground" />
-				</div>
-				<p class="text-sm text-muted-foreground">No photos yet</p>
-				{#if isOwner}
-					<Button variant="outline" size="lg" class="mt-3" onclick={onUpload}>
-						<Upload class="mr-2 h-4 w-4" />
-						Upload Photos
-					</Button>
-				{/if}
-			</div>
-		{/if}
-	</Card.Content>
-</Card.Root>
+		</Card.Content>
+	</Card.Root>
+{/if}
 
 <ConfirmDialog
 	bind:open={confirmOpen}

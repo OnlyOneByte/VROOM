@@ -34,13 +34,13 @@ describe('VehicleInfoCard initial mileage unit', () => {
 			}
 		});
 
-		expect(screen.getByText(/45,000\s+km/)).toBeTruthy();
+		expect(screen.getAllByText(/45,000\s+km/)).toHaveLength(2);
 		expect(screen.queryByText(/45,000\s+mi/)).toBeNull();
 	});
 
 	test("falls back to the user's unit when the vehicle has none", () => {
 		render(VehicleInfoCard, { props: { vehicle: VEHICLE } });
 
-		expect(screen.getByText(/45,000\s+mi/)).toBeTruthy();
+		expect(screen.getAllByText(/45,000\s+mi/)).toHaveLength(2);
 	});
 });
