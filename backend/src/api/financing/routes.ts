@@ -4,7 +4,11 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { vehicleFinancing } from '../../db/schema';
 import { changeTracker, requireAuth } from '../../middleware';
-import { boundedDollarsToCents, financingWithBalanceToApi } from '../../utils/money';
+import {
+  boundedDollarsToCents,
+  financingWithBalanceToApi,
+  formatNumberForMessage,
+} from '../../utils/money';
 import { isValidTimeZone } from '../../utils/time-zone';
 import {
   commonSchemas,
@@ -24,7 +28,7 @@ const FINANCING_TYPES = ['loan', 'lease', 'own'] as const;
 const PAYMENT_FREQUENCIES = ['monthly', 'bi-weekly', 'weekly', 'custom'] as const;
 
 const fin = CONFIG.validation.financing;
-const MILEAGE_LIMIT_TOO_HIGH_MESSAGE = `Mileage limit must be ${MAX_ODOMETER_READING.toLocaleString('en-US')} or less`;
+const MILEAGE_LIMIT_TOO_HIGH_MESSAGE = `Mileage limit must be ${formatNumberForMessage(MAX_ODOMETER_READING)} or less`;
 
 const paymentAmountSchema = boundedDollarsToCents(
   'Payment amount',
