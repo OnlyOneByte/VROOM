@@ -67,6 +67,17 @@
 		calendarValue ? df.format(calendarValue.toDate(getLocalTimeZone())) : placeholder
 	);
 
+	let content = $state<HTMLElement | null>(null);
+
+	function focusDay(event: Event) {
+		const day = ['[data-selected]', '[data-today]', ':not([data-disabled])']
+			.map(state => content?.querySelector<HTMLElement>(`[data-bits-day]${state}`))
+			.find(Boolean);
+		if (!day) return;
+		event.preventDefault();
+		day.focus();
+	}
+
 	let valueId = $derived(id ? `${id}-value` : undefined);
 	let describedBy = $derived([valueId, ariaDescribedby].filter(Boolean).join(' ') || undefined);
 </script>
@@ -90,7 +101,9 @@
 			</Button>
 		{/snippet}
 	</Popover.Trigger>
-	<Popover.Content class="w-auto p-0">
-		<Calendar type="single" bind:value={calendarValue as never} initialFocus />
+	<Popover.Content class="w-auto p-0" onOpenAutoFocus={focusDay}>
+		<div bind:this={content}>
+			<Calendar type="single" bind:value={calendarValue as never} />
+		</div>
 	</Popover.Content>
 </Popover.Root>
