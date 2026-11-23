@@ -18,6 +18,7 @@ export interface SecretSpec {
   key: string;
   label: string;
   required: boolean;
+  reenterWhenChanged?: string[];
 }
 
 export type Availability = 'available' | 'hidden';
@@ -67,7 +68,7 @@ export function toCatalogEntries<Cap extends Capability, Features>(
       scope: d.scope,
       connect: d.connect,
       fields: d.config.fields,
-      secrets: d.secrets,
+      secrets: d.secrets.map(({ key, label, required }) => ({ key, label, required })),
       features: d.features,
     }));
 }
@@ -105,5 +106,22 @@ export function validateProviderSecrets(
       const article = /^[aeiou]/i.test(secret.label) ? 'an' : 'a';
       throw new ValidationError(`${domainLabel} provider requires ${article} ${secret.label}`);
     }
+  }
+}
+
+export function assertSecretsReentered(
+  descriptor: AnyProviderDescriptor,
+  stored: Record<string, unknown>,
+  changes: Record<string, unknown>,
+  credentials: Record<string, unknown> | undefined
+): void {
+  for (const secret of descriptor.secrets) {
+    if (credentials?.[secret.key]) continue;
+    const changed = (secret.reenterWhenChanged ?? []).find(
+      (key) => Object.hasOwn(changes, key) && !Object.is(changes[key], stored[key])
+    );
+    if (changed === undefined) continue;
+    const field = descriptor.config.fields.find((f) => f.key === changed)?.label ?? changed;
+    throw new ValidationError(`Enter the ${secret.label} again: the ${field} changed`);
   }
 }

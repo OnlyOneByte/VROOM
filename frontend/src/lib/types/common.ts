@@ -44,6 +44,7 @@ export interface UserProviderInfo {
 	displayName: string;
 	status: 'active' | 'error' | 'disconnected';
 	config: Record<string, unknown>;
+	secretsSet?: string[];
 	lastSyncAt?: string;
 	createdAt: string;
 }

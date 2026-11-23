@@ -5,11 +5,9 @@ import type { Vehicle } from '#lib/types/index.ts';
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-vi.mock('#lib/components/charts/index.ts', () => ({ AppPieChart: () => {} }));
-vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => {
+vi.mock('#lib/components/charts/index.ts', () => {
 	throw new Error('Failed to fetch dynamically imported module');
 });
-vi.mock('#lib/components/dashboard/VehicleCarousel.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/dashboard/SharedWithMeCard.svelte', () => ({ default: () => {} }));
 
 vi.mock('#lib/services/vehicle-api.ts', () => ({
@@ -43,16 +41,22 @@ vi.mock('#lib/services/reminder-api.ts', () => ({
 	}
 }));
 
+vi.mock('#lib/services/insurance-api.ts', () => ({
+	insuranceApi: { getAllPolicies: () => Promise.resolve([]) }
+}));
+vi.mock('#lib/services/analytics-api.ts', () => ({
+	analyticsApi: { query: () => Promise.resolve(null) }
+}));
+
 import Page from '../+page.svelte';
 
 describe('dashboard chart row when the chart chunk fails to load', () => {
-	test('both chart cards show an error instead of spinning forever', async () => {
+	test('the chart card shows an error instead of spinning forever', async () => {
 		render(Page);
 
 		await waitFor(() =>
-			expect(screen.getAllByText("Charts couldn't be loaded", { exact: false })).toHaveLength(2)
+			expect(screen.getAllByText("Charts couldn't be loaded", { exact: false })).toHaveLength(1)
 		);
-		expect(screen.getByText('Monthly Expense Trends')).toBeInTheDocument();
-		expect(screen.getByText('Expense by Category')).toBeInTheDocument();
+		expect(screen.getByText('Last 12 months')).toBeInTheDocument();
 	});
 });

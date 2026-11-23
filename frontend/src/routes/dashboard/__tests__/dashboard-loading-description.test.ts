@@ -4,9 +4,7 @@ import { render, screen } from '@testing-library/svelte';
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-vi.mock('#lib/components/charts/index.ts', () => ({ AppPieChart: () => {} }));
-vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
-vi.mock('#lib/components/dashboard/VehicleCarousel.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/charts/index.ts', () => ({ AppBarChart: () => {} }));
 vi.mock('#lib/components/dashboard/SharedWithMeCard.svelte', () => ({ default: () => {} }));
 
 const getVehicles = vi.fn();
@@ -40,6 +38,13 @@ vi.mock('#lib/services/reminder-api.ts', () => ({
 	}
 }));
 
+vi.mock('#lib/services/insurance-api.ts', () => ({
+	insuranceApi: { getAllPolicies: () => Promise.resolve([]) }
+}));
+vi.mock('#lib/services/analytics-api.ts', () => ({
+	analyticsApi: { query: () => Promise.resolve(null) }
+}));
+
 import Page from '../+page.svelte';
 
 beforeEach(() => {
@@ -60,9 +65,9 @@ describe('dashboard description while loading', () => {
 	});
 
 	test.each([
-		[1, 'Overview of your 1 vehicle'],
-		[2, 'Overview of your 2 vehicles']
-	])('counts %i owned vehicle(s) once loaded', async (count, description) => {
+		[1, '1 vehicle'],
+		[2, '2 vehicles']
+	])('counts %i vehicle(s) once loaded', async (count, description) => {
 		getVehicles.mockResolvedValue(
 			Array.from({ length: count }, (_, i) => ({
 				id: `v${i}`,
@@ -74,6 +79,16 @@ describe('dashboard description while loading', () => {
 		render(Page);
 
 		expect(await screen.findByText(description)).toBeInTheDocument();
+	});
+
+	test('names how many of the vehicles are shared', async () => {
+		getVehicles.mockResolvedValue([
+			{ id: 'v1', make: 'Toyota', model: 'Camry', year: 2020 },
+			{ id: 'v2', make: 'Honda', model: 'Civic', year: 2019, sharedAccess: { sharedBy: 'Sam' } }
+		]);
+		render(Page);
+
+		expect(await screen.findByText('2 vehicles, incl. 1 shared')).toBeInTheDocument();
 	});
 
 	test('stays neutral after a load failure', async () => {

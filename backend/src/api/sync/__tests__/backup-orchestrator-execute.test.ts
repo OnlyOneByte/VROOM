@@ -323,6 +323,18 @@ describe('BackupOrchestrator.execute() outcome', () => {
         unusable: true,
       });
       expect(result.results.pread?.unusable).toBeUndefined();
+
+      const health = (id: string) =>
+        ctx.sqlite
+          .query('SELECT status, last_error_code, last_sync_at FROM user_providers WHERE id = ?')
+          .get(id) as {
+          status: string;
+          last_error_code: string | null;
+          last_sync_at: number | null;
+        };
+      expect(health('pbroken')).toMatchObject({ status: 'needs_reauth', last_error_code: 'auth' });
+      expect(health('pread')).toMatchObject({ status: 'active', last_error_code: null });
+      expect(health('pread').last_sync_at).not.toBeNull();
     } finally {
       unregister('fake-readable');
     }

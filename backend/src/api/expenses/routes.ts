@@ -458,33 +458,6 @@ routes.delete('/split/:id', zValidator('param', commonSchemas.idParam), async (c
   return c.json({ success: true, message: 'Split expense deleted successfully' });
 });
 
-routes.get(
-  '/vehicle-stats',
-  zValidator(
-    'query',
-    z.object({
-      recentDays: z
-        .string()
-        .transform((v) => parseInt(v, 10))
-        .pipe(z.number().int().min(1).max(365))
-        .optional(),
-    })
-  ),
-  async (c) => {
-    const user = c.get('user');
-    const { recentDays } = c.req.valid('query');
-    const stats = await expenseRepository.getPerVehicleStats(user.id, recentDays);
-    return c.json({
-      success: true,
-      data: stats.map((s) => ({
-        ...s,
-        totalAmount: centsToDollars(s.totalAmount),
-        recentAmount: centsToDollars(s.recentAmount),
-      })),
-    });
-  }
-);
-
 const summaryQuerySchema = z.object({
   vehicleId: z.string().optional(),
   period: z.enum(['7d', '30d', '90d', '1y', 'all']).optional().default('all'),

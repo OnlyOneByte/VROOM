@@ -9,7 +9,7 @@ import { AppError, ConflictError, NotFoundError, ValidationError } from '../../e
 import { changeTracker, requireAuth } from '../../middleware';
 import type { CategorySetting, PhotoCategory, StorageConfig } from '../../types';
 import { DEFAULT_STORAGE_CONFIG, PHOTO_CATEGORIES } from '../../types';
-import { encrypt } from '../../utils/encryption';
+import { decrypt, encrypt, secretContextOf } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { consumePending, getPendingEmail } from '../../utils/pending-credentials';
 import { commonSchemas, zValidator } from '../../utils/validation';
@@ -17,6 +17,7 @@ import { photoRefRepository } from '../photos/photo-ref-repository';
 import { preferencesRepository } from '../settings/repository';
 import {
   type AnyProviderDescriptor,
+  assertSecretsReentered,
   toCatalogEntries,
   validateProviderConfig,
   validateProviderSecrets,
@@ -28,10 +29,15 @@ import {
   type StorageProviderDescriptor,
   storageCatalog,
   storageProviderDescriptor,
-  storageProviderRegistry,
 } from './domains/storage/registry';
 import { CATEGORY_TO_ENTITY_TYPES, ENTITY_TO_CATEGORY } from './domains/storage/storage-provider';
 import { VISION_PROVIDERS } from './domains/vlm/registry';
+import {
+  checkProviderHealth,
+  type HealthResult,
+  healthFailure,
+  recordProviderHealth,
+} from './provider-status';
 
 function isPhotoCategory(value: string): value is PhotoCategory {
   return (PHOTO_CATEGORIES as readonly string[]).includes(value);
@@ -60,6 +66,20 @@ async function findOwnedProviderOrThrow(
   return existing[0];
 }
 
+function secretsSet(row: UserProvider): string[] {
+  const descriptor = providerDescriptor(row.domain, row.providerType);
+  if (!descriptor || descriptor.secrets.length === 0) return [];
+  try {
+    const stored = JSON.parse(decrypt(row.credentials, secretContextOf(row))) as Record<
+      string,
+      unknown
+    >;
+    return descriptor.secrets.map((secret) => secret.key).filter((key) => Boolean(stored[key]));
+  } catch {
+    return [];
+  }
+}
+
 function formatProviderResponse(row: UserProvider) {
   return {
     id: row.id,
@@ -68,7 +88,10 @@ function formatProviderResponse(row: UserProvider) {
     displayName: row.displayName,
     status: row.status,
     config: row.config ?? {},
+    secretsSet: secretsSet(row),
     lastSyncAt: row.lastSyncAt?.toISOString() ?? null,
+    lastErrorCode: row.lastErrorCode ?? null,
+    lastCheckedAt: row.lastCheckedAt?.toISOString() ?? null,
     createdAt: row.createdAt?.toISOString() ?? null,
   };
 }
@@ -335,6 +358,7 @@ routes.put(
         );
         validateProviderConfig(descriptor, clientConfig, unchanged);
         validateProviderConfig(descriptor, merged, unchanged);
+        assertSecretsReentered(descriptor, stored, clientConfig, body.credentials);
       }
       updates.config = merged;
     }
@@ -351,6 +375,9 @@ routes.put(
         userId: existing.userId,
         domain: existing.domain,
       });
+      if (existing.status !== 'disabled') {
+        Object.assign(updates, { status: 'active', lastErrorCode: null, failureCount: 0 });
+      }
     }
 
     // Scope by userId too so the write stays tenant-safe if the ownership check moves.
@@ -459,11 +486,22 @@ routes.post('/:id/test', zValidator('param', commonSchemas.idParam), async (c) =
   const db = getDb();
 
   const existing = await findOwnedProviderOrThrow(db, id, user.id);
+  if (existing.domain === 'auth') {
+    throw new ValidationError('Sign-in providers cannot be tested through this endpoint');
+  }
 
-  const providerInstance = storageProviderRegistry.createProviderInstance(existing);
-  const healthy = await providerInstance.healthCheck();
+  let result: HealthResult;
+  try {
+    result = await checkProviderHealth(existing);
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      await recordProviderHealth(existing.id, healthFailure('config'));
+    }
+    throw error;
+  }
+  await recordProviderHealth(existing.id, result);
 
-  return c.json({ success: true, data: { healthy } });
+  return c.json({ success: true, data: result });
 });
 
 routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (c) => {

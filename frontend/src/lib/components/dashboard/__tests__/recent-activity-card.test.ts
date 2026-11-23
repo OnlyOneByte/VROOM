@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { describe, expect, test, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/svelte';
 import RecentActivityCard from '../RecentActivityCard.svelte';
 import type { ExpenseCategory } from '#lib/types/index.ts';
 
@@ -11,141 +11,67 @@ interface RecentExpense {
 	category: ExpenseCategory;
 	date: Date;
 	description?: string | null;
+	location?: string | null;
 	vehicleName: string;
 }
 
-const NOW = new Date('2026-11-21T12:00:00Z');
-const DAY = 24 * 60 * 60 * 1000;
+const ARCO: RecentExpense = {
+	id: 'e1',
+	amount: 28.99,
+	category: 'fuel',
+	date: new Date(2026, 10, 20, 12),
+	description: 'Arco',
+	vehicleName: 'Weekend Car'
+};
 
-function daysAgo(days: number): Date {
-	return new Date(NOW.getTime() - days * DAY);
+function rows(): string[] {
+	return screen
+		.getAllByRole('listitem')
+		.map(item => item.textContent?.replace(/\s+/g, ' ').trim() ?? '');
 }
-
-function rowFor(vehicleName: string): string {
-	const row = screen.getByText(vehicleName).closest('.rounded-lg.border');
-	return row?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
-}
-
-beforeEach(() => {
-	vi.useFakeTimers({ toFake: ['Date'] });
-	vi.setSystemTime(NOW);
-});
-
-afterEach(() => {
-	vi.useRealTimers();
-});
 
 describe('RecentActivityCard', () => {
-	test('shows five skeletons while loading', () => {
-		const { container } = render(RecentActivityCard, { expenses: [], isLoading: true });
+	test('leads each row with the merchant, then category, vehicle and date, with the amount last', () => {
+		render(RecentActivityCard, { props: { expenses: [ARCO] } });
 
-		expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(5);
-		expect(screen.queryByText('No recent activity')).toBeNull();
+		const [row] = screen.getAllByRole('listitem');
+		expect(within(row!).getByText('Arco')).toHaveClass('font-medium');
+		expect(rows()).toEqual(['Arco Fuel & Charging · Weekend Car · Nov 20 $28.99']);
 	});
 
-	test('shows an empty state with no expenses', () => {
-		render(RecentActivityCard, { expenses: [] });
-
-		expect(screen.getByText('No recent activity')).toBeInTheDocument();
-		expect(screen.queryByRole('link', { name: /View All Expenses/ })).toBeNull();
-	});
-
-	test('an empty card has one heading, so its empty state is not a peer of its own title', () => {
-		render(RecentActivityCard, { expenses: [] });
-
-		expect(screen.getAllByRole('heading').map(h => h.textContent?.trim())).toEqual([
-			'No recent activity'
-		]);
-	});
-
-	test('each row shows category, vehicle, description, relative date and amount', () => {
+	test('falls back to the location, then the category, when there is no description', () => {
 		render(RecentActivityCard, {
-			expenses: [
-				{
-					id: 'e1',
-					amount: 48.2,
-					category: 'fuel',
-					date: daysAgo(0),
-					description: 'Fill-up at Costco',
-					vehicleName: 'Camry'
-				}
-			]
+			props: {
+				expenses: [
+					{ ...ARCO, id: 'e2', description: null, location: 'Shell, Main St' },
+					{ ...ARCO, id: 'e3', description: '  ', location: null, category: 'misc' }
+				]
+			}
 		});
 
-		expect(rowFor('Camry')).toBe('Fuel & Charging Camry Fill-up at Costco Today $48.20');
+		expect(rows()[0]).toMatch(/^Shell, Main St Fuel & Charging/);
+		expect(rows()[1]).toMatch(/^Misc Weekend Car · Nov 20/);
 	});
 
-	test('omits a missing description', () => {
-		render(RecentActivityCard, {
-			expenses: [
-				{
-					id: 'e1',
-					amount: 300,
-					category: 'maintenance',
-					date: daysAgo(1),
-					description: null,
-					vehicleName: 'RAV4'
-				}
-			]
-		});
-
-		expect(rowFor('RAV4')).toBe('Maintenance RAV4 Yesterday $300.00');
+	test('the rows are one divided list, not a card each', () => {
+		render(RecentActivityCard, { props: { expenses: [ARCO, { ...ARCO, id: 'e2' }] } });
+		const list = screen.getByRole('list');
+		expect(list).toHaveClass('divide-y');
+		expect(list.querySelector('.border.rounded-lg')).toBeNull();
 	});
 
-	test.each<[number, string]>([
-		[3, '3 days ago'],
-		[14, '2 weeks ago'],
-		[60, '2 months ago'],
-		[400, '1 year ago']
-	])('an expense %i days old reads "%s"', (days, label) => {
-		render(RecentActivityCard, {
-			expenses: [
-				{ id: 'e1', amount: 1, category: 'misc', date: daysAgo(days), vehicleName: 'Bike' }
-			]
-		});
-
-		expect(rowFor('Bike')).toContain(label);
-	});
-
-	test('links to the expenses page when there is activity', () => {
-		const expenses: RecentExpense[] = [
-			{ id: 'e1', amount: 1, category: 'misc', date: daysAgo(2), vehicleName: 'Bike' },
-			{ id: 'e2', amount: 2, category: 'financial', date: daysAgo(5), vehicleName: 'Van' }
-		];
-		render(RecentActivityCard, { expenses });
-
-		expect(screen.getByText('Financial')).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: /View All Expenses/ })).toHaveAttribute(
+	test('See all links to the expenses page and names where it goes', () => {
+		render(RecentActivityCard, { props: { expenses: [ARCO] } });
+		expect(screen.getByRole('link', { name: 'See all expenses' })).toHaveAttribute(
 			'href',
 			'/expenses'
 		);
 	});
 
-	test('View All Expenses is 40px tall below sm and 36px from sm up', () => {
-		render(RecentActivityCard, {
-			expenses: [{ id: 'e1', amount: 1, category: 'misc', date: daysAgo(2), vehicleName: 'Bike' }]
-		});
-
-		expect(screen.getByRole('link', { name: /View All Expenses/ })).toHaveClass('h-10', 'sm:h-9');
-	});
-	test('the category badge stays on one line and the vehicle name stacks under it on mobile', () => {
-		render(RecentActivityCard, {
-			expenses: [
-				{
-					id: 'e1',
-					amount: 28.99,
-					category: 'fuel',
-					date: daysAgo(2),
-					description: 'Arco',
-					vehicleName: 'Weekend Car'
-				}
-			]
-		});
-
-		const name = screen.getByText('Weekend Car');
-		const badge = name.previousElementSibling;
-		expect(badge).toHaveClass('whitespace-nowrap', 'shrink-0');
-		expect(name.parentElement).toHaveClass('flex-col', 'sm:flex-row');
-		expect(name).toHaveClass('truncate', 'min-w-0', 'max-w-full');
+	test('with no expenses it says so, under one card heading', () => {
+		render(RecentActivityCard, { props: { expenses: [] } });
+		expect(screen.getByRole('heading', { level: 2, name: 'Recent' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { level: 3, name: 'No expenses yet' })).toBeInTheDocument();
+		expect(screen.queryByRole('link', { name: 'See all expenses' })).toBeNull();
 	});
 });

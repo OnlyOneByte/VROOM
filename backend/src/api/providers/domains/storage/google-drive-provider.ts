@@ -8,6 +8,7 @@ import type {
   StorageRef,
   UploadParams,
 } from './storage-provider';
+import { credentialFailureOf } from './storage-provider';
 
 export class GoogleDriveProvider implements StorageProvider {
   readonly type = 'google-drive';
@@ -52,6 +53,8 @@ export class GoogleDriveProvider implements StorageProvider {
       await this.driveService.findFolder('VROOM');
       return true;
     } catch (error) {
+      const credentialFailure = credentialFailureOf(error);
+      if (credentialFailure) throw credentialFailure;
       logger.warn('Google Drive health check failed', {
         error: error instanceof Error ? error.message : String(error),
       });

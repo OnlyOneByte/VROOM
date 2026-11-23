@@ -25,3 +25,7 @@ export const COST_BUCKET_COLOR_TOKENS: Record<
 export function costBucket(category: ExpenseCategory): CostBucket {
 	return BUCKET_BY_CATEGORY[category];
 }
+
+export function costBucketColor(bucket: CostBucket): string {
+	return `var(--${COST_BUCKET_COLOR_TOKENS[bucket]})`;
+}
