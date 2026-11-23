@@ -7,6 +7,7 @@ import {
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 import { odometerRepository } from '../../odometer/repository';
+import { tripRepository } from '../repository';
 
 let ctx: TestApp;
 
@@ -86,5 +87,45 @@ describe('a trip delete and its reading change commit or roll back together', ()
     expect(res.status).toBe(200);
     expect(tripIds()).toEqual([second]);
     expect(readings()).toEqual([{ odometer: 1080, source_trip_id: second }]);
+  });
+});
+
+describe('the shared-reading lookup runs inside the reading change transaction', () => {
+  function spyInTransaction(): { inTransaction: boolean[]; restore: () => void } {
+    const inTransaction: boolean[] = [];
+    const real = tripRepository.findOtherAtOdometerKey.bind(tripRepository);
+    const spy = spyOn(tripRepository, 'findOtherAtOdometerKey').mockImplementation((args, db) => {
+      inTransaction.push(ctx.sqlite.inTransaction);
+      return real(args, db);
+    });
+    return { inTransaction, restore: () => spy.mockRestore() };
+  }
+
+  test('on delete', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    const first = await createTrip(vehicleId);
+    await createTrip(vehicleId);
+    const lookup = spyInTransaction();
+    try {
+      const res = await ctx.authed('DELETE', `/api/v1/trips/${first}`);
+      expect(res.status).toBe(200);
+    } finally {
+      lookup.restore();
+    }
+    expect(lookup.inTransaction).toEqual([true]);
+  });
+
+  test('on an end mileage edit', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    const first = await createTrip(vehicleId);
+    await createTrip(vehicleId);
+    const lookup = spyInTransaction();
+    try {
+      const res = await ctx.authed('PUT', `/api/v1/trips/${first}`, { endOdometer: 1100 });
+      expect(res.status).toBe(200);
+    } finally {
+      lookup.restore();
+    }
+    expect(lookup.inTransaction).toEqual([true]);
   });
 });
