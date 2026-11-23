@@ -124,17 +124,34 @@
 		}
 	});
 
-	async function saveSettings(updates: Partial<UserSettings>, savedMessage: string) {
+	let savesOverlapped = false;
+
+	async function persist(updates: Partial<UserSettings>) {
+		if (savesInFlight > 0) savesOverlapped = true;
 		savesInFlight++;
 		try {
 			await settingsStore.update(updates);
+		} finally {
+			savesInFlight--;
+			if (savesInFlight === 0) void resyncAfterSaves();
+		}
+	}
+
+	async function resyncAfterSaves() {
+		if (savesOverlapped) {
+			savesOverlapped = false;
+			await settingsStore.load().catch(() => undefined);
+		}
+		if (savesInFlight === 0) isInitialized = false;
+	}
+
+	async function saveSettings(updates: Partial<UserSettings>, savedMessage: string) {
+		try {
+			await persist(updates);
 			await fetchLastSyncTime();
 			appStore.showSuccess(savedMessage);
 		} catch (error) {
 			appStore.showError(`Couldn't save settings. ${userFacingErrorMessage(error)}`);
-		} finally {
-			savesInFlight--;
-			isInitialized = false;
 		}
 	}
 
@@ -150,24 +167,15 @@
 		void saveSettings({ syncInactivityMinutes }, 'Backup timing saved');
 	}
 
-	let syncOnInactivityRequested: boolean | null = null;
-
-	async function requestSyncOnInactivity(wanted: boolean) {
-		try {
-			await settingsStore.update({ syncOnInactivity: wanted });
-		} catch {
-			syncOnInactivityRequested = null;
-		}
-	}
+	let syncOnInactivityRequested = false;
 
 	$effect(() => {
-		if (!settings) return;
-		const wanted = backupProvidersEnabled || sheetsSyncEnabled;
-		if ((settings.syncOnInactivity ?? true) === wanted || syncOnInactivityRequested === wanted) {
-			return;
-		}
-		syncOnInactivityRequested = wanted;
-		void requestSyncOnInactivity(wanted);
+		if (!settings || syncOnInactivityRequested || settings.syncOnInactivity !== false) return;
+		if (!backupProvidersEnabled && !sheetsSyncEnabled) return;
+		syncOnInactivityRequested = true;
+		persist({ syncOnInactivity: true }).catch(() => {
+			syncOnInactivityRequested = false;
+		});
 	});
 
 	async function handleBackup() {

@@ -171,7 +171,7 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
 - Long forms keep Save/Cancel reachable (a sticky bar at the bottom on mobile), and that bar
   never covers the last field: pad the form by the bar's height.
 - **One save model per page.** Settings that apply instantly need no Save button; when a page
-  needs one, it shows only while something is unsaved and is never fixed at `lg`.
+  needs one, it shows only while something is unsaved and is never fixed from `lg` up.
 
 ### Cards
 - A card is one topic: title, optional description, content, optional footer action.

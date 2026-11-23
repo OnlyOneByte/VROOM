@@ -275,10 +275,49 @@ describe('Settings page preferences', () => {
 		expect(showSuccess).not.toHaveBeenCalled();
 	});
 
-	test('sync-on-inactivity is left alone when it already matches', async () => {
-		loadsWith(makeSettings({ syncOnInactivity: false }));
+	test.each([
+		['already on, no provider syncing', undefined],
+		['off, no provider syncing', false]
+	])('sync-on-inactivity is left alone when %s', async (_case, stored) => {
+		loadsWith(makeSettings({ syncOnInactivity: stored }));
 		await mount();
 		expect(settingsStoreFake.update).not.toHaveBeenCalled();
+	});
+
+	test('overlapping saves keep the newer pick on screen and reload once both finish', async () => {
+		const pending: Array<() => void> = [];
+		settingsStoreFake.update.mockImplementation(
+			updates =>
+				new Promise(resolve => {
+					pending.push(() => {
+						const next = { ...makeSettings(), ...updates } as UserSettings;
+						fakeSettingsState.settings = next;
+						resolve(next);
+					});
+				})
+		);
+		await mount();
+		await change('stub distance', 'miles');
+		await change('stub volume', 'gallons_uk');
+		expect(settingsStoreFake.update).toHaveBeenLastCalledWith({
+			unitPreferences: { distanceUnit: 'miles', volumeUnit: 'gallons_uk', chargeUnit: 'kwh' }
+		});
+
+		loadsWith(
+			makeSettings({
+				unitPreferences: { distanceUnit: 'miles', volumeUnit: 'gallons_uk', chargeUnit: 'kwh' }
+			})
+		);
+		pending[1]!();
+		await settle();
+		expect(stubInput('stub volume')).toHaveValue('gallons_uk');
+		expect(settingsStoreFake.load).toHaveBeenCalledTimes(1);
+
+		pending[0]!();
+		await settle();
+		expect(settingsStoreFake.load).toHaveBeenCalledTimes(2);
+		expect(stubInput('stub distance')).toHaveValue('miles');
+		expect(stubInput('stub volume')).toHaveValue('gallons_uk');
 	});
 
 	test('after a save the pickers re-sync to what the server returned', async () => {
