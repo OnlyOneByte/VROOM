@@ -32,13 +32,18 @@ export const PHOTO_ONLY_PROVIDER_TYPES = ['google-photos'] as const;
 export const isPhotoOnlyProviderType = (providerType: string): boolean =>
   (PHOTO_ONLY_PROVIDER_TYPES as readonly string[]).includes(providerType);
 
-export const hasZipBackup = (settings: ProviderBackupSettings): boolean => settings.enabled;
+export const hasZipBackup = (
+  settings: ProviderBackupSettings,
+  providerType: string | undefined
+): boolean => settings.enabled && !isPhotoOnlyProviderType(providerType ?? '');
 
 export const hasSheetsSync = (settings: ProviderBackupSettings): boolean =>
   settings.sheetsSyncEnabled === true;
 
-export const isSyncEnabled = (settings: ProviderBackupSettings): boolean =>
-  hasZipBackup(settings) || hasSheetsSync(settings);
+export const isSyncEnabled = (
+  settings: ProviderBackupSettings,
+  providerType: string | undefined
+): boolean => hasZipBackup(settings, providerType) || hasSheetsSync(settings);
 
 export type BackupOutcome = 'success' | 'partial' | 'failed' | 'noop';
 

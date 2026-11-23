@@ -20,12 +20,30 @@ const MUTEX_TTL_MS = 2 * OPERATION_TIMEOUTS.BACKUP;
 const MUTEX_MAX_SIZE = 500;
 const backupMutex = new Map<string, { token: symbol; acquiredAt: number }>();
 
-export function filterEnabledProviders(config: BackupConfig): [string, ProviderBackupSettings][] {
-  return Object.entries(config.providers).filter(([, s]) => isSyncEnabled(s));
+export type ProviderTypes = ReadonlyMap<string, string>;
+
+export async function loadProviderTypes(userId: string): Promise<Map<string, string>> {
+  const rows = await getDb()
+    .select({ id: userProviders.id, providerType: userProviders.providerType })
+    .from(userProviders)
+    .where(eq(userProviders.userId, userId));
+  return new Map(rows.map((row) => [row.id, row.providerType]));
 }
 
-export function needsZipGeneration(enabledProviders: [string, ProviderBackupSettings][]): boolean {
-  return enabledProviders.some(([, s]) => hasZipBackup(s));
+export function filterEnabledProviders(
+  config: BackupConfig,
+  providerTypes: ProviderTypes
+): [string, ProviderBackupSettings][] {
+  return Object.entries(config.providers).filter(([id, s]) =>
+    isSyncEnabled(s, providerTypes.get(id))
+  );
+}
+
+export function needsZipGeneration(
+  enabledProviders: [string, ProviderBackupSettings][],
+  providerTypes: ProviderTypes
+): boolean {
+  return enabledProviders.some(([id, s]) => hasZipBackup(s, providerTypes.get(id)));
 }
 
 function acquireMutex(userId: string): symbol | null {
@@ -108,13 +126,22 @@ export class BackupOrchestrator {
         providers: {},
       };
 
-      const enabledProviders = filterEnabledProviders(config);
+      const db = getDb();
+      const providerRows = await db
+        .select()
+        .from(userProviders)
+        .where(and(eq(userProviders.userId, userId)));
+
+      const providerRowMap = new Map(providerRows.map((r) => [r.id, r]));
+      const providerTypes = new Map(providerRows.map((r) => [r.id, r.providerType]));
+
+      const enabledProviders = filterEnabledProviders(config, providerTypes);
 
       if (enabledProviders.length === 0) {
         return { timestamp, outcome: 'noop', failedProviders: [], results: {} };
       }
 
-      const needsZip = needsZipGeneration(enabledProviders);
+      const needsZip = needsZipGeneration(enabledProviders, providerTypes);
       let zipBuffer: Buffer | null = null;
       if (needsZip) {
         try {
@@ -127,14 +154,6 @@ export class BackupOrchestrator {
           });
         }
       }
-
-      const db = getDb();
-      const providerRows = await db
-        .select()
-        .from(userProviders)
-        .where(and(eq(userProviders.userId, userId)));
-
-      const providerRowMap = new Map(providerRows.map((r) => [r.id, r]));
 
       const strategyPromises = enabledProviders.map(async ([providerId, providerConfig]) => {
         const providerRow = providerRowMap.get(providerId);

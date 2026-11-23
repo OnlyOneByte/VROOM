@@ -12,7 +12,7 @@ import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
 import { preferencesRepository, syncStateRepository } from '../settings/repository';
 import { activityTracker } from './activity-tracker';
 import { backupService } from './backup';
-import { backupOrchestrator } from './backup-orchestrator';
+import { backupOrchestrator, loadProviderTypes } from './backup-orchestrator';
 import { hasSheetsSync, hasZipBackup } from './backup-strategy';
 import './init';
 import { type RestoreResponse, restoreService } from './restore';
@@ -109,7 +109,10 @@ routes.get('/status', async (c) => {
 
   const config = settings.backupConfig as BackupConfig | null;
   const providers = config?.providers;
-  const backupEnabled = providers ? Object.values(providers).some(hasZipBackup) : false;
+  const providerTypes = providers ? await loadProviderTypes(user.id) : new Map<string, string>();
+  const backupEnabled = providers
+    ? Object.entries(providers).some(([id, s]) => hasZipBackup(s, providerTypes.get(id)))
+    : false;
   const sheetsSyncEnabled = providers ? Object.values(providers).some(hasSheetsSync) : false;
 
   return c.json(
@@ -284,7 +287,7 @@ routes.get('/restore/providers', syncRateLimiter, async (c) => {
 
     const sourceTypes: ('zip' | 'sheets')[] = [];
 
-    if (hasZipBackup(providerConfig) && providerConfig.lastBackupAt) {
+    if (hasZipBackup(providerConfig, provider.providerType) && providerConfig.lastBackupAt) {
       sourceTypes.push('zip');
     }
     if (hasSheetsSync(providerConfig) && providerConfig.sheetsSpreadsheetId) {
