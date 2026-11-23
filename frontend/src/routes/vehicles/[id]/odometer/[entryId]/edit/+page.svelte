@@ -7,7 +7,7 @@
 	import { onMount, tick } from 'svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { z } from 'zod';
-	import { ArrowLeft, Info, LoaderCircle, Trash2 } from '@lucide/svelte';
+	import { ArrowLeft, Info, LoaderCircle, Trash2, X } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -293,15 +293,16 @@
 						variant="outline"
 						size="lg"
 						onclick={() => gotoDynamic(returnTo)}
-						class="flex-1"
+						class="flex-shrink-0 sm:flex-1"
 					>
-						Cancel
+						<X class="h-4 w-4 sm:mr-2" />
+						<span class="max-sm:sr-only">Cancel</span>
 					</Button>
 					<Button type="submit" size="lg" disabled={isSubmitting} class="flex-1">
 						{#if isSubmitting}
 							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 						{/if}
-						Save
+						<span>Save <span class="max-[359px]:sr-only">Reading</span></span>
 					</Button>
 				</div>
 			</div>
