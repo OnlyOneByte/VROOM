@@ -23,9 +23,10 @@
 		unitPreferences?: UnitPreferences;
 		isLoading?: boolean;
 		error?: string | null;
+		level?: 2 | 3 | 4;
 	}
 
-	let { data, fuelType, unitPreferences, isLoading = false, error = null }: Props = $props();
+	let { data, fuelType, unitPreferences, isLoading = false, error = null, level }: Props = $props();
 
 	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
 
@@ -55,6 +56,7 @@
 
 <AppLineChart
 	{title}
+	{level}
 	{description}
 	{data}
 	x="date"

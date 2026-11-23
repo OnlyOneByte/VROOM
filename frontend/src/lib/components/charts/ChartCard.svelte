@@ -11,6 +11,7 @@
 
 	interface Props {
 		title: string;
+		level?: 2 | 3 | 4;
 		description?: string;
 		isLoading?: boolean;
 		error?: string | null;
@@ -28,6 +29,7 @@
 
 	let {
 		title,
+		level = 2,
 		description,
 		isLoading = false,
 		error = null,
@@ -88,7 +90,7 @@
 	<Card.Header>
 		<div class="flex items-center justify-between">
 			<div>
-				<Card.Title bind:ref={titleEl} tabindex={-1}>{title}</Card.Title>
+				<Card.Title bind:ref={titleEl} tabindex={-1} {level}>{title}</Card.Title>
 				{#if description}
 					<Card.Description>{description}</Card.Description>
 				{/if}

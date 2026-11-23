@@ -160,6 +160,7 @@
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
 	{#if hasLoanBreakdown}
 		<AppBarChart
+			level={3}
 			title="Loan Payment Breakdown"
 			description="Interest vs Principal over time"
 			data={loanBreakdownData}
@@ -172,6 +173,7 @@
 
 	{#if typeDistData.length > 0}
 		<AppPieChart
+			level={3}
 			title="Financing Type Distribution"
 			description="Value by financing type"
 			data={typeDistData}

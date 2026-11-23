@@ -18,6 +18,7 @@
 	interface Props {
 		data: TrendData[];
 		title?: string;
+		level?: 2 | 3 | 4;
 		description?: string;
 		isLoading?: boolean;
 		error?: string | null;
@@ -27,6 +28,7 @@
 	let {
 		data,
 		title = 'Expense Trends',
+		level,
 		description = 'Spending over time',
 		isLoading = false,
 		error = null,
@@ -36,6 +38,7 @@
 
 <AppLineChart
 	{title}
+	{level}
 	{description}
 	{data}
 	x="date"

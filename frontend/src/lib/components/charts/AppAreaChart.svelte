@@ -28,6 +28,7 @@
 
 	interface Props {
 		title: string;
+		level?: 2 | 3 | 4;
 		description?: string;
 		data: Record<string, unknown>[];
 		x: string;
@@ -48,6 +49,7 @@
 
 	let {
 		title,
+		level,
 		description,
 		data,
 		x,
@@ -81,6 +83,7 @@
 
 <ChartCard
 	{title}
+	{level}
 	{description}
 	{isLoading}
 	{error}

@@ -22,7 +22,7 @@
 		class="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3 text-left outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
 	>
 		<span class="min-w-0">
-			<span class="block font-semibold text-foreground">{title}</span>
+			<h2 class="block font-semibold text-foreground">{title}</h2>
 			<span class="block text-sm text-muted-foreground">{description}</span>
 		</span>
 		<ChevronDown
