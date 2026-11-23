@@ -15,8 +15,9 @@ describe('validateOdometerForm', () => {
 		[Number.NaN, 'Odometer reading is required'],
 		[Number.POSITIVE_INFINITY, 'Odometer reading is required'],
 		[-1, 'Odometer must be 0 or greater'],
-		[-1.5, 'Odometer must be 0 or greater'],
-		[1.5, 'Odometer must be a whole number']
+		[-1.5, 'Odometer must be a whole number'],
+		[1.5, 'Odometer must be a whole number'],
+		[2 ** 53, 'Odometer must be a whole number']
 	])('odometer %s: %s', (odometer, message) => {
 		expect(validateOdometerForm({ ...valid, odometer })).toEqual({ odometer: message });
 	});
