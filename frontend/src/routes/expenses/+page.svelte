@@ -552,7 +552,7 @@
 						<Input
 							type="text"
 							bind:value={searchTerm}
-							placeholder="Search expenses, vehicles..."
+							placeholder="Search by name, place, tag, vehicle or amount"
 							class="pl-10 w-full"
 							aria-label="Search expenses and vehicles"
 						/>

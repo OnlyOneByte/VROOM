@@ -18,7 +18,7 @@ import {
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
-import { expenses, odometerEntries, photos } from '../../db/schema';
+import { expenses, odometerEntries, photos, vehicles } from '../../db/schema';
 import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import type { DrizzleTransaction } from '../../db/types';
 import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '../../errors';
@@ -225,15 +225,35 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
     }
   }
   const search = filters.search?.trim();
-  if (search) {
-    const escaped = search.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`);
-    const pattern = `%${escaped}%`;
-    conditions.push(
-      sql`(lower(${expenses.description}) LIKE ${pattern} ESCAPE '\\' OR lower(${expenses.category}) LIKE ${pattern} ESCAPE '\\')`
-    );
-  }
+  if (search) conditions.push(searchCondition(search));
 
   return conditions;
+}
+
+const AMOUNT_TERM = /^\$?(\d+)(?:\.(\d{1,2}))?$/;
+
+function amountCondition(term: string): SQL | undefined {
+  const match = AMOUNT_TERM.exec(term);
+  if (!match) return undefined;
+  const whole = Number(match[1]) * 100;
+  if (match[2] === undefined) {
+    return sql`(${expenses.expenseAmount} >= ${whole} AND ${expenses.expenseAmount} < ${whole + 100})`;
+  }
+  return eq(expenses.expenseAmount, whole + Number(match[2].padEnd(2, '0')));
+}
+
+function searchCondition(search: string): SQL {
+  const escaped = search.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`);
+  const pattern = `%${escaped}%`;
+  const like = (column: SQL) => sql`lower(${column}) LIKE ${pattern} ESCAPE '\\'`;
+  const amount = amountCondition(search);
+  return sql`(${like(sql`${expenses.description}`)}
+    OR ${like(sql`${expenses.category}`)}
+    OR ${like(sql`${expenses.location}`)}
+    OR EXISTS (SELECT 1 FROM json_each(${expenses.tags}) WHERE ${like(sql`json_each.value`)})
+    OR EXISTS (SELECT 1 FROM ${vehicles} WHERE ${vehicles.id} = ${expenses.vehicleId}
+      AND (${like(sql`${vehicles.nickname}`)} OR ${like(sql`${vehicles.make}`)} OR ${like(sql`${vehicles.model}`)}))
+    ${amount ? sql`OR ${amount}` : sql``})`;
 }
 
 export type { PaginatedResult } from '../../utils/pagination';
