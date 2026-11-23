@@ -474,4 +474,16 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 			expect.objectContaining({ source: 'fuelly' })
 		);
 	});
+
+	test('picking a blank file while a detection is in flight clears the reading state', async () => {
+		detectImportSource.mockReturnValueOnce(new Promise(() => {}));
+		await mount();
+		await openDialog();
+		await chooseFile();
+		expect(screen.getByText(/Reading your file/)).toBeInTheDocument();
+
+		await chooseFile('   \n', 'blank.csv');
+
+		expect(screen.queryByText(/Reading your file/)).toBeNull();
+	});
 });

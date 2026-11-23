@@ -113,6 +113,7 @@
 			format = null;
 			unrecognized = false;
 			preview = null;
+			isPreviewing = false;
 			return;
 		}
 		if (await detectFormat()) await runPreview();
