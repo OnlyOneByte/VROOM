@@ -45,6 +45,14 @@ export function currencyFractionDigits(currency?: string): number {
 	);
 }
 
+export function toMinor(amount: number, currency?: string): number {
+	return Math.round(amount * 10 ** currencyFractionDigits(currency));
+}
+
+export function fromMinor(minor: number, currency?: string): number {
+	return minor / 10 ** currencyFractionDigits(currency);
+}
+
 export function amountStep(currency?: string): string {
 	const digits = currencyFractionDigits(currency);
 	return digits > 0 ? (1 / 10 ** digits).toFixed(digits) : '1';

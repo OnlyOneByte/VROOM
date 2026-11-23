@@ -13,9 +13,11 @@ import {
 	formatNumber,
 	formatNumberUpTo,
 	formatRelativeTime,
+	fromMinor,
 	getCurrencySymbol,
 	toAmountInput,
-	toDateInputValue
+	toDateInputValue,
+	toMinor
 } from '#lib/utils/formatters.ts';
 
 describe('formatCurrency', () => {
@@ -301,6 +303,20 @@ describe('amountPlaceholder and formatBytes', () => {
 		expect(formatBytes(512)).toBe('512 B');
 		expect(formatBytes(1536)).toBe('1.5 KB');
 		expect(formatBytes(5 * 1024 * 1024)).toBe('5.0 MB');
+	});
+});
+
+describe('toMinor and fromMinor', () => {
+	test("convert with the currency's minor unit, not a fixed 100", () => {
+		expect(toMinor(12.34, 'USD')).toBe(1234);
+		expect(fromMinor(1234, 'USD')).toBe(12.34);
+		expect(toMinor(1500.4, 'JPY')).toBe(1500);
+		expect(fromMinor(1500, 'JPY')).toBe(1500);
+	});
+
+	test('round away float drift', () => {
+		expect(toMinor(0.1 + 0.2, 'USD')).toBe(30);
+		expect(fromMinor(toMinor(19.999, 'USD'), 'USD')).toBe(20);
 	});
 });
 
