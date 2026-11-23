@@ -1,21 +1,15 @@
 import { describe, expect, test } from 'vitest';
 import { DollarSign } from '@lucide/svelte';
+import { EXPENSE_CATEGORIES } from '#lib/constants/expense-categories.ts';
 import type { ExpenseCategory } from '#lib/types/index.ts';
 import { categoryLabels, getCategoryBadgeClasses, getCategoryIcon } from '../expense-helpers';
 
-const ALL_CATEGORIES: ExpenseCategory[] = [
-	'fuel',
-	'maintenance',
-	'financial',
-	'regulatory',
-	'enhancement',
-	'misc'
-];
+const ALL_CATEGORIES: ExpenseCategory[] = [...EXPENSE_CATEGORIES];
 
 describe('expense-category display maps — exhaustiveness', () => {
-	test('there are exactly 6 categories (guards against a silent union change)', () => {
-		expect(ALL_CATEGORIES.length).toBe(6);
-		expect(new Set(ALL_CATEGORIES).size).toBe(6);
+	test('the category list has no duplicates', () => {
+		expect(ALL_CATEGORIES.length).toBeGreaterThan(0);
+		expect(new Set(ALL_CATEGORIES).size).toBe(ALL_CATEGORIES.length);
 	});
 
 	test('categoryLabels has a non-empty label for every category', () => {

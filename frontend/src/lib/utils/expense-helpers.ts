@@ -1,12 +1,13 @@
 import type { ExpenseCategory, SplitConfig } from '#lib/types/index.ts';
-import { Coffee, CreditCard, DollarSign, FileText, Fuel, Sparkles, Wrench } from '@lucide/svelte';
+import { DollarSign } from '@lucide/svelte';
+import { mapExpenseCategories } from '#lib/constants/expense-categories.ts';
 import {
 	CATEGORY_LABELS,
 	mapCategoryColorTokens,
 	type CategoryColorToken
 } from '#lib/utils/chart-colors.ts';
 
-type LucideIcon = typeof Fuel;
+type LucideIcon = typeof DollarSign;
 
 type ExpenseSortField = 'date' | 'amount';
 export type SortDirection = 'asc' | 'desc';
@@ -67,14 +68,9 @@ export function buildSplitConfig(
 
 export const categoryLabels: Record<ExpenseCategory, string> = CATEGORY_LABELS;
 
-export const CATEGORY_ICONS: Record<ExpenseCategory, LucideIcon> = {
-	fuel: Fuel,
-	maintenance: Wrench,
-	financial: CreditCard,
-	regulatory: FileText,
-	enhancement: Sparkles,
-	misc: Coffee
-};
+export const CATEGORY_ICONS: Record<ExpenseCategory, LucideIcon> = mapExpenseCategories(
+	info => info.icon
+);
 
 export function getCategoryIcon(category: ExpenseCategory): LucideIcon {
 	return CATEGORY_ICONS[category] || DollarSign;

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { CONFIG } from '../../../config';
 import type { Expense } from '../../../db/schema';
+import { EXPENSE_CATEGORIES } from '../../../db/types';
 import type { PaginatedExpenseFilters, PaginatedResult } from '../repository';
 
 const VEHICLE_IDS = ['vehicle-A', 'vehicle-B', 'vehicle-C'];
@@ -9,7 +10,7 @@ const USER_VEHICLES: Record<string, string[]> = {
   'user-1': ['vehicle-A', 'vehicle-B'],
   'user-2': ['vehicle-C'],
 };
-const CATEGORIES = ['fuel', 'maintenance', 'financial', 'regulatory', 'enhancement', 'misc'];
+const CATEGORIES: string[] = [...EXPENSE_CATEGORIES];
 const SAMPLE_TAGS = ['oil-change', 'tire', 'brake', 'filter', 'inspection', 'wash'];
 
 function makePaginatedExpense(overrides: {

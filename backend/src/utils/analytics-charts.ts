@@ -1,4 +1,4 @@
-import { isElectricFuelType } from '../db/types';
+import { EXPENSE_CATEGORIES, type ExpenseCategory, isElectricFuelType } from '../db/types';
 import {
   MAX_VALID_MI_KWH,
   MAX_VALID_MPG,
@@ -41,14 +41,17 @@ export const SEASON_MAP: Record<number, string> = {
   11: 'Winter',
 };
 
-const VALID_CATEGORIES = [
-  'fuel',
-  'maintenance',
-  'financial',
-  'regulatory',
-  'enhancement',
-  'misc',
-] as const;
+export type CategoryAmounts = Record<ExpenseCategory, number>;
+
+export function emptyCategoryAmounts(): CategoryAmounts {
+  return Object.fromEntries(EXPENSE_CATEGORIES.map((c) => [c, 0])) as CategoryAmounts;
+}
+
+function knownCategory(category: string): ExpenseCategory {
+  return (EXPENSE_CATEGORIES as readonly string[]).includes(category)
+    ? (category as ExpenseCategory)
+    : 'misc';
+}
 
 export interface FuelEfficiencyPoint {
   date: string;
@@ -694,43 +697,15 @@ export function buildVehicleRadar(
 export function buildMonthlyCostHeatmap(
   allExpenses: GeneralExpenseRow[],
   calendar: Calendar = UTC_CALENDAR
-): Array<{
-  month: string;
-  fuel: number;
-  maintenance: number;
-  financial: number;
-  regulatory: number;
-  enhancement: number;
-  misc: number;
-}> {
-  const monthMap = new Map<
-    string,
-    {
-      fuel: number;
-      maintenance: number;
-      financial: number;
-      regulatory: number;
-      enhancement: number;
-      misc: number;
-    }
-  >();
+): Array<{ month: string } & CategoryAmounts> {
+  const monthMap = new Map<string, CategoryAmounts>();
 
   for (const row of allExpenses) {
     const d = normalizeDate(row.date);
     if (!d) continue;
     const key = toMonthKey(d, calendar);
-    const entry = monthMap.get(key) ?? {
-      fuel: 0,
-      maintenance: 0,
-      financial: 0,
-      regulatory: 0,
-      enhancement: 0,
-      misc: 0,
-    };
-    const cat = VALID_CATEGORIES.includes(row.category as (typeof VALID_CATEGORIES)[number])
-      ? (row.category as keyof typeof entry)
-      : 'misc';
-    entry[cat] += row.expenseAmount;
+    const entry = monthMap.get(key) ?? emptyCategoryAmounts();
+    entry[knownCategory(row.category)] += row.expenseAmount;
     monthMap.set(key, entry);
   }
 
@@ -934,9 +909,7 @@ export function buildVehicleExpenseBreakdown(
 ): Array<{ category: string; amount: number }> {
   const map = new Map<string, number>();
   for (const row of allExpenses) {
-    const cat = VALID_CATEGORIES.includes(row.category as (typeof VALID_CATEGORIES)[number])
-      ? row.category
-      : 'misc';
+    const cat = knownCategory(row.category);
     map.set(cat, (map.get(cat) ?? 0) + row.expenseAmount);
   }
   return Array.from(map.entries()).map(([category, amount]) => ({ category, amount }));
@@ -965,9 +938,7 @@ export function buildExpenseByCategory(
   const map = new Map<string, number>();
   let total = 0;
   for (const row of allExpenses) {
-    const cat = VALID_CATEGORIES.includes(row.category as (typeof VALID_CATEGORIES)[number])
-      ? row.category
-      : 'misc';
+    const cat = knownCategory(row.category);
     map.set(cat, (map.get(cat) ?? 0) + row.expenseAmount);
     total += row.expenseAmount;
   }

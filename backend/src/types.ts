@@ -26,11 +26,7 @@ export type {
 } from './db/schema';
 
 export type { ExpenseCategory, PaymentFrequency } from './db/types';
-export {
-  EXPENSE_CATEGORIES,
-  EXPENSE_CATEGORY_DESCRIPTIONS,
-  EXPENSE_CATEGORY_LABELS,
-} from './db/types';
+export { EXPENSE_CATEGORIES } from './db/types';
 
 export type Environment = 'development' | 'production' | 'test';
 

@@ -1,3 +1,4 @@
+import { EXPENSE_CATEGORIES } from '#lib/constants/expense-categories.ts';
 import { toDateInputValue } from '#lib/utils/formatters.ts';
 import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 import type { SplitAllocationDraft } from '#lib/utils/expense-helpers.ts';
@@ -6,14 +7,7 @@ import type { TriggerMode } from '#lib/types/reminder.ts';
 
 export const FREQUENCIES = ['weekly', 'monthly', 'yearly', 'custom'] as const;
 export const INTERVAL_UNITS = ['day', 'week', 'month', 'year'] as const;
-export const EXPENSE_CATEGORIES = [
-	'fuel',
-	'maintenance',
-	'financial',
-	'regulatory',
-	'enhancement',
-	'misc'
-] as const satisfies readonly ExpenseCategory[];
+export { EXPENSE_CATEGORIES };
 
 export type Frequency = (typeof FREQUENCIES)[number];
 export type IntervalUnit = (typeof INTERVAL_UNITS)[number];

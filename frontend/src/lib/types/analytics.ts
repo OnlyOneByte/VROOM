@@ -1,4 +1,5 @@
 import type { UnitsMetadata } from './settings.js';
+import type { ExpenseCategory } from './expense.js';
 
 export interface FuelEfficiencyPoint {
 	date: string;
@@ -124,15 +125,7 @@ export interface FuelAdvancedResponse {
 		avgCost: number;
 		avgVolume: number;
 	}>;
-	monthlyCostHeatmap: Array<{
-		month: string;
-		fuel: number;
-		maintenance: number;
-		financial: number;
-		regulatory: number;
-		enhancement: number;
-		misc: number;
-	}>;
+	monthlyCostHeatmap: Array<{ month: string } & Record<ExpenseCategory, number>>;
 	fillupIntervals: Array<{
 		intervalLabel: string;
 		count: number;

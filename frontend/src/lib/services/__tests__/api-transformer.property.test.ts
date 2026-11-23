@@ -1,3 +1,4 @@
+import { EXPENSE_CATEGORIES } from '#lib/constants/expense-categories.ts';
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
 import { fromBackendExpense, toBackendExpense } from '../api-transformer';
@@ -13,14 +14,7 @@ const NON_ELECTRIC_FUEL_TYPES = [
 	'Other (Custom)'
 ] as const;
 
-const CATEGORIES = [
-	'fuel',
-	'maintenance',
-	'financial',
-	'regulatory',
-	'enhancement',
-	'misc'
-] as const;
+const CATEGORIES = EXPENSE_CATEGORIES;
 
 describe('transformer round-trip preservation', () => {
 	test('round-trip preserves volume for non-electric fuelType expenses', () => {

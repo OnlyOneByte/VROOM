@@ -1,5 +1,6 @@
-export type ExpenseCategory =
-	'fuel' | 'maintenance' | 'financial' | 'regulatory' | 'enhancement' | 'misc';
+import type { ExpenseCategory } from '#lib/constants/expense-categories.ts';
+
+export type { ExpenseCategory };
 
 export const COMMON_EXPENSE_TAGS = [
 	'fuel',

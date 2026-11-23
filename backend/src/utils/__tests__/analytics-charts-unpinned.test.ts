@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { EXPENSE_CATEGORIES } from '../../db/types';
 import {
   buildFillupCostByVehicle,
   buildFillupIntervals,
@@ -52,6 +53,11 @@ function genRow(over: Partial<GeneralExpenseRow> = {}): GeneralExpenseRow {
 describe('buildMonthlyCostHeatmap', () => {
   test('empty input returns an empty array', () => {
     expect(buildMonthlyCostHeatmap([])).toEqual([]);
+  });
+
+  test('every month carries every EXPENSE_CATEGORIES key, so a new category reaches the chart', () => {
+    const [row] = buildMonthlyCostHeatmap([genRow({ category: 'fuel', expenseAmount: 5 })]);
+    expect(Object.keys(row).sort()).toEqual(['month', ...EXPENSE_CATEGORIES].sort());
   });
 
   test('an unknown category falls back to misc (never throws / drops the amount)', () => {

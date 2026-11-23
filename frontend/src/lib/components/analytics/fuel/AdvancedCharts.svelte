@@ -35,6 +35,7 @@
 	} from '#lib/utils/chart-colors.ts';
 	import type { FuelAdvancedResponse } from '#lib/types/index.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { EXPENSE_CATEGORIES } from '#lib/constants/expense-categories.ts';
 	import { getFuelEfficiencyLabel } from '#lib/utils/units.ts';
 
 	interface Props {
@@ -91,17 +92,8 @@
 		return `${base} Fuel Efficiency: No data for ${missing.map(v => v.vehicleName).join(', ')}.`;
 	});
 
-	const heatmapCategories = [
-		'fuel',
-		'maintenance',
-		'financial',
-		'regulatory',
-		'enhancement',
-		'misc'
-	] as const;
-
 	let heatmapSeries = $derived(
-		heatmapCategories.map(cat => ({
+		EXPENSE_CATEGORIES.map(cat => ({
 			key: cat,
 			label: CATEGORY_LABELS[cat] ?? cat,
 			color: CATEGORY_COLORS[cat] ?? 'var(--primary)'
@@ -126,7 +118,7 @@
 		let max = 0;
 		for (const row of fuelAdvanced.monthlyCostHeatmap) {
 			let total = 0;
-			for (const cat of heatmapCategories) {
+			for (const cat of EXPENSE_CATEGORIES) {
 				total += (row[cat] as number) ?? 0;
 			}
 			if (total > max) max = total;
