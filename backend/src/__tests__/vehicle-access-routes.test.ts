@@ -250,6 +250,36 @@ const ROUTES: RouteCase[] = [
     mode: 'write',
     request: (fx) => ['DELETE', `/odometer/${fx.odometerId}`],
   },
+  {
+    name: 'POST /trips',
+    mode: 'owner',
+    request: (fx) => [
+      'POST',
+      '/trips',
+      {
+        vehicleId: fx.vehicleId,
+        startOdometer: 40000,
+        endOdometer: 40100,
+        tripDate: '2024-08-01T00:00:00.000Z',
+        purpose: 'business',
+      },
+    ],
+  },
+  {
+    name: 'GET /trips?vehicleId',
+    mode: 'owner',
+    request: (fx) => ['GET', `/trips?vehicleId=${fx.vehicleId}`],
+  },
+  {
+    name: 'GET /trips/summary?vehicleId',
+    mode: 'owner',
+    request: (fx) => ['GET', `/trips/summary?vehicleId=${fx.vehicleId}`],
+  },
+  {
+    name: 'GET /trips/vehicle/:vehicleId',
+    mode: 'owner',
+    request: (fx) => ['GET', `/trips/vehicle/${fx.vehicleId}`],
+  },
 ];
 
 let ctx: TestApp;

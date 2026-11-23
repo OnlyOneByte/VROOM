@@ -10,12 +10,8 @@ import { logger } from '../../utils/logger';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import { buildTripSummary } from '../../utils/trip-summary';
 import { convertDistance } from '../../utils/unit-conversions';
-import {
-  commonSchemas,
-  validateTripOwnership,
-  validateVehicleOwnership,
-  zValidator,
-} from '../../utils/validation';
+import { commonSchemas, validateTripOwnership, zValidator } from '../../utils/validation';
+import { requireVehicleAccess } from '../../utils/vehicle-access';
 import { assertOdometerInOrder } from '../expenses/repository';
 import { odometerRepository, readingCheck } from '../odometer/repository';
 import { deletePhotosForEntities } from '../photos/photo-service';
@@ -84,7 +80,7 @@ routes.post('/', zValidator('json', createTripSchema), async (c) => {
   const user = c.get('user');
   const data = c.req.valid('json');
 
-  await validateVehicleOwnership(data.vehicleId, user.id);
+  await requireVehicleAccess(data.vehicleId, user.id, 'owner');
 
   const check = await readingCheck(data.vehicleId, data.endOdometer, data.tripDate, data.timeZone);
   const trip = getDb().transaction((tx) => {
@@ -138,7 +134,7 @@ routes.get('/', zValidator('query', listQuerySchema), async (c) => {
   const { limit, offset } = clampPagination(query);
 
   if (query.vehicleId) {
-    await validateVehicleOwnership(query.vehicleId, user.id);
+    await requireVehicleAccess(query.vehicleId, user.id, 'owner');
   }
   const { data, totalCount } = await tripRepository.findByUserIdPaginated(user.id, limit, offset, {
     vehicleId: query.vehicleId,
@@ -154,7 +150,7 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
   const { vehicleId, rate } = c.req.valid('query');
 
   if (vehicleId) {
-    await validateVehicleOwnership(vehicleId, user.id);
+    await requireVehicleAccess(vehicleId, user.id, 'owner');
   }
   const trips = vehicleId
     ? await tripRepository.findByVehicle(vehicleId, user.id)
@@ -178,7 +174,7 @@ routes.get('/vehicle/:vehicleId', zValidator('param', commonSchemas.vehicleIdPar
   const user = c.get('user');
   const { vehicleId } = c.req.valid('param');
 
-  await validateVehicleOwnership(vehicleId, user.id);
+  await requireVehicleAccess(vehicleId, user.id, 'owner');
 
   const data = await tripRepository.findByVehicle(vehicleId, user.id);
   return c.json({ success: true, data });
