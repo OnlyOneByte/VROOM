@@ -40,13 +40,11 @@
 		</CardDescription>
 	</CardHeader>
 	<CardContent>
-		{#if activeTheme && !showAll}
-			<div
-				class="mb-3 flex items-center gap-3 rounded-lg border border-primary p-3 lg:hidden"
-				data-testid="current-theme"
-			>
+		{#if activeTheme}
+			<div class="mb-3 flex items-center gap-3 lg:hidden" data-testid="current-theme">
 				{@render swatches(activeTheme)}
 				<div class="min-w-0">
+					<div class="text-xs text-muted-foreground">Current theme</div>
 					<div class="text-sm font-medium">{activeTheme.label}</div>
 					<div class="text-xs text-muted-foreground">{activeTheme.description}</div>
 				</div>
@@ -63,7 +61,10 @@
 		</Button>
 		<div
 			id={gridId}
-			class={cn('grid-cols-2 gap-3 sm:grid-cols-3 lg:grid', showAll ? 'mt-3 grid' : 'hidden')}
+			class={cn(
+				'grid-cols-2 gap-3 sm:grid-cols-3 lg:grid',
+				showAll ? 'mt-3 grid lg:mt-0' : 'hidden'
+			)}
 		>
 			{#each themes as theme (theme.id)}
 				{@const selected = activeId === theme.id}
