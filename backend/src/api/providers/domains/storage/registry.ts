@@ -93,6 +93,7 @@ export interface StorageProviderDescriptor {
   validateConfig?: (config: Record<string, unknown> | null) => void;
   defaultFolders: Record<PhotoCategory, string>;
   identity?: (config: Record<string, unknown>) => string | null;
+  creatable?: false;
 }
 
 const GENERIC_FOLDERS: Record<PhotoCategory, string> = {
@@ -117,6 +118,7 @@ export const STORAGE_PROVIDERS = {
     credentialKind: 'google-oauth',
     create: ({ credentials, config }) => buildGooglePhotosProvider(credentials, config),
     defaultFolders: GENERIC_FOLDERS,
+    creatable: false,
   },
   s3: {
     credentialKind: 'keys',
@@ -146,6 +148,10 @@ export const STORAGE_PROVIDER_TYPES = Object.keys(STORAGE_PROVIDERS) as [
   StorageProviderType,
   ...StorageProviderType[],
 ];
+
+export const CREATABLE_STORAGE_PROVIDER_TYPES = STORAGE_PROVIDER_TYPES.filter(
+  (type) => (STORAGE_PROVIDERS[type] as StorageProviderDescriptor).creatable !== false
+) as [StorageProviderType, ...StorageProviderType[]];
 
 export function storageProviderDescriptor(
   providerType: string

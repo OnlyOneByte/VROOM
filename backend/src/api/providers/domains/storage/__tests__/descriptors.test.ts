@@ -43,39 +43,21 @@ describe('storage provider descriptors', () => {
     ).toThrow('Unsupported provider type: dropbox');
   });
 
-  test('a Google Photos provider can be created through the API with a connected account', async () => {
-    storePending(
-      ctx.user.id,
-      '5b8f2c1e-3d4a-4b6c-9e7f-1a2b3c4d5e6f',
-      'refresh-tok',
-      'me@example.com'
-    );
+  test('Google Photos cannot be created through the API, even with a connected Google account', async () => {
+    const nonce = '5b8f2c1e-3d4a-4b6c-9e7f-1a2b3c4d5e6f';
+    storePending(ctx.user.id, nonce, 'refresh-tok', 'me@example.com');
 
     const res = await ctx.authed('POST', '/api/v1/providers', {
       domain: 'storage',
       providerType: 'google-photos',
       displayName: 'My photos',
       credentials: {},
-      nonce: '5b8f2c1e-3d4a-4b6c-9e7f-1a2b3c4d5e6f',
+      nonce,
     });
 
-    const body = await json<{ data: { id: string; config: { accountEmail?: string } } }>(res);
-    expect(res.status, JSON.stringify(body)).toBe(201);
-    expect(body.data.config.accountEmail).toBe('me@example.com');
-    const prefs = ctx.sqlite
-      .query('SELECT storage_config FROM user_preferences WHERE user_id = ?')
-      .get(ctx.user.id) as { storage_config: string };
-    const categories = JSON.parse(prefs.storage_config).providerCategories[body.data.id];
-    expect(categories.vehicle_photos).toEqual({ enabled: true, folderPath: 'vehicle-photos' });
-  });
-
-  test('a Google Photos provider needs a connected account, like Google Drive', async () => {
-    const res = await ctx.authed('POST', '/api/v1/providers', {
-      domain: 'storage',
-      providerType: 'google-photos',
-      displayName: 'My photos',
-      credentials: {},
-    });
+    const body = await json<{ error: { message: string } }>(res);
     expect(res.status).toBe(400);
+    expect(JSON.stringify(body)).toContain('Provider type must be one of');
+    expect(ctx.sqlite.query('SELECT COUNT(*) AS n FROM user_providers').get()).toEqual({ n: 0 });
   });
 });

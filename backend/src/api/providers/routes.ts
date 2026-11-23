@@ -16,7 +16,7 @@ import { commonSchemas, zValidator } from '../../utils/validation';
 import { photoRefRepository } from '../photos/photo-ref-repository';
 import { preferencesRepository } from '../settings/repository';
 import {
-  STORAGE_PROVIDER_TYPES,
+  CREATABLE_STORAGE_PROVIDER_TYPES,
   type StorageProviderDescriptor,
   storageProviderDescriptor,
   storageProviderRegistry,
@@ -83,7 +83,7 @@ type ModelProviderType = (typeof MODEL_PROVIDER_TYPES)[number];
 const MODEL_DOMAINS = ['vlm', 'llm'] as const;
 type ModelDomain = (typeof MODEL_DOMAINS)[number];
 export const SUPPORTED_PROVIDER_TYPES = [
-  ...STORAGE_PROVIDER_TYPES,
+  ...CREATABLE_STORAGE_PROVIDER_TYPES,
   ...MODEL_PROVIDER_TYPES,
 ] as const;
 
