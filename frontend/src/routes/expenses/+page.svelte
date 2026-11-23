@@ -626,7 +626,7 @@
 						emptyActionHref={resolve(routes.expenseNew)}
 						scrollHeight="600px"
 						onClearFilters={clearFilters}
-						hasActiveFilters={filtersActive}
+						hasActiveFilters={totalCountFiltered}
 						{totalCount}
 						{currentOffset}
 						{pageSize}

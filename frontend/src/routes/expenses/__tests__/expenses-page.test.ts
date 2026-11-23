@@ -247,13 +247,55 @@ describe('/expenses first screen', () => {
 		expect(screen.queryByText(/across 0 vehicles/)).toBeNull();
 	});
 
-	test('until the filtered list arrives, the count keeps the wording of the total it shows', async () => {
+	test('while the filtered list is in flight, the count keeps the wording of the total it shows', async () => {
 		await mountLoaded();
+		let release = () => {};
+		getAllExpenses.mockImplementation(
+			() =>
+				new Promise(resolve => {
+					release = () => resolve(pageOf(ROWS.slice(0, 1), 1));
+				})
+		);
+		const calls = getAllExpenses.mock.calls.length;
 		await fireEvent.input(screen.getByRole('textbox', { name: 'Search expenses and vehicles' }), {
 			target: { value: 'shell' }
 		});
+		await waitFor(
+			() => expect(getAllExpenses.mock.calls.length).toBe(calls + 1),
+			SEARCH_DEBOUNCE_WAIT
+		);
 		expect(screen.getByText('1 expense across 2 vehicles')).toBeInTheDocument();
 		expect(screen.queryByText(/match(es)? your filters$/)).toBeNull();
+
+		release();
+		expect(await screen.findByText('1 expense matches your filters')).toBeInTheDocument();
+	});
+
+	test('while Clear Filters reloads, the table keeps the filter state of the rows it shows', async () => {
+		await mountLoaded();
+		getAllExpenses.mockResolvedValue(pageOf([], 0));
+		await fireEvent.input(screen.getByRole('textbox', { name: 'Search expenses and vehicles' }), {
+			target: { value: 'nothing' }
+		});
+		await waitFor(
+			() => expect(captured.table['hasActiveFilters']).toBe(true),
+			SEARCH_DEBOUNCE_WAIT
+		);
+
+		let release = () => {};
+		getAllExpenses.mockImplementation(
+			() =>
+				new Promise(resolve => {
+					release = () => resolve(pageOf(ROWS));
+				})
+		);
+		await fireEvent.click(screen.getByRole('button', { name: 'Clear Filters' }));
+		expect(captured.table['hasActiveFilters']).toBe(true);
+		expect(screen.getByText('0 expenses match your filters')).toBeInTheDocument();
+
+		release();
+		await waitFor(() => expect(captured.table['hasActiveFilters']).toBe(false));
+		expect(screen.getByText('1 expense across 2 vehicles')).toBeInTheDocument();
 	});
 
 	test('a search of only spaces is not a filter', async () => {
