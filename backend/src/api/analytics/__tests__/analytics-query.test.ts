@@ -344,6 +344,68 @@ describe('bucketing follows the user calendar', () => {
   });
 });
 
+describe('same-day fill-ups pair by odometer', () => {
+  const fill = (id: string, iso: string, mileage: number) =>
+    seedExpense(testDb.sqlite, {
+      id,
+      vehicleId: CAMRY.id,
+      category: 'fuel',
+      expenseAmount: 4_000,
+      date: new Date(iso),
+      mileage,
+      volume: 10,
+      fuelType: 'Regular',
+      missedFillup: false,
+    });
+
+  const orders = [
+    {
+      name: 'the lower reading saved first, with the smaller id',
+      first: ['a-fill', 10_300],
+      second: ['z-fill', 10_600],
+    },
+    {
+      name: 'the higher reading saved first, with the smaller id',
+      first: ['a-fill', 10_600],
+      second: ['z-fill', 10_300],
+    },
+  ] as const;
+
+  for (const { name, first, second } of orders) {
+    test(`economy and distance are right with ${name}`, async () => {
+      fill('start', '2025-03-01T12:00:00Z', 10_000);
+      fill(first[0], '2025-03-10T12:00:00Z', first[1]);
+      fill(second[0], '2025-03-10T12:00:00Z', second[1]);
+      fill('end', '2025-03-20T12:00:00Z', 10_900);
+
+      const distance = await repo.query(
+        OWNER.id,
+        baseQuery({ metric: 'distance', interval: 'month' })
+      );
+      expect(distance.series[0]?.values[distance.buckets.indexOf('2025-03')]).toBe(900);
+      const efficiency = await repo.query(
+        OWNER.id,
+        baseQuery({ metric: 'efficiency', interval: 'month' })
+      );
+      expect(efficiency.totals.value).toBeCloseTo(30, 9);
+
+      const summary = await new AnalyticsRepository(testDb.drizzle).getSummary(OWNER.id, RANGE);
+      expect(summary.quickStats.avgEfficiency).toBeCloseTo(30, 9);
+    });
+  }
+
+  test('the reading before the range is the highest one on its date', async () => {
+    fill('a-prev', '2025-02-20T12:00:00Z', 10_600);
+    fill('z-prev', '2025-02-20T12:00:00Z', 10_300);
+    fill('inside', '2025-03-10T12:00:00Z', 10_900);
+    const distance = await repo.query(
+      OWNER.id,
+      baseQuery({ metric: 'distance', interval: 'month', start: seconds('2025-03-01T00:00:00Z') })
+    );
+    expect(distance.series[0]?.values[distance.buckets.indexOf('2025-03')]).toBe(300);
+  });
+});
+
 describe('units', () => {
   function seedTwoFillups(vehicleId: string, startMileage: number, volume: number): void {
     for (const [i, offset] of [0, 400].entries()) {

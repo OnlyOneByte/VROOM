@@ -293,14 +293,14 @@ export function* sameEnergyPairs<T extends { vehicleId: string; fuelType: string
   }
 }
 
-export function sortByVehicleThenDate<T extends { vehicleId: string; date: Date | number | null }>(
-  rows: T[]
-): T[] {
+export function sortByVehicleThenDate<
+  T extends { vehicleId: string; date: Date | number | null; mileage?: number | null },
+>(rows: T[]): T[] {
   return [...rows].sort((a, b) => {
     if (a.vehicleId !== b.vehicleId) return a.vehicleId.localeCompare(b.vehicleId);
     const aTime = a.date instanceof Date ? a.date.getTime() : Number(a.date);
     const bTime = b.date instanceof Date ? b.date.getTime() : Number(b.date);
-    return aTime - bTime;
+    return aTime - bTime || (a.mileage ?? 0) - (b.mileage ?? 0);
   });
 }
 
@@ -864,7 +864,7 @@ export function buildFuelEfficiencyAndCost(
     const da = normalizeDate(a.date);
     const db = normalizeDate(b.date);
     if (!da || !db) return 0;
-    return da.getTime() - db.getTime();
+    return da.getTime() - db.getTime() || (a.mileage ?? 0) - (b.mileage ?? 0);
   });
 
   let previousFillup: GeneralExpenseRow | undefined;
