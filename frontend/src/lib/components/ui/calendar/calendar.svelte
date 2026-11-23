@@ -62,7 +62,7 @@
 				<Calendar.PrevButton variant={buttonVariant} />
 				<Calendar.NextButton variant={buttonVariant} />
 			</Calendar.Nav>
-			{#each months as month, monthIndex (month)}
+			{#each months as month, monthIndex (month.value.toString())}
 				<Calendar.Month>
 					<Calendar.Header>
 						<Calendar.Caption
@@ -88,9 +88,9 @@
 							</Calendar.GridRow>
 						</Calendar.GridHead>
 						<Calendar.GridBody>
-							{#each month.weeks as weekDates (weekDates)}
+							{#each month.weeks as weekDates (weekDates[0]?.toString())}
 								<Calendar.GridRow class="mt-2 w-full">
-									{#each weekDates as date (date)}
+									{#each weekDates as date (date.toString())}
 										<Calendar.Cell {date} month={month.value}>
 											{#if day}
 												{@render day({
