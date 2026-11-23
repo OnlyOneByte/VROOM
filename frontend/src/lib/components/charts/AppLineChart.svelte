@@ -191,8 +191,7 @@
 							<Rule
 								y={line.value}
 								dashArray="4 4"
-								class="stroke-muted-foreground"
-								strokeWidth={1.5}
+								style="stroke: var(--muted-foreground); stroke-width: 1.5px"
 								data-reference-line
 							/>
 						{/each}
