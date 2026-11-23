@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { addVehicleFirstTo } from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -156,7 +157,7 @@
 			<div class="space-y-2">
 				<Label for="trip-vehicle">Vehicle *</Label>
 				{#if vehicles.length === 0}
-					<p class="text-sm text-muted-foreground">Add a vehicle first to log a trip.</p>
+					<p class="text-sm text-muted-foreground">{addVehicleFirstTo('log a trip')}</p>
 				{:else if isEdit}
 					<Input
 						id="trip-vehicle"

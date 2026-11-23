@@ -46,7 +46,7 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import ExpensesTable from '#lib/components/expenses/ExpensesTable.svelte';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
-	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import ExpenseTagFilter from '#lib/components/expenses/ExpenseTagFilter.svelte';
 	import OfflineExpenseCards from '#lib/components/expenses/OfflineExpenseCards.svelte';
@@ -495,23 +495,9 @@
 			title="All Expenses"
 			description="Track and categorize expenses across all vehicles"
 		/>
-		<EmptyState>
-			{#snippet icon()}
-				<Car class="h-12 w-12 text-muted-foreground mb-4" />
-			{/snippet}
-			{#snippet title()}
-				Add a vehicle first
-			{/snippet}
-			{#snippet description()}
-				Every expense belongs to a vehicle. Add one, then log fill-ups, repairs and other costs.
-			{/snippet}
-			{#snippet action()}
-				<Button size="lg" href={resolve(routes.vehicleNew)}>
-					<Plus class="mr-2 h-4 w-4" />
-					Add Vehicle
-				</Button>
-			{/snippet}
-		</EmptyState>
+		<NoVehiclesEmptyState
+			description="Every expense belongs to a vehicle. Add one, then log fill-ups, repairs and other costs."
+		/>
 	</div>
 {:else}
 	<div class="space-y-6 pb-24">

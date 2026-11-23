@@ -2,6 +2,7 @@
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { goto } from '$app/navigation';
 	import PageHeader from '#lib/components/common/page-header.svelte';
+	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
@@ -257,6 +258,22 @@
 	}
 </script>
 
+{#snippet titleOnlyHeader()}
+	<PageHeader title={pageTitle}>
+		{#snippet back()}
+			<Button
+				variant="ghost"
+				size="icon-lg"
+				class="shrink-0"
+				aria-label="Go back"
+				onclick={handleBack}
+			>
+				<ArrowLeft class="size-5" />
+			</Button>
+		{/snippet}
+	</PageHeader>
+{/snippet}
+
 <FormLayout>
 	{#if isLoading}
 		<div class="flex items-center justify-center py-12">
@@ -264,19 +281,7 @@
 		</div>
 	{:else if loadError}
 		<div class="space-y-6">
-			<PageHeader title={pageTitle}>
-				{#snippet back()}
-					<Button
-						variant="ghost"
-						size="icon-lg"
-						class="shrink-0"
-						aria-label="Go back"
-						onclick={handleBack}
-					>
-						<ArrowLeft class="size-5" />
-					</Button>
-				{/snippet}
-			</PageHeader>
+			{@render titleOnlyHeader()}
 			<div class="rounded-lg border bg-card p-6">
 				<div class="mb-4 flex items-center gap-3 text-destructive">
 					<CircleAlert class="h-5 w-5" />
@@ -287,6 +292,13 @@
 				<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
 				<Button size="lg" onclick={loadData}>Retry</Button>
 			</div>
+		</div>
+	{:else if !isEditMode && vehicles.length === 0}
+		<div class="space-y-6">
+			{@render titleOnlyHeader()}
+			<NoVehiclesEmptyState
+				description="Every policy covers a vehicle. Add one, then add its policy here."
+			/>
 		</div>
 	{:else}
 		<div class="space-y-6">
@@ -409,11 +421,6 @@
 											<span class="text-sm text-foreground">{getVehicleDisplayName(v)}</span>
 										</label>
 									{/each}
-									{#if vehicles.length === 0}
-										<p class="text-sm text-muted-foreground">
-											No vehicles found. Add a vehicle first.
-										</p>
-									{/if}
 								</div>
 								{#if errors.vehicles}
 									<FormFieldError id="vehicles-error">{errors.vehicles}</FormFieldError>

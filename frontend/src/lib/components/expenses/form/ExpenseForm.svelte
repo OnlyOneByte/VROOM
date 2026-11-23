@@ -7,17 +7,9 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
-	import {
-		LoaderCircle,
-		CreditCard,
-		Info,
-		CircleAlert,
-		TriangleAlert,
-		Car,
-		Plus
-	} from '@lucide/svelte';
+	import { LoaderCircle, CreditCard, Info, CircleAlert, TriangleAlert } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import CategorySelector from './CategorySelector.svelte';
@@ -361,23 +353,9 @@
 	{:else if needsVehicle}
 		<div class="space-y-6">
 			{@render createHeader()}
-			<EmptyState>
-				{#snippet icon()}
-					<Car class="mb-4 h-12 w-12 text-muted-foreground" />
-				{/snippet}
-				{#snippet title()}
-					Add a vehicle first
-				{/snippet}
-				{#snippet description()}
-					Every expense belongs to a vehicle. Add one, then log what you spend on it.
-				{/snippet}
-				{#snippet action()}
-					<Button size="lg" href={resolve(routes.vehicleNew)}>
-						<Plus class="mr-2 h-4 w-4" />
-						Add Vehicle
-					</Button>
-				{/snippet}
-			</EmptyState>
+			<NoVehiclesEmptyState
+				description="Every expense belongs to a vehicle. Add one, then log what you spend on it."
+			/>
 		</div>
 	{:else}
 		<div class="space-y-6 pb-32 sm:pb-24 lg:pb-0">

@@ -2,11 +2,8 @@
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount, tick } from 'svelte';
-	import { LoaderCircle, Car, DollarSign, Activity, TrendingUp, Plus } from '@lucide/svelte';
-	import { resolve } from '$app/paths';
-	import { routes } from '#lib/routes.ts';
-	import { Button } from '#lib/components/ui/button/index.ts';
-	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { LoaderCircle, Car, DollarSign, Activity, TrendingUp } from '@lucide/svelte';
+	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import * as Tabs from '#lib/components/ui/tabs/index.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
@@ -123,24 +120,9 @@
 	{:else if error}
 		<LoadErrorCard title="Couldn't load analytics" message={error} onRetry={loadSummary} />
 	{:else if noVehicles}
-		<EmptyState>
-			{#snippet icon()}
-				<Car class="h-12 w-12 text-muted-foreground mb-4" />
-			{/snippet}
-			{#snippet title()}
-				Add a vehicle first
-			{/snippet}
-			{#snippet description()}
-				Analytics compare what your vehicles cost over time. Add one and log a few expenses to see
-				them.
-			{/snippet}
-			{#snippet action()}
-				<Button size="lg" href={resolve(routes.vehicleNew)}>
-					<Plus class="mr-2 h-4 w-4" />
-					Add Vehicle
-				</Button>
-			{/snippet}
-		</EmptyState>
+		<NoVehiclesEmptyState
+			description="Analytics compare what your vehicles cost over time. Add one and log a few expenses to see them."
+		/>
 	{:else if quickStats}
 		<StatCardGrid items={quickStatsItems} columns={4} />
 	{/if}

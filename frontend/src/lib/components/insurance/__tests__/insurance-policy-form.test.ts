@@ -128,10 +128,13 @@ describe('InsurancePolicyForm create mode', () => {
 		expect(save.className).not.toMatch(/shadow-2xl|bg-foreground|hover:scale/);
 	});
 
-	test('shows the empty-vehicle hint when the user has no vehicles', async () => {
+	test('with no vehicles, shows the Add Vehicle empty state instead of the form', async () => {
 		getVehicles.mockResolvedValue([]);
 		await mount();
-		expect(screen.getByText('No vehicles found. Add a vehicle first.')).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Add a vehicle first' })).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Add Vehicle' })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /Create Policy/ })).toBeNull();
+		expect(screen.queryByLabelText(/Company/)).toBeNull();
 	});
 
 	test('preselects the vehicle passed in props', async () => {
