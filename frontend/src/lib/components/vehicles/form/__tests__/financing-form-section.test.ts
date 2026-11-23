@@ -166,6 +166,31 @@ describe('FinancingFormSection ownership', () => {
 	});
 });
 
+describe('FinancingFormSection amount inputs follow the currency', () => {
+	const amountIds = ['originalAmount', 'paymentAmount', 'residualValue', 'excessMileageFee'];
+
+	test('a JPY user steps money in whole yen, while APR keeps its decimals', () => {
+		store.currencyUnit = 'JPY';
+		mount({ ownershipType: 'lease' });
+		for (const id of amountIds) {
+			expect(document.getElementById(id)?.getAttribute('step')).toBe('1');
+		}
+		expect(document.getElementById('paymentAmount')?.getAttribute('min')).toBe('1');
+		expect(document.getElementById('originalAmount')?.getAttribute('placeholder')).toBe('0');
+		cleanup();
+		mount({ ownershipType: 'finance' });
+		expect(document.getElementById('apr')?.getAttribute('step')).toBe('0.01');
+	});
+
+	test('a USD user keeps the cents step', () => {
+		mount({ ownershipType: 'lease' });
+		for (const id of amountIds) {
+			expect(document.getElementById(id)?.getAttribute('step')).toBe('0.01');
+		}
+		expect(document.getElementById('paymentAmount')?.getAttribute('min')).toBe('0.01');
+	});
+});
+
 describe('FinancingFormSection term and payment day', () => {
 	test('shows the term in months and years', () => {
 		mount({ financingForm: form({ termMonths: 60 }) });
