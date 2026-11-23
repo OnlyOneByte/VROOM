@@ -5,6 +5,7 @@ import { getDb } from '../../db/connection';
 import { type Trip, trips } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { logger } from '../../utils/logger';
+import { requireVehicleAccess } from '../../utils/vehicle-access';
 import { assertOdometerInOrder } from '../expenses/repository';
 import { odometerRepository, readingCheck } from '../odometer/repository';
 import { deletePhotosForEntities } from '../photos/photo-service';
@@ -54,7 +55,7 @@ async function afterOdometerChange(
     }
     await reminderTriggerService.recheckMileageReminders(userId, trip.vehicleId);
   } catch (error) {
-    logger.error(`Trip ${action}: mileage reminder recheck failed after the trip was saved`, {
+    logger.error(`Trip ${action}: mileage reminder recheck failed after the change was committed`, {
       ...trip,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -66,6 +67,7 @@ export async function createTrip(
   data: CreateTripInput,
   db: AppDatabase = getDb()
 ): Promise<Trip> {
+  await requireVehicleAccess(data.vehicleId, userId, 'owner');
   const check = await readingCheck(data.vehicleId, data.endOdometer, data.tripDate, data.timeZone);
   const trip = db.transaction((tx) => {
     assertOdometerInOrder(tx, check);
@@ -127,7 +129,7 @@ export async function updateTrip(
     const row = tx
       .update(trips)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(trips.id, id))
+      .where(and(eq(trips.id, id), eq(trips.userId, userId)))
       .returning()
       .get();
     if (!row) throw new NotFoundError('Trip');

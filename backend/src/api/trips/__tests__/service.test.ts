@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { NotFoundError } from '../../../errors';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { odometerRepository } from '../../odometer/repository';
 import { createTrip, deleteTrip, updateTrip } from '../service';
@@ -85,5 +86,34 @@ describe('trips service keeps the linked odometer entry in sync', () => {
 
     expect(odoCount()).toBe(1);
     expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(5000);
+  });
+});
+
+describe('trips service writes only the caller’s own trips', () => {
+  test('a stranger cannot create on, edit or delete another user’s trip', async () => {
+    const created = await trip(5000, '2024-06-20T20:30:00.000Z');
+    ctx.sqlite.run(
+      "INSERT INTO users (id, email, display_name) VALUES ('u-other', 'o@x.com', 'O')"
+    );
+
+    await expect(
+      createTrip('u-other', {
+        vehicleId,
+        startOdometer: 5000,
+        endOdometer: 5100,
+        purpose: 'business',
+        tripDate: new Date('2024-06-21T20:30:00.000Z'),
+      })
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      updateTrip('u-other', created, { endOdometer: 6000 }, undefined)
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      deleteTrip('u-other', created, { keepOdometer: false, timeZone: undefined })
+    ).rejects.toBeInstanceOf(NotFoundError);
+
+    const row = ctx.sqlite.query('SELECT end_odometer FROM trips WHERE id = ?').get(created.id);
+    expect(row).toEqual({ end_odometer: 5000 });
+    expect(odoCount()).toBe(1);
   });
 });

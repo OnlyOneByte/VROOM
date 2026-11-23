@@ -46,8 +46,6 @@ routes.post('/', zValidator('json', createTripSchema), async (c) => {
   const user = c.get('user');
   const data = c.req.valid('json');
 
-  await requireVehicleAccess(data.vehicleId, user.id, 'owner');
-
   const trip = await createTrip(user.id, data);
 
   return c.json({ success: true, data: trip, message: 'Trip created' }, 201);
