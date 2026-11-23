@@ -41,6 +41,7 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/google'),
   GOOGLE_PROVIDER_REDIRECT_URI: z.string().optional(),
+  PROVIDER_ENCRYPTION_KEY: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   GITHUB_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/github'),
@@ -118,6 +119,7 @@ export const CONFIG = {
   blockPrivateProviderEndpoints: env.BLOCK_PRIVATE_PROVIDER_ENDPOINTS,
   disableRateLimit: env.DISABLE_RATE_LIMIT && (env.NODE_ENV as Environment) !== 'production',
   server: { port: env.PORT, host: env.HOST },
+  encryption: { providerKey: env.PROVIDER_ENCRYPTION_KEY },
   database: {
     url: env.DATABASE_URL,
     cacheSize: 1_000_000,
@@ -322,7 +324,7 @@ export function getRequiredBackupFiles(): string[] {
 const ENCRYPTION_KEY_PATTERN = /^[0-9a-fA-F]{64}$/;
 
 export const validateProductionConfig = () => {
-  const encryptionKey = process.env.PROVIDER_ENCRYPTION_KEY;
+  const encryptionKey = CONFIG.encryption.providerKey;
 
   if (CONFIG.env === 'production') {
     const requiredFields = [

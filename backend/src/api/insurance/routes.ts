@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
-import { parseClampedInt } from '../../utils/calculations';
 import { insuranceClaimToApi, insuranceTermToApi } from '../../utils/money';
 import { requireVehicleRead, resolveVehicleAccess } from '../../utils/sharing';
 import {
@@ -139,22 +138,6 @@ routes.get('/', async (c) => {
   const user = c.get('user');
   const policies = await insurancePolicyRepository.findByUserId(user.id);
   return c.json({ success: true, data: policies.map(policyToApi), count: policies.length });
-});
-
-routes.get('/expiring-soon', async (c) => {
-  const user = c.get('user');
-  const daysAhead = parseClampedInt(c.req.query('days'), 30, 1, 366);
-  const limit = parseClampedInt(c.req.query('limit'), 100, 1, 200);
-  const now = new Date();
-  const endDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
-  const terms = await insurancePolicyRepository.findExpiringTerms(now, endDate, user.id, limit);
-  return c.json({
-    success: true,
-    data: terms.map((t) => insuranceTermToApi(t)),
-    count: terms.length,
-    daysAhead,
-    limit,
-  });
 });
 
 routes.get(

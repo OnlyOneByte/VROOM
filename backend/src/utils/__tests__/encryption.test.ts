@@ -1,24 +1,22 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { randomBytes } from 'node:crypto';
+import { CONFIG } from '../../config';
 import { _clearKeyCache, decrypt, encrypt } from '../encryption';
 
 const TEST_KEY = 'a'.repeat(64);
 const ALT_KEY = 'b'.repeat(64);
 
+const encryption = CONFIG.encryption as { providerKey: string | undefined };
 let originalKey: string | undefined;
 
 beforeEach(() => {
-  originalKey = process.env.PROVIDER_ENCRYPTION_KEY;
-  process.env.PROVIDER_ENCRYPTION_KEY = TEST_KEY;
+  originalKey = encryption.providerKey;
+  encryption.providerKey = TEST_KEY;
   _clearKeyCache();
 });
 
 afterEach(() => {
-  if (originalKey !== undefined) {
-    process.env.PROVIDER_ENCRYPTION_KEY = originalKey;
-  } else {
-    delete process.env.PROVIDER_ENCRYPTION_KEY;
-  }
+  encryption.providerKey = originalKey;
   _clearKeyCache();
 });
 
@@ -57,7 +55,7 @@ describe('encrypt/decrypt round-trip', () => {
 describe('wrong key throws', () => {
   test('decrypt with different key throws', () => {
     const ciphertext = encrypt('secret data');
-    process.env.PROVIDER_ENCRYPTION_KEY = ALT_KEY;
+    encryption.providerKey = ALT_KEY;
     _clearKeyCache();
     expect(() => decrypt(ciphertext)).toThrow();
   });
@@ -87,7 +85,7 @@ describe('tampered ciphertext throws', () => {
 
 describe('missing or invalid encryption key', () => {
   test('throws when PROVIDER_ENCRYPTION_KEY is not set', () => {
-    delete process.env.PROVIDER_ENCRYPTION_KEY;
+    encryption.providerKey = undefined;
     _clearKeyCache();
     expect(() => encrypt('test')).toThrow(
       'PROVIDER_ENCRYPTION_KEY environment variable is not set'
@@ -95,7 +93,7 @@ describe('missing or invalid encryption key', () => {
   });
 
   test('throws when key is wrong length', () => {
-    process.env.PROVIDER_ENCRYPTION_KEY = 'abcd';
+    encryption.providerKey = 'abcd';
     _clearKeyCache();
     expect(() => encrypt('test')).toThrow('must be a 32-byte hex string');
   });

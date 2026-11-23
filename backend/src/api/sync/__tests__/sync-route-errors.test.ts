@@ -49,15 +49,4 @@ describe('sync route error behavior', () => {
     expect(body.success).toBe(false);
     expect(body.error.code).toBe('AuthenticationError');
   });
-
-  test('GET /sync/health is unauthenticated-safe and returns healthy (no error path)', async () => {
-    const res = await ctx.authed('GET', '/api/v1/sync/health');
-    expect(res.status).toBe(200);
-    const body = (await json<{ status: string; service: string }>(res)) as {
-      status: string;
-      service: string;
-    };
-    expect(body.status).toBe('healthy');
-    expect(body.service).toBe('sync');
-  });
 });

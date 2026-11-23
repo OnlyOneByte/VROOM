@@ -1,5 +1,6 @@
 import type { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
+import { CONFIG } from '../../../config';
 import { SyncError, SyncErrorCode } from '../../../errors';
 
 const PHOTOS_API = 'https://photoslibrary.googleapis.com';
@@ -106,9 +107,9 @@ export class GooglePhotosService {
 // Library API upload is a raw bytes POST, so this uses fetch rather than the googleapis SDK.
 function createRealPhotosClient(refreshToken: string): PhotosClient {
   const oauth2Client: OAuth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
+    CONFIG.auth.googleClientId,
+    CONFIG.auth.googleClientSecret,
+    CONFIG.auth.googleStorageRedirectUri
   );
   oauth2Client.setCredentials({ refresh_token: refreshToken });
 

@@ -48,10 +48,6 @@ export const restoreFromProviderSchema = z.discriminatedUnion('sourceType', [
   }),
 ]);
 
-routes.get('/health', async (c) => {
-  return c.json({ status: 'healthy', timestamp: new Date().toISOString(), service: 'sync' });
-});
-
 function validateSyncTypes(syncTypes: unknown): string[] {
   if (!syncTypes || !Array.isArray(syncTypes) || syncTypes.length === 0) {
     throw new ValidationError('syncTypes must be a non-empty array');

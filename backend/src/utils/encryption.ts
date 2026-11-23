@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { CONFIG } from '../config';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
@@ -10,7 +11,7 @@ let _cachedKey: Buffer | null = null;
 function getEncryptionKey(): Buffer {
   if (_cachedKey) return _cachedKey;
 
-  const hex = process.env.PROVIDER_ENCRYPTION_KEY;
+  const hex = CONFIG.encryption.providerKey;
   if (!hex) {
     throw new Error('PROVIDER_ENCRYPTION_KEY environment variable is not set');
   }
