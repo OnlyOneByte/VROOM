@@ -14,8 +14,8 @@
 <Button
 	{href}
 	{onclick}
-	class="fixed bottom-4 left-4 right-4 z-40 h-16 rounded-full sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto flex items-center justify-center gap-2 pl-6 pr-10 bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 border-0 group"
+	class="fixed bottom-4 left-4 right-4 z-40 h-14 rounded-full sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto lg:hidden has-[>svg]:px-6 shadow-lg transition-colors"
 >
-	<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
-	<span class="font-bold text-lg">{label}</span>
+	<Plus class="size-5" />
+	<span class="font-semibold text-base">{label}</span>
 </Button>

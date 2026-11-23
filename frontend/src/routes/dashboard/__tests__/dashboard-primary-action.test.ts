@@ -49,6 +49,14 @@ function controls(name: string) {
 	return [...screen.queryAllByRole('button', { name }), ...screen.queryAllByRole('link', { name })];
 }
 
+function belowLg(name: string) {
+	return controls(name).filter(control => !control.classList.contains('hidden'));
+}
+
+function fromLg(name: string) {
+	return controls(name).filter(control => !control.classList.contains('lg:hidden'));
+}
+
 beforeEach(() => {
 	getVehicles.mockReset();
 });
@@ -58,20 +66,36 @@ describe('dashboard primary action', () => {
 		getVehicles.mockImplementation(() => Promise.resolve([OWNED]));
 		render(Page);
 
-		await waitFor(() => expect(controls('Log Fill-up')).toHaveLength(1));
-		expect(controls('Log Fill-up')[0]).toHaveClass('fixed');
-		const addVehicle = controls('Add Vehicle');
-		expect(addVehicle).toHaveLength(1);
-		expect(addVehicle[0]).not.toHaveClass('fixed');
-		expect(addVehicle[0]).toHaveClass('border', 'bg-background');
+		await waitFor(() => expect(belowLg('Log Fill-up')).toHaveLength(1));
+		expect(belowLg('Log Fill-up')[0]).toHaveClass('fixed');
+		for (const visible of [belowLg, fromLg]) {
+			const addVehicle = visible('Add Vehicle');
+			expect(addVehicle).toHaveLength(1);
+			expect(addVehicle[0]).not.toHaveClass('fixed');
+			expect(addVehicle[0]).toHaveClass('border', 'bg-background');
+		}
+	});
+
+	test('from lg: up, Log Fill-up moves from the floating button to the header', async () => {
+		getVehicles.mockImplementation(() => Promise.resolve([OWNED]));
+		render(Page);
+
+		await waitFor(() => expect(fromLg('Log Fill-up')).toHaveLength(1));
+		const header = screen
+			.getByRole('heading', { level: 1, name: 'Dashboard' })
+			.closest('.flex-col');
+		expect(fromLg('Log Fill-up')[0]).not.toHaveClass('fixed');
+		expect(header).toContainElement(fromLg('Log Fill-up')[0] ?? null);
 	});
 
 	test('with no vehicles, Add Vehicle is the single floating primary and there is no Log Fill-up', async () => {
 		getVehicles.mockImplementation(() => Promise.resolve([]));
 		render(Page);
 
-		await waitFor(() => expect(controls('Add Vehicle')).toHaveLength(1));
-		expect(controls('Add Vehicle')[0]).toHaveClass('fixed');
+		await waitFor(() => expect(belowLg('Add Vehicle')).toHaveLength(1));
+		expect(belowLg('Add Vehicle')[0]).toHaveClass('fixed');
+		expect(fromLg('Add Vehicle')).toHaveLength(1);
+		expect(fromLg('Add Vehicle')[0]).not.toHaveClass('fixed');
 		expect(controls('Log Fill-up')).toHaveLength(0);
 	});
 
@@ -81,8 +105,10 @@ describe('dashboard primary action', () => {
 		);
 		render(Page);
 
-		await waitFor(() => expect(controls('Add Vehicle')).toHaveLength(1));
-		expect(controls('Add Vehicle')[0]).toHaveClass('fixed');
+		await waitFor(() => expect(belowLg('Add Vehicle')).toHaveLength(1));
+		expect(belowLg('Add Vehicle')[0]).toHaveClass('fixed');
+		expect(fromLg('Add Vehicle')).toHaveLength(1);
+		expect(fromLg('Add Vehicle')[0]).not.toHaveClass('fixed');
 		expect(controls('Log Fill-up')).toHaveLength(0);
 	});
 
@@ -104,28 +130,28 @@ describe('dashboard primary action', () => {
 		const header = screen
 			.getByRole('heading', { level: 1, name: 'Dashboard' })
 			.closest('.flex-col');
-		const placeholder = header?.querySelector(':scope > [data-slot="skeleton"]');
+		const placeholder = header?.querySelector('[data-slot="skeleton"]');
 		expect(placeholder).toHaveClass('h-10');
 
 		settle([OWNED]);
-		await waitFor(() => expect(controls('Add Vehicle')).toHaveLength(1));
-		expect(header?.querySelector(':scope > [data-slot="skeleton"]')).toBeNull();
-		expect(controls('Add Vehicle')[0]).toHaveClass('h-10');
+		await waitFor(() => expect(belowLg('Add Vehicle')).toHaveLength(1));
+		expect(header?.querySelector('[data-slot="skeleton"]')).toBeNull();
+		expect(belowLg('Add Vehicle')[0]).toHaveClass('h-10');
 	});
 
 	function headerPlaceholder() {
 		const header = screen
 			.getByRole('heading', { level: 1, name: 'Dashboard' })
 			.closest('.flex-col');
-		return header?.querySelector(':scope > [data-slot="skeleton"]') ?? null;
+		return header?.querySelector('[data-slot="skeleton"]') ?? null;
 	}
 
 	test('with no owned vehicles the header placeholder is gone once the load settles', async () => {
 		getVehicles.mockImplementation(() => Promise.resolve([]));
 		render(Page);
 
-		await waitFor(() => expect(controls('Add Vehicle')).toHaveLength(1));
-		expect(controls('Add Vehicle')[0]).toHaveClass('fixed');
+		await waitFor(() => expect(belowLg('Add Vehicle')).toHaveLength(1));
+		expect(belowLg('Add Vehicle')[0]).toHaveClass('fixed');
 		expect(headerPlaceholder()).toBeNull();
 	});
 

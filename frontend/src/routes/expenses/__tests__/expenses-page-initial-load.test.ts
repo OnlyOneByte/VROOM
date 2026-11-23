@@ -198,10 +198,9 @@ describe('/expenses initial load', () => {
 		expect(await screen.findByText("You're offline")).toBeInTheDocument();
 		expect(screen.queryByText("Couldn't load expenses")).not.toBeInTheDocument();
 		expect(screen.getByText(/Queued oil top-up/)).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: /Add Expense/ })).toHaveAttribute(
-			'href',
-			'/expenses/new'
-		);
+		const addExpense = screen.getAllByRole('link', { name: /Add Expense/ });
+		expect(addExpense.map(link => link.classList.contains('lg:hidden'))).toEqual([false, true]);
+		for (const link of addExpense) expect(link).toHaveAttribute('href', '/expenses/new');
 		expect(appStore.notifications.filter(n => n.type === 'error')).toHaveLength(0);
 	});
 

@@ -120,7 +120,16 @@
 </svelte:head>
 
 <div class="space-y-6 pb-24">
-	<PageHeader title="Trips" description="Track mileage and trips across your vehicles" />
+	<PageHeader title="Trips" description="Track mileage and trips across your vehicles">
+		{#snippet actions()}
+			{#if !isLoading && !loadError && trips.length > 0 && vehicles.length > 0}
+				<Button size="lg" class="hidden lg:inline-flex" onclick={openCreate}>
+					<Plus class="mr-2 h-4 w-4" />
+					Log Trip
+				</Button>
+			{/if}
+		{/snippet}
+	</PageHeader>
 
 	{#if isLoading}
 		<div class="space-y-3">

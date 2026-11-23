@@ -89,7 +89,7 @@
 	<div class="space-y-6 pb-24">
 		<PageHeader title="Insurance" description="Manage your insurance policies across all vehicles">
 			{#snippet actions()}
-				<Button class="hidden sm:flex" onclick={handleAddPolicy}>
+				<Button size="lg" class="hidden lg:inline-flex" onclick={handleAddPolicy}>
 					<Plus class="mr-2 h-4 w-4" />
 					New Policy
 				</Button>

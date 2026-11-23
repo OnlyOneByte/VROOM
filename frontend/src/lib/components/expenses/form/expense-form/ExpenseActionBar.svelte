@@ -23,10 +23,14 @@
 		onCancel,
 		onSave
 	}: Props = $props();
+
+	function keepFieldFocus(event: MouseEvent) {
+		event.preventDefault();
+	}
 </script>
 
 <div
-	class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto z-50"
+	class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto z-50 lg:static lg:z-auto lg:mt-6"
 >
 	<div
 		class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none"
@@ -34,6 +38,7 @@
 		{#if isEditMode}
 			<Button
 				type="button"
+				onmousedown={keepFieldFocus}
 				variant="outline"
 				onclick={onDelete}
 				disabled={isDeleting || isSubmitting}
@@ -47,6 +52,7 @@
 		{#if canDuplicate}
 			<Button
 				type="button"
+				onmousedown={keepFieldFocus}
 				variant="outline"
 				onclick={onDuplicate}
 				disabled={isSubmitting || isDeleting}
@@ -59,6 +65,7 @@
 
 		<Button
 			type="button"
+			onmousedown={keepFieldFocus}
 			variant="outline"
 			onclick={onCancel}
 			disabled={isSubmitting || isDeleting}
@@ -70,6 +77,7 @@
 
 		<Button
 			type="button"
+			onmousedown={keepFieldFocus}
 			onclick={onSave}
 			disabled={isSubmitting || isDeleting}
 			class="sm:rounded-full rounded-full group bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 sm:h-14 px-6 border-0 flex-1 sm:flex-initial"

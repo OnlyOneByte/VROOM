@@ -31,6 +31,8 @@
 		</div>
 	</div>
 	{#if actions}
-		{@render actions()}
+		<div class="contents lg:flex lg:shrink-0 lg:items-center lg:gap-2">
+			{@render actions()}
+		</div>
 	{/if}
 </div>

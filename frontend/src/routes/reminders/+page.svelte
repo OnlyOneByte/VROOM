@@ -216,6 +216,12 @@
 					Run Due Reminders
 				</Button>
 			{/if}
+			{#if !isLoading && !loadError && reminders.length > 0}
+				<Button size="lg" class="hidden lg:inline-flex" onclick={openCreate}>
+					<Plus class="mr-2 h-4 w-4" />
+					New Reminder
+				</Button>
+			{/if}
 		{/snippet}
 	</PageHeader>
 
