@@ -489,7 +489,7 @@
 	</div>
 
 	<FloatingActionButton href={resolve(routes.expenseNew)} label={COMMON_MESSAGES.ADD_EXPENSE} />
-{:else if vehicles.length === 0 && totalCount === 0}
+{:else if vehicles.length === 0 && (summary?.expenseCount ?? 0) === 0}
 	<div class="space-y-6">
 		<PageHeader
 			title="All Expenses"
