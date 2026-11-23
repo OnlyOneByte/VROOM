@@ -451,7 +451,7 @@ describe('ExpenseForm create mode', () => {
 
 		expect(getVehicle).toHaveBeenCalledTimes(1);
 		expect(getVehicle).toHaveBeenCalledWith(loaded);
-		expect(getExpensesByVehicle).toHaveBeenCalledWith(loaded, { limit: 2, category: 'fuel' });
+		expect(getExpensesByVehicle).toHaveBeenCalledWith(loaded, { limit: 10, category: 'fuel' });
 		expect(getExpensesByVehicle).toHaveBeenCalledWith(loaded, { limit: 100 });
 	});
 

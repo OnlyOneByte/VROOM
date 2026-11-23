@@ -91,7 +91,9 @@ export function modelDescriptor<Cap extends ModelCapability, P>(
     scope: 'user',
     availability: alwaysAvailable,
     config: { schema: modelConfigSchema(domain, !!spec.baseUrl), fields },
-    secrets: spec.apiKey ? [{ key: 'apiKey', label: 'API key', required: true }] : [],
+    secrets: spec.apiKey
+      ? [{ key: 'apiKey', label: 'API key', required: true, reenterWhenChanged: ['baseUrl'] }]
+      : [],
     connect: 'form',
     features: {},
     create: (settings) => {

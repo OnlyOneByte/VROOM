@@ -61,7 +61,8 @@ Tailwind's 4px scale is the only spacing scale. Match the neighbours; don't inve
   and add `sm:`/`lg:` overrides — never the reverse.
 - **Grids collapse.** Stat tiles are 2-up on mobile and up to 4-up at `lg` (`StatCardGrid`).
   Three single-value tiles share one card of three rows below `sm` and sit 3-up from `sm`;
-  two-value tiles take a row each below `sm`.
+  two-value tiles take a row each below `sm` and put their two figures side by side from an 18rem
+  tile.
   Side-by-side cards stack below `lg`.
 - **Radius** comes from `--radius` (`rounded-md` controls, `rounded-lg`/`rounded-xl` cards).
   `rounded-full` is for avatars, pills, carousel arrows and the FAB only.
@@ -216,6 +217,9 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   series.
 - One unit per axis. Two measures with different units are two charts, not two series on one
   axis.
+- Neighbouring chart slots (`chart-1`…`chart-8`) in every theme and mode stay at least ΔE 15 apart
+  (OKLab ×100) and ΔE 8 apart under simulated protanopia, deuteranopia and tritanopia;
+  `chart-palette.test.ts` fails a theme that drifts.
 - A chart is never the only way to read a number: pair it with a stat tile, a legend with values
   (as the category pie does), or a table.
 - Every chart can be read without seeing it: the wrappers give the plot a `role="img"` summary

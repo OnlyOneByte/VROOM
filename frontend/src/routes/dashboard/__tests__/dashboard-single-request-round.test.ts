@@ -5,9 +5,7 @@ import type { Vehicle } from '#lib/types/index.ts';
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-vi.mock('#lib/components/charts/index.ts', () => ({ AppPieChart: () => {} }));
-vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
-vi.mock('#lib/components/dashboard/VehicleCarousel.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/charts/index.ts', () => ({ AppBarChart: () => {} }));
 vi.mock('#lib/components/dashboard/SharedWithMeCard.svelte', () => ({ default: () => {} }));
 
 const getVehicles = vi.fn();
@@ -37,6 +35,15 @@ vi.mock('#lib/services/reminder-api.ts', () => ({
 		list: (...args: unknown[]) => listReminders(...args),
 		getRecurringCost: (...args: unknown[]) => getRecurringCost(...args)
 	}
+}));
+
+const getAllPolicies = vi.fn(() => Promise.resolve([]));
+const analyticsQuery = vi.fn(() => Promise.resolve(null));
+vi.mock('#lib/services/insurance-api.ts', () => ({
+	insuranceApi: { getAllPolicies: () => getAllPolicies() }
+}));
+vi.mock('#lib/services/analytics-api.ts', () => ({
+	analyticsApi: { query: (...args: unknown[]) => analyticsQuery(...(args as [])) }
 }));
 
 import Page from '../+page.svelte';
@@ -69,37 +76,54 @@ beforeEach(() => {
 			recentAmount: 0,
 			monthlyAverage: 0,
 			categoryBreakdown: [],
-			monthlyTrend: []
+			monthlyTrend: [],
+			costBuckets: { ownershipTotal: 0, runningTotal: 0, previous: null, byVehicle: [] }
 		})
 	);
 });
 
 describe('dashboard initial load', () => {
-	test('cover photos and per-vehicle stats do NOT queue behind the vehicle list', async () => {
+	test('the period numbers, policies and charts do NOT queue behind the vehicle list', async () => {
 		getVehicles.mockImplementation(() => new Promise<Vehicle[]>(() => {}));
 
 		render(Page);
 
 		await waitFor(() => {
-			expect(getAllVehiclePhotos).toHaveBeenCalled();
-			expect(getVehicleStats).toHaveBeenCalled();
+			expect(getExpenseSummary).toHaveBeenCalledWith({ period: '30d' });
+			expect(getAllPolicies).toHaveBeenCalled();
+			expect(analyticsQuery).toHaveBeenCalledTimes(3);
 		});
 	});
 
-	test('all eight opening reads are issued, and each exactly once', async () => {
+	test('every opening read is issued exactly once, with nothing per shared vehicle when none is shared', async () => {
 		render(Page);
 
-		await waitFor(() => expect(getVehicleStats).toHaveBeenCalled());
+		await waitFor(() => expect(analyticsQuery).toHaveBeenCalledTimes(3));
 		for (const [name, spy] of [
 			['vehicles', getVehicles],
-			['cover photos', getAllVehiclePhotos],
-			['per-vehicle stats', getVehicleStats],
 			['recent expenses', getAllExpenses],
 			['reminders', listReminders],
-			['recurring cost', getRecurringCost]
+			['recurring cost', getRecurringCost],
+			['policies', getAllPolicies]
 		] as const) {
 			expect(spy.mock.calls.length, `${name} requested exactly once`).toBe(1);
 		}
-		expect(getExpenseSummary.mock.calls.length).toBe(1);
+		expect(getExpenseSummary.mock.calls.map(call => call[0])).toEqual([
+			{ period: 'all' },
+			{ period: '30d' }
+		]);
+		expect(getAllVehiclePhotos).not.toHaveBeenCalled();
+		expect(getVehicleStats).not.toHaveBeenCalled();
+	});
+
+	test('a shared vehicle adds its own summary for the period', async () => {
+		getVehicles.mockImplementation(() =>
+			Promise.resolve([VEHICLE, { ...VEHICLE, id: 'v2', sharedAccess: { sharedBy: 'Sam' } }])
+		);
+		render(Page);
+
+		await waitFor(() =>
+			expect(getExpenseSummary).toHaveBeenCalledWith({ vehicleId: 'v2', period: '30d' })
+		);
 	});
 });

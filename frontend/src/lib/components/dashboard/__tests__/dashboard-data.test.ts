@@ -1,0 +1,191 @@
+import { describe, expect, test } from 'vitest';
+import type { ExpenseSummary, InsurancePolicy, ReminderWithVehicles } from '#lib/types/index.ts';
+import {
+	attentionItems,
+	bucketAmounts,
+	combinePeriodSpend,
+	highestMonth,
+	percentChange,
+	RUNNING_CATEGORIES
+} from '../dashboard-data';
+
+const DAY = 24 * 60 * 60 * 1000;
+const NOW = new Date(2026, 10, 23, 12).getTime();
+
+function summary(overrides: Partial<ExpenseSummary>): ExpenseSummary {
+	return {
+		totalAmount: 0,
+		expenseCount: 0,
+		monthlyAverage: 0,
+		recentAmount: 0,
+		categoryBreakdown: [],
+		monthlyTrend: [],
+		costBuckets: { ownershipTotal: 0, runningTotal: 0, previous: null, byVehicle: [] },
+		...overrides
+	};
+}
+
+describe('dashboard data', () => {
+	test('running categories are every category but financial', () => {
+		expect(RUNNING_CATEGORIES).toEqual([
+			'fuel',
+			'maintenance',
+			'regulatory',
+			'enhancement',
+			'misc'
+		]);
+	});
+
+	test('the split groups categories into ownership, fuel and charging, and upkeep', () => {
+		expect(
+			bucketAmounts([
+				{ category: 'financial', amount: 300, count: 1 },
+				{ category: 'fuel', amount: 45, count: 1 },
+				{ category: 'maintenance', amount: 20, count: 1 },
+				{ category: 'misc', amount: 5, count: 1 }
+			])
+		).toEqual({ ownership: 300, energy: 45, upkeep: 25 });
+	});
+
+	test('owned and shared summaries add up, per vehicle and for the period before', () => {
+		const spend = combinePeriodSpend([
+			summary({
+				totalAmount: 100,
+				categoryBreakdown: [{ category: 'fuel', amount: 100, count: 2 }],
+				costBuckets: {
+					ownershipTotal: 0,
+					runningTotal: 100,
+					previous: { ownershipTotal: 50, runningTotal: 30 },
+					byVehicle: [{ vehicleId: 'v1', ownershipTotal: 0, runningTotal: 100, previous: null }]
+				}
+			}),
+			summary({
+				totalAmount: 40,
+				categoryBreakdown: [{ category: 'financial', amount: 40, count: 1 }],
+				costBuckets: {
+					ownershipTotal: 40,
+					runningTotal: 0,
+					previous: { ownershipTotal: 40, runningTotal: 0 },
+					byVehicle: [{ vehicleId: 'v2', ownershipTotal: 40, runningTotal: 0, previous: null }]
+				}
+			})
+		]);
+
+		expect(spend.total).toBe(140);
+		expect(spend.previousTotal).toBe(120);
+		expect(spend.buckets).toEqual({ ownership: 40, energy: 100, upkeep: 0 });
+		expect([...spend.byVehicle]).toEqual([
+			['v1', 100],
+			['v2', 40]
+		]);
+	});
+
+	test('all time has no previous period, so there is no change to show', () => {
+		expect(combinePeriodSpend([summary({ totalAmount: 10 })]).previousTotal).toBeNull();
+		expect(percentChange(10, null)).toBeNull();
+		expect(percentChange(10, 0)).toBeNull();
+		expect(percentChange(94, 100)).toBe(-6);
+		expect(percentChange(112, 100)).toBe(12);
+	});
+
+	test('needs attention lists overdue and soon reminders and renewals, soonest first', () => {
+		const reminders = [
+			{
+				reminder: {
+					id: 'r1',
+					name: 'Oil change',
+					isActive: true,
+					nextDueDate: new Date(NOW - 2 * DAY).toISOString()
+				},
+				vehicleIds: ['v1']
+			},
+			{
+				reminder: {
+					id: 'r2',
+					name: 'Rotation',
+					isActive: true,
+					nextDueDate: new Date(NOW + 5 * DAY).toISOString()
+				},
+				vehicleIds: []
+			},
+			{
+				reminder: {
+					id: 'r3',
+					name: 'Far off',
+					isActive: true,
+					nextDueDate: new Date(NOW + 30 * DAY).toISOString()
+				},
+				vehicleIds: []
+			},
+			{
+				reminder: {
+					id: 'r4',
+					name: 'Paused',
+					isActive: false,
+					nextDueDate: new Date(NOW).toISOString()
+				},
+				vehicleIds: []
+			}
+		] as unknown as ReminderWithVehicles[];
+		const policies = [
+			{
+				id: 'p1',
+				company: 'State Farm',
+				isActive: true,
+				terms: [{ endDate: new Date(NOW + 40 * DAY).toISOString() }]
+			},
+			{
+				id: 'p2',
+				company: 'Later Co',
+				isActive: true,
+				terms: [{ endDate: new Date(NOW + 90 * DAY).toISOString() }]
+			},
+			{
+				id: 'p3',
+				company: 'Old Co',
+				isActive: false,
+				terms: [{ endDate: new Date(NOW).toISOString() }]
+			},
+			{
+				id: 'p4',
+				company: 'Lapsed Co',
+				isActive: true,
+				terms: [{ endDate: new Date(NOW - 10 * DAY).toISOString() }]
+			},
+			{
+				id: 'p5',
+				company: 'Long Gone',
+				isActive: true,
+				terms: [{ endDate: new Date(NOW - 400 * DAY).toISOString() }]
+			}
+		] as unknown as InsurancePolicy[];
+
+		const items = attentionItems(
+			reminders,
+			policies,
+			id => (id === 'v1' ? 'Daily Driver' : undefined),
+			date => date.toISOString().slice(0, 10),
+			NOW
+		);
+
+		expect(items.map(item => [item.title, item.status])).toEqual([
+			['Lapsed Co renewal', 'overdue'],
+			['Oil change · Daily Driver', 'overdue'],
+			['Rotation', 'soon'],
+			['State Farm renewal', 'soon']
+		]);
+		expect(items[1]?.detail).toMatch(/^Was due /);
+		expect(items[0]?.detail).toMatch(/^Ended /);
+	});
+
+	test('the insight names the highest month, and nothing when every month is zero', () => {
+		const aug = new Date(2026, 7, 1);
+		expect(
+			highestMonth([
+				{ date: new Date(2026, 6, 1), amount: 300 },
+				{ date: aug, amount: 812 }
+			])
+		).toEqual({ date: aug, amount: 812 });
+		expect(highestMonth([{ date: aug, amount: 0 }])).toBeNull();
+	});
+});

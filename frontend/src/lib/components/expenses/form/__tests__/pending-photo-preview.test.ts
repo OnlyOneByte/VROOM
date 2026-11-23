@@ -13,6 +13,7 @@ vi.mock('$app/paths', () => ({
 }));
 
 import PendingPhotoPreview from '../PendingPhotoPreview.svelte';
+import '#lib/components/common/MediaCaptureDialog.svelte';
 
 const realCreateObjectURL = URL.createObjectURL;
 const realRevokeObjectURL = URL.revokeObjectURL;

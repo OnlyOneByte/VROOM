@@ -1,17 +1,12 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { Clock, ArrowRight } from '@lucide/svelte';
+	import { Clock } from '@lucide/svelte';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
-	import { formatCurrency, formatRelativeTime } from '#lib/utils/formatters.ts';
-	import {
-		categoryLabels,
-		getCategoryBadgeClasses,
-		getCategoryIcon
-	} from '#lib/utils/expense-helpers.ts';
+	import { formatCurrency, formatDateWith } from '#lib/utils/formatters.ts';
+	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
 	import type { ExpenseCategory } from '#lib/types/index.ts';
 
 	interface RecentExpense {
@@ -20,6 +15,7 @@
 		category: ExpenseCategory;
 		date: Date;
 		description?: string | null;
+		location?: string | null;
 		vehicleName: string;
 	}
 
@@ -29,80 +25,73 @@
 	}
 
 	let { expenses, isLoading = false }: Props = $props();
+
+	function headline(expense: RecentExpense): string {
+		return (
+			expense.description?.trim() || expense.location?.trim() || categoryLabels[expense.category]
+		);
+	}
 </script>
 
-<Card.Root>
-	<Card.Header>
-		<div class="flex items-center justify-between">
-			<div>
-				<Card.Title>Recent Activity</Card.Title>
-				<Card.Description>Latest expenses across all vehicles</Card.Description>
-			</div>
-			<div class="p-2 rounded-lg bg-accent">
-				<Clock class="h-5 w-5 text-accent-foreground" />
-			</div>
-		</div>
+<Card.Root class="gap-3 py-5">
+	<Card.Header class="flex flex-row items-center justify-between gap-3 px-5">
+		<Card.Title level={2} class="text-lg">Recent</Card.Title>
+		{#if expenses.length > 0}
+			<a
+				href={resolve(routes.expenses)}
+				class="inline-flex min-h-10 items-center rounded-sm text-sm font-semibold text-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:min-h-0"
+			>
+				See all<span class="sr-only"> expenses</span>
+			</a>
+		{/if}
 	</Card.Header>
-	<Card.Content>
+	<Card.Content class="px-5">
 		{#if isLoading}
-			<div class="space-y-3">
-				{#each Array(5) as _, i (i)}
-					<Skeleton class="h-16 w-full" />
+			<ul class="divide-y" role="list" aria-busy="true">
+				{#each Array(3) as _, i (i)}
+					<li class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+						<div class="space-y-1.5">
+							<Skeleton class="h-4 w-32" />
+							<Skeleton class="h-3 w-44" />
+						</div>
+						<Skeleton class="h-4 w-14" />
+					</li>
 				{/each}
-			</div>
+			</ul>
 		{:else if expenses.length > 0}
-			<div class="space-y-3">
+			<ul class="divide-y" role="list">
 				{#each expenses as expense (expense.id)}
-					{@const CategoryIcon = getCategoryIcon(expense.category)}
-					<div
-						class="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-					>
-						<div class="flex-1 min-w-0">
-							<div
-								class="mb-1 flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2"
-							>
-								<!-- Tinted label text fails WCAG AA; only the icon chip takes the category colour. -->
-								<span
-									class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium {getCategoryBadgeClasses(
-										expense.category
-									)}"
-								>
-									<CategoryIcon class="h-3 w-3" />
-									<span class="text-foreground">{categoryLabels[expense.category]}</span>
-								</span>
-								<span class="min-w-0 max-w-full truncate text-sm font-medium">
-									{expense.vehicleName}
-								</span>
-							</div>
-							{#if expense.description}
-								<p class="text-sm text-muted-foreground truncate">{expense.description}</p>
-							{/if}
-							<p class="text-xs text-muted-foreground mt-1">
-								{formatRelativeTime(expense.date)}
+					<li class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+						<div class="min-w-0">
+							<p class="truncate text-sm font-medium text-foreground">{headline(expense)}</p>
+							<p class="truncate text-xs text-muted-foreground">
+								{[
+									headline(expense) === categoryLabels[expense.category]
+										? null
+										: categoryLabels[expense.category],
+									expense.vehicleName,
+									formatDateWith(expense.date, { month: 'short', day: 'numeric' })
+								]
+									.filter(Boolean)
+									.join(' · ')}
 							</p>
 						</div>
-						<div class="text-right ml-4">
-							<p class="text-lg font-bold">{formatCurrency(expense.amount)}</p>
-						</div>
-					</div>
+						<p class="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+							{formatCurrency(expense.amount)}
+						</p>
+					</li>
 				{/each}
-			</div>
-			<div class="mt-4 pt-4 border-t">
-				<Button href={resolve(routes.expenses)} variant="outline" class="h-10 w-full sm:h-9">
-					View All Expenses
-					<ArrowRight class="h-4 w-4 ml-2" />
-				</Button>
-			</div>
+			</ul>
 		{:else}
-			<EmptyState>
+			<EmptyState level={3} class="border-0 py-0 shadow-none">
 				{#snippet icon()}
-					<Clock class="h-12 w-12 text-muted-foreground" />
+					<Clock class="mb-4 h-12 w-12 text-muted-foreground" />
 				{/snippet}
 				{#snippet title()}
-					No recent activity
+					No expenses yet
 				{/snippet}
 				{#snippet description()}
-					Add expenses to see recent activity
+					Log a fill-up or any cost and it shows here.
 				{/snippet}
 			</EmptyState>
 		{/if}
