@@ -77,11 +77,11 @@ describe('ThemePickerCard', () => {
 	test('the current-theme row follows the chosen theme', async () => {
 		themeStore.setTheme('vaporwave');
 		render(ThemePickerCard);
-		expect(screen.getByTestId('current-theme')).toHaveTextContent(THEME_REGISTRY.vaporwave.label);
+		expect(screen.getByTestId('current-theme')).toHaveTextContent('Vaporwave');
 
 		await fireEvent.click(screen.getByRole('button', { name: /^Show all/ }));
-		await fireEvent.click(themeButton(THEME_REGISTRY.blueprint.label));
-		expect(screen.getByTestId('current-theme')).toHaveTextContent(THEME_REGISTRY.blueprint.label);
+		await fireEvent.click(themeButton('Blueprint'));
+		expect(screen.getByTestId('current-theme')).toHaveTextContent('Blueprint');
 	});
 
 	test('marks only the active theme as pressed', () => {
