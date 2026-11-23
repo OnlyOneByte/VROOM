@@ -226,8 +226,18 @@ export const STORAGE_PROVIDERS = {
       ],
     },
     secrets: [
-      { key: 'accessKeyId', label: 'Access Key ID', required: true },
-      { key: 'secretAccessKey', label: 'Secret Access Key', required: true },
+      {
+        key: 'accessKeyId',
+        label: 'Access Key ID',
+        required: true,
+        reenterWhenChanged: ['endpoint'],
+      },
+      {
+        key: 'secretAccessKey',
+        label: 'Secret Access Key',
+        required: true,
+        reenterWhenChanged: ['endpoint'],
+      },
     ],
     connect: 'form',
     create: ({ credentials, config }) => buildS3Provider(credentials, config),

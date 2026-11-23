@@ -9,7 +9,7 @@ import { AppError, ConflictError, NotFoundError, ValidationError } from '../../e
 import { changeTracker, requireAuth } from '../../middleware';
 import type { CategorySetting, PhotoCategory, StorageConfig } from '../../types';
 import { DEFAULT_STORAGE_CONFIG, PHOTO_CATEGORIES } from '../../types';
-import { encrypt } from '../../utils/encryption';
+import { decrypt, encrypt, secretContextOf } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { consumePending, getPendingEmail } from '../../utils/pending-credentials';
 import { commonSchemas, zValidator } from '../../utils/validation';
@@ -17,6 +17,7 @@ import { photoRefRepository } from '../photos/photo-ref-repository';
 import { preferencesRepository } from '../settings/repository';
 import {
   type AnyProviderDescriptor,
+  assertSecretsReentered,
   toCatalogEntries,
   validateProviderConfig,
   validateProviderSecrets,
@@ -60,6 +61,20 @@ async function findOwnedProviderOrThrow(
   return existing[0];
 }
 
+function secretsSet(row: UserProvider): string[] {
+  const descriptor = providerDescriptor(row.domain, row.providerType);
+  if (!descriptor || descriptor.secrets.length === 0) return [];
+  try {
+    const stored = JSON.parse(decrypt(row.credentials, secretContextOf(row))) as Record<
+      string,
+      unknown
+    >;
+    return descriptor.secrets.map((secret) => secret.key).filter((key) => Boolean(stored[key]));
+  } catch {
+    return [];
+  }
+}
+
 function formatProviderResponse(row: UserProvider) {
   return {
     id: row.id,
@@ -68,6 +83,7 @@ function formatProviderResponse(row: UserProvider) {
     displayName: row.displayName,
     status: row.status,
     config: row.config ?? {},
+    secretsSet: secretsSet(row),
     lastSyncAt: row.lastSyncAt?.toISOString() ?? null,
     createdAt: row.createdAt?.toISOString() ?? null,
   };
@@ -335,6 +351,7 @@ routes.put(
         );
         validateProviderConfig(descriptor, clientConfig, unchanged);
         validateProviderConfig(descriptor, merged, unchanged);
+        assertSecretsReentered(descriptor, stored, clientConfig, body.credentials);
       }
       updates.config = merged;
     }

@@ -22,6 +22,7 @@ const PROVIDER_RESPONSE_KEYS = [
   'displayName',
   'status',
   'config',
+  'secretsSet',
   'lastSyncAt',
   'createdAt',
 ].sort();
