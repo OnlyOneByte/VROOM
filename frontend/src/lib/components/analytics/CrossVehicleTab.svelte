@@ -10,7 +10,11 @@
 	import type { AnalyticsDateRange } from './analytics-filters';
 	import ExpenseTrendChart from '#lib/components/charts/ExpenseTrendChart.svelte';
 	import { AppBarChart, AppLineChart, AppPieChart } from '#lib/components/charts/index.ts';
-	import { CHART_COLORS, buildChartConfig, buildCategoryPieData } from '#lib/utils/chart-colors.ts';
+	import {
+		buildChartConfig,
+		buildCategoryPieData,
+		buildVehicleColorMap
+	} from '#lib/utils/chart-colors.ts';
 	import type {
 		CrossVehicleResponse,
 		FinancingResponse,
@@ -109,15 +113,15 @@
 	);
 
 	let fuelEffVehicles = $derived.by(() => {
-		const byName = new SvelteMap<string, string>();
+		const byId = new SvelteMap<string, string>();
 		for (const month of crossVehicle?.fuelEfficiencyComparison ?? []) {
 			for (const v of month.vehicles) {
-				byName.set(v.vehicleName, v.vehicleId);
+				byId.set(v.vehicleId, v.vehicleName);
 			}
 		}
-		return [...byName];
+		return [...byId];
 	});
-	let fuelEffVehicleNames = $derived(fuelEffVehicles.map(([name]) => name));
+	let fuelEffVehicleIds = $derived(fuelEffVehicles.map(([id]) => id));
 
 	let fuelEffData = $derived.by(() => {
 		return (crossVehicle?.fuelEfficiencyComparison ?? []).map(d => {
@@ -126,17 +130,19 @@
 				date: parseMonthToDate(d.month)
 			};
 			for (const v of d.vehicles) {
-				row[v.vehicleName] = v.efficiency;
+				row[v.vehicleId] = v.efficiency;
 			}
 			return row;
 		});
 	});
 
+	let fuelEffFallbackColors = $derived(buildVehicleColorMap(fuelEffVehicleIds));
+
 	let fuelEffSeries = $derived(
-		fuelEffVehicles.map(([name, id], i) => ({
-			key: name,
+		fuelEffVehicles.map(([id, name]) => ({
+			key: id,
 			label: name,
-			color: vehicleColors?.[id] ?? CHART_COLORS[i % CHART_COLORS.length] ?? 'var(--chart-1)'
+			color: vehicleColors?.[id] ?? (fuelEffFallbackColors[id] as string)
 		}))
 	);
 
@@ -224,7 +230,7 @@
 				description="{efficiencyLabel} trends across all vehicles"
 				data={fuelEffData}
 				x="date"
-				y={fuelEffVehicleNames}
+				y={fuelEffVehicleIds}
 				series={fuelEffSeries}
 				config={fuelEffConfig}
 				yAxisFormat={v => `${formatNumber(v, 0)} ${efficiencyLabel}`}

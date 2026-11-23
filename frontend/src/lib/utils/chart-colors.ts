@@ -17,6 +17,14 @@ export const CHART_COLORS = [
 	'var(--chart-8)'
 ] as const;
 
+export function buildVehicleColorMap(vehicleIds: readonly string[]): Record<string, string> {
+	return Object.fromEntries(
+		[...new Set(vehicleIds)]
+			.sort()
+			.map((id, i) => [id, CHART_COLORS[i % CHART_COLORS.length] as string])
+	);
+}
+
 export const CATEGORY_COLOR_TOKENS: Record<ExpenseCategory, CategoryColorToken> =
 	mapExpenseCategories(info => info.colorToken);
 
