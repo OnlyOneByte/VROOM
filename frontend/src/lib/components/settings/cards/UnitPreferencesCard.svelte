@@ -2,7 +2,8 @@
 	import { Globe, Fuel, DollarSign } from '@lucide/svelte';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
-	import { currencyLabel, pickerCurrencyCodes } from '#lib/utils/formatters.ts';
+	import { CURRENCIES } from '#lib/constants/currencies.ts';
+	import { currencyLabel } from '#lib/utils/formatters.ts';
 	import {
 		Card,
 		CardContent,
@@ -38,10 +39,10 @@
 		return labels[unit];
 	}
 
-	const currencyCodes = $derived(
-		pickerCurrencyCodes().includes(currencyUnit)
-			? pickerCurrencyCodes()
-			: [currencyUnit, ...pickerCurrencyCodes()]
+	const currencyCodes: readonly string[] = $derived(
+		(CURRENCIES as readonly string[]).includes(currencyUnit)
+			? CURRENCIES
+			: [currencyUnit, ...CURRENCIES]
 	);
 </script>
 

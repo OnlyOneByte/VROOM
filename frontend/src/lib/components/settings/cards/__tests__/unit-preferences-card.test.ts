@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { CURRENCIES } from '#lib/constants/currencies.ts';
 import UnitPreferencesCard from '../UnitPreferencesCard.svelte';
 
 interface CardProps {
@@ -80,24 +81,32 @@ describe('UnitPreferencesCard', () => {
 		expect(trigger('currency')).toHaveTextContent(label);
 	});
 
-	test('offers every 0- and 2-decimal ISO currency, and no 3-decimal one', async () => {
+	test('offers exactly the shared currency list', async () => {
 		mount();
 		await fireEvent.click(trigger('currency'));
 		await settle();
 		const names = screen.getAllByRole('option').map(o => o.textContent?.trim());
-		expect(names.length).toBeGreaterThan(100);
+		expect(names).toHaveLength(CURRENCIES.length);
 		expect(names).toContain('JPY – Japanese Yen (¥)');
 		expect(names).toContain('INR – Indian Rupee (₹)');
-		expect(names.some(n => n?.startsWith('BHD'))).toBe(false);
-		expect(names.some(n => n?.startsWith('KWD'))).toBe(false);
+		for (const dropped of ['BHD', 'KWD', 'IQD', 'HRK', 'BGN', 'XDR', 'SLL']) {
+			expect(
+				names.some(n => n?.startsWith(dropped)),
+				dropped
+			).toBe(false);
+		}
 	});
 
-	test('a saved currency outside the list still shows and stays selectable', async () => {
-		mount({ currencyUnit: 'BHD' });
-		expect(trigger('currency')).toHaveTextContent('BHD – Bahraini Dinar');
+	test.each([
+		['BHD', 'BHD – Bahraini Dinar'],
+		['HRK', 'HRK – Croatian Kuna']
+	])('a saved %s outside the list still shows and stays selectable', async (code, label) => {
+		mount({ currencyUnit: code });
+		expect(trigger('currency')).toHaveTextContent(label);
 		await fireEvent.click(trigger('currency'));
 		await settle();
-		expect(screen.getByRole('option', { name: 'BHD – Bahraini Dinar' })).toBeTruthy();
+		expect(screen.getByRole('option', { name: label })).toBeTruthy();
+		expect(screen.getAllByRole('option')).toHaveLength(CURRENCIES.length + 1);
 	});
 
 	test('picking a distance unit updates the selection', async () => {

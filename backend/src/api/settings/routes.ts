@@ -7,6 +7,7 @@ import { getDb } from '../../db/connection';
 import { userPreferences, userProviders } from '../../db/schema';
 import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import SHARED_CURRENCIES from '../../shared-currencies.json';
 import type { BackupConfig, StorageConfig } from '../../types';
 import { readJsonBody } from '../../utils/request-body';
 import {
@@ -115,7 +116,7 @@ const routes = new Hono();
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
-const SUPPORTED_CURRENCIES = new Set(Intl.supportedValuesOf('currency'));
+const SUPPORTED_CURRENCIES = new Set(SHARED_CURRENCIES.currencies);
 
 const baseSettingsSchema = createInsertSchema(userPreferences, {
   currencyUnit: z

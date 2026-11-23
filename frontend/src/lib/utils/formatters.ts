@@ -103,15 +103,6 @@ export function currencyLabel(code: string): string {
 	return symbol === code ? named : `${named} (${symbol})`;
 }
 
-let pickerCurrencies: string[] | null = null;
-
-export function pickerCurrencyCodes(): string[] {
-	pickerCurrencies ??= Intl.supportedValuesOf('currency').filter(code =>
-		[0, 2].includes(currencyFractionDigits(code))
-	);
-	return pickerCurrencies;
-}
-
 export function formatNumber(value: number, decimals = 2): string {
 	return numberFormat({
 		minimumFractionDigits: decimals,
