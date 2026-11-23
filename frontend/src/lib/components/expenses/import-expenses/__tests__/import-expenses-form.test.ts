@@ -89,6 +89,30 @@ describe('ImportExpensesForm: loading a file', () => {
 		expect(form.preview?.readyCount).toBe(2);
 	});
 
+	test('the server sees the raw sample even when the first line has no CSV headers', async () => {
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		const text = `\n${FUEL_CSV}`;
+
+		await form.loadFile(new File([text], 'fuel.txt'));
+
+		expect(mocks.detectImportSource).toHaveBeenCalledWith(text);
+		expect(form.detectedPreset).toEqual(FUELLY);
+		expect(form.targetVehicleId).toBe('v1');
+		expect(form.manualMapping).toBe(false);
+	});
+
+	test('an unrecognised file with no CSV headers gets no guessed columns', async () => {
+		const form = new ImportExpensesForm(() => [CAMRY]);
+
+		await form.loadFile(new File(['\n{"log": []}'], 'log.json'));
+
+		expect(mocks.detectImportSource).toHaveBeenCalled();
+		expect(form.detectedPreset).toBeNull();
+		expect(form.manualMapping).toBe(false);
+		expect(form.manualColumns).toEqual({});
+	});
+
 	test('a detected preset with several vehicles waits for a target before previewing', async () => {
 		mocks.detectImportSource.mockResolvedValue(FUELLY);
 		const form = new ImportExpensesForm(() => [CAMRY, RAV4]);

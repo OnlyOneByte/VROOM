@@ -97,15 +97,15 @@ export class ImportExpensesForm {
 		this.manualColumns = {};
 		this.categoryRemap = {};
 		this.fileHeaders = [];
+		const sample = this.csvText.slice(0, DETECT_SAMPLE_LENGTH);
+		if (!sample.trim()) return;
 		const headers = parseCsvHeaders(this.csvText);
-		if (headers.length === 0) return;
 		this.fileHeaders = headers;
 		this.isDetecting = true;
 		try {
-			const preset = await expenseApi.detectImportSource(
-				this.csvText.slice(0, DETECT_SAMPLE_LENGTH)
-			);
+			const preset = await expenseApi.detectImportSource(sample);
 			this.detectedPreset = preset;
+			if (!preset && headers.length === 0) return;
 			const outcome = detectionOutcome(
 				headers,
 				preset,
