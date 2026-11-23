@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import type { Vehicle } from '#lib/types/index.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
@@ -76,6 +77,41 @@ describe('vehicle page load failures show once, inline', () => {
 		expect(await screen.findByText("Couldn't load this vehicle")).toBeInTheDocument();
 		await new Promise(resolve => setTimeout(resolve, 50));
 		expect(errorToasts()).toEqual([]);
+	});
+
+	test('side loads that fail before the vehicle request settles raise no toast', async () => {
+		getVehicle.mockImplementation(
+			() =>
+				new Promise((_, reject) =>
+					setTimeout(() => reject(new Error('Request failed with status 500')), 30)
+				)
+		);
+		render(Page, { props: { data: { vehicleId: 'v1' } } });
+
+		expect(await screen.findByText("Couldn't load this vehicle")).toBeInTheDocument();
+		await new Promise(resolve => setTimeout(resolve, 50));
+		expect(errorToasts()).toEqual([]);
+	});
+
+	test('a side load that fails before a slower vehicle request succeeds still toasts', async () => {
+		getVehicle.mockImplementation(
+			() => new Promise(resolve => setTimeout(() => resolve(VEHICLE), 30))
+		);
+		render(Page, { props: { data: { vehicleId: 'v1' } } });
+
+		await waitFor(() =>
+			expect(errorToasts().some(m => m.startsWith("Couldn't load fuel efficiency"))).toBe(true)
+		);
+	});
+
+	test('an unknown vehicle raises its one redirect toast, not one per side load', async () => {
+		getVehicle.mockImplementation(() => Promise.reject(new ApiError('Vehicle not found', 404)));
+		render(Page, { props: { data: { vehicleId: 'v1' } } });
+
+		await waitFor(() => expect(errorToasts()).toHaveLength(1));
+		await new Promise(resolve => setTimeout(resolve, 50));
+		expect(errorToasts()).toHaveLength(1);
+		expect(errorToasts()[0]).toMatch(/^Couldn't load this vehicle/);
 	});
 
 	test('a summary failure under a loaded vehicle shows its inline card without a toast', async () => {

@@ -267,8 +267,8 @@
 
 	async function notifyUnlessPageFailed(error: unknown, context: string) {
 		await vehicleSettled;
-		if (vehicleLoadError) logLoadFailure(error, context);
-		else handleErrorWithNotification(error, context);
+		if (vehicle) handleErrorWithNotification(error, context);
+		else logLoadFailure(error, context);
 	}
 
 	async function loadVehicle() {
@@ -427,7 +427,7 @@
 			const photosResult = await vehicleApi.getPhotos(vehicleId);
 			vehiclePhotos = photosResult.data;
 		} catch (error) {
-			void notifyUnlessPageFailed(error, "Couldn't load photos");
+			handleErrorWithNotification(error, "Couldn't load photos");
 		} finally {
 			isLoadingPhotos = false;
 		}
