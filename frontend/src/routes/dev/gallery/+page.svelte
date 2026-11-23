@@ -38,6 +38,7 @@
 		{ date: new Date(2026, 2, 1), amount: 180 }
 	];
 	const trendConfig = { amount: { label: 'Amount', color: 'var(--primary)' } };
+	const trendAverage = trend.reduce((sum, d) => sum + d.amount, 0) / trend.length;
 
 	const pageHeaderWithBack = `<PageHeader title="Edit Odometer Reading" description="2020 Toyota Camry">
 	{#snippet back()}
@@ -292,6 +293,24 @@
 					config={trendConfig}
 					series={[{ key: 'amount', label: 'Amount', color: 'var(--primary)' }]}
 				/>
+				<AppLineChart
+					level={3}
+					title="Summary, dashed average and footer"
+					data={trend}
+					x="date"
+					y="amount"
+					config={trendConfig}
+					series={[{ key: 'amount', label: 'Amount', color: 'var(--primary)' }]}
+					referenceLines={[{ value: trendAverage, label: 'Average' }]}
+				>
+					{#snippet summary()}
+						<p class="text-2xl font-bold tabular-nums">{formatCurrency(trendAverage)}</p>
+						<p class="text-sm text-muted-foreground">average per month</p>
+					{/snippet}
+					{#snippet footer()}
+						<p class="text-sm text-muted-foreground">One sentence that explains the chart.</p>
+					{/snippet}
+				</AppLineChart>
 				<ChartCard
 					level={3}
 					title="Empty"
