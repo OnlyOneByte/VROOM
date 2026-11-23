@@ -1,12 +1,14 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
+import { EXPENSE_CATEGORIES } from '../../db/types';
 import { requireAuth } from '../../middleware';
 import { calendarParts, zonedCalendar } from '../../utils/analytics-charts';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { zValidator } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
 import {
+  analyticsQueryToApi,
   analyticsSummaryToApi,
   crossVehicleToApi,
   financingToApi,
@@ -18,6 +20,16 @@ import {
   vehicleTcoToApi,
   yearEndToApi,
 } from './api-transform';
+import {
+  analyticsQueryRepository,
+  isValidQueryCombination,
+  QUERY_COMPARES,
+  QUERY_ENERGIES,
+  QUERY_GROUP_BYS,
+  QUERY_INCLUDES,
+  QUERY_INTERVALS,
+  QUERY_METRICS,
+} from './query-repository';
 import { analyticsRepository } from './repository';
 
 const routes = new Hono();
@@ -104,7 +116,46 @@ const yearVehicleQuerySchema = z.object({
   timeZone,
 });
 
+const csv = z
+  .string()
+  .max(4000)
+  .transform((value) =>
+    value
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+  );
+
+const analyticsQuerySchema = z
+  .object({
+    metric: z.enum(QUERY_METRICS),
+    interval: z.enum(QUERY_INTERVALS).default('month'),
+    groupBy: z.enum(QUERY_GROUP_BYS).default('none'),
+    vehicleIds: csv.pipe(z.array(z.string().min(1).max(64)).max(50)).optional(),
+    categories: csv.pipe(z.array(z.enum(EXPENSE_CATEGORIES))).optional(),
+    start: epochSeconds.optional(),
+    end: epochSeconds.optional(),
+    include: z.enum(QUERY_INCLUDES).default('running'),
+    compare: z.enum(QUERY_COMPARES).default('none'),
+    energy: z.enum(QUERY_ENERGIES).default('fuel'),
+    timeZone,
+  })
+  .refine((q) => q.start == null || q.end == null || q.start < q.end, {
+    message: 'start must be before end',
+    path: ['end'],
+  })
+  .refine((q) => isValidQueryCombination(q.metric, q.groupBy), {
+    message: 'This metric cannot be grouped that way',
+    path: ['groupBy'],
+  });
+
 routes.use('*', requireAuth);
+
+routes.get('/query', zValidator('query', analyticsQuerySchema), async (c) => {
+  const user = c.get('user');
+  const data = await analyticsQueryRepository.query(user.id, c.req.valid('query'));
+  return c.json({ success: true, data: analyticsQueryToApi(data) });
+});
 
 routes.get('/summary', zValidator('query', yearToDateQuerySchema), async (c) => {
   const user = c.get('user');
