@@ -223,6 +223,52 @@ describe('ProviderForm — a new provider stores the photo root path the user ty
 	});
 });
 
+describe('ProviderForm — a photo-only provider has no ZIP backup', () => {
+	const PHOTOS_PROVIDER: UserProviderInfo = {
+		...STORED_PROVIDER,
+		id: 'photos-1',
+		providerType: 'google-photos',
+		displayName: 'My Photos'
+	};
+	const staleZip = { enabled: true, folderPath: 'Backups', retentionCount: 10 };
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		appStore.clearNotifications();
+		settingsStore.reset();
+		getSettings.mockResolvedValue({
+			...SETTINGS_RESPONSE,
+			backupConfig: { providers: { 'photos-1': staleZip } }
+		});
+		updateSettings.mockResolvedValue({});
+		updateProvider.mockResolvedValue({} as UserProviderInfo);
+	});
+
+	test('the edit form hides the ZIP toggle and saves a stale ZIP setting as off', async () => {
+		render(ProviderForm, {
+			props: {
+				providerId: 'photos-1',
+				existingProvider: PHOTOS_PROVIDER,
+				existingFolderSettings: STORED_FOLDER_SETTINGS
+			}
+		});
+		await vi.waitFor(() => expect(displayNameInput().value).toBe('My Photos'));
+		await vi.waitFor(() => expect(settingsStore.settings).not.toBeNull());
+		await new Promise(r => setTimeout(r, 0));
+
+		expect(screen.queryByLabelText(/zip backup/i)).toBeNull();
+		expect(screen.getByText(/Google Photos stores your photos only/i)).toBeTruthy();
+
+		await fireEvent.click(saveButton());
+		await vi.waitFor(() => expect(updateSettings).toHaveBeenCalledTimes(2));
+
+		const sent = updateSettings.mock.calls[1]?.[0] as {
+			backupConfig?: { providers: Record<string, { enabled: boolean }> };
+		};
+		expect(sent.backupConfig?.providers['photos-1']?.enabled).toBe(false);
+	});
+});
+
 describe('ProviderForm — a settings save that fails is reported, not announced as success', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();

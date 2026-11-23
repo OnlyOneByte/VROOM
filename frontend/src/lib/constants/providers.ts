@@ -9,6 +9,12 @@ export interface ProviderTypeOption {
 	disabled: boolean;
 }
 
+export const PHOTO_ONLY_PROVIDER_TYPES = ['google-photos'] as const;
+
+export function supportsZipBackup(providerType: string | null | undefined): boolean {
+	return !!providerType && !(PHOTO_ONLY_PROVIDER_TYPES as readonly string[]).includes(providerType);
+}
+
 export const DEFAULT_FOLDER_SETTINGS: Record<PhotoCategory, CategorySetting> = {
 	vehicle_photos: { enabled: true, folderPath: 'Vehicle' },
 	expense_receipts: { enabled: true, folderPath: 'Receipts' },

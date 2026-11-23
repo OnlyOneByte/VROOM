@@ -8,26 +8,23 @@ import {
 import { FakeStorageProvider } from '../../providers/domains/storage/fake-provider';
 import { getStorageProviderRegistry } from '../../providers/domains/storage/registry';
 import { MODEL_PROVIDER_TYPES, SUPPORTED_PROVIDER_TYPES } from '../../providers/routes';
+import { isPhotoOnlyProviderType } from '../backup-strategy';
 import { backupStrategyRegistry } from '../backup-strategy-registry';
 import '../init';
 
 let ctx: TestApp;
 let bucket: FakeStorageProvider;
 let createInstance: ReturnType<typeof spyOn>;
+let encrypt: (plain: string) => string;
 
-beforeEach(async () => {
-  ctx = await createTestApp();
-  bucket = new FakeStorageProvider();
-  createInstance = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockImplementation(
-    () => bucket
-  );
-  const { encrypt } = await import('../../../utils/encryption');
+function seedProvider(id: string, providerType: string): void {
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
-     VALUES (?, ?, 'storage', 's3', 'My Bucket', ?, ?, 'active')`,
+     VALUES (?, ?, 'storage', ?, 'My Provider', ?, ?, 'active')`,
     [
-      'p-s3',
+      id,
       ctx.user.id,
+      providerType,
       encrypt(JSON.stringify({ accessKeyId: 'AKIA', secretAccessKey: 'secret' })),
       JSON.stringify({
         endpoint: 'https://s3.example.com',
@@ -37,12 +34,26 @@ beforeEach(async () => {
       }),
     ]
   );
+}
+
+function setBackupConfig(providers: Record<string, unknown>): void {
   ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
     ctx.user.id,
-    JSON.stringify({
-      providers: { 'p-s3': { enabled: true, folderPath: 'Backups', retentionCount: 5 } },
-    }),
+    JSON.stringify({ providers }),
   ]);
+}
+
+const zipOn = { enabled: true, folderPath: 'Backups', retentionCount: 5 };
+
+beforeEach(async () => {
+  ctx = await createTestApp();
+  bucket = new FakeStorageProvider();
+  createInstance = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockImplementation(
+    () => bucket
+  );
+  encrypt = (await import('../../../utils/encryption')).encrypt;
+  seedProvider('p-s3', 's3');
+  setBackupConfig({ 'p-s3': zipOn });
   const res = await ctx.authed('POST', '/api/v1/vehicles', {
     make: 'Toyota',
     model: 'Camry',
@@ -67,6 +78,15 @@ async function listedBackups(): Promise<ProviderBackups[]> {
   return (await json<DataEnvelope<ProviderBackups[]>>(res)).data;
 }
 
+async function waitForFiles(folder: string, count: number): Promise<void> {
+  const deadline = Date.now() + 5000;
+  while ((await bucket.list(folder)).length < count) {
+    if (Date.now() > deadline)
+      throw new Error(`timed out waiting for ${count} file(s) in ${folder}`);
+    await Bun.sleep(10);
+  }
+}
+
 describe('ZIP backups to an S3 provider', () => {
   test('a manual sync writes a ZIP that the backup list then shows', async () => {
     const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
@@ -85,18 +105,47 @@ describe('ZIP backups to an S3 provider', () => {
 
   test('the inactivity auto-sync writes a ZIP to the S3 provider', async () => {
     const { activityTracker } = await import('../activity-tracker');
-    activityTracker.recordActivity(ctx.user.id, 999);
     try {
-      await (
-        activityTracker as unknown as { handleInactivity: (userId: string) => Promise<void> }
-      ).handleInactivity(ctx.user.id);
+      activityTracker.recordActivity(ctx.user.id, 0);
+      await waitForFiles('VROOM/Backups', 1);
     } finally {
       activityTracker.stopTracking(ctx.user.id);
     }
 
     const files = await bucket.list('VROOM/Backups');
-    expect(files).toHaveLength(1);
     expect(files[0]?.name).toMatch(/^vroom-backup-.*\.zip$/);
+  });
+
+  test('retention prunes the oldest S3 backups past the configured count', async () => {
+    bucket = new FakeStorageProvider([
+      {
+        key: 'VROOM/Backups/vroom-backup-old.zip',
+        name: 'vroom-backup-old.zip',
+        size: 1,
+        createdTime: '1969-12-31T00:00:00.000Z',
+        lastModified: '1969-12-31T00:00:00.000Z',
+      },
+    ]);
+    setBackupConfig({ 'p-s3': { ...zipOn, retentionCount: 1 } });
+
+    const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
+    expect(res.status).toBe(200);
+
+    const names = (await bucket.list('VROOM/Backups')).map((f) => f.name);
+    expect(names).toHaveLength(1);
+    expect(names[0]).not.toBe('vroom-backup-old.zip');
+  });
+
+  test('a stale ZIP setting on a photo-only provider is ignored, so the run still succeeds', async () => {
+    seedProvider('p-photos', 'google-photos');
+    setBackupConfig({ 'p-s3': zipOn, 'p-photos': zipOn });
+
+    const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
+    expect(res.status).toBe(200);
+    const body = await json<DataEnvelope<{ outcome: string; failedProviders: string[] }>>(res);
+    expect(body.data.outcome).toBe('success');
+    expect(body.data.failedProviders).toEqual([]);
+
     const lastBackup = ctx.sqlite
       .query('SELECT last_backup_date FROM sync_state WHERE user_id = ?')
       .get(ctx.user.id) as { last_backup_date: number | null } | null;
@@ -111,6 +160,7 @@ describe('backup strategy registrations', () => {
     );
     expect(storageTypes).toContain('s3');
     for (const type of storageTypes) {
+      expect(isPhotoOnlyProviderType(type), type).toBe(false);
       expect(backupStrategyRegistry.get(type), type).toBeDefined();
     }
   });

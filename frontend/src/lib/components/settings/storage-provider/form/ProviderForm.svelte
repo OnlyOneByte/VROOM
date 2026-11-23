@@ -34,7 +34,11 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import { routes } from '#lib/routes.ts';
-	import { DEFAULT_FOLDER_SETTINGS, type ProviderTypeOption } from '#lib/constants/providers.ts';
+	import {
+		DEFAULT_FOLDER_SETTINGS,
+		supportsZipBackup,
+		type ProviderTypeOption
+	} from '#lib/constants/providers.ts';
 	import type {
 		PhotoCategory,
 		CategorySetting,
@@ -318,7 +322,7 @@
 			if (backupEnabled || sheetsSyncEnabled || backupConfig.providers[resultId]) {
 				try {
 					const providerBackup: ProviderBackupSettings = {
-						enabled: backupEnabled,
+						enabled: backupEnabled && supportsZipBackup(selectedType),
 						folderPath: backupFolderPath.trim() || 'Backups',
 						retentionCount: backupRetentionCount,
 						...(selectedType === 'google-drive' && {

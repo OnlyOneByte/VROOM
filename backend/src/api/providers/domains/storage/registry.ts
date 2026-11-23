@@ -15,6 +15,8 @@ import { GooglePhotosProvider } from './google-photos-provider';
 import { S3CompatProvider } from './s3-compat-provider';
 import type { StorageProvider } from './storage-provider';
 
+const fakeProviders = new Map<string, FakeStorageProvider>();
+
 interface ResolvedProvider {
   provider: StorageProvider;
   providerId: string;
@@ -171,7 +173,12 @@ export class StorageProviderRegistry {
       if (!CONFIG.allowFakeStorageProvider) {
         throw new ValidationError('Fake storage provider is not enabled in this environment');
       }
-      return new FakeStorageProvider();
+      let fake = fakeProviders.get(row.id);
+      if (!fake) {
+        fake = new FakeStorageProvider();
+        fakeProviders.set(row.id, fake);
+      }
+      return fake;
     }
 
     const decrypted = decrypt(row.credentials);

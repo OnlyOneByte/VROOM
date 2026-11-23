@@ -8,8 +8,10 @@ import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
 import {
   type BackupOrchestratorResult,
   type BackupOutcome,
+  type BackupStrategy,
   type BackupStrategyResult,
   hasZipBackup,
+  isPhotoOnlyProviderType,
   isSyncEnabled,
 } from './backup-strategy';
 import { backupStrategyRegistry } from './backup-strategy-registry';
@@ -52,6 +54,22 @@ function releaseMutex(userId: string, token: symbol): void {
 
 function failedAttempt(message: string): BackupStrategyResult {
   return { success: false, message, capabilities: {} };
+}
+
+function lookupStrategy(
+  providerId: string,
+  providerType: string
+): { strategy: BackupStrategy } | { result: BackupStrategyResult | null } {
+  if (isPhotoOnlyProviderType(providerType)) {
+    logger.debug('Photo-only provider has no backups, ignoring its backup settings', {
+      providerId,
+    });
+    return { result: null };
+  }
+  const strategy = backupStrategyRegistry.get(providerType);
+  if (strategy) return { strategy };
+  logger.warn('No backup strategy registered for provider type', { providerId, providerType });
+  return { result: failedAttempt(`Backups are not supported for ${providerType}`) };
 }
 
 export class BackupOrchestrator {
@@ -125,17 +143,11 @@ export class BackupOrchestrator {
           return { providerId, result: null };
         }
 
-        const strategy = backupStrategyRegistry.get(providerRow.providerType);
-        if (!strategy) {
-          logger.warn('No backup strategy registered for provider type', {
-            providerId,
-            providerType: providerRow.providerType,
-          });
-          return {
-            providerId,
-            result: failedAttempt(`Backups are not supported for ${providerRow.providerType}`),
-          };
+        const lookup = lookupStrategy(providerId, providerRow.providerType);
+        if (!('strategy' in lookup)) {
+          return { providerId, result: lookup.result };
         }
+        const { strategy } = lookup;
 
         let decryptedCredentials: Record<string, unknown>;
         try {
