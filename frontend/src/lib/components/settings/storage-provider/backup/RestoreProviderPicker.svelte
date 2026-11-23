@@ -41,7 +41,7 @@
 					</div>
 					<div class="flex-1 min-w-0">
 						<div class="truncate font-medium text-foreground">{provider.displayName}</div>
-						<div class="text-sm text-muted-foreground truncate">
+						<div class="text-sm text-muted-foreground truncate" title={provider.accountEmail}>
 							{provider.accountEmail} · {providerLabel(provider.providerType)}
 						</div>
 					</div>
@@ -67,7 +67,7 @@
 							<div class="font-medium text-foreground">
 								{provider.displayName} — {sourceType === 'zip' ? 'ZIP Backup' : 'Google Sheets'}
 							</div>
-							<div class="text-sm text-muted-foreground truncate">
+							<div class="text-sm text-muted-foreground truncate" title={provider.accountEmail}>
 								{provider.accountEmail} · {providerLabel(provider.providerType)}
 							</div>
 						</div>

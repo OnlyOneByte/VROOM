@@ -46,6 +46,17 @@ export function needsZipGeneration(
   return enabledProviders.some(([id, s]) => hasZipBackup(s, providerTypes.get(id)));
 }
 
+export function withPausedSheetsOff(config: BackupConfig): BackupConfig {
+  return {
+    providers: Object.fromEntries(
+      Object.entries(config.providers).map(([id, settings]) => [
+        id,
+        settings.sheetsAutoPausedAt ? { ...settings, sheetsSyncEnabled: false } : settings,
+      ])
+    ),
+  };
+}
+
 function acquireMutex(userId: string): symbol | null {
   const now = Date.now();
   const existing = backupMutex.get(userId);
@@ -135,7 +146,10 @@ export class BackupOrchestrator {
       const providerRowMap = new Map(providerRows.map((r) => [r.id, r]));
       const providerTypes = new Map(providerRows.map((r) => [r.id, r.providerType]));
 
-      const enabledProviders = filterEnabledProviders(config, providerTypes);
+      const enabledProviders = filterEnabledProviders(
+        force ? config : withPausedSheetsOff(config),
+        providerTypes
+      );
 
       if (enabledProviders.length === 0) {
         return { timestamp, outcome: 'noop', failedProviders: [], results: {} };
@@ -216,7 +230,7 @@ export class BackupOrchestrator {
       const settled = await Promise.allSettled(strategyPromises);
 
       const results: Record<string, BackupStrategyResult> = {};
-      const configPatch: Record<string, Record<string, string>> = {};
+      const configPatch: Record<string, Record<string, string | null>> = {};
       let anySuccess = false;
       const failedProviders: string[] = [];
 
@@ -250,7 +264,11 @@ export class BackupOrchestrator {
           ? (result.capabilities.sheets.metadata?.spreadsheetId as string | undefined)
           : undefined;
         if (sheetsId) {
-          configPatch[providerId] = { ...configPatch[providerId], sheetsSpreadsheetId: sheetsId };
+          configPatch[providerId] = {
+            ...configPatch[providerId],
+            sheetsSpreadsheetId: sheetsId,
+            ...(config.providers[providerId]?.sheetsAutoPausedAt && { sheetsAutoPausedAt: null }),
+          };
         }
       }
 

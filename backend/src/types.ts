@@ -173,6 +173,7 @@ export interface ProviderBackupSettings {
   lastBackupAt?: string;
   sheetsSyncEnabled?: boolean;
   sheetsSpreadsheetId?: string;
+  sheetsAutoPausedAt?: string;
 }
 
 export interface BackupConfig {

@@ -9,6 +9,7 @@ import { bodyLimit, idempotency, rateLimiter, requireAuth } from '../../middlewa
 import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { readJsonBody } from '../../utils/request-body';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
+import { zValidator } from '../../utils/validation';
 import { preferencesRepository, syncStateRepository } from '../settings/repository';
 import { activityTracker } from './activity-tracker';
 import { backupService } from './backup';
@@ -96,6 +97,24 @@ routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) =>
       : 'Sync completed';
   return c.json(createSuccessResponse(result, message), result.outcome === 'partial' ? 207 : 200);
 });
+
+routes.post(
+  '/sheets/:providerId/resume',
+  syncRateLimiter,
+  zValidator('param', z.object({ providerId: z.string().min(1).max(64) })),
+  async (c) => {
+    const userId = c.get('user').id;
+    const { providerId } = c.req.valid('param');
+    const prefs = await preferencesRepository.getOrCreate(userId);
+    const config = prefs?.backupConfig as BackupConfig | null;
+    if (config?.providers?.[providerId]?.sheetsAutoPausedAt) {
+      await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
+        providers: { [providerId]: { sheetsAutoPausedAt: null } },
+      });
+    }
+    return c.json(createSuccessResponse(undefined, 'Automatic Sheets backups resumed'));
+  }
+);
 
 routes.get('/status', async (c) => {
   const user = c.get('user');
