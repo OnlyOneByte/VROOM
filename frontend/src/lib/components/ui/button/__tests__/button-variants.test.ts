@@ -24,14 +24,36 @@ describe('Button aria-disabled focus ring', () => {
 		return color ? { color, alpha: Number(match?.[2] ?? 100) } : null;
 	}
 
-	test.each(VARIANTS)('%s still dims the whole button while aria-disabled', variant => {
+	test.each(VARIANTS)(
+		'%s keeps the element opaque while aria-disabled, so the ring is not dimmed',
+		variant => {
+			const classes = buttonVariants({ variant }).split(/\s+/);
+
+			expect(classes.filter(cls => /^(dark:)?aria-disabled:opacity-/.test(cls))).toEqual([]);
+		}
+	);
+
+	test.each(VARIANTS)('%s dims its text to the muted token while aria-disabled', variant => {
 		const classes = buttonVariants({ variant }).split(/\s+/);
 
-		expect(classes).toContain('aria-disabled:opacity-50');
+		expect(classes.filter(cls => /^(dark:)?aria-disabled:text-/.test(cls))).toEqual([
+			'aria-disabled:text-muted-foreground'
+		]);
+	});
+
+	test.each(VARIANTS)('%s halves each background it paints while aria-disabled', variant => {
+		const classes = buttonVariants({ variant }).split(/\s+/);
+
+		for (const mode of ['', 'dark:']) {
+			const fill = classes.findLast(cls => new RegExp(`^${mode}bg-[a-z-]+(/\\d+)?$`).test(cls));
+			if (!fill) continue;
+			const [, color, alpha = '100'] = fill.match(/bg-([a-z-]+)(?:\/(\d+))?$/)!;
+			expect(classes).toContain(`${mode}aria-disabled:bg-${color}/${Number(alpha) / 2}`);
+		}
 	});
 
 	test.each(VARIANTS.flatMap(variant => [`${variant}:`, `${variant}:dark:`]))(
-		'%s doubles the ring alpha while focused and aria-disabled, so opacity-50 leaves the normal ring',
+		'%s doubles the ring alpha while focused and aria-disabled, so the busy ring stays strong',
 		key => {
 			const [variant, mode = ''] = key.split(/:(.*)/) as [(typeof VARIANTS)[number], string];
 			const classes = buttonVariants({ variant }).split(/\s+/);

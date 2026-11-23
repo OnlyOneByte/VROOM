@@ -4,15 +4,17 @@
 	import { type VariantProps, tv } from 'tailwind-variants';
 
 	export const buttonVariants = tv({
-		base: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium outline-none transition-all focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 aria-disabled:focus-visible:ring-ring [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+		base: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium outline-none transition-all focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:text-muted-foreground aria-disabled:focus-visible:ring-ring [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
 		variants: {
 			variant: {
-				default: 'bg-primary text-primary-foreground shadow-xs hover:bg-primary/90',
+				default:
+					'bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 aria-disabled:bg-primary/50',
 				destructive:
-					'bg-destructive shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 aria-disabled:focus-visible:ring-destructive/40 dark:aria-disabled:focus-visible:ring-destructive/80 dark:bg-destructive/60 text-white',
+					'bg-destructive shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 aria-disabled:focus-visible:ring-destructive/40 dark:aria-disabled:focus-visible:ring-destructive/80 dark:bg-destructive/60 text-white aria-disabled:bg-destructive/50 dark:aria-disabled:bg-destructive/30',
 				outline:
-					'bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:aria-invalid:border-destructive dark:hover:bg-input/50 border',
-				secondary: 'bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80',
+					'bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:aria-invalid:border-destructive dark:hover:bg-input/50 border aria-disabled:bg-background/50 dark:aria-disabled:bg-input/15 aria-disabled:border-border/50 dark:aria-disabled:border-input/50',
+				secondary:
+					'bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80 aria-disabled:bg-secondary/50',
 				ghost: 'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
 				link: 'text-primary underline-offset-4 hover:underline'
 			},
