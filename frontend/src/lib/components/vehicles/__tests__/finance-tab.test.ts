@@ -331,3 +331,34 @@ describe('FinanceTab lease', () => {
 		expect(screen.getByText(/Within limit/)).toBeTruthy();
 	});
 });
+
+describe('FinanceTab heading outline', () => {
+	function outline(container: HTMLElement): string[] {
+		return [...container.querySelectorAll('h1, h2, h3, h4, h5, h6')].map(
+			h => `${h.tagName.toLowerCase()} ${h.textContent?.trim()}`
+		);
+	}
+
+	function expectNoSkippedLevel(headings: string[]) {
+		let previous = 1;
+		for (const heading of headings) {
+			const level = Number(heading[1]);
+			expect(level, heading).toBeLessThanOrEqual(previous + 1);
+			previous = level;
+		}
+	}
+
+	test.each<[string, VehicleFinancing, Expense[]]>([
+		['a loan with payment history', makeLoan(), LOAN_PAYMENTS],
+		['a loan without payment history', makeLoan(), []],
+		['a lease', makeLease(), []]
+	])('opens on an h2 and skips no level for %s', async (_label, financing, payments) => {
+		getExpensesByVehicle.mockResolvedValue(page(payments));
+		const { container } = mount(makeVehicle(financing));
+		await screen.findByText(payments.length ? /payments recorded/ : 'No Payment History');
+		const headings = outline(container);
+		expect(headings[0]).toBe('h2 Financing');
+		expect(headings.filter(h => h.startsWith('h3')).length).toBeGreaterThan(0);
+		expectNoSkippedLevel(headings);
+	});
+});
