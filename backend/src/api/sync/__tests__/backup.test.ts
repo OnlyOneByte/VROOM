@@ -1181,7 +1181,7 @@ describe('validateBackupData: the first error is a plain reason', () => {
     backup.metadata = { ...backup.metadata, userId: '' };
     const { errors } = backupService.validateBackupData(backup);
     expect(errors[0]).toBe(
-      "This backup is missing details VROOM needs to restore it. Choose a backup that VROOM made and that hasn't been edited."
+      "This backup is missing details VROOM needs to restore it. Choose a backup that VROOM made and that hasn't been edited. If this is your only one, make a fresh backup in the VROOM that created it, or close this and keep using VROOM without restoring."
     );
     expect(errors).toContain('Invalid metadata');
   });
@@ -1196,7 +1196,7 @@ describe('validateBackupData: the first error is a plain reason', () => {
     const bad = { ...vehicle(), make: 42 } as Record<string, unknown>;
     const { errors } = backupService.validateBackupData(emptyBackup({ vehicles: [bad] }));
     expect(errors[0]).toBe(
-      "Some entries in this backup can't be read, so it can't be restored. Choose a backup that VROOM made and that hasn't been edited."
+      "Some entries in this backup can't be read, so it can't be restored. Choose a backup that VROOM made and that hasn't been edited. If this is your only one, make a fresh backup in the VROOM that created it, or close this and keep using VROOM without restoring."
     );
     expect(errors.some((e) => e.startsWith('vehicles[0]'))).toBe(true);
   });
@@ -1206,7 +1206,7 @@ describe('validateBackupData: the first error is a plain reason', () => {
       emptyBackup({ expenses: [expense('ghost', 'e1')] })
     );
     expect(errors[0]).toBe(
-      "Some entries in this backup refer to vehicles or other items that aren't in it, so it can't be restored. Choose a backup that VROOM made and that hasn't been edited."
+      "Some entries in this backup refer to vehicles or other items that aren't in it, so it can't be restored. Choose a backup that VROOM made and that hasn't been edited. If this is your only one, make a fresh backup in the VROOM that created it, or close this and keep using VROOM without restoring."
     );
     expect(errors).toContain('Expense e1 references non-existent vehicle');
   });
@@ -1219,7 +1219,7 @@ describe('validateBackupData: the first error is a plain reason', () => {
       emptyBackup({ vehicles: [v], expenses: [e1, e2] })
     );
     expect(errors[0]).toBe(
-      "Some entries appear twice in this backup, so it can't be restored. Choose a backup that VROOM made and that hasn't been edited."
+      "Some entries appear twice in this backup, so it can't be restored. Choose a backup that VROOM made and that hasn't been edited. If this is your only one, make a fresh backup in the VROOM that created it, or close this and keep using VROOM without restoring."
     );
     expect(errors.some((e) => e.includes('violates a unique constraint'))).toBe(true);
   });
