@@ -105,18 +105,19 @@
 						{#if isLoading}
 							<Skeleton class="h-5 w-24" />
 							<Skeleton class="h-7 @sm:h-8 w-20" />
+							{#if unit}
+								<Skeleton class="h-4 w-16" />
+							{/if}
 						{:else}
 							<span class="block text-sm font-medium text-muted-foreground break-words">
 								{label}
 							</span>
-							<div class="flex items-baseline gap-1 flex-wrap">
-								<span class="text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
-									{value}
-								</span>
-								{#if unit}
-									<span class="text-xs text-muted-foreground">{unit}</span>
-								{/if}
-							</div>
+							<span class="block text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
+								{value}
+							</span>
+							{#if unit}
+								<span class="block text-xs text-muted-foreground">{unit}</span>
+							{/if}
 						{/if}
 					</div>
 					<div class="h-px w-full @sm:h-auto @sm:w-px bg-border @sm:self-stretch @sm:my-1"></div>
@@ -124,18 +125,19 @@
 						{#if isLoading}
 							<Skeleton class="h-5 w-24" />
 							<Skeleton class="h-7 @sm:h-8 w-20" />
+							{#if secondaryUnit}
+								<Skeleton class="h-4 w-16" />
+							{/if}
 						{:else}
 							<span class="block text-sm font-medium text-muted-foreground break-words">
 								{secondaryLabel}
 							</span>
-							<div class="flex items-baseline gap-1 flex-wrap">
-								<span class="text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
-									{secondaryValue}
-								</span>
-								{#if secondaryUnit}
-									<span class="text-xs text-muted-foreground">{secondaryUnit}</span>
-								{/if}
-							</div>
+							<span class="block text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
+								{secondaryValue}
+							</span>
+							{#if secondaryUnit}
+								<span class="block text-xs text-muted-foreground">{secondaryUnit}</span>
+							{/if}
 						{/if}
 					</div>
 				</div>
