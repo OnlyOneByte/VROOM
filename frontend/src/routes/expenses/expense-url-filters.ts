@@ -19,9 +19,14 @@ function plainDay(value: string | null): string | undefined {
 	return date.getUTCMonth() === month! - 1 && date.getUTCDate() === day ? value : undefined;
 }
 
+export function expenseCategoryList(value: string | null | undefined): string[] {
+	const picked = new Set((value ?? '').split(',').map(category => category.trim()));
+	return EXPENSE_CATEGORIES.filter(category => picked.has(category));
+}
+
 export function parseExpenseUrlFilters(params: Pick<URLSearchParams, 'get'>): ExpenseUrlFilters {
 	const vehicleId = params.get('vehicleId')?.trim() || undefined;
-	const category = params.get('category') ?? '';
+	const category = expenseCategoryList(params.get('category')).join(',');
 	let startDate = plainDay(params.get('startDate'));
 	let endDate = plainDay(params.get('endDate'));
 	if (startDate && endDate && startDate > endDate) {
@@ -38,7 +43,7 @@ export function parseExpenseUrlFilters(params: Pick<URLSearchParams, 'get'>): Ex
 	];
 	return {
 		vehicleId,
-		category: (EXPENSE_CATEGORIES as readonly string[]).includes(category) ? category : undefined,
+		category: category || undefined,
 		startDate,
 		endDate,
 		tags,

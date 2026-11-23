@@ -46,7 +46,8 @@ export function visibleExpenses(
 	let filtered = [...expenses];
 
 	if (options.filterByCategory && options.categoryFilter) {
-		filtered = filtered.filter(e => e.category === options.categoryFilter);
+		const categories = options.categoryFilter.split(',');
+		filtered = filtered.filter(e => categories.includes(e.category));
 	}
 
 	if (!options.sortLocally) return filtered;
