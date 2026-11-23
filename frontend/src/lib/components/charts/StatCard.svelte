@@ -89,6 +89,12 @@
 				<Skeleton class="h-4 sm:h-5 w-24" />
 			</div>
 			<Skeleton class="h-7 sm:h-8 w-32 mt-2" />
+			{#if unit}
+				<Skeleton class="inline-block h-3 w-16 align-middle" />
+			{/if}
+			{#if subtitle}
+				<Skeleton class="h-4 w-full mt-1" />
+			{/if}
 		{:else if hasDual}
 			<div class="@container">
 				<div class="flex flex-col @sm:flex-row @sm:items-start @sm:justify-between gap-3 @sm:gap-4">
