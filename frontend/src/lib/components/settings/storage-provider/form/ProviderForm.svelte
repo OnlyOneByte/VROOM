@@ -23,7 +23,7 @@
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import { routes } from '#lib/routes.ts';
 	import {
-		DEFAULT_FOLDER_SETTINGS,
+		defaultFolderSettings,
 		PROVIDER_META,
 		providerMeta,
 		supportsZipBackup,
@@ -86,9 +86,9 @@
 	let providerRootPath = $state('VROOM');
 	let photoRootPath = $state(getDefaultPhotoRootPath('google-drive'));
 
-	let folderSettings = $state<Record<PhotoCategory, CategorySetting>>({
-		...DEFAULT_FOLDER_SETTINGS
-	});
+	let folderSettings = $state<Record<PhotoCategory, CategorySetting>>(
+		defaultFolderSettings(restoredState?.selectedType)
+	);
 
 	let backupEnabled = $state(false);
 	let backupFolderPath = $state('Backups');
@@ -154,7 +154,10 @@
 
 	onMount(async () => {
 		const [, oauthResult] = await Promise.all([loadSettings(), oauth.handleOAuthReturn()]);
-		if (oauthResult.restoredSelectedType) selectedType = oauthResult.restoredSelectedType;
+		if (oauthResult.restoredSelectedType) {
+			selectedType = oauthResult.restoredSelectedType;
+			if (!isEditMode) folderSettings = defaultFolderSettings(selectedType);
+		}
 		if (oauthResult.restoredDisplayName) displayName = oauthResult.restoredDisplayName;
 	});
 
@@ -360,6 +363,7 @@
 								onclick={() => {
 									selectedType = pt.id;
 									photoRootPath = getDefaultPhotoRootPath(pt.id);
+									folderSettings = defaultFolderSettings(pt.id);
 								}}
 							>
 								<Icon

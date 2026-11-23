@@ -189,6 +189,58 @@ describe('ProviderForm — an edit-save preserves config the form does not manag
 	});
 });
 
+describe('ProviderForm — folder defaults follow the provider type', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		appStore.clearNotifications();
+		settingsStore.reset();
+		getSettings.mockResolvedValue({ storageConfig: undefined, backupConfig: { providers: {} } });
+		updateSettings.mockResolvedValue({});
+	});
+
+	const folderInput = (name: string) => screen.getByDisplayValue(name) as HTMLInputElement;
+
+	test('switching from S3 to Google Drive swaps in the Drive folder names', async () => {
+		render(ProviderForm, { props: {} });
+
+		await fireEvent.click(screen.getByRole('button', { name: /S3 \/ B2 \/ R2/i }));
+		expect(folderInput('vehicles')).toBeTruthy();
+		await fireEvent.click(screen.getByRole('button', { name: /Google Drive/i }));
+
+		expect(folderInput('Vehicle')).toBeTruthy();
+		expect(screen.queryByDisplayValue('vehicles')).toBeNull();
+	});
+
+	test('editing keeps stored folders that differ from the type defaults', async () => {
+		getSettings.mockResolvedValue(SETTINGS_RESPONSE);
+		const custom = {
+			...STORED_FOLDER_SETTINGS,
+			vehicle_photos: { enabled: true, folderPath: 'Cars' }
+		};
+		render(ProviderForm, {
+			props: {
+				providerId: 'drive-1',
+				existingProvider: STORED_PROVIDER,
+				existingFolderSettings: custom
+			}
+		});
+		await vi.waitFor(() => expect(displayNameInput().value).toBe('My Drive'));
+		await vi.waitFor(() => expect(settingsStore.settings).not.toBeNull());
+		await new Promise(r => setTimeout(r, 0));
+
+		await fireEvent.click(saveButton());
+		await vi.waitFor(() => expect(updateSettings).toHaveBeenCalled());
+		const sent = updateSettings.mock.calls[0]?.[0] as {
+			storageConfig?: {
+				providerCategories: Record<string, Record<string, { folderPath: string }>>;
+			};
+		};
+		expect(sent.storageConfig?.providerCategories['drive-1']?.['vehicle_photos']?.folderPath).toBe(
+			'Cars'
+		);
+	});
+});
+
 describe('ProviderForm — a new provider stores the photo root path the user typed', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -229,6 +281,16 @@ describe('ProviderForm — a new provider stores the photo root path the user ty
 		const config = createProvider.mock.calls[0]?.[0]?.config ?? {};
 		expect(config['photoRootPath']).toBe('vroom/scans');
 		expect(rootPathInput().value).toBe('vroom/scans');
+
+		await vi.waitFor(() => expect(updateSettings).toHaveBeenCalled());
+		const sent = updateSettings.mock.calls[0]?.[0] as {
+			storageConfig?: {
+				providerCategories: Record<string, Record<string, { folderPath: string }>>;
+			};
+		};
+		const folders = sent.storageConfig?.providerCategories['drive-new'] ?? {};
+		expect(folders['vehicle_photos']?.folderPath).toBe('vehicles');
+		expect(folders['expense_receipts']?.folderPath).toBe('receipts');
 	});
 });
 

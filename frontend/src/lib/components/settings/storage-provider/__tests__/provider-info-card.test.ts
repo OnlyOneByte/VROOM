@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type { UserProviderInfo } from '#lib/types/index.ts';
-import { DEFAULT_FOLDER_SETTINGS } from '#lib/constants/providers.ts';
+import { defaultFolderSettings } from '#lib/constants/providers.ts';
 
 const getSyncStatus = vi.fn<(id: string) => Promise<Record<string, never>>>();
 vi.mock('#lib/services/provider-api.ts', () => ({
@@ -44,7 +44,7 @@ async function mount(props: Record<string, unknown> = {}) {
 	const result = render(ProviderInfoCard, {
 		props: {
 			provider: provider(),
-			categorySettings: DEFAULT_FOLDER_SETTINGS,
+			categorySettings: defaultFolderSettings('google-drive'),
 			onEdit,
 			onDelete,
 			onBackupToggle,
