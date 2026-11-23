@@ -78,7 +78,7 @@ test.describe('Adding a vehicle', () => {
 			expect(page.url()).toMatch(/\/vehicles\/new$/);
 		}).toPass({ timeout: 20_000, intervals: [300, 1000, 2000] });
 
-		await expect(page.getByRole('heading', { name: 'Add New Vehicle' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Add Vehicle' })).toBeVisible();
 		await expect(page.getByLabel('Make *')).toBeVisible();
 		await expect(page.getByLabel('Model *')).toBeVisible();
 		await expect(page.getByLabel('Year *')).toBeVisible();
