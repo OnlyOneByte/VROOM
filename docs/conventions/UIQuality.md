@@ -217,6 +217,9 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   series.
 - One unit per axis. Two measures with different units are two charts, not two series on one
   axis.
+- Neighbouring chart slots (`chart-1`…`chart-8`) in every theme and mode stay at least ΔE 15 apart
+  (OKLab ×100) and ΔE 8 apart under simulated protanopia, deuteranopia and tritanopia;
+  `chart-palette.test.ts` fails a theme that drifts.
 - A chart is never the only way to read a number: pair it with a stat tile, a legend with values
   (as the category pie does), or a table.
 - Every chart can be read without seeing it: the wrappers give the plot a `role="img"` summary
