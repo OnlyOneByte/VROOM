@@ -88,6 +88,30 @@ export function getCurrencySymbol(currency?: string): string {
 	return parts.find(p => p.type === 'currency')?.value ?? currencyToUse;
 }
 
+const currencyNames = new Map<string, Intl.DisplayNames>();
+
+export function currencyLabel(code: string): string {
+	const locale = currentLocale();
+	let names = currencyNames.get(locale);
+	if (!names) {
+		names = new Intl.DisplayNames(locale, { type: 'currency' });
+		currencyNames.set(locale, names);
+	}
+	const name = names.of(code);
+	const symbol = getCurrencySymbol(code);
+	const named = name && name !== code ? `${code} – ${name}` : code;
+	return symbol === code ? named : `${named} (${symbol})`;
+}
+
+let pickerCurrencies: string[] | null = null;
+
+export function pickerCurrencyCodes(): string[] {
+	pickerCurrencies ??= Intl.supportedValuesOf('currency').filter(code =>
+		[0, 2].includes(currencyFractionDigits(code))
+	);
+	return pickerCurrencies;
+}
+
 export function formatNumber(value: number, decimals = 2): string {
 	return numberFormat({
 		minimumFractionDigits: decimals,
