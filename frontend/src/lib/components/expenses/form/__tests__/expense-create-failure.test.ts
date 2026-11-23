@@ -57,7 +57,7 @@ async function fillWithMileageAndSave(mileage: string): Promise<HTMLInputElement
 		}
 	});
 	await vi.waitFor(() => expect(screen.getByDisplayValue('42.50')).toBeTruthy());
-	const input = screen.getByLabelText(/Current Mileage/) as HTMLInputElement;
+	const input = screen.getByLabelText(/Odometer/) as HTMLInputElement;
 	await fireEvent.input(input, { target: { value: mileage } });
 	await fireEvent.click(screen.getByRole('button', { name: /save expense/i }));
 	await vi.waitFor(() => expect(createExpense).toHaveBeenCalled());

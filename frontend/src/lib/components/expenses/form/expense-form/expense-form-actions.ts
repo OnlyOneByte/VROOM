@@ -11,6 +11,7 @@ import { handleErrorWithNotification, userFacingErrorMessage } from '#lib/utils/
 import type { ExpenseCategory } from '#lib/types/index.ts';
 import { toOfflineExpense } from '../offline-expense';
 import { buildExpenseData } from './expense-payload';
+import { rememberQuickAdd } from './quick-add-memory';
 import {
 	canQueueFailedSave,
 	offlineQueuedMessage,
@@ -80,6 +81,7 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 	const isSplitCreate = state.isSplit && state.selectedVehicleIds.length >= 2;
 	const clientId = saveClientId(state);
 	const queueOwner = currentOfflineQueueOwner();
+	const rememberEntry = () => rememberQuickAdd(state.formData.vehicleId, state.formData.category);
 
 	try {
 		if (state.isGroupEditMode && state.groupId) {
@@ -139,6 +141,7 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			const created = await expenseApi.createExpense(expenseData, clientId);
 
 			await uploadPendingPhotos(state, created.id);
+			rememberEntry();
 
 			appStore.addNotification({
 				type: 'success',
@@ -158,6 +161,7 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 				return;
 			}
 
+			rememberEntry();
 			appStore.addNotification({
 				type: 'info',
 				message: 'Expense saved offline. Will sync when online.'
@@ -183,6 +187,7 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 				return;
 			}
 
+			rememberEntry();
 			appStore.addNotification({
 				type: 'warning',
 				message: offlineQueuedMessage(failureKind)

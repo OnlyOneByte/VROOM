@@ -12,6 +12,7 @@ import FuelFieldsSection, {
 	type EnergyCapabilities,
 	type EnergyMode
 } from '../FuelFieldsSection.svelte';
+import FuelTypeFields from '../FuelTypeFields.svelte';
 import { validateExpenseField } from '../expense-form-validation';
 
 const GAS: EnergyCapabilities = { canFuel: true, canCharge: false };
@@ -260,6 +261,7 @@ function mountSection(caps: EnergyCapabilities, loaded: Partial<BoundForm> = {})
 		charge: '',
 		fuelType: '',
 		missedFillup: false,
+		energyMode: 'fuel' as EnergyMode,
 		...loaded
 	});
 	const props = {
@@ -287,11 +289,11 @@ function mountSection(caps: EnergyCapabilities, loaded: Partial<BoundForm> = {})
 		set fuelType(value: string) {
 			state.fuelType = value;
 		},
-		get missedFillup() {
-			return state.missedFillup;
+		get energyMode() {
+			return state.energyMode;
 		},
-		set missedFillup(value: boolean) {
-			state.missedFillup = value;
+		set energyMode(value: EnergyMode) {
+			state.energyMode = value;
 		},
 		amount: '40.00',
 		volumeUnit: 'gallons_us' as const,
@@ -306,6 +308,24 @@ function mountSection(caps: EnergyCapabilities, loaded: Partial<BoundForm> = {})
 		onMileageChange: () => {}
 	};
 	const { container } = render(FuelFieldsSection, props);
+	const details = render(FuelTypeFields, {
+		get energyMode() {
+			return state.energyMode;
+		},
+		get fuelType() {
+			return state.fuelType;
+		},
+		set fuelType(value: string) {
+			state.fuelType = value;
+		},
+		get missedFillup() {
+			return state.missedFillup;
+		},
+		set missedFillup(value: boolean) {
+			state.missedFillup = value;
+		},
+		onBlur: () => {}
+	});
 
 	const energyInput = () => {
 		const volume = container.querySelector<HTMLInputElement>('#volume');
@@ -326,7 +346,7 @@ function mountSection(caps: EnergyCapabilities, loaded: Partial<BoundForm> = {})
 		heading: () => container.querySelector('h2')?.textContent?.trim() ?? '',
 		visibleEnergyField: () => energyInput().id as 'volume' | 'charge',
 		visibleEnergyValue: () => energyInput().value,
-		fuelTypeTrigger: () => container.querySelector('#fuelType')?.textContent?.trim() ?? '',
+		fuelTypeTrigger: () => details.container.querySelector('#fuelType')?.textContent?.trim() ?? '',
 		modeToggleLabels,
 		type: async (value: string) => {
 			await fireEvent.input(energyInput(), { target: { value } });
@@ -536,7 +556,7 @@ describe('mounted: the hybrid toggle', () => {
 
 test('the charging dropdown offers the fuelType the reconciler seeds', () => {
 	const source = readFileSync(
-		join(dirname(fileURLToPath(import.meta.url)), '..', 'FuelFieldsSection.svelte'),
+		join(dirname(fileURLToPath(import.meta.url)), '..', 'FuelTypeFields.svelte'),
 		'utf-8'
 	);
 	const start = source.indexOf('const CHARGING_TYPE_OPTIONS');

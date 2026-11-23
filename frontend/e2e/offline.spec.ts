@@ -16,7 +16,7 @@ test.describe('Offline expense entry', () => {
 		await expect(page.getByRole('heading', { name: 'All Expenses' })).toBeVisible();
 		await page.getByRole('link', { name: /Add Expense/ }).click();
 		await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible();
-		await expect(page.getByText(`${VEHICLE_CAMRY.year} Toyota Camry`)).toBeVisible();
+		await expect(page.getByLabel('Vehicle *')).toHaveText(VEHICLE_CAMRY.nickname);
 
 		await page.route('**/api/v1/**', route => route.abort('internetdisconnected'));
 		await expect(async () => {
@@ -26,7 +26,7 @@ test.describe('Offline expense entry', () => {
 			});
 		}).toPass({ timeout: 20_000 });
 
-		await page.getByRole('button', { name: /^Misc/ }).click();
+		await page.getByRole('radio', { name: 'Misc' }).click();
 		await page.getByLabel('Amount *').fill('12.34');
 		await page.getByRole('button', { name: 'Save Expense' }).click();
 		await expect(page.getByText('Expense saved offline. Will sync when online.')).toBeVisible();
@@ -40,7 +40,7 @@ test.describe('Offline expense entry', () => {
 		await page.getByRole('link', { name: /Add Expense/ }).click();
 		await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible();
 		await expect(page.getByText("This page couldn't load")).toHaveCount(0);
-		await expect(page.getByText(`${VEHICLE_CAMRY.year} Toyota Camry`)).toBeVisible();
+		await expect(page.getByLabel('Vehicle *')).toHaveText(VEHICLE_CAMRY.nickname);
 		await expect(page.getByText("Couldn't load your vehicles")).toHaveCount(0);
 	});
 
@@ -153,10 +153,10 @@ test.describe('Opening the app offline', () => {
 		const coldStart = await context.newPage();
 		await coldStart.goto('/expenses/new');
 		await expect(coldStart.getByRole('heading', { name: 'Add Expense' })).toBeVisible();
-		await expect(coldStart.getByText(`${VEHICLE_CAMRY.year} Toyota Camry`)).toBeVisible();
+		await expect(coldStart.getByLabel('Vehicle *')).toHaveText(VEHICLE_CAMRY.nickname);
 		await expect(coldStart.getByText("Couldn't load your vehicles")).toHaveCount(0);
 
-		await coldStart.getByRole('button', { name: /^Fuel/ }).click();
+		await coldStart.getByRole('radio', { name: 'Fuel' }).click();
 		await expect(coldStart.getByTestId('odometer-check-deferred')).toBeVisible();
 		await expect(coldStart.getByText("this fill-up can't be saved yet")).toHaveCount(0);
 	});

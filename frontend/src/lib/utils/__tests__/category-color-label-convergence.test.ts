@@ -23,10 +23,6 @@ const STAT_CARD_SOURCE = readFileSync(
 	join(SRC_ROOT, 'lib', 'components', 'charts', 'StatCard.svelte'),
 	'utf8'
 );
-const CATEGORY_SELECTOR_SOURCE = readFileSync(
-	join(SRC_ROOT, 'lib', 'components', 'expenses', 'form', 'CategorySelector.svelte'),
-	'utf8'
-);
 
 function collectTsFiles(dir: string, acc: string[] = []): string[] {
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -314,10 +310,6 @@ describe('one category → icon assignment', () => {
 		for (const category of ALL_CATEGORIES) {
 			expect(getCategoryIcon(category), `icon → ${category}`).toBe(CATEGORY_ICONS[category]);
 		}
-	});
-
-	test('the form\u2019s category picker derives its icons from the same assignment', () => {
-		expect(CATEGORY_SELECTOR_SOURCE).toContain('getCategoryIcon(category.value)');
 	});
 
 	test('no second category → icon map exists anywhere under src', () => {

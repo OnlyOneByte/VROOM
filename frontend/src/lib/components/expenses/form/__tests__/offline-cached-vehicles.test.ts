@@ -158,7 +158,7 @@ describe('the expense form offline', () => {
 		expect(await screen.findByTestId('odometer-check-deferred')).toBeInTheDocument();
 		expect(screen.queryByTestId('vehicle-load-error')).not.toBeInTheDocument();
 		await fireEvent.input(screen.getByLabelText(/Amount/), { target: { value: '40' } });
-		await fireEvent.input(screen.getByLabelText(/Mileage/), { target: { value: '45000' } });
+		await fireEvent.input(screen.getByLabelText(/Odometer/), { target: { value: '45000' } });
 		await fireEvent.input(screen.getByLabelText(/Gallons|Liters/), { target: { value: '10' } });
 		await fireEvent.click(screen.getByRole('button', { name: /Save Expense/ }));
 

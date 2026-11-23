@@ -84,11 +84,11 @@ describe('split group edit locks the fields the split API does not save', () => 
 		expect(screen.getByTestId('split-edit-note').textContent).toContain(
 			'description, location or tags'
 		);
-		expect(screen.getByRole('button', { name: /Misc/ })).toBeDisabled();
+		expect(screen.getByRole('radio', { name: /Misc/ })).toBeDisabled();
 		const date = screen.getByRole('button', { name: /^Date/ });
 		expect(date).toBeDisabled();
 		expect(date).toHaveAccessibleDescription('May 10, 2026');
-		expect(document.getElementById('description')).toBeDisabled();
+		await vi.waitFor(() => expect(document.getElementById('description')).toBeDisabled());
 		expect(document.getElementById('amount')).toBeEnabled();
 	});
 });

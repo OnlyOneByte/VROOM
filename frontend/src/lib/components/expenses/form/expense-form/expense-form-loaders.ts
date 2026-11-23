@@ -21,6 +21,7 @@ import {
 import { toDateInputValue } from '#lib/utils/formatters.ts';
 import { parsePreselectedTags } from './expense-navigation';
 import { splitStateFromGroup } from './split-config';
+import { readQuickAddMemory } from './quick-add-memory';
 import type { ExpenseFormState } from './expense-form-state.svelte';
 
 interface PreselectedValues {
@@ -35,8 +36,9 @@ function useVehicles(state: ExpenseFormState, vehicles: Vehicle[]): void {
 	state.vehicles = vehicles;
 	state.vehiclesError = null;
 	if (!state.isEditMode && vehicles.length > 0 && !state.formData.vehicleId) {
-		const firstVehicle = vehicles[0];
-		if (firstVehicle) state.formData.vehicleId = firstVehicle.id;
+		const lastUsedId = readQuickAddMemory().vehicleId;
+		const vehicle = vehicles.find(v => v.id === lastUsedId) ?? vehicles[0];
+		if (vehicle) state.formData.vehicleId = vehicle.id;
 	}
 }
 
@@ -98,6 +100,7 @@ export function applyPreselections(state: ExpenseFormState, values: PreselectedV
 	if (values.amount) state.formData.amount = values.amount;
 	if (values.description) state.formData.description = values.description;
 	if (values.tags) state.formData.tags = parsePreselectedTags(values.tags);
+	if (!values.category) state.applyRememberedCategory();
 }
 
 function leaveGoneRecord(state: ExpenseFormState, label: string): void {

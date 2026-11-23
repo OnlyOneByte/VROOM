@@ -26,6 +26,4 @@
 	{getVehicleDisplayName(vehicle)}
 {:else if !onlineStatus.current}
 	<span class="text-chart-5">Offline mode - will sync when online</span>
-{:else}
-	Track a new vehicle expense
 {/if}

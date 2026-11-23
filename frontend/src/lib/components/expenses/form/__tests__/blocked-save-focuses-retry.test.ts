@@ -96,7 +96,7 @@ function failHistoryOnly(): void {
 
 async function fillValidFuelEntry(): Promise<void> {
 	await fireEvent.input(screen.getByLabelText(/Amount/), { target: { value: '40' } });
-	await fireEvent.input(screen.getByLabelText(/Current Mileage/), { target: { value: '45000' } });
+	await fireEvent.input(screen.getByLabelText(/Odometer/), { target: { value: '45000' } });
 }
 
 describe("a fill-up when the vehicle loads but its history doesn't", () => {

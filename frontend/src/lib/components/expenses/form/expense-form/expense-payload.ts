@@ -10,6 +10,8 @@ interface ExpensePayloadContext {
 }
 
 export function buildExpenseData(form: ExpenseFormData, ctx: ExpensePayloadContext) {
+	const isFuel = form.category === 'fuel';
+	const dropsFinancingLink = ctx.sourceType === 'financing' && form.category !== 'financial';
 	return {
 		vehicleId: form.vehicleId,
 		tags: form.tags,
@@ -17,14 +19,14 @@ export function buildExpenseData(form: ExpenseFormData, ctx: ExpensePayloadConte
 		amount: parseFloat(form.amount),
 		date: dateOnlyToISO(form.date),
 		mileage: hasMileageEntry(form.mileage) ? parseInt(form.mileage) : undefined,
-		volume: form.volume ? parseFloat(form.volume) : undefined,
-		charge: form.charge ? parseFloat(form.charge) : undefined,
-		fuelType: form.fuelType || undefined,
+		volume: isFuel && form.volume ? parseFloat(form.volume) : undefined,
+		charge: isFuel && form.charge ? parseFloat(form.charge) : undefined,
+		fuelType: (isFuel && form.fuelType) || undefined,
 		description: form.description || undefined,
 		location: form.location || undefined,
 		currency: ctx.currency,
-		sourceType: ctx.sourceType ?? undefined,
-		sourceId: ctx.sourceId ?? undefined,
-		missedFillup: form.missedFillup
+		sourceType: dropsFinancingLink ? undefined : (ctx.sourceType ?? undefined),
+		sourceId: dropsFinancingLink ? undefined : (ctx.sourceId ?? undefined),
+		missedFillup: isFuel && form.missedFillup
 	};
 }

@@ -71,11 +71,11 @@ describe('ExpenseFormState — construction and derived flags', () => {
 		expect(state.distLabel).toBe('Kilometers');
 	});
 
-	test('previousFuelHint shows the last fuel mileage only for fuel-tagged entries', () => {
+	test('previousFuelHint shows the last fuel mileage only for fuel entries', () => {
 		const state = createState();
 		state.lastFuelExpense = makeExpense('f', { mileage: 5_000 });
 		expect(state.previousFuelHint).toBeNull();
-		state.formData.tags = ['fuel'];
+		state.formData.category = 'fuel';
 		expect(state.previousFuelHint).toBe(5_000);
 	});
 
@@ -90,8 +90,9 @@ describe('ExpenseFormState — construction and derived flags', () => {
 		expect(state.showChargeField).toBe(true);
 	});
 
-	test('isFinancingPayment needs both a financing source type and id', () => {
+	test('isFinancingPayment needs a financing source type and id on a Financial expense', () => {
 		const state = createState();
+		state.formData.category = 'financial';
 		state.sourceType = 'financing';
 		expect(state.isFinancingPayment).toBe(false);
 		state.sourceId = 'fin-1';
@@ -186,25 +187,21 @@ describe('ExpenseFormState — validation', () => {
 });
 
 describe('ExpenseFormState — handlers', () => {
-	test('selecting a non-fuel, non-financial category clears fuel fields and source, keeping the mileage', () => {
+	test('selecting a non-fuel, non-financial category keeps the typed fields and pauses the financing link', () => {
 		const state = createState();
 		fillValidFuel(state);
-		state.formData.charge = '3';
 		state.formData.fuelType = 'Regular';
-		state.formData.missedFillup = true;
 		state.sourceType = 'financing';
 		state.sourceId = 'fin-1';
 		state.selectCategory('maintenance');
 		expect(state.formData).toMatchObject({
 			category: 'maintenance',
-			volume: '',
-			charge: '',
-			fuelType: '',
-			mileage: '1000',
-			missedFillup: false
+			fuelType: 'Regular',
+			mileage: '1000'
 		});
-		expect(state.sourceType).toBeNull();
-		expect(state.sourceId).toBeNull();
+		expect(state.isFinancingPayment).toBe(false);
+		state.selectCategory('financial');
+		expect(state.isFinancingPayment).toBe(true);
 		expect(state.touched['category']).toBe(true);
 	});
 
