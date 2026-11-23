@@ -67,7 +67,6 @@
 	import ExpenseSaveRow from './expense-form/ExpenseSaveRow.svelte';
 	import ExpenseDeleteDialog from './expense-form/ExpenseDeleteDialog.svelte';
 	import ExpenseAmountField from './expense-form/ExpenseAmountField.svelte';
-	import ExpenseNotesFields from './expense-form/ExpenseNotesFields.svelte';
 	import ExpenseSplitBreakdown from './expense-form/ExpenseSplitBreakdown.svelte';
 	import ExpenseFormSubtitle from './expense-form/ExpenseFormSubtitle.svelte';
 
@@ -188,6 +187,7 @@
 	let retryButton = $state<HTMLButtonElement | null>(null);
 	let formEl = $state<HTMLFormElement | null>(null);
 	let amountInput = $state<HTMLInputElement | null>(null);
+	const notesFields = import('./expense-form/ExpenseNotesFields.svelte');
 	let energyMode = $state<EnergyMode>('fuel');
 	let detailsOpen = $state(false);
 
@@ -679,14 +679,16 @@
 								{/key}
 							{/if}
 
-							<ExpenseNotesFields
-								bind:description={form.formData.description}
-								bind:location={form.formData.location}
-								bind:tags={form.formData.tags}
-								tagError={form.errors['tags']}
-								tagTouched={form.touched['tags']}
-								tagSuggestions={form.tagSuggestions}
-							/>
+							{#await notesFields then { default: ExpenseNotesFields }}
+								<ExpenseNotesFields
+									bind:description={form.formData.description}
+									bind:location={form.formData.location}
+									bind:tags={form.formData.tags}
+									tagError={form.errors['tags']}
+									tagTouched={form.touched['tags']}
+									tagSuggestions={form.tagSuggestions}
+								/>
+							{/await}
 						</fieldset>
 
 						{#if form.isEditMode}
