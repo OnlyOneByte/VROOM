@@ -67,9 +67,9 @@ const fuelStats: FuelStatsResponse = {
 
 describe('FuelCharts unit descriptions', () => {
 	test.each([
-		['gallons_us', 'Price per gallon (US)', 'mi/gal', 'gallons (US)'],
-		['gallons_uk', 'Price per gallon (UK)', 'mi/gal', 'gallons (UK)'],
-		['liters', 'Price per liter', 'mi/L', 'liters']
+		['gallons_us', 'Average price per gallon (US)', 'mi/gal', 'gallons (US)'],
+		['gallons_uk', 'Average price per gallon (UK)', 'mi/gal', 'gallons (UK)'],
+		['liters', 'Average price per liter', 'mi/L', 'liters']
 	] as const)(
 		'%s reads "%s", "Monthly %s" and "Monthly %s bought"',
 		(volumeUnit: VolumeUnit, price, efficiency, volume) => {
@@ -78,7 +78,7 @@ describe('FuelCharts unit descriptions', () => {
 			render(FuelCharts, { props: { fuelStats: { ...fuelStats, units }, group: 'primary' } });
 
 			expect(charts.find(c => c.title === 'Gas Price on Fill-up')?.description).toBe(
-				`${price} by fuel type over time`
+				`${price} by fuel type, per month`
 			);
 			expect(charts.find(c => c.title === 'Fuel Efficiency')?.description).toBe(
 				`Monthly ${efficiency}`
