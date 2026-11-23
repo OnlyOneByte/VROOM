@@ -3,7 +3,7 @@ import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { OdometerEntry, PaginatedResponse, Photo } from '#lib/types/index.ts';
 import type { odometerApi } from '#lib/services/odometer-api.ts';
-import { ApiError, UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
+import { ApiError, NetworkError, UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 type UpdateOdometerRequest = Parameters<typeof odometerApi.update>[1];
 
@@ -57,6 +57,7 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 }));
 
 import Page from '../+page.svelte';
+import { onlineStatus } from '#lib/stores/offline.svelte.ts';
 
 const LATEST_NOTE = /^Your latest reading is [\d,]+\.$/;
 
@@ -203,6 +204,39 @@ describe('edit odometer reading load states', () => {
 		expect(
 			screen.getByText(`Couldn't load the reading. ${UNEXPECTED_FAILURE_MESSAGE}`)
 		).toBeInTheDocument();
+	});
+});
+
+describe('edit odometer reading offline', () => {
+	afterEach(() => {
+		onlineStatus.current = true;
+	});
+
+	test('says editing needs a connection instead of showing a load error', async () => {
+		onlineStatus.current = false;
+		getEntry.mockRejectedValue(new NetworkError(new Error('Failed to fetch')));
+		mount();
+		await settle();
+
+		expect(screen.getByTestId('odometer-edit-offline-notice')).toHaveTextContent(
+			'Editing a reading needs a connection.'
+		);
+		expect(screen.queryByText(/Couldn't load the reading/)).toBeNull();
+		expect(screen.queryByLabelText('Odometer Reading *')).toBeNull();
+	});
+
+	test('loads the form once the connection comes back', async () => {
+		onlineStatus.current = false;
+		getEntry.mockRejectedValueOnce(new NetworkError(new Error('Failed to fetch')));
+		mount();
+		await settle();
+
+		onlineStatus.current = true;
+		await settle();
+
+		expect(odometerInput().value).toBe('45000');
+		expect(screen.queryByTestId('odometer-edit-offline-notice')).toBeNull();
+		expect(getEntry).toHaveBeenCalledTimes(2);
 	});
 });
 

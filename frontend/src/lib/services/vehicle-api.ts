@@ -22,9 +22,12 @@ const vehiclePhotos = (vehicleId: string) => photoCollection(`/vehicles/${vehicl
 
 export const vehicleApi = {
 	async getVehicle(vehicleId: string): Promise<Vehicle> {
-		return apiClient.get<Vehicle>(
+		const requestedFor = currentOfflineQueueOwner();
+		const vehicle = await apiClient.get<Vehicle>(
 			`/vehicles/${vehicleId}${buildQueryString({ timeZone: userTimeZone() })}`
 		);
+		if (!vehicle.sharedAccess) updateCachedVehicle(vehicle, requestedFor);
+		return vehicle;
 	},
 
 	async getVehicles(opts?: { includeShared?: boolean }): Promise<Vehicle[]> {

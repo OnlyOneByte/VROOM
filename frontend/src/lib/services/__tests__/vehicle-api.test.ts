@@ -83,6 +83,17 @@ describe('vehicleApi request shapes', () => {
 		expect(get).toHaveBeenCalledWith(`/vehicles/v1?timeZone=${ZONE}`);
 	});
 
+	test('getVehicle refreshes the offline copy of an owned vehicle, never a shared one', async () => {
+		get.mockResolvedValueOnce({ id: 'v1', nickname: 'Daily' });
+		await vehicleApi.getVehicle('v1');
+		expect(updateCachedVehicle).toHaveBeenCalledWith({ id: 'v1', nickname: 'Daily' }, 'u1');
+
+		updateCachedVehicle.mockClear();
+		get.mockResolvedValueOnce({ id: 'v2', sharedAccess: { level: 'viewer' } });
+		await vehicleApi.getVehicle('v2');
+		expect(updateCachedVehicle).not.toHaveBeenCalled();
+	});
+
 	test('getVehicles only asks for shared vehicles when requested', async () => {
 		get.mockResolvedValue([]);
 		await vehicleApi.getVehicles();

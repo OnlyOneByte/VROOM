@@ -5,13 +5,15 @@
 	import { page } from '$app/state';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
+	import { onlineStatus } from '#lib/stores/offline.svelte.ts';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import {
 		validateOdometerForm,
 		type OdometerFormErrors
 	} from '#lib/utils/odometer-form-validation.ts';
-	import { ArrowLeft, Info, LoaderCircle, Trash2, X } from '@lucide/svelte';
+	import { ArrowLeft, Info, LoaderCircle, Trash2, WifiOff, X } from '@lucide/svelte';
+	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -39,6 +41,7 @@
 	onMount(() => trackPendingSave(() => isSubmitting));
 	let isDeleting = $state(false);
 	let loadError = $state<string | null>(null);
+	let offlineLoad = $state(false);
 	let fieldErrors = $state<OdometerFormErrors>({});
 	let submitError = $state<string | null>(null);
 	let deleteDialogOpen = $state(false);
@@ -61,7 +64,16 @@
 		return odometer === '' || odometer === null ? undefined : Number(odometer);
 	}
 
-	onMount(async () => {
+	onMount(loadEntry);
+
+	$effect(() => {
+		if (offlineLoad && onlineStatus.current) untrack(loadEntry);
+	});
+
+	async function loadEntry() {
+		isLoadingEntry = true;
+		loadError = null;
+		offlineLoad = false;
 		try {
 			const [entry, latestResponse] = await Promise.all([
 				odometerApi.getEntry(entryId),
@@ -82,11 +94,13 @@
 				latest = { odometer: newest.odometer, date: toDateInputValue(newest.recordedAt) };
 			}
 		} catch (e) {
-			loadError = `Couldn't load the reading. ${userFacingErrorMessage(e)}`;
+			if (onlineStatus.current)
+				loadError = `Couldn't load the reading. ${userFacingErrorMessage(e)}`;
+			else offlineLoad = true;
 		} finally {
 			isLoadingEntry = false;
 		}
-	});
+	}
 
 	function validate(): boolean {
 		fieldErrors = validateOdometerForm({ odometer: enteredOdometer(), date, note });
@@ -158,6 +172,14 @@
 		<div class="flex justify-center p-8">
 			<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
+	{:else if offlineLoad}
+		<Alert variant="warning" role="status" data-testid="odometer-edit-offline-notice">
+			<WifiOff class="h-4 w-4" />
+			<AlertTitle>You're offline</AlertTitle>
+			<AlertDescription>
+				Editing a reading needs a connection. This form loads when you reconnect.
+			</AlertDescription>
+		</Alert>
 	{:else if loadError}
 		<div class="rounded-md bg-destructive/10 p-4 text-sm text-destructive">
 			{loadError}
