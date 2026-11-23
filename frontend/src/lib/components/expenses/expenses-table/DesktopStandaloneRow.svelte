@@ -13,6 +13,7 @@
 	} from '#lib/utils/expense-helpers.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { expenseEditHref } from './expense-table-actions';
+	import { tagsBesideCategory } from './expense-table-rows';
 
 	interface Props {
 		expense: Expense;
@@ -26,6 +27,7 @@
 
 	let { expense, vehicleMap, showVehicleColumn, canWrite, canDelete, returnTo, onDelete }: Props =
 		$props();
+	let shownTags = $derived(tagsBesideCategory(expense.tags, expense.category));
 
 	let vehicle: Vehicle | undefined = $derived(vehicleMap.get(expense.vehicleId));
 	let IconComponent = $derived(getCategoryIcon(expense.category));
@@ -58,7 +60,7 @@
 	</TableCell>
 	<TableCell>
 		<div class="flex flex-wrap gap-1">
-			{#each expense.tags || [] as tag (tag)}
+			{#each shownTags as tag (tag)}
 				<Badge variant="secondary" class="font-normal">{tag}</Badge>
 			{/each}
 		</div>

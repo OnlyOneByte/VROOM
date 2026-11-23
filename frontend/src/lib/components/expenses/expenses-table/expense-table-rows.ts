@@ -1,5 +1,6 @@
 import type { Expense, ExpenseCategory, Vehicle } from '#lib/types/index.ts';
 import {
+	categoryLabels,
 	compareExpenseRows,
 	type SortDirection,
 	type SortableRow
@@ -121,4 +122,12 @@ export function buildDisplayRows(
 
 export function rowKey(row: DisplayRow): string {
 	return row.type === 'standalone' ? row.expense.id : row.groupId;
+}
+
+export function tagsBesideCategory(
+	tags: string[] | undefined,
+	category: ExpenseCategory
+): string[] {
+	const repeats = new Set([category.toLowerCase(), categoryLabels[category].toLowerCase()]);
+	return (tags ?? []).filter(tag => !repeats.has(tag.trim().toLowerCase()));
 }

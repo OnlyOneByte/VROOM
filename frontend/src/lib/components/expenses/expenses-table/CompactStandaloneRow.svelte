@@ -12,6 +12,7 @@
 	} from '#lib/utils/expense-helpers.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { expenseEditHref } from './expense-table-actions';
+	import { tagsBesideCategory } from './expense-table-rows';
 	import {
 		MOBILE_ROW_ACTION_CLASS,
 		MOBILE_ROW_ACTIONS_CONTAINER_CLASS,
@@ -41,6 +42,7 @@
 		onSelect,
 		onDelete
 	}: Props = $props();
+	let shownTags = $derived(tagsBesideCategory(expense.tags, expense.category));
 
 	let vehicle: Vehicle | undefined = $derived(vehicleMap.get(expense.vehicleId));
 	let IconComponent = $derived(getCategoryIcon(expense.category));
@@ -71,9 +73,9 @@
 				<RecurringExpenseBadge />
 			</div>
 		{/if}
-		{#if expense.tags && expense.tags.length > 0}
+		{#if shownTags.length > 0}
 			<div class="flex flex-wrap gap-1 mt-1.5">
-				{#each expense.tags as tag (tag)}
+				{#each shownTags as tag (tag)}
 					<Badge variant="secondary" class="font-normal text-xs px-1.5 py-0">{tag}</Badge>
 				{/each}
 			</div>

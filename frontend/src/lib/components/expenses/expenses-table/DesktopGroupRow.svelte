@@ -18,7 +18,7 @@
 		expenseEditHref,
 		isInsuranceLinked
 	} from './expense-table-actions';
-	import type { GroupRow } from './expense-table-rows';
+	import { tagsBesideCategory, type GroupRow } from './expense-table-rows';
 
 	interface Props {
 		row: GroupRow;
@@ -43,6 +43,7 @@
 		onToggle,
 		onDelete
 	}: Props = $props();
+	let shownTags = $derived(tagsBesideCategory(row.tags, row.category));
 
 	let IconComponent = $derived(getCategoryIcon(row.category));
 	let insuranceLinked = $derived(isInsuranceLinked(row.tags));
@@ -90,7 +91,7 @@
 	</TableCell>
 	<TableCell>
 		<div class="flex flex-wrap gap-1">
-			{#each row.tags as tag (tag)}
+			{#each shownTags as tag (tag)}
 				<Badge variant="secondary" class="font-normal">{tag}</Badge>
 			{/each}
 		</div>
