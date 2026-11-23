@@ -88,6 +88,14 @@ describe('keyboard stepping through a chart', () => {
 		expect(live.textContent).toBe('Jan 2026: $10.00. 1 of 3.');
 	});
 
+	test('Up and Down are left to the page, so it still scrolls', async () => {
+		const { plot, live } = await mount();
+		const down = new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true });
+		plot.dispatchEvent(down);
+		expect(down.defaultPrevented).toBe(false);
+		expect(live.textContent).toBe('');
+	});
+
 	test('ArrowLeft from nothing starts at the last bucket', async () => {
 		const { plot, live } = await mount();
 		await fireEvent.keyDown(plot, { key: 'ArrowLeft' });

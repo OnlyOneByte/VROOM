@@ -119,7 +119,7 @@
 								type="button"
 								aria-pressed={view === option}
 								onclick={() => (view = option)}
-								class="focus-visible:ring-ring/50 rounded-sm px-2.5 py-1 text-xs font-medium outline-none focus-visible:ring-[3px] {view ===
+								class="focus-visible:ring-ring/50 min-h-10 rounded-sm px-3 text-xs font-medium outline-none focus-visible:ring-[3px] {view ===
 								option
 									? 'bg-background text-foreground shadow-xs'
 									: 'text-muted-foreground hover:text-foreground'}"

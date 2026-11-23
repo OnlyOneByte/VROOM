@@ -26,10 +26,10 @@
 		current: number | null,
 		count: number
 	): number | null | undefined {
-		if (key === 'ArrowRight' || key === 'ArrowDown') {
+		if (key === 'ArrowRight') {
 			return current === null ? 0 : Math.min(current + 1, count - 1);
 		}
-		if (key === 'ArrowLeft' || key === 'ArrowUp') {
+		if (key === 'ArrowLeft') {
 			return current === null ? count - 1 : Math.max(current - 1, 0);
 		}
 		if (key === 'Home') return 0;
@@ -41,12 +41,13 @@
 	function handleKey(event: KeyboardEvent) {
 		const count = a11y.rows.length;
 		if (count === 0) return;
-		if (event.key === 'Enter' && activeIndex !== null && onSelect) {
+		const current = activeIndex !== null && activeIndex < count ? activeIndex : null;
+		if (event.key === 'Enter' && current !== null && onSelect) {
 			event.preventDefault();
-			onSelect(activeIndex);
+			onSelect(current);
 			return;
 		}
-		const next = nextIndex(event.key, activeIndex, count);
+		const next = nextIndex(event.key, current, count);
 		if (next === undefined) return;
 		event.preventDefault();
 		step(next);
