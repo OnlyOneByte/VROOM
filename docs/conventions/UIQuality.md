@@ -206,6 +206,9 @@ Every view that loads or mutates data handles all of these:
    a spinner. `handleErrorWithNotification` is the shared path: it toasts via
    `appStore.addNotification` and logs to console only under `import.meta.env.DEV`. Where the view
    can retry, show a Retry button in place of the content.
+   A load failure is shown once, where the content would be: the inline error with Retry. Don't
+   also toast it; log it with `logLoadFailure`. Toasts are for the result of an action the user
+   took and for background work with no place on screen.
 4. **Populated** — the happy path, including edge sizes: one item, many items, long names, large
    amounts, zero amounts.
 5. **Success** — every mutation gives feedback: a success toast or a visible change (the row

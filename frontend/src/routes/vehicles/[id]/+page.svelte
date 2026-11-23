@@ -35,6 +35,7 @@
 	import {
 		ApiError,
 		handleErrorWithNotification,
+		logLoadFailure,
 		userFacingErrorMessage
 	} from '#lib/utils/error-handling.ts';
 	import type {
@@ -194,10 +195,12 @@
 
 	async function loadPage() {
 		isLoading = true;
+		const vehicleRequest = loadVehicle();
+		vehicleSettled = vehicleRequest;
 		void loadSummary();
 		void loadFuelEfficiency();
 		void loadVehicleStats();
-		await loadVehicle();
+		await vehicleRequest;
 		if (vehicle && isOwner) void loadPhotos();
 		isLoading = false;
 	}
@@ -260,16 +263,25 @@
 		reload: () => fetchExpensesPage(0)
 	});
 
+	let vehicleSettled: Promise<void> = Promise.resolve();
+
+	async function notifyUnlessPageFailed(error: unknown, context: string) {
+		await vehicleSettled;
+		if (vehicleLoadError) logLoadFailure(error, context);
+		else handleErrorWithNotification(error, context);
+	}
+
 	async function loadVehicle() {
 		vehicleLoadError = null;
 		try {
 			vehicle = await vehicleApi.getVehicle(vehicleId);
 		} catch (error) {
-			handleErrorWithNotification(error, "Couldn't load this vehicle");
 			if (error instanceof ApiError && (error.statusCode === 404 || error.statusCode === 400)) {
+				handleErrorWithNotification(error, "Couldn't load this vehicle");
 				goto(resolve(routes.dashboard));
 				return;
 			}
+			logLoadFailure(error, "Couldn't load this vehicle");
 			vehicleLoadError = userFacingErrorMessage(error);
 		}
 	}
@@ -289,7 +301,7 @@
 			if (isCurrent()) summary = loaded;
 		} catch (error) {
 			if (!isCurrent()) return;
-			handleErrorWithNotification(error, "Couldn't load the expense summary");
+			logLoadFailure(error, "Couldn't load the expense summary");
 			summaryLoadError = userFacingErrorMessage(error);
 		} finally {
 			if (isCurrent()) isLoadingSummary = false;
@@ -305,7 +317,7 @@
 			const result = await analyticsApi.getFuelEfficiency({ vehicleId });
 			if (isCurrent()) fuelEfficiencyPoints = result.fuelEfficiencyTrend;
 		} catch (error) {
-			if (isCurrent()) handleErrorWithNotification(error, "Couldn't load fuel efficiency");
+			if (isCurrent()) void notifyUnlessPageFailed(error, "Couldn't load fuel efficiency");
 		} finally {
 			if (isCurrent()) isLoadingFuelEfficiency = false;
 		}
@@ -337,7 +349,7 @@
 			totalCount = result.pagination.totalCount;
 			currentOffset = offset;
 		} catch (error) {
-			handleErrorWithNotification(error, "Couldn't load expenses");
+			logLoadFailure(error, "Couldn't load expenses");
 			expensesLoadError = userFacingErrorMessage(error);
 		} finally {
 			isLoadingPage = false;
@@ -362,7 +374,7 @@
 			const loaded = await vehicleApi.getVehicleStats(vehicleId, selectedStatsPeriod);
 			if (isCurrent()) vehicleStatsData = loaded;
 		} catch (error) {
-			if (isCurrent()) handleErrorWithNotification(error, "Couldn't load the vehicle's stats");
+			if (isCurrent()) void notifyUnlessPageFailed(error, "Couldn't load the vehicle's stats");
 		} finally {
 			if (isCurrent()) isLoadingVehicleStats = false;
 		}
@@ -415,7 +427,7 @@
 			const photosResult = await vehicleApi.getPhotos(vehicleId);
 			vehiclePhotos = photosResult.data;
 		} catch (error) {
-			handleErrorWithNotification(error, "Couldn't load photos");
+			void notifyUnlessPageFailed(error, "Couldn't load photos");
 		} finally {
 			isLoadingPhotos = false;
 		}

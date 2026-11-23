@@ -189,6 +189,12 @@ function handleApiError(error: unknown): AppError {
 	return { message, code: 'UNKNOWN_ERROR' };
 }
 
+export function logLoadFailure(error: unknown, context: string): void {
+	if (import.meta.env.DEV) {
+		console.error(asSentence(context), handleApiError(error), error);
+	}
+}
+
 export function handleErrorWithNotification(error: unknown, context?: string): void {
 	const appError = handleApiError(error);
 	const message = context ? `${asSentence(context)} ${appError.message}` : appError.message;

@@ -13,6 +13,7 @@ const {
 	UNEXPECTED_FAILURE_MESSAGE,
 	NonErrorThrownError,
 	handleErrorWithNotification,
+	logLoadFailure,
 	toError,
 	userFacingErrorMessage
 } = await import('../error-handling');
@@ -306,5 +307,26 @@ describe('handleErrorWithNotification', () => {
 			'Saving expense'
 		);
 		expect(notified().message).toBe(`Saving expense. ${NETWORK_FAILURE_MESSAGE}`);
+	});
+});
+
+describe('logLoadFailure', () => {
+	afterEach(() => {
+		vi.clearAllMocks();
+		vi.restoreAllMocks();
+	});
+
+	test('logs a load failure in dev without raising a toast', () => {
+		const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const failure = new ApiError('Internal server error', 500);
+
+		logLoadFailure(failure, "Couldn't load the dashboard");
+
+		expect(addNotification).not.toHaveBeenCalled();
+		expect(log).toHaveBeenCalledWith(
+			"Couldn't load the dashboard.",
+			expect.objectContaining({ message: SERVER_FAILURE_MESSAGE, statusCode: 500 }),
+			failure
+		);
 	});
 });

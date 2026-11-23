@@ -354,7 +354,7 @@ describe('vehicle detail page overview', () => {
 		getExpenseSummary.mockResolvedValueOnce(DATA_SUMMARY);
 		await mount();
 
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(
+		expect(handleErrorWithNotification).not.toHaveBeenCalledWith(
 			failure,
 			"Couldn't load the expense summary"
 		);
@@ -578,7 +578,7 @@ describe('vehicle detail page tabs', () => {
 
 		await openTab('Expenses');
 
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't load expenses");
+		expect(handleErrorWithNotification).not.toHaveBeenCalledWith(failure, "Couldn't load expenses");
 		expect(screen.getByText("Couldn't load expenses")).toBeInTheDocument();
 		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText('Expenses down')).toBeNull();
