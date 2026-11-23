@@ -202,6 +202,17 @@ describe('trips page list', () => {
 		expect(card.textContent?.replace(/\s+/g, ' ')).toContain('Avg / trip 617 mi');
 	});
 
+	test('a mixed-unit fleet keeps the fraction of its converted totals', async () => {
+		getSummary.mockResolvedValue({ ...SUMMARY, totalDistance: 1234.56, businessDistance: 900.4 });
+		list.mockResolvedValue(tripPage([trip()]));
+		render(Page);
+		await settle();
+
+		const text = screen.getByTestId('trip-summary-card').textContent?.replace(/\s+/g, ' ');
+		expect(text).toContain('Total 1,234.6 mi');
+		expect(text).toContain('Business 900.4 mi');
+	});
+
 	test('each trip shows purpose, date, distance from the odometer span and vehicle', async () => {
 		list.mockResolvedValue(tripPage([trip({ startOdometer: 1000, endOdometer: 1042 })]));
 		render(Page);

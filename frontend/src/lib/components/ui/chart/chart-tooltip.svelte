@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatNumber } from '#lib/utils/formatters.ts';
+	import { formatNumberUpTo } from '#lib/utils/formatters.ts';
 	import { cn, type WithElementRef, type WithoutChildren } from '#lib/utils.js';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { getPayloadConfigFromPayload, useChart, type TooltipPayload } from './chart-utils.js';
@@ -174,7 +174,7 @@
 									{valueFormatter && typeof item.value === 'number'
 										? valueFormatter(item.value, item.key)
 										: typeof item.value === 'number'
-											? formatNumber(item.value, Number.isInteger(item.value) ? 0 : 2)
+											? formatNumberUpTo(item.value, 2)
 											: item.value}
 								</span>
 							{/if}

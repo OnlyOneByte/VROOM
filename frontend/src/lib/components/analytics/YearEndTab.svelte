@@ -20,7 +20,12 @@
 	import { buildCategoryPieData, buildChartConfig } from '#lib/utils/chart-colors.ts';
 	import { analyticsApi } from '#lib/services/analytics-api.ts';
 	import type { YearEndResponse } from '#lib/types/index.ts';
-	import { formatCurrency, formatDateWith, formatNumber } from '#lib/utils/formatters.ts';
+	import {
+		formatCurrency,
+		formatDateWith,
+		formatNumber,
+		formatNumberUpTo
+	} from '#lib/utils/formatters.ts';
 	import { formatDecimalAxis, parseMonthToDate, unitTooltip } from '#lib/utils/chart-formatters.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
@@ -149,7 +154,7 @@
 					value: yearEnd.vehicleCount,
 					icon: CircleAlert,
 					iconColor: 'chart-4',
-					subtitle: `${formatNumber(yearEnd.totalDistance, 0)} total ${distLongLabel.toLowerCase()}`
+					subtitle: `${formatNumberUpTo(yearEnd.totalDistance, 1)} total ${distLongLabel.toLowerCase()}`
 				}
 			]}
 			columns={4}

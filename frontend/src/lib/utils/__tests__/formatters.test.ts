@@ -11,6 +11,7 @@ import {
 	formatDate,
 	formatBytes,
 	formatNumber,
+	formatNumberUpTo,
 	formatRelativeTime,
 	getCurrencySymbol,
 	toAmountInput,
@@ -266,5 +267,13 @@ describe('toAmountInput', () => {
 	test("writes an amount for a number input with the currency's decimals and a dot", () => {
 		expect(toAmountInput(450, 'USD')).toBe('450.00');
 		expect(toAmountInput(45000.4, 'JPY')).toBe('45000');
+	});
+});
+
+describe('formatNumberUpTo', () => {
+	test('keeps up to the given decimals and drops trailing zeros', () => {
+		expect(formatNumberUpTo(1234.56, 1)).toBe('1,234.6');
+		expect(formatNumberUpTo(16198, 1)).toBe('16,198');
+		expect(formatNumberUpTo(2.5, 2)).toBe('2.5');
 	});
 });
