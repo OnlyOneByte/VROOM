@@ -108,14 +108,26 @@ describe('ModelProvidersCard', () => {
 		}
 	);
 
-	test('both Add Provider buttons are 40px tap targets on phones', async () => {
+	test('an empty card has one add button, named for the card and 40px tall on phones', async () => {
 		getProviders.mockResolvedValue([]);
 		render(ModelProvidersCard, { props: { domain: 'llm' } });
 
 		await screen.findByText('No assistant provider configured');
-		const addButtons = screen.getAllByRole('button', { name: 'Add Provider' });
-		expect(addButtons).toHaveLength(2);
-		for (const button of addButtons) expect(button.className).toMatch(/(^|\s)h-10(\s|$)/);
+		const addButtons = screen.getAllByRole('button', { name: /^Add / });
+		expect(addButtons).toHaveLength(1);
+		expect(addButtons[0]).toHaveAccessibleName('Add assistant provider');
+		expect(addButtons[0]?.className).toMatch(/(^|\s)h-10(\s|$)/);
+	});
+
+	test('with a provider, the one add button moves to the Providers row', async () => {
+		getProviders.mockResolvedValue([provider('vlm', 'Receipt Bot')]);
+		render(ModelProvidersCard, { props: { domain: 'vlm' } });
+
+		await screen.findByText('Receipt Bot');
+		const addButtons = screen.getAllByRole('button', { name: /^Add / });
+		expect(addButtons).toHaveLength(1);
+		expect(addButtons[0]).toHaveAccessibleName('Add receipt-parsing provider');
+		expect(screen.queryByText('No receipt-parsing provider configured')).toBeNull();
 	});
 
 	test('lists the providers returned for the domain', async () => {
@@ -202,7 +214,7 @@ describe('ModelProvidersCard', () => {
 describe('ModelProvidersCard add provider', () => {
 	test('opens with OpenAI-compatible defaults and requires name and key', async () => {
 		await openCreate('llm');
-		expect(screen.getByText('Add assistant provider')).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Add assistant provider' })).toBeInTheDocument();
 		expect(screen.getByTestId('llm-type-trigger')).toHaveTextContent('OpenAI-compatible');
 		expect(input('llm-model')).toHaveValue('gpt-4o-mini');
 		expect(input('llm-baseurl')).toHaveValue('https://api.openai.com/v1');
@@ -244,7 +256,9 @@ describe('ModelProvidersCard add provider', () => {
 		});
 		expect(showSuccess).toHaveBeenCalledWith('Receipts GPT added');
 		expect(getProviders).toHaveBeenCalledTimes(2);
-		await waitFor(() => expect(screen.queryByText('Add receipt-parsing provider')).toBeNull());
+		await waitFor(() =>
+			expect(screen.queryByRole('heading', { name: 'Add receipt-parsing provider' })).toBeNull()
+		);
 	});
 
 	test('a create failure reports the error and keeps the dialog open', async () => {
@@ -255,7 +269,7 @@ describe('ModelProvidersCard add provider', () => {
 		await fireEvent.click(saveButton('llm'));
 		await settle();
 		expect(showError).toHaveBeenCalledWith("Couldn't save the provider. Invalid API key.");
-		expect(screen.getByText('Add assistant provider')).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Add assistant provider' })).toBeInTheDocument();
 		expect(saveButton('llm')).not.toBeDisabled();
 	});
 
@@ -300,16 +314,19 @@ describe('ModelProvidersCard add provider', () => {
 	test('cancel closes the dialog without saving', async () => {
 		await openCreate('llm');
 		await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-		await waitFor(() => expect(screen.queryByText('Add assistant provider')).toBeNull());
+		await waitFor(() =>
+			expect(screen.queryByRole('heading', { name: 'Add assistant provider' })).toBeNull()
+		);
 		expect(createProvider).not.toHaveBeenCalled();
 	});
 
 	test('the empty-state button also opens the add dialog', async () => {
 		render(ModelProvidersCard, { props: { domain: 'vlm' } });
 		await settle();
-		const buttons = screen.getAllByRole('button', { name: /Add Provider/ });
-		await fireEvent.click(buttons[buttons.length - 1] as HTMLElement);
-		expect(await screen.findByText('Add receipt-parsing provider')).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole('button', { name: 'Add receipt-parsing provider' }));
+		expect(
+			await screen.findByRole('heading', { name: 'Add receipt-parsing provider' })
+		).toBeInTheDocument();
 	});
 });
 

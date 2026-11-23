@@ -228,16 +228,18 @@
 			<div class="space-y-3">
 				<div class="flex items-center justify-between">
 					<p class="text-sm font-medium">Providers</p>
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-10 sm:h-8"
-						onclick={openCreate}
-						data-testid="{domain}-add-provider"
-					>
-						<Plus class="h-4 w-4 mr-1" />
-						Add Provider
-					</Button>
+					{#if providers.length > 0}
+						<Button
+							variant="outline"
+							size="sm"
+							class="h-10 sm:h-8"
+							onclick={openCreate}
+							data-testid="{domain}-add-provider"
+						>
+							<Plus class="h-4 w-4 mr-1" />
+							Add {copy.noun}
+						</Button>
+					{/if}
 				</div>
 
 				{#if providers.length === 0}
@@ -245,9 +247,15 @@
 						<Icon class="h-10 w-10 text-muted-foreground mx-auto mb-2" />
 						<p class="text-sm font-medium">No {copy.noun} configured</p>
 						<p class="text-xs text-muted-foreground mt-1">{copy.emptyHint}</p>
-						<Button variant="outline" size="sm" class="mt-3 h-10 sm:h-8" onclick={openCreate}>
+						<Button
+							variant="outline"
+							size="sm"
+							class="mt-3 h-10 sm:h-8"
+							onclick={openCreate}
+							data-testid="{domain}-add-provider"
+						>
 							<Plus class="h-4 w-4 mr-1" />
-							Add Provider
+							Add {copy.noun}
 						</Button>
 					</div>
 				{:else}

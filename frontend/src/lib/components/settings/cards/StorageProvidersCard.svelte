@@ -380,15 +380,17 @@
 			<div class="space-y-3">
 				<div class="flex items-center justify-between">
 					<p class="text-sm font-medium">Providers</p>
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-10 sm:h-8"
-						onclick={() => goto(resolve(routes.settingsProviderNew))}
-					>
-						<Plus class="h-4 w-4 mr-1" />
-						Add Provider
-					</Button>
+					{#if providers.length > 0}
+						<Button
+							variant="outline"
+							size="sm"
+							class="h-10 sm:h-8"
+							onclick={() => goto(resolve(routes.settingsProviderNew))}
+						>
+							<Plus class="h-4 w-4 mr-1" />
+							Add storage provider
+						</Button>
+					{/if}
 				</div>
 
 				{#if providers.length === 0}
@@ -405,7 +407,7 @@
 							onclick={() => goto(resolve(routes.settingsProviderNew))}
 						>
 							<Plus class="h-4 w-4 mr-1" />
-							Add Provider
+							Add storage provider
 						</Button>
 					</div>
 				{:else}
