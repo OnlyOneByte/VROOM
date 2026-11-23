@@ -49,6 +49,7 @@ import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { joinStoragePath } from '../../utils/paths';
 import { unitPreferencesSchema } from '../../utils/unit-preferences-schema';
+import { storageProviderDescriptor } from '../providers/domains/storage/registry';
 import { hasZipBackup } from './backup-strategy';
 
 interface ValidationResult {
@@ -94,10 +95,10 @@ export function storageProviderIdentity(
   provider: Pick<UserProvider, 'providerType' | 'config'>
 ): string | null {
   const config = (provider.config ?? {}) as Record<string, unknown>;
-  if (provider.providerType === 's3') {
-    return config.endpoint && config.bucket
-      ? `s3:${normalizeEndpoint(String(config.endpoint))}/${String(config.bucket)}`
-      : null;
+  const identity = storageProviderDescriptor(provider.providerType)?.identity;
+  if (identity) {
+    const raw = identity(config);
+    return raw ? normalizeStorageIdentity(raw) : null;
   }
   return config.accountEmail ? `${provider.providerType}:${String(config.accountEmail)}` : null;
 }
