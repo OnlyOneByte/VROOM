@@ -77,14 +77,15 @@ describe('VehiclePhotoCarousel: loading', () => {
 });
 
 describe('VehiclePhotoCarousel: empty state', () => {
-	test('an owner with no photos is invited to upload', async () => {
+	test('an owner with no photos gets one compact Add a photo row', async () => {
 		const { onUpload } = mount([]);
 
 		expect(screen.getByText('No photos yet')).toBeInTheDocument();
-		for (const name of ['Upload', 'Upload Photos']) {
-			expect(screen.getByRole('button', { name })).toHaveClass('h-10');
-		}
-		await fireEvent.click(screen.getByRole('button', { name: 'Upload Photos' }));
+		expect(screen.getByTestId('vehicle-photos-empty')).toHaveClass('py-4');
+		expect(screen.getAllByRole('button')).toHaveLength(1);
+		const add = screen.getByRole('button', { name: 'Add a photo' });
+		expect(add).toHaveClass('h-10');
+		await fireEvent.click(add);
 
 		expect(onUpload).toHaveBeenCalledOnce();
 	});
