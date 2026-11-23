@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { currentLocale } from '#lib/utils/formatters.ts';
 	import { Calendar as CalendarPrimitive } from 'bits-ui';
 	import * as Calendar from './index.js';
 	import { cn, type WithoutChildrenOrChild } from '#lib/utils.js';
@@ -14,7 +15,7 @@
 		weekdayFormat = 'short',
 		buttonVariant = 'ghost',
 		captionLayout = 'label',
-		locale = 'en-US',
+		locale = currentLocale(),
 		months: monthsProp,
 		years,
 		monthFormat: monthFormatProp,

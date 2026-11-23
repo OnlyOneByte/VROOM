@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatBytes } from '#lib/utils/formatters.ts';
 	import { LoaderCircle, Upload, X, CircleAlert, ImagePlus } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 
@@ -99,12 +100,6 @@
 		selectedFiles = selectedFiles.filter((_, i) => i !== index);
 	}
 
-	function formatFileSize(bytes: number): string {
-		if (bytes < 1024) return `${bytes} B`;
-		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-	}
-
 	function handleUploadClick() {
 		if (selectedFiles.length === 0 || uploading) return;
 		onFilesReady(selectedFiles);
@@ -171,7 +166,7 @@
 			>
 				<div class="min-w-0 flex-1">
 					<p class="truncate text-sm font-medium text-foreground">{file.name}</p>
-					<p class="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+					<p class="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
 				</div>
 				<button
 					type="button"

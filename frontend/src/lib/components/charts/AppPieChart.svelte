@@ -3,7 +3,7 @@
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import ChartCard from './ChartCard.svelte';
 	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
-	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import { formatCurrencyTooltip } from '#lib/utils/chart-formatters.ts';
 	import type { Snippet } from 'svelte';
 
@@ -105,7 +105,7 @@
 							<div class="text-sm font-bold">{formatLegendValue(item)}</div>
 							{#if item.percentage != null}
 								<div class="text-xs text-muted-foreground">
-									{item.percentage.toFixed(1)}%
+									{formatNumber(item.percentage, 1)}%
 								</div>
 							{/if}
 						</div>

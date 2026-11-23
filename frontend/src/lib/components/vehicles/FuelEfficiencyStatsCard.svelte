@@ -13,7 +13,7 @@
 		getFuelEfficiencyLabel,
 		getElectricEfficiencyLabel
 	} from '#lib/utils/units.ts';
-	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import { COMMON_MESSAGES, EXPENSE_MESSAGES } from '#lib/constants/messages.ts';
 	import type { UnitPreferences, VehicleStats } from '#lib/types/index.ts';
 
@@ -60,10 +60,10 @@
 		if (vehicleStatsData.currentMileage !== null) {
 			items.push({
 				label: `Current ${isKilometers ? 'Odometer' : 'Mileage'}`,
-				value: vehicleStatsData.currentMileage.toLocaleString(),
+				value: formatNumber(vehicleStatsData.currentMileage, 0),
 				unit: getDistanceUnitLabel(distanceUnit, false),
 				secondaryLabel: `${isKilometers ? 'Distance' : 'Miles'} Driven`,
-				secondaryValue: vehicleStatsData.totalMileage.toLocaleString(),
+				secondaryValue: formatNumber(vehicleStatsData.totalMileage, 0),
 				secondaryUnit: selectedStatsPeriod === 'all' ? 'lifetime' : `in ${selectedStatsPeriod}`
 			});
 		}
@@ -71,7 +71,7 @@
 		if (vehicleStatsData.totalFuelConsumed > 0) {
 			items.push({
 				label: 'Fuel Consumed',
-				value: vehicleStatsData.totalFuelConsumed.toFixed(1),
+				value: formatNumber(vehicleStatsData.totalFuelConsumed, 1),
 				unit: getVolumeUnitLabel(volumeUnit, true),
 				secondaryLabel: 'Total Fuel Cost',
 				secondaryValue: formatCurrency(vehicleStatsData.totalFuelCost),
@@ -82,7 +82,7 @@
 		if (vehicleStatsData.totalChargeConsumed > 0) {
 			items.push({
 				label: 'Charge Consumed',
-				value: vehicleStatsData.totalChargeConsumed.toFixed(1),
+				value: formatNumber(vehicleStatsData.totalChargeConsumed, 1),
 				unit: getChargeUnitLabel(chargeUnit, true),
 				secondaryLabel: 'Total Charge Cost',
 				secondaryValue: formatCurrency(vehicleStatsData.totalChargeCost),
@@ -93,7 +93,7 @@
 		if (vehicleStatsData.averageMpg !== null) {
 			items.push({
 				label: `Average ${getFuelEfficiencyLabel(distanceUnit, volumeUnit)}`,
-				value: vehicleStatsData.averageMpg.toFixed(1),
+				value: formatNumber(vehicleStatsData.averageMpg, 1),
 				unit: 'fuel efficiency',
 				secondaryLabel: `Cost per ${getDistanceUnitLabel(distanceUnit, true)}`,
 				secondaryValue:
@@ -107,7 +107,7 @@
 		if (vehicleStatsData.averageMilesPerKwh !== null) {
 			items.push({
 				label: 'Efficiency',
-				value: vehicleStatsData.averageMilesPerKwh.toFixed(2),
+				value: formatNumber(vehicleStatsData.averageMilesPerKwh, 2),
 				unit: getElectricEfficiencyLabel(distanceUnit, chargeUnit),
 				secondaryLabel: `Cost per ${getDistanceUnitLabel(distanceUnit, true)}`,
 				secondaryValue:

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { currentLocale } from '#lib/utils/formatters.ts';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
 	import {
 		type DateValue,
@@ -29,7 +30,7 @@
 		id
 	}: Props = $props();
 
-	const df = new DateFormatter('en-US', {
+	const df = new DateFormatter(currentLocale(), {
 		dateStyle: 'medium'
 	});
 

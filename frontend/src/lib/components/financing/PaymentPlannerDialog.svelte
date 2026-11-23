@@ -10,7 +10,12 @@
 		calculateMinimumPayment,
 		type NextPaymentBasis
 	} from '#lib/utils/financing-calculations.ts';
-	import { formatCurrency, formatDate, getCurrencySymbol } from '#lib/utils/formatters.ts';
+	import {
+		formatCurrency,
+		formatDate,
+		getCurrencySymbol,
+		toAmountInput
+	} from '#lib/utils/formatters.ts';
 	import { debounce } from '#lib/utils/memoize.ts';
 	import {
 		computePlannerState,
@@ -85,7 +90,7 @@
 
 	$effect(() => {
 		if (open) {
-			inputValue = financing.paymentAmount.toFixed(2);
+			inputValue = toAmountInput(financing.paymentAmount);
 			savedAmount = financing.paymentAmount;
 			saveError = '';
 			debouncedInput = financing.paymentAmount;

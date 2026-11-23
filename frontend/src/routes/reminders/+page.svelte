@@ -19,7 +19,7 @@
 	import { reminderApi } from '#lib/services/reminder-api.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import type { ReminderNotification, ReminderWithVehicles, Vehicle } from '#lib/types/index.ts';
-	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import {
 		isReminderTimeDue,
@@ -320,7 +320,7 @@
 									{#if item.reminder.nextDueDate !== null}
 										{due ? 'Due' : 'Next'}: {formatDate(item.reminder.nextDueDate)}
 									{:else if item.reminder.nextDueOdometer !== null}
-										Next: {item.reminder.nextDueOdometer.toLocaleString()} (odometer)
+										Next: {formatNumber(item.reminder.nextDueOdometer, 0)} (odometer)
 									{/if}
 								</span>
 								{#if item.reminder.expenseAmount != null}
@@ -466,7 +466,7 @@
 										{#if n.dueDate !== null}
 											Due {formatDate(n.dueDate)}
 										{:else if n.dueOdometer !== null}
-											Due at {n.dueOdometer.toLocaleString()} (odometer)
+											Due at {formatNumber(n.dueOdometer, 0)} (odometer)
 										{/if}
 									</p>
 								</div>

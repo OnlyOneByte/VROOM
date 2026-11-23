@@ -10,6 +10,7 @@
 		formatMonthLabel,
 		type TooltipValueFormat,
 		CHART_PADDING,
+		distinctYTicks,
 		TIME_X_PADDING,
 		insetTimeTicks,
 		getTrendLineProps,
@@ -111,7 +112,10 @@
 					...getTrendLineProps(data.length),
 					...lineProps,
 					xAxis: { ...resolvedXAxisProps, ticks: insetTimeTicks(resolvedXAxisProps['ticks']) },
-					yAxis: { format: yAxisFormat }
+					yAxis: {
+						format: yAxisFormat,
+						ticks: distinctYTicks(yAxisFormat, height - CHART_PADDING.top - CHART_PADDING.bottom)
+					}
 				}}
 			>
 				{#snippet points()}

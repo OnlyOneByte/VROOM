@@ -1,5 +1,5 @@
 import { getVolumeUnitLabel, getChargeUnitLabel, isElectricFuelType } from '#lib/utils/units.ts';
-import { toDateInputValue } from '#lib/utils/formatters.ts';
+import { formatNumber, toDateInputValue } from '#lib/utils/formatters.ts';
 import type { Vehicle, VolumeUnit, ChargeUnit } from '#lib/types/index.ts';
 import { EXPENSE_LIMITS } from '#lib/constants/limits.ts';
 
@@ -41,7 +41,7 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 			const amount = parseFloat(value as string);
 			if (!value || amount <= 0) return 'Amount must be greater than 0';
 			if (amount > EXPENSE_LIMITS.MAX_AMOUNT) {
-				return `Amount must be ${EXPENSE_LIMITS.MAX_AMOUNT.toLocaleString('en-US')} or less`;
+				return `Amount must be ${formatNumber(EXPENSE_LIMITS.MAX_AMOUNT, 0)} or less`;
 			}
 			if (!hasAtMostTwoDecimals(amount)) return 'Amount can have at most 2 decimal places';
 			break;
@@ -116,7 +116,7 @@ function validateMileage(value: string, ctx: ValidationContext): string | null {
 	if (entriesBefore.length > 0) {
 		const maxBefore = Math.max(...entriesBefore.map(e => e.mileage!));
 		if (mileage <= maxBefore) {
-			return `Mileage must be greater than ${maxBefore.toLocaleString()} (from earlier entry)`;
+			return `Mileage must be greater than ${formatNumber(maxBefore, 0)} (from earlier entry)`;
 		}
 	}
 
@@ -127,7 +127,7 @@ function validateMileage(value: string, ctx: ValidationContext): string | null {
 	if (entriesAfter.length > 0) {
 		const minAfter = Math.min(...entriesAfter.map(e => e.mileage!));
 		if (mileage >= minAfter) {
-			return `Mileage must be less than ${minAfter.toLocaleString()} (from later entry)`;
+			return `Mileage must be less than ${formatNumber(minAfter, 0)} (from later entry)`;
 		}
 	}
 

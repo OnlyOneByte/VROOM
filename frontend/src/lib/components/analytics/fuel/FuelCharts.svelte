@@ -12,6 +12,7 @@
 </script>
 
 <script lang="ts">
+	import { formatNumber } from '#lib/utils/formatters.ts';
 	import { AppLineChart, AppAreaChart, AppBarChart } from '#lib/components/charts/index.ts';
 	import { CHART_COLORS, buildChartConfig } from '#lib/utils/chart-colors.ts';
 	import {
@@ -266,7 +267,7 @@
 			y={odometerVehicleNames}
 			series={odometerSeries}
 			config={odometerConfig}
-			yAxisFormat={v => v.toLocaleString()}
+			yAxisFormat={v => formatNumber(v, 0)}
 			tooltipFormat={odometerTooltip}
 			xAxisProps={monthlyXAxisProps(odometerData.length, 6)}
 		/>

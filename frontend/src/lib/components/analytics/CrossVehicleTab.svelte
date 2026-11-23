@@ -14,7 +14,7 @@
 		FinancingResponse,
 		InsuranceResponse
 	} from '#lib/types/index.ts';
-	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import { fitBandTickLabel, parseMonthToDate, unitTooltip } from '#lib/utils/chart-formatters.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { getFuelEfficiencyLabel, getDistanceUnitLabel } from '#lib/utils/units.ts';
@@ -182,7 +182,7 @@
 				y={fuelEffVehicleNames}
 				series={fuelEffSeries}
 				config={fuelEffConfig}
-				yAxisFormat={v => `${v.toFixed(0)} ${efficiencyLabel}`}
+				yAxisFormat={v => `${formatNumber(v, 0)} ${efficiencyLabel}`}
 				tooltipFormat={unitTooltip(efficiencyLabel)}
 			/>
 		{/if}

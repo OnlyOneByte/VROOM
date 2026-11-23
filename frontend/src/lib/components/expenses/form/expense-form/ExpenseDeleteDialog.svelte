@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { LoaderCircle, Save } from '@lucide/svelte';
 	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
-	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatDateWith } from '#lib/utils/formatters.ts';
 	import type { Expense } from '#lib/types/index.ts';
 
 	interface Props {
@@ -53,9 +53,10 @@
 							{originalExpense.description || originalExpense.tags?.join(', ') || 'Expense'}
 						</p>
 						<p class="text-sm text-muted-foreground">
-							{formatCurrency(originalExpense.amount)} on {new Date(
-								originalExpense.date
-							).toLocaleDateString()}
+							{formatCurrency(originalExpense.amount)} on {formatDateWith(
+								new Date(originalExpense.date),
+								{}
+							)}
 						</p>
 					</div>
 				</div>

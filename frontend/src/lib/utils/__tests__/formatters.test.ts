@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
+	amountPlaceholder,
 	amountStep,
 	capitalize,
 	currencyFractionDigits,
@@ -8,9 +9,11 @@ import {
 	formatCompactRelativeTime,
 	formatCurrency,
 	formatDate,
+	formatBytes,
 	formatNumber,
 	formatRelativeTime,
 	getCurrencySymbol,
+	toAmountInput,
 	toDateInputValue
 } from '#lib/utils/formatters.ts';
 
@@ -242,5 +245,26 @@ describe('locale and currency decimals', () => {
 		expect(amountStep('USD')).toBe('0.01');
 		expect(amountStep('JPY')).toBe('1');
 		expect(amountStep('BHD')).toBe('0.001');
+	});
+});
+
+describe('amountPlaceholder and formatBytes', () => {
+	test("the amount placeholder has the currency's decimal places", () => {
+		expect(amountPlaceholder('USD')).toBe('0.00');
+		expect(amountPlaceholder('JPY')).toBe('0');
+		expect(amountPlaceholder('BHD')).toBe('0.000');
+	});
+
+	test('file sizes read in B, KB or MB with one decimal', () => {
+		expect(formatBytes(512)).toBe('512 B');
+		expect(formatBytes(1536)).toBe('1.5 KB');
+		expect(formatBytes(5 * 1024 * 1024)).toBe('5.0 MB');
+	});
+});
+
+describe('toAmountInput', () => {
+	test("writes an amount for a number input with the currency's decimals and a dot", () => {
+		expect(toAmountInput(450, 'USD')).toBe('450.00');
+		expect(toAmountInput(45000.4, 'JPY')).toBe('45000');
 	});
 });

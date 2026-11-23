@@ -3,7 +3,7 @@
 	import Input from '#lib/components/ui/input/input.svelte';
 	import Label from '#lib/components/ui/label/label.svelte';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
-	import { amountStep, getCurrencySymbol } from '#lib/utils/formatters.ts';
+	import { amountPlaceholder, amountStep, getCurrencySymbol } from '#lib/utils/formatters.ts';
 
 	interface Props {
 		date: string;
@@ -53,7 +53,7 @@
 			step={amountStep()}
 			min="0"
 			bind:value={amount}
-			placeholder="0.00"
+			placeholder={amountPlaceholder()}
 			class={currencySymbol.length > 1 ? 'pl-14' : 'pl-8'}
 			onblur={onAmountBlur}
 			aria-invalid={!!amountError}

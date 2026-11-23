@@ -19,7 +19,7 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.ts';
 	import PendingPhotoPreview from '#lib/components/expenses/form/PendingPhotoPreview.svelte';
 	import { isOdometerOrderError, odometerApi } from '#lib/services/odometer-api.ts';
-	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
+	import { dateOnlyToISO, formatNumber, toDateInputValue } from '#lib/utils/formatters.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import type { PageData } from './$types';
 
@@ -163,7 +163,7 @@
 				{#if showLatest}
 					<p class="flex items-center gap-2 text-sm text-muted-foreground">
 						<Info class="h-4 w-4 shrink-0" aria-hidden="true" />
-						Your latest reading is {latest?.odometer.toLocaleString()}.
+						Your latest reading is {latest ? formatNumber(latest.odometer, 0) : ''}.
 					</p>
 				{/if}
 			</div>

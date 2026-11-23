@@ -12,7 +12,7 @@
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import FuelStatsTab from '#lib/components/analytics/fuel/FuelStatsTab.svelte';
 	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
-	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import { getFuelEfficiencyLabel } from '#lib/utils/units.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import type { AnalyticsSummaryResponse } from '#lib/types/index.ts';
@@ -76,7 +76,8 @@
 					},
 					{
 						label: efficiencyLabel,
-						value: quickStats.avgEfficiency != null ? quickStats.avgEfficiency.toFixed(1) : 'N/A',
+						value:
+							quickStats.avgEfficiency != null ? formatNumber(quickStats.avgEfficiency, 1) : 'N/A',
 						icon: Activity,
 						iconColor: 'chart-2'
 					},

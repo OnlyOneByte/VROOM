@@ -1,7 +1,7 @@
 <script lang="ts">
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import { Banknote, Calendar, TrendingUp, Hash, DollarSign, TriangleAlert } from '@lucide/svelte';
-	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import type { VehicleFinancing, UnitPreferences } from '#lib/types/index.ts';
@@ -121,7 +121,7 @@
 			items.push({
 				label: 'Mileage Overage',
 				value: excessMiles > 0 ? formatCurrency(overageCost) : formatCurrency(0),
-				subtitle: `${excessMiles > 0 ? `${excessMiles.toLocaleString()} ${distLabel} over` : 'Within limit'} · ${formatCurrency(financing.excessMileageFee)}/${distLabel}`,
+				subtitle: `${excessMiles > 0 ? `${formatNumber(excessMiles, 0)} ${distLabel} over` : 'Within limit'} · ${formatCurrency(financing.excessMileageFee)}/${distLabel}`,
 				icon: TriangleAlert,
 				iconColor: excessMiles > 0 ? 'destructive' : 'chart-2'
 			});

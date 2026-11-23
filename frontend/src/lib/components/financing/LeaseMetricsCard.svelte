@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils/formatters.ts';
 	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
 	import { Progress } from '#lib/components/ui/progress/index.ts';
 	import { Gauge } from '@lucide/svelte';
@@ -63,8 +64,8 @@
 			<div class="space-y-2">
 				<div class="flex justify-between text-xs sm:text-sm">
 					<span class="text-muted-foreground">
-						{leaseMetrics.mileageUsed.toLocaleString()}
-						/ {totalMileageAllowance.toLocaleString()}
+						{formatNumber(leaseMetrics.mileageUsed, 0)}
+						/ {formatNumber(totalMileageAllowance, 0)}
 						{distLabel}
 					</span>
 					<span class="font-medium">{Math.round(mileageUsagePercentage)}%</span>
@@ -82,13 +83,13 @@
 			<div class="flex items-center justify-between text-xs sm:text-sm text-muted-foreground">
 				<span>
 					Odometer: <span class="font-medium text-foreground">
-						{currentOdometer.toLocaleString()}
+						{formatNumber(currentOdometer, 0)}
 					</span>
-					/ {limitOdometer.toLocaleString()}
+					/ {formatNumber(limitOdometer, 0)}
 					{distLabel}
 				</span>
 				<span class="font-medium text-foreground">
-					{leaseMetrics.mileageRemaining.toLocaleString()} left
+					{formatNumber(leaseMetrics.mileageRemaining, 0)} left
 				</span>
 			</div>
 		</CardContent>
