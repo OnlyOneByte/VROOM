@@ -5,7 +5,9 @@ import type { UserSettings, Vehicle } from '#lib/types/index.ts';
 const nav = vi.hoisted(() => ({
 	page: { url: new URL('http://localhost/expenses'), state: {} },
 	replaceState: vi.fn(),
-	afterNavigate: [] as Array<(navigation: { type: string; to: { url: URL } | null }) => void>
+	afterNavigate: [] as Array<
+		(navigation: { type: string; shallow: boolean; to: { url: URL } | null }) => void
+	>
 }));
 
 vi.mock('$app/navigation', () => ({
@@ -13,6 +15,10 @@ vi.mock('$app/navigation', () => ({
 		if (opts.shallow && opts.replace) {
 			nav.replaceState(url, opts.state);
 			history.replaceState(null, '', url);
+		}
+		const to = { url: new URL(url, location.href) };
+		for (const callback of nav.afterNavigate) {
+			callback({ type: 'goto', shallow: !!opts.shallow, to });
 		}
 		return Promise.resolve();
 	},
@@ -83,7 +89,7 @@ function openAt(query: string) {
 function navigateTo(query: string) {
 	const url = new URL(`http://localhost/expenses${query}`);
 	history.pushState(null, '', `/expenses${query}`);
-	for (const callback of nav.afterNavigate) callback({ type: 'link', to: { url } });
+	for (const callback of nav.afterNavigate) callback({ type: 'link', shallow: false, to: { url } });
 }
 
 function lastListParams(): Record<string, unknown> {
@@ -207,5 +213,32 @@ describe('/expenses filters in the URL', () => {
 		expect(lastListParams()).not.toHaveProperty('search');
 		expect(lastListParams()).not.toHaveProperty('category');
 		expect(screen.getByRole('textbox', { name: 'Search expenses and vehicles' })).toHaveValue('');
+	});
+
+	test('a search longer than the URL keeps is not cut back in the box after the URL write', async () => {
+		openAt('');
+		const input = await screen.findByRole('textbox', { name: 'Search expenses and vehicles' });
+		const long = 'a'.repeat(120);
+
+		await fireEvent.input(input, { target: { value: long } });
+		await waitFor(() => expect(location.search).toBe(`?q=${'a'.repeat(100)}`));
+		await new Promise(resolve => setTimeout(resolve, 400));
+
+		expect(input).toHaveValue(long);
+	});
+
+	test('a link followed while the page is still loading is applied once the vehicles arrive', async () => {
+		let resolveVehicles: (vehicles: Vehicle[]) => void = () => {};
+		getVehicles.mockReturnValue(new Promise(resolve => (resolveVehicles = resolve)));
+		openAt('?category=fuel');
+
+		navigateTo('?vehicleId=v1');
+		resolveVehicles([VEHICLE]);
+
+		await waitFor(() => expect(lastListParams()).toMatchObject({ vehicleId: 'v1' }));
+		expect(lastListParams()).not.toHaveProperty('category');
+		expect(await screen.findByTestId('active-filter-summary')).toHaveTextContent(
+			'Filtered by Daily Driver'
+		);
 	});
 });

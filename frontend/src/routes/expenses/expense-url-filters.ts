@@ -59,7 +59,7 @@ export function expenseUrlFiltersQuery(
 	if (filters.startDate) params.set('startDate', filters.startDate);
 	if (filters.endDate) params.set('endDate', filters.endDate);
 	if (filters.tags.length > 0) params.set('tags', filters.tags.join(','));
-	const q = filters.q.trim();
+	const q = filters.q.trim().slice(0, SEARCH_MAX_LENGTH);
 	if (q) params.set('q', q);
 	const query = params.toString();
 	return query ? `?${query}` : '';

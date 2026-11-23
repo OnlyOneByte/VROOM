@@ -208,10 +208,13 @@
 		return () => clearTimeout(timer);
 	});
 
-	afterNavigate(({ type, to }) => {
-		if (type === 'enter' || !to) return;
-		const next = parseExpenseUrlFilters(to.url.searchParams);
-		if (next.vehicleId && !vehicles.some(v => v.id === next.vehicleId)) next.vehicleId = undefined;
+	afterNavigate(navigation => {
+		if (navigation.type === 'enter' || !navigation.to) return;
+		if (navigation.type === 'goto' && navigation.shallow) return;
+		const next = parseExpenseUrlFilters(navigation.to.url.searchParams);
+		if (!isLoading && next.vehicleId && !vehicles.some(v => v.id === next.vehicleId)) {
+			next.vehicleId = undefined;
+		}
 		if (expenseUrlFiltersQuery(next) === expenseUrlFiltersQuery(currentUrlFilters())) return;
 		searchTerm = next.q;
 		selectedVehicleId = next.vehicleId;
@@ -219,7 +222,8 @@
 		endDate = next.endDate;
 		selectedTags = next.tags;
 		categoryFilter = next.category ?? '';
-		expenseListReload.reloadNow();
+		if (isLoading) void loadInitial();
+		else expenseListReload.reloadNow();
 	});
 
 	onMount(loadInitial);
