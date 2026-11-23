@@ -36,7 +36,7 @@
 	const uid = $props.id();
 	const titleId = `${uid}-fleet-title`;
 
-	const CAROUSEL_ARROW_CLASS = 'top-9 bg-background/90 hover:bg-background shadow-md';
+	const CAROUSEL_ARROW_CLASS = 'top-15 bg-background/90 hover:bg-background shadow-md';
 
 	let canScrollPrev = $state(false);
 	let canScrollNext = $state(false);
@@ -139,36 +139,37 @@
 												{/if}
 											</span>
 										{/if}
-										{#if vehicle.hasActiveFinancing}
-											<Badge
-												variant="secondary"
-												class="absolute top-3 right-3 z-20 bg-background/90 backdrop-blur-sm"
-											>
-												Financed
-											</Badge>
-										{/if}
-										{#if vehicle.sharedBy}
-											<Badge
-												variant="secondary"
-												class="absolute top-3 left-3 z-20 bg-background/90 backdrop-blur-sm inline-flex items-center gap-1"
-											>
-												<Users class="h-3 w-3" aria-hidden="true" />
-												Shared by {vehicle.sharedBy}
-											</Badge>
-										{/if}
 									</div>
 
 									<Card.Content class="relative p-4 flex flex-col h-[200px]">
 										<!-- Stretched-link overlay: the action button must stay above it (z-10). -->
 										<div class="mb-3">
-											<h3 class="font-semibold text-lg leading-tight">
-												<a
-													href={resolve(paramRoutes.vehicle, { id: vehicle.id })}
-													class="rounded-sm after:absolute after:inset-0 after:content-[''] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-												>
-													{vehicle.nickname || vehicle.name}
-												</a>
-											</h3>
+											<div class="flex items-start justify-between gap-2">
+												<h3 class="min-w-0 font-semibold text-lg leading-tight">
+													<a
+														href={resolve(paramRoutes.vehicle, { id: vehicle.id })}
+														class="rounded-sm after:absolute after:inset-0 after:content-[''] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+													>
+														{vehicle.nickname || vehicle.name}
+													</a>
+												</h3>
+												{#if vehicle.hasActiveFinancing || vehicle.sharedBy}
+													<div class="flex max-w-[50%] shrink-0 flex-wrap justify-end gap-1">
+														{#if vehicle.hasActiveFinancing}
+															<Badge variant="secondary">Financed</Badge>
+														{/if}
+														{#if vehicle.sharedBy}
+															<Badge
+																variant="secondary"
+																class="inline-flex max-w-full items-center gap-1"
+															>
+																<Users class="h-3 w-3 shrink-0" aria-hidden="true" />
+																<span class="truncate">Shared by {vehicle.sharedBy}</span>
+															</Badge>
+														{/if}
+													</div>
+												{/if}
+											</div>
 											{#if vehicle.nickname}
 												<p class="text-sm text-muted-foreground">{vehicle.name}</p>
 											{/if}

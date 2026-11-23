@@ -231,7 +231,7 @@ describe('VehicleCarousel states', () => {
 		const next = await screen.findByRole('button', { name: 'Next slide' });
 
 		for (const arrow of [next, screen.getByRole('button', { name: 'Previous slide' })]) {
-			expect(arrow).toHaveClass('top-9');
+			expect(arrow).toHaveClass('top-15');
 			expect(arrow).not.toHaveClass('top-1/2');
 		}
 	});
@@ -362,6 +362,18 @@ describe('VehicleCarousel compact header', () => {
 		const add = screen.getByRole('link', { name: 'Add Vehicle' });
 		expect(add).toHaveAttribute('href', '/vehicles/new');
 		expect(add).toHaveClass('lg:hidden');
+	});
+
+	test('the Financed and Shared badges sit beside the title, clear of the arrows on the band', () => {
+		render(VehicleCarousel, {
+			vehicles: [overview({ hasActiveFinancing: true, sharedBy: 'Sam', make: 'Toyota' })]
+		});
+		const band = screen.getByTestId('fleet-card-header');
+		const title = screen.getByRole('heading', { level: 3 });
+		for (const badge of [screen.getByText('Financed'), screen.getByText('Shared by Sam')]) {
+			expect(band).not.toContainElement(badge);
+			expect(title.parentElement?.parentElement).toContainElement(badge);
+		}
 	});
 
 	test('without a link the header shows no Add Vehicle', () => {

@@ -397,7 +397,7 @@
 				<DueRemindersCard reminders={dueReminders} {isLoading} />
 			</div>
 
-			{#if isLoading || recurringCost.count > 0}
+			{#if recurringCost.count > 0}
 				<RecurringCostCard
 					count={recurringCost.count}
 					monthlyTotal={recurringCost.monthlyTotal}

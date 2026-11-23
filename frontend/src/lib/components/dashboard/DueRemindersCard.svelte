@@ -25,13 +25,13 @@
 	let { reminders, isLoading = false }: Props = $props();
 </script>
 
-{#if !isLoading && reminders.length === 0}
+{#if reminders.length === 0}
 	<Card.Root class="py-4" data-testid="coming-up-empty">
 		<Card.Content class="flex items-center justify-between gap-3">
 			<div class="flex min-w-0 items-center gap-3">
 				<Bell class="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
 				<div class="min-w-0">
-					<Card.Title level={2} class="text-base font-semibold">Coming up</Card.Title>
+					<Card.Title level={2} class="text-base font-semibold">Coming Up</Card.Title>
 					<p class="text-sm text-muted-foreground">Nothing due in the next two weeks</p>
 				</div>
 			</div>

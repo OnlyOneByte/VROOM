@@ -171,11 +171,11 @@ describe('dashboard primary action', () => {
 		expect(controls('Add Vehicle')).toHaveLength(0);
 	});
 
-	test('with nothing due or recurring, the page shows one Coming up row and a Spending header for the period', async () => {
+	test('with nothing due or recurring, the page shows one Coming Up row and a Spending header for the period', async () => {
 		getVehicles.mockImplementation(() => Promise.resolve([OWNED]));
 		render(Page);
 
-		expect(await screen.findByRole('heading', { name: 'Coming up' })).toBeInTheDocument();
+		expect(await screen.findByRole('heading', { name: 'Coming Up' })).toBeInTheDocument();
 		expect(screen.queryByText('Recurring Costs')).toBeNull();
 		const spending = screen.getByRole('heading', { level: 2, name: 'Spending' });
 		expect(spending.parentElement).toContainElement(
