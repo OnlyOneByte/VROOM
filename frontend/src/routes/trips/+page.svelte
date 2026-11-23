@@ -1,6 +1,7 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { onMount } from 'svelte';
-	import { Car, CircleAlert, MapPin, Pencil, Plus, Route, Trash2 } from '@lucide/svelte';
+	import { Car, MapPin, Pencil, Plus, Route, Trash2 } from '@lucide/svelte';
 	import { tripApi } from '#lib/services/trip-api.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import type { Trip, TripSummary, Vehicle } from '#lib/types/index.ts';
@@ -138,19 +139,7 @@
 			{/each}
 		</div>
 	{:else if loadError}
-		<div class="rounded-lg border bg-card p-6">
-			<div class="mb-4 flex items-center gap-3 text-destructive">
-				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Couldn't load trips</p>
-			</div>
-			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
-			<button
-				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-				onclick={load}
-			>
-				Retry
-			</button>
-		</div>
+		<LoadErrorCard title="Couldn't load trips" message={loadError} onRetry={load} />
 	{:else if trips.length === 0 && vehicles.length === 0}
 		<NoVehiclesEmptyState
 			description="Every trip belongs to a vehicle. Add one, then log trips with their start and end odometer."

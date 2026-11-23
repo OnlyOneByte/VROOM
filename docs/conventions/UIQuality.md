@@ -220,6 +220,9 @@ Every view that loads or mutates data handles all of these:
    A load failure is shown once, where the content would be: the inline error with Retry. Don't
    also toast it; log it with `logLoadFailure`. Toasts are for the result of an action the user
    took and for background work with no place on screen.
+   That inline error is `common/LoadErrorCard.svelte` (`compact` inside dialogs and cards): it owns
+   the alert role, the busy Retry and where focus goes after a retry. Don't hand-write a
+   `CircleAlert` + Retry block; `load-error-card-adoption.test.ts` guards this.
 4. **Populated** — the happy path, including edge sizes: one item, many items, long names, large
    amounts, zero amounts.
 5. **Success** — every mutation gives feedback: a success toast or a visible change (the row
