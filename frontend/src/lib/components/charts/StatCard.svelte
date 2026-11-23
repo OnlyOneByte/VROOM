@@ -16,6 +16,7 @@
 <script lang="ts">
 	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { cn } from '#lib/utils.js';
 	import type { AnyIcon } from './types';
 
 	// Tailwind only generates complete class names it can see; keep each class string literal.
@@ -78,7 +79,7 @@
 	});
 </script>
 
-<Card class={className}>
+<Card class={cn('py-0', className)}>
 	<CardContent class="p-4 sm:p-6">
 		{#if isLoading && !hasDual}
 			<div class="flex items-center gap-2">
