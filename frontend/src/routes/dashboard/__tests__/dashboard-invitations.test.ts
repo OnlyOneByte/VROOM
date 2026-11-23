@@ -73,6 +73,11 @@ const INVITE: ReceivedShare = {
 beforeEach(() => {
 	listReceived.mockReset();
 	decline.mockReset().mockResolvedValue();
+	vi.mocked(window.matchMedia).mockReturnValue({
+		matches: false,
+		addEventListener: vi.fn(),
+		removeEventListener: vi.fn()
+	} as unknown as MediaQueryList);
 });
 
 describe('dashboard invitations', () => {
@@ -87,6 +92,26 @@ describe('dashboard invitations', () => {
 		await waitFor(() => expect(screen.queryByTestId('shared-with-you')).toBeNull());
 		expect(screen.queryByText("Couldn't load your invitations")).toBeNull();
 		expect(listReceived).toHaveBeenCalledTimes(1);
+	});
+
+	test.each([
+		{ narrow: true, order: ['Shared with you', 'Your vehicles', 'Recent'] },
+		{ narrow: false, order: ['Your vehicles', 'Shared with you', 'Recent'] }
+	])('sections are read in screen order (narrow: $narrow)', async ({ narrow, order }) => {
+		vi.mocked(window.matchMedia).mockReturnValue({
+			matches: narrow,
+			addEventListener: vi.fn(),
+			removeEventListener: vi.fn()
+		} as unknown as MediaQueryList);
+		listReceived.mockResolvedValue([INVITE]);
+		render(Page);
+
+		await screen.findByText('Camp Wagon');
+		const headings = screen
+			.getAllByRole('heading', { level: 2 })
+			.map(h => h.textContent?.trim())
+			.filter(text => order.includes(text ?? ''));
+		expect(headings).toEqual(order);
 	});
 
 	test('a failed load says why, and Retry shows the invitation in its place', async () => {

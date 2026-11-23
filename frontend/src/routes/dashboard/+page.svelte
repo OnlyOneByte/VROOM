@@ -35,6 +35,7 @@
 	import { formatCurrency, formatDate, formatDateWith } from '#lib/utils/formatters.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
 	import { costBucketColor } from '#lib/utils/cost-bucket.ts';
 	import { buildChartConfig } from '#lib/utils/chart-colors.ts';
 	import { formatCurrencyAxis, parseMonthToDate } from '#lib/utils/chart-formatters.ts';
@@ -94,6 +95,7 @@
 	let ownedVehicles = $derived(vehicles.filter(v => !v.sharedAccess));
 	let sharedVehicles = $derived(vehicles.filter(v => v.sharedAccess));
 	let hasLoaded = $state(false);
+	const isNarrow = new IsMobile(1024);
 	let showFab = $derived(hasLoaded && !loadError);
 	let canLogFillup = $derived(showFab && ownedVehicles.length > 0);
 	let noVehicles = $derived(hasLoaded && !loadError && vehicles.length === 0);
@@ -356,6 +358,83 @@
 	/>
 {/snippet}
 
+{#snippet heroSection()}
+	<DashboardHero
+		{period}
+		total={spend.total}
+		previousTotal={spend.previousTotal}
+		buckets={spend.buckets}
+		runningPerDistance={periodData.perDistance?.totals.perDistance ?? null}
+		runningScope={sharedVehicles.length > 0 ? 'on your vehicles' : null}
+		{distanceLabel}
+		isLoading={!hasLoaded}
+		isUpdating={isUpdatingPeriod}
+		onPeriodChange={handlePeriodChange}
+	/>
+{/snippet}
+
+{#snippet vehiclesSection()}
+	<VehicleRowsCard rows={vehicleRows} periodLabel={PERIOD_PHRASES[period].chip} {distanceLabel} />
+{/snippet}
+
+{#snippet chartSection()}
+	{#await chartModules}
+		<ChartCard title={TREND_TITLE} level={2} description={TREND_DESCRIPTION} isLoading>
+			{null}
+		</ChartCard>
+	{:then { AppBarChart }}
+		<AppBarChart
+			level={2}
+			title={TREND_TITLE}
+			description={TREND_DESCRIPTION}
+			data={trendData}
+			x="month"
+			y="amount"
+			series={trendSeries}
+			config={trendConfig}
+			yAxisFormat={formatCurrencyAxis}
+			xAxisProps={{ ticks: trendTicks, format: (v: string) => v }}
+			error={trendFailed ? "Couldn't load the monthly running costs." : null}
+		>
+			{#snippet footer()}
+				{#if trendInsight}
+					<p class="text-xs text-muted-foreground" data-testid="trend-insight">
+						{trendInsight}
+					</p>
+				{/if}
+			{/snippet}
+		</AppBarChart>
+	{:catch}
+		<ChartCard
+			title={TREND_TITLE}
+			level={2}
+			description={TREND_DESCRIPTION}
+			error="Charts couldn't be loaded. Check your connection and reload."
+		>
+			{null}
+		</ChartCard>
+	{/await}
+{/snippet}
+
+{#snippet attentionSection()}
+	{#if attention.length > 0}
+		<NeedsAttentionCard items={attention} />
+	{/if}
+	{#if invitationsError || pendingInvitations.length > 0}
+		{@render invitationsCard()}
+	{/if}
+{/snippet}
+
+{#snippet recentSection()}
+	<RecentActivityCard expenses={recentExpenses} />
+{/snippet}
+
+{#snippet recurringSection()}
+	{#if recurringCost.count > 0}
+		<RecurringCostCard count={recurringCost.count} monthlyTotal={recurringCost.monthlyTotal} />
+	{/if}
+{/snippet}
+
 {#snippet checklist()}
 	<EmptyState>
 		{#snippet icon()}
@@ -464,99 +543,35 @@
 			<RecurringCostCard count={recurringCost.count} monthlyTotal={recurringCost.monthlyTotal} />
 		{/if}
 	{:else}
-		<div class="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
-			<div class="contents lg:col-span-2 lg:flex lg:flex-col lg:gap-6">
-				<div class="order-1 lg:order-none">
-					<DashboardHero
-						{period}
-						total={spend.total}
-						previousTotal={spend.previousTotal}
-						buckets={spend.buckets}
-						runningPerDistance={periodData.perDistance?.totals.perDistance ?? null}
-						runningScope={sharedVehicles.length > 0 ? 'on your vehicles' : null}
-						{distanceLabel}
-						isLoading={!hasLoaded}
-						isUpdating={isUpdatingPeriod}
-						onPeriodChange={handlePeriodChange}
-					/>
-				</div>
-
+		{#if isNarrow.current}
+			<div class="space-y-6">
+				{@render heroSection()}
 				{#if hasLoaded}
-					<div class="order-4 lg:order-none">
-						<VehicleRowsCard
-							rows={vehicleRows}
-							periodLabel={PERIOD_PHRASES[period].chip}
-							{distanceLabel}
-						/>
-					</div>
-
-					<div class="order-6 lg:order-none">
-						{#await chartModules}
-							<ChartCard title={TREND_TITLE} level={2} description={TREND_DESCRIPTION} isLoading>
-								{null}
-							</ChartCard>
-						{:then { AppBarChart }}
-							<AppBarChart
-								level={2}
-								title={TREND_TITLE}
-								description={TREND_DESCRIPTION}
-								data={trendData}
-								x="month"
-								y="amount"
-								series={trendSeries}
-								config={trendConfig}
-								yAxisFormat={formatCurrencyAxis}
-								xAxisProps={{ ticks: trendTicks, format: (v: string) => v }}
-								error={trendFailed ? "Couldn't load the monthly running costs." : null}
-							>
-								{#snippet footer()}
-									{#if trendInsight}
-										<p class="text-xs text-muted-foreground" data-testid="trend-insight">
-											{trendInsight}
-										</p>
-									{/if}
-								{/snippet}
-							</AppBarChart>
-						{:catch}
-							<ChartCard
-								title={TREND_TITLE}
-								level={2}
-								description={TREND_DESCRIPTION}
-								error="Charts couldn't be loaded. Check your connection and reload."
-							>
-								{null}
-							</ChartCard>
-						{/await}
+					{@render attentionSection()}
+					{@render vehiclesSection()}
+					{@render recentSection()}
+					{@render chartSection()}
+					{@render recurringSection()}
+				{/if}
+			</div>
+		{:else}
+			<div class="grid grid-cols-3 items-start gap-6">
+				<div class="col-span-2 space-y-6">
+					{@render heroSection()}
+					{#if hasLoaded}
+						{@render vehiclesSection()}
+						{@render chartSection()}
+					{/if}
+				</div>
+				{#if hasLoaded}
+					<div class="space-y-6">
+						{@render attentionSection()}
+						{@render recentSection()}
+						{@render recurringSection()}
 					</div>
 				{/if}
 			</div>
-
-			{#if hasLoaded}
-				<div class="contents lg:flex lg:flex-col lg:gap-6">
-					{#if attention.length > 0}
-						<div class="order-2 lg:order-none">
-							<NeedsAttentionCard items={attention} />
-						</div>
-					{/if}
-					{#if invitationsError || pendingInvitations.length > 0}
-						<div class="order-3 lg:order-none">
-							{@render invitationsCard()}
-						</div>
-					{/if}
-					<div class="order-5 lg:order-none">
-						<RecentActivityCard expenses={recentExpenses} />
-					</div>
-					{#if recurringCost.count > 0}
-						<div class="order-7 lg:order-none">
-							<RecurringCostCard
-								count={recurringCost.count}
-								monthlyTotal={recurringCost.monthlyTotal}
-							/>
-						</div>
-					{/if}
-				</div>
-			{/if}
-		</div>
+		{/if}
 	{/if}
 </div>
 
