@@ -104,8 +104,9 @@
 			iconColor: 'chart-1'
 		},
 		{
-			label: 'Fuel spend per month',
+			label: showGasCards ? 'Fuel spend per month' : 'Charging spend per month',
 			value: monthlySpend != null ? formatCurrency(monthlySpend) : 'N/A',
+			subtitle: 'Averaged over the last 12 months',
 			icon: Fuel,
 			iconColor: 'chart-3'
 		},

@@ -33,6 +33,7 @@ test.describe('Analytics', () => {
 
 		for (const tab of ['Fuel & Stats', 'Cross-Vehicle', 'Per-Vehicle', 'Year-End']) {
 			await expect(page.getByRole('tab', { name: tab, exact: true })).toBeVisible();
+			await expect(page.getByRole('tab', { name: tab, exact: true })).toBeInViewport({ ratio: 1 });
 		}
 	});
 
