@@ -71,6 +71,7 @@
 				isPreviewing={form.isPreviewing}
 				preview={form.preview}
 				errorRows={form.errorRows}
+				status={form.previewStatus}
 				needsTargetVehicle={form.needsTargetVehicle}
 				needsManualMapping={form.needsManualMapping}
 				hasCsv={!!form.csvText.trim()}
@@ -97,6 +98,8 @@
 				{#if form.isImporting}
 					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 					Importing…
+				{:else if form.isPreviewing && form.preview}
+					Updating…
 				{:else}
 					Import {form.preview?.readyCount ?? 0}
 					{(form.preview?.readyCount ?? 0) === 1 ? 'row' : 'rows'}

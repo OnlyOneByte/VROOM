@@ -7,13 +7,21 @@
 		isPreviewing: boolean;
 		preview: ExpenseImportResult | null;
 		errorRows: ExpenseImportResult['rows'];
+		status: string;
 		needsTargetVehicle: boolean;
 		needsManualMapping: boolean;
 		hasCsv: boolean;
 	}
 
-	let { isPreviewing, preview, errorRows, needsTargetVehicle, needsManualMapping, hasCsv }: Props =
-		$props();
+	let {
+		isPreviewing,
+		preview,
+		errorRows,
+		status,
+		needsTargetVehicle,
+		needsManualMapping,
+		hasCsv
+	}: Props = $props();
 </script>
 
 {#if isPreviewing && !preview}
@@ -24,12 +32,14 @@
 {:else if preview}
 	<div class="relative rounded-lg border bg-card p-4">
 		{#if isPreviewing}
-			<div
-				class="absolute inset-0 flex items-center justify-center gap-1.5 rounded-lg bg-card/70 text-xs text-muted-foreground"
-				aria-hidden="true"
-			>
-				<LoaderCircle class="h-3.5 w-3.5 animate-spin" />
-				Updating…
+			<div class="absolute inset-0 rounded-lg bg-card/70" aria-hidden="true">
+				<span
+					class="absolute -top-2.5 right-3 flex items-center gap-1.5 rounded-full border bg-card px-2 text-xs text-muted-foreground"
+					data-testid="preview-updating"
+				>
+					<LoaderCircle class="h-3 w-3 animate-spin" />
+					Updating…
+				</span>
 			</div>
 		{/if}
 		<div class="flex items-center gap-4 text-sm">
@@ -87,4 +97,4 @@
 	</p>
 {/if}
 
-<p class="sr-only" role="status">{isPreviewing && preview ? 'Updating the preview…' : ''}</p>
+<p class="sr-only" role="status">{status}</p>
