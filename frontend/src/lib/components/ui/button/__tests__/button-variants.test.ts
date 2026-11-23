@@ -24,26 +24,75 @@ describe('Button aria-disabled focus ring', () => {
 		return color ? { color, alpha: Number(match?.[2] ?? 100) } : null;
 	}
 
-	test.each(VARIANTS)('%s still dims the whole button while aria-disabled', variant => {
+	test.each(VARIANTS)(
+		'%s keeps the element opaque while aria-disabled, so the ring is not dimmed',
+		variant => {
+			const classes = buttonVariants({ variant }).split(/\s+/);
+
+			expect(classes.filter(cls => /^(dark:)?aria-disabled:opacity-/.test(cls))).toEqual([]);
+		}
+	);
+
+	test.each(VARIANTS)('%s dims its text to the muted token while aria-disabled', variant => {
 		const classes = buttonVariants({ variant }).split(/\s+/);
 
-		expect(classes).toContain('aria-disabled:opacity-50');
+		expect(classes.filter(cls => /^(dark:)?aria-disabled:text-/.test(cls))).toEqual([
+			'aria-disabled:text-muted-foreground'
+		]);
 	});
 
-	test.each(VARIANTS.flatMap(variant => [`${variant}:`, `${variant}:dark:`]))(
-		'%s doubles the ring alpha while focused and aria-disabled, so opacity-50 leaves the normal ring',
+	test.each(VARIANTS)('%s halves each background it paints while aria-disabled', variant => {
+		const classes = buttonVariants({ variant }).split(/\s+/);
+
+		for (const mode of ['', 'dark:']) {
+			const fill = classes.findLast(cls => new RegExp(`^${mode}bg-[a-z-]+(/\\d+)?$`).test(cls));
+			if (!fill) continue;
+			const [, color, alpha = '100'] = fill.match(/bg-([a-z-]+)(?:\/(\d+))?$/)!;
+			expect(classes).toContain(`${mode}aria-disabled:bg-${color}/${Number(alpha) / 2}`);
+		}
+	});
+
+	test('outline halves its border in both schemes while aria-disabled', () => {
+		const classes = buttonVariants({ variant: 'outline' }).split(/\s+/);
+
+		expect(classes).toEqual(
+			expect.arrayContaining([
+				'aria-disabled:border-border/50',
+				'dark:aria-disabled:border-input/50'
+			])
+		);
+	});
+
+	test.each(VARIANTS.filter(v => v !== 'destructive').flatMap(v => [`${v}:`, `${v}:dark:`]))(
+		'%s draws the busy ring in the full foreground token, which clears 3:1 on the page in every theme',
 		key => {
 			const [variant, mode = ''] = key.split(/:(.*)/) as [(typeof VARIANTS)[number], string];
 			const classes = buttonVariants({ variant }).split(/\s+/);
-			const normal = ring(classes, `${mode}focus-visible:`) ?? ring(classes, 'focus-visible:');
-			const dimmed =
+			const busy =
 				ring(classes, `${mode}aria-disabled:focus-visible:`) ??
 				ring(classes, 'aria-disabled:focus-visible:');
 
-			expect(normal).not.toBeNull();
-			expect(dimmed).toEqual({ color: normal!.color, alpha: Math.min(100, normal!.alpha * 2) });
+			expect(busy).toEqual({ color: 'foreground', alpha: 100 });
 		}
 	);
+
+	test.each(['', 'dark:'])(
+		'destructive %sdoubles its own ring alpha while focused and aria-disabled',
+		mode => {
+			const classes = buttonVariants({ variant: 'destructive' }).split(/\s+/);
+			const normal = ring(classes, `${mode}focus-visible:`);
+			const busy = ring(classes, `${mode}aria-disabled:focus-visible:`);
+
+			expect(normal).not.toBeNull();
+			expect(busy).toEqual({ color: normal!.color, alpha: normal!.alpha * 2 });
+		}
+	);
+
+	test('the enabled focus ring stays the half-strength ring token', () => {
+		const classes = buttonVariants({ variant: 'default' }).split(/\s+/);
+
+		expect(ring(classes, 'focus-visible:')).toEqual({ color: 'ring', alpha: 50 });
+	});
 
 	test('a positioned caller keeps its position while focused and aria-disabled', () => {
 		const classes = cn(buttonVariants({ variant: 'outline' }), 'absolute top-1/2').split(/\s+/);
