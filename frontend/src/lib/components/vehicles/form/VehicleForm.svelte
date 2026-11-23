@@ -605,10 +605,7 @@
 </script>
 
 {#snippet header()}
-	<PageHeader
-		title={isEditMode ? 'Edit Vehicle' : 'Add New Vehicle'}
-		description={headerDescription}
-	>
+	<PageHeader title={isEditMode ? 'Edit Vehicle' : 'Add Vehicle'} description={headerDescription}>
 		{#snippet back()}
 			<Button
 				variant="ghost"
@@ -743,6 +740,28 @@
 							</div>
 
 							<div class="space-y-2">
+								<Label for="vehicleType">Vehicle Type</Label>
+								<Select.Root
+									type="single"
+									value={vehicleForm.vehicleType}
+									onValueChange={handleVehicleTypeChange}
+								>
+									<Select.Trigger id="vehicleType" class="w-full">
+										{vehicleForm.vehicleType === 'gas'
+											? 'Gas'
+											: vehicleForm.vehicleType === 'electric'
+												? 'Electric'
+												: 'Hybrid'}
+									</Select.Trigger>
+									<Select.Content>
+										<Select.Item value="gas" label="Gas">Gas</Select.Item>
+										<Select.Item value="electric" label="Electric">Electric</Select.Item>
+										<Select.Item value="hybrid" label="Hybrid">Hybrid</Select.Item>
+									</Select.Content>
+								</Select.Root>
+							</div>
+
+							<div class="space-y-2">
 								<Label for="licensePlate">License Plate</Label>
 								<Input
 									id="licensePlate"
@@ -836,28 +855,6 @@
 								{#if errors['purchaseDate']}
 									<FormFieldError id="purchaseDate-error">{errors['purchaseDate']}</FormFieldError>
 								{/if}
-							</div>
-
-							<div class="space-y-2">
-								<Label for="vehicleType">Vehicle Type</Label>
-								<Select.Root
-									type="single"
-									value={vehicleForm.vehicleType}
-									onValueChange={handleVehicleTypeChange}
-								>
-									<Select.Trigger id="vehicleType" class="w-full">
-										{vehicleForm.vehicleType === 'gas'
-											? 'Gas'
-											: vehicleForm.vehicleType === 'electric'
-												? 'Electric'
-												: 'Hybrid'}
-									</Select.Trigger>
-									<Select.Content>
-										<Select.Item value="gas" label="Gas">Gas</Select.Item>
-										<Select.Item value="electric" label="Electric">Electric</Select.Item>
-										<Select.Item value="hybrid" label="Hybrid">Hybrid</Select.Item>
-									</Select.Content>
-								</Select.Root>
 							</div>
 						</div>
 

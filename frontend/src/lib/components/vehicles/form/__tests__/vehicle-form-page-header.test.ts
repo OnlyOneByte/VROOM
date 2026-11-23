@@ -37,9 +37,9 @@ function expectSharedPageTitle(name: string): HTMLElement {
 describe('VehicleForm page title', () => {
 	test('create mode renders the one PageHeader title with its description and a back button', async () => {
 		render(VehicleForm, { props: {} });
-		await screen.findByRole('heading', { name: 'Add New Vehicle' });
+		await screen.findByRole('heading', { name: 'Add Vehicle' });
 
-		expectSharedPageTitle('Add New Vehicle');
+		expectSharedPageTitle('Add Vehicle');
 		expect(
 			screen.getByText('Enter your vehicle information and optional financing details')
 		).toBeTruthy();

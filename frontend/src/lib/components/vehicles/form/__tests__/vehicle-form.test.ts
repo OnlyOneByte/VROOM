@@ -110,7 +110,7 @@ function notificationMessages(): string[] {
 
 async function renderCreate(): Promise<void> {
 	render(VehicleForm, { props: {} });
-	await screen.findByRole('heading', { name: 'Add New Vehicle' });
+	await screen.findByRole('heading', { name: 'Add Vehicle' });
 }
 
 async function renderEdit(vehicle: Vehicle = EXISTING): Promise<void> {
@@ -149,6 +149,12 @@ describe('VehicleForm create mode', () => {
 		expect(switchState('trackCharging')).toBe('unchecked');
 		expect(screen.getByRole('button', { name: /add vehicle/i })).toBeTruthy();
 		expect(screen.queryByRole('button', { name: /delete/i })).toBeNull();
+	});
+
+	test('asks for the vehicle type right after make, model and year', async () => {
+		await renderCreate();
+		const order = [...document.querySelectorAll('label[for]')].map(l => l.getAttribute('for'));
+		expect(order.slice(0, 5)).toEqual(['make', 'model', 'year', 'vehicleType', 'licensePlate']);
 	});
 
 	test('summarises the default unit preferences while the units panel is collapsed', async () => {
