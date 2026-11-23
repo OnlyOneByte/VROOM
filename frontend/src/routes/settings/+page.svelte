@@ -139,17 +139,25 @@
 		}
 	}
 
+	let resyncing = false;
+
 	async function resyncAfterSaves() {
-		while (savesOverlapped) {
-			savesOverlapped = false;
-			const generation = saveGeneration;
-			await settingsStore.load().catch(() => undefined);
-			if (saveGeneration !== generation) {
-				savesOverlapped = true;
-				if (savesInFlight > 0) return;
+		if (resyncing) return;
+		resyncing = true;
+		try {
+			while (savesOverlapped) {
+				savesOverlapped = false;
+				const generation = saveGeneration;
+				await settingsStore.load().catch(() => undefined);
+				if (saveGeneration !== generation) {
+					savesOverlapped = true;
+					if (savesInFlight > 0) return;
+				}
 			}
+			if (savesInFlight === 0) isInitialized = false;
+		} finally {
+			resyncing = false;
 		}
-		if (savesInFlight === 0) isInitialized = false;
 	}
 
 	async function saveSettings(updates: Partial<UserSettings>, savedMessage: string) {
