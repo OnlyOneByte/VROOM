@@ -585,9 +585,10 @@ export class AnalyticsRepository {
 
   private costPerDistance(
     rows: Array<{ vehicleId: string; mileage: number | null; expenseAmount: number }>,
-    convert: FleetUnitConverter
+    convert: FleetUnitConverter,
+    distanceRows: Array<{ vehicleId: string; mileage: number | null }> = rows
   ): number | null {
-    const distances = this.distanceByVehicle(rows, convert);
+    const distances = this.distanceByVehicle(distanceRows, convert);
     let distance = 0;
     for (const d of distances.values()) distance += d;
     if (distance <= 0) return null;
@@ -2170,7 +2171,7 @@ export class AnalyticsRepository {
         vehicleCount: vehicleNameMap.size,
         totalDistance,
         avgEfficiency,
-        costPerDistance: totalDistance > 0 ? totalSpent / totalDistance : null,
+        costPerDistance: this.costPerDistance(allExpenses, convert, fuelRows),
         units: { ...userUnits },
       };
     } catch (error) {
