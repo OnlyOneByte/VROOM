@@ -6,6 +6,7 @@ import { trips, vehicles } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
 import { DEFAULT_UNIT_PREFERENCES, type DistanceUnit, parseUnitPreferences } from '../../types';
 import { BaseRepository } from '../../utils/repository';
+import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { localDayWindow } from '../odometer/repository';
 
 export function tripDistance(trip: Pick<Trip, 'startOdometer' | 'endOdometer'>): number {
@@ -77,7 +78,7 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
     const rows = await this.db
       .select({ id: vehicles.id, unitPreferences: vehicles.unitPreferences })
       .from(vehicles)
-      .where(eq(vehicles.userId, userId));
+      .where(ownedVehiclesScope(userId));
     return new Map(
       rows.map((row) => [
         row.id,
