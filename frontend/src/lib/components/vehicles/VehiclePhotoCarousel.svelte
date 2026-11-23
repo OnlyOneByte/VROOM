@@ -5,6 +5,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import type { Photo } from '#lib/types/index.ts';
@@ -16,9 +17,18 @@
 		onUpload: () => void;
 		onDelete: (_photoId: string) => void | Promise<void>;
 		onSetCover: (_photoId: string) => void;
+		isLoading?: boolean;
 	}
 
-	let { vehicleId, photos, isOwner = true, onUpload, onDelete, onSetCover }: Props = $props();
+	let {
+		vehicleId,
+		photos,
+		isOwner = true,
+		onUpload,
+		onDelete,
+		onSetCover,
+		isLoading = false
+	}: Props = $props();
 
 	let hasPhotos = $derived(photos.length > 0);
 	let deletingPhotoId = $state<string | null>(null);
@@ -64,7 +74,9 @@
 		{/if}
 	</Card.Header>
 	<Card.Content>
-		{#if hasPhotos}
+		{#if isLoading}
+			<Skeleton class="aspect-video w-full rounded-lg" data-testid="vehicle-photos-loading" />
+		{:else if hasPhotos}
 			<Carousel.Root class="w-full" opts={{ loop: photos.length > 1 }} setApi={handleApiSet}>
 				<Carousel.Content>
 					{#each photos as photo, i (photo.id)}

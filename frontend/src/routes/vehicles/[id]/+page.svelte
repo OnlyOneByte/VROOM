@@ -67,6 +67,7 @@
 
 	let summary = $state<ExpenseSummary | null>(null);
 	let fuelEfficiencyPoints = $state<FuelEfficiencyPoint[]>([]);
+	let isLoadingFuelEfficiency = $state(true);
 	let summaryLoadError = $state<string | null>(null);
 
 	let expenses = $state<Expense[]>([]);
@@ -80,6 +81,7 @@
 	let expenseSortDir = $state<'asc' | 'desc'>('desc');
 
 	let vehiclePhotos = $state<Photo[]>([]);
+	let isLoadingPhotos = $state(false);
 	let showUploadDialog = $state(false);
 
 	let shareOpen = $state(false);
@@ -182,25 +184,28 @@
 		return vehicleApi.getPhotoThumbnailUrl(vehicleId, cover.id);
 	});
 
-	$effect(() => {
-		if (!isLoading && !hasLoadedInsurance && activeTab === 'overview') {
-			hasLoadedInsurance = true;
-			import('#lib/components/insurance/InsuranceTab.svelte').then(m => {
-				InsuranceTab = m.default;
-			});
-		}
-	});
+	function loadInsuranceTab() {
+		if (hasLoadedInsurance) return;
+		hasLoadedInsurance = true;
+		import('#lib/components/insurance/InsuranceTab.svelte').then(m => {
+			InsuranceTab = m.default;
+		});
+	}
 
 	async function loadPage() {
 		isLoading = true;
-		await Promise.all([loadVehicle(), loadSummary(), loadFuelEfficiency(), loadVehicleStats()]);
-		if (vehicle && isOwner) {
-			await loadPhotos();
-		}
+		void loadSummary();
+		void loadFuelEfficiency();
+		void loadVehicleStats();
+		await loadVehicle();
+		if (vehicle && isOwner) void loadPhotos();
 		isLoading = false;
 	}
 
-	onMount(loadPage);
+	onMount(() => {
+		loadInsuranceTab();
+		void loadPage();
+	});
 
 	let previousStatsPeriod = $state<TimePeriod | null>(null);
 	$effect(() => {
@@ -291,12 +296,18 @@
 		}
 	}
 
+	const nextFuelEfficiencyRequest = latest();
+
 	async function loadFuelEfficiency() {
+		const isCurrent = nextFuelEfficiencyRequest();
+		isLoadingFuelEfficiency = true;
 		try {
 			const result = await analyticsApi.getFuelEfficiency({ vehicleId });
-			fuelEfficiencyPoints = result.fuelEfficiencyTrend;
+			if (isCurrent()) fuelEfficiencyPoints = result.fuelEfficiencyTrend;
 		} catch (error) {
-			handleErrorWithNotification(error, "Couldn't load fuel efficiency");
+			if (isCurrent()) handleErrorWithNotification(error, "Couldn't load fuel efficiency");
+		} finally {
+			if (isCurrent()) isLoadingFuelEfficiency = false;
 		}
 	}
 
@@ -399,11 +410,14 @@
 	}
 
 	async function loadPhotos() {
+		isLoadingPhotos = true;
 		try {
 			const photosResult = await vehicleApi.getPhotos(vehicleId);
 			vehiclePhotos = photosResult.data;
 		} catch (error) {
 			handleErrorWithNotification(error, "Couldn't load photos");
+		} finally {
+			isLoadingPhotos = false;
 		}
 	}
 
@@ -454,7 +468,7 @@
 			{null}
 		</ChartCard>
 	</div>
-	{#if categoryChartData.length > 0}
+	{#if categoryChartData.length > 0 || summary === null}
 		<ChartCard
 			title={CATEGORY_CHART_TITLE}
 			description={CATEGORY_CHART_DESCRIPTION}
@@ -570,6 +584,7 @@
 						{vehicleId}
 						photos={vehiclePhotos}
 						{isOwner}
+						isLoading={isLoadingPhotos}
 						onUpload={() => {
 							hasOpenedUpload = true;
 							showUploadDialog = true;
@@ -588,7 +603,7 @@
 						<p class="mb-4 text-sm text-muted-foreground">{summaryLoadError}</p>
 						<Button onclick={loadSummary}>Retry</Button>
 					</div>
-				{:else if !hasExpenseData}
+				{:else if summary && !hasExpenseData}
 					<EmptyState>
 						{#snippet icon()}
 							<FileText class="h-12 w-12 text-muted-foreground mb-4" />
@@ -615,7 +630,7 @@
 						onPeriodChange={handlePeriodChange}
 					/>
 
-					<ExpenseOverviewCard stats={localStats} />
+					<ExpenseOverviewCard stats={localStats} isLoading={summary === null} />
 
 					<FuelEfficiencyStatsCard
 						{vehicleId}
@@ -638,11 +653,11 @@
 								data={fuelEfficiencyData}
 								fuelType={vehicle.vehicleType || 'gas'}
 								unitPreferences={vehicle.unitPreferences}
-								isLoading={false}
+								isLoading={isLoadingFuelEfficiency}
 							/>
 						</div>
 
-						{#if categoryChartData.length > 0}
+						{#if categoryChartData.length > 0 || summary === null}
 							<AppPieChart
 								title={CATEGORY_CHART_TITLE}
 								description={CATEGORY_CHART_DESCRIPTION}

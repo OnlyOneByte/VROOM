@@ -57,6 +57,25 @@ beforeEach(() => {
 	vi.clearAllMocks();
 });
 
+describe('VehiclePhotoCarousel: loading', () => {
+	test('while photos load it shows a skeleton, not the empty state', () => {
+		render(VehiclePhotoCarousel, {
+			props: {
+				vehicleId: 'v1',
+				photos: [],
+				isLoading: true,
+				onUpload: vi.fn(),
+				onDelete: vi.fn(),
+				onSetCover: vi.fn()
+			}
+		});
+
+		expect(screen.getByTestId('vehicle-photos-loading')).toBeInTheDocument();
+		expect(screen.queryByText('No photos yet')).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Upload Photos' })).toBeNull();
+	});
+});
+
 describe('VehiclePhotoCarousel: empty state', () => {
 	test('an owner with no photos is invited to upload', async () => {
 		const { onUpload } = mount([]);
