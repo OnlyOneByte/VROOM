@@ -30,7 +30,7 @@
 		(financing.typeDistribution ?? []).map(d => ({
 			key: d.type,
 			label: capitalize(d.type),
-			value: d.value,
+			value: d.count,
 			color:
 				d.type === 'loan'
 					? 'var(--chart-1)'
@@ -40,9 +40,12 @@
 		}))
 	);
 
-	function vehicleCountLabel(type: string): string {
-		const count = financing.typeDistribution?.find(d => d.type === type)?.count ?? 0;
+	function vehicleCountTooltip(count: number): string {
 		return `${count} vehicle${count !== 1 ? 's' : ''}`;
+	}
+
+	function vehicleCountLabel(type: string): string {
+		return vehicleCountTooltip(financing.typeDistribution?.find(d => d.type === type)?.count ?? 0);
 	}
 
 	function getFinancingBadgeVariant(
@@ -175,10 +178,11 @@
 		<AppPieChart
 			level={3}
 			title="Financing Type Distribution"
-			description="Value by financing type"
+			description="Vehicles by financing type"
 			data={typeDistData}
 			legendLabel="Financing types"
 			formatLegendValue={item => vehicleCountLabel(item.key)}
+			tooltipFormat={vehicleCountTooltip}
 		/>
 	{/if}
 </div>
