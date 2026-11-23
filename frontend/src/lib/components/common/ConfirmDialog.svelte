@@ -10,6 +10,7 @@
 		AlertDialogTitle
 	} from '#lib/components/ui/alert-dialog/index.ts';
 	import { LoaderCircle } from '@lucide/svelte';
+	import { buttonVariants } from '#lib/components/ui/button/index.ts';
 	import { cn } from '#lib/utils.ts';
 
 	interface Props {
@@ -62,9 +63,13 @@
 			<AlertDialogCancel disabled={isWorking}>{cancelLabel}</AlertDialogCancel>
 			<AlertDialogAction
 				onclick={handleConfirm}
-				disabled={isWorking}
+				aria-disabled={isWorking}
 				class={cn(
-					destructive && 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+					destructive &&
+						buttonVariants({
+							variant: 'destructive',
+							class: 'aria-disabled:focus-visible:ring-destructive'
+						})
 				)}
 			>
 				{#if isWorking}

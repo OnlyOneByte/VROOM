@@ -48,6 +48,14 @@ describe('ConfirmDialog', () => {
 		expect(screen.getByRole('button', { name: 'Delete' }).className).toContain('bg-destructive');
 	});
 
+	test('a busy destructive confirm keeps a full-strength focus ring', async () => {
+		renderDialog();
+
+		const confirm = await screen.findByRole('button', { name: 'Delete' });
+		expect(confirm.className).toContain('aria-disabled:focus-visible:ring-destructive');
+		expect(confirm.className).not.toContain('aria-disabled:focus-visible:ring-destructive/40');
+	});
+
 	test('uses custom labels and a neutral style when not destructive', async () => {
 		renderDialog({ confirmLabel: 'Archive', cancelLabel: 'Keep', destructive: false });
 
@@ -65,16 +73,19 @@ describe('ConfirmDialog', () => {
 		await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
 	});
 
-	test('while the action runs it shows progress, disables both buttons and ignores repeat clicks', async () => {
+	test('while the action runs it shows progress, keeps focus on the confirm button and ignores repeat presses', async () => {
 		const pending = deferred();
 		const onConfirm = vi.fn(() => pending.promise);
 		renderDialog({}, onConfirm);
 
 		const confirm = await screen.findByRole('button', { name: 'Delete' });
+		confirm.focus();
 		await fireEvent.click(confirm);
 
 		expect(confirm).toHaveTextContent('Working…');
-		expect(confirm).toBeDisabled();
+		expect(confirm).toHaveAttribute('aria-disabled', 'true');
+		expect(confirm).not.toBeDisabled();
+		expect(document.activeElement).toBe(confirm);
 		expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
 
 		await fireEvent.click(confirm);
@@ -89,11 +100,17 @@ describe('ConfirmDialog', () => {
 		const onConfirm = vi.fn(() => pending.promise);
 		renderDialog({}, onConfirm);
 
-		await fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+		const button = await screen.findByRole('button', { name: 'Delete' });
+		button.focus();
+		await fireEvent.click(button);
+		expect(button).toHaveAttribute('aria-disabled', 'true');
+		expect(button).not.toBeDisabled();
 		pending.reject(new Error('network down'));
 
 		const confirm = await screen.findByRole('button', { name: 'Delete' });
-		expect(confirm).not.toBeDisabled();
+		expect(confirm).toBe(button);
+		expect(confirm).not.toHaveAttribute('aria-disabled', 'true');
+		expect(document.activeElement).toBe(confirm);
 		expect(screen.getByRole('alertdialog')).toBeInTheDocument();
 	});
 
