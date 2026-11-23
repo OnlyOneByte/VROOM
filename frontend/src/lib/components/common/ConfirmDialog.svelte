@@ -64,7 +64,13 @@
 			<AlertDialogAction
 				onclick={handleConfirm}
 				aria-disabled={isWorking}
-				class={cn(destructive && buttonVariants({ variant: 'destructive' }))}
+				class={cn(
+					destructive &&
+						buttonVariants({
+							variant: 'destructive',
+							class: 'aria-disabled:focus-visible:ring-destructive'
+						})
+				)}
 			>
 				{#if isWorking}
 					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />

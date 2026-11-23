@@ -48,6 +48,14 @@ describe('ConfirmDialog', () => {
 		expect(screen.getByRole('button', { name: 'Delete' }).className).toContain('bg-destructive');
 	});
 
+	test('a busy destructive confirm keeps a full-strength focus ring', async () => {
+		renderDialog();
+
+		const confirm = await screen.findByRole('button', { name: 'Delete' });
+		expect(confirm.className).toContain('aria-disabled:focus-visible:ring-destructive');
+		expect(confirm.className).not.toContain('aria-disabled:focus-visible:ring-destructive/40');
+	});
+
 	test('uses custom labels and a neutral style when not destructive', async () => {
 		renderDialog({ confirmLabel: 'Archive', cancelLabel: 'Keep', destructive: false });
 
@@ -95,6 +103,8 @@ describe('ConfirmDialog', () => {
 		const button = await screen.findByRole('button', { name: 'Delete' });
 		button.focus();
 		await fireEvent.click(button);
+		expect(button).toHaveAttribute('aria-disabled', 'true');
+		expect(button).not.toBeDisabled();
 		pending.reject(new Error('network down'));
 
 		const confirm = await screen.findByRole('button', { name: 'Delete' });
