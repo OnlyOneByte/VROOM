@@ -281,7 +281,9 @@ verify by hand:
   Every signed-in page starts with a "Skip to content" link as its first Tab stop; it moves focus
   to `<main id="main">`, past the navigation rail (`routes/+layout.svelte`).
 - **Focus.** Never remove outlines. Primitives show `focus-visible:ring-[3px]` in `ring-ring/50`;
-  a custom control shows the same ring. Focus moves into a dialog on open and back on close, and
+  a custom control shows the same ring. On a tinted surface where `ring-ring/50` falls below 3:1
+  (a tag chip's remove button), use `focus-visible:ring-[3px] focus-visible:ring-foreground`, as
+  busy buttons do. Focus moves into a dialog on open and back on close, and
   after a failed submit it moves to the first invalid field (see *Forms*).
 - **Colour is never the only signal** — see *Colour and theme tokens* for contrast.
 - **Semantics.** Lists are lists, tables are `Table`, headings are headings. Updates that matter
