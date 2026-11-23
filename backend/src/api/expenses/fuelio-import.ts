@@ -24,6 +24,7 @@ interface FuelioParseOptions {
   targetUnits: TargetUnits;
   includeCosts?: boolean;
   timeZone?: string;
+  categoryMap?: Record<string, ExpenseCategory>;
 }
 
 const FUELIO_COST_CATEGORY_MAP: Record<string, ExpenseCategory> = {
@@ -171,8 +172,8 @@ function buildCostRows(
   const rows = costRecords.map((rec) => {
     const typeId = cell(rec, cTypeKey).trim();
     const catName = catById.get(typeId) ?? '';
-    const mapped = FUELIO_COST_CATEGORY_MAP[catName.toLowerCase()];
     const label = catName || (typeId ? `Unknown category ${typeId}` : '');
+    const mapped = opts.categoryMap?.[label] ?? FUELIO_COST_CATEGORY_MAP[catName.toLowerCase()];
     if (!mapped && label) unmapped.add(label);
     const title = cell(rec, cTitleKey).trim();
     const note = cell(rec, cNotesKey).trim();

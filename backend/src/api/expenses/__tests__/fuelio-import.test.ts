@@ -177,6 +177,18 @@ describe('cost categories that resolve to no name are still surfaced (never a si
     });
     expect(r.unmappedCategories).toEqual(['Ferry']);
   });
+
+  test('a categoryMap entry remaps an unmapped category by its reported name', () => {
+    const r = parseFuelioExport(FUELIO_CSV, {
+      targetVehicle: TARGET_VEHICLE,
+      targetUnits: TARGET_UNITS,
+      categoryMap: { Ferry: 'regulatory' },
+    });
+    expect(r.unmappedCategories).toEqual([]);
+    const plan = buildImportPlan(r.csv, VEHICLES);
+    const ferry = plan.rows.find((row) => row.expense?.description?.startsWith('Ferry ticket'));
+    expect(ferry?.expense?.category).toBe('regulatory');
+  });
 });
 
 function fileWithLogHeaders(odoHeader: string, fuelHeader: string, odo = '45210', fuel = '42.10') {

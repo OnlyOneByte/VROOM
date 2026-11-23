@@ -24,9 +24,9 @@ describe('detectSource — per-preset signatures', () => {
     expect(detectSource(headers)?.id).toBe('fuelly');
   });
 
-  test('detects a Fuelio export (metric, distinctive Odo/litres columns)', () => {
-    const headers = ['Data', 'Odo (km)', 'Fuel (litres)', 'Full', 'Price'];
-    expect(detectSource(headers)?.id).toBe('fuelio');
+  test('a flat Fuelio-shaped header row matches no preset (Fuelio exports use the Fuelio parser)', () => {
+    expect(detectSource(['Data', 'Odo (km)', 'Fuel (litres)', 'Full', 'Price'])).toBeNull();
+    expect(MAPPING_PRESETS.map((p) => p.id)).not.toContain('fuelio');
   });
 
   test('detects a Drivvo export', () => {
@@ -46,9 +46,9 @@ describe('detectSource — robustness', () => {
     expect(detectSource(headers)?.id).toBe('fuelly');
   });
 
-  test('presets do not cross-detect: a Fuelio file is not read as Fuelly or Drivvo', () => {
-    const fuelio = detectSource(['Data', 'Odo (km)', 'Fuel (litres)', 'Price']);
-    expect(fuelio?.id).toBe('fuelio');
+  test('presets do not cross-detect: a Drivvo file is not read as Fuelly', () => {
+    const drivvo = detectSource(['Date', 'Odometer', 'Total price', 'Volume', 'Type of fuel']);
+    expect(drivvo?.id).toBe('drivvo');
   });
 
   test('every preset detects its OWN seeded columns (self-consistency of signature vs columns)', () => {
@@ -63,22 +63,23 @@ describe('detectSource — robustness', () => {
 });
 
 describe('presetToMapping feeds applyMapping', () => {
-  test('a detected Fuelio preset maps a row end-to-end via applyMapping', () => {
-    const headers = ['Data', 'Odo (km)', 'Fuel (litres)', 'Price'];
+  test('a detected Drivvo preset maps a row end-to-end via applyMapping', () => {
+    const headers = ['Date', 'Odometer', 'Volume', 'Total price', 'Type of fuel'];
     const preset = detectSource(headers);
-    expect(preset?.id).toBe('fuelio');
-    if (!preset) throw new Error('expected Fuelio preset');
+    expect(preset?.id).toBe('drivvo');
+    if (!preset) throw new Error('expected Drivvo preset');
 
     const mapping = presetToMapping(preset, 'Daily Driver');
-    expect(mapping.source).toBe('fuelio');
+    expect(mapping.source).toBe('drivvo');
     expect(mapping.targetVehicle).toBe('Daily Driver');
     expect(mapping.dateFormat).toBe('dmy');
     expect(mapping.distanceUnit).toBe(DistanceUnit.KILOMETERS);
     expect(mapping.volumeUnit).toBe(VolumeUnit.LITERS);
 
-    const csv = ['Data,Odo (km),Fuel (litres),Price', '15/03/2024,160.9344,37.854,52.40'].join(
-      '\n'
-    );
+    const csv = [
+      'Date,Odometer,Volume,Total price,Type of fuel',
+      '15/03/2024,160.9344,37.854,52.40,Gas',
+    ].join('\n');
     const { csv: native } = applyMapping(csv, mapping, () => ({
       distanceUnit: DistanceUnit.MILES,
       volumeUnit: VolumeUnit.GALLONS_US,
@@ -109,7 +110,6 @@ describe('fuel-log presets import rows as fuel', () => {
       'Date,Odometer,Fill Amount,Price,Fuel Type,Notes',
       '03/01/2026,30000,9,36.00,Gas,x',
     ].join('\n'),
-    fuelio: ['Data,Odo (km),Fuel (litres),Price,Notes', '01/03/2026,48280,34,52.00,x'].join('\n'),
     drivvo: [
       'Date,Odometer,Total price,Price per unit,Volume,Type of fuel,Observation',
       '01/03/2026,48280,52.00,1.53,34,Gas,x',

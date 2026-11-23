@@ -3,6 +3,18 @@ import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
 
 const NATIVE_HEADERS = ['date', 'vehicle', 'category', 'amount'] as const;
 
+export const FUELIO_PRESET: ImportMappingPreset = {
+	id: 'fuelio',
+	label: 'Fuelio',
+	signature: [],
+	columns: {},
+	dateFormat: 'iso'
+};
+
+export function isFuelioExport(text: string): boolean {
+	return /^\s*"?##\s*Vehicle"?/im.test(text) && /^\s*"?##\s*Log"?/im.test(text);
+}
+
 export function parseCsvHeaders(csvText: string): string[] {
 	const firstLine = csvText.split('\n', 1)[0]?.trim();
 	if (!firstLine) return [];

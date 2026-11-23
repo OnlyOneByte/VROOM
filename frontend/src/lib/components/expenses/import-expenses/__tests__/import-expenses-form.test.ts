@@ -44,6 +44,15 @@ const FUELLY: ImportMappingPreset = {
 
 const FUEL_CSV = 'Date,Cost\n01/02/2026,40.00\n01/09/2026,42.50';
 const FOREIGN_CSV = 'Transaction Date,Spent,Kind\n2026-01-02,40,gas';
+const FUELIO_EXPORT = [
+	'"## Vehicle"',
+	'"Name","ImportCSVDateFormat","Make","Model","Year"',
+	'"Golf","yyyy-MM-dd","Volkswagen","Golf","2018"',
+	'',
+	'"## Log"',
+	'"Data","Odo (km)","Fuel (litres)","Full","Price (optional)"',
+	'"2024-01-05","45210","42.10","1","68.90"'
+].join('\n');
 
 function previewResult(overrides: Partial<ExpenseImportResult> = {}): ExpenseImportResult {
 	return {
@@ -124,6 +133,22 @@ describe('ImportExpensesForm: loading a file', () => {
 
 		expect(form.manualMapping).toBe(false);
 		expect(mocks.importExpensesCsv).toHaveBeenCalledWith(nativeCsv, true, undefined);
+	});
+
+	test('a Fuelio export goes to the Fuelio parser with no manual mapping', async () => {
+		const form = new ImportExpensesForm(() => [CAMRY]);
+
+		await form.loadFile(new File([FUELIO_EXPORT], 'fuelio.csv'));
+
+		expect(mocks.detectImportSource).not.toHaveBeenCalled();
+		expect(form.detectedPreset?.label).toBe('Fuelio');
+		expect(form.manualMapping).toBe(false);
+		expect(form.targetVehicleId).toBe('v1');
+		expect(mocks.importExpensesCsv).toHaveBeenCalledWith(
+			FUELIO_EXPORT,
+			true,
+			expect.objectContaining({ source: 'fuelio', targetVehicle: '2020 Toyota Camry' })
+		);
 	});
 });
 

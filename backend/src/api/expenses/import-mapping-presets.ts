@@ -2,7 +2,7 @@ import type { ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
 import type { ColumnMapping, ImportDateFormat, NativeField } from './import-mapping';
 
-type PresetId = 'fuelly' | 'fuelio' | 'drivvo';
+type PresetId = 'fuelly' | 'drivvo';
 
 interface MappingPreset {
   id: PresetId;
@@ -37,23 +37,6 @@ export const MAPPING_PRESETS: MappingPreset[] = [
     distanceUnit: DistanceUnit.MILES,
     volumeUnit: VolumeUnit.GALLONS_US,
     categoryMap: { gas: 'fuel', fuel: 'fuel', service: 'maintenance' },
-    defaultCategory: 'fuel',
-  },
-  {
-    id: 'fuelio',
-    label: 'Fuelio',
-    signature: ['odo', 'litres'],
-    columns: {
-      date: 'Data',
-      mileage: 'Odo (km)',
-      volume: 'Fuel (litres)',
-      amount: 'Price',
-      description: 'Notes',
-    },
-    dateFormat: 'dmy',
-    distanceUnit: DistanceUnit.KILOMETERS,
-    volumeUnit: VolumeUnit.LITERS,
-    categoryMap: { gas: 'fuel', fuel: 'fuel', petrol: 'fuel', service: 'maintenance' },
     defaultCategory: 'fuel',
   },
   {
