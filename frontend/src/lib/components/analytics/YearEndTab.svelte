@@ -1,4 +1,5 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
 	import {
@@ -12,7 +13,6 @@
 		Fuel,
 		Wrench
 	} from '@lucide/svelte';
-	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import { AppLineChart, AppPieChart } from '#lib/components/charts/index.ts';
@@ -40,8 +40,8 @@
 	async function loadData(year: number) {
 		try {
 			isLoading = true;
-			error = null;
 			yearEnd = await analyticsApi.getYearEnd({ year });
+			error = null;
 		} catch (e) {
 			error = userFacingErrorMessage(e);
 		} finally {
@@ -53,6 +53,7 @@
 		if (value) {
 			const year = Number.parseInt(value, 10);
 			selectedYear = year;
+			error = null;
 			loadData(year);
 		}
 	}
@@ -107,19 +108,16 @@
 		</Card.Content>
 	</Card.Root>
 
-	{#if isLoading}
+	{#if isLoading && !error}
 		<div class="flex justify-center p-12">
 			<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if error}
-		<div class="rounded-lg border bg-card p-6">
-			<div class="mb-4 flex items-center gap-3 text-destructive">
-				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Couldn't load year-end summary</p>
-			</div>
-			<p class="mb-4 text-sm text-muted-foreground">{error}</p>
-			<Button onclick={() => loadData(selectedYear)}>Retry</Button>
-		</div>
+		<LoadErrorCard
+			title="Couldn't load year-end summary"
+			message={error}
+			onRetry={() => loadData(selectedYear)}
+		/>
 	{:else if yearEnd}
 		<StatCardGrid
 			items={[

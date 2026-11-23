@@ -1,10 +1,10 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
-	import { LoaderCircle, CircleAlert, Car, DollarSign, Activity, TrendingUp } from '@lucide/svelte';
+	import { LoaderCircle, Car, DollarSign, Activity, TrendingUp } from '@lucide/svelte';
 	import * as Tabs from '#lib/components/ui/tabs/index.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
-	import { Button } from '#lib/components/ui/button/index.ts';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import FuelStatsTab from '#lib/components/analytics/fuel/FuelStatsTab.svelte';
 	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
@@ -21,8 +21,8 @@
 	async function loadSummary() {
 		try {
 			isLoading = true;
-			error = null;
 			summary = await analyticsApi.getSummary(getDefaultDateRange());
+			error = null;
 		} catch (e) {
 			error = userFacingErrorMessage(e);
 		} finally {
@@ -93,17 +93,10 @@
 		description="Comprehensive insights into your vehicle spending patterns and trends"
 	/>
 
-	{#if isLoading}
+	{#if isLoading && !error}
 		<StatCardGrid items={QUICK_STAT_SKELETONS} columns={4} isLoading />
 	{:else if error}
-		<div class="rounded-lg border bg-card p-6">
-			<div class="mb-4 flex items-center gap-3 text-destructive">
-				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Couldn't load analytics</p>
-			</div>
-			<p class="mb-4 text-sm text-muted-foreground">{error}</p>
-			<Button onclick={loadSummary}>Retry</Button>
-		</div>
+		<LoadErrorCard title="Couldn't load analytics" message={error} onRetry={loadSummary} />
 	{:else if quickStats}
 		<StatCardGrid items={quickStatsItems} columns={4} />
 	{/if}

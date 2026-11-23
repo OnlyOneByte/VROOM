@@ -1,9 +1,9 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { LoaderCircle, CircleAlert, TrendingUp } from '@lucide/svelte';
-	import { Button } from '#lib/components/ui/button/index.ts';
+	import { LoaderCircle, TrendingUp } from '@lucide/svelte';
 	import type * as Chart from '#lib/components/ui/chart/index.ts';
 	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
 	import ExpenseTrendChart from '#lib/components/charts/ExpenseTrendChart.svelte';
@@ -34,7 +34,6 @@
 	async function loadData() {
 		try {
 			isLoading = true;
-			error = null;
 			const [cv, fin, ins] = await Promise.all([
 				analyticsApi.getCrossVehicle(getDefaultDateRange()),
 				analyticsApi.getFinancing(),
@@ -43,6 +42,7 @@
 			crossVehicle = cv;
 			financing = fin;
 			insurance = ins;
+			error = null;
 		} catch (e) {
 			error = userFacingErrorMessage(e);
 		} finally {
@@ -117,19 +117,12 @@
 	let fuelEffConfig = $derived(buildChartConfig(fuelEffSeries));
 </script>
 
-{#if isLoading}
+{#if isLoading && !error}
 	<div class="flex justify-center p-12">
 		<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 	</div>
 {:else if error}
-	<div class="rounded-lg border bg-card p-6">
-		<div class="flex items-center gap-3 text-destructive mb-4">
-			<CircleAlert class="h-5 w-5" />
-			<p class="font-medium">Couldn't load cross-vehicle analytics</p>
-		</div>
-		<p class="text-sm text-muted-foreground mb-4">{error}</p>
-		<Button onclick={loadData}>Retry</Button>
-	</div>
+	<LoadErrorCard title="Couldn't load cross-vehicle analytics" message={error} onRetry={loadData} />
 {:else if crossVehicle && financing && insurance}
 	<div class="space-y-4 md:space-y-6">
 		{#if trendData.length > 0}

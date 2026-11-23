@@ -1,9 +1,10 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { LoaderCircle, CircleAlert } from '@lucide/svelte';
+	import { LoaderCircle } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
@@ -36,8 +37,8 @@
 	async function loadVehicles() {
 		try {
 			isLoadingVehicles = true;
-			vehiclesLoadError = null;
 			vehicles = await vehicleApi.getVehicles();
+			vehiclesLoadError = null;
 		} catch (e) {
 			vehiclesLoadError = userFacingErrorMessage(e);
 		} finally {
@@ -48,7 +49,6 @@
 	async function loadVehicleData(vehicleId: string) {
 		try {
 			isLoadingData = true;
-			error = null;
 			const [healthData, tcoData, expensesData] = await Promise.all([
 				analyticsApi.getVehicleHealth(vehicleId),
 				analyticsApi.getVehicleTCO(vehicleId),
@@ -57,6 +57,7 @@
 			health = healthData;
 			tco = tcoData;
 			expenses = expensesData;
+			error = null;
 		} catch (e) {
 			error = userFacingErrorMessage(e);
 		} finally {
@@ -67,6 +68,7 @@
 	function handleVehicleChange(value: string | undefined) {
 		if (value) {
 			selectedVehicleId = value;
+			error = null;
 			loadVehicleData(value);
 		}
 	}
@@ -118,19 +120,16 @@
 	let expensePieData = $derived(buildCategoryPieData(expenses?.expenseBreakdown ?? []));
 </script>
 
-{#if isLoadingVehicles}
+{#if isLoadingVehicles && !vehiclesLoadError}
 	<div class="flex justify-center p-12">
 		<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 	</div>
 {:else if vehiclesLoadError}
-	<div class="rounded-lg border bg-card p-6">
-		<div class="flex items-center gap-3 text-destructive mb-4">
-			<CircleAlert class="h-5 w-5" />
-			<p class="font-medium">Couldn't load your vehicles</p>
-		</div>
-		<p class="text-sm text-muted-foreground mb-4">{vehiclesLoadError}</p>
-		<Button size="lg" onclick={loadVehicles}>Retry</Button>
-	</div>
+	<LoadErrorCard
+		title="Couldn't load your vehicles"
+		message={vehiclesLoadError}
+		onRetry={loadVehicles}
+	/>
 {:else if vehicles.length === 0}
 	<div class="rounded-lg border bg-card p-6 text-center">
 		<p class="text-muted-foreground mb-4">No vehicles found. Add a vehicle to see analytics.</p>
@@ -167,21 +166,16 @@
 			</Card.Content>
 		</Card.Root>
 
-		{#if isLoadingData}
+		{#if isLoadingData && !error}
 			<div class="flex justify-center p-12">
 				<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 			</div>
 		{:else if error}
-			<div class="rounded-lg border bg-card p-6">
-				<div class="flex items-center gap-3 text-destructive mb-4">
-					<CircleAlert class="h-5 w-5" />
-					<p class="font-medium">Couldn't load vehicle analytics</p>
-				</div>
-				<p class="text-sm text-muted-foreground mb-4">{error}</p>
-				<Button size="lg" onclick={() => selectedVehicleId && loadVehicleData(selectedVehicleId)}>
-					Retry
-				</Button>
-			</div>
+			<LoadErrorCard
+				title="Couldn't load vehicle analytics"
+				message={error}
+				onRetry={() => selectedVehicleId && loadVehicleData(selectedVehicleId)}
+			/>
 		{:else if health && tco && expenses}
 			<Card.Root>
 				<Card.Header>

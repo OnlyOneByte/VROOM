@@ -53,6 +53,27 @@ describe('PerVehicleTab when the vehicles fail to load', () => {
 	});
 });
 
+describe('PerVehicleTab retrying the vehicles', () => {
+	test('keeps the card and focus on Retry while it runs and after a repeat failure', async () => {
+		let reject: (e: unknown) => void = () => {};
+		getVehicles.mockRejectedValueOnce(new ApiError('boom', 500));
+		getVehicles.mockReturnValueOnce(new Promise((_, r) => (reject = r)));
+		render(PerVehicleTab);
+		const retry = await screen.findByRole('button', { name: 'Retry' });
+		retry.focus();
+
+		await fireEvent.click(retry);
+
+		const running = screen.getByRole('button', { name: /Retrying/ });
+		expect(document.activeElement).toBe(running);
+		reject(new ApiError('boom', 500));
+
+		const again = await screen.findByRole('button', { name: 'Retry' });
+		expect(screen.getByText("Couldn't load your vehicles")).toBeInTheDocument();
+		expect(document.activeElement).toBe(again);
+	});
+});
+
 describe('PerVehicleTab when the vehicle analytics fail to load', () => {
 	test('offers a 40px Retry', async () => {
 		getVehicles.mockResolvedValueOnce([VEHICLE]);
