@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import ProviderFields, {
 	fieldConfig,
 	fieldErrorsFrom,
@@ -87,6 +87,34 @@ describe('ProviderFields', () => {
 		});
 		expect(screen.getByLabelText('Token')).toHaveAttribute('placeholder', 'Enter Token');
 		expect(screen.getByLabelText('Token')).toBeRequired();
+	});
+
+	test('typing one stored key asks for the other, in the markup as well as for Save', async () => {
+		const keys: ProviderFieldsSpec = {
+			fields: [],
+			secrets: [
+				{ key: 'id', label: 'Key ID', required: true },
+				{ key: 'secret', label: 'Secret', required: true }
+			]
+		};
+		render(ProviderFields, {
+			props: {
+				idPrefix: 'keys',
+				spec: keys,
+				stored: {},
+				savedSecrets: ['id', 'secret'],
+				values: {},
+				secretValues: {}
+			}
+		});
+		const secret = screen.getByLabelText('Secret');
+		expect(secret).toHaveAttribute('placeholder', 'Saved, leave blank to keep');
+		expect(secret).not.toBeRequired();
+
+		await fireEvent.input(screen.getByLabelText('Key ID'), { target: { value: 'AKIA-new' } });
+
+		expect(secret).toHaveAttribute('placeholder', 'Enter Secret');
+		expect(secret).toBeRequired();
 	});
 
 	test('config keeps typed values and drops blanks', () => {

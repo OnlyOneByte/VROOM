@@ -41,6 +41,21 @@
 			.map(secret => secret.key);
 	}
 
+	const filled = (value: string | undefined) => (value ?? '').trim().length > 0;
+
+	export function requiredSecrets(
+		spec: ProviderFieldsSpec,
+		values: Record<string, string>,
+		secretValues: Record<string, string>,
+		stored: Record<string, unknown> | undefined,
+		savedSecrets?: string[]
+	): string[] {
+		const anyEntered = spec.secrets.some(secret => filled(secretValues[secret.key]));
+		return anyEntered
+			? spec.secrets.filter(secret => secret.required).map(secret => secret.key)
+			: secretsNeeded(spec, values, stored, savedSecrets);
+	}
+
 	export function fieldsReady(
 		spec: ProviderFieldsSpec,
 		values: Record<string, string>,
@@ -48,14 +63,11 @@
 		stored: Record<string, unknown> | undefined,
 		savedSecrets?: string[]
 	): boolean {
-		const filled = (value: string | undefined) => (value ?? '').trim().length > 0;
-		const anyEntered = spec.secrets.some(secret => filled(secretValues[secret.key]));
-		const required = anyEntered
-			? spec.secrets.filter(secret => secret.required).map(secret => secret.key)
-			: secretsNeeded(spec, values, stored, savedSecrets);
 		return (
 			spec.fields.every(field => !field.required || filled(values[field.key])) &&
-			required.every(key => filled(secretValues[key]))
+			requiredSecrets(spec, values, secretValues, stored, savedSecrets).every(key =>
+				filled(secretValues[key])
+			)
 		);
 	}
 
@@ -129,7 +141,7 @@
 		errors?: Record<string, string>;
 	} = $props();
 
-	let needed = $derived(new Set(secretsNeeded(spec, values, stored, savedSecrets)));
+	let needed = $derived(new Set(requiredSecrets(spec, values, secretValues, stored, savedSecrets)));
 
 	function inputType(kind: ProviderFieldSpec['kind']): string {
 		if (kind === 'url') return 'url';
@@ -201,7 +213,8 @@
 
 	{#each spec.secrets as secret (secret.key)}
 		{@const id = `${idPrefix}-${secret.key}`}
-		{@const keepStored = !!stored && !needed.has(secret.key)}
+		{@const keepStored =
+			!!stored && !needed.has(secret.key) && (savedSecrets?.includes(secret.key) ?? true)}
 		<div class="space-y-2">
 			<div class="flex items-baseline gap-1">
 				<Label for={id}>{secret.label}</Label>
