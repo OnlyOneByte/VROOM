@@ -15,6 +15,14 @@ vi.mock('$app/paths', async () => ({
 	resolve: (await import('./insurance-fixtures.ts')).resolveRoute
 }));
 vi.mock('#lib/utils/navigation.ts', () => ({ gotoDynamic: vi.fn() }));
+const currency = vi.hoisted(() => ({ unit: 'USD' }));
+vi.mock('#lib/stores/settings.svelte.ts', () => ({
+	settingsStore: {
+		get settings() {
+			return { currencyUnit: currency.unit };
+		}
+	}
+}));
 vi.mock('#lib/stores/app.svelte.ts', () => ({
 	appStore: { showError: vi.fn(), showSuccess: vi.fn() }
 }));
@@ -94,6 +102,27 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	currency.unit = 'USD';
+});
+
+describe('InsurancePolicyForm amount inputs follow the currency', () => {
+	const amountIds = [
+		'deductible',
+		'coverage-limit',
+		'total-cost',
+		'monthly-cost',
+		'payment-amount'
+	];
+
+	test.each([
+		['JPY', '1'],
+		['USD', '0.01']
+	])('a %s user steps every amount by %s', async (unit, step) => {
+		currency.unit = unit;
+		render(InsurancePolicyForm);
+		await settle();
+		for (const id of amountIds) expect(document.getElementById(id)).toHaveAttribute('step', step);
+	});
 });
 
 describe('enteredAmount', () => {

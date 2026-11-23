@@ -143,7 +143,7 @@
 					<div class="flex w-24 items-center gap-1">
 						<Input
 							type="number"
-							step="0.01"
+							step={0.01}
 							min="0"
 							max="100"
 							value={alloc?.percentage?.toString() ?? ''}

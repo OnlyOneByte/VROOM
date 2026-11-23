@@ -40,7 +40,7 @@
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
-	import { dateOnlyToISO, getCurrencySymbol } from '#lib/utils/formatters.ts';
+	import { amountStep, dateOnlyToISO, getCurrencySymbol } from '#lib/utils/formatters.ts';
 	import { enteredAmount } from '#lib/utils/insurance.ts';
 	import type { InsurancePolicy, Vehicle, CreateTermRequest } from '#lib/types/index.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
@@ -453,7 +453,7 @@
 										<Input
 											id="deductible"
 											type="number"
-											step="0.01"
+											step={amountStep()}
 											min="0"
 											bind:value={deductibleAmount}
 											aria-invalid={!!errors.deductibleAmount}
@@ -483,7 +483,7 @@
 										<Input
 											id="coverage-limit"
 											type="number"
-											step="0.01"
+											step={amountStep()}
 											min="0"
 											bind:value={coverageLimit}
 											aria-invalid={!!errors.coverageLimit}
@@ -521,7 +521,7 @@
 										<Input
 											id="total-cost"
 											type="number"
-											step="0.01"
+											step={amountStep()}
 											min="0"
 											bind:value={totalCost}
 											aria-invalid={!!errors.totalCost}
@@ -536,7 +536,7 @@
 										<Input
 											id="monthly-cost"
 											type="number"
-											step="0.01"
+											step={amountStep()}
 											min="0"
 											bind:value={monthlyCost}
 										/>
@@ -549,7 +549,7 @@
 										<Input
 											id="payment-amount"
 											type="number"
-											step="0.01"
+											step={amountStep()}
 											min="0"
 											bind:value={paymentAmount}
 										/>

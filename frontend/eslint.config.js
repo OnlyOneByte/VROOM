@@ -177,6 +177,11 @@ export default [
 				{
 					selector: "Literal[value='en-US']",
 					message: 'Take the locale from currentLocale() in #lib/utils/formatters.ts.'
+				},
+				{
+					selector: "SvelteAttribute[key.name='step'] > SvelteLiteral[value='0.01']",
+					message:
+						'Step money inputs by the currency with step={amountStep()}. A non-money field (a percentage, kWh) writes step={0.01}.'
 				}
 			]
 		}
