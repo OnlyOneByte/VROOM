@@ -26,12 +26,14 @@
 	export function secretsNeeded(
 		spec: ProviderFieldsSpec,
 		values: Record<string, string>,
-		stored: Record<string, unknown> | undefined
+		stored: Record<string, unknown> | undefined,
+		savedSecrets?: string[]
 	): string[] {
 		return spec.secrets
 			.filter(secret => {
 				if (!secret.required) return false;
 				if (!stored) return true;
+				if (savedSecrets && !savedSecrets.includes(secret.key)) return true;
 				return (secret.reenterWhenChanged ?? []).some(
 					key => (values[key] ?? '') !== String(stored[key] ?? '')
 				);
@@ -43,12 +45,17 @@
 		spec: ProviderFieldsSpec,
 		values: Record<string, string>,
 		secretValues: Record<string, string>,
-		stored: Record<string, unknown> | undefined
+		stored: Record<string, unknown> | undefined,
+		savedSecrets?: string[]
 	): boolean {
 		const filled = (value: string | undefined) => (value ?? '').trim().length > 0;
+		const anyEntered = spec.secrets.some(secret => filled(secretValues[secret.key]));
+		const required = anyEntered
+			? spec.secrets.filter(secret => secret.required).map(secret => secret.key)
+			: secretsNeeded(spec, values, stored, savedSecrets);
 		return (
 			spec.fields.every(field => !field.required || filled(values[field.key])) &&
-			secretsNeeded(spec, values, stored).every(key => filled(secretValues[key]))
+			required.every(key => filled(secretValues[key]))
 		);
 	}
 
@@ -108,6 +115,7 @@
 		idPrefix,
 		spec,
 		stored,
+		savedSecrets,
 		values = $bindable(),
 		secretValues = $bindable(),
 		errors = {}
@@ -115,12 +123,13 @@
 		idPrefix: string;
 		spec: ProviderFieldsSpec;
 		stored: Record<string, unknown> | undefined;
+		savedSecrets?: string[] | undefined;
 		values: Record<string, string>;
 		secretValues: Record<string, string>;
 		errors?: Record<string, string>;
 	} = $props();
 
-	let needed = $derived(new Set(secretsNeeded(spec, values, stored)));
+	let needed = $derived(new Set(secretsNeeded(spec, values, stored, savedSecrets)));
 
 	function inputType(kind: ProviderFieldSpec['kind']): string {
 		if (kind === 'url') return 'url';
@@ -140,7 +149,9 @@
 		<div class="space-y-2">
 			<div class="flex items-baseline gap-1">
 				<Label for={id}>{field.label}</Label>
-				{#if field.required}<span class="text-sm text-muted-foreground" aria-hidden="true">*</span>{/if}
+				{#if field.required}<span class="text-sm text-muted-foreground" aria-hidden="true">
+						*
+					</span>{/if}
 			</div>
 			{#if field.kind === 'select'}
 				<Select.Root
@@ -150,7 +161,8 @@
 				>
 					<Select.Trigger
 						{id}
-						class="w-full"
+						class="w-full {values[field.key] ? '' : 'text-muted-foreground'}"
+						aria-required={field.required}
 						aria-invalid={!!errors[field.key]}
 						aria-describedby={describedBy(field.key, field.help)}
 					>
@@ -193,7 +205,9 @@
 		<div class="space-y-2">
 			<div class="flex items-baseline gap-1">
 				<Label for={id}>{secret.label}</Label>
-				{#if needed.has(secret.key)}<span class="text-sm text-muted-foreground" aria-hidden="true">*</span>{/if}
+				{#if needed.has(secret.key)}<span class="text-sm text-muted-foreground" aria-hidden="true">
+						*
+					</span>{/if}
 			</div>
 			<Input
 				{id}

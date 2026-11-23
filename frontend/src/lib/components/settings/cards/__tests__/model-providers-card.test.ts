@@ -289,6 +289,22 @@ describe('ModelProvidersCard add provider', () => {
 		expect(saveButton('llm')).not.toBeDisabled();
 	});
 
+	test('a field the backend refuses gets the message and the focus', async () => {
+		createProvider.mockRejectedValueOnce(
+			new ApiError('LLM base URL must use https', 400, {
+				issues: [{ path: ['baseUrl'], message: 'LLM base URL must use https' }]
+			})
+		);
+		await openCreate('llm');
+		await type('llm-name', 'Bad');
+		await type('llm-apiKey', 'sk-bad');
+		await fireEvent.click(saveButton('llm'));
+		await settle();
+		const baseUrl = input('llm-baseUrl');
+		expect(baseUrl).toHaveAttribute('aria-invalid', 'true');
+		expect(document.activeElement).toBe(baseUrl);
+	});
+
 	test('a non-Error create failure reports a generic message', async () => {
 		createProvider.mockRejectedValueOnce('nope');
 		await openCreate('llm');
