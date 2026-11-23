@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { InsuranceTerm } from '#lib/types/index.ts';
-import { makeTerm as term, settle } from './insurance-fixtures.ts';
+import { chooseTermAction, makeTerm as term, settle } from './insurance-fixtures.ts';
 
 const PolicyTermCard = (await import('../PolicyTermCard.svelte')).default;
 
@@ -69,25 +69,15 @@ describe('PolicyTermCard actions', () => {
 		const onEdit = vi.fn<(t: InsuranceTerm) => void>();
 		const t = term();
 		render(PolicyTermCard, { props: { term: t, onEdit } });
-		await fireEvent.click(screen.getByTitle('Edit term'));
+		await chooseTermAction('Edit term');
 		expect(onEdit).toHaveBeenCalledWith(t);
-	});
-
-	test('renew is only offered on the current term', async () => {
-		const onRenew = vi.fn();
-		const { unmount } = render(PolicyTermCard, { props: { term: term(), onRenew } });
-		expect(screen.queryByRole('button', { name: /renew/i })).toBeNull();
-		unmount();
-		render(PolicyTermCard, { props: { term: term(), isCurrent: true, onRenew } });
-		await fireEvent.click(screen.getByRole('button', { name: /renew/i }));
-		expect(onRenew).toHaveBeenCalledTimes(1);
 	});
 
 	test('delete asks for confirmation before calling the handler', async () => {
 		const onDelete = vi.fn<(t: InsuranceTerm) => void>();
 		const t = term();
 		render(PolicyTermCard, { props: { term: t, onDelete } });
-		await fireEvent.click(screen.getByTitle('Delete term'));
+		await chooseTermAction('Delete term');
 		await settle();
 		expect(onDelete).not.toHaveBeenCalled();
 		const dialog = screen.getByRole('alertdialog');
@@ -102,7 +92,7 @@ describe('PolicyTermCard actions', () => {
 	test('cancelling the confirmation leaves the term untouched', async () => {
 		const onDelete = vi.fn<(t: InsuranceTerm) => void>();
 		render(PolicyTermCard, { props: { term: term(), onDelete } });
-		await fireEvent.click(screen.getByTitle('Delete term'));
+		await chooseTermAction('Delete term');
 		await settle();
 		await fireEvent.click(
 			within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' })

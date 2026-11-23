@@ -3,7 +3,15 @@
 	import { resolve } from '$app/paths';
 	import { paramRoutes } from '#lib/routes.ts';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
-	import { ChevronDown, ChevronUp, Building2, Settings } from '@lucide/svelte';
+	import {
+		ChevronDown,
+		ChevronUp,
+		Building2,
+		Settings,
+		Plus,
+		RefreshCw,
+		Upload
+	} from '@lucide/svelte';
 	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -41,6 +49,23 @@
 	let childLevel: 4 | 5 = $derived(level === 3 ? 4 : 5);
 
 	let expanded = $state(false);
+	let documentCount = $state<number | null>(null);
+	let claimCount = $state<number | null>(null);
+	let uploadOpen = $state(false);
+	let claimFormOpen = $state(false);
+
+	let attachmentSummary = $derived(
+		[
+			readOnly || documentCount === null ? null : plural(documentCount, 'document'),
+			claimCount === null ? null : plural(claimCount, 'claim')
+		]
+			.filter(Boolean)
+			.join(' · ')
+	);
+
+	function plural(n: number, noun: string): string {
+		return `${n} ${noun}${n === 1 ? '' : 's'}`;
+	}
 	let latestTerm = $derived(getLatestTerm(policy.terms));
 	let pastTerms = $derived(policy.terms.filter(t => t.id !== latestTerm?.id));
 
@@ -64,7 +89,7 @@
 	}
 </script>
 
-<Card class={isPolicyInForce(policy) ? '' : 'bg-muted/30'}>
+<Card class={isPolicyInForce(policy) ? 'py-0' : 'bg-muted/30 py-0'}>
 	<CardContent class="p-4">
 		<div class="flex items-center justify-between gap-2">
 			<div class="flex items-center gap-2.5 min-w-0">
@@ -112,7 +137,6 @@
 					{vehicleNames}
 					onEdit={readOnly ? undefined : handleEditTerm}
 					onDelete={readOnly ? undefined : handleDeleteTerm}
-					onRenew={readOnly ? undefined : handleRenew}
 				/>
 			</div>
 		{/if}
@@ -159,14 +183,62 @@
 			</div>
 		{/if}
 
-		{#if !readOnly}
-			<div class="mt-3 border-t border-border pt-3">
-				<DocumentViewer entityType="insurance_policy" entityId={policy.id} level={childLevel} />
-			</div>
-		{/if}
-
 		<div class="mt-3 border-t border-border pt-3">
-			<ClaimsSection policyId={policy.id} {vehicles} {readOnly} level={childLevel} />
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<p class="text-xs text-muted-foreground" data-testid="policy-attachments">
+					{attachmentSummary}
+				</p>
+				{#if !readOnly}
+					<div class="flex flex-wrap items-center gap-2">
+						<Button
+							variant="outline"
+							size="sm"
+							class="h-10 sm:h-8"
+							onclick={() => (uploadOpen = true)}
+						>
+							<Upload />
+							Upload
+						</Button>
+						{#if !claimFormOpen}
+							<Button
+								variant="outline"
+								size="sm"
+								class="h-10 sm:h-8"
+								onclick={() => (claimFormOpen = true)}
+							>
+								<Plus />
+								File Claim
+							</Button>
+						{/if}
+						{#if latestTerm}
+							<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={handleRenew}>
+								<RefreshCw />
+								Renew
+							</Button>
+						{/if}
+					</div>
+				{/if}
+			</div>
+
+			{#if !readOnly}
+				<DocumentViewer
+					entityType="insurance_policy"
+					entityId={policy.id}
+					level={childLevel}
+					compact
+					bind:count={documentCount}
+					bind:uploadOpen
+				/>
+			{/if}
+			<ClaimsSection
+				policyId={policy.id}
+				{vehicles}
+				{readOnly}
+				level={childLevel}
+				compact
+				bind:count={claimCount}
+				bind:formOpen={claimFormOpen}
+			/>
 		</div>
 	</CardContent>
 </Card>

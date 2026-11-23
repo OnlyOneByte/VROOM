@@ -7,7 +7,16 @@ import type {
 	Photo,
 	Vehicle
 } from '#lib/types/index.ts';
-import { VEHICLES, makePolicy, makeTerm, photoPage, settle } from './insurance-fixtures.ts';
+import {
+	VEHICLES,
+	chooseTermAction,
+	makeClaim,
+	makePhoto,
+	makePolicy,
+	makeTerm,
+	photoPage,
+	settle
+} from './insurance-fixtures.ts';
 
 const goto = vi.fn<(url: string) => Promise<void>>(() => Promise.resolve());
 vi.mock('$app/navigation', () => ({ goto: (url: string) => goto(url) }));
@@ -26,6 +35,7 @@ vi.mock('#lib/services/insurance-api.ts', () => ({
 		getEntityDocuments: (entityType: string, entityId: string) =>
 			getEntityDocuments(entityType, entityId),
 		deleteTerm: (policyId: string, termId: string) => deleteTerm(policyId, termId),
+		updateClaim: vi.fn(() => Promise.resolve({})),
 		getEntityDocumentThumbnailUrl: () => '/thumb',
 		uploadEntityDocument: vi.fn(),
 		deleteEntityDocument: vi.fn()
@@ -35,7 +45,8 @@ vi.mock('#lib/services/insurance-api.ts', () => ({
 const handleErrorWithNotification = vi.fn<(error: unknown, context?: string) => void>();
 vi.mock('#lib/utils/error-handling.ts', () => ({
 	handleErrorWithNotification: (error: unknown, context?: string) =>
-		handleErrorWithNotification(error, context)
+		handleErrorWithNotification(error, context),
+	userFacingErrorMessage: () => 'Something went wrong.'
 }));
 
 vi.mock('#lib/services/provider-api.ts', () => ({
@@ -130,6 +141,7 @@ describe('PolicyCard header', () => {
 		const { container } = mount();
 		await settle();
 		expect(container.querySelector('[data-slot="card"]')).not.toHaveClass('bg-muted/30');
+		expect(container.querySelector('[data-slot="card"]')).toHaveClass('py-0');
 	});
 
 	test('a policy with no terms shows no term card, number or countdown', async () => {
@@ -162,16 +174,114 @@ describe('PolicyCard child sections', () => {
 		await settle();
 		expect(getEntityDocuments).toHaveBeenCalledWith('insurance_policy', 'p1');
 		expect(getClaims).toHaveBeenCalledWith('p1');
-		expect(screen.getByText('Documents')).toBeInTheDocument();
-		expect(screen.getByText('Claims')).toBeInTheDocument();
+		expect(screen.getByTestId('policy-attachments')).toHaveTextContent('0 documents · 0 claims');
+		expect(screen.queryByRole('heading', { name: 'Documents' })).toBeNull();
+		expect(screen.queryByRole('heading', { name: 'Claims' })).toBeNull();
+		expect(screen.queryByText('No documents uploaded yet.')).toBeNull();
+		expect(screen.queryByText('No claims filed.')).toBeNull();
+	});
+
+	test('a section opens only once it has items, and the footer counts them', async () => {
+		getEntityDocuments.mockResolvedValue(photoPage([makePhoto()]));
+		getClaims.mockResolvedValue([makeClaim()]);
+		mount();
+		await settle();
+		expect(screen.getByTestId('policy-attachments')).toHaveTextContent('1 document · 1 claim');
+		expect(screen.getByRole('heading', { name: 'Documents' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Claims' })).toBeInTheDocument();
+	});
+
+	test('File Claim in the footer opens the claim form and hides itself', async () => {
+		mount();
+		await settle();
+		await fireEvent.click(screen.getByRole('button', { name: 'File Claim' }));
+		await settle();
+		expect(screen.getByText('File a claim')).toBeInTheDocument();
+		const fileClaim = screen.getAllByRole('button', { name: 'File Claim' });
+		expect(fileClaim).toHaveLength(1);
+		expect(fileClaim[0]).toHaveAttribute('type', 'submit');
+	});
+
+	test('Upload in the footer opens the document capture dialog', async () => {
+		mount();
+		await settle();
+		await fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
+		await settle();
+		expect(screen.getByRole('dialog', { name: 'Upload Documents' })).toBeInTheDocument();
+	});
+
+	test('a failed documents load shows Retry on the card, and Retry loads them', async () => {
+		getEntityDocuments.mockRejectedValueOnce(new Error('offline'));
+		mount();
+		await settle();
+		expect(screen.getByText("Couldn't load the documents.")).toBeInTheDocument();
+		expect(screen.getByTestId('policy-attachments')).toHaveTextContent(/^0 claims$/);
+
+		getEntityDocuments.mockResolvedValue(photoPage([makePhoto()]));
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await settle();
+		expect(screen.queryByText("Couldn't load the documents.")).toBeNull();
+		expect(screen.getByTestId('policy-attachments')).toHaveTextContent('1 document · 0 claims');
+	});
+
+	test.each([
+		['documents', "Couldn't load the documents."],
+		['claims', 'Something went wrong.']
+	])(
+		'Retry on a failed %s load stays on screen and focusable while it runs',
+		async (kind, message) => {
+			const failing = kind === 'documents' ? getEntityDocuments : getClaims;
+			failing.mockRejectedValueOnce(new Error('offline'));
+			mount();
+			await settle();
+			if (kind === 'documents') getEntityDocuments.mockReturnValue(new Promise(() => {}));
+			else getClaims.mockReturnValue(new Promise(() => {}));
+			const retry = screen.getByRole('button', { name: 'Retry' });
+			retry.focus();
+			await fireEvent.click(retry);
+			await settle();
+			await fireEvent.click(retry);
+
+			expect(screen.getByText(message)).toBeInTheDocument();
+			expect(retry).toHaveAttribute('aria-disabled', 'true');
+			expect(document.activeElement).toBe(retry);
+			expect(failing).toHaveBeenCalledTimes(2);
+		}
+	);
+
+	test('saving a claim keeps the claims section and the count on screen while it reloads', async () => {
+		getClaims.mockResolvedValue([makeClaim()]);
+		mount();
+		await settle();
+		let finish: (claims: InsuranceClaim[]) => void = () => {};
+		getClaims.mockReturnValue(new Promise(resolve => (finish = resolve)));
+		await fireEvent.click(screen.getByRole('button', { name: 'Edit claim' }));
+		await settle();
+		await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+		await settle();
+
+		expect(screen.getByRole('heading', { name: 'Claims' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+		expect(screen.getByTestId('policy-attachments')).toHaveTextContent('0 documents · 1 claim');
+
+		finish([makeClaim(), makeClaim({ id: 'c2' })]);
+		await settle();
+		expect(screen.getByTestId('policy-attachments')).toHaveTextContent('0 documents · 2 claims');
+	});
+
+	test('a failed claims load is shown in place of the claim count', async () => {
+		getClaims.mockRejectedValue(new Error('offline'));
+		mount();
+		await settle();
+		expect(screen.getByTestId('policy-attachments')).toHaveTextContent(/^0 documents$/);
+		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 	});
 
 	test('read-only hides settings, term actions and documents but keeps claims', async () => {
 		mount({ readOnly: true });
 		await settle();
 		expect(screen.queryByTitle('Policy settings')).toBeNull();
-		expect(screen.queryByTitle('Edit term')).toBeNull();
-		expect(screen.queryByTitle('Delete term')).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Term actions' })).toBeNull();
 		expect(screen.queryByRole('button', { name: /renew/i })).toBeNull();
 		expect(getEntityDocuments).not.toHaveBeenCalled();
 		expect(getClaims).toHaveBeenCalledWith('p1');
@@ -216,7 +326,7 @@ describe('PolicyCard term actions', () => {
 	test('editing the current term navigates to its edit route', async () => {
 		mount();
 		await settle();
-		await fireEvent.click(screen.getByTitle('Edit term'));
+		await chooseTermAction('Edit term');
 		expect(goto).toHaveBeenCalledWith('/insurance/p1/terms/t-current/edit');
 	});
 
@@ -232,7 +342,7 @@ describe('PolicyCard term actions', () => {
 		deleteTerm.mockResolvedValue(makePolicy());
 		const { onRefresh } = mount();
 		await settle();
-		await fireEvent.click(screen.getByTitle('Delete term'));
+		await chooseTermAction('Delete term');
 		await confirmDelete();
 		expect(deleteTerm).toHaveBeenCalledWith('p1', 't-current');
 		expect(onRefresh).toHaveBeenCalledTimes(1);
@@ -244,7 +354,7 @@ describe('PolicyCard term actions', () => {
 		const { onRefresh } = mount();
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: '1 past term' }));
-		await fireEvent.click(screen.getAllByTitle('Delete term').at(-1)!);
+		await chooseTermAction('Delete term', -1);
 		await confirmDelete();
 		expect(deleteTerm).toHaveBeenCalledWith('p1', 't-past');
 		expect(onRefresh).toHaveBeenCalledTimes(1);
@@ -255,7 +365,7 @@ describe('PolicyCard term actions', () => {
 		deleteTerm.mockRejectedValue(failure);
 		const { onRefresh } = mount();
 		await settle();
-		await fireEvent.click(screen.getByTitle('Delete term'));
+		await chooseTermAction('Delete term');
 		await confirmDelete();
 		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't delete the term");
 		expect(onRefresh).not.toHaveBeenCalled();

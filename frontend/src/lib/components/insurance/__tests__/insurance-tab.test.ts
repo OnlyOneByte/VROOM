@@ -6,7 +6,15 @@ import type {
 	PaginatedResponse,
 	Photo
 } from '#lib/types/index.ts';
-import { makePolicy, makeTerm, photoPage, settle } from './insurance-fixtures.ts';
+import {
+	chooseTermAction,
+	makeClaim,
+	makePhoto,
+	makePolicy,
+	makeTerm,
+	photoPage,
+	settle
+} from './insurance-fixtures.ts';
 import {
 	ApiError,
 	SERVER_FAILURE_MESSAGE,
@@ -140,6 +148,8 @@ describe('InsuranceTab policy list', () => {
 
 	test('on the vehicle page the outline runs h2 to h5 without skipping a level', async () => {
 		getPoliciesForVehicle.mockResolvedValue([policy]);
+		getClaims.mockResolvedValue([makeClaim()]);
+		getEntityDocuments.mockResolvedValue(photoPage([makePhoto()]));
 		mount();
 		await settle();
 
@@ -174,7 +184,7 @@ describe('InsuranceTab policy list', () => {
 		deleteTerm.mockResolvedValue(policy);
 		mount();
 		await settle();
-		await fireEvent.click(screen.getByTitle('Delete term'));
+		await chooseTermAction('Delete term');
 		await settle();
 		await fireEvent.click(
 			within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' })

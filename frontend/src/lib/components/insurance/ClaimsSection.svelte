@@ -43,14 +43,26 @@
 		vehicles?: Vehicle[];
 		readOnly?: boolean;
 		level?: 4 | 5;
+		compact?: boolean;
+		count?: number | null;
+		formOpen?: boolean;
 	}
 
-	let { policyId, vehicles = [], readOnly = false, level = 4 }: Props = $props();
+	let {
+		policyId,
+		vehicles = [],
+		readOnly = false,
+		level = 4,
+		compact = false,
+		count = $bindable(null),
+		formOpen = $bindable(false)
+	}: Props = $props();
 
 	let vehicleNameMap = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 
 	let claims = $state<InsuranceClaim[]>([]);
 	let isLoading = $state(true);
+	let hasLoaded = $state(false);
 	let loadError = $state<string | null>(null);
 	const expandedDocs = new SvelteSet<string>();
 
@@ -59,7 +71,6 @@
 		else expandedDocs.add(claimId);
 	}
 
-	let showForm = $state(false);
 	let editingId = $state<string | null>(null);
 	let isSaving = $state(false);
 
@@ -93,17 +104,26 @@
 
 	onMount(loadClaims);
 
+	$effect(() => {
+		count = !hasLoaded || loadError ? null : claims.length;
+	});
+
 	async function loadClaims() {
 		isLoading = true;
-		loadError = null;
 		try {
 			claims = await insuranceApi.getClaims(policyId);
+			hasLoaded = true;
+			loadError = null;
 		} catch (err) {
 			loadError = userFacingErrorMessage(err);
 			handleErrorWithNotification(err, "Couldn't load claims");
 		} finally {
 			isLoading = false;
 		}
+	}
+
+	function retryClaims() {
+		if (!isLoading) loadClaims();
 	}
 
 	function resetForm() {
@@ -119,7 +139,7 @@
 
 	function openNew() {
 		resetForm();
-		showForm = true;
+		formOpen = true;
 	}
 
 	function openEdit(claim: InsuranceClaim) {
@@ -131,11 +151,11 @@
 		payoutAmount = claim.payoutAmount != null ? String(claim.payoutAmount) : '';
 		faultDesignation = claim.faultDesignation ?? '';
 		description = claim.description ?? '';
-		showForm = true;
+		formOpen = true;
 	}
 
 	function closeForm() {
-		showForm = false;
+		formOpen = false;
 		resetForm();
 	}
 
@@ -199,117 +219,130 @@
 	}
 </script>
 
-<div class="space-y-3">
-	<div class="flex items-center justify-between">
-		<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground">
-			Claims
-		</svelte:element>
-		{#if !showForm && !readOnly}
-			<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={openNew}>
-				<Plus />
-				File Claim
-			</Button>
-		{/if}
-	</div>
+{#if !compact || loadError || formOpen || (hasLoaded && claims.length > 0)}
+	<div class={compact ? 'mt-3 space-y-3' : 'space-y-3'}>
+		<div class="flex items-center justify-between">
+			<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground">
+				Claims
+			</svelte:element>
+			{#if !formOpen && !readOnly && !compact}
+				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={openNew}>
+					<Plus />
+					File Claim
+				</Button>
+			{/if}
+		</div>
 
-	{#if isLoading}
-		<div class="flex items-center justify-center py-4">
-			<LoaderCircle class="h-5 w-5 animate-spin text-muted-foreground" />
-		</div>
-	{:else if loadError}
-		<div class="rounded-md border border-destructive/40 bg-destructive/10 p-3">
-			<p class="text-xs text-destructive">{loadError}</p>
-			<Button variant="outline" size="sm" class="mt-2 h-10 sm:h-8" onclick={loadClaims}>
-				Retry
-			</Button>
-		</div>
-	{:else}
-		{#if claims.length === 0 && !showForm}
-			<div class="flex flex-col items-center py-4 text-center">
-				<ShieldAlert class="mb-2 h-6 w-6 text-muted-foreground" />
-				<p class="text-xs text-muted-foreground">No claims filed.</p>
+		{#if loadError}
+			<div class="rounded-md border border-destructive/40 bg-destructive/10 p-3">
+				<p class="text-xs text-destructive">{loadError}</p>
+				<Button
+					variant="outline"
+					size="sm"
+					class="mt-2 h-10 sm:h-8"
+					aria-disabled={isLoading}
+					onclick={retryClaims}
+				>
+					{#if isLoading}
+						<LoaderCircle class="animate-spin" />
+					{/if}
+					Retry
+				</Button>
 			</div>
-		{:else if claims.length > 0}
-			<div class="space-y-2">
-				{#each claims as claim (claim.id)}
-					<div class="rounded-md border border-border p-3">
-						<div class="flex items-start justify-between gap-3">
-							<div class="min-w-0 flex-1">
-								<div class="flex flex-wrap items-center gap-2">
-									<span class="text-sm font-medium text-foreground">
-										{capitalize(claim.claimType)}
-									</span>
-									<Badge variant={STATUS_VARIANT[claim.status]} class="text-xs">
-										{STATUS_LABELS[claim.status]}
-									</Badge>
-									{#if claim.faultDesignation}
-										<Badge variant="outline" class="text-xs">
-											{FAULT_LABELS[claim.faultDesignation]}
+		{:else if isLoading && !hasLoaded}
+			<div class="flex items-center justify-center py-4">
+				<LoaderCircle class="h-5 w-5 animate-spin text-muted-foreground" />
+			</div>
+		{:else}
+			{#if claims.length === 0 && !formOpen}
+				<div class="flex flex-col items-center py-4 text-center">
+					<ShieldAlert class="mb-2 h-6 w-6 text-muted-foreground" />
+					<p class="text-xs text-muted-foreground">No claims filed.</p>
+				</div>
+			{:else if claims.length > 0}
+				<div class="space-y-2">
+					{#each claims as claim (claim.id)}
+						<div class="rounded-md border border-border p-3">
+							<div class="flex items-start justify-between gap-3">
+								<div class="min-w-0 flex-1">
+									<div class="flex flex-wrap items-center gap-2">
+										<span class="text-sm font-medium text-foreground">
+											{capitalize(claim.claimType)}
+										</span>
+										<Badge variant={STATUS_VARIANT[claim.status]} class="text-xs">
+											{STATUS_LABELS[claim.status]}
 										</Badge>
+										{#if claim.faultDesignation}
+											<Badge variant="outline" class="text-xs">
+												{FAULT_LABELS[claim.faultDesignation]}
+											</Badge>
+										{/if}
+									</div>
+									<div
+										class="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground"
+									>
+										<span>{formatDate(claim.claimDate)}</span>
+										{#if claim.payoutAmount != null}
+											<span>Payout: {formatCurrency(claim.payoutAmount)}</span>
+										{/if}
+										{#if claim.vehicleId && vehicleNameMap.has(claim.vehicleId)}
+											<span>{vehicleNameMap.get(claim.vehicleId)}</span>
+										{/if}
+									</div>
+									{#if claim.description}
+										<p class="mt-1 truncate text-xs text-muted-foreground">{claim.description}</p>
 									{/if}
 								</div>
-								<div class="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
-									<span>{formatDate(claim.claimDate)}</span>
-									{#if claim.payoutAmount != null}
-										<span>Payout: {formatCurrency(claim.payoutAmount)}</span>
-									{/if}
-									{#if claim.vehicleId && vehicleNameMap.has(claim.vehicleId)}
-										<span>{vehicleNameMap.get(claim.vehicleId)}</span>
+								<div class="flex shrink-0 items-center gap-2">
+									{#if !readOnly}
+										<Button
+											variant="ghost"
+											size="icon"
+											class="size-10 sm:size-9"
+											aria-label="Claim documents"
+											aria-expanded={expandedDocs.has(claim.id)}
+											onclick={() => toggleDocs(claim.id)}
+										>
+											<Paperclip />
+										</Button>
+										<Button
+											variant="ghost"
+											size="icon"
+											class="size-10 sm:size-9"
+											aria-label="Edit claim"
+											onclick={() => openEdit(claim)}
+										>
+											<Pencil />
+										</Button>
+										<Button
+											variant="ghost"
+											size="icon"
+											class="size-10 sm:size-9"
+											aria-label="Delete claim"
+											onclick={() => requestDelete(claim.id)}
+										>
+											<Trash2 />
+										</Button>
 									{/if}
 								</div>
-								{#if claim.description}
-									<p class="mt-1 truncate text-xs text-muted-foreground">{claim.description}</p>
-								{/if}
 							</div>
-							<div class="flex shrink-0 items-center gap-2">
-								{#if !readOnly}
-									<Button
-										variant="ghost"
-										size="icon"
-										class="size-10 sm:size-9"
-										aria-label="Claim documents"
-										aria-expanded={expandedDocs.has(claim.id)}
-										onclick={() => toggleDocs(claim.id)}
-									>
-										<Paperclip />
-									</Button>
-									<Button
-										variant="ghost"
-										size="icon"
-										class="size-10 sm:size-9"
-										aria-label="Edit claim"
-										onclick={() => openEdit(claim)}
-									>
-										<Pencil />
-									</Button>
-									<Button
-										variant="ghost"
-										size="icon"
-										class="size-10 sm:size-9"
-										aria-label="Delete claim"
-										onclick={() => requestDelete(claim.id)}
-									>
-										<Trash2 class="text-destructive" />
-									</Button>
-								{/if}
-							</div>
+							{#if expandedDocs.has(claim.id)}
+								<div class="mt-3 border-t border-border pt-3">
+									<DocumentViewer
+										entityType="insurance_claim"
+										entityId={claim.id}
+										{readOnly}
+										level={level === 4 ? 5 : 6}
+									/>
+								</div>
+							{/if}
 						</div>
-						{#if expandedDocs.has(claim.id)}
-							<div class="mt-3 border-t border-border pt-3">
-								<DocumentViewer
-									entityType="insurance_claim"
-									entityId={claim.id}
-									{readOnly}
-									level={level === 4 ? 5 : 6}
-								/>
-							</div>
-						{/if}
-					</div>
-				{/each}
-			</div>
+					{/each}
+				</div>
+			{/if}
 		{/if}
 
-		{#if showForm}
+		{#if formOpen}
 			<form
 				class="space-y-3 rounded-md border border-border p-3"
 				onsubmit={e => {
@@ -457,8 +490,8 @@
 				</div>
 			</form>
 		{/if}
-	{/if}
-</div>
+	</div>
+{/if}
 
 <ConfirmDialog
 	bind:open={confirmOpen}

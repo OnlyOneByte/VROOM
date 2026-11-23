@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Pencil, Trash2, RefreshCw } from '@lucide/svelte';
+	import { Ellipsis, Pencil, Trash2 } from '@lucide/svelte';
+	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
@@ -13,82 +14,98 @@
 		vehicleNames?: string[];
 		onEdit?: (_term: InsuranceTerm) => void;
 		onDelete?: (_term: InsuranceTerm) => void;
-		onRenew?: () => void;
 	}
 
-	let { term, isCurrent = false, vehicleNames = [], onEdit, onDelete, onRenew }: Props = $props();
+	let { term, isCurrent = false, vehicleNames = [], onEdit, onDelete }: Props = $props();
 
 	let confirmOpen = $state(false);
+	let menuOpen = $state(false);
 	let ended = $derived(hasTermEnded(term));
 	let termLabel = $derived(isCurrent ? (ended ? 'Latest Term' : 'Current Term') : 'Past Term');
 </script>
 
-<div class="rounded-lg border p-3 space-y-2 {isCurrent ? 'bg-muted/30' : 'bg-background'}">
+<div class={isCurrent ? 'space-y-2' : 'space-y-2 rounded-lg border bg-background p-3'}>
 	<div class="flex items-center justify-between">
 		<Badge variant="secondary" class="text-xs">
 			{termLabel}
 		</Badge>
 		<div class="flex items-center gap-2">
-			{#if onEdit}
-				<Button
-					variant="ghost"
-					size="icon"
-					class="size-10 sm:size-9"
-					onclick={() => onEdit(term)}
-					title="Edit term"
-					aria-label="Edit term"
-				>
-					<Pencil />
-				</Button>
-			{/if}
-			{#if onDelete}
-				<Button
-					variant="ghost"
-					size="icon"
-					class="size-10 sm:size-9 text-destructive hover:text-destructive hover:bg-destructive/10"
-					onclick={() => (confirmOpen = true)}
-					title="Delete term"
-					aria-label="Delete term"
-				>
-					<Trash2 />
-				</Button>
-			{/if}
-			{#if isCurrent && onRenew}
-				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={onRenew}>
-					<RefreshCw />
-					Renew
-				</Button>
+			{#if onEdit || onDelete}
+				<Popover.Root bind:open={menuOpen}>
+					<Popover.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="ghost"
+								size="icon"
+								class="size-10 sm:size-9"
+								title="Term actions"
+								aria-label="Term actions"
+							>
+								<Ellipsis />
+							</Button>
+						{/snippet}
+					</Popover.Trigger>
+					<Popover.Content align="end" class="flex w-44 flex-col gap-1 p-1">
+						{#if onEdit}
+							<Button
+								variant="ghost"
+								class="h-10 w-full justify-start"
+								onclick={() => {
+									menuOpen = false;
+									onEdit(term);
+								}}
+							>
+								<Pencil />
+								Edit term
+							</Button>
+						{/if}
+						{#if onDelete}
+							<Button
+								variant="ghost"
+								class="h-10 w-full justify-start"
+								onclick={() => {
+									menuOpen = false;
+									confirmOpen = true;
+								}}
+							>
+								<Trash2 />
+								Delete term
+							</Button>
+						{/if}
+					</Popover.Content>
+				</Popover.Root>
 			{/if}
 		</div>
 	</div>
 
-	<div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+	<dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs">
 		{#if isCurrent}
-			<div class="text-muted-foreground">{ended ? 'Ended' : 'Expires'}</div>
-			<div class="font-medium text-foreground">{formatDate(term.endDate)}</div>
+			<dt class="text-muted-foreground">{ended ? 'Ended' : 'Expires'}</dt>
+			<dd class="font-medium text-foreground">{formatDate(term.endDate)}</dd>
 		{:else}
-			<div class="text-muted-foreground">Start</div>
-			<div class="font-medium text-foreground">{formatDate(term.startDate)}</div>
-			<div class="text-muted-foreground">End</div>
-			<div class="font-medium text-foreground">{formatDate(term.endDate)}</div>
+			<dt class="text-muted-foreground">Start</dt>
+			<dd class="font-medium text-foreground">{formatDate(term.startDate)}</dd>
+			<dt class="text-muted-foreground">End</dt>
+			<dd class="font-medium text-foreground">{formatDate(term.endDate)}</dd>
 		{/if}
 		{#if term.totalCost !== undefined}
-			<div class="text-muted-foreground">Total Cost</div>
-			<div class="font-semibold text-foreground">
+			<dt class="text-muted-foreground">Total Cost</dt>
+			<dd class="font-semibold text-foreground">
 				{formatCurrency(term.totalCost)}
-			</div>
+			</dd>
 		{/if}
 		{#if term.monthlyCost !== undefined}
-			<div class="text-muted-foreground">Monthly</div>
-			<div class="font-medium text-foreground">
+			<dt class="text-muted-foreground">Monthly</dt>
+			<dd class="font-medium text-foreground">
 				{formatCurrency(term.monthlyCost)}/mo
-			</div>
+			</dd>
 		{/if}
 		{#if vehicleNames.length > 0}
-			<div class="text-muted-foreground">Vehicles</div>
-			<div class="font-medium text-foreground">{vehicleNames.join(', ')}</div>
+			<dt class="text-muted-foreground">Vehicles</dt>
+			<dd class="font-medium text-foreground">{vehicleNames.join(', ')}</dd>
 		{/if}
-	</div>
+	</dl>
 
 	{#if term.coverageDescription}
 		<p class="text-xs text-muted-foreground line-clamp-2">

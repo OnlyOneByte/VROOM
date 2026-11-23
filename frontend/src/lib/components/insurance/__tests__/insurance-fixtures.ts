@@ -1,3 +1,4 @@
+import { fireEvent, screen } from '@testing-library/svelte';
 import { dateOnlyToISO } from '#lib/utils/formatters.ts';
 import type {
 	InsuranceClaim,
@@ -100,4 +101,15 @@ export async function settle(): Promise<void> {
 
 export function resolveRoute(path: string, params: Record<string, string> = {}): string {
 	return path.replace(/\[(\w+)\]/g, (_match, key: string) => params[key] ?? '');
+}
+
+export async function openTermActions(index = 0): Promise<void> {
+	await fireEvent.click(screen.getAllByRole('button', { name: 'Term actions' }).at(index)!);
+	await settle();
+}
+
+export async function chooseTermAction(action: 'Edit term' | 'Delete term', index = 0) {
+	await openTermActions(index);
+	await fireEvent.click(screen.getByRole('button', { name: action }));
+	await settle();
 }
