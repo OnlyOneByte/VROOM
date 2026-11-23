@@ -255,6 +255,16 @@ describe('userFacingErrorMessage for request validation', () => {
 			)
 		).toBe('Unsupported image type. Use JPEG, PNG, or WebP.');
 	});
+
+	test('string reasons in the details win over the generic message', () => {
+		const error = new ApiError(
+			'Backup validation failed',
+			400,
+			{ validationErrors: ['', 'This backup was made by a newer version of VROOM', 'second'] },
+			'ValidationError'
+		);
+		expect(userFacingErrorMessage(error)).toBe('This backup was made by a newer version of VROOM.');
+	});
 });
 
 describe('toError', () => {

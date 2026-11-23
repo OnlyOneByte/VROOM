@@ -92,7 +92,7 @@ export const isSyncError = (error: unknown): error is SyncError => error instanc
 
 interface ErrorResponse {
   success: false;
-  error: { code: string; message: string; details?: unknown };
+  error: { code: string; message: string; details?: unknown; stack?: string };
 }
 
 interface SuccessResponse<T = unknown> {
@@ -118,28 +118,21 @@ export function createSuccessResponse<T>(data?: T, message?: string): SuccessRes
   return response;
 }
 
+function withStack(response: ErrorResponse, error: Error, includeStack: boolean): ErrorResponse {
+  if (includeStack && error.stack) response.error.stack = error.stack;
+  return response;
+}
+
 export function formatErrorResponse(error: unknown, includeStack: boolean = false): ErrorResponse {
   if (isAppError(error)) {
-    if (includeStack) {
-      const details = {
-        ...(typeof error.details === 'object' && error.details !== null ? error.details : {}),
-        stack: error.stack,
-      };
-      return createErrorResponse(error.code, error.message, details);
-    }
-
-    const details = error.statusCode < 500 ? error.details : undefined;
-    return createErrorResponse(error.code, error.message, details);
+    const details = includeStack || error.statusCode < 500 ? error.details : undefined;
+    return withStack(createErrorResponse(error.code, error.message, details), error, includeStack);
   }
 
   if (error instanceof Error) {
     // Raw messages can contain internal details, so they are shown only in development.
     const message = includeStack ? error.message : 'An internal error occurred';
-    return createErrorResponse(
-      'InternalServerError',
-      message,
-      includeStack ? { stack: error.stack } : undefined
-    );
+    return withStack(createErrorResponse('InternalServerError', message), error, includeStack);
   }
 
   return createErrorResponse('UnknownError', 'An unknown error occurred');

@@ -133,6 +133,13 @@ function schemaIssues(details: Record<string, unknown> | undefined): SchemaIssue
 	);
 }
 
+function firstStatedReason(details: Record<string, unknown> | undefined): string | null {
+	const raw = details?.['validationErrors'];
+	if (!Array.isArray(raw)) return null;
+	const reason = raw.find((item): item is string => typeof item === 'string' && item.trim() !== '');
+	return reason ? asSentence(reason.trim()) : null;
+}
+
 function fieldName(path: unknown[]): string | null {
 	const key = [...path].reverse().find((part): part is string => typeof part === 'string');
 	if (!key) return null;
@@ -170,6 +177,8 @@ export function userFacingErrorMessage(error: unknown): string {
 		if (byStatus) return byStatus;
 		const validation = validationSentence(schemaIssues(error.details));
 		if (validation) return validation;
+		const reason = firstStatedReason(error.details);
+		if (reason) return reason;
 		if (status >= 400 && error.message && !STATUS_ONLY_MESSAGE.test(error.message)) {
 			return asSentence(error.message);
 		}
