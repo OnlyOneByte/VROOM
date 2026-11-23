@@ -45,7 +45,7 @@ async function addManualReading(tripId: string, odometer: number): Promise<void>
     .get(tripId) as { vehicle_id: string };
   const res = await ctx.authed('POST', `/api/v1/odometer/${vehicle_id}`, {
     odometer,
-    recordedAt: '2026-05-01T12:00:00.000Z',
+    recordedAt: '2026-05-01T00:01:00.000Z',
   });
   expect(res.status).toBe(201);
 }
