@@ -11,9 +11,10 @@
 
 	interface Props {
 		stats: LocalStats;
+		isLoading?: boolean;
 	}
 
-	let { stats }: Props = $props();
+	let { stats, isLoading = false }: Props = $props();
 
 	const statItems = $derived([
 		{
@@ -40,4 +41,4 @@
 	]);
 </script>
 
-<StatCardGrid items={statItems} columns={3} />
+<StatCardGrid items={statItems} columns={3} {isLoading} />
