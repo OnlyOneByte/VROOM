@@ -186,8 +186,22 @@ describe('ExpenseForm create mode', () => {
 
 		await save();
 
-		await vi.waitFor(() => expect(document.activeElement).toHaveAttribute('aria-invalid', 'true'));
-		expect(document.activeElement).toBe(document.querySelector('form [aria-invalid="true"]'));
+		const firstProblem = document.querySelector(
+			'form [aria-invalid="true"], form [data-invalid="true"]'
+		);
+		expect(firstProblem).not.toBeNull();
+		await vi.waitFor(() => expect(document.activeElement).toBe(firstProblem));
+	});
+
+	test('with no category chosen, a failed save focuses the category group first, described by its error', async () => {
+		await renderCreate();
+
+		await save();
+
+		const group = screen.getByRole('group', { name: 'Category *' });
+		await vi.waitFor(() => expect(document.activeElement).toBe(group));
+		expect(group).toHaveAttribute('aria-describedby', 'category-error');
+		expect(document.getElementById('category-error')).toHaveTextContent('Please select a category');
 	});
 
 	test.each([

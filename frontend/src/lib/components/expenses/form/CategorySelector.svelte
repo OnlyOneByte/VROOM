@@ -13,16 +13,20 @@
 
 	let { value, error, touched = false, onSelect }: Props = $props();
 
+	let showError = $derived(touched && !!error);
+
 	const categories = EXPENSE_CATEGORIES.map(value => ({ value, ...EXPENSE_CATEGORY_INFO[value] }));
 </script>
 
 <div class="space-y-3">
-	<Label for="category">Category *</Label>
+	<Label id="category-label">Category *</Label>
 	<div
-		class="grid grid-cols-2 sm:grid-cols-3 gap-3"
+		class="grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-offset-2 ring-offset-background"
 		role="group"
-		aria-labelledby="category"
-		aria-describedby={touched && error ? 'category-error' : undefined}
+		tabindex="-1"
+		aria-labelledby="category-label"
+		aria-describedby={showError ? 'category-error' : undefined}
+		data-invalid={showError ? 'true' : undefined}
 	>
 		{#each categories as category (category.value)}
 			{@const Icon = getCategoryIcon(category.value)}
@@ -31,7 +35,7 @@
 				onclick={() => onSelect(category.value)}
 				class="p-4 rounded-lg border-2 transition-all text-left {value === category.value
 					? 'border-primary bg-primary/5 shadow-md'
-					: 'border-input hover:border-muted-foreground/30 bg-background'} {touched && error
+					: 'border-input hover:border-muted-foreground/30 bg-background'} {showError
 					? 'border-destructive'
 					: ''}"
 				aria-pressed={value === category.value}
@@ -54,7 +58,7 @@
 			</button>
 		{/each}
 	</div>
-	{#if touched && error}
+	{#if showError}
 		<FormFieldError id="category-error">{error}</FormFieldError>
 	{/if}
 </div>
