@@ -201,13 +201,19 @@
 	function loadInsuranceTab() {
 		if (hasLoadedInsurance) return;
 		hasLoadedInsurance = true;
-		import('#lib/components/insurance/InsuranceTab.svelte').then(m => {
-			InsuranceTab = m.default;
-		});
+		import('#lib/components/insurance/InsuranceTab.svelte').then(
+			m => {
+				InsuranceTab = m.default;
+			},
+			() => {
+				hasLoadedInsurance = false;
+			}
+		);
 	}
 
 	async function loadPage() {
 		isLoading = true;
+		loadInsuranceTab();
 		const vehicleRequest = loadVehicle();
 		vehicleSettled = vehicleRequest;
 		void loadSummary();
@@ -219,7 +225,6 @@
 	}
 
 	onMount(() => {
-		loadInsuranceTab();
 		void loadPage();
 	});
 
@@ -597,7 +602,7 @@
 				{/if}
 			</div>
 		</div>
-		{#if isOwner}
+		{#if isOwner && !showingCachedVehicle}
 			{#await import('#lib/components/vehicles/ShareVehicleDialog.svelte') then { default: ShareVehicleDialog }}
 				<ShareVehicleDialog bind:open={shareOpen} {vehicleId} vehicleName={vehicleDisplayName} />
 			{/await}
