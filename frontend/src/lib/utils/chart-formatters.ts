@@ -76,7 +76,8 @@ export function distinctYTicks(format: (_v: number) => string, plotHeight: numbe
 			const ticks: number[] = scale.ticks?.(count) ?? [];
 			if (new Set(ticks.map(format)).size === ticks.length) return ticks;
 		}
-		return scale.ticks?.(2) ?? [];
+		const ticks: number[] = scale.ticks?.(2) ?? [];
+		return ticks.filter((tick, i) => i === 0 || format(tick) !== format(ticks[i - 1] as number));
 	};
 }
 

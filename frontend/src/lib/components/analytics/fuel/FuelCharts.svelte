@@ -198,6 +198,7 @@
 				y={gasPriceFuelTypes}
 				series={gasPriceSeries}
 				config={gasPriceConfig}
+				yAxisFormat={formatCentsAxis}
 				tooltipLabelFormat={formatDayLabel}
 				xAxisProps={dayXAxisProps(gasPriceData.length)}
 			/>
