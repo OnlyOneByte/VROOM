@@ -46,8 +46,8 @@ describe('validateVehicleFields', () => {
 		expect(validateVehicleFields(vehicle({ model: '' })).model).toBe('Model is required');
 	});
 
-	test('year must be between 1900 and currentYear + 2', () => {
-		const maxYear = new Date().getFullYear() + 2;
+	test('year must be between 1900 and next year', () => {
+		const maxYear = new Date().getFullYear() + 1;
 		expect(validateVehicleFields(vehicle({ year: 1899 })).year).toBe('Please enter a valid year');
 		expect(validateVehicleFields(vehicle({ year: maxYear + 1 })).year).toBe(
 			'Please enter a valid year'

@@ -1,3 +1,4 @@
+import { TRIP_LIMITS } from '#lib/constants/limits.ts';
 import type { TripPurpose } from '#lib/types/index.ts';
 
 export interface TripFormData {
@@ -65,8 +66,8 @@ export function validateTripFields(form: TripFormData): TripFormErrors {
 	if (form.endLocation.length > 200) {
 		errors.endLocation = 'End location is too long (max 200)';
 	}
-	if (form.note.length > 500) {
-		errors.note = 'Note is too long (max 500)';
+	if (form.note.length > TRIP_LIMITS.NOTE_MAX_LENGTH) {
+		errors.note = `Note is too long (max ${TRIP_LIMITS.NOTE_MAX_LENGTH})`;
 	}
 
 	return errors;

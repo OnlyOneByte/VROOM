@@ -1,3 +1,5 @@
+import type { SplitConfig } from './expense.js';
+
 type ReminderFrequency = 'weekly' | 'monthly' | 'yearly' | 'custom';
 
 export type IntervalUnit = 'day' | 'week' | 'month' | 'year';
@@ -5,11 +7,6 @@ export type IntervalUnit = 'day' | 'week' | 'month' | 'year';
 type ReminderType = 'expense' | 'notification';
 
 export type TriggerMode = 'time' | 'mileage' | 'both';
-
-type ReminderSplitConfig =
-	| { method: 'even'; vehicleIds: string[] }
-	| { method: 'absolute'; allocations: { vehicleId: string; amount: number }[] }
-	| { method: 'percentage'; allocations: { vehicleId: string; percentage: number }[] };
 
 export interface Reminder {
 	id: string;
@@ -32,7 +29,7 @@ export interface Reminder {
 	expenseTags: string[] | null;
 	expenseAmount: number | null;
 	expenseDescription: string | null;
-	expenseSplitConfig: ReminderSplitConfig | null;
+	expenseSplitConfig: SplitConfig | null;
 	isActive: boolean;
 	lastTriggeredAt: string | null;
 	createdAt: string;
