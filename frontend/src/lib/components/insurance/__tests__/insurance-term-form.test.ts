@@ -150,6 +150,17 @@ describe('InsuranceTermForm amount inputs follow the currency', () => {
 });
 
 describe('InsuranceTermForm add mode', () => {
+	test('the save bar is fixed below lg and a normal row from lg or on a short viewport, with a plain primary Save button', async () => {
+		await mount();
+		const save = screen.getByRole('button', { name: /Save Term/ });
+		const bar = save.closest('.fixed');
+		expect(bar).toHaveClass('lg:static', 'short:static');
+		expect(save.closest('form')).toBeNull();
+		expect(document.querySelector('form')).toHaveClass('lg:pb-0', 'short:pb-0');
+		expect(save).toHaveClass('shadow-sm', 'transition-colors');
+		expect(save.className).not.toMatch(/shadow-2xl|bg-foreground|hover:scale/);
+	});
+
 	test('shows the add title with the policy company and empty fields', async () => {
 		await mount();
 		expect(getPolicy).toHaveBeenCalledWith('p1');

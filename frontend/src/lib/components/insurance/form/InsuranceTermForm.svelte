@@ -298,7 +298,7 @@
 				{/snippet}
 			</PageHeader>
 
-			<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24">
+			<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24 lg:pb-0 short:pb-0">
 				<Card>
 					<CardHeader>
 						<CardTitle>Coverage Period</CardTitle>
@@ -535,9 +535,11 @@
 				</Card>
 			</form>
 
-			<div class="fixed bottom-4 left-4 right-4 z-50 sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto">
+			<div
+				class="fixed bottom-4 left-4 right-4 z-50 sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto lg:static lg:z-auto lg:mt-6 short:static short:z-auto short:mt-6"
+			>
 				<div
-					class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none border sm:border-0"
+					class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none border sm:border-0 short:bg-transparent short:p-0 short:rounded-none short:shadow-none short:border-0"
 				>
 					<Button
 						type="button"
@@ -556,13 +558,13 @@
 						size="lg"
 						onclick={handleSubmit}
 						disabled={isSubmitting}
-						class="rounded-full group bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 px-6 flex-1 sm:flex-initial"
+						class="rounded-full shadow-sm transition-colors h-14 px-6 flex-1 sm:flex-initial"
 					>
 						{#if isSubmitting}
 							<LoaderCircle class="h-5 w-5 animate-spin mr-2" />
 							<span class="font-bold">Saving...</span>
 						{:else}
-							<Check class="h-5 w-5 mr-2 transition-transform duration-300 group-hover:scale-110" />
+							<Check class="h-5 w-5 mr-2" />
 							<span class="font-bold">{isEditMode ? 'Update' : 'Save'} Term</span>
 						{/if}
 					</Button>
