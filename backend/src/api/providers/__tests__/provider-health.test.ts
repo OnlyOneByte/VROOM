@@ -9,6 +9,7 @@ import {
 } from '../../../test-helpers/http-client';
 import { FakeStorageProvider } from '../domains/storage/fake-provider';
 import { getStorageProviderRegistry } from '../domains/storage/registry';
+import { credentialFailureOf } from '../domains/storage/storage-provider';
 import { FAILURES_BEFORE_ERROR, type HealthResult } from '../provider-status';
 import { processBatch, type SyncWorkerDeps } from '../sync-worker';
 
@@ -73,10 +74,13 @@ async function testProvider(id: string): Promise<{ status: number; data: HealthR
 }
 
 describe('the photo sync worker records what it learns about a provider', () => {
-  function deps(upload: () => Promise<unknown>): SyncWorkerDeps {
+  function deps(
+    upload: () => Promise<unknown>,
+    download: () => Promise<Buffer> = () => Promise.resolve(Buffer.from('x'))
+  ): SyncWorkerDeps {
     const provider = {
       type: 'fake',
-      download: () => Promise.resolve(Buffer.from('x')),
+      download,
       upload,
       delete: () => Promise.resolve(),
     };
@@ -115,6 +119,24 @@ describe('the photo sync worker records what it learns about a provider', () => 
     });
     expect(statusOf('prov-dst').last_checked_at).not.toBeNull();
     expect(statusOf('prov-src')).toMatchObject({ status: 'active', last_error_code: null });
+  });
+
+  test('a PERMISSION_DENIED download marks the source, not the target, and leaves updated_at alone', async () => {
+    const updatedAt = () =>
+      ctx.sqlite.query('SELECT id, updated_at FROM user_providers ORDER BY id').all();
+    const before = updatedAt();
+    await processBatch(
+      deps(
+        () => Promise.resolve({ providerType: 'fake', externalId: 'new' }),
+        () => Promise.reject(new SyncError(SyncErrorCode.PERMISSION_DENIED, 'no access'))
+      )
+    );
+    expect(statusOf('prov-src')).toMatchObject({
+      status: 'needs_reauth',
+      last_error_code: 'permission',
+    });
+    expect(statusOf('prov-dst')).toMatchObject({ status: 'active', last_checked_at: null });
+    expect(updatedAt()).toEqual(before);
   });
 
   test('a successful upload writes last_sync_at and clears an earlier error', async () => {
@@ -216,5 +238,99 @@ describe('POST /providers/:id/test works for every capability', () => {
       lastErrorCode: 'auth',
       lastCheckedAt: new Date(1000 * 1000).toISOString(),
     });
+  });
+
+  test('a storage check the vendor rejects reads as auth, not unreachable', async () => {
+    const fake = new FakeStorageProvider();
+    spyOn(fake, 'healthCheck').mockRejectedValue(
+      credentialFailureOf(Object.assign(new Error('bad key'), { name: 'InvalidAccessKeyId' }))
+    );
+    const built = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockReturnValue(
+      fake
+    );
+    try {
+      seedStorage('s-key');
+      expect((await testProvider('s-key')).data).toMatchObject({ ok: false, code: 'auth' });
+      expect(statusOf('s-key').status).toBe('needs_reauth');
+    } finally {
+      built.mockRestore();
+    }
+  });
+
+  test('a config the server refuses answers 400 and is recorded as config', async () => {
+    const { encrypt } = await import('../../../utils/encryption');
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+       VALUES ('s-bad', ?, 'storage', 's3', 'S3', ?, ?, 'active')`,
+      [
+        ctx.user.id,
+        encrypt(JSON.stringify({ accessKeyId: 'a', secretAccessKey: 'b' }), {
+          rowId: 's-bad',
+          userId: ctx.user.id,
+          domain: 'storage',
+        }),
+        JSON.stringify({ endpoint: 'http://169.254.169.254', bucket: 'b', region: 'r' }),
+      ]
+    );
+    const res = await ctx.authed('POST', '/api/v1/providers/s-bad/test');
+    expect(res.status).toBe(400);
+    expect(statusOf('s-bad')).toMatchObject({ last_error_code: 'config', failure_count: 1 });
+  });
+
+  test('sign-in providers cannot be tested', async () => {
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
+       VALUES ('a-login', ?, 'auth', 'google', 'Google', '', 'active')`,
+      [ctx.user.id]
+    );
+    expect((await ctx.authed('POST', '/api/v1/providers/a-login/test')).status).toBe(400);
+  });
+});
+
+describe('reconnecting clears a provider that needs it', () => {
+  test('saving new credentials returns a needs_reauth provider to active', async () => {
+    const id = await createModel('llm');
+    ctx.sqlite.run(
+      "UPDATE user_providers SET status = 'needs_reauth', last_error_code = 'auth', failure_count = 2 WHERE id = ?",
+      [id]
+    );
+    const res = await ctx.authed('PUT', `/api/v1/providers/${id}`, {
+      credentials: { apiKey: 'sk-new' },
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
+    expect(statusOf(id)).toMatchObject({
+      status: 'active',
+      last_error_code: null,
+      failure_count: 0,
+    });
+  });
+
+  test('a turned-off provider stays turned off when its credentials change', async () => {
+    const id = await createModel('llm');
+    ctx.sqlite.run("UPDATE user_providers SET status = 'disabled' WHERE id = ?", [id]);
+    await ctx.authed('PUT', `/api/v1/providers/${id}`, { credentials: { apiKey: 'sk-new' } });
+    expect(statusOf(id).status).toBe('disabled');
+  });
+});
+
+describe('credentialFailureOf reads vendor errors', () => {
+  test.each([
+    ['an S3 InvalidAccessKeyId', { name: 'InvalidAccessKeyId' }, SyncErrorCode.AUTH_INVALID],
+    ['an S3 SignatureDoesNotMatch', { name: 'SignatureDoesNotMatch' }, SyncErrorCode.AUTH_INVALID],
+    ['an S3 AccessDenied', { name: 'AccessDenied' }, SyncErrorCode.PERMISSION_DENIED],
+    ['a Google 401', { response: { status: 401 } }, SyncErrorCode.AUTH_INVALID],
+    ['a Google invalid_grant', { message: 'invalid_grant' }, SyncErrorCode.AUTH_INVALID],
+    ['a Google 403', { response: { status: 403 } }, SyncErrorCode.PERMISSION_DENIED],
+    ['an AWS 403 status', { $metadata: { httpStatusCode: 403 } }, SyncErrorCode.PERMISSION_DENIED],
+  ])('%s', (_label, error, code) => {
+    expect(credentialFailureOf(Object.assign(new Error('x'), error))?.code).toBe(code);
+  });
+
+  test.each([
+    ['a network error', Object.assign(new Error('ECONNREFUSED'), { code: 'ECONNREFUSED' })],
+    ['a 500', Object.assign(new Error('x'), { response: { status: 500 } })],
+    ['a non-error', 'boom'],
+  ])('%s is not a credential failure', (_label, error) => {
+    expect(credentialFailureOf(error)).toBeNull();
   });
 });

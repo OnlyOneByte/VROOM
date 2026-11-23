@@ -6,6 +6,7 @@ import { decrypt, secretContextOf } from '../../utils/encryption';
 import { LLM_PROVIDERS } from './domains/llm/registry';
 import { resolveModelSettings } from './domains/model/model-registry';
 import { getStorageProviderRegistry } from './domains/storage/registry';
+import { credentialFailureOf } from './domains/storage/storage-provider';
 
 export type HealthCode = 'auth' | 'permission' | 'unreachable' | 'config';
 
@@ -62,14 +63,16 @@ export function healthFailure(code: HealthCode): HealthResult {
 }
 
 export function healthCodeOf(error: unknown): HealthCode {
-  if (isSyncError(error)) {
-    if (error.code === SyncErrorCode.AUTH_INVALID) return 'auth';
-    if (error.code === SyncErrorCode.PERMISSION_DENIED) return 'permission';
-    return 'unreachable';
+  const credentialFailure = credentialFailureOf(error);
+  if (credentialFailure) {
+    return credentialFailure.code === SyncErrorCode.PERMISSION_DENIED ? 'permission' : 'auth';
   }
+  if (isSyncError(error)) return 'unreachable';
   if (error instanceof ValidationError) return 'config';
   const message = error instanceof Error ? error.message : '';
-  if (/HTTP (401|403)\b/.test(message)) return 'auth';
+  if (/HTTP 401\b/.test(message)) return 'auth';
+  if (/HTTP 403\b/.test(message)) return 'permission';
+  if (/HTTP (400|404|422)\b/.test(message)) return 'config';
   return 'unreachable';
 }
 

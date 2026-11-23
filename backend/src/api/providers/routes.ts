@@ -358,6 +358,9 @@ routes.put(
         userId: existing.userId,
         domain: existing.domain,
       });
+      if (existing.status !== 'disabled') {
+        Object.assign(updates, { status: 'active', lastErrorCode: null, failureCount: 0 });
+      }
     }
 
     // Scope by userId too so the write stays tenant-safe if the ownership check moves.
