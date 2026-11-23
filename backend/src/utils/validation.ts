@@ -6,9 +6,8 @@ import { financingRepository } from '../api/financing/repository';
 import { insurancePolicyRepository } from '../api/insurance/repository';
 import { type ReminderWithVehicles, reminderRepository } from '../api/reminders/repository';
 import { tripRepository } from '../api/trips/repository';
-import { vehicleRepository } from '../api/vehicles/repository';
 import { CONFIG } from '../config';
-import type { InsurancePolicy, Trip, Vehicle, VehicleFinancing } from '../db/schema';
+import type { InsurancePolicy, Trip, VehicleFinancing } from '../db/schema';
 import { isElectricFuelType } from '../db/types';
 import { createErrorResponse, NotFoundError, ValidationError } from '../errors';
 import { allowsMode, resolveVehicleAccess } from './vehicle-access';
@@ -90,17 +89,6 @@ export const commonSchemas = {
     offset: z.coerce.number().int().min(0).optional().default(0),
   }),
 };
-
-export async function validateVehicleOwnership(
-  vehicleId: string,
-  userId: string
-): Promise<Vehicle> {
-  const vehicle = await vehicleRepository.findByUserIdAndId(userId, vehicleId);
-  if (!vehicle) {
-    throw new NotFoundError('Vehicle');
-  }
-  return vehicle;
-}
 
 export async function validateFinancingOwnership(
   financingId: string,

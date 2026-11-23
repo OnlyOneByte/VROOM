@@ -52,15 +52,6 @@ class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
     })) as VehicleWithFinancing[];
   }
 
-  async findByUserIdAndId(userId: string, vehicleId: string): Promise<Vehicle | null> {
-    const result = await this.db
-      .select()
-      .from(vehicles)
-      .where(and(ownedVehiclesScope(userId), eq(vehicles.id, vehicleId)))
-      .limit(1);
-    return result[0] || null;
-  }
-
   // User-scoped: a global lookup would leak plate existence across tenants.
   async findByLicensePlate(licensePlate: string, userId: string): Promise<Vehicle | null> {
     const result = await this.db
