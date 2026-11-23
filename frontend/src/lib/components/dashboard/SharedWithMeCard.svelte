@@ -1,6 +1,7 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { onMount } from 'svelte';
-	import { Inbox, Check, X, CircleAlert } from '@lucide/svelte';
+	import { Inbox, Check, X } from '@lucide/svelte';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -67,16 +68,12 @@
 </script>
 
 {#if loadError && !isLoading}
-	<Card.Root>
-		<Card.Content class="p-4">
-			<div class="mb-2 flex items-center gap-2 text-destructive">
-				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Couldn't load your invitations</p>
-			</div>
-			<p class="mb-3 text-sm text-muted-foreground">{loadError}</p>
-			<Button onclick={load}>Retry</Button>
-		</Card.Content>
-	</Card.Root>
+	<LoadErrorCard
+		compact
+		title="Couldn't load your invitations"
+		message={loadError}
+		onRetry={load}
+	/>
 {:else if pending.length > 0}
 	<Card.Root>
 		<Card.Header>

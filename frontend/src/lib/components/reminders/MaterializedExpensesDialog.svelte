@@ -1,10 +1,10 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
-	import { Button } from '#lib/components/ui/button/index.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
-	import { Receipt, CircleAlert, Car } from '@lucide/svelte';
+	import { Receipt, Car } from '@lucide/svelte';
 	import { reminderApi } from '#lib/services/reminder-api.ts';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
 	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
@@ -67,16 +67,12 @@
 				{/each}
 			</div>
 		{:else if loadError}
-			<div class="rounded-lg border bg-card p-4">
-				<div class="mb-3 flex items-center gap-2 text-destructive">
-					<CircleAlert class="h-5 w-5" />
-					<p class="font-medium">Couldn't load the expenses this reminder created</p>
-				</div>
-				<p class="mb-3 text-sm text-muted-foreground">{loadError}</p>
-				{#if reminderId}
-					<Button onclick={() => reminderId && load(reminderId)}>Retry</Button>
-				{/if}
-			</div>
+			<LoadErrorCard
+				compact
+				title="Couldn't load the expenses this reminder created"
+				message={loadError}
+				onRetry={() => reminderId && load(reminderId)}
+			/>
 		{:else if expenses.length > 0}
 			<div class="space-y-2">
 				<div class="flex items-center justify-between px-1 text-sm text-muted-foreground">

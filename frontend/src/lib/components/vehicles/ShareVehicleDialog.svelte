@@ -1,4 +1,5 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -7,7 +8,7 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
-	import { Users, CircleAlert, Trash2 } from '@lucide/svelte';
+	import { Users, Trash2 } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { shareApi } from '#lib/services/share-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
@@ -167,14 +168,12 @@
 					{/each}
 				</div>
 			{:else if loadError}
-				<div class="rounded-lg border bg-card p-4">
-					<div class="mb-2 flex items-center gap-2 text-destructive">
-						<CircleAlert class="h-5 w-5" />
-						<p class="font-medium">Couldn't load who has access</p>
-					</div>
-					<p class="mb-3 text-sm text-muted-foreground">{loadError}</p>
-					<Button onclick={load}>Retry</Button>
-				</div>
+				<LoadErrorCard
+					compact
+					title="Couldn't load who has access"
+					message={loadError}
+					onRetry={load}
+				/>
 			{:else if shares.length > 0}
 				<div class="divide-y rounded-md border">
 					{#each shares as share (share.id)}

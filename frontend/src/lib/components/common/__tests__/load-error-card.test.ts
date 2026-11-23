@@ -98,4 +98,66 @@ describe('LoadErrorCard', () => {
 		await vi.waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
 		expect(document.activeElement).toBe(elsewhere);
 	});
+
+	test('passes a test id to the card and keeps the 40px Retry in the compact variant', () => {
+		const { container } = render(LoadErrorCard, {
+			title: "Couldn't load who has access",
+			message: 'Server unavailable.',
+			onRetry: () => {},
+			compact: true,
+			'data-testid': 'share-load-error'
+		});
+
+		const card = screen.getByTestId('share-load-error');
+		expect(card).toBe(container.querySelector('[data-slot="load-error-card"]'));
+		expect(card).toHaveClass('p-4');
+		expect(card).not.toHaveClass('p-6');
+		expect(screen.getByRole('button', { name: 'Retry' })).toHaveClass('h-10');
+	});
+
+	test('a compact retry that loads moves focus to the first button around it, not the page heading', async () => {
+		const main = document.createElement('main');
+		main.innerHTML = '<h1>Vehicle</h1><div id="dialog"></div>';
+		document.body.append(main);
+		const dialog = main.querySelector('#dialog') as HTMLElement;
+		const view = render(LoadErrorCard, {
+			target: dialog,
+			props: {
+				title: "Couldn't load who has access",
+				message: 'Server unavailable.',
+				compact: true,
+				onRetry: async () => {
+					view.unmount();
+					dialog.innerHTML = '<button>Invite</button>';
+				}
+			}
+		});
+		screen.getByRole('button', { name: 'Retry' }).focus();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+		await vi.waitFor(() =>
+			expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Invite' }))
+		);
+	});
+
+	test('onRecovered replaces the default focus move after a retry that loads', async () => {
+		const main = document.createElement('main');
+		main.innerHTML = '<h1>All Expenses</h1><h2 tabindex="-1">Expenses (3)</h2>';
+		document.body.append(main);
+		const listHeading = screen.getByRole('heading', { name: 'Expenses (3)' });
+		const view = render(LoadErrorCard, {
+			title: "Couldn't load expenses",
+			message: 'Server unavailable.',
+			onRetry: async () => {
+				view.unmount();
+			},
+			onRecovered: () => listHeading.focus()
+		});
+		screen.getByRole('button', { name: 'Retry' }).focus();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+		await vi.waitFor(() => expect(document.activeElement).toBe(listHeading));
+	});
 });

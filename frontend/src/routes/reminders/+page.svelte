@@ -1,4 +1,5 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { onMount } from 'svelte';
 	import {
 		Bell,
@@ -7,7 +8,6 @@
 		RefreshCw,
 		Trash2,
 		Car,
-		CircleAlert,
 		Plus,
 		Pencil,
 		Check,
@@ -233,14 +233,7 @@
 			{/each}
 		</div>
 	{:else if loadError}
-		<div class="rounded-lg border bg-card p-6">
-			<div class="mb-4 flex items-center gap-3 text-destructive">
-				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Couldn't load reminders</p>
-			</div>
-			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
-			<Button onclick={load}>Retry</Button>
-		</div>
+		<LoadErrorCard title="Couldn't load reminders" message={loadError} onRetry={load} />
 	{:else if reminders.length === 0 && vehicles.length === 0}
 		<NoVehiclesEmptyState
 			description="Every reminder belongs to a vehicle. Add one, then set reminders for its recurring costs and maintenance."

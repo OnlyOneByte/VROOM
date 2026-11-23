@@ -1,4 +1,5 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
 	import { addVehicleFirstTo } from '#lib/components/common/NoVehiclesEmptyState.svelte';
@@ -7,7 +8,7 @@
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import { ArrowLeft, Check, CircleAlert, LoaderCircle, X, FileText } from '@lucide/svelte';
+	import { ArrowLeft, Check, LoaderCircle, X, FileText } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -279,14 +280,7 @@
 					</Button>
 				{/snippet}
 			</PageHeader>
-			<div class="rounded-lg border bg-card p-6">
-				<div class="mb-4 flex items-center gap-3 text-destructive">
-					<CircleAlert class="h-5 w-5" />
-					<p class="font-medium">Couldn't load this policy</p>
-				</div>
-				<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
-				<Button size="lg" onclick={loadData}>Retry</Button>
-			</div>
+			<LoadErrorCard title="Couldn't load this policy" message={loadError} onRetry={loadData} />
 		</div>
 	{:else}
 		<div class="space-y-6">
