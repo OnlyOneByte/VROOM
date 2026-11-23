@@ -6,6 +6,7 @@ import {
   AuthenticationError,
   ConflictError,
   DatabaseError,
+  formatErrorResponse,
   NotFoundError,
   SyncError,
   SyncErrorCode,
@@ -139,6 +140,24 @@ describe('errorHandler — database errors outside development', () => {
     const body = (await res.json()) as ErrorBody;
     expect(body.error.code).toBe('ConflictError');
     expect(JSON.stringify(body)).not.toContain('vehicles.id');
+  });
+});
+
+describe('formatErrorResponse — development stack', () => {
+  test('array details stay an array and the stack has its own field', () => {
+    const reasons = ['This backup was made by a newer version of VROOM'];
+    const body = formatErrorResponse(
+      new ValidationError('Backup validation failed', reasons),
+      true
+    );
+    expect(body.error.details).toEqual(reasons);
+    expect(body.error.stack).toContain('Backup validation failed');
+  });
+
+  test('outside development there is no stack', () => {
+    const body = formatErrorResponse(new ValidationError('bad input', ['reason']), false);
+    expect(body.error.details).toEqual(['reason']);
+    expect(body.error.stack).toBeUndefined();
   });
 });
 

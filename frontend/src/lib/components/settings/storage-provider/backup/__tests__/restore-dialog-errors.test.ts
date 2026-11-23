@@ -62,4 +62,23 @@ describe('RestoreDialog errors', () => {
 			)
 		).toBeInTheDocument();
 	});
+
+	test('the first backup check that failed is shown, not the generic validation message', async () => {
+		const newer =
+			'This backup was made by a newer version of VROOM. Update VROOM, then restore it again.';
+		restoreFromProvider.mockRejectedValue(
+			new ApiError(
+				'Sheet data validation failed',
+				400,
+				{ validationErrors: [newer, 'Invalid metadata'] },
+				'ValidationError'
+			)
+		);
+		await openProviderFlow();
+
+		expect(
+			await screen.findByText(`Couldn't preview the Sheets data. ${newer}`)
+		).toBeInTheDocument();
+		expect(screen.queryByText(/validation failed/)).toBeNull();
+	});
 });
