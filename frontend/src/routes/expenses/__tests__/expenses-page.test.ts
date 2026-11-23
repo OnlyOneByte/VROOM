@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Expense, ExpenseSummary, UserSettings, Vehicle } from '#lib/types/index.ts';
 import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
@@ -355,6 +355,23 @@ describe('/expenses filters', () => {
 		);
 		await waitFor(() => expect(captured.table['activeSortBy']).toBe('amount'));
 		expect(captured.table['activeSortDir']).toBe('asc');
+	});
+
+	test('the mobile Filters button counts the sheet filters and opens them in a sheet', async () => {
+		await mountLoaded();
+		expect(screen.getByRole('button', { name: 'Filters' })).toBeTruthy();
+
+		await chooseVehicle('2020 Nissan Leaf');
+		await addTagFilter('commute');
+		await waitFor(() => expect(screen.getByRole('button', { name: 'Filters · 2' })).toBeTruthy());
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Filters · 2' }));
+		const sheet = await screen.findByRole('dialog', { name: 'Filters' });
+		expect(within(sheet).getByRole('combobox', { name: 'Vehicle filter' })).toBeTruthy();
+		expect(within(sheet).getByRole('textbox', { name: 'Search tags' })).toBeTruthy();
+
+		await fireEvent.click(within(sheet).getByRole('button', { name: 'Show results' }));
+		await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Filters' })).toBeNull());
 	});
 
 	test('clearing filters resets every filter and reloads once', async () => {

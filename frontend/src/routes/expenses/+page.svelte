@@ -18,6 +18,7 @@
 		Ellipsis,
 		LoaderCircle,
 		Plus,
+		SlidersHorizontal,
 		WifiOff
 	} from '@lucide/svelte';
 	import { offlineExpenseQueue, onlineStatus } from '#lib/stores/offline.svelte.ts';
@@ -53,6 +54,7 @@
 	import ImportFromPhotosDialog from '#lib/components/expenses/ImportFromPhotosDialog.svelte';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import * as Popover from '#lib/components/ui/popover/index.ts';
+	import * as Sheet from '#lib/components/ui/sheet/index.ts';
 	import { useExpenseListReload } from './expense-list-reload.svelte';
 
 	let isLoading = $state(true);
@@ -323,6 +325,10 @@
 	let importOpen = $state(false);
 	let photosImportOpen = $state(false);
 	let toolsMenuOpen = $state(false);
+	let filtersSheetOpen = $state(false);
+	let sheetFilterCount = $derived(
+		(selectedVehicleId ? 1 : 0) + (startDate || endDate ? 1 : 0) + selectedTags.length
+	);
 	function openTool(open: () => void) {
 		toolsMenuOpen = false;
 		open();
@@ -350,6 +356,45 @@
 		expenses.map(expense => ({ ...expense, vehicle: vehicleById.get(expense.vehicleId) }))
 	);
 </script>
+
+{#snippet vehicleFilter()}
+	<Select.Root type="single" value={selectedVehicleId ?? ''} onValueChange={handleVehicleChange}>
+		<Select.Trigger aria-label="Vehicle filter" class="w-full">
+			<div class="flex items-center gap-2">
+				<Car class="h-4 w-4 text-muted-foreground flex-shrink-0" />
+				<span class="truncate">
+					{#if selectedVehicleId}
+						{@const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId)}
+						{selectedVehicle
+							? getVehicleDisplayName(selectedVehicle)
+							: COMMON_MESSAGES.ALL_VEHICLES}
+					{:else}
+						{COMMON_MESSAGES.ALL_VEHICLES}
+					{/if}
+				</span>
+			</div>
+		</Select.Trigger>
+		<Select.Content>
+			<Select.Item value="" label={COMMON_MESSAGES.ALL_VEHICLES}>
+				{COMMON_MESSAGES.ALL_VEHICLES}
+			</Select.Item>
+			{#each vehicles as vehicle (vehicle.id)}
+				<Select.Item value={vehicle.id} label={getVehicleDisplayName(vehicle)}>
+					{getVehicleDisplayName(vehicle)}
+				</Select.Item>
+			{/each}
+		</Select.Content>
+	</Select.Root>
+{/snippet}
+
+{#snippet dateFilter(className: string)}
+	<DateRangePicker
+		bind:startValue={startDate}
+		bind:endValue={endDate}
+		placeholder="Date range"
+		class={className}
+	/>
+{/snippet}
 
 {#snippet importExportActions(variant: 'outline' | 'ghost', buttonClass: string)}
 	<Button {variant} class={buttonClass} onclick={() => openTool(() => (photosImportOpen = true))}>
@@ -472,25 +517,20 @@
 			{/snippet}
 		</PageHeader>
 
-		<CardNs.Root>
-			<CardNs.Header>
+		<CardNs.Root class="max-sm:gap-0 max-sm:py-4">
+			<CardNs.Header class="max-sm:hidden">
 				<div class="flex items-center justify-between gap-3">
 					<div>
 						<CardNs.Title>Search & Filters</CardNs.Title>
 						<CardNs.Description>Find and filter your expenses</CardNs.Description>
 					</div>
 					<div class="flex items-center gap-2">
-						<DateRangePicker
-							bind:startValue={startDate}
-							bind:endValue={endDate}
-							placeholder="Date range"
-							class="w-auto"
-						/>
+						{@render dateFilter('w-auto')}
 					</div>
 				</div>
 			</CardNs.Header>
-			<CardNs.Content class="space-y-4">
-				<div class="flex flex-col sm:flex-row gap-3">
+			<CardNs.Content class="flex flex-col gap-4 max-sm:px-4">
+				<div class="flex gap-3">
 					<div class="flex-1 relative">
 						<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
 							<Search class="h-5 w-5 text-muted-foreground" />
@@ -503,46 +543,27 @@
 							aria-label="Search expenses and vehicles"
 						/>
 					</div>
-					<div class="sm:w-56">
-						<Select.Root
-							type="single"
-							value={selectedVehicleId ?? ''}
-							onValueChange={handleVehicleChange}
-						>
-							<Select.Trigger aria-label="Vehicle filter" class="w-full">
-								<div class="flex items-center gap-2">
-									<Car class="h-4 w-4 text-muted-foreground flex-shrink-0" />
-									<span class="truncate">
-										{#if selectedVehicleId}
-											{@const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId)}
-											{selectedVehicle
-												? getVehicleDisplayName(selectedVehicle)
-												: COMMON_MESSAGES.ALL_VEHICLES}
-										{:else}
-											{COMMON_MESSAGES.ALL_VEHICLES}
-										{/if}
-									</span>
-								</div>
-							</Select.Trigger>
-							<Select.Content>
-								<Select.Item value="" label={COMMON_MESSAGES.ALL_VEHICLES}>
-									{COMMON_MESSAGES.ALL_VEHICLES}
-								</Select.Item>
-								{#each vehicles as vehicle (vehicle.id)}
-									<Select.Item value={vehicle.id} label={getVehicleDisplayName(vehicle)}>
-										{getVehicleDisplayName(vehicle)}
-									</Select.Item>
-								{/each}
-							</Select.Content>
-						</Select.Root>
+					<div class="hidden sm:block sm:w-56">
+						{@render vehicleFilter()}
 					</div>
+					<Button
+						variant="outline"
+						class="h-10 shrink-0 sm:hidden"
+						aria-haspopup="dialog"
+						onclick={() => (filtersSheetOpen = true)}
+					>
+						<SlidersHorizontal class="h-4 w-4" />
+						{sheetFilterCount > 0 ? `Filters · ${sheetFilterCount}` : 'Filters'}
+					</Button>
 				</div>
 
-				<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={handleTagsChange} />
+				<div class="hidden sm:block">
+					<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={handleTagsChange} />
+				</div>
 
 				{#if searchTerm || selectedVehicleId || selectedTags.length > 0 || startDate || endDate || categoryFilter}
-					<div class="flex justify-end pt-2">
-						<Button variant="outline" size="sm" onclick={clearFilters}>
+					<div class="flex justify-end sm:pt-2">
+						<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={clearFilters}>
 							<X class="h-4 w-4 mr-2" />
 							{COMMON_MESSAGES.CLEAR_FILTERS}
 						</Button>
@@ -634,6 +655,25 @@
 	</div>
 
 	<FloatingActionButton href={resolve(routes.expenseNew)} label={COMMON_MESSAGES.ADD_EXPENSE} />
+
+	<Sheet.Root bind:open={filtersSheetOpen}>
+		<Sheet.Content side="bottom" class="max-h-[85vh] overflow-y-auto">
+			<Sheet.Header>
+				<Sheet.Title>Filters</Sheet.Title>
+				<Sheet.Description>Narrow the list by vehicle, date and tags.</Sheet.Description>
+			</Sheet.Header>
+			<div class="space-y-4 px-4">
+				{@render vehicleFilter()}
+				{@render dateFilter('w-full')}
+				<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={handleTagsChange} />
+			</div>
+			<Sheet.Footer>
+				<Button size="lg" class="w-full" onclick={() => (filtersSheetOpen = false)}>
+					Show results
+				</Button>
+			</Sheet.Footer>
+		</Sheet.Content>
+	</Sheet.Root>
 
 	<ImportExpensesDialog bind:open={importOpen} {vehicles} onImported={handleImported} />
 	<ImportFromPhotosDialog bind:open={photosImportOpen} {vehicles} onImported={handleImported} />

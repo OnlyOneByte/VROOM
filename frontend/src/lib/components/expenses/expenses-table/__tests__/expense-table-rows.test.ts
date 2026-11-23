@@ -3,6 +3,7 @@ import type { Expense, Vehicle } from '#lib/types/index.ts';
 import {
 	buildDisplayRows,
 	rowKey,
+	tagsBesideCategory,
 	visibleExpenses,
 	type GroupRow,
 	type VisibleExpenseOptions
@@ -209,5 +210,18 @@ describe('rowKey', () => {
 		);
 
 		expect(rows.map(rowKey).sort()).toEqual(['grp', 'solo']);
+	});
+});
+
+describe('tagsBesideCategory', () => {
+	test('drops a tag that repeats the category id or label, in any case', () => {
+		expect(tagsBesideCategory(['fuel', 'Costco', ' FUEL '], 'fuel')).toEqual(['Costco']);
+		expect(tagsBesideCategory(['financial', 'loan'], 'financial')).toEqual(['loan']);
+		expect(tagsBesideCategory(['Maintenance', 'oil'], 'maintenance')).toEqual(['oil']);
+	});
+
+	test('keeps every tag when none repeats the category, and handles no tags', () => {
+		expect(tagsBesideCategory(['road trip'], 'fuel')).toEqual(['road trip']);
+		expect(tagsBesideCategory(undefined, 'misc')).toEqual([]);
 	});
 });

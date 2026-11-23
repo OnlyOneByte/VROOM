@@ -22,7 +22,7 @@
 		MOBILE_ROW_ACTIONS_CONTAINER_CLASS,
 		MOBILE_ROW_SUMMARY_CLASS
 	} from './compact-row-classes';
-	import type { GroupRow } from './expense-table-rows';
+	import { tagsBesideCategory, type GroupRow } from './expense-table-rows';
 
 	interface Props {
 		row: GroupRow;
@@ -47,6 +47,7 @@
 		onSelect,
 		onDelete
 	}: Props = $props();
+	let shownTags = $derived(tagsBesideCategory(row.tags, row.category));
 
 	let IconComponent = $derived(getCategoryIcon(row.category));
 	let insuranceLinked = $derived(isInsuranceLinked(row.tags));
@@ -81,9 +82,9 @@
 					<span class="truncate">{row.vehicleNames.join(', ')}</span>
 				{/if}
 			</div>
-			{#if row.tags && row.tags.length > 0}
+			{#if shownTags.length > 0}
 				<div class="flex flex-wrap gap-1 mt-1.5">
-					{#each row.tags as tag (tag)}
+					{#each shownTags as tag (tag)}
 						<Badge variant="secondary" class="font-normal text-xs px-1.5 py-0">{tag}</Badge>
 					{/each}
 				</div>
