@@ -4,6 +4,8 @@
 	import BrandMark from '#lib/components/common/BrandMark.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import HowItWorks from '#lib/components/common/how-it-works.svelte';
+	import HeroFigure from '#lib/components/common/hero-figure.svelte';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert/index.ts';
@@ -112,6 +114,29 @@
 				{/each}
 				<Button disabled>disabled</Button>
 			</div>
+		</section>
+
+		<section class="space-y-3">
+			<h2 class="text-lg font-semibold">Hero figure</h2>
+			<p class="text-sm text-muted-foreground">
+				At most one per screen: the answer to the screen's question, with its comparison in the meta
+				voice.
+			</p>
+			<Card.Root>
+				<Card.Content>
+					<HeroFigure label="Spent in the last 30 days" value={formatCurrency(624.04)}>
+						{#snippet action()}
+							<Badge variant="outline">30 days</Badge>
+						{/snippet}
+						{#snippet meta()}
+							<span>
+								<span class="font-medium text-foreground">6% less</span> than the 30 days before ·
+								{formatCurrency(0.21)} per mile running cost
+							</span>
+						{/snippet}
+					</HeroFigure>
+				</Card.Content>
+			</Card.Root>
 		</section>
 
 		<section class="space-y-3">

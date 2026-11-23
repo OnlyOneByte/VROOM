@@ -23,6 +23,9 @@ screen should let someone glance, trust the number, and act with one thumb.
 1. **Numbers first.** Money, distance and dates are the content. Give them weight
    (`font-semibold`/`font-bold`, right-aligned in lists) and give labels the muted voice. Never
    decorate a number until it is hard to read.
+   **One hero per screen.** A page leads with at most one hero figure (`HeroFigure`): the answer
+   to the page's question, with its comparison in the meta voice beside it. Counts ("3 vehicles")
+   are description text, not stat tiles.
 2. **Quiet chrome.** One primary action per view. Everything else is `outline`, `ghost` or a
    link. Borders and muted surfaces separate content; heavy shadows, gradients and colour
    blocks do not.
@@ -65,6 +68,10 @@ Tailwind's 4px scale is the only spacing scale. Match the neighbours; don't inve
 - **Reserve space** for anything that arrives late (badges, charts, counts) so nothing jumps.
 - **No photo, no image area.** With no photo, a card shows no image area; a placeholder band is
   decoration.
+- **Lists are rows.** Like items (vehicles, expenses, reminders) are rows divided inside one card
+  (`divide-y`, `py-3`), not a card each. A carousel is only for photos.
+- **Order of a screen:** the answer, what needs the user, the breakdown, history, details. Details
+  and reference data go behind one disclosure.
 - **Four screens at 375.** A page or tab fits in about four phone screens. Lead with the
   numbers people come for, then group secondary content behind a disclosure that is closed
   below `lg` (Analytics → Fuel & Stats uses `ChartGroup`), or move it to its own tab.
@@ -76,13 +83,15 @@ size and weight, not from new families or colours.
 
 | Role | Classes |
 |---|---|
+| Hero figure (one per screen, via `HeroFigure`) | `text-4xl font-bold tracking-tight tabular-nums`, `lg:text-5xl` |
 | Page title (`<h1>`, via `PageHeader`) | `text-3xl font-bold tracking-tight` |
 | Page description | `text-muted-foreground` (base size) |
 | Card title | `Card.Title` as-is (base size, `font-semibold`) |
 | Section title outside a card | `text-lg font-semibold` |
 | Body, form labels, table cells | `text-sm` |
 | Meta, captions, helper text | `text-xs text-muted-foreground` |
-| Key figure (stat tile, total) | `text-2xl font-bold` (`text-xl` in dense lists) |
+| Key figure (stat tile, secondary total) | `text-2xl font-bold` (`text-xl` in dense lists) |
+| Row primary (merchant, reminder name) | `text-sm font-medium` |
 
 - One `<h1>` per page, rendered by `PageHeader`. Don't hand-roll one, and don't put an icon in
   it — icons belong on cards and nav, not the page title.
@@ -128,6 +137,11 @@ token table and the role of each token live in `DesignSystem.md` → *Design tok
   Category colours come from `getCategoryChartColor` (`utils/chart-colors`) and
   `getCategoryBadgeClasses` (`utils/expense-helpers`), so a category is the same colour in every
   chart and badge.
+- **Cost buckets have fixed tokens:** ownership `chart-3`, fuel and charging `chart-1`, upkeep
+  `chart-2`, from `COST_BUCKET_COLOR_TOKENS` and `costBucket()` (`utils/cost-bucket`), so a split
+  bar, a vehicle split and Analytics agree. Ownership is every `financial` expense.
+- **Row icons are neutral** (`bg-muted text-foreground`); a row's category is a word in its meta
+  line, not a tint.
 - **A theme is a palette, not a layout.** Theme work changes tokens only. A component never
   branches on the theme id.
 
@@ -176,6 +190,10 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   instantly, `Checkbox` for choices saved with a form.
 - Inputs set `inputmode`/`type` so phones show the right keyboard (`decimal` for money and
   volume, `numeric` for odometer).
+- **Frequent forms are quick forms.** The field people always fill (Amount) is first and focused
+  on open; fields with a sensible default (vehicle, date, category) are prefilled from the last
+  entry and shown as chips; optional fields sit under one "More details" disclosure, open when
+  editing or when a field inside it is invalid. Add Expense is the reference.
 - Long forms keep Save/Cancel reachable (a sticky bar at the bottom on mobile), and that bar
   never covers the last field: pad the form by the bar's height.
 - **One save model per page.** Settings that apply instantly need no Save button; when a page
@@ -200,6 +218,9 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
 - Every chart can be read without seeing it: the wrappers give the plot a `role="img"` summary
   (range, highest, lowest), one tab stop where the arrow keys step through the buckets with the
   tooltip text read out, and a Chart/Table toggle whose table uses the tooltip's formatters.
+- Every chart card carries one plain-language insight sentence under the chart ("Highest:
+  August, $812"). Cost charts default to running costs, with ownership as a toggle or a separate
+  series.
 - On mobile, charts are full width with few enough x-axis ticks to stay legible; no horizontal
   scrolling.
 
@@ -219,6 +240,8 @@ Every view that loads or mutates data handles all of these:
    triggered the work). Never a blank flash or a layout that jumps when data arrives. The app
    shell never waits on the network: for a returning user, navigation and the page render at once
    from the remembered user while the session is checked, and only content areas show skeletons.
+   A skeleton has the content's shape (the hero line, a split bar, three rows) and reserves every
+   line, so CLS stays 0.
 2. **Empty** — `EmptyState` (`#lib/components/common/empty-state.svelte`) with an icon, a
    sentence-case title that says what's missing, one line on why it matters, and the primary
    action that fills it. NOT a bare "No data". `/reminders` is the reference.
@@ -250,7 +273,9 @@ state, it's not done.
 Motion explains a change; it never decorates.
 
 - Durations: `duration-200` for hover, press and colour; `duration-300` for panels, sheets and
-  accordions. Nothing over 500ms except chart entry.
+  accordions. Nothing over 500ms.
+- **Chart entry is at most 400 ms**, wrapped in `motion-safe:`, and data is readable on the first
+  frame; under reduced motion there is no entry at all.
 - Animate colour, opacity and transform (`transition-colors`, `transition-opacity`,
   `transition-transform`). New code avoids `transition-all`, which also animates layout.
 - No motion on page load beyond chart entry and the skeleton pulse. No looping animation outside
@@ -339,6 +364,8 @@ Plain, short, friendly, specific. Write like a helpful friend who knows cars, no
 - **Specific empty states.** "No fuel data yet" plus how to get it, not "No data".
 - **Units and money are always formatted** (`formatCurrency`, `formatDate`, the vehicle's unit
   preferences). Never hardcode "$", "mi" or "gal".
+- **Rows lead with what the user would say** ("Arco", "Oil change"), then category, vehicle and
+  date in the meta voice; the amount is right-aligned.
 - No jargon ("entity", "record", "payload"), no exclamation marks in errors, no blame ("Enter a
   mileage above 25,000", not "You entered an invalid mileage").
 - One name per concept everywhere: Vehicle, Expense, Fill-up, Reminder, Policy, Trip. A heading
@@ -346,8 +373,10 @@ Plain, short, friendly, specific. Write like a helpful friend who knows cars, no
 
 ## Interaction quality
 
-- **Optimistic where safe, honest where not.** Disable the submit button + show a spinner while
-  a mutation is in flight (`isSubmitting`); never let a user double-submit.
+- **Optimistic where safe, honest where not.** Expense create, edit and delete are optimistic:
+  the list updates at once with an unsynced marker, and a failure reverts the row with an inline
+  error and Retry. Other mutations disable the submit button and show a spinner while in flight
+  (`isSubmitting`); never let a user double-submit.
 - **Confirm destructive actions** with `common/ConfirmDialog.svelte`, never a bare click.
 - **No layout shift** when async content or badges appear — reserve space.
 - **Feedback on every action** — success toast or visible state change.
@@ -402,6 +431,8 @@ failed step; nits can be follow-up issues.
 `.github/PULL_REQUEST_TEMPLATE.md` carries this list. A UI change is done when ALL are true:
 
 - [ ] Evidence: before/after at 1280px and 375px, light and dark (a GIF for motion or multi-step).
+- [ ] The screen's question is answered in the first 300px at 375, and a new route has a bundle
+      budget in `frontend/bundle-budgets.json`.
 - [ ] Every state handled (loading / empty / error / populated / success feedback).
 - [ ] No overflow at 375px; tap targets ≥ 40px; primary action in thumb reach.
 - [ ] Tokens only; AA contrast checked in Default plus two other theme families, light and dark.
