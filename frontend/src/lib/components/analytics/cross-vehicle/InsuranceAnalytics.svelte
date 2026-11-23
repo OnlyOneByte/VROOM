@@ -31,6 +31,11 @@
 		{ key: 'annualPremium', label: 'Annual Premium', color: 'var(--chart-4)' }
 	];
 
+	let coveredVehicles = $derived(
+		insurance.vehicleDetails.map(v => v.vehicleId).filter((id, i, ids) => ids.indexOf(id) === i)
+			.length
+	);
+
 	let insuranceSummaryItems = $derived.by(() => {
 		const s = insurance.summary;
 		return [
@@ -47,7 +52,7 @@
 			{
 				label: 'Active Policies',
 				value: String(s.activePoliciesCount),
-				subtitle: 'vehicles insured'
+				subtitle: `covering ${coveredVehicles} vehicle${coveredVehicles === 1 ? '' : 's'}`
 			}
 		];
 	});
