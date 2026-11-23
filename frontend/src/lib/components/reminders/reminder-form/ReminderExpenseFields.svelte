@@ -5,7 +5,7 @@
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import TagInput from '#lib/components/expenses/form/TagInput.svelte';
 	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
-	import { getCurrencySymbol } from '#lib/utils/formatters.ts';
+	import { amountPlaceholder, amountStep, getCurrencySymbol } from '#lib/utils/formatters.ts';
 	import type { ReminderFormState } from './reminder-form-state.svelte';
 	import { EXPENSE_CATEGORIES, isFuelAllowed } from './reminder-form-model';
 
@@ -54,10 +54,10 @@
 				<Input
 					id="reminder-expense-amount"
 					type="number"
-					step="0.01"
+					step={amountStep()}
 					min="0"
 					bind:value={form.values.expenseAmount}
-					placeholder="0.00"
+					placeholder={amountPlaceholder()}
 					class={currencySymbol.length > 1 ? 'pl-14' : 'pl-8'}
 					aria-invalid={!!form.errors['expenseAmount']}
 				/>

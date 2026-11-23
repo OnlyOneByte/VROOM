@@ -13,7 +13,12 @@
 		CardHeader,
 		CardTitle
 	} from '#lib/components/ui/card/index.ts';
-	import { formatCurrency, formatDateWith } from '#lib/utils/formatters.ts';
+	import {
+		amountPlaceholder,
+		amountStep,
+		formatCurrency,
+		formatDateWith
+	} from '#lib/utils/formatters.ts';
 	import type { Vehicle, FinancingFormErrors, FinancingPaymentConfig } from '#lib/types/index.ts';
 
 	interface Props {
@@ -136,8 +141,8 @@
 							id="originalAmount"
 							type="number"
 							min="0"
-							step="0.01"
-							placeholder="0.00"
+							step={amountStep()}
+							placeholder={amountPlaceholder()}
 							bind:value={financingForm.originalAmount}
 							aria-invalid={!!errors['originalAmount']}
 							aria-describedby={errors['originalAmount'] ? 'originalAmount-error' : undefined}
@@ -239,8 +244,8 @@
 							<Input
 								id="paymentAmount"
 								type="number"
-								min="0.01"
-								step="0.01"
+								min={amountStep()}
+								step={amountStep()}
 								placeholder="e.g., 350.00"
 								bind:value={financingForm.paymentAmount}
 								aria-invalid={!!errors['paymentAmount']}
@@ -260,8 +265,8 @@
 								id="residualValue"
 								type="number"
 								min="0"
-								step="0.01"
-								placeholder="0.00"
+								step={amountStep()}
+								placeholder={amountPlaceholder()}
 								bind:value={financingForm.residualValue}
 							/>
 						</div>
@@ -281,7 +286,7 @@
 								id="excessMileageFee"
 								type="number"
 								min="0"
-								step="0.01"
+								step={amountStep()}
 								placeholder="e.g., 0.25"
 								bind:value={financingForm.excessMileageFee}
 							/>

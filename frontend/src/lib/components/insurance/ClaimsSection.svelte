@@ -19,6 +19,8 @@
 	} from '#lib/utils/error-handling.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import {
+		amountPlaceholder,
+		amountStep,
 		capitalize,
 		formatCurrency,
 		formatDate,
@@ -412,10 +414,10 @@
 						<Input
 							id={`claim-payout-${policyId}`}
 							type="number"
-							step="0.01"
+							step={amountStep()}
 							min="0"
 							bind:value={payoutAmount}
-							placeholder="0.00"
+							placeholder={amountPlaceholder()}
 						/>
 					</div>
 					<div class="space-y-1 sm:col-span-2">
