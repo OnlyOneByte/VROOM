@@ -201,3 +201,47 @@ describe('moving with the old vehicle financing pair', () => {
     expect(rowOf(id).vehicle_id).toBe(civic);
   });
 });
+
+describe('replaying a saved financing payment', () => {
+  async function postPayment(vehicleId: string, financingId: string, clientId: string) {
+    return ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'financial',
+      expenseAmount: 400,
+      date: '2024-02-01T00:00:00.000Z',
+      sourceType: 'financing',
+      sourceId: financingId,
+      clientId,
+    });
+  }
+
+  test('returns the saved row after the financing stops being active', async () => {
+    const civic = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const financingId = await createFinancing(civic);
+    const first = await json<DataEnvelope<{ id: string }>>(
+      await postPayment(civic, financingId, 'replay-1')
+    );
+    ctx.sqlite.run('UPDATE vehicle_financing SET is_active = 0 WHERE id = ?', [financingId]);
+
+    const res = await postPayment(civic, financingId, 'replay-1');
+    const body = await json<DataEnvelope<{ id: string }>>(res);
+
+    expect(res.status, JSON.stringify(body)).toBe(201);
+    expect(body.data.id).toBe(first.data.id);
+    const count = ctx.sqlite
+      .query("SELECT COUNT(*) AS n FROM expenses WHERE client_id = 'replay-1'")
+      .get() as { n: number };
+    expect(count.n).toBe(1);
+  });
+
+  test('a new clientId is still validated against the inactive financing', async () => {
+    const civic = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const financingId = await createFinancing(civic);
+    ctx.sqlite.run('UPDATE vehicle_financing SET is_active = 0 WHERE id = ?', [financingId]);
+
+    const res = await postPayment(civic, financingId, 'fresh-1');
+
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('no active financing');
+  });
+});
