@@ -66,10 +66,16 @@
 	data-testid="cost-per-mile-hero"
 >
 	{#if !summary || distanceLoading}
-		<div class="space-y-1" aria-hidden="true">
-			<div class="flex min-h-7 items-center"><Skeleton class="h-4 w-44" /></div>
-			<Skeleton class="h-[2.8125rem] w-32 lg:h-[3.75rem]" />
-			<Skeleton class="h-4 w-56" />
+		<div class="space-y-1">
+			<div class="flex min-h-7 items-center" aria-hidden="true">
+				<Skeleton class="h-4 w-44" />
+			</div>
+			<Skeleton class="h-[2.8125rem] w-32 lg:h-[3.75rem]" aria-hidden="true" />
+			<div class="flex flex-wrap gap-y-1" aria-hidden="true">
+				<Skeleton class="h-4 w-56" />
+				<Skeleton class="h-4 w-24 basis-full sm:hidden" />
+			</div>
+			<span class="sr-only">Loading cost per {unitName}</span>
 		</div>
 		<div class="space-y-2" aria-hidden="true">
 			<Skeleton class="h-2 w-full" />
@@ -90,7 +96,6 @@
 				</div>
 			{/each}
 		</div>
-		<span class="sr-only">Loading cost per {unitName}</span>
 	{:else}
 		{#if perDistance}
 			<HeroFigure
@@ -106,8 +111,8 @@
 							· no ownership costs logged
 						{/if}
 					</span>
-					<span aria-hidden="true">·</span>
-					<span class="whitespace-nowrap">
+					<span class="max-sm:hidden" aria-hidden="true">·</span>
+					<span class="whitespace-nowrap max-sm:basis-full">
 						over {formatNumber(distance ?? 0, 0)}
 						{distanceUnit === 'kilometers' ? 'km' : 'mi'}
 					</span>
