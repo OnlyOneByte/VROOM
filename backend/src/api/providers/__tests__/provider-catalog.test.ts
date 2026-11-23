@@ -69,6 +69,15 @@ describe('GET /api/v1/providers/catalog', () => {
     }
   });
 
+  test('lists every built-in import format, matching GET /expenses/import/formats', async () => {
+    const entries = await catalog('import');
+    const formats = await ctx.authed('GET', '/api/v1/expenses/import/formats');
+    const list = (await json<DataEnvelope<{ formats: { id: string; label: string }[] }>>(formats))
+      .data.formats;
+    expect(entries.map((e) => [e.id, e.label])).toEqual(list.map((f) => [f.id, f.label]));
+    expect(entries.every((e) => e.features.detect === true)).toBe(true);
+  });
+
   test('lists the fake provider only when it is enabled', async () => {
     config.allowFakeStorageProvider = true;
     expect((await catalog()).map((e) => e.id)).toEqual(['google-drive', 's3', 'fake']);
