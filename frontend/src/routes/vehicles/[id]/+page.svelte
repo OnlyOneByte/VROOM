@@ -4,13 +4,22 @@
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
-	import { onMount, type Component } from 'svelte';
-	import { Plus, FileText, Download, CircleAlert, Users, LoaderCircle } from '@lucide/svelte';
+	import { onMount, untrack, type Component } from 'svelte';
+	import {
+		Plus,
+		FileText,
+		Download,
+		CircleAlert,
+		Users,
+		LoaderCircle,
+		WifiOff
+	} from '@lucide/svelte';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
+	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
 	import * as CardFull from '#lib/components/ui/card/index.ts';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
 	import VehicleHeader from '#lib/components/vehicles/VehicleHeader.svelte';
@@ -50,6 +59,8 @@
 		ExpenseCategory
 	} from '#lib/types/index.ts';
 	import { latest } from '#lib/utils/latest-request.ts';
+	import { onlineStatus } from '#lib/stores/offline.svelte.ts';
+	import { loadCachedVehicles } from '#lib/utils/offline-storage.ts';
 	import { useExpenseListReload } from '../../expenses/expense-list-reload.svelte';
 	import type { PageData } from './$types';
 
@@ -62,6 +73,7 @@
 	let isLoadingVehicleStats = $state(false);
 	let isLoadingStats = $derived(isLoadingSummary || isLoadingVehicleStats);
 	let vehicle = $state<Vehicle | null>(null);
+	let showingCachedVehicle = $state(false);
 	let activeTab = $state('overview');
 	let visitedTabs = $state<Record<string, boolean>>({ overview: true });
 	let vehicleStatsData = $state<VehicleStats | null>(null);
@@ -202,13 +214,17 @@
 		void loadFuelEfficiency();
 		void loadVehicleStats();
 		await vehicleRequest;
-		if (vehicle && isOwner) void loadPhotos();
+		if (vehicle && isOwner && !showingCachedVehicle) void loadPhotos();
 		isLoading = false;
 	}
 
 	onMount(() => {
 		loadInsuranceTab();
 		void loadPage();
+	});
+
+	$effect(() => {
+		if (showingCachedVehicle && onlineStatus.current) untrack(loadPage);
 	});
 
 	let previousStatsPeriod = $state<TimePeriod | null>(null);
@@ -268,7 +284,7 @@
 
 	async function notifyUnlessPageFailed(error: unknown, context: string) {
 		await vehicleSettled;
-		if (vehicle) handleErrorWithNotification(error, context);
+		if (vehicle && !showingCachedVehicle) handleErrorWithNotification(error, context);
 		else logLoadFailure(error, context);
 	}
 
@@ -276,10 +292,19 @@
 		vehicleLoadError = null;
 		try {
 			vehicle = await vehicleApi.getVehicle(vehicleId);
+			showingCachedVehicle = false;
 		} catch (error) {
 			if (error instanceof ApiError && (error.statusCode === 404 || error.statusCode === 400)) {
 				handleErrorWithNotification(error, "Couldn't load this vehicle");
 				goto(resolve(routes.dashboard));
+				return;
+			}
+			const cached = onlineStatus.current
+				? undefined
+				: loadCachedVehicles().find(v => v.id === vehicleId);
+			if (cached) {
+				vehicle = cached;
+				showingCachedVehicle = true;
 				return;
 			}
 			logLoadFailure(error, "Couldn't load this vehicle");
@@ -552,7 +577,7 @@
 		<div class="flex items-start justify-between gap-4">
 			<VehicleHeader {vehicle} displayName={vehicleDisplayName} {coverPhotoUrl} />
 			<div class="flex shrink-0 items-center gap-2">
-				{#if isOwner}
+				{#if isOwner && !showingCachedVehicle}
 					<Button
 						variant="outline"
 						size="sm"
@@ -578,204 +603,216 @@
 			{/await}
 		{/if}
 
-		<Tabs bind:value={activeTab} class="space-y-6">
-			<TabsList class="grid w-full grid-cols-4">
-				<TabsTrigger value="overview">Overview</TabsTrigger>
-				<TabsTrigger value="expenses">Expenses</TabsTrigger>
-				<TabsTrigger value="loan">Finance</TabsTrigger>
-				<TabsTrigger value="odometer">Odometer</TabsTrigger>
-			</TabsList>
+		{#if showingCachedVehicle}
+			<Alert variant="warning" role="status" data-testid="vehicle-offline-notice">
+				<WifiOff class="h-4 w-4" />
+				<AlertTitle>You're offline</AlertTitle>
+				<AlertDescription>
+					These are the details saved on this device. Costs, charts and history load when you
+					reconnect. Expenses you add now sync automatically.
+				</AlertDescription>
+			</Alert>
+			<VehicleInfoCard {vehicle} {isOwner} />
+		{:else}
+			<Tabs bind:value={activeTab} class="space-y-6">
+				<TabsList class="grid w-full grid-cols-4">
+					<TabsTrigger value="overview">Overview</TabsTrigger>
+					<TabsTrigger value="expenses">Expenses</TabsTrigger>
+					<TabsTrigger value="loan">Finance</TabsTrigger>
+					<TabsTrigger value="odometer">Odometer</TabsTrigger>
+				</TabsList>
 
-			<TabsContent value="overview" class="space-y-6">
-				{#if summaryLoadError && !isLoadingStats}
-					<LoadErrorCard
-						title="Couldn't load the expense summary"
-						message={summaryLoadError}
-						onRetry={loadSummary}
-					/>
-				{:else if summary && !hasExpenseData}
-					<EmptyState>
-						{#snippet icon()}
-							<FileText class="h-12 w-12 text-muted-foreground mb-4" />
-						{/snippet}
-						{#snippet title()}
-							{COMMON_MESSAGES.NO_EXPENSES}
-						{/snippet}
-						{#snippet description()}
-							Start tracking expenses for this vehicle to see insights and trends
-						{/snippet}
-						{#snippet action()}
-							{#if canWrite}
-								<Button href={addExpenseHref}>
-									<Plus class="h-4 w-4 mr-2" />
-									{COMMON_MESSAGES.ADD_EXPENSE}
-								</Button>
-							{/if}
-						{/snippet}
-					</EmptyState>
-				{:else}
-					<PeriodSelector
-						selectedPeriod={selectedStatsPeriod}
-						isLoading={isLoadingStats}
-						onPeriodChange={handlePeriodChange}
-					/>
-
-					<ExpenseOverviewCard stats={localStats} isLoading={summary === null} />
-
-					<FuelEfficiencyStatsCard
-						{vehicleId}
-						{vehicleStatsData}
-						{isLoadingStats}
-						{selectedStatsPeriod}
-						unitPreferences={vehicle?.unitPreferences}
-						vehicleType={vehicle?.vehicleType}
-					/>
-
-					{#await chartsLoading}
-						{@render chartPlaceholders(null)}
-					{:then [{ default: ExpenseTrendChart }, { default: FuelEfficiencyTrendChart }, { AppPieChart }]}
-						<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-							<ExpenseTrendChart
-								data={expenseTrendData}
-								description={trendDescription}
-								isLoading={isLoadingStats}
-							/>
-							<FuelEfficiencyTrendChart
-								data={fuelEfficiencyData}
-								fuelType={vehicle.vehicleType || 'gas'}
-								unitPreferences={vehicle.unitPreferences}
-								isLoading={isLoadingFuelEfficiency}
-							/>
-						</div>
-
-						{#if categoryChartData.length > 0 || summary === null}
-							<AppPieChart
-								title={CATEGORY_CHART_TITLE}
-								description={CATEGORY_CHART_DESCRIPTION}
-								data={categoryChartData}
-								isLoading={isLoadingStats}
-							/>
-						{/if}
-					{:catch}
-						{@render chartPlaceholders(CHARTS_LOAD_ERROR)}
-					{/await}
-				{/if}
-
-				{#if InsuranceTab}
-					<InsuranceTab {vehicleId} readOnly={!isOwner} />
-				{/if}
-
-				<div class="grid grid-cols-1 items-start lg:grid-cols-2 gap-6">
-					<VehicleInfoCard {vehicle} {isOwner} />
-					<VehiclePhotoCarousel
-						{vehicleId}
-						photos={vehiclePhotos}
-						{isOwner}
-						isLoading={isLoadingPhotos}
-						onUpload={() => {
-							hasOpenedUpload = true;
-							showUploadDialog = true;
-						}}
-						onDelete={handleDeletePhoto}
-						onSetCover={handleSetCover}
-					/>
-				</div>
-			</TabsContent>
-
-			<TabsContent value="expenses" class="space-y-6">
-				{#if visitedTabs['expenses']}
-					{#await loadExpensesTab()}
-						{@render tabLoading()}
-					{:then [{ default: ExpenseSearchFilters }, { default: ExpensesTable }]}
-						<ExpenseSearchFilters
-							{searchTerm}
-							bind:filters
-							{expenses}
-							onSearchChange={v => (searchTerm = v)}
-							onClearFilters={clearFilters}
+				<TabsContent value="overview" class="space-y-6">
+					{#if summaryLoadError && !isLoadingStats}
+						<LoadErrorCard
+							title="Couldn't load the expense summary"
+							message={summaryLoadError}
+							onRetry={loadSummary}
 						/>
-
-						<CardFull.Root>
-							<CardFull.Header class="flex flex-row items-center justify-between gap-2 space-y-0">
-								<CardFull.Title>All Expenses ({totalCount})</CardFull.Title>
-								{#if totalCount > 0 && isOwner}
-									<Button
-										variant="outline"
-										size="sm"
-										onclick={handleExportCsv}
-										disabled={isExporting}
-									>
-										<Download class="mr-2 h-4 w-4" />
-										{isExporting ? 'Exporting…' : 'Export CSV'}
+					{:else if summary && !hasExpenseData}
+						<EmptyState>
+							{#snippet icon()}
+								<FileText class="h-12 w-12 text-muted-foreground mb-4" />
+							{/snippet}
+							{#snippet title()}
+								{COMMON_MESSAGES.NO_EXPENSES}
+							{/snippet}
+							{#snippet description()}
+								Start tracking expenses for this vehicle to see insights and trends
+							{/snippet}
+							{#snippet action()}
+								{#if canWrite}
+									<Button href={addExpenseHref}>
+										<Plus class="h-4 w-4 mr-2" />
+										{COMMON_MESSAGES.ADD_EXPENSE}
 									</Button>
 								{/if}
-							</CardFull.Header>
-							<CardFull.Content>
-								{#if expensesLoadError && !isLoadingPage}
-									<LoadErrorCard
-										compact
-										title="Couldn't load expenses"
-										message={expensesLoadError}
-										onRetry={() => fetchExpensesPage(currentOffset)}
-									/>
-								{:else}
-									<ExpensesTable
-										{expenses}
-										showVehicleColumn={false}
-										{canWrite}
-										returnTo={resolve(paramRoutes.vehicle, { id: vehicleId })}
-										onDelete={handleDeleteExpense}
-										emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
-										emptyDescription="Start tracking expenses for this vehicle"
-										emptyActionLabel={COMMON_MESSAGES.ADD_EXPENSE}
-										emptyActionHref={addExpenseHref}
-										scrollHeight={SCROLL_HEIGHTS.TABLE_DEFAULT}
-										onClearFilters={clearFilters}
-										{hasActiveFilters}
-										{totalCount}
-										{currentOffset}
-										{pageSize}
-										{isLoadingPage}
-										onPageChange={handlePageChange}
-										activeSortBy={expenseSortBy}
-										activeSortDir={expenseSortDir}
-										onSortChange={handleExpenseSortChange}
-										activeCategory={expenseCategoryFilter}
-										onCategoryChange={handleExpenseCategoryChange}
-									/>
-								{/if}
-							</CardFull.Content>
-						</CardFull.Root>
-					{:catch}
-						{@render tabLoadError()}
-					{/await}
-				{/if}
-			</TabsContent>
+							{/snippet}
+						</EmptyState>
+					{:else}
+						<PeriodSelector
+							selectedPeriod={selectedStatsPeriod}
+							isLoading={isLoadingStats}
+							onPeriodChange={handlePeriodChange}
+						/>
 
-			<TabsContent value="odometer" class="space-y-6">
-				{#if visitedTabs['odometer']}
-					{#await loadOdometerTab()}
-						{@render tabLoading()}
-					{:then { default: OdometerTab }}
-						<OdometerTab {vehicleId} {canWrite} unitPreferences={vehicle?.unitPreferences} />
-					{:catch}
-						{@render tabLoadError()}
-					{/await}
-				{/if}
-			</TabsContent>
+						<ExpenseOverviewCard stats={localStats} isLoading={summary === null} />
 
-			<TabsContent value="loan" class="space-y-4 sm:space-y-6">
-				{#if visitedTabs['loan']}
-					{#await loadFinanceTab()}
-						{@render tabLoading()}
-					{:then { default: FinanceTab }}
-						<FinanceTab {vehicle} {vehicleId} {isOwner} {vehicleStatsData} />
-					{:catch}
-						{@render tabLoadError()}
-					{/await}
-				{/if}
-			</TabsContent>
-		</Tabs>
+						<FuelEfficiencyStatsCard
+							{vehicleId}
+							{vehicleStatsData}
+							{isLoadingStats}
+							{selectedStatsPeriod}
+							unitPreferences={vehicle?.unitPreferences}
+							vehicleType={vehicle?.vehicleType}
+						/>
+
+						{#await chartsLoading}
+							{@render chartPlaceholders(null)}
+						{:then [{ default: ExpenseTrendChart }, { default: FuelEfficiencyTrendChart }, { AppPieChart }]}
+							<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+								<ExpenseTrendChart
+									data={expenseTrendData}
+									description={trendDescription}
+									isLoading={isLoadingStats}
+								/>
+								<FuelEfficiencyTrendChart
+									data={fuelEfficiencyData}
+									fuelType={vehicle.vehicleType || 'gas'}
+									unitPreferences={vehicle.unitPreferences}
+									isLoading={isLoadingFuelEfficiency}
+								/>
+							</div>
+
+							{#if categoryChartData.length > 0 || summary === null}
+								<AppPieChart
+									title={CATEGORY_CHART_TITLE}
+									description={CATEGORY_CHART_DESCRIPTION}
+									data={categoryChartData}
+									isLoading={isLoadingStats}
+								/>
+							{/if}
+						{:catch}
+							{@render chartPlaceholders(CHARTS_LOAD_ERROR)}
+						{/await}
+					{/if}
+
+					{#if InsuranceTab}
+						<InsuranceTab {vehicleId} readOnly={!isOwner} />
+					{/if}
+
+					<div class="grid grid-cols-1 items-start lg:grid-cols-2 gap-6">
+						<VehicleInfoCard {vehicle} {isOwner} />
+						<VehiclePhotoCarousel
+							{vehicleId}
+							photos={vehiclePhotos}
+							{isOwner}
+							isLoading={isLoadingPhotos}
+							onUpload={() => {
+								hasOpenedUpload = true;
+								showUploadDialog = true;
+							}}
+							onDelete={handleDeletePhoto}
+							onSetCover={handleSetCover}
+						/>
+					</div>
+				</TabsContent>
+
+				<TabsContent value="expenses" class="space-y-6">
+					{#if visitedTabs['expenses']}
+						{#await loadExpensesTab()}
+							{@render tabLoading()}
+						{:then [{ default: ExpenseSearchFilters }, { default: ExpensesTable }]}
+							<ExpenseSearchFilters
+								{searchTerm}
+								bind:filters
+								{expenses}
+								onSearchChange={v => (searchTerm = v)}
+								onClearFilters={clearFilters}
+							/>
+
+							<CardFull.Root>
+								<CardFull.Header class="flex flex-row items-center justify-between gap-2 space-y-0">
+									<CardFull.Title>All Expenses ({totalCount})</CardFull.Title>
+									{#if totalCount > 0 && isOwner}
+										<Button
+											variant="outline"
+											size="sm"
+											onclick={handleExportCsv}
+											disabled={isExporting}
+										>
+											<Download class="mr-2 h-4 w-4" />
+											{isExporting ? 'Exporting…' : 'Export CSV'}
+										</Button>
+									{/if}
+								</CardFull.Header>
+								<CardFull.Content>
+									{#if expensesLoadError && !isLoadingPage}
+										<LoadErrorCard
+											compact
+											title="Couldn't load expenses"
+											message={expensesLoadError}
+											onRetry={() => fetchExpensesPage(currentOffset)}
+										/>
+									{:else}
+										<ExpensesTable
+											{expenses}
+											showVehicleColumn={false}
+											{canWrite}
+											returnTo={resolve(paramRoutes.vehicle, { id: vehicleId })}
+											onDelete={handleDeleteExpense}
+											emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
+											emptyDescription="Start tracking expenses for this vehicle"
+											emptyActionLabel={COMMON_MESSAGES.ADD_EXPENSE}
+											emptyActionHref={addExpenseHref}
+											scrollHeight={SCROLL_HEIGHTS.TABLE_DEFAULT}
+											onClearFilters={clearFilters}
+											{hasActiveFilters}
+											{totalCount}
+											{currentOffset}
+											{pageSize}
+											{isLoadingPage}
+											onPageChange={handlePageChange}
+											activeSortBy={expenseSortBy}
+											activeSortDir={expenseSortDir}
+											onSortChange={handleExpenseSortChange}
+											activeCategory={expenseCategoryFilter}
+											onCategoryChange={handleExpenseCategoryChange}
+										/>
+									{/if}
+								</CardFull.Content>
+							</CardFull.Root>
+						{:catch}
+							{@render tabLoadError()}
+						{/await}
+					{/if}
+				</TabsContent>
+
+				<TabsContent value="odometer" class="space-y-6">
+					{#if visitedTabs['odometer']}
+						{#await loadOdometerTab()}
+							{@render tabLoading()}
+						{:then { default: OdometerTab }}
+							<OdometerTab {vehicleId} {canWrite} unitPreferences={vehicle?.unitPreferences} />
+						{:catch}
+							{@render tabLoadError()}
+						{/await}
+					{/if}
+				</TabsContent>
+
+				<TabsContent value="loan" class="space-y-4 sm:space-y-6">
+					{#if visitedTabs['loan']}
+						{#await loadFinanceTab()}
+							{@render tabLoading()}
+						{:then { default: FinanceTab }}
+							<FinanceTab {vehicle} {vehicleId} {isOwner} {vehicleStatsData} />
+						{:catch}
+							{@render tabLoadError()}
+						{/await}
+					{/if}
+				</TabsContent>
+			</Tabs>
+		{/if}
 
 		{#if hasOpenedUpload}
 			{#await loadUploadDialog() then { default: MediaCaptureDialog }}
