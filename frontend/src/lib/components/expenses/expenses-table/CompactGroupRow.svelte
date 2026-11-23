@@ -22,7 +22,7 @@
 		MOBILE_ROW_ACTIONS_CONTAINER_CLASS,
 		MOBILE_ROW_SUMMARY_CLASS
 	} from './compact-row-classes';
-	import { tagsBesideCategory, type GroupRow } from './expense-table-rows';
+	import { rowTitle, tagsBesideCategory, type GroupRow } from './expense-table-rows';
 
 	interface Props {
 		row: GroupRow;
@@ -50,6 +50,7 @@
 	let shownTags = $derived(tagsBesideCategory(row.tags, row.category));
 
 	let IconComponent = $derived(getCategoryIcon(row.category));
+	let heading = $derived(rowTitle(row.description, row.category));
 	let insuranceLinked = $derived(isInsuranceLinked(row.tags));
 	let blockedId = $derived(blockedReasonId(row.groupId));
 </script>
@@ -67,7 +68,7 @@
 		<div class="flex-1 min-w-0">
 			<div class="flex items-center justify-between gap-2">
 				<p class="text-sm font-medium text-foreground truncate">
-					{categoryLabels[row.category]}
+					{heading.title}
 				</p>
 				<span class="text-sm font-semibold text-foreground whitespace-nowrap flex-shrink-0">
 					{formatCurrency(row.totalAmount)}
@@ -75,6 +76,10 @@
 			</div>
 			<div class="flex items-center flex-wrap gap-1.5 mt-0.5 text-xs text-muted-foreground">
 				<SplitExpenseBadge />
+				{#if heading.categoryInMeta}
+					<span>·</span>
+					<span>{categoryLabels[row.category]}</span>
+				{/if}
 				<span>·</span>
 				<span>{formatDate(new Date(row.date))}</span>
 				{#if showVehicleColumn && row.vehicleNames.length > 0}

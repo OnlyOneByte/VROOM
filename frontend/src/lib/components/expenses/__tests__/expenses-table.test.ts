@@ -379,3 +379,45 @@ describe('ExpensesTable compact rows', () => {
 		await waitFor(() => expect(deleteSplitExpense).toHaveBeenCalledWith('g1'));
 	});
 });
+
+describe('ExpensesTable rows lead with what the user would call the expense', () => {
+	const NAMED = expense({
+		id: 'named',
+		description: 'Arco',
+		location: 'Main St',
+		amount: 42.5,
+		date: localNoonISO(2024, 2, 21)
+	});
+	const UNNAMED = expense({ id: 'unnamed', category: 'maintenance', amount: 80 });
+	const NAMED_SPLIT = [
+		expense({ id: 'ns-a', amount: 30, description: 'Car wash', groupId: 'g2' }),
+		expense({ id: 'ns-b', amount: 30, description: 'Car wash', groupId: 'g2' })
+	];
+
+	test('compact rows put the description first and the category in the meta line', () => {
+		useLayout('compact');
+		mountTable({ expenses: [NAMED, UNNAMED, ...NAMED_SPLIT], showVehicleColumn: true });
+
+		const named = screen.getByText('Arco').closest('button') as HTMLElement;
+		expect(named.querySelector('p')).toHaveTextContent('Arco');
+		expect(named).toHaveTextContent(/Fuel & Charging\s*·\s*Mar 21, 2024\s*·\s*Daily Driver/);
+
+		const unnamed = screen.getByText('Maintenance').closest('button') as HTMLElement;
+		expect(unnamed.querySelector('p')).toHaveTextContent('Maintenance');
+
+		const split = screen.getByText('Car wash').closest('button') as HTMLElement;
+		expect(split).toHaveTextContent(/Split/);
+		expect(split).toHaveTextContent(/Fuel & Charging/);
+	});
+
+	test('the desktop table opens each row with the description, falling back to the category', () => {
+		useLayout('wide');
+		const { container } = mountTable({ expenses: [NAMED, UNNAMED, ...NAMED_SPLIT] });
+
+		expect(container.querySelector('thead th')).toHaveTextContent('Description');
+		const firstCells = [...container.querySelectorAll('tbody tr')].map(
+			tr => tr.querySelector('td')?.textContent?.replace(/\s+/g, ' ').trim() ?? ''
+		);
+		expect(firstCells).toEqual(['Arco 📍 Main St', 'Maintenance', 'Car wash']);
+	});
+});

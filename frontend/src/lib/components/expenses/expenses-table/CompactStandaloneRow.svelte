@@ -12,7 +12,7 @@
 	} from '#lib/utils/expense-helpers.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { expenseEditHref } from './expense-table-actions';
-	import { tagsBesideCategory } from './expense-table-rows';
+	import { rowTitle, tagsBesideCategory } from './expense-table-rows';
 	import {
 		MOBILE_ROW_ACTION_CLASS,
 		MOBILE_ROW_ACTIONS_CONTAINER_CLASS,
@@ -46,6 +46,7 @@
 
 	let vehicle: Vehicle | undefined = $derived(vehicleMap.get(expense.vehicleId));
 	let IconComponent = $derived(getCategoryIcon(expense.category));
+	let heading = $derived(rowTitle(expense.description, expense.category));
 </script>
 
 {#snippet summary()}
@@ -55,13 +56,17 @@
 	<div class="flex-1 min-w-0">
 		<div class="flex items-start justify-between gap-2">
 			<p class="text-sm font-medium text-foreground truncate">
-				{categoryLabels[expense.category]}
+				{heading.title}
 			</p>
 			<span class="text-sm font-semibold text-foreground whitespace-nowrap">
 				{formatCurrency(expense.amount)}
 			</span>
 		</div>
 		<div class="flex items-center flex-wrap gap-1.5 mt-0.5 text-xs text-muted-foreground">
+			{#if heading.categoryInMeta}
+				<span>{categoryLabels[expense.category]}</span>
+				<span>·</span>
+			{/if}
 			<span>{formatDate(new Date(expense.date))}</span>
 			{#if showVehicleColumn && vehicle}
 				<span>·</span>

@@ -13,7 +13,7 @@
 	} from '#lib/utils/expense-helpers.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { expenseEditHref } from './expense-table-actions';
-	import { tagsBesideCategory } from './expense-table-rows';
+	import { rowTitle, tagsBesideCategory } from './expense-table-rows';
 
 	interface Props {
 		expense: Expense;
@@ -31,10 +31,19 @@
 
 	let vehicle: Vehicle | undefined = $derived(vehicleMap.get(expense.vehicleId));
 	let IconComponent = $derived(getCategoryIcon(expense.category));
+	let heading = $derived(rowTitle(expense.description, expense.category));
 </script>
 
 <TableRow class="group">
-	<TableCell class="font-medium text-muted-foreground">
+	<TableCell class="max-w-[240px]">
+		<div class="truncate font-medium text-foreground">{heading.title}</div>
+		{#if expense.location}
+			<div class="truncate text-xs text-muted-foreground" title={expense.location}>
+				📍 {expense.location}
+			</div>
+		{/if}
+	</TableCell>
+	<TableCell class="whitespace-nowrap text-muted-foreground">
 		{formatDate(new Date(expense.date))}
 	</TableCell>
 	{#if showVehicleColumn}
@@ -64,14 +73,6 @@
 				<Badge variant="secondary" class="font-normal">{tag}</Badge>
 			{/each}
 		</div>
-	</TableCell>
-	<TableCell class="max-w-[200px]">
-		<div class="truncate text-foreground">{expense.description || '-'}</div>
-		{#if expense.location}
-			<div class="truncate text-xs text-muted-foreground" title={expense.location}>
-				📍 {expense.location}
-			</div>
-		{/if}
 	</TableCell>
 	<TableCell class="text-right font-semibold whitespace-nowrap">
 		{formatCurrency(expense.amount)}
