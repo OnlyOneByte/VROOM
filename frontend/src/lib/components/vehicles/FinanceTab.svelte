@@ -154,6 +154,7 @@
 </script>
 
 {#if vehicle.financing?.isActive}
+	<h2 class="sr-only">Financing</h2>
 	{#if vehicle.financing.originalAmount && vehicle.financing.originalAmount > 0}
 		{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
 			<NextPaymentCard
