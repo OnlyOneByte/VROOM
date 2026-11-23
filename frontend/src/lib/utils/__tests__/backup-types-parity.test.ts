@@ -73,17 +73,40 @@ describe('backup types parity with the backend', () => {
 	});
 
 	it.each([
-		['BackupOrchestratorResult', 'backup-strategy.ts', 'BackupOrchestratorResult'],
-		['RestoreResult', 'restore.ts', 'RestoreResponse']
+		[
+			'BackupOrchestratorResult',
+			'backup-strategy.ts',
+			'BackupOrchestratorResult',
+			['outcome', 'results']
+		],
+		['RestoreResult', 'restore.ts', 'RestoreResponse', ['preview', 'imported', 'conflicts']]
 	])(
-		'%s has the same fields and optionality as the backend %s',
-		(frontendName, file, backendName) => {
-			const names = (members: string[]) => members.map(member => member.split(':')[0]);
-			const backend = names(fields(readFileSync(`${BACKEND_SYNC}/${file}`, 'utf8'), backendName));
-			expect(backend.length).toBeGreaterThan(0);
-			expect(names(fields(frontendSrc, frontendName))).toEqual(backend);
+		'%s matches the backend %s, except where the backend names a type (%s)',
+		(frontendName, file, backendName, namedTypeFields) => {
+			const byName = (members: string[]) =>
+				new Map(members.map(member => [member.split(':')[0], member]));
+			const backend = byName(fields(readFileSync(`${BACKEND_SYNC}/${file}`, 'utf8'), backendName));
+			const frontend = byName(fields(frontendSrc, frontendName));
+			expect(backend.size).toBeGreaterThan(0);
+			expect([...frontend.keys()]).toEqual([...backend.keys()]);
+			for (const [name, member] of backend) {
+				if (namedTypeFields.includes(name.replace('?', ''))) continue;
+				expect(frontend.get(name), name).toBe(member);
+			}
 		}
 	);
+
+	it('BackupOrchestratorResult.results entries have the backend BackupStrategyResult fields', () => {
+		const strategySrc = readFileSync(`${BACKEND_SYNC}/backup-strategy.ts`, 'utf8');
+		const backend = fields(strategySrc, 'BackupStrategyResult').map(m => m.split(':')[0]);
+		const results = fields(frontendSrc, 'BackupOrchestratorResult').find(m =>
+			m.startsWith('results:')
+		);
+		const entry = results?.match(/Record< ?string, ?\{(.*)\} ?>$/)?.[1];
+		if (!entry) throw new Error(`can't read results entry: ${results}`);
+		const frontend = fields(`export interface Entry {${entry}}`, 'Entry').map(m => m.split(':')[0]);
+		expect(frontend).toEqual(backend);
+	});
 
 	it('BackupOrchestratorResult.outcome lists the backend BackupOutcome values', () => {
 		const strategySrc = readFileSync(`${BACKEND_SYNC}/backup-strategy.ts`, 'utf8');
