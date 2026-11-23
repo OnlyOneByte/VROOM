@@ -13,25 +13,6 @@ export const EXPENSE_CATEGORIES = [
 
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 
-// Must match the frontend's CATEGORY_LABELS word for word.
-export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
-  fuel: 'Fuel & Charging',
-  maintenance: 'Maintenance',
-  financial: 'Financial',
-  regulatory: 'Regulatory',
-  enhancement: 'Enhancement',
-  misc: 'Misc',
-};
-
-export const EXPENSE_CATEGORY_DESCRIPTIONS: Record<ExpenseCategory, string> = {
-  fuel: 'Fuel, gas, and electric charging costs',
-  maintenance: 'Keeping the car running (oil, repairs, tires)',
-  financial: 'Loans, insurance',
-  regulatory: 'Government-required (registration, inspection, tickets)',
-  enhancement: 'Optional improvements (tint, accessories, detailing)',
-  misc: 'Misc operating costs (tolls, parking, car washes, etc.)',
-};
-
 export type PaymentFrequency = 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
 
 export type SplitConfig =

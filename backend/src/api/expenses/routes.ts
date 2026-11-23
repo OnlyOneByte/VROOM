@@ -4,11 +4,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { type Expense, expenses as expensesTable, type NewExpense } from '../../db/schema';
-import {
-  EXPENSE_CATEGORIES,
-  EXPENSE_CATEGORY_DESCRIPTIONS,
-  EXPENSE_CATEGORY_LABELS,
-} from '../../db/types';
+import { EXPENSE_CATEGORIES } from '../../db/types';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { neutralizeCsvRow } from '../../utils/csv-safety';
@@ -463,17 +459,6 @@ routes.delete('/split/:id', zValidator('param', commonSchemas.idParam), async (c
   await expenseRepository.deleteSplitExpense(id, groupInfo.ownerId);
 
   return c.json({ success: true, message: 'Split expense deleted successfully' });
-});
-
-routes.get('/categories', async (c) => {
-  return c.json({
-    success: true,
-    data: EXPENSE_CATEGORIES.map((category) => ({
-      value: category,
-      label: EXPENSE_CATEGORY_LABELS[category],
-      description: EXPENSE_CATEGORY_DESCRIPTIONS[category],
-    })),
-  });
 });
 
 routes.get(

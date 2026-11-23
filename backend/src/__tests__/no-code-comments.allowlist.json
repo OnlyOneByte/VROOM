@@ -200,7 +200,6 @@
   "backend/src/db/schema.ts: PRAGMA foreign_keys is a no-op inside the migrator's transaction, so table rebuilds must go child-first.",
   "backend/src/db/schema.ts: SQLite treats NULLs as distinct in a UNIQUE index, so mileage rows (null dueDate) are not constrained here.",
   "backend/src/db/sql-helpers.ts: Timestamp columns store Unix seconds. 'unixepoch' is required, or SQLite reads the value as a Julian day.",
-  "backend/src/db/types.ts: Must match the frontend's CATEGORY_LABELS word for word.",
   "backend/src/errors.ts: Raw messages can contain internal details, so they are shown only in development.",
   "backend/src/errors.ts: bun:sqlite sets `code`; drizzle may wrap the driver error, so the cause chain is walked too.",
   "backend/src/index.ts: A db:push-bootstrapped database fails here with 'already exists'; see DatabaseMigrations.md.",

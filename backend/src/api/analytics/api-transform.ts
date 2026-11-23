@@ -1,3 +1,4 @@
+import { EXPENSE_CATEGORIES } from '../../db/types';
 import { centsToDollars as c } from '../../utils/money';
 import type {
   AnalyticsSummaryData,
@@ -52,15 +53,11 @@ export function fuelAdvancedToApi(d: FuelAdvancedData): FuelAdvancedData {
     ...d,
     // Do not convert vehicleRadar: its cost-named fields hold 0-100 scores, not money.
     dayOfWeekPatterns: d.dayOfWeekPatterns.map((p) => ({ ...p, avgCost: c(p.avgCost) })),
-    monthlyCostHeatmap: d.monthlyCostHeatmap.map((m) => ({
-      ...m,
-      fuel: c(m.fuel),
-      maintenance: c(m.maintenance),
-      financial: c(m.financial),
-      regulatory: c(m.regulatory),
-      enhancement: c(m.enhancement),
-      misc: c(m.misc),
-    })),
+    monthlyCostHeatmap: d.monthlyCostHeatmap.map((m) => {
+      const dollars = { ...m };
+      for (const category of EXPENSE_CATEGORIES) dollars[category] = c(m[category]);
+      return dollars;
+    }),
   };
 }
 

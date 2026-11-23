@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
+import { EXPENSE_CATEGORIES } from '#lib/constants/expense-categories.ts';
 import type { ExpenseCategory } from '#lib/types/index.ts';
 import { CATEGORY_COLOR_TOKENS, CATEGORY_LABELS, getCategoryChartColor } from '../chart-colors';
 import {
@@ -13,14 +14,7 @@ import {
 import { collectSvelteFiles } from './_helpers/collect-svelte-files';
 import type { StatCardIconColor } from '#lib/components/charts/StatCard.svelte';
 
-const ALL_CATEGORIES: ExpenseCategory[] = [
-	'fuel',
-	'maintenance',
-	'financial',
-	'regulatory',
-	'enhancement',
-	'misc'
-];
+const ALL_CATEGORIES: ExpenseCategory[] = [...EXPENSE_CATEGORIES];
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC_ROOT = join(HERE, '..', '..', '..');
@@ -49,8 +43,8 @@ function collectTsFiles(dir: string, acc: string[] = []): string[] {
 
 const CATEGORY_ALTERNATION = ALL_CATEGORIES.join('|');
 
-const COLOR_AND_LABEL_HOME = 'lib/utils/chart-colors.ts';
-const ICON_HOME = 'lib/utils/expense-helpers.ts';
+const COLOR_AND_LABEL_HOME = 'lib/constants/expense-categories.ts';
+const ICON_HOME = 'lib/constants/expense-categories.ts';
 
 const COLOR_VALUE_PATTERNS = {
 	badgeClasses: `'(?:text|bg|border)-`,
@@ -123,6 +117,29 @@ function tokenFromChartColor(color: string): string {
 	return `unrecognised chart color: ${color}`;
 }
 
+function backendExpenseCategories(): string[] {
+	const src = readFileSync(join(SRC_ROOT, '..', '..', 'backend', 'src', 'db', 'types.ts'), 'utf8');
+	const match = src.match(/export\s+const\s+EXPENSE_CATEGORIES\s*=\s*\[([\s\S]*?)\]/);
+	if (!match?.[1]) throw new Error('EXPENSE_CATEGORIES not found in backend/src/db/types.ts');
+	return [...match[1].matchAll(/'([^']+)'/g)].map(m => m[1] as string);
+}
+
+describe('one ordered category list, shared with the backend', () => {
+	test('EXPENSE_CATEGORIES matches backend/src/db/types.ts in order', () => {
+		const backend = backendExpenseCategories();
+		expect(backend.length).toBeGreaterThan(0);
+		expect([...EXPENSE_CATEGORIES]).toEqual(backend);
+	});
+
+	test('every category has a label, description, colour token and icon', () => {
+		for (const category of EXPENSE_CATEGORIES) {
+			expect(CATEGORY_LABELS[category], `label → ${category}`).toBeTruthy();
+			expect(CATEGORY_COLOR_TOKENS[category], `token → ${category}`).toBeTruthy();
+			expect(CATEGORY_ICONS[category], `icon → ${category}`).toBeTruthy();
+		}
+	});
+});
+
 describe('the category source scan is live', () => {
 	test('it found both halves of the tree (not a no-op over a renamed directory)', () => {
 		expect(SVELTE_FILES.length).toBeGreaterThan(100);
@@ -182,7 +199,7 @@ describe('one category → color assignment', () => {
 		expect(
 			offenders,
 			`Hand-written category → color entries found: ${JSON.stringify(offenders)}. ` +
-				'A category is assigned a color ONCE, in CATEGORY_COLOR_TOKENS (chart-colors.ts); ' +
+				'A category is assigned a color ONCE, in CATEGORY_COLOR_TOKENS (constants/expense-categories.ts); ' +
 				'renderers key their own map by COLOR TOKEN and derive the category from it, or ' +
 				'badges drift from chart colors again.'
 		).toEqual([]);
@@ -246,7 +263,7 @@ describe('one category → label map', () => {
 		expect(
 			offenders,
 			`Hand-written category → label entries found: ${JSON.stringify(offenders)}. ` +
-				'A category is named ONCE, in CATEGORY_LABELS (chart-colors.ts); import it (or ' +
+				'A category is named ONCE, in EXPENSE_CATEGORY_INFO (constants/expense-categories.ts); import it (or ' +
 				'`getCategoryLabel`) instead of writing a second set of names.'
 		).toEqual([]);
 	});
@@ -318,7 +335,7 @@ describe('one category → icon assignment', () => {
 		expect(
 			offenders,
 			`Hand-written category → icon entries found: ${JSON.stringify(offenders)}. ` +
-				'A category is assigned an icon ONCE, in CATEGORY_ICONS (expense-helpers.ts); call ' +
+				'A category is assigned an icon ONCE, in EXPENSE_CATEGORY_INFO (constants/expense-categories.ts); call ' +
 				'`getCategoryIcon` instead, or the picker and the table disagree again.'
 		).toEqual([]);
 	});

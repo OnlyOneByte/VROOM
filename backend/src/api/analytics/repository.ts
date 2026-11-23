@@ -41,6 +41,7 @@ import {
   buildVehicleMaintenanceCosts,
   buildVehicleRadar,
   type Calendar,
+  type CategoryAmounts,
   calendarParts,
   computeAverageCosts,
   computeEfficiencyPoint,
@@ -274,15 +275,7 @@ export interface FuelAdvancedData {
     avgCost: number;
     avgVolume: number;
   }>;
-  monthlyCostHeatmap: Array<{
-    month: string;
-    fuel: number;
-    maintenance: number;
-    financial: number;
-    regulatory: number;
-    enhancement: number;
-    misc: number;
-  }>;
+  monthlyCostHeatmap: Array<{ month: string } & CategoryAmounts>;
   fillupIntervals: Array<{ intervalLabel: string; count: number }>;
 }
 

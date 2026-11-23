@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ExpenseCategory } from '#lib/types/index.ts';
+	import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_INFO } from '#lib/constants/expense-categories.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import { getCategoryIcon } from '#lib/utils/expense-helpers.ts';
@@ -13,34 +13,7 @@
 
 	let { value, error, touched = false, onSelect }: Props = $props();
 
-	const categories = [
-		{ value: 'fuel', label: 'Fuel', description: 'Gas, diesel, and EV charging' },
-		{
-			value: 'maintenance',
-			label: 'Maintenance',
-			description: 'Keeping the car running'
-		},
-		{
-			value: 'financial',
-			label: 'Financial',
-			description: 'Insurance, loan payment, lease payment, etc'
-		},
-		{
-			value: 'regulatory',
-			label: 'Regulatory',
-			description: 'Registration, tickets, inspections, etc'
-		},
-		{
-			value: 'enhancement',
-			label: 'Enhancement',
-			description: 'Optional improvements'
-		},
-		{
-			value: 'misc',
-			label: 'Misc',
-			description: 'Tolls, parking, etc.'
-		}
-	] as const satisfies readonly { value: ExpenseCategory; label: string; description: string }[];
+	const categories = EXPENSE_CATEGORIES.map(value => ({ value, ...EXPENSE_CATEGORY_INFO[value] }));
 </script>
 
 <div class="space-y-3">
@@ -71,7 +44,7 @@
 								: 'text-muted-foreground'}"
 						/>
 						<span class="font-medium text-sm text-foreground">
-							{category.label}
+							{category.shortLabel}
 						</span>
 					</div>
 					<p class="text-xs text-muted-foreground">

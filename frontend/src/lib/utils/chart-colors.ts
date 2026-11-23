@@ -1,4 +1,10 @@
-import type { ExpenseCategory } from '#lib/types/index.ts';
+import {
+	type CategoryColorToken,
+	type ExpenseCategory,
+	mapExpenseCategories
+} from '#lib/constants/expense-categories.ts';
+
+export type { CategoryColorToken };
 
 export const CHART_COLORS = [
 	'var(--chart-1)',
@@ -11,25 +17,13 @@ export const CHART_COLORS = [
 	'var(--chart-8)'
 ] as const;
 
-export const CATEGORY_COLOR_TOKENS = {
-	fuel: 'chart-1',
-	maintenance: 'chart-2',
-	financial: 'chart-3',
-	regulatory: 'chart-4',
-	enhancement: 'chart-5',
-	misc: 'neutral'
-} as const satisfies Record<ExpenseCategory, string>;
-
-export type CategoryColorToken = (typeof CATEGORY_COLOR_TOKENS)[ExpenseCategory];
+export const CATEGORY_COLOR_TOKENS: Record<ExpenseCategory, CategoryColorToken> =
+	mapExpenseCategories(info => info.colorToken);
 
 export function mapCategoryColorTokens<T>(
 	render: (token: CategoryColorToken) => T
 ): Record<ExpenseCategory, T> & Record<string, T> {
-	const rendered: Record<string, T> = {};
-	for (const category of Object.keys(CATEGORY_COLOR_TOKENS) as ExpenseCategory[]) {
-		rendered[category] = render(CATEGORY_COLOR_TOKENS[category]);
-	}
-	return rendered as Record<ExpenseCategory, T> & Record<string, T>;
+	return mapExpenseCategories(info => render(info.colorToken));
 }
 
 function chartFillForToken(token: CategoryColorToken): string {
@@ -39,14 +33,8 @@ function chartFillForToken(token: CategoryColorToken): string {
 export const CATEGORY_COLORS: Record<ExpenseCategory, string> & Record<string, string> =
 	mapCategoryColorTokens(chartFillForToken);
 
-export const CATEGORY_LABELS: Record<ExpenseCategory, string> & Record<string, string> = {
-	fuel: 'Fuel & Charging',
-	maintenance: 'Maintenance',
-	financial: 'Financial',
-	regulatory: 'Regulatory',
-	enhancement: 'Enhancement',
-	misc: 'Misc'
-};
+export const CATEGORY_LABELS: Record<ExpenseCategory, string> & Record<string, string> =
+	mapExpenseCategories(info => info.label);
 
 export function getCategoryChartColor(key: string): string {
 	return Object.hasOwn(CATEGORY_COLORS, key) ? (CATEGORY_COLORS[key] as string) : 'var(--primary)';
