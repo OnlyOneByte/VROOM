@@ -14,6 +14,25 @@ import { DETECT_SAMPLE_LENGTH, parseCsvHeaders } from '#lib/utils/import-mapping
 import { detectionOutcome } from './import-detection';
 import { buildImportMapping, type ManualColumns } from './import-mapping';
 
+export interface ImportCopy {
+	previewFailed: (format: DetectedImportFormat | null) => string;
+	detectFailed: string | null;
+	done: (imported: number, format: DetectedImportFormat | null) => string;
+	failed: (format: DetectedImportFormat | null) => string;
+}
+
+const IMPORT_COPY: ImportCopy = {
+	previewFailed: () => "Couldn't read that CSV",
+	detectFailed: null,
+	done: imported => `Imported ${imported} expense${imported === 1 ? '' : 's'}`,
+	failed: () => "Couldn't import the expenses"
+};
+
+interface ImportFormOptions {
+	presetsOnly?: boolean;
+	copy?: Partial<ImportCopy>;
+}
+
 export class ImportExpensesForm {
 	csvText = $state('');
 	fileName = $state<string | null>(null);
@@ -24,6 +43,7 @@ export class ImportExpensesForm {
 	formats = $state<ImportFormatList | null>(null);
 	isDetecting = $state(false);
 	detectedPreset = $state<DetectedImportFormat | null>(null);
+	unrecognized = $state(false);
 	targetVehicleId = $state('');
 
 	fileHeaders = $state<string[]>([]);
@@ -36,6 +56,9 @@ export class ImportExpensesForm {
 	categoryRemap = $state<Record<string, ExpenseCategory>>({});
 
 	readonly #getVehicles: () => Vehicle[];
+	readonly #presetsOnly: boolean;
+	readonly #copy: ImportCopy;
+	#flow = 0;
 
 	targetVehicle = $derived(this.#findTargetVehicle());
 	mapping = $derived(
@@ -57,11 +80,15 @@ export class ImportExpensesForm {
 	errorRows = $derived(this.preview?.rows.filter(r => r.status === 'error') ?? []);
 	unmappedCategories = $derived(this.preview?.unmappedCategories ?? []);
 
-	constructor(getVehicles: () => Vehicle[]) {
+	constructor(getVehicles: () => Vehicle[], options: ImportFormOptions = {}) {
 		this.#getVehicles = getVehicles;
+		this.#presetsOnly = options.presetsOnly ?? false;
+		this.#copy = { ...IMPORT_COPY, ...options.copy };
 	}
 
 	reset() {
+		this.#flow++;
+		this.unrecognized = false;
 		this.csvText = '';
 		this.fileName = null;
 		this.preview = null;
@@ -89,24 +116,41 @@ export class ImportExpensesForm {
 	}
 
 	async loadFile(file: File) {
+		const flow = ++this.#flow;
 		this.fileName = file.name;
-		this.csvText = await file.text();
-		await this.detectSource();
-		await this.runPreview();
+		const text = await file.text();
+		if (flow !== this.#flow) return;
+		this.csvText = text;
+		await this.#detect(flow);
+		if (flow === this.#flow) await this.#preview(flow);
 	}
 
 	async handlePasteBlur() {
-		await this.detectSource();
-		await this.runPreview();
+		const flow = ++this.#flow;
+		await this.#detect(flow);
+		if (flow === this.#flow) await this.#preview(flow);
 	}
 
-	async detectSource() {
+	detectSource() {
+		return this.#detect(++this.#flow);
+	}
+
+	runPreview() {
+		return this.#preview(++this.#flow);
+	}
+
+	async #detect(flow: number) {
+		const chosenVehicleId = this.targetVehicleId;
 		this.detectedPreset = null;
+		this.unrecognized = false;
 		this.targetVehicleId = '';
 		this.manualMapping = false;
 		this.manualColumns = {};
 		this.categoryRemap = {};
 		this.fileHeaders = [];
+		this.preview = null;
+		this.isPreviewing = false;
+		this.isDetecting = false;
 		const sample = this.csvText.slice(0, DETECT_SAMPLE_LENGTH);
 		if (!sample.trim()) return;
 		const headers = parseCsvHeaders(this.csvText);
@@ -114,47 +158,49 @@ export class ImportExpensesForm {
 		this.isDetecting = true;
 		try {
 			const preset = await expenseApi.detectImportSource(sample);
+			if (flow !== this.#flow) return;
 			this.detectedPreset = preset;
-			if (!preset && headers.length === 0) return;
+			this.unrecognized = !preset;
+			if (!preset && (this.#presetsOnly || headers.length === 0)) return;
 			const outcome = detectionOutcome(
 				headers,
 				preset,
 				this.#getVehicles().map(v => v.id)
 			);
-			if (outcome.targetVehicleId) this.targetVehicleId = outcome.targetVehicleId;
+			const targetVehicleId = (preset && chosenVehicleId) || outcome.targetVehicleId;
+			if (targetVehicleId) this.targetVehicleId = targetVehicleId;
 			if (outcome.manualColumns) {
 				this.manualMapping = true;
 				this.manualColumns = outcome.manualColumns;
 				this.#seedManualUnitsFromTarget();
 			}
-		} catch {
+		} catch (err) {
+			if (flow !== this.#flow) return;
 			this.detectedPreset = null;
+			if (this.#copy.detectFailed) handleErrorWithNotification(err, this.#copy.detectFailed);
 		} finally {
-			this.isDetecting = false;
+			if (flow === this.#flow) this.isDetecting = false;
 		}
 	}
 
-	async runPreview() {
-		if (!this.csvText.trim()) {
-			this.preview = null;
-			return;
-		}
-		if (this.needsTargetVehicle || this.needsManualMapping) {
-			this.preview = null;
-			return;
-		}
-		this.isPreviewing = true;
+	async #preview(flow: number) {
 		this.preview = null;
+		if (!this.csvText.trim() || (this.#presetsOnly && !this.detectedPreset)) return;
+		if (this.needsTargetVehicle || this.needsManualMapping) return;
+		this.isPreviewing = true;
 		try {
-			this.preview = await expenseApi.importExpensesCsv(
+			const preview = await expenseApi.importExpensesCsv(
 				this.csvText,
 				true,
 				this.mapping ?? undefined
 			);
+			if (flow === this.#flow) this.preview = preview;
 		} catch (err) {
-			handleErrorWithNotification(err, "Couldn't read that CSV");
+			if (flow === this.#flow) {
+				handleErrorWithNotification(err, this.#copy.previewFailed(this.detectedPreset));
+			}
 		} finally {
-			this.isPreviewing = false;
+			if (flow === this.#flow) this.isPreviewing = false;
 		}
 	}
 
@@ -198,14 +244,11 @@ export class ImportExpensesForm {
 				false,
 				this.mapping ?? undefined
 			);
-			appStore.addNotification({
-				type: 'success',
-				message: `Imported ${result.imported} expense${result.imported === 1 ? '' : 's'}`
-			});
+			appStore.showSuccess(this.#copy.done(result.imported, this.detectedPreset));
 			onImported();
 			return true;
 		} catch (err) {
-			handleErrorWithNotification(err, "Couldn't import the expenses");
+			handleErrorWithNotification(err, this.#copy.failed(this.detectedPreset));
 			return false;
 		} finally {
 			this.isImporting = false;
