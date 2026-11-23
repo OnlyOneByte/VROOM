@@ -213,6 +213,7 @@ describe('Settings page loading', () => {
 	test('groups storage and both AI provider cards under one Connections section', async () => {
 		await mount();
 		const section = screen.getByRole('region', { name: 'Connections' });
+		expect(section.nextElementSibling).toBeNull();
 		expect(section).toContainElement(screen.getByTestId('stub-model-vlm'));
 		expect(section).toContainElement(screen.getByTestId('stub-model-llm'));
 		expect(section).toContainElement(screen.getByRole('button', { name: 'stub download' }));
