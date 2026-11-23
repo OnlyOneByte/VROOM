@@ -41,7 +41,7 @@ Composed in `src/app.ts`, in this order: error handler → body limit (10MB; 50M
 backup restore upload) → secure headers (CSP, HSTS, `X-Frame-Options`) → optional auth
 (`/api/*` only) → rate limiter → CORS → CSRF → request logging → activity tracking.
 
-Optional auth runs *before* the rate limiter on purpose: it populates the user context, so
+Optional auth runs _before_ the rate limiter on purpose: it populates the user context, so
 authenticated callers are rate-limited per user instead of sharing an IP bucket.
 
 ### Authentication
@@ -105,12 +105,19 @@ file, not touching call sites. Backups go through the `BackupStrategy` interface
 in `src/api/sync/`, implemented under `src/api/providers/backup-strategies/`: a generic ZIP
 strategy for any storage provider (S3-compatible, fake), and a Google Drive strategy that adds
 the Sheets mirror. `src/api/sync/init.ts` registers each storage type's strategy from its
-descriptor's `backupStrategy` (ZIP by default), and `src/api/sync/backup-orchestrator.ts` fans
-out to every enabled provider. An enabled provider whose type has no strategy is marked failed
-rather than skipped, so the run ends `failed`, or `partial` when another provider succeeded.
-Photo-only types (`photoOnly: true` on the storage descriptor, mirrored in the frontend's
-`PROVIDER_META` and checked by a parity test) get no strategy, offer no ZIP backup, and the
-orchestrator ignores any backup settings left on them.
+descriptor's features (the Drive strategy when `backupSheets` is set, ZIP otherwise), and
+`src/api/sync/backup-orchestrator.ts` fans out to every enabled provider. An enabled provider
+whose type has no strategy is marked failed rather than skipped, so the run ends `failed`, or
+`partial` when another provider succeeded. Photo-only types (`features.photoOnly` on the
+storage descriptor) get no strategy, offer no ZIP backup, and the orchestrator ignores any
+backup settings left on them.
+
+Every provider is a `ProviderDescriptor` (`src/api/providers/descriptor.ts`): label, config
+schema and field specs, secret names, connect kind, availability and features.
+`GET /api/v1/providers/catalog` serves the available descriptors as JSON, and the frontend
+reads labels, fields and features from it (`lib/stores/provider-catalog.svelte.ts`). The
+frontend keeps only what can't travel as JSON, an icon and an optional custom form per id, in
+`PROVIDER_UI`; a test checks every backend storage id has an entry.
 
 Auto-sync is inactivity-driven: a per-domain `changeTracker` middleware marks data changed on
 each successful write, the global activity middleware arms the inactivity timer, and when it
@@ -157,15 +164,15 @@ original row instead of creating a duplicate.
 
 ## Key design decisions
 
-| Decision | Rationale |
-|---|---|
-| SQLite over Postgres | Single file, no server to run or secure, trivially backed up — right for self-hosting one household |
-| WAL mode | Readers don't block the writer, which matters because analytics queries are wide |
-| Hono on Bun | Small, fast, first-class TypeScript, no transpile step |
-| Repository singletons, no DI framework | Less indirection to trace; constructor-injected DB handle is all testing needs |
-| Side-effect-free `app.ts` | Lets the real app run in-process against an in-memory DB, so route tests exercise real middleware |
-| Polymorphic `source_type`/`source_id` | New expense-generating features add no columns and no query paths |
-| Provider registries per capability | A new storage or model vendor is one file; call sites stay untouched |
-| Svelte 5 runes | Finer-grained reactivity and less ceremony than stores-everywhere |
-| shadcn-svelte | Accessible primitives you own in-tree, no component-library lock-in |
-| layerchart over raw D3 | Svelte-native, so charts are components rather than imperative DOM code |
+| Decision                               | Rationale                                                                                           |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| SQLite over Postgres                   | Single file, no server to run or secure, trivially backed up — right for self-hosting one household |
+| WAL mode                               | Readers don't block the writer, which matters because analytics queries are wide                    |
+| Hono on Bun                            | Small, fast, first-class TypeScript, no transpile step                                              |
+| Repository singletons, no DI framework | Less indirection to trace; constructor-injected DB handle is all testing needs                      |
+| Side-effect-free `app.ts`              | Lets the real app run in-process against an in-memory DB, so route tests exercise real middleware   |
+| Polymorphic `source_type`/`source_id`  | New expense-generating features add no columns and no query paths                                   |
+| Provider registries per capability     | A new storage or model vendor is one file; call sites stay untouched                                |
+| Svelte 5 runes                         | Finer-grained reactivity and less ceremony than stores-everywhere                                   |
+| shadcn-svelte                          | Accessible primitives you own in-tree, no component-library lock-in                                 |
+| layerchart over raw D3                 | Svelte-native, so charts are components rather than imperative DOM code                             |

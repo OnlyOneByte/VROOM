@@ -229,7 +229,21 @@
 
 	<CardContent class="pt-0">
 		<div class="space-y-3">
-			{#if !providerCatalog.loaded}
+			{#if providerCatalog.error && !providerCatalog.loaded}
+				<div role="alert" class="space-y-2">
+					<p class="text-xs text-destructive">
+						Couldn't load the backup options. {providerCatalog.error}
+					</p>
+					<Button
+						variant="outline"
+						size="sm"
+						class="h-10 sm:h-8"
+						onclick={() => providerCatalog.load()}
+					>
+						Retry
+					</Button>
+				</div>
+			{:else if !providerCatalog.loaded}
 				<span class="sr-only">Loading backup options</span>
 			{:else if supportsZipBackup}
 				<div class="flex items-center justify-between">
