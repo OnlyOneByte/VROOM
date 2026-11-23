@@ -95,6 +95,17 @@ describe('focusFirstProblem', () => {
 		expect(document.activeElement?.id).toBe('bad');
 	});
 
+	test('a group marked data-invalid="true" counts in DOM order, but a bare data-invalid does not', async () => {
+		const form = document.createElement('form');
+		form.innerHTML =
+			'<div id="date" data-invalid tabindex="-1"></div><div id="tiles" role="group" tabindex="-1" data-invalid="true"></div><input id="amount" aria-invalid="true" />';
+		document.body.append(form);
+
+		await focusFirstProblem(form);
+
+		expect(document.activeElement?.id).toBe('tiles');
+	});
+
 	test('falls back to the submit error when no field is invalid', async () => {
 		const form = document.createElement('form');
 		form.innerHTML = '<input id="ok" /><p id="submit-error" tabindex="-1">Could not save</p>';
