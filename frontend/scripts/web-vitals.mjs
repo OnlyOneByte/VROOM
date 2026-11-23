@@ -79,40 +79,29 @@ for (const [name, path] of routes) {
 		console.error(`web-vitals: ${path} ended on ${landed.path}. Is the session valid?`);
 		process.exit(1);
 	}
-	const ceiling = budgets.ceilings[name] ?? {};
+	const budget = budgets.routes[name];
 	const row = {
 		name,
 		lcp: Math.round(median(samples.map(sample => sample.lcp))),
 		tbt: Math.round(median(samples.map(sample => sample.tbt))),
 		cls: Number(median(samples.map(sample => sample.cls)).toFixed(3)),
-		ceiling
+		budget
 	};
-	row.aboveTarget = metrics.filter(metric => row[metric] > budgets.target[metric]);
-	row.over = metrics.filter(metric => row[metric] > (ceiling[metric] ?? budgets.target[metric]));
+	row.over = metrics.filter(metric => row[metric] > budget[metric]);
 	results.push(row);
 	console.log(`${name}: LCP ${row.lcp} ms, TBT ${row.tbt} ms, CLS ${row.cls}`);
 }
 await browser.close();
 
-const names = list => list.join(', ').toUpperCase();
-function status(row) {
-	if (row.over.length > 0) return `**OVER** ${names(row.over)}`;
-	if (row.aboveTarget.length > 0) {
-		return `above target: ${names(row.aboveTarget)} (ceiling until ${row.ceiling.until})`;
-	}
-	return 'meets target';
-}
-const limit = (row, metric) => row.ceiling[metric] ?? budgets.target[metric];
-const { target } = budgets;
-const meeting = results.filter(row => row.aboveTarget.length === 0).length;
+const over = results.filter(row => row.over.length > 0);
 const lines = [
-	`Web vitals at 375×812, ${cpuRate}× CPU, median of ${runs} cold loads. Target LCP ≤ ${target.lcp} ms, TBT ≤ ${target.tbt} ms, CLS ≤ ${target.cls}: ${meeting} of ${results.length} routes meet it.`,
+	`Web vitals at 375×812, ${cpuRate}× CPU, median of ${runs} cold loads: ${results.length - over.length} of ${results.length} routes within budget.`,
 	'',
-	'| Route | LCP (ms) | TBT (ms) | CLS | Limit (LCP / TBT / CLS) | Status |',
+	'| Route | LCP (ms) | TBT (ms) | CLS | Budget (LCP / TBT / CLS) | Status |',
 	'|---|---|---|---|---|---|',
 	...results.map(
 		row =>
-			`| ${row.name} | ${row.lcp} | ${row.tbt} | ${row.cls} | ${limit(row, 'lcp')} / ${limit(row, 'tbt')} / ${limit(row, 'cls')} | ${status(row)} |`
+			`| ${row.name} | ${row.lcp} | ${row.tbt} | ${row.cls} | ${row.budget.lcp} / ${row.budget.tbt} / ${row.budget.cls} | ${row.over.length ? `**OVER** ${row.over.join(', ').toUpperCase()}` : 'ok'} |`
 	)
 ];
 const table = lines.join('\n');
@@ -123,10 +112,9 @@ writeFileSync(join(reportDir, 'web-vitals.md'), `${table}\n`);
 writeFileSync(join(reportDir, 'web-vitals.json'), `${JSON.stringify(results, null, '\t')}\n`);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${table}\n`);
 
-const over = results.filter(row => row.over.length > 0);
 if (over.length > 0) {
 	console.error(
-		`\nweb-vitals: ${over.length} route(s) over their limit. Fix the regression, or raise the limit in web-vitals-budgets.json and say why in the PR.`
+		`\nweb-vitals: ${over.length} route(s) over budget. Fix the regression, or raise the budget in web-vitals-budgets.json and say why in the PR.`
 	);
 	process.exit(1);
 }

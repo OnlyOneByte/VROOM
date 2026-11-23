@@ -113,11 +113,10 @@ cd frontend && VITALS_SESSION=<session> VITALS_VEHICLE_ID=<vehicleId> npm run we
 
 `DATABASE_URL` must point at the same scratch database for the seed and the backend, and the
 backend needs `CORS_ORIGINS=http://127.0.0.1:4173`. `VITALS_CHROMIUM` selects a different
-Chromium binary. `frontend/web-vitals-budgets.json` holds the target every route should meet and,
-for a route that doesn't meet it yet, a ceiling naming the issue that will fix it. The job fails
-when a route is over its ceiling, or over the target when it has none. When a change has to go
-over, raise that route's ceiling in the same PR and say in the PR description why; when a route
-meets the target, delete its ceiling.
+Chromium binary. The job fails when a route is over its budget in
+`frontend/web-vitals-budgets.json` (LCP ≤ 1.5 s, TBT ≤ 500 ms, CLS ≤ 0.01 for every route). When a
+change has to go over, raise that route's budget in the same PR and say in the PR description why.
+The CI runner is faster than a mid-range phone, so local runs on a slower machine read higher.
 
 ## Conventions
 

@@ -1,4 +1,10 @@
 {
-	"target": { "lcp": 1500, "tbt": 500, "cls": 0.01 },
-	"ceilings": {}
+	"routes": {
+		"Dashboard": { "lcp": 1500, "tbt": 500, "cls": 0.01 },
+		"Vehicle page": { "lcp": 1500, "tbt": 500, "cls": 0.01 },
+		"Analytics": { "lcp": 1500, "tbt": 500, "cls": 0.01 },
+		"All Expenses": { "lcp": 1500, "tbt": 500, "cls": 0.01 },
+		"Add Expense": { "lcp": 1500, "tbt": 500, "cls": 0.01 },
+		"Add Odometer Reading": { "lcp": 1500, "tbt": 500, "cls": 0.01 }
+	}
 }
