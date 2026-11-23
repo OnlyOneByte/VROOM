@@ -153,24 +153,25 @@
 				<div
 					class="mx-auto mt-12 max-w-5xl overflow-hidden rounded-xl border border-border shadow-sm"
 				>
-					<img
-						src="/landing/dashboard-light.webp"
-						width="1280"
-						height="1180"
-						alt="The VROOM Dashboard with two vehicles: spending totals, the fleet and monthly cost charts"
-						loading="lazy"
-						decoding="async"
-						class="block h-auto w-full dark:hidden"
-					/>
-					<img
-						src="/landing/dashboard-dark.webp"
-						width="1280"
-						height="1180"
-						alt="The VROOM Dashboard with two vehicles: spending totals, the fleet and monthly cost charts"
-						loading="lazy"
-						decoding="async"
-						class="hidden h-auto w-full dark:block"
-					/>
+					{#each ['light', 'dark'] as scheme (scheme)}
+						<picture class={scheme === 'light' ? 'block dark:hidden' : 'hidden dark:block'}>
+							<source
+								media="(max-width: 639px)"
+								srcset="/landing/dashboard-phone-{scheme}.webp"
+								width="750"
+								height="1360"
+							/>
+							<img
+								src="/landing/dashboard-{scheme}.webp"
+								width="1280"
+								height="1180"
+								alt="The VROOM Dashboard with two vehicles: spending totals, the fleet and monthly cost charts"
+								loading="lazy"
+								decoding="async"
+								class="block h-auto w-full"
+							/>
+						</picture>
+					{/each}
 				</div>
 			</div>
 		</div>
