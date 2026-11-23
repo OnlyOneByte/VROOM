@@ -246,7 +246,7 @@
 								type="number"
 								min={amountStep()}
 								step={amountStep()}
-								placeholder="e.g., 350.00"
+								placeholder={amountPlaceholder()}
 								bind:value={financingForm.paymentAmount}
 								aria-invalid={!!errors['paymentAmount']}
 								aria-describedby={errors['paymentAmount'] ? 'paymentAmount-error' : undefined}
@@ -287,7 +287,7 @@
 								type="number"
 								min="0"
 								step={amountStep()}
-								placeholder="e.g., 0.25"
+								placeholder={amountPlaceholder()}
 								bind:value={financingForm.excessMileageFee}
 							/>
 						</div>

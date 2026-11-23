@@ -177,6 +177,8 @@ describe('FinancingFormSection amount inputs follow the currency', () => {
 		}
 		expect(document.getElementById('paymentAmount')?.getAttribute('min')).toBe('1');
 		expect(document.getElementById('originalAmount')?.getAttribute('placeholder')).toBe('0');
+		expect(document.getElementById('paymentAmount')?.getAttribute('placeholder')).toBe('0');
+		expect(document.getElementById('excessMileageFee')?.getAttribute('placeholder')).toBe('0');
 		cleanup();
 		mount({ ownershipType: 'finance' });
 		expect(document.getElementById('apr')?.getAttribute('step')).toBe('0.01');
@@ -188,6 +190,8 @@ describe('FinancingFormSection amount inputs follow the currency', () => {
 			expect(document.getElementById(id)?.getAttribute('step')).toBe('0.01');
 		}
 		expect(document.getElementById('paymentAmount')?.getAttribute('min')).toBe('0.01');
+		expect(document.getElementById('paymentAmount')?.getAttribute('placeholder')).toBe('0.00');
+		expect(document.getElementById('excessMileageFee')?.getAttribute('placeholder')).toBe('0.00');
 	});
 });
 
