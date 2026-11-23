@@ -442,9 +442,12 @@
 							<div class="space-y-2 text-sm" role="alert" data-testid="vehicle-load-error">
 								<p id="vehicle-load-message" class="flex items-start gap-2 text-destructive">
 									<CircleAlert class="mt-0.5 h-4 w-4 shrink-0" />
-									{form.showFuelFields
-										? FUEL_NEEDS_VEHICLE_MESSAGE
-										: "Couldn't load this vehicle's details."}
+									<span>
+										{form.showFuelFields
+											? FUEL_NEEDS_VEHICLE_MESSAGE
+											: "Couldn't load this vehicle's details."}
+										{form.vehicleError}
+									</span>
 								</p>
 								<Button
 									bind:ref={retryButton}
