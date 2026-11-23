@@ -4,7 +4,6 @@ import {
   asc,
   desc,
   eq,
-  exists,
   gte,
   inArray,
   isNotNull,
@@ -13,14 +12,13 @@ import {
   max,
   min,
   ne,
-  or,
   type SQL,
   sql,
 } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
-import { expenses, odometerEntries, photos, vehicleShares } from '../../db/schema';
+import { expenses, odometerEntries, photos } from '../../db/schema';
 import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import type { DrizzleTransaction } from '../../db/types';
 import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '../../errors';
@@ -30,6 +28,7 @@ import { logger } from '../../utils/logger';
 import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
 import { zonedDayWindow, zonedMidnight } from '../../utils/time-zone';
+import { readableVehiclesScope } from '../../utils/vehicle-access';
 import { expenseSplitService } from './split-service';
 import {
   type OdometerCheck,
@@ -514,24 +513,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           lastExpenseDate: sql<string>`MAX(${toDateTimeString(expenses.date)})`,
         })
         .from(expenses)
-        .where(
-          or(
-            eq(expenses.userId, userId),
-            exists(
-              this.db
-                .select({ id: vehicleShares.id })
-                .from(vehicleShares)
-                .where(
-                  and(
-                    eq(vehicleShares.vehicleId, expenses.vehicleId),
-                    eq(vehicleShares.ownerId, expenses.userId),
-                    eq(vehicleShares.sharedWithId, userId),
-                    eq(vehicleShares.status, 'accepted')
-                  )
-                )
-            )
-          )
-        )
+        .where(readableVehiclesScope(expenses.vehicleId, expenses.userId, userId, this.db))
         .groupBy(expenses.vehicleId);
 
       return rows.map((r) => ({

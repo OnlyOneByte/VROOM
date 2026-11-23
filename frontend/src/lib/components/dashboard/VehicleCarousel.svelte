@@ -178,7 +178,7 @@
 										</div>
 									{/if}
 
-									<Card.Content class="relative p-4 flex flex-col h-[200px]">
+									<Card.Content class="relative p-4 flex flex-col min-h-[200px]">
 										<!-- Stretched-link overlay: the action button must stay above it (z-10). -->
 										<div class="mb-3">
 											<div class="flex items-start gap-3">
@@ -207,7 +207,7 @@
 														</a>
 													</h3>
 													{#if vehicle.hasActiveFinancing || vehicle.sharedBy}
-														<div class="mt-1 flex min-w-0 gap-1">
+														<div class="mt-1 flex min-w-0 flex-wrap gap-1">
 															{#if vehicle.hasActiveFinancing}
 																<Badge variant="secondary">Financed</Badge>
 															{/if}

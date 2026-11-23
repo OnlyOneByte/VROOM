@@ -1,4 +1,4 @@
-import { and, eq, type SQL } from 'drizzle-orm';
+import { and, type Column, eq, exists, or, type SQL } from 'drizzle-orm';
 import type { AppDatabase } from '../db/connection';
 import { getDb } from '../db/connection';
 import { vehicleShares, vehicles } from '../db/schema';
@@ -79,4 +79,25 @@ export async function requireVehiclesAccess(
 
 export function ownedVehiclesScope(userId: string): SQL {
   return eq(vehicles.userId, userId);
+}
+
+export function readableVehiclesScope(
+  vehicleId: Column,
+  ownerId: Column,
+  userId: string,
+  db: AppDatabase | DrizzleTransaction = getDb()
+): SQL {
+  const sharedWithUser = db
+    .select({ id: vehicles.id })
+    .from(vehicles)
+    .innerJoin(
+      vehicleShares,
+      and(
+        eq(vehicleShares.vehicleId, vehicles.id),
+        eq(vehicleShares.sharedWithId, userId),
+        eq(vehicleShares.status, 'accepted')
+      )
+    )
+    .where(and(eq(vehicles.id, vehicleId), eq(vehicles.userId, ownerId)));
+  return or(eq(ownerId, userId), exists(sharedWithUser)) as SQL;
 }

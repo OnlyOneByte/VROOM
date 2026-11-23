@@ -121,7 +121,7 @@ describe('GET /api/v1/expenses/vehicle-stats for shared vehicles', () => {
       const accepted = await invitee.request('POST', `/api/v1/shares/${created.data.id}/accept`);
       expect(accepted.status).toBe(200);
     }
-    return invitee;
+    return { ...invitee, shareId: created.data.id };
   }
 
   async function statsFor(request: (method: string, path: string) => Promise<Response>) {
@@ -150,6 +150,18 @@ describe('GET /api/v1/expenses/vehicle-stats for shared vehicles', () => {
     }
     expect(await statsFor(pending.request)).toEqual([]);
     expect(await statsFor(stranger.request)).toEqual([]);
+  });
+
+  test('a share the owner revoked gives nothing back', async () => {
+    const shared = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    await createExpense(shared, 90, isoDaysAgo(4));
+    const viewer = await share(shared, 'viewer', true);
+    expect(await statsFor(viewer.request)).toHaveLength(1);
+
+    const revoked = await ctx.authed('DELETE', `/api/v1/shares/${viewer.shareId}`);
+    expect(revoked.status).toBe(200);
+
+    expect(await statsFor(viewer.request)).toEqual([]);
   });
 
   test("an expense an editor logs counts toward the owner's card too", async () => {
