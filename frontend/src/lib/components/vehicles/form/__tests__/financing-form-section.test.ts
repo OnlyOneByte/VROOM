@@ -64,6 +64,7 @@ function mount(
 		errors?: FinancingFormErrors;
 		isEditMode?: boolean;
 		vehicle?: Vehicle | null;
+		distanceUnit?: 'miles' | 'kilometers';
 		amortizationPreview?: typeof PREVIEW | null;
 	} = {}
 ) {
@@ -74,6 +75,7 @@ function mount(
 			errors: props.errors ?? {},
 			isEditMode: props.isEditMode ?? false,
 			vehicle: props.vehicle ?? null,
+			distanceUnit: props.distanceUnit ?? 'miles',
 			amortizationPreview: props.amortizationPreview ?? null
 		}
 	});
@@ -132,6 +134,20 @@ describe('FinancingFormSection ownership', () => {
 		expect(screen.getByLabelText(/Excess Mileage Fee/)).toBeTruthy();
 		expect(screen.queryByLabelText(/APR/)).toBeNull();
 	});
+
+	test.each([
+		['miles', 'mi', 'e.g., 12000'],
+		['kilometers', 'km', 'e.g., 20000']
+	] as const)(
+		'a %s vehicle labels the lease distance terms in %s',
+		(distanceUnit, short, example) => {
+			mount({ ownershipType: 'lease', distanceUnit });
+			const limit = screen.getByLabelText(`Annual Mileage Limit (${short})`);
+			expect(limit.getAttribute('placeholder')).toBe(example);
+			expect(screen.getByLabelText(`Excess Mileage Fee (per ${short})`)).toBeTruthy();
+			expect(screen.queryByText(/per mile\b/)).toBeNull();
+		}
+	);
 
 	test('switching ownership swaps the fields shown', async () => {
 		mount({ ownershipType: 'own' });

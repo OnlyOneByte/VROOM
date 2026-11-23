@@ -997,6 +997,7 @@
 					{errors}
 					{isEditMode}
 					{vehicle}
+					{distanceUnit}
 					amortizationPreview={loanTermsChanged ? amortizationPreview : null}
 				/>
 			</form>

@@ -20,6 +20,8 @@
 		formatDateWith
 	} from '#lib/utils/formatters.ts';
 	import type { Vehicle, FinancingFormErrors, FinancingPaymentConfig } from '#lib/types/index.ts';
+	import type { DistanceUnit } from '#lib/types/settings.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 
 	interface Props {
 		ownershipType: 'own' | 'lease' | 'finance';
@@ -40,6 +42,7 @@
 		errors: FinancingFormErrors;
 		isEditMode: boolean;
 		vehicle: Vehicle | null;
+		distanceUnit: DistanceUnit;
 		amortizationPreview: {
 			monthlyPayment: number;
 			totalInterest: number;
@@ -54,8 +57,11 @@
 		errors,
 		isEditMode,
 		vehicle,
+		distanceUnit,
 		amortizationPreview
 	}: Props = $props();
+
+	const distanceShort = $derived(getDistanceUnitLabel(distanceUnit, true));
 
 	function formatPayoffDate(date: Date): string {
 		return formatDateWith(new Date(date), {
@@ -271,17 +277,17 @@
 							/>
 						</div>
 						<div class="space-y-2">
-							<Label for="mileageLimit">Annual Mileage Limit</Label>
+							<Label for="mileageLimit">Annual Mileage Limit ({distanceShort})</Label>
 							<Input
 								id="mileageLimit"
 								type="number"
 								min="0"
-								placeholder="e.g., 12000"
+								placeholder={distanceUnit === 'kilometers' ? 'e.g., 20000' : 'e.g., 12000'}
 								bind:value={financingForm.mileageLimit}
 							/>
 						</div>
 						<div class="space-y-2">
-							<Label for="excessMileageFee">Excess Mileage Fee (per mile)</Label>
+							<Label for="excessMileageFee">Excess Mileage Fee (per {distanceShort})</Label>
 							<Input
 								id="excessMileageFee"
 								type="number"
