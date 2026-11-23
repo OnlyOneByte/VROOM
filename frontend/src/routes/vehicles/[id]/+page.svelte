@@ -12,22 +12,24 @@
 		CircleAlert,
 		Users,
 		LoaderCircle,
-		WifiOff
+		WifiOff,
+		Ellipsis
 	} from '@lucide/svelte';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
-	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
 	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
 	import * as CardFull from '#lib/components/ui/card/index.ts';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
 	import VehicleHeader from '#lib/components/vehicles/VehicleHeader.svelte';
 	import VehiclePhotoCarousel from '#lib/components/vehicles/VehiclePhotoCarousel.svelte';
 	import VehicleInfoCard from '#lib/components/vehicles/VehicleInfoCard.svelte';
-	import ExpenseOverviewCard from '#lib/components/vehicles/ExpenseOverviewCard.svelte';
+	import CostPerMileHero from '#lib/components/vehicles/CostPerMileHero.svelte';
+	import * as Popover from '#lib/components/ui/popover/index.ts';
+	import { distanceDriven } from '#lib/utils/cost-per-distance.ts';
+	import { resolveCurrentOdometer } from '#lib/utils/financing-calculations.ts';
 	import FuelEfficiencyStatsCard from '#lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
-	import PeriodSelector from '#lib/components/common/period-selector.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	let InsuranceTab = $state<Component<{ vehicleId: string; readOnly?: boolean }> | null>(null);
 	let hasLoadedInsurance = $state(false);
@@ -77,7 +79,7 @@
 	let activeTab = $state('overview');
 	let visitedTabs = $state<Record<string, boolean>>({ overview: true });
 	let vehicleStatsData = $state<VehicleStats | null>(null);
-	let selectedStatsPeriod = $state<TimePeriod>('all');
+	const selectedStatsPeriod: TimePeriod = 'all';
 
 	let summary = $state<ExpenseSummary | null>(null);
 	let fuelEfficiencyPoints = $state<FuelEfficiencyPoint[]>([]);
@@ -99,6 +101,7 @@
 	let showUploadDialog = $state(false);
 
 	let shareOpen = $state(false);
+	let moreMenuOpen = $state(false);
 	let hasOpenedUpload = $state(false);
 
 	const CATEGORY_CHART_TITLE = 'Expense by Category';
@@ -154,11 +157,21 @@
 			.sort((a, b) => b.value - a.value);
 	});
 
-	let localStats = $derived({
-		totalExpenses: summary?.totalAmount ?? 0,
-		recentExpenses: summary?.recentAmount ?? 0,
-		monthlyAverage: summary?.monthlyAverage ?? 0
-	});
+	let distanceUnit = $derived(
+		vehicle?.unitPreferences?.distanceUnit ?? settingsStore.unitPreferences.distanceUnit
+	);
+	let currentOdometer = $derived(
+		vehicle
+			? resolveCurrentOdometer(
+					vehicleStatsData?.currentOdometer,
+					vehicleStatsData?.currentMileage,
+					vehicle.initialMileage
+				)
+			: null
+	);
+	let distanceSoFar = $derived(
+		vehicleStatsData ? distanceDriven(currentOdometer, vehicle?.initialMileage) : null
+	);
 
 	let hasExpenseData = $derived((summary?.expenseCount ?? 0) > 0);
 
@@ -230,20 +243,6 @@
 
 	$effect(() => {
 		if (showingCachedVehicle && onlineStatus.current) untrack(loadPage);
-	});
-
-	let previousStatsPeriod = $state<TimePeriod | null>(null);
-	$effect(() => {
-		if (
-			!isLoading &&
-			selectedStatsPeriod &&
-			previousStatsPeriod !== null &&
-			selectedStatsPeriod !== previousStatsPeriod
-		) {
-			void loadVehicleStats();
-			void loadSummary();
-		}
-		previousStatsPeriod = selectedStatsPeriod;
 	});
 
 	$effect(() => {
@@ -451,10 +450,6 @@
 		}
 	}
 
-	function handlePeriodChange(period: TimePeriod) {
-		selectedStatsPeriod = period;
-	}
-
 	async function loadPhotos() {
 		isLoadingPhotos = true;
 		try {
@@ -548,31 +543,41 @@
 </svelte:head>
 
 {#if isLoading}
-	<div class="space-y-6">
+	<div class="space-y-6" data-testid="vehicle-page-skeleton">
 		<div class="flex items-center gap-4">
 			<Skeleton class="h-10 w-10 rounded-md" />
 			<div class="space-y-2">
-				<Skeleton class="h-8 w-64" />
-				<Skeleton class="h-5 w-48" />
+				<Skeleton class="h-8 w-48" />
+				<Skeleton class="h-5 w-64" />
 			</div>
 		</div>
-
-		<div class="space-y-6">
-			<Skeleton class="h-10 w-full" />
-			<div class="flex justify-end">
-				<Skeleton class="h-10 w-[180px]" />
+		<Skeleton class="h-10 w-full" />
+		<div class="space-y-4 rounded-xl border bg-card p-4 sm:p-6">
+			<div class="space-y-1">
+				<Skeleton class="h-5 w-44" />
+				<Skeleton class="h-10 w-32 lg:h-12" />
+				<Skeleton class="h-4 w-56" />
 			</div>
-
-			<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-				{#each Array(4) as _, i (i)}
-					<Card>
-						<CardContent class="p-6 space-y-2">
-							<Skeleton class="h-4 w-24" />
-							<Skeleton class="h-8 w-32" />
-						</CardContent>
-					</Card>
+			<Skeleton class="h-2 w-full" />
+			<div class="grid grid-cols-3 gap-3">
+				{#each Array(3) as _, i (i)}
+					<div class="space-y-1">
+						<Skeleton class="h-4 w-16" />
+						<Skeleton class="h-6 w-20" />
+					</div>
 				{/each}
 			</div>
+		</div>
+		<div class="divide-y rounded-xl border bg-card">
+			{#each Array(3) as _, i (i)}
+				<div class="flex items-center justify-between gap-3 p-4">
+					<div class="space-y-1">
+						<Skeleton class="h-4 w-32" />
+						<Skeleton class="h-3 w-48" />
+					</div>
+					<Skeleton class="h-5 w-16" />
+				</div>
+			{/each}
 		</div>
 	</div>
 {:else if vehicleLoadError}
@@ -581,7 +586,13 @@
 	<div class="space-y-6 pb-24 short:pb-0">
 		<div class="flex flex-wrap items-start justify-between gap-4">
 			<div class="min-w-0 grow basis-[min-content]">
-				<VehicleHeader {vehicle} displayName={vehicleDisplayName} {coverPhotoUrl} />
+				<VehicleHeader
+					{vehicle}
+					displayName={vehicleDisplayName}
+					{coverPhotoUrl}
+					odometer={currentOdometer}
+					{distanceUnit}
+				/>
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
 				{#if isOwner && !showingCachedVehicle}
@@ -589,12 +600,35 @@
 						variant="outline"
 						size="sm"
 						onclick={() => (shareOpen = true)}
-						aria-label="Share"
-						class="h-10 w-10 shrink-0 sm:w-auto"
+						class="hidden h-10 shrink-0 lg:inline-flex"
 					>
-						<Users class="h-4 w-4 sm:mr-2" aria-hidden="true" />
-						<span class="hidden sm:inline">Share</span>
+						<Users class="h-4 w-4 mr-2" aria-hidden="true" />
+						Share
 					</Button>
+					<div class="lg:hidden">
+						<Popover.Root bind:open={moreMenuOpen}>
+							<Popover.Trigger>
+								{#snippet child({ props })}
+									<Button {...props} variant="outline" size="icon-lg" aria-label="More actions">
+										<Ellipsis class="h-4 w-4" />
+									</Button>
+								{/snippet}
+							</Popover.Trigger>
+							<Popover.Content align="end" class="flex w-48 flex-col p-1">
+								<Button
+									variant="ghost"
+									class="h-10 w-full justify-start"
+									onclick={() => {
+										moreMenuOpen = false;
+										shareOpen = true;
+									}}
+								>
+									<Users class="mr-2 h-4 w-4" aria-hidden="true" />
+									Share
+								</Button>
+							</Popover.Content>
+						</Popover.Root>
+					</div>
 				{/if}
 				{#if showAddExpenseAction}
 					<Button
@@ -662,13 +696,15 @@
 							{/snippet}
 						</EmptyState>
 					{:else}
-						<PeriodSelector
-							selectedPeriod={selectedStatsPeriod}
-							isLoading={isLoadingStats}
-							onPeriodChange={handlePeriodChange}
+						<CostPerMileHero
+							{summary}
+							distance={distanceSoFar}
+							{distanceUnit}
+							vehicleType={vehicle.vehicleType}
+							logMileageHref={canWrite
+								? resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })
+								: undefined}
 						/>
-
-						<ExpenseOverviewCard stats={localStats} isLoading={summary === null} />
 
 						<FuelEfficiencyStatsCard
 							{vehicleId}

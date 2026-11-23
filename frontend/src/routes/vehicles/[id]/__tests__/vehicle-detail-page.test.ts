@@ -55,7 +55,6 @@ vi.mock('#lib/components/vehicles/OdometerTab.svelte', () => capture('odometer')
 vi.mock('#lib/components/vehicles/ShareVehicleDialog.svelte', () => capture('share'));
 vi.mock('#lib/components/vehicles/FuelEfficiencyStatsCard.svelte', () => capture('fuelStats'));
 vi.mock('#lib/components/common/MediaCaptureDialog.svelte', () => capture('media'));
-vi.mock('#lib/components/common/period-selector.svelte', () => capture('period'));
 vi.mock('#lib/components/insurance/InsuranceTab.svelte', () => captureWithMarker('insurance'));
 
 const getExpensesByVehicle = vi.fn();
@@ -122,7 +121,8 @@ const EMPTY_SUMMARY: ExpenseSummary = {
 	recentAmount: 0,
 	monthlyAverage: 0,
 	categoryBreakdown: [],
-	monthlyTrend: []
+	monthlyTrend: [],
+	costBuckets: { ownershipTotal: 0, runningTotal: 0, previous: null, byVehicle: [] }
 } as unknown as ExpenseSummary;
 
 const DATA_SUMMARY = {
@@ -134,7 +134,8 @@ const DATA_SUMMARY = {
 		{ category: 'fuel', amount: 300 },
 		{ category: 'maintenance', amount: 1200 }
 	],
-	monthlyTrend: [{ period: '2026-10', amount: 1500, count: 3 }]
+	monthlyTrend: [{ period: '2026-10', amount: 1500, count: 3 }],
+	costBuckets: { ownershipTotal: 0, runningTotal: 1500, previous: null, byVehicle: [] }
 } as unknown as ExpenseSummary;
 
 const EXPENSE = {
@@ -234,7 +235,8 @@ describe('vehicle detail page overview', () => {
 
 		expect(document.title).toBe('Daily Driver - VROOM Car Tracker');
 		expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
-		expect(screen.getByRole('button', { name: 'Share' })).toHaveClass('w-10', 'sm:w-auto');
+		expect(screen.getByRole('button', { name: 'Share' })).toHaveClass('hidden', 'lg:inline-flex');
+		expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument();
 		expect(captured['share']?.['vehicleName']).toBe('Daily Driver');
 		expect(screen.getAllByRole('link', { name: /Add Expense/ })[0]).toHaveAttribute(
 			'href',
@@ -367,7 +369,7 @@ describe('vehicle detail page overview', () => {
 
 		expect(getExpenseSummary).toHaveBeenCalledTimes(2);
 		expect(screen.queryByText("Couldn't load the expense summary")).toBeNull();
-		expect(captured['period']).toBeDefined();
+		expect(screen.getByTestId('cost-per-mile-hero')).toBeInTheDocument();
 	});
 
 	test('a non-Error summary failure shows the same title and hint', async () => {
@@ -378,14 +380,15 @@ describe('vehicle detail page overview', () => {
 		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 
-	test('with expenses the overview hands the period, trend and category data to its cards', async () => {
+	test('with expenses the overview loads all-time figures and hands trend and category data to its cards', async () => {
 		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
 		getFuelEfficiency.mockResolvedValue({
 			fuelEfficiencyTrend: [{ date: '2026-10-01', efficiency: 30, mileage: 1000 }]
 		});
 		await mount();
 
-		expect(captured['period']?.['selectedPeriod']).toBe('all');
+		expect(getExpenseSummary).toHaveBeenCalledWith({ vehicleId: 'v1', period: 'all' });
+		expect(getVehicleStats).toHaveBeenCalledWith('v1', 'all');
 		expect(captured['trend']?.['description']).toBe('All Time');
 		expect(captured['trend']?.['data']).toHaveLength(1);
 		expect(captured['fuelTrend']?.['fuelType']).toBe('gas');
@@ -401,116 +404,8 @@ describe('vehicle detail page overview', () => {
 		});
 		await mount();
 
-		expect(captured['period']).toBeDefined();
+		expect(screen.getByTestId('cost-per-mile-hero')).toBeInTheDocument();
 		expect(captured['pie']).toBeUndefined();
-	});
-
-	test('the stats stay loading until both the summary and the stats for a new period arrive', async () => {
-		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
-		await mount();
-		const onPeriodChange = captured['period']?.['onPeriodChange'] as (p: string) => void;
-		let resolveStats: (stats: null) => void = () => {};
-		getVehicleStats.mockImplementationOnce(() => new Promise(r => (resolveStats = r)));
-
-		onPeriodChange('30d');
-		await settle();
-
-		expect(getExpenseSummary).toHaveBeenLastCalledWith({ vehicleId: 'v1', period: '30d' });
-		expect(captured['fuelStats']?.['isLoadingStats']).toBe(true);
-		expect(captured['period']?.['isLoading']).toBe(true);
-
-		resolveStats(null);
-		await settle();
-
-		expect(captured['fuelStats']?.['isLoadingStats']).toBe(false);
-		expect(captured['period']?.['isLoading']).toBe(false);
-	});
-
-	function deferredByPeriod<T>() {
-		const pending = new Map<string, (value: T) => void>();
-		const call = (period: string) => new Promise<T>(r => pending.set(period, r));
-		const resolve = (period: string, value: T) => pending.get(period)?.(value);
-		return { call, resolve };
-	}
-
-	function summaryWithMonths(months: number): ExpenseSummary {
-		return {
-			...DATA_SUMMARY,
-			monthlyTrend: Array.from({ length: months }, (_, i) => ({
-				period: `2026-0${i + 1}`,
-				amount: 100,
-				count: 1
-			}))
-		} as unknown as ExpenseSummary;
-	}
-
-	const STATS_90D = { period: '90d', fuelExpenseCount: 9 };
-	const STATS_30D = { period: '30d', fuelExpenseCount: 3 };
-
-	async function changePeriodTwice() {
-		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
-		await mount();
-		const summaries = deferredByPeriod<ExpenseSummary>();
-		const stats = deferredByPeriod<unknown>();
-		getExpenseSummary.mockImplementation(({ period }: { period: string }) =>
-			summaries.call(period)
-		);
-		getVehicleStats.mockImplementation((_id: string, period: string) => stats.call(period));
-		const onPeriodChange = captured['period']?.['onPeriodChange'] as (p: string) => void;
-
-		onPeriodChange('90d');
-		await settle();
-		onPeriodChange('30d');
-		await settle();
-		return { summaries, stats };
-	}
-
-	test('an older period answering last does not replace the latest period on screen', async () => {
-		const { summaries, stats } = await changePeriodTwice();
-
-		summaries.resolve('30d', summaryWithMonths(1));
-		stats.resolve('30d', STATS_30D);
-		await settle();
-		summaries.resolve('90d', summaryWithMonths(3));
-		stats.resolve('90d', STATS_90D);
-		await settle();
-
-		expect(captured['trend']?.['description']).toBe('Last 30d');
-		expect(captured['trend']?.['data']).toHaveLength(1);
-		expect(captured['fuelStats']?.['vehicleStatsData']).toEqual(STATS_30D);
-		expect(captured['fuelStats']?.['isLoadingStats']).toBe(false);
-	});
-
-	test('an older period answering first leaves the stats loading for the latest one', async () => {
-		const { summaries, stats } = await changePeriodTwice();
-
-		summaries.resolve('90d', summaryWithMonths(3));
-		stats.resolve('90d', STATS_90D);
-		await settle();
-
-		expect(captured['fuelStats']?.['isLoadingStats']).toBe(true);
-		expect(captured['fuelStats']?.['vehicleStatsData']).not.toEqual(STATS_90D);
-
-		summaries.resolve('30d', summaryWithMonths(1));
-		stats.resolve('30d', STATS_30D);
-		await settle();
-
-		expect(captured['fuelStats']?.['isLoadingStats']).toBe(false);
-		expect(captured['fuelStats']?.['vehicleStatsData']).toEqual(STATS_30D);
-		expect(captured['trend']?.['data']).toHaveLength(1);
-	});
-
-	test('changing the period refetches stats and summary for that period', async () => {
-		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
-		await mount();
-		const onPeriodChange = captured['period']?.['onPeriodChange'] as (p: string) => void;
-
-		onPeriodChange('30d');
-		await settle();
-
-		expect(getVehicleStats).toHaveBeenLastCalledWith('v1', '30d');
-		expect(getExpenseSummary).toHaveBeenLastCalledWith({ vehicleId: 'v1', period: '30d' });
-		expect(captured['trend']?.['description']).toBe('Last 30d');
 	});
 
 	test('fuel efficiency, stats and photo failures are reported without blocking the page', async () => {

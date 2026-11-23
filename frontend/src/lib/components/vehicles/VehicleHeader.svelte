@@ -6,17 +6,40 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import type { Vehicle } from '#lib/types/index.ts';
+	import type { DistanceUnit } from '#lib/types/settings.ts';
+	import { formatNumber } from '#lib/utils/formatters.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 
 	interface Props {
 		vehicle: Vehicle;
 		displayName: string;
 		coverPhotoUrl?: string | null;
+		odometer?: number | null;
+		distanceUnit?: DistanceUnit;
 	}
 
-	let { vehicle, displayName, coverPhotoUrl = null }: Props = $props();
+	let {
+		vehicle,
+		displayName,
+		coverPhotoUrl = null,
+		odometer = null,
+		distanceUnit = 'miles'
+	}: Props = $props();
+
+	let description = $derived(
+		[
+			`${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+			odometer !== null
+				? `${formatNumber(odometer, 0)} ${getDistanceUnitLabel(distanceUnit, true)}`
+				: null,
+			vehicle.licensePlate || null
+		]
+			.filter(Boolean)
+			.join(' · ')
+	);
 </script>
 
-<PageHeader title={displayName} description="{vehicle.year} {vehicle.make} {vehicle.model}">
+<PageHeader title={displayName} {description}>
 	{#snippet back()}
 		<Button
 			variant="outline"
