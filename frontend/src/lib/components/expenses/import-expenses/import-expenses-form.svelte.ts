@@ -263,7 +263,7 @@ export class ImportExpensesForm {
 	}
 
 	async commit(onImported: () => void): Promise<boolean> {
-		if (!this.preview || this.preview.readyCount === 0) return false;
+		if (this.isPreviewing || !this.preview || this.preview.readyCount === 0) return false;
 		const format = this.detectedPreset;
 		this.isImporting = true;
 		try {

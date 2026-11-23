@@ -22,7 +22,16 @@
 		Checking your file…
 	</div>
 {:else if preview}
-	<div class="rounded-lg border bg-card p-4">
+	<div class="relative rounded-lg border bg-card p-4">
+		{#if isPreviewing}
+			<div
+				class="absolute inset-0 flex items-center justify-center gap-1.5 rounded-lg bg-card/70 text-xs text-muted-foreground"
+				aria-hidden="true"
+			>
+				<LoaderCircle class="h-3.5 w-3.5 animate-spin" />
+				Updating…
+			</div>
+		{/if}
 		<div class="flex items-center gap-4 text-sm">
 			<span class="flex items-center gap-1.5 font-medium text-foreground">
 				<CircleCheck class="h-4 w-4 text-chart-2" />
@@ -33,12 +42,6 @@
 					<CircleAlert class="h-4 w-4 text-destructive" />
 					{preview.errorCount}
 					{preview.errorCount === 1 ? 'row needs' : 'rows need'} attention
-				</span>
-			{/if}
-			{#if isPreviewing}
-				<span class="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground" role="status">
-					<LoaderCircle class="h-3.5 w-3.5 animate-spin" />
-					Updating…
 				</span>
 			{/if}
 		</div>
@@ -83,3 +86,5 @@
 		Click outside the box to preview.
 	</p>
 {/if}
+
+<p class="sr-only" role="status">{isPreviewing && preview ? 'Updating the preview…' : ''}</p>
