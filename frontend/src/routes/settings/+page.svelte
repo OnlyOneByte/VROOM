@@ -224,9 +224,9 @@
 		results: BackupOrchestratorResult['results']
 	): string {
 		const names = (ids: string[]) =>
-			ids
-				.map(id => storageProviders.find(provider => provider.id === id)?.displayName ?? id)
-				.join(', ');
+			new Intl.ListFormat('en', { type: 'conjunction' }).format(
+				ids.map(id => storageProviders.find(provider => provider.id === id)?.displayName ?? id)
+			);
 		const unusable = failedProviders.filter(id => results[id]?.unusable);
 		const failed = failedProviders.filter(id => !results[id]?.unusable);
 		const problems = [
