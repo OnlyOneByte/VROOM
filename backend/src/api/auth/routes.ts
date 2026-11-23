@@ -724,6 +724,11 @@ async function updateExistingProvider(
     .set({
       credentials: encryptedCredentials,
       config: { ...existingConfig, accountEmail: email },
+      ...(existing[0].status !== 'disabled' && {
+        status: 'active',
+        lastErrorCode: null,
+        failureCount: 0,
+      }),
       updatedAt: new Date(),
     })
     .where(eq(userProviders.id, providerId));

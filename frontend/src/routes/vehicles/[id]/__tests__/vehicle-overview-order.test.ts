@@ -31,7 +31,8 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 				recentAmount: 300,
 				monthlyAverage: 100,
 				categoryBreakdown: [{ category: 'fuel', amount: 1200, count: 4 }],
-				monthlyTrend: []
+				monthlyTrend: [],
+				costBuckets: { ownershipTotal: 0, runningTotal: 1200, previous: null, byVehicle: [] }
 			})
 	}
 }));
@@ -68,11 +69,11 @@ function follows(later: Node, earlier: Node): boolean {
 }
 
 describe('vehicle Overview puts the numbers first', () => {
-	test('the spending tiles come before the vehicle details and the photos', async () => {
+	test('the cost per distance hero comes before the vehicle details and the photos', async () => {
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 
-		const total = await screen.findByText('Total Expenses');
-		const recent = screen.getByText('Last 30 Days');
+		const recent = await screen.findByText('Last 30 days');
+		const total = screen.getByTestId('cost-per-mile-hero');
 		const details = screen.getByRole('heading', { name: 'Vehicle Information' });
 		const photos = screen.getByRole('heading', { name: 'Photos' });
 
@@ -84,7 +85,7 @@ describe('vehicle Overview puts the numbers first', () => {
 	test('the category chart describes this vehicle, not the fleet', async () => {
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 
-		await screen.findByText('Total Expenses');
+		await screen.findByTestId('cost-per-mile-hero');
 		await vi.waitFor(() => expect(pieProps.value).not.toBeNull());
 		expect(pieProps.value?.['description']).toBe('Distribution for this vehicle');
 	});

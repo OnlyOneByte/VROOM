@@ -25,6 +25,9 @@ const baseProvider: UserProvider = {
   config: { photoRootPath: 'VROOM/Photos' },
   status: 'active',
   lastSyncAt: null,
+  lastErrorCode: null,
+  lastCheckedAt: null,
+  failureCount: 0,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -100,16 +103,29 @@ describe('StorageProviderRegistry', () => {
       );
     });
 
-    test('throws ValidationError when provider is not active', async () => {
-      const inactiveProvider = { ...baseProvider, status: 'error' };
+    test('throws ValidationError when the provider is turned off', async () => {
+      const inactiveProvider = { ...baseProvider, status: 'disabled' };
       const db = createMockDb([[{ storageConfig: baseStorageConfig }], [inactiveProvider]]);
 
       const registry = new StorageProviderRegistry(db as never);
 
       await expect(registry.getDefaultProvider('user-1', 'vehicle_photos')).rejects.toThrow(
-        'Storage provider is not active'
+        'Storage provider is turned off'
       );
     });
+
+    test.each(['needs_reauth', 'error'])(
+      'a provider whose status is %s is still used, so a failing check never hides it',
+      async (status) => {
+        const db = createMockDb([
+          [{ storageConfig: baseStorageConfig }],
+          [{ ...baseProvider, status }],
+        ]);
+        const registry = new StorageProviderRegistry(db as never);
+        const resolved = await registry.getDefaultProvider('user-1', 'vehicle_photos');
+        expect(resolved.providerId).toBe('provider-1');
+      }
+    );
 
     test('returns DEFAULT_STORAGE_CONFIG when user has no settings', async () => {
       const db = createMockDb([[]]);
@@ -196,11 +212,11 @@ describe('StorageProviderRegistry', () => {
       expect(results).toHaveLength(0);
     });
 
-    test('skips inactive backup providers', async () => {
+    test('skips turned-off backup providers', async () => {
       const inactiveBackup: UserProvider = {
         ...baseProvider,
         id: 'provider-2',
-        status: 'error',
+        status: 'disabled',
       };
 
       const configWithBackup: StorageConfig = {

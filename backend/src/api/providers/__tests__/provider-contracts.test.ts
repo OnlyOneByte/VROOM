@@ -160,6 +160,10 @@ describe('storage descriptor features hold for every type', () => {
         expect(on?.capabilities.zip?.success, type).toBe(true);
       }
       expect(uploads).toHaveBeenCalledTimes(zipOnly.length);
+      for (const [params] of uploads.mock.calls) {
+        expect(params.rawPath).toBe('Backups');
+        expect(params.fileName).toMatch(/^vroom-backup-.*\.zip$/);
+      }
     } finally {
       built.mockRestore();
     }
