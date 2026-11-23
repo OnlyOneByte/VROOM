@@ -25,14 +25,7 @@ afterEach(() => {
   testDb.sqlite.close();
 });
 
-const CATEGORIES = [
-  'fuel',
-  'maintenance',
-  'financial',
-  'regulatory',
-  'enhancement',
-  'misc',
-] as const;
+const CATEGORIES = EXPENSE_CATEGORIES;
 
 function resetDb(): void {
   testDb.sqlite.close();

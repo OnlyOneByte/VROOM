@@ -4,6 +4,7 @@ import fc from 'fast-check';
 import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
+import { EXPENSE_CATEGORIES } from '../../../db/types';
 
 export interface TestUser {
   id: string;
@@ -38,15 +39,6 @@ export interface TestInsurancePolicy {
   company: string;
   isActive: boolean;
 }
-
-const EXPENSE_CATEGORIES = [
-  'fuel',
-  'maintenance',
-  'financial',
-  'regulatory',
-  'enhancement',
-  'misc',
-] as const;
 
 export function userArb(index: number): fc.Arbitrary<TestUser> {
   return fc.constant({

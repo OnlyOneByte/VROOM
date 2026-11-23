@@ -305,7 +305,9 @@ describe('one category → label map', () => {
 describe('one category → icon assignment', () => {
 	test('the assignment is the picker\u2019s six distinct icons', () => {
 		expect(Object.keys(CATEGORY_ICONS).sort()).toEqual([...ALL_CATEGORIES].sort());
-		expect(new Set(ALL_CATEGORIES.map(category => CATEGORY_ICONS[category])).size).toBe(6);
+		expect(new Set(ALL_CATEGORIES.map(category => CATEGORY_ICONS[category])).size).toBe(
+			ALL_CATEGORIES.length
+		);
 	});
 
 	test('getCategoryIcon derives from the one assignment', () => {

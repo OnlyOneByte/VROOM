@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
+import { EXPENSE_CATEGORIES } from '#lib/constants/expense-categories.ts';
 import {
 	CATEGORY_COLORS,
 	CATEGORY_LABELS,
@@ -10,7 +11,7 @@ import {
 	getCategoryLabel
 } from '#lib/utils/chart-colors.ts';
 
-const CATEGORY_ENUM = ['fuel', 'maintenance', 'financial', 'regulatory', 'enhancement', 'misc'];
+const CATEGORY_ENUM: string[] = [...EXPENSE_CATEGORIES];
 
 describe('Category maps completeness', () => {
 	test('CATEGORY_COLORS covers the full enum and uses CSS custom property syntax', () => {
