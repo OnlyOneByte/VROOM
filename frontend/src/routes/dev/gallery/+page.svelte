@@ -296,6 +296,7 @@
 				<AppLineChart
 					level={3}
 					title="Summary, dashed average and footer"
+					description="Monthly spending, with its average drawn as a dashed line"
 					data={trend}
 					x="date"
 					y="amount"
