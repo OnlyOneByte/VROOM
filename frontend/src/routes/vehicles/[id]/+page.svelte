@@ -584,7 +584,7 @@
 	<LoadErrorCard title="Couldn't load this vehicle" message={vehicleLoadError} onRetry={loadPage} />
 {:else if vehicle}
 	<div class="space-y-6 pb-24 short:pb-0">
-		<div class="flex flex-wrap items-start justify-between gap-4">
+		<div class="flex items-start justify-between gap-4 sm:flex-wrap">
 			<div class="min-w-0 grow basis-[min-content]">
 				<VehicleHeader
 					{vehicle}
