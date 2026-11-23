@@ -223,17 +223,28 @@ describe('VehicleCarousel states', () => {
 		expect(document.activeElement).toBe(card);
 	});
 
-	test('the arrows sit on the card header band, photo or not, not over the card title', async () => {
+	test('the arrows sit in the Your Fleet header next to Add Vehicle, not over the cards', async () => {
 		embla.reset(1);
 		render(VehicleCarousel, {
-			vehicles: [overview(), overview({ id: 'v2', name: '2019 Honda Civic' })]
+			vehicles: [overview(), overview({ id: 'v2', name: '2019 Honda Civic' })],
+			addVehicleHref: '/vehicles/new'
 		});
 		const next = await screen.findByRole('button', { name: 'Next slide' });
+		const region = screen.getByRole('region', { name: 'Your Fleet' });
+		const header = screen
+			.getByRole('heading', { level: 2, name: 'Your Fleet' })
+			.closest('[data-slot="card-header"]');
 
 		for (const arrow of [next, screen.getByRole('button', { name: 'Previous slide' })]) {
-			expect(arrow).toHaveClass('top-15');
-			expect(arrow).not.toHaveClass('top-1/2');
+			expect(region).not.toContainElement(arrow);
+			expect(header).toContainElement(arrow);
+			expect(arrow.className).not.toMatch(/(^|\s)absolute(\s|$)/);
+			expect(arrow).toHaveAttribute('aria-controls', region.id);
 		}
+		const add = screen.getByRole('link', { name: 'Add Vehicle' });
+		expect(header).toContainElement(add);
+		expect(add).toHaveClass('max-sm:w-10');
+		expect(add.querySelector('span')).toHaveClass('max-sm:sr-only');
 	});
 });
 
@@ -337,15 +348,39 @@ describe('VehicleCarousel vehicle card', () => {
 });
 
 describe('VehicleCarousel compact header', () => {
-	test('a vehicle without a cover photo gets a 64px band with its type icon and make initial', () => {
+	test('a vehicle without a cover photo has no image area, only a 40px type avatar beside its name', () => {
 		render(VehicleCarousel, {
 			vehicles: [overview({ make: 'Toyota', vehicleType: 'gas' })]
 		});
-		const band = screen.getByTestId('fleet-card-header');
-		expect(band).toHaveClass('h-16');
-		expect(band).not.toHaveClass('h-40');
-		expect(band).toHaveTextContent('T');
-		expect(band.querySelector('img')).toBeNull();
+		expect(screen.queryByTestId('fleet-card-header')).toBeNull();
+		const avatar = screen.getByTestId('fleet-card-avatar');
+		expect(avatar).toHaveClass('size-10', 'rounded-full');
+		expect(avatar.parentElement).toContainElement(screen.getByRole('heading', { level: 3 }));
+		expect(avatar.querySelector('.lucide-car')).not.toBeNull();
+	});
+
+	test('an electric vehicle without a photo gets the bolt avatar', () => {
+		render(VehicleCarousel, { vehicles: [overview({ vehicleType: 'electric' })] });
+		expect(screen.getByTestId('fleet-card-avatar').querySelector('.lucide-zap')).not.toBeNull();
+	});
+
+	test('the full name under a nickname spans the card, not the narrow title column', () => {
+		render(VehicleCarousel, {
+			vehicles: [
+				overview({ nickname: 'Daily Driver', name: '2020 Toyota Camry', hasActiveFinancing: true })
+			]
+		});
+		const fullName = screen.getByText('2020 Toyota Camry');
+		const avatarRow = screen.getByTestId('fleet-card-avatar').parentElement;
+		expect(avatarRow).not.toContainElement(fullName);
+		expect(avatarRow?.parentElement).toContainElement(fullName);
+	});
+
+	test('a card hovers with the quiet accent tint, not a heavy shadow', () => {
+		render(VehicleCarousel, { vehicles: [overview()] });
+		const card = screen.getByRole('heading', { level: 3 }).closest('[data-slot="card"]');
+		expect(card).toHaveClass('hover:bg-accent/50');
+		expect(card?.className).not.toMatch(/hover:shadow/);
 	});
 
 	test('a cover photo keeps the full 160px image', () => {
@@ -354,7 +389,11 @@ describe('VehicleCarousel compact header', () => {
 		});
 		const band = screen.getByTestId('fleet-card-header');
 		expect(band).toHaveClass('h-40');
-		expect(band.querySelector('img')).toHaveAttribute('src', '/photo.jpg');
+		const img = band.querySelector('img');
+		expect(img).toHaveAttribute('src', '/photo.jpg');
+		expect(img).toHaveClass('motion-safe:sm:group-hover:scale-110');
+		expect(img?.className).not.toMatch(/(^|\s)group-hover:scale/);
+		expect(screen.queryByTestId('fleet-card-avatar')).toBeNull();
 	});
 
 	test('below lg the Your Fleet header carries Add Vehicle when the page hands it a link', () => {
@@ -364,9 +403,16 @@ describe('VehicleCarousel compact header', () => {
 		expect(add).toHaveClass('lg:hidden');
 	});
 
-	test('the Financed and Shared badges sit beside the title, clear of the arrows on the band', () => {
+	test('the Financed and Shared badges sit beside the title, clear of the photo', () => {
 		render(VehicleCarousel, {
-			vehicles: [overview({ hasActiveFinancing: true, sharedBy: 'Sam', make: 'Toyota' })]
+			vehicles: [
+				overview({
+					hasActiveFinancing: true,
+					sharedBy: 'Sam',
+					make: 'Toyota',
+					coverPhotoUrl: '/p.jpg'
+				})
+			]
 		});
 		const band = screen.getByTestId('fleet-card-header');
 		const title = screen.getByRole('heading', { level: 3 });
