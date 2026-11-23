@@ -31,7 +31,12 @@
 	import * as CardNs from '#lib/components/ui/card/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
-	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
+	import NoVehiclesEmptyState, {
+		NO_VEHICLES_TITLE
+	} from '#lib/components/common/NoVehiclesEmptyState.svelte';
+	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
+	import { resolve } from '$app/paths';
+	import { routes } from '#lib/routes.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import ReminderForm from '#lib/components/reminders/ReminderForm.svelte';
@@ -211,7 +216,7 @@
 <div class="space-y-6 pb-24">
 	<PageHeader title="Reminders" description="Recurring expenses and maintenance reminders">
 		{#snippet actions()}
-			{#if dueReminders.length > 0}
+			{#if dueReminders.length > 0 && vehicles.length > 0}
 				<Button variant="outline" size="lg" onclick={runDueReminders} disabled={isTriggering}>
 					<RefreshCw class="mr-2 h-4 w-4 {isTriggering ? 'animate-spin' : ''}" />
 					Run Due Reminders
@@ -369,6 +374,20 @@
 				</CardNs.CardContent>
 			</CardNs.Card>
 		{/snippet}
+
+		{#if vehicles.length === 0}
+			<Alert data-testid="reminders-no-vehicles">
+				<Car class="h-4 w-4" />
+				<AlertTitle>{NO_VEHICLES_TITLE}</AlertTitle>
+				<AlertDescription>
+					<p>These reminders have no vehicle, so they can't file expenses until you add one.</p>
+					<Button size="lg" class="mt-2" href={resolve(routes.vehicleNew)}>
+						<Plus class="mr-2 h-4 w-4" />
+						Add Vehicle
+					</Button>
+				</AlertDescription>
+			</Alert>
+		{/if}
 
 		{#if dueReminders.length > 0}
 			<section class="space-y-3">

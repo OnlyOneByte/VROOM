@@ -81,6 +81,31 @@ describe('/reminders primary action', () => {
 		expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
 	});
 
+	test('due reminders left without vehicles offer Add Vehicle above the list and no Run Due Reminders', async () => {
+		list.mockImplementation(() => Promise.resolve([reminder('2000-01-01T00:00:00.000Z')]));
+		getVehicles.mockImplementation(() => Promise.resolve([]));
+		render(Page);
+
+		await waitFor(() => expect(screen.getByText('Oil change')).toBeInTheDocument());
+		const prompt = screen.getByTestId('reminders-no-vehicles');
+		expect(prompt).toHaveTextContent("can't file expenses until you add one");
+		expect(controls('Add Vehicle')).toHaveLength(1);
+		expect(controls('Add Vehicle')[0]).toHaveAttribute('href', '/vehicles/new');
+		expect(
+			prompt.compareDocumentPosition(screen.getByText('Oil change')) &
+				Node.DOCUMENT_POSITION_FOLLOWING
+		).toBeTruthy();
+		expect(controls('Run Due Reminders')).toHaveLength(0);
+	});
+
+	test('with vehicles there is no Add Vehicle prompt above the list', async () => {
+		list.mockImplementation(() => Promise.resolve([reminder('2000-01-01T00:00:00.000Z')]));
+		render(Page);
+
+		await waitFor(() => expect(controls('Run Due Reminders')).toHaveLength(1));
+		expect(screen.queryByTestId('reminders-no-vehicles')).toBeNull();
+	});
+
 	test('the empty state offers New Reminder once and no Run Due Reminders', async () => {
 		list.mockImplementation(() => Promise.resolve([]));
 		render(Page);

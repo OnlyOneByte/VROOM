@@ -21,4 +21,11 @@ describe('analytics load failure', () => {
 		expect(screen.queryByText('boom')).toBeNull();
 		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 	});
+
+	test('still shows the tabs under the error card', async () => {
+		render(Page);
+
+		await screen.findByText("Couldn't load analytics");
+		expect(screen.getByRole('tablist')).toBeInTheDocument();
+	});
 });
