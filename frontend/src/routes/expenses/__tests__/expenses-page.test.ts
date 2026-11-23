@@ -247,6 +247,31 @@ describe('/expenses first screen', () => {
 		expect(screen.queryByText(/across 0 vehicles/)).toBeNull();
 	});
 
+	test('until the filtered list arrives, the count keeps the wording of the total it shows', async () => {
+		await mountLoaded();
+		await fireEvent.input(screen.getByRole('textbox', { name: 'Search expenses and vehicles' }), {
+			target: { value: 'shell' }
+		});
+		expect(screen.getByText('1 expense across 2 vehicles')).toBeInTheDocument();
+		expect(screen.queryByText(/match(es)? your filters$/)).toBeNull();
+	});
+
+	test('a search of only spaces is not a filter', async () => {
+		await mountLoaded();
+		const calls = getAllExpenses.mock.calls.length;
+		await fireEvent.input(screen.getByRole('textbox', { name: 'Search expenses and vehicles' }), {
+			target: { value: '   ' }
+		});
+		await waitFor(
+			() => expect(getAllExpenses.mock.calls.length).toBeGreaterThan(calls),
+			SEARCH_DEBOUNCE_WAIT
+		);
+		await waitFor(() =>
+			expect(screen.getByText('1 expense across 2 vehicles')).toBeInTheDocument()
+		);
+		expect(screen.queryByRole('button', { name: /Clear filters/i })).toBeNull();
+	});
+
 	test('with a filter on, the count says it matches the filters instead of naming every vehicle', async () => {
 		await mountLoaded();
 		getAllExpenses.mockResolvedValue(pageOf(ROWS.slice(0, 1), 1));
