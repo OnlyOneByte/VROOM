@@ -56,8 +56,8 @@ Notes:
 - `text-chart-*` is for chart marks and icons, not words: chart tokens are gated at 3:1, on
   `card` and as an icon on their own `/10` tint over `card` and `background` (the category badges
   and `StatCard` chips). Put the label in `text-foreground` beside the tinted icon. Status text
-  uses `text-success` / `text-warning` / `text-destructive`. `chart-5` and `chart-2` are
-  still used for words on a few screens, so both are also gated as text at AA (`background` and
+  uses `text-success` / `text-warning` / `text-destructive`, never a chart token. `chart-5` (the
+  Enhancement badge) and `chart-2` are still used for words on a few screens, so both are also gated as text at AA (`background` and
   `card`, plus `popover` for `chart-2`); new status text uses `text-warning` / `text-success`.
 - In every theme and both modes these tinted text pairs are gated at AA over `background` and
   `card`: `text-primary` on `bg-primary/10` (the active nav item, chips, avatars),

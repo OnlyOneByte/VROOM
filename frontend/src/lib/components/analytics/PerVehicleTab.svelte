@@ -121,7 +121,7 @@
 	// Tier colours fail WCAG contrast as text on their tint; the ring and a label carry the tier.
 	function getScoreBgColor(score: number): string {
 		if (score >= 70) return 'bg-chart-2/10';
-		if (score >= 40) return 'bg-chart-5/10';
+		if (score >= 40) return 'bg-warning/10';
 		return 'bg-destructive/10';
 	}
 

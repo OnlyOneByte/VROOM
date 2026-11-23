@@ -69,7 +69,7 @@
 		urgencyLevel === 'overdue' || urgencyLevel === 'urgent'
 			? 'border-destructive'
 			: urgencyLevel === 'warning'
-				? 'border-chart-5'
+				? 'border-warning'
 				: 'border-chart-2'
 	);
 

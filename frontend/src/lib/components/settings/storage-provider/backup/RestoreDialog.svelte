@@ -498,8 +498,8 @@
 				{/if}
 
 				{#if restoreConflicts.length > 0}
-					<div class="rounded-lg border border-chart-5/30 bg-chart-5/5 p-4">
-						<h4 class="mb-3 font-medium text-chart-5">Conflicts Detected</h4>
+					<div class="rounded-lg border border-warning/30 bg-warning/5 p-4">
+						<h4 class="mb-3 font-medium text-warning">Conflicts Detected</h4>
 						<p class="mb-3 text-sm text-muted-foreground">
 							{restoreConflicts.length} conflict(s) found.
 						</p>

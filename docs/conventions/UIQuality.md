@@ -131,10 +131,10 @@ token table and the role of each token live in `DesignSystem.md` → *Design tok
   "needs attention", `text-success` for "all good". Pair each with an icon or a word — colour is
   never the only signal.
 - **Chart colours are for marks and icons.** `chart-1`…`chart-8` are gated at 3:1; never use them
-  for new text. Existing screens still colour words with two of them: `text-chart-5` (banners,
-  notes and a heading across odometer, insurance, settings and the expense form) and
-  `text-chart-2` (the payment planner, fuel stats) are both gated as text at 4.5:1. Prefer
-  `text-warning` / `text-success`.
+  for new text, and never for status: warnings, offline and pending states, conflicts and
+  "due soon" use `warning`. Two still colour a few words and are gated as text at 4.5:1:
+  `text-chart-5` (the Enhancement category badge and a "(custom)" marker in Settings) and
+  `text-chart-2` (the payment planner, fuel stats). Prefer `text-warning` / `text-success`.
   Category colours come from `getCategoryChartColor` (`utils/chart-colors`) and
   `getCategoryBadgeClasses` (`utils/expense-helpers`), so a category is the same colour in every
   chart and badge.

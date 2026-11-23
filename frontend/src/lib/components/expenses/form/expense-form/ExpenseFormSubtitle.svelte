@@ -25,5 +25,5 @@
 {:else if isEditMode}
 	{getVehicleDisplayName(vehicle)}
 {:else if !onlineStatus.current}
-	<span class="text-chart-5">Offline mode - will sync when online</span>
+	<span class="text-warning">Offline mode - will sync when online</span>
 {/if}
