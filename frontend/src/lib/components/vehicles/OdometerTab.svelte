@@ -1,7 +1,7 @@
 <script module lang="ts">
 	import type { AnyScale } from '#lib/components/charts/index.ts';
 	import {
-		TIME_X_PADDING,
+		fittedTimeTicks,
 		formatDateTick,
 		monthlyXAxisProps
 	} from '#lib/utils/chart-formatters.ts';
@@ -24,9 +24,7 @@
 		return {
 			format,
 			ticks: (scale: AnyScale) => {
-				const ticks: Date[] = (scale.ticks?.(count) ?? []).filter(
-					(tick: Date) => scale(tick) >= TIME_X_PADDING[0]
-				);
+				const ticks = fittedTimeTicks(count, format)(scale);
 				const labels = ticks.map(format);
 				return ticks.filter((_tick, i) => i === 0 || labels[i] !== labels[i - 1]);
 			}

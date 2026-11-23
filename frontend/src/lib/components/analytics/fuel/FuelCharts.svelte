@@ -18,10 +18,9 @@
 	import {
 		formatDecimalAxis,
 		formatCentsAxis,
-		formatDateTick,
+		dayXAxisProps,
 		formatDayLabel,
 		formatCountTooltip,
-		getXTickCount,
 		byVehicleMonth,
 		monthlyXAxisProps,
 		unitTooltip,
@@ -199,7 +198,7 @@
 				series={gasPriceSeries}
 				config={gasPriceConfig}
 				tooltipLabelFormat={formatDayLabel}
-				xAxisProps={{ ticks: getXTickCount(gasPriceData.length, 6), format: formatDateTick }}
+				xAxisProps={dayXAxisProps(gasPriceData.length)}
 			/>
 		{/if}
 		{#if chargePriceData.length > 0}
@@ -213,7 +212,7 @@
 				config={chargePriceConfig}
 				yAxisFormat={formatCentsAxis}
 				tooltipLabelFormat={formatDayLabel}
-				xAxisProps={{ ticks: getXTickCount(chargePriceData.length, 6), format: formatDateTick }}
+				xAxisProps={dayXAxisProps(chargePriceData.length)}
 			/>
 		{/if}
 		{#if showGasCharts}

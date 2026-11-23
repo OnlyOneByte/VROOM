@@ -91,6 +91,45 @@ export function formatDateTick(value: unknown): string {
 	return formatDateWith(value, { month: 'short', day: 'numeric' });
 }
 
+const TICK_WIDE_CHAR_WIDTH = 12;
+
+function tickLabelWidth(label: string): number {
+	let width = 0;
+	for (const char of label) {
+		width += char.charCodeAt(0) > 0x2e7f ? TICK_WIDE_CHAR_WIDTH : TICK_CHAR_WIDTH;
+	}
+	return width;
+}
+
+function labelsFit(ticks: Date[], scale: AnyScale, format: (_v: unknown) => string): boolean {
+	const widths = ticks.map(tick => tickLabelWidth(format(tick)));
+	return ticks.every((tick, i) => {
+		if (i === 0) return true;
+		const space = scale(tick) - scale(ticks[i - 1]);
+		return space >= ((widths[i] ?? 0) + (widths[i - 1] ?? 0)) / 2 + TICK_LABEL_GAP;
+	});
+}
+
+export function fittedTimeTicks(maxTicks: number, format: (_v: unknown) => string) {
+	return (scale: AnyScale): Date[] => {
+		const all: Date[] = (scale.ticks?.(maxTicks) ?? []).filter(
+			(tick: Date) => scale(tick) >= TIME_X_PADDING[0]
+		);
+		for (let stride = 1; stride < all.length; stride++) {
+			const ticks = all.filter((_tick, i) => i % stride === 0);
+			if (labelsFit(ticks, scale, format)) return ticks;
+		}
+		return all.slice(0, 1);
+	};
+}
+
+export function dayXAxisProps(dataLength: number, maxTicks = 6) {
+	return {
+		ticks: fittedTimeTicks(getXTickCount(dataLength, maxTicks), formatDateTick),
+		format: formatDateTick
+	};
+}
+
 export function monthlyXAxisProps(dataLength: number, maxTicks = 4) {
 	return {
 		ticks: getXTickCount(dataLength, maxTicks),
