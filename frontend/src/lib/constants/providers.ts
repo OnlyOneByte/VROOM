@@ -1,12 +1,51 @@
 import type { Component } from 'svelte';
+import { Cloud, Database, Image } from '@lucide/svelte';
 import type { PhotoCategory, CategorySetting } from '#lib/types/index.ts';
 
-export interface ProviderTypeOption {
-	id: string;
+export interface StorageProviderMeta {
 	label: string;
-	description: string;
 	icon: Component<Record<string, unknown>>;
-	disabled: boolean;
+	form: 'google' | 's3' | null;
+	option: { label: string; description: string } | null;
+	defaultPhotoRootPath: string;
+	supportsSheets: boolean;
+}
+
+export const PROVIDER_META: Record<string, StorageProviderMeta> = {
+	'google-drive': {
+		label: 'Google Drive',
+		icon: Cloud,
+		form: 'google',
+		option: { label: 'Google Drive', description: 'Store photos in Google Drive' },
+		defaultPhotoRootPath: 'Photos',
+		supportsSheets: true
+	},
+	'google-photos': {
+		label: 'Google Photos',
+		icon: Image,
+		form: null,
+		option: null,
+		defaultPhotoRootPath: 'photos',
+		supportsSheets: false
+	},
+	s3: {
+		label: 'S3 Compatible',
+		icon: Database,
+		form: 's3',
+		option: { label: 'S3 / B2 / R2', description: 'S3-compatible storage' },
+		defaultPhotoRootPath: 'vroom/photos',
+		supportsSheets: false
+	}
+};
+
+export function providerMeta(providerType: string | null | undefined): StorageProviderMeta | null {
+	return providerType && Object.hasOwn(PROVIDER_META, providerType)
+		? (PROVIDER_META[providerType] ?? null)
+		: null;
+}
+
+export function providerLabel(providerType: string): string {
+	return providerMeta(providerType)?.label ?? providerType;
 }
 
 export const PHOTO_ONLY_PROVIDER_TYPES = ['google-photos'] as const;
