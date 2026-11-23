@@ -43,14 +43,22 @@ describe('ImportPreviewSummary', () => {
 		expect(text(container)).toBe('');
 	});
 
-	test('shows a spinner message while previewing, even if an old preview exists', () => {
+	test('shows a spinner message while the first preview loads', () => {
+		const { container } = render(ImportPreviewSummary, { ...IDLE, isPreviewing: true });
+
+		expect(text(container)).toBe('Checking your file…');
+	});
+
+	test('keeps the previous preview on screen, marked as updating, while a new one loads', () => {
 		const { container } = render(ImportPreviewSummary, {
 			...IDLE,
 			isPreviewing: true,
 			preview: preview(3, 0)
 		});
 
-		expect(text(container)).toBe('Checking your file…');
+		expect(text(container)).toContain('3 ready');
+		expect(text(container)).toContain('Updating…');
+		expect(text(container)).not.toContain('Checking your file…');
 	});
 
 	test('a clean preview shows only the ready count', () => {

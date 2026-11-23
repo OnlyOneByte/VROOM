@@ -16,7 +16,7 @@
 		$props();
 </script>
 
-{#if isPreviewing}
+{#if isPreviewing && !preview}
 	<div class="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
 		<LoaderCircle class="h-4 w-4 animate-spin" />
 		Checking your file…
@@ -33,6 +33,12 @@
 					<CircleAlert class="h-4 w-4 text-destructive" />
 					{preview.errorCount}
 					{preview.errorCount === 1 ? 'row needs' : 'rows need'} attention
+				</span>
+			{/if}
+			{#if isPreviewing}
+				<span class="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground" role="status">
+					<LoaderCircle class="h-3.5 w-3.5 animate-spin" />
+					Updating…
 				</span>
 			{/if}
 		</div>

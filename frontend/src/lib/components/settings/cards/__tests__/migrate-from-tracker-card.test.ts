@@ -300,6 +300,28 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		expect(document.activeElement).toBe(trigger);
 	});
 
+	test('a re-preview after a remap keeps the result in place, marked as updating, with Migrate off', async () => {
+		importExpensesCsv.mockResolvedValueOnce(result({ unmappedCategories: ['Parking'] }));
+		importExpensesCsv.mockReturnValue(new Promise(() => {}));
+		await mount();
+		await openDialog();
+		await chooseFile();
+
+		const trigger = screen.getByLabelText('Category for Parking');
+		await fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' });
+		await fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' });
+		const option = await screen.findByRole('option', { name: 'Maintenance' });
+		await fireEvent.pointerUp(option, { button: 0, pointerType: 'mouse' });
+		await fireEvent.click(option);
+		await settle();
+
+		expect(screen.getByTestId('migrate-preview')).toHaveTextContent('3 ready');
+		expect(screen.getByTestId('migrate-preview')).toHaveTextContent('Updating…');
+		expect(screen.queryByText(/Reading your file/)).toBeNull();
+		expect(commitButton()).toBeDisabled();
+		expect(screen.getByTestId('remap-count')).toHaveTextContent('1 of 1 mapped');
+	});
+
 	test('a vehicle picked before the file is kept for the preview', async () => {
 		getVehicles.mockResolvedValue([
 			vehicle(),

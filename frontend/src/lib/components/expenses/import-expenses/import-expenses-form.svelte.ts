@@ -194,10 +194,16 @@ export class ImportExpensesForm {
 	}
 
 	async #preview(flow: number) {
-		this.preview = null;
 		this.isPreviewing = false;
-		if (!this.csvText.trim() || (this.#presetsOnly && !this.detectedPreset)) return;
-		if (this.needsTargetVehicle || this.needsManualMapping) return;
+		const cannotPreview =
+			!this.csvText.trim() ||
+			(this.#presetsOnly && !this.detectedPreset) ||
+			this.needsTargetVehicle ||
+			this.needsManualMapping;
+		if (cannotPreview) {
+			this.preview = null;
+			return;
+		}
 		this.isPreviewing = true;
 		try {
 			const preview = await expenseApi.importExpensesCsv(
@@ -213,6 +219,7 @@ export class ImportExpensesForm {
 			}
 		} catch (err) {
 			if (flow === this.#previewFlow) {
+				this.preview = null;
 				handleErrorWithNotification(err, this.#copy.previewFailed(this.detectedPreset));
 			}
 		} finally {

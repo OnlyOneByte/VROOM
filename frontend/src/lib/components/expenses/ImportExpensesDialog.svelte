@@ -89,7 +89,10 @@
 			</Button>
 			<Button
 				onclick={handleCommit}
-				disabled={form.isImporting || !form.preview || form.preview.readyCount === 0}
+				disabled={form.isImporting ||
+					form.isPreviewing ||
+					!form.preview ||
+					form.preview.readyCount === 0}
 			>
 				{#if form.isImporting}
 					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
