@@ -1228,15 +1228,29 @@ describe('validateBackupData: the first error is a plain reason', () => {
     const backup = emptyBackup();
     backup.metadata = { ...backup.metadata, version: 'abc' };
     const { errors } = backupService.validateBackupData(backup);
-    expect(errors[0]).toBe(BACKUP_CHECK_REASONS.metadata);
+    expect(errors[0]).toBe(BACKUP_CHECK_REASONS.zip.metadata);
     expect(errors).toContain('Backup version "abc" is not a version number');
   });
 
   test('no reason tells the user to make a backup, which could overwrite the one being restored', () => {
-    for (const reason of Object.values(BACKUP_CHECK_REASONS)) {
-      expect(reason).not.toMatch(/\b(make|create|take|run)\b[^.]*\bbackup\b|\bback (it )?up\b/i);
+    const advice = /\b(make|create|take|run)\b[^.]*\bbackup\b|\bback (it )?up\b/i;
+    for (const reason of Object.values(BACKUP_CHECK_REASONS.zip)) {
+      expect(reason).not.toMatch(advice);
       expect(reason).toContain('select Cancel');
     }
+    for (const reason of Object.values(BACKUP_CHECK_REASONS.sheets)) {
+      expect(reason).not.toMatch(advice);
+      expect(reason).toContain('use File > Make a copy');
+      expect(reason).not.toContain('select Cancel');
+    }
+  });
+
+  test('a Sheets mirror gets the copy-it-first advice', () => {
+    const backup = emptyBackup();
+    backup.metadata = { ...backup.metadata, userId: '' };
+    expect(backupService.validateBackupData(backup, 'sheets').errors[0]).toBe(
+      "This backup is missing details VROOM needs to restore it. Only a backup that VROOM made, without edits, can be restored. If this spreadsheet is the only copy you have, open it in Google Drive and use File > Make a copy. VROOM's next backup writes over this spreadsheet."
+    );
   });
 
   test('a valid backup has no errors at all', () => {

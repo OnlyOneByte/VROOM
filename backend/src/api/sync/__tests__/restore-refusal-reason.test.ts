@@ -12,7 +12,7 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 describe('a refused Sheets restore', () => {
-  test('leads with the plain reason, which says to keep the backup and cancel', async () => {
+  test('leads with the plain reason, which says to copy the spreadsheet first', async () => {
     ctx.sqlite.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
        VALUES ('prov-sheets', ?, 'storage', 'google-drive', 'Drive', 'x', 'active')`,
@@ -45,8 +45,8 @@ describe('a refused Sheets restore', () => {
         );
       expect(refused).toBeInstanceOf(ValidationError);
       const details = (refused as ValidationError).details as string[];
-      expect(details[0]).toBe(BACKUP_CHECK_REASONS.metadata);
-      expect(details[0]).toContain('select Cancel');
+      expect(details[0]).toBe(BACKUP_CHECK_REASONS.sheets.metadata);
+      expect(details[0]).toContain('use File > Make a copy');
     } finally {
       spy.mockRestore();
     }

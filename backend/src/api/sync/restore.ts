@@ -272,7 +272,7 @@ class RestoreService {
       vehicleShares: coerceRows(sheet.vehicleShares, TABLE_SCHEMA_MAP.vehicleShares),
     });
 
-    const validation = backupService.validateBackupData(sheetData);
+    const validation = backupService.validateBackupData(sheetData, 'sheets');
     if (!validation.valid) {
       throw new ValidationError('Sheet data validation failed', validation.errors);
     }
