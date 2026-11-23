@@ -28,7 +28,7 @@
 	import { latest } from '#lib/utils/latest-request.ts';
 
 	type ExpenseWithVehicle = Expense & { vehicle?: Vehicle };
-	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import {
 		handleErrorWithNotification,
 		logLoadFailure,
@@ -125,7 +125,23 @@
 	});
 
 	let offlineLoad = $state(false);
-	let expensesHeading = $state<HTMLElement | null>(null);
+	let expensesList = $state<HTMLElement | null>(null);
+	let filtersActive = $derived(
+		Boolean(
+			searchTerm ||
+			selectedVehicleId ||
+			selectedTags.length > 0 ||
+			startDate ||
+			endDate ||
+			categoryFilter
+		)
+	);
+	let countLine = $derived.by(() => {
+		const expenses = `${formatNumber(totalCount, 0)} ${totalCount === 1 ? 'expense' : 'expenses'}`;
+		if (filtersActive) return `${expenses} ${totalCount === 1 ? 'matches' : 'match'} your filters`;
+		if (vehicles.length === 0) return expenses;
+		return `${expenses} across ${formatNumber(vehicles.length, 0)} ${vehicles.length === 1 ? 'vehicle' : 'vehicles'}`;
+	});
 
 	onMount(loadInitial);
 
@@ -418,7 +434,7 @@
 			title="Couldn't load expenses"
 			message={loadError}
 			onRetry={loadInitial}
-			onRecovered={() => expensesHeading?.focus()}
+			onRecovered={() => expensesList?.focus()}
 		/>
 	</div>
 {:else if offlineLoad}
@@ -461,32 +477,32 @@
 	</div>
 {:else}
 	<div class="space-y-6 pb-24">
-		<PageHeader
-			title="All Expenses"
-			description="Track and categorize expenses across all vehicles"
-		>
-			{#snippet actions()}
-				<div class="hidden sm:flex sm:items-center sm:gap-2">
-					{@render importExportActions('outline', '')}
-				</div>
-				<div class="sm:hidden">
-					<Popover.Root bind:open={toolsMenuOpen}>
-						<Popover.Trigger>
-							{#snippet child({ props })}
-								<Button {...props} variant="outline" size="lg">
-									<Ellipsis class="mr-2 h-4 w-4" />
-									Import & export
-								</Button>
-							{/snippet}
-						</Popover.Trigger>
-						<Popover.Content align="start" class="flex w-56 flex-col gap-2 p-1">
-							{@render importExportActions('ghost', 'h-10 w-full justify-start')}
-						</Popover.Content>
-					</Popover.Root>
-				</div>
-				{@render addExpenseHeaderAction()}
-			{/snippet}
-		</PageHeader>
+		<div class="flex items-start justify-between gap-3">
+			<div class="min-w-0 flex-1">
+				<PageHeader title="All Expenses" description={countLine}>
+					{#snippet actions()}
+						<div class="hidden sm:flex sm:items-center sm:gap-2">
+							{@render importExportActions('outline', '')}
+						</div>
+						{@render addExpenseHeaderAction()}
+					{/snippet}
+				</PageHeader>
+			</div>
+			<div class="shrink-0 sm:hidden">
+				<Popover.Root bind:open={toolsMenuOpen}>
+					<Popover.Trigger>
+						{#snippet child({ props })}
+							<Button {...props} variant="outline" size="icon-lg" aria-label="Import and export">
+								<Ellipsis class="h-4 w-4" />
+							</Button>
+						{/snippet}
+					</Popover.Trigger>
+					<Popover.Content align="end" class="flex w-56 flex-col gap-2 p-1">
+						{@render importExportActions('ghost', 'h-10 w-full justify-start')}
+					</Popover.Content>
+				</Popover.Root>
+			</div>
+		</div>
 
 		<CardNs.Root class="max-sm:gap-0 max-sm:py-4">
 			<CardNs.Header class="max-sm:hidden">
@@ -532,7 +548,7 @@
 					<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={handleTagsChange} />
 				</div>
 
-				{#if searchTerm || selectedVehicleId || selectedTags.length > 0 || startDate || endDate || categoryFilter}
+				{#if filtersActive}
 					<div class="flex justify-end sm:pt-2">
 						<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={clearFilters}>
 							<X class="h-4 w-4 mr-2" />
@@ -553,25 +569,14 @@
 			onRemoveNeedsAttention={removeOfflineExpense}
 		/>
 
-		<CardNs.Root>
-			<CardNs.Header>
-				<div class="flex items-center justify-between">
-					<div>
-						<CardNs.Title
-							bind:ref={expensesHeading}
-							tabindex={-1}
-							class="w-fit rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-						>
-							Expenses ({totalCount})
-						</CardNs.Title>
-						<CardNs.Description>All recorded expenses</CardNs.Description>
-					</div>
-					<div class="p-2 rounded-lg bg-primary/10">
-						<DollarSign class="h-5 w-5 text-primary" />
-					</div>
-				</div>
-			</CardNs.Header>
-			<CardNs.Content>
+		<CardNs.Root
+			bind:ref={expensesList}
+			role="region"
+			aria-label="Expenses"
+			tabindex={-1}
+			class="outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 max-sm:border-0 max-sm:bg-transparent max-sm:py-0 max-sm:shadow-none"
+		>
+			<CardNs.Content class="max-sm:px-0">
 				{#if pageError}
 					<LoadErrorCard
 						compact
@@ -579,7 +584,7 @@
 						title="Couldn't load expenses"
 						message={pageError.message}
 						onRetry={() => fetchPageAndSummary(pageError?.offset ?? currentOffset)}
-						onRecovered={() => expensesHeading?.focus()}
+						onRecovered={() => expensesList?.focus()}
 					/>
 				{:else}
 					<ExpensesTable

@@ -11,9 +11,11 @@ describe('/expenses import and export tools on mobile', () => {
 		expect(SRC).toMatch(/class="hidden sm:flex[^"]*">\s*\{@render importExportActions\('outline'/);
 	});
 
-	test('below sm: the same actions sit behind one 40px menu trigger', () => {
-		expect(SRC).toMatch(/<div class="sm:hidden">\s*<Popover\.Root/);
-		expect(SRC).toMatch(/variant="outline" size="lg">\s*<Ellipsis[^>]*\/>\s*Import & export/);
+	test('below sm: the same actions sit behind one 40px icon-only menu trigger', () => {
+		expect(SRC).toMatch(/<div class="shrink-0 sm:hidden">\s*<Popover\.Root/);
+		expect(SRC).toMatch(
+			/variant="outline" size="icon-lg" aria-label="Import and export">\s*<Ellipsis[^>]*\/>\s*<\/Button>/
+		);
 		expect(SRC).toMatch(/<Popover\.Content[\s\S]{0,120}\{@render importExportActions\('ghost'/);
 		expect(SRC).toMatch(/<Popover\.Content[^>]*gap-2/);
 	});
