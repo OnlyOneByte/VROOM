@@ -334,16 +334,21 @@ export function computeMpgAndCostPerMile(
 export function buildGasPriceHistory(
   rows: FuelExpenseRow[],
   include: (r: FuelExpenseRow) => boolean = isFillup,
-  toUserVolume: (value: number, vehicleId: string) => number = (value) => value
-): Array<{ date: string; fuelType: string; pricePerVolume: number }> {
-  return rows
-    .filter((r) => include(r) && r.expenseAmount > 0 && r.date != null)
-    .map((r) => ({
-      date: r.date instanceof Date ? r.date.toISOString() : String(r.date),
-      fuelType: r.fuelType ?? 'Regular',
-      pricePerVolume: r.expenseAmount / toUserVolume(r.volume as number, r.vehicleId),
-    }))
-    .slice(-100);
+  toUserVolume: (value: number, vehicleId: string) => number = (value) => value,
+  calendar: Calendar = UTC_CALENDAR
+): Array<{ date: string; month: string; fuelType: string; pricePerVolume: number }> {
+  return rows.flatMap((r) => {
+    const d = normalizeDate(r.date);
+    if (!d || !include(r) || r.expenseAmount <= 0) return [];
+    return [
+      {
+        date: d.toISOString(),
+        month: toMonthKey(d, calendar),
+        fuelType: r.fuelType ?? 'Regular',
+        pricePerVolume: r.expenseAmount / toUserVolume(r.volume as number, r.vehicleId),
+      },
+    ];
+  });
 }
 
 export function buildFillupCostByVehicle(

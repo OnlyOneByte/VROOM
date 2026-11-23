@@ -44,7 +44,9 @@ const mockFuelStats: FuelStatsResponse = {
 	},
 	distance: { totalDistance: 17000, avgPerDay: 46.6, avgPerMonth: 1416.7 },
 	monthlyConsumption: [{ month: '2024-01', efficiency: 28.5, volume: 50 }],
-	gasPriceHistory: [{ date: '2024-01-15', fuelType: '87 (Regular)', pricePerVolume: 3.45 }],
+	gasPriceHistory: [
+		{ date: '2024-01-15', month: '2024-01', fuelType: '87 (Regular)', pricePerVolume: 3.45 }
+	],
 	fillupCostByVehicle: [{ month: '2024-01', vehicleId: 'v1', vehicleName: 'Civic', avgCost: 42.0 }],
 	odometerProgression: [
 		{ month: '2024-01', vehicleId: 'v1', vehicleName: 'Civic', mileage: 55000 }

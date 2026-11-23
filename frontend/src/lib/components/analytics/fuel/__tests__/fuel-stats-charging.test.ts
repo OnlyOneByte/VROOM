@@ -59,7 +59,9 @@ const charging: NonNullable<FuelStatsResponse['charging']> = {
 	efficiency: { avgEfficiency: 4, bestEfficiency: 4.5, worstEfficiency: 3.5 },
 	sessionDetails: { avgEnergy: 15, minEnergy: 12, maxEnergy: 18 },
 	averageCost: { perSession: 7, perEnergyUnit: 0.467 },
-	priceHistory: [{ date: '2024-01-05', fuelType: 'Level 2 (AC)', pricePerVolume: 0.467 }]
+	priceHistory: [
+		{ date: '2024-01-05', month: '2024-01', fuelType: 'Level 2 (AC)', pricePerVolume: 0.467 }
+	]
 };
 
 describe('FuelStatsTab with nothing in the window', () => {
