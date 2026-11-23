@@ -295,6 +295,7 @@
 
 	async function loadMonthTotals() {
 		const isCurrent = nextMonthTotalsRequest();
+		monthTotals = new Map();
 		const {
 			limit: _limit,
 			offset: _offset,

@@ -123,7 +123,9 @@
 							{@const total = monthTotals?.get(section.month)}
 							<TableRow class="hover:bg-transparent">
 								<TableCell colspan={columnCount} class="sticky top-0 z-10 bg-muted py-2">
-									<h2 class="flex items-baseline gap-3 text-sm font-semibold text-foreground">
+									<h2
+										class="sticky left-4 flex w-fit items-baseline gap-3 text-sm font-semibold text-foreground"
+									>
 										<span>{monthLabel(section.month)}</span>
 										<span class="tabular-nums text-muted-foreground">
 											{#if total !== undefined}
