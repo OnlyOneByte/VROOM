@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { resolve } from '$app/paths';
+	import { afterNavigate, goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { routes } from '#lib/routes.ts';
 	import {
 		Calendar,
@@ -28,7 +30,7 @@
 	import { latest } from '#lib/utils/latest-request.ts';
 
 	type ExpenseWithVehicle = Expense & { vehicle?: Vehicle };
-	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
+	import { dateOnlyToISO, formatCurrency, formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import {
 		handleErrorWithNotification,
 		logLoadFailure,
@@ -56,6 +58,15 @@
 	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
 	import { useExpenseListReload } from './expense-list-reload.svelte';
+	import {
+		expenseUrlFiltersQuery,
+		parseExpenseUrlFilters,
+		type ExpenseUrlFilters
+	} from './expense-url-filters.ts';
+	import {
+		EXPENSE_CATEGORY_INFO,
+		type ExpenseCategory
+	} from '#lib/constants/expense-categories.ts';
 
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
@@ -70,17 +81,20 @@
 	let totalCountFiltered = $state(false);
 	let isLoadingPage = $state(false);
 
-	let searchTerm = $state('');
-	let selectedVehicleId = $state<string | undefined>(undefined);
-	let startDate = $state<string | undefined>(undefined);
-	let endDate = $state<string | undefined>(undefined);
+	const URL_WRITE_DELAY_MS = 300;
+	const urlFilters = parseExpenseUrlFilters(page.url.searchParams);
 
-	let selectedTags = $state<string[]>([]);
+	let searchTerm = $state(urlFilters.q);
+	let selectedVehicleId = $state<string | undefined>(urlFilters.vehicleId);
+	let startDate = $state<string | undefined>(urlFilters.startDate);
+	let endDate = $state<string | undefined>(urlFilters.endDate);
+
+	let selectedTags = $state<string[]>(urlFilters.tags);
 
 	let sortBy = $state<'date' | 'amount'>('date');
 	let sortDir = $state<'asc' | 'desc'>('desc');
 
-	let categoryFilter = $state<string>('');
+	let categoryFilter = $state<string>(urlFilters.category ?? '');
 
 	let pendingExpenses = $derived(
 		offlineExpenseQueue.current.filter(expense => !expense.synced && !expense.needsAttention)
@@ -147,6 +161,72 @@
 		return `${expenses} across ${formatNumber(vehicles.length, 0)} ${vehicles.length === 1 ? 'vehicle' : 'vehicles'}`;
 	});
 
+	let activeFilterSummary = $derived.by(() => {
+		const parts: string[] = [];
+		const vehicle = vehicles.find(v => v.id === selectedVehicleId);
+		if (vehicle) parts.push(getVehicleDisplayName(vehicle));
+		if (categoryFilter in EXPENSE_CATEGORY_INFO) {
+			parts.push(EXPENSE_CATEGORY_INFO[categoryFilter as ExpenseCategory].label);
+		}
+		const day = (value: string) => formatDate(dateOnlyToISO(value));
+		if (startDate && endDate) parts.push(`${day(startDate)} – ${day(endDate)}`);
+		else if (startDate) parts.push(`From ${day(startDate)}`);
+		else if (endDate) parts.push(`Until ${day(endDate)}`);
+		if (selectedTags.length > 0) parts.push(`Tagged ${selectedTags.join(', ')}`);
+		const term = searchTerm.trim();
+		if (term) parts.push(`“${term}”`);
+		return parts.length > 0 ? `Filtered by ${parts.join(' · ')}` : '';
+	});
+
+	function currentUrlFilters(): ExpenseUrlFilters {
+		return {
+			vehicleId: selectedVehicleId,
+			category: categoryFilter || undefined,
+			startDate,
+			endDate,
+			tags: [...selectedTags],
+			q: searchTerm
+		};
+	}
+
+	$effect(() => {
+		const filters = currentUrlFilters();
+		if (isLoading) return;
+		const timer = setTimeout(
+			() =>
+				untrack(() => {
+					const query = expenseUrlFiltersQuery(filters, new URLSearchParams(location.search));
+					if (query === location.search) return;
+					// eslint-disable-next-line svelte/no-navigation-without-resolve -- the path is resolved; only the query string is added
+					goto(`${resolve(routes.expenses)}${query}${location.hash}`, {
+						state: page.state,
+						shallow: true,
+						replace: true
+					});
+				}),
+			URL_WRITE_DELAY_MS
+		);
+		return () => clearTimeout(timer);
+	});
+
+	afterNavigate(navigation => {
+		if (navigation.type === 'enter' || !navigation.to) return;
+		if (navigation.type === 'goto' && navigation.shallow) return;
+		const next = parseExpenseUrlFilters(navigation.to.url.searchParams);
+		if (!isLoading && next.vehicleId && !vehicles.some(v => v.id === next.vehicleId)) {
+			next.vehicleId = undefined;
+		}
+		if (expenseUrlFiltersQuery(next) === expenseUrlFiltersQuery(currentUrlFilters())) return;
+		searchTerm = next.q;
+		selectedVehicleId = next.vehicleId;
+		startDate = next.startDate;
+		endDate = next.endDate;
+		selectedTags = next.tags;
+		categoryFilter = next.category ?? '';
+		if (isLoading) void loadInitial();
+		else expenseListReload.reloadNow();
+	});
+
 	onMount(loadInitial);
 
 	$effect(() => {
@@ -157,9 +237,14 @@
 		isLoading = loadError === null;
 		offlineLoad = false;
 		try {
+			const vehiclesRequest = vehicleApi.getVehicles();
+			if (selectedVehicleId) {
+				const known = await vehiclesRequest;
+				if (!known.some(v => v.id === selectedVehicleId)) selectedVehicleId = undefined;
+			}
 			const [, loadedVehicles] = await Promise.all([
 				settingsStore.load(),
-				vehicleApi.getVehicles(),
+				vehiclesRequest,
 				fetchPageAndSummary(0, { throwOnFailure: true })
 			]);
 			vehicles = loadedVehicles;
@@ -576,8 +661,11 @@
 				</div>
 
 				{#if filtersActive}
-					<div class="flex justify-end sm:pt-2">
-						<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={clearFilters}>
+					<div class="flex items-center justify-between gap-3 sm:pt-2">
+						<p class="min-w-0 text-sm text-muted-foreground" data-testid="active-filter-summary">
+							{activeFilterSummary}
+						</p>
+						<Button variant="outline" size="sm" class="h-10 shrink-0 sm:h-8" onclick={clearFilters}>
 							<X class="h-4 w-4 mr-2" />
 							{COMMON_MESSAGES.CLEAR_FILTERS}
 						</Button>

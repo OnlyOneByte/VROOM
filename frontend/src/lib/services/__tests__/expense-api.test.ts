@@ -74,6 +74,15 @@ describe('list methods (getPaginated passthrough + per-row transform)', () => {
 		expect(result.pagination.totalCount).toBe(2);
 	});
 
+	test('getAllExpenses sends a vehicleId filter to the server', async () => {
+		getPaginated.mockResolvedValueOnce({
+			data: [],
+			pagination: { totalCount: 0, limit: 20, offset: 0, hasMore: false }
+		});
+		await expenseApi.getAllExpenses({ vehicleId: 'v2', limit: 20 });
+		expect(getPaginated).toHaveBeenCalledWith('/expenses?vehicleId=v2&limit=20');
+	});
+
 	test('getExpensesByVehicle sets vehicleId in the query', async () => {
 		getPaginated.mockResolvedValueOnce({
 			data: [],

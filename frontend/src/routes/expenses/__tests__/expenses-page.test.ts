@@ -6,7 +6,10 @@ import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
+vi.mock('$app/navigation', () => ({
+	goto: vi.fn(() => Promise.resolve()),
+	afterNavigate: vi.fn()
+}));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 const captured = vi.hoisted(() => ({

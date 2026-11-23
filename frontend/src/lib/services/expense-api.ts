@@ -107,8 +107,11 @@ export const expenseApi = {
 		return fetchPaginatedExpenses(`/expenses${buildExpenseQuery(params, vehicleId)}`);
 	},
 
-	async getAllExpenses(params?: ExpenseListParams): Promise<PaginatedExpenseResponse> {
-		return fetchPaginatedExpenses(`/expenses${buildExpenseQuery(params)}`);
+	async getAllExpenses(
+		params?: ExpenseListParams & { vehicleId?: string }
+	): Promise<PaginatedExpenseResponse> {
+		const { vehicleId, ...filters } = params ?? {};
+		return fetchPaginatedExpenses(`/expenses${buildExpenseQuery(filters, vehicleId)}`);
 	},
 
 	async downloadExpensesCsv(params?: ExpenseExportParams): Promise<void> {

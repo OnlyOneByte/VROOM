@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/svelte';
 import type { ExpenseSummary, UserSettings } from '#lib/types/index.ts';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
+vi.mock('$app/navigation', () => ({
+	goto: vi.fn(() => Promise.resolve()),
+	afterNavigate: vi.fn()
+}));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 let tableProps: Record<string, unknown> = {};
