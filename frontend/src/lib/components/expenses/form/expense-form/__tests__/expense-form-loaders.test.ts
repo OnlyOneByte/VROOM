@@ -369,17 +369,28 @@ describe('vehicle context loaders', () => {
 		expect(state.lastFuelExpense?.id).toBe('aa-evening');
 	});
 
-	test('loadLastFuelExpense breaks a mileage tie by the later date', async () => {
+	test('loadLastFuelExpense keeps the newest date even when an older fill-up reads higher', async () => {
 		expenseApiMock.getExpensesByVehicle.mockResolvedValue({
 			data: [
-				makeExpense('earlier', { date: '2026-11-19T00:00:00.000Z', mileage: 41480 }),
-				makeExpense('later', { date: '2026-11-20T00:00:00.000Z', mileage: 41480 }),
-				makeExpense('no-odometer', { date: '2026-11-21T00:00:00.000Z', mileage: undefined })
+				makeExpense('newest', { date: '2026-11-21T00:00:00.000Z', mileage: 41480 }),
+				makeExpense('typo', { date: '2026-11-12T00:00:00.000Z', mileage: 414800 })
 			]
 		});
 		const state = createState();
 		await loadLastFuelExpense(state);
-		expect(state.lastFuelExpense?.id).toBe('later');
+		expect(state.lastFuelExpense?.id).toBe('newest');
+	});
+
+	test('loadLastFuelExpense keeps a newest fill-up with no odometer over an older one with a reading', async () => {
+		expenseApiMock.getExpensesByVehicle.mockResolvedValue({
+			data: [
+				makeExpense('no-odometer', { date: '2026-11-21T00:00:00.000Z', mileage: undefined }),
+				makeExpense('older', { date: '2026-11-10T00:00:00.000Z', mileage: 41000 })
+			]
+		});
+		const state = createState();
+		await loadLastFuelExpense(state);
+		expect(state.lastFuelExpense?.id).toBe('no-odometer');
 	});
 
 	test('loadLastFuelExpense sets null when there is no prior fuel expense', async () => {

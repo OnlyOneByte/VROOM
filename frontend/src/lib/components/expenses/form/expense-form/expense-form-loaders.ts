@@ -212,20 +212,14 @@ export async function loadVehicle(state: ExpenseFormState): Promise<Error | null
 
 const LAST_FILLUP_WINDOW = 10;
 
-function latestFillup(fillups: Expense[]): Expense | null {
-	let best: Expense | null = null;
-	for (const fillup of fillups) {
-		if (!best) {
-			best = fillup;
-			continue;
-		}
-		const mileage = fillup.mileage ?? -Infinity;
-		const bestMileage = best.mileage ?? -Infinity;
-		if (mileage > bestMileage || (mileage === bestMileage && fillup.date > best.date)) {
-			best = fillup;
-		}
-	}
-	return best;
+function latestFillup(newestFirst: Expense[]): Expense | null {
+	const newest = newestFirst[0];
+	if (!newest) return null;
+	return newestFirst
+		.filter(fillup => fillup.date === newest.date)
+		.reduce((best, fillup) =>
+			(fillup.mileage ?? -Infinity) > (best.mileage ?? -Infinity) ? fillup : best
+		);
 }
 
 export async function loadLastFuelExpense(state: ExpenseFormState): Promise<void> {
