@@ -105,6 +105,27 @@ describe('trigger push hook', () => {
     expect(p?.url).toBe('/reminders');
   });
 
+  test('a mileage-axis notification for a kilometre vehicle says km', async () => {
+    const vehicleId = await seedVehicle(ctx, {
+      make: 'Skoda',
+      model: 'Octavia',
+      year: 2020,
+      extra: {
+        unitPreferences: { distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' },
+      },
+    });
+    await addOdometerReading(ctx, vehicleId, 150200);
+    await subscribe();
+    seedMileageReminder(ctx, 'rp-km', vehicleId, 150000);
+    const sender = recordingSender();
+    setPushSenderForTest(sender);
+
+    await trigger();
+
+    expect(sender.payloads).toHaveLength(1);
+    expect(sender.payloads[0]?.body).toBe('Due at 150,000 km');
+  });
+
   test('a throwing push sender does not fail the trigger or lose the notification', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     await addOdometerReading(ctx, vehicleId, 60200);
