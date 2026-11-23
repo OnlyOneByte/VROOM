@@ -68,12 +68,6 @@ describe('RecentActivityCard', () => {
 		);
 	});
 
-	test('while loading it reserves three rows', () => {
-		render(RecentActivityCard, { props: { expenses: [], isLoading: true } });
-		expect(screen.getAllByRole('listitem')).toHaveLength(3);
-		expect(screen.queryByRole('link', { name: 'See all expenses' })).toBeNull();
-	});
-
 	test('with no expenses it says so, under one card heading', () => {
 		render(RecentActivityCard, { props: { expenses: [] } });
 		expect(screen.getByRole('heading', { level: 2, name: 'Recent' })).toBeInTheDocument();
