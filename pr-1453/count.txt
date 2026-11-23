@@ -1,0 +1,70 @@
+BOTH  /dashboard :: Monthly Expense Trends  plot=true table=true list=false
+    Monthly Expense Trends: 24 points, Dec 2024 to Nov 2026. Highest: Jul 2026, $3,076.20. Lowest: Dec 2024, $372.86.
+BOTH  /dashboard :: Expense by Category  plot=true table=false list=true
+    Expense by Category: 6 categories. Highest: Financial, $11,048.64, 72.4%. Lowest: Misc, $35.50, 0.2%.
+BOTH  /analytics #Fuel :: Fuel Efficiency  plot=true table=true list=false
+    Fuel Efficiency: 12 points, Dec 2025 to Nov 2026. Highest: Aug 2026, 32.5 mi/gal. Lowest: Mar 2026, 31.6 mi/gal.
+BOTH  /analytics #Fuel :: Fuel Bought  plot=true table=true list=false
+    Fuel Bought: 12 points, Dec 2025 to Nov 2026. Highest: Jun 2026, 48.2 gal. Lowest: Nov 2026, 29.0 gal.
+BOTH  /analytics #Fuel :: Gas Price on Fill-up  plot=true table=true list=false
+    Gas Price on Fill-up: 52 points, Nov 28, 2025 to Nov 20, 2026. Highest: Feb 26, 2026, $3.81. Lowest: Apr 24, 2026, $3.45.
+BOTH  /analytics #Fuel :: Charging Price  plot=true table=true list=true
+    Charging Price: 30 points, Dec 28, 2025 to Nov 12, 2026. Highest: DC Fast Charging, Jan 8, 2026, $0.42. Lowest: Level 2 (AC), Dec 28, 2025, $0.14.
+BOTH  /analytics #Fuel :: Fill-up Cost by Vehicle  plot=true table=true list=true
+    Fill-up Cost by Vehicle: 13 points, Nov 2025 to Nov 2026. Highest: 2020 Toyota Camry (Daily Driver), May 2026, $38.10. Lowest: 2019 Honda Civic (Weekend Car), Sep 2026, $28.50.
+BOTH  /analytics #Fuel :: Fill-up Patterns by Day of Week  plot=true table=true list=false
+    Fill-up Patterns by Day of Week: 7 categories. Highest: Friday, 24. Lowest: Sunday, 5.
+BOTH  /analytics #Fuel :: Seasonal Efficiency  plot=true table=true list=false
+    Seasonal Efficiency: 4 categories. Highest: Summer, 32.3 mi/gal. Lowest: Spring, 31.9 mi/gal.
+BOTH  /analytics #Fuel :: Time Between Fill-ups  plot=true table=true list=false
+    Time Between Fill-ups: 2 categories. Highest: 8-14 days, 64. Lowest: 15-21 days, 17.
+BOTH  /analytics #Fuel :: Cost/mi  plot=true table=true list=true
+    Cost/mi: 12 points, Dec 2025 to Nov 2026. Highest: 2020 Toyota Camry (Daily Driver), May 2026, $0.12. Lowest: 2023 Tesla Model 3 (Sparky), Nov 2026, $0.02.
+BOTH  /analytics #Fuel :: Total Odometer  plot=true table=true list=true
+    Total Odometer: 13 points, Nov 2025 to Nov 2026. Highest: 2020 Toyota Camry (Daily Driver), Nov 2026, 40,360 mi. Lowest: 2023 Tesla Model 3 (Sparky), Dec 2025, 5,250 mi.
+BOTH  /analytics #Fuel :: Vehicle Performance Comparison  plot=true table=true list=true
+    Vehicle Performance Comparison: 5 categories. Highest: 2019 Honda Civic (Weekend Car), Fuel Efficiency, 100. Lowest: 2020 Toyota Camry (Daily Driver), Fuel Efficiency, 10.
+BOTH  /analytics #Fuel :: Monthly Spending by Category  plot=true table=true list=true
+    Monthly Spending by Category: 13 points, Nov 2025 to Nov 2026. Highest: Financial, Jul 2026, $2,472.86. Lowest: Maintenance, Nov 2025, $0.00.
+BOTH  /analytics #Cross :: Monthly Expense Trends  plot=true table=true list=false
+    Monthly Expense Trends: 13 points, Nov 2025 to Nov 2026. Highest: Jul 2026, $3,076.20. Lowest: Nov 2025, $67.07.
+BOTH  /analytics #Cross :: Expense by Category  plot=true table=false list=true
+    Expense by Category: 6 categories. Highest: Financial, $6,574.32, 61.0%. Lowest: Misc, $35.50, 0.3%.
+BOTH  /analytics #Cross :: Vehicle Cost Comparison  plot=true table=true list=false
+    Vehicle Cost Comparison: 3 categories. Highest: 2020 Toyota Camry (Daily Driver), $8,586.56. Lowest: 2023 Tesla Model 3 (Sparky), $325.08.
+BOTH  /analytics #Cross :: Fuel Efficiency Comparison  plot=true table=true list=true
+    Fuel Efficiency Comparison: 12 points, Dec 2025 to Nov 2026. Highest: 2019 Honda Civic (Weekend Car), Nov 2026, 36.2 mi/gal. Lowest: 2020 Toyota Camry (Daily Driver), Apr 2026, 30.6 mi/gal.
+BOTH  /analytics #Cross :: Loan Payment Breakdown  plot=true table=true list=true
+    Loan Payment Breakdown: 12 points, Nov 2026 to Oct 2027. Highest: Principal, Oct 2027, $339.64. Lowest: Interest, Oct 2027, $33.22.
+BOTH  /analytics #Cross :: Financing Type Distribution  plot=true table=false list=true
+    Financing Type Distribution: 2 categories. Highest: Loan, 1 vehicle. Lowest: Own, 2 vehicles.
+BOTH  /analytics #Cross :: Monthly Premium Trends  plot=true table=true list=false
+    Monthly Premium Trends: 6 points, Jul 2026 to Dec 2026. Highest: Jul 2026, $350.00. Lowest: Jul 2026, $350.00.
+BOTH  /analytics #Cross :: Cost by Insurance Carrier  plot=true table=true list=false
+    Cost by Insurance Carrier: 2 categories. Highest: State Farm, $2,400.00. Lowest: Geico, $1,800.00.
+BOTH  /analytics #Per :: Expense Breakdown  plot=true table=false list=true
+    Expense Breakdown: 6 categories. Highest: Financial, $5,674.32, 66.1%. Lowest: Misc, $23.50, 0.3%.
+BOTH  /analytics #Year :: Expense Breakdown  plot=true table=false list=true
+    Expense Breakdown: 6 categories. Highest: Financial, $6,201.46, 61.3%. Lowest: Misc, $35.50, 0.4%.
+BOTH  /analytics #Year :: mi/gal Trend  plot=true table=true list=false
+    mi/gal Trend: 11 points, Jan 2026 to Nov 2026. Highest: Aug 2026, 32.5 mi/gal. Lowest: Jan 2026, 31.5 mi/gal.
+BOTH  /vehicles/[camry] #Overview :: Expense Trends  plot=true table=true list=false
+    Expense Trends: 24 points, Dec 2024 to Nov 2026. Highest: Jul 2026, $2,105.22. Lowest: Dec 2024, $372.86.
+BOTH  /vehicles/[camry] #Overview :: Fuel Efficiency  plot=true table=true list=false
+    Fuel Efficiency: 35 points, Dec 8, 2025 to Nov 13, 2026. Highest: Dec 18, 2025, 32.2 mi/gal. Lowest: Jan 17, 2026, 29.8 mi/gal.
+BOTH  /vehicles/[camry] #Overview :: Expense by Category  plot=true table=false list=true
+    Expense by Category: 6 categories. Highest: Financial, $10,148.64, 77.7%. Lowest: Misc, $23.50, 0.2%.
+BOTH  /vehicles/[camry] #Finance :: Expense Trends  plot=true table=true list=false
+    Expense Trends: 24 points, Dec 2024 to Nov 2026. Highest: Jul 2026, $2,105.22. Lowest: Dec 2024, $372.86.
+BOTH  /vehicles/[camry] #Finance :: Fuel Efficiency  plot=true table=true list=false
+    Fuel Efficiency: 35 points, Dec 8, 2025 to Nov 13, 2026. Highest: Dec 18, 2025, 32.2 mi/gal. Lowest: Jan 17, 2026, 29.8 mi/gal.
+BOTH  /vehicles/[camry] #Finance :: Amortization Schedule  plot=true table=true list=true
+    Amortization Schedule: 60 categories. Highest: Principal, Payment #60, $371.47. Lowest: Interest, Payment #60, $1.39.
+BOTH  /vehicles/[camry] #Odometer :: Expense Trends  plot=true table=true list=false
+    Expense Trends: 24 points, Dec 2024 to Nov 2026. Highest: Jul 2026, $2,105.22. Lowest: Dec 2024, $372.86.
+BOTH  /vehicles/[camry] #Odometer :: Fuel Efficiency  plot=true table=true list=false
+    Fuel Efficiency: 35 points, Dec 8, 2025 to Nov 13, 2026. Highest: Dec 18, 2025, 32.2 mi/gal. Lowest: Jan 17, 2026, 29.8 mi/gal.
+BOTH  /vehicles/[camry] #Odometer :: Mileage Over Time  plot=true table=true list=false
+    Mileage Over Time: 36 points, Nov 28, 2025 to Nov 13, 2026. Highest: Nov 13, 2026, 40,360 mi. Lowest: Nov 28, 2025, 29,160 mi.
+
+34 of 34 chart cards rendered here have a text alternative and keyboard stepping
