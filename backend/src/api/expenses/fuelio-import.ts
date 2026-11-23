@@ -2,6 +2,7 @@ import { parse } from 'csv-parse/sync';
 import type { ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
 import {
+  CSV_ACCEPT,
   CsvMappingError,
   type ImportDateFormat,
   mapMileage,
@@ -222,6 +223,7 @@ export function parseFuelioExport(text: string, opts: FuelioParseOptions): Fueli
 export const fuelioFormat: ImportFormat = {
   id: 'fuelio',
   label: 'Fuelio',
+  accept: CSV_ACCEPT,
   detect: isFuelioExport,
   toNativeCsv: (text, { mapping, targetUnitsFor, timeZone }) => ({
     ...parseFuelioExport(text, {

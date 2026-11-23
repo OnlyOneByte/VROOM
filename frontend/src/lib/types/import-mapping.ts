@@ -30,3 +30,8 @@ export interface DetectedImportFormat {
 	id: string;
 	label: string;
 }
+
+export interface ImportFormatList {
+	formats: DetectedImportFormat[];
+	accept: string[];
+}

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
+import { IMPORT_FORMATS } from '../import-mapping-presets';
 
 let ctx: TestApp;
 
@@ -355,6 +356,17 @@ describe('POST /import/detect and a detected format through /import', () => {
 
     const unknown = await json<{ data: unknown }>(await detect('Date,Amount,Category,Vehicle'));
     expect(unknown.data).toBeNull();
+  });
+
+  test('formats lists every importable format and the file types the picker accepts', async () => {
+    const res = await ctx.authed('GET', '/api/v1/expenses/import/formats');
+    expect(res.status).toBe(200);
+    const body = await json<{
+      data: { formats: { id: string; label: string }[]; accept: string[] };
+    }>(res);
+    expect(body.data.formats.map((f) => f.id)).toEqual(IMPORT_FORMATS.map((f) => f.id));
+    expect(body.data.formats[0]).toEqual({ id: 'fuelio', label: 'Fuelio' });
+    expect(body.data.accept).toEqual(['.csv', 'text/csv']);
   });
 
   test('detect refuses a sample longer than the limit', async () => {
