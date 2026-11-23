@@ -338,6 +338,45 @@ describe('bucketing follows the user calendar', () => {
   });
 });
 
+describe('same-day fill-ups pair by odometer', () => {
+  for (const [lower, higher] of [
+    ['a-fill', 'z-fill'],
+    ['z-fill', 'a-fill'],
+  ]) {
+    test(`two fill-ups on one date give the right economy when ids are ${lower} then ${higher}`, async () => {
+      const fill = (id: string, iso: string, mileage: number) =>
+        seedExpense(testDb.sqlite, {
+          id,
+          vehicleId: CAMRY.id,
+          category: 'fuel',
+          expenseAmount: 4_000,
+          date: new Date(iso),
+          mileage,
+          volume: 10,
+          fuelType: 'Regular',
+          missedFillup: false,
+        });
+      fill('first', '2025-03-01T12:00:00Z', 10_000);
+      fill(lower, '2025-03-10T12:00:00Z', 10_300);
+      fill(higher, '2025-03-10T12:00:00Z', 10_600);
+
+      const efficiency = await repo.query(
+        OWNER.id,
+        baseQuery({ metric: 'efficiency', interval: 'month' })
+      );
+      expect(efficiency.totals.value).toBeCloseTo(30, 9);
+      const distance = await repo.query(
+        OWNER.id,
+        baseQuery({ metric: 'distance', interval: 'month' })
+      );
+      expect(distance.totals.value).toBe(600);
+
+      const summary = await new AnalyticsRepository(testDb.drizzle).getSummary(OWNER.id, RANGE);
+      expect(summary.quickStats.avgEfficiency).toBeCloseTo(30, 9);
+    });
+  }
+});
+
 describe('units', () => {
   function seedTwoFillups(vehicleId: string, startMileage: number, volume: number): void {
     for (const [i, offset] of [0, 400].entries()) {
