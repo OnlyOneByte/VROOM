@@ -155,7 +155,7 @@ async function chooseVehicle(name: string) {
 }
 
 async function addTagFilter(tag: string) {
-	const input = screen.getByRole('textbox', { name: 'Search tags' });
+	const input = screen.getByRole('combobox', { name: 'Search tags' });
 	await fireEvent.input(input, { target: { value: tag } });
 	await fireEvent.keyDown(input, { key: 'Enter' });
 }
@@ -406,7 +406,7 @@ describe('/expenses filters', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Filters · 2' }));
 		const sheet = await screen.findByRole('dialog', { name: 'Filters' });
 		expect(within(sheet).getByRole('combobox', { name: 'Vehicle filter' })).toBeTruthy();
-		expect(within(sheet).getByRole('textbox', { name: 'Search tags' })).toBeTruthy();
+		expect(within(sheet).getByRole('combobox', { name: 'Search tags' })).toBeTruthy();
 
 		expect(within(sheet).getByRole('button', { name: 'Close' })).toHaveClass('size-11');
 		expect(

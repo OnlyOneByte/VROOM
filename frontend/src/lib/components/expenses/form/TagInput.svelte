@@ -17,20 +17,32 @@
 		suggestions = COMMON_EXPENSE_TAGS
 	}: Props = $props();
 
+	const listId = 'tags-suggestions';
+
 	let tagInput = $state('');
 	let showSuggestions = $state(false);
+	let activeIndex = $state(-1);
 
-	let filteredSuggestions = $derived(
-		suggestions.filter(
-			tag => !tags.includes(tag) && tag.toLowerCase().includes(tagInput.toLowerCase())
-		)
+	let visibleSuggestions = $derived(
+		suggestions
+			.filter(tag => !tags.includes(tag) && tag.toLowerCase().includes(tagInput.toLowerCase()))
+			.slice(0, 8)
 	);
+	let listOpen = $derived(showSuggestions && visibleSuggestions.length > 0);
+	let activeSuggestion = $derived(listOpen ? visibleSuggestions[activeIndex] : undefined);
+
+	$effect(() => {
+		if (activeSuggestion) {
+			document.getElementById(`${listId}-${activeIndex}`)?.scrollIntoView?.({ block: 'nearest' });
+		}
+	});
 
 	function addTag(tag: string) {
 		const trimmed = tag.trim().toLowerCase();
 		if (trimmed && !tags.includes(trimmed) && tags.length < 10) {
 			tags = [...tags, trimmed];
 			tagInput = '';
+			activeIndex = -1;
 		}
 	}
 
@@ -38,17 +50,41 @@
 		tags = tags.filter(t => t !== tag);
 	}
 
+	function moveActive(step: number) {
+		showSuggestions = true;
+		const count = visibleSuggestions.length;
+		if (count === 0) return;
+		activeIndex =
+			step > 0 ? (activeIndex + 1) % count : activeIndex <= 0 ? count - 1 : activeIndex - 1;
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter') {
+		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
 			e.preventDefault();
-			if (tagInput.trim()) addTag(tagInput);
+			moveActive(e.key === 'ArrowDown' ? 1 : -1);
+		} else if (e.key === 'Enter') {
+			e.preventDefault();
+			if (activeSuggestion) addTag(activeSuggestion);
+			else if (tagInput.trim()) addTag(tagInput);
+		} else if (e.key === 'Escape' && listOpen) {
+			e.preventDefault();
+			e.stopPropagation();
+			showSuggestions = false;
+			activeIndex = -1;
 		} else if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
 			tags = tags.slice(0, -1);
 		}
 	}
+
+	function handleFocusOut(e: FocusEvent & { currentTarget: HTMLElement }) {
+		if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+			showSuggestions = false;
+			activeIndex = -1;
+		}
+	}
 </script>
 
-<div class="space-y-2">
+<div class="space-y-2" onfocusout={handleFocusOut}>
 	<Label for="tags">Tags (Optional)</Label>
 	<div
 		class="border rounded-lg p-2 min-h-[42px] bg-background has-[input:disabled]:cursor-not-allowed has-[input:disabled]:opacity-50 {touched &&
@@ -82,23 +118,42 @@
 				id="tags"
 				type="text"
 				bind:value={tagInput}
+				oninput={() => {
+					showSuggestions = true;
+					activeIndex = -1;
+				}}
 				onkeydown={handleKeydown}
 				onfocus={() => (showSuggestions = true)}
-				onblur={() => setTimeout(() => (showSuggestions = false), 200)}
 				placeholder={tags.length === 0 ? 'Add tags (e.g., fuel, maintenance)' : ''}
 				class="flex-1 min-w-[120px] outline-none bg-transparent"
+				role="combobox"
+				aria-autocomplete="list"
+				aria-expanded={listOpen}
+				aria-controls={listOpen ? listId : undefined}
+				aria-activedescendant={activeSuggestion ? `${listId}-${activeIndex}` : undefined}
 				aria-describedby={touched && error ? 'tags-error' : undefined}
 			/>
 		</div>
 	</div>
 
-	{#if showSuggestions && filteredSuggestions.length > 0}
-		<div class="border border-border rounded-lg shadow-lg bg-popover max-h-48 overflow-y-auto">
-			{#each filteredSuggestions.slice(0, 8) as suggestion (suggestion)}
+	{#if listOpen}
+		<div
+			id={listId}
+			role="listbox"
+			aria-label="Tag suggestions"
+			tabindex="-1"
+			class="border border-border rounded-lg shadow-lg bg-popover max-h-48 overflow-y-auto"
+		>
+			{#each visibleSuggestions as suggestion, i (suggestion)}
 				<button
+					id="{listId}-{i}"
 					type="button"
+					role="option"
+					tabindex="-1"
+					aria-selected={i === activeIndex}
+					onmousedown={e => e.preventDefault()}
 					onclick={() => addTag(suggestion)}
-					class="flex w-full min-h-10 items-center text-left px-3 py-2 hover:bg-accent text-sm sm:min-h-0"
+					class="flex w-full min-h-10 items-center text-left px-3 py-2 hover:bg-accent text-sm sm:min-h-0 aria-selected:bg-accent aria-selected:text-accent-foreground"
 				>
 					{suggestion}
 				</button>
@@ -107,7 +162,7 @@
 	{/if}
 
 	<p class="text-xs text-muted-foreground">
-		Press Enter to add a tag, or click suggestions below. Maximum 10 tags.
+		Press Enter to add a tag, or pick a suggestion with the arrow keys or a click. Maximum 10 tags.
 	</p>
 
 	{#if touched && error}

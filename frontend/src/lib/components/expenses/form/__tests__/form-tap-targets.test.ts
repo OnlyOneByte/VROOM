@@ -38,7 +38,7 @@ describe('expense and vehicle form controls meet the 40px tap target on mobile',
 
 	test('text and toggle buttons are at least 40px tall below sm', () => {
 		expect(source('expenses/form/TagInput.svelte')).toContain(
-			'class="flex w-full min-h-10 items-center text-left px-3 py-2 hover:bg-accent text-sm sm:min-h-0"'
+			'class="flex w-full min-h-10 items-center text-left px-3 py-2 hover:bg-accent text-sm sm:min-h-0 aria-selected:bg-accent aria-selected:text-accent-foreground"'
 		);
 		expect(
 			source('expenses/form/FuelFieldsSection.svelte').match(/class="h-10 flex-1 gap-1\.5 sm:h-8"/g)

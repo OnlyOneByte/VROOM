@@ -10,14 +10,26 @@
 
 	let { allTags, selectedTags, onTagsChange }: Props = $props();
 
+	const uid = $props.id();
+	const listId = `${uid}-tag-suggestions`;
+
 	let tagSearchTerm = $state('');
 	let tagSearchFocused = $state(false);
-	let tagInputEl = $state<HTMLInputElement | null>(null);
+	let activeIndex = $state(-1);
 
 	let tagSuggestions = $derived.by(() => {
 		if (!tagSearchTerm.trim()) return allTags.filter(t => !selectedTags.includes(t));
 		const term = tagSearchTerm.toLowerCase();
 		return allTags.filter(t => !selectedTags.includes(t) && t.toLowerCase().includes(term));
+	});
+	let visibleSuggestions = $derived(tagSuggestions.slice(0, 8));
+	let listOpen = $derived(tagSearchFocused && visibleSuggestions.length > 0);
+	let activeSuggestion = $derived(listOpen ? visibleSuggestions[activeIndex] : undefined);
+
+	$effect(() => {
+		if (activeSuggestion) {
+			document.getElementById(`${listId}-${activeIndex}`)?.scrollIntoView?.({ block: 'nearest' });
+		}
 	});
 
 	function addTag(tag: string): void {
@@ -25,37 +37,52 @@
 			onTagsChange([...selectedTags, tag]);
 		}
 		tagSearchTerm = '';
-		tagSearchFocused = true;
-		tagInputEl?.focus();
+		activeIndex = -1;
 	}
 
 	function removeTag(tag: string): void {
 		onTagsChange(selectedTags.filter(t => t !== tag));
 	}
 
+	function moveActive(step: number): void {
+		tagSearchFocused = true;
+		const count = visibleSuggestions.length;
+		if (count === 0) return;
+		activeIndex =
+			step > 0 ? (activeIndex + 1) % count : activeIndex <= 0 ? count - 1 : activeIndex - 1;
+	}
+
 	function handleTagKeydown(e: KeyboardEvent): void {
-		if (e.key === 'Enter') {
+		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+			e.preventDefault();
+			moveActive(e.key === 'ArrowDown' ? 1 : -1);
+		} else if (e.key === 'Enter') {
 			e.preventDefault();
 			const exactMatch = allTags.find(
 				t => !selectedTags.includes(t) && t.toLowerCase() === tagSearchTerm.trim().toLowerCase()
 			);
-			if (exactMatch) {
-				addTag(exactMatch);
-			} else if (tagSuggestions.length > 0) {
-				const firstSuggestion = tagSuggestions[0];
-				if (firstSuggestion) addTag(firstSuggestion);
-			}
+			const pick = activeSuggestion ?? exactMatch ?? tagSuggestions[0];
+			if (pick) addTag(pick);
 		} else if (e.key === 'Backspace' && !tagSearchTerm && selectedTags.length > 0) {
 			const lastTag = selectedTags[selectedTags.length - 1];
 			if (lastTag) removeTag(lastTag);
-		} else if (e.key === 'Escape') {
+		} else if (e.key === 'Escape' && listOpen) {
+			e.preventDefault();
+			e.stopPropagation();
 			tagSearchFocused = false;
-			tagInputEl?.blur();
+			activeIndex = -1;
+		}
+	}
+
+	function handleFocusOut(e: FocusEvent & { currentTarget: HTMLElement }): void {
+		if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+			tagSearchFocused = false;
+			activeIndex = -1;
 		}
 	}
 </script>
 
-<div class="space-y-2">
+<div class="space-y-2" onfocusout={handleFocusOut}>
 	<div class="flex items-center justify-between">
 		<p class="text-sm font-medium text-muted-foreground">Tags</p>
 		{#if selectedTags.length > 1}
@@ -83,28 +110,44 @@
 				<div class="flex items-center gap-1.5 flex-1 min-w-[120px]">
 					<Tag class="h-4 w-4 text-muted-foreground flex-shrink-0" />
 					<input
-						bind:this={tagInputEl}
 						bind:value={tagSearchTerm}
+						oninput={() => {
+							tagSearchFocused = true;
+							activeIndex = -1;
+						}}
 						onkeydown={handleTagKeydown}
 						onfocus={() => (tagSearchFocused = true)}
-						onblur={() => setTimeout(() => (tagSearchFocused = false), 200)}
 						placeholder={selectedTags.length > 0 ? 'Add more tags...' : 'Search and add tags...'}
 						class="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
 						aria-label="Search tags"
+						role="combobox"
+						aria-autocomplete="list"
+						aria-expanded={listOpen}
+						aria-controls={listOpen ? listId : undefined}
+						aria-activedescendant={activeSuggestion ? `${listId}-${activeIndex}` : undefined}
 					/>
 				</div>
 			</div>
 		</div>
 
-		{#if tagSearchFocused && tagSuggestions.length > 0}
+		{#if listOpen}
 			<div
+				id={listId}
+				role="listbox"
+				aria-label="Tag suggestions"
+				tabindex="-1"
 				class="absolute z-50 left-0 right-0 mt-1 border border-border rounded-lg shadow-lg bg-popover max-h-48 overflow-y-auto"
 			>
-				{#each tagSuggestions.slice(0, 8) as suggestion (suggestion)}
+				{#each visibleSuggestions as suggestion, i (suggestion)}
 					<button
+						id="{listId}-{i}"
 						type="button"
+						role="option"
+						tabindex="-1"
+						aria-selected={i === activeIndex}
+						onmousedown={e => e.preventDefault()}
 						onclick={() => addTag(suggestion)}
-						class="flex w-full items-center gap-2 px-3 py-2 hover:bg-accent text-sm"
+						class="flex w-full items-center gap-2 px-3 py-2 hover:bg-accent text-sm aria-selected:bg-accent aria-selected:text-accent-foreground"
 					>
 						<Tag class="h-3.5 w-3.5 text-muted-foreground" />
 						{suggestion}

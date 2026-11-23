@@ -19,10 +19,7 @@ function tagInput(): HTMLInputElement {
 }
 
 function suggestionButtons(): string[] {
-	return screen
-		.queryAllByRole('button')
-		.filter(b => b.className.includes('hover:bg-accent'))
-		.map(b => b.textContent?.trim() ?? '');
+	return screen.queryAllByRole('option').map(b => b.textContent?.trim() ?? '');
 }
 
 describe('ExpenseTagFilter: suggestions', () => {
@@ -67,20 +64,104 @@ describe('ExpenseTagFilter: suggestions', () => {
 		expect(suggestionButtons()).toHaveLength(0);
 	});
 
-	test('close shortly after the box loses focus', async () => {
-		vi.useFakeTimers();
-		try {
-			renderTagFilter();
-			await fireEvent.focus(tagInput());
-			await fireEvent.blur(tagInput());
-			expect(suggestionButtons()).not.toHaveLength(0);
+	test('close as soon as focus leaves the field', async () => {
+		renderTagFilter();
+		const outside = document.createElement('button');
+		document.body.append(outside);
+		await fireEvent.focus(tagInput());
+		expect(suggestionButtons()).not.toHaveLength(0);
 
-			await vi.advanceTimersByTimeAsync(250);
+		await fireEvent.focusOut(tagInput(), { relatedTarget: outside });
 
-			expect(suggestionButtons()).toHaveLength(0);
-		} finally {
-			vi.useRealTimers();
+		expect(suggestionButtons()).toHaveLength(0);
+		outside.remove();
+	});
+});
+
+describe('ExpenseTagFilter: keyboard', () => {
+	test('suggestions are listbox options outside the tab order', async () => {
+		renderTagFilter();
+
+		await fireEvent.focus(tagInput());
+
+		expect(tagInput()).toHaveAttribute('role', 'combobox');
+		expect(tagInput()).toHaveAttribute('aria-controls', screen.getByRole('listbox').id);
+		expect(screen.getByRole('listbox')).toHaveAttribute('tabindex', '-1');
+		for (const option of screen.getAllByRole('option')) {
+			expect(option).toHaveAttribute('tabindex', '-1');
 		}
+	});
+
+	test('ArrowDown then Enter adds the active suggestion', async () => {
+		const { onTagsChange } = renderTagFilter();
+		await fireEvent.focus(tagInput());
+
+		await fireEvent.keyDown(tagInput(), { key: 'ArrowDown' });
+		await fireEvent.keyDown(tagInput(), { key: 'ArrowDown' });
+		expect(tagInput()).toHaveAttribute(
+			'aria-activedescendant',
+			screen.getByRole('option', { name: 'parking' }).id
+		);
+		await fireEvent.keyDown(tagInput(), { key: 'Enter' });
+
+		expect(onTagsChange).toHaveBeenCalledWith(['parking']);
+	});
+
+	test('ArrowUp wraps to the last suggestion', async () => {
+		renderTagFilter();
+		await fireEvent.focus(tagInput());
+
+		await fireEvent.keyDown(tagInput(), { key: 'ArrowUp' });
+
+		expect(screen.getByRole('option', { name: 'tolls' })).toHaveAttribute('aria-selected', 'true');
+	});
+
+	test('Escape stays inside the field while the list is open, and passes on once it is closed', async () => {
+		renderTagFilter();
+		const pageKeydown = vi.fn();
+		document.addEventListener('keydown', pageKeydown);
+		await fireEvent.focus(tagInput());
+
+		await fireEvent.keyDown(tagInput(), { key: 'Escape' });
+		expect(pageKeydown).not.toHaveBeenCalled();
+		expect(tagInput()).toHaveAttribute('aria-expanded', 'false');
+
+		await fireEvent.keyDown(tagInput(), { key: 'Escape' });
+		expect(pageKeydown).toHaveBeenCalledTimes(1);
+		document.removeEventListener('keydown', pageKeydown);
+	});
+
+	test('typing after Escape opens the list again, so Enter never adds a hidden tag', async () => {
+		renderTagFilter();
+		await fireEvent.focus(tagInput());
+		await fireEvent.keyDown(tagInput(), { key: 'Escape' });
+
+		await fireEvent.input(tagInput(), { target: { value: 'ol' } });
+
+		expect(suggestionButtons()).toEqual(['tolls']);
+	});
+
+	test('pressing a suggestion keeps focus in the box', async () => {
+		renderTagFilter();
+		await fireEvent.focus(tagInput());
+
+		const pressed = await fireEvent.mouseDown(screen.getByRole('option', { name: 'tolls' }));
+
+		expect(pressed).toBe(false);
+	});
+
+	test('two filters on one page get distinct list ids', async () => {
+		renderTagFilter();
+		renderTagFilter();
+		const [first, second] = screen.getAllByLabelText('Search tags');
+		if (!first || !second) throw new Error('expected two tag filters');
+
+		await fireEvent.focus(first);
+		const firstList = first.getAttribute('aria-controls');
+		await fireEvent.focus(second);
+
+		expect(firstList).toBeTruthy();
+		expect(second.getAttribute('aria-controls')).not.toBe(firstList);
 	});
 });
 
@@ -89,7 +170,7 @@ describe('ExpenseTagFilter: adding and removing', () => {
 		const { onTagsChange } = renderTagFilter(['tolls']);
 
 		await fireEvent.focus(tagInput());
-		await fireEvent.click(screen.getByRole('button', { name: 'parking' }));
+		await fireEvent.click(screen.getByRole('option', { name: 'parking' }));
 
 		expect(onTagsChange).toHaveBeenCalledWith(['tolls', 'parking']);
 	});

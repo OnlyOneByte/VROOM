@@ -19,10 +19,7 @@ function selectedTags(): string[] {
 }
 
 function suggestionButtons(): string[] {
-	return screen
-		.queryAllByRole('button')
-		.filter(b => b.className.includes('text-left'))
-		.map(b => b.textContent?.trim() ?? '');
+	return screen.queryAllByRole('option').map(b => b.textContent?.trim() ?? '');
 }
 
 async function typeAndEnter(input: HTMLInputElement, value: string): Promise<void> {
@@ -139,7 +136,7 @@ describe('TagInput: suggestions', () => {
 		const input = renderTagInput();
 
 		await fireEvent.focus(input);
-		await fireEvent.click(screen.getByRole('button', { name: 'road-trip' }));
+		await fireEvent.click(screen.getByRole('option', { name: 'road-trip' }));
 
 		expect(selectedTags()).toEqual(['road-trip']);
 		expect(suggestionButtons()).not.toContain('road-trip');
@@ -154,16 +151,105 @@ describe('TagInput: suggestions', () => {
 		expect(suggestionButtons()).toHaveLength(8);
 	});
 
-	test('hide shortly after the box loses focus', async () => {
-		vi.useFakeTimers();
+	test('hide as soon as focus leaves the field', async () => {
 		const input = renderTagInput();
+		const outside = document.createElement('button');
+		document.body.append(outside);
 		await fireEvent.focus(input);
-		await fireEvent.blur(input);
 		expect(suggestionButtons()).not.toHaveLength(0);
 
-		await vi.advanceTimersByTimeAsync(250);
+		await fireEvent.focusOut(input, { relatedTarget: outside });
 
 		expect(suggestionButtons()).toEqual([]);
+		outside.remove();
+	});
+
+	test('pressing a suggestion keeps focus in the box', async () => {
+		const input = renderTagInput();
+		await fireEvent.focus(input);
+
+		const pressed = await fireEvent.mouseDown(screen.getByRole('option', { name: 'fuel' }));
+
+		expect(pressed).toBe(false);
+	});
+});
+
+describe('TagInput: keyboard', () => {
+	test('the box is a combobox and the suggestions are not tab stops', async () => {
+		const input = renderTagInput();
+		expect(input).toHaveAttribute('role', 'combobox');
+		expect(input).toHaveAttribute('aria-expanded', 'false');
+
+		await fireEvent.focus(input);
+
+		expect(input).toHaveAttribute('aria-expanded', 'true');
+		expect(input).toHaveAttribute('aria-controls', screen.getByRole('listbox').id);
+		expect(screen.getByRole('listbox')).toHaveAttribute('tabindex', '-1');
+		for (const option of screen.getAllByRole('option')) {
+			expect(option).toHaveAttribute('tabindex', '-1');
+		}
+	});
+
+	test('ArrowDown then Enter adds the active suggestion', async () => {
+		const input = renderTagInput();
+		await fireEvent.focus(input);
+
+		await fireEvent.keyDown(input, { key: 'ArrowDown' });
+		await fireEvent.keyDown(input, { key: 'ArrowDown' });
+		const active = screen.getByRole('option', { name: 'tolls' });
+		expect(active).toHaveAttribute('aria-selected', 'true');
+		expect(input).toHaveAttribute('aria-activedescendant', active.id);
+
+		await fireEvent.keyDown(input, { key: 'Enter' });
+
+		expect(selectedTags()).toEqual(['tolls']);
+		expect(input).not.toHaveAttribute('aria-activedescendant');
+	});
+
+	test('ArrowUp wraps to the last suggestion', async () => {
+		const input = renderTagInput();
+		await fireEvent.focus(input);
+
+		await fireEvent.keyDown(input, { key: 'ArrowUp' });
+
+		expect(screen.getByRole('option', { name: 'road-trip' })).toHaveAttribute(
+			'aria-selected',
+			'true'
+		);
+	});
+
+	test('Escape closes the list without leaving the box', async () => {
+		const input = renderTagInput();
+		await fireEvent.focus(input);
+
+		await fireEvent.keyDown(input, { key: 'Escape' });
+
+		expect(suggestionButtons()).toEqual([]);
+		expect(input).toHaveAttribute('aria-expanded', 'false');
+	});
+
+	test('Escape stays inside the field while the list is open, and passes on once it is closed', async () => {
+		const input = renderTagInput();
+		const pageKeydown = vi.fn();
+		document.addEventListener('keydown', pageKeydown);
+		await fireEvent.focus(input);
+
+		await fireEvent.keyDown(input, { key: 'Escape' });
+		expect(pageKeydown).not.toHaveBeenCalled();
+
+		await fireEvent.keyDown(input, { key: 'Escape' });
+		expect(pageKeydown).toHaveBeenCalledTimes(1);
+		document.removeEventListener('keydown', pageKeydown);
+	});
+
+	test('typing after Escape opens the list again', async () => {
+		const input = renderTagInput();
+		await fireEvent.focus(input);
+		await fireEvent.keyDown(input, { key: 'Escape' });
+
+		await fireEvent.input(input, { target: { value: 'par' } });
+
+		expect(suggestionButtons()).toEqual(['parking']);
 	});
 });
 
