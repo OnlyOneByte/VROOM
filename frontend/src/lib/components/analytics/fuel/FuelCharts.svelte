@@ -23,8 +23,7 @@
 		formatCountTooltip,
 		byVehicleMonth,
 		monthlyXAxisProps,
-		unitTooltip,
-		type TooltipValueFormat
+		unitTooltip
 	} from '#lib/utils/chart-formatters.ts';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import type { FuelAdvancedResponse, UnitsMetadata } from '#lib/types/index.ts';
@@ -58,20 +57,20 @@
 	);
 
 	let consumptionData = $derived(consumptionChartRows(fuelStats.monthlyConsumption));
-	let consumptionTooltip: TooltipValueFormat = $derived((value, key) =>
-		unitTooltip(key === 'volume' ? getVolumeUnitLabel(units.volumeUnit, true) : efficiencyLabel)(
-			value,
-			key
-		)
-	);
+	let volumeData = $derived(consumptionData.filter(d => d.volume > 0));
+	let efficiencyTooltip = $derived(unitTooltip(efficiencyLabel));
+	let volumeTooltip = $derived(unitTooltip(getVolumeUnitLabel(units.volumeUnit, true)));
 	let odometerTooltip = $derived(unitTooltip(getDistanceUnitLabel(units.distanceUnit, true), 0));
 
-	let consumptionSeries = $derived([
-		{ key: 'efficiency', label: efficiencyLabel, color: CHART_COLORS[0] as string },
+	let efficiencySeries = $derived([
+		{ key: 'efficiency', label: efficiencyLabel, color: CHART_COLORS[0] as string }
+	]);
+	let efficiencyConfig = $derived(buildChartConfig(efficiencySeries));
+
+	let volumeSeries = $derived([
 		{ key: 'volume', label: volumeLabel, color: CHART_COLORS[1] as string }
 	]);
-
-	let consumptionConfig = $derived(buildChartConfig(consumptionSeries));
+	let volumeConfig = $derived(buildChartConfig(volumeSeries));
 
 	type PriceHistory = FuelStatsResponse['gasPriceHistory'];
 
@@ -174,20 +173,35 @@
 	}
 </script>
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+<div
+	class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 lg:[&>*:last-child:nth-child(odd)]:col-span-2"
+>
 	{#if group === 'primary'}
 		{#if showGasCharts}
 			<AppLineChart
-				title="Fuel Consumption"
-				description="Monthly {efficiencyLabel} and {getVolumeUnitName(units.volumeUnit, true)} used"
+				title="Fuel Efficiency"
+				description="Monthly {efficiencyLabel}"
 				data={consumptionData}
 				x="date"
-				y={['efficiency', 'volume']}
-				series={consumptionSeries}
-				config={consumptionConfig}
+				y="efficiency"
+				series={efficiencySeries}
+				config={efficiencyConfig}
 				yAxisFormat={formatDecimalAxis}
-				tooltipFormat={consumptionTooltip}
+				tooltipFormat={efficiencyTooltip}
 				xAxisProps={monthlyXAxisProps(consumptionData.length, 6)}
+			/>
+
+			<AppBarChart
+				title="Fuel Bought"
+				description="Monthly {getVolumeUnitName(units.volumeUnit, true)} bought"
+				data={volumeData}
+				x="date"
+				y="volume"
+				series={volumeSeries}
+				config={volumeConfig}
+				yAxisFormat={v => formatNumber(v, 0)}
+				tooltipFormat={volumeTooltip}
+				xAxisProps={monthlyXAxisProps(volumeData.length, 6)}
 			/>
 
 			<AppLineChart
