@@ -244,6 +244,17 @@ routes.put(
         recordedAt: existing.tripDate,
         timeZone,
       };
+      const movedId = otherAtOld
+        ? null
+        : odometerRepository.moveLinkedTripEntry(
+            oldKey,
+            { odometer: end, recordedAt: tripDate },
+            tx
+          );
+      if (movedId) {
+        assertOdometerInOrder(tx, check && { ...check, excludeId: movedId });
+        return { updated: row, removedEntryIds: [] };
+      }
       let removed: string[] = [];
       if (otherAtOld) odometerRepository.handOverLinkedTripEntry(oldKey, otherAtOld, tx);
       else removed = odometerRepository.deleteLinkedTripEntry(oldKey, tx);

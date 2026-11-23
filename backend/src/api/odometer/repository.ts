@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
@@ -112,15 +112,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     },
     db: AppDatabase | DrizzleTransaction = this.db
   ): OdometerEntry | null {
-    const { dayStart, nextDay } = localDayWindow(entry.recordedAt, entry.timeZone);
-
-    const sameReading = and(
-      eq(odometerEntries.vehicleId, entry.vehicleId),
-      eq(odometerEntries.userId, entry.userId),
-      eq(odometerEntries.odometer, entry.odometer),
-      gte(odometerEntries.recordedAt, dayStart),
-      lt(odometerEntries.recordedAt, nextDay)
-    );
+    const sameReading = this.sameReadingWhere(entry);
     const existing = db
       .select({ id: odometerEntries.id })
       .from(odometerEntries)
@@ -168,6 +160,36 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     return removed.map((row) => row.id);
   }
 
+  moveLinkedTripEntry(
+    from: LinkedTripEntryKey,
+    to: { odometer: number; recordedAt: Date },
+    db: AppDatabase | DrizzleTransaction = this.db
+  ): string | null {
+    const linked = db
+      .select({ id: odometerEntries.id })
+      .from(odometerEntries)
+      .where(this.linkedTripEntryWhere(from))
+      .all();
+    const [only] = linked;
+    if (!only || linked.length !== 1) return null;
+    const target = db
+      .select({ id: odometerEntries.id })
+      .from(odometerEntries)
+      .where(and(this.sameReadingWhere({ ...from, ...to }), ne(odometerEntries.id, only.id)))
+      .get();
+    if (target) return null;
+    db.update(odometerEntries)
+      .set({
+        odometer: to.odometer,
+        recordedAt: to.recordedAt,
+        sourceTripId: from.tripId,
+        updatedAt: new Date(),
+      })
+      .where(eq(odometerEntries.id, only.id))
+      .run();
+    return only.id;
+  }
+
   handOverLinkedTripEntry(
     entry: LinkedTripEntryKey,
     toTripId: string,
@@ -177,6 +199,17 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       .set({ sourceTripId: toTripId })
       .where(this.linkedTripEntryWhere(entry))
       .run();
+  }
+
+  private sameReadingWhere(entry: LinkedTripEntryKey) {
+    const { dayStart, nextDay } = localDayWindow(entry.recordedAt, entry.timeZone);
+    return and(
+      eq(odometerEntries.vehicleId, entry.vehicleId),
+      eq(odometerEntries.userId, entry.userId),
+      eq(odometerEntries.odometer, entry.odometer),
+      gte(odometerEntries.recordedAt, dayStart),
+      lt(odometerEntries.recordedAt, nextDay)
+    );
   }
 
   private linkedTripEntryWhere(entry: LinkedTripEntryKey) {

@@ -1139,7 +1139,7 @@ describe('a trip finds its odometer entry through the link, not the note', () =>
     const res = await ctx.authed('PUT', `/api/v1/trips/${tripId}`, { endOdometer: 1200 });
 
     expect(res.status).toBe(200);
-    expect(readings(vehicleId)).toEqual([{ odometer: 1200, note: 'From trip' }]);
+    expect(readings(vehicleId)).toEqual([{ odometer: 1200, note: 'Fuel stop' }]);
   });
 
   test('after the note is edited, moving the trip a day earlier is not refused by its own old entry', async () => {
@@ -1152,7 +1152,7 @@ describe('a trip finds its odometer entry through the link, not the note', () =>
     });
 
     expect(res.status).toBe(200);
-    expect(readings(vehicleId)).toEqual([{ odometer: 1080, note: 'From trip' }]);
+    expect(readings(vehicleId)).toEqual([{ odometer: 1080, note: 'Fuel stop' }]);
   });
 
   test('after the note is edited, deleting the trip with keepOdometer=false removes its entry', async () => {
