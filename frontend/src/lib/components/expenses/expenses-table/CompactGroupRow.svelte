@@ -5,12 +5,9 @@
 	import SplitExpenseBadge from '../split/SplitExpenseBadge.svelte';
 	import type { Vehicle } from '#lib/types/index.ts';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
-	import {
-		categoryLabels,
-		getCategoryBadgeClasses,
-		getCategoryIcon
-	} from '#lib/utils/expense-helpers.ts';
+	import { getCategoryBadgeClasses, getCategoryIcon } from '#lib/utils/expense-helpers.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { EXPENSE_CATEGORY_INFO } from '#lib/constants/expense-categories.ts';
 	import {
 		INSURANCE_DELETE_BLOCKED,
 		blockedReasonId,
@@ -22,7 +19,7 @@
 		MOBILE_ROW_ACTIONS_CONTAINER_CLASS,
 		MOBILE_ROW_SUMMARY_CLASS
 	} from './compact-row-classes';
-	import { tagsBesideCategory, type GroupRow } from './expense-table-rows';
+	import { rowTitle, tagsBesideCategory, type GroupRow } from './expense-table-rows';
 
 	interface Props {
 		row: GroupRow;
@@ -50,6 +47,7 @@
 	let shownTags = $derived(tagsBesideCategory(row.tags, row.category));
 
 	let IconComponent = $derived(getCategoryIcon(row.category));
+	let heading = $derived(rowTitle(row.description, row.category));
 	let insuranceLinked = $derived(isInsuranceLinked(row.tags));
 	let blockedId = $derived(blockedReasonId(row.groupId));
 </script>
@@ -67,19 +65,23 @@
 		<div class="flex-1 min-w-0">
 			<div class="flex items-center justify-between gap-2">
 				<p class="text-sm font-medium text-foreground truncate">
-					{categoryLabels[row.category]}
+					{heading.title}
 				</p>
 				<span class="text-sm font-semibold text-foreground whitespace-nowrap flex-shrink-0">
 					{formatCurrency(row.totalAmount)}
 				</span>
 			</div>
-			<div class="flex items-center flex-wrap gap-1.5 mt-0.5 text-xs text-muted-foreground">
+			<div class="flex min-w-0 items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
 				<SplitExpenseBadge />
+				{#if heading.categoryInMeta}
+					<span>·</span>
+					<span class="shrink-0">{EXPENSE_CATEGORY_INFO[row.category].shortLabel}</span>
+				{/if}
 				<span>·</span>
-				<span>{formatDate(new Date(row.date))}</span>
+				<span class="shrink-0 whitespace-nowrap">{formatDate(new Date(row.date))}</span>
 				{#if showVehicleColumn && row.vehicleNames.length > 0}
 					<span>·</span>
-					<span class="truncate">{row.vehicleNames.join(', ')}</span>
+					<span class="min-w-0 truncate">{row.vehicleNames.join(', ')}</span>
 				{/if}
 			</div>
 			{#if shownTags.length > 0}
