@@ -14,10 +14,12 @@ const loadRestoreProviders = vi.fn(() => Promise.resolve([sheetsProvider]));
 const restoreFromProvider = vi.fn((_request: unknown) =>
 	Promise.resolve({ success: true } as RestoreResult)
 );
+const loadSettings = vi.fn(() => Promise.resolve());
 vi.mock('#lib/stores/settings.svelte.ts', () => ({
 	settingsStore: {
 		loadRestoreProviders: () => loadRestoreProviders(),
-		restoreFromProvider: (request: unknown) => restoreFromProvider(request)
+		restoreFromProvider: (request: unknown) => restoreFromProvider(request),
+		load: () => loadSettings()
 	}
 }));
 
@@ -38,6 +40,7 @@ async function openProviderFlow(): Promise<void> {
 
 beforeEach(() => {
 	loadRestoreProviders.mockReset().mockResolvedValue([sheetsProvider]);
+	loadSettings.mockClear();
 	restoreFromProvider.mockReset();
 });
 
@@ -61,6 +64,14 @@ describe('RestoreDialog errors', () => {
 				"Couldn't preview the Sheets data. The spreadsheet has no Vehicles tab."
 			)
 		).toBeInTheDocument();
+	});
+
+	test('a refused Sheets preview reloads settings, so the paused-backups notice shows', async () => {
+		restoreFromProvider.mockRejectedValue(new ApiError('Sheet data validation failed', 400));
+		await openProviderFlow();
+
+		await screen.findByText(/Couldn't preview the Sheets data/);
+		expect(loadSettings).toHaveBeenCalled();
 	});
 
 	test('the first backup check that failed is shown, not the generic validation message', async () => {

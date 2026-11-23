@@ -99,6 +99,33 @@ describe('automatic Sheets backups pause after a refused restore', () => {
     expect(storedSettings()).not.toHaveProperty('sheetsAutoPausedAt');
   });
 
+  test('a backup the user starts keeps the pause when the Sheets write fails', async () => {
+    setBackupConfig(PAUSED);
+    const { backupStrategyRegistry } = await import('../backup-strategy-registry');
+    backupStrategyRegistry.register('fake-sheets-pause', {
+      async execute(): Promise<BackupStrategyResult> {
+        return { success: false, capabilities: { sheets: { success: false, message: 'quota' } } };
+      },
+    });
+    const { backupOrchestrator } = await import('../backup-orchestrator');
+
+    await backupOrchestrator.execute(ctx.user.id, 'U', true);
+
+    expect(storedSettings().sheetsAutoPausedAt).toBe(PAUSED.sheetsAutoPausedAt);
+  });
+
+  test('a settings save from the app cannot set the pause either', async () => {
+    const { sheetsAutoPausedAt: _paused, ...unpaused } = PAUSED;
+    setBackupConfig(unpaused);
+
+    const res = await ctx.authed('PUT', '/api/v1/settings', {
+      backupConfig: { providers: { psheets: PAUSED } },
+    });
+
+    expect(res.status).toBe(200);
+    expect(storedSettings()).not.toHaveProperty('sheetsAutoPausedAt');
+  });
+
   test('resuming from the notice ends the pause', async () => {
     setBackupConfig(PAUSED);
 

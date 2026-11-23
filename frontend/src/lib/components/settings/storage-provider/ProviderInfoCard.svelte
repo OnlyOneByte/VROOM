@@ -266,8 +266,8 @@
 						<AlertDescription class="space-y-2">
 							<p>
 								Automatic backups to this spreadsheet are paused, because restoring from it was
-								refused. Make a copy of the spreadsheet in Google Drive if you want to keep it as it
-								is. Backing up now, or resuming, writes over it.
+								refused. If you want to keep it as it is, make a copy in Google Drive first. A
+								backup you start, or the next automatic one after you resume, writes over it.
 							</p>
 							<Button
 								variant="outline"
@@ -279,7 +279,7 @@
 								{#if isResuming}
 									<LoaderCircle class="h-3 w-3 animate-spin mr-1" />
 								{/if}
-								Resume automatic backups
+								Resume Automatic Backups
 							</Button>
 						</AlertDescription>
 					</Alert>

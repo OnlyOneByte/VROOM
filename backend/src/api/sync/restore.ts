@@ -237,6 +237,22 @@ class RestoreService {
       throw new ValidationError('No Google Sheets spreadsheet found for this provider');
     }
 
+    try {
+      return await this.readSheetsAndRestore(userId, providerId, sheetsSpreadsheetId, mode);
+    } catch (error) {
+      await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
+        providers: { [providerId]: { sheetsAutoPausedAt: new Date().toISOString() } },
+      });
+      throw error;
+    }
+  }
+
+  private async readSheetsAndRestore(
+    userId: string,
+    providerId: string,
+    sheetsSpreadsheetId: string,
+    mode: RestoreMode
+  ): Promise<RestoreResponse> {
     const { createSheetsServiceForProvider } = await import(
       '../providers/services/google-sheets-service'
     );
@@ -274,9 +290,6 @@ class RestoreService {
 
     const validation = backupService.validateBackupData(sheetData, 'sheets');
     if (!validation.valid) {
-      await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
-        providers: { [providerId]: { sheetsAutoPausedAt: new Date().toISOString() } },
-      });
       throw new ValidationError('Sheet data validation failed', validation.errors);
     }
 
