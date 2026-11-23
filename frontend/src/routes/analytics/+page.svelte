@@ -84,8 +84,10 @@
 		void goto(`${url.pathname}${url.search}`, { replace: true, reset: false });
 	});
 
-	function clearFilters() {
+	async function clearFilters() {
 		setFilters({ range: DEFAULT_RANGE, cars: [] });
+		await tick();
+		document.querySelector<HTMLElement>('[aria-label="Analytics filters"] button')?.focus();
 	}
 
 	async function loadVehicles() {

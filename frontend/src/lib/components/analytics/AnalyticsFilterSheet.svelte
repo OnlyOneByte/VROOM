@@ -2,7 +2,10 @@
 	import { untrack } from 'svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
-	import DateRangePicker from '#lib/components/common/date-range-picker.svelte';
+	import { parseDate, type DateValue } from '@internationalized/date';
+	import { CalendarRange } from '@lucide/svelte';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
+	import { RangeCalendar } from '#lib/components/ui/range-calendar/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import * as RadioGroup from '#lib/components/ui/radio-group/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
@@ -23,7 +26,7 @@
 		vehicles: Array<{ id: string; name: string }>;
 		onChange: (_filters: AnalyticsFilters) => void;
 		vehiclesError?: string | null;
-		onRetryVehicles?: () => void;
+		onRetryVehicles?: () => unknown;
 	}
 
 	let {
@@ -39,24 +42,27 @@
 	let names = $derived(new Set(vehicles.map(v => v.id)));
 	let selectedCars = $derived(filters.cars.filter(id => names.has(id)));
 
-	let customFrom = $state<string | undefined>(undefined);
-	let customTo = $state<string | undefined>(undefined);
+	let customOpen = $state(false);
+	let customValue = $state<{ start: DateValue | undefined; end: DateValue | undefined }>();
 	let seeded = '';
 
 	$effect(() => {
 		if (menu !== 'range') return;
 		untrack(() => {
 			const range = filterDateRange(filters);
-			customFrom = filters.from ?? toDayString(new Date(range.startDate * 1000));
-			customTo = filters.to ?? toDayString(new Date((range.endDate - 1) * 1000));
-			seeded = `${customFrom}|${customTo}`;
+			const from = filters.from ?? toDayString(new Date(range.startDate * 1000));
+			const to = filters.to ?? toDayString(new Date((range.endDate - 1) * 1000));
+			customValue = { start: parseDate(from), end: parseDate(to) };
+			customOpen = filters.range === 'custom';
+			seeded = `${from}|${to}`;
 		});
 	});
 
 	$effect(() => {
-		const picked = `${customFrom}|${customTo}`;
-		if (menu !== 'range' || !customFrom || !customTo || picked === seeded) return;
-		untrack(() => applyCustom(customFrom as string, customTo as string));
+		const start = customValue?.start?.toString();
+		const end = customValue?.end?.toString();
+		if (menu !== 'range' || !start || !end || `${start}|${end}` === seeded) return;
+		untrack(() => applyCustom(start, end));
 	});
 
 	function pickRange(value: string) {
@@ -82,7 +88,10 @@
 		if (!open) menu = null;
 	}}
 >
-	<Sheet.Content {side} class={side === 'bottom' ? 'max-h-[85vh]' : 'sm:max-w-sm'}>
+	<Sheet.Content
+		{side}
+		class={side === 'bottom' ? 'max-h-[85vh] overflow-y-auto' : 'overflow-y-auto sm:max-w-sm'}
+	>
 		<Sheet.Header>
 			<Sheet.Title>{menu === 'cars' ? 'Cars' : 'Date range'}</Sheet.Title>
 			<Sheet.Description>
@@ -92,12 +101,11 @@
 
 		<div class="px-4">
 			{#if menu === 'cars' && vehiclesError}
-				<div class="space-y-3" role="alert">
-					<p class="text-sm">Couldn't load your cars. {vehiclesError}</p>
-					{#if onRetryVehicles}
-						<Button variant="outline" onclick={onRetryVehicles}>Try Again</Button>
-					{/if}
-				</div>
+				<LoadErrorCard
+					title="Couldn't load your cars"
+					message={vehiclesError}
+					onRetry={() => onRetryVehicles?.()}
+				/>
 			{:else if menu === 'cars'}
 				<div class="space-y-1" role="group" aria-label="Cars">
 					<Label
@@ -142,14 +150,28 @@
 						</Label>
 					{/each}
 				</RadioGroup.Root>
-				<div class="mt-3 space-y-2 border-t pt-3">
-					<Label for="analytics-range-custom" class="text-sm font-medium">Custom range</Label>
-					<DateRangePicker
-						id="analytics-range-custom"
-						bind:startValue={customFrom}
-						bind:endValue={customTo}
-						placeholder="Pick a start and end date"
-					/>
+				<div class="mt-3 space-y-3 border-t pt-3">
+					<Button
+						variant="outline"
+						class="w-full justify-start"
+						aria-expanded={customOpen}
+						aria-controls="analytics-range-calendar"
+						onclick={() => (customOpen = !customOpen)}
+					>
+						<CalendarRange class="mr-2 h-4 w-4" aria-hidden="true" />
+						Pick Custom Dates
+					</Button>
+					{#if customOpen}
+						<div id="analytics-range-calendar" class="flex flex-col items-center gap-2">
+							<p class="text-sm text-muted-foreground">Choose the first day, then the last day.</p>
+							<RangeCalendar
+								bind:value={customValue}
+								numberOfMonths={1}
+								captionLayout="dropdown"
+								class="rounded-md border"
+							/>
+						</div>
+					{/if}
 				</div>
 			{/if}
 		</div>

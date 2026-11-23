@@ -1,7 +1,7 @@
 export const RANGE_PRESETS = [
 	{ value: '3m', label: 'Last 3 months', short: '3 months' },
 	{ value: '12m', label: 'Last 12 months', short: '12 months' },
-	{ value: 'ytd', label: 'Year to date', short: 'This year' },
+	{ value: 'ytd', label: 'Year to date', short: 'Year to date' },
 	{ value: '24m', label: 'Last 24 months', short: '24 months' },
 	{ value: 'all', label: 'All time', short: 'All time' }
 ] as const;

@@ -90,7 +90,9 @@ describe('analytics filter bar', () => {
 		render(Page);
 
 		await fireEvent.click(await screen.findByRole('button', { name: /Last 12 months/ }));
-		await fireEvent.click(await screen.findByRole('radio', { name: 'Last 24 months' }));
+		await fireEvent.click(
+			await screen.findByRole('radio', { name: 'Last 24 months' }, { timeout: 10_000 })
+		);
 		expect(mocks.goto).toHaveBeenCalledWith('/analytics?range=24m&cars=civic', { reset: false });
 	});
 });

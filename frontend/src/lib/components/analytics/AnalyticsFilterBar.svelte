@@ -80,7 +80,13 @@
 
 	{#if !isDefaultFilters(filters)}
 		{#if isMobile.current}
-			<Button variant="ghost" size="icon" aria-label="Clear filters" onclick={clearFilters}>
+			<Button
+				variant="ghost"
+				size="icon"
+				class="size-10 shrink-0"
+				aria-label="Clear filters"
+				onclick={clearFilters}
+			>
 				<X class="h-4 w-4" aria-hidden="true" />
 			</Button>
 		{:else}
