@@ -83,6 +83,10 @@ function createAuthStore() {
 			return recheckingSession;
 		},
 
+		remembersUser() {
+			return lastKnownUser() !== null;
+		},
+
 		async recheckSession() {
 			if (recheckingSession) return;
 			recheckingSession = true;

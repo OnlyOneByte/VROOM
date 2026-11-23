@@ -60,6 +60,7 @@
 
 	onMount(async () => {
 		themeStore.initialize();
+		mayBeSignedIn = authStore.remembersUser();
 		authStore.initialize({ fromCache: !isPublicRoute(page.url.pathname) });
 
 		if (pwaInfo) {
@@ -91,6 +92,11 @@
 	}
 	let isAuthPage = $derived(currentPath.startsWith('/auth'));
 	let isHomePage = $derived(currentPath === '/');
+	let mayBeSignedIn = $state(true);
+	let showSplash = $derived(
+		authState.isLoading &&
+			(!isPublicRoute(currentPath) || ((isAuthPage || isHomePage) && mayBeSignedIn))
+	);
 
 	$effect(() => {
 		if (authState.isAuthenticated && !authState.isLoading) {
@@ -149,7 +155,7 @@
 	{@html webManifestLink}
 </svelte:head>
 
-{#if authState.isLoading && !isPublicRoute(currentPath)}
+{#if showSplash}
 	<div class="min-h-screen bg-background flex items-center justify-center">
 		<div class="text-center">
 			<BrandMark class="h-14 w-14 mx-auto mb-4" />

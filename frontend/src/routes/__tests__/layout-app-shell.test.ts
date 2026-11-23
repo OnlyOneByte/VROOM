@@ -142,6 +142,23 @@ describe('authStore.initialize from the remembered user', () => {
 		expect(offlineExpenseQueue.current.map(e => e.id)).toEqual(['bob-1']);
 	});
 
+	it('forgets the remembered user on sign-out, so the next visit waits for the server', async () => {
+		mockFetch.mockResolvedValueOnce(meOk(alice));
+		await authStore.initialize();
+		expect(authStore.remembersUser()).toBe(true);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ success: true, data: null }), {
+				status: 200,
+				headers: { 'content-type': 'application/json' }
+			})
+		);
+
+		await authStore.logout();
+
+		expect(localStorage.getItem('vroom_last_user')).toBeNull();
+		expect(authStore.remembersUser()).toBe(false);
+	});
+
 	it('waits for the server when not asked to use the remembered user', () => {
 		localStorage.setItem('vroom_last_user', JSON.stringify(alice));
 		deferredMe();
@@ -176,7 +193,21 @@ describe('the root layout paints the app shell without waiting on /auth/me', () 
 	});
 
 	it.each(['/', '/auth'])(
-		'renders %s for a signed-out visitor at once, without the splash or the app shell',
+		'renders %s at once, without the splash or the app shell, when nobody signed in on this device',
+		async path => {
+			location.path = path;
+			deferredMe();
+
+			render(Layout, { children: pageContent });
+
+			await waitFor(() => expect(screen.getByText('Page content')).toBeInTheDocument());
+			expect(screen.queryByText('Loading VROOM...')).toBeNull();
+			expect(screen.queryByRole('link', { name: 'Skip to content' })).toBeNull();
+		}
+	);
+
+	it.each(['/', '/auth'])(
+		'keeps the splash on %s for a remembered user until the server answers, so the page never flashes',
 		async path => {
 			location.path = path;
 			localStorage.setItem('vroom_last_user', JSON.stringify(alice));
@@ -184,12 +215,36 @@ describe('the root layout paints the app shell without waiting on /auth/me', () 
 
 			render(Layout, { children: pageContent });
 
-			expect(screen.getByText('Page content')).toBeInTheDocument();
-			expect(screen.queryByText('Loading VROOM...')).toBeNull();
+			await waitFor(() => expect(screen.getByText('Loading VROOM...')).toBeInTheDocument());
+			expect(screen.queryByText('Page content')).toBeNull();
 			expect(screen.queryByRole('link', { name: 'Skip to content' })).toBeNull();
 			expect(authStore.isAuthenticated).toBe(false);
 		}
 	);
+
+	it.each(['/privacypolicy', '/termsofservice'])('renders %s at once', path => {
+		location.path = path;
+		localStorage.setItem('vroom_last_user', JSON.stringify(alice));
+		deferredMe();
+
+		render(Layout, { children: pageContent });
+
+		expect(screen.getByText('Page content')).toBeInTheDocument();
+		expect(screen.queryByText('Loading VROOM...')).toBeNull();
+	});
+
+	it('starts offline from the remembered user with its queue when the server is unreachable', async () => {
+		localStorage.setItem('vroom_last_user', JSON.stringify(alice));
+		localStorage.setItem('vroom_offline_expenses:alice', JSON.stringify([queued('alice-1')]));
+		mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+
+		render(Layout, { children: pageContent });
+
+		await waitFor(() => expect(authStore.sessionUnverified).toBe(true));
+		expect(screen.getByText('Page content')).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Skip to content' })).toBeInTheDocument();
+		expect(offlineExpenseQueue.current.map(e => e.id)).toEqual(['alice-1']);
+	});
 
 	it('keeps the branded splash on a protected route when nobody signed in on this device', () => {
 		deferredMe();
