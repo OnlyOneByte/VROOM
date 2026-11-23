@@ -34,6 +34,7 @@ vi.mock('$app/paths', () => ({
 }));
 
 import ExpensePhotoSection from '../ExpensePhotoSection.svelte';
+import '#lib/components/common/MediaCaptureDialog.svelte';
 
 function photo(id: string, overrides: Partial<Photo> = {}): Photo {
 	return {

@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { Upload, Trash2, ImagePlus, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import MediaCaptureDialog from '#lib/components/common/MediaCaptureDialog.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { expenseApi, type PhotoSectionEntityType } from '#lib/services/expense-api.ts';
 	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
@@ -24,6 +23,20 @@
 	let photos = $state<Photo[]>([]);
 	let isLoading = $state(true);
 	let showUploadDialog = $state(false);
+	let mediaDialog = $state<Promise<
+		typeof import('#lib/components/common/MediaCaptureDialog.svelte')
+	> | null>(null);
+
+	function openUploadDialog() {
+		mediaDialog ??= import('#lib/components/common/MediaCaptureDialog.svelte');
+		mediaDialog.then(
+			() => (showUploadDialog = true),
+			error => {
+				mediaDialog = null;
+				handleErrorWithNotification(error, "Couldn't open the upload dialog");
+			}
+		);
+	}
 
 	onMount(async () => {
 		await loadPhotos();
@@ -88,7 +101,7 @@
 			variant="outline"
 			size="sm"
 			class="h-10 text-xs sm:h-7"
-			onclick={() => (showUploadDialog = true)}
+			onclick={openUploadDialog}
 		>
 			<Upload class="mr-1 h-3 w-3" />
 			Upload
@@ -145,15 +158,21 @@
 	{/if}
 </div>
 
-<MediaCaptureDialog
-	bind:open={showUploadDialog}
-	title="Upload Photos & Receipts"
-	description="Add photos or receipt images for this {ENTITY_NOUN[entityType]}"
-	acceptedTypes={['image/jpeg', 'image/png', 'image/webp', 'application/pdf']}
-	onUpload={file => expenseApi.uploadPhoto(entityType, entityId, file)}
-	onUploadComplete={handleUploadComplete}
-	onClose={() => (showUploadDialog = false)}
-/>
+{#if mediaDialog}
+	{#await mediaDialog then { default: MediaCaptureDialog }}
+		<MediaCaptureDialog
+			bind:open={showUploadDialog}
+			title="Upload Photos & Receipts"
+			description="Add photos or receipt images for this {ENTITY_NOUN[entityType]}"
+			acceptedTypes={['image/jpeg', 'image/png', 'image/webp', 'application/pdf']}
+			onUpload={file => expenseApi.uploadPhoto(entityType, entityId, file)}
+			onUploadComplete={handleUploadComplete}
+			onClose={() => (showUploadDialog = false)}
+		/>
+	{:catch}
+
+	{/await}
+{/if}
 
 <ConfirmDialog
 	bind:open={confirmOpen}
