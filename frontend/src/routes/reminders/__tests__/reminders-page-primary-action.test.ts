@@ -81,6 +81,48 @@ describe('/reminders primary action', () => {
 		expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
 	});
 
+	test('due reminders left without vehicles offer Add Vehicle above the list and no Run Due Reminders', async () => {
+		list.mockImplementation(() => Promise.resolve([reminder('2000-01-01T00:00:00.000Z')]));
+		getVehicles.mockImplementation(() => Promise.resolve([]));
+		render(Page);
+
+		await waitFor(() => expect(screen.getByText('Oil change')).toBeInTheDocument());
+		const prompt = screen.getByTestId('reminders-no-vehicles');
+		expect(prompt).toHaveAttribute('role', 'status');
+		expect(prompt).toHaveTextContent('This reminder lost its vehicle');
+		expect(controls('Add Vehicle')).toHaveLength(1);
+		expect(controls('Add Vehicle')[0]).toHaveAttribute('href', '/vehicles/new');
+		expect(
+			prompt.compareDocumentPosition(screen.getByText('Oil change')) &
+				Node.DOCUMENT_POSITION_FOLLOWING
+		).toBeTruthy();
+		expect(controls('Run Due Reminders')).toHaveLength(0);
+	});
+
+	test('a paused reminder that lost its vehicle offers no Resume, which the server would reject', async () => {
+		const orphan = reminder('2999-01-01T00:00:00.000Z');
+		orphan.reminder.isActive = false;
+		const kept = { ...reminder('2998-01-01T00:00:00.000Z'), vehicleIds: ['v1'] };
+		kept.reminder = { ...kept.reminder, id: 'r-kept', name: 'Tyre swap', isActive: false };
+		list.mockImplementation(() => Promise.resolve([orphan, kept]));
+		render(Page);
+
+		await waitFor(() => expect(screen.getByText('Tyre swap')).toBeInTheDocument());
+		expect(controls('Resume')).toHaveLength(1);
+		expect(screen.getAllByText('No vehicle. Edit to choose one, then resume.')).toHaveLength(1);
+		expect(screen.getByTestId('reminder-card-r-kept').contains(controls('Resume')[0] ?? null)).toBe(
+			true
+		);
+	});
+
+	test('with vehicles there is no Add Vehicle prompt above the list', async () => {
+		list.mockImplementation(() => Promise.resolve([reminder('2000-01-01T00:00:00.000Z')]));
+		render(Page);
+
+		await waitFor(() => expect(controls('Run Due Reminders')).toHaveLength(1));
+		expect(screen.queryByTestId('reminders-no-vehicles')).toBeNull();
+	});
+
 	test('the empty state offers New Reminder once and no Run Due Reminders', async () => {
 		list.mockImplementation(() => Promise.resolve([]));
 		render(Page);

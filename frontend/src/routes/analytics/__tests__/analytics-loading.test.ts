@@ -12,16 +12,15 @@ vi.mock('#lib/services/analytics-api.ts', () => ({
 import Page from '../+page.svelte';
 
 describe('analytics while the summary loads', () => {
-	test('reserves the four quick-stat tiles above the tabs with icon-shaped skeletons', async () => {
+	test('reserves the four quick-stat tiles with icon-shaped skeletons and holds the tabs', async () => {
 		const { container } = render(Page);
 
-		const tabs = await screen.findByRole('tablist');
 		const tiles = [...container.querySelectorAll('[data-slot="card"]')];
 		expect(tiles).toHaveLength(4);
 		for (const tile of tiles) {
 			expect(tile.querySelector('[data-slot="skeleton"].rounded-xl')).not.toBeNull();
-			expect(tile.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 		}
+		expect(screen.queryByRole('tablist')).toBeNull();
 		expect(container.querySelector('.animate-spin')).toBeNull();
 	});
 });

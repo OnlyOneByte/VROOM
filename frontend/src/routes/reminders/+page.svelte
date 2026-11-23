@@ -31,7 +31,12 @@
 	import * as CardNs from '#lib/components/ui/card/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
-	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
+	import NoVehiclesEmptyState, {
+		NO_VEHICLES_TITLE
+	} from '#lib/components/common/NoVehiclesEmptyState.svelte';
+	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
+	import { resolve } from '$app/paths';
+	import { routes } from '#lib/routes.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import ReminderForm from '#lib/components/reminders/ReminderForm.svelte';
@@ -211,7 +216,7 @@
 <div class="space-y-6 pb-24">
 	<PageHeader title="Reminders" description="Recurring expenses and maintenance reminders">
 		{#snippet actions()}
-			{#if dueReminders.length > 0}
+			{#if dueReminders.length > 0 && vehicles.length > 0}
 				<Button variant="outline" size="lg" onclick={runDueReminders} disabled={isTriggering}>
 					<RefreshCw class="mr-2 h-4 w-4 {isTriggering ? 'animate-spin' : ''}" />
 					Run Due Reminders
@@ -315,6 +320,11 @@
 										<Car class="h-3.5 w-3.5" />
 										{item.vehicleIds.map(id => vehicleNames.get(id) ?? 'Vehicle').join(', ')}
 									</span>
+								{:else if !item.reminder.isActive}
+									<span class="inline-flex items-center gap-1">
+										<Car class="h-3.5 w-3.5" />
+										No vehicle. Edit to choose one, then resume.
+									</span>
 								{/if}
 							</div>
 						</div>
@@ -346,9 +356,11 @@
 								Mark Serviced
 							</Button>
 						{/if}
-						<Button variant="ghost" size="sm" onclick={() => toggleActive(item)}>
-							{item.reminder.isActive ? 'Pause' : 'Resume'}
-						</Button>
+						{#if item.reminder.isActive || (item.vehicleIds?.length ?? 0) > 0}
+							<Button variant="ghost" size="sm" onclick={() => toggleActive(item)}>
+								{item.reminder.isActive ? 'Pause' : 'Resume'}
+							</Button>
+						{/if}
 						<Button
 							variant="ghost"
 							size="sm"
@@ -369,6 +381,24 @@
 				</CardNs.CardContent>
 			</CardNs.Card>
 		{/snippet}
+
+		{#if vehicles.length === 0}
+			<Alert role="status" data-testid="reminders-no-vehicles">
+				<Car class="h-4 w-4" />
+				<AlertTitle>{NO_VEHICLES_TITLE}</AlertTitle>
+				<AlertDescription>
+					<p>
+						{reminders.length === 1
+							? 'This reminder lost its vehicle and is paused. Add a vehicle, then edit the reminder to choose it.'
+							: 'These reminders lost their vehicle and are paused. Add a vehicle, then edit each reminder to choose it.'}
+					</p>
+					<Button size="lg" class="mt-2" href={resolve(routes.vehicleNew)}>
+						<Plus class="mr-2 h-4 w-4" />
+						Add Vehicle
+					</Button>
+				</AlertDescription>
+			</Alert>
+		{/if}
 
 		{#if dueReminders.length > 0}
 			<section class="space-y-3">

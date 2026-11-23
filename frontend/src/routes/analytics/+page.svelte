@@ -48,6 +48,7 @@
 
 	let quickStats = $derived(summary?.quickStats ?? null);
 	let noVehicles = $derived(!isLoading && !error && quickStats?.vehicleCount === 0);
+	let showTabs = $derived(quickStats ? quickStats.vehicleCount > 0 : !!error);
 	let fuelStats = $derived(summary?.fuelStats ?? null);
 	let fuelAdvanced = $derived(summary?.fuelAdvanced ?? null);
 
@@ -127,7 +128,7 @@
 		<StatCardGrid items={quickStatsItems} columns={4} />
 	{/if}
 
-	{#if !noVehicles}
+	{#if showTabs}
 		<Tabs.Root bind:value={activeTab} class="space-y-4 md:space-y-6">
 			<Tabs.List
 				bind:ref={tabList}
