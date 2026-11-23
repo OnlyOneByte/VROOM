@@ -21,7 +21,7 @@ import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, odometerEntries, photos } from '../../db/schema';
 import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import type { DrizzleTransaction } from '../../db/types';
-import { DatabaseError, NotFoundError, ValidationError } from '../../errors';
+import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '../../errors';
 import { zonedCalendar } from '../../utils/analytics-charts';
 import { getPeriodStartDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
@@ -268,6 +268,13 @@ function computeMonthlyAverage(
   return totalAmount / Math.max(calendarMonths, 1);
 }
 
+function replayFor(existing: Expense, vehicleId: string): Expense {
+  if (existing.vehicleId !== vehicleId) {
+    throw new ConflictError('This request was already used for a different expense');
+  }
+  return existing;
+}
+
 export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   constructor(db: AppDatabase) {
     super(db, expenses);
@@ -334,6 +341,11 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return result[0] ?? null;
   }
 
+  async findReplay(clientId: string, userId: string, vehicleId: string): Promise<Expense | null> {
+    const existing = await this.findByClientId(clientId, userId);
+    return existing && replayFor(existing, vehicleId);
+  }
+
   async createIdempotent(
     data: NewExpense,
     odometer: OdometerCheck | null = null
@@ -347,15 +359,16 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
             .from(expenses)
             .where(and(eq(expenses.clientId, clientId), eq(expenses.userId, userId)))
             .get();
-          if (existing) return existing;
+          if (existing) return replayFor(existing, data.vehicleId);
         }
         assertOdometerInOrder(tx, odometer);
         return tx.insert(expenses).values(data).returning().get();
       });
     } catch (error) {
-      if (!clientId || error instanceof ValidationError) throw error;
+      if (!clientId || error instanceof ValidationError || error instanceof ConflictError)
+        throw error;
       const raced = await this.findByClientId(clientId, userId);
-      if (raced) return raced;
+      if (raced) return replayFor(raced, data.vehicleId);
       throw error;
     }
   }

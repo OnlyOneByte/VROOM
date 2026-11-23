@@ -729,7 +729,7 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   const createdBy = ownerId === user.id ? null : user.id;
 
   let createdExpense = expenseData.clientId
-    ? await expenseRepository.findByClientId(expenseData.clientId, ownerId)
+    ? await expenseRepository.findReplay(expenseData.clientId, ownerId, expenseData.vehicleId)
     : null;
 
   if (!createdExpense) {

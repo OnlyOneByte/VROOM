@@ -6,6 +6,7 @@ import type { AppDatabase } from '../../../db/connection';
 import type { NewExpense } from '../../../db/schema';
 import * as schema from '../../../db/schema';
 import { expenses } from '../../../db/schema';
+import { ConflictError } from '../../../errors';
 import { ExpenseRepository } from '../repository';
 
 let sqliteDb: Database;
@@ -104,5 +105,21 @@ describe('createIdempotent', () => {
 
     expect(await repo.findByClientId('scoped-key', USER_A)).not.toBeNull();
     expect(await repo.findByClientId('scoped-key', USER_B)).toBeNull();
+  });
+});
+
+describe('createIdempotent replay scoping', () => {
+  test('a clientId already saved on another of the same user vehicles is a conflict, not that row', async () => {
+    sqliteDb.run(
+      `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-a2', '${USER_A}', 'Mazda', 'CX-5', 2023)`
+    );
+    await repo.createIdempotent(expenseInput({ clientId: 'scope-1' }));
+
+    await expect(
+      repo.createIdempotent(expenseInput({ clientId: 'scope-1', vehicleId: 'veh-a2' }))
+    ).rejects.toThrow(ConflictError);
+    expect(await repo.findReplay('scope-1', USER_A, VEHICLE_A)).not.toBeNull();
+    await expect(repo.findReplay('scope-1', USER_A, 'veh-a2')).rejects.toThrow(ConflictError);
+    expect(countRows()).toBe(1);
   });
 });
