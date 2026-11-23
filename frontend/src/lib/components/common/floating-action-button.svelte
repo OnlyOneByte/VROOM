@@ -14,7 +14,7 @@
 <Button
 	{href}
 	{onclick}
-	class="fixed bottom-4 left-4 right-4 z-40 h-14 rounded-full sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto lg:hidden pl-5 pr-6 shadow-lg transition-colors"
+	class="fixed bottom-4 left-4 right-4 z-40 h-14 rounded-full sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto lg:hidden has-[>svg]:px-6 shadow-lg transition-colors"
 >
 	<Plus class="size-5" />
 	<span class="font-semibold text-base">{label}</span>
