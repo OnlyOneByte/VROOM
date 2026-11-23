@@ -249,6 +249,33 @@ describe('locale and currency decimals', () => {
 	});
 });
 
+describe('Intl formatter reuse', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	test('a repeated call reuses the formatter instead of building a new one', () => {
+		formatCurrency(1, 'CAD');
+		formatDate('2026-01-02');
+		const numberSpy = vi.spyOn(Intl, 'NumberFormat');
+		const dateSpy = vi.spyOn(Intl, 'DateTimeFormat');
+		expect(formatCurrency(1, 'CAD')).toBe(formatCurrency(1, 'CAD'));
+		formatDate('2026-03-04');
+		expect(numberSpy).not.toHaveBeenCalled();
+		expect(dateSpy).not.toHaveBeenCalled();
+	});
+
+	test('keeps one formatter per currency and per locale', () => {
+		expect(formatCurrency(5, 'USD')).toBe('$5.00');
+		expect(formatCurrency(5, 'JPY')).toBe('¥5');
+		expect(formatCurrency(5, 'USD')).toBe('$5.00');
+		vi.spyOn(navigator, 'language', 'get').mockReturnValue('de-DE');
+		expect(formatNumber(1234.5, 1)).toBe('1.234,5');
+		vi.restoreAllMocks();
+		expect(formatNumber(1234.5, 1)).toBe('1,234.5');
+	});
+});
+
 describe('amountPlaceholder and formatBytes', () => {
 	test("the amount placeholder has the currency's decimal places", () => {
 		expect(amountPlaceholder('USD')).toBe('0.00');

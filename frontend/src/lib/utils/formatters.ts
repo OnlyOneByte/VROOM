@@ -8,12 +8,35 @@ function userCurrency(currency?: string): string {
 	return currency || settingsStore.settings?.currencyUnit || 'USD';
 }
 
+const numberFormats = new Map<string, Intl.NumberFormat>();
+const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
+
+function numberFormat(options: Intl.NumberFormatOptions): Intl.NumberFormat {
+	const locale = currentLocale();
+	const key = `${locale}|${JSON.stringify(options)}`;
+	let format = numberFormats.get(key);
+	if (!format) {
+		format = new Intl.NumberFormat(locale, options);
+		numberFormats.set(key, format);
+	}
+	return format;
+}
+
+function dateTimeFormat(options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+	const locale = currentLocale();
+	const key = `${locale}|${JSON.stringify(options)}`;
+	let format = dateTimeFormats.get(key);
+	if (!format) {
+		format = new Intl.DateTimeFormat(locale, options);
+		dateTimeFormats.set(key, format);
+	}
+	return format;
+}
+
 export function currencyFractionDigits(currency?: string): number {
 	return (
-		new Intl.NumberFormat(currentLocale(), {
-			style: 'currency',
-			currency: userCurrency(currency)
-		}).resolvedOptions().maximumFractionDigits ?? 2
+		numberFormat({ style: 'currency', currency: userCurrency(currency) }).resolvedOptions()
+			.maximumFractionDigits ?? 2
 	);
 }
 
@@ -38,13 +61,13 @@ export function formatBytes(bytes: number): string {
 }
 
 export function formatDateWith(date: Date, options: Intl.DateTimeFormatOptions): string {
-	return new Intl.DateTimeFormat(currentLocale(), options).format(date);
+	return dateTimeFormat(options).format(date);
 }
 
 export function formatCurrency(amount: number, currency?: string, fractionDigits?: number): string {
 	const currencyToUse = userCurrency(currency);
 
-	return new Intl.NumberFormat(currentLocale(), {
+	return numberFormat({
 		style: 'currency',
 		currency: currencyToUse,
 		...(fractionDigits != null && {
@@ -56,24 +79,19 @@ export function formatCurrency(amount: number, currency?: string, fractionDigits
 
 export function getCurrencySymbol(currency?: string): string {
 	const currencyToUse = userCurrency(currency);
-	const parts = new Intl.NumberFormat(currentLocale(), {
-		style: 'currency',
-		currency: currencyToUse
-	}).formatToParts(0);
+	const parts = numberFormat({ style: 'currency', currency: currencyToUse }).formatToParts(0);
 	return parts.find(p => p.type === 'currency')?.value ?? currencyToUse;
 }
 
 export function formatNumber(value: number, decimals = 2): string {
-	return new Intl.NumberFormat(currentLocale(), {
+	return numberFormat({
 		minimumFractionDigits: decimals,
 		maximumFractionDigits: decimals
 	}).format(value);
 }
 
 export function formatNumberUpTo(value: number, maxDecimals: number): string {
-	return new Intl.NumberFormat(currentLocale(), { maximumFractionDigits: maxDecimals }).format(
-		value
-	);
+	return numberFormat({ maximumFractionDigits: maxDecimals }).format(value);
 }
 
 export function capitalize(s: string): string {
