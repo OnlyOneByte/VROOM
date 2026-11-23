@@ -4,6 +4,7 @@
   "backend/src/api/analytics/repository.ts: Do not reuse for getAllVehicleUnits: that path must throw on invalid prefs, not default.",
   "backend/src/api/assistant/routes.ts: The provider error is not echoed: it may contain credentials. The adapter has already logged it.",
   "backend/src/api/assistant/routes.ts: Tool turns are server-produced; accepting them from the request would let a client inject tool results.",
+  "backend/src/api/auth/__tests__/link-account-http.test.ts: App modules must be imported after createTestApp, or they bind the wrong database.",
   "backend/src/api/auth/__tests__/login-callback-http.test.ts: App modules must be imported after createTestApp, or they bind the wrong database.",
   "backend/src/api/auth/__tests__/login-email-preservation.test.ts: App modules must be imported after createTestApp, or they bind the wrong database.",
   "backend/src/api/auth/__tests__/oauth-redirect-uri-paths.test.ts: Read defaults from the config source, not CONFIG: a developer's .env would replace them.",

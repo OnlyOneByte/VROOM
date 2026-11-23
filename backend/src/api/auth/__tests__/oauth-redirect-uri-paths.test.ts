@@ -62,6 +62,18 @@ describe('OAuth redirect-URI defaults resolve to mounted routes', () => {
     expect(await statusFor(derived)).not.toBe(404);
   });
 
+  test('the link URIs derived from the login defaults hit the link callback', async () => {
+    for (const [name, provider] of [
+      ['GOOGLE_REDIRECT_URI', 'google'],
+      ['GITHUB_REDIRECT_URI', 'github'],
+    ] as const) {
+      const loginDefault = redirectUriDefaults().find((d) => d.name === name)?.uri ?? '';
+      const derived = loginDefault.replace(`/callback/${provider}`, `/callback/link/${provider}`);
+      expect(new URL(derived).pathname).toBe(`/api/v1/auth/callback/link/${provider}`);
+      expect(await statusFor(derived)).not.toBe(404);
+    }
+  });
+
   test('an unmounted callback path DOES 404 (the probe can tell the difference)', async () => {
     expect(await statusFor('http://localhost:3001/auth/callback/google')).toBe(404);
     expect(await statusFor('http://localhost:3001/auth/callback/provider/google')).toBe(404);

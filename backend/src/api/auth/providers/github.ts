@@ -1,12 +1,19 @@
 import { GitHub } from 'arctic';
 import { CONFIG } from '../../../config';
-import { NoVerifiedEmailError, type OAuthProviderConfig } from './types';
+import { NoVerifiedEmailError, type OAuthFlow, type OAuthProviderConfig } from './types';
 
-const githubLoginClient = new GitHub(
-  CONFIG.auth.githubClientId || '',
-  CONFIG.auth.githubClientSecret || '',
-  CONFIG.auth.githubRedirectUri
-);
+function createGitHubClient(redirectUri: string): GitHub {
+  return new GitHub(
+    CONFIG.auth.githubClientId || '',
+    CONFIG.auth.githubClientSecret || '',
+    redirectUri
+  );
+}
+
+const githubClients: Record<OAuthFlow, GitHub> = {
+  login: createGitHubClient(CONFIG.auth.githubRedirectUri),
+  link: createGitHubClient(CONFIG.auth.githubLinkRedirectUri),
+};
 
 const SCOPES = ['user:email'];
 
@@ -29,11 +36,11 @@ export const githubAuthProvider: OAuthProviderConfig = {
   id: 'github',
   displayName: 'GitHub',
   supportsPKCE: false,
-  createAuthorizationURL: (state) => {
-    return githubLoginClient.createAuthorizationURL(state, SCOPES);
+  createAuthorizationURL: (state, _codeVerifier, flow) => {
+    return githubClients[flow].createAuthorizationURL(state, SCOPES);
   },
-  validateAuthorizationCode: async (code) => {
-    const tokens = await githubLoginClient.validateAuthorizationCode(code);
+  validateAuthorizationCode: async (code, _codeVerifier, flow) => {
+    const tokens = await githubClients[flow].validateAuthorizationCode(code);
     return {
       accessToken: tokens.accessToken(),
     };

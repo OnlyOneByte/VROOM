@@ -39,12 +39,15 @@ There is no demo login. Sign-in is OAuth only, so set up at least one provider i
 `backend/.env` before you open the app:
 
 - **GitHub:** create an OAuth app at https://github.com/settings/developers with the callback
-  URL `http://localhost:3001/api/v1/auth/callback/github`, then fill in `GITHUB_CLIENT_ID` and
-  `GITHUB_CLIENT_SECRET`.
+  URL `http://localhost:3001/api/v1/auth/callback`, then fill in `GITHUB_CLIENT_ID` and
+  `GITHUB_CLIENT_SECRET`. GitHub accepts any redirect under that URL, so it covers both sign-in
+  (`.../callback/github`) and linking a second account on Profile (`.../callback/link/github`).
 - **Google:** create an OAuth client in the Google Cloud Console with the redirect URI
   `http://localhost:3001/api/v1/auth/callback/google`, then fill in `GOOGLE_CLIENT_ID` and
   `GOOGLE_CLIENT_SECRET`. Production requires Google. To use Google Drive storage too, add
-  `http://localhost:3001/api/v1/auth/callback/provider/google` as a second redirect URI.
+  `http://localhost:3001/api/v1/auth/callback/provider/google` as a second redirect URI, and
+  add `http://localhost:3001/api/v1/auth/callback/link/google` to link a second Google account
+  on Profile.
 
 A provider shows on the sign-in page once both its client ID and secret are set, so blank the
 Google placeholder values if you use GitHub only. The first sign-in creates your account.

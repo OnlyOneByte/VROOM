@@ -41,10 +41,12 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/google'),
   GOOGLE_PROVIDER_REDIRECT_URI: z.string().optional(),
+  GOOGLE_LINK_REDIRECT_URI: z.string().optional(),
   PROVIDER_ENCRYPTION_KEY: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   GITHUB_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/github'),
+  GITHUB_LINK_REDIRECT_URI: z.string().optional(),
   FRONTEND_URL: z.string().optional(),
   CORS_ORIGINS: z
     .string()
@@ -135,9 +137,15 @@ export const CONFIG = {
     googleStorageRedirectUri:
       env.GOOGLE_PROVIDER_REDIRECT_URI ||
       env.GOOGLE_REDIRECT_URI.replace('/callback/google', '/callback/provider/google'),
+    googleLinkRedirectUri:
+      env.GOOGLE_LINK_REDIRECT_URI ||
+      env.GOOGLE_REDIRECT_URI.replace('/callback/google', '/callback/link/google'),
     githubClientId: env.GITHUB_CLIENT_ID,
     githubClientSecret: env.GITHUB_CLIENT_SECRET,
     githubRedirectUri: env.GITHUB_REDIRECT_URI,
+    githubLinkRedirectUri:
+      env.GITHUB_LINK_REDIRECT_URI ||
+      env.GITHUB_REDIRECT_URI.replace('/callback/github', '/callback/link/github'),
     cookieMaxAge: 30 * 24 * 60 * 60,
     sessionDuration: 30 * 24 * 60 * 60 * 1000,
     oauthStateExpiry: 10 * 60 * 1000,
