@@ -202,6 +202,10 @@ Every view that loads or mutates data handles all of these:
 2. **Empty** — `EmptyState` (`#lib/components/common/empty-state.svelte`) with an icon, a
    sentence-case title that says what's missing, one line on why it matters, and the primary
    action that fills it. NOT a bare "No data". `/reminders` is the reference.
+   With no vehicles, every page whose content needs one shows the no-vehicle `EmptyState` with
+   Add Vehicle as its action (`/trips` is the reference). Don't render zero-value stat tiles,
+   filters or charts over no data. While an empty state shows its action, the page shows no second
+   button for the same action under another label.
 3. **Error** — a visible, recoverable message, never a silent `catch {}` that leaves the user on
    a spinner. `handleErrorWithNotification` is the shared path: it toasts via
    `appStore.addNotification` and logs to console only under `import.meta.env.DEV`. Where the view

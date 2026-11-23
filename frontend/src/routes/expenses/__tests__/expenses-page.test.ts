@@ -184,6 +184,44 @@ afterEach(() => {
 
 const SEARCH_DEBOUNCE_WAIT = { timeout: 4000 };
 
+describe('/expenses with no vehicles', () => {
+	test('shows only the Add Vehicle empty state: no filters, overview, list or Add Expense', async () => {
+		getVehicles.mockResolvedValue([]);
+		getAllExpenses.mockResolvedValue(pageOf([], 0));
+		getExpenseSummary.mockResolvedValue({ ...SUMMARY, totalAmount: 0, expenseCount: 0 });
+		render(Page);
+
+		await screen.findByRole('heading', { name: 'Add a vehicle first' });
+		expect(screen.getByRole('link', { name: 'Add Vehicle' }).getAttribute('href')).toBe(
+			'/vehicles/new'
+		);
+		expect(screen.queryByRole('textbox', { name: 'Search expenses and vehicles' })).toBeNull();
+		expect(screen.queryByText('Search & Filters')).toBeNull();
+		expect(screen.queryByText('Expense Overview')).toBeNull();
+		expect(captured.table['expenses']).toBeUndefined();
+		expect(screen.queryByRole('link', { name: /add expense/i })).toBeNull();
+	});
+
+	test('expenses left on a deleted vehicle still list normally', async () => {
+		getVehicles.mockResolvedValue([]);
+		await mountLoaded();
+		expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
+	});
+
+	test('a search with no matches over those expenses keeps the list and its filters', async () => {
+		getVehicles.mockResolvedValue([]);
+		await mountLoaded();
+		getAllExpenses.mockResolvedValue(pageOf([], 0));
+		await fireEvent.input(screen.getByRole('textbox', { name: 'Search expenses and vehicles' }), {
+			target: { value: 'nothing matches' }
+		});
+		await waitFor(() => expect(lastListParams()).toMatchObject({ search: 'nothing matches' }));
+
+		expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
+		expect(screen.getByRole('textbox', { name: 'Search expenses and vehicles' })).toBeTruthy();
+	});
+});
+
 describe('/expenses loading states', () => {
 	test('shows skeletons and no header until the first load finishes', async () => {
 		getAllExpenses.mockReturnValue(new Promise(() => {}));
