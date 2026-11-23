@@ -23,7 +23,7 @@ const tooltipTags = svelteFiles(SRC).flatMap(file => {
 
 describe('every chart tooltip formats its value', () => {
 	test('the scan finds the chart tooltips', () => {
-		expect(tooltipTags.length).toBeGreaterThanOrEqual(7);
+		expect(tooltipTags.length).toBeGreaterThanOrEqual(5);
 	});
 
 	test.each(tooltipTags)('$file passes a value formatter', ({ tag }) => {
@@ -32,11 +32,6 @@ describe('every chart tooltip formats its value', () => {
 
 	test('only pie tooltips hide the point label, because the slice name is the label', () => {
 		const hidden = tooltipTags.filter(t => t.tag.includes('hideLabel')).map(t => t.file);
-		expect(hidden.sort()).toEqual(
-			[
-				'lib/components/analytics/cross-vehicle/FinancingAnalytics.svelte',
-				'lib/components/charts/AppPieChart.svelte'
-			].sort()
-		);
+		expect(hidden).toEqual(['lib/components/charts/AppPieChart.svelte']);
 	});
 });

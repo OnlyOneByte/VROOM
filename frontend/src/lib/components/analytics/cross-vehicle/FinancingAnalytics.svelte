@@ -1,21 +1,15 @@
 <script lang="ts">
-	import '#lib/components/charts/pie-chart-animations.css';
-	import '#lib/components/charts/bar-chart-animations.css';
-	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
-	import { PieChart } from 'layerchart';
 	import { CreditCard } from '@lucide/svelte';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import * as Chart from '#lib/components/ui/chart/index.ts';
+	import type * as Chart from '#lib/components/ui/chart/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { AppBarChart } from '#lib/components/charts/index.ts';
+	import { AppBarChart, AppPieChart } from '#lib/components/charts/index.ts';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import type { FinancingResponse } from '#lib/types/index.ts';
 	import { capitalize, formatCurrency } from '#lib/utils/formatters.ts';
-	import { formatCurrencyTooltip, parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
 
 	let { financing }: { financing: FinancingResponse } = $props();
-
-	let typeDistGate = createVisibilityWatch();
 
 	let loanBreakdownData = $derived(
 		(financing.loanBreakdown ?? []).map(d => ({ ...d, date: parseMonthToDate(d.month) }))
@@ -34,7 +28,9 @@
 
 	let typeDistData = $derived(
 		(financing.typeDistribution ?? []).map(d => ({
-			...d,
+			key: d.type,
+			label: capitalize(d.type),
+			value: d.value,
 			color:
 				d.type === 'loan'
 					? 'var(--chart-1)'
@@ -44,13 +40,10 @@
 		}))
 	);
 
-	let typeDistConfig = $derived.by(() => {
-		const config: Chart.ChartConfig = {};
-		for (const item of typeDistData) {
-			config[item.type] = { label: item.type, color: item.color };
-		}
-		return config;
-	});
+	function vehicleCountLabel(type: string): string {
+		const count = financing.typeDistribution?.find(d => d.type === type)?.count ?? 0;
+		return `${count} vehicle${count !== 1 ? 's' : ''}`;
+	}
 
 	function getFinancingBadgeVariant(
 		type: string
@@ -178,61 +171,12 @@
 	{/if}
 
 	{#if typeDistData.length > 0}
-		<Card.Root class="p-4 sm:p-6">
-			<div class="space-y-4">
-				<div>
-					<h3 class="font-semibold text-sm sm:text-base">Financing Type Distribution</h3>
-					<p class="text-xs sm:text-sm text-muted-foreground">Value by financing type</p>
-				</div>
-				<div
-					bind:this={typeDistGate.el}
-					class="chart-pie-animate-ready chart-pie-animated mx-auto aspect-square max-h-[250px] w-full max-w-[250px] overflow-hidden"
-				>
-					{#if typeDistGate.visible}
-						<Chart.Container
-							config={typeDistConfig}
-							class="aspect-square h-full w-full overflow-hidden"
-						>
-							<PieChart
-								data={typeDistData}
-								key="type"
-								value="value"
-								label="type"
-								cRange={typeDistData.map(d => d.color)}
-								innerRadius={0.5}
-								padAngle={0.02}
-								cornerRadius={4}
-								props={{
-									pie: {}
-								}}
-							>
-								{#snippet tooltip()}
-									<Chart.Tooltip hideLabel valueFormatter={formatCurrencyTooltip} />
-								{/snippet}
-							</PieChart>
-						</Chart.Container>
-					{/if}
-				</div>
-				<div class="space-y-1.5" role="list" aria-label="Financing types">
-					{#each typeDistData as item (item.type)}
-						<div class="flex items-center justify-between p-2 rounded-lg" role="listitem">
-							<div class="flex items-center gap-2">
-								<div
-									class="w-3 h-3 rounded-full"
-									style:background-color={item.color}
-									aria-hidden="true"
-								></div>
-								<span class="text-sm font-medium capitalize">{item.type}</span>
-							</div>
-							<div class="text-right">
-								<div class="text-sm font-bold">
-									{item.count} vehicle{item.count !== 1 ? 's' : ''}
-								</div>
-							</div>
-						</div>
-					{/each}
-				</div>
-			</div>
-		</Card.Root>
+		<AppPieChart
+			title="Financing Type Distribution"
+			description="Value by financing type"
+			data={typeDistData}
+			legendLabel="Financing types"
+			formatLegendValue={item => vehicleCountLabel(item.key)}
+		/>
 	{/if}
 </div>
