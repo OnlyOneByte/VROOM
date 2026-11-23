@@ -479,6 +479,33 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
     expect(summary.quickStats.costPerDistance).toBeCloseTo(quick.costPerDistance ?? Number.NaN, 6);
   });
 
+  test('cost per distance leaves out the spending of a vehicle with no distance in the range', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedVehicle(testDb.sqlite, VEH_B);
+    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 150, 60, 10));
+    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 11_000, 150, 30, 10));
+    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 200, 40, 10));
+    seedExpense(testDb.sqlite, {
+      ...fillup('i1', VEH_B.id, 0, 500, 20, 0),
+      category: 'financial',
+      mileage: null,
+      volume: null,
+      fuelType: null,
+    });
+
+    const [quick, stats, summary] = await Promise.all([
+      repo.getQuickStats(USER.id, rangeAll()),
+      repo.getFuelStats(USER.id, rangeAll()),
+      repo.getSummary(USER.id, rangeAll()),
+    ]);
+
+    expect(quick.costPerDistance).toBeCloseTo(300 / 1000, 9);
+    expect(summary.quickStats.costPerDistance).toBeCloseTo(300 / 1000, 9);
+    expect(stats.averageCost.costPerDistance).toBeCloseTo(300 / 1000, 9);
+    expect(summary.fuelStats.averageCost.costPerDistance).toBeCloseTo(300 / 1000, 9);
+  });
+
   test('quick stats have no cost per distance without two odometer readings', async () => {
     seedUser(testDb.sqlite, USER);
     seedVehicle(testDb.sqlite, VEH_A);

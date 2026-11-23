@@ -44,6 +44,7 @@ export interface FuelStatsResponse {
 		bestCostPerDistance: number | null;
 		worstCostPerDistance: number | null;
 		avgCostPerDay: number | null;
+		costPerDistance?: number | null;
 	};
 	monthlySpend?: { months: number; fuel: number | null; charging: number | null } | null;
 	previous?: {

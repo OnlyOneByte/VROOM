@@ -35,6 +35,7 @@ const MOCK_SUMMARY: AnalyticsSummaryData = {
       bestCostPerDistance: 0.08,
       worstCostPerDistance: 0.15,
       avgCostPerDay: 3.5,
+      costPerDistance: 0.15,
     },
     monthlySpend: { months: 12, fuel: 106.5, charging: null },
     previous: {
