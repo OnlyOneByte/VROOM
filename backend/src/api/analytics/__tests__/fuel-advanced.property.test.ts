@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
+import { EXPENSE_CATEGORIES } from '../../../db/types';
 import { AnalyticsRepository } from '../repository';
 import {
   createTestDb,
@@ -225,16 +226,8 @@ function seedCategorizedExpenses(vehicleId: string, count: number): void {
 }
 
 describe('Heatmap uses valid expense categories', () => {
-  test('every heatmap entry has exactly the six valid category keys', async () => {
-    const expectedKeys = [
-      'enhancement',
-      'financial',
-      'fuel',
-      'maintenance',
-      'misc',
-      'month',
-      'regulatory',
-    ];
+  test('every heatmap entry has exactly the EXPENSE_CATEGORIES keys', async () => {
+    const expectedKeys = ['month', ...EXPENSE_CATEGORIES].sort();
 
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 10 }), async (expenseCount) => {

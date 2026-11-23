@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
+import { EXPENSE_CATEGORIES } from '#lib/constants/expense-categories.ts';
 import type { FuelAdvancedResponse } from '#lib/types/index.ts';
 
 type ChartProps = {
@@ -41,14 +42,7 @@ describe('Monthly Cost Heatmap', () => {
 		const heatmap = charts.find(c => c.title === 'Monthly Cost Heatmap');
 		expect(heatmap?.seriesLayout).toBe('stack');
 		expect(heatmap?.y).toBeUndefined();
-		expect(heatmap?.series.map(s => s.key)).toEqual([
-			'fuel',
-			'maintenance',
-			'financial',
-			'regulatory',
-			'enhancement',
-			'misc'
-		]);
+		expect(heatmap?.series.map(s => s.key)).toEqual([...EXPENSE_CATEGORIES]);
 	});
 
 	test('the y domain still reaches the tallest month', () => {

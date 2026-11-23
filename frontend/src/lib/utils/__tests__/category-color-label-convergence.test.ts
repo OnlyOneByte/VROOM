@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
-import { EXPENSE_CATEGORIES } from '#lib/constants/expense-categories.ts';
+import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_INFO } from '#lib/constants/expense-categories.ts';
 import type { ExpenseCategory } from '#lib/types/index.ts';
 import { CATEGORY_COLOR_TOKENS, CATEGORY_LABELS, getCategoryChartColor } from '../chart-colors';
 import {
@@ -134,6 +134,7 @@ describe('one ordered category list, shared with the backend', () => {
 	test('every category has a label, description, colour token and icon', () => {
 		for (const category of EXPENSE_CATEGORIES) {
 			expect(CATEGORY_LABELS[category], `label → ${category}`).toBeTruthy();
+			expect(EXPENSE_CATEGORY_INFO[category].description, `description → ${category}`).toBeTruthy();
 			expect(CATEGORY_COLOR_TOKENS[category], `token → ${category}`).toBeTruthy();
 			expect(CATEGORY_ICONS[category], `icon → ${category}`).toBeTruthy();
 		}
