@@ -15,7 +15,7 @@
 <Dialog.Root bind:open>
 	<Dialog.Content class="max-w-lg">
 		<Dialog.Header>
-			<Dialog.Title>Backup Now</Dialog.Title>
+			<Dialog.Title>Back Up Now</Dialog.Title>
 			<Dialog.Description>Run a backup to all enabled providers</Dialog.Description>
 		</Dialog.Header>
 
@@ -36,7 +36,7 @@
 			<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
 			<Button onclick={onSync} disabled={!backupProvidersEnabled}>
 				<RefreshCw class="mr-2 h-4 w-4" />
-				Backup Now
+				Back Up Now
 			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>

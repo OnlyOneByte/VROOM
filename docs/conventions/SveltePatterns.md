@@ -88,13 +88,13 @@ A dialog owns an `open = $bindable()` prop and is opened by setting parent state
 <Dialog.Root bind:open>
   <Dialog.Content class="max-w-lg">
     <Dialog.Header>
-      <Dialog.Title>Backup Now</Dialog.Title>
+      <Dialog.Title>Back Up Now</Dialog.Title>
       <Dialog.Description>Run a backup to all enabled providers</Dialog.Description>
     </Dialog.Header>
     <!-- body -->
     <Dialog.Footer class="flex gap-2">
       <Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
-      <Button onclick={onSync}>Backup Now</Button>
+      <Button onclick={onSync}>Back Up Now</Button>
     </Dialog.Footer>
   </Dialog.Content>
 </Dialog.Root>
