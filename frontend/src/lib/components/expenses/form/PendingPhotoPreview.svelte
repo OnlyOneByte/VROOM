@@ -107,5 +107,7 @@
 			}}
 			onClose={() => (showUploadDialog = false)}
 		/>
+	{:catch}
+
 	{/await}
 {/if}

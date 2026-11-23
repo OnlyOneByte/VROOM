@@ -169,6 +169,8 @@
 			onUploadComplete={handleUploadComplete}
 			onClose={() => (showUploadDialog = false)}
 		/>
+	{:catch}
+
 	{/await}
 {/if}
 
