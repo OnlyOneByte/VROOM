@@ -126,3 +126,19 @@ export function parseMonthToDate(month: string): Date {
 	const parts = month.split('-');
 	return new Date(Number(parts[0] ?? '0'), Number(parts[1] ?? '1') - 1, 1);
 }
+
+export function byVehicleMonth<T extends { month: string; vehicleName: string }>(
+	rows: readonly T[],
+	value: (row: T) => number
+): Record<string, number | string | Date>[] {
+	const byMonth = new Map<string, Record<string, number | string | Date>>();
+	for (const row of rows) {
+		let entry = byMonth.get(row.month);
+		if (!entry) {
+			entry = { month: row.month, date: parseMonthToDate(row.month) };
+			byMonth.set(row.month, entry);
+		}
+		entry[row.vehicleName] = value(row);
+	}
+	return [...byMonth.values()].sort((a, b) => String(a['month']).localeCompare(String(b['month'])));
+}

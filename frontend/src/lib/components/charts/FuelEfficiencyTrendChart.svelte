@@ -15,7 +15,7 @@
 		monthlyXAxisProps
 	} from '#lib/utils/chart-formatters.ts';
 	import { getFuelEfficiencyLabel, getElectricEfficiencyLabel } from '#lib/utils/units.ts';
-	import type { UnitPreferences } from '#lib/types/index.ts';
+	import type { UnitPreferences, VehicleType } from '#lib/types/index.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 
 	const CHART_HEIGHT = 280;
@@ -29,7 +29,7 @@
 
 	interface Props {
 		data: FuelEfficiencyData[];
-		fuelType: 'gas' | 'diesel' | 'electric' | 'hybrid';
+		fuelType: VehicleType;
 		unitPreferences?: UnitPreferences;
 		isLoading?: boolean;
 		error?: string | null;
