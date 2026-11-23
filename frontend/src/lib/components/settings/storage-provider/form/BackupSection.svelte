@@ -3,7 +3,6 @@
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
-	import { supportsZipBackup } from '#lib/constants/providers.ts';
 
 	let {
 		providerRootPrefix = '',
@@ -32,83 +31,77 @@
 </script>
 
 <div class="space-y-5">
-	{#if !supportsZipBackup(selectedType)}
-		<p class="text-xs text-muted-foreground">
-			Google Photos stores your photos only. Use a Google Drive or S3 provider for ZIP data backups.
-		</p>
-	{:else}
-		<div class="space-y-2">
-			<Label for="backup-folder-path" class="text-sm">Backup folder path</Label>
-			<div
-				class="flex items-center h-9 rounded-md border {folderPathError
-					? 'border-destructive'
-					: 'border-input'} bg-background text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
-			>
-				{#if providerRootPrefix}
-					<span class="pl-3 text-muted-foreground select-none shrink-0">{providerRootPrefix}</span>
-				{/if}
-				<input
-					id="backup-folder-path"
-					bind:value={backupFolderPath}
-					placeholder="Backups"
-					class="flex-1 bg-transparent px-3 py-1 outline-none placeholder:text-muted-foreground {providerRootPrefix
-						? 'pl-0'
-						: ''}"
-				/>
-			</div>
-			{#if folderPathError}
-				<p class="text-xs text-destructive">{folderPathError}</p>
-			{:else}
-				<p class="text-xs text-muted-foreground">All backups are stored under this path</p>
+	<div class="space-y-2">
+		<Label for="backup-folder-path" class="text-sm">Backup folder path</Label>
+		<div
+			class="flex items-center h-9 rounded-md border {folderPathError
+				? 'border-destructive'
+				: 'border-input'} bg-background text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+		>
+			{#if providerRootPrefix}
+				<span class="pl-3 text-muted-foreground select-none shrink-0">{providerRootPrefix}</span>
 			{/if}
+			<input
+				id="backup-folder-path"
+				bind:value={backupFolderPath}
+				placeholder="Backups"
+				class="flex-1 bg-transparent px-3 py-1 outline-none placeholder:text-muted-foreground {providerRootPrefix
+					? 'pl-0'
+					: ''}"
+			/>
+		</div>
+		{#if folderPathError}
+			<p class="text-xs text-destructive">{folderPathError}</p>
+		{:else}
+			<p class="text-xs text-muted-foreground">All backups are stored under this path</p>
+		{/if}
+	</div>
+
+	<div class="space-y-3">
+		<div class="flex items-start gap-3">
+			<Checkbox
+				id="backup-zip"
+				checked={backupEnabled}
+				onCheckedChange={checked => (backupEnabled = checked === true)}
+				class="mt-0.5"
+			/>
+			<div class="space-y-0.5">
+				<Label for="backup-zip" class="text-sm cursor-pointer">ZIP backup</Label>
+				<p class="text-xs text-muted-foreground">Store compressed backup archives</p>
+			</div>
 		</div>
 
-		<div class="space-y-3">
-			<div class="flex items-start gap-3">
-				<Checkbox
-					id="backup-zip"
-					checked={backupEnabled}
-					onCheckedChange={checked => (backupEnabled = checked === true)}
-					class="mt-0.5"
-				/>
-				<div class="space-y-0.5">
-					<Label for="backup-zip" class="text-sm cursor-pointer">ZIP backup</Label>
-					<p class="text-xs text-muted-foreground">Store compressed backup archives</p>
-				</div>
+		{#if backupEnabled}
+			<div class="pl-7 space-y-2">
+				<Label for="backup-retention" class="text-sm">Backups to keep</Label>
+				<Select.Root
+					type="single"
+					value={backupRetentionCount.toString()}
+					onValueChange={v => {
+						if (v) backupRetentionCount = parseInt(v);
+					}}
+				>
+					<Select.Trigger id="backup-retention" class="w-full">
+						{backupRetentionCount}
+						{backupRetentionCount === 1 ? 'backup' : 'backups'}
+					</Select.Trigger>
+					<Select.Content>
+						<Select.Item value="5" label="5 backups">5 backups</Select.Item>
+						<Select.Item value="10" label="10 backups">10 backups</Select.Item>
+						<Select.Item value="15" label="15 backups">15 backups</Select.Item>
+						<Select.Item value="20" label="20 backups">20 backups</Select.Item>
+						<Select.Item value="30" label="30 backups">30 backups</Select.Item>
+						<Select.Item value="50" label="50 backups">50 backups</Select.Item>
+						<Select.Item value="100" label="100 backups">100 backups</Select.Item>
+					</Select.Content>
+				</Select.Root>
+				<p class="text-xs text-muted-foreground">Older backups are automatically deleted</p>
+				<p class="text-xs text-muted-foreground">
+					Note: backups include your data only — images and photos are not included.
+				</p>
 			</div>
-
-			{#if backupEnabled}
-				<div class="pl-7 space-y-2">
-					<Label for="backup-retention" class="text-sm">Backups to keep</Label>
-					<Select.Root
-						type="single"
-						value={backupRetentionCount.toString()}
-						onValueChange={v => {
-							if (v) backupRetentionCount = parseInt(v);
-						}}
-					>
-						<Select.Trigger id="backup-retention" class="w-full">
-							{backupRetentionCount}
-							{backupRetentionCount === 1 ? 'backup' : 'backups'}
-						</Select.Trigger>
-						<Select.Content>
-							<Select.Item value="5" label="5 backups">5 backups</Select.Item>
-							<Select.Item value="10" label="10 backups">10 backups</Select.Item>
-							<Select.Item value="15" label="15 backups">15 backups</Select.Item>
-							<Select.Item value="20" label="20 backups">20 backups</Select.Item>
-							<Select.Item value="30" label="30 backups">30 backups</Select.Item>
-							<Select.Item value="50" label="50 backups">50 backups</Select.Item>
-							<Select.Item value="100" label="100 backups">100 backups</Select.Item>
-						</Select.Content>
-					</Select.Root>
-					<p class="text-xs text-muted-foreground">Older backups are automatically deleted</p>
-					<p class="text-xs text-muted-foreground">
-						Note: backups include your data only — images and photos are not included.
-					</p>
-				</div>
-			{/if}
-		</div>
-	{/if}
+		{/if}
+	</div>
 
 	{#if selectedType === 'google-drive'}
 		<div class="space-y-3">

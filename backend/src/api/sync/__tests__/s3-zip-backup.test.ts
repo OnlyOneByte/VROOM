@@ -78,11 +78,17 @@ async function listedBackups(): Promise<ProviderBackups[]> {
   return (await json<DataEnvelope<ProviderBackups[]>>(res)).data;
 }
 
-async function waitForFiles(folder: string, count: number): Promise<void> {
+function lastBackupDate(): number | null {
+  const row = ctx.sqlite
+    .query('SELECT last_backup_date FROM sync_state WHERE user_id = ?')
+    .get(ctx.user.id) as { last_backup_date: number | null } | null;
+  return row?.last_backup_date ?? null;
+}
+
+async function waitForBackupDate(): Promise<void> {
   const deadline = Date.now() + 5000;
-  while ((await bucket.list(folder)).length < count) {
-    if (Date.now() > deadline)
-      throw new Error(`timed out waiting for ${count} file(s) in ${folder}`);
+  while (!lastBackupDate()) {
+    if (Date.now() > deadline) throw new Error('timed out waiting for last_backup_date');
     await Bun.sleep(10);
   }
 }
@@ -107,12 +113,13 @@ describe('ZIP backups to an S3 provider', () => {
     const { activityTracker } = await import('../activity-tracker');
     try {
       activityTracker.recordActivity(ctx.user.id, 0);
-      await waitForFiles('VROOM/Backups', 1);
+      await waitForBackupDate();
     } finally {
       activityTracker.stopTracking(ctx.user.id);
     }
 
     const files = await bucket.list('VROOM/Backups');
+    expect(files).toHaveLength(1);
     expect(files[0]?.name).toMatch(/^vroom-backup-.*\.zip$/);
   });
 
@@ -146,10 +153,7 @@ describe('ZIP backups to an S3 provider', () => {
     expect(body.data.outcome).toBe('success');
     expect(body.data.failedProviders).toEqual([]);
 
-    const lastBackup = ctx.sqlite
-      .query('SELECT last_backup_date FROM sync_state WHERE user_id = ?')
-      .get(ctx.user.id) as { last_backup_date: number | null } | null;
-    expect(lastBackup?.last_backup_date).toBeTruthy();
+    expect(lastBackupDate()).toBeTruthy();
   });
 });
 

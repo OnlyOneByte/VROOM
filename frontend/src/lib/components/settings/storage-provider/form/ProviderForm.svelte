@@ -552,23 +552,25 @@
 				</CardContent>
 			</Card>
 
-			<Card>
-				<CardHeader>
-					<CardTitle class="text-base">Backup Settings</CardTitle>
-					<CardDescription>Configure backup storage for this provider</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<BackupSection
-						{providerRootPrefix}
-						{selectedType}
-						bind:backupFolderPath
-						bind:backupEnabled
-						bind:backupRetentionCount
-						bind:sheetsSyncEnabled
-						bind:sheetsSpreadsheetId
-					/>
-				</CardContent>
-			</Card>
+			{#if supportsZipBackup(selectedType)}
+				<Card>
+					<CardHeader>
+						<CardTitle class="text-base">Backup Settings</CardTitle>
+						<CardDescription>Configure backup storage for this provider</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<BackupSection
+							{providerRootPrefix}
+							{selectedType}
+							bind:backupFolderPath
+							bind:backupEnabled
+							bind:backupRetentionCount
+							bind:sheetsSyncEnabled
+							bind:sheetsSpreadsheetId
+						/>
+					</CardContent>
+				</Card>
+			{/if}
 
 			{#if isEditMode}
 				<Card class="border-destructive/50">

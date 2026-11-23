@@ -244,7 +244,7 @@ describe('ProviderForm — a photo-only provider has no ZIP backup', () => {
 		updateProvider.mockResolvedValue({} as UserProviderInfo);
 	});
 
-	test('the edit form hides the ZIP toggle and saves a stale ZIP setting as off', async () => {
+	test('the edit form hides the Backup Settings card and saves a stale ZIP setting as off', async () => {
 		render(ProviderForm, {
 			props: {
 				providerId: 'photos-1',
@@ -256,8 +256,8 @@ describe('ProviderForm — a photo-only provider has no ZIP backup', () => {
 		await vi.waitFor(() => expect(settingsStore.settings).not.toBeNull());
 		await new Promise(r => setTimeout(r, 0));
 
+		expect(screen.queryByText('Backup Settings')).toBeNull();
 		expect(screen.queryByLabelText(/zip backup/i)).toBeNull();
-		expect(screen.getByText(/Google Photos stores your photos only/i)).toBeTruthy();
 
 		await fireEvent.click(saveButton());
 		await vi.waitFor(() => expect(updateSettings).toHaveBeenCalledTimes(2));
