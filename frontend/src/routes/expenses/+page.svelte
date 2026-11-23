@@ -512,14 +512,14 @@
 			<div class="min-w-0 flex-1">
 				<PageHeader title="All Expenses" description={countLine}>
 					{#snippet actions()}
-						<div class="hidden sm:flex sm:items-center sm:gap-2">
+						<div class="hidden sm:flex sm:items-center sm:gap-2 short:hidden">
 							{@render importExportActions('outline', '')}
 						</div>
 						{@render addExpenseHeaderAction()}
 					{/snippet}
 				</PageHeader>
 			</div>
-			<div class="shrink-0 sm:hidden">
+			<div class="shrink-0 sm:hidden short:block">
 				<Popover.Root bind:open={toolsMenuOpen}>
 					<Popover.Trigger>
 						{#snippet child({ props })}

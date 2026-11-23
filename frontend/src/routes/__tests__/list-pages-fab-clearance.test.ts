@@ -60,10 +60,10 @@ describe('the FAB is the mobile primary only', () => {
 				match => match[1] ?? ''
 			);
 			expect(labels.length).toBeGreaterThan(0);
-			expect(src).toMatch(/class="hidden lg:inline-flex short:inline-flex"/);
+			expect(src).toMatch(/class="hidden lg:inline-flex short:inline-flex[^"]*"/);
 			for (const label of labels) {
 				const headerAction = new RegExp(
-					`class="hidden lg:inline-flex short:inline-flex"[^>]*>\\s*<Plus[^>]*/>\\s*\\{?${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
+					`class="hidden lg:inline-flex short:inline-flex[^"]*"[^>]*>\\s*<Plus[^>]*/>\\s*(?:<span[^>]*>)?\\{?${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
 				);
 				expect(src, `${page}: no lg/short header button for "${label}"`).toMatch(headerAction);
 			}

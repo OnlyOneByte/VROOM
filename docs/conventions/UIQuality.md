@@ -314,7 +314,8 @@ VROOM installs to phones. Mobile is the primary form factor, not an afterthought
   short viewports (`max-height: 500px`, which includes 200%+ zoom and landscape phones), the
   header scrolls away and form action bars sit in the page flow (the `short:` variant in `app.css`).
   The FAB hides there and the page header shows the same action (`short:inline-flex` on the
-  header button, `short:pb-0` on the FAB clearance), so the primary action stays on the first screen.
+  header button, `short:pb-0` on the FAB clearance), so the primary action stays on the first
+  screen. Secondary header tools move into the page's overflow menu so the row still fits.
 - Respect safe areas (`app.css` defines `.safe-top` and `.safe-bottom`).
 - Nothing depends on hover, tooltips or right-click; everything has a tap path.
 - The first screen is useful: title, the key number, the primary action. Secondary tools
