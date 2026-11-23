@@ -56,7 +56,7 @@
 			const draft = await vlmApi.parseReceipt(file);
 			onDraft(draft, file);
 		} catch (err) {
-			if (err instanceof ApiError && err.statusCode === 400) {
+			if (err instanceof ApiError && err.code === 'NO_PROVIDER') {
 				errorMessage =
 					'No receipt-parsing provider is set up yet. Add one in Settings → Receipt Parsing.';
 			} else if (err instanceof ApiError && err.statusCode === 502) {

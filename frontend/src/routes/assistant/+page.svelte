@@ -133,6 +133,10 @@
 	}
 
 	function errorMessageFor(err: unknown): string {
+		if (err instanceof ApiError && err.code === 'NO_PROVIDER') {
+			hasProvider = false;
+			return 'No assistant provider is connected. Add one in Settings → Assistant (AI).';
+		}
 		if (err instanceof ApiError && err.statusCode === 502) {
 			return "The AI provider couldn't be reached. Check the key and model in Settings, then try again.";
 		}

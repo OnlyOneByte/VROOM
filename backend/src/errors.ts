@@ -55,6 +55,16 @@ export class PayloadTooLargeError extends AppError {
   }
 }
 
+export class NoProviderError extends AppError {
+  constructor(capability: string, message: string) {
+    super(message, 400, true, { capability });
+  }
+
+  override get code(): string {
+    return 'NO_PROVIDER';
+  }
+}
+
 export class UnprocessableEntityError extends AppError {
   constructor(message: string) {
     super(message, 422, true);

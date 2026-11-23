@@ -11,6 +11,7 @@ import { zValidator } from '../../utils/validation';
 import type { ChatMessage } from '../providers/domains/llm/llm-provider';
 import { runAssistant } from '../providers/domains/llm/orchestrator';
 import { getLlmProvider } from '../providers/domains/llm/registry';
+import { resolveProvider } from '../providers/resolve';
 
 const routes = new Hono();
 
@@ -37,25 +38,7 @@ const chatBodySchema = z.object({
 routes.post('/chat', zValidator('json', chatBodySchema), async (c) => {
   const user = c.get('user');
   const body = c.req.valid('json');
-  const db = getDb();
-
-  const rows = await db
-    .select()
-    .from(userProviders)
-    .where(
-      and(
-        eq(userProviders.userId, user.id),
-        eq(userProviders.domain, 'llm'),
-        ne(userProviders.status, 'disabled')
-      )
-    );
-  const providerRow = rows[0];
-  if (!providerRow) {
-    throw new ValidationError(
-      'No assistant (LLM) provider is configured. Add one in Settings to use the assistant.'
-    );
-  }
-
+  const providerRow = await resolveProvider(user.id, 'ai.llm');
   const provider = getLlmProvider(providerRow);
   const history: ChatMessage[] = (body.history ?? []).map((m) => ({
     role: m.role,

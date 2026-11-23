@@ -7,6 +7,7 @@ import { bodyLimit, changeTracker, requireAuth } from '../../middleware';
 import { logger } from '../../utils/logger';
 import { parseExtraction } from './domains/vlm/prompt';
 import { getVlmProvider } from './domains/vlm/registry';
+import { resolveProvider } from './resolve';
 
 const routes = new Hono();
 
@@ -22,24 +23,7 @@ routes.use(
 
 routes.post('/parse', async (c) => {
   const user = c.get('user');
-  const db = getDb();
-
-  const rows = await db
-    .select()
-    .from(userProviders)
-    .where(
-      and(
-        eq(userProviders.userId, user.id),
-        eq(userProviders.domain, 'vlm'),
-        ne(userProviders.status, 'disabled')
-      )
-    );
-  const providerRow = rows[0];
-  if (!providerRow) {
-    throw new ValidationError(
-      'No receipt-parsing (VLM) provider is configured. Add one in Settings to scan receipts.'
-    );
-  }
+  const providerRow = await resolveProvider(user.id, 'ai.vision');
 
   const body = await c.req.parseBody().catch(() => {
     throw new ValidationError('Upload the receipt image as multipart/form-data');

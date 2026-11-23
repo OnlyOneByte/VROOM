@@ -90,7 +90,9 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
     seedPhotosProvider();
     const res = await ctx.authed('GET', '/api/v1/photos/receipt-drafts');
     expect(res.status).toBe(400);
-    expect(await res.text()).toMatch(/VLM|receipt-parsing|Settings/i);
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('NO_PROVIDER');
+    expect(body.error.message).toMatch(/VLM|receipt-parsing|Settings/i);
   });
 
   test('a google-photos provider without a usable refresh token → 400 asking to reconnect', async () => {

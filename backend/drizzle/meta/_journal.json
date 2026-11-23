@@ -64,6 +64,13 @@
       "when": 1795453130838,
       "tag": "0008_provider_health",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1795470490739,
+      "tag": "0009_provider_defaults",
+      "breakpoints": true
     }
   ]
 }
