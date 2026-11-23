@@ -42,6 +42,7 @@ import {
 import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
+import { CAPABILITY_DOMAIN } from '../providers/resolve';
 import { preferencesRepository } from '../settings/repository';
 import {
   backupService,
@@ -630,21 +631,21 @@ class RestoreService {
       .get();
   }
 
-  private ownedProviderIds(tx: DrizzleTransaction, userId: string): Set<string> {
-    return new Set(
+  private ownedProviderIds(tx: DrizzleTransaction, userId: string): Map<string, string> {
+    return new Map(
       tx
-        .select({ id: userProviders.id })
+        .select({ id: userProviders.id, domain: userProviders.domain })
         .from(userProviders)
         .where(eq(userProviders.userId, userId))
         .all()
-        .map((row) => row.id)
+        .map((row) => [row.id, row.domain])
     );
   }
 
   private keepOwnedProviderSettings<T extends Record<string, unknown>>(
     row: T,
     current: ProviderScopedPrefs | undefined,
-    owned: Set<string>
+    owned: Map<string, string>
   ): T {
     const ownedEntries = <V>(entries: Record<string, V> | undefined): Record<string, V> =>
       Object.fromEntries(Object.entries(entries ?? {}).filter(([id]) => owned.has(id)));
@@ -667,7 +668,7 @@ class RestoreService {
       DEFAULT_PROVIDER_CAPABILITIES.map((capability) => [
         capability,
         [current?.providerDefaults?.[capability], restoredDefaults?.[capability]].find(
-          (id) => id != null && owned.has(id)
+          (id) => id != null && owned.get(id) === CAPABILITY_DOMAIN[capability]
         ) ?? null,
       ])
     ) as ProviderDefaults;

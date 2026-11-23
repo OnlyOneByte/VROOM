@@ -471,8 +471,6 @@ routes.delete(
       throw new ValidationError('Auth providers cannot be modified through this endpoint');
     }
 
-    await cleanupProviderDefaults(user.id, id);
-
     if (existing.domain === 'storage') {
       await assertNoPhotosOnlyHere(id, force);
       await cleanupStorageConfig(user.id, id);
@@ -491,6 +489,7 @@ routes.delete(
     await db
       .delete(userProviders)
       .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)));
+    await cleanupProviderDefaults(user.id, id);
 
     return c.body(null, 204);
   }

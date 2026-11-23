@@ -1,9 +1,8 @@
 import { and, asc, eq, ne } from 'drizzle-orm';
 import { getDb } from '../../db/connection';
-import { type UserProvider, userProviders } from '../../db/schema';
+import { type UserProvider, userPreferences, userProviders } from '../../db/schema';
 import { NoProviderError } from '../../errors';
 import type { DefaultProviderCapability } from '../../types';
-import { preferencesRepository } from '../settings/repository';
 
 export const CAPABILITY_DOMAIN: Record<DefaultProviderCapability, string> = {
   'ai.llm': 'llm',
@@ -31,8 +30,12 @@ export async function resolveProvider(
       )
     )
     .orderBy(asc(userProviders.createdAt), asc(userProviders.id));
-  const prefs = await preferencesRepository.getOrCreate(userId);
-  const defaultId = prefs.providerDefaults?.[capability];
+  const prefs = await getDb()
+    .select({ providerDefaults: userPreferences.providerDefaults })
+    .from(userPreferences)
+    .where(eq(userPreferences.userId, userId))
+    .get();
+  const defaultId = prefs?.providerDefaults?.[capability];
   const chosen = rows.find((row) => row.id === defaultId) ?? rows[0];
   if (!chosen) throw new NoProviderError(capability, NO_PROVIDER_MESSAGE[capability]);
   return chosen;

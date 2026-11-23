@@ -56,8 +56,10 @@ function storedDefaults(userId = ctx.user.id): Record<string, string | null> {
 
 describe('the assistant uses the default provider the user picked', () => {
   test('with two LLM providers, the chosen default is the one called', async () => {
-    await createModel('llm', 'First', 'sk-first');
+    const first = await createModel('llm', 'First', 'sk-first');
     const second = await createModel('llm', 'Second', 'sk-second');
+    ctx.sqlite.run('UPDATE user_providers SET created_at = 1000 WHERE id = ?', [first]);
+    ctx.sqlite.run('UPDATE user_providers SET created_at = 2000 WHERE id = ?', [second]);
     expect((await setDefaults({ 'ai.llm': second })).status).toBe(200);
 
     const keys = recordKeysSent();
@@ -78,12 +80,15 @@ describe('the assistant uses the default provider the user picked', () => {
   test('a default that is turned off falls back to another provider', async () => {
     const first = await createModel('llm', 'First', 'sk-first');
     const second = await createModel('llm', 'Second', 'sk-second');
-    await setDefaults({ 'ai.llm': second });
-    ctx.sqlite.run("UPDATE user_providers SET status = 'disabled' WHERE id = ?", [second]);
+    const third = await createModel('llm', 'Third', 'sk-third');
+    ctx.sqlite.run('UPDATE user_providers SET created_at = 1000 WHERE id = ?', [first]);
+    ctx.sqlite.run('UPDATE user_providers SET created_at = 2000 WHERE id = ?', [second]);
+    ctx.sqlite.run('UPDATE user_providers SET created_at = 3000 WHERE id = ?', [third]);
+    await setDefaults({ 'ai.llm': third });
+    ctx.sqlite.run("UPDATE user_providers SET status = 'disabled' WHERE id = ?", [third]);
     const keys = recordKeysSent();
     await chat();
     expect(keys).toEqual(['Bearer sk-first']);
-    expect(first).not.toBe(second);
   });
 });
 
@@ -142,6 +147,14 @@ describe('PUT /settings providerDefaults', () => {
     expect(storedDefaults()).toEqual({});
   });
 
+  test('null clears a default and leaves the other', async () => {
+    const llm = await createModel('llm', 'Chat', 'sk-1');
+    const vlm = await createModel('vlm', 'Scan', 'sk-2');
+    await setDefaults({ 'ai.llm': llm, 'ai.vision': vlm });
+    expect((await setDefaults({ 'ai.llm': null })).status).toBe(200);
+    expect(storedDefaults()).toEqual({ 'ai.vision': vlm });
+  });
+
   test('an unknown capability is refused', async () => {
     expect((await setDefaults({ storage: 'x' })).status).toBe(400);
   });
@@ -186,5 +199,24 @@ describe('backup and restore carry the defaults', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
     expect(storedDefaults()['ai.llm'] ?? null).toBeNull();
+  });
+
+  test('a restored default that names one of the user’s providers of another kind is dropped', async () => {
+    const llm = await createModel('llm', 'Chat', 'sk-1');
+    const vlm = await createModel('vlm', 'Scan', 'sk-2');
+    await setDefaults({ 'ai.llm': llm });
+    ctx.sqlite.run('UPDATE user_preferences SET provider_defaults = ? WHERE user_id = ?', [
+      JSON.stringify({ 'ai.llm': vlm, 'ai.vision': llm }),
+      ctx.user.id,
+    ]);
+    const { backupService } = await import('../../sync/backup');
+    const { restoreService } = await import('../../sync/restore');
+    const zip = await backupService.exportAsZip(ctx.user.id);
+    ctx.sqlite.run("UPDATE user_preferences SET provider_defaults = '{}' WHERE user_id = ?", [
+      ctx.user.id,
+    ]);
+    const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(storedDefaults()).toEqual({ 'ai.llm': null, 'ai.vision': null });
   });
 });

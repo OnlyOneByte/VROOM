@@ -224,10 +224,12 @@ routes.put('/', async (c) => {
     ...restUpdates,
     ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
     ...(mergedStorageConfig && { storageConfig: mergedStorageConfig }),
-    ...(providerDefaults && {
-      providerDefaults: { ...(existingSettings.providerDefaults ?? {}), ...providerDefaults },
-    }),
   });
+  if (providerDefaults) {
+    updatedSettings =
+      (await preferencesRepository.mergeJsonField(user.id, 'providerDefaults', providerDefaults)) ??
+      updatedSettings;
+  }
   if (backupConfig) {
     updatedSettings =
       (await preferencesRepository.mergeJsonField(
