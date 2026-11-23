@@ -175,6 +175,14 @@ describe('VehicleForm create mode', () => {
 		expect(createVehicle).not.toHaveBeenCalled();
 	});
 
+	test('a blocked submit moves focus to the first invalid field', async () => {
+		await renderCreate();
+
+		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+
+		await vi.waitFor(() => expect(document.activeElement).toBe(input('make')));
+	});
+
 	test('whitespace-only make is treated as missing', async () => {
 		await renderCreate();
 		await type('make', '   ');

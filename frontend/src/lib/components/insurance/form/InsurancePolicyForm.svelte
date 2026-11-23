@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { focusFirstProblem } from '#lib/utils/focus.ts';
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { goto } from '$app/navigation';
 	import PageHeader from '#lib/components/common/page-header.svelte';
@@ -94,6 +95,7 @@
 		totalCost?: string;
 	}
 	let errors = $state<FormErrors>({});
+	let formEl = $state<HTMLFormElement | null>(null);
 
 	let loadError = $state<string | null>(null);
 	let pageTitle = $derived(isEditMode ? 'Edit Policy' : 'New Insurance Policy');
@@ -175,7 +177,10 @@
 
 	async function handleSubmit(event?: Event) {
 		event?.preventDefault();
-		if (!validate()) return;
+		if (!validate()) {
+			await focusFirstProblem(formEl);
+			return;
+		}
 
 		isSubmitting = true;
 		try {
@@ -321,7 +326,11 @@
 				{/snippet}
 			</PageHeader>
 
-			<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24 lg:pb-0 short:pb-0">
+			<form
+				bind:this={formEl}
+				onsubmit={handleSubmit}
+				class="space-y-6 pb-32 sm:pb-24 lg:pb-0 short:pb-0"
+			>
 				<Card>
 					<CardHeader>
 						<div class="flex items-center gap-2">
@@ -417,6 +426,8 @@
 											<Checkbox
 												checked={selectedVehicleIds.includes(v.id)}
 												onCheckedChange={() => toggleVehicle(v.id)}
+												aria-invalid={!!errors.vehicles}
+												aria-describedby={errors.vehicles ? 'vehicles-error' : undefined}
 											/>
 											<span class="text-sm text-foreground">{getVehicleDisplayName(v)}</span>
 										</label>

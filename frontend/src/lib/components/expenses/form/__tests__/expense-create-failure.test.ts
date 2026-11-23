@@ -103,7 +103,7 @@ describe('ExpenseForm — a failed create is classified before anything is queue
 		toast.mockRestore();
 	});
 
-	test('a retry that fails validation drops the old message and leaves focus alone', async () => {
+	test('a retry that fails validation drops the old message and moves focus to the invalid field', async () => {
 		createExpense.mockRejectedValue(new ApiError('Amount must be greater than 0', 400));
 		await fillAndSave();
 		await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('submit-error')));
@@ -115,7 +115,7 @@ describe('ExpenseForm — a failed create is classified before anything is queue
 
 		await vi.waitFor(() => expect(submitError()).toBeNull());
 		expect(createExpense).toHaveBeenCalledTimes(1);
-		expect(document.activeElement).toBe(save);
+		await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText(/Amount/)));
 	});
 
 	test.each([

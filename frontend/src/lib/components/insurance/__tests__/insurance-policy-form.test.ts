@@ -161,6 +161,26 @@ describe('InsurancePolicyForm create mode', () => {
 		expect(createPolicy).not.toHaveBeenCalled();
 	});
 
+	test('a blocked submit moves focus to the first invalid field', async () => {
+		await mount();
+		await clickCreate();
+		await vi.waitFor(() => expect(document.activeElement).toBe(field('company')));
+	});
+
+	test('with only the vehicles missing, focus lands on the first vehicle checkbox', async () => {
+		await mount({ preselectedVehicleId: undefined });
+		await type('company', 'Acme');
+		await type('start-date', '2026-01-01');
+		await type('end-date', '2026-12-31');
+		await clickCreate();
+		const first = screen
+			.getAllByRole('checkbox')
+			.find(c => c.getAttribute('aria-invalid') === 'true');
+		expect(first).toBeDefined();
+		await vi.waitFor(() => expect(document.activeElement).toBe(first));
+		expect(first).toHaveAttribute('aria-describedby', 'vehicles-error');
+	});
+
 	test.each([
 		['an end date before the start date', '2026-06-01', '2026-01-01'],
 		['an end date equal to the start date', '2026-06-01', '2026-06-01']

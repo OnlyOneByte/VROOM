@@ -181,6 +181,15 @@ describe('ExpenseForm create mode', () => {
 		expect(goto).not.toHaveBeenCalled();
 	});
 
+	test('a failed save moves focus from Save to the first invalid field', async () => {
+		await renderCreate();
+
+		await save();
+
+		await vi.waitFor(() => expect(document.activeElement).toHaveAttribute('aria-invalid', 'true'));
+		expect(document.activeElement).toBe(document.querySelector('form [aria-invalid="true"]'));
+	});
+
 	test.each([
 		['an empty state', [] as Vehicle[], 'Add a vehicle first'],
 		['the form', [CAMRY], null]

@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { onMount, tick, untrack } from 'svelte';
-	import { focusFirstButton, focusInView, focusLeftOn } from '#lib/utils/focus.ts';
+	import {
+		focusFirstButton,
+		focusFirstProblem,
+		focusInView,
+		focusLeftOn
+	} from '#lib/utils/focus.ts';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
 	import { gotoDynamic, gotoWithQuery } from '#lib/utils/navigation.ts';
@@ -158,6 +163,7 @@
 	);
 	let isRetrying = $state(false);
 	let retryButton = $state<HTMLButtonElement | null>(null);
+	let formEl = $state<HTMLFormElement | null>(null);
 
 	const formTitle = $derived(
 		form.isGroupEditMode
@@ -172,13 +178,8 @@
 	async function save() {
 		await (form.queuedExpense ? saveQueuedExpense(form) : submitExpense(form));
 		if (form.errors['vehicleDetails']) focusInView(retryButton);
-		if (form.submitError) {
-			await tick();
-			focusInView(document.getElementById('submit-error'));
-		} else if (form.errors['mileage'] && Object.keys(form.errors).length === 1) {
-			await tick();
-			focusInView(document.getElementById('mileage'));
-		}
+		else if (form.submitError || Object.keys(form.errors).length > 0)
+			await focusFirstProblem(formEl);
 	}
 
 	async function retry(load: () => Promise<void>) {
@@ -356,6 +357,7 @@
 			</ExpenseFormHeader>
 
 			<form
+				bind:this={formEl}
 				onsubmit={e => {
 					e.preventDefault();
 					save();
