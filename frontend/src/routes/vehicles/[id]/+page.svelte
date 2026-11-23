@@ -552,7 +552,7 @@
 				</div>
 			</div>
 		</div>
-		<Skeleton class="h-[2.875rem] w-full sm:h-9" />
+		<Skeleton class="mb-8 h-[2.875rem] w-full sm:h-9" />
 		<CostPerMileHero
 			summary={null}
 			distance={null}
