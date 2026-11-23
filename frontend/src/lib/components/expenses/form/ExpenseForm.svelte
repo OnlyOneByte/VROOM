@@ -380,7 +380,7 @@
 			</EmptyState>
 		</div>
 	{:else}
-		<div class="space-y-6 pb-32 sm:pb-24 lg:pb-0">
+		<div class="space-y-6 pb-32 sm:pb-24 lg:pb-0 short:pb-0">
 			<ExpenseFormHeader title={formTitle} onBack={handleBack}>
 				{#snippet subtitle()}
 					{#if form.queuedExpense}

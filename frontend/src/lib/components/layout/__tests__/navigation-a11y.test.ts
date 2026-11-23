@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import { offlineExpenseQueue, onlineStatus, syncState } from '#lib/stores/offline.svelte.ts';
@@ -118,5 +121,23 @@ describe('pending badge', () => {
 		render(Navigation);
 
 		expect(screen.getByLabelText('1 pending items')).toBeInTheDocument();
+	});
+});
+
+describe('fixed chrome on short viewports and at high zoom', () => {
+	it('keeps focus clear of the fixed header and bars below lg, and lets the header scroll away on short screens', async () => {
+		const css = readFileSync(
+			join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', 'app.css'),
+			'utf8'
+		);
+		expect(css).toMatch(/@custom-variant short \(@media \(max-height: 500px\)\);/);
+		expect(css).toMatch(
+			/html \{\s*@variant max-lg \{\s*scroll-padding-top: calc\(4rem \+ env\(safe-area-inset-top\)\);\s*scroll-padding-bottom: 6rem;\s*\}\s*@variant short \{\s*scroll-padding-top: 0;/
+		);
+
+		const { container } = render(Navigation);
+		const header = container.querySelector('.fixed.top-0');
+		expect(header).toHaveClass('lg:hidden', 'short:static');
+		expect(container.querySelector('.h-16')).toHaveClass('lg:hidden', 'short:hidden');
 	});
 });

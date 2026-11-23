@@ -22,9 +22,9 @@ function mount() {
 }
 
 describe('ExpenseActionBar', () => {
-	test('is a fixed bar below lg and a normal row from lg', () => {
+	test('is a fixed bar below lg and a normal row from lg or on a short viewport', () => {
 		const { container } = mount();
-		expect(container.firstElementChild).toHaveClass('fixed', 'lg:static');
+		expect(container.firstElementChild).toHaveClass('fixed', 'lg:static', 'short:static');
 	});
 
 	test('Save is the plain primary button, not a foreground slab with a heavy shadow', () => {

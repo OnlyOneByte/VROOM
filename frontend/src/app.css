@@ -4,6 +4,8 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@custom-variant short (@media (max-height: 500px));
+
 /* Text-colored tokens must clear WCAG AA 4.5:1 on white/card; light chart ambers do not. */
 :root {
 	--radius: 0.625rem;
@@ -137,6 +139,17 @@
 
 	body {
 		@apply bg-background text-foreground;
+	}
+
+	html {
+		@variant max-lg {
+			scroll-padding-top: calc(4rem + env(safe-area-inset-top));
+			scroll-padding-bottom: 6rem;
+		}
+
+		@variant short {
+			scroll-padding-top: 0;
+		}
 	}
 
 	.safe-top {
