@@ -2,6 +2,7 @@ import { recalculateOvercountedMonthlyPremiums } from './api/insurance/hooks';
 import { startSyncWorker, stopSyncWorker } from './api/providers/sync-worker';
 import { app } from './app';
 import './api/sync/init';
+import { discoverOidc } from './api/auth/providers/oidc';
 import { CONFIG } from './config';
 import { checkpointWAL, forceCheckpointWAL, runMigrations } from './db/connection';
 import { extractErrorMessage } from './utils/error-handling';
@@ -37,6 +38,8 @@ try {
   });
   process.exit(1);
 }
+
+await discoverOidc();
 
 try {
   await recalculateOvercountedMonthlyPremiums();

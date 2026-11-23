@@ -10,16 +10,9 @@
 	import { routes } from '#lib/routes.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import { LoaderCircle, ArrowLeft, LogIn, CircleAlert } from '@lucide/svelte';
-	import GoogleLogo from '#lib/components/icons/GoogleLogo.svelte';
-	import GitHubLogo from '#lib/components/icons/GitHubLogo.svelte';
+	import { LoaderCircle, ArrowLeft, CircleAlert } from '@lucide/svelte';
 	import BrandMark from '#lib/components/common/BrandMark.svelte';
-	import type { Component } from 'svelte';
-
-	const iconMap: Record<string, Component<{ class?: string }>> = {
-		google: GoogleLogo,
-		github: GitHubLogo
-	};
+	import { authProviderIcon } from '#lib/constants/auth-providers.ts';
 
 	const authErrorMessages: Record<string, string> = {
 		invalid_state: 'Your sign-in session expired. Please try again.',
@@ -133,7 +126,7 @@
 					</div>
 				{:else}
 					{#each providers as provider (provider.id)}
-						{@const IconComponent = iconMap[provider.id]}
+						{@const IconComponent = authProviderIcon(provider.id)}
 						<Button
 							variant="outline"
 							size="lg"
@@ -145,11 +138,7 @@
 								<LoaderCircle class="mr-2 h-5 w-5 animate-spin" />
 								Signing in...
 							{:else}
-								{#if IconComponent}
-									<IconComponent class="mr-2 h-5 w-5" />
-								{:else}
-									<LogIn class="mr-2 h-5 w-5" />
-								{/if}
+								<IconComponent class="mr-2 h-5 w-5" />
 								Continue with {provider.displayName}
 							{/if}
 						</Button>

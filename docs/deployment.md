@@ -50,7 +50,7 @@ Examples in [`docs/examples/`](examples/):
 `backend/src/config.ts` is the authoritative list.
 
 The example stacks pass through only the variables in their backend `environment:` block. An
-optional variable from the tables below (GitHub login, web push, `TRUSTED_PROXY_IPS`,
+optional variable from the tables below (GitHub or OIDC login, web push, `TRUSTED_PROXY_IPS`,
 `BLOCK_PRIVATE_PROVIDER_ENDPOINTS`) takes effect
 only after you add it to that block as well as to `.env`.
 
@@ -60,8 +60,7 @@ The backend logs the missing names and exits at startup without these.
 
 | Variable | Description |
 |---|---|
-| `GOOGLE_CLIENT_ID` | Google OAuth Client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
+| A sign-in provider | At least one of: `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET`, or `OIDC_ISSUER` + `OIDC_CLIENT_ID` + `OIDC_CLIENT_SECRET` |
 | `PROVIDER_ENCRYPTION_KEY` | Exactly 64 hex chars. `openssl rand -hex 32` |
 
 `PROVIDER_ENCRYPTION_KEY` is the AES-256-GCM key for stored provider credentials (Drive/Sheets
@@ -101,6 +100,10 @@ These have defaults, but the defaults only suit localhost.
 | `TRUSTED_PROXY_IPS` | empty | Comma-separated proxy IPs whose `X-Forwarded-For` is honored. Left unset behind a reverse proxy, every anonymous request shares one rate-limit bucket keyed on the proxy's IP |
 | `BLOCK_PRIVATE_PROVIDER_ENDPOINTS` | off | Set to `1` to require public `https://` hosts for S3 endpoints and model base URLs. Off, `http://` and LAN or loopback hosts are allowed, so a self-hosted MinIO or Ollama works. Cloud metadata and link-local addresses are refused either way. Any signed-in user can point a provider at the server's own network while it is off, so turn it on for an instance other people can sign up to |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | — | Set both to add a GitHub login button. Callback defaults to `http://localhost:3001/api/v1/auth/callback/github`; override with `GITHUB_REDIRECT_URI`. Register the OAuth app's callback URL as `https://yourdomain.com/api/v1/auth/callback`: GitHub accepts any redirect under it, so login and account linking both work |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | — | Set all three to sign in with your own OpenID Connect provider (Authentik, Keycloak, Pocket ID and the like). The backend reads `OIDC_ISSUER/.well-known/openid-configuration` at startup; if that fails it logs the error and leaves the OIDC button off until the next start. Sign-in uses PKCE, asks for `openid profile email` only, and refuses an account whose `email_verified` is not `true` |
+| `OIDC_REDIRECT_URI` | `http://localhost:3001/api/v1/auth/callback/oidc` | OIDC login callback. Register it, and the link callback below, with your provider |
+| `OIDC_LINK_REDIRECT_URI` | derived from `OIDC_REDIRECT_URI` | Callback for linking OIDC to an account on Profile, `.../callback/link/oidc` |
+| `OIDC_DISPLAY_NAME` | `Single sign-on` | Button label: "Continue with <name>" |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | — | Web push. All three or the feature stays off. Generate with `bun run vapid:gen` |
 | `GOOGLE_PROVIDER_REDIRECT_URI` | derived from `GOOGLE_REDIRECT_URI` | Storage-connect callback. Override only if it must differ from the derived `.../callback/provider/google` |
 | `GOOGLE_LINK_REDIRECT_URI`, `GITHUB_LINK_REDIRECT_URI` | derived from `GOOGLE_REDIRECT_URI` / `GITHUB_REDIRECT_URI` | Callback for linking a second sign-in account on Profile. Override only if it must differ from the derived `.../callback/link/google` or `.../callback/link/github` |

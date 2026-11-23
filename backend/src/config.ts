@@ -48,6 +48,12 @@ const envSchema = z.object({
   GITHUB_CLIENT_SECRET: z.string().optional(),
   GITHUB_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/github'),
   GITHUB_LINK_REDIRECT_URI: z.string().optional(),
+  OIDC_ISSUER: z.string().optional(),
+  OIDC_CLIENT_ID: z.string().optional(),
+  OIDC_CLIENT_SECRET: z.string().optional(),
+  OIDC_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/oidc'),
+  OIDC_LINK_REDIRECT_URI: z.string().optional(),
+  OIDC_DISPLAY_NAME: z.string().default('Single sign-on'),
   FRONTEND_URL: z.string().optional(),
   CORS_ORIGINS: z
     .string()
@@ -95,7 +101,7 @@ const parseEnv = () => {
   }
 };
 
-export function linkRedirectFrom(loginRedirectUri: string, provider: 'google' | 'github'): string {
+export function linkRedirectFrom(loginRedirectUri: string, provider: string): string {
   const base = loginRedirectUri.split(/[?#]/)[0].replace(/\/+$/, '');
   const loginSuffix = `/callback/${provider}`;
   if (base.endsWith(loginSuffix)) {
@@ -158,6 +164,15 @@ export const CONFIG = {
     githubRedirectUri: env.GITHUB_REDIRECT_URI,
     githubLinkRedirectUri:
       env.GITHUB_LINK_REDIRECT_URI || linkRedirectFrom(env.GITHUB_REDIRECT_URI, 'github'),
+    oidc: {
+      issuer: env.OIDC_ISSUER ?? '',
+      clientId: env.OIDC_CLIENT_ID ?? '',
+      clientSecret: env.OIDC_CLIENT_SECRET ?? '',
+      redirectUri: env.OIDC_REDIRECT_URI,
+      linkRedirectUri:
+        env.OIDC_LINK_REDIRECT_URI || linkRedirectFrom(env.OIDC_REDIRECT_URI, 'oidc'),
+      displayName: env.OIDC_DISPLAY_NAME,
+    },
     cookieMaxAge: 30 * 24 * 60 * 60,
     sessionDuration: 30 * 24 * 60 * 60 * 1000,
     oauthStateExpiry: 10 * 60 * 1000,
@@ -412,11 +427,23 @@ export const validateProductionConfig = () => {
   }
 };
 
+export function hasSignInProvider(): boolean {
+  const { auth } = CONFIG;
+  return (
+    !!(auth.googleClientId && auth.googleClientSecret) ||
+    !!(auth.githubClientId && auth.githubClientSecret) ||
+    !!(auth.oidc.issuer && auth.oidc.clientId && auth.oidc.clientSecret)
+  );
+}
+
 function requireProductionConfig(): void {
   const { providerKey, providerKeys } = CONFIG.encryption;
   const requiredFields = [
-    { field: 'GOOGLE_CLIENT_ID', value: CONFIG.auth.googleClientId },
-    { field: 'GOOGLE_CLIENT_SECRET', value: CONFIG.auth.googleClientSecret },
+    {
+      field:
+        'a sign-in provider (GOOGLE_CLIENT_ID/SECRET, GITHUB_CLIENT_ID/SECRET or OIDC_ISSUER/CLIENT_ID/CLIENT_SECRET)',
+      value: hasSignInProvider(),
+    },
     { field: 'PROVIDER_ENCRYPTION_KEY', value: providerKey || providerKeys },
   ];
 

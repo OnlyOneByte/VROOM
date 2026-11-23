@@ -16,6 +16,7 @@ import {
 } from '../../../test-helpers/provider-contracts/model';
 import { describeStorageContract } from '../../../test-helpers/provider-contracts/storage';
 import { STORAGE_CHECKS } from '../../../test-helpers/provider-contracts/storage-checks';
+import { AUTH_PROVIDERS } from '../../auth/providers/registry';
 import { IMPORT_FORMATS, IMPORT_PROVIDERS } from '../../expenses/import-mapping-presets';
 import { backupStrategyRegistry } from '../../sync/backup-strategy-registry';
 import '../../sync/init';
@@ -245,6 +246,7 @@ for (const [id, subject] of Object.entries(VISION_SUBJECTS)) {
 }
 
 const REGISTRIES: Record<string, Record<string, AnyProviderDescriptor>> = {
+  auth: AUTH_PROVIDERS,
   import: IMPORT_PROVIDERS,
   storage: STORAGE_PROVIDERS,
   'ai.llm': LLM_PROVIDERS,
