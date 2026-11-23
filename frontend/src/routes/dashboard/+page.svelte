@@ -44,12 +44,14 @@
 	import { reminderApi } from '#lib/services/reminder-api.ts';
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
 	import { analyticsApi } from '#lib/services/analytics-api.ts';
+	import { shareApi } from '#lib/services/share-api.ts';
 	import type {
 		AnalyticsQueryResponse,
 		DistanceUnit,
 		Expense,
 		ExpenseSummary,
 		InsurancePolicy,
+		ReceivedShare,
 		RecurringCostSummary,
 		ReminderWithVehicles,
 		Vehicle
@@ -81,6 +83,10 @@
 	let recentExpensesList = $state<Expense[]>([]);
 	let remindersList = $state<ReminderWithVehicles[]>([]);
 	let policies = $state<InsurancePolicy[]>([]);
+	let invitations = $state<ReceivedShare[] | null>([]);
+	let pendingInvitations = $derived(
+		invitations?.filter(share => share.status === 'pending').length ?? 0
+	);
 	let recurringCost = $state<RecurringCostSummary>({ count: 0, monthlyTotal: 0 });
 	let spendTrend = $state<AnalyticsQueryResponse | null>(null);
 	let runningByMonth = $state<AnalyticsQueryResponse | null>(null);
@@ -180,6 +186,7 @@
 		const names = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
 		return attentionItems(remindersList, policies, id => names.get(id), formatDate, Date.now());
 	});
+	let hasAside = $derived(attention.length > 0 || invitations === null || pendingInvitations > 0);
 
 	onMount(loadDashboardData);
 
@@ -232,6 +239,7 @@
 				loadedReminders,
 				loadedRecurringCost,
 				loadedPolicies,
+				loadedInvitations,
 				ownedPeriod,
 				loadedSpendTrend,
 				loadedRunningByMonth
@@ -242,6 +250,7 @@
 				reminderApi.list().catch(() => [] as ReminderWithVehicles[]),
 				reminderApi.getRecurringCost().catch(() => ({ count: 0, monthlyTotal: 0 })),
 				insuranceApi.getAllPolicies().catch(() => [] as InsurancePolicy[]),
+				shareApi.listReceived().catch(() => null),
 				loadPeriod(selected, []),
 				analyticsApi
 					.query({
@@ -278,6 +287,7 @@
 			remindersList = loadedReminders;
 			recurringCost = loadedRecurringCost;
 			policies = loadedPolicies;
+			invitations = loadedInvitations;
 			spendTrend = loadedSpendTrend;
 			runningByMonth = loadedRunningByMonth;
 			trendFailed = loadedRunningByMonth === null;
@@ -421,22 +431,13 @@
 
 		<SharedWithMeCard onAccepted={loadDashboardData} />
 		<NeedsAttentionCard items={attention} />
-		<VehicleRowsCard
-			rows={vehicleRows}
-			periodLabel={PERIOD_PHRASES[period].chip}
-			{distanceLabel}
-			isLoading={false}
-		/>
+		<VehicleRowsCard rows={vehicleRows} periodLabel={PERIOD_PHRASES[period].chip} {distanceLabel} />
 		{#if recurringCost.count > 0}
-			<RecurringCostCard
-				count={recurringCost.count}
-				monthlyTotal={recurringCost.monthlyTotal}
-				isLoading={false}
-			/>
+			<RecurringCostCard count={recurringCost.count} monthlyTotal={recurringCost.monthlyTotal} />
 		{/if}
 	{:else}
 		<div class="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
-			<div class="lg:col-span-2">
+			<div class="lg:col-span-2 lg:row-start-1">
 				<DashboardHero
 					{period}
 					total={spend.total}
@@ -451,23 +452,31 @@
 				/>
 			</div>
 
-			{#if hasLoaded && attention.length > 0}
-				<NeedsAttentionCard items={attention} />
+			{#if hasLoaded && hasAside}
+				<div class="space-y-6 lg:col-start-3 lg:row-span-2 lg:row-start-1">
+					{#if attention.length > 0}
+						<NeedsAttentionCard items={attention} />
+					{/if}
+					{#key invitations}
+						<SharedWithMeCard received={invitations} onAccepted={loadDashboardData} />
+					{/key}
+				</div>
 			{/if}
 
 			{#if hasLoaded}
-				<div class="lg:col-span-2">
+				<div class="lg:col-span-2 lg:col-start-1 lg:row-start-2">
 					<VehicleRowsCard
 						rows={vehicleRows}
 						periodLabel={PERIOD_PHRASES[period].chip}
 						{distanceLabel}
-						isLoading={false}
 					/>
 				</div>
 
-				<RecentActivityCard expenses={recentExpenses} />
+				<div class="lg:col-start-3 {hasAside ? 'lg:row-start-3' : 'lg:row-span-2 lg:row-start-1'}">
+					<RecentActivityCard expenses={recentExpenses} />
+				</div>
 
-				<div class="lg:col-span-2">
+				<div class="lg:col-span-2 lg:col-start-1 lg:row-start-3">
 					{#await chartModules}
 						<ChartCard title={TREND_TITLE} level={2} description={TREND_DESCRIPTION} isLoading>
 							{null}
@@ -507,16 +516,15 @@
 				</div>
 
 				{#if recurringCost.count > 0}
-					<RecurringCostCard
-						count={recurringCost.count}
-						monthlyTotal={recurringCost.monthlyTotal}
-						isLoading={false}
-					/>
+					<div class="lg:col-start-3 {hasAside ? 'lg:row-start-4' : 'lg:row-start-3'}">
+						<RecurringCostCard
+							count={recurringCost.count}
+							monthlyTotal={recurringCost.monthlyTotal}
+						/>
+					</div>
 				{/if}
 			{/if}
 		</div>
-
-		<SharedWithMeCard onAccepted={loadDashboardData} />
 	{/if}
 </div>
 

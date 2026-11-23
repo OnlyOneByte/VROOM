@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { ReceivedShare } from '#lib/types/index.ts';
 import {
 	ApiError,
@@ -96,8 +96,7 @@ describe('SharedWithMeCard listing', () => {
 
 		expect(screen.getByText('Shared with you')).toBeInTheDocument();
 		expect(screen.getByText('Family Van')).toBeInTheDocument();
-		expect(screen.getByText('Editor')).toBeInTheDocument();
-		expect(screen.getByText('Shared by Alex')).toBeInTheDocument();
+		expect(screen.getByText('Editor · Shared by Alex')).toBeInTheDocument();
 		expect(screen.queryByText('Old Truck')).toBeNull();
 	});
 
@@ -221,5 +220,22 @@ describe('SharedWithMeCard accepting and declining', () => {
 		expect(toastError).toHaveBeenCalledWith(
 			`Couldn't decline the invitation. ${UNEXPECTED_FAILURE_MESSAGE}`
 		);
+	});
+
+	test('with invitations the dashboard already loaded it shows them without asking again', async () => {
+		render(SharedWithMeCard, {
+			props: { received: [share({ id: 'p1', vehicleName: 'Family Van' })] }
+		});
+		expect(await screen.findByText('Family Van')).toBeInTheDocument();
+		expect(listReceived).not.toHaveBeenCalled();
+	});
+
+	test('when the dashboard could not load them it offers Retry, which asks again', async () => {
+		listReceived.mockResolvedValue([share()]);
+		render(SharedWithMeCard, { props: { received: null } });
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+		await waitFor(() => expect(listReceived).toHaveBeenCalledTimes(1));
 	});
 });
