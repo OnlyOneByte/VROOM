@@ -11,10 +11,7 @@
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import {
-		handleErrorWithNotification,
-		userFacingErrorMessage
-	} from '#lib/utils/error-handling.ts';
+	import { logLoadFailure, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as CardNs from '#lib/components/ui/card/index.ts';
@@ -105,7 +102,7 @@
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load trips:', error);
 			loadError = userFacingErrorMessage(error);
-			handleErrorWithNotification(error, "Couldn't load trips");
+			logLoadFailure(error, "Couldn't load trips");
 		} finally {
 			isLoading = false;
 		}

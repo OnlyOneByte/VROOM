@@ -14,10 +14,7 @@
 	import PolicyList from '#lib/components/insurance/PolicyList.svelte';
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
-	import {
-		handleErrorWithNotification,
-		userFacingErrorMessage
-	} from '#lib/utils/error-handling.ts';
+	import { logLoadFailure, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import type { InsurancePolicy, Vehicle } from '#lib/types/index.ts';
 
@@ -44,7 +41,7 @@
 			vehicles = vehiclesData;
 		} catch (err) {
 			error = userFacingErrorMessage(err);
-			handleErrorWithNotification(err, "Couldn't load insurance data");
+			logLoadFailure(err, "Couldn't load insurance data");
 		} finally {
 			isLoading = false;
 		}

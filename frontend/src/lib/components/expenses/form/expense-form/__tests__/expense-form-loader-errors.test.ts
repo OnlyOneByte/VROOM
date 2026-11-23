@@ -45,17 +45,12 @@ beforeEach(() => {
 });
 
 describe('expense form loader failures are reported', () => {
-	test('a failed vehicle list sets an inline error and a toast; a retry clears it', async () => {
+	test('a failed vehicle list sets only an inline error, no toast; a retry clears it', async () => {
 		vehicleApiMock.getVehicles.mockRejectedValueOnce(new Error('offline'));
 		const state = createState();
 		await loadVehicles(state);
 		expect(state.vehiclesError).toBe('Offline.');
-		expect(addNotification).toHaveBeenCalledWith(
-			expect.objectContaining({
-				type: 'error',
-				message: "Couldn't load your vehicles. Offline."
-			})
-		);
+		expect(addNotification).not.toHaveBeenCalled();
 
 		vehicleApiMock.getVehicles.mockResolvedValueOnce([makeVehicle('v1')]);
 		await loadVehicles(state);
@@ -63,7 +58,7 @@ describe('expense form loader failures are reported', () => {
 		expect(state.formData.vehicleId).toBe('v1');
 	});
 
-	test('a failed vehicle load clears the previous vehicle and reports it once', async () => {
+	test('a failed vehicle load clears the previous vehicle and reports it inline only', async () => {
 		const state = createState();
 		state.vehicle = makeVehicle('v1');
 		state.allVehicleExpenses = [makeExpense('old')];
@@ -74,10 +69,10 @@ describe('expense form loader failures are reported', () => {
 		expect(state.vehicle).toBeNull();
 		expect(state.allVehicleExpenses).toEqual([]);
 		expect(state.vehicleError).toBe(SERVER_FAILURE_MESSAGE);
-		expect(addNotification).toHaveBeenCalledTimes(1);
+		expect(addNotification).not.toHaveBeenCalled();
 	});
 
-	test('a full outage raises one toast per vehicle load, and a retry clears the error', async () => {
+	test('a full outage shows one inline error and no toast, and a retry clears the error', async () => {
 		const state = createState();
 		state.formData.vehicleId = 'v1';
 		state.allVehicleExpenses = [makeExpense('old')];
@@ -87,19 +82,14 @@ describe('expense form loader failures are reported', () => {
 			.mockRejectedValueOnce(new Error('offline'));
 		await loadVehicleContext(state);
 		expect(state.allVehicleExpenses).toEqual([]);
-		expect(addNotification).toHaveBeenCalledTimes(1);
-		expect(addNotification).toHaveBeenCalledWith(
-			expect.objectContaining({
-				type: 'error',
-				message: "Couldn't load this vehicle's details. Offline."
-			})
-		);
+		expect(state.vehicleError).toBe('Offline.');
+		expect(addNotification).not.toHaveBeenCalled();
 
 		vehicleApiMock.getVehicle.mockResolvedValueOnce(makeVehicle('v1'));
 		expenseApiMock.getExpensesByVehicle.mockResolvedValue({ data: [] });
 		await loadVehicleContext(state);
 		expect(state.vehicleError).toBeNull();
-		expect(addNotification).toHaveBeenCalledTimes(1);
+		expect(addNotification).not.toHaveBeenCalled();
 	});
 });
 
@@ -111,11 +101,8 @@ describe('a thrown non-Error value', () => {
 		expenseApiMock.getExpensesByVehicle.mockResolvedValue({ data: [] });
 		await loadVehicleContext(state);
 		expect(state.vehicleError).toBe(UNEXPECTED_FAILURE_MESSAGE);
-		const toast = addNotification.mock.calls[0]?.[0] as { message: string } | undefined;
-		expect(toast?.message).toBe(
-			`Couldn't load this vehicle's details. ${UNEXPECTED_FAILURE_MESSAGE}`
-		);
-		expect(JSON.stringify(addNotification.mock.calls)).not.toContain('[object Object]');
+		expect(state.vehicleError).not.toContain('[object Object]');
+		expect(addNotification).not.toHaveBeenCalled();
 	});
 });
 
@@ -209,7 +196,7 @@ describe('switching vehicles keeps only the latest response', () => {
 		await Promise.all([p1, p2]);
 		expect(state.vehicle?.id).toBe('v2');
 		expect(state.vehicleError).toBe('Expenses down.');
-		expect(addNotification).toHaveBeenCalledTimes(1);
+		expect(addNotification).not.toHaveBeenCalled();
 	});
 });
 

@@ -479,9 +479,7 @@ describe('ExpenseForm edit mode', () => {
 
 		const card = await screen.findByTestId('expense-load-error');
 		expect(within(card).getByText("Couldn't load this split expense")).toBeTruthy();
-		expect(notificationMessages()).toContain(
-			"Couldn't load this split expense. Something went wrong on our side. Try again in a moment."
-		);
+		expect(notificationMessages()).toEqual([]);
 	});
 
 	test('saving sends the edited expense to updateExpense and returns', async () => {

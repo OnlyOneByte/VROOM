@@ -31,6 +31,7 @@
 	import { formatCurrency } from '#lib/utils/formatters.ts';
 	import {
 		handleErrorWithNotification,
+		logLoadFailure,
 		userFacingErrorMessage
 	} from '#lib/utils/error-handling.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
@@ -146,7 +147,7 @@
 		} catch (error) {
 			if (onlineStatus.current) {
 				loadError = userFacingErrorMessage(error);
-				handleErrorWithNotification(error, "Couldn't load expenses");
+				logLoadFailure(error, "Couldn't load expenses");
 			} else {
 				loadError = null;
 				offlineLoad = true;
@@ -193,7 +194,7 @@
 			message: userFacingErrorMessage(error),
 			offset
 		};
-		handleErrorWithNotification(error, "Couldn't load expenses");
+		logLoadFailure(error, "Couldn't load expenses");
 	}
 
 	async function fetchPageAndSummary(offset = 0, { throwOnFailure = false } = {}) {
