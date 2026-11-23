@@ -32,6 +32,8 @@
 		x: string;
 		y?: string | string[];
 		series: LegendItem[];
+		hiddenKeys?: readonly string[];
+		onToggleSeries?: (_key: string) => void;
 		config: Chart.ChartConfig;
 		isLoading?: boolean;
 		error?: string | null;
@@ -60,7 +62,9 @@
 		data,
 		x,
 		y,
-		series,
+		series: legendItems,
+		hiddenKeys,
+		onToggleSeries,
 		config,
 		isLoading = false,
 		error = null,
@@ -81,6 +85,10 @@
 		onSelect,
 		class: className
 	}: Props = $props();
+
+	let series = $derived(
+		hiddenKeys?.length ? legendItems.filter(s => !hiddenKeys.includes(s.key)) : legendItems
+	);
 
 	let isEmpty = $derived(data.length === 0);
 	let context = $state<ChartState<Record<string, unknown>>>();
@@ -164,8 +172,13 @@
 		</div>
 	</ChartPlot>
 	{#snippet legend()}
-		{#if series.length > 1}
-			<ChartLegend items={series} class="mt-3 justify-center" />
+		{#if legendItems.length > 1}
+			<ChartLegend
+				items={legendItems}
+				{hiddenKeys}
+				onToggle={onToggleSeries}
+				class="mt-3 justify-center"
+			/>
 		{/if}
 		{@render footer?.()}
 	{/snippet}

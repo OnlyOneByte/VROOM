@@ -22,6 +22,11 @@
 		writeAnalyticsFilters,
 		type AnalyticsFilters
 	} from '#lib/components/analytics/analytics-filters.ts';
+	import {
+		parseExplore,
+		writeExplore,
+		type ExploreQuery
+	} from '#lib/components/analytics/explore/query-state.ts';
 	import { analyticsApi } from '#lib/services/analytics-api.ts';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
@@ -32,7 +37,7 @@
 	let summary = $state<AnalyticsSummaryResponse | null>(null);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
-	let activeTab = $state('fuel-stats');
+	let activeTab = $state('explore');
 	let tabList = $state<HTMLElement | null>(null);
 	let vehicles = $state<Vehicle[]>([]);
 	let vehiclesLoaded = $state(false);
@@ -84,6 +89,14 @@
 		void goto(`${url.pathname}${url.search}`, { replace: true, reset: false });
 	});
 
+	let explore = $derived(parseExplore(page.url.searchParams));
+
+	function setExplore(next: ExploreQuery) {
+		const url = writeExplore(page.url, next);
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
+		void goto(`${url.pathname}${url.search}`, { reset: false });
+	}
+
 	async function clearFilters() {
 		setFilters({ range: DEFAULT_RANGE, cars: [] });
 		await tick();
@@ -112,9 +125,33 @@
 		else if (tab.right > list.right) tabList.scrollLeft += tab.right - list.right;
 	}
 
+	let tabFade = $state({ left: false, right: false });
+	let tabMask = $derived(
+		tabFade.left || tabFade.right
+			? `mask-image: linear-gradient(to right, ${tabFade.left ? 'transparent, black 24px' : 'black'}, ${tabFade.right ? 'black calc(100% - 32px), transparent' : 'black'})`
+			: undefined
+	);
+
+	$effect(() => {
+		if (!tabList) return;
+		const observer = new ResizeObserver(updateTabFade);
+		observer.observe(tabList);
+		for (const tab of tabList.children) observer.observe(tab);
+		return () => observer.disconnect();
+	});
+
+	function updateTabFade() {
+		if (!tabList) return;
+		const { scrollLeft, scrollWidth, clientWidth } = tabList;
+		tabFade = { left: scrollLeft > 4, right: scrollLeft + clientWidth < scrollWidth - 4 };
+	}
+
 	$effect(() => {
 		void activeTab;
-		void tick().then(revealActiveTab);
+		void tick().then(() => {
+			revealActiveTab();
+			updateTabFade();
+		});
 	});
 
 	async function loadSummary() {
@@ -242,8 +279,13 @@
 		<Tabs.Root bind:value={activeTab} class="space-y-4 md:space-y-6">
 			<Tabs.List
 				bind:ref={tabList}
-				class="w-full justify-start overflow-x-auto lg:grid lg:grid-cols-4"
+				class="w-full justify-start overflow-x-auto lg:grid lg:grid-cols-5"
+				style={tabMask}
+				onscroll={updateTabFade}
 			>
+				<Tabs.Trigger value="explore" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
+					Explore
+				</Tabs.Trigger>
 				<Tabs.Trigger value="fuel-stats" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
 					Fuel & Stats
 				</Tabs.Trigger>
@@ -258,7 +300,31 @@
 				</Tabs.Trigger>
 			</Tabs.List>
 
-			{#if activeTab === 'fuel-stats'}
+			{#if activeTab === 'explore'}
+				<Tabs.Content value="explore">
+					{#await import('#lib/components/analytics/explore/ExploreTab.svelte')}
+						<div class="flex min-h-[480px] justify-center p-8" aria-busy="true">
+							<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+						</div>
+					{:then { default: ExploreTab }}
+						<ExploreTab
+							query={explore}
+							onQueryChange={setExplore}
+							{dateRange}
+							{vehicleIds}
+							{vehicleColors}
+							filterLabel={filtered ? filterLabel : undefined}
+							onClearFilters={filtered ? clearFilters : undefined}
+						/>
+					{:catch}
+						<LoadErrorCard
+							title="Couldn't load Explore"
+							message="Check your connection, then reload the page."
+							onRetry={() => location.reload()}
+						/>
+					{/await}
+				</Tabs.Content>
+			{:else if activeTab === 'fuel-stats'}
 				<Tabs.Content value="fuel-stats">
 					<FuelStatsTab
 						{fuelStats}
