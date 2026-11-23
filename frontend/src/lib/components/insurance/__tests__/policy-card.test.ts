@@ -35,6 +35,7 @@ vi.mock('#lib/services/insurance-api.ts', () => ({
 		getEntityDocuments: (entityType: string, entityId: string) =>
 			getEntityDocuments(entityType, entityId),
 		deleteTerm: (policyId: string, termId: string) => deleteTerm(policyId, termId),
+		updateClaim: vi.fn(() => Promise.resolve({})),
 		getEntityDocumentThumbnailUrl: () => '/thumb',
 		uploadEntityDocument: vi.fn(),
 		deleteEntityDocument: vi.fn()
@@ -207,6 +208,40 @@ describe('PolicyCard child sections', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
 		await settle();
 		expect(screen.getByRole('dialog', { name: 'Upload Documents' })).toBeInTheDocument();
+	});
+
+	test('a failed documents load shows Retry on the card, and Retry loads them', async () => {
+		getEntityDocuments.mockRejectedValueOnce(new Error('offline'));
+		mount();
+		await settle();
+		expect(screen.getByText("Couldn't load the documents.")).toBeInTheDocument();
+		expect(screen.getByTestId('policy-attachments')).toHaveTextContent(/^0 claims$/);
+
+		getEntityDocuments.mockResolvedValue(photoPage([makePhoto()]));
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await settle();
+		expect(screen.queryByText("Couldn't load the documents.")).toBeNull();
+		expect(screen.getByTestId('policy-attachments')).toHaveTextContent('1 document · 0 claims');
+	});
+
+	test('saving a claim keeps the claims section and the count on screen while it reloads', async () => {
+		getClaims.mockResolvedValue([makeClaim()]);
+		mount();
+		await settle();
+		let finish: (claims: InsuranceClaim[]) => void = () => {};
+		getClaims.mockReturnValue(new Promise(resolve => (finish = resolve)));
+		await fireEvent.click(screen.getByRole('button', { name: 'Edit claim' }));
+		await settle();
+		await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+		await settle();
+
+		expect(screen.getByRole('heading', { name: 'Claims' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+		expect(screen.getByTestId('policy-attachments')).toHaveTextContent('0 documents · 1 claim');
+
+		finish([makeClaim(), makeClaim({ id: 'c2' })]);
+		await settle();
+		expect(screen.getByTestId('policy-attachments')).toHaveTextContent('0 documents · 2 claims');
 	});
 
 	test('a failed claims load is shown in place of the claim count', async () => {

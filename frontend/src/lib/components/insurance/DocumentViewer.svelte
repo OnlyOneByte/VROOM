@@ -87,7 +87,14 @@
 </script>
 
 {#if compact}
-	{#if !isLoading && documents.length > 0}
+	{#if loadFailed}
+		<div class="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3">
+			<p class="text-xs text-destructive">Couldn't load the documents.</p>
+			<Button variant="outline" size="sm" class="mt-2 h-10 sm:h-8" onclick={loadDocuments}>
+				Retry
+			</Button>
+		</div>
+	{:else if !isLoading && documents.length > 0}
 		<div class="mt-3 space-y-3">
 			<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground">
 				Documents

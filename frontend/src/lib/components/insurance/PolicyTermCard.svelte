@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Ellipsis, Pencil, Trash2, RefreshCw } from '@lucide/svelte';
+	import { Ellipsis, Pencil, Trash2 } from '@lucide/svelte';
 	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -14,10 +14,9 @@
 		vehicleNames?: string[];
 		onEdit?: (_term: InsuranceTerm) => void;
 		onDelete?: (_term: InsuranceTerm) => void;
-		onRenew?: () => void;
 	}
 
-	let { term, isCurrent = false, vehicleNames = [], onEdit, onDelete, onRenew }: Props = $props();
+	let { term, isCurrent = false, vehicleNames = [], onEdit, onDelete }: Props = $props();
 
 	let confirmOpen = $state(false);
 	let menuOpen = $state(false);
@@ -76,12 +75,6 @@
 						{/if}
 					</Popover.Content>
 				</Popover.Root>
-			{/if}
-			{#if isCurrent && onRenew}
-				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={onRenew}>
-					<RefreshCw />
-					Renew
-				</Button>
 			{/if}
 		</div>
 	</div>

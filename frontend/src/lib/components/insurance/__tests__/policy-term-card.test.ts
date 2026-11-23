@@ -73,16 +73,6 @@ describe('PolicyTermCard actions', () => {
 		expect(onEdit).toHaveBeenCalledWith(t);
 	});
 
-	test('renew is only offered on the current term', async () => {
-		const onRenew = vi.fn();
-		const { unmount } = render(PolicyTermCard, { props: { term: term(), onRenew } });
-		expect(screen.queryByRole('button', { name: /renew/i })).toBeNull();
-		unmount();
-		render(PolicyTermCard, { props: { term: term(), isCurrent: true, onRenew } });
-		await fireEvent.click(screen.getByRole('button', { name: /renew/i }));
-		expect(onRenew).toHaveBeenCalledTimes(1);
-	});
-
 	test('delete asks for confirmation before calling the handler', async () => {
 		const onDelete = vi.fn<(t: InsuranceTerm) => void>();
 		const t = term();
