@@ -758,14 +758,28 @@ describe('ExpenseForm loading and load failures', () => {
 		expect(screen.queryByRole('heading', { name: 'Edit Expense' })).toBeNull();
 	});
 
+	test('a vehicle detail failure names the server reason next to Retry', async () => {
+		getVehicle.mockRejectedValue(new ApiError('Internal server error', 500));
+		render(ExpenseForm, { props: { preselectedCategory: 'misc' } });
+
+		await screen.findByTestId('vehicle-load-error');
+
+		expect(document.getElementById('vehicle-load-message')).toHaveTextContent(
+			"Couldn't load this vehicle's details. Something went wrong on our side. Try again in a moment."
+		);
+		expect(screen.getByRole('button', { name: 'Retry' })).toHaveAccessibleDescription(
+			"Couldn't load this vehicle's details. Something went wrong on our side. Try again in a moment."
+		);
+	});
+
 	test('a vehicle detail failure on a non-fuel expense offers a retry that recovers', async () => {
 		getVehicle.mockRejectedValue(new Error('offline'));
 		render(ExpenseForm, { props: { preselectedCategory: 'misc' } });
 
 		const alert = await screen.findByTestId('vehicle-load-error');
-		expect(document.getElementById('vehicle-load-message')?.textContent?.trim()).toBe(
-			"Couldn't load this vehicle's details."
-		);
+		expect(
+			document.getElementById('vehicle-load-message')?.textContent?.replace(/\s+/g, ' ').trim()
+		).toBe("Couldn't load this vehicle's details. Offline.");
 		const failedCalls = getVehicle.mock.calls.length;
 		getVehicle.mockResolvedValue(CAMRY);
 		const retry = within(alert).getByRole('button', { name: 'Retry' });
