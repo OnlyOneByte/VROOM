@@ -48,7 +48,7 @@
 
 	let quickStats = $derived(summary?.quickStats ?? null);
 	let noVehicles = $derived(!isLoading && !error && quickStats?.vehicleCount === 0);
-	let showTabs = $derived(quickStats ? quickStats.vehicleCount > 0 : !isLoading && !!error);
+	let showTabs = $derived(quickStats ? quickStats.vehicleCount > 0 : !!error);
 	let fuelStats = $derived(summary?.fuelStats ?? null);
 	let fuelAdvanced = $derived(summary?.fuelAdvanced ?? null);
 

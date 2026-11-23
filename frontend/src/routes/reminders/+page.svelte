@@ -355,6 +355,8 @@
 							<Button variant="ghost" size="sm" onclick={() => toggleActive(item)}>
 								{item.reminder.isActive ? 'Pause' : 'Resume'}
 							</Button>
+						{:else}
+							<p class="text-xs text-muted-foreground">Edit to choose a vehicle, then resume.</p>
 						{/if}
 						<Button
 							variant="ghost"
@@ -378,13 +380,14 @@
 		{/snippet}
 
 		{#if vehicles.length === 0}
-			<Alert data-testid="reminders-no-vehicles">
+			<Alert role="status" data-testid="reminders-no-vehicles">
 				<Car class="h-4 w-4" />
 				<AlertTitle>{NO_VEHICLES_TITLE}</AlertTitle>
 				<AlertDescription>
 					<p>
-						These reminders lost their vehicle and are paused. Add a vehicle, then edit each
-						reminder to choose it.
+						{reminders.length === 1
+							? 'This reminder lost its vehicle and is paused. Add a vehicle, then edit the reminder to choose it.'
+							: 'These reminders lost their vehicle and are paused. Add a vehicle, then edit each reminder to choose it.'}
 					</p>
 					<Button size="lg" class="mt-2" href={resolve(routes.vehicleNew)}>
 						<Plus class="mr-2 h-4 w-4" />

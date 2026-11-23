@@ -88,7 +88,8 @@ describe('/reminders primary action', () => {
 
 		await waitFor(() => expect(screen.getByText('Oil change')).toBeInTheDocument());
 		const prompt = screen.getByTestId('reminders-no-vehicles');
-		expect(prompt).toHaveTextContent('edit each reminder to choose it');
+		expect(prompt).toHaveAttribute('role', 'status');
+		expect(prompt).toHaveTextContent('This reminder lost its vehicle');
 		expect(controls('Add Vehicle')).toHaveLength(1);
 		expect(controls('Add Vehicle')[0]).toHaveAttribute('href', '/vehicles/new');
 		expect(
@@ -108,6 +109,7 @@ describe('/reminders primary action', () => {
 
 		await waitFor(() => expect(screen.getByText('Tyre swap')).toBeInTheDocument());
 		expect(controls('Resume')).toHaveLength(1);
+		expect(screen.getAllByText('Edit to choose a vehicle, then resume.')).toHaveLength(1);
 		expect(screen.getByTestId('reminder-card-r-kept').contains(controls('Resume')[0] ?? null)).toBe(
 			true
 		);
