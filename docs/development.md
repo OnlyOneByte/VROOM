@@ -100,6 +100,25 @@ frontend dev server itself and mocks every `/api/v1` call in the browser. One-ti
 cd frontend && npm run test:e2e
 ```
 
+The Web Vitals CI job measures LCP, TBT and CLS on six key routes (Dashboard, a vehicle page,
+Analytics, All Expenses, Add Expense, Add Odometer Reading) at 375×812 with 4× CPU throttling,
+taking the median of 3 cold loads of the production build against a seeded backend. To run it
+locally, seed a scratch database, then start the backend and `node build` on 127.0.0.1:
+
+```bash
+cd backend && bun run db:seed && bun ../frontend/scripts/web-vitals-seed.mjs
+cd frontend && npm run build && PORT=4173 PUBLIC_API_URL=http://127.0.0.1:3001 node build
+cd frontend && VITALS_SESSION=<session> VITALS_VEHICLE_ID=<vehicleId> npm run web-vitals
+```
+
+`DATABASE_URL` must point at the same scratch database for the seed and the backend, and the
+backend needs `CORS_ORIGINS=http://127.0.0.1:4173`. `VITALS_CHROMIUM` selects a different
+Chromium binary. `frontend/web-vitals-budgets.json` holds the target every route should meet and,
+for a route that doesn't meet it yet, a ceiling naming the issue that will fix it. The job fails
+when a route is over its ceiling, or over the target when it has none. When a change has to go
+over, raise that route's ceiling in the same PR and say in the PR description why; when a route
+meets the target, delete its ceiling.
+
 ## Conventions
 
 `docs/conventions/` holds the project's coding rules — one file per area: tech stack, code
