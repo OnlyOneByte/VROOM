@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const BACKEND_TYPES = resolve(here, '../../../../../backend/src/types.ts');
+const BACKEND_SYNC = resolve(here, '../../../../../backend/src/api/sync');
 const FRONTEND_TYPES = resolve(here, '../../types/settings.ts');
 const SHARED = [
 	'ProviderBackupSettings',
@@ -60,6 +61,40 @@ describe('backup types parity with the backend', () => {
 		const backend = fields(backendSrc, name);
 		expect(backend.length).toBeGreaterThan(0);
 		expect(fields(frontendSrc, name)).toEqual(backend);
+	});
+
+	it('RestoreProviderInfo matches the restore providers route exactly', () => {
+		const backend = fields(
+			readFileSync(`${BACKEND_SYNC}/routes.ts`, 'utf8'),
+			'RestoreProviderInfo'
+		);
+		expect(backend.length).toBeGreaterThan(0);
+		expect(fields(frontendSrc, 'RestoreProviderInfo')).toEqual(backend);
+	});
+
+	it.each([
+		['BackupOrchestratorResult', 'backup-strategy.ts', 'BackupOrchestratorResult'],
+		['RestoreResult', 'restore.ts', 'RestoreResponse']
+	])(
+		'%s has the same fields and optionality as the backend %s',
+		(frontendName, file, backendName) => {
+			const names = (members: string[]) => members.map(member => member.split(':')[0]);
+			const backend = names(fields(readFileSync(`${BACKEND_SYNC}/${file}`, 'utf8'), backendName));
+			expect(backend.length).toBeGreaterThan(0);
+			expect(names(fields(frontendSrc, frontendName))).toEqual(backend);
+		}
+	);
+
+	it('BackupOrchestratorResult.outcome lists the backend BackupOutcome values', () => {
+		const strategySrc = readFileSync(`${BACKEND_SYNC}/backup-strategy.ts`, 'utf8');
+		const union = strategySrc.match(/export type BackupOutcome = ([^;]+);/)?.[1];
+		if (!union) throw new Error('BackupOutcome not found');
+		const literals = (text: string) => [...text.matchAll(/'([^']+)'/g)].map(m => m[1]).sort();
+		const outcome = fields(frontendSrc, 'BackupOrchestratorResult').find(member =>
+			member.startsWith('outcome:')
+		);
+		expect(outcome).toBeDefined();
+		expect(literals(outcome as string)).toEqual(literals(union));
 	});
 
 	it('reads inline objects, wrapped unions and readonly or quoted keys, and refuses anything else', () => {

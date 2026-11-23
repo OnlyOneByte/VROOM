@@ -248,7 +248,7 @@ routes.post(
   }
 );
 
-interface RestoreProviderInfo {
+export interface RestoreProviderInfo {
   providerId: string;
   providerType: string;
   displayName: string;

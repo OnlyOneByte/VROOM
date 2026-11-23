@@ -67,6 +67,8 @@ export interface BackupOrchestratorResult {
 	timestamp: string;
 	status?: 'in_progress';
 	skipped?: boolean;
+	outcome: 'success' | 'partial' | 'failed' | 'noop';
+	failedProviders: string[];
 	results: Record<
 		string,
 		{
