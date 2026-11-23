@@ -1,10 +1,11 @@
 <script lang="ts">
+	import { focusFirstProblem } from '#lib/utils/focus.ts';
 	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { page } from '$app/state';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
-	import { onMount, tick } from 'svelte';
+	import { onMount } from 'svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import {
 		validateOdometerForm,
@@ -52,13 +53,6 @@
 		return val <= latest.odometer && date >= latest.date;
 	});
 
-	async function focusFirstProblem() {
-		await tick();
-		const target = formElement?.querySelector<HTMLElement>('[aria-invalid="true"], #submit-error');
-		target?.scrollIntoView({ block: 'center' });
-		target?.focus({ preventScroll: true });
-	}
-
 	function clearFieldError(field: 'odometer' | 'date' | 'note') {
 		if (fieldErrors[field]) fieldErrors = { ...fieldErrors, [field]: undefined };
 	}
@@ -102,7 +96,7 @@
 	async function handleSubmit() {
 		submitError = null;
 		if (!validate()) {
-			await focusFirstProblem();
+			await focusFirstProblem(formElement);
 			return;
 		}
 
@@ -117,7 +111,7 @@
 		} catch (e) {
 			if (isOdometerOrderError(e)) fieldErrors = { odometer: userFacingErrorMessage(e) };
 			else submitError = `Couldn't update the reading. ${userFacingErrorMessage(e)}`;
-			await focusFirstProblem();
+			await focusFirstProblem(formElement);
 		} finally {
 			isSubmitting = false;
 		}
