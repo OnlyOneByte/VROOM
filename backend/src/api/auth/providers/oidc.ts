@@ -11,7 +11,12 @@ interface OidcEndpoints {
   userinfo: string;
 }
 
+const DISCOVERY_TIMEOUT_MS = 5_000;
+const RETRY_AFTER_MS = 30_000;
+
 let endpoints: OidcEndpoints | null = null;
+let lastAttemptAt = 0;
+let inFlight: Promise<void> | null = null;
 
 export function oidcConfigured(): boolean {
   const { issuer, clientId, clientSecret } = CONFIG.auth.oidc;
@@ -22,14 +27,24 @@ export function oidcDiscovered(): boolean {
   return endpoints !== null;
 }
 
+function issuerUrl(): string {
+  return CONFIG.auth.oidc.issuer.replace(/\/+$/, '');
+}
+
 export async function discoverOidc(): Promise<void> {
   endpoints = null;
+  lastAttemptAt = Date.now();
   if (!oidcConfigured()) return;
-  const issuer = CONFIG.auth.oidc.issuer.replace(/\/+$/, '');
+  const issuer = issuerUrl();
   try {
-    const res = await fetch(`${issuer}/.well-known/openid-configuration`);
+    const res = await fetch(`${issuer}/.well-known/openid-configuration`, {
+      signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS),
+    });
     if (!res.ok) throw new Error(`discovery returned HTTP ${res.status}`);
     const doc = (await res.json()) as Record<string, unknown>;
+    if (typeof doc.issuer !== 'string' || doc.issuer.replace(/\/+$/, '') !== issuer) {
+      throw new Error('discovery names a different issuer than OIDC_ISSUER');
+    }
     const { authorization_endpoint, token_endpoint, userinfo_endpoint } = doc;
     if (
       typeof authorization_endpoint !== 'string' ||
@@ -44,11 +59,20 @@ export async function discoverOidc(): Promise<void> {
       userinfo: userinfo_endpoint,
     };
   } catch (error) {
-    logger.error('OIDC discovery failed; OIDC sign-in is off until the next start', {
+    logger.error('OIDC discovery failed; it is retried on a later sign-in request', {
       issuer,
       error: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+export async function ensureOidcDiscovered(): Promise<void> {
+  if (endpoints || !oidcConfigured()) return;
+  if (!inFlight && Date.now() - lastAttemptAt < RETRY_AFTER_MS) return;
+  inFlight ??= discoverOidc().finally(() => {
+    inFlight = null;
+  });
+  await inFlight;
 }
 
 function discovered(): OidcEndpoints {
@@ -107,7 +131,7 @@ export const oidcAuthProvider: OAuthProviderConfig = {
       (value): value is string => typeof value === 'string' && value !== ''
     );
     return {
-      providerAccountId: data.sub,
+      providerAccountId: `${issuerUrl()}|${data.sub}`,
       email: data.email,
       displayName: name ?? data.email,
       avatarUrl: typeof data.picture === 'string' ? data.picture : undefined,

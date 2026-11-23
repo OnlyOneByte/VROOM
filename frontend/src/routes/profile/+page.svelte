@@ -46,7 +46,7 @@
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import ComingSoonCard from '#lib/components/common/coming-soon-card.svelte';
-	import { authProviderIcon } from '#lib/constants/auth-providers.ts';
+	import { authProviderHasLogo, authProviderIcon } from '#lib/constants/auth-providers.ts';
 
 	const linkErrorMessages: Record<string, string> = {
 		account_conflict: 'This account is already linked to a different user.',
@@ -349,7 +349,11 @@
 							<div class="flex items-center justify-between">
 								<div class="flex items-center gap-3">
 									<div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-										<IconComponent class="h-5 w-5" />
+										<IconComponent
+											class="h-5 w-5 {authProviderHasLogo(account.providerType)
+												? ''
+												: 'text-muted-foreground'}"
+										/>
 									</div>
 									<div>
 										<p class="text-sm font-medium">{account.displayName}</p>

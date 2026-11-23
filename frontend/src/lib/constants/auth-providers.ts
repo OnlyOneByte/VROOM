@@ -10,8 +10,12 @@ const AUTH_PROVIDER_ICONS: Record<string, AuthIcon> = {
 	github: GitHubLogo
 };
 
+export function authProviderHasLogo(providerId: string): boolean {
+	return Object.hasOwn(AUTH_PROVIDER_ICONS, providerId);
+}
+
 export function authProviderIcon(providerId: string): AuthIcon {
-	return Object.hasOwn(AUTH_PROVIDER_ICONS, providerId)
+	return authProviderHasLogo(providerId)
 		? (AUTH_PROVIDER_ICONS[providerId] as AuthIcon)
 		: (LogIn as unknown as AuthIcon);
 }

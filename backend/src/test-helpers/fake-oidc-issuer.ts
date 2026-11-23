@@ -9,6 +9,7 @@ export interface FakeOidcIssuer {
   issuer: string;
   user: FakeOidcUser;
   tokenRequests: URLSearchParams[];
+  discoveryIssuer?: string;
   stop: () => void;
 }
 
@@ -21,7 +22,7 @@ export function startFakeOidcIssuer(user: FakeOidcUser): FakeOidcIssuer {
       const url = new URL(request.url);
       if (url.pathname === '/.well-known/openid-configuration') {
         return Response.json({
-          issuer: state.issuer,
+          issuer: state.discoveryIssuer ?? state.issuer,
           authorization_endpoint: `${state.issuer}/authorize`,
           token_endpoint: `${state.issuer}/token`,
           userinfo_endpoint: `${state.issuer}/userinfo`,

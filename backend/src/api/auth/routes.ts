@@ -18,6 +18,7 @@ import { attachPendingInvites } from '../shares/repository';
 import { authProviderRepository, buildAuthProviderConfig } from './auth-provider-repository';
 import { lucia } from './lucia';
 import { googleStorageClient, STORAGE_SCOPES } from './providers/google';
+import { ensureOidcDiscovered } from './providers/oidc';
 import { getEnabledProvider, getEnabledProviders, getProvider } from './providers/registry';
 import { NoVerifiedEmailError, type OAuthFlow } from './providers/types';
 import {
@@ -105,6 +106,13 @@ const authRateLimiter = rateLimiter({
   // Key on the trusted client IP; a raw X-Forwarded-For header is spoofable.
   keyGenerator: (c) => `auth:${getClientIp(c)}`,
 });
+
+for (const path of ['/providers', '/login/*', '/link/*', '/callback/*']) {
+  routes.use(path, async (_c, next) => {
+    await ensureOidcDiscovered();
+    await next();
+  });
+}
 
 routes.get('/providers', async (c) => {
   const providers = getEnabledProviders();

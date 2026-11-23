@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { type FakeOidcIssuer, startFakeOidcIssuer } from '../../../test-helpers/fake-oidc-issuer';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 
@@ -24,6 +24,7 @@ let saved: {
   oidc: Record<string, string>;
 };
 let discoverOidc: () => Promise<void>;
+let ensureOidcDiscovered: () => Promise<void>;
 let hasSignInProvider: () => boolean;
 
 beforeEach(async () => {
@@ -31,7 +32,7 @@ beforeEach(async () => {
   const configModule = await import('../../../config');
   config = configModule.CONFIG as unknown as MutableConfig;
   hasSignInProvider = configModule.hasSignInProvider;
-  ({ discoverOidc } = await import('../providers/oidc'));
+  ({ discoverOidc, ensureOidcDiscovered } = await import('../providers/oidc'));
   saved = {
     disableRateLimit: config.disableRateLimit,
     auth: Object.fromEntries(SIGN_IN_KEYS.map((key) => [key, config.auth[key]])),
@@ -125,10 +126,83 @@ describe('a deployment with only OIDC configured', () => {
     expect(done.headers.get('location')).toBe(`${config.frontend.url}/profile?success=linked`);
     const linked = ctx.sqlite
       .query(
-        "SELECT user_id FROM user_providers WHERE domain = 'auth' AND provider_type = 'oidc' AND provider_account_id = 'idp-user-1'"
+        "SELECT user_id FROM user_providers WHERE domain = 'auth' AND provider_type = 'oidc' AND provider_account_id = ?"
       )
-      .get() as { user_id: string } | null;
+      .get(`${issuer.issuer}|idp-user-1`) as { user_id: string } | null;
     expect(linked?.user_id).toBe(ctx.user.id);
+  });
+
+  async function signIn(): Promise<Response> {
+    const start = await ctx.app.request('/api/v1/auth/login/oidc');
+    const stateCookie = (start.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
+    return ctx.app.request(providerReturn(start.headers.get('location')), {
+      headers: { Cookie: stateCookie },
+    });
+  }
+
+  test('an identity is scoped to its issuer, so a new issuer with the same subject is a new identity', async () => {
+    expect((await signIn()).headers.get('location')).toBe(`${config.frontend.url}/dashboard`);
+
+    const other = startFakeOidcIssuer({ ...issuer.user, email: 'someone-else@example.com' });
+    try {
+      config.auth.oidc.issuer = other.issuer;
+      await discoverOidc();
+      issuer.stop();
+      issuer = other;
+      expect((await signIn()).headers.get('location')).toBe(`${config.frontend.url}/dashboard`);
+    } finally {
+      other.stop();
+    }
+    const owners = ctx.sqlite
+      .query("SELECT COUNT(DISTINCT user_id) AS n FROM user_providers WHERE provider_type = 'oidc'")
+      .get() as { n: number };
+    expect(owners.n).toBe(2);
+  });
+
+  test('a discovery document naming another issuer leaves OIDC off', async () => {
+    issuer.discoveryIssuer = 'https://elsewhere.example.com';
+    await discoverOidc();
+    const res = await ctx.anon('GET', '/api/v1/auth/providers');
+    expect((await json<{ data: unknown[] }>(res)).data).toEqual([]);
+  });
+
+  test('discovery that failed at startup is retried on a later sign-in request', async () => {
+    issuer.discoveryIssuer = 'https://elsewhere.example.com';
+    await discoverOidc();
+    issuer.discoveryIssuer = undefined;
+
+    await ensureOidcDiscovered();
+    expect(
+      (await json<{ data: unknown[] }>(await ctx.anon('GET', '/api/v1/auth/providers'))).data
+    ).toEqual([]);
+
+    const later = Date.now() + 31_000;
+    const clock = spyOn(Date, 'now').mockReturnValue(later);
+    try {
+      const res = await ctx.anon('GET', '/api/v1/auth/providers');
+      expect((await json<{ data: unknown }>(res)).data).toEqual([
+        { id: 'oidc', displayName: 'Pocket ID' },
+      ]);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  test('discovery carries a timeout, so an issuer that never answers cannot stall startup', async () => {
+    const timeouts: number[] = [];
+    const spy = spyOn(AbortSignal, 'timeout').mockImplementation((ms: number) => {
+      timeouts.push(ms);
+      return AbortSignal.abort(new DOMException('The operation timed out.', 'TimeoutError'));
+    });
+    try {
+      await discoverOidc();
+    } finally {
+      spy.mockRestore();
+    }
+    expect(timeouts.length).toBe(1);
+    expect(
+      (await json<{ data: unknown[] }>(await ctx.anon('GET', '/api/v1/auth/providers'))).data
+    ).toEqual([]);
   });
 
   test('hides OIDC when discovery fails', async () => {
