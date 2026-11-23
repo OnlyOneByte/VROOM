@@ -1,4 +1,5 @@
 import { type drive_v3, google } from 'googleapis';
+import { CONFIG } from '../../../config';
 import { SyncError, SyncErrorCode } from '../../../errors';
 
 interface DriveFolder {
@@ -33,9 +34,9 @@ export class GoogleDriveService {
     }
 
     const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI
+      CONFIG.auth.googleClientId,
+      CONFIG.auth.googleClientSecret,
+      CONFIG.auth.googleStorageRedirectUri
     );
 
     oauth2Client.setCredentials({

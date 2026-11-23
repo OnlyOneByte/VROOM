@@ -117,7 +117,7 @@ export function expenseSummaryToApi(summary: ExpenseSummary): ExpenseSummary {
 }
 
 // Refinements apply to the dollar value, so compose them before the cents transform.
-export function moneyDollarsToCents(build: (base: z.ZodNumber) => z.ZodNumber = (n) => n) {
+function moneyDollarsToCents(build: (base: z.ZodNumber) => z.ZodNumber = (n) => n) {
   return build(z.number()).transform(dollarsToCents);
 }
 

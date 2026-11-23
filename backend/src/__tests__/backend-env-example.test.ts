@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateProductionConfig } from '../config';
+import { CONFIG, validateProductionConfig } from '../config';
 import { createTestApp, type TestApp } from '../test-helpers/http-client';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -77,14 +77,15 @@ describe('backend/.env.example matches the backend', () => {
   });
 
   describe('startup outside production', () => {
-    const original = process.env.PROVIDER_ENCRYPTION_KEY;
+    const encryption = CONFIG.encryption as { providerKey: string | undefined };
+    const original = encryption.providerKey;
 
     afterEach(() => {
-      process.env.PROVIDER_ENCRYPTION_KEY = original;
+      encryption.providerKey = original;
     });
 
     const warningsFor = (key: string) => {
-      process.env.PROVIDER_ENCRYPTION_KEY = key;
+      encryption.providerKey = key;
       const warn = spyOn(console, 'warn').mockImplementation(() => {});
       try {
         validateProductionConfig();
