@@ -188,8 +188,9 @@ right after `goto` the URL is still the requested one whether or not the app is 
   `<label for>` or `aria-label`, never from its content, so query it as `getByRole('combobox', { name })`.
   The delete confirmation is role **alertdialog**, not `dialog`. Icon-only row actions are named by their `title` ("Delete expense"), not by visible text.
 - `ExpensesTable` renders ONE layout at runtime (`{:else if isMobile.current}`), so the other is
-  absent from the DOM, not hidden. The two carry different fields: the compact row is
-  category, amount, date and vehicle, and drops the description. A test that asserts a field only
+  absent from the DOM, not hidden. The two carry different fields: the compact row is the
+  description (or the category name), the short category name, date, vehicle and amount, and drops
+  the place and the full category name. A test that asserts a field only
   one layout renders must pin the viewport, or it passes on the desktop projects and fails on the
   mobile ones. Prefer `.filter({ visible: true })` over `.first()` regardless, because the same
   figure can also appear in the page's summary card.

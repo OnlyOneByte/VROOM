@@ -58,7 +58,7 @@
 				variant="ghost"
 				size="icon-sm"
 				class="-ml-1.5 text-muted-foreground"
-				aria-label="Split expense portions"
+				aria-label={`Split expense portions: ${heading.title}`}
 				aria-expanded={isExpanded}
 				onclick={e => {
 					e.stopPropagation();
@@ -69,7 +69,9 @@
 					class="h-4 w-4 transition-transform duration-200 {isExpanded ? 'rotate-90' : ''}"
 				/>
 			</Button>
-			<span class="truncate font-medium text-foreground">{heading.title}</span>
+			<span class="truncate font-medium text-foreground" title={heading.title}>
+				{heading.title}
+			</span>
 		</div>
 	</TableCell>
 	<TableCell class="whitespace-nowrap text-muted-foreground">

@@ -27,6 +27,12 @@ interface ExpenseImportRow {
 	raw?: { vehicle: string; category: string; amount: string; date: string };
 }
 
+export interface ExpenseMonthTotal {
+	month: string;
+	amount: number;
+	count: number;
+}
+
 export interface ExpenseImportResult {
 	dryRun: boolean;
 	imported: number;
@@ -112,6 +118,25 @@ export const expenseApi = {
 	): Promise<PaginatedExpenseResponse> {
 		const { vehicleId, ...filters } = params ?? {};
 		return fetchPaginatedExpenses(`/expenses${buildExpenseQuery(filters, vehicleId)}`);
+	},
+
+	async getMonthlyTotals(
+		params?: Omit<ExpenseListParams, 'limit' | 'offset' | 'sortBy' | 'sortDir'> & {
+			vehicleId?: string;
+		}
+	): Promise<ExpenseMonthTotal[]> {
+		const { vehicleId, ...filters } = params ?? {};
+		return apiClient.get<ExpenseMonthTotal[]>(
+			`/expenses/monthly-totals${buildQueryString({
+				vehicleId: vehicleId || undefined,
+				category: filters.category || undefined,
+				startDate: filters.startDate || undefined,
+				endDate: filters.endDate || undefined,
+				timeZone: userTimeZone(),
+				search: filters.search?.trim() || undefined,
+				tags: filters.tags?.length ? filters.tags.join(',') : undefined
+			})}`
+		);
 	},
 
 	async downloadExpensesCsv(params?: ExpenseExportParams): Promise<void> {

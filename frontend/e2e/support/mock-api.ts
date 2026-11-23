@@ -265,6 +265,18 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 		}
 
 		if (path === '/expenses/summary') return fulfillData(route, EXPENSE_SUMMARY);
+		if (path === '/expenses/monthly-totals') {
+			const months = new Map<string, { amount: number; count: number }>();
+			for (const e of expenses as Array<{ date: string; expenseAmount: number }>) {
+				const month = e.date.slice(0, 7);
+				const bucket = months.get(month) ?? { amount: 0, count: 0 };
+				months.set(month, { amount: bucket.amount + e.expenseAmount, count: bucket.count + 1 });
+			}
+			return fulfillData(
+				route,
+				[...months].map(([month, bucket]) => ({ month, ...bucket }))
+			);
+		}
 		if (path === '/expenses/vehicle-stats') {
 			return fulfillData(
 				route,
