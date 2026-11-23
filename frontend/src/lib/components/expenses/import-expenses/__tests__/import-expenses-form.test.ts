@@ -542,4 +542,44 @@ describe('ImportExpensesForm: a new file replaces the old preview at once', () =
 		expect(form.unmappedCategories).toEqual(['ferry']);
 		expect(form.categoryRemap).toEqual({});
 	});
+
+	test('a failed re-preview drops the old result instead of leaving it importable', async () => {
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		await form.loadFile(new File([FUEL_CSV], 'fuel.csv'));
+		expect(form.preview).not.toBeNull();
+
+		mocks.importExpensesCsv.mockRejectedValueOnce(new Error('boom'));
+		await form.runPreview();
+
+		expect(form.preview).toBeNull();
+		expect(await form.commit(vi.fn())).toBe(false);
+	});
+
+	test('a re-preview that cannot run drops the old result', async () => {
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		const form = new ImportExpensesForm(() => [CAMRY, RAV4]);
+		await form.loadFile(new File([FUEL_CSV], 'fuel.csv'));
+		form.changeTargetVehicle('v1');
+		await flush();
+		expect(form.preview).not.toBeNull();
+
+		form.targetVehicleId = '';
+		await form.runPreview();
+
+		expect(form.preview).toBeNull();
+	});
+
+	test('commit refuses while a re-preview is in flight', async () => {
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		await form.loadFile(new File([FUEL_CSV], 'fuel.csv'));
+		mocks.importExpensesCsv.mockReturnValueOnce(new Promise(() => {}));
+		void form.runPreview();
+		expect(form.isPreviewing).toBe(true);
+		mocks.importExpensesCsv.mockClear();
+
+		expect(await form.commit(vi.fn())).toBe(false);
+		expect(mocks.importExpensesCsv).not.toHaveBeenCalled();
+	});
 });

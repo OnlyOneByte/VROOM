@@ -13,6 +13,8 @@
 	let { unmappedCategories, categoryRemap, onRemap }: Props = $props();
 
 	const CATEGORY_OPTIONS = Object.entries(categoryLabels) as [ExpenseCategory, string][];
+
+	let mappedCount = $derived(unmappedCategories.filter(word => categoryRemap[word]).length);
 </script>
 
 {#if unmappedCategories.length > 0}
@@ -20,6 +22,12 @@
 		<div class="flex items-center gap-2 text-sm font-medium text-foreground">
 			<CircleAlert class="h-4 w-4 text-chart-4" />
 			Unrecognized categories
+			<span
+				class="ml-auto shrink-0 whitespace-nowrap text-xs font-normal text-muted-foreground"
+				data-testid="remap-count"
+			>
+				{mappedCount} of {unmappedCategories.length} mapped
+			</span>
 		</div>
 		<p class="text-xs text-muted-foreground">
 			These category names from your file aren't VROOM categories — they'll import as

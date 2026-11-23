@@ -92,6 +92,29 @@ beforeEach(() => {
 });
 
 describe('ImportExpensesDialog', () => {
+	test('Import is off while a re-preview updates the result, which stays on screen', async () => {
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		mocks.importExpensesCsv
+			.mockResolvedValueOnce(previewResult({ unmappedCategories: ['Tolls'] }))
+			.mockReturnValue(new Promise(() => {}));
+		renderDialog();
+		await chooseFile(FUEL_CSV, 'fuel.csv');
+		await waitFor(() => expect(importButton()).toBeEnabled());
+
+		const trigger = await screen.findByLabelText('Category for Tolls');
+		await fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' });
+		await fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' });
+		const option = await screen.findByRole('option', { name: 'Maintenance' });
+		await fireEvent.pointerUp(option, { button: 0, pointerType: 'mouse' });
+		await fireEvent.click(option);
+		await waitFor(() =>
+			expect(screen.getByRole('status')).toHaveTextContent('Updating the preview…')
+		);
+
+		expect(screen.getByText('2 ready')).toBeInTheDocument();
+		expect(importButton()).toBeDisabled();
+	});
+
 	test('a category remap keeps its row and keyboard focus through the re-preview', async () => {
 		mocks.detectImportSource.mockResolvedValue(FUELLY);
 		mocks.importExpensesCsv

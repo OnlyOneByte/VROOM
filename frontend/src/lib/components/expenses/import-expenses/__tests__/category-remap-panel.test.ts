@@ -34,6 +34,15 @@ describe('CategoryRemapPanel', () => {
 		expect(screen.getByTestId('remap-category-insurance')).toHaveTextContent('Map to… (Misc)');
 	});
 
+	test('counts mapped words from the start, so the heading never changes shape', () => {
+		const { unmount } = renderPanel(['gas', 'insurance']);
+		expect(screen.getByTestId('remap-count')).toHaveTextContent('0 of 2 mapped');
+		unmount();
+
+		renderPanel(['gas', 'insurance'], { gas: 'fuel' });
+		expect(screen.getByTestId('remap-count')).toHaveTextContent('1 of 2 mapped');
+	});
+
 	test('choosing a category reports the word and category key', async () => {
 		const { onRemap } = renderPanel(['oil change']);
 		const trigger = screen.getByLabelText('Category for oil change');
