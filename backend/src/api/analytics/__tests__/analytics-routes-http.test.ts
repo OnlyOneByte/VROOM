@@ -218,6 +218,24 @@ describe('analytics routes (real HTTP stack)', () => {
     expect(body.data.compare).toBeNull();
   });
 
+  test('summary, cross-vehicle, financing and insurance take a vehicleIds list', async () => {
+    const vehicleId = await seedVehicle(ctx, { nickname: 'Daily Driver' });
+    for (const path of [
+      `/api/v1/analytics/summary?${RANGE}&vehicleIds=${vehicleId},other`,
+      `/api/v1/analytics/cross-vehicle?${RANGE}&vehicleIds=${vehicleId}`,
+      `/api/v1/analytics/financing?vehicleIds=${vehicleId}`,
+      `/api/v1/analytics/insurance?vehicleIds=${vehicleId}`,
+      `/api/v1/analytics/fuel-stats?${RANGE}&vehicleIds=${vehicleId}`,
+      `/api/v1/analytics/fuel-advanced?${RANGE}&vehicleIds=${vehicleId}`,
+    ]) {
+      const res = await ctx.authed('GET', path);
+      expect(res.status, path).toBe(200);
+    }
+    const tooMany = Array.from({ length: 51 }, (_, i) => `v${i}`).join(',');
+    const bad = await ctx.authed('GET', `/api/v1/analytics/financing?vehicleIds=${tooMany}`);
+    expect(bad.status).toBe(400);
+  });
+
   test('year-end: 401 anon / 200 with NO year (defaults to current year, optional param) / 200 with a year', async () => {
     expect((await ctx.anon('GET', '/api/v1/analytics/year-end')).status).toBe(401);
     const noYear = await ctx.authed('GET', '/api/v1/analytics/year-end');

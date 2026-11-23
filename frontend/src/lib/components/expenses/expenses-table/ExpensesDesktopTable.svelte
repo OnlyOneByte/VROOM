@@ -58,6 +58,7 @@
 		<Table>
 			<TableHeader>
 				<TableRow>
+					<TableHead class="w-full min-w-[100px]">Description</TableHead>
 					<TableHead class="whitespace-nowrap">
 						<ExpenseSortButton
 							label="Date"
@@ -79,7 +80,6 @@
 						/>
 					</TableHead>
 					<TableHead>Tags</TableHead>
-					<TableHead class="w-full min-w-[100px]">Description</TableHead>
 					<TableHead class="text-right whitespace-nowrap">
 						<ExpenseSortButton
 							label="Amount"

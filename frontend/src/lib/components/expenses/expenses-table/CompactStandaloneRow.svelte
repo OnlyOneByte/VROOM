@@ -5,14 +5,11 @@
 	import RecurringExpenseBadge from '../RecurringExpenseBadge.svelte';
 	import type { Expense, Vehicle } from '#lib/types/index.ts';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
-	import {
-		categoryLabels,
-		getCategoryBadgeClasses,
-		getCategoryIcon
-	} from '#lib/utils/expense-helpers.ts';
+	import { getCategoryBadgeClasses, getCategoryIcon } from '#lib/utils/expense-helpers.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { EXPENSE_CATEGORY_INFO } from '#lib/constants/expense-categories.ts';
 	import { expenseEditHref } from './expense-table-actions';
-	import { tagsBesideCategory } from './expense-table-rows';
+	import { rowTitle, tagsBesideCategory } from './expense-table-rows';
 	import {
 		MOBILE_ROW_ACTION_CLASS,
 		MOBILE_ROW_ACTIONS_CONTAINER_CLASS,
@@ -46,6 +43,7 @@
 
 	let vehicle: Vehicle | undefined = $derived(vehicleMap.get(expense.vehicleId));
 	let IconComponent = $derived(getCategoryIcon(expense.category));
+	let heading = $derived(rowTitle(expense.description, expense.category));
 </script>
 
 {#snippet summary()}
@@ -55,17 +53,21 @@
 	<div class="flex-1 min-w-0">
 		<div class="flex items-start justify-between gap-2">
 			<p class="text-sm font-medium text-foreground truncate">
-				{categoryLabels[expense.category]}
+				{heading.title}
 			</p>
 			<span class="text-sm font-semibold text-foreground whitespace-nowrap">
 				{formatCurrency(expense.amount)}
 			</span>
 		</div>
-		<div class="flex items-center flex-wrap gap-1.5 mt-0.5 text-xs text-muted-foreground">
-			<span>{formatDate(new Date(expense.date))}</span>
+		<div class="flex min-w-0 items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+			{#if heading.categoryInMeta}
+				<span class="shrink-0">{EXPENSE_CATEGORY_INFO[expense.category].shortLabel}</span>
+				<span>·</span>
+			{/if}
+			<span class="shrink-0 whitespace-nowrap">{formatDate(new Date(expense.date))}</span>
 			{#if showVehicleColumn && vehicle}
 				<span>·</span>
-				<span class="truncate">{getVehicleDisplayName(vehicle)}</span>
+				<span class="min-w-0 truncate">{getVehicleDisplayName(vehicle)}</span>
 			{/if}
 		</div>
 		{#if expense.sourceType === 'reminder'}

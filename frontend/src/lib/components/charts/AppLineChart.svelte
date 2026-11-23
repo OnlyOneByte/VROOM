@@ -27,6 +27,8 @@
 		key: string;
 		label: string;
 		color: string;
+		value?: string;
+		data?: Record<string, unknown>[];
 	}
 
 	interface Props {
@@ -107,12 +109,7 @@
 	let yTicks = $derived(
 		distinctYTicks(yAxisFormat, height - CHART_PADDING.top - CHART_PADDING.bottom)
 	);
-	let isolatedValues = $derived(
-		isolatedValueRows(
-			data,
-			series.map(s => s.key)
-		)
-	);
+	let isolatedValues = $derived(series.flatMap(s => isolatedValueRows(s.data ?? data, [s.key])));
 </script>
 
 <ChartCard
