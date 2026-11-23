@@ -123,6 +123,8 @@ export class ImportExpensesForm {
 		this.#previewFlow++;
 		this.preview = null;
 		this.isPreviewing = false;
+		this.unmappedCategories = [];
+		this.categoryRemap = {};
 		this.fileName = file.name;
 		const text = await file.text();
 		if (flow !== this.#detectFlow) return;
@@ -226,6 +228,10 @@ export class ImportExpensesForm {
 
 	setManualColumn(field: NativeImportField, header: string) {
 		this.manualColumns = { ...this.manualColumns, [field]: header };
+		if (field === 'category') {
+			this.unmappedCategories = [];
+			this.categoryRemap = {};
+		}
 		this.runPreview();
 	}
 

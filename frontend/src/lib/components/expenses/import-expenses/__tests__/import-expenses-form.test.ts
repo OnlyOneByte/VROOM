@@ -486,11 +486,15 @@ describe('ImportExpensesForm: presets-only mode and stale results', () => {
 });
 
 describe('ImportExpensesForm: a new file replaces the old preview at once', () => {
-	test('the old preview is gone before the new file has been read', async () => {
+	test('the old preview and its category picks are gone before the new file has been read', async () => {
 		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		mocks.importExpensesCsv.mockResolvedValue(previewResult({ unmappedCategories: ['Tolls'] }));
 		const form = new ImportExpensesForm(() => [CAMRY]);
 		await form.loadFile(new File([FUEL_CSV], 'fuel.csv'));
+		form.setCategoryRemap('Tolls', 'misc');
+		await flush();
 		expect(form.preview).not.toBeNull();
+		expect(form.unmappedCategories).toEqual(['Tolls']);
 
 		let release!: (text: string) => void;
 		const slowFile = { name: 'next.csv', text: () => new Promise<string>(r => (release = r)) };
@@ -498,6 +502,8 @@ describe('ImportExpensesForm: a new file replaces the old preview at once', () =
 
 		expect(form.fileName).toBe('next.csv');
 		expect(form.preview).toBeNull();
+		expect(form.unmappedCategories).toEqual([]);
+		expect(form.categoryRemap).toEqual({});
 		release(FUEL_CSV);
 		await loading;
 	});
@@ -515,5 +521,25 @@ describe('ImportExpensesForm: a new file replaces the old preview at once', () =
 		expect(form.unmappedCategories).toEqual(['Tolls']);
 		await form.loadFile(new File([FUEL_CSV], 'other.csv'));
 		expect(form.unmappedCategories).toEqual([]);
+	});
+
+	test('choosing another category column drops the old column’s words and picks', async () => {
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		await form.loadFile(new File([FOREIGN_CSV], 'foreign.csv'));
+		form.setManualColumn('date', 'Transaction Date');
+		form.setManualColumn('amount', 'Spent');
+		mocks.importExpensesCsv.mockResolvedValueOnce(previewResult({ unmappedCategories: ['gas'] }));
+		form.setManualColumn('category', 'Kind');
+		await flush();
+		form.setCategoryRemap('gas', 'fuel');
+		await flush();
+		expect(form.unmappedCategories).toEqual(['gas']);
+
+		mocks.importExpensesCsv.mockResolvedValueOnce(previewResult({ unmappedCategories: ['ferry'] }));
+		form.setManualColumn('category', 'Spent');
+		await flush();
+
+		expect(form.unmappedCategories).toEqual(['ferry']);
+		expect(form.categoryRemap).toEqual({});
 	});
 });
