@@ -23,10 +23,10 @@
 <Card>
 	<CardHeader>
 		<CardTitle>Appearance</CardTitle>
-		<CardDescription>Choose how VROOM looks to you</CardDescription>
+		<CardDescription>Choose how VROOM looks to you. Changes apply right away.</CardDescription>
 	</CardHeader>
 	<CardContent>
-		<Label class="mb-3 block">Theme</Label>
+		<Label class="mb-3 block">Mode</Label>
 		<div class="grid grid-cols-3 gap-3">
 			{#each options as option (option.value)}
 				{@const Icon = option.icon}
