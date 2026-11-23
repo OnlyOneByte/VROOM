@@ -24,11 +24,13 @@
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { PHOTO_CATEGORY_LABELS } from '#lib/constants/ui.ts';
 	import {
-		PROVIDER_META,
+		providerDetails,
 		providerLabel,
-		providerMeta,
+		providerUi,
+		supportsSheetsBackup,
 		supportsZipBackup as providerSupportsZipBackup
 	} from '#lib/constants/providers.ts';
+	import { providerCatalog } from '#lib/stores/provider-catalog.svelte.ts';
 	import type { PhotoCategory, CategorySetting, UserProviderInfo } from '#lib/types/index.ts';
 
 	let {
@@ -61,7 +63,7 @@
 	let isLoadingSyncStatus = $state(false);
 
 	function getProviderIcon(providerType: string) {
-		return providerMeta(providerType)?.icon ?? Cloud;
+		return providerUi(providerType)?.icon ?? Cloud;
 	}
 
 	function getStatusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -133,13 +135,14 @@
 	}
 
 	onMount(() => {
+		providerCatalog.load();
 		loadSyncStatus();
 	});
 
 	let Icon = $derived(getProviderIcon(provider.providerType));
 
 	let supportsZipBackup = $derived(providerSupportsZipBackup(provider.providerType));
-	let meta = $derived(providerMeta(provider.providerType));
+	let supportsSheets = $derived(supportsSheetsBackup(provider.providerType));
 	let sheetsPaused = $derived(
 		!!settingsStore.settings?.backupConfig?.providers[provider.id]?.sheetsAutoPausedAt
 	);
@@ -156,11 +159,11 @@
 			isResuming = false;
 		}
 	}
-	let details = $derived(meta?.form?.details?.(provider.config ?? {}) ?? []);
-	const zipBackupProviders = new Intl.ListFormat('en', { type: 'disjunction' }).format(
-		Object.values(PROVIDER_META)
-			.filter(m => m.option && !m.photoOnly)
-			.map(m => m.label)
+	let details = $derived(providerDetails(provider.providerType, provider.config ?? {}));
+	let zipBackupProviders = $derived(
+		new Intl.ListFormat('en', { type: 'disjunction' }).format(
+			providerCatalog.entries.filter(e => !e.features.photoOnly).map(e => e.label)
+		)
 	);
 </script>
 
@@ -226,7 +229,9 @@
 
 	<CardContent class="pt-0">
 		<div class="space-y-3">
-			{#if supportsZipBackup}
+			{#if !providerCatalog.loaded}
+				<span class="sr-only">Loading backup options</span>
+			{:else if supportsZipBackup}
 				<div class="flex items-center justify-between">
 					<div class="space-y-0.5">
 						<Label for="backup-{provider.id}" class="text-sm">ZIP backup</Label>
@@ -249,7 +254,7 @@
 					provider for ZIP data backups.
 				</p>
 			{/if}
-			{#if meta?.supportsSheets}
+			{#if supportsSheets}
 				<div class="flex items-center justify-between">
 					<div class="space-y-0.5">
 						<Label for="sheets-{provider.id}" class="text-sm">Sheets sync</Label>

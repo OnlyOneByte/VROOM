@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { Cloud, Database, FileArchive, FileSpreadsheet } from '@lucide/svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { providerLabel, providerMeta } from '#lib/constants/providers.ts';
+	import { providerLabel, providerUi } from '#lib/constants/providers.ts';
+	import { providerCatalog } from '#lib/stores/provider-catalog.svelte.ts';
 	import type { RestoreProviderInfo } from '#lib/types/index.ts';
 
 	let {
@@ -12,8 +14,10 @@
 		onSelect: (_providerId: string, _sourceType: 'zip' | 'sheets') => void;
 	} = $props();
 
+	onMount(() => providerCatalog.load());
+
 	function getProviderIcon(providerType: string) {
-		return providerMeta(providerType)?.icon ?? Cloud;
+		return providerUi(providerType)?.icon ?? Cloud;
 	}
 </script>
 

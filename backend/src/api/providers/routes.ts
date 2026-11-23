@@ -16,10 +16,12 @@ import { commonSchemas, zValidator } from '../../utils/validation';
 import { photoRefRepository } from '../photos/photo-ref-repository';
 import { preferencesRepository } from '../settings/repository';
 import {
-  CREATABLE_STORAGE_PROVIDER_TYPES,
+  STORAGE_PROVIDER_TYPES,
   type StorageProviderDescriptor,
+  storageCatalog,
   storageProviderDescriptor,
   storageProviderRegistry,
+  validateStorageConfig,
 } from './domains/storage/registry';
 import { CATEGORY_TO_ENTITY_TYPES, ENTITY_TO_CATEGORY } from './domains/storage/storage-provider';
 
@@ -83,9 +85,15 @@ type ModelProviderType = (typeof MODEL_PROVIDER_TYPES)[number];
 const MODEL_DOMAINS = ['vlm', 'llm'] as const;
 type ModelDomain = (typeof MODEL_DOMAINS)[number];
 export const SUPPORTED_PROVIDER_TYPES = [
-  ...CREATABLE_STORAGE_PROVIDER_TYPES,
+  ...STORAGE_PROVIDER_TYPES,
   ...MODEL_PROVIDER_TYPES,
 ] as const;
+
+function creatableProviderTypes(): string[] {
+  return SUPPORTED_PROVIDER_TYPES.filter(
+    (type) => storageProviderDescriptor(type)?.availability() !== 'hidden'
+  );
+}
 
 function isModelProviderType(providerType: string): providerType is ModelProviderType {
   return (MODEL_PROVIDER_TYPES as readonly string[]).includes(providerType);
@@ -104,7 +112,7 @@ const createProviderSchema = z.object({
     message: `Domain must be one of: ${PROVIDER_DOMAINS.join(', ')}`,
   }),
   providerType: z.enum(SUPPORTED_PROVIDER_TYPES, {
-    message: `Provider type must be one of: ${SUPPORTED_PROVIDER_TYPES.join(', ')}`,
+    error: () => `Provider type must be one of: ${creatableProviderTypes().join(', ')}`,
   }),
   displayName: z
     .string()
@@ -124,11 +132,13 @@ const updateProviderSchema = z.object({
 function defaultCategorySettings(
   descriptor: StorageProviderDescriptor
 ): Record<PhotoCategory, CategorySetting> {
-  const paths = descriptor.defaultFolders;
+  const paths = descriptor.features.defaultFolders;
   return Object.fromEntries(
     PHOTO_CATEGORIES.map((cat) => [cat, { enabled: true, folderPath: paths[cat] }])
   ) as Record<PhotoCategory, CategorySetting>;
 }
+
+routes.get('/catalog', (c) => c.json({ success: true, data: storageCatalog() }));
 
 routes.get('/', async (c) => {
   const user = c.get('user');
@@ -151,7 +161,8 @@ function validateStorageProviderConfig(
   providerType: string,
   config: Record<string, unknown> | null
 ): void {
-  storageProviderDescriptor(providerType)?.validateConfig?.(config);
+  const descriptor = storageProviderDescriptor(providerType);
+  if (descriptor) validateStorageConfig(descriptor, config);
 }
 
 function validateModelConfigShape(
@@ -191,7 +202,7 @@ function resolveProviderCredentials(
   config: Record<string, unknown> | null,
   nonce?: string
 ): { encryptedCredentials: string; resolvedConfig: Record<string, unknown> | null } {
-  if (storageProviderDescriptor(providerType)?.credentialKind === 'google-oauth') {
+  if (storageProviderDescriptor(providerType)?.connect === 'oauth') {
     if (!nonce) {
       throw new ValidationError('Missing nonce — please connect your Google account');
     }
@@ -231,6 +242,12 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
 
   if (body.providerType === 'fake' && !CONFIG.allowFakeStorageProvider) {
     throw new ValidationError('Fake storage provider is not enabled in this environment');
+  }
+
+  if (storageProviderDescriptor(body.providerType)?.availability() === 'hidden') {
+    throw new ValidationError(
+      `Provider type must be one of: ${creatableProviderTypes().join(', ')}`
+    );
   }
 
   if (isModelProviderType(body.providerType) !== isModelDomain(body.domain)) {

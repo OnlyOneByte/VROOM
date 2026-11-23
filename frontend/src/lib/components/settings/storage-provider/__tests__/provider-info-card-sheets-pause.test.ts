@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { UserProviderInfo } from '#lib/types/index.ts';
 import { defaultFolderSettings } from '#lib/constants/providers.ts';
@@ -10,7 +10,12 @@ const store = vi.hoisted(() => ({
 const resumeSheetsBackups = vi.hoisted(() => vi.fn((_id: string) => Promise.resolve()));
 
 vi.mock('#lib/services/provider-api.ts', () => ({
-	providerApi: { getSyncStatus: vi.fn(() => Promise.resolve({})), backfillProvider: vi.fn() }
+	providerApi: {
+		getCatalog: async () =>
+			(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).STORAGE_CATALOG,
+		getSyncStatus: vi.fn(() => Promise.resolve({})),
+		backfillProvider: vi.fn()
+	}
 }));
 vi.mock('#lib/services/settings-api.ts', () => ({
 	settingsApi: { resumeSheetsBackups: (id: string) => resumeSheetsBackups(id) }
@@ -50,6 +55,11 @@ function mount() {
 		}
 	});
 }
+
+beforeAll(async () => {
+	const { providerCatalog } = await import('#lib/stores/provider-catalog.svelte.ts');
+	await providerCatalog.ensureLoaded();
+});
 
 beforeEach(() => {
 	vi.clearAllMocks();

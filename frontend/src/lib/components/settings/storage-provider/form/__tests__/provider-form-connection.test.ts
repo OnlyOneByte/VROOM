@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { UserProviderInfo } from '#lib/types/index.ts';
 
@@ -39,6 +39,8 @@ const updateProvider = vi.fn((_id: string, _data: ProviderPayload) =>
 );
 vi.mock('#lib/services/provider-api.ts', () => ({
 	providerApi: {
+		getCatalog: async () =>
+			(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).STORAGE_CATALOG,
 		createProvider: (data: ProviderPayload) => createProvider(data),
 		updateProvider: (id: string, data: ProviderPayload) => updateProvider(id, data),
 		deleteProvider: vi.fn()
@@ -64,6 +66,11 @@ async function startCreate(typeName: RegExp) {
 	await fireEvent.click(screen.getByRole('button', { name: typeName }));
 	await type('Name', 'My Provider');
 }
+
+beforeAll(async () => {
+	const { providerCatalog } = await import('#lib/stores/provider-catalog.svelte.ts');
+	await providerCatalog.ensureLoaded();
+});
 
 beforeEach(() => {
 	vi.clearAllMocks();

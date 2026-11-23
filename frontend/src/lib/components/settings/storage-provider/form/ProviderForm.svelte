@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { resolve } from '$app/paths';
-	import { ArrowLeft, LoaderCircle, Save, Trash2 } from '@lucide/svelte';
+	import { ArrowLeft, CircleAlert, Cloud, LoaderCircle, Save, Trash2 } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		Card,
@@ -24,11 +24,12 @@
 	import { routes } from '#lib/routes.ts';
 	import {
 		defaultFolderSettings,
-		PROVIDER_META,
-		providerMeta,
+		providerUi,
+		supportsSheetsBackup,
 		supportsZipBackup,
 		type ProviderConnection
 	} from '#lib/constants/providers.ts';
+	import { providerCatalog } from '#lib/stores/provider-catalog.svelte.ts';
 	import type {
 		PhotoCategory,
 		CategorySetting,
@@ -41,8 +42,13 @@
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
-	const PROVIDER_TYPES = Object.entries(PROVIDER_META).flatMap(([id, meta]) =>
-		meta.option ? [{ id, icon: meta.icon, ...meta.option }] : []
+	let providerTypes = $derived(
+		providerCatalog.entries.map(entry => ({
+			id: entry.id,
+			icon: providerUi(entry.id)?.icon ?? Cloud,
+			label: entry.shortLabel,
+			description: entry.description
+		}))
 	);
 
 	let {
@@ -60,7 +66,7 @@
 	let isEditMode = $derived(!!providerId && !!existingProvider);
 
 	let selectedType = $state<string | null>(null);
-	let selectedForm = $derived(providerMeta(selectedType)?.form ?? null);
+	let selectedForm = $derived(providerUi(selectedType)?.form ?? null);
 	let displayName = $state('');
 	let isSaving = $state(false);
 
@@ -153,10 +159,17 @@
 	}
 
 	onMount(async () => {
-		const [, oauthResult] = await Promise.all([loadSettings(), oauth.handleOAuthReturn()]);
+		const [, oauthResult] = await Promise.all([
+			loadSettings(),
+			oauth.handleOAuthReturn(),
+			providerCatalog.load()
+		]);
 		if (oauthResult.restoredSelectedType) {
 			selectedType = oauthResult.restoredSelectedType;
-			if (!isEditMode) folderSettings = defaultFolderSettings(selectedType);
+			if (!isEditMode) {
+				folderSettings = defaultFolderSettings(selectedType);
+				photoRootPath = getDefaultPhotoRootPath(selectedType);
+			}
 		}
 		if (oauthResult.restoredDisplayName) displayName = oauthResult.restoredDisplayName;
 	});
@@ -166,7 +179,7 @@
 	}
 
 	function getDefaultPhotoRootPath(providerType: string): string {
-		return providerMeta(providerType)?.defaultPhotoRootPath ?? 'photos';
+		return providerCatalog.entry(providerType)?.features.defaultPhotoRootPath ?? 'photos';
 	}
 
 	let canSave = $derived.by(() => {
@@ -243,7 +256,7 @@
 						enabled: backupEnabled && supportsZipBackup(selectedType),
 						folderPath: backupFolderPath.trim() || 'Backups',
 						retentionCount: backupRetentionCount,
-						...(providerMeta(selectedType)?.supportsSheets && {
+						...(supportsSheetsBackup(selectedType) && {
 							sheetsSyncEnabled,
 							sheetsSpreadsheetId: sheetsSpreadsheetId || undefined
 						})
@@ -331,7 +344,7 @@
 
 	<div class="space-y-6 pb-32 sm:pb-24">
 		{#if isEditMode}
-			{@const pt = PROVIDER_TYPES.find(p => p.id === selectedType)}
+			{@const pt = providerTypes.find(p => p.id === selectedType)}
 			{#if pt}
 				{@const Icon = pt.icon}
 				<div class="flex items-center gap-3 rounded-lg border border-border p-3">
@@ -351,8 +364,23 @@
 					<CardDescription>Choose your storage provider</CardDescription>
 				</CardHeader>
 				<CardContent>
+					{#if providerCatalog.error && !providerCatalog.loaded}
+						<div role="alert" class="space-y-3">
+							<p class="flex items-center gap-2 text-sm font-medium text-destructive">
+								<CircleAlert class="h-4 w-4" aria-hidden="true" />
+								Couldn't load the provider types
+							</p>
+							<p class="text-sm text-muted-foreground">{providerCatalog.error}</p>
+							<Button variant="outline" onclick={() => providerCatalog.load()}>Retry</Button>
+						</div>
+					{:else if !providerCatalog.loaded}
+						<div class="flex justify-center py-6" role="status">
+							<LoaderCircle class="h-6 w-6 animate-spin text-primary" aria-hidden="true" />
+							<span class="sr-only">Loading provider types</span>
+						</div>
+					{/if}
 					<div class="grid grid-cols-2 gap-2">
-						{#each PROVIDER_TYPES as pt (pt.id)}
+						{#each providerTypes as pt (pt.id)}
 							{@const Icon = pt.icon}
 							<button
 								type="button"
@@ -379,7 +407,7 @@
 			</Card>
 		{/if}
 
-		{#if selectedType}
+		{#if selectedType && providerCatalog.loaded}
 			<Card>
 				<CardHeader>
 					<CardTitle class="text-base">Display Name</CardTitle>
@@ -391,8 +419,7 @@
 						<Input
 							id="provider-name"
 							bind:value={displayName}
-							placeholder="My {PROVIDER_TYPES.find(p => p.id === selectedType)?.label ??
-								'Provider'}"
+							placeholder="My {providerTypes.find(p => p.id === selectedType)?.label ?? 'Provider'}"
 						/>
 					</div>
 				</CardContent>
@@ -486,7 +513,7 @@
 		{/if}
 	</div>
 
-	{#if selectedType}
+	{#if selectedType && providerCatalog.loaded}
 		<Button
 			onclick={handleSave}
 			disabled={!canSave || isSaving}

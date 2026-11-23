@@ -26,6 +26,8 @@ vi.mock('#lib/services/provider-api.ts', async importOriginal => {
 	return {
 		...actual,
 		providerApi: {
+			getCatalog: async () =>
+				(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).STORAGE_CATALOG,
 			getProviders: () => providers(),
 			deleteProvider: (id: string) => deleteProvider(id)
 		}

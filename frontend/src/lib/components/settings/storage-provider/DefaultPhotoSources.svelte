@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { providerMeta } from '#lib/constants/providers.ts';
+	import { providerUi } from '#lib/constants/providers.ts';
 	import {
 		Camera,
 		Image,
@@ -73,7 +73,7 @@
 	});
 
 	function getProviderIcon(providerType: string) {
-		return providerMeta(providerType)?.icon ?? HardDrive;
+		return providerUi(providerType)?.icon ?? HardDrive;
 	}
 
 	function getEnabledProviders(category: PhotoCategory): UserProviderInfo[] {

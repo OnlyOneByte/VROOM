@@ -18,7 +18,11 @@ vi.mock('$app/navigation', () => ({ goto }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 vi.mock('#lib/services/provider-api.ts', async importOriginal => ({
 	...(await importOriginal<typeof import('#lib/services/provider-api.ts')>()),
-	providerApi: { getProviders: () => getProviders() }
+	providerApi: {
+		getProviders: () => getProviders(),
+		getCatalog: async () =>
+			(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).STORAGE_CATALOG
+	}
 }));
 vi.mock('#lib/services/settings-api.ts', () => ({
 	settingsApi: { getSettings: () => getSettings() }

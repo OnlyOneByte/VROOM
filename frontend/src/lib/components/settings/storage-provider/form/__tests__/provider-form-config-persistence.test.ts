@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { UserProviderInfo } from '#lib/types/index.ts';
@@ -24,6 +24,8 @@ const createProvider = vi.fn((data: ProviderPayload) =>
 );
 vi.mock('#lib/services/provider-api.ts', () => ({
 	providerApi: {
+		getCatalog: async () =>
+			(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).STORAGE_CATALOG,
 		updateProvider: (id: string, data: ProviderPayload) => updateProvider(id, data),
 		createProvider: (data: ProviderPayload) => createProvider(data),
 		deleteProvider: vi.fn()
@@ -106,6 +108,11 @@ function sentConfig(call = 0): Record<string, unknown> {
 function toasts(): { type: string; message: string }[] {
 	return appStore.notifications.map(n => ({ type: n.type, message: n.message }));
 }
+
+beforeAll(async () => {
+	const { providerCatalog } = await import('#lib/stores/provider-catalog.svelte.ts');
+	await providerCatalog.ensureLoaded();
+});
 
 describe('ProviderForm — an edit-save preserves config the form does not manage', () => {
 	beforeEach(() => {

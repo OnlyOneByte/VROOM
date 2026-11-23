@@ -1,5 +1,6 @@
 import type { UserProviderInfo } from '#lib/types/index.ts';
 import { ApiError } from '#lib/utils/error-handling.ts';
+import type { StorageCatalogEntry } from '#lib/stores/provider-catalog.svelte.ts';
 import { apiClient } from './api-client';
 
 export function photosOnlyOnProvider(error: unknown): number | null {
@@ -24,6 +25,10 @@ interface UpdateProviderData {
 }
 
 export const providerApi = {
+	async getCatalog(): Promise<StorageCatalogEntry[]> {
+		return apiClient.get<StorageCatalogEntry[]>('/providers/catalog');
+	},
+
 	async getProviders(domain?: string): Promise<UserProviderInfo[]> {
 		const params = domain ? `?domain=${encodeURIComponent(domain)}` : '';
 		return apiClient.get<UserProviderInfo[]>(`/providers${params}`);
