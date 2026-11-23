@@ -12,7 +12,7 @@
 </script>
 
 <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-4">
-	<div class="flex min-w-0 items-center gap-3 sm:min-w-min sm:flex-1">
+	<div class="flex min-w-0 items-center gap-3 sm:grow sm:basis-[min-content]">
 		{#if back}
 			{@render back()}
 		{/if}

@@ -39,7 +39,7 @@ describe('the shared page header', () => {
 		});
 
 		const titleBlock = getByRole('heading', { level: 1 }).parentElement?.parentElement;
-		expect(titleBlock).toHaveClass('min-w-0', 'sm:min-w-min', 'sm:flex-1');
+		expect(titleBlock).toHaveClass('min-w-0', 'sm:grow', 'sm:basis-[min-content]');
 		expect(titleBlock?.parentElement).toHaveClass('sm:flex-row', 'sm:flex-wrap');
 	});
 
