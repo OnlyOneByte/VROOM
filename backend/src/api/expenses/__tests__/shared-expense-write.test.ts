@@ -197,3 +197,57 @@ describe('shared expense writes stamp the owner and createdBy', () => {
     ).toBe(sharedVehicle);
   });
 });
+
+describe('a create replay is scoped to the request vehicle', () => {
+  test('an editor replay that matches an expense on another vehicle is refused with no row data', async () => {
+    const sharedId = await shareAccepted('editor');
+    const privateId = await seedVehicle(ctx, { make: 'Private', model: 'Car', year: 2020 });
+    const saved = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId: privateId,
+      category: 'maintenance',
+      expenseAmount: 75,
+      date: '2024-06-01T00:00:00.000Z',
+      description: 'owner-only note',
+      clientId: 'scope-key-1',
+    });
+    const savedBody = await json<DataEnvelope<{ id: string }>>(saved);
+    expect(saved.status, JSON.stringify(savedBody)).toBe(201);
+
+    const res = await asB('POST', '/api/v1/expenses', {
+      vehicleId: sharedId,
+      category: 'maintenance',
+      expenseAmount: 1,
+      date: '2024-06-01T00:00:00.000Z',
+      clientId: 'scope-key-1',
+    });
+    const text = await res.text();
+
+    expect(res.status).toBe(409);
+    expect(text).not.toContain(savedBody.data.id);
+    expect(text).not.toContain(privateId);
+    expect(text).not.toContain('owner-only note');
+    const count = ctx.sqlite
+      .query("SELECT COUNT(*) AS n FROM expenses WHERE client_id = 'scope-key-1'")
+      .get() as { n: number };
+    expect(count.n).toBe(1);
+  });
+
+  test('a replay on the same vehicle still returns the saved row', async () => {
+    const sharedId = await shareAccepted('editor');
+    const body = {
+      vehicleId: sharedId,
+      category: 'maintenance',
+      expenseAmount: 20,
+      date: '2024-06-01T00:00:00.000Z',
+      clientId: 'scope-key-2',
+    };
+    const first = await json<DataEnvelope<{ id: string }>>(
+      await asB('POST', '/api/v1/expenses', body)
+    );
+    const again = await asB('POST', '/api/v1/expenses', body);
+    const againBody = await json<DataEnvelope<{ id: string }>>(again);
+
+    expect(again.status).toBe(201);
+    expect(againBody.data.id).toBe(first.data.id);
+  });
+});
