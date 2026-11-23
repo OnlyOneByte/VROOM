@@ -232,7 +232,7 @@ test.describe('Analytics', () => {
 		await expect(page).toHaveURL(/metric=costPerDistance/);
 		await expect(page).toHaveURL(/split=vehicle/);
 		await expect(
-			page.getByRole('heading', { name: 'Cost per distance per month by car' })
+			page.getByRole('heading', { name: 'Cost per mile per month by car' })
 		).toBeVisible();
 		await expect.poll(() => requests.at(-1)?.get('metric')).toBe('costPerDistance');
 
@@ -259,7 +259,7 @@ test.describe('Analytics', () => {
 
 		await page.reload();
 		await expect(
-			page.getByRole('heading', { name: 'Cost per distance per quarter by car' })
+			page.getByRole('heading', { name: 'Cost per mile per quarter by car' })
 		).toBeVisible();
 		await expect(page.getByRole('button', { name: /2020 Toyota Camry/ })).toHaveAttribute(
 			'aria-pressed',
@@ -276,7 +276,7 @@ test.describe('Analytics', () => {
 		await page.goto('/analytics');
 		const presets: Array<[string, string]> = [
 			['Where the money goes', 'Total cost per month by category'],
-			['Cost per mile', 'Cost per distance per month by car'],
+			['Cost per mile', 'Cost per mile per month by car'],
 			['Fuel vs charging', 'Total cost per month by fuel type'],
 			['This year vs last', 'Total cost per month, against the year before'],
 			['Seasons', 'Fuel efficiency per quarter by car']

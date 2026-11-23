@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { ChartColumn, RotateCcw, SearchX } from '@lucide/svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
@@ -12,7 +13,6 @@
 	import type { AnalyticsQueryResponse } from '#lib/types/index.ts';
 	import { buildChartConfig } from '#lib/utils/chart-colors.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import type { AnalyticsDateRange } from '../analytics-filters';
 	import QueryBar from './QueryBar.svelte';
 	import {
@@ -61,6 +61,7 @@
 	}: Props = $props();
 
 	let response = $state<AnalyticsQueryResponse | null>(null);
+	let shown = $state<ExploreQuery>(untrack(() => query));
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 	let controller: AbortController | null = null;
@@ -73,11 +74,12 @@
 	});
 	let requestKey = $derived(JSON.stringify(request));
 
-	async function load(params: typeof request, key: string) {
+	async function load(params: typeof request, key: string, asked: ExploreQuery) {
 		controller?.abort();
 		const cached = queryCache.get(key);
 		if (cached) {
 			response = cached;
+			shown = asked;
 			isLoading = false;
 			error = null;
 			return;
@@ -90,6 +92,7 @@
 			if (current.signal.aborted) return;
 			queryCache.set(key, result);
 			response = result;
+			shown = asked;
 			error = null;
 		} catch (e) {
 			if (current.signal.aborted) return;
@@ -100,13 +103,15 @@
 	}
 
 	$effect(() => {
-		void load(request, requestKey);
+		const asked = untrack(() => query);
+		void load(request, requestKey, asked);
 		return () => controller?.abort();
 	});
 
 	let units = $derived(settingsStore.unitPreferences);
-	let format = $derived(valueFormatter(query, units));
-	let form = $derived(chartForm(query));
+	let distanceWord = $derived(units.distanceUnit === 'kilometers' ? 'km' : 'mile');
+	let format = $derived(valueFormatter(shown, units));
+	let form = $derived(chartForm(shown));
 	let preset = $derived(activePreset(query));
 	let hidden = $derived(new Set(query.hide));
 
@@ -114,23 +119,25 @@
 	let visibleSeries = $derived(allSeries.filter(s => !hidden.has(s.sourceKey)));
 	let visibleKeys = $derived(new Set(visibleSeries.map(s => s.sourceKey)));
 	let hiddenSeriesKeys = $derived(allSeries.filter(s => hidden.has(s.sourceKey)).map(s => s.key));
-	let summary = $derived(response ? kpis(query, response, visibleKeys) : null);
+	let summary = $derived(
+		response ? kpis({ ...shown, hide: query.hide }, response, visibleKeys) : null
+	);
 	let intervalLabel = $derived(
-		EXPLORE_INTERVALS.find(i => i.value === query.per)?.label.toLowerCase() ?? 'bucket'
+		EXPLORE_INTERVALS.find(i => i.value === shown.per)?.label.toLowerCase() ?? 'bucket'
 	);
 	let compareLabel = $derived(
-		query.compare === 'prevYear' ? 'the year before' : 'the period before'
+		shown.compare === 'prevYear' ? 'the year before' : 'the period before'
 	);
 
 	let kpiItems = $derived.by(() => {
 		if (!summary) return [];
 		const items: Array<{ label: string; value: string; subtitle?: string }> = [
 			{
-				label: isAdditive(query) ? 'Total' : 'Average',
+				label: isAdditive(shown) ? 'Total' : 'Average',
 				value: summary.total != null ? format.full(summary.total) : 'N/A'
 			}
 		];
-		if (query.per !== 'none' && summary.perBucket != null) {
+		if (shown.per !== 'none' && summary.perBucket != null) {
 			const change = percentChange(summary.perBucket, summary.previousPerBucket);
 			items.push({
 				label: `Per ${intervalLabel}`,
@@ -141,16 +148,16 @@
 						: `${change > 0 ? '▲' : change < 0 ? '▼' : '='} ${Math.abs(change)}% vs ${compareLabel}`
 			});
 		}
-		if (summary.perDistance != null) {
+		if (summary.perDistance != null && shown.metric !== 'costPerDistance') {
 			items.push({
-				label: `Per ${getDistanceUnitLabel(units.distanceUnit, true)}`,
+				label: `Per ${distanceWord}`,
 				value: format.full(summary.perDistance)
 			});
 		}
 		return items;
 	});
 
-	let labels = $derived(response ? response.buckets.map(b => bucketLabel(b, query.per)) : []);
+	let labels = $derived(response ? response.buckets.map(b => bucketLabel(b, shown.per)) : []);
 	const isMobile = new IsMobile();
 	let maxTicks = $derived(isMobile.current ? 4 : 6);
 	let tickStep = $derived(Math.max(1, Math.ceil(labels.length / maxTicks)));
@@ -172,14 +179,18 @@
 		})
 	);
 
-	let compareSeries = $derived([
+	let compareSeriesAll = $derived([
 		{ key: 'current', label: 'This period', color: 'var(--chart-1)' },
 		{
 			key: 'previous',
-			label: EXPLORE_COMPARES.find(c => c.value === query.compare)?.label ?? 'Before',
+			label: EXPLORE_COMPARES.find(c => c.value === shown.compare)?.label ?? 'Before',
 			color: 'var(--chart-4)'
 		}
 	]);
+	let hasPrevious = $derived(
+		!!response?.compare?.series.some(s => s.values.some(v => v != null && v !== 0))
+	);
+	let compareSeries = $derived(hasPrevious ? compareSeriesAll : compareSeriesAll.slice(0, 1));
 	let compareRows = $derived.by(() => {
 		if (!response) return [];
 		const length = response.buckets.length;
@@ -191,20 +202,20 @@
 		return response.buckets.map((bucket, i) => ({
 			date: bucketDate(bucket),
 			current: current[i] ?? 0,
-			previous: previous[i] ?? 0
+			previous: hasPrevious ? (previous[i] ?? 0) : null
 		}));
 	});
 
 	let rankingRows = $derived(
-		visibleSeries
+		allSeries
 			.map(s => ({ label: s.label, value: s.values[0] ?? 0 }))
 			.sort((a, b) => b.value - a.value)
 	);
 	let rankingSeries = $derived([
-		{ key: 'value', label: describeQuery(query), color: 'var(--chart-1)' }
+		{ key: 'value', label: describeQuery(shown, distanceWord), color: 'var(--chart-1)' }
 	]);
 
-	let chartTitle = $derived(describeQuery(query));
+	let chartTitle = $derived(describeQuery(shown, distanceWord));
 	let rankingGutter = $derived(isMobile.current ? 112 : 232);
 
 	function fitLabel(label: string): string {
@@ -213,16 +224,16 @@
 	}
 	let lineXAxis = $derived({
 		ticks: Math.min(maxTicks, lineRows.length),
-		format: (v: Date) => (v instanceof Date ? bucketLabel(keyFor(v), query.per) : '')
+		format: (v: Date) => (v instanceof Date ? bucketLabel(keyFor(v), shown.per) : '')
 	});
 
 	function keyFor(date: Date): string {
 		const y = date.getFullYear();
 		const m = date.getMonth();
-		if (query.per === 'year') return String(y);
-		if (query.per === 'quarter') return `${y}-Q${Math.floor(m / 3) + 1}`;
+		if (shown.per === 'year') return String(y);
+		if (shown.per === 'quarter') return `${y}-Q${Math.floor(m / 3) + 1}`;
 		const pad = (n: number) => String(n).padStart(2, '0');
-		if (query.per === 'week') return `${y}-${pad(m + 1)}-${pad(date.getDate())}`;
+		if (shown.per === 'week') return `${y}-${pad(m + 1)}-${pad(date.getDate())}`;
 		return `${y}-${pad(m + 1)}`;
 	}
 
@@ -255,7 +266,7 @@
 		<LoadErrorCard
 			title="Couldn't load this chart"
 			message={error}
-			onRetry={() => load(request, requestKey)}
+			onRetry={() => load(request, requestKey, query)}
 		/>
 	{:else if !response}
 		<div class="space-y-4" aria-busy="true" aria-label="Loading the chart">
@@ -289,13 +300,18 @@
 	{:else}
 		<div
 			class="space-y-4 transition-opacity md:space-y-6"
-			class:opacity-60={isLoading}
+			class:opacity-60={isLoading || !!error}
 			aria-busy={isLoading}
 		>
 			{#if error}
-				<p class="text-sm text-destructive" role="alert">
-					Couldn't update the chart: {error}
-				</p>
+				<div class="flex flex-wrap items-center gap-3" role="alert">
+					<p class="text-sm text-destructive">
+						Couldn't update the chart, so it still shows {chartTitle.toLowerCase()}. {error}
+					</p>
+					<Button variant="outline" size="sm" onclick={() => load(request, requestKey, query)}>
+						Retry
+					</Button>
+				</div>
 			{/if}
 			<StatCardGrid items={kpiItems} columns={3} />
 
@@ -319,18 +335,23 @@
 					{#snippet icon()}<ChartColumn class="h-5 w-5 text-primary" />{/snippet}
 				</AppBarChart>
 			{:else if form === 'compare'}
+				{#if !hasPrevious}
+					<p class="text-sm text-muted-foreground">
+						There is no data for {compareLabel} in this range, so only this period is drawn.
+					</p>
+				{/if}
 				<AppLineChart
 					level={2}
 					title={chartTitle}
 					data={compareRows}
 					x="date"
-					y={['current', 'previous']}
+					y={compareSeries.map(c => c.key)}
 					series={compareSeries}
 					config={buildChartConfig(compareSeries)}
 					xAxisProps={lineXAxis}
 					yAxisFormat={format.axis}
 					tooltipFormat={format.full}
-					tooltipLabelFormat={v => (v instanceof Date ? bucketLabel(keyFor(v), query.per) : '')}
+					tooltipLabelFormat={v => (v instanceof Date ? bucketLabel(keyFor(v), shown.per) : '')}
 				/>
 			{:else if form === 'line'}
 				<AppLineChart
@@ -346,7 +367,7 @@
 					xAxisProps={lineXAxis}
 					yAxisFormat={format.axis}
 					tooltipFormat={format.full}
-					tooltipLabelFormat={v => (v instanceof Date ? bucketLabel(keyFor(v), query.per) : '')}
+					tooltipLabelFormat={v => (v instanceof Date ? bucketLabel(keyFor(v), shown.per) : '')}
 				/>
 			{:else}
 				<AppBarChart
@@ -358,7 +379,7 @@
 					hiddenKeys={hiddenSeriesKeys}
 					onToggleSeries={toggleSeries}
 					config={buildChartConfig(allSeries)}
-					seriesLayout={form === 'stacked' ? 'stack' : undefined}
+					seriesLayout={form === 'stacked' ? 'stack' : form === 'grouped' ? 'group' : undefined}
 					xAxisProps={{ ticks: bandTicks }}
 					yAxisFormat={format.axis}
 					tooltipFormat={format.full}

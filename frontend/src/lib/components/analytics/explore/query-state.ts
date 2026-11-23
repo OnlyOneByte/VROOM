@@ -9,7 +9,7 @@ import type {
 
 export const EXPLORE_METRICS = [
 	{ value: 'cost', label: 'Total cost', metric: 'cost' },
-	{ value: 'costPerDistance', label: 'Cost per distance', metric: 'costPerDistance' },
+	{ value: 'costPerDistance', label: 'Cost per mile', metric: 'costPerDistance' },
 	{ value: 'distance', label: 'Distance driven', metric: 'distance' },
 	{ value: 'fuel', label: 'Fuel bought', metric: 'volume', energy: 'fuel' },
 	{ value: 'charge', label: 'Energy charged', metric: 'volume', energy: 'electric' },
@@ -84,7 +84,7 @@ export const EXPLORE_PRESETS = [
 	{
 		id: 'fuel-vs-charging',
 		label: 'Fuel vs charging',
-		query: { split: 'fuelType', inc: 'running' }
+		query: { split: 'fuelType' }
 	},
 	{
 		id: 'year-vs-year',
@@ -112,12 +112,19 @@ export function metricInfo(metric: ExploreMetric) {
 	return EXPLORE_METRICS.find(m => m.value === metric) ?? EXPLORE_METRICS[0];
 }
 
-export function allowedSplits(metric: ExploreMetric): readonly AnalyticsQueryGroupBy[] {
-	return SPLITS_FOR_METRIC[metricInfo(metric).metric];
+export function metricLabel(metric: ExploreMetric, distance = 'mile'): string {
+	return metric === 'costPerDistance' ? `Cost per ${distance}` : metricInfo(metric).label;
+}
+
+export function allowedSplits(
+	metric: ExploreMetric,
+	compare: AnalyticsQueryCompare = 'none'
+): readonly AnalyticsQueryGroupBy[] {
+	return compare === 'none' ? SPLITS_FOR_METRIC[metricInfo(metric).metric] : ['none'];
 }
 
 export function normalizeExplore(query: ExploreQuery): ExploreQuery {
-	const splits = allowedSplits(query.metric);
+	const splits = allowedSplits(query.metric, query.compare);
 	return splits.includes(query.split) ? query : { ...query, split: 'none', hide: [] };
 }
 
@@ -173,18 +180,19 @@ export function apiQuery(query: ExploreQuery) {
 	} as const;
 }
 
-export type ChartForm = 'stacked' | 'bars' | 'line' | 'ranking' | 'compare';
+export type ChartForm = 'stacked' | 'grouped' | 'bars' | 'line' | 'ranking' | 'compare';
 
 export function chartForm(query: ExploreQuery): ChartForm {
 	const ratio = ['costPerDistance', 'efficiency'].includes(metricInfo(query.metric).metric);
 	if (query.per === 'none') return 'ranking';
 	if (query.compare !== 'none') return 'compare';
 	if (ratio) return 'line';
+	if (query.split === 'tag') return 'grouped';
 	return query.split === 'none' ? 'bars' : 'stacked';
 }
 
-export function describeQuery(query: ExploreQuery): string {
-	const metric = metricInfo(query.metric).label;
+export function describeQuery(query: ExploreQuery, distance = 'mile'): string {
+	const metric = metricLabel(query.metric, distance);
 	const per = EXPLORE_INTERVALS.find(i => i.value === query.per)?.label.toLowerCase();
 	const split = EXPLORE_SPLITS.find(s => s.value === query.split)?.label.toLowerCase();
 	const time = query.per === 'none' ? 'over the whole range' : `per ${per}`;

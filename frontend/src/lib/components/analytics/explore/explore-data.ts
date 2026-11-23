@@ -86,7 +86,7 @@ export function kpis(
 	const allVisible = response.series.every(s => visible.has(s.key));
 	const visibleTotal = (period: AnalyticsQueryPeriod) =>
 		sum(period.series.filter(s => visible.has(s.key)).flatMap(s => s.values));
-	if (!isAdditive(query) || allVisible) {
+	if (!isAdditive(query) || allVisible || query.split === 'tag') {
 		return {
 			total: response.totals.value,
 			perBucket: response.totals.perBucket,
@@ -102,7 +102,9 @@ export function kpis(
 		perBucket: total / buckets,
 		previousPerBucket: previous == null ? null : previous / buckets,
 		perDistance:
-			response.totals.perDistance != null && response.totals.distance > 0
+			query.split !== 'vehicle' &&
+			response.totals.perDistance != null &&
+			response.totals.distance > 0
 				? total / response.totals.distance
 				: null
 	};

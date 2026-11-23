@@ -4,8 +4,8 @@
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import * as RadioGroup from '#lib/components/ui/radio-group/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
-	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		DEFAULT_EXPLORE,
 		EXPLORE_COMPARES,
@@ -14,6 +14,8 @@
 		EXPLORE_SPLITS,
 		allowedSplits,
 		describeQuery,
+		metricInfo,
+		metricLabel,
 		normalizeExplore,
 		type ExploreQuery
 	} from './query-state';
@@ -28,7 +30,20 @@
 	const isMobile = new IsMobile();
 	let editing = $state(false);
 
-	let splits = $derived(EXPLORE_SPLITS.filter(s => allowedSplits(query.metric).includes(s.value)));
+	let distanceWord = $derived(
+		settingsStore.unitPreferences.distanceUnit === 'kilometers' ? 'km' : 'mile'
+	);
+	let metrics = $derived(
+		EXPLORE_METRICS.map(m => ({ value: m.value, label: metricLabel(m.value, distanceWord) }))
+	);
+	let splits = $derived(
+		EXPLORE_SPLITS.filter(s => allowedSplits(query.metric, query.compare).includes(s.value))
+	);
+	let moneyMetric = $derived(['cost', 'costPerDistance'].includes(metricInfo(query.metric).metric));
+	const COSTS = [
+		{ value: 'running', label: 'Running costs' },
+		{ value: 'all', label: 'All costs' }
+	];
 	let isDefault = $derived(
 		JSON.stringify({ ...query, hide: [] }) === JSON.stringify({ ...DEFAULT_EXPLORE, hide: [] })
 	);
@@ -69,9 +84,14 @@
 <div class="rounded-lg border bg-card p-3 md:p-4">
 	<div class="flex items-start justify-between gap-3">
 		<p class="min-w-0 text-sm md:text-base" aria-live="polite">
-			<span class="font-medium">{describeQuery(query)}</span>{query.inc === 'all'
-				? ', financing and fees included'
-				: ''}
+			<span class="font-medium">{describeQuery(query, distanceWord)}</span>
+			{#if moneyMetric}
+				<span class="block text-xs text-muted-foreground md:text-sm">
+					{query.inc === 'all'
+						? 'All costs, including financing, insurance and fees.'
+						: 'Running costs only: fuel, maintenance and misc.'}
+				</span>
+			{/if}
 		</p>
 		<div class="flex shrink-0 items-center gap-1">
 			{#if !isDefault && !isMobile.current}
@@ -104,7 +124,7 @@
 			<Sheet.Description>Pick what to measure and how to split it.</Sheet.Description>
 		</Sheet.Header>
 		<div class="space-y-5 px-4">
-			{@render field('explore-metric', 'Show', query.metric, EXPLORE_METRICS, v =>
+			{@render field('explore-metric', 'Show', query.metric, metrics, v =>
 				update({ metric: v as ExploreQuery['metric'], hide: [] })
 			)}
 			{@render field('explore-per', 'Per', query.per, EXPLORE_INTERVALS, v =>
@@ -116,14 +136,9 @@
 			{@render field('explore-compare', 'Compare with', query.compare, EXPLORE_COMPARES, v =>
 				update({ compare: v as ExploreQuery['compare'] })
 			)}
-			<div class="flex min-h-10 items-center gap-2">
-				<Switch
-					id="explore-include"
-					checked={query.inc === 'all'}
-					onCheckedChange={checked => update({ inc: checked ? 'all' : 'running' })}
-				/>
-				<Label for="explore-include" class="font-normal">Include financing and fees</Label>
-			</div>
+			{@render field('explore-include', 'Costs', query.inc, COSTS, v =>
+				update({ inc: v as ExploreQuery['inc'] })
+			)}
 		</div>
 		<Sheet.Footer class="pb-[max(1rem,env(safe-area-inset-bottom))]">
 			{#if !isDefault}

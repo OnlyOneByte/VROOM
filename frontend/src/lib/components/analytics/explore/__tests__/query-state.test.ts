@@ -11,6 +11,8 @@ import {
 	applyPreset,
 	chartForm,
 	describeQuery,
+	metricLabel,
+	normalizeExplore,
 	parseExplore,
 	writeExplore
 } from '../query-state';
@@ -149,5 +151,37 @@ describe('Explore chart data', () => {
 		expect(percentChange(25, 50)).toBe(-50);
 		expect(percentChange(25, 0)).toBeNull();
 		expect(percentChange(null, 10)).toBeNull();
+	});
+
+	test('a comparison draws one total line, so ratios are never added up', () => {
+		const seasons = normalizeExplore({
+			...applyPreset({ metric: 'mpg', split: 'vehicle' }),
+			compare: 'prevYear'
+		});
+		expect(seasons.split).toBe('none');
+		expect(allowedSplits('cost', 'prevPeriod')).toEqual(['none']);
+		expect(
+			parseExplore(params('metric=costPerDistance&split=vehicle&compare=prevYear')).split
+		).toBe('none');
+	});
+
+	test('tags draw as grouped bars and their KPIs stay the server totals', () => {
+		const tags = applyPreset({ split: 'tag' });
+		expect(chartForm(tags)).toBe('grouped');
+		const tagResponse = { ...response, groupBy: 'tag' } as AnalyticsQueryResponse;
+		expect(kpis(tags, tagResponse, new Set(['fuel'])).total).toBe(200);
+	});
+
+	test('per distance is dropped when a car is hidden from a car split', () => {
+		const byCar = applyPreset({ split: 'vehicle' });
+		expect(kpis(byCar, response, new Set(['fuel'])).perDistance).toBeNull();
+	});
+
+	test('the cost-per-distance measure names the user unit', () => {
+		expect(metricLabel('costPerDistance')).toBe('Cost per mile');
+		expect(metricLabel('costPerDistance', 'km')).toBe('Cost per km');
+		expect(describeQuery(applyPreset({ metric: 'costPerDistance', split: 'vehicle' }), 'km')).toBe(
+			'Cost per km per month by car'
+		);
 	});
 });

@@ -303,7 +303,9 @@
 			{#if activeTab === 'explore'}
 				<Tabs.Content value="explore">
 					{#await import('#lib/components/analytics/explore/ExploreTab.svelte')}
-						<div class="min-h-[480px]" aria-busy="true"></div>
+						<div class="flex min-h-[480px] justify-center p-8" aria-busy="true">
+							<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+						</div>
 					{:then { default: ExploreTab }}
 						<ExploreTab
 							query={explore}
@@ -313,6 +315,12 @@
 							{vehicleColors}
 							filterLabel={filtered ? filterLabel : undefined}
 							onClearFilters={filtered ? clearFilters : undefined}
+						/>
+					{:catch}
+						<LoadErrorCard
+							title="Couldn't load Explore"
+							message="Check your connection, then reload the page."
+							onRetry={() => location.reload()}
 						/>
 					{/await}
 				</Tabs.Content>
