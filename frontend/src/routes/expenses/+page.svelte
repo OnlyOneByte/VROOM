@@ -30,7 +30,7 @@
 	import { latest } from '#lib/utils/latest-request.ts';
 
 	type ExpenseWithVehicle = Expense & { vehicle?: Vehicle };
-	import { formatCurrency, formatDate, formatNumber } from '#lib/utils/formatters.ts';
+	import { dateOnlyToISO, formatCurrency, formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import {
 		handleErrorWithNotification,
 		logLoadFailure,
@@ -168,9 +168,10 @@
 		if (categoryFilter in EXPENSE_CATEGORY_INFO) {
 			parts.push(EXPENSE_CATEGORY_INFO[categoryFilter as ExpenseCategory].label);
 		}
-		if (startDate && endDate) parts.push(`${formatDate(startDate)} – ${formatDate(endDate)}`);
-		else if (startDate) parts.push(`From ${formatDate(startDate)}`);
-		else if (endDate) parts.push(`Until ${formatDate(endDate)}`);
+		const day = (value: string) => formatDate(dateOnlyToISO(value));
+		if (startDate && endDate) parts.push(`${day(startDate)} – ${day(endDate)}`);
+		else if (startDate) parts.push(`From ${day(startDate)}`);
+		else if (endDate) parts.push(`Until ${day(endDate)}`);
 		if (selectedTags.length > 0) parts.push(`Tagged ${selectedTags.join(', ')}`);
 		const term = searchTerm.trim();
 		if (term) parts.push(`“${term}”`);
