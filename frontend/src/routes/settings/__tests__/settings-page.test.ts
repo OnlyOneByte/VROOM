@@ -43,7 +43,9 @@ vi.mock('#lib/components/settings/cards/PwaInstallCard.svelte', stub);
 vi.mock('#lib/components/settings/cards/PushNotificationsCard.svelte', stub);
 vi.mock('#lib/components/settings/cards/StorageProvidersCard.svelte', stub);
 vi.mock('#lib/components/settings/cards/ModelProvidersCard.svelte', stub);
-vi.mock('#lib/components/settings/cards/MigrateFromTrackerCard.svelte', stub);
+vi.mock('#lib/components/settings/cards/MigrateFromTrackerCard.svelte', async () => ({
+	default: (await import('./MigrateStub.svelte')).default
+}));
 vi.mock('#lib/components/settings/storage-provider/backup/BackupDialog.svelte', stub);
 vi.mock('#lib/components/settings/storage-provider/backup/RestoreDialog.svelte', stub);
 
@@ -210,10 +212,18 @@ describe('Settings page loading', () => {
 		expect(link).toHaveTextContent('Account & profile settings');
 	});
 
-	test('renders both AI provider cards', async () => {
+	test('groups storage and both AI provider cards under one Connections section', async () => {
 		await mount();
-		expect(screen.getByTestId('stub-model-vlm')).toBeInTheDocument();
-		expect(screen.getByTestId('stub-model-llm')).toBeInTheDocument();
+		const section = screen.getByRole('region', { name: 'Connections' });
+		expect(section.nextElementSibling).toBeNull();
+		const migrate = screen.getByTestId('stub-migrate');
+		expect(section).not.toContainElement(migrate);
+		expect(
+			migrate.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING
+		).toBeTruthy();
+		expect(section).toContainElement(screen.getByTestId('stub-model-vlm'));
+		expect(section).toContainElement(screen.getByTestId('stub-model-llm'));
+		expect(section).toContainElement(screen.getByRole('button', { name: 'stub download' }));
 	});
 });
 
@@ -318,6 +328,108 @@ describe('Settings page preferences', () => {
 		expect(settingsStoreFake.load).toHaveBeenCalledTimes(2);
 		expect(stubInput('stub distance')).toHaveValue('miles');
 		expect(stubInput('stub volume')).toHaveValue('gallons_uk');
+	});
+
+	test('a pick made while the post-overlap reload waits is not undone by that late reply', async () => {
+		const saves: Array<() => void> = [];
+		settingsStoreFake.update.mockImplementation(
+			updates =>
+				new Promise(resolve => {
+					saves.push(() => {
+						const next = { ...fakeSettingsState.settings, ...updates } as UserSettings;
+						fakeSettingsState.settings = next;
+						resolve(next);
+					});
+				})
+		);
+		await mount();
+		await change('stub distance', 'miles');
+		await change('stub volume', 'gallons_uk');
+
+		const reloads: Array<() => void> = [];
+		const stale = makeSettings();
+		settingsStoreFake.load.mockImplementation(
+			() =>
+				new Promise<void>(resolve => {
+					reloads.push(() => {
+						fakeSettingsState.settings = { ...stale };
+						resolve();
+					});
+				})
+		);
+		saves[0]!();
+		saves[1]!();
+		await settle();
+		expect(reloads).toHaveLength(1);
+
+		await change('stub currency', 'GBP');
+		saves[2]!();
+		await settle();
+		reloads[0]!();
+		await settle();
+
+		expect(stubInput('stub currency')).toHaveValue('GBP');
+		expect(reloads).toHaveLength(2);
+
+		stale.currencyUnit = 'GBP';
+		reloads[1]!();
+		await settle();
+		expect(stubInput('stub currency')).toHaveValue('GBP');
+		expect(reloads).toHaveLength(2);
+	});
+
+	test('two overlapping picks during the reload cannot ride the same stale reply back in', async () => {
+		const saves: Array<() => void> = [];
+		settingsStoreFake.update.mockImplementation(
+			updates =>
+				new Promise(resolve => {
+					saves.push(() => {
+						const next = { ...fakeSettingsState.settings, ...updates } as UserSettings;
+						fakeSettingsState.settings = next;
+						resolve(next);
+					});
+				})
+		);
+		await mount();
+		await change('stub distance', 'miles');
+		await change('stub volume', 'gallons_uk');
+
+		const reloads: Array<() => void> = [];
+		const server = makeSettings();
+		let inFlight: Promise<void> | null = null;
+		settingsStoreFake.load.mockImplementation(() => {
+			if (inFlight) return inFlight;
+			const request = new Promise<void>(resolve => {
+				const snapshot = { ...server };
+				reloads.push(() => {
+					fakeSettingsState.settings = snapshot;
+					resolve();
+				});
+			}).finally(() => {
+				if (inFlight === request) inFlight = null;
+			});
+			inFlight = request;
+			return request;
+		});
+		saves[0]!();
+		saves[1]!();
+		await settle();
+		expect(reloads).toHaveLength(1);
+
+		await change('stub currency', 'GBP');
+		await change('stub distance', 'kilometers');
+		saves[2]!();
+		saves[3]!();
+		await settle();
+		server.currencyUnit = 'GBP';
+		reloads[0]!();
+		await settle();
+
+		expect(stubInput('stub currency')).toHaveValue('GBP');
+		expect(reloads).toHaveLength(2);
+		reloads[1]!();
+		await settle();
+		expect(stubInput('stub currency')).toHaveValue('GBP');
 	});
 
 	test('after a save the pickers re-sync to what the server returned', async () => {

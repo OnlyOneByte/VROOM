@@ -125,9 +125,11 @@
 	});
 
 	let savesOverlapped = false;
+	let saveGeneration = 0;
 
 	async function persist(updates: Partial<UserSettings>) {
 		if (savesInFlight > 0) savesOverlapped = true;
+		saveGeneration++;
 		savesInFlight++;
 		try {
 			await settingsStore.update(updates);
@@ -137,12 +139,25 @@
 		}
 	}
 
+	let resyncing = false;
+
 	async function resyncAfterSaves() {
-		if (savesOverlapped) {
-			savesOverlapped = false;
-			await settingsStore.load().catch(() => undefined);
+		if (resyncing) return;
+		resyncing = true;
+		try {
+			while (savesOverlapped) {
+				savesOverlapped = false;
+				const generation = saveGeneration;
+				await settingsStore.load().catch(() => undefined);
+				if (saveGeneration !== generation) {
+					savesOverlapped = true;
+					if (savesInFlight > 0) return;
+				}
+			}
+			if (savesInFlight === 0) isInitialized = false;
+		} finally {
+			resyncing = false;
 		}
-		if (savesInFlight === 0) isInitialized = false;
 	}
 
 	async function saveSettings(updates: Partial<UserSettings>, savedMessage: string) {
@@ -328,16 +343,6 @@
 			/>
 			<PWAInstallCard />
 			<PushNotificationsCard />
-			<PhotoStorageSettings
-				{isBackingUp}
-				bind:syncInactivityMinutes
-				onSyncInactivityChange={saveSyncInterval}
-				onBackupNow={handleBackupNowClick}
-				onRestore={handleRestoreClick}
-				onDownloadBackup={handleBackup}
-			/>
-			<ModelProvidersCard domain="vlm" />
-			<ModelProvidersCard domain="llm" />
 			{#await migrateCard then { default: MigrateFromTrackerCard }}
 				<MigrateFromTrackerCard />
 			{:catch}
@@ -349,6 +354,24 @@
 					Couldn't load the migration tool. Check your connection and reload.
 				</p>
 			{/await}
+			<section class="space-y-4" aria-labelledby="settings-connections">
+				<div>
+					<h2 id="settings-connections" class="text-lg font-semibold">Connections</h2>
+					<p class="text-sm text-muted-foreground">
+						Storage and AI services you connect with your own account or key.
+					</p>
+				</div>
+				<PhotoStorageSettings
+					{isBackingUp}
+					bind:syncInactivityMinutes
+					onSyncInactivityChange={saveSyncInterval}
+					onBackupNow={handleBackupNowClick}
+					onRestore={handleRestoreClick}
+					onDownloadBackup={handleBackup}
+				/>
+				<ModelProvidersCard domain="vlm" />
+				<ModelProvidersCard domain="llm" />
+			</section>
 		</div>
 	{/if}
 

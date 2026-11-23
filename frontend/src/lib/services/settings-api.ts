@@ -22,6 +22,10 @@ export const settingsApi = {
 		return apiClient.put<UserSettings>('/settings', updates);
 	},
 
+	async resumeSheetsBackups(providerId: string): Promise<void> {
+		await apiClient.post(`/sync/sheets/${encodeURIComponent(providerId)}/resume`, {});
+	},
+
 	async executeSync(syncTypes: 'backup'[], force = false): Promise<SyncResponse> {
 		return apiClient.post<SyncResponse>('/sync', { syncTypes, force });
 	},

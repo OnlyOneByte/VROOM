@@ -32,6 +32,11 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		detectImportSource: (sample: string) => detectImportSource(sample),
+		getImportFormats: () =>
+			Promise.resolve({
+				formats: [{ id: 'fuelio', label: 'Fuelio' }],
+				accept: ['.csv', 'text/csv']
+			}),
 		importExpensesCsv: (csv: string, dryRun: boolean, mapping?: ImportColumnMapping) =>
 			importExpensesCsv(csv, dryRun, mapping)
 	}
@@ -196,7 +201,8 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 			source: 'fuelio',
 			columns: {},
 			dateFormat: 'iso',
-			targetVehicle: '2019 Toyota Corolla'
+			targetVehicle: '2019 Toyota Corolla',
+			categoryMap: {}
 		});
 		expect(screen.getByText('fuelio.csv')).toBeInTheDocument();
 		expect(screen.getByTestId('migrate-preview')).toHaveTextContent('3 ready');
@@ -238,8 +244,76 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		expect(preview).toHaveTextContent('Missing date');
 		expect(preview).toHaveTextContent('Row 3');
 		expect(preview).toHaveTextContent('Bad amount');
-		expect(preview).toHaveTextContent('Parking, Tolls');
+		expect(screen.getByText('Unrecognized categories')).toBeInTheDocument();
+		expect(screen.getByText('Parking')).toBeInTheDocument();
+		expect(screen.getByText('Tolls')).toBeInTheDocument();
 		expect(commitButton()).toHaveTextContent('Migrate 1 entry');
+	});
+
+	test('a category remap is sent with the preview and the migration', async () => {
+		importExpensesCsv.mockResolvedValue(result({ unmappedCategories: ['Parking'] }));
+		await mount();
+		await openDialog();
+		await chooseFile();
+
+		const trigger = screen.getByLabelText('Category for Parking');
+		await fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' });
+		await fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' });
+		const option = await screen.findByRole('option', { name: 'Maintenance' });
+		await fireEvent.pointerUp(option, { button: 0, pointerType: 'mouse' });
+		await fireEvent.click(option);
+		await settle();
+
+		expect(importExpensesCsv).toHaveBeenLastCalledWith(
+			CSV,
+			true,
+			expect.objectContaining({ categoryMap: { Parking: 'maintenance' } })
+		);
+		await fireEvent.click(commitButton());
+		await settle();
+		expect(importExpensesCsv).toHaveBeenLastCalledWith(
+			CSV,
+			false,
+			expect.objectContaining({ categoryMap: { Parking: 'maintenance' } })
+		);
+	});
+
+	test('a vehicle picked before the file is kept for the preview', async () => {
+		getVehicles.mockResolvedValue([
+			vehicle(),
+			vehicle({ id: 'v2', nickname: 'Weekend Car', make: 'Mazda', model: 'MX-5' })
+		]);
+		await mount();
+		await openDialog();
+		await pickVehicle('Weekend Car');
+		await chooseFile();
+
+		expect(importExpensesCsv).toHaveBeenCalledWith(
+			CSV,
+			true,
+			expect.objectContaining({ targetVehicle: 'Weekend Car' })
+		);
+		expect(screen.getByTestId('migrate-vehicle')).toHaveTextContent('Weekend Car');
+	});
+
+	test('reopening keeps the vehicle picked last time, and an unrecognised file keeps it too', async () => {
+		getVehicles.mockResolvedValue([
+			vehicle(),
+			vehicle({ id: 'v2', nickname: 'Weekend Car', make: 'Mazda', model: 'MX-5' })
+		]);
+		detectImportSource.mockResolvedValue(null);
+		await mount();
+		await openDialog();
+		await pickVehicle('Weekend Car');
+		await chooseFile('foo,bar\n1,2', 'other.csv');
+
+		expect(screen.getByTestId('migrate-unrecognized')).toBeInTheDocument();
+		expect(screen.getByTestId('migrate-vehicle')).toHaveTextContent('Weekend Car');
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+		await settle();
+		await openDialog();
+		expect(screen.getByTestId('migrate-vehicle')).toHaveTextContent('Weekend Car');
 	});
 
 	test('a single bad row reads in the singular', async () => {

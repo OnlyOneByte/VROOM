@@ -49,6 +49,7 @@ import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { joinStoragePath } from '../../utils/paths';
 import { unitPreferencesSchema } from '../../utils/unit-preferences-schema';
+import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { storageProviderDescriptor } from '../providers/domains/storage/registry';
 import { hasZipBackup } from './backup-strategy';
 
@@ -181,7 +182,7 @@ export const BACKUP_CHECK_REASONS = {
     'If this is the only one you have, keep it as it is and select Cancel. VROOM keeps working without a restore.'
   ),
   sheets: reasonsFor(
-    "If this spreadsheet is the only copy you have, open it in Google Drive and use File > Make a copy. VROOM's next backup writes over this spreadsheet."
+    'If this spreadsheet is the only copy you have, open it in Google Drive and use File\u00a0>\u00a0Make a copy. VROOM has paused its automatic backups to this spreadsheet, and the next backup you start writes over it.'
   ),
 };
 
@@ -422,20 +423,20 @@ class BackupService {
     const db = getDb();
     const [userVehicles, userExpenses, userFinancing, userInsurance, userOdometer, userTrips] =
       await Promise.all([
-        db.select().from(vehicles).where(eq(vehicles.userId, userId)),
+        db.select().from(vehicles).where(ownedVehiclesScope(userId)),
         db.select().from(expenses).where(eq(expenses.userId, userId)),
         db
           .select()
           .from(vehicleFinancing)
           .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-          .where(eq(vehicles.userId, userId))
+          .where(ownedVehiclesScope(userId))
           .then((r) => r.map((x) => x.vehicle_financing)),
         db.select().from(insurancePolicies).where(eq(insurancePolicies.userId, userId)),
         db
           .select()
           .from(odometerEntries)
           .innerJoin(vehicles, eq(odometerEntries.vehicleId, vehicles.id))
-          .where(eq(vehicles.userId, userId))
+          .where(ownedVehiclesScope(userId))
           .then((r) => r.map((x) => x.odometer_entries)),
         db.select().from(trips).where(eq(trips.userId, userId)),
       ]);

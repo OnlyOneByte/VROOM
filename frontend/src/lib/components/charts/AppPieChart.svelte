@@ -17,6 +17,7 @@
 
 	interface Props {
 		title: string;
+		level?: 2 | 3 | 4;
 		description?: string;
 		data: PieDataItem[];
 		isLoading?: boolean;
@@ -30,6 +31,7 @@
 
 	let {
 		title,
+		level,
 		description,
 		data,
 		isLoading = false,
@@ -55,7 +57,7 @@
 	let pieGate = createVisibilityWatch();
 </script>
 
-<ChartCard {title} {description} {isLoading} {error} {isEmpty} {icon} class={className}>
+<ChartCard {title} {level} {description} {isLoading} {error} {isEmpty} {icon} class={className}>
 	<div class="flex flex-col md:flex-row gap-6">
 		<div class="flex-1 flex items-center justify-center overflow-hidden" bind:this={pieGate.el}>
 			<div class="mx-auto aspect-square max-h-[250px] w-full max-w-[250px]">

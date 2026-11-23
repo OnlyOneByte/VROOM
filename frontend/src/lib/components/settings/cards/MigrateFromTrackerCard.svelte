@@ -12,44 +12,40 @@
 		CardHeader,
 		CardTitle
 	} from '#lib/components/ui/card/index.ts';
+	import CategoryRemapPanel from '#lib/components/expenses/import-expenses/CategoryRemapPanel.svelte';
+	import { ImportExpensesForm } from '#lib/components/expenses/import-expenses/import-expenses-form.svelte';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
-	import { expenseApi, type ExpenseImportResult } from '#lib/services/expense-api.ts';
-	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
-	import {
-		handleErrorWithNotification,
-		userFacingErrorMessage
-	} from '#lib/utils/error-handling.ts';
-	import { DETECT_SAMPLE_LENGTH } from '#lib/utils/import-mapping-helpers.ts';
-	import type { ImportColumnMapping, Vehicle } from '#lib/types/index.ts';
-	import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import type { Vehicle } from '#lib/types/index.ts';
 
 	let vehicles = $state<Vehicle[]>([]);
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
 	let content = $state<HTMLElement | null>(null);
-
 	let dialogOpen = $state(false);
-	let targetVehicleId = $state('');
-	let fileName = $state<string | null>(null);
-	let csvText = $state('');
-	let format = $state<DetectedImportFormat | null>(null);
-	let unrecognized = $state(false);
-	let preview = $state<ExpenseImportResult | null>(null);
-	let isPreviewing = $state(false);
-	let isImporting = $state(false);
-	let previewSeq = 0;
 
-	let targetVehicle = $derived(vehicles.find(v => v.id === targetVehicleId));
-	let errorRows = $derived(preview?.rows.filter(r => r.status === 'error') ?? []);
-	let unmappedCategories = $derived(preview?.unmappedCategories ?? []);
+	const form = new ImportExpensesForm(() => vehicles, {
+		presetsOnly: true,
+		copy: {
+			previewFailed: format => `Couldn't read that ${format ? `${format.label} ` : ''}file`,
+			detectFailed: "Couldn't read that file",
+			done: (imported, format) =>
+				`Migrated ${imported} ${imported === 1 ? 'entry' : 'entries'} from ${format?.label ?? 'your old app'}`,
+			failed: format => `Couldn't migrate from ${format?.label ?? 'your old app'}`
+		}
+	});
+
+	let extensions = $derived(form.formats?.accept.filter(type => type.startsWith('.')) ?? []);
+	let chooseLabel = $derived(
+		`Choose your export file${extensions.length ? ` (${extensions.join(', ')})` : ''}`
+	);
 
 	async function loadVehicles() {
 		isLoading = true;
 		loadError = null;
 		try {
 			vehicles = await vehicleApi.getVehicles();
-			if (vehicles.length === 1 && vehicles[0]) targetVehicleId = vehicles[0].id;
 		} catch (e) {
 			loadError = `Couldn't load your vehicles. ${userFacingErrorMessage(e)}`;
 		} finally {
@@ -65,112 +61,24 @@
 		focusFirstButton(content);
 	}
 
-	function buildMapping(): { mapping: ImportColumnMapping; label: string } | null {
-		if (!targetVehicle || !format) return null;
-		return {
-			mapping: {
-				source: format.id,
-				columns: {},
-				dateFormat: 'iso',
-				targetVehicle: getVehicleDisplayName(targetVehicle)
-			},
-			label: format.label
-		};
-	}
-
-	async function runPreview() {
-		const built = buildMapping();
-		if (!csvText.trim() || !built) {
-			preview = null;
-			return;
-		}
-		const { mapping, label } = built;
-		const seq = ++previewSeq;
-		isPreviewing = true;
-		preview = null;
-		try {
-			const result = await expenseApi.importExpensesCsv(csvText, true, mapping);
-			if (seq === previewSeq) preview = result;
-		} catch (err) {
-			if (seq === previewSeq) {
-				handleErrorWithNotification(err, `Couldn't read that ${label} file`);
-			}
-		} finally {
-			if (seq === previewSeq) isPreviewing = false;
-		}
-	}
-
 	async function handleFileChange(event: Event) {
 		const input = event.target as HTMLInputElement;
 		const file = input.files?.[0];
 		if (!file) return;
-		fileName = file.name;
-		csvText = await file.text();
 		// Clear so re-picking the same file after a cancel still fires change.
 		input.value = '';
-		if (!csvText.trim()) {
-			previewSeq++;
-			format = null;
-			unrecognized = false;
-			preview = null;
-			isPreviewing = false;
-			return;
-		}
-		if (await detectFormat()) await runPreview();
-	}
-
-	async function detectFormat(): Promise<boolean> {
-		const seq = ++previewSeq;
-		format = null;
-		unrecognized = false;
-		preview = null;
-		isPreviewing = true;
-		try {
-			const detected = await expenseApi.detectImportSource(csvText.slice(0, DETECT_SAMPLE_LENGTH));
-			if (seq !== previewSeq) return false;
-			format = detected;
-			unrecognized = !detected;
-			return !!detected;
-		} catch (err) {
-			if (seq === previewSeq) handleErrorWithNotification(err, "Couldn't read that file");
-			return false;
-		} finally {
-			if (seq === previewSeq) isPreviewing = false;
-		}
-	}
-
-	function onVehicleChange(id: string) {
-		targetVehicleId = id;
-		void runPreview();
+		await form.loadFile(file);
 	}
 
 	async function handleCommit() {
-		const built = buildMapping();
-		if (!preview || preview.readyCount === 0 || !built) return;
-		const { mapping, label } = built;
-		isImporting = true;
-		try {
-			const result = await expenseApi.importExpensesCsv(csvText, false, mapping);
-			appStore.showSuccess(
-				`Migrated ${result.imported} ${result.imported === 1 ? 'entry' : 'entries'} from ${label}`
-			);
-			dialogOpen = false;
-		} catch (err) {
-			handleErrorWithNotification(err, `Couldn't migrate from ${label}`);
-		} finally {
-			isImporting = false;
-		}
+		if (await form.commit(() => {})) dialogOpen = false;
 	}
 
 	function openDialog() {
-		fileName = null;
-		csvText = '';
-		format = null;
-		unrecognized = false;
-		preview = null;
-		isPreviewing = false;
-		isImporting = false;
-		previewSeq++;
+		const lastVehicleId = form.targetVehicleId;
+		form.reset();
+		form.targetVehicleId = vehicles.length === 1 && vehicles[0] ? vehicles[0].id : lastVehicleId;
+		void form.loadFormats();
 		dialogOpen = true;
 	}
 </script>
@@ -235,9 +143,13 @@
 				<label for="migrate-vehicle" class="text-xs font-medium text-foreground">
 					Import into vehicle *
 				</label>
-				<Select.Root type="single" value={targetVehicleId} onValueChange={onVehicleChange}>
+				<Select.Root
+					type="single"
+					value={form.targetVehicleId}
+					onValueChange={id => form.changeTargetVehicle(id)}
+				>
 					<Select.Trigger id="migrate-vehicle" class="w-full" data-testid="migrate-vehicle">
-						{targetVehicle ? getVehicleDisplayName(targetVehicle) : 'Select a vehicle'}
+						{form.targetVehicle ? getVehicleDisplayName(form.targetVehicle) : 'Select a vehicle'}
 					</Select.Trigger>
 					<Select.Content>
 						{#each vehicles as v (v.id)}
@@ -255,24 +167,25 @@
 					class="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-4 py-6 text-sm text-muted-foreground transition-colors hover:bg-muted/50"
 				>
 					<Upload class="h-5 w-5" />
-					<span>{fileName ?? 'Choose your export file (.csv)'}</span>
+					<span>{form.fileName ?? chooseLabel}</span>
 				</label>
 				<input
 					id="migrate-file"
 					type="file"
-					accept=".csv,text/csv"
+					accept={form.formats?.accept.join(',')}
 					class="sr-only"
 					data-testid="migrate-file"
 					onchange={handleFileChange}
 				/>
 			</div>
 
-			{#if isPreviewing}
+			{#if form.isDetecting || form.isPreviewing}
 				<div class="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
 					<LoaderCircle class="h-4 w-4 animate-spin" />
 					Reading your file…
 				</div>
-			{:else if preview}
+			{:else if form.preview}
+				{@const preview = form.preview}
 				<div class="rounded-lg border bg-card p-4" data-testid="migrate-preview">
 					<div class="flex items-center gap-4 text-sm">
 						<span class="flex items-center gap-1.5 font-medium text-foreground">
@@ -288,9 +201,9 @@
 						{/if}
 					</div>
 
-					{#if errorRows.length > 0}
+					{#if form.errorRows.length > 0}
 						<div class="mt-3 max-h-40 space-y-1.5 overflow-y-auto border-t pt-3">
-							{#each errorRows as row (row.row)}
+							{#each form.errorRows as row (row.row)}
 								<div class="flex gap-2 text-xs">
 									<span class="shrink-0 font-medium text-muted-foreground">Row {row.row}</span>
 									<span class="text-foreground">{row.message}</span>
@@ -298,39 +211,37 @@
 							{/each}
 						</div>
 					{/if}
-
-					{#if unmappedCategories.length > 0}
-						<p class="mt-3 border-t pt-3 text-xs text-muted-foreground">
-							Imported as <span class="text-foreground">Misc</span> (no matching VROOM category):
-							{unmappedCategories.join(', ')}
-						</p>
-					{/if}
 				</div>
-			{:else if unrecognized}
+				<CategoryRemapPanel
+					unmappedCategories={form.unmappedCategories}
+					categoryRemap={form.categoryRemap}
+					onRemap={(word, category) => form.setCategoryRemap(word, category)}
+				/>
+			{:else if form.unrecognized}
 				<p class="text-sm text-destructive" role="alert" data-testid="migrate-unrecognized">
-					We don't recognize this file. Check that it's the CSV export from your old app and try
+					We don't recognize this file. Check that it's the export file from your old app and try
 					again.
 				</p>
-			{:else if csvText.trim() && !targetVehicle}
+			{:else if form.csvText.trim() && form.needsTargetVehicle}
 				<p class="text-sm text-muted-foreground">Choose a vehicle above to preview.</p>
 			{/if}
 		</div>
 
 		<Dialog.Footer>
-			<Button variant="outline" onclick={() => (dialogOpen = false)} disabled={isImporting}>
+			<Button variant="outline" onclick={() => (dialogOpen = false)} disabled={form.isImporting}>
 				Cancel
 			</Button>
 			<Button
 				onclick={handleCommit}
-				disabled={isImporting || !preview || preview.readyCount === 0}
+				disabled={form.isImporting || !form.preview || form.preview.readyCount === 0}
 				data-testid="migrate-commit"
 			>
-				{#if isImporting}
+				{#if form.isImporting}
 					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 					Migrating…
 				{:else}
-					Migrate {preview?.readyCount ?? 0}
-					{(preview?.readyCount ?? 0) === 1 ? 'entry' : 'entries'}
+					Migrate {form.preview?.readyCount ?? 0}
+					{(form.preview?.readyCount ?? 0) === 1 ? 'entry' : 'entries'}
 				{/if}
 			</Button>
 		</Dialog.Footer>

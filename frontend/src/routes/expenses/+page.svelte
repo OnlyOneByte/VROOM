@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { onMount, tick, untrack } from 'svelte';
-	import { focusLeftOn } from '#lib/utils/focus.ts';
+	import { onMount, untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
 	import {
@@ -11,12 +10,10 @@
 		TrendingUp,
 		X,
 		Car,
-		CircleAlert,
 		Download,
 		Upload,
 		Images,
 		Ellipsis,
-		LoaderCircle,
 		Plus,
 		SlidersHorizontal,
 		WifiOff
@@ -34,6 +31,7 @@
 	import { formatCurrency } from '#lib/utils/formatters.ts';
 	import {
 		handleErrorWithNotification,
+		logLoadFailure,
 		userFacingErrorMessage
 	} from '#lib/utils/error-handling.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
@@ -47,6 +45,7 @@
 	import ExpensesTable from '#lib/components/expenses/ExpensesTable.svelte';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import ExpenseTagFilter from '#lib/components/expenses/ExpenseTagFilter.svelte';
 	import OfflineExpenseCards from '#lib/components/expenses/OfflineExpenseCards.svelte';
@@ -126,8 +125,6 @@
 	});
 
 	let offlineLoad = $state(false);
-	let isRetryingLoad = $state(false);
-	let loadFailures = $state(0);
 	let expensesHeading = $state<HTMLElement | null>(null);
 
 	onMount(loadInitial);
@@ -150,8 +147,7 @@
 		} catch (error) {
 			if (onlineStatus.current) {
 				loadError = userFacingErrorMessage(error);
-				loadFailures += 1;
-				handleErrorWithNotification(error, "Couldn't load expenses");
+				logLoadFailure(error, "Couldn't load expenses");
 			} else {
 				loadError = null;
 				offlineLoad = true;
@@ -198,7 +194,7 @@
 			message: userFacingErrorMessage(error),
 			offset
 		};
-		handleErrorWithNotification(error, "Couldn't load expenses");
+		logLoadFailure(error, "Couldn't load expenses");
 	}
 
 	async function fetchPageAndSummary(offset = 0, { throwOnFailure = false } = {}) {
@@ -241,30 +237,6 @@
 		} finally {
 			if (isCurrent()) isLoadingPage = false;
 		}
-	}
-
-	async function focusExpensesAfter(origin: Element | null) {
-		await tick();
-		if (focusLeftOn(origin)) expensesHeading?.focus();
-	}
-
-	async function retryLoad() {
-		if (isRetryingLoad) return;
-		const origin = document.activeElement;
-		isRetryingLoad = true;
-		try {
-			await loadInitial();
-		} finally {
-			isRetryingLoad = false;
-		}
-		if (!loadError && !offlineLoad) await focusExpensesAfter(origin);
-	}
-
-	async function retryPage() {
-		if (isLoadingPage) return;
-		const origin = document.activeElement;
-		await fetchPageAndSummary(pageError?.offset ?? currentOffset);
-		if (!pageError) await focusExpensesAfter(origin);
 	}
 
 	function handleFilterChange() {
@@ -441,25 +413,13 @@
 			title="All Expenses"
 			description="Track and categorize expenses across all vehicles"
 		/>
-		<div class="rounded-lg border bg-card p-6" data-testid="expenses-load-error">
-			<div role="alert">
-				{#key loadFailures}
-					<div class="mb-4 flex items-center gap-3 text-destructive">
-						<CircleAlert class="h-5 w-5" />
-						<p class="font-medium">Couldn't load expenses</p>
-					</div>
-					<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
-				{/key}
-			</div>
-			<Button size="lg" onclick={retryLoad} aria-disabled={isRetryingLoad}>
-				{#if isRetryingLoad}
-					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-					Retrying…
-				{:else}
-					Retry
-				{/if}
-			</Button>
-		</div>
+		<LoadErrorCard
+			data-testid="expenses-load-error"
+			title="Couldn't load expenses"
+			message={loadError}
+			onRetry={loadInitial}
+			onRecovered={() => expensesHeading?.focus()}
+		/>
 	</div>
 {:else if offlineLoad}
 	<div class="space-y-6 pb-24">
@@ -613,21 +573,14 @@
 			</CardNs.Header>
 			<CardNs.Content>
 				{#if pageError}
-					<div class="py-6" role="alert" data-testid="expenses-page-error">
-						<div class="mb-4 flex items-center gap-3 text-destructive">
-							<CircleAlert class="h-5 w-5" />
-							<p class="font-medium">Couldn't load expenses</p>
-						</div>
-						<p class="mb-4 text-sm text-muted-foreground">{pageError.message}</p>
-						<Button size="lg" onclick={retryPage} aria-disabled={isLoadingPage}>
-							{#if isLoadingPage}
-								<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-								Retrying…
-							{:else}
-								Retry
-							{/if}
-						</Button>
-					</div>
+					<LoadErrorCard
+						compact
+						data-testid="expenses-page-error"
+						title="Couldn't load expenses"
+						message={pageError.message}
+						onRetry={() => fetchPageAndSummary(pageError?.offset ?? currentOffset)}
+						onRecovered={() => expensesHeading?.focus()}
+					/>
 				{:else}
 					<ExpensesTable
 						expenses={displayExpenses}

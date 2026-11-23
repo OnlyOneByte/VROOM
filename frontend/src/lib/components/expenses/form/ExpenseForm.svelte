@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { onMount, tick, untrack } from 'svelte';
-	import { focusFirstButton, focusLeftOn } from '#lib/utils/focus.ts';
+	import {
+		focusFirstButton,
+		focusFirstProblem,
+		focusInView,
+		focusLeftOn
+	} from '#lib/utils/focus.ts';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
 	import { gotoDynamic, gotoWithQuery } from '#lib/utils/navigation.ts';
@@ -10,6 +15,7 @@
 	import { LoaderCircle, CreditCard, Info, CircleAlert, TriangleAlert } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import CategorySelector from './CategorySelector.svelte';
@@ -157,6 +163,7 @@
 	);
 	let isRetrying = $state(false);
 	let retryButton = $state<HTMLButtonElement | null>(null);
+	let formEl = $state<HTMLFormElement | null>(null);
 
 	const formTitle = $derived(
 		form.isGroupEditMode
@@ -170,21 +177,9 @@
 
 	async function save() {
 		await (form.queuedExpense ? saveQueuedExpense(form) : submitExpense(form));
-		if (form.errors['vehicleDetails'] && retryButton) {
-			retryButton.scrollIntoView({ block: 'center' });
-			retryButton.focus({ preventScroll: true });
-		}
-		if (form.submitError) {
-			await tick();
-			const submitError = document.getElementById('submit-error');
-			submitError?.scrollIntoView({ block: 'center' });
-			submitError?.focus({ preventScroll: true });
-		} else if (form.errors['mileage'] && Object.keys(form.errors).length === 1) {
-			await tick();
-			const mileage = document.getElementById('mileage');
-			mileage?.scrollIntoView({ block: 'center' });
-			mileage?.focus({ preventScroll: true });
-		}
+		if (form.errors['vehicleDetails']) focusInView(retryButton);
+		else if (form.submitError || Object.keys(form.errors).length > 0)
+			await focusFirstProblem(formEl);
 	}
 
 	async function retry(load: () => Promise<void>) {
@@ -297,18 +292,12 @@
 	{:else if form.expenseError}
 		<div class="space-y-6">
 			<ExpenseFormHeader title="Edit Expense" onBack={handleBack} />
-			<div class="rounded-lg border bg-card p-6" role="alert" data-testid="expense-load-error">
-				<div class="mb-4 flex items-center gap-3 text-destructive">
-					<CircleAlert class="h-5 w-5" />
-					<p class="font-medium">
-						Couldn't load this {form.groupId ? 'split expense' : 'expense'}
-					</p>
-				</div>
-				<p class="mb-4 text-sm text-muted-foreground">{form.expenseError}</p>
-				<Button size="lg" aria-disabled={isRetrying} onclick={() => retry(reloadExpense)}>
-					Retry
-				</Button>
-			</div>
+			<LoadErrorCard
+				data-testid="expense-load-error"
+				title="Couldn't load this {form.groupId ? 'split expense' : 'expense'}"
+				message={form.expenseError}
+				onRetry={() => retry(reloadExpense)}
+			/>
 		</div>
 	{:else if form.isInsuranceManaged}
 		<InsuranceManagedView
@@ -335,20 +324,12 @@
 					/>
 				{/snippet}
 			</ExpenseFormHeader>
-			<div class="rounded-lg border bg-card p-6" role="alert" data-testid="vehicles-load-error">
-				<div class="mb-4 flex items-center gap-3 text-destructive">
-					<CircleAlert class="h-5 w-5" />
-					<p class="font-medium">Couldn't load your vehicles</p>
-				</div>
-				<p class="mb-4 text-sm text-muted-foreground">{form.vehiclesError}</p>
-				<Button
-					size="lg"
-					aria-disabled={isRetrying}
-					onclick={() => retry(() => loadVehicles(form))}
-				>
-					Retry
-				</Button>
-			</div>
+			<LoadErrorCard
+				data-testid="vehicles-load-error"
+				title="Couldn't load your vehicles"
+				message={form.vehiclesError}
+				onRetry={() => retry(() => loadVehicles(form))}
+			/>
 		</div>
 	{:else if needsVehicle}
 		<div class="space-y-6">
@@ -376,6 +357,7 @@
 			</ExpenseFormHeader>
 
 			<form
+				bind:this={formEl}
 				onsubmit={e => {
 					e.preventDefault();
 					save();

@@ -1,6 +1,7 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { onMount } from 'svelte';
-	import { Inbox, Check, X, CircleAlert } from '@lucide/svelte';
+	import { Inbox, Check, X } from '@lucide/svelte';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -17,7 +18,6 @@
 
 	let { onAccepted }: Props = $props();
 
-	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
 	let pending = $state<ReceivedShare[]>([]);
 	let acting = $state<string | null>(null);
@@ -25,16 +25,13 @@
 	onMount(load);
 
 	async function load() {
-		isLoading = true;
-		loadError = null;
 		try {
 			const received = await shareApi.listReceived();
 			pending = received.filter(s => s.status === 'pending');
+			loadError = null;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load invitations:', error);
 			loadError = userFacingErrorMessage(error);
-		} finally {
-			isLoading = false;
 		}
 	}
 
@@ -66,17 +63,13 @@
 	}
 </script>
 
-{#if loadError && !isLoading}
-	<Card.Root>
-		<Card.Content class="p-4">
-			<div class="mb-2 flex items-center gap-2 text-destructive">
-				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Couldn't load your invitations</p>
-			</div>
-			<p class="mb-3 text-sm text-muted-foreground">{loadError}</p>
-			<Button onclick={load}>Retry</Button>
-		</Card.Content>
-	</Card.Root>
+{#if loadError}
+	<LoadErrorCard
+		compact
+		title="Couldn't load your invitations"
+		message={loadError}
+		onRetry={load}
+	/>
 {:else if pending.length > 0}
 	<Card.Root>
 		<Card.Header>

@@ -1,8 +1,9 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { TrendingUp, ChartPie, CircleAlert, Car, Plus, Check, ListChecks } from '@lucide/svelte';
+	import { TrendingUp, ChartPie, Car, Plus, Check, ListChecks } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
@@ -339,6 +340,7 @@
 {#snippet chartPlaceholders(error: string | null)}
 	<ChartCard
 		title={TREND_TITLE}
+		level={3}
 		description={TREND_DESCRIPTION}
 		isLoading={!error}
 		{error}
@@ -348,6 +350,7 @@
 	</ChartCard>
 	<ChartCard
 		title={CATEGORY_TITLE}
+		level={3}
 		description={CATEGORY_DESCRIPTION}
 		isLoading={!error}
 		{error}
@@ -391,14 +394,11 @@
 	</PageHeader>
 
 	{#if loadError && !isLoading}
-		<div class="rounded-lg border bg-card p-6">
-			<div class="mb-4 flex items-center gap-3 text-destructive">
-				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Couldn't load the dashboard</p>
-			</div>
-			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
-			<Button size="lg" onclick={loadDashboardData}>Retry</Button>
-		</div>
+		<LoadErrorCard
+			title="Couldn't load the dashboard"
+			message={loadError}
+			onRetry={loadDashboardData}
+		/>
 	{:else if noVehicles}
 		{@render checklist()}
 
@@ -455,6 +455,7 @@
 					{@render chartPlaceholders(null)}
 				{:then [{ default: ExpenseTrendChart }, { AppPieChart }]}
 					<ExpenseTrendChart
+						level={3}
 						data={trendChartData}
 						title={TREND_TITLE}
 						description={TREND_DESCRIPTION}
@@ -465,6 +466,7 @@
 						{/snippet}
 					</ExpenseTrendChart>
 					<AppPieChart
+						level={3}
 						title={CATEGORY_TITLE}
 						description={CATEGORY_DESCRIPTION}
 						data={categoryChartData}

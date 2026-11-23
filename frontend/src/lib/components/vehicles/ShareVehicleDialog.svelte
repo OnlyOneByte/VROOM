@@ -1,4 +1,5 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -7,7 +8,7 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
-	import { Users, CircleAlert, Trash2 } from '@lucide/svelte';
+	import { Users, Trash2 } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { shareApi } from '#lib/services/share-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
@@ -49,18 +50,19 @@
 		if (key === lastKey) return;
 		lastKey = key;
 		if (!open || !vehicleId) return;
+		loadError = null;
 		void load();
 	});
 
 	async function load() {
 		if (!vehicleId) return;
 		isLoading = true;
-		loadError = null;
 		try {
 			const all = await shareApi.listGranted();
 			shares = all.filter(
 				s => s.vehicleId === vehicleId && SHARE_STATUSES_WITH_ACCESS.includes(s.status)
 			);
+			loadError = null;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load shares:', error);
 			loadError = userFacingErrorMessage(error);
@@ -160,21 +162,19 @@
 
 		<div class="mt-2 min-w-0">
 			<h3 class="mb-2 text-sm font-medium text-muted-foreground">People with access</h3>
-			{#if isLoading}
+			{#if isLoading && !loadError}
 				<div class="space-y-2">
 					{#each Array(2) as _, i (i)}
 						<Skeleton class="h-12 w-full" />
 					{/each}
 				</div>
 			{:else if loadError}
-				<div class="rounded-lg border bg-card p-4">
-					<div class="mb-2 flex items-center gap-2 text-destructive">
-						<CircleAlert class="h-5 w-5" />
-						<p class="font-medium">Couldn't load who has access</p>
-					</div>
-					<p class="mb-3 text-sm text-muted-foreground">{loadError}</p>
-					<Button onclick={load}>Retry</Button>
-				</div>
+				<LoadErrorCard
+					compact
+					title="Couldn't load who has access"
+					message={loadError}
+					onRetry={load}
+				/>
 			{:else if shares.length > 0}
 				<div class="divide-y rounded-md border">
 					{#each shares as share (share.id)}

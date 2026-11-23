@@ -39,6 +39,7 @@ import {
 } from '../../types';
 import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
+import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { preferencesRepository } from '../settings/repository';
 import {
   backupService,
@@ -237,6 +238,22 @@ class RestoreService {
       throw new ValidationError('No Google Sheets spreadsheet found for this provider');
     }
 
+    try {
+      return await this.readSheetsAndRestore(userId, providerId, sheetsSpreadsheetId, mode);
+    } catch (error) {
+      await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
+        providers: { [providerId]: { sheetsAutoPausedAt: new Date().toISOString() } },
+      });
+      throw error;
+    }
+  }
+
+  private async readSheetsAndRestore(
+    userId: string,
+    providerId: string,
+    sheetsSpreadsheetId: string,
+    mode: RestoreMode
+  ): Promise<RestoreResponse> {
     const { createSheetsServiceForProvider } = await import(
       '../providers/services/google-sheets-service'
     );
@@ -286,7 +303,7 @@ class RestoreService {
     const userVehicleRows = await this.db
       .select({ id: vehicles.id })
       .from(vehicles)
-      .where(eq(vehicles.userId, userId));
+      .where(ownedVehiclesScope(userId));
     const userVehicleIds = userVehicleRows.map((v) => v.id);
     const userPhotoRows = await this.db
       .select({ id: photos.id })
@@ -300,7 +317,7 @@ class RestoreService {
         data: data.vehicles,
         table: vehicles,
         name: 'vehicles',
-        scope: eq(vehicles.userId, userId),
+        scope: ownedVehiclesScope(userId),
         idColumn: vehicles.id,
         idField: 'id' as const,
       },
@@ -421,7 +438,7 @@ class RestoreService {
     const userVehicles = tx
       .select({ id: vehicles.id })
       .from(vehicles)
-      .where(eq(vehicles.userId, userId))
+      .where(ownedVehiclesScope(userId))
       .all();
     const vehicleIds = userVehicles.map((v) => v.id);
 
@@ -453,7 +470,7 @@ class RestoreService {
     }
     tx.delete(syncState).where(eq(syncState.userId, userId)).run();
 
-    tx.delete(vehicles).where(eq(vehicles.userId, userId)).run();
+    tx.delete(vehicles).where(ownedVehiclesScope(userId)).run();
   }
 
   private photosOnOtherOwnersVehicles(tx: DrizzleTransaction, userId: string): string[] {

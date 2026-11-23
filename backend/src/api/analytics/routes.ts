@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { requireAuth } from '../../middleware';
 import { calendarParts, zonedCalendar } from '../../utils/analytics-charts';
-import { requireVehicleOwnerScope } from '../../utils/sharing';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { zValidator } from '../../utils/validation';
+import { requireVehicleAccess } from '../../utils/vehicle-access';
 import {
   analyticsSummaryToApi,
   crossVehicleToApi,
@@ -134,7 +134,9 @@ routes.get('/fuel-stats', zValidator('query', dateRangeVehicleQuerySchema), asyn
   const user = c.get('user');
   const { startDate, endDate, vehicleId, timeZone } = c.req.valid('query');
 
-  const scopeId = vehicleId ? await requireVehicleOwnerScope(vehicleId, user.id, 'read') : user.id;
+  const scopeId = vehicleId
+    ? (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId
+    : user.id;
 
   const data = await analyticsRepository.getFuelStats(
     scopeId,
@@ -174,7 +176,9 @@ routes.get('/fuel-advanced', zValidator('query', dateRangeVehicleQuerySchema), a
   const user = c.get('user');
   const { startDate, endDate, vehicleId, timeZone } = c.req.valid('query');
 
-  const scopeId = vehicleId ? await requireVehicleOwnerScope(vehicleId, user.id, 'read') : user.id;
+  const scopeId = vehicleId
+    ? (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId
+    : user.id;
 
   const data = await analyticsRepository.getFuelAdvanced(
     scopeId,
@@ -188,7 +192,7 @@ routes.get('/fuel-advanced', zValidator('query', dateRangeVehicleQuerySchema), a
 routes.get('/vehicle-health', zValidator('query', vehicleIdQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, timeZone } = c.req.valid('query');
-  const scopeId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
+  const scopeId = (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId;
   const data = await analyticsRepository.getVehicleHealth(scopeId, vehicleId, timeZone);
   return c.json({ success: true, data });
 });
@@ -196,7 +200,7 @@ routes.get('/vehicle-health', zValidator('query', vehicleIdQuerySchema), async (
 routes.get('/vehicle-tco', zValidator('query', yearVehicleQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, year, timeZone } = c.req.valid('query');
-  const scopeId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
+  const scopeId = (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId;
   const data = await analyticsRepository.getVehicleTCO(scopeId, vehicleId, year, timeZone);
   return c.json({ success: true, data: vehicleTcoToApi(data) });
 });
@@ -207,7 +211,7 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { vehicleId, startDate, endDate, timeZone } = c.req.valid('query');
-    const scopeId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
+    const scopeId = (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId;
     const data = await analyticsRepository.getVehicleExpenses(
       scopeId,
       vehicleId,
@@ -230,7 +234,9 @@ routes.get('/fuel-efficiency', zValidator('query', fuelEfficiencyQuerySchema), a
   const user = c.get('user');
   const { vehicleId } = c.req.valid('query');
 
-  const scopeId = vehicleId ? await requireVehicleOwnerScope(vehicleId, user.id, 'read') : user.id;
+  const scopeId = vehicleId
+    ? (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId
+    : user.id;
 
   const fuelEfficiencyTrend = await analyticsRepository.getFuelEfficiencyTrend(scopeId, vehicleId);
 

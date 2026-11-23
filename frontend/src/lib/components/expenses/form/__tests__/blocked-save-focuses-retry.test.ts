@@ -130,7 +130,7 @@ describe("a fill-up when the vehicle loads but its history doesn't", () => {
 });
 
 describe('a Save blocked by another validation error', () => {
-	test('keeps focus on Save while the vehicle alert and its Retry are on screen', async () => {
+	test('moves focus to the first invalid field, even with the vehicle alert and its Retry on screen', async () => {
 		render(ExpenseForm, { props: { preselectedCategory: 'maintenance' } });
 		await screen.findByTestId('vehicle-load-error');
 		const save = saveBarButton();
@@ -138,11 +138,11 @@ describe('a Save blocked by another validation error', () => {
 
 		await fireEvent.click(save);
 		await vi.waitFor(() => expect(document.getElementById('amount-error')).not.toBeNull());
-		expect(document.activeElement).toBe(save);
-		expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+		await vi.waitFor(() => expect(document.activeElement).toBe(document.getElementById('amount')));
+		expect(screen.getByTestId('vehicle-load-error')).toBeInTheDocument();
 	});
 
-	test('with the vehicle loaded, leaves focus on Save and does not scroll', async () => {
+	test('with the vehicle loaded, moves focus from Save to the first invalid field', async () => {
 		getVehicle.mockResolvedValue(vehicle);
 		render(ExpenseForm, { props: { preselectedCategory: 'fuel' } });
 		await screen.findByLabelText(/Gallons|Liters/);
@@ -152,7 +152,7 @@ describe('a Save blocked by another validation error', () => {
 		await fireEvent.click(save);
 		await vi.waitFor(() => expect(document.getElementById('amount-error')).not.toBeNull());
 		expect(screen.queryByTestId('vehicle-load-error')).toBeNull();
-		expect(document.activeElement).toBe(save);
-		expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+		await vi.waitFor(() => expect(document.activeElement).not.toBe(save));
+		expect(document.activeElement).toHaveAttribute('aria-invalid', 'true');
 	});
 });

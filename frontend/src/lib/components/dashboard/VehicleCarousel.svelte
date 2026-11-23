@@ -2,7 +2,17 @@
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
-	import { Car, Calendar, TrendingUp, DollarSign, Plus, Users, Zap } from '@lucide/svelte';
+	import {
+		ArrowLeft,
+		ArrowRight,
+		Car,
+		Calendar,
+		TrendingUp,
+		DollarSign,
+		Plus,
+		Users,
+		Zap
+	} from '@lucide/svelte';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import * as Carousel from '#lib/components/ui/carousel/index.ts';
 	import type { CarouselAPI } from '#lib/components/ui/carousel/context.ts';
@@ -35,23 +45,34 @@
 	let { vehicles, isLoading = false, addVehicleHref }: Props = $props();
 	const uid = $props.id();
 	const titleId = `${uid}-fleet-title`;
-
-	const CAROUSEL_ARROW_CLASS = 'top-15 bg-background/90 hover:bg-background shadow-md';
+	const carouselId = `${uid}-fleet-carousel`;
 
 	let canScrollPrev = $state(false);
 	let canScrollNext = $state(false);
 	let carousel = $state<HTMLElement | null>(null);
+	let arrows = $state<HTMLElement | null>(null);
+	let carouselApi = $state<CarouselAPI>();
+	let showArrows = $derived(!isLoading && (canScrollPrev || canScrollNext));
+
+	function pageWithKeys(event: KeyboardEvent) {
+		if (event.key === 'ArrowLeft') {
+			event.preventDefault();
+			carouselApi?.scrollPrev();
+		} else if (event.key === 'ArrowRight') {
+			event.preventDefault();
+			carouselApi?.scrollNext();
+		}
+	}
 
 	function trackScrollRange(api: CarouselAPI | undefined) {
 		if (!api) return;
+		carouselApi = api;
 		const sync = () => {
 			canScrollPrev = api.canScrollPrev();
 			canScrollNext = api.canScrollNext();
-			const arrow = document.activeElement?.closest(
-				'[data-slot="carousel-previous"], [data-slot="carousel-next"]'
-			);
-			if (!canScrollPrev && !canScrollNext && arrow && carousel?.contains(arrow)) {
-				carousel.focus();
+			const focusedArrow = arrows?.contains(document.activeElement) ?? false;
+			if (!canScrollPrev && !canScrollNext && focusedArrow) {
+				carousel?.focus();
 			}
 		};
 		sync();
@@ -62,21 +83,57 @@
 
 <Card.Root>
 	<Card.Header>
-		<div class="flex items-center justify-between">
-			<div>
+		<div class="flex items-center justify-between gap-2">
+			<div class="min-w-0">
 				<Card.Title level={2} id={titleId}>Your Fleet</Card.Title>
 				<Card.Description class="hidden sm:block">
 					Click on a vehicle to view details
 				</Card.Description>
 			</div>
-			{#if addVehicleHref}
-				<Button variant="ghost" size="lg" href={addVehicleHref} class="lg:hidden">
-					<Plus class="mr-2 h-4 w-4" />
-					Add Vehicle
-				</Button>
-			{/if}
-			<div class="p-2 rounded-lg bg-chart-2/10 {addVehicleHref ? 'hidden lg:block' : ''}">
-				<Car class="h-5 w-5 text-chart-2" />
+			<div class="flex shrink-0 items-center gap-2">
+				{#if addVehicleHref}
+					<Button
+						variant="ghost"
+						size="lg"
+						href={addVehicleHref}
+						class="lg:hidden {showArrows ? 'max-sm:w-10' : ''}"
+					>
+						<Plus class="h-4 w-4 {showArrows ? 'sm:mr-2' : 'mr-2'}" />
+						<span class={showArrows ? 'max-sm:sr-only' : ''}>Add Vehicle</span>
+					</Button>
+				{/if}
+				{#if showArrows}
+					<div bind:this={arrows} class="flex items-center gap-2" data-testid="fleet-arrows">
+						<Button
+							variant="outline"
+							size="icon-lg"
+							class="rounded-full"
+							aria-controls={carouselId}
+							aria-disabled={!canScrollPrev}
+							onclick={() => carouselApi?.scrollPrev()}
+							onkeydown={pageWithKeys}
+						>
+							<ArrowLeft class="size-4" />
+							<span class="sr-only">Previous slide</span>
+						</Button>
+						<Button
+							variant="outline"
+							size="icon-lg"
+							class="rounded-full"
+							aria-controls={carouselId}
+							aria-disabled={!canScrollNext}
+							onclick={() => carouselApi?.scrollNext()}
+							onkeydown={pageWithKeys}
+						>
+							<ArrowRight class="size-4" />
+							<span class="sr-only">Next slide</span>
+						</Button>
+					</div>
+				{:else}
+					<div class="p-2 rounded-lg bg-chart-2/10 {addVehicleHref ? 'hidden lg:block' : ''}">
+						<Car class="h-5 w-5 text-chart-2" />
+					</div>
+				{/if}
 			</div>
 		</div>
 	</Card.Header>
@@ -95,6 +152,7 @@
 				}}
 				setApi={trackScrollRange}
 				bind:ref={carousel}
+				id={carouselId}
 				tabindex={-1}
 				aria-labelledby={titleId}
 				class="w-full relative rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
@@ -106,53 +164,49 @@
 						>
 							<div class="p-1">
 								<!-- Not a link: a link would nest the Add-Expense button inside it. -->
-								<Card.Root class="overflow-hidden hover:shadow-lg transition-shadow group">
-									<div
-										class="relative {vehicle.coverPhotoUrl
-											? 'h-40'
-											: 'h-16'} bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center overflow-hidden"
-										data-testid="fleet-card-header"
-									>
-										{#if vehicle.coverPhotoUrl}
+								<Card.Root class="overflow-hidden hover:bg-accent/50 transition-colors group">
+									{#if vehicle.coverPhotoUrl}
+										<div
+											class="relative h-40 overflow-hidden bg-muted"
+											data-testid="fleet-card-header"
+										>
 											<img
 												src={vehicle.coverPhotoUrl}
 												alt={vehicle.name}
-												class="absolute inset-0 h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
+												class="absolute inset-0 h-full w-full object-cover motion-safe:sm:group-hover:scale-110 transition-transform duration-300"
 											/>
-										{:else}
-											<div
-												class="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20"
-											></div>
-											<span
-												class="relative z-10 flex items-center gap-1.5 text-muted-foreground"
-												aria-hidden="true"
-											>
-												{#if vehicle.vehicleType === 'electric'}
-													<Zap class="h-5 w-5" />
-												{:else}
-													<Car class="h-5 w-5" />
-												{/if}
-												{#if vehicle.make}
-													<span class="text-lg font-semibold">
-														{vehicle.make.charAt(0).toUpperCase()}
-													</span>
-												{/if}
-											</span>
-										{/if}
-									</div>
+										</div>
+									{/if}
 
 									<Card.Content class="relative p-4 flex flex-col h-[200px]">
 										<!-- Stretched-link overlay: the action button must stay above it (z-10). -->
 										<div class="mb-3">
-											<div class="flex items-start justify-between gap-2">
-												<h3 class="min-w-0 font-semibold text-lg leading-tight">
-													<a
-														href={resolve(paramRoutes.vehicle, { id: vehicle.id })}
-														class="block rounded-sm after:absolute after:inset-0 after:content-[''] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+											<div class="flex items-start gap-3">
+												{#if !vehicle.coverPhotoUrl}
+													<span
+														class="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+														aria-hidden="true"
+														data-testid="fleet-card-avatar"
 													>
-														<span class="line-clamp-2 break-words">{vehicle.nickname || vehicle.name}</span>
-													</a>
-												</h3>
+														{#if vehicle.vehicleType === 'electric'}
+															<Zap class="h-5 w-5" />
+														{:else}
+															<Car class="h-5 w-5" />
+														{/if}
+													</span>
+												{/if}
+												<div class="min-w-0 flex-1">
+													<h3 class="font-semibold text-lg leading-tight">
+														<a
+															href={resolve(paramRoutes.vehicle, { id: vehicle.id })}
+															class="block rounded-sm after:absolute after:inset-0 after:content-[''] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+														>
+															<span class="line-clamp-2 break-words">
+																{vehicle.nickname || vehicle.name}
+															</span>
+														</a>
+													</h3>
+												</div>
 												{#if vehicle.hasActiveFinancing || vehicle.sharedBy}
 													<div class="flex max-w-[50%] shrink-0 flex-wrap justify-end gap-1">
 														{#if vehicle.hasActiveFinancing}
@@ -171,7 +225,7 @@
 												{/if}
 											</div>
 											{#if vehicle.nickname}
-												<p class="truncate text-sm text-muted-foreground">{vehicle.name}</p>
+												<p class="mt-1 truncate text-sm text-muted-foreground">{vehicle.name}</p>
 											{/if}
 										</div>
 
@@ -222,18 +276,6 @@
 						</Carousel.Item>
 					{/each}
 				</Carousel.Content>
-				{#if canScrollPrev || canScrollNext}
-					<Carousel.Previous
-						variant="ghost"
-						aria-disabled={!canScrollPrev}
-						class="{CAROUSEL_ARROW_CLASS} left-2 md:left-4"
-					/>
-					<Carousel.Next
-						variant="ghost"
-						aria-disabled={!canScrollNext}
-						class="{CAROUSEL_ARROW_CLASS} right-2 md:right-4"
-					/>
-				{/if}
 			</Carousel.Root>
 		{:else}
 			<EmptyState>

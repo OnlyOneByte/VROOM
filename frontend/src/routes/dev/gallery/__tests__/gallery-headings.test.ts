@@ -11,4 +11,13 @@ describe('the component gallery', () => {
 
 		expect(titles).toEqual(['Component Gallery']);
 	});
+
+	test('shows the shared How it works disclosure, closed', () => {
+		const { container } = render(GalleryPage);
+		const details = container.querySelector(
+			'[data-slot="how-it-works"]'
+		) as HTMLDetailsElement | null;
+		expect(details?.open).toBe(false);
+		expect(details?.querySelector('summary')).toHaveTextContent('How it works');
+	});
 });

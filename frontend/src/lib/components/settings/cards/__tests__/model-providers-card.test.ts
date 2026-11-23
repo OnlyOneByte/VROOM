@@ -93,8 +93,8 @@ afterEach(() => {
 
 describe('ModelProvidersCard', () => {
 	test.each([
-		['vlm', 'Receipt Parsing (AI)', 'No receipt-parsing provider configured'],
-		['llm', 'Assistant (AI)', 'No assistant provider configured']
+		['vlm', 'Receipt Parsing (AI)', 'No receipt-parsing provider connected'],
+		['llm', 'Assistant (AI)', 'No assistant provider connected']
 	] as const)(
 		'%s domain loads its own providers and shows its copy',
 		async (domain, title, empty) => {
@@ -102,17 +102,31 @@ describe('ModelProvidersCard', () => {
 			render(ModelProvidersCard, { props: { domain } });
 
 			expect(await screen.findByText(empty)).toBeInTheDocument();
-			expect(screen.getByText(title)).toBeInTheDocument();
+			expect(screen.getByRole('heading', { level: 3, name: title })).toBeInTheDocument();
 			expect(getProviders).toHaveBeenCalledWith(domain);
 			expect(document.querySelector(`[data-testid="${domain}-add-provider"]`)).not.toBeNull();
 		}
 	);
 
+	test('the card leads with one line and keeps the privacy details behind How it works', async () => {
+		getProviders.mockResolvedValue([]);
+		const { container } = render(ModelProvidersCard, { props: { domain: 'vlm' } });
+		await screen.findByText('No receipt-parsing provider connected');
+
+		expect(
+			screen.getByText('Scan receipts into expense drafts with your own AI key.')
+		).toBeInTheDocument();
+		const details = container.querySelector('details');
+		expect(details?.open).toBe(false);
+		expect(details?.querySelector('summary')).toHaveTextContent('How it works');
+		expect(details).toHaveTextContent(/self-host with Ollama/);
+	});
+
 	test('an empty card has one add button, named for the card and 40px tall on phones', async () => {
 		getProviders.mockResolvedValue([]);
 		render(ModelProvidersCard, { props: { domain: 'llm' } });
 
-		await screen.findByText('No assistant provider configured');
+		await screen.findByText('No assistant provider connected');
 		const addButtons = screen.getAllByRole('button', { name: /^Add / });
 		expect(addButtons).toHaveLength(1);
 		expect(addButtons[0]).toHaveAccessibleName('Add Assistant Provider');
@@ -127,7 +141,7 @@ describe('ModelProvidersCard', () => {
 		const addButtons = screen.getAllByRole('button', { name: /^Add / });
 		expect(addButtons).toHaveLength(1);
 		expect(addButtons[0]).toHaveAccessibleName('Add Receipt-Parsing Provider');
-		expect(screen.queryByText('No receipt-parsing provider configured')).toBeNull();
+		expect(screen.queryByText('No receipt-parsing provider connected')).toBeNull();
 	});
 
 	test('lists the providers returned for the domain', async () => {
@@ -417,7 +431,7 @@ describe('ModelProvidersCard edit and delete', () => {
 		await settle();
 		expect(deleteProvider).toHaveBeenCalledWith('llm-1');
 		expect(showSuccess).toHaveBeenCalledWith('Work Claude removed');
-		expect(await screen.findByText('No assistant provider configured')).toBeInTheDocument();
+		expect(await screen.findByText('No assistant provider connected')).toBeInTheDocument();
 	});
 
 	test('a delete failure reports an error and keeps the provider', async () => {

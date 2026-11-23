@@ -2,6 +2,7 @@
 	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import { onMount, tick } from 'svelte';
 	import { Bell, LoaderCircle } from '@lucide/svelte';
+	import HowItWorks from '#lib/components/common/how-it-works.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
@@ -133,10 +134,14 @@
 			<CardTitle>Push Notifications</CardTitle>
 		</div>
 		<CardDescription>
-			Get a browser notification when a reminder comes due — even when VROOM isn't open. Delivery is
-			best-effort: a notification fires when VROOM next runs a reminder check, not on a fixed
-			schedule.
+			Get a notification when a reminder comes due, even when VROOM isn't open.
 		</CardDescription>
+		<HowItWorks>
+			<p class="text-sm text-muted-foreground">
+				Delivery is best-effort: a notification fires when VROOM next runs a reminder check, not on
+				a fixed schedule.
+			</p>
+		</HowItWorks>
 	</CardHeader>
 	<CardContent bind:ref={content} tabindex={-1}>
 		{#if isLoading}

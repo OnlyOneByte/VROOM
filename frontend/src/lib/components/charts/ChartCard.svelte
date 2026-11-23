@@ -11,6 +11,7 @@
 
 	interface Props {
 		title: string;
+		level?: 2 | 3 | 4;
 		description?: string;
 		isLoading?: boolean;
 		error?: string | null;
@@ -28,6 +29,7 @@
 
 	let {
 		title,
+		level = 2,
 		description,
 		isLoading = false,
 		error = null,
@@ -44,6 +46,7 @@
 	}: Props = $props();
 
 	let placeholderHeight = $derived(height ?? 300);
+	let stateLevel = $derived(level === 2 ? (3 as const) : (4 as const));
 
 	// LayerChart measures 0x0 in hidden containers; gate rendering on visibility.
 	let gate = createVisibilityWatch();
@@ -88,7 +91,7 @@
 	<Card.Header>
 		<div class="flex items-center justify-between">
 			<div>
-				<Card.Title bind:ref={titleEl} tabindex={-1}>{title}</Card.Title>
+				<Card.Title bind:ref={titleEl} tabindex={-1} {level}>{title}</Card.Title>
 				{#if description}
 					<Card.Description>{description}</Card.Description>
 				{/if}
@@ -103,7 +106,7 @@
 			<Skeleton class="w-full" style="height: {placeholderHeight}px" />
 		{:else if error}
 			<div style="height: {placeholderHeight}px">
-				<EmptyState class="h-full" action={onRetry ? retryAction : undefined}>
+				<EmptyState class="h-full" level={stateLevel} action={onRetry ? retryAction : undefined}>
 					{#snippet title()}
 						Couldn't load the chart
 					{/snippet}
@@ -114,7 +117,7 @@
 			</div>
 		{:else if isEmpty}
 			<div style="height: {placeholderHeight}px">
-				<EmptyState class="h-full">
+				<EmptyState class="h-full" level={stateLevel}>
 					{#snippet title()}
 						{emptyTitle}
 					{/snippet}

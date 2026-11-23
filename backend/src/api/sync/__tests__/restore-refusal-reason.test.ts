@@ -11,6 +11,50 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
+async function seedSheetsProvider(): Promise<void> {
+  ctx.sqlite.run(
+    `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
+     VALUES ('prov-sheets', ?, 'storage', 'google-drive', 'Drive', 'x', 'active')`,
+    [ctx.user.id]
+  );
+  ctx.sqlite.run(
+    `INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET backup_config = excluded.backup_config`,
+    [
+      ctx.user.id,
+      JSON.stringify({ providers: { 'prov-sheets': { sheetsSpreadsheetId: 'sheet-1' } } }),
+    ]
+  );
+}
+
+function pausedAt(): unknown {
+  const row = ctx.sqlite
+    .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
+    .get(ctx.user.id) as { backup_config: string };
+  return JSON.parse(row.backup_config).providers['prov-sheets'].sheetsAutoPausedAt;
+}
+
+describe('a Sheets restore that fails before validation', () => {
+  test('a spreadsheet that cannot be read still pauses automatic backups', async () => {
+    await seedSheetsProvider();
+    const sheetsModule = await import('../../providers/services/google-sheets-service');
+    const spy = spyOn(sheetsModule, 'createSheetsServiceForProvider').mockResolvedValue({
+      readSpreadsheetData: async () => {
+        throw new ValidationError('Spreadsheet is missing the Vehicles tab');
+      },
+    } as never);
+    try {
+      const { restoreService } = await import('../restore');
+      await expect(
+        restoreService.restoreFromSheets(ctx.user.id, 'prov-sheets', 'preview')
+      ).rejects.toThrow('missing the Vehicles tab');
+      expect(typeof pausedAt()).toBe('string');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
 describe('a refused Sheets restore', () => {
   test('leads with the plain reason, which says to copy the spreadsheet first', async () => {
     ctx.sqlite.run(
@@ -46,7 +90,13 @@ describe('a refused Sheets restore', () => {
       expect(refused).toBeInstanceOf(ValidationError);
       const details = (refused as ValidationError).details as string[];
       expect(details[0]).toBe(BACKUP_CHECK_REASONS.sheets.metadata);
-      expect(details[0]).toContain('use File > Make a copy');
+      expect(details[0]).toContain('use File\u00a0>\u00a0Make a copy');
+      const row = ctx.sqlite
+        .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
+        .get(ctx.user.id) as { backup_config: string };
+      const settings = JSON.parse(row.backup_config).providers['prov-sheets'];
+      expect(typeof settings.sheetsAutoPausedAt).toBe('string');
+      expect(settings.sheetsSpreadsheetId).toBe('sheet-1');
     } finally {
       spy.mockRestore();
     }

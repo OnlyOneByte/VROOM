@@ -15,7 +15,7 @@ const rel = (file: string) => relative(SRC_ROOT, file).split('\\').join('/');
 ratchet({
 	name: 'no hardcoded currency symbols in user-facing labels',
 	kind: 'exclusion',
-	tolerated: ['lib/components/settings/cards/UnitPreferencesCard.svelte'],
+	tolerated: [],
 	guidance:
 		'Hardcoded currency symbol(s) in a label suffix. Route the label through ' +
 		'getCurrencySymbol()/formatCurrency() so EUR/GBP users see the right unit:',

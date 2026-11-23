@@ -59,8 +59,10 @@ Tailwind's 4px scale is the only spacing scale. Match the neighbours; don't inve
 - **Grids collapse.** Stat tiles are 2-up on mobile and up to 4-up at `lg` (`StatCardGrid`).
   Side-by-side cards stack below `lg`.
 - **Radius** comes from `--radius` (`rounded-md` controls, `rounded-lg`/`rounded-xl` cards).
-  `rounded-full` is for avatars, pills and the FAB only.
+  `rounded-full` is for avatars, pills, carousel arrows and the FAB only.
 - **Reserve space** for anything that arrives late (badges, charts, counts) so nothing jumps.
+- **No photo, no image area.** With no photo, a card shows no image area; a placeholder band is
+  decoration.
 - **Four screens at 375.** A page or tab fits in about four phone screens. Lead with the
   numbers people come for, then group secondary content behind a disclosure that is closed
   below `lg` (Analytics → Fuel & Stats uses `ChartGroup`), or move it to its own tab.
@@ -161,8 +163,9 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   screen-reader users land on what needs fixing instead of staying on Save. Focusing the field
   is enough: its wired error is announced with it. Move focus after the errors have rendered,
   to the element that carries `aria-invalid` and `aria-describedby` (the trigger, for `Select`
-  and `DatePicker`). New forms do this; existing forms adopt it form by form, and a PR that
-  changes a form for another reason isn't blocked on it.
+  and `DatePicker`). `focusFirstProblem` in `utils/focus.ts` does this; the expense, vehicle,
+  policy and odometer forms use it. New forms do this; other existing forms adopt it form by form,
+  and a PR that changes a form for another reason isn't blocked on it.
 - Use the right control: `DatePicker` for dates, `Select` for a short fixed list, a tile grid for
   a handful of illustrated choices (expense category), `Switch` for settings that apply
   instantly, `Checkbox` for choices saved with a form.
@@ -185,6 +188,8 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
 - Every chart has a title, a one-line description of what it shows, axis values formatted by
   `utils/formatters` (currency, units), and a legend or direct labels when there is more than one
   series.
+- One unit per axis. Two measures with different units are two charts, not two series on one
+  axis.
 - A chart is never the only way to read a number: pair it with a stat tile, a legend with values
   (as the category pie does), or a table.
 - On mobile, charts are full width with few enough x-axis ticks to stay legible; no horizontal
@@ -218,6 +223,9 @@ Every view that loads or mutates data handles all of these:
    A load failure is shown once, where the content would be: the inline error with Retry. Don't
    also toast it; log it with `logLoadFailure`. Toasts are for the result of an action the user
    took and for background work with no place on screen.
+   That inline error is `common/LoadErrorCard.svelte` (`compact` inside dialogs and cards): it owns
+   the alert role, the busy Retry and where focus goes after a retry. Don't hand-write a
+   `CircleAlert` + Retry block; `load-error-card-adoption.test.ts` guards this.
 4. **Populated** — the happy path, including edge sizes: one item, many items, long names, large
    amounts, zero amounts.
 5. **Success** — every mutation gives feedback: a success toast or a visible change (the row
@@ -268,6 +276,8 @@ verify by hand:
   `tabindex="-1"`, Arrow keys move through them, Enter picks the active one, Escape closes the
   list, and Tab moves on to the next control. Close the list on `focusout` to outside the field,
   never on a timer, so focus is never left on a removed element.
+  Every signed-in page starts with a "Skip to content" link as its first Tab stop; it moves focus
+  to `<main id="main">`, past the navigation rail (`routes/+layout.svelte`).
 - **Focus.** Never remove outlines. Primitives show `focus-visible:ring-[3px]` in `ring-ring/50`;
   a custom control shows the same ring. Focus moves into a dialog on open and back on close, and
   after a failed submit it moves to the first invalid field (see *Forms*).

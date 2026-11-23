@@ -76,9 +76,18 @@ export function distinctYTicks(format: (_v: number) => string, plotHeight: numbe
 			const ticks: number[] = scale.ticks?.(count) ?? [];
 			if (new Set(ticks.map(format)).size === ticks.length) return ticks;
 		}
-		const ticks: number[] = scale.ticks?.(2) ?? [];
-		return ticks.filter((tick, i) => i === 0 || format(tick) !== format(ticks[i - 1] as number));
+		const kept: number[] = [];
+		for (const tick of (scale.ticks?.(2) ?? []) as number[]) {
+			const last = kept.at(-1);
+			if (last === undefined || format(last) !== format(tick)) kept.push(tick);
+			else if (decimalPlaces(tick) < decimalPlaces(last)) kept[kept.length - 1] = tick;
+		}
+		return kept;
 	};
+}
+
+function decimalPlaces(value: number): number {
+	return (String(value).split('.')[1] ?? '').length;
 }
 
 function formatMonthTick(value: unknown): string {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
@@ -545,14 +546,7 @@
 		</div>
 	</div>
 {:else if vehicleLoadError}
-	<div class="rounded-lg border bg-card p-6">
-		<div class="mb-4 flex items-center gap-3 text-destructive">
-			<CircleAlert class="h-5 w-5" />
-			<p class="font-medium">Couldn't load this vehicle</p>
-		</div>
-		<p class="mb-4 text-sm text-muted-foreground">{vehicleLoadError}</p>
-		<Button size="lg" onclick={loadPage}>Retry</Button>
-	</div>
+	<LoadErrorCard title="Couldn't load this vehicle" message={vehicleLoadError} onRetry={loadPage} />
 {:else if vehicle}
 	<div class="space-y-6 pb-24">
 		<div class="flex items-start justify-between gap-4">
@@ -594,14 +588,11 @@
 
 			<TabsContent value="overview" class="space-y-6">
 				{#if summaryLoadError && !isLoadingStats}
-					<div class="rounded-lg border bg-card p-6">
-						<div class="mb-4 flex items-center gap-3 text-destructive">
-							<CircleAlert class="h-5 w-5" />
-							<p class="font-medium">Couldn't load the expense summary</p>
-						</div>
-						<p class="mb-4 text-sm text-muted-foreground">{summaryLoadError}</p>
-						<Button onclick={loadSummary}>Retry</Button>
-					</div>
+					<LoadErrorCard
+						title="Couldn't load the expense summary"
+						message={summaryLoadError}
+						onRetry={loadSummary}
+					/>
 				{:else if summary && !hasExpenseData}
 					<EmptyState>
 						{#snippet icon()}
@@ -721,14 +712,12 @@
 							</CardFull.Header>
 							<CardFull.Content>
 								{#if expensesLoadError && !isLoadingPage}
-									<div class="flex flex-col items-center gap-3 py-8 text-center">
-										<CircleAlert class="h-8 w-8 text-destructive" />
-										<p class="font-medium">Couldn't load expenses</p>
-										<p class="text-sm text-muted-foreground">{expensesLoadError}</p>
-										<Button variant="outline" onclick={() => fetchExpensesPage(currentOffset)}>
-											Retry
-										</Button>
-									</div>
+									<LoadErrorCard
+										compact
+										title="Couldn't load expenses"
+										message={expensesLoadError}
+										onRetry={() => fetchExpensesPage(currentOffset)}
+									/>
 								{:else}
 									<ExpensesTable
 										{expenses}

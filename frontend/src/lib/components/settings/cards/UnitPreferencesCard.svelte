@@ -2,6 +2,7 @@
 	import { Globe, Fuel, DollarSign } from '@lucide/svelte';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
+	import { currencyLabel, pickerCurrencyCodes } from '#lib/utils/formatters.ts';
 	import {
 		Card,
 		CardContent,
@@ -37,16 +38,11 @@
 		return labels[unit];
 	}
 
-	function getCurrencyLabel(currency: string): string {
-		const labels: Record<string, string> = {
-			USD: 'USD ($)',
-			EUR: 'EUR (€)',
-			GBP: 'GBP (£)',
-			CAD: 'CAD ($)',
-			AUD: 'AUD ($)'
-		};
-		return labels[currency] || currency;
-	}
+	const currencyCodes = $derived(
+		pickerCurrencyCodes().includes(currencyUnit)
+			? pickerCurrencyCodes()
+			: [currencyUnit, ...pickerCurrencyCodes()]
+	);
 </script>
 
 <Card>
@@ -148,14 +144,14 @@
 				}}
 			>
 				<Select.Trigger id="currency" class="w-full">
-					{getCurrencyLabel(currencyUnit)}
+					{currencyLabel(currencyUnit)}
 				</Select.Trigger>
 				<Select.Content>
-					<Select.Item value="USD" label="USD ($)">USD ($)</Select.Item>
-					<Select.Item value="EUR" label="EUR (€)">EUR (€)</Select.Item>
-					<Select.Item value="GBP" label="GBP (£)">GBP (£)</Select.Item>
-					<Select.Item value="CAD" label="CAD ($)">CAD ($)</Select.Item>
-					<Select.Item value="AUD" label="AUD ($)">AUD ($)</Select.Item>
+					{#each currencyCodes as code (code)}
+						<Select.Item value={code} label={currencyLabel(code)}>
+							{currencyLabel(code)}
+						</Select.Item>
+					{/each}
 				</Select.Content>
 			</Select.Root>
 		</div>

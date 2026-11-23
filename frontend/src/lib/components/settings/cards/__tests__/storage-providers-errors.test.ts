@@ -70,7 +70,7 @@ describe('Storage Providers card errors read as plain sentences', () => {
 		expect(screen.queryByText(/boom/)).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-		expect(await screen.findByText('Providers')).toBeInTheDocument();
+		expect(await screen.findByText('No storage provider connected')).toBeInTheDocument();
 		expect(screen.queryByText("Couldn't load your storage providers")).toBeNull();
 		await waitFor(() => expect(screen.getAllByRole('button')[0]).toHaveFocus());
 	});

@@ -8,6 +8,7 @@
 		align?: 'start' | 'center' | 'end';
 		sideOffset?: number;
 		children?: Snippet;
+		onOpenAutoFocus?: (_event: Event) => void;
 	}
 
 	let {

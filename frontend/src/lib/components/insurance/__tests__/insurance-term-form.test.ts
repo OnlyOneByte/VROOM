@@ -15,6 +15,15 @@ import {
 	UNEXPECTED_FAILURE_MESSAGE
 } from '#lib/utils/error-handling.ts';
 
+const currency = vi.hoisted(() => ({ unit: 'USD' }));
+vi.mock('#lib/stores/settings.svelte.ts', () => ({
+	settingsStore: {
+		get settings() {
+			return { currencyUnit: currency.unit };
+		}
+	}
+}));
+
 const gotoDynamic = vi.fn<(url: string) => void>();
 vi.mock('#lib/utils/navigation.ts', () => ({ gotoDynamic: (url: string) => gotoDynamic(url) }));
 
@@ -116,6 +125,28 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	currency.unit = 'USD';
+});
+
+describe('InsuranceTermForm amount inputs follow the currency', () => {
+	const amountIds = [
+		'total-cost',
+		'monthly-cost',
+		'payment-amount',
+		'deductible',
+		'coverage-limit'
+	];
+
+	test('a JPY user steps every amount in whole yen', async () => {
+		currency.unit = 'JPY';
+		await mount();
+		for (const id of amountIds) expect(field(id)).toHaveAttribute('step', '1');
+	});
+
+	test('a USD user keeps the cents step', async () => {
+		await mount();
+		for (const id of amountIds) expect(field(id)).toHaveAttribute('step', '0.01');
+	});
 });
 
 describe('InsuranceTermForm add mode', () => {

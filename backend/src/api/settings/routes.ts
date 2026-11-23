@@ -86,7 +86,11 @@ function mergeStorageConfig(
   };
 }
 
-const SERVER_OWNED_BACKUP_FIELDS = new Set(['lastBackupAt', 'sheetsSpreadsheetId']);
+const SERVER_OWNED_BACKUP_FIELDS = new Set([
+  'lastBackupAt',
+  'sheetsSpreadsheetId',
+  'sheetsAutoPausedAt',
+]);
 
 function clientBackupConfigPatch(
   existing: BackupConfig | null | undefined,

@@ -121,6 +121,7 @@
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
 	{#if premiumTrendData.length > 0}
 		<AppLineChart
+			level={3}
 			title="Monthly Premium Trends"
 			description="Total insurance costs over time"
 			data={premiumTrendData}
@@ -133,6 +134,7 @@
 
 	{#if carrierData.length > 0}
 		<AppBarChart
+			level={3}
 			title="Cost by Insurance Carrier"
 			description="Annual premium comparison"
 			data={carrierData}

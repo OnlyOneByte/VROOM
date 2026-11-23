@@ -6,15 +6,8 @@
 		pwaInstallState,
 		getPlatformInfo
 	} from '#lib/utils/pwa.ts';
-	import {
-		Download,
-		CircleCheck,
-		Share,
-		Smartphone,
-		Monitor,
-		Plus,
-		LoaderCircle
-	} from '@lucide/svelte';
+	import { Download, CircleCheck, Share, Smartphone, Plus, LoaderCircle } from '@lucide/svelte';
+	import HowItWorks from '#lib/components/common/how-it-works.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		Card,
@@ -68,105 +61,56 @@
 			<Smartphone class="h-5 w-5" />
 			Install App
 		</CardTitle>
-		<CardDescription>
-			Use VROOM as a standalone app for faster access and offline support
-		</CardDescription>
+		<CardDescription>Use VROOM like an app, with offline access.</CardDescription>
 	</CardHeader>
 	<CardContent>
 		{#if isStandalone}
-			<div class="flex items-center gap-3 rounded-lg bg-chart-2/10 p-4">
-				<CircleCheck class="h-5 w-5 text-chart-2 shrink-0" />
-				<p class="text-sm text-foreground">
-					You're using VROOM as an installed app. You're all set.
-				</p>
-			</div>
+			<p class="flex items-center gap-2 text-sm text-foreground">
+				<CircleCheck class="h-4 w-4 text-chart-2 shrink-0" />
+				You're using the installed app.
+			</p>
 		{:else if canInstall}
-			<div class="space-y-4">
-				<p class="text-sm text-muted-foreground">
-					Install VROOM on your device for a native app experience with offline support and faster
-					loading.
-				</p>
-				<Button onclick={handleInstall} disabled={installing}>
-					{#if installing}
-						<LoaderCircle class="h-4 w-4 animate-spin mr-2" />
-						Installing…
-					{:else}
-						<Download class="h-4 w-4 mr-2" />
-						Install VROOM
-					{/if}
-				</Button>
-			</div>
+			<Button onclick={handleInstall} disabled={installing}>
+				{#if installing}
+					<LoaderCircle class="h-4 w-4 animate-spin mr-2" />
+					Installing…
+				{:else}
+					<Download class="h-4 w-4 mr-2" />
+					Install VROOM
+				{/if}
+			</Button>
 		{:else if isIOS}
-			<div class="space-y-4">
-				<p class="text-sm text-muted-foreground">
-					To install VROOM on your iPhone or iPad, use Safari's Add to Home Screen feature:
-				</p>
-				<ol class="space-y-3 text-sm">
-					<li class="flex items-start gap-3">
-						<span
-							class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
-						>
-							1
-						</span>
-						<span class="text-foreground">
-							Tap the <Share class="inline h-4 w-4 text-primary align-text-bottom" />
-							<span class="font-medium">Share</span> button in Safari's toolbar
-						</span>
+			<p class="text-sm text-muted-foreground">
+				In Safari, tap <span class="font-medium text-foreground">Share</span>, then
+				<span class="font-medium text-foreground">Add to Home Screen</span>.
+			</p>
+			<HowItWorks class="mt-2">
+				<ol class="mt-2 space-y-2 text-sm text-foreground">
+					<li>
+						1. Tap the <Share class="inline h-4 w-4 text-primary align-text-bottom" />
+						<span class="font-medium">Share</span> button in Safari's toolbar.
 					</li>
-					<li class="flex items-start gap-3">
-						<span
-							class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
-						>
-							2
-						</span>
-						<span class="text-foreground">
-							Scroll down and tap <Plus class="inline h-4 w-4 text-primary align-text-bottom" />
-							<span class="font-medium">Add to Home Screen</span>
-						</span>
+					<li>
+						2. Scroll down and tap <Plus class="inline h-4 w-4 text-primary align-text-bottom" />
+						<span class="font-medium">Add to Home Screen</span>.
 					</li>
-					<li class="flex items-start gap-3">
-						<span
-							class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
-						>
-							3
-						</span>
-						<span class="text-foreground">
-							Tap <span class="font-medium">Add</span> to confirm
-						</span>
-					</li>
+					<li>3. Tap <span class="font-medium">Add</span> to confirm.</li>
 				</ol>
-				<p class="text-xs text-muted-foreground">
-					Make sure you're using Safari — other iOS browsers don't support Add to Home Screen.
+				<p class="mt-2 text-xs text-muted-foreground">
+					Other iOS browsers don't support Add to Home Screen.
 				</p>
-			</div>
+			</HowItWorks>
 		{:else if isChromium}
-			<div class="space-y-4">
-				<p class="text-sm text-muted-foreground">
-					Install VROOM on your device for a native app experience with offline support and faster
-					loading.
-				</p>
-				<p class="text-sm text-muted-foreground">
-					Look for the install icon
-					<Download class="inline h-4 w-4 text-primary align-text-bottom" /> in your browser's address
-					bar, or open the browser menu and select
-					<span class="font-medium text-foreground">Install VROOM</span>.
-				</p>
-			</div>
+			<p class="text-sm text-muted-foreground">
+				Use the install icon
+				<Download class="inline h-4 w-4 text-primary align-text-bottom" /> in the address bar, or
+				<span class="font-medium text-foreground">Install VROOM</span> in the browser menu.
+			</p>
 		{:else}
-			<div class="space-y-3">
-				<div class="flex items-start gap-3 rounded-lg bg-muted p-4">
-					<Monitor class="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-					<div class="text-sm">
-						<p class="text-foreground">
-							For the best experience, open VROOM in <span class="font-medium">Chrome</span> or
-							<span class="font-medium">Edge</span> to install it as a desktop app.
-						</p>
-						<p class="text-muted-foreground mt-1">
-							You'll get a dedicated window, offline access, and faster loading.
-						</p>
-					</div>
-				</div>
-			</div>
+			<p class="text-sm text-muted-foreground">
+				Open VROOM in <span class="font-medium text-foreground">Chrome</span> or
+				<span class="font-medium text-foreground">Edge</span> to install it.
+			</p>
 		{/if}
 	</CardContent>
 </Card>

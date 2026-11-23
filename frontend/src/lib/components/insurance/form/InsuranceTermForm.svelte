@@ -1,4 +1,5 @@
 <script lang="ts">
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
 	import { addVehicleFirstTo } from '#lib/components/common/NoVehiclesEmptyState.svelte';
@@ -7,7 +8,7 @@
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import { ArrowLeft, Check, CircleAlert, LoaderCircle, X, FileText } from '@lucide/svelte';
+	import { ArrowLeft, Check, LoaderCircle, X, FileText } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -33,7 +34,7 @@
 		enteredAmount,
 		prefillFromPreviousTerm
 	} from '#lib/utils/insurance.ts';
-	import { getCurrencySymbol } from '#lib/utils/formatters.ts';
+	import { amountStep, getCurrencySymbol } from '#lib/utils/formatters.ts';
 	import type { InsurancePolicy, InsuranceTerm, Vehicle } from '#lib/types/index.ts';
 
 	interface Props {
@@ -279,14 +280,7 @@
 					</Button>
 				{/snippet}
 			</PageHeader>
-			<div class="rounded-lg border bg-card p-6">
-				<div class="mb-4 flex items-center gap-3 text-destructive">
-					<CircleAlert class="h-5 w-5" />
-					<p class="font-medium">Couldn't load this policy</p>
-				</div>
-				<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
-				<Button size="lg" onclick={loadData}>Retry</Button>
-			</div>
+			<LoadErrorCard title="Couldn't load this policy" message={loadError} onRetry={loadData} />
 		</div>
 	{:else}
 		<div class="space-y-6">
@@ -356,7 +350,7 @@
 								<Input
 									id="total-cost"
 									type="number"
-									step="0.01"
+									step={amountStep()}
 									min="0"
 									bind:value={totalCost}
 									aria-invalid={!!errors.totalCost}
@@ -370,7 +364,7 @@
 								<Input
 									id="monthly-cost"
 									type="number"
-									step="0.01"
+									step={amountStep()}
 									min="0"
 									bind:value={monthlyCost}
 									aria-invalid={!!errors.monthlyCost}
@@ -387,7 +381,7 @@
 								<Input
 									id="payment-amount"
 									type="number"
-									step="0.01"
+									step={amountStep()}
 									min="0"
 									bind:value={paymentAmount}
 									aria-invalid={!!errors.paymentAmount}
@@ -485,7 +479,7 @@
 								<Input
 									id="deductible"
 									type="number"
-									step="0.01"
+									step={amountStep()}
 									min="0"
 									bind:value={deductibleAmount}
 									aria-invalid={!!errors.deductibleAmount}
@@ -512,7 +506,7 @@
 								<Input
 									id="coverage-limit"
 									type="number"
-									step="0.01"
+									step={amountStep()}
 									min="0"
 									bind:value={coverageLimit}
 									aria-invalid={!!errors.coverageLimit}

@@ -17,6 +17,9 @@
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { providerApi } from '#lib/services/provider-api.ts';
+	import { settingsApi } from '#lib/services/settings-api.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { Alert, AlertDescription } from '#lib/components/ui/alert/index.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { PHOTO_CATEGORY_LABELS } from '#lib/constants/ui.ts';
@@ -137,6 +140,22 @@
 
 	let supportsZipBackup = $derived(providerSupportsZipBackup(provider.providerType));
 	let meta = $derived(providerMeta(provider.providerType));
+	let sheetsPaused = $derived(
+		!!settingsStore.settings?.backupConfig?.providers[provider.id]?.sheetsAutoPausedAt
+	);
+	let isResuming = $state(false);
+
+	async function resumeSheetsBackups() {
+		isResuming = true;
+		try {
+			await settingsApi.resumeSheetsBackups(provider.id);
+			await settingsStore.load();
+		} catch (e) {
+			appStore.showError(`Couldn't resume automatic Sheets backups. ${userFacingErrorMessage(e)}`);
+		} finally {
+			isResuming = false;
+		}
+	}
 	let details = $derived(meta?.form?.details?.(provider.config ?? {}) ?? []);
 	const zipBackupProviders = new Intl.ListFormat('en', { type: 'disjunction' }).format(
 		Object.values(PROVIDER_META)
@@ -242,6 +261,29 @@
 						onCheckedChange={checked => onSheetsSyncToggle?.(provider.id, checked === true)}
 					/>
 				</div>
+				{#if sheetsPaused}
+					<Alert variant="warning" role="status">
+						<AlertDescription class="space-y-2">
+							<p>
+								Automatic backups to this spreadsheet are paused, because restoring from it was
+								refused. If you want to keep it as it is, make a copy in Google Drive first. A
+								backup you start, or the next automatic one after you resume, writes over it.
+							</p>
+							<Button
+								variant="outline"
+								size="sm"
+								class="h-10 sm:h-8"
+								onclick={resumeSheetsBackups}
+								disabled={isResuming}
+							>
+								{#if isResuming}
+									<LoaderCircle class="h-3 w-3 animate-spin mr-1" />
+								{/if}
+								Resume Automatic Backups
+							</Button>
+						</AlertDescription>
+					</Alert>
+				{/if}
 			{/if}
 			{#if lastBackupAt}
 				<p class="text-xs text-muted-foreground">Last backup: {formatLastSync(lastBackupAt)}</p>

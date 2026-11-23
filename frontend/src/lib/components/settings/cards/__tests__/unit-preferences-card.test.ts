@@ -50,7 +50,7 @@ describe('UnitPreferencesCard', () => {
 		expect(trigger('distance-unit')).toHaveTextContent('Miles');
 		expect(trigger('volume-unit')).toHaveTextContent('Gallons (US)');
 		expect(trigger('charge-unit')).toHaveTextContent('kWh');
-		expect(trigger('currency')).toHaveTextContent('USD ($)');
+		expect(trigger('currency')).toHaveTextContent('USD – US Dollar ($)');
 	});
 
 	test.each([
@@ -70,14 +70,34 @@ describe('UnitPreferencesCard', () => {
 	});
 
 	test.each([
-		['EUR', 'EUR (€)'],
-		['GBP', 'GBP (£)'],
-		['CAD', 'CAD ($)'],
-		['AUD', 'AUD ($)'],
-		['JPY', 'JPY']
+		['EUR', 'EUR – Euro (€)'],
+		['GBP', 'GBP – British Pound (£)'],
+		['CAD', 'CAD – Canadian Dollar (CA$)'],
+		['JPY', 'JPY – Japanese Yen (¥)'],
+		['CHF', 'CHF – Swiss Franc']
 	])('currency %s is labelled %s', (code, label) => {
 		mount({ currencyUnit: code });
 		expect(trigger('currency')).toHaveTextContent(label);
+	});
+
+	test('offers every 0- and 2-decimal ISO currency, and no 3-decimal one', async () => {
+		mount();
+		await fireEvent.click(trigger('currency'));
+		await settle();
+		const names = screen.getAllByRole('option').map(o => o.textContent?.trim());
+		expect(names.length).toBeGreaterThan(100);
+		expect(names).toContain('JPY – Japanese Yen (¥)');
+		expect(names).toContain('INR – Indian Rupee (₹)');
+		expect(names.some(n => n?.startsWith('BHD'))).toBe(false);
+		expect(names.some(n => n?.startsWith('KWD'))).toBe(false);
+	});
+
+	test('a saved currency outside the list still shows and stays selectable', async () => {
+		mount({ currencyUnit: 'BHD' });
+		expect(trigger('currency')).toHaveTextContent('BHD – Bahraini Dinar');
+		await fireEvent.click(trigger('currency'));
+		await settle();
+		expect(screen.getByRole('option', { name: 'BHD – Bahraini Dinar' })).toBeTruthy();
 	});
 
 	test('picking a distance unit updates the selection', async () => {
@@ -94,8 +114,8 @@ describe('UnitPreferencesCard', () => {
 
 	test('picking a currency updates the selection', async () => {
 		mount();
-		await pickOption('currency', 'GBP (£)');
-		expect(trigger('currency')).toHaveTextContent('GBP (£)');
+		await pickOption('currency', 'GBP – British Pound (£)');
+		expect(trigger('currency')).toHaveTextContent('GBP – British Pound (£)');
 	});
 
 	test('the charge unit offers kWh', async () => {
@@ -114,7 +134,7 @@ describe('UnitPreferencesCard', () => {
 		expect(onUnitsChange).toHaveBeenCalledTimes(2);
 		expect(onCurrencyChange).not.toHaveBeenCalled();
 
-		await pickOption('currency', 'GBP (£)');
+		await pickOption('currency', 'GBP – British Pound (£)');
 		expect(onCurrencyChange).toHaveBeenCalledOnce();
 	});
 
@@ -124,7 +144,7 @@ describe('UnitPreferencesCard', () => {
 		mount({ onUnitsChange, onCurrencyChange });
 
 		await pickOption('charge-unit', 'kWh');
-		await pickOption('currency', 'USD ($)');
+		await pickOption('currency', 'USD – US Dollar ($)');
 		expect(onUnitsChange).not.toHaveBeenCalled();
 		expect(onCurrencyChange).not.toHaveBeenCalled();
 	});

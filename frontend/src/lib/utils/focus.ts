@@ -18,9 +18,12 @@ export function focusMainHeading(): void {
 	heading.focus({ preventScroll: true });
 }
 
-export async function focusFirstProblem(form: Element | null | undefined): Promise<void> {
-	await tick();
-	const target = form?.querySelector<HTMLElement>('[aria-invalid="true"], #submit-error');
+export function focusInView(target: HTMLElement | null | undefined): void {
 	target?.scrollIntoView({ block: 'center' });
 	target?.focus({ preventScroll: true });
+}
+
+export async function focusFirstProblem(form: Element | null | undefined): Promise<void> {
+	await tick();
+	focusInView(form?.querySelector<HTMLElement>('[aria-invalid="true"], #submit-error'));
 }

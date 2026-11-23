@@ -23,6 +23,7 @@
 
 	interface Props {
 		title: string;
+		level?: 2 | 3 | 4;
 		description?: string;
 		data: Record<string, unknown>[];
 		x: string;
@@ -49,6 +50,7 @@
 
 	let {
 		title,
+		level,
 		description,
 		data,
 		x,
@@ -78,10 +80,14 @@
 		padding ?? (seriesLayout === 'stack' ? { ...CHART_PADDING, top: 16 } : CHART_PADDING)
 	);
 	let resolvedXAxisProps = $derived(xAxisProps ?? monthlyXAxisProps(data.length));
+	let yTicks = $derived(
+		distinctYTicks(yAxisFormat, height - resolvedPadding.top - resolvedPadding.bottom)
+	);
 </script>
 
 <ChartCard
 	{title}
+	{level}
 	{description}
 	{isLoading}
 	{error}
@@ -108,13 +114,9 @@
 					xAxis: resolvedXAxisProps,
 					yAxis: {
 						format: yAxisFormat,
-						...(orientation === 'vertical' && {
-							ticks: distinctYTicks(
-								yAxisFormat,
-								height - resolvedPadding.top - resolvedPadding.bottom
-							)
-						})
-					}
+						...(orientation === 'vertical' && { ticks: yTicks })
+					},
+					...(orientation === 'vertical' && { grid: { yTicks } })
 				}}
 			>
 				{#snippet tooltip()}

@@ -23,8 +23,7 @@
 		formatCountTooltip,
 		byVehicleMonth,
 		monthlyXAxisProps,
-		unitTooltip,
-		type TooltipValueFormat
+		unitTooltip
 	} from '#lib/utils/chart-formatters.ts';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import type { FuelAdvancedResponse, UnitsMetadata } from '#lib/types/index.ts';
@@ -49,6 +48,7 @@
 	let { fuelStats, dayOfWeekPatterns, showGasCharts = true, group }: Props = $props();
 
 	let units: UnitsMetadata = $derived(fuelStats.units ?? settingsStore.unitPreferences);
+	let chartLevel = $derived(group === 'primary' ? (2 as const) : (3 as const));
 
 	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
 	let volumeLabel = $derived(getLongFormLabel(units.volumeUnit));
@@ -58,20 +58,20 @@
 	);
 
 	let consumptionData = $derived(consumptionChartRows(fuelStats.monthlyConsumption));
-	let consumptionTooltip: TooltipValueFormat = $derived((value, key) =>
-		unitTooltip(key === 'volume' ? getVolumeUnitLabel(units.volumeUnit, true) : efficiencyLabel)(
-			value,
-			key
-		)
-	);
+	let volumeData = $derived(consumptionData.filter(d => d.volume > 0));
+	let efficiencyTooltip = $derived(unitTooltip(efficiencyLabel));
+	let volumeTooltip = $derived(unitTooltip(getVolumeUnitLabel(units.volumeUnit, true)));
 	let odometerTooltip = $derived(unitTooltip(getDistanceUnitLabel(units.distanceUnit, true), 0));
 
-	let consumptionSeries = $derived([
-		{ key: 'efficiency', label: efficiencyLabel, color: CHART_COLORS[0] as string },
+	let efficiencySeries = $derived([
+		{ key: 'efficiency', label: efficiencyLabel, color: CHART_COLORS[0] as string }
+	]);
+	let efficiencyConfig = $derived(buildChartConfig(efficiencySeries));
+
+	let volumeSeries = $derived([
 		{ key: 'volume', label: volumeLabel, color: CHART_COLORS[1] as string }
 	]);
-
-	let consumptionConfig = $derived(buildChartConfig(consumptionSeries));
+	let volumeConfig = $derived(buildChartConfig(volumeSeries));
 
 	type PriceHistory = FuelStatsResponse['gasPriceHistory'];
 
@@ -174,23 +174,41 @@
 	}
 </script>
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+<div
+	class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 lg:[&>*:last-child:nth-child(odd)]:col-span-2"
+>
 	{#if group === 'primary'}
 		{#if showGasCharts}
 			<AppLineChart
-				title="Fuel Consumption"
-				description="Monthly {efficiencyLabel} and {getVolumeUnitName(units.volumeUnit, true)} used"
+				level={chartLevel}
+				title="Fuel Efficiency"
+				description="Monthly {efficiencyLabel}"
 				data={consumptionData}
 				x="date"
-				y={['efficiency', 'volume']}
-				series={consumptionSeries}
-				config={consumptionConfig}
+				y="efficiency"
+				series={efficiencySeries}
+				config={efficiencyConfig}
 				yAxisFormat={formatDecimalAxis}
-				tooltipFormat={consumptionTooltip}
+				tooltipFormat={efficiencyTooltip}
 				xAxisProps={monthlyXAxisProps(consumptionData.length, 6)}
 			/>
 
+			<AppBarChart
+				level={chartLevel}
+				title="Fuel Bought"
+				description="Monthly {getVolumeUnitName(units.volumeUnit, true)} bought"
+				data={volumeData}
+				x="date"
+				y="volume"
+				series={volumeSeries}
+				config={volumeConfig}
+				yAxisFormat={v => formatNumber(v, 0)}
+				tooltipFormat={volumeTooltip}
+				xAxisProps={monthlyXAxisProps(volumeData.length, 6)}
+			/>
+
 			<AppLineChart
+				level={chartLevel}
 				title="Gas Price on Fill-up"
 				description={pricePerVolumeDesc}
 				data={gasPriceData}
@@ -205,6 +223,7 @@
 		{/if}
 		{#if chargePriceData.length > 0}
 			<AppLineChart
+				level={chartLevel}
 				title="Charging Price"
 				description={pricePerChargeDesc}
 				data={chargePriceData}
@@ -219,6 +238,7 @@
 		{/if}
 		{#if showGasCharts}
 			<AppLineChart
+				level={chartLevel}
 				title="Fill-up Cost by Vehicle"
 				description="Average fill-up cost per vehicle over time"
 				data={fillupCostData}
@@ -232,6 +252,7 @@
 	{:else if group === 'patterns'}
 		{#if showGasCharts}
 			<AppBarChart
+				level={chartLevel}
 				title="Fill-up Patterns by Day of Week"
 				description="When you typically fill up"
 				data={dayPatternData}
@@ -250,6 +271,7 @@
 		{/if}
 	{:else}
 		<AppLineChart
+			level={chartLevel}
 			title={costPerDistLabel}
 			description="{costPerDistLabel} trend by vehicle"
 			data={costPerMileData}
@@ -261,6 +283,7 @@
 			xAxisProps={monthlyXAxisProps(costPerMileData.length, 6)}
 		/>
 		<AppAreaChart
+			level={chartLevel}
 			title="Total Odometer"
 			description="Mileage progression per vehicle"
 			data={odometerData}

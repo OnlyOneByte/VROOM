@@ -137,6 +137,7 @@
 			} catch (err) {
 				error = `Couldn't preview the Sheets data. ${userFacingErrorMessage(err)}`;
 				providerSubStep = 'pick-provider';
+				void settingsStore.load();
 			} finally {
 				isProcessing = false;
 			}
@@ -223,6 +224,7 @@
 			open = false;
 		} catch (err) {
 			error = `Couldn't restore. ${userFacingErrorMessage(err)}`;
+			if (selectedSourceType === 'sheets') void settingsStore.load();
 		} finally {
 			isProcessing = false;
 		}

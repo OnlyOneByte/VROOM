@@ -136,7 +136,8 @@ describe('FuelStatsTab charging series', () => {
 		expect(screen.queryByText('Gas Price on Fill-up')).toBeNull();
 		expect(screen.queryByText('Fill-up Cost by Vehicle')).toBeNull();
 		expect(screen.queryByText('Fill-up Patterns by Day of Week')).toBeNull();
-		expect(screen.queryByText('Fuel Consumption')).toBeNull();
+		expect(screen.queryByText('Fuel Efficiency')).toBeNull();
+		expect(screen.queryByText('Fuel Bought')).toBeNull();
 		expect(screen.getByText('Total Odometer')).toBeTruthy();
 	});
 
@@ -209,7 +210,7 @@ describe('FuelStatsTab summary and groups', () => {
 	test('puts the details, patterns and comparisons in groups that start closed below lg', () => {
 		const { container } = render(FuelStatsTab, { fuelStats: stats(gas), fuelAdvanced: advanced });
 		const groups = [...container.querySelectorAll('details[data-slot="chart-group"]')];
-		expect(groups.map(g => g.querySelector('summary span span')?.textContent)).toEqual([
+		expect(groups.map(g => g.querySelector('summary h2')?.textContent)).toEqual([
 			'Fill-up details',
 			'Patterns',
 			'Comparisons'

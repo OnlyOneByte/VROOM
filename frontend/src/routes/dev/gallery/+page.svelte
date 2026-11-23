@@ -3,6 +3,7 @@
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import BrandMark from '#lib/components/common/BrandMark.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import HowItWorks from '#lib/components/common/how-it-works.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert/index.ts';
@@ -183,6 +184,18 @@
 		</section>
 
 		<section class="space-y-3">
+			<h2 class="text-lg font-semibold">How it works disclosure</h2>
+			<div class="max-w-sm">
+				<p class="text-sm text-muted-foreground">One line that says what this does.</p>
+				<HowItWorks>
+					<p class="text-sm text-muted-foreground">
+						The longer explanation people need once, closed by default.
+					</p>
+				</HowItWorks>
+			</div>
+		</section>
+
+		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">The Four States (every data view must handle all four)</h2>
 			<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 				<Card.Root>
@@ -247,6 +260,7 @@
 			<h2 class="text-lg font-semibold">Charts (ChartCard 4-state wrapper)</h2>
 			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 				<AppLineChart
+					level={3}
 					title="Populated"
 					data={trend}
 					x="date"
@@ -255,6 +269,7 @@
 					series={[{ key: 'amount', label: 'Amount', color: 'var(--primary)' }]}
 				/>
 				<ChartCard
+					level={3}
 					title="Empty"
 					isEmpty
 					emptyTitle="No data yet"
@@ -262,10 +277,10 @@
 				>
 					<div></div>
 				</ChartCard>
-				<ChartCard title="Loading" isLoading>
+				<ChartCard title="Loading" level={3} isLoading>
 					<div></div>
 				</ChartCard>
-				<ChartCard title="Error" error="Couldn't load the chart data.">
+				<ChartCard title="Error" level={3} error="Couldn't load the chart data.">
 					<div></div>
 				</ChartCard>
 			</div>

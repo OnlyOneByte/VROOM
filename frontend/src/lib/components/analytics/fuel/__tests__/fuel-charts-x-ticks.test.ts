@@ -62,7 +62,13 @@ describe('FuelCharts monthly x-axis', () => {
 		charts.length = 0;
 		render(FuelCharts, { props: { fuelStats, group: 'primary' } });
 		render(FuelCharts, { props: { fuelStats, group: 'comparisons' } });
-		const monthly = ['Fuel Consumption', 'Fill-up Cost by Vehicle', 'Cost/mi', 'Total Odometer'];
+		const monthly = [
+			'Fuel Efficiency',
+			'Fuel Bought',
+			'Fill-up Cost by Vehicle',
+			'Cost/mi',
+			'Total Odometer'
+		];
 		for (const title of monthly) {
 			const chart = charts.find(c => c.title === title);
 			expect(chart?.xAxisProps?.ticks, title).toBe(6);
