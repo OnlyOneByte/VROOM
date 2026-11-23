@@ -33,6 +33,14 @@
 	);
 	let description = $derived(`Measured in ${unitLabel}`);
 	let tooltipFormat = $derived(unitTooltip(unitLabel));
+	let emptyTitle = $derived(
+		fuelType === 'electric' ? 'No efficiency trend yet' : 'Insufficient fuel data'
+	);
+	let emptyDescription = $derived(
+		fuelType === 'electric'
+			? "Efficiency over time isn't charted for electric vehicles yet. Charging sessions still count in this vehicle's costs."
+			: 'Add at least 2 fuel entries with mileage and volume to calculate efficiency'
+	);
 
 	const chartConfig: Chart.ChartConfig = {
 		efficiency: { label: 'Efficiency', color: 'var(--chart-2)' }
@@ -55,6 +63,6 @@
 	yAxisFormat={formatDecimalAxis}
 	{tooltipFormat}
 	tooltipLabelFormat={formatDayLabel}
-	emptyTitle="Insufficient fuel data"
-	emptyDescription="Add at least 2 fuel entries with mileage and volume to calculate efficiency"
+	{emptyTitle}
+	{emptyDescription}
 />
