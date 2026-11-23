@@ -21,6 +21,7 @@
 		formatDayLabel,
 		formatCountTooltip,
 		getXTickCount,
+		byVehicleMonth,
 		monthlyXAxisProps,
 		unitTooltip,
 		type TooltipValueFormat
@@ -112,19 +113,7 @@
 		...new Set(fuelStats.fillupCostByVehicle.map(d => d.vehicleName))
 	]);
 
-	let fillupCostData = $derived.by(() => {
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map used within $derived computation, not mutated reactively
-		const byMonth = new Map<string, Record<string, number | string | Date>>();
-		for (const item of fuelStats.fillupCostByVehicle) {
-			if (!byMonth.has(item.month))
-				byMonth.set(item.month, { month: item.month, date: parseMonthToDate(item.month) });
-			const row = byMonth.get(item.month)!;
-			row[item.vehicleName] = item.avgCost;
-		}
-		return Array.from(byMonth.values()).sort((a, b) =>
-			String(a['month']).localeCompare(String(b['month']))
-		);
-	});
+	let fillupCostData = $derived(byVehicleMonth(fuelStats.fillupCostByVehicle, d => d.avgCost));
 
 	let fillupCostSeries = $derived(
 		costVehicleNames.map((name, i) => ({
@@ -140,19 +129,7 @@
 		...new Set(fuelStats.odometerProgression.map(d => d.vehicleName))
 	]);
 
-	let odometerData = $derived.by(() => {
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map used within $derived computation, not mutated reactively
-		const byMonth = new Map<string, Record<string, number | string | Date>>();
-		for (const item of fuelStats.odometerProgression) {
-			if (!byMonth.has(item.month))
-				byMonth.set(item.month, { month: item.month, date: parseMonthToDate(item.month) });
-			const row = byMonth.get(item.month)!;
-			row[item.vehicleName] = item.mileage;
-		}
-		return Array.from(byMonth.values()).sort((a, b) =>
-			String(a['month']).localeCompare(String(b['month']))
-		);
-	});
+	let odometerData = $derived(byVehicleMonth(fuelStats.odometerProgression, d => d.mileage));
 
 	let odometerSeries = $derived(
 		odometerVehicleNames.map((name, i) => ({
@@ -166,19 +143,7 @@
 
 	let cpmVehicleNames = $derived([...new Set(fuelStats.costPerDistance.map(d => d.vehicleName))]);
 
-	let costPerMileData = $derived.by(() => {
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map used within $derived computation, not mutated reactively
-		const byMonth = new Map<string, Record<string, number | string | Date>>();
-		for (const item of fuelStats.costPerDistance) {
-			if (!byMonth.has(item.month))
-				byMonth.set(item.month, { month: item.month, date: parseMonthToDate(item.month) });
-			const row = byMonth.get(item.month)!;
-			row[item.vehicleName] = item.costPerDistance;
-		}
-		return Array.from(byMonth.values()).sort((a, b) =>
-			String(a['month']).localeCompare(String(b['month']))
-		);
-	});
+	let costPerMileData = $derived(byVehicleMonth(fuelStats.costPerDistance, d => d.costPerDistance));
 
 	let costPerMileSeries = $derived(
 		cpmVehicleNames.map((name, i) => ({

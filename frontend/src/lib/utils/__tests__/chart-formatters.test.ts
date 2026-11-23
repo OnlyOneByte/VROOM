@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { scaleTime } from 'd3-scale';
 import {
+	byVehicleMonth,
 	formatCentsAxis,
 	formatCountTooltip,
 	formatCurrencyAxis,
@@ -247,5 +248,27 @@ describe('insetTimeTicks (no x label inside the inset under the y labels)', () =
 		const list = [new Date(2025, 0, 1)];
 		expect(insetTimeTicks(list)).toBe(list);
 		expect(insetTimeTicks(undefined)).toBeUndefined();
+	});
+});
+
+describe('byVehicleMonth', () => {
+	test('builds one row per month with a column per vehicle, sorted by month', () => {
+		const rows = byVehicleMonth(
+			[
+				{ month: '2026-03', vehicleName: 'Camry', cost: 40 },
+				{ month: '2026-01', vehicleName: 'Camry', cost: 30 },
+				{ month: '2026-03', vehicleName: 'Model 3', cost: 12 }
+			],
+			r => r.cost
+		);
+
+		expect(rows).toEqual([
+			{ month: '2026-01', date: parseMonthToDate('2026-01'), Camry: 30 },
+			{ month: '2026-03', date: parseMonthToDate('2026-03'), Camry: 40, 'Model 3': 12 }
+		]);
+	});
+
+	test('returns no rows for no input', () => {
+		expect(byVehicleMonth([], () => 0)).toEqual([]);
 	});
 });
