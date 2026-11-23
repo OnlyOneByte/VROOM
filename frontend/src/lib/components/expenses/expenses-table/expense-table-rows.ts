@@ -131,3 +131,13 @@ export function tagsBesideCategory(
 	const repeats = new Set([category.toLowerCase(), categoryLabels[category].toLowerCase()]);
 	return (tags ?? []).filter(tag => !repeats.has(tag.trim().toLowerCase()));
 }
+
+export function rowTitle(
+	description: string | undefined | null,
+	category: ExpenseCategory
+): { title: string; categoryInMeta: boolean } {
+	const text = description?.trim();
+	return text
+		? { title: text, categoryInMeta: true }
+		: { title: categoryLabels[category], categoryInMeta: false };
+}

@@ -12,6 +12,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { logger } from '../../../../utils/logger';
 import { fetchOutbound } from '../../../../utils/outbound-url';
+import { assertSafeStoragePath } from '../../../../utils/paths';
 import type {
   StorageFileInfo,
   StorageProvider,
@@ -131,6 +132,8 @@ export class S3CompatProvider implements StorageProvider {
   }
 
   async upload(params: UploadParams): Promise<StorageRef> {
+    assertSafeStoragePath(params.pathHint);
+    assertSafeStoragePath(params.rawPath);
     const key = params.rawPath
       ? this.buildRawKey(params.rawPath, params.fileName)
       : this.buildKey(params.pathHint, params.entityType, params.entityId, params.fileName);
@@ -208,6 +211,7 @@ export class S3CompatProvider implements StorageProvider {
   }
 
   async list(folderPath: string): Promise<StorageFileInfo[]> {
+    assertSafeStoragePath(folderPath);
     const folder = folderPath.replace(/^\/+|\/+$/g, '');
     const prefix = folder ? `${folder}/` : '';
     const results: StorageFileInfo[] = [];

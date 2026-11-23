@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { assertSafeStoragePath } from '../../../../utils/paths';
 import type {
   StorageFileInfo,
   StorageProvider,
@@ -36,6 +37,8 @@ export class FakeStorageProvider implements StorageProvider {
   }
 
   upload(params: UploadParams): Promise<StorageRef> {
+    assertSafeStoragePath(params.pathHint);
+    assertSafeStoragePath(params.rawPath);
     const key = params.rawPath
       ? `${params.rawPath}/${params.fileName}`
       : `${params.pathHint}/${params.entityType}/${params.entityId}/${randomUUID()}-${params.fileName}`;
@@ -75,6 +78,7 @@ export class FakeStorageProvider implements StorageProvider {
   }
 
   list(folderPath: string): Promise<StorageFileInfo[]> {
+    assertSafeStoragePath(folderPath);
     const prefix = folderPath ? `${folderPath}/` : '';
     const out: StorageFileInfo[] = [];
     for (const f of this.files.values()) {

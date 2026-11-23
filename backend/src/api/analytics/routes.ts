@@ -35,7 +35,18 @@ import { analyticsRepository } from './repository';
 const routes = new Hono();
 
 const timeZone = z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional();
-const timeZoneQuerySchema = z.object({ timeZone });
+const vehicleIds = z
+  .string()
+  .max(4000)
+  .transform((value) =>
+    value
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+  )
+  .pipe(z.array(z.string().min(1).max(64)).max(50))
+  .optional();
+const timeZoneQuerySchema = z.object({ timeZone, vehicleIds });
 
 const fuelEfficiencyQuerySchema = z.object({
   vehicleId: z.string().optional(),
@@ -96,14 +107,20 @@ const dateRangeFields = {
   timeZone,
 };
 
-const dateRangeQuerySchema = z.object(dateRangeFields).refine(startBeforeEnd, RANGE_ORDER_ERROR);
+const dateRangeQuerySchema = z
+  .object({ ...dateRangeFields, vehicleIds })
+  .refine(startBeforeEnd, RANGE_ORDER_ERROR);
 
-const yearToDateQuerySchema = z
-  .object({ ...dateRangeFields, ytdStart: epochSeconds.optional() })
+const yearToDateFields = { ...dateRangeFields, ytdStart: epochSeconds.optional() };
+
+const yearToDateQuerySchema = z.object(yearToDateFields).refine(startBeforeEnd, RANGE_ORDER_ERROR);
+
+const summaryQuerySchema = z
+  .object({ ...yearToDateFields, vehicleIds })
   .refine(startBeforeEnd, RANGE_ORDER_ERROR);
 
 const dateRangeVehicleQuerySchema = z
-  .object({ ...dateRangeFields, vehicleId: z.string().optional() })
+  .object({ ...dateRangeFields, vehicleId: z.string().optional(), vehicleIds })
   .refine(startBeforeEnd, RANGE_ORDER_ERROR);
 
 const dateRangeRequiredVehicleQuerySchema = z
@@ -157,14 +174,15 @@ routes.get('/query', zValidator('query', analyticsQuerySchema), async (c) => {
   return c.json({ success: true, data: analyticsQueryToApi(data) });
 });
 
-routes.get('/summary', zValidator('query', yearToDateQuerySchema), async (c) => {
+routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
   const user = c.get('user');
-  const { startDate, endDate, ytdStart, timeZone } = c.req.valid('query');
+  const { startDate, endDate, ytdStart, timeZone, vehicleIds } = c.req.valid('query');
   const data = await analyticsRepository.getSummary(
     user.id,
     { start: startDate, end: endDate },
     ytdStart,
-    timeZone
+    timeZone,
+    vehicleIds
   );
   return c.json({ success: true, data: analyticsSummaryToApi(data) });
 });
@@ -183,7 +201,7 @@ routes.get('/quick-stats', zValidator('query', yearToDateQuerySchema), async (c)
 
 routes.get('/fuel-stats', zValidator('query', dateRangeVehicleQuerySchema), async (c) => {
   const user = c.get('user');
-  const { startDate, endDate, vehicleId, timeZone } = c.req.valid('query');
+  const { startDate, endDate, vehicleId, vehicleIds, timeZone } = c.req.valid('query');
 
   const scopeId = vehicleId
     ? (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId
@@ -192,7 +210,7 @@ routes.get('/fuel-stats', zValidator('query', dateRangeVehicleQuerySchema), asyn
   const data = await analyticsRepository.getFuelStats(
     scopeId,
     { start: startDate, end: endDate },
-    vehicleId,
+    vehicleId ?? vehicleIds,
     timeZone
   );
   return c.json({ success: true, data: fuelStatsToApi(data) });
@@ -200,32 +218,33 @@ routes.get('/fuel-stats', zValidator('query', dateRangeVehicleQuerySchema), asyn
 
 routes.get('/cross-vehicle', zValidator('query', dateRangeQuerySchema), async (c) => {
   const user = c.get('user');
-  const { startDate, endDate, timeZone } = c.req.valid('query');
+  const { startDate, endDate, timeZone, vehicleIds } = c.req.valid('query');
   const data = await analyticsRepository.getCrossVehicle(
     user.id,
     { start: startDate, end: endDate },
-    timeZone
+    timeZone,
+    vehicleIds
   );
   return c.json({ success: true, data: crossVehicleToApi(data) });
 });
 
 routes.get('/financing', zValidator('query', timeZoneQuerySchema), async (c) => {
   const user = c.get('user');
-  const { timeZone } = c.req.valid('query');
-  const data = await analyticsRepository.getFinancing(user.id, timeZone);
+  const { timeZone, vehicleIds } = c.req.valid('query');
+  const data = await analyticsRepository.getFinancing(user.id, timeZone, vehicleIds);
   return c.json({ success: true, data: financingToApi(data) });
 });
 
 routes.get('/insurance', zValidator('query', timeZoneQuerySchema), async (c) => {
   const user = c.get('user');
-  const { timeZone } = c.req.valid('query');
-  const data = await analyticsRepository.getInsurance(user.id, timeZone);
+  const { timeZone, vehicleIds } = c.req.valid('query');
+  const data = await analyticsRepository.getInsurance(user.id, timeZone, vehicleIds);
   return c.json({ success: true, data: insuranceToApi(data) });
 });
 
 routes.get('/fuel-advanced', zValidator('query', dateRangeVehicleQuerySchema), async (c) => {
   const user = c.get('user');
-  const { startDate, endDate, vehicleId, timeZone } = c.req.valid('query');
+  const { startDate, endDate, vehicleId, vehicleIds, timeZone } = c.req.valid('query');
 
   const scopeId = vehicleId
     ? (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId
@@ -234,7 +253,7 @@ routes.get('/fuel-advanced', zValidator('query', dateRangeVehicleQuerySchema), a
   const data = await analyticsRepository.getFuelAdvanced(
     scopeId,
     { start: startDate, end: endDate },
-    vehicleId,
+    vehicleId ?? vehicleIds,
     timeZone
   );
   return c.json({ success: true, data: fuelAdvancedToApi(data) });

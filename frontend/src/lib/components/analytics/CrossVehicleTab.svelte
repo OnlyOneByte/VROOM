@@ -1,11 +1,13 @@
 <script lang="ts">
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-	import { onMount } from 'svelte';
-	import { SvelteSet } from 'svelte/reactivity';
-	import { LoaderCircle, TrendingUp } from '@lucide/svelte';
+	import { SvelteMap } from 'svelte/reactivity';
+	import { LoaderCircle, SearchX, TrendingUp } from '@lucide/svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import type * as Chart from '#lib/components/ui/chart/index.ts';
 	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
+	import type { AnalyticsDateRange } from './analytics-filters';
 	import ExpenseTrendChart from '#lib/components/charts/ExpenseTrendChart.svelte';
 	import { AppBarChart, AppLineChart, AppPieChart } from '#lib/components/charts/index.ts';
 	import { CHART_COLORS, buildChartConfig, buildCategoryPieData } from '#lib/utils/chart-colors.ts';
@@ -21,7 +23,24 @@
 	import FinancingAnalytics from './cross-vehicle/FinancingAnalytics.svelte';
 	import InsuranceAnalytics from './cross-vehicle/InsuranceAnalytics.svelte';
 
+	interface Props {
+		dateRange?: AnalyticsDateRange;
+		vehicleIds?: string[];
+		vehicleColors?: Record<string, string>;
+		filterLabel?: string;
+		onClearFilters?: () => void;
+	}
+
+	let {
+		dateRange = getDefaultDateRange(),
+		vehicleIds,
+		vehicleColors,
+		filterLabel,
+		onClearFilters
+	}: Props = $props();
+
 	let crossVehicle = $state<CrossVehicleResponse | null>(null);
+	let request = 0;
 	let financing = $state<FinancingResponse | null>(null);
 	let insurance = $state<InsuranceResponse | null>(null);
 	let isLoading = $state(true);
@@ -32,26 +51,32 @@
 	let distShortLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 
 	async function loadData() {
+		const current = ++request;
 		try {
 			isLoading = true;
 			const [cv, fin, ins] = await Promise.all([
-				analyticsApi.getCrossVehicle(getDefaultDateRange()),
-				analyticsApi.getFinancing(),
-				analyticsApi.getInsurance()
+				analyticsApi.getCrossVehicle({ ...dateRange, vehicleIds }),
+				analyticsApi.getFinancing({ vehicleIds }),
+				analyticsApi.getInsurance({ vehicleIds })
 			]);
+			if (current !== request) return;
 			crossVehicle = cv;
 			financing = fin;
 			insurance = ins;
 			error = null;
 		} catch (e) {
+			if (current !== request) return;
 			error = userFacingErrorMessage(e);
 		} finally {
-			isLoading = false;
+			if (current === request) isLoading = false;
 		}
 	}
 
-	onMount(() => {
-		loadData();
+	$effect(() => {
+		void dateRange.startDate;
+		void dateRange.endDate;
+		void vehicleIds;
+		void loadData();
 	});
 
 	let trendData = $derived(
@@ -83,15 +108,16 @@
 			: ''
 	);
 
-	let fuelEffVehicleNames = $derived.by(() => {
-		const names = new SvelteSet<string>();
+	let fuelEffVehicles = $derived.by(() => {
+		const byName = new SvelteMap<string, string>();
 		for (const month of crossVehicle?.fuelEfficiencyComparison ?? []) {
 			for (const v of month.vehicles) {
-				names.add(v.vehicleName);
+				byName.set(v.vehicleName, v.vehicleId);
 			}
 		}
-		return [...names];
+		return [...byName];
 	});
+	let fuelEffVehicleNames = $derived(fuelEffVehicles.map(([name]) => name));
 
 	let fuelEffData = $derived.by(() => {
 		return (crossVehicle?.fuelEfficiencyComparison ?? []).map(d => {
@@ -107,12 +133,14 @@
 	});
 
 	let fuelEffSeries = $derived(
-		fuelEffVehicleNames.map((name, i) => ({
+		fuelEffVehicles.map(([name, id], i) => ({
 			key: name,
 			label: name,
-			color: CHART_COLORS[i % CHART_COLORS.length] ?? 'var(--chart-1)'
+			color: vehicleColors?.[id] ?? CHART_COLORS[i % CHART_COLORS.length] ?? 'var(--chart-1)'
 		}))
 	);
+
+	let hasExpenses = $derived((crossVehicle?.monthlyExpenseTrends.length ?? 0) > 0);
 
 	let fuelEffConfig = $derived(buildChartConfig(fuelEffSeries));
 </script>
@@ -125,6 +153,23 @@
 	<LoadErrorCard title="Couldn't load cross-vehicle analytics" message={error} onRetry={loadData} />
 {:else if crossVehicle && financing && insurance}
 	<div class="space-y-4 md:space-y-6">
+		{#if !hasExpenses && filterLabel && onClearFilters}
+			<EmptyState level={3}>
+				{#snippet icon()}
+					<div class="mb-4 rounded-full bg-muted p-4">
+						<SearchX class="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+					</div>
+				{/snippet}
+				{#snippet title()}No expenses for {filterLabel}{/snippet}
+				{#snippet description()}
+					Try a longer date range or more cars. Loans and insurance below show what is in force
+					today.
+				{/snippet}
+				{#snippet action()}
+					<Button variant="outline" onclick={onClearFilters}>Clear filters</Button>
+				{/snippet}
+			</EmptyState>
+		{/if}
 		{#if trendData.length > 0}
 			<ExpenseTrendChart data={trendData} title="Monthly Expense Trends">
 				{#snippet icon()}
@@ -142,7 +187,7 @@
 				/>
 			{/if}
 
-			{#if costBarData.length > 0}
+			{#if costBarData.length > 0 && hasExpenses}
 				<AppBarChart
 					title="Vehicle Cost Comparison"
 					description="Total costs by vehicle"

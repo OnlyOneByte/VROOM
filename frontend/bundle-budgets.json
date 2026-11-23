@@ -4,8 +4,8 @@
 	"routes": {
 		"/dashboard": 70,
 		"/vehicles/[id]": 80,
-		"/expenses": 112,
-		"/expenses/new": 110,
+		"/expenses": 114,
+		"/expenses/new": 112,
 		"/expenses/[id]/edit": 110,
 		"/dev/gallery": 170,
 		"/analytics": 180,

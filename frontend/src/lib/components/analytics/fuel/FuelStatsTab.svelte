@@ -41,13 +41,26 @@
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import type { StatCardChange } from '#lib/components/charts/StatCard.svelte';
 	import { CHART_COLORS } from '#lib/utils/chart-colors.ts';
+	import type { AnalyticsDateRange } from '../analytics-filters';
 
 	let {
 		fuelStats: fuelStatsProp = null,
-		fuelAdvanced: fuelAdvancedProp = null
+		fuelAdvanced: fuelAdvancedProp = null,
+		vehicleColors: vehicleColorsProp,
+		filterLabel,
+		onClearFilters,
+		previousPeriodLabel = 'vs the 12 months before',
+		dateRange,
+		vehicleIds
 	}: {
 		fuelStats?: FuelStatsResponse | null;
 		fuelAdvanced?: FuelAdvancedResponse | null;
+		vehicleColors?: Record<string, string>;
+		filterLabel?: string;
+		onClearFilters?: () => void;
+		previousPeriodLabel?: string;
+		dateRange?: AnalyticsDateRange;
+		vehicleIds?: string[];
 	} = $props();
 
 	let localFuelStats = $state<FuelStatsResponse | null>(null);
@@ -77,7 +90,10 @@
 		];
 		const ids = [...new Set(rows.map(r => r.vehicleId))].sort();
 		return Object.fromEntries(
-			ids.map((id, i) => [id, CHART_COLORS[i % CHART_COLORS.length] as string])
+			ids.map((id, i) => [
+				id,
+				vehicleColorsProp?.[id] ?? (CHART_COLORS[i % CHART_COLORS.length] as string)
+			])
 		);
 	});
 
@@ -141,7 +157,7 @@
 	): StatCardChange | null {
 		if (current == null || previous == null) return null;
 		const percent = pctChange(current, previous);
-		return percent == null ? null : { percent, goodWhen, label: 'vs the 12 months before' };
+		return percent == null ? null : { percent, goodWhen, label: previousPeriodLabel };
 	}
 
 	let summaryItems = $derived([
@@ -178,7 +194,10 @@
 	);
 
 	let hasOlderFuel = $state<boolean | null>(null);
-	let checkingFuelHistory = $derived(!!fuelStats && !hasFuelData && hasOlderFuel === null);
+	let filteredEmpty = $derived(!!fuelStats && !hasFuelData && !!filterLabel && !!onClearFilters);
+	let checkingFuelHistory = $derived(
+		!!fuelStats && !hasFuelData && !filteredEmpty && hasOlderFuel === null
+	);
 
 	$effect(() => {
 		if (checkingFuelHistory) void checkFuelHistory();
@@ -205,7 +224,7 @@
 	async function loadData() {
 		try {
 			internalLoading = true;
-			const range = getDefaultDateRange();
+			const range = { ...(dateRange ?? getDefaultDateRange()), vehicleIds };
 			const [stats, advanced] = await Promise.all([
 				analyticsApi.getFuelStats(range),
 				analyticsApi.getFuelAdvanced(range)
@@ -293,6 +312,21 @@
 	</div>
 {:else if error}
 	<LoadErrorCard title="Couldn't load fuel statistics" message={error} onRetry={loadData} />
+{:else if filteredEmpty}
+	<EmptyState level={3}>
+		{#snippet icon()}
+			<div class="mb-4 rounded-full bg-muted p-4">
+				<Fuel class="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+			</div>
+		{/snippet}
+		{#snippet title()}No fill-ups or charging for {filterLabel}{/snippet}
+		{#snippet description()}
+			Try a longer date range or more cars. Your other fill-ups are still in your expenses.
+		{/snippet}
+		{#snippet action()}
+			<Button variant="outline" size="lg" onclick={onClearFilters}>Clear filters</Button>
+		{/snippet}
+	</EmptyState>
 {:else if fuelStats && !hasFuelData}
 	<EmptyState>
 		{#snippet icon()}

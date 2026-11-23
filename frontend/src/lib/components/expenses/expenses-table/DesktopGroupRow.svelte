@@ -18,7 +18,7 @@
 		expenseEditHref,
 		isInsuranceLinked
 	} from './expense-table-actions';
-	import { tagsBesideCategory, type GroupRow } from './expense-table-rows';
+	import { rowTitle, tagsBesideCategory, type GroupRow } from './expense-table-rows';
 
 	interface Props {
 		row: GroupRow;
@@ -46,12 +46,13 @@
 	let shownTags = $derived(tagsBesideCategory(row.tags, row.category));
 
 	let IconComponent = $derived(getCategoryIcon(row.category));
+	let heading = $derived(rowTitle(row.description, row.category));
 	let insuranceLinked = $derived(isInsuranceLinked(row.tags));
 	let blockedId = $derived(blockedReasonId(row.groupId));
 </script>
 
 <TableRow class="group cursor-pointer hover:bg-muted/50" onclick={() => onToggle(row.groupId)}>
-	<TableCell class="font-medium text-muted-foreground">
+	<TableCell class="max-w-[240px]">
 		<div class="flex items-center gap-1.5">
 			<Button
 				variant="ghost"
@@ -68,8 +69,11 @@
 					class="h-4 w-4 transition-transform duration-200 {isExpanded ? 'rotate-90' : ''}"
 				/>
 			</Button>
-			{formatDate(new Date(row.date))}
+			<span class="truncate font-medium text-foreground">{heading.title}</span>
 		</div>
+	</TableCell>
+	<TableCell class="whitespace-nowrap text-muted-foreground">
+		{formatDate(new Date(row.date))}
 	</TableCell>
 	{#if showVehicleColumn}
 		<TableCell>
@@ -95,9 +99,6 @@
 				<Badge variant="secondary" class="font-normal">{tag}</Badge>
 			{/each}
 		</div>
-	</TableCell>
-	<TableCell class="max-w-[200px]">
-		<div class="truncate text-foreground">{row.description || '-'}</div>
 	</TableCell>
 	<TableCell class="text-right font-semibold whitespace-nowrap">
 		<div class="flex items-center justify-end gap-1.5">
@@ -152,7 +153,8 @@
 	{#each row.children as child (child.id)}
 		{@const childVehicle = vehicleMap.get(child.vehicleId)}
 		<TableRow class="bg-muted/30">
-			<TableCell class="pl-8 text-xs text-muted-foreground">
+			<TableCell></TableCell>
+			<TableCell class="text-xs text-muted-foreground">
 				{formatDate(new Date(child.date))}
 			</TableCell>
 			{#if showVehicleColumn}
@@ -165,7 +167,6 @@
 					</div>
 				</TableCell>
 			{/if}
-			<TableCell></TableCell>
 			<TableCell></TableCell>
 			<TableCell></TableCell>
 			<TableCell class="text-right text-sm text-muted-foreground whitespace-nowrap">

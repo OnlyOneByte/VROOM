@@ -1,4 +1,5 @@
 import { logger } from '../../../../utils/logger';
+import { assertSafeStoragePath } from '../../../../utils/paths';
 import { GooglePhotosService } from '../../services/google-photos-service';
 import type {
   StorageCapabilities,
@@ -23,6 +24,8 @@ export class GooglePhotosProvider implements StorageProvider {
   }
 
   async upload(params: UploadParams): Promise<StorageRef> {
+    assertSafeStoragePath(params.pathHint);
+    assertSafeStoragePath(params.rawPath);
     const item = await this.service.uploadImage(params.buffer, params.mimeType, params.fileName);
     return {
       providerType: this.type,
