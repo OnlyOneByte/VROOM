@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import type { Vehicle } from '#lib/types/index.ts';
+import { appStore } from '#lib/stores/app.svelte.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
@@ -162,6 +163,16 @@ describe('dashboard primary action', () => {
 		await screen.findByRole('button', { name: 'Retry' });
 		expect(headerPlaceholder()).toBeNull();
 		expect(controls('Add Vehicle')).toHaveLength(0);
+	});
+
+	test('a failed load shows its inline card and raises no error toast', async () => {
+		appStore.clearNotifications();
+		getVehicles.mockImplementation(() => Promise.reject(new Error('Server down')));
+		render(Page);
+
+		await screen.findByRole('button', { name: 'Retry' });
+		expect(screen.getByText("Couldn't load the dashboard")).toBeInTheDocument();
+		expect(appStore.notifications.filter(n => n.type === 'error')).toEqual([]);
 	});
 
 	test('a failed load offers only a 40px Retry, with no floating action', async () => {

@@ -18,6 +18,7 @@
 	import PeriodSelector from '#lib/components/common/period-selector.svelte';
 	import {
 		handleErrorWithNotification,
+		logLoadFailure,
 		userFacingErrorMessage
 	} from '#lib/utils/error-handling.ts';
 	import { latest } from '#lib/utils/latest-request.ts';
@@ -232,7 +233,7 @@
 			hasLoaded = true;
 		} catch (error) {
 			loadError = userFacingErrorMessage(error);
-			handleErrorWithNotification(error, "Couldn't load the dashboard");
+			logLoadFailure(error, "Couldn't load the dashboard");
 		} finally {
 			isLoading = false;
 		}
