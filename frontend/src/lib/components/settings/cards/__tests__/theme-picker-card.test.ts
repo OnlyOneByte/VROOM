@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { UserSettings } from '#lib/types/index.ts';
 
 const { updateSettings } = vi.hoisted(() => ({
@@ -16,6 +16,13 @@ const ThemePickerCard = (await import('../ThemePickerCard.svelte')).default;
 
 function themeButton(label: string): HTMLButtonElement {
 	return screen.getByRole('button', { name: new RegExp(`^${label}\\b`) }) as HTMLButtonElement;
+}
+
+function themeGrid(): HTMLElement {
+	const toggle = screen.getByRole('button', { name: /themes$/ });
+	const grid = document.getElementById(toggle.getAttribute('aria-controls') ?? '');
+	if (!grid) throw new Error('theme grid missing');
+	return grid;
 }
 
 function swatchCount(button: HTMLElement): number {
@@ -36,10 +43,32 @@ afterEach(() => {
 describe('ThemePickerCard', () => {
 	test('lists every registered theme with its label and description', () => {
 		render(ThemePickerCard);
+		const grid = within(themeGrid());
 		for (const theme of Object.values(THEME_REGISTRY)) {
-			expect(screen.getByText(theme.label)).toBeInTheDocument();
-			expect(screen.getByText(theme.description)).toBeInTheDocument();
+			expect(grid.getByText(theme.label)).toBeInTheDocument();
+			expect(grid.getByText(theme.description)).toBeInTheDocument();
 		}
+	});
+
+	test('below lg the grid starts collapsed behind the current theme and a Show all toggle', async () => {
+		render(ThemePickerCard);
+		const count = Object.keys(THEME_REGISTRY).length;
+		const toggle = screen.getByRole('button', { name: `Show all ${count} themes` });
+		const grid = themeGrid();
+
+		expect(toggle).toHaveAttribute('aria-expanded', 'false');
+		expect(toggle).toHaveClass('lg:hidden');
+		expect(grid).toHaveClass('hidden', 'lg:grid');
+		expect(screen.getByTestId('current-theme')).toHaveTextContent('Default');
+		expect(screen.getByTestId('current-theme')).toHaveClass('lg:hidden');
+
+		await fireEvent.click(toggle);
+
+		expect(toggle).toHaveAttribute('aria-expanded', 'true');
+		expect(toggle).toHaveAccessibleName('Show fewer themes');
+		expect(grid).toHaveClass('grid');
+		expect(grid).not.toHaveClass('hidden');
+		expect(screen.queryByTestId('current-theme')).toBeNull();
 	});
 
 	test('marks only the active theme as pressed', () => {
