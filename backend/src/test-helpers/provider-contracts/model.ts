@@ -7,12 +7,15 @@ export interface ModelContractSubject<P> {
   invoke: (instance: P) => Promise<unknown>;
   okResponse: unknown;
   path: string;
+  credential: { header: string; value: (key: string) => string } | { query: string };
 }
 
 interface SeenRequest {
   method: string;
   path: string;
   contentType: string | null;
+  headers: Headers;
+  query: URLSearchParams;
   body: Record<string, unknown>;
 }
 
@@ -38,6 +41,8 @@ export function describeModelContract<P>(name: string, subject: ModelContractSub
             method: request.method,
             path: url.pathname,
             contentType: request.headers.get('content-type'),
+            headers: request.headers,
+            query: url.searchParams,
             body: (await request.json().catch(() => ({}))) as Record<string, unknown>,
           });
           return status === 200
@@ -76,6 +81,16 @@ export function describeModelContract<P>(name: string, subject: ModelContractSub
       expect(seen[0]?.path).toBe(subject.path.replace('{model}', MODEL));
       expect(seen[0]?.contentType).toContain('application/json');
       if ('model' in (seen[0]?.body ?? {})) expect(seen[0]?.body.model).toBe(MODEL);
+    });
+
+    test('sends the key where the vendor reads it', async () => {
+      await subject.invoke(instance());
+      const { credential } = subject;
+      if ('header' in credential) {
+        expect(seen[0]?.headers.get(credential.header)).toBe(credential.value(API_KEY));
+      } else {
+        expect(seen[0]?.query.get(credential.query)).toBe(API_KEY);
+      }
     });
 
     test('a non-2xx answer is an error that never names the key', async () => {

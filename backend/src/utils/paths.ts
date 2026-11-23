@@ -9,14 +9,14 @@ export function joinStoragePath(...segments: (string | null | undefined)[]): str
     .join('/');
 }
 
+const PATH_TRAVERSAL_MESSAGE = 'Path traversal not allowed';
+const hasNoTraversal = (path: string) => !path.includes('..');
+
 export const storagePathSchema = z
   .string()
   .max(255, 'Folder path must be 255 characters or less')
-  .refine((s) => !s.includes('..'), { message: 'Path traversal not allowed' });
+  .refine(hasNoTraversal, { message: PATH_TRAVERSAL_MESSAGE });
 
 export function assertSafeStoragePath(path: string | undefined): void {
-  const result = storagePathSchema.safeParse(path ?? '');
-  if (!result.success) {
-    throw new ValidationError(result.error.issues[0]?.message ?? 'Invalid storage path');
-  }
+  if (!hasNoTraversal(path ?? '')) throw new ValidationError(PATH_TRAVERSAL_MESSAGE);
 }

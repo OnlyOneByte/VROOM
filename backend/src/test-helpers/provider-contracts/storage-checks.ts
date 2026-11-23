@@ -72,7 +72,7 @@ export const STORAGE_CHECKS: StorageCheck[] = [
       const provider = make();
       if (!capabilitiesOf(provider).list) return;
       await upload(provider, { rawPath: 'contract/inside', fileName: 'inside.zip' });
-      await upload(provider, { rawPath: 'contract/outside', fileName: 'outside.zip' });
+      await upload(provider, { rawPath: 'contract/inside-sibling', fileName: 'outside.zip' });
       const names = (await provider.list('contract/inside')).map((file) => file.name);
       check(names.includes('inside.zip'), `list missed its own file: ${names.join(', ')}`);
       check(!names.includes('outside.zip'), `list left its folder: ${names.join(', ')}`);
@@ -94,6 +94,8 @@ export const STORAGE_CHECKS: StorageCheck[] = [
       if (capabilitiesOf(provider).list) {
         await rejects(() => provider.list('contract/../escape'), 'list');
       }
+      const longPath = `${'a'.repeat(150)}/${'b'.repeat(150)}`;
+      await upload(provider, { rawPath: longPath, fileName: 'long.zip' });
     },
   },
 ];

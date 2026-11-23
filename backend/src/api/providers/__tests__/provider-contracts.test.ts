@@ -1,4 +1,4 @@
-import { describe, expect, spyOn, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONFIG } from '../../../config';
@@ -8,6 +8,7 @@ import {
   FakePhotosStore,
   makeFakePhotosClient,
 } from '../../../test-helpers/fake-google-photos-client';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { describeDescriptorContract } from '../../../test-helpers/provider-contracts/descriptor';
 import {
   describeModelContract,
@@ -114,24 +115,50 @@ describe('storage descriptor features hold for every type', () => {
     expect(STORAGE_PROVIDERS.s3.identity({ ...config })).toBe(identity);
   });
 
+  let app: TestApp;
+  beforeEach(async () => {
+    app = await createTestApp();
+  });
+  afterEach(() => app.close());
+
+  function backupContext(type: string, enabled: boolean) {
+    return {
+      userId: app.user.id,
+      displayName: 'Contract',
+      providerId: `p-${type}`,
+      providerRow: { id: `p-${type}`, providerType: type, config: {} } as UserProvider,
+      decryptedCredentials: { refreshToken: 'refresh' },
+      providerConfig: { enabled, folderPath: 'Backups', retentionCount: 1 },
+      zipBuffer: Buffer.from('zip'),
+    };
+  }
+
   test('a ZIP backup runs only when the provider ZIP flag is on', async () => {
-    const built = spyOn(getStorageProviderRegistry(), 'createProviderInstance');
+    const fake = new FakeStorageProvider();
+    const built = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockReturnValue(
+      fake
+    );
     try {
-      for (const type of Object.keys(STORAGE_PROVIDERS)) {
+      const zipTypes = Object.entries(STORAGE_PROVIDERS)
+        .filter(([, descriptor]) => !descriptor.features.photoOnly)
+        .map(([type]) => type);
+      expect(zipTypes.length).toBeGreaterThan(0);
+      for (const type of zipTypes) {
         const strategy = backupStrategyRegistry.get(type);
-        if (!strategy) continue;
-        const result = await strategy.execute({
-          userId: 'u1',
-          displayName: 'Contract',
-          providerId: `p-${type}`,
-          providerRow: { id: `p-${type}`, providerType: type, config: {} } as UserProvider,
-          decryptedCredentials: { refreshToken: 'refresh' },
-          providerConfig: { enabled: false, folderPath: 'Backups', retentionCount: 1 },
-          zipBuffer: Buffer.from('zip'),
-        });
-        expect(result.capabilities.zip, type).toBeUndefined();
+        expect(strategy, type).toBeDefined();
+        const off = await strategy?.execute(backupContext(type, false));
+        expect(off?.capabilities.zip, type).toBeUndefined();
       }
       expect(built).not.toHaveBeenCalled();
+
+      const zipOnly = zipTypes.filter(
+        (type) => !STORAGE_PROVIDERS[type as StorageProviderType].features.backupSheets
+      );
+      for (const type of zipOnly) {
+        const on = await backupStrategyRegistry.get(type)?.execute(backupContext(type, true));
+        expect(on?.capabilities.zip?.success, type).toBe(true);
+      }
+      expect((await fake.list('Backups')).length).toBe(zipOnly.length);
     } finally {
       built.mockRestore();
     }
@@ -142,11 +169,17 @@ const LLM_REQUEST = { messages: [{ role: 'user' as const, content: 'hi' }], tool
 const RECEIPT = { data: Buffer.from('image'), mimeType: 'image/jpeg' };
 
 const OPENAI = {
+  credential: { header: 'authorization', value: (key: string) => `Bearer ${key}` },
   okResponse: { choices: [{ message: { content: '{}' } }] },
   path: '/chat/completions',
 };
-const ANTHROPIC = { okResponse: { content: [{ type: 'text', text: '{}' }] }, path: '/v1/messages' };
+const ANTHROPIC = {
+  credential: { header: 'x-api-key', value: (key: string) => key },
+  okResponse: { content: [{ type: 'text', text: '{}' }] },
+  path: '/v1/messages',
+};
 const GEMINI = {
+  credential: { query: 'key' },
   okResponse: { candidates: [{ content: { parts: [{ text: '{}' }] } }] },
   path: '/v1beta/models/{model}:generateContent',
 };
@@ -198,8 +231,9 @@ const VISION_SUBJECTS: Record<keyof typeof VISION_PROVIDERS, ModelContractSubjec
   },
 };
 
-for (const [id, subject] of Object.entries(LLM_SUBJECTS))
+for (const [id, subject] of Object.entries(LLM_SUBJECTS)) {
   describeModelContract(`ai.llm/${id}`, subject);
+}
 for (const [id, subject] of Object.entries(VISION_SUBJECTS)) {
   describeModelContract(`ai.vision/${id}`, subject);
 }
