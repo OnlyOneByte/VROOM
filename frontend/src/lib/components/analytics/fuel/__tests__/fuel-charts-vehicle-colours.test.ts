@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
 import type { FuelStatsResponse } from '#lib/types/index.ts';
 
-type Series = { key: string; color: string };
+type Series = { key: string; label: string; color: string };
 
 const { charts } = vi.hoisted(() => ({
 	charts: [] as { title: string; series?: Series[] }[]
@@ -58,7 +58,31 @@ describe('FuelCharts vehicle colours', () => {
 				(charts.find(c => c.title === title)?.series ?? []).map(s => [s.key, s.color])
 			);
 
-		expect(colours('Total Odometer')).toEqual({ Civic: 'var(--chart-1)', Niro: 'var(--chart-2)' });
-		expect(colours('Cost/mi')).toEqual({ Civic: 'var(--chart-1)', Niro: 'var(--chart-2)' });
+		const expected = { 'v-civic': 'var(--chart-1)', 'v-niro': 'var(--chart-2)' };
+		expect(colours('Total Odometer')).toEqual(expected);
+		expect(colours('Cost/mi')).toEqual(expected);
+	});
+
+	test('two vehicles with the same nickname get two series, each labelled with the name', () => {
+		charts.length = 0;
+		const twin = { vehicleId: 'v-civic-2', vehicleName: 'Civic' };
+		render(FuelCharts, {
+			props: {
+				fuelStats: {
+					...fuelStats,
+					costPerDistance: [
+						{ month: '2026-06', ...civic, costPerDistance: 0.14 },
+						{ month: '2026-06', ...twin, costPerDistance: 0.2 }
+					]
+				},
+				group: 'comparisons'
+			}
+		});
+		const series = charts.find(c => c.title === 'Cost/mi')?.series ?? [];
+		expect(series.map(s => [s.key, s.label])).toEqual([
+			['v-civic', 'Civic'],
+			['v-civic-2', 'Civic']
+		]);
+		expect(new Set(series.map(s => s.color)).size).toBe(2);
 	});
 });

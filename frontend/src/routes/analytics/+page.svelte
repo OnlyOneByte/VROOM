@@ -25,7 +25,7 @@
 	import { analyticsApi } from '#lib/services/analytics-api.ts';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
-	import { CHART_COLORS } from '#lib/utils/chart-colors.ts';
+	import { buildVehicleColorMap } from '#lib/utils/chart-colors.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import type { AnalyticsSummaryResponse, Vehicle } from '#lib/types/index.ts';
 
@@ -61,14 +61,7 @@
 			new Map(vehicleOptions.map(v => [v.id, v.name]))
 		).toLowerCase()}`
 	);
-	let vehicleColors = $derived(
-		Object.fromEntries(
-			vehicles
-				.map(v => v.id)
-				.sort()
-				.map((id, i) => [id, CHART_COLORS[i % CHART_COLORS.length] as string])
-		)
-	);
+	let vehicleColors = $derived(buildVehicleColorMap(vehicles.map(v => v.id)));
 
 	function setFilters(next: AnalyticsFilters) {
 		const url = writeAnalyticsFilters(page.url, next);

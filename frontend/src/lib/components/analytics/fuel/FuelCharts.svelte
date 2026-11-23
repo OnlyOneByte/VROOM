@@ -14,7 +14,7 @@
 <script lang="ts">
 	import { formatNumber } from '#lib/utils/formatters.ts';
 	import { AppLineChart, AppAreaChart, AppBarChart } from '#lib/components/charts/index.ts';
-	import { CHART_COLORS, buildChartConfig } from '#lib/utils/chart-colors.ts';
+	import { CHART_COLORS, buildChartConfig, buildVehicleColorMap } from '#lib/utils/chart-colors.ts';
 	import {
 		formatDecimalAxis,
 		formatCentsAxis,
@@ -54,12 +54,13 @@
 		vehicleColors = {}
 	}: Props = $props();
 
-	function vehicleSeries(rows: { vehicleId: string; vehicleName: string }[], names: string[]) {
-		const ids = new Map(rows.map(r => [r.vehicleName, r.vehicleId]));
-		return names.map((name, i) => ({
-			key: name,
+	function vehicleSeries(rows: { vehicleId: string; vehicleName: string }[]) {
+		const names = Object.fromEntries(rows.map(r => [r.vehicleId, r.vehicleName]));
+		const fallback = buildVehicleColorMap(Object.keys(names));
+		return Object.entries(names).map(([id, name]) => ({
+			key: id,
 			label: name,
-			color: vehicleColors[ids.get(name) ?? ''] ?? (CHART_COLORS[i % CHART_COLORS.length] as string)
+			color: vehicleColors[id] ?? (fallback[id] as string)
 		}));
 	}
 
@@ -127,31 +128,21 @@
 		`Price per ${getChargeUnitLabel(units.chargeUnit, true)} by charger type over time`
 	);
 
-	let costVehicleNames = $derived([
-		...new Set(fuelStats.fillupCostByVehicle.map(d => d.vehicleName))
-	]);
-
 	let fillupCostData = $derived(byVehicleMonth(fuelStats.fillupCostByVehicle, d => d.avgCost));
 
-	let fillupCostSeries = $derived(vehicleSeries(fuelStats.fillupCostByVehicle, costVehicleNames));
+	let fillupCostSeries = $derived(vehicleSeries(fuelStats.fillupCostByVehicle));
 
 	let fillupCostConfig = $derived(buildChartConfig(fillupCostSeries));
 
-	let odometerVehicleNames = $derived([
-		...new Set(fuelStats.odometerProgression.map(d => d.vehicleName))
-	]);
-
 	let odometerData = $derived(byVehicleMonth(fuelStats.odometerProgression, d => d.mileage));
 
-	let odometerSeries = $derived(vehicleSeries(fuelStats.odometerProgression, odometerVehicleNames));
+	let odometerSeries = $derived(vehicleSeries(fuelStats.odometerProgression));
 
 	let odometerConfig = $derived(buildChartConfig(odometerSeries));
 
-	let cpmVehicleNames = $derived([...new Set(fuelStats.costPerDistance.map(d => d.vehicleName))]);
-
 	let costPerMileData = $derived(byVehicleMonth(fuelStats.costPerDistance, d => d.costPerDistance));
 
-	let costPerMileSeries = $derived(vehicleSeries(fuelStats.costPerDistance, cpmVehicleNames));
+	let costPerMileSeries = $derived(vehicleSeries(fuelStats.costPerDistance));
 
 	let costPerMileConfig = $derived(buildChartConfig(costPerMileSeries));
 
@@ -241,7 +232,7 @@
 				description="Average fill-up cost per vehicle over time"
 				data={fillupCostData}
 				x="date"
-				y={costVehicleNames}
+				y={fillupCostSeries.map(v => v.key)}
 				series={fillupCostSeries}
 				config={fillupCostConfig}
 				xAxisProps={monthlyXAxisProps(fillupCostData.length, 6)}
@@ -274,7 +265,7 @@
 			description="{costPerDistLabel} trend by vehicle"
 			data={costPerMileData}
 			x="date"
-			y={cpmVehicleNames}
+			y={costPerMileSeries.map(v => v.key)}
 			series={costPerMileSeries}
 			config={costPerMileConfig}
 			yAxisFormat={formatCentsAxis}
@@ -286,7 +277,7 @@
 			description="Mileage progression per vehicle"
 			data={odometerData}
 			x="date"
-			y={odometerVehicleNames}
+			y={odometerSeries.map(v => v.key)}
 			series={odometerSeries}
 			config={odometerConfig}
 			yAxisFormat={v => formatNumber(v, 0)}
