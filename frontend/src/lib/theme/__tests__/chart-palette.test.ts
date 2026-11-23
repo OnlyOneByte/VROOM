@@ -5,6 +5,7 @@ import type { ThemeTokenKey, ThemeTokens } from '../theme-types';
 const NORMAL_MIN = 15;
 const CVD_MIN = 8;
 const SURFACE_MIN = 3;
+const CHROMA_MIN = 0.08;
 const SLOTS = Array.from({ length: 8 }, (_, i) => `chart-${i + 1}` as ThemeTokenKey);
 
 const MACHADO = {
@@ -85,6 +86,16 @@ function contrast(x: string, y: string): number {
 }
 
 const ADJACENT = SLOTS.slice(0, -1).map((slot, i) => [slot, SLOTS[i + 1]!] as const);
+const CATEGORY_SLOTS = SLOTS.slice(0, 5);
+const CATEGORY_PAIRS = CATEGORY_SLOTS.flatMap((a, i) =>
+	CATEGORY_SLOTS.slice(i + 2).map(b => [a, b] as const)
+);
+
+function chroma(oklch: string): number {
+	const m = oklch.match(/oklch\(\s*[\d.]+\s+([\d.]+)/);
+	if (!m) throw new Error(`not an oklch() value: ${oklch}`);
+	return Number(m[1]);
+}
 const VARIANTS = Object.values(THEME_REGISTRY).flatMap(theme =>
 	(['light', 'dark'] as const).map(variant => ({
 		label: `${theme.id}.${variant}`,
@@ -127,6 +138,26 @@ describe.each(VARIANTS)('$label chart slots', ({ label, tokens }) => {
 			}
 		}
 	);
+
+	test.each(CATEGORY_PAIRS)(
+		`category slots %s and %s, which can touch in a stack, are as far apart as neighbours`,
+		(a, b) => {
+			const d = deltaE(tokens[a], tokens[b]);
+			expect(d, `${label}: ${a}↔${b} ΔE ${d.toFixed(1)}`).toBeGreaterThanOrEqual(NORMAL_MIN);
+			for (const vision of Object.keys(MACHADO) as Vision[]) {
+				const v = deltaE(tokens[a], tokens[b], vision);
+				expect(v, `${label}: ${a}↔${b} ΔE ${v.toFixed(1)} (${vision})`).toBeGreaterThanOrEqual(
+					CVD_MIN
+				);
+			}
+		}
+	);
+
+	test.each(SLOTS)(`%s has chroma ≥ ${CHROMA_MIN}, so it never reads as grey`, slot => {
+		expect(chroma(tokens[slot]), `${label}: ${slot} ${tokens[slot]}`).toBeGreaterThanOrEqual(
+			CHROMA_MIN
+		);
+	});
 
 	test.each(SLOTS)(`%s is ≥ ${SURFACE_MIN}:1 against the card`, slot => {
 		const ratio = contrast(tokens[slot], tokens.card);
