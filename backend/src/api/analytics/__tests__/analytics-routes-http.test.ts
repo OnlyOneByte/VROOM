@@ -70,6 +70,21 @@ describe('analytics routes (real HTTP stack)', () => {
     expect(res.status).toBe(404);
   });
 
+  test('bucket items take a JSON list of keys and reject a bad list or split', async () => {
+    const base = '/api/v1/analytics/query/items?start=1700000000&end=1710000000';
+    const keys = encodeURIComponent(JSON.stringify(['fuel', '']));
+    const ok = await ctx.authed('GET', `${base}&groupBy=category&keys=${keys}`);
+    expect(ok.status).toBe(200);
+    for (const path of [
+      `${base}&keys=fuel`,
+      `${base}&keys=${encodeURIComponent('[1]')}`,
+      `${base}&metric=efficiency&groupBy=category`,
+    ]) {
+      const bad = await ctx.authed('GET', path);
+      expect(bad.status, path).toBe(400);
+    }
+  });
+
   test('vehicle-tco missing the REQUIRED vehicleId is a 400 (query validation)', async () => {
     const res = await ctx.authed('GET', '/api/v1/analytics/vehicle-tco');
     expect(res.status).toBe(400);

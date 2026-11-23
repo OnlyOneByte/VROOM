@@ -152,3 +152,67 @@ export function valueFormatter(
 export function hasData(response: AnalyticsQueryResponse): boolean {
 	return response.series.some(s => s.values.some(v => v != null && v !== 0));
 }
+
+function nextBucketStart(start: Date, per: AnalyticsQueryInterval): Date {
+	const y = start.getFullYear();
+	const m = start.getMonth();
+	if (per === 'week') return new Date(y, m, start.getDate() + 7);
+	if (per === 'quarter') return new Date(y, m + 3, 1);
+	if (per === 'year') return new Date(y + 1, 0, 1);
+	return new Date(y, m + 1, 1);
+}
+
+export function bucketBounds(
+	key: string,
+	per: AnalyticsQueryInterval,
+	range: { start: number; end: number }
+): { start: number; end: number } {
+	if (per === 'none') return range;
+	const start = bucketDate(key);
+	const startSec = Math.floor(start.getTime() / 1000);
+	const endSec = Math.floor(nextBucketStart(start, per).getTime() / 1000);
+	return { start: Math.max(startSec, range.start), end: Math.min(endSec, range.end) };
+}
+
+function plainDay(seconds: number): string {
+	const d = new Date(seconds * 1000);
+	const pad = (n: number) => String(n).padStart(2, '0');
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export function expensesQuery(filters: {
+	start: number;
+	end: number;
+	vehicleId?: string;
+	categories?: readonly string[];
+	tag?: string;
+}): string {
+	const params = new URLSearchParams();
+	if (filters.vehicleId) params.set('vehicleId', filters.vehicleId);
+	if (filters.categories?.length) params.set('category', filters.categories.join(','));
+	if (filters.tag) params.set('tags', filters.tag);
+	params.set('startDate', plainDay(filters.start));
+	params.set('endDate', plainDay(filters.end - 1));
+	return `?${params.toString()}`;
+}
+
+export function expensesNote(selection: {
+	split: ExploreQuery['split'];
+	keys?: string[];
+	cars: number;
+	energy: boolean;
+}): string | undefined {
+	const extra: string[] = [];
+	if (selection.cars > 1) extra.push('your other cars');
+	if (selection.energy || (selection.split === 'fuelType' && selection.keys)) {
+		extra.push('other fuel types');
+	}
+	if (selection.split === 'tag' && selection.keys) {
+		if (selection.keys.includes('')) extra.push('tagged expenses');
+		else if (selection.keys.length > 1) extra.push('expenses with other tags');
+	}
+	if (extra.length === 0) return undefined;
+	const list =
+		extra.length === 1 ? extra[0] : `${extra.slice(0, -1).join(', ')} and ${extra.at(-1)}`;
+	return `Expenses also lists ${list} for these dates.`;
+}

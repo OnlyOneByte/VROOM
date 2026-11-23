@@ -1,6 +1,6 @@
 import { EXPENSE_CATEGORIES } from '../../db/types';
 import { centsToDollars as c } from '../../utils/money';
-import type { AnalyticsQueryResult, QueryPeriod } from './query-repository';
+import type { AnalyticsQueryResult, BucketItems, QueryPeriod } from './query-repository';
 import type {
   AnalyticsSummaryData,
   CrossVehicleData,
@@ -201,5 +201,18 @@ export function analyticsQueryToApi(d: AnalyticsQueryResult): AnalyticsQueryResu
     ...d,
     ...queryPeriodToApi(d, money),
     compare: d.compare ? queryPeriodToApi(d.compare, money) : null,
+  };
+}
+
+export function bucketItemsToApi(d: BucketItems): BucketItems {
+  const part = (p: { total: number; count: number } | null) =>
+    p ? { total: c(p.total), count: p.count } : null;
+  return {
+    total: c(d.total),
+    count: d.count,
+    fuel: part(d.fuel),
+    items: d.items.map((i) => ({ ...i, amount: c(i.amount) })),
+    others: part(d.others),
+    categories: d.categories,
   };
 }

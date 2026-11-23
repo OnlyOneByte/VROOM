@@ -69,7 +69,11 @@
 	let vehicleColors = $derived(buildVehicleColorMap(vehicles.map(v => v.id)));
 
 	function setFilters(next: AnalyticsFilters) {
-		const url = writeAnalyticsFilters(page.url, next);
+		const url = writeExplore(writeAnalyticsFilters(page.url, next), {
+			...explore,
+			sel: undefined,
+			seg: undefined
+		});
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
 		void goto(`${url.pathname}${url.search}`, { reset: false });
 	}
@@ -86,6 +90,13 @@
 
 	function setExplore(next: ExploreQuery) {
 		const url = writeExplore(page.url, next);
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
+		void goto(`${url.pathname}${url.search}`, { reset: false });
+	}
+
+	function onlyCar(id: string) {
+		const withCar = writeAnalyticsFilters(page.url, { ...filters, cars: [id] });
+		const url = writeExplore(withCar, { ...explore, sel: undefined, seg: undefined, hide: [] });
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
 		void goto(`${url.pathname}${url.search}`, { reset: false });
 	}
@@ -303,6 +314,10 @@
 						<ExploreTab
 							query={explore}
 							onQueryChange={setExplore}
+							rangeText={rangeLabel(filters, d => formatDate(d))}
+							carsText={carsLabel(filters.cars, new Map(vehicleOptions.map(v => [v.id, v.name])))}
+							onOnlyCar={onlyCar}
+							onAllCars={() => setFilters({ ...filters, cars: [] })}
 							{dateRange}
 							{vehicleIds}
 							{vehicleColors}

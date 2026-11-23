@@ -54,6 +54,8 @@ export interface ExploreQuery {
 	inc: AnalyticsQueryInclude;
 	compare: AnalyticsQueryCompare;
 	hide: string[];
+	sel?: string;
+	seg?: string;
 }
 
 export const DEFAULT_EXPLORE: ExploreQuery = {
@@ -138,6 +140,8 @@ export function parseExplore(params: Pick<URLSearchParams, 'get'>): ExploreQuery
 		split: pick(params.get('split'), EXPLORE_SPLITS, DEFAULT_EXPLORE.split),
 		inc: params.get('inc') === 'all' ? 'all' : 'running',
 		compare: pick(params.get('compare'), EXPLORE_COMPARES, DEFAULT_EXPLORE.compare),
+		sel: params.get('sel')?.trim() || undefined,
+		seg: params.get('seg') ?? undefined,
 		hide: (params.get('hide') ?? '')
 			.split(',')
 			.map(key => key.trim())
@@ -147,11 +151,15 @@ export function parseExplore(params: Pick<URLSearchParams, 'get'>): ExploreQuery
 
 export function writeExplore(url: { href: string }, query: ExploreQuery): URL {
 	const next = new URL(url.href);
-	for (const key of PARAMS) next.searchParams.delete(key);
+	for (const key of [...PARAMS, 'sel', 'seg']) next.searchParams.delete(key);
 	for (const key of PARAMS) {
 		const value = key === 'hide' ? query.hide.join(',') : query[key];
 		const fallback = key === 'hide' ? '' : DEFAULT_EXPLORE[key];
 		if (value && value !== fallback) next.searchParams.set(key, value);
+	}
+	if (query.sel) {
+		next.searchParams.set('sel', query.sel);
+		if (query.seg !== undefined) next.searchParams.set('seg', query.seg);
 	}
 	return next;
 }

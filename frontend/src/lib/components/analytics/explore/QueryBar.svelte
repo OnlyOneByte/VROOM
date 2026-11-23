@@ -49,7 +49,15 @@
 	);
 
 	function update(patch: Partial<ExploreQuery>) {
-		onChange(normalizeExplore({ ...query, ...patch, hide: patch.split ? [] : query.hide }));
+		onChange(
+			normalizeExplore({
+				...query,
+				...patch,
+				hide: patch.split ? [] : query.hide,
+				sel: undefined,
+				seg: undefined
+			})
+		);
 	}
 </script>
 

@@ -10,6 +10,7 @@ import { requireVehicleAccess } from '../../utils/vehicle-access';
 import {
   analyticsQueryToApi,
   analyticsSummaryToApi,
+  bucketItemsToApi,
   crossVehicleToApi,
   financingToApi,
   fuelAdvancedToApi,
@@ -143,6 +144,19 @@ const csv = z
       .filter(Boolean)
   );
 
+const jsonList = z
+  .string()
+  .max(8000)
+  .transform((value, ctx) => {
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      ctx.addIssue({ code: 'custom', message: 'keys must be a JSON array of strings' });
+      return z.NEVER;
+    }
+  })
+  .pipe(z.array(z.string().max(200)).max(200));
+
 const analyticsQuerySchema = z
   .object({
     metric: z.enum(QUERY_METRICS),
@@ -166,7 +180,31 @@ const analyticsQuerySchema = z
     path: ['groupBy'],
   });
 
+const bucketItemsSchema = z
+  .object({
+    start: epochSeconds,
+    end: epochSeconds,
+    vehicleIds,
+    categories: csv.pipe(z.array(z.enum(EXPENSE_CATEGORIES)).min(1)).optional(),
+    include: z.enum(QUERY_INCLUDES).default('running'),
+    metric: z.enum(QUERY_METRICS).default('cost'),
+    energy: z.enum(QUERY_ENERGIES).default('fuel'),
+    groupBy: z.enum(QUERY_GROUP_BYS).default('none'),
+    keys: jsonList.optional(),
+  })
+  .refine((q) => q.start < q.end, { message: 'start must be before end', path: ['end'] })
+  .refine((q) => isValidQueryCombination(q.metric, q.groupBy), {
+    message: 'metric cannot be grouped this way',
+    path: ['groupBy'],
+  });
+
 routes.use('*', requireAuth);
+
+routes.get('/query/items', zValidator('query', bucketItemsSchema), async (c) => {
+  const user = c.get('user');
+  const data = await analyticsQueryRepository.items(user.id, c.req.valid('query'));
+  return c.json({ success: true, data: bucketItemsToApi(data) });
+});
 
 routes.get('/query', zValidator('query', analyticsQuerySchema), async (c) => {
   const user = c.get('user');
