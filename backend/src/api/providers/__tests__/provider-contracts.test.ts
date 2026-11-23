@@ -297,7 +297,11 @@ describe('a stored config is checked when the provider is resolved', () => {
       row({
         domain: 'llm',
         providerType: 'anthropic',
-        credentials: encrypt(JSON.stringify({ apiKey: 'sk-x' })),
+        credentials: encrypt(JSON.stringify({ apiKey: 'sk-x' }), {
+          rowId: 'p-resolve',
+          userId: 'u1',
+          domain: 'llm',
+        }),
         config: cfg,
       });
     expect(() => getLlmProvider(modelRow({ model: 'claude', baseUrl: 42 }))).toThrow();
