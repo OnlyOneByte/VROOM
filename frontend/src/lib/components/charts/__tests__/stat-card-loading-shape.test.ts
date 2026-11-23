@@ -61,4 +61,21 @@ describe('StatCard loading tile has the filled tile shape', () => {
 		expect(label).toHaveClass('h-4', 'sm:h-5');
 		expect(value).toHaveClass('h-7', 'sm:h-8', 'mt-2');
 	});
+
+	test('a unit and a subtitle each keep their line while loading', () => {
+		const { container } = render(StatCard, {
+			props: {
+				label: 'Monthly Average',
+				value: '',
+				unit: 'last 12 months',
+				subtitle: '2 vehicles need attention',
+				isLoading: true
+			}
+		});
+
+		const [, , unit, subtitle] = skeletons(container);
+		expect(skeletons(container)).toHaveLength(4);
+		expect(unit).toHaveClass('inline-block', 'h-3', 'align-middle');
+		expect(subtitle).toHaveClass('h-4', 'mt-1');
+	});
 });
