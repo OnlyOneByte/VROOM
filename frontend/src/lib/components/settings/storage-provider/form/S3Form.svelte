@@ -1,62 +1,41 @@
 <script lang="ts">
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
+	import type { ProviderFormProps } from '#lib/constants/providers.ts';
 
-	let {
-		config,
-		credentials,
-		onConfigChange,
-		onCredentialsChange
-	}: {
-		config: { endpoint: string; bucket: string; region: string; photoRootPath: string };
-		credentials: { accessKeyId: string; secretAccessKey: string };
-		onConfigChange: (_config: {
-			endpoint: string;
-			bucket: string;
-			region: string;
-			photoRootPath: string;
-		}) => void;
-		onCredentialsChange: (_creds: { accessKeyId: string; secretAccessKey: string }) => void;
-	} = $props();
+	let { existingConfig, isEditMode, connection = $bindable() }: ProviderFormProps = $props();
 
-	function updateConfig(field: string, value: string) {
-		onConfigChange({ ...config, [field]: value });
-	}
+	const stored = (key: string) => (existingConfig?.[key] as string | undefined) ?? '';
+	let endpoint = $state(stored('endpoint'));
+	let bucket = $state(stored('bucket'));
+	let region = $state(stored('region'));
+	let accessKeyId = $state('');
+	let secretAccessKey = $state('');
 
-	function updateCredentials(field: string, value: string) {
-		onCredentialsChange({ ...credentials, [field]: value });
-	}
+	$effect(() => {
+		const hasKeys = !!(accessKeyId && secretAccessKey);
+		connection = {
+			ready: !!(endpoint && bucket && (isEditMode || hasKeys)),
+			config: { endpoint, bucket, region },
+			credentials: hasKeys ? { accessKeyId, secretAccessKey } : {}
+		};
+	});
 </script>
 
 <div class="space-y-4">
 	<div class="space-y-2">
 		<Label for="s3-endpoint">Endpoint</Label>
-		<Input
-			id="s3-endpoint"
-			value={config.endpoint}
-			oninput={e => updateConfig('endpoint', e.currentTarget.value)}
-			placeholder="s3.us-west-002.backblazeb2.com"
-		/>
+		<Input id="s3-endpoint" bind:value={endpoint} placeholder="s3.us-west-002.backblazeb2.com" />
 	</div>
 
 	<div class="grid grid-cols-2 gap-3">
 		<div class="space-y-2">
 			<Label for="s3-bucket">Bucket</Label>
-			<Input
-				id="s3-bucket"
-				value={config.bucket}
-				oninput={e => updateConfig('bucket', e.currentTarget.value)}
-				placeholder="vroom-photos"
-			/>
+			<Input id="s3-bucket" bind:value={bucket} placeholder="vroom-photos" />
 		</div>
 		<div class="space-y-2">
 			<Label for="s3-region">Region</Label>
-			<Input
-				id="s3-region"
-				value={config.region}
-				oninput={e => updateConfig('region', e.currentTarget.value)}
-				placeholder="us-west-002"
-			/>
+			<Input id="s3-region" bind:value={region} placeholder="us-west-002" />
 		</div>
 	</div>
 
@@ -65,8 +44,7 @@
 		<Input
 			id="s3-access-key"
 			type="password"
-			value={credentials.accessKeyId}
-			oninput={e => updateCredentials('accessKeyId', e.currentTarget.value)}
+			bind:value={accessKeyId}
 			placeholder="Enter access key ID"
 		/>
 	</div>
@@ -76,9 +54,12 @@
 		<Input
 			id="s3-secret-key"
 			type="password"
-			value={credentials.secretAccessKey}
-			oninput={e => updateCredentials('secretAccessKey', e.currentTarget.value)}
+			bind:value={secretAccessKey}
 			placeholder="Enter secret access key"
 		/>
 	</div>
 </div>
+
+{#if isEditMode}
+	<p class="text-xs text-muted-foreground mt-3">Leave credentials blank to keep existing values.</p>
+{/if}

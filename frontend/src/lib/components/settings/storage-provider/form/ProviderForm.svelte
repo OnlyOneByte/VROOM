@@ -13,8 +13,6 @@
 	} from '#lib/components/ui/card/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
-	import S3ProviderForm from './S3Form.svelte';
-	import GoogleDriveProviderForm from './GoogleDriveForm.svelte';
 	import ProviderFolderSettings from './PhotoFolderSection.svelte';
 	import BackupSection from './BackupSection.svelte';
 	import { useGoogleOAuth } from '../use-google-oauth.svelte';
@@ -28,7 +26,8 @@
 		DEFAULT_FOLDER_SETTINGS,
 		PROVIDER_META,
 		providerMeta,
-		supportsZipBackup
+		supportsZipBackup,
+		type ProviderConnection
 	} from '#lib/constants/providers.ts';
 	import type {
 		PhotoCategory,
@@ -82,14 +81,7 @@
 		if (restoredState.displayName) displayName = restoredState.displayName;
 	}
 
-	let googleEmail = $derived.by(() => {
-		if (selectedForm !== 'google') return '';
-		if (isEditMode) return (existingProvider?.config?.['accountEmail'] as string) ?? '';
-		return oauth.pendingEmail;
-	});
-
-	let s3Config = $state({ endpoint: '', bucket: '', region: '' });
-	let s3Credentials = $state({ accessKeyId: '', secretAccessKey: '' });
+	let connection = $state<ProviderConnection>({ ready: false, config: {}, credentials: {} });
 
 	let providerRootPath = $state('VROOM');
 	let photoRootPath = $state(getDefaultPhotoRootPath('google-drive'));
@@ -133,13 +125,6 @@
 			photoRootPath =
 				(existingProvider.config?.['photoRootPath'] as string) ||
 				getDefaultPhotoRootPath(existingProvider.providerType);
-			if (providerMeta(existingProvider.providerType)?.form === 's3') {
-				s3Config = {
-					endpoint: (existingProvider.config?.['endpoint'] as string) ?? '',
-					bucket: (existingProvider.config?.['bucket'] as string) ?? '',
-					region: (existingProvider.config?.['region'] as string) ?? ''
-				};
-			}
 			if (existingFolderSettings) {
 				folderSettings = { ...existingFolderSettings };
 			}
@@ -184,21 +169,7 @@
 	let canSave = $derived.by(() => {
 		if (!selectedType || !displayName.trim()) return false;
 		if (hasBackupErrors && anyBackupEnabled) return false;
-		if (selectedForm === 's3') {
-			if (isEditMode) {
-				return !!(s3Config.endpoint && s3Config.bucket);
-			}
-			return !!(
-				s3Config.endpoint &&
-				s3Config.bucket &&
-				s3Credentials.accessKeyId &&
-				s3Credentials.secretAccessKey
-			);
-		}
-		if (selectedForm === 'google') {
-			return isEditMode || !!oauth.pendingEmail;
-		}
-		return true;
+		return !selectedForm || connection.ready;
 	});
 
 	function navigateBack() {
@@ -210,27 +181,15 @@
 
 		isSaving = true;
 		try {
-			let credentials: Record<string, unknown> = {};
-			let config: Record<string, unknown> = {
+			const { credentials, nonce } = selectedForm
+				? connection
+				: { credentials: {}, nonce: undefined };
+			const config: Record<string, unknown> = {
 				...(existingProvider?.config ?? {}),
 				providerRootPath: providerRootPath.trim(),
-				photoRootPath: photoRootPath.trim() || getDefaultPhotoRootPath(selectedType)
+				photoRootPath: photoRootPath.trim() || getDefaultPhotoRootPath(selectedType),
+				...(selectedForm && connection.config)
 			};
-
-			if (selectedForm === 's3') {
-				if (s3Credentials.accessKeyId && s3Credentials.secretAccessKey) {
-					credentials = {
-						accessKeyId: s3Credentials.accessKeyId,
-						secretAccessKey: s3Credentials.secretAccessKey
-					};
-				}
-				config = {
-					...config,
-					endpoint: s3Config.endpoint,
-					bucket: s3Config.bucket,
-					region: s3Config.region
-				};
-			}
 
 			let resultId: string;
 
@@ -255,7 +214,7 @@
 					displayName: displayName.trim(),
 					credentials,
 					config,
-					...(selectedForm === 'google' && oauth.oauthNonce ? { nonce: oauth.oauthNonce } : {})
+					...(nonce ? { nonce } : {})
 				});
 				resultId = created.id;
 			}
@@ -438,41 +397,17 @@
 			<Card>
 				<CardHeader>
 					<CardTitle class="text-base">Connection Settings</CardTitle>
-					<CardDescription>
-						{#if selectedForm === 's3'}
-							S3-compatible storage credentials and endpoint
-						{:else if selectedForm === 'google'}
-							Google Drive connection
-						{:else}
-							Provider configuration
-						{/if}
-					</CardDescription>
+					<CardDescription>{selectedForm?.description ?? 'Provider configuration'}</CardDescription>
 				</CardHeader>
 				<CardContent class="space-y-4">
-					{#if selectedForm === 's3'}
-						<S3ProviderForm
-							config={{ ...s3Config, photoRootPath }}
-							credentials={s3Credentials}
-							onConfigChange={(c: { endpoint: string; bucket: string; region: string }) =>
-								(s3Config = { endpoint: c.endpoint, bucket: c.bucket, region: c.region })}
-							onCredentialsChange={(c: { accessKeyId: string; secretAccessKey: string }) =>
-								(s3Credentials = c)}
+					{#if selectedForm}
+						{@const ConnectionForm = selectedForm.component}
+						<ConnectionForm
+							existingConfig={existingProvider?.config}
+							{isEditMode}
+							{oauth}
+							bind:connection
 						/>
-						{#if isEditMode}
-							<p class="text-xs text-muted-foreground mt-3">
-								Leave credentials blank to keep existing values.
-							</p>
-						{/if}
-					{:else if selectedForm === 'google'}
-						<GoogleDriveProviderForm
-							connectedEmail={googleEmail}
-							onStartOAuth={oauth.startGoogleOAuth}
-						/>
-						{#if !isEditMode && !googleEmail}
-							<p class="text-sm text-muted-foreground mt-3">
-								Connect your Google account first, then return here to add the provider.
-							</p>
-						{/if}
 					{/if}
 
 					<div class="space-y-2 border-t border-border pt-4">

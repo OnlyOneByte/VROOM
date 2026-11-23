@@ -2,21 +2,31 @@
 	import { browser } from '$app/env';
 	import { Cloud, CircleCheck, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import type { ProviderFormProps } from '#lib/constants/providers.ts';
 
-	let {
-		connectedEmail = '',
-		onStartOAuth
-	}: {
-		connectedEmail?: string;
-		onStartOAuth?: () => void;
-	} = $props();
+	let { existingConfig, isEditMode, oauth, connection = $bindable() }: ProviderFormProps = $props();
+
+	let connectedEmail = $derived(
+		isEditMode
+			? ((existingConfig?.['accountEmail'] as string | undefined) ?? '')
+			: oauth.pendingEmail
+	);
+
+	$effect(() => {
+		connection = {
+			ready: isEditMode || !!oauth.pendingEmail,
+			config: {},
+			credentials: {},
+			nonce: !isEditMode && oauth.oauthNonce ? oauth.oauthNonce : undefined
+		};
+	});
 
 	let isRedirecting = $state(false);
 
 	function handleConnectGoogle() {
 		if (!browser) return;
 		isRedirecting = true;
-		onStartOAuth?.();
+		oauth.startGoogleOAuth();
 	}
 </script>
 
@@ -82,3 +92,9 @@
 		</div>
 	{/if}
 </div>
+
+{#if !isEditMode && !connectedEmail}
+	<p class="text-sm text-muted-foreground mt-3">
+		Connect your Google account first, then return here to add the provider.
+	</p>
+{/if}
