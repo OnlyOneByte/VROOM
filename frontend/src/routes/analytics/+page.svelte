@@ -2,23 +2,106 @@
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount, tick } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { LoaderCircle, Car, DollarSign, Route, TrendingUp } from '@lucide/svelte';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import * as Tabs from '#lib/components/ui/tabs/index.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import FuelStatsTab from '#lib/components/analytics/fuel/FuelStatsTab.svelte';
-	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
-	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import AnalyticsFilterBar from '#lib/components/analytics/AnalyticsFilterBar.svelte';
+	import {
+		DEFAULT_RANGE,
+		carsLabel,
+		filterDateRange,
+		isDefaultFilters,
+		parseAnalyticsFilters,
+		previousPeriodLabel,
+		rangeLabel,
+		writeAnalyticsFilters,
+		type AnalyticsFilters
+	} from '#lib/components/analytics/analytics-filters.ts';
+	import { analyticsApi } from '#lib/services/analytics-api.ts';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { CHART_COLORS } from '#lib/utils/chart-colors.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
-	import type { AnalyticsSummaryResponse } from '#lib/types/index.ts';
+	import type { AnalyticsSummaryResponse, Vehicle } from '#lib/types/index.ts';
 
 	let summary = $state<AnalyticsSummaryResponse | null>(null);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 	let activeTab = $state('fuel-stats');
 	let tabList = $state<HTMLElement | null>(null);
+	let vehicles = $state<Vehicle[]>([]);
+	let vehiclesLoaded = $state(false);
+	let vehiclesError = $state<string | null>(null);
+	let summaryRequest = 0;
+
+	let filters = $derived(parseAnalyticsFilters(page.url.searchParams));
+	let dateRange = $derived(filterDateRange(filters));
+	let vehicleIds = $derived.by(() => {
+		if (filters.cars.length === 0) return undefined;
+		if (vehicles.length === 0) return filters.cars;
+		const known = filters.cars.filter(id => vehicles.some(v => v.id === id));
+		return known.length > 0 ? known : undefined;
+	});
+	let filtered = $derived(!isDefaultFilters(filters));
+	let nonDefaultRange = $derived(filters.range !== DEFAULT_RANGE);
+	let vehicleOptions = $derived(
+		vehicles.map(v => ({
+			id: v.id,
+			name: `${v.year} ${v.make} ${v.model}${v.nickname ? ` (${v.nickname})` : ''}`
+		}))
+	);
+	let filterLabel = $derived(
+		`${rangeLabel(filters, d => formatDate(d))}, ${carsLabel(
+			filters.cars,
+			new Map(vehicleOptions.map(v => [v.id, v.name]))
+		).toLowerCase()}`
+	);
+	let vehicleColors = $derived(
+		Object.fromEntries(
+			vehicles
+				.map(v => v.id)
+				.sort()
+				.map((id, i) => [id, CHART_COLORS[i % CHART_COLORS.length] as string])
+		)
+	);
+
+	function setFilters(next: AnalyticsFilters) {
+		const url = writeAnalyticsFilters(page.url, next);
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
+		void goto(`${url.pathname}${url.search}`, { reset: false });
+	}
+
+	$effect(() => {
+		if (!vehiclesLoaded || vehicles.length === 0 || filters.cars.length === 0) return;
+		if (filters.cars.some(id => vehicles.some(v => v.id === id))) return;
+		const url = writeAnalyticsFilters(page.url, { ...filters, cars: [] });
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
+		void goto(`${url.pathname}${url.search}`, { replace: true, reset: false });
+	});
+
+	async function clearFilters() {
+		setFilters({ range: DEFAULT_RANGE, cars: [] });
+		await tick();
+		document.querySelector<HTMLElement>('[aria-label="Analytics filters"] button')?.focus();
+	}
+
+	async function loadVehicles() {
+		try {
+			const { vehicleApi } = await import('#lib/services/vehicle-api.ts');
+			vehicles = await vehicleApi.getVehicles();
+			vehiclesError = null;
+		} catch (e) {
+			vehicles = [];
+			vehiclesError = userFacingErrorMessage(e);
+		} finally {
+			vehiclesLoaded = true;
+		}
+	}
 
 	function revealActiveTab() {
 		const active = tabList?.querySelector('[data-state="active"]');
@@ -35,20 +118,36 @@
 	});
 
 	async function loadSummary() {
+		const request = ++summaryRequest;
 		try {
 			isLoading = true;
-			summary = await analyticsApi.getSummary(getDefaultDateRange());
+			const result = await analyticsApi.getSummary({
+				...dateRange,
+				ytdStart: nonDefaultRange ? dateRange.startDate : dateRange.ytdStart,
+				vehicleIds
+			});
+			if (request !== summaryRequest) return;
+			summary = result;
 			error = null;
 		} catch (e) {
+			if (request !== summaryRequest) return;
 			error = userFacingErrorMessage(e);
 		} finally {
-			isLoading = false;
+			if (request === summaryRequest) isLoading = false;
 		}
 	}
 
+	$effect(() => {
+		void dateRange.startDate;
+		void dateRange.endDate;
+		void vehicleIds;
+		if (filters.cars.length > 0 && !vehiclesLoaded) return;
+		void loadSummary();
+	});
+
 	let quickStats = $derived(summary?.quickStats ?? null);
-	let noVehicles = $derived(!isLoading && !error && quickStats?.vehicleCount === 0);
-	let showTabs = $derived(quickStats ? quickStats.vehicleCount > 0 : !!error);
+	let noVehicles = $derived(!isLoading && !error && quickStats?.vehicleCount === 0 && !vehicleIds);
+	let showTabs = $derived(quickStats ? quickStats.vehicleCount > 0 || !!vehicleIds : !!error);
 	let fuelStats = $derived(summary?.fuelStats ?? null);
 	let fuelAdvanced = $derived(summary?.fuelAdvanced ?? null);
 
@@ -67,8 +166,9 @@
 						iconColor: 'primary'
 					},
 					{
-						label: 'YTD Spending',
+						label: nonDefaultRange ? 'Spending' : 'YTD Spending',
 						value: formatCurrency(quickStats.ytdSpending),
+						subtitle: nonDefaultRange ? rangeLabel(filters, d => formatDate(d)) : undefined,
 						icon: DollarSign,
 						iconColor: 'chart-1'
 					},
@@ -101,7 +201,7 @@
 	];
 
 	onMount(() => {
-		loadSummary();
+		void loadVehicles();
 	});
 </script>
 
@@ -115,6 +215,16 @@
 		title="Analytics Dashboard"
 		description="Comprehensive insights into your vehicle spending patterns and trends"
 	/>
+
+	{#if !noVehicles}
+		<AnalyticsFilterBar
+			{filters}
+			vehicles={vehicleOptions}
+			onChange={setFilters}
+			{vehiclesError}
+			onRetryVehicles={loadVehicles}
+		/>
+	{/if}
 
 	{#if isLoading && !error}
 		<StatCardGrid items={QUICK_STAT_SKELETONS} columns={4} isLoading />
@@ -150,7 +260,16 @@
 
 			{#if activeTab === 'fuel-stats'}
 				<Tabs.Content value="fuel-stats">
-					<FuelStatsTab {fuelStats} {fuelAdvanced} />
+					<FuelStatsTab
+						{fuelStats}
+						{fuelAdvanced}
+						{vehicleColors}
+						previousPeriodLabel={previousPeriodLabel(filters)}
+						{dateRange}
+						{vehicleIds}
+						filterLabel={filtered ? filterLabel : undefined}
+						onClearFilters={filtered ? clearFilters : undefined}
+					/>
 				</Tabs.Content>
 			{:else if activeTab === 'cross-vehicle'}
 				<Tabs.Content value="cross-vehicle">
@@ -159,7 +278,13 @@
 							<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 						</div>
 					{:then { default: CrossVehicleTab }}
-						<CrossVehicleTab />
+						<CrossVehicleTab
+							{dateRange}
+							{vehicleIds}
+							{vehicleColors}
+							filterLabel={filtered ? filterLabel : undefined}
+							onClearFilters={filtered ? clearFilters : undefined}
+						/>
 					{/await}
 				</Tabs.Content>
 			{:else if activeTab === 'per-vehicle'}
@@ -169,7 +294,12 @@
 							<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 						</div>
 					{:then { default: PerVehicleTab }}
-						<PerVehicleTab />
+						<PerVehicleTab
+							{dateRange}
+							preferredVehicleId={vehicleIds?.[0]}
+							filterLabel={filtered ? filterLabel : undefined}
+							onClearFilters={filtered ? clearFilters : undefined}
+						/>
 					{/await}
 				</Tabs.Content>
 			{:else if activeTab === 'year-end'}
