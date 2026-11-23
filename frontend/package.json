@@ -103,8 +103,7 @@
 	"dependencies": {
 		"@tailwindcss/postcss": "^4.3.3",
 		"d3": "^7.9.0",
-		"sveltekit-superforms": "^3.1.0",
-		"zod": "^4.6.7"
+		"sveltekit-superforms": "^3.1.0"
 	},
 	"imports": {
 		"#lib": "./src/lib/index.js",

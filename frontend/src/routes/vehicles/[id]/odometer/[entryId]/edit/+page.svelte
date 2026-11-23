@@ -6,7 +6,10 @@
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { onMount, tick } from 'svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
-	import { z } from 'zod';
+	import {
+		validateOdometerForm,
+		type OdometerFormErrors
+	} from '#lib/utils/odometer-form-validation.ts';
 	import { ArrowLeft, Info, LoaderCircle, Trash2, X } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
@@ -35,7 +38,7 @@
 	onMount(() => trackPendingSave(() => isSubmitting));
 	let isDeleting = $state(false);
 	let loadError = $state<string | null>(null);
-	let fieldErrors = $state<{ odometer?: string; date?: string; note?: string }>({});
+	let fieldErrors = $state<OdometerFormErrors>({});
 	let submitError = $state<string | null>(null);
 	let deleteDialogOpen = $state(false);
 	let deleteError = $state<string | null>(null);
@@ -63,15 +66,6 @@
 	function enteredOdometer(): number | undefined {
 		return odometer === '' || odometer === null ? undefined : Number(odometer);
 	}
-
-	const formSchema = z.object({
-		odometer: z
-			.number({ error: 'Odometer reading is required' })
-			.int('Odometer must be a whole number')
-			.min(0, 'Odometer must be 0 or greater'),
-		date: z.string().min(1, 'Date is required'),
-		note: z.string().max(500, 'Note must be 500 characters or less').optional()
-	});
 
 	onMount(async () => {
 		try {
@@ -101,28 +95,8 @@
 	});
 
 	function validate(): boolean {
-		fieldErrors = {};
-		const odometerNum = enteredOdometer();
-
-		const result = formSchema.safeParse({
-			odometer: odometerNum,
-			date,
-			note: note || undefined
-		});
-
-		if (!result.success) {
-			const errs: { odometer?: string; date?: string; note?: string } = {};
-			for (const issue of result.error.issues) {
-				const field = issue.path[0];
-				if (field === 'odometer') errs.odometer = issue.message;
-				else if (field === 'date') errs.date = issue.message;
-				else if (field === 'note') errs.note = issue.message;
-			}
-			fieldErrors = errs;
-			return false;
-		}
-
-		return true;
+		fieldErrors = validateOdometerForm({ odometer: enteredOdometer(), date, note });
+		return Object.keys(fieldErrors).length === 0;
 	}
 
 	async function handleSubmit() {
