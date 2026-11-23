@@ -18,7 +18,10 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 }));
 
 vi.mock('#lib/stores/app.svelte.ts', () => ({
-	appStore: { addNotification: mocks.addNotification }
+	appStore: {
+		addNotification: mocks.addNotification,
+		showSuccess: (message: string) => mocks.addNotification({ type: 'success', message })
+	}
 }));
 
 const CAMRY: Vehicle = {
@@ -383,6 +386,101 @@ describe('ImportExpensesForm: manual mapping settings', () => {
 			FOREIGN_CSV,
 			true,
 			expect.objectContaining({ categoryMap: expect.objectContaining({ gas: 'fuel' }) })
+		);
+	});
+});
+
+describe('ImportExpensesForm: presets-only mode and stale results', () => {
+	const deferred = <T>() => {
+		let resolve!: (value: T) => void;
+		const promise = new Promise<T>(r => (resolve = r));
+		return { promise, resolve };
+	};
+
+	test('an unrecognised file is flagged, never guessed or previewed, and keeps the chosen vehicle', async () => {
+		const form = new ImportExpensesForm(() => [CAMRY, RAV4], { presetsOnly: true });
+		form.targetVehicleId = 'v2';
+
+		await form.loadFile(new File([FOREIGN_CSV], 'other.csv'));
+
+		expect(form.unrecognized).toBe(true);
+		expect(form.manualMapping).toBe(false);
+		expect(mocks.importExpensesCsv).not.toHaveBeenCalled();
+		expect(form.targetVehicleId).toBe('v2');
+	});
+
+	test('picking a vehicle while detection runs neither cancels it nor leaves a spinner', async () => {
+		const detection = deferred<DetectedImportFormat | null>();
+		mocks.detectImportSource.mockReturnValue(detection.promise);
+		const form = new ImportExpensesForm(() => [CAMRY, RAV4], { presetsOnly: true });
+
+		const loading = form.loadFile(new File([FUEL_CSV], 'fuel.csv'));
+		await flush();
+		form.changeTargetVehicle('v2');
+		detection.resolve(FUELLY);
+		await loading;
+
+		expect(form.isDetecting).toBe(false);
+		expect(form.isPreviewing).toBe(false);
+		expect(form.detectedPreset).toEqual(FUELLY);
+		expect(mocks.importExpensesCsv).toHaveBeenLastCalledWith(
+			FUEL_CSV,
+			true,
+			expect.objectContaining({ source: 'fuelly', targetVehicle: '2020 Toyota RAV4' })
+		);
+	});
+
+	test('a preview that cannot run clears the spinner of the one it replaces', async () => {
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		const form = new ImportExpensesForm(() => [CAMRY, RAV4]);
+		await form.loadFile(new File([FUEL_CSV], 'fuel.csv'));
+		form.changeTargetVehicle('v1');
+		mocks.importExpensesCsv.mockReturnValue(new Promise(() => {}));
+		void form.runPreview();
+		expect(form.isPreviewing).toBe(true);
+
+		form.targetVehicleId = '';
+		await form.runPreview();
+
+		expect(form.isPreviewing).toBe(false);
+	});
+
+	test('a preview that resolves after a newer one is discarded', async () => {
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		await form.loadFile(new File([FUEL_CSV], 'fuel.csv'));
+		const slow = deferred<ExpenseImportResult>();
+		mocks.importExpensesCsv.mockReturnValueOnce(slow.promise);
+		const first = form.runPreview();
+		mocks.importExpensesCsv.mockResolvedValueOnce(previewResult({ readyCount: 7 }));
+		await form.runPreview();
+		slow.resolve(previewResult({ readyCount: 1 }));
+		await first;
+
+		expect(form.preview?.readyCount).toBe(7);
+		expect(form.isPreviewing).toBe(false);
+	});
+
+	test('the caller’s copy is used for success and failure', async () => {
+		mocks.detectImportSource.mockResolvedValue(FUELLY);
+		const form = new ImportExpensesForm(() => [CAMRY], {
+			copy: {
+				done: (n, format) => `Moved ${n} from ${format?.label}`,
+				failed: format => `No luck with ${format?.label}`
+			}
+		});
+		await form.loadFile(new File([FUEL_CSV], 'fuel.csv'));
+		mocks.importExpensesCsv.mockResolvedValueOnce(previewResult({ dryRun: false, imported: 2 }));
+		await form.commit(vi.fn());
+		expect(mocks.addNotification).toHaveBeenCalledWith({
+			type: 'success',
+			message: 'Moved 2 from Fuelly'
+		});
+
+		mocks.importExpensesCsv.mockRejectedValueOnce(new Error('boom'));
+		await form.commit(vi.fn());
+		expect(mocks.addNotification).toHaveBeenCalledWith(
+			expect.objectContaining({ message: expect.stringContaining('No luck with Fuelly') })
 		);
 	});
 });

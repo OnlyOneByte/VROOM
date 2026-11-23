@@ -21,7 +21,10 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 }));
 
 vi.mock('#lib/stores/app.svelte.ts', () => ({
-	appStore: { addNotification: mocks.addNotification }
+	appStore: {
+		addNotification: mocks.addNotification,
+		showSuccess: (message: string) => mocks.addNotification({ type: 'success', message })
+	}
 }));
 
 const CAMRY: Vehicle = {
