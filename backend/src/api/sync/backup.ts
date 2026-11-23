@@ -167,14 +167,25 @@ export function upgradeBackupTables(
   }).reduce((current, step) => step.upgrade(current), tables);
 }
 
-const UNEDITED_BACKUP = "Choose a backup that VROOM made and that hasn't been edited.";
+const RESTORABLE = 'Only a backup that VROOM made, without edits, can be restored.';
+
+const reasonsFor = (keepIt: string) => ({
+  metadata: `This backup is missing details VROOM needs to restore it. ${RESTORABLE} ${keepIt}`,
+  rows: `Some entries in this backup can't be read, so it can't be restored. ${RESTORABLE} ${keepIt}`,
+  references: `Some entries in this backup refer to vehicles or other items that aren't in it, so it can't be restored. ${RESTORABLE} ${keepIt}`,
+  duplicates: `Some entries appear twice in this backup, so it can't be restored. ${RESTORABLE} ${keepIt}`,
+});
 
 export const BACKUP_CHECK_REASONS = {
-  metadata: `This backup is missing details VROOM needs to restore it. ${UNEDITED_BACKUP}`,
-  rows: `Some entries in this backup can't be read, so it can't be restored. ${UNEDITED_BACKUP}`,
-  references: `Some entries in this backup refer to vehicles or other items that aren't in it, so it can't be restored. ${UNEDITED_BACKUP}`,
-  duplicates: `Some entries appear twice in this backup, so it can't be restored. ${UNEDITED_BACKUP}`,
+  zip: reasonsFor(
+    'If this is the only one you have, keep it as it is and select Cancel. VROOM keeps working without a restore.'
+  ),
+  sheets: reasonsFor(
+    "If this spreadsheet is the only copy you have, open it in Google Drive and use File > Make a copy. VROOM's next backup writes over this spreadsheet."
+  ),
 };
+
+export type BackupSource = keyof typeof BACKUP_CHECK_REASONS;
 
 export function backupVersionError(version: string | undefined): string | null {
   const backup = parseVersion(version);
@@ -655,7 +666,8 @@ class BackupService {
       quote: '"',
     }) as Record<string, string>[];
   }
-  validateBackupData(backup: ParsedBackupData): ValidationResult {
+  validateBackupData(backup: ParsedBackupData, source: BackupSource = 'zip'): ValidationResult {
+    const reasons = BACKUP_CHECK_REASONS[source];
     const rowErrors: string[] = [];
     for (const key of getBackupTableKeys()) {
       const schema = TABLE_SCHEMAS[key];
@@ -668,22 +680,22 @@ class BackupService {
 
     const checks: Array<{ reason: string | null; errors: string[] }> = [
       {
-        reason: BACKUP_CHECK_REASONS.metadata,
+        reason: reasons.metadata,
         errors: backup.metadata?.userId && backup.metadata?.version ? [] : ['Invalid metadata'],
       },
       {
-        reason: parseVersion(backup.metadata?.version) ? null : BACKUP_CHECK_REASONS.metadata,
+        reason: parseVersion(backup.metadata?.version) ? null : reasons.metadata,
         errors: versionError ? [versionError] : [],
       },
       {
-        reason: BACKUP_CHECK_REASONS.rows,
+        reason: reasons.rows,
         errors: [...rowErrors, ...this.validateJsonColumnShapes(backup)],
       },
       {
-        reason: BACKUP_CHECK_REASONS.references,
+        reason: reasons.references,
         errors: this.validateReferentialIntegrity(backup),
       },
-      { reason: BACKUP_CHECK_REASONS.duplicates, errors: this.validateUniqueConstraints(backup) },
+      { reason: reasons.duplicates, errors: this.validateUniqueConstraints(backup) },
     ];
     const errors = checks.flatMap((check) => check.errors);
     const reason = checks.find((check) => check.errors.length > 0)?.reason;
