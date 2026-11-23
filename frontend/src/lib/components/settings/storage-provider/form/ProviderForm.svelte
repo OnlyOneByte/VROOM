@@ -81,7 +81,7 @@
 		if (restoredState.displayName) displayName = restoredState.displayName;
 	}
 
-	let connection = $state<ProviderConnection>({ ready: true, config: {}, credentials: {} });
+	let connection = $state<ProviderConnection>({ ready: false, config: {}, credentials: {} });
 
 	let providerRootPath = $state('VROOM');
 	let photoRootPath = $state(getDefaultPhotoRootPath('google-drive'));

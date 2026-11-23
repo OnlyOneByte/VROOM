@@ -138,10 +138,11 @@
 	let supportsZipBackup = $derived(providerSupportsZipBackup(provider.providerType));
 	let meta = $derived(providerMeta(provider.providerType));
 	let details = $derived(meta?.form?.details?.(provider.config ?? {}) ?? []);
-	const zipBackupProviders = Object.values(PROVIDER_META)
-		.filter(m => m.option && !m.photoOnly)
-		.map(m => m.label)
-		.join(' or ');
+	const zipBackupProviders = new Intl.ListFormat('en', { type: 'disjunction' }).format(
+		Object.values(PROVIDER_META)
+			.filter(m => m.option && !m.photoOnly)
+			.map(m => m.label)
+	);
 </script>
 
 <Card>
