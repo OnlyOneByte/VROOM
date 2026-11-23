@@ -212,6 +212,7 @@ which one a proxy dials first depends on the host's resolver.
 
 ```
 yourdomain.com {
+    encode zstd gzip
     handle /api/* {
         reverse_proxy 127.0.0.1:3001
     }
@@ -224,6 +225,10 @@ yourdomain.com {
 Caddy provisions SSL automatically via Let's Encrypt. It caps request bodies only when you
 ask it to (`request_body max_size`), so backups and photo uploads need nothing extra here —
 unlike nginx below.
+
+The backend gzips its own JSON and CSV responses when the client accepts gzip. `encode`
+compresses the frontend's pages too, and leaves responses the backend already compressed as
+they are. Caddy compresses nothing without it.
 
 ### Nginx
 
@@ -242,6 +247,9 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
 
     client_max_body_size 10m;  # the app caps request bodies at 10MB; nginx defaults to 1MB
+
+    gzip on;
+    gzip_types application/json text/csv text/css application/javascript image/svg+xml;
 
     # Restoring a backup uploads a whole ZIP, which the app allows up to 50MB. nginx rejects
     # on Content-Length before the request ever reaches the backend, so this one path needs
@@ -279,6 +287,10 @@ Regex locations are matched before prefix ones, so the restore block wins over `
 Without the 10MB `client_max_body_size`, photo and receipt uploads fail at the proxy with 413;
 without the restore block, so does every backup larger than 10MB — the one path that must never
 be blocked by a limit tuned for JSON payloads.
+
+nginx's own `gzip` covers only `text/html` unless `gzip_types` names more. The backend already
+gzips its JSON and CSV, and nginx passes those through as they are; the two lines above
+compress the frontend's pages and assets.
 
 ### Cloudflare Tunnel
 
