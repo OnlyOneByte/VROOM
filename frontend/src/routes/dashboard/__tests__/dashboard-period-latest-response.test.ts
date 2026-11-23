@@ -13,7 +13,18 @@ vi.mock('#lib/components/dashboard/DashboardHero.svelte', () => ({
 		heroProps = props;
 	}
 }));
-vi.mock('#lib/components/dashboard/SharedWithMeCard.svelte', () => ({ default: () => {} }));
+let sharedProps: Record<string, unknown> = {};
+vi.mock('#lib/components/dashboard/SharedWithMeCard.svelte', () => ({
+	default: (_anchor: unknown, props: Record<string, unknown>) => {
+		sharedProps = props;
+	}
+}));
+vi.mock('#lib/services/share-api.ts', () => ({
+	shareApi: {
+		listReceived: () =>
+			Promise.resolve([{ id: 's1', status: 'pending', vehicleName: 'Van', level: 'viewer' }])
+	}
+}));
 
 const getExpenseSummary = vi.fn();
 
@@ -129,5 +140,20 @@ describe('dashboard period switch', () => {
 
 		await waitFor(() => expect(heroProps['period']).toBe('30d'));
 		expect(heroProps['total']).toBe(30);
+	});
+
+	test('a full reload while a switch is still in flight frees the period chip', async () => {
+		getExpenseSummary.mockImplementation(({ period }: { period: TimePeriod }) => {
+			if (period === '7d') return new Promise<ExpenseSummary>(() => {});
+			return Promise.resolve(summaryOf(TOTALS[period]));
+		});
+		render(Page);
+		await waitFor(() => expect(heroProps['total']).toBe(30));
+
+		changePeriod('7d');
+		await waitFor(() => expect(heroProps['isUpdating']).toBe(true));
+		(sharedProps['onAccepted'] as () => void)();
+
+		await waitFor(() => expect(heroProps['isUpdating']).toBe(false));
 	});
 });
