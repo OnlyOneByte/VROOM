@@ -131,7 +131,6 @@ describe('offline photo delivery', () => {
 		syncConfig.current = {
 			maxRetries: 0,
 			retryDelay: 100,
-			batchSize: 10,
 			conflictResolution: 'ask_user'
 		};
 		uploadPhoto.mockResolvedValue({ id: 'photo' });
@@ -188,11 +187,14 @@ describe('offline photo delivery', () => {
 		expect(firstRun.failed).toBe(1);
 		expect(await storage.loadPendingPhotos('cid-1')).toEqual([second]);
 
-		mockFetch.mockImplementation(() => Promise.resolve(respond(200, [serverRow()])));
+		mockFetch.mockImplementation(() => Promise.resolve(respond(200, serverRow())));
 		const secondRun = await syncManager.syncAll();
 
 		expect(secondRun.synced).toBe(1);
-		expect(posts()).toHaveLength(1);
+		expect(posts()).toHaveLength(2);
+		expect(mockFetch.mock.calls.filter(([, init]) => (init?.method ?? 'GET') === 'GET')).toEqual(
+			[]
+		);
 		expect(uploadPhoto.mock.calls.map(call => (call[2] as File).name)).toEqual([
 			'a.jpg',
 			'b.jpg',

@@ -112,7 +112,6 @@ describe('SyncManager.syncAll — HTTP failure classification', () => {
 		syncConfig.current = {
 			maxRetries: 3,
 			retryDelay: 100,
-			batchSize: 10,
 			conflictResolution: 'ask_user'
 		};
 	});
@@ -222,7 +221,6 @@ describe('SyncManager.syncAll — delivery', () => {
 		syncConfig.current = {
 			maxRetries: 3,
 			retryDelay: 100,
-			batchSize: 10,
 			conflictResolution: 'ask_user'
 		};
 	});
@@ -291,7 +289,6 @@ describe('SyncManager.retryParked', () => {
 		syncConfig.current = {
 			maxRetries: 3,
 			retryDelay: 100,
-			batchSize: 10,
 			conflictResolution: 'ask_user'
 		};
 	});

@@ -81,7 +81,6 @@ describe('Sync Manager', () => {
 		syncConfig.current = {
 			maxRetries: 3,
 			retryDelay: 100,
-			batchSize: 10,
 			conflictResolution: 'ask_user'
 		};
 	});
@@ -134,7 +133,7 @@ describe('Sync Manager', () => {
 
 			vi.mocked(loadOfflineExpenses).mockReturnValue(mockExpenses);
 
-			mockFetch.mockResolvedValueOnce(apiOk([])).mockResolvedValueOnce(apiOk({ id: 'server-1' }));
+			mockFetch.mockResolvedValueOnce(apiOk({ id: 'server-1' }));
 
 			const result = await syncManager.syncAll();
 
@@ -162,9 +161,7 @@ describe('Sync Manager', () => {
 
 			vi.mocked(loadOfflineExpenses).mockReturnValue(mockExpenses);
 
-			mockFetch
-				.mockResolvedValueOnce(apiOk([]))
-				.mockResolvedValueOnce(apiError(500, 'Server Error'));
+			mockFetch.mockResolvedValueOnce(apiError(500, 'Server Error'));
 
 			const result = await syncManager.syncAll();
 
@@ -189,7 +186,11 @@ describe('Sync Manager', () => {
 			};
 			vi.mocked(loadOfflineExpenses).mockReturnValue([local]);
 			mockFetch.mockResolvedValueOnce(
-				apiOk([{ ...serverRow('server-1', 'cid-test-1'), expenseAmount: 45 }])
+				apiOk({
+					...serverRow('server-1', 'cid-test-1'),
+					expenseAmount: 45,
+					updatedAt: '2024-01-02T00:00:00.000Z'
+				})
 			);
 
 			const result = await syncManager.syncAll();
@@ -201,7 +202,7 @@ describe('Sync Manager', () => {
 			expect(result.conflicts[0]?.serverExpense.amount).toBe(45);
 		});
 
-		it('syncs a distinct same-day, same-tag expense instead of calling it a conflict', async () => {
+		it('posts a queued expense with its clientId and time zone', async () => {
 			vi.mocked(loadOfflineExpenses).mockReturnValue([
 				{
 					id: 'b',
@@ -215,24 +216,14 @@ describe('Sync Manager', () => {
 					synced: false
 				}
 			]);
-			mockFetch
-				.mockResolvedValueOnce(
-					apiOk([
-						{
-							...serverRow('server-a', null),
-							tags: ['parking'],
-							category: 'misc',
-							expenseAmount: 12
-						}
-					])
-				)
-				.mockResolvedValueOnce(apiOk({ id: 'server-b' }));
+			mockFetch.mockResolvedValueOnce(apiOk({ id: 'server-b' }));
 
 			const result = await syncManager.syncAll();
 
 			expect(result.conflicts).toHaveLength(0);
 			expect(result.synced).toBe(1);
-			const post = mockFetch.mock.calls[1] as [string, { method: string; body: string }];
+			expect(mockFetch).toHaveBeenCalledTimes(1);
+			const post = mockFetch.mock.calls[0] as [string, { method: string; body: string }];
 			expect(post[1].method).toBe('POST');
 			expect(JSON.parse(post[1].body)).toMatchObject({
 				clientId: 'cid-b',
@@ -240,7 +231,7 @@ describe('Sync Manager', () => {
 			});
 		});
 
-		it('treats an unchanged server copy as already delivered: no POST, no conflict', async () => {
+		it('a replayed entry makes 1 request: the idempotent POST returns the existing row, no conflict', async () => {
 			vi.mocked(loadOfflineExpenses).mockReturnValue([
 				{
 					id: 'test-1',
@@ -257,13 +248,16 @@ describe('Sync Manager', () => {
 					synced: false
 				}
 			]);
-			mockFetch.mockResolvedValueOnce(apiOk([serverRow('server-1', 'cid-test-1')]));
+			mockFetch.mockResolvedValueOnce(apiOk(serverRow('server-1', 'cid-test-1')));
 
 			const result = await syncManager.syncAll();
 
 			expect(result.conflicts).toHaveLength(0);
 			expect(result.synced).toBe(1);
 			expect(mockFetch).toHaveBeenCalledTimes(1);
+			const [url, init] = mockFetch.mock.calls[0] as [string, { method: string }];
+			expect(init.method).toBe('POST');
+			expect(url).not.toContain('?');
 		});
 
 		it('uploads the photos queued with an offline expense once it reaches the server', async () => {
@@ -282,7 +276,7 @@ describe('Sync Manager', () => {
 				}
 			]);
 			vi.mocked(loadPendingPhotos).mockResolvedValueOnce([photo]);
-			mockFetch.mockResolvedValueOnce(apiOk([])).mockResolvedValueOnce(apiOk({ id: 'server-p' }));
+			mockFetch.mockResolvedValueOnce(apiOk({ id: 'server-p' }));
 
 			const result = await syncManager.syncAll();
 
@@ -308,7 +302,7 @@ describe('Sync Manager', () => {
 			]);
 			vi.mocked(loadPendingPhotos).mockResolvedValueOnce([photo]);
 			vi.mocked(expenseApi.uploadPhoto).mockRejectedValueOnce(new TypeError('Failed to fetch'));
-			mockFetch.mockResolvedValueOnce(apiOk([])).mockResolvedValueOnce(apiOk({ id: 'server-p' }));
+			mockFetch.mockResolvedValueOnce(apiOk({ id: 'server-p' }));
 
 			vi.useFakeTimers();
 			try {
@@ -512,11 +506,9 @@ describe('Sync Manager', () => {
 				volume: 10
 			};
 			vi.mocked(loadOfflineExpenses).mockReturnValue([queued]);
-			mockFetch
-				.mockResolvedValueOnce(apiOk([]))
-				.mockResolvedValueOnce(
-					apiError(400, 'Mileage must be greater than 10,000 (from earlier entry)')
-				);
+			mockFetch.mockResolvedValueOnce(
+				apiError(400, 'Mileage must be greater than 10,000 (from earlier entry)')
+			);
 
 			const result = await syncManager.syncAll();
 
@@ -571,7 +563,7 @@ describe('Sync Manager', () => {
 		it('schedules the failed-sync retry with EXPONENTIAL backoff: retryDelay * 2^retries', async () => {
 			syncConfig.update(config => ({ ...config, maxRetries: 3, retryDelay: 100 }));
 			vi.mocked(loadOfflineExpenses).mockReturnValue([failingExpense()]);
-			mockFetch.mockResolvedValueOnce(apiOk([])).mockResolvedValueOnce(apiError(500, 'boom'));
+			mockFetch.mockResolvedValueOnce(apiError(500, 'boom'));
 
 			const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
 			try {
@@ -615,12 +607,16 @@ describe('Sync Manager', () => {
 
 			vi.useFakeTimers();
 			try {
-				mockFetch.mockResolvedValueOnce(apiOk([])).mockResolvedValueOnce(apiError(500, 'boom'));
+				mockFetch.mockResolvedValueOnce(apiError(500, 'boom'));
 				await syncManager.syncAll();
 				expect(syncConflicts.current).toHaveLength(0);
 
 				mockFetch.mockResolvedValueOnce(
-					apiOk([{ ...serverRow('server-x', 'cid-retry-conf-1'), expenseAmount: 75 }])
+					apiOk({
+						...serverRow('server-x', 'cid-retry-conf-1'),
+						expenseAmount: 75,
+						updatedAt: '2024-01-02T00:00:00.000Z'
+					})
 				);
 				await vi.advanceTimersByTimeAsync(200);
 
@@ -640,7 +636,7 @@ describe('Sync Manager', () => {
 
 			vi.useFakeTimers();
 			try {
-				mockFetch.mockResolvedValueOnce(apiOk([])).mockResolvedValueOnce(apiError(500, 'boom'));
+				mockFetch.mockResolvedValueOnce(apiError(500, 'boom'));
 				await syncManager.syncAll();
 
 				vi.mocked(loadOfflineExpenses).mockReturnValue([{ ...exp, synced: true }]);
@@ -678,7 +674,6 @@ describe('Sync Manager — same-record conflict detection', () => {
 		syncConfig.current = {
 			maxRetries: 3,
 			retryDelay: 100,
-			batchSize: 10,
 			conflictResolution: 'ask_user'
 		};
 	});
@@ -703,10 +698,13 @@ describe('Sync Manager — same-record conflict detection', () => {
 			...local
 		};
 		vi.mocked(loadOfflineExpenses).mockReturnValue([localExpense]);
-		mockFetch
-			.mockReset()
-			.mockResolvedValueOnce(apiOk([{ ...serverRow('server-1', 'cid-local-1'), ...server }]))
-			.mockResolvedValueOnce(apiOk({ id: 'server-2' }));
+		mockFetch.mockReset().mockResolvedValueOnce(
+			apiOk({
+				...serverRow('server-1', 'cid-local-1'),
+				updatedAt: '2024-01-02T00:00:00.000Z',
+				...server
+			})
+		);
 		const result = await syncManager.syncAll();
 		return result.conflicts;
 	}
@@ -731,8 +729,9 @@ describe('Sync Manager — same-record conflict detection', () => {
 		expect(await conflictsAgainst({ amount: 50.0 }, { expenseAmount: 50.004 })).toHaveLength(0);
 	});
 
-	it('a different record that merely matches on day, tags and amount is never a conflict', async () => {
-		expect(await conflictsAgainst({}, { clientId: 'someone-else' })).toHaveLength(0);
-		expect(await conflictsAgainst({}, { clientId: null })).toHaveLength(0);
+	it('a changed server copy that was never edited on the server is not a conflict', async () => {
+		expect(
+			await conflictsAgainst({}, { expenseAmount: 75, updatedAt: '2024-01-01T00:00:00.000Z' })
+		).toHaveLength(0);
 	});
 });
