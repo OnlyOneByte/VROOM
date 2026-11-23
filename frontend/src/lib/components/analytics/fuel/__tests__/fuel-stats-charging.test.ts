@@ -136,7 +136,8 @@ describe('FuelStatsTab charging series', () => {
 		expect(screen.queryByText('Gas Price on Fill-up')).toBeNull();
 		expect(screen.queryByText('Fill-up Cost by Vehicle')).toBeNull();
 		expect(screen.queryByText('Fill-up Patterns by Day of Week')).toBeNull();
-		expect(screen.queryByText('Fuel Consumption')).toBeNull();
+		expect(screen.queryByText('Fuel Efficiency')).toBeNull();
+		expect(screen.queryByText('Fuel Used')).toBeNull();
 		expect(screen.getByText('Total Odometer')).toBeTruthy();
 	});
 

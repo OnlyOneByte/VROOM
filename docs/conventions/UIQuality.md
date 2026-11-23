@@ -185,6 +185,8 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
 - Every chart has a title, a one-line description of what it shows, axis values formatted by
   `utils/formatters` (currency, units), and a legend or direct labels when there is more than one
   series.
+- One unit per axis. Two measures with different units are two charts, not two series on one
+  axis.
 - A chart is never the only way to read a number: pair it with a stat tile, a legend with values
   (as the category pie does), or a table.
 - On mobile, charts are full width with few enough x-axis ticks to stay legible; no horizontal
