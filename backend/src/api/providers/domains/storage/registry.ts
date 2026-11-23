@@ -60,6 +60,101 @@ function buildS3Provider(credentials: Record<string, unknown>, config: unknown):
   );
 }
 
+function validateS3Config(config: Record<string, unknown> | null): void {
+  const c = config ?? {};
+  if (!c.endpoint || !c.bucket || !c.region) {
+    throw new ValidationError('S3 config must include endpoint, bucket, and region');
+  }
+  assertSafeOutboundUrl(String(c.endpoint), 'S3 endpoint');
+}
+
+function getFakeProvider(providerId: string): StorageProvider {
+  // Fakes are double-gated: only outside production and only when explicitly opted in.
+  if (!CONFIG.allowFakeStorageProvider) {
+    throw new ValidationError('Fake storage provider is not enabled in this environment');
+  }
+  let fake = fakeProviders.get(providerId);
+  if (!fake) {
+    fake = new FakeStorageProvider();
+    fakeProviders.set(providerId, fake);
+  }
+  return fake;
+}
+
+export interface StorageProviderInput {
+  id: string;
+  credentials: Record<string, unknown>;
+  config: Record<string, unknown> | null;
+}
+
+export interface StorageProviderDescriptor {
+  credentialKind: 'google-oauth' | 'keys' | 'none';
+  create: (input: StorageProviderInput) => StorageProvider;
+  validateConfig?: (config: Record<string, unknown> | null) => void;
+  defaultFolders: Record<PhotoCategory, string>;
+  identity?: (config: Record<string, unknown>) => string | null;
+}
+
+const GENERIC_FOLDERS: Record<PhotoCategory, string> = {
+  vehicle_photos: 'vehicle-photos',
+  expense_receipts: 'receipts',
+  insurance_docs: 'insurance',
+  odometer_readings: 'odometer',
+};
+
+export const STORAGE_PROVIDERS = {
+  'google-drive': {
+    credentialKind: 'google-oauth',
+    create: ({ credentials }) => buildGoogleDriveProvider(credentials),
+    defaultFolders: {
+      vehicle_photos: 'Vehicle',
+      expense_receipts: 'Receipts',
+      insurance_docs: 'Insurance',
+      odometer_readings: 'Odometer',
+    },
+  },
+  'google-photos': {
+    credentialKind: 'google-oauth',
+    create: ({ credentials, config }) => buildGooglePhotosProvider(credentials, config),
+    defaultFolders: GENERIC_FOLDERS,
+  },
+  s3: {
+    credentialKind: 'keys',
+    create: ({ credentials, config }) => buildS3Provider(credentials, config),
+    validateConfig: validateS3Config,
+    defaultFolders: {
+      vehicle_photos: 'vehicles',
+      expense_receipts: 'receipts',
+      insurance_docs: 'insurance',
+      odometer_readings: 'odometer',
+    },
+    identity: (config) =>
+      config.endpoint && config.bucket
+        ? `s3:${String(config.endpoint)}/${String(config.bucket)}`
+        : null,
+  },
+  fake: {
+    credentialKind: 'none',
+    create: ({ id }) => getFakeProvider(id),
+    defaultFolders: GENERIC_FOLDERS,
+  },
+} satisfies Record<string, StorageProviderDescriptor>;
+
+export type StorageProviderType = keyof typeof STORAGE_PROVIDERS;
+
+export const STORAGE_PROVIDER_TYPES = Object.keys(STORAGE_PROVIDERS) as [
+  StorageProviderType,
+  ...StorageProviderType[],
+];
+
+export function storageProviderDescriptor(
+  providerType: string
+): StorageProviderDescriptor | undefined {
+  return Object.hasOwn(STORAGE_PROVIDERS, providerType)
+    ? STORAGE_PROVIDERS[providerType as StorageProviderType]
+    : undefined;
+}
+
 export class StorageProviderRegistry {
   constructor(private db: ReturnType<typeof getDb>) {}
 
@@ -168,32 +263,19 @@ export class StorageProviderRegistry {
   }
 
   createProviderInstance(row: UserProvider): StorageProvider {
-    // Fakes are double-gated: only outside production and only when explicitly opted in.
-    if (row.providerType === 'fake') {
-      if (!CONFIG.allowFakeStorageProvider) {
-        throw new ValidationError('Fake storage provider is not enabled in this environment');
-      }
-      let fake = fakeProviders.get(row.id);
-      if (!fake) {
-        fake = new FakeStorageProvider();
-        fakeProviders.set(row.id, fake);
-      }
-      return fake;
+    const descriptor = storageProviderDescriptor(row.providerType);
+    if (!descriptor) {
+      throw new ValidationError(`Unsupported provider type: ${row.providerType}`);
     }
-
-    const decrypted = decrypt(row.credentials);
-    const credentials = JSON.parse(decrypted) as Record<string, unknown>;
-
-    switch (row.providerType) {
-      case 'google-drive':
-        return buildGoogleDriveProvider(credentials);
-      case 'google-photos':
-        return buildGooglePhotosProvider(credentials, row.config as Record<string, unknown> | null);
-      case 's3':
-        return buildS3Provider(credentials, row.config);
-      default:
-        throw new ValidationError(`Unsupported provider type: ${row.providerType}`);
-    }
+    const credentials =
+      descriptor.credentialKind === 'none'
+        ? {}
+        : (JSON.parse(decrypt(row.credentials)) as Record<string, unknown>);
+    return descriptor.create({
+      id: row.id,
+      credentials,
+      config: row.config as Record<string, unknown> | null,
+    });
   }
 
   // Merge with defaults: older rows predate newer categories.

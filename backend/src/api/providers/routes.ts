@@ -15,7 +15,12 @@ import { consumePending, getPendingEmail } from '../../utils/pending-credentials
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { photoRefRepository } from '../photos/photo-ref-repository';
 import { preferencesRepository } from '../settings/repository';
-import { storageProviderRegistry } from './domains/storage/registry';
+import {
+  STORAGE_PROVIDER_TYPES,
+  type StorageProviderDescriptor,
+  storageProviderDescriptor,
+  storageProviderRegistry,
+} from './domains/storage/registry';
 import { CATEGORY_TO_ENTITY_TYPES, ENTITY_TO_CATEGORY } from './domains/storage/storage-provider';
 
 function isPhotoCategory(value: string): value is PhotoCategory {
@@ -78,9 +83,7 @@ type ModelProviderType = (typeof MODEL_PROVIDER_TYPES)[number];
 const MODEL_DOMAINS = ['vlm', 'llm'] as const;
 type ModelDomain = (typeof MODEL_DOMAINS)[number];
 export const SUPPORTED_PROVIDER_TYPES = [
-  'google-drive',
-  's3',
-  'fake',
+  ...STORAGE_PROVIDER_TYPES,
   ...MODEL_PROVIDER_TYPES,
 ] as const;
 
@@ -118,29 +121,10 @@ const updateProviderSchema = z.object({
   config: z.record(z.string(), z.unknown()).optional(),
 });
 
-const DEFAULT_FOLDER_PATHS: Record<string, Record<PhotoCategory, string>> = {
-  'google-drive': {
-    vehicle_photos: 'Vehicle',
-    expense_receipts: 'Receipts',
-    insurance_docs: 'Insurance',
-    odometer_readings: 'Odometer',
-  },
-  s3: {
-    vehicle_photos: 'vehicles',
-    expense_receipts: 'receipts',
-    insurance_docs: 'insurance',
-    odometer_readings: 'odometer',
-  },
-};
-const FALLBACK_FOLDER_PATHS: Record<PhotoCategory, string> = {
-  vehicle_photos: 'vehicle-photos',
-  expense_receipts: 'receipts',
-  insurance_docs: 'insurance',
-  odometer_readings: 'odometer',
-};
-
-function defaultCategorySettings(providerType: string): Record<PhotoCategory, CategorySetting> {
-  const paths = DEFAULT_FOLDER_PATHS[providerType] ?? FALLBACK_FOLDER_PATHS;
+function defaultCategorySettings(
+  descriptor: StorageProviderDescriptor
+): Record<PhotoCategory, CategorySetting> {
+  const paths = descriptor.defaultFolders;
   return Object.fromEntries(
     PHOTO_CATEGORIES.map((cat) => [cat, { enabled: true, folderPath: paths[cat] }])
   ) as Record<PhotoCategory, CategorySetting>;
@@ -167,13 +151,7 @@ function validateStorageProviderConfig(
   providerType: string,
   config: Record<string, unknown> | null
 ): void {
-  if (providerType === 's3') {
-    const c = config ?? {};
-    if (!c.endpoint || !c.bucket || !c.region) {
-      throw new ValidationError('S3 config must include endpoint, bucket, and region');
-    }
-    assertSafeOutboundUrl(String(c.endpoint), 'S3 endpoint');
-  }
+  storageProviderDescriptor(providerType)?.validateConfig?.(config);
 }
 
 function validateModelConfigShape(
@@ -213,7 +191,7 @@ function resolveProviderCredentials(
   config: Record<string, unknown> | null,
   nonce?: string
 ): { encryptedCredentials: string; resolvedConfig: Record<string, unknown> | null } {
-  if (providerType === 'google-drive') {
+  if (storageProviderDescriptor(providerType)?.credentialKind === 'google-oauth') {
     if (!nonce) {
       throw new ValidationError('Missing nonce — please connect your Google account');
     }
@@ -324,7 +302,10 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
 
     storageConfig.providerCategories = { ...storageConfig.providerCategories };
 
-    storageConfig.providerCategories[created.id] = defaultCategorySettings(body.providerType);
+    const descriptor = storageProviderDescriptor(body.providerType);
+    if (descriptor) {
+      storageConfig.providerCategories[created.id] = defaultCategorySettings(descriptor);
+    }
 
     await preferencesRepository.update(user.id, { storageConfig });
   }

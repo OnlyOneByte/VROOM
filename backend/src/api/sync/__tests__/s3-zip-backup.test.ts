@@ -6,8 +6,10 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { FakeStorageProvider } from '../../providers/domains/storage/fake-provider';
-import { getStorageProviderRegistry } from '../../providers/domains/storage/registry';
-import { MODEL_PROVIDER_TYPES, SUPPORTED_PROVIDER_TYPES } from '../../providers/routes';
+import {
+  getStorageProviderRegistry,
+  STORAGE_PROVIDER_TYPES,
+} from '../../providers/domains/storage/registry';
 import { isPhotoOnlyProviderType } from '../backup-strategy';
 import { backupStrategyRegistry } from '../backup-strategy-registry';
 import '../init';
@@ -159,12 +161,10 @@ describe('ZIP backups to an S3 provider', () => {
 
 describe('backup strategy registrations', () => {
   test('every storage provider type that offers ZIP backup has a strategy', () => {
-    const storageTypes = SUPPORTED_PROVIDER_TYPES.filter(
-      (t) => !(MODEL_PROVIDER_TYPES as readonly string[]).includes(t)
-    );
-    expect(storageTypes).toContain('s3');
-    for (const type of storageTypes) {
-      expect(isPhotoOnlyProviderType(type), type).toBe(false);
+    const zipTypes = STORAGE_PROVIDER_TYPES.filter((t) => !isPhotoOnlyProviderType(t));
+    expect(zipTypes).toContain('s3');
+    expect(zipTypes).not.toContain('google-photos');
+    for (const type of zipTypes) {
       expect(backupStrategyRegistry.get(type), type).toBeDefined();
     }
   });
