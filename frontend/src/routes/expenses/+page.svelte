@@ -667,7 +667,7 @@
 				{@render dateFilter('w-full')}
 				<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={handleTagsChange} />
 			</div>
-			<Sheet.Footer>
+			<Sheet.Footer class="pb-[max(1rem,env(safe-area-inset-bottom))]">
 				<Button size="lg" class="w-full" onclick={() => (filtersSheetOpen = false)}>
 					Show results
 				</Button>

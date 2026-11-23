@@ -195,6 +195,15 @@ describe('insurance page with policies', () => {
 		expect(policyList.latest?.policies.map(p => p.id)).toEqual(['p1', 'p2']);
 	});
 
+	test('policies left with no vehicles still list, with no Add Policy button', async () => {
+		getVehicles.mockResolvedValue([]);
+		await mount();
+
+		expect(policyList.latest).not.toBeNull();
+		expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Add Policy' })).toBeNull();
+	});
+
 	test('both Add Policy buttons open the new-policy form', async () => {
 		await mount();
 		const buttons = screen.getAllByRole('button', { name: 'Add Policy' });
