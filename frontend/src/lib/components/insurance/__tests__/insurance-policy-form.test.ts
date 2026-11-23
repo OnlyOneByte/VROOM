@@ -128,10 +128,13 @@ describe('InsurancePolicyForm create mode', () => {
 		expect(save.className).not.toMatch(/shadow-2xl|bg-foreground|hover:scale/);
 	});
 
-	test('shows the empty-vehicle hint when the user has no vehicles', async () => {
+	test('with no vehicles, shows the Add Vehicle empty state instead of the form', async () => {
 		getVehicles.mockResolvedValue([]);
 		await mount();
-		expect(screen.getByText('No vehicles found. Add a vehicle first.')).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Add a vehicle first' })).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Add Vehicle' })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /Create Policy/ })).toBeNull();
+		expect(screen.queryByLabelText(/Company/)).toBeNull();
 	});
 
 	test('preselects the vehicle passed in props', async () => {
@@ -351,6 +354,13 @@ describe('InsurancePolicyForm edit mode', () => {
 		expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
 		expect(screen.queryByText('Initial Term')).toBeNull();
 		expect(document.getElementById('start-date')).toBeNull();
+	});
+
+	test('still shows the form when the account has no vehicles left', async () => {
+		getVehicles.mockResolvedValue([]);
+		await mount({ policyId: 'p9' });
+		expect(field('company')).toHaveValue('Acme Mutual');
+		expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
 	});
 
 	test('sends only company, notes and active flag on update', async () => {

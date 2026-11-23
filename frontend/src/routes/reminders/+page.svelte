@@ -1,7 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { routes } from '#lib/routes.ts';
-	import { resolve } from '$app/paths';
 	import {
 		Bell,
 		BellRing,
@@ -33,6 +31,7 @@
 	import * as CardNs from '#lib/components/ui/card/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import ReminderForm from '#lib/components/reminders/ReminderForm.svelte';
@@ -243,24 +242,9 @@
 			<Button onclick={load}>Retry</Button>
 		</div>
 	{:else if reminders.length === 0 && vehicles.length === 0}
-		<EmptyState>
-			{#snippet icon()}
-				<Car class="h-12 w-12 text-muted-foreground mb-4" />
-			{/snippet}
-			{#snippet title()}
-				Add a vehicle first
-			{/snippet}
-			{#snippet description()}
-				Every reminder belongs to a vehicle. Add one, then set reminders for its recurring costs and
-				maintenance.
-			{/snippet}
-			{#snippet action()}
-				<Button size="lg" href={resolve(routes.vehicleNew)}>
-					<Plus class="mr-2 h-4 w-4" />
-					Add Vehicle
-				</Button>
-			{/snippet}
-		</EmptyState>
+		<NoVehiclesEmptyState
+			description="Every reminder belongs to a vehicle. Add one, then set reminders for its recurring costs and maintenance."
+		/>
 	{:else if reminders.length === 0}
 		<EmptyState>
 			{#snippet icon()}

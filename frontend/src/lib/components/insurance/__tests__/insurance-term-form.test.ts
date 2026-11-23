@@ -135,7 +135,9 @@ describe('InsuranceTermForm add mode', () => {
 	test('shows the empty-vehicle hint when the user has no vehicles', async () => {
 		getVehicles.mockResolvedValue([]);
 		await mount();
-		expect(screen.getByText('No vehicles found. Add a vehicle first.')).toBeInTheDocument();
+		expect(
+			screen.getByText('Add a vehicle first to cover it under this term.')
+		).toBeInTheDocument();
 		expect(screen.queryByRole('checkbox')).toBeNull();
 	});
 

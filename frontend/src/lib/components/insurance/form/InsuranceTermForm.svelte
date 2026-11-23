@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
+	import { addVehicleFirstTo } from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
@@ -439,7 +440,9 @@
 								{/each}
 							</div>
 						{:else}
-							<p class="text-sm text-muted-foreground">No vehicles found. Add a vehicle first.</p>
+							<p class="text-sm text-muted-foreground">
+								{addVehicleFirstTo('cover it under this term')}
+							</p>
 						{/if}
 						{#if errors.vehicles}
 							<FormFieldError id="vehicles-error">{errors.vehicles}</FormFieldError>
