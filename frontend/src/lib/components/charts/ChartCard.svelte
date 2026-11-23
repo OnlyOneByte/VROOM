@@ -46,6 +46,7 @@
 	}: Props = $props();
 
 	let placeholderHeight = $derived(height ?? 300);
+	let stateLevel = $derived(level === 2 ? (3 as const) : (4 as const));
 
 	// LayerChart measures 0x0 in hidden containers; gate rendering on visibility.
 	let gate = createVisibilityWatch();
@@ -105,7 +106,7 @@
 			<Skeleton class="w-full" style="height: {placeholderHeight}px" />
 		{:else if error}
 			<div style="height: {placeholderHeight}px">
-				<EmptyState class="h-full" action={onRetry ? retryAction : undefined}>
+				<EmptyState class="h-full" level={stateLevel} action={onRetry ? retryAction : undefined}>
 					{#snippet title()}
 						Couldn't load the chart
 					{/snippet}
@@ -116,7 +117,7 @@
 			</div>
 		{:else if isEmpty}
 			<div style="height: {placeholderHeight}px">
-				<EmptyState class="h-full">
+				<EmptyState class="h-full" level={stateLevel}>
 					{#snippet title()}
 						{emptyTitle}
 					{/snippet}
