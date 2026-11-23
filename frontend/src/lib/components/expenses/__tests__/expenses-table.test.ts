@@ -309,6 +309,28 @@ describe('ExpensesTable deleting', () => {
 		expect(onDelete).not.toHaveBeenCalled();
 	});
 
+	test('a failed delete keeps the dialog open with focus on Delete so the user can retry', async () => {
+		let reject: (reason: unknown) => void = () => {};
+		deleteExpense.mockReturnValue(new Promise((_, r) => (reject = r)));
+		mountTable();
+
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Delete expense' })[0]!);
+		const dialog = await screen.findByRole('alertdialog');
+		const confirm = within(dialog).getByRole('button', { name: 'Delete' });
+		confirm.focus();
+		await fireEvent.click(confirm);
+		expect(confirm).toHaveAttribute('aria-disabled', 'true');
+		expect(confirm).not.toBeDisabled();
+		reject(new Error('Expense is locked'));
+
+		await waitFor(() =>
+			expect(notificationMessages()).toContain("Couldn't delete the expense. Expense is locked.")
+		);
+		expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+		expect(within(dialog).getByRole('button', { name: 'Delete' })).toBe(confirm);
+		expect(document.activeElement).toBe(confirm);
+	});
+
 	test('a failed delete with a non-Error reason shows the generic message', async () => {
 		deleteExpense.mockRejectedValue('offline');
 		mountTable();

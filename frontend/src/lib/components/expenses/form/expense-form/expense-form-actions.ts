@@ -217,11 +217,12 @@ export async function deleteExpense(state: ExpenseFormState): Promise<void> {
 			type: 'success',
 			message: 'Expense deleted successfully'
 		});
+		state.showDeleteConfirm = false;
 		gotoDynamic(returnTo);
 	} catch (error) {
 		handleErrorWithNotification(error, "Couldn't delete this expense");
+		throw error;
 	} finally {
 		state.isDeleting = false;
-		state.showDeleteConfirm = false;
 	}
 }

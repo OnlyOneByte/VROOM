@@ -403,11 +403,11 @@ describe('deleteExpense', () => {
 		expect(expenseApiMock.deleteExpense).not.toHaveBeenCalled();
 	});
 
-	test('a delete failure notifies, stays on the page and closes the confirm dialog', async () => {
+	test('a delete failure notifies, stays on the page and keeps the confirm dialog open to retry', async () => {
 		expenseApiMock.deleteExpense.mockRejectedValue(new ApiError('Internal server error', 500));
 		const state = createState('e1');
 		state.showDeleteConfirm = true;
-		await deleteExpense(state);
+		await expect(deleteExpense(state)).rejects.toThrow();
 		expect(addNotification).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'error',
@@ -417,6 +417,6 @@ describe('deleteExpense', () => {
 		);
 		expect(gotoDynamic).not.toHaveBeenCalled();
 		expect(state.isDeleting).toBe(false);
-		expect(state.showDeleteConfirm).toBe(false);
+		expect(state.showDeleteConfirm).toBe(true);
 	});
 });

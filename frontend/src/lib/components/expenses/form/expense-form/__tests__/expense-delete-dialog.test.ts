@@ -21,18 +21,17 @@ interface Options {
 	isGroupEditMode?: boolean;
 	groupId?: string | null;
 	originalExpense?: Expense | null;
-	isDeleting?: boolean;
+	onConfirm?: () => Promise<void>;
 }
 
 function renderDialog(options: Options = {}) {
-	const onConfirm = vi.fn();
+	const onConfirm = vi.fn(options.onConfirm ?? (() => Promise.resolve()));
 	render(ExpenseDeleteDialog, {
 		open: true,
 		isInsuranceManaged: options.isInsuranceManaged ?? false,
 		isGroupEditMode: options.isGroupEditMode ?? false,
 		groupId: options.groupId ?? null,
 		originalExpense: options.originalExpense === undefined ? EXPENSE : options.originalExpense,
-		isDeleting: options.isDeleting ?? false,
 		onConfirm
 	});
 	return { onConfirm };
@@ -115,12 +114,32 @@ describe('ExpenseDeleteDialog: actions', () => {
 		expect(onConfirm).toHaveBeenCalledTimes(1);
 	});
 
-	test('while deleting both buttons are disabled and progress is shown', async () => {
-		renderDialog({ isDeleting: true });
+	test('while deleting, the confirm button keeps focus and Cancel is disabled', async () => {
+		let reject: (reason: unknown) => void = () => {};
+		renderDialog({ onConfirm: () => new Promise((_, r) => (reject = r)) });
+		const confirm = await screen.findByRole('button', { name: 'Delete Expense' });
+		confirm.focus();
 
-		const confirm = await screen.findByRole('button', { name: /Deleting\.\.\./ });
-		expect(confirm).toBeDisabled();
+		await fireEvent.click(confirm);
+
+		expect(confirm).toHaveTextContent('Working…');
+		expect(confirm).toHaveAttribute('aria-disabled', 'true');
+		expect(confirm).not.toBeDisabled();
+		expect(document.activeElement).toBe(confirm);
 		expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
-		expect(screen.queryByRole('button', { name: 'Delete Expense' })).toBeNull();
+		reject(new Error('offline'));
+	});
+
+	test('a failed delete keeps the dialog open with focus on the confirm button', async () => {
+		renderDialog({ onConfirm: () => Promise.reject(new Error('offline')) });
+		const confirm = await screen.findByRole('button', { name: 'Delete Expense' });
+		confirm.focus();
+
+		await fireEvent.click(confirm);
+
+		const again = await screen.findByRole('button', { name: 'Delete Expense' });
+		expect(again).toBe(confirm);
+		expect(document.activeElement).toBe(confirm);
+		expect(screen.getByRole('alertdialog')).toBeInTheDocument();
 	});
 });
