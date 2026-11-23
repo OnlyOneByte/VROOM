@@ -3,7 +3,13 @@ import { ApiError } from '../../error-handling';
 import type { OfflineExpense } from '../../offline-storage';
 import { classifySyncFailure } from '../classify-failure';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
+const navigation = vi.hoisted(() => ({ onGoto: () => {} }));
+vi.mock('$app/navigation', () => ({
+	goto: vi.fn(() => {
+		navigation.onGoto();
+		return Promise.resolve();
+	})
+}));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 vi.mock('#lib/stores/auth.svelte.ts', () => ({ authStore: { clearUser: vi.fn() } }));
 
@@ -295,7 +301,10 @@ describe('SyncManager.syncAll — replay across vehicles', () => {
 		vehicleId
 	});
 
-	function slowPosts(respond: (clientId: string) => Response): Array<{
+	function slowPosts(
+		respond: (clientId: string) => Response,
+		holdUntil: (clientId: string) => Promise<void> | undefined = () => undefined
+	): Array<{
 		clientId: string;
 		start: number;
 		end: number;
@@ -306,12 +315,12 @@ describe('SyncManager.syncAll — replay across vehicles', () => {
 			const clientId = JSON.parse(init?.body ?? '{}').clientId as string;
 			const post = { clientId, start: performance.now(), end: 0 };
 			posts.push(post);
-			return new Promise(done =>
-				setTimeout(() => {
+			return new Promise<void>(done => setTimeout(done, ROUND_TRIP_MS))
+				.then(() => holdUntil(clientId))
+				.then(() => {
 					post.end = performance.now();
-					done(respond(clientId));
-				}, ROUND_TRIP_MS)
-			);
+					return respond(clientId);
+				});
 		});
 		return posts;
 	}
@@ -349,11 +358,17 @@ describe('SyncManager.syncAll — replay across vehicles', () => {
 			forVehicle('b2', 'vb'),
 			forVehicle('b3', 'vb')
 		]);
-		const posts = slowPosts(clientId =>
-			clientId === 'cid-a1' ? apiError(401, 'Session expired') : apiOk()
+		const sessionEnded = new Promise<void>(done => {
+			navigation.onGoto = () => setTimeout(done, 0);
+		});
+		const posts = slowPosts(
+			clientId => (clientId === 'cid-a1' ? apiError(401, 'Session expired') : apiOk()),
+			clientId => (clientId === 'cid-b1' ? sessionEnded : undefined)
 		);
 
-		const result = await syncManager.syncAll();
+		const result = await syncManager.syncAll().finally(() => {
+			navigation.onGoto = () => {};
+		});
 
 		expect(posts.map(p => p.clientId).sort()).toEqual(['cid-a1', 'cid-b1']);
 		expect(result).toMatchObject({ synced: 1, failed: 4, needsAttention: 0, success: false });
