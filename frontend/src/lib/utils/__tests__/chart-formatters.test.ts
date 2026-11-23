@@ -314,6 +314,11 @@ describe('distinctYTicks', () => {
 		expect(labels.length).toBeGreaterThanOrEqual(1);
 		expect(new Set(labels).size).toBe(labels.length);
 	});
+	test('a 0–1 count axis keeps the whole number, not the half-way tick', () => {
+		const format = (v: number) => String(Math.round(v));
+		const ticks = distinctYTicks(format, 300)(scaleLinear().domain([0, 1]) as never);
+		expect(ticks).toEqual([0, 1]);
+	});
 });
 
 describe('dayXAxisProps (day-and-month ticks sized to the plot)', () => {
