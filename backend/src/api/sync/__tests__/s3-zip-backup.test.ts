@@ -5,6 +5,8 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { GoogleDriveStrategy } from '../../providers/backup-strategies/google-drive-strategy';
+import { ZipBackupStrategy } from '../../providers/backup-strategies/zip-strategy';
 import { FakeStorageProvider } from '../../providers/domains/storage/fake-provider';
 import {
   getStorageProviderRegistry,
@@ -167,5 +169,11 @@ describe('backup strategy registrations', () => {
     for (const type of zipTypes) {
       expect(backupStrategyRegistry.get(type), type).toBeDefined();
     }
+  });
+
+  test('the descriptor picks the strategy, and photo-only types get none', () => {
+    expect(backupStrategyRegistry.get('google-drive')).toBeInstanceOf(GoogleDriveStrategy);
+    expect(backupStrategyRegistry.get('s3')).toBeInstanceOf(ZipBackupStrategy);
+    expect(backupStrategyRegistry.get('google-photos')).toBeUndefined();
   });
 });

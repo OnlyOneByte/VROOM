@@ -23,7 +23,8 @@ describe('PROVIDER_META', () => {
 			form: null,
 			option: null,
 			defaultPhotoRootPath: 'photos',
-			supportsSheets: false
+			supportsSheets: false,
+			photoOnly: false
 		};
 		try {
 			render(RestoreProviderPicker, {

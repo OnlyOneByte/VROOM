@@ -9,6 +9,7 @@ export interface StorageProviderMeta {
 	option: { label: string; description: string } | null;
 	defaultPhotoRootPath: string;
 	supportsSheets: boolean;
+	photoOnly: boolean;
 }
 
 export const PROVIDER_META: Record<string, StorageProviderMeta> = {
@@ -18,7 +19,8 @@ export const PROVIDER_META: Record<string, StorageProviderMeta> = {
 		form: 'google',
 		option: { label: 'Google Drive', description: 'Store photos in Google Drive' },
 		defaultPhotoRootPath: 'Photos',
-		supportsSheets: true
+		supportsSheets: true,
+		photoOnly: false
 	},
 	'google-photos': {
 		label: 'Google Photos',
@@ -26,7 +28,8 @@ export const PROVIDER_META: Record<string, StorageProviderMeta> = {
 		form: null,
 		option: null,
 		defaultPhotoRootPath: 'photos',
-		supportsSheets: false
+		supportsSheets: false,
+		photoOnly: true
 	},
 	s3: {
 		label: 'S3 Compatible',
@@ -34,7 +37,8 @@ export const PROVIDER_META: Record<string, StorageProviderMeta> = {
 		form: 's3',
 		option: { label: 'S3 / B2 / R2', description: 'S3-compatible storage' },
 		defaultPhotoRootPath: 'vroom/photos',
-		supportsSheets: false
+		supportsSheets: false,
+		photoOnly: false
 	}
 };
 
@@ -48,10 +52,8 @@ export function providerLabel(providerType: string): string {
 	return providerMeta(providerType)?.label ?? providerType;
 }
 
-export const PHOTO_ONLY_PROVIDER_TYPES = ['google-photos'] as const;
-
 export function supportsZipBackup(providerType: string | null | undefined): boolean {
-	return !!providerType && !(PHOTO_ONLY_PROVIDER_TYPES as readonly string[]).includes(providerType);
+	return !!providerType && providerMeta(providerType)?.photoOnly !== true;
 }
 
 export const DEFAULT_FOLDER_SETTINGS: Record<PhotoCategory, CategorySetting> = {

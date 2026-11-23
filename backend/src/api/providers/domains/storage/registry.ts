@@ -23,24 +23,37 @@ interface ResolvedProvider {
   folderPath: string;
 }
 
-function buildGoogleDriveProvider(credentials: Record<string, unknown>): StorageProvider {
+const MISSING_REFRESH_TOKEN =
+  'Provider has no refresh token. Please re-connect your Google account.';
+
+function refreshTokenOf(credentials: Record<string, unknown>): string {
   const refreshToken = credentials.refreshToken;
-  if (typeof refreshToken !== 'string') {
-    throw new ValidationError('Invalid Google Drive credentials: missing refreshToken');
+  if (typeof refreshToken !== 'string' || refreshToken === '') {
+    throw new ValidationError(MISSING_REFRESH_TOKEN);
   }
-  return new GoogleDriveProvider(refreshToken);
+  return refreshToken;
+}
+
+export function decryptRefreshToken(encryptedCredentials: string): string {
+  let credentials: Record<string, unknown>;
+  try {
+    credentials = JSON.parse(decrypt(encryptedCredentials)) as Record<string, unknown>;
+  } catch {
+    throw new ValidationError('Failed to decrypt provider credentials');
+  }
+  return refreshTokenOf(credentials);
+}
+
+function buildGoogleDriveProvider(credentials: Record<string, unknown>): StorageProvider {
+  return new GoogleDriveProvider(refreshTokenOf(credentials));
 }
 
 function buildGooglePhotosProvider(
   credentials: Record<string, unknown>,
   config: Record<string, unknown> | null
 ): StorageProvider {
-  const refreshToken = credentials.refreshToken;
-  if (typeof refreshToken !== 'string') {
-    throw new ValidationError('Invalid Google Photos credentials: missing refreshToken');
-  }
   const albumId = typeof config?.albumId === 'string' ? config.albumId : undefined;
-  return new GooglePhotosProvider(refreshToken, undefined, albumId);
+  return new GooglePhotosProvider(refreshTokenOf(credentials), undefined, albumId);
 }
 
 function buildS3Provider(credentials: Record<string, unknown>, config: unknown): StorageProvider {
@@ -94,6 +107,8 @@ export interface StorageProviderDescriptor {
   defaultFolders: Record<PhotoCategory, string>;
   identity?: (config: Record<string, unknown>) => string | null;
   creatable?: false;
+  photoOnly?: true;
+  backupStrategy?: 'zip' | 'google-drive';
 }
 
 const GENERIC_FOLDERS: Record<PhotoCategory, string> = {
@@ -107,6 +122,7 @@ export const STORAGE_PROVIDERS = {
   'google-drive': {
     credentialKind: 'google-oauth',
     create: ({ credentials }) => buildGoogleDriveProvider(credentials),
+    backupStrategy: 'google-drive',
     defaultFolders: {
       vehicle_photos: 'Vehicle',
       expense_receipts: 'Receipts',
@@ -119,6 +135,7 @@ export const STORAGE_PROVIDERS = {
     create: ({ credentials, config }) => buildGooglePhotosProvider(credentials, config),
     defaultFolders: GENERIC_FOLDERS,
     creatable: false,
+    photoOnly: true,
   },
   s3: {
     credentialKind: 'keys',

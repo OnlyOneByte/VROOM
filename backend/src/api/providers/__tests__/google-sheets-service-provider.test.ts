@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { NotFoundError, ValidationError } from '../../../errors';
+import { decryptRefreshToken } from '../domains/storage/registry';
+
+process.env.PROVIDER_ENCRYPTION_KEY ||= '0'.repeat(64);
+const { encrypt } = await import('../../../utils/encryption');
+
+const enc = (creds: unknown): string => encrypt(JSON.stringify(creds));
 
 interface ProviderRow {
   id: string;
@@ -7,30 +12,6 @@ interface ProviderRow {
   domain: string;
   status: string;
   credentials: string;
-}
-
-function extractRefreshToken(
-  providerRows: ProviderRow[],
-  decryptFn: (encrypted: string) => string
-): string {
-  if (!providerRows.length) {
-    throw new NotFoundError('Provider');
-  }
-
-  let credentials: { refreshToken?: string };
-  try {
-    credentials = JSON.parse(decryptFn(providerRows[0].credentials)) as { refreshToken?: string };
-  } catch {
-    throw new ValidationError('Failed to decrypt provider credentials');
-  }
-
-  if (!credentials.refreshToken) {
-    throw new ValidationError(
-      'Provider has no refresh token. Please re-connect your Google account.'
-    );
-  }
-
-  return credentials.refreshToken;
 }
 
 function queryProvider(
@@ -56,38 +37,25 @@ describe('createSheetsServiceForProvider', () => {
   const allProviders = [activeProvider];
 
   test('correct token extraction — returns decrypted refreshToken', () => {
-    const rows = queryProvider(allProviders, 'prov-1', 'user-1');
-    const token = extractRefreshToken(rows, () =>
-      JSON.stringify({ refreshToken: 'my-refresh-token' })
-    );
-    expect(token).toBe('my-refresh-token');
-  });
-
-  test('provider not found — throws NotFoundError when no matching row', () => {
-    const rows = queryProvider(allProviders, 'prov-missing', 'user-1');
-    expect(() => extractRefreshToken(rows, () => '{}')).toThrow('Provider not found');
-  });
-
-  test('missing token — throws ValidationError when refreshToken is absent', () => {
-    const rows = queryProvider(allProviders, 'prov-1', 'user-1');
-    expect(() => extractRefreshToken(rows, () => JSON.stringify({}))).toThrow(
-      'Provider has no refresh token'
-    );
+    expect(decryptRefreshToken(enc({ refreshToken: 'my-refresh-token' }))).toBe('my-refresh-token');
   });
 
   test('ownership rejection — different userId returns no rows', () => {
     const rows = queryProvider(allProviders, 'prov-1', 'user-other');
     expect(rows).toHaveLength(0);
-    expect(() => extractRefreshToken(rows, () => '{}')).toThrow('Provider not found');
+  });
+
+  test('missing token — throws ValidationError when refreshToken is absent', () => {
+    expect(() => decryptRefreshToken(enc({}))).toThrow('Provider has no refresh token');
+    expect(() => decryptRefreshToken(enc({ refreshToken: '' }))).toThrow(
+      'Provider has no refresh token'
+    );
   });
 
   test('decrypt failure — throws ValidationError', () => {
-    const rows = queryProvider(allProviders, 'prov-1', 'user-1');
-    expect(() =>
-      extractRefreshToken(rows, () => {
-        throw new Error('Decryption failed');
-      })
-    ).toThrow('Failed to decrypt provider credentials');
+    expect(() => decryptRefreshToken('not-encrypted')).toThrow(
+      'Failed to decrypt provider credentials'
+    );
   });
 
   test('inactive provider — filtered out by query', () => {

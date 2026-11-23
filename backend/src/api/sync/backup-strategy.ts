@@ -1,5 +1,6 @@
 import type { UserProvider } from '../../db/schema';
 import type { ProviderBackupSettings } from '../../types';
+import { storageProviderDescriptor } from '../providers/domains/storage/registry';
 
 export interface BackupStrategyContext {
   userId: string;
@@ -27,10 +28,8 @@ export interface BackupStrategy {
   execute(context: BackupStrategyContext): Promise<BackupStrategyResult>;
 }
 
-export const PHOTO_ONLY_PROVIDER_TYPES = ['google-photos'] as const;
-
 export const isPhotoOnlyProviderType = (providerType: string): boolean =>
-  (PHOTO_ONLY_PROVIDER_TYPES as readonly string[]).includes(providerType);
+  storageProviderDescriptor(providerType)?.photoOnly === true;
 
 export const hasZipBackup = (
   settings: ProviderBackupSettings,

@@ -5,9 +5,9 @@ import type { UserProvider } from '../../db/schema';
 import { userProviders } from '../../db/schema';
 import { AppError, ValidationError } from '../../errors';
 import { requireAuth } from '../../middleware';
-import { decrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { expenseRepository } from '../expenses/repository';
+import { decryptRefreshToken } from '../providers/domains/storage/registry';
 import { parseExtraction } from '../providers/domains/vlm/prompt';
 import { getVlmProvider } from '../providers/domains/vlm/registry';
 import { GooglePhotosService } from '../providers/services/google-photos-service';
@@ -36,11 +36,7 @@ async function findEnabledProvider(
 }
 
 function buildRealPhotosService(row: UserProvider): GooglePhotosService {
-  const credentials = JSON.parse(decrypt(row.credentials)) as Record<string, unknown>;
-  const refreshToken = credentials.refreshToken;
-  if (typeof refreshToken !== 'string') {
-    throw new ValidationError('Google Photos provider is missing its credentials');
-  }
+  const refreshToken = decryptRefreshToken(row.credentials);
   const config = (row.config ?? {}) as Record<string, unknown>;
   const albumId = typeof config.albumId === 'string' ? config.albumId : undefined;
   return new GooglePhotosService(refreshToken, undefined, albumId);
