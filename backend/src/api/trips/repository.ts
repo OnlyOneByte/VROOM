@@ -112,14 +112,6 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
     const [result] = await this.db.select({ count: count() }).from(trips).where(where);
     return { data, totalCount: result?.count ?? 0 };
   }
-
-  async deleteByIdAndUserId(id: string, userId: string): Promise<boolean> {
-    const deleted = await this.db
-      .delete(trips)
-      .where(and(eq(trips.id, id), eq(trips.userId, userId)))
-      .returning();
-    return deleted.length > 0;
-  }
 }
 
 export const tripRepository = new TripRepository(getDb());

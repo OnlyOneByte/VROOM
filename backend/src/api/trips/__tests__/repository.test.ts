@@ -113,18 +113,6 @@ describe('TripRepository', () => {
     expect(page.data).toHaveLength(2);
   });
 
-  test('deleteByIdAndUserId removes the owner’s trip but refuses a foreign user’s delete', async () => {
-    const trip = await repo.create(tripData());
-
-    expect(await repo.deleteByIdAndUserId(trip.id, OTHER_USER)).toBe(false);
-    expect(await repo.findByIdAndUserId(trip.id, USER_ID)).not.toBeNull();
-
-    expect(await repo.deleteByIdAndUserId(trip.id, USER_ID)).toBe(true);
-    expect(await repo.findByIdAndUserId(trip.id, USER_ID)).toBeNull();
-
-    expect(await repo.deleteByIdAndUserId(trip.id, USER_ID)).toBe(false);
-  });
-
   test('update mutates fields and bumps updatedAt', async () => {
     const trip = await repo.create(tripData({ note: 'before' }));
     const updated = await repo.update(trip.id, { note: 'after', endOdometer: 1200 });

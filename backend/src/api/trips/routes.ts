@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { getDb } from '../../db/connection';
@@ -307,44 +307,51 @@ routes.delete(
       throw new NotFoundError('Trip');
     }
 
-    const deleted = await tripRepository.deleteByIdAndUserId(id, user.id);
-    if (!deleted) {
-      throw new NotFoundError('Trip');
-    }
+    const other = await tripRepository.findOtherAtOdometerKey({
+      excludeTripId: id,
+      vehicleId: existing.vehicleId,
+      userId: user.id,
+      endOdometer: existing.endOdometer,
+      tripDate: existing.tripDate,
+      timeZone,
+    });
+    const key = {
+      tripId: id,
+      vehicleId: existing.vehicleId,
+      userId: user.id,
+      odometer: existing.endOdometer,
+      recordedAt: existing.tripDate,
+      timeZone,
+    };
 
-    try {
-      const other = await tripRepository.findOtherAtOdometerKey({
-        excludeTripId: id,
-        vehicleId: existing.vehicleId,
-        userId: user.id,
-        endOdometer: existing.endOdometer,
-        tripDate: existing.tripDate,
-        timeZone,
-      });
-      const key = {
-        tripId: id,
-        vehicleId: existing.vehicleId,
-        userId: user.id,
-        odometer: existing.endOdometer,
-        recordedAt: existing.tripDate,
-        timeZone,
-      };
+    const removedEntryIds = getDb().transaction((tx) => {
+      const row = tx
+        .delete(trips)
+        .where(and(eq(trips.id, id), eq(trips.userId, user.id)))
+        .returning({ id: trips.id })
+        .get();
+      if (!row) throw new NotFoundError('Trip');
       if (other) {
-        odometerRepository.handOverLinkedTripEntry(key, other);
-      } else if (keepOdometer === false) {
-        const removedEntryIds = odometerRepository.deleteLinkedTripEntry(key);
+        odometerRepository.handOverLinkedTripEntry(key, other, tx);
+        return [];
+      }
+      return keepOdometer === false ? odometerRepository.deleteLinkedTripEntry(key, tx) : [];
+    });
+
+    if (!other && keepOdometer === false) {
+      try {
         await deleteEntryPhotosWithRetry(removedEntryIds, user.id, {
           tripId: id,
           vehicleId: existing.vehicleId,
         });
         await reminderTriggerService.recheckMileageReminders(user.id, existing.vehicleId);
+      } catch (error) {
+        logger.error('Trip-delete mileage reminder recheck failed (trip already deleted)', {
+          tripId: id,
+          vehicleId: existing.vehicleId,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
-    } catch (error) {
-      logger.error('Trip-delete linked-odometer cleanup failed (trip already deleted)', {
-        tripId: id,
-        vehicleId: existing.vehicleId,
-        error: error instanceof Error ? error.message : String(error),
-      });
     }
 
     return c.json({ success: true, message: 'Trip deleted' });
