@@ -580,7 +580,7 @@
 {:else if vehicle}
 	<div class="space-y-6 pb-24 short:pb-0">
 		<div class="flex flex-wrap items-start justify-between gap-4">
-			<div class="flex-1">
+			<div class="min-w-0 grow basis-[min-content]">
 				<VehicleHeader {vehicle} displayName={vehicleDisplayName} {coverPhotoUrl} />
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
