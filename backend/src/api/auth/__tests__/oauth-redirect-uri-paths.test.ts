@@ -63,15 +63,30 @@ describe('OAuth redirect-URI defaults resolve to mounted routes', () => {
   });
 
   test('the link URIs derived from the login defaults hit the link callback', async () => {
+    const { linkRedirectFrom } = await import('../../../config');
     for (const [name, provider] of [
       ['GOOGLE_REDIRECT_URI', 'google'],
       ['GITHUB_REDIRECT_URI', 'github'],
     ] as const) {
       const loginDefault = redirectUriDefaults().find((d) => d.name === name)?.uri ?? '';
-      const derived = loginDefault.replace(`/callback/${provider}`, `/callback/link/${provider}`);
+      const derived = linkRedirectFrom(loginDefault, provider);
       expect(new URL(derived).pathname).toBe(`/api/v1/auth/callback/link/${provider}`);
       expect(await statusFor(derived)).not.toBe(404);
     }
+  });
+
+  test('an unset link URI follows the login URI host, and never equals it', async () => {
+    const { linkRedirectFrom } = await import('../../../config');
+    expect(linkRedirectFrom('https://cars.example.com/api/v1/auth/callback/github', 'github')).toBe(
+      'https://cars.example.com/api/v1/auth/callback/link/github'
+    );
+    expect(
+      linkRedirectFrom('https://cars.example.com/vroom/api/v1/auth/callback/google', 'google')
+    ).toBe('https://cars.example.com/vroom/api/v1/auth/callback/link/google');
+    const unusual = 'https://cars.example.com/oauth/return';
+    expect(linkRedirectFrom(unusual, 'google')).toBe(
+      'https://cars.example.com/api/v1/auth/callback/link/google'
+    );
   });
 
   test('an unmounted callback path DOES 404 (the probe can tell the difference)', async () => {

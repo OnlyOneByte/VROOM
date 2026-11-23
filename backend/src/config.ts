@@ -94,6 +94,16 @@ const parseEnv = () => {
   }
 };
 
+export function linkRedirectFrom(loginRedirectUri: string, provider: 'google' | 'github'): string {
+  const url = new URL(loginRedirectUri);
+  const loginSuffix = `/callback/${provider}`;
+  url.pathname = url.pathname.endsWith(loginSuffix)
+    ? `${url.pathname.slice(0, -loginSuffix.length)}/callback/link/${provider}`
+    : `/api/v1/auth/callback/link/${provider}`;
+  url.search = '';
+  return url.toString();
+}
+
 const env = parseEnv();
 
 const getDefaultFrontendUrl = (environment: Environment): string => {
@@ -138,14 +148,12 @@ export const CONFIG = {
       env.GOOGLE_PROVIDER_REDIRECT_URI ||
       env.GOOGLE_REDIRECT_URI.replace('/callback/google', '/callback/provider/google'),
     googleLinkRedirectUri:
-      env.GOOGLE_LINK_REDIRECT_URI ||
-      env.GOOGLE_REDIRECT_URI.replace('/callback/google', '/callback/link/google'),
+      env.GOOGLE_LINK_REDIRECT_URI || linkRedirectFrom(env.GOOGLE_REDIRECT_URI, 'google'),
     githubClientId: env.GITHUB_CLIENT_ID,
     githubClientSecret: env.GITHUB_CLIENT_SECRET,
     githubRedirectUri: env.GITHUB_REDIRECT_URI,
     githubLinkRedirectUri:
-      env.GITHUB_LINK_REDIRECT_URI ||
-      env.GITHUB_REDIRECT_URI.replace('/callback/github', '/callback/link/github'),
+      env.GITHUB_LINK_REDIRECT_URI || linkRedirectFrom(env.GITHUB_REDIRECT_URI, 'github'),
     cookieMaxAge: 30 * 24 * 60 * 60,
     sessionDuration: 30 * 24 * 60 * 60 * 1000,
     oauthStateExpiry: 10 * 60 * 1000,
