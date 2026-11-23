@@ -39,6 +39,21 @@ describe('landing page', () => {
 		}
 	});
 
+	test('below sm each variant swaps in a phone-width capture with its own dimensions', () => {
+		render(Page);
+		const shots = screen.getAllByRole('img', { name: /The VROOM Dashboard/ });
+		const sources = shots.map(img => img.closest('picture')?.querySelector('source'));
+		expect(sources.map(source => source?.getAttribute('srcset'))).toEqual([
+			'/landing/dashboard-phone-light.webp',
+			'/landing/dashboard-phone-dark.webp'
+		]);
+		for (const source of sources) {
+			expect(source?.getAttribute('media')).toBe('(width < 40rem)');
+			expect(source?.getAttribute('width')).toBe('750');
+			expect(source?.getAttribute('height')).toBe('1400');
+		}
+	});
+
 	test('the stacked footer links are 40px tap targets on phones', () => {
 		render(Page);
 		for (const name of ['Privacy Policy', 'Terms of Service']) {
