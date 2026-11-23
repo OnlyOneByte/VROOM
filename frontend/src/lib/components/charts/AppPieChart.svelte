@@ -5,7 +5,7 @@
 	import ChartPlot from './ChartPlot.svelte';
 	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
 	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
-	import { formatCurrencyTooltip } from '#lib/utils/chart-formatters.ts';
+	import { formatCurrencyTooltip, type TooltipValueFormat } from '#lib/utils/chart-formatters.ts';
 	import { prefersReducedMotion } from 'svelte/motion';
 	import type { Snippet } from 'svelte';
 	import type { ChartState } from 'layerchart';
@@ -30,6 +30,7 @@
 		showLegend?: boolean;
 		legendLabel?: string;
 		formatLegendValue?: (_item: PieDataItem) => string;
+		tooltipFormat?: TooltipValueFormat;
 		class?: string;
 	}
 
@@ -44,6 +45,7 @@
 		showLegend = true,
 		legendLabel = 'Categories',
 		formatLegendValue = item => formatCurrency(item.value),
+		tooltipFormat = formatCurrencyTooltip,
 		class: className
 	}: Props = $props();
 
@@ -130,7 +132,7 @@
 								}}
 							>
 								{#snippet tooltip()}
-									<Chart.Tooltip hideLabel valueFormatter={formatCurrencyTooltip} />
+									<Chart.Tooltip hideLabel valueFormatter={tooltipFormat} />
 								{/snippet}
 							</PieChart>
 						</Chart.Container>

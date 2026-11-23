@@ -192,7 +192,7 @@ export function parseMonthToDate(month: string): Date {
 	return new Date(Number(parts[0] ?? '0'), Number(parts[1] ?? '1') - 1, 1);
 }
 
-export function byVehicleMonth<T extends { month: string; vehicleName: string }>(
+export function byVehicleMonth<T extends { month: string; vehicleId: string }>(
 	rows: readonly T[],
 	value: (row: T) => number
 ): Record<string, number | string | Date>[] {
@@ -203,7 +203,7 @@ export function byVehicleMonth<T extends { month: string; vehicleName: string }>
 			entry = { month: row.month, date: parseMonthToDate(row.month) };
 			byMonth.set(row.month, entry);
 		}
-		entry[row.vehicleName] = value(row);
+		entry[row.vehicleId] = value(row);
 	}
 	return [...byMonth.values()].sort((a, b) => String(a['month']).localeCompare(String(b['month'])));
 }

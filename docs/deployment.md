@@ -436,6 +436,8 @@ list already names `default`, the list wins and `PROVIDER_ENCRYPTION_KEY` is ign
    block there too.
 3. Re-encrypt every stored secret under the new key:
    - in the container: `docker compose exec backend bun dist/scripts/rotate-provider-keys.js`
+     (on Portainer, open the backend container's console and run
+     `bun dist/scripts/rotate-provider-keys.js`)
    - from a checkout, in `backend/`: `bun run providers:rotate-key`
 
    It works in batches of 100 rows, one transaction each, and prints how many rows it
@@ -446,7 +448,8 @@ list already names `default`, the list wins and `PROVIDER_ENCRYPTION_KEY` is ign
    (`PROVIDER_ENCRYPTION_KEYS` and `PROVIDER_ENCRYPTION_KEY`) and restart. Back up the new key
    with the database.
 
-Secrets stored before key ids existed are read only with the key whose id is `default`.
+Secrets stored before key ids existed are read only with the key whose id is `default`, so
+the old key must keep that id in the list (`default=<old key>`), not a new one like `k1`.
 Running the command with a single key upgrades them in place, but that old format stays
 readable for as long as a `default` key is configured. Rotating to a new key id and then
 removing `default` turns it off.

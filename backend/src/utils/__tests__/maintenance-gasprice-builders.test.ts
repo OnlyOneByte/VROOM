@@ -5,6 +5,7 @@ import {
   buildVehicleMaintenanceCosts,
   type FuelExpenseRow,
   type GeneralExpenseRow,
+  zonedCalendar,
 } from '../analytics-charts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -74,11 +75,24 @@ describe('buildGasPriceHistory', () => {
     expect(out.every((r) => Number.isFinite(r.pricePerVolume))).toBe(true);
   });
 
-  test('caps the output at the last 100 entries', () => {
+  test('keeps every entry in the range, so monthly averages see whole months', () => {
     const rows = Array.from({ length: 130 }, (_, i) =>
       fuelRow({ date: d(2024, 1, 1 + (i % 27)), expenseAmount: 40 + i, volume: 10 })
     );
-    expect(buildGasPriceHistory(rows)).toHaveLength(100);
+    expect(buildGasPriceHistory(rows)).toHaveLength(130);
+  });
+
+  test("each entry's month follows the user's time zone, like the other monthly charts", () => {
+    const lateOnJan31InLosAngeles = new Date(Date.UTC(2024, 1, 1, 6));
+    const row = fuelRow({ date: lateOnJan31InLosAngeles });
+    expect(buildGasPriceHistory([row])[0]?.month).toBe('2024-02');
+    const zoned = buildGasPriceHistory(
+      [row],
+      undefined,
+      undefined,
+      zonedCalendar('America/Los_Angeles')
+    );
+    expect(zoned[0]?.month).toBe('2024-01');
   });
 });
 

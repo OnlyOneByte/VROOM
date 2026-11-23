@@ -41,7 +41,7 @@ function tiles(container: HTMLElement): Element[] {
 }
 
 function isTwoValueSkeleton(tile: Element): boolean {
-	const halves = tile.querySelector('[class~="@sm:flex-row"]');
+	const halves = tile.querySelector('[data-stat-halves]');
 	return (
 		halves !== null &&
 		halves.querySelectorAll('[data-slot="skeleton"]').length === 6 &&

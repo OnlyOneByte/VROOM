@@ -40,7 +40,7 @@
 	import ChartGroup from './ChartGroup.svelte';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import type { StatCardChange } from '#lib/components/charts/StatCard.svelte';
-	import { CHART_COLORS } from '#lib/utils/chart-colors.ts';
+	import { buildVehicleColorMap } from '#lib/utils/chart-colors.ts';
 	import type { AnalyticsDateRange } from '../analytics-filters';
 
 	let {
@@ -88,12 +88,9 @@
 			...(fuelStats?.costPerDistance ?? []),
 			...(fuelAdvanced?.vehicleRadar ?? [])
 		];
-		const ids = [...new Set(rows.map(r => r.vehicleId))].sort();
+		const fallback = buildVehicleColorMap(rows.map(r => r.vehicleId));
 		return Object.fromEntries(
-			ids.map((id, i) => [
-				id,
-				vehicleColorsProp?.[id] ?? (CHART_COLORS[i % CHART_COLORS.length] as string)
-			])
+			Object.keys(fallback).map(id => [id, vehicleColorsProp?.[id] ?? (fallback[id] as string)])
 		);
 	});
 

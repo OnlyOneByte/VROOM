@@ -349,10 +349,48 @@ describe('vehicle context loaders', () => {
 		state.formData.vehicleId = 'v1';
 		await loadLastFuelExpense(state);
 		expect(expenseApiMock.getExpensesByVehicle).toHaveBeenCalledWith('v1', {
-			limit: 2,
+			limit: 10,
 			category: 'fuel'
 		});
 		expect(state.lastFuelExpense?.id).toBe('e0');
+	});
+
+	test('loadLastFuelExpense picks the highest odometer among same-day fill-ups, whatever the list order', async () => {
+		const day = '2026-11-20T00:00:00.000Z';
+		expenseApiMock.getExpensesByVehicle.mockResolvedValue({
+			data: [
+				makeExpense('zz-morning', { date: day, mileage: 41200 }),
+				makeExpense('aa-evening', { date: day, mileage: 41480 }),
+				makeExpense('older', { date: '2026-11-12T00:00:00.000Z', mileage: 40900 })
+			]
+		});
+		const state = createState();
+		await loadLastFuelExpense(state);
+		expect(state.lastFuelExpense?.id).toBe('aa-evening');
+	});
+
+	test('loadLastFuelExpense keeps the newest date even when an older fill-up reads higher', async () => {
+		expenseApiMock.getExpensesByVehicle.mockResolvedValue({
+			data: [
+				makeExpense('newest', { date: '2026-11-21T00:00:00.000Z', mileage: 41480 }),
+				makeExpense('typo', { date: '2026-11-12T00:00:00.000Z', mileage: 414800 })
+			]
+		});
+		const state = createState();
+		await loadLastFuelExpense(state);
+		expect(state.lastFuelExpense?.id).toBe('newest');
+	});
+
+	test('loadLastFuelExpense keeps a newest fill-up with no odometer over an older one with a reading', async () => {
+		expenseApiMock.getExpensesByVehicle.mockResolvedValue({
+			data: [
+				makeExpense('no-odometer', { date: '2026-11-21T00:00:00.000Z', mileage: undefined }),
+				makeExpense('older', { date: '2026-11-10T00:00:00.000Z', mileage: 41000 })
+			]
+		});
+		const state = createState();
+		await loadLastFuelExpense(state);
+		expect(state.lastFuelExpense?.id).toBe('no-odometer');
 	});
 
 	test('loadLastFuelExpense sets null when there is no prior fuel expense', async () => {

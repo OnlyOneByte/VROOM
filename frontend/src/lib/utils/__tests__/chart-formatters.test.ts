@@ -255,19 +255,19 @@ describe('insetTimeTicks (no x label inside the inset under the y labels)', () =
 });
 
 describe('byVehicleMonth', () => {
-	test('builds one row per month with a column per vehicle, sorted by month', () => {
+	test('builds one row per month with a column per vehicle id, sorted by month', () => {
 		const rows = byVehicleMonth(
 			[
-				{ month: '2026-03', vehicleName: 'Camry', cost: 40 },
-				{ month: '2026-01', vehicleName: 'Camry', cost: 30 },
-				{ month: '2026-03', vehicleName: 'Model 3', cost: 12 }
+				{ month: '2026-03', vehicleId: 'camry', cost: 40 },
+				{ month: '2026-01', vehicleId: 'camry', cost: 30 },
+				{ month: '2026-03', vehicleId: 'model3', cost: 12 }
 			],
 			r => r.cost
 		);
 
 		expect(rows).toEqual([
-			{ month: '2026-01', date: parseMonthToDate('2026-01'), Camry: 30 },
-			{ month: '2026-03', date: parseMonthToDate('2026-03'), Camry: 40, 'Model 3': 12 }
+			{ month: '2026-01', date: parseMonthToDate('2026-01'), camry: 30 },
+			{ month: '2026-03', date: parseMonthToDate('2026-03'), camry: 40, model3: 12 }
 		]);
 	});
 

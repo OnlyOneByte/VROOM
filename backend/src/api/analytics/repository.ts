@@ -249,7 +249,12 @@ export interface FuelStatsData {
     avgPerMonth: number | null;
   };
   monthlyConsumption: Array<{ month: string; efficiency: number | null; volume: number }>;
-  gasPriceHistory: Array<{ date: string; fuelType: string; pricePerVolume: number }>;
+  gasPriceHistory: Array<{
+    date: string;
+    month: string;
+    fuelType: string;
+    pricePerVolume: number;
+  }>;
   fillupCostByVehicle: Array<{
     month: string;
     vehicleId: string;
@@ -276,7 +281,7 @@ export interface FuelStatsData {
       maxEnergy: number | null;
     };
     averageCost: { perSession: number | null; perEnergyUnit: number | null };
-    priceHistory: Array<{ date: string; fuelType: string; pricePerVolume: number }>;
+    priceHistory: Array<{ date: string; month: string; fuelType: string; pricePerVolume: number }>;
   };
   costPerDistance: Array<{
     month: string;
@@ -1640,7 +1645,7 @@ export class AnalyticsRepository {
       previous: this.previousWindowStats(prevFuelRows, rangeStartDate, convert),
       distance,
       monthlyConsumption: this.buildMonthlyConsumption(fuelRowsByVehicle, convert),
-      gasPriceHistory: buildGasPriceHistory(fuelRows, isFillup, convert.volume),
+      gasPriceHistory: buildGasPriceHistory(fuelRows, isFillup, convert.volume, convert.calendar),
       fillupCostByVehicle: buildFillupCostByVehicle(fuelRows, vehicleNameMap, convert.calendar),
       odometerProgression: this.buildOdometerProgression(
         fuelRows,
@@ -1715,7 +1720,12 @@ export class AnalyticsRepository {
         perSession: sessions.length > 0 ? totalCost / sessions.length : null,
         perEnergyUnit: totalEnergy > 0 ? totalCost / totalEnergy : null,
       },
-      priceHistory: buildGasPriceHistory(fuelRows, isChargeSession),
+      priceHistory: buildGasPriceHistory(
+        fuelRows,
+        isChargeSession,
+        (value) => value,
+        convert.calendar
+      ),
     };
   }
 

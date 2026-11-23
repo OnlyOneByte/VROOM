@@ -59,7 +59,7 @@ export interface FuelStatsResponse {
 		avgPerMonth: number | null;
 	};
 	monthlyConsumption: Array<{ month: string; efficiency: number | null; volume: number }>;
-	gasPriceHistory: Array<{ date: string; fuelType: string; pricePerVolume: number }>;
+	gasPriceHistory: Array<{ date: string; month: string; fuelType: string; pricePerVolume: number }>;
 	fillupCostByVehicle: Array<{
 		month: string;
 		vehicleId: string;
@@ -92,7 +92,7 @@ export interface FuelStatsResponse {
 			maxEnergy: number | null;
 		};
 		averageCost: { perSession: number | null; perEnergyUnit: number | null };
-		priceHistory: Array<{ date: string; fuelType: string; pricePerVolume: number }>;
+		priceHistory: Array<{ date: string; month: string; fuelType: string; pricePerVolume: number }>;
 	};
 	units?: UnitsMetadata;
 }

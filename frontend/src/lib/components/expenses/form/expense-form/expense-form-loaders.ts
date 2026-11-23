@@ -210,16 +210,28 @@ export async function loadVehicle(state: ExpenseFormState): Promise<Error | null
 	}
 }
 
+const LAST_FILLUP_WINDOW = 10;
+
+function latestFillup(newestFirst: Expense[]): Expense | null {
+	const newest = newestFirst[0];
+	if (!newest) return null;
+	return newestFirst
+		.filter(fillup => fillup.date === newest.date)
+		.reduce((best, fillup) =>
+			(fillup.mileage ?? -Infinity) > (best.mileage ?? -Infinity) ? fillup : best
+		);
+}
+
 export async function loadLastFuelExpense(state: ExpenseFormState): Promise<void> {
 	const isCurrent = state.nextLastFuelRequest();
 	try {
 		const result = await expenseApi.getExpensesByVehicle(state.formData.vehicleId, {
-			limit: 2,
+			limit: LAST_FILLUP_WINDOW,
 			category: 'fuel'
 		});
 		if (!isCurrent()) return;
-		const fuelExpenses = result.data.filter((e: { id: string }) => e.id !== state.ctx.expenseId);
-		state.lastFuelExpense = fuelExpenses[0] ?? null;
+		const fuelExpenses = result.data.filter(e => e.id !== state.ctx.expenseId);
+		state.lastFuelExpense = latestFillup(fuelExpenses);
 	} catch {
 		if (isCurrent()) state.lastFuelExpense = null;
 	}
