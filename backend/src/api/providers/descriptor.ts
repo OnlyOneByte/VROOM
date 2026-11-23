@@ -35,6 +35,7 @@ export interface ProviderDescriptor<Cap extends Capability, Input, Instance, Fea
   features: Features;
   create: (input: Input) => Instance;
   identity?: (config: Record<string, unknown>) => string | null;
+  serverState?: string[];
 }
 
 export interface CatalogEntry<Cap extends Capability = Capability, Features = unknown> {
@@ -75,12 +76,23 @@ export type AnyProviderDescriptor = ProviderDescriptor<Capability, never, unknow
 
 export function validateProviderConfig(
   descriptor: AnyProviderDescriptor,
-  config: Record<string, unknown> | null
+  config: Record<string, unknown> | null,
+  toleratedKeys: string[] = []
 ): void {
   const parsed = descriptor.config.schema.safeParse(config ?? {});
-  if (!parsed.success) {
-    throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid provider config');
-  }
+  if (parsed.success) return;
+  const issue = parsed.error.issues.find(
+    (i) => i.code !== 'unrecognized_keys' || i.keys.some((key) => !toleratedKeys.includes(key))
+  );
+  if (issue) throw new ValidationError(issue.message);
+}
+
+export function withoutServerState(
+  descriptor: AnyProviderDescriptor,
+  config: Record<string, unknown>
+): Record<string, unknown> {
+  const serverState = descriptor.serverState ?? [];
+  return Object.fromEntries(Object.entries(config).filter(([key]) => !serverState.includes(key)));
 }
 
 export function validateProviderSecrets(

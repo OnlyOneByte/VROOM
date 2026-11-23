@@ -19,6 +19,7 @@ import {
   toCatalogEntries,
   validateProviderConfig,
   validateProviderSecrets,
+  withoutServerState,
 } from './descriptor';
 import { LLM_PROVIDERS } from './domains/llm/registry';
 import {
@@ -175,6 +176,7 @@ function resolveProviderCredentials(
   config: Record<string, unknown> | null,
   nonce?: string
 ): { encryptedCredentials: string; resolvedConfig: Record<string, unknown> | null } {
+  validateProviderConfig(descriptor, config);
   if (descriptor.connect === 'oauth') {
     if (!nonce) {
       throw new ValidationError('Missing nonce — please connect your Google account');
@@ -188,7 +190,6 @@ function resolveProviderCredentials(
       resolvedConfig: { ...(config ?? {}), accountEmail: pending.email },
     };
   }
-  validateProviderConfig(descriptor, config);
   validateProviderSecrets(descriptor, DOMAIN_LABELS[domain] ?? domain, credentials);
   return {
     encryptedCredentials: encrypt(JSON.stringify(credentials)),
@@ -222,7 +223,7 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
     body.domain,
     descriptor,
     body.credentials,
-    body.config ?? null,
+    body.config ? withoutServerState(descriptor, body.config) : null,
     body.nonce
   );
 
@@ -315,9 +316,18 @@ routes.put(
     }
     const descriptor = providerDescriptor(existing.domain, existing.providerType);
     if (body.config !== undefined) {
-      if (descriptor) validateProviderConfig(descriptor, body.config);
+      const clientConfig = descriptor ? withoutServerState(descriptor, body.config) : body.config;
       // Server-written keys (accountEmail, albumId) are not sent by forms; a wholesale replace would drop them.
-      updates.config = { ...(existing.config ?? {}), ...body.config };
+      const merged = { ...(existing.config ?? {}), ...clientConfig };
+      if (descriptor) {
+        const stored = (existing.config ?? {}) as Record<string, unknown>;
+        const unchanged = Object.keys(stored).filter(
+          (key) => !Object.hasOwn(clientConfig, key) || Object.is(clientConfig[key], stored[key])
+        );
+        validateProviderConfig(descriptor, clientConfig, unchanged);
+        validateProviderConfig(descriptor, merged, unchanged);
+      }
+      updates.config = merged;
     }
     if (body.credentials !== undefined) {
       if (descriptor) {

@@ -85,13 +85,25 @@ describe('PUT /providers/:id merges `config` instead of replacing it', () => {
   test('a key the caller DOES send still wins — merging is not ignoring the payload', async () => {
     seedConnectedDrive('drive-3', { photoRootPath: 'Photos', accountEmail: 'owner@example.com' });
 
-    await ctx.authed('PUT', '/api/v1/providers/drive-3', {
-      config: { photoRootPath: 'Scans', accountEmail: 'second@example.com' },
-    });
+    await ctx.authed('PUT', '/api/v1/providers/drive-3', { config: { photoRootPath: 'Scans' } });
 
     expect(await storedConfig('drive-3')).toEqual({
       photoRootPath: 'Scans',
-      accountEmail: 'second@example.com',
+      accountEmail: 'owner@example.com',
+    });
+  });
+
+  test('a server-only key in the payload leaves the stored value unchanged', async () => {
+    seedConnectedDrive('drive-5', { photoRootPath: 'Photos', accountEmail: 'owner@example.com' });
+
+    const res = await ctx.authed('PUT', '/api/v1/providers/drive-5', {
+      config: { photoRootPath: 'Photos', accountEmail: 'second@example.com' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(await storedConfig('drive-5')).toEqual({
+      photoRootPath: 'Photos',
+      accountEmail: 'owner@example.com',
     });
   });
 

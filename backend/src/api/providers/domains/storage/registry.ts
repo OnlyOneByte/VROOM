@@ -9,8 +9,13 @@ import type { PhotoCategory, StorageConfig } from '../../../../types';
 import { DEFAULT_STORAGE_CONFIG } from '../../../../types';
 import { decrypt } from '../../../../utils/encryption';
 import { assertSafeOutboundUrl } from '../../../../utils/outbound-url';
-import { joinStoragePath } from '../../../../utils/paths';
-import { alwaysAvailable, type ProviderDescriptor, toCatalogEntries } from '../../descriptor';
+import { joinStoragePath, storagePathSchema } from '../../../../utils/paths';
+import {
+  alwaysAvailable,
+  type ProviderDescriptor,
+  toCatalogEntries,
+  validateProviderConfig,
+} from '../../descriptor';
 import { FakeStorageProvider } from './fake-provider';
 import { GoogleDriveProvider } from './google-drive-provider';
 import { GooglePhotosProvider } from './google-photos-provider';
@@ -78,8 +83,19 @@ function buildS3Provider(credentials: Record<string, unknown>, config: unknown):
 const S3_CONFIG_MESSAGE = 'S3 config must include endpoint, bucket, and region';
 const requiredS3Text = z.string({ message: S3_CONFIG_MESSAGE }).min(1, S3_CONFIG_MESSAGE);
 
+const storageRoots = {
+  providerRootPath: storagePathSchema.optional(),
+  photoRootPath: storagePathSchema.optional(),
+};
+const googleAccount = { accountEmail: z.string().optional() };
+
 const s3ConfigSchema = z
-  .looseObject({ endpoint: requiredS3Text, bucket: requiredS3Text, region: requiredS3Text })
+  .strictObject({
+    ...storageRoots,
+    endpoint: requiredS3Text,
+    bucket: requiredS3Text,
+    region: requiredS3Text,
+  })
   .superRefine((config, ctx) => {
     try {
       assertSafeOutboundUrl(config.endpoint, 'S3 endpoint');
@@ -87,8 +103,6 @@ const s3ConfigSchema = z
       ctx.addIssue({ code: 'custom', message: (error as Error).message, path: ['endpoint'] });
     }
   });
-
-const noConfig = { schema: z.looseObject({}), fields: [] };
 
 function getFakeProvider(providerId: string): StorageProvider {
   // Fakes are double-gated: only outside production and only when explicitly opted in.
@@ -137,9 +151,10 @@ export const STORAGE_PROVIDERS = {
     description: 'Store photos in Google Drive',
     scope: 'user',
     availability: alwaysAvailable,
-    config: noConfig,
+    config: { schema: z.strictObject({ ...storageRoots, ...googleAccount }), fields: [] },
     secrets: [],
     connect: 'oauth',
+    serverState: ['accountEmail'],
     create: ({ credentials }) => buildGoogleDriveProvider(credentials),
     features: {
       photoOnly: false,
@@ -159,9 +174,13 @@ export const STORAGE_PROVIDERS = {
     description: 'Store photos in Google Photos',
     scope: 'user',
     availability: () => 'hidden',
-    config: noConfig,
+    config: {
+      schema: z.strictObject({ ...storageRoots, ...googleAccount, albumId: z.string().optional() }),
+      fields: [],
+    },
     secrets: [],
     connect: 'oauth',
+    serverState: ['accountEmail', 'albumId'],
     create: ({ credentials, config }) => buildGooglePhotosProvider(credentials, config),
     features: {
       photoOnly: true,
@@ -231,7 +250,7 @@ export const STORAGE_PROVIDERS = {
     description: 'In-memory storage for tests',
     scope: 'user',
     availability: () => (CONFIG.allowFakeStorageProvider ? 'available' : 'hidden'),
-    config: noConfig,
+    config: { schema: z.strictObject(storageRoots), fields: [] },
     secrets: [],
     connect: 'none',
     create: ({ id }) => getFakeProvider(id),
@@ -379,11 +398,10 @@ export class StorageProviderRegistry {
       descriptor.connect === 'none'
         ? {}
         : (JSON.parse(decrypt(row.credentials)) as Record<string, unknown>);
-    return descriptor.create({
-      id: row.id,
-      credentials,
-      config: row.config as Record<string, unknown> | null,
-    });
+    const config = row.config as Record<string, unknown> | null;
+    const provider = descriptor.create({ id: row.id, credentials, config });
+    validateProviderConfig(descriptor, config, Object.keys(config ?? {}));
+    return provider;
   }
 
   // Merge with defaults: older rows predate newer categories.
