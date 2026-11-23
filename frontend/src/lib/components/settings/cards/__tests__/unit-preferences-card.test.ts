@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import UnitPreferencesCard from '../UnitPreferencesCard.svelte';
 
@@ -7,6 +7,8 @@ interface CardProps {
 	volumeUnit: 'gallons_us' | 'gallons_uk' | 'liters';
 	chargeUnit: 'kwh';
 	currencyUnit: string;
+	onUnitsChange: () => void;
+	onCurrencyChange: () => void;
 }
 
 function mount(overrides: Partial<CardProps> = {}) {
@@ -100,5 +102,30 @@ describe('UnitPreferencesCard', () => {
 		mount();
 		await pickOption('charge-unit', 'kWh');
 		expect(trigger('charge-unit')).toHaveTextContent('kWh');
+	});
+
+	test('picking a different unit or currency asks the page to save it', async () => {
+		const onUnitsChange = vi.fn();
+		const onCurrencyChange = vi.fn();
+		mount({ onUnitsChange, onCurrencyChange });
+
+		await pickOption('distance-unit', 'Kilometers');
+		await pickOption('volume-unit', 'Liters');
+		expect(onUnitsChange).toHaveBeenCalledTimes(2);
+		expect(onCurrencyChange).not.toHaveBeenCalled();
+
+		await pickOption('currency', 'GBP (£)');
+		expect(onCurrencyChange).toHaveBeenCalledOnce();
+	});
+
+	test('picking the value already selected saves nothing', async () => {
+		const onUnitsChange = vi.fn();
+		const onCurrencyChange = vi.fn();
+		mount({ onUnitsChange, onCurrencyChange });
+
+		await pickOption('charge-unit', 'kWh');
+		await pickOption('currency', 'USD ($)');
+		expect(onUnitsChange).not.toHaveBeenCalled();
+		expect(onCurrencyChange).not.toHaveBeenCalled();
 	});
 });

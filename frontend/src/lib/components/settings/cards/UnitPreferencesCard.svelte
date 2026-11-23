@@ -15,13 +15,17 @@
 		volumeUnit: 'gallons_us' | 'gallons_uk' | 'liters';
 		chargeUnit: 'kwh';
 		currencyUnit: string;
+		onUnitsChange?: () => void;
+		onCurrencyChange?: () => void;
 	}
 
 	let {
 		distanceUnit = $bindable(),
 		volumeUnit = $bindable(),
 		chargeUnit = $bindable(),
-		currencyUnit = $bindable()
+		currencyUnit = $bindable(),
+		onUnitsChange,
+		onCurrencyChange
 	}: Props = $props();
 
 	function getDistanceLabel(unit: 'miles' | 'kilometers'): string {
@@ -48,7 +52,9 @@
 <Card>
 	<CardHeader>
 		<CardTitle>Unit Preferences</CardTitle>
-		<CardDescription>Choose your preferred units for measurements</CardDescription>
+		<CardDescription>
+			Choose your preferred units for measurements. Changes save right away.
+		</CardDescription>
 		<p class="text-sm text-muted-foreground mt-1">
 			These units are used as defaults when adding new vehicles and determine the display units for
 			cross-vehicle analytics.
@@ -64,7 +70,9 @@
 				type="single"
 				value={distanceUnit}
 				onValueChange={v => {
-					if (v) distanceUnit = v as 'miles' | 'kilometers';
+					if (!v || v === distanceUnit) return;
+					distanceUnit = v as 'miles' | 'kilometers';
+					onUnitsChange?.();
 				}}
 			>
 				<Select.Trigger id="distance-unit" class="w-full">
@@ -87,7 +95,9 @@
 				type="single"
 				value={volumeUnit}
 				onValueChange={v => {
-					if (v) volumeUnit = v as 'gallons_us' | 'gallons_uk' | 'liters';
+					if (!v || v === volumeUnit) return;
+					volumeUnit = v as 'gallons_us' | 'gallons_uk' | 'liters';
+					onUnitsChange?.();
 				}}
 			>
 				<Select.Trigger id="volume-unit" class="w-full">
@@ -111,7 +121,9 @@
 				type="single"
 				value={chargeUnit}
 				onValueChange={v => {
-					if (v) chargeUnit = v as 'kwh';
+					if (!v || v === chargeUnit) return;
+					chargeUnit = v as 'kwh';
+					onUnitsChange?.();
 				}}
 			>
 				<Select.Trigger id="charge-unit" class="w-full">kWh</Select.Trigger>
@@ -130,7 +142,9 @@
 				type="single"
 				value={currencyUnit}
 				onValueChange={v => {
-					if (v) currencyUnit = v;
+					if (!v || v === currencyUnit) return;
+					currencyUnit = v;
+					onCurrencyChange?.();
 				}}
 			>
 				<Select.Trigger id="currency" class="w-full">

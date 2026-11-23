@@ -48,6 +48,7 @@
 		onBackupNow?: () => void;
 		onRestore?: () => void;
 		onDownloadBackup?: () => void;
+		onSyncInactivityChange?: () => void;
 	}
 
 	let {
@@ -55,7 +56,8 @@
 		syncInactivityMinutes = $bindable(5),
 		onBackupNow,
 		onRestore,
-		onDownloadBackup
+		onDownloadBackup,
+		onSyncInactivityChange
 	}: Props = $props();
 
 	const DEFAULT_STORAGE_CONFIG: StorageConfig = {
@@ -302,7 +304,9 @@
 							type="single"
 							value={syncInactivityMinutes.toString()}
 							onValueChange={v => {
-								if (v) syncInactivityMinutes = parseInt(v);
+								if (!v || parseInt(v) === syncInactivityMinutes) return;
+								syncInactivityMinutes = parseInt(v);
+								onSyncInactivityChange?.();
 							}}
 						>
 							<Select.Trigger id="inactivity-minutes" class="w-full">
