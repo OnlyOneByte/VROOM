@@ -4,5 +4,7 @@ export function focusLeftOn(origin: Element | null): boolean {
 }
 
 export function focusFirstButton(container: Element | null | undefined): void {
-	container?.querySelector<HTMLButtonElement>('button')?.focus();
+	const target =
+		container?.querySelector('button') ?? (container?.hasAttribute('tabindex') ? container : null);
+	if (target instanceof HTMLElement) target.focus();
 }

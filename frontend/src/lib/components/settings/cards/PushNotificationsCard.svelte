@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import { onMount, tick } from 'svelte';
 	import { Bell, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -55,7 +56,7 @@
 	async function retryStatus() {
 		await loadStatus();
 		await tick();
-		(content?.querySelector('button') ?? content)?.focus();
+		focusFirstButton(content);
 	}
 
 	function isDisclosed(): boolean {

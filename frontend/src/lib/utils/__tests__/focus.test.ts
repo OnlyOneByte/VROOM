@@ -58,7 +58,18 @@ describe('focusFirstButton', () => {
 		expect(document.activeElement?.textContent).toBe('Add');
 	});
 
-	test('leaves focus alone when there is no container or no button', () => {
+	test('focuses a focusable container when it holds no button', () => {
+		const container = document.createElement('div');
+		container.tabIndex = -1;
+		container.innerHTML = '<p>Notifications are on</p>';
+		document.body.append(container);
+
+		focusFirstButton(container);
+
+		expect(document.activeElement).toBe(container);
+	});
+
+	test('leaves focus alone when there is no container, or no button in an unfocusable one', () => {
 		const origin = button('Retry');
 		origin.focus();
 		const empty = document.createElement('div');
