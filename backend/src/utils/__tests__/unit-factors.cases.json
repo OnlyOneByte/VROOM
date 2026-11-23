@@ -1,0 +1,4 @@
+{
+  "milesPerDistanceUnit": { "miles": 1, "kilometers": 0.621371192237334 },
+  "usGallonsPerVolumeUnit": { "gallons_us": 1, "gallons_uk": 1.200949925504855, "liters": 0.264172052358148 }
+}
