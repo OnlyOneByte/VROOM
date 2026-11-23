@@ -22,7 +22,7 @@
 <script lang="ts">
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { amountStep, formatCurrency } from '#lib/utils/formatters.ts';
+	import { amountStep, formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import type { Vehicle } from '#lib/types/index.ts';
 
 	type SplitMethod = 'even' | 'absolute' | 'percentage';
@@ -63,7 +63,7 @@
 
 	let absoluteSum = $derived(allocations.reduce((sum, a) => sum + (a.amount ?? 0), 0));
 	let percentageSumBasisPoints = $derived(splitPercentageBasisPoints(allocations));
-	let percentageSumLabel = $derived(`${(percentageSumBasisPoints / 100).toFixed(2)}%`);
+	let percentageSumLabel = $derived(`${formatNumber(percentageSumBasisPoints / 100, 2)}%`);
 
 	let absoluteError = $derived(
 		splitMethod === 'absolute' && !splitAmountsMatchTotal(allocations, totalAmount)

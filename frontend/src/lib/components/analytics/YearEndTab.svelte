@@ -20,7 +20,7 @@
 	import { buildCategoryPieData, buildChartConfig } from '#lib/utils/chart-colors.ts';
 	import { analyticsApi } from '#lib/services/analytics-api.ts';
 	import type { YearEndResponse } from '#lib/types/index.ts';
-	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatDateWith, formatNumber } from '#lib/utils/formatters.ts';
 	import { formatDecimalAxis, parseMonthToDate, unitTooltip } from '#lib/utils/chart-formatters.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
@@ -127,12 +127,12 @@
 					icon: DollarSign,
 					iconColor: 'chart-1',
 					subtitle: yearEnd.previousYearComparison
-						? `${yearEnd.previousYearComparison.percentageChange > 0 ? '+' : ''}${yearEnd.previousYearComparison.percentageChange.toFixed(1)}% vs ${yearEnd.year - 1}`
+						? `${yearEnd.previousYearComparison.percentageChange > 0 ? '+' : ''}${formatNumber(yearEnd.previousYearComparison.percentageChange, 1)}% vs ${yearEnd.year - 1}`
 						: undefined
 				},
 				{
 					label: `Avg ${efficiencyLabel}`,
-					value: yearEnd.avgEfficiency != null ? yearEnd.avgEfficiency.toFixed(1) : 'N/A',
+					value: yearEnd.avgEfficiency != null ? formatNumber(yearEnd.avgEfficiency, 1) : 'N/A',
 					icon: Fuel,
 					iconColor: 'chart-2',
 					subtitle: 'Across all vehicles'
@@ -149,7 +149,7 @@
 					value: yearEnd.vehicleCount,
 					icon: CircleAlert,
 					iconColor: 'chart-4',
-					subtitle: `${yearEnd.totalDistance.toLocaleString()} total ${distLongLabel.toLowerCase()}`
+					subtitle: `${formatNumber(yearEnd.totalDistance, 0)} total ${distLongLabel.toLowerCase()}`
 				}
 			]}
 			columns={4}
@@ -187,7 +187,7 @@
 							</p>
 							<p class="text-muted-foreground">{yearEnd.biggestExpense.description}</p>
 							<p class="text-sm text-muted-foreground">
-								{new Date(yearEnd.biggestExpense.date).toLocaleDateString('en-US', {
+								{formatDateWith(new Date(yearEnd.biggestExpense.date), {
 									month: 'long',
 									day: 'numeric',
 									year: 'numeric'
@@ -216,13 +216,13 @@
 								{#if yearEnd.previousYearComparison.percentageChange > 0}
 									<TrendingUp class="h-5 w-5 text-destructive" />
 									<span class="text-lg font-medium text-destructive">
-										+{yearEnd.previousYearComparison.percentageChange.toFixed(1)}%
+										+{formatNumber(yearEnd.previousYearComparison.percentageChange, 1)}%
 									</span>
 								{:else if yearEnd.previousYearComparison.percentageChange < 0}
 									<!-- Tinted text fails WCAG AA at this size; only the icon takes the hue. -->
 									<TrendingDown class="h-5 w-5 text-chart-2" />
 									<span class="text-lg font-medium text-foreground">
-										{yearEnd.previousYearComparison.percentageChange.toFixed(1)}%
+										{formatNumber(yearEnd.previousYearComparison.percentageChange, 1)}%
 									</span>
 								{:else}
 									<span class="text-lg font-medium text-muted-foreground">No change</span>

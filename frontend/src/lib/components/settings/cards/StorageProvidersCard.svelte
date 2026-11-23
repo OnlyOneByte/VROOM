@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatDateWith } from '#lib/utils/formatters.ts';
 	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -204,7 +205,7 @@
 			}
 		}
 		if (!latest) return 'Never';
-		return new Date(latest).toLocaleDateString('en-US', {
+		return formatDateWith(new Date(latest), {
 			year: 'numeric',
 			month: 'short',
 			day: 'numeric',

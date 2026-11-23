@@ -13,7 +13,7 @@
 		CardHeader,
 		CardTitle
 	} from '#lib/components/ui/card/index.ts';
-	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatDateWith } from '#lib/utils/formatters.ts';
 	import type { Vehicle, FinancingFormErrors, FinancingPaymentConfig } from '#lib/types/index.ts';
 
 	interface Props {
@@ -53,7 +53,7 @@
 	}: Props = $props();
 
 	function formatPayoffDate(date: Date): string {
-		return new Date(date).toLocaleDateString('en-US', {
+		return formatDateWith(new Date(date), {
 			year: 'numeric',
 			month: 'short'
 		});

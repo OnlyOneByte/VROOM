@@ -6,7 +6,7 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
-	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import type { Vehicle } from '#lib/types/index.ts';
 
 	interface Props {
@@ -30,7 +30,7 @@
 		[
 			vehicle.licensePlate && `plate ${vehicle.licensePlate}`,
 			vehicle.initialMileage &&
-				`${vehicle.initialMileage.toLocaleString()} ${distanceLabel} initial`
+				`${formatNumber(vehicle.initialMileage, 0)} ${distanceLabel} initial`
 		]
 			.filter(Boolean)
 			.join(', ') || String(vehicle.year)
@@ -104,7 +104,7 @@
 				<div class="space-y-1">
 					<p class="text-sm font-medium text-muted-foreground">Initial Mileage</p>
 					<p class="text-base font-semibold">
-						{vehicle.initialMileage.toLocaleString()}
+						{formatNumber(vehicle.initialMileage, 0)}
 						{distanceLabel}
 					</p>
 				</div>

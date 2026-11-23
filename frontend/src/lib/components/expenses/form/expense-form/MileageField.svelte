@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils/formatters.ts';
 	import { Gauge } from '@lucide/svelte';
 	import Input from '#lib/components/ui/input/input.svelte';
 	import Label from '#lib/components/ui/label/label.svelte';
@@ -51,7 +52,7 @@
 	</div>
 	{#if previousFuelMileage}
 		<p class="text-xs text-muted-foreground">
-			Previous fuel entry: {previousFuelMileage.toLocaleString()}
+			Previous fuel entry: {formatNumber(previousFuelMileage, 0)}
 			{distanceLabel.toLowerCase()}
 		</p>
 	{/if}

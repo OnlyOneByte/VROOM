@@ -7,7 +7,7 @@
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import type { Trip, TripSummary, Vehicle } from '#lib/types/index.ts';
 	import { tripDistance } from '#lib/types/index.ts';
-	import { capitalize, formatDate } from '#lib/utils/formatters.ts';
+	import { capitalize, formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
@@ -202,7 +202,7 @@
 					<div>
 						<p class="text-xs text-muted-foreground">Total</p>
 						<p class="text-lg font-semibold">
-							{summary.totalDistance.toLocaleString()}
+							{formatNumber(summary.totalDistance, 0)}
 							<span class="text-sm font-normal">{distLabel}</span>
 						</p>
 					</div>
@@ -213,14 +213,14 @@
 					<div>
 						<p class="text-xs text-muted-foreground">Business</p>
 						<p class="text-lg font-semibold">
-							{summary.businessDistance.toLocaleString()}
+							{formatNumber(summary.businessDistance, 0)}
 							<span class="text-sm font-normal">{distLabel}</span>
 						</p>
 					</div>
 					<div>
 						<p class="text-xs text-muted-foreground">Avg / trip</p>
 						<p class="text-lg font-semibold">
-							{Math.round(summary.averageTripDistance).toLocaleString()}
+							{formatNumber(summary.averageTripDistance, 0)}
 							<span class="text-sm font-normal">{distLabel}</span>
 						</p>
 					</div>
@@ -238,10 +238,10 @@
 								<span class="text-sm text-muted-foreground">{formatDate(trip.tripDate)}</span>
 							</div>
 							<p class="font-medium">
-								{tripDistance(trip).toLocaleString()}
+								{formatNumber(tripDistance(trip), 0)}
 								{tripDistLabel(trip.vehicleId)}
 								<span class="text-sm font-normal text-muted-foreground">
-									({trip.startOdometer.toLocaleString()} → {trip.endOdometer.toLocaleString()})
+									({formatNumber(trip.startOdometer, 0)} → {formatNumber(trip.endOdometer, 0)})
 								</span>
 							</p>
 							{#if trip.startLocation || trip.endLocation}
@@ -289,7 +289,7 @@
 
 		{#if trips.length < totalCount}
 			<p class="text-center text-sm text-muted-foreground" data-testid="trip-list-truncation">
-				Showing {trips.length.toLocaleString()} of {totalCount.toLocaleString()} trips
+				Showing {formatNumber(trips.length, 0)} of {formatNumber(totalCount, 0)} trips
 			</p>
 		{/if}
 	{/if}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { currentLocale } from '#lib/utils/formatters.ts';
 	import { RangeCalendar as RangeCalendarPrimitive } from 'bits-ui';
 	import * as RangeCalendar from './index.js';
 	import { cn, type WithoutChildrenOrChild } from '#lib/utils.js';
@@ -14,7 +15,7 @@
 		class: className,
 		buttonVariant = 'ghost',
 		captionLayout = 'label',
-		locale = 'en-US',
+		locale = currentLocale(),
 		months: monthsProp,
 		years,
 		monthFormat: monthFormatProp,

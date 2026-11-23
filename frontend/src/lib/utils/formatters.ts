@@ -22,6 +22,21 @@ export function amountStep(currency?: string): string {
 	return digits > 0 ? (1 / 10 ** digits).toFixed(digits) : '1';
 }
 
+export function toAmountInput(amount: number, currency?: string): string {
+	return amount.toFixed(currencyFractionDigits(currency));
+}
+
+export function amountPlaceholder(currency?: string): string {
+	const digits = currencyFractionDigits(currency);
+	return digits > 0 ? `0.${'0'.repeat(digits)}` : '0';
+}
+
+export function formatBytes(bytes: number): string {
+	if (bytes < 1024) return `${formatNumber(bytes, 0)} B`;
+	if (bytes < 1024 * 1024) return `${formatNumber(bytes / 1024, 1)} KB`;
+	return `${formatNumber(bytes / (1024 * 1024), 1)} MB`;
+}
+
 export function formatDateWith(date: Date, options: Intl.DateTimeFormatOptions): string {
 	return new Intl.DateTimeFormat(currentLocale(), options).format(date);
 }

@@ -68,6 +68,18 @@ export function insetTimeTicks(ticks: unknown): TicksConfig | undefined {
 
 export const SMOOTH_CURVE = curveMonotoneX;
 
+const Y_TICK_SPACING = 50;
+
+export function distinctYTicks(format: (_v: number) => string, plotHeight: number) {
+	return (scale: AnyScale): number[] => {
+		for (let count = Math.max(2, Math.round(plotHeight / Y_TICK_SPACING)); count >= 2; count--) {
+			const ticks: number[] = scale.ticks?.(count) ?? [];
+			if (new Set(ticks.map(format)).size === ticks.length) return ticks;
+		}
+		return scale.ticks?.(2) ?? [];
+	};
+}
+
 function formatMonthTick(value: unknown): string {
 	if (!(value instanceof Date) || isNaN(value.getTime())) return '';
 	if (value.getMonth() === 0) return String(value.getFullYear());

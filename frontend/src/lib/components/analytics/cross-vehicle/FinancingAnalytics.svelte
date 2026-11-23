@@ -6,7 +6,7 @@
 	import { AppBarChart, AppPieChart } from '#lib/components/charts/index.ts';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import type { FinancingResponse } from '#lib/types/index.ts';
-	import { capitalize, formatCurrency } from '#lib/utils/formatters.ts';
+	import { capitalize, formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
 
 	let { financing }: { financing: FinancingResponse } = $props();
@@ -123,7 +123,7 @@
 											<div>
 												<p class="text-muted-foreground">APR</p>
 												<p class="font-semibold">
-													{vehicle.apr != null ? `${vehicle.apr.toFixed(1)}%` : '—'}
+													{vehicle.apr != null ? `${formatNumber(vehicle.apr, 1)}%` : '—'}
 												</p>
 											</div>
 											<div>

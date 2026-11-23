@@ -24,7 +24,7 @@
 	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
 	import { expenseApi } from '#lib/services/expense-api.ts';
 	import type { FuelStatsResponse, FuelAdvancedResponse, PeriodCounts } from '#lib/types/index.ts';
-	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import {
 		getDistanceUnitLabel,
 		getVolumeUnitLabel,
@@ -112,7 +112,7 @@
 		},
 		{
 			label: `Average ${showGasCards ? effLabel : electricEffLabel}`,
-			value: summaryEfficiency != null ? summaryEfficiency.toFixed(1) : 'N/A',
+			value: summaryEfficiency != null ? formatNumber(summaryEfficiency, 1) : 'N/A',
 			icon: Gauge,
 			iconColor: 'chart-2'
 		}
@@ -202,14 +202,14 @@
 			<div class="space-y-3 border-b pb-3">
 				<div class="flex items-baseline justify-between">
 					<span class="text-xs text-muted-foreground">This Period</span>
-					<span class="text-2xl font-bold">{counts.currentYear.toFixed(decimals)}</span>
+					<span class="text-2xl font-bold">{formatNumber(counts.currentYear, decimals)}</span>
 				</div>
 				{#if counts.previousYear > 0}
 					<div class="flex items-center justify-between">
 						<span class="text-xs text-muted-foreground">Last Period</span>
 						<div class="flex items-center gap-2">
 							<span class="text-sm text-muted-foreground">
-								{counts.previousYear.toFixed(decimals)}
+								{formatNumber(counts.previousYear, decimals)}
 							</span>
 							{@render changeBadge(counts.currentYear, counts.previousYear)}
 						</div>
@@ -220,13 +220,13 @@
 			<div class="space-y-3 pt-3">
 				<div class="flex items-baseline justify-between">
 					<span class="text-xs text-muted-foreground">This Month</span>
-					<span class="text-2xl font-bold">{counts.currentMonth.toFixed(decimals)}</span>
+					<span class="text-2xl font-bold">{formatNumber(counts.currentMonth, decimals)}</span>
 				</div>
 				<div class="flex items-center justify-between">
 					<span class="text-xs text-muted-foreground">Last Month</span>
 					<div class="flex items-center gap-2">
 						<span class="text-sm text-muted-foreground">
-							{counts.previousMonth.toFixed(decimals)}
+							{formatNumber(counts.previousMonth, decimals)}
 						</span>
 						{@render changeBadge(counts.currentMonth, counts.previousMonth)}
 					</div>
@@ -316,7 +316,7 @@
 									</span>
 									<p class="text-3xl font-bold">
 										{fuelStats.fuelConsumption.avgEfficiency != null
-											? fuelStats.fuelConsumption.avgEfficiency.toFixed(1)
+											? formatNumber(fuelStats.fuelConsumption.avgEfficiency, 1)
 											: 'N/A'}
 									</p>
 								</div>
@@ -328,7 +328,7 @@
 										</span>
 										<p class="text-xl font-bold text-chart-2">
 											{fuelStats.fuelConsumption.bestEfficiency != null
-												? fuelStats.fuelConsumption.bestEfficiency.toFixed(1)
+												? formatNumber(fuelStats.fuelConsumption.bestEfficiency, 1)
 												: 'N/A'}
 										</p>
 									</div>
@@ -338,7 +338,7 @@
 										</span>
 										<p class="text-xl font-bold text-destructive">
 											{fuelStats.fuelConsumption.worstEfficiency != null
-												? fuelStats.fuelConsumption.worstEfficiency.toFixed(1)
+												? formatNumber(fuelStats.fuelConsumption.worstEfficiency, 1)
 												: 'N/A'}
 										</p>
 									</div>
@@ -366,7 +366,7 @@
 									</span>
 									<p class="text-3xl font-bold">
 										{charging.efficiency.avgEfficiency != null
-											? charging.efficiency.avgEfficiency.toFixed(1)
+											? formatNumber(charging.efficiency.avgEfficiency, 1)
 											: 'N/A'}
 									</p>
 								</div>
@@ -378,7 +378,7 @@
 										</span>
 										<p class="text-xl font-bold text-chart-2">
 											{charging.efficiency.bestEfficiency != null
-												? charging.efficiency.bestEfficiency.toFixed(1)
+												? formatNumber(charging.efficiency.bestEfficiency, 1)
 												: 'N/A'}
 										</p>
 									</div>
@@ -388,7 +388,7 @@
 										</span>
 										<p class="text-xl font-bold text-destructive">
 											{charging.efficiency.worstEfficiency != null
-												? charging.efficiency.worstEfficiency.toFixed(1)
+												? formatNumber(charging.efficiency.worstEfficiency, 1)
 												: 'N/A'}
 										</p>
 									</div>
@@ -407,7 +407,7 @@
 									<span class="text-xs text-muted-foreground"> Average Session </span>
 									<p class="text-3xl font-bold">
 										{charging.sessionDetails.avgEnergy != null
-											? charging.sessionDetails.avgEnergy.toFixed(1) + ' ' + chargeLabel
+											? formatNumber(charging.sessionDetails.avgEnergy, 1) + ' ' + chargeLabel
 											: 'N/A'}
 									</p>
 								</div>
@@ -417,7 +417,7 @@
 										<span class="text-muted-foreground">Min Session</span>
 										<span class="font-semibold">
 											{charging.sessionDetails.minEnergy != null
-												? charging.sessionDetails.minEnergy.toFixed(1) + ' ' + chargeLabel
+												? formatNumber(charging.sessionDetails.minEnergy, 1) + ' ' + chargeLabel
 												: 'N/A'}
 										</span>
 									</div>
@@ -425,7 +425,7 @@
 										<span class="text-muted-foreground">Max Session</span>
 										<span class="font-semibold">
 											{charging.sessionDetails.maxEnergy != null
-												? charging.sessionDetails.maxEnergy.toFixed(1) + ' ' + chargeLabel
+												? formatNumber(charging.sessionDetails.maxEnergy, 1) + ' ' + chargeLabel
 												: 'N/A'}
 										</span>
 									</div>
@@ -464,7 +464,7 @@
 									<span class="text-xs text-muted-foreground"> Average Fill-up </span>
 									<p class="text-3xl font-bold">
 										{fuelStats.fillupDetails.avgVolume != null
-											? fuelStats.fillupDetails.avgVolume.toFixed(1) + ' ' + volLabelShort
+											? formatNumber(fuelStats.fillupDetails.avgVolume, 1) + ' ' + volLabelShort
 											: 'N/A'}
 									</p>
 								</div>
@@ -474,7 +474,7 @@
 										<span class="text-muted-foreground">Min Fill-up</span>
 										<span class="font-semibold">
 											{fuelStats.fillupDetails.minVolume != null
-												? fuelStats.fillupDetails.minVolume.toFixed(1) + ' ' + volLabelShort
+												? formatNumber(fuelStats.fillupDetails.minVolume, 1) + ' ' + volLabelShort
 												: 'N/A'}
 										</span>
 									</div>
@@ -482,7 +482,7 @@
 										<span class="text-muted-foreground">Max Fill-up</span>
 										<span class="font-semibold">
 											{fuelStats.fillupDetails.maxVolume != null
-												? fuelStats.fillupDetails.maxVolume.toFixed(1) + ' ' + volLabelShort
+												? formatNumber(fuelStats.fillupDetails.maxVolume, 1) + ' ' + volLabelShort
 												: 'N/A'}
 										</span>
 									</div>
@@ -546,7 +546,7 @@
 							<div class="border-b pb-4 text-center">
 								<span class="text-xs text-muted-foreground"> Total Distance </span>
 								<p class="text-3xl font-bold">
-									{fuelStats.distance.totalDistance.toLocaleString()}
+									{formatNumber(fuelStats.distance.totalDistance, 0)}
 									{distLabelShort}
 								</p>
 							</div>
@@ -556,7 +556,7 @@
 									<span class="text-muted-foreground">Avg/Day</span>
 									<span class="font-semibold">
 										{fuelStats.distance.avgPerDay != null
-											? fuelStats.distance.avgPerDay.toFixed(1) + ' ' + distLabelShort
+											? formatNumber(fuelStats.distance.avgPerDay, 1) + ' ' + distLabelShort
 											: 'N/A'}
 									</span>
 								</div>
@@ -564,7 +564,7 @@
 									<span class="text-muted-foreground">Avg/Month</span>
 									<span class="font-semibold">
 										{fuelStats.distance.avgPerMonth != null
-											? fuelStats.distance.avgPerMonth.toFixed(0) + ' ' + distLabelShort
+											? formatNumber(fuelStats.distance.avgPerMonth, 0) + ' ' + distLabelShort
 											: 'N/A'}
 									</span>
 								</div>

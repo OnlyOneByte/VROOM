@@ -160,6 +160,28 @@ export default [
 		}
 	},
 	{
+		files: ['src/**/*.{ts,svelte}'],
+		ignores: ['src/lib/utils/formatters.ts', '**/*.test.ts', '**/__tests__/**'],
+		rules: {
+			'no-restricted-syntax': [
+				'error',
+				{
+					selector: "CallExpression[callee.property.name='toFixed']",
+					message: 'Format numbers for display with formatNumber() from #lib/utils/formatters.ts.'
+				},
+				{
+					selector: 'CallExpression[callee.property.name=/^toLocale(Date|Time)?String$/]',
+					message:
+						'Format with formatNumber(), formatDate() or formatDateWith() from #lib/utils/formatters.ts.'
+				},
+				{
+					selector: "Literal[value='en-US']",
+					message: 'Take the locale from currentLocale() in #lib/utils/formatters.ts.'
+				}
+			]
+		}
+	},
+	{
 		files: ['src/lib/components/ui/**/*.svelte'],
 		rules: {
 			'svelte/require-each-key': 'off',

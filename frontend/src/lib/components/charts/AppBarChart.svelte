@@ -10,6 +10,7 @@
 		formatMonthLabel,
 		type TooltipValueFormat,
 		CHART_PADDING,
+		distinctYTicks,
 		monthlyXAxisProps
 	} from '#lib/utils/chart-formatters.ts';
 	import type { Snippet } from 'svelte';
@@ -105,7 +106,15 @@
 					bars: { stroke: 'none' },
 					...barProps,
 					xAxis: resolvedXAxisProps,
-					yAxis: { format: yAxisFormat }
+					yAxis: {
+						format: yAxisFormat,
+						...(orientation === 'vertical' && {
+							ticks: distinctYTicks(
+								yAxisFormat,
+								height - resolvedPadding.top - resolvedPadding.bottom
+							)
+						})
+					}
 				}}
 			>
 				{#snippet tooltip()}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatDateWith } from '#lib/utils/formatters.ts';
 	import { onMount } from 'svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
@@ -141,7 +142,7 @@
 
 	let memberSince = $derived.by(() => {
 		if (!user?.createdAt) return '';
-		return new Date(user.createdAt).toLocaleDateString('en-US', {
+		return formatDateWith(new Date(user.createdAt), {
 			month: 'long',
 			year: 'numeric'
 		});

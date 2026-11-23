@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatBytes, formatDateWith } from '#lib/utils/formatters.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -393,7 +394,7 @@
 									<Database class="h-4 w-4 text-muted-foreground" />
 									<div>
 										<div class="text-sm font-medium text-foreground">
-											{new Date(backup.createdTime).toLocaleDateString('en-US', {
+											{formatDateWith(new Date(backup.createdTime), {
 												month: 'short',
 												day: 'numeric',
 												year: 'numeric',
@@ -402,11 +403,7 @@
 											})}
 										</div>
 										<div class="text-xs text-muted-foreground">
-											{backup.size < 1024
-												? backup.size + ' B'
-												: backup.size < 1048576
-													? (backup.size / 1024).toFixed(1) + ' KB'
-													: (backup.size / 1048576).toFixed(1) + ' MB'}
+											{formatBytes(backup.size)}
 										</div>
 									</div>
 								</div>

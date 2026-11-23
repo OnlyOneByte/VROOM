@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
-import { scaleTime } from 'd3-scale';
+import { scaleLinear, scaleTime } from 'd3-scale';
 import {
+	distinctYTicks,
 	byVehicleMonth,
 	formatCentsAxis,
 	formatCountTooltip,
@@ -20,6 +21,7 @@ import {
 	parseMonthToDate,
 	TIME_X_PADDING
 } from '#lib/utils/chart-formatters.ts';
+import { formatNumber } from '#lib/utils/formatters.ts';
 
 describe('chart money axis formatters', () => {
 	test('formatCurrencyAxis renders compact currency with no decimals', () => {
@@ -284,5 +286,23 @@ describe('formatCentsAxis currency decimals', () => {
 		} finally {
 			spy.mockRestore();
 		}
+	});
+});
+
+describe('distinctYTicks', () => {
+	const linear = (max: number) => scaleLinear().domain([0, max]);
+
+	test('keeps the default ticks when every label is distinct', () => {
+		const ticks = distinctYTicks(v => formatNumber(v, 1), 276)(linear(4.4) as never);
+		expect(ticks).toEqual(linear(4.4).ticks(6));
+	});
+
+	test('coarsens the ticks until whole-number labels stop repeating', () => {
+		const format = (v: number) => formatNumber(v, 0);
+		const ticks = distinctYTicks(format, 276)(linear(4.4) as never);
+		const labels = ticks.map(format);
+		expect(new Set(labels).size).toBe(labels.length);
+		expect(ticks.every(Number.isInteger)).toBe(true);
+		expect(ticks.length).toBeGreaterThanOrEqual(2);
 	});
 });

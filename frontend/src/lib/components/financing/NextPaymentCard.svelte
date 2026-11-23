@@ -4,7 +4,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Progress } from '#lib/components/ui/progress/index.ts';
 	import { Calendar, CreditCard, ArrowRightLeft } from '@lucide/svelte';
-	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatDateWith } from '#lib/utils/formatters.ts';
 	import {
 		calculateNextPaymentDate,
 		remainingBalance,
@@ -82,7 +82,7 @@
 	);
 
 	let formattedDueDate = $derived(
-		nextPaymentDate.toLocaleDateString('en-US', {
+		formatDateWith(nextPaymentDate, {
 			month: 'short',
 			day: 'numeric',
 			year: 'numeric'
