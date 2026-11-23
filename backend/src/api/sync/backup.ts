@@ -168,7 +168,7 @@ export function upgradeBackupTables(
 }
 
 const UNEDITED_BACKUP =
-  "Choose a backup that VROOM made and that hasn't been edited. If this is your only one, make a fresh backup in the VROOM that created it, or close this and keep using VROOM without restoring.";
+  'Only a backup that VROOM made, without edits, can be restored. If this is the only one you have, keep it as it is and select Cancel. VROOM keeps working without a restore.';
 
 export const BACKUP_CHECK_REASONS = {
   metadata: `This backup is missing details VROOM needs to restore it. ${UNEDITED_BACKUP}`,
