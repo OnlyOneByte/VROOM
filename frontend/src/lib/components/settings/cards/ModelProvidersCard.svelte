@@ -2,7 +2,8 @@
 	import { onMount, tick } from 'svelte';
 	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
-	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2, ChevronDown } from '@lucide/svelte';
+	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
+	import HowItWorks from '#lib/components/common/how-it-works.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -212,18 +213,12 @@
 	<CardHeader>
 		<div class="flex items-center gap-2">
 			<Icon class="h-5 w-5 text-muted-foreground" />
-			<CardTitle>{copy.title}</CardTitle>
+			<CardTitle level={3}>{copy.title}</CardTitle>
 		</div>
 		<CardDescription>{copy.summary}</CardDescription>
-		<details class="group">
-			<summary
-				class="inline-flex min-h-10 cursor-pointer list-none items-center gap-1 rounded-sm text-sm font-medium text-primary outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
-			>
-				<ChevronDown class="h-4 w-4 transition-transform group-open:rotate-180" />
-				How it works
-			</summary>
+		<HowItWorks>
 			<p class="text-sm text-muted-foreground">{copy.description}</p>
-		</details>
+		</HowItWorks>
 	</CardHeader>
 	<CardContent bind:ref={content}>
 		{#if isLoading}

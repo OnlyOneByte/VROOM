@@ -171,7 +171,7 @@
 	{:else if !hasProvider}
 		<EmptyState>
 			{#snippet icon()}<Bot class="h-12 w-12 text-muted-foreground mb-4" />{/snippet}
-			{#snippet title()}No assistant provider configured{/snippet}
+			{#snippet title()}No assistant provider connected{/snippet}
 			{#snippet description()}
 				Connect a chat-AI provider to ask questions about your vehicles and costs. Bring your own
 				key — the assistant is read-only and can never change your data.

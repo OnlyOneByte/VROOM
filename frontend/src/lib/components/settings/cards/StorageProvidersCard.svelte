@@ -273,7 +273,7 @@
 	<CardHeader>
 		<div class="flex items-center gap-2">
 			<HardDrive class="h-5 w-5 text-muted-foreground" />
-			<CardTitle>Storage Providers</CardTitle>
+			<CardTitle level={3}>Storage Providers</CardTitle>
 		</div>
 		<CardDescription>Configure storage providers for photos and backups</CardDescription>
 	</CardHeader>
