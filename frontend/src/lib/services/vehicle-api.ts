@@ -18,13 +18,12 @@ import {
 	updateCachedVehicle
 } from '#lib/utils/offline-storage.ts';
 
-const vehiclePhotos = (vehicleId: string) =>
-	photoCollection(`/api/v1/vehicles/${vehicleId}/photos`);
+const vehiclePhotos = (vehicleId: string) => photoCollection(`/vehicles/${vehicleId}/photos`);
 
 export const vehicleApi = {
 	async getVehicle(vehicleId: string): Promise<Vehicle> {
 		return apiClient.get<Vehicle>(
-			`/api/v1/vehicles/${vehicleId}${buildQueryString({ timeZone: userTimeZone() })}`
+			`/vehicles/${vehicleId}${buildQueryString({ timeZone: userTimeZone() })}`
 		);
 	},
 
@@ -34,7 +33,7 @@ export const vehicleApi = {
 			timeZone: userTimeZone()
 		});
 		const requestedFor = currentOfflineQueueOwner();
-		const vehicles = await apiClient.get<Vehicle[]>(`/api/v1/vehicles${qs}`);
+		const vehicles = await apiClient.get<Vehicle[]>(`/vehicles${qs}`);
 		cacheVehicles(
 			vehicles.filter(v => !v.sharedAccess),
 			requestedFor
@@ -43,30 +42,30 @@ export const vehicleApi = {
 	},
 
 	async createVehicle(data: Partial<Vehicle>): Promise<Vehicle> {
-		return apiClient.post<Vehicle>('/api/v1/vehicles', data);
+		return apiClient.post<Vehicle>('/vehicles', data);
 	},
 
 	async updateVehicle(vehicleId: string, data: UpdateVehicleRequest): Promise<Vehicle> {
 		const requestedFor = currentOfflineQueueOwner();
-		const vehicle = await apiClient.put<Vehicle>(`/api/v1/vehicles/${vehicleId}`, data);
+		const vehicle = await apiClient.put<Vehicle>(`/vehicles/${vehicleId}`, data);
 		updateCachedVehicle(vehicle, requestedFor);
 		return vehicle;
 	},
 
 	async getVehicleStats(vehicleId: string, period: TimePeriod): Promise<VehicleStats> {
-		return apiClient.get<VehicleStats>(`/api/v1/vehicles/${vehicleId}/stats?period=${period}`);
+		return apiClient.get<VehicleStats>(`/vehicles/${vehicleId}/stats?period=${period}`);
 	},
 
 	async deleteVehicle(vehicleId: string): Promise<void> {
 		const requestedFor = currentOfflineQueueOwner();
-		await apiClient.delete(`/api/v1/vehicles/${vehicleId}`);
+		await apiClient.delete(`/vehicles/${vehicleId}`);
 		removeCachedVehicle(vehicleId, requestedFor);
 	},
 
 	// The backend answers 200 with data: null when the vehicle has no financing; any error is real.
 	async getFinancing(vehicleId: string): Promise<VehicleFinancing | null> {
 		return apiClient.get<VehicleFinancing | null>(
-			`/api/v1/financing/vehicles/${vehicleId}/financing${buildQueryString({ timeZone: userTimeZone() })}`
+			`/financing/vehicles/${vehicleId}/financing${buildQueryString({ timeZone: userTimeZone() })}`
 		);
 	},
 
@@ -74,20 +73,17 @@ export const vehicleApi = {
 		vehicleId: string,
 		data: Partial<Omit<VehicleFinancing, 'id' | 'vehicleId' | 'createdAt' | 'updatedAt'>>
 	): Promise<VehicleFinancing> {
-		return apiClient.post<VehicleFinancing>(
-			`/api/v1/financing/vehicles/${vehicleId}/financing`,
-			data
-		);
+		return apiClient.post<VehicleFinancing>(`/financing/vehicles/${vehicleId}/financing`, data);
 	},
 
 	async updatePaymentAmount(financingId: string, paymentAmount: number): Promise<VehicleFinancing> {
-		return apiClient.patch<VehicleFinancing>(`/api/v1/financing/${financingId}/payment-amount`, {
+		return apiClient.patch<VehicleFinancing>(`/financing/${financingId}/payment-amount`, {
 			paymentAmount
 		});
 	},
 
 	async payOffFinancing(financingId: string): Promise<VehicleFinancing> {
-		return apiClient.put<VehicleFinancing>(`/api/v1/financing/${financingId}/payoff`);
+		return apiClient.put<VehicleFinancing>(`/financing/${financingId}/payoff`);
 	},
 
 	getPhotos(
@@ -98,7 +94,7 @@ export const vehicleApi = {
 	},
 
 	async getAllVehiclePhotos(): Promise<Record<string, Photo[]>> {
-		return apiClient.get<Record<string, Photo[]>>('/api/v1/photos?entityType=vehicle');
+		return apiClient.get<Record<string, Photo[]>>('/photos?entityType=vehicle');
 	},
 
 	uploadPhoto(vehicleId: string, file: File): Promise<Photo> {
@@ -106,7 +102,7 @@ export const vehicleApi = {
 	},
 
 	async setCoverPhoto(vehicleId: string, photoId: string): Promise<Photo> {
-		return apiClient.put<Photo>(`/api/v1/vehicles/${vehicleId}/photos/${photoId}/cover`);
+		return apiClient.put<Photo>(`/vehicles/${vehicleId}/photos/${photoId}/cover`);
 	},
 
 	deletePhoto(vehicleId: string, photoId: string): Promise<void> {

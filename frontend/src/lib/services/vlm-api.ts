@@ -13,10 +13,7 @@ export const vlmApi = {
 	async parseReceipt(image: File): Promise<ReceiptDraft> {
 		const formData = new FormData();
 		formData.append('image', image);
-		const { draft } = await apiClient.post<{ draft: ReceiptDraft }>(
-			'/api/v1/receipts/parse',
-			formData
-		);
+		const { draft } = await apiClient.post<{ draft: ReceiptDraft }>('/receipts/parse', formData);
 		return draft;
 	}
 };

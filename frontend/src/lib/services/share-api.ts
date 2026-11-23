@@ -9,30 +9,30 @@ import { apiClient } from './api-client';
 
 export const shareApi = {
 	async invite(data: CreateShareRequest): Promise<VehicleShare> {
-		return apiClient.post<VehicleShare>('/api/v1/shares', data);
+		return apiClient.post<VehicleShare>('/shares', data);
 	},
 
 	async listGranted(): Promise<GrantedShare[]> {
-		return apiClient.get<GrantedShare[]>('/api/v1/shares/granted');
+		return apiClient.get<GrantedShare[]>('/shares/granted');
 	},
 
 	async changeLevel(id: string, level: ShareLevel): Promise<VehicleShare> {
-		return apiClient.put<VehicleShare>(`/api/v1/shares/${id}`, { level });
+		return apiClient.put<VehicleShare>(`/shares/${id}`, { level });
 	},
 
 	async revoke(id: string): Promise<void> {
-		await apiClient.delete(`/api/v1/shares/${id}`);
+		await apiClient.delete(`/shares/${id}`);
 	},
 
 	async listReceived(): Promise<ReceivedShare[]> {
-		return apiClient.get<ReceivedShare[]>('/api/v1/shares/received');
+		return apiClient.get<ReceivedShare[]>('/shares/received');
 	},
 
 	async accept(id: string): Promise<VehicleShare> {
-		return apiClient.post<VehicleShare>(`/api/v1/shares/${id}/accept`);
+		return apiClient.post<VehicleShare>(`/shares/${id}/accept`);
 	},
 
 	async decline(id: string): Promise<void> {
-		await apiClient.post(`/api/v1/shares/${id}/decline`);
+		await apiClient.post(`/shares/${id}/decline`);
 	}
 };

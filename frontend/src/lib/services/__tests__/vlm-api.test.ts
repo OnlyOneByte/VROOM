@@ -28,7 +28,7 @@ describe('vlmApi.parseReceipt', () => {
 		const call = post.mock.calls[0] ?? [];
 		const url = call[0];
 		const body = call[1];
-		expect(url).toBe('/api/v1/receipts/parse');
+		expect(url).toBe('/receipts/parse');
 		expect(body).toBeInstanceOf(FormData);
 		expect((body as FormData).get('image')).toBeInstanceOf(File);
 		expect(((body as FormData).get('image') as File).name).toBe('receipt.jpg');

@@ -15,25 +15,25 @@ interface SyncResponse {
 
 export const settingsApi = {
 	async getSettings(): Promise<UserSettings> {
-		return apiClient.get<UserSettings>('/api/v1/settings');
+		return apiClient.get<UserSettings>('/settings');
 	},
 
 	async updateSettings(updates: Partial<UserSettings>): Promise<UserSettings> {
-		return apiClient.put<UserSettings>('/api/v1/settings', updates);
+		return apiClient.put<UserSettings>('/settings', updates);
 	},
 
 	async executeSync(syncTypes: 'backup'[], force = false): Promise<SyncResponse> {
-		return apiClient.post<SyncResponse>('/api/v1/sync', { syncTypes, force });
+		return apiClient.post<SyncResponse>('/sync', { syncTypes, force });
 	},
 
 	async listBackupsFromProvider(providerId: string): Promise<BackupFileInfo[]> {
 		return apiClient.get<BackupFileInfo[]>(
-			`/api/v1/sync/backups/providers?providerId=${encodeURIComponent(providerId)}`
+			`/sync/backups/providers?providerId=${encodeURIComponent(providerId)}`
 		);
 	},
 
 	async listAllBackups(): Promise<ProviderBackupList[]> {
-		return apiClient.get<ProviderBackupList[]>('/api/v1/sync/backups/providers');
+		return apiClient.get<ProviderBackupList[]>('/sync/backups/providers');
 	},
 
 	async restoreFromProvider(opts: {
@@ -53,17 +53,17 @@ export const settingsApi = {
 					}
 				: { providerId: opts.providerId, sourceType: 'sheets', mode: opts.mode };
 
-		return apiClient.post<RestoreResult>('/api/v1/sync/restore/from-provider', body, {
+		return apiClient.post<RestoreResult>('/sync/restore/from-provider', body, {
 			headers: { 'Idempotency-Key': opts.idempotencyKey }
 		});
 	},
 
 	async getRestoreProviders(): Promise<RestoreProviderInfo[]> {
-		return apiClient.get<RestoreProviderInfo[]>('/api/v1/sync/restore/providers');
+		return apiClient.get<RestoreProviderInfo[]>('/sync/restore/providers');
 	},
 
 	async downloadBackup(): Promise<Response> {
-		return apiClient.raw('/api/v1/sync/backups/download');
+		return apiClient.raw('/sync/backups/download');
 	},
 
 	async uploadBackup(
@@ -75,7 +75,7 @@ export const settingsApi = {
 		formData.append('file', file);
 		formData.append('mode', mode);
 
-		return apiClient.post<RestoreResult>('/api/v1/sync/restore/from-backup', formData, {
+		return apiClient.post<RestoreResult>('/sync/restore/from-backup', formData, {
 			headers: { 'Idempotency-Key': idempotencyKey }
 		});
 	}

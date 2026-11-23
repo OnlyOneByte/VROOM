@@ -21,8 +21,8 @@ describe('providerApi', () => {
 		await providerApi.getProviders();
 		await providerApi.getProviders('photos & docs');
 		expect(get.mock.calls.map(c => c[0])).toEqual([
-			'/api/v1/providers',
-			'/api/v1/providers?domain=photos%20%26%20docs'
+			'/providers',
+			'/providers?domain=photos%20%26%20docs'
 		]);
 	});
 
@@ -36,7 +36,7 @@ describe('providerApi', () => {
 		};
 		post.mockResolvedValueOnce({ id: 'pr1' });
 		await providerApi.createProvider(data);
-		expect(post).toHaveBeenCalledWith('/api/v1/providers', data);
+		expect(post).toHaveBeenCalledWith('/providers', data);
 	});
 
 	test('updateProvider PUTs and deleteProvider DELETEs the provider path', async () => {
@@ -44,14 +44,14 @@ describe('providerApi', () => {
 		del.mockResolvedValueOnce({ deleted: true });
 		await providerApi.updateProvider('pr1', { displayName: 'Renamed' });
 		await expect(providerApi.deleteProvider('pr1')).resolves.toBeUndefined();
-		expect(put).toHaveBeenCalledWith('/api/v1/providers/pr1', { displayName: 'Renamed' });
-		expect(del).toHaveBeenCalledWith('/api/v1/providers/pr1');
+		expect(put).toHaveBeenCalledWith('/providers/pr1', { displayName: 'Renamed' });
+		expect(del).toHaveBeenCalledWith('/providers/pr1');
 	});
 
 	test('backfillProvider POSTs with no body and returns the created count', async () => {
 		post.mockResolvedValueOnce({ created: 7 });
 		await expect(providerApi.backfillProvider('pr1')).resolves.toEqual({ created: 7 });
-		expect(post).toHaveBeenCalledWith('/api/v1/providers/pr1/backfill');
+		expect(post).toHaveBeenCalledWith('/providers/pr1/backfill');
 	});
 
 	test('getSyncStatus returns per-entity counts', async () => {
@@ -59,7 +59,7 @@ describe('providerApi', () => {
 		await expect(providerApi.getSyncStatus('pr1')).resolves.toEqual({
 			photo: { total: 3, synced: 2, failed: 1 }
 		});
-		expect(get).toHaveBeenCalledWith('/api/v1/providers/pr1/sync-status');
+		expect(get).toHaveBeenCalledWith('/providers/pr1/sync-status');
 	});
 
 	test('a failed backfill propagates the API error', async () => {

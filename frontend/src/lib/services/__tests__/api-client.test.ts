@@ -33,27 +33,27 @@ afterEach(() => {
 });
 
 describe('getApiBaseUrl', () => {
-	test('returns empty string when PUBLIC_API_URL is unset (same-origin)', () => {
-		expect(getApiBaseUrl()).toBe('');
+	test('is the versioned API path when PUBLIC_API_URL is unset (same-origin)', () => {
+		expect(getApiBaseUrl()).toBe('/api/v1');
 	});
 });
 
 describe('request envelope unwrapping', () => {
 	test('GET unwraps the { success, data } envelope to data', async () => {
 		mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: { id: 'v1' } }));
-		const result = await apiClient.get<{ id: string }>('/api/v1/vehicles/v1');
+		const result = await apiClient.get<{ id: string }>('/vehicles/v1');
 		expect(result).toEqual({ id: 'v1' });
 	});
 
 	test('a response WITHOUT a data field is returned as-is (no over-unwrap)', async () => {
 		mockFetch.mockResolvedValueOnce(jsonResponse({ count: 3, monthlyTotal: 10 }));
-		const result = await apiClient.get('/api/v1/reminders/recurring-cost');
+		const result = await apiClient.get('/reminders/recurring-cost');
 		expect(result).toEqual({ count: 3, monthlyTotal: 10 });
 	});
 
 	test('a falsy-but-present data value (data: 0) still unwraps (uses !== undefined, not truthiness)', async () => {
 		mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: 0 }));
-		const result = await apiClient.get<number>('/api/v1/some-count');
+		const result = await apiClient.get<number>('/some-count');
 		expect(result).toBe(0);
 	});
 
@@ -65,7 +65,7 @@ describe('request envelope unwrapping', () => {
 			json: () => Promise.reject(new Error('no body'))
 		};
 		mockFetch.mockResolvedValueOnce(raw as unknown as Response);
-		const result = await apiClient.delete('/api/v1/expenses/e1');
+		const result = await apiClient.delete('/expenses/e1');
 		expect(result).toBe(raw);
 	});
 });
@@ -73,7 +73,7 @@ describe('request envelope unwrapping', () => {
 describe('request method + header behavior', () => {
 	test('GET sends method GET, credentials include, and no Content-Type (no body)', async () => {
 		mockFetch.mockResolvedValueOnce(jsonResponse({ data: [] }));
-		await apiClient.get('/api/v1/vehicles');
+		await apiClient.get('/vehicles');
 		const [url, init] = mockFetch.mock.calls[0] ?? [];
 		expect(url).toBe('/api/v1/vehicles');
 		expect(init?.method).toBe('GET');
@@ -83,7 +83,7 @@ describe('request method + header behavior', () => {
 
 	test('POST with a body sets Content-Type application/json and JSON-stringifies it', async () => {
 		mockFetch.mockResolvedValueOnce(jsonResponse({ data: { id: 'e1' } }));
-		await apiClient.post('/api/v1/expenses', { amount: 42 });
+		await apiClient.post('/expenses', { amount: 42 });
 		const [, init] = mockFetch.mock.calls[0] ?? [];
 		expect(init?.method).toBe('POST');
 		expect((init?.headers as Record<string, string>)['Content-Type']).toBe('application/json');
@@ -94,7 +94,7 @@ describe('request method + header behavior', () => {
 		mockFetch.mockResolvedValueOnce(jsonResponse({ data: { id: 'p1' } }));
 		const fd = new FormData();
 		fd.append('photo', 'x');
-		await apiClient.post('/api/v1/photos', fd, {});
+		await apiClient.post('/photos', fd, {});
 		const [, init] = mockFetch.mock.calls[0] ?? [];
 		expect((init?.headers as Record<string, string>)['Content-Type']).toBeUndefined();
 		expect(init?.body).toBe(fd);
@@ -109,7 +109,7 @@ describe('request error handling', () => {
 				{ ok: false, status: 404 }
 			)
 		);
-		const err = await captureError(apiClient.get('/api/v1/vehicles/x'));
+		const err = await captureError(apiClient.get('/vehicles/x'));
 		expect(err).toBeInstanceOf(ApiError);
 		expect(err.message).toBe('Vehicle not found');
 		expect(err.statusCode).toBe(404);
@@ -120,7 +120,7 @@ describe('request error handling', () => {
 		mockFetch.mockResolvedValueOnce(
 			jsonResponse({ message: 'top-level message' }, { ok: false, status: 400 })
 		);
-		const err = await captureError(apiClient.get('/api/v1/x'));
+		const err = await captureError(apiClient.get('/x'));
 		expect(err.message).toBe('top-level message');
 	});
 
@@ -131,7 +131,7 @@ describe('request error handling', () => {
 				{ ok: false, status: 400 }
 			)
 		);
-		const err = await captureError(apiClient.post('/api/v1/expenses', {}));
+		const err = await captureError(apiClient.post('/expenses', {}));
 		expect(err.details).toEqual({ validationErrors: ['amount required'] });
 	});
 
@@ -143,7 +143,7 @@ describe('request error handling', () => {
 			json: () => Promise.reject(new Error('not json'))
 		};
 		mockFetch.mockResolvedValueOnce(bad as unknown as Response);
-		const err = await captureError(apiClient.get('/api/v1/x'));
+		const err = await captureError(apiClient.get('/x'));
 		expect(err.message).toBe('Request failed with status 500');
 		expect(err.statusCode).toBe(500);
 	});
@@ -156,7 +156,7 @@ describe('getPaginated (requestFull — does NOT unwrap data)', () => {
 			pagination: { totalCount: 1, limit: 20, offset: 0, hasMore: false }
 		};
 		mockFetch.mockResolvedValueOnce(jsonResponse(envelope));
-		const result = await apiClient.getPaginated('/api/v1/expenses');
+		const result = await apiClient.getPaginated('/expenses');
 		expect(result).toEqual(envelope);
 		expect(result.pagination.totalCount).toBe(1);
 	});
@@ -165,23 +165,23 @@ describe('getPaginated (requestFull — does NOT unwrap data)', () => {
 		mockFetch.mockResolvedValueOnce(
 			jsonResponse({ error: { message: 'Boom', code: 'X' } }, { ok: false, status: 500 })
 		);
-		await expect(apiClient.getPaginated('/api/v1/expenses')).rejects.toThrow(ApiError);
+		await expect(apiClient.getPaginated('/expenses')).rejects.toThrow(ApiError);
 	});
 });
 
 describe('withPagination', () => {
 	test('appends limit + offset as query params', () => {
-		expect(withPagination('/api/v1/expenses', { limit: 20, offset: 40 })).toBe(
-			'/api/v1/expenses?limit=20&offset=40'
+		expect(withPagination('/expenses', { limit: 20, offset: 40 })).toBe(
+			'/expenses?limit=20&offset=40'
 		);
 	});
 
 	test('includes offset=0 (it is defined) but omits undefined params', () => {
-		expect(withPagination('/api/v1/expenses', { offset: 0 })).toBe('/api/v1/expenses?offset=0');
+		expect(withPagination('/expenses', { offset: 0 })).toBe('/expenses?offset=0');
 	});
 
 	test('returns the bare url when no params are given', () => {
-		expect(withPagination('/api/v1/expenses')).toBe('/api/v1/expenses');
+		expect(withPagination('/expenses')).toBe('/expenses');
 	});
 });
 
@@ -190,7 +190,7 @@ describe('apiClient.raw', () => {
 		const resp = jsonResponse({ ok: true });
 		mockFetch.mockResolvedValueOnce(resp);
 
-		const out = await apiClient.raw('/api/v1/backup/export');
+		const out = await apiClient.raw('/backup/export');
 
 		expect(out).toBe(resp);
 		expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -208,7 +208,7 @@ describe('apiClient.raw', () => {
 
 	test('forwards the method + headers options', async () => {
 		mockFetch.mockResolvedValueOnce(jsonResponse({}));
-		await apiClient.raw('/api/v1/backup/export', {
+		await apiClient.raw('/backup/export', {
 			method: 'POST',
 			headers: { 'X-Test': '1' }
 		});
@@ -225,7 +225,7 @@ describe('apiClient.raw', () => {
 				{ ok: false, status: 404 }
 			)
 		);
-		const err = await captureError(apiClient.raw('/api/v1/sync/backups/download'));
+		const err = await captureError(apiClient.raw('/sync/backups/download'));
 		expect(err).toBeInstanceOf(ApiError);
 		expect(err.statusCode).toBe(404);
 		expect(err.message).toBe('Backup not found');
@@ -236,7 +236,7 @@ describe('network failures', () => {
 	test('a fetch that never gets a response rejects with NetworkError, keeping the cause', async () => {
 		const cause = new TypeError('Load failed');
 		mockFetch.mockRejectedValueOnce(cause);
-		const err = await captureError(apiClient.get('/api/v1/vehicles'));
+		const err = await captureError(apiClient.get('/vehicles'));
 		expect(err).toBeInstanceOf(NetworkError);
 		expect(err).toBeInstanceOf(TypeError);
 		expect((err as Error).cause).toBe(cause);
@@ -247,9 +247,7 @@ describe('network failures', () => {
 		controller.abort();
 		const abortError = new DOMException('The operation was aborted.', 'AbortError');
 		mockFetch.mockRejectedValueOnce(abortError);
-		const err = await captureError(
-			apiClient.get('/api/v1/vehicles', { signal: controller.signal })
-		);
+		const err = await captureError(apiClient.get('/vehicles', { signal: controller.signal }));
 		expect(err).toBe(abortError);
 	});
 });

@@ -39,7 +39,7 @@ describe('tripApi.list (paginated + filter-drop)', () => {
 	test('no filters → bare /api/v1/trips, getPaginated passthrough', async () => {
 		getPaginated.mockResolvedValueOnce({ data: [TRIP], pagination: { totalCount: 1 } });
 		const res = await tripApi.list();
-		expect(getPaginated).toHaveBeenCalledWith('/api/v1/trips');
+		expect(getPaginated).toHaveBeenCalledWith('/trips');
 		expect(res.data).toEqual([TRIP]);
 	});
 
@@ -75,7 +75,7 @@ describe('tripApi.getSummary', () => {
 	test('no params → bare /api/v1/trips/summary', async () => {
 		get.mockResolvedValueOnce(SUMMARY);
 		const res = await tripApi.getSummary();
-		expect(get).toHaveBeenCalledWith('/api/v1/trips/summary');
+		expect(get).toHaveBeenCalledWith('/trips/summary');
 		expect(res).toEqual(SUMMARY);
 	});
 
@@ -83,7 +83,7 @@ describe('tripApi.getSummary', () => {
 		get.mockResolvedValueOnce(SUMMARY);
 		await tripApi.getSummary({ vehicleId: 'v1', rate: 0.67 });
 		const url = get.mock.calls[0]?.[0] as string;
-		expect(url).toContain('/api/v1/trips/summary?');
+		expect(url).toContain('/trips/summary?');
 		expect(url).toContain('vehicleId=v1');
 		expect(url).toContain('rate=0.67');
 	});
@@ -100,14 +100,14 @@ describe('tripApi CRUD wiring', () => {
 	test('getByVehicle hits the vehicle sub-path', async () => {
 		get.mockResolvedValueOnce([TRIP]);
 		const res = await tripApi.getByVehicle('v1');
-		expect(get).toHaveBeenCalledWith('/api/v1/trips/vehicle/v1');
+		expect(get).toHaveBeenCalledWith('/trips/vehicle/v1');
 		expect(res).toEqual([TRIP]);
 	});
 
 	test('getById interpolates the id', async () => {
 		get.mockResolvedValueOnce(TRIP);
 		await tripApi.getById('t1');
-		expect(get).toHaveBeenCalledWith('/api/v1/trips/t1');
+		expect(get).toHaveBeenCalledWith('/trips/t1');
 	});
 
 	test('create POSTs the body to /api/v1/trips', async () => {
@@ -120,26 +120,26 @@ describe('tripApi CRUD wiring', () => {
 			tripDate: '2024-06-20T12:00:00.000Z'
 		};
 		await tripApi.create(body);
-		expect(post).toHaveBeenCalledWith('/api/v1/trips', { ...body, timeZone: ZONE });
+		expect(post).toHaveBeenCalledWith('/trips', { ...body, timeZone: ZONE });
 	});
 
 	test('update PUTs to /api/v1/trips/:id', async () => {
 		put.mockResolvedValueOnce(TRIP);
 		await tripApi.update('t1', { note: 'updated' });
-		expect(put).toHaveBeenCalledWith('/api/v1/trips/t1', { note: 'updated', timeZone: ZONE });
+		expect(put).toHaveBeenCalledWith('/trips/t1', { note: 'updated', timeZone: ZONE });
 	});
 
 	test('delete DELETEs /api/v1/trips/:id', async () => {
 		del.mockResolvedValueOnce(undefined);
 		await tripApi.delete('t1');
-		expect(del).toHaveBeenCalledWith('/api/v1/trips/t1');
+		expect(del).toHaveBeenCalledWith('/trips/t1');
 	});
 
 	test('delete without keeping the odometer sends the user time zone for the same-day match', async () => {
 		del.mockResolvedValueOnce(undefined);
 		await tripApi.delete('t1', false);
 		expect(del).toHaveBeenCalledWith(
-			`/api/v1/trips/t1?keepOdometer=false&timeZone=${encodeURIComponent(ZONE)}`
+			`/trips/t1?keepOdometer=false&timeZone=${encodeURIComponent(ZONE)}`
 		);
 	});
 });

@@ -17,10 +17,7 @@ describe('deleting a storage provider that holds the only copy of photos', () =>
 		del.mockResolvedValue(undefined);
 		await providerApi.deleteProvider('pr1');
 		await providerApi.deleteProvider('pr1', { force: true });
-		expect(del.mock.calls.map(c => c[0])).toEqual([
-			'/api/v1/providers/pr1',
-			'/api/v1/providers/pr1?force=true'
-		]);
+		expect(del.mock.calls.map(c => c[0])).toEqual(['/providers/pr1', '/providers/pr1?force=true']);
 	});
 
 	test('photosOnlyOnProvider reads the count from the 409 the server sends', () => {

@@ -9,7 +9,7 @@ const patch = vi.fn();
 const getPaginated = vi.fn();
 vi.mock('../api-client', () => ({
 	apiClient: { get, post, put, patch, delete: del, getPaginated },
-	getApiBaseUrl: () => 'https://api.example.com',
+	getApiBaseUrl: () => 'https://api.example.com/api/v1',
 	withPagination: (url: string) => url
 }));
 
@@ -40,7 +40,7 @@ describe('vehicleApi.getFinancing', () => {
 	test('returns null when the backend reports no financing (data: null)', async () => {
 		get.mockResolvedValueOnce(null);
 		await expect(vehicleApi.getFinancing('v1')).resolves.toBeNull();
-		expect(get).toHaveBeenCalledWith(`/api/v1/financing/vehicles/v1/financing?timeZone=${ZONE}`);
+		expect(get).toHaveBeenCalledWith(`/financing/vehicles/v1/financing?timeZone=${ZONE}`);
 	});
 
 	test.each([401, 403, 404, 500])(
@@ -60,11 +60,11 @@ describe('vehicleApi photo wiring', () => {
 		await vehicleApi.uploadPhoto('v1', file);
 		await vehicleApi.deletePhoto('v1', 'p1');
 
-		expect(getPaginated).toHaveBeenCalledWith('/api/v1/vehicles/v1/photos');
+		expect(getPaginated).toHaveBeenCalledWith('/vehicles/v1/photos');
 		const [uploadUrl, body] = post.mock.calls[0] ?? [];
-		expect(uploadUrl).toBe('/api/v1/vehicles/v1/photos');
+		expect(uploadUrl).toBe('/vehicles/v1/photos');
 		expect((body as FormData).get('photo')).toBeInstanceOf(File);
-		expect(del).toHaveBeenCalledWith('/api/v1/vehicles/v1/photos/p1');
+		expect(del).toHaveBeenCalledWith('/vehicles/v1/photos/p1');
 		expect(vehicleApi.getPhotoThumbnailUrl('v1', 'p1')).toBe(
 			'https://api.example.com/api/v1/vehicles/v1/photos/p1/thumbnail'
 		);
@@ -72,7 +72,7 @@ describe('vehicleApi photo wiring', () => {
 
 	test('deleteVehicle DELETEs the vehicle path', async () => {
 		await vehicleApi.deleteVehicle('v9');
-		expect(del).toHaveBeenCalledWith('/api/v1/vehicles/v9');
+		expect(del).toHaveBeenCalledWith('/vehicles/v9');
 	});
 });
 
@@ -80,7 +80,7 @@ describe('vehicleApi request shapes', () => {
 	test('getVehicle GETs the vehicle path', async () => {
 		get.mockResolvedValueOnce({ id: 'v1' });
 		await expect(vehicleApi.getVehicle('v1')).resolves.toEqual({ id: 'v1' });
-		expect(get).toHaveBeenCalledWith(`/api/v1/vehicles/v1?timeZone=${ZONE}`);
+		expect(get).toHaveBeenCalledWith(`/vehicles/v1?timeZone=${ZONE}`);
 	});
 
 	test('getVehicles only asks for shared vehicles when requested', async () => {
@@ -89,9 +89,9 @@ describe('vehicleApi request shapes', () => {
 		await vehicleApi.getVehicles({ includeShared: false });
 		await vehicleApi.getVehicles({ includeShared: true });
 		expect(get.mock.calls.map(c => c[0])).toEqual([
-			`/api/v1/vehicles?timeZone=${ZONE}`,
-			`/api/v1/vehicles?timeZone=${ZONE}`,
-			`/api/v1/vehicles?include=shared&timeZone=${ZONE}`
+			`/vehicles?timeZone=${ZONE}`,
+			`/vehicles?timeZone=${ZONE}`,
+			`/vehicles?include=shared&timeZone=${ZONE}`
 		]);
 	});
 
@@ -100,20 +100,20 @@ describe('vehicleApi request shapes', () => {
 		put.mockResolvedValueOnce({ id: 'v2' });
 		await vehicleApi.createVehicle({ make: 'Honda' });
 		await vehicleApi.updateVehicle('v2', { nickname: 'Daily' });
-		expect(post).toHaveBeenCalledWith('/api/v1/vehicles', { make: 'Honda' });
-		expect(put).toHaveBeenCalledWith('/api/v1/vehicles/v2', { nickname: 'Daily' });
+		expect(post).toHaveBeenCalledWith('/vehicles', { make: 'Honda' });
+		expect(put).toHaveBeenCalledWith('/vehicles/v2', { nickname: 'Daily' });
 	});
 
 	test('getVehicleStats passes the period as a query parameter', async () => {
 		get.mockResolvedValueOnce({});
 		await vehicleApi.getVehicleStats('v1', '90d');
-		expect(get).toHaveBeenCalledWith('/api/v1/vehicles/v1/stats?period=90d');
+		expect(get).toHaveBeenCalledWith('/vehicles/v1/stats?period=90d');
 	});
 
 	test('createFinancing POSTs to the vehicle financing path', async () => {
 		post.mockResolvedValueOnce({ id: 'f1' });
 		await vehicleApi.createFinancing('v1', { financingType: 'loan', originalAmount: 10_000 });
-		expect(post).toHaveBeenCalledWith('/api/v1/financing/vehicles/v1/financing', {
+		expect(post).toHaveBeenCalledWith('/financing/vehicles/v1/financing', {
 			financingType: 'loan',
 			originalAmount: 10_000
 		});
@@ -122,7 +122,7 @@ describe('vehicleApi request shapes', () => {
 	test('updatePaymentAmount PATCHes only the new amount', async () => {
 		patch.mockResolvedValueOnce({ id: 'f1', paymentAmount: 410 });
 		await vehicleApi.updatePaymentAmount('f1', 410);
-		expect(patch).toHaveBeenCalledWith('/api/v1/financing/f1/payment-amount', {
+		expect(patch).toHaveBeenCalledWith('/financing/f1/payment-amount', {
 			paymentAmount: 410
 		});
 	});
@@ -132,8 +132,8 @@ describe('vehicleApi request shapes', () => {
 		put.mockResolvedValueOnce({ id: 'p1' });
 		await expect(vehicleApi.getAllVehiclePhotos()).resolves.toEqual({ v1: [] });
 		await vehicleApi.setCoverPhoto('v1', 'p1');
-		expect(get).toHaveBeenCalledWith('/api/v1/photos?entityType=vehicle');
-		expect(put).toHaveBeenCalledWith('/api/v1/vehicles/v1/photos/p1/cover');
+		expect(get).toHaveBeenCalledWith('/photos?entityType=vehicle');
+		expect(put).toHaveBeenCalledWith('/vehicles/v1/photos/p1/cover');
 	});
 
 	test('a failed update propagates the API error', async () => {

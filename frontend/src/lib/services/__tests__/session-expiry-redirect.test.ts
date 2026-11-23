@@ -47,7 +47,7 @@ describe('api client — global session expiry on 401', () => {
 	});
 
 	it('clears the session, warns the user, and redirects on a 401 from an app request', async () => {
-		await expect(apiClient.get('/api/v1/expenses')).rejects.toThrow();
+		await expect(apiClient.get('/expenses')).rejects.toThrow();
 
 		expect(authStore.isAuthenticated).toBe(false);
 		expect(expiryWarningShown()).toBe(true);
@@ -55,7 +55,7 @@ describe('api client — global session expiry on 401', () => {
 	});
 
 	it('handles a 401 on a raw download the same way', async () => {
-		await expect(apiClient.raw('/api/v1/sync/backups/download')).rejects.toThrow();
+		await expect(apiClient.raw('/sync/backups/download')).rejects.toThrow();
 
 		expect(authStore.isAuthenticated).toBe(false);
 		expect(expiryWarningShown()).toBe(true);
@@ -63,16 +63,17 @@ describe('api client — global session expiry on 401', () => {
 	});
 
 	it('leaves the startup auth probe to report its own 401', async () => {
-		await expect(apiClient.get('/api/v1/auth/me')).rejects.toThrow();
+		await expect(apiClient.get('/auth/me')).rejects.toThrow();
 
+		expect(mockFetch.mock.calls[0]?.[0]).toBe('/api/v1/auth/me');
 		expect(authStore.isAuthenticated).toBe(true);
 		expect(expiryWarningShown()).toBe(false);
 		expect(goto).not.toHaveBeenCalled();
 	});
 
 	it('reacts once when several requests all see the same expiry', async () => {
-		await expect(apiClient.get('/api/v1/expenses')).rejects.toThrow();
-		await expect(apiClient.get('/api/v1/vehicles')).rejects.toThrow();
+		await expect(apiClient.get('/expenses')).rejects.toThrow();
+		await expect(apiClient.get('/vehicles')).rejects.toThrow();
 
 		expect(goto).toHaveBeenCalledTimes(1);
 		expect(
@@ -83,7 +84,7 @@ describe('api client — global session expiry on 401', () => {
 	it('keeps the user signed in when a storage provider rejects its credentials', async () => {
 		mockFetch.mockResolvedValue(unauthorized('AUTH_INVALID'));
 
-		const error = await apiClient.get('/api/v1/providers/p1/photos').catch((e: unknown) => e);
+		const error = await apiClient.get('/providers/p1/photos').catch((e: unknown) => e);
 		handleErrorWithNotification(error, "Couldn't load the photos");
 
 		expect(authStore.isAuthenticated).toBe(true);
@@ -96,7 +97,7 @@ describe('api client — global session expiry on 401', () => {
 
 	it('shows only the expiry notice when the failed requests also report their errors', async () => {
 		await Promise.all(
-			['/api/v1/expenses', '/api/v1/vehicles'].map(url =>
+			['/expenses', '/vehicles'].map(url =>
 				apiClient.get(url).catch((error: unknown) => {
 					handleErrorWithNotification(error, "Couldn't load the page");
 				})
@@ -108,7 +109,7 @@ describe('api client — global session expiry on 401', () => {
 	});
 
 	it('shows error toasts again once the expiry has been handled', async () => {
-		await expect(apiClient.get('/api/v1/expenses')).rejects.toThrow();
+		await expect(apiClient.get('/expenses')).rejects.toThrow();
 		vi.advanceTimersByTime(1000);
 
 		appStore.showError("Couldn't save the trip.");
@@ -117,7 +118,7 @@ describe('api client — global session expiry on 401', () => {
 	});
 
 	it('lets an urgent error through while the expiry mutes the others', async () => {
-		await expect(apiClient.get('/api/v1/expenses')).rejects.toThrow();
+		await expect(apiClient.get('/expenses')).rejects.toThrow();
 
 		appStore.addNotification({ type: 'error', message: 'cascade' });
 		appStore.addNotification({
@@ -134,7 +135,7 @@ describe('api client — global session expiry on 401', () => {
 	it('says the changes were not kept when a save was in flight', async () => {
 		const stop = trackPendingSave(() => true);
 		try {
-			await expect(apiClient.put('/api/v1/vehicles/v1', {})).rejects.toThrow();
+			await expect(apiClient.put('/vehicles/v1', {})).rejects.toThrow();
 		} finally {
 			stop();
 		}

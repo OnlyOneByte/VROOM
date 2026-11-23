@@ -24,7 +24,7 @@ describe('assistantApi.sendMessage', () => {
 
 		expect(post).toHaveBeenCalledTimes(1);
 		const call = post.mock.calls[0] ?? [];
-		expect(call[0]).toBe('/api/v1/assistant/chat');
+		expect(call[0]).toBe('/assistant/chat');
 		expect(call[1]).toEqual({
 			message: 'How much on fuel?',
 			history: [

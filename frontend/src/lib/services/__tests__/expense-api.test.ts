@@ -39,7 +39,7 @@ describe('getExpense (backend→frontend transform)', () => {
 	test('maps expenseAmount→amount and GETs the id path', async () => {
 		get.mockResolvedValueOnce(backendExpense({ expenseAmount: 99.9 }));
 		const result = await expenseApi.getExpense('e1');
-		expect(get).toHaveBeenCalledWith('/api/v1/expenses/e1');
+		expect(get).toHaveBeenCalledWith('/expenses/e1');
 		expect(result.amount).toBe(99.9);
 		expect(result.id).toBe('e1');
 	});
@@ -69,7 +69,7 @@ describe('list methods (getPaginated passthrough + per-row transform)', () => {
 			pagination: { totalCount: 2, limit: 20, offset: 0, hasMore: false }
 		});
 		const result = await expenseApi.getAllExpenses({ limit: 20 });
-		expect(getPaginated).toHaveBeenCalledWith('/api/v1/expenses?limit=20');
+		expect(getPaginated).toHaveBeenCalledWith('/expenses?limit=20');
 		expect(result.data.map(e => e.amount)).toEqual([10, 20]);
 		expect(result.pagination.totalCount).toBe(2);
 	});
@@ -102,7 +102,7 @@ describe('createExpense / updateExpense (frontend→backend transform + isEdit)'
 		post.mockResolvedValueOnce(backendExpense({ expenseAmount: 50 }));
 		await expenseApi.createExpense({ vehicleId: 'v1', category: 'fuel', amount: 50 });
 		const [url, body] = post.mock.calls[0] ?? [];
-		expect(url).toBe('/api/v1/expenses');
+		expect(url).toBe('/expenses');
 		expect((body as { expenseAmount: number }).expenseAmount).toBe(50);
 	});
 
@@ -127,7 +127,7 @@ describe('createExpense / updateExpense (frontend→backend transform + isEdit)'
 			description: ''
 		});
 		const [url, body] = put.mock.calls[0] ?? [];
-		expect(url).toBe('/api/v1/expenses/e1');
+		expect(url).toBe('/expenses/e1');
 		expect((body as { description: string | null }).description).toBeNull();
 	});
 
@@ -153,7 +153,7 @@ describe('downloadExpensesCsv (blob → anchor download)', () => {
 	test('no filters → bare export path', async () => {
 		raw.mockRejectedValueOnce(new Error('stop'));
 		await expect(expenseApi.downloadExpensesCsv()).rejects.toThrow('stop');
-		expect(raw).toHaveBeenCalledWith('/api/v1/expenses/export');
+		expect(raw).toHaveBeenCalledWith('/expenses/export');
 	});
 
 	test('on success: fetches the export URL with filters, blobs, and clicks a download anchor', async () => {
@@ -177,7 +177,7 @@ describe('downloadExpensesCsv (blob → anchor download)', () => {
 		await expenseApi.downloadExpensesCsv({ vehicleId: 'v1', tags: ['a', 'b'] });
 
 		const exportUrl = raw.mock.calls[0]?.[0] as string;
-		expect(exportUrl).toContain('/api/v1/expenses/export');
+		expect(exportUrl).toContain('/expenses/export');
 		expect(exportUrl).toContain('vehicleId=v1');
 		expect(exportUrl).toContain('tags=a%2Cb');
 		expect(click).toHaveBeenCalledTimes(1);
@@ -189,7 +189,7 @@ describe('split + delete endpoint wiring', () => {
 	test('deleteExpense DELETEs the id path', async () => {
 		del.mockResolvedValueOnce(undefined);
 		await expenseApi.deleteExpense('e1');
-		expect(del).toHaveBeenCalledWith('/api/v1/expenses/e1');
+		expect(del).toHaveBeenCalledWith('/expenses/e1');
 	});
 
 	test('createSplitExpense POSTs to the split endpoint with the config', async () => {
@@ -206,14 +206,14 @@ describe('split + delete endpoint wiring', () => {
 			totalAmount: 100
 		});
 		const [url, body] = post.mock.calls[0] ?? [];
-		expect(url).toBe('/api/v1/expenses/split');
+		expect(url).toBe('/expenses/split');
 		expect((body as { totalAmount: number }).totalAmount).toBe(100);
 	});
 
 	test('deleteSplitExpense DELETEs the split group path', async () => {
 		del.mockResolvedValueOnce(undefined);
 		await expenseApi.deleteSplitExpense('g1');
-		expect(del).toHaveBeenCalledWith('/api/v1/expenses/split/g1');
+		expect(del).toHaveBeenCalledWith('/expenses/split/g1');
 	});
 });
 
@@ -221,7 +221,7 @@ describe('expenseApi query and photo wiring', () => {
 	test('detectImportSource POSTs the file sample and returns the detected format', async () => {
 		post.mockResolvedValueOnce(null);
 		await expect(expenseApi.detectImportSource('Date,Amount\n')).resolves.toBeNull();
-		expect(post).toHaveBeenCalledWith('/api/v1/expenses/import/detect', {
+		expect(post).toHaveBeenCalledWith('/expenses/import/detect', {
 			sample: 'Date,Amount\n'
 		});
 	});
@@ -233,9 +233,9 @@ describe('expenseApi query and photo wiring', () => {
 		await expenseApi.getExpenseSummary({ vehicleId: '', period: '' });
 		await expenseApi.getExpenseSummary({ vehicleId: 'v1', period: '30d' });
 		expect(get.mock.calls.map(c => c[0])).toEqual([
-			`/api/v1/expenses/summary?timeZone=${zone}`,
-			`/api/v1/expenses/summary?timeZone=${zone}`,
-			`/api/v1/expenses/summary?vehicleId=v1&period=30d&timeZone=${zone}`
+			`/expenses/summary?timeZone=${zone}`,
+			`/expenses/summary?timeZone=${zone}`,
+			`/expenses/summary?vehicleId=v1&period=30d&timeZone=${zone}`
 		]);
 	});
 
@@ -245,9 +245,9 @@ describe('expenseApi query and photo wiring', () => {
 		await expenseApi.getVehicleStats(0);
 		await expenseApi.getVehicleStats(30);
 		expect(get.mock.calls.map(c => c[0])).toEqual([
-			'/api/v1/expenses/vehicle-stats',
-			'/api/v1/expenses/vehicle-stats',
-			'/api/v1/expenses/vehicle-stats?recentDays=30'
+			'/expenses/vehicle-stats',
+			'/expenses/vehicle-stats',
+			'/expenses/vehicle-stats?recentDays=30'
 		]);
 	});
 
@@ -256,10 +256,10 @@ describe('expenseApi query and photo wiring', () => {
 		del.mockResolvedValueOnce(undefined);
 		await expenseApi.getPhotos('expense', 'e1');
 		await expenseApi.deletePhoto('expense', 'e1', 'p1');
-		expect(getPaginated).toHaveBeenCalledWith('/api/v1/photos/expense/e1');
-		expect(del).toHaveBeenCalledWith('/api/v1/photos/expense/e1/p1');
+		expect(getPaginated).toHaveBeenCalledWith('/photos/expense/e1');
+		expect(del).toHaveBeenCalledWith('/photos/expense/e1/p1');
 		expect(expenseApi.getPhotoThumbnailUrl('expense', 'e1', 'p1')).toBe(
-			'/api/v1/photos/expense/e1/p1/thumbnail'
+			'/photos/expense/e1/p1/thumbnail'
 		);
 	});
 
@@ -269,7 +269,7 @@ describe('expenseApi query and photo wiring', () => {
 			splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
 			totalAmount: 50
 		});
-		expect(put).toHaveBeenCalledWith('/api/v1/expenses/split/g1', {
+		expect(put).toHaveBeenCalledWith('/expenses/split/g1', {
 			splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
 			totalAmount: 50
 		});
@@ -278,7 +278,7 @@ describe('expenseApi query and photo wiring', () => {
 	test('getSplitExpense GETs the group and propagates failures', async () => {
 		get.mockResolvedValueOnce({ siblings: [], groupId: 'g2', groupTotal: 0, splitMethod: 'even' });
 		await expect(expenseApi.getSplitExpense('g2')).resolves.toMatchObject({ groupId: 'g2' });
-		expect(get).toHaveBeenCalledWith('/api/v1/expenses/split/g2');
+		expect(get).toHaveBeenCalledWith('/expenses/split/g2');
 		get.mockRejectedValueOnce(new Error('gone'));
 		await expect(expenseApi.getSplitExpense('g3')).rejects.toThrow('gone');
 	});

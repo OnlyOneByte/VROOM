@@ -25,7 +25,7 @@ describe('photosImportApi.getReceiptDrafts', () => {
 		const out = await photosImportApi.getReceiptDrafts();
 
 		expect(get).toHaveBeenCalledTimes(1);
-		expect(get.mock.calls[0]?.[0]).toBe('/api/v1/photos/receipt-drafts');
+		expect(get.mock.calls[0]?.[0]).toBe('/photos/receipt-drafts');
 		expect(out).toEqual(drafts);
 	});
 
@@ -51,7 +51,7 @@ describe('photosImportApi.confirmDraft', () => {
 
 		expect(post).toHaveBeenCalledTimes(1);
 		const [url, body] = post.mock.calls[0] ?? [];
-		expect(url).toBe('/api/v1/expenses');
+		expect(url).toBe('/expenses');
 		expect(body.clientId).toBe('photos:m-1');
 		expect(body.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
 		expect(body.vehicleId).toBe('veh-1');

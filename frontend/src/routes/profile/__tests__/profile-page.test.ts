@@ -20,7 +20,7 @@ vi.mock('$app/state', () => ({ page }));
 vi.mock('#lib/services/auth-api.ts', () => ({ authApi }));
 vi.mock('#lib/services/api-client.ts', () => ({
 	apiClient: { get: vi.fn() },
-	getApiBaseUrl: () => 'https://api.example'
+	getApiBaseUrl: () => 'https://api.example/api/v1'
 }));
 vi.mock('#lib/stores/app.svelte.ts', () => ({
 	appStore: {

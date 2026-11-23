@@ -4,11 +4,13 @@ import { ApiError, isSessionExpiryError, NetworkError } from '#lib/utils/error-h
 import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { buildQueryString } from './api-utils';
 
+const API_PREFIX = '/api/v1';
+
 export function getApiBaseUrl(): string {
-	return PUBLIC_API_URL;
+	return `${PUBLIC_API_URL}${API_PREFIX}`;
 }
 
-const SELF_REPORTED_401_PATHS = ['/api/v1/auth/me', '/api/v1/auth/refresh'];
+const SELF_REPORTED_401_PATHS = [`${API_PREFIX}/auth/me`, `${API_PREFIX}/auth/refresh`];
 const SESSION_EXPIRY_WINDOW_MS = 1000;
 const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please sign in again.';
 export const UNSAVED_ON_EXPIRY_MESSAGE =

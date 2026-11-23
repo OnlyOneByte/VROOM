@@ -111,7 +111,7 @@ describe('analyticsApi.getSummary()', () => {
 		const result = await analyticsApi.getSummary(dateParams);
 
 		expect(mockGet).toHaveBeenCalledTimes(1);
-		expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('/api/v1/analytics/summary'));
+		expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('/analytics/summary'));
 		expect(result).toEqual(mockSummaryResponse);
 		expect(result.quickStats).toEqual(mockQuickStats);
 		expect(result.fuelStats).toEqual(mockFuelStats);
@@ -128,22 +128,10 @@ describe('analyticsApi.getSummary()', () => {
 		const result = await analyticsApi.getSummary(dateParams);
 
 		expect(mockGet).toHaveBeenCalledTimes(4);
-		expect(mockGet).toHaveBeenNthCalledWith(
-			1,
-			expect.stringContaining('/api/v1/analytics/summary')
-		);
-		expect(mockGet).toHaveBeenNthCalledWith(
-			2,
-			expect.stringContaining('/api/v1/analytics/quick-stats')
-		);
-		expect(mockGet).toHaveBeenNthCalledWith(
-			3,
-			expect.stringContaining('/api/v1/analytics/fuel-stats')
-		);
-		expect(mockGet).toHaveBeenNthCalledWith(
-			4,
-			expect.stringContaining('/api/v1/analytics/fuel-advanced')
-		);
+		expect(mockGet).toHaveBeenNthCalledWith(1, expect.stringContaining('/analytics/summary'));
+		expect(mockGet).toHaveBeenNthCalledWith(2, expect.stringContaining('/analytics/quick-stats'));
+		expect(mockGet).toHaveBeenNthCalledWith(3, expect.stringContaining('/analytics/fuel-stats'));
+		expect(mockGet).toHaveBeenNthCalledWith(4, expect.stringContaining('/analytics/fuel-advanced'));
 		expect(result).toEqual(mockSummaryResponse);
 	});
 
@@ -306,18 +294,18 @@ describe('analyticsApi — method→endpoint wiring', () => {
 
 	it('getFuelEfficiency: no vehicleId → bare path (no "?")', async () => {
 		await analyticsApi.getFuelEfficiency();
-		expect(calledUrl()).toBe('/api/v1/analytics/fuel-efficiency');
+		expect(calledUrl()).toBe('/analytics/fuel-efficiency');
 	});
 
 	it('getFuelEfficiency: a vehicleId is appended as a query param', async () => {
 		await analyticsApi.getFuelEfficiency({ vehicleId: 'veh-1' });
-		expect(calledUrl()).toBe('/api/v1/analytics/fuel-efficiency?vehicleId=veh-1');
+		expect(calledUrl()).toBe('/analytics/fuel-efficiency?vehicleId=veh-1');
 	});
 
 	it('getQuickStats: serializes startDate + endDate', async () => {
 		await analyticsApi.getQuickStats(dateParams);
 		const url = calledUrl();
-		expect(url).toContain('/api/v1/analytics/quick-stats?');
+		expect(url).toContain('/analytics/quick-stats?');
 		expect(url).toContain('startDate=1700000000');
 		expect(url).toContain('endDate=1710000000');
 	});
@@ -325,7 +313,7 @@ describe('analyticsApi — method→endpoint wiring', () => {
 	it('getFuelStats: omits an undefined vehicleId but keeps the dates', async () => {
 		await analyticsApi.getFuelStats(dateParams);
 		const url = calledUrl();
-		expect(url).toContain('/api/v1/analytics/fuel-stats?');
+		expect(url).toContain('/analytics/fuel-stats?');
 		expect(url).not.toContain('vehicleId');
 	});
 
@@ -336,33 +324,33 @@ describe('analyticsApi — method→endpoint wiring', () => {
 
 	it('getFuelAdvanced: hits the fuel-advanced endpoint', async () => {
 		await analyticsApi.getFuelAdvanced(dateParams);
-		expect(calledUrl()).toContain('/api/v1/analytics/fuel-advanced?');
+		expect(calledUrl()).toContain('/analytics/fuel-advanced?');
 	});
 
 	it('getCrossVehicle: hits the cross-vehicle endpoint', async () => {
 		await analyticsApi.getCrossVehicle(dateParams);
-		expect(calledUrl()).toContain('/api/v1/analytics/cross-vehicle?');
+		expect(calledUrl()).toContain('/analytics/cross-vehicle?');
 	});
 
 	it('getFinancing: only the browser time zone in the query', async () => {
 		await analyticsApi.getFinancing();
-		expect(calledUrl()).toBe(`/api/v1/analytics/financing?timeZone=${ZONE}`);
+		expect(calledUrl()).toBe(`/analytics/financing?timeZone=${ZONE}`);
 	});
 
 	it('getInsurance: only the browser time zone in the query', async () => {
 		await analyticsApi.getInsurance();
-		expect(calledUrl()).toBe(`/api/v1/analytics/insurance?timeZone=${ZONE}`);
+		expect(calledUrl()).toBe(`/analytics/insurance?timeZone=${ZONE}`);
 	});
 
 	it('getVehicleHealth: appends the vehicleId and the browser time zone', async () => {
 		await analyticsApi.getVehicleHealth('veh-2');
-		expect(calledUrl()).toBe(`/api/v1/analytics/vehicle-health?vehicleId=veh-2&timeZone=${ZONE}`);
+		expect(calledUrl()).toBe(`/analytics/vehicle-health?vehicleId=veh-2&timeZone=${ZONE}`);
 	});
 
 	it('getVehicleTCO: vehicleId only when no year', async () => {
 		await analyticsApi.getVehicleTCO('veh-3');
 		const url = calledUrl();
-		expect(url).toContain('/api/v1/analytics/vehicle-tco?vehicleId=veh-3');
+		expect(url).toContain('/analytics/vehicle-tco?vehicleId=veh-3');
 		expect(url).not.toContain('year');
 	});
 
@@ -374,19 +362,19 @@ describe('analyticsApi — method→endpoint wiring', () => {
 	it('getVehicleExpenses: serializes vehicleId + date range', async () => {
 		await analyticsApi.getVehicleExpenses('veh-4', dateParams);
 		const url = calledUrl();
-		expect(url).toContain('/api/v1/analytics/vehicle-expenses?');
+		expect(url).toContain('/analytics/vehicle-expenses?');
 		expect(url).toContain('vehicleId=veh-4');
 		expect(url).toContain('startDate=1700000000');
 	});
 
 	it('getYearEnd: no year → only the time zone', async () => {
 		await analyticsApi.getYearEnd();
-		expect(calledUrl()).toBe(`/api/v1/analytics/year-end?timeZone=${ZONE}`);
+		expect(calledUrl()).toBe(`/analytics/year-end?timeZone=${ZONE}`);
 	});
 
 	it('getYearEnd: includes a provided year', async () => {
 		await analyticsApi.getYearEnd({ year: 2023 });
-		expect(calledUrl()).toBe(`/api/v1/analytics/year-end?year=2023&timeZone=${ZONE}`);
+		expect(calledUrl()).toBe(`/analytics/year-end?year=2023&timeZone=${ZONE}`);
 	});
 
 	it('a wrapper returns the apiClient result verbatim (envelope already unwrapped)', async () => {

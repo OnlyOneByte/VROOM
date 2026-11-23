@@ -26,30 +26,30 @@ interface UpdateProviderData {
 export const providerApi = {
 	async getProviders(domain?: string): Promise<UserProviderInfo[]> {
 		const params = domain ? `?domain=${encodeURIComponent(domain)}` : '';
-		return apiClient.get<UserProviderInfo[]>(`/api/v1/providers${params}`);
+		return apiClient.get<UserProviderInfo[]>(`/providers${params}`);
 	},
 
 	async createProvider(data: CreateProviderData): Promise<UserProviderInfo> {
-		return apiClient.post<UserProviderInfo>('/api/v1/providers', data);
+		return apiClient.post<UserProviderInfo>('/providers', data);
 	},
 
 	async updateProvider(id: string, data: UpdateProviderData): Promise<UserProviderInfo> {
-		return apiClient.put<UserProviderInfo>(`/api/v1/providers/${id}`, data);
+		return apiClient.put<UserProviderInfo>(`/providers/${id}`, data);
 	},
 
 	async deleteProvider(id: string, options: { force?: boolean } = {}): Promise<void> {
-		await apiClient.delete(`/api/v1/providers/${id}${options.force ? '?force=true' : ''}`);
+		await apiClient.delete(`/providers/${id}${options.force ? '?force=true' : ''}`);
 	},
 
 	async backfillProvider(id: string): Promise<{ created: number }> {
-		return apiClient.post<{ created: number }>(`/api/v1/providers/${id}/backfill`);
+		return apiClient.post<{ created: number }>(`/providers/${id}/backfill`);
 	},
 
 	async getSyncStatus(
 		id: string
 	): Promise<Record<string, { total: number; synced: number; failed: number }>> {
 		return apiClient.get<Record<string, { total: number; synced: number; failed: number }>>(
-			`/api/v1/providers/${id}/sync-status`
+			`/providers/${id}/sync-status`
 		);
 	}
 };
