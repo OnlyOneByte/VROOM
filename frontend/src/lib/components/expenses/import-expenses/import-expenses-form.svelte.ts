@@ -54,6 +54,7 @@ export class ImportExpensesForm {
 	manualVolumeUnit = $state<VolumeUnit>('gallons_us');
 
 	categoryRemap = $state<Record<string, ExpenseCategory>>({});
+	unmappedCategories = $state<string[]>([]);
 
 	readonly #getVehicles: () => Vehicle[];
 	readonly #presetsOnly: boolean;
@@ -79,7 +80,6 @@ export class ImportExpensesForm {
 	needsTargetVehicle = $derived(!!this.detectedPreset && !this.targetVehicle);
 	needsManualMapping = $derived(this.manualMapping && !this.mapping);
 	errorRows = $derived(this.preview?.rows.filter(r => r.status === 'error') ?? []);
-	unmappedCategories = $derived(this.preview?.unmappedCategories ?? []);
 
 	constructor(getVehicles: () => Vehicle[], options: ImportFormOptions = {}) {
 		this.#getVehicles = getVehicles;
@@ -106,6 +106,7 @@ export class ImportExpensesForm {
 		this.manualDistanceUnit = 'miles';
 		this.manualVolumeUnit = 'gallons_us';
 		this.categoryRemap = {};
+		this.unmappedCategories = [];
 	}
 
 	async loadFormats() {
@@ -119,6 +120,11 @@ export class ImportExpensesForm {
 
 	async loadFile(file: File) {
 		const flow = ++this.#detectFlow;
+		this.#previewFlow++;
+		this.preview = null;
+		this.isPreviewing = false;
+		this.unmappedCategories = [];
+		this.categoryRemap = {};
 		this.fileName = file.name;
 		const text = await file.text();
 		if (flow !== this.#detectFlow) return;
@@ -149,6 +155,7 @@ export class ImportExpensesForm {
 		this.manualMapping = false;
 		this.manualColumns = {};
 		this.categoryRemap = {};
+		this.unmappedCategories = [];
 		this.fileHeaders = [];
 		this.preview = null;
 		this.isPreviewing = false;
@@ -198,7 +205,12 @@ export class ImportExpensesForm {
 				true,
 				this.mapping ?? undefined
 			);
-			if (flow === this.#previewFlow) this.preview = preview;
+			if (flow === this.#previewFlow) {
+				this.preview = preview;
+				const known = this.unmappedCategories;
+				const fresh = (preview.unmappedCategories ?? []).filter(c => !known.includes(c));
+				this.unmappedCategories = [...known, ...fresh];
+			}
 		} catch (err) {
 			if (flow === this.#previewFlow) {
 				handleErrorWithNotification(err, this.#copy.previewFailed(this.detectedPreset));
@@ -216,6 +228,10 @@ export class ImportExpensesForm {
 
 	setManualColumn(field: NativeImportField, header: string) {
 		this.manualColumns = { ...this.manualColumns, [field]: header };
+		if (field === 'category') {
+			this.unmappedCategories = [];
+			this.categoryRemap = {};
+		}
 		this.runPreview();
 	}
 

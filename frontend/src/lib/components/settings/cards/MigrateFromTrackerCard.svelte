@@ -212,11 +212,6 @@
 						</div>
 					{/if}
 				</div>
-				<CategoryRemapPanel
-					unmappedCategories={form.unmappedCategories}
-					categoryRemap={form.categoryRemap}
-					onRemap={(word, category) => form.setCategoryRemap(word, category)}
-				/>
 			{:else if form.unrecognized}
 				<p class="text-sm text-destructive" role="alert" data-testid="migrate-unrecognized">
 					We don't recognize this file. Check that it's the export file from your old app and try
@@ -225,6 +220,12 @@
 			{:else if form.csvText.trim() && form.needsTargetVehicle}
 				<p class="text-sm text-muted-foreground">Choose a vehicle above to preview.</p>
 			{/if}
+
+			<CategoryRemapPanel
+				unmappedCategories={form.unmappedCategories}
+				categoryRemap={form.categoryRemap}
+				onRemap={(word, category) => form.setCategoryRemap(word, category)}
+			/>
 		</div>
 
 		<Dialog.Footer>
