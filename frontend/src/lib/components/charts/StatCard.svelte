@@ -111,27 +111,30 @@
 			{/if}
 		{:else if hasDual}
 			<div class="@container">
-				<div class="flex flex-col @sm:flex-row @sm:items-start @sm:justify-between gap-3 @sm:gap-4">
+				<div
+					data-stat-halves
+					class="flex flex-col @[18rem]:flex-row @[18rem]:items-start @[18rem]:justify-between gap-3 @[18rem]:gap-4"
+				>
 					<div class="flex-1 space-y-1 min-w-0">
 						{#if isLoading}
 							<Skeleton class="h-5 w-24" />
 							<div>
 								<Skeleton class="h-7 @sm:h-8 w-20" />
 								{#if unit}
-									<Skeleton class="mt-1 h-4 w-16 sm:@max-sm:hidden" />
+									<Skeleton class="mt-1 h-4 w-16 sm:@max-[18rem]:hidden" />
 								{/if}
 							</div>
 						{:else}
 							<span class="block text-sm font-medium text-muted-foreground break-words">
 								{label}
 							</span>
-							<div class="sm:@max-sm:flex sm:@max-sm:items-baseline sm:@max-sm:gap-1">
+							<div class="sm:@max-[18rem]:flex sm:@max-[18rem]:items-baseline sm:@max-[18rem]:gap-1">
 								<span class="block text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
 									{value}
 								</span>
 								{#if unit}
 									<span
-										class="mt-1 block text-xs text-muted-foreground sm:@max-sm:mt-0 sm:@max-sm:whitespace-nowrap"
+										class="mt-1 block text-xs text-muted-foreground sm:@max-[18rem]:mt-0 sm:@max-[18rem]:whitespace-nowrap"
 									>
 										{unit}
 									</span>
@@ -139,27 +142,29 @@
 							</div>
 						{/if}
 					</div>
-					<div class="h-px w-full @sm:h-auto @sm:w-px bg-border @sm:self-stretch @sm:my-1"></div>
+					<div
+						class="h-px w-full @[18rem]:h-auto @[18rem]:w-px bg-border @[18rem]:self-stretch @[18rem]:my-1"
+					></div>
 					<div class="flex-1 space-y-1 min-w-0">
 						{#if isLoading}
 							<Skeleton class="h-5 w-24" />
 							<div>
 								<Skeleton class="h-7 @sm:h-8 w-20" />
 								{#if secondaryUnit}
-									<Skeleton class="mt-1 h-4 w-16 sm:@max-sm:hidden" />
+									<Skeleton class="mt-1 h-4 w-16 sm:@max-[18rem]:hidden" />
 								{/if}
 							</div>
 						{:else}
 							<span class="block text-sm font-medium text-muted-foreground break-words">
 								{secondaryLabel}
 							</span>
-							<div class="sm:@max-sm:flex sm:@max-sm:items-baseline sm:@max-sm:gap-1">
+							<div class="sm:@max-[18rem]:flex sm:@max-[18rem]:items-baseline sm:@max-[18rem]:gap-1">
 								<span class="block text-xl @sm:text-2xl font-bold tabular-nums whitespace-nowrap">
 									{secondaryValue}
 								</span>
 								{#if secondaryUnit}
 									<span
-										class="mt-1 block text-xs text-muted-foreground sm:@max-sm:mt-0 sm:@max-sm:whitespace-nowrap"
+										class="mt-1 block text-xs text-muted-foreground sm:@max-[18rem]:mt-0 sm:@max-[18rem]:whitespace-nowrap"
 									>
 										{secondaryUnit}
 									</span>
