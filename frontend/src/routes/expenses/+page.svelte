@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { resolve } from '$app/paths';
+	import { replaceState } from '$app/navigation';
+	import { page } from '$app/state';
 	import { routes } from '#lib/routes.ts';
 	import {
 		Calendar,
@@ -28,7 +30,7 @@
 	import { latest } from '#lib/utils/latest-request.ts';
 
 	type ExpenseWithVehicle = Expense & { vehicle?: Vehicle };
-	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import {
 		handleErrorWithNotification,
 		logLoadFailure,
@@ -56,6 +58,11 @@
 	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
 	import { useExpenseListReload } from './expense-list-reload.svelte';
+	import { expenseUrlFiltersQuery, parseExpenseUrlFilters } from './expense-url-filters.ts';
+	import {
+		EXPENSE_CATEGORY_INFO,
+		type ExpenseCategory
+	} from '#lib/constants/expense-categories.ts';
 
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
@@ -70,17 +77,19 @@
 	let totalCountFiltered = $state(false);
 	let isLoadingPage = $state(false);
 
-	let searchTerm = $state('');
-	let selectedVehicleId = $state<string | undefined>(undefined);
-	let startDate = $state<string | undefined>(undefined);
-	let endDate = $state<string | undefined>(undefined);
+	const urlFilters = parseExpenseUrlFilters(page.url.searchParams);
 
-	let selectedTags = $state<string[]>([]);
+	let searchTerm = $state(urlFilters.q);
+	let selectedVehicleId = $state<string | undefined>(urlFilters.vehicleId);
+	let startDate = $state<string | undefined>(urlFilters.startDate);
+	let endDate = $state<string | undefined>(urlFilters.endDate);
+
+	let selectedTags = $state<string[]>(urlFilters.tags);
 
 	let sortBy = $state<'date' | 'amount'>('date');
 	let sortDir = $state<'asc' | 'desc'>('desc');
 
-	let categoryFilter = $state<string>('');
+	let categoryFilter = $state<string>(urlFilters.category ?? '');
 
 	let pendingExpenses = $derived(
 		offlineExpenseQueue.current.filter(expense => !expense.synced && !expense.needsAttention)
@@ -147,6 +156,39 @@
 		return `${expenses} across ${formatNumber(vehicles.length, 0)} ${vehicles.length === 1 ? 'vehicle' : 'vehicles'}`;
 	});
 
+	let activeFilterSummary = $derived.by(() => {
+		const parts: string[] = [];
+		const vehicle = vehicles.find(v => v.id === selectedVehicleId);
+		if (vehicle) parts.push(getVehicleDisplayName(vehicle));
+		if (categoryFilter in EXPENSE_CATEGORY_INFO) {
+			parts.push(EXPENSE_CATEGORY_INFO[categoryFilter as ExpenseCategory].label);
+		}
+		if (startDate && endDate) parts.push(`${formatDate(startDate)} – ${formatDate(endDate)}`);
+		else if (startDate) parts.push(`From ${formatDate(startDate)}`);
+		else if (endDate) parts.push(`Until ${formatDate(endDate)}`);
+		if (selectedTags.length > 0) parts.push(`Tagged ${selectedTags.join(', ')}`);
+		const term = searchTerm.trim();
+		if (term) parts.push(`“${term}”`);
+		return parts.length > 0 ? `Filtered by ${parts.join(' · ')}` : '';
+	});
+
+	$effect(() => {
+		const query = expenseUrlFiltersQuery({
+			vehicleId: selectedVehicleId,
+			category: categoryFilter || undefined,
+			startDate,
+			endDate,
+			tags: selectedTags,
+			q: searchTerm
+		});
+		if (isLoading) return;
+		untrack(() => {
+			if (query === page.url.search) return;
+			// eslint-disable-next-line svelte/no-navigation-without-resolve -- the path is resolved; only the query string is added
+			replaceState(`${resolve(routes.expenses)}${query}${page.url.hash}`, page.state);
+		});
+	});
+
 	onMount(loadInitial);
 
 	$effect(() => {
@@ -157,9 +199,14 @@
 		isLoading = loadError === null;
 		offlineLoad = false;
 		try {
+			const vehiclesRequest = vehicleApi.getVehicles();
+			if (selectedVehicleId) {
+				const known = await vehiclesRequest;
+				if (!known.some(v => v.id === selectedVehicleId)) selectedVehicleId = undefined;
+			}
 			const [, loadedVehicles] = await Promise.all([
 				settingsStore.load(),
-				vehicleApi.getVehicles(),
+				vehiclesRequest,
 				fetchPageAndSummary(0, { throwOnFailure: true })
 			]);
 			vehicles = loadedVehicles;
@@ -576,8 +623,11 @@
 				</div>
 
 				{#if filtersActive}
-					<div class="flex justify-end sm:pt-2">
-						<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={clearFilters}>
+					<div class="flex items-center justify-between gap-3 sm:pt-2">
+						<p class="min-w-0 text-sm text-muted-foreground" data-testid="active-filter-summary">
+							{activeFilterSummary}
+						</p>
+						<Button variant="outline" size="sm" class="h-10 shrink-0 sm:h-8" onclick={clearFilters}>
 							<X class="h-4 w-4 mr-2" />
 							{COMMON_MESSAGES.CLEAR_FILTERS}
 						</Button>
