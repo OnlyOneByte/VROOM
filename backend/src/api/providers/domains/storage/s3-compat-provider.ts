@@ -10,6 +10,7 @@ import {
   type S3ClientConfig,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { ValidationError } from '../../../../errors';
 import { logger } from '../../../../utils/logger';
 import { fetchOutbound, type PrivateEndpointPolicy } from '../../../../utils/outbound-url';
 import { assertSafeStoragePath } from '../../../../utils/paths';
@@ -208,6 +209,7 @@ export class S3CompatProvider implements StorageProvider {
       await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
       return true;
     } catch (error) {
+      if (error instanceof ValidationError) throw error;
       const credentialFailure = credentialFailureOf(error);
       if (credentialFailure) throw credentialFailure;
       logger.warn('S3 health check failed', {

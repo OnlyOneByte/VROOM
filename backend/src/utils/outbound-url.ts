@@ -344,7 +344,7 @@ export function assertSafeOutboundUrl(
     const address = literalAddress(host) ?? (isLocalhostName(host) ? '127.0.0.1' : null);
     assertTargetAllowed(kind, url, address, label, policy);
   } else if (url.protocol !== 'https:' && !mayReachPrivateByName(policy, url)) {
-    throw new ValidationError(`${label} must use https`);
+    throw new EndpointNotAllowedError(`${label} must use https`);
   }
   return url;
 }

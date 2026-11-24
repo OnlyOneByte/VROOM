@@ -198,6 +198,29 @@ describe('provider endpoints with private endpoints blocked', () => {
     expect(healthCodeOf(new EndpointNotAllowedError('x'))).toBe('endpoint');
     expect(healthCodeOf(new ValidationError('x'))).toBe('config');
   });
+
+  test.each([
+    ['plain http to a host name', 'http://nas.home.example:9000', ['93.184.215.14']],
+    [
+      'https to a host name that resolves to a private address',
+      'https://minio.home.example',
+      ['10.0.0.9'],
+    ],
+  ])(
+    '%s is refused when tested and recorded as an endpoint problem',
+    async (_case, endpoint, addresses) => {
+      outboundResolver.lookup = async () => addresses;
+      const id = insertStoredS3Provider(endpoint);
+      const res = await ctx.authed('POST', `/api/v1/providers/${id}/test`);
+      expect(res.status).toBe(400);
+      const listed = (await (
+        await ctx.authed('GET', '/api/v1/providers?domain=storage')
+      ).json()) as {
+        data: { id: string; lastErrorCode: string | null }[];
+      };
+      expect(listed.data.find((p) => p.id === id)?.lastErrorCode).toBe('endpoint');
+    }
+  );
 });
 
 describe('provider endpoints with an admin allowlist', () => {

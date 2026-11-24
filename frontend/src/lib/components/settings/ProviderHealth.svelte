@@ -49,7 +49,9 @@
 
 	let needsAction = $derived(provider.status === 'needs_reauth' || provider.status === 'error');
 	let problem = $derived(
-		PROBLEM[provider.lastErrorCode ?? (provider.status === 'needs_reauth' ? 'auth' : 'unreachable')]
+		PROBLEM[
+			provider.lastErrorCode ?? (provider.status === 'needs_reauth' ? 'auth' : 'unreachable')
+		] ?? PROBLEM.unreachable
 	);
 	let checkedText = $derived(
 		provider.lastCheckedAt
