@@ -138,6 +138,73 @@ describe('expenses resolve through can() for every role', () => {
   });
 });
 
+describe('split updates cannot delete legs the caller may not delete', () => {
+  const cars = ['split-a', 'split-b', 'split-c'];
+  const splitBody = (vehicleIds: string[]) => ({
+    splitConfig: { method: 'even', vehicleIds },
+    totalAmount: 90,
+  });
+  const legs = (groupId: string) =>
+    ctx.sqlite
+      .query('SELECT vehicle_id, created_by FROM expenses WHERE group_id = ? ORDER BY vehicle_id')
+      .all(groupId) as { vehicle_id: string; created_by: string | null }[];
+
+  beforeEach(() => {
+    for (const car of cars) {
+      ctx.sqlite.run(
+        "INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, 'Mazda', 'CX-5', 2021)",
+        [car, ctx.user.id]
+      );
+      ctx.sqlite.run(
+        "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status) VALUES (?, ?, ?, ?, 'editor', 'accepted')",
+        [`share-${car}`, car, ctx.user.id, editor.id]
+      );
+      grantShareRole(getDb(), {
+        vehicleId: car,
+        sharedWithId: editor.id,
+        level: 'editor',
+        grantedBy: ctx.user.id,
+      });
+    }
+  });
+
+  async function createSplit(request: RequestFn, vehicleIds: string[]): Promise<string> {
+    const res = await request('POST', '/api/v1/expenses/split', {
+      ...splitBody(vehicleIds),
+      category: 'misc',
+      date: '2024-06-06T00:00:00.000Z',
+    });
+    expect(res.status).toBe(201);
+    return (await json<DataEnvelope<{ groupId: string }>>(res)).data.groupId;
+  }
+
+  test("an editor can't shrink, regrow-and-shrink or delete the owner's split", async () => {
+    const groupId = await createSplit(ctx.authed, ['split-a', 'split-b']);
+    const put = (vehicleIds: string[]) =>
+      editor.request('PUT', `/api/v1/expenses/split/${groupId}`, splitBody(vehicleIds));
+
+    expect((await put(['split-a'])).status).toBe(403);
+    expect((await put(['split-a', 'split-b', 'split-c'])).status).toBe(200);
+    expect(legs(groupId).map((leg) => leg.created_by)).toEqual([null, null, null]);
+    expect((await put(['split-c'])).status).toBe(403);
+    expect((await editor.request('DELETE', `/api/v1/expenses/split/${groupId}`)).status).toBe(403);
+    expect(legs(groupId).map((leg) => leg.vehicle_id)).toEqual(['split-a', 'split-b', 'split-c']);
+  });
+
+  test('an editor shrinks and deletes their own split, but not one with legs by someone else', async () => {
+    const mine = await createSplit(editor.request, ['split-a', 'split-b']);
+    const path = `/api/v1/expenses/split/${mine}`;
+    expect((await editor.request('PUT', path, splitBody(['split-a']))).status).toBe(200);
+    const mixed = await createSplit(editor.request, ['split-b', 'split-c']);
+    ctx.sqlite.run(
+      "UPDATE expenses SET created_by = NULL WHERE group_id = ? AND vehicle_id = 'split-c'",
+      [mixed]
+    );
+    expect((await editor.request('DELETE', `/api/v1/expenses/split/${mixed}`)).status).toBe(403);
+    expect((await editor.request('DELETE', path)).status).toBe(200);
+  });
+});
+
 describe('expenses never cross accounts', () => {
   test("another person's own expenses stay out of lists, exports and lookups", async () => {
     const theirCar = `exp-their-car-${crypto.randomUUID()}`;

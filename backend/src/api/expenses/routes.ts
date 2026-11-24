@@ -342,7 +342,8 @@ const fromSplitBody: ResourceOf = async (c) => {
 const fromSplitGroup: ResourceOf = async (c) => {
   const group = await expenseRepository.getSplitGroupAccessInfo(c.req.param('id') ?? '');
   if (!group) throw new NotFoundError('Split expense');
-  const author = group.createdBy ?? group.ownerId;
+  const [only, ...others] = group.authors;
+  const author = others.length === 0 ? (only ?? group.ownerId) : null;
   return group.vehicleIds.map((vehicleId) => vehicleResource(vehicleId, author));
 };
 
@@ -443,29 +444,31 @@ routes.put(
     if (!groupInfo) throw new NotFoundError('Split expense');
     const existingConfig: SplitConfig = { method: 'even', vehicleIds: groupInfo.vehicleIds };
     await requireSplitWriteAccess(existingConfig, user.id);
-    const {
-      ownerId: newOwnerId,
-      createdBy,
-      writesFinancials: mayTouch,
-    } = await requireSplitWriteAccess(data.splitConfig, user.id);
+    const { ownerId: newOwnerId, writesFinancials: mayTouch } = await requireSplitWriteAccess(
+      data.splitConfig,
+      user.id
+    );
     if (newOwnerId !== groupInfo.ownerId) {
       throw new ValidationError('A split cannot be moved to a vehicle owned by a different user');
     }
     assertMayTouchFinancialExpense(mayTouch, groupInfo.sourceType);
 
     const existing = await expenseRepository.getSplitExpense(id, groupInfo.ownerId);
+    const kept = new Set(splitConfigVehicleIds(data.splitConfig));
+    for (const leg of existing.filter((row) => !kept.has(row.vehicleId))) {
+      requireCan(
+        c,
+        'vehicle.expense.delete',
+        vehicleResource(leg.vehicleId, leg.createdBy ?? groupInfo.ownerId)
+      );
+    }
     await assertSplitFinancingSourceValid(
       existing[0]?.sourceType ?? undefined,
       existing[0]?.sourceId ?? undefined,
       data.splitConfig
     );
 
-    const siblings = await expenseRepository.updateSplitExpense(
-      id,
-      data,
-      groupInfo.ownerId,
-      createdBy
-    );
+    const siblings = await expenseRepository.updateSplitExpense(id, data, groupInfo.ownerId);
     const first = siblings[0];
     if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
       throw new ValidationError('Split expense update returned invalid data');

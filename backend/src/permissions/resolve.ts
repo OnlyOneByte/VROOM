@@ -124,6 +124,10 @@ const OWNER_RULES: Rule[] = PERMISSION_REGISTRY.list
   .filter((d) => d.scope === 'vehicle')
   .map((d) => rule(d.id, 'owner'));
 
+const OWN_ACCOUNT_RULES: Rule[] = PERMISSION_REGISTRY.list
+  .filter((d) => d.scope === 'vehicle' && d.grantable)
+  .map((d) => rule(d.id, 'owner'));
+
 function denyTargets(permission: string): Set<string> {
   const own = ownDeleteOf(permission);
   return own ? new Set([...targets(permission), ...targets(own)]) : targets(permission);
@@ -137,7 +141,8 @@ function servesResource(permission: string, resource: Resource): boolean {
 }
 
 function isOwnVehicleData(permission: string, resource: Resource): boolean {
-  return resource.kind === 'account' && PERMISSION_REGISTRY.get(permission)?.scope === 'vehicle';
+  const descriptor = PERMISSION_REGISTRY.get(permission);
+  return resource.kind === 'account' && descriptor?.scope === 'vehicle' && descriptor.grantable;
 }
 
 function ownDeleteOf(permission: string): string | null {
@@ -240,7 +245,7 @@ export function createResolver(actor: Actor, source: GrantSource): Resolver {
     if (actor.disabled) return [];
     const state = stateFor(resource);
     if (state.kind === 'hidden') return [];
-    return resource.kind === 'account' ? [...state.rules, ...OWNER_RULES] : state.rules;
+    return resource.kind === 'account' ? [...state.rules, ...OWN_ACCOUNT_RULES] : state.rules;
   };
 
   return { can, rulesFor, packedRulesFor: (resource) => packRules(rulesFor(resource)) };

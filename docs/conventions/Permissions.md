@@ -81,6 +81,7 @@ edited or deleted; the built-in keys are reserved, and a role's scope never chan
   re-reads the share in its transaction and answers 409 if it changed underneath. `vehicle_shares` stays the membership and invite record.
 - `permission_overrides` allows or denies one permission for one person, at server or vehicle scope.
   A deny on `delete_own` does not stop someone who also holds `delete`; deny `delete` for that.
+  A deny on `X.write` doesn't block `X.delete_own` either; deny `X.delete` to stop deletes.
 - A co-owner can't remove the Co-owner role the owner gave them, but can leave the car by declining
   the share.
 - A full restore is refused (409) while the account's vehicles carry overrides or custom-role
@@ -99,9 +100,11 @@ edited or deleted; the built-in keys are reserved, and a role's scope never chan
    and a deny on `delete` also blocks `delete_own`. A non-grantable permission in a role row or
    an override grants nothing, not even what it implies.
 5. A `delete` check also passes on `delete_own` when the entry's `createdBy` is the actor.
-6. A vehicle permission checked on the actor's own account means "on my own vehicles": allowed
-   unless the actor is disabled. Routes with no vehicle (an unfiltered list, orphan photos, the
-   notifications inbox, fleet analytics) resolve this way.
+6. A grantable vehicle permission checked on the actor's own account means "on my own vehicles":
+   allowed unless the actor is disabled (never `vehicle.delete` or `vehicle.transfer`). Routes with
+   no vehicle (an unfiltered list, orphan photos, the notifications inbox, fleet analytics) resolve
+   this way, so any route mapped to the account scope must scope its query to the caller's own
+   vehicles.
 
 A redaction that used to ask "is owner" asks for permissions instead: loan and insurance details
 show to whoever holds both `vehicle.financing.read` and `vehicle.insurance.read` (the owner, a
