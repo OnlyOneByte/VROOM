@@ -312,20 +312,42 @@ describe('private endpoint policy', () => {
   });
 
   test('an allowlist never permits metadata or link-local addresses', () => {
-    const wide = parsePrivateEndpointPolicy('0.0.0.0/0', false);
+    const wide = parsePrivateEndpointPolicy('128.0.0.0/1', false);
     expect(() => assertSafeOutboundUrl('http://169.254.169.254', 'S3', wide)).toThrow(
       'S3 must point to a public host'
     );
   });
 
-  test.each(['10.0.0.0/33', 'not a host!', '192.168.1.10:0', 'nas.lan:99999', 'fd00::/129'])(
-    'a malformed entry %s is refused at parse time',
-    (entry) => {
-      expect(() => parsePrivateEndpointPolicy(entry, false)).toThrow(
-        'PRIVATE_PROVIDER_ENDPOINTS entry'
-      );
-    }
-  );
+  test('an IPv4 rule does not match a 6to4 address that embeds it', () => {
+    const one = parsePrivateEndpointPolicy('192.168.1.20', false);
+    expect(() => assertSafeOutboundUrl('http://192.168.1.20', 'S3', one)).not.toThrow();
+    expect(() => assertSafeOutboundUrl('http://[2002:c0a8:114::]', 'S3', one)).toThrow(
+      ValidationError
+    );
+  });
+
+  test.each([
+    '10.0.0.0/33',
+    '10.0.0.0/',
+    '10.0.0.0/ 8',
+    '10.0.0.0/0x8',
+    '10.0.0.0/1e1',
+    '10.0.0.0/8/9',
+    '0.0.0.0/0',
+    '::/0',
+    '[fd00::1',
+    '[fd00::1]junk',
+    '[fd00::]/8:9000',
+    'allow,10.0.0.1',
+    'not a host!',
+    '192.168.1.10:0',
+    'nas.lan:99999',
+    'fd00::/129',
+  ])('a malformed entry %s is refused at parse time', (entry) => {
+    expect(() => parsePrivateEndpointPolicy(entry, false)).toThrow(
+      'PRIVATE_PROVIDER_ENDPOINTS entry'
+    );
+  });
 
   test('a name that resolves to a non-allowlisted private address is refused', async () => {
     outboundResolver.lookup = async () => ['192.168.1.99'];

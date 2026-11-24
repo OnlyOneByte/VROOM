@@ -1,5 +1,5 @@
 import { lookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
+import { BlockList, isIP } from 'node:net';
 import { CONFIG } from '../config';
 import { ValidationError } from '../errors';
 
@@ -120,18 +120,9 @@ function classifyHostname(hostname: string): AddressClass | null {
   return null;
 }
 
-interface AddressBits {
-  family: 4 | 6;
-  value: bigint;
-}
-
-interface AddressRange extends AddressBits {
-  bits: number;
-}
-
 interface PrivateTargetRule {
   host?: string;
-  range?: AddressRange;
+  range?: BlockList;
   port?: number;
 }
 
@@ -143,37 +134,35 @@ export interface PrivateEndpointPolicy {
 export const BLOCK_PRIVATE: PrivateEndpointPolicy = { allowAll: false, rules: [] };
 export const ALLOW_PRIVATE: PrivateEndpointPolicy = { allowAll: true, rules: [] };
 
-function addressBits(address: string): AddressBits | null {
+function familyOf(address: string): 'ipv4' | 'ipv6' {
+  return isIP(address) === 6 ? 'ipv6' : 'ipv4';
+}
+
+const RANGE_PATTERN = /^([0-9a-f.:]+)(?:\/(\d{1,3}))?$/;
+
+function parseRange(text: string): BlockList | null {
+  const match = RANGE_PATTERN.exec(text);
+  const address = match?.[1] ?? '';
   const family = isIP(address);
-  if (family === 4) return { family: 4, value: BigInt(ipv4ToInt(address)) };
-  if (family !== 6) return null;
-  const groups = expandIpv6(address);
-  const v4 = embeddedIpv4(groups);
-  if (v4) return { family: 4, value: BigInt(ipv4ToInt(v4)) };
-  return { family: 6, value: groups.reduce((acc, g) => (acc << 16n) | BigInt(g), 0n) };
+  if (!match || family === 0) return null;
+  const range = new BlockList();
+  if (match[2] === undefined) {
+    range.addAddress(address, familyOf(address));
+    return range;
+  }
+  const bits = Number(match[2]);
+  if (bits < 1 || bits > (family === 6 ? 128 : 32)) return null;
+  range.addSubnet(address, bits, familyOf(address));
+  return range;
 }
 
-function inRange(range: AddressRange, address: AddressBits): boolean {
-  if (range.family !== address.family) return false;
-  const shift = BigInt((range.family === 4 ? 32 : 128) - range.bits);
-  return range.value >> shift === address.value >> shift;
-}
+const BRACKETED = /^\[([^\]]+)\](?::(\d+))?$/;
+const HOSTNAME_RULE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
 
-function parseRange(text: string): AddressRange | null {
-  const [address = '', prefix] = text.split('/');
-  const bits = addressBits(address);
-  if (!bits) return null;
-  const width = bits.family === 4 && isIP(address) === 4 ? 32 : 128;
-  const length = prefix === undefined ? width : Number(prefix);
-  if (!Number.isInteger(length) || length < 0 || length > width) return null;
-  return { ...bits, bits: bits.family === 4 && width === 128 ? Math.max(0, length - 96) : length };
-}
-
-function splitPort(entry: string): { target: string; port?: string } {
+function splitPort(entry: string): { target: string; port?: string } | null {
   if (entry.startsWith('[')) {
-    const end = entry.indexOf(']');
-    const rest = entry.slice(end + 1);
-    return { target: entry.slice(1, end), port: rest.startsWith(':') ? rest.slice(1) : undefined };
+    const match = BRACKETED.exec(entry);
+    return match ? { target: match[1] ?? '', port: match[2] } : null;
   }
   const colons = entry.split(':').length - 1;
   if (colons !== 1) return { target: entry };
@@ -181,22 +170,21 @@ function splitPort(entry: string): { target: string; port?: string } {
   return { target, port };
 }
 
-const HOSTNAME_RULE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
-
 function parseRule(entry: string): PrivateTargetRule {
   const invalid = new Error(
-    `PRIVATE_PROVIDER_ENDPOINTS entry "${entry}" must be "allow", or a host, IP address or CIDR range with an optional :port`
+    `PRIVATE_PROVIDER_ENDPOINTS entry "${entry}" must be a host, IP address or CIDR range with an optional :port, or "allow" on its own`
   );
-  const { target, port: portText } = splitPort(entry.trim().toLowerCase());
+  const split = splitPort(entry.toLowerCase());
+  if (!split) throw invalid;
   let port: number | undefined;
-  if (portText !== undefined) {
-    port = Number(portText);
-    if (!/^\d+$/.test(portText) || port < 1 || port > 65535) throw invalid;
+  if (split.port !== undefined) {
+    port = Number(split.port);
+    if (!/^\d{1,5}$/.test(split.port) || port < 1 || port > 65535) throw invalid;
   }
-  const range = parseRange(target);
+  const range = parseRange(split.target);
   if (range) return { range, port };
-  if (target.includes('/') || !HOSTNAME_RULE.test(target)) throw invalid;
-  return { host: target, port };
+  if (split.target === 'allow' || !HOSTNAME_RULE.test(split.target)) throw invalid;
+  return { host: split.target, port };
 }
 
 export function parsePrivateEndpointPolicy(allow: string, block: boolean): PrivateEndpointPolicy {
@@ -241,13 +229,14 @@ function privateTargetAllowed(
   if (policy.allowAll) return true;
   const host = normalizedHost(url.hostname);
   const port = effectivePort(url);
-  const bits = address ? addressBits(address) : null;
   return policy.rules.some(
     (rule) =>
       (rule.port === undefined || rule.port === port) &&
       (rule.host !== undefined
         ? rule.host === host
-        : rule.range !== undefined && bits !== null && inRange(rule.range, bits))
+        : rule.range !== undefined &&
+          address !== null &&
+          rule.range.check(address, familyOf(address)))
   );
 }
 
