@@ -119,6 +119,30 @@ describe('share management cannot be used to escalate', () => {
     expect((await ctx.authed('DELETE', shareOf(other))).status).toBe(200);
   });
 
+  test('a manager only changes or removes people whose access they hold themselves', async () => {
+    overrideOn(ctx, CAR, m.viewer, 'vehicle.share.manage', 'allow');
+    expect((await m.viewer.request('PUT', editorShare(), { level: 'viewer' })).status).toBe(403);
+    expect((await m.viewer.request('DELETE', editorShare())).status).toBe(403);
+
+    const appointed = await createInvitee(ctx, 'sh-co-owner-3');
+    shareCar(ctx, CAR, appointed, 'viewer');
+    ctx.sqlite.run(
+      'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?)',
+      [`ra-${appointed.id}`, appointed.id, builtInRoleId('co_owner'), CAR, m.coOwner.id]
+    );
+    overrideOn(ctx, CAR, m.editor, 'vehicle.share.manage', 'allow');
+    expect((await m.editor.request('DELETE', shareOf(appointed))).status).toBe(403);
+    expect((await m.coOwner.request('DELETE', shareOf(appointed))).status).toBe(200);
+  });
+
+  test('revoking your own share points you to Decline', async () => {
+    const res = await m.coOwner.request('DELETE', shareOf(m.coOwner));
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: { message: string } }).error.message).toContain(
+      'decline'
+    );
+  });
+
   test('roles granted through a share stay set by the owner', async () => {
     expect((await m.coOwner.request('PUT', editorShare(), { level: 'viewer' })).status).toBe(200);
     expect(grantedBy(m.editor.id)).toEqual([ctx.user.id]);
