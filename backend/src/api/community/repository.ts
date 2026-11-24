@@ -6,6 +6,7 @@ import {
   communityRefreshes,
   communityStats,
   expenses,
+  insurancePolicies,
   insuranceTerms,
   type NewCommunityStat,
   odometerEntries,
@@ -248,6 +249,13 @@ export class CommunityStatsRepository {
       })
       .from(expenses)
       .innerJoin(insuranceTerms, eq(expenses.sourceId, insuranceTerms.id))
+      .innerJoin(
+        insurancePolicies,
+        and(
+          eq(insuranceTerms.policyId, insurancePolicies.id),
+          eq(insurancePolicies.userId, expenses.userId)
+        )
+      )
       .where(
         and(
           inArray(expenses.vehicleId, ids),

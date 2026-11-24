@@ -205,8 +205,14 @@ describe('per-vehicle samples', () => {
   });
 
   test('maintenance and insurance need the whole window, and insurance needs a region', () => {
-    const recent = vehicle('recent', { firstRecordAt: new Date(NOW.getTime() - 30 * 86_400_000) });
-    expect(vehicleSamples(recent, NOW).map((s) => s.metric)).not.toContain('maintenance');
+    const recent = vehicle('recent', {
+      firstRecordAt: new Date(NOW.getTime() - 30 * 86_400_000),
+      region: 'US-CA',
+      insurancePremiums: [term(-30, 335, 90_000)],
+    });
+    const recentMetrics = vehicleSamples(recent, NOW).map((s) => s.metric);
+    expect(recentMetrics).not.toContain('maintenance');
+    expect(recentMetrics).not.toContain('insurance');
 
     const insured = (region: string | null) =>
       vehicle('insured', {

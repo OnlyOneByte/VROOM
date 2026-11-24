@@ -180,6 +180,41 @@ describe('community stats refresh against the database', () => {
     db.sqlite.run(
       "UPDATE expenses SET source_type = 'insurance_term', source_id = 'term-1' WHERE id = 'premium'"
     );
+    seedUser(db.sqlite, { id: 'stranger', email: 'stranger@example.com', displayName: 'S' });
+    seedInsurancePolicy(db.sqlite, {
+      id: 'pol-x',
+      userId: 'stranger',
+      company: 'X',
+      isActive: true,
+    });
+    db.sqlite.run(
+      'INSERT INTO insurance_terms (id, policy_id, start_date, end_date) VALUES (?, ?, ?, ?)',
+      ['term-x', 'pol-x', unix(-100), unix(265)]
+    );
+    db.sqlite.run(
+      'INSERT INTO insurance_terms (id, policy_id, start_date, end_date) VALUES (?, ?, ?, ?)',
+      ['term-old', 'pol', unix(-900), unix(-400)]
+    );
+    for (const [id, termId] of [
+      ['foreign-premium', 'term-x'],
+      ['old-premium', 'term-old'],
+    ] as const) {
+      seedExpense(db.sqlite, {
+        id,
+        vehicleId: 'in-0-car',
+        category: 'financial',
+        expenseAmount: 70_000,
+        date: new Date(NOW.getTime() - 100 * DAY),
+        mileage: null,
+        volume: null,
+        fuelType: null,
+        missedFillup: false,
+      });
+      db.sqlite.run(
+        "UPDATE expenses SET source_type = 'insurance_term', source_id = ? WHERE id = ?",
+        [termId, id]
+      );
+    }
     for (const [id, category] of [
       ['loan', 'financial'],
       ['parking', 'misc'],
