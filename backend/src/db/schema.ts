@@ -570,6 +570,34 @@ export const vehicleShares = sqliteTable(
   })
 );
 
+export interface CalendarFeedOptions {
+  reminders: boolean;
+  insurance: boolean;
+  loans: boolean;
+  vehicleNames: boolean;
+  amounts: boolean;
+}
+
+export const calendarFeeds = sqliteTable(
+  'calendar_feeds',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    options: text('options', { mode: 'json' }).$type<CalendarFeedOptions>().notNull(),
+    lastUsedAt: integer('last_used_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    userIdx: uniqueIndex('cf_user_idx').on(table.userId),
+    tokenHashIdx: uniqueIndex('cf_token_hash_idx').on(table.tokenHash),
+  })
+);
+
 export const pushSubscriptions = sqliteTable(
   'push_subscriptions',
   {
@@ -691,3 +719,5 @@ export type NewPushSubscription = typeof pushSubscriptions.$inferInsert;
 
 export type CommunityStat = typeof communityStats.$inferSelect;
 export type NewCommunityStat = typeof communityStats.$inferInsert;
+
+export type CalendarFeed = typeof calendarFeeds.$inferSelect;

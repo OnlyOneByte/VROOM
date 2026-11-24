@@ -232,6 +232,7 @@ export const CONFIG = {
     trustedProxyIps: env.TRUSTED_PROXY_IPS,
     global: { windowMs: 15 * 60 * 1000, limit: 1000, message: 'Too many requests' },
     auth: { windowMs: 15 * 60 * 1000, limit: 30 },
+    calendar: { windowMs: 15 * 60 * 1000, limit: 120, message: 'Too many calendar requests' },
     sync: { windowMs: 15 * 60 * 1000, limit: 50, message: 'Too many sync requests' },
     backup: { windowMs: 5 * 60 * 1000, limit: 20, message: 'Too many backup requests' },
     restore: { windowMs: 10 * 60 * 1000, limit: 10, message: 'Too many restore requests' },

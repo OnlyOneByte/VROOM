@@ -9,6 +9,7 @@ import { routes as analyticsRoutes } from './api/analytics/routes';
 import { routes as assistantRoutes } from './api/assistant/routes';
 import { DEMO_USER_ID, demoGuard } from './api/auth/demo';
 import { routes as authRoutes } from './api/auth/routes';
+import { routes as calendarRoutes } from './api/calendar/routes';
 import { routes as communityRoutes } from './api/community/routes';
 import { routes as expenseRoutes } from './api/expenses/routes';
 import { routes as financingRoutes } from './api/financing/routes';
@@ -113,7 +114,12 @@ app.use(
   })
 );
 
-app.use('*', honoLogger());
+app.use(
+  '*',
+  honoLogger((line, ...rest) =>
+    console.log(line.replace(/(\/calendar\/feed\/)[^/\s]+\.ics/, '$1[redacted].ics'), ...rest)
+  )
+);
 
 if (CONFIG.env === 'development') {
   app.use('*', prettyJSON());
@@ -149,6 +155,7 @@ app.route('/api/v1/reminders', reminderRoutes);
 app.route('/api/v1/trips', tripRoutes);
 app.route('/api/v1/shares', shareRoutes);
 app.route('/api/v1/push', pushRoutes);
+app.route('/api/v1/calendar', calendarRoutes);
 
 app.use('/api/*', async (c, next) => {
   const path = c.req.path;

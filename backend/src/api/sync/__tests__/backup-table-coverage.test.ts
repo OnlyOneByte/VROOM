@@ -12,6 +12,7 @@ const EXCLUDED_BY_DESIGN = [
   'push_subscriptions',
   'community_stats',
   'community_refreshes',
+  'calendar_feeds',
 ] as const;
 
 function allSchemaTableNames(): string[] {
