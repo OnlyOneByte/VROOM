@@ -158,4 +158,12 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   'GET /api/v1/push/vapid-public-key': 'account.push.read',
   'POST /api/v1/push/subscribe': 'account.push.write',
   'DELETE /api/v1/push/subscribe': 'account.push.write',
+
+  'GET /api/v1/calendar/feed/:file': {
+    public: 'Calendar apps fetch the feed with the secret token in the link, without a session',
+  },
+  'GET /api/v1/calendar/feed': 'account.calendar.read',
+  'POST /api/v1/calendar/feed': 'account.calendar.manage',
+  'PUT /api/v1/calendar/feed': 'account.calendar.manage',
+  'DELETE /api/v1/calendar/feed': 'account.calendar.manage',
 };

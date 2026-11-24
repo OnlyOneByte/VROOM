@@ -8,8 +8,8 @@ const QUERY_SERIES: Record<string, Array<{ key: string; label: string }>> = {
 		{ key: 'maintenance', label: 'Maintenance' }
 	],
 	vehicle: [
-		{ key: 'camry', label: '2020 Toyota Camry' },
-		{ key: 'civic', label: '2019 Honda Civic' }
+		{ key: 'vehicle-camry', label: '2020 Toyota Camry' },
+		{ key: 'vehicle-civic', label: '2019 Honda Civic' }
 	],
 	none: [{ key: 'total', label: 'Total cost' }]
 };
@@ -41,7 +41,7 @@ function queryPayload(params: URLSearchParams) {
 				{
 					t: Math.floor(new Date(2026, 7, 15, 12).getTime() / 1000),
 					kind: 'service',
-					vehicleId: 'camry',
+					vehicleId: 'vehicle-camry',
 					vehicleName: '2020 Toyota Camry',
 					label: 'Brake pads',
 					amount: 300
@@ -64,7 +64,7 @@ const BUCKET_ITEMS = {
 			id: 'e1',
 			date: 1754784000,
 			category: 'maintenance',
-			vehicleId: 'camry',
+			vehicleId: 'vehicle-camry',
 			vehicleName: '2020 Toyota Camry',
 			description: 'Brake pads',
 			amount: 110
@@ -323,7 +323,7 @@ test.describe('Analytics', () => {
 		await expect.poll(() => requests.at(-1)?.get('start')).toBe(yearStart);
 
 		await page.getByRole('button', { name: /2020 Toyota Camry/ }).click();
-		await expect(page).toHaveURL(/hide=camry/);
+		await expect(page).toHaveURL(/hide=vehicle-camry/);
 		await expect(page.getByRole('button', { name: /2020 Toyota Camry/ })).toHaveAttribute(
 			'aria-pressed',
 			'false'
@@ -340,7 +340,7 @@ test.describe('Analytics', () => {
 		await expect(page.getByRole('button', { name: /Year to date/ })).toBeVisible();
 
 		await page.goBack();
-		await expect(page).not.toHaveURL(/hide=camry/);
+		await expect(page).not.toHaveURL(/hide=vehicle-camry/);
 	});
 
 	test('every Explore preset renders and round-trips through the URL', async ({ page }) => {
@@ -402,7 +402,7 @@ test.describe('Analytics', () => {
 		await chart.click({ position: { x: 300, y: 150 } });
 		await expect(page.getByRole('dialog')).toBeVisible();
 		await page.getByRole('dialog').getByRole('button', { name: 'Show only' }).first().click();
-		await expect(page).toHaveURL(/cars=/);
+		await expect(page).toHaveURL(/cars=vehicle-civic/);
 		await expect(page).not.toHaveURL(/sel=/);
 	});
 
@@ -464,11 +464,14 @@ test.describe('Analytics', () => {
 			.getByRole('heading', { level: 3 })
 			.first()
 			.evaluate(e => e.scrollIntoView({ block: 'start' }));
-		const first = panels.getByRole('img').first();
+		const first = panels
+			.getByRole('img', { name: /^2020 Toyota Camry:/ })
+			.and(page.locator('[tabindex="0"]'));
 		await first.focus();
+		await expect(first).toBeFocused();
 		await page.keyboard.press('ArrowRight');
 		await page.keyboard.press('Enter');
-		await expect(page).toHaveURL(/seg=camry/);
+		await expect(page).toHaveURL(/seg=vehicle-camry/);
 		await expect(page.getByRole('dialog').getByRole('heading').first()).toContainText(
 			'2020 Toyota Camry'
 		);
@@ -488,6 +491,7 @@ test.describe('Analytics', () => {
 			.scrollIntoViewIfNeeded();
 		const lane = page.getByRole('group', { name: /Services and trips: 1 marker/ });
 		await lane.focus();
+		await expect(lane).toBeFocused();
 		await page.keyboard.press('ArrowRight');
 		await expect(
 			page.getByText(/: Brake pads\. 2020 Toyota Camry, \$300\.00 1 of 1\./)
