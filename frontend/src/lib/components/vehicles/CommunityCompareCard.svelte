@@ -39,12 +39,18 @@
 	const headingId = $props.id();
 	const MIN_GROUP = 10;
 
-	let LABELS = $derived<Record<CompareMetric['metric'], string>>({
-		efficiency: vehicle.vehicleType === 'electric' ? 'Efficiency' : 'Fuel efficiency',
-		running_cost: 'Running cost',
-		maintenance: 'Maintenance per year',
-		insurance: 'Insurance per year'
-	});
+	function metricLabel(metric: CompareMetric['metric']): string {
+		switch (metric) {
+			case 'efficiency':
+				return vehicle.vehicleType === 'electric' ? 'Efficiency' : 'Fuel efficiency';
+			case 'running_cost':
+				return 'Running cost';
+			case 'maintenance':
+				return 'Maintenance per year';
+			case 'insurance':
+				return 'Insurance per year';
+		}
+	}
 
 	let result = $state<CompareResult | null>(null);
 	let loading = $state(true);
@@ -285,7 +291,7 @@
 				{#each metrics as metric (metric.metric)}
 					{#if metric.status !== 'needs_model' || !isOwner || !suggestion || dismissed}
 						<li class="space-y-2 p-4" data-testid="community-compare-{metric.metric}">
-							<p class="text-sm font-medium">{LABELS[metric.metric]}</p>
+							<p class="text-sm font-medium">{metricLabel(metric.metric)}</p>
 							{#if metric.status === 'ok' && metric.bucket && metric.yours !== null}
 								{@const bar = barGeometry(metric)}
 								<p class="text-sm">
