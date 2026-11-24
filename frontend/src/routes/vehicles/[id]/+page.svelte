@@ -450,6 +450,7 @@
 				error => {
 					if (!isCurrent()) return;
 					logLoadFailure(error, "Couldn't load recent expenses");
+					recentList = [];
 					recentFailed = true;
 					recentSettled = true;
 				}
