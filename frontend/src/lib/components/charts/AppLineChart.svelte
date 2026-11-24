@@ -1,6 +1,6 @@
 <script lang="ts">
 	import './line-chart-animations.css';
-	import { LineChart, Points, Rule } from 'layerchart';
+	import { Area, LineChart, Points, Rule } from 'layerchart';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import ChartCard from './ChartCard.svelte';
 	import ChartPlot from './ChartPlot.svelte';
@@ -17,6 +17,7 @@
 		getTrendLineProps,
 		monthlyXAxisProps,
 		SINGLE_POINT_PROPS,
+		SMOOTH_CURVE,
 		isolatedValueRows
 	} from '#lib/utils/chart-formatters.ts';
 	import type { Snippet } from 'svelte';
@@ -59,6 +60,7 @@
 		categoryLabel?: string;
 		onSelect?: ChartSelectHandler;
 		annotations?: ChartAnnotations;
+		band?: { from: string; to: string };
 		referenceLines?: ReferenceLine[];
 		summary?: Snippet;
 		footer?: Snippet;
@@ -97,6 +99,7 @@
 		categoryLabel,
 		onSelect,
 		annotations,
+		band,
 		referenceLines = [],
 		summary,
 		footer,
@@ -106,6 +109,12 @@
 	let series = $derived(
 		hiddenKeys?.length ? legendItems.filter(s => !hiddenKeys.includes(s.key)) : legendItems
 	);
+
+	let bandLabel = $derived.by(() => {
+		if (!band) return '';
+		const name = (key: string) => legendItems.find(s => s.key === key)?.label ?? key;
+		return `${name(band.from)} and ${name(band.to)}`;
+	});
 
 	let isEmpty = $derived(data.length === 0);
 	let context = $state<ChartState<Record<string, unknown>>>();
@@ -119,9 +128,12 @@
 			series,
 			labelFormat: tooltipLabelFormat,
 			valueFormat: tooltipFormat,
-			notes: referenceLines.map(
-				line => `${line.label}: ${tooltipFormat(line.value, series[0]?.key ?? '')}.`
-			)
+			notes: [
+				...referenceLines.map(
+					line => `${line.label}: ${tooltipFormat(line.value, series[0]?.key ?? '')}.`
+				),
+				...(bandLabel ? [`The shaded area is the gap between ${bandLabel}.`] : [])
+			]
 		})
 	);
 
@@ -136,6 +148,21 @@
 	);
 	let isolatedValues = $derived(series.flatMap(s => isolatedValueRows(s.data ?? data, [s.key])));
 </script>
+
+{#snippet bandMarks()}
+	{#if band}
+		{@const { from, to } = band}
+		<Area
+			y0={(d: Record<string, unknown>) => d[from]}
+			y1={(d: Record<string, unknown>) => d[to]}
+			defined={(d: Record<string, unknown>) => d[from] != null && d[to] != null}
+			curve={SMOOTH_CURVE}
+			fill="var(--chart-4)"
+			class="[fill-opacity:0.18]"
+			data-band
+		/>
+	{/if}
+{/snippet}
 
 <ChartCard
 	{title}
@@ -176,6 +203,7 @@
 					{y}
 					{series}
 					{yDomain}
+					belowMarks={band ? bandMarks : undefined}
 					padding={CHART_PADDING}
 					xPadding={TIME_X_PADDING}
 					props={{

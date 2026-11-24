@@ -14,6 +14,7 @@ vi.mock('layerchart', () => ({
 
 const { default: AnnotationLane } = await import('../AnnotationLane.svelte');
 const { default: AppLineChart } = await import('../AppLineChart.svelte');
+await import('../EventsTable.svelte');
 
 const JAN = new Date(Date.UTC(2026, 0, 1));
 const FEB = new Date(Date.UTC(2026, 1, 1));

@@ -43,7 +43,7 @@ describe('buildChartA11y', () => {
 			{ date: new Date(2026, 1, 1), amount: null },
 			{ date: new Date(2026, 2, 1), amount: 9 }
 		]);
-		expect(a11y.rows.map(r => r.cells[0])).toEqual(['$5.00', '—', '$9.00']);
+		expect(a11y.rows.map(r => r.cells[0])).toEqual(['$5.00', 'No data', '$9.00']);
 		expect(a11y.summary).toContain('Lowest: Jan 2026, $5.00.');
 	});
 

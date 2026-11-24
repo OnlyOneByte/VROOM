@@ -128,7 +128,7 @@ describe.each(CASES)('$name table view', ({ component, props, format }) => {
 				.map(c => c.textContent?.trim());
 			expect(cells).toEqual([
 				format(d.fuel, 'fuel'),
-				d.maintenance === null ? '—' : format(d.maintenance, 'maintenance')
+				d.maintenance === null ? 'No data' : format(d.maintenance, 'maintenance')
 			]);
 		});
 	});
