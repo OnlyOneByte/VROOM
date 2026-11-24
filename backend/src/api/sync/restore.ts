@@ -32,6 +32,7 @@ import {
   SyncError,
   ValidationError,
 } from '../../errors';
+import { changeShareRole } from '../../permissions/grants';
 import {
   type BackupConfig,
   DEFAULT_PROVIDER_CAPABILITIES,
@@ -608,6 +609,7 @@ class RestoreService {
           status: this.resolveShareStatus(share, consentedShares),
         }))
     );
+    this.grantAcceptedShareRoles(tx, userId);
     const ownedProviders = this.ownedProviderIds(tx, userId);
     this.insertRows(
       tx,
@@ -720,6 +722,23 @@ class RestoreService {
         },
       },
     };
+  }
+
+  private grantAcceptedShareRoles(tx: DrizzleTransaction, userId: string): void {
+    const accepted = tx
+      .select()
+      .from(vehicleShares)
+      .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')))
+      .all();
+    for (const share of accepted) {
+      if (!share.sharedWithId) continue;
+      changeShareRole(tx, {
+        vehicleId: share.vehicleId,
+        sharedWithId: share.sharedWithId,
+        level: share.level,
+        grantedBy: userId,
+      });
+    }
   }
 
   private consentedShareKeys(tx: DrizzleTransaction, userId: string): Set<string> {

@@ -21,6 +21,7 @@ export const users = sqliteTable(
       .$defaultFn(() => createId()),
     email: text('email').notNull().unique(),
     displayName: text('display_name').notNull(),
+    disabledAt: integer('disabled_at', { mode: 'timestamp' }),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
@@ -567,6 +568,100 @@ export const vehicleShares = sqliteTable(
       .where(sql`shared_with_id is null and status = 'pending'`),
     sharedWithIdx: index('vehicle_shares_shared_with_idx').on(table.sharedWithId, table.status),
     ownerIdx: index('vehicle_shares_owner_idx').on(table.ownerId),
+  })
+);
+
+export const roles = sqliteTable(
+  'roles',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    scope: text('scope', { enum: ['server', 'vehicle'] }).notNull(),
+    key: text('key'),
+    name: text('name').notNull(),
+    color: text('color'),
+    builtIn: integer('built_in', { mode: 'boolean' }).notNull().default(false),
+    ownerUserId: text('owner_user_id').references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    scopeKeyIdx: uniqueIndex('roles_scope_key_idx').on(table.scope, table.key),
+    ownerIdx: index('roles_owner_idx').on(table.ownerUserId),
+  })
+);
+
+export const rolePermissions = sqliteTable(
+  'role_permissions',
+  {
+    roleId: text('role_id')
+      .notNull()
+      .references(() => roles.id, { onDelete: 'cascade' }),
+    permission: text('permission').notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.roleId, table.permission] }),
+  })
+);
+
+export const roleAssignments = sqliteTable(
+  'role_assignments',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    roleId: text('role_id')
+      .notNull()
+      .references(() => roles.id, { onDelete: 'cascade' }),
+    scopeId: text('scope_id').references(() => vehicles.id, { onDelete: 'cascade' }),
+    grantedBy: text('granted_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    userRoleScopeIdx: uniqueIndex('ra_user_role_scope_idx').on(
+      table.userId,
+      table.roleId,
+      table.scopeId
+    ),
+    serverUserRoleIdx: uniqueIndex('ra_server_user_role_idx')
+      .on(table.userId, table.roleId)
+      .where(sql`scope_id is null`),
+    roleIdx: index('ra_role_idx').on(table.roleId),
+    scopeIdx: index('ra_scope_idx').on(table.scopeId),
+  })
+);
+
+export const permissionOverrides = sqliteTable(
+  'permission_overrides',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    scope: text('scope', { enum: ['server', 'vehicle'] }).notNull(),
+    scopeId: text('scope_id').references(() => vehicles.id, { onDelete: 'cascade' }),
+    permission: text('permission').notNull(),
+    effect: text('effect', { enum: ['allow', 'deny'] }).notNull(),
+    setBy: text('set_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    userScopePermissionIdx: uniqueIndex('po_user_scope_permission_idx').on(
+      table.userId,
+      table.scope,
+      table.scopeId,
+      table.permission
+    ),
+    serverUserPermissionIdx: uniqueIndex('po_server_user_permission_idx')
+      .on(table.userId, table.scope, table.permission)
+      .where(sql`scope_id is null`),
+    scopeIdx: index('po_scope_idx').on(table.scopeId),
   })
 );
 

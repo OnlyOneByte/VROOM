@@ -43,6 +43,12 @@ export class DemoReadOnlyError extends AppError {
   }
 }
 
+export class ForbiddenError extends AppError {
+  constructor(message: string = "You don't have permission to do that") {
+    super(message, 403, true);
+  }
+}
+
 export class NotFoundError extends AppError {
   constructor(resource: string = 'Resource') {
     super(`${resource} not found`, 404, true);

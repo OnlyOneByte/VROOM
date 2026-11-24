@@ -449,3 +449,61 @@ describe('provider health defaults', () => {
     ).toEqual({ status: 'active', last_error_code: null, last_checked_at: null, failure_count: 0 });
   });
 });
+
+describe('roles and overrides', () => {
+  let db: Database;
+  beforeEach(() => {
+    db = seeded();
+    for (const migration of migrations.slice(1)) applyMigration(db, migration);
+    db.run("INSERT INTO users (id, email, display_name) VALUES ('u2', 'b@test.com', 'User B')");
+    db.run(
+      "INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES ('ra1', 'u2', 'builtin_editor', 'v1', 'u1')"
+    );
+    db.run(
+      "INSERT INTO permission_overrides (id, user_id, scope, scope_id, permission, effect, set_by) VALUES ('po1', 'u2', 'vehicle', 'v1', 'vehicle.trip.read', 'deny', 'u1')"
+    );
+  });
+  afterEach(() => db.close());
+
+  const assignmentsOf = (userId: string) =>
+    db.query('SELECT id FROM role_assignments WHERE user_id = ?').all(userId).length;
+
+  test('deleting the vehicle drops its assignments and overrides', () => {
+    db.run("DELETE FROM vehicles WHERE id = 'v1'");
+    expect(assignmentsOf('u2')).toBe(0);
+    expect(countRows(db, 'permission_overrides')).toBe(0);
+  });
+
+  test('deleting the member drops their assignments and overrides', () => {
+    db.run("DELETE FROM users WHERE id = 'u2'");
+    expect(assignmentsOf('u2')).toBe(0);
+    expect(countRows(db, 'permission_overrides')).toBe(0);
+  });
+
+  test('deleting the person who granted them keeps the grant', () => {
+    db.run("INSERT INTO users (id, email, display_name) VALUES ('u3', 'c@test.com', 'User C')");
+    db.run("UPDATE role_assignments SET granted_by = 'u3' WHERE id = 'ra1'");
+    db.run("DELETE FROM users WHERE id = 'u3'");
+    expect(db.query("SELECT granted_by FROM role_assignments WHERE id = 'ra1'").get()).toEqual({
+      granted_by: null,
+    });
+  });
+
+  test('a server role or server override is held once per person, despite the NULL scope id', () => {
+    expect(() =>
+      db.run(
+        "INSERT INTO role_assignments (id, user_id, role_id, scope_id) VALUES ('ra2', 'u1', 'builtin_member', NULL)"
+      )
+    ).toThrow(/UNIQUE constraint failed/);
+    const override =
+      "INSERT INTO permission_overrides (id, user_id, scope, scope_id, permission, effect) VALUES (?, 'u1', 'server', NULL, 'account.delete', 'deny')";
+    db.run(override, ['po2']);
+    expect(() => db.run(override, ['po3'])).toThrow(/UNIQUE constraint failed/);
+  });
+
+  test('deleting a role drops its permissions and assignments', () => {
+    db.run("DELETE FROM roles WHERE id = 'builtin_editor'");
+    expect(assignmentsOf('u2')).toBe(0);
+    expect(assignmentsOf('u1')).toBe(1);
+  });
+});

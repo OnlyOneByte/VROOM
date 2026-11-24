@@ -18,11 +18,13 @@ export async function createInvitee(
 ): Promise<Invitee> {
   const { db } = await import('../db/connection');
   const schema = await import('../db/schema');
+  const { assignServerRole } = await import('../permissions/grants');
 
   const n = ++inviteeCounter;
   const id = `${idPrefix}-${n}`;
   const email = `${idPrefix}-${n}@test.com`;
   await db.insert(schema.users).values({ id, email, displayName: displayName ?? `Invitee ${n}` });
+  assignServerRole(db, id, 'member');
   const { cookie, request } = await requestAs(ctx, id);
 
   const acceptShare = async (vehicleId: string, level: 'viewer' | 'editor'): Promise<void> => {

@@ -13,6 +13,10 @@ const EXCLUDED_BY_DESIGN = [
   'community_stats',
   'community_refreshes',
   'calendar_feeds',
+  'roles',
+  'role_permissions',
+  'role_assignments',
+  'permission_overrides',
 ] as const;
 
 function allSchemaTableNames(): string[] {

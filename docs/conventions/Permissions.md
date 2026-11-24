@@ -67,6 +67,44 @@ and account permissions, vehicle roles hold vehicle permissions. Demo is the one
 may also hold vehicle reads, plus `account.session.manage` so a demo visitor can sign out. The
 vehicle owner is not a template: the owner holds every vehicle permission.
 
+## Roles, assignments and overrides
+
+Roles are rows. `syncBuiltInRoles()` writes the templates into `roles` and `role_permissions` on
+every start, with stable ids (`builtin_<key>`), so a template change needs no migration. Custom
+roles are server roles (managed with `server.roles.manage`) or vehicle roles in an owner's own
+library.
+
+- `role_assignments` gives a person a role: at server scope (`scope_id` null), or on one vehicle.
+  Everyone holds Member, and the demo user Demo. Accepting a share assigns Editor or Viewer from
+  its level; changing the level swaps it; revoking or leaving deletes that person's vehicle
+  assignments and overrides. `vehicle_shares` stays the membership and invite record.
+- `permission_overrides` allows or denies one permission for one person, at server or vehicle scope.
+
+`can()` in `src/permissions/resolve.ts` decides, following the design's algorithm:
+
+1. Unknown permission, or one that doesn't fit the resource → forbidden. Disabled user → disabled.
+2. The scope chain: server and the actor's own account resolve at server scope; a vehicle only at
+   that vehicle. Another person's account → not found.
+3. The vehicle owner holds every vehicle permission, overrides ignored. Without an accepted share
+   → not found. A non-grantable permission → forbidden.
+4. CASL, with later rules winning: one `can` per role permission, then one per allow override,
+   then one `cannot` per deny override on the denied permission and every permission that implies
+   it. Roles and overrides are closed under `implies`, so a deny on `read` also blocks `write`,
+   and a deny on `delete` also blocks `delete_own`. A non-grantable permission in a role row or
+   an override grants nothing, not even what it implies.
+5. A `delete` check also passes on `delete_own` when the entry's `createdBy` is the actor.
+
+The Demo role's vehicle reads count only for the built-in Demo row (built-in flag plus key), and
+only on the demo garage: vehicles whose owner holds that row. The frontend `can()` in
+`src/lib/utils/permissions.ts` reads the same rules, packed.
+
+Writes go through the escalation guards in `src/permissions/grants.ts`: you grant only permissions
+you hold, assign only roles whose permissions you hold, and the registry refuses unknown,
+non-grantable and out-of-scope permissions (a custom server role can't hold vehicle permissions).
+
+A new resolution rule gets a row in `src/permissions/__tests__/resolution.cases.json`; the backend
+and frontend suites both run it.
+
 ## Mapping the routes
 
 Every route mounted in `src/app.ts` has one entry in `ROUTE_PERMISSIONS`
