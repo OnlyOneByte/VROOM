@@ -48,6 +48,18 @@ class InsuranceClaimRepository {
     }
   }
 
+  async findAccessTarget(
+    claimId: string
+  ): Promise<{ vehicleId: string | null; ownerId: string } | null> {
+    const [row] = await this.db
+      .select({ vehicleId: insuranceClaims.vehicleId, ownerId: insurancePolicies.userId })
+      .from(insuranceClaims)
+      .innerJoin(insurancePolicies, eq(insuranceClaims.policyId, insurancePolicies.id))
+      .where(eq(insuranceClaims.id, claimId))
+      .limit(1);
+    return row ?? null;
+  }
+
   async findOwnerUserId(claimId: string): Promise<string | null> {
     const [row] = await this.db
       .select({ userId: insurancePolicies.userId })

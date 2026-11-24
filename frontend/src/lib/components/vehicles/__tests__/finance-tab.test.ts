@@ -144,6 +144,29 @@ describe('FinanceTab without active financing', () => {
 	});
 });
 
+describe('FinanceTab for a shared vehicle', () => {
+	test('says the loan is private when the sharee cannot see it', () => {
+		mount(
+			makeVehicle(undefined, {
+				sharedAccess: { level: 'viewer', sharedBy: 'Sam', seesFinancials: false }
+			}),
+			{ isOwner: false }
+		);
+		expect(screen.getByText('Loan details are private')).toBeTruthy();
+		expect(screen.queryByText(/No active financing/)).toBeNull();
+	});
+
+	test('shows no active financing to a sharee who can see loan details', () => {
+		mount(
+			makeVehicle(undefined, {
+				sharedAccess: { level: 'editor', sharedBy: 'Sam', seesFinancials: true }
+			}),
+			{ isOwner: false }
+		);
+		expect(screen.getByText(/No active financing/)).toBeTruthy();
+	});
+});
+
 describe('FinanceTab payment history', () => {
 	test('lists only the payments recorded against this loan', async () => {
 		mount(makeVehicle(makeLoan()));

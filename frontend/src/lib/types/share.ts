@@ -31,4 +31,5 @@ export interface ReceivedShare extends VehicleShare {
 export interface SharedAccess {
 	level: ShareLevel;
 	sharedBy: string;
+	seesFinancials?: boolean;
 }
