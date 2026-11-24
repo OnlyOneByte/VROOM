@@ -84,3 +84,40 @@ export function getClientIp(
   const xff = c.req.header('x-forwarded-for');
   return xff ? nearestUntrustedHop(xff, list, socketIp) : socketIp;
 }
+
+function ipv4ToGroups(address: string): number[] {
+  const [a = 0, b = 0, c = 0, d = 0] = address.split('.').map(Number);
+  return [(a << 8) | b, (c << 8) | d];
+}
+
+function ipv6Groups(address: string): number[] {
+  const parse = (part: string) =>
+    part === ''
+      ? []
+      : part
+          .split(':')
+          .flatMap((group) => (group.includes('.') ? ipv4ToGroups(group) : [parseInt(group, 16)]));
+  const [head = '', tail] = address.split('::');
+  const start = parse(head);
+  if (tail === undefined) return start;
+  const end = parse(tail);
+  return [...start, ...new Array<number>(8 - start.length - end.length).fill(0), ...end];
+}
+
+export function rateLimitKeyOf(ip: string): string {
+  const address = ip.split('%')[0] ?? ip;
+  if (isIP(address) !== 6) return ip;
+  const groups = ipv6Groups(address);
+  const [, , , , , mapped = 0, high = 0, low = 0] = groups;
+  if (groups.slice(0, 5).every((group) => group === 0) && mapped === 0xffff) {
+    return `${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`;
+  }
+  return `${groups
+    .slice(0, 4)
+    .map((group) => group.toString(16))
+    .join(':')}::/64`;
+}
+
+export function getClientRateKey(c: Context): string {
+  return rateLimitKeyOf(getClientIp(c));
+}

@@ -49,8 +49,8 @@ validates every declaration when it loads and throws on a duplicate id, a malfor
 that doesn't match the id, or an `implies` target that isn't declared. `PermissionId` is the
 union of every declared id, so a typo in the route map or a role template fails type-check.
 
-The `server` scope has no routes yet, so it declares its permissions in
-`src/permissions/server-capabilities.ts`.
+The `server` scope declares its permissions in `src/permissions/server-capabilities.ts`. The
+sign-up admin routes (`/api/v1/admin/...`) check `server.signup.manage` against the server.
 
 ## Role templates
 
@@ -75,7 +75,8 @@ library, assignable only on that owner's cars. Built-in roles can be copied (`co
 edited or deleted; the built-in keys are reserved, and a role's scope never changes.
 
 - `role_assignments` gives a person a role: at server scope (`scope_id` null), or on one vehicle.
-  Everyone holds Member, and the demo user Demo. Accepting a share clears anything left over for
+  Everyone holds Member, and the demo user Demo, except an account waiting for approval, which
+  holds no server role until an admin approves it. Accepting a share clears anything left over for
   that person on that car and assigns Editor or Viewer from its level; changing the level swaps
   it; revoking or leaving deletes that person's vehicle assignments and overrides. Each of these
   re-reads the share in its transaction and answers 409 if it changed underneath. `vehicle_shares` stays the membership and invite record.

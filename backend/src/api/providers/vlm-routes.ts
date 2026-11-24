@@ -13,6 +13,7 @@ import {
   rateLimiter,
   requireAuth,
 } from '../../middleware';
+import { authorize, ownAccount } from '../../permissions/authorize';
 import { logger } from '../../utils/logger';
 import { OcrUnavailableError } from './domains/vlm/local-ocr';
 import { parseExtraction } from './domains/vlm/prompt';
@@ -42,7 +43,7 @@ const scansAtOnce = concurrencyLimiter({
   status: 429,
 });
 
-routes.post('/parse', receiptScanLimiter, scansAtOnce, async (c) => {
+routes.post('/parse', receiptScanLimiter, scansAtOnce, authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const providerRow = await resolveProvider(user.id, 'ai.vision');
 

@@ -57,6 +57,12 @@ import { vehicleRepository } from './repository';
 
 const routes = new Hono();
 
+interface SharedAccess {
+  level: string;
+  sharedBy: string;
+  seesFinancials: boolean;
+}
+
 const VIN_PATTERN = new RegExp(
   `^[A-Z0-9]{${CONFIG.validation.vehicle.vinMinLength},${CONFIG.validation.vehicle.vinMaxLength}}$`,
   'i'
@@ -358,13 +364,14 @@ routes.get(
       throw new NotFoundError('Vehicle');
     }
 
-    let sharedAccess: { level: string; sharedBy: string } | undefined;
+    let sharedAccess: SharedAccess | undefined;
     if (access.role !== 'owner') {
       const grants = await vehicleShareRepository.findAcceptedAccessForUser(user.id);
       const grant = grants.find((g) => g.vehicleId === id);
       sharedAccess = {
         level: grant?.level ?? access.role,
         sharedBy: grant?.ownerName ?? 'Unknown',
+        seesFinancials: seesFinancials(access),
       };
     }
 
@@ -373,7 +380,7 @@ routes.get(
         computedBalance?: number;
         eligibleForPayoff?: boolean;
       };
-      sharedAccess?: { level: string; sharedBy: string };
+      sharedAccess?: SharedAccess;
     } = seesFinancials(access) ? vehicle : sharedVehicleView(vehicle);
     if (responseData.financing) {
       const computedBalance = await financingRepository.computeBalance(

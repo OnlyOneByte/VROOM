@@ -2,7 +2,7 @@ import type { MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { type AuthUser, lucia } from '../api/auth/lucia';
 import { clearSessionCookie, validateAndRefreshSession } from '../api/auth/utils';
-import { AuthenticationError } from '../errors';
+import { AccountPendingError, AuthenticationError } from '../errors';
 import { logger } from '../utils/logger';
 
 declare module 'hono' {
@@ -27,8 +27,17 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
 
   c.set('session', { id: result.session.id, expiresAt: result.session.expiresAt });
   c.set('user', result.user);
+  if (result.user.pendingApprovalAt && !PENDING_ALLOWED.has(`${c.req.method} ${c.req.path}`)) {
+    throw new AccountPendingError();
+  }
   return next();
 };
+
+const PENDING_ALLOWED = new Set([
+  'GET /api/v1/auth/me',
+  'POST /api/v1/auth/logout',
+  'GET /api/v1/auth/capabilities',
+]);
 
 // Use validateAndRefreshSession: lucia.validateSession refreshes the sliding expiry only once per request.
 export const optionalAuth: MiddlewareHandler = async (c, next) => {
