@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { MediaQuery } from 'svelte/reactivity';
 	import { resolve } from '$app/paths';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { routes } from '#lib/routes.ts';
@@ -34,6 +35,7 @@
 	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
 	import BrandMark from '#lib/components/common/BrandMark.svelte';
 
+	const wide = new MediaQuery('min-width: 64rem');
 	let mobileMenuOpen = $state(false);
 
 	let currentPath = $derived(page.url.pathname);
@@ -92,188 +94,157 @@
 	);
 </script>
 
-<div
-	class="lg:hidden fixed short:static top-0 left-0 right-0 z-40 bg-background border-b border-border pt-[env(safe-area-inset-top)]"
->
-	<div class="flex items-center justify-between px-4 py-3">
-		<div class="flex items-center gap-3">
-			<BrandMark />
-			<span class="font-bold text-foreground">VROOM</span>
-		</div>
+{#if !wide.current}
+	<div
+		class="lg:hidden fixed short:static top-0 left-0 right-0 z-40 bg-background border-b border-border pt-[env(safe-area-inset-top)]"
+	>
+		<div class="flex items-center justify-between px-4 py-3">
+			<div class="flex items-center gap-3">
+				<BrandMark />
+				<span class="font-bold text-foreground">VROOM</span>
+			</div>
 
-		<div class="flex items-center gap-2">
-			<OfflineIndicator floating={false} />
-			{#snippet mobileStatusIcon()}
-				{@const StatusIcon = syncStatusInfo.icon}
-				<div class="{syncStatusInfo.color} relative" role="status" aria-label="Sync status">
-					<StatusIcon class="h-5 w-5 {syncState.current === 'syncing' ? 'animate-spin' : ''}" />
-					{#if pendingCount > 0}
-						<Badge
-							variant="secondary"
-							class="absolute -top-2 -right-2 text-xs font-bold h-4 min-w-4 px-0.5 py-0 flex items-center justify-center"
-							aria-label="{pendingCount} pending items"
-						>
-							{pendingCount > 9 ? '9+' : pendingCount}
-						</Badge>
-					{/if}
-				</div>
-			{/snippet}
-			{@render mobileStatusIcon()}
+			<div class="flex items-center gap-2">
+				<OfflineIndicator floating={false} />
+				{#snippet mobileStatusIcon()}
+					{@const StatusIcon = syncStatusInfo.icon}
+					<div class="{syncStatusInfo.color} relative" role="status" aria-label="Sync status">
+						<StatusIcon class="h-5 w-5 {syncState.current === 'syncing' ? 'animate-spin' : ''}" />
+						{#if pendingCount > 0}
+							<Badge
+								variant="secondary"
+								class="absolute -top-2 -right-2 text-xs font-bold h-4 min-w-4 px-0.5 py-0 flex items-center justify-center"
+								aria-label="{pendingCount} pending items"
+							>
+								{pendingCount > 9 ? '9+' : pendingCount}
+							</Badge>
+						{/if}
+					</div>
+				{/snippet}
+				{@render mobileStatusIcon()}
 
-			<Sheet bind:open={mobileMenuOpen}>
-				<SheetTrigger
-					class="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring"
-					aria-label="Open navigation menu"
-				>
-					<Menu class="h-6 w-6" />
-				</SheetTrigger>
-				<SheetContent side="left" class="w-64 p-0 flex flex-col">
-					<SheetHeader class="px-6 pt-6 pb-4 border-b border-border">
-						<SheetTitle>
-							<div class="flex items-center">
-								<BrandMark />
-								<span class="ml-3 text-xl font-bold text-foreground">VROOM</span>
+				<Sheet bind:open={mobileMenuOpen}>
+					<SheetTrigger
+						class="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring"
+						aria-label="Open navigation menu"
+					>
+						<Menu class="h-6 w-6" />
+					</SheetTrigger>
+					<SheetContent side="left" class="w-64 p-0 flex flex-col">
+						<SheetHeader class="px-6 pt-6 pb-4 border-b border-border">
+							<SheetTitle>
+								<div class="flex items-center">
+									<BrandMark />
+									<span class="ml-3 text-xl font-bold text-foreground">VROOM</span>
+								</div>
+							</SheetTitle>
+						</SheetHeader>
+
+						<ScrollArea class="flex-1 px-3 mt-8">
+							<nav class="space-y-1">
+								{#each navigation as item (item.href)}
+									{@const IconComponent = item.icon}
+									<a
+										href={resolve(item.href)}
+										class={cn(
+											'group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200',
+											isActive(item.href)
+												? 'bg-primary/10 text-primary'
+												: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+										)}
+										onclick={closeMobileMenu}
+										aria-current={isActive(item.href) ? 'page' : undefined}
+									>
+										<IconComponent
+											class={cn(
+												'mr-3 h-5 w-5 flex-shrink-0',
+												isActive(item.href) ? 'text-primary' : 'text-muted-foreground'
+											)}
+										/>
+										{item.name}
+									</a>
+								{/each}
+							</nav>
+						</ScrollArea>
+
+						<div class="flex-shrink-0 px-3 pb-4">
+							<div class="space-y-1">
+								{#each userNavigation as item (item.href)}
+									{@const IconComponent = item.icon}
+									<a
+										href={resolve(item.href)}
+										class={cn(
+											'group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200',
+											isActive(item.href)
+												? 'bg-primary/10 text-primary'
+												: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+										)}
+										onclick={closeMobileMenu}
+										aria-current={isActive(item.href) ? 'page' : undefined}
+									>
+										<IconComponent
+											class={cn(
+												'mr-3 h-5 w-5 flex-shrink-0',
+												isActive(item.href) ? 'text-primary' : 'text-muted-foreground'
+											)}
+										/>
+										{item.name}
+									</a>
+								{/each}
 							</div>
-						</SheetTitle>
-					</SheetHeader>
 
-					<ScrollArea class="flex-1 px-3 mt-8">
-						<nav class="space-y-1">
-							{#each navigation as item (item.href)}
-								{@const IconComponent = item.icon}
-								<a
-									href={resolve(item.href)}
-									class={cn(
-										'group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200',
-										isActive(item.href)
-											? 'bg-primary/10 text-primary'
-											: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-									)}
-									onclick={closeMobileMenu}
-									aria-current={isActive(item.href) ? 'page' : undefined}
-								>
-									<IconComponent
-										class={cn(
-											'mr-3 h-5 w-5 flex-shrink-0',
-											isActive(item.href) ? 'text-primary' : 'text-muted-foreground'
-										)}
-									/>
-									{item.name}
-								</a>
-							{/each}
-						</nav>
-					</ScrollArea>
-
-					<div class="flex-shrink-0 px-3 pb-4">
-						<div class="space-y-1">
-							{#each userNavigation as item (item.href)}
-								{@const IconComponent = item.icon}
-								<a
-									href={resolve(item.href)}
-									class={cn(
-										'group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200',
-										isActive(item.href)
-											? 'bg-primary/10 text-primary'
-											: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-									)}
-									onclick={closeMobileMenu}
-									aria-current={isActive(item.href) ? 'page' : undefined}
-								>
-									<IconComponent
-										class={cn(
-											'mr-3 h-5 w-5 flex-shrink-0',
-											isActive(item.href) ? 'text-primary' : 'text-muted-foreground'
-										)}
-									/>
-									{item.name}
-								</a>
-							{/each}
+							<button
+								type="button"
+								class="w-full flex items-center px-3 py-2 text-sm font-medium text-muted-foreground rounded-md hover:bg-accent hover:text-accent-foreground transition-colors duration-200 mt-2"
+								onclick={handleLogout}
+							>
+								<LogOut class="mr-3 h-5 w-5 text-muted-foreground" />
+								Sign out
+							</button>
 						</div>
 
-						<button
-							type="button"
-							class="w-full flex items-center px-3 py-2 text-sm font-medium text-muted-foreground rounded-md hover:bg-accent hover:text-accent-foreground transition-colors duration-200 mt-2"
-							onclick={handleLogout}
-						>
-							<LogOut class="mr-3 h-5 w-5 text-muted-foreground" />
-							Sign out
-						</button>
-					</div>
-
-					<div class="flex-shrink-0 px-3 pb-4 border-t border-border pt-3">
-						<SyncStatusInline isExpanded={true} />
-					</div>
-				</SheetContent>
-			</Sheet>
-		</div>
-	</div>
-</div>
-
-<!-- Presentational wrapper: a role here would duplicate the nav landmark. -->
-<div
-	class={cn(
-		'hidden lg:fixed lg:inset-y-0 lg:flex lg:flex-col z-40',
-		'transition-all duration-300 ease-in-out',
-		isDesktopSidebarExpanded ? 'lg:w-64' : 'lg:w-20'
-	)}
-	onmouseenter={() => (isDesktopSidebarExpanded = true)}
-	onmouseleave={() => (isDesktopSidebarExpanded = false)}
-	onfocusin={() => (isDesktopSidebarExpanded = true)}
-	onfocusout={collapseSidebarOnFocusLeave}
-	role="none"
->
-	<div
-		class={cn(
-			'flex flex-col flex-grow overflow-y-auto',
-			'bg-background border-r border-border',
-			'pt-5 pb-4'
-		)}
-	>
-		<div class={cn('flex items-center flex-shrink-0 px-6', 'transition-all duration-300')}>
-			<div class="flex h-8 items-center">
-				<BrandMark />
-				{#if isDesktopSidebarExpanded}
-					<span class={cn('ml-3 text-xl font-bold whitespace-nowrap', 'text-foreground')}>
-						VROOM
-					</span>
-				{/if}
+						<div class="flex-shrink-0 px-3 pb-4 border-t border-border pt-3">
+							<SyncStatusInline isExpanded={true} />
+						</div>
+					</SheetContent>
+				</Sheet>
 			</div>
 		</div>
-
-		<nav class={cn('mt-8 flex-1 px-3 space-y-1')}>
-			{#each navigation as item (item.href)}
-				{@const IconComponent = item.icon}
-				<a
-					href={resolve(item.href)}
-					class={cn(
-						'group flex items-center px-3 py-2 text-sm font-medium rounded-md',
-						'transition-colors duration-200',
-						'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-						isActive(item.href)
-							? 'bg-primary/10 text-primary'
-							: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-						!isDesktopSidebarExpanded && 'justify-center'
-					)}
-					title={!isDesktopSidebarExpanded ? item.name : ''}
-					aria-current={isActive(item.href) ? 'page' : undefined}
-				>
-					<IconComponent
-						class={cn(
-							'h-5 w-5 flex-shrink-0',
-							isActive(item.href) ? 'text-primary' : 'text-muted-foreground',
-							isDesktopSidebarExpanded && 'mr-3'
-						)}
-					/>
+	</div>
+{:else}
+	<!-- Presentational wrapper: a role here would duplicate the nav landmark. -->
+	<div
+		class={cn(
+			'hidden lg:fixed lg:inset-y-0 lg:flex lg:flex-col z-40',
+			'transition-all duration-300 ease-in-out',
+			isDesktopSidebarExpanded ? 'lg:w-64' : 'lg:w-20'
+		)}
+		onmouseenter={() => (isDesktopSidebarExpanded = true)}
+		onmouseleave={() => (isDesktopSidebarExpanded = false)}
+		onfocusin={() => (isDesktopSidebarExpanded = true)}
+		onfocusout={collapseSidebarOnFocusLeave}
+		role="none"
+	>
+		<div
+			class={cn(
+				'flex flex-col flex-grow overflow-y-auto',
+				'bg-background border-r border-border',
+				'pt-5 pb-4'
+			)}
+		>
+			<div class={cn('flex items-center flex-shrink-0 px-6', 'transition-all duration-300')}>
+				<div class="flex h-8 items-center">
+					<BrandMark />
 					{#if isDesktopSidebarExpanded}
-						<span class="whitespace-nowrap">{item.name}</span>
+						<span class={cn('ml-3 text-xl font-bold whitespace-nowrap', 'text-foreground')}>
+							VROOM
+						</span>
 					{/if}
-				</a>
-			{/each}
-		</nav>
+				</div>
+			</div>
 
-		<div class={cn('flex-shrink-0 px-3 pb-3')}>
-			<div class="space-y-1">
-				{#each userNavigation as item (item.href)}
+			<nav class={cn('mt-8 flex-1 px-3 space-y-1')}>
+				{#each navigation as item (item.href)}
 					{@const IconComponent = item.icon}
 					<a
 						href={resolve(item.href)}
@@ -301,31 +272,64 @@
 						{/if}
 					</a>
 				{/each}
+			</nav>
+
+			<div class={cn('flex-shrink-0 px-3 pb-3')}>
+				<div class="space-y-1">
+					{#each userNavigation as item (item.href)}
+						{@const IconComponent = item.icon}
+						<a
+							href={resolve(item.href)}
+							class={cn(
+								'group flex items-center px-3 py-2 text-sm font-medium rounded-md',
+								'transition-colors duration-200',
+								'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+								isActive(item.href)
+									? 'bg-primary/10 text-primary'
+									: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+								!isDesktopSidebarExpanded && 'justify-center'
+							)}
+							title={!isDesktopSidebarExpanded ? item.name : ''}
+							aria-current={isActive(item.href) ? 'page' : undefined}
+						>
+							<IconComponent
+								class={cn(
+									'h-5 w-5 flex-shrink-0',
+									isActive(item.href) ? 'text-primary' : 'text-muted-foreground',
+									isDesktopSidebarExpanded && 'mr-3'
+								)}
+							/>
+							{#if isDesktopSidebarExpanded}
+								<span class="whitespace-nowrap">{item.name}</span>
+							{/if}
+						</a>
+					{/each}
+				</div>
+
+				<button
+					type="button"
+					class={cn(
+						'w-full flex items-center px-3 py-2 text-sm font-medium rounded-md',
+						'transition-colors duration-200 mt-2',
+						'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+						'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+						!isDesktopSidebarExpanded && 'justify-center'
+					)}
+					onclick={handleLogout}
+					title={!isDesktopSidebarExpanded ? 'Sign out' : ''}
+				>
+					<LogOut class={cn('h-5 w-5 text-muted-foreground', isDesktopSidebarExpanded && 'mr-3')} />
+					{#if isDesktopSidebarExpanded}
+						<span class="whitespace-nowrap">Sign out</span>
+					{/if}
+				</button>
 			</div>
 
-			<button
-				type="button"
-				class={cn(
-					'w-full flex items-center px-3 py-2 text-sm font-medium rounded-md',
-					'transition-colors duration-200 mt-2',
-					'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-					'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-					!isDesktopSidebarExpanded && 'justify-center'
-				)}
-				onclick={handleLogout}
-				title={!isDesktopSidebarExpanded ? 'Sign out' : ''}
-			>
-				<LogOut class={cn('h-5 w-5 text-muted-foreground', isDesktopSidebarExpanded && 'mr-3')} />
-				{#if isDesktopSidebarExpanded}
-					<span class="whitespace-nowrap">Sign out</span>
-				{/if}
-			</button>
-		</div>
-
-		<div class={cn('flex-shrink-0 px-3 pb-4')}>
-			<SyncStatusInline isExpanded={isDesktopSidebarExpanded} />
+			<div class={cn('flex-shrink-0 px-3 pb-4')}>
+				<SyncStatusInline isExpanded={isDesktopSidebarExpanded} />
+			</div>
 		</div>
 	</div>
-</div>
+{/if}
 
 <div class="lg:hidden short:hidden h-16 pt-[env(safe-area-inset-top)]"></div>
