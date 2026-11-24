@@ -6,7 +6,7 @@ import { requireAuth } from '../../middleware';
 import { calendarParts, zonedCalendar } from '../../utils/analytics-charts';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { zValidator } from '../../utils/validation';
-import { requireVehicleAccess } from '../../utils/vehicle-access';
+import { requireVehicleAccess, seesFinancials } from '../../utils/vehicle-access';
 import {
   analyticsQueryToApi,
   analyticsSummaryToApi,
@@ -308,8 +308,14 @@ routes.get('/vehicle-health', zValidator('query', vehicleIdQuerySchema), async (
 routes.get('/vehicle-tco', zValidator('query', yearVehicleQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, year, timeZone } = c.req.valid('query');
-  const scopeId = (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId;
-  const data = await analyticsRepository.getVehicleTCO(scopeId, vehicleId, year, timeZone);
+  const access = await requireVehicleAccess(vehicleId, user.id, 'read');
+  const data = await analyticsRepository.getVehicleTCO(
+    access.ownerId,
+    vehicleId,
+    year,
+    timeZone,
+    !seesFinancials(access)
+  );
   return c.json({ success: true, data: vehicleTcoToApi(data) });
 });
 
@@ -319,12 +325,13 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { vehicleId, startDate, endDate, timeZone } = c.req.valid('query');
-    const scopeId = (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId;
+    const access = await requireVehicleAccess(vehicleId, user.id, 'read');
     const data = await analyticsRepository.getVehicleExpenses(
-      scopeId,
+      access.ownerId,
       vehicleId,
       { start: startDate, end: endDate },
-      timeZone
+      timeZone,
+      !seesFinancials(access)
     );
     return c.json({ success: true, data: vehicleExpensesToApi(data) });
   }

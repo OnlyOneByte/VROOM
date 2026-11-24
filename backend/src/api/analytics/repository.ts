@@ -80,7 +80,7 @@ import {
   convertVolume,
   type UnitScale,
 } from '../../utils/unit-conversions';
-import { ownedVehiclesScope } from '../../utils/vehicle-access';
+import { hiddenFinancialsScope, ownedVehiclesScope } from '../../utils/vehicle-access';
 import { FinancingRepository } from '../financing/repository';
 import { isTermInForce, termInForceAt } from '../insurance/in-force';
 
@@ -867,11 +867,13 @@ export class AnalyticsRepository {
   private async queryAllExpenses(
     userId: string,
     range?: DateRange,
-    filter?: VehicleFilter
+    filter?: VehicleFilter,
+    hideFinancials = false
   ): Promise<GeneralExpenseRow[]> {
     const conditions = [eq(expenses.userId, userId)];
     const vehicleCondition = vehicleFilterCondition(expenses.vehicleId, filter);
     if (vehicleCondition) conditions.push(vehicleCondition);
+    if (hideFinancials) conditions.push(hiddenFinancialsScope());
     if (range) {
       conditions.push(gte(expenses.date, new Date(range.start * 1000)));
       conditions.push(lt(expenses.date, new Date(range.end * 1000)));
@@ -2085,7 +2087,8 @@ export class AnalyticsRepository {
     userId: string,
     vehicleId: string,
     year?: number,
-    timeZone?: string
+    timeZone?: string,
+    hideFinancials = false
   ): Promise<VehicleTCOData> {
     const calendar = zonedCalendar(timeZone);
     try {
@@ -2099,10 +2102,11 @@ export class AnalyticsRepository {
       ]);
       const vehicleName = vehicleNameMap.get(vehicleId) ?? 'Unknown';
       const vehicle = vehicleRows[0];
-      const purchasePrice = vehicle?.purchasePrice ?? null;
+      const purchasePrice = hideFinancials ? null : (vehicle?.purchasePrice ?? null);
       const purchaseDate = vehicle?.purchaseDate ?? null;
 
       const conditions = [eq(expenses.vehicleId, vehicleId), ownedVehiclesScope(userId)];
+      if (hideFinancials) conditions.push(hiddenFinancialsScope());
       if (year) {
         const { start: yearStart, end: yearEnd } = calendarYearRange(year, calendar);
         conditions.push(gte(expenses.date, yearStart));
@@ -2164,12 +2168,13 @@ export class AnalyticsRepository {
     userId: string,
     vehicleId: string,
     range: DateRange,
-    timeZone?: string
+    timeZone?: string,
+    hideFinancials = false
   ): Promise<VehicleExpensesData> {
     const calendar = zonedCalendar(timeZone);
     try {
       const [allExpenses, vehicleUnitsMap] = await Promise.all([
-        this.queryAllExpenses(userId, range, [vehicleId]),
+        this.queryAllExpenses(userId, range, [vehicleId], hideFinancials),
         this.getAllVehicleUnits(userId),
       ]);
       const fuelRows = allExpenses.filter((e) => e.category === 'fuel');

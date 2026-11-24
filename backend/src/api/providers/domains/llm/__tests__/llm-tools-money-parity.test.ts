@@ -330,8 +330,8 @@ describe('assistant tools scope a shared vehicle to the OWNER books, like the ro
       `/api/v1/expenses/summary?vehicleId=${vehicleId}&period=all`
     );
 
-    expect(tool.expenseCount).toBe(ALL_TIME_EXPENSE_COUNT);
-    expect(tool.totalAmount).toBe(ALL_TIME_EXPENSES);
+    expect(tool.expenseCount).toBe(ALL_TIME_EXPENSE_COUNT - 1);
+    expect(tool.totalAmount).toBe(WINDOW_EXPENSES);
     expect(tool).toEqual(route);
   });
 
