@@ -118,6 +118,9 @@ Full pattern in `DatabaseMigrations.md`. Key points:
 
 ## Rules
 
+- A test that fails with no code cause is a flake. Fix it or quarantine it the same day, as
+  `Flaky-Tests.md` describes. Never add retries or a longer timeout to hide it.
+
 - Mocks must match current types. If `Expense` changes, update them — no stale field names.
 - Type what you assert against: import the real type or declare the shape inline (`json<T>()` is
   the only cast in the backend harness). `no-explicit-any` is deliberately off for test files
