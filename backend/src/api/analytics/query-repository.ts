@@ -772,7 +772,7 @@ export class AnalyticsQueryRepository {
       sql`
       SELECT e.id, e.date, e.category, e.vehicle_id, e.description, e.expense_amount AS amount
       FROM expenses e WHERE ${where} AND e.category <> 'fuel'
-      ORDER BY e.expense_amount DESC, e.date DESC LIMIT ${limit}
+      ORDER BY e.expense_amount DESC, e.date DESC, e.id DESC LIMIT ${limit}
     `
     );
     const total = totals?.total ?? 0;
