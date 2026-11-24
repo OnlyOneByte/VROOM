@@ -1,11 +1,12 @@
 import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
-import { count, ne } from 'drizzle-orm';
-import { DEMO_USER_ID } from '../api/auth/demo';
+import { count, eq, ne } from 'drizzle-orm';
+import { DEMO_USER_ID } from '../api/auth/demo-account';
 import { CONFIG } from '../config';
 import { getDb } from '../db/connection';
 import { users } from '../db/schema';
 import { ValidationError } from '../errors';
+import { resolverFor } from '../permissions/grants';
 
 type AddressClass = 'public' | 'private' | 'forbidden';
 
@@ -222,6 +223,27 @@ export function privateEndpointPolicy(): PrivateEndpointPolicy {
   return cachedPolicy.policy;
 }
 
+export const PRIVATE_NETWORK_PERMISSION = 'server.private_network.use';
+
+export function isNetworkAdmin(userId: string): boolean {
+  const db = getDb();
+  const email = db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .get()?.email;
+  if (email && CONFIG.adminEmails.includes(email.toLowerCase())) return true;
+  return resolverFor(db, userId).can(PRIVATE_NETWORK_PERMISSION, { kind: 'server' }).allow;
+}
+
+export function privateEndpointPolicyFor(ownerId: string): PrivateEndpointPolicy {
+  const { allow, block } = CONFIG.privateProviderEndpoints;
+  if (block) return BLOCK_PRIVATE;
+  if (CONFIG.adminEmails.length === 0) return privateEndpointPolicy();
+  if (!isNetworkAdmin(ownerId)) return BLOCK_PRIVATE;
+  return allow.trim() === '' ? ALLOW_PRIVATE : privateEndpointPolicy();
+}
+
 function normalizedHost(hostname: string): string {
   return hostname.toLowerCase().replace(/\.$/, '');
 }
@@ -361,9 +383,10 @@ function isConnectFailure(err: unknown): boolean {
 export async function fetchOutbound(
   raw: string,
   init: RequestInit & { headers?: Record<string, string> },
-  label: string
+  label: string,
+  policy: PrivateEndpointPolicy = privateEndpointPolicy()
 ): Promise<Response> {
-  const { url, addresses } = await resolveSafeOutboundTarget(raw, label);
+  const { url, addresses } = await resolveSafeOutboundTarget(raw, label, policy);
   if (literalAddress(url.hostname)) return fetch(url, { ...init, redirect: 'manual' });
   let lastError: unknown;
   for (const address of addresses) {

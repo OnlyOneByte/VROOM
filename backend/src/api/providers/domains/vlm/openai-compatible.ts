@@ -13,6 +13,7 @@ interface OpenAiResponse {
 export class OpenAiCompatibleVlmProvider implements VlmProvider {
   private readonly apiKey?: string;
   private readonly model: string;
+  private readonly outbound: ModelProviderSettings['outbound'];
   private readonly baseUrl: string;
 
   constructor(settings: ModelProviderSettings) {
@@ -21,6 +22,7 @@ export class OpenAiCompatibleVlmProvider implements VlmProvider {
     }
     this.apiKey = settings.apiKey;
     this.model = settings.model;
+    this.outbound = settings.outbound;
     this.baseUrl = trimBaseUrl(settings.baseUrl);
   }
 
@@ -34,6 +36,7 @@ export class OpenAiCompatibleVlmProvider implements VlmProvider {
       url: `${this.baseUrl}/chat/completions`,
       headers: this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {},
       timeoutMs: REQUEST_TIMEOUT_MS,
+      outbound: this.outbound,
       body: {
         model: this.model,
         max_tokens: MAX_TOKENS,

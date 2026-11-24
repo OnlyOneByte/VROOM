@@ -10,10 +10,12 @@ import { assignServerRole } from '../../permissions/grants';
 import { DEMO_ROLE_KEY } from '../../permissions/roles';
 import { extractErrorMessage } from '../../utils/error-handling';
 import { logger } from '../../utils/logger';
+import { DEMO_USER_ID } from './demo-account';
 import { lucia } from './lucia';
 import { DEMO_SESSION_PREFIX, demoSessionExpiresAt, setSessionCookie } from './utils';
 
-export const DEMO_USER_ID = 'demo-garage';
+export { DEMO_USER_ID };
+
 const DEMO_USER_EMAIL = 'demo-garage@vroom.invalid';
 
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

@@ -23,6 +23,7 @@ interface OpenAiResponse {
 export class OpenAiCompatibleLlmProvider implements LlmProvider {
   private readonly apiKey?: string;
   private readonly model: string;
+  private readonly outbound: ModelProviderSettings['outbound'];
   private readonly baseUrl: string;
 
   constructor(settings: ModelProviderSettings) {
@@ -31,6 +32,7 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
     }
     this.apiKey = settings.apiKey;
     this.model = settings.model;
+    this.outbound = settings.outbound;
     this.baseUrl = trimBaseUrl(settings.baseUrl);
   }
 
@@ -42,6 +44,7 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
       url: `${this.baseUrl}/chat/completions`,
       headers: this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {},
       timeoutMs: REQUEST_TIMEOUT_MS,
+      outbound: this.outbound,
       body: {
         model: this.model,
         max_tokens: MAX_TOKENS,

@@ -33,6 +33,7 @@ interface AnthropicMessage {
 export class AnthropicLlmProvider implements LlmProvider {
   private readonly apiKey: string;
   private readonly model: string;
+  private readonly outbound: ModelProviderSettings['outbound'];
   private readonly baseUrl: string;
 
   constructor(settings: ModelProviderSettings) {
@@ -41,6 +42,7 @@ export class AnthropicLlmProvider implements LlmProvider {
     }
     this.apiKey = settings.apiKey;
     this.model = settings.model;
+    this.outbound = settings.outbound;
     this.baseUrl = trimBaseUrl(settings.baseUrl ?? DEFAULT_BASE_URL);
   }
 
@@ -58,6 +60,7 @@ export class AnthropicLlmProvider implements LlmProvider {
       url: `${this.baseUrl}/v1/messages`,
       headers: { 'x-api-key': this.apiKey, 'anthropic-version': ANTHROPIC_VERSION },
       timeoutMs: REQUEST_TIMEOUT_MS,
+      outbound: this.outbound,
       body: {
         model: this.model,
         max_tokens: MAX_TOKENS,
