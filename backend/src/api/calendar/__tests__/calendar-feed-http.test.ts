@@ -279,6 +279,9 @@ describe('the calendar feed link', () => {
       for (const variant of [
         path.replace('/calendar/', '/%63alendar/'),
         path.replace('/calendar/', '/%2563alendar/'),
+        `/api${path}`,
+        `/api${path.replace('/calendar/', '/%63alendar/')}`,
+        `/api${path.replace('.ics', '%0A.ics')}`,
         path.replace(token, `${token.slice(0, 21)}${hex(token[21])}${token.slice(22)}`),
         path.replace(token, `${token.slice(0, 21)}%25${hex(token[21]).slice(1)}${token.slice(22)}`),
       ]) {

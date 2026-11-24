@@ -27,7 +27,7 @@ import { routes as syncRoutes } from './api/sync/routes';
 import { routes as tripRoutes } from './api/trips/routes';
 import { routes as vehicleRoutes } from './api/vehicles/routes';
 import { CONFIG } from './config';
-import { createErrorResponse } from './errors';
+import { createErrorResponse, NotFoundError } from './errors';
 import { activityTracker, bodyLimit, errorHandler, optionalAuth, rateLimiter } from './middleware';
 import { getClientIp } from './utils/client-ip';
 import { logger } from './utils/logger';
@@ -167,11 +167,10 @@ app.use('/api/*', async (c, next) => {
     return next();
   }
 
+  if (redactFeedTokens(path) !== path) throw new NotFoundError('Calendar feed');
+
   const newPath = path.replace('/api/', '/api/v1/');
-  logger.debug('Redirecting to versioned API', {
-    from: redactFeedTokens(path),
-    to: redactFeedTokens(newPath),
-  });
+  logger.debug('Redirecting to versioned API', { from: path, to: newPath });
   return c.redirect(newPath, 308);
 });
 
