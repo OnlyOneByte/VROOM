@@ -333,8 +333,9 @@ function emptyAggregate(): Aggregate {
 function rangeStart(requested: number | undefined, firsts: number[], end: number): number {
   const earliest = firsts.length > 0 ? Math.min(...firsts) : undefined;
   const first = earliest !== undefined && earliest < end ? earliest : undefined;
-  if (requested === undefined) return first ?? end - DEFAULT_RANGE_SECONDS;
-  return Math.max(requested, first ?? requested);
+  const fallback = end - DEFAULT_RANGE_SECONDS;
+  if (requested === undefined) return first ?? fallback;
+  return Math.max(requested, first ?? fallback);
 }
 
 function vehicleName(v: {

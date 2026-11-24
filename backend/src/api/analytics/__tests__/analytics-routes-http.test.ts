@@ -215,7 +215,6 @@ describe('analytics routes (real HTTP stack)', () => {
       'metric=distance&groupBy=tag',
       'metric=cost&start=1735689600&end=1704067200',
       'metric=cost&categories=fuel,petrol',
-      'metric=cost&interval=week&start=946684800&end=1735689600',
       'metric=cost&timeZone=Mars%2FOlympus',
       'metric=cost&vehicleIds=,,',
       'metric=cost&categories=',
@@ -237,6 +236,18 @@ describe('analytics routes (real HTTP stack)', () => {
     expect(body.data.buckets).toHaveLength(12);
     expect(body.data.series).toEqual([]);
     expect(body.data.compare).toBeNull();
+
+    const seeded = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'maintenance',
+      expenseAmount: 50,
+      date: '2000-01-15T00:00:00.000Z',
+    });
+    expect(seeded.status).toBe(201);
+    const tooMany = 'metric=cost&interval=week&start=946684800&end=1735689600';
+    expect((await ctx.authed('GET', `/api/v1/analytics/query?${tooMany}`)).status, tooMany).toBe(
+      400
+    );
   });
 
   test('summary, cross-vehicle, financing and insurance take a vehicleIds list', async () => {
