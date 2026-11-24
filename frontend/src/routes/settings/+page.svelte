@@ -13,6 +13,7 @@
 	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
 	import { Avatar, AvatarFallback } from '#lib/components/ui/avatar/index.ts';
 	import UnitPreferencesCard from '#lib/components/settings/cards/UnitPreferencesCard.svelte';
+	import CommunityStatsCard from '#lib/components/settings/cards/CommunityStatsCard.svelte';
 	import ThemeCard from '#lib/components/settings/cards/ThemeCard.svelte';
 	import ThemePickerCard from '#lib/components/settings/cards/ThemePickerCard.svelte';
 	import PWAInstallCard from '#lib/components/settings/cards/PwaInstallCard.svelte';
@@ -26,6 +27,7 @@
 	import type {
 		BackupConfig,
 		BackupOrchestratorResult,
+		CommunityStatsUpdate,
 		RestoreResult,
 		UserProviderInfo,
 		UserSettings
@@ -177,6 +179,21 @@
 
 	function saveCurrency() {
 		void saveSettings({ currencyUnit }, 'Currency saved');
+	}
+
+	async function saveCommunityStats(updates: CommunityStatsUpdate) {
+		try {
+			await persist(updates);
+		} catch (error) {
+			appStore.showError(`Couldn't save community settings. ${userFacingErrorMessage(error)}`);
+			throw error;
+		}
+		appStore.showSuccess(communitySavedMessage(updates));
+	}
+
+	function communitySavedMessage(updates: CommunityStatsUpdate): string {
+		if (updates.communityStatsOptIn === undefined) return 'Region saved';
+		return updates.communityStatsOptIn ? 'Community stats turned on' : 'Community stats turned off';
 	}
 
 	function saveSyncInterval() {
@@ -365,6 +382,13 @@
 				onUnitsChange={saveUnits}
 				onCurrencyChange={saveCurrency}
 			/>
+			{#if settings.communityStatsMode !== 'off'}
+				<CommunityStatsCard
+					optIn={settings.communityStatsOptIn ?? false}
+					region={settings.communityRegion ?? null}
+					onSave={saveCommunityStats}
+				/>
+			{/if}
 			<PWAInstallCard />
 			<PushNotificationsCard />
 			{#await migrateCard then { default: MigrateFromTrackerCard }}

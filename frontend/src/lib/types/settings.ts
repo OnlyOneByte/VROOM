@@ -107,6 +107,16 @@ export interface UserSettings {
 	storageConfig?: StorageConfig;
 	backupConfig?: BackupConfig;
 	providerDefaults?: Partial<Record<'ai.llm' | 'ai.vision', string | null>>;
+	communityStatsOptIn?: boolean;
+	communityStatsConsentedAt?: string | null;
+	communityRegion?: string | null;
+	communityStatsMode?: CommunityStatsMode;
 	createdAt: string;
 	updatedAt: string;
 }
+
+export type CommunityStatsMode = 'off' | 'local';
+
+export type CommunityStatsUpdate = Partial<
+	Pick<UserSettings, 'communityStatsOptIn' | 'communityRegion'>
+>;
