@@ -14,6 +14,7 @@ import {
 } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
+import { countNum, sqlFalse, sumNum } from '../../db/dialect';
 import {
   expenses,
   insurancePolicies,
@@ -106,7 +107,7 @@ function vehicleFilterCondition(
   filter: VehicleFilter
 ): SQL | undefined {
   if (!filter) return undefined;
-  return filter.length > 0 ? inArray(column, [...filter]) : sql`0`;
+  return filter.length > 0 ? inArray(column, [...filter]) : sqlFalse;
 }
 
 function toVehicleFilter(vehicles: string | VehicleFilter): VehicleFilter {
@@ -903,7 +904,7 @@ export class AnalyticsRepository {
   ): Promise<number> {
     const { start: yearStart, end: yearEnd } = calendarYearRange(year, calendar);
     const result = await this.db
-      .select({ total: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)` })
+      .select({ total: sumNum(expenses.expenseAmount) })
       .from(expenses)
       .where(
         and(eq(expenses.userId, userId), gte(expenses.date, yearStart), lt(expenses.date, yearEnd))
@@ -932,10 +933,10 @@ export class AnalyticsRepository {
     const rows = await this.db
       .select({
         vehicleId: expenses.vehicleId,
-        count: sql<number>`COUNT(CASE WHEN ${expenses.volume} > 0 AND ${isGas} THEN 1 END)`,
-        totalGallons: sql<number>`COALESCE(SUM(CASE WHEN ${isGas} THEN ${expenses.volume} END), 0)`,
-        chargeCount: sql<number>`COUNT(CASE WHEN ${expenses.volume} > 0 AND ${isCharge} THEN 1 END)`,
-        chargeEnergy: sql<number>`COALESCE(SUM(CASE WHEN ${isCharge} THEN ${expenses.volume} END), 0)`,
+        count: countNum(sql`CASE WHEN ${expenses.volume} > 0 AND ${isGas} THEN 1 END`),
+        totalGallons: sumNum(sql`CASE WHEN ${isGas} THEN ${expenses.volume} END`),
+        chargeCount: countNum(sql`CASE WHEN ${expenses.volume} > 0 AND ${isCharge} THEN 1 END`),
+        chargeEnergy: sumNum(sql`CASE WHEN ${isCharge} THEN ${expenses.volume} END`),
       })
       .from(expenses)
       .where(and(...conditions))
