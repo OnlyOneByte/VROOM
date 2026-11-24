@@ -112,7 +112,7 @@ vroom/
 | [Architecture](docs/architecture.md) | System design, data flow, and the reasoning behind it |
 | [Development Guide](docs/development.md) | Local setup, workflow, and testing |
 | [Deployment Guide](docs/deployment.md) | Docker, self-hosting, reverse proxy, and SSL |
-| [Conventions](docs/conventions/) | Coding rules for each area: code quality, Svelte, API, migrations, testing, design system, UI |
+| [Conventions](docs/conventions/) | Coding rules for each area: code quality, Svelte, API, permissions, migrations, testing, design system, UI |
 | [Contributing](CONTRIBUTING.md) | How to propose and submit a change |
 
 ## Contributing
