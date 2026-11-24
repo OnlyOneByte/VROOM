@@ -43,6 +43,7 @@ export function vehicle(
     catalogModelId: 'honda-civic',
     modelYear: 2019,
     vehicleType: 'gas',
+    vehicleKind: 'car',
     unitPreferences: units ?? DEFAULT_UNIT_PREFERENCES,
     currency: 'USD',
     region: null,

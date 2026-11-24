@@ -58,6 +58,7 @@ export interface CommunityVehicle {
   catalogModelId: string | null;
   modelYear: number;
   vehicleType: string;
+  vehicleKind: string;
   unitPreferences: UnitPreferences;
   currency: string;
   region: string | null;
@@ -167,7 +168,7 @@ const isRunningCost = (expense: CommunityExpense) =>
 
 export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSample[] {
   const samples: VehicleSample[] = [];
-  const { vehicleType, currency, region, modelYear, catalogModelId } = vehicle;
+  const { vehicleType, vehicleKind, currency, region, modelYear, catalogModelId } = vehicle;
   const band = ageBand(modelYear, now);
   const ownedWholeWindow =
     vehicle.firstRecordAt !== null &&
@@ -190,7 +191,7 @@ export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSam
   if (km >= MIN_RUNNING_COST_KM) {
     samples.push({
       metric: 'running_cost',
-      bucketKey: `running_cost|${vehicleType}|${currency}|${region ?? '-'}`,
+      bucketKey: `running_cost|${vehicleType}|${vehicleKind}|${currency}|${region ?? '-'}`,
       unit: 'cents_per_km',
       value: sumCents(vehicle, isRunningCost) / km,
       fields: { vehicleType, currency, region },
@@ -200,7 +201,7 @@ export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSam
   if (ownedWholeWindow) {
     samples.push({
       metric: 'maintenance',
-      bucketKey: `maintenance|${band}|${vehicleType}|${currency}`,
+      bucketKey: `maintenance|${band}|${vehicleType}|${vehicleKind}|${currency}`,
       unit: 'cents_per_year',
       value: sumCents(vehicle, isMaintenance),
       fields: { ageBand: band, vehicleType, currency },

@@ -284,7 +284,7 @@ describe('GET /api/v1/community/compare', () => {
   test("a share recipient never sees metrics keyed by the owner's region", async () => {
     await ctx.authed('PUT', '/api/v1/settings', { communityRegion: 'US-CA' });
     const vehicleId = await seedCivic();
-    insertBucket('running_cost|gas|USD|US-CA', 'running_cost', 'cents_per_km', 400, 9);
+    insertBucket('running_cost|gas|car|USD|US-CA', 'running_cost', 'cents_per_km', 400, 9);
     await optIn();
     await other.acceptShare(vehicleId, 'viewer');
     await optIn(other.request);

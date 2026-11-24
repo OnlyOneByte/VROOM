@@ -80,8 +80,9 @@
 				your own numbers.
 			</li>
 			<li>
-				What's used: make, model and model year, powertrain, vehicle age, and your fuel, maintenance
-				and insurance costs from the last 12 months. Your region is used only if you set one below.
+				What's used: make, model and model year, powertrain, vehicle kind, vehicle age, and your
+				fuel, maintenance and insurance costs from the last 12 months. Your region is used only if
+				you set one below.
 			</li>
 			<li>
 				Never used: VIN, plate, nickname, notes, photos, locations, exact dates or odometer

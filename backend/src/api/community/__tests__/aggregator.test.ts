@@ -257,7 +257,29 @@ describe('per-vehicle samples', () => {
     expect(vehicleSamples(tooShort, NOW).some((s) => s.metric === 'running_cost')).toBe(false);
     const running = vehicleSamples(vehicle('long'), NOW).find((s) => s.metric === 'running_cost');
     expect(running?.value).toBeCloseTo((6 * 4000) / (5 * 300 * 1.609344), 6);
-    expect(running?.bucketKey).toBe('running_cost|gas|USD|-');
+    expect(running?.bucketKey).toBe('running_cost|gas|car|USD|-');
+  });
+
+  test('a motorcycle and a car with the same powertrain never share a cost or maintenance group', () => {
+    const keys = (vehicleKind: string) =>
+      vehicleSamples(vehicle(vehicleKind, { vehicleKind }), NOW)
+        .filter((s) => s.metric === 'running_cost' || s.metric === 'maintenance')
+        .map((s) => s.bucketKey);
+    const car = keys('car');
+    const motorcycle = keys('motorcycle');
+    expect(car).toHaveLength(2);
+    expect(motorcycle).toHaveLength(2);
+    expect(motorcycle.filter((key) => car.includes(key))).toEqual([]);
+
+    const riders = owners(10).map((id) => vehicle(id, { vehicleKind: 'motorcycle' }));
+    const drivers = owners(10, 'driver').map((id) => vehicle(id));
+    const rows = aggregate([...riders, ...drivers], OPTIONS).rows.filter(
+      (row) => row.metric === 'running_cost'
+    );
+    expect(rows.map((row) => [row.bucketKey, row.nPublished]).sort()).toEqual([
+      ['running_cost|gas|car|USD|-', 10],
+      ['running_cost|gas|motorcycle|USD|-', 10],
+    ]);
   });
 
   test('maintenance and insurance need the whole window, and insurance needs a region', () => {
