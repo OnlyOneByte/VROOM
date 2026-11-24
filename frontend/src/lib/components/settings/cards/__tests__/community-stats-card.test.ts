@@ -102,6 +102,11 @@ describe('CommunityStatsCard', () => {
 		expect(screen.queryByTestId('community-region-saving')).toBeNull();
 	});
 
+	test('the region label row reserves the spinner height so the pickers never shift', () => {
+		mount();
+		expect(screen.getByTestId('community-region-label-row')).toHaveClass('min-h-4');
+	});
+
 	test('a long country name is truncated inside its trigger', () => {
 		mount({ region: 'GS' });
 		const label = trigger('community-region-country').querySelector('span.truncate');

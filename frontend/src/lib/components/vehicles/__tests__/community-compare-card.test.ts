@@ -95,6 +95,28 @@ afterEach(() => {
 });
 
 describe('CommunityCompareCard', () => {
+	test('the heading that receives focus shows the standard focus ring', async () => {
+		compare.mockResolvedValue(data(OK_EFFICIENCY));
+		await mount();
+		expect(screen.getByRole('heading', { name: 'Compare with others' })).toHaveClass(
+			'focus-visible:ring-[3px]',
+			'focus-visible:ring-ring/50'
+		);
+	});
+
+	test('focus returns to the heading after a successful Retry', async () => {
+		compare.mockRejectedValueOnce(new Error('offline'));
+		compare.mockResolvedValueOnce(data(OK_EFFICIENCY));
+		await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });
+		const retry = screen.getByRole('button', { name: 'Retry' });
+		retry.focus();
+		await fireEvent.click(retry);
+		await settle();
+		expect(document.activeElement).toBe(
+			screen.getByRole('heading', { name: 'Compare with others' })
+		);
+	});
+
 	test('shows a three-row skeleton while loading', async () => {
 		compare.mockReturnValue(new Promise(() => {}));
 		await mount();

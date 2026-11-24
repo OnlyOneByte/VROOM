@@ -226,7 +226,7 @@
 				id={headingId}
 				bind:this={heading}
 				tabindex="-1"
-				class="text-lg font-semibold outline-none"
+				class="text-lg font-semibold rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 			>
 				Compare with others
 			</h2>
