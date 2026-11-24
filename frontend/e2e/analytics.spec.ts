@@ -477,6 +477,50 @@ test.describe('Analytics', () => {
 		);
 	});
 
+	test('a failed per-car average shows an error with Retry, not an empty range', async ({
+		page
+	}) => {
+		await mockAnalytics(page);
+		let failing = true;
+		let release = () => {};
+		let held = Promise.resolve();
+		await page.route(
+			url =>
+				url.pathname === '/api/v1/analytics/query' && url.searchParams.get('interval') === 'none',
+			async route => {
+				await held;
+				return failing
+					? route.fulfill({
+							status: 500,
+							contentType: 'application/json',
+							body: JSON.stringify({ success: false, error: { message: 'Server error' } })
+						})
+					: route.fallback();
+			}
+		);
+		await page.goto('/analytics?metric=costPerDistance&compare=cars');
+		await page.mouse.move(640, 600);
+		const panels = page.getByRole('region', { name: /each car on its own/ });
+		const failure = panels.getByText("Couldn't work out each car's average");
+		await expect(failure).toBeVisible();
+		await expect(panels.getByText('No data in this range')).toHaveCount(0);
+		await expect(panels.getByText('Average not available')).toHaveCount(2);
+
+		held = new Promise(resolve => (release = resolve));
+		await panels.getByRole('button', { name: 'Retry' }).click();
+		await expect(panels.getByRole('button', { name: 'Retrying…' })).toBeVisible();
+		release();
+		await expect(panels.getByRole('button', { name: 'Retry' })).toBeFocused();
+		await expect(failure).toBeVisible();
+
+		failing = false;
+		await panels.getByRole('button', { name: 'Retry' }).click();
+		await expect(failure).toHaveCount(0);
+		await expect(panels.getByText(/^Average /)).toHaveCount(2);
+		await expect(panels.getByText('Average not available')).toHaveCount(0);
+		await expect(panels.getByRole('heading', { level: 2 })).toBeFocused();
+	});
+
 	test('services sit in a lane above the chart, reachable by keyboard and listed in Table view', async ({
 		page
 	}, testInfo) => {

@@ -993,6 +993,7 @@ export class AnalyticsQueryRepository {
     const value = this.totalValue(ctx.query.metric, total, distance, perDistance);
     const additive = ['cost', 'count', 'volume', 'distance'].includes(ctx.query.metric);
     const moneyMetric = ctx.query.metric === 'cost' || ctx.query.metric === 'costPerDistance';
+    const filled = buckets.filter((_, i) => series.some((s) => (s.values[i] ?? 0) !== 0)).length;
 
     return {
       range,
@@ -1000,7 +1001,7 @@ export class AnalyticsQueryRepository {
       series: series.map(({ rank: _rank, ...s }) => s),
       totals: {
         value,
-        perBucket: additive && value != null && buckets.length > 0 ? value / buckets.length : null,
+        perBucket: additive && value != null && filled > 0 ? value / filled : null,
         perDistance: moneyMetric ? perDistance : null,
         distance,
       },
