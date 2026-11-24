@@ -21,6 +21,7 @@ import {
   vehicleTcoToApi,
   yearEndToApi,
 } from './api-transform';
+import { analyticsInsightsRepository } from './insights';
 import {
   analyticsQueryRepository,
   isValidQueryCombination,
@@ -157,6 +158,15 @@ const jsonList = z
   })
   .pipe(z.array(z.string().max(200)).max(200));
 
+const insightsQuerySchema = z
+  .object({
+    start: epochSeconds,
+    end: epochSeconds,
+    vehicleIds: csv.pipe(z.array(z.string().min(1).max(64)).min(1).max(50)).optional(),
+    timeZone,
+  })
+  .refine((q) => q.start < q.end, { message: 'start must be before end', path: ['end'] });
+
 const analyticsQuerySchema = z
   .object({
     metric: z.enum(QUERY_METRICS),
@@ -204,6 +214,18 @@ routes.get('/query/items', zValidator('query', bucketItemsSchema), async (c) => 
   const user = c.get('user');
   const data = await analyticsQueryRepository.items(user.id, c.req.valid('query'));
   return c.json({ success: true, data: bucketItemsToApi(data) });
+});
+
+routes.get('/insights', zValidator('query', insightsQuerySchema), async (c) => {
+  const user = c.get('user');
+  const { start, end, vehicleIds: ids, timeZone: zone } = c.req.valid('query');
+  const data = await analyticsInsightsRepository.insights(user.id, {
+    start,
+    end,
+    vehicleIds: ids,
+    timeZone: zone ?? 'UTC',
+  });
+  return c.json({ success: true, data });
 });
 
 routes.get('/query', zValidator('query', analyticsQuerySchema), async (c) => {

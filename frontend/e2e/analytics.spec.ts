@@ -58,8 +58,36 @@ const BUCKET_ITEMS = {
 	categories: ['fuel', 'maintenance', 'regulatory', 'enhancement', 'misc']
 };
 
+const INSIGHTS = [
+	{
+		id: 'repairFree',
+		title: 'Repair-free streak',
+		value: 150,
+		unit: 'days',
+		sentence: 'Civic: no repairs since Jul 4, 2025. Oil changes, rotations and washes don’t count.',
+		query: { metric: 'cost', per: 'month', split: 'category', range: 'all', cars: 'vehicle-civic' }
+	},
+	{
+		id: 'recordMonth',
+		title: 'Record month',
+		value: 230,
+		unit: 'money',
+		sentence: 'August 2026 had the highest running costs in this period.',
+		query: { metric: 'cost', per: 'month', split: 'category', sel: '2026-08' }
+	}
+];
+
 async function mockAnalytics(page: Page, requests: URLSearchParams[] = []) {
 	await mockApi(page);
+	await page.route(
+		url => url.pathname === '/api/v1/analytics/insights',
+		route =>
+			route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({ success: true, data: INSIGHTS })
+			})
+	);
 	await page.route(
 		url => url.pathname === '/api/v1/analytics/query/items',
 		route =>
@@ -378,6 +406,32 @@ test.describe('Analytics', () => {
 		await expect(path).toContainText('Select a bar or point to see its expenses');
 		await expect(path.getByRole('button', { name: 'Last 12 months' })).toHaveCount(0);
 		await expect(page.getByRole('dialog')).toHaveCount(0);
+	});
+
+	test('an insight card loads the chart that proves it', async ({ page }) => {
+		await mockAnalytics(page);
+		await page.goto('/analytics');
+		await page.mouse.move(640, 600);
+		const insights = page.getByRole('region', { name: 'Things we noticed' });
+		await insights.scrollIntoViewIfNeeded();
+		await expect(insights.getByText('150 days')).toBeVisible();
+		await insights.getByRole('button', { name: 'Show in Chart: Repair-free streak' }).click();
+		await expect(page).toHaveURL(/range=all/);
+		await expect(page).toHaveURL(/cars=vehicle-civic/);
+		await expect(
+			page.getByRole('heading', { name: 'Total cost per month by category' })
+		).toBeVisible();
+	});
+
+	test('the record month card opens that month in the drill-down panel', async ({ page }) => {
+		await mockAnalytics(page);
+		await page.goto('/analytics');
+		await page.mouse.move(640, 600);
+		const insights = page.getByRole('region', { name: 'Things we noticed' });
+		await insights.scrollIntoViewIfNeeded();
+		await insights.getByRole('button', { name: 'Show in Chart: Record month' }).click();
+		await expect(page).toHaveURL(/sel=2026-08/);
+		await expect(page.getByRole('dialog').getByRole('heading', { name: 'Aug ’26' })).toBeVisible();
 	});
 
 	test('each car on its own draws one panel per car on a shared scale', async ({ page }) => {
