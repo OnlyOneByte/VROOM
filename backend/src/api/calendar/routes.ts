@@ -7,7 +7,7 @@ import { getDb } from '../../db/connection';
 import { type CalendarFeed, type CalendarFeedOptions, calendarFeeds } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
-import { getClientIp } from '../../utils/client-ip';
+import { getClientRateKey } from '../../utils/client-ip';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { zValidator } from '../../utils/validation';
 import { buildFeedEvents } from './feed-events';
@@ -45,7 +45,7 @@ const optionsSchema = z
 
 const feedRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.calendar,
-  keyGenerator: (c) => `calendar:${getClientIp(c)}`,
+  keyGenerator: (c) => `calendar:${getClientRateKey(c)}`,
 });
 
 export function hashFeedToken(token: string): string {

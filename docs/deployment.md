@@ -633,6 +633,8 @@ Every signed-in user has these limits on the routes that cost the server the mos
 
 A CSV import (not a preview) and a restore are heavy jobs: each user runs one at a time (429 for a second), and the whole server runs at most 2 at once (503 with `Retry-After` over that), so a few large uploads can't exhaust the server's memory. The limits are in memory, per backend process.
 
+Limits that apply before sign-in (sign-in itself, calendar feeds, and the global limit for requests without a session) key on the client's address. An IPv6 client is keyed on its /64 network, because one client usually holds a whole /64; an IPv4-mapped IPv6 address counts as its IPv4 address.
+
 Receipt scans with the built-in text reader run on the server's CPU. On a public server, `LOCAL_OCR=off` turns the reader off, so every user scans with a vision provider of their own.
 
 ## Public instance
