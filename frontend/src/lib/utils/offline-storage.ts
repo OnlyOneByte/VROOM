@@ -425,6 +425,7 @@ export function markExpenseNeedsAttention(id: string, reason?: string, serverId?
 			? {
 					...expense,
 					needsAttention: true,
+					lastError: undefined,
 					...(reason !== undefined && { attentionReason: reason }),
 					...(serverId !== undefined && { serverId })
 				}

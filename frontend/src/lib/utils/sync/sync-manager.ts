@@ -528,7 +528,9 @@ class SyncManager {
 		if (options.park) markExpenseNeedsAttention(id, reason, options.serverId);
 		else noteSyncError(id, reason);
 		const after = loadOfflineExpenses().find(entry => entry.id === id);
-		if (before && after && !before.lastError && !before.needsAttention) {
+		const firstFailure = !before?.lastError && !before?.needsAttention;
+		const nowRefused = !!options.park && !before?.needsAttention;
+		if (before && after && (firstFailure || nowRefused)) {
 			announceSaveFailure(after, reason, () => this.retryEntry(id));
 		}
 	}

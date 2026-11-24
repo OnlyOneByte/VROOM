@@ -122,7 +122,7 @@
 
 	const pending = usePendingRows({
 		match: expense => !selectedVehicleId || expense.vehicleId === selectedVehicleId,
-		refresh: () => fetchPageAndSummary(currentOffset)
+		refresh: () => fetchPageAndSummary(currentOffset, { keepMonthTotals: true })
 	});
 	let pendingFilters = $derived({
 		vehicleId: selectedVehicleId,
@@ -321,9 +321,9 @@
 	const nextMonthTotalsRequest = latest();
 	let monthTotals = $state<ReadonlyMap<string, number>>(new Map());
 
-	async function loadMonthTotals() {
+	async function loadMonthTotals(keepShown = false) {
 		const isCurrent = nextMonthTotalsRequest();
-		monthTotals = new Map();
+		if (!keepShown) monthTotals = new Map();
 		const {
 			limit: _limit,
 			offset: _offset,
@@ -358,12 +358,15 @@
 		logLoadFailure(error, "Couldn't load expenses");
 	}
 
-	async function fetchPageAndSummary(offset = 0, { throwOnFailure = false } = {}) {
+	async function fetchPageAndSummary(
+		offset = 0,
+		{ throwOnFailure = false, keepMonthTotals = false } = {}
+	) {
 		const isCurrentList = nextListRequest();
 		const isCurrentSummary = nextSummaryRequest();
 		const filtered = filtersActive;
 		isLoadingPage = true;
-		void loadMonthTotals();
+		void loadMonthTotals(keepMonthTotals);
 		try {
 			const [pageResult, summaryResult] = await Promise.allSettled([
 				expenseApi.getAllExpenses(buildListParams(offset)),

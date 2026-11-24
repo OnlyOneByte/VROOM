@@ -97,4 +97,19 @@ describe('a queued save that fails is announced once, and Retry clears it', () =
 		expect(appStore.dismissToast).toHaveBeenCalledWith('save-failed-a');
 		await vi.waitFor(() => expect(appStore.addNotification).toHaveBeenCalledTimes(2));
 	});
+
+	it('a refusal that follows a network error is announced again, now offering Edit', async () => {
+		saveOfflineExpenses([queued('a')]);
+		mockFetch.mockResolvedValueOnce(apiError(500, 'Database unavailable'));
+		await syncManager.syncAll();
+		mockFetch.mockResolvedValueOnce(apiError(400, 'That vehicle was archived'));
+		await syncManager.syncAll();
+
+		expect(appStore.addNotification).toHaveBeenCalledTimes(2);
+		const [second] = appStore.addNotification.mock.calls[1] as [Record<string, unknown>];
+		expect(second['description']).toContain('That vehicle was archived');
+		expect((second['action'] as { label: string }).label).toBe('Edit');
+		expect(loadOfflineExpenses()[0]?.needsAttention).toBe(true);
+		expect(loadOfflineExpenses()[0]?.lastError).toBeUndefined();
+	});
 });

@@ -24,19 +24,23 @@ export function usePendingRows(options: {
 	);
 	let shown = $state<PendingItem[]>([]);
 	let previousIds: string[] = [];
+	let refreshing = 0;
 
 	$effect(() => {
 		const current = live;
 		const left = rowsLeft(previousIds, current);
 		previousIds = current.map(({ row }) => row.id);
-		if (!left) {
+		if (!left && refreshing === 0) {
 			shown = current;
 			return;
 		}
 		untrack(() => {
 			shown = keepLeftRows(shown, current);
+			if (!left) return;
+			refreshing++;
 			void options.refresh().finally(() => {
-				shown = live;
+				refreshing--;
+				if (refreshing === 0) shown = live;
 			});
 		});
 	});

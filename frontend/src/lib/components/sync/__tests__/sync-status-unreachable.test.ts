@@ -62,4 +62,17 @@ describe('SyncStatusInline — server unreachable', () => {
 
 		expect(screen.getByRole('status')).toHaveTextContent('Up to date');
 	});
+
+	it('does not announce the steps of a background sync, which the save and failure toasts already cover', async () => {
+		authStore.setUser(alice);
+		render(SyncStatusInline);
+		const status = screen.getByRole('status');
+
+		for (const step of ['syncing', 'success', 'error'] as const) {
+			syncState.current = step;
+			await Promise.resolve();
+			expect(status).toHaveTextContent('Up to date');
+		}
+		expect(screen.getByText('Sync failed')).toBeInTheDocument();
+	});
 });

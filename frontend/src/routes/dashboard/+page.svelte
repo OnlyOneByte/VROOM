@@ -176,7 +176,13 @@
 
 	const pending = usePendingRows({
 		match: () => true,
-		refresh: () => loadDashboardData()
+		refresh: () =>
+			expenseApi.getAllExpenses({ limit: RECENT_COUNT }).then(
+				response => {
+					recentExpensesList = response.data;
+				},
+				error => logLoadFailure(error, "Couldn't refresh recent expenses")
+			)
 	});
 
 	let recentExpenses = $derived.by(() => {
