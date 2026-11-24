@@ -133,6 +133,25 @@ describe('userFacingErrorMessage', () => {
 	});
 });
 
+describe('a busy server', () => {
+	test('says the server is busy and when to retry, from the seconds the backend sends', () => {
+		const busy = (details?: Record<string, unknown>) =>
+			userFacingErrorMessage(new ApiError('Server busy', 503, details, 'SERVER_BUSY'));
+		expect(busy({ retryAfter: 5 })).toBe(
+			'The server is busy with other imports or restores. Try again in 5 seconds.'
+		);
+		expect(busy({ retryAfter: 1 })).toBe(
+			'The server is busy with other imports or restores. Try again in 1 second.'
+		);
+		expect(busy()).toBe(
+			'The server is busy with other imports or restores. Try again in a moment.'
+		);
+		expect(busy({ retryAfter: 'soon' })).toBe(
+			'The server is busy with other imports or restores. Try again in a moment.'
+		);
+	});
+});
+
 describe('the copy for each code the backend sends', () => {
 	test.each([
 		['AuthenticationError', 401],
@@ -141,7 +160,8 @@ describe('the copy for each code the backend sends', () => {
 		['BACKUP_IN_PROGRESS', 409],
 		['BACKUP_FAILED', 502],
 		['AUTH_INVALID', 401],
-		['PUSH_NOT_CONFIGURED', 503]
+		['PUSH_NOT_CONFIGURED', 503],
+		['SERVER_BUSY', 503]
 	])('%s gets its own full sentence, never the raw text or a connection hint', (code, status) => {
 		const message = userFacingErrorMessage(
 			new ApiError('raw backend text', status, undefined, code)

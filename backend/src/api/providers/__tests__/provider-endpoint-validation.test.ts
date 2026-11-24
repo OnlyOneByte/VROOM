@@ -18,6 +18,7 @@ import {
 } from '../../../test-helpers/outbound';
 import { encrypt } from '../../../utils/encryption';
 import {
+  EndpointNotAllowedError,
   outboundResolver,
   privateEndpointPolicyFor,
   urlForAddress,
@@ -25,6 +26,7 @@ import {
 import { resolveModelSettings } from '../domains/model/model-registry';
 import { postModelJson } from '../domains/model/model-transport';
 import { s3RequestHandler, s3RequestHandlerFor } from '../domains/storage/s3-compat-provider';
+import { healthCodeOf } from '../provider-status';
 
 let ctx: TestApp;
 const stubLookup = outboundResolver.lookup;
@@ -186,6 +188,40 @@ describe('provider endpoints with private endpoints blocked', () => {
     const res = await ctx.authed('POST', `/api/v1/providers/${id}/test`);
     expect(res.status).toBe(400);
   });
+
+  test('the refusal is recorded as an endpoint problem, so Settings can say why', async () => {
+    const id = insertStoredS3Provider('http://192.168.1.20:9000');
+    await ctx.authed('POST', `/api/v1/providers/${id}/test`);
+    const listed = (await (await ctx.authed('GET', '/api/v1/providers?domain=storage')).json()) as {
+      data: { id: string; lastErrorCode: string | null }[];
+    };
+    expect(listed.data.find((p) => p.id === id)?.lastErrorCode).toBe('endpoint');
+    expect(healthCodeOf(new EndpointNotAllowedError('x'))).toBe('endpoint');
+    expect(healthCodeOf(new ValidationError('x'))).toBe('config');
+  });
+
+  test.each([
+    ['plain http to a host name', 'http://nas.home.example:9000', ['93.184.215.14']],
+    [
+      'https to a host name that resolves to a private address',
+      'https://minio.home.example',
+      ['10.0.0.9'],
+    ],
+  ])(
+    '%s is refused when tested and recorded as an endpoint problem',
+    async (_case, endpoint, addresses) => {
+      outboundResolver.lookup = async () => addresses;
+      const id = insertStoredS3Provider(endpoint);
+      const res = await ctx.authed('POST', `/api/v1/providers/${id}/test`);
+      expect(res.status).toBe(400);
+      const listed = (await (
+        await ctx.authed('GET', '/api/v1/providers?domain=storage')
+      ).json()) as {
+        data: { id: string; lastErrorCode: string | null }[];
+      };
+      expect(listed.data.find((p) => p.id === id)?.lastErrorCode).toBe('endpoint');
+    }
+  );
 });
 
 describe('provider endpoints with an admin allowlist', () => {
