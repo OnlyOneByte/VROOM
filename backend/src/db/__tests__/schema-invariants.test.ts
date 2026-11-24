@@ -502,8 +502,10 @@ describe('roles and overrides', () => {
   });
 
   test('deleting a role drops its permissions and assignments', () => {
+    const serverRoles = assignmentsOf('u1');
     db.run("DELETE FROM roles WHERE id = 'builtin_editor'");
     expect(assignmentsOf('u2')).toBe(0);
-    expect(assignmentsOf('u1')).toBe(1);
+    expect(serverRoles).toBeGreaterThan(0);
+    expect(assignmentsOf('u1')).toBe(serverRoles);
   });
 });

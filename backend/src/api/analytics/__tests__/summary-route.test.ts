@@ -12,6 +12,7 @@ const TEST_USER = {
   id: 'user-123',
   email: 'test@example.com',
   displayName: 'Test User',
+  pendingApprovalAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

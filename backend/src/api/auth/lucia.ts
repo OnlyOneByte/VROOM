@@ -49,6 +49,7 @@ export const lucia = new Lucia(adapter, {
       id: attributes.id,
       email: attributes.email,
       displayName: attributes.displayName,
+      pendingApprovalAt: attributes.pendingApprovalAt,
       createdAt: attributes.createdAt,
       updatedAt: attributes.updatedAt,
     };
@@ -65,6 +66,7 @@ declare module 'lucia' {
     id: string;
     email: string;
     displayName: string;
+    pendingApprovalAt: Date | null;
     createdAt: Date | null;
     updatedAt: Date | null;
   }
@@ -74,6 +76,7 @@ interface DatabaseUserAttributes {
   id: string;
   email: string;
   displayName: string;
+  pendingApprovalAt: Date | null;
   createdAt: Date | null;
   updatedAt: Date | null;
 }

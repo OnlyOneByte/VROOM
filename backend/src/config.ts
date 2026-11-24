@@ -121,6 +121,8 @@ const envSchema = z.object({
         );
       return minGroup;
     }),
+  SIGNUP_MODE: z.enum(['open', 'approval', 'invite', 'closed']).optional(),
+  SIGNUP_ALLOWED_DOMAINS: z.string().optional(),
 });
 
 const parseEnv = () => {
@@ -236,6 +238,12 @@ export const CONFIG = {
     enabled: Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT),
   },
   pagination: { defaultPageSize: 20, maxPageSize: 100, minPageSize: 1 },
+  signup: {
+    mode: env.SIGNUP_MODE,
+    allowedDomains: env.SIGNUP_ALLOWED_DOMAINS,
+    inviteTtlDays: 7,
+    maxInviteTtlDays: 90,
+  },
   communityStats: {
     mode: env.COMMUNITY_STATS,
     enabled: env.COMMUNITY_STATS !== 'off' && env.NODE_ENV !== 'test',

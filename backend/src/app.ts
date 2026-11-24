@@ -24,6 +24,7 @@ import { routes as reminderRoutes } from './api/reminders/routes';
 import { assignmentRoutes, overrideRoutes, roleRoutes } from './api/roles/routes';
 import { routes as settingsRoutes } from './api/settings/routes';
 import { routes as shareRoutes } from './api/shares/routes';
+import { signupRoutes } from './api/signup/routes';
 import { routes as syncRoutes } from './api/sync/routes';
 import { routes as tripRoutes } from './api/trips/routes';
 import { routes as vehicleRoutes } from './api/vehicles/routes';
@@ -173,6 +174,7 @@ app.route('/api/v1/role-assignments', assignmentRoutes);
 app.route('/api/v1/overrides', overrideRoutes);
 app.route('/api/v1/push', pushRoutes);
 app.route('/api/v1/calendar', calendarRoutes);
+app.route('/api/v1/admin', signupRoutes);
 
 app.use('/api/*', async (c, next) => {
   const path = c.req.path;

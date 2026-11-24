@@ -2,6 +2,7 @@ import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
 import { count, eq, ne } from 'drizzle-orm';
 import { DEMO_USER_ID } from '../api/auth/demo-account';
+import { signupSettings } from '../api/signup/store';
 import { CONFIG } from '../config';
 import { getDb } from '../db/connection';
 import { users } from '../db/schema';
@@ -213,9 +214,16 @@ function hasSecondAccount(): boolean {
   return (row?.accounts ?? 0) > 1;
 }
 
+const SIGNUP_CLOSED_TO_STRANGERS = new Set(['invite', 'closed']);
+
+function automaticPrivateAccess(): boolean {
+  return SIGNUP_CLOSED_TO_STRANGERS.has(signupSettings(getDb()).mode) || !hasSecondAccount();
+}
+
 export function privateEndpointPolicy(): PrivateEndpointPolicy {
   const { allow, block } = CONFIG.privateProviderEndpoints;
-  if (!block && allow.trim() === '') return hasSecondAccount() ? BLOCK_PRIVATE : ALLOW_PRIVATE;
+  if (!block && allow.trim() === '')
+    return automaticPrivateAccess() ? ALLOW_PRIVATE : BLOCK_PRIVATE;
   const key = `${block}|${allow}`;
   if (cachedPolicy?.key !== key) {
     cachedPolicy = { key, policy: parsePrivateEndpointPolicy(allow, block) };
