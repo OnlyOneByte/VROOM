@@ -207,9 +207,9 @@ describe('S3CompatProvider', () => {
     });
 
     test('returns null when presigning fails', async () => {
-      const client = (provider as unknown as { client: { config: Record<string, unknown> } })
+      const client = (provider as unknown as { client: { config: { credentials: unknown } } })
         .client;
-      client.config['credentials'] = () => Promise.reject(new Error('Signing error'));
+      client.config.credentials = () => Promise.reject(new Error('Signing error'));
 
       const ref: StorageRef = {
         providerType: 's3',
