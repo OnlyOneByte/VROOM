@@ -109,7 +109,7 @@
 		</div>
 
 		<div class="space-y-2">
-			<div class="flex items-center gap-2">
+			<div class="flex min-h-4 items-center gap-2" data-testid="community-region-label-row">
 				<Label for="community-region-country">Region (optional)</Label>
 				{#if pendingRegion !== null}
 					<LoaderCircle

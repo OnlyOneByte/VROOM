@@ -16,7 +16,7 @@ package-lock.json
 # would make the generator and the committed file disagree.
 src/lib/theme/themes.css
 
-# A minified copy of backend/src/shared-vehicle-catalog.json, kept equal by vehicle-catalog-parity.test.ts.
+# A minified copy of backend/src/shared-vehicle-catalog.json, kept equal by src/lib/utils/__tests__/vehicle-catalog.test.ts.
 src/lib/constants/vehicle-catalog.json
 
 # Environment files
