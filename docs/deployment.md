@@ -113,6 +113,7 @@ These have defaults, but the defaults only suit localhost.
 | `OIDC_DISPLAY_NAME` | `Single sign-on` | Button label: "Continue with <name>" |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | — | Web push. All three or the feature stays off. Generate with `bun run vapid:gen` |
 | `COMMUNITY_STATS` | `local` | `off` or `local`. With `local`, users can opt in from Settings › Community comparisons to compare their vehicles with other opted-in owners on this server. Everyone starts opted out. `off` stops the daily job and hides both the settings card and the vehicle comparison. See [Community stats](#community-stats) |
+| `LOCAL_OCR` | `on` | `on` or `off`. The built-in text reader scans receipts on this server's CPU, with no AI model or key, and is every user's receipt scanner until they add a vision provider. `off` removes it: Settings no longer offers it, a default saved as the built-in reader is ignored, and users without a vision provider are asked to add one. See [Rate limits](#rate-limits) |
 | `COMMUNITY_STATS_MIN_GROUP` | `30` | The publication threshold T: a group is published only when its noisy owner count reaches it. The guarantee's δ is ½·e^(−(T − 1)/2), about 2.5e-7 at `30` and 4e-5 at `20`. You can raise it but not lower it below `20`, where the backend refuses to start |
 | `GOOGLE_PROVIDER_REDIRECT_URI` | derived from `GOOGLE_REDIRECT_URI` | Storage-connect callback. Override only if it must differ from the derived `.../callback/provider/google` |
 | `GOOGLE_LINK_REDIRECT_URI`, `GITHUB_LINK_REDIRECT_URI` | derived from `GOOGLE_REDIRECT_URI` / `GITHUB_REDIRECT_URI` | Callback for linking a second sign-in account on Profile. Override only if it must differ from the derived `.../callback/link/google` or `.../callback/link/github` |
@@ -627,9 +628,12 @@ Every signed-in user has these limits on the routes that cost the server the mos
 | Assistant (`POST /assistant/chat`) | 60 per 15 minutes |
 | CSV import (`POST /expenses/import`) | 20 per 15 minutes; the previews the import form sends while you map columns have their own 300 |
 | Photo upload | 120 per 15 minutes |
+| Provider test (`POST /providers/:id/test`) | 30 per 15 minutes |
 | Restore | 10 per 10 minutes |
 
 A CSV import (not a preview) and a restore are heavy jobs: each user runs one at a time (429 for a second), and the whole server runs at most 2 at once (503 with `Retry-After` over that), so a few large uploads can't exhaust the server's memory. The limits are in memory, per backend process.
+
+Receipt scans with the built-in text reader run on the server's CPU. On a public server, `LOCAL_OCR=off` turns the reader off, so every user scans with a vision provider of their own.
 
 ## Public instance
 
@@ -646,6 +650,7 @@ or a home server you share:
     [Reverse Proxy + SSL](#reverse-proxy--ssl);
   - `ADMIN_EMAILS` with your own sign-in email, so only your providers can reach your private
     network;
+  - `LOCAL_OCR=off` on a small server, so receipt scans don't compete for its CPU;
   - `DEMO_MODE` unset unless you want a public demo.
 - **Logs:** give Docker's log driver a cap, or the request log fills the disk:
 
