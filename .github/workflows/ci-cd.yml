@@ -180,7 +180,11 @@ jobs:
       - name: Run preview-only E2E tests (service worker, manifest, offline reload)
         env:
           E2E_TARGET: preview
-        run: npx playwright test --project=chromium --grep "PWA surface|Opening the app offline"
+        run: npx playwright test --project=chromium --grep "PWA surface|Opening the app offline" --grep-invert @quarantine
+
+      - name: List tests that passed only on retry
+        if: ${{ !cancelled() }}
+        run: node scripts/e2e-retry-report.mjs
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
@@ -323,8 +327,13 @@ jobs:
 
       - name: Run E2E tests
         # The dev target needs no backend and no database — every /api/v1 call is mocked
-        # in-browser. Each shard runs a third of the chromium tests.
-        run: npm run test:e2e:chromium -- --shard=${{ matrix.shard }}/3
+        # in-browser. Each shard runs a third of the chromium tests. Quarantined tests run in
+        # Quarantined E2E instead (docs/conventions/Flaky-Tests.md).
+        run: npm run test:e2e:chromium -- --shard=${{ matrix.shard }}/3 --grep-invert @quarantine
+
+      - name: List tests that passed only on retry
+        if: ${{ !cancelled() }}
+        run: node scripts/e2e-retry-report.mjs
 
       - name: Upload Playwright report
         # The axe scans attach their full violation JSON to the report; without this the
@@ -333,6 +342,80 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ matrix.shard }}
+          path: frontend/playwright-report/
+          retention-days: 7
+
+  frontend-e2e-quarantine:
+    # Not a required check: it runs the tests tagged @quarantine so a fix can be seen working
+    # before the tag comes off (docs/conventions/Flaky-Tests.md).
+    name: Quarantined E2E
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Any quarantined tests?
+        id: tagged
+        run: |
+          if grep -rqs '@quarantine' e2e; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No test is tagged @quarantine."
+          fi
+
+      - name: Setup Node.js
+        if: steps.tagged.outputs.found == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        if: steps.tagged.outputs.found == 'true'
+        run: npm ci
+
+      - name: Prepare SvelteKit
+        if: steps.tagged.outputs.found == 'true'
+        run: npm run sync
+
+      - name: Cache Playwright browsers
+        if: steps.tagged.outputs.found == 'true'
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install Playwright browsers
+        if: steps.tagged.outputs.found == 'true'
+        env:
+          CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
+        run: |
+          if [ "$CACHE_HIT" = true ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      - name: Run the quarantined tests
+        if: steps.tagged.outputs.found == 'true'
+        run: npm run test:e2e:chromium -- --grep @quarantine --pass-with-no-tests
+
+      - name: List tests that passed only on retry
+        if: ${{ !cancelled() && steps.tagged.outputs.found == 'true' }}
+        run: node scripts/e2e-retry-report.mjs
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() && steps.tagged.outputs.found == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-quarantine
           path: frontend/playwright-report/
           retention-days: 7
 

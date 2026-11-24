@@ -10,7 +10,11 @@ export default defineConfig({
 	retries: process.env['CI'] ? 2 : 0,
 	workers: process.env['CI'] ? 1 : undefined,
 	// The html reporter's default open mode starts a server that never returns, hanging CI.
-	reporter: [['list'], ['html', { open: 'never' }]],
+	reporter: [
+		['list'],
+		['html', { open: 'never' }],
+		['json', { outputFile: 'test-results/e2e-results.json' }]
+	],
 	timeout: 90_000,
 	globalSetup: './e2e/support/warm-dev-server.ts',
 	expect: {
