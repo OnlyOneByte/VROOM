@@ -3,7 +3,6 @@
 	import { routes } from '#lib/routes.ts';
 	import { Clock } from '@lucide/svelte';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { formatCurrency, formatDateWith } from '#lib/utils/formatters.ts';
 	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
@@ -21,10 +20,9 @@
 
 	interface Props {
 		expenses: RecentExpense[];
-		isLoading?: boolean;
 	}
 
-	let { expenses, isLoading = false }: Props = $props();
+	let { expenses }: Props = $props();
 
 	function headline(expense: RecentExpense): string {
 		return (
@@ -46,19 +44,7 @@
 		{/if}
 	</Card.Header>
 	<Card.Content class="px-5">
-		{#if isLoading}
-			<ul class="divide-y" role="list" aria-busy="true">
-				{#each Array(3) as _, i (i)}
-					<li class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-						<div class="space-y-1.5">
-							<Skeleton class="h-4 w-32" />
-							<Skeleton class="h-3 w-44" />
-						</div>
-						<Skeleton class="h-4 w-14" />
-					</li>
-				{/each}
-			</ul>
-		{:else if expenses.length > 0}
+		{#if expenses.length > 0}
 			<ul class="divide-y" role="list">
 				{#each expenses as expense (expense.id)}
 					<li class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">

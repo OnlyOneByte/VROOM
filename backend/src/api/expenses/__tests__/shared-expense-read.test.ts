@@ -183,3 +183,31 @@ describe('shared per-vehicle CSV export', () => {
     expect(await res.text()).toContain('2022 Owned Car');
   });
 });
+
+describe('monthly totals follow the list scoping', () => {
+  type Month = { month: string; amount: number; count: number };
+
+  test("an accepted VIEWER gets the shared vehicle's months in dollars", async () => {
+    const [vehicleId] = await shareWithExpense('viewer');
+
+    const res = await asB('GET', `/api/v1/expenses/monthly-totals?vehicleId=${vehicleId}`);
+    expect(res.status).toBe(200);
+    expect((await json<DataEnvelope<Month[]>>(res)).data).toEqual([
+      { month: '2024-06', amount: 75, count: 1 },
+    ]);
+  });
+
+  test('the all-vehicles totals exclude a shared vehicle, like the list', async () => {
+    await shareWithExpense('editor');
+
+    const res = await asB('GET', '/api/v1/expenses/monthly-totals');
+    expect((await json<DataEnvelope<Month[]>>(res)).data).toEqual([]);
+  });
+
+  test('a STRANGER gets the existence-hiding 404', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Private', model: 'Car', year: 2021 });
+
+    const res = await asB('GET', `/api/v1/expenses/monthly-totals?vehicleId=${vehicleId}`);
+    expect(res.status).toBe(404);
+  });
+});

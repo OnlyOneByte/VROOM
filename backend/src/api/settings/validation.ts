@@ -43,5 +43,13 @@ export const backupConfigSchema = z.object({
     .refine(providerEntryLimit, providerEntryLimitMessage),
 });
 
+export const providerDefaultsSchema = z
+  .object({
+    'ai.llm': z.string().max(64).nullable(),
+    'ai.vision': z.string().max(64).nullable(),
+  })
+  .partial()
+  .strict();
+
 export type StorageConfigUpdate = z.infer<typeof storageConfigSchema>;
 export type BackupConfigUpdate = z.infer<typeof backupConfigSchema>;

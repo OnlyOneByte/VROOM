@@ -16,6 +16,7 @@ import { logger } from '../../utils/logger';
 import { zonedMidnight, zonedParts, zoneOffsetMs } from '../../utils/time-zone';
 import { canonicalScale, convertDistance, convertVolume } from '../../utils/unit-conversions';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
+import { OWNERSHIP_CATEGORIES } from '../expenses/repository';
 
 export const QUERY_METRICS = [
   'cost',
@@ -38,7 +39,9 @@ export type QueryInclude = (typeof QUERY_INCLUDES)[number];
 export type QueryCompare = (typeof QUERY_COMPARES)[number];
 export type QueryEnergy = (typeof QUERY_ENERGIES)[number];
 
-export const RUNNING_CATEGORIES: readonly ExpenseCategory[] = ['fuel', 'maintenance', 'misc'];
+export const RUNNING_CATEGORIES: readonly ExpenseCategory[] = EXPENSE_CATEGORIES.filter(
+  (c) => !(OWNERSHIP_CATEGORIES as readonly string[]).includes(c)
+);
 
 const ALL_GROUP_BYS = QUERY_GROUP_BYS;
 
@@ -796,7 +799,7 @@ export class AnalyticsQueryRepository {
       f AS (
         SELECT b.period, b.idx, e.vehicle_id, e.fuel_type, e.mileage, e.volume, e.missed_fillup,
           e.expense_amount,
-          LAG(e.mileage) OVER (PARTITION BY b.period, e.vehicle_id ORDER BY e.date, e.id) AS prev_mileage
+          LAG(e.mileage) OVER (PARTITION BY b.period, e.vehicle_id ORDER BY e.date, e.mileage, e.id) AS prev_mileage
         FROM b CROSS JOIN expenses e ON e.date >= b.t0 AND e.date < b.t1
         WHERE ${this.scope(ctx)} ${measuresEnergy(ctx.query) ? sql`AND ${electricFilter(ctx.query.energy)}` : sql``}
       )
@@ -823,11 +826,11 @@ export class AnalyticsQueryRepository {
           (SELECT x.mileage FROM expenses x
             WHERE x.user_id = ${ctx.userId} AND x.vehicle_id = vu.vehicle_id
               AND x.mileage IS NOT NULL AND x.date < p.t0
-            ORDER BY x.date DESC, x.id DESC LIMIT 1) AS mileage
+            ORDER BY x.date DESC, x.mileage DESC, x.id DESC LIMIT 1) AS mileage
         FROM p CROSS JOIN vu
       ),
       m AS (
-        SELECT raw.*, LAG(raw.mileage) OVER (PARTITION BY raw.period, raw.vehicle_id ORDER BY raw.date, raw.id) AS prev_mileage
+        SELECT raw.*, LAG(raw.mileage) OVER (PARTITION BY raw.period, raw.vehicle_id ORDER BY raw.date, raw.mileage, raw.id) AS prev_mileage
         FROM raw WHERE raw.mileage IS NOT NULL
       )
       SELECT m.period, m.idx, m.vehicle_id,

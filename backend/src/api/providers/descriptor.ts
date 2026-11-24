@@ -85,7 +85,11 @@ export function validateProviderConfig(
   const issue = parsed.error.issues.find(
     (i) => i.code !== 'unrecognized_keys' || i.keys.some((key) => !toleratedKeys.includes(key))
   );
-  if (issue) throw new ValidationError(issue.message);
+  if (issue) {
+    throw new ValidationError(issue.message, {
+      issues: [{ path: issue.path, message: issue.message }],
+    });
+  }
 }
 
 export function withoutServerState(
@@ -104,10 +108,13 @@ export function validateProviderSecrets(
   for (const secret of descriptor.secrets) {
     if (secret.required && !credentials[secret.key]) {
       const article = /^[aeiou]/i.test(secret.label) ? 'an' : 'a';
-      throw new ValidationError(`${domainLabel} provider requires ${article} ${secret.label}`);
+      const message = `${domainLabel} provider requires ${article} ${secret.label}`;
+      throw new ValidationError(message, { issues: [{ path: [secret.key], message }] });
     }
   }
 }
+
+const REENTRY_FIELD_LABELS: Record<string, string> = { baseUrl: 'Base URL', endpoint: 'Endpoint' };
 
 export function assertSecretsReentered(
   descriptor: AnyProviderDescriptor,
@@ -121,7 +128,10 @@ export function assertSecretsReentered(
       (key) => Object.hasOwn(changes, key) && !Object.is(changes[key], stored[key])
     );
     if (changed === undefined) continue;
-    const field = descriptor.config.fields.find((f) => f.key === changed)?.label ?? changed;
+    const field =
+      descriptor.config.fields.find((f) => f.key === changed)?.label ??
+      REENTRY_FIELD_LABELS[changed] ??
+      changed;
     throw new ValidationError(`Enter the ${secret.label} again: the ${field} changed`);
   }
 }

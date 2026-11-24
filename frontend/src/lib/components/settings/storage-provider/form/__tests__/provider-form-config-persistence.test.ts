@@ -277,6 +277,7 @@ describe('ProviderForm — a new provider stores the photo root path the user ty
 			target: { value: 'https://s3.example.com' }
 		});
 		await fireEvent.input(screen.getByLabelText('Bucket'), { target: { value: 'vroom' } });
+		await fireEvent.input(screen.getByLabelText('Region'), { target: { value: 'us-east-1' } });
 		await fireEvent.input(screen.getByLabelText('Access Key ID'), { target: { value: 'AKIA' } });
 		await fireEvent.input(screen.getByLabelText('Secret Access Key'), {
 			target: { value: 'secret' }

@@ -72,7 +72,7 @@ describe('ExpirationAlert thresholds', () => {
 	test('eight days left switches to the warning colour', () => {
 		const badge = badgeFor(8);
 		expect(badge).toHaveTextContent('8 days left');
-		expect(badge).toHaveClass('text-chart-5', 'border-chart-5');
+		expect(badge).toHaveClass('text-warning', 'border-warning');
 		expect(badge).not.toHaveClass('text-destructive');
 	});
 

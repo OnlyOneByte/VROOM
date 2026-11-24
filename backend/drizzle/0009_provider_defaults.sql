@@ -1,0 +1,1 @@
+ALTER TABLE `user_preferences` ADD `provider_defaults` text DEFAULT '{}';

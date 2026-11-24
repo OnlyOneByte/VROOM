@@ -250,7 +250,7 @@
 			/>
 			<span>Customize per photo type</span>
 			{#if hasPerCategoryOverrides}
-				<span class="text-xs text-chart-5">(custom)</span>
+				<span class="text-xs text-muted-foreground">(custom)</span>
 			{/if}
 		</Collapsible.Trigger>
 		<Collapsible.Content class="pt-3">

@@ -78,6 +78,20 @@ describe('assistant page errors', () => {
 		).toBeInTheDocument();
 	});
 
+	test('a NO_PROVIDER answer switches the page to the connect-a-provider prompt', async () => {
+		sendMessage.mockRejectedValue(
+			new ApiError(
+				'No assistant (LLM) provider is configured.',
+				400,
+				{ capability: 'ai.llm' },
+				'NO_PROVIDER'
+			)
+		);
+		await ask('How much did I spend?');
+
+		expect(await screen.findByText('No assistant provider connected')).toBeInTheDocument();
+	});
+
 	test('a message the server rejects as too long is not reported as a missing provider', async () => {
 		sendMessage.mockRejectedValue(
 			new ApiError('Invalid request data', 400, {

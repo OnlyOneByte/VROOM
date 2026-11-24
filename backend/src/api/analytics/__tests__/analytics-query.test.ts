@@ -172,13 +172,19 @@ describe('GET /analytics/query matches the existing summary aggregations', () =>
     expect(efficiency.unit).toBe('miles/gallons_us');
   });
 
-  test('running costs leave financing, regulatory and enhancement out by default', async () => {
+  test('running costs are every category except financial, as on the Dashboard', async () => {
     seedFleet();
     const running = await repo.query(
       OWNER.id,
       baseQuery({ include: 'running', interval: 'none', groupBy: 'category' })
     );
-    expect(running.series.map((s) => s.key).sort()).toEqual(['fuel', 'maintenance', 'misc']);
+    expect(running.series.map((s) => s.key).sort()).toEqual([
+      'enhancement',
+      'fuel',
+      'maintenance',
+      'misc',
+      'regulatory',
+    ]);
     const picked = await repo.query(
       OWNER.id,
       baseQuery({ interval: 'none', groupBy: 'category', categories: ['maintenance', 'financial'] })
@@ -336,6 +342,68 @@ describe('bucketing follows the user calendar', () => {
     expect(result.compare?.series[0]?.values).toEqual([7_000]);
     expect(result.compare?.totals.value).toBe(7_000);
     expect(result.compare?.totals.perBucket).toBe(7_000);
+  });
+});
+
+describe('same-day fill-ups pair by odometer', () => {
+  const fill = (id: string, iso: string, mileage: number) =>
+    seedExpense(testDb.sqlite, {
+      id,
+      vehicleId: CAMRY.id,
+      category: 'fuel',
+      expenseAmount: 4_000,
+      date: new Date(iso),
+      mileage,
+      volume: 10,
+      fuelType: 'Regular',
+      missedFillup: false,
+    });
+
+  const orders = [
+    {
+      name: 'the lower reading saved first, with the smaller id',
+      first: ['a-fill', 10_300],
+      second: ['z-fill', 10_600],
+    },
+    {
+      name: 'the higher reading saved first, with the smaller id',
+      first: ['a-fill', 10_600],
+      second: ['z-fill', 10_300],
+    },
+  ] as const;
+
+  for (const { name, first, second } of orders) {
+    test(`economy and distance are right with ${name}`, async () => {
+      fill('start', '2025-03-01T12:00:00Z', 10_000);
+      fill(first[0], '2025-03-10T12:00:00Z', first[1]);
+      fill(second[0], '2025-03-10T12:00:00Z', second[1]);
+      fill('end', '2025-03-20T12:00:00Z', 10_900);
+
+      const distance = await repo.query(
+        OWNER.id,
+        baseQuery({ metric: 'distance', interval: 'month' })
+      );
+      expect(distance.series[0]?.values[distance.buckets.indexOf('2025-03')]).toBe(900);
+      const efficiency = await repo.query(
+        OWNER.id,
+        baseQuery({ metric: 'efficiency', interval: 'month' })
+      );
+      expect(efficiency.totals.value).toBeCloseTo(30, 9);
+
+      const summary = await new AnalyticsRepository(testDb.drizzle).getSummary(OWNER.id, RANGE);
+      expect(summary.quickStats.avgEfficiency).toBeCloseTo(30, 9);
+    });
+  }
+
+  test('the reading before the range is the highest one on its date', async () => {
+    fill('a-prev', '2025-02-20T12:00:00Z', 10_600);
+    fill('z-prev', '2025-02-20T12:00:00Z', 10_300);
+    fill('inside', '2025-03-10T12:00:00Z', 10_900);
+    const distance = await repo.query(
+      OWNER.id,
+      baseQuery({ metric: 'distance', interval: 'month', start: seconds('2025-03-01T00:00:00Z') })
+    );
+    expect(distance.series[0]?.values[distance.buckets.indexOf('2025-03')]).toBe(300);
   });
 });
 

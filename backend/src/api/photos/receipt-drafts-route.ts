@@ -10,6 +10,7 @@ import { expenseRepository } from '../expenses/repository';
 import { decryptRefreshToken } from '../providers/domains/storage/registry';
 import { parseExtraction } from '../providers/domains/vlm/prompt';
 import { getVlmProvider } from '../providers/domains/vlm/registry';
+import { resolveProvider } from '../providers/resolve';
 import { GooglePhotosService } from '../providers/services/google-photos-service';
 import { type StageDeps, stageReceiptDrafts } from './receipt-drafts-service';
 
@@ -59,12 +60,7 @@ routes.get('/receipt-drafts', async (c) => {
       'Connect Google Photos in Settings to import receipts from your VROOM photo album.'
     );
   }
-  const vlmRow = await findEnabledProvider(db, user.id, 'vlm');
-  if (!vlmRow) {
-    throw new ValidationError(
-      'No receipt-parsing (VLM) provider is configured. Add one in Settings to import receipts.'
-    );
-  }
+  const vlmRow = await resolveProvider(user.id, 'ai.vision');
 
   const photosService = photosServiceBuilder(photosRow);
   const vlmProvider = getVlmProvider(vlmRow);

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type { UserProviderInfo } from '#lib/types/index.ts';
 import { defaultFolderSettings } from '#lib/constants/providers.ts';
@@ -17,6 +17,11 @@ vi.mock('#lib/stores/app.svelte.ts', () => ({
 }));
 
 const ProviderInfoCard = (await import('../ProviderInfoCard.svelte')).default;
+
+beforeAll(async () => {
+	const { providerCatalog } = await import('#lib/stores/provider-catalog.svelte.ts');
+	await providerCatalog.ensureLoaded();
+});
 
 const NOW = new Date('2026-05-10T12:00:00.000Z');
 

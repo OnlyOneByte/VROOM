@@ -2,7 +2,10 @@ import { describe, expect, test } from 'vitest';
 import type { Expense, Vehicle } from '#lib/types/index.ts';
 import {
 	buildDisplayRows,
+	monthLabel,
+	monthSections,
 	rowKey,
+	rowTitle,
 	tagsBesideCategory,
 	visibleExpenses,
 	type GroupRow,
@@ -223,5 +226,54 @@ describe('tagsBesideCategory', () => {
 	test('keeps every tag when none repeats the category, and handles no tags', () => {
 		expect(tagsBesideCategory(['road trip'], 'fuel')).toEqual(['road trip']);
 		expect(tagsBesideCategory(undefined, 'misc')).toEqual([]);
+	});
+});
+
+describe('monthSections', () => {
+	const local = (y: number, m: number, d: number) => new Date(y, m, d, 12).toISOString();
+
+	test('splits date-sorted rows into one run per local month', () => {
+		const rows = buildDisplayRows(
+			[
+				expense({ id: 'a', date: local(2026, 10, 21) }),
+				expense({ id: 'b', date: local(2026, 10, 1) }),
+				expense({ id: 'g1', groupId: 'g', date: local(2026, 9, 31) }),
+				expense({ id: 'g2', groupId: 'g', date: local(2026, 9, 31) }),
+				expense({ id: 'c', date: local(2026, 8, 5) })
+			],
+			VEHICLES,
+			{ sortBy: 'date', sortOrder: 'desc' }
+		);
+
+		expect(monthSections(rows).map(s => [s.month, s.rows.map(rowKey)])).toEqual([
+			['2026-11', ['a', 'b']],
+			['2026-10', ['g']],
+			['2026-09', ['c']]
+		]);
+	});
+
+	test('an empty list has no sections', () => {
+		expect(monthSections([])).toEqual([]);
+	});
+});
+
+describe('monthLabel', () => {
+	test('names the month and year', () => {
+		expect(monthLabel('2026-11')).toBe('November 2026');
+		expect(monthLabel('2027-01')).toBe('January 2027');
+	});
+});
+
+describe('rowTitle', () => {
+	test('uses the trimmed description and keeps the category for the meta line', () => {
+		expect(rowTitle('  Arco ', 'fuel')).toEqual({ title: 'Arco', categoryInMeta: true });
+	});
+
+	test('falls back to the category name when there is no description', () => {
+		expect(rowTitle('   ', 'maintenance')).toEqual({
+			title: 'Maintenance',
+			categoryInMeta: false
+		});
+		expect(rowTitle(undefined, 'misc')).toEqual({ title: 'Misc', categoryInMeta: false });
 	});
 });

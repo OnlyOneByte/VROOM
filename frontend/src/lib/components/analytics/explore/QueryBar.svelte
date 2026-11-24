@@ -96,8 +96,8 @@
 			{#if moneyMetric}
 				<span class="block text-xs text-muted-foreground md:text-sm">
 					{query.inc === 'all'
-						? 'All costs, including financing, insurance and fees.'
-						: 'Running costs only: fuel, maintenance and misc.'}
+						? 'All costs, including insurance and loan or lease payments.'
+						: 'Running costs only: everything except insurance and loan or lease payments.'}
 				</span>
 			{/if}
 		</p>

@@ -233,23 +233,23 @@ describe('ModelProvidersCard add provider', () => {
 		expect(screen.getByRole('heading', { name: 'Add assistant provider' })).toBeInTheDocument();
 		expect(screen.getByTestId('llm-type-trigger')).toHaveTextContent('OpenAI-compatible');
 		expect(input('llm-model')).toHaveValue('gpt-4o-mini');
-		expect(input('llm-baseurl')).toHaveValue('https://api.openai.com/v1');
-		expect(input('llm-key')).toHaveAttribute('placeholder', 'sk-…');
+		expect(input('llm-baseUrl')).toHaveValue('https://api.openai.com/v1');
+		expect(input('llm-apiKey')).toHaveAttribute('placeholder', 'Enter API key');
 		expect(saveButton('llm')).toBeDisabled();
 
 		await type('llm-name', 'My GPT');
 		expect(saveButton('llm')).toBeDisabled();
-		await type('llm-key', 'sk-123');
+		await type('llm-apiKey', 'sk-123');
 		expect(saveButton('llm')).not.toBeDisabled();
 	});
 
 	test('a blank base URL or model blocks saving', async () => {
 		await openCreate('llm');
 		await type('llm-name', 'My GPT');
-		await type('llm-key', 'sk-123');
-		await type('llm-baseurl', '  ');
+		await type('llm-apiKey', 'sk-123');
+		await type('llm-baseUrl', '  ');
 		expect(saveButton('llm')).toBeDisabled();
-		await type('llm-baseurl', 'https://proxy.example/v1');
+		await type('llm-baseUrl', 'https://proxy.example/v1');
 		await type('llm-model', ' ');
 		expect(saveButton('llm')).toBeDisabled();
 	});
@@ -257,9 +257,9 @@ describe('ModelProvidersCard add provider', () => {
 	test('saving posts the trimmed provider, confirms and reloads', async () => {
 		await openCreate('vlm');
 		await type('vlm-name', '  Receipts GPT ');
-		await type('vlm-key', ' sk-abc ');
+		await type('vlm-apiKey', ' sk-abc ');
 		await type('vlm-model', ' gpt-4o ');
-		await type('vlm-baseurl', ' https://proxy.example/v1 ');
+		await type('vlm-baseUrl', ' https://proxy.example/v1 ');
 		await fireEvent.click(saveButton('vlm'));
 		await settle();
 
@@ -281,7 +281,7 @@ describe('ModelProvidersCard add provider', () => {
 		createProvider.mockRejectedValueOnce(new ApiError('Invalid API key', 400));
 		await openCreate('llm');
 		await type('llm-name', 'Bad');
-		await type('llm-key', 'sk-bad');
+		await type('llm-apiKey', 'sk-bad');
 		await fireEvent.click(saveButton('llm'));
 		await settle();
 		expect(showError).toHaveBeenCalledWith("Couldn't save the provider. Invalid API key.");
@@ -293,7 +293,7 @@ describe('ModelProvidersCard add provider', () => {
 		createProvider.mockRejectedValueOnce('nope');
 		await openCreate('llm');
 		await type('llm-name', 'Bad');
-		await type('llm-key', 'sk-bad');
+		await type('llm-apiKey', 'sk-bad');
 		await fireEvent.click(saveButton('llm'));
 		await settle();
 		expect(showError).toHaveBeenCalledWith(
@@ -305,7 +305,7 @@ describe('ModelProvidersCard add provider', () => {
 		createProvider.mockReturnValueOnce(new Promise(() => {}));
 		await openCreate('llm');
 		await type('llm-name', 'Slow');
-		await type('llm-key', 'sk-slow');
+		await type('llm-apiKey', 'sk-slow');
 		await fireEvent.click(saveButton('llm'));
 		await settle();
 		expect(saveButton('llm')).toHaveTextContent('Saving...');
@@ -316,7 +316,7 @@ describe('ModelProvidersCard add provider', () => {
 		createProvider.mockReturnValueOnce(new Promise(() => {}));
 		await openCreate('llm');
 		await type('llm-name', 'Slow');
-		await type('llm-key', 'sk-slow');
+		await type('llm-apiKey', 'sk-slow');
 		expect(hasPendingSave()).toBe(false);
 
 		await fireEvent.click(saveButton('llm'));
@@ -359,8 +359,8 @@ describe('ModelProvidersCard edit and delete', () => {
 		expect(screen.getByTestId('llm-type-trigger')).toBeDisabled();
 		expect(input('llm-name')).toHaveValue('Work Claude');
 		expect(input('llm-model')).toHaveValue('claude-3-5-sonnet-latest');
-		expect(document.getElementById('llm-baseurl')).toBeNull();
-		expect(input('llm-key')).toHaveAttribute('placeholder', 'Leave blank to keep current key');
+		expect(document.getElementById('llm-baseUrl')).toBeNull();
+		expect(input('llm-apiKey')).toHaveAttribute('placeholder', 'Saved, leave blank to keep');
 
 		await type('llm-name', 'Home Claude');
 		await fireEvent.click(saveButton('llm'));
@@ -378,7 +378,7 @@ describe('ModelProvidersCard edit and delete', () => {
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: 'Edit Work Claude' }));
 		await settle();
-		await type('llm-key', ' sk-new ');
+		await type('llm-apiKey', ' sk-new ');
 		await fireEvent.click(saveButton('llm'));
 		await settle();
 		expect(updateProvider).toHaveBeenCalledWith('llm-1', {
@@ -399,8 +399,8 @@ describe('ModelProvidersCard edit and delete', () => {
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: 'Edit Local Llava' }));
 		await settle();
-		expect(input('vlm-baseurl')).toHaveValue('http://nas:11434/v1');
-		expect(document.getElementById('vlm-key')).toBeNull();
+		expect(input('vlm-baseUrl')).toHaveValue('http://nas:11434/v1');
+		expect(document.getElementById('vlm-apiKey')).toBeNull();
 		await fireEvent.click(saveButton('vlm'));
 		await settle();
 		expect(updateProvider).toHaveBeenCalledWith('vlm-1', {
@@ -418,7 +418,7 @@ describe('ModelProvidersCard edit and delete', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Edit Odd' }));
 		await settle();
 		expect(input('llm-model')).toHaveValue('');
-		expect(input('llm-baseurl')).toHaveValue('');
+		expect(input('llm-baseUrl')).toHaveValue('');
 		expect(saveButton('llm')).toBeDisabled();
 	});
 

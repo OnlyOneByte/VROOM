@@ -20,7 +20,7 @@
 {:else if daysRemaining <= EXPIRING_SOON_DAYS}
 	<Badge
 		variant="outline"
-		class={isUrgent ? 'text-destructive border-destructive' : 'text-chart-5 border-chart-5'}
+		class={isUrgent ? 'text-destructive border-destructive' : 'text-warning border-warning'}
 	>
 		{#if daysRemaining === 0}
 			Expires today

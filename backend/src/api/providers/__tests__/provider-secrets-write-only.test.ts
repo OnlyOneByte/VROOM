@@ -123,4 +123,28 @@ describe('changing where a secret is sent asks for the secret again', () => {
     const res = await ctx.authed('PUT', `/api/v1/providers/${created.id}`, { config: S3_CONFIG });
     expect(res.status, await res.clone().text()).toBe(200);
   });
+
+  test('adding a base URL to a provider whose form has none names it as Base URL', async () => {
+    const created = await create({
+      domain: 'llm',
+      providerType: 'anthropic',
+      displayName: 'Claude',
+      credentials: { apiKey: 'sk-ant' },
+      config: { model: 'claude-opus-5-5' },
+    });
+    const res = await ctx.authed('PUT', `/api/v1/providers/${created.id}`, {
+      config: { model: 'claude-opus-5-5', baseUrl: 'https://other.example.com' },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('Enter the API key again: the Base URL changed');
+  });
+
+  test('an S3 endpoint change that resends only one key asks for the other', async () => {
+    const created = await createS3();
+    const res = await ctx.authed('PUT', `/api/v1/providers/${created.id}`, {
+      config: { ...S3_CONFIG, endpoint: 'https://other.example.com' },
+      credentials: { accessKeyId: 'AKIA-NEW' },
+    });
+    expect(res.status).toBe(400);
+  });
 });

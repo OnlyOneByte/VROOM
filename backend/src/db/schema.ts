@@ -9,7 +9,7 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
-import type { BackupConfig, StorageConfig, UnitPreferences } from '../types';
+import type { BackupConfig, ProviderDefaults, StorageConfig, UnitPreferences } from '../types';
 import { DEFAULT_BACKUP_CONFIG, DEFAULT_STORAGE_CONFIG, DEFAULT_UNIT_PREFERENCES } from '../types';
 import type { SplitConfig } from './types';
 
@@ -306,6 +306,9 @@ export const userPreferences = sqliteTable('user_preferences', {
   backupConfig: text('backup_config', { mode: 'json' })
     .$type<BackupConfig>()
     .default(DEFAULT_BACKUP_CONFIG),
+  providerDefaults: text('provider_defaults', { mode: 'json' })
+    .$type<ProviderDefaults>()
+    .default({}),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
