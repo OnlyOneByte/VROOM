@@ -221,14 +221,33 @@ Do not route `/auth` to the backend: it is the frontend sign-in page. OAuth prov
 Set `CORS_ORIGINS` and `FRONTEND_URL` to the public origin, leave `PUBLIC_API_URL` empty, and
 set `TRUSTED_PROXY_IPS` to the proxy's address so rate limiting keys on the real client IP:
 
-| In front of the backend | `TRUSTED_PROXY_IPS` | `TRUSTED_CLIENT_IP_HEADER` |
-|---|---|---|
-| Caddy or nginx on the same host | `127.0.0.1` | — |
-| Cloudflare Tunnel (`cloudflared` in the stack) | the stack network, e.g. `172.16.0.0/12` | `CF-Connecting-IP` |
-| Cloudflare proxy → Caddy or nginx | `127.0.0.1` | `CF-Connecting-IP` (Caddy and nginx pass it through unchanged) |
+Trust only an address that nothing but your proxy can connect from:
 
-Behind a Cloudflare-proxied host, firewall ports 80 and 443 to Cloudflare's published ranges, or
-a client can reach the proxy directly and set `CF-Connecting-IP` itself.
+| Setup | `TRUSTED_PROXY_IPS` | `TRUSTED_CLIENT_IP_HEADER` | Required |
+|---|---|---|---|
+| Backend run directly on the host (no Docker), Caddy or nginx on the same host | `127.0.0.1` | — | `HOST=127.0.0.1` |
+| Backend in the example stack, Caddy or nginx on the host | the stack network's gateway, e.g. `172.30.0.1` with the pinned network below | — | the backend published as `"127.0.0.1:3001:3001"` only. The container sees the gateway, not `127.0.0.1`, for every host connection |
+| Cloudflare Tunnel (`cloudflared` in the stack) | the `cloudflared` container's fixed address, e.g. `172.30.0.10` | `CF-Connecting-IP` | no `ports:` entry for the backend at all, so nothing else reaches it |
+| Cloudflare proxy in front of either of the first two | as in that row | `CF-Connecting-IP` (Caddy and nginx pass it through unchanged) | ports 80 and 443 firewalled to Cloudflare's published ranges, or a client can reach the proxy directly and set `CF-Connecting-IP` itself |
+
+Never trust a whole private range such as `172.16.0.0/12` while the backend publishes a port: Docker
+can hand on a connection to a published port from the network's gateway, and a LAN may use the
+same range. Pin the stack's network and the tunnel's address in `docker-compose.yml`:
+
+```yaml
+services:
+  cloudflared:
+    networks:
+      vroom-network:
+        ipv4_address: 172.30.0.10
+networks:
+  vroom-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+          gateway: 172.30.0.1
+```
 
 Upstreams below use `127.0.0.1` rather than `localhost`: the backend binds one loopback
 address (`HOST`, `127.0.0.1` by default), while `localhost` resolves to both families and

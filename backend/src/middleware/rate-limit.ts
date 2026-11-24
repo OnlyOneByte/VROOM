@@ -25,12 +25,25 @@ function dropExpired(now: number): void {
   }
 }
 
+let evictionCursor: Iterator<string> | null = null;
+
+function evictOldest(): boolean {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    evictionCursor ??= rateLimitStore.keys();
+    const next = evictionCursor.next();
+    if (!next.done) {
+      rateLimitStore.delete(next.value);
+      return true;
+    }
+    evictionCursor = null;
+  }
+  return false;
+}
+
 function startWindow(key: string, now: number, windowMs: number): void {
   rateLimitStore.delete(key);
   while (rateLimitStore.size >= CONFIG.rateLimit.maxTrackedKeys) {
-    const oldest = rateLimitStore.keys().next().value;
-    if (oldest === undefined) break;
-    rateLimitStore.delete(oldest);
+    if (!evictOldest()) break;
   }
   rateLimitStore.set(key, { count: 1, resetTime: now + windowMs });
 }

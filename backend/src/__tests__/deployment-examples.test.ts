@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { GLOBAL_MAX_BODY_SIZE } from '../app';
 import { CONFIG } from '../config';
 import { createTestApp, type TestApp } from '../test-helpers/http-client';
+import { parseTrustedProxies } from '../utils/client-ip';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC_ROOT = join(HERE, '..');
@@ -213,5 +214,35 @@ describe('documented deployment examples match the backend', () => {
       expect(serverCap).toBe(appCapMb);
       expect(serverCap ?? 0).toBeLessThan(capMb(restoreLocation()?.body ?? '') ?? 0);
     });
+  });
+});
+
+describe('the trusted proxy recipes in docs/deployment.md', () => {
+  const guide = () => repoFile(DEPLOYMENT_GUIDE);
+  const recipeTable = () => {
+    const text = guide();
+    const start = text.indexOf('| Setup | `TRUSTED_PROXY_IPS` |');
+    return text.slice(start, text.indexOf('\n\n', start)).split('\n').slice(2);
+  };
+  const trustedValues = () =>
+    recipeTable().flatMap((row) =>
+      [...(row.split('|')[2] ?? '').matchAll(/`([0-9a-f.:/]+)`/g)].map((match) => match[1] ?? '')
+    );
+
+  test('every documented value is a single address, never a range', () => {
+    const values = trustedValues();
+    expect(values.length).toBeGreaterThanOrEqual(3);
+    for (const value of values) {
+      expect(() => parseTrustedProxies([value])).not.toThrow();
+      expect(value).not.toContain('/');
+    }
+  });
+
+  test('the pinned network snippet matches the addresses the table trusts', () => {
+    const values = trustedValues();
+    const tunnel = /ipv4_address: ([0-9.]+)/.exec(guide())?.[1] ?? 'missing ipv4_address';
+    const gateway = /gateway: ([0-9.]+)/.exec(guide())?.[1] ?? 'missing gateway';
+    expect(values).toContain(tunnel);
+    expect(values).toContain(gateway);
   });
 });

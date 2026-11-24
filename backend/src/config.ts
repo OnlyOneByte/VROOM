@@ -73,7 +73,10 @@ const envSchema = z.object({
   TRUSTED_CLIENT_IP_HEADER: z
     .string()
     .optional()
-    .transform((val) => val?.trim().toLowerCase() || undefined),
+    .transform((val) => val?.trim().toLowerCase() || undefined)
+    .refine((val) => val === undefined || /^[!#$%&'*+.^_`|~0-9a-z-]+$/.test(val), {
+      message: 'TRUSTED_CLIENT_IP_HEADER must be a header name, e.g. CF-Connecting-IP',
+    }),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   ALLOW_FAKE_STORAGE: z
     .string()

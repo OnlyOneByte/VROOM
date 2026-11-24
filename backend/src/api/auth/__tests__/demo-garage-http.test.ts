@@ -172,24 +172,23 @@ describe('demo garage, on', () => {
     const limits = CONFIG.rateLimit as { trustedProxyIps: readonly string[] };
     const previous = limits.trustedProxyIps;
     limits.trustedProxyIps = ['172.16.0.0/12'];
+    const viaProxy = (forwardedFor: string) =>
+      ctx.app.request(
+        '/api/v1/auth/demo',
+        {
+          method: 'POST',
+          headers: { 'Sec-Fetch-Site': 'same-origin', 'X-Forwarded-For': forwardedFor },
+        },
+        socketFrom('172.18.0.2')
+      );
     try {
       const statuses: number[] = [];
       for (let i = 0; i <= CONFIG.rateLimit.auth.limit; i++) {
-        const res = await ctx.app.request(
-          '/api/v1/auth/demo',
-          {
-            method: 'POST',
-            headers: {
-              'Sec-Fetch-Site': 'same-origin',
-              'X-Forwarded-For': `10.9.${i}.1, 203.0.113.44`,
-            },
-          },
-          socketFrom('172.18.0.2')
-        );
-        statuses.push(res.status);
+        statuses.push((await viaProxy(`10.9.${i}.1, 203.0.113.44`)).status);
       }
       expect(statuses.slice(0, -1).every((s) => s === 200)).toBe(true);
       expect(statuses.at(-1)).toBe(429);
+      expect((await viaProxy('10.9.0.1, 203.0.113.45')).status).toBe(200);
     } finally {
       limits.trustedProxyIps = previous;
     }
