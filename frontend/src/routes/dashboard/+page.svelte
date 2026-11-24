@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
@@ -173,17 +174,26 @@
 			: ''
 	);
 
+	const pending = usePendingRows({
+		match: () => true,
+		refresh: () => loadDashboardData()
+	});
+
 	let recentExpenses = $derived.by(() => {
 		const names = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
-		return recentExpensesList.map(e => ({
-			id: e.id,
-			amount: e.amount,
-			category: e.category,
-			date: new Date(e.date),
-			description: e.description,
-			location: e.location,
-			vehicleName: names.get(e.vehicleId) || 'Unknown Vehicle'
-		}));
+		return [...pending.rows, ...recentExpensesList].slice(0, 4).map(e => {
+			const sync = pending.states.get(e.id);
+			return {
+				id: e.id,
+				amount: e.amount,
+				category: e.category,
+				date: new Date(e.date),
+				description: e.description,
+				location: e.location,
+				vehicleName: names.get(e.vehicleId) || 'Unknown Vehicle',
+				...(sync && { syncNote: sync.status === 'failed' ? 'Not saved' : 'Unsynced' })
+			};
+		});
 	});
 
 	let attention = $derived.by(() => {

@@ -17,6 +17,8 @@ vi.mock('../offline-storage', async () => {
 		saveOfflineExpenses: vi.fn(),
 		markExpenseAsSynced: vi.fn(),
 		markExpenseNeedsAttention: vi.fn(),
+		noteSyncError: vi.fn(),
+		clearNeedsAttention: vi.fn(),
 		clearSyncedExpenses: vi.fn(),
 		loadPendingPhotos: vi.fn(async () => []),
 		savePendingPhotos: vi.fn(async () => true),

@@ -129,7 +129,10 @@
 
 			const options = {
 				duration: notification.duration || 5000,
-				style: `--toast-duration: ${notification.duration || 5000}ms;`
+				style: `--toast-duration: ${notification.duration || 5000}ms;`,
+				...(notification.toastId && { id: notification.toastId }),
+				...(notification.description && { description: notification.description }),
+				...(notification.action && { action: notification.action })
 			};
 
 			const toastFn = {
@@ -142,6 +145,13 @@
 			toastFn(notification.message, options);
 			appStore.removeNotification(notification.id);
 		});
+	});
+
+	$effect(() => {
+		const dismissals = appStore.toastDismissals;
+		if (dismissals.length === 0) return;
+		for (const id of dismissals) toast.dismiss(id);
+		appStore.clearToastDismissals();
 	});
 
 	$effect(() => {

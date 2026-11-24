@@ -16,6 +16,7 @@
 		description?: string | null;
 		location?: string | null;
 		vehicleName?: string;
+		syncNote?: string;
 	}
 
 	interface Props {
@@ -70,6 +71,15 @@
 									.filter(Boolean)
 									.join(' · ')}
 							</p>
+							{#if expense.syncNote}
+								<p
+									class="text-xs font-medium {expense.syncNote === 'Not saved'
+										? 'text-destructive'
+										: 'text-muted-foreground'}"
+								>
+									{expense.syncNote}
+								</p>
+							{/if}
 						</div>
 						<p class="shrink-0 text-sm font-semibold tabular-nums text-foreground">
 							{formatCurrency(expense.amount)}

@@ -35,6 +35,7 @@ export interface OfflineExpense {
 	synced: boolean;
 	needsAttention?: boolean;
 	attentionReason?: string;
+	lastError?: string;
 	serverId?: string;
 	version?: string;
 }
@@ -440,12 +441,21 @@ export function clearNeedsAttention(id: string): void {
 			? {
 					...expense,
 					needsAttention: false,
-					attentionReason: undefined
+					attentionReason: undefined,
+					lastError: undefined
 				}
 			: expense
 	);
 
 	saveOfflineExpenses(updatedExpenses);
+}
+
+export function noteSyncError(id: string, message: string): void {
+	saveOfflineExpenses(
+		loadOfflineExpenses().map(expense =>
+			expense.id === id ? { ...expense, lastError: message } : expense
+		)
+	);
 }
 
 export function markExpenseAsSynced(id: string): void {

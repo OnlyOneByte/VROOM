@@ -60,7 +60,7 @@ describe('a save that finds the session expired', () => {
 
 		await submitExpense(aliceForm());
 
-		expect(authStore.isAuthenticated).toBe(false);
+		await vi.waitFor(() => expect(authStore.isAuthenticated).toBe(false));
 		expect(loadOfflineExpenses('alice').map(e => e.description)).toEqual(['alice private note']);
 
 		authStore.setUser(user('bob'));

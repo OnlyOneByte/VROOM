@@ -307,4 +307,10 @@
 			width: 0%;
 		}
 	}
+
+	@keyframes row-arrive {
+		from {
+			background-color: var(--accent);
+		}
+	}
 }
