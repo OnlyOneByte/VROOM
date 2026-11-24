@@ -6,30 +6,39 @@ import { requestResolver } from '../../permissions/grants';
 import type { Resource } from '../../permissions/resolve';
 import { insurancePolicyRepository } from './repository';
 
-export async function policyResources(
-  c: Context,
-  policyId: string,
-  permission: string
-): Promise<Resource[]> {
+async function findPolicy(policyId: string) {
   const policy = await insurancePolicyRepository.findById(policyId);
   if (!policy) throw new NotFoundError('Insurance policy');
+  return policy;
+}
+
+function coveredVehicles(policy: { vehicleIds: string[] }): Resource[] {
+  return policy.vehicleIds.map((vehicleId) => ({ kind: 'vehicle', vehicleId }));
+}
+
+export async function policyDocumentResources(
+  c: Context,
+  policyId: string
+): Promise<Resource | Resource[]> {
+  const policy = await findPolicy(policyId);
   const owner: Resource = { kind: 'account', userId: policy.userId };
-  if (policy.userId === c.get('user').id) return [owner];
-  const resolver = requestResolver(c, getDb());
-  const vehicles: Resource[] = policy.vehicleIds.map((vehicleId) => ({
-    kind: 'vehicle',
-    vehicleId,
-  }));
-  const allowed = vehicles.filter((resource) => resolver.can(permission, resource).allow);
-  if (allowed.length > 0) return allowed;
-  return vehicles.length > 0 ? vehicles.slice(0, 1) : [owner];
+  if (c.req.method !== 'GET' || policy.userId === c.get('user').id) return owner;
+  const vehicles = coveredVehicles(policy);
+  return vehicles.length > 0 ? vehicles : owner;
 }
 
 export const fromPolicyOwner: ResourceOf = async (c) => {
-  const policy = await insurancePolicyRepository.findById(c.req.param('id') ?? '');
-  if (!policy) throw new NotFoundError('Insurance policy');
+  const policy = await findPolicy(c.req.param('id') ?? '');
   return { kind: 'account', userId: policy.userId };
 };
 
-export const fromPolicyReaders: ResourceOf = (c) =>
-  policyResources(c, c.req.param('id') ?? '', 'vehicle.read');
+export const fromPolicyReaders: ResourceOf = async (c) => {
+  const policy = await findPolicy(c.req.param('id') ?? '');
+  const vehicles = coveredVehicles(policy);
+  const first = vehicles[0];
+  if (policy.userId === c.get('user').id || !first) {
+    return { kind: 'account', userId: policy.userId };
+  }
+  const resolver = requestResolver(c, getDb());
+  return vehicles.find((resource) => resolver.can('vehicle.read', resource).allow) ?? first;
+};

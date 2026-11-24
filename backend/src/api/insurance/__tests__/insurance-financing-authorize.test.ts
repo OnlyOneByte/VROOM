@@ -112,18 +112,42 @@ describe('insurance resolves through can() for every role', () => {
     ).toBe(404);
   });
 
-  test('policy documents follow vehicle.insurance.read and write', async () => {
-    const docs = '/api/v1/photos/insurance_policy/pol-1';
-    expect(await status(ctx.authed, 'GET', docs)).toBe(200);
-    expect(await status(m.coOwner.request, 'GET', docs)).toBe(200);
-    expect(await status(m.viewer.request, 'GET', docs)).toBe(403);
-    expect(await status(m.stranger.request, 'GET', docs)).toBe(404);
+  test('policy documents need insurance read on every covered car and stay with the owner for writes', async () => {
+    ctx.sqlite.run(
+      "INSERT INTO insurance_policies (id, user_id, company) VALUES ('pol-2', ?, 'Mutual')",
+      [ctx.user.id]
+    );
+    ctx.sqlite.run(
+      "INSERT INTO insurance_terms (id, policy_id, start_date, end_date, total_cost) VALUES ('term-2', 'pol-2', 1704067200, 1735689600, 90000)"
+    );
+    ctx.sqlite.run(
+      "INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES ('term-2', ?)",
+      [CAR]
+    );
+    ctx.sqlite.run(
+      "INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size) VALUES ('pol2-doc', ?, 'insurance_policy', 'pol-2', 'p.pdf', 'application/pdf', 10)",
+      [ctx.user.id]
+    );
+    const shared = '/api/v1/photos/insurance_policy/pol-2';
+    const multiCar = '/api/v1/photos/insurance_policy/pol-1';
+    expect(await status(ctx.authed, 'GET', multiCar)).toBe(200);
+    expect(await status(m.coOwner.request, 'GET', multiCar)).toBe(404);
+    expect(await status(m.coOwner.request, 'GET', shared)).toBe(200);
+    expect(await status(m.editor.request, 'GET', shared)).toBe(403);
+    expect(await status(m.viewer.request, 'GET', shared)).toBe(403);
+    expect(await status(m.disabled.request, 'GET', shared)).toBe(403);
+    expect(await status(m.stranger.request, 'GET', shared)).toBe(404);
     overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
-    expect(await status(m.viewer.request, 'GET', docs)).toBe(200);
-    expect(await status(m.viewer.request, 'DELETE', `${docs}/pol-doc`)).toBe(403);
+    expect(await status(m.viewer.request, 'GET', shared)).toBe(200);
+    overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
+    expect(await status(m.coOwner.request, 'GET', shared)).toBe(403);
+    overrideOn(ctx, CAR, m.editor, 'vehicle.insurance.write', 'allow');
+    expect(await status(m.editor.request, 'DELETE', `${shared}/pol2-doc`)).toBe(404);
+    expect(await status(m.coOwner.request, 'DELETE', `${multiCar}/pol-doc`)).toBe(404);
+    expect(await status(ctx.authed, 'DELETE', `${shared}/pol2-doc`)).toBe(204);
   });
 
-  test("claim documents follow the claim's own car", async () => {
+  test("claims and claim documents follow insurance read on the claim's own car", async () => {
     for (const [id, vehicleId] of [
       ['claim-shared', CAR],
       ['claim-private', PRIVATE],
@@ -133,10 +157,31 @@ describe('insurance resolves through can() for every role', () => {
         [id, vehicleId]
       );
     }
+    const claims = '/api/v1/insurance/pol-1/claims';
+    const claimIds = async (request: RequestFn) => {
+      const res = await request('GET', claims);
+      expect(res.status).toBe(200);
+      return (await json<DataEnvelope<{ id: string }[]>>(res)).data.map((cl) => cl.id).sort();
+    };
+    expect(await claimIds(ctx.authed)).toEqual(['claim-private', 'claim-shared']);
+    expect(await claimIds(m.coOwner.request)).toEqual(['claim-shared']);
+    expect(await claimIds(m.editor.request)).toEqual([]);
+    expect(await claimIds(m.viewer.request)).toEqual([]);
+    expect(await status(m.stranger.request, 'GET', claims)).toBe(404);
+    expect(await status(m.disabled.request, 'GET', claims)).toBe(403);
+
     const docs = (claimId: string) => `/api/v1/photos/insurance_claim/${claimId}`;
     expect(await status(m.coOwner.request, 'GET', docs('claim-shared'))).toBe(200);
     expect(await status(m.coOwner.request, 'GET', docs('claim-private'))).toBe(404);
+    expect(await status(m.viewer.request, 'GET', docs('claim-shared'))).toBe(403);
     expect(await status(ctx.authed, 'GET', docs('claim-private'))).toBe(200);
+
+    overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
+    expect(await claimIds(m.viewer.request)).toEqual(['claim-shared']);
+    expect(await status(m.viewer.request, 'GET', docs('claim-shared'))).toBe(200);
+    overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
+    expect(await claimIds(m.coOwner.request)).toEqual([]);
+    expect(await status(m.coOwner.request, 'GET', docs('claim-shared'))).toBe(403);
   });
 
   test('policy writes stay with the policy owner', async () => {

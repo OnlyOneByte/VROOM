@@ -5,7 +5,6 @@ import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, ownAccount, vehicleParam } from '../../permissions/authorize';
 import { requestResolver } from '../../permissions/grants';
-import type { Resource } from '../../permissions/resolve';
 import { insuranceClaimToApi, insuranceTermToApi } from '../../utils/money';
 import { validateInsuranceOwnership, zValidator } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
@@ -331,15 +330,18 @@ routes.get(
   authorize(fromPolicyReaders),
   async (c) => {
     const { id } = c.req.valid('param');
-    const readable = (await fromPolicyReaders(c)) as Resource[];
-    const isOwner = readable.some((r) => r.kind === 'account');
-    const readableVehicleIds = new Set(
-      readable.flatMap((r) => (r.kind === 'vehicle' ? [r.vehicleId] : []))
-    );
+    const policy = await insurancePolicyRepository.findById(id);
     const claims = await insuranceClaimRepository.findByPolicyId(id);
-    const scoped = isOwner
-      ? claims
-      : claims.filter((cl) => cl.vehicleId !== null && readableVehicleIds.has(cl.vehicleId));
+    const resolver = requestResolver(c, getDb());
+    const scoped =
+      policy?.userId === c.get('user').id
+        ? claims
+        : claims.filter(
+            (cl) =>
+              cl.vehicleId !== null &&
+              resolver.can('vehicle.insurance.read', { kind: 'vehicle', vehicleId: cl.vehicleId })
+                .allow
+          );
     return c.json({
       success: true,
       data: scoped.map((cl) => insuranceClaimToApi(cl)),

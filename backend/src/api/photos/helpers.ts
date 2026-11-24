@@ -8,7 +8,7 @@ import {
   seesFinancials,
 } from '../../utils/vehicle-access';
 import { expenseRepository } from '../expenses/repository';
-import { policyResources } from '../insurance/access';
+import { policyDocumentResources } from '../insurance/access';
 import { insuranceClaimRepository } from '../insurance/claims-repository';
 import { insurancePolicyRepository } from '../insurance/repository';
 import { odometerRepository } from '../odometer/repository';
@@ -54,13 +54,10 @@ async function insuranceDocumentResources(
   entityType: string,
   entityId: string
 ): Promise<Resource | Resource[]> {
-  const access = c.req.method === 'GET' ? 'read' : 'write';
-  if (entityType === 'insurance_policy') {
-    return policyResources(c, entityId, `vehicle.insurance.${access}`);
-  }
+  if (entityType === 'insurance_policy') return policyDocumentResources(c, entityId);
   const claim = await insuranceClaimRepository.findAccessTarget(entityId);
   if (!claim) throw new NotFoundError('Insurance claim');
-  return claim.vehicleId
+  return claim.vehicleId && c.req.method === 'GET'
     ? { kind: 'vehicle', vehicleId: claim.vehicleId }
     : { kind: 'account', userId: claim.ownerId };
 }
