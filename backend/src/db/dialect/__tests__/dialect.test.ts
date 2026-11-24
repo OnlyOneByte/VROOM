@@ -22,6 +22,7 @@ import {
   sqlTrue,
   sumNum,
   toDateTimeString,
+  typedParam,
 } from '..';
 
 let testDb: TestDb;
@@ -212,5 +213,15 @@ describe('classifyDbError over real SQLite errors', () => {
       )
     ).toBe(true);
     expect(looksLikeDriverError(new Error('SQLITE_BUSY: database is locked'))).toBe(true);
+  });
+});
+
+describe('typedParam', () => {
+  test('casts a bound value, and refuses a fractional bigint rather than truncating it', () => {
+    const [row] = testDb.drizzle.all<{ n: number; r: number; t: string }>(
+      sql`SELECT ${typedParam(1795000000, 'bigint')} AS n, ${typedParam(1, 'real')} AS r, ${typedParam(7, 'text')} AS t`
+    );
+    expect(row).toEqual({ n: 1795000000, r: 1, t: '7' });
+    expect(() => typedParam(1.5, 'bigint')).toThrow(TypeError);
   });
 });

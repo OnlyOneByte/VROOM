@@ -392,7 +392,7 @@ function bucketsCte(periods: Bucket[][]): SQL {
   periods.forEach((buckets, period) => {
     buckets.forEach((b, idx) => {
       rows.push(
-        sql`(${typedParam(period, 'integer')}, ${typedParam(idx, 'integer')}, ${typedParam(b.start, 'integer')}, ${typedParam(b.end, 'integer')})`
+        sql`(${typedParam(period, 'bigint')}, ${typedParam(idx, 'bigint')}, ${typedParam(b.start, 'bigint')}, ${typedParam(b.end, 'bigint')})`
       );
     });
   });
@@ -808,8 +808,8 @@ export class AnalyticsQueryRepository {
       WITH ${bucketsCte(ctx.periods)}
       SELECT b.period, b.idx, 0 AS is_total, ${key} AS key, SUM(e.expense_amount) AS cost, COUNT(*) AS n,
         NULL AS volume, NULL AS eff_distance, NULL AS eff_energy
-      FROM b JOIN expenses e ON e.date >= b.t0 AND e.date < b.t1
-      WHERE ${this.scope(ctx)}
+      FROM b CROSS JOIN expenses e
+      WHERE e.date >= b.t0 AND e.date < b.t1 AND ${this.scope(ctx)}
       GROUP BY b.period, b.idx, ${key}
     `
     );
@@ -823,9 +823,9 @@ export class AnalyticsQueryRepository {
       WITH ${bucketsCte(ctx.periods)},
       tagged AS (
         SELECT DISTINCT b.period, b.idx, e.id, e.expense_amount, COALESCE(${tag.element}, '') AS key
-        FROM b JOIN expenses e ON e.date >= b.t0 AND e.date < b.t1
+        FROM b CROSS JOIN expenses e
         ${tag.join}
-        WHERE ${this.scope(ctx)}
+        WHERE e.date >= b.t0 AND e.date < b.t1 AND ${this.scope(ctx)}
       )
       SELECT period, idx, 0 AS is_total, key, SUM(expense_amount) AS cost, COUNT(*) AS n,
         NULL AS volume, NULL AS eff_distance, NULL AS eff_energy
@@ -834,8 +834,8 @@ export class AnalyticsQueryRepository {
       UNION ALL
       SELECT b.period, b.idx, 1 AS is_total, NULL AS key, SUM(e.expense_amount) AS cost, COUNT(*) AS n,
         NULL AS volume, NULL AS eff_distance, NULL AS eff_energy
-      FROM b JOIN expenses e ON e.date >= b.t0 AND e.date < b.t1
-      WHERE ${this.scope(ctx)}
+      FROM b CROSS JOIN expenses e
+      WHERE e.date >= b.t0 AND e.date < b.t1 AND ${this.scope(ctx)}
       GROUP BY b.period, b.idx
     `
     );
@@ -866,8 +866,8 @@ export class AnalyticsQueryRepository {
         SELECT b.period, b.idx, e.vehicle_id, e.fuel_type, e.mileage, e.volume, e.missed_fillup,
           e.expense_amount,
           LAG(e.mileage) OVER (PARTITION BY b.period, e.vehicle_id ORDER BY e.date, e.mileage, e.id) AS prev_mileage
-        FROM b JOIN expenses e ON e.date >= b.t0 AND e.date < b.t1
-        WHERE ${this.scope(ctx)} ${measuresEnergy(ctx.query) ? sql`AND ${electricFilter(ctx.query.energy)}` : sql``}
+        FROM b CROSS JOIN expenses e
+        WHERE e.date >= b.t0 AND e.date < b.t1 AND ${this.scope(ctx)} ${measuresEnergy(ctx.query) ? sql`AND ${electricFilter(ctx.query.energy)}` : sql``}
       )
       SELECT f.period, f.idx, 0 AS is_total, ${key} AS key, SUM(f.expense_amount) AS cost, COUNT(*) AS n,
         SUM(CASE WHEN f.volume > 0 THEN ${energyUser} END) AS volume,
@@ -887,8 +887,8 @@ export class AnalyticsQueryRepository {
       p AS (SELECT period, MIN(t0) AS t0 FROM b GROUP BY period),
       raw AS (
         SELECT b.period, b.idx, e.vehicle_id, e.date, e.id, e.mileage
-        FROM b JOIN expenses e ON e.date >= b.t0 AND e.date < b.t1
-        WHERE e.user_id = ${ctx.userId} AND e.vehicle_id IN (${inList(ctx.vehicleIds)})
+        FROM b CROSS JOIN expenses e
+        WHERE e.date >= b.t0 AND e.date < b.t1 AND e.user_id = ${ctx.userId} AND e.vehicle_id IN (${inList(ctx.vehicleIds)})
           AND e.mileage IS NOT NULL
         UNION ALL
         SELECT p.period, -2 AS idx, vu.vehicle_id, p.t0 - 1 AS date, '' AS id,

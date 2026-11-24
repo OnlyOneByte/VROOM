@@ -45,9 +45,12 @@ export function rawJsonValue<T>(value: unknown): T | null {
   return (typeof value === 'string' ? JSON.parse(value) : value) as T;
 }
 
-const SQL_TYPES = { integer: 'INTEGER', real: 'REAL', text: 'TEXT' } as const;
+const SQL_TYPES = { bigint: 'INTEGER', real: 'REAL', text: 'TEXT' } as const;
 
 export function typedParam(value: string | number, type: keyof typeof SQL_TYPES): SQL {
+  if (type === 'bigint' && !Number.isSafeInteger(value)) {
+    throw new TypeError(`typedParam: ${String(value)} is not a whole number`);
+  }
   return sql`CAST(${value} AS ${sql.raw(SQL_TYPES[type])})`;
 }
 
