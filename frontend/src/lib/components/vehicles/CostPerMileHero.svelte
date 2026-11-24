@@ -61,7 +61,7 @@
 </script>
 
 <section
-	class="space-y-4 rounded-xl border bg-card p-4 outline-none sm:p-6"
+	class="space-y-4 rounded-xl border bg-card p-4 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:p-6"
 	aria-label="True cost per {unitName}"
 	data-testid="cost-per-mile-hero"
 	tabindex="-1"
