@@ -47,7 +47,7 @@ describe('ReceiptScanButton: privacy disclosure', () => {
 
 		await fireEvent.click(scanButton());
 
-		expect(await screen.findByText('Scan a receipt with AI')).toBeInTheDocument();
+		expect(await screen.findByText('Scan a receipt')).toBeInTheDocument();
 		expect(click).not.toHaveBeenCalled();
 	});
 
@@ -60,7 +60,7 @@ describe('ReceiptScanButton: privacy disclosure', () => {
 
 		expect(localStorage.setItem).toHaveBeenCalledWith(DISCLOSURE_KEY, '1');
 		expect(click).toHaveBeenCalledOnce();
-		await waitFor(() => expect(screen.queryByText('Scan a receipt with AI')).toBeNull());
+		await waitFor(() => expect(screen.queryByText('Scan a receipt')).toBeNull());
 	});
 
 	test('continuing still opens the picker when storage is unavailable', async () => {
@@ -84,7 +84,7 @@ describe('ReceiptScanButton: privacy disclosure', () => {
 		await fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
 
 		expect(click).not.toHaveBeenCalled();
-		await waitFor(() => expect(screen.queryByText('Scan a receipt with AI')).toBeNull());
+		await waitFor(() => expect(screen.queryByText('Scan a receipt')).toBeNull());
 	});
 
 	test('once acknowledged, scanning goes straight to the picker', async () => {
@@ -95,7 +95,7 @@ describe('ReceiptScanButton: privacy disclosure', () => {
 		await fireEvent.click(scanButton());
 
 		expect(click).toHaveBeenCalledOnce();
-		expect(screen.queryByText('Scan a receipt with AI')).toBeNull();
+		expect(screen.queryByText('Scan a receipt')).toBeNull();
 	});
 });
 
@@ -150,7 +150,7 @@ describe('ReceiptScanButton: errors', () => {
 		[
 			'missing provider (NO_PROVIDER)',
 			new ApiError('Bad Request', 400, { capability: 'ai.vision' }, 'NO_PROVIDER'),
-			'No receipt-parsing provider is set up yet. Add one in Settings → Receipt Parsing.'
+			'No receipt-scanning provider is set up yet. Add one in Settings → Receipt Scanning.'
 		],
 		[
 			'another 400, such as an unreadable image',
@@ -163,9 +163,17 @@ describe('ReceiptScanButton: errors', () => {
 			"Couldn't reach the AI provider. Check the key and model, or fill it in manually."
 		],
 		[
-			'other API',
-			new ApiError('Image too blurry', 422),
-			"Couldn't read the receipt. Image too blurry. Or fill it in manually."
+			'built-in reader found no text (422)',
+			new ApiError('No readable text found. Try a sharper, well-lit photo.', 422),
+			'No readable text found. Try a sharper, well-lit photo. Or fill it in manually.'
+		],
+		[
+			'built-in reader unavailable (503)',
+			new ApiError(
+				"The built-in text reader isn't available right now. Try again in a moment.",
+				503
+			),
+			"The built-in text reader isn't available right now. Try again in a moment. Or fill it in manually."
 		],
 		[
 			'non-Error',

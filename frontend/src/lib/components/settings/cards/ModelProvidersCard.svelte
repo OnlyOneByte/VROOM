@@ -4,6 +4,7 @@
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
 	import HowItWorks from '#lib/components/common/how-it-works.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -40,19 +41,19 @@
 	const COPY = {
 		vlm: {
 			icon: Sparkles,
-			title: 'Receipt Parsing (AI)',
+			title: 'Receipt Scanning',
 			description:
-				'Connect a vision-AI provider to scan receipts into expense drafts. Bring your own key — your receipt is sent only to the provider you choose. For maximum privacy, self-host with Ollama.',
-			noun: 'receipt-parsing provider',
-			addLabel: 'Add Receipt-Parsing Provider',
-			summary: 'Scan receipts into expense drafts with your own AI key.',
+				'The built-in text reader reads receipts on your VROOM server, with no AI model and no key. For harder receipts, connect a vision-AI provider with your own key: your receipt is then sent only to the provider you choose. For maximum privacy, self-host with Ollama.',
+			noun: 'receipt-scanning provider',
+			addLabel: 'Add AI Provider',
+			summary: 'Scan receipts into expense drafts, built in or with your own AI key.',
 			dialogNote:
 				'The API key is stored encrypted and never shown again. Your receipt image is sent only to this provider when you scan.',
 			namePlaceholder: 'My receipt parser',
 			feature: 'Receipt scanning',
 			useFor: 'receipt scanning',
 			useForTitle: 'Receipt Scanning',
-			loadError: "Couldn't load your receipt-parsing providers.",
+			loadError: "Couldn't load your receipt-scanning providers.",
 			capability: 'ai.vision'
 		},
 		llm: {
@@ -75,7 +76,13 @@
 	} as const;
 
 	let copy = $derived(COPY[domain]);
-	let providerTypes = $derived(providerCatalog.models(copy.capability));
+	let providerTypes = $derived(
+		providerCatalog.models(copy.capability).filter(t => t.scope !== 'builtin')
+	);
+	let builtins = $derived(
+		providerCatalog.models(copy.capability).filter(t => t.scope === 'builtin')
+	);
+	const builtinId = (entry: { id: string }) => `builtin:${entry.id}`;
 	let Icon = $derived(copy.icon);
 
 	let providers = $state<UserProviderInfo[]>([]);
@@ -107,15 +114,17 @@
 	);
 
 	let usable = $derived(providers.filter(p => p.status !== 'disabled'));
+	let choiceCount = $derived(usable.length + builtins.length);
 	let defaultId = $derived(
-		usable.find(p => p.id === savedDefaultId)?.id ??
+		builtins.map(builtinId).find(id => id === savedDefaultId) ??
+			usable.find(p => p.id === savedDefaultId)?.id ??
 			[...usable].sort(
 				(a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.id.localeCompare(b.id)
 			)[0]?.id ??
-			null
+			(builtins[0] ? builtinId(builtins[0]) : null)
 	);
 
-	async function useAsDefault(p: UserProviderInfo) {
+	async function useAsDefault(p: { id: string; displayName: string }) {
 		if (savingDefaultId) return;
 		savingDefaultId = p.id;
 		try {
@@ -261,6 +270,26 @@
 	}
 </script>
 
+{#snippet defaultControl(provider: { id: string; displayName: string })}
+	{#if defaultsUnknown}
+		<p class="text-xs text-muted-foreground">Couldn't load which provider {copy.useFor} uses.</p>
+	{:else if provider.id === defaultId}
+		<p class="text-xs text-muted-foreground">Used for {copy.useFor}</p>
+	{:else}
+		<Button
+			variant="outline"
+			class="h-10 sm:h-9"
+			aria-disabled={savingDefaultId !== null}
+			onclick={() => useAsDefault(provider)}
+		>
+			{#if savingDefaultId === provider.id}
+				<LoaderCircle class="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+			{/if}
+			Use for {copy.useForTitle}
+		</Button>
+	{/if}
+{/snippet}
+
 <Card>
 	<CardHeader>
 		<div class="flex items-center gap-2">
@@ -285,7 +314,7 @@
 		{:else}
 			<div class="space-y-3">
 				<div class="flex flex-wrap items-center justify-between gap-2">
-					{#if providers.length === 0}
+					{#if providers.length === 0 && builtins.length === 0}
 						<p class="text-sm text-muted-foreground">No {copy.noun} connected</p>
 					{:else}
 						<p class="text-sm font-medium">Providers</p>
@@ -302,8 +331,25 @@
 					</Button>
 				</div>
 
-				{#if providers.length > 0}
+				{#if providers.length > 0 || builtins.length > 0}
 					<div class="space-y-2">
+						{#each builtins as entry (entry.id)}
+							{@const id = builtinId(entry)}
+							<div class="space-y-3 rounded-lg border p-3" data-testid="{domain}-builtin-row">
+								<div class="min-w-0">
+									<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+										<p class="text-sm font-medium">{entry.label}</p>
+										<Badge variant="outline" class="shrink-0 text-xs text-muted-foreground">
+											Built in
+										</Badge>
+									</div>
+									<p class="text-xs text-muted-foreground">{entry.description}</p>
+								</div>
+								{#if choiceCount > 1}
+									{@render defaultControl({ id, displayName: entry.label })}
+								{/if}
+							</div>
+						{/each}
 						{#each providers as provider (provider.id)}
 							<div class="space-y-3 rounded-lg border p-3" data-testid="{domain}-provider-row">
 								<div class="flex items-center justify-between gap-2">
@@ -340,26 +386,8 @@
 										</Button>
 									</div>
 								</div>
-								{#if usable.length > 1 && provider.status !== 'disabled'}
-									{#if defaultsUnknown}
-										<p class="text-xs text-muted-foreground">
-											Couldn't load which provider {copy.useFor} uses.
-										</p>
-									{:else if provider.id === defaultId}
-										<p class="text-xs text-muted-foreground">Used for {copy.useFor}</p>
-									{:else}
-										<Button
-											variant="outline"
-											class="h-10 sm:h-9"
-											aria-disabled={savingDefaultId !== null}
-											onclick={() => useAsDefault(provider)}
-										>
-											{#if savingDefaultId === provider.id}
-												<LoaderCircle class="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-											{/if}
-											Use for {copy.useForTitle}
-										</Button>
-									{/if}
+								{#if choiceCount > 1 && provider.status !== 'disabled'}
+									{@render defaultControl(provider)}
 								{/if}
 								<ProviderHealth {provider} onFix={openEdit} onUpdated={replaceProvider} />
 							</div>

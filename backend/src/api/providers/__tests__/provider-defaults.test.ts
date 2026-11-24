@@ -1,10 +1,13 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   createTestApp,
   type DataEnvelope,
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { stopLocalOcr } from '../domains/vlm/local-ocr';
 
 let ctx: TestApp;
 const realFetch = globalThis.fetch;
@@ -100,19 +103,54 @@ describe('no provider is a typed error', () => {
     expect(body.error.code).toBe('NO_PROVIDER');
     expect(body.error.details.capability).toBe('ai.llm');
   });
+});
 
-  test('receipt parsing answers NO_PROVIDER for ai.vision', async () => {
+describe('receipt scanning falls back to the built-in text reader', () => {
+  const RECEIPT = readFileSync(
+    join(import.meta.dir, '../../../test-helpers/provider-contracts/fixtures/receipt-fuel-eu.png')
+  );
+
+  async function scan(): Promise<Response> {
     const form = new FormData();
-    form.append('image', new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }), 'r.jpg');
-    const res = await ctx.app.request('/api/v1/receipts/parse', {
+    form.append('image', new Blob([RECEIPT], { type: 'image/png' }), 'r.png');
+    return await ctx.app.request('/api/v1/receipts/parse', {
       method: 'POST',
       headers: { Cookie: ctx.cookie, 'Sec-Fetch-Site': 'same-origin' },
       body: form,
     });
-    const body = await json<{ error: { code: string; details: { capability: string } } }>(res);
-    expect(res.status, JSON.stringify(body)).toBe(400);
-    expect(body.error.code).toBe('NO_PROVIDER');
-    expect(body.error.details.capability).toBe('ai.vision');
+  }
+
+  afterAll(stopLocalOcr);
+
+  test('with no vision provider, a receipt is read on the server', async () => {
+    const res = await scan();
+    const body = await json<DataEnvelope<{ draft: Record<string, unknown> }>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.draft).toMatchObject({ amount: 75.44, volume: 42.17, volumeUnit: 'liters' });
+  }, 60_000);
+
+  test('a user with an AI provider can pick the built-in reader as the default', async () => {
+    await createModel('vlm', 'Scan', 'sk-vision');
+    expect((await setDefaults({ 'ai.vision': 'builtin:local-ocr' })).status).toBe(200);
+    const keys = recordKeysSent();
+    const res = await scan();
+    expect(res.status).toBe(200);
+    expect(keys).toEqual([]);
+  }, 60_000);
+
+  test('the built-in id is not a default for the assistant', async () => {
+    expect((await setDefaults({ 'ai.llm': 'builtin:local-ocr' })).status).toBe(400);
+  });
+
+  test('the built-in reader cannot be added as a user provider', async () => {
+    const res = await ctx.authed('POST', '/api/v1/providers', {
+      domain: 'vlm',
+      providerType: 'local-ocr',
+      displayName: 'Mine',
+      credentials: {},
+      config: {},
+    });
+    expect(res.status).toBe(400);
   });
 });
 
@@ -184,6 +222,23 @@ describe('backup and restore carry the defaults', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
     expect(storedDefaults()['ai.llm']).toBe(llm);
+  });
+
+  test('a restored choice of the built-in text reader is kept, for receipts only', async () => {
+    await createModel('vlm', 'Scan', 'sk-2');
+    ctx.sqlite.run('UPDATE user_preferences SET provider_defaults = ? WHERE user_id = ?', [
+      JSON.stringify({ 'ai.llm': 'builtin:local-ocr', 'ai.vision': 'builtin:local-ocr' }),
+      ctx.user.id,
+    ]);
+    const { backupService } = await import('../../sync/backup');
+    const { restoreService } = await import('../../sync/restore');
+    const zip = await backupService.exportAsZip(ctx.user.id);
+    ctx.sqlite.run("UPDATE user_preferences SET provider_defaults = '{}' WHERE user_id = ?", [
+      ctx.user.id,
+    ]);
+    const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(storedDefaults()).toEqual({ 'ai.llm': null, 'ai.vision': 'builtin:local-ocr' });
   });
 
   test('a restored default naming a provider the user does not own is dropped', async () => {

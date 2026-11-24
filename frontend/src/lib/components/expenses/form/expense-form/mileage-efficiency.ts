@@ -44,6 +44,10 @@ export const US_GALLONS_PER_UNIT: Record<VolumeUnit, number> = {
 	liters: 1 / 3.785411784
 };
 
+export function convertVolume(value: number, from: VolumeUnit, to: VolumeUnit): number {
+	return Math.round(((value * US_GALLONS_PER_UNIT[from]) / US_GALLONS_PER_UNIT[to]) * 1000) / 1000;
+}
+
 export function calculateMileageEfficiency(
 	input: MileageEfficiencyInput
 ): MileageEfficiency | null {

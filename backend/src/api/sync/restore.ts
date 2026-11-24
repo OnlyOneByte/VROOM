@@ -44,6 +44,7 @@ import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { catalogModelMatchesMake } from '../../utils/vehicle-catalog';
+import { LOCAL_OCR_PROVIDER_ID } from '../providers/domains/vlm/registry';
 import { CAPABILITY_DOMAIN } from '../providers/resolve';
 import { preferencesRepository } from '../settings/repository';
 import { isKnownRegion } from '../settings/validation';
@@ -695,7 +696,10 @@ class RestoreService {
       DEFAULT_PROVIDER_CAPABILITIES.map((capability) => [
         capability,
         [current?.providerDefaults?.[capability], restoredDefaults?.[capability]].find(
-          (id) => id != null && owned.get(id) === CAPABILITY_DOMAIN[capability]
+          (id) =>
+            id != null &&
+            (owned.get(id) === CAPABILITY_DOMAIN[capability] ||
+              (capability === 'ai.vision' && id === LOCAL_OCR_PROVIDER_ID))
         ) ?? null,
       ])
     ) as ProviderDefaults;

@@ -40,6 +40,7 @@
 	import ExpensePhotoSection from './ExpensePhotoSection.svelte';
 	import PendingPhotoPreview from './PendingPhotoPreview.svelte';
 	import ReceiptScanButton from './ReceiptScanButton.svelte';
+	import { convertVolume } from './expense-form/mileage-efficiency';
 	import type { ReceiptDraft } from '#lib/services/vlm-api.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import {
@@ -308,6 +309,11 @@
 		if (typeof draft.amount === 'number') form.formData.amount = String(draft.amount);
 		if (draft.date) form.formData.date = draft.date;
 		if (typeof draft.odometer === 'number') form.formData.mileage = String(draft.odometer);
+		if (typeof draft.volume === 'number' && draft.volumeUnit) {
+			form.formData.volume = String(
+				convertVolume(draft.volume, draft.volumeUnit, form.effectiveVolumeUnit)
+			);
+		}
 		if (draft.vendor && !form.formData.description.trim()) {
 			form.formData.description = draft.vendor;
 		}

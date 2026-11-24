@@ -819,6 +819,15 @@ describe('ExpenseForm receipt scanning', () => {
 		expect(document.getElementById('volume')).not.toBeNull();
 	});
 
+	test('a fuel receipt in litres fills the volume in the vehicle’s gallons', async () => {
+		await renderCreate();
+
+		await scanReceipt({ amount: 75.44, category: 'fuel', volume: 42.17, volumeUnit: 'liters' });
+
+		await vi.waitFor(() => expect(field('volume').value).toBe('11.14'));
+		expect(field('amount').value).toBe('75.44');
+	});
+
 	test('an odometer reading on a receipt with no category fills the mileage', async () => {
 		await renderCreate({ preselectedCategory: 'misc' });
 

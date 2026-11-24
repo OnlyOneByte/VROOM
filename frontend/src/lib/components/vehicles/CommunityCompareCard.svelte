@@ -65,6 +65,7 @@
 	let metrics = $derived(result?.metrics ?? []);
 	let featureOff = $derived(metrics.length > 0 && metrics.every(m => m.status === 'feature_off'));
 	let optInRequired = $derived(metrics.some(m => m.status === 'opt_in_required'));
+	let awaitingRefresh = $derived(metrics.some(m => m.status === 'awaiting_refresh'));
 	let needsModel = $derived(metrics.some(m => m.status === 'needs_model'));
 	let anyOk = $derived(metrics.some(m => m.status === 'ok'));
 	let anyTooFew = $derived(metrics.some(m => m.status === 'too_few'));
@@ -247,6 +248,10 @@
 				onRecovered={focusHeading}
 				data-testid="community-compare-error"
 			/>
+		{:else if awaitingRefresh}
+			<p class="text-sm text-muted-foreground" data-testid="community-compare-awaiting">
+				You're in. Comparisons appear after the next daily refresh includes your vehicles.
+			</p>
 		{:else if optInRequired}
 			<div class="space-y-3" data-testid="community-compare-opt-in">
 				<p class="text-sm text-muted-foreground">

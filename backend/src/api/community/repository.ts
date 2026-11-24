@@ -3,6 +3,7 @@ import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import {
   type CommunityStat,
+  communityRefreshes,
   communityStats,
   expenses,
   type NewCommunityStat,
@@ -41,6 +42,8 @@ const VEHICLE_COLUMNS = {
   vehicleType: vehicles.vehicleType,
   unitPreferences: vehicles.unitPreferences,
 };
+
+export type Contribution = 'opted_out' | 'awaiting_refresh' | 'included';
 
 export class CommunityStatsRepository {
   constructor(private db: AppDatabase) {}
@@ -88,13 +91,22 @@ export class CommunityStatsRepository {
     return loaded ?? null;
   }
 
-  async isOptedIn(userId: string): Promise<boolean> {
+  async contribution(userId: string, scope: string): Promise<Contribution> {
     const row = await this.db
-      .select({ optIn: userPreferences.communityStatsOptIn })
+      .select({
+        optIn: userPreferences.communityStatsOptIn,
+        consentedAt: userPreferences.communityStatsConsentedAt,
+      })
       .from(userPreferences)
       .where(eq(userPreferences.userId, userId))
       .get();
-    return row?.optIn === true;
+    if (row?.optIn !== true) return 'opted_out';
+    const snapshot = await this.lastRefreshedAt(scope);
+    const included =
+      row.consentedAt !== null &&
+      snapshot !== null &&
+      row.consentedAt.getTime() < snapshot.getTime();
+    return included ? 'included' : 'awaiting_refresh';
   }
 
   async publishedBuckets(
@@ -222,24 +234,26 @@ export class CommunityStatsRepository {
     });
   }
 
-  async newestComputedAt(scope: string): Promise<Date | null> {
+  async lastRefreshedAt(scope: string): Promise<Date | null> {
     const row = await this.db
-      .select({ computedAt: communityStats.computedAt })
-      .from(communityStats)
-      .where(eq(communityStats.scope, scope))
-      .orderBy(desc(communityStats.computedAt))
-      .limit(1)
+      .select({ refreshedAt: communityRefreshes.refreshedAt })
+      .from(communityRefreshes)
+      .where(eq(communityRefreshes.scope, scope))
       .get();
-    return row?.computedAt ?? null;
+    return row?.refreshedAt ?? null;
   }
 
-  replaceScope(scope: string, rows: NewCommunityStat[]): void {
+  replaceScope(scope: string, rows: NewCommunityStat[], refreshedAt: Date): void {
     this.db.transaction((tx) => {
       tx.delete(communityStats).where(eq(communityStats.scope, scope)).run();
       const perInsert = rowsPerInsert(Object.keys(getTableColumns(communityStats)).length);
       for (const batch of chunk(rows, perInsert)) {
         tx.insert(communityStats).values(batch).run();
       }
+      tx.insert(communityRefreshes)
+        .values({ scope, refreshedAt })
+        .onConflictDoUpdate({ target: communityRefreshes.scope, set: { refreshedAt } })
+        .run();
     });
   }
 }

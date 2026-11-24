@@ -28,6 +28,7 @@ export type CompareStatus =
   | 'no_data'
   | 'needs_model'
   | 'opt_in_required'
+  | 'awaiting_refresh'
   | 'feature_off';
 
 export type DisplayUnit =
@@ -110,10 +111,16 @@ routes.get('/compare', zValidator('query', compareQuerySchema), async (c) => {
       data: { currency: null, metrics: emptyMetrics('feature_off') },
     });
   }
-  if (GIVE_TO_GET && !(await communityStatsRepository.isOptedIn(user.id))) {
+  const contribution = await communityStatsRepository.contribution(user.id, LOCAL_SCOPE);
+  if (GIVE_TO_GET && contribution !== 'included') {
     return c.json({
       success: true,
-      data: { currency: null, metrics: emptyMetrics('opt_in_required') },
+      data: {
+        currency: null,
+        metrics: emptyMetrics(
+          contribution === 'opted_out' ? 'opt_in_required' : 'awaiting_refresh'
+        ),
+      },
     });
   }
 

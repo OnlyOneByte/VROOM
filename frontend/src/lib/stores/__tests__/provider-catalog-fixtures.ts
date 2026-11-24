@@ -133,5 +133,18 @@ function modelEntries(capability: ModelCapability, ollamaModel: string): ModelCa
 export const PROVIDER_CATALOG: CatalogEntry[] = [
 	...STORAGE_CATALOG,
 	...modelEntries('ai.llm', 'llama3.1'),
-	...modelEntries('ai.vision', 'llava')
+	...modelEntries('ai.vision', 'llava'),
+	{
+		id: 'local-ocr',
+		capability: 'ai.vision',
+		label: 'Built-in text reader',
+		shortLabel: 'Built-in',
+		description:
+			'Reads the total, date, station and fuel quantity on your VROOM server. No AI model, no key, and the image never leaves your server.',
+		scope: 'builtin',
+		connect: 'none',
+		fields: [],
+		secrets: [],
+		features: {}
+	}
 ];

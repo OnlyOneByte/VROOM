@@ -230,6 +230,16 @@ describe('community stats refresh against the database', () => {
     }
   });
 
+  test('every refresh records its time, even one that publishes nothing', async () => {
+    expect(await repository.lastRefreshedAt('local')).toBeNull();
+    await refreshCommunityStats(repository, NOW);
+    expect(db.sqlite.query('SELECT COUNT(*) AS n FROM community_stats').get()).toEqual({ n: 0 });
+    expect(await repository.lastRefreshedAt('local')).toEqual(NOW);
+    const later = new Date(NOW.getTime() + DAY);
+    await refreshCommunityStats(repository, later);
+    expect(await repository.lastRefreshedAt('local')).toEqual(later);
+  });
+
   test('the table has no user id column', () => {
     expect(getColumnNames(db.sqlite, 'community_stats').some((name) => name.includes('user'))).toBe(
       false

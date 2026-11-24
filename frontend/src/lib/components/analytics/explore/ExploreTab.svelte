@@ -14,6 +14,7 @@
 	import { buildChartConfig } from '#lib/utils/chart-colors.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import type { AnalyticsDateRange } from '../analytics-filters';
+	import InsightCards from './InsightCards.svelte';
 	import QueryBar from './QueryBar.svelte';
 	import DrillPanel from './DrillPanel.svelte';
 	import {
@@ -57,6 +58,7 @@
 		carsText?: string;
 		onOnlyCar?: (_id: string) => void;
 		onAllCars?: () => void;
+		onApplyInsight?: (_query: Record<string, string>) => void;
 	}
 
 	let {
@@ -70,8 +72,16 @@
 		rangeText = 'Last 12 months',
 		carsText = 'All cars',
 		onOnlyCar,
-		onAllCars
+		onAllCars,
+		onApplyInsight
 	}: Props = $props();
+
+	let root = $state<HTMLElement | null>(null);
+
+	function applyInsight(insightQuery: Record<string, string>) {
+		onApplyInsight?.(insightQuery);
+		root?.scrollIntoView({ block: 'start' });
+	}
 
 	let response = $state<AnalyticsQueryResponse | null>(null);
 	let shown = $state<ExploreQuery>(untrack(() => query));
@@ -451,7 +461,7 @@
 	}
 </script>
 
-<div class="space-y-4 md:space-y-6">
+<div class="space-y-4 md:space-y-6" bind:this={root}>
 	<QueryBar {query} onChange={onQueryChange} />
 
 	<div class="flex flex-wrap gap-2" role="group" aria-label="Presets">
@@ -683,4 +693,6 @@
 		{onOnlyCar}
 		onClose={closeSelection}
 	/>
+
+	<InsightCards {dateRange} {vehicleIds} onApply={applyInsight} />
 </div>

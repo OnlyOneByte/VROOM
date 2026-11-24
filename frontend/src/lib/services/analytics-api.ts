@@ -11,6 +11,7 @@ import type {
 	VehicleExpensesResponse,
 	YearEndResponse,
 	AnalyticsSummaryResponse,
+	AnalyticsInsight,
 	AnalyticsQueryParams,
 	AnalyticsQueryResponse,
 	AnalyticsBucketItems,
@@ -157,6 +158,17 @@ export const analyticsApi = {
 				vehicleIds: vehicleIds?.join(','),
 				keys: keys ? JSON.stringify(keys) : undefined
 			})}`,
+			options
+		);
+	},
+
+	async insights(
+		params: { start: number; end: number; vehicleIds?: string[] },
+		options?: { signal?: AbortSignal }
+	): Promise<AnalyticsInsight[]> {
+		const { vehicleIds, ...rest } = params;
+		return apiClient.get<AnalyticsInsight[]>(
+			`/analytics/insights${buildQueryString({ ...rest, vehicleIds: vehicleIds?.join(','), timeZone: userTimeZone() })}`,
 			options
 		);
 	},

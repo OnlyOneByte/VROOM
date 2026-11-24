@@ -126,3 +126,53 @@ describe('choosing which assistant provider is used', () => {
 		);
 	});
 });
+
+describe('the built-in text reader in receipt scanning', () => {
+	const VISION = { ...OLDER, id: 'vlm-1', domain: 'vlm', displayName: 'My GPT' };
+
+	async function mountVision() {
+		render(ModelProvidersCard, { props: { domain: 'vlm' } });
+		await settle();
+	}
+
+	test('with no AI provider it is listed and used, with nothing to pick', async () => {
+		getProviders.mockResolvedValue([]);
+		await mountVision();
+		expect(screen.getByTestId('vlm-builtin-row')).toHaveTextContent('Built-in text reader');
+		expect(screen.queryByRole('button', { name: /^Use for/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: /Delete Built-in/ })).toBeNull();
+	});
+
+	test('an AI provider stays the default, and the built-in reader can be picked instead', async () => {
+		getProviders.mockResolvedValue([VISION]);
+		await mountVision();
+		expect(screen.getByTestId('vlm-provider-row')).toHaveTextContent('Used for receipt scanning');
+		await fireEvent.click(screen.getByRole('button', { name: 'Use for Receipt Scanning' }));
+		await settle();
+		expect(updateSettings).toHaveBeenCalledWith({
+			providerDefaults: { 'ai.vision': 'builtin:local-ocr' }
+		});
+		expect(screen.getByTestId('vlm-builtin-row')).toHaveTextContent('Used for receipt scanning');
+	});
+
+	test('a saved built-in choice is shown as the one used', async () => {
+		getProviders.mockResolvedValue([VISION]);
+		getSettings.mockResolvedValue({
+			providerDefaults: { 'ai.vision': 'builtin:local-ocr' }
+		} as UserSettings);
+		await mountVision();
+		expect(screen.getByTestId('vlm-builtin-row')).toHaveTextContent('Used for receipt scanning');
+		expect(screen.getByTestId('vlm-provider-row')).toHaveTextContent('Use for Receipt Scanning');
+	});
+
+	test('the add dialog offers only AI providers, not the built-in reader', async () => {
+		getProviders.mockResolvedValue([]);
+		await mountVision();
+		await fireEvent.click(screen.getByTestId('vlm-add-provider'));
+		await settle();
+		await fireEvent.click(screen.getByTestId('vlm-type-trigger'));
+		await settle();
+		expect(screen.queryByRole('option', { name: 'Built-in text reader' })).toBeNull();
+		expect(screen.getByRole('option', { name: 'OpenAI-compatible' })).toBeInTheDocument();
+	});
+});
