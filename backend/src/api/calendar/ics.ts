@@ -9,7 +9,8 @@ function escapeText(value: string): string {
     .replace(/\\/g, '\\\\')
     .replace(/;/g, '\\;')
     .replace(/,/g, '\\,')
-    .replace(/\r\n|\r|\n/g, '\\n');
+    .replace(/\r\n|\r|\n|\u0085|\u2028|\u2029/g, '\\n')
+    .replace(/\p{Cc}/gu, ' ');
 }
 
 function fold(line: string): string {

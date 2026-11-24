@@ -16,10 +16,10 @@ import { toIcs } from './ics';
 const routes = new Hono();
 
 const FEED_PATH = '/calendar/feed/';
-const FEED_TOKEN_IN_TEXT = /(\/calendar\/feed\/)[^/\s?#"]+/g;
+const TOKEN_LIKE = /[A-Za-z0-9_-]{40,}/g;
 
 export function redactFeedTokens(text: string): string {
-  return text.replace(FEED_TOKEN_IN_TEXT, '$1[redacted]');
+  return /calendar/i.test(text) ? text.replace(TOKEN_LIKE, '[redacted]') : text;
 }
 const TOKEN_FILE = /^([A-Za-z0-9_-]{43})\.ics$/;
 

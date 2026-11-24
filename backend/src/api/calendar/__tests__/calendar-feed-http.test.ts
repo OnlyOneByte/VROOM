@@ -238,15 +238,33 @@ describe('the calendar feed link', () => {
     expect(bad.status).toBe(400);
   });
 
+  test('an insurance term renewing today stays in the feed at UTC+14', async () => {
+    await ownGarage(ctx.user.id);
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Kiritimati' });
+    ctx.sqlite.run(
+      `UPDATE insurance_terms SET end_date = ? WHERE policy_id IN (SELECT id FROM insurance_policies WHERE user_id = ? AND company = 'State Farm')`,
+      [Math.floor(new Date(`${today}T12:00:00+14:00`).getTime() / 1000), ctx.user.id]
+    );
+    const ics = await (
+      await fetchFeed(await createFeed({ timeZone: 'Pacific/Kiritimati' }))
+    ).text();
+    expect(ics).toContain(`DTSTART;VALUE=DATE:${today.replace(/-/g, '')}\r\nDTEND`);
+    expect(ics).toContain('Insurance renews: State Farm');
+  });
+
   test('the request log shows the feed path with the token redacted', async () => {
     const path = await createFeed();
     const token = path.match(/feed\/(.+)\.ics$/)?.[1] ?? '';
     const log = spyOn(console, 'log');
     try {
       await fetchFeed(path);
+      await fetchFeed(path.toUpperCase());
+      await fetchFeed(path.replace('/feed/', '//feed//'));
+      await fetchFeed(path.replace('/feed/', '/%66eed/'));
       const lines = log.mock.calls.map((call) => call.join(' '));
       expect(lines.some((line) => line.includes('/calendar/feed/[redacted]'))).toBe(true);
       expect(lines.some((line) => line.includes(token))).toBe(false);
+      expect(lines.some((line) => line.toLowerCase().includes(token.toLowerCase()))).toBe(false);
     } finally {
       log.mockRestore();
     }

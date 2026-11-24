@@ -128,4 +128,15 @@ describe('CalendarFeedCard', () => {
 		await screen.findByTestId('calendar-link');
 		expect(screen.queryByRole('button', { name: 'Open in Apple Calendar' })).toBeNull();
 	});
+
+	test('a time zone the server rejects falls back to creating the link without one', async () => {
+		const { ApiError } = await import('#lib/utils/error-handling.ts');
+		getFeed.mockResolvedValue(null);
+		createFeed.mockRejectedValueOnce(new ApiError('Unknown time zone', 400));
+		render(CalendarFeedCard);
+		await fireEvent.click(await screen.findByTestId('calendar-create'));
+		await screen.findByTestId('calendar-link');
+		expect(createFeed).toHaveBeenNthCalledWith(1, { ...OPTIONS, timeZone: TIME_ZONE });
+		expect(createFeed).toHaveBeenNthCalledWith(2, OPTIONS);
+	});
 });

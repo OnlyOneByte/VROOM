@@ -20,7 +20,7 @@
 	} from '#lib/services/calendar-api.ts';
 	import { absoluteApiUrl } from '#lib/services/api-client.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { formatDate } from '#lib/utils/formatters.ts';
 
 	type FeedSwitch = Exclude<keyof CalendarFeedOptions, 'timeZone'>;
@@ -67,7 +67,13 @@
 	async function createLink() {
 		busy = true;
 		try {
-			const created = await calendarApi.createFeed({ ...options, timeZone });
+			const created = await calendarApi
+				.createFeed({ ...options, timeZone })
+				.catch(e =>
+					e instanceof ApiError && e.statusCode === 400
+						? calendarApi.createFeed(options)
+						: Promise.reject(e)
+				);
 			feed = created.feed;
 			link = absoluteApiUrl(created.path);
 		} catch (e) {

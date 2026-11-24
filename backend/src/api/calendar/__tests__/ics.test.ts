@@ -45,6 +45,20 @@ describe('toIcs', () => {
     expect(ics.split(/\r\n|\r|\n/).filter((l) => l === 'BEGIN:VEVENT')).toHaveLength(1);
   });
 
+  test('other control characters and Unicode line separators never reach the file raw', () => {
+    const ics = toIcs(
+      [
+        {
+          uid: 'u',
+          date: '2026-12-01',
+          summary: 'a\u000bb\u000cc\u0000d\u001ce\u0085f\u2028g\u2029h',
+        },
+      ],
+      NOW
+    );
+    expect(ics).toContain('SUMMARY:a b c d e\\nf\\ng\\nh\r\n');
+  });
+
   test('folds lines longer than 75 octets without splitting a character', () => {
     const ics = toIcs([{ uid: 'u', date: '2026-12-01', summary: 'é'.repeat(60) }], NOW);
     const lines = ics.split('\r\n');
@@ -90,6 +104,23 @@ describe('paymentDates', () => {
     );
     expect(days).toHaveLength(12);
     expect(days.at(-1)?.toISOString().slice(0, 10)).toBe('2027-01-20');
+  });
+
+  test('a weekly loan ignores a month day when finding the end of its term', () => {
+    const loan = {
+      startDate: new Date('2026-09-25T12:00:00Z'),
+      termMonths: 6,
+      paymentDayOfMonth: 1,
+      endDate: null,
+      paymentFrequency: 'weekly',
+    };
+    const all = paymentDates(
+      loan,
+      new Date('2026-09-01T00:00:00Z'),
+      new Date('2027-12-31T00:00:00Z')
+    );
+    expect(all.at(-1)?.toISOString().slice(0, 10)).toBe('2027-03-19');
+    expect(all).toHaveLength(25);
   });
 
   test('payments stop at the end of the term', () => {

@@ -100,9 +100,10 @@ async function insuranceEvents(ctx: FeedContext): Promise<CalendarEvent[]> {
       and(
         eq(insurancePolicies.userId, ctx.userId),
         eq(insurancePolicies.isActive, true),
-        gte(insuranceTerms.endDate, ctx.today)
+        gte(insuranceTerms.endDate, new Date(ctx.today.getTime() - DAY_MS))
       )
-    );
+    )
+    .then((found) => found.filter((r) => ctx.day(r.term.endDate) >= isoDay(ctx.today)));
   const termIds = rows.map((r) => r.term.id);
   const covered = new Map<string, string[]>();
   if (termIds.length > 0) {
@@ -150,7 +151,9 @@ export function paymentDates(
     addMonths(
       loan.startDate,
       loan.termMonths,
-      loan.paymentDayOfMonth ?? loan.startDate.getUTCDate()
+      loan.paymentFrequency === 'monthly'
+        ? (loan.paymentDayOfMonth ?? loan.startDate.getUTCDate())
+        : loan.startDate.getUTCDate()
     );
   const dates: Date[] = [];
   const push = (d: Date) => {

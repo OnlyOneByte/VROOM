@@ -501,7 +501,7 @@ Each user can create a private calendar link in Settings → Calendar, which Goo
   ```caddyfile
   log {
       format filter {
-          request>uri regexp ^(/api/v1/calendar/feed/)[^/?]+ ${1}[redacted]
+          request>uri regexp (?i)^(.*/calendar/+feed/+)[^/?]+ ${1}[redacted]
       }
   }
   ```
@@ -510,13 +510,14 @@ Each user can create a private calendar link in Settings → Calendar, which Goo
 
   ```nginx
   map $request_uri $vroom_logged_uri {
-      ~^(?<feed>/api/v1/calendar/feed/)[^/?]+ "${feed}[redacted]";
+      "~*^(?<feed>.*/calendar/+feed/+)[^/?]+(?<rest>.*)$" "${feed}[redacted]${rest}";
       default $request_uri;
   }
   log_format vroom '$remote_addr - [$time_local] "$request_method $vroom_logged_uri" $status $body_bytes_sent';
   access_log /var/log/nginx/access.log vroom;
   ```
 
+- **Error logs:** both servers can write the request line to their error log (for example on a timeout); keep error logs at a level that omits request URIs, or treat them like the secret itself.
 - **Cloudflare Tunnel:** Cloudflare's own request logs (if you enable Logpush) include the path; exclude `/api/v1/calendar/feed/` there or accept that Cloudflare sees the links.
 
 ## Security Checklist
