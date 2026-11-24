@@ -534,6 +534,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
     strategy:
       fail-fast: true
       matrix:
@@ -590,6 +591,33 @@ jobs:
           RUNTIME: ${{ matrix.image == 'backend' && 'bun' || 'node' }}
           ARCH: ${{ matrix.arch == 'amd64' && 'x64' || 'arm64' }}
         run: docker run --rm "$REF" "$RUNTIME" -e "if (process.arch !== '$ARCH') process.exit(1)"
+
+      # Pinned by commit, not tag: this action's tags were once rewritten in a supply-chain attack.
+      - name: Scan the image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          format: sarif
+          output: trivy.sarif
+          severity: HIGH,CRITICAL
+          limit-severities-for-sarif: true
+          ignore-unfixed: true
+
+      - name: Upload the scan to code scanning
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy.sarif
+          category: image-${{ matrix.image }}-${{ matrix.arch }}
+
+      # Runs before the digest is recorded, so a fixable critical issue publishes no tag.
+      - name: Fail on fixable critical issues
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          skip-setup-trivy: true
 
       - name: Record the digest
         env:

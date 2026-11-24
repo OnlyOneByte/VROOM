@@ -175,7 +175,9 @@ developer contact), set the Audience, and submit for verification. VROOM ships c
 
 `ghcr.io/onlyonebyte/vroom/backend` and `ghcr.io/onlyonebyte/vroom/frontend`, each built for
 `linux/amd64` and `linux/arm64`, so the same tag runs on an x86 server, a Raspberry Pi 4 or 5,
-or an ARM VPS such as Hetzner CAX or Oracle Ampere.
+or an ARM VPS such as Hetzner CAX or Oracle Ampere. Every build is scanned with Trivy: a fixable
+critical vulnerability stops the tag from being published, and the findings are listed under the
+repository's Security tab.
 
 | Tag | Published on |
 |---|---|
