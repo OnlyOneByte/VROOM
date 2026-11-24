@@ -261,6 +261,14 @@
 	<meta name="description" content="Analyze your vehicle expenses and trends" />
 </svelte:head>
 
+{#snippet tabLoadError(name: string)}
+	<LoadErrorCard
+		title="Couldn't load {name}"
+		message="Check your connection, then reload the page."
+		onRetry={() => location.reload()}
+	/>
+{/snippet}
+
 <div class="min-h-screen space-y-4 md:space-y-6">
 	<PageHeader
 		title="Analytics Dashboard"
@@ -336,11 +344,7 @@
 							onApplyInsight={applyInsight}
 						/>
 					{:catch}
-						<LoadErrorCard
-							title="Couldn't load Explore"
-							message="Check your connection, then reload the page."
-							onRetry={() => location.reload()}
-						/>
+						{@render tabLoadError('Explore')}
 					{/await}
 				</Tabs.Content>
 			{:else if activeTab === 'fuel-stats'}
@@ -360,6 +364,8 @@
 							filterLabel={filtered ? filterLabel : undefined}
 							onClearFilters={filtered ? clearFilters : undefined}
 						/>
+					{:catch}
+						{@render tabLoadError('Fuel & Stats')}
 					{/await}
 				</Tabs.Content>
 			{:else if activeTab === 'cross-vehicle'}
@@ -376,6 +382,8 @@
 							filterLabel={filtered ? filterLabel : undefined}
 							onClearFilters={filtered ? clearFilters : undefined}
 						/>
+					{:catch}
+						{@render tabLoadError('Cross-Vehicle')}
 					{/await}
 				</Tabs.Content>
 			{:else if activeTab === 'per-vehicle'}
@@ -391,6 +399,8 @@
 							filterLabel={filtered ? filterLabel : undefined}
 							onClearFilters={filtered ? clearFilters : undefined}
 						/>
+					{:catch}
+						{@render tabLoadError('Per-Vehicle')}
 					{/await}
 				</Tabs.Content>
 			{:else if activeTab === 'year-end'}
@@ -401,6 +411,8 @@
 						</div>
 					{:then { default: YearEndTab }}
 						<YearEndTab />
+					{:catch}
+						{@render tabLoadError('Year-End')}
 					{/await}
 				</Tabs.Content>
 			{/if}

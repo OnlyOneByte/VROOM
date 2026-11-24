@@ -105,7 +105,7 @@ export default defineConfig({
 	// Vitest's default conditions omit 'browser'; without it inlined svelte loads its server entry, where mount() throws.
 	resolve: {
 		conditions: ['browser'],
-		// shortcut: LayerChart needs only geoPath (for map projections VROOM never draws) and one colour scheme, so these stand-ins keep 14 KB of d3-geo and d3-scale-chromatic off the charts; drop an alias before using geo charts or another scheme.
+		// shortcut: LayerChart calls d3-geo only when a chart has a map projection, which VROOM never sets, and takes one colour list from d3-scale-chromatic, so these stand-ins keep about 15 KB off the charts; drop an alias before using geo charts or another scheme.
 		alias: {
 			'd3-geo': new URL('./src/lib/vendor/d3-geo.ts', import.meta.url).pathname,
 			'd3-scale-chromatic': new URL('./src/lib/vendor/d3-scale-chromatic.ts', import.meta.url)
