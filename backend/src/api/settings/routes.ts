@@ -4,7 +4,12 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
-import { userPreferences, userProviders } from '../../db/schema';
+import {
+  type NewUserPreferences,
+  type UserPreferences,
+  userPreferences,
+  userProviders,
+} from '../../db/schema';
 import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import SHARED_CURRENCIES from '../../shared-currencies.json';
@@ -19,6 +24,7 @@ import { preferencesRepository } from './repository';
 import {
   type BackupConfigUpdate,
   backupConfigSchema,
+  communityRegionSchema,
   providerDefaultsSchema,
   type StorageConfigUpdate,
   storageConfigSchema,
@@ -138,6 +144,14 @@ function clientBackupConfigPatch(
   return { providers };
 }
 
+function consentUpdate(
+  existing: Pick<UserPreferences, 'communityStatsOptIn'>,
+  optIn: boolean | undefined
+): Pick<NewUserPreferences, 'communityStatsOptIn' | 'communityStatsConsentedAt'> {
+  if (optIn === undefined || optIn === existing.communityStatsOptIn) return {};
+  return { communityStatsOptIn: optIn, communityStatsConsentedAt: optIn ? new Date() : null };
+}
+
 const routes = new Hono();
 
 routes.use('*', requireAuth);
@@ -166,6 +180,7 @@ const updateSettingsSchema = baseSettingsSchema
     storageConfig: true,
     backupConfig: true,
     providerDefaults: true,
+    communityStatsConsentedAt: true,
   })
   .extend({
     unitPreferences: partialUnitPreferencesSchema.optional(),
@@ -174,6 +189,8 @@ const updateSettingsSchema = baseSettingsSchema
     providerDefaults: providerDefaultsSchema.optional(),
     themePreference: z.string().min(1).max(64).optional(),
     businessMileageRate: z.number().min(0).max(100).optional(),
+    communityStatsOptIn: z.boolean().optional(),
+    communityRegion: communityRegionSchema.nullable().optional(),
   })
   .partial();
 
@@ -200,6 +217,7 @@ routes.put('/', async (c) => {
     storageConfig,
     backupConfig,
     providerDefaults,
+    communityStatsOptIn,
     ...restUpdates
   } = updates;
   const mergedUnitPreferences = mergeUnitPreferences(
@@ -224,6 +242,7 @@ routes.put('/', async (c) => {
     ...restUpdates,
     ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
     ...(mergedStorageConfig && { storageConfig: mergedStorageConfig }),
+    ...consentUpdate(existingSettings, communityStatsOptIn),
   });
   if (providerDefaults) {
     updatedSettings =

@@ -309,6 +309,11 @@ export const userPreferences = sqliteTable('user_preferences', {
   providerDefaults: text('provider_defaults', { mode: 'json' })
     .$type<ProviderDefaults>()
     .default({}),
+  communityStatsOptIn: integer('community_stats_opt_in', { mode: 'boolean' })
+    .notNull()
+    .default(false),
+  communityStatsConsentedAt: integer('community_stats_consented_at', { mode: 'timestamp' }),
+  communityRegion: text('community_region'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
