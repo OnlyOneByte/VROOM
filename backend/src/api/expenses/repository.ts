@@ -402,13 +402,17 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return rows.map((r) => r.id);
   }
 
-  async getSplitGroupAccessInfo(
-    groupId: string
-  ): Promise<{ vehicleIds: string[]; ownerId: string; sourceType: string | null } | null> {
+  async getSplitGroupAccessInfo(groupId: string): Promise<{
+    vehicleIds: string[];
+    ownerId: string;
+    authors: (string | null)[];
+    sourceType: string | null;
+  } | null> {
     const rows = await this.db
       .select({
         vehicleId: expenses.vehicleId,
         userId: expenses.userId,
+        createdBy: expenses.createdBy,
         sourceType: expenses.sourceType,
       })
       .from(expenses)
@@ -417,6 +421,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return {
       vehicleIds: [...new Set(rows.map((r) => r.vehicleId))],
       ownerId: rows[0].userId,
+      authors: [...new Set(rows.map((r) => r.createdBy))],
       sourceType: rows[0].sourceType,
     };
   }
@@ -913,8 +918,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   async updateSplitExpense(
     groupId: string,
     data: { splitConfig: SplitConfig; totalAmount?: number },
-    userId: string,
-    createdBy: string | null = null
+    userId: string
   ): Promise<Expense[]> {
     try {
       // bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.
@@ -937,7 +941,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         return expenseSplitService.updateSiblingsSync(tx, {
           groupId,
           existing: [firstOld, ...restOld],
-          createdBy,
+          createdBy: firstOld.createdBy,
           splitMethod: data.splitConfig.method,
           groupTotal: totalAmount,
           allocations: expenseSplitService.computeAllocations(data.splitConfig, totalAmount),

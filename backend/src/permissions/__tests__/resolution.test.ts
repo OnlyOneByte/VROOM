@@ -15,7 +15,7 @@ import CASES from './resolution.cases.json';
 export interface ResolutionCase {
   name: string;
   permission: string;
-  resource?: 'vehicle' | 'server' | 'other_account';
+  resource?: 'vehicle' | 'server' | 'own_account' | 'other_account';
   owner?: boolean;
   member?: boolean;
   disabled?: boolean;
@@ -32,6 +32,7 @@ const ACTOR = 'actor';
 
 function resourceOf(row: ResolutionCase): Resource {
   if (row.resource === 'server') return { kind: 'server' };
+  if (row.resource === 'own_account') return { kind: 'account', userId: ACTOR };
   if (row.resource === 'other_account') return { kind: 'account', userId: 'someone' };
   const entryCreatedBy = row.entry === 'own' ? ACTOR : row.entry === 'other' ? 'someone' : null;
   return { kind: 'vehicle', vehicleId: 'v1', entryCreatedBy };

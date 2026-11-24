@@ -1,6 +1,38 @@
 import type { PermissionId } from './registry';
 
-export type RouteRule = PermissionId | { public: string };
+export type RoleScopeRule = { byScope: { server: PermissionId; vehicle: PermissionId } };
+export type EntityRule = { byEntity: Record<string, readonly PermissionId[]> };
+export type RouteRule = PermissionId | { public: string } | RoleScopeRule | EntityRule;
+
+export function isPublicRule(rule: RouteRule): rule is { public: string } {
+  return typeof rule === 'object' && 'public' in rule;
+}
+
+export function rulePermissions(rule: RouteRule): PermissionId[] {
+  if (typeof rule === 'string') return [rule];
+  if ('byScope' in rule) return Object.values(rule.byScope);
+  if ('byEntity' in rule) return Object.values(rule.byEntity).flat();
+  return [];
+}
+
+function photoRule(action: 'read' | 'write' | 'delete'): EntityRule {
+  const photo: PermissionId = `vehicle.photo.${action}`;
+  const insurance: PermissionId =
+    action === 'read' ? 'vehicle.insurance.read' : 'vehicle.insurance.write';
+  return {
+    byEntity: {
+      vehicle: [photo],
+      expense: [photo],
+      odometer_entry: [photo],
+      insurance_policy: [photo, insurance],
+      insurance_claim: [photo, insurance],
+    },
+  };
+}
+
+const ROLE_SCOPED: RoleScopeRule = {
+  byScope: { server: 'server.roles.manage', vehicle: 'vehicle.share.manage' },
+};
 
 export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   'GET /health': { public: 'Liveness probe for containers and load balancers' },
@@ -82,10 +114,10 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   'GET /api/v1/photos': 'vehicle.photo.read',
   'GET /api/v1/photos/orphans': 'vehicle.photo.read',
   'DELETE /api/v1/photos/orphans': 'vehicle.photo.delete',
-  'GET /api/v1/photos/:entityType/:entityId': 'vehicle.photo.read',
-  'POST /api/v1/photos/:entityType/:entityId': 'vehicle.photo.write',
-  'GET /api/v1/photos/:entityType/:entityId/:photoId/thumbnail': 'vehicle.photo.read',
-  'DELETE /api/v1/photos/:entityType/:entityId/:photoId': 'vehicle.photo.delete',
+  'GET /api/v1/photos/:entityType/:entityId': photoRule('read'),
+  'POST /api/v1/photos/:entityType/:entityId': photoRule('write'),
+  'GET /api/v1/photos/:entityType/:entityId/:photoId/thumbnail': photoRule('read'),
+  'DELETE /api/v1/photos/:entityType/:entityId/:photoId': photoRule('delete'),
 
   'GET /api/v1/providers': 'account.provider.manage',
   'POST /api/v1/providers': 'account.provider.manage',
@@ -162,11 +194,11 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   'DELETE /api/v1/roles/:id': 'account.roles.manage',
   'GET /api/v1/roles/:id/permissions': 'account.roles.manage',
   'PUT /api/v1/roles/:id/permissions': 'account.roles.manage',
-  'POST /api/v1/role-assignments': 'vehicle.share.manage',
-  'DELETE /api/v1/role-assignments': 'vehicle.share.manage',
-  'GET /api/v1/overrides': 'vehicle.share.manage',
-  'PUT /api/v1/overrides': 'vehicle.share.manage',
-  'DELETE /api/v1/overrides': 'vehicle.share.manage',
+  'POST /api/v1/role-assignments': ROLE_SCOPED,
+  'DELETE /api/v1/role-assignments': ROLE_SCOPED,
+  'GET /api/v1/overrides': ROLE_SCOPED,
+  'PUT /api/v1/overrides': ROLE_SCOPED,
+  'DELETE /api/v1/overrides': ROLE_SCOPED,
 
   'GET /api/v1/push/vapid-public-key': 'account.push.read',
   'POST /api/v1/push/subscribe': 'account.push.write',
