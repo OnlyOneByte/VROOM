@@ -20,6 +20,7 @@ interface GoogleOAuthState {
 
 export interface GoogleOAuthReturn extends GoogleOAuthState {
 	startGoogleOAuth: () => void;
+	forget: () => void;
 	handleOAuthReturn: () => Promise<{
 		restoredSelectedType?: string;
 		restoredDisplayName?: string;
@@ -41,7 +42,11 @@ export function startGoogleConnect(opts: GoogleOAuthOptions): void {
 		})
 	);
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- used inside non-reactive function, not tracked
-	const params = new URLSearchParams({ returnTo, nonce });
+	const params = new URLSearchParams({
+		returnTo,
+		nonce,
+		providerType: opts.selectedType ?? 'google-drive'
+	});
 	if (opts.isEditMode && opts.providerId) params.set('providerId', opts.providerId);
 	if (opts.isEditMode && opts.existingEmail) {
 		params.set('email', opts.existingEmail);
@@ -121,6 +126,8 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 				cancelled: 'Google account connection was cancelled.',
 				exchange_failed: "Couldn't connect your Google account. Try again.",
 				no_refresh_token: 'Google did not grant offline access. Please try again.',
+				missing_scope:
+					'Google Photos needs permission to add photos. Connect again and leave that permission ticked.',
 				session_expired: 'Your session expired. Please log in and try again.',
 				invalid_state: 'The Google connection expired. Please try again.',
 				session_mismatch:
@@ -144,6 +151,10 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 			return oauthNonce;
 		},
 		startGoogleOAuth,
+		forget() {
+			pendingEmail = '';
+			oauthNonce = '';
+		},
 		handleOAuthReturn,
 		restoreFormState
 	};

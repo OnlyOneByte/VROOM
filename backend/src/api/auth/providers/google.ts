@@ -27,6 +27,14 @@ export const STORAGE_SCOPES = [
   'https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata',
 ];
 
+export const PHOTOS_UPLOAD_SCOPE = 'https://www.googleapis.com/auth/photoslibrary.appendonly';
+
+export const PHOTOS_SCOPES = [
+  ...LOGIN_SCOPES,
+  PHOTOS_UPLOAD_SCOPE,
+  'https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata',
+];
+
 export const googleAuthProvider: OAuthProviderConfig = {
   id: 'google',
   displayName: 'Google',

@@ -42,10 +42,10 @@ function hasFunction(value: unknown): boolean {
 }
 
 describe('GET /api/v1/providers/catalog', () => {
-  test('lists Google Drive and S3 as storage providers, and hides Google Photos', async () => {
+  test('lists Google Drive, Google Photos and S3 as storage providers', async () => {
     config.allowFakeStorageProvider = false;
     const entries = await catalog();
-    expect(entries.map((e) => e.id)).toEqual(['google-drive', 's3']);
+    expect(entries.map((e) => e.id)).toEqual(['google-drive', 'google-photos', 's3']);
   });
 
   test('lists the assistant and receipt-reading model providers with their defaults', async () => {
@@ -80,7 +80,12 @@ describe('GET /api/v1/providers/catalog', () => {
 
   test('lists the fake provider only when it is enabled', async () => {
     config.allowFakeStorageProvider = true;
-    expect((await catalog()).map((e) => e.id)).toEqual(['google-drive', 's3', 'fake']);
+    expect((await catalog()).map((e) => e.id)).toEqual([
+      'google-drive',
+      'google-photos',
+      's3',
+      'fake',
+    ]);
   });
 
   test('carries the S3 field specs and secret names, with no functions or secret values', async () => {

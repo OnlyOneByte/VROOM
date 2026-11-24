@@ -18,10 +18,9 @@ const routes = new Hono();
 
 routes.use('*', requireAuth);
 
-async function findEnabledProvider(
+async function findPhotosProvider(
   db: ReturnType<typeof getDb>,
-  userId: string,
-  domain: string
+  userId: string
 ): Promise<UserProvider | null> {
   const rows = await db
     .select()
@@ -29,7 +28,8 @@ async function findEnabledProvider(
     .where(
       and(
         eq(userProviders.userId, userId),
-        eq(userProviders.domain, domain),
+        eq(userProviders.domain, 'storage'),
+        eq(userProviders.providerType, 'google-photos'),
         ne(userProviders.status, 'disabled')
       )
     );
@@ -54,8 +54,8 @@ routes.get('/receipt-drafts', async (c) => {
   const user = c.get('user');
   const db = getDb();
 
-  const photosRow = await findEnabledProvider(db, user.id, 'storage');
-  if (photosRow?.providerType !== 'google-photos') {
+  const photosRow = await findPhotosProvider(db, user.id);
+  if (!photosRow) {
     throw new ValidationError(
       'Connect Google Photos in Settings to import receipts from your VROOM photo album.'
     );

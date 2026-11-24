@@ -176,7 +176,7 @@ export const STORAGE_PROVIDERS = {
     label: 'Google Photos',
     description: 'Store photos in Google Photos',
     scope: 'user',
-    availability: () => 'hidden',
+    availability: alwaysAvailable,
     config: {
       schema: z.strictObject({ ...storageRoots, ...googleAccount, albumId: z.string().optional() }),
       fields: [],

@@ -201,6 +201,7 @@ function resolveProviderCredentials(
   userId: string,
   domain: string,
   descriptor: AnyProviderDescriptor,
+  providerType: string,
   credentials: Record<string, unknown>,
   config: Record<string, unknown> | null,
   nonce?: string
@@ -213,6 +214,11 @@ function resolveProviderCredentials(
     const pending = consumePending(userId, nonce);
     if (!pending) {
       throw new ValidationError('Please connect your Google account first');
+    }
+    if (pending.providerType !== providerType) {
+      throw new ValidationError(
+        `That Google connection was made for another provider. Connect Google again for ${descriptor.label}.`
+      );
     }
     return {
       encryptedCredentials: encrypt(JSON.stringify({ refreshToken: pending.refreshToken }), {
@@ -257,6 +263,7 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
     user.id,
     body.domain,
     descriptor,
+    body.providerType,
     body.credentials,
     body.config ? withoutServerState(descriptor, body.config) : null,
     body.nonce

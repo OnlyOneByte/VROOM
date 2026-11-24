@@ -261,7 +261,8 @@ describe('ProviderForm — a new provider stores the photo root path the user ty
 
 		expect(screen.getByRole('button', { name: /Google Drive/i })).toBeTruthy();
 		expect(screen.getByRole('button', { name: /S3 \/ B2 \/ R2/i })).toBeTruthy();
-		expect(screen.queryByRole('button', { name: /OneDrive|Dropbox|Google Photos/i })).toBeNull();
+		expect(screen.getByRole('button', { name: /Google Photos/i })).toBeTruthy();
+		expect(screen.queryByRole('button', { name: /OneDrive|Dropbox/i })).toBeNull();
 		expect(screen.queryByText('Soon')).toBeNull();
 	});
 

@@ -29,6 +29,28 @@ export const STORAGE_CATALOG: StorageCatalogEntry[] = [
 		}
 	},
 	{
+		id: 'google-photos',
+		capability: 'storage',
+		label: 'Google Photos',
+		shortLabel: 'Google Photos',
+		description: 'Store photos in Google Photos',
+		scope: 'user',
+		connect: 'oauth',
+		fields: [],
+		secrets: [],
+		features: {
+			photoOnly: true,
+			backupSheets: false,
+			defaultPhotoRootPath: 'photos',
+			defaultFolders: {
+				vehicle_photos: 'vehicle-photos',
+				expense_receipts: 'receipts',
+				insurance_docs: 'insurance',
+				odometer_readings: 'odometer'
+			}
+		}
+	},
+	{
 		id: 's3',
 		capability: 'storage',
 		label: 'S3 Compatible',

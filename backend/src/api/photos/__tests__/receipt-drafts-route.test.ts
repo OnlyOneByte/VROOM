@@ -122,6 +122,27 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
     expect(count).toBe(0);
   });
 
+  test('Google Photos is found when Drive and S3 are connected too, whichever row comes first', async () => {
+    for (const [id, type] of [
+      ['drive-prov-1', 'google-drive'],
+      ['s3-prov-1', 's3'],
+    ]) {
+      ctx.sqlite.run(
+        `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+         VALUES (?, ?, 'storage', ?, ?, 'x', '{}', 'active')`,
+        [id, ctx.user.id, type, type]
+      );
+    }
+    seedPhotosProvider();
+    await seedVlmProvider();
+    store.seedSearchablePhotos([{ filename: 'r1.jpg' }]);
+    stubVlm('{"amount": 10, "category": "fuel"}');
+
+    const { status, drafts } = await getDrafts();
+    expect(status).toBe(200);
+    expect(drafts).toHaveLength(1);
+  });
+
   test('an already-imported photo is filtered out', async () => {
     seedPhotosProvider();
     await seedVlmProvider();

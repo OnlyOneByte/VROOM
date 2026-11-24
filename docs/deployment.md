@@ -131,11 +131,13 @@ through the proxy.
 2. APIs & Services → Library → enable:
    - **Google Drive API** — backup and photo storage
    - **Google Sheets API** — Sheets mirroring and restore
-   - **Photos Library API** — reading back receipt photos VROOM uploaded
+   - **Photos Library API** — the Google Photos storage provider: uploading photos and reading back the ones VROOM uploaded
 3. APIs & Services → OAuth consent screen → Data Access → add the scopes VROOM requests:
    - `openid`, `../auth/userinfo.email`, `../auth/userinfo.profile` — login
    - `../auth/drive.file` — only the Drive files VROOM creates
    - `../auth/photoslibrary.readonly.appcreateddata` — only the photos VROOM uploaded
+   - `../auth/photoslibrary.appendonly` — adding photos to the VROOM album. Asked for only when a
+     user adds a Google Photos provider, as an incremental grant, so Drive users never see it
 4. APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID, type
    Web application, with **all three** authorized redirect URIs:
    - `https://yourdomain.com/api/v1/auth/callback/google` — login

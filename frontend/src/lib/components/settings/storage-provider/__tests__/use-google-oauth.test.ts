@@ -115,6 +115,13 @@ describe('startGoogleOAuth', () => {
 		expect(JSON.parse(sessionStorage.getItem(FORM_KEY) ?? '{}').selectedType).toBe('google-sheets');
 	});
 
+	test('the connect request names the provider type, so Google Photos asks for its own permission', () => {
+		createOAuth({ selectedType: 'google-photos' }).startGoogleOAuth();
+		expect(new URL(assignedHref).searchParams.get('providerType')).toBe('google-photos');
+		createOAuth({ selectedType: null }).startGoogleOAuth();
+		expect(new URL(assignedHref).searchParams.get('providerType')).toBe('google-drive');
+	});
+
 	test('edit mode without an existing email omits the email hint', () => {
 		createOAuth({ isEditMode: true, providerId: 'prov-9' }).startGoogleOAuth();
 		expect(new URL(assignedHref).searchParams.has('email')).toBe(false);
