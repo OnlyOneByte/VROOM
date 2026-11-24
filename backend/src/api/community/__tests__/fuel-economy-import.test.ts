@@ -21,14 +21,21 @@ describe('fuel economy ratings import', () => {
         row({ comb08: '30' }),
         row({ comb08: '36' }),
         row({ comb08: '25', baseModel: 'Civic Type R' }),
-        row({ atvType: 'Hybrid', comb08: '47' }),
         row({ year: '2020', comb08: '33' }),
       ])
     ).toEqual({
       'honda-civic|2019|gas': [10.63, 15.31],
-      'honda-civic|2019|hybrid': [19.98, 19.98],
       'honda-civic|2020|gas': [14.03, 14.03],
     });
+  });
+
+  test('hybrids and plug-in hybrids get no rating, so they keep the wide band', () => {
+    expect(
+      ratingsFromRows([
+        row({ atvType: 'Hybrid', comb08: '47' }),
+        row({ atvType: 'Plug-in Hybrid', comb08: '52' }),
+      ])
+    ).toEqual({});
   });
 
   test('electric ratings become km/kWh, and unknown models or fuels are left out', () => {

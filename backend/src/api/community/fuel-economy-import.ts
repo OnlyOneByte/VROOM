@@ -22,7 +22,6 @@ export interface FuelEconomyRatings {
 const KM_PER_MILE = 1.609344;
 const LITRES_PER_US_GALLON = 3.785411784;
 const GAS_TYPES = new Set(['', 'Diesel', 'FFV']);
-const HYBRID_TYPES = new Set(['Hybrid', 'Plug-in Hybrid']);
 
 function rating(row: FuelEconomyRow): { vehicleType: string; value: number } | null {
   if (row.atvType === 'EV') {
@@ -32,13 +31,8 @@ function rating(row: FuelEconomyRow): { vehicleType: string; value: number } | n
       : null;
   }
   const mpg = Number(row.comb08);
-  if (!(mpg > 0)) return null;
-  const vehicleType = HYBRID_TYPES.has(row.atvType)
-    ? 'hybrid'
-    : GAS_TYPES.has(row.atvType)
-      ? 'gas'
-      : null;
-  return vehicleType ? { vehicleType, value: (mpg * KM_PER_MILE) / LITRES_PER_US_GALLON } : null;
+  if (!(mpg > 0) || !GAS_TYPES.has(row.atvType)) return null;
+  return { vehicleType: 'gas', value: (mpg * KM_PER_MILE) / LITRES_PER_US_GALLON };
 }
 
 const round2 = (value: number) => Math.round(value * 100) / 100;

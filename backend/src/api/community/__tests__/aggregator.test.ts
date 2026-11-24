@@ -96,6 +96,9 @@ describe('community stats aggregation privacy', () => {
     expect(bandFor('efficiency', 'km_per_l', { ...CIVIC_FIELDS, modelYear: 1950 })).toEqual(
       PLAUSIBLE_BANDS.km_per_l
     );
+    expect(bandFor('efficiency', 'km_per_l', { ...CIVIC_FIELDS, vehicleType: 'hybrid' })).toEqual(
+      PLAUSIBLE_BANDS.km_per_l
+    );
     expect(bandFor('running_cost', 'cents_per_km', CIVIC_FIELDS)).toEqual(
       PLAUSIBLE_BANDS.cents_per_km
     );
