@@ -2,12 +2,12 @@ import type { ErrorHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
 import { CONFIG } from '../config';
+import { looksLikeDriverError } from '../db/dialect';
 import {
   createErrorResponse,
   formatErrorResponse,
   handleDatabaseError,
   isAppError,
-  isSqliteError,
   isSyncError,
   syncErrorResponse,
   ValidationError,
@@ -57,7 +57,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
     );
   }
 
-  if (isSqliteError(err) || (err instanceof Error && err.message.includes('SQLITE_'))) {
+  if (looksLikeDriverError(err)) {
     const dbError = handleDatabaseError(err);
     return c.json(
       formatErrorResponse(dbError, isDevelopment),
