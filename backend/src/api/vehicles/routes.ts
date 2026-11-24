@@ -37,6 +37,7 @@ import {
   zValidator,
 } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
+import { isCatalogModel } from '../../utils/vehicle-catalog';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
 import { financingRepository, withComputedBalance } from '../financing/repository';
@@ -120,6 +121,7 @@ const baseVehicleSchema = createInsertSchema(vehiclesTable, {
     (n) => n.min(0, 'Purchase price cannot be negative')
   ).optional(),
   purchaseDate: dateInput.optional(),
+  catalogModelId: z.string().refine(isCatalogModel, 'Unknown catalogue model').nullish(),
 });
 
 const createVehicleSchema = baseVehicleSchema
@@ -164,6 +166,16 @@ function changedUnits(existing: UnitPreferences, merged: UnitPreferences | undef
   return (Object.keys(merged) as Array<keyof UnitPreferences>).filter(
     (unit) => merged[unit] !== existing[unit]
   );
+}
+
+function renamedWithoutCatalogModel(
+  existing: { make: string; model: string },
+  update: { make?: string; model?: string; catalogModelId?: string | null }
+): boolean {
+  if (update.catalogModelId !== undefined) return false;
+  const makeChanged = update.make !== undefined && update.make !== existing.make;
+  const modelChanged = update.model !== undefined && update.model !== existing.model;
+  return makeChanged || modelChanged;
 }
 
 async function vehicleHasMeasuredHistory(vehicleId: string): Promise<boolean> {
@@ -402,6 +414,7 @@ routes.put(
     const updatedVehicle = await vehicleRepository.update(id, {
       ...restUpdateData,
       ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
+      ...(renamedWithoutCatalogModel(existingVehicle, updateData) && { catalogModelId: null }),
     });
 
     return c.json({

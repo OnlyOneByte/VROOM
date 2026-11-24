@@ -47,6 +47,7 @@ export const SHEET_HEADERS = {
     'purchasePrice',
     'purchaseDate',
     'unitPreferences',
+    'catalogModelId',
     'createdAt',
     'updatedAt',
   ],

@@ -42,6 +42,7 @@ import {
 import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
+import { isCatalogModel } from '../../utils/vehicle-catalog';
 import { CAPABILITY_DOMAIN } from '../providers/resolve';
 import { preferencesRepository } from '../settings/repository';
 import { isKnownRegion } from '../settings/validation';
@@ -561,7 +562,17 @@ class RestoreService {
     );
 
     // SQLite checks foreign keys on insert, so parents must be inserted before children.
-    this.insertRows(tx, vehicles, this.stampUserId(data.vehicles, userId));
+    this.insertRows(
+      tx,
+      vehicles,
+      this.stampUserId(data.vehicles, userId).map((row) => ({
+        ...row,
+        catalogModelId:
+          typeof row.catalogModelId === 'string' && isCatalogModel(row.catalogModelId)
+            ? row.catalogModelId
+            : null,
+      }))
+    );
     this.insertRows(tx, vehicleFinancing, data.financing ?? []);
     this.insertRows(tx, insurancePolicies, this.stampUserId(data.insurance, userId));
     this.insertRows(tx, insuranceTerms, data.insuranceTerms ?? []);

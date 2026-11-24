@@ -78,6 +78,13 @@
       "when": 1795481910396,
       "tag": "0010_community_stats_consent",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1795483901798,
+      "tag": "0011_vehicle_catalog_model",
+      "breakpoints": true
     }
   ]
 }
