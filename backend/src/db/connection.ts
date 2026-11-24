@@ -141,3 +141,13 @@ export function forceCheckpointWAL(): void {
     logger.error('Forced WAL checkpoint failed', { error });
   }
 }
+
+export function startWalCheckpoints(intervalMs: number): (() => void) | null {
+  if (!CONFIG.database.appCheckpoints) return null;
+  forceCheckpointWAL();
+  const timer = setInterval(checkpointWAL, intervalMs);
+  return () => {
+    clearInterval(timer);
+    forceCheckpointWAL();
+  };
+}

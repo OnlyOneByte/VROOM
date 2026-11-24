@@ -40,6 +40,7 @@ const envSchema = z.object({
   // Unset HOST binds every interface, and 'localhost' can resolve to ::1 only, so keep the IPv4 literal.
   HOST: z.string().default('127.0.0.1'),
   DATABASE_URL: z.string().default('./data/vroom.db'),
+  WAL_CHECKPOINTS: z.enum(['on', 'off']).default('on'),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/google'),
@@ -185,6 +186,7 @@ export const CONFIG = {
   },
   database: {
     url: env.DATABASE_URL,
+    appCheckpoints: env.WAL_CHECKPOINTS === 'on',
     cacheSize: 1_000_000,
     walCheckpointPages: 1000,
     checkpointIntervalDev: 5 * 60 * 1000,

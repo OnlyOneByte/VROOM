@@ -246,3 +246,64 @@ describe('the trusted proxy recipes in docs/deployment.md', () => {
     expect(values).toContain(gateway);
   });
 });
+
+describe('the Litestream example', () => {
+  const OVERRIDE = 'docs/examples/docker-compose.litestream.yml';
+  const LITESTREAM = 'docs/examples/litestream.yml';
+
+  test('it turns the backend checkpoints off with a value the backend reads', () => {
+    expect(backendEnvKeys(OVERRIDE)).toEqual(['WAL_CHECKPOINTS']);
+    expect(repoFile(OVERRIDE)).toContain('- WAL_CHECKPOINTS=off');
+    expect(backendReadsEnvVars().has('WAL_CHECKPOINTS')).toBe(true);
+  });
+
+  test('it publishes no port, takes secrets fail-fast from .env, and pins the image', () => {
+    const yaml = repoFile(OVERRIDE);
+    expect(yaml).not.toMatch(/^ {4}ports:/m);
+    for (const name of [
+      'LITESTREAM_ACCESS_KEY_ID',
+      'LITESTREAM_SECRET_ACCESS_KEY',
+      'LITESTREAM_BUCKET',
+      'LITESTREAM_ENDPOINT',
+    ]) {
+      expect(yaml).toContain(`${name}=\${${name}:?`);
+    }
+    expect(yaml).toMatch(/image: litestream\/litestream:\d+\.\d+\.\d+/);
+  });
+
+  test('it replicates the database file the backend writes', () => {
+    expect(repoFile(LITESTREAM)).toContain('- path: /data/vroom.db');
+    expect(repoFile(OVERRIDE)).toContain('- vroom-data:/data');
+    expect(repoFile(COMPOSE)).toContain('DATABASE_URL=/app/data/vroom.db');
+  });
+
+  test("it runs as the backend image's user, so the shared volume stays writable by the backend", () => {
+    expect(repoFile('backend/Dockerfile')).toMatch(/^USER bun$/m);
+    expect(repoFile(OVERRIDE)).toMatch(/^ {4}user: "1000:1000"$/m);
+  });
+
+  test('the restore drill runs both containers as the host user and gives the drill backend no .env', () => {
+    const drill = repoFile('docs/deployment.md').split('### Restore drill')[1].split('```')[1];
+    const runs = drill.split('docker run').slice(1);
+    expect(runs).toHaveLength(2);
+    for (const run of runs) expect(run).toContain('--user "$(id -u):$(id -g)"');
+    expect(runs[1]).not.toContain('--env-file');
+    expect(runs[1]).toContain('-p 127.0.0.1:');
+  });
+});
+
+describe('the Portainer stack', () => {
+  test("the auto-updater's Docker-controlling dashboard is published on loopback only", () => {
+    const yaml = repoFile(PORTAINER);
+    const service = yaml.slice(yaml.search(/^ {2}tugtainer:$/m));
+    const lines = service
+      .slice(service.search(/^ {4}ports:$/m))
+      .split('\n')
+      .slice(1);
+    const end = lines.findIndex((line) => /^ {0,4}\S/.test(line));
+    const published = lines.slice(0, end).filter((line) => /^ {6}- /.test(line));
+    expect(published.length).toBeGreaterThan(0);
+    for (const line of published) expect(line).toMatch(/^ {6}- "127\.0\.0\.1:/);
+    expect(service).toContain('/var/run/docker.sock');
+  });
+});

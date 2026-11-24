@@ -99,8 +99,9 @@ services:
     image: quenary/tugtainer:latest
     container_name: vroom-tugtainer
     ports:
-      # Behind a reverse proxy on this host, publish on loopback only: "127.0.0.1:${TUGTAINER_PORT:-3002}:80"
-      - "${TUGTAINER_PORT:-3002}:80"
+      # Loopback only: this dashboard controls Docker through its socket, which is root on the host.
+      # Reach it through an SSH tunnel or Tailscale, never by publishing it on every interface.
+      - "127.0.0.1:${TUGTAINER_PORT:-3002}:80"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
