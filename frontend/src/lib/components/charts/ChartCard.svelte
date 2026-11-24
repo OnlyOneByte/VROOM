@@ -197,7 +197,7 @@
 							<Table.Row>
 								<Table.Head scope="row" class="font-normal">{row.label}</Table.Head>
 								{#each row.cells as cell, c (c)}
-									<Table.Cell class="text-right tabular-nums">{cell}</Table.Cell>
+									<Table.Cell class="text-right whitespace-normal tabular-nums">{cell}</Table.Cell>
 								{/each}
 							</Table.Row>
 						{/each}

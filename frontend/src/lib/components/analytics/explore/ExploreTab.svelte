@@ -305,7 +305,7 @@
 		const change = percentChange(value, previous);
 		return change == null
 			? text
-			: `${text} (${change > 0 ? '▲' : change < 0 ? '▼' : '='} ${Math.abs(change)}%)`;
+			: `${text} (${change > 0 ? '▲' : change < 0 ? '▼' : '='}\u00a0${Math.abs(change)}%)`;
 	}
 
 	let rankingRows = $derived(

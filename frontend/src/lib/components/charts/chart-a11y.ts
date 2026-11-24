@@ -79,15 +79,18 @@ export function chartSummary(
 
 export function buildChartA11y(options: BuildOptions): ChartA11y {
 	const { title, description, data, categoryKey, series, labelFormat, valueFormat } = options;
-	const rows = data.map(datum => {
-		const values = series.map(s => numeric(datum[s.key]));
-		return {
-			label: labelFormat(datum[categoryKey]),
-			values,
-			cells: values.map((v, i) => (v === null ? MISSING : valueFormat(v, series[i]!.key))),
-			datum
-		};
-	});
+	const format = (datum: Record<string, unknown>, row?: Record<string, unknown>) =>
+		series.map(s => {
+			const value = numeric(datum[s.key]);
+			return value === null ? MISSING : valueFormat(value, s.key, row);
+		});
+	const rows = data.map(datum => ({
+		label: labelFormat(datum[categoryKey]),
+		values: series.map(s => numeric(datum[s.key])),
+		cells: format(datum, datum),
+		datum
+	}));
+	const plainRows = rows.map((row, i) => ({ ...row, cells: format(data[i]!) }));
 	const isDate = data[0]?.[categoryKey] instanceof Date;
 	const fallbackLabel = isDate ? (labelFormat === formatMonthLabel ? 'Month' : 'Date') : 'Category';
 	return {
@@ -95,7 +98,7 @@ export function buildChartA11y(options: BuildOptions): ChartA11y {
 		categoryLabel: options.categoryLabel ?? fallbackLabel,
 		columns: series,
 		rows,
-		summary: [chartSummary(title, series, rows, isDate), ...(options.notes ?? [])].join(' ')
+		summary: [chartSummary(title, series, plainRows, isDate), ...(options.notes ?? [])].join(' ')
 	};
 }
 
