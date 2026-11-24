@@ -28,6 +28,7 @@ describe('the real S3 client through the outbound request handler', () => {
         NODE_ENV: 'test',
         DATABASE_URL: ':memory:',
         PROVIDER_ENCRYPTION_KEY: '0'.repeat(64),
+        PRIVATE_PROVIDER_ENDPOINTS: 'allow',
       },
       stdout: 'pipe',
       stderr: 'pipe',

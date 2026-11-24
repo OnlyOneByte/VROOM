@@ -1,5 +1,5 @@
 import { lookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
+import { BlockList, isIP } from 'node:net';
 import { CONFIG } from '../config';
 import { ValidationError } from '../errors';
 
@@ -120,9 +120,148 @@ function classifyHostname(hostname: string): AddressClass | null {
   return null;
 }
 
-function assertAllowed(kind: AddressClass, label: string, allowPrivate: boolean): void {
-  if (kind === 'forbidden' || (kind === 'private' && !allowPrivate)) {
-    throw new ValidationError(`${label} must point to a public host`);
+interface PrivateTargetRule {
+  host?: string;
+  range?: BlockList;
+  port?: number;
+}
+
+export interface PrivateEndpointPolicy {
+  allowAll: boolean;
+  rules: readonly PrivateTargetRule[];
+}
+
+export const BLOCK_PRIVATE: PrivateEndpointPolicy = { allowAll: false, rules: [] };
+export const ALLOW_PRIVATE: PrivateEndpointPolicy = { allowAll: true, rules: [] };
+
+function familyOf(address: string): 'ipv4' | 'ipv6' {
+  return isIP(address) === 6 ? 'ipv6' : 'ipv4';
+}
+
+const RANGE_PATTERN = /^([0-9a-f.:]+)(?:\/(\d{1,3}))?$/;
+
+function parseRange(text: string): BlockList | null {
+  const match = RANGE_PATTERN.exec(text);
+  const address = match?.[1] ?? '';
+  const family = isIP(address);
+  if (!match || family === 0) return null;
+  const range = new BlockList();
+  if (match[2] === undefined) {
+    range.addAddress(address, familyOf(address));
+    return range;
+  }
+  const bits = Number(match[2]);
+  if (bits < 1 || bits > (family === 6 ? 128 : 32)) return null;
+  range.addSubnet(address, bits, familyOf(address));
+  return range;
+}
+
+const BRACKETED = /^\[([^\]]+)\](?::(\d+))?$/;
+const HOSTNAME_RULE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
+
+function splitPort(entry: string): { target: string; port?: string } | null {
+  if (entry.startsWith('[')) {
+    const match = BRACKETED.exec(entry);
+    return match ? { target: match[1] ?? '', port: match[2] } : null;
+  }
+  const colons = entry.split(':').length - 1;
+  if (colons !== 1) return { target: entry };
+  const [target = '', port] = entry.split(':');
+  return { target, port };
+}
+
+function parseRule(entry: string): PrivateTargetRule {
+  const invalid = new Error(
+    `PRIVATE_PROVIDER_ENDPOINTS entry "${entry}" must be a host, IP address or CIDR range with an optional :port, or "allow" on its own`
+  );
+  const split = splitPort(entry.toLowerCase());
+  if (!split) throw invalid;
+  let port: number | undefined;
+  if (split.port !== undefined) {
+    port = Number(split.port);
+    if (!/^\d{1,5}$/.test(split.port) || port < 1 || port > 65535) throw invalid;
+  }
+  const range = parseRange(split.target);
+  if (range) return { range, port };
+  if (split.target === 'allow' || !HOSTNAME_RULE.test(split.target)) throw invalid;
+  return { host: split.target, port };
+}
+
+export function parsePrivateEndpointPolicy(allow: string, block: boolean): PrivateEndpointPolicy {
+  if (block) return BLOCK_PRIVATE;
+  const entries = allow
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (entries.length === 1 && entries[0]?.toLowerCase() === 'allow') return ALLOW_PRIVATE;
+  return { allowAll: false, rules: entries.map(parseRule) };
+}
+
+let cachedPolicy: { key: string; policy: PrivateEndpointPolicy } | null = null;
+
+export function privateEndpointPolicy(): PrivateEndpointPolicy {
+  const { allow, block } = CONFIG.privateProviderEndpoints;
+  const key = `${block}|${allow}`;
+  if (cachedPolicy?.key !== key) {
+    cachedPolicy = { key, policy: parsePrivateEndpointPolicy(allow, block) };
+  }
+  return cachedPolicy.policy;
+}
+
+function normalizedHost(hostname: string): string {
+  return hostname.toLowerCase().replace(/\.$/, '');
+}
+
+function effectivePort(url: URL): number {
+  if (url.port) return Number(url.port);
+  return url.protocol === 'https:' ? 443 : 80;
+}
+
+function isLocalhostName(host: string): boolean {
+  return host === 'localhost' || host.endsWith('.localhost');
+}
+
+function privateTargetAllowed(
+  policy: PrivateEndpointPolicy,
+  url: URL,
+  address: string | null
+): boolean {
+  if (policy.allowAll) return true;
+  const host = normalizedHost(url.hostname);
+  const port = effectivePort(url);
+  return policy.rules.some(
+    (rule) =>
+      (rule.port === undefined || rule.port === port) &&
+      (rule.host !== undefined
+        ? rule.host === host
+        : rule.range !== undefined &&
+          address !== null &&
+          rule.range.check(address, familyOf(address)))
+  );
+}
+
+function mayReachPrivateByName(policy: PrivateEndpointPolicy, url: URL): boolean {
+  const host = normalizedHost(url.hostname);
+  return (
+    policy.allowAll || policy.rules.some((rule) => rule.range !== undefined || rule.host === host)
+  );
+}
+
+function assertTargetAllowed(
+  kind: AddressClass,
+  url: URL,
+  address: string | null,
+  label: string,
+  policy: PrivateEndpointPolicy
+): void {
+  if (kind === 'forbidden') throw new ValidationError(`${label} must point to a public host`);
+  if (kind === 'private' && !privateTargetAllowed(policy, url, address)) {
+    throw new ValidationError(
+      `${label} must point to a public host: this server doesn't allow private network addresses`
+    );
+  }
+  if (kind === 'public' && url.protocol !== 'https:') {
+    throw new ValidationError(`${label} must use https`);
   }
 }
 
@@ -146,7 +285,7 @@ export const outboundResolver = {
 export function assertSafeOutboundUrl(
   raw: string,
   label: string,
-  allowPrivate: boolean = !CONFIG.blockPrivateProviderEndpoints
+  policy: PrivateEndpointPolicy = privateEndpointPolicy()
 ): URL {
   let url: URL;
   try {
@@ -154,14 +293,20 @@ export function assertSafeOutboundUrl(
   } catch {
     throw new ValidationError(`${label} must be a valid URL`);
   }
-  if (url.protocol !== 'https:' && !(allowPrivate && url.protocol === 'http:')) {
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
     throw new ValidationError(`${label} must use https`);
   }
   if (url.username || url.password) {
     throw new ValidationError(`${label} must not contain credentials`);
   }
-  const literalKind = classifyHostname(url.hostname);
-  if (literalKind) assertAllowed(literalKind, label, allowPrivate);
+  const kind = classifyHostname(url.hostname);
+  if (kind) {
+    const host = normalizedHost(url.hostname);
+    const address = literalAddress(host) ?? (isLocalhostName(host) ? '127.0.0.1' : null);
+    assertTargetAllowed(kind, url, address, label, policy);
+  } else if (url.protocol !== 'https:' && !mayReachPrivateByName(policy, url)) {
+    throw new ValidationError(`${label} must use https`);
+  }
   return url;
 }
 
@@ -173,11 +318,12 @@ interface SafeOutboundTarget {
 export async function resolveSafeOutboundTarget(
   raw: string,
   label: string,
-  allowPrivate: boolean = !CONFIG.blockPrivateProviderEndpoints
+  policy: PrivateEndpointPolicy = privateEndpointPolicy()
 ): Promise<SafeOutboundTarget> {
-  const url = assertSafeOutboundUrl(raw, label, allowPrivate);
+  const url = assertSafeOutboundUrl(raw, label, policy);
   const literal = literalAddress(url.hostname);
   if (literal) return { url, addresses: [literal] };
+  if (isLocalhostName(normalizedHost(url.hostname))) return { url, addresses: ['127.0.0.1'] };
   let addresses: string[];
   try {
     addresses = await outboundResolver.lookup(url.hostname);
@@ -185,7 +331,9 @@ export async function resolveSafeOutboundTarget(
     throw new ValidationError(`${label} host could not be resolved`);
   }
   if (addresses.length === 0) throw new ValidationError(`${label} host could not be resolved`);
-  for (const address of addresses) assertAllowed(classifyAddress(address), label, allowPrivate);
+  for (const address of addresses) {
+    assertTargetAllowed(classifyAddress(address), url, address, label, policy);
+  }
   return { url, addresses };
 }
 

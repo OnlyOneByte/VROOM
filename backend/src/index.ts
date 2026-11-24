@@ -10,6 +10,7 @@ import { checkpointWAL, forceCheckpointWAL, runMigrations } from './db/connectio
 import { validateTrustedProxies } from './utils/client-ip';
 import { extractErrorMessage } from './utils/error-handling';
 import { logger } from './utils/logger';
+import { privateEndpointPolicy } from './utils/outbound-url';
 
 logger.startup(`VROOM Backend starting on ${CONFIG.server.host}:${CONFIG.server.port}`);
 logger.startup(`Environment: ${CONFIG.env}`);
@@ -33,6 +34,7 @@ try {
 
 try {
   validateTrustedProxies();
+  privateEndpointPolicy();
 } catch (error) {
   logger.error(extractErrorMessage(error));
   process.exit(1);
