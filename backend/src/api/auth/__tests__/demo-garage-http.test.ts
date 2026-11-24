@@ -189,4 +189,42 @@ describe('demo garage, on', () => {
       Date.now() + CONFIG.demo.sessionDuration
     );
   });
+
+  test('the hour holds for any session check, and validating never stretches it', async () => {
+    const stale = `demo_${Date.now() - CONFIG.demo.sessionDuration - 1000}_stale`;
+    await lucia.createSession(DEMO_USER_ID, {}, { sessionId: stale });
+    expect((await lucia.validateSession(stale)).session).toBeNull();
+    expect(await db.select().from(sessions).where(eq(sessions.id, stale))).toEqual([]);
+
+    const live = (await demoCookie()).split('=')[1];
+    expect((await lucia.validateSession(live)).user?.id).toBe(DEMO_USER_ID);
+    const [row] = await db.select().from(sessions).where(eq(sessions.id, live));
+    expect(row.expiresAt * 1000).toBeLessThanOrEqual(Date.now() + CONFIG.demo.sessionDuration);
+  });
+
+  test('starting a demo session clears expired ones', async () => {
+    const stale = `demo_${Date.now() - CONFIG.demo.sessionDuration - 1000}_stale`;
+    await lucia.createSession(DEMO_USER_ID, {}, { sessionId: stale });
+    await demoCookie();
+    const left = await db.select().from(sessions).where(eq(sessions.userId, DEMO_USER_ID));
+    expect(left.map((s) => s.id)).not.toContain(stale);
+    expect(left).toHaveLength(1);
+  });
+
+  test('a rebuild that fails partway leaves no demo account behind', async () => {
+    ctx.sqlite.exec(
+      `CREATE TRIGGER fail_demo_seed BEFORE INSERT ON vehicles WHEN NEW.user_id = '${DEMO_USER_ID}' BEGIN SELECT RAISE(ABORT, 'seed failed'); END`
+    );
+    try {
+      await expect(prepareDemoGarage()).rejects.toThrow();
+    } finally {
+      ctx.sqlite.exec('DROP TRIGGER fail_demo_seed');
+    }
+    expect(await db.select().from(users).where(eq(users.id, DEMO_USER_ID))).toEqual([]);
+    const leftovers = ctx.sqlite
+      .query("SELECT COUNT(*) AS n FROM user_preferences WHERE user_id = 'demo-garage'")
+      .get() as { n: number };
+    expect(leftovers.n).toBe(0);
+    expect((await startDemo()).status).toBe(404);
+  });
 });

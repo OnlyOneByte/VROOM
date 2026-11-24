@@ -78,11 +78,6 @@ export async function validateAndRefreshSession(
   c?: Context
 ): Promise<SessionRefreshResult | null> {
   const demoExpiresAt = demoSessionExpiresAt(sessionId);
-  if (demoExpiresAt && demoExpiresAt <= new Date()) {
-    await lucia.invalidateSession(sessionId);
-    return null;
-  }
-
   const { session, user } = await lucia.validateSession(sessionId);
 
   if (!session || !user) {

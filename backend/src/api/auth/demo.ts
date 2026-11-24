@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, lte } from 'drizzle-orm';
 import type { Context, MiddlewareHandler } from 'hono';
 import { generateIdFromEntropySize } from 'lucia';
 import { CONFIG } from '../../config';
@@ -43,23 +43,28 @@ export async function prepareDemoGarage(): Promise<void> {
   demoReady = false;
   await db.delete(users).where(eq(users.id, DEMO_USER_ID));
   if (!CONFIG.demo.enabled) return;
-  await db
-    .insert(users)
-    .values({ id: DEMO_USER_ID, email: DEMO_USER_EMAIL, displayName: 'Demo Garage' });
-  assignServerRole(db, DEMO_USER_ID, DEMO_ROLE_KEY);
-  await seedGarage(DEMO_USER_ID);
+  try {
+    await db
+      .insert(users)
+      .values({ id: DEMO_USER_ID, email: DEMO_USER_EMAIL, displayName: 'Demo Garage' });
+    assignServerRole(db, DEMO_USER_ID, DEMO_ROLE_KEY);
+    await seedGarage(DEMO_USER_ID);
+  } catch (error) {
+    await db.delete(users).where(eq(users.id, DEMO_USER_ID));
+    throw error;
+  }
   demoReady = true;
   logger.info('Demo garage is ready');
 }
 
 export async function startDemoSession(c: Context): Promise<Date> {
-  const sessionId = `${DEMO_SESSION_PREFIX}${Date.now()}_${generateIdFromEntropySize(25)}`;
+  const now = Date.now();
+  await getDb()
+    .delete(sessions)
+    .where(and(eq(sessions.userId, DEMO_USER_ID), lte(sessions.expiresAt, Math.floor(now / 1000))));
+  const sessionId = `${DEMO_SESSION_PREFIX}${now}_${generateIdFromEntropySize(25)}`;
   await lucia.createSession(DEMO_USER_ID, {}, { sessionId });
   const expiresAt = demoSessionExpiresAt(sessionId) as Date;
-  await getDb()
-    .update(sessions)
-    .set({ expiresAt: Math.floor(expiresAt.getTime() / 1000) })
-    .where(eq(sessions.id, sessionId));
   setSessionCookie(c, lucia.sessionCookieName, { id: sessionId, expiresAt });
   return expiresAt;
 }
