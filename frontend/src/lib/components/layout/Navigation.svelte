@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { onMount } from 'svelte';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { resolve } from '$app/paths';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
@@ -19,7 +20,7 @@
 	import SyncStatusInline from '../sync/SyncStatusInline.svelte';
 	import OfflineIndicator from '../sync/OfflineIndicator.svelte';
 	import { syncState, onlineStatus, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
-	import { syncConflicts } from '#lib/utils/sync/sync-manager.ts';
+	import { syncConflicts, syncManager, fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
 	import { getSyncStatusInfo } from '#lib/utils/sync/sync-status.ts';
 	import { countPendingSync } from '#lib/utils/sync/pending-expenses.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -37,6 +38,18 @@
 
 	const wide = new MediaQuery('min-width: 64rem');
 	let mobileMenuOpen = $state(false);
+
+	onMount(() => {
+		syncManager.setupAutoSync();
+
+		const interval = setInterval(() => {
+			if (onlineStatus.current) {
+				fetchLastSyncTime();
+			}
+		}, 30000);
+
+		return () => clearInterval(interval);
+	});
 
 	let currentPath = $derived(page.url.pathname);
 

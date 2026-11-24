@@ -157,6 +157,16 @@ describe('only the navigation for the screen width is rendered', () => {
 		expect(container.querySelector('div.lg\\:inset-y-0')).toBeNull();
 	});
 
+	it('below lg, auto-sync still starts on its own, with no menu opened', async () => {
+		const { syncManager } = await import('#lib/utils/sync/sync-manager.ts');
+		vi.mocked(syncManager.setupAutoSync).mockClear();
+
+		render(Navigation);
+
+		expect(syncManager.setupAutoSync).toHaveBeenCalledOnce();
+		expect(screen.queryByRole('button', { name: 'Sync Now' })).toBeNull();
+	});
+
 	describe('at lg and up', () => {
 		onWideScreen();
 

@@ -7,7 +7,7 @@ export function onWideScreen(): void {
 		vi.mocked(window.matchMedia).mockImplementation(
 			query =>
 				({
-					matches: query.includes('64rem'),
+					matches: query === '(min-width: 64rem)',
 					addEventListener: vi.fn(),
 					removeEventListener: vi.fn()
 				}) as unknown as MediaQueryList
