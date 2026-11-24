@@ -264,15 +264,15 @@ function quantile(sorted: number[], q: number): number {
 export function keyedUniform(noiseKey: string): NoiseSource {
   return (label) => {
     const digest = createHmac('sha256', noiseKey).update(label).digest();
-    const high = digest.readUInt32BE(0) >>> 5;
+    const high = digest.readUInt32BE(0) >>> 6;
     const low = digest.readUInt32BE(4) >>> 6;
-    return (high * 2 ** 26 + low + 0.5) / 2 ** 53;
+    return (high * 2 ** 26 + low + 0.5) / 2 ** 52;
   };
 }
 
 function laplace(scale: number, u: number): number {
   const centred = u - 0.5;
-  return -scale * Math.sign(centred) * Math.log(Math.max(1 - 2 * Math.abs(centred), 2 ** -53));
+  return -scale * Math.sign(centred) * Math.log(1 - 2 * Math.abs(centred));
 }
 
 function roundToStep(value: number, step: number): number {
@@ -317,12 +317,15 @@ function publishBucket(
   options: AggregateOptions,
   uniform: NoiseSource
 ): NewCommunityStat | null {
-  const ownerValues = [...byOwner.values()].map(median).sort((a, b) => a - b);
+  const band = bandFor(sample.metric, sample.unit, sample.fields);
+  const ownerValues = [...byOwner.values()]
+    .map((values) => Math.min(Math.max(roundToStep(median(values), band.step), band.lo), band.hi))
+    .sort((a, b) => a - b);
+  const release = `${COMMUNITY_SCHEMA_VERSION}|${band.lo}|${band.hi}|${EPSILON_COUNT}|${EPSILON_SUM}`;
   const draw = (label: string) =>
-    uniform(`${sample.bucketKey}|${dataDigest(ownerValues)}|${label}`);
+    uniform(`${sample.bucketKey}|${release}|${dataDigest(ownerValues)}|${label}`);
   const noisyCount = byOwner.size + laplace(1 / EPSILON_COUNT, draw('count'));
   if (noisyCount < options.minGroup) return null;
-  const band = bandFor(sample.metric, sample.unit, sample.fields);
   const noisySum =
     ownerValues.reduce((sum, value) => sum + (value - band.lo), 0) +
     laplace((band.hi - band.lo) / EPSILON_SUM, draw('sum'));
@@ -373,7 +376,7 @@ export async function refreshCommunityStats(
   repository.replaceScope(LOCAL_SCOPE, result.rows, now);
   const ms = Math.round(performance.now() - started);
   logger.info(
-    `community stats refreshed: ${result.published} buckets published, ${result.suppressed} suppressed (n<K), ${input.optedInOwners} opted-in owners, ${ms} ms`
+    `community stats refreshed: ${result.published} buckets published, ${result.suppressed} below the threshold, ${input.optedInOwners} opted-in owners, ${ms} ms`
   );
   if (ms > CONFIG.communityStats.slowRunWarnMs) {
     logger.warn(`community stats refresh took ${ms} ms`);

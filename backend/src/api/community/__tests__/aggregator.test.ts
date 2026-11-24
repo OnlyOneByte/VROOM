@@ -89,9 +89,24 @@ describe('community stats aggregation privacy', () => {
     );
     const draw = -Math.log(1 - 2 * (u - 0.5));
     const noisyCount = 12 + (1 / EPSILON_COUNT) * draw;
-    const noisySum = 12 * (CIVIC_KM_PER_L - 8.5) + ((18.4 - 8.5) / EPSILON_SUM) * draw;
+    const stepRounded = Math.round(CIVIC_KM_PER_L * 10) / 10;
+    const noisySum = 12 * (stepRounded - 8.5) + ((18.4 - 8.5) / EPSILON_SUM) * draw;
     expect(row?.nPublished).toBe(15);
     expect(row?.mean).toBeCloseTo(Math.round((8.5 + noisySum / noisyCount) * 10) / 10, 6);
+  });
+
+  test('a change in the band or the budget draws fresh noise even over the same data', () => {
+    const labels: string[] = [];
+    const record = (label: string) => {
+      labels.push(label);
+      return 0.5;
+    };
+    aggregate(
+      owners(12).map((id) => vehicle(id)),
+      { ...OPTIONS, uniform: record }
+    );
+    const civicCount = labels.find((l) => l.startsWith('efficiency|') && l.endsWith('|count'));
+    expect(civicCount).toContain(`|8.5|18.4|${EPSILON_COUNT}|${EPSILON_SUM}|`);
   });
 
   test('whether a group is published, and the count it shows, come from the noisy count', () => {
