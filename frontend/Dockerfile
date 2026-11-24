@@ -18,7 +18,13 @@ RUN addgroup -g 1001 -S nodejs && \
     adduser -S -D -H -u 1001 -h /app -s /sbin/nologin -G nodejs -g nodejs nodejs
 
 COPY --chown=nodejs:nodejs package*.json .npmrc ./
-RUN npm ci --omit=dev
+# The server runs `node build` only: the package managers that ship with the base image are
+# removed once the dependencies are installed, with everything they bundle.
+RUN npm ci --omit=dev \
+    && npm cache clean --force \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+       /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+       /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-v*
 
 COPY --chown=nodejs:nodejs --from=builder /app/build ./build
 COPY --chown=nodejs:nodejs --from=builder /app/package.json ./
