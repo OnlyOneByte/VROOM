@@ -1,7 +1,8 @@
-import { and, desc, eq, getTableColumns, gte, inArray, lte, min } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, gte, inArray, lte, min, or } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import {
+  type CommunityStat,
   communityStats,
   expenses,
   type NewCommunityStat,
@@ -26,16 +27,27 @@ function pickTime(
   return times.length > 0 ? new Date(pick(...times)) : null;
 }
 
+const OWNER_COLUMNS = {
+  userId: userPreferences.userId,
+  currency: userPreferences.currencyUnit,
+  region: userPreferences.communityRegion,
+};
+
+const VEHICLE_COLUMNS = {
+  id: vehicles.id,
+  userId: vehicles.userId,
+  catalogModelId: vehicles.catalogModelId,
+  year: vehicles.year,
+  vehicleType: vehicles.vehicleType,
+  unitPreferences: vehicles.unitPreferences,
+};
+
 export class CommunityStatsRepository {
   constructor(private db: AppDatabase) {}
 
   async loadOptedIn(windowStart: Date, windowEnd: Date): Promise<CommunityInput> {
     const owners = await this.db
-      .select({
-        userId: userPreferences.userId,
-        currency: userPreferences.currencyUnit,
-        region: userPreferences.communityRegion,
-      })
+      .select(OWNER_COLUMNS)
       .from(userPreferences)
       .where(eq(userPreferences.communityStatsOptIn, true));
     const ownerById = new Map(owners.map((owner) => [owner.userId, owner]));
@@ -43,14 +55,7 @@ export class CommunityStatsRepository {
     const result: CommunityVehicle[] = [];
     for (const ownerIds of chunk([...ownerById.keys()])) {
       const ownedVehicles = await this.db
-        .select({
-          id: vehicles.id,
-          userId: vehicles.userId,
-          catalogModelId: vehicles.catalogModelId,
-          year: vehicles.year,
-          vehicleType: vehicles.vehicleType,
-          unitPreferences: vehicles.unitPreferences,
-        })
+        .select(VEHICLE_COLUMNS)
         .from(vehicles)
         .where(inArray(vehicles.userId, ownerIds));
       for (const batch of chunk(ownedVehicles)) {
@@ -58,6 +63,56 @@ export class CommunityStatsRepository {
       }
     }
     return { optedInOwners: owners.length, vehicles: result };
+  }
+
+  async loadVehicle(
+    vehicleId: string,
+    windowStart: Date,
+    windowEnd: Date
+  ): Promise<CommunityVehicle | null> {
+    const vehicle = await this.db
+      .select(VEHICLE_COLUMNS)
+      .from(vehicles)
+      .where(eq(vehicles.id, vehicleId))
+      .get();
+    if (!vehicle) return null;
+    const owner = await this.db
+      .select(OWNER_COLUMNS)
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, vehicle.userId))
+      .get();
+    const owners = new Map([
+      [vehicle.userId, owner ?? { userId: vehicle.userId, currency: 'USD', region: null }],
+    ]);
+    const [loaded] = await this.loadBatch([vehicle], owners, windowStart, windowEnd);
+    return loaded ?? null;
+  }
+
+  async isOptedIn(userId: string): Promise<boolean> {
+    const row = await this.db
+      .select({ optIn: userPreferences.communityStatsOptIn })
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId))
+      .get();
+    return row?.optIn === true;
+  }
+
+  async publishedBuckets(
+    scope: string,
+    bucketKeys: string[],
+    minGroup: number
+  ): Promise<CommunityStat[]> {
+    if (bucketKeys.length === 0) return [];
+    return this.db
+      .select()
+      .from(communityStats)
+      .where(
+        and(
+          eq(communityStats.scope, scope),
+          inArray(communityStats.bucketKey, bucketKeys),
+          gte(communityStats.nPublished, minGroup)
+        )
+      );
   }
 
   private async loadBatch(
@@ -91,6 +146,10 @@ export class CommunityStatsRepository {
         .where(
           and(
             inArray(expenses.vehicleId, ids),
+            or(
+              inArray(expenses.category, ['fuel', 'maintenance']),
+              eq(expenses.sourceType, 'insurance_term')
+            ),
             gte(expenses.date, windowStart),
             lte(expenses.date, windowEnd)
           )

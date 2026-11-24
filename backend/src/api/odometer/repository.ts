@@ -8,6 +8,7 @@ import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 import { zonedDayWindow } from '../../utils/time-zone';
+import { hiddenFinancialsScope } from '../../utils/vehicle-access';
 import type { OdometerCheck } from '../expenses/validation';
 import { vehicleRepository } from '../vehicles/repository';
 
@@ -259,10 +260,11 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   async getHistory(
     vehicleId: string,
     userId: string,
-    options?: { limit?: number; offset?: number }
+    options?: { limit?: number; offset?: number; hideFinancials?: boolean }
   ): Promise<OdometerHistoryResult> {
     const limit = options?.limit ?? 50;
     const offset = options?.offset ?? 0;
+    const visibleExpenses = options?.hideFinancials ? sql`AND ${hiddenFinancialsScope()}` : sql``;
 
     try {
       const rows = await this.db.all<{
@@ -273,7 +275,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
         note: string | null;
       }>(sql`
         SELECT mileage AS odometer, date AS recorded_at, 'expense' AS source, id AS source_id, NULL AS note
-        FROM expenses WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL
+        FROM expenses WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL ${visibleExpenses}
         UNION ALL
         SELECT odometer, recorded_at, 'manual' AS source, id AS source_id, note
         FROM odometer_entries WHERE ${this.vehicleScope(vehicleId, userId)}
@@ -283,7 +285,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
 
       const [countResult] = await this.db.all<{ total: number }>(sql`
         SELECT (
-          (SELECT COUNT(*) FROM expenses WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL) +
+          (SELECT COUNT(*) FROM expenses WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL ${visibleExpenses}) +
           (SELECT COUNT(*) FROM odometer_entries WHERE ${this.vehicleScope(vehicleId, userId)})
         ) AS total
       `);

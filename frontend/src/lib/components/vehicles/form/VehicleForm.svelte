@@ -66,6 +66,7 @@
 	import type {
 		Vehicle,
 		VehicleFinancing,
+		VehicleKind,
 		VehicleType,
 		VehicleFormData,
 		FinancingPaymentConfig,
@@ -76,6 +77,8 @@
 		ChargeUnit
 	} from '#lib/types/index.ts';
 	import { validateVehicleFields, validateFinancingFields } from './vehicle-form-validation';
+	import { VEHICLE_KINDS } from '#lib/types/vehicle.ts';
+	import { VEHICLE_KIND_LABELS } from '#lib/utils/vehicle-kind.ts';
 	import { maxVehicleYear } from '#lib/constants/limits.ts';
 	import {
 		annuityPayment,
@@ -164,6 +167,7 @@
 		model: '',
 		year: new Date().getFullYear(),
 		vehicleType: 'gas',
+		vehicleKind: 'car',
 		licensePlate: '',
 		nickname: '',
 		vin: '',
@@ -288,6 +292,7 @@
 			model: vehicle.model,
 			year: vehicle.year,
 			vehicleType: vehicle.vehicleType,
+			vehicleKind: vehicle.vehicleKind ?? 'car',
 			licensePlate: vehicle.licensePlate || '',
 			nickname: vehicle.nickname || '',
 			vin: vehicle.vin || '',
@@ -503,6 +508,7 @@
 				model: vehicleForm.model,
 				year: vehicleForm.year,
 				vehicleType: vehicleForm.vehicleType,
+				vehicleKind: vehicleForm.vehicleKind,
 				catalogModelId,
 				trackFuel,
 				trackCharging,
@@ -784,7 +790,27 @@
 							</div>
 
 							<div class="space-y-2">
-								<Label for="vehicleType">Vehicle Type</Label>
+								<Label for="vehicleKind">Kind</Label>
+								<Select.Root
+									type="single"
+									value={vehicleForm.vehicleKind}
+									onValueChange={kind => (vehicleForm.vehicleKind = kind as VehicleKind)}
+								>
+									<Select.Trigger id="vehicleKind" class="w-full">
+										{VEHICLE_KIND_LABELS[vehicleForm.vehicleKind]}
+									</Select.Trigger>
+									<Select.Content>
+										{#each VEHICLE_KINDS as kind (kind)}
+											<Select.Item value={kind} label={VEHICLE_KIND_LABELS[kind]}>
+												{VEHICLE_KIND_LABELS[kind]}
+											</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+							</div>
+
+							<div class="space-y-2">
+								<Label for="vehicleType">Powertrain</Label>
 								<Select.Root
 									type="single"
 									value={vehicleForm.vehicleType}

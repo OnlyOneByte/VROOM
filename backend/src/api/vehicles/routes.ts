@@ -13,6 +13,7 @@ import {
   vehicleFinancing,
   vehicles as vehiclesTable,
 } from '../../db/schema';
+import { VEHICLE_KINDS, VEHICLE_TYPES } from '../../db/types';
 import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
@@ -36,7 +37,11 @@ import {
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
-import { requireVehicleAccess } from '../../utils/vehicle-access';
+import {
+  requireVehicleAccess,
+  seesFinancials,
+  sharedVehicleView,
+} from '../../utils/vehicle-access';
 import { catalogModelMatchesMake, isCatalogModel } from '../../utils/vehicle-catalog';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
@@ -51,7 +56,6 @@ import { vehicleRepository } from './repository';
 
 const routes = new Hono();
 
-const VEHICLE_TYPES = ['gas', 'electric', 'hybrid'] as const;
 const VIN_PATTERN = new RegExp(
   `^[A-Z0-9]{${CONFIG.validation.vehicle.vinMinLength},${CONFIG.validation.vehicle.vinMaxLength}}$`,
   'i'
@@ -59,6 +63,7 @@ const VIN_PATTERN = new RegExp(
 
 const baseVehicleSchema = createInsertSchema(vehiclesTable, {
   vehicleType: z.enum(VEHICLE_TYPES).optional(),
+  vehicleKind: z.enum(VEHICLE_KINDS).optional(),
   vin: z
     .union([
       z.literal(''),
@@ -274,7 +279,7 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), async (c) => {
       sharedRows = sharedVehicles.map((v) => {
         const g = byVehicleId.get(v.id);
         return {
-          ...v,
+          ...sharedVehicleView(v),
           sharedAccess: { level: g?.level ?? 'viewer', sharedBy: g?.ownerName ?? 'Unknown' },
         };
       });
@@ -368,15 +373,15 @@ routes.get(
         eligibleForPayoff?: boolean;
       };
       sharedAccess?: { level: string; sharedBy: string };
-    } = vehicle;
-    if (vehicle.financing) {
+    } = seesFinancials(access) ? vehicle : sharedVehicleView(vehicle);
+    if (responseData.financing) {
       const computedBalance = await financingRepository.computeBalance(
-        vehicle.financing.id,
+        responseData.financing.id,
         timeZone
       );
       responseData = {
-        ...vehicle,
-        financing: withComputedBalance(vehicle.financing, computedBalance),
+        ...responseData,
+        financing: withComputedBalance(responseData.financing, computedBalance),
       };
     }
     if (sharedAccess) {

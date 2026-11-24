@@ -34,6 +34,7 @@
 		bucketDate,
 		bucketLabel,
 		bucketTotals,
+		carPanels,
 		hasData,
 		isAdditive,
 		kpis,
@@ -192,6 +193,46 @@
 			return row;
 		})
 	);
+
+	let carTotals = $state<Record<string, number | null> | null>(null);
+
+	$effect(() => {
+		if (chartForm(query) !== 'panels' || isAdditive(query)) {
+			carTotals = null;
+			return;
+		}
+		const params = { ...request, interval: 'none' as const, compare: 'none' as const };
+		const key = JSON.stringify(params);
+		const totalsOf = (r: AnalyticsQueryResponse) =>
+			Object.fromEntries(r.series.map(s => [s.key, s.values[0] ?? null]));
+		const cached = queryCache.get(key);
+		if (cached) {
+			carTotals = totalsOf(cached);
+			return;
+		}
+		const totalsController = new AbortController();
+		carTotals = null;
+		analyticsApi
+			.query(params, { signal: totalsController.signal })
+			.then(result => {
+				queryCache.set(key, result);
+				carTotals = totalsOf(result);
+			})
+			.catch(() => {
+				if (!totalsController.signal.aborted) carTotals = {};
+			});
+		return () => totalsController.abort();
+	});
+
+	let panels = $derived(
+		carPanels(
+			allSeries,
+			isAdditive(shown)
+				? undefined
+				: { fleet: response?.totals.value ?? null, cars: carTotals ?? {} }
+		)
+	);
+	let panelPer = $derived(isAdditive(shown) ? ` per ${intervalLabel}` : '');
 
 	let lineRows = $derived(
 		(response?.buckets ?? []).map((bucket, i) => {
@@ -398,6 +439,11 @@
 		if (date instanceof Date) select(keyFor(date), seriesKey);
 	}
 
+	function selectPanel(row: Record<string, unknown>, car: string) {
+		const date = row['date'];
+		if (date instanceof Date) onQueryChange({ ...query, sel: keyFor(date), seg: car });
+	}
+
 	function selectRanking(row: Record<string, unknown>) {
 		const series = allSeries.find(s => s.label === row['label']);
 		if (series) onQueryChange({ ...query, sel: 'total', seg: series.sourceKey });
@@ -510,7 +556,7 @@
 						{rangeText}
 					</span>
 					<span class="basis-full px-1 text-muted-foreground sm:basis-auto">
-						Select a bar to see its expenses
+						Select a bar or point to see its expenses
 					</span>
 				{/if}
 			</nav>
@@ -554,6 +600,45 @@
 					tooltipFormat={format.full}
 					tooltipLabelFormat={v => (v instanceof Date ? bucketLabel(keyFor(v), shown.per) : '')}
 				/>
+			{:else if form === 'panels'}
+				<section aria-labelledby="explore-panels-title" class="space-y-3">
+					<h2 id="explore-panels-title" class="text-lg font-semibold">{chartTitle}</h2>
+					<p class="text-sm text-muted-foreground">
+						One scale for every car. The dashed line is the fleet average{panels.fleetMean != null
+							? ` (${format.full(panels.fleetMean)}${panelPer})`
+							: ''}.
+					</p>
+					<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+						{#each panels.panels as panel (panel.series.key)}
+							<AppLineChart
+								class="min-w-0"
+								level={3}
+								title={panel.series.label}
+								description={panel.mean != null
+									? `Average ${format.full(panel.mean)}${panelPer}`
+									: !isAdditive(shown) && carTotals === null
+										? 'Working out the average'
+										: 'No data in this range'}
+								onSelect={row => selectPanel(row, panel.series.sourceKey)}
+								data={lineRows}
+								x="date"
+								y={[panel.series.key]}
+								series={[panel.series]}
+								config={buildChartConfig([panel.series])}
+								height={200}
+								yDomain={panels.yDomain}
+								referenceLines={panels.fleetMean != null
+									? [{ value: panels.fleetMean, label: 'Fleet average' }]
+									: []}
+								xAxisProps={lineXAxis}
+								yAxisFormat={format.axis}
+								tooltipFormat={format.full}
+								tooltipLabelFormat={v =>
+									v instanceof Date ? bucketLabel(keyFor(v), shown.per) : ''}
+							/>
+						{/each}
+					</div>
+				</section>
 			{:else if form === 'line'}
 				<AppLineChart
 					level={2}

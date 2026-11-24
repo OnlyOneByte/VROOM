@@ -42,8 +42,11 @@ export const EXPLORE_SPLITS = [
 export const EXPLORE_COMPARES = [
 	{ value: 'none', label: 'No comparison' },
 	{ value: 'prevPeriod', label: 'The period before' },
-	{ value: 'prevYear', label: 'The year before' }
-] as const satisfies ReadonlyArray<{ value: AnalyticsQueryCompare; label: string }>;
+	{ value: 'prevYear', label: 'The year before' },
+	{ value: 'cars', label: 'Each car on its own' }
+] as const satisfies ReadonlyArray<{ value: ExploreCompare; label: string }>;
+
+export type ExploreCompare = AnalyticsQueryCompare | 'cars';
 
 export type ExploreMetric = (typeof EXPLORE_METRICS)[number]['value'];
 
@@ -52,7 +55,7 @@ export interface ExploreQuery {
 	per: AnalyticsQueryInterval;
 	split: AnalyticsQueryGroupBy;
 	inc: AnalyticsQueryInclude;
-	compare: AnalyticsQueryCompare;
+	compare: ExploreCompare;
 	hide: string[];
 	sel?: string;
 	seg?: string;
@@ -120,8 +123,9 @@ export function metricLabel(metric: ExploreMetric, distance = 'mile'): string {
 
 export function allowedSplits(
 	metric: ExploreMetric,
-	compare: AnalyticsQueryCompare = 'none'
+	compare: ExploreCompare = 'none'
 ): readonly AnalyticsQueryGroupBy[] {
+	if (compare === 'cars') return ['vehicle'];
 	return compare === 'none' ? SPLITS_FOR_METRIC[metricInfo(metric).metric] : ['none'];
 }
 
@@ -129,8 +133,9 @@ export function normalizeExplore(query: ExploreQuery): ExploreQuery {
 	const splits = allowedSplits(query.metric, query.compare);
 	const next: ExploreQuery = splits.includes(query.split)
 		? query
-		: { ...query, split: 'none', hide: [] };
-	return next.per === 'none' && next.hide.length > 0 ? { ...next, hide: [] } : next;
+		: { ...query, split: splits[0] ?? 'none', hide: [] };
+	const clear = next.per === 'none' || next.compare === 'cars';
+	return clear && next.hide.length > 0 ? { ...next, hide: [] } : next;
 }
 
 export function parseExplore(params: Pick<URLSearchParams, 'get'>): ExploreQuery {
@@ -187,15 +192,16 @@ export function apiQuery(query: ExploreQuery) {
 		interval: query.per,
 		groupBy: query.split,
 		include: query.inc,
-		compare: query.compare === 'none' ? 'prevPeriod' : query.compare
+		compare: query.compare === 'none' || query.compare === 'cars' ? 'prevPeriod' : query.compare
 	} as const;
 }
 
-export type ChartForm = 'stacked' | 'grouped' | 'bars' | 'line' | 'ranking' | 'compare';
+export type ChartForm = 'stacked' | 'grouped' | 'bars' | 'line' | 'ranking' | 'compare' | 'panels';
 
 export function chartForm(query: ExploreQuery): ChartForm {
 	const ratio = ['costPerDistance', 'efficiency'].includes(metricInfo(query.metric).metric);
 	if (query.per === 'none') return 'ranking';
+	if (query.compare === 'cars') return 'panels';
 	if (query.compare !== 'none') return 'compare';
 	if (ratio) return 'line';
 	if (query.split === 'tag') return 'grouped';
@@ -211,6 +217,10 @@ export function describeQuery(query: ExploreQuery, distance = 'mile'): string {
 	const versus =
 		query.compare === 'none'
 			? ''
-			: `, against ${EXPLORE_COMPARES.find(c => c.value === query.compare)?.label.toLowerCase()}`;
+			: query.compare === 'cars'
+				? query.per === 'none'
+					? ''
+					: ', each car on its own'
+				: `, against ${EXPLORE_COMPARES.find(c => c.value === query.compare)?.label.toLowerCase()}`;
 	return `${metric} ${time}${by}${versus}`;
 }

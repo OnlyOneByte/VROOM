@@ -3,6 +3,10 @@ import type { UnitPreferences } from './settings.js';
 
 export type VehicleType = 'gas' | 'electric' | 'hybrid';
 
+export const VEHICLE_KINDS = ['car', 'motorcycle', 'van', 'truck', 'rv', 'other'] as const;
+
+export type VehicleKind = (typeof VEHICLE_KINDS)[number];
+
 export interface Vehicle {
 	id: string;
 	userId?: string;
@@ -10,6 +14,7 @@ export interface Vehicle {
 	model: string;
 	year: number;
 	vehicleType: VehicleType;
+	vehicleKind?: VehicleKind;
 	catalogModelId?: string | null;
 	trackFuel: boolean;
 	trackCharging: boolean;
@@ -31,6 +36,7 @@ export interface UpdateVehicleRequest {
 	model?: string;
 	year?: number;
 	vehicleType?: VehicleType;
+	vehicleKind?: VehicleKind;
 	catalogModelId?: string | null;
 	trackFuel?: boolean;
 	trackCharging?: boolean;

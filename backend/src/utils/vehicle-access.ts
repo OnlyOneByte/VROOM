@@ -1,7 +1,7 @@
-import { and, eq, type SQL } from 'drizzle-orm';
+import { and, eq, isNull, notInArray, type SQL, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../db/connection';
 import { getDb } from '../db/connection';
-import { vehicleShares, vehicles } from '../db/schema';
+import { expenses, vehicleShares, vehicles } from '../db/schema';
 import type { DrizzleTransaction } from '../db/types';
 import { NotFoundError } from '../errors';
 
@@ -79,4 +79,41 @@ export async function requireVehiclesAccess(
 
 export function ownedVehiclesScope(userId: string): SQL {
   return eq(vehicles.userId, userId);
+}
+
+const FINANCIAL_SOURCE_TYPES = ['financing', 'insurance_term'] as const;
+
+export function seesFinancials(access: VehicleAccess): boolean {
+  return access.role === 'owner';
+}
+
+export async function resolveExpenseReadScope(
+  vehicleId: string | undefined,
+  userId: string
+): Promise<{ userId: string; hideFinancials: boolean }> {
+  if (!vehicleId) return { userId, hideFinancials: false };
+  const access = await requireVehicleAccess(vehicleId, userId, 'read');
+  return { userId: access.ownerId, hideFinancials: !seesFinancials(access) };
+}
+
+function isFinancialSource(sourceType: string | null | undefined): boolean {
+  return (FINANCIAL_SOURCE_TYPES as readonly (string | null | undefined)[]).includes(sourceType);
+}
+
+export function hiddenFinancialsScope(): SQL {
+  return sql`(${isNull(expenses.sourceType)} or ${notInArray(expenses.sourceType, [...FINANCIAL_SOURCE_TYPES])})`;
+}
+
+export function assertMayTouchFinancialExpense(
+  mayTouchFinancials: boolean,
+  ...sourceTypes: (string | null | undefined)[]
+): void {
+  if (!mayTouchFinancials && sourceTypes.some(isFinancialSource)) {
+    throw new NotFoundError('Expense');
+  }
+}
+
+export function sharedVehicleView<T extends Record<string, unknown>>(vehicle: T): T {
+  const { financing: _financing, userId: _userId, ...rest } = vehicle;
+  return { ...rest, purchasePrice: null, vin: null } as unknown as T;
 }

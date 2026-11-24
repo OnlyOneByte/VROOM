@@ -48,6 +48,7 @@ export const SHEET_HEADERS = {
     'purchaseDate',
     'unitPreferences',
     'catalogModelId',
+    'vehicleKind',
     'createdAt',
     'updatedAt',
   ],

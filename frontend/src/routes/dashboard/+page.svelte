@@ -35,6 +35,7 @@
 	import { formatCurrency, formatDate, formatDateWith } from '#lib/utils/formatters.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { vehicleKindNote } from '#lib/utils/vehicle-kind.ts';
 	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
 	import { costBucketColor } from '#lib/utils/cost-bucket.ts';
 	import { buildChartConfig } from '#lib/utils/chart-colors.ts';
@@ -130,6 +131,7 @@
 		return vehicles.map(v => {
 			const model = `${v.year} ${v.make} ${v.model}`;
 			const notes = [
+				vehicleKindNote(v.vehicleKind),
 				v.nickname ? model : null,
 				v.financing?.isActive ? 'Financed' : null,
 				v.sharedAccess ? `Shared by ${v.sharedAccess.sharedBy}` : null
@@ -138,6 +140,7 @@
 				id: v.id,
 				name: v.nickname || model,
 				detail: notes.join(' · '),
+				kind: v.vehicleKind,
 				isElectric: v.vehicleType === 'electric',
 				spend: spend.byVehicle.get(v.id) ?? 0,
 				runningPerDistance: perVehicle.get(v.id) ?? null,

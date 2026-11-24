@@ -28,6 +28,7 @@
 	let { summary, statCards, error = null, onRetry = () => {} }: Props = $props();
 
 	let overviewOpen = $state(false);
+	let hasOpenedOverview = $state(false);
 </script>
 
 {#if error}
@@ -40,7 +41,12 @@
 	/>
 {:else}
 	<CardNs.Root>
-		<Collapsible bind:open={overviewOpen}>
+		<Collapsible
+			bind:open={overviewOpen}
+			onOpenChange={open => {
+				if (open) hasOpenedOverview = true;
+			}}
+		>
 			<CardNs.Header class="pb-0">
 				<CollapsibleTrigger class="flex min-h-10 items-center justify-between w-full">
 					<div class="flex items-center gap-3">
@@ -63,42 +69,44 @@
 				</CollapsibleTrigger>
 			</CardNs.Header>
 			<CollapsibleContent>
-				<CardNs.Content class="space-y-6">
-					<StatCardGrid items={statCards} columns={4} />
+				{#if hasOpenedOverview}
+					<CardNs.Content class="space-y-6">
+						<StatCardGrid items={statCards} columns={4} />
 
-					{#if summary && summary.categoryBreakdown.length > 0}
-						<div class="space-y-3">
-							<div class="flex items-center gap-2">
-								<Receipt class="h-4 w-4 text-muted-foreground" />
-								<p class="text-sm font-medium">
-									{EXPENSE_MESSAGES.EXPENSES_BY_CATEGORY}
-								</p>
-							</div>
-							<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-								{#each summary.categoryBreakdown as item (item.category)}
-									{@const IconComponent = getCategoryIcon(item.category as ExpenseCategory)}
-									<div class="p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-										<div class="flex items-center gap-2">
-											<div
-												class="p-1.5 rounded-lg {getCategoryBadgeClasses(
-													item.category as ExpenseCategory
-												)} shrink-0"
-											>
-												<IconComponent class="h-3.5 w-3.5" />
+						{#if summary && summary.categoryBreakdown.length > 0}
+							<div class="space-y-3">
+								<div class="flex items-center gap-2">
+									<Receipt class="h-4 w-4 text-muted-foreground" />
+									<p class="text-sm font-medium">
+										{EXPENSE_MESSAGES.EXPENSES_BY_CATEGORY}
+									</p>
+								</div>
+								<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+									{#each summary.categoryBreakdown as item (item.category)}
+										{@const IconComponent = getCategoryIcon(item.category as ExpenseCategory)}
+										<div class="p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+											<div class="flex items-center gap-2">
+												<div
+													class="p-1.5 rounded-lg {getCategoryBadgeClasses(
+														item.category as ExpenseCategory
+													)} shrink-0"
+												>
+													<IconComponent class="h-3.5 w-3.5" />
+												</div>
+												<span class="text-xs sm:text-sm font-medium">
+													{categoryLabels[item.category as ExpenseCategory]}
+												</span>
 											</div>
-											<span class="text-xs sm:text-sm font-medium">
-												{categoryLabels[item.category as ExpenseCategory]}
-											</span>
+											<p class="text-sm font-bold mt-1.5">
+												{formatCurrency(item.amount)}
+											</p>
 										</div>
-										<p class="text-sm font-bold mt-1.5">
-											{formatCurrency(item.amount)}
-										</p>
-									</div>
-								{/each}
+									{/each}
+								</div>
 							</div>
-						</div>
-					{/if}
-				</CardNs.Content>
+						{/if}
+					</CardNs.Content>
+				{/if}
 			</CollapsibleContent>
 		</Collapsible>
 	</CardNs.Root>

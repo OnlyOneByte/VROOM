@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
+	import { MediaQuery } from 'svelte/reactivity';
 	import { resolve } from '$app/paths';
 	import { afterNavigate, goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -74,6 +75,7 @@
 		type ExpenseCategory
 	} from '#lib/constants/expense-categories.ts';
 
+	const phone = new MediaQuery('width < 40rem');
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
 	let expenses = $state<Expense[]>([]);
@@ -652,17 +654,19 @@
 		</div>
 
 		<CardNs.Root class="max-sm:gap-0 max-sm:py-4">
-			<CardNs.Header class="max-sm:hidden">
-				<div class="flex items-center justify-between gap-3">
-					<div>
-						<CardNs.Title>Search & Filters</CardNs.Title>
-						<CardNs.Description>Find and filter your expenses</CardNs.Description>
+			{#if !phone.current}
+				<CardNs.Header class="max-sm:hidden">
+					<div class="flex items-center justify-between gap-3">
+						<div>
+							<CardNs.Title>Search & Filters</CardNs.Title>
+							<CardNs.Description>Find and filter your expenses</CardNs.Description>
+						</div>
+						<div class="flex items-center gap-2">
+							{@render dateFilter('w-auto')}
+						</div>
 					</div>
-					<div class="flex items-center gap-2">
-						{@render dateFilter('w-auto')}
-					</div>
-				</div>
-			</CardNs.Header>
+				</CardNs.Header>
+			{/if}
 			<CardNs.Content class="flex flex-col gap-4 max-sm:px-4">
 				<div class="flex gap-3">
 					<div class="flex-1 relative">
@@ -677,9 +681,11 @@
 							aria-label="Search expenses and vehicles"
 						/>
 					</div>
-					<div class="hidden sm:block sm:w-56">
-						{@render vehicleFilter()}
-					</div>
+					{#if !phone.current}
+						<div class="hidden sm:block sm:w-56">
+							{@render vehicleFilter()}
+						</div>
+					{/if}
 					<Button
 						variant="outline"
 						class="h-10 shrink-0 sm:hidden"
@@ -691,9 +697,11 @@
 					</Button>
 				</div>
 
-				<div class="hidden sm:block">
-					<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={handleTagsChange} />
-				</div>
+				{#if !phone.current}
+					<div class="hidden sm:block">
+						<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={handleTagsChange} />
+					</div>
+				{/if}
 
 				{#if filtersActive}
 					<div class="flex items-center justify-between gap-3 sm:pt-2">

@@ -87,3 +87,25 @@ export function textStillNames(
 	if (!model || findMake(catalog, makeText)?.id !== model.makeId) return false;
 	return keysOf(model).includes(catalogKey(modelText));
 }
+
+export function suggestCatalogModel(
+	catalog: VehicleCatalog,
+	makeText: string,
+	modelText: string
+): CatalogModel | undefined {
+	const make = findMake(catalog, makeText);
+	if (!make) return undefined;
+	let typed = catalogKey(modelText);
+	const repeatedMake = keysOf(make).find(key => typed.startsWith(key));
+	if (repeatedMake) typed = typed.slice(repeatedMake.length);
+	let best: { model: CatalogModel; length: number } | undefined;
+	for (const model of catalog.models) {
+		if (model.makeId !== make.id) continue;
+		for (const key of keysOf(model)) {
+			if (key && typed.startsWith(key) && key.length > (best?.length ?? 0)) {
+				best = { model, length: key.length };
+			}
+		}
+	}
+	return best?.model;
+}

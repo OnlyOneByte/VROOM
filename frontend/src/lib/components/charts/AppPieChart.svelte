@@ -60,7 +60,7 @@
 	});
 
 	// Tween starts at mount, so mount only once the container is visible.
-	let pieGate = createVisibilityWatch();
+	let pieGate = createVisibilityWatch(0);
 
 	let context = $state<ChartState<PieDataItem>>();
 	let activeKey = $state<string | null>(null);
@@ -95,7 +95,17 @@
 	}
 </script>
 
-<ChartCard {title} {level} {description} {isLoading} {error} {isEmpty} {icon} class={className}>
+<ChartCard
+	{title}
+	{level}
+	{description}
+	{isLoading}
+	{error}
+	{isEmpty}
+	{icon}
+	textAlternative={a11y.summary}
+	class={className}
+>
 	<div class="flex flex-col md:flex-row gap-6">
 		<div class="flex-1 flex items-center justify-center overflow-hidden" bind:this={pieGate.el}>
 			<ChartPlot

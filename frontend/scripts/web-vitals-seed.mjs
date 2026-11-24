@@ -143,7 +143,7 @@ db.query('insert into sessions (id, user_id, expires_at) values (?, ?, ?)').run(
 );
 const vehicle = db
 	.query(
-		"select id from vehicles where user_id = ? order by coalesce(license_plate, '') like 'PERF%', created_at, id limit 1"
+		"select id from vehicles where user_id = ? order by coalesce(license_plate, '') like 'PERF%', created_at, license_plate, id limit 1"
 	)
 	.get(user.id);
 console.log(JSON.stringify({ session, vehicleId: vehicle.id }));

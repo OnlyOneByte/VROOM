@@ -20,6 +20,7 @@ import {
 	bucketBounds,
 	bucketDate,
 	bucketLabel,
+	carPanels,
 	expensesNote,
 	expensesQuery,
 	kpis,
@@ -272,5 +273,58 @@ describe('drill-down selection', () => {
 		expect(expensesNote({ split: 'tag', keys: [''], cars: 3, energy: false })).toBe(
 			'Expenses also lists your other cars and tagged expenses for these dates.'
 		);
+	});
+});
+
+describe('each car on its own', () => {
+	test('splits by car, asks for the period before, and draws panels', () => {
+		const query = parseExplore(new URLSearchParams('metric=costPerDistance&compare=cars'));
+		expect(query.split).toBe('vehicle');
+		expect(allowedSplits('cost', 'cars')).toEqual(['vehicle']);
+		expect(apiQuery(query)).toMatchObject({ groupBy: 'vehicle', compare: 'prevPeriod' });
+		expect(chartForm(query)).toBe('panels');
+		expect(chartForm({ ...query, per: 'none' })).toBe('ranking');
+		expect(describeQuery(query)).toBe('Cost per mile per month by car, each car on its own');
+	});
+
+	test('panels share one scale, and the fleet average is over every car', () => {
+		const series = (key: string, values: Array<number | null>) => ({
+			key,
+			sourceKey: key,
+			label: key,
+			color: 'red',
+			values
+		});
+		const { yDomain, fleetMean, panels } = carPanels([
+			series('a', [10, 30, null]),
+			series('b', [20, null, null])
+		]);
+		expect(yDomain).toEqual([0, 30]);
+		expect(fleetMean).toBe(20);
+		expect(panels.map(p => p.mean)).toEqual([20, 20]);
+		expect(carPanels([series('empty', [null])]).yDomain).toEqual([0, 1]);
+	});
+
+	test('ratio panels use each car pooled over the range, and the scale fits the fleet line', () => {
+		const series = (key: string, values: Array<number | null>) => ({
+			key,
+			sourceKey: key,
+			label: key,
+			color: 'red',
+			values
+		});
+		const pooled = carPanels([series('a', [0.1, 0.78]), series('b', [0.2, 0.2])], {
+			fleet: 0.9,
+			cars: { a: 0.15, b: 0.2 }
+		});
+		expect(pooled.panels.map(p => p.mean)).toEqual([0.15, 0.2]);
+		expect(pooled.fleetMean).toBe(0.9);
+		expect(pooled.yDomain).toEqual([0, 0.9]);
+	});
+
+	test('switching to each car clears hidden cars, and the whole range reads plainly', () => {
+		const query = parseExplore(new URLSearchParams('split=vehicle&hide=camry&compare=cars'));
+		expect(query.hide).toEqual([]);
+		expect(describeQuery({ ...query, per: 'none' })).toBe('Total cost over the whole range by car');
 	});
 });
