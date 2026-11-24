@@ -11,7 +11,6 @@
 		formatMonthLabel,
 		type TooltipValueFormat,
 		CHART_PADDING,
-		distinctYTicks,
 		TIME_X_PADDING,
 		insetTimeTicks,
 		SMOOTH_CURVE,
@@ -22,6 +21,7 @@
 	import type { Snippet } from 'svelte';
 	import type { ChartState } from 'layerchart';
 	import { buildChartA11y, type ChartSelectHandler } from './chart-a11y.ts';
+	import { guideTicks } from './guides.ts';
 
 	interface LegendItem {
 		key: string;
@@ -49,6 +49,7 @@
 		tooltipLabelFormat?: (_v: unknown) => string;
 		categoryLabel?: string;
 		onSelect?: ChartSelectHandler;
+		insight?: string;
 		class?: string;
 	}
 
@@ -72,6 +73,7 @@
 		tooltipLabelFormat = formatMonthLabel,
 		categoryLabel,
 		onSelect,
+		insight,
 		class: className
 	}: Props = $props();
 
@@ -96,9 +98,7 @@
 		else context?.tooltip.hide();
 	}
 	let resolvedXAxisProps = $derived(xAxisProps ?? monthlyXAxisProps(data.length));
-	let yTicks = $derived(
-		distinctYTicks(yAxisFormat, height - CHART_PADDING.top - CHART_PADDING.bottom)
-	);
+	let yTicks = $derived(guideTicks(yAxisFormat));
 	let isolatedValues = $derived(
 		isolatedValueRows(
 			data,
@@ -118,6 +118,7 @@
 	{height}
 	animationClass="chart-line-animated"
 	table={a11y}
+	{insight}
 	class={className}
 >
 	<ChartPlot

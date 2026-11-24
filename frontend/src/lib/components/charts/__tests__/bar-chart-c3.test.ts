@@ -129,6 +129,12 @@ describe('C3 bar columns', () => {
 		expect(seen.labels.map(label => label['value'])).toEqual(['$751']);
 	});
 
+	test('a current month with no value gets no label', async () => {
+		const data = [...MONTHS, { date: new Date(2026, 8, 1), amount: null }];
+		await mount({ ...SINGLE, data, current: new Date(2026, 8, 1) });
+		expect(seen.labels.map(label => label['value'])).toEqual(['$751']);
+	});
+
 	test('value labels can be turned off, and never show on several series', async () => {
 		await mount({ ...SINGLE, valueLabels: false });
 		expect(seen.labels).toHaveLength(0);
@@ -200,6 +206,21 @@ describe('C3 bar columns', () => {
 		expect(barsConfig()).toMatchObject({ height: 10, radius: 5 });
 	});
 
+	test('vertical columns grow on entry, horizontal bars do not wipe upward', async () => {
+		const vertical = await mount(SINGLE);
+		expect(vertical.container.querySelector('.chart-bar-animate-ready')).not.toBeNull();
+		cleanup();
+		const horizontal = await mount({
+			...SINGLE,
+			data: [{ car: 'Weekend Car', mpg: 35 }],
+			x: 'mpg',
+			y: 'car',
+			orientation: 'horizontal',
+			series: [{ key: 'mpg', label: 'mpg', color: 'var(--chart-3)' }]
+		});
+		expect(horizontal.container.querySelector('.chart-bar-animate-ready')).toBeNull();
+	});
+
 	test('a horizontal reference line is listed under the chart, since it has no label on the plot', async () => {
 		await mount({
 			...SINGLE,
@@ -207,7 +228,7 @@ describe('C3 bar columns', () => {
 			x: 'mpg',
 			y: 'car',
 			orientation: 'horizontal',
-			yAxisFormat: (v: number) => `${v} mpg`,
+			tooltipFormat: (v: number) => `${v} mpg`,
 			series: [{ key: 'mpg', label: 'mpg', color: 'var(--chart-3)' }],
 			referenceLines: [{ value: 33, label: 'Fleet' }]
 		});

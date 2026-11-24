@@ -161,6 +161,10 @@
 	);
 	let barSize = $derived(fixedWidth ? { width: fixedWidth } : vertical ? {} : { height: 10 });
 
+	function hasValue(value: unknown): boolean {
+		return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
+	}
+
 	function sameBucket(a: unknown, b: unknown): boolean {
 		if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
 		return a === b;
@@ -184,7 +188,10 @@
 
 	let labelRows = $derived(
 		valueLabels && vertical && singleSeries
-			? [...new Set([peakRow, currentRow].filter(row => row !== undefined))]
+			? [...new Set([peakRow, currentRow])].filter(
+					(row): row is Record<string, unknown> =>
+						row !== undefined && hasValue(row[valueKey as string])
+				)
 			: []
 	);
 
@@ -211,7 +218,7 @@
 	{isEmpty}
 	{icon}
 	{height}
-	animationClass="chart-bar-animated"
+	animationClass={vertical ? 'chart-bar-animated' : undefined}
 	table={a11y}
 	events={annotations}
 	{insight}
@@ -321,7 +328,7 @@
 					<li class="flex items-center gap-1.5 text-xs text-muted-foreground">
 						<span class="w-4 border-t-2 border-dashed border-muted-foreground" aria-hidden="true"
 						></span>
-						{line.label}: {yAxisFormat(line.value)}
+						{line.label}: {tooltipFormat(line.value, series[0]?.key ?? '')}
 					</li>
 				{/each}
 			</ul>
