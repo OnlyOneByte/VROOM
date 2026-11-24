@@ -141,7 +141,11 @@
 			{@render field('explore-split', 'Split by', query.split, splits, v =>
 				update({ split: v as ExploreQuery['split'] })
 			)}
-			{#if query.compare !== 'none'}
+			{#if query.compare === 'cars'}
+				<p class="-mt-3 text-xs text-muted-foreground">
+					Each car gets its own chart on one shared scale, so the split is by car.
+				</p>
+			{:else if query.compare !== 'none'}
 				<p class="-mt-3 text-xs text-muted-foreground">
 					A comparison draws one total line, so the split is off while comparing.
 				</p>
