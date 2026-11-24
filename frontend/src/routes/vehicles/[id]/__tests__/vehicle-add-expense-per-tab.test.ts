@@ -58,8 +58,14 @@ vi.mock('#lib/services/analytics-api.ts', () => ({
 
 import Page from '../+page.svelte';
 
+function headerAddExpense(): HTMLElement[] {
+	return screen
+		.queryAllByRole('link', { name: 'Add Expense' })
+		.filter(link => link.classList.contains('max-sm:w-10'));
+}
+
 function pageAddExpenseActions(): number {
-	return screen.queryAllByRole('link', { name: 'Add Expense' }).length;
+	return headerAddExpense().length;
 }
 
 describe('vehicle page Add Expense action per tab', () => {
@@ -68,7 +74,7 @@ describe('vehicle page Add Expense action per tab', () => {
 		await screen.findByRole('tab', { name: 'Odometer' });
 
 		expect(pageAddExpenseActions()).toBe(1);
-		expect(screen.getByRole('link', { name: 'Add Expense' })).not.toHaveClass('fixed', 'hidden');
+		expect(headerAddExpense()[0]).not.toHaveClass('fixed', 'hidden');
 
 		for (const tab of ['Expenses', 'Finance']) {
 			await fireEvent.click(screen.getByRole('tab', { name: tab }));
