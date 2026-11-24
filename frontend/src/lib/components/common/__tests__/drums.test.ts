@@ -76,6 +76,19 @@ describe('Drums', () => {
 		]);
 	});
 
+	test('in Spanish the thousands separator is still not drawn', () => {
+		inLocale('es-ES');
+		const { container } = render(Drums, { props: { amount: 13061, currency: 'EUR' } });
+		expect(cells(container).map(([, char]) => char)).toEqual(['1', '3', '0', '6', '1', '€']);
+	});
+
+	test('Eastern Arabic digits each get their own cell', () => {
+		inLocale('ar-EG');
+		const { container } = render(Drums, { props: { amount: 1234, currency: 'EGP' } });
+		const digits = cells(container).filter(([kind]) => kind === 'digit');
+		expect(digits.map(([, char]) => char)).toEqual(['١', '٢', '٣', '٤']);
+	});
+
 	test('a currency with no minor unit draws no cent cells even when asked', () => {
 		const { container } = render(Drums, { props: { amount: 4500, currency: 'JPY', cents: true } });
 		expect(cells(container).some(([kind]) => kind === 'cent')).toBe(false);
@@ -83,7 +96,7 @@ describe('Drums', () => {
 
 	test('a negative amount keeps its sign', () => {
 		const { container } = render(Drums, { props: { amount: -42, currency: 'USD' } });
-		expect(cells(container).map(([, char]) => char)).toEqual(['-$', '4', '2']);
+		expect(cells(container).map(([, char]) => char)).toEqual(['-', '$', '4', '2']);
 	});
 
 	test('a wide symbol is counted at its width, so the drum still fits', () => {

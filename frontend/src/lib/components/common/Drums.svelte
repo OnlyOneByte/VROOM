@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
+	import { currentLocale, formatCurrency } from '#lib/utils/formatters.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 
 	interface Props {
 		amount: number;
@@ -21,9 +22,8 @@
 	const PADDING_EM = 0.3;
 
 	let value = $derived(Number.isNaN(amount) ? 0 : amount);
-	let label = $derived(formatCurrency(value, currency, cents ? undefined : 0));
-	let decimalMark = $derived(formatNumber(1.5, 1).replace(/\d/g, ''));
-	let groupMark = $derived(formatNumber(1000, 0).replace(/\d/g, ''));
+	let currencyCode = $derived(currency || settingsStore.settings?.currencyUnit || 'USD');
+	let label = $derived(formatCurrency(value, currencyCode, cents ? undefined : 0));
 
 	function sepCell(char: string): Cell {
 		return {
@@ -35,29 +35,22 @@
 	}
 
 	let cells = $derived.by((): Cell[] => {
+		const parts = new Intl.NumberFormat(currentLocale(), {
+			style: 'currency',
+			currency: currencyCode,
+			...(!cents && { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+		}).formatToParts(value);
 		const out: Cell[] = [];
-		let pending = '';
-		let afterDecimal = false;
-		const flush = () => {
-			const text = pending.trim();
-			if (text) out.push(sepCell(text));
-			pending = '';
-		};
-		for (const char of label) {
-			if (/\d/.test(char)) {
-				flush();
-				out.push({ key: '', char, kind: afterDecimal ? 'cent' : 'digit', width: DIGIT_EM });
-			} else if (cents && char === decimalMark && !afterDecimal) {
-				flush();
-				afterDecimal = true;
-				out.push(sepCell(char));
-			} else if (groupMark && char === groupMark && !afterDecimal) {
-				continue;
+		for (const part of parts) {
+			if (part.type === 'group' || part.type === 'literal') continue;
+			if (part.type === 'integer' || part.type === 'fraction') {
+				const kind = part.type === 'integer' ? 'digit' : 'cent';
+				for (const char of part.value) out.push({ key: '', char, kind, width: DIGIT_EM });
 			} else {
-				pending += char.replace(/\s/u, ' ');
+				const text = part.value.trim();
+				if (text) out.push(sepCell(text));
 			}
 		}
-		flush();
 		return out.map((cell, i) => ({ ...cell, key: `${out.length - i}` }));
 	});
 
