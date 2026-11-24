@@ -1,4 +1,4 @@
-import { and, desc, eq, getTableColumns, gte, inArray, lte, min, or } from 'drizzle-orm';
+import { and, eq, getTableColumns, gte, inArray, lte, min, or } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import {

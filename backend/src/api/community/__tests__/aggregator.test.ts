@@ -4,6 +4,7 @@ import {
   ageBand,
   aggregate,
   type CommunityVehicle,
+  noiseScaleFor,
   premiumInWindow,
   vehicleSamples,
 } from '../aggregator';
@@ -15,7 +16,7 @@ const term = (startDays: number, endDays: number, amount: number) => ({
   termStart: new Date(NOW.getTime() + startDays * DAY),
   termEnd: new Date(NOW.getTime() + endDays * DAY),
 });
-const OPTIONS = { now: NOW, minGroup: 10, quartileMinGroup: 20, uniform: NO_NOISE };
+const OPTIONS = { now: NOW, minGroup: 10, uniform: NO_NOISE };
 const CIVIC_KM_PER_L = (300 * 1.609344) / (10 * 3.785411784);
 
 function efficiencyRow(vehicles: CommunityVehicle[], options = OPTIONS) {
@@ -42,16 +43,47 @@ describe('community stats aggregation privacy', () => {
     expect(efficiencyRow([...vehicles, vehicle('one-more')])?.nPublished).toBe(10);
   });
 
-  test('quartiles appear only from 20 owners, and n is rounded down to a multiple of 5', () => {
-    const thirteen = efficiencyRow(owners(13).map((id) => vehicle(id)));
-    expect(thirteen?.nPublished).toBe(10);
-    expect(thirteen?.p25).toBeNull();
-    expect(thirteen?.p75).toBeNull();
+  test('a bucket publishes only its mean, at any size, and n is rounded down to a multiple of 5', () => {
+    for (const [count, published] of [
+      [13, 10],
+      [22, 20],
+      [60, 60],
+    ] as const) {
+      const row = efficiencyRow(owners(count).map((id) => vehicle(id)));
+      expect(row?.nPublished).toBe(published);
+      expect(Object.keys(row ?? {}).filter((key) => /^p\d+$/.test(key))).toEqual([]);
+      expect(row?.mean).toBeCloseTo(Math.round(CIVIC_KM_PER_L * 10) / 10, 6);
+    }
+  });
 
-    const twentyTwo = efficiencyRow(owners(22).map((id) => vehicle(id)));
-    expect(twentyTwo?.nPublished).toBe(20);
-    expect(twentyTwo?.p25).not.toBeNull();
-    expect(twentyTwo?.p75).not.toBeNull();
+  test('each bucket takes exactly one noise draw per refresh, spending ε = 1 on its mean', () => {
+    let draws = 0;
+    const uniform = () => {
+      draws++;
+      return 0.5;
+    };
+    const result = aggregate(
+      owners(30).map((id) => vehicle(id)),
+      { ...OPTIONS, uniform }
+    );
+    expect(result.rows.length).toBeGreaterThan(0);
+    expect(draws).toBe(result.rows.length);
+  });
+
+  test('the published mean is the true mean plus one Laplace draw at the published-n scale', () => {
+    const u = 0.9;
+    const row = efficiencyRow(
+      owners(12).map((id) => vehicle(id)),
+      { ...OPTIONS, uniform: () => u }
+    );
+    const scale = (60 - 2) / 10;
+    const noise = -scale * Math.sign(u - 0.5) * Math.log(1 - 2 * Math.abs(u - 0.5));
+    expect(row?.mean).toBeCloseTo(Math.round((CIVIC_KM_PER_L + noise) * 10) / 10, 6);
+  });
+
+  test('the noise scale is the band width over the published n', () => {
+    expect(noiseScaleFor({ lo: 2, hi: 60 }, 10)).toBeCloseTo(5.8, 9);
+    expect(noiseScaleFor({ lo: 2, hi: 60 }, 100)).toBeCloseTo(0.58, 9);
   });
 
   test('a raised minimum group size is respected, and published n never falls below it', () => {
@@ -74,7 +106,6 @@ describe('community stats aggregation privacy', () => {
     );
     expect(ten?.mean).not.toBeCloseTo(Math.round(CIVIC_KM_PER_L * 10) / 10, 3);
     expect(fourteen?.mean).toBe(ten?.mean as number);
-    expect(fourteen?.p50).toBe(ten?.p50 as number);
   });
 
   test('published values are rounded to their step and never reveal exact n', () => {
@@ -82,15 +113,11 @@ describe('community stats aggregation privacy', () => {
     for (const row of aggregate(vehicles, OPTIONS).rows) {
       expect(row.nPublished % 5).toBe(0);
       const step = row.unit === 'cents_per_year' ? 1000 : 0.1;
-      for (const value of [row.mean, row.p25, row.p50, row.p75]) {
-        if (value === null || value === undefined) continue;
-        expect(Math.abs(value / step - Math.round(value / step))).toBeLessThan(1e-6);
-      }
+      expect(Math.abs(row.mean / step - Math.round(row.mean / step))).toBeLessThan(1e-6);
     }
-    expect(efficiencyRow(vehicles)?.p50).toBeCloseTo(Math.round(CIVIC_KM_PER_L * 10) / 10, 6);
   });
 
-  test('noise moves values but keeps them inside the plausibility band and in order', () => {
+  test('noise moves the mean but keeps it inside the plausibility band', () => {
     let i = 0;
     const draws = [0.99, 0.01, 0.7, 0.2];
     const uniform = () => draws[i++ % draws.length] ?? 0.5;
@@ -99,12 +126,9 @@ describe('community stats aggregation privacy', () => {
       { ...OPTIONS, uniform }
     );
     expect(row).toBeDefined();
-    for (const value of [row?.mean, row?.p25, row?.p50, row?.p75]) {
-      expect(value).toBeGreaterThanOrEqual(2);
-      expect(value).toBeLessThanOrEqual(60);
-    }
-    expect(row?.p25 ?? 0).toBeLessThanOrEqual(row?.p50 ?? 0);
-    expect(row?.p50 ?? 0).toBeLessThanOrEqual(row?.p75 ?? 0);
+    expect(row?.mean).toBeGreaterThanOrEqual(2);
+    expect(row?.mean).toBeLessThanOrEqual(60);
+    expect(row?.mean).not.toBeCloseTo(Math.round(CIVIC_KM_PER_L * 10) / 10, 3);
   });
 
   test('values outside the plausibility band are dropped before counting', () => {

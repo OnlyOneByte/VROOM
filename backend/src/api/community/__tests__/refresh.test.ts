@@ -144,7 +144,7 @@ describe('community stats refresh against the database', () => {
       ['c', 25],
     ] as const) {
       db.sqlite.run(
-        "INSERT INTO community_stats (id, scope, metric, bucket_key, unit, n_published, mean, p50, computed_at, schema_version) VALUES (?, 'local', 'efficiency', ?, 'km_per_l', ?, 12, 12, 0, 1)",
+        "INSERT INTO community_stats (id, scope, metric, bucket_key, unit, n_published, mean, computed_at, schema_version) VALUES (?, 'local', 'efficiency', ?, 'km_per_l', ?, 12, 0, 1)",
         [key, key, n]
       );
     }

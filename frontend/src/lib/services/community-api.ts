@@ -18,9 +18,6 @@ export type CompareUnit =
 export interface CompareBucket {
 	n: number;
 	mean: number;
-	p25: number | null;
-	p50: number;
-	p75: number | null;
 	computedAt: string;
 }
 

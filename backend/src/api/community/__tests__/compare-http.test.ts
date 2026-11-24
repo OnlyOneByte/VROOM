@@ -20,7 +20,7 @@ interface CompareMetric {
   status: string;
   unit: string | null;
   yours: number | null;
-  bucket: { n: number; mean: number; p25: number | null; p50: number; p75: number | null } | null;
+  bucket: Record<string, number | string> | null;
 }
 
 interface CompareBody {
@@ -57,22 +57,11 @@ async function seedCivic(extra: Record<string, unknown> = { catalogModelId: 'hon
   return vehicleId;
 }
 
-function insertBucket(bucketKey: string, metric: string, unit: string, n: number, p50: number) {
+function insertBucket(bucketKey: string, metric: string, unit: string, n: number, mean: number) {
   ctx.sqlite.run(
-    `INSERT INTO community_stats (id, scope, metric, bucket_key, unit, n_published, mean, p25, p50, p75, computed_at, schema_version)
-     VALUES (?, 'local', ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-    [
-      `row-${bucketKey}`,
-      metric,
-      bucketKey,
-      unit,
-      n,
-      p50,
-      n >= 20 ? p50 - 1 : null,
-      p50,
-      n >= 20 ? p50 + 1 : null,
-      Math.floor(Date.now() / 1000),
-    ]
+    `INSERT INTO community_stats (id, scope, metric, bucket_key, unit, n_published, mean, computed_at, schema_version)
+     VALUES (?, 'local', ?, ?, ?, ?, ?, ?, 1)`,
+    [`row-${bucketKey}`, metric, bucketKey, unit, n, mean, Math.floor(Date.now() / 1000)]
   );
   markRefreshed();
 }
@@ -143,9 +132,8 @@ describe('GET /api/v1/community/compare', () => {
     expect(efficiency?.unit).toBe('distance_per_volume');
     expect(efficiency?.yours).toBeCloseTo(30, 6);
     expect(efficiency?.bucket?.n).toBe(20);
-    expect(efficiency?.bucket?.p50).toBeCloseTo(12 * MPG_PER_KM_PER_L, 6);
-    expect(efficiency?.bucket?.p25).toBeCloseTo(11 * MPG_PER_KM_PER_L, 6);
-    expect(efficiency?.bucket?.p75).toBeCloseTo(13 * MPG_PER_KM_PER_L, 6);
+    expect(efficiency?.bucket?.mean as number).toBeCloseTo(12 * MPG_PER_KM_PER_L, 6);
+    expect(Object.keys(efficiency?.bucket ?? {}).sort()).toEqual(['computedAt', 'mean', 'n']);
     expect(body?.currency).toBe('USD');
   });
 

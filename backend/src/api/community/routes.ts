@@ -45,9 +45,6 @@ export interface CompareMetric {
   bucket: {
     n: number;
     mean: number;
-    p25: number | null;
-    p50: number;
-    p75: number | null;
     computedAt: string;
   } | null;
 }
@@ -87,9 +84,6 @@ function bucketView(row: CommunityStat, unit: CommunityUnit, units: UnitPreferen
   return {
     n: row.nPublished,
     mean: convert(row.mean),
-    p25: row.p25 === null ? null : convert(row.p25),
-    p50: convert(row.p50),
-    p75: row.p75 === null ? null : convert(row.p75),
     computedAt: row.computedAt.toISOString(),
   };
 }

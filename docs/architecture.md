@@ -137,9 +137,9 @@ no-ops when nothing changed since the last sync, so an idle user with no edits c
 Before a bucket is stored, the job enforces the privacy rules:
 
 - n counts people, and a bucket is published only when that count, rounded down to a multiple of 5, is at least K (10, or `COMMUNITY_STATS_MIN_GROUP`);
-- quartiles are published only from 20 people;
 - implausible values are dropped first;
-- Laplace noise from a cryptographic source is scaled to the rounded count, then the values are rounded.
+- each bucket publishes its rounded group size and one noisy statistic, the mean. The mean gets one Laplace draw from a cryptographic source at scale `(hi − lo) / n_published`, then is rounded. That is ε = 1 per bucket per refresh against a change in one person's value. No quantiles are published: Laplace noise at a mean's sensitivity is not a private release for a median.
+- not yet covered: one person joining or leaving a group. The noise scale follows the rounded size, and the rounded size and whether a group appears are published without noise (#1591).
 
 The write replaces the `scope='local'` rows in one transaction. `GET /api/v1/community/compare` (`routes.ts`) only answers callers who have opted in. It computes the caller's own values with the same `vehicleSamples` function and looks up only rows with `n_published >= K`.
 

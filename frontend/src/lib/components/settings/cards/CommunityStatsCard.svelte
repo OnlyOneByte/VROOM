@@ -75,7 +75,10 @@
 	</CardHeader>
 	<CardContent class="space-y-6">
 		<ul class="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-			<li>Only totals for groups of 10 or more people are ever shown — never your own numbers.</li>
+			<li>
+				Only averages and rounded group sizes for groups of 10 or more people are ever shown — never
+				your own numbers.
+			</li>
 			<li>
 				What's used: make, model and model year, powertrain, vehicle age, and your fuel, maintenance
 				and insurance costs from the last 12 months. Your region is used only if you set one below.

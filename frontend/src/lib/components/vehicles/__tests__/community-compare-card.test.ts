@@ -64,7 +64,7 @@ const OK_EFFICIENCY = metric('efficiency', {
 	status: 'ok',
 	unit: 'distance_per_volume',
 	yours: 34,
-	bucket: { n: 40, mean: 31.2, p25: 28, p50: 31, p75: 33, computedAt: '2026-11-23T00:00:00Z' }
+	bucket: { n: 40, mean: 31, computedAt: '2026-11-23T00:00:00Z' }
 });
 
 function data(...metrics: CompareMetric[]): CompareResult {
@@ -159,20 +159,38 @@ describe('CommunityCompareCard', () => {
 		expect(screen.queryByTestId('community-compare-efficiency')).toBeNull();
 	});
 
-	test('shows the comparison row with the median, typical range, rounded n and a text range', async () => {
+	test('shows the comparison row with the average, rounded n and a text equivalent', async () => {
 		compare.mockResolvedValue(data(OK_EFFICIENCY));
 		await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });
 		const row = screen.getByTestId('community-compare-efficiency');
-		expect(row).toHaveTextContent('You 34.0 mi/gal · Others 31.0 mi/gal');
-		expect(row).toHaveTextContent('(typical 28.0–33.0 mi/gal)');
+		expect(row).toHaveTextContent('You 34.0 mi/gal · Others 31.0 mi/gal (average)');
+		expect(row).not.toHaveTextContent('typical');
 		expect(row).toHaveTextContent('about 40 owners');
 		expect(screen.getByRole('img')).toHaveAttribute(
 			'aria-label',
-			'Your 34.0 mi/gal is above the typical range of 28.0 to 33.0 mi/gal'
+			"Your 34.0 mi/gal is above the others' average of 31.0 mi/gal"
 		);
 		expect(
 			screen.getByText('Updated daily. Anonymous averages from opted-in owners, including you.')
 		).toBeInTheDocument();
+	});
+
+	test('values that round to the same figure read as the same, not above or below', async () => {
+		compare.mockResolvedValue(
+			data(
+				metric('efficiency', {
+					status: 'ok',
+					unit: 'distance_per_volume',
+					yours: 31.04,
+					bucket: { n: 40, mean: 31, computedAt: '' }
+				})
+			)
+		);
+		await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });
+		expect(screen.getByRole('img')).toHaveAttribute(
+			'aria-label',
+			"Your 31.0 mi/gal is the same as the others' average of 31.0 mi/gal"
+		);
 	});
 
 	test('formats costs in the currency with the distance unit, and yearly costs per year', async () => {
@@ -182,13 +200,13 @@ describe('CommunityCompareCard', () => {
 					status: 'ok',
 					unit: 'cents_per_distance',
 					yours: 12.4,
-					bucket: { n: 15, mean: 11, p25: null, p50: 11, p75: null, computedAt: '' }
+					bucket: { n: 15, mean: 11, computedAt: '' }
 				}),
 				metric('maintenance', {
 					status: 'ok',
 					unit: 'cents_per_year',
 					yours: 45_000,
-					bucket: { n: 10, mean: 60_000, p25: null, p50: 60_000, p75: null, computedAt: '' }
+					bucket: { n: 10, mean: 60_000, computedAt: '' }
 				})
 			)
 		);
@@ -201,7 +219,7 @@ describe('CommunityCompareCard', () => {
 		);
 		expect(screen.getAllByRole('img')[1]).toHaveAttribute(
 			'aria-label',
-			"Your $450/yr compared with the others' median of $600/yr"
+			"Your $450/yr is below the others' average of $600/yr"
 		);
 	});
 

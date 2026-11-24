@@ -24,7 +24,6 @@ import SHARED_LIMITS from './shared-limits.json';
 import type { Environment } from './types';
 
 const COMMUNITY_STATS_MIN_GROUP_FLOOR = 10;
-const COMMUNITY_STATS_QUARTILE_FLOOR = 20;
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -217,7 +216,6 @@ export const CONFIG = {
     mode: env.COMMUNITY_STATS,
     enabled: env.COMMUNITY_STATS !== 'off' && env.NODE_ENV !== 'test',
     minGroup: env.COMMUNITY_STATS_MIN_GROUP,
-    quartileMinGroup: Math.max(COMMUNITY_STATS_QUARTILE_FLOOR, env.COMMUNITY_STATS_MIN_GROUP),
     refreshIntervalMs: 24 * 60 * 60 * 1000,
     maxJitterMs: 60 * 60 * 1000,
     slowRunWarnMs: 30_000,

@@ -110,12 +110,12 @@
 				<h2 class="text-xl font-semibold text-foreground">Community Comparisons (Optional)</h2>
 				<p>
 					If this server has community comparisons turned on and you switch on "Include my vehicles
-					in community stats" in Settings, anonymous totals built from your vehicles are shown to
-					other people on the same server who have also opted in. A total covers a group of at least
-					10 people and is never your own numbers. Only make, model and model year, powertrain,
-					vehicle age, your currency, your region if you set one, and from the last 12 months your
-					fuel, maintenance and insurance costs, your fuel or charge amounts, and the distance
-					driven (worked out from your odometer readings) are used.
+					in community stats" in Settings, anonymous averages built from your vehicles are shown to
+					other people on the same server who have also opted in. Each average covers a group of at
+					least 10 people, has random noise added, and is never your own numbers. Only make, model
+					and model year, powertrain, vehicle age, your currency, your region if you set one, and
+					from the last 12 months your fuel, maintenance and insurance costs, your fuel or charge
+					amounts, and the distance driven (worked out from your odometer readings) are used.
 				</p>
 				<p>
 					Nothing leaves the server. The setting is off by default, restoring a backup never turns
