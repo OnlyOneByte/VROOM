@@ -168,7 +168,9 @@ developer contact), set the Audience, and submit for verification. VROOM ships c
 
 ### Pre-built images (recommended)
 
-`ghcr.io/onlyonebyte/vroom/backend` and `ghcr.io/onlyonebyte/vroom/frontend`.
+`ghcr.io/onlyonebyte/vroom/backend` and `ghcr.io/onlyonebyte/vroom/frontend`, each built for
+`linux/amd64` and `linux/arm64`, so the same tag runs on an x86 server, a Raspberry Pi 4 or 5,
+or an ARM VPS such as Hetzner CAX or Oracle Ampere.
 
 | Tag | Published on |
 |---|---|
