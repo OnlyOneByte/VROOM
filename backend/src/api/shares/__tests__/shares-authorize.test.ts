@@ -135,6 +135,22 @@ describe('share management cannot be used to escalate', () => {
     expect((await m.coOwner.request('DELETE', shareOf(appointed))).status).toBe(200);
   });
 
+  test('revoking someone needs the rank to remove their overrides', async () => {
+    const setOverride = (by: string, permission: string) =>
+      ctx.sqlite.run(
+        "INSERT INTO permission_overrides (id, user_id, scope, scope_id, permission, effect, set_by) VALUES (?, ?, 'vehicle', ?, ?, 'allow', ?)",
+        [`po-${by}-${permission}`, m.viewer.id, CAR, permission, by]
+      );
+    setOverride(ctx.user.id, 'vehicle.financing.read');
+    expect((await m.coOwner.request('DELETE', shareOf(m.viewer))).status).toBe(403);
+
+    ctx.sqlite.run('DELETE FROM permission_overrides WHERE user_id = ?', [m.viewer.id]);
+    setOverride(m.coOwner.id, 'vehicle.insurance.read');
+    overrideOn(ctx, CAR, m.editor, 'vehicle.share.manage', 'allow');
+    expect((await m.editor.request('DELETE', shareOf(m.viewer))).status).toBe(403);
+    expect((await m.coOwner.request('DELETE', shareOf(m.viewer))).status).toBe(200);
+  });
+
   test('revoking your own share points you to Decline', async () => {
     const res = await m.coOwner.request('DELETE', shareOf(m.coOwner));
     expect(res.status).toBe(403);

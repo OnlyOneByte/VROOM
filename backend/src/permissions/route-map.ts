@@ -60,7 +60,7 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   'GET /api/v1/vehicles/:id': 'vehicle.read',
   'PUT /api/v1/vehicles/:id': 'vehicle.write',
   'DELETE /api/v1/vehicles/:id': 'vehicle.delete',
-  'GET /api/v1/vehicles/:id/stats': 'vehicle.read',
+  'GET /api/v1/vehicles/:id/stats': 'vehicle.expense.read',
   'GET /api/v1/vehicles/:vehicleId/photos': 'vehicle.photo.read',
   'POST /api/v1/vehicles/:vehicleId/photos': 'vehicle.photo.write',
   'GET /api/v1/vehicles/:vehicleId/photos/:photoId/thumbnail': 'vehicle.photo.read',

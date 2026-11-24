@@ -3,6 +3,7 @@ import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { getDb } from '../../db/connection';
 import {
+  permissionOverrides,
   roleAssignments,
   rolePermissions,
   users,
@@ -144,6 +145,24 @@ function refuseOverSharee(c: Context, share: VehicleShare, ownerId: string | nul
     )
     .get();
   if (ownerSet) throw new ForbiddenError('Only the owner can change what the owner set');
+  const overrides = getDb()
+    .select({ permission: permissionOverrides.permission, setBy: permissionOverrides.setBy })
+    .from(permissionOverrides)
+    .where(
+      and(
+        eq(permissionOverrides.userId, share.sharedWithId),
+        eq(permissionOverrides.scope, 'vehicle'),
+        eq(permissionOverrides.scopeId, share.vehicleId)
+      )
+    )
+    .all();
+  refuseUnheld(
+    [...new Set(overrides.map((override) => override.permission))],
+    holdsOn(c, share.vehicleId)
+  );
+  if (overrides.some((override) => override.setBy === ownerId)) {
+    throw new ForbiddenError('Only the owner can change what the owner set');
+  }
 }
 
 routes.post('/', zValidator('json', inviteSchema), authorize(fromInviteVehicle), async (c) => {

@@ -83,11 +83,13 @@ const ROUTES: RouteCase[] = [
   {
     name: 'PUT /vehicles/:id',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['PUT', `/vehicles/${fx.vehicleId}`, { nickname: 'Renamed' }],
   },
   {
     name: 'DELETE /vehicles/:id',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['DELETE', `/vehicles/${fx.vehicleId}`],
   },
   {
