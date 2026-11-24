@@ -15,9 +15,13 @@ const VOLUME_AFTER = new RegExp(
   String.raw`\b(gal(?:lons?)?|lit(?:res?|ers?))\b\s*[:=]?\s*(${NUMBER})`,
   'i'
 );
-const PRICE_PER_UNIT = new RegExp(
-  String.raw`(?:price\s*\/\s*(gal|l)\b|\/\s*(gal|l|1)\b|per\s+(gal|litre|liter))\s*[:=]?\s*[$€£]?\s*(${NUMBER})|[$€£]?\s*(${NUMBER})\s*(?:[$€£]|EUR|USD|GBP)?\s*\/\s*(gal|l|1)\b`,
-  'i'
+const PRICE_LABEL_FIRST = new RegExp(
+  String.raw`(?:price\s*\/\s*(?:gal|l)\b|\/\s*(?:gal|l|1)\b|per\s+(?:gal(?:lon)?|litre|liter))\s*[:=]?\s*[$€£]?\s*(${NUMBER})`,
+  'gi'
+);
+const PRICE_NUMBER_FIRST = new RegExp(
+  String.raw`[$€£]?\s*(${NUMBER})\s*(?:[$€£]|EUR|USD|GBP)?\s*\/\s*(?:gal|l|1)\b`,
+  'gi'
 );
 
 const ADDRESS_OR_NOISE =
@@ -121,14 +125,53 @@ function unitOf(token: string): ReceiptVolumeUnit {
 
 type FoundVolume = { volume: number; unit: ReceiptVolumeUnit };
 
+const MAX_UNIT_PRICE = 20;
+
+type PriceMatch = { start: number; end: number; value: number };
+
+function priceMatches(line: string, pattern: RegExp): PriceMatch[] {
+  return [...line.matchAll(pattern)]
+    .map((m) => ({
+      start: m.index ?? 0,
+      end: (m.index ?? 0) + m[0].length,
+      value: toNumber(m[1]) ?? 0,
+    }))
+    .filter((p) => p.value > 0);
+}
+
+function overlaps(a: PriceMatch, b: PriceMatch): boolean {
+  return a.start < b.end && b.start < a.end;
+}
+
+function priceIn(line: string): PriceMatch | undefined {
+  const numberFirst = priceMatches(line, PRICE_NUMBER_FIRST);
+  const labelFirst = priceMatches(line, PRICE_LABEL_FIRST).filter((label) => {
+    const rival = numberFirst.find((n) => overlaps(n, label));
+    return !rival || (rival.value >= MAX_UNIT_PRICE && label.value < MAX_UNIT_PRICE);
+  });
+  const kept = [
+    ...labelFirst,
+    ...numberFirst.filter((n) => !labelFirst.some((label) => overlaps(n, label))),
+  ];
+  return kept.find((p) => p.value < MAX_UNIT_PRICE) ?? kept[0];
+}
+
 function volumeIn(line: string): FoundVolume | undefined {
-  const after = PRICE_PER_UNIT.test(line) ? null : VOLUME_AFTER.exec(line);
-  const before = VOLUME_BEFORE.exec(line);
-  const [raw, unit] = after
-    ? [after[2], after[1]]
-    : before && /[.,]/.test(before[1])
-      ? [before[1], before[2]]
-      : [];
+  const price = priceIn(line);
+  const quantity = price ? `${line.slice(0, price.start)} ${line.slice(price.end)}` : line;
+  const after = VOLUME_AFTER.exec(quantity);
+  const before = VOLUME_BEFORE.exec(quantity);
+  const beforeUsable = before && /[.,]/.test(before[1]) ? before : null;
+  const sameUnitWord =
+    !!beforeUsable &&
+    !!after &&
+    beforeUsable.index + beforeUsable[0].length - beforeUsable[2].length === after.index;
+  const [raw, unit] =
+    beforeUsable && (!after || sameUnitWord)
+      ? [beforeUsable[1], beforeUsable[2]]
+      : after
+        ? [after[2], after[1]]
+        : [];
   const volume = raw === undefined ? undefined : toNumber(raw);
   return volume && unit ? { volume, unit: unitOf(unit) } : undefined;
 }
@@ -143,10 +186,8 @@ function findVolume(all: string[]): FoundVolume | undefined {
 
 function findPricePerUnit(all: string[]): number | undefined {
   for (const line of all) {
-    const m = PRICE_PER_UNIT.exec(line);
-    if (!m) continue;
-    const value = toNumber(m[4] ?? m[5]);
-    if (value && value > 0) return value;
+    const price = priceIn(line);
+    if (price) return price.value;
   }
   return undefined;
 }
