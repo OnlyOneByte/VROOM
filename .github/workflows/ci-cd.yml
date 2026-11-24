@@ -62,8 +62,48 @@ jobs:
       - name: Build application
         run: bun run build
 
-  frontend-test:
-    name: Frontend Tests
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.diff.outputs.frontend }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Does the change touch anything outside backend/?
+        # A backend-only change cannot change what the E2E suite tests: it mocks every /api/v1
+        # call. The unit tests always run, since several of them read backend/src to keep the two
+        # sides in step. Anything else, and any event without a known base, runs E2E too.
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          QUEUE_BASE: ${{ github.event.merge_group.base_sha }}
+        run: |
+          case "$EVENT" in
+            pull_request) base=HEAD^1 ;;
+            merge_group) base="$QUEUE_BASE" ;;
+            push) base="$PUSH_BEFORE" ;;
+            *) base= ;;
+          esac
+          if [ -z "$base" ] || [ "$base" = 0000000000000000000000000000000000000000 ]; then
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git cat-file -e "$base^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$base"
+          files=$(git diff --name-only "$base" HEAD)
+          echo "$files"
+          if [ -n "$files" ] && ! echo "$files" | grep -qv '^backend/'; then
+            echo "frontend=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  frontend-checks:
+    name: Frontend checks
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -80,6 +120,8 @@ jobs:
           # latest 22.x, which silently satisfied the lockfile's `^22.22.2` floor while a
           # developer on an older 22.x could not install at all.
           node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         # Must be `npm ci`, never `npm install`: re-resolving the lockfile changes which
@@ -108,8 +150,8 @@ jobs:
       - name: Run linting
         run: npm run lint
 
-      - name: Run tests
-        run: npm run test:coverage && npm run test:tz
+      - name: Run the time-zone tests
+        run: npm run test:tz
 
       - name: Build application
         run: npm run build
@@ -117,21 +159,23 @@ jobs:
       - name: Check per-route bundle budgets
         run: npm run bundle-budget
 
-      - name: Install Playwright browsers
-        # Chromium only. The suite declares five projects (two of them mobile viewports) and
-        # runs at `workers: 1` under CI, so the full matrix costs roughly 5x; chromium catches
-        # the regressions these specs are about — the a11y ratchet, the offline outbox drain,
-        # delete-confirms-before-DELETE, server-side search — at a fifth of the runtime. The
-        # engine-specific and mobile-viewport projects stay a local/pre-release concern.
-        run: npx playwright install --with-deps chromium
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
 
-      - name: Run E2E tests
-        # Sequential, after the build, NOT in parallel with type-check or vitest: those run
-        # `svelte-kit sync`, which rewrites .svelte-kit/generated/ and makes the dev server
-        # force-reload every open page, aborting in-flight navigations (see
-        # playwright.config.ts). The dev target needs no backend and no database — every
-        # /api/v1 call is mocked in-browser.
-        run: npm run test:e2e:chromium
+      - name: Install Playwright browsers
+        # Chromium only; see the E2E job. A cache hit still needs the system libraries.
+        env:
+          CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
+        run: |
+          if [ "$CACHE_HIT" = true ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
 
       - name: Run preview-only E2E tests (service worker, manifest, offline reload)
         env:
@@ -139,14 +183,190 @@ jobs:
         run: npx playwright test --project=chromium --grep "PWA surface|Opening the app offline"
 
       - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-preview
+          path: frontend/playwright-report/
+          retention-days: 7
+
+  frontend-unit:
+    name: Frontend unit tests (${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare SvelteKit
+        run: npm run sync
+
+      - name: Run this shard with coverage
+        # A shard covers a third of the code, so the thresholds are checked once, on the merged
+        # coverage, in Frontend coverage.
+        run: >-
+          npx vitest run --shard=${{ matrix.shard }}/3 --reporter=blob --coverage
+          --coverage.reporter=text-summary
+          --coverage.thresholds.lines=0 --coverage.thresholds.statements=0
+          --coverage.thresholds.functions=0 --coverage.thresholds.branches=0
+
+      - name: Upload the shard's report
+        uses: actions/upload-artifact@v7
+        with:
+          name: vitest-blob-${{ matrix.shard }}
+          path: frontend/.vitest/blob/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  frontend-coverage:
+    name: Frontend coverage
+    needs: frontend-unit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download the shard reports
+        uses: actions/download-artifact@v7
+        with:
+          pattern: vitest-blob-*
+          path: frontend/.vitest/blob
+          merge-multiple: true
+
+      - name: Merge the shards and check the coverage thresholds
+        run: npx vitest --merge-reports=.vitest/blob --coverage
+
+  frontend-e2e:
+    name: Frontend E2E (${{ matrix.shard }}/3)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare SvelteKit
+        run: npm run sync
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install Playwright browsers
+        # Chromium only. The suite declares five projects (two of them mobile viewports) and
+        # runs at `workers: 1` under CI, so the full matrix costs roughly 5x; chromium catches
+        # the regressions these specs are about — the a11y ratchet, the offline outbox drain,
+        # delete-confirms-before-DELETE, server-side search — at a fifth of the runtime. The
+        # engine-specific and mobile-viewport projects stay a local/pre-release concern. A cache
+        # hit still needs the system libraries.
+        env:
+          CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
+        run: |
+          if [ "$CACHE_HIT" = true ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      - name: Run E2E tests
+        # The dev target needs no backend and no database — every /api/v1 call is mocked
+        # in-browser. Each shard runs a third of the chromium tests.
+        run: npm run test:e2e:chromium -- --shard=${{ matrix.shard }}/3
+
+      - name: Upload Playwright report
         # The axe scans attach their full violation JSON to the report; without this the
         # report dies with the runner and a red a11y gate says only "expected [] to equal".
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: frontend/playwright-report/
           retention-days: 7
+
+  frontend-test:
+    # The required check. It passes when every frontend job passed, with E2E allowed to be
+    # skipped on a backend-only change; anything else fails it.
+    name: Frontend Tests
+    needs: [changes, frontend-checks, frontend-unit, frontend-coverage, frontend-e2e]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the frontend jobs
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          FRONTEND: ${{ needs.changes.outputs.frontend }}
+          E2E: ${{ needs.frontend-e2e.result }}
+          RESULTS: >-
+            ${{ needs.frontend-checks.result }} ${{ needs.frontend-unit.result }}
+            ${{ needs.frontend-coverage.result }}
+        run: |
+          for result in $CHANGES $RESULTS; do
+            if [ "$result" != success ]; then
+              echo "Detect changes: $CHANGES. Checks, unit tests, coverage: $RESULTS."
+              exit 1
+            fi
+          done
+          if [ "$E2E" = success ]; then
+            echo "Every frontend job passed."
+          elif [ "$E2E" = skipped ] && [ "$FRONTEND" = false ]; then
+            echo "Backend-only change: E2E was skipped; every other frontend job passed."
+          else
+            echo "Frontend E2E: $E2E"
+            exit 1
+          fi
 
   web-vitals:
     name: Web Vitals
