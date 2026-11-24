@@ -13,6 +13,7 @@ import { decrypt, encrypt, secretContextOf } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { consumePending, getPendingEmail } from '../../utils/pending-credentials';
 import { commonSchemas, zValidator } from '../../utils/validation';
+import { AUTH_PROVIDERS } from '../auth/providers/registry';
 import { IMPORT_PROVIDERS } from '../expenses/import-mapping-presets';
 import { photoRefRepository } from '../photos/photo-ref-repository';
 import { preferencesRepository } from '../settings/repository';
@@ -172,6 +173,7 @@ routes.get('/catalog', (c) =>
       ...storageCatalog(),
       ...toCatalogEntries(LLM_PROVIDERS),
       ...toCatalogEntries(VISION_PROVIDERS),
+      ...toCatalogEntries(AUTH_PROVIDERS),
       ...toCatalogEntries(IMPORT_PROVIDERS),
     ],
   })

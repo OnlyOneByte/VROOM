@@ -10,7 +10,6 @@
 	import { authApi } from '#lib/services/auth-api.ts';
 	import { getApiBaseUrl } from '#lib/services/api-client.ts';
 	import type { LinkedAuthProvider } from '#lib/types/index.ts';
-	import type { Component } from 'svelte';
 	import {
 		CircleUser,
 		Link2,
@@ -28,8 +27,7 @@
 		LoaderCircle,
 		Unlink,
 		CircleAlert,
-		CircleCheck,
-		LogIn
+		CircleCheck
 	} from '@lucide/svelte';
 	import {
 		Card,
@@ -48,13 +46,7 @@
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import ComingSoonCard from '#lib/components/common/coming-soon-card.svelte';
-	import GoogleLogo from '#lib/components/icons/GoogleLogo.svelte';
-	import GitHubLogo from '#lib/components/icons/GitHubLogo.svelte';
-
-	const iconMap: Record<string, Component<{ class?: string }>> = {
-		google: GoogleLogo,
-		github: GitHubLogo
-	};
+	import { authProviderHasLogo, authProviderIcon } from '#lib/constants/auth-providers.ts';
 
 	const linkErrorMessages: Record<string, string> = {
 		account_conflict: 'This account is already linked to a different user.',
@@ -353,15 +345,15 @@
 				{:else}
 					<div class="space-y-3">
 						{#each accounts as account (account.id)}
-							{@const IconComponent = iconMap[account.providerType]}
+							{@const IconComponent = authProviderIcon(account.providerType)}
 							<div class="flex items-center justify-between">
 								<div class="flex items-center gap-3">
 									<div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-										{#if IconComponent}
-											<IconComponent class="h-5 w-5" />
-										{:else}
-											<LogIn class="h-5 w-5 text-muted-foreground" />
-										{/if}
+										<IconComponent
+											class="h-5 w-5 {authProviderHasLogo(account.providerType)
+												? ''
+												: 'text-muted-foreground'}"
+										/>
 									</div>
 									<div>
 										<p class="text-sm font-medium">{account.displayName}</p>
@@ -390,7 +382,7 @@
 							<div class="space-y-2">
 								<p class="text-sm text-muted-foreground">Link another account</p>
 								{#each unlinkableProviders as provider (provider.id)}
-									{@const ProviderIcon = iconMap[provider.id]}
+									{@const ProviderIcon = authProviderIcon(provider.id)}
 									<Button
 										variant="outline"
 										size="sm"
@@ -402,11 +394,7 @@
 											<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 											Linking...
 										{:else}
-											{#if ProviderIcon}
-												<ProviderIcon class="mr-2 h-4 w-4" />
-											{:else}
-												<LogIn class="mr-2 h-4 w-4" />
-											{/if}
+											<ProviderIcon class="mr-2 h-4 w-4" />
 											Link {provider.displayName}
 										{/if}
 									</Button>
