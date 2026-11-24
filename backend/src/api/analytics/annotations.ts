@@ -1,5 +1,6 @@
 import { type SQL, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
+import { rawAll } from '../../db/dialect';
 import type { UnitPreferences } from '../../types';
 import { convertDistance } from '../../utils/unit-conversions';
 
@@ -42,18 +43,21 @@ export function serviceAnnotations(
   scope: Scope
 ): { services: ServiceAnnotation[]; truncated: boolean } {
   if (scope.vehicleIds.length === 0) return { services: [], truncated: false };
-  const rows = db.all<{
+  const rows = rawAll<{
     date: number;
     vehicle_id: string;
     description: string | null;
     amount: number;
-  }>(sql`
+  }>(
+    db,
+    sql`
     SELECT e.date, e.vehicle_id, e.description, e.expense_amount AS amount FROM expenses e
     WHERE e.user_id = ${scope.userId} AND e.category = 'maintenance'
       AND e.vehicle_id IN (${inList(scope.vehicleIds)})
       AND e.date >= ${scope.start} AND e.date < ${scope.end}
     ORDER BY e.date DESC, e.id DESC LIMIT ${MAX_SERVICES + 1}
-  `);
+  `
+  );
   const truncated = rows.length > MAX_SERVICES;
   const services = rows
     .slice(0, MAX_SERVICES)
@@ -77,11 +81,14 @@ export function tripLane(
 ): TripLane {
   const lane: TripLane = { count: buckets.map(() => 0), distance: buckets.map(() => 0) };
   if (scope.vehicleIds.length === 0 || buckets.length === 0) return lane;
-  const rows = db.all<{ date: number; vehicle_id: string; distance: number }>(sql`
+  const rows = rawAll<{ date: number; vehicle_id: string; distance: number }>(
+    db,
+    sql`
     SELECT t.trip_date AS date, t.vehicle_id, t.end_odometer - t.start_odometer AS distance FROM trips t
     WHERE t.user_id = ${scope.userId} AND t.vehicle_id IN (${inList(scope.vehicleIds)})
       AND t.trip_date >= ${scope.start} AND t.trip_date < ${scope.end}
-  `);
+  `
+  );
   for (const row of rows) {
     const i = buckets.findIndex((b) => row.date >= b.start && row.date < b.end);
     if (i < 0) continue;

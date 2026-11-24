@@ -127,4 +127,31 @@ describe('OdometerRepository.getCurrentOdometer', () => {
     expect(await repo.getCurrentOdometer('v-other-tenant', USER_ID)).toBeNull();
     expect(await repo.getCurrentOdometer('v-other-tenant', OTHER_USER)).toBe(77000);
   });
+
+  test("history and current reading never include another user's rows on the same vehicle", async () => {
+    const OTHER_USER = 'u-same-car';
+    sqliteDb.run(
+      `INSERT INTO users (id, email, display_name) VALUES ('${OTHER_USER}', 'same@test.com', 'Same')`
+    );
+    insertExpenseWithMileage(10000);
+    insertOdometerEntry(11000);
+    sqliteDb.run(
+      `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, mileage)
+       VALUES ('exp-same-car', '${VEHICLE_ID}', '${OTHER_USER}', 'fuel', 1700000100, 20.0, 99000)`
+    );
+    sqliteDb.run(
+      `INSERT INTO odometer_entries (id, vehicle_id, user_id, odometer, recorded_at)
+       VALUES ('odo-same-car', '${VEHICLE_ID}', '${OTHER_USER}', 98000, 1700000100)`
+    );
+
+    const mine = await repo.getHistory(VEHICLE_ID, USER_ID);
+    expect(mine.data.map((e) => e.odometer).sort()).toEqual([10000, 11000]);
+    expect(mine.totalCount).toBe(2);
+    expect(await repo.getCurrentOdometer(VEHICLE_ID, USER_ID)).toBe(11000);
+
+    const theirs = await repo.getHistory(VEHICLE_ID, OTHER_USER);
+    expect(theirs.data.map((e) => e.sourceId).sort()).toEqual(['exp-same-car', 'odo-same-car']);
+    expect(theirs.totalCount).toBe(2);
+    expect(await repo.getCurrentOdometer(VEHICLE_ID, OTHER_USER)).toBe(99000);
+  });
 });

@@ -1,6 +1,7 @@
 import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
+import { rawAll, rawJsonValue } from '../../db/dialect';
 import { userPreferences, vehicles } from '../../db/schema';
 import { ELECTRIC_FUEL_TYPES } from '../../db/types';
 import { DatabaseError } from '../../errors';
@@ -303,12 +304,14 @@ export class AnalyticsInsightsRepository {
       (b) => b.key === key
     );
     if (!bucket) return null;
-    const [largest] = this.db.all<{
+    const [largest] = rawAll<{
       description: string | null;
       category: string;
       vehicle_id: string;
       amount: number;
-    }>(sql`
+    }>(
+      this.db,
+      sql`
       SELECT e.description, e.category, e.vehicle_id, e.expense_amount AS amount FROM expenses e
       WHERE e.user_id = ${ctx.userId} AND e.vehicle_id IN (${sql.join(
         ctx.cars.map((c) => sql`${c.id}`),
@@ -318,7 +321,8 @@ export class AnalyticsInsightsRepository {
         sql`, `
       )}) AND e.date >= ${bucket.start} AND e.date < ${bucket.end}
       ORDER BY e.expense_amount DESC LIMIT 1
-    `);
+    `
+    );
     const car = ctx.cars.find((c) => c.id === largest?.vehicle_id);
     const what = largest
       ? ` The largest expense was ${largest.description || largest.category}${car && ctx.cars.length > 1 ? ` on the ${car.name}` : ''} (${ctx.money(largest.amount)}).`
@@ -334,12 +338,14 @@ export class AnalyticsInsightsRepository {
   }
 
   private async repairFree(ctx: Context): Promise<Insight | null> {
-    const rows = this.db.all<{
+    const rows = rawAll<{
       vehicle_id: string;
       date: number;
       tags: string | null;
       description: string | null;
-    }>(sql`
+    }>(
+      this.db,
+      sql`
       SELECT e.vehicle_id, e.date, e.tags, e.description FROM expenses e
       WHERE e.user_id = ${ctx.userId} AND e.category = 'maintenance' AND e.date < ${ctx.query.end}
         AND e.vehicle_id IN (${sql.join(
@@ -347,10 +353,11 @@ export class AnalyticsInsightsRepository {
           sql`, `
         )})
       ORDER BY e.date
-    `);
+    `
+    );
     const repairs = new Map<string, number[]>();
     for (const row of rows) {
-      const tags = row.tags ? (JSON.parse(row.tags) as string[]) : null;
+      const tags = rawJsonValue<string[]>(row.tags);
       if (isRoutineMaintenance(tags, row.description)) continue;
       repairs.set(row.vehicle_id, [...(repairs.get(row.vehicle_id) ?? []), row.date]);
     }
@@ -441,14 +448,17 @@ export class AnalyticsInsightsRepository {
   }
 
   private async costPerTrip(ctx: Context): Promise<Insight | null> {
-    const trips = this.db.all<{ vehicle_id: string; distance: number; purpose: string }>(sql`
+    const trips = rawAll<{ vehicle_id: string; distance: number; purpose: string }>(
+      this.db,
+      sql`
       SELECT t.vehicle_id, t.end_odometer - t.start_odometer AS distance, t.purpose FROM trips t
       WHERE t.user_id = ${ctx.userId} AND t.trip_date >= ${ctx.query.start} AND t.trip_date < ${ctx.query.end}
         AND t.end_odometer > t.start_odometer AND t.vehicle_id IN (${sql.join(
           ctx.cars.map((c) => sql`${c.id}`),
           sql`, `
         )})
-    `);
+    `
+    );
     if (trips.length < MIN_TRIPS) return null;
     const result = await this.queries.query(
       ctx.userId,
@@ -478,7 +488,9 @@ export class AnalyticsInsightsRepository {
   }
 
   private async cheapestStation(ctx: Context): Promise<Insight | null> {
-    const rows = this.db.all<StationRow>(sql`
+    const rows = rawAll<StationRow>(
+      this.db,
+      sql`
       SELECT e.vehicle_id, TRIM(e.location) AS location, COALESCE(e.fuel_type, '') AS grade, e.volume,
         e.expense_amount AS amount FROM expenses e
       WHERE e.user_id = ${ctx.userId} AND e.category = 'fuel' AND e.volume > 0 AND e.expense_amount > 0
@@ -493,7 +505,8 @@ export class AnalyticsInsightsRepository {
           sql`, `
         )})
       ORDER BY e.date DESC
-    `);
+    `
+    );
     const user = ctx.userUnits.volumeUnit;
     const fills = rows.map((row) => {
       const from = ctx.cars.find((c) => c.id === row.vehicle_id)?.units.volumeUnit ?? user;
