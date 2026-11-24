@@ -225,6 +225,19 @@ describe('GET /api/v1/community/compare', () => {
     expect(metric((await compare(vehicleId)).body, 'efficiency')?.status).toBe('ok');
   });
 
+  test("a rated model's narrower band shows its average from 10 owners", async () => {
+    const vehicleId = await seedCivic();
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 10, 12);
+    ctx.sqlite.run(
+      "UPDATE community_stats SET catalog_model_id = 'honda-civic', model_year = 2019, vehicle_type = 'gas' WHERE bucket_key = ?",
+      [CIVIC_KEY]
+    );
+    await optIn();
+    const shown = metric((await compare(vehicleId)).body, 'efficiency');
+    expect(shown?.status).toBe('ok');
+    expect(shown?.bucket?.n).toBe(10);
+  });
+
   test('a row below K in the table is never returned', async () => {
     const vehicleId = await seedCivic();
     insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 5, 12);
