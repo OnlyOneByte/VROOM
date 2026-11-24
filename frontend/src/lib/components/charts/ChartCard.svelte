@@ -27,6 +27,7 @@
 		legend?: Snippet;
 		summary?: Snippet | undefined;
 		footer?: Snippet | undefined;
+		insight?: string | undefined;
 		animationClass?: 'chart-line-animated' | 'chart-bar-animated';
 		table?: ChartA11y | undefined;
 		textAlternative?: string | undefined;
@@ -50,6 +51,7 @@
 		legend,
 		summary,
 		footer,
+		insight,
 		animationClass,
 		table,
 		textAlternative,
@@ -233,6 +235,9 @@
 			{#if legend}
 				{@render legend()}
 			{/if}
+		{/if}
+		{#if insight && !isLoading && !error && !isEmpty}
+			<p class="mt-4 text-[15px] leading-snug" data-chart-insight>{insight}</p>
 		{/if}
 		{#if footer}
 			<div class="mt-4">{@render footer()}</div>

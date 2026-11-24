@@ -1,6 +1,6 @@
 <script lang="ts">
 	import './bar-chart-animations.css';
-	import { BarChart } from 'layerchart';
+	import { Bar, BarChart, Labels, Rule, Text } from 'layerchart';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import ChartCard from './ChartCard.svelte';
 	import ChartPlot from './ChartPlot.svelte';
@@ -54,7 +54,16 @@
 		categoryLabel?: string;
 		onSelect?: ChartSelectHandler;
 		annotations?: ChartAnnotations;
+		current?: unknown;
+		referenceLines?: ReferenceLine[];
+		valueLabels?: boolean;
+		insight?: string;
 		class?: string;
+	}
+
+	interface ReferenceLine {
+		value: number;
+		label: string;
 	}
 
 	let {
@@ -86,11 +95,36 @@
 		categoryLabel,
 		onSelect,
 		annotations,
+		current,
+		referenceLines = [],
+		valueLabels = true,
+		insight,
 		class: className
 	}: Props = $props();
 
+	const COLUMN_WIDTH = 12;
+	const COLUMN_RADIUS = 6;
+	const MIN_BAND_FOR_COLUMN = 16;
+
 	let series = $derived(
 		hiddenKeys?.length ? legendItems.filter(s => !hiddenKeys.includes(s.key)) : legendItems
+	);
+
+	let stacked = $derived(seriesLayout === 'stack' && series.length > 1);
+
+	function isStackTop(row: Record<string, unknown>, index: number): boolean {
+		return series.slice(index + 1).every(s => !(Number(row[s.key]) > 0));
+	}
+
+	let plottedSeries = $derived(
+		stacked
+			? series.map((s, i) => ({
+					...s,
+					props: {
+						rounded: (row: Record<string, unknown>) => (isStackTop(row, i) ? 'top' : 'none')
+					}
+				}))
+			: series
 	);
 
 	let isEmpty = $derived(data.length === 0);
@@ -104,8 +138,47 @@
 			categoryLabel,
 			series,
 			labelFormat: tooltipLabelFormat,
-			valueFormat: tooltipFormat
+			valueFormat: tooltipFormat,
+			notes: referenceLines.map(
+				line => `${line.label}: ${tooltipFormat(line.value, series[0]?.key ?? '')}.`
+			)
 		})
+	);
+
+	let vertical = $derived(orientation === 'vertical');
+	let valueKey = $derived(
+		typeof y === 'string' ? y : series.length === 1 ? series[0]?.key : undefined
+	);
+	let singleSeries = $derived(series.length === 1 && valueKey !== undefined);
+	let narrowColumns = $derived(
+		vertical && plotWidth > 0 && plotWidth / Math.max(data.length, 1) >= MIN_BAND_FOR_COLUMN
+	);
+
+	function sameBucket(a: unknown, b: unknown): boolean {
+		if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+		return a === b;
+	}
+
+	let currentRow = $derived(
+		current === undefined ? undefined : data.find(row => sameBucket(row[x], current))
+	);
+
+	let peakRow = $derived.by(() => {
+		if (!singleSeries || !valueKey) return undefined;
+		let peak: Record<string, unknown> | undefined;
+		for (const row of data) {
+			const value = Number(row[valueKey]);
+			if (Number.isFinite(value) && value > 0 && (!peak || value > Number(peak[valueKey]))) {
+				peak = row;
+			}
+		}
+		return peak;
+	});
+
+	let labelRows = $derived(
+		valueLabels && vertical && singleSeries
+			? [...new Set([peakRow, currentRow].filter(row => row !== undefined))]
+			: []
 	);
 
 	function showRow(index: number | null) {
@@ -134,6 +207,7 @@
 	animationClass="chart-bar-animated"
 	table={a11y}
 	events={annotations}
+	{insight}
 	class={className}
 >
 	{#if annotations}{#await import('./AnnotationLane.svelte')}<div
@@ -154,13 +228,19 @@
 					{data}
 					{x}
 					{y}
-					{series}
+					series={plottedSeries}
 					{orientation}
 					{seriesLayout}
 					{yDomain}
 					padding={resolvedPadding}
 					props={{
-						bars: { stroke: 'none' },
+						bars: {
+							stroke: 'none',
+							rounded: stacked ? 'none' : 'edge',
+							radius: vertical ? COLUMN_RADIUS : 5,
+							...(narrowColumns && { width: COLUMN_WIDTH }),
+							...(!vertical && { height: 10 })
+						},
 						...barProps,
 						xAxis: resolvedXAxisProps,
 						yAxis: {
@@ -170,6 +250,50 @@
 						...(orientation === 'vertical' && { grid: { yTicks } })
 					}}
 				>
+					{#snippet aboveMarks({ context: chart })}
+						{#if currentRow && singleSeries && valueKey}
+							<Bar
+								data={currentRow}
+								y={valueKey}
+								fill="var(--foreground)"
+								stroke="none"
+								rounded="edge"
+								radius={vertical ? COLUMN_RADIUS : 5}
+								{...narrowColumns ? { width: COLUMN_WIDTH } : {}}
+								{...vertical ? {} : { height: 10 }}
+								data-current-period
+							/>
+						{/if}
+						{#each referenceLines as line, i (`${i}-${line.label}`)}
+							<Rule
+								{...vertical ? { y: line.value } : { x: line.value }}
+								dashArray="4 4"
+								style="stroke: var(--muted-foreground); stroke-width: 1.5px"
+								data-reference-line
+							/>
+							{#if vertical}
+								<Text
+									x={chart.width}
+									y={chart.yScale(line.value) - 6}
+									value="{line.label} {yAxisFormat(line.value)}"
+									textAnchor="end"
+									class="fill-muted-foreground text-xs"
+									data-reference-label
+								/>
+							{/if}
+						{/each}
+						{#if labelRows.length > 0 && valueKey}
+							<Labels
+								data={labelRows}
+								y={valueKey}
+								placement="outside"
+								offset={6}
+								format={(value: number) => yAxisFormat(value)}
+								class="fill-foreground text-xs font-semibold"
+								data-value-label
+							/>
+						{/if}
+					{/snippet}
 					{#snippet tooltip()}
 						<Chart.Tooltip
 							labelAxis={orientation === 'horizontal' ? 'y' : 'x'}
