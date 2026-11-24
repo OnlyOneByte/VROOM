@@ -158,7 +158,6 @@
   "backend/src/api/sync/restore.ts: Read before the wipe: deleteUserData cascades vehicle_shares.",
   "backend/src/api/sync/restore.ts: SQLite checks foreign keys on insert, so parents must be inserted before children.",
   "backend/src/api/sync/restore.ts: Scoped to the importer: an unscoped probe on an id collision would leak another user's row.",
-  "backend/src/api/sync/restore.ts: Users are not backed up, so an absent author would fail the createdBy foreign key.",
   "backend/src/api/sync/restore.ts: bun:sqlite transactions must be synchronous: an async callback autocommits each statement.",
   "backend/src/api/sync/routes.ts: Full backup ZIPs exceed the app-wide body cap, which app.ts must relax for this path.",
   "backend/src/api/sync/routes.ts: null parses as valid JSON, so the parsed body can be null and must be optional-chained.",

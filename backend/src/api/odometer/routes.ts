@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { getDb } from '../../db/connection';
 import type { DrizzleTransaction } from '../../db/types';
 import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
@@ -9,6 +10,7 @@ import {
   vehicleEntry,
   vehicleParam,
 } from '../../permissions/authorize';
+import { requestResolver } from '../../permissions/grants';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import { isValidTimeZone, zonedDayWindow } from '../../utils/time-zone';
 import {
@@ -107,6 +109,10 @@ routes.get(
       limit,
       offset,
       hideFinancials: !seesFinancials(access),
+      includeExpenses: requestResolver(c, getDb()).can('vehicle.expense.read', {
+        kind: 'vehicle',
+        vehicleId,
+      }).allow,
     });
 
     return c.json(buildPaginatedResponse(data, totalCount, limit, offset));

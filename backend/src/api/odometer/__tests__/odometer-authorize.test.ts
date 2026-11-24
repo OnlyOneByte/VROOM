@@ -68,6 +68,30 @@ describe('odometer resolves through can() for every role', () => {
     expect(await add(m.editor.request)).toBe(403);
   });
 
+  test('the history leaves out fill-ups for a member denied expense reads', async () => {
+    ctx.sqlite.run(
+      "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, mileage) VALUES ('fill-up', ?, ?, 'fuel', 1717300000, 4000, 1500)",
+      [CAR, ctx.user.id]
+    );
+    const history = async (request: RequestFn) => {
+      const res = await request('GET', `/api/v1/odometer/${CAR}/history`);
+      const body = (await res.json()) as {
+        data: { source: string }[];
+        pagination: { totalCount: number };
+      };
+      return {
+        sources: body.data.map((row) => row.source).sort(),
+        total: body.pagination.totalCount,
+      };
+    };
+    expect(await history(m.editor.request)).toEqual({
+      sources: ['expense', 'manual', 'manual'],
+      total: 3,
+    });
+    overrideOn(ctx, CAR, m.editor, 'vehicle.expense.read', 'deny');
+    expect(await history(m.editor.request)).toEqual({ sources: ['manual', 'manual'], total: 2 });
+  });
+
   test("another person's car stays out of reach", async () => {
     seedCar(ctx, 'their-car', m.stranger.id);
     reading('their-reading', 9000, null, 'their-car');
