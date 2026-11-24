@@ -18,7 +18,16 @@ export default defineConfig({
 			{
 				preprocess: vitePreprocess(),
 				adapter: adapter(),
-				serviceWorker: { register: false }
+				serviceWorker: { register: false },
+				csp: {
+					mode: 'auto',
+					directives: {
+						'script-src': ['self'],
+						'object-src': ['none'],
+						'base-uri': ['self'],
+						'frame-ancestors': ['none']
+					}
+				}
 			},
 			{
 				strategies: 'buildSW',
