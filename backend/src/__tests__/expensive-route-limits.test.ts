@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { Worker } from 'tesseract.js';
-import { setLocalOcrForTest, stopLocalOcr } from '../api/providers/domains/vlm/local-ocr';
+import {
+  LOCAL_OCR_MAX_WAITING,
+  localOcrWaiting,
+  setLocalOcrForTest,
+  stopLocalOcr,
+} from '../api/providers/domains/vlm/local-ocr';
 import { CONFIG } from '../config';
 import { createTestApp, requestAs, type TestApp } from '../test-helpers/http-client';
 
@@ -30,9 +35,9 @@ async function anotherUser(): Promise<ReturnType<typeof requestAs>> {
   return requestAs(ctx, id);
 }
 
-function receiptForm(): FormData {
+function receiptForm(type = 'image/gif'): FormData {
   const form = new FormData();
-  form.append('image', new File([new Uint8Array([1, 2, 3])], 'r.gif', { type: 'image/gif' }));
+  form.append('image', new File([new Uint8Array([1, 2, 3])], `r.${type.split('/')[1]}`, { type }));
   return form;
 }
 
@@ -164,13 +169,9 @@ describe('restores and imports in flight', () => {
 });
 
 describe('the built-in text reader is shared fairly', () => {
-  afterEach(async () => {
-    await stopLocalOcr().catch(() => undefined);
-    setLocalOcrForTest();
-  });
+  let release = () => {};
 
-  test("one user filling their scans at once doesn't make another user's scan fail", async () => {
-    let release = () => {};
+  beforeEach(() => {
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
@@ -184,31 +185,62 @@ describe('the built-in text reader is shared fairly', () => {
           terminate: async () => undefined,
         }) as unknown as Worker,
     });
-    const scan = (cookie: string) =>
-      ctx.app.request('/api/v1/receipts/parse', {
-        method: 'POST',
-        headers: { Cookie: cookie, Origin: 'http://localhost:3000' },
-        body: (() => {
-          const form = new FormData();
-          form.append(
-            'image',
-            new File([new Uint8Array([1, 2, 3])], 'r.png', { type: 'image/png' })
-          );
-          return form;
-        })(),
-      });
-
-    const mine = Array.from({ length: CONFIG.rateLimit.receiptScansAtOnce }, () =>
-      scan(ctx.cookie)
-    );
-    await Bun.sleep(20);
-    expect((await scan(ctx.cookie)).status).toBe(429);
-
-    const other = await anotherUser();
-    const theirs = scan(other.cookie);
-    await Bun.sleep(20);
+  });
+  afterEach(async () => {
     release();
-    expect((await theirs).status).toBe(200);
-    for (const response of await Promise.all(mine)) expect(response.status).toBe(200);
+    await stopLocalOcr().catch(() => undefined);
+    setLocalOcrForTest();
+  });
+
+  const scan = (cookie: string) =>
+    ctx.app.request('/api/v1/receipts/parse', {
+      method: 'POST',
+      headers: { Cookie: cookie, Origin: 'http://localhost:3000' },
+      body: receiptForm('image/png'),
+    });
+
+  async function untilWaiting(count: number): Promise<void> {
+    for (let i = 0; i < 200 && localOcrWaiting() < count; i++) await Bun.sleep(5);
+    expect(localOcrWaiting()).toBe(count);
+  }
+
+  test("one user filling their scans at once doesn't make another user's scan fail", async () => {
+    const atOnce = CONFIG.rateLimit.receiptScansAtOnce;
+    try {
+      const mine = Array.from({ length: atOnce }, () => scan(ctx.cookie));
+      await untilWaiting(atOnce);
+      expect((await scan(ctx.cookie)).status).toBe(429);
+
+      const other = await anotherUser();
+      const theirs = scan(other.cookie);
+      await untilWaiting(atOnce + 1);
+      release();
+      expect((await theirs).status).toBe(200);
+      for (const response of await Promise.all(mine)) expect(response.status).toBe(200);
+    } finally {
+      release();
+    }
+  });
+
+  test('when the shared queue is full, the next user is told the reader is busy, not refused for good', async () => {
+    const atOnce = CONFIG.rateLimit.receiptScansAtOnce;
+    const users = Math.ceil(LOCAL_OCR_MAX_WAITING / atOnce);
+    try {
+      const held: (Response | Promise<Response>)[] = [];
+      for (let u = 0; u < users; u++) {
+        const user = u === 0 ? ctx : await anotherUser();
+        for (let i = 0; i < atOnce; i++) held.push(scan(user.cookie));
+      }
+      await untilWaiting(LOCAL_OCR_MAX_WAITING);
+
+      const late = await anotherUser();
+      expect((await scan(late.cookie)).status).toBe(503);
+
+      release();
+      for (const response of await Promise.all(held)) expect(response.status).toBe(200);
+      expect((await scan(late.cookie)).status).toBe(200);
+    } finally {
+      release();
+    }
   });
 });

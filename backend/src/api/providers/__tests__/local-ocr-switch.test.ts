@@ -5,13 +5,14 @@ import { LOCAL_OCR_PROVIDER_ID } from '../domains/vlm/registry';
 
 let ctx: TestApp;
 const localOcr = CONFIG.localOcr as { enabled: boolean };
+const enabledBefore = localOcr.enabled;
 
 beforeEach(async () => {
   ctx = await createTestApp();
   localOcr.enabled = false;
 });
 afterEach(() => {
-  localOcr.enabled = true;
+  localOcr.enabled = enabledBefore;
   ctx.close();
 });
 

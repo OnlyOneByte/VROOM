@@ -7,7 +7,7 @@ import { parseReceiptText } from './receipt-text';
 import type { RawExtraction, ReceiptImage, VlmProvider } from './vlm-provider';
 
 const IDLE_STOP_MS = 60_000;
-const MAX_WAITING = 8;
+export const LOCAL_OCR_MAX_WAITING = 8;
 
 export const LOCAL_OCR_LANG_PATH = join(
   dirname(createRequire(import.meta.url).resolve('@tesseract.js-data/eng/package.json')),
@@ -52,6 +52,10 @@ export function setLocalOcrForTest(
   workerFactory = options.createWorker ?? startRealWorker;
   timeoutMs = options.timeoutMs ?? 30_000;
   startBroken = false;
+}
+
+export function localOcrWaiting(): number {
+  return waiting;
 }
 
 let worker: Promise<Worker> | null = null;
@@ -148,7 +152,7 @@ async function recognizeOnce(image: Buffer): Promise<string> {
 }
 
 export function recognizeText(image: Buffer): Promise<string> {
-  if (waiting >= MAX_WAITING) {
+  if (waiting >= LOCAL_OCR_MAX_WAITING) {
     return Promise.reject(new OcrUnavailableError('The text reader is busy'));
   }
   waiting++;
