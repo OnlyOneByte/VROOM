@@ -2,6 +2,7 @@ import { untrack } from 'svelte';
 import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 import type { Expense } from '#lib/types/index.ts';
 import {
+	withoutListed,
 	keepLeftRows,
 	pendingExpenseRow,
 	pendingRowState,
@@ -14,6 +15,7 @@ import {
 export function usePendingRows(options: {
 	match: (expense: Expense) => boolean;
 	refresh: () => Promise<unknown>;
+	listedIds?: () => ReadonlySet<string>;
 }) {
 	const live = $derived<PendingItem[]>(
 		offlineExpenseQueue.current
@@ -22,7 +24,13 @@ export function usePendingRows(options: {
 			.map(entry => ({ row: pendingExpenseRow(entry), state: pendingRowState(entry) }))
 			.filter(({ row }) => options.match(row))
 	);
+	const syncedServerIds = $derived(
+		offlineExpenseQueue.current.flatMap(entry =>
+			entry.synced && entry.serverId ? [[entry.id, entry.serverId] as const] : []
+		)
+	);
 	let shown = $state<PendingItem[]>([]);
+	const visible = $derived(options.listedIds ? withoutListed(shown, options.listedIds()) : shown);
 	let previousIds: string[] = [];
 	let refreshing = 0;
 
@@ -35,7 +43,7 @@ export function usePendingRows(options: {
 			return;
 		}
 		untrack(() => {
-			shown = keepLeftRows(shown, current);
+			shown = keepLeftRows(shown, current, syncedServerIds);
 			if (!left) return;
 			refreshing++;
 			void options.refresh().finally(() => {
@@ -47,13 +55,13 @@ export function usePendingRows(options: {
 
 	return {
 		get rows(): Expense[] {
-			return shown.map(({ row }) => row);
+			return visible.map(({ row }) => row);
 		},
 		get states(): ReadonlyMap<string, PendingRowState> {
-			return rowStates(shown);
+			return rowStates(visible);
 		},
 		get saving(): Expense[] {
-			return shown.filter(({ state }) => state.status === 'saving').map(({ row }) => row);
+			return visible.filter(({ state }) => state.status === 'saving').map(({ row }) => row);
 		}
 	};
 }

@@ -268,8 +268,10 @@
 				hasLoadedExpensesTab ? fetchExpensesPage(currentOffset) : undefined,
 				loadSummary(),
 				loadOverviewLists()
-			])
+			]),
+		listedIds: () => listedExpenseIds
 	});
+	let listedExpenseIds = $derived(new Set([...expenses, ...recentList].map(expense => expense.id)));
 	let pendingTabRows = $derived(
 		pending.rows.filter(row =>
 			matchesFilters(row, {

@@ -171,6 +171,31 @@ describe('usePendingRows', () => {
 		stop();
 	});
 
+	test('a kept row hides as soon as the list shows its server copy, before the refresh settles', () => {
+		offlineExpenseQueue.current = [entry('a')];
+		let listed = $state(new Set<string>());
+		let pending!: ReturnType<typeof usePendingRows>;
+		const stop = $effect.root(() => {
+			pending = usePendingRows({
+				match: () => true,
+				refresh: () => new Promise<void>(() => {}),
+				listedIds: () => listed
+			});
+		});
+		flushSync();
+
+		offlineExpenseQueue.current = [entry('a', { synced: true, serverId: 'srv-a' })];
+		flushSync();
+		offlineExpenseQueue.current = [];
+		flushSync();
+		expect(pending.rows.map(row => row.id)).toEqual(['a']);
+
+		listed = new Set(['srv-a']);
+		flushSync();
+		expect(pending.rows).toEqual([]);
+		stop();
+	});
+
 	test('a new row shows at once, with no refresh', () => {
 		let refreshes = 0;
 		offlineExpenseQueue.current = [];

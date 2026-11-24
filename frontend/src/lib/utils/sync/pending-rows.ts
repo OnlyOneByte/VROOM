@@ -115,6 +115,7 @@ export function pendingAmountsByMonth(rows: readonly Expense[]): Map<string, num
 export interface PendingItem {
 	row: Expense;
 	state: PendingRowState;
+	serverId?: string | undefined;
 }
 
 export function rowsLeft(previousIds: readonly string[], current: readonly PendingItem[]): boolean {
@@ -124,14 +125,29 @@ export function rowsLeft(previousIds: readonly string[], current: readonly Pendi
 
 export function keepLeftRows(
 	shown: readonly PendingItem[],
-	current: readonly PendingItem[]
+	current: readonly PendingItem[],
+	syncedServerIds: ReadonlyArray<readonly [string, string]> = []
 ): PendingItem[] {
 	const byId = new Map(current.map(item => [item.row.id, item]));
+	const serverIdOf = new Map(syncedServerIds);
 	const shownIds = new Set(shown.map(({ row }) => row.id));
 	return [
 		...current.filter(({ row }) => !shownIds.has(row.id)),
-		...shown.map(item => byId.get(item.row.id) ?? item)
+		...shown.map(
+			item =>
+				byId.get(item.row.id) ?? {
+					...item,
+					serverId: item.serverId ?? serverIdOf.get(item.row.id)
+				}
+		)
 	];
+}
+
+export function withoutListed(
+	items: readonly PendingItem[],
+	listedIds: ReadonlySet<string>
+): PendingItem[] {
+	return items.filter(item => !item.serverId || !listedIds.has(item.serverId));
 }
 
 export function rowStates(items: readonly PendingItem[]): ReadonlyMap<string, PendingRowState> {

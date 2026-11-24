@@ -122,8 +122,10 @@
 
 	const pending = usePendingRows({
 		match: expense => !selectedVehicleId || expense.vehicleId === selectedVehicleId,
-		refresh: () => fetchPageAndSummary(currentOffset, { keepMonthTotals: true })
+		refresh: () => fetchPageAndSummary(currentOffset, { keepMonthTotals: true }),
+		listedIds: () => listedExpenseIds
 	});
+	let listedExpenseIds = $derived(new Set(expenses.map(expense => expense.id)));
 	let pendingFilters = $derived({
 		vehicleId: selectedVehicleId,
 		categories: expenseCategoryList(categoryFilter),

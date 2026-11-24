@@ -280,7 +280,7 @@ class SyncManager {
 
 			if (syncResult.success) {
 				result.synced++;
-				markExpenseAsSynced(expense.id);
+				markExpenseAsSynced(expense.id, syncResult.serverId);
 				clearSaveFailure(expense.id);
 				this.retryCount.delete(expense.id);
 			} else if (syncResult.conflict) {
@@ -354,7 +354,7 @@ class SyncManager {
 	): Promise<SingleSyncResult> {
 		try {
 			await this.uploadQueuedPhotos(expense, serverId);
-			return { success: true };
+			return { success: true, serverId };
 		} catch (error) {
 			if (classifySyncFailure(error) !== 'terminal') throw error;
 			return {
@@ -413,7 +413,7 @@ class SyncManager {
 		try {
 			const result = await this.syncSingleExpense(expense);
 			if (result.success) {
-				markExpenseAsSynced(expense.id);
+				markExpenseAsSynced(expense.id, result.serverId);
 				clearSaveFailure(expense.id);
 				this.retryCount.delete(expense.id);
 				const currentExpenses = offlineExpenseQueue.current;

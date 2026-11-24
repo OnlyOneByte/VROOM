@@ -459,10 +459,12 @@ export function noteSyncError(id: string, message: string): void {
 	);
 }
 
-export function markExpenseAsSynced(id: string): void {
+export function markExpenseAsSynced(id: string, serverId?: string): void {
 	const currentExpenses = loadOfflineExpenses();
 	const updatedExpenses = currentExpenses.map(expense =>
-		expense.id === id ? { ...expense, synced: true } : expense
+		expense.id === id
+			? { ...expense, synced: true, ...(serverId !== undefined && { serverId }) }
+			: expense
 	);
 
 	saveOfflineExpenses(updatedExpenses);

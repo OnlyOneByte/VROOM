@@ -182,8 +182,10 @@
 					recentExpensesList = response.data;
 				},
 				error => logLoadFailure(error, "Couldn't refresh recent expenses")
-			)
+			),
+		listedIds: () => listedExpenseIds
 	});
+	let listedExpenseIds = $derived(new Set(recentExpensesList.map(expense => expense.id)));
 
 	let recentExpenses = $derived.by(() => {
 		const names = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
