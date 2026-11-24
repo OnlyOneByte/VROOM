@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import type { Worker } from 'tesseract.js';
+import { setLocalOcrForTest, stopLocalOcr } from '../api/providers/domains/vlm/local-ocr';
 import { CONFIG } from '../config';
 import { createTestApp, requestAs, type TestApp } from '../test-helpers/http-client';
 
@@ -84,6 +86,16 @@ describe('per-user limits on expensive routes', () => {
     expect(statuses.at(-1)).toBe(429);
   });
 
+  test('provider tests are limited per user, and only for that user', async () => {
+    const { limit } = CONFIG.rateLimit.providerTest;
+    const send = () => ctx.authed('POST', '/api/v1/providers/missing/test');
+    const statuses = await statusesFor(limit + 1, send);
+    expect(statuses.slice(0, -1).every((s) => s !== 429)).toBe(true);
+    expect(statuses.at(-1)).toBe(429);
+    const other = await anotherUser();
+    expect((await other.request('POST', '/api/v1/providers/missing/test')).status).not.toBe(429);
+  });
+
   test('receipt imports from Google Photos are limited per user', async () => {
     const { limit } = CONFIG.rateLimit.receiptDrafts;
     const statuses = await statusesFor(limit + 1, () =>
@@ -148,5 +160,55 @@ describe('restores and imports in flight', () => {
     const afterwards = slowRestore(third.cookie, crypto.randomUUID());
     afterwards.release();
     expect((await afterwards.response).status).not.toBe(503);
+  });
+});
+
+describe('the built-in text reader is shared fairly', () => {
+  afterEach(async () => {
+    await stopLocalOcr().catch(() => undefined);
+    setLocalOcrForTest();
+  });
+
+  test("one user filling their scans at once doesn't make another user's scan fail", async () => {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    setLocalOcrForTest({
+      createWorker: async () =>
+        ({
+          recognize: async () => {
+            await gate;
+            return { data: { text: 'TOTAL 12.34' } };
+          },
+          terminate: async () => undefined,
+        }) as unknown as Worker,
+    });
+    const scan = (cookie: string) =>
+      ctx.app.request('/api/v1/receipts/parse', {
+        method: 'POST',
+        headers: { Cookie: cookie, Origin: 'http://localhost:3000' },
+        body: (() => {
+          const form = new FormData();
+          form.append(
+            'image',
+            new File([new Uint8Array([1, 2, 3])], 'r.png', { type: 'image/png' })
+          );
+          return form;
+        })(),
+      });
+
+    const mine = Array.from({ length: CONFIG.rateLimit.receiptScansAtOnce }, () =>
+      scan(ctx.cookie)
+    );
+    await Bun.sleep(20);
+    expect((await scan(ctx.cookie)).status).toBe(429);
+
+    const other = await anotherUser();
+    const theirs = scan(other.cookie);
+    await Bun.sleep(20);
+    release();
+    expect((await theirs).status).toBe(200);
+    for (const response of await Promise.all(mine)) expect(response.status).toBe(200);
   });
 });

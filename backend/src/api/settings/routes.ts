@@ -19,7 +19,7 @@ import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
 } from '../../utils/unit-preferences-schema';
-import { LOCAL_OCR_PROVIDER_ID } from '../providers/domains/vlm/registry';
+import { LOCAL_OCR_PROVIDER_ID, localOcrEnabled } from '../providers/domains/vlm/registry';
 import { CAPABILITY_DOMAIN } from '../providers/resolve';
 import { preferencesRepository } from './repository';
 import {
@@ -55,7 +55,10 @@ async function assertDefaultsOwned(
 ): Promise<void> {
   for (const [capability, providerId] of Object.entries(defaults)) {
     if (providerId === null || providerId === undefined) continue;
-    if (capability === 'ai.vision' && providerId === LOCAL_OCR_PROVIDER_ID) continue;
+    if (capability === 'ai.vision' && providerId === LOCAL_OCR_PROVIDER_ID) {
+      if (localOcrEnabled()) continue;
+      throw new ValidationError('The built-in text reader is turned off on this server');
+    }
     const owned = await getDb()
       .select({ id: userProviders.id })
       .from(userProviders)
