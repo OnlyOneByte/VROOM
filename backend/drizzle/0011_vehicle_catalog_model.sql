@@ -1,0 +1,1 @@
+ALTER TABLE `vehicles` ADD `catalog_model_id` text;

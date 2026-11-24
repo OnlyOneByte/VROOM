@@ -54,6 +54,7 @@ export const vehicles = sqliteTable(
       .$type<UnitPreferences>()
       .notNull()
       .default(DEFAULT_UNIT_PREFERENCES),
+    catalogModelId: text('catalog_model_id'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
