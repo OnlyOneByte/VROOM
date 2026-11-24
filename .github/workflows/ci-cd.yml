@@ -225,7 +225,7 @@ jobs:
       - name: Run preview-only E2E tests (service worker, manifest, offline reload)
         env:
           E2E_TARGET: preview
-        run: npx playwright test --project=chromium --grep "PWA surface|Opening the app offline" --grep-invert @quarantine
+        run: npx playwright test --project=chromium --grep "PWA surface|Opening the app offline|Security headers" --grep-invert @quarantine
 
       - name: List tests that passed only on retry
         if: ${{ !cancelled() }}
