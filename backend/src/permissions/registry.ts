@@ -1,5 +1,6 @@
 import { ASSISTANT_PERMISSIONS } from '../api/assistant/capabilities';
 import { ACCOUNT_PERMISSIONS } from '../api/auth/capabilities';
+import { CALENDAR_PERMISSIONS } from '../api/calendar/capabilities';
 import { COMMUNITY_PERMISSIONS } from '../api/community/capabilities';
 import { EXPENSE_PERMISSIONS } from '../api/expenses/capabilities';
 import { FINANCING_PERMISSIONS } from '../api/financing/capabilities';
@@ -34,6 +35,7 @@ const DECLARED_PERMISSIONS = [
   ...PROVIDER_PERMISSIONS,
   ...SYNC_PERMISSIONS,
   ...PUSH_PERMISSIONS,
+  ...CALENDAR_PERMISSIONS,
   ...SERVER_PERMISSIONS,
 ];
 
