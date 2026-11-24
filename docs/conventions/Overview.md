@@ -128,8 +128,7 @@ All monetary values are stored AND computed as **integer cents** — the 14 mone
 `CodeQualityRules.md` adds the frontend-only rules: the shadcn/Tailwind styling rules, the status and accent color tokens, the ESLint-config rule, the static source-scan guards and the chart-color contract. The rules below apply to the whole repo:
 
 - No comments in code. CLAUDE.md quality bar #6 states the rule and its narrow exceptions; rename or extract before reaching for a comment.
-- Floating action buttons paint with `bg-foreground` / `text-background`, as `common/floating-action-button.svelte` does — never `bg-gray-900 text-white`, and never a gradient stack with `!text-white` overrides.
-- Pages with a floating action button must add `pb-24` to the main content wrapper so the fixed FAB doesn't cover the last row. `fab-bottom-clearance.test.ts` enforces this.
+- Pages add no bottom clearance of their own: below `lg`, `routes/+layout.svelte` pads `<main>` past the phone bottom bar (`list-pages-bottom-bar-clearance.test.ts`).
 - Never access browser-only APIs (`window`, `document`, `PerformanceObserver`) at module top level or without a guard — including `window.location` inside event handlers, since SvelteKit may SSR the component. Guard with `browser` from `$app/env` or initialize lazily.
 - An array index access can yield `undefined` — guard (or narrow) before dereferencing. The frontend tsconfig sets `noUncheckedIndexedAccess` so the compiler says so there; `backend/tsconfig.json` does NOT, so on the backend `rows[0].id` type-checks and throws at runtime.
 - Memoization caches (`Map`-based) must have a max size to prevent memory leaks. Use LRU eviction or clear on navigation.

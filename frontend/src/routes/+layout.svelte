@@ -190,7 +190,7 @@
 					'pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0 short:pb-0'
 			)}
 		>
-			<div class="px-4 sm:px-6 lg:px-8 py-6">
+			<div class="px-4 sm:px-6 lg:px-10 py-6">
 				{@render children?.()}
 			</div>
 		</main>

@@ -115,7 +115,6 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 | Empty state | `common/empty-state.svelte` | `icon?`, `title`, `description`, `action?` (all Snippets), `level?` (`2`/`3`/`4`, default `2`): the title's heading level. Use `3` inside a card whose `Card.Title` is the `h2` |
 | Destructive confirm | `common/ConfirmDialog.svelte` | `bind:open`, `title`, `description`, `onConfirm` (may be async), `destructive?`, `confirmLabel?`, `cancelLabel?`, `children?` (a snippet under the description, for a summary of what the action affects, such as the expense a delete removes) — native `confirm()`/`alert()` are banned (`no-native-dialogs.test.ts`) |
 | Pagination | `common/pagination-controls.svelte` | `currentOffset`, `pageSize`, `totalCount`, `isLoading?`, `onPageChange` |
-| Mobile primary action | `common/floating-action-button.svelte` | `href`/`onclick`, `label` (the visible text is the accessible name) |
 | Date | `common/date-picker.svelte` | `bind:value` — a date-only `YYYY-MM-DD` string (convert with `dateOnlyToISO` / `toDateInputValue`, never a UTC `.slice(0,10)`) |
 | Date range | `common/date-range-picker.svelte` | `bind:startValue`, `bind:endValue` (same `YYYY-MM-DD` form) |
 | Time period | `common/period-selector.svelte` | `selectedPeriod`, `isLoading`, `onPeriodChange` |

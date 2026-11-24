@@ -122,7 +122,7 @@
 	tabindex="-1"
 	role="group"
 	aria-label="Sync status"
-	class="border-t border-border pt-3 space-y-2 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50"
+	class="py-1 space-y-2 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50"
 >
 	<span class="sr-only" role="status">{statusInfo.text}</span>
 	{#if isExpanded}

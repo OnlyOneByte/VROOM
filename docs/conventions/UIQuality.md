@@ -57,7 +57,7 @@ Tailwind's 4px scale is the only spacing scale. Match the neighbours; don't inve
 - **Page width.** Forms use `FormLayout` (centred, `max-w-2xl`). List, detail and dashboard
   pages are full-width inside the app shell.
 - **Breakpoints** are Tailwind defaults: `sm` 640, `md` 768, `lg` 1024. Navigation switches from
-  the mobile top bar + menu to the desktop rail at `lg`. Write the base (mobile) classes first
+  the phone top bar + bottom bar to the desktop top pill nav at `lg`. Write the base (mobile) classes first
   and add `sm:`/`lg:` overrides — never the reverse.
 - **Grids collapse.** Stat tiles are 2-up on mobile and up to 4-up at `lg` (`StatCardGrid`).
   Three single-value tiles share one card of three rows below `sm` and sit 3-up from `sm`;
@@ -65,7 +65,7 @@ Tailwind's 4px scale is the only spacing scale. Match the neighbours; don't inve
   tile.
   Side-by-side cards stack below `lg`.
 - **Radius** comes from `--radius` (`rounded-md` controls, `rounded-lg`/`rounded-xl` cards).
-  `rounded-full` is for avatars, pills, carousel arrows and the FAB only.
+  `rounded-full` is for avatars, pills, carousel arrows and the bottom bar's raised + only.
 - **Reserve space** for anything that arrives late (badges, charts, counts) so nothing jumps.
 - **No photo, no image area.** With no photo, a card shows no image area; a placeholder band is
   decoration.
@@ -158,12 +158,10 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   tertiary and toolbar actions are `ghost`; actions that navigate use `href`.
 - `destructive` is for the final confirm of a delete inside `ConfirmDialog` — not for the button
   that opens it.
-- Mobile primary actions are `size="lg"` (40px) or full-width. On list pages the mobile primary
-  action is the `FloatingActionButton`; don't repeat the same action in the header on mobile.
-- The FAB is the mobile primary action only. At `lg` and up, the same action is the primary
-  button in `PageHeader` (`class="hidden lg:inline-flex"`). From `lg` up nothing fixed covers page
-  content at rest: form action bars are sticky below `lg` (with bottom padding to clear them) and a
-  normal row at the end of the form from `lg`. A tab with its own primary action hides the page FAB.
+- Mobile primary actions are `size="lg"` (40px) or full-width. A page's primary action is the
+  primary button in `PageHeader` at every width; the bottom bar's raised + is always Add expense.
+  From `lg` up nothing fixed covers page content at rest: form action bars are sticky below `lg`
+  (with bottom padding to clear them) and a normal row at the end of the form from `lg`.
 - Icon-only buttons are `size="icon"` or larger and always have an `aria-label`. On touch layouts
   use `icon-lg` or pad the hit area to 40px.
 - Labels are verbs in Title Case: "Add Expense", "Log Fill-up", "Import CSV". While a mutation is
@@ -322,7 +320,7 @@ verify by hand:
   list, and Tab moves on to the next control. Close the list on `focusout` to outside the field,
   never on a timer, so focus is never left on a removed element.
   Every signed-in page starts with a "Skip to content" link as its first Tab stop; it moves focus
-  to `<main id="main">`, past the navigation rail (`routes/+layout.svelte`).
+  to `<main id="main">`, past the navigation (`routes/+layout.svelte`).
 - **Focus.** Never remove outlines. Primitives show `focus-visible:ring-[3px]` in `ring-ring/50`;
   a custom control shows the same ring. On a tinted surface where `ring-ring/50` falls below 3:1
   (a tag chip's remove button), use `focus-visible:ring-[3px] focus-visible:ring-foreground`, as
@@ -346,14 +344,14 @@ VROOM installs to phones. Mobile is the primary form factor, not an afterthought
   collapse to cards, as the expense list does.
 - **Tap targets ≥ 40×40px**, with at least 8px between neighbouring targets. `Button` default is
   h-9/36px, so mobile primary actions use `size="lg"` or full-width.
-- **Thumb zone.** The primary action sits at the bottom (FAB or sticky action bar). Fixed bottom UI
-  never hides content: the page has bottom padding at least the height of the bar or FAB.
+- **Thumb zone.** Add expense sits at the bottom (the bottom bar's raised +), and forms keep a
+  sticky action bar. Fixed bottom UI never hides content: `<main>` is padded past the bottom bar,
+  and forms, which hide the bar, pad past their own action bar.
 - **Fixed UI leaves room for content and focus.** Below `lg`, `html` carries `scroll-padding`
   equal to the fixed header and bottom bar, so a focused control is never hidden under them. On
   short viewports (`max-height: 500px`, which includes 200%+ zoom and landscape phones), the
-  header scrolls away and form action bars sit in the page flow (the `short:` variant in `app.css`).
-  The FAB hides there and the page header shows the same action (`short:inline-flex` on the
-  header button, `short:pb-0` on the FAB clearance), so the primary action stays on the first
+  top bar and the bottom bar scroll with the page and form action bars sit in the page flow (the
+  `short:` variant in `app.css`), so the primary action in the page header stays on the first
   screen. Secondary header tools move into the page's overflow menu so the row still fits.
 - Respect safe areas (`app.css` defines `.safe-top` and `.safe-bottom`).
 - Nothing depends on hover, tooltips or right-click; everything has a tap path.
@@ -425,7 +423,7 @@ failed step; nits can be follow-up issues.
 ### Capturing evidence
 
 - Run the app on `127.0.0.1` only and capture with Playwright Chromium.
-- Move the mouse off the desktop rail first (it expands on hover), and scroll the page once
+- Move the mouse off the nav first (its items have a hover state), and scroll the page once
   before a full-page shot — charts mount when they scroll into view. Wait for chart entry
   animations to finish before the shot.
 - The accent is a user setting: set it with `PUT /api/v1/settings`
