@@ -203,6 +203,15 @@ describe('a start before any data', () => {
     const later = await repo.query(OWNER.id, baseQuery({ start: seconds('2024-06-01T00:00:00Z') }));
     expect(later.buckets[0]).toBe('2024-06');
   });
+
+  test('a range that ends before the first expense keeps the range that was asked for', async () => {
+    seedFleet();
+    const range = { start: seconds('2023-01-01T00:00:00Z'), end: seconds('2023-04-01T00:00:00Z') };
+    const result = await repo.query(OWNER.id, baseQuery(range));
+    expect(result.buckets).toEqual(['2023-01', '2023-02', '2023-03']);
+    expect(result.range).toEqual(range);
+    expect(result.series).toEqual([]);
+  });
 });
 
 describe('bucketing follows the user calendar', () => {
