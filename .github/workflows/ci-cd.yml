@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  merge_group:
+    types: [checks_requested]
   release:
     types: [published]
   workflow_dispatch:
@@ -12,7 +14,8 @@ on:
 # A new push to a PR cancels that PR's older run. Pushes and dispatches share one group per ref
 # without cancel-in-progress: the running run finishes, and GitHub keeps only the newest pending
 # run per group, so a backlog on main collapses to its latest commit. A release gets a group of
-# its own keyed on the run id, so a release build is never replaced.
+# its own keyed on the run id, so a release build is never replaced. A merge-queue run has its
+# own gh-readonly-queue ref, so it gets a group of its own and a PR push never cancels it.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.event_name == 'release' && github.run_id) || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -147,7 +150,6 @@ jobs:
 
   web-vitals:
     name: Web Vitals
-    # Not a required check yet: it becomes one after 10 stable runs (#1421).
     runs-on: ubuntu-latest
     permissions:
       contents: read
