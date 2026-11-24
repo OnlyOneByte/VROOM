@@ -40,6 +40,7 @@
 	let isTesting = $state(false);
 	let announcement = $state('');
 	let note = $state('');
+	let noteIsFailure = $state(false);
 	let root = $state<HTMLElement | null>(null);
 
 	let needsAction = $derived(provider.status === 'needs_reauth' || provider.status === 'error');
@@ -72,10 +73,12 @@
 		try {
 			const result = await providerApi.testProvider(provider.id);
 			announcement = result.ok ? 'Connected.' : result.message;
-			note = result.ok ? 'Connected.' : '';
+			note = announcement;
+			noteIsFailure = !result.ok;
 		} catch (error) {
 			announcement = `Couldn't test the connection. ${userFacingErrorMessage(error)}`;
 			note = announcement;
+			noteIsFailure = false;
 		}
 		await refresh();
 		isTesting = false;
@@ -128,11 +131,13 @@
 			</AlertDescription>
 		</Alert>
 	{:else if provider.status !== 'disabled'}
-		<div class="flex items-center justify-between gap-2">
+		<div class="flex flex-wrap items-center justify-between gap-2">
 			<p class="text-xs text-muted-foreground">{checkedText}</p>
 			{@render testButton()}
 		</div>
 	{/if}
-	<p class="text-xs text-muted-foreground empty:hidden">{note}</p>
+	{#if note && !(noteIsFailure && needsAction)}
+		<p class="text-xs {noteIsFailure ? 'text-destructive' : 'text-muted-foreground'}">{note}</p>
+	{/if}
 	<p class="sr-only" role="status">{announcement}</p>
 </div>

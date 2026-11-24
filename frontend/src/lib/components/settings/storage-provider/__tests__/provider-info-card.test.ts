@@ -163,6 +163,25 @@ describe('ProviderInfoCard header', () => {
 		);
 	});
 
+	test('a failed check on a provider that is still active shows the failure on screen', async () => {
+		testProvider.mockResolvedValue({
+			ok: false,
+			code: 'unreachable',
+			message: "Couldn't reach the provider."
+		});
+		getProviders.mockResolvedValue([provider({ status: 'active', lastErrorCode: 'unreachable' })]);
+		const view = await mount({
+			onUpdated: (p: UserProviderInfo) => view.rerender({ provider: p })
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Test Connection to My Drive' }));
+		await settle();
+		const shown = screen
+			.getAllByText("Couldn't reach the provider.")
+			.filter(el => !el.classList.contains('sr-only'));
+		expect(shown).toHaveLength(1);
+		expect(screen.getByText('Connected')).toBeInTheDocument();
+	});
+
 	test('a test that fails to run says so on screen and still refreshes the card', async () => {
 		testProvider.mockRejectedValue(new Error('offline'));
 		getProviders.mockResolvedValue([provider({ status: 'error', lastErrorCode: 'config' })]);
