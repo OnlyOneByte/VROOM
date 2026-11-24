@@ -13,6 +13,7 @@ import {
 	getFuelEfficiencyLabel,
 	getVolumeUnitLabel
 } from '#lib/utils/units.ts';
+import type { ChartAnnotations } from '#lib/components/charts/types.ts';
 import { metricInfo, type ExploreQuery } from './query-state';
 
 export const queryCache = new Map<string, AnalyticsQueryResponse>();
@@ -236,5 +237,74 @@ export function carPanels(
 			series: s,
 			mean: pooled ? (pooled.cars[s.sourceKey] ?? null) : mean(s.values)
 		}))
+	};
+}
+
+const MAX_LISTED_SERVICES = 3;
+
+export function exploreAnnotations(
+	response: Pick<
+		AnalyticsQueryResponse,
+		'buckets' | 'range' | 'annotations' | 'annotationsTruncated' | 'trips'
+	>,
+	per: AnalyticsQueryInterval,
+	options: {
+		atFor: (_index: number) => unknown;
+		money: (_amount: number) => string;
+		distanceUnit: string;
+	}
+): ChartAnnotations | undefined {
+	if (per === 'none' || (!response.annotations && !response.trips)) return undefined;
+	const bounds = response.buckets.map(key => bucketBounds(key, per, response.range));
+	const byBucket = response.buckets.map(() => [] as NonNullable<typeof response.annotations>);
+	for (const service of response.annotations ?? []) {
+		const i = bounds.findIndex(b => service.t >= b.start && service.t < b.end);
+		if (i >= 0) byBucket[i]?.push(service);
+	}
+	const markers = byBucket.flatMap((services, i) => {
+		const first = services[0];
+		if (!first) return [];
+		if (services.length === 1) {
+			return [
+				{
+					at: options.atFor(i),
+					label: first.label,
+					detail: `${first.vehicleName}, ${options.money(first.amount)}`
+				}
+			];
+		}
+		const listed = services
+			.slice(0, MAX_LISTED_SERVICES)
+			.map(s => `${s.label}, ${s.vehicleName}, ${options.money(s.amount)}`);
+		const more = services.length - MAX_LISTED_SERVICES;
+		return [
+			{
+				at: options.atFor(i),
+				label: `${services.length} services`,
+				detail: more > 0 ? `${listed.join('; ')} and ${more} more` : listed.join('; '),
+				rows: services.map(s => `${s.label}: ${s.vehicleName}, ${options.money(s.amount)}`)
+			}
+		];
+	});
+	const density = (response.trips?.count ?? []).map((count, i) => ({
+		at: options.atFor(i),
+		value: count,
+		label:
+			count === 0
+				? 'No trips'
+				: `${count} ${count === 1 ? 'trip' : 'trips'}, ${formatNumber(Math.round(response.trips?.distance[i] ?? 0), 0)} ${options.distanceUnit}`
+	}));
+	if (markers.length === 0 && !density.some(d => d.value > 0)) return undefined;
+	const labelOf = new Map(
+		response.buckets.map((key, i) => [options.atFor(i), bucketLabel(key, per)])
+	);
+	return {
+		label: 'Services and trips',
+		...(response.annotationsTruncated && {
+			note: 'Only the latest services are shown; pick a shorter range to see older ones.'
+		}),
+		markers,
+		density,
+		formatAt: at => labelOf.get(at) ?? ''
 	};
 }

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { rowAnnouncement, type ChartA11y } from './chart-a11y.ts';
+	import { nextIndex, rowAnnouncement, type ChartA11y } from './chart-a11y.ts';
 
 	interface Props {
 		a11y: ChartA11y;
@@ -19,23 +19,6 @@
 		activeIndex = index;
 		announcement = index === null ? '' : rowAnnouncement(a11y, index);
 		onStep?.(index);
-	}
-
-	function nextIndex(
-		key: string,
-		current: number | null,
-		count: number
-	): number | null | undefined {
-		if (key === 'ArrowRight') {
-			return current === null ? 0 : Math.min(current + 1, count - 1);
-		}
-		if (key === 'ArrowLeft') {
-			return current === null ? count - 1 : Math.max(current - 1, 0);
-		}
-		if (key === 'Home') return 0;
-		if (key === 'End') return count - 1;
-		if (key === 'Escape' && current !== null) return null;
-		return undefined;
 	}
 
 	function handleKey(event: KeyboardEvent) {

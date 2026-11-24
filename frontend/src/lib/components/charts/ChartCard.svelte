@@ -10,6 +10,7 @@
 	import { focusLeftOn } from '#lib/utils/focus.ts';
 	import * as Table from '#lib/components/ui/table/index.ts';
 	import type { ChartA11y } from './chart-a11y.ts';
+	import type { ChartAnnotations } from './types.ts';
 
 	interface Props {
 		title: string;
@@ -29,6 +30,7 @@
 		animationClass?: 'chart-line-animated' | 'chart-bar-animated';
 		table?: ChartA11y | undefined;
 		textAlternative?: string | undefined;
+		events?: ChartAnnotations | undefined;
 		class?: string;
 		children: Snippet;
 	}
@@ -51,6 +53,7 @@
 		animationClass,
 		table,
 		textAlternative,
+		events,
 		class: className,
 		children
 	}: Props = $props();
@@ -201,7 +204,11 @@
 					</Table.Body>
 				</table>
 			</div>
-			{#if legend}
+			{#if events}{#await import('./EventsTable.svelte') then { default: EventsTable }}<EventsTable
+						annotations={events}
+						{title}
+						maxHeight={placeholderHeight}
+					/>{/await}{/if}{#if legend}
 				{@render legend()}
 			{/if}
 		{:else}

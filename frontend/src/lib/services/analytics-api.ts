@@ -140,9 +140,9 @@ export const analyticsApi = {
 		params: AnalyticsQueryParams,
 		options?: { signal?: AbortSignal }
 	): Promise<AnalyticsQueryResponse> {
-		const { vehicleIds, categories, ...rest } = params;
+		const { vehicleIds, categories, annotations, ...rest } = params;
 		return apiClient.get<AnalyticsQueryResponse>(
-			`/analytics/query${buildQueryString({ ...rest, vehicleIds: vehicleIds?.join(','), categories: categories?.join(','), timeZone: userTimeZone() })}`,
+			`/analytics/query${buildQueryString({ ...rest, vehicleIds: vehicleIds?.join(','), categories: categories?.join(','), annotations: annotations?.join(','), timeZone: userTimeZone() })}`,
 			options
 		);
 	},
