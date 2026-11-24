@@ -12,6 +12,7 @@ const apiProxy = {
 };
 
 export default defineConfig({
+	build: { modulePreload: false },
 	plugins: [
 		tailwindcss(),
 		withPwa(
