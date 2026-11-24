@@ -1,6 +1,6 @@
 import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
-import { count, eq, ne } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { DEMO_USER_ID } from '../api/auth/demo-account';
 import { CONFIG } from '../config';
 import { getDb } from '../db/connection';
@@ -234,6 +234,33 @@ export function isNetworkAdmin(userId: string): boolean {
     .get()?.email;
   if (email && CONFIG.adminEmails.includes(email.toLowerCase())) return true;
   return resolverFor(db, userId).can(PRIVATE_NETWORK_PERMISSION, { kind: 'server' }).allow;
+}
+
+const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+export function adminEmailWarnings(adminEmails: readonly string[]): string[] {
+  if (adminEmails.length === 0) return [];
+  const warnings = adminEmails
+    .filter((email) => !EMAIL_SHAPE.test(email))
+    .map((email) => `ADMIN_EMAILS entry "${email}" is not an email address, so it matches nobody`);
+  const listedAccount = getDb()
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      and(
+        inArray(sql`lower(${users.email})`, [...adminEmails]),
+        isNull(users.disabledAt),
+        ne(users.id, DEMO_USER_ID)
+      )
+    )
+    .limit(1)
+    .get();
+  if (!listedAccount) {
+    warnings.push(
+      'No active account uses an ADMIN_EMAILS address yet: until that person signs in, only users whose role grants private network access can use private network targets'
+    );
+  }
+  return warnings;
 }
 
 export function privateEndpointPolicyFor(ownerId: string): PrivateEndpointPolicy {
