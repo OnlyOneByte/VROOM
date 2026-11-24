@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { AppError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
+import { authorize, ownAccount } from '../../permissions/authorize';
 import { logger } from '../../utils/logger';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { zValidator } from '../../utils/validation';
@@ -38,35 +39,41 @@ const chatBodySchema = z.object({
   timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
 });
 
-routes.post('/chat', assistantLimiter, zValidator('json', chatBodySchema), async (c) => {
-  const user = c.get('user');
-  const body = c.req.valid('json');
-  const providerRow = await resolveProvider(user.id, 'ai.llm');
-  const provider = getLlmProvider(providerRow);
-  const history: ChatMessage[] = (body.history ?? []).map((m) => ({
-    role: m.role,
-    content: m.content,
-  }));
+routes.post(
+  '/chat',
+  assistantLimiter,
+  zValidator('json', chatBodySchema),
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const body = c.req.valid('json');
+    const providerRow = await resolveProvider(user.id, 'ai.llm');
+    const provider = getLlmProvider(providerRow);
+    const history: ChatMessage[] = (body.history ?? []).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
 
-  try {
-    const { reply, toolsUsed } = await runAssistant(
-      provider,
-      user.id,
-      body.message,
-      history,
-      Date.now(),
-      body.timeZone
-    );
-    return c.json({ success: true, data: { reply, toolsUsed } });
-  } catch (err) {
-    // The provider error is not echoed: it may contain credentials. The adapter has already logged it.
-    const message = err instanceof Error ? err.message : 'LLM provider error';
-    logger.warn('Assistant chat failed', {
-      providerType: providerRow.providerType,
-      error: message,
-    });
-    throw new AppError('The assistant provider could not be reached. Try again.', 502);
+    try {
+      const { reply, toolsUsed } = await runAssistant(
+        provider,
+        user.id,
+        body.message,
+        history,
+        Date.now(),
+        body.timeZone
+      );
+      return c.json({ success: true, data: { reply, toolsUsed } });
+    } catch (err) {
+      // The provider error is not echoed: it may contain credentials. The adapter has already logged it.
+      const message = err instanceof Error ? err.message : 'LLM provider error';
+      logger.warn('Assistant chat failed', {
+        providerType: providerRow.providerType,
+        error: message,
+      });
+      throw new AppError('The assistant provider could not be reached. Try again.', 502);
+    }
   }
-});
+);
 
 export { routes };
