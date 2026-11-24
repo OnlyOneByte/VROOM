@@ -237,7 +237,7 @@
 			{/if}
 		{/if}
 		{#if insight && !isLoading && !error && !isEmpty}
-			<p class="mt-4 text-[15px] leading-snug" data-chart-insight>{insight}</p>
+			<p class="mt-4 text-sm" data-chart-insight>{insight}</p>
 		{/if}
 		{#if footer}
 			<div class="mt-4">{@render footer()}</div>

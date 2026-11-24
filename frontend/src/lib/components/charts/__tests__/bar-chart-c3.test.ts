@@ -163,12 +163,50 @@ describe('C3 bar columns', () => {
 		expect(series[0]?.props.rounded({ fuel: 700, upkeep: 40 })).toBe('none');
 	});
 
-	test('the insight sentence shows under a chart with data, and not while it loads', async () => {
+	test('the insight sentence shows only under a chart with data', async () => {
 		const insight = 'June was the tires: $751.';
 		await mount({ ...SINGLE, insight });
 		expect(screen.getByText(insight)).toHaveAttribute('data-chart-insight');
-		cleanup();
-		await mount({ ...SINGLE, insight, isLoading: true });
-		expect(screen.queryByText(insight)).toBeNull();
+		for (const state of [{ isLoading: true }, { error: 'Offline' }, { data: [] }]) {
+			cleanup();
+			await mount({ ...SINGLE, insight, ...state });
+			expect(screen.queryByText(insight)).toBeNull();
+		}
+	});
+
+	test('on horizontal bars the current overlay and its value follow the x key', async () => {
+		const cars = [
+			{ car: 'Weekend Car', mpg: 35 },
+			{ car: 'Daily Driver', mpg: 31 }
+		];
+		await mount({
+			...SINGLE,
+			data: cars,
+			x: 'mpg',
+			y: 'car',
+			orientation: 'horizontal',
+			series: [{ key: 'mpg', label: 'mpg', color: 'var(--chart-3)' }],
+			current: 'Daily Driver'
+		});
+		expect(seen.bars).toHaveLength(1);
+		expect(seen.bars[0]).toMatchObject({ data: cars[1], x: 'mpg', fill: 'var(--foreground)' });
+		expect(barsConfig()).toMatchObject({ height: 10, radius: 5 });
+	});
+
+	test('a horizontal reference line is listed under the chart, since it has no label on the plot', async () => {
+		await mount({
+			...SINGLE,
+			data: [{ car: 'Weekend Car', mpg: 35 }],
+			x: 'mpg',
+			y: 'car',
+			orientation: 'horizontal',
+			yAxisFormat: (v: number) => `${v} mpg`,
+			series: [{ key: 'mpg', label: 'mpg', color: 'var(--chart-3)' }],
+			referenceLines: [{ value: 33, label: 'Fleet' }]
+		});
+		expect(seen.texts).toHaveLength(0);
+		expect(screen.getByRole('list', { name: 'Reference lines' })).toHaveTextContent(
+			'Fleet: 33 mpg'
+		);
 	});
 });

@@ -18,6 +18,7 @@
 	import type { ChartState } from 'layerchart';
 	import { buildChartA11y, type ChartSelectHandler } from './chart-a11y.ts';
 	import type { ChartAnnotations } from './types.ts';
+	import { columnWidth } from './bar-columns.ts';
 
 	interface LegendItem {
 		key: string;
@@ -102,9 +103,7 @@
 		class: className
 	}: Props = $props();
 
-	const COLUMN_WIDTH = 12;
 	const COLUMN_RADIUS = 6;
-	const MIN_BAND_FOR_COLUMN = 16;
 
 	let series = $derived(
 		hiddenKeys?.length ? legendItems.filter(s => !hiddenKeys.includes(s.key)) : legendItems
@@ -146,13 +145,21 @@
 	);
 
 	let vertical = $derived(orientation === 'vertical');
+	let valueAccessor = $derived(vertical ? y : x);
+	let categoryKey = $derived(vertical || typeof y !== 'string' ? x : y);
 	let valueKey = $derived(
-		typeof y === 'string' ? y : series.length === 1 ? series[0]?.key : undefined
+		typeof valueAccessor === 'string'
+			? valueAccessor
+			: series.length === 1
+				? series[0]?.key
+				: undefined
 	);
 	let singleSeries = $derived(series.length === 1 && valueKey !== undefined);
-	let narrowColumns = $derived(
-		vertical && plotWidth > 0 && plotWidth / Math.max(data.length, 1) >= MIN_BAND_FOR_COLUMN
+	let grouped = $derived(series.length > 1 && seriesLayout !== 'stack');
+	let fixedWidth = $derived(
+		vertical ? columnWidth(context?.xScale?.bandwidth?.(), grouped) : undefined
 	);
+	let barSize = $derived(fixedWidth ? { width: fixedWidth } : vertical ? {} : { height: 10 });
 
 	function sameBucket(a: unknown, b: unknown): boolean {
 		if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
@@ -160,7 +167,7 @@
 	}
 
 	let currentRow = $derived(
-		current === undefined ? undefined : data.find(row => sameBucket(row[x], current))
+		current === undefined ? undefined : data.find(row => sameBucket(row[categoryKey], current))
 	);
 
 	let peakRow = $derived.by(() => {
@@ -238,8 +245,7 @@
 							stroke: 'none',
 							rounded: stacked ? 'none' : 'edge',
 							radius: vertical ? COLUMN_RADIUS : 5,
-							...(narrowColumns && { width: COLUMN_WIDTH }),
-							...(!vertical && { height: 10 })
+							...barSize
 						},
 						...barProps,
 						xAxis: resolvedXAxisProps,
@@ -254,13 +260,12 @@
 						{#if currentRow && singleSeries && valueKey}
 							<Bar
 								data={currentRow}
-								y={valueKey}
+								{...vertical ? { y: valueKey } : { x: valueKey }}
 								fill="var(--foreground)"
 								stroke="none"
 								rounded="edge"
 								radius={vertical ? COLUMN_RADIUS : 5}
-								{...narrowColumns ? { width: COLUMN_WIDTH } : {}}
-								{...vertical ? {} : { height: 10 }}
+								{...barSize}
 								data-current-period
 							/>
 						{/if}
@@ -277,6 +282,9 @@
 									y={chart.yScale(line.value) - 6}
 									value="{line.label} {yAxisFormat(line.value)}"
 									textAnchor="end"
+									stroke="var(--card)"
+									strokeWidth={4}
+									style="paint-order: stroke"
 									class="fill-muted-foreground text-xs"
 									data-reference-label
 								/>
@@ -306,6 +314,17 @@
 		</div>
 	</ChartPlot>
 	{#snippet legend()}
+		{#if !vertical && referenceLines.length > 0}
+			<ul class="mt-3 flex flex-wrap justify-center gap-3" aria-label="Reference lines">
+				{#each referenceLines as line, i (`${i}-${line.label}`)}
+					<li class="flex items-center gap-1.5 text-xs text-muted-foreground">
+						<span class="w-4 border-t-2 border-dashed border-muted-foreground" aria-hidden="true"
+						></span>
+						{line.label}: {yAxisFormat(line.value)}
+					</li>
+				{/each}
+			</ul>
+		{/if}
 		{#if legendItems.length > 1}
 			<ChartLegend
 				items={legendItems}

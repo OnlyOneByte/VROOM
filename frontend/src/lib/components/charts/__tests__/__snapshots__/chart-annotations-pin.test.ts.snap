@@ -8,7 +8,7 @@ exports[`charts without annotations render as before > a bar chart 1`] = `
 .dark [data-chart=chart-c2] {
 	--color-fuel: var(--chart-1);
 	--color-maintenance: var(--chart-2);
-}</style> </div></div></div> <p class="sr-only" aria-live="polite"></p></div></div> <div role="list" class="flex flex-wrap gap-3 mt-3 justify-center"><div class="flex items-center gap-1.5" role="listitem"><div class="h-2.5 w-2.5 rounded-full shrink-0" aria-hidden="true" style="background-color: var(--chart-1);"></div> <span class="text-xs text-muted-foreground">Fuel</span></div><div class="flex items-center gap-1.5" role="listitem"><div class="h-2.5 w-2.5 rounded-full shrink-0" aria-hidden="true" style="background-color: var(--chart-2);"></div> <span class="text-xs text-muted-foreground">Maintenance</span></div></div>   </div></div>"
+}</style> </div></div></div> <p class="sr-only" aria-live="polite"></p></div></div>  <div role="list" class="flex flex-wrap gap-3 mt-3 justify-center"><div class="flex items-center gap-1.5" role="listitem"><div class="h-2.5 w-2.5 rounded-full shrink-0" aria-hidden="true" style="background-color: var(--chart-1);"></div> <span class="text-xs text-muted-foreground">Fuel</span></div><div class="flex items-center gap-1.5" role="listitem"><div class="h-2.5 w-2.5 rounded-full shrink-0" aria-hidden="true" style="background-color: var(--chart-2);"></div> <span class="text-xs text-muted-foreground">Maintenance</span></div></div>   </div></div>"
 `;
 
 exports[`charts without annotations render as before > a line chart 1`] = `
