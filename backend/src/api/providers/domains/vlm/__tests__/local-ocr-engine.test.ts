@@ -24,24 +24,15 @@ afterEach(async () => {
 });
 
 describe('the built-in text reader engine', () => {
-  test('a worker that never starts times out instead of blocking later scans', async () => {
-    let starts = 0;
-    setLocalOcrForTest({
-      timeoutMs: 50,
-      startRetryMs: 0,
-      createWorker: () => {
-        starts++;
-        return starts === 1
-          ? new Promise<Worker>(() => undefined)
-          : Promise.resolve(fakeWorker(async () => 'TOTAL 1.00'));
-      },
-    });
-    await expect(recognizeText(Buffer.from('a'))).rejects.toBeInstanceOf(OcrUnavailableError);
-    expect(await recognizeText(Buffer.from('b'))).toBe('TOTAL 1.00');
-    expect(starts).toBe(2);
+  test('a worker that never starts times out instead of blocking the queue', async () => {
+    setLocalOcrForTest({ timeoutMs: 50, createWorker: () => new Promise<Worker>(() => undefined) });
+    const first = recognizeText(Buffer.from('a'));
+    const second = recognizeText(Buffer.from('b'));
+    await expect(first).rejects.toBeInstanceOf(OcrUnavailableError);
+    await expect(second).rejects.toBeInstanceOf(OcrUnavailableError);
   });
 
-  test('after a failed start, scans are refused for a while without starting another worker', async () => {
+  test('after a failed start, scans stay refused without starting another worker', async () => {
     let starts = 0;
     setLocalOcrForTest({
       createWorker: () => {
@@ -51,12 +42,47 @@ describe('the built-in text reader engine', () => {
     });
     await expect(recognizeText(Buffer.from('a'))).rejects.toBeInstanceOf(OcrUnavailableError);
     await expect(recognizeText(Buffer.from('b'))).rejects.toBeInstanceOf(OcrUnavailableError);
+    await expect(recognizeText(Buffer.from('c'))).rejects.toBeInstanceOf(OcrUnavailableError);
     expect(starts).toBe(1);
+  });
+
+  test('a start that times out is not retried until a restart', async () => {
+    let starts = 0;
+    setLocalOcrForTest({
+      timeoutMs: 50,
+      createWorker: () => {
+        starts++;
+        return new Promise<Worker>(() => undefined);
+      },
+    });
+    await expect(recognizeText(Buffer.from('a'))).rejects.toBeInstanceOf(OcrUnavailableError);
+    await expect(recognizeText(Buffer.from('b'))).rejects.toBeInstanceOf(OcrUnavailableError);
+    expect(starts).toBe(1);
+  });
+
+  test('a late crash from a replaced worker leaves the current worker in place', async () => {
+    const listeners: ((error: unknown) => void)[] = [];
+    let starts = 0;
+    setLocalOcrForTest({
+      createWorker: async () => {
+        starts++;
+        const w = fakeWorker(async () => 'ok') as unknown as Record<string, unknown>;
+        w.worker = {
+          on: (_event: string, listener: (error: unknown) => void) => listeners.push(listener),
+        };
+        return w as unknown as Worker;
+      },
+    });
+    await recognizeText(Buffer.from('a'));
+    await stopLocalOcr();
+    await recognizeText(Buffer.from('b'));
+    listeners[0]?.(new Error('old worker crashed'));
+    await recognizeText(Buffer.from('c'));
+    expect(starts).toBe(2);
   });
 
   test('a failed start is reported as unavailable, not as an unreadable picture', async () => {
     setLocalOcrForTest({
-      startRetryMs: 0,
       createWorker: () => Promise.reject('Error: model not found'),
     });
     const error = await recognizeText(Buffer.from('a')).catch((e) => e);

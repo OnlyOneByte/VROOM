@@ -45,27 +45,33 @@ function startRealWorker(): Promise<Worker> {
 
 let workerFactory: WorkerFactory = startRealWorker;
 let timeoutMs = 30_000;
-let startRetryMs = 60_000;
 
 export function setLocalOcrForTest(
-  options: { createWorker?: WorkerFactory | null; timeoutMs?: number; startRetryMs?: number } = {}
+  options: { createWorker?: WorkerFactory | null; timeoutMs?: number } = {}
 ): void {
   workerFactory = options.createWorker ?? startRealWorker;
   timeoutMs = options.timeoutMs ?? 30_000;
-  startRetryMs = options.startRetryMs ?? 60_000;
-  startFailedAt = Number.NEGATIVE_INFINITY;
+  startBroken = false;
 }
 
 let worker: Promise<Worker> | null = null;
 let queue: Promise<unknown> = Promise.resolve();
 let waiting = 0;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
-let startFailedAt = Number.NEGATIVE_INFINITY;
+let startBroken = false;
+
+function markStartBroken(reason: string): void {
+  if (startBroken) return;
+  startBroken = true;
+  logger.error('The built-in text reader could not start; scans stay off until a restart', {
+    reason,
+  });
+}
 
 function startWorker(): Promise<Worker> {
   if (worker) return worker;
-  if (Date.now() - startFailedAt < startRetryMs) {
-    return Promise.reject(new OcrUnavailableError('The text reader failed to start recently'));
+  if (startBroken) {
+    return Promise.reject(new OcrUnavailableError('The text reader could not start'));
   }
   const mine: Promise<Worker> = workerFactory().then(
     (started) => {
@@ -76,7 +82,7 @@ function startWorker(): Promise<Worker> {
       return started;
     },
     (error) => {
-      startFailedAt = Date.now();
+      markStartBroken(String(error));
       if (worker === mine) worker = null;
       throw error instanceof OcrUnavailableError ? error : new OcrUnavailableError(String(error));
     }
@@ -115,7 +121,7 @@ async function recognizeOnce(image: Buffer): Promise<string> {
   let started = false;
   const timedOut = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      if (!started) startFailedAt = Date.now();
+      if (!started) markStartBroken('the start timed out');
       reject(new OcrUnavailableError('Text recognition timed out'));
     }, timeoutMs);
   });

@@ -16,7 +16,7 @@ const VOLUME_AFTER = new RegExp(
   'i'
 );
 const PRICE_LABEL_FIRST = new RegExp(
-  String.raw`(?:price\s*\/\s*(?:gal|l)\b|\/\s*(?:gal|l|1)\b|per\s+(?:gal|litre|liter))\s*[:=]?\s*[$€£]?\s*(${NUMBER})`,
+  String.raw`(?:price\s*\/\s*(?:gal|l)\b|\/\s*(?:gal|l|1)\b|per\s+(?:gal(?:lon)?|litre|liter))\s*[:=]?\s*[$€£]?\s*(${NUMBER})`,
   'gi'
 );
 const PRICE_NUMBER_FIRST = new RegExp(
@@ -127,16 +127,38 @@ type FoundVolume = { volume: number; unit: ReceiptVolumeUnit };
 
 const MAX_UNIT_PRICE = 20;
 
-function priceIn(line: string): { text: string; value: number } | undefined {
-  const found = [...line.matchAll(PRICE_LABEL_FIRST), ...line.matchAll(PRICE_NUMBER_FIRST)]
-    .map((m) => ({ text: m[0], value: toNumber(m[1]) ?? 0 }))
+type PriceMatch = { start: number; end: number; value: number };
+
+function priceMatches(line: string, pattern: RegExp): PriceMatch[] {
+  return [...line.matchAll(pattern)]
+    .map((m) => ({
+      start: m.index ?? 0,
+      end: (m.index ?? 0) + m[0].length,
+      value: toNumber(m[1]) ?? 0,
+    }))
     .filter((p) => p.value > 0);
-  return found.find((p) => p.value < MAX_UNIT_PRICE) ?? found[0];
+}
+
+function overlaps(a: PriceMatch, b: PriceMatch): boolean {
+  return a.start < b.end && b.start < a.end;
+}
+
+function priceIn(line: string): PriceMatch | undefined {
+  const numberFirst = priceMatches(line, PRICE_NUMBER_FIRST);
+  const labelFirst = priceMatches(line, PRICE_LABEL_FIRST).filter((label) => {
+    const rival = numberFirst.find((n) => overlaps(n, label));
+    return !rival || (rival.value >= MAX_UNIT_PRICE && label.value < MAX_UNIT_PRICE);
+  });
+  const kept = [
+    ...labelFirst,
+    ...numberFirst.filter((n) => !labelFirst.some((label) => overlaps(n, label))),
+  ];
+  return kept.find((p) => p.value < MAX_UNIT_PRICE) ?? kept[0];
 }
 
 function volumeIn(line: string): FoundVolume | undefined {
   const price = priceIn(line);
-  const quantity = price ? line.replace(price.text, ' ') : line;
+  const quantity = price ? `${line.slice(0, price.start)} ${line.slice(price.end)}` : line;
   const after = VOLUME_AFTER.exec(quantity);
   const before = VOLUME_BEFORE.exec(quantity);
   const [raw, unit] = after

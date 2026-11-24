@@ -109,6 +109,10 @@ describe('parseReceiptText on awkward lines', () => {
       ['GALLONS 11.482 PRICE/GAL 4.599', 11.482, 4.599],
       ['GALLONS: 11.482 @ 4.599/GAL', 11.482, 4.599],
       ['Liter 42,17 EUR/l 1,789', 42.17, 1.789],
+      ['4.599/GAL 11.482 GAL', 11.482, 4.599],
+      ['@ 4.599/GAL 11.482 GALLONS', 11.482, 4.599],
+      ['$4.599/GAL 11.482 GAL', 11.482, 4.599],
+      ['1,789 EUR/l 12,17 l', 12.17, 1.789],
     ] as const) {
       expect(parseReceiptText(line, NOW), line).toMatchObject({
         volume,
@@ -116,6 +120,13 @@ describe('parseReceiptText on awkward lines', () => {
         category: 'fuel',
       });
     }
+  });
+
+  test('a spelled-out price per gallon is a price, not a volume', () => {
+    expect(parseReceiptText('GALLONS 11.482\nPRICE PER GALLON 4.599', NOW)).toMatchObject({
+      volume: 11.482,
+      pricePerUnit: 4.599,
+    });
   });
 
   test('a quantity of 1 or a weight in grams is not a fuel volume', () => {
