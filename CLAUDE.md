@@ -57,7 +57,9 @@ A green build is the floor, not "done".
 1. **Data safety is sacred.** No silent loss. Every schema table is either round-tripped by
    backup/restore or on the documented exclusion list in the backend's
    `src/api/sync/__tests__/backup-table-coverage.test.ts` (account identity, sessions,
-   encrypted provider credentials, per-device push subscriptions), and those guards fail if
+   encrypted provider credentials, per-device push subscriptions, and the server-wide
+   community stats aggregate, which is rebuilt daily and would import a foreign population if
+   restored on another server), and those guards fail if
    a new table is silently omitted; destructive actions disclose their full cascade; offline
    writes never drop.
 2. **Correct for everyone.** Unit- and currency-correct for metric and non-USD users;

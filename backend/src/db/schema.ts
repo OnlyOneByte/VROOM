@@ -592,6 +592,38 @@ export const pushSubscriptions = sqliteTable(
   })
 );
 
+export const communityStats = sqliteTable(
+  'community_stats',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    scope: text('scope').notNull(),
+    metric: text('metric').notNull(),
+    bucketKey: text('bucket_key').notNull(),
+    catalogModelId: text('catalog_model_id'),
+    modelYear: integer('model_year'),
+    vehicleType: text('vehicle_type'),
+    ageBand: text('age_band'),
+    region: text('region'),
+    currency: text('currency'),
+    unit: text('unit').notNull(),
+    nPublished: integer('n_published').notNull(),
+    mean: real('mean').notNull(),
+    p25: real('p25'),
+    p50: real('p50').notNull(),
+    p75: real('p75'),
+    computedAt: integer('computed_at', { mode: 'timestamp' }).notNull(),
+    schemaVersion: integer('schema_version').notNull(),
+  },
+  (table) => ({
+    scopeBucketIdx: uniqueIndex('community_stats_scope_bucket_idx').on(
+      table.scope,
+      table.bucketKey
+    ),
+  })
+);
+
 export type User = typeof users.$inferSelect;
 
 export type Vehicle = typeof vehicles.$inferSelect;
@@ -650,3 +682,6 @@ export type NewVehicleShare = typeof vehicleShares.$inferInsert;
 
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type NewPushSubscription = typeof pushSubscriptions.$inferInsert;
+
+export type CommunityStat = typeof communityStats.$inferSelect;
+export type NewCommunityStat = typeof communityStats.$inferInsert;
