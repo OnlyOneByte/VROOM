@@ -52,12 +52,13 @@ export function seriesFor(
 	vehicleColors: Record<string, string> = {}
 ): ExploreSeries[] {
 	return response.series.map((s, i) => {
-		const fallback = CHART_COLORS[i % CHART_COLORS.length] as string;
+		const palette = response.groupBy === 'vehicle' ? VEHICLE_COLORS : CHART_COLORS;
+		const fallback = palette[i % palette.length] as string;
 		const color =
 			response.groupBy === 'category'
 				? getCategoryChartColor(s.key)
 				: response.groupBy === 'vehicle'
-					? (vehicleColors[s.key] ?? (VEHICLE_COLORS[i % VEHICLE_COLORS.length] as string))
+					? (vehicleColors[s.key] ?? fallback)
 					: fallback;
 		const label = response.groupBy === 'category' ? getCategoryLabel(s.key) : s.label;
 		return { key: `s${i}`, sourceKey: s.key, label, color, values: s.values };
