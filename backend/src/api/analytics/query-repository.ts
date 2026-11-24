@@ -914,7 +914,7 @@ export class AnalyticsQueryRepository {
       SELECT m.period, -1 AS idx, m.vehicle_id, (MAX(m.mileage) - MIN(m.mileage)) * vu.dist_user AS distance
       FROM m JOIN vu ON vu.vehicle_id = m.vehicle_id
       WHERE m.idx >= 0
-      GROUP BY m.period, m.vehicle_id
+      GROUP BY m.period, m.vehicle_id, vu.dist_user
     `
     );
   }

@@ -3,6 +3,7 @@ import { Readable } from 'node:stream';
 import { CONFIG } from '../../../config';
 import type { UserProvider } from '../../../db/schema';
 import { ValidationError } from '../../../errors';
+import { builtInRoleId } from '../../../permissions/grants';
 import {
   createTestApp,
   type DataEnvelope,
@@ -544,6 +545,19 @@ describe('with ADMIN_EMAILS set, only admins reach private targets', () => {
 
   test('the admin can save a LAN endpoint even though a second account exists', async () => {
     const res = await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.20:9000'));
+    expect(res.status).toBe(201);
+  });
+
+  test('a user who holds the built-in admin role, but is not listed in ADMIN_EMAILS, is an admin too', async () => {
+    ctx.sqlite.run(
+      'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, NULL, ?)',
+      [`ra-${memberId}`, memberId, builtInRoleId('admin'), ctx.user.id]
+    );
+    const res = await member.request(
+      'POST',
+      '/api/v1/providers',
+      s3Body('http://192.168.1.20:9000')
+    );
     expect(res.status).toBe(201);
   });
 

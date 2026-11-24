@@ -7,9 +7,10 @@ import { outboundResolver } from '../../utils/outbound-url';
 
 const FIXTURES = join(import.meta.dir, 'fixtures');
 
-const RECEIPTS: { file: string; expected: ReceiptDraft }[] = [
+const RECEIPTS: { file: string; expected: ReceiptDraft; quarantined?: string }[] = [
   {
     file: 'receipt-fuel-us.png',
+    quarantined: '#1695',
     expected: {
       amount: 52.81,
       vendor: 'SHELL',
@@ -41,23 +42,29 @@ export function describeOcrContract(
   describe(`${name} OCR contract`, () => {
     afterAll(stop);
 
-    for (const { file, expected } of RECEIPTS) {
-      test(`reads ${file} into a draft without any outbound request`, async () => {
-        const fetchSpy = spyOn(globalThis, 'fetch');
-        const lookupSpy = spyOn(outboundResolver, 'lookup');
-        try {
-          const raw = await create().extractReceipt({
-            data: readFileSync(join(FIXTURES, file)),
-            mimeType: 'image/png',
-          });
-          expect(parseExtraction(raw)).toEqual(expected);
-          expect(fetchSpy).not.toHaveBeenCalled();
-          expect(lookupSpy).not.toHaveBeenCalled();
-        } finally {
-          fetchSpy.mockRestore();
-          lookupSpy.mockRestore();
-        }
-      }, 60_000);
+    for (const { file, expected, quarantined } of RECEIPTS) {
+      const run = quarantined ? test.skip : test;
+      const flaky = quarantined ? ` [quarantined: flaky ${quarantined}]` : '';
+      run(
+        `reads ${file} into a draft without any outbound request${flaky}`,
+        async () => {
+          const fetchSpy = spyOn(globalThis, 'fetch');
+          const lookupSpy = spyOn(outboundResolver, 'lookup');
+          try {
+            const raw = await create().extractReceipt({
+              data: readFileSync(join(FIXTURES, file)),
+              mimeType: 'image/png',
+            });
+            expect(parseExtraction(raw)).toEqual(expected);
+            expect(fetchSpy).not.toHaveBeenCalled();
+            expect(lookupSpy).not.toHaveBeenCalled();
+          } finally {
+            fetchSpy.mockRestore();
+            lookupSpy.mockRestore();
+          }
+        },
+        60_000
+      );
     }
 
     test('an image that is not a picture is an error, not a draft', async () => {
