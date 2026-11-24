@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { getDb } from '../../db/connection';
-import { type VehicleShare, vehicleShares } from '../../db/schema';
+import { users, type VehicleShare, vehicleShares } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
 import type { ApiResponse } from '../../errors';
 import {
@@ -12,9 +12,10 @@ import {
   ValidationError,
 } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import { authorize, ownAccount, type ResourceOf } from '../../permissions/authorize';
 import { changeShareRole, endVehicleMembership, grantShareRole } from '../../permissions/grants';
 import { commonSchemas, zValidator } from '../../utils/validation';
-import { requireVehicleAccess } from '../../utils/vehicle-access';
+import { vehicleRepository } from '../vehicles/repository';
 import {
   ACTIVE_SHARE_STATUSES,
   findInviteeId,
@@ -24,8 +25,6 @@ import {
   toOwnerView,
   vehicleShareRepository,
 } from './repository';
-
-// Non-owners and non-invitees get 404, not 403, so share existence is not revealed.
 
 const routes = new Hono();
 
@@ -66,15 +65,35 @@ const inviteSchema = z.object({
 
 const levelSchema = z.object({ level: z.enum(LEVELS) });
 
-routes.post('/', zValidator('json', inviteSchema), async (c) => {
+const fromInviteVehicle: ResourceOf = (c) => ({
+  kind: 'vehicle',
+  vehicleId: (c.req.valid('json' as never) as { vehicleId: string }).vehicleId,
+});
+
+const fromShare: ResourceOf = async (c) => {
+  const share = await vehicleShareRepository.findById(c.req.param('id') ?? '');
+  if (!share) throw new NotFoundError('Share');
+  return { kind: 'vehicle', vehicleId: share.vehicleId };
+};
+
+routes.post('/', zValidator('json', inviteSchema), authorize(fromInviteVehicle), async (c) => {
   const user = c.get('user');
   const { vehicleId, level } = c.req.valid('json');
   const email = c.req.valid('json').email.trim().toLowerCase();
 
-  await requireVehicleAccess(vehicleId, user.id, 'owner');
+  const vehicle = await vehicleRepository.findById(vehicleId);
+  if (!vehicle) throw new NotFoundError('Vehicle');
+  const owner = getDb()
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, vehicle.userId))
+    .get();
 
   if (email === user.email.toLowerCase()) {
     throw new ValidationError('You cannot share a vehicle with yourself');
+  }
+  if (email === owner?.email.toLowerCase()) {
+    throw new ValidationError('The owner already has access to this vehicle');
   }
 
   const inviteeId = await findInviteeId(getDb(), email);
@@ -87,7 +106,7 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
   const created = await vehicleShareRepository
     .create({
       vehicleId,
-      ownerId: user.id,
+      ownerId: vehicle.userId,
       sharedWithId: inviteeId,
       level,
       status: 'pending',
@@ -106,7 +125,7 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
   return c.json(response, 201);
 });
 
-routes.get('/granted', async (c) => {
+routes.get('/granted', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const shares = await vehicleShareRepository.findByOwner(user.id);
   const response: ApiResponse<GrantedShare[]> = {
@@ -121,12 +140,13 @@ routes.put(
   '/:id',
   zValidator('param', commonSchemas.idParam),
   zValidator('json', levelSchema),
+  authorize(fromShare),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const { level } = c.req.valid('json');
 
-    const share = await vehicleShareRepository.findByIdAndOwner(id, user.id);
+    const share = await vehicleShareRepository.findById(id);
     if (!share) {
       throw new NotFoundError('Share');
     }
@@ -148,24 +168,28 @@ routes.put(
   }
 );
 
-routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
+routes.delete(
+  '/:id',
+  zValidator('param', commonSchemas.idParam),
+  authorize(fromShare),
+  async (c) => {
+    const { id } = c.req.valid('param');
 
-  const share = await vehicleShareRepository.findByIdAndOwner(id, user.id);
-  if (!share) {
-    throw new NotFoundError('Share');
-  }
-
-  transitionShare(id, ANY_STATUS, { status: 'revoked' }, (tx, before) => {
-    if (before.status === 'accepted' && before.sharedWithId) {
-      endVehicleMembership(tx, before.vehicleId, before.sharedWithId);
+    const share = await vehicleShareRepository.findById(id);
+    if (!share) {
+      throw new NotFoundError('Share');
     }
-  });
-  return c.json({ success: true, message: 'Share revoked' });
-});
 
-routes.get('/received', async (c) => {
+    transitionShare(id, ANY_STATUS, { status: 'revoked' }, (tx, before) => {
+      if (before.status === 'accepted' && before.sharedWithId) {
+        endVehicleMembership(tx, before.vehicleId, before.sharedWithId);
+      }
+    });
+    return c.json({ success: true, message: 'Share revoked' });
+  }
+);
+
+routes.get('/received', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const shares = await vehicleShareRepository.findReceivedByUser(user.id);
   const response: ApiResponse<ReceivedShare[]> = {
@@ -176,46 +200,56 @@ routes.get('/received', async (c) => {
   return c.json(response);
 });
 
-routes.post('/:id/accept', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
+routes.post(
+  '/:id/accept',
+  zValidator('param', commonSchemas.idParam),
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
 
-  const share = await vehicleShareRepository.findByIdAndSharedWith(id, user.id);
-  if (!share) {
-    throw new NotFoundError('Share');
-  }
-  if (share.status !== 'pending') {
-    throw new ConflictError('This invitation is no longer pending');
-  }
+    const share = await vehicleShareRepository.findByIdAndSharedWith(id, user.id);
+    if (!share) {
+      throw new NotFoundError('Share');
+    }
+    if (share.status !== 'pending') {
+      throw new ConflictError('This invitation is no longer pending');
+    }
 
-  const updated = transitionShare(id, ['pending'], { status: 'accepted' }, (tx, _, row) => {
-    endVehicleMembership(tx, row.vehicleId, user.id);
-    grantShareRole(tx, {
-      vehicleId: row.vehicleId,
-      sharedWithId: user.id,
-      level: row.level,
-      grantedBy: row.ownerId,
+    const updated = transitionShare(id, ['pending'], { status: 'accepted' }, (tx, _, row) => {
+      endVehicleMembership(tx, row.vehicleId, user.id);
+      grantShareRole(tx, {
+        vehicleId: row.vehicleId,
+        sharedWithId: user.id,
+        level: row.level,
+        grantedBy: row.ownerId,
+      });
     });
-  });
-  return c.json({ success: true, data: updated, message: 'Invitation accepted' });
-});
-
-routes.post('/:id/decline', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
-
-  const share = await vehicleShareRepository.findByIdAndSharedWith(id, user.id);
-  if (!share) {
-    throw new NotFoundError('Share');
+    return c.json({ success: true, data: updated, message: 'Invitation accepted' });
   }
-  if (share.status !== 'pending' && share.status !== 'accepted') {
-    throw new ConflictError('This share is no longer active');
-  }
+);
 
-  transitionShare(id, ACTIVE_SHARE_STATUSES, { status: 'declined' }, (tx, before) => {
-    if (before.status === 'accepted') endVehicleMembership(tx, before.vehicleId, user.id);
-  });
-  return c.json({ success: true, message: 'Share declined' });
-});
+routes.post(
+  '/:id/decline',
+  zValidator('param', commonSchemas.idParam),
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+
+    const share = await vehicleShareRepository.findByIdAndSharedWith(id, user.id);
+    if (!share) {
+      throw new NotFoundError('Share');
+    }
+    if (share.status !== 'pending' && share.status !== 'accepted') {
+      throw new ConflictError('This share is no longer active');
+    }
+
+    transitionShare(id, ACTIVE_SHARE_STATUSES, { status: 'declined' }, (tx, before) => {
+      if (before.status === 'accepted') endVehicleMembership(tx, before.vehicleId, user.id);
+    });
+    return c.json({ success: true, message: 'Share declined' });
+  }
+);
 
 export { routes };

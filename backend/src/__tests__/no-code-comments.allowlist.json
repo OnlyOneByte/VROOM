@@ -142,7 +142,6 @@
   "backend/src/api/shares/repository.ts: Must match the partial unique index vehicle_shares_active_idx in db/schema.ts; changing either requires a migration.",
   "backend/src/api/shares/repository.ts: Only a share the invitee accepted identifies them to the owner; every other status stays anonymous.",
   "backend/src/api/shares/repository.ts: vehicle_shares.ownerId is a denormalized copy for listing only; never use it as the access gate.",
-  "backend/src/api/shares/routes.ts: Non-owners and non-invitees get 404, not 403, so share existence is not revealed.",
   "backend/src/api/sync/__tests__/backup-table-coverage.test.ts: Never exported: account identity, encrypted credentials, live sessions and per-device push endpoints.",
   "backend/src/api/sync/backup.ts: A null in a NOT NULL column aborts the restore, so blanks take the static default.",
   "backend/src/api/sync/backup.ts: CSV round-trips present booleans as true, 1, '1' or 'true'.",
