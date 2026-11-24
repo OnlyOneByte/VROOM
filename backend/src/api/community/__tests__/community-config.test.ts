@@ -37,10 +37,10 @@ describe('community stats server settings', () => {
     }
   );
 
-  test('a raised minimum group raises the quartile floor with it', async () => {
+  test('a raised minimum group is accepted', async () => {
     const { code, config } = await loadConfig({ COMMUNITY_STATS_MIN_GROUP: '25' });
     expect(code).toBe(0);
-    expect(config()).toMatchObject({ minGroup: 25, quartileMinGroup: 25 });
+    expect(config()).toMatchObject({ minGroup: 25 });
   });
 
   test('an unknown mode stops startup naming the variable', async () => {
@@ -49,13 +49,12 @@ describe('community stats server settings', () => {
     expect(output).toContain('COMMUNITY_STATS');
   });
 
-  test('defaults are local with a minimum group of 10 and quartiles from 20', async () => {
+  test('defaults are local with a minimum group of 10', async () => {
     const { code, config } = await loadConfig({});
     expect(code).toBe(0);
     expect(config()).toMatchObject({
       mode: 'local',
       minGroup: 10,
-      quartileMinGroup: 20,
       enabled: false,
     });
   });

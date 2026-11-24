@@ -171,10 +171,6 @@
 		return `${amount(metric, value)}${suffix(metric)}`;
 	}
 
-	function formatRange(metric: CompareMetric, low: number, high: number): string {
-		return `${amount(metric, low)}–${amount(metric, high)}${suffix(metric)}`;
-	}
-
 	function noDataHint(metric: CompareMetric): string {
 		if (!isOwner && (metric.metric === 'running_cost' || metric.metric === 'insurance')) {
 			return 'Only the owner can compare this.';
@@ -194,28 +190,18 @@
 	function rangeText(metric: CompareMetric): string {
 		const bucket = metric.bucket;
 		if (!bucket || metric.yours === null) return '';
-		const yours = format(metric, metric.yours);
-		if (bucket.p25 === null || bucket.p75 === null) {
-			return `Your ${yours} compared with the others' median of ${format(metric, bucket.p50)}`;
-		}
 		const position =
-			metric.yours < bucket.p25 ? 'below' : metric.yours > bucket.p75 ? 'above' : 'within';
-		return `Your ${yours} is ${position} the typical range of ${formatRange(metric, bucket.p25, bucket.p75).replace('–', ' to ')}`;
+			metric.yours === bucket.mean ? 'the same as' : metric.yours > bucket.mean ? 'above' : 'below';
+		return `Your ${format(metric, metric.yours)} is ${position} the others' average of ${format(metric, bucket.mean)}`;
 	}
 
 	function barGeometry(metric: CompareMetric) {
 		const bucket = metric.bucket;
 		if (!bucket || metric.yours === null) return null;
-		const values = [metric.yours, bucket.p50, bucket.p25 ?? bucket.p50, bucket.p75 ?? bucket.p50];
-		const lo = Math.min(...values) * 0.9;
-		const hi = Math.max(...values) * 1.1;
+		const lo = Math.min(metric.yours, bucket.mean) * 0.8;
+		const hi = Math.max(metric.yours, bucket.mean) * 1.2;
 		const at = (value: number) => (hi > lo ? ((value - lo) / (hi - lo)) * 100 : 50);
-		return {
-			bandLeft: at(bucket.p25 ?? bucket.p50),
-			bandWidth: Math.max(at(bucket.p75 ?? bucket.p50) - at(bucket.p25 ?? bucket.p50), 1),
-			median: at(bucket.p50),
-			yours: at(metric.yours)
-		};
+		return { others: at(bucket.mean), yours: at(metric.yours) };
 	}
 </script>
 
@@ -303,13 +289,9 @@
 									You <span class="font-semibold tabular-nums">{format(metric, metric.yours)}</span>
 									· Others
 									<span class="font-semibold tabular-nums">
-										{format(metric, metric.bucket.p50)}
+										{format(metric, metric.bucket.mean)}
 									</span>
-									{#if metric.bucket.p25 !== null && metric.bucket.p75 !== null}
-										<span class="text-muted-foreground">
-											(typical {formatRange(metric, metric.bucket.p25, metric.bucket.p75)})
-										</span>
-									{/if}
+									<span class="text-muted-foreground">(average)</span>
 									<span class="text-muted-foreground">· about {metric.bucket.n} owners</span>
 								</p>
 								{#if bar}
@@ -319,12 +301,8 @@
 										aria-label={rangeText(metric)}
 									>
 										<div
-											class="absolute inset-y-0 rounded-full bg-primary/40"
-											style="left: {bar.bandLeft}%; width: {bar.bandWidth}%"
-										></div>
-										<div
 											class="absolute inset-y-[-2px] w-0.5 bg-muted-foreground"
-											style="left: {bar.median}%"
+											style="left: {bar.others}%"
 										></div>
 										<div
 											class="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-primary"

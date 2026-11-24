@@ -85,7 +85,6 @@ export interface VehicleSample {
 export interface AggregateOptions {
   now: Date;
   minGroup: number;
-  quartileMinGroup: number;
   uniform?: () => number;
 }
 
@@ -257,6 +256,10 @@ function publish(
   return Math.round(Math.round(noisy / band.step) * band.step * 1000) / 1000;
 }
 
+export function noiseScaleFor(band: { lo: number; hi: number }, nPublished: number): number {
+  return (band.hi - band.lo) / (nPublished * EPSILON);
+}
+
 function publishedCount(n: number): number {
   return Math.floor(n / PUBLISHED_N_STEP) * PUBLISHED_N_STEP;
 }
@@ -289,14 +292,9 @@ function publishBucket(
 ): NewCommunityStat {
   const n = byOwner.size;
   const nPublished = publishedCount(n);
-  const values = [...byOwner.values()].map(median).sort((a, b) => a - b);
+  const ownerValues = [...byOwner.values()].map(median);
   const band = bandFor(sample.metric, sample.unit);
-  const noiseScale = (band.hi - band.lo) / (nPublished * EPSILON);
-  const at = (value: number) => publish(value, band, noiseScale, uniform);
-  const quartiles =
-    nPublished >= options.quartileMinGroup
-      ? [0.25, 0.5, 0.75].map((q) => at(quantile(values, q))).sort((a, b) => a - b)
-      : null;
+  const noiseScale = noiseScaleFor(band, nPublished);
   const { fields } = sample;
   return {
     scope: LOCAL_SCOPE,
@@ -310,10 +308,12 @@ function publishBucket(
     currency: fields.currency ?? null,
     unit: sample.unit,
     nPublished,
-    mean: at(values.reduce((sum, value) => sum + value, 0) / n),
-    p25: quartiles?.[0] ?? null,
-    p50: quartiles?.[1] ?? at(quantile(values, 0.5)),
-    p75: quartiles?.[2] ?? null,
+    mean: publish(
+      ownerValues.reduce((sum, value) => sum + value, 0) / n,
+      band,
+      noiseScale,
+      uniform
+    ),
     computedAt: options.now,
     schemaVersion: COMMUNITY_SCHEMA_VERSION,
   };
@@ -340,7 +340,6 @@ export async function refreshCommunityStats(
   const result = aggregate(input.vehicles, {
     now,
     minGroup: CONFIG.communityStats.minGroup,
-    quartileMinGroup: CONFIG.communityStats.quartileMinGroup,
   });
   repository.replaceScope(LOCAL_SCOPE, result.rows, now);
   const ms = Math.round(performance.now() - started);

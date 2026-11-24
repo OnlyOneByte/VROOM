@@ -32,12 +32,12 @@ describe('community values in display units', () => {
     expect(toDisplayUnits(120_000, 'cents_per_year', US)).toBe(120_000);
   });
 
-  test('every conversion keeps quartiles in order', () => {
+  test('every conversion keeps values in order', () => {
     for (const to of [US, UK, METRIC]) {
       for (const unit of ['km_per_l', 'km_per_kwh', 'cents_per_km', 'cents_per_year'] as const) {
-        const [p25, p50, p75] = [10, 12, 14].map((value) => toDisplayUnits(value, unit, to));
-        expect(p25).toBeLessThan(p50 as number);
-        expect(p50).toBeLessThan(p75 as number);
+        const [low, mid, high] = [10, 12, 14].map((value) => toDisplayUnits(value, unit, to));
+        expect(low).toBeLessThan(mid as number);
+        expect(mid).toBeLessThan(high as number);
       }
     }
   });
