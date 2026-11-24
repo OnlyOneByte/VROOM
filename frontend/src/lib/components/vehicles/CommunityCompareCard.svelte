@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { LoaderCircle, Users } from '@lucide/svelte';
 	import { routes } from '#lib/routes.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import {
@@ -13,7 +14,7 @@
 		type CompareResult
 	} from '#lib/services/community-api.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
-	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { logLoadFailure, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import {
 		getDistanceUnitLabel,
@@ -38,17 +39,18 @@
 	const headingId = $props.id();
 	const MIN_GROUP = 10;
 
-	const LABELS: Record<CompareMetric['metric'], string> = {
-		efficiency: 'Fuel efficiency',
+	let LABELS = $derived<Record<CompareMetric['metric'], string>>({
+		efficiency: vehicle.vehicleType === 'electric' ? 'Efficiency' : 'Fuel efficiency',
 		running_cost: 'Running cost',
 		maintenance: 'Maintenance per year',
 		insurance: 'Insurance per year'
-	};
+	});
 
 	let result = $state<CompareResult | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let suggestion = $state<CatalogModel | null>(null);
+	let suggestion = $state<{ model: CatalogModel; makeName: string } | null>(null);
+	let heading = $state<HTMLElement | null>(null);
 	let confirming = $state(false);
 	let dismissed = $state(false);
 
@@ -64,22 +66,33 @@
 		result?.units ?? vehicle.unitPreferences ?? settingsStore.unitPreferences
 	);
 
-	async function load() {
-		loading = true;
+	async function findSuggestion() {
+		const catalog = await loadVehicleCatalog().catch(() => null);
+		const model = catalog ? suggestCatalogModel(catalog, vehicle.make, vehicle.model) : undefined;
+		const makeName = catalog?.makes.find(make => make.id === model?.makeId)?.name;
+		return model && makeName ? { model, makeName } : null;
+	}
+
+	async function load({ quiet = false } = {}) {
+		if (!quiet) loading = true;
 		error = null;
 		try {
 			result = await communityApi.compare(vehicle.id);
-			if (result.metrics.some(m => m.status === 'needs_model') && isOwner) {
-				const catalog = await loadVehicleCatalog().catch(() => null);
-				suggestion = catalog
-					? (suggestCatalogModel(catalog, vehicle.make, vehicle.model) ?? null)
+			suggestion =
+				isOwner && result.metrics.some(m => m.status === 'needs_model')
+					? await findSuggestion()
 					: null;
-			}
 		} catch (e) {
-			error = `Couldn't load community comparisons. ${userFacingErrorMessage(e)}`;
+			logLoadFailure(e, 'community comparisons');
+			error = userFacingErrorMessage(e);
 		} finally {
 			loading = false;
 		}
+	}
+
+	async function focusHeading() {
+		await tick();
+		heading?.focus();
 	}
 
 	function readDismissed(): boolean {
@@ -100,11 +113,11 @@
 		confirming = true;
 		try {
 			const updated = await vehicleApi.updateVehicle(vehicle.id, {
-				catalogModelId: suggestion.id
+				catalogModelId: suggestion.model.id
 			});
 			onVehicleUpdated?.(updated);
-			suggestion = null;
-			await load();
+			await load({ quiet: true });
+			await focusHeading();
 		} catch (e) {
 			appStore.showError(`Couldn't save the model. ${userFacingErrorMessage(e)}`);
 		} finally {
@@ -114,6 +127,7 @@
 
 	function dismissModel() {
 		dismissed = true;
+		void focusHeading();
 		try {
 			localStorage.setItem(dismissKey, '1');
 		} catch {
@@ -162,7 +176,7 @@
 			case 'efficiency':
 				return 'Log at least 3 fill-ups with odometer readings to compare.';
 			case 'running_cost':
-				return 'Log fuel or maintenance with odometer readings over at least 500 km (310 mi) to compare.';
+				return `Log fuel or maintenance with odometer readings over at least ${units.distanceUnit === 'miles' ? '310 mi' : '500 km'} to compare.`;
 			case 'maintenance':
 				return 'Comparisons start once this vehicle has a full year of records.';
 			case 'insurance':
@@ -202,7 +216,14 @@
 	<section aria-labelledby={headingId} class="space-y-4" data-testid="community-compare">
 		<div class="flex items-center gap-2">
 			<Users class="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-			<h2 id={headingId} class="text-lg font-semibold">Compare with others</h2>
+			<h2
+				id={headingId}
+				bind:this={heading}
+				tabindex="-1"
+				class="text-lg font-semibold outline-none"
+			>
+				Compare with others
+			</h2>
 		</div>
 
 		{#if loading}
@@ -212,14 +233,19 @@
 				{/each}
 			</div>
 		{:else if error}
-			<div class="space-y-3" data-testid="community-compare-error">
-				<p class="text-sm text-destructive" role="alert">{error}</p>
-				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={load}>Retry</Button>
-			</div>
+			<LoadErrorCard
+				compact
+				title="Couldn't load community comparisons"
+				message={error}
+				onRetry={load}
+				onRecovered={focusHeading}
+				data-testid="community-compare-error"
+			/>
 		{:else if optInRequired}
 			<div class="space-y-3" data-testid="community-compare-opt-in">
 				<p class="text-sm text-muted-foreground">
-					See how your {vehicle.model} compares with other owners on this server.
+					See how {isOwner ? 'your' : 'this'}
+					{vehicle.model} compares with other owners on this server.
 				</p>
 				<Button href={`${resolve(routes.settings)}#community-comparisons`} variant="outline">
 					Turn on community stats
@@ -231,7 +257,10 @@
 					class="space-y-3 rounded-lg border bg-muted/40 p-4"
 					data-testid="community-compare-needs-model"
 				>
-					<p class="text-sm font-medium">Is this a {vehicle.make} {suggestion.name}?</p>
+					<p class="text-sm font-medium">
+						Is this a {suggestion.makeName}
+						{suggestion.model.name}?
+					</p>
 					<div class="flex flex-wrap gap-2">
 						<Button size="sm" class="h-10 sm:h-8" onclick={confirmModel} disabled={confirming}>
 							{#if confirming}
@@ -279,7 +308,7 @@
 										aria-label={rangeText(metric)}
 									>
 										<div
-											class="absolute inset-y-0 rounded-full bg-primary/30"
+											class="absolute inset-y-0 rounded-full bg-primary/40"
 											style="left: {bar.bandLeft}%; width: {bar.bandWidth}%"
 										></div>
 										<div

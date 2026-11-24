@@ -778,6 +778,10 @@
 										if (vehicle) vehicle = { ...vehicle, catalogModelId: updated.catalogModelId };
 									}}
 								/>
+							{:catch}
+								<p class="text-sm text-muted-foreground" data-testid="community-compare-load-error">
+									Couldn't load community comparisons. Reload the page to try again.
+								</p>
 							{/await}
 						{/if}
 					{/if}
