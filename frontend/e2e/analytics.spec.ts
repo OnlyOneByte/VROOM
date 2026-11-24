@@ -343,6 +343,20 @@ test.describe('Analytics', () => {
 		await expect(page).not.toHaveURL(/hide=vehicle-camry/);
 	});
 
+	test('a comparison lists each bucket’s change in Table view', async ({ page }) => {
+		await mockAnalytics(page);
+		await page.goto('/analytics?split=none&compare=prevPeriod');
+		await page.mouse.move(640, 600);
+		const heading = page
+			.getByRole('heading', { name: 'Total cost per month, against the period before', level: 2 })
+			.last();
+		await heading.scrollIntoViewIfNeeded();
+		await page.getByRole('button', { name: 'Table', exact: true }).first().click();
+		const table = page.getByRole('region', { name: /against the period before table/ });
+		await expect(table.getByRole('row')).toHaveCount(5);
+		await expect(table.getByRole('cell', { name: '$100.00 (= 0%)' })).toBeVisible();
+	});
+
 	test('every Explore preset renders and round-trips through the URL', async ({ page }) => {
 		await mockAnalytics(page);
 		await page.goto('/analytics');

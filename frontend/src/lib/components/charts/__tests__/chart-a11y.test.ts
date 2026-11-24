@@ -37,6 +37,22 @@ describe('buildChartA11y', () => {
 		expect(a11y.summary).toBe('Spending: Jan 2026. Highest: Jan 2026, $12.00.');
 	});
 
+	test('the table and the step announcement get what the tooltip shows; the summary stays plain', () => {
+		const a11y = build(
+			[
+				{ date: new Date(2026, 0, 1), amount: 150, before: 100 },
+				{ date: new Date(2026, 1, 1), amount: 80, before: null }
+			],
+			{
+				valueFormat: (value, _key, row) =>
+					typeof row?.['before'] === 'number' ? `$${value} (vs $${row['before']})` : `$${value}`
+			}
+		);
+		expect(a11y.rows.map(r => r.cells[0])).toEqual(['$150 (vs $100)', '$80']);
+		expect(rowAnnouncement(a11y, 0)).toBe('Jan 2026: $150 (vs $100). 1 of 2.');
+		expect(a11y.summary).toContain('Highest: Jan 2026, $150.');
+	});
+
 	test('missing values show a dash and never count as the lowest', () => {
 		const a11y = build([
 			{ date: new Date(2026, 0, 1), amount: 5 },
