@@ -1,0 +1,311 @@
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import type { CompareMetric, CompareResult } from '#lib/services/community-api.ts';
+import type { UpdateVehicleRequest, Vehicle } from '#lib/types/index.ts';
+
+const { compare, updateVehicle, showError, settingsState } = vi.hoisted(() => ({
+	compare: vi.fn<(vehicleId: string) => Promise<CompareResult>>(),
+	updateVehicle: vi.fn<(id: string, data: UpdateVehicleRequest) => Promise<Vehicle>>(),
+	showError: vi.fn<(message: string) => void>(),
+	settingsState: { mode: 'local' as 'local' | 'off' }
+}));
+
+vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
+vi.mock('#lib/services/community-api.ts', () => ({
+	communityApi: { compare: (vehicleId: string) => compare(vehicleId) }
+}));
+vi.mock('#lib/services/vehicle-api.ts', () => ({
+	vehicleApi: {
+		updateVehicle: (id: string, data: UpdateVehicleRequest) => updateVehicle(id, data)
+	}
+}));
+vi.mock('#lib/stores/app.svelte.ts', () => ({
+	appStore: { showError: (message: string) => showError(message) }
+}));
+vi.mock('#lib/stores/settings.svelte.ts', () => ({
+	settingsStore: {
+		get settings() {
+			return { communityStatsMode: settingsState.mode };
+		},
+		unitPreferences: { distanceUnit: 'miles', volumeUnit: 'gallons_us', chargeUnit: 'kwh' }
+	}
+}));
+
+const CommunityCompareCard = (await import('../CommunityCompareCard.svelte')).default;
+
+const VEHICLE: Vehicle = {
+	id: 'veh-1',
+	make: 'Honda',
+	model: 'Civic EX',
+	year: 2019,
+	vehicleType: 'gas',
+	catalogModelId: null,
+	trackFuel: true,
+	trackCharging: false,
+	unitPreferences: { distanceUnit: 'miles', volumeUnit: 'gallons_us', chargeUnit: 'kwh' },
+	createdAt: '2024-01-01T00:00:00.000Z',
+	updatedAt: '2024-01-01T00:00:00.000Z'
+};
+
+function metric(name: CompareMetric['metric'], overrides: Partial<CompareMetric>): CompareMetric {
+	return { metric: name, status: 'no_data', unit: null, yours: null, bucket: null, ...overrides };
+}
+
+function all(status: CompareMetric['status']): CompareResult {
+	return {
+		currency: null,
+		metrics: (['efficiency', 'running_cost', 'maintenance', 'insurance'] as const).map(name =>
+			metric(name, { status })
+		)
+	};
+}
+
+const OK_EFFICIENCY = metric('efficiency', {
+	status: 'ok',
+	unit: 'distance_per_volume',
+	yours: 34,
+	bucket: { n: 40, mean: 31.2, p25: 28, p50: 31, p75: 33, computedAt: '2026-11-23T00:00:00Z' }
+});
+
+function data(...metrics: CompareMetric[]): CompareResult {
+	return { currency: 'USD', metrics };
+}
+
+async function settle() {
+	for (let i = 0; i < 20; i++) await new Promise(r => setTimeout(r, 0));
+}
+
+async function mount(props: { vehicle?: Vehicle; isOwner?: boolean } = {}) {
+	const onVehicleUpdated = vi.fn<(vehicle: Vehicle) => void>();
+	render(CommunityCompareCard, {
+		props: { vehicle: props.vehicle ?? VEHICLE, isOwner: props.isOwner ?? true, onVehicleUpdated }
+	});
+	await settle();
+	return { onVehicleUpdated };
+}
+
+beforeEach(() => {
+	vi.clearAllMocks();
+	localStorage.clear();
+	settingsState.mode = 'local';
+});
+
+afterEach(() => {
+	cleanup();
+});
+
+describe('CommunityCompareCard', () => {
+	test('shows a three-row skeleton while loading', async () => {
+		compare.mockReturnValue(new Promise(() => {}));
+		await mount();
+		expect(screen.getByTestId('community-compare-loading').children).toHaveLength(3);
+	});
+
+	test('is not rendered when the server has the feature off', async () => {
+		settingsState.mode = 'off';
+		await mount();
+		expect(screen.queryByTestId('community-compare')).toBeNull();
+		expect(compare).not.toHaveBeenCalled();
+	});
+
+	test('is not rendered when the API reports the feature off', async () => {
+		compare.mockResolvedValue(all('feature_off'));
+		await mount();
+		expect(screen.queryByTestId('community-compare')).toBeNull();
+	});
+
+	test('a user who has not opted in gets a link to the settings card and no numbers', async () => {
+		compare.mockResolvedValue(all('opt_in_required'));
+		await mount();
+		expect(
+			screen.getByText('See how your Civic EX compares with other owners on this server.')
+		).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Turn on community stats' })).toHaveAttribute(
+			'href',
+			'/settings#community-comparisons'
+		);
+		expect(screen.queryByText(/owners ·|about \d+ owners/)).toBeNull();
+	});
+
+	test('shows the comparison row with the median, typical range, rounded n and a text range', async () => {
+		compare.mockResolvedValue(data(OK_EFFICIENCY));
+		await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });
+		const row = screen.getByTestId('community-compare-efficiency');
+		expect(row).toHaveTextContent('You 34.0 mi/gal · Others 31.0 mi/gal');
+		expect(row).toHaveTextContent('(typical 28.0–33.0 mi/gal)');
+		expect(row).toHaveTextContent('about 40 owners');
+		expect(screen.getByRole('img')).toHaveAttribute(
+			'aria-label',
+			'Your 34.0 mi/gal is above the typical range of 28.0 to 33.0 mi/gal'
+		);
+		expect(
+			screen.getByText('Updated daily. Anonymous averages from opted-in owners, including you.')
+		).toBeInTheDocument();
+	});
+
+	test('formats costs in the currency with the distance unit, and yearly costs per year', async () => {
+		compare.mockResolvedValue(
+			data(
+				metric('running_cost', {
+					status: 'ok',
+					unit: 'cents_per_distance',
+					yours: 12.4,
+					bucket: { n: 15, mean: 11, p25: null, p50: 11, p75: null, computedAt: '' }
+				}),
+				metric('maintenance', {
+					status: 'ok',
+					unit: 'cents_per_year',
+					yours: 45_000,
+					bucket: { n: 10, mean: 60_000, p25: null, p50: 60_000, p75: null, computedAt: '' }
+				})
+			)
+		);
+		await mount();
+		expect(screen.getByTestId('community-compare-running_cost')).toHaveTextContent(
+			'You $0.12/mi · Others $0.11/mi'
+		);
+		expect(screen.getByTestId('community-compare-maintenance')).toHaveTextContent(
+			'You $450/yr · Others $600/yr'
+		);
+		expect(screen.getAllByRole('img')[1]).toHaveAttribute(
+			'aria-label',
+			"Your $450/yr compared with the others' median of $600/yr"
+		);
+	});
+
+	test('too few owners never says how many there are', async () => {
+		compare.mockResolvedValue(data(metric('efficiency', { status: 'too_few', yours: 34 })));
+		await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });
+		expect(screen.getByTestId('community-compare-efficiency')).toHaveTextContent(
+			'Not enough owners yet.'
+		);
+		expect(
+			screen.getByText(
+				'Comparisons appear once at least 10 people on this server with a similar car have opted in.'
+			)
+		).toBeInTheDocument();
+		expect(screen.queryByText(/of 10|\d+ owners/)).toBeNull();
+	});
+
+	test('no data of your own explains what to log', async () => {
+		compare.mockResolvedValue(data(metric('efficiency', { status: 'no_data' })));
+		await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });
+		expect(
+			screen.getByText('Log at least 3 fill-ups with odometer readings to compare.')
+		).toBeInTheDocument();
+	});
+
+	test('a share recipient sees that the owner-only metrics are not available', async () => {
+		compare.mockResolvedValue(data(metric('running_cost', { status: 'no_data' })));
+		await mount({ isOwner: false });
+		expect(screen.getByTestId('community-compare-running_cost')).toHaveTextContent(
+			'Only the owner can compare this.'
+		);
+	});
+
+	test('needs model: Yes sets the catalogue model and reloads', async () => {
+		compare.mockResolvedValueOnce(data(metric('efficiency', { status: 'needs_model' })));
+		compare.mockResolvedValueOnce(data(OK_EFFICIENCY));
+		updateVehicle.mockResolvedValue({ ...VEHICLE, catalogModelId: 'honda-civic' });
+		const { onVehicleUpdated } = await mount();
+
+		expect(screen.getByText('Is this a Honda Civic?')).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole('button', { name: 'Yes' }));
+		await settle();
+
+		expect(updateVehicle).toHaveBeenCalledWith('veh-1', { catalogModelId: 'honda-civic' });
+		expect(onVehicleUpdated).toHaveBeenCalledWith(
+			expect.objectContaining({ catalogModelId: 'honda-civic' })
+		);
+		expect(compare).toHaveBeenCalledTimes(2);
+		expect(screen.getByTestId('community-compare-efficiency')).toHaveTextContent('You 34.0');
+		expect(document.activeElement).toBe(
+			screen.getByRole('heading', { name: 'Compare with others' })
+		);
+	});
+
+	test('needs model: No hides the prompt for this vehicle, also after a reload', async () => {
+		compare.mockResolvedValue(data(metric('efficiency', { status: 'needs_model' })));
+		await mount();
+		await fireEvent.click(screen.getByRole('button', { name: "No, it's something else" }));
+		await settle();
+		expect(screen.queryByText('Is this a Honda Civic?')).toBeNull();
+		expect(document.activeElement).toBe(
+			screen.getByRole('heading', { name: 'Compare with others' })
+		);
+		expect(updateVehicle).not.toHaveBeenCalled();
+
+		cleanup();
+		await mount();
+		expect(screen.queryByText('Is this a Honda Civic?')).toBeNull();
+		expect(screen.getByTestId('community-compare-efficiency')).toHaveTextContent(
+			'Pick the model from the list when you edit this vehicle'
+		);
+	});
+
+	test('the prompt uses the catalogue spelling of the make', async () => {
+		compare.mockResolvedValue(data(metric('efficiency', { status: 'needs_model' })));
+		await mount({ vehicle: { ...VEHICLE, make: 'honda', model: 'civic ex' } });
+		expect(screen.getByText('Is this a Honda Civic?')).toBeInTheDocument();
+	});
+
+	test('a share recipient who has not opted in is told about this vehicle, not theirs', async () => {
+		compare.mockResolvedValue(all('opt_in_required'));
+		await mount({ isOwner: false });
+		expect(
+			screen.getByText('See how this Civic EX compares with other owners on this server.')
+		).toBeInTheDocument();
+	});
+
+	test('an electric vehicle labels its first row Efficiency and the distance hint follows units', async () => {
+		compare.mockResolvedValue(
+			data(
+				metric('efficiency', { status: 'no_data' }),
+				metric('running_cost', { status: 'no_data' })
+			)
+		);
+		await mount({
+			vehicle: {
+				...VEHICLE,
+				vehicleType: 'electric',
+				catalogModelId: 'tesla-model-3',
+				unitPreferences: { distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }
+			}
+		});
+		expect(screen.getByTestId('community-compare-efficiency')).toHaveTextContent('Efficiency');
+		expect(screen.getByTestId('community-compare-efficiency')).not.toHaveTextContent('Fuel');
+		expect(screen.getByTestId('community-compare-running_cost')).toHaveTextContent('500 km');
+		expect(screen.getByTestId('community-compare-running_cost')).not.toHaveTextContent('mi');
+	});
+
+	test('needs model is never offered to a share recipient', async () => {
+		compare.mockResolvedValue(data(metric('efficiency', { status: 'needs_model' })));
+		await mount({ isOwner: false });
+		expect(screen.queryByRole('button', { name: 'Yes' })).toBeNull();
+		expect(screen.getByTestId('community-compare-efficiency')).toHaveTextContent(
+			'Only the owner can compare this.'
+		);
+	});
+
+	test('a failed load shows an inline error, and Retry loads again', async () => {
+		compare.mockRejectedValueOnce(new Error('offline'));
+		compare.mockResolvedValueOnce(data(OK_EFFICIENCY));
+		await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });
+		expect(screen.getByTestId('community-compare-error')).toHaveTextContent(
+			"Couldn't load community comparisons"
+		);
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await settle();
+		expect(screen.getByTestId('community-compare-efficiency')).toBeInTheDocument();
+	});
+
+	test('a failed model save shows an error and keeps the prompt', async () => {
+		compare.mockResolvedValue(data(metric('efficiency', { status: 'needs_model' })));
+		updateVehicle.mockRejectedValue(new Error('nope'));
+		await mount();
+		await fireEvent.click(screen.getByRole('button', { name: 'Yes' }));
+		await settle();
+		expect(showError).toHaveBeenCalledWith(expect.stringContaining("Couldn't save the model."));
+		expect(screen.getByText('Is this a Honda Civic?')).toBeInTheDocument();
+	});
+});

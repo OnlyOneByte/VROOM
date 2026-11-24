@@ -8,6 +8,7 @@ import {
 	loadVehicleCatalog,
 	makeSuggestions,
 	modelSuggestions,
+	suggestCatalogModel,
 	textStillNames
 } from '../vehicle-catalog';
 
@@ -59,5 +60,15 @@ describe('vehicle catalogue suggestions', () => {
 		expect(textStillNames(catalog, 'honda-civic', 'Honda', 'Civic EX')).toBe(false);
 		expect(textStillNames(catalog, 'honda-civic', 'Toyota', 'Civic')).toBe(false);
 		expect(textStillNames(catalog, 'nope', 'Honda', 'Civic')).toBe(false);
+	});
+
+	test('suggestCatalogModel finds the model behind trims and a repeated make', () => {
+		expect(suggestCatalogModel(catalog, 'Honda', 'Civic EX')?.id).toBe('honda-civic');
+		expect(suggestCatalogModel(catalog, 'honda', 'Honda Civic Si')?.id).toBe('honda-civic');
+		expect(suggestCatalogModel(catalog, 'Land Rover', 'Range Rover Sport HSE')?.id).toBe(
+			'land-rover-range-rover-sport'
+		);
+		expect(suggestCatalogModel(catalog, 'Honda', 'Mystery')).toBeUndefined();
+		expect(suggestCatalogModel(catalog, 'Zastava', 'Civic')).toBeUndefined();
 	});
 });
