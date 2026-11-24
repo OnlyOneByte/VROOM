@@ -68,7 +68,7 @@ export class EntityRepository extends BaseRepository<Entity, NewEntity> {
 Don't export an instance. Register the repository in `createAppContext` (`backend/src/app-context.ts`)
 and call it as `repos().entity.findByUserId(...)`; tests build `createAppContext(db)` on their own
 database. Only the context factory and the DB tooling call `getDb()`, which opens the database on
-first use, so importing a module never touches it. `db-access-ratchet.test.ts` holds the remaining
+first call rather than at import; keep it out of module scope. `db-access-ratchet.test.ts` holds the remaining
 module-level instances and `getDb()` calls while #974 moves them over. Inside a repository, pass
 `this.db` to `transaction(fn, this.db)` so the transaction runs on the injected database.
 

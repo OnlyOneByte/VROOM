@@ -23,8 +23,6 @@ import {
   vehicles,
 } from './schema.js';
 
-const db = getDb();
-
 function daysAgo(days: number): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() - days, 12);
@@ -131,6 +129,7 @@ function loanPayments(loan: VehicleFinancing, pattern: DrivingPattern): NewExpen
 }
 
 export async function seedDatabase() {
+  const db = getDb();
   try {
     logger.info('Seeding database with sample data...');
 
@@ -164,6 +163,7 @@ export async function seedDatabase() {
 }
 
 export async function seedGarage(userId: string) {
+  const db = getDb();
   try {
     await db.insert(userPreferences).values({
       userId,

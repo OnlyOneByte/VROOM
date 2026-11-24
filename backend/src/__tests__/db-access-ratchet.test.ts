@@ -9,7 +9,8 @@ const OWNERS = new Set(['app-context.ts', 'db/connection.ts', 'db/seed.ts']);
 
 const PATTERNS: Record<string, RegExp> = {
   'getDb()': /(?<!function )\bgetDb\(\)/g,
-  'repository singleton': /^export const \w+ = new \w+Repository\(/gm,
+  'repository singleton':
+    /^(?:export )?(?:const|let) \w+(?:\s*:[^=\n]+)?\s*=\s*new \w+Repository\(/gm,
 };
 
 const BASELINE: Record<string, number> = {
@@ -117,7 +118,16 @@ countRatchet({
         'repository singleton'
       )
     ).toBe(1);
-    expect(one('const repo = new TripRepository(db);', 'repository singleton')).toBe(0);
+    expect(one('const tripRepository = new TripRepository(getDb());', 'repository singleton')).toBe(
+      1
+    );
+    expect(
+      one(
+        'export const trips: TripRepository = new TripRepository(getDb());',
+        'repository singleton'
+      )
+    ).toBe(1);
+    expect(one('  const repo = new TripRepository(db);', 'repository singleton')).toBe(0);
     expect(productionSources().length).toBeGreaterThan(100);
   },
 });
