@@ -60,12 +60,93 @@ describe('per-user limits on expensive routes', () => {
     expect(statuses.at(-1)).toBe(429);
   });
 
-  test('CSV imports are limited per user', async () => {
+  test('CSV imports are limited per user, and previews do not use up that limit', async () => {
     const { limit } = CONFIG.rateLimit.expenseImport;
-    const send = () =>
-      ctx.authed('POST', '/api/v1/expenses/import', { csv: 'date,amount\n', dryRun: true });
-    const statuses = await statusesFor(limit + 1, send);
+    const importCsv = (dryRun: boolean) =>
+      ctx.authed('POST', '/api/v1/expenses/import', { csv: 'date,amount\n', dryRun });
+    const previews = await statusesFor(limit + 5, () => importCsv(true));
+    expect(previews.every((s) => s !== 429)).toBe(true);
+    const imports = await statusesFor(limit + 1, () => importCsv(false));
+    expect(imports.slice(0, -1).every((s) => s !== 429)).toBe(true);
+    expect(imports.at(-1)).toBe(429);
+  });
+
+  test('photo uploads are limited per user', async () => {
+    const { limit } = CONFIG.rateLimit.photoUpload;
+    const statuses = await statusesFor(limit + 1, () =>
+      ctx.app.request('/api/v1/photos/vehicle/missing', {
+        method: 'POST',
+        headers: { Cookie: ctx.cookie, Origin: 'http://localhost:3000' },
+        body: receiptForm(),
+      })
+    );
     expect(statuses.slice(0, -1).every((s) => s !== 429)).toBe(true);
     expect(statuses.at(-1)).toBe(429);
+  });
+
+  test('receipt imports from Google Photos are limited per user', async () => {
+    const { limit } = CONFIG.rateLimit.receiptDrafts;
+    const statuses = await statusesFor(limit + 1, () =>
+      ctx.authed('GET', '/api/v1/photos/receipt-drafts')
+    );
+    expect(statuses.slice(0, -1).every((s) => s !== 429)).toBe(true);
+    expect(statuses.at(-1)).toBe(429);
+  });
+});
+
+describe('restores and imports in flight', () => {
+  function slowRestore(cookie: string, idempotencyKey: string) {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            '--b\r\nContent-Disposition: form-data; name="file"; filename="x.zip"\r\n\r\n'
+          )
+        );
+        await gate;
+        controller.enqueue(encoder.encode('not a zip\r\n--b--\r\n'));
+        controller.close();
+      },
+    });
+    const response = ctx.app.request('/api/v1/sync/restore/from-backup', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: 'http://localhost:3000',
+        'Content-Type': 'multipart/form-data; boundary=b',
+        'Idempotency-Key': idempotencyKey,
+      },
+      body,
+      duplex: 'half',
+    } as RequestInit);
+    return { response, release };
+  }
+
+  test('one user runs one at a time, and the server runs at most two', async () => {
+    const second = await anotherUser();
+    const third = await anotherUser();
+    const a = slowRestore(ctx.cookie, crypto.randomUUID());
+    await Bun.sleep(20);
+    const aAgain = await slowRestore(ctx.cookie, crypto.randomUUID()).response;
+    expect(aAgain.status).toBe(429);
+
+    const b = slowRestore(second.cookie, crypto.randomUUID());
+    await Bun.sleep(20);
+    const c = await slowRestore(third.cookie, crypto.randomUUID()).response;
+    expect(c.status).toBe(503);
+    expect(c.headers.get('Retry-After')).toBe('5');
+
+    a.release();
+    b.release();
+    expect((await a.response).status).not.toBe(503);
+    expect((await b.response).status).not.toBe(503);
+    const afterwards = slowRestore(third.cookie, crypto.randomUUID());
+    afterwards.release();
+    expect((await afterwards.response).status).not.toBe(503);
   });
 });

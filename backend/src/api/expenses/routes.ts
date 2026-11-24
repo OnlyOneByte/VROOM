@@ -1,6 +1,6 @@
 import { stringify } from 'csv-stringify/sync';
 import { createInsertSchema } from 'drizzle-zod';
-import { Hono } from 'hono';
+import { type Context, Hono, type Next } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { type Expense, expenses as expensesTable, type NewExpense } from '../../db/schema';
@@ -696,13 +696,25 @@ const expenseImportLimiter = rateLimiter({
   ...CONFIG.rateLimit.expenseImport,
   keyGenerator: (c) => `expenseImport:${c.get('user').id}`,
 });
+const importPreviewLimiter = rateLimiter({
+  ...CONFIG.rateLimit.importPreview,
+  keyGenerator: (c) => `importPreview:${c.get('user').id}`,
+});
+
+async function importLimits(c: Context, next: Next) {
+  const { dryRun } = await c.req.json<{ dryRun?: boolean }>();
+  if (dryRun) return importPreviewLimiter(c, next);
+  return expenseImportLimiter(c, async () => {
+    const refused = await heavyJobLimiter(c, next);
+    if (refused) c.res = refused;
+  });
+}
 
 routes.post(
   '/import',
-  expenseImportLimiter,
-  heavyJobLimiter,
   zValidator('json', importBodySchema),
   authorize(ownAccount),
+  importLimits,
   async (c) => {
     const user = c.get('user');
     const { csv, dryRun, mapping, timeZone } = c.req.valid('json');

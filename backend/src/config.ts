@@ -252,6 +252,7 @@ export const CONFIG = {
     },
     assistant: { windowMs: 15 * 60 * 1000, limit: 60, message: 'Too many assistant messages' },
     expenseImport: { windowMs: 15 * 60 * 1000, limit: 20, message: 'Too many imports' },
+    importPreview: { windowMs: 15 * 60 * 1000, limit: 300, message: 'Too many import previews' },
     photoUpload: { windowMs: 15 * 60 * 1000, limit: 120, message: 'Too many photo uploads' },
     receiptScansAtOnce: 2,
     heavyJobsAtOnce: 2,

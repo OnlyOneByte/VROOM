@@ -561,11 +561,11 @@ Every signed-in user has these limits on the routes that cost the server the mos
 | Receipt scan (`POST /receipts/parse`) | 30 per 15 minutes, at most 2 at once |
 | Receipts from Google Photos (`GET /photos/receipt-drafts`) | 10 per 15 minutes, 1 at once |
 | Assistant (`POST /assistant/chat`) | 60 per 15 minutes |
-| CSV import (`POST /expenses/import`) | 20 per 15 minutes |
+| CSV import (`POST /expenses/import`) | 20 per 15 minutes; the previews the import form sends while you map columns have their own 300 |
 | Photo upload | 120 per 15 minutes |
 | Restore | 10 per 10 minutes |
 
-CSV imports and restores also share a server-wide cap of 2 at once, so a few large uploads can't exhaust the server's memory. Over it, the API answers 503 with `Retry-After` and the user can try again a moment later. The limits are in memory, per backend process.
+A CSV import (not a preview) and a restore are heavy jobs: each user runs one at a time (429 for a second), and the whole server runs at most 2 at once (503 with `Retry-After` over that), so a few large uploads can't exhaust the server's memory. The limits are in memory, per backend process.
 
 ## Security Checklist
 
