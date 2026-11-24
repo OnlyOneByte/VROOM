@@ -145,6 +145,14 @@ export function formatNumberForMessage(value: number): string {
   return value.toLocaleString('en-US');
 }
 
+export function formatMoneyForMessage(cents: number, currency: string): string {
+  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency });
+}
+
+export function formatDateForMessage(date: Date, options: Intl.DateTimeFormatOptions): string {
+  return date.toLocaleDateString('en-US', options);
+}
+
 const RELATIVE_DRIFT_TOLERANCE = 1e-12;
 const MAX_EXPENSE_AMOUNT = CONFIG.validation.expense.maxAmount;
 
