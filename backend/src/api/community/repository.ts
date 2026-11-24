@@ -6,6 +6,7 @@ import {
   communityRefreshes,
   communityStats,
   expenses,
+  insuranceTerms,
   type NewCommunityStat,
   odometerEntries,
   userPreferences,
@@ -13,7 +14,7 @@ import {
 } from '../../db/schema';
 import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences } from '../../types';
 import { chunk, rowsPerInsert } from '../../utils/chunk';
-import type { CommunityExpense, CommunityVehicle } from './aggregator';
+import type { CommunityExpense, CommunityVehicle, InsurancePremium } from './aggregator';
 
 export interface CommunityInput {
   optedInOwners: number;
@@ -158,10 +159,7 @@ export class CommunityStatsRepository {
         .where(
           and(
             inArray(expenses.vehicleId, ids),
-            or(
-              inArray(expenses.category, ['fuel', 'maintenance']),
-              eq(expenses.sourceType, 'insurance_term')
-            ),
+            inArray(expenses.category, ['fuel', 'maintenance']),
             gte(expenses.date, windowStart),
             lte(expenses.date, windowEnd)
           )
@@ -200,6 +198,7 @@ export class CommunityStatsRepository {
     for (const { vehicleId, ...reading } of odometerRows) {
       readingsByVehicle.set(vehicleId, [...(readingsByVehicle.get(vehicleId) ?? []), reading]);
     }
+    const premiumsByVehicle = await this.premiumsByVehicle(ids, windowStart, windowEnd);
     const firstExpense = new Map(firstExpenses.map((row) => [row.vehicleId, row.first]));
     const firstReading = new Map(firstReadings.map((row) => [row.vehicleId, row.first]));
 
@@ -229,9 +228,39 @@ export class CommunityStatsRepository {
           ]),
           expenses: windowExpenses,
           odometerReadings: readings.map((reading) => reading.odometer),
+          insurancePremiums: premiumsByVehicle.get(vehicle.id) ?? [],
         },
       ];
     });
+  }
+
+  private async premiumsByVehicle(
+    ids: string[],
+    windowStart: Date,
+    windowEnd: Date
+  ): Promise<Map<string, InsurancePremium[]>> {
+    const rows = await this.db
+      .select({
+        vehicleId: expenses.vehicleId,
+        amount: expenses.expenseAmount,
+        termStart: insuranceTerms.startDate,
+        termEnd: insuranceTerms.endDate,
+      })
+      .from(expenses)
+      .innerJoin(insuranceTerms, eq(expenses.sourceId, insuranceTerms.id))
+      .where(
+        and(
+          inArray(expenses.vehicleId, ids),
+          eq(expenses.sourceType, 'insurance_term'),
+          lte(insuranceTerms.startDate, windowEnd),
+          gte(insuranceTerms.endDate, windowStart)
+        )
+      );
+    const byVehicle = new Map<string, InsurancePremium[]>();
+    for (const { vehicleId, ...premium } of rows) {
+      byVehicle.set(vehicleId, [...(byVehicle.get(vehicleId) ?? []), premium]);
+    }
+    return byVehicle;
   }
 
   async lastRefreshedAt(scope: string): Promise<Date | null> {

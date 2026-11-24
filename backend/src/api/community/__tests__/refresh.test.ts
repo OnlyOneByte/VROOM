@@ -5,6 +5,7 @@ import { logger } from '../../../utils/logger';
 import {
   createTestDb,
   seedExpense,
+  seedInsurancePolicy,
   seedUser,
   type TestDb,
 } from '../../analytics/__tests__/analytics-test-generators';
@@ -157,20 +158,28 @@ describe('community stats refresh against the database', () => {
     expect(await repository.publishedBuckets('global', keys, 10)).toEqual([]);
   });
 
-  test('only fuel, maintenance and insurance-premium expenses are loaded', async () => {
+  test('only fuel and maintenance expenses load as expenses, and premiums come with their term', async () => {
     seedOwner(db.sqlite, 'in-0', true);
+    seedInsurancePolicy(db.sqlite, { id: 'pol', userId: 'in-0', company: 'Acme', isActive: true });
+    const unix = (days: number) => Math.floor((NOW.getTime() + days * DAY) / 1000);
+    db.sqlite.run(
+      'INSERT INTO insurance_terms (id, policy_id, start_date, end_date) VALUES (?, ?, ?, ?)',
+      ['term-1', 'pol', unix(-500), unix(-135)]
+    );
     seedExpense(db.sqlite, {
       id: 'premium',
       vehicleId: 'in-0-car',
       category: 'financial',
       expenseAmount: 90_000,
-      date: new Date(NOW.getTime() - 30 * DAY),
+      date: new Date(NOW.getTime() - 500 * DAY),
       mileage: null,
       volume: null,
       fuelType: null,
       missedFillup: false,
     });
-    db.sqlite.run("UPDATE expenses SET source_type = 'insurance_term' WHERE id = 'premium'");
+    db.sqlite.run(
+      "UPDATE expenses SET source_type = 'insurance_term', source_id = 'term-1' WHERE id = 'premium'"
+    );
     for (const [id, category] of [
       ['loan', 'financial'],
       ['parking', 'misc'],
@@ -187,11 +196,16 @@ describe('community stats refresh against the database', () => {
         missedFillup: false,
       });
     }
+
     const { vehicles } = await repository.loadOptedIn(new Date(NOW.getTime() - 365 * DAY), NOW);
-    const loaded = vehicles.flatMap((v) => v.expenses);
-    expect(new Set(loaded.map((e) => e.category))).toEqual(new Set(['fuel', 'financial']));
-    expect(loaded.filter((e) => e.category === 'financial')).toEqual([
-      expect.objectContaining({ expenseAmount: 90_000, sourceType: 'insurance_term' }),
+    const [loaded] = vehicles;
+    expect(new Set(loaded?.expenses.map((e) => e.category))).toEqual(new Set(['fuel']));
+    expect(loaded?.insurancePremiums).toEqual([
+      {
+        amount: 90_000,
+        termStart: new Date(unix(-500) * 1000),
+        termEnd: new Date(unix(-135) * 1000),
+      },
     ]);
   });
 

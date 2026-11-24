@@ -62,6 +62,13 @@ export interface CommunityVehicle {
   lastRecordAt: Date | null;
   expenses: CommunityExpense[];
   odometerReadings: number[];
+  insurancePremiums: InsurancePremium[];
+}
+
+export interface InsurancePremium {
+  amount: number;
+  termStart: Date;
+  termEnd: Date;
 }
 
 export interface VehicleSample {
@@ -140,6 +147,17 @@ function sumCents(vehicle: CommunityVehicle, include: (expense: CommunityExpense
 }
 
 const isInsurance = (expense: CommunityExpense) => expense.sourceType === 'insurance_term';
+
+export function premiumInWindow(premiums: InsurancePremium[], now: Date): number {
+  const windowStart = now.getTime() - COMMUNITY_WINDOW_MS;
+  return premiums.reduce((sum, { amount, termStart, termEnd }) => {
+    const termMs = termEnd.getTime() - termStart.getTime();
+    if (termMs <= 0) return sum;
+    const overlapMs =
+      Math.min(termEnd.getTime(), now.getTime()) - Math.max(termStart.getTime(), windowStart);
+    return overlapMs > 0 ? sum + amount * (overlapMs / termMs) : sum;
+  }, 0);
+}
 const isMaintenance = (expense: CommunityExpense) =>
   expense.category === 'maintenance' && !isInsurance(expense);
 const isRunningCost = (expense: CommunityExpense) =>
@@ -187,12 +205,12 @@ export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSam
     });
   }
 
-  if (ownedWholeWindow && region) {
+  if (ownedWholeWindow && region && vehicle.insurancePremiums.length > 0) {
     samples.push({
       metric: 'insurance',
       bucketKey: `insurance|${currency}|${region}|${band}`,
       unit: 'cents_per_year',
-      value: sumCents(vehicle, isInsurance),
+      value: premiumInWindow(vehicle.insurancePremiums, now),
       fields: { ageBand: band, region, currency },
     });
   }

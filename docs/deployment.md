@@ -410,7 +410,8 @@ With `COMMUNITY_STATS=local`, which is the default, a background job runs once a
 - **What it reads:** for opted-in owners only:
   - the vehicle's catalogue model (the one the owner picked or confirmed), model year, powertrain and units;
   - the owner's currency and region;
-  - the last 12 months of fuel, maintenance and insurance-premium expenses (amount, date, fuel type, volume, odometer and the missed-fill-up flag);
+  - the last 12 months of fuel and maintenance expenses (amount, date, fuel type, volume, odometer and the missed-fill-up flag);
+  - the insurance premiums whose term overlaps those 12 months, with each term's start and end date, so a premium counts only for the part of its term inside the window;
   - the odometer readings in that window;
   - the date of each vehicle's earliest record, used to check it was owned for the whole window.
 
