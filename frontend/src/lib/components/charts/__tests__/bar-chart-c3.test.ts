@@ -206,6 +206,21 @@ describe('C3 bar columns', () => {
 		expect(barsConfig()).toMatchObject({ height: 10, radius: 5 });
 	});
 
+	test('vertical columns grow on entry, horizontal bars do not wipe upward', async () => {
+		const vertical = await mount(SINGLE);
+		expect(vertical.container.querySelector('.chart-bar-animate-ready')).not.toBeNull();
+		cleanup();
+		const horizontal = await mount({
+			...SINGLE,
+			data: [{ car: 'Weekend Car', mpg: 35 }],
+			x: 'mpg',
+			y: 'car',
+			orientation: 'horizontal',
+			series: [{ key: 'mpg', label: 'mpg', color: 'var(--chart-3)' }]
+		});
+		expect(horizontal.container.querySelector('.chart-bar-animate-ready')).toBeNull();
+	});
+
 	test('a horizontal reference line is listed under the chart, since it has no label on the plot', async () => {
 		await mount({
 			...SINGLE,

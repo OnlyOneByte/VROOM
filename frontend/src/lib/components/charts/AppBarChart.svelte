@@ -218,7 +218,7 @@
 	{isEmpty}
 	{icon}
 	{height}
-	animationClass="chart-bar-animated"
+	animationClass={vertical ? 'chart-bar-animated' : undefined}
 	table={a11y}
 	events={annotations}
 	{insight}

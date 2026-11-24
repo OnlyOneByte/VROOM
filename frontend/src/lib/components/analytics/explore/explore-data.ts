@@ -4,7 +4,12 @@ import type {
 	AnalyticsQueryResponse,
 	UnitPreferences
 } from '#lib/types/index.ts';
-import { CHART_COLORS, getCategoryChartColor, getCategoryLabel } from '#lib/utils/chart-colors.ts';
+import {
+	CHART_COLORS,
+	VEHICLE_COLORS,
+	getCategoryChartColor,
+	getCategoryLabel
+} from '#lib/utils/chart-colors.ts';
 import { formatCurrency, formatDateWith, formatNumber } from '#lib/utils/formatters.ts';
 import {
 	getChargeUnitLabel,
@@ -52,7 +57,7 @@ export function seriesFor(
 			response.groupBy === 'category'
 				? getCategoryChartColor(s.key)
 				: response.groupBy === 'vehicle'
-					? (vehicleColors[s.key] ?? fallback)
+					? (vehicleColors[s.key] ?? (VEHICLE_COLORS[i % VEHICLE_COLORS.length] as string))
 					: fallback;
 		const label = response.groupBy === 'category' ? getCategoryLabel(s.key) : s.label;
 		return { key: `s${i}`, sourceKey: s.key, label, color, values: s.values };

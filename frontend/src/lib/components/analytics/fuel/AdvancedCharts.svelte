@@ -30,6 +30,7 @@
 	import { AppBarChart } from '#lib/components/charts/index.ts';
 	import {
 		CHART_COLORS,
+		VEHICLE_COLORS,
 		CATEGORY_COLORS,
 		CATEGORY_LABELS,
 		buildChartConfig
@@ -79,7 +80,7 @@
 		fuelAdvanced.vehicleRadar.map((v, i) => ({
 			key: v.vehicleId,
 			label: v.vehicleName,
-			color: vehicleColors[v.vehicleId] ?? (CHART_COLORS[i % CHART_COLORS.length] as string)
+			color: vehicleColors[v.vehicleId] ?? (VEHICLE_COLORS[i % VEHICLE_COLORS.length] as string)
 		}))
 	);
 
