@@ -27,7 +27,7 @@ import { tableName } from '../../db/schema';
 import { type ApiResponse, NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { commonSchemas } from '../../utils/validation';
-import { domainRepository } from './repository';
+import { repos } from '../../app-context';
 
 const routes = new Hono();
 
@@ -51,7 +51,7 @@ export { routes };
 
 ```typescript
 import { and, desc, eq } from 'drizzle-orm';
-import { type AppDatabase, getDb } from '../../db/connection';
+import type { AppDatabase } from '../../db/connection';
 import { type Entity, entityTable, type NewEntity } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
 
@@ -63,9 +63,14 @@ export class EntityRepository extends BaseRepository<Entity, NewEntity> {
   // Domain queries use Drizzle directly — no query-builder abstraction
   async findByUserId(userId: string): Promise<Entity[]> { /* ... */ }
 }
-
-export const entityRepository = new EntityRepository(getDb());
 ```
+
+Don't export an instance. Register the repository in `createAppContext` (`backend/src/app-context.ts`)
+and call it as `repos().entity.findByUserId(...)`; tests build `createAppContext(db)` on their own
+database. Only the context factory and the DB tooling call `getDb()`, which opens the database on
+first use, so importing a module never touches it. `db-access-ratchet.test.ts` holds the remaining
+module-level instances and `getDb()` calls while #974 moves them over. Inside a repository, pass
+`this.db` to `transaction(fn, this.db)` so the transaction runs on the injected database.
 
 `BaseRepository` supplies `findById`/`create`/`update`/`delete` (the last two throw
 `NotFoundError` on a missing row). Take `AppDatabase`, never `BunSQLiteDatabase` — the alias
