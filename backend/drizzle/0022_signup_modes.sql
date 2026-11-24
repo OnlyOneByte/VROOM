@@ -18,6 +18,7 @@ CREATE TABLE `server_settings` (
 	`allowed_email_domains` text DEFAULT '' NOT NULL,
 	`updated_at` integer,
 	`updated_by` text,
+	`admin_assigned_at` integer,
 	FOREIGN KEY (`updated_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint

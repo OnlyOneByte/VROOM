@@ -598,7 +598,7 @@ An admin chooses who can create an account. The setting lives under `/api/v1/adm
 | Closed | never |
 
 - **The first account** on an empty server always becomes admin, in any mode, and the server starts in **invite only**. With `ADMIN_EMAILS` set, only a listed email becomes that first admin; anyone else is held to the mode.
-- **A server with no admin**, such as one upgrading to this version, keeps its sign-up mode (an existing server stays **open**), and at startup its oldest account that is neither disabled nor waiting becomes admin. With `ADMIN_EMAILS` set, only a listed account is picked.
+- **On upgrade** to this version, an existing server keeps **open** sign-up, and at the first startup its oldest account that is neither disabled nor waiting becomes admin (with `ADMIN_EMAILS` set, only a listed account). This happens once: a server whose admin is later removed gets no new one by itself.
 - **Allowed email domains:** when the list is set, only those exact domains can sign up, so `example.com` doesn't admit `sub.example.com`. A server invite from an admin still admits any email; a vehicle-share invite doesn't.
 - **Server invites:** an admin invites an email for 1 to 90 days, 7 by default. An invite works once, matches the email exactly (lower-cased), and can be revoked while it is open. A closed server refuses invites too.
 - **A refused sign-in** creates no account and returns to the sign-in page with `auth_error=signup_closed`, `signup_invite_required` or `signup_domain_not_allowed`.

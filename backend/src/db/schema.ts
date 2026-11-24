@@ -767,6 +767,7 @@ export const serverSettings = sqliteTable('server_settings', {
   allowedEmailDomains: text('allowed_email_domains').notNull().default(''),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  adminAssignedAt: integer('admin_assigned_at', { mode: 'timestamp' }),
 });
 
 export const serverInvites = sqliteTable(

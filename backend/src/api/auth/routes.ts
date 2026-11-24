@@ -23,8 +23,8 @@ import {
   activeInviteFor,
   becomesFirstAdmin,
   consumeInvite,
-  ensureServerSettings,
   hasShareInvite,
+  markAdminAssigned,
   signupSettings,
 } from '../signup/store';
 import { authProviderRepository, buildAuthProviderConfig } from './auth-provider-repository';
@@ -295,11 +295,13 @@ export async function attachPendingInvitesOnSignIn(userId: string): Promise<void
   const db = getDb();
   try {
     const [account] = await db
-      .select({ email: users.email })
+      .select({ email: users.email, pendingApprovalAt: users.pendingApprovalAt })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
-    if (account?.email) attachPendingInvites(db, userId, account.email);
+    if (account?.email && !account.pendingApprovalAt) {
+      attachPendingInvites(db, userId, account.email);
+    }
   } catch (error) {
     logger.warn('Could not attach pending invites on sign-in', { userId, error });
   }
@@ -361,7 +363,7 @@ export async function resolveNewUser(
         if (decision.role !== 'pending') assignServerRole(tx, newUser.id, 'member');
         if (decision.role === 'admin') {
           assignServerRole(tx, newUser.id, 'admin');
-          ensureServerSettings(tx);
+          markAdminAssigned(tx, now);
           logger.info('First admin account created', { userId: newUser.id });
         }
         if (invite && decision.via === 'server_invite')

@@ -94,8 +94,21 @@ export function becomesFirstAdmin(db: Db, email: string): boolean {
   return listed.length > 0 ? listed.includes(email.toLowerCase()) : !hasRealAccounts(db);
 }
 
+export function markAdminAssigned(db: Db, now: Date = new Date()): void {
+  ensureServerSettings(db);
+  db.update(serverSettings)
+    .set({ adminAssignedAt: now })
+    .where(and(eq(serverSettings.id, SETTINGS_ROW), isNull(serverSettings.adminAssignedAt)))
+    .run();
+}
+
 export function ensureServerAdmin(db: Db): string | null {
-  if (hasServerAdmin(db)) return null;
+  const row = db.select().from(serverSettings).where(eq(serverSettings.id, SETTINGS_ROW)).get();
+  if (!row || row.adminAssignedAt) return null;
+  if (hasServerAdmin(db)) {
+    markAdminAssigned(db);
+    return null;
+  }
   const listed = CONFIG.adminEmails;
   const candidate = db
     .select({ id: users.id })
@@ -112,6 +125,7 @@ export function ensureServerAdmin(db: Db): string | null {
     .get();
   if (!candidate) return null;
   assignServerRole(db, candidate.id, 'admin');
+  markAdminAssigned(db);
   return candidate.id;
 }
 

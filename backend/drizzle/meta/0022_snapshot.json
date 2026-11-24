@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "0155ac0c-35c7-4a9e-bd85-fbd17d800981",
+  "id": "622194ce-57a1-461b-84d3-5ec9ddd85c48",
   "prevId": "45ac99b5-c51a-41bd-811b-2485a812bb96",
   "tables": {
     "calendar_feeds": {
@@ -2457,6 +2457,13 @@
         "updated_by": {
           "name": "updated_by",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "admin_assigned_at": {
+          "name": "admin_assigned_at",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false

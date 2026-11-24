@@ -207,10 +207,18 @@ describe('a server with no admin', () => {
     expect(serverRoles('oldest')).toEqual(['builtin_admin']);
   });
 
+  test('does not pick a new admin after the admin is later removed', () => {
+    expect(ensureServerAdmin(db)).toBe('oldest');
+    ctx.sqlite.run('DELETE FROM role_assignments');
+    expect(ensureServerAdmin(db)).toBeNull();
+    expect(serverRoles('newer')).toEqual([]);
+  });
+
   test('with ADMIN_EMAILS set, gets only a listed account as admin', () => {
     adminConfig.adminEmails = ['newer@example.com', 'disabled@example.com'];
     expect(ensureServerAdmin(db)).toBe('newer');
     ctx.sqlite.run('DELETE FROM role_assignments');
+    ctx.sqlite.run('UPDATE server_settings SET admin_assigned_at = NULL');
     adminConfig.adminEmails = ['nobody@example.com'];
     expect(ensureServerAdmin(db)).toBeNull();
   });
@@ -262,6 +270,9 @@ describe('approval', () => {
       [vehicleId, ctx.user.id]
     );
     const { userId } = (await signUp('later@example.com')) as { userId: string };
+    expect(shareHolder('s1')).toBeNull();
+    const { attachPendingInvitesOnSignIn } = await import('../../auth/routes');
+    await attachPendingInvitesOnSignIn(userId);
     expect(shareHolder('s1')).toBeNull();
     await admin('POST', `/api/v1/admin/pending-accounts/${userId}/approve`);
     expect(shareHolder('s1')).toBe(userId);
