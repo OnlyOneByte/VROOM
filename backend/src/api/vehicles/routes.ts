@@ -13,6 +13,7 @@ import {
   vehicleFinancing,
   vehicles as vehiclesTable,
 } from '../../db/schema';
+import { VEHICLE_KINDS, VEHICLE_TYPES } from '../../db/types';
 import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
@@ -51,7 +52,6 @@ import { vehicleRepository } from './repository';
 
 const routes = new Hono();
 
-const VEHICLE_TYPES = ['gas', 'electric', 'hybrid'] as const;
 const VIN_PATTERN = new RegExp(
   `^[A-Z0-9]{${CONFIG.validation.vehicle.vinMinLength},${CONFIG.validation.vehicle.vinMaxLength}}$`,
   'i'
@@ -59,6 +59,7 @@ const VIN_PATTERN = new RegExp(
 
 const baseVehicleSchema = createInsertSchema(vehiclesTable, {
   vehicleType: z.enum(VEHICLE_TYPES).optional(),
+  vehicleKind: z.enum(VEHICLE_KINDS).optional(),
   vin: z
     .union([
       z.literal(''),

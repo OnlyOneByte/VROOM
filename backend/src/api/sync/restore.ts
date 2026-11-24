@@ -24,6 +24,7 @@ import {
   vehicleShares,
   vehicles,
 } from '../../db/schema';
+import { isVehicleKind } from '../../db/types';
 import {
   AppError,
   ConflictError,
@@ -572,6 +573,7 @@ class RestoreService {
           catalogModelMatchesMake(row.catalogModelId, String(row.make))
             ? row.catalogModelId
             : null,
+        vehicleKind: isVehicleKind(row.vehicleKind) ? row.vehicleKind : 'car',
       }))
     );
     this.insertRows(tx, vehicleFinancing, data.financing ?? []);

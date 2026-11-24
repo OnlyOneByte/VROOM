@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { ArrowLeft, Car } from '@lucide/svelte';
+	import { ArrowLeft } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import type { Vehicle } from '#lib/types/index.ts';
@@ -10,6 +10,7 @@
 	import { formatNumber } from '#lib/utils/formatters.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { vehicleKindIcon, vehicleKindNote } from '#lib/utils/vehicle-kind.ts';
 
 	interface Props {
 		vehicle: Vehicle;
@@ -28,11 +29,18 @@
 		odometerLoading = false,
 		distanceUnit = 'miles'
 	}: Props = $props();
+
+	let KindIcon = $derived(vehicleKindIcon(vehicle.vehicleKind));
+	let kindNote = $derived(vehicleKindNote(vehicle.vehicleKind));
 </script>
 
 {#snippet description()}
 	<span class="block sm:flex sm:min-w-0 sm:gap-1">
-		<span class="block truncate">{vehicle.year} {vehicle.make} {vehicle.model}</span>
+		<span class="block truncate">
+			{kindNote ? `${kindNote} · ` : ''}{vehicle.year}
+			{vehicle.make}
+			{vehicle.model}
+		</span>
 		{#if vehicle.licensePlate || odometerLoading || odometer !== null}
 			<span class="shrink-0 max-sm:hidden" aria-hidden="true">·</span>
 		{/if}
@@ -76,7 +84,7 @@
 			<div
 				class="hidden h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted sm:flex"
 			>
-				<Car class="h-6 w-6 text-muted-foreground" />
+				<KindIcon class="h-6 w-6 text-muted-foreground" />
 			</div>
 		{/if}
 	{/snippet}

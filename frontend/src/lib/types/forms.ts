@@ -1,4 +1,4 @@
-import type { VehicleType } from './vehicle.js';
+import type { VehicleKind, VehicleType } from './vehicle.js';
 import type { Expense, ExpenseCategory } from './expense.js';
 
 export interface VehicleFormData {
@@ -6,6 +6,7 @@ export interface VehicleFormData {
 	model: string;
 	year: number;
 	vehicleType: VehicleType;
+	vehicleKind: VehicleKind;
 	licensePlate?: string;
 	nickname?: string;
 	vin?: string;

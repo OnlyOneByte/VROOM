@@ -92,6 +92,13 @@
       "when": 1795485471566,
       "tag": "0012_community_stats",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1795492794161,
+      "tag": "0013_vehicle_kind",
+      "breakpoints": true
     }
   ]
 }
