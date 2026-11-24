@@ -12,6 +12,7 @@ const EXCLUDED_BY_DESIGN = [
   'push_subscriptions',
   'community_stats',
   'community_refreshes',
+  'community_noise_keys',
   'calendar_feeds',
   'roles',
   'role_permissions',

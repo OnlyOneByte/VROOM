@@ -753,6 +753,11 @@ export const communityRefreshes = sqliteTable('community_refreshes', {
   refreshedAt: integer('refreshed_at', { mode: 'timestamp' }).notNull(),
 });
 
+export const communityNoiseKeys = sqliteTable('community_noise_keys', {
+  scope: text('scope').primaryKey(),
+  noiseKey: text('noise_key').notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 
 export type Vehicle = typeof vehicles.$inferSelect;

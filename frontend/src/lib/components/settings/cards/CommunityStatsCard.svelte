@@ -16,10 +16,11 @@
 	interface Props {
 		optIn: boolean;
 		region: string | null;
+		minGroup?: number;
 		onSave: (_updates: CommunityStatsUpdate) => Promise<void>;
 	}
 
-	let { optIn, region, onSave }: Props = $props();
+	let { optIn, region, minGroup = 30, onSave }: Props = $props();
 
 	const NOT_SET = 'not-set';
 	const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
@@ -70,14 +71,14 @@
 		<CardDescription>
 			<span class="block font-semibold text-foreground">Compare with other owners</span>
 			Share anonymous averages from your vehicles so you and other people on this server can see how your
-			car compares.
+			vehicle compares.
 		</CardDescription>
 	</CardHeader>
 	<CardContent class="space-y-6">
 		<ul class="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
 			<li>
-				Only averages and rounded group sizes for groups of 10 or more people are ever shown — never
-				your own numbers.
+				Only averages and rounded group sizes for groups of about {minGroup} or more people are ever shown,
+				both with random noise added — never your own numbers.
 			</li>
 			<li>
 				What's used: make, model and model year, powertrain, vehicle kind, vehicle age, and your

@@ -1,10 +1,14 @@
 import { describe, expect, test } from 'bun:test';
 import { ChargeUnit, DistanceUnit, VolumeUnit } from '../../../types';
 import {
+  type AggregateOptions,
   ageBand,
   aggregate,
   bandFor,
   type CommunityVehicle,
+  EPSILON_COUNT,
+  EPSILON_SUM,
+  keyedUniform,
   noiseScaleFor,
   PLAUSIBLE_BANDS,
   premiumInWindow,
@@ -18,7 +22,7 @@ const term = (startDays: number, endDays: number, amount: number) => ({
   termStart: new Date(NOW.getTime() + startDays * DAY),
   termEnd: new Date(NOW.getTime() + endDays * DAY),
 });
-const OPTIONS = { now: NOW, minGroup: 10, uniform: NO_NOISE };
+const OPTIONS: AggregateOptions = { now: NOW, minGroup: 10, uniform: NO_NOISE };
 const CIVIC_KM_PER_L = (300 * 1.609344) / (10 * 3.785411784);
 const CIVIC_FIELDS = { catalogModelId: 'honda-civic', modelYear: 2019, vehicleType: 'gas' };
 
@@ -59,29 +63,51 @@ describe('community stats aggregation privacy', () => {
     }
   });
 
-  test('each bucket takes exactly one noise draw per refresh, spending ε = 1 on its mean', () => {
-    let draws = 0;
-    const uniform = () => {
-      draws++;
+  test('a published bucket draws once for its count and once for its sum, a suppressed one only for its count', () => {
+    const labels: string[] = [];
+    const uniform = (label: string) => {
+      labels.push(label);
       return 0.5;
     };
     const result = aggregate(
-      owners(30).map((id) => vehicle(id)),
+      [...owners(30).map((id) => vehicle(id)), vehicle('alone', { vehicleKind: 'motorcycle' })],
       { ...OPTIONS, uniform }
     );
-    expect(result.rows.length).toBeGreaterThan(0);
-    expect(draws).toBe(result.rows.length);
+    const kinds = labels.map((label) => label.split('|').at(-1));
+    expect(kinds.filter((kind) => kind === 'sum')).toHaveLength(result.published);
+    expect(kinds.filter((kind) => kind === 'count')).toHaveLength(
+      result.published + result.suppressed
+    );
+    expect(result.suppressed).toBeGreaterThan(0);
   });
 
-  test('the published mean is the true mean plus one Laplace draw at the published-n scale', () => {
+  test('the mean is lo plus the noisy sum over the noisy count, with ε = 0.5 for each', () => {
     const u = 0.9;
     const row = efficiencyRow(
       owners(12).map((id) => vehicle(id)),
       { ...OPTIONS, uniform: () => u }
     );
-    const scale = (18.4 - 8.5) / 10;
-    const noise = -scale * Math.sign(u - 0.5) * Math.log(1 - 2 * Math.abs(u - 0.5));
-    expect(row?.mean).toBeCloseTo(Math.round((CIVIC_KM_PER_L + noise) * 10) / 10, 6);
+    const draw = -Math.log(1 - 2 * (u - 0.5));
+    const noisyCount = 12 + (1 / EPSILON_COUNT) * draw;
+    const noisySum = 12 * (CIVIC_KM_PER_L - 8.5) + ((18.4 - 8.5) / EPSILON_SUM) * draw;
+    expect(row?.nPublished).toBe(15);
+    expect(row?.mean).toBeCloseTo(Math.round((8.5 + noisySum / noisyCount) * 10) / 10, 6);
+  });
+
+  test('whether a group is published, and the count it shows, come from the noisy count', () => {
+    const twentyThree = owners(23).map((id) => vehicle(id));
+    const lifted = (label: string) => (label.endsWith('|count') ? 0.99 : 0.5);
+    const lowered = (label: string) => (label.endsWith('|count') ? 0.01 : 0.5);
+    const lift = -(1 / EPSILON_COUNT) * Math.log(1 - 2 * 0.49);
+    expect(23 + lift).toBeGreaterThan(30);
+    expect(
+      efficiencyRow(twentyThree, { ...OPTIONS, minGroup: 30, uniform: lifted })?.nPublished
+    ).toBe(30);
+    const thirtyTwo = owners(32).map((id) => vehicle(id));
+    expect(efficiencyRow(thirtyTwo, { ...OPTIONS, minGroup: 30 })?.nPublished).toBe(30);
+    expect(
+      efficiencyRow(thirtyTwo, { ...OPTIONS, minGroup: 30, uniform: lowered })
+    ).toBeUndefined();
   });
 
   test('a rated model is clipped to 20% beyond its public ratings, an unrated one to the wide band', () => {
@@ -113,31 +139,62 @@ describe('community stats aggregation privacy', () => {
     expect(efficiencyRow([...typical('audi-a1'), outlier('audi-a1')])?.nPublished).toBe(15);
   });
 
-  test('the noise scale is the band width over the published n', () => {
-    expect(noiseScaleFor({ lo: 2, hi: 60 }, 10)).toBeCloseTo(5.8, 9);
-    expect(noiseScaleFor({ lo: 2, hi: 60 }, 100)).toBeCloseTo(0.58, 9);
+  test("the mean's noise scale is the band width over ε_sum times the count", () => {
+    expect(noiseScaleFor({ lo: 2, hi: 60 }, 10)).toBeCloseTo(11.6, 9);
+    expect(noiseScaleFor({ lo: 2, hi: 60 }, 100)).toBeCloseTo(1.16, 9);
   });
 
-  test('a raised minimum group size is respected, and published n never falls below it', () => {
-    const twelve = owners(12).map((id) => vehicle(id));
-    expect(efficiencyRow(twelve, { ...OPTIONS, minGroup: 15 })).toBeUndefined();
-    expect(efficiencyRow(twelve, { ...OPTIONS, minGroup: 12 })).toBeUndefined();
+  test('a group publishes only once its noisy count reaches the threshold', () => {
+    const fourteen = owners(14).map((id) => vehicle(id));
+    expect(efficiencyRow(fourteen, { ...OPTIONS, minGroup: 15 })).toBeUndefined();
     const fifteen = owners(15).map((id) => vehicle(id));
-    expect(efficiencyRow(fifteen, { ...OPTIONS, minGroup: 12 })?.nPublished).toBe(15);
+    expect(efficiencyRow(fifteen, { ...OPTIONS, minGroup: 15 })?.nPublished).toBe(15);
   });
 
-  test('the noise depends only on the published n, not the exact n', () => {
-    const fixed = () => 0.9;
-    const ten = efficiencyRow(
-      owners(10).map((id) => vehicle(id)),
-      { ...OPTIONS, uniform: fixed }
-    );
-    const fourteen = efficiencyRow(
-      owners(14).map((id) => vehicle(id)),
-      { ...OPTIONS, uniform: fixed }
-    );
-    expect(ten?.mean).not.toBeCloseTo(Math.round(CIVIC_KM_PER_L * 10) / 10, 3);
-    expect(fourteen?.mean).toBe(ten?.mean as number);
+  test('unchanged data under the same key gives the same release, so refreshes cannot be averaged', () => {
+    const group = () => owners(40).map((id) => vehicle(id));
+    const keyed = { now: NOW, minGroup: 30, noiseKey: 'test-key' };
+    const first = aggregate(group(), keyed).rows;
+    expect(first.length).toBeGreaterThan(0);
+    expect(aggregate(group(), keyed).rows).toEqual(first);
+    expect(
+      aggregate(group(), { ...keyed, now: new Date(NOW.getTime() + DAY) }).rows.map((r) => r.mean)
+    ).toEqual(first.map((r) => r.mean));
+  });
+
+  test('a change to the data, or a different key, draws fresh noise', () => {
+    const labels = (vehicles: CommunityVehicle[]) => {
+      const seen: string[] = [];
+      aggregate(vehicles, {
+        ...OPTIONS,
+        uniform: (label) => {
+          seen.push(label);
+          return 0.5;
+        },
+      });
+      return seen;
+    };
+    const forty = owners(40).map((id) => vehicle(id));
+    const joined = [...forty, vehicle('newcomer')];
+    const changed = [
+      ...forty.slice(1),
+      vehicle(forty[0]?.ownerId ?? '', { expenses: fillUps({ volume: 9 }) }),
+    ];
+    const before = labels(forty);
+    const efficiencyLabels = (list: string[]) => list.filter((l) => l.startsWith('efficiency|'));
+    expect(labels(joined).filter((label) => before.includes(label))).toEqual([]);
+    expect(efficiencyLabels(before)).toHaveLength(2);
+    expect(efficiencyLabels(labels(changed)).filter((label) => before.includes(label))).toEqual([]);
+    expect(labels(changed).filter((label) => before.includes(label)).length).toBeGreaterThan(0);
+
+    const [label = ''] = before;
+    expect(keyedUniform('a')(label)).toBe(keyedUniform('a')(label));
+    expect(keyedUniform('a')(label)).not.toBe(keyedUniform('b')(label));
+    for (const probe of ['x', 'y', 'z']) {
+      const u = keyedUniform('a')(probe);
+      expect(u).toBeGreaterThan(0);
+      expect(u).toBeLessThan(1);
+    }
   });
 
   test('published values are rounded to their step and never reveal exact n', () => {

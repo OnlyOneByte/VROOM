@@ -112,7 +112,7 @@ function metric(body: CompareBody | null, name: string): CompareMetric | undefin
 describe('GET /api/v1/community/compare', () => {
   test('a caller who has not opted in gets no numbers at all', async () => {
     const vehicleId = await seedCivic();
-    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 40, 12);
 
     const { res, body } = await compare(vehicleId);
     expect(res.status).toBe(200);
@@ -123,7 +123,7 @@ describe('GET /api/v1/community/compare', () => {
 
   test('an opted-in owner sees the bucket converted to the vehicle units', async () => {
     const vehicleId = await seedCivic();
-    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 40, 12);
     await optIn();
 
     const { body } = await compare(vehicleId);
@@ -131,7 +131,7 @@ describe('GET /api/v1/community/compare', () => {
     expect(efficiency?.status).toBe('ok');
     expect(efficiency?.unit).toBe('distance_per_volume');
     expect(efficiency?.yours).toBeCloseTo(30, 6);
-    expect(efficiency?.bucket?.n).toBe(20);
+    expect(efficiency?.bucket?.n).toBe(40);
     expect(efficiency?.bucket?.mean as number).toBeCloseTo(12 * MPG_PER_KM_PER_L, 6);
     expect(Object.keys(efficiency?.bucket ?? {}).sort()).toEqual(['computedAt', 'mean', 'n']);
     expect(body?.currency).toBe('USD');
@@ -139,7 +139,7 @@ describe('GET /api/v1/community/compare', () => {
 
   test('an opt-in after the last refresh waits for the next one before showing numbers', async () => {
     const vehicleId = await seedCivic();
-    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 40, 12);
     markRefreshed(-3600);
     await optInNow();
 
@@ -161,7 +161,7 @@ describe('GET /api/v1/community/compare', () => {
 
   test('opting out hides comparisons at once, and opting back in waits for a refresh', async () => {
     const vehicleId = await seedCivic();
-    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 40, 12);
     await optIn();
     expect(metric((await compare(vehicleId)).body, 'efficiency')?.status).toBe('ok');
 
@@ -188,7 +188,7 @@ describe('GET /api/v1/community/compare', () => {
 
   test('a consent stamped in the same second as the refresh still waits', async () => {
     const vehicleId = await seedCivic();
-    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 40, 12);
     await optInNow();
     ctx.sqlite.run("UPDATE community_refreshes SET refreshed_at = ? WHERE scope = 'local'", [
       consentedAt(ctx.user.id),
@@ -199,7 +199,7 @@ describe('GET /api/v1/community/compare', () => {
 
   test('a share recipient who just opted in waits even though the owner is included', async () => {
     const vehicleId = await seedCivic();
-    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 40, 12);
     await optIn();
     await other.acceptShare(vehicleId, 'viewer');
     await optInNow(other.request);
@@ -214,20 +214,20 @@ describe('GET /api/v1/community/compare', () => {
 
   test('an average whose noise is over a quarter of its value is hidden as not_enough_data', async () => {
     const vehicleId = await seedCivic();
-    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 10, 12);
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 30, 12);
     await optIn();
     const hidden = metric((await compare(vehicleId)).body, 'efficiency');
     expect(hidden?.status).toBe('not_enough_data');
     expect(hidden?.bucket).toBeNull();
     expect(JSON.stringify(hidden)).not.toContain('"n"');
 
-    ctx.sqlite.run('UPDATE community_stats SET n_published = 20 WHERE bucket_key = ?', [CIVIC_KEY]);
+    ctx.sqlite.run('UPDATE community_stats SET n_published = 40 WHERE bucket_key = ?', [CIVIC_KEY]);
     expect(metric((await compare(vehicleId)).body, 'efficiency')?.status).toBe('ok');
   });
 
-  test("a rated model's narrower band shows its average from 10 owners", async () => {
+  test("a rated model's narrower band shows its average from the smallest published group", async () => {
     const vehicleId = await seedCivic();
-    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 10, 12);
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 30, 12);
     ctx.sqlite.run(
       "UPDATE community_stats SET catalog_model_id = 'honda-civic', model_year = 2019, vehicle_type = 'gas' WHERE bucket_key = ?",
       [CIVIC_KEY]
@@ -235,19 +235,19 @@ describe('GET /api/v1/community/compare', () => {
     await optIn();
     const shown = metric((await compare(vehicleId)).body, 'efficiency');
     expect(shown?.status).toBe('ok');
-    expect(shown?.bucket?.n).toBe(10);
+    expect(shown?.bucket?.n).toBe(30);
   });
 
-  test('a row below K in the table is never returned', async () => {
+  test('a row below the publication threshold in the table is never returned', async () => {
     const vehicleId = await seedCivic();
-    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 5, 12);
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 25, 12);
     await optIn();
 
     const { body } = await compare(vehicleId);
     const efficiency = metric(body, 'efficiency');
     expect(efficiency?.status).toBe('too_few');
     expect(efficiency?.bucket).toBeNull();
-    expect(JSON.stringify(body)).not.toContain('"n":5');
+    expect(JSON.stringify(body)).not.toContain('"n":25');
   });
 
   test('a vehicle without a catalogue model asks for one, and missing data says so', async () => {
@@ -263,7 +263,7 @@ describe('GET /api/v1/community/compare', () => {
 
   test("another user's vehicle is a 404, even for an opted-in caller", async () => {
     const vehicleId = await seedCivic();
-    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 40, 12);
     await optIn(other.request);
 
     const { res } = await compare(vehicleId, other.request);
@@ -272,7 +272,7 @@ describe('GET /api/v1/community/compare', () => {
 
   test('an accepted share recipient who opted in can read the comparison', async () => {
     const vehicleId = await seedCivic();
-    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 40, 12);
     await other.acceptShare(vehicleId, 'viewer');
     await optIn(other.request);
 
@@ -304,7 +304,7 @@ describe('GET /api/v1/community/compare', () => {
 
   test('a share recipient who has not opted in gets no numbers from an opted-in owner', async () => {
     const vehicleId = await seedCivic();
-    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 40, 12);
     await optIn();
     await other.acceptShare(vehicleId, 'viewer');
 
@@ -316,7 +316,7 @@ describe('GET /api/v1/community/compare', () => {
 
   test('the server switch set to off returns feature_off and no numbers', async () => {
     const vehicleId = await seedCivic();
-    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 40, 12);
     await optIn();
     communityConfig.mode = 'off';
 

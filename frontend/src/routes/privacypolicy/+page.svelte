@@ -111,8 +111,10 @@
 				<p>
 					If this server has community comparisons turned on and you switch on "Include my vehicles
 					in community stats" in Settings, anonymous averages built from your vehicles are shown to
-					other people on the same server who have also opted in. Each average covers a group of at
-					least 10 people, has random noise added, and is never your own numbers. Only make, model
+					other people on the same server who have also opted in. Each average covers a group of
+					about 30 people or more (a server can set this, but never below 20). The average, the
+					group size and whether a group is shown at all have random noise added, so they can't
+					reveal whether you are in it, and an average is never your own numbers. Only make, model
 					and model year, powertrain, vehicle kind (such as car or motorcycle), vehicle age, your
 					currency, your region if you set one, and from the last 12 months your fuel, maintenance
 					and insurance costs, your fuel or charge amounts, and the distance driven (worked out from

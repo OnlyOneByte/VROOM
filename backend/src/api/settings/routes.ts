@@ -155,7 +155,11 @@ function consentUpdate(
 }
 
 function withServerSettings<T extends object>(prefs: T) {
-  return { ...prefs, communityStatsMode: CONFIG.communityStats.mode };
+  return {
+    ...prefs,
+    communityStatsMode: CONFIG.communityStats.mode,
+    communityStatsMinGroup: CONFIG.communityStats.minGroup,
+  };
 }
 
 const routes = new Hono();

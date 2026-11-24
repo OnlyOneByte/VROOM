@@ -387,6 +387,7 @@
 				<CommunityStatsCard
 					optIn={settings.communityStatsOptIn ?? false}
 					region={settings.communityRegion ?? null}
+					minGroup={settings.communityStatsMinGroup}
 					onSave={saveCommunityStats}
 				/>
 			{/if}

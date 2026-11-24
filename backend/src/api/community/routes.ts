@@ -15,6 +15,7 @@ import {
   type CommunityUnit,
   LOCAL_SCOPE,
   noiseScaleFor,
+  publishedCount,
   vehicleSamples,
 } from './aggregator';
 import { communityStatsRepository } from './repository';
@@ -141,15 +142,14 @@ routes.get('/compare', zValidator('query', compareQuerySchema), async (c) => {
   if (!vehicle) throw new NotFoundError('Vehicle');
 
   const samples = vehicleSamples(vehicle, now);
+  const smallestPublished = publishedCount(CONFIG.communityStats.minGroup);
   const rows = await communityStatsRepository.publishedBuckets(
     LOCAL_SCOPE,
     samples.map((sample) => sample.bucketKey),
-    CONFIG.communityStats.minGroup
+    smallestPublished
   );
   const rowByKey = new Map(
-    rows
-      .filter((row) => row.nPublished >= CONFIG.communityStats.minGroup)
-      .map((row) => [row.bucketKey, row])
+    rows.filter((row) => row.nPublished >= smallestPublished).map((row) => [row.bucketKey, row])
   );
 
   const metrics = METRICS.map((metric): CompareMetric => {

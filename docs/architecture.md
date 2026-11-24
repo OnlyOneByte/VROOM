@@ -136,12 +136,28 @@ no-ops when nothing changed since the last sync, so an idle user with no edits c
 
 Before a bucket is stored, the job enforces the privacy rules:
 
-- n counts people, and a bucket is published only when that count, rounded down to a multiple of 5, is at least K (10, or `COMMUNITY_STATS_MIN_GROUP`);
+- n counts people: each owner contributes one value per bucket, the median of their vehicles in it;
 - values outside the bucket's band `[lo, hi]` are dropped first. Bands come only from public data, never from the bucket's own values. Fuel efficiency for a petrol or electric model and year in `fuel-economy-ratings.json` uses 80% of its lowest to 120% of its highest fueleconomy.gov combined rating; hybrids and everything else use the wide plausible band for their unit;
-- each bucket publishes its rounded group size and one noisy statistic, the mean. The mean gets one Laplace draw from a cryptographic source at scale `(hi − lo) / n_published`, then is rounded. That is ε = 1 per bucket per refresh against a change in one person's value. No quantiles are published: Laplace noise at a mean's sensitivity is not a private release for a median.
-- not yet covered: one person joining or leaving a group. The noise scale follows the rounded size, and the rounded size and whether a group appears are published without noise (#1591).
+- the count and the sum are noised separately, and everything published is computed from those two noisy numbers. No quantiles are published.
 
-The write replaces the `scope='local'` rows in one transaction. `GET /api/v1/community/compare` (`routes.ts`) only answers callers who have opted in. It computes the caller's own values with the same `vehicleSamples` function and looks up only rows with `n_published >= K`.
+#### The release, and what it guarantees (#1591)
+
+For one bucket with owner values `v₁ … vₙ` in `[lo, hi]`, each refresh computes:
+
+| Step | Formula | Budget |
+|---|---|---|
+| Noisy count | `ñ = n + Lap(1 / ε_c)` | `ε_c = 0.5` (a count changes by at most 1 when one person joins or leaves) |
+| Threshold | publish only if `ñ ≥ T`, where `T = COMMUNITY_STATS_MIN_GROUP` (default 30, never below 20) | none: it only reads `ñ` |
+| Noisy sum | `S̃ = Σ(vᵢ − lo) + Lap((hi − lo) / ε_s)` | `ε_s = 0.5` (each term lies in `[0, hi − lo]`) |
+| Published | `n_published = 5·⌊ñ / 5⌋`, `mean = clamp(lo + S̃ / ñ, lo, hi)`, rounded to the unit's step | none: computed only from `ñ` and `S̃` |
+
+- **Guarantee:** (ε = 1, δ) per bucket per refresh, where two datasets are neighbours when one person is added or removed. A person whose value changes, or moves out of the band, is a removal followed by an addition. By basic composition the two Laplace releases add up to `ε_c + ε_s = 1`. The threshold and the rounding are post-processing.
+- **The δ term** covers the one case pure ε can't: a bucket that exists only because one person is in it. Without them nothing is published. With them, `ñ = 1 + Lap(2)` reaches `T` with probability `δ = ½·e^(−(T − 1)/2)`, which is about 2.5e-7 at `T = 30` and about 4e-5 at `T = 20`.
+- **Sampler:** each draw is a 53-bit uniform taken from HMAC-SHA256, and the Laplace value comes from the inverse CDF. The largest possible draw is about 36.7 scales, so cutting off the tail adds at most about 1e-16 to δ. Floating-point Laplace sampling has known small leaks; rounding to the publish step softens them.
+- **Stable noise:** the uniform for a draw is `HMAC(k, bucket key | SHA-256(sorted owner values) | "count" or "sum")`. `k` is a random 256-bit key per scope in `community_noise_keys`, created on the first refresh and never exported or backed up. A refresh over unchanged data therefore republishes exactly the same numbers, so daily refreshes can't be averaged to wear the noise down. Each distinct dataset a bucket goes through is a fresh (ε, δ) release, so the total cost grows with the number of real changes, not the number of refreshes. Anyone holding `k` together with the database could recompute the noise, but database access already exposes the raw data.
+- **Accuracy:** the noise on the published mean is about `(hi − lo) / (ε_s · ñ)`. The compare API shows an average only when `(hi − lo) / (ε_s · n_published)` is at most 25% of it, and reports `not_enough_data` otherwise.
+
+The write replaces the `scope='local'` rows in one transaction. `GET /api/v1/community/compare` (`routes.ts`) only answers callers who have opted in. It computes the caller's own values with the same `vehicleSamples` function and looks up only rows with `n_published` at least `T` rounded down to a multiple of 5.
 
 ## Frontend
 

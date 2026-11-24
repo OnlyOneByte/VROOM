@@ -37,7 +37,6 @@
 	let { vehicle, isOwner, onVehicleUpdated }: Props = $props();
 
 	const headingId = $props.id();
-	const MIN_GROUP = 10;
 
 	function metricLabel(metric: CompareMetric['metric']): string {
 		switch (metric) {
@@ -62,6 +61,7 @@
 
 	let dismissKey = $derived(`vroom.community.model-dismissed.${vehicle.id}`);
 	let serverOff = $derived(settingsStore.settings?.communityStatsMode === 'off');
+	let minGroup = $derived(settingsStore.settings?.communityStatsMinGroup ?? 30);
 	let metrics = $derived(result?.metrics ?? []);
 	let featureOff = $derived(metrics.length > 0 && metrics.every(m => m.status === 'feature_off'));
 	let optInRequired = $derived(metrics.some(m => m.status === 'opt_in_required'));
@@ -321,7 +321,7 @@
 							{:else if metric.status === 'not_enough_data'}
 								<p class="text-sm text-muted-foreground">
 									Not enough owners yet for a reliable average. It shows once more people with a
-									similar car have opted in.
+									similar vehicle have opted in.
 								</p>
 							{:else if metric.status === 'too_few'}
 								<p class="text-sm text-muted-foreground">Not enough owners yet.</p>
@@ -335,7 +335,7 @@
 
 			{#if anyTooFew}
 				<p class="text-xs text-muted-foreground">
-					Comparisons appear once at least {MIN_GROUP} people on this server with a similar car have opted
+					Comparisons appear once about {minGroup} people on this server with a similar vehicle have opted
 					in.
 				</p>
 			{/if}
