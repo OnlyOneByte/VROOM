@@ -269,4 +269,36 @@ describe('the calendar feed link', () => {
       log.mockRestore();
     }
   });
+
+  test('a percent-escaped link is a 404 and never reaches the log', async () => {
+    const path = await createFeed();
+    const token = path.match(/feed\/(.+)\.ics$/)?.[1] ?? '';
+    const hex = (char: string) => `%${char.charCodeAt(0).toString(16)}`;
+    const log = spyOn(console, 'log');
+    try {
+      for (const variant of [
+        path.replace('/calendar/', '/%63alendar/'),
+        path.replace('/calendar/', '/%2563alendar/'),
+        `/api${path}`,
+        `/api${path.replace('/calendar/', '/%63alendar/')}`,
+        `/api${path.replace('.ics', '%0A.ics')}`,
+        `/api${path.replace('/calendar/', '/cal%09endar/')}`,
+        ...['%09', '%0A', '%20', '%2F'].flatMap((split) => {
+          const broken = path.replace(token, `${token.slice(0, 21)}${split}${token.slice(21)}`);
+          return [broken, `/api${broken}`];
+        }),
+        path.replace(token, `${token.slice(0, 21)}${hex(token[21])}${token.slice(22)}`),
+        path.replace(token, `${token.slice(0, 21)}%25${hex(token[21]).slice(1)}${token.slice(22)}`),
+      ]) {
+        const res = await fetchFeed(variant);
+        expect(`${variant.length} ${res.status}`).toBe(`${variant.length} 404`);
+      }
+      const lines = log.mock.calls.map((call) => call.join(' '));
+      for (const piece of [token.slice(0, 20), token.slice(12, 32), token.slice(-20)]) {
+        expect(lines.some((line) => line.includes(piece))).toBe(false);
+      }
+    } finally {
+      log.mockRestore();
+    }
+  });
 });

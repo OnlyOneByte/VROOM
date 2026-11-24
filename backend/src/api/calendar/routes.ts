@@ -16,10 +16,10 @@ import { toIcs } from './ics';
 const routes = new Hono();
 
 const FEED_PATH = '/calendar/feed/';
-const TOKEN_LIKE = /[A-Za-z0-9_-]{40,}/g;
+const TOKEN_LIKE = /[A-Za-z0-9_%-]{40,}/g;
 
 export function redactFeedTokens(text: string): string {
-  return /calendar/i.test(text) ? text.replace(TOKEN_LIKE, '[redacted]') : text;
+  return text.replace(TOKEN_LIKE, '[redacted]');
 }
 const TOKEN_FILE = /^([A-Za-z0-9_-]{43})\.ics$/;
 
@@ -62,7 +62,8 @@ async function feedOf(userId: string): Promise<CalendarFeed | undefined> {
 }
 
 routes.get('/feed/:file', feedRateLimiter, async (c) => {
-  const token = TOKEN_FILE.exec(c.req.param('file') ?? '')?.[1];
+  const escaped = new URL(c.req.url).pathname.includes('%');
+  const token = escaped ? undefined : TOKEN_FILE.exec(c.req.param('file') ?? '')?.[1];
   const feed = token
     ? await getDb()
         .select()

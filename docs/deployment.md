@@ -495,14 +495,14 @@ removing `default` turns it off.
 
 Each user can create a private calendar link in Settings → Calendar, which Google, Apple and Outlook Calendar subscribe to. The link carries a long random secret in its path (`/api/v1/calendar/feed/<secret>.ics`); anyone holding it can read that user's feed until they replace or turn it off. VROOM stores only a hash of the secret and prints the path with the secret replaced by `[redacted]` in its own request log.
 
-**Your reverse proxy logs the full URL**, secret included, unless you filter it. Calendar apps fetch the link from their own servers every few hours, so the access log fills with working links. Filter the path out before it is written:
+**Your reverse proxy logs the full URL**, secret included, unless you filter it. Calendar apps fetch the link from their own servers every few hours, so the access log fills with working links. Filter it out before it is written. These filters replace any run of 40 or more letters, digits, `-`, `_` or `%` in the request URI, so they also catch a link written with percent-escapes (VROOM answers those with 404, but the secret would still be in the log):
 
 - **Caddy:**
 
   ```caddyfile
   log {
       format filter {
-          request>uri regexp (?i)^(.*/calendar/+feed/+)[^/?]+ ${1}[redacted]
+          request>uri regexp [A-Za-z0-9_%-]{40,} [redacted]
       }
   }
   ```
@@ -511,7 +511,7 @@ Each user can create a private calendar link in Settings → Calendar, which Goo
 
   ```nginx
   map $request_uri $vroom_logged_uri {
-      "~*^(?<feed>.*/calendar/+feed/+)[^/?]+(?<rest>.*)$" "${feed}[redacted]${rest}";
+      "~^(?<pre>[^?]*?)[A-Za-z0-9_%-]{40,}(?<rest>.*)$" "${pre}[redacted]${rest}";
       default $request_uri;
   }
   log_format vroom '$remote_addr - [$time_local] "$request_method $vroom_logged_uri" $status $body_bytes_sent';
