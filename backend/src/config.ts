@@ -81,6 +81,10 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((val) => val === '1' || val === 'true'),
+  DEMO_MODE: z
+    .string()
+    .optional()
+    .transform((val) => val === '1' || val === 'true'),
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().optional(),
@@ -137,6 +141,7 @@ export const CONFIG = {
     env.ALLOW_FAKE_STORAGE && (env.NODE_ENV as Environment) !== 'production',
   blockPrivateProviderEndpoints: env.BLOCK_PRIVATE_PROVIDER_ENDPOINTS,
   disableRateLimit: env.DISABLE_RATE_LIMIT && (env.NODE_ENV as Environment) !== 'production',
+  demo: { enabled: env.DEMO_MODE, sessionDuration: 60 * 60 * 1000 },
   server: { port: env.PORT, host: env.HOST },
   encryption: {
     providerKey: env.PROVIDER_ENCRYPTION_KEY,

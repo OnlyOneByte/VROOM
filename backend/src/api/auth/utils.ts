@@ -36,7 +36,11 @@ export function setSessionCookie(
   cookieName: string,
   session: Pick<Session, 'id' | 'expiresAt'>
 ): void {
-  setCookie(c, cookieName, session.id, { ...sessionCookieOptions(), expires: session.expiresAt });
+  const options = { ...sessionCookieOptions(), expires: session.expiresAt };
+  if (demoSessionExpiresAt(session.id)) {
+    options.maxAge = Math.max(0, Math.floor((session.expiresAt.getTime() - Date.now()) / 1000));
+  }
+  setCookie(c, cookieName, session.id, options);
 }
 
 export function clearSessionCookie(c: Context, cookieName: string): void {
@@ -59,16 +63,38 @@ export function consumeOAuthState(
   return entry;
 }
 
+export const DEMO_SESSION_PREFIX = 'demo_';
+
+export function demoSessionExpiresAt(sessionId: string): Date | null {
+  if (!sessionId.startsWith(DEMO_SESSION_PREFIX)) return null;
+  const issuedAt = Number(sessionId.slice(DEMO_SESSION_PREFIX.length).split('_')[0]);
+  return new Date((Number.isFinite(issuedAt) ? issuedAt : 0) + CONFIG.demo.sessionDuration);
+}
+
 // Lucia extends the DB expiry without rewriting the cookie; re-issue it or the browser drops a live session.
 export async function validateAndRefreshSession(
   sessionId: string,
   lucia: Lucia,
   c?: Context
 ): Promise<SessionRefreshResult | null> {
+  const demoExpiresAt = demoSessionExpiresAt(sessionId);
+  if (demoExpiresAt && demoExpiresAt <= new Date()) {
+    await lucia.invalidateSession(sessionId);
+    return null;
+  }
+
   const { session, user } = await lucia.validateSession(sessionId);
 
   if (!session || !user) {
     return null;
+  }
+
+  if (demoExpiresAt) {
+    return {
+      session: { ...session, expiresAt: demoExpiresAt, fresh: false },
+      user,
+      refreshed: false,
+    };
   }
 
   if (!session.fresh) {

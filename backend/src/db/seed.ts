@@ -151,17 +151,26 @@ export async function seedDatabase() {
       status: 'active',
     });
 
+    await seedGarage(sampleUser.id);
+  } catch (error) {
+    logger.error('Error seeding database', { error });
+    throw error;
+  }
+}
+
+export async function seedGarage(userId: string) {
+  try {
     await db.insert(userPreferences).values({
-      userId: sampleUser.id,
+      userId,
     });
     await db.insert(syncState).values({
-      userId: sampleUser.id,
+      userId,
     });
 
     const [vehicle1] = await db
       .insert(vehicles)
       .values({
-        userId: sampleUser.id,
+        userId,
         make: 'Toyota',
         model: 'Camry',
         year: 2020,
@@ -176,7 +185,7 @@ export async function seedDatabase() {
     const [vehicle2] = await db
       .insert(vehicles)
       .values({
-        userId: sampleUser.id,
+        userId,
         make: 'Honda',
         model: 'Civic',
         year: 2019,
@@ -209,7 +218,7 @@ export async function seedDatabase() {
     const [policy1] = await db
       .insert(insurancePolicies)
       .values({
-        userId: sampleUser.id,
+        userId,
         company: 'State Farm',
         isActive: true,
       })
@@ -218,7 +227,7 @@ export async function seedDatabase() {
     const [policy2] = await db
       .insert(insurancePolicies)
       .values({
-        userId: sampleUser.id,
+        userId,
         company: 'Geico',
         isActive: true,
       })
@@ -258,19 +267,19 @@ export async function seedDatabase() {
         startDate: term.startDate,
         endDate: term.endDate,
         policyNumber: term.policyNumber,
-        userId: sampleUser.id,
+        userId,
       });
     }
 
     const camry: DrivingPattern = {
       vehicleId: vehicle1.id,
-      userId: sampleUser.id,
+      userId,
       mileageAYearAgo: 29000,
       milesPerDay: 32,
     };
     const civic: DrivingPattern = {
       vehicleId: vehicle2.id,
-      userId: sampleUser.id,
+      userId,
       mileageAYearAgo: 24000,
       milesPerDay: 14,
     };
@@ -324,7 +333,7 @@ export async function seedDatabase() {
     await db.insert(expenses).values([
       {
         vehicleId: vehicle1.id,
-        userId: sampleUser.id,
+        userId,
         tags: ['car-wash'],
         category: 'maintenance',
         expenseAmount: dollarsToCents(30.0),
@@ -336,7 +345,7 @@ export async function seedDatabase() {
       },
       {
         vehicleId: vehicle2.id,
-        userId: sampleUser.id,
+        userId,
         tags: ['car-wash'],
         category: 'maintenance',
         expenseAmount: dollarsToCents(30.0),

@@ -16,6 +16,7 @@ import { storePending } from '../../utils/pending-credentials';
 import { readJsonBody } from '../../utils/request-body';
 import { attachPendingInvites } from '../shares/repository';
 import { authProviderRepository, buildAuthProviderConfig } from './auth-provider-repository';
+import { DEMO_USER_ID, isDemoAvailable, startDemoSession } from './demo';
 import { lucia } from './lucia';
 import {
   googleStorageClient,
@@ -29,6 +30,7 @@ import { NoVerifiedEmailError, type OAuthFlow } from './providers/types';
 import {
   clearSessionCookie,
   consumeOAuthState,
+  demoSessionExpiresAt,
   setSessionCookie,
   validateAndRefreshSession,
 } from './utils';
@@ -156,6 +158,14 @@ routes.get('/providers', async (c) => {
     success: true,
     data: providers.map((p) => ({ id: p.id, displayName: p.displayName })),
   });
+});
+
+routes.get('/demo', (c) => c.json({ success: true, data: { available: isDemoAvailable() } }));
+
+routes.post('/demo', authRateLimiter, async (c) => {
+  if (!isDemoAvailable()) throw new NotFoundError('Demo garage');
+  const expiresAt = await startDemoSession(c);
+  return c.json({ success: true, data: { session: { expiresAt } } });
 });
 
 routes.get('/login/:authProvider', authRateLimiter, async (c) => {
@@ -528,8 +538,9 @@ routes.get('/me', async (c) => {
     data: {
       user: serializeSessionUser(user),
       session: {
-        expiresAt: session.expiresAt,
+        expiresAt: demoSessionExpiresAt(session.id) ?? session.expiresAt,
       },
+      demo: user.id === DEMO_USER_ID,
     },
   });
 });
