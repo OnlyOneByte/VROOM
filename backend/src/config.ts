@@ -23,7 +23,8 @@ import {
 import SHARED_LIMITS from './shared-limits.json';
 import type { Environment } from './types';
 
-const COMMUNITY_STATS_MIN_GROUP_FLOOR = 10;
+const COMMUNITY_STATS_MIN_GROUP_FLOOR = 20;
+const COMMUNITY_STATS_MIN_GROUP_DEFAULT = 30;
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -101,7 +102,7 @@ const envSchema = z.object({
   COMMUNITY_STATS: z.enum(['off', 'local']).default('local'),
   COMMUNITY_STATS_MIN_GROUP: z
     .string()
-    .default(String(COMMUNITY_STATS_MIN_GROUP_FLOOR))
+    .default(String(COMMUNITY_STATS_MIN_GROUP_DEFAULT))
     .transform((val) => {
       const minGroup = Number(val);
       if (!Number.isInteger(minGroup) || minGroup < COMMUNITY_STATS_MIN_GROUP_FLOOR)

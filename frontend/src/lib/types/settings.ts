@@ -111,6 +111,7 @@ export interface UserSettings {
 	communityStatsConsentedAt?: string | null;
 	communityRegion?: string | null;
 	communityStatsMode?: CommunityStatsMode;
+	communityStatsMinGroup?: number;
 	createdAt: string;
 	updatedAt: string;
 }

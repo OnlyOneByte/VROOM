@@ -136,12 +136,29 @@ no-ops when nothing changed since the last sync, so an idle user with no edits c
 
 Before a bucket is stored, the job enforces the privacy rules:
 
-- n counts people, and a bucket is published only when that count, rounded down to a multiple of 5, is at least K (10, or `COMMUNITY_STATS_MIN_GROUP`);
+- n counts people: each owner contributes one value per bucket, the median of their vehicles in it;
 - values outside the bucket's band `[lo, hi]` are dropped first. Bands come only from public data, never from the bucket's own values. Fuel efficiency for a petrol or electric model and year in `fuel-economy-ratings.json` uses 80% of its lowest to 120% of its highest fueleconomy.gov combined rating; hybrids and everything else use the wide plausible band for their unit;
-- each bucket publishes its rounded group size and one noisy statistic, the mean. The mean gets one Laplace draw from a cryptographic source at scale `(hi − lo) / n_published`, then is rounded. That is ε = 1 per bucket per refresh against a change in one person's value. No quantiles are published: Laplace noise at a mean's sensitivity is not a private release for a median.
-- not yet covered: one person joining or leaving a group. The noise scale follows the rounded size, and the rounded size and whether a group appears are published without noise (#1591).
+- the count and the sum are noised separately, and everything published is computed from those two noisy numbers. No quantiles are published.
 
-The write replaces the `scope='local'` rows in one transaction. `GET /api/v1/community/compare` (`routes.ts`) only answers callers who have opted in. It computes the caller's own values with the same `vehicleSamples` function and looks up only rows with `n_published >= K`.
+#### The release, and what it guarantees (#1591)
+
+For one bucket with owner values `v₁ … vₙ` in `[lo, hi]`, each rounded to the unit's publish step, each refresh computes:
+
+| Step | Formula | Budget |
+|---|---|---|
+| Noisy count | `ñ = n + Lap(1 / ε_c)` | `ε_c = 0.5` (a count changes by at most 1 when one person joins or leaves) |
+| Threshold | publish only if `ñ ≥ T`, where `T = COMMUNITY_STATS_MIN_GROUP` (default 30, never below 20) | none: it only reads `ñ` |
+| Noisy sum | `S̃ = Σ(vᵢ − lo) + Lap((hi − lo) / ε_s)` | `ε_s = 0.5` (each term lies in `[0, hi − lo]`) |
+| Published | `n_published = 5·⌊ñ / 5⌋`, `mean = clamp(lo + S̃ / ñ, lo, hi)`, rounded to the unit's step | none: computed only from `ñ` and `S̃` |
+
+- **Guarantee:** (ε = 1, δ) per bucket per refresh, where two datasets are neighbours when one person is added or removed. By basic composition the two Laplace releases add up to `ε_c + ε_s = 1`. The threshold and the rounding are post-processing. A change in one person's value that stays inside the band leaves the count alone and moves the sum by at most `hi − lo`, so it costs only `ε_s = 0.5`. A change that takes the value out of the band removes them from the bucket, which costs the full 1.
+- **Per person:** a person's vehicles in the same bucket count once, and each vehicle lands in at most one bucket per metric. Their total per refresh is the sum over the buckets they are in. One vehicle is in at most 4 (efficiency, running cost, maintenance, insurance), which gives at most (4, 4δ). Vehicles in different buckets add more. Across refreshes the total grows again for every bucket whose data changed.
+- **The δ term** covers the one case pure ε can't: a bucket that exists only because one person is in it. Without them nothing is published. With them, `ñ = 1 + Lap(2)` reaches `T` with probability `δ = ½·e^(−(T − 1)/2)`, which is about 2.5e-7 at `T = 30` and about 4e-5 at `T = 20`.
+- **Sampler:** each draw is a 52-bit uniform strictly inside (0, 1), taken from HMAC-SHA256, and the Laplace value comes from the inverse CDF. The largest possible draw is about 36 scales, so cutting off the tail adds at most about 1e-16 to δ. Floating-point Laplace sampling has known small leaks; rounding to the publish step softens them.
+- **Stable noise:** the uniform for a draw is `HMAC(k, bucket key | schema version, lo, hi, ε_c, ε_s | SHA-256(sorted, step-rounded owner values) | "count" or "sum")`. `k` is a random 256-bit key per scope in `community_noise_keys`, created on the first refresh and never exported or backed up. The same inputs always give the same draw, and the hash covers exactly the values the sum uses, so a reused draw only ever goes with an identical release. A bucket whose owners and rounded values haven't changed republishes the same numbers, and repeating that release costs nothing. Any change draws fresh noise, and that includes a change to the band or the budget. In practice an active bucket changes often: one of 30 or more owners logs a record, a record ages out of the 12-month window, or an insurance premium's pro-rated share moves by a publish step. So refreshes are mostly fresh releases, and the cost adds up with the number of real changes, as the per-person line says. Anyone holding `k` together with the database could recompute the noise, but database access already exposes the raw data.
+- **Accuracy:** the noise on the published mean is about `(hi − lo) / (ε_s · ñ)`. The compare API shows an average only when `(hi − lo) / (ε_s · n_published)` is at most 25% of it, and reports `not_enough_data` otherwise.
+
+The write replaces the `scope='local'` rows in one transaction. `GET /api/v1/community/compare` (`routes.ts`) only answers callers who have opted in. It computes the caller's own values with the same `vehicleSamples` function and looks up only rows with `n_published` at least `T` rounded down to a multiple of 5.
 
 ## Frontend
 

@@ -7,7 +7,7 @@ const { compare, updateVehicle, showError, settingsState } = vi.hoisted(() => ({
 	compare: vi.fn<(vehicleId: string) => Promise<CompareResult>>(),
 	updateVehicle: vi.fn<(id: string, data: UpdateVehicleRequest) => Promise<Vehicle>>(),
 	showError: vi.fn<(message: string) => void>(),
-	settingsState: { mode: 'local' as 'local' | 'off' }
+	settingsState: { mode: 'local' as 'local' | 'off', minGroup: undefined as number | undefined }
 }));
 
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
@@ -25,7 +25,10 @@ vi.mock('#lib/stores/app.svelte.ts', () => ({
 vi.mock('#lib/stores/settings.svelte.ts', () => ({
 	settingsStore: {
 		get settings() {
-			return { communityStatsMode: settingsState.mode };
+			return {
+				communityStatsMode: settingsState.mode,
+				communityStatsMinGroup: settingsState.minGroup
+			};
 		},
 		unitPreferences: { distanceUnit: 'miles', volumeUnit: 'gallons_us', chargeUnit: 'kwh' }
 	}
@@ -231,10 +234,21 @@ describe('CommunityCompareCard', () => {
 		);
 		expect(
 			screen.getByText(
-				'Comparisons appear once at least 10 people on this server with a similar car have opted in.'
+				'Comparisons appear once about 30 people on this server with a similar vehicle have opted in.'
 			)
 		).toBeInTheDocument();
-		expect(screen.queryByText(/of 10|\d+ owners/)).toBeNull();
+		expect(screen.queryByText(/\d+ owners/)).toBeNull();
+	});
+
+	test("the group size in the hint is the server's publication threshold", async () => {
+		settingsState.minGroup = 45;
+		try {
+			compare.mockResolvedValue(data(metric('efficiency', { status: 'too_few', yours: 34 })));
+			await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });
+			expect(screen.getByText(/Comparisons appear once about 45 people/)).toBeInTheDocument();
+		} finally {
+			settingsState.minGroup = undefined;
+		}
 	});
 
 	test('an average too noisy to be useful explains why, with no numbers', async () => {
@@ -242,7 +256,7 @@ describe('CommunityCompareCard', () => {
 		await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });
 		const row = screen.getByTestId('community-compare-efficiency');
 		expect(row).toHaveTextContent(
-			'Not enough owners yet for a reliable average. It shows once more people with a similar car have opted in.'
+			'Not enough owners yet for a reliable average. It shows once more people with a similar vehicle have opted in.'
 		);
 		expect(row).not.toHaveTextContent(/\d/);
 	});
