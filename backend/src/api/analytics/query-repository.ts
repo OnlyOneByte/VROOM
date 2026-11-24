@@ -319,6 +319,12 @@ function emptyAggregate(): Aggregate {
   return { cost: 0, count: 0, volume: 0, effDistance: 0, effEnergy: 0 };
 }
 
+function rangeStart(requested: number | undefined, firsts: number[], end: number): number {
+  const first = firsts.length > 0 ? Math.min(Math.min(...firsts), end - 1) : undefined;
+  if (requested === undefined) return first ?? end - DEFAULT_RANGE_SECONDS;
+  return Math.max(requested, first ?? requested);
+}
+
 function vehicleName(v: {
   year: number;
   make: string;
@@ -588,8 +594,7 @@ export class AnalyticsQueryRepository {
     const firsts = vehicleRows.flatMap((row) => (row.earliest == null ? [] : [row.earliest]));
 
     const end = query.end ?? Math.floor(Date.now() / 1000);
-    const fallbackStart = firsts.length > 0 ? Math.min(...firsts) : end - DEFAULT_RANGE_SECONDS;
-    const start = query.start ?? Math.min(fallbackStart, end - 1);
+    const start = rangeStart(query.start, firsts, end);
     if (start >= end) throw new ValidationError('start must be before end');
     const range = { start, end };
     const primary = buildBuckets(range, query.interval, timeZone);
