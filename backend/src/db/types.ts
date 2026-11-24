@@ -13,6 +13,16 @@ export const EXPENSE_CATEGORIES = [
 
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 
+export const VEHICLE_TYPES = ['gas', 'electric', 'hybrid'] as const;
+
+export const VEHICLE_KINDS = ['car', 'motorcycle', 'van', 'truck', 'rv', 'other'] as const;
+
+export type VehicleKind = (typeof VEHICLE_KINDS)[number];
+
+export function isVehicleKind(value: unknown): value is VehicleKind {
+  return typeof value === 'string' && (VEHICLE_KINDS as readonly string[]).includes(value);
+}
+
 export type PaymentFrequency = 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
 
 export type SplitConfig =
