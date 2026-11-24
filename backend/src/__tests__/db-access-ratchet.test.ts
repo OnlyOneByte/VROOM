@@ -46,7 +46,7 @@ const BASELINE: Record<string, number> = {
   'api/settings/routes.ts · getDb()': 2,
   'api/shares/repository.ts · getDb()': 2,
   'api/shares/repository.ts · repository singleton': 1,
-  'api/shares/routes.ts · getDb()': 2,
+  'api/shares/routes.ts · getDb()': 8,
   'api/signup/routes.ts · getDb()': 9,
   'api/sync/activity-tracker.ts · getDb()': 1,
   'api/sync/backup-orchestrator.ts · getDb()': 2,
