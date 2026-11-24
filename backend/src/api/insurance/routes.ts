@@ -34,19 +34,28 @@ function policyToApi<T extends Record<string, unknown>>(policy: T): T {
   };
 }
 
-function narrowPolicyToVehicle<
+function sharedPolicyView<
   T extends {
-    terms: Array<{ id: string }>;
+    terms: Array<{
+      id: string;
+      totalCost: number | null;
+      monthlyCost: number | null;
+      paymentAmount: number | null;
+    }>;
     termVehicleCoverage: Array<{ termId: string; vehicleId: string }>;
     vehicleIds: string[];
   },
->(policy: T, vehicleId: string): T {
+>(policy: T, vehicleId: string) {
   const coveredTermIds = new Set(
     policy.termVehicleCoverage.filter((c) => c.vehicleId === vehicleId).map((c) => c.termId)
   );
   return {
     ...policy,
-    terms: policy.terms.filter((t) => coveredTermIds.has(t.id)),
+    terms: policy.terms
+      .filter((t) => coveredTermIds.has(t.id))
+      .map(
+        ({ totalCost: _total, monthlyCost: _monthly, paymentAmount: _payment, ...term }) => term
+      ),
     termVehicleCoverage: policy.termVehicleCoverage.filter((c) => c.vehicleId === vehicleId),
     vehicleIds: policy.vehicleIds.filter((v) => v === vehicleId),
   };
@@ -145,7 +154,7 @@ routes.get(
     const access = await requireVehicleAccess(vehicleId, user.id, 'read');
     const policies = await insurancePolicyRepository.findByVehicleId(vehicleId);
     const scoped =
-      access.role === 'owner' ? policies : policies.map((p) => narrowPolicyToVehicle(p, vehicleId));
+      access.role === 'owner' ? policies : policies.map((p) => sharedPolicyView(p, vehicleId));
     return c.json({ success: true, data: scoped.map(policyToApi), count: scoped.length });
   }
 );

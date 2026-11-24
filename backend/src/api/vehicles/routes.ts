@@ -37,7 +37,11 @@ import {
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
-import { requireVehicleAccess } from '../../utils/vehicle-access';
+import {
+  requireVehicleAccess,
+  seesFinancials,
+  sharedVehicleView,
+} from '../../utils/vehicle-access';
 import { catalogModelMatchesMake, isCatalogModel } from '../../utils/vehicle-catalog';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
@@ -275,7 +279,7 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), async (c) => {
       sharedRows = sharedVehicles.map((v) => {
         const g = byVehicleId.get(v.id);
         return {
-          ...v,
+          ...sharedVehicleView(v),
           sharedAccess: { level: g?.level ?? 'viewer', sharedBy: g?.ownerName ?? 'Unknown' },
         };
       });
@@ -369,15 +373,15 @@ routes.get(
         eligibleForPayoff?: boolean;
       };
       sharedAccess?: { level: string; sharedBy: string };
-    } = vehicle;
-    if (vehicle.financing) {
+    } = seesFinancials(access) ? vehicle : sharedVehicleView(vehicle);
+    if (responseData.financing) {
       const computedBalance = await financingRepository.computeBalance(
-        vehicle.financing.id,
+        responseData.financing.id,
         timeZone
       );
       responseData = {
-        ...vehicle,
-        financing: withComputedBalance(vehicle.financing, computedBalance),
+        ...responseData,
+        financing: withComputedBalance(responseData.financing, computedBalance),
       };
     }
     if (sharedAccess) {

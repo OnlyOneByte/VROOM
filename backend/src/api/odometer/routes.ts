@@ -14,7 +14,7 @@ import {
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
-import { requireVehicleAccess } from '../../utils/vehicle-access';
+import { requireVehicleAccess, seesFinancials } from '../../utils/vehicle-access';
 import { assertOdometerInOrder } from '../expenses/repository';
 import type { OdometerCheck } from '../expenses/validation';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
@@ -85,13 +85,14 @@ routes.get(
     const { vehicleId } = c.req.valid('param');
     const query = c.req.valid('query');
 
-    const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'read');
+    const access = await requireVehicleAccess(vehicleId, user.id, 'read');
 
     const { limit, offset } = clampPagination(query);
 
-    const { data, totalCount } = await odometerRepository.getHistory(vehicleId, ownerId, {
+    const { data, totalCount } = await odometerRepository.getHistory(vehicleId, access.ownerId, {
       limit,
       offset,
+      hideFinancials: !seesFinancials(access),
     });
 
     return c.json(buildPaginatedResponse(data, totalCount, limit, offset));

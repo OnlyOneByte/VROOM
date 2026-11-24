@@ -7,7 +7,7 @@ import {
   reminderWithVehiclesToApi,
   vehicleRowToApi,
 } from '../../../../utils/money';
-import { requireVehicleAccess } from '../../../../utils/vehicle-access';
+import { requireVehicleAccess, resolveExpenseReadScope } from '../../../../utils/vehicle-access';
 import {
   analyticsSummaryToApi,
   crossVehicleToApi,
@@ -124,9 +124,8 @@ const TOOL_LIST: AssistantTool[] = [
       'Optionally scoped to one vehicle.',
     schema: rangeVehicleArgs,
     read: async (args, userId) => {
-      const scopeId = await resolveScope(args.vehicleId, userId);
       return expenseRepository.getSummary({
-        userId: scopeId,
+        ...(await resolveExpenseReadScope(args.vehicleId, userId)),
         period: toExpensePeriod(args.range),
         ...(args.vehicleId ? { vehicleId: args.vehicleId } : {}),
       });
