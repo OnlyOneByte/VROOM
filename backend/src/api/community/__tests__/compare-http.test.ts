@@ -1,0 +1,181 @@
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { CONFIG } from '../../../config';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type RequestFn,
+  type TestApp,
+} from '../../../test-helpers/http-client';
+import { createInvitee, type Invitee } from '../../../test-helpers/invitee';
+import { seedVehicle } from '../../../test-helpers/seed';
+
+const DAY = 86_400_000;
+const MPG_PER_KM_PER_L = 3.785411784 / 1.609344;
+const CIVIC_KEY = 'efficiency|honda-civic|2019|gas';
+const communityConfig = CONFIG.communityStats as { mode: 'off' | 'local' };
+
+interface CompareMetric {
+  metric: string;
+  status: string;
+  unit: string | null;
+  yours: number | null;
+  bucket: { n: number; mean: number; p25: number | null; p50: number; p75: number | null } | null;
+}
+
+interface CompareBody {
+  currency: string | null;
+  metrics: CompareMetric[];
+}
+
+let ctx: TestApp;
+let other: Invitee;
+
+beforeEach(async () => {
+  ctx = await createTestApp();
+  other = await createInvitee(ctx, 'compare-other', 'Other');
+});
+afterEach(() => {
+  communityConfig.mode = 'local';
+  ctx.close();
+});
+
+async function seedCivic(extra: Record<string, unknown> = { catalogModelId: 'honda-civic' }) {
+  const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2019, extra });
+  for (let i = 0; i < 6; i++) {
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'fuel',
+      expenseAmount: 40,
+      date: new Date(Date.now() - (6 - i) * 20 * DAY).toISOString(),
+      mileage: 10_000 + i * 300,
+      volume: 10,
+      fuelType: '87 (Regular)',
+    });
+    expect(res.status, await res.clone().text()).toBeLessThan(300);
+  }
+  return vehicleId;
+}
+
+function insertBucket(bucketKey: string, metric: string, unit: string, n: number, p50: number) {
+  ctx.sqlite.run(
+    `INSERT INTO community_stats (id, scope, metric, bucket_key, unit, n_published, mean, p25, p50, p75, computed_at, schema_version)
+     VALUES (?, 'local', ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+    [
+      `row-${bucketKey}`,
+      metric,
+      bucketKey,
+      unit,
+      n,
+      p50,
+      n >= 20 ? p50 - 1 : null,
+      p50,
+      n >= 20 ? p50 + 1 : null,
+      Math.floor(Date.now() / 1000),
+    ]
+  );
+}
+
+async function optIn(request: RequestFn = ctx.authed): Promise<void> {
+  const res = await request('PUT', '/api/v1/settings', { communityStatsOptIn: true });
+  expect(res.status).toBe(200);
+}
+
+async function compare(vehicleId: string, request: RequestFn = ctx.authed) {
+  const res = await request('GET', `/api/v1/community/compare?vehicleId=${vehicleId}`);
+  return {
+    res,
+    body: res.status === 200 ? (await json<DataEnvelope<CompareBody>>(res)).data : null,
+  };
+}
+
+function metric(body: CompareBody | null, name: string): CompareMetric | undefined {
+  return body?.metrics.find((m) => m.metric === name);
+}
+
+describe('GET /api/v1/community/compare', () => {
+  test('a caller who has not opted in gets no numbers at all', async () => {
+    const vehicleId = await seedCivic();
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+
+    const { res, body } = await compare(vehicleId);
+    expect(res.status).toBe(200);
+    expect(body?.metrics.every((m) => m.status === 'opt_in_required')).toBe(true);
+    expect(body?.metrics.every((m) => m.yours === null && m.bucket === null)).toBe(true);
+    expect(body?.currency).toBeNull();
+  });
+
+  test('an opted-in owner sees the bucket converted to the vehicle units', async () => {
+    const vehicleId = await seedCivic();
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    await optIn();
+
+    const { body } = await compare(vehicleId);
+    const efficiency = metric(body, 'efficiency');
+    expect(efficiency?.status).toBe('ok');
+    expect(efficiency?.unit).toBe('distance_per_volume');
+    expect(efficiency?.yours).toBeCloseTo(30, 6);
+    expect(efficiency?.bucket?.n).toBe(20);
+    expect(efficiency?.bucket?.p50).toBeCloseTo(12 * MPG_PER_KM_PER_L, 6);
+    expect(efficiency?.bucket?.p25).toBeCloseTo(11 * MPG_PER_KM_PER_L, 6);
+    expect(efficiency?.bucket?.p75).toBeCloseTo(13 * MPG_PER_KM_PER_L, 6);
+    expect(body?.currency).toBe('USD');
+  });
+
+  test('a row below K in the table is never returned', async () => {
+    const vehicleId = await seedCivic();
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 5, 12);
+    await optIn();
+
+    const { body } = await compare(vehicleId);
+    const efficiency = metric(body, 'efficiency');
+    expect(efficiency?.status).toBe('too_few');
+    expect(efficiency?.bucket).toBeNull();
+    expect(JSON.stringify(body)).not.toContain('"n":5');
+  });
+
+  test('a vehicle without a catalogue model asks for one, and missing data says so', async () => {
+    const vehicleId = await seedCivic({});
+    await optIn();
+
+    const { body } = await compare(vehicleId);
+    expect(metric(body, 'efficiency')?.status).toBe('needs_model');
+    expect(metric(body, 'insurance')?.status).toBe('no_data');
+    expect(metric(body, 'running_cost')?.status).toBe('too_few');
+  });
+
+  test("another user's vehicle is a 404, even for an opted-in caller", async () => {
+    const vehicleId = await seedCivic();
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    await optIn(other.request);
+
+    const { res } = await compare(vehicleId, other.request);
+    expect(res.status).toBe(404);
+  });
+
+  test('an accepted share recipient who opted in can read the comparison', async () => {
+    const vehicleId = await seedCivic();
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    await other.acceptShare(vehicleId, 'viewer');
+    await optIn(other.request);
+
+    const { res, body } = await compare(vehicleId, other.request);
+    expect(res.status).toBe(200);
+    expect(metric(body, 'efficiency')?.status).toBe('ok');
+  });
+
+  test('the server switch set to off returns feature_off and no numbers', async () => {
+    const vehicleId = await seedCivic();
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    await optIn();
+    communityConfig.mode = 'off';
+
+    const { body } = await compare(vehicleId);
+    expect(body?.metrics.every((m) => m.status === 'feature_off' && m.bucket === null)).toBe(true);
+  });
+
+  test('a missing vehicleId is rejected', async () => {
+    const res = await ctx.authed('GET', '/api/v1/community/compare');
+    expect(res.status).toBe(400);
+  });
+});
