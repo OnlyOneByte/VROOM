@@ -101,6 +101,17 @@ describe('GET /api/v1/vehicles/:id/people', () => {
     expect((await people(viewer.request)).length).toBe(list.length);
   });
 
+  test('members without share.manage see only names and role names', async () => {
+    const res = await viewer.request('GET', `/api/v1/vehicles/${vehicleId}/people`);
+    const list = (await json<DataEnvelope<Record<string, unknown>[]>>(res)).data;
+    expect(list.length).toBeGreaterThan(1);
+    for (const person of list) {
+      expect(Object.keys(person).sort()).toEqual(['displayName', 'owner', 'roles']);
+    }
+    const detailed = await people(coOwner.request);
+    expect(detailed.find((p) => p.userId === editor.id)?.permissions.length).toBeGreaterThan(0);
+  });
+
   test('a stranger gets 404 and a disabled member 403', async () => {
     const path = `/api/v1/vehicles/${vehicleId}/people`;
     expect((await stranger.request('GET', path)).status).toBe(404);
@@ -188,6 +199,26 @@ describe('overrides', () => {
     await asOwner('PUT', '/api/v1/overrides', override(editor.id, 'vehicle.share.manage', 'allow'));
     expect((await allowLoan(editor.request)).status).toBe(403);
     expect((await allowLoan(stranger.request)).status).toBe(404);
+  });
+
+  test('a co-owner cannot change or delete what the owner set; the owner still can', async () => {
+    const path = `/api/v1/overrides?userId=${editor.id}&scope=vehicle&scopeId=${vehicleId}&permission=vehicle.trip.read`;
+    const set = (request: RequestFn, effect: 'allow' | 'deny') =>
+      request('PUT', '/api/v1/overrides', override(editor.id, 'vehicle.trip.read', effect));
+    expect((await set(asOwner, 'deny')).status).toBe(200);
+    expect((await set(coOwner.request, 'allow')).status).toBe(403);
+    expect((await coOwner.request('DELETE', path)).status).toBe(403);
+    expect((await set(asOwner, 'allow')).status).toBe(200);
+    expect((await asOwner('DELETE', path)).status).toBe(200);
+    expect((await set(coOwner.request, 'deny')).status).toBe(200);
+    expect((await set(coOwner.request, 'allow')).status).toBe(200);
+    expect((await coOwner.request('DELETE', path)).status).toBe(200);
+  });
+
+  test('a co-owner cannot remove a role the owner granted', async () => {
+    const query = `userId=${editor.id}&roleId=${builtInRoleId('editor')}&scopeId=${vehicleId}`;
+    expect((await coOwner.request('DELETE', `/api/v1/role-assignments?${query}`)).status).toBe(403);
+    expect(count('role_assignments', editor.id)).toBe(1);
   });
 
   test('non-grantable permissions, other scopes and the owner are refused', async () => {

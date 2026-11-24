@@ -98,6 +98,12 @@ function authorityAt(c: Context, scope: RoleScope, scopeId: string | null | unde
   };
 }
 
+function refuseOverOwner(c: Context, authority: Authority, setBy: string | null | undefined) {
+  if (authority.ownerId && setBy === authority.ownerId && c.get('user').id !== authority.ownerId) {
+    throw new ForbiddenError('Only the owner can change what the owner set');
+  }
+}
+
 function requireTarget(authority: Authority, userId: string): void {
   if (authority.scopeId) {
     if (!isVehicleMember(getDb(), authority.scopeId, userId)) throw new NotFoundError('Member');
@@ -279,7 +285,7 @@ function assignable(c: Context, input: z.infer<typeof assignmentSchema>) {
   }
   requireTarget(authority, input.userId);
   refuseUnheld(permissionsOf(role.id), authority.holds);
-  return { role, scopeId: authority.scopeId };
+  return { role, scopeId: authority.scopeId, authority };
 }
 
 export const assignmentRoutes = new Hono();
@@ -304,21 +310,16 @@ assignmentRoutes.post('/', zValidator('json', assignmentSchema), (c) => {
 
 assignmentRoutes.delete('/', zValidator('query', assignmentSchema), (c) => {
   const input = c.req.valid('query');
-  const { role, scopeId } = assignable(c, input);
-  const removed = writeAt(role.scope, (tx) =>
-    tx
-      .delete(roleAssignments)
-      .where(
-        and(
-          eq(roleAssignments.userId, input.userId),
-          eq(roleAssignments.roleId, role.id),
-          scopeId ? eq(roleAssignments.scopeId, scopeId) : isNull(roleAssignments.scopeId)
-        )
-      )
-      .returning()
-      .all()
+  const { role, scopeId, authority } = assignable(c, input);
+  const where = and(
+    eq(roleAssignments.userId, input.userId),
+    eq(roleAssignments.roleId, role.id),
+    scopeId ? eq(roleAssignments.scopeId, scopeId) : isNull(roleAssignments.scopeId)
   );
-  if (removed.length === 0) throw new NotFoundError('Role assignment');
+  const existing = getDb().select().from(roleAssignments).where(where).get();
+  if (!existing) throw new NotFoundError('Role assignment');
+  refuseOverOwner(c, authority, existing.grantedBy);
+  writeAt(role.scope, (tx) => tx.delete(roleAssignments).where(where).run());
   return c.json({ success: true, message: 'Role removed' });
 });
 
@@ -370,6 +371,11 @@ overrideRoutes.put(
       overrideWhere(scope, userId, authority.scopeId),
       eq(permissionOverrides.permission, permission)
     );
+    refuseOverOwner(
+      c,
+      authority,
+      getDb().select().from(permissionOverrides).where(where).get()?.setBy
+    );
     const saved = writeAt(scope, (tx) => {
       tx.delete(permissionOverrides).where(where).run();
       return tx
@@ -396,19 +402,14 @@ overrideRoutes.delete(
     const { userId, scope, scopeId, permission } = c.req.valid('query');
     const authority = authorityAt(c, scope, scopeId);
     refuseUnheld([permission], authority.holds);
-    const removed = writeAt(scope, (tx) =>
-      tx
-        .delete(permissionOverrides)
-        .where(
-          and(
-            overrideWhere(scope, userId, authority.scopeId),
-            eq(permissionOverrides.permission, permission)
-          )
-        )
-        .returning()
-        .all()
+    const where = and(
+      overrideWhere(scope, userId, authority.scopeId),
+      eq(permissionOverrides.permission, permission)
     );
-    if (removed.length === 0) throw new NotFoundError('Override');
+    const existing = getDb().select().from(permissionOverrides).where(where).get();
+    if (!existing) throw new NotFoundError('Override');
+    refuseOverOwner(c, authority, existing.setBy);
+    writeAt(scope, (tx) => tx.delete(permissionOverrides).where(where).run());
     return c.json({ success: true, message: 'Override removed' });
   }
 );
@@ -416,7 +417,9 @@ overrideRoutes.delete(
 export function vehiclePeople(c: Context) {
   const vehicleId = c.req.param('id') ?? '';
   const vehicle: Resource = { kind: 'vehicle', vehicleId };
-  enforce(requestResolver(c, getDb()).can('vehicle.share.read', vehicle), 'Vehicle');
+  const caller = requestResolver(c, getDb());
+  enforce(caller.can('vehicle.share.read', vehicle), 'Vehicle');
+  const detailed = caller.can('vehicle.share.manage', vehicle).allow;
   const db = getDb();
   const owner = db
     .select({ id: vehicles.userId })
@@ -435,17 +438,26 @@ export function vehiclePeople(c: Context) {
     .where(inArray(users.id, [owner?.id ?? '', ...memberIds]))
     .all()
     .map((person) => {
+      const heldRoles = db
+        .select({ id: roles.id, key: roles.key, name: roles.name, builtIn: roles.builtIn })
+        .from(roleAssignments)
+        .innerJoin(roles, eq(roles.id, roleAssignments.roleId))
+        .where(and(eq(roleAssignments.userId, person.id), eq(roleAssignments.scopeId, vehicleId)))
+        .all();
+      const owned = person.id === owner?.id;
+      if (!detailed) {
+        return {
+          displayName: person.displayName,
+          owner: owned,
+          roles: heldRoles.map(({ name }) => ({ name })),
+        };
+      }
       const resolver = resolverFor(db, person.id);
       return {
         userId: person.id,
         displayName: person.displayName,
-        owner: person.id === owner?.id,
-        roles: db
-          .select({ id: roles.id, key: roles.key, name: roles.name, builtIn: roles.builtIn })
-          .from(roleAssignments)
-          .innerJoin(roles, eq(roles.id, roleAssignments.roleId))
-          .where(and(eq(roleAssignments.userId, person.id), eq(roleAssignments.scopeId, vehicleId)))
-          .all(),
+        owner: owned,
+        roles: heldRoles,
         overrides: db
           .select({
             permission: permissionOverrides.permission,
