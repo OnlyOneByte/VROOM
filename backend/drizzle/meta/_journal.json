@@ -169,6 +169,13 @@
       "when": 1795554618154,
       "tag": "0023_backfill_term_vehicle_position",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1795556719738,
+      "tag": "0024_signup_modes",
+      "breakpoints": true
     }
   ]
 }

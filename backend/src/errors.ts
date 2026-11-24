@@ -51,6 +51,16 @@ export class ForbiddenError extends AppError {
   }
 }
 
+export class AccountPendingError extends AppError {
+  constructor() {
+    super('Your account is waiting for an admin to approve it', 403, true);
+  }
+
+  override get code(): string {
+    return 'ACCOUNT_PENDING';
+  }
+}
+
 export class NotFoundError extends AppError {
   constructor(resource: string = 'Resource') {
     super(`${resource} not found`, 404, true);
