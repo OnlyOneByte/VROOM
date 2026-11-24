@@ -1,4 +1,5 @@
-import { and, eq, inArray, isNull, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, isNull, notInArray, type SQL } from 'drizzle-orm';
+import type { Context } from 'hono';
 import type { AppDatabase } from '../db/connection';
 import {
   permissionOverrides,
@@ -10,7 +11,7 @@ import {
   vehicles,
 } from '../db/schema';
 import type { DrizzleTransaction } from '../db/types';
-import { ForbiddenError, ValidationError } from '../errors';
+import { ConflictError, ForbiddenError, ValidationError } from '../errors';
 import { PERMISSION_REGISTRY } from './registry';
 import {
   type Actor,
@@ -23,6 +24,14 @@ import {
 import { DEMO_ROLE_KEY, ROLE_REACH, ROLE_TEMPLATES, type RoleScope } from './roles';
 
 type Db = AppDatabase | DrizzleTransaction;
+
+declare module 'hono' {
+  interface ContextVariableMap {
+    resolver: Resolver;
+  }
+}
+
+export const ROLE_MANAGE_PERMISSION = 'server.roles.manage';
 
 export function refuseUngrantable(scope: RoleScope, permissions: readonly string[]): void {
   for (const permission of permissions) {
@@ -55,6 +64,18 @@ export function builtInRoleId(key: string): string {
 
 export function syncBuiltInRoles(db: AppDatabase): void {
   db.transaction((tx) => {
+    tx.update(roles)
+      .set({ key: null })
+      .where(
+        and(
+          eq(roles.builtIn, false),
+          inArray(
+            roles.key,
+            ROLE_TEMPLATES.map((template) => template.key)
+          )
+        )
+      )
+      .run();
     for (const template of ROLE_TEMPLATES) {
       const id = builtInRoleId(template.key);
       tx.insert(roles)
@@ -258,4 +279,69 @@ export function actorFor(db: Db, userId: string): Actor {
 
 export function resolverFor(db: Db, userId: string): Resolver {
   return createResolver(actorFor(db, userId), dbGrantSource(db));
+}
+
+export function requestResolver(c: Context, db: Db): Resolver {
+  const cached = c.get('resolver') as Resolver | undefined;
+  if (cached) return cached;
+  const resolver = resolverFor(db, c.get('user').id);
+  c.set('resolver', resolver);
+  return resolver;
+}
+
+function roleManagerCount(db: Db): number {
+  const viaRoles = db
+    .selectDistinct({ userId: roleAssignments.userId })
+    .from(roleAssignments)
+    .innerJoin(rolePermissions, eq(rolePermissions.roleId, roleAssignments.roleId))
+    .where(
+      and(isNull(roleAssignments.scopeId), eq(rolePermissions.permission, ROLE_MANAGE_PERMISSION))
+    )
+    .all();
+  const viaOverrides = db
+    .selectDistinct({ userId: permissionOverrides.userId })
+    .from(permissionOverrides)
+    .where(
+      and(
+        eq(permissionOverrides.scope, 'server'),
+        eq(permissionOverrides.permission, ROLE_MANAGE_PERMISSION),
+        eq(permissionOverrides.effect, 'allow')
+      )
+    )
+    .all();
+  const candidates = new Set([...viaRoles, ...viaOverrides].map((row) => row.userId));
+  return [...candidates].filter(
+    (userId) => resolverFor(db, userId).can(ROLE_MANAGE_PERMISSION, { kind: 'server' }).allow
+  ).length;
+}
+
+export function keepingARoleManager<T>(db: AppDatabase, change: (tx: DrizzleTransaction) => T): T {
+  return db.transaction((tx) => {
+    const before = roleManagerCount(tx);
+    const result = change(tx);
+    if (before > 0 && roleManagerCount(tx) === 0) {
+      throw new ConflictError('At least one person must keep the permission to manage roles');
+    }
+    return result;
+  });
+}
+
+export function hasPerPersonVehicleGrants(db: Db, ownerId: string): boolean {
+  const owned = db.select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.userId, ownerId));
+  const override = db
+    .select({ id: permissionOverrides.id })
+    .from(permissionOverrides)
+    .where(inArray(permissionOverrides.scopeId, owned))
+    .get();
+  const customRole = db
+    .select({ id: roleAssignments.id })
+    .from(roleAssignments)
+    .where(
+      and(
+        inArray(roleAssignments.scopeId, owned),
+        notInArray(roleAssignments.roleId, [shareRoleId('editor'), shareRoleId('viewer')])
+      )
+    )
+    .get();
+  return override !== undefined || customRole !== undefined;
 }

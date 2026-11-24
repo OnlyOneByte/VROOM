@@ -21,6 +21,7 @@ import { routes as providerRoutes } from './api/providers/routes';
 import { routes as receiptRoutes } from './api/providers/vlm-routes';
 import { routes as pushRoutes } from './api/push/routes';
 import { routes as reminderRoutes } from './api/reminders/routes';
+import { assignmentRoutes, overrideRoutes, roleRoutes } from './api/roles/routes';
 import { routes as settingsRoutes } from './api/settings/routes';
 import { routes as shareRoutes } from './api/shares/routes';
 import { routes as syncRoutes } from './api/sync/routes';
@@ -107,7 +108,7 @@ app.use(
   cors({
     origin: CONFIG.cors.origins,
     credentials: true,
-    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
   })
 );
@@ -157,6 +158,9 @@ app.route('/api/v1/community', communityRoutes);
 app.route('/api/v1/reminders', reminderRoutes);
 app.route('/api/v1/trips', tripRoutes);
 app.route('/api/v1/shares', shareRoutes);
+app.route('/api/v1/roles', roleRoutes);
+app.route('/api/v1/role-assignments', assignmentRoutes);
+app.route('/api/v1/overrides', overrideRoutes);
 app.route('/api/v1/push', pushRoutes);
 app.route('/api/v1/calendar', calendarRoutes);
 

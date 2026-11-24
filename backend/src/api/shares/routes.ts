@@ -12,10 +12,11 @@ import {
   ValidationError,
 } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
-import { changeShareRole, endVehicleMembership } from '../../permissions/grants';
+import { changeShareRole, endVehicleMembership, grantShareRole } from '../../permissions/grants';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
 import {
+  ACTIVE_SHARE_STATUSES,
   findInviteeId,
   type GrantedShare,
   isActiveShareStatus,
@@ -33,17 +34,28 @@ routes.use('*', changeTracker);
 
 const LEVELS = ['viewer', 'editor'] as const;
 
-function setShare(
-  tx: DrizzleTransaction,
+const ANY_STATUS = ['pending', 'accepted', 'declined', 'revoked'] as const;
+
+function transitionShare(
   id: string,
-  change: { status?: string; level?: string }
+  from: readonly string[],
+  change: { status?: string; level?: string },
+  then: (tx: DrizzleTransaction, before: VehicleShare, after: VehicleShare) => void
 ): VehicleShare {
-  return tx
-    .update(vehicleShares)
-    .set({ ...change, updatedAt: new Date() })
-    .where(eq(vehicleShares.id, id))
-    .returning()
-    .get() as VehicleShare;
+  return getDb().transaction((tx) => {
+    const before = tx.select().from(vehicleShares).where(eq(vehicleShares.id, id)).get();
+    if (!before || !from.includes(before.status)) {
+      throw new ConflictError('This share changed in the meantime. Reload and try again');
+    }
+    const after = tx
+      .update(vehicleShares)
+      .set({ ...change, updatedAt: new Date() })
+      .where(eq(vehicleShares.id, id))
+      .returning()
+      .get() as VehicleShare;
+    then(tx, before, after);
+    return after;
+  });
 }
 
 const inviteSchema = z.object({
@@ -122,8 +134,7 @@ routes.put(
       throw new ConflictError('This share is no longer active');
     }
 
-    const updated = getDb().transaction((tx) => {
-      const row = setShare(tx, id, { level });
+    const updated = transitionShare(id, ACTIVE_SHARE_STATUSES, { level }, (tx, _, row) => {
       if (row.status === 'accepted' && row.sharedWithId) {
         changeShareRole(tx, {
           vehicleId: row.vehicleId,
@@ -132,7 +143,6 @@ routes.put(
           grantedBy: user.id,
         });
       }
-      return row;
     });
     return c.json({ success: true, data: toOwnerView(updated), message: 'Share level updated' });
   }
@@ -147,10 +157,9 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
     throw new NotFoundError('Share');
   }
 
-  getDb().transaction((tx) => {
-    setShare(tx, id, { status: 'revoked' });
-    if (share.status === 'accepted' && share.sharedWithId) {
-      endVehicleMembership(tx, share.vehicleId, share.sharedWithId);
+  transitionShare(id, ANY_STATUS, { status: 'revoked' }, (tx, before) => {
+    if (before.status === 'accepted' && before.sharedWithId) {
+      endVehicleMembership(tx, before.vehicleId, before.sharedWithId);
     }
   });
   return c.json({ success: true, message: 'Share revoked' });
@@ -179,15 +188,14 @@ routes.post('/:id/accept', zValidator('param', commonSchemas.idParam), async (c)
     throw new ConflictError('This invitation is no longer pending');
   }
 
-  const updated = getDb().transaction((tx) => {
-    const row = setShare(tx, id, { status: 'accepted' });
-    changeShareRole(tx, {
+  const updated = transitionShare(id, ['pending'], { status: 'accepted' }, (tx, _, row) => {
+    endVehicleMembership(tx, row.vehicleId, user.id);
+    grantShareRole(tx, {
       vehicleId: row.vehicleId,
       sharedWithId: user.id,
       level: row.level,
       grantedBy: row.ownerId,
     });
-    return row;
   });
   return c.json({ success: true, data: updated, message: 'Invitation accepted' });
 });
@@ -204,9 +212,8 @@ routes.post('/:id/decline', zValidator('param', commonSchemas.idParam), async (c
     throw new ConflictError('This share is no longer active');
   }
 
-  getDb().transaction((tx) => {
-    setShare(tx, id, { status: 'declined' });
-    if (share.status === 'accepted') endVehicleMembership(tx, share.vehicleId, user.id);
+  transitionShare(id, ACTIVE_SHARE_STATUSES, { status: 'declined' }, (tx, before) => {
+    if (before.status === 'accepted') endVehicleMembership(tx, before.vehicleId, user.id);
   });
   return c.json({ success: true, message: 'Share declined' });
 });

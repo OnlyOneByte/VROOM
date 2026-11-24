@@ -49,6 +49,7 @@ import { financingRepository, withComputedBalance } from '../financing/repositor
 import { odometerRepository } from '../odometer/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderRepository } from '../reminders/repository';
+import { vehiclePeople } from '../roles/routes';
 import { preferencesRepository } from '../settings/repository';
 import { vehicleShareRepository } from '../shares/repository';
 import { photoRoutes } from './photo-routes';
@@ -579,5 +580,7 @@ routes.get(
     });
   }
 );
+
+routes.get('/:id/people', zValidator('param', commonSchemas.idParam), vehiclePeople);
 
 export { routes };

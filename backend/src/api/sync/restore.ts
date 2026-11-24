@@ -32,7 +32,7 @@ import {
   SyncError,
   ValidationError,
 } from '../../errors';
-import { changeShareRole } from '../../permissions/grants';
+import { changeShareRole, hasPerPersonVehicleGrants } from '../../permissions/grants';
 import {
   type BackupConfig,
   DEFAULT_PROVIDER_CAPABILITIES,
@@ -184,6 +184,11 @@ class RestoreService {
     }
 
     this.assertReplaceNotEmpty(summary, mode);
+    if (mode === 'replace' && hasPerPersonVehicleGrants(this.db, userId)) {
+      throw new ConflictError(
+        'Some people have their own roles or permission changes on your vehicles, and a full restore would remove them. Remove those changes first, or restore in merge mode.'
+      );
+    }
 
     // bun:sqlite transactions must be synchronous: an async callback autocommits each statement.
     try {
