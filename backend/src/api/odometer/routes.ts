@@ -1,8 +1,16 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { getDb } from '../../db/connection';
 import type { DrizzleTransaction } from '../../db/types';
 import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import {
+  authorize,
+  type ResourceOf,
+  vehicleEntry,
+  vehicleParam,
+} from '../../permissions/authorize';
+import { requestResolver } from '../../permissions/grants';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import { isValidTimeZone, zonedDayWindow } from '../../utils/time-zone';
 import {
@@ -45,6 +53,12 @@ function inOrder(check: OdometerCheck | null) {
   return (tx: DrizzleTransaction) => assertOdometerInOrder(tx, check);
 }
 
+const fromEntry: ResourceOf = async (c) => {
+  const entry = await odometerRepository.findById(c.req.param('id') ?? '');
+  if (!entry) throw new NotFoundError('Odometer entry');
+  return vehicleEntry(entry.vehicleId, entry.userId, entry.createdBy);
+};
+
 const listQuerySchema = z.object({
   ...commonSchemas.clampedPaginationFields,
 });
@@ -56,6 +70,7 @@ routes.get(
   '/:vehicleId',
   zValidator('param', commonSchemas.vehicleIdParam),
   zValidator('query', listQuerySchema),
+  authorize(vehicleParam('vehicleId')),
   async (c) => {
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
@@ -80,6 +95,7 @@ routes.get(
   '/:vehicleId/history',
   zValidator('param', commonSchemas.vehicleIdParam),
   zValidator('query', listQuerySchema),
+  authorize(vehicleParam('vehicleId')),
   async (c) => {
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
@@ -93,33 +109,41 @@ routes.get(
       limit,
       offset,
       hideFinancials: !seesFinancials(access),
+      includeExpenses: requestResolver(c, getDb()).can('vehicle.expense.read', {
+        kind: 'vehicle',
+        vehicleId,
+      }).allow,
     });
 
     return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
   }
 );
 
-routes.get('/entry/:id', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
+routes.get(
+  '/entry/:id',
+  zValidator('param', commonSchemas.idParam),
+  authorize(fromEntry),
+  async (c) => {
+    const { id } = c.req.valid('param');
 
-  const entry = await odometerRepository.findById(id);
-  if (!entry) throw new NotFoundError('Odometer entry');
-  await requireVehicleAccess(entry.vehicleId, user.id, 'read');
+    const entry = await odometerRepository.findById(id);
+    if (!entry) throw new NotFoundError('Odometer entry');
 
-  return c.json({ success: true, data: entry });
-});
+    return c.json({ success: true, data: entry });
+  }
+);
 
 routes.post(
   '/:vehicleId',
   zValidator('param', commonSchemas.vehicleIdParam),
   zValidator('json', createBodySchema),
+  authorize(vehicleParam('vehicleId')),
   async (c) => {
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
     const data = c.req.valid('json');
 
-    const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'write');
+    const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'read');
 
     const entry = await odometerRepository.createChecked(
       {
@@ -128,6 +152,7 @@ routes.post(
         odometer: data.odometer,
         recordedAt: data.recordedAt,
         note: data.note ?? null,
+        createdBy: ownerId === user.id ? null : user.id,
       },
       inOrder(await readingCheck(vehicleId, data.odometer, data.recordedAt, data.timeZone))
     );
@@ -142,14 +167,13 @@ routes.put(
   '/:id',
   zValidator('param', commonSchemas.idParam),
   zValidator('json', updateSchema),
+  authorize(fromEntry),
   async (c) => {
-    const user = c.get('user');
     const { id } = c.req.valid('param');
     const data = c.req.valid('json');
 
     const existing = await odometerRepository.findById(id);
     if (!existing) throw new NotFoundError('Odometer entry');
-    await requireVehicleAccess(existing.vehicleId, user.id, 'write');
 
     const { timeZone, ...changes } = data;
     const odometer = changes.odometer ?? existing.odometer;
@@ -171,18 +195,21 @@ routes.put(
   }
 );
 
-routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
+routes.delete(
+  '/:id',
+  zValidator('param', commonSchemas.idParam),
+  authorize(fromEntry),
+  async (c) => {
+    const { id } = c.req.valid('param');
 
-  const existing = await odometerRepository.findById(id);
-  if (!existing) throw new NotFoundError('Odometer entry');
-  await requireVehicleAccess(existing.vehicleId, user.id, 'write');
+    const existing = await odometerRepository.findById(id);
+    if (!existing) throw new NotFoundError('Odometer entry');
 
-  await deleteAllPhotosForEntity('odometer_entry', id, existing.userId);
-  await odometerRepository.delete(id);
+    await deleteAllPhotosForEntity('odometer_entry', id, existing.userId);
+    await odometerRepository.delete(id);
 
-  return c.json({ success: true, message: 'Odometer reading deleted' });
-});
+    return c.json({ success: true, message: 'Odometer reading deleted' });
+  }
+);
 
 export { routes };

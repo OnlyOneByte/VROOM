@@ -524,20 +524,24 @@ class RestoreService {
     return (rows ?? []).map((row) => ({ ...row, userId }));
   }
 
-  private dropUnknownAuthors<T extends Record<string, unknown>>(
+  private keepMemberAuthors<T extends Record<string, unknown>>(
     rows: T[],
-    knownUserIds: Set<string>
+    consentedShares: Set<string>,
+    vehiclesOf: (row: T) => string[]
   ): T[] {
-    // Users are not backed up, so an absent author would fail the createdBy foreign key.
-    const isAbsent = (row: T): boolean =>
-      row.createdBy != null && !knownUserIds.has(String(row.createdBy));
-    const absentCount = rows.filter(isAbsent).length;
-    if (absentCount > 0) {
-      logger.warn('Restore cleared expense authorship naming users absent on this instance', {
-        rows: absentCount,
+    const isMember = (row: T): boolean =>
+      vehiclesOf(row).every((vehicleId) =>
+        consentedShares.has(shareConsentKey(vehicleId, String(row.createdBy)))
+      );
+    const cleared = rows.filter((row) => row.createdBy != null && !isMember(row)).length;
+    if (cleared > 0) {
+      logger.warn('Restore credited entries to the owner because their author is not a member', {
+        rows: cleared,
       });
     }
-    return rows.map((row) => (isAbsent(row) ? { ...row, createdBy: null } : row));
+    return rows.map((row) =>
+      row.createdBy != null && !isMember(row) ? { ...row, createdBy: null } : row
+    );
   }
 
   private insertRows<TTable extends SQLiteTable>(
@@ -588,7 +592,20 @@ class RestoreService {
     this.insertRows(tx, insuranceTerms, data.insuranceTerms ?? []);
     this.insertRows(tx, insuranceTermVehicles, data.insuranceTermVehicles ?? []);
     this.insertRows(tx, insuranceClaims, data.insuranceClaims ?? []);
-    this.insertRows(tx, reminders, this.stampUserId(data.reminders, userId));
+    const reminderVehicleIds = new Map<string, string[]>();
+    for (const link of data.reminderVehicles ?? []) {
+      const id = String(link.reminderId);
+      reminderVehicleIds.set(id, [...(reminderVehicleIds.get(id) ?? []), String(link.vehicleId)]);
+    }
+    this.insertRows(
+      tx,
+      reminders,
+      this.keepMemberAuthors(
+        this.stampUserId(data.reminders, userId),
+        consentedShares,
+        (row) => reminderVehicleIds.get(String(row.id)) ?? ['']
+      )
+    );
     this.insertRows(tx, reminderVehicles, data.reminderVehicles ?? []);
     this.insertRows(
       tx,
@@ -598,9 +615,17 @@ class RestoreService {
     this.insertRows(
       tx,
       expenses,
-      this.dropUnknownAuthors(this.stampUserId(data.expenses, userId), knownUserIds)
+      this.keepMemberAuthors(this.stampUserId(data.expenses, userId), consentedShares, (row) => [
+        String(row.vehicleId),
+      ])
     );
-    this.insertRows(tx, odometerEntries, this.stampUserId(data.odometer, userId));
+    this.insertRows(
+      tx,
+      odometerEntries,
+      this.keepMemberAuthors(this.stampUserId(data.odometer, userId), consentedShares, (row) => [
+        String(row.vehicleId),
+      ])
+    );
     this.insertRows(tx, trips, this.stampUserId(data.trips, userId));
     this.insertRows(
       tx,

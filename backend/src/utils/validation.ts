@@ -4,7 +4,6 @@ import type { ZodError, ZodType } from 'zod';
 import { z } from 'zod';
 import { financingRepository } from '../api/financing/repository';
 import { insurancePolicyRepository } from '../api/insurance/repository';
-import { type ReminderWithVehicles, reminderRepository } from '../api/reminders/repository';
 import { tripRepository } from '../api/trips/repository';
 import { CONFIG } from '../config';
 import type { InsurancePolicy, Trip, VehicleFinancing } from '../db/schema';
@@ -121,17 +120,6 @@ export async function validateInsuranceOwnership(
   }
 
   return insurance;
-}
-
-export async function validateReminderOwnership(
-  reminderId: string,
-  userId: string
-): Promise<ReminderWithVehicles> {
-  const reminder = await reminderRepository.findByIdAndUserId(reminderId, userId);
-  if (!reminder) {
-    throw new NotFoundError('Reminder');
-  }
-  return reminder;
 }
 
 export async function validateTripOwnership(tripId: string, userId: string): Promise<Trip> {

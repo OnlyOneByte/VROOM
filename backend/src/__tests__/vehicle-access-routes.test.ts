@@ -216,12 +216,14 @@ const ROUTES: RouteCase[] = [
   {
     name: 'GET /reminders?vehicleId',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/reminders?vehicleId=${fx.vehicleId}`],
     expectInBody: (fx) => fx.reminderId,
   },
   {
     name: 'POST /reminders',
     mode: 'write',
+    authorized: true,
     request: (fx) => [
       'POST',
       '/reminders',
@@ -239,23 +241,27 @@ const ROUTES: RouteCase[] = [
   {
     name: 'GET /odometer/:vehicleId',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/odometer/${fx.vehicleId}`],
   },
   {
     name: 'GET /odometer/:vehicleId/history',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/odometer/${fx.vehicleId}/history`],
     expectInBody: (fx) => fx.odometerId,
   },
   {
     name: 'GET /odometer/entry/:id',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/odometer/entry/${fx.odometerId}`],
     expectInBody: (fx) => fx.odometerId,
   },
   {
     name: 'POST /odometer/:vehicleId',
     mode: 'write',
+    authorized: true,
     request: (fx) => [
       'POST',
       `/odometer/${fx.vehicleId}`,
@@ -265,11 +271,14 @@ const ROUTES: RouteCase[] = [
   {
     name: 'PUT /odometer/:id',
     mode: 'write',
+    authorized: true,
     request: (fx) => ['PUT', `/odometer/${fx.odometerId}`, { odometer: 31500 }],
   },
   {
     name: 'DELETE /odometer/:id',
     mode: 'write',
+    authorized: true,
+    allowed: ['owner'],
     request: (fx) => ['DELETE', `/odometer/${fx.odometerId}`],
   },
   {

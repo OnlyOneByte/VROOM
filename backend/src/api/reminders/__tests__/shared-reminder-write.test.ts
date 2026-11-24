@@ -119,7 +119,7 @@ describe('reminder writes on shared vehicles', () => {
     expect(res.status, 'cross-owner reminder rejected').toBe(400);
   });
 
-  test('an editor can PUT, mark-serviced, and DELETE a shared reminder', async () => {
+  test('an editor can PUT and mark-serviced a shared reminder, and DELETE only their own', async () => {
     const vehicleId = await shareAccepted('editor');
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Tire rotation',
@@ -142,12 +142,23 @@ describe('reminder writes on shared vehicles', () => {
     expect(mark.status, 'editor can mark-serviced a shared reminder').toBe(200);
     expect(storedReminderUserId(rid)).toBe(ctx.user.id);
 
-    const del = await b.request('DELETE', `/api/v1/reminders/${rid}`);
-    expect(del.status, 'editor can delete a shared reminder').toBe(200);
-    expect(ctx.sqlite.query('SELECT id FROM reminders WHERE id = ?').get(rid)).toBeNull();
+    const owners = await b.request('DELETE', `/api/v1/reminders/${rid}`);
+    expect(owners.status, "editor cannot delete the owner's reminder").toBe(403);
+
+    const mine = await b.request('POST', '/api/v1/reminders', {
+      name: 'Editor reminder',
+      type: 'notification',
+      frequency: 'monthly',
+      startDate: '2024-06-01T00:00:00.000Z',
+      vehicleIds: [vehicleId],
+    });
+    const mineId = (await json<DataEnvelope<ReminderEnvelope>>(mine)).data.reminder.id;
+    const del = await b.request('DELETE', `/api/v1/reminders/${mineId}`);
+    expect(del.status, 'editor can delete a reminder they added').toBe(200);
+    expect(ctx.sqlite.query('SELECT id FROM reminders WHERE id = ?').get(mineId)).toBeNull();
   });
 
-  test('a viewer cannot create, update, delete, or mark-serviced a shared reminder (404)', async () => {
+  test('a viewer cannot create, update, delete, or mark-serviced a shared reminder (403)', async () => {
     const vehicleId = await shareAccepted('viewer');
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Owner reminder',
@@ -165,17 +176,17 @@ describe('reminder writes on shared vehicles', () => {
       startDate: '2024-06-02T00:00:00.000Z',
       vehicleIds: [vehicleId],
     });
-    expect(create.status, 'viewer create denied').toBe(404);
+    expect(create.status, 'viewer create denied').toBe(403);
     expect(
       (await b.request('PUT', `/api/v1/reminders/${rid}`, { name: 'x' })).status,
       'viewer PUT'
-    ).toBe(404);
+    ).toBe(403);
     expect(
       (await b.request('POST', `/api/v1/reminders/${rid}/mark-serviced`)).status,
       'viewer mark-serviced'
-    ).toBe(404);
+    ).toBe(403);
     expect((await b.request('DELETE', `/api/v1/reminders/${rid}`)).status, 'viewer DELETE').toBe(
-      404
+      403
     );
 
     expect(ctx.sqlite.query('SELECT id FROM reminders WHERE id = ?').get(rid)).not.toBeNull();

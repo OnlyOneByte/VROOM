@@ -71,7 +71,7 @@ describe('restore of a backup whose created_by names a user absent from this ins
     expect(own?.created_by).toBeNull();
   });
 
-  test('a created_by that DOES exist on this instance still round-trips byte-for-byte', async () => {
+  test('a created_by naming a current member of the car still round-trips byte-for-byte', async () => {
     const { db } = await import('../../../db/connection');
     const schema = await import('../../../db/schema');
     const { backupService } = await import('../backup');
@@ -84,6 +84,10 @@ describe('restore of a backup whose created_by names a user absent from this ins
 
     const vehicleId = await seedVehicle(ctx, { make: 'Kia', model: 'Niro', year: 2023 });
     ctx.sqlite.run(
+      "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status) VALUES (?, ?, ?, ?, 'editor', 'accepted')",
+      [`share-${editorId}`, vehicleId, ctx.user.id, editorId]
+    );
+    ctx.sqlite.run(
       `INSERT INTO expenses (id, vehicle_id, user_id, created_by, category, date, expense_amount, missed_fillup)
        VALUES ('exp-kept-provenance', ?, ?, ?, 'maintenance', 1700000000, 1234, 0)`,
       [vehicleId, ctx.user.id, editorId]
@@ -93,9 +97,6 @@ describe('restore of a backup whose created_by names a user absent from this ins
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    expect(
-      expenseRow('exp-kept-provenance')?.created_by,
-      'a known author is NOT dropped — the filter must be absence-only'
-    ).toBe(editorId);
+    expect(expenseRow('exp-kept-provenance')?.created_by, 'a member author is kept').toBe(editorId);
   });
 });
