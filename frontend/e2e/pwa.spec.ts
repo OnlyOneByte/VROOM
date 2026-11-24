@@ -131,6 +131,7 @@ interface A11yRoute {
 	debt: string[];
 	anonymous?: true;
 	ready: (page: Page) => Locator;
+	open?: (page: Page) => Promise<void>;
 }
 
 const signInControl = (page: Page) =>
@@ -148,7 +149,14 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 	},
 	'/expenses/new': { debt: [], ready: pageHeading('Add Expense') },
 	'/vehicles/new': { debt: [], ready: pageHeading('Add Vehicle') },
-	'/vehicles/vehicle-camry': { debt: [], ready: expiredPolicy },
+	'/vehicles/vehicle-camry': {
+		debt: [],
+		ready: page => page.getByRole('button', { name: 'Details, insurance and photos' }),
+		open: async page => {
+			await page.getByRole('button', { name: 'Details, insurance and photos' }).click();
+			await expect(expiredPolicy(page)).toBeVisible();
+		}
+	},
 	'/analytics': { debt: [], ready: pageHeading('Analytics Dashboard') },
 	'/insurance': { debt: [], ready: expiredPolicy },
 	'/reminders': { debt: [], ready: pageHeading('Reminders') },
@@ -183,7 +191,7 @@ async function expectNoNewViolations(
 }
 
 test.describe('Accessibility (axe)', () => {
-	for (const [route, { debt, anonymous, ready }] of Object.entries(A11Y_ROUTES)) {
+	for (const [route, { debt, anonymous, ready, open }] of Object.entries(A11Y_ROUTES)) {
 		test(`${route} has no axe violations beyond its recorded debt`, async ({
 			page,
 			context
@@ -193,6 +201,7 @@ test.describe('Accessibility (axe)', () => {
 
 			await page.goto(route);
 			await expect(ready(page)).toBeVisible();
+			await open?.(page);
 
 			await expectNoNewViolations(page, testInfo, attachmentLabel(route), debt);
 
