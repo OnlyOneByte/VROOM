@@ -24,6 +24,7 @@ import {
   vehicleShares,
   vehicles,
 } from '../../db/schema';
+import { isVehicleKind } from '../../db/types';
 import {
   AppError,
   ConflictError,
@@ -43,6 +44,7 @@ import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { catalogModelMatchesMake } from '../../utils/vehicle-catalog';
+import { LOCAL_OCR_PROVIDER_ID } from '../providers/domains/vlm/registry';
 import { CAPABILITY_DOMAIN } from '../providers/resolve';
 import { preferencesRepository } from '../settings/repository';
 import { isKnownRegion } from '../settings/validation';
@@ -572,6 +574,7 @@ class RestoreService {
           catalogModelMatchesMake(row.catalogModelId, String(row.make))
             ? row.catalogModelId
             : null,
+        vehicleKind: isVehicleKind(row.vehicleKind) ? row.vehicleKind : 'car',
       }))
     );
     this.insertRows(tx, vehicleFinancing, data.financing ?? []);
@@ -693,7 +696,10 @@ class RestoreService {
       DEFAULT_PROVIDER_CAPABILITIES.map((capability) => [
         capability,
         [current?.providerDefaults?.[capability], restoredDefaults?.[capability]].find(
-          (id) => id != null && owned.get(id) === CAPABILITY_DOMAIN[capability]
+          (id) =>
+            id != null &&
+            (owned.get(id) === CAPABILITY_DOMAIN[capability] ||
+              (capability === 'ai.vision' && id === LOCAL_OCR_PROVIDER_ID))
         ) ?? null,
       ])
     ) as ProviderDefaults;

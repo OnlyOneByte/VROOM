@@ -171,6 +171,29 @@ describe('GoogleSheetsService.readSpreadsheetData', () => {
     expect(data.metadata.userId).toBe(ctx.user.id);
   });
 
+  test('a vehicle kind survives the Sheets export→read round-trip', async () => {
+    const { db } = await import('../../../../db/connection');
+    const schema = await import('../../../../db/schema');
+    await db.insert(schema.vehicles).values({
+      userId: ctx.user.id,
+      make: 'Ducati',
+      model: 'Monster',
+      year: 2021,
+      vehicleKind: 'motorcycle',
+    });
+
+    const svc = makeSvc();
+    const info = await svc.createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
+
+    const data = await svc.readSpreadsheetData(info.id);
+    expect(data.vehicles).toHaveLength(1);
+    expect(data.vehicles[0].vehicleKind).toBe('motorcycle');
+  });
+
   test('a non-default themePreference survives the Sheets export→read round-trip', async () => {
     await seedVehicle('Honda', 'Civic', 2019);
     const { db } = await import('../../../../db/connection');

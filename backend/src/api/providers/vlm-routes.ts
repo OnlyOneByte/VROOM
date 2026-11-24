@@ -2,11 +2,17 @@ import { and, eq, ne } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { getDb } from '../../db/connection';
 import { userProviders } from '../../db/schema';
-import { AppError, PayloadTooLargeError, ValidationError } from '../../errors';
+import {
+  AppError,
+  PayloadTooLargeError,
+  UnprocessableEntityError,
+  ValidationError,
+} from '../../errors';
 import { bodyLimit, changeTracker, requireAuth } from '../../middleware';
 import { logger } from '../../utils/logger';
+import { OcrUnavailableError } from './domains/vlm/local-ocr';
 import { parseExtraction } from './domains/vlm/prompt';
-import { getVlmProvider } from './domains/vlm/registry';
+import { getVlmProvider, LOCAL_OCR_PROVIDER_ID } from './domains/vlm/registry';
 import { resolveProvider } from './resolve';
 
 const routes = new Hono();
@@ -49,6 +55,15 @@ routes.post('/parse', async (c) => {
     // Adapters log upstream errors; the client gets a generic 502 with no key or raw error.
     const message = err instanceof Error ? err.message : 'VLM provider error';
     logger.warn('Receipt parse failed', { providerType: providerRow.providerType, error: message });
+    if (err instanceof OcrUnavailableError) {
+      throw new AppError(
+        "The built-in text reader isn't available right now. Try again in a moment.",
+        503
+      );
+    }
+    if (providerRow.id === LOCAL_OCR_PROVIDER_ID) {
+      throw new UnprocessableEntityError('No readable text found. Try a sharper, well-lit photo.');
+    }
     throw new AppError('The receipt-parsing provider could not be reached. Try again.', 502);
   }
 

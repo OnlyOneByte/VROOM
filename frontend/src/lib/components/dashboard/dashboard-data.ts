@@ -1,6 +1,11 @@
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '#lib/constants/expense-categories.ts';
 import type { TimePeriod } from '#lib/constants/time-periods.ts';
-import type { ExpenseSummary, InsurancePolicy, ReminderWithVehicles } from '#lib/types/index.ts';
+import type {
+	ExpenseSummary,
+	InsurancePolicy,
+	ReminderWithVehicles,
+	VehicleKind
+} from '#lib/types/index.ts';
 import { costBucket, type CostBucket } from '#lib/utils/cost-bucket.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -36,6 +41,7 @@ export interface VehicleRow {
 	id: string;
 	name: string;
 	detail: string;
+	kind?: VehicleKind;
 	isElectric: boolean;
 	spend: number;
 	runningPerDistance: number | null;

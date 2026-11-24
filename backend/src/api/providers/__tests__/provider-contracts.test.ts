@@ -14,6 +14,7 @@ import {
   describeModelContract,
   type ModelContractSubject,
 } from '../../../test-helpers/provider-contracts/model';
+import { describeOcrContract } from '../../../test-helpers/provider-contracts/ocr';
 import { describeStorageContract } from '../../../test-helpers/provider-contracts/storage';
 import { STORAGE_CHECKS } from '../../../test-helpers/provider-contracts/storage-checks';
 import { AUTH_PROVIDERS } from '../../auth/providers/registry';
@@ -32,7 +33,8 @@ import {
   type StorageProviderType,
 } from '../domains/storage/registry';
 import type { StorageProvider } from '../domains/storage/storage-provider';
-import { VISION_PROVIDERS } from '../domains/vlm/registry';
+import { stopLocalOcr } from '../domains/vlm/local-ocr';
+import { BUILTIN_VISION_PROVIDERS, VISION_PROVIDERS } from '../domains/vlm/registry';
 import type { VlmProvider } from '../domains/vlm/vlm-provider';
 import { GoogleDriveService } from '../services/google-drive-service';
 import { GooglePhotosService } from '../services/google-photos-service';
@@ -244,13 +246,18 @@ for (const [id, subject] of Object.entries(LLM_SUBJECTS)) {
 for (const [id, subject] of Object.entries(VISION_SUBJECTS)) {
   describeModelContract(`ai.vision/${id}`, subject);
 }
+describeOcrContract(
+  'ai.vision/local-ocr',
+  BUILTIN_VISION_PROVIDERS['local-ocr'].create,
+  stopLocalOcr
+);
 
 const REGISTRIES: Record<string, Record<string, AnyProviderDescriptor>> = {
   auth: AUTH_PROVIDERS,
   import: IMPORT_PROVIDERS,
   storage: STORAGE_PROVIDERS,
   'ai.llm': LLM_PROVIDERS,
-  'ai.vision': VISION_PROVIDERS,
+  'ai.vision': { ...VISION_PROVIDERS, ...BUILTIN_VISION_PROVIDERS },
 };
 
 for (const [capability, table] of Object.entries(REGISTRIES)) {

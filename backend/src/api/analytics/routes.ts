@@ -6,7 +6,7 @@ import { requireAuth } from '../../middleware';
 import { calendarParts, zonedCalendar } from '../../utils/analytics-charts';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { zValidator } from '../../utils/validation';
-import { requireVehicleAccess } from '../../utils/vehicle-access';
+import { requireVehicleAccess, seesFinancials } from '../../utils/vehicle-access';
 import { QUERY_ANNOTATIONS } from './annotations';
 import {
   analyticsQueryToApi,
@@ -22,6 +22,7 @@ import {
   vehicleTcoToApi,
   yearEndToApi,
 } from './api-transform';
+import { analyticsInsightsRepository } from './insights';
 import {
   analyticsQueryRepository,
   isValidQueryCombination,
@@ -158,6 +159,15 @@ const jsonList = z
   })
   .pipe(z.array(z.string().max(200)).max(200));
 
+const insightsQuerySchema = z
+  .object({
+    start: epochSeconds,
+    end: epochSeconds,
+    vehicleIds: csv.pipe(z.array(z.string().min(1).max(64)).min(1).max(50)).optional(),
+    timeZone,
+  })
+  .refine((q) => q.start < q.end, { message: 'start must be before end', path: ['end'] });
+
 const analyticsQuerySchema = z
   .object({
     metric: z.enum(QUERY_METRICS),
@@ -206,6 +216,18 @@ routes.get('/query/items', zValidator('query', bucketItemsSchema), async (c) => 
   const user = c.get('user');
   const data = await analyticsQueryRepository.items(user.id, c.req.valid('query'));
   return c.json({ success: true, data: bucketItemsToApi(data) });
+});
+
+routes.get('/insights', zValidator('query', insightsQuerySchema), async (c) => {
+  const user = c.get('user');
+  const { start, end, vehicleIds: ids, timeZone: zone } = c.req.valid('query');
+  const data = await analyticsInsightsRepository.insights(user.id, {
+    start,
+    end,
+    vehicleIds: ids,
+    timeZone: zone ?? 'UTC',
+  });
+  return c.json({ success: true, data });
 });
 
 routes.get('/query', zValidator('query', analyticsQuerySchema), async (c) => {
@@ -310,8 +332,14 @@ routes.get('/vehicle-health', zValidator('query', vehicleIdQuerySchema), async (
 routes.get('/vehicle-tco', zValidator('query', yearVehicleQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, year, timeZone } = c.req.valid('query');
-  const scopeId = (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId;
-  const data = await analyticsRepository.getVehicleTCO(scopeId, vehicleId, year, timeZone);
+  const access = await requireVehicleAccess(vehicleId, user.id, 'read');
+  const data = await analyticsRepository.getVehicleTCO(
+    access.ownerId,
+    vehicleId,
+    year,
+    timeZone,
+    !seesFinancials(access)
+  );
   return c.json({ success: true, data: vehicleTcoToApi(data) });
 });
 
@@ -321,12 +349,13 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { vehicleId, startDate, endDate, timeZone } = c.req.valid('query');
-    const scopeId = (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId;
+    const access = await requireVehicleAccess(vehicleId, user.id, 'read');
     const data = await analyticsRepository.getVehicleExpenses(
-      scopeId,
+      access.ownerId,
       vehicleId,
       { start: startDate, end: endDate },
-      timeZone
+      timeZone,
+      !seesFinancials(access)
     );
     return c.json({ success: true, data: vehicleExpensesToApi(data) });
   }

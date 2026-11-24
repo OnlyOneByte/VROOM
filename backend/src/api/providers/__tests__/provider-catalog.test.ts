@@ -56,6 +56,7 @@ describe('GET /api/v1/providers/catalog', () => {
         'anthropic',
         'gemini',
         'ollama',
+        ...(capability === 'ai.vision' ? ['local-ocr'] : []),
       ]);
       const ollama = entries.find((e) => e.id === 'ollama');
       expect(ollama?.secrets).toEqual([]);
@@ -67,6 +68,11 @@ describe('GET /api/v1/providers/catalog', () => {
         'apiKey',
       ]);
     }
+  });
+
+  test('lists the built-in text reader as a receipt-scanning provider with nothing to set up', async () => {
+    const ocr = (await catalog('ai.vision')).find((e) => e.id === 'local-ocr');
+    expect(ocr).toMatchObject({ scope: 'builtin', connect: 'none', fields: [], secrets: [] });
   });
 
   test('lists every built-in import format, matching GET /expenses/import/formats', async () => {

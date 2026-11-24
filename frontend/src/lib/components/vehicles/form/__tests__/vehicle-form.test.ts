@@ -49,6 +49,7 @@ const EXISTING: Vehicle = {
 	model: 'Civic',
 	year: 2019,
 	vehicleType: 'hybrid',
+	vehicleKind: 'van',
 	trackFuel: true,
 	trackCharging: true,
 	licensePlate: 'ABC-1234',
@@ -153,10 +154,36 @@ describe('VehicleForm create mode', () => {
 		expect(screen.queryByRole('button', { name: /delete/i })).toBeNull();
 	});
 
-	test('asks for the vehicle type right after make, model and year', async () => {
+	test('asks for the kind and the powertrain right after make, model and year', async () => {
 		await renderCreate();
 		const order = [...document.querySelectorAll('label[for]')].map(l => l.getAttribute('for'));
-		expect(order.slice(0, 5)).toEqual(['make', 'model', 'year', 'vehicleType', 'licensePlate']);
+		expect(order.slice(0, 6)).toEqual([
+			'make',
+			'model',
+			'year',
+			'vehicleKind',
+			'vehicleType',
+			'licensePlate'
+		]);
+		expect(document.querySelector('label[for="vehicleKind"]')?.textContent?.trim()).toBe('Kind');
+		expect(document.querySelector('label[for="vehicleType"]')?.textContent?.trim()).toBe(
+			'Powertrain'
+		);
+	});
+
+	test('a new vehicle is a car unless another kind is picked, and the kind is saved', async () => {
+		createVehicle.mockResolvedValue({ ...EXISTING, id: 'new-1', vehicleKind: 'motorcycle' });
+		await renderCreate();
+		expect(document.getElementById('vehicleKind')?.textContent?.trim()).toBe('Car');
+		await fillRequired();
+
+		await choose('vehicleKind', 'Motorcycle');
+		expect(document.getElementById('vehicleKind')?.textContent?.trim()).toBe('Motorcycle');
+		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+
+		await vi.waitFor(() => expect(createVehicle).toHaveBeenCalledTimes(1));
+		expect(createdPayload().vehicleKind).toBe('motorcycle');
+		expect(createdPayload().vehicleType).toBe('gas');
 	});
 
 	test('summarises the default unit preferences while the units panel is collapsed', async () => {
@@ -266,6 +293,7 @@ describe('VehicleForm create mode', () => {
 			model: 'Camry',
 			year: 2021,
 			vehicleType: 'gas',
+			vehicleKind: 'car',
 			catalogModelId: null,
 			trackFuel: true,
 			trackCharging: false,
@@ -471,11 +499,13 @@ describe('VehicleForm edit mode', () => {
 
 		await vi.waitFor(() => expect(updateVehicle).toHaveBeenCalledTimes(1));
 		expect(updateVehicle.mock.calls[0]?.[0]).toBe('veh-1');
+		expect(document.getElementById('vehicleKind')?.textContent?.trim()).toBe('Van');
 		expect(updatedPayload()).toEqual({
 			make: 'Honda',
 			model: 'Accord',
 			year: 2019,
 			vehicleType: 'hybrid',
+			vehicleKind: 'van',
 			catalogModelId: null,
 			trackFuel: true,
 			trackCharging: true,

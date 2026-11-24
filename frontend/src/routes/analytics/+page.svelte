@@ -88,6 +88,17 @@
 
 	let explore = $derived(parseExplore(page.url.searchParams));
 
+	function applyInsight(insightQuery: Record<string, string>) {
+		const withFilters = writeAnalyticsFilters(page.url, {
+			...filters,
+			...(insightQuery['range'] === 'all' && { range: 'all', from: undefined, to: undefined }),
+			cars: insightQuery['cars'] ? [insightQuery['cars']] : filters.cars
+		});
+		const url = writeExplore(withFilters, parseExplore(new URLSearchParams(insightQuery)));
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
+		void goto(`${url.pathname}${url.search}`, { reset: false });
+	}
+
 	function setExplore(next: ExploreQuery) {
 		const url = writeExplore(page.url, next);
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
@@ -323,6 +334,7 @@
 							{vehicleColors}
 							filterLabel={filtered ? filterLabel : undefined}
 							onClearFilters={filtered ? clearFilters : undefined}
+							onApplyInsight={applyInsight}
 						/>
 					{:catch}
 						<LoadErrorCard

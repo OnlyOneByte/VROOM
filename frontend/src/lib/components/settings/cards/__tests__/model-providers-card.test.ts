@@ -95,7 +95,7 @@ afterEach(() => {
 
 describe('ModelProvidersCard', () => {
 	test.each([
-		['vlm', 'Receipt Parsing (AI)', 'No receipt-parsing provider connected'],
+		['vlm', 'Receipt Scanning', 'Built-in text reader'],
 		['llm', 'Assistant (AI)', 'No assistant provider connected']
 	] as const)(
 		'%s domain loads its own providers and shows its copy',
@@ -113,10 +113,10 @@ describe('ModelProvidersCard', () => {
 	test('the card leads with one line and keeps the privacy details behind How it works', async () => {
 		getProviders.mockResolvedValue([]);
 		const { container } = render(ModelProvidersCard, { props: { domain: 'vlm' } });
-		await screen.findByText('No receipt-parsing provider connected');
+		await screen.findByText('Built-in text reader');
 
 		expect(
-			screen.getByText('Scan receipts into expense drafts with your own AI key.')
+			screen.getByText('Scan receipts into expense drafts, built in or with your own AI key.')
 		).toBeInTheDocument();
 		const details = container.querySelector('details');
 		expect(details?.open).toBe(false);
@@ -142,8 +142,8 @@ describe('ModelProvidersCard', () => {
 		await screen.findByText('Receipt Bot');
 		const addButtons = screen.getAllByRole('button', { name: /^Add / });
 		expect(addButtons).toHaveLength(1);
-		expect(addButtons[0]).toHaveAccessibleName('Add Receipt-Parsing Provider');
-		expect(screen.queryByText('No receipt-parsing provider connected')).toBeNull();
+		expect(addButtons[0]).toHaveAccessibleName('Add AI Provider');
+		expect(screen.queryByText('No receipt-scanning provider connected')).toBeNull();
 	});
 
 	test('lists the providers returned for the domain', async () => {
@@ -184,7 +184,7 @@ describe('ModelProvidersCard', () => {
 
 		expect(
 			await screen.findByText(
-				`Couldn't load your receipt-parsing providers. ${UNEXPECTED_FAILURE_MESSAGE}`
+				`Couldn't load your receipt-scanning providers. ${UNEXPECTED_FAILURE_MESSAGE}`
 			)
 		).toBeInTheDocument();
 	});
@@ -273,7 +273,7 @@ describe('ModelProvidersCard add provider', () => {
 		expect(showSuccess).toHaveBeenCalledWith('Receipts GPT added');
 		expect(getProviders).toHaveBeenCalledTimes(2);
 		await waitFor(() =>
-			expect(screen.queryByRole('heading', { name: 'Add receipt-parsing provider' })).toBeNull()
+			expect(screen.queryByRole('heading', { name: 'Add receipt-scanning provider' })).toBeNull()
 		);
 	});
 
@@ -355,9 +355,9 @@ describe('ModelProvidersCard add provider', () => {
 	test('the empty-state button also opens the add dialog', async () => {
 		render(ModelProvidersCard, { props: { domain: 'vlm' } });
 		await settle();
-		await fireEvent.click(screen.getByRole('button', { name: 'Add Receipt-Parsing Provider' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Add AI Provider' }));
 		expect(
-			await screen.findByRole('heading', { name: 'Add receipt-parsing provider' })
+			await screen.findByRole('heading', { name: 'Add receipt-scanning provider' })
 		).toBeInTheDocument();
 	});
 });

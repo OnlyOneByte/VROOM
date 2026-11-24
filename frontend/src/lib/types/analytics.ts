@@ -362,3 +362,12 @@ export interface AnalyticsBucketItems {
 	others: { total: number; count: number } | null;
 	categories: string[];
 }
+
+export interface AnalyticsInsight {
+	id: 'recordMonth' | 'repairFree' | 'winterPenalty' | 'costPerTrip' | 'cheapestStation';
+	title: string;
+	value: number;
+	unit: 'money' | 'days' | 'percent' | 'moneyPerVolume';
+	sentence: string;
+	query: Record<string, string>;
+}

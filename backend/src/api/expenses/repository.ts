@@ -28,6 +28,7 @@ import { logger } from '../../utils/logger';
 import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
 import { zonedDayWindow, zonedMidnight } from '../../utils/time-zone';
+import { hiddenFinancialsScope } from '../../utils/vehicle-access';
 import { expenseSplitService } from './split-service';
 import {
   type OdometerCheck,
@@ -47,6 +48,7 @@ export interface ExpenseFilters {
   timeZone?: string;
   startDateIsDay?: boolean;
   endDateIsDay?: boolean;
+  hideFinancials?: boolean;
 }
 
 type ExpenseSortBy = 'date' | 'amount' | 'category';
@@ -228,6 +230,7 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
   }
   const search = filters.search?.trim();
   if (search) conditions.push(searchCondition(search));
+  if (filters.hideFinancials) conditions.push(hiddenFinancialsScope());
 
   return conditions;
 }
@@ -285,6 +288,7 @@ interface ExpenseSummaryFilters {
   vehicleId?: string;
   period?: '7d' | '30d' | '90d' | '1y' | 'all';
   timeZone?: string;
+  hideFinancials?: boolean;
 }
 
 export interface ExpenseSummary {
@@ -312,6 +316,13 @@ export interface VehicleCostBuckets extends CostBucketTotals {
 export interface CostBuckets extends CostBucketTotals {
   previous: CostBucketTotals | null;
   byVehicle: VehicleCostBuckets[];
+}
+
+function summaryVisibility(filters: ExpenseSummaryFilters): SQL[] {
+  return buildExpenseConditions({
+    vehicleId: filters.vehicleId,
+    hideFinancials: filters.hideFinancials,
+  });
 }
 
 function sumBuckets(rows: CostBucketTotals[]): CostBucketTotals {
@@ -393,13 +404,21 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
   async getSplitGroupAccessInfo(
     groupId: string
-  ): Promise<{ vehicleIds: string[]; ownerId: string } | null> {
+  ): Promise<{ vehicleIds: string[]; ownerId: string; sourceType: string | null } | null> {
     const rows = await this.db
-      .select({ vehicleId: expenses.vehicleId, userId: expenses.userId })
+      .select({
+        vehicleId: expenses.vehicleId,
+        userId: expenses.userId,
+        sourceType: expenses.sourceType,
+      })
       .from(expenses)
       .where(eq(expenses.groupId, groupId));
     if (rows.length === 0) return null;
-    return { vehicleIds: [...new Set(rows.map((r) => r.vehicleId))], ownerId: rows[0].userId };
+    return {
+      vehicleIds: [...new Set(rows.map((r) => r.vehicleId))],
+      ownerId: rows[0].userId,
+      sourceType: rows[0].sourceType,
+    };
   }
 
   async findByClientId(clientId: string, userId: string): Promise<Expense | null> {
@@ -607,10 +626,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   async getSummary(filters: ExpenseSummaryFilters): Promise<ExpenseSummary> {
     try {
       const periodConditions: SQL[] = [eq(expenses.userId, filters.userId)];
-
-      if (filters.vehicleId) {
-        periodConditions.push(eq(expenses.vehicleId, filters.vehicleId));
-      }
+      const visibility = summaryVisibility(filters);
+      periodConditions.push(...visibility);
 
       const period = filters.period ?? 'all';
       if (period !== 'all') {
@@ -624,10 +641,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       const recentConditions: SQL[] = [
         eq(expenses.userId, filters.userId),
         gte(expenses.date, thirtyDaysAgo),
+        ...visibility,
       ];
-      if (filters.vehicleId) {
-        recentConditions.push(eq(expenses.vehicleId, filters.vehicleId));
-      }
       const recentWhere = and(...recentConditions);
 
       const [totals, categoryBreakdown, monthlyTrend, recentTotals, costBuckets] =
@@ -712,8 +727,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     const previousStart = start
       ? new Date(start.getTime() - (now.getTime() - start.getTime()))
       : null;
-    const conditions: SQL[] = [eq(expenses.userId, filters.userId)];
-    if (filters.vehicleId) conditions.push(eq(expenses.vehicleId, filters.vehicleId));
+    const conditions: SQL[] = [eq(expenses.userId, filters.userId), ...summaryVisibility(filters)];
     if (previousStart) conditions.push(gte(expenses.date, previousStart));
 
     const isOwnership = inArray(expenses.category, [...OWNERSHIP_CATEGORIES]);

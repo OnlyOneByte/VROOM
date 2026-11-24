@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Car, Zap } from '@lucide/svelte';
+	import { Zap } from '@lucide/svelte';
+	import { vehicleKindIcon } from '#lib/utils/vehicle-kind.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { paramRoutes } from '#lib/routes.ts';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
@@ -43,7 +44,9 @@
 						class="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground"
 						aria-hidden="true"
 					>
-						{#if row.isElectric}<Zap class="size-4" />{:else}<Car class="size-4" />{/if}
+						{#if row.isElectric}<Zap class="size-4" />{:else}{@const KindIcon = vehicleKindIcon(
+								row.kind
+							)}<KindIcon class="size-4" />{/if}
 					</span>
 					<div class="min-w-0 flex-1">
 						<a

@@ -1,7 +1,11 @@
 import type { Context } from 'hono';
 import { NotFoundError, ValidationError } from '../../errors';
 import { validateInsuranceOwnership } from '../../utils/validation';
-import { requireVehicleAccess } from '../../utils/vehicle-access';
+import {
+  assertMayTouchFinancialExpense,
+  requireVehicleAccess,
+  seesFinancials,
+} from '../../utils/vehicle-access';
 import { expenseRepository } from '../expenses/repository';
 import { insuranceClaimRepository } from '../insurance/claims-repository';
 import { odometerRepository } from '../odometer/repository';
@@ -29,7 +33,9 @@ export async function validateEntityOwnership(
       // Shared-vehicle rows carry the owner's userId, so authorize through the vehicle write gate.
       const expense = await expenseRepository.findById(entityId);
       if (!expense) throw new NotFoundError('Expense');
-      return (await requireVehicleAccess(expense.vehicleId, userId, 'write')).ownerId;
+      const access = await requireVehicleAccess(expense.vehicleId, userId, 'write');
+      assertMayTouchFinancialExpense(seesFinancials(access), expense.sourceType);
+      return access.ownerId;
     }
     case 'odometer_entry': {
       const entry = await odometerRepository.findById(entityId);

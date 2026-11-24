@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/svelte';
 import { authStore } from '#lib/stores/auth.svelte.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import type { User } from '#lib/types/index.ts';
+import { onWideScreen } from './wide-screen.ts';
 
 vi.mock('$app/state', () => ({
 	page: { url: new URL('http://localhost/expenses') }
@@ -57,6 +58,8 @@ function messages(): string[] {
 }
 
 describe('Sign out', () => {
+	onWideScreen();
+
 	it('offline, says it could not sign out and keeps the user signed in', async () => {
 		global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
 		render(Navigation);

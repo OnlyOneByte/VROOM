@@ -95,6 +95,28 @@ afterEach(() => {
 });
 
 describe('CommunityCompareCard', () => {
+	test('the heading that receives focus shows the standard focus ring', async () => {
+		compare.mockResolvedValue(data(OK_EFFICIENCY));
+		await mount();
+		expect(screen.getByRole('heading', { name: 'Compare with others' })).toHaveClass(
+			'focus-visible:ring-[3px]',
+			'focus-visible:ring-ring/50'
+		);
+	});
+
+	test('focus returns to the heading after a successful Retry', async () => {
+		compare.mockRejectedValueOnce(new Error('offline'));
+		compare.mockResolvedValueOnce(data(OK_EFFICIENCY));
+		await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });
+		const retry = screen.getByRole('button', { name: 'Retry' });
+		retry.focus();
+		await fireEvent.click(retry);
+		await settle();
+		expect(document.activeElement).toBe(
+			screen.getByRole('heading', { name: 'Compare with others' })
+		);
+	});
+
 	test('shows a three-row skeleton while loading', async () => {
 		compare.mockReturnValue(new Promise(() => {}));
 		await mount();
@@ -125,6 +147,16 @@ describe('CommunityCompareCard', () => {
 			'/settings#community-comparisons'
 		);
 		expect(screen.queryByText(/owners ·|about \d+ owners/)).toBeNull();
+	});
+
+	test('a user whose opt-in is not in a refresh yet is told to wait, with no numbers', async () => {
+		compare.mockResolvedValue(all('awaiting_refresh'));
+		await mount();
+		expect(screen.getByTestId('community-compare-awaiting')).toHaveTextContent(
+			"You're in. Comparisons appear after the next daily refresh includes your vehicles."
+		);
+		expect(screen.queryByRole('link', { name: 'Turn on community stats' })).toBeNull();
+		expect(screen.queryByTestId('community-compare-efficiency')).toBeNull();
 	});
 
 	test('shows the comparison row with the median, typical range, rounded n and a text range', async () => {
@@ -209,7 +241,7 @@ describe('CommunityCompareCard', () => {
 		updateVehicle.mockResolvedValue({ ...VEHICLE, catalogModelId: 'honda-civic' });
 		const { onVehicleUpdated } = await mount();
 
-		expect(screen.getByText('Is this a Honda Civic?')).toBeInTheDocument();
+		expect(await screen.findByText('Is this a Honda Civic?')).toBeInTheDocument();
 		await fireEvent.click(screen.getByRole('button', { name: 'Yes' }));
 		await settle();
 
@@ -227,7 +259,7 @@ describe('CommunityCompareCard', () => {
 	test('needs model: No hides the prompt for this vehicle, also after a reload', async () => {
 		compare.mockResolvedValue(data(metric('efficiency', { status: 'needs_model' })));
 		await mount();
-		await fireEvent.click(screen.getByRole('button', { name: "No, it's something else" }));
+		await fireEvent.click(await screen.findByRole('button', { name: "No, it's something else" }));
 		await settle();
 		expect(screen.queryByText('Is this a Honda Civic?')).toBeNull();
 		expect(document.activeElement).toBe(
@@ -246,7 +278,7 @@ describe('CommunityCompareCard', () => {
 	test('the prompt uses the catalogue spelling of the make', async () => {
 		compare.mockResolvedValue(data(metric('efficiency', { status: 'needs_model' })));
 		await mount({ vehicle: { ...VEHICLE, make: 'honda', model: 'civic ex' } });
-		expect(screen.getByText('Is this a Honda Civic?')).toBeInTheDocument();
+		expect(await screen.findByText('Is this a Honda Civic?')).toBeInTheDocument();
 	});
 
 	test('a share recipient who has not opted in is told about this vehicle, not theirs', async () => {
@@ -303,9 +335,9 @@ describe('CommunityCompareCard', () => {
 		compare.mockResolvedValue(data(metric('efficiency', { status: 'needs_model' })));
 		updateVehicle.mockRejectedValue(new Error('nope'));
 		await mount();
-		await fireEvent.click(screen.getByRole('button', { name: 'Yes' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Yes' }));
 		await settle();
 		expect(showError).toHaveBeenCalledWith(expect.stringContaining("Couldn't save the model."));
-		expect(screen.getByText('Is this a Honda Civic?')).toBeInTheDocument();
+		expect(await screen.findByText('Is this a Honda Civic?')).toBeInTheDocument();
 	});
 });
