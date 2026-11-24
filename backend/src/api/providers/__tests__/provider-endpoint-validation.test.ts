@@ -198,14 +198,16 @@ describe('provider endpoints with an admin allowlist', () => {
 
   test('a name that resolves to a public address over plain http is never sent to', async () => {
     const id = insertStoredS3Provider('http://s3.example.com');
+    outboundResolver.lookup = async () => ['93.184.215.14'];
     const sent: string[] = [];
     globalThis.fetch = (async (input: string | URL | Request) => {
       sent.push(String(input));
       return new Response(null, { status: 200 });
     }) as typeof fetch;
     const res = await ctx.authed('POST', `/api/v1/providers/${id}/test`);
-    expect((await json<DataEnvelope<{ ok: boolean }>>(res)).data.ok).toBe(false);
+    const body = await json<DataEnvelope<{ ok: boolean }>>(res);
     expect(sent).toEqual([]);
+    expect(body.data.ok).toBe(false);
   });
 });
 
