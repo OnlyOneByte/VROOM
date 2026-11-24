@@ -50,6 +50,7 @@ export function vehicle(
     lastRecordAt: new Date(NOW.getTime() - 20 * DAY),
     expenses: fillUps({}),
     odometerReadings: [],
+    insurancePremiums: [],
     ...rest,
   };
 }

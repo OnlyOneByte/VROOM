@@ -1,8 +1,20 @@
 import { describe, expect, test } from 'bun:test';
 import { ChargeUnit, DistanceUnit, VolumeUnit } from '../../../types';
-import { ageBand, aggregate, type CommunityVehicle, vehicleSamples } from '../aggregator';
+import {
+  ageBand,
+  aggregate,
+  type CommunityVehicle,
+  premiumInWindow,
+  vehicleSamples,
+} from '../aggregator';
 import { fillUps, NO_NOISE, NOW, owners, vehicle } from './community-fixtures';
 
+const DAY = 86_400_000;
+const term = (startDays: number, endDays: number, amount: number) => ({
+  amount,
+  termStart: new Date(NOW.getTime() + startDays * DAY),
+  termEnd: new Date(NOW.getTime() + endDays * DAY),
+});
 const OPTIONS = { now: NOW, minGroup: 10, quartileMinGroup: 20, uniform: NO_NOISE };
 const CIVIC_KM_PER_L = (300 * 1.609344) / (10 * 3.785411784);
 
@@ -193,30 +205,48 @@ describe('per-vehicle samples', () => {
   });
 
   test('maintenance and insurance need the whole window, and insurance needs a region', () => {
-    const recent = vehicle('recent', { firstRecordAt: new Date(NOW.getTime() - 30 * 86_400_000) });
-    expect(vehicleSamples(recent, NOW).map((s) => s.metric)).not.toContain('maintenance');
+    const recent = vehicle('recent', {
+      firstRecordAt: new Date(NOW.getTime() - 30 * 86_400_000),
+      region: 'US-CA',
+      insurancePremiums: [term(-30, 335, 90_000)],
+    });
+    const recentMetrics = vehicleSamples(recent, NOW).map((s) => s.metric);
+    expect(recentMetrics).not.toContain('maintenance');
+    expect(recentMetrics).not.toContain('insurance');
 
     const insured = (region: string | null) =>
       vehicle('insured', {
         region,
-        expenses: [
-          ...fillUps({}),
+        insurancePremiums: [
           {
-            date: new Date(NOW.getTime() - 86_400_000),
-            category: 'financial',
-            expenseAmount: 90_000,
-            mileage: null,
-            volume: null,
-            fuelType: null,
-            missedFillup: false,
-            sourceType: 'insurance_term',
+            amount: 90_000,
+            termStart: new Date(NOW.getTime() - 300 * DAY),
+            termEnd: new Date(NOW.getTime() + 65 * DAY),
           },
         ],
       });
     expect(vehicleSamples(insured(null), NOW).map((s) => s.metric)).not.toContain('insurance');
     const premium = vehicleSamples(insured('US-CA'), NOW).find((s) => s.metric === 'insurance');
-    expect(premium?.value).toBe(90_000);
+    expect(premium?.value).toBeCloseTo(90_000 * (300 / 365), 6);
     expect(premium?.bucketKey).toBe('insurance|USD|US-CA|6-9');
+  });
+
+  test.each([
+    ['a single 6-month term inside the window', [term(-200, -17, 45_000)], 45_000],
+    [
+      'a 12-month term that began before the window',
+      [term(-500, -135, 90_000)],
+      90_000 * (230 / 365),
+    ],
+    [
+      'two 6-month terms back to back',
+      [term(-365, -182.5, 45_000), term(-182.5, 0, 45_000)],
+      90_000,
+    ],
+    ['a 3-year term', [term(-500, 595, 270_000)], 270_000 * (365 / 1095)],
+    ['a term that ended before the window', [term(-800, -400, 90_000)], 0],
+  ])('insurance per year counts %s by its share of the window', (_label, premiums, expected) => {
+    expect(premiumInWindow(premiums, NOW)).toBeCloseTo(expected, 3);
   });
 
   test.each([
