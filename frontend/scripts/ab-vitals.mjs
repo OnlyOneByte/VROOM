@@ -1,20 +1,14 @@
-// Throwaway A/B: interleaved cold loads of the same route on two servers, as web-vitals.mjs measures them.
-// env: VITALS_SESSION, VITALS_VEHICLE_ID, AB_PAIRS (default 5). Servers: A on 4173, B on 4174.
+// Throwaway A/B/C: interleaved loads on three servers. env: VITALS_SESSION, VITALS_VEHICLE_ID, AB_PAIRS (default 5), AB_LATENCY (ms, default 0).
+// A = main on 4173, B = modulePreload false on 4174, C = preload only for route navigation on 4175.
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 
 const pairs = Number(process.env.AB_PAIRS ?? 5);
+const latency = Number(process.env.AB_LATENCY ?? 0);
 const session = process.env.VITALS_SESSION;
-const vehicleId = process.env.VITALS_VEHICLE_ID;
-const servers = { A: 4173, B: 4174 };
-const routes = [
-	['Dashboard', '/dashboard'],
-	['Vehicle page', `/vehicles/${vehicleId}`],
-	['Analytics', '/analytics'],
-	['All Expenses', '/expenses'],
-	['Add Expense', '/expenses/new'],
-	['Add Odometer Reading', `/vehicles/${vehicleId}/odometer/new`]
-];
+const vid = process.env.VITALS_VEHICLE_ID;
+const servers = { A: 4173, B: 4174, C: 4175 };
+const variants = Object.keys(servers);
 
 function observe() {
 	window.__v = { lcp: 0, lt: [] };
@@ -27,15 +21,49 @@ function observe() {
 }
 
 const browser = await chromium.launch();
-async function load(port, path) {
-	const context = await browser.newContext({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 2, isMobile: true });
+async function open(port, path) {
+	const context = await browser.newContext({
+		viewport: { width: 375, height: 812 },
+		deviceScaleFactor: 2,
+		isMobile: true,
+		serviceWorkers: 'block'
+	});
 	await context.addCookies([{ name: 'auth_session', value: session, domain: '127.0.0.1', path: '/' }]);
 	await context.addInitScript(observe);
 	const page = await context.newPage();
 	const cdp = await context.newCDPSession(page);
 	await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
-	await page.goto(`http://127.0.0.1:${port}${path}`, { waitUntil: 'networkidle', timeout: 120000 });
-	await page.waitForTimeout(1500);
+	if (latency) {
+		await cdp.send('Network.enable');
+		await cdp.send('Network.emulateNetworkConditions', {
+			offline: false,
+			latency,
+			downloadThroughput: (10 * 1024 * 1024) / 8,
+			uploadThroughput: (5 * 1024 * 1024) / 8
+		});
+	}
+	let pending = 0;
+	let last = 0;
+	page.on('request', () => pending++);
+	const done = () => {
+		pending--;
+		last = Date.now();
+	};
+	page.on('requestfinished', done);
+	page.on('requestfailed', done);
+	await page.goto(`http://127.0.0.1:${port}${path}`, { waitUntil: 'networkidle', timeout: 180000 });
+	await page.waitForTimeout(1000);
+	const quiet = async () => {
+		for (;;) {
+			await page.waitForTimeout(100);
+			if (pending <= 0 && Date.now() - last > 500) return;
+		}
+	};
+	return { context, page, quiet, lastEnd: () => last };
+}
+
+async function cold(port, path) {
+	const { context, page } = await open(port, path);
 	const v = await page.evaluate(() => {
 		const fcp = performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? 0;
 		const tbt = window.__v.lt.reduce((s, [st, d]) => s + Math.max(0, st + d - Math.max(st + 50, fcp)), 0);
@@ -43,23 +71,65 @@ async function load(port, path) {
 	});
 	await context.close();
 	if (v.path !== path) throw new Error(`${path} on ${port} ended on ${v.path}`);
-	return v;
+	return { lcp: v.lcp, tbt: v.tbt };
 }
 
+async function navigate(port, from, to) {
+	const { context, page, quiet, lastEnd } = await open(port, from);
+	const start = Date.now();
+	await page.evaluate(href => {
+		const a = Object.assign(document.createElement('a'), { href });
+		document.body.append(a);
+		a.click();
+	}, to);
+	await page.waitForURL(`**${to}`);
+	await quiet();
+	const ms = lastEnd() - start;
+	await context.close();
+	return { ms };
+}
+
+async function openTab(port, path, tab) {
+	const { context, page, quiet, lastEnd } = await open(port, path);
+	const start = Date.now();
+	await page.getByRole('tab', { name: tab, exact: true }).click();
+	await quiet();
+	const ms = lastEnd() - start;
+	await context.close();
+	return { ms };
+}
+
+const cases = [
+	['Cold: Vehicle page', p => cold(p, `/vehicles/${vid}`), ['tbt', 'lcp']],
+	['Cold: Analytics', p => cold(p, '/analytics'), ['tbt', 'lcp']],
+	['Cold: Add Odometer Reading', p => cold(p, `/vehicles/${vid}/odometer/new`), ['tbt', 'lcp']],
+	['Navigate: Dashboard → Vehicle page', p => navigate(p, '/dashboard', `/vehicles/${vid}`), ['ms']],
+	['Navigate: Dashboard → Analytics', p => navigate(p, '/dashboard', '/analytics'), ['ms']],
+	['Navigate: Dashboard → All Expenses', p => navigate(p, '/dashboard', '/expenses'), ['ms']],
+	['Open tab: Vehicle → Odometer', p => openTab(p, `/vehicles/${vid}`, 'Odometer'), ['ms']],
+	['Open tab: Analytics → Fuel & Stats', p => openTab(p, '/analytics', 'Fuel & Stats'), ['ms']]
+];
+
 const median = a => a.toSorted((x, y) => x - y)[Math.floor(a.length / 2)];
-const lines = [`A/B, ${pairs} interleaved pairs per route, 375×812, 4× CPU. A = main, B = build.modulePreload false. Medians in ms.`, '', '| Route | TBT A | TBT B | B wins (TBT) | LCP A | LCP B | B wins (LCP) |', '|---|---|---|---|---|---|---|'];
+const lines = [
+	`A/B/C, ${pairs} interleaved rounds per case, 375×812, 4× CPU, ${latency} ms added latency, service worker blocked. A = main, B = modulePreload false, C = preload only for route navigation. Medians in ms; navigation and tab times run from the click to the last network response.`,
+	'',
+	'| Case | Metric | A | B | C |',
+	'|---|---|---|---|---|'
+];
 const raw = {};
-for (const [name, path] of routes) {
-	const s = { A: [], B: [] };
+for (const [name, run, metrics] of cases) {
+	const s = Object.fromEntries(variants.map(v => [v, []]));
 	for (let i = 0; i < pairs; i++) {
-		const order = i % 2 ? ['B', 'A'] : ['A', 'B'];
-		for (const k of order) s[k].push(await load(servers[k], path));
+		const order = variants.map((_, k) => variants[(k + i) % variants.length]);
+		for (const v of order) s[v].push(await run(servers[v]));
 	}
 	raw[name] = s;
-	const wins = m => s.A.filter((a, i) => s.B[i][m] < a[m]).length;
-	const row = `| ${name} | ${Math.round(median(s.A.map(x => x.tbt)))} | ${Math.round(median(s.B.map(x => x.tbt)))} | ${wins('tbt')}/${pairs} | ${Math.round(median(s.A.map(x => x.lcp)))} | ${Math.round(median(s.B.map(x => x.lcp)))} | ${wins('lcp')}/${pairs} |`;
-	lines.push(row);
-	console.log(row);
+	for (const m of metrics) {
+		const row = `| ${name} | ${m.toUpperCase()} | ${variants.map(v => Math.round(median(s[v].map(x => x[m])))).join(' | ')} |`;
+		lines.push(row);
+		console.log(row);
+	}
 }
 await browser.close();
 writeFileSync('ab-vitals.json', JSON.stringify(raw, null, '\t'));
