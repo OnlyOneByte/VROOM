@@ -58,7 +58,7 @@
 		} catch (err) {
 			if (err instanceof ApiError && err.code === 'NO_PROVIDER') {
 				errorMessage =
-					'No receipt-parsing provider is set up yet. Add one in Settings → Receipt Parsing.';
+					'No receipt-scanning provider is set up yet. Add one in Settings → Receipt Scanning.';
 			} else if (err instanceof ApiError && err.statusCode === 502) {
 				errorMessage =
 					"Couldn't reach the AI provider. Check the key and model, or fill it in manually.";
@@ -125,12 +125,12 @@
 <AlertDialog.Root bind:open={showDisclosure}>
 	<AlertDialog.Content>
 		<AlertDialog.Header>
-			<AlertDialog.Title>Scan a receipt with AI</AlertDialog.Title>
+			<AlertDialog.Title>Scan a receipt</AlertDialog.Title>
 			<AlertDialog.Description>
-				Your receipt photo is sent to the AI provider you configured to read the amount, date, and
-				category — then you review and confirm before anything is saved. Nothing is stored by VROOM
-				until you save the expense. For maximum privacy, configure a self-hosted (Ollama) provider
-				so the image never leaves your machine.
+				Your receipt photo is read by the provider chosen in Settings → Receipt Scanning: the
+				built-in text reader on your VROOM server, or an AI provider you added, which then receives
+				the image. It fills in the amount, date and fuel details, and you review them before
+				anything is saved. Nothing is stored by VROOM until you save the expense.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>

@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
   type DataEnvelope,
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { stopLocalOcr } from '../domains/vlm/local-ocr';
 
 let ctx: TestApp;
 const realFetch = globalThis.fetch;
@@ -12,6 +13,8 @@ const realFetch = globalThis.fetch;
 beforeEach(async () => {
   ctx = await createTestApp();
 });
+afterAll(stopLocalOcr);
+
 afterEach(() => {
   globalThis.fetch = realFetch;
 });
@@ -110,13 +113,11 @@ describe('POST /api/v1/receipts/parse', () => {
     expect((await json<DataEnvelope<DraftEnvelope>>(res)).data.draft).toEqual({});
   });
 
-  test('NO configured vlm provider → 400 with an actionable message (not 500)', async () => {
-    stubModel('{"amount": 10}');
+  test('with no configured provider, the built-in reader answers and an unreadable image is a 422', async () => {
     const res = await postImage(IMG, 'image/jpeg');
-    expect(res.status).toBe(400);
-    const text = await res.text();
-    expect(text).toMatch(/VLM|Settings|configured/i);
-  });
+    expect(res.status).toBe(422);
+    expect(await res.text()).toMatch(/couldn't read/i);
+  }, 60_000);
 
   test('a provider transport or HTTP failure returns 502', async () => {
     await seedVlmProvider();

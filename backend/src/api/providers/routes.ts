@@ -33,7 +33,7 @@ import {
   storageProviderDescriptor,
 } from './domains/storage/registry';
 import { CATEGORY_TO_ENTITY_TYPES, ENTITY_TO_CATEGORY } from './domains/storage/storage-provider';
-import { VISION_PROVIDERS } from './domains/vlm/registry';
+import { BUILTIN_VISION_PROVIDERS, VISION_PROVIDERS } from './domains/vlm/registry';
 import {
   checkProviderHealth,
   type HealthResult,
@@ -173,6 +173,7 @@ routes.get('/catalog', (c) =>
       ...storageCatalog(),
       ...toCatalogEntries(LLM_PROVIDERS),
       ...toCatalogEntries(VISION_PROVIDERS),
+      ...toCatalogEntries(BUILTIN_VISION_PROVIDERS),
       ...toCatalogEntries(AUTH_PROVIDERS),
       ...toCatalogEntries(IMPORT_PROVIDERS),
     ],

@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   FakePhotosStore,
   makeFakePhotosClient,
@@ -12,6 +14,7 @@ import {
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 import { encrypt } from '../../../utils/encryption';
+import { stopLocalOcr } from '../../providers/domains/vlm/local-ocr';
 import { GooglePhotosService } from '../../providers/services/google-photos-service';
 import { setPhotosServiceBuilderForTest } from '../receipt-drafts-route';
 import type { ReceiptDraftItem } from '../receipt-drafts-service';
@@ -27,6 +30,8 @@ beforeEach(async () => {
     () => new GooglePhotosService('fake-token', makeFakePhotosClient(store), 'album-vroom')
   );
 });
+afterAll(stopLocalOcr);
+
 afterEach(() => {
   setPhotosServiceBuilderForTest(null);
   globalThis.fetch = realFetch;
@@ -86,14 +91,24 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
     expect(await res.text()).toMatch(/Google Photos|Settings/i);
   });
 
-  test('a google-photos provider but no vlm provider → 400 with an actionable message', async () => {
+  test('a google-photos provider but no vlm provider → drafts come from the built-in text reader', async () => {
     seedPhotosProvider();
-    const res = await ctx.authed('GET', '/api/v1/photos/receipt-drafts');
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: { code: string; message: string } };
-    expect(body.error.code).toBe('NO_PROVIDER');
-    expect(body.error.message).toMatch(/VLM|receipt-parsing|Settings/i);
-  });
+    store.seedSearchablePhotos([
+      {
+        filename: 'fuel.png',
+        mimeType: 'image/png',
+        bytes: readFileSync(
+          join(
+            import.meta.dir,
+            '../../../test-helpers/provider-contracts/fixtures/receipt-fuel-eu.png'
+          )
+        ),
+      },
+    ]);
+    const { status, drafts } = await getDrafts();
+    expect(status).toBe(200);
+    expect(drafts.map((d) => d.draft.amount)).toEqual([75.44]);
+  }, 60_000);
 
   test('a google-photos provider without a usable refresh token → 400 asking to reconnect', async () => {
     setPhotosServiceBuilderForTest(null);

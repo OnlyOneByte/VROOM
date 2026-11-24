@@ -97,7 +97,7 @@ Everything the user brings their own account for sits under `src/api/providers/d
 one registry per capability:
 
 - **storage** — Google Drive, Google Photos, S3-compatible, plus an in-memory fake for tests and local development
-- **vlm** — receipt parsing (Anthropic, Gemini, OpenAI-compatible)
+- **vlm** — receipt parsing (Anthropic, Gemini, OpenAI-compatible), plus the built-in `local-ocr` text reader (tesseract.js on the server), used when no AI provider is set up or when it is picked as the default
 - **llm** — the assistant (same three, plus tool-calling)
 
 Each domain defines a provider interface and a registry; adding a vendor means adding one

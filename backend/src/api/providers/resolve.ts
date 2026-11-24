@@ -3,6 +3,7 @@ import { getDb } from '../../db/connection';
 import { type UserProvider, userPreferences, userProviders } from '../../db/schema';
 import { NoProviderError } from '../../errors';
 import type { DefaultProviderCapability } from '../../types';
+import { builtinVisionRow, LOCAL_OCR_PROVIDER_ID } from './domains/vlm/registry';
 
 export const CAPABILITY_DOMAIN: Record<DefaultProviderCapability, string> = {
   'ai.llm': 'llm',
@@ -11,8 +12,7 @@ export const CAPABILITY_DOMAIN: Record<DefaultProviderCapability, string> = {
 
 const NO_PROVIDER_MESSAGE: Record<DefaultProviderCapability, string> = {
   'ai.llm': 'No assistant (LLM) provider is configured. Add one in Settings to use the assistant.',
-  'ai.vision':
-    'No receipt-parsing (VLM) provider is configured. Add one in Settings to scan receipts.',
+  'ai.vision': 'No receipt-scanning provider is configured. Add one in Settings to scan receipts.',
 };
 
 export async function resolveProvider(
@@ -36,7 +36,11 @@ export async function resolveProvider(
     .where(eq(userPreferences.userId, userId))
     .get();
   const defaultId = prefs?.providerDefaults?.[capability];
+  if (capability === 'ai.vision' && defaultId === LOCAL_OCR_PROVIDER_ID) {
+    return builtinVisionRow(userId);
+  }
   const chosen = rows.find((row) => row.id === defaultId) ?? rows[0];
-  if (!chosen) throw new NoProviderError(capability, NO_PROVIDER_MESSAGE[capability]);
-  return chosen;
+  if (chosen) return chosen;
+  if (capability === 'ai.vision') return builtinVisionRow(userId);
+  throw new NoProviderError(capability, NO_PROVIDER_MESSAGE[capability]);
 }
