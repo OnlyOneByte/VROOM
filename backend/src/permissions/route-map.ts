@@ -155,7 +155,7 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   'GET /api/v1/analytics/insurance': 'vehicle.insurance.read',
   'GET /api/v1/analytics/fuel-advanced': 'vehicle.expense.read',
   'GET /api/v1/analytics/vehicle-health': 'vehicle.read',
-  'GET /api/v1/analytics/vehicle-tco': 'vehicle.read',
+  'GET /api/v1/analytics/vehicle-tco': 'vehicle.expense.read',
   'GET /api/v1/analytics/vehicle-expenses': 'vehicle.expense.read',
   'GET /api/v1/analytics/year-end': 'vehicle.expense.read',
   'GET /api/v1/analytics/fuel-efficiency': 'vehicle.expense.read',

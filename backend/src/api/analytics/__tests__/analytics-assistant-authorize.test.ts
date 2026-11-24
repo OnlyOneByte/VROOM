@@ -21,12 +21,14 @@ describe('vehicle analytics resolve through can() for every role', () => {
   const fuel = `/api/v1/analytics/fuel-stats?vehicleId=${CAR}&${RANGE}`;
   const expenses = `/api/v1/analytics/vehicle-expenses?vehicleId=${CAR}&${RANGE}`;
   const health = `/api/v1/analytics/vehicle-health?vehicleId=${CAR}`;
+  const tco = `/api/v1/analytics/vehicle-tco?vehicleId=${CAR}`;
 
   test('members read a shared car; strangers get 404 and disabled accounts 403', async () => {
     for (const request of [ctx.authed, m.coOwner.request, m.editor.request, m.viewer.request]) {
       expect(await status(request, fuel)).toBe(200);
       expect(await status(request, expenses)).toBe(200);
       expect(await status(request, health)).toBe(200);
+      expect(await status(request, tco)).toBe(200);
     }
     expect(await status(m.stranger.request, fuel)).toBe(404);
     expect(await status(m.stranger.request, health)).toBe(404);
@@ -37,6 +39,7 @@ describe('vehicle analytics resolve through can() for every role', () => {
     overrideOn(ctx, CAR, m.viewer, 'vehicle.expense.read', 'deny');
     expect(await status(m.viewer.request, fuel)).toBe(403);
     expect(await status(m.viewer.request, expenses)).toBe(403);
+    expect(await status(m.viewer.request, tco)).toBe(403);
     expect(await status(m.viewer.request, health)).toBe(200);
   });
 
@@ -54,6 +57,17 @@ describe('the assistant resolves through can()', () => {
     expect(chat.status).toBe(403);
     const drafts = await m.disabled.request('GET', '/api/v1/photos/receipt-drafts');
     expect(drafts.status).toBe(403);
+    const scan = await m.disabled.request('POST', '/api/v1/receipts/parse');
+    expect(scan.status).toBe(403);
+  });
+
+  test('an account without a server role cannot use the assistant', async () => {
+    ctx.sqlite.run('DELETE FROM role_assignments WHERE user_id = ? AND scope_id IS NULL', [
+      m.stranger.id,
+    ]);
+    const chat = await m.stranger.request('POST', '/api/v1/assistant/chat', { message: 'hi' });
+    expect(chat.status).toBe(403);
+    expect((await m.stranger.request('POST', '/api/v1/receipts/parse')).status).toBe(403);
   });
 
   test('vehicle tools follow expense read on the car', async () => {
@@ -61,6 +75,10 @@ describe('the assistant resolves through can()', () => {
     const summary = ASSISTANT_TOOLS.getExpenseSummary;
     if (!fuelStats || !summary) throw new Error('assistant tools missing');
     const args = { range: 'all', vehicleId: CAR };
+    for (const member of [m.coOwner, m.editor]) {
+      expect(await fuelStats.run(args, member.id, Date.now())).toBeTruthy();
+      expect(await summary.run(args, member.id, Date.now())).toBeTruthy();
+    }
     expect(await fuelStats.run(args, m.viewer.id, Date.now())).toBeTruthy();
     expect(await summary.run(args, m.viewer.id, Date.now())).toBeTruthy();
     overrideOn(ctx, CAR, m.viewer, 'vehicle.expense.read', 'deny');

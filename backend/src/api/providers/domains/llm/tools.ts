@@ -105,7 +105,6 @@ function defineTool<A, R>(spec: AssistantToolSpec<A, R>): AssistantTool<A> {
   };
 }
 
-// Without a vehicleId, scope to the user's own vehicles: shared ones would leak another user's name to the LLM provider.
 function requireExpenseRead(vehicleId: string | undefined, userId: string): void {
   if (!vehicleId) return;
   const decision = resolverFor(getDb(), userId).can('vehicle.expense.read', {
@@ -115,6 +114,7 @@ function requireExpenseRead(vehicleId: string | undefined, userId: string): void
   enforce(decision, 'Vehicle');
 }
 
+// Without a vehicleId, scope to the user's own vehicles: shared ones would leak another user's name to the LLM provider.
 async function resolveScope(vehicleId: string | undefined, userId: string): Promise<string> {
   if (!vehicleId) return userId;
   requireExpenseRead(vehicleId, userId);
