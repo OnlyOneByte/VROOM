@@ -131,6 +131,7 @@
 		]);
 	const loadOdometerTab = () => import('#lib/components/vehicles/OdometerTab.svelte');
 	const loadFinanceTab = () => import('#lib/components/vehicles/FinanceTab.svelte');
+	const loadCompareCard = () => import('#lib/components/vehicles/CommunityCompareCard.svelte');
 	const loadUploadDialog = () => import('#lib/components/common/MediaCaptureDialog.svelte');
 
 	let searchTerm = $state('');
@@ -767,6 +768,18 @@
 								{/await}
 							{/snippet}
 						</FuelEfficiencyStatsCard>
+
+						{#if !showingCachedVehicle}
+							{#await loadCompareCard() then { default: CommunityCompareCard }}
+								<CommunityCompareCard
+									{vehicle}
+									{isOwner}
+									onVehicleUpdated={updated => {
+										if (vehicle) vehicle = { ...vehicle, catalogModelId: updated.catalogModelId };
+									}}
+								/>
+							{/await}
+						{/if}
 					{/if}
 
 					<Collapsible

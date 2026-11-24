@@ -54,6 +54,7 @@ vi.mock('#lib/components/vehicles/FinanceTab.svelte', () => capture('finance'));
 vi.mock('#lib/components/vehicles/OdometerTab.svelte', () => capture('odometer'));
 vi.mock('#lib/components/vehicles/ShareVehicleDialog.svelte', () => capture('share'));
 vi.mock('#lib/components/vehicles/FuelEfficiencyStatsCard.svelte', () => capture('fuelStats'));
+vi.mock('#lib/components/vehicles/CommunityCompareCard.svelte', () => capture('compare'));
 vi.mock('#lib/components/common/MediaCaptureDialog.svelte', () => capture('media'));
 vi.mock('#lib/components/insurance/InsuranceTab.svelte', () => captureWithMarker('insurance'));
 
@@ -235,6 +236,14 @@ describe('vehicle detail page loading and not-found', () => {
 });
 
 describe('vehicle detail page overview', () => {
+	test('the overview loads the community comparison for this vehicle below fuel economy', async () => {
+		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
+		await mount();
+		await vi.waitFor(() => expect(captured['compare']).toBeDefined());
+		expect((captured['compare']?.['vehicle'] as { id: string } | undefined)?.id).toBe('v1');
+		expect(captured['compare']?.['isOwner']).toBe(true);
+	});
+
 	test('the nickname titles the page and the owner sees Share and Add Expense', async () => {
 		await mount();
 
