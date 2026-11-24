@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import SHARED_REGIONS from '../../shared-regions.json';
 import { storagePathSchema } from '../../utils/paths';
 
 const photoCategoryEnum = z.enum([
@@ -50,6 +51,17 @@ export const providerDefaultsSchema = z
   })
   .partial()
   .strict();
+
+const KNOWN_REGIONS = new Set([
+  ...SHARED_REGIONS.countries,
+  ...Object.keys(SHARED_REGIONS.subdivisions),
+]);
+
+export function isKnownRegion(code: string): boolean {
+  return KNOWN_REGIONS.has(code);
+}
+
+export const communityRegionSchema = z.string().refine(isKnownRegion, 'Unknown region code');
 
 export type StorageConfigUpdate = z.infer<typeof storageConfigSchema>;
 export type BackupConfigUpdate = z.infer<typeof backupConfigSchema>;

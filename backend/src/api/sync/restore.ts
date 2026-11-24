@@ -44,6 +44,7 @@ import { logger } from '../../utils/logger';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { CAPABILITY_DOMAIN } from '../providers/resolve';
 import { preferencesRepository } from '../settings/repository';
+import { isKnownRegion } from '../settings/validation';
 import {
   backupService,
   coerceRow,
@@ -597,7 +598,9 @@ class RestoreService {
       tx,
       userPreferences,
       this.stampUserId(data.userPreferences, userId).map((row) =>
-        this.keepOwnedProviderSettings(row, currentPrefs, ownedProviders)
+        this.withoutCommunityConsent(
+          this.keepOwnedProviderSettings(row, currentPrefs, ownedProviders)
+        )
       )
     );
     this.insertRows(tx, syncState, this.stampUserId(data.syncState, userId));
@@ -614,6 +617,16 @@ class RestoreService {
       photoRefs,
       refRows.filter((ref) => knownProviders.has(String(ref.providerId)))
     );
+  }
+
+  private withoutCommunityConsent<T extends Record<string, unknown>>(row: T): T {
+    const region = row.communityRegion;
+    return {
+      ...row,
+      communityStatsOptIn: false,
+      communityStatsConsentedAt: null,
+      communityRegion: typeof region === 'string' && isKnownRegion(region) ? region : null,
+    };
   }
 
   private currentProviderPrefs(
