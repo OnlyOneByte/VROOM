@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import { offlineExpenseQueue, onlineStatus, syncState } from '#lib/stores/offline.svelte.ts';
 import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
+import { onWideScreen } from './wide-screen.ts';
 
 let currentUrl = new URL('http://localhost/expenses');
 vi.mock('$app/state', () => ({
@@ -55,6 +56,8 @@ beforeEach(() => {
 });
 
 describe('active page is announced, not just coloured', () => {
+	onWideScreen();
+
 	it('marks the current route with aria-current and nothing else', () => {
 		render(Navigation);
 
@@ -73,6 +76,8 @@ describe('active page is announced, not just coloured', () => {
 });
 
 describe('one navigation landmark', () => {
+	onWideScreen();
+
 	it('exposes exactly one, and it is the <nav>', () => {
 		const { container } = render(Navigation);
 
@@ -83,6 +88,8 @@ describe('one navigation landmark', () => {
 });
 
 describe('labels reveal on keyboard focus, not only on hover', () => {
+	onWideScreen();
+
 	it('expands when focus enters the sidebar and collapses when it leaves', async () => {
 		render(Navigation);
 		const expensesLink = screen.getByRole('link', { name: 'Expenses' });
@@ -139,5 +146,35 @@ describe('fixed chrome on short viewports and at high zoom', () => {
 		const header = container.querySelector('.fixed.top-0');
 		expect(header).toHaveClass('lg:hidden', 'short:static');
 		expect(container.querySelector('.h-16')).toHaveClass('lg:hidden', 'short:hidden');
+	});
+});
+
+describe('only the navigation for the screen width is rendered', () => {
+	it('below lg, the mobile header without the desktop sidebar', () => {
+		const { container } = render(Navigation);
+
+		expect(container.querySelector('div.fixed.top-0')).not.toBeNull();
+		expect(container.querySelector('div.lg\\:inset-y-0')).toBeNull();
+	});
+
+	it('below lg, auto-sync still starts on its own, with no menu opened', async () => {
+		const { syncManager } = await import('#lib/utils/sync/sync-manager.ts');
+		vi.mocked(syncManager.setupAutoSync).mockClear();
+
+		render(Navigation);
+
+		expect(syncManager.setupAutoSync).toHaveBeenCalledOnce();
+		expect(screen.queryByRole('button', { name: 'Sync Now' })).toBeNull();
+	});
+
+	describe('at lg and up', () => {
+		onWideScreen();
+
+		it('the desktop sidebar without the mobile header', () => {
+			const { container } = render(Navigation);
+
+			expect(container.querySelector('div.lg\\:inset-y-0')).not.toBeNull();
+			expect(container.querySelector('div.fixed.top-0')).toBeNull();
+		});
 	});
 });

@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import { offlineExpenseQueue, onlineStatus, syncState } from '#lib/stores/offline.svelte.ts';
 import { authStore } from '#lib/stores/auth.svelte.ts';
 import type { User } from '#lib/types/index.ts';
+import { onWideScreen } from './wide-screen.ts';
 
 vi.mock('$app/state', () => ({
 	get page() {
@@ -84,89 +85,82 @@ describe('the sync status indicator lives in the navigation, never floating over
 		expect(document.querySelector('div.fixed.top-4.right-4')).toBeNull();
 	});
 
-	it('offers Retry connection in the desktop sidebar, which re-checks the session', async () => {
-		await startWithUnreachableServer();
-		render(Navigation);
+	describe('in the desktop sidebar', () => {
+		onWideScreen();
 
-		const sidebarRetry = screen
-			.getAllByRole('button', { name: 'Retry connection' })
-			.find(button => !mobileHeader().contains(button));
-		expect(sidebarRetry).toBeDefined();
+		it('offers Retry connection in the desktop sidebar, which re-checks the session', async () => {
+			await startWithUnreachableServer();
+			render(Navigation);
 
-		mockFetch.mockReset();
-		mockFetch.mockResolvedValue(me());
-		await waitFor(() => expect(sidebarRetry).not.toHaveAttribute('aria-disabled', 'true'));
-		await fireEvent.click(sidebarRetry!);
+			const sidebarRetry = screen.getByRole('button', { name: 'Retry connection' });
+			expect(document.querySelector('div.fixed.top-0')).toBeNull();
 
-		await waitFor(() => expect(authStore.sessionUnverified).toBe(false));
-	});
+			mockFetch.mockReset();
+			mockFetch.mockResolvedValue(me());
+			await waitFor(() => expect(sidebarRetry).not.toHaveAttribute('aria-disabled', 'true'));
+			await fireEvent.click(sidebarRetry);
 
-	it('the collapsed sidebar offers Sync Now, with the pending count only on the status badge', async () => {
-		authStore.setUser(alice);
-		offlineExpenseQueue.current = [
-			{
-				id: 'p1',
-				vehicleId: 'v1',
-				tags: [],
-				category: 'misc',
-				amount: 1,
-				date: '2024-06-01',
-				timestamp: 0,
-				synced: false,
-				version: '3.0'
-			}
-		];
-		render(Navigation);
+			await waitFor(() => expect(authStore.sessionUnverified).toBe(false));
+		});
 
-		const sync = screen
-			.getAllByRole('button', { name: 'Sync Now' })
-			.find(button => !mobileHeader().contains(button));
-		expect(sync).toBeDefined();
-		const panel = screen
-			.getAllByRole('group', { name: 'Sync status' })
-			.find(element => !mobileHeader().contains(element));
-		expect(within(panel!).getByRole('status')).toHaveTextContent('1 pending');
-		expect(panel?.querySelector('[data-slot="badge"]')).toHaveTextContent('1');
-	});
+		it('the collapsed sidebar offers Sync Now, with the pending count only on the status badge', async () => {
+			authStore.setUser(alice);
+			offlineExpenseQueue.current = [
+				{
+					id: 'p1',
+					vehicleId: 'v1',
+					tags: [],
+					category: 'misc',
+					amount: 1,
+					date: '2024-06-01',
+					timestamp: 0,
+					synced: false,
+					version: '3.0'
+				}
+			];
+			render(Navigation);
 
-	it('the sidebar action under the pointer survives the hover that expands the sidebar', async () => {
-		authStore.setUser(alice);
-		offlineExpenseQueue.current = [
-			{
-				id: 'p1',
-				vehicleId: 'v1',
-				tags: [],
-				category: 'misc',
-				amount: 1,
-				date: '2024-06-01',
-				timestamp: 0,
-				synced: false,
-				version: '3.0'
-			}
-		];
-		render(Navigation);
-		const sidebar = document.querySelector<HTMLElement>('div.lg\\:inset-y-0');
-		const sync = screen
-			.getAllByRole('button', { name: 'Sync Now' })
-			.find(button => !mobileHeader().contains(button))!;
+			expect(screen.getByRole('button', { name: 'Sync Now' })).toBeInTheDocument();
+			const panel = screen.getByRole('group', { name: 'Sync status' });
+			expect(within(panel).getByRole('status')).toHaveTextContent('1 pending');
+			expect(panel.querySelector('[data-slot="badge"]')).toHaveTextContent('1');
+		});
 
-		await fireEvent.mouseEnter(sidebar!);
+		it('the sidebar action under the pointer survives the hover that expands the sidebar', async () => {
+			authStore.setUser(alice);
+			offlineExpenseQueue.current = [
+				{
+					id: 'p1',
+					vehicleId: 'v1',
+					tags: [],
+					category: 'misc',
+					amount: 1,
+					date: '2024-06-01',
+					timestamp: 0,
+					synced: false,
+					version: '3.0'
+				}
+			];
+			render(Navigation);
+			const sidebar = document.querySelector<HTMLElement>('div.lg\\:inset-y-0');
+			const sync = screen.getByRole('button', { name: 'Sync Now' });
 
-		expect(sync.isConnected).toBe(true);
-		expect(sync).toHaveTextContent('Sync Now');
-		await fireEvent.click(sync);
-		const { syncManager } = await import('#lib/utils/sync/sync-manager.ts');
-		expect(syncManager.syncAll).toHaveBeenCalled();
-	});
+			await fireEvent.mouseEnter(sidebar!);
 
-	it('the sidebar status is announced as a status with its text', async () => {
-		await startWithUnreachableServer();
-		render(Navigation);
+			expect(sync.isConnected).toBe(true);
+			expect(sync).toHaveTextContent('Sync Now');
+			await fireEvent.click(sync);
+			const { syncManager } = await import('#lib/utils/sync/sync-manager.ts');
+			expect(syncManager.syncAll).toHaveBeenCalled();
+		});
 
-		const statuses = screen
-			.getAllByRole('status')
-			.filter(status => !mobileHeader().contains(status));
-		expect(statuses.some(status => status.textContent === "Can't reach VROOM")).toBe(true);
+		it('the sidebar status is announced as a status with its text', async () => {
+			await startWithUnreachableServer();
+			render(Navigation);
+
+			const statuses = screen.getAllByRole('status');
+			expect(statuses.some(status => status.textContent === "Can't reach VROOM")).toBe(true);
+		});
 	});
 
 	it('the root layout floats the indicator only on pages without the navigation', () => {

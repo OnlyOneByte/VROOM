@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { tick } from 'svelte';
 	import { focusLeftOn } from '#lib/utils/focus.ts';
 	import { syncState, onlineStatus, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 	import {
@@ -9,8 +9,7 @@
 		lastDataChangeTime,
 		backupEnabled,
 		sheetsSyncEnabled,
-		syncConflicts,
-		fetchLastSyncTime
+		syncConflicts
 	} from '#lib/utils/sync/sync-manager.ts';
 	import { RefreshCw, CircleAlert, Clock, Wifi, WifiOff, TriangleAlert } from '@lucide/svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -43,18 +42,6 @@
 			serverReachable: !authStore.sessionUnverified
 		})
 	);
-
-	onMount(() => {
-		syncManager.setupAutoSync();
-
-		const interval = setInterval(() => {
-			if (onlineStatus.current) {
-				fetchLastSyncTime();
-			}
-		}, 30000);
-
-		return () => clearInterval(interval);
-	});
 
 	let statusPanel = $state<HTMLElement | null>(null);
 
