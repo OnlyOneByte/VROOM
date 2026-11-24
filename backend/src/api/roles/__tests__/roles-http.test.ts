@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { unpackRules } from '@casl/ability/extra';
 import { CONFIG } from '../../../config';
 import { getDb } from '../../../db/connection';
-import { assignServerRole, builtInRoleId, syncBuiltInRoles } from '../../../permissions/grants';
+import {
+  assignServerRole,
+  builtInRoleId,
+  grantShareRole,
+  syncBuiltInRoles,
+} from '../../../permissions/grants';
 import {
   createTestApp,
   type DataEnvelope,
@@ -62,23 +67,40 @@ function shareIdOf(userId: string): string {
   ).id;
 }
 
+function seedMember(member: Invitee, level: 'viewer' | 'editor'): void {
+  ctx.sqlite.run(
+    "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, invited_email) VALUES (?, ?, ?, ?, ?, 'accepted', ?)",
+    [`share-${member.id}`, vehicleId, ctx.user.id, member.id, level, member.email]
+  );
+  grantShareRole(getDb(), {
+    vehicleId,
+    sharedWithId: member.id,
+    level,
+    grantedBy: ctx.user.id,
+  });
+}
+
 beforeEach(async () => {
   ctx = await createTestApp();
-  vehicleId = await seedVehicle(ctx);
-  [coOwner, editor, viewer, stranger, disabled] = await Promise.all(
-    ['co-owner', 'editor', 'viewer', 'stranger', 'disabled'].map((name) => createInvitee(ctx, name))
+  vehicleId = `roles-car-${crypto.randomUUID()}`;
+  ctx.sqlite.run(
+    "INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, 'Toyota', 'Camry', 2022)",
+    [vehicleId, ctx.user.id]
   );
-  await coOwner.acceptShare(vehicleId, 'viewer');
-  await editor.acceptShare(vehicleId, 'editor');
-  await viewer.acceptShare(vehicleId, 'viewer');
-  await disabled.acceptShare(vehicleId, 'editor');
+  coOwner = await createInvitee(ctx, 'co-owner');
+  editor = await createInvitee(ctx, 'editor');
+  viewer = await createInvitee(ctx, 'viewer');
+  stranger = await createInvitee(ctx, 'stranger');
+  disabled = await createInvitee(ctx, 'disabled');
+  seedMember(coOwner, 'viewer');
+  seedMember(editor, 'editor');
+  seedMember(viewer, 'viewer');
+  seedMember(disabled, 'editor');
   ctx.sqlite.run('UPDATE users SET disabled_at = 1 WHERE id = ?', [disabled.id]);
-  const res = await asOwner('POST', '/api/v1/role-assignments', {
-    userId: coOwner.id,
-    roleId: CO_OWNER,
-    scopeId: vehicleId,
-  });
-  expect(res.status).toBe(201);
+  ctx.sqlite.run(
+    'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?)',
+    [`ra-${coOwner.id}`, coOwner.id, CO_OWNER, vehicleId, ctx.user.id]
+  );
 });
 
 afterEach(() => ctx.close());
