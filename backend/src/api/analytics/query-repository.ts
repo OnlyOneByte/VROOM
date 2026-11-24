@@ -494,15 +494,15 @@ function sumBucketTotals(result: PeriodRows[]): void {
 }
 
 function collectDistances(ctx: QueryContext, result: PeriodRows[], rows: DistanceRow[]): void {
+  const wholeRange = ctx.query.interval === 'none';
   for (const row of rows) {
     const period = result[row.period];
     if (!period) continue;
-    if (row.idx < 0) {
-      period.rangeDistance += row.distance ?? 0;
-      continue;
-    }
+    const rangeRow = row.idx < 0;
+    if (rangeRow) period.rangeDistance += row.distance ?? 0;
+    if (rangeRow !== wholeRange) continue;
     const length = ctx.periods[row.period]?.length ?? 0;
-    seriesFor(period.distanceByVehicle, row.vehicle_id, length, () => 0)[row.idx] =
+    seriesFor(period.distanceByVehicle, row.vehicle_id, length, () => 0)[rangeRow ? 0 : row.idx] =
       row.distance ?? 0;
   }
 }
