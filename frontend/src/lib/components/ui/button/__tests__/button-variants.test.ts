@@ -2,7 +2,15 @@ import { describe, expect, test } from 'vitest';
 import { cn } from '#lib/utils.js';
 import { buttonVariants } from '../button.svelte';
 
-const VARIANTS = ['default', 'destructive', 'outline', 'secondary', 'ghost', 'link'] as const;
+const VARIANTS = [
+	'default',
+	'accent',
+	'destructive',
+	'outline',
+	'secondary',
+	'ghost',
+	'link'
+] as const;
 
 describe('Button invalid border', () => {
 	test.each(VARIANTS)('%s keeps the destructive border when invalid in dark mode', variant => {
@@ -52,15 +60,13 @@ describe('Button aria-disabled focus ring', () => {
 		}
 	});
 
-	test('outline halves its border in both schemes while aria-disabled', () => {
+	test('outline draws its edge in border-strong and drops to the hairline while aria-disabled', () => {
 		const classes = buttonVariants({ variant: 'outline' }).split(/\s+/);
 
 		expect(classes).toEqual(
-			expect.arrayContaining([
-				'aria-disabled:border-border/50',
-				'dark:aria-disabled:border-input/50'
-			])
+			expect.arrayContaining(['border-border-strong', 'aria-disabled:border-border/50'])
 		);
+		expect(classes.filter(cls => /^dark:(aria-disabled:)?(border|bg)-/.test(cls))).toEqual([]);
 	});
 
 	test.each(VARIANTS.filter(v => v !== 'destructive').flatMap(v => [`${v}:`, `${v}:dark:`]))(
@@ -76,17 +82,21 @@ describe('Button aria-disabled focus ring', () => {
 		}
 	);
 
-	test.each(['', 'dark:'])(
-		'destructive %sdoubles its own ring alpha while focused and aria-disabled',
-		mode => {
-			const classes = buttonVariants({ variant: 'destructive' }).split(/\s+/);
-			const normal = ring(classes, `${mode}focus-visible:`);
-			const busy = ring(classes, `${mode}aria-disabled:focus-visible:`);
+	test('destructive doubles its own ring alpha while focused and aria-disabled', () => {
+		const classes = buttonVariants({ variant: 'destructive' }).split(/\s+/);
+		const normal = ring(classes, 'focus-visible:');
+		const busy = ring(classes, 'aria-disabled:focus-visible:');
 
-			expect(normal).not.toBeNull();
-			expect(busy).toEqual({ color: normal!.color, alpha: normal!.alpha * 2 });
-		}
-	);
+		expect(normal).not.toBeNull();
+		expect(busy).toEqual({ color: normal!.color, alpha: normal!.alpha * 2 });
+	});
+
+	test('ghost icon buttons stay muted while ghost text buttons use the accent ink', () => {
+		expect(buttonVariants({ variant: 'ghost', size: 'icon' }).split(/\s+/)).toContain(
+			'text-muted-foreground'
+		);
+		expect(buttonVariants({ variant: 'ghost' }).split(/\s+/)).toContain('text-accent-ink');
+	});
 
 	test('the enabled focus ring stays the half-strength ring token', () => {
 		const classes = buttonVariants({ variant: 'default' }).split(/\s+/);
