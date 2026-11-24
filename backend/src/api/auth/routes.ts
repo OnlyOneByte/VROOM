@@ -17,7 +17,12 @@ import { readJsonBody } from '../../utils/request-body';
 import { attachPendingInvites } from '../shares/repository';
 import { authProviderRepository, buildAuthProviderConfig } from './auth-provider-repository';
 import { lucia } from './lucia';
-import { googleStorageClient, STORAGE_SCOPES } from './providers/google';
+import {
+  googleStorageClient,
+  PHOTOS_SCOPES,
+  PHOTOS_UPLOAD_SCOPE,
+  STORAGE_SCOPES,
+} from './providers/google';
 import { ensureOidcDiscovered } from './providers/oidc';
 import { getEnabledProvider, getEnabledProviders, getProvider } from './providers/registry';
 import { NoVerifiedEmailError, type OAuthFlow } from './providers/types';
@@ -56,9 +61,31 @@ const oauthStateStore = new Map<
     userId?: string;
     flowType?: 'provider' | 'auth-link';
     providerId?: string;
+    providerType?: string;
     nonce?: string;
   }
 >();
+
+const GOOGLE_CONNECT_SCOPES: Record<string, { scopes: string[]; required: string[] }> = {
+  'google-drive': { scopes: STORAGE_SCOPES, required: [] },
+  'google-photos': { scopes: PHOTOS_SCOPES, required: [PHOTOS_UPLOAD_SCOPE] },
+};
+
+function lacksRequiredScope(
+  providerType: string,
+  tokens: { hasScopes(): boolean; scopes(): string[] }
+): boolean {
+  const required = googleConnectScopes(providerType)?.required ?? [];
+  if (required.length === 0) return false;
+  const granted = tokens.hasScopes() ? tokens.scopes() : [];
+  return required.some((scope) => !granted.includes(scope));
+}
+
+function googleConnectScopes(providerType: string) {
+  return Object.hasOwn(GOOGLE_CONNECT_SCOPES, providerType)
+    ? GOOGLE_CONNECT_SCOPES[providerType]
+    : undefined;
+}
 
 const MAX_STATE_STORE_SIZE = 1000;
 const cleanupExpiredStates = () => {
@@ -655,13 +682,19 @@ routes.get('/providers/connect/google', requireAuth, async (c) => {
 
   const providerId = c.req.query('providerId') ?? undefined;
   const email = c.req.query('email') ?? undefined;
+  const providerType = c.req.query('providerType') ?? 'google-drive';
+  const connect = googleConnectScopes(providerType);
+  if (!connect) {
+    throw new HTTPException(400, { message: 'providerType must be google-drive or google-photos' });
+  }
 
   const state = generateState();
   const codeVerifier = generateCodeVerifier();
-  const url = googleStorageClient.createAuthorizationURL(state, codeVerifier, STORAGE_SCOPES);
+  const url = googleStorageClient.createAuthorizationURL(state, codeVerifier, connect.scopes);
 
   url.searchParams.set('access_type', 'offline');
   url.searchParams.set('prompt', 'consent');
+  url.searchParams.set('include_granted_scopes', 'true');
   if (email) {
     url.searchParams.set('login_hint', email);
   }
@@ -674,6 +707,7 @@ routes.get('/providers/connect/google', requireAuth, async (c) => {
     userId: user.id,
     flowType: 'provider',
     providerId,
+    providerType,
   });
 
   cleanupExpiredStates();
@@ -748,6 +782,7 @@ interface ProviderCallbackState {
   userId: string;
   nonce: string;
   providerId?: string;
+  providerType: string;
 }
 
 function resolveProviderState(
@@ -785,6 +820,7 @@ function resolveProviderState(
       userId: storedData.userId ?? '',
       nonce: storedData.nonce ?? '',
       providerId: storedData.providerId,
+      providerType: storedData.providerType ?? 'google-drive',
     },
     returnTo,
   };
@@ -842,6 +878,10 @@ routes.get('/callback/provider/google', async (c) => {
   if (!result.refreshToken || !result.email) {
     const errorType = !result.refreshToken ? 'no_refresh_token' : 'exchange_failed';
     return c.redirect(frontendRedirect(`${state.returnTo}?provider_error=${errorType}`));
+  }
+
+  if (lacksRequiredScope(state.providerType, result.tokens)) {
+    return c.redirect(frontendRedirect(`${state.returnTo}?provider_error=missing_scope`));
   }
 
   if (state.providerId) {

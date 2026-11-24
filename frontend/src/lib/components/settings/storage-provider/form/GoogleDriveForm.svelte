@@ -4,7 +4,13 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import type { ProviderFormProps } from '#lib/constants/providers.ts';
 
-	let { existingConfig, isEditMode, oauth, connection = $bindable() }: ProviderFormProps = $props();
+	let {
+		existingConfig,
+		isEditMode,
+		providerLabel,
+		oauth,
+		connection = $bindable()
+	}: ProviderFormProps = $props();
 
 	let connectedEmail = $derived(
 		isEditMode
@@ -66,7 +72,7 @@
 		<div class="rounded-lg border border-border p-4 text-center">
 			<Cloud class="h-8 w-8 text-muted-foreground mx-auto mb-2" />
 			<p class="text-sm text-muted-foreground mb-3">
-				Connect your Google account to use Google Drive for photo storage
+				Connect your Google account to use {providerLabel} for photo storage
 			</p>
 			<Button variant="outline" onclick={handleConnectGoogle}>
 				<svg class="h-4 w-4 mr-2" viewBox="0 0 24 24">

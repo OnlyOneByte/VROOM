@@ -474,6 +474,7 @@
 						<ConnectionForm
 							existingConfig={existingProvider?.config}
 							{isEditMode}
+							providerLabel={selectedEntry?.label ?? 'Google'}
 							{oauth}
 							bind:connection
 						/>

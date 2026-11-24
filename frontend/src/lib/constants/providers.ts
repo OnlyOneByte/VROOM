@@ -15,6 +15,7 @@ export interface ProviderConnection {
 export interface ProviderFormProps {
 	existingConfig: Record<string, unknown> | undefined;
 	isEditMode: boolean;
+	providerLabel: string;
 	oauth: GoogleOAuthReturn;
 	connection: ProviderConnection;
 }
@@ -35,7 +36,11 @@ export const PROVIDER_UI: Record<string, ProviderUi> = {
 		icon: Cloud,
 		form: { component: GoogleDriveForm, description: 'Google Drive connection' }
 	},
-	'google-photos': { icon: Image, fallbackLabel: 'Google Photos' },
+	'google-photos': {
+		icon: Image,
+		form: { component: GoogleDriveForm, description: 'Google Photos connection' },
+		fallbackLabel: 'Google Photos'
+	},
 	s3: { icon: Database },
 	fake: { icon: FlaskConical }
 };
