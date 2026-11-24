@@ -815,6 +815,34 @@ describe('splits, compare and shape', () => {
     expect(result.totals.perBucket).toBeNull();
   });
 
+  test('over the whole range, each car uses the same distance as the fleet total', async () => {
+    seedFleet();
+    const whole = (overrides: Partial<AnalyticsQuery>) =>
+      repo.query(
+        OWNER.id,
+        baseQuery({
+          interval: 'none',
+          groupBy: 'vehicle',
+          start: seconds('2024-06-01T00:00:00Z'),
+          ...overrides,
+        })
+      );
+    const distance = await whole({ metric: 'distance' });
+    const cost = await whole({ metric: 'cost' });
+    const perDistance = await whole({ metric: 'costPerDistance' });
+    const byCar = (r: typeof distance) =>
+      Object.fromEntries(r.series.map((s) => [s.key, s.values[0] ?? 0]));
+    const miles = byCar(distance);
+    const dollars = byCar(cost);
+    const carTotal = Object.values(miles).reduce((a, b) => a + b, 0);
+    expect(carTotal).toBeCloseTo(distance.totals.distance, 9);
+    for (const [car, value] of Object.entries(byCar(perDistance))) {
+      expect(value).toBeCloseTo((dollars[car] ?? 0) / (miles[car] ?? 1), 9);
+    }
+    const fleetCost = Object.values(dollars).reduce((a, b) => a + b, 0);
+    expect(perDistance.totals.value).toBeCloseTo(fleetCost / carTotal, 9);
+  });
+
   test('the average per bucket skips buckets with no data', async () => {
     for (const [id, iso, amount] of [
       ['jan', '2025-01-10T12:00:00Z', 10_000],
