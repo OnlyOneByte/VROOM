@@ -459,7 +459,8 @@ covers a typical instance.
    `docker compose -f docker-compose.yml -f docker-compose.litestream.yml up -d`.
 
 The add-on sets `WAL_CHECKPOINTS=off` on the backend: Litestream needs to be the only process
-that checkpoints the WAL, or it has to start a fresh snapshot. With it, stopping the backend no
+that forces (`RESTART` or `TRUNCATE`) checkpoints, or it has to start a fresh snapshot. SQLite's
+own automatic checkpoints still run, and Litestream handles them. With it, stopping the backend no
 longer checkpoints either; Litestream carries the WAL. Keep `PROVIDER_ENCRYPTION_KEY` out of the
 bucket, in a password manager: a copy of the database without it can't decrypt anyone's provider
 credentials, and losing it means everyone reconnects their providers.
@@ -469,12 +470,13 @@ credentials, and losing it means everyone reconnects their providers.
 Do this once when you set Litestream up, and then monthly. It never touches the running instance.
 
 ```bash
+TAG=latest   # the backend tag your stack runs
 mkdir -p drill
-docker run --rm -v "$PWD/litestream.yml:/etc/litestream.yml:ro" -v "$PWD/drill:/out" \
-  --env-file .env litestream/litestream:0.3.13 \
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/litestream.yml:/etc/litestream.yml:ro" \
+  -v "$PWD/drill:/out" --env-file .env litestream/litestream:0.3.13 \
   restore -o /out/vroom.db /data/vroom.db
-docker run -d --rm --name vroom-drill -p 127.0.0.1:3091:3001 -v "$PWD/drill:/app/data" \
-  --env-file .env ghcr.io/onlyonebyte/vroom/backend:latest
+docker run -d --rm --name vroom-drill --user "$(id -u):$(id -g)" -e NODE_ENV=development \
+  -p 127.0.0.1:3091:3001 -v "$PWD/drill:/app/data" ghcr.io/onlyonebyte/vroom/backend:$TAG
 sleep 10 && curl http://127.0.0.1:3091/health
 docker stop vroom-drill && rm -rf drill
 ```
@@ -482,6 +484,11 @@ docker stop vroom-drill && rm -rf drill
 A `200` from `/health` means the restored file opens and migrates. To check the data itself before
 the `docker stop`, compare `sqlite3 drill/vroom.db 'select count(*) from expenses'` with the live
 instance. The drill backend is published on loopback only and never on the live port.
+
+Both containers run as your own user, so the backend can write the restored file and its `-wal`
+and `-shm` files. The drill backend gets no `.env`: without the encryption key it can't decrypt
+anyone's provider credentials, so its sync and backup jobs never reach users' real storage.
+`NODE_ENV=development` lets it start without the key and a sign-in provider.
 
 ## Community stats
 

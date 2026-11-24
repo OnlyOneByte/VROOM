@@ -276,6 +276,20 @@ describe('the Litestream example', () => {
     expect(repoFile(OVERRIDE)).toContain('- vroom-data:/data');
     expect(repoFile(COMPOSE)).toContain('DATABASE_URL=/app/data/vroom.db');
   });
+
+  test("it runs as the backend image's user, so the shared volume stays writable by the backend", () => {
+    expect(repoFile('backend/Dockerfile')).toMatch(/^USER bun$/m);
+    expect(repoFile(OVERRIDE)).toMatch(/^ {4}user: "1000:1000"$/m);
+  });
+
+  test('the restore drill runs both containers as the host user and gives the drill backend no .env', () => {
+    const drill = repoFile('docs/deployment.md').split('### Restore drill')[1].split('```')[1];
+    const runs = drill.split('docker run').slice(1);
+    expect(runs).toHaveLength(2);
+    for (const run of runs) expect(run).toContain('--user "$(id -u):$(id -g)"');
+    expect(runs[1]).not.toContain('--env-file');
+    expect(runs[1]).toContain('-p 127.0.0.1:');
+  });
 });
 
 describe('the Portainer stack', () => {

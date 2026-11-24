@@ -13,6 +13,8 @@ services:
     image: litestream/litestream:0.3.13
     container_name: vroom-litestream
     command: replicate
+    # The backend's own user (bun), so Litestream never leaves root-owned files in the shared volume.
+    user: "1000:1000"
     volumes:
       - vroom-data:/data
       - ./litestream.yml:/etc/litestream.yml:ro
