@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { CalendarDays, Copy, LoaderCircle } from '@lucide/svelte';
-	import { PUBLIC_API_URL } from '$app/env/public';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -19,11 +18,14 @@
 		type CalendarFeedInfo,
 		type CalendarFeedOptions
 	} from '#lib/services/calendar-api.ts';
+	import { absoluteApiUrl } from '#lib/services/api-client.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { formatDate } from '#lib/utils/formatters.ts';
 
-	const SWITCHES: { key: keyof CalendarFeedOptions; label: string }[] = [
+	type FeedSwitch = Exclude<keyof CalendarFeedOptions, 'timeZone'>;
+
+	const SWITCHES: { key: FeedSwitch; label: string }[] = [
 		{ key: 'reminders', label: 'Reminders' },
 		{ key: 'insurance', label: 'Insurance renewals' },
 		{ key: 'loans', label: 'Loan and lease payments' },
@@ -47,6 +49,9 @@
 	let confirmRotate = $state(false);
 
 	let webcal = $derived(link?.replace(/^https?:/, 'webcal:') ?? null);
+	const onApple =
+		typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+	const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 	onMount(async () => {
 		try {
@@ -59,29 +64,32 @@
 		}
 	});
 
-	function absolute(path: string): string {
-		return new URL(path, PUBLIC_API_URL || window.location.origin).href;
-	}
-
 	async function createLink() {
 		busy = true;
 		try {
-			const created = await calendarApi.createFeed(options);
+			const created = await calendarApi
+				.createFeed({ ...options, timeZone })
+				.catch(e =>
+					e instanceof ApiError && e.statusCode === 400
+						? calendarApi.createFeed(options)
+						: Promise.reject(e)
+				);
 			feed = created.feed;
-			link = absolute(created.path);
+			link = absoluteApiUrl(created.path);
 		} catch (e) {
 			appStore.showError(`Couldn't create the link. ${userFacingErrorMessage(e)}`);
+			throw e;
 		} finally {
 			busy = false;
 		}
 	}
 
-	async function setOption(key: keyof CalendarFeedOptions, value: boolean) {
+	async function setOption(key: FeedSwitch, value: boolean) {
 		const previous = options[key];
 		options = { ...options, [key]: value };
 		if (!feed) return;
 		try {
-			feed = await calendarApi.updateOptions({ [key]: value });
+			feed = await calendarApi.updateOptions({ [key]: value, timeZone });
 		} catch (e) {
 			options = { ...options, [key]: previous };
 			appStore.showError(`Couldn't save that. ${userFacingErrorMessage(e)}`);
@@ -133,9 +141,9 @@
 		{:else if loadError}
 			<p class="text-sm text-destructive" role="alert">{loadError}</p>
 		{:else}
-			<div class="space-y-3">
+			<div class="space-y-1">
 				{#each SWITCHES as item (item.key)}
-					<div class="flex items-center justify-between gap-4">
+					<div class="flex min-h-10 items-center justify-between gap-4">
 						<Label for="calendar-{item.key}" class="text-sm font-medium">{item.label}</Label>
 						<Switch
 							id="calendar-{item.key}"
@@ -158,14 +166,14 @@
 						<Input id="calendar-url" value={link} readonly class="min-w-0 font-mono text-xs" />
 						<Button variant="outline" class="h-10 shrink-0 sm:h-9" onclick={copyLink}>
 							<Copy class="mr-1 h-4 w-4" />
-							Copy
+							Copy Link
 						</Button>
 					</div>
 					<p class="text-xs text-muted-foreground">
 						Shown once: copy it now. In Google Calendar, add it under Other calendars → From URL. In
 						Outlook, use Add calendar → Subscribe from web.
 					</p>
-					{#if webcal}
+					{#if webcal && onApple}
 						<Button
 							variant="outline"
 							class="h-10 sm:h-9"
@@ -192,26 +200,27 @@
 						disabled={busy}
 						data-testid="calendar-rotate"
 					>
-						Get a new link
+						Get a New Link
 					</Button>
 					<Button
 						variant="outline"
 						class="h-10 text-destructive sm:h-9"
 						onclick={() => (confirmOff = true)}
+						disabled={busy}
 						data-testid="calendar-off"
 					>
-						Turn off
+						Turn Off
 					</Button>
 				</div>
 			{:else}
 				<Button
 					class="h-10 sm:h-9"
-					onclick={createLink}
+					onclick={() => void createLink().catch(() => undefined)}
 					disabled={busy}
 					data-testid="calendar-create"
 				>
 					{#if busy}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
-					Create link
+					Create Link
 				</Button>
 			{/if}
 		{/if}
@@ -222,7 +231,7 @@
 	bind:open={confirmRotate}
 	title="Get a new calendar link?"
 	description="The current link stops working at once. Calendars subscribed to it need the new link."
-	confirmLabel="Get a new link"
+	confirmLabel="Get a New Link"
 	onConfirm={createLink}
 />
 
@@ -230,6 +239,6 @@
 	bind:open={confirmOff}
 	title="Turn off the calendar link?"
 	description="Calendars subscribed to it stop updating and its events disappear. You can create a new link at any time."
-	confirmLabel="Turn off"
+	confirmLabel="Turn Off"
 	onConfirm={turnOff}
 />

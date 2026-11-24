@@ -8,13 +8,19 @@ import { type CalendarFeed, type CalendarFeedOptions, calendarFeeds } from '../.
 import { NotFoundError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
 import { getClientIp } from '../../utils/client-ip';
+import { isValidTimeZone } from '../../utils/time-zone';
 import { zValidator } from '../../utils/validation';
 import { buildFeedEvents } from './feed-events';
 import { toIcs } from './ics';
 
 const routes = new Hono();
 
-export const FEED_PATH_PREFIX = '/api/v1/calendar/feed/';
+const FEED_PATH = '/calendar/feed/';
+const TOKEN_LIKE = /[A-Za-z0-9_-]{40,}/g;
+
+export function redactFeedTokens(text: string): string {
+  return /calendar/i.test(text) ? text.replace(TOKEN_LIKE, '[redacted]') : text;
+}
 const TOKEN_FILE = /^([A-Za-z0-9_-]{43})\.ics$/;
 
 const DEFAULT_OPTIONS: CalendarFeedOptions = {
@@ -32,6 +38,7 @@ const optionsSchema = z
     loans: z.boolean(),
     vehicleNames: z.boolean(),
     amounts: z.boolean(),
+    timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone'),
   })
   .partial()
   .strict();
@@ -72,7 +79,6 @@ routes.get('/feed/:file', feedRateLimiter, async (c) => {
   return c.body(body, 200, {
     'Content-Type': 'text/calendar; charset=utf-8',
     'Cache-Control': 'private, max-age=900',
-    'Referrer-Policy': 'no-referrer',
   });
 });
 
@@ -90,19 +96,17 @@ routes.post(
     const options = { ...DEFAULT_OPTIONS, ...existing?.options, ...c.req.valid('json').options };
     const token = randomBytes(32).toString('base64url');
     const tokenHash = hashFeedToken(token);
-    const db = getDb();
-    if (existing) {
-      await db
-        .update(calendarFeeds)
-        .set({ tokenHash, options, createdAt: new Date(), lastUsedAt: null })
-        .where(eq(calendarFeeds.id, existing.id));
-    } else {
-      await db.insert(calendarFeeds).values({ userId, tokenHash, options });
-    }
+    await getDb()
+      .insert(calendarFeeds)
+      .values({ userId, tokenHash, options })
+      .onConflictDoUpdate({
+        target: calendarFeeds.userId,
+        set: { tokenHash, options, createdAt: new Date(), lastUsedAt: null },
+      });
     return c.json(
       {
         success: true,
-        data: { feed: describe(await feedOf(userId)), path: `${FEED_PATH_PREFIX}${token}.ics` },
+        data: { feed: describe(await feedOf(userId)), path: `${FEED_PATH}${token}.ics` },
       },
       201
     );

@@ -6,6 +6,7 @@ export interface CalendarFeedOptions {
 	loans: boolean;
 	vehicleNames: boolean;
 	amounts: boolean;
+	timeZone?: string;
 }
 
 export interface CalendarFeedInfo {

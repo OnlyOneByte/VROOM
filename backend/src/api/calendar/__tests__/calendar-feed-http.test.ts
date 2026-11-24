@@ -47,10 +47,11 @@ async function ownGarage(userId: string): Promise<void> {
 }
 
 async function fetchFeed(path: string, ip = `198.51.100.${++visitor}`): Promise<Response> {
-  return await ctx.app.request(path, { headers: { 'X-Forwarded-For': ip } });
+  const url = path.startsWith('/api/') ? path : `/api/v1${path}`;
+  return await ctx.app.request(url, { headers: { 'X-Forwarded-For': ip } });
 }
 
-async function createFeed(options?: Record<string, boolean>): Promise<string> {
+async function createFeed(options?: Record<string, boolean | string>): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/calendar/feed', options ? { options } : {});
   expect(res.status).toBe(201);
   return (await json<DataEnvelope<FeedResponse>>(res)).data.path as string;
@@ -193,15 +194,77 @@ describe('the calendar feed link', () => {
     expect(statuses.at(-1)).toBe(429);
   });
 
+  test('the feed is served with no referrer, whatever the app-wide headers say', async () => {
+    const res = await fetchFeed(await createFeed());
+    expect(res.headers.get('referrer-policy')).toBe('no-referrer');
+    const other = await ctx.authed('GET', '/api/v1/calendar/feed');
+    expect(other.headers.get('referrer-policy')).not.toBe('no-referrer');
+  });
+
+  test('two first-time creates at once both succeed and leave one feed', async () => {
+    const [a, b] = await Promise.all([
+      ctx.authed('POST', '/api/v1/calendar/feed', {}),
+      ctx.authed('POST', '/api/v1/calendar/feed', {}),
+    ]);
+    expect([a.status, b.status]).toEqual([201, 201]);
+    expect(ctx.sqlite.query('SELECT COUNT(*) AS n FROM calendar_feeds').get()).toEqual({ n: 1 });
+  });
+
+  test('events fall on the user’s own calendar day, given their time zone', async () => {
+    const [car] = await db
+      .insert(vehicles)
+      .values({ userId: ctx.user.id, make: 'Kia', model: 'Niro', year: 2022 })
+      .returning();
+    const due = new Date('2027-01-10T12:00:00+13:00');
+    const [row] = await db
+      .insert(reminders)
+      .values({
+        userId: ctx.user.id,
+        name: 'Warrant of fitness',
+        type: 'notification',
+        frequency: 'yearly',
+        startDate: new Date(),
+        nextDueDate: due,
+      })
+      .returning();
+    await db.insert(reminderVehicles).values({ reminderId: row.id, vehicleId: car.id });
+    const local = await (
+      await fetchFeed(await createFeed({ timeZone: 'Pacific/Auckland' }))
+    ).text();
+    expect(local).toContain('DTSTART;VALUE=DATE:20270110');
+    const bad = await ctx.authed('PUT', '/api/v1/calendar/feed', {
+      options: { timeZone: 'Mars/Base' },
+    });
+    expect(bad.status).toBe(400);
+  });
+
+  test('an insurance term renewing today stays in the feed at UTC+14', async () => {
+    await ownGarage(ctx.user.id);
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Kiritimati' });
+    ctx.sqlite.run(
+      `UPDATE insurance_terms SET end_date = ? WHERE policy_id IN (SELECT id FROM insurance_policies WHERE user_id = ? AND company = 'State Farm')`,
+      [Math.floor(new Date(`${today}T12:00:00+14:00`).getTime() / 1000), ctx.user.id]
+    );
+    const ics = await (
+      await fetchFeed(await createFeed({ timeZone: 'Pacific/Kiritimati' }))
+    ).text();
+    expect(ics).toContain(`DTSTART;VALUE=DATE:${today.replace(/-/g, '')}\r\nDTEND`);
+    expect(ics).toContain('Insurance renews: State Farm');
+  });
+
   test('the request log shows the feed path with the token redacted', async () => {
     const path = await createFeed();
     const token = path.match(/feed\/(.+)\.ics$/)?.[1] ?? '';
     const log = spyOn(console, 'log');
     try {
       await fetchFeed(path);
+      await fetchFeed(path.toUpperCase());
+      await fetchFeed(path.replace('/feed/', '//feed//'));
+      await fetchFeed(path.replace('/feed/', '/%66eed/'));
       const lines = log.mock.calls.map((call) => call.join(' '));
-      expect(lines.some((line) => line.includes('/calendar/feed/[redacted].ics'))).toBe(true);
+      expect(lines.some((line) => line.includes('/calendar/feed/[redacted]'))).toBe(true);
       expect(lines.some((line) => line.includes(token))).toBe(false);
+      expect(lines.some((line) => line.toLowerCase().includes(token.toLowerCase()))).toBe(false);
     } finally {
       log.mockRestore();
     }

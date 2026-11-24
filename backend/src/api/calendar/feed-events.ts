@@ -11,6 +11,7 @@ import {
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
+import { calendarDayIn, isValidTimeZone } from '../../utils/time-zone';
 import type { CalendarEvent } from './ics';
 
 const HORIZON_DAYS = 365;
@@ -21,12 +22,17 @@ interface FeedContext {
   options: CalendarFeedOptions;
   vehicleNames: Map<string, string>;
   money: (cents: number) => string;
+  day: (date: Date) => string;
   today: Date;
   horizon: Date;
 }
 
 function isoDay(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+function utcNoon(day: string): Date {
+  return new Date(`${day}T12:00:00Z`);
 }
 
 function withDetail(title: string, parts: (string | null | undefined)[]): string {
@@ -72,7 +78,7 @@ async function reminderEvents(ctx: FeedContext): Promise<CalendarEvent[]> {
   );
   const linked = await vehiclesByReminder(due.map((r) => r.id));
   return due.map((r) => {
-    const date = isoDay(r.nextDueDate as Date);
+    const date = ctx.day(r.nextDueDate as Date);
     const owned = (linked.get(r.id) ?? []).filter((id) => ctx.vehicleNames.has(id));
     return {
       uid: `reminder-${r.id}-${date.replace(/-/g, '')}@vroom`,
@@ -94,9 +100,10 @@ async function insuranceEvents(ctx: FeedContext): Promise<CalendarEvent[]> {
       and(
         eq(insurancePolicies.userId, ctx.userId),
         eq(insurancePolicies.isActive, true),
-        gte(insuranceTerms.endDate, ctx.today)
+        gte(insuranceTerms.endDate, new Date(ctx.today.getTime() - DAY_MS))
       )
-    );
+    )
+    .then((found) => found.filter((r) => ctx.day(r.term.endDate) >= isoDay(ctx.today)));
   const termIds = rows.map((r) => r.term.id);
   const covered = new Map<string, string[]>();
   if (termIds.length > 0) {
@@ -109,7 +116,7 @@ async function insuranceEvents(ctx: FeedContext): Promise<CalendarEvent[]> {
   return rows
     .filter((r) => r.term.endDate <= ctx.horizon)
     .map(({ term, company }) => {
-      const date = isoDay(term.endDate);
+      const date = ctx.day(term.endDate);
       return {
         uid: `insurance-${term.id}-${date.replace(/-/g, '')}@vroom`,
         date,
@@ -140,7 +147,14 @@ export function paymentDates(
   to: Date
 ): Date[] {
   const last =
-    loan.endDate ?? addMonths(loan.startDate, loan.termMonths, loan.startDate.getUTCDate());
+    loan.endDate ??
+    addMonths(
+      loan.startDate,
+      loan.termMonths,
+      loan.paymentFrequency === 'monthly'
+        ? (loan.paymentDayOfMonth ?? loan.startDate.getUTCDate())
+        : loan.startDate.getUTCDate()
+    );
   const dates: Date[] = [];
   const push = (d: Date) => {
     if (d >= from && d <= to && d <= last) dates.push(d);
@@ -166,7 +180,15 @@ async function loanEvents(ctx: FeedContext): Promise<CalendarEvent[]> {
     .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
     .where(and(eq(vehicles.userId, ctx.userId), eq(vehicleFinancing.isActive, true)));
   return rows.flatMap(({ loan }) =>
-    paymentDates(loan, ctx.today, ctx.horizon).map((due) => {
+    paymentDates(
+      {
+        ...loan,
+        startDate: utcNoon(ctx.day(loan.startDate)),
+        endDate: loan.endDate ? utcNoon(ctx.day(loan.endDate)) : null,
+      },
+      ctx.today,
+      ctx.horizon
+    ).map((due) => {
       const date = isoDay(due);
       const title = loan.financingType === 'lease' ? 'Lease payment' : 'Loan payment';
       return {
@@ -204,12 +226,15 @@ export async function buildFeedEvents(
     style: 'currency',
     currency: prefs?.currency ?? 'USD',
   });
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const timeZone = options.timeZone && isValidTimeZone(options.timeZone) ? options.timeZone : null;
+  const day = (date: Date) => (timeZone ? calendarDayIn(date, timeZone) : isoDay(date));
+  const today = new Date(`${day(now)}T00:00:00Z`);
   const ctx: FeedContext = {
     userId,
     options,
     vehicleNames: new Map(owned.map((v) => [v.id, v.nickname || `${v.make} ${v.model}`])),
     money: (cents) => formatter.format(cents / 100),
+    day,
     today,
     horizon: new Date(today.getTime() + HORIZON_DAYS * DAY_MS),
   };
