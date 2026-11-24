@@ -190,8 +190,10 @@
 	function rangeText(metric: CompareMetric): string {
 		const bucket = metric.bucket;
 		if (!bucket || metric.yours === null) return '';
+		const yoursShown = amount(metric, metric.yours);
+		const othersShown = amount(metric, bucket.mean);
 		const position =
-			metric.yours === bucket.mean ? 'the same as' : metric.yours > bucket.mean ? 'above' : 'below';
+			yoursShown === othersShown ? 'the same as' : metric.yours > bucket.mean ? 'above' : 'below';
 		return `Your ${format(metric, metric.yours)} is ${position} the others' average of ${format(metric, bucket.mean)}`;
 	}
 

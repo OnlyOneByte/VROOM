@@ -175,6 +175,24 @@ describe('CommunityCompareCard', () => {
 		).toBeInTheDocument();
 	});
 
+	test('values that round to the same figure read as the same, not above or below', async () => {
+		compare.mockResolvedValue(
+			data(
+				metric('efficiency', {
+					status: 'ok',
+					unit: 'distance_per_volume',
+					yours: 31.04,
+					bucket: { n: 40, mean: 31, computedAt: '' }
+				})
+			)
+		);
+		await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });
+		expect(screen.getByRole('img')).toHaveAttribute(
+			'aria-label',
+			"Your 31.0 mi/gal is the same as the others' average of 31.0 mi/gal"
+		);
+	});
+
 	test('formats costs in the currency with the distance unit, and yearly costs per year', async () => {
 		compare.mockResolvedValue(
 			data(

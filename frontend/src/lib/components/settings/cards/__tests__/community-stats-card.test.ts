@@ -45,7 +45,7 @@ describe('CommunityStatsCard', () => {
 		expect(screen.getByText('Compare with other owners')).toBeInTheDocument();
 		expect(
 			screen.getByText(
-				'Only averages for groups of 10 or more people are ever shown — never your own numbers.'
+				'Only averages and rounded group sizes for groups of 10 or more people are ever shown — never your own numbers.'
 			)
 		).toBeInTheDocument();
 		expect(

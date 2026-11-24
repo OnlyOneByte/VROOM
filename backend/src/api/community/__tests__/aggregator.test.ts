@@ -70,6 +70,17 @@ describe('community stats aggregation privacy', () => {
     expect(draws).toBe(result.rows.length);
   });
 
+  test('the published mean is the true mean plus one Laplace draw at the published-n scale', () => {
+    const u = 0.9;
+    const row = efficiencyRow(
+      owners(12).map((id) => vehicle(id)),
+      { ...OPTIONS, uniform: () => u }
+    );
+    const scale = (60 - 2) / 10;
+    const noise = -scale * Math.sign(u - 0.5) * Math.log(1 - 2 * Math.abs(u - 0.5));
+    expect(row?.mean).toBeCloseTo(Math.round((CIVIC_KM_PER_L + noise) * 10) / 10, 6);
+  });
+
   test('the noise scale is the band width over the published n', () => {
     expect(noiseScaleFor({ lo: 2, hi: 60 }, 10)).toBeCloseTo(5.8, 9);
     expect(noiseScaleFor({ lo: 2, hi: 60 }, 100)).toBeCloseTo(0.58, 9);
