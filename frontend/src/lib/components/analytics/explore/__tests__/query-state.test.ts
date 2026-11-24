@@ -21,6 +21,7 @@ import {
 	bucketDate,
 	bucketLabel,
 	carPanels,
+	exploreAnnotations,
 	expensesNote,
 	expensesQuery,
 	kpis,
@@ -326,5 +327,61 @@ describe('each car on its own', () => {
 		const query = parseExplore(new URLSearchParams('split=vehicle&hide=camry&compare=cars'));
 		expect(query.hide).toEqual([]);
 		expect(describeQuery({ ...query, per: 'none' })).toBe('Total cost over the whole range by car');
+	});
+});
+
+describe('services and trips on the time charts', () => {
+	const at = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
+	const service = (iso: string, vehicleName: string, label: string, amount: number) => ({
+		t: at(iso),
+		kind: 'service' as const,
+		vehicleId: vehicleName,
+		vehicleName,
+		label,
+		amount
+	});
+	const response = {
+		buckets: ['2026-01', '2026-02', '2026-03'],
+		range: { start: at('2026-01-01T00:00:00'), end: at('2026-04-01T00:00:00') },
+		annotations: [
+			service('2026-01-10T12:00:00', 'Camry', 'Oil change', 75),
+			service('2026-03-02T12:00:00', 'Camry', 'Brakes', 300),
+			service('2026-03-20T12:00:00', 'Civic', 'Tires', 640)
+		],
+		trips: { count: [0, 2, 0], distance: [0, 41.6, 0] }
+	};
+	const options = {
+		atFor: (i: number) => response.buckets[i],
+		money: (n: number) => `$${n}`,
+		distanceUnit: 'mi'
+	};
+
+	test('one marker per month that had service, and a trip strip', () => {
+		const result = exploreAnnotations(response, 'month', options);
+		expect(result?.markers).toEqual([
+			{ at: '2026-01', label: 'Oil change', detail: 'Camry, $75' },
+			{
+				at: '2026-03',
+				label: '2 services',
+				detail: 'Brakes, Camry, $300; Tires, Civic, $640',
+				rows: ['Brakes: Camry, $300', 'Tires: Civic, $640']
+			}
+		]);
+		expect(result?.note).toBeUndefined();
+		expect(
+			exploreAnnotations({ ...response, annotationsTruncated: true }, 'month', options)?.note
+		).toMatch(/Only the latest services/);
+		expect(result?.density?.map(d => d.label)).toEqual(['No trips', '2 trips, 42 mi', 'No trips']);
+		expect(result?.formatAt('2026-03')).toBe(bucketLabel('2026-03', 'month'));
+	});
+
+	test('nothing for the whole range, or when there is nothing to show', () => {
+		expect(exploreAnnotations(response, 'none', options)).toBeUndefined();
+		const quiet = {
+			...response,
+			annotations: [],
+			trips: { count: [0, 0, 0], distance: [0, 0, 0] }
+		};
+		expect(exploreAnnotations(quiet, 'month', options)).toBeUndefined();
 	});
 });

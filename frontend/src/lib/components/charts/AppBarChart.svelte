@@ -17,6 +17,7 @@
 	import type { Snippet } from 'svelte';
 	import type { ChartState } from 'layerchart';
 	import { buildChartA11y, type ChartSelectHandler } from './chart-a11y.ts';
+	import type { ChartAnnotations } from './types.ts';
 
 	interface LegendItem {
 		key: string;
@@ -52,6 +53,7 @@
 		footer?: Snippet;
 		categoryLabel?: string;
 		onSelect?: ChartSelectHandler;
+		annotations?: ChartAnnotations;
 		class?: string;
 	}
 
@@ -83,6 +85,7 @@
 		footer,
 		categoryLabel,
 		onSelect,
+		annotations,
 		class: className
 	}: Props = $props();
 
@@ -130,9 +133,15 @@
 	{height}
 	animationClass="chart-bar-animated"
 	table={a11y}
+	events={annotations}
 	class={className}
 >
-	<ChartPlot
+	{#if annotations}{#await import('./AnnotationLane.svelte')}<div
+				class="mb-1 h-6"
+			></div>{:then { default: AnnotationLane }}<AnnotationLane
+				{annotations}
+				{context}
+			/>{/await}{/if}<ChartPlot
 		{a11y}
 		onStep={showRow}
 		onSelect={onSelect ? i => onSelect(data[i]!, null) : undefined}

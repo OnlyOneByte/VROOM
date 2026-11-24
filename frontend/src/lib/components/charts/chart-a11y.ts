@@ -107,3 +107,20 @@ export function rowAnnouncement(a11y: ChartA11y, index: number): string {
 	const parts = a11y.columns.map((column, i) => `${column.label}: ${row.cells[i]}`);
 	return `${row.label}. ${parts.join('. ')}. ${position}`;
 }
+
+export function nextIndex(
+	key: string,
+	current: number | null,
+	count: number
+): number | null | undefined {
+	if (key === 'ArrowRight') {
+		return current === null ? 0 : Math.min(current + 1, count - 1);
+	}
+	if (key === 'ArrowLeft') {
+		return current === null ? count - 1 : Math.max(current - 1, 0);
+	}
+	if (key === 'Home') return 0;
+	if (key === 'End') return count - 1;
+	if (key === 'Escape' && current !== null) return null;
+	return undefined;
+}

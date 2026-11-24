@@ -201,6 +201,9 @@ export function analyticsQueryToApi(d: AnalyticsQueryResult): AnalyticsQueryResu
     ...d,
     ...queryPeriodToApi(d, money),
     compare: d.compare ? queryPeriodToApi(d.compare, money) : null,
+    ...(d.annotations && {
+      annotations: d.annotations.map((a) => ({ ...a, amount: c(a.amount) })),
+    }),
   };
 }
 

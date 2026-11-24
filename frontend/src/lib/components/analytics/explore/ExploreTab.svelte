@@ -13,6 +13,8 @@
 	import type { AnalyticsQueryResponse } from '#lib/types/index.ts';
 	import { buildChartConfig } from '#lib/utils/chart-colors.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import type { AnalyticsDateRange } from '../analytics-filters';
 	import InsightCards from './InsightCards.svelte';
 	import QueryBar from './QueryBar.svelte';
@@ -35,6 +37,7 @@
 		bucketLabel,
 		bucketTotals,
 		carPanels,
+		exploreAnnotations,
 		hasData,
 		isAdditive,
 		kpis,
@@ -93,7 +96,10 @@
 		...apiQuery(query),
 		start: dateRange.startDate,
 		end: dateRange.endDate,
-		vehicleIds
+		vehicleIds,
+		...(['bars', 'stacked', 'grouped', 'line'].includes(chartForm(query)) && {
+			annotations: ['services', 'trips'] as Array<'services' | 'trips'>
+		})
 	});
 	let requestKey = $derived(JSON.stringify(request));
 
@@ -289,6 +295,24 @@
 		ticks: Math.min(maxTicks, lineRows.length),
 		format: (v: Date) => (v instanceof Date ? bucketLabel(keyFor(v), shown.per) : '')
 	});
+
+	let annotationOptions = $derived({
+		money: formatCurrency,
+		distanceUnit: getDistanceUnitLabel(units.distanceUnit, true)
+	});
+	let lineAnnotations = $derived(
+		response
+			? exploreAnnotations(response, shown.per, {
+					...annotationOptions,
+					atFor: i => lineRows[i]?.['date']
+				})
+			: undefined
+	);
+	let barAnnotations = $derived(
+		response
+			? exploreAnnotations(response, shown.per, { ...annotationOptions, atFor: i => labels[i] })
+			: undefined
+	);
 
 	function keyFor(date: Date): string {
 		const y = date.getFullYear();
@@ -644,6 +668,7 @@
 					level={2}
 					title={chartTitle}
 					data={lineRows}
+					annotations={lineAnnotations}
 					x="date"
 					y={visibleSeries.map(s => s.key)}
 					onSelect={selectLine}
@@ -663,6 +688,7 @@
 					data={barRows}
 					x="label"
 					onSelect={selectBar}
+					annotations={barAnnotations}
 					series={allSeries}
 					hiddenKeys={hiddenSeriesKeys}
 					onToggleSeries={toggleSeries}

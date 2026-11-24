@@ -104,6 +104,55 @@ describe('parseReceiptText on awkward lines', () => {
     });
   });
 
+  test('quantity and price on one line keep the quantity as the volume', () => {
+    for (const [line, volume, pricePerUnit] of [
+      ['GALLONS 11.482 PRICE/GAL 4.599', 11.482, 4.599],
+      ['GALLONS: 11.482 @ 4.599/GAL', 11.482, 4.599],
+      ['Liter 42,17 EUR/l 1,789', 42.17, 1.789],
+      ['4.599/GAL 11.482 GAL', 11.482, 4.599],
+      ['@ 4.599/GAL 11.482 GALLONS', 11.482, 4.599],
+      ['$4.599/GAL 11.482 GAL', 11.482, 4.599],
+      ['1,789 EUR/l 12,17 l', 12.17, 1.789],
+    ] as const) {
+      expect(parseReceiptText(line, NOW), line).toMatchObject({
+        volume,
+        pricePerUnit,
+        category: 'fuel',
+      });
+    }
+  });
+
+  test('a pump line with quantity, unit price and total reads the quantity, not the total', () => {
+    for (const [line, volume, amount] of [
+      ['11.482 GAL 4.599/GAL 52.81\nTOTAL 52.81', 11.482, 52.81],
+      ['$4.599/GAL 11.482 GAL 52.81\nTOTAL 52.81', 11.482, 52.81],
+      ['4.599/GAL 11.482 GAL 52.81\nTOTAL 52.81', 11.482, 52.81],
+      ['1,789 EUR/l 12,17 Liter 21,77\nSUMME 21,77', 12.17, 21.77],
+      ['11.482 GAL 52.81\nTOTAL 52.81', 11.482, 52.81],
+    ] as const) {
+      expect(parseReceiptText(line, NOW), line).toMatchObject({ volume, amount });
+    }
+  });
+
+  test('a quantity after its unit word keeps its last digit before x, @ or *', () => {
+    for (const [line, volume, volumeUnit] of [
+      ['GALLONS 11.481 @ 4.599', 11.481, 'gallons_us'],
+      ['Liter 42,11 x 1,789', 42.11, 'liters'],
+      ['Liter 42,11 @ 1,789', 42.11, 'liters'],
+      ['Liters 42.11 * 1.789', 42.11, 'liters'],
+      ['GALLONS 11.482 0.5 L', 11.482, 'gallons_us'],
+    ] as const) {
+      expect(parseReceiptText(line, NOW), line).toMatchObject({ volume, volumeUnit });
+    }
+  });
+
+  test('a spelled-out price per gallon is a price, not a volume', () => {
+    expect(parseReceiptText('GALLONS 11.482\nPRICE PER GALLON 4.599', NOW)).toMatchObject({
+      volume: 11.482,
+      pricePerUnit: 4.599,
+    });
+  });
+
   test('a quantity of 1 or a weight in grams is not a fuel volume', () => {
     expect(parseReceiptText('Car wash 12.50 1\nTOTAL 12.50', NOW)).toEqual({ amount: 12.5 });
     expect(parseReceiptText('Snack 1.5 g\nTOTAL 3.00', NOW)).toEqual({ amount: 3 });

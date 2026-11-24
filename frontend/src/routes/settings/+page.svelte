@@ -18,6 +18,7 @@
 	import ThemePickerCard from '#lib/components/settings/cards/ThemePickerCard.svelte';
 	import PWAInstallCard from '#lib/components/settings/cards/PwaInstallCard.svelte';
 	import PushNotificationsCard from '#lib/components/settings/cards/PushNotificationsCard.svelte';
+	import CalendarFeedCard from '#lib/components/settings/cards/CalendarFeedCard.svelte';
 	import PhotoStorageSettings from '#lib/components/settings/cards/StorageProvidersCard.svelte';
 	import ModelProvidersCard from '#lib/components/settings/cards/ModelProvidersCard.svelte';
 	import { fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
@@ -391,6 +392,7 @@
 			{/if}
 			<PWAInstallCard />
 			<PushNotificationsCard />
+			<CalendarFeedCard />
 			{#await migrateCard then { default: MigrateFromTrackerCard }}
 				<MigrateFromTrackerCard />
 			{:catch}

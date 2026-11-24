@@ -17,6 +17,13 @@ import { zonedMidnight, zonedParts, zoneOffsetMs } from '../../utils/time-zone';
 import { canonicalScale, convertDistance, convertVolume } from '../../utils/unit-conversions';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { OWNERSHIP_CATEGORIES } from '../expenses/repository';
+import {
+  type QueryAnnotation,
+  type ServiceAnnotation,
+  serviceAnnotations,
+  type TripLane,
+  tripLane,
+} from './annotations';
 
 export const QUERY_METRICS = [
   'cost',
@@ -71,6 +78,7 @@ export interface AnalyticsQuery {
   compare: QueryCompare;
   energy: QueryEnergy;
   timeZone?: string;
+  annotations?: QueryAnnotation[];
 }
 
 export interface QuerySeries {
@@ -131,6 +139,9 @@ export interface AnalyticsQueryResult extends QueryPeriod {
   interval: QueryInterval;
   groupBy: QueryGroupBy;
   compare: QueryPeriod | null;
+  annotations?: ServiceAnnotation[];
+  annotationsTruncated?: boolean;
+  trips?: TripLane;
 }
 
 export interface Bucket {
@@ -564,6 +575,31 @@ export class AnalyticsQueryRepository {
       groupBy: query.groupBy,
       ...primary,
       compare: comparePeriod,
+      ...this.annotate(ctx, range),
+    };
+  }
+
+  private annotate(ctx: QueryContext, range: { start: number; end: number }) {
+    const wanted = ctx.query.annotations ?? [];
+    if (wanted.length === 0) return {};
+    const scope = {
+      userId: ctx.userId,
+      vehicleIds: ctx.vehicleIds,
+      names: new Map([...ctx.vehicleInfo].map(([id, v]) => [id, v.name])),
+      ...range,
+    };
+    const services = wanted.includes('services') ? serviceAnnotations(this.db, scope) : null;
+    return {
+      ...(services && {
+        annotations: services.services,
+        annotationsTruncated: services.truncated,
+      }),
+      ...(wanted.includes('trips') && {
+        trips: tripLane(this.db, scope, ctx.periods[0] ?? [], {
+          user: ctx.userUnits,
+          byVehicle: new Map([...ctx.vehicleInfo].map(([id, v]) => [id, v.units])),
+        }),
+      }),
     };
   }
 

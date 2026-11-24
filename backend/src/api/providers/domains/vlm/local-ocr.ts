@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { createWorker, type Worker } from 'tesseract.js';
@@ -22,12 +23,23 @@ type ThreadHandle = {
 };
 
 function startRealWorker(): Promise<Worker> {
-  return createWorker('eng', 1, {
-    langPath: LOCAL_OCR_LANG_PATH,
-    gzip: true,
-    cacheMethod: 'none',
-    errorHandler: (error: unknown) =>
-      logger.warn('Text recognition failed', { error: String(error) }),
+  if (!existsSync(join(LOCAL_OCR_LANG_PATH, 'eng.traineddata.gz'))) {
+    return Promise.reject(new OcrUnavailableError('The text reader model is missing'));
+  }
+  return new Promise((resolve, reject) => {
+    let starting = true;
+    createWorker('eng', 1, {
+      langPath: LOCAL_OCR_LANG_PATH,
+      gzip: true,
+      cacheMethod: 'none',
+      errorHandler: (error: unknown) => {
+        if (starting) reject(new OcrUnavailableError(`The text reader failed to start: ${error}`));
+        else logger.warn('Text recognition failed', { error: String(error) });
+      },
+    }).then((started) => {
+      starting = false;
+      resolve(started);
+    }, reject);
   });
 }
 
@@ -39,22 +51,44 @@ export function setLocalOcrForTest(
 ): void {
   workerFactory = options.createWorker ?? startRealWorker;
   timeoutMs = options.timeoutMs ?? 30_000;
+  startBroken = false;
 }
 
 let worker: Promise<Worker> | null = null;
 let queue: Promise<unknown> = Promise.resolve();
 let waiting = 0;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
+let startBroken = false;
+
+function markStartBroken(reason: string): void {
+  if (startBroken) return;
+  startBroken = true;
+  logger.error('The built-in text reader could not start; scans stay off until a restart', {
+    reason,
+  });
+}
 
 function startWorker(): Promise<Worker> {
-  worker ??= workerFactory().then((started) => {
-    (started as unknown as ThreadHandle).worker?.on?.('error', (error) => {
-      logger.warn('Text recognition worker crashed', { error: String(error) });
-      worker = null;
-    });
-    return started;
-  });
-  return worker;
+  if (worker) return worker;
+  if (startBroken) {
+    return Promise.reject(new OcrUnavailableError('The text reader could not start'));
+  }
+  const mine: Promise<Worker> = workerFactory().then(
+    (started) => {
+      (started as unknown as ThreadHandle).worker?.on?.('error', (error) => {
+        logger.warn('Text recognition worker crashed', { error: String(error) });
+        if (worker === mine) worker = null;
+      });
+      return started;
+    },
+    (error) => {
+      markStartBroken(String(error));
+      if (worker === mine) worker = null;
+      throw error instanceof OcrUnavailableError ? error : new OcrUnavailableError(String(error));
+    }
+  );
+  worker = mine;
+  return mine;
 }
 
 function clearIdleTimer(): void {
@@ -84,14 +118,18 @@ function scheduleIdleStop(): void {
 
 async function recognizeOnce(image: Buffer): Promise<string> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let started = false;
   const timedOut = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new OcrUnavailableError('Text recognition timed out')),
-      timeoutMs
-    );
+    timer = setTimeout(() => {
+      if (!started) markStartBroken('the start timed out');
+      reject(new OcrUnavailableError('Text recognition timed out'));
+    }, timeoutMs);
   });
   timedOut.catch(() => undefined);
-  const job = startWorker().then(async (w) => (await w.recognize(image)).data.text);
+  const job = startWorker().then(async (w) => {
+    started = true;
+    return (await w.recognize(image)).data.text;
+  });
   job.catch(() => undefined);
   try {
     const text = await Promise.race([job, timedOut]);

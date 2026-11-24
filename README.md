@@ -46,6 +46,7 @@ Screenshots show the demo data from `bun run db:seed`.
 - 👥 Vehicle sharing with other VROOM users
 - 📥 CSV import from Fuelio, Fuelly and Drivvo, or any CSV with manual column mapping, and CSV export of expenses
 - 📷 Photos for receipts, vehicles, odometer readings and insurance, stored in Google Drive, Google Photos or S3-compatible storage
+- 📅 A private calendar link with your reminders, insurance renewals and loan payments, for Google, Apple or Outlook Calendar
 - 🧾 Receipt scanning that fills in the expense form, with a built-in text reader on your server or an AI vision model you configure
 - 💬 An assistant that answers questions about your vehicles and costs, using Anthropic, Gemini or any OpenAI-compatible model
 - 💾 ZIP backups to Google Drive or S3-compatible storage, Google Sheets sync, and restore from a backup file
@@ -112,7 +113,7 @@ vroom/
 | [Architecture](docs/architecture.md) | System design, data flow, and the reasoning behind it |
 | [Development Guide](docs/development.md) | Local setup, workflow, and testing |
 | [Deployment Guide](docs/deployment.md) | Docker, self-hosting, reverse proxy, and SSL |
-| [Conventions](docs/conventions/) | Coding rules for each area: code quality, Svelte, API, migrations, testing, design system, UI |
+| [Conventions](docs/conventions/) | Coding rules for each area: code quality, Svelte, API, permissions, migrations, testing, design system, UI |
 | [Contributing](CONTRIBUTING.md) | How to propose and submit a change |
 
 ## Contributing
