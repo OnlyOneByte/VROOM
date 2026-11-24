@@ -1,7 +1,7 @@
 import { describe, expect, setSystemTime, test } from 'bun:test';
 import { type Context, Hono } from 'hono';
 import { CONFIG } from '../../config';
-import { rateLimiter, trackedRateLimitKeys } from '../rate-limit';
+import { concurrencyLimiter, rateLimiter, trackedRateLimitKeys } from '../rate-limit';
 
 interface RateLimitErrorBody {
   success: boolean;
@@ -97,5 +97,50 @@ describe('rate-limit middleware — bounded store', () => {
     } finally {
       limits.maxTrackedKeys = previous;
     }
+  });
+});
+
+describe('concurrency limiter', () => {
+  function gatedApp(limit: number) {
+    const gates: (() => void)[] = [];
+    const app = new Hono();
+    app.use(
+      '*',
+      concurrencyLimiter({ limit, keyGenerator: () => 'k', message: 'busy', status: 503 })
+    );
+    app.get('/slow', async (c) => {
+      await new Promise<void>((release) => gates.push(release));
+      return c.json({ ok: true });
+    });
+    app.get('/fail', () => {
+      throw new Error('boom');
+    });
+    const releaseAll = () => {
+      for (const release of gates.splice(0)) release();
+    };
+    return { app, releaseAll };
+  }
+
+  test('a request over the in-flight limit is refused until one finishes', async () => {
+    const { app, releaseAll } = gatedApp(2);
+    const first = app.request('/slow');
+    const second = app.request('/slow');
+    await Bun.sleep(5);
+    const third = await app.request('/slow');
+    expect(third.status).toBe(503);
+    expect(third.headers.get('Retry-After')).toBe('5');
+    releaseAll();
+    expect((await first).status).toBe(200);
+    expect((await second).status).toBe(200);
+    const fourth = app.request('/slow');
+    await Bun.sleep(5);
+    releaseAll();
+    expect((await fourth).status).toBe(200);
+  });
+
+  test('a request that fails still frees its slot', async () => {
+    const { app } = gatedApp(1);
+    expect((await app.request('/fail')).status).toBe(500);
+    expect((await app.request('/fail')).status).toBe(500);
   });
 });

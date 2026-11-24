@@ -94,3 +94,41 @@ export function rateLimiter(config: RateLimitConfig) {
     return next();
   };
 }
+
+interface ConcurrencyLimitConfig {
+  limit: number;
+  keyGenerator: (c: Context) => string;
+  message: string;
+  status: 429 | 503;
+}
+
+export function concurrencyLimiter(config: ConcurrencyLimitConfig) {
+  const inFlight = new Map<string, number>();
+  return async (c: Context, next: Next) => {
+    if (CONFIG.disableRateLimit) return next();
+    const key = config.keyGenerator(c);
+    const running = inFlight.get(key) ?? 0;
+    if (running >= config.limit) {
+      return c.json(
+        createErrorResponse('RATE_LIMIT_EXCEEDED', config.message, { retryAfter: 5 }),
+        config.status,
+        { 'Retry-After': '5' }
+      );
+    }
+    inFlight.set(key, running + 1);
+    try {
+      await next();
+    } finally {
+      const left = (inFlight.get(key) ?? 1) - 1;
+      if (left > 0) inFlight.set(key, left);
+      else inFlight.delete(key);
+    }
+  };
+}
+
+export const heavyJobLimiter = concurrencyLimiter({
+  limit: CONFIG.rateLimit.heavyJobsAtOnce,
+  keyGenerator: () => 'heavy-jobs',
+  message: 'The server is busy with other imports and restores. Try again in a moment.',
+  status: 503,
+});

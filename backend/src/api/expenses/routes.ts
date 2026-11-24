@@ -6,7 +6,7 @@ import { CONFIG } from '../../config';
 import { type Expense, expenses as expensesTable, type NewExpense } from '../../db/schema';
 import { EXPENSE_CATEGORIES } from '../../db/types';
 import { NotFoundError, ValidationError } from '../../errors';
-import { changeTracker, requireAuth } from '../../middleware';
+import { changeTracker, heavyJobLimiter, rateLimiter, requireAuth } from '../../middleware';
 import {
   authorize,
   ownAccount,
@@ -692,73 +692,85 @@ function targetUnitsResolver(
   };
 }
 
-routes.post('/import', zValidator('json', importBodySchema), authorize(ownAccount), async (c) => {
-  const user = c.get('user');
-  const { csv, dryRun, mapping, timeZone } = c.req.valid('json');
+const expenseImportLimiter = rateLimiter({
+  ...CONFIG.rateLimit.expenseImport,
+  keyGenerator: (c) => `expenseImport:${c.get('user').id}`,
+});
 
-  const vehicles = await vehicleRepository.findByUserId(user.id);
-  if (vehicles.length === 0) {
-    throw new ValidationError('Add a vehicle before importing expenses');
-  }
-  const { currencyUnit: accountCurrency } = await preferencesRepository.getOrCreate(user.id);
+routes.post(
+  '/import',
+  expenseImportLimiter,
+  heavyJobLimiter,
+  zValidator('json', importBodySchema),
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const { csv, dryRun, mapping, timeZone } = c.req.valid('json');
 
-  let importCsv = csv;
-  let unmappedCategories: string[] = [];
-  let rowErrors = new Map<number, string>();
-  if (mapping) {
-    const targetUnitsFor = targetUnitsResolver(vehicles);
-    try {
-      const format = findImportFormat(mapping.source);
-      const result = format
-        ? format.toNativeCsv(csv, { mapping, targetUnitsFor, timeZone })
-        : applyMapping(csv, mapping, targetUnitsFor, timeZone);
-      importCsv = result.csv;
-      unmappedCategories = result.unmappedCategories;
-      rowErrors = result.rowErrors;
-    } catch (err) {
-      if (err instanceof CsvMappingError) {
-        throw new ValidationError(err.message);
+    const vehicles = await vehicleRepository.findByUserId(user.id);
+    if (vehicles.length === 0) {
+      throw new ValidationError('Add a vehicle before importing expenses');
+    }
+    const { currencyUnit: accountCurrency } = await preferencesRepository.getOrCreate(user.id);
+
+    let importCsv = csv;
+    let unmappedCategories: string[] = [];
+    let rowErrors = new Map<number, string>();
+    if (mapping) {
+      const targetUnitsFor = targetUnitsResolver(vehicles);
+      try {
+        const format = findImportFormat(mapping.source);
+        const result = format
+          ? format.toNativeCsv(csv, { mapping, targetUnitsFor, timeZone })
+          : applyMapping(csv, mapping, targetUnitsFor, timeZone);
+        importCsv = result.csv;
+        unmappedCategories = result.unmappedCategories;
+        rowErrors = result.rowErrors;
+      } catch (err) {
+        if (err instanceof CsvMappingError) {
+          throw new ValidationError(err.message);
+        }
+        throw err;
       }
+    }
+
+    let plan: ReturnType<typeof buildImportPlan>;
+    try {
+      plan = buildImportPlan(importCsv, vehicles, rowErrors, timeZone);
+    } catch (err) {
+      if (err instanceof CsvImportError) throw new ValidationError(err.message);
       throw err;
     }
-  }
 
-  let plan: ReturnType<typeof buildImportPlan>;
-  try {
-    plan = buildImportPlan(importCsv, vehicles, rowErrors, timeZone);
-  } catch (err) {
-    if (err instanceof CsvImportError) throw new ValidationError(err.message);
-    throw err;
-  }
+    if (dryRun) {
+      return c.json({
+        success: true,
+        data: {
+          dryRun: true,
+          imported: 0,
+          unmappedCategories,
+          ...summarizeImportPlan(plan, accountCurrency),
+        },
+      });
+    }
 
-  if (dryRun) {
+    const readyRows = plan.rows
+      .filter((row) => row.status === 'ready' && row.expense)
+      .map((row) => ({ ...row.expense, userId: user.id }) as NewExpense);
+    const { imported, duplicates } = await expenseRepository.importExpenses(readyRows, user.id);
+
     return c.json({
       success: true,
       data: {
-        dryRun: true,
-        imported: 0,
+        dryRun: false,
+        imported,
+        duplicates,
         unmappedCategories,
         ...summarizeImportPlan(plan, accountCurrency),
       },
     });
   }
-
-  const readyRows = plan.rows
-    .filter((row) => row.status === 'ready' && row.expense)
-    .map((row) => ({ ...row.expense, userId: user.id }) as NewExpense);
-  const { imported, duplicates } = await expenseRepository.importExpenses(readyRows, user.id);
-
-  return c.json({
-    success: true,
-    data: {
-      dryRun: false,
-      imported,
-      duplicates,
-      unmappedCategories,
-      ...summarizeImportPlan(plan, accountCurrency),
-    },
-  });
-});
+);
 
 const detectSourceSchema = z.object({
   sample: z.string().min(1).max(IMPORT_DETECT_SAMPLE_LENGTH),

@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { CONFIG } from '../../config';
 import { NotFoundError } from '../../errors';
-import { changeTracker, requireAuth } from '../../middleware';
+import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { parseUploadedPhoto, photoThumbnailResponse } from './helpers';
@@ -56,7 +57,12 @@ routes.get('/:entityType/:entityId', zValidator('query', commonSchemas.paginatio
   return c.json(buildPaginatedResponse(result.data, result.totalCount, limit, offset));
 });
 
-routes.post('/:entityType/:entityId', async (c) => {
+const photoUploadLimiter = rateLimiter({
+  ...CONFIG.rateLimit.photoUpload,
+  keyGenerator: (c) => `photoUpload:${c.get('user').id}`,
+});
+
+routes.post('/:entityType/:entityId', photoUploadLimiter, async (c) => {
   const entityType = c.req.param('entityType');
   const entityId = c.req.param('entityId');
   if (!entityType || !entityId) throw new NotFoundError('Entity');
