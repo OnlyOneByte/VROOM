@@ -9,15 +9,27 @@ import { convertDistance, convertEfficiency } from '../../utils/unit-conversions
 import { zValidator } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
 import {
+  bandFor,
   COMMUNITY_WINDOW_MS,
   type CommunityMetric,
   type CommunityUnit,
   LOCAL_SCOPE,
+  noiseScaleFor,
   vehicleSamples,
 } from './aggregator';
 import { communityStatsRepository } from './repository';
 
 export const GIVE_TO_GET = true;
+export const MAX_NOISE_SHARE = 0.25;
+
+export function usefulEnough(
+  row: Pick<CommunityStat, 'mean' | 'nPublished'>,
+  metric: CommunityMetric,
+  unit: CommunityUnit
+): boolean {
+  const scale = noiseScaleFor(bandFor(metric, unit), row.nPublished);
+  return row.mean > 0 && scale <= MAX_NOISE_SHARE * row.mean;
+}
 
 const METRICS: CommunityMetric[] = ['efficiency', 'running_cost', 'maintenance', 'insurance'];
 const OWNER_REGION_METRICS: ReadonlySet<CommunityMetric> = new Set(['running_cost', 'insurance']);
@@ -29,6 +41,7 @@ export type CompareStatus =
   | 'needs_model'
   | 'opt_in_required'
   | 'awaiting_refresh'
+  | 'not_enough_data'
   | 'feature_off';
 
 export type DisplayUnit =
@@ -151,6 +164,9 @@ routes.get('/compare', zValidator('query', compareQuerySchema), async (c) => {
     const yours = toDisplayUnits(sample.value, sample.unit, vehicle.unitPreferences);
     const row = rowByKey.get(sample.bucketKey);
     if (!row) return { metric, status: 'too_few', unit, yours, bucket: null };
+    if (!usefulEnough(row, sample.metric, sample.unit)) {
+      return { metric, status: 'not_enough_data', unit, yours, bucket: null };
+    }
     return {
       metric,
       status: 'ok',

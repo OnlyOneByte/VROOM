@@ -318,6 +318,11 @@
 										? 'Pick the model from the list when you edit this vehicle to compare fuel efficiency.'
 										: 'Only the owner can compare this.'}
 								</p>
+							{:else if metric.status === 'not_enough_data'}
+								<p class="text-sm text-muted-foreground">
+									Not enough owners yet for a reliable average. It shows once more people with a
+									similar car have opted in.
+								</p>
 							{:else if metric.status === 'too_few'}
 								<p class="text-sm text-muted-foreground">Not enough owners yet.</p>
 							{:else}

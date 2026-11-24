@@ -212,6 +212,19 @@ describe('GET /api/v1/community/compare', () => {
     expect(shared?.currency).toBeNull();
   });
 
+  test('an average whose noise is over a quarter of its value is hidden as not_enough_data', async () => {
+    const vehicleId = await seedCivic();
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 10, 12);
+    await optIn();
+    const hidden = metric((await compare(vehicleId)).body, 'efficiency');
+    expect(hidden?.status).toBe('not_enough_data');
+    expect(hidden?.bucket).toBeNull();
+    expect(JSON.stringify(hidden)).not.toContain('"n"');
+
+    ctx.sqlite.run('UPDATE community_stats SET n_published = 20 WHERE bucket_key = ?', [CIVIC_KEY]);
+    expect(metric((await compare(vehicleId)).body, 'efficiency')?.status).toBe('ok');
+  });
+
   test('a row below K in the table is never returned', async () => {
     const vehicleId = await seedCivic();
     insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 5, 12);
@@ -258,7 +271,7 @@ describe('GET /api/v1/community/compare', () => {
   test("a share recipient never sees metrics keyed by the owner's region", async () => {
     await ctx.authed('PUT', '/api/v1/settings', { communityRegion: 'US-CA' });
     const vehicleId = await seedCivic();
-    insertBucket('running_cost|gas|USD|US-CA', 'running_cost', 'cents_per_km', 20, 9);
+    insertBucket('running_cost|gas|USD|US-CA', 'running_cost', 'cents_per_km', 400, 9);
     await optIn();
     await other.acceptShare(vehicleId, 'viewer');
     await optIn(other.request);
