@@ -173,8 +173,15 @@
     {
       "idx": 24,
       "version": "6",
-      "when": 1795556706201,
-      "tag": "0024_term_vehicle_position_index",
+      "when": 1795556719738,
+      "tag": "0024_signup_modes",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1795561074458,
+      "tag": "0025_term_vehicle_position_index",
       "breakpoints": true
     }
   ]

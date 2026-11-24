@@ -12,12 +12,21 @@ import { rateLimiter, requireAuth } from '../../middleware';
 import { assignServerRole, requestResolver } from '../../permissions/grants';
 import { PERMISSION_REGISTRY } from '../../permissions/registry';
 import { ROLE_TEMPLATES } from '../../permissions/roles';
-import { getClientIp } from '../../utils/client-ip';
+import { getClientRateKey } from '../../utils/client-ip';
 import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { storePending } from '../../utils/pending-credentials';
 import { readJsonBody } from '../../utils/request-body';
 import { attachPendingInvites } from '../shares/repository';
+import { decideSignup } from '../signup/policy';
+import {
+  activeInviteFor,
+  becomesFirstAdmin,
+  consumeInvite,
+  hasShareInvite,
+  markAdminAssigned,
+  signupSettings,
+} from '../signup/store';
 import { authProviderRepository, buildAuthProviderConfig } from './auth-provider-repository';
 import { DEMO_USER_ID, isDemoAvailable, startDemoSession } from './demo';
 import { lucia } from './lucia';
@@ -145,7 +154,7 @@ function takeLoginStateCookie(c: Context): string | undefined {
 const authRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.auth,
   // Key on the trusted client IP; a raw X-Forwarded-For header is spoofable.
-  keyGenerator: (c) => `auth:${getClientIp(c)}`,
+  keyGenerator: (c) => `auth:${getClientRateKey(c)}`,
 });
 
 for (const path of ['/providers', '/login/*', '/link/*', '/callback/*']) {
@@ -286,11 +295,13 @@ export async function attachPendingInvitesOnSignIn(userId: string): Promise<void
   const db = getDb();
   try {
     const [account] = await db
-      .select({ email: users.email })
+      .select({ email: users.email, pendingApprovalAt: users.pendingApprovalAt })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
-    if (account?.email) attachPendingInvites(db, userId, account.email);
+    if (account?.email && !account.pendingApprovalAt) {
+      attachPendingInvites(db, userId, account.email);
+    }
   } catch (error) {
     logger.warn('Could not attach pending invites on sign-in', { userId, error });
   }
@@ -310,35 +321,63 @@ export async function resolveNewUser(
 
   try {
     // Keep this callback synchronous: bun:sqlite would autocommit each awaited insert.
-    const result = db.transaction((tx) => {
-      const newUser = tx
-        .insert(users)
-        .values({
+    const result = db.transaction(
+      (tx): { userId: string } | { redirect: string } => {
+        const now = new Date();
+        const firstAdmin = becomesFirstAdmin(tx, email);
+        const settings = signupSettings(tx);
+        const invite = activeInviteFor(tx, email, now);
+        const decision = decideSignup({
           email,
-          displayName: userInfo.displayName,
-        })
-        .returning()
-        .get();
-      tx.insert(userProviders)
-        .values({
-          userId: newUser.id,
-          domain: 'auth',
-          providerType: authProviderId,
-          providerAccountId: userInfo.providerAccountId,
-          displayName: userInfo.displayName,
-          credentials: '',
-          config: buildAuthProviderConfig(userInfo.email, userInfo.avatarUrl),
-          status: 'active',
-        })
-        .run();
-      assignServerRole(tx, newUser.id, 'member');
-      try {
-        attachPendingInvites(tx, newUser.id, newUser.email);
-      } catch (error) {
-        logger.warn('Could not attach pending invites on signup', { userId: newUser.id, error });
-      }
-      return { userId: newUser.id };
-    });
+          firstAdmin,
+          mode: settings.mode,
+          allowedDomains: settings.allowedDomains,
+          serverInvite: invite !== undefined,
+          shareInvite: hasShareInvite(tx, email),
+        });
+        if (!decision.allow) {
+          logger.info('Sign-up refused', { reason: decision.reason, mode: settings.mode });
+          return { redirect: `${CONFIG.frontend.url}/auth?auth_error=signup_${decision.reason}` };
+        }
+        const newUser = tx
+          .insert(users)
+          .values({
+            email,
+            displayName: userInfo.displayName,
+            pendingApprovalAt: decision.role === 'pending' ? now : null,
+          })
+          .returning()
+          .get();
+        tx.insert(userProviders)
+          .values({
+            userId: newUser.id,
+            domain: 'auth',
+            providerType: authProviderId,
+            providerAccountId: userInfo.providerAccountId,
+            displayName: userInfo.displayName,
+            credentials: '',
+            config: buildAuthProviderConfig(userInfo.email, userInfo.avatarUrl),
+            status: 'active',
+          })
+          .run();
+        if (decision.role !== 'pending') assignServerRole(tx, newUser.id, 'member');
+        if (decision.role === 'admin') {
+          assignServerRole(tx, newUser.id, 'admin');
+          markAdminAssigned(tx, now);
+          logger.info('First admin account created', { userId: newUser.id });
+        }
+        if (invite && decision.via === 'server_invite')
+          consumeInvite(tx, invite.id, newUser.id, now);
+        if (decision.role === 'pending') return { userId: newUser.id };
+        try {
+          attachPendingInvites(tx, newUser.id, newUser.email);
+        } catch (error) {
+          logger.warn('Could not attach pending invites on signup', { userId: newUser.id, error });
+        }
+        return { userId: newUser.id };
+      },
+      { behavior: 'immediate' }
+    );
     return result;
   } catch (txErr) {
     if (isUniqueConstraintError(txErr)) {
@@ -545,6 +584,7 @@ routes.get('/me', async (c) => {
         expiresAt: demoSessionExpiresAt(session.id) ?? session.expiresAt,
       },
       demo: user.id === DEMO_USER_ID,
+      pendingApproval: user.pendingApprovalAt !== null,
     },
   });
 });

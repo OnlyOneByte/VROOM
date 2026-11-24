@@ -772,7 +772,7 @@ export class AnalyticsQueryRepository {
       sql`
       SELECT e.id, e.date, e.category, e.vehicle_id, e.description, e.expense_amount AS amount
       FROM expenses e WHERE ${where} AND e.category <> 'fuel'
-      ORDER BY e.expense_amount DESC, e.date DESC LIMIT ${limit}
+      ORDER BY e.expense_amount DESC, e.date DESC, e.id DESC LIMIT ${limit}
     `
     );
     const total = totals?.total ?? 0;
@@ -915,7 +915,7 @@ export class AnalyticsQueryRepository {
       SELECT m.period, -1 AS idx, m.vehicle_id, (MAX(m.mileage) - MIN(m.mileage)) * vu.dist_user AS distance
       FROM m JOIN vu ON vu.vehicle_id = m.vehicle_id
       WHERE m.idx >= 0
-      GROUP BY m.period, m.vehicle_id
+      GROUP BY m.period, m.vehicle_id, vu.dist_user
     `
     );
   }

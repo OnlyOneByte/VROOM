@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import type { Context } from 'hono';
-import { getClientIp, parseTrustedProxies } from '../client-ip';
+import { getClientIp, getClientRateKey, parseTrustedProxies, rateLimitKeyOf } from '../client-ip';
 
 let socketAddress: string | undefined;
 let connInfoThrows = false;
@@ -146,5 +146,39 @@ describe('parseTrustedProxies', () => {
 
   test.each(['proxy.lan', '10.0.0.0/33', '10.0.0.0/x', '::/129', ''])('refuses %s', (entry) => {
     expect(() => parseTrustedProxies([entry])).toThrow('TRUSTED_PROXY_IPS entry');
+  });
+});
+
+describe('rate limit keys', () => {
+  test('two IPv6 addresses in one /64 share a key, in any notation', () => {
+    expect(rateLimitKeyOf('2001:db8:1:2::1')).toBe(
+      rateLimitKeyOf('2001:0db8:0001:0002:ffff::abcd')
+    );
+    expect(rateLimitKeyOf('2001:db8:1:2:3:4:5:6')).toBe('2001:db8:1:2::/64');
+  });
+
+  test('IPv6 addresses in different /64s get different keys', () => {
+    expect(rateLimitKeyOf('2001:db8:1:2::1')).not.toBe(rateLimitKeyOf('2001:db8:1:3::1'));
+    expect(rateLimitKeyOf('::1')).toBe('0:0:0:0::/64');
+  });
+
+  test('an IPv4-mapped address keys as its IPv4 address, in either notation', () => {
+    expect(rateLimitKeyOf('::ffff:203.0.113.7')).toBe('203.0.113.7');
+    expect(rateLimitKeyOf('::ffff:cb00:7107')).toBe('203.0.113.7');
+  });
+
+  test('IPv4 addresses, zones and unknown sockets keep their own key', () => {
+    expect(rateLimitKeyOf('203.0.113.7')).toBe('203.0.113.7');
+    expect(rateLimitKeyOf('fe80::1%eth0')).toBe('fe80:0:0:0::/64');
+    expect(rateLimitKeyOf('unknown')).toBe('unknown');
+  });
+
+  test("a request's key is its client address collapsed to the /64", () => {
+    const keyFrom = (address: string) => {
+      socketAddress = address;
+      return getClientRateKey(ctx());
+    };
+    expect(keyFrom('2001:db8:1:2::1')).toBe(keyFrom('2001:db8:1:2::99'));
+    expect(keyFrom('2001:db8:1:2::1')).not.toBe(keyFrom('2001:db8:1:3::1'));
   });
 });

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Expense, ExpenseSummary, Vehicle } from '#lib/types/index.ts';
 import {
@@ -197,6 +197,10 @@ async function openTab(name: string) {
 function lastListParams(): Record<string, unknown> {
 	return getExpensesByVehicle.mock.calls.at(-1)?.[1] as Record<string, unknown>;
 }
+
+beforeAll(async () => {
+	await import('#lib/components/expenses/ExpenseSearchFilters.svelte');
+});
 
 beforeEach(() => {
 	vi.clearAllMocks();

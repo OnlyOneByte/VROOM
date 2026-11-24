@@ -7,6 +7,8 @@ import {
   stopLocalOcr,
 } from '../api/providers/domains/vlm/local-ocr';
 import { CONFIG } from '../config';
+import { getDb } from '../db/connection';
+import { assignServerRole } from '../permissions/grants';
 import { createTestApp, requestAs, type TestApp } from '../test-helpers/http-client';
 
 let ctx: TestApp;
@@ -32,6 +34,7 @@ async function anotherUser(): Promise<ReturnType<typeof requestAs>> {
     `${id}@example.com`,
     'Other',
   ]);
+  assignServerRole(getDb(), id, 'member');
   return requestAs(ctx, id);
 }
 
