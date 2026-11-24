@@ -13,6 +13,11 @@ if (!existsSync(join(output, 'server/manifest-full.js'))) {
 }
 
 const budgets = JSON.parse(readFileSync(budgetsFile, 'utf8'));
+const missing = ['shared', 'fonts', 'default'].filter(key => typeof budgets[key] !== 'number');
+if (missing.length > 0) {
+	console.error(`bundle-budget: bundle-budgets.json has no number for ${missing.join(', ')}.`);
+	process.exit(1);
+}
 const { manifest } = await import(pathToFileURL(join(output, 'server/manifest-full.js')).href);
 
 const sizeCache = new Map();
