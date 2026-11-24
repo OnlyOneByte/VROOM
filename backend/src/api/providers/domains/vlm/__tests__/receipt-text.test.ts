@@ -122,6 +122,18 @@ describe('parseReceiptText on awkward lines', () => {
     }
   });
 
+  test('a pump line with quantity, unit price and total reads the quantity, not the total', () => {
+    for (const [line, volume, amount] of [
+      ['11.482 GAL 4.599/GAL 52.81\nTOTAL 52.81', 11.482, 52.81],
+      ['$4.599/GAL 11.482 GAL 52.81\nTOTAL 52.81', 11.482, 52.81],
+      ['4.599/GAL 11.482 GAL 52.81\nTOTAL 52.81', 11.482, 52.81],
+      ['1,789 EUR/l 12,17 Liter 21,77\nSUMME 21,77', 12.17, 21.77],
+      ['11.482 GAL 52.81\nTOTAL 52.81', 11.482, 52.81],
+    ] as const) {
+      expect(parseReceiptText(line, NOW), line).toMatchObject({ volume, amount });
+    }
+  });
+
   test('a spelled-out price per gallon is a price, not a volume', () => {
     expect(parseReceiptText('GALLONS 11.482\nPRICE PER GALLON 4.599', NOW)).toMatchObject({
       volume: 11.482,

@@ -161,11 +161,8 @@ function volumeIn(line: string): FoundVolume | undefined {
   const quantity = price ? `${line.slice(0, price.start)} ${line.slice(price.end)}` : line;
   const after = VOLUME_AFTER.exec(quantity);
   const before = VOLUME_BEFORE.exec(quantity);
-  const [raw, unit] = after
-    ? [after[2], after[1]]
-    : before && /[.,]/.test(before[1])
-      ? [before[1], before[2]]
-      : [];
+  const [raw, unit] =
+    before && /[.,]/.test(before[1]) ? [before[1], before[2]] : after ? [after[2], after[1]] : [];
   const volume = raw === undefined ? undefined : toNumber(raw);
   return volume && unit ? { volume, unit: unitOf(unit) } : undefined;
 }
