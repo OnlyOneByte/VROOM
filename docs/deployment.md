@@ -663,12 +663,16 @@ or a home server you share:
   before each upgrade, then `docker compose pull && docker compose up -d`.
 - **Backups:** [Litestream](#continuous-backups-with-litestream) for the database, a monthly
   [restore drill](#restore-drill), and `PROVIDER_ENCRYPTION_KEY` stored apart from the backups.
-- **First drill, once, on the real host:** run the [restore drill](#restore-drill) exactly as
-  written before anyone else signs in. It runs both containers as your own user (`--user`), and
-  this is the step that proves your host's file permissions let the backend open a restored file.
-  It hasn't been tested on every host. If `/health` doesn't answer `200`, read
-  `docker logs vroom-drill` before the `docker stop`: a permissions error there means the `drill`
-  folder or its files aren't owned by the user you ran it as.
+- **First drill, once, on the real host:** run the [restore drill](#restore-drill) before anyone
+  else signs in. It runs both containers as your own user (`--user`), and this is what proves your
+  host's file permissions let the backend open a restored file; it hasn't been tested on every
+  host. The first time, paste the lines one at a time and leave `--rm` off the second
+  `docker run`, so a backend that fails at start stays around to read:
+  - a failed restore (the first `docker run`) prints its error in the terminal;
+  - if `/health` doesn't answer `200`, run `docker logs vroom-drill`. A permissions error there
+    usually means the `drill` folder or its files aren't owned by the user you ran it as. On
+    SELinux hosts (Fedora, RHEL), add `:Z` to both `-v` mounts;
+  - clean up with `docker rm -f vroom-drill && rm -rf drill`.
 - **Legal pages:** fill in `frontend/src/routes/privacypolicy` and `termsofservice` with who runs
   the server, how to reach you, what is stored and for how long, the services involved (your host,
   Cloudflare, your backup bucket, the sign-in providers) and the community stats opt-in. Google's
