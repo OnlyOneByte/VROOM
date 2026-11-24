@@ -148,17 +148,20 @@ const ROUTES: RouteCase[] = [
   {
     name: 'GET /financing/vehicles/:id/financing',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['GET', `/financing/vehicles/${fx.vehicleId}/financing`],
     expectInBody: (fx) => fx.financingId,
   },
   {
     name: 'POST /financing/vehicles/:id/financing',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['POST', `/financing/vehicles/${fx.vehicleId}/financing`, FINANCING_BODY],
   },
   {
     name: 'PATCH /financing/:id/payment-amount',
     mode: 'owner',
+    authorized: true,
     request: (fx) => [
       'PATCH',
       `/financing/${fx.financingId}/payment-amount`,
@@ -168,11 +171,13 @@ const ROUTES: RouteCase[] = [
   {
     name: 'PUT /financing/:id/payoff',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['PUT', `/financing/${fx.financingId}/payoff`],
   },
   {
     name: 'DELETE /financing/:id',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['DELETE', `/financing/${fx.financingId}`],
   },
   {
