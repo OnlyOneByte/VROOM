@@ -124,24 +124,6 @@ class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehicleShar
     return rows.map((r) => toOwnerView(r.share, r));
   }
 
-  async findById(id: string): Promise<VehicleShare | null> {
-    const [row] = await this.db
-      .select()
-      .from(vehicleShares)
-      .where(eq(vehicleShares.id, id))
-      .limit(1);
-    return row ?? null;
-  }
-
-  async findByIdAndOwner(id: string, ownerId: string): Promise<VehicleShare | null> {
-    const [row] = await this.db
-      .select()
-      .from(vehicleShares)
-      .where(and(eq(vehicleShares.id, id), eq(vehicleShares.ownerId, ownerId)))
-      .limit(1);
-    return row ?? null;
-  }
-
   async findReceivedByUser(sharedWithId: string): Promise<ReceivedShare[]> {
     const rows = await this.db
       .select({
