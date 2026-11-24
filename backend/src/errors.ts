@@ -33,6 +33,16 @@ export class AuthenticationError extends AppError {
   }
 }
 
+export class DemoReadOnlyError extends AppError {
+  constructor() {
+    super("This is a demo garage, so changes aren't saved", 403, true);
+  }
+
+  override get code(): string {
+    return 'DEMO_READ_ONLY';
+  }
+}
+
 export class NotFoundError extends AppError {
   constructor(resource: string = 'Resource') {
     super(`${resource} not found`, 404, true);

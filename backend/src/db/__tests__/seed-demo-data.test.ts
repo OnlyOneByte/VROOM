@@ -64,7 +64,7 @@ describe('db:init --seed', () => {
     }
   });
 
-  test('adds one paid windshield claim on the State Farm policy', async () => {
+  test('adds one settled windshield claim on the State Farm policy', async () => {
     const [stateFarm] = await db
       .select()
       .from(insurancePolicies)

@@ -7,6 +7,7 @@ import { prettyJSON } from 'hono/pretty-json';
 import { secureHeaders } from 'hono/secure-headers';
 import { routes as analyticsRoutes } from './api/analytics/routes';
 import { routes as assistantRoutes } from './api/assistant/routes';
+import { DEMO_USER_ID, demoGuard } from './api/auth/demo';
 import { routes as authRoutes } from './api/auth/routes';
 import { routes as expenseRoutes } from './api/expenses/routes';
 import { routes as financingRoutes } from './api/financing/routes';
@@ -83,11 +84,14 @@ const globalRateLimiter = rateLimiter({
   keyGenerator: (c) => {
     // Keys by trusted client IP: the raw X-Forwarded-For header is spoofable.
     const user = c.get('user');
+    if (user?.id === DEMO_USER_ID) return `global:demo:${getClientIp(c)}`;
     return `global:${user?.id || getClientIp(c)}`;
   },
 });
 
 app.use('/api/*', optionalAuth);
+
+app.use('/api/*', demoGuard);
 
 app.use('*', globalRateLimiter);
 

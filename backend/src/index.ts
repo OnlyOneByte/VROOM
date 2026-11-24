@@ -2,6 +2,7 @@ import { recalculateOvercountedMonthlyPremiums } from './api/insurance/hooks';
 import { startSyncWorker, stopSyncWorker } from './api/providers/sync-worker';
 import { app } from './app';
 import './api/sync/init';
+import { prepareDemoGarage } from './api/auth/demo';
 import { discoverOidc } from './api/auth/providers/oidc';
 import { CONFIG } from './config';
 import { checkpointWAL, forceCheckpointWAL, runMigrations } from './db/connection';
@@ -40,6 +41,12 @@ try {
 }
 
 await discoverOidc();
+
+try {
+  await prepareDemoGarage();
+} catch (error) {
+  logger.error('Failed to prepare the demo garage', { message: extractErrorMessage(error) });
+}
 
 try {
   await recalculateOvercountedMonthlyPremiums();
