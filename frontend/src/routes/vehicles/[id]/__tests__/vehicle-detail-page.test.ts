@@ -62,9 +62,23 @@ const getExpensesByVehicle = vi.fn();
 const getExpenseSummary = vi.fn();
 const downloadExpensesCsv = vi.fn();
 
+const getRecentExpenses = vi.fn();
+const listReminders = vi.fn();
+const getPoliciesForVehicle = vi.fn();
+vi.mock('#lib/services/reminder-api.ts', () => ({
+	reminderApi: { list: (...args: unknown[]) => listReminders(...args) }
+}));
+vi.mock('#lib/services/insurance-api.ts', () => ({
+	insuranceApi: {
+		getPoliciesForVehicle: (...args: unknown[]) => getPoliciesForVehicle(...args)
+	}
+}));
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
-		getExpensesByVehicle: (...args: unknown[]) => getExpensesByVehicle(...args),
+		getExpensesByVehicle: (vehicleId: string, params: { limit?: number }) =>
+			params.limit === 3
+				? getRecentExpenses(vehicleId, params)
+				: getExpensesByVehicle(vehicleId, params),
 		getExpenseSummary: (...args: unknown[]) => getExpenseSummary(...args),
 		downloadExpensesCsv: (...args: unknown[]) => downloadExpensesCsv(...args)
 	}
@@ -197,6 +211,12 @@ beforeEach(() => {
 		pagination: { totalCount: 1, limit: 20, offset: 0, hasMore: false }
 	});
 	downloadExpensesCsv.mockResolvedValue(undefined);
+	getRecentExpenses.mockResolvedValue({
+		data: [EXPENSE],
+		pagination: { totalCount: 1, limit: 3, offset: 0, hasMore: false }
+	});
+	listReminders.mockResolvedValue([]);
+	getPoliciesForVehicle.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -629,5 +649,79 @@ describe('vehicle detail page tabs', () => {
 
 		expect(screen.queryByRole('button', { name: /export csv/i })).toBeNull();
 		expect(captured['table']?.['canWrite']).toBe(true);
+	});
+});
+
+describe('vehicle detail page Next up and Recent expenses', () => {
+	const dueReminder = (type: 'notification' | 'expense') => ({
+		reminder: {
+			id: `r-${type}`,
+			name: type === 'notification' ? 'Oil change' : 'Car loan',
+			type,
+			isActive: true,
+			nextDueDate: new Date(Date.now() - 86_400_000).toISOString(),
+			expenseCategory: type === 'notification' ? null : 'financial'
+		},
+		vehicleIds: ['v1']
+	});
+
+	test("the vehicle's due reminders lead Next up, and only a notification reminder offers Log it", async () => {
+		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
+		listReminders.mockResolvedValue([dueReminder('notification'), dueReminder('expense')]);
+		await mount();
+
+		expect(listReminders).toHaveBeenCalledWith({ vehicleId: 'v1' });
+		expect(getPoliciesForVehicle).toHaveBeenCalledWith('v1');
+		expect(await screen.findByRole('heading', { name: 'Next up' })).toBeInTheDocument();
+		const logIt = screen.getByRole('link', { name: 'Log it: Oil change' });
+		const href = new URL(logIt.getAttribute('href') ?? '', 'http://x');
+		expect(href.pathname).toBe('/expenses/new');
+		expect(Object.fromEntries(href.searchParams)).toMatchObject({
+			vehicleId: 'v1',
+			category: 'maintenance',
+			description: 'Oil change',
+			returnTo: '/vehicles/v1'
+		});
+		expect(screen.queryByRole('link', { name: /^Log it: Car loan/ })).toBeNull();
+	});
+
+	test('a viewer sees Next up without Log it', async () => {
+		getVehicle.mockResolvedValue(VIEWER_VEHICLE);
+		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
+		listReminders.mockResolvedValue([dueReminder('notification')]);
+		await mount();
+
+		expect(await screen.findByRole('heading', { name: 'Next up' })).toBeInTheDocument();
+		expect(screen.queryByRole('link', { name: /^Log it/ })).toBeNull();
+	});
+
+	test('Recent expenses shows the latest three, and See all opens the Expenses tab', async () => {
+		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
+		getRecentExpenses.mockResolvedValue({
+			data: [{ ...EXPENSE, description: 'Arco' }],
+			pagination: { totalCount: 61, limit: 3, offset: 0, hasMore: true }
+		});
+		await mount();
+
+		expect(getRecentExpenses).toHaveBeenCalledWith('v1', {
+			limit: 3,
+			offset: 0,
+			sortBy: 'date',
+			sortDir: 'desc'
+		});
+		expect(await screen.findByRole('heading', { name: 'Recent expenses' })).toBeInTheDocument();
+		expect(screen.getByText('Arco')).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole('button', { name: 'See all 61 expenses' }));
+		await settle();
+		expect(screen.getByRole('tab', { name: 'Expenses' })).toHaveAttribute('aria-selected', 'true');
+	});
+
+	test('a failed recent-expenses load says so instead of showing an empty list', async () => {
+		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
+		getRecentExpenses.mockRejectedValue(new Error('down'));
+		await mount();
+
+		expect(await screen.findByTestId('recent-expenses-load-error')).toBeInTheDocument();
+		expect(screen.queryByText('No expenses yet')).toBeNull();
 	});
 });

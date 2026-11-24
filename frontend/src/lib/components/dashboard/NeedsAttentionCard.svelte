@@ -1,20 +1,22 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { routes } from '#lib/routes.ts';
 	import type { AttentionItem } from './dashboard-data';
 
 	interface Props {
 		items: AttentionItem[];
+		title?: string;
 	}
 
-	let { items }: Props = $props();
+	let { items, title = 'Needs attention' }: Props = $props();
 </script>
 
 {#if items.length > 0}
 	<Card.Root class="gap-3 py-5" data-testid="needs-attention">
 		<Card.Header class="px-5">
-			<Card.Title level={2} class="text-lg">Needs attention</Card.Title>
+			<Card.Title level={2} class="text-lg">{title}</Card.Title>
 		</Card.Header>
 		<Card.Content class="px-5">
 			<ul class="divide-y" role="list">
@@ -29,13 +31,26 @@
 							</a>
 							<p class="text-xs text-muted-foreground">{item.detail}</p>
 						</div>
-						<span
-							class="shrink-0 text-xs font-semibold {item.status === 'overdue'
-								? 'text-warning'
-								: 'text-muted-foreground'}"
-						>
-							{item.status === 'overdue' ? 'Overdue' : 'Soon'}
-						</span>
+						<div class="flex shrink-0 items-center gap-3">
+							<span
+								class="text-xs font-semibold {item.status === 'overdue'
+									? 'text-warning'
+									: 'text-muted-foreground'}"
+							>
+								{item.status === 'overdue' ? 'Overdue' : 'Soon'}
+							</span>
+							{#if item.action}
+								<Button
+									variant="outline"
+									size="sm"
+									class="relative"
+									href={item.action.href}
+									aria-label="{item.action.label}: {item.title}"
+								>
+									{item.action.label}
+								</Button>
+							{/if}
+						</div>
 					</li>
 				{/each}
 			</ul>

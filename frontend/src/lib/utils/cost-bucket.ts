@@ -1,4 +1,9 @@
-import type { CategoryColorToken, ExpenseCategory } from '#lib/constants/expense-categories.ts';
+import {
+	EXPENSE_CATEGORIES,
+	type CategoryColorToken,
+	type ExpenseCategory
+} from '#lib/constants/expense-categories.ts';
+import type { ExpenseSummary } from '#lib/types/index.ts';
 
 export const COST_BUCKETS = ['ownership', 'energy', 'upkeep'] as const;
 
@@ -24,6 +29,18 @@ export const COST_BUCKET_COLOR_TOKENS: Record<
 
 export function costBucket(category: ExpenseCategory): CostBucket {
 	return BUCKET_BY_CATEGORY[category];
+}
+
+export type BucketAmounts = Record<CostBucket, number>;
+
+export function bucketAmounts(breakdown: ExpenseSummary['categoryBreakdown']): BucketAmounts {
+	const amounts: BucketAmounts = { ownership: 0, energy: 0, upkeep: 0 };
+	for (const row of breakdown) {
+		if ((EXPENSE_CATEGORIES as readonly string[]).includes(row.category)) {
+			amounts[costBucket(row.category as ExpenseCategory)] += row.amount;
+		}
+	}
+	return amounts;
 }
 
 export function costBucketColor(bucket: CostBucket): string {

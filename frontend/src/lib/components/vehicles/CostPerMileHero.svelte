@@ -7,11 +7,12 @@
 	import type { DistanceUnit } from '#lib/types/settings.ts';
 	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import {
+		bucketAmounts,
 		COST_BUCKETS,
 		COST_BUCKET_COLOR_TOKENS,
 		type CostBucket
 	} from '#lib/utils/cost-bucket.ts';
-	import { bucketAmounts, costPerDistance } from '#lib/utils/cost-per-distance.ts';
+	import { costPerDistance } from '#lib/utils/cost-per-distance.ts';
 
 	interface Props {
 		summary: ExpenseSummary | null;

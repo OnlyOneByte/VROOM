@@ -6,7 +6,12 @@ import type {
 	ReminderWithVehicles,
 	VehicleKind
 } from '#lib/types/index.ts';
-import { costBucket, type CostBucket } from '#lib/utils/cost-bucket.ts';
+import {
+	bucketAmounts,
+	costBucket,
+	type BucketAmounts,
+	type CostBucket
+} from '#lib/utils/cost-bucket.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const REMINDER_WINDOW_DAYS = 14;
@@ -48,8 +53,6 @@ export interface VehicleRow {
 	trend: number[] | null;
 }
 
-export type BucketAmounts = Record<CostBucket, number>;
-
 export interface PeriodSpend {
 	total: number;
 	previousTotal: number | null;
@@ -60,16 +63,6 @@ export interface PeriodSpend {
 export function periodStartSeconds(period: TimePeriod, now: number): number {
 	if (period === 'all') return 1;
 	return Math.floor((now - PERIOD_DAYS[period] * DAY_MS) / 1000);
-}
-
-export function bucketAmounts(breakdown: ExpenseSummary['categoryBreakdown']): BucketAmounts {
-	const amounts: BucketAmounts = { ownership: 0, energy: 0, upkeep: 0 };
-	for (const row of breakdown) {
-		if ((EXPENSE_CATEGORIES as readonly string[]).includes(row.category)) {
-			amounts[costBucket(row.category as ExpenseCategory)] += row.amount;
-		}
-	}
-	return amounts;
 }
 
 export function combinePeriodSpend(summaries: ExpenseSummary[]): PeriodSpend {
@@ -107,6 +100,7 @@ export interface AttentionItem {
 	status: 'overdue' | 'soon';
 	dueAt: number;
 	href: 'reminders' | 'insurance';
+	action?: { label: string; href: string };
 }
 
 export function attentionItems(

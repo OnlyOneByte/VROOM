@@ -24,9 +24,18 @@
 		isLoading?: boolean;
 		error?: string | null;
 		level?: 2 | 3 | 4;
+		referenceLines?: Array<{ value: number; label: string }>;
 	}
 
-	let { data, fuelType, unitPreferences, isLoading = false, error = null, level }: Props = $props();
+	let {
+		data,
+		fuelType,
+		unitPreferences,
+		isLoading = false,
+		error = null,
+		level,
+		referenceLines = []
+	}: Props = $props();
 
 	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
 
@@ -71,4 +80,5 @@
 	tooltipLabelFormat={formatDayLabel}
 	{emptyTitle}
 	{emptyDescription}
+	{referenceLines}
 />

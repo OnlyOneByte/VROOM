@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { EXPENSE_CATEGORIES } from '#lib/constants/expense-categories.ts';
 import { THEME_REGISTRY } from '#lib/theme/theme-registry.ts';
-import { COST_BUCKETS, COST_BUCKET_COLOR_TOKENS, costBucket } from '../cost-bucket';
+import { COST_BUCKETS, COST_BUCKET_COLOR_TOKENS, bucketAmounts, costBucket } from '../cost-bucket';
 
 describe('costBucket', () => {
 	test.each([...EXPENSE_CATEGORIES])('%s has a bucket', category => {
@@ -39,5 +39,26 @@ describe('cost bucket colours', () => {
 				}
 			}
 		}
+	});
+});
+
+describe('bucketAmounts', () => {
+	test('the split groups categories into ownership, fuel and charging, and upkeep', () => {
+		expect(
+			bucketAmounts([
+				{ category: 'financial', amount: 300, count: 1 },
+				{ category: 'fuel', amount: 45, count: 1 },
+				{ category: 'maintenance', amount: 20, count: 1 },
+				{ category: 'misc', amount: 5, count: 1 }
+			])
+		).toEqual({ ownership: 300, energy: 45, upkeep: 25 });
+	});
+
+	test('skips a category it does not know', () => {
+		expect(bucketAmounts([{ category: 'tolls', amount: 9, count: 1 }])).toEqual({
+			ownership: 0,
+			energy: 0,
+			upkeep: 0
+		});
 	});
 });

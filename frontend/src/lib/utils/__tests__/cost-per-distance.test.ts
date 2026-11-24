@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { bucketAmounts, costPerDistance, distanceDriven } from '../cost-per-distance.ts';
+import { costPerDistance, distanceDriven } from '../cost-per-distance.ts';
 
 describe('costPerDistance', () => {
 	test('splits the all-in cost per distance into running and ownership parts', () => {
@@ -16,19 +16,6 @@ describe('costPerDistance', () => {
 
 	test.each([null, 0, -5, Number.NaN])('has nothing to show for a distance of %s', distance => {
 		expect(costPerDistance({ runningTotal: 100, ownershipTotal: 50 }, distance)).toBeNull();
-	});
-});
-
-describe('bucketAmounts', () => {
-	test('adds each category into the shared cost buckets', () => {
-		expect(
-			bucketAmounts([
-				{ category: 'financial', amount: 1000, count: 4 },
-				{ category: 'fuel', amount: 300, count: 9 },
-				{ category: 'maintenance', amount: 120, count: 2 },
-				{ category: 'regulatory', amount: 80, count: 1 }
-			])
-		).toEqual({ ownership: 1000, energy: 300, upkeep: 200 });
 	});
 });
 

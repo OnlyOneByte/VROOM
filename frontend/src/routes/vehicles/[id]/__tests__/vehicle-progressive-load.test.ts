@@ -27,6 +27,11 @@ vi.mock('#lib/components/vehicles/FuelEfficiencyStatsCard.svelte', () => ({ defa
 
 const never = <T>() => new Promise<T>(() => {});
 
+vi.mock('#lib/services/reminder-api.ts', () => ({ reminderApi: { list: () => never() } }));
+vi.mock('#lib/services/insurance-api.ts', () => ({
+	insuranceApi: { getPoliciesForVehicle: () => never() }
+}));
+
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		getExpensesByVehicle: () => never(),

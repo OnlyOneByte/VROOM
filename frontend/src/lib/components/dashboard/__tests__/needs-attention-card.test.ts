@@ -45,4 +45,29 @@ describe('NeedsAttentionCard', () => {
 		const { container } = render(NeedsAttentionCard, { props: { items: [] } });
 		expect(container.textContent?.trim()).toBe('');
 	});
+
+	test('can carry its own title and a "Log it" action on a row', () => {
+		render(NeedsAttentionCard, {
+			props: {
+				title: 'Next up',
+				items: [
+					{
+						id: 'r',
+						title: 'Oil change',
+						detail: 'Was due Nov 20',
+						status: 'overdue',
+						dueAt: 1,
+						href: 'reminders',
+						action: { label: 'Log it', href: '/expenses/new?vehicleId=v1' }
+					}
+				]
+			}
+		});
+
+		expect(screen.getByRole('heading', { name: 'Next up' })).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Log it: Oil change' })).toHaveAttribute(
+			'href',
+			'/expenses/new?vehicleId=v1'
+		);
+	});
 });
