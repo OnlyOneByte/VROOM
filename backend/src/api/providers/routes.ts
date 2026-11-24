@@ -8,6 +8,7 @@ import { countNum } from '../../db/dialect';
 import { photoRefs, photos, type UserProvider, userProviders } from '../../db/schema';
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
+import { authorize, ownAccount } from '../../permissions/authorize';
 import type { CategorySetting, PhotoCategory, StorageConfig } from '../../types';
 import { DEFAULT_STORAGE_CONFIG, PHOTO_CATEGORIES } from '../../types';
 import { decrypt, encrypt, secretContextOf } from '../../utils/encryption';
@@ -104,7 +105,7 @@ function formatProviderResponse(row: UserProvider) {
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
-routes.get('/pending/:nonce', async (c) => {
+routes.get('/pending/:nonce', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const nonce = c.req.param('nonce');
 
@@ -169,7 +170,7 @@ function defaultCategorySettings(
   ) as Record<PhotoCategory, CategorySetting>;
 }
 
-routes.get('/catalog', (c) =>
+routes.get('/catalog', authorize(ownAccount), (c) =>
   c.json({
     success: true,
     data: [
@@ -183,7 +184,7 @@ routes.get('/catalog', (c) =>
   })
 );
 
-routes.get('/', async (c) => {
+routes.get('/', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const domain = c.req.query('domain');
 
@@ -258,7 +259,7 @@ function assertOwnerMayReach(
   }
 }
 
-routes.post('/', zValidator('json', createProviderSchema), async (c) => {
+routes.post('/', zValidator('json', createProviderSchema), authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const body = c.req.valid('json');
 
@@ -362,6 +363,7 @@ routes.put(
   '/:id',
   zValidator('param', commonSchemas.idParam),
   zValidator('json', updateProviderSchema),
+  authorize(ownAccount),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -493,6 +495,7 @@ routes.delete(
   '/:id',
   zValidator('param', commonSchemas.idParam),
   zValidator('query', deleteProviderQuerySchema),
+  authorize(ownAccount),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -539,6 +542,7 @@ routes.post(
   '/:id/test',
   providerTestLimiter,
   zValidator('param', commonSchemas.idParam),
+  authorize(ownAccount),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -565,103 +569,113 @@ routes.post(
   }
 );
 
-routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
+routes.post(
+  '/:id/backfill',
+  zValidator('param', commonSchemas.idParam),
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
 
-  const db = getDb();
+    const db = getDb();
 
-  await findOwnedProviderOrThrow(db, id, user.id);
-  await photoRefRepository.resetFailedForProvider(id);
+    await findOwnedProviderOrThrow(db, id, user.id);
+    await photoRefRepository.resetFailedForProvider(id);
 
-  const prefs = await preferencesRepository.getOrCreate(user.id);
-  const storageConfig = prefs.storageConfig as StorageConfig | null;
-  const providerCategories = storageConfig?.providerCategories?.[id];
-  if (!providerCategories) {
-    return c.json({ success: true, data: { created: 0 } });
-  }
+    const prefs = await preferencesRepository.getOrCreate(user.id);
+    const storageConfig = prefs.storageConfig as StorageConfig | null;
+    const providerCategories = storageConfig?.providerCategories?.[id];
+    if (!providerCategories) {
+      return c.json({ success: true, data: { created: 0 } });
+    }
 
-  let created = 0;
-  // bun:sqlite transactions must be synchronous.
-  db.transaction((tx) => {
-    for (const [category, setting] of Object.entries(providerCategories)) {
-      if (!setting?.enabled || !isPhotoCategory(category)) continue;
-      const entityTypes = CATEGORY_TO_ENTITY_TYPES[category];
+    let created = 0;
+    // bun:sqlite transactions must be synchronous.
+    db.transaction((tx) => {
+      for (const [category, setting] of Object.entries(providerCategories)) {
+        if (!setting?.enabled || !isPhotoCategory(category)) continue;
+        const entityTypes = CATEGORY_TO_ENTITY_TYPES[category];
 
-      for (const entityType of entityTypes) {
-        const notExistsClause = notExists(
-          tx
-            .select({ one: sql`1` })
-            .from(photoRefs)
-            .where(and(eq(photoRefs.photoId, photos.id), eq(photoRefs.providerId, id)))
-        );
+        for (const entityType of entityTypes) {
+          const notExistsClause = notExists(
+            tx
+              .select({ one: sql`1` })
+              .from(photoRefs)
+              .where(and(eq(photoRefs.photoId, photos.id), eq(photoRefs.providerId, id)))
+          );
 
-        const missingPhotos = tx
-          .select({ id: photos.id })
-          .from(photos)
-          .where(
-            and(eq(photos.entityType, entityType), eq(photos.userId, user.id), notExistsClause)
-          )
-          .all();
+          const missingPhotos = tx
+            .select({ id: photos.id })
+            .from(photos)
+            .where(
+              and(eq(photos.entityType, entityType), eq(photos.userId, user.id), notExistsClause)
+            )
+            .all();
 
-        for (const photo of missingPhotos) {
-          tx.insert(photoRefs)
-            .values({
-              photoId: photo.id,
-              providerId: id,
-              storageRef: '',
-              status: 'pending',
-            })
-            .run();
-          created++;
+          for (const photo of missingPhotos) {
+            tx.insert(photoRefs)
+              .values({
+                photoId: photo.id,
+                providerId: id,
+                storageRef: '',
+                status: 'pending',
+              })
+              .run();
+            created++;
+          }
         }
       }
+    });
+
+    return c.json({ success: true, data: { created } });
+  }
+);
+
+routes.get(
+  '/:id/sync-status',
+  zValidator('param', commonSchemas.idParam),
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+
+    const db = getDb();
+
+    await findOwnedProviderOrThrow(db, id, user.id);
+
+    const result = Object.fromEntries(
+      PHOTO_CATEGORIES.map((category) => [category, { total: 0, synced: 0, failed: 0 }])
+    ) as Record<PhotoCategory, { total: number; synced: number; failed: number }>;
+
+    const photoTotals = await db
+      .select({ entityType: photos.entityType, count: countNum() })
+      .from(photos)
+      .where(eq(photos.userId, user.id))
+      .groupBy(photos.entityType);
+    for (const row of photoTotals) {
+      const category = ENTITY_TO_CATEGORY[row.entityType];
+      if (category) result[category].total += row.count;
     }
-  });
 
-  return c.json({ success: true, data: { created } });
-});
+    const refCounts = await db
+      .select({
+        entityType: photos.entityType,
+        status: photoRefs.status,
+        count: countNum(),
+      })
+      .from(photoRefs)
+      .innerJoin(photos, eq(photoRefs.photoId, photos.id))
+      .where(and(eq(photoRefs.providerId, id), inArray(photoRefs.status, ['active', 'failed'])))
+      .groupBy(photos.entityType, photoRefs.status);
+    for (const row of refCounts) {
+      const category = ENTITY_TO_CATEGORY[row.entityType];
+      if (!category) continue;
+      if (row.status === 'active') result[category].synced += row.count;
+      else result[category].failed += row.count;
+    }
 
-routes.get('/:id/sync-status', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
-
-  const db = getDb();
-
-  await findOwnedProviderOrThrow(db, id, user.id);
-
-  const result = Object.fromEntries(
-    PHOTO_CATEGORIES.map((category) => [category, { total: 0, synced: 0, failed: 0 }])
-  ) as Record<PhotoCategory, { total: number; synced: number; failed: number }>;
-
-  const photoTotals = await db
-    .select({ entityType: photos.entityType, count: countNum() })
-    .from(photos)
-    .where(eq(photos.userId, user.id))
-    .groupBy(photos.entityType);
-  for (const row of photoTotals) {
-    const category = ENTITY_TO_CATEGORY[row.entityType];
-    if (category) result[category].total += row.count;
+    return c.json({ success: true, data: result });
   }
-
-  const refCounts = await db
-    .select({
-      entityType: photos.entityType,
-      status: photoRefs.status,
-      count: countNum(),
-    })
-    .from(photoRefs)
-    .innerJoin(photos, eq(photoRefs.photoId, photos.id))
-    .where(and(eq(photoRefs.providerId, id), inArray(photoRefs.status, ['active', 'failed'])))
-    .groupBy(photos.entityType, photoRefs.status);
-  for (const row of refCounts) {
-    const category = ENTITY_TO_CATEGORY[row.entityType];
-    if (!category) continue;
-    if (row.status === 'active') result[category].synced += row.count;
-    else result[category].failed += row.count;
-  }
-
-  return c.json({ success: true, data: result });
-});
+);
 
 export { routes };

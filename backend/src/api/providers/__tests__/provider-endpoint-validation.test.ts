@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { Readable } from 'node:stream';
 import { CONFIG } from '../../../config';
+import { getDb } from '../../../db/connection';
 import type { UserProvider } from '../../../db/schema';
 import { ValidationError } from '../../../errors';
-import { builtInRoleId } from '../../../permissions/grants';
+import { assignServerRole, builtInRoleId } from '../../../permissions/grants';
 import {
   createTestApp,
   type DataEnvelope,
@@ -573,6 +574,7 @@ describe('with ADMIN_EMAILS set, only admins reach private targets', () => {
       `${memberId}@example.com`,
       'Member',
     ]);
+    assignServerRole(getDb(), memberId, 'member');
     member = await requestAs(ctx, memberId);
   });
   afterEach(() => {

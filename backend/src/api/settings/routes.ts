@@ -12,6 +12,7 @@ import {
 } from '../../db/schema';
 import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import { authorize, ownAccount } from '../../permissions/authorize';
 import SHARED_CURRENCIES from '../../shared-currencies.json';
 import type { BackupConfig, DefaultProviderCapability, StorageConfig } from '../../types';
 import { readJsonBody } from '../../utils/request-body';
@@ -207,7 +208,7 @@ const updateSettingsSchema = baseSettingsSchema
   })
   .partial();
 
-routes.get('/', async (c) => {
+routes.get('/', authorize(ownAccount), async (c) => {
   const user = c.get('user');
 
   const prefs = await preferencesRepository.getOrCreate(user.id);
@@ -218,7 +219,7 @@ routes.get('/', async (c) => {
   });
 });
 
-routes.put('/', async (c) => {
+routes.put('/', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const body = await readJsonBody(c);
   const updates = updateSettingsSchema.parse(body);
