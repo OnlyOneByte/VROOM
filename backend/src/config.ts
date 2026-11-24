@@ -70,6 +70,10 @@ const envSchema = z.object({
         .map((ip) => ip.trim())
         .filter(Boolean)
     ),
+  TRUSTED_CLIENT_IP_HEADER: z
+    .string()
+    .optional()
+    .transform((val) => val?.trim().toLowerCase() || undefined),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   ALLOW_FAKE_STORAGE: z
     .string()
@@ -228,6 +232,8 @@ export const CONFIG = {
   rateLimit: {
     cleanupInterval: 60_000,
     trustedProxyIps: env.TRUSTED_PROXY_IPS,
+    trustedClientIpHeader: env.TRUSTED_CLIENT_IP_HEADER,
+    maxTrackedKeys: 100_000,
     global: { windowMs: 15 * 60 * 1000, limit: 1000, message: 'Too many requests' },
     auth: { windowMs: 15 * 60 * 1000, limit: 30 },
     calendar: { windowMs: 15 * 60 * 1000, limit: 120, message: 'Too many calendar requests' },

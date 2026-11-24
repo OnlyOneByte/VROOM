@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { CONFIG } from '../../../config';
 import { db } from '../../../db/connection';
 import { sessions, users } from '../../../db/schema';
-import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, json, socketFrom, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 import { DEMO_USER_ID, prepareDemoGarage } from '../demo';
 import { lucia } from '../lucia';
@@ -13,10 +13,11 @@ let ctx: TestApp;
 let visitor = 0;
 
 async function startDemo(ip = `198.51.100.${++visitor}`): Promise<Response> {
-  return await ctx.app.request('/api/v1/auth/demo', {
-    method: 'POST',
-    headers: { 'Sec-Fetch-Site': 'same-origin', 'X-Forwarded-For': ip },
-  });
+  return await ctx.app.request(
+    '/api/v1/auth/demo',
+    { method: 'POST', headers: { 'Sec-Fetch-Site': 'same-origin' } },
+    socketFrom(ip)
+  );
 }
 
 async function send(
@@ -165,6 +166,33 @@ describe('demo garage, on', () => {
     }
     expect(statuses.slice(0, -1).every((s) => s === 200)).toBe(true);
     expect(statuses.at(-1)).toBe(429);
+  });
+
+  test('behind a trusted proxy, a new forged X-Forwarded-For each time does not reset the limit', async () => {
+    const limits = CONFIG.rateLimit as { trustedProxyIps: readonly string[] };
+    const previous = limits.trustedProxyIps;
+    limits.trustedProxyIps = ['172.16.0.0/12'];
+    try {
+      const statuses: number[] = [];
+      for (let i = 0; i <= CONFIG.rateLimit.auth.limit; i++) {
+        const res = await ctx.app.request(
+          '/api/v1/auth/demo',
+          {
+            method: 'POST',
+            headers: {
+              'Sec-Fetch-Site': 'same-origin',
+              'X-Forwarded-For': `10.9.${i}.1, 203.0.113.44`,
+            },
+          },
+          socketFrom('172.18.0.2')
+        );
+        statuses.push(res.status);
+      }
+      expect(statuses.slice(0, -1).every((s) => s === 200)).toBe(true);
+      expect(statuses.at(-1)).toBe(429);
+    } finally {
+      limits.trustedProxyIps = previous;
+    }
   });
 
   test('a restart rebuilds the garage and ends every demo session', async () => {

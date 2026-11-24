@@ -7,6 +7,7 @@ import { prepareDemoGarage } from './api/auth/demo';
 import { discoverOidc } from './api/auth/providers/oidc';
 import { CONFIG } from './config';
 import { checkpointWAL, forceCheckpointWAL, runMigrations } from './db/connection';
+import { validateTrustedProxies } from './utils/client-ip';
 import { extractErrorMessage } from './utils/error-handling';
 import { logger } from './utils/logger';
 
@@ -27,6 +28,13 @@ try {
       'Use 0.0.0.0 (every interface, what a container needs), 127.0.0.1 (loopback only), or an ' +
       'address this host actually owns.'
   );
+  process.exit(1);
+}
+
+try {
+  validateTrustedProxies();
+} catch (error) {
+  logger.error(extractErrorMessage(error));
   process.exit(1);
 }
 

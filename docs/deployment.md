@@ -97,7 +97,8 @@ These have defaults, but the defaults only suit localhost.
 | `DATABASE_URL` | `./data/vroom.db` | SQLite file. Both Dockerfiles and example stacks set `/app/data/vroom.db` |
 | `DATA_PATH` | `./data` | Host directory bind-mounted at `/app/data` by `docker-compose.yml`. Must exist |
 | `LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug` |
-| `TRUSTED_PROXY_IPS` | empty | Comma-separated proxy IPs whose `X-Forwarded-For` is honored. Left unset behind a reverse proxy, every anonymous request shares one rate-limit bucket keyed on the proxy's IP |
+| `TRUSTED_PROXY_IPS` | empty | Comma-separated proxy IPs or CIDR ranges whose `X-Forwarded-For` is honored. It is read from the right: the nearest address that is not a trusted proxy is the client, so an entry a client added itself is ignored. Left unset behind a reverse proxy, every anonymous request shares one rate-limit bucket keyed on the proxy's IP. An invalid entry stops the backend at startup |
+| `TRUSTED_CLIENT_IP_HEADER` | empty | A header a trusted proxy sets to the client IP, such as `CF-Connecting-IP`. Read only when the request comes from a `TRUSTED_PROXY_IPS` address, and before `X-Forwarded-For` |
 | `BLOCK_PRIVATE_PROVIDER_ENDPOINTS` | off | Set to `1` to require public `https://` hosts for S3 endpoints and model base URLs. Off, `http://` and LAN or loopback hosts are allowed, so a self-hosted MinIO or Ollama works. Cloud metadata and link-local addresses are refused either way. Any signed-in user can point a provider at the server's own network while it is off, so turn it on for an instance other people can sign up to |
 | `DEMO_MODE` | off | Set to `1` to offer a read-only demo garage from the landing page. Anyone who can reach the instance can open it without signing in, for an hour at a time. It is a separate account the server rebuilds with sample data on every start, so it never holds or sees anyone else's data; every change is refused with 403, and provider, backup, share, export and assistant endpoints are closed to it. Turning it off removes the demo account on the next start |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | — | Set both to add a GitHub login button. Callback defaults to `http://localhost:3001/api/v1/auth/callback/github`; override with `GITHUB_REDIRECT_URI`. Register the OAuth app's callback URL as `https://yourdomain.com/api/v1/auth/callback`: GitHub accepts any redirect under it, so login and account linking both work |
@@ -218,7 +219,16 @@ Do not route `/auth` to the backend: it is the frontend sign-in page. OAuth prov
 `/api/v1/auth/callback/*`, which the `/api/*` rule already sends to the backend.
 
 Set `CORS_ORIGINS` and `FRONTEND_URL` to the public origin, leave `PUBLIC_API_URL` empty, and
-set `TRUSTED_PROXY_IPS` to the proxy's address so rate limiting keys on the real client IP.
+set `TRUSTED_PROXY_IPS` to the proxy's address so rate limiting keys on the real client IP:
+
+| In front of the backend | `TRUSTED_PROXY_IPS` | `TRUSTED_CLIENT_IP_HEADER` |
+|---|---|---|
+| Caddy or nginx on the same host | `127.0.0.1` | — |
+| Cloudflare Tunnel (`cloudflared` in the stack) | the stack network, e.g. `172.16.0.0/12` | `CF-Connecting-IP` |
+| Cloudflare proxy → Caddy or nginx | `127.0.0.1` | `CF-Connecting-IP` (Caddy and nginx pass it through unchanged) |
+
+Behind a Cloudflare-proxied host, firewall ports 80 and 443 to Cloudflare's published ranges, or
+a client can reach the proxy directly and set `CF-Connecting-IP` itself.
 
 Upstreams below use `127.0.0.1` rather than `localhost`: the backend binds one loopback
 address (`HOST`, `127.0.0.1` by default), while `localhost` resolves to both families and
