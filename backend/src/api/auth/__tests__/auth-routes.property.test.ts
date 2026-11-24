@@ -86,7 +86,7 @@ describe('Auth routes structural properties', () => {
         const linkInitLine = routesSource.lastIndexOf('routes.get(', linkInitIdx);
         const linkInitDef = routesSource.slice(
           linkInitLine,
-          routesSource.indexOf('\n', linkInitIdx)
+          routesSource.indexOf('async (c)', linkInitIdx)
         );
         expect(linkInitDef).toContain('authRateLimiter');
       }),

@@ -12,6 +12,7 @@ import {
   rateLimiter,
   requireAuth,
 } from '../../middleware';
+import { authorize, ownAccount } from '../../permissions/authorize';
 import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { readJsonBody } from '../../utils/request-body';
 import { OPERATION_TIMEOUTS, withDeadline, withTimeout } from '../../utils/timeout';
@@ -69,45 +70,52 @@ function validateSyncTypes(syncTypes: unknown): string[] {
   return syncTypes as string[];
 }
 
-routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) => {
-  const user = c.get('user');
-  const userId = user.id;
+routes.post(
+  '/',
+  syncRateLimiter,
+  idempotency({ required: false }),
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const userId = user.id;
 
-  // null parses as valid JSON, so the parsed body can be null and must be optional-chained.
-  const body = await readJsonBody<{ syncTypes?: unknown; force?: unknown } | null>(c);
-  validateSyncTypes(body?.syncTypes);
-  const force = body?.force === true;
+    // null parses as valid JSON, so the parsed body can be null and must be optional-chained.
+    const body = await readJsonBody<{ syncTypes?: unknown; force?: unknown } | null>(c);
+    validateSyncTypes(body?.syncTypes);
+    const force = body?.force === true;
 
-  const result = await backupOrchestrator.execute(userId, user.displayName, force);
+    const result = await backupOrchestrator.execute(userId, user.displayName, force);
 
-  if (result.status === 'in_progress') {
-    return c.json(
-      createErrorResponse('BACKUP_IN_PROGRESS', 'A backup is already in progress'),
-      409
-    );
+    if (result.status === 'in_progress') {
+      return c.json(
+        createErrorResponse('BACKUP_IN_PROGRESS', 'A backup is already in progress'),
+        409
+      );
+    }
+
+    if (result.outcome === 'failed') {
+      return c.json(
+        createErrorResponse('BACKUP_FAILED', 'All backup providers failed', {
+          failedProviders: result.failedProviders,
+          results: result.results,
+        }),
+        502
+      );
+    }
+
+    const message =
+      result.outcome === 'partial'
+        ? `Backup partially failed (${result.failedProviders.join(', ')})`
+        : 'Sync completed';
+    return c.json(createSuccessResponse(result, message), result.outcome === 'partial' ? 207 : 200);
   }
-
-  if (result.outcome === 'failed') {
-    return c.json(
-      createErrorResponse('BACKUP_FAILED', 'All backup providers failed', {
-        failedProviders: result.failedProviders,
-        results: result.results,
-      }),
-      502
-    );
-  }
-
-  const message =
-    result.outcome === 'partial'
-      ? `Backup partially failed (${result.failedProviders.join(', ')})`
-      : 'Sync completed';
-  return c.json(createSuccessResponse(result, message), result.outcome === 'partial' ? 207 : 200);
-});
+);
 
 routes.post(
   '/sheets/:providerId/resume',
   syncRateLimiter,
   zValidator('param', z.object({ providerId: z.string().min(1).max(64) })),
+  authorize(ownAccount),
   async (c) => {
     const userId = c.get('user').id;
     const { providerId } = c.req.valid('param');
@@ -122,7 +130,7 @@ routes.post(
   }
 );
 
-routes.get('/status', async (c) => {
+routes.get('/status', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const settings = await preferencesRepository.getOrCreate(user.id);
   const syncStatus = activityTracker.getSyncStatus(user.id);
@@ -150,7 +158,7 @@ routes.get('/status', async (c) => {
   );
 });
 
-routes.get('/backups/providers', async (c) => {
+routes.get('/backups/providers', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const providerId = c.req.query('providerId');
 
@@ -163,7 +171,7 @@ routes.get('/backups/providers', async (c) => {
   return c.json(createSuccessResponse(allBackups));
 });
 
-routes.get('/backups/download', backupRateLimiter, async (c) => {
+routes.get('/backups/download', backupRateLimiter, authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const zipBuffer = await withTimeout(
     backupService.exportAsZip(user.id),
@@ -185,6 +193,7 @@ routes.post(
   restoreRateLimiter,
   heavyJobLimiter,
   idempotency({ required: true }),
+  authorize(ownAccount),
   async (c) => {
     const user = c.get('user');
     const body = restoreFromProviderSchema.parse(await readJsonBody(c));
@@ -237,6 +246,7 @@ routes.post(
   heavyJobLimiter,
   bodyLimit({ maxSize: CONFIG.backup.maxFileSize }),
   idempotency({ required: true }),
+  authorize(ownAccount),
   async (c) => {
     const user = c.get('user');
     const formData = await c.req.formData().catch(() => {
@@ -285,7 +295,7 @@ export interface RestoreProviderInfo {
   sourceTypes: ('zip' | 'sheets')[];
 }
 
-routes.get('/restore/providers', syncRateLimiter, async (c) => {
+routes.get('/restore/providers', syncRateLimiter, authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const db = getDb();
   const providers = await db
