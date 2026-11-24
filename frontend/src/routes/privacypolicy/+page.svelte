@@ -18,7 +18,7 @@
 		</a>
 
 		<h1 class="text-4xl font-bold text-foreground mb-2">Privacy Policy</h1>
-		<p class="text-muted-foreground mb-10">Last updated: March 2026</p>
+		<p class="text-muted-foreground mb-10">Last updated: November 2026</p>
 
 		<div class="space-y-8 text-foreground leading-relaxed">
 			<section class="space-y-3">
@@ -103,6 +103,22 @@
 				<p>
 					Data synced to your Google Drive remains in your Drive even if your account on this
 					instance is deleted. You can manage or delete that data directly from Google Drive.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h2 class="text-xl font-semibold text-foreground">Community Comparisons (Optional)</h2>
+				<p>
+					If this server has community comparisons turned on and you switch on "Include my vehicles
+					in community stats" in Settings, anonymous totals built from your vehicles are shown to
+					other people on the same server who have also opted in. A total covers a group of at least
+					10 people and is never your own numbers. Only make, model and model year, powertrain,
+					vehicle age, your region if you set one, and your fuel, maintenance and insurance costs
+					from the last 12 months are used.
+				</p>
+				<p>
+					Nothing leaves the server. The setting is off by default, a restored backup always turns
+					it off, and if you turn it off you are left out from the next daily refresh.
 				</p>
 			</section>
 

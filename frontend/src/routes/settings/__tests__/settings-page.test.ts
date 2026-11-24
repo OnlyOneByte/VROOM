@@ -686,3 +686,31 @@ describe('Settings page backups', () => {
 		);
 	});
 });
+
+describe('Settings page community comparisons card', () => {
+	test('shows the card when the server mode is local or not reported', async () => {
+		loadsWith(makeSettings({ communityStatsMode: 'local' }));
+		await mount();
+		expect(screen.getByText('Community comparisons')).toBeInTheDocument();
+		cleanup();
+		loadsWith(makeSettings());
+		await mount();
+		expect(screen.getByText('Community comparisons')).toBeInTheDocument();
+	});
+
+	test('hides the card when the server has community stats turned off', async () => {
+		loadsWith(makeSettings({ communityStatsMode: 'off', communityStatsOptIn: true }));
+		await mount();
+		expect(screen.queryByText('Community comparisons')).toBeNull();
+	});
+
+	test('turning it on saves through the settings store and confirms', async () => {
+		await mount();
+		await fireEvent.click(
+			screen.getByRole('switch', { name: 'Include my vehicles in community stats' })
+		);
+		await settle();
+		expect(settingsStoreFake.update).toHaveBeenCalledWith({ communityStatsOptIn: true });
+		expect(showSuccess).toHaveBeenCalledWith('Community stats turned on');
+	});
+});
