@@ -47,6 +47,14 @@
 		AlertDialogTitle
 	} from '#lib/components/ui/alert-dialog/index.ts';
 	import FinancingFormSection from './FinancingFormSection.svelte';
+	import CatalogCombobox from './CatalogCombobox.svelte';
+	import {
+		loadVehicleCatalog,
+		makeSuggestions,
+		modelSuggestions,
+		textStillNames,
+		type VehicleCatalog
+	} from '#lib/utils/vehicle-catalog.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { getLongFormLabel } from '#lib/utils/units.ts';
 	import {
@@ -164,6 +172,36 @@
 		purchaseDate: ''
 	});
 
+	let catalog = $state<VehicleCatalog | null>(null);
+	let catalogModelId = $state<string | null>(null);
+	let catalogAnchor = { make: '', model: '' };
+
+	let makeOptions = $derived(catalog ? makeSuggestions(catalog, vehicleForm.make) : []);
+	let modelOptions = $derived(
+		catalog ? modelSuggestions(catalog, vehicleForm.make, vehicleForm.model) : []
+	);
+
+	function ensureCatalog() {
+		if (catalog) return;
+		loadVehicleCatalog()
+			.then(loaded => (catalog = loaded))
+			.catch(() => undefined);
+	}
+
+	function setCatalogModel(id: string | null) {
+		catalogModelId = id;
+		catalogAnchor = { make: vehicleForm.make, model: vehicleForm.model };
+	}
+
+	$effect(() => {
+		const { make, model } = vehicleForm;
+		if (!catalogModelId) return;
+		if (make === catalogAnchor.make && model === catalogAnchor.model) return;
+		if (!untrack(() => catalog && textStillNames(catalog, catalogModelId!, make, model))) {
+			catalogModelId = null;
+		}
+	});
+
 	let headerDescription = $derived(
 		!isEditMode
 			? 'Enter your vehicle information and optional financing details'
@@ -257,6 +295,7 @@
 			purchasePrice: vehicle.purchasePrice,
 			purchaseDate: vehicle.purchaseDate ? toDateInputValue(vehicle.purchaseDate) : ''
 		};
+		setCatalogModel(vehicle.catalogModelId ?? null);
 
 		trackFuel = vehicle.trackFuel;
 		trackCharging = vehicle.trackCharging;
@@ -464,6 +503,7 @@
 				model: vehicleForm.model,
 				year: vehicleForm.year,
 				vehicleType: vehicleForm.vehicleType,
+				catalogModelId,
 				trackFuel,
 				trackCharging,
 				unitPreferences: {
@@ -703,37 +743,28 @@
 					</CardHeader>
 					<CardContent>
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-							<div class="space-y-2">
-								<Label for="make">Make *</Label>
-								<Input
-									id="make"
-									type="text"
-									placeholder="e.g., Toyota, Honda, Ford"
-									bind:value={vehicleForm.make}
-									aria-invalid={!!errors['make']}
-									aria-describedby={errors['make'] ? 'make-error' : undefined}
-									required
-								/>
-								{#if errors['make']}
-									<FormFieldError id="make-error">{errors['make']}</FormFieldError>
-								{/if}
-							</div>
+							<CatalogCombobox
+								id="make"
+								label="Make *"
+								placeholder="e.g., Toyota, Honda, Ford"
+								bind:value={vehicleForm.make}
+								suggestions={makeOptions}
+								listLabel="Make suggestions"
+								error={errors['make']}
+								onFocus={ensureCatalog}
+							/>
 
-							<div class="space-y-2">
-								<Label for="model">Model *</Label>
-								<Input
-									id="model"
-									type="text"
-									placeholder="e.g., Camry, Civic, F-150"
-									bind:value={vehicleForm.model}
-									aria-invalid={!!errors['model']}
-									aria-describedby={errors['model'] ? 'model-error' : undefined}
-									required
-								/>
-								{#if errors['model']}
-									<FormFieldError id="model-error">{errors['model']}</FormFieldError>
-								{/if}
-							</div>
+							<CatalogCombobox
+								id="model"
+								label="Model *"
+								placeholder="e.g., Camry, Civic, F-150"
+								bind:value={vehicleForm.model}
+								suggestions={modelOptions}
+								listLabel="Model suggestions"
+								error={errors['model']}
+								onFocus={ensureCatalog}
+								onPick={entry => setCatalogModel(entry.id)}
+							/>
 
 							<div class="space-y-2">
 								<Label for="year">Year *</Label>
