@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getDb } from '../../db/connection';
 import {
   roleAssignments,
+  rolePermissions,
   users,
   type VehicleShare,
   vehicleShares,
@@ -104,15 +105,32 @@ function vehicleOwnerId(vehicleId: string): string | null {
   return row?.userId ?? null;
 }
 
-function refuseUnheldLevel(c: Context, vehicleId: string, level: string): void {
+function holdsOn(c: Context, vehicleId: string): (permission: string) => boolean {
   const resolver = requestResolver(c, getDb());
   const vehicle: Resource = { kind: 'vehicle', vehicleId };
-  const granted = ROLE_TEMPLATES.find((template) => template.key === level)?.permissions ?? [];
-  refuseUnheld(granted, (permission) => resolver.can(permission, vehicle).allow);
+  return (permission) => resolver.can(permission, vehicle).allow;
 }
 
-function refuseOverOwner(c: Context, share: VehicleShare, ownerId: string | null): void {
+function refuseUnheldLevel(c: Context, vehicleId: string, level: string): void {
+  const granted = ROLE_TEMPLATES.find((template) => template.key === level)?.permissions ?? [];
+  refuseUnheld(granted, holdsOn(c, vehicleId));
+}
+
+function refuseOverSharee(c: Context, share: VehicleShare, ownerId: string | null): void {
   if (!share.sharedWithId || !ownerId || c.get('user').id === ownerId) return;
+  const held = getDb()
+    .select({ permission: rolePermissions.permission })
+    .from(roleAssignments)
+    .innerJoin(rolePermissions, eq(rolePermissions.roleId, roleAssignments.roleId))
+    .where(
+      and(
+        eq(roleAssignments.userId, share.sharedWithId),
+        eq(roleAssignments.scopeId, share.vehicleId)
+      )
+    )
+    .all()
+    .map((row) => row.permission);
+  refuseUnheld([...new Set(held)], holdsOn(c, share.vehicleId));
   const ownerSet = getDb()
     .select({ id: roleAssignments.id })
     .from(roleAssignments)
@@ -211,7 +229,7 @@ routes.put(
     }
     const ownerId = vehicleOwnerId(share.vehicleId);
     refuseUnheldLevel(c, share.vehicleId, level);
-    refuseOverOwner(c, share, ownerId);
+    refuseOverSharee(c, share, ownerId);
 
     const updated = transitionShare(id, ACTIVE_SHARE_STATUSES, { level }, (tx, _, row) => {
       if (row.status === 'accepted' && row.sharedWithId) {
@@ -238,7 +256,10 @@ routes.delete(
     if (!share) {
       throw new NotFoundError('Share');
     }
-    refuseOverOwner(c, share, vehicleOwnerId(share.vehicleId));
+    if (share.sharedWithId === c.get('user').id) {
+      throw new ForbiddenError('To leave this vehicle, decline the share');
+    }
+    refuseOverSharee(c, share, vehicleOwnerId(share.vehicleId));
 
     transitionShare(id, ANY_STATUS, { status: 'revoked' }, (tx, before) => {
       if (before.status === 'accepted' && before.sharedWithId) {
