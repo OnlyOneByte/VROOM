@@ -16,25 +16,10 @@ import { toIcs } from './ics';
 const routes = new Hono();
 
 const FEED_PATH = '/calendar/feed/';
-const TOKEN_LIKE = /[A-Za-z0-9_-]{40,}/g;
-const TOKEN_CHAR_OR_PERCENT = /^[A-Za-z0-9_%-]$/;
-
-function decodeTokenChars(text: string): string {
-  let previous: string;
-  let current = text;
-  do {
-    previous = current;
-    current = previous.replace(/%([0-9A-Fa-f]{2})/g, (escaped, hex: string) => {
-      const char = String.fromCharCode(Number.parseInt(hex, 16));
-      return TOKEN_CHAR_OR_PERCENT.test(char) ? char : escaped;
-    });
-  } while (current !== previous);
-  return current;
-}
+const TOKEN_LIKE = /[A-Za-z0-9_%-]{40,}/g;
 
 export function redactFeedTokens(text: string): string {
-  const decoded = decodeTokenChars(text);
-  return /calendar/i.test(decoded) ? decoded.replace(TOKEN_LIKE, '[redacted]') : text;
+  return text.replace(TOKEN_LIKE, '[redacted]');
 }
 const TOKEN_FILE = /^([A-Za-z0-9_-]{43})\.ics$/;
 

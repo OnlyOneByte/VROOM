@@ -167,10 +167,13 @@ app.use('/api/*', async (c, next) => {
     return next();
   }
 
-  if (redactFeedTokens(path) !== path) throw new NotFoundError('Calendar feed');
+  if (/calendar|%|[\p{Cc}\s]/iu.test(path)) throw new NotFoundError();
 
   const newPath = path.replace('/api/', '/api/v1/');
-  logger.debug('Redirecting to versioned API', { from: path, to: newPath });
+  logger.debug('Redirecting to versioned API', {
+    from: redactFeedTokens(path),
+    to: redactFeedTokens(newPath),
+  });
   return c.redirect(newPath, 308);
 });
 
