@@ -10,6 +10,7 @@ import { authorize, type ResourceOf } from '../../permissions/authorize';
 import { assignServerRole } from '../../permissions/grants';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { DEMO_USER_ID } from '../auth/demo-account';
+import { attachPendingInvites } from '../shares/repository';
 import { SIGNUP_MODES } from './policy';
 import {
   createInvite,
@@ -60,7 +61,7 @@ function inviteView(invite: typeof serverInvites.$inferSelect, now: Date) {
 
 function pendingUser(id: string) {
   const user = getDb()
-    .select({ id: users.id })
+    .select({ id: users.id, email: users.email })
     .from(users)
     .where(and(eq(users.id, id), isNotNull(users.pendingApprovalAt)))
     .get();
@@ -130,13 +131,14 @@ signupRoutes.post(
   authorize(SERVER),
   zValidator('param', commonSchemas.idParam),
   (c) => {
-    const { id } = pendingUser(c.req.valid('param').id);
+    const { id, email } = pendingUser(c.req.valid('param').id);
     getDb().transaction((tx) => {
       tx.update(users)
         .set({ pendingApprovalAt: null, updatedAt: new Date() })
         .where(eq(users.id, id))
         .run();
       assignServerRole(tx, id, 'member');
+      attachPendingInvites(tx, id, email);
     });
     return c.json({ success: true, data: { id } });
   }

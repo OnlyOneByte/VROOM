@@ -121,8 +121,14 @@ const envSchema = z.object({
         );
       return minGroup;
     }),
-  SIGNUP_MODE: z.enum(['open', 'approval', 'invite', 'closed']).optional(),
-  SIGNUP_ALLOWED_DOMAINS: z.string().optional(),
+  SIGNUP_MODE: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.enum(['open', 'approval', 'invite', 'closed']).optional()
+  ),
+  SIGNUP_ALLOWED_DOMAINS: z
+    .string()
+    .optional()
+    .transform((val) => (val?.trim() ? val : undefined)),
 });
 
 const parseEnv = () => {

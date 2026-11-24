@@ -3,7 +3,7 @@ import { decideSignup, parseDomains, type SignupRequest } from '../policy';
 
 const base: SignupRequest = {
   email: 'new@example.com',
-  firstAccount: false,
+  firstAdmin: false,
   mode: 'open',
   allowedDomains: [],
   serverInvite: false,
@@ -29,8 +29,8 @@ describe('who may create an account', () => {
   test('the first account is admin in every mode, whatever its domain', () => {
     for (const mode of ['open', 'approval', 'invite', 'closed'] as const) {
       expect(
-        decideSignup({ ...base, mode, firstAccount: true, allowedDomains: ['other.org'] })
-      ).toEqual({ allow: true, role: 'admin', via: 'first_account' });
+        decideSignup({ ...base, mode, firstAdmin: true, allowedDomains: ['other.org'] })
+      ).toEqual({ allow: true, role: 'admin', via: 'first_admin' });
     }
   });
 

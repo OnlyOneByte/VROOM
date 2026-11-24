@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { isPublicRule, ROUTE_PERMISSIONS } from '../../../permissions/route-map';
 import {
   createTestApp,
   type DataEnvelope,
@@ -9,11 +10,13 @@ import {
 } from '../../../test-helpers/http-client';
 import { defaultPrivateProviderEndpoints } from '../../../test-helpers/outbound';
 import { seedVehicle } from '../../../test-helpers/seed';
+import { SIGNUP_MODES } from '../policy';
 
 let ctx: TestApp;
 let resolveNewUser: typeof import('../../auth/routes').resolveNewUser;
 let frontend: string;
 let signupConfig: { mode?: string; allowedDomains?: string };
+let adminConfig: { adminEmails: string[] };
 let admin: RequestFn;
 
 let identity = 0;
@@ -39,6 +42,25 @@ function userByEmail(email: string) {
     .get(email) as { id: string; pending: number | null } | null;
 }
 
+const WAITING_MAY_USE = new Set([
+  'GET /api/v1/auth/me',
+  'POST /api/v1/auth/logout',
+  'GET /api/v1/auth/capabilities',
+  'POST /api/v1/auth/refresh',
+  'GET /api/v1/auth/callback/link/:authProvider',
+  'GET /api/v1/auth/callback/provider/google',
+]);
+
+function shareHolder(shareId: string): string | null {
+  return (
+    ctx.sqlite
+      .query('SELECT shared_with_id AS id FROM vehicle_shares WHERE id = ?')
+      .get(shareId) as {
+      id: string | null;
+    }
+  ).id;
+}
+
 function serverRoles(userId: string): string[] {
   return (
     ctx.sqlite
@@ -55,6 +77,7 @@ beforeEach(async () => {
   const { CONFIG } = await import('../../../config');
   frontend = CONFIG.frontend.url;
   signupConfig = CONFIG.signup as typeof signupConfig;
+  adminConfig = CONFIG as typeof adminConfig;
   const { assignServerRole } = await import('../../../permissions/grants');
   const { getDb } = await import('../../../db/connection');
   assignServerRole(getDb(), ctx.user.id, 'admin');
@@ -64,6 +87,7 @@ beforeEach(async () => {
 afterEach(() => {
   signupConfig.mode = undefined;
   signupConfig.allowedDomains = undefined;
+  adminConfig.adminEmails = [];
   ctx.close();
 });
 
@@ -141,6 +165,55 @@ describe('sign-up modes', () => {
       redirect: `${frontend}/auth?auth_error=signup_invite_required`,
     });
   });
+
+  test('with ADMIN_EMAILS set, only a listed email becomes the first admin', async () => {
+    ctx.sqlite.run('DELETE FROM users');
+    ctx.sqlite.run('DELETE FROM server_settings');
+    adminConfig.adminEmails = ['boss@example.com'];
+    expect(await signUp('stranger@example.com')).toEqual({
+      redirect: `${frontend}/auth?auth_error=signup_invite_required`,
+    });
+    expect(userByEmail('stranger@example.com')).toBeNull();
+    const boss = (await signUp('Boss@Example.com')) as { userId: string };
+    expect(serverRoles(boss.userId)).toEqual(['builtin_admin', 'builtin_member']);
+  });
+});
+
+describe('a server with no admin', () => {
+  let ensureServerAdmin: typeof import('../store').ensureServerAdmin;
+  let db: ReturnType<typeof import('../../../db/connection').getDb>;
+
+  beforeEach(async () => {
+    ({ ensureServerAdmin } = await import('../store'));
+    db = (await import('../../../db/connection')).getDb();
+    ctx.sqlite.run('DELETE FROM users');
+    for (const [id, created, disabled, pending] of [
+      ['disabled', 1, 1, null],
+      ['undated', null, null, null],
+      ['waiting', 2, null, 2],
+      ['oldest', 3, null, null],
+      ['newer', 4, null, null],
+    ] as const) {
+      ctx.sqlite.run(
+        'INSERT INTO users (id, email, display_name, created_at, disabled_at, pending_approval_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [id, `${id}@example.com`, id, created, disabled, pending]
+      );
+    }
+  });
+
+  test('gets its oldest active, dated account as admin at startup, once', () => {
+    expect(ensureServerAdmin(db)).toBe('oldest');
+    expect(ensureServerAdmin(db)).toBeNull();
+    expect(serverRoles('oldest')).toEqual(['builtin_admin']);
+  });
+
+  test('with ADMIN_EMAILS set, gets only a listed account as admin', () => {
+    adminConfig.adminEmails = ['newer@example.com', 'disabled@example.com'];
+    expect(ensureServerAdmin(db)).toBe('newer');
+    ctx.sqlite.run('DELETE FROM role_assignments');
+    adminConfig.adminEmails = ['nobody@example.com'];
+    expect(ensureServerAdmin(db)).toBeNull();
+  });
 });
 
 describe('approval', () => {
@@ -150,17 +223,21 @@ describe('approval', () => {
     expect(serverRoles(userId)).toEqual([]);
     const waiting = (await requestAs(ctx, userId)).request;
 
-    for (const [method, path] of [
-      ['GET', '/api/v1/vehicles'],
-      ['POST', '/api/v1/vehicles'],
-      ['GET', '/api/v1/expenses'],
-      ['GET', '/api/v1/settings'],
-      ['GET', '/api/v1/admin/signup'],
-    ] as const) {
-      const res = await waiting(method, path, method === 'POST' ? {} : undefined);
-      expect(res.status, `${method} ${path}`).toBe(403);
-      expect((await json<{ error: { code: string } }>(res)).error.code).toBe('ACCOUNT_PENDING');
+    const reachable: string[] = [];
+    for (const [route, rule] of Object.entries(ROUTE_PERMISSIONS)) {
+      if (isPublicRule(rule) || WAITING_MAY_USE.has(route)) continue;
+      const [method = '', pattern = ''] = route.split(' ');
+      const res = await waiting(
+        method as 'GET',
+        pattern.replace(/:\w+/g, 'x'),
+        method === 'GET' ? undefined : {}
+      );
+      const refused =
+        res.status === 403 &&
+        (await json<{ error?: { code?: string } }>(res)).error?.code === 'ACCOUNT_PENDING';
+      if (!refused) reachable.push(`${route} -> ${res.status}`);
     }
+    expect(reachable).toEqual([]);
     const me = await json<DataEnvelope<{ pendingApproval: boolean }>>(
       await waiting('GET', '/api/v1/auth/me')
     );
@@ -177,14 +254,35 @@ describe('approval', () => {
     expect((await waiting('GET', '/api/v1/vehicles')).status).toBe(200);
   });
 
-  test('rejecting a waiting account deletes it, and only waiting accounts can be rejected', async () => {
+  test('a vehicle-share invite reaches a waiting account only once it is approved', async () => {
     setMode('approval');
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2018 });
+    ctx.sqlite.run(
+      "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, level, status, invited_email) VALUES ('s1', ?, ?, 'viewer', 'pending', 'later@example.com')",
+      [vehicleId, ctx.user.id]
+    );
+    const { userId } = (await signUp('later@example.com')) as { userId: string };
+    expect(shareHolder('s1')).toBeNull();
+    await admin('POST', `/api/v1/admin/pending-accounts/${userId}/approve`);
+    expect(shareHolder('s1')).toBe(userId);
+  });
+
+  test('rejecting a waiting account deletes it and keeps the invites sent to its email', async () => {
+    setMode('approval');
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2018 });
+    ctx.sqlite.run(
+      "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, level, status, invited_email) VALUES ('s1', ?, ?, 'viewer', 'pending', 'nope@example.com')",
+      [vehicleId, ctx.user.id]
+    );
     const { userId } = (await signUp('nope@example.com')) as { userId: string };
     expect((await admin('DELETE', `/api/v1/admin/pending-accounts/${ctx.user.id}`)).status).toBe(
       404
     );
     expect((await admin('DELETE', `/api/v1/admin/pending-accounts/${userId}`)).status).toBe(200);
     expect(userByEmail('nope@example.com')).toBeNull();
+    expect(ctx.sqlite.query("SELECT status FROM vehicle_shares WHERE id = 's1'").get()).toEqual({
+      status: 'pending',
+    });
   });
 });
 
@@ -273,25 +371,21 @@ describe('admin routes', () => {
   });
 });
 
-describe('private provider targets follow the sign-up mode', () => {
+describe('private provider targets', () => {
   defaultPrivateProviderEndpoints();
 
-  test('with two accounts, open and approval block them, invite only and closed allow them', async () => {
+  test('no sign-up mode allows them once a second account exists', async () => {
     const { privateEndpointPolicy } = await import('../../../utils/outbound-url');
+    for (const mode of SIGNUP_MODES) {
+      setMode(mode);
+      expect(privateEndpointPolicy().allowAll, mode).toBe(true);
+    }
     ctx.sqlite.run(
       "INSERT INTO users (id, email, display_name) VALUES ('u2', 'u2@example.com', 'U2')"
     );
-    for (const [mode, allowAll] of [
-      ['open', false],
-      ['approval', false],
-      ['invite', true],
-      ['closed', true],
-    ] as const) {
+    for (const mode of SIGNUP_MODES) {
       setMode(mode);
-      expect(privateEndpointPolicy().allowAll, mode).toBe(allowAll);
+      expect(privateEndpointPolicy().allowAll, mode).toBe(false);
     }
-    ctx.sqlite.run("DELETE FROM users WHERE id = 'u2'");
-    setMode('open');
-    expect(privateEndpointPolicy().allowAll).toBe(true);
   });
 });

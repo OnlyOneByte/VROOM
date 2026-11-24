@@ -22,5 +22,4 @@ CREATE TABLE `server_settings` (
 );
 --> statement-breakpoint
 ALTER TABLE `users` ADD `pending_approval_at` integer;--> statement-breakpoint
-INSERT OR IGNORE INTO `server_settings` (`id`, `signup_mode`, `allowed_email_domains`, `updated_at`) SELECT 1, 'open', '', CAST(strftime('%s', 'now') AS integer) WHERE EXISTS (SELECT 1 FROM `users` WHERE `id` != 'demo-garage');--> statement-breakpoint
-INSERT OR IGNORE INTO `role_assignments` (`id`, `user_id`, `role_id`, `scope_id`, `granted_by`, `created_at`) SELECT lower(hex(randomblob(12))), `id`, 'builtin_admin', NULL, NULL, CAST(strftime('%s', 'now') AS integer) FROM `users` WHERE `id` != 'demo-garage' AND NOT EXISTS (SELECT 1 FROM `role_assignments` WHERE `role_id` = 'builtin_admin' AND `scope_id` IS NULL) AND EXISTS (SELECT 1 FROM `roles` WHERE `id` = 'builtin_admin') ORDER BY `created_at`, `id` LIMIT 1;
+INSERT OR IGNORE INTO `server_settings` (`id`, `signup_mode`, `allowed_email_domains`, `updated_at`) SELECT 1, 'open', '', CAST(strftime('%s', 'now') AS integer) WHERE EXISTS (SELECT 1 FROM `users` WHERE `id` != 'demo-garage');

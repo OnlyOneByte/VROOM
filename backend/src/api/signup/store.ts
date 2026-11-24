@@ -1,9 +1,16 @@
-import { and, desc, eq, gt, isNotNull, isNull, ne } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import { CONFIG } from '../../config';
 import type { AppDatabase } from '../../db/connection';
-import { serverInvites, serverSettings, users, vehicleShares } from '../../db/schema';
+import {
+  roleAssignments,
+  serverInvites,
+  serverSettings,
+  users,
+  vehicleShares,
+} from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
 import { ConflictError, NotFoundError } from '../../errors';
+import { assignServerRole, builtInRoleId } from '../../permissions/grants';
 import { DEMO_USER_ID } from '../auth/demo-account';
 import { isSignupMode, parseDomains, type SignupMode } from './policy';
 
@@ -67,6 +74,45 @@ export function hasRealAccounts(db: Db): boolean {
   return (
     db.select({ id: users.id }).from(users).where(ne(users.id, DEMO_USER_ID)).get() !== undefined
   );
+}
+
+export function hasServerAdmin(db: Db): boolean {
+  return (
+    db
+      .select({ id: roleAssignments.id })
+      .from(roleAssignments)
+      .where(
+        and(eq(roleAssignments.roleId, builtInRoleId('admin')), isNull(roleAssignments.scopeId))
+      )
+      .get() !== undefined
+  );
+}
+
+export function becomesFirstAdmin(db: Db, email: string): boolean {
+  if (hasServerAdmin(db)) return false;
+  const listed = CONFIG.adminEmails;
+  return listed.length > 0 ? listed.includes(email.toLowerCase()) : !hasRealAccounts(db);
+}
+
+export function ensureServerAdmin(db: Db): string | null {
+  if (hasServerAdmin(db)) return null;
+  const listed = CONFIG.adminEmails;
+  const candidate = db
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      and(
+        ne(users.id, DEMO_USER_ID),
+        isNull(users.disabledAt),
+        isNull(users.pendingApprovalAt),
+        listed.length > 0 ? inArray(users.email, listed) : undefined
+      )
+    )
+    .orderBy(sql`${users.createdAt} IS NULL`, users.createdAt, users.id)
+    .get();
+  if (!candidate) return null;
+  assignServerRole(db, candidate.id, 'admin');
+  return candidate.id;
 }
 
 export type InviteStatus = 'active' | 'used' | 'expired' | 'revoked';

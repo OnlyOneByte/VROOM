@@ -7,13 +7,13 @@ export type SignupDecision =
   | {
       allow: true;
       role: 'admin' | 'member' | 'pending';
-      via: 'first_account' | 'mode' | 'server_invite' | 'share_invite';
+      via: 'first_admin' | 'mode' | 'server_invite' | 'share_invite';
     }
   | { allow: false; reason: SignupRefusal };
 
 export interface SignupRequest {
   email: string;
-  firstAccount: boolean;
+  firstAdmin: boolean;
   mode: SignupMode;
   allowedDomains: readonly string[];
   serverInvite: boolean;
@@ -37,7 +37,7 @@ export function emailDomain(email: string): string {
 }
 
 export function decideSignup(request: SignupRequest): SignupDecision {
-  if (request.firstAccount) return { allow: true, role: 'admin', via: 'first_account' };
+  if (request.firstAdmin) return { allow: true, role: 'admin', via: 'first_admin' };
   if (request.mode === 'closed') return { allow: false, reason: 'closed' };
   if (request.serverInvite) return { allow: true, role: 'member', via: 'server_invite' };
   if (

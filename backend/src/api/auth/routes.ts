@@ -21,9 +21,9 @@ import { attachPendingInvites } from '../shares/repository';
 import { decideSignup } from '../signup/policy';
 import {
   activeInviteFor,
+  becomesFirstAdmin,
   consumeInvite,
   ensureServerSettings,
-  hasRealAccounts,
   hasShareInvite,
   signupSettings,
 } from '../signup/store';
@@ -322,12 +322,12 @@ export async function resolveNewUser(
     const result = db.transaction(
       (tx): { userId: string } | { redirect: string } => {
         const now = new Date();
-        const firstAccount = !hasRealAccounts(tx);
+        const firstAdmin = becomesFirstAdmin(tx, email);
         const settings = signupSettings(tx);
         const invite = activeInviteFor(tx, email, now);
         const decision = decideSignup({
           email,
-          firstAccount,
+          firstAdmin,
           mode: settings.mode,
           allowedDomains: settings.allowedDomains,
           serverInvite: invite !== undefined,
@@ -362,10 +362,11 @@ export async function resolveNewUser(
         if (decision.role === 'admin') {
           assignServerRole(tx, newUser.id, 'admin');
           ensureServerSettings(tx);
-          logger.info('First account created and made admin', { userId: newUser.id });
+          logger.info('First admin account created', { userId: newUser.id });
         }
         if (invite && decision.via === 'server_invite')
           consumeInvite(tx, invite.id, newUser.id, now);
+        if (decision.role === 'pending') return { userId: newUser.id };
         try {
           attachPendingInvites(tx, newUser.id, newUser.email);
         } catch (error) {

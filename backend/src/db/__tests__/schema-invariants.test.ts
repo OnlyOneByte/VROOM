@@ -502,10 +502,38 @@ describe('roles and overrides', () => {
   });
 
   test('deleting a role drops its permissions and assignments', () => {
-    const serverRoles = assignmentsOf('u1');
     db.run("DELETE FROM roles WHERE id = 'builtin_editor'");
     expect(assignmentsOf('u2')).toBe(0);
-    expect(serverRoles).toBeGreaterThan(0);
-    expect(assignmentsOf('u1')).toBe(serverRoles);
+    expect(assignmentsOf('u1')).toBe(1);
+  });
+});
+
+describe('sign-up settings and server invites', () => {
+  let db: Database;
+  beforeEach(() => {
+    db = seeded();
+    for (const migration of migrations.slice(1)) applyMigration(db, migration);
+    db.run("INSERT INTO users (id, email, display_name) VALUES ('u2', 'b@test.com', 'User B')");
+    db.run('DELETE FROM server_settings');
+  });
+  afterEach(() => db.close());
+
+  test('a new settings row defaults to invite only with no domain list', () => {
+    db.run('INSERT INTO server_settings (id) VALUES (1)');
+    expect(
+      db.query('SELECT signup_mode, allowed_email_domains FROM server_settings').get()
+    ).toEqual({ signup_mode: 'invite', allowed_email_domains: '' });
+  });
+
+  test('deleting the people on an invite or a settings change keeps the row', () => {
+    db.run(
+      "INSERT INTO server_invites (id, email, created_by, expires_at, used_by) VALUES ('i1', 'x@test.com', 'u1', 1, 'u2')"
+    );
+    db.run("INSERT INTO server_settings (id, updated_by) VALUES (1, 'u1')");
+    db.run("DELETE FROM users WHERE id IN ('u1', 'u2')");
+    expect(
+      db.query("SELECT created_by, used_by FROM server_invites WHERE id = 'i1'").get()
+    ).toEqual({ created_by: null, used_by: null });
+    expect(db.query('SELECT updated_by FROM server_settings').get()).toEqual({ updated_by: null });
   });
 });
