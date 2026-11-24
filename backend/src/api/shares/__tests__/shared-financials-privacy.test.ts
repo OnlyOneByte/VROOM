@@ -16,6 +16,7 @@ let stranger: Invitee;
 
 const RANGE = 'startDate=1704067200&endDate=1735689600';
 const VIN = '1HGCM82633A004352';
+const LOAN_CLIENT_ID = 'owner-loan-payment-1';
 
 interface Garage {
   vehicleId: string;
@@ -63,6 +64,8 @@ async function sharedGarage(): Promise<Garage> {
       category: 'financial',
       expenseAmount: 400,
       date: '2024-02-01T00:00:00.000Z',
+      mileage: 12000,
+      clientId: LOAN_CLIENT_ID,
       sourceType: 'financing',
       sourceId: financing.id,
     })
@@ -375,5 +378,55 @@ describe('shared expense writes linked to a loan or policy', () => {
       200
     );
     expect(premiumRows()).toBe(0);
+  });
+});
+
+describe('other views of a loan payment', () => {
+  test('odometer history leaves out readings from loan payments for sharees', async () => {
+    const { vehicleId, loanPaymentId } = await sharedGarage();
+    const route = `/api/v1/odometer/${vehicleId}/history`;
+
+    const own = await created<Array<{ sourceId: string }>>(await ctx.authed('GET', route));
+    expect(own.map((r) => r.sourceId)).toContain(loanPaymentId);
+
+    for (const [who, request] of sharees()) {
+      const rows = await created<Array<{ sourceId: string }>>(await request('GET', route));
+      expect(
+        rows.map((r) => r.sourceId),
+        `${who} history`
+      ).not.toContain(loanPaymentId);
+    }
+
+    expect((await stranger.request('GET', route)).status).toBe(404);
+  });
+
+  test('photos on a loan payment are owner-only', async () => {
+    const { loanPaymentId, maintenanceId } = await sharedGarage();
+
+    expect((await ctx.authed('GET', `/api/v1/photos/expense/${loanPaymentId}`)).status).toBe(200);
+    for (const [who, request] of [...sharees(), ['stranger', stranger.request] as const]) {
+      expect(
+        (await request('GET', `/api/v1/photos/expense/${loanPaymentId}`)).status,
+        `${who} list`
+      ).toBe(404);
+    }
+    expect((await editor.request('GET', `/api/v1/photos/expense/${maintenanceId}`)).status).toBe(
+      200
+    );
+  });
+
+  test("an editor replaying the owner's loan payment request gets nothing back", async () => {
+    const { vehicleId, financingId } = await sharedGarage();
+
+    const res = await editor.request('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 1,
+      date: '2024-02-01T00:00:00.000Z',
+      clientId: LOAN_CLIENT_ID,
+    });
+    const text = await res.text();
+    expect(res.status).toBe(404);
+    expect(text).not.toContain(financingId);
   });
 });

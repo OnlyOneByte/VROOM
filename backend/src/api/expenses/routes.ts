@@ -708,7 +708,6 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   let createdExpense = expenseData.clientId
     ? await expenseRepository.findReplay(expenseData.clientId, ownerId, expenseData.vehicleId)
     : null;
-  assertMayTouchFinancialExpense(seesFinancials(access), createdExpense?.sourceType);
 
   if (!createdExpense) {
     await assertFinancingSourceValid(
@@ -729,6 +728,7 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
       await odometerCheck({ ...expenseData, timeZone })
     );
   }
+  assertMayTouchFinancialExpense(seesFinancials(access), createdExpense.sourceType);
 
   if (createdExpense.mileage != null) {
     await reminderTriggerService.recheckMileageReminders(ownerId, createdExpense.vehicleId);
