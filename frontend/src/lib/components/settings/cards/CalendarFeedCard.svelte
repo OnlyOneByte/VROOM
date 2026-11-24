@@ -1,0 +1,235 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { CalendarDays, Copy, LoaderCircle } from '@lucide/svelte';
+	import { PUBLIC_API_URL } from '$app/env/public';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Switch } from '#lib/components/ui/switch/index.ts';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
+	import {
+		Card,
+		CardContent,
+		CardDescription,
+		CardHeader,
+		CardTitle
+	} from '#lib/components/ui/card/index.ts';
+	import {
+		calendarApi,
+		type CalendarFeedInfo,
+		type CalendarFeedOptions
+	} from '#lib/services/calendar-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { formatDate } from '#lib/utils/formatters.ts';
+
+	const SWITCHES: { key: keyof CalendarFeedOptions; label: string }[] = [
+		{ key: 'reminders', label: 'Reminders' },
+		{ key: 'insurance', label: 'Insurance renewals' },
+		{ key: 'loans', label: 'Loan and lease payments' },
+		{ key: 'vehicleNames', label: 'Show vehicle names' },
+		{ key: 'amounts', label: 'Show amounts' }
+	];
+
+	let feed = $state<CalendarFeedInfo | null>(null);
+	let options = $state<CalendarFeedOptions>({
+		reminders: true,
+		insurance: true,
+		loans: true,
+		vehicleNames: false,
+		amounts: false
+	});
+	let link = $state<string | null>(null);
+	let loading = $state(true);
+	let loadError = $state<string | null>(null);
+	let busy = $state(false);
+	let confirmOff = $state(false);
+	let confirmRotate = $state(false);
+
+	let webcal = $derived(link?.replace(/^https?:/, 'webcal:') ?? null);
+
+	onMount(async () => {
+		try {
+			feed = await calendarApi.getFeed();
+			if (feed) options = { ...feed.options };
+		} catch (e) {
+			loadError = `Couldn't load your calendar link. ${userFacingErrorMessage(e)}`;
+		} finally {
+			loading = false;
+		}
+	});
+
+	function absolute(path: string): string {
+		return new URL(path, PUBLIC_API_URL || window.location.origin).href;
+	}
+
+	async function createLink() {
+		busy = true;
+		try {
+			const created = await calendarApi.createFeed(options);
+			feed = created.feed;
+			link = absolute(created.path);
+		} catch (e) {
+			appStore.showError(`Couldn't create the link. ${userFacingErrorMessage(e)}`);
+		} finally {
+			busy = false;
+		}
+	}
+
+	async function setOption(key: keyof CalendarFeedOptions, value: boolean) {
+		const previous = options[key];
+		options = { ...options, [key]: value };
+		if (!feed) return;
+		try {
+			feed = await calendarApi.updateOptions({ [key]: value });
+		} catch (e) {
+			options = { ...options, [key]: previous };
+			appStore.showError(`Couldn't save that. ${userFacingErrorMessage(e)}`);
+		}
+	}
+
+	function openInCalendarApp(url: string) {
+		window.location.assign(url);
+	}
+
+	async function copyLink() {
+		if (!link) return;
+		try {
+			await navigator.clipboard.writeText(link);
+			appStore.showSuccess('Link copied');
+		} catch {
+			appStore.showError("Couldn't copy. Select the link and copy it yourself.");
+		}
+	}
+
+	async function turnOff() {
+		try {
+			await calendarApi.turnOff();
+			feed = null;
+			link = null;
+			appStore.showSuccess('Calendar link turned off');
+		} catch (e) {
+			appStore.showError(`Couldn't turn the link off. ${userFacingErrorMessage(e)}`);
+			throw e;
+		}
+	}
+</script>
+
+<Card id="calendar-feed">
+	<CardHeader>
+		<div class="flex items-center gap-2">
+			<CalendarDays class="h-5 w-5 text-muted-foreground" />
+			<CardTitle level={3}>Calendar</CardTitle>
+		</div>
+		<CardDescription>
+			See reminders, insurance renewals and loan payments in Google, Apple or Outlook Calendar.
+		</CardDescription>
+	</CardHeader>
+	<CardContent class="space-y-5">
+		{#if loading}
+			<div class="flex justify-center py-4">
+				<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
+			</div>
+		{:else if loadError}
+			<p class="text-sm text-destructive" role="alert">{loadError}</p>
+		{:else}
+			<div class="space-y-3">
+				{#each SWITCHES as item (item.key)}
+					<div class="flex items-center justify-between gap-4">
+						<Label for="calendar-{item.key}" class="text-sm font-medium">{item.label}</Label>
+						<Switch
+							id="calendar-{item.key}"
+							checked={options[item.key]}
+							onCheckedChange={v => void setOption(item.key, v)}
+							data-testid="calendar-{item.key}"
+						/>
+					</div>
+				{/each}
+				<p class="text-xs text-muted-foreground">
+					Anyone with the link can see what's in it, and calendar apps keep a copy on their own
+					servers. Vehicle names and amounts stay out unless you turn them on.
+				</p>
+			</div>
+
+			{#if link}
+				<div class="space-y-2" data-testid="calendar-link">
+					<Label for="calendar-url">Your private calendar link</Label>
+					<div class="flex gap-2">
+						<Input id="calendar-url" value={link} readonly class="min-w-0 font-mono text-xs" />
+						<Button variant="outline" class="h-10 shrink-0 sm:h-9" onclick={copyLink}>
+							<Copy class="mr-1 h-4 w-4" />
+							Copy
+						</Button>
+					</div>
+					<p class="text-xs text-muted-foreground">
+						Shown once: copy it now. In Google Calendar, add it under Other calendars → From URL. In
+						Outlook, use Add calendar → Subscribe from web.
+					</p>
+					{#if webcal}
+						<Button
+							variant="outline"
+							class="h-10 sm:h-9"
+							onclick={() => openInCalendarApp(webcal)}
+							data-testid="calendar-webcal"
+						>
+							Open in Apple Calendar
+						</Button>
+					{/if}
+				</div>
+			{/if}
+
+			{#if feed}
+				<p class="text-sm text-muted-foreground" data-testid="calendar-status">
+					Link created {formatDate(feed.createdAt)} · {feed.lastUsedAt
+						? `last used ${formatDate(feed.lastUsedAt)}`
+						: 'not used yet'}
+				</p>
+				<div class="flex flex-wrap gap-2">
+					<Button
+						variant="outline"
+						class="h-10 sm:h-9"
+						onclick={() => (confirmRotate = true)}
+						disabled={busy}
+						data-testid="calendar-rotate"
+					>
+						Get a new link
+					</Button>
+					<Button
+						variant="outline"
+						class="h-10 text-destructive sm:h-9"
+						onclick={() => (confirmOff = true)}
+						data-testid="calendar-off"
+					>
+						Turn off
+					</Button>
+				</div>
+			{:else}
+				<Button
+					class="h-10 sm:h-9"
+					onclick={createLink}
+					disabled={busy}
+					data-testid="calendar-create"
+				>
+					{#if busy}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
+					Create link
+				</Button>
+			{/if}
+		{/if}
+	</CardContent>
+</Card>
+
+<ConfirmDialog
+	bind:open={confirmRotate}
+	title="Get a new calendar link?"
+	description="The current link stops working at once. Calendars subscribed to it need the new link."
+	confirmLabel="Get a new link"
+	onConfirm={createLink}
+/>
+
+<ConfirmDialog
+	bind:open={confirmOff}
+	title="Turn off the calendar link?"
+	description="Calendars subscribed to it stop updating and its events disappear. You can create a new link at any time."
+	confirmLabel="Turn off"
+	onConfirm={turnOff}
+/>

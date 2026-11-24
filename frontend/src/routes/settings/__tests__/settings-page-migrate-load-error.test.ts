@@ -20,6 +20,7 @@ vi.mock('#lib/components/settings/cards/ThemeCard.svelte', stub);
 vi.mock('#lib/components/settings/cards/ThemePickerCard.svelte', stub);
 vi.mock('#lib/components/settings/cards/PwaInstallCard.svelte', stub);
 vi.mock('#lib/components/settings/cards/PushNotificationsCard.svelte', stub);
+vi.mock('#lib/components/settings/cards/CalendarFeedCard.svelte', stub);
 vi.mock('#lib/components/settings/cards/StorageProvidersCard.svelte', stub);
 vi.mock('#lib/components/settings/cards/ModelProvidersCard.svelte', stub);
 vi.mock('#lib/components/settings/cards/MigrateFromTrackerCard.svelte', () => {
