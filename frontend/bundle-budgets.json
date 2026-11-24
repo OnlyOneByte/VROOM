@@ -8,8 +8,8 @@
 		"/expenses": 116,
 		"/expenses/new": 110,
 		"/expenses/[id]/edit": 110,
-		"/dev/gallery": 170,
-		"/analytics": 185,
+		"/dev/gallery": 200,
+		"/analytics": 186,
 		"/vehicles/[id]/odometer/new": 65,
 		"/vehicles/[id]/odometer/[entryId]/edit": 65
 	}

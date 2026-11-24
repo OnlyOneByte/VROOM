@@ -91,7 +91,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 ### Primitives — `#lib/components/ui/*` (barrel imports)
 | Need | Import | Notes |
 |---|---|---|
-| Action | `import { Button } from '#lib/components/ui/button'` | variants: default/destructive/outline/secondary/ghost/link · sizes: default/sm/lg/icon/icon-sm/icon-lg · `href` renders an `<a>` |
+| Action | `import { Button } from '#lib/components/ui/button'` | Pill buttons. variants: `default` (the ink pill; one per view) / `accent` (the C3 accent fill, Add expense only) / `destructive` (final delete only) / `outline` / `secondary` / `ghost` (keeps the surrounding text colour, hovers on `sunk`) / `link` (accent-ink text) · sizes: default/sm/lg/icon/icon-sm/icon-lg · `href` renders an `<a>` |
 | Text input | `import { Input } from '#lib/components/ui/input'` | `bind:value`, `aria-invalid`, `aria-describedby` |
 | Multiline | `import { Textarea } from '#lib/components/ui/textarea'` | |
 | Toggle | `import { Switch } from '#lib/components/ui/switch'` / `{ Checkbox }` | `bind:checked`, or `checked` + `onCheckedChange` |
@@ -99,7 +99,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 | Label | `import { Label } from '#lib/components/ui/label'` | `for=` ties to input id |
 | Field error | `import { FormFieldError } from '#lib/components/ui/form-field'` | renders `role="alert"`; wire via `aria-describedby` (`FormFieldDescription` for hints) |
 | Card | `import * as Card from '#lib/components/ui/card'` | Root/Header/Title/Description/Action/Content/Footer. `Title` takes `level?` (`2`/`3`/`4`) to render a heading; without it, it renders a `div` |
-| Badge | `import { Badge } from '#lib/components/ui/badge'` | variants: default/secondary/destructive/outline |
+| Badge | `import { Badge } from '#lib/components/ui/badge'` | Pill tags. variants: default/secondary/destructive/outline, plus the status tints `due` / `soon` / `ok` / `info` (always beside a word, never colour alone) |
 | Alert | `import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert'` | `variant`: `default` / `destructive` / `warning` / `success`, all themed; `role?`: `'alert'` (default, announced at once) or `'status'` (polite, for non-urgent notices such as the restore dialog's skipped-photos note) |
 | Skeleton | `import { Skeleton } from '#lib/components/ui/skeleton'` | loading placeholder |
 | Tabs | `import * as Tabs from '#lib/components/ui/tabs'` | |
