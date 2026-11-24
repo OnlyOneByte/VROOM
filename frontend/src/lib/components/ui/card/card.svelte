@@ -5,16 +5,22 @@
 	let {
 		ref = $bindable(null),
 		class: className,
+		variant = 'default',
 		children,
 		...restProps
-	}: WithElementRef<HTMLAttributes<HTMLDivElement>> = $props();
+	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
+		variant?: 'default' | 'section';
+	} = $props();
 </script>
 
 <div
 	bind:this={ref}
 	data-slot="card"
+	data-variant={variant}
 	class={cn(
-		'bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm',
+		variant === 'section'
+			? 'text-foreground flex flex-col gap-3 border-t pt-4 [&>[data-slot^=card-]]:px-0'
+			: 'bg-card text-card-foreground flex flex-col gap-6 rounded-[var(--r-lg)] border py-6',
 		className
 	)}
 	{...restProps}
