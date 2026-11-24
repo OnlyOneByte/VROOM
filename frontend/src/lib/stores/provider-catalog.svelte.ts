@@ -50,7 +50,18 @@ export interface ModelCatalogEntry extends CatalogEntryBase {
 	features: Record<string, never>;
 }
 
-export type CatalogEntry = StorageCatalogEntry | ModelCatalogEntry;
+export interface AuthCatalogEntry extends CatalogEntryBase {
+	capability: 'auth';
+	features: { pkce: boolean; verifiedEmail: boolean };
+}
+
+export interface ImportCatalogEntry extends CatalogEntryBase {
+	capability: 'import';
+	features: { accept: string[]; detect: true };
+}
+
+export type CatalogEntry =
+	StorageCatalogEntry | ModelCatalogEntry | AuthCatalogEntry | ImportCatalogEntry;
 
 function createProviderCatalogStore() {
 	let entries = $state<CatalogEntry[] | null>(null);
