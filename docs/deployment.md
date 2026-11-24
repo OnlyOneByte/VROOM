@@ -407,11 +407,18 @@ In-app restore from a Drive ZIP or Google Sheets lives in Settings → Storage P
 
 With `COMMUNITY_STATS=local`, which is the default, a background job runs once a day. It turns the data of users who opted in into anonymous group totals and stores them in the `community_stats` table, where opted-in users can compare their own vehicles against them. Nothing leaves the server and no outbound request is made.
 
-- **What it reads:** for opted-in owners only, the make and model (the catalogue entry they picked or confirmed), model year, powertrain, vehicle age, and the last 12 months of fuel, maintenance and insurance amounts. It uses dates and odometer readings only to pick the window and measure the distance driven. It never reads VINs, plates, nicknames, notes, photos, locations, or purchase and financing details.
+- **What it reads:** for opted-in owners only:
+  - the vehicle's catalogue model (the one the owner picked or confirmed), model year, powertrain and units;
+  - the owner's currency and region;
+  - the last 12 months of fuel, maintenance and insurance-premium expenses (amount, date, fuel type, volume, odometer and the missed-fill-up flag);
+  - the odometer readings in that window;
+  - the date of each vehicle's earliest record, used to check it was owned for the whole window.
+
+  Dates and odometer readings are used only to pick the window, check ownership and measure the distance driven. It never reads VINs, plates, nicknames, notes, descriptions, photos, locations, or purchase and financing details.
 - **What it stores:** groups of at least `COMMUNITY_STATS_MIN_GROUP` people. Each group has a count rounded down to a multiple of 5, plus a mean, a median and, from 20 people up, a typical range. The values are noised and rounded. No user ids or per-person rows are stored.
-- **What you see as an admin:** one log line per run, with counts only, for example `community stats refreshed: 7 buckets published, 31 suppressed (n<K), 18 opted-in owners, 412 ms`. There's no admin UI listing who opted in. As with any other column, you can query `user_preferences.community_stats_opt_in` in the database directly.
-- **Backups:** `community_stats` is left out of backups and the Sheets mirror. It is derived, covers the whole server, and is rebuilt daily, and restoring it on another server would bring in another server's population. A restore always sets a user's opt-in back to off, because consent belongs to a person on a server and doesn't travel in a backup file.
-- **Opting out:** a user who turns it off is left out from the next daily refresh. Setting `COMMUNITY_STATS=off` stops the job, and the existing rows are no longer served.
+- **What you see as an admin:** one info line per run, with counts only, for example `community stats refreshed: 7 buckets published, 31 suppressed (n<K), 18 opted-in owners, 412 ms`. A run that takes over 30 s adds a warning with its duration. A failed run logs an error message, which contains no data. There's no admin UI listing who opted in. As with any other column, you can query `user_preferences.community_stats_opt_in` in the database directly.
+- **Backups:** `community_stats` is left out of backups and the Sheets mirror. It is derived, covers the whole server, and is rebuilt daily, and restoring it on another server would bring in another server's population. Restoring a backup never turns a user's opt-in on: a backup that holds preferences restores them with opt-in off, because consent belongs to a person on a server and doesn't travel in a backup file.
+- **Opting out:** a user who turns it off is left out from the next daily refresh. Setting `COMMUNITY_STATS=off` stops the job and stops serving comparisons. Rows already in `community_stats` stay in the table until a later refresh replaces them.
 
 ## Maintenance
 

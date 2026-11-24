@@ -156,6 +156,29 @@ describe('community stats refresh against the database', () => {
     expect(await repository.publishedBuckets('global', keys, 10)).toEqual([]);
   });
 
+  test('only fuel, maintenance and insurance-premium expenses are loaded', async () => {
+    seedOwner(db.sqlite, 'in-0', true);
+    for (const [id, category] of [
+      ['loan', 'financial'],
+      ['parking', 'misc'],
+    ] as const) {
+      seedExpense(db.sqlite, {
+        id,
+        vehicleId: 'in-0-car',
+        category,
+        expenseAmount: 50_000,
+        date: new Date(NOW.getTime() - 10 * DAY),
+        mileage: null,
+        volume: null,
+        fuelType: null,
+        missedFillup: false,
+      });
+    }
+    const { vehicles } = await repository.loadOptedIn(new Date(NOW.getTime() - 365 * DAY), NOW);
+    const categories = new Set(vehicles.flatMap((v) => v.expenses.map((e) => e.category)));
+    expect([...categories]).toEqual(['fuel']);
+  });
+
   test('the table has no user id column', () => {
     expect(getColumnNames(db.sqlite, 'community_stats').some((name) => name.includes('user'))).toBe(
       false

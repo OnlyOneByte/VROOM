@@ -8,20 +8,23 @@ const BACKEND_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '
 const communityConfig = CONFIG.communityStats as { mode: 'off' | 'local' };
 
 async function loadConfig(env: Record<string, string>) {
-  const proc = Bun.spawn(
-    [process.execPath, '--env-file=/dev/null', '-e', "await import('./src/config.ts')"],
-    {
-      cwd: BACKEND_ROOT,
-      env: { PATH: process.env.PATH ?? '', NODE_ENV: 'test', ...env },
-      stdout: 'pipe',
-      stderr: 'pipe',
-    }
-  );
+  const script =
+    "const { CONFIG } = await import('./src/config.ts'); console.log(JSON.stringify(CONFIG.communityStats))";
+  const proc = Bun.spawn([process.execPath, '--env-file=/dev/null', '-e', script], {
+    cwd: BACKEND_ROOT,
+    env: { PATH: process.env.PATH ?? '', NODE_ENV: 'test', ...env },
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
   const [stdout, stderr] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
   ]);
-  return { code: await proc.exited, output: `${stdout}${stderr}` };
+  return {
+    code: await proc.exited,
+    output: `${stdout}${stderr}`,
+    config: () => JSON.parse(stdout.trim().split('\n').at(-1) ?? 'null'),
+  };
 }
 
 describe('community stats server settings', () => {
@@ -34,16 +37,27 @@ describe('community stats server settings', () => {
     }
   );
 
-  test('a raised minimum group and an unknown mode are handled', async () => {
-    expect((await loadConfig({ COMMUNITY_STATS_MIN_GROUP: '25' })).code).toBe(0);
-    expect((await loadConfig({ COMMUNITY_STATS: 'global' })).code).not.toBe(0);
+  test('a raised minimum group raises the quartile floor with it', async () => {
+    const { code, config } = await loadConfig({ COMMUNITY_STATS_MIN_GROUP: '25' });
+    expect(code).toBe(0);
+    expect(config()).toMatchObject({ minGroup: 25, quartileMinGroup: 25 });
   });
 
-  test('defaults are local with a minimum group of 10 and quartiles from 20', () => {
-    expect(CONFIG.communityStats.mode).toBe('local');
-    expect(CONFIG.communityStats.minGroup).toBe(10);
-    expect(CONFIG.communityStats.quartileMinGroup).toBe(20);
-    expect(CONFIG.communityStats.enabled).toBe(false);
+  test('an unknown mode stops startup naming the variable', async () => {
+    const { code, output } = await loadConfig({ COMMUNITY_STATS: 'global' });
+    expect(code).not.toBe(0);
+    expect(output).toContain('COMMUNITY_STATS');
+  });
+
+  test('defaults are local with a minimum group of 10 and quartiles from 20', async () => {
+    const { code, config } = await loadConfig({});
+    expect(code).toBe(0);
+    expect(config()).toMatchObject({
+      mode: 'local',
+      minGroup: 10,
+      quartileMinGroup: 20,
+      enabled: false,
+    });
   });
 });
 
@@ -53,8 +67,9 @@ describe('settings response carries the server mode', () => {
   beforeEach(async () => {
     ctx = await createTestApp();
   });
+  const originalMode = CONFIG.communityStats.mode;
   afterEach(() => {
-    communityConfig.mode = 'local';
+    communityConfig.mode = originalMode;
     ctx.close();
   });
 
@@ -64,7 +79,7 @@ describe('settings response carries the server mode', () => {
   }
 
   test('GET and PUT report local by default and off when switched off', async () => {
-    expect(await mode()).toBe('local');
+    expect(await mode()).toBe(originalMode);
     const put = await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'EUR' });
     expect(
       (await json<{ data: { communityStatsMode?: string } }>(put)).data.communityStatsMode
@@ -74,7 +89,8 @@ describe('settings response carries the server mode', () => {
   });
 
   test('a client cannot write the server mode', async () => {
-    await ctx.authed('PUT', '/api/v1/settings', { communityStatsMode: 'off' });
-    expect(await mode()).toBe('local');
+    const res = await ctx.authed('PUT', '/api/v1/settings', { communityStatsMode: 'off' });
+    expect(res.status).toBe(200);
+    expect(await mode()).toBe(originalMode);
   });
 });

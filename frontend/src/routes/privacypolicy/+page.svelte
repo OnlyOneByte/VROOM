@@ -113,12 +113,13 @@
 					in community stats" in Settings, anonymous totals built from your vehicles are shown to
 					other people on the same server who have also opted in. A total covers a group of at least
 					10 people and is never your own numbers. Only make, model and model year, powertrain,
-					vehicle age, your region if you set one, and your fuel, maintenance and insurance costs
-					from the last 12 months are used.
+					vehicle age, your currency, your region if you set one, and from the last 12 months your
+					fuel, maintenance and insurance costs, your fuel or charge amounts, and the distance
+					driven (worked out from your odometer readings) are used.
 				</p>
 				<p>
-					Nothing leaves the server. The setting is off by default, a restored backup always turns
-					it off, and if you turn it off you are left out from the next daily refresh.
+					Nothing leaves the server. The setting is off by default, restoring a backup never turns
+					it on, and if you turn it off you are left out from the next daily refresh.
 				</p>
 			</section>
 

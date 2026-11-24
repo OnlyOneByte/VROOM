@@ -1,4 +1,4 @@
-import { and, desc, eq, getTableColumns, gte, inArray, lte, min } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, gte, inArray, lte, min, or } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import {
@@ -146,6 +146,10 @@ export class CommunityStatsRepository {
         .where(
           and(
             inArray(expenses.vehicleId, ids),
+            or(
+              inArray(expenses.category, ['fuel', 'maintenance']),
+              eq(expenses.sourceType, 'insurance_term')
+            ),
             gte(expenses.date, windowStart),
             lte(expenses.date, windowEnd)
           )

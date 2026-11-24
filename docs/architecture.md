@@ -132,7 +132,7 @@ no-ops when nothing changed since the last sync, so an idle user with no edits c
 
 ### Community stats
 
-`src/api/community/aggregator.ts` is the only code that reads more than one user's rows. It runs as a daily background job, started from `src/index.ts` next to the sync worker, and no request handler can reach it. It loads opted-in owners' vehicles and the last 12 months of their expenses through `repository.ts`, which selects only the columns the metrics need. It then computes one value per vehicle using the analytics efficiency helpers, and keeps one value per owner per bucket.
+`src/api/community/aggregator.ts` is the only code that combines different users' data into one result. It runs as a daily background job, started from `src/index.ts` next to the sync worker, and no request handler can reach it. It loads opted-in owners' vehicles, plus their last 12 months of fuel, maintenance and insurance-premium expenses, through `repository.ts`, which selects only the columns the metrics need. It then computes one value per vehicle per metric using the analytics efficiency helpers, and keeps one value per owner per bucket.
 
 Before a bucket is stored, the job enforces the privacy rules:
 
