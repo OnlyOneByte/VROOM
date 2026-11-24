@@ -36,6 +36,10 @@ updates:
     directories:
       - "/backend"
       - "/frontend"
+    ignore:
+      # Odd Node majors never become LTS.
+      - dependency-name: "node"
+        versions: ["23.x", "25.x", "27.x"]
     schedule:
       interval: "weekly"
       day: "monday"
