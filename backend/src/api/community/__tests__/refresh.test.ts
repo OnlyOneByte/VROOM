@@ -135,6 +135,27 @@ describe('community stats refresh against the database', () => {
     expect(maintenance()).toEqual([{ n_published: 10 }]);
   });
 
+  test('publishedBuckets filters out rows below the minimum group in the query itself', async () => {
+    for (const [key, n] of [
+      ['a', 5],
+      ['b', 10],
+      ['c', 25],
+    ] as const) {
+      db.sqlite.run(
+        "INSERT INTO community_stats (id, scope, metric, bucket_key, unit, n_published, mean, p50, computed_at, schema_version) VALUES (?, 'local', 'efficiency', ?, 'km_per_l', ?, 12, 12, 0, 1)",
+        [key, key, n]
+      );
+    }
+    const keys = ['a', 'b', 'c'];
+    expect(
+      (await repository.publishedBuckets('local', keys, 10)).map((r) => r.bucketKey).sort()
+    ).toEqual(['b', 'c']);
+    expect((await repository.publishedBuckets('local', keys, 15)).map((r) => r.bucketKey)).toEqual([
+      'c',
+    ]);
+    expect(await repository.publishedBuckets('global', keys, 10)).toEqual([]);
+  });
+
   test('the table has no user id column', () => {
     expect(getColumnNames(db.sqlite, 'community_stats').some((name) => name.includes('user'))).toBe(
       false

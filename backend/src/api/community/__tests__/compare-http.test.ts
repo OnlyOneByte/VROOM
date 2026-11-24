@@ -164,6 +164,39 @@ describe('GET /api/v1/community/compare', () => {
     expect(metric(body, 'efficiency')?.status).toBe('ok');
   });
 
+  test("a share recipient never sees metrics keyed by the owner's region", async () => {
+    await ctx.authed('PUT', '/api/v1/settings', { communityRegion: 'US-CA' });
+    const vehicleId = await seedCivic();
+    insertBucket('running_cost|gas|USD|US-CA', 'running_cost', 'cents_per_km', 20, 9);
+    await optIn();
+    await other.acceptShare(vehicleId, 'viewer');
+    await optIn(other.request);
+
+    expect(metric((await compare(vehicleId)).body, 'running_cost')?.status).toBe('ok');
+    const shared = (await compare(vehicleId, other.request)).body;
+    for (const name of ['running_cost', 'insurance']) {
+      expect(metric(shared, name)).toEqual({
+        metric: name,
+        status: 'no_data',
+        unit: null,
+        yours: null,
+        bucket: null,
+      });
+    }
+  });
+
+  test('a share recipient who has not opted in gets no numbers from an opted-in owner', async () => {
+    const vehicleId = await seedCivic();
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    await optIn();
+    await other.acceptShare(vehicleId, 'viewer');
+
+    const { body } = await compare(vehicleId, other.request);
+    expect(body?.metrics.every((m) => m.status === 'opt_in_required' && m.bucket === null)).toBe(
+      true
+    );
+  });
+
   test('the server switch set to off returns feature_off and no numbers', async () => {
     const vehicleId = await seedCivic();
     insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);

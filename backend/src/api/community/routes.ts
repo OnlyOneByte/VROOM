@@ -20,6 +20,7 @@ import { communityStatsRepository } from './repository';
 export const GIVE_TO_GET = true;
 
 const METRICS: CommunityMetric[] = ['efficiency', 'running_cost', 'maintenance', 'insurance'];
+const OWNER_REGION_METRICS: ReadonlySet<CommunityMetric> = new Set(['running_cost', 'insurance']);
 
 export type CompareStatus =
   | 'ok'
@@ -101,7 +102,7 @@ routes.use('*', requireAuth);
 routes.get('/compare', zValidator('query', compareQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId } = c.req.valid('query');
-  await requireVehicleAccess(vehicleId, user.id, 'read');
+  const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'read');
 
   if (CONFIG.communityStats.mode === 'off') {
     return c.json({
@@ -137,6 +138,9 @@ routes.get('/compare', zValidator('query', compareQuerySchema), async (c) => {
   );
 
   const metrics = METRICS.map((metric): CompareMetric => {
+    if (ownerId !== user.id && OWNER_REGION_METRICS.has(metric)) {
+      return { metric, status: 'no_data', unit: null, yours: null, bucket: null };
+    }
     if (metric === 'efficiency' && !vehicle.catalogModelId) {
       return { metric, status: 'needs_model', unit: null, yours: null, bucket: null };
     }
