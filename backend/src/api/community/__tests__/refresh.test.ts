@@ -1,13 +1,14 @@
 import type { Database } from 'bun:sqlite';
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { getColumnNames } from '../../../db/__tests__/migration-helpers';
+import { logger } from '../../../utils/logger';
 import {
   createTestDb,
   seedExpense,
   seedUser,
   type TestDb,
 } from '../../analytics/__tests__/analytics-test-generators';
-import { firstRunDelayMs, refreshCommunityStats } from '../aggregator';
+import { firstRunDelayMs, refreshCommunityStats, refreshSafely } from '../aggregator';
 import { CommunityStatsRepository } from '../repository';
 import { NOW } from './community-fixtures';
 
@@ -154,6 +155,79 @@ describe('community stats refresh against the database', () => {
       'c',
     ]);
     expect(await repository.publishedBuckets('global', keys, 10)).toEqual([]);
+  });
+
+  test('only fuel, maintenance and insurance-premium expenses are loaded', async () => {
+    seedOwner(db.sqlite, 'in-0', true);
+    seedExpense(db.sqlite, {
+      id: 'premium',
+      vehicleId: 'in-0-car',
+      category: 'financial',
+      expenseAmount: 90_000,
+      date: new Date(NOW.getTime() - 30 * DAY),
+      mileage: null,
+      volume: null,
+      fuelType: null,
+      missedFillup: false,
+    });
+    db.sqlite.run("UPDATE expenses SET source_type = 'insurance_term' WHERE id = 'premium'");
+    for (const [id, category] of [
+      ['loan', 'financial'],
+      ['parking', 'misc'],
+    ] as const) {
+      seedExpense(db.sqlite, {
+        id,
+        vehicleId: 'in-0-car',
+        category,
+        expenseAmount: 50_000,
+        date: new Date(NOW.getTime() - 10 * DAY),
+        mileage: null,
+        volume: null,
+        fuelType: null,
+        missedFillup: false,
+      });
+    }
+    const { vehicles } = await repository.loadOptedIn(new Date(NOW.getTime() - 365 * DAY), NOW);
+    const loaded = vehicles.flatMap((v) => v.expenses);
+    expect(new Set(loaded.map((e) => e.category))).toEqual(new Set(['fuel', 'financial']));
+    expect(loaded.filter((e) => e.category === 'financial')).toEqual([
+      expect.objectContaining({ expenseAmount: 90_000, sourceType: 'insurance_term' }),
+    ]);
+  });
+
+  test('a failed run logs only the database cause, never the query or its ids', async () => {
+    const failing = {
+      loadOptedIn: () =>
+        Promise.reject(
+          new Error('Failed query: select ... params: owner-secret-id,vehicle-secret-id', {
+            cause: Object.assign(new Error('database is locked'), { name: 'SQLiteError' }),
+          })
+        ),
+    } as unknown as CommunityStatsRepository;
+    const errorSpy = spyOn(logger, 'error').mockImplementation(() => {});
+    try {
+      await refreshSafely(failing);
+      const logged = JSON.stringify(errorSpy.mock.calls);
+      expect(logged).toContain('SQLiteError: database is locked');
+      expect(logged).not.toContain('secret');
+      expect(logged).not.toContain('select');
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  test('a failure without a cause logs only the error name', async () => {
+    const failing = {
+      loadOptedIn: () => Promise.reject(new TypeError('owner-secret-id is not a thing')),
+    } as unknown as CommunityStatsRepository;
+    const errorSpy = spyOn(logger, 'error').mockImplementation(() => {});
+    try {
+      await refreshSafely(failing);
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('secret');
+      expect(JSON.stringify(errorSpy.mock.calls)).toContain('TypeError');
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   test('the table has no user id column', () => {

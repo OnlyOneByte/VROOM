@@ -152,6 +152,10 @@ function consentUpdate(
   return { communityStatsOptIn: optIn, communityStatsConsentedAt: optIn ? new Date() : null };
 }
 
+function withServerSettings<T extends object>(prefs: T) {
+  return { ...prefs, communityStatsMode: CONFIG.communityStats.mode };
+}
+
 const routes = new Hono();
 
 routes.use('*', requireAuth);
@@ -201,7 +205,7 @@ routes.get('/', async (c) => {
 
   return c.json({
     success: true,
-    data: prefs,
+    data: withServerSettings(prefs),
   });
 });
 
@@ -260,7 +264,7 @@ routes.put('/', async (c) => {
 
   return c.json({
     success: true,
-    data: updatedSettings,
+    data: withServerSettings(updatedSettings),
     message: 'Settings updated successfully',
   });
 });

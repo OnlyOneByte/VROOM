@@ -130,6 +130,19 @@ each successful write, the global activity middleware arms the inactivity timer,
 elapses `src/api/sync/activity-tracker.ts` triggers the enabled backups. The orchestrator
 no-ops when nothing changed since the last sync, so an idle user with no edits costs nothing.
 
+### Community stats
+
+`src/api/community/aggregator.ts` is the only code that combines different users' data into one result. It runs as a daily background job, started from `src/index.ts` next to the sync worker, and no request handler can reach it. It loads opted-in owners' vehicles, plus their last 12 months of fuel, maintenance and insurance-premium expenses, through `repository.ts`, which selects only the columns the metrics need. It then computes one value per vehicle per metric using the analytics efficiency helpers, and keeps one value per owner per bucket.
+
+Before a bucket is stored, the job enforces the privacy rules:
+
+- n counts people, and a bucket is published only when that count, rounded down to a multiple of 5, is at least K (10, or `COMMUNITY_STATS_MIN_GROUP`);
+- quartiles are published only from 20 people;
+- implausible values are dropped first;
+- Laplace noise from a cryptographic source is scaled to the rounded count, then the values are rounded.
+
+The write replaces the `scope='local'` rows in one transaction. `GET /api/v1/community/compare` (`routes.ts`) only answers callers who have opted in. It computes the caller's own values with the same `vehicleSamples` function and looks up only rows with `n_published >= K`.
+
 ## Frontend
 
 ### Layering
