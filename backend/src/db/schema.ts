@@ -163,6 +163,7 @@ export const insuranceTermVehicles = sqliteTable(
     vehicleId: text('vehicle_id')
       .notNull()
       .references(() => vehicles.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull().default(0),
   },
   (table) => ({
     pk: primaryKey({ columns: [table.termId, table.vehicleId] }),
@@ -170,7 +171,8 @@ export const insuranceTermVehicles = sqliteTable(
   })
 );
 
-export const insuranceTermVehicleSelectionOrder = sql`${insuranceTermVehicles}.rowid`;
+export const insuranceTermVehicleSelectionOrder = insuranceTermVehicles.position;
+export const nextInsuranceTermVehiclePosition = sql<number>`(SELECT COALESCE(MAX(${insuranceTermVehicles.position}), 0) + 1 FROM ${insuranceTermVehicles})`;
 
 export const insuranceClaims = sqliteTable(
   'insurance_claims',

@@ -590,7 +590,11 @@ class RestoreService {
     this.insertRows(tx, vehicleFinancing, data.financing ?? []);
     this.insertRows(tx, insurancePolicies, this.stampUserId(data.insurance, userId));
     this.insertRows(tx, insuranceTerms, data.insuranceTerms ?? []);
-    this.insertRows(tx, insuranceTermVehicles, data.insuranceTermVehicles ?? []);
+    this.insertRows(
+      tx,
+      insuranceTermVehicles,
+      (data.insuranceTermVehicles ?? []).map((row, index) => ({ ...row, position: index + 1 }))
+    );
     this.insertRows(tx, insuranceClaims, data.insuranceClaims ?? []);
     const reminderVehicleIds = new Map<string, string[]>();
     for (const link of data.reminderVehicles ?? []) {

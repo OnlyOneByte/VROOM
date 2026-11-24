@@ -12,6 +12,7 @@ import {
   insuranceTermVehicles,
   type NewExpense,
   type NewTrip,
+  nextInsuranceTermVehiclePosition,
   syncState,
   trips,
   userPreferences,
@@ -260,7 +261,9 @@ export async function seedGarage(userId: string) {
 
     for (const { vehicleId, ...term } of terms) {
       await db.insert(insuranceTerms).values(term);
-      await db.insert(insuranceTermVehicles).values({ termId: term.id, vehicleId });
+      await db
+        .insert(insuranceTermVehicles)
+        .values({ termId: term.id, vehicleId, position: nextInsuranceTermVehiclePosition });
       await createTermExpenses({
         termId: term.id,
         vehicleIds: [vehicleId],
