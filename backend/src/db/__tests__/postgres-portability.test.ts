@@ -62,6 +62,15 @@ const EXPECTED_FAILURES: Record<string, string> = {
   'items fuelType [] #2': '#1681',
   'insights #5': '#1681',
   'insights #7': '#1681',
+  'odometer history 0 without expenses #1': '#1681',
+  'odometer history 0 without expenses #2': '#1681',
+  'odometer history 1 without expenses #1': '#1681',
+  'odometer history 1 without expenses #2': '#1681',
+};
+
+const ISSUE_ERRORS: Record<string, RegExp> = {
+  '#1681': /"vu\.dist_user" must appear in the GROUP BY|type boolean|boolean = integer/,
+  '#1682': /function json_each\(text\) does not exist/,
 };
 
 interface Captured {
@@ -143,16 +152,19 @@ function normalizeValue(value: unknown): unknown {
   return value;
 }
 
-function normalizeRows(rows: unknown[]): string[] {
-  return rows
-    .map((row) =>
-      JSON.stringify(
-        Object.entries(row as Record<string, unknown>)
-          .map(([key, value]) => [key.toLowerCase(), normalizeValue(value)])
-          .sort(([a], [b]) => String(a).localeCompare(String(b)))
-      )
+function endsInOrderBy(text: string): boolean {
+  return /\border\s+by\s[^()]*$/i.test(text.trim());
+}
+
+function normalizeRows(rows: unknown[], ordered: boolean): string[] {
+  const out = rows.map((row) =>
+    JSON.stringify(
+      Object.entries(row as Record<string, unknown>)
+        .map(([key, value]) => [key, normalizeValue(value)])
+        .sort(([a], [b]) => String(a).localeCompare(String(b)))
     )
-    .sort();
+  );
+  return ordered ? out : out.sort();
 }
 
 async function captureWorkload(userId: string): Promise<Captured[]> {
@@ -192,6 +204,7 @@ async function captureWorkload(userId: string): Promise<Captured[]> {
     ['tag', ['fuel', '']],
     ['fuelType', ['Regular']],
     ['fuelType', []],
+    ['category', ['maintenance']],
   ] as const) {
     out.push(
       ...(await capture(`items ${groupBy} ${JSON.stringify(keys)}`, () =>
@@ -208,6 +221,12 @@ async function captureWorkload(userId: string): Promise<Captured[]> {
   for (const [index, { id }] of vehicles.entries()) {
     out.push(
       ...(await capture(`odometer history ${index}`, () => odometer.getHistory(id, userId))),
+      ...(await capture(`odometer history ${index} without expenses`, () =>
+        odometer.getHistory(id, userId, { includeExpenses: false })
+      )),
+      ...(await capture(`odometer history ${index} without financials`, () =>
+        odometer.getHistory(id, userId, { hideFinancials: true })
+      )),
       ...(await capture(`odometer current ${index}`, () => odometer.getCurrentOdometer(id, userId)))
     );
   }
@@ -230,7 +249,11 @@ describe.skipIf(!ENABLED)('raw SQL runs the same on Postgres', () => {
       const { sql: text, params } = dialect.sqlToQuery(query);
       try {
         const result = await pg.query(text, params as unknown[]);
-        if (JSON.stringify(normalizeRows(result.rows)) !== JSON.stringify(normalizeRows(rows))) {
+        const ordered = endsInOrderBy(text);
+        const same =
+          JSON.stringify(normalizeRows(result.rows, ordered)) ===
+          JSON.stringify(normalizeRows(rows, ordered));
+        if (!same) {
           failures.set(label, 'different rows from SQLite');
         }
       } catch (error) {
@@ -252,7 +275,10 @@ describe.skipIf(!ENABLED)('raw SQL runs the same on Postgres', () => {
       appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
 
     const unexpected = [...failures]
-      .filter(([label]) => !(label in EXPECTED_FAILURES))
+      .filter(([label, why]) => {
+        const issue = EXPECTED_FAILURES[label];
+        return !issue || !ISSUE_ERRORS[issue]?.test(why);
+      })
       .map(([label, why]) => `${label}: ${why}`);
     expect(
       unexpected,
