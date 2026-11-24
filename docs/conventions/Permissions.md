@@ -2,10 +2,9 @@
 
 Every action in VROOM is a permission: a string such as `vehicle.expense.write` or
 `account.backup.run`. A feature declares its permissions in one `capabilities.ts` next to its
-routes, and maps each of its routes to one of them. The registry and the route map are in
-**report mode** today: they describe what each route needs, and the contract test keeps them
-complete, but nothing at runtime reads them yet. Requests are still authorized by
-`requireAuth` and `requireVehicleAccess`.
+routes, and maps each of its routes to one of them. Routes moved behind `authorize()` (expenses,
+role assignments and overrides so far) are enforced from the route map at runtime; the rest are
+still authorized by `requireAuth` and `requireVehicleAccess`, with the map in report mode.
 
 ## Permission ids
 
@@ -82,6 +81,8 @@ edited or deleted; the built-in keys are reserved, and a role's scope never chan
   re-reads the share in its transaction and answers 409 if it changed underneath. `vehicle_shares` stays the membership and invite record.
 - `permission_overrides` allows or denies one permission for one person, at server or vehicle scope.
   A deny on `delete_own` does not stop someone who also holds `delete`; deny `delete` for that.
+- A co-owner can't remove the Co-owner role the owner gave them, but can leave the car by declining
+  the share.
 - A full restore is refused (409) while the account's vehicles carry overrides or custom-role
   assignments, since the restore re-creates the vehicles and would drop them. Merge mode is fine.
 
@@ -98,6 +99,14 @@ edited or deleted; the built-in keys are reserved, and a role's scope never chan
    and a deny on `delete` also blocks `delete_own`. A non-grantable permission in a role row or
    an override grants nothing, not even what it implies.
 5. A `delete` check also passes on `delete_own` when the entry's `createdBy` is the actor.
+6. A vehicle permission checked on the actor's own account means "on my own vehicles": allowed
+   unless the actor is disabled. Routes with no vehicle (an unfiltered list, orphan photos, the
+   notifications inbox, fleet analytics) resolve this way.
+
+A redaction that used to ask "is owner" asks for permissions instead: loan and insurance details
+show to whoever holds both `vehicle.financing.read` and `vehicle.insurance.read` (the owner, a
+co-owner, or a person with allow overrides), and loan-linked or premium expenses can be changed by
+whoever holds both `.write` permissions.
 
 The Demo role's vehicle reads count only for the built-in Demo row (built-in flag plus key), and
 only on the demo garage: vehicles whose owner holds that row. `GET /auth/capabilities` returns the
@@ -125,6 +134,16 @@ Every route mounted in `src/app.ts` has one entry in `ROUTE_PERMISSIONS`
 
 - Pick the permission the handler needs today. A handler that calls
   `requireVehicleAccess(id, user.id, 'write')` on an expense maps to `vehicle.expense.write`.
+- A delete route maps to `<resource>.delete`; when its resource resolver supplies the entry's
+  author, `delete_own` covers the actor's own entries.
+- `{ byScope: { server, vehicle } }` picks the permission by the request's scope (role
+  assignments and overrides), and `{ byEntity: { <entityType>: [...] } }` requires every listed
+  permission for that entity type (photos of policies and claims also need insurance access).
+
+To enforce a route, add `authorize(resourceOf)` after its validators. `resourceOf` loads the
+resource from the database (`fromExpense` reads the expense's vehicle and author), never from what
+the caller claims; identity always comes from the session. A route with no map entry is refused.
+Not visible → 404; visible but not allowed → 403.
 - Use `{ public: '<reason>' }` only for routes a signed-out visitor must reach: health, the
   sign-in flow. The reason says why.
 

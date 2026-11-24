@@ -402,13 +402,17 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return rows.map((r) => r.id);
   }
 
-  async getSplitGroupAccessInfo(
-    groupId: string
-  ): Promise<{ vehicleIds: string[]; ownerId: string; sourceType: string | null } | null> {
+  async getSplitGroupAccessInfo(groupId: string): Promise<{
+    vehicleIds: string[];
+    ownerId: string;
+    createdBy: string | null;
+    sourceType: string | null;
+  } | null> {
     const rows = await this.db
       .select({
         vehicleId: expenses.vehicleId,
         userId: expenses.userId,
+        createdBy: expenses.createdBy,
         sourceType: expenses.sourceType,
       })
       .from(expenses)
@@ -417,6 +421,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return {
       vehicleIds: [...new Set(rows.map((r) => r.vehicleId))],
       ownerId: rows[0].userId,
+      createdBy: rows[0].createdBy,
       sourceType: rows[0].sourceType,
     };
   }

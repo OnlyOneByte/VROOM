@@ -21,6 +21,7 @@ import {
   ValidationError,
 } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import { authorize, enforce, type ResourceOf } from '../../permissions/authorize';
 import {
   isVehicleMember,
   keepingARoleManager,
@@ -31,19 +32,33 @@ import {
   resolverFor,
 } from '../../permissions/grants';
 import { PERMISSION_REGISTRY } from '../../permissions/registry';
-import type { Decision, Resource } from '../../permissions/resolve';
+import type { Resource } from '../../permissions/resolve';
 import type { RoleScope } from '../../permissions/roles';
+import { readJsonBody } from '../../utils/request-body';
 import { commonSchemas, zValidator } from '../../utils/validation';
 
 const SCOPES = ['server', 'vehicle'] as const;
 const SERVER: Resource = { kind: 'server' };
 const VEHICLE_PERMISSIONS = PERMISSION_REGISTRY.list.filter((d) => d.scope === 'vehicle');
 
-function enforce(decision: Decision, resource: string): void {
-  if (decision.allow) return;
-  if (decision.reason === 'not_found') throw new NotFoundError(resource);
-  throw new ForbiddenError();
+function scopedResource(scopeId: string | null | undefined): Resource {
+  return scopeId ? { kind: 'vehicle', vehicleId: scopeId } : SERVER;
 }
+
+const assignmentResource: ResourceOf = async (c) =>
+  scopedResource(
+    c.req.method === 'POST'
+      ? (await readJsonBody<{ scopeId?: string | null }>(c)).scopeId
+      : c.req.query('scopeId')
+  );
+
+const overrideResource: ResourceOf = async (c) => {
+  const target =
+    c.req.method === 'PUT'
+      ? await readJsonBody<{ scope?: string; scopeId?: string | null }>(c)
+      : { scope: c.req.query('scope'), scopeId: c.req.query('scopeId') };
+  return scopedResource(target.scope === 'vehicle' ? target.scopeId : null);
+};
 
 function writeAt<T>(scope: RoleScope, change: (tx: DrizzleTransaction) => T): T {
   const db = getDb();
@@ -292,36 +307,46 @@ export const assignmentRoutes = new Hono();
 assignmentRoutes.use('*', requireAuth);
 assignmentRoutes.use('*', changeTracker);
 
-assignmentRoutes.post('/', zValidator('json', assignmentSchema), (c) => {
-  const input = c.req.valid('json');
-  const { role, scopeId } = assignable(c, input);
-  try {
-    const created = getDb()
-      .insert(roleAssignments)
-      .values({ userId: input.userId, roleId: role.id, scopeId, grantedBy: c.get('user').id })
-      .returning()
-      .get();
-    return c.json({ success: true, data: created }, 201);
-  } catch (error) {
-    if (isUniqueConstraintError(error)) throw new ConflictError('They already hold this role');
-    throw error;
+assignmentRoutes.post(
+  '/',
+  zValidator('json', assignmentSchema),
+  authorize(assignmentResource),
+  (c) => {
+    const input = c.req.valid('json');
+    const { role, scopeId } = assignable(c, input);
+    try {
+      const created = getDb()
+        .insert(roleAssignments)
+        .values({ userId: input.userId, roleId: role.id, scopeId, grantedBy: c.get('user').id })
+        .returning()
+        .get();
+      return c.json({ success: true, data: created }, 201);
+    } catch (error) {
+      if (isUniqueConstraintError(error)) throw new ConflictError('They already hold this role');
+      throw error;
+    }
   }
-});
+);
 
-assignmentRoutes.delete('/', zValidator('query', assignmentSchema), (c) => {
-  const input = c.req.valid('query');
-  const { role, scopeId, authority } = assignable(c, input);
-  const where = and(
-    eq(roleAssignments.userId, input.userId),
-    eq(roleAssignments.roleId, role.id),
-    scopeId ? eq(roleAssignments.scopeId, scopeId) : isNull(roleAssignments.scopeId)
-  );
-  const existing = getDb().select().from(roleAssignments).where(where).get();
-  if (!existing) throw new NotFoundError('Role assignment');
-  refuseOverOwner(c, authority, existing.grantedBy);
-  writeAt(role.scope, (tx) => tx.delete(roleAssignments).where(where).run());
-  return c.json({ success: true, message: 'Role removed' });
-});
+assignmentRoutes.delete(
+  '/',
+  zValidator('query', assignmentSchema),
+  authorize(assignmentResource),
+  (c) => {
+    const input = c.req.valid('query');
+    const { role, scopeId, authority } = assignable(c, input);
+    const where = and(
+      eq(roleAssignments.userId, input.userId),
+      eq(roleAssignments.roleId, role.id),
+      scopeId ? eq(roleAssignments.scopeId, scopeId) : isNull(roleAssignments.scopeId)
+    );
+    const existing = getDb().select().from(roleAssignments).where(where).get();
+    if (!existing) throw new NotFoundError('Role assignment');
+    refuseOverOwner(c, authority, existing.grantedBy);
+    writeAt(role.scope, (tx) => tx.delete(roleAssignments).where(where).run());
+    return c.json({ success: true, message: 'Role removed' });
+  }
+);
 
 const overrideTargetSchema = z.object({
   userId: z.string().min(1),
@@ -361,6 +386,7 @@ overrideRoutes.put(
       effect: z.enum(['allow', 'deny']),
     })
   ),
+  authorize(overrideResource),
   (c) => {
     const { userId, scope, scopeId, permission, effect } = c.req.valid('json');
     const authority = authorityAt(c, scope, scopeId);
@@ -398,6 +424,7 @@ overrideRoutes.put(
 overrideRoutes.delete(
   '/',
   zValidator('query', overrideTargetSchema.extend({ permission: z.string().min(1) })),
+  authorize(overrideResource),
   (c) => {
     const { userId, scope, scopeId, permission } = c.req.valid('query');
     const authority = authorityAt(c, scope, scopeId);

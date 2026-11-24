@@ -28,6 +28,8 @@ interface RouteCase {
   mode: VehicleAccessMode;
   request: (fx: Fixture) => [method: string, path: string, body?: unknown];
   expectInBody?: (fx: Fixture) => string;
+  authorized?: boolean;
+  allowed?: readonly Actor[];
 }
 
 const ALLOWED: Record<VehicleAccessMode, readonly Actor[]> = {
@@ -100,39 +102,47 @@ const ROUTES: RouteCase[] = [
   {
     name: 'GET /expenses?vehicleId',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/expenses?vehicleId=${fx.vehicleId}`],
     expectInBody: (fx) => fx.expenseId,
   },
   {
     name: 'GET /expenses/summary?vehicleId',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/expenses/summary?vehicleId=${fx.vehicleId}`],
   },
   {
     name: 'GET /expenses/export?vehicleId',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/expenses/export?vehicleId=${fx.vehicleId}`],
     expectInBody: () => 'access-table expense',
   },
   {
     name: 'GET /expenses/:id',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/expenses/${fx.expenseId}`],
     expectInBody: (fx) => fx.expenseId,
   },
   {
     name: 'POST /expenses',
     mode: 'write',
+    authorized: true,
     request: (fx) => ['POST', '/expenses', { ...EXPENSE_BODY, vehicleId: fx.vehicleId }],
   },
   {
     name: 'PUT /expenses/:id',
     mode: 'write',
+    authorized: true,
     request: (fx) => ['PUT', `/expenses/${fx.expenseId}`, { description: 'edited' }],
   },
   {
     name: 'DELETE /expenses/:id',
     mode: 'write',
+    authorized: true,
+    allowed: ['owner'],
     request: (fx) => ['DELETE', `/expenses/${fx.expenseId}`],
   },
   {
@@ -395,8 +405,9 @@ afterEach(() => ctx.close());
 describe('every vehicle-scoped route enforces owner / editor / viewer / stranger access', () => {
   for (const route of ROUTES) {
     for (const actor of ['owner', 'editor', 'viewer', 'stranger'] as const) {
-      const allowed = ALLOWED[route.mode].includes(actor);
-      test(`${route.name} as ${actor} → ${allowed ? 'allowed' : '404'}`, async () => {
+      const allowed = (route.allowed ?? ALLOWED[route.mode]).includes(actor);
+      const denied = route.authorized && actor !== 'stranger' ? 403 : 404;
+      test(`${route.name} as ${actor} → ${allowed ? 'allowed' : denied}`, async () => {
         const [method, path, body] = route.request(fx);
         const res = await as[actor](method, `/api/v1${path}`, body);
         if (allowed) {
@@ -404,7 +415,7 @@ describe('every vehicle-scoped route enforces owner / editor / viewer / stranger
           expect(res.status, text).toBeLessThan(300);
           if (route.expectInBody) expect(text).toContain(route.expectInBody(fx));
         } else {
-          expect(res.status).toBe(404);
+          expect(res.status).toBe(denied);
         }
       });
     }
