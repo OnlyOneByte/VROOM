@@ -4,11 +4,16 @@ import type { UserProviderInfo } from '#lib/types/index.ts';
 import { defaultFolderSettings } from '#lib/constants/providers.ts';
 
 const getSyncStatus = vi.fn<(id: string) => Promise<Record<string, never>>>();
+const testProvider =
+	vi.fn<(id: string) => Promise<{ ok: boolean; message: string; code?: string }>>();
+const getProviders = vi.fn<(domain?: string) => Promise<UserProviderInfo[]>>();
 vi.mock('#lib/services/provider-api.ts', () => ({
 	providerApi: {
 		getCatalog: async () =>
 			(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).PROVIDER_CATALOG,
 		getSyncStatus: (id: string) => getSyncStatus(id),
+		testProvider: (id: string) => testProvider(id),
+		getProviders: (domain?: string) => getProviders(domain),
 		backfillProvider: vi.fn()
 	}
 }));
@@ -78,8 +83,9 @@ afterEach(() => {
 describe('ProviderInfoCard header', () => {
 	test.each([
 		['active', 'Connected'],
-		['error', 'Error'],
-		['disconnected', 'Disconnected']
+		['needs_reauth', 'Needs reconnecting'],
+		['error', 'Not working'],
+		['disabled', 'Turned off']
 	] as const)('status %s is labelled %s', async (status, label) => {
 		await mount({ provider: provider({ status }) });
 		expect(screen.getByText(label)).toBeInTheDocument();
@@ -104,6 +110,103 @@ describe('ProviderInfoCard header', () => {
 		await mount();
 		expect(screen.getByText(/ada@gmail\.com ·/)).toBeInTheDocument();
 		expect(screen.getByText('My Drive')).toBeInTheDocument();
+	});
+
+	test('a healthy provider shows when it was last checked and a Test Connection button', async () => {
+		await mount({ provider: provider({ lastCheckedAt: '2026-05-10T11:55:00.000Z' }) });
+		expect(screen.getByText('Connection checked 5m ago')).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Test Connection to My Drive' })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Reconnect' })).toBeNull();
+	});
+
+	test('a provider that needs reconnecting says why and offers Reconnect, which opens the edit flow', async () => {
+		await mount({ provider: provider({ status: 'needs_reauth', lastErrorCode: 'auth' }) });
+		expect(
+			screen.getByText("The saved sign-in or key isn't accepted anymore.")
+		).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
+		expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 'prov-1' }));
+	});
+
+	test('a provider that is not working says what to check and offers Edit Provider', async () => {
+		await mount({ provider: provider({ status: 'error', lastErrorCode: 'unreachable' }) });
+		expect(screen.getByText("Couldn't reach the provider.")).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Edit Provider' })).toBeInTheDocument();
+	});
+
+	test('Test Connection checks the provider and hands back its refreshed status', async () => {
+		const onUpdated = vi.fn<(p: UserProviderInfo) => void>();
+		testProvider.mockResolvedValue({ ok: false, code: 'auth', message: 'Reconnect it.' });
+		getProviders.mockResolvedValue([provider({ status: 'needs_reauth', lastErrorCode: 'auth' })]);
+		await mount({ onUpdated });
+		await fireEvent.click(screen.getByRole('button', { name: 'Test Connection to My Drive' }));
+		await settle();
+		expect(testProvider).toHaveBeenCalledWith('prov-1');
+		expect(getProviders).toHaveBeenCalledWith('storage');
+		expect(onUpdated).toHaveBeenCalledWith(expect.objectContaining({ status: 'needs_reauth' }));
+		expect(screen.getAllByRole('status').at(-1)).toHaveTextContent('Reconnect it.');
+	});
+
+	test('focus stays on Test Connection when the result moves it into the alert', async () => {
+		testProvider.mockResolvedValue({ ok: false, code: 'auth', message: 'Reconnect it.' });
+		getProviders.mockResolvedValue([provider({ status: 'needs_reauth', lastErrorCode: 'auth' })]);
+		const view = await mount({
+			onUpdated: (p: UserProviderInfo) => view.rerender({ provider: p })
+		});
+		const button = screen.getByRole('button', { name: 'Test Connection to My Drive' });
+		button.focus();
+		await fireEvent.click(button);
+		await settle();
+		expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+		expect(document.activeElement).toBe(
+			screen.getByRole('button', { name: 'Test Connection to My Drive' })
+		);
+	});
+
+	test('a failed check on a provider that is still active shows the failure on screen', async () => {
+		testProvider.mockResolvedValue({
+			ok: false,
+			code: 'unreachable',
+			message: "Couldn't reach the provider."
+		});
+		getProviders.mockResolvedValue([provider({ status: 'active', lastErrorCode: 'unreachable' })]);
+		const view = await mount({
+			onUpdated: (p: UserProviderInfo) => view.rerender({ provider: p })
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Test Connection to My Drive' }));
+		await settle();
+		const shown = screen
+			.getAllByText("Couldn't reach the provider.")
+			.filter(el => !el.classList.contains('sr-only'));
+		expect(shown).toHaveLength(1);
+		expect(screen.getByText('Connected')).toBeInTheDocument();
+	});
+
+	test('a test that fails to run says so on screen and still refreshes the card', async () => {
+		testProvider.mockRejectedValue(new Error('offline'));
+		getProviders.mockResolvedValue([provider({ status: 'error', lastErrorCode: 'config' })]);
+		const onUpdated = vi.fn<(p: UserProviderInfo) => void>();
+		await mount({ onUpdated });
+		await fireEvent.click(screen.getByRole('button', { name: 'Test Connection to My Drive' }));
+		await settle();
+		const shown = screen
+			.getAllByText(/^Couldn't test the connection\./)
+			.filter(el => !el.classList.contains('sr-only'));
+		expect(shown).toHaveLength(1);
+		expect(onUpdated).toHaveBeenCalledWith(expect.objectContaining({ status: 'error' }));
+	});
+
+	test('Reconnect uses onReconnect when the card has one, and Edit Provider always edits', async () => {
+		const onReconnect = vi.fn<(p: UserProviderInfo) => void>();
+		await mount({ provider: provider({ status: 'needs_reauth' }), onReconnect });
+		await fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
+		expect(onReconnect).toHaveBeenCalledWith(expect.objectContaining({ id: 'prov-1' }));
+		expect(onEdit).not.toHaveBeenCalled();
+	});
+
+	test('a turned-off provider shows no test row', async () => {
+		await mount({ provider: provider({ status: 'disabled' }) });
+		expect(screen.queryByRole('button', { name: /Test Connection/ })).toBeNull();
 	});
 
 	test('edit and delete hand the provider to their callbacks', async () => {

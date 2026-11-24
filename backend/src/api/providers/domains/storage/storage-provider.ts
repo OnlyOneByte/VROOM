@@ -86,6 +86,27 @@ function statusOf(error: Record<string, unknown>): number | undefined {
   return typeof status === 'number' ? status : undefined;
 }
 
+const THROTTLE_REASONS = new Set([
+  'rateLimitExceeded',
+  'userRateLimitExceeded',
+  'quotaExceeded',
+  'storageQuotaExceeded',
+  'dailyLimitExceeded',
+]);
+
+function isThrottled(error: Record<string, unknown>, text: string): boolean {
+  const data = (error.response as { data?: { error?: { errors?: { reason?: unknown }[] } } })?.data;
+  const reasons = [
+    ...((error.errors as { reason?: unknown }[] | undefined) ?? []),
+    ...(data?.error?.errors ?? []),
+  ].map((item) => String(item?.reason ?? ''));
+  const googleShaped = Array.isArray(error.errors) || data?.error !== undefined;
+  return (
+    reasons.some((reason) => THROTTLE_REASONS.has(reason)) ||
+    (googleShaped && /rate limit|quota/i.test(text))
+  );
+}
+
 export function credentialFailureOf(error: unknown): SyncError | null {
   if (isSyncError(error)) {
     return error.code === SyncErrorCode.AUTH_INVALID ||
@@ -100,6 +121,7 @@ export function credentialFailureOf(error: unknown): SyncError | null {
   if (status === 401 || AUTH_ERROR_NAMES.has(String(record.name)) || /invalid_grant/.test(text)) {
     return new SyncError(SyncErrorCode.AUTH_INVALID, 'The provider rejected the saved credentials');
   }
+  if (status === 403 && isThrottled(record, text)) return null;
   if (status === 403 || record.name === 'AccessDenied') {
     return new SyncError(SyncErrorCode.PERMISSION_DENIED, 'The provider refused access');
   }

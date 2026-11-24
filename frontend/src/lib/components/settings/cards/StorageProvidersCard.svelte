@@ -25,6 +25,9 @@
 	} from '#lib/components/ui/card/index.ts';
 	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import DefaultPhotoSources from '../storage-provider/DefaultPhotoSources.svelte';
+	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
+	import { startGoogleConnect } from '../storage-provider/use-google-oauth.svelte.ts';
+	import { providerCatalog } from '#lib/stores/provider-catalog.svelte.ts';
 	import ProviderCard from '../storage-provider/ProviderInfoCard.svelte';
 	import { photosOnlyOnProvider, providerApi } from '#lib/services/provider-api.ts';
 	import { orphanedPhotosApi } from '#lib/services/photo-api.ts';
@@ -163,6 +166,22 @@
 		goto(resolve(paramRoutes.settingsProviderEdit, { id: provider.id }));
 	}
 
+	function handleProviderReconnect(provider: UserProviderInfo) {
+		const entry = providerCatalog.storage.find(e => e.id === provider.providerType);
+		if (entry?.connect !== 'oauth') {
+			handleProviderEdit(provider);
+			return;
+		}
+		const email = provider.config['accountEmail'];
+		startGoogleConnect({
+			isEditMode: true,
+			providerId: provider.id,
+			...(typeof email === 'string' && { existingEmail: email }),
+			displayName: provider.displayName,
+			selectedType: provider.providerType
+		});
+	}
+
 	let deleteConfirmOpen = $state(false);
 	let pendingDelete = $state<UserProviderInfo | null>(null);
 
@@ -194,6 +213,14 @@
 		if (!stored) return DEFAULT_CATEGORY_SETTINGS;
 		return { ...DEFAULT_CATEGORY_SETTINGS, ...stored };
 	}
+
+	let unhealthyBackupProviders = $derived(
+		providers.filter(
+			p =>
+				(p.status === 'needs_reauth' || p.status === 'error') &&
+				(backupConfig.providers[p.id]?.enabled || backupConfig.providers[p.id]?.sheetsSyncEnabled)
+		)
+	);
 
 	let backupProviderCount = $derived(
 		Object.values(backupConfig.providers).filter(p => p.enabled || p.sheetsSyncEnabled).length
@@ -294,6 +321,25 @@
 		{:else}
 			<div class="space-y-4">
 				<p class="text-sm font-medium">Data Backups</p>
+
+				{#if unhealthyBackupProviders.length > 0}
+					<Alert role="status" variant="warning">
+						<CircleAlert aria-hidden="true" />
+						<AlertTitle class="line-clamp-none">
+							{unhealthyBackupProviders.length === 1
+								? '1 backup provider needs attention.'
+								: `${unhealthyBackupProviders.length} backup providers need attention.`}
+						</AlertTitle>
+						<AlertDescription class="text-foreground!">
+							Your backups may not reach {new Intl.ListFormat('en', {
+								type: 'conjunction'
+							}).format(unhealthyBackupProviders.map(p => p.displayName))} until you fix {unhealthyBackupProviders.length ===
+							1
+								? 'it'
+								: 'them'} below.
+						</AlertDescription>
+					</Alert>
+				{/if}
 
 				{#if backupProviderCount > 0}
 					<div class="text-xs text-muted-foreground">Last backup: {lastBackupText}</div>
@@ -411,9 +457,12 @@
 								sheetsSyncEnabled={backupConfig.providers[provider.id]?.sheetsSyncEnabled ?? false}
 								lastBackupAt={backupConfig.providers[provider.id]?.lastBackupAt}
 								onEdit={handleProviderEdit}
+								onReconnect={handleProviderReconnect}
 								onDelete={requestProviderDelete}
 								onBackupToggle={handleBackupToggle}
 								onSheetsSyncToggle={handleSheetsSyncToggle}
+								onUpdated={updated =>
+									(providers = providers.map(p => (p.id === updated.id ? updated : p)))}
 							/>
 						{/each}
 					</div>

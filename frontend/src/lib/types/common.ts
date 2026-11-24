@@ -37,15 +37,26 @@ export interface Photo {
 	createdAt: string;
 }
 
+export type ProviderStatus = 'active' | 'needs_reauth' | 'error' | 'disabled';
+export type ProviderHealthCode = 'auth' | 'permission' | 'unreachable' | 'config';
+
+export interface ProviderHealthResult {
+	ok: boolean;
+	code?: ProviderHealthCode;
+	message: string;
+}
+
 export interface UserProviderInfo {
 	id: string;
 	domain: string;
 	providerType: string;
 	displayName: string;
-	status: 'active' | 'error' | 'disconnected';
+	status: ProviderStatus;
 	config: Record<string, unknown>;
 	secretsSet?: string[];
-	lastSyncAt?: string;
+	lastSyncAt?: string | null;
+	lastErrorCode?: ProviderHealthCode | null;
+	lastCheckedAt?: string | null;
 	createdAt: string;
 }
 
