@@ -308,6 +308,7 @@
   "frontend/src/routes/settings/+page.svelte: Leave the list empty; the page already renders its empty state.",
   "frontend/src/routes/vehicles/[id]/odometer/new/+page.svelte: The soft warning is optional; ignore failures.",
   "frontend/src/service-worker/index.ts: No sync listener: the offline outbox lives in localStorage, which workers cannot read.",
+  "frontend/vite.config.ts: shortcut: LayerChart needs only geoPath (for map projections VROOM never draws) and one colour scheme, so these stand-ins keep 14 KB of d3-geo and d3-scale-chromatic off the charts; drop an alias before using geo charts or another scheme.",
   "frontend/vite.config.ts: Vitest's default conditions omit 'browser'; without it inlined svelte loads its server entry, where mount() throws.",
   "frontend/vite.config.ts: Without strictPort a busy port silently shifts, leaving callers waiting on the pinned one.",
   "frontend/vite.config.ts: withPwa appends a prerendered/ pattern that this app never matches; strict globbing would fail the build."
