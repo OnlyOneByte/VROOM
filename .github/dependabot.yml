@@ -41,7 +41,6 @@ updates:
       day: "monday"
     labels:
       - "dependencies"
-      - "ci"
 
   - package-ecosystem: "github-actions"
     directory: "/"
