@@ -77,6 +77,7 @@ async function runS3Contract(): Promise<{
       NODE_ENV: 'test',
       DATABASE_URL: ':memory:',
       PROVIDER_ENCRYPTION_KEY: '0'.repeat(64),
+      PRIVATE_PROVIDER_ENDPOINTS: 'allow',
     },
     stdout: 'pipe',
     stderr: 'pipe',

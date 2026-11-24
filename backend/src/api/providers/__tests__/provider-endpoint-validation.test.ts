@@ -8,7 +8,10 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
-import { blockPrivateProviderEndpoints } from '../../../test-helpers/outbound';
+import {
+  blockPrivateProviderEndpoints,
+  usePrivateProviderEndpoints,
+} from '../../../test-helpers/outbound';
 import { encrypt } from '../../../utils/encryption';
 import { outboundResolver, urlForAddress } from '../../../utils/outbound-url';
 import { resolveModelSettings } from '../domains/model/model-registry';
@@ -89,7 +92,7 @@ function insertStoredS3Provider(endpoint: string): string {
   return id;
 }
 
-describe('provider endpoints by default', () => {
+describe('provider endpoints when the admin allows private endpoints', () => {
   test.each([
     'http://169.254.169.254',
     'http://[fe80::1]',
@@ -139,7 +142,7 @@ describe('provider endpoints by default', () => {
   });
 });
 
-describe('provider endpoints with private endpoints blocked', () => {
+describe('provider endpoints by default, with private endpoints blocked', () => {
   blockPrivateProviderEndpoints();
 
   test.each([
@@ -168,6 +171,41 @@ describe('provider endpoints with private endpoints blocked', () => {
   test('an S3 provider whose host resolves to a private address never sends', async () => {
     outboundResolver.lookup = async () => ['10.0.0.9'];
     await expect(sendS3({})).rejects.toThrow(ValidationError);
+  });
+
+  test('a stored row saved while LAN hosts were allowed is refused when tested', async () => {
+    const id = insertStoredS3Provider('http://192.168.1.20:9000');
+    const res = await ctx.authed('POST', `/api/v1/providers/${id}/test`);
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('provider endpoints with an admin allowlist', () => {
+  usePrivateProviderEndpoints({ block: false, allow: '192.168.1.20:9000' });
+
+  test('the allowlisted host and port is accepted', async () => {
+    const res = await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.20:9000'));
+    expect(res.status).toBe(201);
+  });
+
+  test.each(['http://192.168.1.20:80', 'http://192.168.1.21:9000', 'http://localhost:9000'])(
+    'storage endpoint %s outside the allowlist is rejected',
+    async (endpoint) => {
+      const res = await ctx.authed('POST', '/api/v1/providers', s3Body(endpoint));
+      expect(res.status).toBe(400);
+    }
+  );
+
+  test('a name that resolves to a public address over plain http is never sent to', async () => {
+    const id = insertStoredS3Provider('http://s3.example.com');
+    const sent: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      sent.push(String(input));
+      return new Response(null, { status: 200 });
+    }) as typeof fetch;
+    const res = await ctx.authed('POST', `/api/v1/providers/${id}/test`);
+    expect((await json<DataEnvelope<{ ok: boolean }>>(res)).data.ok).toBe(false);
+    expect(sent).toEqual([]);
   });
 });
 
