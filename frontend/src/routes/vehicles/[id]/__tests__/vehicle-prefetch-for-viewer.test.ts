@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import type { Vehicle } from '#lib/types/index.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
@@ -80,8 +80,8 @@ describe('vehicle page — a shared viewer', () => {
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 
 		await screen.findByRole('tab', { name: 'Finance' });
+		await waitFor(() => expect(requested.has('finance')).toBe(true), { timeout: 3000 });
 		await pause();
-		expect(requested.has('finance')).toBe(true);
 		expect(requested.has('upload')).toBe(false);
 	});
 });
