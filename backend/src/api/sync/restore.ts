@@ -626,7 +626,13 @@ class RestoreService {
         String(row.vehicleId),
       ])
     );
-    this.insertRows(tx, trips, this.stampUserId(data.trips, userId));
+    this.insertRows(
+      tx,
+      trips,
+      this.keepMemberAuthors(this.stampUserId(data.trips, userId), consentedShares, (row) => [
+        String(row.vehicleId),
+      ])
+    );
     this.insertRows(
       tx,
       vehicleShares,
@@ -651,7 +657,23 @@ class RestoreService {
       )
     );
     this.insertRows(tx, syncState, this.stampUserId(data.syncState, userId));
-    this.insertRows(tx, photos, this.stampUserId(data.photos, userId));
+    const entryVehicle = new Map<string, string>(
+      [...(data.expenses ?? []), ...(data.odometer ?? [])].map((row) => [
+        String(row.id),
+        String(row.vehicleId),
+      ])
+    );
+    const photoVehicle = (row: Record<string, unknown>): string =>
+      row.entityType === 'vehicle'
+        ? String(row.entityId)
+        : (entryVehicle.get(String(row.entityId)) ?? '');
+    this.insertRows(
+      tx,
+      photos,
+      this.keepMemberAuthors(this.stampUserId(data.photos, userId), consentedShares, (row) => [
+        photoVehicle(row),
+      ])
+    );
     const refRows = this.relinkPhotoRefs(
       tx,
       (data.photoRefs ?? []) as Record<string, unknown>[],

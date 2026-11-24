@@ -17,13 +17,13 @@ export function rulePermissions(rule: RouteRule): PermissionId[] {
 
 function photoRule(action: 'read' | 'write' | 'delete'): EntityRule {
   const photo: PermissionId = `vehicle.photo.${action}`;
-  const insurance: PermissionId =
-    action === 'read' ? 'vehicle.insurance.read' : 'vehicle.insurance.write';
+  const access = action === 'read' ? 'read' : 'write';
+  const insurance: PermissionId = `vehicle.insurance.${access}`;
   return {
     byEntity: {
       vehicle: [photo],
-      expense: [photo],
-      odometer_entry: [photo],
+      expense: [photo, `vehicle.expense.${access}`],
+      odometer_entry: [photo, `vehicle.odometer.${access}`],
       insurance_policy: [photo, insurance],
       insurance_claim: [photo, insurance],
     },

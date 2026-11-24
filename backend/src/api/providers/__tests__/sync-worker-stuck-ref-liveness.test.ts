@@ -33,6 +33,7 @@ function makePhoto(id: string): Photo {
     fileSize: 1024,
     isCover: false,
     sortOrder: 0,
+    createdBy: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
   };
 }

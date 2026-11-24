@@ -61,7 +61,6 @@
   "backend/src/api/odometer/repository.ts: Shared with trips: changing this window breaks trip/odometer dedup.",
   "backend/src/api/photos/__tests__/photo-service.property.test.ts: created_at has 1s resolution, so pin the creation order for deterministic promotion.",
   "backend/src/api/photos/__tests__/photos-http.test.ts: Bun's mock.module is process-global and never restored, so no other file may mock photo-repository.",
-  "backend/src/api/photos/helpers.ts: Shared-vehicle rows carry the owner's userId, so authorize through the vehicle write gate.",
   "backend/src/api/photos/helpers.ts: mimeType is client-asserted; nosniff stops the browser from executing uploaded content.",
   "backend/src/api/photos/photo-repository.ts: Must use the instance db: the module-level transaction() helper ignores the injected connection.",
   "backend/src/api/photos/photo-repository.ts: SQLite caps bound parameters at 32766; batch large IN lists.",

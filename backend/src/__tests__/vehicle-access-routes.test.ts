@@ -283,7 +283,8 @@ const ROUTES: RouteCase[] = [
   },
   {
     name: 'POST /trips',
-    mode: 'owner',
+    mode: 'write',
+    authorized: true,
     request: (fx) => [
       'POST',
       '/trips',
@@ -298,13 +299,15 @@ const ROUTES: RouteCase[] = [
   },
   {
     name: 'GET /trips?vehicleId',
-    mode: 'owner',
+    mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/trips?vehicleId=${fx.vehicleId}`],
     expectInBody: (fx) => fx.tripId,
   },
   {
     name: 'GET /trips/summary?vehicleId',
-    mode: 'owner',
+    mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/trips/summary?vehicleId=${fx.vehicleId}`],
     expectInBody: () => '"tripCount":1',
   },

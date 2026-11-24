@@ -389,6 +389,7 @@ export const trips = sqliteTable(
     startLocation: text('start_location'),
     endLocation: text('end_location'),
     note: text('note'),
+    createdBy: text('created_by'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
@@ -414,6 +415,7 @@ export const photos = sqliteTable(
     fileSize: integer('file_size').notNull(),
     isCover: integer('is_cover', { mode: 'boolean' }).notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
+    createdBy: text('created_by'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
   (table) => ({

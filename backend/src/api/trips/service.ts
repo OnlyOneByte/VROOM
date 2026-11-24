@@ -65,6 +65,7 @@ async function afterOdometerChange(
 export async function createTrip(
   userId: string,
   data: CreateTripInput,
+  createdBy: string | null = null,
   db: AppDatabase = getDb()
 ): Promise<Trip> {
   await requireVehicleAccess(data.vehicleId, userId, 'owner');
@@ -83,6 +84,7 @@ export async function createTrip(
         startLocation: data.startLocation ?? null,
         endLocation: data.endLocation ?? null,
         note: data.note ?? null,
+        createdBy,
       })
       .returning()
       .get();
@@ -94,6 +96,7 @@ export async function createTrip(
         odometer: data.endOdometer,
         recordedAt: data.tripDate,
         timeZone: data.timeZone,
+        createdBy,
       },
       tx
     );
@@ -165,7 +168,15 @@ export async function updateTrip(
     else removed = odometerRepository.deleteLinkedTripEntry(oldKey, tx);
     assertOdometerInOrder(tx, check);
     odometerRepository.createFromTrip(
-      { tripId: id, vehicleId, userId, odometer: end, recordedAt: tripDate, timeZone },
+      {
+        tripId: id,
+        vehicleId,
+        userId,
+        odometer: end,
+        recordedAt: tripDate,
+        timeZone,
+        createdBy: existing.createdBy,
+      },
       tx
     );
     return { updated: row, removedEntryIds: removed };
