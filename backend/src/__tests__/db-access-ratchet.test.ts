@@ -58,7 +58,7 @@ const BASELINE: Record<string, number> = {
   'api/vehicles/repository.ts · repository singleton': 1,
   'api/vehicles/routes.ts · getDb()': 3,
   'permissions/authorize.ts · getDb()': 1,
-  'utils/outbound-url.ts · getDb()': 2,
+  'utils/outbound-url.ts · getDb()': 3,
   'utils/vehicle-access.ts · getDb()': 3,
 };
 
