@@ -4,38 +4,10 @@ import type { StorageRef } from '../domains/storage/storage-provider';
 
 const mockSend = mock<(command: unknown) => Promise<unknown>>(() => Promise.resolve({}));
 
-mock.module('@aws-sdk/client-s3', () => {
-  class MockS3Client {
-    send = mockSend;
-    constructor(public config: unknown) {}
-  }
-  return {
-    S3Client: MockS3Client,
-    PutObjectCommand: class {
-      constructor(public input: unknown) {}
-    },
-    GetObjectCommand: class {
-      constructor(public input: unknown) {}
-    },
-    DeleteObjectCommand: class {
-      constructor(public input: unknown) {}
-    },
-    HeadBucketCommand: class {
-      constructor(public input: unknown) {}
-    },
-    ListObjectsV2Command: class {
-      constructor(public input: unknown) {}
-    },
-  };
-});
-
-const mockGetSignedUrl = mock<(...args: unknown[]) => Promise<string>>(() =>
-  Promise.resolve('https://s3.example.com/signed-url')
-);
-
-mock.module('@aws-sdk/s3-request-presigner', () => ({
-  getSignedUrl: mockGetSignedUrl,
-}));
+function withStubbedSend(provider: S3CompatProvider): S3CompatProvider {
+  (provider as unknown as { client: { send: typeof mockSend } }).client.send = mockSend;
+  return provider;
+}
 
 const credentials = { accessKeyId: 'test-key', secretAccessKey: 'test-secret' };
 const KEY_PATTERN = (prefix: string, fileName: string) =>
@@ -49,9 +21,8 @@ describe('S3CompatProvider', () => {
   let provider: S3CompatProvider;
 
   beforeEach(() => {
-    provider = new S3CompatProvider(credentials, config);
+    provider = withStubbedSend(new S3CompatProvider(credentials, config));
     mockSend.mockReset();
-    mockGetSignedUrl.mockReset();
   });
 
   test('type is s3', () => {
@@ -220,21 +191,25 @@ describe('S3CompatProvider', () => {
   });
 
   describe('getExternalUrl', () => {
-    test('returns presigned URL on success', async () => {
-      mockGetSignedUrl.mockResolvedValueOnce('https://s3.example.com/presigned/photo.jpg');
-
+    test('returns a presigned URL for the object, signed locally without a request', async () => {
       const ref: StorageRef = {
         providerType: 's3',
         externalId: 'vroom/vehicle/v-1/photo.jpg',
       };
 
-      const url = await provider.getExternalUrl(ref);
-      expect(url).toBe('https://s3.example.com/presigned/photo.jpg');
-      expect(mockGetSignedUrl).toHaveBeenCalledTimes(1);
+      const url = new URL((await provider.getExternalUrl(ref)) ?? '');
+      expect(`${url.origin}${url.pathname}`).toBe(
+        'https://s3.example.com/test-bucket/vroom/vehicle/v-1/photo.jpg'
+      );
+      expect(url.searchParams.get('X-Amz-Expires')).toBe('3600');
+      expect(url.searchParams.get('X-Amz-Signature')).toMatch(/^[0-9a-f]{64}$/);
+      expect(mockSend).not.toHaveBeenCalled();
     });
 
     test('returns null when presigning fails', async () => {
-      mockGetSignedUrl.mockRejectedValueOnce(new Error('Signing error'));
+      const client = (provider as unknown as { client: { config: Record<string, unknown> } })
+        .client;
+      client.config['credentials'] = () => Promise.reject(new Error('Signing error'));
 
       const ref: StorageRef = {
         providerType: 's3',
@@ -291,7 +266,7 @@ describe('S3CompatProvider list', () => {
 
   let provider: S3CompatProvider;
   beforeEach(() => {
-    provider = new S3CompatProvider(credentials, config);
+    provider = withStubbedSend(new S3CompatProvider(credentials, config));
     mockSend.mockReset();
     mockSend.mockImplementation(listLikeS3);
   });
