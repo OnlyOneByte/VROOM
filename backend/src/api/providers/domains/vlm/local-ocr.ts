@@ -8,6 +8,7 @@ import type { RawExtraction, ReceiptImage, VlmProvider } from './vlm-provider';
 
 const IDLE_STOP_MS = 60_000;
 export const LOCAL_OCR_MAX_WAITING = 8;
+const ENGINE_CRASH = /RuntimeError|null reference|unreachable|out of bounds|memory access/i;
 
 export const LOCAL_OCR_LANG_PATH = join(
   dirname(createRequire(import.meta.url).resolve('@tesseract.js-data/eng/package.json')),
@@ -143,6 +144,13 @@ async function recognizeOnce(image: Buffer): Promise<string> {
     if (error instanceof OcrUnavailableError) {
       dropWorker();
       throw error;
+    }
+    if (ENGINE_CRASH.test(String(error))) {
+      logger.warn('The text reader crashed; it restarts on the next scan', {
+        error: String(error),
+      });
+      dropWorker();
+      throw new OcrUnavailableError('The text reader stopped unexpectedly. Try again');
     }
     scheduleIdleStop();
     throw new OcrUnreadableError(error instanceof Error ? error.message : String(error));
