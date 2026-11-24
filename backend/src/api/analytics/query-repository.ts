@@ -391,8 +391,12 @@ function bucketsCte(periods: Bucket[][]): SQL {
   const rows: SQL[] = [];
   periods.forEach((buckets, period) => {
     buckets.forEach((b, idx) => {
+      const values = [period, idx, b.start, b.end];
+      for (const v of values) if (!Number.isSafeInteger(v)) throw new TypeError(String(v));
       rows.push(
-        sql`(${typedParam(period, 'bigint')}, ${typedParam(idx, 'bigint')}, ${typedParam(b.start, 'bigint')}, ${typedParam(b.end, 'bigint')})`
+        rows.length === 0
+          ? sql`(${typedParam(period, 'bigint')}, ${typedParam(idx, 'bigint')}, ${typedParam(b.start, 'bigint')}, ${typedParam(b.end, 'bigint')})`
+          : sql`(${period}, ${idx}, ${b.start}, ${b.end})`
       );
     });
   });
