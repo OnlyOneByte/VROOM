@@ -68,18 +68,19 @@ beforeEach(() => {
 });
 
 describe('dashboard primary action', () => {
-	test('with a vehicle, Log Fill-up is the single floating primary and Add Vehicle is secondary', async () => {
+	test('with a vehicle, Log Fill-up is the single primary at every width and Add Vehicle is secondary', async () => {
 		getVehicles.mockImplementation(() => Promise.resolve([OWNED]));
 		render(Page);
 
 		await waitFor(() => expect(belowLg('Log Fill-up')).toHaveLength(1));
-		expect(belowLg('Log Fill-up')[0]).toHaveClass('fixed');
+		expect(controls('Log Fill-up')).toHaveLength(1);
+		expect(belowLg('Log Fill-up')[0]).not.toHaveClass('fixed');
 		expect(belowLg('Add Vehicle')).toHaveLength(0);
 		expect(fromLg('Add Vehicle')).toHaveLength(1);
 		expect(fromLg('Add Vehicle')[0]).toHaveClass('border', 'bg-background');
 	});
 
-	test('from lg: up, Log Fill-up moves from the floating button to the header', async () => {
+	test('Log Fill-up sits in the page header', async () => {
 		getVehicles.mockImplementation(() => Promise.resolve([OWNED]));
 		render(Page);
 
@@ -102,20 +103,18 @@ describe('dashboard primary action', () => {
 		expect(controls('Log Fill-up')).toHaveLength(0);
 	});
 
-	test('with only vehicles shared with me, Add Vehicle is the floating primary and there is no Log Fill-up', async () => {
+	test('with only vehicles shared with me, Add Vehicle is the primary and there is no Log Fill-up', async () => {
 		getVehicles.mockImplementation(() =>
 			Promise.resolve([{ ...OWNED, sharedAccess: { sharedBy: 'Sam' } } as unknown as Vehicle])
 		);
 		render(Page);
 
-		await waitFor(() => expect(belowLg('Add Vehicle')).toHaveLength(1));
-		expect(belowLg('Add Vehicle')[0]).toHaveClass('fixed');
-		expect(fromLg('Add Vehicle')).toHaveLength(1);
-		expect(fromLg('Add Vehicle')[0]).not.toHaveClass('fixed');
+		await waitFor(() => expect(controls('Add Vehicle')).toHaveLength(1));
+		expect(controls('Add Vehicle')[0]).not.toHaveClass('fixed', 'hidden');
 		expect(controls('Log Fill-up')).toHaveLength(0);
 	});
 
-	test('no floating action while the first load is in flight', async () => {
+	test('no primary action while the first load is in flight', async () => {
 		getVehicles.mockImplementation(() => new Promise<Vehicle[]>(() => {}));
 		render(Page);
 		await new Promise(resolve => setTimeout(resolve, 0));
@@ -190,7 +189,7 @@ describe('dashboard primary action', () => {
 		expect(appStore.notifications.filter(n => n.type === 'error')).toEqual([]);
 	});
 
-	test('a failed load offers only a 40px Retry, with no floating action', async () => {
+	test('a failed load offers only a 40px Retry, with no primary action', async () => {
 		getVehicles.mockImplementation(() => Promise.reject(new Error('Server down')));
 		render(Page);
 

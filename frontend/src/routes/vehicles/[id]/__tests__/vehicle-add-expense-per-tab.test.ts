@@ -58,30 +58,27 @@ vi.mock('#lib/services/analytics-api.ts', () => ({
 
 import Page from '../+page.svelte';
 
-function pageAddExpenseActions(): { fab: number; header: number } {
-	const links = screen.queryAllByRole('link', { name: 'Add Expense' });
-	return {
-		fab: links.filter(link => link.classList.contains('fixed')).length,
-		header: links.filter(link => link.classList.contains('lg:inline-flex')).length
-	};
+function pageAddExpenseActions(): number {
+	return screen.queryAllByRole('link', { name: 'Add Expense' }).length;
 }
 
 describe('vehicle page Add Expense action per tab', () => {
-	test('the FAB and the header action show on every tab but Odometer', async () => {
+	test('the header action shows on every tab but Odometer', async () => {
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 		await screen.findByRole('tab', { name: 'Odometer' });
 
-		expect(pageAddExpenseActions()).toEqual({ fab: 1, header: 1 });
+		expect(pageAddExpenseActions()).toBe(1);
+		expect(screen.getByRole('link', { name: 'Add Expense' })).not.toHaveClass('fixed', 'hidden');
 
 		for (const tab of ['Expenses', 'Finance']) {
 			await fireEvent.click(screen.getByRole('tab', { name: tab }));
-			await waitFor(() => expect(pageAddExpenseActions()).toEqual({ fab: 1, header: 1 }));
+			await waitFor(() => expect(pageAddExpenseActions()).toBe(1));
 		}
 
 		await fireEvent.click(screen.getByRole('tab', { name: 'Odometer' }));
-		await waitFor(() => expect(pageAddExpenseActions()).toEqual({ fab: 0, header: 0 }));
+		await waitFor(() => expect(pageAddExpenseActions()).toBe(0));
 
 		await fireEvent.click(screen.getByRole('tab', { name: 'Overview' }));
-		await waitFor(() => expect(pageAddExpenseActions()).toEqual({ fab: 1, header: 1 }));
+		await waitFor(() => expect(pageAddExpenseActions()).toBe(1));
 	});
 });

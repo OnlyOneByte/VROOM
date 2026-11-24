@@ -42,14 +42,6 @@ function logTripControls() {
 	return screen.queryAllByRole('button', { name: 'Log Trip' });
 }
 
-function belowLg() {
-	return logTripControls().filter(control => !control.classList.contains('hidden'));
-}
-
-function fromLg() {
-	return logTripControls().filter(control => !control.classList.contains('lg:hidden'));
-}
-
 beforeEach(() => {
 	vi.clearAllMocks();
 });
@@ -72,9 +64,7 @@ describe('/trips primary action', () => {
 		render(Page);
 
 		await waitFor(() => expect(screen.getByTestId('trip-card-t1')).toBeInTheDocument());
-		expect(belowLg()).toHaveLength(1);
-		expect(belowLg()[0]).toHaveClass('fixed');
-		expect(fromLg()).toHaveLength(1);
-		expect(fromLg()[0]).not.toHaveClass('fixed');
+		expect(logTripControls()).toHaveLength(1);
+		expect(logTripControls()[0]).not.toHaveClass('fixed', 'hidden');
 	});
 });
