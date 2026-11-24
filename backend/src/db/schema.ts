@@ -813,3 +813,5 @@ export type CommunityStat = typeof communityStats.$inferSelect;
 export type NewCommunityStat = typeof communityStats.$inferInsert;
 
 export type CalendarFeed = typeof calendarFeeds.$inferSelect;
+
+export type Role = typeof roles.$inferSelect;

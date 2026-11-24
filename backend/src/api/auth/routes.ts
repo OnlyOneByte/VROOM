@@ -9,7 +9,7 @@ import { getDb } from '../../db/connection';
 import { userProviders, users } from '../../db/schema';
 import { createErrorResponse, isUniqueConstraintError, NotFoundError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
-import { assignServerRole } from '../../permissions/grants';
+import { assignServerRole, requestResolver } from '../../permissions/grants';
 import { PERMISSION_REGISTRY } from '../../permissions/registry';
 import { ROLE_TEMPLATES } from '../../permissions/roles';
 import { getClientIp } from '../../utils/client-ip';
@@ -601,6 +601,7 @@ routes.get('/capabilities', requireAuth, (c) =>
         scope,
         permissions,
       })),
+      rules: requestResolver(c, getDb()).packedRulesFor({ kind: 'server' }),
     },
   })
 );

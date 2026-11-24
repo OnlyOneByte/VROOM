@@ -72,13 +72,18 @@ vehicle owner is not a template: the owner holds every vehicle permission.
 Roles are rows. `syncBuiltInRoles()` writes the templates into `roles` and `role_permissions` on
 every start, with stable ids (`builtin_<key>`), so a template change needs no migration. Custom
 roles are server roles (managed with `server.roles.manage`) or vehicle roles in an owner's own
-library.
+library, assignable only on that owner's cars. Built-in roles can be copied (`copyFrom`) but not
+edited or deleted; the built-in keys are reserved, and a role's scope never changes.
 
 - `role_assignments` gives a person a role: at server scope (`scope_id` null), or on one vehicle.
-  Everyone holds Member, and the demo user Demo. Accepting a share assigns Editor or Viewer from
-  its level; changing the level swaps it; revoking or leaving deletes that person's vehicle
-  assignments and overrides. `vehicle_shares` stays the membership and invite record.
+  Everyone holds Member, and the demo user Demo. Accepting a share clears anything left over for
+  that person on that car and assigns Editor or Viewer from its level; changing the level swaps
+  it; revoking or leaving deletes that person's vehicle assignments and overrides. Each of these
+  re-reads the share in its transaction and answers 409 if it changed underneath. `vehicle_shares` stays the membership and invite record.
 - `permission_overrides` allows or denies one permission for one person, at server or vehicle scope.
+  A deny on `delete_own` does not stop someone who also holds `delete`; deny `delete` for that.
+- A full restore is refused (409) while the account's vehicles carry overrides or custom-role
+  assignments, since the restore re-creates the vehicles and would drop them. Merge mode is fine.
 
 `can()` in `src/permissions/resolve.ts` decides, following the design's algorithm:
 
@@ -95,12 +100,15 @@ library.
 5. A `delete` check also passes on `delete_own` when the entry's `createdBy` is the actor.
 
 The Demo role's vehicle reads count only for the built-in Demo row (built-in flag plus key), and
-only on the demo garage: vehicles whose owner holds that row. The frontend `can()` in
-`src/lib/utils/permissions.ts` reads the same rules, packed.
+only on the demo garage: vehicles whose owner holds that row. `GET /auth/capabilities` returns the
+caller's packed server and account rules, and the frontend `can()` in
+`src/lib/utils/permissions.ts` reads them.
 
 Writes go through the escalation guards in `src/permissions/grants.ts`: you grant only permissions
-you hold, assign only roles whose permissions you hold, and the registry refuses unknown,
-non-grantable and out-of-scope permissions (a custom server role can't hold vehicle permissions).
+you hold, assign only roles whose permissions you hold, the registry refuses unknown,
+non-grantable and out-of-scope permissions (a custom server role can't hold vehicle permissions),
+and the last holder of `server.roles.manage` keeps it. The API is `/roles`,
+`/roles/:id/permissions`, `/role-assignments`, `/overrides` and `/vehicles/:id/people`.
 
 A new resolution rule gets a row in `src/permissions/__tests__/resolution.cases.json`; the backend
 and frontend suites both run it.

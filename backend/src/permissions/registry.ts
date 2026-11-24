@@ -10,6 +10,7 @@ import { PHOTO_PERMISSIONS } from '../api/photos/capabilities';
 import { PROVIDER_PERMISSIONS } from '../api/providers/capabilities';
 import { PUSH_PERMISSIONS } from '../api/push/capabilities';
 import { REMINDER_PERMISSIONS } from '../api/reminders/capabilities';
+import { ROLE_PERMISSIONS } from '../api/roles/capabilities';
 import { SETTINGS_PERMISSIONS } from '../api/settings/capabilities';
 import { SHARE_PERMISSIONS } from '../api/shares/capabilities';
 import { SYNC_PERMISSIONS } from '../api/sync/capabilities';
@@ -28,6 +29,7 @@ const DECLARED_PERMISSIONS = [
   ...FINANCING_PERMISSIONS,
   ...INSURANCE_PERMISSIONS,
   ...SHARE_PERMISSIONS,
+  ...ROLE_PERMISSIONS,
   ...COMMUNITY_PERMISSIONS,
   ...ASSISTANT_PERMISSIONS,
   ...ACCOUNT_PERMISSIONS,
