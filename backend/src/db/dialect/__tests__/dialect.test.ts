@@ -128,10 +128,10 @@ describe('portable fragments over real SQLite', () => {
     return rows.map((r) => r.id).sort();
   }
 
-  test('sqlTrue and sqlFalse keep or drop every row', async () => {
+  test('sqlTrue() and sqlFalse() keep or drop every row', async () => {
     seedAt('e-1', new Date(2024, 0, 1));
-    expect(await idsWhere(sqlTrue)).toEqual(['e-1']);
-    expect(await idsWhere(sqlFalse)).toEqual([]);
+    expect(await idsWhere(sqlTrue())).toEqual(['e-1']);
+    expect(await idsWhere(sqlFalse())).toEqual([]);
   });
 
   test('jsonArraySome and jsonArrayIsEmpty read a JSON array column', async () => {
@@ -167,7 +167,7 @@ describe('portable fragments over real SQLite', () => {
     const [none] = await testDb.drizzle
       .select({ n: countNum(), total: sumNum(expenses.expenseAmount) })
       .from(expenses)
-      .where(sqlFalse);
+      .where(sqlFalse());
     expect(none).toEqual({ n: 0, total: 0 });
   });
 });

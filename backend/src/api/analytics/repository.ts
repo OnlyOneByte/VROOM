@@ -107,7 +107,7 @@ function vehicleFilterCondition(
   filter: VehicleFilter
 ): SQL | undefined {
   if (!filter) return undefined;
-  return filter.length > 0 ? inArray(column, [...filter]) : sqlFalse;
+  return filter.length > 0 ? inArray(column, [...filter]) : sqlFalse();
 }
 
 function toVehicleFilter(vehicles: string | VehicleFilter): VehicleFilter {

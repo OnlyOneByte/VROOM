@@ -271,7 +271,8 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     const limit = options?.limit ?? 50;
     const offset = options?.offset ?? 0;
     const financials = options?.hideFinancials ? sql`AND ${hiddenFinancialsScope()}` : sql``;
-    const visibleExpenses = options?.includeExpenses === false ? sql`AND ${sqlFalse}` : financials;
+    const visibleExpenses =
+      options?.includeExpenses === false ? sql`AND ${sqlFalse()}` : financials;
 
     try {
       const rows = await rawAll<{

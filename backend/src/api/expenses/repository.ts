@@ -741,8 +741,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     if (previousStart) conditions.push(gte(expenses.date, previousStart));
 
     const isOwnership = inArray(expenses.category, [...OWNERSHIP_CATEGORIES]);
-    const inCurrent = start ? gte(expenses.date, start) : sqlTrue;
-    const inPrevious = start ? lt(expenses.date, start) : sqlFalse;
+    const inCurrent = start ? gte(expenses.date, start) : sqlTrue();
+    const inPrevious = start ? lt(expenses.date, start) : sqlFalse();
     const bucketSum = (when: SQL) =>
       sumNum(sql`CASE WHEN ${when} THEN ${expenses.expenseAmount} ELSE 0 END`);
 

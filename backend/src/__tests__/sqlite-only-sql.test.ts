@@ -12,10 +12,11 @@ const PATTERNS: Record<string, RegExp> = {
   strftime: /\bstrftime\b/gi,
   unixepoch: /\bunixepoch\b/gi,
   julianday: /\bjulianday\b/gi,
-  rowid: /(?<![A-Za-z0-9])(?:rowid|ROWID)\b/g,
+  rowid: /(?<![A-Za-z0-9])(?:rowid|ROWID)(?![A-Za-z0-9])/g,
   'INSERT OR': /\bINSERT\s+OR\s+(?:IGNORE|REPLACE|ABORT|FAIL|ROLLBACK)\b/gi,
   PRAGMA: /\bpragma\b/gi,
-  'CROSS JOIN … ON': /\bCROSS\s+JOIN\s+(?:\w+|\$\{[^}]*\}|\([^)]*\))(?:\s+(?:AS\s+)?\w+)?\s+ON\b/gi,
+  'CROSS JOIN … ON':
+    /\bCROSS\s+JOIN\s+(?:\w+(?:\((?:[^()]|\([^()]*\))*\))?|"[^"]+"|`[^`]+`|\$\{[^}]*\}|\((?:[^()]|\([^()]*\))*\))(?:\s+(?:AS\s+)?\w+)?\s+ON\b/gi,
   'raw db/tx query': /\b(?:db|tx)\.(?:all|get|run|values)\s*(?:<[^(]*?>)?\s*\(\s*sql\b/g,
   SQLITE_: /\bSQLITE_/g,
   sqlite_master: /\bsqlite_master\b/gi,
@@ -86,6 +87,7 @@ countRatchet({
     expect(one('ORDER BY rowid', 'rowid')).toBe(1);
     expect(one('encrypt(x, { rowId, userId })', 'rowid')).toBe(0);
     expect(one('SELECT last_insert_rowid()', 'rowid')).toBe(1);
+    expect(one('ORDER BY _rowid_', 'rowid')).toBe(1);
     expect(one('INSERT OR IGNORE INTO t', 'INSERT OR')).toBe(1);
     expect(one("sqlite.exec('PRAGMA foreign_keys = ON')", 'PRAGMA')).toBe(1);
     expect(one('FROM b CROSS JOIN expenses e ON e.date >= b.t0', 'CROSS JOIN … ON')).toBe(1);
@@ -94,6 +96,9 @@ countRatchet({
       1
     );
     expect(one('CROSS JOIN (SELECT id FROM t) s ON s.id = b.id', 'CROSS JOIN … ON')).toBe(1);
+    expect(one('CROSS JOIN (SELECT max(id) FROM t) s ON s.id = b.id', 'CROSS JOIN … ON')).toBe(1);
+    expect(one('CROSS JOIN "expenses" e ON e.id = b.id', 'CROSS JOIN … ON')).toBe(1);
+    expect(one('CROSS JOIN json_each(e.tags) t ON 1', 'CROSS JOIN … ON')).toBe(1);
     expect(one('this.db.all<{ n: number }>(sql`SELECT 1`)', 'raw db/tx query')).toBe(1);
     expect(one('await tx.all(sql`SELECT 1`)', 'raw db/tx query')).toBe(1);
     expect(one('db.select().from(t).all()', 'raw db/tx query')).toBe(0);

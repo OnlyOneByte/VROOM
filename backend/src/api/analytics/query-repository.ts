@@ -535,7 +535,7 @@ function itemsWhere(
   ];
   const keys = query.keys;
   if (groupBy === 'fuelType' && keys) {
-    conditions.push(keys.length ? sql`COALESCE(e.fuel_type, '') IN (${inList(keys)})` : sqlFalse);
+    conditions.push(keys.length ? sql`COALESCE(e.fuel_type, '') IN (${inList(keys)})` : sqlFalse());
   }
   if (groupBy === 'tag' && keys) {
     const tagged = keys.filter(Boolean);
@@ -544,7 +544,7 @@ function itemsWhere(
       parts.push(jsonArraySome(sql`e.tags`, (element) => sql`${element} IN (${inList(tagged)})`));
     }
     if (keys.includes('')) parts.push(jsonArrayIsEmpty(sql`e.tags`));
-    conditions.push(parts.length ? sql`(${sql.join(parts, sql` OR `)})` : sqlFalse);
+    conditions.push(parts.length ? sql`(${sql.join(parts, sql` OR `)})` : sqlFalse());
   }
   if (query.metric === 'volume' || query.metric === 'efficiency') {
     conditions.push(electricFilter(query.energy ?? 'fuel'));
@@ -855,7 +855,7 @@ export class AnalyticsQueryRepository {
       ? [MIN_VALID_MI_KWH, MAX_VALID_MI_KWH]
       : [MIN_VALID_MPG, MAX_VALID_MPG];
     const driven = sql`(f.mileage - f.prev_mileage)`;
-    const valid = sql`(f.missed_fillup = ${sqlFalse} AND f.mileage > 0 AND f.prev_mileage > 0 AND ${driven} > 0
+    const valid = sql`(f.missed_fillup = ${sqlFalse()} AND f.mileage > 0 AND f.prev_mileage > 0 AND ${driven} > 0
       AND ${driven} * vu.dist_canon <= ${MAX_REASONABLE_MILES_BETWEEN_FILLUPS} AND f.volume > 0
       AND ${driven} * vu.dist_canon / (${energyCanon}) BETWEEN ${min} AND ${max})`;
     return rawAll<AggregateRow>(

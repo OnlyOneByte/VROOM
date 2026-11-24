@@ -13,8 +13,13 @@ export function toDateTimeString(column: Column): SQL<string> {
   return sql<string>`datetime(${column}, 'unixepoch')`;
 }
 
-export const sqlTrue: SQL = sql`1`;
-export const sqlFalse: SQL = sql`0`;
+export function sqlTrue(): SQL {
+  return sql`1`;
+}
+
+export function sqlFalse(): SQL {
+  return sql`0`;
+}
 
 export function jsonArraySome(array: SQLWrapper, test: (element: SQL) => SQL): SQL {
   return sql`EXISTS (SELECT 1 FROM json_each(${array}) AS je WHERE ${test(sql`je.value`)})`;
@@ -30,7 +35,7 @@ export function leftJoinJsonArrayElements(
 ): { join: SQL; element: SQL } {
   const name = sql.identifier(alias);
   return {
-    join: sql`LEFT JOIN json_each(${array}) AS ${name} ON ${sqlTrue}`,
+    join: sql`LEFT JOIN json_each(${array}) AS ${name} ON ${sqlTrue()}`,
     element: sql`${name}.value`,
   };
 }
@@ -40,10 +45,10 @@ export function rawJsonValue<T>(value: unknown): T | null {
   return (typeof value === 'string' ? JSON.parse(value) : value) as T;
 }
 
-const SQL_TYPES = { integer: sql`INTEGER`, real: sql`REAL`, text: sql`TEXT` } as const;
+const SQL_TYPES = { integer: 'INTEGER', real: 'REAL', text: 'TEXT' } as const;
 
 export function typedParam(value: string | number, type: keyof typeof SQL_TYPES): SQL {
-  return sql`CAST(${value} AS ${SQL_TYPES[type]})`;
+  return sql`CAST(${value} AS ${sql.raw(SQL_TYPES[type])})`;
 }
 
 export interface RawQueryable {
