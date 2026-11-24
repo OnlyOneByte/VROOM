@@ -26,6 +26,8 @@
 	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import DefaultPhotoSources from '../storage-provider/DefaultPhotoSources.svelte';
 	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
+	import { startGoogleConnect } from '../storage-provider/use-google-oauth.svelte.ts';
+	import { providerCatalog } from '#lib/stores/provider-catalog.svelte.ts';
 	import ProviderCard from '../storage-provider/ProviderInfoCard.svelte';
 	import { photosOnlyOnProvider, providerApi } from '#lib/services/provider-api.ts';
 	import { orphanedPhotosApi } from '#lib/services/photo-api.ts';
@@ -162,6 +164,22 @@
 
 	async function handleProviderEdit(provider: UserProviderInfo) {
 		goto(resolve(paramRoutes.settingsProviderEdit, { id: provider.id }));
+	}
+
+	function handleProviderReconnect(provider: UserProviderInfo) {
+		const entry = providerCatalog.storage.find(e => e.id === provider.providerType);
+		if (entry?.connect !== 'oauth') {
+			handleProviderEdit(provider);
+			return;
+		}
+		const email = provider.config['accountEmail'];
+		startGoogleConnect({
+			isEditMode: true,
+			providerId: provider.id,
+			...(typeof email === 'string' && { existingEmail: email }),
+			displayName: provider.displayName,
+			selectedType: provider.providerType
+		});
 	}
 
 	let deleteConfirmOpen = $state(false);
@@ -305,7 +323,7 @@
 				<p class="text-sm font-medium">Data Backups</p>
 
 				{#if unhealthyBackupProviders.length > 0}
-					<Alert variant="warning">
+					<Alert role="status" variant="warning">
 						<CircleAlert aria-hidden="true" />
 						<AlertTitle class="line-clamp-none">
 							{unhealthyBackupProviders.length === 1
@@ -313,9 +331,10 @@
 								: `${unhealthyBackupProviders.length} backup providers need attention.`}
 						</AlertTitle>
 						<AlertDescription class="text-foreground!">
-							Backups to {new Intl.ListFormat('en', { type: 'conjunction' }).format(
-								unhealthyBackupProviders.map(p => p.displayName)
-							)} may not be saved until you fix {unhealthyBackupProviders.length === 1
+							Your backups may not reach {new Intl.ListFormat('en', {
+								type: 'conjunction'
+							}).format(unhealthyBackupProviders.map(p => p.displayName))} until you fix {unhealthyBackupProviders.length ===
+							1
 								? 'it'
 								: 'them'} below.
 						</AlertDescription>
@@ -438,6 +457,7 @@
 								sheetsSyncEnabled={backupConfig.providers[provider.id]?.sheetsSyncEnabled ?? false}
 								lastBackupAt={backupConfig.providers[provider.id]?.lastBackupAt}
 								onEdit={handleProviderEdit}
+								onReconnect={handleProviderReconnect}
 								onDelete={requestProviderDelete}
 								onBackupToggle={handleBackupToggle}
 								onSheetsSyncToggle={handleSheetsSyncToggle}

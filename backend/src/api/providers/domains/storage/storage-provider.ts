@@ -100,7 +100,11 @@ function isThrottled(error: Record<string, unknown>, text: string): boolean {
     ...((error.errors as { reason?: unknown }[] | undefined) ?? []),
     ...(data?.error?.errors ?? []),
   ].map((item) => String(item?.reason ?? ''));
-  return reasons.some((reason) => THROTTLE_REASONS.has(reason)) || /rate limit|quota/i.test(text);
+  const googleShaped = Array.isArray(error.errors) || data?.error !== undefined;
+  return (
+    reasons.some((reason) => THROTTLE_REASONS.has(reason)) ||
+    (googleShaped && /rate limit|quota/i.test(text))
+  );
 }
 
 export function credentialFailureOf(error: unknown): SyncError | null {

@@ -45,7 +45,8 @@
 		onDelete,
 		onBackupToggle,
 		onSheetsSyncToggle,
-		onUpdated
+		onUpdated,
+		onReconnect
 	}: {
 		provider: UserProviderInfo;
 		categorySettings: Record<PhotoCategory, CategorySetting>;
@@ -57,6 +58,7 @@
 		onBackupToggle?: (_providerId: string, _enabled: boolean) => void;
 		onSheetsSyncToggle?: (_providerId: string, _enabled: boolean) => void;
 		onUpdated?: (_provider: UserProviderInfo) => void;
+		onReconnect?: (_provider: UserProviderInfo) => void;
 	} = $props();
 
 	let expanded = $state(false);
@@ -205,7 +207,11 @@
 
 	<CardContent class="pt-0">
 		<div class="space-y-3">
-			<ProviderHealth {provider} onFix={onEdit} onUpdated={p => onUpdated?.(p)} />
+			<ProviderHealth
+				{provider}
+				onFix={(p, kind) => (kind === 'reconnect' && onReconnect ? onReconnect(p) : onEdit(p))}
+				onUpdated={p => onUpdated?.(p)}
+			/>
 			{#if providerCatalog.error && !providerCatalog.loaded}
 				<LoadErrorCard
 					compact

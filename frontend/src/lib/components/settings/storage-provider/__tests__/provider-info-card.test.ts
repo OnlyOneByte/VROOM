@@ -114,7 +114,7 @@ describe('ProviderInfoCard header', () => {
 
 	test('a healthy provider shows when it was last checked and a Test Connection button', async () => {
 		await mount({ provider: provider({ lastCheckedAt: '2026-05-10T11:55:00.000Z' }) });
-		expect(screen.getByText('Checked 5m ago')).toBeInTheDocument();
+		expect(screen.getByText('Connection checked 5m ago')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Test Connection to My Drive' })).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: 'Reconnect' })).toBeNull();
 	});
@@ -144,7 +144,45 @@ describe('ProviderInfoCard header', () => {
 		expect(testProvider).toHaveBeenCalledWith('prov-1');
 		expect(getProviders).toHaveBeenCalledWith('storage');
 		expect(onUpdated).toHaveBeenCalledWith(expect.objectContaining({ status: 'needs_reauth' }));
-		expect(screen.getByRole('status')).toHaveTextContent('My Drive: Reconnect it.');
+		expect(screen.getAllByRole('status').at(-1)).toHaveTextContent('Reconnect it.');
+	});
+
+	test('focus stays on Test Connection when the result moves it into the alert', async () => {
+		testProvider.mockResolvedValue({ ok: false, code: 'auth', message: 'Reconnect it.' });
+		getProviders.mockResolvedValue([provider({ status: 'needs_reauth', lastErrorCode: 'auth' })]);
+		const view = await mount({
+			onUpdated: (p: UserProviderInfo) => view.rerender({ provider: p })
+		});
+		const button = screen.getByRole('button', { name: 'Test Connection to My Drive' });
+		button.focus();
+		await fireEvent.click(button);
+		await settle();
+		expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+		expect(document.activeElement).toBe(
+			screen.getByRole('button', { name: 'Test Connection to My Drive' })
+		);
+	});
+
+	test('a test that fails to run says so on screen and still refreshes the card', async () => {
+		testProvider.mockRejectedValue(new Error('offline'));
+		getProviders.mockResolvedValue([provider({ status: 'error', lastErrorCode: 'config' })]);
+		const onUpdated = vi.fn<(p: UserProviderInfo) => void>();
+		await mount({ onUpdated });
+		await fireEvent.click(screen.getByRole('button', { name: 'Test Connection to My Drive' }));
+		await settle();
+		const shown = screen
+			.getAllByText(/^Couldn't test the connection\./)
+			.filter(el => !el.classList.contains('sr-only'));
+		expect(shown).toHaveLength(1);
+		expect(onUpdated).toHaveBeenCalledWith(expect.objectContaining({ status: 'error' }));
+	});
+
+	test('Reconnect uses onReconnect when the card has one, and Edit Provider always edits', async () => {
+		const onReconnect = vi.fn<(p: UserProviderInfo) => void>();
+		await mount({ provider: provider({ status: 'needs_reauth' }), onReconnect });
+		await fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
+		expect(onReconnect).toHaveBeenCalledWith(expect.objectContaining({ id: 'prov-1' }));
+		expect(onEdit).not.toHaveBeenCalled();
 	});
 
 	test('a turned-off provider shows no test row', async () => {

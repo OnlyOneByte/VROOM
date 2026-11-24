@@ -5,7 +5,7 @@ import { apiClient, getApiBaseUrl } from '#lib/services/api-client.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
-interface GoogleOAuthOptions {
+export interface GoogleOAuthOptions {
 	isEditMode: boolean;
 	providerId?: string;
 	existingEmail?: string;
@@ -27,6 +27,28 @@ export interface GoogleOAuthReturn extends GoogleOAuthState {
 	restoreFormState: () => { selectedType?: string; displayName?: string } | null;
 }
 
+export function startGoogleConnect(opts: GoogleOAuthOptions): void {
+	const nonce = crypto.randomUUID();
+	const returnTo = opts.isEditMode
+		? `/settings/providers/${opts.providerId}/edit`
+		: '/settings/providers/new';
+	sessionStorage.setItem(
+		'provider-form-state',
+		JSON.stringify({
+			selectedType: opts.selectedType ?? 'google-drive',
+			displayName: opts.displayName,
+			nonce
+		})
+	);
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- used inside non-reactive function, not tracked
+	const params = new URLSearchParams({ returnTo, nonce });
+	if (opts.isEditMode && opts.providerId) params.set('providerId', opts.providerId);
+	if (opts.isEditMode && opts.existingEmail) {
+		params.set('email', opts.existingEmail);
+	}
+	window.location.href = `${getApiBaseUrl()}/auth/providers/connect/google?${params.toString()}`;
+}
+
 export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAuthReturn {
 	let pendingEmail = $state('');
 	let oauthNonce = $state('');
@@ -44,26 +66,7 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 	}
 
 	function startGoogleOAuth() {
-		const opts = getOptions();
-		const nonce = crypto.randomUUID();
-		const returnTo = opts.isEditMode
-			? `/settings/providers/${opts.providerId}/edit`
-			: '/settings/providers/new';
-		sessionStorage.setItem(
-			'provider-form-state',
-			JSON.stringify({
-				selectedType: opts.selectedType ?? 'google-drive',
-				displayName: opts.displayName,
-				nonce
-			})
-		);
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- used inside non-reactive function, not tracked
-		const params = new URLSearchParams({ returnTo, nonce });
-		if (opts.isEditMode && opts.providerId) params.set('providerId', opts.providerId);
-		if (opts.isEditMode && opts.existingEmail) {
-			params.set('email', opts.existingEmail);
-		}
-		window.location.href = `${getApiBaseUrl()}/auth/providers/connect/google?${params.toString()}`;
+		startGoogleConnect(getOptions());
 	}
 
 	async function handleOAuthReturn(): Promise<{

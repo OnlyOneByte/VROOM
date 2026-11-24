@@ -80,6 +80,7 @@
 
 	let providers = $state<UserProviderInfo[]>([]);
 	let savedDefaultId = $state<string | null>(null);
+	let defaultsUnknown = $state(false);
 	let savingDefaultId = $state<string | null>(null);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
@@ -106,7 +107,9 @@
 	let usable = $derived(providers.filter(p => p.status !== 'disabled'));
 	let defaultId = $derived(
 		usable.find(p => p.id === savedDefaultId)?.id ??
-			[...usable].sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0]?.id ??
+			[...usable].sort(
+				(a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.id.localeCompare(b.id)
+			)[0]?.id ??
 			null
 	);
 
@@ -116,6 +119,7 @@
 		try {
 			await settingsApi.updateSettings({ providerDefaults: { [copy.capability]: p.id } });
 			savedDefaultId = p.id;
+			defaultsUnknown = false;
 			appStore.showSuccess(`${copy.feature} now uses ${p.displayName}.`);
 		} catch (e) {
 			appStore.showError(`Couldn't change the provider. ${userFacingErrorMessage(e)}`);
@@ -140,6 +144,7 @@
 				settingsApi.getSettings().catch(() => null)
 			]);
 			providers = list;
+			defaultsUnknown = settings === null;
 			savedDefaultId = settings?.providerDefaults?.[copy.capability] ?? null;
 			error = null;
 		} catch (e) {
@@ -331,7 +336,11 @@
 									</div>
 								</div>
 								{#if usable.length > 1 && provider.status !== 'disabled'}
-									{#if provider.id === defaultId}
+									{#if defaultsUnknown}
+										<p class="text-xs text-muted-foreground">
+											Couldn't load which provider {copy.useFor} uses.
+										</p>
+									{:else if provider.id === defaultId}
 										<p class="text-xs text-muted-foreground">Used for {copy.useFor}</p>
 									{:else}
 										<Button

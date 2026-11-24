@@ -322,6 +322,21 @@ describe('credentialFailureOf reads vendor errors', () => {
     ['a Google invalid_grant', { message: 'invalid_grant' }, SyncErrorCode.AUTH_INVALID],
     ['a Google 403', { response: { status: 403 } }, SyncErrorCode.PERMISSION_DENIED],
     ['an AWS 403 status', { $metadata: { httpStatusCode: 403 } }, SyncErrorCode.PERMISSION_DENIED],
+    [
+      'a Google 403 for missing permissions',
+      {
+        response: {
+          status: 403,
+          data: { error: { errors: [{ reason: 'insufficientPermissions' }] } },
+        },
+      },
+      SyncErrorCode.PERMISSION_DENIED,
+    ],
+    [
+      'a non-Google 403 that mentions a quota',
+      { message: 'quota policy denies this', response: { status: 403 } },
+      SyncErrorCode.PERMISSION_DENIED,
+    ],
   ])('%s', (_label, error, code) => {
     expect(credentialFailureOf(Object.assign(new Error('x'), error))?.code).toBe(code);
   });
@@ -331,7 +346,7 @@ describe('credentialFailureOf reads vendor errors', () => {
     ['a 500', Object.assign(new Error('x'), { response: { status: 500 } })],
     [
       'a Google 403 for a rate limit',
-      Object.assign(new Error('User rate limit exceeded'), {
+      Object.assign(new Error('Forbidden'), {
         response: {
           status: 403,
           data: { error: { errors: [{ reason: 'userRateLimitExceeded' }] } },
@@ -340,7 +355,7 @@ describe('credentialFailureOf reads vendor errors', () => {
     ],
     [
       'a Google 403 for a full storage quota',
-      Object.assign(new Error('The user has exceeded their Drive storage quota'), {
+      Object.assign(new Error('Forbidden'), {
         response: { status: 403 },
         errors: [{ reason: 'storageQuotaExceeded' }],
       }),

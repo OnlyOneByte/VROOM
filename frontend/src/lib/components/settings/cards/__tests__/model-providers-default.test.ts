@@ -103,5 +103,26 @@ describe('choosing which assistant provider is used', () => {
 		]);
 		await mount();
 		expect(screen.queryByRole('button', { name: /^Use for/ })).toBeNull();
+		expect(screen.queryByText(/Used for the assistant/)).toBeNull();
+	});
+
+	test('if the saved choice can’t be loaded, it says so instead of guessing', async () => {
+		getProviders.mockResolvedValue([OLDER, NEWER]);
+		getSettings.mockRejectedValue(new Error('offline'));
+		await mount();
+		expect(screen.getAllByText("Couldn't load which provider the assistant uses.")).toHaveLength(2);
+		expect(screen.queryByText(/Used for the assistant/)).toBeNull();
+	});
+
+	test('a tie on creation time is broken by id, as the server does', async () => {
+		getProviders.mockResolvedValue([
+			provider('llm-b', 'Second', '2026-01-01T00:00:00.000Z'),
+			provider('llm-a', 'First', '2026-01-01T00:00:00.000Z')
+		]);
+		await mount();
+		const rows = screen.getAllByTestId('llm-provider-row');
+		expect(rows.find(row => row.textContent?.includes('First'))?.textContent).toContain(
+			'Used for the assistant'
+		);
 	});
 });
