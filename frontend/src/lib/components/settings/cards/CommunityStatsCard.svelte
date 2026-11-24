@@ -68,7 +68,7 @@
 			<CardTitle>Community comparisons</CardTitle>
 		</div>
 		<CardDescription>
-			<span class="block font-medium text-foreground">Compare with other owners</span>
+			<span class="block font-semibold text-foreground">Compare with other owners</span>
 			Share anonymous averages from your vehicles so you and other people on this server can see how your
 			car compares.
 		</CardDescription>
@@ -109,7 +109,15 @@
 		</div>
 
 		<div class="space-y-2">
-			<Label for="community-region-country">Region (optional)</Label>
+			<div class="flex items-center gap-2">
+				<Label for="community-region-country">Region (optional)</Label>
+				{#if pendingRegion !== null}
+					<LoaderCircle
+						class="h-4 w-4 animate-spin text-muted-foreground"
+						data-testid="community-region-saving"
+					/>
+				{/if}
+			</div>
 			<Select.Root
 				type="single"
 				value={country ?? NOT_SET}
@@ -118,10 +126,10 @@
 			>
 				<Select.Trigger
 					id="community-region-country"
-					class="w-full"
+					class="w-full min-w-0"
 					data-testid="community-region-country"
 				>
-					{nameOf(country, countries)}
+					<span class="truncate">{nameOf(country, countries)}</span>
 				</Select.Trigger>
 				<Select.Content>
 					<Select.Item value={NOT_SET} label="Not set">Not set</Select.Item>
@@ -143,10 +151,10 @@
 				>
 					<Select.Trigger
 						id="community-region-subdivision"
-						class="w-full"
+						class="w-full min-w-0"
 						data-testid="community-region-subdivision"
 					>
-						{nameOf(subdivision, subdivisions)}
+						<span class="truncate">{nameOf(subdivision, subdivisions)}</span>
 					</Select.Trigger>
 					<Select.Content>
 						<Select.Item value={NOT_SET} label="Not set">Not set</Select.Item>
