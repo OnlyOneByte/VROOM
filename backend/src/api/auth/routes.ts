@@ -25,6 +25,7 @@ import { NoVerifiedEmailError, type OAuthFlow } from './providers/types';
 import {
   clearSessionCookie,
   consumeOAuthState,
+  demoSessionExpiresAt,
   setSessionCookie,
   validateAndRefreshSession,
 } from './utils';
@@ -501,7 +502,7 @@ routes.get('/me', async (c) => {
     data: {
       user: serializeSessionUser(user),
       session: {
-        expiresAt: session.expiresAt,
+        expiresAt: demoSessionExpiresAt(session.id) ?? session.expiresAt,
       },
       demo: user.id === DEMO_USER_ID,
     },

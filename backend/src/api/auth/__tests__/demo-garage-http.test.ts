@@ -35,6 +35,8 @@ async function demoCookie(): Promise<string> {
   const res = await startDemo();
   expect(res.status).toBe(200);
   const setCookie = res.headers.get('set-cookie') ?? '';
+  const maxAge = Number(/Max-Age=(\d+)/i.exec(setCookie)?.[1]);
+  expect(maxAge).toBeLessThanOrEqual(CONFIG.demo.sessionDuration / 1000);
   return setCookie.split(';')[0];
 }
 
@@ -92,6 +94,9 @@ describe('demo garage, on', () => {
       await send(cookie, 'GET', '/api/v1/auth/me')
     );
     expect(me.data.demo).toBe(true);
+    expect(new Date(me.data.session.expiresAt).getTime()).toBeLessThanOrEqual(
+      Date.now() + CONFIG.demo.sessionDuration
+    );
     const vehicles = await json<{ data: { nickname: string }[] }>(
       await send(cookie, 'GET', '/api/v1/vehicles')
     );
