@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
-	import { onMount, untrack, type Component } from 'svelte';
+	import { onMount, tick, untrack, type Component } from 'svelte';
 	import {
 		Plus,
 		FileText,
@@ -104,7 +104,9 @@
 	let recentList = $state<Expense[]>([]);
 	let recentTotal = $state(0);
 	let recentFailed = $state(false);
-	let listsSettled = $state(false);
+	let recentSettled = $state(false);
+	let attentionSettled = $state(false);
+	let overviewCardsFailed = $state(false);
 
 	let expenses = $state<Expense[]>([]);
 	let currentOffset = $state(0);
@@ -435,51 +437,64 @@
 
 	async function loadOverviewLists() {
 		const isCurrent = nextOverviewListsRequest();
-		const recentRequest = expenseApi.getExpensesByVehicle(vehicleId, {
-			limit: 3,
-			offset: 0,
-			sortBy: 'date',
-			sortDir: 'desc'
-		});
+		const recentRequest = expenseApi
+			.getExpensesByVehicle(vehicleId, { limit: 3, offset: 0, sortBy: 'date', sortDir: 'desc' })
+			.then(
+				result => {
+					if (!isCurrent()) return;
+					recentList = result.data;
+					recentTotal = result.pagination.totalCount;
+					recentFailed = false;
+					recentSettled = true;
+				},
+				error => {
+					if (!isCurrent()) return;
+					logLoadFailure(error, "Couldn't load recent expenses");
+					recentFailed = true;
+					recentSettled = true;
+				}
+			);
 		let modules: Awaited<ReturnType<typeof loadOverviewModules>>;
 		try {
 			modules = await loadOverviewModules();
 		} catch (error) {
-			if (!isCurrent()) return;
-			logLoadFailure(error, "Couldn't load the Next up and Recent expenses cards");
-			recentFailed = true;
-			listsSettled = true;
-			return;
+			if (isCurrent()) {
+				logLoadFailure(error, "Couldn't load the Next up and Recent expenses cards");
+				overviewCardsFailed = true;
+			}
+			return recentRequest;
 		}
-		const [, , { attentionItems }, { reminderApi }, { insuranceApi }] = modules;
-		const [reminders, policies, recent] = await Promise.allSettled([
-			reminderApi.list({ vehicleId }),
-			insuranceApi.getPoliciesForVehicle(vehicleId),
-			recentRequest
-		]);
-		if (!isCurrent()) return;
-		vehicleReminders = reminders.status === 'fulfilled' ? reminders.value : [];
-		attention = attentionItems(
-			vehicleReminders,
-			policies.status === 'fulfilled' ? policies.value : [],
-			() => undefined,
-			formatDate,
-			Date.now()
-		);
+		if (!isCurrent()) return recentRequest;
 		overviewCards = modules;
-		recentFailed = recent.status === 'rejected';
-		if (recent.status === 'fulfilled') {
-			recentList = recent.value.data;
-			recentTotal = recent.value.pagination.totalCount;
+		const [, , { attentionItems }, { reminderApi }, { insuranceApi }] = modules;
+		const [reminders, policies] = await Promise.allSettled([
+			reminderApi.list({ vehicleId }),
+			insuranceApi.getPoliciesForVehicle(vehicleId)
+		]);
+		if (isCurrent()) {
+			vehicleReminders = reminders.status === 'fulfilled' ? reminders.value : [];
+			attention = attentionItems(
+				vehicleReminders,
+				policies.status === 'fulfilled' ? policies.value : [],
+				() => undefined,
+				formatDate,
+				Date.now()
+			);
+			if (reminders.status === 'rejected') {
+				logLoadFailure(reminders.reason, "Couldn't load this vehicle's reminders");
+			}
+			if (policies.status === 'rejected') {
+				logLoadFailure(policies.reason, "Couldn't load this vehicle's insurance");
+			}
+			attentionSettled = true;
 		}
-		for (const [result, context] of [
-			[reminders, "Couldn't load this vehicle's reminders"],
-			[policies, "Couldn't load this vehicle's insurance"],
-			[recent, "Couldn't load recent expenses"]
-		] as const) {
-			if (result.status === 'rejected') logLoadFailure(result.reason, context);
-		}
-		listsSettled = true;
+		return recentRequest;
+	}
+
+	async function seeAllExpenses() {
+		activeTab = 'expenses';
+		await tick();
+		document.getElementById('vehicle-tab-expenses')?.focus();
 	}
 
 	function buildExpenseListParams(offset: number) {
@@ -803,7 +818,7 @@
 			<Tabs bind:value={activeTab} class="space-y-6">
 				<TabsList class="grid w-full grid-cols-4">
 					<TabsTrigger value="overview">Overview</TabsTrigger>
-					<TabsTrigger value="expenses">Expenses</TabsTrigger>
+					<TabsTrigger value="expenses" id="vehicle-tab-expenses">Expenses</TabsTrigger>
 					<TabsTrigger value="loan">Finance</TabsTrigger>
 					<TabsTrigger value="odometer">Odometer</TabsTrigger>
 				</TabsList>
@@ -882,25 +897,29 @@
 						</FuelEfficiencyStatsCard>
 					{/if}
 
-					{#if listsSettled}
-						{#if overviewCards}
-							{@const [{ default: NeedsAttentionCard }, { default: RecentActivityCard }] =
-								overviewCards}
+					{#if overviewCards}
+						{@const [{ default: NeedsAttentionCard }, { default: RecentActivityCard }] =
+							overviewCards}
+						{#if attentionSettled}
 							<NeedsAttentionCard title="Next up" items={nextUp} />
-							{#if showOverviewBody && recentExpenses.length > 0}
-								<RecentActivityCard
-									title="Recent expenses"
-									expenses={recentExpenses}
-									totalCount={recentTotal}
-									onSeeAll={() => (activeTab = 'expenses')}
-								/>
-							{/if}
 						{/if}
-						{#if showOverviewBody && recentFailed}
-							<p class="text-sm text-muted-foreground" data-testid="recent-expenses-load-error">
-								Couldn't load recent expenses. They're on the Expenses tab.
-							</p>
+						{#if showOverviewBody && recentSettled && recentExpenses.length > 0}
+							<RecentActivityCard
+								title="Recent expenses"
+								expenses={recentExpenses}
+								totalCount={recentTotal}
+								onSeeAll={seeAllExpenses}
+							/>
 						{/if}
+					{/if}
+					{#if overviewCardsFailed}
+						<p class="text-sm text-muted-foreground" data-testid="overview-cards-load-error">
+							Couldn't load Next up and recent expenses. Reload the page to try again.
+						</p>
+					{:else if showOverviewBody && recentFailed}
+						<p class="text-sm text-muted-foreground" data-testid="recent-expenses-load-error">
+							Couldn't load recent expenses. They're on the Expenses tab.
+						</p>
 					{/if}
 
 					{#if showOverviewBody}

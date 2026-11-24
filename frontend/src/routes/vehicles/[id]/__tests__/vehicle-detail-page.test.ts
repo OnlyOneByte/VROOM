@@ -714,6 +714,17 @@ describe('vehicle detail page Next up and Recent expenses', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'See all 61 expenses' }));
 		await settle();
 		expect(screen.getByRole('tab', { name: 'Expenses' })).toHaveAttribute('aria-selected', 'true');
+		expect(screen.getByRole('tab', { name: 'Expenses' })).toHaveFocus();
+	});
+
+	test('a recent-expenses failure that lands before the card code loads is still handled', async () => {
+		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
+		getRecentExpenses.mockImplementation(() => Promise.reject(new ApiError('down', 500)));
+		listReminders.mockReturnValue(new Promise(() => {}));
+		await mount();
+
+		expect(await screen.findByTestId('recent-expenses-load-error')).toBeInTheDocument();
+		expect(screen.queryByRole('heading', { name: 'Next up' })).toBeNull();
 	});
 
 	test('a failed recent-expenses load says so instead of showing an empty list', async () => {
