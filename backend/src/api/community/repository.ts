@@ -42,6 +42,7 @@ const VEHICLE_COLUMNS = {
   catalogModelId: vehicles.catalogModelId,
   year: vehicles.year,
   vehicleType: vehicles.vehicleType,
+  vehicleKind: vehicles.vehicleKind,
   unitPreferences: vehicles.unitPreferences,
 };
 
@@ -136,6 +137,7 @@ export class CommunityStatsRepository {
       catalogModelId: string | null;
       year: number;
       vehicleType: string;
+      vehicleKind: string;
       unitPreferences: unknown;
     }[],
     ownerById: Map<string, { currency: string; region: string | null }>,
@@ -215,6 +217,7 @@ export class CommunityStatsRepository {
           catalogModelId: vehicle.catalogModelId,
           modelYear: vehicle.year,
           vehicleType: vehicle.vehicleType,
+          vehicleKind: vehicle.vehicleKind,
           unitPreferences:
             parseUnitPreferences(vehicle.unitPreferences) ?? DEFAULT_UNIT_PREFERENCES,
           currency: owner.currency,

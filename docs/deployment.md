@@ -439,7 +439,7 @@ In-app restore from a Drive ZIP or Google Sheets lives in Settings → Storage P
 With `COMMUNITY_STATS=local`, which is the default, a background job runs once a day. It turns the data of users who opted in into anonymous group averages and stores them in the `community_stats` table, where opted-in users can compare their own vehicles against them. Nothing leaves the server and no outbound request is made.
 
 - **What it reads:** for opted-in owners only:
-  - the vehicle's catalogue model (the one the owner picked or confirmed), model year, powertrain and units;
+  - the vehicle's catalogue model (the one the owner picked or confirmed), model year, powertrain, kind (car, motorcycle, van and so on) and units. Running-cost and maintenance groups are split by kind, so a motorcycle is only compared with motorcycles;
   - the owner's currency and region;
   - the last 12 months of fuel and maintenance expenses (amount, date, fuel type, volume, odometer and the missed-fill-up flag);
   - the insurance premiums whose term overlaps those 12 months, with each term's start and end date, so a premium counts only for the part of its term inside the window;
