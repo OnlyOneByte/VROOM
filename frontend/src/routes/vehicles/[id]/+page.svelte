@@ -271,7 +271,11 @@
 			]),
 		listedIds: () => listedExpenseIds
 	});
-	let listedExpenseIds = $derived(new Set([...expenses, ...recentList].map(expense => expense.id)));
+	let listedExpenseIds = $derived.by(() => {
+		const inRecent = new Set(recentList.map(expense => expense.id));
+		if (!hasLoadedExpensesTab) return inRecent;
+		return new Set(expenses.map(expense => expense.id).filter(id => inRecent.has(id)));
+	});
 	let pendingTabRows = $derived(
 		pending.rows.filter(row =>
 			matchesFilters(row, {
