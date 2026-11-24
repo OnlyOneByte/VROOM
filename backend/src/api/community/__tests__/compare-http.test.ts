@@ -74,6 +74,22 @@ function insertBucket(bucketKey: string, metric: string, unit: string, n: number
       Math.floor(Date.now() / 1000),
     ]
   );
+  markRefreshed();
+}
+
+function markRefreshed(offsetSeconds = 0): void {
+  ctx.sqlite.run(
+    "INSERT INTO community_refreshes (scope, refreshed_at) VALUES ('local', ?) ON CONFLICT(scope) DO UPDATE SET refreshed_at = excluded.refreshed_at",
+    [Math.floor(Date.now() / 1000) + offsetSeconds]
+  );
+}
+
+function consentedAt(userId: string): number {
+  return (
+    ctx.sqlite
+      .query('SELECT community_stats_consented_at AS t FROM user_preferences WHERE user_id = ?')
+      .get(userId) as { t: number }
+  ).t;
 }
 
 async function optInNow(request: RequestFn = ctx.authed): Promise<void> {
@@ -136,7 +152,7 @@ describe('GET /api/v1/community/compare', () => {
   test('an opt-in after the last refresh waits for the next one before showing numbers', async () => {
     const vehicleId = await seedCivic();
     insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
-    ctx.sqlite.run('UPDATE community_stats SET computed_at = computed_at - 3600');
+    markRefreshed(-3600);
     await optInNow();
 
     const waiting = (await compare(vehicleId)).body;
@@ -144,7 +160,7 @@ describe('GET /api/v1/community/compare', () => {
     expect(waiting?.metrics.every((m) => m.yours === null && m.bucket === null)).toBe(true);
     expect(waiting?.currency).toBeNull();
 
-    ctx.sqlite.run('UPDATE community_stats SET computed_at = computed_at + 7200');
+    markRefreshed(3600);
     expect(metric((await compare(vehicleId)).body, 'efficiency')?.status).toBe('ok');
   });
 
@@ -172,6 +188,42 @@ describe('GET /api/v1/community/compare', () => {
     ).toBe(true);
   });
 
+  test('a refresh that published no groups still counts, so the caller sees too_few or no_data', async () => {
+    const vehicleId = await seedCivic();
+    markRefreshed();
+    await optIn();
+    const { body } = await compare(vehicleId);
+    expect(metric(body, 'efficiency')?.status).toBe('too_few');
+    expect(metric(body, 'insurance')?.status).toBe('no_data');
+    expect(body?.metrics.some((m) => m.status === 'awaiting_refresh')).toBe(false);
+  });
+
+  test('a consent stamped in the same second as the refresh still waits', async () => {
+    const vehicleId = await seedCivic();
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    await optInNow();
+    ctx.sqlite.run("UPDATE community_refreshes SET refreshed_at = ? WHERE scope = 'local'", [
+      consentedAt(ctx.user.id),
+    ]);
+    const { body } = await compare(vehicleId);
+    expect(body?.metrics.every((m) => m.status === 'awaiting_refresh')).toBe(true);
+  });
+
+  test('a share recipient who just opted in waits even though the owner is included', async () => {
+    const vehicleId = await seedCivic();
+    insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 20, 12);
+    await optIn();
+    await other.acceptShare(vehicleId, 'viewer');
+    await optInNow(other.request);
+
+    expect(metric((await compare(vehicleId)).body, 'efficiency')?.status).toBe('ok');
+    const shared = (await compare(vehicleId, other.request)).body;
+    expect(shared?.metrics.every((m) => m.status === 'awaiting_refresh' && m.bucket === null)).toBe(
+      true
+    );
+    expect(shared?.currency).toBeNull();
+  });
+
   test('a row below K in the table is never returned', async () => {
     const vehicleId = await seedCivic();
     insertBucket(CIVIC_KEY, 'efficiency', 'km_per_l', 5, 12);
@@ -186,7 +238,7 @@ describe('GET /api/v1/community/compare', () => {
 
   test('a vehicle without a catalogue model asks for one, and missing data says so', async () => {
     const vehicleId = await seedCivic({});
-    insertBucket('maintenance|15+|gas|EUR', 'maintenance', 'cents_per_year', 10, 50_000);
+    markRefreshed();
     await optIn();
 
     const { body } = await compare(vehicleId);

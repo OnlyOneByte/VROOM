@@ -625,6 +625,11 @@ export const communityStats = sqliteTable(
   })
 );
 
+export const communityRefreshes = sqliteTable('community_refreshes', {
+  scope: text('scope').primaryKey(),
+  refreshedAt: integer('refreshed_at', { mode: 'timestamp' }).notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 
 export type Vehicle = typeof vehicles.$inferSelect;
