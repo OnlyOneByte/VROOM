@@ -10,6 +10,7 @@ export type CompareStatus =
 	| 'needs_model'
 	| 'opt_in_required'
 	| 'awaiting_refresh'
+	| 'not_enough_data'
 	| 'feature_off';
 
 export type CompareUnit =

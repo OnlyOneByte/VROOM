@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { ChargeUnit, DistanceUnit, type UnitPreferences, VolumeUnit } from '../../../types';
-import { toDisplayUnits } from '../routes';
+import { toDisplayUnits, usefulEnough } from '../routes';
 
 const units = (distanceUnit: DistanceUnit, volumeUnit: VolumeUnit): UnitPreferences => ({
   distanceUnit,
@@ -40,5 +40,21 @@ describe('community values in display units', () => {
         expect(mid).toBeLessThan(high as number);
       }
     }
+  });
+});
+
+describe('an average is shown only when its noise is at most a quarter of it', () => {
+  test.each([
+    ['efficiency', 'km_per_l', 12, 10, false],
+    ['efficiency', 'km_per_l', 12, 20, true],
+    ['running_cost', 'cents_per_km', 9, 80, false],
+    ['running_cost', 'cents_per_km', 9, 90, true],
+    ['maintenance', 'cents_per_year', 60_000, 130, false],
+    ['maintenance', 'cents_per_year', 60_000, 135, true],
+    ['insurance', 'cents_per_year', 120_000, 65, false],
+    ['insurance', 'cents_per_year', 120_000, 70, true],
+    ['efficiency', 'km_per_l', 0, 1000, false],
+  ] as const)('%s at mean %d with %d owners: %p', (metric, unit, mean, nPublished, expected) => {
+    expect(usefulEnough({ mean, nPublished }, metric, unit)).toBe(expected);
   });
 });

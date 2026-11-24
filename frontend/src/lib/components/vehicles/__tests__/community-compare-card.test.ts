@@ -237,6 +237,16 @@ describe('CommunityCompareCard', () => {
 		expect(screen.queryByText(/of 10|\d+ owners/)).toBeNull();
 	});
 
+	test('an average too noisy to be useful explains why, with no numbers', async () => {
+		compare.mockResolvedValue(data(metric('efficiency', { status: 'not_enough_data', yours: 34 })));
+		await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });
+		const row = screen.getByTestId('community-compare-efficiency');
+		expect(row).toHaveTextContent(
+			'Not enough owners yet for a reliable average. It shows once more people with a similar car have opted in.'
+		);
+		expect(row).not.toHaveTextContent(/\d/);
+	});
+
 	test('no data of your own explains what to log', async () => {
 		compare.mockResolvedValue(data(metric('efficiency', { status: 'no_data' })));
 		await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });
