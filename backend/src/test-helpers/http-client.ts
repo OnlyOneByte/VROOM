@@ -1,5 +1,10 @@
 import type { Hono } from 'hono';
 
+export function socketFrom(address: string) {
+  const family = address.includes(':') ? 'IPv6' : 'IPv4';
+  return { requestIP: () => ({ address, family, port: 40000 }) };
+}
+
 export async function json<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }

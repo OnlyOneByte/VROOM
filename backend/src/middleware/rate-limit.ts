@@ -19,14 +19,42 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 
 let cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
+function dropExpired(now: number): void {
+  for (const [key, entry] of rateLimitStore.entries()) {
+    if (entry.resetTime < now) rateLimitStore.delete(key);
+  }
+}
+
+let evictionCursor: Iterator<string> | null = null;
+
+function evictOldest(): boolean {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    evictionCursor ??= rateLimitStore.keys();
+    const next = evictionCursor.next();
+    if (!next.done) {
+      rateLimitStore.delete(next.value);
+      return true;
+    }
+    evictionCursor = null;
+  }
+  return false;
+}
+
+function startWindow(key: string, now: number, windowMs: number): void {
+  rateLimitStore.delete(key);
+  while (rateLimitStore.size >= CONFIG.rateLimit.maxTrackedKeys) {
+    if (!evictOldest()) break;
+  }
+  rateLimitStore.set(key, { count: 1, resetTime: now + windowMs });
+}
+
+export function trackedRateLimitKeys(): number {
+  return rateLimitStore.size;
+}
+
 function ensureCleanupTimer(): void {
   if (cleanupTimer) return;
-  cleanupTimer = setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of rateLimitStore.entries()) {
-      if (entry.resetTime < now) rateLimitStore.delete(key);
-    }
-  }, CONFIG.rateLimit.cleanupInterval);
+  cleanupTimer = setInterval(() => dropExpired(Date.now()), CONFIG.rateLimit.cleanupInterval);
   if (cleanupTimer && typeof cleanupTimer === 'object' && 'unref' in cleanupTimer) {
     cleanupTimer.unref();
   }
@@ -42,7 +70,7 @@ export function rateLimiter(config: RateLimitConfig) {
     const entry = rateLimitStore.get(key);
 
     if (!entry || entry.resetTime < now) {
-      rateLimitStore.set(key, { count: 1, resetTime: now + config.windowMs });
+      startWindow(key, now, config.windowMs);
       return next();
     }
 

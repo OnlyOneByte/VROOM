@@ -1,7 +1,7 @@
 import { describe, expect, setSystemTime, test } from 'bun:test';
 import { type Context, Hono } from 'hono';
 import { CONFIG } from '../../config';
-import { rateLimiter } from '../rate-limit';
+import { rateLimiter, trackedRateLimitKeys } from '../rate-limit';
 
 interface RateLimitErrorBody {
   success: boolean;
@@ -71,6 +71,31 @@ describe('rate-limit middleware — window + limit', () => {
       expect((await app.request('/ping')).status).toBe(200);
     } finally {
       setSystemTime();
+    }
+  });
+});
+
+describe('rate-limit middleware — bounded store', () => {
+  test('the store never holds more than maxTrackedKeys keys, evicting the oldest first', async () => {
+    const limits = CONFIG.rateLimit as { maxTrackedKeys: number };
+    const previous = limits.maxTrackedKeys;
+    limits.maxTrackedKeys = 3;
+    try {
+      let key = '';
+      const app = new Hono();
+      app.use('*', rateLimiter({ windowMs: 60_000, limit: 1, keyGenerator: () => key }));
+      app.get('/ping', (c: Context) => c.json({ ok: true }));
+      for (const next of ['cap-a', 'cap-b', 'cap-c', 'cap-d', 'cap-e']) {
+        key = next;
+        expect((await app.request('/ping')).status).toBe(200);
+      }
+      expect(trackedRateLimitKeys()).toBe(limits.maxTrackedKeys);
+      key = 'cap-e';
+      expect((await app.request('/ping')).status).toBe(429);
+      key = 'cap-a';
+      expect((await app.request('/ping')).status).toBe(200);
+    } finally {
+      limits.maxTrackedKeys = previous;
     }
   });
 });

@@ -9,6 +9,7 @@ import {
   type DataEnvelope,
   json,
   requestAs,
+  socketFrom,
   type TestApp,
 } from '../../../test-helpers/http-client';
 
@@ -48,7 +49,7 @@ async function ownGarage(userId: string): Promise<void> {
 
 async function fetchFeed(path: string, ip = `198.51.100.${++visitor}`): Promise<Response> {
   const url = path.startsWith('/api/') ? path : `/api/v1${path}`;
-  return await ctx.app.request(url, { headers: { 'X-Forwarded-For': ip } });
+  return await ctx.app.request(url, {}, socketFrom(ip));
 }
 
 async function createFeed(options?: Record<string, boolean | string>): Promise<string> {
