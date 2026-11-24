@@ -671,7 +671,8 @@ or a home server you share:
   - a failed restore (the first `docker run`) prints its error in the terminal;
   - if `/health` doesn't answer `200`, run `docker logs vroom-drill`. A permissions error there
     usually means the `drill` folder or its files aren't owned by the user you ran it as. On
-    SELinux hosts (Fedora, RHEL), add `:Z` to both `-v` mounts;
+    SELinux hosts (Fedora, RHEL), add `:Z` to each `-v` mount (`:ro,Z` on the `litestream.yml`
+    one);
   - clean up with `docker rm -f vroom-drill && rm -rf drill`.
 - **Legal pages:** fill in `frontend/src/routes/privacypolicy` and `termsofservice` with who runs
   the server, how to reach you, what is stored and for how long, the services involved (your host,
