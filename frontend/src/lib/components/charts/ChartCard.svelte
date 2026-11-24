@@ -28,6 +28,7 @@
 		footer?: Snippet | undefined;
 		animationClass?: 'chart-line-animated' | 'chart-bar-animated';
 		table?: ChartA11y | undefined;
+		textAlternative?: string | undefined;
 		class?: string;
 		children: Snippet;
 	}
@@ -49,11 +50,13 @@
 		footer,
 		animationClass,
 		table,
+		textAlternative,
 		class: className,
 		children
 	}: Props = $props();
 
 	let placeholderHeight = $derived(height ?? 300);
+	let placeholderLabel = $derived(textAlternative ?? table?.summary);
 	let stateLevel = $derived(level === 2 ? (3 as const) : (4 as const));
 
 	// LayerChart measures 0x0 in hidden containers; gate rendering on visibility.
@@ -212,7 +215,12 @@
 						{@render children()}
 					{/if}
 				{:else}
-					<Skeleton class="w-full" style="height: {placeholderHeight}px" />
+					<Skeleton
+						class="w-full"
+						style="height: {placeholderHeight}px"
+						role={placeholderLabel ? 'img' : undefined}
+						aria-label={placeholderLabel}
+					/>
 				{/if}
 			</div>
 			{#if legend}
