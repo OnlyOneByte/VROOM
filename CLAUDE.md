@@ -59,7 +59,9 @@ A green build is the floor, not "done".
    `src/api/sync/__tests__/backup-table-coverage.test.ts` (account identity, sessions,
    encrypted provider credentials, per-device push subscriptions, and the server-wide
    community stats aggregate and its refresh time, which are rebuilt daily and would import
-   a foreign population if restored on another server), and those guards fail if
+   a foreign population if restored on another server, and the roles, role assignments and
+   overrides, since a restore must never grant access: restored shares re-create theirs),
+   and those guards fail if
    a new table is silently omitted; destructive actions disclose their full cascade; offline
    writes never drop.
 2. **Correct for everyone.** Unit- and currency-correct for metric and non-USD users;

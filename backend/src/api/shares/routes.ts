@@ -1,6 +1,9 @@
+import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { getDb } from '../../db/connection';
+import { type VehicleShare, vehicleShares } from '../../db/schema';
+import type { DrizzleTransaction } from '../../db/types';
 import type { ApiResponse } from '../../errors';
 import {
   ConflictError,
@@ -9,6 +12,7 @@ import {
   ValidationError,
 } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import { changeShareRole, endVehicleMembership } from '../../permissions/grants';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
 import {
@@ -28,6 +32,19 @@ routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
 const LEVELS = ['viewer', 'editor'] as const;
+
+function setShare(
+  tx: DrizzleTransaction,
+  id: string,
+  change: { status?: string; level?: string }
+): VehicleShare {
+  return tx
+    .update(vehicleShares)
+    .set({ ...change, updatedAt: new Date() })
+    .where(eq(vehicleShares.id, id))
+    .returning()
+    .get() as VehicleShare;
+}
 
 const inviteSchema = z.object({
   vehicleId: z.string().min(1, 'Vehicle ID is required'),
@@ -105,7 +122,18 @@ routes.put(
       throw new ConflictError('This share is no longer active');
     }
 
-    const updated = await vehicleShareRepository.update(id, { level, updatedAt: new Date() });
+    const updated = getDb().transaction((tx) => {
+      const row = setShare(tx, id, { level });
+      if (row.status === 'accepted' && row.sharedWithId) {
+        changeShareRole(tx, {
+          vehicleId: row.vehicleId,
+          sharedWithId: row.sharedWithId,
+          level,
+          grantedBy: user.id,
+        });
+      }
+      return row;
+    });
     return c.json({ success: true, data: toOwnerView(updated), message: 'Share level updated' });
   }
 );
@@ -119,7 +147,12 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
     throw new NotFoundError('Share');
   }
 
-  await vehicleShareRepository.update(id, { status: 'revoked', updatedAt: new Date() });
+  getDb().transaction((tx) => {
+    setShare(tx, id, { status: 'revoked' });
+    if (share.status === 'accepted' && share.sharedWithId) {
+      endVehicleMembership(tx, share.vehicleId, share.sharedWithId);
+    }
+  });
   return c.json({ success: true, message: 'Share revoked' });
 });
 
@@ -146,9 +179,15 @@ routes.post('/:id/accept', zValidator('param', commonSchemas.idParam), async (c)
     throw new ConflictError('This invitation is no longer pending');
   }
 
-  const updated = await vehicleShareRepository.update(id, {
-    status: 'accepted',
-    updatedAt: new Date(),
+  const updated = getDb().transaction((tx) => {
+    const row = setShare(tx, id, { status: 'accepted' });
+    changeShareRole(tx, {
+      vehicleId: row.vehicleId,
+      sharedWithId: user.id,
+      level: row.level,
+      grantedBy: row.ownerId,
+    });
+    return row;
   });
   return c.json({ success: true, data: updated, message: 'Invitation accepted' });
 });
@@ -165,7 +204,10 @@ routes.post('/:id/decline', zValidator('param', commonSchemas.idParam), async (c
     throw new ConflictError('This share is no longer active');
   }
 
-  await vehicleShareRepository.update(id, { status: 'declined', updatedAt: new Date() });
+  getDb().transaction((tx) => {
+    setShare(tx, id, { status: 'declined' });
+    if (share.status === 'accepted') endVehicleMembership(tx, share.vehicleId, user.id);
+  });
   return c.json({ success: true, message: 'Share declined' });
 });
 

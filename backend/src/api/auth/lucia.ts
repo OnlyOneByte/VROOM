@@ -50,4 +50,4 @@ interface DatabaseUserAttributes {
   updatedAt: Date | null;
 }
 
-export type AuthUser = User;
+export type AuthUser = Omit<User, 'disabledAt'>;

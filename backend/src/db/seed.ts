@@ -1,5 +1,6 @@
 import { createId } from '@paralleldrive/cuid2';
 import { createTermExpenses } from '../api/insurance/hooks';
+import { assignServerRole } from '../permissions/grants';
 import { logger } from '../utils/logger';
 import { dollarsToCents } from '../utils/money';
 import { db } from './connection.js';
@@ -138,6 +139,7 @@ export async function seedDatabase() {
       })
       .returning();
 
+    assignServerRole(db, sampleUser.id, 'member');
     logger.info('Created sample user', { userId: sampleUser.id });
 
     await db.insert(userProviders).values({

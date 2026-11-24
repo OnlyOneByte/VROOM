@@ -120,6 +120,20 @@
       "when": 1795515632691,
       "tag": "0016_community_mean_only",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1795517777927,
+      "tag": "0017_roles_overrides",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1795517778927,
+      "tag": "0018_backfill_role_assignments",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,7 @@ import { getDb } from '../../db/connection';
 import { userProviders, users } from '../../db/schema';
 import { createErrorResponse, isUniqueConstraintError, NotFoundError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
+import { assignServerRole } from '../../permissions/grants';
 import { PERMISSION_REGISTRY } from '../../permissions/registry';
 import { ROLE_TEMPLATES } from '../../permissions/roles';
 import { getClientIp } from '../../utils/client-ip';
@@ -330,6 +331,7 @@ export async function resolveNewUser(
           status: 'active',
         })
         .run();
+      assignServerRole(tx, newUser.id, 'member');
       try {
         attachPendingInvites(tx, newUser.id, newUser.email);
       } catch (error) {

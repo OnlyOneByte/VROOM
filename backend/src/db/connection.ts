@@ -6,6 +6,7 @@ import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { CONFIG } from '../config';
 import { handleDatabaseError, isAppError, isSyncError } from '../errors';
+import { syncBuiltInRoles } from '../permissions/grants';
 import { extractErrorMessage } from '../utils/error-handling';
 import { logger } from '../utils/logger';
 import * as schema from './schema.js';
@@ -87,6 +88,7 @@ export function runMigrations(): void {
     logger.info('Running database migrations...');
     migrate(db, { migrationsFolder: './drizzle' });
     foldUserEmailCase(db);
+    syncBuiltInRoles(db);
     logger.info('Database migrations completed successfully');
   } catch (error) {
     const message = extractErrorMessage(error);

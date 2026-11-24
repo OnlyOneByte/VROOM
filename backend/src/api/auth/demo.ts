@@ -6,6 +6,8 @@ import { getDb } from '../../db/connection';
 import { sessions, users } from '../../db/schema';
 import { seedGarage } from '../../db/seed';
 import { DemoReadOnlyError } from '../../errors';
+import { assignServerRole } from '../../permissions/grants';
+import { DEMO_ROLE_KEY } from '../../permissions/roles';
 import { logger } from '../../utils/logger';
 import { lucia } from './lucia';
 import { DEMO_SESSION_PREFIX, demoSessionExpiresAt, setSessionCookie } from './utils';
@@ -44,6 +46,7 @@ export async function prepareDemoGarage(): Promise<void> {
   await db
     .insert(users)
     .values({ id: DEMO_USER_ID, email: DEMO_USER_EMAIL, displayName: 'Demo Garage' });
+  assignServerRole(db, DEMO_USER_ID, DEMO_ROLE_KEY);
   await seedGarage(DEMO_USER_ID);
   demoReady = true;
   logger.info('Demo garage is ready');

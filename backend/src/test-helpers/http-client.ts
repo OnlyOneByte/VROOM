@@ -37,6 +37,7 @@ export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<T
   const schema = await import('../db/schema');
   const { lucia } = await import('../api/auth/lucia');
   const { app } = await import('../app');
+  const { assignServerRole, syncBuiltInRoles } = await import('../permissions/grants');
 
   const sqlite = (db as unknown as { $client: import('bun:sqlite').Database }).$client;
 
@@ -45,12 +46,14 @@ export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<T
     migrated = true;
   } else {
     resetAllTables(sqlite);
+    syncBuiltInRoles(db);
   }
 
   const id = seedUser.id ?? `test-user-${++counter}`;
   const email = seedUser.email ?? `test${counter}@example.com`;
   const displayName = seedUser.displayName ?? 'Test User';
   await db.insert(schema.users).values({ id, email, displayName });
+  assignServerRole(db, id, 'member');
 
   const session = await lucia.createSession(id, {});
   const sessionCookie = lucia.createSessionCookie(session.id);
