@@ -90,6 +90,25 @@ describe('the built-in text reader engine', () => {
     expect(error).not.toBeInstanceOf(OcrUnreadableError);
   });
 
+  test('an engine crash is "try again", not "unreadable", and the next scan gets a fresh worker', async () => {
+    let starts = 0;
+    setLocalOcrForTest({
+      createWorker: async () => {
+        starts++;
+        return fakeWorker(async () => {
+          if (starts === 1)
+            throw "RuntimeError: access to a null reference (evaluating 'Tf(b, a)')";
+          return 'TOTAL 52.81';
+        });
+      },
+    });
+    const crashed = await recognizeText(Buffer.from('a')).catch((error: unknown) => error);
+    expect(crashed).toBeInstanceOf(OcrUnavailableError);
+    expect(crashed).not.toBeInstanceOf(OcrUnreadableError);
+    expect(await recognizeText(Buffer.from('b'))).toBe('TOTAL 52.81');
+    expect(starts).toBe(2);
+  });
+
   test('a picture it cannot read is reported as unreadable, and the worker is kept', async () => {
     let starts = 0;
     setLocalOcrForTest({
