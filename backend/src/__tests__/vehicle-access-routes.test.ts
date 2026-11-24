@@ -93,6 +93,7 @@ const ROUTES: RouteCase[] = [
   {
     name: 'POST /shares',
     mode: 'owner',
+    authorized: true,
     request: (fx) => [
       'POST',
       '/shares',
