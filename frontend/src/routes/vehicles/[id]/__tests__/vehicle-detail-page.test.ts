@@ -717,6 +717,25 @@ describe('vehicle detail page Next up and Recent expenses', () => {
 		expect(screen.getByRole('tab', { name: 'Expenses' })).toHaveFocus();
 	});
 
+	test('when the recent list fails to reload after a delete, its old rows go and the error shows', async () => {
+		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
+		getRecentExpenses.mockResolvedValueOnce({
+			data: [{ ...EXPENSE, description: 'Arco' }],
+			pagination: { totalCount: 1, limit: 3, offset: 0, hasMore: false }
+		});
+		await mount();
+		expect(await screen.findByText('Arco')).toBeInTheDocument();
+		await openTab('Expenses');
+
+		getRecentExpenses.mockRejectedValueOnce(new ApiError('down', 500));
+		await (captured['table']?.['onDelete'] as (e: Expense) => Promise<void>)(EXPENSE);
+		await openTab('Overview');
+
+		expect(await screen.findByTestId('recent-expenses-load-error')).toBeInTheDocument();
+		expect(screen.queryByText('Arco')).toBeNull();
+		expect(screen.queryByRole('heading', { name: 'Recent expenses' })).toBeNull();
+	});
+
 	test('a recent-expenses failure that lands before the card code loads is still handled', async () => {
 		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
 		getRecentExpenses.mockImplementation(() => Promise.reject(new ApiError('down', 500)));
