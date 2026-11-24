@@ -1,6 +1,4 @@
-import type { ExpenseCategory } from '#lib/constants/expense-categories.ts';
-import type { CostBucketTotals, ExpenseSummary } from '#lib/types/index.ts';
-import { COST_BUCKETS, costBucket, type CostBucket } from './cost-bucket.ts';
+import type { CostBucketTotals } from '#lib/types/index.ts';
 
 export interface CostPerDistance {
 	total: number;
@@ -18,19 +16,6 @@ export function costPerDistance(
 		running: totals.runningTotal / distance,
 		ownership: totals.ownershipTotal / distance
 	};
-}
-
-export function bucketAmounts(
-	breakdown: ExpenseSummary['categoryBreakdown']
-): Record<CostBucket, number> {
-	const amounts = Object.fromEntries(COST_BUCKETS.map(bucket => [bucket, 0])) as Record<
-		CostBucket,
-		number
-	>;
-	for (const { category, amount } of breakdown) {
-		amounts[costBucket(category as ExpenseCategory) ?? 'upkeep'] += amount;
-	}
-	return amounts;
 }
 
 export function distanceDriven(

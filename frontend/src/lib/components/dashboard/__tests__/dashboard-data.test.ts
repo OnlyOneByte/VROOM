@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 import type { ExpenseSummary, InsurancePolicy, ReminderWithVehicles } from '#lib/types/index.ts';
 import {
 	attentionItems,
-	bucketAmounts,
 	combinePeriodSpend,
 	highestMonth,
 	percentChange,
@@ -34,17 +33,6 @@ describe('dashboard data', () => {
 			'enhancement',
 			'misc'
 		]);
-	});
-
-	test('the split groups categories into ownership, fuel and charging, and upkeep', () => {
-		expect(
-			bucketAmounts([
-				{ category: 'financial', amount: 300, count: 1 },
-				{ category: 'fuel', amount: 45, count: 1 },
-				{ category: 'maintenance', amount: 20, count: 1 },
-				{ category: 'misc', amount: 5, count: 1 }
-			])
-		).toEqual({ ownership: 300, energy: 45, upkeep: 25 });
 	});
 
 	test('owned and shared summaries add up, per vehicle and for the period before', () => {

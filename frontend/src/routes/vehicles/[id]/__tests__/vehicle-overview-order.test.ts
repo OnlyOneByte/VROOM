@@ -23,7 +23,20 @@ vi.mock('#lib/components/charts/index.ts', () => ({
 
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
-		getExpensesByVehicle: () => Promise.resolve({ data: [], pagination: { totalCount: 0 } }),
+		getExpensesByVehicle: () =>
+			Promise.resolve({
+				data: [
+					{
+						id: 'e1',
+						vehicleId: 'v1',
+						category: 'fuel',
+						amount: 40,
+						date: '2026-11-20T12:00:00.000Z',
+						description: 'Arco'
+					}
+				],
+				pagination: { totalCount: 1 }
+			}),
 		getExpenseSummary: () =>
 			Promise.resolve({
 				totalAmount: 1200,
@@ -35,6 +48,28 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 				costBuckets: { ownershipTotal: 0, runningTotal: 1200, previous: null, byVehicle: [] }
 			})
 	}
+}));
+
+vi.mock('#lib/services/reminder-api.ts', () => ({
+	reminderApi: {
+		list: () =>
+			Promise.resolve([
+				{
+					reminder: {
+						id: 'r1',
+						name: 'Oil change',
+						type: 'notification',
+						isActive: true,
+						nextDueDate: new Date(Date.now() - 86_400_000).toISOString()
+					},
+					vehicleIds: ['v1']
+				}
+			])
+	}
+}));
+
+vi.mock('#lib/services/insurance-api.ts', () => ({
+	insuranceApi: { getPoliciesForVehicle: () => Promise.resolve([]) }
 }));
 
 vi.mock('#lib/services/analytics-api.ts', () => ({
@@ -69,15 +104,19 @@ function follows(later: Node, earlier: Node): boolean {
 }
 
 describe('vehicle Overview puts the numbers first', () => {
-	test('the hero comes first, then the fuel economy, then the details disclosure', async () => {
+	test('the hero comes first, then Next up and Recent expenses, then the details disclosure', async () => {
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 
 		const recent = await screen.findByText('Last 30 days');
 		const hero = screen.getByTestId('cost-per-mile-hero');
+		const nextUp = await screen.findByRole('heading', { name: 'Next up' });
+		const recentExpenses = screen.getByRole('heading', { name: 'Recent expenses' });
 		const details = screen.getByRole('button', { name: 'Details, insurance and photos' });
 
 		expect(follows(recent, hero) || hero.contains(recent)).toBe(true);
-		expect(follows(details, hero)).toBe(true);
+		expect(follows(nextUp, hero)).toBe(true);
+		expect(follows(recentExpenses, nextUp)).toBe(true);
+		expect(follows(details, recentExpenses)).toBe(true);
 	});
 
 	test('the category chart moved to the Expenses tab and still describes this vehicle', async () => {

@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
-	import { onMount, untrack, type Component } from 'svelte';
+	import { onMount, tick, untrack, type Component } from 'svelte';
 	import {
 		Plus,
 		FileText,
@@ -37,6 +37,8 @@
 	} from '#lib/components/ui/collapsible/index.ts';
 	import { resolveCurrentOdometer } from '#lib/utils/financing-calculations.ts';
 	import FuelEfficiencyStatsCard from '#lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
+	import type { AttentionItem } from '#lib/components/dashboard/dashboard-data.ts';
+	import { formatDate } from '#lib/utils/formatters.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	let InsuranceTab = $state<Component<{ vehicleId: string; readOnly?: boolean }> | null>(null);
 	let hasLoadedInsurance = $state(false);
@@ -65,7 +67,8 @@
 		Photo,
 		ExpenseSummary,
 		FuelEfficiencyPoint,
-		ExpenseCategory
+		ExpenseCategory,
+		ReminderWithVehicles
 	} from '#lib/types/index.ts';
 	import { latest } from '#lib/utils/latest-request.ts';
 	import { loadWhenIdle } from '#lib/utils/idle.ts';
@@ -94,6 +97,16 @@
 	let isLoadingFuelEfficiency = $state(true);
 	let yearStats = $state<VehicleStats | null>(null);
 	let summaryLoadError = $state<string | null>(null);
+
+	let vehicleReminders = $state<ReminderWithVehicles[]>([]);
+	let attention = $state<AttentionItem[]>([]);
+	let overviewCards = $state<Awaited<ReturnType<typeof loadOverviewModules>> | null>(null);
+	let recentList = $state<Expense[]>([]);
+	let recentTotal = $state(0);
+	let recentFailed = $state(false);
+	let recentSettled = $state(false);
+	let attentionSettled = $state(false);
+	let overviewCardsFailed = $state(false);
 
 	let expenses = $state<Expense[]>([]);
 	let currentOffset = $state(0);
@@ -133,6 +146,14 @@
 	const loadFinanceTab = () => import('#lib/components/vehicles/FinanceTab.svelte');
 	const loadCompareCard = () => import('#lib/components/vehicles/CommunityCompareCard.svelte');
 	const loadUploadDialog = () => import('#lib/components/common/MediaCaptureDialog.svelte');
+	const loadOverviewModules = () =>
+		Promise.all([
+			import('#lib/components/dashboard/NeedsAttentionCard.svelte'),
+			import('#lib/components/dashboard/RecentActivityCard.svelte'),
+			import('#lib/components/dashboard/dashboard-data.ts'),
+			import('#lib/services/reminder-api.ts'),
+			import('#lib/services/insurance-api.ts')
+		]);
 
 	let searchTerm = $state('');
 	let filters = $state<ExpenseFilters>({});
@@ -189,6 +210,9 @@
 	);
 
 	let hasExpenseData = $derived((summary?.expenseCount ?? 0) > 0);
+	let showOverviewBody = $derived(
+		!(summaryLoadError && !isLoadingStats) && !(summary !== null && !hasExpenseData)
+	);
 
 	let hasActiveFilters = $derived(
 		checkActiveFilters(searchTerm, filters) || !!expenseCategoryFilter
@@ -218,6 +242,34 @@
 		`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`
 	);
 
+	let nextUp = $derived(
+		attention.map(item => {
+			const reminder = vehicleReminders.find(r => `reminder-${r.reminder.id}` === item.id);
+			if (!canWrite || reminder?.reminder.type !== 'notification') return item;
+			const params = new URLSearchParams({
+				vehicleId,
+				category: reminder.reminder.expenseCategory ?? 'maintenance',
+				description: reminder.reminder.name,
+				returnTo: resolve(paramRoutes.vehicle, { id: vehicleId })
+			});
+			return {
+				...item,
+				action: { label: 'Log it', href: `${resolve(routes.expenseNew)}?${params}` }
+			};
+		})
+	);
+
+	let recentExpenses = $derived(
+		recentList.map(expense => ({
+			id: expense.id,
+			amount: expense.amount,
+			category: expense.category,
+			date: new Date(expense.date),
+			description: expense.description,
+			location: expense.location
+		}))
+	);
+
 	let coverPhotoUrl = $derived.by(() => {
 		const cover = vehiclePhotos.find(p => p.isCover);
 		if (!cover) return null;
@@ -244,6 +296,7 @@
 		vehicleSettled = vehicleRequest;
 		void loadFuelEfficiency();
 		void loadVehicleStats();
+		void loadOverviewLists();
 		await vehicleRequest;
 		if (vehicle && isOwner && !showingCachedVehicle) void loadPhotos();
 		isLoading = false;
@@ -380,6 +433,70 @@
 		}
 	}
 
+	const nextOverviewListsRequest = latest();
+
+	async function loadOverviewLists() {
+		const isCurrent = nextOverviewListsRequest();
+		const recentRequest = expenseApi
+			.getExpensesByVehicle(vehicleId, { limit: 3, offset: 0, sortBy: 'date', sortDir: 'desc' })
+			.then(
+				result => {
+					if (!isCurrent()) return;
+					recentList = result.data;
+					recentTotal = result.pagination.totalCount;
+					recentFailed = false;
+					recentSettled = true;
+				},
+				error => {
+					if (!isCurrent()) return;
+					logLoadFailure(error, "Couldn't load recent expenses");
+					recentFailed = true;
+					recentSettled = true;
+				}
+			);
+		let modules: Awaited<ReturnType<typeof loadOverviewModules>>;
+		try {
+			modules = await loadOverviewModules();
+		} catch (error) {
+			if (isCurrent()) {
+				logLoadFailure(error, "Couldn't load the Next up and Recent expenses cards");
+				overviewCardsFailed = true;
+			}
+			return recentRequest;
+		}
+		if (!isCurrent()) return recentRequest;
+		overviewCards = modules;
+		const [, , { attentionItems }, { reminderApi }, { insuranceApi }] = modules;
+		const [reminders, policies] = await Promise.allSettled([
+			reminderApi.list({ vehicleId }),
+			insuranceApi.getPoliciesForVehicle(vehicleId)
+		]);
+		if (isCurrent()) {
+			vehicleReminders = reminders.status === 'fulfilled' ? reminders.value : [];
+			attention = attentionItems(
+				vehicleReminders,
+				policies.status === 'fulfilled' ? policies.value : [],
+				() => undefined,
+				formatDate,
+				Date.now()
+			);
+			if (reminders.status === 'rejected') {
+				logLoadFailure(reminders.reason, "Couldn't load this vehicle's reminders");
+			}
+			if (policies.status === 'rejected') {
+				logLoadFailure(policies.reason, "Couldn't load this vehicle's insurance");
+			}
+			attentionSettled = true;
+		}
+		return recentRequest;
+	}
+
+	async function seeAllExpenses() {
+		activeTab = 'expenses';
+		await tick();
+		document.getElementById('vehicle-tab-expenses')?.focus();
+	}
+
 	function buildExpenseListParams(offset: number) {
 		return {
 			limit: pageSize,
@@ -448,7 +565,12 @@
 		const remaining = Math.max(0, totalCount - 1);
 		const offset =
 			currentOffset >= remaining ? Math.max(0, currentOffset - pageSize) : currentOffset;
-		await Promise.all([fetchExpensesPage(offset), loadSummary(), loadFuelEfficiency()]);
+		await Promise.all([
+			fetchExpensesPage(offset),
+			loadSummary(),
+			loadFuelEfficiency(),
+			loadOverviewLists()
+		]);
 	}
 
 	function handlePageChange(offset: number) {
@@ -696,7 +818,7 @@
 			<Tabs bind:value={activeTab} class="space-y-6">
 				<TabsList class="grid w-full grid-cols-4">
 					<TabsTrigger value="overview">Overview</TabsTrigger>
-					<TabsTrigger value="expenses">Expenses</TabsTrigger>
+					<TabsTrigger value="expenses" id="vehicle-tab-expenses">Expenses</TabsTrigger>
 					<TabsTrigger value="loan">Finance</TabsTrigger>
 					<TabsTrigger value="odometer">Odometer</TabsTrigger>
 				</TabsList>
@@ -741,7 +863,9 @@
 								? resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })
 								: undefined}
 						/>
+					{/if}
 
+					{#if showOverviewBody}
 						<FuelEfficiencyStatsCard
 							{vehicleId}
 							{vehicleStatsData}
@@ -752,7 +876,7 @@
 							vehicleType={vehicle?.vehicleType}
 							trend={fuelEfficiencyData}
 						>
-							{#snippet chart()}
+							{#snippet chart(average: number | null)}
 								{#await fuelChartLoading}
 									{@render fuelChartPlaceholder(null)}
 								{:then { default: FuelEfficiencyTrendChart }}
@@ -762,13 +886,43 @@
 										unitPreferences={vehicle?.unitPreferences}
 										isLoading={isLoadingFuelEfficiency}
 										level={3}
+										referenceLines={average === null
+											? []
+											: [{ value: average, label: '12-month average' }]}
 									/>
 								{:catch}
 									{@render fuelChartPlaceholder(CHARTS_LOAD_ERROR)}
 								{/await}
 							{/snippet}
 						</FuelEfficiencyStatsCard>
+					{/if}
 
+					{#if overviewCards}
+						{@const [{ default: NeedsAttentionCard }, { default: RecentActivityCard }] =
+							overviewCards}
+						{#if attentionSettled}
+							<NeedsAttentionCard title="Next up" items={nextUp} />
+						{/if}
+						{#if showOverviewBody && recentSettled && recentExpenses.length > 0}
+							<RecentActivityCard
+								title="Recent expenses"
+								expenses={recentExpenses}
+								totalCount={recentTotal}
+								onSeeAll={seeAllExpenses}
+							/>
+						{/if}
+					{/if}
+					{#if overviewCardsFailed}
+						<p class="text-sm text-muted-foreground" data-testid="overview-cards-load-error">
+							Couldn't load Next up and recent expenses. Reload the page to try again.
+						</p>
+					{:else if showOverviewBody && recentFailed}
+						<p class="text-sm text-muted-foreground" data-testid="recent-expenses-load-error">
+							Couldn't load recent expenses. They're on the Expenses tab.
+						</p>
+					{/if}
+
+					{#if showOverviewBody}
 						{#if !showingCachedVehicle}
 							{#await loadCompareCard() then { default: CommunityCompareCard }}
 								<CommunityCompareCard

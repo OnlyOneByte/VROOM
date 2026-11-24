@@ -15,14 +15,20 @@
 		date: Date;
 		description?: string | null;
 		location?: string | null;
-		vehicleName: string;
+		vehicleName?: string;
 	}
 
 	interface Props {
 		expenses: RecentExpense[];
+		title?: string;
+		totalCount?: number | undefined;
+		onSeeAll?: (() => void) | undefined;
 	}
 
-	let { expenses }: Props = $props();
+	let { expenses, title = 'Recent', totalCount, onSeeAll }: Props = $props();
+
+	const seeAllClass =
+		'inline-flex min-h-10 items-center rounded-sm text-sm font-semibold text-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:min-h-0';
 
 	function headline(expense: RecentExpense): string {
 		return (
@@ -33,14 +39,17 @@
 
 <Card.Root class="gap-3 py-5">
 	<Card.Header class="flex flex-row items-center justify-between gap-3 px-5">
-		<Card.Title level={2} class="text-lg">Recent</Card.Title>
+		<Card.Title level={2} class="text-lg">{title}</Card.Title>
 		{#if expenses.length > 0}
-			<a
-				href={resolve(routes.expenses)}
-				class="inline-flex min-h-10 items-center rounded-sm text-sm font-semibold text-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:min-h-0"
-			>
-				See all<span class="sr-only"> expenses</span>
-			</a>
+			{#if onSeeAll}
+				<button type="button" class={seeAllClass} onclick={onSeeAll}>
+					See all{totalCount ? ` ${totalCount}` : ''}<span class="sr-only"> expenses</span>
+				</button>
+			{:else}
+				<a href={resolve(routes.expenses)} class={seeAllClass}>
+					See all{totalCount ? ` ${totalCount}` : ''}<span class="sr-only"> expenses</span>
+				</a>
+			{/if}
 		{/if}
 	</Card.Header>
 	<Card.Content class="px-5">

@@ -32,7 +32,7 @@
 		unitPreferences?: UnitPreferences | undefined;
 		vehicleType?: VehicleType | undefined;
 		trend?: EconomyPoint[];
-		chart?: Snippet;
+		chart?: Snippet<[number | null]>;
 	}
 
 	let {
@@ -141,7 +141,7 @@
 				</div>
 			{/each}
 		</dl>
-		{@render chart?.()}
+		{@render chart?.(average)}
 		{#if insight}
 			<p class="text-sm text-muted-foreground" data-testid="fuel-economy-insight">{insight}</p>
 		{/if}

@@ -24,6 +24,13 @@ vi.mock('#lib/components/vehicles/VehiclePhotoCarousel.svelte', () => ({ default
 vi.mock('#lib/components/vehicles/FuelEfficiencyStatsCard.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/insurance/InsuranceTab.svelte', () => ({ default: () => {} }));
 
+vi.mock('#lib/services/reminder-api.ts', () => ({
+	reminderApi: { list: () => Promise.resolve([]) }
+}));
+vi.mock('#lib/services/insurance-api.ts', () => ({
+	insuranceApi: { getPoliciesForVehicle: () => Promise.resolve([]) }
+}));
+
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		getExpensesByVehicle: () => Promise.resolve({ data: [], pagination: { totalCount: 0 } }),

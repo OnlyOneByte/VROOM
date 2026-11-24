@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import RecentActivityCard from '../RecentActivityCard.svelte';
 import type { ExpenseCategory } from '#lib/types/index.ts';
 
@@ -12,7 +12,7 @@ interface RecentExpense {
 	date: Date;
 	description?: string | null;
 	location?: string | null;
-	vehicleName: string;
+	vehicleName?: string;
 }
 
 const ARCO: RecentExpense = {
@@ -73,5 +73,23 @@ describe('RecentActivityCard', () => {
 		expect(screen.getByRole('heading', { level: 2, name: 'Recent' })).toBeInTheDocument();
 		expect(screen.getByRole('heading', { level: 3, name: 'No expenses yet' })).toBeInTheDocument();
 		expect(screen.queryByRole('link', { name: 'See all expenses' })).toBeNull();
+	});
+
+	test('on a vehicle page it drops the vehicle name, and See all with the count runs its handler', async () => {
+		const onSeeAll = vi.fn();
+		render(RecentActivityCard, {
+			props: {
+				title: 'Recent expenses',
+				expenses: [{ ...ARCO, vehicleName: undefined }],
+				totalCount: 61,
+				onSeeAll
+			}
+		});
+
+		expect(screen.getByRole('heading', { name: 'Recent expenses' })).toBeInTheDocument();
+		expect(rows()).toEqual(['Arco Fuel & Charging · Nov 20 $28.99']);
+		const seeAll = screen.getByRole('button', { name: 'See all 61 expenses' });
+		await fireEvent.click(seeAll);
+		expect(onSeeAll).toHaveBeenCalledOnce();
 	});
 });

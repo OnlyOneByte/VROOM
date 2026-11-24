@@ -6,7 +6,8 @@
 	import { PERIOD_OPTIONS, isValidPeriod, type TimePeriod } from '#lib/constants/time-periods.ts';
 	import { COST_BUCKETS, costBucketColor, type CostBucket } from '#lib/utils/cost-bucket.ts';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
-	import { PERIOD_PHRASES, percentChange, type BucketAmounts } from './dashboard-data';
+	import type { BucketAmounts } from '#lib/utils/cost-bucket.ts';
+	import { PERIOD_PHRASES, percentChange } from './dashboard-data';
 
 	interface Props {
 		period: TimePeriod;
