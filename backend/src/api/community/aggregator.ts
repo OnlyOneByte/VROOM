@@ -324,7 +324,7 @@ export async function refreshCommunityStats(
     minGroup: CONFIG.communityStats.minGroup,
     quartileMinGroup: CONFIG.communityStats.quartileMinGroup,
   });
-  repository.replaceScope(LOCAL_SCOPE, result.rows);
+  repository.replaceScope(LOCAL_SCOPE, result.rows, now);
   const ms = Math.round(performance.now() - started);
   logger.info(
     `community stats refreshed: ${result.published} buckets published, ${result.suppressed} suppressed (n<K), ${input.optedInOwners} opted-in owners, ${ms} ms`
@@ -371,7 +371,7 @@ export function firstRunDelayMs(newest: Date | null, now: Date): number {
 
 export async function startCommunityStatsJob(): Promise<void> {
   if (!CONFIG.communityStats.enabled || timer) return;
-  const newest = await communityStatsRepository.newestComputedAt(LOCAL_SCOPE);
+  const newest = await communityStatsRepository.lastRefreshedAt(LOCAL_SCOPE);
   scheduleNext(firstRunDelayMs(newest, new Date()));
 }
 
