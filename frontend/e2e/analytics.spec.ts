@@ -448,8 +448,11 @@ test.describe('Analytics', () => {
 			.getByRole('heading', { level: 3 })
 			.first()
 			.evaluate(e => e.scrollIntoView({ block: 'start' }));
-		const first = panels.getByRole('img').first();
+		const first = panels
+			.getByRole('img', { name: /^2020 Toyota Camry:/ })
+			.and(page.locator('[tabindex="0"]'));
 		await first.focus();
+		await expect(first).toBeFocused();
 		await page.keyboard.press('ArrowRight');
 		await page.keyboard.press('Enter');
 		await expect(page).toHaveURL(/seg=camry/);
