@@ -236,6 +236,28 @@ export function isNetworkAdmin(userId: string): boolean {
   return resolverFor(db, userId).can(PRIVATE_NETWORK_PERMISSION, { kind: 'server' }).allow;
 }
 
+const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+export function adminEmailWarnings(adminEmails: readonly string[]): string[] {
+  if (adminEmails.length === 0) return [];
+  const warnings = adminEmails
+    .filter((email) => !EMAIL_SHAPE.test(email))
+    .map((email) => `ADMIN_EMAILS entry "${email}" is not an email address, so it matches nobody`);
+  const known = new Set(
+    getDb()
+      .select({ email: users.email })
+      .from(users)
+      .all()
+      .map((row) => row.email.toLowerCase())
+  );
+  if (!adminEmails.some((email) => known.has(email))) {
+    warnings.push(
+      'No account uses an ADMIN_EMAILS address yet: until that person signs in, only users with the admin role can use private network targets'
+    );
+  }
+  return warnings;
+}
+
 export function privateEndpointPolicyFor(ownerId: string): PrivateEndpointPolicy {
   const { allow, block } = CONFIG.privateProviderEndpoints;
   if (block) return BLOCK_PRIVATE;
