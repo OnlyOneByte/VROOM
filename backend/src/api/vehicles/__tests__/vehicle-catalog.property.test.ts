@@ -11,6 +11,12 @@ import {
 
 const makesById = new Map(VEHICLE_CATALOG.makes.map((make) => [make.id, make]));
 const modelArb = fc.constantFrom(...VEHICLE_CATALOG.models);
+const modelKeys = new Set(
+  VEHICLE_CATALOG.models.flatMap((model) => [model.name, ...model.aliases].map(catalogKey))
+);
+const yearArb = fc
+  .integer({ min: 1990, max: 2030 })
+  .filter((year) => !modelKeys.has(catalogKey(String(year))));
 const trimArb = fc.constantFrom('EX', 'LX', 'Si', 'XLT', 'Limited', 'Touring', 'SE');
 
 function makeName(makeId: string): string {
@@ -123,7 +129,7 @@ describe('suggestCatalogModel', () => {
 
   test('a leading model year is ignored', () => {
     fc.assert(
-      fc.property(modelArb, fc.integer({ min: 1990, max: 2030 }), (model, year) => {
+      fc.property(modelArb, yearArb, (model, year) => {
         expect(suggestCatalogModel(makeName(model.makeId), `${year} ${model.name}`)).toBe(model.id);
       })
     );
