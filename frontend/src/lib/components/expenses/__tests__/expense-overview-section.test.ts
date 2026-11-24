@@ -59,14 +59,26 @@ describe('ExpenseOverviewSection', () => {
 		expect(screen.getByText(/\$0\.00 across 0\s+expenses/)).toBeInTheDocument();
 	});
 
-	test('is collapsed initially and hides the details', () => {
+	test('is collapsed initially and renders no details until opened', () => {
 		render(ExpenseOverviewSection, { props: { summary: summary(), statCards: STAT_CARDS } });
 		expect(screen.getByRole('button', { name: /Expense Overview/ })).toHaveAttribute(
 			'aria-expanded',
 			'false'
 		);
+		expect(screen.queryByText('Total Spent')).toBeNull();
+		expect(screen.queryByText('Expenses by Category')).toBeNull();
+	});
+
+	test('collapsing again keeps the details, only hidden', async () => {
+		render(ExpenseOverviewSection, { props: { summary: summary(), statCards: STAT_CARDS } });
+		await expand();
+		await expand();
+
+		expect(screen.getByRole('button', { name: /Expense Overview/ })).toHaveAttribute(
+			'aria-expanded',
+			'false'
+		);
 		expect(screen.getByText('Total Spent')).not.toBeVisible();
-		expect(screen.getByText('Expenses by Category')).not.toBeVisible();
 	});
 
 	test('expanding shows the stat cards and the per-category breakdown', async () => {
