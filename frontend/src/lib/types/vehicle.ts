@@ -10,6 +10,7 @@ export interface Vehicle {
 	model: string;
 	year: number;
 	vehicleType: VehicleType;
+	catalogModelId?: string | null;
 	trackFuel: boolean;
 	trackCharging: boolean;
 	licensePlate?: string;
@@ -30,6 +31,7 @@ export interface UpdateVehicleRequest {
 	model?: string;
 	year?: number;
 	vehicleType?: VehicleType;
+	catalogModelId?: string | null;
 	trackFuel?: boolean;
 	trackCharging?: boolean;
 	licensePlate?: string | null;
