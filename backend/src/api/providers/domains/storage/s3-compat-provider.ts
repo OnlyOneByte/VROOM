@@ -11,7 +11,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { logger } from '../../../../utils/logger';
-import { fetchOutbound } from '../../../../utils/outbound-url';
+import { fetchOutbound, type PrivateEndpointPolicy } from '../../../../utils/outbound-url';
 import { assertSafeStoragePath } from '../../../../utils/paths';
 import type {
   StorageFileInfo,
@@ -86,39 +86,44 @@ async function requestBody(body: unknown): Promise<RequestInit['body'] | undefin
   return body as RequestInit['body'];
 }
 
-export const s3RequestHandler = {
-  async handle(request: S3WireRequest, options?: { abortSignal?: unknown }) {
-    const port = request.port ? `:${request.port}` : '';
-    const url = `${request.protocol}//${request.hostname}${port}${request.path}${buildQuery(request.query)}`;
-    const res = await fetchOutbound(
-      url,
-      {
-        method: request.method,
-        headers: request.headers,
-        signal: options?.abortSignal as AbortSignal | undefined,
-        body: await requestBody(request.body),
-      },
-      'S3 endpoint'
-    );
-    return {
-      response: {
-        statusCode: res.status,
-        reason: res.statusText,
-        headers: Object.fromEntries(res.headers),
-        body: res.body
-          ? Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0])
-          : Readable.from([]),
-      },
-    };
-  },
-} as unknown as S3ClientConfig['requestHandler'];
+export function s3RequestHandlerFor(policy?: PrivateEndpointPolicy) {
+  return {
+    async handle(request: S3WireRequest, options?: { abortSignal?: unknown }) {
+      const port = request.port ? `:${request.port}` : '';
+      const url = `${request.protocol}//${request.hostname}${port}${request.path}${buildQuery(request.query)}`;
+      const res = await fetchOutbound(
+        url,
+        {
+          method: request.method,
+          headers: request.headers,
+          signal: options?.abortSignal as AbortSignal | undefined,
+          body: await requestBody(request.body),
+        },
+        'S3 endpoint',
+        policy
+      );
+      return {
+        response: {
+          statusCode: res.status,
+          reason: res.statusText,
+          headers: Object.fromEntries(res.headers),
+          body: res.body
+            ? Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0])
+            : Readable.from([]),
+        },
+      };
+    },
+  } as unknown as S3ClientConfig['requestHandler'];
+}
+
+export const s3RequestHandler = s3RequestHandlerFor();
 
 export class S3CompatProvider implements StorageProvider {
   readonly type = 's3';
   private client: S3Client;
   private bucket: string;
 
-  constructor(credentials: S3Credentials, config: S3Config) {
+  constructor(credentials: S3Credentials, config: S3Config, outbound?: PrivateEndpointPolicy) {
     this.bucket = config.bucket;
     this.client = new S3Client({
       endpoint: config.endpoint,
@@ -128,7 +133,7 @@ export class S3CompatProvider implements StorageProvider {
         secretAccessKey: credentials.secretAccessKey,
       },
       forcePathStyle: true,
-      requestHandler: s3RequestHandler,
+      requestHandler: outbound ? s3RequestHandlerFor(outbound) : s3RequestHandler,
     });
   }
 

@@ -153,7 +153,7 @@ describe('getVlmProvider / resolveModelSettings dispatch by provider type', () =
 
   test('resolveModelSettings decrypts the api key + reads model/baseUrl', () => {
     const s = resolveModelSettings(vlmRow(), 'VLM');
-    expect(s).toEqual({
+    expect(s).toMatchObject({
       apiKey: 'sk-x',
       model: 'gpt-4o-mini',
       baseUrl: 'https://api.openai.com/v1',

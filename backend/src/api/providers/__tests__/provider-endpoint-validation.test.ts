@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { Readable } from 'node:stream';
+import { CONFIG } from '../../../config';
 import type { UserProvider } from '../../../db/schema';
 import { ValidationError } from '../../../errors';
 import {
   createTestApp,
   type DataEnvelope,
   json,
+  requestAs,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import {
@@ -14,10 +16,14 @@ import {
   usePrivateProviderEndpoints,
 } from '../../../test-helpers/outbound';
 import { encrypt } from '../../../utils/encryption';
-import { outboundResolver, urlForAddress } from '../../../utils/outbound-url';
+import {
+  outboundResolver,
+  privateEndpointPolicyFor,
+  urlForAddress,
+} from '../../../utils/outbound-url';
 import { resolveModelSettings } from '../domains/model/model-registry';
 import { postModelJson } from '../domains/model/model-transport';
-import { s3RequestHandler } from '../domains/storage/s3-compat-provider';
+import { s3RequestHandler, s3RequestHandlerFor } from '../domains/storage/s3-compat-provider';
 
 let ctx: TestApp;
 const stubLookup = outboundResolver.lookup;
@@ -511,5 +517,167 @@ describe('an explicit PRIVATE_PROVIDER_ENDPOINTS wins over the account count', (
     expect(
       (await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.20:9000'))).status
     ).toBe(201);
+  });
+});
+
+describe('with ADMIN_EMAILS set, only admins reach private targets', () => {
+  defaultPrivateProviderEndpoints();
+  const admin = CONFIG as { adminEmails: string[] };
+  let previousAdmins: string[];
+  let member: Awaited<ReturnType<typeof requestAs>>;
+  let memberId: string;
+
+  beforeEach(async () => {
+    previousAdmins = admin.adminEmails;
+    admin.adminEmails = [ctx.user.email.toLowerCase()];
+    memberId = `member-${crypto.randomUUID()}`;
+    ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+      memberId,
+      `${memberId}@example.com`,
+      'Member',
+    ]);
+    member = await requestAs(ctx, memberId);
+  });
+  afterEach(() => {
+    admin.adminEmails = previousAdmins;
+  });
+
+  test('the admin can save a LAN endpoint even though a second account exists', async () => {
+    const res = await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.20:9000'));
+    expect(res.status).toBe(201);
+  });
+
+  test('a member cannot save a LAN endpoint or a local model, but can save public https', async () => {
+    expect(
+      (await member.request('POST', '/api/v1/providers', s3Body('http://192.168.1.20:9000'))).status
+    ).toBe(400);
+    expect(
+      (await member.request('POST', '/api/v1/providers', modelBody('http://localhost:11434/v1')))
+        .status
+    ).toBe(400);
+    expect(
+      (await member.request('POST', '/api/v1/providers', s3Body('https://s3.example.com'))).status
+    ).toBe(201);
+  });
+
+  test("a member's update cannot move an endpoint onto the LAN", async () => {
+    const created = await member.request(
+      'POST',
+      '/api/v1/providers',
+      s3Body('https://s3.example.com')
+    );
+    const { id } = (await json<DataEnvelope<{ id: string }>>(created)).data;
+    const res = await member.request('PUT', `/api/v1/providers/${id}`, {
+      config: { endpoint: 'http://192.168.1.20:9000', bucket: 'photos', region: 'us-east-1' },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("a member's stored LAN provider is refused when tested", async () => {
+    const id = `member-s3-${crypto.randomUUID()}`;
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+       VALUES (?, ?, 'storage', 's3', 'Stored', ?, ?, 'active')`,
+      [
+        id,
+        memberId,
+        encrypt(JSON.stringify({ accessKeyId: 'a', secretAccessKey: 'b' }), {
+          rowId: id,
+          userId: memberId,
+          domain: 'storage',
+        }),
+        JSON.stringify({
+          endpoint: 'http://192.168.1.20:9000',
+          bucket: 'photos',
+          region: 'us-east-1',
+        }),
+      ]
+    );
+    expect((await member.request('POST', `/api/v1/providers/${id}/test`)).status).toBe(400);
+  });
+
+  test("a member's public-looking host that resolves to the LAN is refused at request time", async () => {
+    outboundResolver.lookup = async () => ['10.0.0.9'];
+    const sent: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      sent.push(String(input));
+      return new Response('{}');
+    }) as typeof fetch;
+    const handler = s3RequestHandlerFor(privateEndpointPolicyFor(memberId)) as unknown as {
+      handle: (request: unknown) => Promise<unknown>;
+    };
+    await expect(
+      handler.handle({
+        protocol: 'https:',
+        hostname: 'files.example.com',
+        path: '/',
+        method: 'GET',
+        headers: {},
+      })
+    ).rejects.toThrow(ValidationError);
+
+    const settings = resolveModelSettings(
+      {
+        id: 'm',
+        userId: memberId,
+        domain: 'llm',
+        providerType: 'openai-compatible',
+        credentials: encrypt(JSON.stringify({ apiKey: 'sk' }), {
+          rowId: 'm',
+          userId: memberId,
+          domain: 'llm',
+        }),
+        config: { model: 'm', baseUrl: 'https://llm.example.com/v1' },
+      } as unknown as UserProvider,
+      'LLM'
+    );
+    await expect(
+      postModelJson({
+        domain: 'LLM',
+        providerType: 'openai-compatible',
+        model: 'm',
+        url: 'https://llm.example.com/v1/chat/completions',
+        body: {},
+        timeoutMs: 1000,
+        outbound: settings.outbound,
+      })
+    ).rejects.toThrow(ValidationError);
+    expect(sent).toEqual([]);
+  });
+
+  test('the admin is held to an explicit PRIVATE_PROVIDER_ENDPOINTS list', async () => {
+    const endpoints = CONFIG as { privateProviderEndpoints: { block: boolean; allow: string } };
+    const before = endpoints.privateProviderEndpoints;
+    endpoints.privateProviderEndpoints = { block: false, allow: '192.168.1.20:9000' };
+    try {
+      expect(
+        (await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.21:9000'))).status
+      ).toBe(400);
+      expect(
+        (await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.20:9000'))).status
+      ).toBe(201);
+      expect(
+        (await member.request('POST', '/api/v1/providers', s3Body('http://192.168.1.20:9000')))
+          .status
+      ).toBe(400);
+    } finally {
+      endpoints.privateProviderEndpoints = before;
+    }
+  });
+
+  test('BLOCK_PRIVATE_PROVIDER_ENDPOINTS refuses the admin too, and metadata is never allowed', async () => {
+    expect(
+      (await ctx.authed('POST', '/api/v1/providers', s3Body('http://169.254.169.254'))).status
+    ).toBe(400);
+    const endpoints = CONFIG as { privateProviderEndpoints: { block: boolean; allow: string } };
+    const before = endpoints.privateProviderEndpoints;
+    endpoints.privateProviderEndpoints = { block: true, allow: 'allow' };
+    try {
+      expect(
+        (await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.20:9000'))).status
+      ).toBe(400);
+    } finally {
+      endpoints.privateProviderEndpoints = before;
+    }
   });
 });

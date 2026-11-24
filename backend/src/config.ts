@@ -87,6 +87,15 @@ const envSchema = z.object({
     .optional()
     .transform((val) => val === '1' || val === 'true'),
   PRIVATE_PROVIDER_ENDPOINTS: z.string().optional(),
+  ADMIN_EMAILS: z
+    .string()
+    .optional()
+    .transform((val) =>
+      (val ?? '')
+        .split(',')
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean)
+    ),
   DISABLE_RATE_LIMIT: z
     .string()
     .optional()
@@ -165,6 +174,7 @@ export const CONFIG = {
     block: env.BLOCK_PRIVATE_PROVIDER_ENDPOINTS,
     allow: env.PRIVATE_PROVIDER_ENDPOINTS ?? '',
   },
+  adminEmails: env.ADMIN_EMAILS,
   disableRateLimit: env.DISABLE_RATE_LIMIT && (env.NODE_ENV as Environment) !== 'production',
   demo: { enabled: env.DEMO_MODE, sessionDuration: 60 * 60 * 1000 },
   server: { port: env.PORT, host: env.HOST },

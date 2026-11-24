@@ -11,6 +11,7 @@ import type { CategorySetting, PhotoCategory, StorageConfig } from '../../types'
 import { DEFAULT_STORAGE_CONFIG, PHOTO_CATEGORIES } from '../../types';
 import { decrypt, encrypt, secretContextOf } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
+import { assertSafeOutboundUrl, privateEndpointPolicyFor } from '../../utils/outbound-url';
 import { consumePending, getPendingEmail } from '../../utils/pending-credentials';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { AUTH_PROVIDERS } from '../auth/providers/registry';
@@ -237,6 +238,24 @@ function resolveProviderCredentials(
   };
 }
 
+const TARGET_FIELD_LABELS: Record<string, [field: string, label: string]> = {
+  storage: ['endpoint', 'S3 endpoint'],
+  llm: ['baseUrl', 'LLM base URL'],
+  vlm: ['baseUrl', 'VLM base URL'],
+};
+
+function assertOwnerMayReach(
+  ownerId: string,
+  domain: string,
+  config: Record<string, unknown> | null | undefined
+): void {
+  const entry = TARGET_FIELD_LABELS[domain];
+  const target = entry ? config?.[entry[0]] : undefined;
+  if (entry && typeof target === 'string') {
+    assertSafeOutboundUrl(target, entry[1], privateEndpointPolicyFor(ownerId));
+  }
+}
+
 routes.post('/', zValidator('json', createProviderSchema), async (c) => {
   const user = c.get('user');
   const body = c.req.valid('json');
@@ -269,6 +288,7 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
     body.config ? withoutServerState(descriptor, body.config) : null,
     body.nonce
   );
+  assertOwnerMayReach(user.id, body.domain, resolvedConfig);
 
   // bun:sqlite transactions must be synchronous.
   const created = db.transaction((tx) => {
@@ -372,6 +392,7 @@ routes.put(
         validateProviderConfig(descriptor, merged, unchanged);
         assertSecretsReentered(descriptor, stored, clientConfig, body.credentials);
       }
+      assertOwnerMayReach(existing.userId, existing.domain, merged);
       updates.config = merged;
     }
     if (body.credentials !== undefined) {

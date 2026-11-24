@@ -8,7 +8,11 @@ import { NotFoundError, ValidationError } from '../../../../errors';
 import type { PhotoCategory, StorageConfig } from '../../../../types';
 import { DEFAULT_STORAGE_CONFIG } from '../../../../types';
 import { decrypt, secretContextOf } from '../../../../utils/encryption';
-import { assertSafeOutboundUrl } from '../../../../utils/outbound-url';
+import {
+  ALLOW_PRIVATE,
+  assertSafeOutboundUrl,
+  privateEndpointPolicyFor,
+} from '../../../../utils/outbound-url';
 import { joinStoragePath, storagePathSchema } from '../../../../utils/paths';
 import {
   alwaysAvailable,
@@ -66,7 +70,11 @@ function buildGooglePhotosProvider(
   return new GooglePhotosProvider(refreshTokenOf(credentials), undefined, albumId);
 }
 
-function buildS3Provider(credentials: Record<string, unknown>, config: unknown): StorageProvider {
+function buildS3Provider(
+  credentials: Record<string, unknown>,
+  config: unknown,
+  ownerId: string
+): StorageProvider {
   const accessKeyId = credentials.accessKeyId;
   const secretAccessKey = credentials.secretAccessKey;
   if (typeof accessKeyId !== 'string' || typeof secretAccessKey !== 'string') {
@@ -76,10 +84,12 @@ function buildS3Provider(credentials: Record<string, unknown>, config: unknown):
   if (!s3Config?.endpoint || !s3Config?.bucket || !s3Config?.region) {
     throw new ValidationError('Invalid S3 config: missing endpoint, bucket, or region');
   }
-  assertSafeOutboundUrl(s3Config.endpoint, 'S3 endpoint');
+  const outbound = privateEndpointPolicyFor(ownerId);
+  assertSafeOutboundUrl(s3Config.endpoint, 'S3 endpoint', outbound);
   return new S3CompatProvider(
     { accessKeyId, secretAccessKey },
-    { endpoint: s3Config.endpoint, bucket: s3Config.bucket, region: s3Config.region }
+    { endpoint: s3Config.endpoint, bucket: s3Config.bucket, region: s3Config.region },
+    outbound
   );
 }
 
@@ -101,7 +111,7 @@ const s3ConfigSchema = z
   })
   .superRefine((config, ctx) => {
     try {
-      assertSafeOutboundUrl(config.endpoint, 'S3 endpoint');
+      assertSafeOutboundUrl(config.endpoint, 'S3 endpoint', ALLOW_PRIVATE);
     } catch (error) {
       ctx.addIssue({ code: 'custom', message: (error as Error).message, path: ['endpoint'] });
     }
@@ -122,6 +132,7 @@ function getFakeProvider(providerId: string): StorageProvider {
 
 export interface StorageProviderInput {
   id: string;
+  ownerId: string;
   credentials: Record<string, unknown>;
   config: Record<string, unknown> | null;
 }
@@ -240,7 +251,7 @@ export const STORAGE_PROVIDERS = {
       },
     ],
     connect: 'form',
-    create: ({ credentials, config }) => buildS3Provider(credentials, config),
+    create: ({ credentials, config, ownerId }) => buildS3Provider(credentials, config, ownerId),
     features: {
       photoOnly: false,
       backupSheets: false,
@@ -412,7 +423,7 @@ export class StorageProviderRegistry {
         ? {}
         : (JSON.parse(decrypt(row.credentials, secretContextOf(row))) as Record<string, unknown>);
     const config = row.config as Record<string, unknown> | null;
-    const provider = descriptor.create({ id: row.id, credentials, config });
+    const provider = descriptor.create({ id: row.id, ownerId: row.userId, credentials, config });
     validateProviderConfig(descriptor, config, Object.keys(config ?? {}));
     return provider;
   }
