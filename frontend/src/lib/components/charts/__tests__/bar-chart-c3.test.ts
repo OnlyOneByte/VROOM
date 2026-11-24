@@ -129,6 +129,12 @@ describe('C3 bar columns', () => {
 		expect(seen.labels.map(label => label['value'])).toEqual(['$751']);
 	});
 
+	test('a current month with no value gets no label', async () => {
+		const data = [...MONTHS, { date: new Date(2026, 8, 1), amount: null }];
+		await mount({ ...SINGLE, data, current: new Date(2026, 8, 1) });
+		expect(seen.labels.map(label => label['value'])).toEqual(['$751']);
+	});
+
 	test('value labels can be turned off, and never show on several series', async () => {
 		await mount({ ...SINGLE, valueLabels: false });
 		expect(seen.labels).toHaveLength(0);
