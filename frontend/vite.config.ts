@@ -28,7 +28,7 @@ export default defineConfig({
 				scope: '/',
 				buildSW: {
 					swSrc: 'src/service-worker/index.ts',
-					globPatterns: ['client/**/*.{js,css,ico,png,svg,webp,webmanifest}'],
+					globPatterns: ['client/**/*.{js,css,ico,png,svg,webp,webmanifest,woff2}'],
 					// withPwa appends a prerendered/ pattern that this app never matches; strict globbing would fail the build.
 					globStrict: false
 				},

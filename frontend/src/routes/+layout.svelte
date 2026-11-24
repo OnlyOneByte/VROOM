@@ -15,6 +15,7 @@
 	import '../app.css';
 	// Theme overrides must load after app.css, or non-default themes flash the default palette.
 	import '#lib/theme/themes.css';
+	import '#lib/theme/fonts.css';
 
 	import { LoaderCircle } from '@lucide/svelte';
 
