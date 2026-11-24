@@ -82,6 +82,27 @@ describe('GET /api/v1/expenses/export (CSV)', () => {
     expect(csv).not.toContain('Fuel A');
   });
 
+  test('a list of categories narrows the export and the list to those categories', async () => {
+    const vehicleId = await seedCivic();
+    await createExpense(vehicleId, 'fuel', 40, 'Fuel A', '2024-06-01T00:00:00.000Z');
+    await createExpense(vehicleId, 'maintenance', 200, 'Brakes', '2024-06-03T00:00:00.000Z');
+    await createExpense(vehicleId, 'financial', 300, 'Loan payment', '2024-06-04T00:00:00.000Z');
+
+    const csv = await (
+      await ctx.authed('GET', '/api/v1/expenses/export?category=fuel,maintenance')
+    ).text();
+    expect(csv.trim().split('\n').length).toBe(3);
+    expect(csv).not.toContain('Loan payment');
+
+    const list = await ctx.authed('GET', '/api/v1/expenses?category=fuel,maintenance');
+    expect(list.status).toBe(200);
+    const body = (await list.json()) as { data: Array<{ description: string }> };
+    expect(body.data.map((e) => e.description).sort()).toEqual(['Brakes', 'Fuel A']);
+
+    const bad = await ctx.authed('GET', '/api/v1/expenses?category=fuel,groceries');
+    expect(bad.status).toBe(400);
+  });
+
   test('search filter narrows the export to matching rows (matches the table)', async () => {
     const vehicleId = await seedCivic();
     await createExpense(

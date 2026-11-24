@@ -48,6 +48,11 @@ describe('parseExpenseUrlFilters', () => {
 		expect(parse(query)).toMatchObject(expected);
 	});
 
+	test('reads a list of categories in a fixed order, dropping unknown ones', () => {
+		expect(parse('category=misc,%20fuel,groceries,fuel').category).toBe('fuel,misc');
+		expect(parse('category=groceries,toys').category).toBeUndefined();
+	});
+
 	test('keeps a one-sided date range', () => {
 		expect(parse('startDate=2026-01-01')).toMatchObject({
 			startDate: '2026-01-01',

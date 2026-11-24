@@ -144,6 +144,17 @@ describe('/expenses filters in the URL', () => {
 		expect(nav.replaceState).not.toHaveBeenCalled();
 	});
 
+	test('a list of categories from an analytics link asks the server for all of them', async () => {
+		openAt('?category=fuel,maintenance&startDate=2026-10-01&endDate=2026-10-31');
+
+		await waitFor(() => expect(getAllExpenses).toHaveBeenCalledTimes(1));
+		expect(lastListParams()).toMatchObject({ category: 'fuel,maintenance' });
+		await waitFor(() => expect(tableProps['activeCategory']).toBe('fuel,maintenance'));
+		expect(await screen.findByTestId('active-filter-summary')).toHaveTextContent(
+			'Filtered by Fuel & Charging, Maintenance · Oct 1, 2026 – Oct 31, 2026'
+		);
+	});
+
 	test('an unknown vehicle id shows the normal list, without an error, and drops out of the URL', async () => {
 		openAt('?vehicleId=someone-elses-car&category=nope');
 

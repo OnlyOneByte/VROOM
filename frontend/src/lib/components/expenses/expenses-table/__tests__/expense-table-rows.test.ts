@@ -52,6 +52,15 @@ describe('visibleExpenses', () => {
 		expect(ids).toEqual(['c', 'a']);
 	});
 
+	test('narrows to any of several categories', () => {
+		const ids = visibleExpenses(
+			[...list, expense({ id: 'd', category: 'financial', date: '2024-04-01T00:00:00.000Z' })],
+			{ ...VIEW, categoryFilter: 'fuel,maintenance' }
+		).map(e => e.id);
+
+		expect(ids).toEqual(['b', 'c', 'a']);
+	});
+
 	test('keeps every row when no category is selected', () => {
 		expect(visibleExpenses(list, VIEW)).toHaveLength(3);
 	});

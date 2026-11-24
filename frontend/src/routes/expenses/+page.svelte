@@ -64,6 +64,7 @@
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
 	import { useExpenseListReload } from './expense-list-reload.svelte';
 	import {
+		expenseCategoryList,
 		expenseUrlFiltersQuery,
 		parseExpenseUrlFilters,
 		type ExpenseUrlFilters
@@ -170,8 +171,9 @@
 		const parts: string[] = [];
 		const vehicle = vehicles.find(v => v.id === selectedVehicleId);
 		if (vehicle) parts.push(getVehicleDisplayName(vehicle));
-		if (categoryFilter in EXPENSE_CATEGORY_INFO) {
-			parts.push(EXPENSE_CATEGORY_INFO[categoryFilter as ExpenseCategory].label);
+		const categories = expenseCategoryList(categoryFilter);
+		if (categories.length > 0) {
+			parts.push(categories.map(c => EXPENSE_CATEGORY_INFO[c as ExpenseCategory].label).join(', '));
 		}
 		const day = (value: string) => formatDate(dateOnlyToISO(value));
 		if (startDate && endDate) parts.push(`${day(startDate)} – ${day(endDate)}`);

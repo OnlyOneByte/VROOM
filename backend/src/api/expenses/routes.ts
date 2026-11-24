@@ -103,6 +103,10 @@ async function editedOdometerCheck(
 }
 
 const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
+const expenseCategoryListSchema = z
+  .string()
+  .transform((val) => [...new Set(val.split(',').map((c) => c.trim()))])
+  .pipe(z.array(expenseCategorySchema).min(1));
 
 const baseExpenseSchema = createInsertSchema(expensesTable, {
   tags: z
@@ -313,7 +317,7 @@ export const expenseQuerySchema = z.object({
     .string()
     .optional()
     .transform((val) => (val ? val.split(',').map((t) => t.trim()) : undefined)),
-  category: expenseCategorySchema.optional(),
+  category: expenseCategoryListSchema.optional(),
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
   timeZone: timeZoneSchema,
@@ -486,7 +490,7 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
 
 const exportQuerySchema = z.object({
   vehicleId: z.string().optional(),
-  category: expenseCategorySchema.optional(),
+  category: expenseCategoryListSchema.optional(),
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
   timeZone: timeZoneSchema,
