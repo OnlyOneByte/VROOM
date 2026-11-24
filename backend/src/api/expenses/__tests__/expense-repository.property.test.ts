@@ -504,8 +504,7 @@ describe('split edit updates legs in place (per-leg data survives)', () => {
     const result = await repo.updateSplitExpense(
       groupId,
       { splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-2'] }, totalAmount: 200 },
-      USER_ID,
-      EDITOR_ID
+      USER_ID
     );
 
     expect(result.map((s) => s.id)).toEqual([
@@ -567,8 +566,7 @@ describe('split edit updates legs in place (per-leg data survives)', () => {
     const result = await repo.updateSplitExpense(
       groupId,
       { splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-3'] }, totalAmount: 200 },
-      USER_ID,
-      EDITOR_ID
+      USER_ID
     );
 
     expect(result.length).toBe(2);
@@ -579,7 +577,7 @@ describe('split edit updates legs in place (per-leg data survives)', () => {
     expect(kept?.createdBy).toBe(USER_ID);
     expect(added?.vehicleId).toBe('v-3');
     expect(added?.id).not.toBe(removedId);
-    expect(added?.createdBy).toBe(EDITOR_ID);
+    expect(added?.createdBy, "a new leg keeps the split's author").toBe(USER_ID);
     expect(added?.category).toBe('maintenance');
     expect(added?.groupId).toBe(groupId);
     expect(legRow(removedId)).toBeUndefined();

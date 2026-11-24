@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -13,6 +13,11 @@ if (!existsSync(join(output, 'server/manifest-full.js'))) {
 }
 
 const budgets = JSON.parse(readFileSync(budgetsFile, 'utf8'));
+const missing = ['shared', 'fonts', 'default'].filter(key => typeof budgets[key] !== 'number');
+if (missing.length > 0) {
+	console.error(`bundle-budget: bundle-budgets.json has no number for ${missing.join(', ')}.`);
+	process.exit(1);
+}
 const { manifest } = await import(pathToFileURL(join(output, 'server/manifest-full.js')).href);
 
 const sizeCache = new Map();
@@ -41,8 +46,16 @@ const kb = bytes => bytes / 1024;
 const shared = new Set(manifest.client.imports);
 for (const file of nodeImports(0)) shared.add(file);
 
+const fontsDir = join(root, 'static/fonts');
+const fontBytes = existsSync(fontsDir)
+	? readdirSync(fontsDir)
+			.filter(name => name.endsWith('.woff2'))
+			.reduce((sum, name) => sum + statSync(join(fontsDir, name)).size, 0)
+	: 0;
+
 const rows = [
-	{ route: 'shared entry + root layout', size: kb(total(shared)), budget: budgets.shared }
+	{ route: 'shared entry + root layout', size: kb(total(shared)), budget: budgets.shared },
+	{ route: 'fonts (woff2, as served)', size: kb(fontBytes), budget: budgets.fonts }
 ];
 for (const route of manifest.routes) {
 	if (!route.page) continue;

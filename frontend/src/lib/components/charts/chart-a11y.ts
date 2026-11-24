@@ -34,7 +34,7 @@ interface BuildOptions {
 	notes?: string[] | undefined;
 }
 
-const MISSING = '—';
+const MISSING = 'No data';
 
 function numeric(value: unknown): number | null {
 	return typeof value === 'number' && Number.isFinite(value) ? value : null;

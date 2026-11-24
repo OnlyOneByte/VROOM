@@ -54,7 +54,7 @@ function share(status: string, level = 'viewer', sharedWith = INVITEE): void {
 
 describe('resolveVehicleAccess', () => {
   test('the owner resolves to owner without a share row', async () => {
-    expect(await resolveVehicleAccess(VEHICLE, OWNER, db)).toEqual({
+    expect(await resolveVehicleAccess(VEHICLE, OWNER, db)).toMatchObject({
       role: 'owner',
       ownerId: OWNER,
     });
@@ -63,11 +63,11 @@ describe('resolveVehicleAccess', () => {
   test('accepted viewer and editor shares resolve to their level, scoped to the owner', async () => {
     share('accepted', 'viewer');
     share('accepted', 'editor', STRANGER);
-    expect(await resolveVehicleAccess(VEHICLE, INVITEE, db)).toEqual({
+    expect(await resolveVehicleAccess(VEHICLE, INVITEE, db)).toMatchObject({
       role: 'viewer',
       ownerId: OWNER,
     });
-    expect(await resolveVehicleAccess(VEHICLE, STRANGER, db)).toEqual({
+    expect(await resolveVehicleAccess(VEHICLE, STRANGER, db)).toMatchObject({
       role: 'editor',
       ownerId: OWNER,
     });
@@ -84,7 +84,7 @@ describe('resolveVehicleAccess', () => {
   test('a revoked share next to a new accepted one resolves to the accepted level', async () => {
     share('revoked', 'editor');
     share('accepted', 'viewer');
-    expect(await resolveVehicleAccess(VEHICLE, INVITEE, db)).toEqual({
+    expect(await resolveVehicleAccess(VEHICLE, INVITEE, db)).toMatchObject({
       role: 'viewer',
       ownerId: OWNER,
     });
@@ -102,7 +102,7 @@ describe('resolveVehicleAccess', () => {
       STRANGER,
       STRANGER,
     ]);
-    expect(await resolveVehicleAccess(VEHICLE, STRANGER, db)).toEqual({
+    expect(await resolveVehicleAccess(VEHICLE, STRANGER, db)).toMatchObject({
       role: 'editor',
       ownerId: OWNER,
     });

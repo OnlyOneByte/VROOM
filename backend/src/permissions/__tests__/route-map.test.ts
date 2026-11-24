@@ -10,7 +10,7 @@ import {
   ROUTE_MAP_FILE,
   routeKeys,
 } from '../route-contract';
-import { ROUTE_PERMISSIONS } from '../route-map';
+import { isPublicRule, ROUTE_PERMISSIONS, rulePermissions } from '../route-map';
 
 describe('route map contract', () => {
   const gaps = findRouteMapGaps(app, ROUTE_PERMISSIONS);
@@ -25,14 +25,14 @@ describe('route map contract', () => {
 
   test('every mapped permission is declared in the registry', () => {
     const unknown = Object.entries(ROUTE_PERMISSIONS).filter(
-      ([, rule]) => typeof rule === 'string' && !PERMISSION_REGISTRY.has(rule)
+      ([, rule]) => !rulePermissions(rule).every((id) => PERMISSION_REGISTRY.has(id))
     );
     expect(unknown).toEqual([]);
   });
 
   test('every public route gives a reason', () => {
     const blank = Object.entries(ROUTE_PERMISSIONS).filter(
-      ([, rule]) => typeof rule !== 'string' && rule.public.trim() === ''
+      ([, rule]) => isPublicRule(rule) && rule.public.trim() === ''
     );
     expect(blank).toEqual([]);
   });

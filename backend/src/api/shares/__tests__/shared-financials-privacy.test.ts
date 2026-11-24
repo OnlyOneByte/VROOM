@@ -296,6 +296,10 @@ describe('shared expense writes linked to a loan or policy', () => {
     )?.expense_amount;
   }
 
+  function expectRefused(status: number, who: string, action: string): void {
+    expect(who === 'stranger' ? [404] : [403, 404], `${who} ${action}`).toContain(status);
+  }
+
   test('only the owner can record, change or delete a loan payment', async () => {
     const { vehicleId, financingId, loanPaymentId } = await sharedGarage();
     const payment = {
@@ -308,26 +312,27 @@ describe('shared expense writes linked to a loan or policy', () => {
     };
 
     for (const [who, request] of [...sharees(), ['stranger', stranger.request] as const]) {
-      expect((await request('POST', '/api/v1/expenses', payment)).status, `${who} create`).toBe(
-        404
-      );
-      expect(
+      expectRefused((await request('POST', '/api/v1/expenses', payment)).status, who, 'create');
+      expectRefused(
         (await request('PUT', `/api/v1/expenses/${loanPaymentId}`, { expenseAmount: 1 })).status,
-        `${who} update`
-      ).toBe(404);
-      expect(
+        who,
+        'update'
+      );
+      expectRefused(
         (
           await request('PUT', `/api/v1/expenses/${loanPaymentId}`, {
             sourceType: null,
             sourceId: null,
           })
         ).status,
-        `${who} unlink`
-      ).toBe(404);
-      expect(
+        who,
+        'unlink'
+      );
+      expectRefused(
         (await request('DELETE', `/api/v1/expenses/${loanPaymentId}`)).status,
-        `${who} delete`
-      ).toBe(404);
+        who,
+        'delete'
+      );
     }
     const linked = ctx.sqlite
       .query("SELECT COUNT(*) AS n FROM expenses WHERE source_type = 'financing'")
@@ -367,10 +372,11 @@ describe('shared expense writes linked to a loan or policy', () => {
       ).n;
 
     for (const [who, request] of [...sharees(), ['stranger', stranger.request] as const]) {
-      expect(
+      expectRefused(
         (await request('DELETE', `/api/v1/expenses/split/${premiumGroupId}`)).status,
-        `${who} delete`
-      ).toBe(404);
+        who,
+        'delete'
+      );
     }
     expect(premiumRows()).toBe(1);
 

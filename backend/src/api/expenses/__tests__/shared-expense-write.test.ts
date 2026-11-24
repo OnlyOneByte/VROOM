@@ -118,7 +118,7 @@ describe('shared expense writes stamp the owner and createdBy', () => {
     expect(row.created_by).toBe(bId);
   });
 
-  test('an editor can PUT and DELETE a cost row on the shared vehicle', async () => {
+  test('an editor can PUT any cost row on the shared vehicle but DELETE only their own', async () => {
     const vehicleId = await shareAccepted('editor');
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
@@ -134,12 +134,23 @@ describe('shared expense writes stamp the owner and createdBy', () => {
     expect(putBody.data.expenseAmount).toBe(99);
     expect(storedRow(id).user_id).toBe(ctx.user.id);
 
-    const del = await asB('DELETE', `/api/v1/expenses/${id}`);
-    expect(del.status, 'editor can delete a shared-vehicle expense').toBe(200);
-    expect(ctx.sqlite.query('SELECT id FROM expenses WHERE id = ?').get(id)).toBeNull();
+    const ownersRow = await asB('DELETE', `/api/v1/expenses/${id}`);
+    expect(ownersRow.status, "editor cannot delete the owner's expense").toBe(403);
+    expect(ctx.sqlite.query('SELECT id FROM expenses WHERE id = ?').get(id)).not.toBeNull();
+
+    const mine = await asB('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 12,
+      date: '2024-06-04T00:00:00.000Z',
+    });
+    const mineId = (await json<DataEnvelope<{ id: string }>>(mine)).data.id;
+    const del = await asB('DELETE', `/api/v1/expenses/${mineId}`);
+    expect(del.status, 'editor can delete an expense they added').toBe(200);
+    expect(ctx.sqlite.query('SELECT id FROM expenses WHERE id = ?').get(mineId)).toBeNull();
   });
 
-  test('a VIEWER cannot create/update/delete on the shared vehicle (404, never 403)', async () => {
+  test('a VIEWER cannot create/update/delete on the shared vehicle it can see (403)', async () => {
     const vehicleId = await shareAccepted('viewer');
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
@@ -155,11 +166,11 @@ describe('shared expense writes stamp the owner and createdBy', () => {
       expenseAmount: 5,
       date: '2024-06-05T00:00:00.000Z',
     });
-    expect(create.status, 'viewer create denied').toBe(404);
+    expect(create.status, 'viewer create denied').toBe(403);
     const put = await asB('PUT', `/api/v1/expenses/${id}`, { expenseAmount: 1 });
-    expect(put.status, 'viewer update denied').toBe(404);
+    expect(put.status, 'viewer update denied').toBe(403);
     const del = await asB('DELETE', `/api/v1/expenses/${id}`);
-    expect(del.status, 'viewer delete denied').toBe(404);
+    expect(del.status, 'viewer delete denied').toBe(403);
 
     expect((storedRow(id) as { user_id: string }).user_id).toBe(ctx.user.id);
     const stillAmount = ctx.sqlite

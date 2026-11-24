@@ -203,6 +203,15 @@ describe('a start before any data', () => {
     const later = await repo.query(OWNER.id, baseQuery({ start: seconds('2024-06-01T00:00:00Z') }));
     expect(later.buckets[0]).toBe('2024-06');
   });
+
+  test('a range that ends before the first expense keeps the range that was asked for', async () => {
+    seedFleet();
+    const range = { start: seconds('2023-01-01T00:00:00Z'), end: seconds('2023-04-01T00:00:00Z') };
+    const result = await repo.query(OWNER.id, baseQuery(range));
+    expect(result.buckets).toEqual(['2023-01', '2023-02', '2023-03']);
+    expect(result.range).toEqual(range);
+    expect(result.series).toEqual([]);
+  });
 });
 
 describe('bucketing follows the user calendar', () => {
@@ -810,10 +819,37 @@ describe('splits, compare and shape', () => {
     expect(perDistance.totals.value).toBeCloseTo(fleetCost / carTotal, 9);
   });
 
+  test('the average per bucket skips buckets with no data', async () => {
+    for (const [id, iso, amount] of [
+      ['jan', '2025-01-10T12:00:00Z', 10_000],
+      ['mar', '2025-03-10T12:00:00Z', 30_000],
+    ] as const) {
+      seedExpense(testDb.sqlite, {
+        id,
+        vehicleId: CAMRY.id,
+        category: 'maintenance',
+        expenseAmount: amount,
+        date: new Date(iso),
+        mileage: null,
+        volume: null,
+        fuelType: null,
+        missedFillup: false,
+      });
+    }
+    const result = await repo.query(
+      OWNER.id,
+      baseQuery({ start: seconds('2025-01-01T00:00:00Z'), end: seconds('2025-04-01T00:00:00Z') })
+    );
+    expect(result.buckets).toEqual(['2025-01', '2025-02', '2025-03']);
+    expect(result.series[0]?.values).toEqual([10_000, 0, 30_000]);
+    expect(result.totals.value).toBe(40_000);
+    expect(result.totals.perBucket).toBe(20_000);
+  });
+
   test('an empty account answers with zero totals and no series', async () => {
     const result = await repo.query(STRANGER.id, baseQuery({ groupBy: 'category' }));
     expect(result.series).toEqual([]);
-    expect(result.totals).toEqual({ value: 0, perBucket: 0, perDistance: null, distance: 0 });
+    expect(result.totals).toEqual({ value: 0, perBucket: null, perDistance: null, distance: 0 });
     const noRange = await repo.query(STRANGER.id, {
       ...baseQuery(),
       start: undefined,
