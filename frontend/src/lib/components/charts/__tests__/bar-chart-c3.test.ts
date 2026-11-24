@@ -207,7 +207,7 @@ describe('C3 bar columns', () => {
 			x: 'mpg',
 			y: 'car',
 			orientation: 'horizontal',
-			yAxisFormat: (v: number) => `${v} mpg`,
+			tooltipFormat: (v: number) => `${v} mpg`,
 			series: [{ key: 'mpg', label: 'mpg', color: 'var(--chart-3)' }],
 			referenceLines: [{ value: 33, label: 'Fleet' }]
 		});

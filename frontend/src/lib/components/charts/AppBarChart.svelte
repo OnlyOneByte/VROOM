@@ -321,7 +321,7 @@
 					<li class="flex items-center gap-1.5 text-xs text-muted-foreground">
 						<span class="w-4 border-t-2 border-dashed border-muted-foreground" aria-hidden="true"
 						></span>
-						{line.label}: {yAxisFormat(line.value)}
+						{line.label}: {tooltipFormat(line.value, series[0]?.key ?? '')}
 					</li>
 				{/each}
 			</ul>

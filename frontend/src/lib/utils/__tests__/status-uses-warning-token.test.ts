@@ -11,7 +11,7 @@ const CHART_5 =
 const CATEGORY_USES: Record<string, number> = {
 	'lib/components/vehicles/CostPerMileHero.svelte': 1,
 	'lib/utils/expense-helpers.ts': 2,
-	'lib/utils/chart-colors.ts': 1,
+	'lib/utils/chart-colors.ts': 2,
 	'routes/+page.svelte': 2
 };
 
