@@ -212,6 +212,23 @@ describe('a start before any data', () => {
     expect(result.range).toEqual(range);
     expect(result.series).toEqual([]);
   });
+
+  test('All time with no expenses falls back to the year before the end', async () => {
+    for (const interval of ['month', 'week'] as const) {
+      const result = await repo.query(OWNER.id, baseQuery({ interval, start: 1 }));
+      expect(result.range).toEqual({ start: RANGE.end - 365 * 86_400, end: RANGE.end });
+      expect(result.buckets.length).toBeLessThanOrEqual(interval === 'month' ? 13 : 54);
+      expect(result.series).toEqual([]);
+    }
+  });
+
+  test('All time when every expense is after the end falls back to the year before the end', async () => {
+    seedFleet();
+    const end = seconds('2023-06-01T00:00:00Z');
+    const result = await repo.query(OWNER.id, baseQuery({ interval: 'week', start: 1, end }));
+    expect(result.range).toEqual({ start: end - 365 * 86_400, end });
+    expect(result.series).toEqual([]);
+  });
 });
 
 describe('bucketing follows the user calendar', () => {
@@ -525,7 +542,14 @@ describe('annotations', () => {
         [`trip-${i}`, CAMRY.id, OWNER.id, 1_000, 1_100, 'personal', seconds(`${day}T12:00:00Z`)]
       );
     }
-    const result = await repo.query(OWNER.id, baseQuery({ annotations: ['trips'] }));
+    const result = await repo.query(
+      OWNER.id,
+      baseQuery({
+        annotations: ['trips'],
+        start: seconds('2024-01-01T00:00:00Z'),
+        end: seconds('2024-07-01T00:00:00Z'),
+      })
+    );
     const at = (key: string) => result.buckets.indexOf(key);
     expect(result.trips?.count[at('2024-02')]).toBe(2);
     expect(result.trips?.count[at('2024-04')]).toBe(1);
