@@ -62,3 +62,15 @@ export const ownAccount: ResourceOf = (c) => ({ kind: 'account', userId: c.get('
 export function vehicleOrOwnAccount(vehicleId: string | undefined, c: Context): Resource {
   return vehicleId ? { kind: 'vehicle', vehicleId } : { kind: 'account', userId: c.get('user').id };
 }
+
+export function vehicleParam(name: string): ResourceOf {
+  return (c) => ({ kind: 'vehicle', vehicleId: c.req.param(name) ?? '' });
+}
+
+export function vehicleEntry(
+  vehicleId: string,
+  ownerId: string,
+  createdBy: string | null
+): Resource {
+  return { kind: 'vehicle', vehicleId, entryCreatedBy: createdBy ?? ownerId };
+}

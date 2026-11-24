@@ -333,8 +333,9 @@ function emptyAggregate(): Aggregate {
 function rangeStart(requested: number | undefined, firsts: number[], end: number): number {
   const earliest = firsts.length > 0 ? Math.min(...firsts) : undefined;
   const first = earliest !== undefined && earliest < end ? earliest : undefined;
-  if (requested === undefined) return first ?? end - DEFAULT_RANGE_SECONDS;
-  return Math.max(requested, first ?? requested);
+  const fallback = end - DEFAULT_RANGE_SECONDS;
+  if (requested === undefined) return first ?? fallback;
+  return Math.max(requested, first ?? fallback);
 }
 
 function vehicleName(v: {
@@ -495,15 +496,15 @@ function sumBucketTotals(result: PeriodRows[]): void {
 }
 
 function collectDistances(ctx: QueryContext, result: PeriodRows[], rows: DistanceRow[]): void {
+  const wholeRange = ctx.query.interval === 'none';
   for (const row of rows) {
     const period = result[row.period];
     if (!period) continue;
-    if (row.idx < 0) {
-      period.rangeDistance += row.distance ?? 0;
-      continue;
-    }
+    const rangeRow = row.idx < 0;
+    if (rangeRow) period.rangeDistance += row.distance ?? 0;
+    if (rangeRow !== wholeRange) continue;
     const length = ctx.periods[row.period]?.length ?? 0;
-    seriesFor(period.distanceByVehicle, row.vehicle_id, length, () => 0)[row.idx] =
+    seriesFor(period.distanceByVehicle, row.vehicle_id, length, () => 0)[rangeRow ? 0 : row.idx] =
       row.distance ?? 0;
   }
 }

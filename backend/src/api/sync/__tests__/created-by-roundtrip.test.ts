@@ -31,7 +31,7 @@ async function roundTrip(): Promise<void> {
 }
 
 describe('backup → restore round-trip preserves expenses.created_by', () => {
-  test('an editor-authored shared expense keeps userId=OWNER AND created_by=editor across the round-trip', async () => {
+  test('an editor-authored shared expense keeps userId=OWNER AND created_by=editor (still a member) across the round-trip', async () => {
     const { db } = await import('../../../db/connection');
     const schema = await import('../../../db/schema');
     const editorId = 'editor-author-rt';
@@ -40,6 +40,10 @@ describe('backup → restore round-trip preserves expenses.created_by', () => {
       .values({ id: editorId, email: 'editor-rt@test.com', displayName: 'Editor RT' });
 
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2022 });
+    ctx.sqlite.run(
+      "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status) VALUES (?, ?, ?, ?, 'editor', 'accepted')",
+      [`share-${editorId}`, vehicleId, ctx.user.id, editorId]
+    );
 
     ctx.sqlite.run(
       `INSERT INTO expenses (id, vehicle_id, category, date, expense_amount, user_id, created_by, missed_fillup)

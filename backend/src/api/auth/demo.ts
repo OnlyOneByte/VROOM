@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, lte } from 'drizzle-orm';
 import type { Context, MiddlewareHandler } from 'hono';
 import { generateIdFromEntropySize } from 'lucia';
 import { CONFIG } from '../../config';
@@ -8,6 +8,7 @@ import { seedGarage } from '../../db/seed';
 import { DemoReadOnlyError } from '../../errors';
 import { assignServerRole } from '../../permissions/grants';
 import { DEMO_ROLE_KEY } from '../../permissions/roles';
+import { extractErrorMessage } from '../../utils/error-handling';
 import { logger } from '../../utils/logger';
 import { lucia } from './lucia';
 import { DEMO_SESSION_PREFIX, demoSessionExpiresAt, setSessionCookie } from './utils';
@@ -43,23 +44,35 @@ export async function prepareDemoGarage(): Promise<void> {
   demoReady = false;
   await db.delete(users).where(eq(users.id, DEMO_USER_ID));
   if (!CONFIG.demo.enabled) return;
-  await db
-    .insert(users)
-    .values({ id: DEMO_USER_ID, email: DEMO_USER_EMAIL, displayName: 'Demo Garage' });
-  assignServerRole(db, DEMO_USER_ID, DEMO_ROLE_KEY);
-  await seedGarage(DEMO_USER_ID);
+  try {
+    await db
+      .insert(users)
+      .values({ id: DEMO_USER_ID, email: DEMO_USER_EMAIL, displayName: 'Demo Garage' });
+    assignServerRole(db, DEMO_USER_ID, DEMO_ROLE_KEY);
+    await seedGarage(DEMO_USER_ID);
+  } catch (error) {
+    await db
+      .delete(users)
+      .where(eq(users.id, DEMO_USER_ID))
+      .catch((cleanupError: unknown) =>
+        logger.error('Could not remove the partly seeded demo garage', {
+          message: extractErrorMessage(cleanupError),
+        })
+      );
+    throw error;
+  }
   demoReady = true;
   logger.info('Demo garage is ready');
 }
 
 export async function startDemoSession(c: Context): Promise<Date> {
-  const sessionId = `${DEMO_SESSION_PREFIX}${Date.now()}_${generateIdFromEntropySize(25)}`;
+  const now = Date.now();
+  await getDb()
+    .delete(sessions)
+    .where(and(eq(sessions.userId, DEMO_USER_ID), lte(sessions.expiresAt, Math.floor(now / 1000))));
+  const sessionId = `${DEMO_SESSION_PREFIX}${now}_${generateIdFromEntropySize(25)}`;
   await lucia.createSession(DEMO_USER_ID, {}, { sessionId });
   const expiresAt = demoSessionExpiresAt(sessionId) as Date;
-  await getDb()
-    .update(sessions)
-    .set({ expiresAt: Math.floor(expiresAt.getTime() / 1000) })
-    .where(eq(sessions.id, sessionId));
   setSessionCookie(c, lucia.sessionCookieName, { id: sessionId, expiresAt });
   return expiresAt;
 }

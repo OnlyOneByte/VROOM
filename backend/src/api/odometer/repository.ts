@@ -260,11 +260,17 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   async getHistory(
     vehicleId: string,
     userId: string,
-    options?: { limit?: number; offset?: number; hideFinancials?: boolean }
+    options?: {
+      limit?: number;
+      offset?: number;
+      hideFinancials?: boolean;
+      includeExpenses?: boolean;
+    }
   ): Promise<OdometerHistoryResult> {
     const limit = options?.limit ?? 50;
     const offset = options?.offset ?? 0;
-    const visibleExpenses = options?.hideFinancials ? sql`AND ${hiddenFinancialsScope()}` : sql``;
+    const financials = options?.hideFinancials ? sql`AND ${hiddenFinancialsScope()}` : sql``;
+    const visibleExpenses = options?.includeExpenses === false ? sql`AND 0` : financials;
 
     try {
       const rows = await this.db.all<{
