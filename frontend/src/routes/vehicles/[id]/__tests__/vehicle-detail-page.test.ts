@@ -162,6 +162,11 @@ async function mount() {
 	return view;
 }
 
+async function openDetails() {
+	await fireEvent.click(screen.getByRole('button', { name: 'Details, insurance and photos' }));
+	await settle();
+}
+
 const TAB_CONTENT_MOUNTED: Record<string, () => unknown> = {
 	Overview: () => true,
 	Expenses: () => screen.queryByRole('textbox', { name: 'Search expenses' }),
@@ -246,8 +251,7 @@ describe('vehicle detail page overview', () => {
 
 	test('the overview headings go in order from the page h1', async () => {
 		await mount();
-		await fireEvent.click(screen.getByRole('button', { name: 'Details, insurance and photos' }));
-		await settle();
+		await openDetails();
 
 		const levels = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'), h =>
 			Number(h.tagName[1])
@@ -280,6 +284,7 @@ describe('vehicle detail page overview', () => {
 
 	test('the first Upload Photos tap mounts the upload dialog open', async () => {
 		await mount();
+		await openDetails();
 		expect(captured['media']).toBeUndefined();
 		expect(captured['photos']?.['onUpload']).toBeTypeOf('function');
 
@@ -305,6 +310,7 @@ describe('vehicle detail page overview', () => {
 		expect(screen.queryByRole('button', { name: 'Share' })).toBeNull();
 		expect(screen.queryByRole('link', { name: /Add Expense/ })).toBeNull();
 		expect(captured['share']).toBeUndefined();
+		await openDetails();
 		expect(getPhotos).not.toHaveBeenCalled();
 		expect(captured['photos']?.['isOwner']).toBe(false);
 	});
@@ -326,12 +332,14 @@ describe('vehicle detail page overview', () => {
 		});
 		const { container } = await mount();
 
-		expect(captured['photos']?.['photos']).toHaveLength(2);
 		expect(container.querySelector('img[src="/thumb/v1/p2"]')).not.toBeNull();
+		await openDetails();
+		expect(captured['photos']?.['photos']).toHaveLength(2);
 	});
 
 	test('the insurance section is loaded lazily on the overview', async () => {
 		await mount();
+		await openDetails();
 
 		await waitFor(() => expect(captured['insurance']).toBeDefined());
 		expect(captured['insurance']?.['vehicleId']).toBe('v1');
@@ -343,6 +351,8 @@ describe('vehicle detail page overview', () => {
 		const { container } = await mount();
 		const trigger = screen.getByRole('button', { name: 'Details, insurance and photos' });
 		expect(trigger).toHaveAttribute('aria-expanded', 'false');
+		expect(captured['photos']).toBeUndefined();
+		expect(screen.queryByRole('heading', { name: /Vehicle Information/ })).toBeNull();
 
 		await fireEvent.click(trigger);
 		await waitFor(() => expect(container.querySelector('[data-mock="insurance"]')).not.toBeNull());

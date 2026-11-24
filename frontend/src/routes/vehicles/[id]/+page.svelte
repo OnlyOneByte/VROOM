@@ -68,6 +68,7 @@
 		ExpenseCategory
 	} from '#lib/types/index.ts';
 	import { latest } from '#lib/utils/latest-request.ts';
+	import { loadWhenIdle } from '#lib/utils/idle.ts';
 	import { onlineStatus } from '#lib/stores/offline.svelte.ts';
 	import { loadCachedVehicles } from '#lib/utils/offline-storage.ts';
 	import { useExpenseListReload } from '../../expenses/expense-list-reload.svelte';
@@ -111,16 +112,18 @@
 	let shareOpen = $state(false);
 	let moreMenuOpen = $state(false);
 	let detailsOpen = $state(false);
+	let hasOpenedDetails = $state(false);
 	let hasOpenedUpload = $state(false);
 
 	const CATEGORY_CHART_TITLE = 'Expense by Category';
 	const CATEGORY_CHART_DESCRIPTION = 'Distribution for this vehicle';
 	const CHARTS_LOAD_ERROR = "Charts couldn't be loaded. Check your connection and reload.";
-	const chartsLoading = Promise.all([
-		import('#lib/components/charts/ExpenseTrendChart.svelte'),
-		import('#lib/components/charts/FuelEfficiencyTrendChart.svelte'),
-		import('#lib/components/charts/index.ts')
-	]);
+	const fuelChartLoading = import('#lib/components/charts/FuelEfficiencyTrendChart.svelte');
+	const loadSpendCharts = () =>
+		Promise.all([
+			import('#lib/components/charts/ExpenseTrendChart.svelte'),
+			import('#lib/components/charts/index.ts')
+		]);
 	const loadExpensesTab = () =>
 		Promise.all([
 			import('#lib/components/expenses/ExpenseSearchFilters.svelte'),
@@ -221,9 +224,9 @@
 	});
 
 	function loadInsuranceTab() {
-		if (hasLoadedInsurance) return;
+		if (hasLoadedInsurance) return Promise.resolve();
 		hasLoadedInsurance = true;
-		import('#lib/components/insurance/InsuranceTab.svelte').then(
+		return import('#lib/components/insurance/InsuranceTab.svelte').then(
 			m => {
 				InsuranceTab = m.default;
 			},
@@ -235,7 +238,6 @@
 
 	async function loadPage() {
 		isLoading = true;
-		loadInsuranceTab();
 		const vehicleRequest = loadVehicle();
 		summarySettled = loadSummary();
 		vehicleSettled = vehicleRequest;
@@ -262,11 +264,13 @@
 	$effect(() => {
 		if (isLoading || !vehicle || hasPrefetchedTabs) return;
 		hasPrefetchedTabs = true;
-		void Promise.allSettled([
-			loadExpensesTab(),
-			loadOdometerTab(),
-			loadFinanceTab(),
-			...(isOwner ? [loadUploadDialog()] : [])
+		loadWhenIdle([
+			loadExpensesTab,
+			loadSpendCharts,
+			loadOdometerTab,
+			loadFinanceTab,
+			loadInsuranceTab,
+			...(isOwner ? [loadUploadDialog] : [])
 		]);
 	});
 
@@ -748,9 +752,9 @@
 							trend={fuelEfficiencyData}
 						>
 							{#snippet chart()}
-								{#await chartsLoading}
+								{#await fuelChartLoading}
 									{@render fuelChartPlaceholder(null)}
-								{:then [, { default: FuelEfficiencyTrendChart }]}
+								{:then { default: FuelEfficiencyTrendChart }}
 									<FuelEfficiencyTrendChart
 										data={recentFuelEfficiency}
 										fuelType={vehicle?.vehicleType || 'gas'}
@@ -765,7 +769,15 @@
 						</FuelEfficiencyStatsCard>
 					{/if}
 
-					<Collapsible bind:open={detailsOpen} class="rounded-xl border bg-card">
+					<Collapsible
+						bind:open={detailsOpen}
+						onOpenChange={open => {
+							if (!open) return;
+							hasOpenedDetails = true;
+							void loadInsuranceTab();
+						}}
+						class="rounded-xl border bg-card"
+					>
 						<CollapsibleTrigger
 							class="flex min-h-12 w-full items-center gap-2 rounded-xl px-4 text-left text-sm font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:px-6"
 						>
@@ -776,22 +788,24 @@
 							Details, insurance and photos
 						</CollapsibleTrigger>
 						<CollapsibleContent class="space-y-6 border-t p-4 sm:p-6">
-							<VehicleInfoCard {vehicle} {isOwner} />
-							{#if InsuranceTab}
-								<InsuranceTab {vehicleId} readOnly={!isOwner} />
+							{#if hasOpenedDetails}
+								<VehicleInfoCard {vehicle} {isOwner} />
+								{#if InsuranceTab}
+									<InsuranceTab {vehicleId} readOnly={!isOwner} />
+								{/if}
+								<VehiclePhotoCarousel
+									{vehicleId}
+									photos={vehiclePhotos}
+									{isOwner}
+									isLoading={isLoadingPhotos}
+									onUpload={() => {
+										hasOpenedUpload = true;
+										showUploadDialog = true;
+									}}
+									onDelete={handleDeletePhoto}
+									onSetCover={handleSetCover}
+								/>
 							{/if}
-							<VehiclePhotoCarousel
-								{vehicleId}
-								photos={vehiclePhotos}
-								{isOwner}
-								isLoading={isLoadingPhotos}
-								onUpload={() => {
-									hasOpenedUpload = true;
-									showUploadDialog = true;
-								}}
-								onDelete={handleDeletePhoto}
-								onSetCover={handleSetCover}
-							/>
 						</CollapsibleContent>
 					</Collapsible>
 				</TabsContent>
@@ -799,9 +813,9 @@
 				<TabsContent value="expenses" class="space-y-6">
 					{#if visitedTabs['expenses']}
 						{#if hasExpenseData}
-							{#await chartsLoading}
+							{#await loadSpendCharts()}
 								{@render spendChartPlaceholders(null)}
-							{:then [{ default: ExpenseTrendChart }, , { AppPieChart }]}
+							{:then [{ default: ExpenseTrendChart }, { AppPieChart }]}
 								<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 									<ExpenseTrendChart
 										data={expenseTrendData}

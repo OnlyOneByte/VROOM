@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Vehicle } from '#lib/types/index.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
@@ -67,10 +67,11 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 import Page from '../+page.svelte';
 
 describe('vehicle page draws as soon as the vehicle loads', () => {
-	test('the Insurance chunk starts on mount, and the page and photos follow the vehicle alone', async () => {
+	test('the page and photos follow the vehicle alone, and the Insurance chunk waits for the page', async () => {
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 
-		await waitFor(() => expect(insuranceRequested.value).toBe(true));
+		await new Promise(resolve => setTimeout(resolve, 100));
+		expect(insuranceRequested.value).toBe(false);
 		expect(screen.queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument();
 		expect(getPhotos).not.toHaveBeenCalled();
 
@@ -78,6 +79,7 @@ describe('vehicle page draws as soon as the vehicle loads', () => {
 
 		expect(await screen.findByRole('tab', { name: 'Overview' })).toBeInTheDocument();
 		await waitFor(() => expect(getPhotos).toHaveBeenCalledTimes(1));
+		await waitFor(() => expect(insuranceRequested.value).toBe(true), { timeout: 3000 });
 		expect(screen.queryByText('No expenses yet')).not.toBeInTheDocument();
 		expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
 		expect(
@@ -95,6 +97,9 @@ describe('vehicle page draws as soon as the vehicle loads', () => {
 		);
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 		vehicleCall.release(VEHICLE);
+		await fireEvent.click(
+			await screen.findByRole('button', { name: 'Details, insurance and photos' })
+		);
 
 		await waitFor(() => expect(carouselProps.value?.['isLoading']).toBe(true));
 		releasePhotos({ data: [] });

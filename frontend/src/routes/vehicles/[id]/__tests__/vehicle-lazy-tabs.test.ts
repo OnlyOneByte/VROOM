@@ -130,8 +130,9 @@ describe('vehicle page — tab, chart and dialog code loads on demand', () => {
 
 		releaseVehicle(VEHICLE);
 		const financeTab = await screen.findByRole('tab', { name: 'Finance' });
-		await waitFor(() =>
-			expect(requested).toEqual(new Set(['expenses', 'odometer', 'finance', 'upload']))
+		await waitFor(
+			() => expect(requested).toEqual(new Set(['expenses', 'odometer', 'finance', 'upload'])),
+			{ timeout: 3000 }
 		);
 		await new Promise(resolve => setTimeout(resolve, 100));
 		expect(financeProps).toBeNull();
