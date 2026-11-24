@@ -178,7 +178,7 @@ describe('provider OAuth callback never modifies the session', () => {
         const refreshToken = `1/test-refresh-token-${nonce.slice(0, 8)}`;
         const email = 'provider@gmail.com';
 
-        storePending(USER_A_ID, nonce, refreshToken, email);
+        storePending(USER_A_ID, nonce, refreshToken, email, 'google-drive');
         const consumed = consumePending(USER_A_ID, nonce);
 
         expect(consumed).not.toBeNull();

@@ -31,7 +31,7 @@ export function storePending(
   nonce: string,
   refreshToken: string,
   email: string,
-  providerType = 'google-drive'
+  providerType: string
 ): void {
   cleanupExpired();
 
