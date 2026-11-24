@@ -12,7 +12,7 @@ import { rateLimiter, requireAuth } from '../../middleware';
 import { assignServerRole, requestResolver } from '../../permissions/grants';
 import { PERMISSION_REGISTRY } from '../../permissions/registry';
 import { ROLE_TEMPLATES } from '../../permissions/roles';
-import { getClientIp } from '../../utils/client-ip';
+import { getClientRateKey } from '../../utils/client-ip';
 import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { storePending } from '../../utils/pending-credentials';
@@ -145,7 +145,7 @@ function takeLoginStateCookie(c: Context): string | undefined {
 const authRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.auth,
   // Key on the trusted client IP; a raw X-Forwarded-For header is spoofable.
-  keyGenerator: (c) => `auth:${getClientIp(c)}`,
+  keyGenerator: (c) => `auth:${getClientRateKey(c)}`,
 });
 
 for (const path of ['/providers', '/login/*', '/link/*', '/callback/*']) {

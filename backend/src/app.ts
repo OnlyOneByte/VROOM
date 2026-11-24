@@ -31,7 +31,7 @@ import { CONFIG } from './config';
 import { checkDatabaseHealth } from './db/connection';
 import { createErrorResponse, NotFoundError } from './errors';
 import { activityTracker, bodyLimit, errorHandler, optionalAuth, rateLimiter } from './middleware';
-import { getClientIp } from './utils/client-ip';
+import { getClientRateKey } from './utils/client-ip';
 import { logger } from './utils/logger';
 
 const app = new Hono();
@@ -98,8 +98,8 @@ const globalRateLimiter = rateLimiter({
   keyGenerator: (c) => {
     // Keys by trusted client IP: the raw X-Forwarded-For header is spoofable.
     const user = c.get('user');
-    if (user?.id === DEMO_USER_ID) return `global:demo:${getClientIp(c)}`;
-    return `global:${user?.id || getClientIp(c)}`;
+    if (user?.id === DEMO_USER_ID) return `global:demo:${getClientRateKey(c)}`;
+    return `global:${user?.id || getClientRateKey(c)}`;
   },
 });
 
