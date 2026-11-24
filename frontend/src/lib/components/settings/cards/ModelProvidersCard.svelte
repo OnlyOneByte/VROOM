@@ -18,6 +18,9 @@
 		CardTitle
 	} from '#lib/components/ui/card/index.ts';
 	import { providerApi } from '#lib/services/provider-api.ts';
+	import { settingsApi } from '#lib/services/settings-api.ts';
+	import ProviderHealth from '#lib/components/settings/ProviderHealth.svelte';
+	import ProviderStatusBadge from '#lib/components/settings/ProviderStatusBadge.svelte';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import ProviderFields, {
@@ -47,6 +50,8 @@
 				'The API key is stored encrypted and never shown again. Your receipt image is sent only to this provider when you scan.',
 			namePlaceholder: 'My receipt parser',
 			feature: 'Receipt scanning',
+			useFor: 'receipt scanning',
+			useForTitle: 'Receipt Scanning',
 			loadError: "Couldn't load your receipt-parsing providers.",
 			capability: 'ai.vision'
 		},
@@ -62,6 +67,8 @@
 				'The API key is stored encrypted and never shown again. Your questions are sent only to this provider when you chat.',
 			namePlaceholder: 'My assistant',
 			feature: 'The assistant',
+			useFor: 'the assistant',
+			useForTitle: 'the Assistant',
 			loadError: "Couldn't load your assistant providers.",
 			capability: 'ai.llm'
 		}
@@ -72,6 +79,8 @@
 	let Icon = $derived(copy.icon);
 
 	let providers = $state<UserProviderInfo[]>([]);
+	let savedDefaultId = $state<string | null>(null);
+	let savingDefaultId = $state<string | null>(null);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 	let content = $state<HTMLElement | null>(null);
@@ -94,16 +103,44 @@
 			(providerTypes.find(t => t.id === deletingProvider?.providerType)?.secrets.length ?? 1) > 0
 	);
 
+	let usable = $derived(providers.filter(p => p.status !== 'disabled'));
+	let defaultId = $derived(
+		usable.find(p => p.id === savedDefaultId)?.id ??
+			[...usable].sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0]?.id ??
+			null
+	);
+
+	async function useAsDefault(p: UserProviderInfo) {
+		if (savingDefaultId) return;
+		savingDefaultId = p.id;
+		try {
+			await settingsApi.updateSettings({ providerDefaults: { [copy.capability]: p.id } });
+			savedDefaultId = p.id;
+			appStore.showSuccess(`${copy.feature} now uses ${p.displayName}.`);
+		} catch (e) {
+			appStore.showError(`Couldn't change the provider. ${userFacingErrorMessage(e)}`);
+		} finally {
+			savingDefaultId = null;
+		}
+	}
+
+	function replaceProvider(updated: UserProviderInfo) {
+		providers = providers.map(p => (p.id === updated.id ? updated : p));
+	}
+
 	let selectedEntry = $derived(providerTypes.find(t => t.id === formType) ?? providerTypes[0]);
 	let typeLabel = $derived(selectedEntry?.label ?? '');
 
 	async function loadData() {
 		isLoading = true;
 		try {
-			[providers] = await Promise.all([
+			const [list, , settings] = await Promise.all([
 				providerApi.getProviders(domain),
-				providerCatalog.ensureLoaded()
+				providerCatalog.ensureLoaded(),
+				settingsApi.getSettings().catch(() => null)
 			]);
+			providers = list;
+			savedDefaultId = settings?.providerDefaults?.[copy.capability] ?? null;
 			error = null;
 		} catch (e) {
 			error = `${copy.loadError} ${userFacingErrorMessage(e)}`;
@@ -258,39 +295,59 @@
 				{#if providers.length > 0}
 					<div class="space-y-2">
 						{#each providers as provider (provider.id)}
-							<div
-								class="flex items-center justify-between rounded-lg border p-3"
-								data-testid="{domain}-provider-row"
-							>
-								<div class="min-w-0">
-									<p class="text-sm font-medium truncate">{provider.displayName}</p>
-									<p class="text-xs text-muted-foreground truncate">
-										{labelFor(provider.providerType)}
-										{#if typeof provider.config['model'] === 'string'}
-											· {provider.config['model']}
-										{/if}
-									</p>
+							<div class="space-y-3 rounded-lg border p-3" data-testid="{domain}-provider-row">
+								<div class="flex items-center justify-between gap-2">
+									<div class="min-w-0">
+										<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+											<p class="text-sm font-medium truncate">{provider.displayName}</p>
+											<ProviderStatusBadge status={provider.status} />
+										</div>
+										<p class="text-xs text-muted-foreground truncate">
+											{labelFor(provider.providerType)}
+											{#if typeof provider.config['model'] === 'string'}
+												· {provider.config['model']}
+											{/if}
+										</p>
+									</div>
+									<div class="flex items-center gap-2 shrink-0">
+										<Button
+											variant="ghost"
+											size="icon"
+											class="size-10 sm:size-9"
+											aria-label="Edit {provider.displayName}"
+											onclick={() => openEdit(provider)}
+										>
+											<Pencil class="h-4 w-4" />
+										</Button>
+										<Button
+											variant="ghost"
+											size="icon"
+											class="size-10 sm:size-9"
+											aria-label="Delete {provider.displayName}"
+											onclick={() => confirmDelete(provider)}
+										>
+											<Trash2 class="h-4 w-4 text-destructive" />
+										</Button>
+									</div>
 								</div>
-								<div class="flex items-center gap-2 shrink-0">
-									<Button
-										variant="ghost"
-										size="icon"
-										class="size-10 sm:size-9"
-										aria-label="Edit {provider.displayName}"
-										onclick={() => openEdit(provider)}
-									>
-										<Pencil class="h-4 w-4" />
-									</Button>
-									<Button
-										variant="ghost"
-										size="icon"
-										class="size-10 sm:size-9"
-										aria-label="Delete {provider.displayName}"
-										onclick={() => confirmDelete(provider)}
-									>
-										<Trash2 class="h-4 w-4 text-destructive" />
-									</Button>
-								</div>
+								{#if usable.length > 1 && provider.status !== 'disabled'}
+									{#if provider.id === defaultId}
+										<p class="text-xs text-muted-foreground">Used for {copy.useFor}</p>
+									{:else}
+										<Button
+											variant="outline"
+											class="h-10 sm:h-9"
+											aria-disabled={savingDefaultId !== null}
+											onclick={() => useAsDefault(provider)}
+										>
+											{#if savingDefaultId === provider.id}
+												<LoaderCircle class="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+											{/if}
+											Use for {copy.useForTitle}
+										</Button>
+									{/if}
+								{/if}
+								<ProviderHealth {provider} onFix={openEdit} onUpdated={replaceProvider} />
 							</div>
 						{/each}
 					</div>

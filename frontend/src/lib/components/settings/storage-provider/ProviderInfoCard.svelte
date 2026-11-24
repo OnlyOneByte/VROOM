@@ -11,7 +11,6 @@
 	} from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Card, CardContent, CardHeader } from '#lib/components/ui/card/index.ts';
-	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import { Progress } from '#lib/components/ui/progress/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
@@ -22,6 +21,8 @@
 	import { Alert, AlertDescription } from '#lib/components/ui/alert/index.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
+	import ProviderHealth from '#lib/components/settings/ProviderHealth.svelte';
+	import ProviderStatusBadge from '#lib/components/settings/ProviderStatusBadge.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { PHOTO_CATEGORY_LABELS } from '#lib/constants/ui.ts';
 	import {
@@ -43,7 +44,8 @@
 		onEdit,
 		onDelete,
 		onBackupToggle,
-		onSheetsSyncToggle
+		onSheetsSyncToggle,
+		onUpdated
 	}: {
 		provider: UserProviderInfo;
 		categorySettings: Record<PhotoCategory, CategorySetting>;
@@ -54,6 +56,7 @@
 		onDelete: (_provider: UserProviderInfo) => void;
 		onBackupToggle?: (_providerId: string, _enabled: boolean) => void;
 		onSheetsSyncToggle?: (_providerId: string, _enabled: boolean) => void;
+		onUpdated?: (_provider: UserProviderInfo) => void;
 	} = $props();
 
 	let expanded = $state(false);
@@ -65,32 +68,6 @@
 
 	function getProviderIcon(providerType: string) {
 		return providerUi(providerType)?.icon ?? Cloud;
-	}
-
-	function getStatusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-		switch (status) {
-			case 'active':
-				return 'default';
-			case 'error':
-				return 'destructive';
-			case 'disconnected':
-				return 'secondary';
-			default:
-				return 'outline';
-		}
-	}
-
-	function getStatusLabel(status: string): string {
-		switch (status) {
-			case 'active':
-				return 'Connected';
-			case 'error':
-				return 'Error';
-			case 'disconnected':
-				return 'Disconnected';
-			default:
-				return status;
-		}
 	}
 
 	function formatLastSync(lastSyncAt?: string): string {
@@ -179,9 +156,7 @@
 				<div class="min-w-0">
 					<div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 sm:flex-nowrap">
 						<p class="text-sm font-semibold truncate min-w-0">{provider.displayName}</p>
-						<Badge variant={getStatusVariant(provider.status)} class="text-xs shrink-0">
-							{getStatusLabel(provider.status)}
-						</Badge>
+						<ProviderStatusBadge status={provider.status} />
 					</div>
 					<p class="text-xs text-muted-foreground truncate">
 						{#if provider.config?.['accountEmail']}
@@ -230,6 +205,7 @@
 
 	<CardContent class="pt-0">
 		<div class="space-y-3">
+			<ProviderHealth {provider} onFix={onEdit} onUpdated={p => onUpdated?.(p)} />
 			{#if providerCatalog.error && !providerCatalog.loaded}
 				<LoadErrorCard
 					compact

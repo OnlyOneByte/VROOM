@@ -140,7 +140,9 @@
 		<div class="space-y-2">
 			<div class="flex items-baseline gap-1">
 				<Label for={id}>{field.label}</Label>
-				{#if field.required}<span class="text-sm text-muted-foreground" aria-hidden="true">*</span>{/if}
+				{#if field.required}<span class="text-sm text-muted-foreground" aria-hidden="true">
+						*
+					</span>{/if}
 			</div>
 			{#if field.kind === 'select'}
 				<Select.Root
@@ -193,7 +195,9 @@
 		<div class="space-y-2">
 			<div class="flex items-baseline gap-1">
 				<Label for={id}>{secret.label}</Label>
-				{#if needed.has(secret.key)}<span class="text-sm text-muted-foreground" aria-hidden="true">*</span>{/if}
+				{#if needed.has(secret.key)}<span class="text-sm text-muted-foreground" aria-hidden="true">
+						*
+					</span>{/if}
 			</div>
 			<Input
 				{id}

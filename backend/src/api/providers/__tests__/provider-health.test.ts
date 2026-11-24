@@ -329,6 +329,22 @@ describe('credentialFailureOf reads vendor errors', () => {
   test.each([
     ['a network error', Object.assign(new Error('ECONNREFUSED'), { code: 'ECONNREFUSED' })],
     ['a 500', Object.assign(new Error('x'), { response: { status: 500 } })],
+    [
+      'a Google 403 for a rate limit',
+      Object.assign(new Error('User rate limit exceeded'), {
+        response: {
+          status: 403,
+          data: { error: { errors: [{ reason: 'userRateLimitExceeded' }] } },
+        },
+      }),
+    ],
+    [
+      'a Google 403 for a full storage quota',
+      Object.assign(new Error('The user has exceeded their Drive storage quota'), {
+        response: { status: 403 },
+        errors: [{ reason: 'storageQuotaExceeded' }],
+      }),
+    ],
     ['a non-error', 'boom'],
   ])('%s is not a credential failure', (_label, error) => {
     expect(credentialFailureOf(error)).toBeNull();

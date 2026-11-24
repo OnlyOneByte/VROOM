@@ -1,4 +1,4 @@
-import type { UserProviderInfo } from '#lib/types/index.ts';
+import type { ProviderHealthResult, UserProviderInfo } from '#lib/types/index.ts';
 import { ApiError } from '#lib/utils/error-handling.ts';
 import type { CatalogEntry } from '#lib/stores/provider-catalog.svelte.ts';
 import { apiClient } from './api-client';
@@ -27,6 +27,10 @@ interface UpdateProviderData {
 export const providerApi = {
 	async getCatalog(): Promise<CatalogEntry[]> {
 		return apiClient.get<CatalogEntry[]>('/providers/catalog');
+	},
+
+	async testProvider(id: string): Promise<ProviderHealthResult> {
+		return apiClient.post<ProviderHealthResult>(`/providers/${encodeURIComponent(id)}/test`);
 	},
 
 	async getProviders(domain?: string): Promise<UserProviderInfo[]> {

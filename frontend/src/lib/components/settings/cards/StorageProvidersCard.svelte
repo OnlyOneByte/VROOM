@@ -25,6 +25,7 @@
 	} from '#lib/components/ui/card/index.ts';
 	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import DefaultPhotoSources from '../storage-provider/DefaultPhotoSources.svelte';
+	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
 	import ProviderCard from '../storage-provider/ProviderInfoCard.svelte';
 	import { photosOnlyOnProvider, providerApi } from '#lib/services/provider-api.ts';
 	import { orphanedPhotosApi } from '#lib/services/photo-api.ts';
@@ -195,6 +196,14 @@
 		return { ...DEFAULT_CATEGORY_SETTINGS, ...stored };
 	}
 
+	let unhealthyBackupProviders = $derived(
+		providers.filter(
+			p =>
+				(p.status === 'needs_reauth' || p.status === 'error') &&
+				(backupConfig.providers[p.id]?.enabled || backupConfig.providers[p.id]?.sheetsSyncEnabled)
+		)
+	);
+
 	let backupProviderCount = $derived(
 		Object.values(backupConfig.providers).filter(p => p.enabled || p.sheetsSyncEnabled).length
 	);
@@ -294,6 +303,24 @@
 		{:else}
 			<div class="space-y-4">
 				<p class="text-sm font-medium">Data Backups</p>
+
+				{#if unhealthyBackupProviders.length > 0}
+					<Alert variant="warning">
+						<CircleAlert aria-hidden="true" />
+						<AlertTitle class="line-clamp-none">
+							{unhealthyBackupProviders.length === 1
+								? '1 backup provider needs attention.'
+								: `${unhealthyBackupProviders.length} backup providers need attention.`}
+						</AlertTitle>
+						<AlertDescription class="text-foreground!">
+							Backups to {new Intl.ListFormat('en', { type: 'conjunction' }).format(
+								unhealthyBackupProviders.map(p => p.displayName)
+							)} may not be saved until you fix {unhealthyBackupProviders.length === 1
+								? 'it'
+								: 'them'} below.
+						</AlertDescription>
+					</Alert>
+				{/if}
 
 				{#if backupProviderCount > 0}
 					<div class="text-xs text-muted-foreground">Last backup: {lastBackupText}</div>
@@ -414,6 +441,8 @@
 								onDelete={requestProviderDelete}
 								onBackupToggle={handleBackupToggle}
 								onSheetsSyncToggle={handleSheetsSyncToggle}
+								onUpdated={updated =>
+									(providers = providers.map(p => (p.id === updated.id ? updated : p)))}
 							/>
 						{/each}
 					</div>
