@@ -2,7 +2,7 @@ import type { ThemeDefinition, ThemeTokenKey, ThemeTokens } from './theme-types'
 
 type AccentOverrides = Pick<ThemeTokens, 'accent' | 'accent-ink' | 'needle'>;
 
-const ACCENT_SWATCH: ThemeTokenKey[] = ['background', 'bar', 'accent'];
+const ACCENT_SWATCH: ThemeTokenKey[] = ['background', 'foreground', 'accent'];
 
 const C3_LIGHT: ThemeTokens = {
 	accent: 'oklch(0.8 0.15 70)',
@@ -92,7 +92,7 @@ const C3_DARK: ThemeTokens = {
 	'popover-foreground': 'oklch(0.94 0.02 85)',
 	primary: 'oklch(0.94 0.02 85)',
 	'primary-foreground': 'oklch(0.17 0.006 60)',
-	ring: 'oklch(0.5 0.012 70)',
+	ring: 'oklch(0.51 0.012 70)',
 	secondary: 'oklch(0.14 0.005 60)',
 	'secondary-foreground': 'oklch(0.94 0.02 85)',
 	sidebar: 'oklch(0.165 0.006 60)',
@@ -102,7 +102,7 @@ const C3_DARK: ThemeTokens = {
 	'sidebar-foreground': 'oklch(0.94 0.02 85)',
 	'sidebar-primary': 'oklch(0.94 0.02 85)',
 	'sidebar-primary-foreground': 'oklch(0.17 0.006 60)',
-	'sidebar-ring': 'oklch(0.5 0.012 70)',
+	'sidebar-ring': 'oklch(0.51 0.012 70)',
 	'soon-tint': 'oklch(0.28 0.05 80)',
 	success: 'oklch(0.76 0.13 150)',
 	sunk: 'oklch(0.14 0.005 60)',

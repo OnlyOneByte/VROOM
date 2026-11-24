@@ -79,3 +79,26 @@ describe('themeStore.reconcileServerTheme server-wins hydrate', () => {
 		expect(updateSettings).not.toHaveBeenCalled();
 	});
 });
+
+describe('old theme ids from before the C3 accents', () => {
+	test('a server-sent old id is applied and saved as its accent, without a server write', () => {
+		themeStore.setTheme('default');
+		updateSettings.mockClear();
+		themeStore.reconcileServerTheme('cyberpunk');
+		expect(themeStore.themeId).toBe('electric');
+		expect(dataTheme()).toBe('electric');
+		expect(localStorage.getItem(THEME_ID_KEY)).toBe('electric');
+		expect(updateSettings).not.toHaveBeenCalled();
+	});
+
+	test('initialize rewrites a stored old id to its accent before applying it', async () => {
+		vi.resetModules();
+		localStorage.setItem(THEME_ID_KEY, 'vaporwave');
+		const { themeStore: fresh } = await import('../theme.svelte');
+		fresh.initialize();
+		expect(fresh.themeId).toBe('electric');
+		expect(localStorage.getItem(THEME_ID_KEY)).toBe('electric');
+		expect(dataTheme()).toBe('electric');
+		expect(updateSettings).not.toHaveBeenCalled();
+	});
+});

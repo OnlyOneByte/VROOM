@@ -31,9 +31,9 @@ screen should let someone glance, trust the number, and act with one thumb.
    blocks do not.
 3. **Phone first, desktop wider.** Design at 375px, then let the layout breathe. A desktop-only
    affordance (hover, wide tables) always has a mobile equivalent.
-4. **Tokens, not colours.** A screen is painted only with theme tokens, so all 11 theme families
-   in light and dark work without a second thought. If it only looks right in Default light, it
-   is not done.
+4. **Tokens, not colours.** A screen is painted only with theme tokens, so all four accents in
+   light and dark work without a second thought. If it only looks right in Amber light, it is not
+   done.
 5. **Every state is designed.** Loading, empty, error and populated are four screens, not one,
    and every action gives success feedback.
    The empty state is where a new user decides whether the app is worth it.
@@ -428,9 +428,9 @@ failed step; nits can be follow-up issues.
 - Move the mouse off the desktop rail first (it expands on hover), and scroll the page once
   before a full-page shot — charts mount when they scroll into view. Wait for chart entry
   animations to finish before the shot.
-- The theme family is a user setting: set it with `PUT /api/v1/settings`
-  `{"themePreference": "<family id>"}` (ids are listed under *Colour and theme tokens*; an
-  unknown id renders Default) or in Settings → Theme. If the account already has a
+- The accent is a user setting: set it with `PUT /api/v1/settings`
+  `{"themePreference": "<accent id>"}` (ids are listed under *Colour and theme tokens*; an old
+  theme id renders its accent and an unknown id renders Amber) or in Settings → Accent. If the account already has a
   `themePreference`, it overwrites the `vroom-theme-id` `localStorage` key once settings load.
   Light/dark is the `vroom-theme-preference` key (`light` / `dark` / `system`).
 - Before and after use the same route, viewport and data.
@@ -445,7 +445,7 @@ failed step; nits can be follow-up issues.
       one says why).
 - [ ] Every state handled (loading / empty / error / populated / success feedback).
 - [ ] No overflow at 375px; tap targets ≥ 40px; primary action in thumb reach.
-- [ ] Tokens only; AA contrast checked in Default plus two other theme families, light and dark.
+- [ ] Tokens only; AA contrast checked in Amber plus two other accents, light and dark.
 - [ ] Icon-only controls have `aria-label`; forms have labels + wired errors, and a new form
       focuses the first invalid field after a failed submit (existing forms: see *Forms*); no
       nested interactive elements; keyboard and focus work.
