@@ -554,6 +554,21 @@ Each user can create a private calendar link in Settings → Calendar, which Goo
 - **Error logs:** both servers can write the request line to their error log (for example on a timeout); keep error logs at a level that omits request URIs, or treat them like the secret itself.
 - **Cloudflare Tunnel:** Cloudflare's own request logs (if you enable Logpush) include the path; exclude `/api/v1/calendar/feed/` there or accept that Cloudflare sees the links.
 
+## Rate limits
+
+Every signed-in user has these limits on the routes that cost the server the most CPU or memory, on top of the 1,000 requests per 15 minutes every route shares. Over a limit, the API answers 429 with `Retry-After`.
+
+| Route | Per user |
+|---|---|
+| Receipt scan (`POST /receipts/parse`) | 30 per 15 minutes, at most 2 at once |
+| Receipts from Google Photos (`GET /photos/receipt-drafts`) | 10 per 15 minutes, 1 at once |
+| Assistant (`POST /assistant/chat`) | 60 per 15 minutes |
+| CSV import (`POST /expenses/import`) | 20 per 15 minutes; the previews the import form sends while you map columns have their own 300 |
+| Photo upload | 120 per 15 minutes |
+| Restore | 10 per 10 minutes |
+
+A CSV import (not a preview) and a restore are heavy jobs: each user runs one at a time (429 for a second), and the whole server runs at most 2 at once (503 with `Retry-After` over that), so a few large uploads can't exhaust the server's memory. The limits are in memory, per backend process.
+
 ## Security Checklist
 
 - [ ] HTTPS in front of the app — the production session cookie is `Secure`, so login fails without it

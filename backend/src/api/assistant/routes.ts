@@ -1,10 +1,8 @@
-import { and, eq, ne } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { getDb } from '../../db/connection';
-import { userProviders } from '../../db/schema';
-import { AppError, ValidationError } from '../../errors';
-import { requireAuth } from '../../middleware';
+import { CONFIG } from '../../config';
+import { AppError } from '../../errors';
+import { rateLimiter, requireAuth } from '../../middleware';
 import { logger } from '../../utils/logger';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { zValidator } from '../../utils/validation';
@@ -16,6 +14,11 @@ import { resolveProvider } from '../providers/resolve';
 const routes = new Hono();
 
 routes.use('*', requireAuth);
+
+const assistantLimiter = rateLimiter({
+  ...CONFIG.rateLimit.assistant,
+  keyGenerator: (c) => `assistant:${c.get('user').id}`,
+});
 
 const MAX_MESSAGE_CHARS = 2000;
 const MAX_HISTORY_TURNS = 12;
@@ -35,7 +38,7 @@ const chatBodySchema = z.object({
   timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
 });
 
-routes.post('/chat', zValidator('json', chatBodySchema), async (c) => {
+routes.post('/chat', assistantLimiter, zValidator('json', chatBodySchema), async (c) => {
   const user = c.get('user');
   const body = c.req.valid('json');
   const providerRow = await resolveProvider(user.id, 'ai.llm');

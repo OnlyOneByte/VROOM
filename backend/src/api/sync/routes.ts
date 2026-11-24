@@ -5,7 +5,13 @@ import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { userProviders } from '../../db/schema';
 import { createErrorResponse, createSuccessResponse, ValidationError } from '../../errors';
-import { bodyLimit, idempotency, rateLimiter, requireAuth } from '../../middleware';
+import {
+  bodyLimit,
+  heavyJobLimiter,
+  idempotency,
+  rateLimiter,
+  requireAuth,
+} from '../../middleware';
 import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { readJsonBody } from '../../utils/request-body';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
@@ -177,6 +183,7 @@ routes.get('/backups/download', backupRateLimiter, async (c) => {
 routes.post(
   '/restore/from-provider',
   restoreRateLimiter,
+  heavyJobLimiter,
   idempotency({ required: true }),
   async (c) => {
     const user = c.get('user');
@@ -227,6 +234,7 @@ routes.post(
 routes.post(
   '/restore/from-backup',
   restoreRateLimiter,
+  heavyJobLimiter,
   bodyLimit({ maxSize: CONFIG.backup.maxFileSize }),
   idempotency({ required: true }),
   async (c) => {

@@ -94,3 +94,57 @@ export function rateLimiter(config: RateLimitConfig) {
     return next();
   };
 }
+
+interface ConcurrencyLimitConfig {
+  limit: number;
+  keyGenerator: (c: Context) => string;
+  message: string;
+  status: 429 | 503;
+}
+
+const BUSY_RETRY_AFTER_SECONDS = 5;
+
+export function concurrencyLimiter(config: ConcurrencyLimitConfig) {
+  const inFlight = new Map<string, number>();
+  const code = config.status === 503 ? 'SERVER_BUSY' : 'RATE_LIMIT_EXCEEDED';
+  return async (c: Context, next: Next) => {
+    if (CONFIG.disableRateLimit) return next();
+    const key = config.keyGenerator(c);
+    const running = inFlight.get(key) ?? 0;
+    if (running >= config.limit) {
+      return c.json(
+        createErrorResponse(code, config.message, { retryAfter: BUSY_RETRY_AFTER_SECONDS }),
+        config.status,
+        { 'Retry-After': String(BUSY_RETRY_AFTER_SECONDS) }
+      );
+    }
+    inFlight.set(key, running + 1);
+    try {
+      await next();
+    } finally {
+      const left = (inFlight.get(key) ?? 1) - 1;
+      if (left > 0) inFlight.set(key, left);
+      else inFlight.delete(key);
+    }
+  };
+}
+
+const heavyJobsPerUser = concurrencyLimiter({
+  limit: 1,
+  keyGenerator: (c) => `heavy-jobs:${c.get('user').id}`,
+  message: 'Wait for your other import or restore to finish',
+  status: 429,
+});
+
+const heavyJobsOnServer = concurrencyLimiter({
+  limit: CONFIG.rateLimit.heavyJobsAtOnce,
+  keyGenerator: () => 'heavy-jobs',
+  message: 'The server is busy with other imports and restores. Try again in a moment.',
+  status: 503,
+});
+
+export const heavyJobLimiter = (c: Context, next: Next) =>
+  heavyJobsPerUser(c, async () => {
+    const refused = await heavyJobsOnServer(c, next);
+    if (refused) c.res = refused;
+  });

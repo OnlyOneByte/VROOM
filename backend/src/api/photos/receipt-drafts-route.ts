@@ -1,10 +1,11 @@
 import { and, eq, ne } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import type { UserProvider } from '../../db/schema';
 import { userProviders } from '../../db/schema';
 import { AppError, ValidationError } from '../../errors';
-import { requireAuth } from '../../middleware';
+import { concurrencyLimiter, rateLimiter, requireAuth } from '../../middleware';
 import { logger } from '../../utils/logger';
 import { expenseRepository } from '../expenses/repository';
 import { decryptRefreshToken } from '../providers/domains/storage/registry';
@@ -50,7 +51,18 @@ export function setPhotosServiceBuilderForTest(builder: PhotosServiceBuilder | n
   photosServiceBuilder = builder ?? buildRealPhotosService;
 }
 
-routes.get('/receipt-drafts', async (c) => {
+const receiptDraftsLimiter = rateLimiter({
+  ...CONFIG.rateLimit.receiptDrafts,
+  keyGenerator: (c) => `receiptDrafts:${c.get('user').id}`,
+});
+const draftsAtOnce = concurrencyLimiter({
+  limit: 1,
+  keyGenerator: (c) => `receipt-drafts:${c.get('user').id}`,
+  message: 'Your receipts are already being read from Google Photos',
+  status: 429,
+});
+
+routes.get('/receipt-drafts', receiptDraftsLimiter, draftsAtOnce, async (c) => {
   const user = c.get('user');
   const db = getDb();
 

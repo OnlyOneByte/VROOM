@@ -248,6 +248,18 @@ export const CONFIG = {
     backup: { windowMs: 5 * 60 * 1000, limit: 20, message: 'Too many backup requests' },
     restore: { windowMs: 10 * 60 * 1000, limit: 10, message: 'Too many restore requests' },
     trigger: { windowMs: 15 * 60 * 1000, limit: 10, message: 'Too many trigger requests' },
+    receiptScan: { windowMs: 15 * 60 * 1000, limit: 30, message: 'Too many receipt scans' },
+    receiptDrafts: {
+      windowMs: 15 * 60 * 1000,
+      limit: 10,
+      message: 'Too many receipt imports from photos',
+    },
+    assistant: { windowMs: 15 * 60 * 1000, limit: 60, message: 'Too many assistant messages' },
+    expenseImport: { windowMs: 15 * 60 * 1000, limit: 20, message: 'Too many imports' },
+    importPreview: { windowMs: 15 * 60 * 1000, limit: 300, message: 'Too many import previews' },
+    photoUpload: { windowMs: 15 * 60 * 1000, limit: 120, message: 'Too many photo uploads' },
+    receiptScansAtOnce: 2,
+    heavyJobsAtOnce: 2,
   },
   backup: {
     maxFileSize: 50 * 1024 * 1024,
