@@ -1,6 +1,6 @@
 <script lang="ts">
 	import './bar-chart-animations.css';
-	import { Bar, BarChart, Labels, Rule, Text } from 'layerchart';
+	import { Bar, BarChart, Rule, Text } from 'layerchart';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import ChartCard from './ChartCard.svelte';
 	import ChartPlot from './ChartPlot.svelte';
@@ -290,16 +290,17 @@
 								/>
 							{/if}
 						{/each}
-						{#if labelRows.length > 0 && valueKey}
-							<Labels
-								data={labelRows}
-								y={valueKey}
-								placement="outside"
-								offset={6}
-								format={(value: number) => yAxisFormat(value)}
-								class="fill-foreground text-xs font-semibold"
-								data-value-label
-							/>
+						{#if valueKey}
+							{#each labelRows as row, i (i)}
+								<Text
+									x={(chart.xScale(row[x]) ?? 0) + (chart.xScale.bandwidth?.() ?? 0) / 2}
+									y={chart.yScale(Number(row[valueKey])) - 6}
+									value={yAxisFormat(Number(row[valueKey]))}
+									textAnchor="middle"
+									class="fill-foreground text-xs font-semibold"
+									data-value-label
+								/>
+							{/each}
 						{/if}
 					{/snippet}
 					{#snippet tooltip()}

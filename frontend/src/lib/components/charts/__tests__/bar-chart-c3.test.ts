@@ -17,19 +17,25 @@ vi.mock('layerchart', () => ({
 		props: Props & { aboveMarks?: (a: unknown, c: () => unknown) => void }
 	) => {
 		seen.chart = props;
-		props.aboveMarks?.(anchor, () => ({ context: { width: 400, yScale: (v: number) => 200 - v } }));
+		props.aboveMarks?.(anchor, () => ({
+			context: {
+				width: 400,
+				yScale: (v: number) => 200 - v,
+				xScale: Object.assign((v: unknown) => (v instanceof Date ? v.getMonth() * 10 : 0), {
+					bandwidth: () => 8
+				})
+			}
+		}));
 	},
 	Bar: (_anchor: unknown, props: Props) => {
 		seen.bars.push({ ...props });
-	},
-	Labels: (_anchor: unknown, props: Props) => {
-		seen.labels.push({ ...props });
 	},
 	Rule: (_anchor: unknown, props: Props) => {
 		seen.rules.push({ ...props });
 	},
 	Text: (_anchor: unknown, props: Props) => {
-		seen.texts.push({ ...props });
+		if ('data-value-label' in props) seen.labels.push({ ...props });
+		else seen.texts.push({ ...props });
 	},
 	Tooltip: { Root: () => {} },
 	getChartContext: () => ({})
@@ -113,13 +119,14 @@ describe('C3 bar columns', () => {
 
 	test('value labels sit on the peak and the current period only', async () => {
 		await mount({ ...SINGLE, current: new Date(2026, 7, 1) });
-		expect(seen.labels).toHaveLength(1);
-		expect(seen.labels[0]?.['data']).toEqual([MONTHS[0], MONTHS[2]]);
+		expect(seen.labels.map(label => label['value'])).toEqual(['$751', '$113']);
+		expect(seen.labels.map(label => label['x'])).toEqual([5 * 10 + 4, 7 * 10 + 4]);
+		expect(seen.labels[0]).toMatchObject({ y: 200 - 751 - 6, textAnchor: 'middle' });
 	});
 
 	test('when the current period is the peak there is one label', async () => {
 		await mount({ ...SINGLE, current: new Date(2026, 5, 1) });
-		expect(seen.labels[0]?.['data']).toEqual([MONTHS[0]]);
+		expect(seen.labels.map(label => label['value'])).toEqual(['$751']);
 	});
 
 	test('value labels can be turned off, and never show on several series', async () => {
