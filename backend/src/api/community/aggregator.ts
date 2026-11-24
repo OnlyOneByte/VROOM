@@ -9,6 +9,7 @@ import {
 } from '../../utils/analytics-charts';
 import { logger } from '../../utils/logger';
 import { canonicalScale, convertDistance, convertVolume } from '../../utils/unit-conversions';
+import FUEL_ECONOMY from './fuel-economy-ratings.json';
 import { type CommunityStatsRepository, communityStatsRepository } from './repository';
 
 export type CommunityMetric = 'efficiency' | 'running_cost' | 'maintenance' | 'insurance';
@@ -37,6 +38,8 @@ export const PLAUSIBLE_BANDS: Record<CommunityUnit, { lo: number; hi: number; st
 };
 
 const INSURANCE_BAND = { lo: 5000, hi: 2_000_000, step: 1000 };
+export const RATED_MARGIN = 0.2;
+const RATINGS: Record<string, number[]> = FUEL_ECONOMY.ratings;
 
 export interface CommunityExpense {
   date: Date;
@@ -217,8 +220,23 @@ export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSam
   return samples;
 }
 
-export function bandFor(metric: CommunityMetric, unit: CommunityUnit) {
-  return metric === 'insurance' ? INSURANCE_BAND : PLAUSIBLE_BANDS[unit];
+type BandFields = Pick<VehicleSample['fields'], 'catalogModelId' | 'modelYear' | 'vehicleType'>;
+
+export function ratedEfficiencyBand(fields: BandFields, unit: CommunityUnit) {
+  const [min, max] =
+    RATINGS[`${fields.catalogModelId}|${fields.modelYear}|${fields.vehicleType}`] ?? [];
+  if (min === undefined || max === undefined) return null;
+  const plausible = PLAUSIBLE_BANDS[unit];
+  return {
+    lo: Math.max(plausible.lo, Math.round(min * (1 - RATED_MARGIN) * 10) / 10),
+    hi: Math.min(plausible.hi, Math.round(max * (1 + RATED_MARGIN) * 10) / 10),
+    step: plausible.step,
+  };
+}
+
+export function bandFor(metric: CommunityMetric, unit: CommunityUnit, fields: BandFields = {}) {
+  if (metric === 'insurance') return INSURANCE_BAND;
+  return (metric === 'efficiency' && ratedEfficiencyBand(fields, unit)) || PLAUSIBLE_BANDS[unit];
 }
 
 export function median(values: number[]): number {
@@ -273,7 +291,7 @@ function collectBuckets(vehicles: CommunityVehicle[], now: Date): Bucket[] {
   const buckets = new Map<string, Bucket>();
   for (const vehicle of vehicles) {
     for (const sample of vehicleSamples(vehicle, now)) {
-      const band = bandFor(sample.metric, sample.unit);
+      const band = bandFor(sample.metric, sample.unit, sample.fields);
       if (sample.value < band.lo || sample.value > band.hi) continue;
       const bucket = buckets.get(sample.bucketKey) ?? { sample, byOwner: new Map() };
       const ownerValues = bucket.byOwner.get(vehicle.ownerId) ?? [];
@@ -293,7 +311,7 @@ function publishBucket(
   const n = byOwner.size;
   const nPublished = publishedCount(n);
   const ownerValues = [...byOwner.values()].map(median);
-  const band = bandFor(sample.metric, sample.unit);
+  const band = bandFor(sample.metric, sample.unit, sample.fields);
   const noiseScale = noiseScaleFor(band, nPublished);
   const { fields } = sample;
   return {

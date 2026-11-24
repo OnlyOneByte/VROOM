@@ -23,11 +23,12 @@ export const GIVE_TO_GET = true;
 export const MAX_NOISE_SHARE = 0.25;
 
 export function usefulEnough(
-  row: Pick<CommunityStat, 'mean' | 'nPublished'>,
+  row: Pick<CommunityStat, 'mean' | 'nPublished'> &
+    Partial<Pick<CommunityStat, 'catalogModelId' | 'modelYear' | 'vehicleType'>>,
   metric: CommunityMetric,
   unit: CommunityUnit
 ): boolean {
-  const scale = noiseScaleFor(bandFor(metric, unit), row.nPublished);
+  const scale = noiseScaleFor(bandFor(metric, unit, row), row.nPublished);
   return row.mean > 0 && scale <= MAX_NOISE_SHARE * row.mean;
 }
 

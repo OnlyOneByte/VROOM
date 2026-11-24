@@ -137,7 +137,7 @@ no-ops when nothing changed since the last sync, so an idle user with no edits c
 Before a bucket is stored, the job enforces the privacy rules:
 
 - n counts people, and a bucket is published only when that count, rounded down to a multiple of 5, is at least K (10, or `COMMUNITY_STATS_MIN_GROUP`);
-- implausible values are dropped first;
+- values outside the bucket's band `[lo, hi]` are dropped first. Bands come only from public data, never from the bucket's own values. Fuel efficiency for a model, year and powertrain in `fuel-economy-ratings.json` uses 80% of its lowest to 120% of its highest fueleconomy.gov combined rating; everything else uses the wide plausible band for its unit;
 - each bucket publishes its rounded group size and one noisy statistic, the mean. The mean gets one Laplace draw from a cryptographic source at scale `(hi − lo) / n_published`, then is rounded. That is ε = 1 per bucket per refresh against a change in one person's value. No quantiles are published: Laplace noise at a mean's sensitivity is not a private release for a median.
 - not yet covered: one person joining or leaving a group. The noise scale follows the rounded size, and the rounded size and whether a group appears are published without noise (#1591).
 

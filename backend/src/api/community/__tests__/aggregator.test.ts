@@ -3,8 +3,10 @@ import { ChargeUnit, DistanceUnit, VolumeUnit } from '../../../types';
 import {
   ageBand,
   aggregate,
+  bandFor,
   type CommunityVehicle,
   noiseScaleFor,
+  PLAUSIBLE_BANDS,
   premiumInWindow,
   vehicleSamples,
 } from '../aggregator';
@@ -18,6 +20,7 @@ const term = (startDays: number, endDays: number, amount: number) => ({
 });
 const OPTIONS = { now: NOW, minGroup: 10, uniform: NO_NOISE };
 const CIVIC_KM_PER_L = (300 * 1.609344) / (10 * 3.785411784);
+const CIVIC_FIELDS = { catalogModelId: 'honda-civic', modelYear: 2019, vehicleType: 'gas' };
 
 function efficiencyRow(vehicles: CommunityVehicle[], options = OPTIONS) {
   return aggregate(vehicles, options).rows.find((row) => row.metric === 'efficiency');
@@ -76,9 +79,35 @@ describe('community stats aggregation privacy', () => {
       owners(12).map((id) => vehicle(id)),
       { ...OPTIONS, uniform: () => u }
     );
-    const scale = (60 - 2) / 10;
+    const scale = (18.4 - 8.5) / 10;
     const noise = -scale * Math.sign(u - 0.5) * Math.log(1 - 2 * Math.abs(u - 0.5));
     expect(row?.mean).toBeCloseTo(Math.round((CIVIC_KM_PER_L + noise) * 10) / 10, 6);
+  });
+
+  test('a rated model is clipped to 20% beyond its public ratings, an unrated one to the wide band', () => {
+    expect(bandFor('efficiency', 'km_per_l', CIVIC_FIELDS)).toEqual({
+      lo: 8.5,
+      hi: 18.4,
+      step: 0.1,
+    });
+    expect(
+      bandFor('efficiency', 'km_per_l', { ...CIVIC_FIELDS, catalogModelId: 'audi-a1' })
+    ).toEqual(PLAUSIBLE_BANDS.km_per_l);
+    expect(bandFor('efficiency', 'km_per_l', { ...CIVIC_FIELDS, modelYear: 1950 })).toEqual(
+      PLAUSIBLE_BANDS.km_per_l
+    );
+    expect(bandFor('running_cost', 'cents_per_km', CIVIC_FIELDS)).toEqual(
+      PLAUSIBLE_BANDS.cents_per_km
+    );
+  });
+
+  test('a value outside the rated band is dropped, but counts for an unrated model', () => {
+    const outlier = (catalogModelId: string) =>
+      vehicle('outlier', { catalogModelId, expenses: fillUps({ volume: 5 }) });
+    const typical = (catalogModelId: string) =>
+      owners(14).map((id) => vehicle(id, { catalogModelId }));
+    expect(efficiencyRow([...typical('honda-civic'), outlier('honda-civic')])?.nPublished).toBe(10);
+    expect(efficiencyRow([...typical('audi-a1'), outlier('audi-a1')])?.nPublished).toBe(15);
   });
 
   test('the noise scale is the band width over the published n', () => {
