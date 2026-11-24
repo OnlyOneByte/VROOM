@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, onTestFinished, test, vi } from 'vitest';
 import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Expense, ExpenseSummary, UserSettings, Vehicle } from '#lib/types/index.ts';
@@ -524,6 +524,31 @@ describe('/expenses filters', () => {
 
 		await fireEvent.click(within(sheet).getByRole('button', { name: 'Show results' }));
 		await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Filters' })).toBeNull());
+	});
+
+	test('on a phone the desktop filters are not rendered, only the Filters sheet', async () => {
+		const desktop = vi.mocked(window.matchMedia).getMockImplementation();
+		onTestFinished(() => {
+			if (desktop) vi.mocked(window.matchMedia).mockImplementation(desktop);
+		});
+		vi.mocked(window.matchMedia).mockImplementation(
+			query =>
+				({
+					matches: query.includes('40rem'),
+					addEventListener: vi.fn(),
+					removeEventListener: vi.fn()
+				}) as unknown as MediaQueryList
+		);
+		await mountLoaded();
+
+		expect(screen.queryByText('Search & Filters')).toBeNull();
+		expect(screen.queryByRole('combobox', { name: 'Vehicle filter' })).toBeNull();
+		expect(screen.queryByRole('combobox', { name: 'Search tags' })).toBeNull();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+		const sheet = await screen.findByRole('dialog', { name: 'Filters' });
+		expect(within(sheet).getByRole('combobox', { name: 'Vehicle filter' })).toBeTruthy();
+		expect(within(sheet).getByRole('combobox', { name: 'Search tags' })).toBeTruthy();
 	});
 
 	test('clearing filters resets every filter and reloads once', async () => {
