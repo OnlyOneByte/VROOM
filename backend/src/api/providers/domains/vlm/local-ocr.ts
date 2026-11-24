@@ -6,65 +6,119 @@ import { parseReceiptText } from './receipt-text';
 import type { RawExtraction, ReceiptImage, VlmProvider } from './vlm-provider';
 
 const IDLE_STOP_MS = 60_000;
-const RECOGNIZE_TIMEOUT_MS = 30_000;
+const MAX_WAITING = 8;
 
-const LANG_PATH = join(
+export const LOCAL_OCR_LANG_PATH = join(
   dirname(createRequire(import.meta.url).resolve('@tesseract.js-data/eng/package.json')),
   '4.0.0_best_int'
 );
 
-let worker: Promise<Worker> | null = null;
-let queue: Promise<unknown> = Promise.resolve();
-let idleTimer: ReturnType<typeof setTimeout> | null = null;
+export class OcrUnavailableError extends Error {}
+export class OcrUnreadableError extends Error {}
 
-function startWorker(): Promise<Worker> {
-  worker ??= createWorker('eng', 1, {
-    langPath: LANG_PATH,
+type WorkerFactory = () => Promise<Worker>;
+type ThreadHandle = {
+  worker?: { on?: (event: string, listener: (error: unknown) => void) => void };
+};
+
+function startRealWorker(): Promise<Worker> {
+  return createWorker('eng', 1, {
+    langPath: LOCAL_OCR_LANG_PATH,
     gzip: true,
     cacheMethod: 'none',
     errorHandler: (error: unknown) =>
       logger.warn('Text recognition failed', { error: String(error) }),
   });
+}
+
+let workerFactory: WorkerFactory = startRealWorker;
+let timeoutMs = 30_000;
+
+export function setLocalOcrForTest(
+  options: { createWorker?: WorkerFactory | null; timeoutMs?: number } = {}
+): void {
+  workerFactory = options.createWorker ?? startRealWorker;
+  timeoutMs = options.timeoutMs ?? 30_000;
+}
+
+let worker: Promise<Worker> | null = null;
+let queue: Promise<unknown> = Promise.resolve();
+let waiting = 0;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+function startWorker(): Promise<Worker> {
+  worker ??= workerFactory().then((started) => {
+    (started as unknown as ThreadHandle).worker?.on?.('error', (error) => {
+      logger.warn('Text recognition worker crashed', { error: String(error) });
+      worker = null;
+    });
+    return started;
+  });
   return worker;
 }
 
-export async function stopLocalOcr(): Promise<void> {
+function clearIdleTimer(): void {
   if (idleTimer) clearTimeout(idleTimer);
   idleTimer = null;
+}
+
+function dropWorker(): void {
+  const running = worker;
+  worker = null;
+  clearIdleTimer();
+  running?.then((w) => w.terminate()).catch(() => undefined);
+}
+
+export async function stopLocalOcr(): Promise<void> {
+  clearIdleTimer();
   const running = worker;
   worker = null;
   if (running) await (await running).terminate();
 }
 
 function scheduleIdleStop(): void {
-  if (idleTimer) clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => void stopLocalOcr(), IDLE_STOP_MS);
+  clearIdleTimer();
+  idleTimer = setTimeout(() => void stopLocalOcr().catch(() => undefined), IDLE_STOP_MS);
   idleTimer.unref?.();
 }
 
 async function recognizeOnce(image: Buffer): Promise<string> {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const timedOut = new Promise<never>((_, reject) => {
-    timeout = setTimeout(
-      () => reject(new Error('Text recognition timed out')),
-      RECOGNIZE_TIMEOUT_MS
+    timer = setTimeout(
+      () => reject(new OcrUnavailableError('Text recognition timed out')),
+      timeoutMs
     );
   });
+  timedOut.catch(() => undefined);
+  const job = startWorker().then(async (w) => (await w.recognize(image)).data.text);
+  job.catch(() => undefined);
   try {
-    const running = await startWorker();
-    const { data } = await Promise.race([running.recognize(image), timedOut]);
-    return data.text;
+    const text = await Promise.race([job, timedOut]);
+    scheduleIdleStop();
+    return text;
   } catch (error) {
-    await stopLocalOcr();
-    throw error instanceof Error ? error : new Error(String(error));
+    if (error instanceof OcrUnavailableError) {
+      dropWorker();
+      throw error;
+    }
+    scheduleIdleStop();
+    throw new OcrUnreadableError(error instanceof Error ? error.message : String(error));
   } finally {
-    clearTimeout(timeout);
-    if (worker) scheduleIdleStop();
+    clearTimeout(timer);
   }
 }
 
 export function recognizeText(image: Buffer): Promise<string> {
-  const run = queue.then(() => recognizeOnce(image));
+  if (waiting >= MAX_WAITING) {
+    return Promise.reject(new OcrUnavailableError('The text reader is busy'));
+  }
+  waiting++;
+  const run = queue
+    .then(() => recognizeOnce(image))
+    .finally(() => {
+      waiting--;
+    });
   queue = run.catch(() => undefined);
   return run;
 }

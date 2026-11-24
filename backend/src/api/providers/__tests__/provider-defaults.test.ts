@@ -224,6 +224,23 @@ describe('backup and restore carry the defaults', () => {
     expect(storedDefaults()['ai.llm']).toBe(llm);
   });
 
+  test('a restored choice of the built-in text reader is kept, for receipts only', async () => {
+    await createModel('vlm', 'Scan', 'sk-2');
+    ctx.sqlite.run('UPDATE user_preferences SET provider_defaults = ? WHERE user_id = ?', [
+      JSON.stringify({ 'ai.llm': 'builtin:local-ocr', 'ai.vision': 'builtin:local-ocr' }),
+      ctx.user.id,
+    ]);
+    const { backupService } = await import('../../sync/backup');
+    const { restoreService } = await import('../../sync/restore');
+    const zip = await backupService.exportAsZip(ctx.user.id);
+    ctx.sqlite.run("UPDATE user_preferences SET provider_defaults = '{}' WHERE user_id = ?", [
+      ctx.user.id,
+    ]);
+    const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(storedDefaults()).toEqual({ 'ai.llm': null, 'ai.vision': 'builtin:local-ocr' });
+  });
+
   test('a restored default naming a provider the user does not own is dropped', async () => {
     const llm = await createModel('llm', 'Chat', 'sk-1');
     await setDefaults({ 'ai.llm': llm });

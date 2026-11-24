@@ -96,6 +96,33 @@ describe('parseReceiptText', () => {
   });
 });
 
+describe('parseReceiptText on awkward lines', () => {
+  test('a price-per-gallon line before the gallons line is not read as the volume', () => {
+    expect(parseReceiptText('PRICE/GAL 4.599\nGALLONS 11.482\nTOTAL 52.81', NOW)).toMatchObject({
+      volume: 11.482,
+      pricePerUnit: 4.599,
+    });
+  });
+
+  test('a quantity of 1 or a weight in grams is not a fuel volume', () => {
+    expect(parseReceiptText('Car wash 12.50 1\nTOTAL 12.50', NOW)).toEqual({ amount: 12.5 });
+    expect(parseReceiptText('Snack 1.5 g\nTOTAL 3.00', NOW)).toEqual({ amount: 3 });
+  });
+
+  test('an item count on the total line is not the amount, and the total line is not the vendor', () => {
+    expect(parseReceiptText('SHOP\nTOTAL 2 ITEMS $52.81', NOW)).toEqual({
+      amount: 52.81,
+      vendor: 'SHOP',
+    });
+    expect(parseReceiptText('TOTAL\n$9.99', NOW)).toEqual({ amount: 9.99 });
+  });
+
+  test('a very long line is cut to a receipt-sized line before any rule runs', () => {
+    expect(parseReceiptText(`${'x'.repeat(200)} TOTAL 9.99`, NOW).amount).toBeUndefined();
+    expect(parseReceiptText('1.'.repeat(50_000), NOW)).toEqual({});
+  });
+});
+
 describe('toNumber', () => {
   test.each([
     ['52.81', 52.81],

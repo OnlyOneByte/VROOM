@@ -4,6 +4,7 @@
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
 	import HowItWorks from '#lib/components/common/how-it-works.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -338,9 +339,9 @@
 								<div class="min-w-0">
 									<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
 										<p class="text-sm font-medium">{entry.label}</p>
-										<span class="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+										<Badge variant="outline" class="shrink-0 text-xs text-muted-foreground">
 											Built in
-										</span>
+										</Badge>
 									</div>
 									<p class="text-xs text-muted-foreground">{entry.description}</p>
 								</div>

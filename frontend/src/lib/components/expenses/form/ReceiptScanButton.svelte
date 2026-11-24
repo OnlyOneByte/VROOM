@@ -59,6 +59,8 @@
 			if (err instanceof ApiError && err.code === 'NO_PROVIDER') {
 				errorMessage =
 					'No receipt-scanning provider is set up yet. Add one in Settings → Receipt Scanning.';
+			} else if (err instanceof ApiError && (err.statusCode === 422 || err.statusCode === 503)) {
+				errorMessage = `${err.message} Or fill it in manually.`;
 			} else if (err instanceof ApiError && err.statusCode === 502) {
 				errorMessage =
 					"Couldn't reach the AI provider. Check the key and model, or fill it in manually.";

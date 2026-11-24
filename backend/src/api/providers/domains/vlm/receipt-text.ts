@@ -1,12 +1,14 @@
-const NUMBER = String.raw`\d{1,3}(?:[.,\s]\d{3})*[.,]\d{1,3}|\d+(?:[.,]\d{1,3})?`;
-const MONEY = new RegExp(String.raw`[$€£]?\s*(${NUMBER})\s*(?:[$€£]|EUR|USD|GBP)?`, 'i');
+const NUMBER = String.raw`\d{1,3}(?:[.,]\d{3})*[.,]\d{1,3}|\d+(?:[.,]\d{1,3})?`;
+const MONEY = new RegExp(String.raw`[$€£]?\s?(${NUMBER})`, 'gi');
+const MAX_LINE = 120;
+const MAX_LINES = 300;
 
 const TOTAL_LABEL =
   /\b(grand\s+total|total\s+due|amount\s+due|balance\s+due|total\s+ttc|total|summe|gesamt|importe|montant|fuel\s+sale|sale\s+amount|amount)\b/i;
 const NOT_TOTAL = /\b(sub\s*-?total|tax|mwst|vat|tva|change|cash|tip|discount|savings)\b/i;
 
 const VOLUME_BEFORE = new RegExp(
-  String.raw`(?<![\d.,$€£])(${NUMBER})\s*(gal(?:lons?)?\b|g\b|l(?:itres?|iters?)?\b|1(?=\s*(?:x|@|\*|$)))`,
+  String.raw`(?<![\d.,$€£])(${NUMBER})\s*(gal(?:lons?)?\b|l(?:itres?|iters?)?\b|1(?=\s?(?:x|@|\*)))`,
   'i'
 );
 const VOLUME_AFTER = new RegExp(
@@ -56,9 +58,15 @@ function round(value: number, places: number): number {
 
 function lines(text: string): string[] {
   return text
-    .split(/\r?\n/)
-    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .split(/\r?\n/, MAX_LINES)
+    .map((line) => line.slice(0, MAX_LINE).replace(/\s+/g, ' ').trim())
     .filter(Boolean);
+}
+
+function moneyIn(text: string): number | undefined {
+  const matches = [...text.matchAll(MONEY)].map((m) => m[1]);
+  const pick = matches.filter((m) => /[.,]\d{2}$/.test(m)).at(-1) ?? matches.at(-1);
+  return pick === undefined ? undefined : toNumber(pick);
 }
 
 function findAmount(all: string[]): number | undefined {
@@ -67,8 +75,7 @@ function findAmount(all: string[]): number | undefined {
     const label = TOTAL_LABEL.exec(line);
     if (!label || NOT_TOTAL.test(line)) return;
     const afterLabel = line.slice(label.index + label[0].length);
-    const match = MONEY.exec(afterLabel) ?? MONEY.exec(all[index + 1] ?? '');
-    const value = match ? toNumber(match[1]) : undefined;
+    const value = moneyIn(afterLabel) ?? moneyIn(all[index + 1] ?? '');
     if (value === undefined || value <= 0) return;
     const score = (/grand|due|summe|ttc/i.test(label[0]) ? 2 : 1) * 1000 + index;
     if (!best || score > best.score) best = { value, score };
@@ -101,7 +108,7 @@ function findDate(text: string, now: Date): string | undefined {
 
 function findVendor(all: string[]): string | undefined {
   for (const line of all.slice(0, 6)) {
-    if (ADDRESS_OR_NOISE.test(line) || MONEY.test(line.replace(/[A-Za-z]/g, ''))) continue;
+    if (ADDRESS_OR_NOISE.test(line) || TOTAL_LABEL.test(line) || /\d[.,]\d/.test(line)) continue;
     if ((line.match(/[A-Za-zÀ-ž]/g) ?? []).length < 3) continue;
     return line.slice(0, 120);
   }
@@ -115,7 +122,7 @@ function unitOf(token: string): ReceiptVolumeUnit {
 type FoundVolume = { volume: number; unit: ReceiptVolumeUnit };
 
 function volumeIn(line: string): FoundVolume | undefined {
-  const after = VOLUME_AFTER.exec(line);
+  const after = PRICE_PER_UNIT.test(line) ? null : VOLUME_AFTER.exec(line);
   const before = VOLUME_BEFORE.exec(line);
   const [raw, unit] = after
     ? [after[2], after[1]]

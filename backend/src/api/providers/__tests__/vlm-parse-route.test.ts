@@ -116,7 +116,7 @@ describe('POST /api/v1/receipts/parse', () => {
   test('with no configured provider, the built-in reader answers and an unreadable image is a 422', async () => {
     const res = await postImage(IMG, 'image/jpeg');
     expect(res.status).toBe(422);
-    expect(await res.text()).toMatch(/couldn't read/i);
+    expect(await res.text()).toMatch(/No readable text found/);
   }, 60_000);
 
   test('a provider transport or HTTP failure returns 502', async () => {

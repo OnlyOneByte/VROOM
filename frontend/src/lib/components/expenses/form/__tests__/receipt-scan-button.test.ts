@@ -163,9 +163,17 @@ describe('ReceiptScanButton: errors', () => {
 			"Couldn't reach the AI provider. Check the key and model, or fill it in manually."
 		],
 		[
-			'other API',
-			new ApiError('Image too blurry', 422),
-			"Couldn't read the receipt. Image too blurry. Or fill it in manually."
+			'built-in reader found no text (422)',
+			new ApiError('No readable text found. Try a sharper, well-lit photo.', 422),
+			'No readable text found. Try a sharper, well-lit photo. Or fill it in manually.'
+		],
+		[
+			'built-in reader unavailable (503)',
+			new ApiError(
+				"The built-in text reader isn't available right now. Try again in a moment.",
+				503
+			),
+			"The built-in text reader isn't available right now. Try again in a moment. Or fill it in manually."
 		],
 		[
 			'non-Error',
