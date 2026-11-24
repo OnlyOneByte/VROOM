@@ -21,7 +21,6 @@
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
-	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import TripForm from '#lib/components/trips/TripForm.svelte';
 
 	let isLoading = $state(true);
@@ -116,11 +115,11 @@
 	<meta name="description" content="Track and manage your vehicle trips" />
 </svelte:head>
 
-<div class="space-y-6 pb-24 short:pb-0">
+<div class="space-y-6">
 	<PageHeader title="Trips" description="Track mileage and trips across your vehicles">
 		{#snippet actions()}
 			{#if !isLoading && !loadError && trips.length > 0 && vehicles.length > 0}
-				<Button size="lg" class="hidden lg:inline-flex short:inline-flex" onclick={openCreate}>
+				<Button size="lg" onclick={openCreate}>
 					<Plus class="mr-2 h-4 w-4" />
 					Log Trip
 				</Button>
@@ -263,10 +262,6 @@
 				Showing {formatNumber(trips.length, 0)} of {formatNumber(totalCount, 0)} trips
 			</p>
 		{/if}
-	{/if}
-
-	{#if !isLoading && !loadError && trips.length > 0 && vehicles.length > 0}
-		<FloatingActionButton label="Log Trip" onclick={openCreate} />
 	{/if}
 
 	<TripForm bind:open={formOpen} {vehicles} trip={editingTrip} onSaved={load} />

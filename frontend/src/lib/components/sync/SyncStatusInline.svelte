@@ -23,7 +23,7 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
 
-	let { isExpanded = true } = $props();
+	let { isExpanded = true, providerNeedsAttention = false } = $props();
 
 	let pendingCount = $derived(countPendingSync(offlineExpenseQueue.current));
 	let parkedCount = $derived(countParked(offlineExpenseQueue.current));
@@ -39,7 +39,8 @@
 			syncStatus: syncState.current,
 			pendingCount,
 			conflictsCount: syncConflicts.current.length,
-			serverReachable: !authStore.sessionUnverified
+			serverReachable: !authStore.sessionUnverified,
+			providerNeedsAttention
 		})
 	);
 
@@ -195,6 +196,15 @@
 						{formatCompactRelativeTime(lastBackupTime.current ?? lastSheetsSync.current)}
 					</span>
 				</div>
+			{/if}
+
+			{#if providerNeedsAttention}
+				<a
+					href="{resolve(routes.settings)}#settings-connections"
+					class="block rounded-sm text-xs font-medium text-accent-ink underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					Fix it in Settings → Storage Providers
+				</a>
 			{/if}
 
 			{#if lastDataChangeTime.current}

@@ -29,3 +29,7 @@ export const paramRoutes = {
 	vehicleOdometerEntryEdit: '/vehicles/[id]/odometer/[entryId]/edit',
 	settingsProviderEdit: '/settings/providers/[id]/edit'
 } as const;
+
+export function isFormRoute(pathname: string): boolean {
+	return /\/(new|edit)\/?$/.test(pathname);
+}

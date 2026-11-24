@@ -49,22 +49,26 @@ afterEach(() => {
 	authStore.clearUser();
 });
 
-function signOutButton(): HTMLElement {
-	return screen.getAllByRole('button', { name: 'Sign out' })[0]!;
+async function signOutButton(): Promise<HTMLElement> {
+	await fireEvent.click(screen.getByRole('button', { name: 'More' }));
+	return screen.findByRole('button', { name: 'Sign out' });
 }
 
 function messages(): string[] {
 	return appStore.notifications.map(n => n.message);
 }
 
-describe('Sign out', () => {
-	onWideScreen();
+describe.each([
+	['in the More menu at lg and up', true],
+	['in the More sheet on a phone', false]
+])('Sign out %s', (_where, isWide) => {
+	if (isWide) onWideScreen();
 
 	it('offline, says it could not sign out and keeps the user signed in', async () => {
 		global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
 		render(Navigation);
 
-		await fireEvent.click(signOutButton());
+		await fireEvent.click(await signOutButton());
 
 		await vi.waitFor(() =>
 			expect(messages()).toContain("Couldn't sign out. Check your connection and try again.")
@@ -81,7 +85,7 @@ describe('Sign out', () => {
 		});
 		render(Navigation);
 
-		await fireEvent.click(signOutButton());
+		await fireEvent.click(await signOutButton());
 
 		await vi.waitFor(() => expect(authStore.isAuthenticated).toBe(false));
 		expect(appStore.notifications.filter(n => n.type === 'error')).toHaveLength(0);

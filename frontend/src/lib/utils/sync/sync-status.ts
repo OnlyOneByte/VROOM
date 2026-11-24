@@ -5,8 +5,11 @@ import {
 	CircleCheck,
 	CircleAlert,
 	Clock,
-	ServerOff
+	ServerOff,
+	TriangleAlert
 } from '@lucide/svelte';
+import type { ProviderStatus, UserProviderInfo } from '#lib/types/common.ts';
+import type { BackupConfig } from '#lib/types/settings.ts';
 
 type LucideIcon = typeof Wifi;
 
@@ -22,6 +25,7 @@ export interface SyncStatusParams {
 	pendingCount: number;
 	conflictsCount: number;
 	serverReachable: boolean;
+	providerNeedsAttention?: boolean;
 }
 
 export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
@@ -51,6 +55,14 @@ export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
 		return { color: 'text-destructive', icon: CircleAlert, text: 'Sync failed' };
 	}
 
+	if (params.providerNeedsAttention) {
+		return {
+			color: 'text-warning',
+			icon: TriangleAlert,
+			text: 'A backup provider needs attention'
+		};
+	}
+
 	if (syncStatus === 'success') {
 		return { color: 'text-success', icon: CircleCheck, text: 'Synced' };
 	}
@@ -64,4 +76,17 @@ export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
 	}
 
 	return { color: 'text-success', icon: Wifi, text: 'Up to date' };
+}
+
+const UNHEALTHY: ReadonlySet<ProviderStatus> = new Set(['needs_reauth', 'error']);
+
+export function backupProviderNeedsAttention(
+	providers: Pick<UserProviderInfo, 'id' | 'status'>[],
+	backupConfig: BackupConfig | null | undefined
+): boolean {
+	const settings = backupConfig?.providers ?? {};
+	return providers.some(provider => {
+		const backup = settings[provider.id];
+		return UNHEALTHY.has(provider.status) && !!(backup?.enabled || backup?.sheetsSyncEnabled);
+	});
 }

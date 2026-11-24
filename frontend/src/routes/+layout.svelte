@@ -5,6 +5,8 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { handleRouteProtection, isPublicRoute } from '#lib/utils/auth.js';
 	import Navigation from '#lib/components/layout/Navigation.svelte';
+	import { isFormRoute } from '#lib/routes.ts';
+	import { cn } from '#lib/utils.ts';
 	import { Toaster } from '#lib/components/ui/sonner/index.ts';
 	import { toast } from 'svelte-sonner';
 	import OfflineIndicator from '#lib/components/sync/OfflineIndicator.svelte';
@@ -182,7 +184,11 @@
 			bind:this={mainEl}
 			id="main"
 			tabindex="-1"
-			class="lg:pl-20 transition-all duration-300 outline-none"
+			class={cn(
+				'outline-none',
+				!isFormRoute(currentPath) &&
+					'pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0 short:pb-0'
+			)}
 		>
 			<div class="px-4 sm:px-6 lg:px-8 py-6">
 				{@render children?.()}
