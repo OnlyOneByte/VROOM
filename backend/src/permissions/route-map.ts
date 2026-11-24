@@ -200,6 +200,15 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   'PUT /api/v1/overrides': ROLE_SCOPED,
   'DELETE /api/v1/overrides': ROLE_SCOPED,
 
+  'GET /api/v1/admin/signup': 'server.signup.manage',
+  'PUT /api/v1/admin/signup': 'server.signup.manage',
+  'GET /api/v1/admin/invites': 'server.signup.manage',
+  'POST /api/v1/admin/invites': 'server.signup.manage',
+  'DELETE /api/v1/admin/invites/:id': 'server.signup.manage',
+  'GET /api/v1/admin/pending-accounts': 'server.signup.manage',
+  'POST /api/v1/admin/pending-accounts/:id/approve': 'server.signup.manage',
+  'DELETE /api/v1/admin/pending-accounts/:id': 'server.signup.manage',
+
   'GET /api/v1/push/vapid-public-key': 'account.push.read',
   'POST /api/v1/push/subscribe': 'account.push.write',
   'DELETE /api/v1/push/subscribe': 'account.push.write',

@@ -102,6 +102,8 @@ These have defaults, but the defaults only suit localhost.
 | `LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug` |
 | `TRUSTED_PROXY_IPS` | empty | Comma-separated proxy IPs or CIDR ranges whose `X-Forwarded-For` is honored. It is read from the right: the nearest address that is not a trusted proxy is the client, so an entry a client added itself is ignored. Left unset behind a reverse proxy, every anonymous request shares one rate-limit bucket keyed on the proxy's IP. An invalid entry stops the backend at startup |
 | `TRUSTED_CLIENT_IP_HEADER` | empty | A header a trusted proxy sets to the client IP, such as `CF-Connecting-IP`. Read only when the request comes from a `TRUSTED_PROXY_IPS` address, and before `X-Forwarded-For` |
+| `SIGNUP_MODE` | empty (set by an admin) | Who can create an account: `open`, `approval`, `invite` or `closed`. When set, it wins over the admin setting and locks it. See [Who can join](#who-can-join) |
+| `SIGNUP_ALLOWED_DOMAINS` | empty (set by an admin) | Comma-separated email domains allowed to sign up, such as `example.com,example.org`. When set, it wins over the admin setting and locks it. Set but blank counts as unset |
 | `PRIVATE_PROVIDER_ENDPOINTS` | empty (automatic) | Which private network targets S3 endpoints and model base URLs may use. Empty, the server decides by itself: while it has one account (the demo garage doesn't count), LAN and loopback hosts are allowed, so your own Ollama or MinIO works out of the box; as soon as a second account exists, providers must use public `https://` hosts, so nobody else can make the server call your LAN or the host itself. Setting a value overrides this either way. Set `allow` to allow every LAN and loopback host, or a comma-separated list of hosts, IP addresses or CIDR ranges, each with an optional `:port`, to allow only those, e.g. `192.168.1.10:11434,minio.lan:9000` for a self-hosted Ollama and MinIO. A host name entry trusts your DNS: it matches whatever private address that name resolves to, so prefer an IP address where you can. A `/0` range is refused; use `allow` for that. Plain `http://` works only for an allowed private target. Cloud metadata and link-local addresses are refused whatever it says. Without `ADMIN_EMAILS`, every signed-in user gets the same reach, so on a server other people can sign in to, set `ADMIN_EMAILS` or list only the targets you need. An invalid entry stops the backend at startup |
 | `BLOCK_PRIVATE_PROVIDER_ENDPOINTS` | off | Set to `1` to refuse every private target even when `PRIVATE_PROVIDER_ENDPOINTS` allows some |
 | `ADMIN_EMAILS` | empty | Comma-separated sign-in emails of this server's admins. When it is set, only admins' providers may use private network targets: an admin gets what `PRIVATE_PROVIDER_ENDPOINTS` allows, or every LAN and loopback host when that is empty, however many accounts exist; everyone else's S3 endpoints and model base URLs must be public `https://` hosts. Checked when a provider is saved, tested and used, so it also applies to providers saved earlier. Set it on a home server you share, e.g. `ADMIN_EMAILS=you@example.com`, to keep your own Ollama or MinIO while nobody else can reach your LAN |
@@ -587,6 +589,24 @@ removing `default` turns it off.
 | [Oracle Cloud Free Tier](oci/README.md) | free | ARM VM up to 4 OCPU / 24GB RAM — [full guide](oci/README.md) |
 | Synology / QNAP NAS | free | Docker via Package Center |
 
+## Who can join
+
+An admin chooses who can create an account. The setting lives under `/api/v1/admin/signup`, and the admin screen comes later. `SIGNUP_MODE` and `SIGNUP_ALLOWED_DOMAINS` override it and lock it.
+
+| Mode | A new sign-in creates an account when |
+|---|---|
+| Open | always |
+| Approval | always, but the account waits: it can sign in and sign out, and every other request answers 403 `ACCOUNT_PENDING` until an admin approves it. Rejecting deletes it |
+| Invite only | the email has an open server invite, or a pending vehicle-share invite from an active account |
+| Closed | never |
+
+- **The first account** on an empty server always becomes admin, in any mode, and the server starts in **invite only**. With `ADMIN_EMAILS` set, only a listed email becomes that first admin; anyone else is held to the mode.
+- **On upgrade** to this version, an existing server keeps **open** sign-up, and at the first startup its oldest account that is neither disabled nor waiting becomes admin (with `ADMIN_EMAILS` set, only a listed account). This happens once: a server whose admin is later removed gets no new one by itself.
+- **Allowed email domains:** when the list is set, only those exact domains can sign up, so `example.com` doesn't admit `sub.example.com`. A server invite from an admin still admits any email; a vehicle-share invite doesn't.
+- **Server invites:** an admin invites an email for 1 to 90 days, 7 by default. An invite works once, matches the email exactly (lower-cased), and can be revoked while it is open. A closed server refuses invites too.
+- **A refused sign-in** creates no account and returns to the sign-in page with `auth_error=signup_closed`, `signup_invite_required` or `signup_domain_not_allowed`.
+- **Private provider targets** don't depend on the mode: with `PRIVATE_PROVIDER_ENDPOINTS` empty they are refused once a second account exists. Set `ADMIN_EMAILS` to keep them for admins.
+
 ## Calendar links
 
 Each user can create a private calendar link in Settings → Calendar, which Google, Apple and Outlook Calendar subscribe to. The link carries a long random secret in its path (`/api/v1/calendar/feed/<secret>.ics`); anyone holding it can read that user's feed until they replace or turn it off. VROOM stores only a hash of the secret and prints the path with the secret replaced by `[redacted]` in its own request log.
@@ -632,6 +652,8 @@ Every signed-in user has these limits on the routes that cost the server the mos
 | Restore | 10 per 10 minutes |
 
 A CSV import (not a preview) and a restore are heavy jobs: each user runs one at a time (429 for a second), and the whole server runs at most 2 at once (503 with `Retry-After` over that), so a few large uploads can't exhaust the server's memory. The limits are in memory, per backend process.
+
+Limits that apply before sign-in (sign-in itself, calendar feeds, and the global limit for requests without a session) key on the client's address. An IPv6 client is keyed on its /64 network, because one client usually holds a whole /64; an IPv4-mapped IPv6 address counts as its IPv4 address.
 
 Receipt scans with the built-in text reader run on the server's CPU. On a public server, `LOCAL_OCR=off` turns the reader off, so every user scans with a vision provider of their own.
 
@@ -694,6 +716,7 @@ or a home server you share:
 - [ ] Only 80/443 reachable from the internet (plus 22 for SSH). Behind a proxy or tunnel, drop the `ports:` mappings for 3000/3001 so they stay on the Docker network
 - [ ] Bind to 127.0.0.1 when behind a reverse proxy on the same host: publish each port as `"127.0.0.1:3000:3000"` (the example stacks show this form above each mapping). A bare `"3000:3000"` listens on every interface, and Docker's published ports bypass host firewalls such as ufw
 - [ ] `TRUSTED_PROXY_IPS` set when behind a proxy, so rate limits key on real client IPs
+- [ ] Sign-up set to invite only, approval or closed on a server reachable from the internet (see [Who can join](#who-can-join))
 - [ ] `PRIVATE_PROVIDER_ENDPOINTS` unset (private targets are refused once a second account exists), or listing only the LAN hosts and ports your own providers need: every signed-in user can reach what it allows
 - [ ] Images updated
 - [ ] Backups configured
