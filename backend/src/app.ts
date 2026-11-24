@@ -60,6 +60,11 @@ app.use('/api/*', compress());
 
 app.use('*', (c, next) => (largerBodyLimits.get(c.req.path) ?? globalBodyLimit)(c, next));
 
+app.use('/api/*', async (c, next) => {
+  await next();
+  if (!c.res.headers.has('Cache-Control')) c.res.headers.set('Cache-Control', 'private, no-store');
+});
+
 app.use('/api/v1/calendar/feed/:file', async (c, next) => {
   await next();
   c.res.headers.set('Referrer-Policy', 'no-referrer');
