@@ -187,7 +187,7 @@
 						{/each}
 					{/snippet}
 					{#snippet aboveMarks()}
-						{#each referenceLines as line (line.label)}
+						{#each referenceLines as line, i (`${i}-${line.label}`)}
 							<Rule
 								y={line.value}
 								dashArray="4 4"
@@ -206,7 +206,7 @@
 	{#snippet legend()}
 		{#if referenceLines.length > 0}
 			<ul class="mt-3 flex flex-wrap justify-center gap-3" aria-label="Reference lines">
-				{#each referenceLines as line (line.label)}
+				{#each referenceLines as line, i (`${i}-${line.label}`)}
 					<li class="flex items-center gap-1.5 text-xs text-muted-foreground">
 						<span class="w-4 border-t-2 border-dashed border-muted-foreground" aria-hidden="true"
 						></span>
