@@ -16,6 +16,7 @@ import {
 } from '../../../test-helpers/provider-contracts/model';
 import { describeStorageContract } from '../../../test-helpers/provider-contracts/storage';
 import { STORAGE_CHECKS } from '../../../test-helpers/provider-contracts/storage-checks';
+import { IMPORT_FORMATS, IMPORT_PROVIDERS } from '../../expenses/import-mapping-presets';
 import { backupStrategyRegistry } from '../../sync/backup-strategy-registry';
 import '../../sync/init';
 import type { AnyProviderDescriptor } from '../descriptor';
@@ -244,6 +245,7 @@ for (const [id, subject] of Object.entries(VISION_SUBJECTS)) {
 }
 
 const REGISTRIES: Record<string, Record<string, AnyProviderDescriptor>> = {
+  import: IMPORT_PROVIDERS,
   storage: STORAGE_PROVIDERS,
   'ai.llm': LLM_PROVIDERS,
   'ai.vision': VISION_PROVIDERS,
@@ -262,6 +264,7 @@ describe('provider contract coverage', () => {
     );
     expect(Object.keys(LLM_SUBJECTS).sort()).toEqual(Object.keys(LLM_PROVIDERS).sort());
     expect(Object.keys(VISION_SUBJECTS).sort()).toEqual(Object.keys(VISION_PROVIDERS).sort());
+    expect(Object.keys(IMPORT_PROVIDERS)).toEqual(IMPORT_FORMATS.map((format) => format.id));
   });
 });
 

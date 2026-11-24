@@ -184,6 +184,10 @@ export const DEFAULT_BACKUP_CONFIG: BackupConfig = {
   providers: {},
 };
 
+export const DEFAULT_PROVIDER_CAPABILITIES = ['ai.llm', 'ai.vision'] as const;
+export type DefaultProviderCapability = (typeof DEFAULT_PROVIDER_CAPABILITIES)[number];
+export type ProviderDefaults = Partial<Record<DefaultProviderCapability, string | null>>;
+
 export interface BackupFileInfo {
   providerId: string;
   providerName: string;

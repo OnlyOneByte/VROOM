@@ -177,6 +177,7 @@ export const SHEET_HEADERS = {
     'syncInactivityMinutes',
     'storageConfig',
     'backupConfig',
+    'providerDefaults',
     'createdAt',
     'updatedAt',
   ],

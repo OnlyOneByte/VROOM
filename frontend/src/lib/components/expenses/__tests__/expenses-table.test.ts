@@ -421,3 +421,44 @@ describe('ExpensesTable rows lead with what the user would call the expense', ()
 		expect(firstCells).toEqual(['Arco Main St', 'Maintenance', 'Car wash']);
 	});
 });
+
+describe('ExpensesTable month groups', () => {
+	const TOTALS = new Map([
+		['2024-03', 1234.5],
+		['2024-02', 300]
+	]);
+
+	test.each(['compact', 'wide'] as const)(
+		'%s: a date-sorted list gets one month heading per month, with the total for the whole filter',
+		layout => {
+			useLayout(layout);
+			mountTable({ monthTotals: TOTALS });
+
+			const headings = screen.getAllByRole('heading', { level: 2 });
+			expect(headings.map(h => h.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+				'March 2024 total $1,234.50',
+				'February 2024 total $300.00',
+				'January 2024'
+			]);
+		}
+	);
+
+	test.each(['compact', 'wide'] as const)(
+		'%s: sorting by amount drops the month headings',
+		async layout => {
+			useLayout(layout);
+			mountTable({ monthTotals: TOTALS });
+
+			await clickSort('Amount');
+
+			expect(screen.queryAllByRole('heading', { level: 2 })).toHaveLength(0);
+		}
+	);
+
+	test('without month totals the list stays ungrouped', () => {
+		useLayout('compact');
+		mountTable();
+
+		expect(screen.queryAllByRole('heading', { level: 2 })).toHaveLength(0);
+	});
+});

@@ -861,7 +861,7 @@ export class AnalyticsRepository {
       })
       .from(expenses)
       .where(and(...conditions))
-      .orderBy(asc(expenses.date));
+      .orderBy(asc(expenses.date), asc(expenses.mileage));
   }
 
   private async queryAllExpenses(
@@ -891,7 +891,7 @@ export class AnalyticsRepository {
       })
       .from(expenses)
       .where(and(...conditions))
-      .orderBy(asc(expenses.date));
+      .orderBy(asc(expenses.date), asc(expenses.mileage));
   }
 
   private async queryTotalSpending(
@@ -1362,7 +1362,7 @@ export class AnalyticsRepository {
         .from(expenses)
         .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
         .where(and(...conditions))
-        .orderBy(asc(expenses.vehicleId), asc(expenses.date));
+        .orderBy(asc(expenses.vehicleId), asc(expenses.date), asc(expenses.mileage));
       if (rows.length < 2) return [];
       const vehicleUnitsMap = await this.getAllVehicleUnits(userId);
       const points: FuelEfficiencyPoint[] = [];
@@ -1449,7 +1449,7 @@ export class AnalyticsRepository {
       })
       .from(expenses)
       .where(and(inArray(expenses.vehicleId, vehicleIds), eq(expenses.category, 'maintenance')))
-      .orderBy(asc(expenses.date));
+      .orderBy(asc(expenses.date), asc(expenses.mileage));
 
     const maintenanceByVehicle = new Map<
       string,
@@ -2049,7 +2049,7 @@ export class AnalyticsRepository {
           .select({ date: expenses.date, mileage: expenses.mileage })
           .from(expenses)
           .where(and(eq(expenses.vehicleId, vehicleId), eq(expenses.category, 'maintenance')))
-          .orderBy(asc(expenses.date)),
+          .orderBy(asc(expenses.date), asc(expenses.mileage)),
       ]);
 
       const vehicleName = vehicleNameMap.get(vehicleId) ?? 'Unknown';
@@ -2118,7 +2118,7 @@ export class AnalyticsRepository {
         .from(expenses)
         .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
         .where(and(...conditions))
-        .orderBy(asc(expenses.date));
+        .orderBy(asc(expenses.date), asc(expenses.mileage));
 
       const costs = this.categorizeTCOExpenses(detailedExpenses);
       const { totalCost, countedFinancingInterest } = this.computeTCOTotal(

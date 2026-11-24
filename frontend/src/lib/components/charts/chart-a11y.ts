@@ -31,6 +31,7 @@ interface BuildOptions {
 	series: ChartA11yColumn[];
 	labelFormat: (_v: unknown) => string;
 	valueFormat: TooltipValueFormat;
+	notes?: string[] | undefined;
 }
 
 const MISSING = '—';
@@ -94,7 +95,7 @@ export function buildChartA11y(options: BuildOptions): ChartA11y {
 		categoryLabel: options.categoryLabel ?? fallbackLabel,
 		columns: series,
 		rows,
-		summary: chartSummary(title, series, rows, isDate)
+		summary: [chartSummary(title, series, rows, isDate), ...(options.notes ?? [])].join(' ')
 	};
 }
 

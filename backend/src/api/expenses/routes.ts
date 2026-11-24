@@ -770,6 +770,34 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
   return c.json(buildPaginatedResponse(data.map(expenseToApi), totalCount, limit, offset));
 });
 
+routes.get('/monthly-totals', zValidator('query', expenseQuerySchema), async (c) => {
+  const user = c.get('user');
+  const query = c.req.valid('query');
+
+  let listUserId = user.id;
+  if (query.vehicleId) {
+    const { ownerId } = await requireVehicleAccess(query.vehicleId, user.id, 'read');
+    listUserId = ownerId;
+  }
+
+  const months = await expenseRepository.getMonthlyTotals({
+    userId: listUserId,
+    vehicleId: query.vehicleId,
+    category: query.category,
+    startDate: query.startDate,
+    endDate: query.endDate,
+    timeZone: query.timeZone,
+    ...plainDayFilters(c.req.query('startDate'), c.req.query('endDate')),
+    tags: query.tags,
+    search: query.search,
+  });
+
+  return c.json({
+    success: true,
+    data: months.map((m) => ({ ...m, amount: centsToDollars(m.amount) })),
+  });
+});
+
 routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');

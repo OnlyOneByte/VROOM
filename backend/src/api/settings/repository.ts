@@ -6,6 +6,12 @@ import { syncState, userPreferences } from '../../db/schema';
 import { DatabaseError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES } from '../../types';
 
+const JSON_FIELD_COLUMNS = {
+  storageConfig: 'storage_config',
+  backupConfig: 'backup_config',
+  providerDefaults: 'provider_defaults',
+} as const;
+
 export class PreferencesRepository {
   constructor(private db: AppDatabase) {}
 
@@ -71,11 +77,11 @@ export class PreferencesRepository {
   // One UPDATE statement: a read-modify-write here would lose concurrent patches.
   async mergeJsonField(
     userId: string,
-    column: 'storageConfig' | 'backupConfig',
+    column: keyof typeof JSON_FIELD_COLUMNS,
     patch: Record<string, unknown>
   ): Promise<UserPreferences | null> {
     // Column names come from a closed map; never interpolate user input into SQL.
-    const sqlColumn = column === 'storageConfig' ? 'storage_config' : 'backup_config';
+    const sqlColumn = JSON_FIELD_COLUMNS[column];
     try {
       const result = await this.db
         .update(userPreferences)

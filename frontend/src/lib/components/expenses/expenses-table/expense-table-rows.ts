@@ -6,6 +6,7 @@ import {
 	type SortableRow
 } from '#lib/utils/expense-helpers.ts';
 import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+import { formatDateWith } from '#lib/utils/formatters.ts';
 
 export interface ExpenseRow {
 	type: 'standalone';
@@ -141,4 +142,28 @@ export function rowTitle(
 	return text
 		? { title: text, categoryInMeta: true }
 		: { title: categoryLabels[category], categoryInMeta: false };
+}
+
+export function rowMonth(row: DisplayRow): string {
+	const date = new Date(row.type === 'standalone' ? row.expense.date : row.date);
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function monthSections(rows: DisplayRow[]): Array<{ month: string; rows: DisplayRow[] }> {
+	const sections: Array<{ month: string; rows: DisplayRow[] }> = [];
+	for (const row of rows) {
+		const month = rowMonth(row);
+		const last = sections.at(-1);
+		if (last?.month === month) last.rows.push(row);
+		else sections.push({ month, rows: [row] });
+	}
+	return sections;
+}
+
+export function monthLabel(month: string): string {
+	const [year, monthNumber] = month.split('-').map(Number);
+	return formatDateWith(new Date(year ?? 1970, (monthNumber ?? 1) - 1, 1), {
+		month: 'long',
+		year: 'numeric'
+	});
 }

@@ -292,6 +292,28 @@
 
 	const nextListRequest = latest();
 	const nextSummaryRequest = latest();
+	const nextMonthTotalsRequest = latest();
+	let monthTotals = $state<ReadonlyMap<string, number>>(new Map());
+
+	async function loadMonthTotals() {
+		const isCurrent = nextMonthTotalsRequest();
+		monthTotals = new Map();
+		const {
+			limit: _limit,
+			offset: _offset,
+			sortBy: _by,
+			sortDir: _dir,
+			...filters
+		} = buildListParams(0);
+		try {
+			const months = await expenseApi.getMonthlyTotals(filters);
+			if (isCurrent()) monthTotals = new Map(months.map(m => [m.month, m.amount]));
+		} catch (error) {
+			if (!isCurrent()) return;
+			monthTotals = new Map();
+			logLoadFailure(error, "Couldn't load the month totals");
+		}
+	}
 	let pageError = $state<{ message: string; offset: number } | null>(null);
 
 	function applyPage(pageResult: PaginatedResponse<Expense>, offset: number, filtered: boolean) {
@@ -315,6 +337,7 @@
 		const isCurrentSummary = nextSummaryRequest();
 		const filtered = filtersActive;
 		isLoadingPage = true;
+		void loadMonthTotals();
 		try {
 			const [pageResult, summaryResult] = await Promise.allSettled([
 				expenseApi.getAllExpenses(buildListParams(offset)),
@@ -399,6 +422,7 @@
 		categoryFilter = category;
 		currentOffset = 0;
 		fetchPage(0);
+		void loadMonthTotals();
 	}
 
 	function clearFilters() {
@@ -736,6 +760,7 @@
 						onSortChange={handleSortChange}
 						activeCategory={categoryFilter}
 						onCategoryChange={handleCategoryChange}
+						{monthTotals}
 					/>
 				{/if}
 			</CardNs.Content>

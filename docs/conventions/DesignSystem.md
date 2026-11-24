@@ -56,9 +56,12 @@ Notes:
 - `text-chart-*` is for chart marks and icons, not words: chart tokens are gated at 3:1, on
   `card` and as an icon on their own `/10` tint over `card` and `background` (the category badges
   and `StatCard` chips). Put the label in `text-foreground` beside the tinted icon. Status text
-  uses `text-success` / `text-warning` / `text-destructive`. `chart-5` and `chart-2` are
+  uses `text-success` / `text-warning` / `text-destructive`. Warning states never use `chart-5`
+  (`status-uses-warning-token.test.ts`). `chart-5` (the Enhancement badge) and `chart-2` are
   still used for words on a few screens, so both are also gated as text at AA (`background` and
-  `card`, plus `popover` for `chart-2`); new status text uses `text-warning` / `text-success`.
+  `card`, plus `popover` for `chart-2`). `chart-2` is still the "good" / "synced" colour on some
+  screens (health tier, payment urgency, lease mileage, synced rows); that is known debt, and
+  new status text uses `text-warning` / `text-success`.
 - In every theme and both modes these tinted text pairs are gated at AA over `background` and
   `card`: `text-primary` on `bg-primary/10` (the active nav item, chips, avatars),
   `text-warning` on `bg-warning/10` and `text-chart-5` on `bg-chart-5/10`. The axe e2e scans
@@ -117,6 +120,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 | Any chart | `import { AppLineChart, AppBarChart, AppPieChart, AppAreaChart } from '#lib/components/charts'` | all wrap `ChartCard` → loading/empty/error handled for you |
 | KPI tiles | `import { StatCard, StatCardGrid } from '#lib/components/charts'` | `iconColor` (`StatCardIconColor`): `primary` · `chart-1`…`chart-8` · `destructive` · `muted`. An unknown token still falls back to the primary tint, but warns under `import.meta.env.DEV`; `category-color-label-convergence.test.ts` fails if the map stops covering a theme token |
 | Custom chart container | `import ChartCard from '#lib/components/charts/ChartCard.svelte'` | not in the barrel; pass `isLoading`/`error`/`isEmpty`/`emptyTitle` — never render a raw chart in a bare div |
+| Figures, chart and sentence in one card | `ChartCard` (and `AppLineChart`) `summary` / `footer` snippets render inside the card, above and below the plot; `AppLineChart` `referenceLines={[{ value, label }]}` draws a dashed muted rule, lists it under the plot and adds it to the chart's text summary | use them instead of a second card beside the chart (`/dev/gallery` shows one) |
 | Chart table, summary and keyboard | built into `AppLineChart`/`AppBarChart`/`AppAreaChart` (Chart/Table toggle, `role="img"` summary, arrow-key stepping with a live region) and `AppPieChart` (summary and stepping; its value list is the table) | name the category column with `categoryLabel` when "Month"/"Date"/"Category" is wrong; `onSelect(row, seriesKey)` fires on Enter. A custom chart builds a `ChartA11y` with `buildChartA11y` (`charts/chart-a11y.ts`), passes it to `ChartCard` as `table` and wraps its plot in `ChartPlot` |
 
 ## The Four-States contract (cross-ref UIQuality.md, *States*)

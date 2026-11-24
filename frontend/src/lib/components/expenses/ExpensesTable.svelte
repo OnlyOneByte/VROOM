@@ -44,6 +44,7 @@
 		onSortChange?: (_by: SortField, _dir: 'asc' | 'desc') => void;
 		activeCategory?: string;
 		onCategoryChange?: (_category: string) => void;
+		monthTotals?: ReadonlyMap<string, number>;
 	}
 
 	let {
@@ -69,7 +70,8 @@
 		activeSortDir,
 		onSortChange,
 		activeCategory,
-		onCategoryChange
+		onCategoryChange,
+		monthTotals
 	}: Props = $props();
 
 	let onDelete = $derived(canWrite ? onDeleteProp : undefined);
@@ -193,6 +195,7 @@
 		onCategoryChange={handleCategoryChange}
 		onDeleteExpense={confirmDelete}
 		onDeleteGroup={requestGroupDelete}
+		{monthTotals}
 	/>
 {:else}
 	<ExpensesDesktopTable
@@ -211,6 +214,7 @@
 		onCategoryChange={handleCategoryChange}
 		onDeleteExpense={confirmDelete}
 		onDeleteGroup={requestGroupDelete}
+		{monthTotals}
 	/>
 {/if}
 

@@ -13,7 +13,15 @@
 	import ExpenseSortButton from './ExpenseSortButton.svelte';
 	import DesktopStandaloneRow from './DesktopStandaloneRow.svelte';
 	import DesktopGroupRow from './DesktopGroupRow.svelte';
-	import { rowKey, type DisplayRow, type GroupRow, type SortField } from './expense-table-rows';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import {
+		monthLabel,
+		monthSections,
+		rowKey,
+		type DisplayRow,
+		type GroupRow,
+		type SortField
+	} from './expense-table-rows';
 
 	interface Props {
 		rows: DisplayRow[];
@@ -31,6 +39,7 @@
 		onCategoryChange: (_category: string) => void;
 		onDeleteExpense: (_expense: Expense) => void;
 		onDeleteGroup: (_row: GroupRow) => void;
+		monthTotals?: ReadonlyMap<string, number> | undefined;
 	}
 
 	let {
@@ -48,13 +57,21 @@
 		onSort,
 		onCategoryChange,
 		onDeleteExpense,
-		onDeleteGroup
+		onDeleteGroup,
+		monthTotals
 	}: Props = $props();
+
+	let columnCount = $derived(showVehicleColumn ? 7 : 6);
+	let sections = $derived(
+		sortBy === 'date' && monthTotals ? monthSections(rows) : [{ month: '', rows }]
+	);
 </script>
 
-<div class="rounded-md border bg-card overflow-hidden">
+<div
+	class="rounded-md border bg-card overflow-hidden [&_[data-slot=table-container]]:overflow-visible"
+>
 	<!-- Tailwind cannot generate classes from a runtime value, so the height stays an inline style. -->
-	<ScrollArea class="w-full" style="height: {scrollHeight}">
+	<ScrollArea class="w-full" orientation="both" style="height: {scrollHeight}">
 		<Table>
 			<TableHeader>
 				<TableRow>
@@ -96,35 +113,55 @@
 			<TableBody>
 				{#if rows.length === 0}
 					<TableRow>
-						<TableCell colspan={showVehicleColumn ? 7 : 6} class="h-24 text-center">
+						<TableCell colspan={columnCount} class="h-24 text-center">
 							<p class="text-muted-foreground">No expenses match this category filter.</p>
 						</TableCell>
 					</TableRow>
 				{:else}
-					{#each rows as row (rowKey(row))}
-						{#if row.type === 'standalone'}
-							<DesktopStandaloneRow
-								expense={row.expense}
-								{vehicleMap}
-								{showVehicleColumn}
-								{canWrite}
-								{canDelete}
-								{returnTo}
-								onDelete={onDeleteExpense}
-							/>
-						{:else}
-							<DesktopGroupRow
-								{row}
-								{vehicleMap}
-								{showVehicleColumn}
-								{canWrite}
-								{canDelete}
-								{returnTo}
-								isExpanded={expandedGroups.has(row.groupId)}
-								onToggle={onToggleGroup}
-								onDelete={onDeleteGroup}
-							/>
+					{#each sections as section (section.month)}
+						{#if section.month}
+							{@const total = monthTotals?.get(section.month)}
+							<TableRow class="hover:bg-transparent">
+								<TableCell colspan={columnCount} class="sticky top-0 z-10 bg-muted py-2">
+									<h2
+										class="sticky left-4 flex w-fit items-baseline gap-3 text-sm font-semibold text-foreground"
+									>
+										<span>{monthLabel(section.month)}</span>
+										<span class="tabular-nums text-muted-foreground">
+											{#if total !== undefined}
+												<span class="sr-only">total</span>
+												{formatCurrency(total)}
+											{/if}
+										</span>
+									</h2>
+								</TableCell>
+							</TableRow>
 						{/if}
+						{#each section.rows as row (rowKey(row))}
+							{#if row.type === 'standalone'}
+								<DesktopStandaloneRow
+									expense={row.expense}
+									{vehicleMap}
+									{showVehicleColumn}
+									{canWrite}
+									{canDelete}
+									{returnTo}
+									onDelete={onDeleteExpense}
+								/>
+							{:else}
+								<DesktopGroupRow
+									{row}
+									{vehicleMap}
+									{showVehicleColumn}
+									{canWrite}
+									{canDelete}
+									{returnTo}
+									isExpanded={expandedGroups.has(row.groupId)}
+									onToggle={onToggleGroup}
+									onDelete={onDeleteGroup}
+								/>
+							{/if}
+						{/each}
 					{/each}
 				{/if}
 			</TableBody>

@@ -74,7 +74,7 @@
 		{#if currentConflict}
 			<DialogHeader>
 				<div class="flex items-center gap-3">
-					<TriangleAlert class="h-6 w-6 text-chart-5" />
+					<TriangleAlert class="h-6 w-6 text-warning" />
 					<div>
 						<DialogTitle>Sync Conflict Detected</DialogTitle>
 						<DialogDescription>

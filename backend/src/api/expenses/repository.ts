@@ -561,6 +561,27 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     }
   }
 
+  async getMonthlyTotals(
+    filters: ExpenseFilters
+  ): Promise<Array<{ month: string; amount: number; count: number }>> {
+    const rows = await this.db
+      .select({ date: expenses.date, amount: expenses.expenseAmount })
+      .from(expenses)
+      .where(and(eq(expenses.userId, filters.userId ?? ''), ...buildExpenseConditions(filters)));
+    const calendar = zonedCalendar(filters.timeZone);
+    const months = new Map<string, { amount: number; count: number }>();
+    for (const row of rows) {
+      const month = calendar.day(row.date).slice(0, 7);
+      const bucket = months.get(month) ?? { amount: 0, count: 0 };
+      bucket.amount += row.amount;
+      bucket.count += 1;
+      months.set(month, bucket);
+    }
+    return [...months.entries()]
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([month, bucket]) => ({ month, ...bucket }));
+  }
+
   private async zonedMonthlyTrend(
     where: SQL | undefined,
     timeZone: string

@@ -223,6 +223,15 @@ describe('sortByVehicleThenDate', () => {
     expect((sorted[2].date as Date).getTime()).toBeLessThan((sorted[3].date as Date).getTime());
   });
 
+  test('orders fill-ups on the same date by odometer', () => {
+    const rows: FuelExpenseRow[] = [
+      fuelRow({ date: d(2024, 3, 1), mileage: 1600 }),
+      fuelRow({ date: d(2024, 3, 1), mileage: 1300 }),
+      fuelRow({ date: d(2024, 2, 1), mileage: 1000 }),
+    ];
+    expect(sortByVehicleThenDate(rows).map((r) => r.mileage)).toEqual([1000, 1300, 1600]);
+  });
+
   test('does NOT mutate the input array (returns a copy)', () => {
     const rows: FuelExpenseRow[] = [
       fuelRow({ vehicleId: 'v2', date: d(2024, 3, 1) }),
