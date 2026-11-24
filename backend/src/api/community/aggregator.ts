@@ -337,20 +337,30 @@ export async function refreshCommunityStats(
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 
+export function refreshFailureSummary(error: unknown): string {
+  const root = error instanceof Error && error.cause instanceof Error ? error.cause : error;
+  if (!(root instanceof Error)) return 'unknown error';
+  return root === error ? root.name : `${root.name}: ${root.message}`;
+}
+
+export async function refreshSafely(
+  repository: CommunityStatsRepository = communityStatsRepository
+): Promise<void> {
+  try {
+    await refreshCommunityStats(repository);
+  } catch (error) {
+    logger.error('community stats refresh failed', { error: refreshFailureSummary(error) });
+  }
+}
+
 function scheduleNext(delayMs: number): void {
   timer = setTimeout(() => {
-    void refreshCommunityStats()
-      .catch((error) => {
-        logger.error('community stats refresh failed', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      })
-      .finally(() => {
-        scheduleNext(
-          CONFIG.communityStats.refreshIntervalMs +
-            Math.floor(Math.random() * CONFIG.communityStats.maxJitterMs)
-        );
-      });
+    void refreshSafely().finally(() => {
+      scheduleNext(
+        CONFIG.communityStats.refreshIntervalMs +
+          Math.floor(Math.random() * CONFIG.communityStats.maxJitterMs)
+      );
+    });
   }, delayMs);
 }
 
