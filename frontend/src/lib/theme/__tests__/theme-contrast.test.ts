@@ -77,7 +77,33 @@ const TEXT_PAIRS: ReadonlyArray<readonly [ThemeTokenKey, ThemeTokenKey]> = [
 	['success', 'card'],
 	['success', 'popover'],
 	['success', 'muted'],
-	['success', 'sidebar']
+	['success', 'sidebar'],
+	['foreground', 'surface'],
+	['foreground', 'sunk'],
+	['muted-foreground', 'surface'],
+	['muted-foreground', 'sunk'],
+	['accent-ink', 'background'],
+	['accent-ink', 'surface'],
+	['accent-ink', 'sunk'],
+	['bar-fg', 'bar'],
+	['bar-on', 'bar'],
+	['destructive', 'due-tint'],
+	['warning', 'soon-tint'],
+	['success', 'ok-tint'],
+	['info', 'info-tint'],
+	['info', 'background'],
+	['info', 'surface'],
+	['foreground', 'due-tint'],
+	['foreground', 'soon-tint'],
+	['foreground', 'ok-tint'],
+	['foreground', 'info-tint']
+];
+
+const GRAPHICAL_PAIRS: ReadonlyArray<readonly [ThemeTokenKey, ThemeTokenKey]> = [
+	['border-strong', 'background'],
+	['border-strong', 'surface'],
+	['needle', 'surface'],
+	['accent', 'bar']
 ];
 
 describe('every built-in theme clears WCAG AA on text pairs', () => {
@@ -100,6 +126,44 @@ describe('every built-in theme clears WCAG AA on text pairs', () => {
 
 	test('a known low-contrast pair is correctly rejected (non-vacuous)', () => {
 		expect(contrast('oklch(0.7 0 0)', 'oklch(0.75 0 0)')).toBeLessThan(AA_NORMAL);
+	});
+});
+
+describe('every accent clears 3:1 on control edges, the needle and the raised + on the bar', () => {
+	describe.each(Object.values(THEME_REGISTRY))('theme "$id"', theme => {
+		describe.each(['light', 'dark'] as const)('%s variant', variant => {
+			const tokens = theme[variant] as ThemeTokens;
+			test.each(GRAPHICAL_PAIRS)('%s on %s ≥ 3:1', (fg, bg) => {
+				const ratio = contrast(tokens[fg], tokens[bg]);
+				expect(
+					ratio,
+					`${theme.id}.${variant}: ${fg} on ${bg} = ${ratio.toFixed(2)}:1 (need ≥ 3)`
+				).toBeGreaterThanOrEqual(3);
+			});
+		});
+	});
+});
+
+describe('the accent presets change only accent, accent-ink and needle', () => {
+	const base = THEME_REGISTRY['default'] as { light: ThemeTokens; dark: ThemeTokens };
+	const ACCENT_KEYS = new Set(['accent', 'accent-ink', 'needle']);
+
+	test('there are four presets', () => {
+		expect(Object.keys(THEME_REGISTRY).sort()).toEqual(
+			['default', 'electric', 'racing-green', 'vermilion'].sort()
+		);
+	});
+
+	describe.each(Object.values(THEME_REGISTRY))('theme "$id"', theme => {
+		test.each(['light', 'dark'] as const)(
+			'%s differs from Amber only in the accent tokens',
+			variant => {
+				const changed = (Object.keys(base[variant]) as ThemeTokenKey[]).filter(
+					key => theme[variant][key] !== base[variant][key]
+				);
+				expect(changed.filter(key => !ACCENT_KEYS.has(key))).toEqual([]);
+			}
+		);
 	});
 });
 

@@ -41,5 +41,5 @@ Fixes #
 - [ ] All states handled: loading, empty, error, populated, success feedback
 - [ ] The screen's question is answered in the first 300px at 375; a new route fits a bundle budget
 - [ ] No horizontal overflow at 375px; tap targets ≥ 40px
-- [ ] Themes checked in light and dark: Default plus two other families (names: …)
+- [ ] Accents checked in light and dark: Amber plus two other accents (names: …)
 - [ ] Keyboard, focus and accessible names checked; axe e2e (`npm run test:e2e`) passing, new routes added to `A11Y_ROUTES`

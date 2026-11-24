@@ -2,6 +2,7 @@ import { browser } from '$app/env';
 import { settingsApi } from '#lib/services/settings-api.ts';
 // The generated chrome module, not theme-registry, which would put every token on the root layout's path.
 import { DEFAULT_THEME_ID, THEME_BACKGROUND_HEX } from '#lib/theme/theme-chrome.ts';
+import { canonicalThemeId } from '#lib/theme/theme-ids.ts';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 
@@ -18,7 +19,7 @@ function getStoredPreference(): ThemePreference {
 
 function getStoredThemeId(): string {
 	if (!browser) return DEFAULT_THEME_ID;
-	return localStorage.getItem(THEME_ID_KEY) || DEFAULT_THEME_ID;
+	return canonicalThemeId(localStorage.getItem(THEME_ID_KEY));
 }
 
 export function getSystemTheme(): 'light' | 'dark' {
@@ -79,6 +80,13 @@ function createThemeStore() {
 
 			const preference = getStoredPreference();
 			const id = getStoredThemeId();
+			if (
+				browser &&
+				localStorage.getItem(THEME_ID_KEY) &&
+				localStorage.getItem(THEME_ID_KEY) !== id
+			) {
+				localStorage.setItem(THEME_ID_KEY, id);
+			}
 			applyTheme(preference, id);
 			current = preference;
 			themeId = id;
@@ -101,7 +109,8 @@ function createThemeStore() {
 			current = preference;
 		},
 
-		setTheme(id: string) {
+		setTheme(requestedId: string) {
+			const id = canonicalThemeId(requestedId);
 			if (browser) {
 				localStorage.setItem(THEME_ID_KEY, id);
 			}
@@ -111,12 +120,14 @@ function createThemeStore() {
 		},
 
 		reconcileServerTheme(serverThemeId: string | null | undefined) {
-			if (!serverThemeId || serverThemeId === themeId) return;
+			if (!serverThemeId) return;
+			const id = canonicalThemeId(serverThemeId);
+			if (id === themeId) return;
 			if (browser) {
-				localStorage.setItem(THEME_ID_KEY, serverThemeId);
+				localStorage.setItem(THEME_ID_KEY, id);
 			}
-			themeId = serverThemeId;
-			applyTheme(current, serverThemeId);
+			themeId = id;
+			applyTheme(current, id);
 		}
 	};
 }

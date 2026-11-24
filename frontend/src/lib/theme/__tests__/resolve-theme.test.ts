@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { resolveTheme, resolveThemeDefinition, resolveVariant } from '../resolve-theme';
+import { canonicalThemeId } from '../theme-ids';
 import { DEFAULT_THEME_ID, THEME_REGISTRY } from '../theme-registry';
 import { THEME_TOKEN_KEYS } from '../theme-types';
 
@@ -86,5 +87,35 @@ describe('resolveVariant', () => {
 	test('null/garbage mode → treated as system (→ light without a pref)', () => {
 		expect(resolveVariant(null, null)).toBe('light');
 		expect(resolveVariant(undefined, 'dark')).toBe('dark');
+	});
+});
+
+describe('the 11 pre-C3 theme ids map onto the four accents', () => {
+	test.each([
+		['default', 'default'],
+		['bento', 'default'],
+		['blueprint', 'default'],
+		['tui', 'default'],
+		['editorial', 'vermilion'],
+		['neobrutalist', 'vermilion'],
+		['vaporwave', 'electric'],
+		['cyberpunk', 'electric'],
+		['y2k', 'electric'],
+		['solarpunk', 'racing-green'],
+		['aurora', 'racing-green'],
+		['no-such-theme', 'default']
+	])('%s resolves to %s', (oldId, accent) => {
+		expect(canonicalThemeId(oldId)).toBe(accent);
+		expect(resolveThemeDefinition(oldId).id).toBe(accent);
+		expect(resolveTheme(oldId, 'dark', null)).toEqual(THEME_REGISTRY[accent]?.dark);
+	});
+
+	test('the current accent ids resolve to themselves', () => {
+		for (const id of Object.keys(THEME_REGISTRY)) expect(canonicalThemeId(id)).toBe(id);
+	});
+
+	test('inherited Object keys are not treated as old ids', () => {
+		expect(canonicalThemeId('constructor')).toBe('default');
+		expect(canonicalThemeId('__proto__')).toBe('default');
 	});
 });

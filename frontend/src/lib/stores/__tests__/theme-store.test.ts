@@ -39,7 +39,7 @@ describe('themeStore.setPreference — explicit light/dark', () => {
 	test("'dark' adds the html dark class + sets the dark theme-color + persists + updates current", () => {
 		themeStore.setPreference('dark');
 		expect(htmlIsDark()).toBe(true);
-		expect(themeColor()).toBe('#09090b');
+		expect(themeColor()).toBe('#100e0c');
 		expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
 		expect(themeStore.current).toBe('dark');
 	});
@@ -48,7 +48,7 @@ describe('themeStore.setPreference — explicit light/dark', () => {
 		themeStore.setPreference('dark');
 		themeStore.setPreference('light');
 		expect(htmlIsDark()).toBe(false);
-		expect(themeColor()).toBe('#ffffff');
+		expect(themeColor()).toBe('#f4f0e6');
 		expect(localStorage.getItem(STORAGE_KEY)).toBe('light');
 		expect(themeStore.current).toBe('light');
 	});
@@ -59,7 +59,7 @@ describe('themeStore.setPreference — system resolves against the OS preference
 		mockSystemDark(true);
 		themeStore.setPreference('system');
 		expect(htmlIsDark()).toBe(true);
-		expect(themeColor()).toBe('#09090b');
+		expect(themeColor()).toBe('#100e0c');
 		expect(localStorage.getItem(STORAGE_KEY)).toBe('system');
 		expect(themeStore.current).toBe('system');
 	});
@@ -68,7 +68,7 @@ describe('themeStore.setPreference — system resolves against the OS preference
 		mockSystemDark(false);
 		themeStore.setPreference('system');
 		expect(htmlIsDark()).toBe(false);
-		expect(themeColor()).toBe('#ffffff');
+		expect(themeColor()).toBe('#f4f0e6');
 		expect(themeStore.current).toBe('system');
 	});
 
@@ -87,23 +87,36 @@ describe('themeStore.setTheme — the theme-color meta follows the active theme 
 		themeStore.setTheme('default');
 	});
 
-	test('switching to aurora (light) tints the meta to aurora.light background', () => {
+	test('switching to an accent (light) sets data-theme and tints the meta to the cream background', () => {
 		themeStore.setPreference('light');
-		themeStore.setTheme('aurora');
-		expect(document.documentElement.getAttribute('data-theme')).toBe('aurora');
-		expect(themeColor()).toBe('#f5f8ff');
+		themeStore.setTheme('racing-green');
+		expect(document.documentElement.getAttribute('data-theme')).toBe('racing-green');
+		expect(themeColor()).toBe('#f4f0e6');
 	});
 
-	test('switching to aurora (dark) tints the meta to aurora.dark background', () => {
+	test('switching to an accent (dark) tints the meta to the charcoal background', () => {
 		themeStore.setPreference('dark');
-		themeStore.setTheme('aurora');
-		expect(themeColor()).toBe('#091123');
+		themeStore.setTheme('racing-green');
+		expect(themeColor()).toBe('#100e0c');
+	});
+
+	test.each([
+		['vaporwave', 'electric'],
+		['neobrutalist', 'vermilion'],
+		['aurora', 'racing-green'],
+		['tui', null]
+	])('an old theme id %s is stored and applied as its accent', (oldId, accent) => {
+		themeStore.setTheme(oldId);
+		expect(themeStore.themeId).toBe(accent ?? 'default');
+		expect(localStorage.getItem('vroom-theme-id')).toBe(accent ?? 'default');
+		if (accent) expect(document.documentElement.getAttribute('data-theme')).toBe(accent);
+		else expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
 	});
 
 	test('an unknown theme id falls back to the default surface', () => {
 		themeStore.setPreference('light');
 		themeStore.setTheme('no-such-theme');
-		expect(themeColor()).toBe('#ffffff');
+		expect(themeColor()).toBe('#f4f0e6');
 	});
 });
 
@@ -142,7 +155,7 @@ describe('themeStore on the server', () => {
 		}));
 		vi.doMock('#lib/services/settings-api.ts', () => ({ settingsApi: { updateSettings } }));
 		localStorage.setItem(STORAGE_KEY, 'dark');
-		localStorage.setItem('vroom-theme-id', 'aurora');
+		localStorage.setItem('vroom-theme-id', 'racing-green');
 		server = await import('../theme.svelte');
 		vi.mocked(localStorage.getItem).mockClear();
 		vi.mocked(localStorage.setItem).mockClear();
@@ -171,9 +184,9 @@ describe('themeStore on the server', () => {
 
 	test('setPreference and setTheme update the store without storage, DOM or server writes', () => {
 		server.themeStore.setPreference('dark');
-		server.themeStore.setTheme('aurora');
+		server.themeStore.setTheme('racing-green');
 		expect(server.themeStore.current).toBe('dark');
-		expect(server.themeStore.themeId).toBe('aurora');
+		expect(server.themeStore.themeId).toBe('racing-green');
 		expect(localStorage.setItem).not.toHaveBeenCalled();
 		expect(htmlIsDark()).toBe(false);
 		expect(updateSettings).not.toHaveBeenCalled();
@@ -181,7 +194,7 @@ describe('themeStore on the server', () => {
 
 	test('reconcileServerTheme adopts the server theme without writing storage', () => {
 		server.themeStore.reconcileServerTheme('aurora');
-		expect(server.themeStore.themeId).toBe('aurora');
+		expect(server.themeStore.themeId).toBe('racing-green');
 		expect(localStorage.setItem).not.toHaveBeenCalled();
 	});
 });

@@ -8,8 +8,13 @@ export type ThemeId = string;
 export type ThemeTokenKey =
 	| 'accent'
 	| 'accent-foreground'
+	| 'accent-ink'
 	| 'background'
+	| 'bar'
+	| 'bar-fg'
+	| 'bar-on'
 	| 'border'
+	| 'border-strong'
 	| 'card'
 	| 'card-foreground'
 	| 'chart-1'
@@ -22,10 +27,15 @@ export type ThemeTokenKey =
 	| 'chart-8'
 	| 'destructive'
 	| 'destructive-foreground'
+	| 'due-tint'
 	| 'foreground'
+	| 'info'
+	| 'info-tint'
 	| 'input'
 	| 'muted'
 	| 'muted-foreground'
+	| 'needle'
+	| 'ok-tint'
 	| 'popover'
 	| 'popover-foreground'
 	| 'primary'
@@ -41,14 +51,22 @@ export type ThemeTokenKey =
 	| 'sidebar-primary'
 	| 'sidebar-primary-foreground'
 	| 'sidebar-ring'
+	| 'soon-tint'
 	| 'success'
+	| 'sunk'
+	| 'surface'
 	| 'warning';
 
 export const THEME_TOKEN_KEYS = [
 	'accent',
 	'accent-foreground',
+	'accent-ink',
 	'background',
+	'bar',
+	'bar-fg',
+	'bar-on',
 	'border',
+	'border-strong',
 	'card',
 	'card-foreground',
 	'chart-1',
@@ -61,10 +79,15 @@ export const THEME_TOKEN_KEYS = [
 	'chart-8',
 	'destructive',
 	'destructive-foreground',
+	'due-tint',
 	'foreground',
+	'info',
+	'info-tint',
 	'input',
 	'muted',
 	'muted-foreground',
+	'needle',
+	'ok-tint',
 	'popover',
 	'popover-foreground',
 	'primary',
@@ -80,7 +103,10 @@ export const THEME_TOKEN_KEYS = [
 	'sidebar-primary',
 	'sidebar-primary-foreground',
 	'sidebar-ring',
+	'soon-tint',
 	'success',
+	'sunk',
+	'surface',
 	'warning'
 ] as const satisfies readonly ThemeTokenKey[];
 

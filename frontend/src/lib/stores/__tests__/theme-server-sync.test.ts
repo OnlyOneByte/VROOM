@@ -30,18 +30,18 @@ afterEach(() => {
 
 describe('themeStore.setTheme server sync', () => {
 	test('pushes the chosen themePreference to the settings PUT', () => {
-		themeStore.setTheme('instrument');
-		expect(updateSettings).toHaveBeenCalledWith({ themePreference: 'instrument' });
+		themeStore.setTheme('electric');
+		expect(updateSettings).toHaveBeenCalledWith({ themePreference: 'electric' });
 	});
 
 	test('is FAIL-SOFT: a rejected server push does not revert the locally-applied theme', async () => {
 		updateSettings.mockRejectedValueOnce(new Error('network down'));
-		themeStore.setTheme('instrument');
-		expect(themeStore.themeId).toBe('instrument');
-		expect(dataTheme()).toBe('instrument');
-		expect(localStorage.getItem(THEME_ID_KEY)).toBe('instrument');
+		themeStore.setTheme('electric');
+		expect(themeStore.themeId).toBe('electric');
+		expect(dataTheme()).toBe('electric');
+		expect(localStorage.getItem(THEME_ID_KEY)).toBe('electric');
 		await Promise.resolve();
-		expect(themeStore.themeId).toBe('instrument');
+		expect(themeStore.themeId).toBe('electric');
 	});
 });
 
@@ -49,33 +49,33 @@ describe('themeStore.reconcileServerTheme server-wins hydrate', () => {
 	test('adopts a server theme id that differs from the local mirror (server wins)', () => {
 		themeStore.setTheme('default');
 		updateSettings.mockClear();
-		themeStore.reconcileServerTheme('instrument');
-		expect(themeStore.themeId).toBe('instrument');
-		expect(dataTheme()).toBe('instrument');
-		expect(localStorage.getItem(THEME_ID_KEY)).toBe('instrument');
+		themeStore.reconcileServerTheme('electric');
+		expect(themeStore.themeId).toBe('electric');
+		expect(dataTheme()).toBe('electric');
+		expect(localStorage.getItem(THEME_ID_KEY)).toBe('electric');
 	});
 
 	test('does NOT re-push the adopted server value (server already has it)', () => {
 		updateSettings.mockClear();
-		themeStore.reconcileServerTheme('instrument');
+		themeStore.reconcileServerTheme('electric');
 		expect(updateSettings).not.toHaveBeenCalled();
 	});
 
 	test('is a no-op when the server value equals the local mirror', () => {
-		themeStore.setTheme('instrument');
+		themeStore.setTheme('electric');
 		updateSettings.mockClear();
-		themeStore.reconcileServerTheme('instrument');
-		expect(themeStore.themeId).toBe('instrument');
+		themeStore.reconcileServerTheme('electric');
+		expect(themeStore.themeId).toBe('electric');
 		expect(updateSettings).not.toHaveBeenCalled();
 	});
 
 	test('is a no-op for an absent/null server value (keeps the local mirror)', () => {
-		themeStore.setTheme('instrument');
+		themeStore.setTheme('electric');
 		updateSettings.mockClear();
 		themeStore.reconcileServerTheme(null);
 		themeStore.reconcileServerTheme(undefined);
 		themeStore.reconcileServerTheme('');
-		expect(themeStore.themeId).toBe('instrument');
+		expect(themeStore.themeId).toBe('electric');
 		expect(updateSettings).not.toHaveBeenCalled();
 	});
 });

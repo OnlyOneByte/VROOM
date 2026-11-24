@@ -102,10 +102,12 @@ size and weight, not from new families or colours.
 
 ## Colour and theme tokens
 
-VROOM ships 11 theme families, each with a light and a dark variant. Their ids (used by the
-`themePreference` setting) are `default`, `blueprint`, `bento`, `vaporwave`, `cyberpunk`,
-`aurora`, `solarpunk`, `editorial`, `tui` (labelled Terminal), `y2k` and `neobrutalist`. The
-token table and the role of each token live in `DesignSystem.md` → *Design tokens*.
+VROOM ships the C3 palette in light and dark with four accents. Their ids (used by the
+`themePreference` setting) are `default` (labelled Amber), `vermilion`, `electric` and
+`racing-green`. An accent changes only `--accent`, `--accent-ink` and `--needle`. Ids from before
+C3 still resolve: `canonicalThemeId()` in `frontend/src/lib/theme/theme-ids.ts` maps the 11 old
+families onto the four accents. The token table and the role of each token live in
+`DesignSystem.md` → *Design tokens*.
 
 - **Only tokens.** `bg-*`/`text-*`/`border-*` from the token set. No hex, `rgb()`, `gray-*`,
   `white`, `black` or other palette classes in components or `app.css`.
@@ -409,9 +411,8 @@ failed step; nits can be follow-up issues.
    PR's own head commit running against a real or seeded backend, not from a mockup.
 2. **Check the evidence against this guide**, section by section: one primary action, spacing on
    the scale, the type table, tokens only, every state, copy, mobile.
-3. **Check themes.** At least Default, one high-contrast family (Terminal or Neobrutalist) and one
-   saturated family (Vaporwave or Cyberpunk), each light and dark. Look for invisible text,
-   low-contrast badges, and surfaces that don't change with the theme.
+3. **Check accents.** At least Amber and two other accents, each light and dark. Look for
+   invisible text, low-contrast badges, and surfaces that don't change with the mode.
 4. **Check the states.** Find the loading, empty and error paths in the diff and in the evidence.
 5. **Check the diff** for hex/`rgb()`/palette classes, hand-rolled headings, cards, empty states
    or dialogs, icon buttons without `aria-label`, new `transition-all`, inline number or date
