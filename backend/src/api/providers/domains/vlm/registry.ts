@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { CONFIG } from '../../../../config';
 import type { UserProvider } from '../../../../db/schema';
-import { alwaysAvailable, type ProviderDescriptor } from '../../descriptor';
+import type { ProviderDescriptor } from '../../descriptor';
 import {
   createModelProviderResolver,
   type ModelAdapters,
@@ -66,7 +67,7 @@ export const BUILTIN_VISION_PROVIDERS = {
     description:
       'Reads the total, date, station and fuel quantity on your VROOM server. No AI model, no key, and the image never leaves your server.',
     scope: 'builtin',
-    availability: alwaysAvailable,
+    availability: () => (CONFIG.localOcr.enabled ? 'available' : 'hidden'),
     config: { schema: z.strictObject({}), fields: [] },
     secrets: [],
     connect: 'none',
@@ -103,6 +104,10 @@ const getUserVlmProvider = createModelProviderResolver<'ai.vision', VlmProvider>
   'ai.vision',
   VISION_PROVIDERS
 );
+
+export function localOcrEnabled(): boolean {
+  return BUILTIN_VISION_PROVIDERS['local-ocr'].availability() === 'available';
+}
 
 export function getVlmProvider(row: UserProvider): VlmProvider {
   if (row.id === LOCAL_OCR_PROVIDER_ID) return BUILTIN_VISION_PROVIDERS['local-ocr'].create();

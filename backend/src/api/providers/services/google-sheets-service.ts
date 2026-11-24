@@ -96,7 +96,7 @@ export const SHEET_HEADERS = {
     'createdAt',
     'updatedAt',
   ],
-  insuranceTermVehicles: ['termId', 'vehicleId'],
+  insuranceTermVehicles: ['termId', 'vehicleId', 'position'],
   insuranceClaims: [
     'id',
     'policyId',

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "622194ce-57a1-461b-84d3-5ec9ddd85c48",
+  "id": "16d1dcf0-a0e1-48c6-a08f-c759c176c53b",
   "prevId": "45ac99b5-c51a-41bd-811b-2485a812bb96",
   "tables": {
     "calendar_feeds": {
@@ -799,6 +799,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -2320,175 +2328,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "server_invites": {
-      "name": "server_invites",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "email": {
-          "name": "email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "used_at": {
-          "name": "used_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "used_by": {
-          "name": "used_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "revoked_at": {
-          "name": "revoked_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "server_invites_email_idx": {
-          "name": "server_invites_email_idx",
-          "columns": [
-            "email"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "server_invites_created_by_users_id_fk": {
-          "name": "server_invites_created_by_users_id_fk",
-          "tableFrom": "server_invites",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "server_invites_used_by_users_id_fk": {
-          "name": "server_invites_used_by_users_id_fk",
-          "tableFrom": "server_invites",
-          "tableTo": "users",
-          "columnsFrom": [
-            "used_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "server_settings": {
-      "name": "server_settings",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "signup_mode": {
-          "name": "signup_mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'invite'"
-        },
-        "allowed_email_domains": {
-          "name": "allowed_email_domains",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "admin_assigned_at": {
-          "name": "admin_assigned_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "server_settings_updated_by_users_id_fk": {
-          "name": "server_settings_updated_by_users_id_fk",
-          "tableFrom": "server_settings",
-          "tableTo": "users",
-          "columnsFrom": [
-            "updated_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "sessions": {
       "name": "sessions",
       "columns": {
@@ -3069,13 +2908,6 @@
         },
         "disabled_at": {
           "name": "disabled_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "pending_approval_at": {
-          "name": "pending_approval_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,

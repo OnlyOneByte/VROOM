@@ -7,7 +7,7 @@ import { getDb } from '../../db/connection';
 import { countNum } from '../../db/dialect';
 import { photoRefs, photos, type UserProvider, userProviders } from '../../db/schema';
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../errors';
-import { changeTracker, requireAuth } from '../../middleware';
+import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
 import type { CategorySetting, PhotoCategory, StorageConfig } from '../../types';
 import { DEFAULT_STORAGE_CONFIG, PHOTO_CATEGORIES } from '../../types';
 import { decrypt, encrypt, secretContextOf } from '../../utils/encryption';
@@ -529,30 +529,40 @@ routes.delete(
   }
 );
 
-routes.post('/:id/test', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
-
-  const db = getDb();
-
-  const existing = await findOwnedProviderOrThrow(db, id, user.id);
-  if (existing.domain === 'auth') {
-    throw new ValidationError('Sign-in providers cannot be tested through this endpoint');
-  }
-
-  let result: HealthResult;
-  try {
-    result = await checkProviderHealth(existing);
-  } catch (error) {
-    if (error instanceof ValidationError) {
-      await recordProviderHealth(existing.id, healthFailure('config'));
-    }
-    throw error;
-  }
-  await recordProviderHealth(existing.id, result);
-
-  return c.json({ success: true, data: result });
+const providerTestLimiter = rateLimiter({
+  ...CONFIG.rateLimit.providerTest,
+  keyGenerator: (c) => `providerTest:${c.get('user').id}`,
 });
+
+routes.post(
+  '/:id/test',
+  providerTestLimiter,
+  zValidator('param', commonSchemas.idParam),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+
+    const db = getDb();
+
+    const existing = await findOwnedProviderOrThrow(db, id, user.id);
+    if (existing.domain === 'auth') {
+      throw new ValidationError('Sign-in providers cannot be tested through this endpoint');
+    }
+
+    let result: HealthResult;
+    try {
+      result = await checkProviderHealth(existing);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        await recordProviderHealth(existing.id, healthFailure('config'));
+      }
+      throw error;
+    }
+    await recordProviderHealth(existing.id, result);
+
+    return c.json({ success: true, data: result });
+  }
+);
 
 routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');

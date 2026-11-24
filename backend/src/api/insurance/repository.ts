@@ -8,6 +8,7 @@ import {
   insuranceTerms,
   insuranceTermVehicleSelectionOrder,
   insuranceTermVehicles,
+  nextInsuranceTermVehiclePosition,
 } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError, NotFoundError, ValidationError } from '../../errors';
@@ -96,7 +97,9 @@ export class InsurancePolicyRepository {
     vehicleIds: string[]
   ): void {
     for (const vehicleId of vehicleIds) {
-      tx.insert(insuranceTermVehicles).values({ termId, vehicleId }).run();
+      tx.insert(insuranceTermVehicles)
+        .values({ termId, vehicleId, position: nextInsuranceTermVehiclePosition })
+        .run();
     }
   }
 

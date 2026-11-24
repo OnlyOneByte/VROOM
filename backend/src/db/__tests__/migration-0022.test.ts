@@ -3,13 +3,11 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   applyMigration,
   applyMigrationsUpTo,
-  countRows,
-  getColumnNames,
   loadMigrations,
   seedCoreData,
 } from './migration-helpers';
 
-describe('Migration 0022: sign-up modes, invites and the waiting state', () => {
+describe('Migration 0022: insurance term vehicles get a position column', () => {
   let db: Database;
   const migrations = loadMigrations();
 
@@ -17,44 +15,36 @@ describe('Migration 0022: sign-up modes, invites and the waiting state', () => {
     db = new Database(':memory:');
     db.run('PRAGMA foreign_keys = ON');
     applyMigrationsUpTo(db, migrations, 21);
+    seedCoreData(db);
+    db.run(
+      "INSERT INTO insurance_policies (id, user_id, company, is_active) VALUES ('p1', 'u1', 'Acme', 1)"
+    );
+    db.run(
+      "INSERT INTO insurance_terms (id, policy_id, start_date, end_date) VALUES ('t1', 'p1', 1, 2)"
+    );
+    db.run("INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES ('t1', 'v1')");
   });
 
   afterEach(() => {
     db.close();
   });
 
-  test('an existing server stays open, and its data and roles are untouched', () => {
-    seedCoreData(db);
-    const rolesBefore = countRows(db, 'role_assignments');
+  test('adds a NOT NULL position that existing rows read as 0', () => {
     applyMigration(db, migrations[22]);
-
+    const column = (
+      db
+        .query(
+          'SELECT name, "notnull", dflt_value FROM pragma_table_info(\'insurance_term_vehicles\')'
+        )
+        .all() as {
+        name: string;
+        notnull: number;
+        dflt_value: string | null;
+      }[]
+    ).find((c) => c.name === 'position');
+    expect(column).toEqual({ name: 'position', notnull: 1, dflt_value: '0' });
     expect(
-      db.query('SELECT id, signup_mode, allowed_email_domains FROM server_settings').all()
-    ).toEqual([{ id: 1, signup_mode: 'open', allowed_email_domains: '' }]);
-    expect(db.query("SELECT email, pending_approval_at FROM users WHERE id = 'u1'").get()).toEqual({
-      email: 'test@example.com',
-      pending_approval_at: null,
-    });
-    expect(countRows(db, 'vehicles')).toBe(1);
-    expect(countRows(db, 'expenses')).toBe(1);
-    expect(countRows(db, 'role_assignments')).toBe(rolesBefore);
-  });
-
-  test('a new, empty server gets no settings row, so it starts invite only on first sign-up', () => {
-    db.run(
-      "INSERT INTO users (id, email, display_name) VALUES ('demo-garage', 'demo@vroom.invalid', 'Demo')"
-    );
-    applyMigration(db, migrations[22]);
-    expect(countRows(db, 'server_settings')).toBe(0);
-    expect(getColumnNames(db, 'server_invites').sort()).toEqual([
-      'created_at',
-      'created_by',
-      'email',
-      'expires_at',
-      'id',
-      'revoked_at',
-      'used_at',
-      'used_by',
-    ]);
+      db.query('SELECT term_id, vehicle_id, position FROM insurance_term_vehicles').all()
+    ).toEqual([{ term_id: 't1', vehicle_id: 'v1', position: 0 }]);
   });
 });
