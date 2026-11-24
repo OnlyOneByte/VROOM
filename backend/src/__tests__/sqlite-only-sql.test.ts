@@ -12,36 +12,27 @@ const PATTERNS: Record<string, RegExp> = {
   strftime: /\bstrftime\b/gi,
   unixepoch: /\bunixepoch\b/gi,
   julianday: /\bjulianday\b/gi,
-  rowid: /\b(?:rowid|ROWID)\b/g,
+  rowid: /(?<![A-Za-z0-9])(?:rowid|ROWID)\b/g,
   'INSERT OR': /\bINSERT\s+OR\s+(?:IGNORE|REPLACE|ABORT|FAIL|ROLLBACK)\b/gi,
   PRAGMA: /\bpragma\b/gi,
-  'CROSS JOIN … ON': /\bCROSS\s+JOIN\s+\w+(?:\s+(?:AS\s+)?\w+)?\s+ON\b/gi,
+  'CROSS JOIN … ON': /\bCROSS\s+JOIN\s+(?:\w+|\$\{[^}]*\}|\([^)]*\))(?:\s+(?:AS\s+)?\w+)?\s+ON\b/gi,
   'raw db/tx query': /\b(?:db|tx)\.(?:all|get|run|values)\s*(?:<[^(]*?>)?\s*\(\s*sql\b/g,
   SQLITE_: /\bSQLITE_/g,
   sqlite_master: /\bsqlite_master\b/gi,
   randomblob: /\brandomblob\b/gi,
-  'sql`0`/sql`1` predicate': /\bsql`\s*[01]\s*`/g,
+  'sql`0`/sql`1` predicate': /\bsql(?:<[^>]*>)?`\s*[01]\s*`/g,
 };
 
 const BASELINE: Record<string, number> = {
   'api/analytics/annotations.ts · raw db/tx query': 2,
   'api/analytics/insights.ts · raw db/tx query': 4,
   'api/analytics/query-repository.ts · CROSS JOIN … ON': 5,
-  'api/analytics/query-repository.ts · json_each': 3,
+  'api/analytics/query-repository.ts · json_each': 1,
   'api/analytics/query-repository.ts · raw db/tx query': 6,
-  'api/analytics/query-repository.ts · sql`0`/sql`1` predicate': 2,
-  'api/analytics/repository.ts · sql`0`/sql`1` predicate': 1,
-  'api/expenses/repository.ts · json_each': 4,
-  'api/expenses/repository.ts · sql`0`/sql`1` predicate': 2,
   'api/odometer/repository.ts · raw db/tx query': 3,
   'api/providers/routes.ts · sql`0`/sql`1` predicate': 1,
-  'api/settings/repository.ts · json_patch': 1,
   'db/connection.ts · PRAGMA': 9,
   'db/schema.ts · rowid': 1,
-  'db/sql-helpers.ts · strftime': 2,
-  'db/sql-helpers.ts · unixepoch': 3,
-  'errors.ts · SQLITE_': 3,
-  'middleware/error-handler.ts · SQLITE_': 1,
   'utils/chunk.ts · SQLITE_': 5,
 };
 
@@ -100,10 +91,15 @@ countRatchet({
     expect(one("sql`strftime('%Y-%m', e.date, 'unixepoch')`", 'unixepoch')).toBe(1);
     expect(one('ORDER BY rowid', 'rowid')).toBe(1);
     expect(one('encrypt(x, { rowId, userId })', 'rowid')).toBe(0);
+    expect(one('SELECT last_insert_rowid()', 'rowid')).toBe(1);
     expect(one('INSERT OR IGNORE INTO t', 'INSERT OR')).toBe(1);
     expect(one("sqlite.exec('PRAGMA foreign_keys = ON')", 'PRAGMA')).toBe(1);
     expect(one('FROM b CROSS JOIN expenses e ON e.date >= b.t0', 'CROSS JOIN … ON')).toBe(1);
     expect(one('FROM p CROSS JOIN vu', 'CROSS JOIN … ON')).toBe(0);
+    expect(one('FROM b CROSS JOIN $' + '{expenses} e ON e.date >= b.t0', 'CROSS JOIN … ON')).toBe(
+      1
+    );
+    expect(one('CROSS JOIN (SELECT id FROM t) s ON s.id = b.id', 'CROSS JOIN … ON')).toBe(1);
     expect(one('this.db.all<{ n: number }>(sql`SELECT 1`)', 'raw db/tx query')).toBe(1);
     expect(one('await tx.all(sql`SELECT 1`)', 'raw db/tx query')).toBe(1);
     expect(one('db.select().from(t).all()', 'raw db/tx query')).toBe(0);
@@ -111,10 +107,13 @@ countRatchet({
     expect(one('SELECT name FROM sqlite_master', 'sqlite_master')).toBe(1);
     expect(one('lower(hex(randomblob(12)))', 'randomblob')).toBe(1);
     expect(one('conditions.push(sql`0`)', 'sql`0`/sql`1` predicate')).toBe(1);
+    expect(one('const yes = sql<boolean>`1`', 'sql`0`/sql`1` predicate')).toBe(1);
     expect(one('// json_each in a comment\n/* rowid */', 'json_each')).toBe(0);
     expect(one('// json_each in a comment\n/* rowid */', 'rowid')).toBe(0);
     expect(one("const url = 'https://example.com'; json_each", 'json_each')).toBe(1);
     expect(productionSources().length).toBeGreaterThan(100);
     expect(productionSources().some((f) => f.startsWith(DIALECT_DIR))).toBe(false);
+    const dialect = countConstructs(readFileSync(join(DIALECT_DIR, 'index.ts'), 'utf-8'));
+    expect(dialect.get('json_each')).toBeGreaterThan(0);
   },
 });

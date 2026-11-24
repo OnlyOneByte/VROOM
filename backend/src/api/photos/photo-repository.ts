@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, notExists, or, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
+import { countNum } from '../../db/dialect';
 import {
   expenses,
   insuranceClaims,
@@ -88,7 +89,7 @@ export class PhotoRepository {
     );
 
     const [countResult, data] = await Promise.all([
-      this.db.select({ count: sql<number>`count(*)` }).from(photos).where(whereClause),
+      this.db.select({ count: countNum() }).from(photos).where(whereClause),
       this.db
         .select()
         .from(photos)

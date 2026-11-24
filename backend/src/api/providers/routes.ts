@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
+import { countNum } from '../../db/dialect';
 import { photoRefs, photos, type UserProvider, userProviders } from '../../db/schema';
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
@@ -623,7 +624,7 @@ routes.get('/:id/sync-status', zValidator('param', commonSchemas.idParam), async
   ) as Record<PhotoCategory, { total: number; synced: number; failed: number }>;
 
   const photoTotals = await db
-    .select({ entityType: photos.entityType, count: sql<number>`count(*)` })
+    .select({ entityType: photos.entityType, count: countNum() })
     .from(photos)
     .where(eq(photos.userId, user.id))
     .groupBy(photos.entityType);
@@ -636,7 +637,7 @@ routes.get('/:id/sync-status', zValidator('param', commonSchemas.idParam), async
     .select({
       entityType: photos.entityType,
       status: photoRefs.status,
-      count: sql<number>`count(*)`,
+      count: countNum(),
     })
     .from(photoRefs)
     .innerJoin(photos, eq(photoRefs.photoId, photos.id))

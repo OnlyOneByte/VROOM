@@ -1,6 +1,7 @@
 import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
+import { jsonArrayIsEmpty, jsonArraySome, sqlFalse } from '../../db/dialect';
 import { userPreferences, vehicles } from '../../db/schema';
 import { ELECTRIC_FUEL_TYPES, EXPENSE_CATEGORIES, type ExpenseCategory } from '../../db/types';
 import { DatabaseError, ValidationError } from '../../errors';
@@ -525,18 +526,16 @@ function itemsWhere(
   ];
   const keys = query.keys;
   if (groupBy === 'fuelType' && keys) {
-    conditions.push(keys.length ? sql`COALESCE(e.fuel_type, '') IN (${inList(keys)})` : sql`0`);
+    conditions.push(keys.length ? sql`COALESCE(e.fuel_type, '') IN (${inList(keys)})` : sqlFalse);
   }
   if (groupBy === 'tag' && keys) {
     const tagged = keys.filter(Boolean);
     const parts: SQL[] = [];
     if (tagged.length) {
-      parts.push(
-        sql`EXISTS (SELECT 1 FROM json_each(e.tags) t WHERE t.value IN (${inList(tagged)}))`
-      );
+      parts.push(jsonArraySome(sql`e.tags`, (element) => sql`${element} IN (${inList(tagged)})`));
     }
-    if (keys.includes('')) parts.push(sql`NOT EXISTS (SELECT 1 FROM json_each(e.tags) t)`);
-    conditions.push(parts.length ? sql`(${sql.join(parts, sql` OR `)})` : sql`0`);
+    if (keys.includes('')) parts.push(jsonArrayIsEmpty(sql`e.tags`));
+    conditions.push(parts.length ? sql`(${sql.join(parts, sql` OR `)})` : sqlFalse);
   }
   if (query.metric === 'volume' || query.metric === 'efficiency') {
     conditions.push(electricFilter(query.energy ?? 'fuel'));
