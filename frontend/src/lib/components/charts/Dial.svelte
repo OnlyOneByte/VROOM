@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { costBucketColor } from '#lib/utils/cost-bucket.ts';
+	import { formatNumberUpTo } from '#lib/utils/formatters.ts';
 
 	interface Props {
 		running: number;
@@ -27,13 +28,18 @@
 	const START = 225;
 	const MINOR_STEPS = 4;
 
+	let scale = $derived(max > 0 ? max : 80);
+
+	function amount(value: number): number {
+		return Number.isNaN(value) || value <= 0 ? 0 : value;
+	}
+
 	function clamp(value: number): number {
-		if (!Number.isFinite(value)) return 0;
-		return Math.min(Math.max(value, 0), max);
+		return Math.min(amount(value), scale);
 	}
 
 	function angleOf(value: number): number {
-		return START - (SWEEP * clamp(value)) / max;
+		return START - (SWEEP * clamp(value)) / scale;
 	}
 
 	function point(angle: number, radius: number): [number, number] {
@@ -53,12 +59,12 @@
 	}
 
 	let runningEnd = $derived(clamp(running));
-	let total = $derived(clamp(running + ownership));
-	let sweepDegrees = $derived((SWEEP * total) / max);
+	let total = $derived(clamp(amount(running) + amount(ownership)));
+	let sweepDegrees = $derived((SWEEP * total) / scale);
 
 	let ticks = $derived(
 		Array.from({ length: 4 * MINOR_STEPS + 1 }, (_, i) => {
-			const value = (max * i) / (4 * MINOR_STEPS);
+			const value = (scale * i) / (4 * MINOR_STEPS);
 			const major = i % MINOR_STEPS === 0;
 			const angle = angleOf(value);
 			const [x1, y1] = point(angle, 95);
@@ -102,7 +108,7 @@
 			stroke-width="7"
 		/>
 	{/if}
-	{#each ticks as tick (tick.value)}
+	{#each ticks as tick, i (i)}
 		<line
 			class="stroke-foreground"
 			x1={tick.x1}
@@ -113,7 +119,7 @@
 		/>
 		{#if tick.major}
 			<text class="dial-figure fill-foreground" x={tick.lx} y={tick.ly} text-anchor="middle">
-				{Math.round(tick.value)}
+				{formatNumberUpTo(tick.value, 1)}
 			</text>
 		{/if}
 	{/each}
@@ -136,7 +142,7 @@
 		x="110"
 		y="178"
 		text-anchor="middle"
-		font-size={valueLabel.length > 3 ? 26 : 34}
+		font-size={valueLabel.length > 5 ? 20 : valueLabel.length > 3 ? 26 : 34}
 	>
 		{valueLabel}
 	</text>

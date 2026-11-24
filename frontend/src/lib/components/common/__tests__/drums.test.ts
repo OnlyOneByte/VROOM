@@ -1,17 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/svelte';
+import Drums from '../Drums.svelte';
 
-const motion = vi.hoisted(() => ({ reduce: false }));
-vi.mock('svelte/motion', async importOriginal => ({
-	...(await importOriginal<typeof import('svelte/motion')>()),
-	prefersReducedMotion: {
-		get current() {
-			return motion.reduce;
-		}
-	}
-}));
-
-const Drums = (await import('../Drums.svelte')).default;
+const SOURCE = readFileSync(
+	join(dirname(fileURLToPath(import.meta.url)), '..', 'Drums.svelte'),
+	'utf8'
+);
 
 function cells(container: HTMLElement) {
 	return [...container.querySelectorAll<HTMLElement>('[data-kind]')].map(cell => [
@@ -20,9 +17,13 @@ function cells(container: HTMLElement) {
 	]);
 }
 
+function inLocale(locale: string) {
+	vi.spyOn(navigator, 'language', 'get').mockReturnValue(locale);
+}
+
 afterEach(() => {
 	cleanup();
-	motion.reduce = false;
+	vi.restoreAllMocks();
 });
 
 describe('Drums', () => {
@@ -58,44 +59,75 @@ describe('Drums', () => {
 		}
 	});
 
-	test('another currency draws its own symbol', () => {
-		const { container } = render(Drums, { props: { amount: 42, currency: 'EUR' } });
-		expect(cells(container)[0]).toEqual(['sep', '€']);
+	test('in German the euro sign follows the amount and the comma marks the cents', () => {
+		inLocale('de-DE');
+		const { container } = render(Drums, {
+			props: { amount: 1234.5, currency: 'EUR', cents: true }
+		});
+		expect(cells(container)).toEqual([
+			['digit', '1'],
+			['digit', '2'],
+			['digit', '3'],
+			['digit', '4'],
+			['sep', ','],
+			['cent', '5'],
+			['cent', '0'],
+			['sep', '€']
+		]);
 	});
 
-	test('stays on one line at any width', () => {
+	test('a currency with no minor unit draws no cent cells even when asked', () => {
+		const { container } = render(Drums, { props: { amount: 4500, currency: 'JPY', cents: true } });
+		expect(cells(container).some(([kind]) => kind === 'cent')).toBe(false);
+	});
+
+	test('a negative amount keeps its sign', () => {
+		const { container } = render(Drums, { props: { amount: -42, currency: 'USD' } });
+		expect(cells(container).map(([, char]) => char)).toEqual(['-$', '4', '2']);
+	});
+
+	test('a wide symbol is counted at its width, so the drum still fits', () => {
+		const { container } = render(Drums, { props: { amount: 12, currency: 'CHF' } });
+		const symbol = container.querySelector<HTMLElement>('[data-kind="sep"]')!;
+		expect(symbol.textContent).toBe('CHF');
+		expect(symbol.style.width).toBe('1.65em');
+		const width = Number(screen.getByRole('img').style.getPropertyValue('--drum-width'));
+		expect(width).toBeCloseTo(1.65 + 0.86 * 2 + 0.08 * 2 + 0.3, 5);
+	});
+
+	test('stays on one line and shrinks to its container rather than the screen', () => {
 		render(Drums, { props: { amount: 123456789, currency: 'USD', size: 'lg' } });
 		const drums = screen.getByRole('img');
-		for (const name of ['inline-flex', 'flex-nowrap', 'whitespace-nowrap', 'w-max', 'shrink-0']) {
+		for (const name of ['inline-flex', 'flex-nowrap', 'whitespace-nowrap', 'w-max', 'max-w-full']) {
 			expect(drums).toHaveClass(name);
 		}
+		expect(SOURCE).toContain('calc((100cqi - 2.5rem) / var(--drum-width))');
 	});
 
-	test('the drum shrinks to fit a phone by the number of cells it holds', () => {
-		render(Drums, { props: { amount: 1029.5, currency: 'USD', cents: true, size: 'lg' } });
-		expect(screen.getByRole('img').getAttribute('style')).toContain('--drum-cells: 8');
+	test('nothing rolls on first paint', () => {
+		const { container } = render(Drums, { props: { amount: 501, currency: 'USD' } });
+		expect(container.querySelectorAll('[data-roll]')).toHaveLength(0);
 	});
 
-	test('an update replaces only the digits that changed', async () => {
-		motion.reduce = true;
+	test('an update rolls in only the digits that changed', async () => {
 		const { container, rerender } = render(Drums, { props: { amount: 501, currency: 'USD' } });
 		const before = [...container.querySelectorAll('[data-kind] > span')];
 		await rerender({ amount: 541, currency: 'USD' });
-		const after = [...container.querySelectorAll('[data-kind] > span')];
+		const after = [...container.querySelectorAll<HTMLElement>('[data-kind] > span')];
 		expect(after.map(span => span.textContent)).toEqual(['$', '5', '4', '1']);
 		expect(after[0]).toBe(before[0]);
 		expect(after[1]).toBe(before[1]);
 		expect(after[2]).not.toBe(before[2]);
 		expect(after[3]).toBe(before[3]);
+		expect(after.map(span => span.hasAttribute('data-roll'))).toEqual([false, false, true, false]);
 	});
 
-	test('with reduced motion the new digit is in place at once', async () => {
-		motion.reduce = true;
-		const { container, rerender } = render(Drums, { props: { amount: 501, currency: 'USD' } });
-		await rerender({ amount: 509, currency: 'USD' });
-		const changed = container.querySelectorAll<HTMLElement>('[data-kind] > span')[3]!;
-		expect(changed.textContent).toBe('9');
-		expect(changed.getAnimations?.() ?? []).toHaveLength(0);
+	test('the roll is a CSS animation that runs only when motion is allowed', () => {
+		const media = SOURCE.indexOf('@media (prefers-reduced-motion: no-preference)');
+		const roll = SOURCE.indexOf('animation: drum-roll 300ms');
+		expect(media).toBeGreaterThan(-1);
+		expect(roll).toBeGreaterThan(media);
+		expect(SOURCE).not.toMatch(/\bin:|transition:/);
 	});
 
 	test('a missing amount shows zero instead of breaking', () => {

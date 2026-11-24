@@ -79,6 +79,35 @@ describe('Dial', () => {
 		expect(container.querySelector('[data-arc]')).toBeNull();
 	});
 
+	test('a missing ownership value leaves the needle at the running cost', () => {
+		const { container } = mount(20, Number.NaN);
+		expect(needleAngle(container)).toBeCloseTo(225 - (270 * 20) / 80, 1);
+		expect(container.querySelector('[data-arc="ownership"]')).toBeNull();
+	});
+
+	test('a negative ownership value counts as none, never below the running arc', () => {
+		const { container } = mount(30, -10);
+		expect(needleAngle(container)).toBeCloseTo(225 - (270 * 30) / 80, 1);
+		expect(container.querySelector('[data-arc="ownership"]')).toBeNull();
+	});
+
+	test('an infinite value pegs the needle at the end of the scale', () => {
+		const { container } = mount(Number.POSITIVE_INFINITY, 0);
+		expect(needleAngle(container)).toBeCloseTo(-45, 1);
+	});
+
+	test('a maximum of zero or less falls back to the 0–80 scale', () => {
+		const { container } = mount(13, 45, 0);
+		const numbers = [...container.querySelectorAll('text.dial-figure')].map(t => t.textContent);
+		expect(numbers).toEqual(['0', '20', '40', '60', '80']);
+	});
+
+	test('a scale that does not split evenly keeps one decimal on its labels', () => {
+		const { container } = mount(10, 10, 50);
+		const numbers = [...container.querySelectorAll('text.dial-figure')].map(t => t.textContent);
+		expect(numbers).toEqual(['0', '12.5', '25', '37.5', '50']);
+	});
+
 	test('a running-only cost draws no ownership arc', () => {
 		const { container } = mount(20, 0);
 		expect(container.querySelector('[data-arc="running"]')).not.toBeNull();
