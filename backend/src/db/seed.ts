@@ -5,11 +5,14 @@ import { dollarsToCents } from '../utils/money';
 import { db } from './connection.js';
 import {
   expenses,
+  insuranceClaims,
   insurancePolicies,
   insuranceTerms,
   insuranceTermVehicles,
   type NewExpense,
+  type NewTrip,
   syncState,
+  trips,
   userPreferences,
   userProviders,
   users,
@@ -76,6 +79,27 @@ function plainExpense(
     expenseAmount: dollarsToCents(dollars),
     date: daysAgo(days),
     description,
+  };
+}
+
+function tripAroundFillUp(
+  pattern: DrivingPattern,
+  days: number,
+  miles: number,
+  purpose: 'business' | 'personal',
+  startLocation: string,
+  endLocation: string
+): NewTrip {
+  const startOdometer = mileageOn(pattern, days) - Math.floor(miles / 2);
+  return {
+    vehicleId: pattern.vehicleId,
+    userId: pattern.userId,
+    startOdometer,
+    endOdometer: startOdometer + miles,
+    purpose,
+    tripDate: daysAgo(days),
+    startLocation,
+    endLocation,
   };
 }
 
@@ -272,6 +296,27 @@ export async function seedDatabase() {
 
     await db.insert(expenses).values(sampleExpenses);
 
+    await db
+      .insert(trips)
+      .values([
+        tripAroundFillUp(camry, 80, 248, 'business', 'San Jose', 'Tejon Ranch'),
+        tripAroundFillUp(civic, 45, 412, 'personal', 'Home', 'Lake Tahoe'),
+        tripAroundFillUp(camry, 20, 36, 'business', 'Office', 'Client site'),
+        tripAroundFillUp(camry, 40, 142, 'personal', 'Home', 'Monterey'),
+      ]);
+
+    await db.insert(insuranceClaims).values({
+      policyId: policy1.id,
+      termId: terms[0].id,
+      vehicleId: vehicle1.id,
+      claimDate: daysAgo(105),
+      claimType: 'other',
+      description: 'Windshield chip repair',
+      status: 'settled',
+      payoutAmount: dollarsToCents(120),
+      faultDesignation: 'not_at_fault',
+    });
+
     const splitGroupId = createId();
     const splitGroupTotal = dollarsToCents(60.0);
     const splitDate = daysAgo(12);
@@ -306,6 +351,8 @@ export async function seedDatabase() {
     logger.info('Database seeding completed successfully', {
       standaloneExpenses: sampleExpenses.length,
       splitExpenses: 2,
+      trips: 4,
+      claims: 1,
     });
   } catch (error) {
     logger.error('Error seeding database', { error });
