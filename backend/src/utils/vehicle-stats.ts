@@ -1,5 +1,10 @@
 import { isElectricFuelType } from '../db/types';
-import { averageConsecutiveMpg, calculateAverageMilesPerKwh, maxOf } from './calculations';
+import {
+  averageConsecutiveMpg,
+  calculateAverageMilesPerKwh,
+  maxOf,
+  sortExpensesByDate,
+} from './calculations';
 import { NATIVE_SCALE, type UnitScale } from './unit-conversions';
 
 export interface FuelExpense {
@@ -120,6 +125,5 @@ function calculateMileageStats(
 }
 
 function calculateAverageMpg(unorderedExpenses: FuelExpense[], scale: UnitScale): number | null {
-  const sorted = [...unorderedExpenses].sort((a, b) => a.date.getTime() - b.date.getTime());
-  return averageConsecutiveMpg(sorted, scale);
+  return averageConsecutiveMpg(sortExpensesByDate(unorderedExpenses), scale);
 }

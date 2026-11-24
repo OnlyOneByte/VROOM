@@ -238,6 +238,15 @@ describe('sortExpensesByDate', () => {
     expect(sortExpensesByDate(rows).map((r) => r.id)).toEqual(['early', 'mid', 'late']);
   });
 
+  test('orders rows on the same date by odometer', () => {
+    const rows = [
+      { date: '2024-03-10', mileage: 1600, id: 'high' },
+      { date: '2024-03-10', mileage: 1300, id: 'low' },
+      { date: '2024-03-01', mileage: 1000, id: 'first' },
+    ];
+    expect(sortExpensesByDate(rows).map((r) => r.id)).toEqual(['first', 'low', 'high']);
+  });
+
   test('empty and single-element inputs are returned as a sorted copy', () => {
     expect(sortExpensesByDate([])).toEqual([]);
     expect(sortExpensesByDate([{ date: '2024-01-01', id: 'x' }]).map((r) => r.id)).toEqual(['x']);

@@ -7,8 +7,13 @@ interface EfficiencyExpense {
   date: Date | string;
 }
 
-export function sortExpensesByDate<T extends { date: Date | string }>(expenses: T[]): T[] {
-  return [...expenses].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+export function sortExpensesByDate<T extends { date: Date | string; mileage?: number | null }>(
+  expenses: T[]
+): T[] {
+  return [...expenses].sort(
+    (a, b) =>
+      new Date(a.date).getTime() - new Date(b.date).getTime() || (a.mileage ?? 0) - (b.mileage ?? 0)
+  );
 }
 
 export const MIN_VALID_MPG = 5;
