@@ -9,6 +9,8 @@ import { getDb } from '../../db/connection';
 import { userProviders, users } from '../../db/schema';
 import { createErrorResponse, isUniqueConstraintError, NotFoundError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
+import { PERMISSION_REGISTRY } from '../../permissions/registry';
+import { ROLE_TEMPLATES } from '../../permissions/roles';
 import { getClientIp } from '../../utils/client-ip';
 import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
@@ -576,6 +578,30 @@ routes.patch('/me', requireAuth, async (c) => {
     message: 'Profile updated successfully',
   });
 });
+
+routes.get('/capabilities', requireAuth, (c) =>
+  c.json({
+    success: true,
+    data: {
+      permissions: PERMISSION_REGISTRY.list.map(
+        ({ id, label, scope, grantable, implies, sensitive }) => ({
+          id,
+          label,
+          scope,
+          grantable,
+          implies,
+          sensitive,
+        })
+      ),
+      roles: ROLE_TEMPLATES.map(({ key, name, scope, permissions }) => ({
+        key,
+        name,
+        scope,
+        permissions,
+      })),
+    },
+  })
+);
 
 routes.post('/logout', async (c) => {
   const sessionId = getCookie(c, lucia.sessionCookieName);

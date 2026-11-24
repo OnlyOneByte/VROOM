@@ -137,7 +137,8 @@ The CI runner is faster than a mid-range phone, so local runs on a slower machin
 
 `docs/conventions/` holds the project's coding rules — one file per area: tech stack, code
 quality, Svelte 5 runes patterns, API and repository patterns, migrations, testing (including
-external APIs), the design system, UI quality, PWA behavior, and backup/restore. Read the ones
+external APIs), the design system, UI quality, PWA behavior, backup/restore, and
+[how a feature declares its permissions](conventions/Permissions.md). Read the ones
 relevant to what you're touching before writing code; they are the authority on style, and they
 are more specific than this guide.
 
