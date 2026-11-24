@@ -1,11 +1,16 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { NotFoundError, ValidationError } from '../../errors';
+import { getDb } from '../../db/connection';
+import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import { authorize, ownAccount, vehicleParam } from '../../permissions/authorize';
+import { requestResolver } from '../../permissions/grants';
+import type { Resource } from '../../permissions/resolve';
 import { insuranceClaimToApi, insuranceTermToApi } from '../../utils/money';
 import { validateInsuranceOwnership, zValidator } from '../../utils/validation';
-import { requireVehicleAccess, resolveVehicleAccess } from '../../utils/vehicle-access';
+import { requireVehicleAccess } from '../../utils/vehicle-access';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
+import { fromPolicyOwner, fromPolicyReaders } from './access';
 import { insuranceClaimRepository } from './claims-repository';
 import { createClaimSchema, updateClaimSchema } from './claims-validation';
 import {
@@ -45,7 +50,7 @@ function sharedPolicyView<
     termVehicleCoverage: Array<{ termId: string; vehicleId: string }>;
     vehicleIds: string[];
   },
->(policy: T, vehicleId: string) {
+>(policy: T, vehicleId: string, seesCosts: boolean) {
   const coveredTermIds = new Set(
     policy.termVehicleCoverage.filter((c) => c.vehicleId === vehicleId).map((c) => c.termId)
   );
@@ -53,28 +58,14 @@ function sharedPolicyView<
     ...policy,
     terms: policy.terms
       .filter((t) => coveredTermIds.has(t.id))
-      .map(
-        ({ totalCost: _total, monthlyCost: _monthly, paymentAmount: _payment, ...term }) => term
-      ),
+      .map((t) => {
+        if (seesCosts) return t;
+        const { totalCost: _total, monthlyCost: _monthly, paymentAmount: _payment, ...term } = t;
+        return term;
+      }),
     termVehicleCoverage: policy.termVehicleCoverage.filter((c) => c.vehicleId === vehicleId),
     vehicleIds: policy.vehicleIds.filter((v) => v === vehicleId),
   };
-}
-
-async function requirePolicyReadVehicles(
-  policyId: string,
-  userId: string
-): Promise<{ isOwner: boolean; readableVehicleIds: Set<string> }> {
-  const policy = await insurancePolicyRepository.findById(policyId);
-  if (!policy) throw new NotFoundError('Insurance policy');
-  if (policy.userId === userId) return { isOwner: true, readableVehicleIds: new Set() };
-
-  const readableVehicleIds = new Set<string>();
-  for (const vehicleId of policy.vehicleIds) {
-    if (await resolveVehicleAccess(vehicleId, userId)) readableVehicleIds.add(vehicleId);
-  }
-  if (readableVehicleIds.size === 0) throw new NotFoundError('Insurance policy');
-  return { isOwner: false, readableVehicleIds };
 }
 
 function termExpenseParams(
@@ -139,7 +130,7 @@ const vehiclePoliciesParamSchema = z.object({
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
-routes.get('/', async (c) => {
+routes.get('/', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const policies = await insurancePolicyRepository.findByUserId(user.id);
   return c.json({ success: true, data: policies.map(policyToApi), count: policies.length });
@@ -148,18 +139,25 @@ routes.get('/', async (c) => {
 routes.get(
   '/vehicles/:vehicleId/policies',
   zValidator('param', vehiclePoliciesParamSchema),
+  authorize(vehicleParam('vehicleId')),
   async (c) => {
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
     const access = await requireVehicleAccess(vehicleId, user.id, 'read');
+    const seesCosts = requestResolver(c, getDb()).can('vehicle.insurance.read', {
+      kind: 'vehicle',
+      vehicleId,
+    }).allow;
     const policies = await insurancePolicyRepository.findByVehicleId(vehicleId);
     const scoped =
-      access.role === 'owner' ? policies : policies.map((p) => sharedPolicyView(p, vehicleId));
+      access.role === 'owner'
+        ? policies
+        : policies.map((p) => sharedPolicyView(p, vehicleId, seesCosts));
     return c.json({ success: true, data: scoped.map(policyToApi), count: scoped.length });
   }
 );
 
-routes.post('/', zValidator('json', createPolicySchema), async (c) => {
+routes.post('/', zValidator('json', createPolicySchema), authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const data = c.req.valid('json');
   for (const term of data.terms) {
@@ -185,7 +183,7 @@ routes.post('/', zValidator('json', createPolicySchema), async (c) => {
   );
 });
 
-routes.get('/:id', zValidator('param', idParamSchema), async (c) => {
+routes.get('/:id', zValidator('param', idParamSchema), authorize(fromPolicyOwner), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
   const policy = await validateInsuranceOwnership(id, user.id);
@@ -196,6 +194,7 @@ routes.put(
   '/:id',
   zValidator('param', idParamSchema),
   zValidator('json', updatePolicySchema),
+  authorize(fromPolicyOwner),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -210,7 +209,7 @@ routes.put(
   }
 );
 
-routes.delete('/:id', zValidator('param', idParamSchema), async (c) => {
+routes.delete('/:id', zValidator('param', idParamSchema), authorize(fromPolicyOwner), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
   await validateInsuranceOwnership(id, user.id);
@@ -235,6 +234,7 @@ routes.post(
   '/:id/terms',
   zValidator('param', idParamSchema),
   zValidator('json', addTermSchema),
+  authorize(fromPolicyOwner),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -271,6 +271,7 @@ routes.put(
   '/:id/terms/:termId',
   zValidator('param', termParamsSchema),
   zValidator('json', updateTermSchema),
+  authorize(fromPolicyOwner),
   async (c) => {
     const user = c.get('user');
     const { id, termId } = c.req.valid('param');
@@ -303,37 +304,55 @@ routes.put(
   }
 );
 
-routes.delete('/:id/terms/:termId', zValidator('param', termParamsSchema), async (c) => {
-  const user = c.get('user');
-  const { id, termId } = c.req.valid('param');
-  await validateInsuranceOwnership(id, user.id);
+routes.delete(
+  '/:id/terms/:termId',
+  zValidator('param', termParamsSchema),
+  authorize(fromPolicyOwner),
+  async (c) => {
+    const user = c.get('user');
+    const { id, termId } = c.req.valid('param');
+    await validateInsuranceOwnership(id, user.id);
 
-  // Premium expenses link to terms by text, not FK, so they must be deleted explicitly.
-  await deleteTermExpenses(termId, user.id);
+    // Premium expenses link to terms by text, not FK, so they must be deleted explicitly.
+    await deleteTermExpenses(termId, user.id);
 
-  const policy = await insurancePolicyRepository.deleteTerm(id, termId, user.id);
-  return c.json({ success: true, data: policyToApi(policy), message: 'Term deleted successfully' });
-});
+    const policy = await insurancePolicyRepository.deleteTerm(id, termId, user.id);
+    return c.json({
+      success: true,
+      data: policyToApi(policy),
+      message: 'Term deleted successfully',
+    });
+  }
+);
 
-routes.get('/:id/claims', zValidator('param', idParamSchema), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
-  const { isOwner, readableVehicleIds } = await requirePolicyReadVehicles(id, user.id);
-  const claims = await insuranceClaimRepository.findByPolicyId(id);
-  const scoped = isOwner
-    ? claims
-    : claims.filter((cl) => cl.vehicleId !== null && readableVehicleIds.has(cl.vehicleId));
-  return c.json({
-    success: true,
-    data: scoped.map((cl) => insuranceClaimToApi(cl)),
-    count: scoped.length,
-  });
-});
+routes.get(
+  '/:id/claims',
+  zValidator('param', idParamSchema),
+  authorize(fromPolicyReaders),
+  async (c) => {
+    const { id } = c.req.valid('param');
+    const readable = (await fromPolicyReaders(c)) as Resource[];
+    const isOwner = readable.some((r) => r.kind === 'account');
+    const readableVehicleIds = new Set(
+      readable.flatMap((r) => (r.kind === 'vehicle' ? [r.vehicleId] : []))
+    );
+    const claims = await insuranceClaimRepository.findByPolicyId(id);
+    const scoped = isOwner
+      ? claims
+      : claims.filter((cl) => cl.vehicleId !== null && readableVehicleIds.has(cl.vehicleId));
+    return c.json({
+      success: true,
+      data: scoped.map((cl) => insuranceClaimToApi(cl)),
+      count: scoped.length,
+    });
+  }
+);
 
 routes.post(
   '/:id/claims',
   zValidator('param', idParamSchema),
   zValidator('json', createClaimSchema),
+  authorize(fromPolicyOwner),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -352,6 +371,7 @@ routes.put(
   '/:id/claims/:claimId',
   zValidator('param', claimParamsSchema),
   zValidator('json', updateClaimSchema),
+  authorize(fromPolicyOwner),
   async (c) => {
     const user = c.get('user');
     const { id, claimId } = c.req.valid('param');
@@ -367,13 +387,18 @@ routes.put(
   }
 );
 
-routes.delete('/:id/claims/:claimId', zValidator('param', claimParamsSchema), async (c) => {
-  const user = c.get('user');
-  const { id, claimId } = c.req.valid('param');
-  await validateInsuranceOwnership(id, user.id);
-  await deleteAllPhotosForEntity('insurance_claim', claimId, user.id);
-  await insuranceClaimRepository.delete(id, claimId);
-  return c.json({ success: true, message: 'Claim deleted successfully' });
-});
+routes.delete(
+  '/:id/claims/:claimId',
+  zValidator('param', claimParamsSchema),
+  authorize(fromPolicyOwner),
+  async (c) => {
+    const user = c.get('user');
+    const { id, claimId } = c.req.valid('param');
+    await validateInsuranceOwnership(id, user.id);
+    await deleteAllPhotosForEntity('insurance_claim', claimId, user.id);
+    await insuranceClaimRepository.delete(id, claimId);
+    return c.json({ success: true, message: 'Claim deleted successfully' });
+  }
+);
 
 export { routes };

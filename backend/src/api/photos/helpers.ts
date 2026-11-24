@@ -2,13 +2,13 @@ import type { Context } from 'hono';
 import { NotFoundError, ValidationError } from '../../errors';
 import type { ResourceOf } from '../../permissions/authorize';
 import type { Resource } from '../../permissions/resolve';
-import { validateInsuranceOwnership } from '../../utils/validation';
 import {
   assertMayTouchFinancialExpense,
   requireVehicleAccess,
   seesFinancials,
 } from '../../utils/vehicle-access';
 import { expenseRepository } from '../expenses/repository';
+import { policyResources } from '../insurance/access';
 import { insuranceClaimRepository } from '../insurance/claims-repository';
 import { insurancePolicyRepository } from '../insurance/repository';
 import { odometerRepository } from '../odometer/repository';
@@ -23,13 +23,14 @@ export async function validateEntityOwnership(
     case 'vehicle':
       return (await requireVehicleAccess(entityId, userId, 'read')).ownerId;
     case 'insurance_policy': {
-      await validateInsuranceOwnership(entityId, userId);
-      return userId;
+      const policy = await insurancePolicyRepository.findById(entityId);
+      if (!policy) throw new NotFoundError('Insurance policy');
+      return policy.userId;
     }
     case 'insurance_claim': {
       const ownerId = await insuranceClaimRepository.findOwnerUserId(entityId);
-      if (ownerId !== userId) throw new NotFoundError('Insurance claim');
-      return userId;
+      if (!ownerId) throw new NotFoundError('Insurance claim');
+      return ownerId;
     }
     case 'expense': {
       const expense = await expenseRepository.findById(entityId);
@@ -48,25 +49,33 @@ export async function validateEntityOwnership(
   }
 }
 
-function entityOwnerAccount(ownerId: string | null, label: string): Resource {
-  if (!ownerId) throw new NotFoundError(label);
-  return { kind: 'account', userId: ownerId };
+async function insuranceDocumentResources(
+  c: Context,
+  entityType: string,
+  entityId: string
+): Promise<Resource | Resource[]> {
+  const access = c.req.method === 'GET' ? 'read' : 'write';
+  if (entityType === 'insurance_policy') {
+    return policyResources(c, entityId, `vehicle.insurance.${access}`);
+  }
+  const claim = await insuranceClaimRepository.findAccessTarget(entityId);
+  if (!claim) throw new NotFoundError('Insurance claim');
+  return claim.vehicleId
+    ? { kind: 'vehicle', vehicleId: claim.vehicleId }
+    : { kind: 'account', userId: claim.ownerId };
 }
 
-export async function photoEntityResource(entityType: string, entityId: string): Promise<Resource> {
+export async function photoEntityResource(
+  c: Context,
+  entityType: string,
+  entityId: string
+): Promise<Resource | Resource[]> {
   switch (entityType) {
     case 'vehicle':
       return { kind: 'vehicle', vehicleId: entityId };
     case 'insurance_policy':
-      return entityOwnerAccount(
-        (await insurancePolicyRepository.findById(entityId))?.userId ?? null,
-        'Insurance policy'
-      );
     case 'insurance_claim':
-      return entityOwnerAccount(
-        await insuranceClaimRepository.findOwnerUserId(entityId),
-        'Insurance claim'
-      );
+      return insuranceDocumentResources(c, entityType, entityId);
     case 'expense': {
       const expense = await expenseRepository.findById(entityId);
       if (!expense) throw new NotFoundError('Expense');
@@ -83,18 +92,18 @@ export async function photoEntityResource(entityType: string, entityId: string):
 }
 
 export const fromPhotoEntity: ResourceOf = (c) =>
-  photoEntityResource(c.req.param('entityType') ?? '', c.req.param('entityId') ?? '');
+  photoEntityResource(c, c.req.param('entityType') ?? '', c.req.param('entityId') ?? '');
 
 export function withPhotoAuthor(resourceOf: ResourceOf): ResourceOf {
   return async (c) => {
-    const resource = (await resourceOf(c)) as Resource;
+    const resource = await resourceOf(c);
     const photo = await photoRepository.findById(c.req.param('photoId') ?? '');
     const entityType = c.req.param('entityType') ?? 'vehicle';
     const entityId = c.req.param('entityId') ?? c.req.param('vehicleId');
     if (!photo || photo.entityType !== entityType || photo.entityId !== entityId) {
       throw new NotFoundError('Photo');
     }
-    if (resource.kind !== 'vehicle') return resource;
+    if (Array.isArray(resource) || resource.kind !== 'vehicle') return resource;
     return { ...resource, entryCreatedBy: photo.createdBy ?? photo.userId };
   };
 }
