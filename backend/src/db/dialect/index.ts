@@ -24,6 +24,36 @@ export function jsonArrayIsEmpty(array: SQLWrapper): SQL {
   return sql`NOT EXISTS (SELECT 1 FROM json_each(${array}))`;
 }
 
+export function leftJoinJsonArrayElements(
+  array: SQLWrapper,
+  alias: string
+): { join: SQL; element: SQL } {
+  const name = sql.identifier(alias);
+  return {
+    join: sql`LEFT JOIN json_each(${array}) AS ${name} ON ${sqlTrue}`,
+    element: sql`${name}.value`,
+  };
+}
+
+export function rawJsonValue<T>(value: unknown): T | null {
+  if (value == null || value === '') return null;
+  return (typeof value === 'string' ? JSON.parse(value) : value) as T;
+}
+
+const SQL_TYPES = { integer: sql`INTEGER`, real: sql`REAL`, text: sql`TEXT` } as const;
+
+export function typedParam(value: string | number, type: keyof typeof SQL_TYPES): SQL {
+  return sql`CAST(${value} AS ${SQL_TYPES[type]})`;
+}
+
+export interface RawQueryable {
+  all<T>(query: SQL): T[];
+}
+
+export function rawAll<T>(db: RawQueryable, query: SQL): T[] {
+  return db.all<T>(query);
+}
+
 export function jsonMergePatch(object: SQLWrapper, patch: Record<string, unknown>): SQL {
   return sql`json_patch(coalesce(${object}, '{}'), ${JSON.stringify(patch)})`;
 }

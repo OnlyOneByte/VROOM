@@ -24,12 +24,6 @@ const PATTERNS: Record<string, RegExp> = {
 };
 
 const BASELINE: Record<string, number> = {
-  'api/analytics/annotations.ts · raw db/tx query': 2,
-  'api/analytics/insights.ts · raw db/tx query': 4,
-  'api/analytics/query-repository.ts · CROSS JOIN … ON': 5,
-  'api/analytics/query-repository.ts · json_each': 1,
-  'api/analytics/query-repository.ts · raw db/tx query': 6,
-  'api/odometer/repository.ts · raw db/tx query': 3,
   'api/providers/routes.ts · sql`0`/sql`1` predicate': 1,
   'db/connection.ts · PRAGMA': 9,
   'db/schema.ts · rowid': 1,
