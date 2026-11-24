@@ -28,7 +28,8 @@ class SessionAdapter extends DrizzleSQLiteAdapter {
   }
 
   override async updateSessionExpiration(sessionId: string, expiresAt: Date): Promise<void> {
-    await super.updateSessionExpiration(sessionId, cappedExpiry(sessionId, expiresAt));
+    if (demoSessionExpiresAt(sessionId)) return;
+    await super.updateSessionExpiration(sessionId, expiresAt);
   }
 }
 

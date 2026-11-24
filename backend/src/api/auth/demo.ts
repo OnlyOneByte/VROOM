@@ -8,6 +8,7 @@ import { seedGarage } from '../../db/seed';
 import { DemoReadOnlyError } from '../../errors';
 import { assignServerRole } from '../../permissions/grants';
 import { DEMO_ROLE_KEY } from '../../permissions/roles';
+import { extractErrorMessage } from '../../utils/error-handling';
 import { logger } from '../../utils/logger';
 import { lucia } from './lucia';
 import { DEMO_SESSION_PREFIX, demoSessionExpiresAt, setSessionCookie } from './utils';
@@ -50,7 +51,14 @@ export async function prepareDemoGarage(): Promise<void> {
     assignServerRole(db, DEMO_USER_ID, DEMO_ROLE_KEY);
     await seedGarage(DEMO_USER_ID);
   } catch (error) {
-    await db.delete(users).where(eq(users.id, DEMO_USER_ID));
+    await db
+      .delete(users)
+      .where(eq(users.id, DEMO_USER_ID))
+      .catch((cleanupError: unknown) =>
+        logger.error('Could not remove the partly seeded demo garage', {
+          message: extractErrorMessage(cleanupError),
+        })
+      );
     throw error;
   }
   demoReady = true;

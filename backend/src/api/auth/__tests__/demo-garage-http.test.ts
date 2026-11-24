@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
+import { Hono } from 'hono';
+import type { Session } from 'lucia';
 import { CONFIG } from '../../../config';
 import { db } from '../../../db/connection';
 import { sessions, users } from '../../../db/schema';
@@ -7,6 +9,7 @@ import { createTestApp, json, type TestApp } from '../../../test-helpers/http-cl
 import { seedVehicle } from '../../../test-helpers/seed';
 import { DEMO_USER_ID, prepareDemoGarage } from '../demo';
 import { lucia } from '../lucia';
+import { setSessionCookie } from '../utils';
 
 const demoConfig = CONFIG.demo as { enabled: boolean };
 let ctx: TestApp;
@@ -200,6 +203,24 @@ describe('demo garage, on', () => {
     expect((await lucia.validateSession(live)).user?.id).toBe(DEMO_USER_ID);
     const [row] = await db.select().from(sessions).where(eq(sessions.id, live));
     expect(row.expiresAt * 1000).toBeLessThanOrEqual(Date.now() + CONFIG.demo.sessionDuration);
+    await lucia.validateSession(live);
+    const [after] = await db.select().from(sessions).where(eq(sessions.id, live));
+    expect(after.expiresAt).toBe(row.expiresAt);
+  });
+
+  test('a demo cookie never outlives the hour, whatever expiry it is handed', async () => {
+    const live = (await demoCookie()).split('=')[1];
+    const { session } = await lucia.validateSession(live);
+    const app = new Hono().get('/', (c) => {
+      setSessionCookie(c, lucia.sessionCookieName, session as Session);
+      return c.body(null, 204);
+    });
+    const cookie = (await app.request('/')).headers.get('set-cookie') ?? '';
+    expect(Number(/Max-Age=(\d+)/i.exec(cookie)?.[1])).toBeLessThanOrEqual(
+      CONFIG.demo.sessionDuration / 1000
+    );
+    const expires = new Date(/Expires=([^;]+)/i.exec(cookie)?.[1] ?? '').getTime();
+    expect(expires).toBeLessThanOrEqual(Date.now() + CONFIG.demo.sessionDuration);
   });
 
   test('starting a demo session clears expired ones', async () => {
@@ -225,6 +246,23 @@ describe('demo garage, on', () => {
       .query("SELECT COUNT(*) AS n FROM user_preferences WHERE user_id = 'demo-garage'")
       .get() as { n: number };
     expect(leftovers.n).toBe(0);
+    expect((await startDemo()).status).toBe(404);
+  });
+
+  test('if the clean-up after a failed rebuild also fails, the seeding error still surfaces', async () => {
+    await db.delete(users).where(eq(users.id, DEMO_USER_ID));
+    ctx.sqlite.exec(
+      `CREATE TRIGGER fail_demo_seed BEFORE INSERT ON vehicles WHEN NEW.user_id = '${DEMO_USER_ID}' BEGIN SELECT RAISE(ABORT, 'seed failed'); END`
+    );
+    ctx.sqlite.exec(
+      `CREATE TRIGGER fail_demo_cleanup BEFORE DELETE ON users WHEN OLD.id = '${DEMO_USER_ID}' BEGIN SELECT RAISE(ABORT, 'cleanup failed'); END`
+    );
+    try {
+      await expect(prepareDemoGarage()).rejects.toThrow('seed failed');
+    } finally {
+      ctx.sqlite.exec('DROP TRIGGER fail_demo_seed');
+      ctx.sqlite.exec('DROP TRIGGER fail_demo_cleanup');
+    }
     expect((await startDemo()).status).toBe(404);
   });
 });

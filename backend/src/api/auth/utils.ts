@@ -36,9 +36,12 @@ export function setSessionCookie(
   cookieName: string,
   session: Pick<Session, 'id' | 'expiresAt'>
 ): void {
-  const options = { ...sessionCookieOptions(), expires: session.expiresAt };
-  if (demoSessionExpiresAt(session.id)) {
-    options.maxAge = Math.max(0, Math.floor((session.expiresAt.getTime() - Date.now()) / 1000));
+  const demoExpiresAt = demoSessionExpiresAt(session.id);
+  const expires =
+    demoExpiresAt && demoExpiresAt < session.expiresAt ? demoExpiresAt : session.expiresAt;
+  const options = { ...sessionCookieOptions(), expires };
+  if (demoExpiresAt) {
+    options.maxAge = Math.max(0, Math.floor((expires.getTime() - Date.now()) / 1000));
   }
   setCookie(c, cookieName, session.id, options);
 }
