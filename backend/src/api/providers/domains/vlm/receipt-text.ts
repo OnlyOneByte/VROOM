@@ -15,9 +15,13 @@ const VOLUME_AFTER = new RegExp(
   String.raw`\b(gal(?:lons?)?|lit(?:res?|ers?))\b\s*[:=]?\s*(${NUMBER})`,
   'i'
 );
-const PRICE_PER_UNIT = new RegExp(
-  String.raw`(?:price\s*\/\s*(gal|l)\b|\/\s*(gal|l|1)\b|per\s+(gal|litre|liter))\s*[:=]?\s*[$€£]?\s*(${NUMBER})|[$€£]?\s*(${NUMBER})\s*(?:[$€£]|EUR|USD|GBP)?\s*\/\s*(gal|l|1)\b`,
-  'i'
+const PRICE_LABEL_FIRST = new RegExp(
+  String.raw`(?:price\s*\/\s*(?:gal|l)\b|\/\s*(?:gal|l|1)\b|per\s+(?:gal|litre|liter))\s*[:=]?\s*[$€£]?\s*(${NUMBER})`,
+  'gi'
+);
+const PRICE_NUMBER_FIRST = new RegExp(
+  String.raw`[$€£]?\s*(${NUMBER})\s*(?:[$€£]|EUR|USD|GBP)?\s*\/\s*(?:gal|l|1)\b`,
+  'gi'
 );
 
 const ADDRESS_OR_NOISE =
@@ -121,9 +125,20 @@ function unitOf(token: string): ReceiptVolumeUnit {
 
 type FoundVolume = { volume: number; unit: ReceiptVolumeUnit };
 
+const MAX_UNIT_PRICE = 20;
+
+function priceIn(line: string): { text: string; value: number } | undefined {
+  const found = [...line.matchAll(PRICE_LABEL_FIRST), ...line.matchAll(PRICE_NUMBER_FIRST)]
+    .map((m) => ({ text: m[0], value: toNumber(m[1]) ?? 0 }))
+    .filter((p) => p.value > 0);
+  return found.find((p) => p.value < MAX_UNIT_PRICE) ?? found[0];
+}
+
 function volumeIn(line: string): FoundVolume | undefined {
-  const after = PRICE_PER_UNIT.test(line) ? null : VOLUME_AFTER.exec(line);
-  const before = VOLUME_BEFORE.exec(line);
+  const price = priceIn(line);
+  const quantity = price ? line.replace(price.text, ' ') : line;
+  const after = VOLUME_AFTER.exec(quantity);
+  const before = VOLUME_BEFORE.exec(quantity);
   const [raw, unit] = after
     ? [after[2], after[1]]
     : before && /[.,]/.test(before[1])
@@ -143,10 +158,8 @@ function findVolume(all: string[]): FoundVolume | undefined {
 
 function findPricePerUnit(all: string[]): number | undefined {
   for (const line of all) {
-    const m = PRICE_PER_UNIT.exec(line);
-    if (!m) continue;
-    const value = toNumber(m[4] ?? m[5]);
-    if (value && value > 0) return value;
+    const price = priceIn(line);
+    if (price) return price.value;
   }
   return undefined;
 }

@@ -104,6 +104,20 @@ describe('parseReceiptText on awkward lines', () => {
     });
   });
 
+  test('quantity and price on one line keep the quantity as the volume', () => {
+    for (const [line, volume, pricePerUnit] of [
+      ['GALLONS 11.482 PRICE/GAL 4.599', 11.482, 4.599],
+      ['GALLONS: 11.482 @ 4.599/GAL', 11.482, 4.599],
+      ['Liter 42,17 EUR/l 1,789', 42.17, 1.789],
+    ] as const) {
+      expect(parseReceiptText(line, NOW), line).toMatchObject({
+        volume,
+        pricePerUnit,
+        category: 'fuel',
+      });
+    }
+  });
+
   test('a quantity of 1 or a weight in grams is not a fuel volume', () => {
     expect(parseReceiptText('Car wash 12.50 1\nTOTAL 12.50', NOW)).toEqual({ amount: 12.5 });
     expect(parseReceiptText('Snack 1.5 g\nTOTAL 3.00', NOW)).toEqual({ amount: 3 });
