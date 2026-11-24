@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { ValidationError } from '../../errors';
 import { requireAuth } from '../../middleware';
 import { zValidator } from '../../utils/validation';
 import { isAllowedPushEndpoint } from './push-endpoint';
-import { pushSubscriptionRepository } from './repository';
 
 const routes = new Hono();
 
@@ -46,7 +46,7 @@ routes.post('/subscribe', zValidator('json', subscribeSchema), async (c) => {
   if (!isAllowedPushEndpoint(body.endpoint)) {
     throw new ValidationError('Unsupported push endpoint.');
   }
-  const stored = await pushSubscriptionRepository.upsertByEndpoint(user.id, {
+  const stored = await repos().pushSubscriptions.upsertByEndpoint(user.id, {
     endpoint: body.endpoint,
     p256dh: body.keys.p256dh,
     auth: body.keys.auth,
@@ -58,7 +58,7 @@ routes.post('/subscribe', zValidator('json', subscribeSchema), async (c) => {
 routes.delete('/subscribe', zValidator('json', unsubscribeSchema), async (c) => {
   const user = c.get('user');
   const { endpoint } = c.req.valid('json');
-  const removed = await pushSubscriptionRepository.deleteByEndpoint(user.id, endpoint);
+  const removed = await repos().pushSubscriptions.deleteByEndpoint(user.id, endpoint);
   return c.json({ success: true, data: { removed } });
 });
 

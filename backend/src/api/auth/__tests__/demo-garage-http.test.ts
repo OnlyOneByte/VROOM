@@ -2,14 +2,16 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Session } from 'lucia';
+import { appContext } from '../../../app-context';
 import { CONFIG } from '../../../config';
-import { db } from '../../../db/connection';
+import { getDb } from '../../../db/connection';
 import { sessions, users } from '../../../db/schema';
 import { createTestApp, json, socketFrom, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 import { DEMO_USER_ID, prepareDemoGarage } from '../demo';
-import { lucia } from '../lucia';
 import { setSessionCookie } from '../utils';
+
+const db = getDb();
 
 const demoConfig = CONFIG.demo as { enabled: boolean };
 let ctx: TestApp;
@@ -206,8 +208,12 @@ describe('demo garage, on', () => {
 
   test('a demo session expires after its hour, however often it is used', async () => {
     const stale = `demo_${Date.now() - CONFIG.demo.sessionDuration - 1000}_stale`;
-    await lucia.createSession(DEMO_USER_ID, {}, { sessionId: stale });
-    const res = await send(`${lucia.sessionCookieName}=${stale}`, 'GET', '/api/v1/vehicles');
+    await appContext().lucia.createSession(DEMO_USER_ID, {}, { sessionId: stale });
+    const res = await send(
+      `${appContext().lucia.sessionCookieName}=${stale}`,
+      'GET',
+      '/api/v1/vehicles'
+    );
     expect(res.status).toBe(401);
     expect(await db.select().from(sessions).where(eq(sessions.id, stale))).toEqual([]);
 
@@ -222,24 +228,24 @@ describe('demo garage, on', () => {
 
   test('the hour holds for any session check, and validating never stretches it', async () => {
     const stale = `demo_${Date.now() - CONFIG.demo.sessionDuration - 1000}_stale`;
-    await lucia.createSession(DEMO_USER_ID, {}, { sessionId: stale });
-    expect((await lucia.validateSession(stale)).session).toBeNull();
+    await appContext().lucia.createSession(DEMO_USER_ID, {}, { sessionId: stale });
+    expect((await appContext().lucia.validateSession(stale)).session).toBeNull();
     expect(await db.select().from(sessions).where(eq(sessions.id, stale))).toEqual([]);
 
     const live = (await demoCookie()).split('=')[1];
-    expect((await lucia.validateSession(live)).user?.id).toBe(DEMO_USER_ID);
+    expect((await appContext().lucia.validateSession(live)).user?.id).toBe(DEMO_USER_ID);
     const [row] = await db.select().from(sessions).where(eq(sessions.id, live));
     expect(row.expiresAt * 1000).toBeLessThanOrEqual(Date.now() + CONFIG.demo.sessionDuration);
-    await lucia.validateSession(live);
+    await appContext().lucia.validateSession(live);
     const [after] = await db.select().from(sessions).where(eq(sessions.id, live));
     expect(after.expiresAt).toBe(row.expiresAt);
   });
 
   test('a demo cookie never outlives the hour, whatever expiry it is handed', async () => {
     const live = (await demoCookie()).split('=')[1];
-    const { session } = await lucia.validateSession(live);
+    const { session } = await appContext().lucia.validateSession(live);
     const app = new Hono().get('/', (c) => {
-      setSessionCookie(c, lucia.sessionCookieName, session as Session);
+      setSessionCookie(c, appContext().lucia.sessionCookieName, session as Session);
       return c.body(null, 204);
     });
     const cookie = (await app.request('/')).headers.get('set-cookie') ?? '';
@@ -252,7 +258,7 @@ describe('demo garage, on', () => {
 
   test('starting a demo session clears expired ones', async () => {
     const stale = `demo_${Date.now() - CONFIG.demo.sessionDuration - 1000}_stale`;
-    await lucia.createSession(DEMO_USER_ID, {}, { sessionId: stale });
+    await appContext().lucia.createSession(DEMO_USER_ID, {}, { sessionId: stale });
     await demoCookie();
     const left = await db.select().from(sessions).where(eq(sessions.userId, DEMO_USER_ID));
     expect(left.map((s) => s.id)).not.toContain(stale);

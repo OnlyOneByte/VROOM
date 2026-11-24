@@ -1,6 +1,7 @@
 import { and, eq, lte } from 'drizzle-orm';
 import type { Context, MiddlewareHandler } from 'hono';
 import { generateIdFromEntropySize } from 'lucia';
+import { appContext } from '../../app-context';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { sessions, users } from '../../db/schema';
@@ -11,7 +12,6 @@ import { DEMO_ROLE_KEY } from '../../permissions/roles';
 import { extractErrorMessage } from '../../utils/error-handling';
 import { logger } from '../../utils/logger';
 import { DEMO_USER_ID } from './demo-account';
-import { lucia } from './lucia';
 import { DEMO_SESSION_PREFIX, demoSessionExpiresAt, setSessionCookie } from './utils';
 
 export { DEMO_USER_ID };
@@ -73,9 +73,9 @@ export async function startDemoSession(c: Context): Promise<Date> {
     .delete(sessions)
     .where(and(eq(sessions.userId, DEMO_USER_ID), lte(sessions.expiresAt, Math.floor(now / 1000))));
   const sessionId = `${DEMO_SESSION_PREFIX}${now}_${generateIdFromEntropySize(25)}`;
-  await lucia.createSession(DEMO_USER_ID, {}, { sessionId });
+  await appContext().lucia.createSession(DEMO_USER_ID, {}, { sessionId });
   const expiresAt = demoSessionExpiresAt(sessionId) as Date;
-  setSessionCookie(c, lucia.sessionCookieName, { id: sessionId, expiresAt });
+  setSessionCookie(c, appContext().lucia.sessionCookieName, { id: sessionId, expiresAt });
   return expiresAt;
 }
 

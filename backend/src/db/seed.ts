@@ -3,7 +3,7 @@ import { createTermExpenses } from '../api/insurance/hooks';
 import { assignServerRole } from '../permissions/grants';
 import { logger } from '../utils/logger';
 import { dollarsToCents } from '../utils/money';
-import { db } from './connection.js';
+import { getDb } from './connection.js';
 import {
   expenses,
   insuranceClaims,
@@ -22,6 +22,8 @@ import {
   vehicleFinancing,
   vehicles,
 } from './schema.js';
+
+const db = getDb();
 
 function daysAgo(days: number): Date {
   const now = new Date();

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { CONFIG } from '../../../config';
-import { db } from '../../../db/connection';
+import { getDb } from '../../../db/connection';
 import { calendarFeeds, reminders, reminderVehicles, users, vehicles } from '../../../db/schema';
 import { seedGarage } from '../../../db/seed';
 import {
@@ -12,6 +12,8 @@ import {
   socketFrom,
   type TestApp,
 } from '../../../test-helpers/http-client';
+
+const db = getDb();
 
 let ctx: TestApp;
 let visitor = 0;

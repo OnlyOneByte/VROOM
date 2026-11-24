@@ -9,7 +9,7 @@ let authProviderId: string;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  const { db } = await import('../../../db/connection');
+  const db = (await import('../../../db/connection')).getDb();
   const schema = await import('../../../db/schema');
   const [row] = await db
     .insert(schema.userProviders)
@@ -27,7 +27,7 @@ beforeEach(async () => {
 });
 
 async function storedDisplayName(): Promise<string | undefined> {
-  const { db } = await import('../../../db/connection');
+  const db = (await import('../../../db/connection')).getDb();
   const schema = await import('../../../db/schema');
   const [row] = await db
     .select()

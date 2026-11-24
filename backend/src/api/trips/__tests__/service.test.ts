@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import { NotFoundError } from '../../../errors';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
-import { odometerRepository } from '../../odometer/repository';
 import { createTrip, deleteTrip, updateTrip } from '../service';
 
 let ctx: TestApp;
@@ -48,7 +48,7 @@ describe('trips service keeps the linked odometer entry in sync', () => {
     await updateTrip(ctx.user.id, created, { startOdometer: 100, endOdometer: 500 }, undefined);
 
     expect(odoCount()).toBe(1);
-    expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(500);
+    expect(await repos().odometer.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(500);
   });
 
   test('create, edit and delete match the linked entry on the user’s day in their time zone', async () => {
@@ -85,7 +85,7 @@ describe('trips service keeps the linked odometer entry in sync', () => {
     await deleteTrip(ctx.user.id, created, { keepOdometer: true, timeZone: undefined });
 
     expect(odoCount()).toBe(1);
-    expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(5000);
+    expect(await repos().odometer.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(5000);
   });
 });
 

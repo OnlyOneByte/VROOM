@@ -4,6 +4,7 @@ import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { HTTPException } from 'hono/http-exception';
+import { type AppContext, appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { userProviders, users } from '../../db/schema';
@@ -27,9 +28,8 @@ import {
   markAdminAssigned,
   signupSettings,
 } from '../signup/store';
-import { authProviderRepository, buildAuthProviderConfig } from './auth-provider-repository';
+import { buildAuthProviderConfig } from './auth-provider-repository';
 import { DEMO_USER_ID, isDemoAvailable, startDemoSession } from './demo';
-import { lucia } from './lucia';
 import {
   googleStorageClient,
   PHOTOS_SCOPES,
@@ -244,7 +244,7 @@ export async function updateExistingUserProfile(
   userInfo: { email: string; displayName: string; avatarUrl?: string }
 ) {
   const db = getDb();
-  await authProviderRepository.updateProfile(authRowId, userId, {
+  await repos().authProviders.updateProfile(authRowId, userId, {
     email: userInfo.email,
     displayName: userInfo.displayName,
     avatarUrl: userInfo.avatarUrl,
@@ -381,7 +381,7 @@ export async function resolveNewUser(
     return result;
   } catch (txErr) {
     if (isUniqueConstraintError(txErr)) {
-      const retryRow = await authProviderRepository.findByProviderIdentity(
+      const retryRow = await repos().authProviders.findByProviderIdentity(
         authProviderId,
         userInfo.providerAccountId
       );
@@ -413,7 +413,7 @@ export async function checkLinkConflicts(
   authProviderId: string,
   providerAccountId: string,
   currentUserId: string,
-  repo: Pick<typeof authProviderRepository, 'findByProviderIdentity'> = authProviderRepository
+  repo: Pick<AppContext['repos']['authProviders'], 'findByProviderIdentity'> = repos().authProviders
 ): Promise<string | null> {
   const existingRow = await repo.findByProviderIdentity(authProviderId, providerAccountId);
   if (!existingRow) return null;
@@ -438,7 +438,7 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
   if ('error' in stateResult) return c.redirect(profileRedirect('link_error=invalid_state'));
   const storedData = stateResult.data;
 
-  const sessionId = getCookie(c, lucia.sessionCookieName);
+  const sessionId = getCookie(c, appContext().lucia.sessionCookieName);
   const authResult = await validateProviderSession(sessionId);
   if (!authResult) return c.redirect(`${CONFIG.frontend.url}/auth?auth_error=invalid_state`);
 
@@ -472,7 +472,7 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
   );
   if (conflict) return c.redirect(profileRedirect(`link_error=${conflict}`));
 
-  await authProviderRepository.create({
+  await repos().authProviders.create({
     userId: authResult.user.id,
     authProvider: authProviderId,
     providerAccountId: userInfo.providerAccountId,
@@ -485,8 +485,8 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
 });
 
 async function createAuthSession(c: Context, userId: string) {
-  const session = await lucia.createSession(userId, {});
-  setSessionCookie(c, lucia.sessionCookieName, session);
+  const session = await appContext().lucia.createSession(userId, {});
+  setSessionCookie(c, appContext().lucia.sessionCookieName, session);
 }
 
 async function exchangeAuthTokensOrRedirect(
@@ -542,7 +542,7 @@ routes.get('/callback/:authProvider', authRateLimiter, async (c) => {
     return c.redirect(authRedirect(`auth_error=${tokenResult.redirect}`));
   const { userInfo } = tokenResult;
 
-  const existingAuthRow = await authProviderRepository.findByProviderIdentity(
+  const existingAuthRow = await repos().authProviders.findByProviderIdentity(
     authProviderId,
     userInfo.providerAccountId
   );
@@ -563,16 +563,16 @@ routes.get('/callback/:authProvider', authRateLimiter, async (c) => {
 });
 
 routes.get('/me', async (c) => {
-  const sessionId = getCookie(c, lucia.sessionCookieName);
+  const sessionId = getCookie(c, appContext().lucia.sessionCookieName);
 
   if (!sessionId) {
     throw new HTTPException(401, { message: 'No session found' });
   }
 
-  const { session, user } = await lucia.validateSession(sessionId);
+  const { session, user } = await appContext().lucia.validateSession(sessionId);
 
   if (!session) {
-    clearSessionCookie(c, lucia.sessionCookieName);
+    clearSessionCookie(c, appContext().lucia.sessionCookieName);
     throw new HTTPException(401, { message: 'Invalid session' });
   }
 
@@ -647,28 +647,28 @@ routes.get('/capabilities', requireAuth, (c) =>
 );
 
 routes.post('/logout', async (c) => {
-  const sessionId = getCookie(c, lucia.sessionCookieName);
+  const sessionId = getCookie(c, appContext().lucia.sessionCookieName);
 
   if (sessionId) {
-    await lucia.invalidateSession(sessionId);
+    await appContext().lucia.invalidateSession(sessionId);
   }
 
-  clearSessionCookie(c, lucia.sessionCookieName);
+  clearSessionCookie(c, appContext().lucia.sessionCookieName);
 
   return c.json({ success: true, message: 'Logged out successfully' });
 });
 
 routes.post('/refresh', async (c) => {
-  const sessionId = getCookie(c, lucia.sessionCookieName);
+  const sessionId = getCookie(c, appContext().lucia.sessionCookieName);
 
   if (!sessionId) {
     throw new HTTPException(401, { message: 'No session found' });
   }
 
-  const result = await validateAndRefreshSession(sessionId, lucia, c);
+  const result = await validateAndRefreshSession(sessionId, appContext().lucia, c);
 
   if (!result) {
-    clearSessionCookie(c, lucia.sessionCookieName);
+    clearSessionCookie(c, appContext().lucia.sessionCookieName);
     throw new HTTPException(401, { message: 'Invalid session' });
   }
 
@@ -685,7 +685,7 @@ routes.post('/refresh', async (c) => {
 
 routes.get('/accounts', requireAuth, async (c) => {
   const user = c.get('user');
-  const rows = await authProviderRepository.findByUserId(user.id);
+  const rows = await repos().authProviders.findByUserId(user.id);
 
   const data = rows.map((row) => {
     const config = (row.config as Record<string, unknown>) ?? {};
@@ -809,7 +809,7 @@ async function validateProviderSession(
   sessionId: string | undefined
 ): Promise<{ user: { id: string }; session: { id: string } } | null> {
   if (!sessionId) return null;
-  const { session, user } = await lucia.validateSession(sessionId);
+  const { session, user } = await appContext().lucia.validateSession(sessionId);
   if (!session || !user) return null;
   return { user, session };
 }
@@ -942,7 +942,7 @@ routes.get('/callback/provider/google', async (c) => {
   const { state } = resolved;
   const authCode = code as string;
 
-  const sessionId = getCookie(c, lucia.sessionCookieName);
+  const sessionId = getCookie(c, appContext().lucia.sessionCookieName);
   const validated = await validateProviderCsrf(sessionId, state.userId);
   if (!validated) {
     const authResult = await validateProviderSession(sessionId);

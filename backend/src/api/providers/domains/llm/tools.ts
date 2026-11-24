@@ -1,6 +1,7 @@
 // userId always comes from the session, never from model arguments.
 
 import { z } from 'zod';
+import { repos } from '../../../../app-context';
 import { getDb } from '../../../../db/connection';
 import { enforce } from '../../../../permissions/authorize';
 import { resolverFor } from '../../../../permissions/grants';
@@ -18,9 +19,7 @@ import {
   fuelStatsToApi,
   insuranceToApi,
 } from '../../../analytics/api-transform';
-import { analyticsRepository } from '../../../analytics/repository';
 import { expenseRepository } from '../../../expenses/repository';
-import { reminderRepository } from '../../../reminders/repository';
 import { vehicleRepository } from '../../../vehicles/repository';
 import type { ToolDefinition } from './llm-provider';
 
@@ -154,7 +153,7 @@ const TOOL_LIST: AssistantTool[] = [
     schema: rangeVehicleArgs,
     read: async (args, userId, nowMs, timeZone) => {
       const scopeId = await resolveScope(args.vehicleId, userId);
-      return analyticsRepository.getFuelStats(
+      return repos().analytics.getFuelStats(
         scopeId,
         resolveRange(args.range, nowMs, timeZone),
         args.vehicleId,
@@ -169,7 +168,7 @@ const TOOL_LIST: AssistantTool[] = [
       'A combined quick-stats + fuel-stats overview across all vehicles over a time range.',
     schema: rangeArgs,
     read: async (args, userId, nowMs, timeZone) =>
-      analyticsRepository.getSummary(
+      repos().analytics.getSummary(
         userId,
         resolveRange(args.range, nowMs, timeZone),
         resolveRange('ytd', nowMs, timeZone).start,
@@ -183,7 +182,7 @@ const TOOL_LIST: AssistantTool[] = [
       'Compare all vehicles head-to-head over a time range (spend, efficiency, cost-per-mile per vehicle).',
     schema: rangeArgs,
     read: async (args, userId, nowMs, timeZone) =>
-      analyticsRepository.getCrossVehicle(
+      repos().analytics.getCrossVehicle(
         userId,
         resolveRange(args.range, nowMs, timeZone),
         timeZone
@@ -195,7 +194,7 @@ const TOOL_LIST: AssistantTool[] = [
     description: "The user's loan/lease state per vehicle: balances, payments, payoff progress.",
     schema: emptyArgs,
     read: async (_args, userId, _nowMs, timeZone) =>
-      analyticsRepository.getFinancing(userId, timeZone),
+      repos().analytics.getFinancing(userId, timeZone),
     toApi: financingAnalyticsToApi,
   }),
   defineTool({
@@ -203,7 +202,7 @@ const TOOL_LIST: AssistantTool[] = [
     description: "The user's insurance policies/terms per vehicle and upcoming expirations.",
     schema: emptyArgs,
     read: async (_args, userId, _nowMs, timeZone) =>
-      analyticsRepository.getInsurance(userId, timeZone),
+      repos().analytics.getInsurance(userId, timeZone),
     toApi: insuranceToApi,
   }),
   defineTool({
@@ -211,7 +210,7 @@ const TOOL_LIST: AssistantTool[] = [
     description:
       'Active reminders (service intervals, registration, etc.) and when they are next due.',
     schema: emptyArgs,
-    read: async (_args, userId) => reminderRepository.findByUserId(userId, { isActive: true }),
+    read: async (_args, userId) => repos().reminders.findByUserId(userId, { isActive: true }),
     toApi: (rows) => rows.map(reminderWithVehiclesToApi),
   }),
 ];

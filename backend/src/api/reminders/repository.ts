@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNotNull, isNull, lte, ne, type SQL } from 'drizzle-orm';
 import { CONFIG } from '../../config';
 import type { AppDatabase } from '../../db/connection';
-import { getDb, transaction } from '../../db/connection';
+import { transaction } from '../../db/connection';
 import type { NewReminder, Reminder, ReminderNotification } from '../../db/schema';
 import { reminderNotifications, reminders, reminderVehicles } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
@@ -21,7 +21,7 @@ interface ReminderFilters {
   isActive?: boolean;
 }
 
-class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
+export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   constructor(db: AppDatabase) {
     super(db, reminders);
   }
@@ -213,7 +213,7 @@ class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
         this.insertVehicleJunctionsSync(tx, reminder.id, vehicleIds);
 
         return { reminder, vehicleIds };
-      });
+      }, this.db);
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
       logger.error('Failed to create reminder with vehicles', {
@@ -256,7 +256,7 @@ class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
         }
 
         return { reminder, vehicleIds: vehicleIds ?? this.getVehicleIdsSync(tx, id) };
-      });
+      }, this.db);
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
       logger.error('Failed to update reminder with vehicles', {
@@ -416,5 +416,3 @@ class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     }
   }
 }
-
-export const reminderRepository = new ReminderRepository(getDb());

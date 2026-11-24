@@ -1,7 +1,6 @@
 import { createId } from '@paralleldrive/cuid2';
 import { and, asc, count, eq } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import type { UserProvider } from '../../db/schema';
 import { userProviders } from '../../db/schema';
 
@@ -108,5 +107,3 @@ export class AuthProviderRepository {
       );
   }
 }
-
-export const authProviderRepository = new AuthProviderRepository(getDb());
