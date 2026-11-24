@@ -30,7 +30,7 @@ class VisibleIntersectionObserver {
 	observe(target: Element) {
 		queueMicrotask(() =>
 			this.callback(
-				[{ isIntersecting: true, target } as IntersectionObserverEntry],
+				[{ isIntersecting: true, intersectionRatio: 1, target } as IntersectionObserverEntry],
 				this as unknown as IntersectionObserver
 			)
 		);

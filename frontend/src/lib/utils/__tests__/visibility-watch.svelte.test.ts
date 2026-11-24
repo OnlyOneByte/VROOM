@@ -10,7 +10,9 @@ vi.mock('$app/env', () => ({
 
 import { createVisibilityWatch, type VisibilityWatchResult } from '../visibility-watch.svelte';
 
-type ObserverCallback = (entries: Array<{ isIntersecting: boolean }>) => void;
+type ObserverCallback = (
+	entries: Array<{ isIntersecting: boolean; intersectionRatio: number }>
+) => void;
 
 const intersection = { callback: null as ObserverCallback | null, disconnect: vi.fn() };
 const mutation = {
@@ -106,8 +108,21 @@ describe('createVisibilityWatch', () => {
 		expect(watch.visible).toBe(false);
 		expect(mutation.callback).toBeNull();
 
-		intersection.callback?.([{ isIntersecting: true }]);
+		intersection.callback?.([{ isIntersecting: true, intersectionRatio: 1 }]);
 
+		expect(watch.visible).toBe(true);
+	});
+
+	test('waits until a quarter of the element is on screen', () => {
+		const node = document.createElement('div');
+		document.body.append(node);
+		setRendered(node, true);
+		const watch = mountWatch(node);
+
+		intersection.callback?.([{ isIntersecting: true, intersectionRatio: 0.1 }]);
+		expect(watch.visible).toBe(false);
+
+		intersection.callback?.([{ isIntersecting: true, intersectionRatio: 0.25 }]);
 		expect(watch.visible).toBe(true);
 	});
 
@@ -117,8 +132,8 @@ describe('createVisibilityWatch', () => {
 		setRendered(node, false);
 		const watch = mountWatch(node);
 
-		intersection.callback?.([{ isIntersecting: false }]);
-		intersection.callback?.([{ isIntersecting: true }]);
+		intersection.callback?.([{ isIntersecting: false, intersectionRatio: 0 }]);
+		intersection.callback?.([{ isIntersecting: true, intersectionRatio: 1 }]);
 
 		expect(watch.visible).toBe(false);
 	});
@@ -139,7 +154,7 @@ describe('createVisibilityWatch', () => {
 		mutation.callback?.();
 		expect(watch.visible).toBe(false);
 
-		intersection.callback?.([{ isIntersecting: true }]);
+		intersection.callback?.([{ isIntersecting: true, intersectionRatio: 1 }]);
 		expect(watch.visible).toBe(true);
 	});
 
@@ -151,7 +166,7 @@ describe('createVisibilityWatch', () => {
 		document.body.append(panel);
 		setRendered(node, true);
 		const watch = mountWatch(node);
-		intersection.callback?.([{ isIntersecting: true }]);
+		intersection.callback?.([{ isIntersecting: true, intersectionRatio: 1 }]);
 
 		watch.el = undefined;
 		flushSync();

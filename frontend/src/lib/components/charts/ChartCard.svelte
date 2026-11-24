@@ -212,7 +212,12 @@
 						{@render children()}
 					{/if}
 				{:else}
-					<Skeleton class="w-full" style="height: {placeholderHeight}px" />
+					<Skeleton
+						class="w-full"
+						style="height: {placeholderHeight}px"
+						role={table ? 'img' : undefined}
+						aria-label={table?.summary}
+					/>
 				{/if}
 			</div>
 			{#if legend}

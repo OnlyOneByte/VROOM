@@ -9,6 +9,8 @@ function findHiddenAncestor(el: HTMLElement): HTMLElement | null {
 	return null;
 }
 
+const DRAW_SHARE = 0.25;
+
 function isElementHidden(el: HTMLElement): boolean {
 	return el.offsetParent === null;
 }
@@ -58,13 +60,17 @@ export function createVisibilityWatch(): VisibilityWatchResult {
 		intersectionObserver = new IntersectionObserver(
 			entries => {
 				for (const entry of entries) {
-					if (entry.isIntersecting && !isElementHidden(node)) {
+					if (
+						entry.isIntersecting &&
+						entry.intersectionRatio >= DRAW_SHARE &&
+						!isElementHidden(node)
+					) {
 						visible = true;
 						hasBeenVisible = true;
 					}
 				}
 			},
-			{ threshold: 0 }
+			{ threshold: DRAW_SHARE }
 		);
 		intersectionObserver.observe(node);
 
