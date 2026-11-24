@@ -124,6 +124,7 @@ describe('the sync status indicator lives in the navigation, never floating over
 			const panel = screen.getByRole('group', { name: 'Sync status' });
 			expect(within(panel).getByRole('status')).toHaveTextContent('1 pending');
 			expect(panel.querySelector('[data-slot="badge"]')).toHaveTextContent('1');
+			expect(within(panel).getByRole('status')).toHaveAttribute('aria-live', 'off');
 		});
 
 		it('the sidebar action under the pointer survives the hover that expands the sidebar', async () => {
