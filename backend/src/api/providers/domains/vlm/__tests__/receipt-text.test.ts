@@ -134,6 +134,18 @@ describe('parseReceiptText on awkward lines', () => {
     }
   });
 
+  test('a quantity after its unit word keeps its last digit before x, @ or *', () => {
+    for (const [line, volume, volumeUnit] of [
+      ['GALLONS 11.481 @ 4.599', 11.481, 'gallons_us'],
+      ['Liter 42,11 x 1,789', 42.11, 'liters'],
+      ['Liter 42,11 @ 1,789', 42.11, 'liters'],
+      ['Liters 42.11 * 1.789', 42.11, 'liters'],
+      ['GALLONS 11.482 0.5 L', 11.482, 'gallons_us'],
+    ] as const) {
+      expect(parseReceiptText(line, NOW), line).toMatchObject({ volume, volumeUnit });
+    }
+  });
+
   test('a spelled-out price per gallon is a price, not a volume', () => {
     expect(parseReceiptText('GALLONS 11.482\nPRICE PER GALLON 4.599', NOW)).toMatchObject({
       volume: 11.482,
