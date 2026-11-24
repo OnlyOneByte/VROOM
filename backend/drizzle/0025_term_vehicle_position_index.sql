@@ -1,0 +1,1 @@
+CREATE INDEX `itv_position_idx` ON `insurance_term_vehicles` (`position`);
