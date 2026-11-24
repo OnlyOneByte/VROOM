@@ -16,7 +16,16 @@ import {
 	parseExplore,
 	writeExplore
 } from '../query-state';
-import { bucketDate, bucketLabel, kpis, percentChange, seriesFor } from '../explore-data';
+import {
+	bucketBounds,
+	bucketDate,
+	bucketLabel,
+	expensesNote,
+	expensesQuery,
+	kpis,
+	percentChange,
+	seriesFor
+} from '../explore-data';
 
 const params = (query: string) => new URLSearchParams(query);
 
@@ -190,5 +199,78 @@ describe('Explore chart data', () => {
 		expect(normalizeExplore({ ...byCar, per: 'none' }).hide).toEqual([]);
 		expect(normalizeExplore(byCar).hide).toEqual(['camry']);
 		expect(parseExplore(params('per=none&split=vehicle&hide=camry')).hide).toEqual([]);
+	});
+});
+
+describe('drill-down selection', () => {
+	test('the selected bucket and segment round-trip through the URL', () => {
+		const query = { ...applyPreset({ split: 'vehicle' }), sel: '2025-03', seg: 'camry' };
+		const url = writeExplore(new URL('https://x.test/analytics'), query);
+		expect(url.searchParams.get('sel')).toBe('2025-03');
+		expect(url.searchParams.get('seg')).toBe('camry');
+		expect(parseExplore(url.searchParams)).toMatchObject({ sel: '2025-03', seg: 'camry' });
+		const cleared = writeExplore(url, { ...query, sel: undefined, seg: undefined });
+		expect(cleared.searchParams.has('sel')).toBe(false);
+		expect(cleared.searchParams.has('seg')).toBe(false);
+	});
+
+	test('bucket bounds follow the interval and stay inside the range', () => {
+		const range = {
+			start: Math.floor(new Date(2025, 0, 15).getTime() / 1000),
+			end: Math.floor(new Date(2025, 5, 1).getTime() / 1000)
+		};
+		const s = (d: Date) => Math.floor(d.getTime() / 1000);
+		expect(bucketBounds('2025-01', 'month', range)).toEqual({
+			start: range.start,
+			end: s(new Date(2025, 1, 1))
+		});
+		expect(bucketBounds('2025-Q2', 'quarter', range)).toEqual({
+			start: s(new Date(2025, 3, 1)),
+			end: range.end
+		});
+		expect(bucketBounds('2025-03-03', 'week', range)).toEqual({
+			start: s(new Date(2025, 2, 3)),
+			end: s(new Date(2025, 2, 10))
+		});
+		expect(bucketBounds('total', 'none', range)).toEqual(range);
+	});
+
+	test('the Expenses link carries the car, category and the bucket days', () => {
+		const start = Math.floor(new Date(2025, 2, 1).getTime() / 1000);
+		const end = Math.floor(new Date(2025, 3, 1).getTime() / 1000);
+		expect(expensesQuery({ start, end, vehicleId: 'camry', categories: ['fuel'] })).toBe(
+			'?vehicleId=camry&category=fuel&startDate=2025-03-01&endDate=2025-03-31'
+		);
+		expect(expensesQuery({ start, end })).toBe('?startDate=2025-03-01&endDate=2025-03-31');
+		expect(expensesQuery({ start, end, tag: 'road trip' })).toBe(
+			'?tags=road+trip&startDate=2025-03-01&endDate=2025-03-31'
+		);
+	});
+
+	test('the Expenses link carries a list of categories', () => {
+		const start = Math.floor(new Date(2025, 2, 1).getTime() / 1000);
+		const end = Math.floor(new Date(2025, 3, 1).getTime() / 1000);
+		expect(expensesQuery({ start, end, categories: ['fuel', 'misc'] })).toBe(
+			'?category=fuel%2Cmisc&startDate=2025-03-01&endDate=2025-03-31'
+		);
+	});
+
+	test('the Expenses note names what the link cannot narrow to', () => {
+		expect(expensesNote({ split: 'none', cars: 0, energy: false })).toBeUndefined();
+		expect(
+			expensesNote({ split: 'category', keys: ['fuel'], cars: 1, energy: false })
+		).toBeUndefined();
+		expect(expensesNote({ split: 'vehicle', keys: ['a', 'b'], cars: 2, energy: false })).toBe(
+			'Expenses also lists your other cars for these dates.'
+		);
+		expect(expensesNote({ split: 'fuelType', keys: ['Regular'], cars: 2, energy: false })).toBe(
+			'Expenses also lists your other cars and other fuel types for these dates.'
+		);
+		expect(expensesNote({ split: 'none', cars: 0, energy: true })).toBe(
+			'Expenses also lists other fuel types for these dates.'
+		);
+		expect(expensesNote({ split: 'tag', keys: [''], cars: 3, energy: false })).toBe(
+			'Expenses also lists your other cars and tagged expenses for these dates.'
+		);
 	});
 });

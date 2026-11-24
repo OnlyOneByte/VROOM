@@ -9,6 +9,7 @@ import { analyticsQueryToApi } from '../api-transform';
 import {
   type AnalyticsQuery,
   AnalyticsQueryRepository,
+  type BucketItemsQuery,
   buildBuckets,
   compareBuckets,
   MAX_QUERY_BUCKETS,
@@ -767,5 +768,145 @@ describe('performance guard', () => {
     expect(statements).toBeLessThanOrEqual(4);
     expect(result.buckets.length).toBeGreaterThanOrEqual(24);
     expect(elapsed).toBeLessThan(100);
+  });
+});
+
+describe('bucket items for drill-down', () => {
+  const MARCH = { start: seconds('2024-03-01T00:00:00Z'), end: seconds('2024-04-01T00:00:00Z') };
+
+  test('the parts add up to the bucket value of the query', async () => {
+    seedFleet();
+    const query = await repo.query(OWNER.id, baseQuery({ groupBy: 'category' }));
+    const march = query.buckets.indexOf('2024-03');
+    const bucketTotal = query.series.reduce((sum, s) => sum + (s.values[march] ?? 0), 0);
+    const items = await repo.items(OWNER.id, { ...MARCH, include: 'all', limit: 1 });
+    const parts =
+      (items.fuel?.total ?? 0) +
+      items.items.reduce((sum, i) => sum + i.amount, 0) +
+      (items.others?.total ?? 0);
+    expect(items.total).toBe(bucketTotal);
+    expect(parts).toBe(items.total);
+    expect(items.fuel?.count).toBeGreaterThan(0);
+    expect(items.items).toHaveLength(1);
+    expect(items.items[0]?.vehicleName).toMatch(/Toyota Camry|Nissan Leaf/);
+  });
+
+  test('a selected segment narrows to its category, car, fuel type or tag', async () => {
+    seedFleet();
+    const fleetMarch = await repo.items(OWNER.id, { ...MARCH, include: 'all' });
+    const camry = await repo.items(OWNER.id, {
+      ...MARCH,
+      include: 'all',
+      groupBy: 'vehicle',
+      keys: [CAMRY.id],
+    });
+    const leaf = await repo.items(OWNER.id, {
+      ...MARCH,
+      include: 'all',
+      groupBy: 'vehicle',
+      keys: [LEAF.id],
+    });
+    expect(camry.total + leaf.total).toBe(fleetMarch.total);
+    const fuel = await repo.items(OWNER.id, {
+      ...MARCH,
+      include: 'all',
+      groupBy: 'category',
+      keys: ['fuel'],
+    });
+    expect(fuel.items).toEqual([]);
+    expect(fuel.total).toBe(fuel.fuel?.total ?? -1);
+    const regular = await repo.items(OWNER.id, {
+      ...MARCH,
+      include: 'all',
+      groupBy: 'fuelType',
+      keys: ['Regular'],
+    });
+    expect(regular.count).toBeGreaterThan(0);
+    expect(regular.total).toBeLessThan(fuel.total);
+    const january = {
+      start: seconds('2024-01-01T00:00:00Z'),
+      end: seconds('2024-02-01T00:00:00Z'),
+    };
+    const work = await repo.items(OWNER.id, {
+      ...january,
+      include: 'all',
+      groupBy: 'tag',
+      keys: ['work'],
+    });
+    expect(work.count).toBe(2);
+    expect(work.items.map((i) => i.id)).toEqual(['other-1']);
+    expect(work.fuel?.count).toBe(1);
+    const untagged = await repo.items(OWNER.id, {
+      ...january,
+      include: 'all',
+      groupBy: 'tag',
+      keys: [''],
+    });
+    expect(untagged.items.map((i) => i.id)).not.toContain('other-0');
+  });
+
+  test('the items match the bar for every split, hidden series and energy metric', async () => {
+    seedFleet();
+    seedExpense(testDb.sqlite, {
+      id: 'blank-type',
+      vehicleId: CAMRY.id,
+      category: 'fuel',
+      expenseAmount: 1_234,
+      date: new Date('2024-03-20T12:00:00Z'),
+      mileage: null,
+      volume: 5,
+      fuelType: null,
+      missedFillup: false,
+    });
+    const bucket = async (q: Partial<AnalyticsQuery>, keys?: string[]) => {
+      const result = await repo.query(OWNER.id, baseQuery(q));
+      const i = result.buckets.indexOf('2024-03');
+      return result.series
+        .filter((s) => !keys || keys.includes(s.key))
+        .reduce((sum, s) => sum + (s.values[i] ?? 0), 0);
+    };
+    const items = (q: Partial<BucketItemsQuery>) =>
+      repo.items(OWNER.id, { ...MARCH, include: 'running', ...q });
+
+    const byType = await items({ groupBy: 'fuelType' });
+    expect(byType.total).toBe(await bucket({ include: 'running', groupBy: 'fuelType' }));
+    expect(byType.categories).toEqual(['fuel']);
+    const blank = await items({ groupBy: 'fuelType', keys: [''] });
+    expect(blank.total).toBe(1_234);
+
+    const visible = ['fuel', 'maintenance'];
+    const shown = await items({ groupBy: 'category', keys: visible });
+    expect(shown.total).toBe(await bucket({ include: 'running', groupBy: 'category' }, visible));
+    expect(shown.categories).toEqual(visible);
+
+    const charges = await items({ metric: 'volume', energy: 'electric' });
+    expect(charges.categories).toEqual(['fuel']);
+    expect(charges.count).toBeGreaterThan(0);
+    const leafOnly = await items({ groupBy: 'vehicle', keys: [LEAF.id] });
+    const leafCharges = await items({
+      metric: 'volume',
+      energy: 'electric',
+      groupBy: 'vehicle',
+      keys: [LEAF.id],
+    });
+    expect(charges.count).toBe(leafCharges.count);
+    expect(leafCharges.total).toBe(leafOnly.fuel?.total ?? -1);
+  });
+
+  test("another user's car or an empty selection returns nothing", async () => {
+    seedFleet();
+    const foreign = await repo.items(OWNER.id, {
+      ...MARCH,
+      include: 'all',
+      vehicleIds: [OTHER.id],
+    });
+    expect(foreign).toMatchObject({ total: 0, count: 0, fuel: null, items: [], others: null });
+    const none = await repo.items(OWNER.id, {
+      ...MARCH,
+      include: 'running',
+      groupBy: 'category',
+      keys: ['financial'],
+    });
+    expect(none.count).toBe(0);
   });
 });

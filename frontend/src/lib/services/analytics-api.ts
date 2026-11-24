@@ -12,7 +12,9 @@ import type {
 	YearEndResponse,
 	AnalyticsSummaryResponse,
 	AnalyticsQueryParams,
-	AnalyticsQueryResponse
+	AnalyticsQueryResponse,
+	AnalyticsBucketItems,
+	AnalyticsBucketItemsParams
 } from '#lib/types/index.ts';
 import { ApiError } from '#lib/utils/error-handling.ts';
 import { apiClient } from './api-client';
@@ -140,6 +142,21 @@ export const analyticsApi = {
 		const { vehicleIds, categories, ...rest } = params;
 		return apiClient.get<AnalyticsQueryResponse>(
 			`/analytics/query${buildQueryString({ ...rest, vehicleIds: vehicleIds?.join(','), categories: categories?.join(','), timeZone: userTimeZone() })}`,
+			options
+		);
+	},
+
+	async queryItems(
+		params: AnalyticsBucketItemsParams,
+		options?: { signal?: AbortSignal }
+	): Promise<AnalyticsBucketItems> {
+		const { vehicleIds, keys, ...rest } = params;
+		return apiClient.get<AnalyticsBucketItems>(
+			`/analytics/query/items${buildQueryString({
+				...rest,
+				vehicleIds: vehicleIds?.join(','),
+				keys: keys ? JSON.stringify(keys) : undefined
+			})}`,
 			options
 		);
 	},

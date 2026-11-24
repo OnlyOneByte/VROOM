@@ -24,7 +24,7 @@ function queryPayload(params: URLSearchParams) {
 	}));
 	const total = series.flatMap(s => s.values).reduce((sum, v) => sum + v, 0);
 	const period = {
-		range: { start: 1, end: 2 },
+		range: { start: Number(params.get('start') ?? 1), end: Number(params.get('end') ?? 2) },
 		buckets,
 		series,
 		totals: { value: total, perBucket: total / buckets.length, perDistance: 0.25, distance: 4000 }
@@ -39,8 +39,36 @@ function queryPayload(params: URLSearchParams) {
 	};
 }
 
+const BUCKET_ITEMS = {
+	total: 230,
+	count: 4,
+	fuel: { total: 100, count: 2 },
+	items: [
+		{
+			id: 'e1',
+			date: 1754784000,
+			category: 'maintenance',
+			vehicleId: 'camry',
+			vehicleName: '2020 Toyota Camry',
+			description: 'Brake pads',
+			amount: 110
+		}
+	],
+	others: { total: 20, count: 1 },
+	categories: ['fuel', 'maintenance', 'regulatory', 'enhancement', 'misc']
+};
+
 async function mockAnalytics(page: Page, requests: URLSearchParams[] = []) {
 	await mockApi(page);
+	await page.route(
+		url => url.pathname === '/api/v1/analytics/query/items',
+		route =>
+			route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({ success: true, data: BUCKET_ITEMS })
+			})
+	);
 	await page.route(
 		url => url.pathname === '/api/v1/analytics/query',
 		route => {
@@ -294,5 +322,59 @@ test.describe('Analytics', () => {
 				'true'
 			);
 		}
+	});
+
+	test('drill down from a month to a car and on to its expenses', async ({ page }) => {
+		await mockAnalytics(page);
+		await page.goto('/analytics?split=vehicle');
+		await page.mouse.move(640, 600);
+
+		await page
+			.getByRole('heading', { name: 'Total cost per month by car' })
+			.scrollIntoViewIfNeeded();
+		const chart = page.getByRole('img', { name: /Total cost per month by car/ });
+		await chart.focus();
+		await page.keyboard.press('ArrowRight');
+		await page.keyboard.press('Enter');
+
+		const panel = page.getByRole('dialog');
+		await expect(panel.getByRole('heading', { name: 'Aug ’26' })).toBeVisible();
+		await expect(page).toHaveURL(/sel=2026-08/);
+		await expect(panel.getByText('Brake pads')).toBeVisible();
+		await expect(panel.getByText('Fuel & charging')).toBeVisible();
+		await expect(panel.getByRole('link', { name: /Open in Expenses/ })).toHaveAttribute(
+			'href',
+			/category=fuel%2Cmaintenance%2Cregulatory%2Cenhancement%2Cmisc&startDate=2026-08-01&endDate=2026-08-31/
+		);
+		await expect(page.getByRole('navigation', { name: 'Drill path' })).toContainText('Aug ’26');
+
+		await page.keyboard.press('Escape');
+		await expect(panel).toBeHidden();
+		await expect(page).not.toHaveURL(/sel=/);
+		await expect(chart).toBeFocused();
+
+		await chart.click({ position: { x: 300, y: 150 } });
+		await expect(page.getByRole('dialog')).toBeVisible();
+		await page.getByRole('dialog').getByRole('button', { name: 'Show only' }).first().click();
+		await expect(page).toHaveURL(/cars=/);
+		await expect(page).not.toHaveURL(/sel=/);
+	});
+
+	test('a tag bar takes its value from the expenses, counted once', async ({ page }) => {
+		await mockAnalytics(page);
+		await page.goto('/analytics?split=tag&sel=2026-08');
+		const panel = page.getByRole('dialog');
+		await expect(panel.getByRole('heading', { name: 'Aug ’26' })).toBeVisible();
+		await expect(panel.getByText('$230.00', { exact: true })).toBeVisible();
+		await expect(panel.getByText(/below your average|above your average/)).toHaveCount(0);
+	});
+
+	test('a selection that no longer matches a bar opens nothing', async ({ page }) => {
+		await mockAnalytics(page);
+		await page.goto('/analytics?split=vehicle&sel=1999-01&seg=gone');
+		const path = page.getByRole('navigation', { name: 'Drill path' });
+		await expect(path).toContainText('Select a bar to see its expenses');
+		await expect(path.getByRole('button', { name: 'Last 12 months' })).toHaveCount(0);
+		await expect(page.getByRole('dialog')).toHaveCount(0);
 	});
 });

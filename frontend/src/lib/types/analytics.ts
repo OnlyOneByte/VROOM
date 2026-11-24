@@ -323,3 +323,31 @@ export interface AnalyticsQueryResponse extends AnalyticsQueryPeriod {
 	groupBy: AnalyticsQueryGroupBy;
 	compare: AnalyticsQueryPeriod | null;
 }
+
+export interface AnalyticsBucketItemsParams {
+	start: number;
+	end: number;
+	vehicleIds?: string[];
+	include?: AnalyticsQueryInclude;
+	metric?: AnalyticsQueryMetric;
+	energy?: AnalyticsQueryEnergy;
+	groupBy?: AnalyticsQueryGroupBy;
+	keys?: string[];
+}
+
+export interface AnalyticsBucketItems {
+	total: number;
+	count: number;
+	fuel: { total: number; count: number } | null;
+	items: Array<{
+		id: string;
+		date: number;
+		category: string;
+		vehicleId: string;
+		vehicleName: string;
+		description: string | null;
+		amount: number;
+	}>;
+	others: { total: number; count: number } | null;
+	categories: string[];
+}

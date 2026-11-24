@@ -93,6 +93,38 @@ export interface QueryPeriod {
   totals: QueryTotals;
 }
 
+export interface BucketItemsQuery {
+  start: number;
+  end: number;
+  vehicleIds?: string[];
+  categories?: ExpenseCategory[];
+  include: QueryInclude;
+  metric?: QueryMetric;
+  energy?: QueryEnergy;
+  groupBy?: QueryGroupBy;
+  keys?: string[];
+  limit?: number;
+}
+
+export interface BucketItem {
+  id: string;
+  date: number;
+  category: string;
+  vehicleId: string;
+  vehicleName: string;
+  description: string | null;
+  amount: number;
+}
+
+export interface BucketItems {
+  total: number;
+  count: number;
+  fuel: { total: number; count: number } | null;
+  items: BucketItem[];
+  others: { total: number; count: number } | null;
+  categories: string[];
+}
+
 export interface AnalyticsQueryResult extends QueryPeriod {
   metric: QueryMetric;
   unit: string;
@@ -458,6 +490,41 @@ function collectDistances(ctx: QueryContext, result: PeriodRows[], rows: Distanc
   }
 }
 
+function itemsWhere(
+  userId: string,
+  vehicleIds: string[],
+  categories: ExpenseCategory[],
+  query: BucketItemsQuery,
+  groupBy: QueryGroupBy
+): SQL {
+  const conditions: SQL[] = [
+    sql`e.user_id = ${userId}`,
+    sql`e.vehicle_id IN (${inList(vehicleIds)})`,
+    sql`e.category IN (${inList(categories)})`,
+    sql`e.date >= ${query.start}`,
+    sql`e.date < ${query.end}`,
+  ];
+  const keys = query.keys;
+  if (groupBy === 'fuelType' && keys) {
+    conditions.push(keys.length ? sql`COALESCE(e.fuel_type, '') IN (${inList(keys)})` : sql`0`);
+  }
+  if (groupBy === 'tag' && keys) {
+    const tagged = keys.filter(Boolean);
+    const parts: SQL[] = [];
+    if (tagged.length) {
+      parts.push(
+        sql`EXISTS (SELECT 1 FROM json_each(e.tags) t WHERE t.value IN (${inList(tagged)}))`
+      );
+    }
+    if (keys.includes('')) parts.push(sql`NOT EXISTS (SELECT 1 FROM json_each(e.tags) t)`);
+    conditions.push(parts.length ? sql`(${sql.join(parts, sql` OR `)})` : sql`0`);
+  }
+  if (query.metric === 'volume' || query.metric === 'efficiency') {
+    conditions.push(electricFilter(query.energy ?? 'fuel'));
+  }
+  return sql.join(conditions, sql` AND `);
+}
+
 export class AnalyticsQueryRepository {
   constructor(private db: AppDatabase) {}
 
@@ -581,6 +648,94 @@ export class AnalyticsQueryRepository {
   private aggregateRows(ctx: QueryContext): AggregateRow[] {
     if (ctx.categories.length === 0) return [];
     return usesFuelRows(ctx.query) ? this.fuelAggregate(ctx) : this.expenseAggregate(ctx);
+  }
+
+  async items(userId: string, query: BucketItemsQuery): Promise<BucketItems> {
+    try {
+      return await this.loadItems(userId, query);
+    } catch (error) {
+      logger.error('Failed to load bucket items', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to load bucket items', error);
+    }
+  }
+
+  private async loadItems(userId: string, query: BucketItemsQuery): Promise<BucketItems> {
+    const groupBy = query.groupBy ?? 'none';
+    const keys = query.keys;
+    const owned = await this.selectVehicles(userId, query.vehicleIds);
+    const names = new Map(owned.map((v) => [v.id, vehicleName(v)]));
+    const vehicleIds = [...names.keys()].filter(
+      (id) => groupBy !== 'vehicle' || !keys || keys.includes(id)
+    );
+    const categories = effectiveCategories({
+      metric: query.metric ?? 'cost',
+      interval: 'none',
+      groupBy,
+      include: query.include,
+      compare: 'none',
+      energy: query.energy ?? 'fuel',
+      categories: query.categories,
+    }).filter((c) => groupBy !== 'category' || !keys || keys.includes(c));
+    const empty: BucketItems = {
+      total: 0,
+      count: 0,
+      fuel: null,
+      items: [],
+      others: null,
+      categories,
+    };
+    if (vehicleIds.length === 0 || categories.length === 0) return empty;
+
+    const where = itemsWhere(userId, vehicleIds, categories, query, groupBy);
+    const limit = query.limit ?? 8;
+    const [totals] = this.db.all<{
+      total: number | null;
+      n: number;
+      fuel_total: number | null;
+      fuel_n: number;
+    }>(sql`
+      SELECT SUM(e.expense_amount) AS total, COUNT(*) AS n,
+        SUM(CASE WHEN e.category = 'fuel' THEN e.expense_amount END) AS fuel_total,
+        COUNT(CASE WHEN e.category = 'fuel' THEN 1 END) AS fuel_n
+      FROM expenses e WHERE ${where}
+    `);
+    const rows = this.db.all<{
+      id: string;
+      date: number;
+      category: string;
+      vehicle_id: string;
+      description: string | null;
+      amount: number;
+    }>(sql`
+      SELECT e.id, e.date, e.category, e.vehicle_id, e.description, e.expense_amount AS amount
+      FROM expenses e WHERE ${where} AND e.category <> 'fuel'
+      ORDER BY e.expense_amount DESC, e.date DESC LIMIT ${limit}
+    `);
+    const total = totals?.total ?? 0;
+    const count = totals?.n ?? 0;
+    const fuelTotal = totals?.fuel_total ?? 0;
+    const fuelCount = totals?.fuel_n ?? 0;
+    const listed = rows.reduce((sum, r) => sum + r.amount, 0);
+    const othersCount = count - fuelCount - rows.length;
+    return {
+      total,
+      count,
+      fuel: fuelCount > 0 ? { total: fuelTotal, count: fuelCount } : null,
+      items: rows.map((r) => ({
+        id: r.id,
+        date: r.date,
+        category: r.category,
+        vehicleId: r.vehicle_id,
+        vehicleName: names.get(r.vehicle_id) ?? 'Unknown vehicle',
+        description: r.description,
+        amount: r.amount,
+      })),
+      others: othersCount > 0 ? { total: total - fuelTotal - listed, count: othersCount } : null,
+      categories,
+    };
   }
 
   private scope(ctx: QueryContext): SQL {

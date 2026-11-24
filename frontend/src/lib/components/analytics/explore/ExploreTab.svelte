@@ -15,6 +15,7 @@
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import type { AnalyticsDateRange } from '../analytics-filters';
 	import QueryBar from './QueryBar.svelte';
+	import DrillPanel from './DrillPanel.svelte';
 	import {
 		DEFAULT_EXPLORE,
 		EXPLORE_COMPARES,
@@ -25,6 +26,7 @@
 		applyPreset,
 		chartForm,
 		describeQuery,
+		metricInfo,
 		type ExploreQuery
 	} from './query-state';
 	import {
@@ -34,6 +36,8 @@
 		hasData,
 		isAdditive,
 		kpis,
+		bucketBounds,
+		expensesNote,
 		percentChange,
 		queryCache,
 		seriesFor,
@@ -48,6 +52,10 @@
 		vehicleColors?: Record<string, string>;
 		filterLabel?: string;
 		onClearFilters?: () => void;
+		rangeText?: string;
+		carsText?: string;
+		onOnlyCar?: (_id: string) => void;
+		onAllCars?: () => void;
 	}
 
 	let {
@@ -57,7 +65,11 @@
 		vehicleIds,
 		vehicleColors,
 		filterLabel,
-		onClearFilters
+		onClearFilters,
+		rangeText = 'Last 12 months',
+		carsText = 'All cars',
+		onOnlyCar,
+		onAllCars
 	}: Props = $props();
 
 	let response = $state<AnalyticsQueryResponse | null>(null);
@@ -237,11 +249,159 @@
 		return `${y}-${pad(m + 1)}`;
 	}
 
+	let selectedSeries = $derived(
+		query.seg === undefined ? undefined : allSeries.find(s => s.sourceKey === query.seg)
+	);
+	let selectedIndex = $derived(response && query.sel ? response.buckets.indexOf(query.sel) : -1);
+	let selectionValue = $derived.by(() => {
+		if (!response || selectedIndex < 0) return null;
+		if (selectedSeries) return selectedSeries.values[selectedIndex] ?? null;
+		return isAdditive(shown) && shown.split !== 'tag'
+			? (bucketTotals(visibleSeries, response.buckets.length)[selectedIndex] ?? null)
+			: null;
+	});
+	let selectionTitle = $derived(
+		response && selectedIndex >= 0
+			? `${bucketLabel(response.buckets[selectedIndex] ?? '', shown.per)}${selectedSeries ? ` · ${selectedSeries.label}` : ''}`
+			: ''
+	);
+	let selectionComparison = $derived.by(() => {
+		const average = response?.totals.perBucket;
+		if (selectionValue == null || average == null || average === 0 || shown.per === 'none') {
+			return undefined;
+		}
+		const change = percentChange(selectionValue, average);
+		if (change == null || selectedSeries) return undefined;
+		if (change === 0) return `Same as your average per ${intervalLabel}`;
+		return `${Math.abs(change)}% ${change > 0 ? 'above' : 'below'} your average per ${intervalLabel}`;
+	});
+	let selectionBounds = $derived(
+		response && selectedIndex >= 0 && query.sel
+			? bucketBounds(query.sel, shown.per, response.range)
+			: null
+	);
+	let shownEnergy = $derived.by(() => {
+		const info = metricInfo(shown.metric);
+		return 'energy' in info ? info.energy : undefined;
+	});
+	let measuresEnergy = $derived(['volume', 'efficiency'].includes(metricInfo(shown.metric).metric));
+	let selectionKeys = $derived.by(() => {
+		if (selectedSeries) return [selectedSeries.sourceKey];
+		if (shown.split === 'none' || visibleSeries.length === allSeries.length) return undefined;
+		return visibleSeries.map(s => s.sourceKey);
+	});
+	let segVehicle = $derived(
+		shown.split === 'vehicle' && selectionKeys?.length === 1 ? selectionKeys[0] : undefined
+	);
+	let selectionParams = $derived.by(() => {
+		if (!selectionBounds) return null;
+		return {
+			...selectionBounds,
+			vehicleIds,
+			include: shown.inc,
+			metric: metricInfo(shown.metric).metric,
+			energy: shownEnergy,
+			groupBy: shown.split,
+			keys: selectionKeys
+		};
+	});
+	let selectionExpenses = $derived(
+		selectionBounds
+			? {
+					...selectionBounds,
+					vehicleId: segVehicle ?? (vehicleIds?.length === 1 ? vehicleIds[0] : undefined),
+					tag:
+						shown.split === 'tag' && selectionKeys?.length === 1 && selectionKeys[0]
+							? selectionKeys[0]
+							: undefined
+				}
+			: null
+	);
+	let selectionExpensesNote = $derived(
+		expensesNote({
+			split: shown.split,
+			keys: selectionKeys,
+			cars: segVehicle
+				? 1
+				: shown.split === 'vehicle' && selectionKeys
+					? selectionKeys.length
+					: (vehicleIds?.length ?? 0),
+			energy: measuresEnergy
+		})
+	);
+	let selectionCostLabel = $derived.by(() => {
+		if (measuresEnergy) {
+			return shownEnergy === 'electric' ? 'What these charges cost' : 'What these fill-ups cost';
+		}
+		const metric = metricInfo(shown.metric).metric;
+		return metric === 'distance' || metric === 'costPerDistance'
+			? 'Expenses in this period'
+			: undefined;
+	});
+	let selectionValueFromItems = $derived(
+		shown.split === 'tag' && !selectedSeries
+			? metricInfo(shown.metric).metric === 'count'
+				? ('count' as const)
+				: ('total' as const)
+			: undefined
+	);
+	let selectionCar = $derived(
+		segVehicle && selectedSeries && !(vehicleIds?.length === 1 && vehicleIds[0] === segVehicle)
+			? { id: segVehicle, name: selectedSeries.label }
+			: null
+	);
+
+	let selectionParts = $derived.by(() => {
+		if (selectedIndex < 0 || selectedSeries || shown.split === 'none') return [];
+		return visibleSeries
+			.map(series => ({ series, raw: series.values[selectedIndex] ?? 0 }))
+			.filter(p => p.raw !== 0)
+			.sort((a, b) => b.raw - a.raw)
+			.map(({ series, raw }) => ({
+				key: series.key,
+				label: series.label,
+				value: format.full(raw),
+				color: series.color,
+				action: shown.split === 'vehicle' && onOnlyCar ? 'Show only' : 'Details',
+				run: () =>
+					shown.split === 'vehicle' && onOnlyCar
+						? onOnlyCar(series.sourceKey)
+						: onQueryChange({ ...query, seg: series.sourceKey })
+			}));
+	});
+
+	function select(bucket: string | undefined, seriesKey: string | null) {
+		if (!bucket) return;
+		const seg =
+			seriesKey && shown.split !== 'none'
+				? allSeries.find(s => s.key === seriesKey)?.sourceKey
+				: undefined;
+		onQueryChange({ ...query, sel: bucket, seg });
+	}
+
+	function selectBar(row: Record<string, unknown>, seriesKey: string | null) {
+		select(response?.buckets[labels.indexOf(String(row['label']))], seriesKey);
+	}
+
+	function selectLine(row: Record<string, unknown>, seriesKey: string | null) {
+		const date = row['date'];
+		if (date instanceof Date) select(keyFor(date), seriesKey);
+	}
+
+	function selectRanking(row: Record<string, unknown>) {
+		const series = allSeries.find(s => s.label === row['label']);
+		if (series) onQueryChange({ ...query, sel: 'total', seg: series.sourceKey });
+	}
+
+	function closeSelection() {
+		onQueryChange({ ...query, sel: undefined, seg: undefined });
+	}
+
 	function toggleSeries(seriesKey: string) {
 		const key = allSeries.find(s => s.key === seriesKey)?.sourceKey;
 		if (!key) return;
 		const next = hidden.has(key) ? query.hide.filter(k => k !== key) : [...query.hide, key];
-		onQueryChange({ ...query, hide: next });
+		onQueryChange({ ...query, hide: next, sel: undefined, seg: undefined });
 	}
 </script>
 
@@ -312,6 +472,39 @@
 		>
 			<StatCardGrid items={kpiItems} columns={3} />
 
+			<nav aria-label="Drill path" class="flex flex-wrap items-center gap-x-1 text-sm">
+				{#if onAllCars && carsText !== 'All cars'}
+					<button
+						type="button"
+						class="inline-flex min-h-10 items-center px-1 underline underline-offset-2"
+						onclick={onAllCars}
+					>
+						All cars
+					</button>
+					<span aria-hidden="true" class="text-muted-foreground">›</span>
+				{/if}
+				<span class="px-1">{carsText}</span>
+				<span aria-hidden="true" class="text-muted-foreground">›</span>
+				{#if selectedIndex >= 0}
+					<button
+						type="button"
+						class="inline-flex min-h-10 items-center px-1 underline underline-offset-2"
+						onclick={closeSelection}
+					>
+						{rangeText}
+					</button>
+					<span aria-hidden="true" class="text-muted-foreground">›</span>
+					<span aria-current="page" class="px-1 font-medium">{selectionTitle}</span>
+				{:else}
+					<span aria-current="page" class="inline-flex min-h-10 items-center px-1 font-medium">
+						{rangeText}
+					</span>
+					<span class="basis-full px-1 text-muted-foreground sm:basis-auto">
+						Select a bar to see its expenses
+					</span>
+				{/if}
+			</nav>
+
 			{#if form === 'ranking'}
 				<AppBarChart
 					level={2}
@@ -320,6 +513,7 @@
 					x="value"
 					y="label"
 					orientation="horizontal"
+					onSelect={selectRanking}
 					series={rankingSeries}
 					config={buildChartConfig(rankingSeries)}
 					height={Math.max(160, rankingRows.length * 44)}
@@ -357,6 +551,7 @@
 					data={lineRows}
 					x="date"
 					y={visibleSeries.map(s => s.key)}
+					onSelect={selectLine}
 					series={allSeries}
 					hiddenKeys={hiddenSeriesKeys}
 					onToggleSeries={toggleSeries}
@@ -372,6 +567,7 @@
 					title={chartTitle}
 					data={barRows}
 					x="label"
+					onSelect={selectBar}
 					series={allSeries}
 					hiddenKeys={hiddenSeriesKeys}
 					onToggleSeries={toggleSeries}
@@ -387,4 +583,19 @@
 			{/if}
 		</div>
 	{/if}
+	<DrillPanel
+		open={!!query.sel && selectedIndex >= 0}
+		title={selectionTitle}
+		value={selectionValue != null ? format.full(selectionValue) : undefined}
+		comparison={selectionComparison}
+		params={selectionParams}
+		expenses={selectionExpenses}
+		costLabel={selectionCostLabel}
+		valueFromItems={selectionValueFromItems}
+		expensesNote={selectionExpensesNote}
+		car={selectionCar}
+		parts={selectionParts}
+		{onOnlyCar}
+		onClose={closeSelection}
+	/>
 </div>

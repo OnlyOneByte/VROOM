@@ -161,6 +161,7 @@
 			<Chart.Container {config} class="h-full w-full">
 				<LineChart
 					bind:context
+					onTooltipClick={onSelect ? (_event, detail) => onSelect(detail.data, null) : undefined}
 					{data}
 					{x}
 					{y}
