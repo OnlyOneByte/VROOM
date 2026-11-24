@@ -42,6 +42,8 @@ const VEHICLE_COLUMNS = {
   unitPreferences: vehicles.unitPreferences,
 };
 
+export type Contribution = 'opted_out' | 'awaiting_refresh' | 'included';
+
 export class CommunityStatsRepository {
   constructor(private db: AppDatabase) {}
 
@@ -88,13 +90,22 @@ export class CommunityStatsRepository {
     return loaded ?? null;
   }
 
-  async isOptedIn(userId: string): Promise<boolean> {
+  async contribution(userId: string, scope: string): Promise<Contribution> {
     const row = await this.db
-      .select({ optIn: userPreferences.communityStatsOptIn })
+      .select({
+        optIn: userPreferences.communityStatsOptIn,
+        consentedAt: userPreferences.communityStatsConsentedAt,
+      })
       .from(userPreferences)
       .where(eq(userPreferences.userId, userId))
       .get();
-    return row?.optIn === true;
+    if (row?.optIn !== true) return 'opted_out';
+    const snapshot = await this.newestComputedAt(scope);
+    const included =
+      row.consentedAt !== null &&
+      snapshot !== null &&
+      row.consentedAt.getTime() < snapshot.getTime();
+    return included ? 'included' : 'awaiting_refresh';
   }
 
   async publishedBuckets(
