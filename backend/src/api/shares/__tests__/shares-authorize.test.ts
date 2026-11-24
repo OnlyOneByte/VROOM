@@ -151,6 +151,17 @@ describe('share management cannot be used to escalate', () => {
     expect((await m.coOwner.request('DELETE', shareOf(m.viewer))).status).toBe(200);
   });
 
+  test('owner-set overrides limit revoking, not level changes or the owner', async () => {
+    ctx.sqlite.run(
+      "INSERT INTO permission_overrides (id, user_id, scope, scope_id, permission, effect, set_by) VALUES ('po-owner-switch', ?, 'vehicle', ?, 'vehicle.financing.read', 'allow', ?)",
+      [m.viewer.id, CAR, ctx.user.id]
+    );
+    expect((await m.coOwner.request('PUT', shareOf(m.viewer), { level: 'editor' })).status).toBe(
+      200
+    );
+    expect((await ctx.authed('DELETE', shareOf(m.viewer))).status).toBe(200);
+  });
+
   test('revoking your own share points you to Decline', async () => {
     const res = await m.coOwner.request('DELETE', shareOf(m.coOwner));
     expect(res.status).toBe(403);

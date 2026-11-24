@@ -74,6 +74,32 @@ describe('vehicles resolve through can() for every role', () => {
     expect(await status(m.viewer.request, 'GET', car)).toBe(403);
   });
 
+  test('an edit never returns or changes what the editor cannot see', async () => {
+    ctx.sqlite.run("UPDATE vehicles SET vin = 'VIN123', purchase_price = 2000000 WHERE id = ?", [
+      CAR,
+    ]);
+    overrideOn(ctx, CAR, m.coOwner, 'vehicle.financing.read', 'deny');
+    const res = await m.coOwner.request('PUT', car, { nickname: 'Ours' });
+    expect(res.status).toBe(200);
+    const body = (await json<DataEnvelope<Record<string, unknown>>>(res)).data;
+    expect(body.vin).toBeNull();
+    expect(body.purchasePrice).toBeNull();
+    expect(body.userId).toBeUndefined();
+    expect(await status(m.coOwner.request, 'PUT', car, { purchasePrice: 1 })).toBe(403);
+    expect(await status(m.coOwner.request, 'PUT', car, { vin: '1HGCM82633A004352' })).toBe(403);
+
+    overrideOn(ctx, CAR, m.viewer, 'vehicle.write', 'allow');
+    const edited = await m.viewer.request('PUT', car, {});
+    expect(edited.status).toBe(200);
+    expect((await json<DataEnvelope<Record<string, unknown>>>(edited)).data.vin).toBeNull();
+  });
+
+  test('allow overrides on both financial reads show the loan in the shared list', async () => {
+    overrideOn(ctx, CAR, m.viewer, 'vehicle.financing.read', 'allow');
+    overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
+    expect((await sharedList(m.viewer.request)).find((v) => v.id === CAR)?.financing).toBeTruthy();
+  });
+
   test('a disabled account cannot list or add vehicles', async () => {
     expect(await status(m.disabled.request, 'GET', '/api/v1/vehicles')).toBe(403);
     const body = { make: 'Ford', model: 'Focus', year: 2019 };

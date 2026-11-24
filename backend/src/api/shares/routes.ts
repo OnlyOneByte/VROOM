@@ -117,7 +117,12 @@ function refuseUnheldLevel(c: Context, vehicleId: string, level: string): void {
   refuseUnheld(granted, holdsOn(c, vehicleId));
 }
 
-function refuseOverSharee(c: Context, share: VehicleShare, ownerId: string | null): void {
+function refuseOverSharee(
+  c: Context,
+  share: VehicleShare,
+  ownerId: string | null,
+  removesOverrides: boolean
+): void {
   if (!share.sharedWithId || !ownerId || c.get('user').id === ownerId) return;
   const held = getDb()
     .select({ permission: rolePermissions.permission })
@@ -145,6 +150,7 @@ function refuseOverSharee(c: Context, share: VehicleShare, ownerId: string | nul
     )
     .get();
   if (ownerSet) throw new ForbiddenError('Only the owner can change what the owner set');
+  if (!removesOverrides) return;
   const overrides = getDb()
     .select({ permission: permissionOverrides.permission, setBy: permissionOverrides.setBy })
     .from(permissionOverrides)
@@ -248,7 +254,7 @@ routes.put(
     }
     const ownerId = vehicleOwnerId(share.vehicleId);
     refuseUnheldLevel(c, share.vehicleId, level);
-    refuseOverSharee(c, share, ownerId);
+    refuseOverSharee(c, share, ownerId, false);
 
     const updated = transitionShare(id, ACTIVE_SHARE_STATUSES, { level }, (tx, _, row) => {
       if (row.status === 'accepted' && row.sharedWithId) {
@@ -278,7 +284,7 @@ routes.delete(
     if (share.sharedWithId === c.get('user').id) {
       throw new ForbiddenError('To leave this vehicle, decline the share');
     }
-    refuseOverSharee(c, share, vehicleOwnerId(share.vehicleId));
+    refuseOverSharee(c, share, vehicleOwnerId(share.vehicleId), true);
 
     transitionShare(id, ANY_STATUS, { status: 'revoked' }, (tx, before) => {
       if (before.status === 'accepted' && before.sharedWithId) {

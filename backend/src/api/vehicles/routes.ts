@@ -15,7 +15,7 @@ import {
 } from '../../db/schema';
 import { VEHICLE_KINDS, VEHICLE_TYPES } from '../../db/types';
 import type { ApiResponse } from '../../errors';
-import { ConflictError, NotFoundError, ValidationError } from '../../errors';
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, ownAccount, vehicleParam } from '../../permissions/authorize';
 import { requestResolver } from '../../permissions/grants';
@@ -429,6 +429,13 @@ routes.put(
     if (!existingVehicle) {
       throw new NotFoundError('Vehicle');
     }
+    const access = await requireVehicleAccess(id, user.id, 'read');
+    if (
+      !seesFinancials(access) &&
+      (updateData.purchasePrice !== undefined || updateData.vin !== undefined)
+    ) {
+      throw new ForbiddenError('Only people who can see loan details can change the price or VIN');
+    }
 
     if (updateData.licensePlate && updateData.licensePlate !== existingVehicle.licensePlate) {
       await assertLicensePlateAvailable(updateData.licensePlate, existingVehicle.userId, id);
@@ -453,7 +460,9 @@ routes.put(
 
     return c.json({
       success: true,
-      data: vehicleRowToApi(updatedVehicle),
+      data: vehicleRowToApi(
+        seesFinancials(access) ? updatedVehicle : sharedVehicleView(updatedVehicle)
+      ),
       message: 'Vehicle updated successfully',
     });
   }
@@ -554,15 +563,14 @@ routes.get(
   zValidator('query', statsQuerySchema),
   authorize(vehicleParam('id')),
   async (c) => {
-    const user = c.get('user');
     const { id } = c.req.valid('param');
     const { period } = c.req.valid('query');
 
-    const { ownerId } = await requireVehicleAccess(id, user.id, 'read');
     const vehicle = (await vehicleRepository.findByIds([id]))[0] ?? null;
     if (!vehicle) {
       throw new NotFoundError('Vehicle');
     }
+    const ownerId = vehicle.userId;
 
     const fuelExpenses = await expenseRepository.findAll({
       vehicleId: id,
