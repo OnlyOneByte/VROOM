@@ -123,6 +123,12 @@ helper, never inline in a repository or route:
 per file and construct. A new site, or a higher count, fails with the file named. When you move a
 site into the dialect layer, the test asks you to lower or delete its baseline entry.
 
+`bun run test:postgres` (CI: `Backend Tests (Postgres, optional)`, never a required check) runs
+the raw analytics, insights and odometer SQL on Postgres. It captures each query on the seeded
+SQLite garage, copies the tables into an in-process Postgres (PGlite), and compares the rows.
+A query that fails is listed in `EXPECTED_FAILURES` with the issue that fixes it. A new failure,
+or a listed one that now passes, fails the run.
+
 ## Production
 
 - Prod runs `runMigrations()` on startup, so migrations deploy with the next container build.
