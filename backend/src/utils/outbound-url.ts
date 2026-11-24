@@ -283,6 +283,8 @@ function mayReachPrivateByName(policy: PrivateEndpointPolicy, url: URL): boolean
   );
 }
 
+export class EndpointNotAllowedError extends ValidationError {}
+
 function assertTargetAllowed(
   kind: AddressClass,
   url: URL,
@@ -290,14 +292,15 @@ function assertTargetAllowed(
   label: string,
   policy: PrivateEndpointPolicy
 ): void {
-  if (kind === 'forbidden') throw new ValidationError(`${label} must point to a public host`);
+  if (kind === 'forbidden')
+    throw new EndpointNotAllowedError(`${label} must point to a public host`);
   if (kind === 'private' && !privateTargetAllowed(policy, url, address)) {
-    throw new ValidationError(
+    throw new EndpointNotAllowedError(
       `${label} must point to a public host: this server doesn't allow private network addresses`
     );
   }
   if (kind === 'public' && url.protocol !== 'https:') {
-    throw new ValidationError(`${label} must use https`);
+    throw new EndpointNotAllowedError(`${label} must use https`);
   }
 }
 
@@ -341,7 +344,7 @@ export function assertSafeOutboundUrl(
     const address = literalAddress(host) ?? (isLocalhostName(host) ? '127.0.0.1' : null);
     assertTargetAllowed(kind, url, address, label, policy);
   } else if (url.protocol !== 'https:' && !mayReachPrivateByName(policy, url)) {
-    throw new ValidationError(`${label} must use https`);
+    throw new EndpointNotAllowedError(`${label} must use https`);
   }
   return url;
 }
