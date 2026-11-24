@@ -30,6 +30,19 @@ updates:
       - "dependencies"
       - "backend"
 
+  # The base images (oven/bun, node). Their tags float within a major, so every build already
+  # pulls the latest patch; this opens a PR when a new major (bun 2, node 24) comes out.
+  - package-ecosystem: "docker"
+    directories:
+      - "/backend"
+      - "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "ci"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
