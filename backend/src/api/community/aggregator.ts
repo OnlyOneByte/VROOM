@@ -19,6 +19,7 @@ export const COMMUNITY_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 export const LOCAL_SCOPE = 'local';
 const MIN_EFFICIENCY_INTERVALS = 3;
 const MIN_RUNNING_COST_KM = 500;
+const RECENT_ACTIVITY_MS = 90 * 24 * 60 * 60 * 1000;
 const PUBLISHED_N_STEP = 5;
 const EPSILON = 1;
 const AGE_BANDS: [maxAge: number, band: string][] = [
@@ -58,6 +59,7 @@ export interface CommunityVehicle {
   currency: string;
   region: string | null;
   firstRecordAt: Date | null;
+  lastRecordAt: Date | null;
   expenses: CommunityExpense[];
   odometerReadings: number[];
 }
@@ -149,7 +151,9 @@ export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSam
   const band = ageBand(modelYear, now);
   const ownedWholeWindow =
     vehicle.firstRecordAt !== null &&
-    vehicle.firstRecordAt.getTime() <= now.getTime() - COMMUNITY_WINDOW_MS;
+    vehicle.lastRecordAt !== null &&
+    vehicle.firstRecordAt.getTime() <= now.getTime() - COMMUNITY_WINDOW_MS &&
+    vehicle.lastRecordAt.getTime() >= now.getTime() - RECENT_ACTIVITY_MS;
 
   const fuel = catalogModelId ? efficiency(vehicle) : null;
   if (fuel && catalogModelId) {
@@ -173,7 +177,7 @@ export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSam
     });
   }
 
-  if (ownedWholeWindow && vehicle.expenses.length > 0) {
+  if (ownedWholeWindow) {
     samples.push({
       metric: 'maintenance',
       bucketKey: `maintenance|${band}|${vehicleType}|${currency}`,
@@ -235,6 +239,10 @@ function publish(
   return Math.round(Math.round(noisy / band.step) * band.step * 1000) / 1000;
 }
 
+function publishedCount(n: number): number {
+  return Math.floor(n / PUBLISHED_N_STEP) * PUBLISHED_N_STEP;
+}
+
 interface Bucket {
   sample: VehicleSample;
   byOwner: Map<string, number[]>;
@@ -262,12 +270,13 @@ function publishBucket(
   uniform: () => number
 ): NewCommunityStat {
   const n = byOwner.size;
+  const nPublished = publishedCount(n);
   const values = [...byOwner.values()].map(median).sort((a, b) => a - b);
   const band = bandFor(sample.metric, sample.unit);
-  const noiseScale = (band.hi - band.lo) / (n * EPSILON);
+  const noiseScale = (band.hi - band.lo) / (nPublished * EPSILON);
   const at = (value: number) => publish(value, band, noiseScale, uniform);
   const quartiles =
-    n >= options.quartileMinGroup
+    nPublished >= options.quartileMinGroup
       ? [0.25, 0.5, 0.75].map((q) => at(quantile(values, q))).sort((a, b) => a - b)
       : null;
   const { fields } = sample;
@@ -282,7 +291,7 @@ function publishBucket(
     region: fields.region ?? null,
     currency: fields.currency ?? null,
     unit: sample.unit,
-    nPublished: Math.floor(n / PUBLISHED_N_STEP) * PUBLISHED_N_STEP,
+    nPublished,
     mean: at(values.reduce((sum, value) => sum + value, 0) / n),
     p25: quartiles?.[0] ?? null,
     p50: quartiles?.[1] ?? at(quantile(values, 0.5)),
@@ -299,7 +308,7 @@ export function aggregate(
   const uniform = options.uniform ?? cryptoUniform;
   const buckets = collectBuckets(vehicles, options.now);
   const rows = buckets
-    .filter((bucket) => bucket.byOwner.size >= options.minGroup)
+    .filter((bucket) => publishedCount(bucket.byOwner.size) >= options.minGroup)
     .map((bucket) => publishBucket(bucket, options, uniform));
   return { rows, published: rows.length, suppressed: buckets.length - rows.length };
 }

@@ -42,9 +42,27 @@ describe('community stats aggregation privacy', () => {
     expect(twentyTwo?.p75).not.toBeNull();
   });
 
-  test('a raised minimum group size is respected', () => {
-    const vehicles = owners(12).map((id) => vehicle(id));
-    expect(efficiencyRow(vehicles, { ...OPTIONS, minGroup: 15 })).toBeUndefined();
+  test('a raised minimum group size is respected, and published n never falls below it', () => {
+    const twelve = owners(12).map((id) => vehicle(id));
+    expect(efficiencyRow(twelve, { ...OPTIONS, minGroup: 15 })).toBeUndefined();
+    expect(efficiencyRow(twelve, { ...OPTIONS, minGroup: 12 })).toBeUndefined();
+    const fifteen = owners(15).map((id) => vehicle(id));
+    expect(efficiencyRow(fifteen, { ...OPTIONS, minGroup: 12 })?.nPublished).toBe(15);
+  });
+
+  test('the noise depends only on the published n, not the exact n', () => {
+    const fixed = () => 0.9;
+    const ten = efficiencyRow(
+      owners(10).map((id) => vehicle(id)),
+      { ...OPTIONS, uniform: fixed }
+    );
+    const fourteen = efficiencyRow(
+      owners(14).map((id) => vehicle(id)),
+      { ...OPTIONS, uniform: fixed }
+    );
+    expect(ten?.mean).not.toBeCloseTo(Math.round(CIVIC_KM_PER_L * 10) / 10, 3);
+    expect(fourteen?.mean).toBe(ten?.mean as number);
+    expect(fourteen?.p50).toBe(ten?.p50 as number);
   });
 
   test('published values are rounded to their step and never reveal exact n', () => {
@@ -140,6 +158,22 @@ describe('per-vehicle samples', () => {
     expect(sample?.value).toBeCloseTo((100 * 1.609344) / 25, 6);
   });
 
+  test('a hybrid counts its liquid fuel only', () => {
+    const liquid = fillUps({});
+    const charges = fillUps({ distance: 30, volume: 8, fuelType: 'Level 2 (AC)' }).map(
+      (expense) => ({ ...expense, date: new Date(expense.date.getTime() + 3_600_000) })
+    );
+    const hybrid = vehicle('phev', { vehicleType: 'hybrid', expenses: [...liquid, ...charges] });
+    const sample = vehicleSamples(hybrid, NOW).find((s) => s.metric === 'efficiency');
+    expect(sample?.unit).toBe('km_per_l');
+    expect(sample?.value).toBeCloseTo(CIVIC_KM_PER_L, 6);
+  });
+
+  test('a vehicle with no recent records is not treated as owned for the whole window', () => {
+    const idle = vehicle('idle', { lastRecordAt: new Date(NOW.getTime() - 200 * 86_400_000) });
+    expect(vehicleSamples(idle, NOW).map((s) => s.metric)).not.toContain('maintenance');
+  });
+
   test('fewer than 3 valid intervals gives no efficiency value', () => {
     const short = vehicle('short', { expenses: fillUps({ count: 3 }) });
     expect(vehicleSamples(short, NOW).some((s) => s.metric === 'efficiency')).toBe(false);
@@ -169,7 +203,7 @@ describe('per-vehicle samples', () => {
           ...fillUps({}),
           {
             date: new Date(NOW.getTime() - 86_400_000),
-            category: 'insurance',
+            category: 'financial',
             expenseAmount: 90_000,
             mileage: null,
             volume: null,

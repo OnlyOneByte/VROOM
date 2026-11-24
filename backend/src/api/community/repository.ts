@@ -18,9 +18,12 @@ export interface CommunityInput {
   vehicles: CommunityVehicle[];
 }
 
-function earliest(...dates: (Date | null | undefined)[]): Date | null {
+function pickTime(
+  pick: (...times: number[]) => number,
+  dates: (Date | null | undefined)[]
+): Date | null {
   const times = dates.flatMap((date) => (date ? [date.getTime()] : []));
-  return times.length > 0 ? new Date(Math.min(...times)) : null;
+  return times.length > 0 ? new Date(pick(...times)) : null;
 }
 
 export class CommunityStatsRepository {
@@ -93,7 +96,11 @@ export class CommunityStatsRepository {
           )
         ),
       this.db
-        .select({ vehicleId: odometerEntries.vehicleId, odometer: odometerEntries.odometer })
+        .select({
+          vehicleId: odometerEntries.vehicleId,
+          odometer: odometerEntries.odometer,
+          recordedAt: odometerEntries.recordedAt,
+        })
         .from(odometerEntries)
         .where(
           and(
@@ -118,9 +125,9 @@ export class CommunityStatsRepository {
     for (const { vehicleId, ...expense } of expenseRows) {
       expensesByVehicle.set(vehicleId, [...(expensesByVehicle.get(vehicleId) ?? []), expense]);
     }
-    const readingsByVehicle = new Map<string, number[]>();
-    for (const { vehicleId, odometer } of odometerRows) {
-      readingsByVehicle.set(vehicleId, [...(readingsByVehicle.get(vehicleId) ?? []), odometer]);
+    const readingsByVehicle = new Map<string, { odometer: number; recordedAt: Date }[]>();
+    for (const { vehicleId, ...reading } of odometerRows) {
+      readingsByVehicle.set(vehicleId, [...(readingsByVehicle.get(vehicleId) ?? []), reading]);
     }
     const firstExpense = new Map(firstExpenses.map((row) => [row.vehicleId, row.first]));
     const firstReading = new Map(firstReadings.map((row) => [row.vehicleId, row.first]));
@@ -128,6 +135,8 @@ export class CommunityStatsRepository {
     return batch.flatMap((vehicle) => {
       const owner = ownerById.get(vehicle.userId);
       if (!owner) return [];
+      const windowExpenses = expensesByVehicle.get(vehicle.id) ?? [];
+      const readings = readingsByVehicle.get(vehicle.id) ?? [];
       return [
         {
           ownerId: vehicle.userId,
@@ -139,9 +148,16 @@ export class CommunityStatsRepository {
             parseUnitPreferences(vehicle.unitPreferences) ?? DEFAULT_UNIT_PREFERENCES,
           currency: owner.currency,
           region: owner.region,
-          firstRecordAt: earliest(firstExpense.get(vehicle.id), firstReading.get(vehicle.id)),
-          expenses: expensesByVehicle.get(vehicle.id) ?? [],
-          odometerReadings: readingsByVehicle.get(vehicle.id) ?? [],
+          firstRecordAt: pickTime(Math.min, [
+            firstExpense.get(vehicle.id),
+            firstReading.get(vehicle.id),
+          ]),
+          lastRecordAt: pickTime(Math.max, [
+            ...windowExpenses.map((expense) => expense.date),
+            ...readings.map((reading) => reading.recordedAt),
+          ]),
+          expenses: windowExpenses,
+          odometerReadings: readings.map((reading) => reading.odometer),
         },
       ];
     });

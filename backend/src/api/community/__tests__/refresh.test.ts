@@ -109,6 +109,32 @@ describe('community stats refresh against the database', () => {
     }
   });
 
+  test('records from before the window let maintenance count, read end to end', async () => {
+    for (let i = 0; i < 10; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    const maintenance = () =>
+      db.sqlite
+        .query("SELECT n_published FROM community_stats WHERE metric = 'maintenance'")
+        .all() as { n_published: number }[];
+    await refreshCommunityStats(repository, NOW);
+    expect(maintenance()).toEqual([]);
+
+    for (let i = 0; i < 10; i++) {
+      seedExpense(db.sqlite, {
+        id: `in-${i}-old`,
+        vehicleId: `in-${i}-car`,
+        category: 'maintenance',
+        expenseAmount: 12_000,
+        date: new Date(NOW.getTime() - 400 * DAY),
+        mileage: 9_000,
+        volume: null,
+        fuelType: null,
+        missedFillup: false,
+      });
+    }
+    await refreshCommunityStats(repository, NOW);
+    expect(maintenance()).toEqual([{ n_published: 10 }]);
+  });
+
   test('the table has no user id column', () => {
     expect(getColumnNames(db.sqlite, 'community_stats').some((name) => name.includes('user'))).toBe(
       false

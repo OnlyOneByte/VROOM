@@ -47,6 +47,7 @@ export function vehicle(
     currency: 'USD',
     region: null,
     firstRecordAt: new Date(NOW.getTime() - 400 * DAY),
+    lastRecordAt: new Date(NOW.getTime() - 20 * DAY),
     expenses: fillUps({}),
     odometerReadings: [],
     ...rest,
