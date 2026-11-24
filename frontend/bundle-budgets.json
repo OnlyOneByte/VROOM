@@ -9,7 +9,7 @@
 		"/expenses/new": 110,
 		"/expenses/[id]/edit": 110,
 		"/dev/gallery": 170,
-		"/analytics": 184,
+		"/analytics": 185,
 		"/vehicles/[id]/odometer/new": 65,
 		"/vehicles/[id]/odometer/[entryId]/edit": 65
 	}
