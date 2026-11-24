@@ -10,6 +10,7 @@ import {
 } from '../../../test-helpers/http-client';
 import {
   blockPrivateProviderEndpoints,
+  defaultPrivateProviderEndpoints,
   usePrivateProviderEndpoints,
 } from '../../../test-helpers/outbound';
 import { encrypt } from '../../../utils/encryption';
@@ -142,7 +143,7 @@ describe('provider endpoints when the admin allows private endpoints', () => {
   });
 });
 
-describe('provider endpoints by default, with private endpoints blocked', () => {
+describe('provider endpoints with private endpoints blocked', () => {
   blockPrivateProviderEndpoints();
 
   test.each([
@@ -435,5 +436,80 @@ describe('outbound requests connect to the validated address', () => {
     } finally {
       server.stop();
     }
+  });
+});
+
+describe('provider endpoints by default: local providers until a second account exists', () => {
+  defaultPrivateProviderEndpoints();
+
+  function addAccount(id: string): void {
+    ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+      id,
+      `${id}@example.com`,
+      'Another person',
+    ]);
+  }
+
+  test('with one account, a LAN storage endpoint and a local model are accepted', async () => {
+    expect(
+      (await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.20:9000'))).status
+    ).toBe(201);
+    expect(
+      (await ctx.authed('POST', '/api/v1/providers', modelBody('http://localhost:11434/v1'))).status
+    ).toBe(201);
+  });
+
+  test('with one account, metadata addresses are still refused', async () => {
+    const res = await ctx.authed('POST', '/api/v1/providers', s3Body('http://169.254.169.254'));
+    expect(res.status).toBe(400);
+  });
+
+  test('the demo account does not count as a second account', async () => {
+    addAccount('demo-garage');
+    const res = await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.20:9000'));
+    expect(res.status).toBe(201);
+  });
+
+  test('once a second account exists, private targets are refused, including stored ones', async () => {
+    const created = await ctx.authed(
+      'POST',
+      '/api/v1/providers',
+      s3Body('http://192.168.1.20:9000')
+    );
+    expect(created.status).toBe(201);
+    const { id } = (await json<DataEnvelope<{ id: string }>>(created)).data;
+
+    addAccount('second-person');
+
+    const again = await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.21:9000'));
+    expect(again.status).toBe(400);
+    expect((await ctx.authed('POST', `/api/v1/providers/${id}/test`)).status).toBe(400);
+    expect(
+      (await ctx.authed('POST', '/api/v1/providers', s3Body('https://s3.example.com'))).status
+    ).toBe(201);
+  });
+});
+
+describe('an explicit PRIVATE_PROVIDER_ENDPOINTS wins over the account count', () => {
+  usePrivateProviderEndpoints({ block: false, allow: '192.168.1.20:9000' });
+
+  test('with one account, only the listed target is allowed', async () => {
+    expect(
+      (await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.21:9000'))).status
+    ).toBe(400);
+    expect(
+      (await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.20:9000'))).status
+    ).toBe(201);
+  });
+
+  test('with two accounts, the listed target is still allowed', async () => {
+    ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+      'listed-second',
+      'listed-second@example.com',
+      'Another person',
+    ]);
+    expect(
+      (await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.20:9000'))).status
+    ).toBe(201);
   });
 });

@@ -1,6 +1,10 @@
 import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
+import { count, ne } from 'drizzle-orm';
+import { DEMO_USER_ID } from '../api/auth/demo';
 import { CONFIG } from '../config';
+import { getDb } from '../db/connection';
+import { users } from '../db/schema';
 import { ValidationError } from '../errors';
 
 type AddressClass = 'public' | 'private' | 'forbidden';
@@ -199,8 +203,18 @@ export function parsePrivateEndpointPolicy(allow: string, block: boolean): Priva
 
 let cachedPolicy: { key: string; policy: PrivateEndpointPolicy } | null = null;
 
+function hasSecondAccount(): boolean {
+  const row = getDb()
+    .select({ accounts: count() })
+    .from(users)
+    .where(ne(users.id, DEMO_USER_ID))
+    .get();
+  return (row?.accounts ?? 0) > 1;
+}
+
 export function privateEndpointPolicy(): PrivateEndpointPolicy {
   const { allow, block } = CONFIG.privateProviderEndpoints;
+  if (!block && allow.trim() === '') return hasSecondAccount() ? BLOCK_PRIVATE : ALLOW_PRIVATE;
   const key = `${block}|${allow}`;
   if (cachedPolicy?.key !== key) {
     cachedPolicy = { key, policy: parsePrivateEndpointPolicy(allow, block) };

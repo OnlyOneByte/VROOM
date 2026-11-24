@@ -15,5 +15,9 @@ export function usePrivateProviderEndpoints(settings: PrivateEndpointSettings): 
 }
 
 export function blockPrivateProviderEndpoints(): void {
+  usePrivateProviderEndpoints({ block: true, allow: '' });
+}
+
+export function defaultPrivateProviderEndpoints(): void {
   usePrivateProviderEndpoints({ block: false, allow: '' });
 }
