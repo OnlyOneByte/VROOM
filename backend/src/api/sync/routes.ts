@@ -14,7 +14,7 @@ import {
 } from '../../middleware';
 import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { readJsonBody } from '../../utils/request-body';
-import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
+import { OPERATION_TIMEOUTS, withDeadline, withTimeout } from '../../utils/timeout';
 import { zValidator } from '../../utils/validation';
 import { preferencesRepository, syncStateRepository } from '../settings/repository';
 import { activityTracker } from './activity-tracker';
@@ -213,14 +213,14 @@ routes.post(
         OPERATION_TIMEOUTS.RESTORE,
         'Download backup from provider'
       );
-      result = await withTimeout(
-        restoreService.restoreFromBackup(user.id, zipBuffer, body.mode),
+      result = await withDeadline(
+        (signal) => restoreService.restoreFromBackup(user.id, zipBuffer, body.mode, signal),
         OPERATION_TIMEOUTS.RESTORE,
         'Restore from provider backup'
       );
     } else {
-      result = await withTimeout(
-        restoreService.restoreFromSheets(user.id, body.providerId, body.mode),
+      result = await withDeadline(
+        (signal) => restoreService.restoreFromSheets(user.id, body.providerId, body.mode, signal),
         OPERATION_TIMEOUTS.RESTORE,
         'Restore from provider sheets'
       );
@@ -262,12 +262,14 @@ routes.post(
       throw new ValidationError(sizeValidation.errors[0]);
     }
 
-    const result = await withTimeout(
-      restoreService.restoreFromBackup(
-        user.id,
-        fileBuffer,
-        mode as 'preview' | 'merge' | 'replace'
-      ),
+    const result = await withDeadline(
+      (signal) =>
+        restoreService.restoreFromBackup(
+          user.id,
+          fileBuffer,
+          mode as 'preview' | 'merge' | 'replace',
+          signal
+        ),
       OPERATION_TIMEOUTS.RESTORE,
       'Restore from backup'
     );

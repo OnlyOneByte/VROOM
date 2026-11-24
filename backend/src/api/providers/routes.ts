@@ -39,6 +39,7 @@ import { BUILTIN_VISION_PROVIDERS, VISION_PROVIDERS } from './domains/vlm/regist
 import {
   checkProviderHealth,
   type HealthResult,
+  healthCodeOf,
   healthFailure,
   recordProviderHealth,
 } from './provider-status';
@@ -554,7 +555,7 @@ routes.post(
       result = await checkProviderHealth(existing);
     } catch (error) {
       if (error instanceof ValidationError) {
-        await recordProviderHealth(existing.id, healthFailure('config'));
+        await recordProviderHealth(existing.id, healthFailure(healthCodeOf(error)));
       }
       throw error;
     }

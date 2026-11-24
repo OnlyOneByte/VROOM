@@ -166,9 +166,19 @@ function validationSentence(issues: SchemaIssue[]): string | null {
 	return `Check the ${listFields(fields)}, then try again.`;
 }
 
+function serverBusyMessage(details: Record<string, unknown> | undefined): string {
+	const seconds = Number(details?.['retryAfter']);
+	const when =
+		Number.isInteger(seconds) && seconds > 0
+			? `in ${seconds} second${seconds === 1 ? '' : 's'}`
+			: 'in a moment';
+	return `The server is busy with other imports or restores. Try again ${when}.`;
+}
+
 export function userFacingErrorMessage(error: unknown): string {
 	if (isNetworkError(error)) return NETWORK_FAILURE_MESSAGE;
 	if (isVroomError(error)) {
+		if (error.code === 'SERVER_BUSY') return serverBusyMessage(error.details);
 		const status = error.statusCode ?? 0;
 		const byCode = error.code ? ERROR_CODE_MESSAGES[error.code] : undefined;
 		if (byCode) return byCode;

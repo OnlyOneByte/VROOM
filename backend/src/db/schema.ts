@@ -169,6 +169,7 @@ export const insuranceTermVehicles = sqliteTable(
   (table) => ({
     pk: primaryKey({ columns: [table.termId, table.vehicleId] }),
     vehicleIdx: index('itv_vehicle_idx').on(table.vehicleId),
+    positionIdx: index('itv_position_idx').on(table.position),
   })
 );
 

@@ -71,3 +71,24 @@ describe('replace-mode restore atomicity — a mid-insert failure rolls the wipe
     expect(rows[0]?.id).toBe(vehicleId);
   });
 });
+
+describe('a restore past its time limit', () => {
+  test('writes nothing once its deadline has passed, even in replace mode', async () => {
+    await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2021 });
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+    const zip = await backupService.exportAsZip(ctx.user.id);
+    await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2019 });
+
+    const timedOut = new Error('Restore from backup timed out');
+    await expect(
+      restoreService.restoreFromBackup(ctx.user.id, zip, 'replace', AbortSignal.abort(timedOut))
+    ).rejects.toBe(timedOut);
+
+    expect(
+      vehicleRows()
+        .map((v) => v.make)
+        .sort()
+    ).toEqual(['Honda', 'Subaru']);
+  });
+});
