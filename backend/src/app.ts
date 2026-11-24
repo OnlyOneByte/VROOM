@@ -28,6 +28,7 @@ import { routes as syncRoutes } from './api/sync/routes';
 import { routes as tripRoutes } from './api/trips/routes';
 import { routes as vehicleRoutes } from './api/vehicles/routes';
 import { CONFIG } from './config';
+import { checkDatabaseHealth } from './db/connection';
 import { createErrorResponse, NotFoundError } from './errors';
 import { activityTracker, bodyLimit, errorHandler, optionalAuth, rateLimiter } from './middleware';
 import { getClientIp } from './utils/client-ip';
@@ -137,11 +138,15 @@ if (CONFIG.env === 'development') {
 app.use('*', activityTracker);
 
 app.get('/health', (c) => {
-  return c.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    version: CONFIG.version,
-  });
+  const healthy = checkDatabaseHealth();
+  return c.json(
+    {
+      status: healthy ? 'ok' : 'unavailable',
+      timestamp: new Date().toISOString(),
+      version: CONFIG.version,
+    },
+    healthy ? 200 : 503
+  );
 });
 
 app.route('/api/v1/auth', authRoutes);

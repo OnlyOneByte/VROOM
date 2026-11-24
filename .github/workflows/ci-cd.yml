@@ -67,6 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       frontend: ${{ steps.diff.outputs.frontend }}
+      quarantined: ${{ steps.tagged.outputs.found }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -100,6 +101,17 @@ jobs:
             echo "frontend=false" >> "$GITHUB_OUTPUT"
           else
             echo "frontend=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Any quarantined tests?
+        # Quarantined E2E only starts when a test carries the tag, so it costs no runner otherwise.
+        id: tagged
+        run: |
+          if grep -rqs '@quarantine' frontend/e2e; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No test is tagged @quarantine."
           fi
 
   frontend-checks:
@@ -195,12 +207,12 @@ jobs:
           retention-days: 7
 
   frontend-unit:
-    name: Frontend unit tests (${{ matrix.shard }}/3)
+    name: Frontend unit tests (${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2]
     defaults:
       run:
         working-directory: ./frontend
@@ -223,10 +235,10 @@ jobs:
         run: npm run sync
 
       - name: Run this shard with coverage
-        # A shard covers a third of the code, so the thresholds are checked once, on the merged
-        # coverage, in Frontend coverage.
+        # A shard covers half the code, so the thresholds are checked once, on the merged
+        # coverage, in Frontend Tests.
         run: >-
-          npx vitest run --shard=${{ matrix.shard }}/3 --reporter=blob --coverage
+          npx vitest run --shard=${{ matrix.shard }}/2 --reporter=blob --coverage
           --coverage.reporter=text-summary
           --coverage.thresholds.lines=0 --coverage.thresholds.statements=0
           --coverage.thresholds.functions=0 --coverage.thresholds.branches=0
@@ -240,47 +252,15 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  frontend-coverage:
-    name: Frontend coverage
-    needs: frontend-unit
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Download the shard reports
-        uses: actions/download-artifact@v7
-        with:
-          pattern: vitest-blob-*
-          path: frontend/.vitest/blob
-          merge-multiple: true
-
-      - name: Merge the shards and check the coverage thresholds
-        run: npx vitest --merge-reports=.vitest/blob --coverage
-
   frontend-e2e:
-    name: Frontend E2E (${{ matrix.shard }}/3)
+    name: Frontend E2E (${{ matrix.shard }}/2)
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2]
     defaults:
       run:
         working-directory: ./frontend
@@ -327,9 +307,9 @@ jobs:
 
       - name: Run E2E tests
         # The dev target needs no backend and no database — every /api/v1 call is mocked
-        # in-browser. Each shard runs a third of the chromium tests. Quarantined tests run in
+        # in-browser. Each shard runs half the chromium tests. Quarantined tests run in
         # Quarantined E2E instead (docs/conventions/Flaky-Tests.md).
-        run: npm run test:e2e:chromium -- --shard=${{ matrix.shard }}/3 --grep-invert @quarantine
+        run: npm run test:e2e:chromium -- --shard=${{ matrix.shard }}/2 --grep-invert @quarantine
 
       - name: List tests that passed only on retry
         if: ${{ !cancelled() }}
@@ -349,6 +329,8 @@ jobs:
     # Not a required check: it runs the tests tagged @quarantine so a fix can be seen working
     # before the tag comes off (docs/conventions/Flaky-Tests.md).
     name: Quarantined E2E
+    needs: changes
+    if: needs.changes.outputs.quarantined == 'true'
     runs-on: ubuntu-latest
     continue-on-error: true
     defaults:
@@ -359,17 +341,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Any quarantined tests?
-        id: tagged
-        run: |
-          if grep -rqs '@quarantine' e2e; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "No test is tagged @quarantine."
-          fi
-
       - name: Setup Node.js
-        if: steps.tagged.outputs.found == 'true'
         uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -377,15 +349,12 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        if: steps.tagged.outputs.found == 'true'
         run: npm ci
 
       - name: Prepare SvelteKit
-        if: steps.tagged.outputs.found == 'true'
         run: npm run sync
 
       - name: Cache Playwright browsers
-        if: steps.tagged.outputs.found == 'true'
         id: playwright-cache
         uses: actions/cache@v6
         with:
@@ -393,7 +362,6 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
 
       - name: Install Playwright browsers
-        if: steps.tagged.outputs.found == 'true'
         env:
           CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
         run: |
@@ -404,15 +372,14 @@ jobs:
           fi
 
       - name: Run the quarantined tests
-        if: steps.tagged.outputs.found == 'true'
         run: npm run test:e2e:chromium -- --grep @quarantine --pass-with-no-tests
 
       - name: List tests that passed only on retry
-        if: ${{ !cancelled() && steps.tagged.outputs.found == 'true' }}
+        if: ${{ !cancelled() }}
         run: node scripts/e2e-retry-report.mjs
 
       - name: Upload Playwright report
-        if: ${{ !cancelled() && steps.tagged.outputs.found == 'true' }}
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report-quarantine
@@ -421,24 +388,27 @@ jobs:
 
   frontend-test:
     # The required check. It passes when every frontend job passed, with E2E allowed to be
-    # skipped on a backend-only change; anything else fails it.
+    # skipped on a backend-only change, and the merged unit-test coverage meets the thresholds
+    # in vite.config.ts; anything else fails it.
     name: Frontend Tests
-    needs: [changes, frontend-checks, frontend-unit, frontend-coverage, frontend-e2e]
+    needs: [changes, frontend-checks, frontend-unit, frontend-e2e]
     if: ${{ always() }}
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
     steps:
       - name: Check the frontend jobs
+        working-directory: .
         env:
           CHANGES: ${{ needs.changes.result }}
           FRONTEND: ${{ needs.changes.outputs.frontend }}
           E2E: ${{ needs.frontend-e2e.result }}
-          RESULTS: >-
-            ${{ needs.frontend-checks.result }} ${{ needs.frontend-unit.result }}
-            ${{ needs.frontend-coverage.result }}
+          RESULTS: ${{ needs.frontend-checks.result }} ${{ needs.frontend-unit.result }}
         run: |
           for result in $CHANGES $RESULTS; do
             if [ "$result" != success ]; then
-              echo "Detect changes: $CHANGES. Checks, unit tests, coverage: $RESULTS."
+              echo "Detect changes: $CHANGES. Checks, unit tests: $RESULTS."
               exit 1
             fi
           done
@@ -450,6 +420,29 @@ jobs:
             echo "Frontend E2E: $E2E"
             exit 1
           fi
+
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download the shard reports
+        uses: actions/download-artifact@v7
+        with:
+          pattern: vitest-blob-*
+          path: frontend/.vitest/blob
+          merge-multiple: true
+
+      - name: Merge the shards and check the coverage thresholds
+        run: npx vitest --merge-reports=.vitest/blob --coverage
 
   web-vitals:
     name: Web Vitals
@@ -534,6 +527,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
     strategy:
       fail-fast: true
       matrix:
@@ -590,6 +584,33 @@ jobs:
           RUNTIME: ${{ matrix.image == 'backend' && 'bun' || 'node' }}
           ARCH: ${{ matrix.arch == 'amd64' && 'x64' || 'arm64' }}
         run: docker run --rm "$REF" "$RUNTIME" -e "if (process.arch !== '$ARCH') process.exit(1)"
+
+      # Pinned by commit, not tag: this action's tags were once rewritten in a supply-chain attack.
+      - name: Scan the image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          format: sarif
+          output: trivy.sarif
+          severity: HIGH,CRITICAL
+          limit-severities-for-sarif: true
+          ignore-unfixed: true
+
+      - name: Upload the scan to code scanning
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy.sarif
+          category: image-${{ matrix.image }}-${{ matrix.arch }}
+
+      # Runs before the digest is recorded, so a fixable critical issue publishes no tag.
+      - name: Fail on fixable critical issues
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          skip-setup-trivy: true
 
       - name: Record the digest
         env:

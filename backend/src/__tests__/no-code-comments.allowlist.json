@@ -191,9 +191,9 @@
   "backend/src/db/__tests__/migration-general.test.ts: Frozen: the migrator replays entries whose `when` exceeds the newest recorded one, so shipped rows must not change.",
   "backend/src/db/__tests__/migration-general.test.ts: Type drift makes drizzle-kit emit a table rebuild that drops rows; index drift emits a CREATE INDEX that fails on existing installs.",
   "backend/src/db/__tests__/migration-helpers.ts: drizzle-kit sorts snapshot names and diffs against the last one, so this order is load-bearing.",
+  "backend/src/db/connection.ts: bun:sqlite transactions must use a synchronous callback: an awaited statement autocommits on its own.",
   "backend/src/db/dialect/index.ts: Timestamp columns store Unix seconds. 'unixepoch' is required, or SQLite reads the value as a Julian day.",
   "backend/src/db/dialect/index.ts: bun:sqlite sets `code`; drizzle may wrap the driver error, so the cause chain is walked too.",
-  "backend/src/db/connection.ts: bun:sqlite transactions must use a synchronous callback: an awaited statement autocommits on its own.",
   "backend/src/db/schema.ts: Every route that reads a shared vehicle must go through utils/vehicle-access.ts.",
   "backend/src/db/schema.ts: PRAGMA foreign_keys is a no-op inside the migrator's transaction, so table rebuilds must go child-first.",
   "backend/src/db/schema.ts: SQLite treats NULLs as distinct in a UNIQUE index, so mileage rows (null dueDate) are not constrained here.",
@@ -307,6 +307,7 @@
   "frontend/src/routes/settings/+page.svelte: Leave the list empty; the page already renders its empty state.",
   "frontend/src/routes/vehicles/[id]/odometer/new/+page.svelte: The soft warning is optional; ignore failures.",
   "frontend/src/service-worker/index.ts: No sync listener: the offline outbox lives in localStorage, which workers cannot read.",
+  "frontend/vite.config.ts: shortcut: LayerChart needs only geoPath (for map projections VROOM never draws) and one colour scheme, so these stand-ins keep 14 KB of d3-geo and d3-scale-chromatic off the charts; drop an alias before using geo charts or another scheme.",
   "frontend/vite.config.ts: Vitest's default conditions omit 'browser'; without it inlined svelte loads its server entry, where mount() throws.",
   "frontend/vite.config.ts: Without strictPort a busy port silently shifts, leaving callers waiting on the pinned one.",
   "frontend/vite.config.ts: withPwa appends a prerendered/ pattern that this app never matches; strict globbing would fail the build."

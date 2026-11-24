@@ -1,4 +1,4 @@
-import { classifyDbError, isDriverError } from './db/dialect';
+import { classifyDbError } from './db/dialect';
 
 export class AppError extends Error {
   public readonly statusCode: number;
@@ -185,8 +185,6 @@ const ERROR_STATUS_MAP: Record<string, number> = {
 export function isUniqueConstraintError(err: unknown): boolean {
   return classifyDbError(err) === 'unique';
 }
-
-export const isSqliteError = (err: unknown): boolean => isDriverError(err);
 
 export const handleDatabaseError = (error: unknown): AppError => {
   switch (classifyDbError(error)) {

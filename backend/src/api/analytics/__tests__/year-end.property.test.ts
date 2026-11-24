@@ -30,6 +30,7 @@ function resetDb(): void {
   testDb.sqlite.run('DELETE FROM expenses');
   testDb.sqlite.run('DELETE FROM vehicles');
   testDb.sqlite.run('DELETE FROM users');
+  repo = new AnalyticsRepository(testDb.drizzle);
 }
 
 function setupUserAndVehicle(): { userId: string; vehicle: TestVehicle } {

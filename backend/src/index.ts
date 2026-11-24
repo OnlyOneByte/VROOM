@@ -6,7 +6,7 @@ import './api/sync/init';
 import { prepareDemoGarage } from './api/auth/demo';
 import { discoverOidc } from './api/auth/providers/oidc';
 import { CONFIG } from './config';
-import { checkpointWAL, forceCheckpointWAL, runMigrations } from './db/connection';
+import { runMigrations, startWalCheckpoints } from './db/connection';
 import { validateTrustedProxies } from './utils/client-ip';
 import { extractErrorMessage } from './utils/error-handling';
 import { logger } from './utils/logger';
@@ -70,16 +70,11 @@ try {
   });
 }
 
-const checkpointInterval = setInterval(
-  () => {
-    checkpointWAL();
-  },
+const stopWalCheckpoints = startWalCheckpoints(
   CONFIG.env === 'development'
     ? CONFIG.database.checkpointIntervalDev
     : CONFIG.database.checkpointIntervalProd
 );
-
-forceCheckpointWAL();
 
 startSyncWorker();
 
@@ -95,9 +90,7 @@ const shutdown = (signal: string) => {
   stopSyncWorker();
   stopCommunityStatsJob();
 
-  clearInterval(checkpointInterval);
-
-  forceCheckpointWAL();
+  stopWalCheckpoints?.();
 
   process.exit(0);
 };

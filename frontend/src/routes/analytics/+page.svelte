@@ -9,7 +9,6 @@
 	import * as Tabs from '#lib/components/ui/tabs/index.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
-	import FuelStatsTab from '#lib/components/analytics/fuel/FuelStatsTab.svelte';
 	import AnalyticsFilterBar from '#lib/components/analytics/AnalyticsFilterBar.svelte';
 	import {
 		DEFAULT_RANGE,
@@ -346,16 +345,22 @@
 				</Tabs.Content>
 			{:else if activeTab === 'fuel-stats'}
 				<Tabs.Content value="fuel-stats">
-					<FuelStatsTab
-						{fuelStats}
-						{fuelAdvanced}
-						{vehicleColors}
-						previousPeriodLabel={previousPeriodLabel(filters)}
-						{dateRange}
-						{vehicleIds}
-						filterLabel={filtered ? filterLabel : undefined}
-						onClearFilters={filtered ? clearFilters : undefined}
-					/>
+					{#await import('#lib/components/analytics/fuel/FuelStatsTab.svelte')}
+						<div class="flex justify-center p-8">
+							<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+						</div>
+					{:then { default: FuelStatsTab }}
+						<FuelStatsTab
+							{fuelStats}
+							{fuelAdvanced}
+							{vehicleColors}
+							previousPeriodLabel={previousPeriodLabel(filters)}
+							{dateRange}
+							{vehicleIds}
+							filterLabel={filtered ? filterLabel : undefined}
+							onClearFilters={filtered ? clearFilters : undefined}
+						/>
+					{/await}
 				</Tabs.Content>
 			{:else if activeTab === 'cross-vehicle'}
 				<Tabs.Content value="cross-vehicle">

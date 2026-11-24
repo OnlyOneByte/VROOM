@@ -40,6 +40,26 @@ function nodeImports(index) {
 	return JSON.parse(match[1]);
 }
 
+const viteManifest = JSON.parse(readFileSync(join(output, 'client/.vite/manifest.json'), 'utf8'));
+
+function chunkGraph(source) {
+	if (!viteManifest[source]) {
+		console.error(
+			`bundle-budget: firstView names ${source}, which is not a chunk in this build. Update bundle-budgets.json.`
+		);
+		process.exit(1);
+	}
+	const files = new Set();
+	const visit = key => {
+		const entry = viteManifest[key];
+		if (!entry || files.has(entry.file)) return;
+		files.add(entry.file);
+		for (const dependency of entry.imports ?? []) visit(dependency);
+	};
+	visit(source);
+	return files;
+}
+
 const total = files => [...files].reduce((sum, file) => sum + gzipSize(file), 0);
 const kb = bytes => bytes / 1024;
 
@@ -63,6 +83,9 @@ for (const route of manifest.routes) {
 	for (const index of [...route.page.layouts, route.page.leaf]) {
 		if (index === undefined) continue;
 		for (const file of nodeImports(index)) if (!shared.has(file)) files.add(file);
+	}
+	for (const source of budgets.firstView?.[route.id] ?? []) {
+		for (const file of chunkGraph(source)) if (!shared.has(file)) files.add(file);
 	}
 	rows.push({
 		route: route.id,
