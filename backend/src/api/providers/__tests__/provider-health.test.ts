@@ -257,7 +257,7 @@ describe('POST /providers/:id/test works for every capability', () => {
     }
   });
 
-  test('a config the server refuses answers 400 and is recorded as config', async () => {
+  test('an endpoint the server refuses answers 400 and is recorded as an endpoint problem', async () => {
     const { encrypt } = await import('../../../utils/encryption');
     ctx.sqlite.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
@@ -274,7 +274,7 @@ describe('POST /providers/:id/test works for every capability', () => {
     );
     const res = await ctx.authed('POST', '/api/v1/providers/s-bad/test');
     expect(res.status).toBe(400);
-    expect(statusOf('s-bad')).toMatchObject({ last_error_code: 'config', failure_count: 1 });
+    expect(statusOf('s-bad')).toMatchObject({ last_error_code: 'endpoint', failure_count: 1 });
   });
 
   test('sign-in providers cannot be tested', async () => {

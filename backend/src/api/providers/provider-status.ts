@@ -3,12 +3,13 @@ import { getDb } from '../../db/connection';
 import { type UserProvider, userProviders } from '../../db/schema';
 import { isSyncError, SyncErrorCode, ValidationError } from '../../errors';
 import { decrypt, secretContextOf } from '../../utils/encryption';
+import { EndpointNotAllowedError } from '../../utils/outbound-url';
 import { LLM_PROVIDERS } from './domains/llm/registry';
 import { resolveModelSettings } from './domains/model/model-registry';
 import { getStorageProviderRegistry } from './domains/storage/registry';
 import { credentialFailureOf } from './domains/storage/storage-provider';
 
-export type HealthCode = 'auth' | 'permission' | 'unreachable' | 'config';
+export type HealthCode = 'auth' | 'permission' | 'unreachable' | 'config' | 'endpoint';
 
 export interface HealthResult {
   ok: boolean;
@@ -56,6 +57,8 @@ const HEALTH_MESSAGES: Record<HealthCode, string> = {
     "The provider is connected but isn't allowed to do this. Reconnect it and grant access.",
   unreachable: "Couldn't reach the provider. Check its address and your network, then test again.",
   config: 'The provider settings are incomplete or invalid. Edit them, then test again.',
+  endpoint:
+    "This server only lets providers reach public https:// addresses. Change the provider's address, then test again.",
 };
 
 export function healthFailure(code: HealthCode): HealthResult {
@@ -68,6 +71,7 @@ export function healthCodeOf(error: unknown): HealthCode {
     return credentialFailure.code === SyncErrorCode.PERMISSION_DENIED ? 'permission' : 'auth';
   }
   if (isSyncError(error)) return 'unreachable';
+  if (error instanceof EndpointNotAllowedError) return 'endpoint';
   if (error instanceof ValidationError) return 'config';
   const message = error instanceof Error ? error.message : '';
   if (/HTTP 401\b/.test(message)) return 'auth';

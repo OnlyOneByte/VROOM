@@ -17,6 +17,7 @@ import {
 } from '../../../test-helpers/outbound';
 import { encrypt } from '../../../utils/encryption';
 import {
+  EndpointNotAllowedError,
   outboundResolver,
   privateEndpointPolicyFor,
   urlForAddress,
@@ -24,6 +25,7 @@ import {
 import { resolveModelSettings } from '../domains/model/model-registry';
 import { postModelJson } from '../domains/model/model-transport';
 import { s3RequestHandler, s3RequestHandlerFor } from '../domains/storage/s3-compat-provider';
+import { healthCodeOf } from '../provider-status';
 
 let ctx: TestApp;
 const stubLookup = outboundResolver.lookup;
@@ -184,6 +186,17 @@ describe('provider endpoints with private endpoints blocked', () => {
     const id = insertStoredS3Provider('http://192.168.1.20:9000');
     const res = await ctx.authed('POST', `/api/v1/providers/${id}/test`);
     expect(res.status).toBe(400);
+  });
+
+  test('the refusal is recorded as an endpoint problem, so Settings can say why', async () => {
+    const id = insertStoredS3Provider('http://192.168.1.20:9000');
+    await ctx.authed('POST', `/api/v1/providers/${id}/test`);
+    const listed = (await (await ctx.authed('GET', '/api/v1/providers?domain=storage')).json()) as {
+      data: { id: string; lastErrorCode: string | null }[];
+    };
+    expect(listed.data.find((p) => p.id === id)?.lastErrorCode).toBe('endpoint');
+    expect(healthCodeOf(new EndpointNotAllowedError('x'))).toBe('endpoint');
+    expect(healthCodeOf(new ValidationError('x'))).toBe('config');
   });
 });
 
