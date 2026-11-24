@@ -7,6 +7,9 @@ export interface ReceiptDraft {
 	odometer?: number;
 	category?: ExpenseCategory;
 	vendor?: string;
+	volume?: number;
+	volumeUnit?: 'gallons_us' | 'liters';
+	pricePerUnit?: number;
 }
 
 export const vlmApi = {
