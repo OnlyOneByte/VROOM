@@ -1,5 +1,7 @@
 import { browser } from '$app/env';
 
+const DRAW_SHARE = 0.25;
+
 function findHiddenAncestor(el: HTMLElement): HTMLElement | null {
 	let current: HTMLElement | null = el;
 	while (current) {
@@ -8,8 +10,6 @@ function findHiddenAncestor(el: HTMLElement): HTMLElement | null {
 	}
 	return null;
 }
-
-const DRAW_SHARE = 0.25;
 
 function isElementHidden(el: HTMLElement): boolean {
 	return el.offsetParent === null;
@@ -21,7 +21,7 @@ export interface VisibilityWatchResult {
 	get visible(): boolean;
 }
 
-export function createVisibilityWatch(): VisibilityWatchResult {
+export function createVisibilityWatch(share = DRAW_SHARE): VisibilityWatchResult {
 	let el = $state<HTMLDivElement | undefined>();
 	let visible = $state(false);
 	let hasBeenVisible = false;
@@ -60,17 +60,13 @@ export function createVisibilityWatch(): VisibilityWatchResult {
 		intersectionObserver = new IntersectionObserver(
 			entries => {
 				for (const entry of entries) {
-					if (
-						entry.isIntersecting &&
-						entry.intersectionRatio >= DRAW_SHARE &&
-						!isElementHidden(node)
-					) {
+					if (entry.isIntersecting && entry.intersectionRatio >= share && !isElementHidden(node)) {
 						visible = true;
 						hasBeenVisible = true;
 					}
 				}
 			},
-			{ threshold: DRAW_SHARE }
+			{ threshold: share }
 		);
 		intersectionObserver.observe(node);
 

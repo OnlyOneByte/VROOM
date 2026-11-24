@@ -332,7 +332,9 @@ test.describe('Analytics', () => {
 		await page
 			.getByRole('heading', { name: 'Total cost per month by car' })
 			.scrollIntoViewIfNeeded();
-		const chart = page.getByRole('img', { name: /Total cost per month by car/ });
+		const chart = page
+			.getByRole('img', { name: /Total cost per month by car/ })
+			.and(page.locator('[tabindex="0"]'));
 		await chart.focus();
 		await page.keyboard.press('ArrowRight');
 		await page.keyboard.press('Enter');
