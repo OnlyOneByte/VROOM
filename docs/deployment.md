@@ -490,6 +490,35 @@ removing `default` turns it off.
 | [Oracle Cloud Free Tier](oci/README.md) | free | ARM VM up to 4 OCPU / 24GB RAM — [full guide](oci/README.md) |
 | Synology / QNAP NAS | free | Docker via Package Center |
 
+## Calendar links
+
+Each user can create a private calendar link in Settings → Calendar, which Google, Apple and Outlook Calendar subscribe to. The link carries a long random secret in its path (`/api/v1/calendar/feed/<secret>.ics`); anyone holding it can read that user's feed until they replace or turn it off. VROOM stores only a hash of the secret and prints the path with the secret replaced by `[redacted]` in its own request log.
+
+**Your reverse proxy logs the full URL**, secret included, unless you filter it. Calendar apps fetch the link from their own servers every few hours, so the access log fills with working links. Filter the path out before it is written:
+
+- **Caddy:**
+
+  ```caddyfile
+  log {
+      format filter {
+          request>uri regexp ^(/api/v1/calendar/feed/)[^/?]+ ${1}[redacted]
+      }
+  }
+  ```
+
+- **nginx** (in the `http` block, then use the format in `access_log`):
+
+  ```nginx
+  map $request_uri $vroom_logged_uri {
+      ~^(?<feed>/api/v1/calendar/feed/)[^/?]+ "${feed}[redacted]";
+      default $request_uri;
+  }
+  log_format vroom '$remote_addr - [$time_local] "$request_method $vroom_logged_uri" $status $body_bytes_sent';
+  access_log /var/log/nginx/access.log vroom;
+  ```
+
+- **Cloudflare Tunnel:** Cloudflare's own request logs (if you enable Logpush) include the path; exclude `/api/v1/calendar/feed/` there or accept that Cloudflare sees the links.
+
 ## Security Checklist
 
 - [ ] HTTPS in front of the app — the production session cookie is `Secure`, so login fails without it
@@ -500,3 +529,4 @@ removing `default` turns it off.
 - [ ] `TRUSTED_PROXY_IPS` set when behind a proxy, so rate limits key on real client IPs
 - [ ] Images updated
 - [ ] Backups configured
+- [ ] Reverse proxy access logs filter calendar links (see [Calendar links](#calendar-links))

@@ -10,6 +10,10 @@ export function getApiBaseUrl(): string {
 	return `${PUBLIC_API_URL}${API_PREFIX}`;
 }
 
+export function absoluteApiUrl(path: string): string {
+	return new URL(`${getApiBaseUrl()}${path}`, window.location.origin).href;
+}
+
 const SELF_REPORTED_401_PATHS = [`${API_PREFIX}/auth/me`, `${API_PREFIX}/auth/refresh`];
 const SESSION_EXPIRY_WINDOW_MS = 1000;
 const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please sign in again.';

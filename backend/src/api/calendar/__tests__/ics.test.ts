@@ -39,6 +39,12 @@ describe('toIcs', () => {
     expect(ics.match(/^BEGIN:VEVENT$/gm)).toHaveLength(1);
   });
 
+  test('a bare carriage return is escaped like any other line break', () => {
+    const ics = toIcs([{ uid: 'u', date: '2026-12-01', summary: 'A\rBEGIN:VEVENT\rB' }], NOW);
+    expect(ics).toContain('SUMMARY:A\\nBEGIN:VEVENT\\nB\r\n');
+    expect(ics.split(/\r\n|\r|\n/).filter((l) => l === 'BEGIN:VEVENT')).toHaveLength(1);
+  });
+
   test('folds lines longer than 75 octets without splitting a character', () => {
     const ics = toIcs([{ uid: 'u', date: '2026-12-01', summary: 'é'.repeat(60) }], NOW);
     const lines = ics.split('\r\n');
@@ -67,6 +73,23 @@ describe('paymentDates', () => {
       d.toISOString().slice(0, 10)
     );
     expect(days).toEqual(['2026-01-31', '2026-02-28', '2026-03-31']);
+  });
+
+  test('a payment day later in the month than the start keeps the last payment', () => {
+    const loan = {
+      startDate: new Date('2026-01-05T12:00:00Z'),
+      termMonths: 12,
+      paymentDayOfMonth: 20,
+      endDate: null,
+      paymentFrequency: 'monthly',
+    };
+    const days = paymentDates(
+      loan,
+      new Date('2026-01-01T00:00:00Z'),
+      new Date('2027-12-31T00:00:00Z')
+    );
+    expect(days).toHaveLength(12);
+    expect(days.at(-1)?.toISOString().slice(0, 10)).toBe('2027-01-20');
   });
 
   test('payments stop at the end of the term', () => {

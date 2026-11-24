@@ -9,7 +9,7 @@ import { routes as analyticsRoutes } from './api/analytics/routes';
 import { routes as assistantRoutes } from './api/assistant/routes';
 import { DEMO_USER_ID, demoGuard } from './api/auth/demo';
 import { routes as authRoutes } from './api/auth/routes';
-import { routes as calendarRoutes } from './api/calendar/routes';
+import { routes as calendarRoutes, redactFeedTokens } from './api/calendar/routes';
 import { routes as communityRoutes } from './api/community/routes';
 import { routes as expenseRoutes } from './api/expenses/routes';
 import { routes as financingRoutes } from './api/financing/routes';
@@ -58,6 +58,11 @@ const largerBodyLimits = new Map(
 app.use('/api/*', compress());
 
 app.use('*', (c, next) => (largerBodyLimits.get(c.req.path) ?? globalBodyLimit)(c, next));
+
+app.use('/api/v1/calendar/feed/:file', async (c, next) => {
+  await next();
+  c.res.headers.set('Referrer-Policy', 'no-referrer');
+});
 
 app.use(
   '*',
@@ -116,9 +121,7 @@ app.use(
 
 app.use(
   '*',
-  honoLogger((line, ...rest) =>
-    console.log(line.replace(/(\/calendar\/feed\/)[^/\s]+\.ics/, '$1[redacted].ics'), ...rest)
-  )
+  honoLogger((line, ...rest) => console.log(redactFeedTokens(line), ...rest))
 );
 
 if (CONFIG.env === 'development') {
@@ -165,7 +168,10 @@ app.use('/api/*', async (c, next) => {
   }
 
   const newPath = path.replace('/api/', '/api/v1/');
-  logger.debug('Redirecting to versioned API', { from: path, to: newPath });
+  logger.debug('Redirecting to versioned API', {
+    from: redactFeedTokens(path),
+    to: redactFeedTokens(newPath),
+  });
   return c.redirect(newPath, 308);
 });
 
