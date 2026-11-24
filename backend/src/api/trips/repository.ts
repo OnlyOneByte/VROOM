@@ -23,6 +23,11 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
     super(db, trips);
   }
 
+  async findById(id: string): Promise<Trip | null> {
+    const [row] = await this.db.select().from(trips).where(eq(trips.id, id)).limit(1);
+    return row ?? null;
+  }
+
   async findByIdAndUserId(id: string, userId: string): Promise<Trip | null> {
     const [row] = await this.db
       .select()

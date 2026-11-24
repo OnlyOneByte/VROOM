@@ -3,9 +3,15 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { NotFoundError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
+import { authorize, ownAccount } from '../../permissions/authorize';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas, zValidator } from '../../utils/validation';
-import { parseUploadedPhoto, photoThumbnailResponse } from './helpers';
+import {
+  fromPhotoEntity,
+  parseUploadedPhoto,
+  photoThumbnailResponse,
+  withPhotoAuthor,
+} from './helpers';
 import {
   countOrphanedPhotos,
   deletePhotoForEntity,
@@ -26,6 +32,7 @@ routes.use('*', changeTracker);
 routes.get(
   '/',
   zValidator('query', z.object({ entityType: z.string().min(1).max(64) })),
+  authorize(ownAccount),
   async (c) => {
     const { entityType } = c.req.valid('query');
     const user = c.get('user');
@@ -34,35 +41,40 @@ routes.get(
   }
 );
 
-routes.get('/orphans', async (c) => {
+routes.get('/orphans', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const count = await countOrphanedPhotos(user.id);
   return c.json({ success: true, data: { count } });
 });
 
-routes.delete('/orphans', async (c) => {
+routes.delete('/orphans', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const result = await removeOrphanedPhotos(user.id);
   return c.json({ success: true, data: result });
 });
 
-routes.get('/:entityType/:entityId', zValidator('query', commonSchemas.pagination), async (c) => {
-  const entityType = c.req.param('entityType');
-  const entityId = c.req.param('entityId');
-  if (!entityType || !entityId) throw new NotFoundError('Entity');
+routes.get(
+  '/:entityType/:entityId',
+  zValidator('query', commonSchemas.pagination),
+  authorize(fromPhotoEntity),
+  async (c) => {
+    const entityType = c.req.param('entityType');
+    const entityId = c.req.param('entityId');
+    if (!entityType || !entityId) throw new NotFoundError('Entity');
 
-  const { limit, offset } = c.req.valid('query');
-  const user = c.get('user');
-  const result = await listPhotosForEntity(entityType, entityId, user.id, { limit, offset });
-  return c.json(buildPaginatedResponse(result.data, result.totalCount, limit, offset));
-});
+    const { limit, offset } = c.req.valid('query');
+    const user = c.get('user');
+    const result = await listPhotosForEntity(entityType, entityId, user.id, { limit, offset });
+    return c.json(buildPaginatedResponse(result.data, result.totalCount, limit, offset));
+  }
+);
 
 const photoUploadLimiter = rateLimiter({
   ...CONFIG.rateLimit.photoUpload,
   keyGenerator: (c) => `photoUpload:${c.get('user').id}`,
 });
 
-routes.post('/:entityType/:entityId', photoUploadLimiter, async (c) => {
+routes.post('/:entityType/:entityId', photoUploadLimiter, authorize(fromPhotoEntity), async (c) => {
   const entityType = c.req.param('entityType');
   const entityId = c.req.param('entityId');
   if (!entityType || !entityId) throw new NotFoundError('Entity');
@@ -74,7 +86,7 @@ routes.post('/:entityType/:entityId', photoUploadLimiter, async (c) => {
   return c.json({ success: true, data: photo }, 201);
 });
 
-routes.get('/:entityType/:entityId/:photoId/thumbnail', async (c) => {
+routes.get('/:entityType/:entityId/:photoId/thumbnail', authorize(fromPhotoEntity), async (c) => {
   const entityType = c.req.param('entityType');
   const entityId = c.req.param('entityId');
   const photoId = c.req.param('photoId');
@@ -107,15 +119,19 @@ routes.get('/:entityType/:entityId/:photoId/thumbnail', async (c) => {
   return response;
 });
 
-routes.delete('/:entityType/:entityId/:photoId', async (c) => {
-  const entityType = c.req.param('entityType');
-  const entityId = c.req.param('entityId');
-  const photoId = c.req.param('photoId');
-  if (!entityType || !entityId || !photoId) throw new NotFoundError('Photo');
+routes.delete(
+  '/:entityType/:entityId/:photoId',
+  authorize(withPhotoAuthor(fromPhotoEntity)),
+  async (c) => {
+    const entityType = c.req.param('entityType');
+    const entityId = c.req.param('entityId');
+    const photoId = c.req.param('photoId');
+    if (!entityType || !entityId || !photoId) throw new NotFoundError('Photo');
 
-  const user = c.get('user');
-  await deletePhotoForEntity(entityType, entityId, photoId, user.id);
-  return c.body(null, 204);
-});
+    const user = c.get('user');
+    await deletePhotoForEntity(entityType, entityId, photoId, user.id);
+    return c.body(null, 204);
+  }
+);
 
 export { routes };

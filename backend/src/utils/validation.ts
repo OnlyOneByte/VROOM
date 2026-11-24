@@ -4,9 +4,8 @@ import type { ZodError, ZodType } from 'zod';
 import { z } from 'zod';
 import { financingRepository } from '../api/financing/repository';
 import { insurancePolicyRepository } from '../api/insurance/repository';
-import { tripRepository } from '../api/trips/repository';
 import { CONFIG } from '../config';
-import type { InsurancePolicy, Trip, VehicleFinancing } from '../db/schema';
+import type { InsurancePolicy, VehicleFinancing } from '../db/schema';
 import { isElectricFuelType } from '../db/types';
 import { createErrorResponse, NotFoundError, ValidationError } from '../errors';
 import { formatNumberForMessage } from './money';
@@ -120,14 +119,6 @@ export async function validateInsuranceOwnership(
   }
 
   return insurance;
-}
-
-export async function validateTripOwnership(tripId: string, userId: string): Promise<Trip> {
-  const trip = await tripRepository.findByIdAndUserId(tripId, userId);
-  if (!trip) {
-    throw new NotFoundError('Trip');
-  }
-  return trip;
 }
 
 export function validateFuelExpenseData(

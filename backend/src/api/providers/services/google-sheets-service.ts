@@ -154,6 +154,7 @@ export const SHEET_HEADERS = {
     'fileSize',
     'isCover',
     'sortOrder',
+    'createdBy',
     'createdAt',
   ],
   photoRefs: [
@@ -238,6 +239,7 @@ export const SHEET_HEADERS = {
     'startLocation',
     'endLocation',
     'note',
+    'createdBy',
     'createdAt',
     'updatedAt',
   ],

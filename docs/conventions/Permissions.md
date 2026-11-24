@@ -3,7 +3,7 @@
 Every action in VROOM is a permission: a string such as `vehicle.expense.write` or
 `account.backup.run`. A feature declares its permissions in one `capabilities.ts` next to its
 routes, and maps each of its routes to one of them. Routes moved behind `authorize()` (expenses,
-odometer, reminders, role assignments and overrides so far) are enforced from the route map at runtime; the rest are
+odometer, reminders, trips, photos, role assignments and overrides so far) are enforced from the route map at runtime; the rest are
 still authorized by `requireAuth` and `requireVehicleAccess`, with the map in report mode.
 
 ## Permission ids
@@ -138,8 +138,9 @@ Every route mounted in `src/app.ts` has one entry in `ROUTE_PERMISSIONS`
 - Pick the permission the handler needs today. A handler that calls
   `requireVehicleAccess(id, user.id, 'write')` on an expense maps to `vehicle.expense.write`.
 - A delete route maps to `<resource>.delete`; when its resource resolver supplies the entry's
-  author, `delete_own` covers the actor's own entries. Expenses, odometer readings and reminders
-  record `created_by` (null when the owner added it) for this.
+  author, `delete_own` covers the actor's own entries. Expenses, odometer readings, reminders,
+  trips and photos record `created_by` (null when the owner added it) for this, and a restore
+  keeps it only while that person is a member of every car the entry covers.
 - `{ byScope: { server, vehicle } }` picks the permission by the request's scope (role
   assignments and overrides), and `{ byEntity: { <entityType>: [...] } }` requires every listed
   permission for that entity type (photos of policies and claims also need insurance access).
