@@ -42,7 +42,8 @@ Examples in [`docs/examples/`](examples/):
 | File | Contents |
 |---|---|
 | `docker-compose.yml` | backend, frontend, Cloudflare Tunnel; healthchecks; `DATA_PATH` bind mount |
-| `portainer-stack.yml` | the same three plus Tugtainer (auto-updater); named volume, no `DATA_PATH` |
+| `portainer-stack.yml` | the same three plus Tugtainer (auto-updater, dashboard on loopback only); named volume, no `DATA_PATH` |
+| `docker-compose.litestream.yml` + `litestream.yml` | add-on for `docker-compose.yml`: streams the database to an S3-compatible bucket (see [Continuous backups with Litestream](#continuous-backups-with-litestream)) |
 | `.env.example` | variable template |
 
 ## Environment Variables
@@ -64,7 +65,8 @@ The backend logs the missing names and exits at startup without these.
 | `PROVIDER_ENCRYPTION_KEY` | Exactly 64 hex chars. `openssl rand -hex 32` |
 
 `PROVIDER_ENCRYPTION_KEY` is the AES-256-GCM key for stored provider credentials (Drive/Sheets
-refresh tokens, S3 keys, LLM keys). Back it up with the database — if it changes, those
+refresh tokens, S3 keys, LLM keys). Back it up, and keep that copy apart from the database backups so
+a leaked backup can't be decrypted — if it changes, those
 credentials no longer decrypt and every provider must be reconnected. Both example stacks pass
 it through and `docs/examples/.env.example` carries a placeholder that fails the format check,
 so an unedited copy exits with the variable named instead of encrypting with a published key.
@@ -96,6 +98,7 @@ These have defaults, but the defaults only suit localhost.
 | `HOST` | `127.0.0.1` | Address the backend binds. The default is loopback only, so a direct install is not exposed until you say so; containers need `0.0.0.0` (both Dockerfiles and example stacks set it). The backend exits naming `HOST` if this machine has no such address |
 | `DATABASE_URL` | `./data/vroom.db` | SQLite file. Both Dockerfiles and example stacks set `/app/data/vroom.db` |
 | `DATA_PATH` | `./data` | Host directory bind-mounted at `/app/data` by `docker-compose.yml`. Must exist |
+| `WAL_CHECKPOINTS` | `on` | `off` stops the backend's own WAL checkpoints (every 15 minutes, at start and at shutdown), so a replication tool such as Litestream can own them. Leave it `on` without one |
 | `LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug` |
 | `TRUSTED_PROXY_IPS` | empty | Comma-separated proxy IPs or CIDR ranges whose `X-Forwarded-For` is honored. It is read from the right: the nearest address that is not a trusted proxy is the client, so an entry a client added itself is ignored. Left unset behind a reverse proxy, every anonymous request shares one rate-limit bucket keyed on the proxy's IP. An invalid entry stops the backend at startup |
 | `TRUSTED_CLIENT_IP_HEADER` | empty | A header a trusted proxy sets to the client IP, such as `CF-Connecting-IP`. Read only when the request comes from a `TRUSTED_PROXY_IPS` address, and before `X-Forwarded-For` |
@@ -435,6 +438,51 @@ Deleting the stale `-wal`/`-shm` matters: left behind, they belong to the replac
 
 In-app restore from a Drive ZIP or Google Sheets lives in Settings → Storage Providers → Restore.
 
+### Continuous backups with Litestream
+
+[Litestream](https://litestream.io) copies every change to the database to an S3-compatible
+bucket within seconds, so a lost disk costs seconds of data, not a day. Cloudflare R2's free tier
+covers a typical instance.
+
+1. Create a bucket and an API token that can read and write only that bucket.
+2. Copy `docs/examples/docker-compose.litestream.yml` and `docs/examples/litestream.yml` next to
+   your `docker-compose.yml`, and add to `.env`:
+
+   ```env
+   LITESTREAM_ACCESS_KEY_ID=...
+   LITESTREAM_SECRET_ACCESS_KEY=...
+   LITESTREAM_BUCKET=vroom-backups
+   LITESTREAM_ENDPOINT=https://<account id>.r2.cloudflarestorage.com
+   ```
+
+3. Start both files together:
+   `docker compose -f docker-compose.yml -f docker-compose.litestream.yml up -d`.
+
+The add-on sets `WAL_CHECKPOINTS=off` on the backend: Litestream needs to be the only process
+that checkpoints the WAL, or it has to start a fresh snapshot. With it, stopping the backend no
+longer checkpoints either; Litestream carries the WAL. Keep `PROVIDER_ENCRYPTION_KEY` out of the
+bucket, in a password manager: a copy of the database without it can't decrypt anyone's provider
+credentials, and losing it means everyone reconnects their providers.
+
+### Restore drill
+
+Do this once when you set Litestream up, and then monthly. It never touches the running instance.
+
+```bash
+mkdir -p drill
+docker run --rm -v "$PWD/litestream.yml:/etc/litestream.yml:ro" -v "$PWD/drill:/out" \
+  --env-file .env litestream/litestream:0.3.13 \
+  restore -o /out/vroom.db /data/vroom.db
+docker run -d --rm --name vroom-drill -p 127.0.0.1:3091:3001 -v "$PWD/drill:/app/data" \
+  --env-file .env ghcr.io/onlyonebyte/vroom/backend:latest
+sleep 10 && curl http://127.0.0.1:3091/health
+docker stop vroom-drill && rm -rf drill
+```
+
+A `200` from `/health` means the restored file opens and migrates. To check the data itself before
+the `docker stop`, compare `sqlite3 drill/vroom.db 'select count(*) from expenses'` with the live
+instance. The drill backend is published on loopback only and never on the live port.
+
 ## Community stats
 
 With `COMMUNITY_STATS=local`, which is the default, a background job runs once a day. It turns the data of users who opted in into anonymous group averages and stores them in the `community_stats` table, where opted-in users can compare their own vehicles against them. Nothing leaves the server and no outbound request is made.
@@ -464,6 +512,10 @@ docker compose logs -f backend
 docker stats vroom-backend vroom-frontend
 curl http://localhost:3001/health
 ```
+
+`/health` answers `200` with `"status": "ok"` when the backend can query its database, and `503`
+with `"status": "unavailable"` when it can't, so the container healthcheck and any uptime monitor
+see a broken database as down.
 
 ### Updates
 
@@ -569,10 +621,49 @@ Every signed-in user has these limits on the routes that cost the server the mos
 
 A CSV import (not a preview) and a restore are heavy jobs: each user runs one at a time (429 for a second), and the whole server runs at most 2 at once (503 with `Retry-After` over that), so a few large uploads can't exhaust the server's memory. The limits are in memory, per backend process.
 
+## Public instance
+
+What changes when people other than you can reach and sign in to the server, whether it's a VPS
+or a home server you share:
+
+- **Reach:** Cloudflare Tunnel with no published ports, or a VPS where only 443 is open, and only
+  to Cloudflare's published ranges. Never forward 3000 or 3001 directly.
+- **Who can sign in:** there is no sign-up control yet, so anyone with a Google, GitHub or OIDC
+  account can create an account. Until it lands, keep the Google OAuth app in *Testing* mode with
+  your people listed as test users, or sign in only through an OIDC provider you run.
+- **Environment:**
+  - `TRUSTED_PROXY_IPS` (and `TRUSTED_CLIENT_IP_HEADER` behind Cloudflare), from the table in
+    [Reverse Proxy + SSL](#reverse-proxy--ssl);
+  - `ADMIN_EMAILS` with your own sign-in email, so only your providers can reach your private
+    network;
+  - `DEMO_MODE` unset unless you want a public demo.
+- **Logs:** give Docker's log driver a cap, or the request log fills the disk:
+
+  ```yaml
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+  ```
+
+  under each service, and filter calendar links out of any proxy log
+  ([Calendar links](#calendar-links)).
+- **Uptime:** point an external monitor (UptimeRobot, Better Stack, or Cloudflare's health checks)
+  at `https://yourdomain/` and at `/health` through a tunnel route only you can reach. `/health`
+  turns `503` when the database is unusable.
+- **Upgrades:** pin an exact image tag (`X.Y.Z`) instead of `latest` with an hourly cron.
+  Migrations run at start and can't be undone, so take a backup (or check Litestream is current)
+  before each upgrade, then `docker compose pull && docker compose up -d`.
+- **Backups:** [Litestream](#continuous-backups-with-litestream) for the database, a monthly
+  [restore drill](#restore-drill), and `PROVIDER_ENCRYPTION_KEY` stored apart from the backups.
+- **Legal pages:** fill in `frontend/src/routes/privacypolicy` and `termsofservice` with who runs
+  the server, how to reach you, what is stored and for how long, the services involved (your host,
+  Cloudflare, your backup bucket, the sign-in providers) and the community stats opt-in. Google's
+  OAuth verification asks for both pages.
+
 ## Security Checklist
 
 - [ ] HTTPS in front of the app — the production session cookie is `Secure`, so login fails without it
-- [ ] `PROVIDER_ENCRYPTION_KEY` randomly generated (`openssl rand -hex 32`) and backed up alongside the database
+- [ ] `PROVIDER_ENCRYPTION_KEY` randomly generated (`openssl rand -hex 32`) and stored safely, apart from the database backups
 - [ ] `CORS_ORIGINS` listing only your own origins
 - [ ] Only 80/443 reachable from the internet (plus 22 for SSH). Behind a proxy or tunnel, drop the `ports:` mappings for 3000/3001 so they stay on the Docker network
 - [ ] Bind to 127.0.0.1 when behind a reverse proxy on the same host: publish each port as `"127.0.0.1:3000:3000"` (the example stacks show this form above each mapping). A bare `"3000:3000"` listens on every interface, and Docker's published ports bypass host firewalls such as ufw

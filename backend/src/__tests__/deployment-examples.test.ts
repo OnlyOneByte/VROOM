@@ -246,3 +246,50 @@ describe('the trusted proxy recipes in docs/deployment.md', () => {
     expect(values).toContain(gateway);
   });
 });
+
+describe('the Litestream example', () => {
+  const OVERRIDE = 'docs/examples/docker-compose.litestream.yml';
+  const LITESTREAM = 'docs/examples/litestream.yml';
+
+  test('it turns the backend checkpoints off with a value the backend reads', () => {
+    expect(backendEnvKeys(OVERRIDE)).toEqual(['WAL_CHECKPOINTS']);
+    expect(repoFile(OVERRIDE)).toContain('- WAL_CHECKPOINTS=off');
+    expect(backendReadsEnvVars().has('WAL_CHECKPOINTS')).toBe(true);
+  });
+
+  test('it publishes no port, takes secrets fail-fast from .env, and pins the image', () => {
+    const yaml = repoFile(OVERRIDE);
+    expect(yaml).not.toMatch(/^ {4}ports:/m);
+    for (const name of [
+      'LITESTREAM_ACCESS_KEY_ID',
+      'LITESTREAM_SECRET_ACCESS_KEY',
+      'LITESTREAM_BUCKET',
+      'LITESTREAM_ENDPOINT',
+    ]) {
+      expect(yaml).toContain(`${name}=\${${name}:?`);
+    }
+    expect(yaml).toMatch(/image: litestream\/litestream:\d+\.\d+\.\d+/);
+  });
+
+  test('it replicates the database file the backend writes', () => {
+    expect(repoFile(LITESTREAM)).toContain('- path: /data/vroom.db');
+    expect(repoFile(OVERRIDE)).toContain('- vroom-data:/data');
+    expect(repoFile(COMPOSE)).toContain('DATABASE_URL=/app/data/vroom.db');
+  });
+});
+
+describe('the Portainer stack', () => {
+  test("the auto-updater's Docker-controlling dashboard is published on loopback only", () => {
+    const yaml = repoFile(PORTAINER);
+    const service = yaml.slice(yaml.search(/^ {2}tugtainer:$/m));
+    const lines = service
+      .slice(service.search(/^ {4}ports:$/m))
+      .split('\n')
+      .slice(1);
+    const end = lines.findIndex((line) => /^ {0,4}\S/.test(line));
+    const published = lines.slice(0, end).filter((line) => /^ {6}- /.test(line));
+    expect(published.length).toBeGreaterThan(0);
+    for (const line of published) expect(line).toMatch(/^ {6}- "127\.0\.0\.1:/);
+    expect(service).toContain('/var/run/docker.sock');
+  });
+});

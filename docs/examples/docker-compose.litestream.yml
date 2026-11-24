@@ -1,0 +1,29 @@
+# Off-site backups with Litestream. Use it on top of docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.litestream.yml up -d
+# Litestream streams every change to the SQLite file to an S3-compatible bucket (Cloudflare R2,
+# Backblaze B2, MinIO...). It owns WAL checkpoints, so the backend's own are turned off.
+# Put litestream.yml next to this file and the four LITESTREAM_ values in .env.
+
+services:
+  backend:
+    environment:
+      - WAL_CHECKPOINTS=off
+
+  litestream:
+    image: litestream/litestream:0.3.13
+    container_name: vroom-litestream
+    command: replicate
+    volumes:
+      - vroom-data:/data
+      - ./litestream.yml:/etc/litestream.yml:ro
+    environment:
+      - LITESTREAM_ACCESS_KEY_ID=${LITESTREAM_ACCESS_KEY_ID:?set LITESTREAM_ACCESS_KEY_ID in .env}
+      - LITESTREAM_SECRET_ACCESS_KEY=${LITESTREAM_SECRET_ACCESS_KEY:?set LITESTREAM_SECRET_ACCESS_KEY in .env}
+      - LITESTREAM_BUCKET=${LITESTREAM_BUCKET:?set LITESTREAM_BUCKET in .env}
+      - LITESTREAM_ENDPOINT=${LITESTREAM_ENDPOINT:?set LITESTREAM_ENDPOINT in .env}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - vroom-network
