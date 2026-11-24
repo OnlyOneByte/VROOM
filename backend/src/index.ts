@@ -1,3 +1,4 @@
+import { startCommunityStatsJob, stopCommunityStatsJob } from './api/community/aggregator';
 import { recalculateOvercountedMonthlyPremiums } from './api/insurance/hooks';
 import { startSyncWorker, stopSyncWorker } from './api/providers/sync-worker';
 import { app } from './app';
@@ -69,10 +70,17 @@ forceCheckpointWAL();
 
 startSyncWorker();
 
+startCommunityStatsJob().catch((error) => {
+  logger.error('Failed to start the community stats job', {
+    message: extractErrorMessage(error),
+  });
+});
+
 const shutdown = (signal: string) => {
   logger.shutdown(`Received ${signal}, shutting down gracefully...`);
 
   stopSyncWorker();
+  stopCommunityStatsJob();
 
   clearInterval(checkpointInterval);
 

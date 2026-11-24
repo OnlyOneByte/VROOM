@@ -23,6 +23,9 @@ import {
 import SHARED_LIMITS from './shared-limits.json';
 import type { Environment } from './types';
 
+const COMMUNITY_STATS_MIN_GROUP_FLOOR = 10;
+const COMMUNITY_STATS_QUARTILE_FLOOR = 20;
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z
@@ -88,6 +91,18 @@ const envSchema = z.object({
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().optional(),
+  COMMUNITY_STATS: z.enum(['off', 'local']).default('local'),
+  COMMUNITY_STATS_MIN_GROUP: z
+    .string()
+    .default(String(COMMUNITY_STATS_MIN_GROUP_FLOOR))
+    .transform((val) => {
+      const minGroup = Number(val);
+      if (!Number.isInteger(minGroup) || minGroup < COMMUNITY_STATS_MIN_GROUP_FLOOR)
+        throw new Error(
+          `COMMUNITY_STATS_MIN_GROUP must be a whole number of at least ${COMMUNITY_STATS_MIN_GROUP_FLOOR}`
+        );
+      return minGroup;
+    }),
 });
 
 const parseEnv = () => {
@@ -198,6 +213,15 @@ export const CONFIG = {
     enabled: Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT),
   },
   pagination: { defaultPageSize: 20, maxPageSize: 100, minPageSize: 1 },
+  communityStats: {
+    mode: env.COMMUNITY_STATS,
+    enabled: env.COMMUNITY_STATS !== 'off' && env.NODE_ENV !== 'test',
+    minGroup: env.COMMUNITY_STATS_MIN_GROUP,
+    quartileMinGroup: Math.max(COMMUNITY_STATS_QUARTILE_FLOOR, env.COMMUNITY_STATS_MIN_GROUP),
+    refreshIntervalMs: 24 * 60 * 60 * 1000,
+    maxJitterMs: 60 * 60 * 1000,
+    slowRunWarnMs: 30_000,
+  },
   syncWorker: {
     enabled: env.NODE_ENV !== 'test',
     pollIntervalMs: 30_000,

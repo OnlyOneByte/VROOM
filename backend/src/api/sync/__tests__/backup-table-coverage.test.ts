@@ -5,7 +5,13 @@ import * as schema from '../../../db/schema';
 import { ratchet } from '../../../test-helpers/debt-ratchet';
 
 // Never exported: account identity, encrypted credentials, live sessions and per-device push endpoints.
-const EXCLUDED_BY_DESIGN = ['users', 'user_providers', 'sessions', 'push_subscriptions'] as const;
+const EXCLUDED_BY_DESIGN = [
+  'users',
+  'user_providers',
+  'sessions',
+  'push_subscriptions',
+  'community_stats',
+] as const;
 
 function allSchemaTableNames(): string[] {
   const names = new Set<string>();
