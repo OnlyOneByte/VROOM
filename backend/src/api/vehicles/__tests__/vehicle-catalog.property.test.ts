@@ -3,6 +3,7 @@ import fc from 'fast-check';
 import {
   catalogKey,
   catalogModel,
+  catalogModelMatchesMake,
   isCatalogModel,
   suggestCatalogModel,
   VEHICLE_CATALOG,
@@ -151,6 +152,21 @@ describe('suggestCatalogModel', () => {
     ['Mercedes', 'C300', 'mercedes-benz-c-class'],
     ['VW', 'golf gti', 'volkswagen-golf'],
     ['Škoda', 'Octavia', 'skoda-octavia'],
+    ['Honda', '2019 Honda Civic', 'honda-civic'],
+    ['', '2019 Honda Civic', 'honda-civic'],
+    ['Ford', 'Bronco Sport Badlands', 'ford-bronco-sport'],
+    ['Ford', 'Bronco Wildtrak', 'ford-bronco'],
+    ['Ford', 'Transit Connect', 'ford-transit-connect'],
+    ['Toyota', 'Corolla Cross', 'toyota-corolla-cross'],
+    ['Nissan', 'Rogue Sport', 'nissan-rogue-sport'],
+    ['Buick', 'Encore GX', 'buick-encore-gx'],
+    ['Chevrolet', 'Silverado 2500 HD LTZ', 'chevrolet-silverado-2500hd'],
+    ['Chevrolet', 'Silverado 1500', 'chevrolet-silverado'],
+    ['GMC', 'Sierra 3500HD', 'gmc-sierra-3500hd'],
+    ['Mercedes-Benz', 'C63 AMG', 'mercedes-benz-c-class'],
+    ['Mercedes-Benz', 'AMG GT', 'mercedes-benz-amg-gt'],
+    ['BMW', 'X5M', 'bmw-x5'],
+    ['Kia', 'Optima', 'kia-k5'],
   ])('%p %p suggests %p', (make, model, expected) => {
     expect(suggestCatalogModel(make, model)).toBe(expected);
     expect(isCatalogModel(expected)).toBe(true);
@@ -158,6 +174,23 @@ describe('suggestCatalogModel', () => {
 
   test('a model of a different make is not suggested', () => {
     expect(suggestCatalogModel('Toyota', 'Civic')).toBeNull();
+  });
+
+  test('a typed make the catalogue does not know never borrows a make from the model', () => {
+    expect(suggestCatalogModel('Zastava', 'Mini Cooper')).toBeNull();
+    expect(suggestCatalogModel('Holden', 'Ram 1500')).toBeNull();
+  });
+
+  test("catalogModelMatchesMake accepts only the model's own make, by name or alias", () => {
+    fc.assert(
+      fc.property(modelArb, (model) => {
+        expect(catalogModelMatchesMake(model.id, makeName(model.makeId))).toBe(true);
+      })
+    );
+    expect(catalogModelMatchesMake('volkswagen-golf', 'VW')).toBe(true);
+    expect(catalogModelMatchesMake('honda-civic', 'Toyota')).toBe(false);
+    expect(catalogModelMatchesMake('honda-civic', 'Zastava')).toBe(false);
+    expect(catalogModelMatchesMake('nope', 'Honda')).toBe(false);
   });
 
   test('catalogModel looks a model up by id', () => {

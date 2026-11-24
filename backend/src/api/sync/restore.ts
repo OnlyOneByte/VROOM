@@ -42,7 +42,7 @@ import {
 import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
-import { isCatalogModel } from '../../utils/vehicle-catalog';
+import { catalogModelMatchesMake } from '../../utils/vehicle-catalog';
 import { CAPABILITY_DOMAIN } from '../providers/resolve';
 import { preferencesRepository } from '../settings/repository';
 import { isKnownRegion } from '../settings/validation';
@@ -568,7 +568,8 @@ class RestoreService {
       this.stampUserId(data.vehicles, userId).map((row) => ({
         ...row,
         catalogModelId:
-          typeof row.catalogModelId === 'string' && isCatalogModel(row.catalogModelId)
+          typeof row.catalogModelId === 'string' &&
+          catalogModelMatchesMake(row.catalogModelId, String(row.make))
             ? row.catalogModelId
             : null,
       }))

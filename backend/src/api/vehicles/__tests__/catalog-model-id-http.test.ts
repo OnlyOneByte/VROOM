@@ -62,6 +62,23 @@ describe('vehicle catalogModelId', () => {
     }
   );
 
+  test('a catalogue model of another make is rejected on create and update', async () => {
+    expect((await createVehicle({ catalogModelId: 'toyota-camry' })).status).toBe(400);
+    const id = await createdId({ catalogModelId: 'honda-civic' });
+    const res = await ctx.authed('PUT', `/api/v1/vehicles/${id}`, {
+      make: 'Toyota',
+      catalogModelId: 'honda-civic',
+    });
+    expect(res.status).toBe(400);
+    const switched = await ctx.authed('PUT', `/api/v1/vehicles/${id}`, {
+      make: 'Toyota',
+      model: 'Camry',
+      catalogModelId: 'toyota-camry',
+    });
+    expect(switched.status, await switched.clone().text()).toBe(200);
+    expect((await fetchVehicle(id)).catalogModelId).toBe('toyota-camry');
+  });
+
   test('update sets, keeps and clears it', async () => {
     const id = await createdId();
     const set = await ctx.authed('PUT', `/api/v1/vehicles/${id}`, {

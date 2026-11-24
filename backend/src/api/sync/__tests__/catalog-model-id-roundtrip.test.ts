@@ -55,4 +55,15 @@ describe('backup → restore round-trip of vehicles.catalog_model_id', () => {
 
     expect(catalogIds()).toEqual([null]);
   });
+
+  test('an id that belongs to another make restores as null', async () => {
+    const id = await createVehicle({ make: 'Honda', model: 'Civic' });
+    ctx.sqlite
+      .query('UPDATE vehicles SET catalog_model_id = ? WHERE id = ?')
+      .run('toyota-camry', id);
+
+    await roundTrip();
+
+    expect(catalogIds()).toEqual([null]);
+  });
 });

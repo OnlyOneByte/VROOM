@@ -37,7 +37,7 @@ import {
   zValidator,
 } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
-import { isCatalogModel } from '../../utils/vehicle-catalog';
+import { catalogModelMatchesMake, isCatalogModel } from '../../utils/vehicle-catalog';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
 import { financingRepository, withComputedBalance } from '../financing/repository';
@@ -166,6 +166,12 @@ function changedUnits(existing: UnitPreferences, merged: UnitPreferences | undef
   return (Object.keys(merged) as Array<keyof UnitPreferences>).filter(
     (unit) => merged[unit] !== existing[unit]
   );
+}
+
+function assertCatalogModelMatchesMake(catalogModelId: string | null | undefined, make: string) {
+  if (catalogModelId && !catalogModelMatchesMake(catalogModelId, make)) {
+    throw new ValidationError("The catalogue model doesn't belong to this vehicle's make");
+  }
 }
 
 function renamedWithoutCatalogModel(
@@ -307,6 +313,7 @@ routes.post('/', zValidator('json', createVehicleSchema), async (c) => {
   if (vehicleData.licensePlate) {
     await assertLicensePlateAvailable(vehicleData.licensePlate, user.id);
   }
+  assertCatalogModelMatchesMake(vehicleData.catalogModelId, vehicleData.make);
 
   let { unitPreferences } = vehicleData;
   if (!unitPreferences) {
@@ -403,6 +410,10 @@ routes.put(
     if (updateData.licensePlate && updateData.licensePlate !== existingVehicle.licensePlate) {
       await assertLicensePlateAvailable(updateData.licensePlate, user.id, id);
     }
+    assertCatalogModelMatchesMake(
+      updateData.catalogModelId,
+      updateData.make ?? existingVehicle.make
+    );
 
     const { unitPreferences: partialUnitPrefs, confirmUnitChange, ...restUpdateData } = updateData;
     const mergedUnitPreferences = mergeUnitPreferences(

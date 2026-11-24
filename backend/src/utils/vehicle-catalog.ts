@@ -64,25 +64,37 @@ function prefixMatches(tokens: string[], index: Map<string, string>) {
   return matches;
 }
 
+function yearVariants(tokens: string[]): string[][] {
+  return YEAR_TOKEN.test(tokens[0] ?? '') ? [tokens, tokens.slice(1)] : [tokens];
+}
+
 function makeCandidates(makeTokens: string[], modelTokens: string[]) {
-  const givenMake = prefixMatches(makeTokens, MAKE_BY_KEY)[0]?.id;
-  if (!givenMake) {
+  if (makeTokens.length === 0) {
     return prefixMatches(modelTokens, MAKE_BY_KEY).map(({ id, rest }) => ({ makeId: id, rest }));
   }
+  const givenMake = prefixMatches(makeTokens, MAKE_BY_KEY)[0]?.id;
+  if (!givenMake) return [];
   const withoutRepeatedMake = prefixMatches(modelTokens, MAKE_BY_KEY)
     .filter(({ id }) => id === givenMake)
     .map(({ rest }) => ({ makeId: givenMake, rest }));
   return [...withoutRepeatedMake, { makeId: givenMake, rest: modelTokens }];
 }
 
+export function catalogModelMatchesMake(modelId: string, make: string): boolean {
+  const makeId = prefixMatches(catalogTokens(make), MAKE_BY_KEY)[0]?.id;
+  return makeId !== undefined && MODELS_BY_ID.get(modelId)?.makeId === makeId;
+}
+
 export function suggestCatalogModel(make: string, model: string): string | null {
-  for (const { makeId, rest } of makeCandidates(catalogTokens(make), catalogTokens(model))) {
-    const models = MODELS_BY_MAKE.get(makeId);
-    if (!models) continue;
-    const variants = YEAR_TOKEN.test(rest[0] ?? '') ? [rest, rest.slice(1)] : [rest];
-    for (const tokens of variants) {
-      const match = prefixMatches(tokens, models)[0];
-      if (match) return match.id;
+  const makeTokens = catalogTokens(make);
+  for (const modelTokens of yearVariants(catalogTokens(model))) {
+    for (const { makeId, rest } of makeCandidates(makeTokens, modelTokens)) {
+      const models = MODELS_BY_MAKE.get(makeId);
+      if (!models) continue;
+      for (const tokens of yearVariants(rest)) {
+        const match = prefixMatches(tokens, models)[0];
+        if (match) return match.id;
+      }
     }
   }
   return null;

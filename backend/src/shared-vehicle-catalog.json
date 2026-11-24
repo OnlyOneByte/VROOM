@@ -807,7 +807,10 @@
       "id": "bmw-x3",
       "makeId": "bmw",
       "name": "X3",
-      "aliases": []
+      "aliases": [
+        "x3 m",
+        "x3m"
+      ]
     },
     {
       "id": "bmw-x4",
@@ -819,13 +822,19 @@
       "id": "bmw-x5",
       "makeId": "bmw",
       "name": "X5",
-      "aliases": []
+      "aliases": [
+        "x5 m",
+        "x5m"
+      ]
     },
     {
       "id": "bmw-x6",
       "makeId": "bmw",
       "name": "X6",
-      "aliases": []
+      "aliases": [
+        "x6 m",
+        "x6m"
+      ]
     },
     {
       "id": "bmw-x7",
@@ -897,9 +906,13 @@
       "id": "buick-encore",
       "makeId": "buick",
       "name": "Encore",
-      "aliases": [
-        "encore gx"
-      ]
+      "aliases": []
+    },
+    {
+      "id": "buick-encore-gx",
+      "makeId": "buick",
+      "name": "Encore GX",
+      "aliases": []
     },
     {
       "id": "buick-envision",
@@ -1064,10 +1077,26 @@
       "makeId": "chevrolet",
       "name": "Silverado",
       "aliases": [
-        "silverado 1500",
+        "silverado 1500"
+      ]
+    },
+    {
+      "id": "chevrolet-silverado-2500hd",
+      "makeId": "chevrolet",
+      "name": "Silverado 2500HD",
+      "aliases": [
         "silverado 2500",
-        "silverado 2500hd",
-        "silverado 3500"
+        "silverado 2500 hd",
+        "silverado hd"
+      ]
+    },
+    {
+      "id": "chevrolet-silverado-3500hd",
+      "makeId": "chevrolet",
+      "name": "Silverado 3500HD",
+      "aliases": [
+        "silverado 3500",
+        "silverado 3500 hd"
       ]
     },
     {
@@ -1590,9 +1619,13 @@
       "id": "ford-bronco",
       "makeId": "ford",
       "name": "Bronco",
-      "aliases": [
-        "bronco sport"
-      ]
+      "aliases": []
+    },
+    {
+      "id": "ford-bronco-sport",
+      "makeId": "ford",
+      "name": "Bronco Sport",
+      "aliases": []
     },
     {
       "id": "ford-mustang",
@@ -1643,9 +1676,13 @@
       "id": "ford-transit",
       "makeId": "ford",
       "name": "Transit",
-      "aliases": [
-        "transit connect"
-      ]
+      "aliases": []
+    },
+    {
+      "id": "ford-transit-connect",
+      "makeId": "ford",
+      "name": "Transit Connect",
+      "aliases": []
     },
     {
       "id": "ford-kuga",
@@ -1706,10 +1743,26 @@
       "makeId": "gmc",
       "name": "Sierra",
       "aliases": [
-        "sierra 1500",
+        "sierra 1500"
+      ]
+    },
+    {
+      "id": "gmc-sierra-2500hd",
+      "makeId": "gmc",
+      "name": "Sierra 2500HD",
+      "aliases": [
         "sierra 2500",
-        "sierra 2500hd",
-        "sierra 3500"
+        "sierra 2500 hd",
+        "sierra hd"
+      ]
+    },
+    {
+      "id": "gmc-sierra-3500hd",
+      "makeId": "gmc",
+      "name": "Sierra 3500HD",
+      "aliases": [
+        "sierra 3500",
+        "sierra 3500 hd"
       ]
     },
     {
@@ -2155,16 +2208,12 @@
       ]
     },
     {
-      "id": "kia-optima",
-      "makeId": "kia",
-      "name": "Optima",
-      "aliases": []
-    },
-    {
       "id": "kia-k5",
       "makeId": "kia",
       "name": "K5",
-      "aliases": []
+      "aliases": [
+        "optima"
+      ]
     },
     {
       "id": "kia-rio",
@@ -2650,7 +2699,10 @@
         "c250",
         "c300",
         "c350",
-        "c43"
+        "c43",
+        "c63",
+        "c63 amg",
+        "c43 amg"
       ]
     },
     {
@@ -2662,7 +2714,10 @@
         "e350",
         "e400",
         "e450",
-        "e550"
+        "e550",
+        "e63",
+        "e63 amg",
+        "e53"
       ]
     },
     {
@@ -2803,6 +2858,12 @@
       "id": "mercedes-benz-vito",
       "makeId": "mercedes-benz",
       "name": "Vito",
+      "aliases": []
+    },
+    {
+      "id": "mercedes-benz-amg-gt",
+      "makeId": "mercedes-benz",
+      "name": "AMG GT",
       "aliases": []
     },
     {
@@ -2963,9 +3024,13 @@
       "id": "nissan-rogue",
       "makeId": "nissan",
       "name": "Rogue",
-      "aliases": [
-        "rogue sport"
-      ]
+      "aliases": []
+    },
+    {
+      "id": "nissan-rogue-sport",
+      "makeId": "nissan",
+      "name": "Rogue Sport",
+      "aliases": []
     },
     {
       "id": "nissan-pathfinder",
@@ -3713,9 +3778,13 @@
       "id": "toyota-corolla",
       "makeId": "toyota",
       "name": "Corolla",
-      "aliases": [
-        "corolla cross"
-      ]
+      "aliases": []
+    },
+    {
+      "id": "toyota-corolla-cross",
+      "makeId": "toyota",
+      "name": "Corolla Cross",
+      "aliases": []
     },
     {
       "id": "toyota-rav4",
