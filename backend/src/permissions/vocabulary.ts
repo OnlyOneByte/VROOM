@@ -1,4 +1,4 @@
-export const PERMISSION_SCOPES = ['server', 'account', 'household', 'vehicle'] as const;
+export const PERMISSION_SCOPES = ['server', 'account', 'vehicle'] as const;
 
 export type PermissionScope = (typeof PERMISSION_SCOPES)[number];
 
@@ -12,15 +12,7 @@ export const CORE_ACTIONS = [
   'use',
 ] as const;
 
-export const NAMED_ACTIONS = [
-  'transfer',
-  'restore',
-  'invite',
-  'remove',
-  'add',
-  'record_others',
-  'read_others',
-] as const;
+export const NAMED_ACTIONS = ['transfer', 'restore'] as const;
 
 export const PERMISSION_ACTIONS = [...CORE_ACTIONS, ...NAMED_ACTIONS] as const;
 

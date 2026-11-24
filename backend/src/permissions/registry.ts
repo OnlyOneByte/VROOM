@@ -15,7 +15,6 @@ import { SYNC_PERMISSIONS } from '../api/sync/capabilities';
 import { TRIP_PERMISSIONS } from '../api/trips/capabilities';
 import { VEHICLE_PERMISSIONS } from '../api/vehicles/capabilities';
 import { buildPermissionRegistry } from './build-registry';
-import { HOUSEHOLD_PERMISSIONS } from './household-capabilities';
 import { SERVER_PERMISSIONS } from './server-capabilities';
 
 const DECLARED_PERMISSIONS = [
@@ -36,7 +35,6 @@ const DECLARED_PERMISSIONS = [
   ...SYNC_PERMISSIONS,
   ...PUSH_PERMISSIONS,
   ...SERVER_PERMISSIONS,
-  ...HOUSEHOLD_PERMISSIONS,
 ];
 
 export type PermissionId = (typeof DECLARED_PERMISSIONS)[number]['id'];

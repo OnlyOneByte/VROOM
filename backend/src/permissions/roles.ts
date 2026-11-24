@@ -2,7 +2,7 @@ import { type PermissionRegistry, PermissionRegistryError } from './build-regist
 import { PERMISSION_REGISTRY, type PermissionId } from './registry';
 import { type PermissionDescriptor, type PermissionScope, parsePermissionId } from './vocabulary';
 
-export type RoleScope = 'server' | 'household' | 'vehicle';
+export type RoleScope = 'server' | 'vehicle';
 
 export interface RoleTemplate<Id extends string = string> {
   key: string;
@@ -11,11 +11,27 @@ export interface RoleTemplate<Id extends string = string> {
   permissions: readonly Id[];
 }
 
+export const DEMO_ROLE_KEY = 'demo';
+
 export const ROLE_REACH: Record<RoleScope, readonly PermissionScope[]> = {
-  server: ['server', 'account', 'vehicle'],
-  household: ['household', 'vehicle'],
+  server: ['server', 'account'],
   vehicle: ['vehicle'],
 };
+
+function isDemoVehicleRead(template: RoleTemplate, descriptor: PermissionDescriptor): boolean {
+  return (
+    template.scope === 'server' &&
+    template.key === DEMO_ROLE_KEY &&
+    descriptor.scope === 'vehicle' &&
+    parsePermissionId(descriptor.id)?.action === 'read'
+  );
+}
+
+function withinReach(template: RoleTemplate, descriptor: PermissionDescriptor): boolean {
+  return (
+    ROLE_REACH[template.scope].includes(descriptor.scope) || isDemoVehicleRead(template, descriptor)
+  );
+}
 
 function validateTemplate(registry: PermissionRegistry, template: RoleTemplate): void {
   for (const id of template.permissions) {
@@ -30,7 +46,7 @@ function validateTemplate(registry: PermissionRegistry, template: RoleTemplate):
         `Role "${template.key}" lists "${id}", which only the owner holds and no role can grant`
       );
     }
-    if (!ROLE_REACH[template.scope].includes(descriptor.scope)) {
+    if (!withinReach(template, descriptor)) {
       throw new PermissionRegistryError(
         `Role "${template.key}" is a ${template.scope} role and can't hold the ${descriptor.scope} permission "${id}"`
       );
@@ -70,6 +86,8 @@ const EDITOR_PERMISSIONS: readonly PermissionId[] = [
   'vehicle.photo.read',
   'vehicle.photo.write',
   'vehicle.photo.delete_own',
+  'vehicle.share.read',
+  'vehicle.community.read',
 ];
 
 const VIEWER_HIDDEN: readonly PermissionId[] = ['vehicle.financing.read', 'vehicle.insurance.read'];
@@ -92,10 +110,13 @@ function buildRoleTemplates(
     },
     { key: 'member', name: 'Member', scope: 'server', permissions: member },
     {
-      key: 'demo',
+      key: DEMO_ROLE_KEY,
       name: 'Demo',
       scope: 'server',
-      permissions: select((d) => (d.scope === 'account' || d.scope === 'vehicle') && isRead(d)),
+      permissions: [
+        ...select((d) => (d.scope === 'account' || d.scope === 'vehicle') && isRead(d)),
+        'account.session.manage',
+      ],
     },
     {
       key: 'co_owner',
@@ -111,18 +132,6 @@ function buildRoleTemplates(
       permissions: select(
         (d) => d.scope === 'vehicle' && isRead(d) && !VIEWER_HIDDEN.includes(d.id)
       ),
-    },
-    {
-      key: 'household_admin',
-      name: 'Household admin',
-      scope: 'household',
-      permissions: select((d) => d.scope === 'household'),
-    },
-    {
-      key: 'household_member',
-      name: 'Household member',
-      scope: 'household',
-      permissions: ['household.read', ...EDITOR_PERMISSIONS],
     },
   ];
 }

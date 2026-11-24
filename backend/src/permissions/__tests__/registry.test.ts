@@ -100,12 +100,8 @@ describe('the app registry', () => {
     expect(ids((d) => !d.grantable)).toEqual(['vehicle.delete', 'vehicle.transfer']);
   });
 
-  test('exactly the financial, insurance and household-stats reads are sensitive', () => {
-    expect(ids((d) => d.sensitive)).toEqual([
-      'household.stats.read_others',
-      'vehicle.financing.read',
-      'vehicle.insurance.read',
-    ]);
+  test('exactly the loan and insurance reads are sensitive', () => {
+    expect(ids((d) => d.sensitive)).toEqual(['vehicle.financing.read', 'vehicle.insurance.read']);
   });
 
   test('every write implies the read on the same resource when one exists', () => {
@@ -119,7 +115,6 @@ describe('the app registry', () => {
   test('declares every scope', () => {
     expect([...new Set(PERMISSION_REGISTRY.list.map((d) => d.scope))].sort()).toEqual([
       'account',
-      'household',
       'server',
       'vehicle',
     ]);

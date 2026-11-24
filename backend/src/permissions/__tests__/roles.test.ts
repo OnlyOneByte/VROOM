@@ -8,6 +8,7 @@ const registry = buildPermissionRegistry(
   definePermissions({
     'vehicle.read': { label: 'See', scope: 'vehicle' },
     'vehicle.delete': { label: 'Delete', scope: 'vehicle', grantable: false },
+    'vehicle.trip.write': { label: 'Log', scope: 'vehicle' },
     'server.audit.read': { label: 'Audit', scope: 'server' },
   })
 );
@@ -37,6 +38,29 @@ describe('validateRoleTemplates', () => {
     ).toThrow(/"editor" is a vehicle role and can't hold the server permission/);
   });
 
+  test('refuses vehicle permissions to any server role but Demo', () => {
+    expect(() =>
+      validateRoleTemplates(registry, [
+        { key: 'support', name: 'Support', scope: 'server', permissions: ['vehicle.read'] },
+      ])
+    ).toThrow(/"support" is a server role and can't hold the vehicle permission "vehicle\.read"/);
+  });
+
+  test('lets Demo hold vehicle reads but not vehicle writes', () => {
+    expect(
+      validateRoleTemplates(registry, [
+        { key: 'demo', name: 'Demo', scope: 'server', permissions: ['vehicle.read'] },
+      ])
+    ).toHaveLength(1);
+    expect(() =>
+      validateRoleTemplates(registry, [
+        { key: 'demo', name: 'Demo', scope: 'server', permissions: ['vehicle.trip.write'] },
+      ])
+    ).toThrow(
+      /"demo" is a server role and can't hold the vehicle permission "vehicle\.trip\.write"/
+    );
+  });
+
   test('throws on a duplicate key', () => {
     const viewer = {
       key: 'viewer',
@@ -57,7 +81,7 @@ describe('built-in role templates', () => {
     return found;
   };
 
-  test('ships the eight templates, with no owner template', () => {
+  test('ships the six templates, with no owner template', () => {
     expect(ROLE_TEMPLATES.map((t) => t.key)).toEqual([
       'admin',
       'member',
@@ -65,18 +89,26 @@ describe('built-in role templates', () => {
       'co_owner',
       'editor',
       'viewer',
-      'household_admin',
-      'household_member',
     ]);
   });
 
-  test('server roles never hold vehicle or household permissions, except Demo reads', () => {
+  test('only Demo holds vehicle permissions among server roles', () => {
     for (const key of ['admin', 'member']) {
       const reach = role(key).permissions.filter((id) => !/^(server|account)\./.test(id));
       expect(reach, key).toEqual([]);
     }
+  });
+
+  test('Demo only reads, apart from signing out and refreshing its session', () => {
     const demoWrites = role('demo').permissions.filter((id) => !id.endsWith('.read'));
-    expect(demoWrites).toEqual([]);
+    expect(demoWrites).toEqual(['account.session.manage']);
+  });
+
+  test('Viewer is a subset of Editor, and Editor of Co-owner', () => {
+    const editor = role('editor').permissions;
+    const coOwner = role('co_owner').permissions;
+    expect(role('viewer').permissions.filter((id) => !editor.includes(id))).toEqual([]);
+    expect(editor.filter((id) => !coOwner.includes(id))).toEqual([]);
   });
 
   test('viewers do not see loan or insurance details', () => {

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
 import { app } from '../../app';
 import { PERMISSION_REGISTRY } from '../registry';
+import { ROLE_TEMPLATES } from '../roles';
 import {
   describeStale,
   describeUnmapped,
@@ -34,6 +35,14 @@ describe('route map contract', () => {
       ([, rule]) => typeof rule !== 'string' && rule.public.trim() === ''
     );
     expect(blank).toEqual([]);
+  });
+
+  test('Demo holds the permission behind sign-out and session refresh', () => {
+    const demo = ROLE_TEMPLATES.find((t) => t.key === 'demo')?.permissions ?? [];
+    for (const key of ['POST /api/v1/auth/logout', 'POST /api/v1/auth/refresh']) {
+      const rule = ROUTE_PERMISSIONS[key];
+      expect(typeof rule === 'string' && demo.includes(rule), key).toBe(true);
+    }
   });
 
   test('the capabilities endpoint is part of the map', () => {
