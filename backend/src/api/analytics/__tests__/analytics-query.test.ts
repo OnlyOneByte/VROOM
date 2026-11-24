@@ -5,6 +5,7 @@ import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migra
 import * as schema from '../../../db/schema';
 import { EXPENSE_CATEGORIES } from '../../../db/types';
 import { ValidationError } from '../../../errors';
+import { MAX_SERVICES } from '../annotations';
 import { analyticsQueryToApi } from '../api-transform';
 import {
   type AnalyticsQuery,
@@ -436,6 +437,92 @@ describe('same-day fill-ups pair by odometer', () => {
       baseQuery({ metric: 'distance', interval: 'month', start: seconds('2025-03-01T00:00:00Z') })
     );
     expect(distance.series[0]?.values[distance.buckets.indexOf('2025-03')]).toBe(300);
+  });
+});
+
+describe('annotations', () => {
+  const monthOf = (t: number) => new Date(t * 1000).toISOString().slice(0, 7);
+
+  test('a service marker in every month with maintenance, and none elsewhere', async () => {
+    seedFleet();
+    const byCategory = await repo.query(OWNER.id, baseQuery({ groupBy: 'category' }));
+    const maintenance = byCategory.series.find((s) => s.key === 'maintenance');
+    const months = byCategory.buckets.filter((_, i) => (maintenance?.values[i] ?? 0) > 0);
+    const result = await repo.query(OWNER.id, baseQuery({ annotations: ['services'] }));
+    expect(months.length).toBeGreaterThan(0);
+    expect([...new Set(result.annotations?.map((a) => monthOf(a.t)))]).toEqual(months);
+    const first = result.annotations?.[0];
+    expect(first?.kind).toBe('service');
+    expect(first?.vehicleName).toMatch(/Toyota Camry|Nissan Leaf/);
+    expect(first?.amount).toBeGreaterThan(0);
+    expect(result.trips).toBeUndefined();
+  });
+
+  test('follow the car and range filters and never show another user', async () => {
+    seedFleet();
+    seedExpense(testDb.sqlite, {
+      id: 'stranger-service',
+      vehicleId: OTHER.id,
+      category: 'maintenance',
+      expenseAmount: 9_999,
+      date: new Date('2024-05-05T12:00:00Z'),
+      mileage: null,
+      volume: null,
+      fuelType: null,
+      missedFillup: false,
+    });
+    const leaf = await repo.query(
+      OWNER.id,
+      baseQuery({
+        annotations: ['services'],
+        vehicleIds: [LEAF.id],
+        start: seconds('2024-03-01T00:00:00Z'),
+        end: seconds('2024-09-01T00:00:00Z'),
+      })
+    );
+    expect(leaf.annotations?.length).toBeGreaterThan(0);
+    for (const a of leaf.annotations ?? []) {
+      expect(a.vehicleId).toBe(LEAF.id);
+      expect(a.t).toBeGreaterThanOrEqual(seconds('2024-03-01T00:00:00Z'));
+      expect(a.t).toBeLessThan(seconds('2024-09-01T00:00:00Z'));
+    }
+    const forced = await repo.query(
+      OWNER.id,
+      baseQuery({ annotations: ['services', 'trips'], vehicleIds: [OTHER.id] })
+    );
+    expect(forced.annotations ?? []).toEqual([]);
+  });
+
+  test('past the cap, the newest services are kept and the result says so', async () => {
+    const start = seconds('2024-01-01T00:00:00Z');
+    const insert = testDb.sqlite.prepare(
+      "INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, missed_fillup) VALUES (?, ?, ?, 'maintenance', 100, ?, 0)"
+    );
+    for (let i = 0; i <= MAX_SERVICES; i++) {
+      insert.run(`many-${i}`, CAMRY.id, OWNER.id, start + i * 3_600);
+    }
+    const result = await repo.query(OWNER.id, baseQuery({ annotations: ['services'] }));
+    expect(result.annotations).toHaveLength(MAX_SERVICES);
+    expect(result.annotationsTruncated).toBe(true);
+    expect(result.annotations?.at(-1)?.t).toBe(start + MAX_SERVICES * 3_600);
+    expect(result.annotations?.[0]?.t).toBe(start + 3_600);
+  });
+
+  test('trips count and distance per bucket, in the user units', async () => {
+    setUnits('vehicles', CAMRY.id, { distanceUnit: 'kilometers', volumeUnit: 'liters' });
+    for (const [i, day] of ['2024-02-03', '2024-02-20', '2024-04-10'].entries()) {
+      testDb.sqlite.run(
+        'INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [`trip-${i}`, CAMRY.id, OWNER.id, 1_000, 1_100, 'personal', seconds(`${day}T12:00:00Z`)]
+      );
+    }
+    const result = await repo.query(OWNER.id, baseQuery({ annotations: ['trips'] }));
+    const at = (key: string) => result.buckets.indexOf(key);
+    expect(result.trips?.count[at('2024-02')]).toBe(2);
+    expect(result.trips?.count[at('2024-04')]).toBe(1);
+    expect(result.trips?.count[at('2024-03')]).toBe(0);
+    expect(result.trips?.distance[at('2024-02')]).toBeCloseTo(124.27, 1);
+    expect(result.trips?.count).toHaveLength(result.buckets.length);
   });
 });
 

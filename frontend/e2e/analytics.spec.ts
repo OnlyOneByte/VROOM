@@ -35,7 +35,23 @@ function queryPayload(params: URLSearchParams) {
 		interval,
 		groupBy,
 		...period,
-		compare: { ...period, totals: { ...period.totals, perBucket: total / buckets.length / 2 } }
+		compare: { ...period, totals: { ...period.totals, perBucket: total / buckets.length / 2 } },
+		...(params.get('annotations') && {
+			annotations: [
+				{
+					t: Math.floor(new Date(2026, 7, 15, 12).getTime() / 1000),
+					kind: 'service',
+					vehicleId: 'camry',
+					vehicleName: '2020 Toyota Camry',
+					label: 'Brake pads',
+					amount: 300
+				}
+			],
+			trips: {
+				count: buckets.map((_, b) => (b === 1 ? 2 : 0)),
+				distance: buckets.map((_, b) => (b === 1 ? 42 : 0))
+			}
+		})
 	};
 }
 
@@ -402,5 +418,33 @@ test.describe('Analytics', () => {
 		await expect(page.getByRole('dialog').getByRole('heading').first()).toContainText(
 			'2020 Toyota Camry'
 		);
+	});
+
+	test('services sit in a lane above the chart, reachable by keyboard and listed in Table view', async ({
+		page
+	}, testInfo) => {
+		const requests: URLSearchParams[] = [];
+		await mockAnalytics(page, requests);
+		await page.goto('/analytics');
+		await page.mouse.move(640, 600);
+		await expect.poll(() => requests.at(-1)?.get('annotations')).toBe('services,trips');
+		await page
+			.getByRole('heading', { name: 'Total cost per month by category', level: 2 })
+			.last()
+			.scrollIntoViewIfNeeded();
+		const lane = page.getByRole('group', { name: /Services and trips: 1 marker/ });
+		await lane.focus();
+		await page.keyboard.press('ArrowRight');
+		await expect(
+			page.getByText(/: Brake pads\. 2020 Toyota Camry, \$300\.00 1 of 1\./)
+		).toBeAttached();
+		const laneScan = await scanA11y(page, testInfo, 'annotation-lane');
+		expect(laneScan.ids).toEqual([]);
+		await page.getByRole('button', { name: 'Table', exact: true }).first().click();
+		const events = page.getByRole('region', { name: /Services and trips/ });
+		await expect(events).toContainText('Brake pads: 2020 Toyota Camry, $300.00');
+		await expect(events).toContainText('2 trips, 42 mi');
+		const tableScan = await scanA11y(page, testInfo, 'annotation-events');
+		expect(tableScan.ids).toEqual([]);
 	});
 });

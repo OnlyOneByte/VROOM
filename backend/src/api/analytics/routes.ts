@@ -7,6 +7,7 @@ import { calendarParts, zonedCalendar } from '../../utils/analytics-charts';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { zValidator } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
+import { QUERY_ANNOTATIONS } from './annotations';
 import {
   analyticsQueryToApi,
   analyticsSummaryToApi,
@@ -170,6 +171,7 @@ const analyticsQuerySchema = z
     compare: z.enum(QUERY_COMPARES).default('none'),
     energy: z.enum(QUERY_ENERGIES).default('fuel'),
     timeZone,
+    annotations: csv.pipe(z.array(z.enum(QUERY_ANNOTATIONS)).min(1)).optional(),
   })
   .refine((q) => q.start == null || q.end == null || q.start < q.end, {
     message: 'start must be before end',

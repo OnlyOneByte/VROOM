@@ -85,6 +85,12 @@ describe('analytics routes (real HTTP stack)', () => {
     }
   });
 
+  test('annotations are a list of known kinds', async () => {
+    const base = '/api/v1/analytics/query?metric=cost';
+    expect((await ctx.authed('GET', `${base}&annotations=services,trips`)).status).toBe(200);
+    expect((await ctx.authed('GET', `${base}&annotations=parties`)).status).toBe(400);
+  });
+
   test('vehicle-tco missing the REQUIRED vehicleId is a 400 (query validation)', async () => {
     const res = await ctx.authed('GET', '/api/v1/analytics/vehicle-tco');
     expect(res.status).toBe(400);

@@ -296,6 +296,7 @@ export interface AnalyticsQueryParams {
 	include?: AnalyticsQueryInclude;
 	compare?: AnalyticsQueryCompare;
 	energy?: AnalyticsQueryEnergy;
+	annotations?: Array<'services' | 'trips'>;
 }
 
 export interface AnalyticsQuerySeries {
@@ -322,6 +323,16 @@ export interface AnalyticsQueryResponse extends AnalyticsQueryPeriod {
 	interval: AnalyticsQueryInterval;
 	groupBy: AnalyticsQueryGroupBy;
 	compare: AnalyticsQueryPeriod | null;
+	annotations?: Array<{
+		t: number;
+		kind: 'service';
+		vehicleId: string;
+		vehicleName: string;
+		label: string;
+		amount: number;
+	}>;
+	annotationsTruncated?: boolean;
+	trips?: { count: number[]; distance: number[] };
 }
 
 export interface AnalyticsBucketItemsParams {
