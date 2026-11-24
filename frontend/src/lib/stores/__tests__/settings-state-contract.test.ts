@@ -186,17 +186,17 @@ describe('settings store load() reconciles the server theme', () => {
 	});
 
 	it('load() adopts the server themePreference (calls reconcileServerTheme with it)', async () => {
-		mockFetch.mockResolvedValueOnce(okJson({ ...SETTINGS, themePreference: 'instrument' }));
+		mockFetch.mockResolvedValueOnce(okJson({ ...SETTINGS, themePreference: 'electric' }));
 		await settingsStore.load();
-		expect(themeStore.themeId).toBe('instrument');
-		expect(document.documentElement.getAttribute('data-theme')).toBe('instrument');
+		expect(themeStore.themeId).toBe('electric');
+		expect(document.documentElement.getAttribute('data-theme')).toBe('electric');
 	});
 
 	it('load() with no server themePreference leaves the local theme untouched (no-op reconcile)', async () => {
-		themeStore.setTheme('instrument');
+		themeStore.setTheme('electric');
 		document.documentElement.removeAttribute('data-theme');
 		mockFetch.mockResolvedValueOnce(okJson(SETTINGS));
 		await settingsStore.load();
-		expect(themeStore.themeId).toBe('instrument');
+		expect(themeStore.themeId).toBe('electric');
 	});
 });

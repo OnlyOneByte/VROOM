@@ -1,14 +1,14 @@
+import { canonicalThemeId } from './theme-ids';
 import { DEFAULT_THEME_ID, THEME_REGISTRY } from './theme-registry';
 import type { ThemeDefinition, ThemeId, ThemeMode, ThemeTokens } from './theme-types';
 
 type ResolvedVariant = 'light' | 'dark';
 
 export function resolveThemeDefinition(themeId: ThemeId | null | undefined): ThemeDefinition {
-	if (themeId && Object.hasOwn(THEME_REGISTRY, themeId)) {
-		const def = THEME_REGISTRY[themeId];
-		if (def) return def;
-	}
-	return THEME_REGISTRY[DEFAULT_THEME_ID] as ThemeDefinition;
+	return (
+		THEME_REGISTRY[canonicalThemeId(themeId)] ??
+		(THEME_REGISTRY[DEFAULT_THEME_ID] as ThemeDefinition)
+	);
 }
 
 export function resolveVariant(

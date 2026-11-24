@@ -30,15 +30,15 @@ function dataTheme(): string | null {
 
 describe('themeStore.setTheme — the theme-id axis', () => {
 	test('a non-default id sets data-theme on <html> + persists the mirror + updates themeId', () => {
-		themeStore.setTheme('instrument');
-		expect(dataTheme()).toBe('instrument');
-		expect(localStorage.getItem(THEME_ID_KEY)).toBe('instrument');
-		expect(themeStore.themeId).toBe('instrument');
+		themeStore.setTheme('electric');
+		expect(dataTheme()).toBe('electric');
+		expect(localStorage.getItem(THEME_ID_KEY)).toBe('electric');
+		expect(themeStore.themeId).toBe('electric');
 	});
 
 	test("the 'default' id REMOVES data-theme (app.css bare :root serves the identity theme)", () => {
-		themeStore.setTheme('instrument');
-		expect(dataTheme()).toBe('instrument');
+		themeStore.setTheme('electric');
+		expect(dataTheme()).toBe('electric');
 		themeStore.setTheme('default');
 		expect(dataTheme()).toBeNull();
 		expect(localStorage.getItem(THEME_ID_KEY)).toBe('default');
@@ -49,28 +49,30 @@ describe('themeStore.setTheme — the theme-id axis', () => {
 		themeStore.setPreference('dark');
 		expect(document.documentElement.classList.contains('dark')).toBe(true);
 
-		themeStore.setTheme('instrument');
+		themeStore.setTheme('electric');
 		expect(document.documentElement.classList.contains('dark')).toBe(true);
-		expect(dataTheme()).toBe('instrument');
+		expect(dataTheme()).toBe('electric');
 	});
 
 	test('switching the mode PRESERVES the active theme id (the data-theme attribute stays)', () => {
-		themeStore.setTheme('instrument');
+		themeStore.setTheme('electric');
 		themeStore.setPreference('light');
-		expect(dataTheme()).toBe('instrument');
+		expect(dataTheme()).toBe('electric');
 		expect(document.documentElement.classList.contains('dark')).toBe(false);
 	});
 
-	test('an unknown id is still stored and applied, degrading to the default look', () => {
+	test('an unknown id is stored and applied as the default accent', () => {
+		themeStore.setTheme('electric');
 		themeStore.setTheme('no-such-theme');
-		expect(dataTheme()).toBe('no-such-theme');
-		expect(localStorage.getItem(THEME_ID_KEY)).toBe('no-such-theme');
+		expect(dataTheme()).toBeNull();
+		expect(localStorage.getItem(THEME_ID_KEY)).toBe('default');
+		expect(themeStore.themeId).toBe('default');
 	});
 });
 
 describe('themeStore.themeId getter', () => {
 	test('reflects the persisted id', () => {
-		themeStore.setTheme('instrument');
-		expect(themeStore.themeId).toBe('instrument');
+		themeStore.setTheme('electric');
+		expect(themeStore.themeId).toBe('electric');
 	});
 });

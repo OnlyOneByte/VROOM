@@ -15,27 +15,39 @@ function declaredTokenKeys(selector: string): Set<string> {
 	return keys;
 }
 
+const SHAPE_KEYS = new Set(['radius', 'r-sm', 'r-md', 'r-lg', 'r-xl', 'r-pill', 'shadow-pop']);
+
 describe('THEME_TOKEN_KEYS mirrors the app.css per-variant token set', () => {
 	const light = declaredTokenKeys(':root');
 	const dark = declaredTokenKeys('.dark');
+	const darkColors = new Set([...dark].filter(k => !SHAPE_KEYS.has(k)));
 
 	test('the scan actually found tokens (non-vacuous)', () => {
 		expect(light.size).toBeGreaterThan(20);
 		expect(dark.size).toBeGreaterThan(20);
 	});
 
-	test('light (:root) and dark (.dark) declare the same key set, except the variant-invariant --radius', () => {
-		const lightColorOnly = new Set([...light].filter(k => k !== 'radius'));
-		expect([...lightColorOnly].sort()).toEqual([...dark].sort());
+	test('light (:root) and dark (.dark) declare the same colour key set', () => {
+		const lightColors = new Set([...light].filter(k => !SHAPE_KEYS.has(k)));
+		expect([...lightColors].sort()).toEqual([...darkColors].sort());
 	});
 
-	test('THEME_TOKEN_KEYS equals the .dark (per-variant) token set exactly', () => {
-		expect([...THEME_TOKEN_KEYS].sort()).toEqual([...dark].sort());
+	test('THEME_TOKEN_KEYS equals the .dark colour token set exactly', () => {
+		expect([...THEME_TOKEN_KEYS].sort()).toEqual([...darkColors].sort());
 	});
 
-	test('--radius is NOT a themeable per-variant key (excluded by design)', () => {
-		expect(THEME_TOKEN_KEYS).not.toContain('radius');
-		expect(light.has('radius')).toBe(true);
+	test('the radius scale is declared once on :root and is not a themeable key', () => {
+		for (const key of ['radius', 'r-sm', 'r-md', 'r-lg', 'r-xl', 'r-pill']) {
+			expect(THEME_TOKEN_KEYS as readonly string[]).not.toContain(key);
+			expect(light.has(key), `:root declares --${key}`).toBe(true);
+			expect(dark.has(key), `.dark must not redeclare --${key}`).toBe(false);
+		}
+	});
+
+	test('--shadow-pop is set for each mode and is not a colour token', () => {
+		expect(light.has('shadow-pop')).toBe(true);
+		expect(dark.has('shadow-pop')).toBe(true);
+		expect(THEME_TOKEN_KEYS as readonly string[]).not.toContain('shadow-pop');
 	});
 
 	test('THEME_TOKEN_KEYS has no duplicates', () => {
@@ -74,5 +86,21 @@ describe('@theme inline color aliases reference only engine-managed tokens', () 
 				`the Tailwind utilities that name them emit NOTHING and the colour silently inherits. Add an ` +
 				`alias for each:\n  ${unaliased.join(', ')}`
 		).toEqual([]);
+	});
+});
+
+describe('the shadcn accent utilities keep their hover meaning until the C3 kit lands', () => {
+	const themeBlock = APP_CSS.match(/@theme[^{]*\{([\s\S]*?)\}/)?.[1] ?? '';
+	const alias = (name: string) =>
+		themeBlock.match(new RegExp(`--color-${name}\\s*:\\s*var\\(--([a-z0-9-]+)\\)`))?.[1];
+
+	test('bg-accent paints the sunk surface, not the C3 accent colour', () => {
+		expect(alias('accent')).toBe('sunk');
+		expect(alias('accent-foreground')).toBe('foreground');
+	});
+
+	test('the C3 accent colour is reachable as accent-fill', () => {
+		expect(alias('accent-fill')).toBe('accent');
+		expect(alias('accent-fill-foreground')).toBe('accent-foreground');
 	});
 });

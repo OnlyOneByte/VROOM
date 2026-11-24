@@ -18,9 +18,10 @@ alerts, a wired form field, the four states, StatCards and ChartCard.
 
 ## Design tokens (theme — never hardcode colors)
 
-`frontend/src/app.css` defines the default palette as CSS custom properties exposed as
-Tailwind v4 `@theme inline` tokens; `theme/theme-registry.ts` redeclares the same set per
-built-in theme (emitted to the generated `theme/themes.css`). A token is therefore the only
+`frontend/src/app.css` defines the C3 palette (Amber) as CSS custom properties exposed as
+Tailwind v4 `@theme inline` tokens; `theme/theme-registry.ts` redeclares the same set for each
+of the four accents (emitted to the generated `theme/themes.css`). An accent changes only
+`--accent`, `--accent-ink` and `--needle`. A token is therefore the only
 way to paint something that survives a theme switch: use the Tailwind class, never a raw hex
 / `gray-*` / `white` / `black` — `no-theme-clashing-colors.test.ts` fails the suite on a bare
 palette class. Every token has a light and a dark variant.
@@ -32,7 +33,14 @@ palette class. Every token has a light and a dark variant.
 | `bg-primary` / `text-primary-foreground` | Primary actions/emphasis |
 | `bg-secondary` / `text-secondary-foreground` | Secondary surfaces |
 | `bg-muted` / `text-muted-foreground` | Muted surfaces + secondary text (AA-contrast — see note) |
-| `bg-accent` / `text-accent-foreground` | Hover/active surfaces |
+| `bg-accent` / `text-accent-foreground` | Hover/active surfaces. Until the C3 kit lands this alias paints `--sunk`, not the accent colour (#1526) |
+| `bg-accent-fill` / `text-accent-fill-foreground` | The C3 accent colour and the ink on it (Add expense, the raised +) |
+| `text-accent-ink` | Accent-coloured text: links and "Log it" (never `accent` on cream) |
+| `bg-surface` / `bg-sunk` | Inputs, dialogs and sheets / segmented tracks, bar tracks, provider tiles |
+| `border-border-strong` | Control edges (3:1) |
+| `bg-bar` / `text-bar-fg` / `text-bar-on` | The phone bottom bar and toasts (dark in both modes) |
+| `text-info`, `bg-due-tint` / `bg-soon-tint` / `bg-ok-tint` / `bg-info-tint` | Info status text and the status tag and banner backgrounds |
+| `--needle` (CSS variable) | The dial needle and the amount caret |
 | `bg-destructive` / `text-destructive` | Errors, delete |
 | `text-warning` / `bg-warning/10` | "Attention" / due-now cues (reminders, offline state) |
 | `text-success` / `bg-success/10` | "All good" status text (synced, up to date) |
@@ -43,8 +51,9 @@ Notes:
 - `--muted-foreground` and `--destructive` are deliberately darkened to clear WCAG AA 4.5:1
   on white/card — do NOT lighten them, and avoid `text-muted-foreground/40`-style opacity on
   real text. `theme/__tests__/theme-contrast.test.ts` gates every theme's text pairs at AA
-  (`warning` included) and the chart tokens at 3:1; `border`, `input` and `ring` are not gated
-  yet (see `UIQuality.md`, *Colour and theme tokens*).
+  (`warning` included), the chart tokens at 3:1, and `border-strong` (also used by `input` and
+  `ring`), the needle and the accent on the bar at 3:1. `border` is a hairline and is not gated
+  (see `UIQuality.md`, *Colour and theme tokens*).
 - Status surfaces: use `Alert` (`default`, `destructive`, `warning` or `success`), or a
   `bg-warning/10` + `text-warning` tint, rather than a hand-tinted div. The three status variants
   paint `bg-card` with their status token as the text colour (AA-gated on `card`); `default` is

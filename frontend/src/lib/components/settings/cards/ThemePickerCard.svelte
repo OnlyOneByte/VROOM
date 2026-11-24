@@ -34,9 +34,9 @@
 
 <Card>
 	<CardHeader>
-		<CardTitle>Theme</CardTitle>
+		<CardTitle>Accent</CardTitle>
 		<CardDescription>
-			Pick a color theme. It applies right away, in the mode you chose above.
+			Pick an accent colour. It applies right away, in the mode you chose above.
 		</CardDescription>
 	</CardHeader>
 	<CardContent>
@@ -44,7 +44,7 @@
 			<div class="mb-3 flex items-center gap-3 lg:hidden" data-testid="current-theme">
 				{@render swatches(activeTheme)}
 				<div class="min-w-0">
-					<div class="text-xs text-muted-foreground">Current theme</div>
+					<div class="text-xs text-muted-foreground">Current accent</div>
 					<div class="text-sm font-medium">{activeTheme.label}</div>
 					<div class="text-xs text-muted-foreground">{activeTheme.description}</div>
 				</div>
@@ -57,7 +57,7 @@
 			aria-controls={gridId}
 			onclick={() => (showAll = !showAll)}
 		>
-			{showAll ? 'Show fewer themes' : `Show all ${themes.length} themes`}
+			{showAll ? 'Show fewer accents' : `Show all ${themes.length} accents`}
 		</Button>
 		<div
 			id={gridId}
