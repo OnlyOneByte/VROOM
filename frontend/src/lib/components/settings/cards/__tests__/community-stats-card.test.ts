@@ -90,6 +90,24 @@ describe('CommunityStatsCard', () => {
 		expect(screen.queryByTestId('community-saving')).toBeNull();
 	});
 
+	test('a region save shows progress beside the region and disables the pickers', async () => {
+		let finish: () => void = () => {};
+		mount({ onSave: () => new Promise<void>(resolve => (finish = resolve)) });
+		await pickOption('community-region-country', 'Germany');
+		expect(screen.getByTestId('community-region-saving')).toBeInTheDocument();
+		expect(trigger('community-region-country')).toBeDisabled();
+		expect(screen.queryByTestId('community-saving')).toBeNull();
+		finish();
+		await settle();
+		expect(screen.queryByTestId('community-region-saving')).toBeNull();
+	});
+
+	test('a long country name is truncated inside its trigger', () => {
+		mount({ region: 'GS' });
+		const label = trigger('community-region-country').querySelector('span.truncate');
+		expect(label).toHaveTextContent('South Georgia & South Sandwich Islands');
+	});
+
 	test('a failed save puts the switch back to the saved value', async () => {
 		mount({ onSave: () => Promise.reject(new Error('boom')) });
 		await fireEvent.click(toggle());
