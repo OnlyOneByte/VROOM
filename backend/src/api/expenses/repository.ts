@@ -39,7 +39,7 @@ import {
 export interface ExpenseFilters {
   vehicleId?: string;
   userId?: string;
-  category?: string;
+  category?: string | string[];
   startDate?: Date;
   endDate?: Date;
   tags?: string[];
@@ -198,8 +198,10 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
   if (filters.vehicleId) {
     conditions.push(eq(expenses.vehicleId, filters.vehicleId));
   }
-  if (filters.category) {
+  if (typeof filters.category === 'string') {
     conditions.push(eq(expenses.category, filters.category));
+  } else if (filters.category?.length) {
+    conditions.push(inArray(expenses.category, filters.category));
   }
   if (filters.startDate) {
     conditions.push(
