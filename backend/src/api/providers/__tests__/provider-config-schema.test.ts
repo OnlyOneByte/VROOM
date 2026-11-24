@@ -78,7 +78,7 @@ describe('the routes refuse a config the descriptor does not accept', () => {
 
   test('a server-only key sent on create is dropped, and the server writes its own value', async () => {
     const nonce = crypto.randomUUID();
-    storePending(ctx.user.id, nonce, 'refresh-token', 'owner@example.com');
+    storePending(ctx.user.id, nonce, 'refresh-token', 'owner@example.com', 'google-drive');
     const res = await ctx.authed('POST', '/api/v1/providers', {
       domain: 'storage',
       providerType: 'google-drive',

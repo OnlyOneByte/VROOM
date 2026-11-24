@@ -11,7 +11,7 @@ afterEach(() => ctx.close());
 
 function drivePayload(accountEmail: string) {
   const nonce = crypto.randomUUID();
-  storePending(ctx.user.id, nonce, `refresh-${nonce}`, accountEmail);
+  storePending(ctx.user.id, nonce, `refresh-${nonce}`, accountEmail, 'google-drive');
   return {
     domain: 'storage',
     providerType: 'google-drive',

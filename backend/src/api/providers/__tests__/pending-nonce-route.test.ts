@@ -11,7 +11,7 @@ afterEach(() => ctx.close());
 describe('GET /api/v1/providers/pending/:nonce', () => {
   test('returns the stored email for the user’s own pending nonce', async () => {
     const { storePending } = await import('../../../utils/pending-credentials');
-    storePending(ctx.user.id, 'nonce-abc', 'refresh-tok', 'me@example.com');
+    storePending(ctx.user.id, 'nonce-abc', 'refresh-tok', 'me@example.com', 'google-drive');
 
     const res = await ctx.authed('GET', '/api/v1/providers/pending/nonce-abc');
     const body = await json<{ success: boolean; data: { email: string } }>(res);
@@ -26,7 +26,7 @@ describe('GET /api/v1/providers/pending/:nonce', () => {
 
   test('404s a nonce stored under ANOTHER user (userId:nonce key-scoping — no cross-user leak)', async () => {
     const { storePending } = await import('../../../utils/pending-credentials');
-    storePending('someone-else', 'shared-nonce', 'tok', 'victim@example.com');
+    storePending('someone-else', 'shared-nonce', 'tok', 'victim@example.com', 'google-drive');
 
     const res = await ctx.authed('GET', '/api/v1/providers/pending/shared-nonce');
     expect(res.status).toBe(404);
