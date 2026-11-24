@@ -265,6 +265,27 @@ describe('bucketing follows the user calendar', () => {
     expect(MAX_QUERY_BUCKETS).toBeGreaterThan(24 * 4);
   });
 
+  test('the year before lines up month by month across a leap day and a clock change', () => {
+    const zone = 'America/Los_Angeles';
+    const spring = buildBuckets(
+      { start: seconds('2024-02-01T08:00:00Z'), end: seconds('2024-04-01T07:00:00Z') },
+      'month',
+      zone
+    );
+    expect(spring.map((b) => b.key)).toEqual(['2024-02', '2024-03']);
+    const [feb, mar] = spring;
+    expect(((feb?.end ?? 0) - (feb?.start ?? 0)) / 86_400).toBe(29);
+    expect(((mar?.end ?? 0) - (mar?.start ?? 0)) / 3_600).toBe(31 * 24 - 1);
+
+    const before = compareBuckets(spring, 'month', 'prevYear', zone);
+    expect(before?.map((b) => b.key)).toEqual(['2023-02', '2023-03']);
+    expect(before?.[0]).toMatchObject({
+      start: seconds('2023-02-01T08:00:00Z'),
+      end: seconds('2023-03-01T08:00:00Z'),
+    });
+    expect(before?.[1]?.end).toBe(seconds('2023-04-01T07:00:00Z'));
+  });
+
   test('compare buckets shift each bucket back one period or one local year', () => {
     const march = buildBuckets(
       { start: seconds('2025-03-01T00:00:00Z'), end: seconds('2025-04-01T00:00:00Z') },

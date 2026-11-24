@@ -216,3 +216,25 @@ export function expensesNote(selection: {
 		extra.length === 1 ? extra[0] : `${extra.slice(0, -1).join(', ')} and ${extra.at(-1)}`;
 	return `Expenses also lists ${list} for these dates.`;
 }
+
+function mean(values: ReadonlyArray<number | null>): number | null {
+	const known = values.filter((v): v is number => v != null);
+	return known.length > 0 ? known.reduce((a, b) => a + b, 0) / known.length : null;
+}
+
+export function carPanels(
+	series: readonly ExploreSeries[],
+	pooled?: { fleet: number | null; cars: Record<string, number | null> }
+) {
+	const all = series.flatMap(s => s.values);
+	const fleetMean = pooled ? pooled.fleet : mean(all);
+	const max = Math.max(0, fleetMean ?? 0, ...all.filter((v): v is number => v != null));
+	return {
+		yDomain: [0, max > 0 ? max : 1] as [number, number],
+		fleetMean,
+		panels: series.map(s => ({
+			series: s,
+			mean: pooled ? (pooled.cars[s.sourceKey] ?? null) : mean(s.values)
+		}))
+	};
+}

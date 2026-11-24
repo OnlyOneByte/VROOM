@@ -373,8 +373,32 @@ test.describe('Analytics', () => {
 		await mockAnalytics(page);
 		await page.goto('/analytics?split=vehicle&sel=1999-01&seg=gone');
 		const path = page.getByRole('navigation', { name: 'Drill path' });
-		await expect(path).toContainText('Select a bar to see its expenses');
+		await expect(path).toContainText('Select a bar or point to see its expenses');
 		await expect(path.getByRole('button', { name: 'Last 12 months' })).toHaveCount(0);
 		await expect(page.getByRole('dialog')).toHaveCount(0);
+	});
+
+	test('each car on its own draws one panel per car on a shared scale', async ({ page }) => {
+		await mockAnalytics(page);
+		await page.goto('/analytics?metric=costPerDistance&compare=cars');
+		await page.mouse.move(640, 600);
+		const panels = page.getByRole('region', { name: /each car on its own/ });
+		await expect(panels).toBeVisible();
+		await expect(panels.getByRole('heading', { level: 3 })).toHaveCount(2);
+		await expect(panels).toContainText('The dashed line is the fleet average');
+		await expect(page).toHaveURL(/compare=cars/);
+
+		await panels
+			.getByRole('heading', { level: 3 })
+			.first()
+			.evaluate(e => e.scrollIntoView({ block: 'start' }));
+		const first = panels.getByRole('img').first();
+		await first.focus();
+		await page.keyboard.press('ArrowRight');
+		await page.keyboard.press('Enter');
+		await expect(page).toHaveURL(/seg=camry/);
+		await expect(page.getByRole('dialog').getByRole('heading').first()).toContainText(
+			'2020 Toyota Camry'
+		);
 	});
 });
