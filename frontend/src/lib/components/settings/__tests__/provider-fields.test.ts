@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import ProviderFields, {
 	fieldConfig,
 	fieldErrorsFrom,
@@ -44,6 +44,7 @@ describe('ProviderFields', () => {
 		expect(screen.getByLabelText('Host')).toHaveAttribute('type', 'url');
 		expect(screen.getByLabelText('Port')).toHaveValue(8080);
 		expect(screen.getByLabelText('Mode')).toHaveTextContent('Choose…');
+		expect(screen.getByLabelText('Mode')).toHaveAttribute('aria-required', 'true');
 		expect(screen.getByText('How files are written')).toBeInTheDocument();
 		expect(screen.getByLabelText('Token')).toHaveAttribute('type', 'password');
 	});
@@ -57,6 +58,63 @@ describe('ProviderFields', () => {
 		const stored = { host: 'https://dav.local', mode: 'fast' };
 		expect(fieldsReady(DUMMY, filled, {}, stored)).toBe(true);
 		expect(fieldsReady(DUMMY, { ...filled, host: 'https://other.local' }, {}, stored)).toBe(false);
+
+		const twoKeys: ProviderFieldsSpec = {
+			fields: [],
+			secrets: [
+				{ key: 'id', label: 'Key ID', required: true },
+				{ key: 'secret', label: 'Secret', required: true }
+			]
+		};
+		expect(fieldsReady(twoKeys, {}, {}, {})).toBe(true);
+		expect(fieldsReady(twoKeys, {}, { id: 'AKIA' }, {})).toBe(false);
+		expect(fieldsReady(twoKeys, {}, { id: 'AKIA', secret: 's' }, {})).toBe(true);
+
+		expect(fieldsReady(twoKeys, {}, {}, {}, ['id', 'secret'])).toBe(true);
+		expect(fieldsReady(twoKeys, {}, {}, {}, ['id'])).toBe(false);
+	});
+
+	test('only a secret the server says is stored offers to keep its saved value', () => {
+		render(ProviderFields, {
+			props: {
+				idPrefix: 'dummy',
+				spec: DUMMY,
+				stored: { host: 'https://dav.local', mode: 'fast' },
+				savedSecrets: [],
+				values: { host: 'https://dav.local', port: '', mode: 'fast' },
+				secretValues: {}
+			}
+		});
+		expect(screen.getByLabelText('Token')).toHaveAttribute('placeholder', 'Enter Token');
+		expect(screen.getByLabelText('Token')).toBeRequired();
+	});
+
+	test('typing one stored key asks for the other, in the markup as well as for Save', async () => {
+		const keys: ProviderFieldsSpec = {
+			fields: [],
+			secrets: [
+				{ key: 'id', label: 'Key ID', required: true },
+				{ key: 'secret', label: 'Secret', required: true }
+			]
+		};
+		render(ProviderFields, {
+			props: {
+				idPrefix: 'keys',
+				spec: keys,
+				stored: {},
+				savedSecrets: ['id', 'secret'],
+				values: {},
+				secretValues: {}
+			}
+		});
+		const secret = screen.getByLabelText('Secret');
+		expect(secret).toHaveAttribute('placeholder', 'Saved, leave blank to keep');
+		expect(secret).not.toBeRequired();
+
+		await fireEvent.input(screen.getByLabelText('Key ID'), { target: { value: 'AKIA-new' } });
+
+		expect(secret).toHaveAttribute('placeholder', 'Enter Secret');
+		expect(secret).toBeRequired();
 	});
 
 	test('config keeps typed values and drops blanks', () => {

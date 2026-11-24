@@ -49,6 +49,7 @@
 	import { onMount } from 'svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { focusFirstProblem } from '#lib/utils/focus.ts';
 
 	let providerTypes = $derived(
 		providerCatalog.storage.map(entry => ({
@@ -78,9 +79,11 @@
 	let selectedEntry = $derived(providerCatalog.storageEntry(selectedType));
 	let usesFields = $derived(!selectedForm && selectedEntry?.connect === 'form');
 	let storedConfig = $derived(isEditMode ? existingProvider?.config : undefined);
+	let storedSecrets = $derived(isEditMode ? existingProvider?.secretsSet : undefined);
 	let fieldValues = $state<Record<string, string>>({});
 	let secretValues = $state<Record<string, string>>({});
 	let fieldErrors = $state<Record<string, string>>({});
+	let connectionCard = $state<HTMLElement | null>(null);
 
 	function resetFields(providerType: string, stored: Record<string, unknown> | undefined) {
 		const entry = providerCatalog.storageEntry(providerType);
@@ -210,7 +213,7 @@
 		if (hasBackupErrors && anyBackupEnabled) return false;
 		if (selectedForm) return connection.ready;
 		if (usesFields && selectedEntry) {
-			return fieldsReady(selectedEntry, fieldValues, secretValues, storedConfig);
+			return fieldsReady(selectedEntry, fieldValues, secretValues, storedConfig, storedSecrets);
 		}
 		return true;
 	});
@@ -321,6 +324,7 @@
 			navigateBack();
 		} catch (error) {
 			if (selectedEntry) fieldErrors = fieldErrorsFrom(error, selectedEntry);
+			if (Object.keys(fieldErrors).length > 0) void focusFirstProblem(connectionCard);
 			appStore.showError(
 				`Couldn't ${isEditMode ? 'update' : 'add'} the provider. ${userFacingErrorMessage(error)}`
 			);
@@ -464,7 +468,7 @@
 						{selectedForm?.description ?? selectedEntry?.description ?? 'Provider configuration'}
 					</CardDescription>
 				</CardHeader>
-				<CardContent class="space-y-4">
+				<CardContent class="space-y-4" bind:ref={connectionCard}>
 					{#if selectedForm}
 						{@const ConnectionForm = selectedForm.component}
 						<ConnectionForm
@@ -478,6 +482,7 @@
 							idPrefix="provider-{selectedEntry.id}"
 							spec={selectedEntry}
 							stored={storedConfig}
+							savedSecrets={storedSecrets}
 							bind:values={fieldValues}
 							bind:secretValues
 							errors={fieldErrors}

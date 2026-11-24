@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { focusFirstButton } from '#lib/utils/focus.ts';
+	import { focusFirstButton, focusFirstProblem } from '#lib/utils/focus.ts';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
 	import HowItWorks from '#lib/components/common/how-it-works.svelte';
@@ -79,11 +79,13 @@
 	let dialogOpen = $state(false);
 	let editingId = $state<string | null>(null);
 	let editingConfig = $state<Record<string, unknown> | undefined>(undefined);
+	let editingSecrets = $state<string[] | undefined>(undefined);
 	let formType = $state('');
 	let formDisplayName = $state('');
 	let fieldValues = $state<Record<string, string>>({});
 	let secretValues = $state<Record<string, string>>({});
 	let fieldErrors = $state<Record<string, string>>({});
+	let dialogFields = $state<HTMLElement | null>(null);
 	let isSaving = $state(false);
 
 	onMount(() => trackPendingSave(() => isSaving));
@@ -123,6 +125,7 @@
 	function openCreate() {
 		editingId = null;
 		editingConfig = undefined;
+		editingSecrets = undefined;
 		formType = providerTypes[0]?.id ?? '';
 		resetFields();
 		formDisplayName = '';
@@ -132,6 +135,7 @@
 	function openEdit(p: UserProviderInfo) {
 		editingId = p.id;
 		editingConfig = p.config;
+		editingSecrets = p.secretsSet;
 		formType = p.providerType;
 		formDisplayName = p.displayName;
 		resetFields();
@@ -153,7 +157,7 @@
 	let canSave = $derived(
 		formDisplayName.trim().length > 0 &&
 			!!selectedEntry &&
-			fieldsReady(selectedEntry, fieldValues, secretValues, editingConfig)
+			fieldsReady(selectedEntry, fieldValues, secretValues, editingConfig, editingSecrets)
 	);
 
 	async function handleSave() {
@@ -185,6 +189,7 @@
 			await loadData();
 		} catch (e) {
 			fieldErrors = fieldErrorsFrom(e, entry);
+			if (Object.keys(fieldErrors).length > 0) void focusFirstProblem(dialogFields);
 			appStore.showError(`Couldn't save the provider. ${userFacingErrorMessage(e)}`);
 		} finally {
 			isSaving = false;
@@ -307,8 +312,8 @@
 			<Dialog.Description>{copy.dialogNote}</Dialog.Description>
 		</Dialog.Header>
 
-		<div class="space-y-4 py-2">
-			<div class="space-y-1.5">
+		<div class="space-y-4 py-2" bind:this={dialogFields}>
+			<div class="space-y-2">
 				<Label for="{domain}-type">Provider</Label>
 				<Select.Root
 					type="single"
@@ -327,9 +332,17 @@
 				</Select.Root>
 			</div>
 
-			<div class="space-y-1.5">
-				<Label for="{domain}-name">Display name</Label>
-				<Input id="{domain}-name" bind:value={formDisplayName} placeholder={copy.namePlaceholder} />
+			<div class="space-y-2">
+				<div class="flex items-baseline gap-1">
+					<Label for="{domain}-name">Display name</Label>
+					<span class="text-sm text-muted-foreground" aria-hidden="true">*</span>
+				</div>
+				<Input
+					id="{domain}-name"
+					bind:value={formDisplayName}
+					placeholder={copy.namePlaceholder}
+					required
+				/>
 			</div>
 
 			{#if selectedEntry}
@@ -337,6 +350,7 @@
 					idPrefix={domain}
 					spec={selectedEntry}
 					stored={editingConfig}
+					savedSecrets={editingSecrets}
 					bind:values={fieldValues}
 					bind:secretValues
 					errors={fieldErrors}

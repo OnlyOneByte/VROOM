@@ -1,6 +1,7 @@
 import { beforeEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { UserProviderInfo } from '#lib/types/index.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
@@ -101,6 +102,25 @@ describe('ProviderForm connection contract', () => {
 			region: 'us-east-1'
 		});
 		expect(sent?.nonce).toBeUndefined();
+	});
+
+	test('a refused S3 field gets its message and the focus after a failed save', async () => {
+		createProvider.mockRejectedValueOnce(
+			new ApiError('S3 endpoint must use https', 400, {
+				issues: [{ path: ['endpoint'], message: 'S3 endpoint must use https' }]
+			})
+		);
+		await startCreate(/S3 \/ B2 \/ R2/);
+		await type('Endpoint', 'http://s3.example.com');
+		await type('Bucket', 'vroom');
+		await type('Region', 'us-east-1');
+		await type('Access Key ID', 'AKIA');
+		await type('Secret Access Key', 'secret');
+		await fireEvent.click(saveButton());
+		const endpoint = screen.getByLabelText('Endpoint');
+		await vi.waitFor(() => expect(document.activeElement).toBe(endpoint));
+		expect(endpoint).toHaveAttribute('aria-invalid', 'true');
+		expect(screen.getByText('S3 endpoint must use https')).toBeInTheDocument();
 	});
 
 	test('S3 cannot be saved without a region, which the backend requires', async () => {
