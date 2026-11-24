@@ -4,6 +4,7 @@ const MAX_SIZE = 1000;
 interface PendingCredential {
   refreshToken: string;
   email: string;
+  providerType: string;
   createdAt: number;
 }
 
@@ -29,7 +30,8 @@ export function storePending(
   userId: string,
   nonce: string,
   refreshToken: string,
-  email: string
+  email: string,
+  providerType = 'google-drive'
 ): void {
   cleanupExpired();
 
@@ -43,6 +45,7 @@ export function storePending(
   pendingProviderCredentials.set(makeKey(userId, nonce), {
     refreshToken,
     email,
+    providerType,
     createdAt: Date.now(),
   });
 }
@@ -58,7 +61,7 @@ export function getPendingEmail(userId: string, nonce: string): string | null {
 export function consumePending(
   userId: string,
   nonce: string
-): { refreshToken: string; email: string } | null {
+): { refreshToken: string; email: string; providerType: string } | null {
   const key = makeKey(userId, nonce);
   const entry = pendingProviderCredentials.get(key);
   if (!entry || isExpired(entry)) {
@@ -66,7 +69,7 @@ export function consumePending(
     return null;
   }
   pendingProviderCredentials.delete(key);
-  return { refreshToken: entry.refreshToken, email: entry.email };
+  return { refreshToken: entry.refreshToken, email: entry.email, providerType: entry.providerType };
 }
 
 export { pendingProviderCredentials };

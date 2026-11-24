@@ -41,7 +41,7 @@ describe('storage provider descriptors', () => {
 
   test('Google Photos can be created once a Google account is connected for it', async () => {
     const nonce = '5b8f2c1e-3d4a-4b6c-9e7f-1a2b3c4d5e6f';
-    storePending(ctx.user.id, nonce, 'refresh-tok', 'me@example.com');
+    storePending(ctx.user.id, nonce, 'refresh-tok', 'me@example.com', 'google-photos');
 
     const res = await ctx.authed('POST', '/api/v1/providers', {
       domain: 'storage',
@@ -59,5 +59,25 @@ describe('storage provider descriptors', () => {
         )
         .get()
     ).toEqual({ type: 'google-photos', email: 'me@example.com' });
+  });
+
+  test('a Google connection made for one provider type cannot create the other', async () => {
+    for (const [connectedFor, created] of [
+      ['google-drive', 'google-photos'],
+      ['google-photos', 'google-drive'],
+    ]) {
+      const nonce = crypto.randomUUID();
+      storePending(ctx.user.id, nonce, 'refresh-tok', 'me@example.com', connectedFor);
+      const res = await ctx.authed('POST', '/api/v1/providers', {
+        domain: 'storage',
+        providerType: created,
+        displayName: 'Mixed up',
+        credentials: {},
+        nonce,
+      });
+      expect(res.status, `${connectedFor} -> ${created}`).toBe(400);
+      expect(await res.text()).toContain('Connect Google again');
+    }
+    expect(ctx.sqlite.query('SELECT COUNT(*) AS n FROM user_providers').get()).toEqual({ n: 0 });
   });
 });

@@ -424,6 +424,7 @@
 									? 'border-primary bg-primary/5'
 									: 'border-border hover:border-primary/50 hover:bg-muted/50 cursor-pointer'}"
 								onclick={() => {
+									if (pt.id !== selectedType && selectedEntry?.connect === 'oauth') oauth.forget();
 									selectedType = pt.id;
 									photoRootPath = getDefaultPhotoRootPath(pt.id);
 									folderSettings = defaultFolderSettings(pt.id);
@@ -471,13 +472,16 @@
 				<CardContent class="space-y-4" bind:ref={connectionCard}>
 					{#if selectedForm}
 						{@const ConnectionForm = selectedForm.component}
-						<ConnectionForm
-							existingConfig={existingProvider?.config}
-							{isEditMode}
-							providerLabel={selectedEntry?.label ?? 'Google'}
-							{oauth}
-							bind:connection
-						/>
+						{#key selectedType}
+							<ConnectionForm
+								existingConfig={existingProvider?.config}
+								{isEditMode}
+								providerLabel={selectedEntry?.label ?? 'Google'}
+								providerIcon={providerUi(selectedType)?.icon ?? Cloud}
+								{oauth}
+								bind:connection
+							/>
+						{/key}
 					{:else if usesFields && selectedEntry}
 						<ProviderFields
 							idPrefix="provider-{selectedEntry.id}"

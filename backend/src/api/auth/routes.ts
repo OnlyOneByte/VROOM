@@ -81,6 +81,15 @@ function lacksRequiredScope(
   return required.some((scope) => !granted.includes(scope));
 }
 
+async function ownedProviderType(providerId: string, userId: string): Promise<string> {
+  const row = await getDb()
+    .select({ providerType: userProviders.providerType })
+    .from(userProviders)
+    .where(and(eq(userProviders.id, providerId), eq(userProviders.userId, userId)))
+    .limit(1);
+  return row[0]?.providerType ?? '';
+}
+
 function googleConnectScopes(providerType: string) {
   return Object.hasOwn(GOOGLE_CONNECT_SCOPES, providerType)
     ? GOOGLE_CONNECT_SCOPES[providerType]
@@ -682,7 +691,9 @@ routes.get('/providers/connect/google', requireAuth, async (c) => {
 
   const providerId = c.req.query('providerId') ?? undefined;
   const email = c.req.query('email') ?? undefined;
-  const providerType = c.req.query('providerType') ?? 'google-drive';
+  const providerType = providerId
+    ? await ownedProviderType(providerId, user.id)
+    : (c.req.query('providerType') ?? 'google-drive');
   const connect = googleConnectScopes(providerType);
   if (!connect) {
     throw new HTTPException(400, { message: 'providerType must be google-drive or google-photos' });
@@ -694,7 +705,7 @@ routes.get('/providers/connect/google', requireAuth, async (c) => {
 
   url.searchParams.set('access_type', 'offline');
   url.searchParams.set('prompt', 'consent');
-  url.searchParams.set('include_granted_scopes', 'true');
+  if (connect.required.length > 0) url.searchParams.set('include_granted_scopes', 'true');
   if (email) {
     url.searchParams.set('login_hint', email);
   }
@@ -892,7 +903,13 @@ routes.get('/callback/provider/google', async (c) => {
       result.email
     );
   } else {
-    storePending(validated.userId, state.nonce, result.refreshToken, result.email);
+    storePending(
+      validated.userId,
+      state.nonce,
+      result.refreshToken,
+      result.email,
+      state.providerType
+    );
   }
 
   return c.redirect(

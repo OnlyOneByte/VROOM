@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
-import { getPendingEmail } from '../../../utils/pending-credentials';
+import { consumePending, getPendingEmail } from '../../../utils/pending-credentials';
 
 let ctx: TestApp;
 let googleStorageClient: typeof import('../providers/google').googleStorageClient;
@@ -69,7 +69,25 @@ describe('connecting Google storage asks only for what the provider needs', () =
       const url = await connect(query);
       expect(scopesOf(url)).toContain(DRIVE_FILE);
       expect(scopesOf(url)).not.toContain(APPEND_ONLY);
+      expect(url.searchParams.has('include_granted_scopes')).toBe(false);
     }
+  });
+
+  test('reconnecting an existing provider asks for the scopes of its own type, whatever the query says', async () => {
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+       VALUES ('photos-1', ?, 'storage', 'google-photos', 'Photos', 'x', '{}', 'active')`,
+      [ctx.user.id]
+    );
+    const url = await connect('&providerId=photos-1&providerType=google-drive');
+    expect(scopesOf(url)).toContain(APPEND_ONLY);
+    expect(scopesOf(url)).not.toContain(DRIVE_FILE);
+  });
+
+  test('a stored Google Photos grant remembers it was made for Google Photos', async () => {
+    googleGrants(['openid', 'email', APPEND_ONLY]);
+    await callback(await connect('&providerType=google-photos'));
+    expect(consumePending(ctx.user.id, 'n-1')?.providerType).toBe('google-photos');
   });
 
   test('an unknown provider type is refused', async () => {

@@ -20,6 +20,7 @@ interface GoogleOAuthState {
 
 export interface GoogleOAuthReturn extends GoogleOAuthState {
 	startGoogleOAuth: () => void;
+	forget: () => void;
 	handleOAuthReturn: () => Promise<{
 		restoredSelectedType?: string;
 		restoredDisplayName?: string;
@@ -150,6 +151,10 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 			return oauthNonce;
 		},
 		startGoogleOAuth,
+		forget() {
+			pendingEmail = '';
+			oauthNonce = '';
+		},
 		handleOAuthReturn,
 		restoreFormState
 	};

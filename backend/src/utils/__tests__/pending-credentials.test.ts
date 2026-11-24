@@ -23,6 +23,7 @@ describe('storePending / consumePending — happy path + consume-once', () => {
     expect(consumePending('u1', 'n1')).toEqual({
       refreshToken: 'refresh-tok',
       email: 'a@example.com',
+      providerType: 'google-drive',
     });
     expect(consumePending('u1', 'n1')).toBeNull();
   });

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/env';
-	import { Cloud, CircleCheck, LoaderCircle } from '@lucide/svelte';
+	import { CircleCheck, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import type { ProviderFormProps } from '#lib/constants/providers.ts';
 
@@ -8,6 +8,7 @@
 		existingConfig,
 		isEditMode,
 		providerLabel,
+		providerIcon: ProviderIcon,
 		oauth,
 		connection = $bindable()
 	}: ProviderFormProps = $props();
@@ -70,7 +71,7 @@
 		</div>
 	{:else}
 		<div class="rounded-lg border border-border p-4 text-center">
-			<Cloud class="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+			<ProviderIcon class="h-8 w-8 text-muted-foreground mx-auto mb-2" />
 			<p class="text-sm text-muted-foreground mb-3">
 				Connect your Google account to use {providerLabel} for photo storage
 			</p>

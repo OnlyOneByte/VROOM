@@ -20,6 +20,10 @@ vi.mock('../../use-google-oauth.svelte', () => ({
 			return oauth.oauthNonce;
 		},
 		startGoogleOAuth: vi.fn(),
+		forget: () => {
+			oauth.pendingEmail = '';
+			oauth.oauthNonce = '';
+		},
 		handleOAuthReturn: () => Promise.resolve({}),
 		restoreFormState: () => null
 	})
@@ -145,6 +149,16 @@ describe('ProviderForm connection contract', () => {
 		expect(saveButton().disabled).toBe(false);
 
 		await fireEvent.click(screen.getByRole('button', { name: /Google Drive/ }));
+		expect(saveButton().disabled).toBe(true);
+	});
+
+	test('switching between Google types after connecting asks to connect again for the new one', async () => {
+		oauth.pendingEmail = 'me@example.com';
+		oauth.oauthNonce = '0f8fad5b-d9cb-469f-a165-70867728950e';
+		await startCreate(/Google Drive/);
+		expect(saveButton().disabled).toBe(false);
+
+		await fireEvent.click(screen.getByRole('button', { name: /Google Photos/ }));
 		expect(saveButton().disabled).toBe(true);
 	});
 
