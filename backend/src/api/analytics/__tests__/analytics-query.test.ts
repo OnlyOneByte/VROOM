@@ -193,6 +193,17 @@ describe('GET /analytics/query matches the existing summary aggregations', () =>
   });
 });
 
+describe('a start before any data', () => {
+  test('begins at the first expense, so All time draws no empty years', async () => {
+    seedFleet();
+    const result = await repo.query(OWNER.id, baseQuery({ start: 1 }));
+    expect(result.buckets[0]).toBe('2024-01');
+    expect(result.range.start).toBeGreaterThanOrEqual(RANGE.start);
+    const later = await repo.query(OWNER.id, baseQuery({ start: seconds('2024-06-01T00:00:00Z') }));
+    expect(later.buckets[0]).toBe('2024-06');
+  });
+});
+
 describe('bucketing follows the user calendar', () => {
   const lateOnJan31 = [
     { zone: 'America/Los_Angeles', instant: '2025-02-01T07:30:00Z' },
