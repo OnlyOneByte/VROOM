@@ -628,7 +628,7 @@ routes.patch('/me', requireAuth, authorize(ownAccount), async (c) => {
   });
 });
 
-routes.get('/capabilities', requireAuth, authorize(ownAccount), (c) =>
+routes.get('/capabilities', requireAuth, (c) =>
   c.json({
     success: true,
     data: {

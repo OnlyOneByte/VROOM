@@ -73,8 +73,8 @@ function validateSyncTypes(syncTypes: unknown): string[] {
 routes.post(
   '/',
   syncRateLimiter,
-  idempotency({ required: false }),
   authorize(ownAccount),
+  idempotency({ required: false }),
   async (c) => {
     const user = c.get('user');
     const userId = user.id;
@@ -192,8 +192,8 @@ routes.post(
   '/restore/from-provider',
   restoreRateLimiter,
   heavyJobLimiter,
-  idempotency({ required: true }),
   authorize(ownAccount),
+  idempotency({ required: true }),
   async (c) => {
     const user = c.get('user');
     const body = restoreFromProviderSchema.parse(await readJsonBody(c));
@@ -244,9 +244,9 @@ routes.post(
   '/restore/from-backup',
   restoreRateLimiter,
   heavyJobLimiter,
+  authorize(ownAccount),
   bodyLimit({ maxSize: CONFIG.backup.maxFileSize }),
   idempotency({ required: true }),
-  authorize(ownAccount),
   async (c) => {
     const user = c.get('user');
     const formData = await c.req.formData().catch(() => {

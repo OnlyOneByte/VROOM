@@ -2,9 +2,9 @@
 
 Every action in VROOM is a permission: a string such as `vehicle.expense.write` or
 `account.backup.run`. A feature declares its permissions in one `capabilities.ts` next to its
-routes, and maps each of its routes to one of them. Routes moved behind `authorize()` (expenses,
-odometer, reminders, trips, photos, role assignments and overrides so far) are enforced from the route map at runtime; the rest are
-still authorized by `requireAuth` and `requireVehicleAccess`, with the map in report mode.
+routes, and maps each of its routes to one of them. Every route is enforced from the route map
+at runtime: each non-public route runs `authorize()`, and the app-wide route guard refuses any
+route the map doesn't list.
 
 ## Permission ids
 
@@ -113,7 +113,10 @@ co-owner, or a person with allow overrides), and loan-linked or premium expenses
 whoever holds both `.write` permissions.
 
 The Demo role's vehicle reads count only for the built-in Demo row (built-in flag plus key), and
-only on the demo garage: vehicles whose owner holds that row. `GET /auth/capabilities` returns the
+only on the demo garage: vehicles whose owner holds that row. An actor holding the Demo role never
+resolves as an owner, not even of its own garage, so it gets reads only. The route guard in
+`src/permissions/route-guard.ts` lets the demo user call a route only when the Demo template holds
+every permission the route maps to, and no public route except a read. `GET /auth/capabilities` returns the
 caller's packed server and account rules, and the frontend `can()` in
 `src/lib/utils/permissions.ts` reads them.
 
@@ -146,10 +149,15 @@ Every route mounted in `src/app.ts` has one entry in `ROUTE_PERMISSIONS`
   assignments and overrides), and `{ byEntity: { <entityType>: [...] } }` requires every listed
   permission for that entity type (photos of policies and claims also need insurance access).
 
-To enforce a route, add `authorize(resourceOf)` after its validators. `resourceOf` loads the
+To enforce a route, add `authorize(resourceOf)` after its validators and rate limiters, and
+before idempotency and body limits, so a refused caller costs no stored response or body read. `resourceOf` loads the
 resource from the database (`fromExpense` reads the expense's vehicle and author), never from what
-the caller claims; identity always comes from the session. A route with no map entry is refused.
-Not visible → 404; visible but not allowed → 403.
+the caller claims; identity always comes from the session. A route with no map entry is refused at runtime by the route guard.
+Not visible → 404; visible but not allowed → 403. The few session routes that read the cookie
+themselves (`GET /auth/me`, `/auth/capabilities`, logout, refresh and the two OAuth returns) and
+`GET /overrides`, where anyone reads their own overrides, check inside instead;
+`src/permissions/__tests__/route-guard.test.ts` lists them and fails when any other mapped route
+lacks `authorize()`.
 - Use `{ public: '<reason>' }` only for routes a signed-out visitor must reach: health, the
   sign-in flow. The reason says why.
 

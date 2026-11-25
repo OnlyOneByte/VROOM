@@ -250,6 +250,7 @@ describe('approval', () => {
       await waiting('GET', '/api/v1/auth/me')
     );
     expect(me.data.pendingApproval).toBe(true);
+    expect((await waiting('GET', '/api/v1/auth/capabilities')).status).toBe(200);
 
     const pending = await json<DataEnvelope<{ id: string }[]>>(
       await admin('GET', '/api/v1/admin/pending-accounts')
