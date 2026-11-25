@@ -20,11 +20,9 @@ interface PendingDelete {
 	onDeleted?: (() => Promise<void> | void) | undefined;
 }
 
-// A split is deleted as a whole, so every vehicle's portion shares its group's key.
 const keyOf = (expense: Pick<Expense, 'id' | 'groupId'>) => expense.groupId ?? expense.id;
 const toastId = (key: string) => `expense-delete-${key}`;
 
-// In memory on purpose: nothing is queued, so a reload inside the window keeps the expense.
 const deletes = new SvelteMap<string, PendingDelete>();
 
 function update(key: string, change: Partial<PendingDelete>): void {
@@ -35,6 +33,7 @@ function update(key: string, change: Partial<PendingDelete>): void {
 async function send(key: string): Promise<void> {
 	const entry = deletes.get(key);
 	if (!entry) return;
+	appStore.dismissToast(toastId(key));
 	update(key, { status: 'sending', timer: undefined });
 	try {
 		await deleteExpenseRecord(entry.expense);
@@ -51,7 +50,6 @@ async function send(key: string): Promise<void> {
 		});
 		return;
 	}
-	// Stays hidden: the server copy is gone, and a list loaded before the refresh still holds it.
 	update(key, { status: 'deleted' });
 	try {
 		await entry.onDeleted?.();
@@ -62,7 +60,9 @@ async function send(key: string): Promise<void> {
 
 export function scheduleDelete(expense: Expense, onDeleted?: () => Promise<void> | void): void {
 	const key = keyOf(expense);
-	if (deletes.has(key)) return;
+	const existing = deletes.get(key);
+	if (existing && existing.status !== 'failed') return;
+	if (existing) appStore.dismissToast(toastId(key));
 	deletes.set(key, {
 		expense,
 		status: 'waiting',
@@ -95,10 +95,6 @@ export function retryDelete(key: string): void {
 export function isDeleteHidden(expense: Pick<Expense, 'id' | 'groupId'>): boolean {
 	const status = deletes.get(keyOf(expense))?.status;
 	return status !== undefined && status !== 'failed';
-}
-
-export function deleteKey(expense: Pick<Expense, 'id' | 'groupId'>): string {
-	return keyOf(expense);
 }
 
 export function deleteFailureStates(expenses: readonly Expense[]): [string, PendingRowState][] {

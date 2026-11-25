@@ -39,7 +39,7 @@
 	import FuelEfficiencyStatsCard from '#lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
 	import type { AttentionItem } from '#lib/components/dashboard/dashboard-data.ts';
 	import { formatDate } from '#lib/utils/formatters.ts';
-	import { matchesFilters } from '#lib/utils/sync/pending-rows.ts';
+	import { matchesFilters, withoutRowsInBreakdowns } from '#lib/utils/sync/pending-rows.ts';
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
@@ -162,9 +162,11 @@
 	let filters = $state<ExpenseFilters>({});
 	let expenseCategoryFilter = $state<string>('');
 
+	let chartSummary = $derived(withoutRowsInBreakdowns(summary, expenses.filter(isDeleteHidden)));
+
 	let expenseTrendData = $derived.by(() => {
-		if (!summary?.monthlyTrend.length) return [];
-		return summary.monthlyTrend.map(item => ({
+		if (!chartSummary?.monthlyTrend.length) return [];
+		return chartSummary.monthlyTrend.map(item => ({
 			date: parseMonthToDate(item.period),
 			amount: item.amount,
 			count: item.count
@@ -182,10 +184,10 @@
 	let recentFuelEfficiency = $derived(lastTwelveMonths(fuelEfficiencyData));
 
 	let categoryChartData = $derived.by(() => {
-		if (!summary?.categoryBreakdown.length) return [];
-		const total = summary.categoryBreakdown.reduce((sum, item) => sum + item.amount, 0);
+		if (!chartSummary?.categoryBreakdown.length) return [];
+		const total = chartSummary.categoryBreakdown.reduce((sum, item) => sum + item.amount, 0);
 		if (total === 0) return [];
-		return summary.categoryBreakdown
+		return chartSummary.categoryBreakdown
 			.map(item => ({
 				key: item.category,
 				label: categoryLabels[item.category as ExpenseCategory] || item.category,

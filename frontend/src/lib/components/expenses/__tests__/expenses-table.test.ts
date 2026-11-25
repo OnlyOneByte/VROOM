@@ -310,6 +310,21 @@ describe('ExpensesTable deleting', () => {
 		await waitFor(() => expect(desktopAmounts(container)).toEqual(['$75.00']));
 	});
 
+	test('a failed split delete shows the group row again with its reason and Retry', async () => {
+		deleteSplitExpense.mockRejectedValue('offline');
+		vi.useFakeTimers();
+		scheduleDelete(SPLIT[0]!);
+		await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS);
+		vi.useRealTimers();
+
+		mountTable({ expenses: SPLIT });
+
+		expect(screen.getByText(`Not deleted: ${UNEXPECTED_FAILURE_MESSAGE}`)).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole('button', { name: /^Retry deleting/ }));
+		await waitFor(() => expect(deleteSplitExpense).toHaveBeenCalledTimes(2));
+		expect(deleteSplitExpense).toHaveBeenLastCalledWith('g1');
+	});
+
 	test('a failed delete shows the row again with its reason and Retry', async () => {
 		deleteExpense.mockRejectedValue('offline');
 		vi.useFakeTimers();

@@ -19,8 +19,11 @@
 		isInsuranceLinked
 	} from './expense-table-actions';
 	import { rowTitle, tagsBesideCategory, type GroupRow } from './expense-table-rows';
+	import PendingSyncNote from './PendingSyncNote.svelte';
+	import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 
 	interface Props {
+		pending?: PendingRowState | undefined;
 		row: GroupRow;
 		vehicleMap: ReadonlyMap<string, Vehicle>;
 		showVehicleColumn: boolean;
@@ -41,7 +44,8 @@
 		returnTo,
 		isExpanded,
 		onToggle,
-		onDelete
+		onDelete,
+		pending
 	}: Props = $props();
 	let shownTags = $derived(tagsBesideCategory(row.tags, row.category));
 
@@ -73,6 +77,15 @@
 				{heading.title}
 			</span>
 		</div>
+		{#if pending}
+			<PendingSyncNote
+				{pending}
+				entryId={row.children[0]?.id ?? row.groupId}
+				deleteKey={row.groupId}
+				{returnTo}
+				label="{formatCurrency(row.totalAmount)} {heading.title}"
+			/>
+		{/if}
 	</TableCell>
 	<TableCell class="whitespace-nowrap text-muted-foreground">
 		{formatDate(new Date(row.date))}

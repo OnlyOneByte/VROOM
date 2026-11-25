@@ -72,6 +72,27 @@ describe('deleting an expense waits 5 s for Undo', () => {
 		expect(appStore.addNotification).toHaveBeenCalledTimes(1);
 	});
 
+	test('the Undo toast is taken down when the DELETE goes out, even if it was held open', async () => {
+		scheduleDelete(expense());
+		await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS);
+		expect(appStore.dismissToast).toHaveBeenCalledWith('expense-delete-e1');
+		lastAction().onClick();
+		expect(isDeleteHidden(expense())).toBe(true);
+	});
+
+	test('deleting again after a failure starts a new Undo window', async () => {
+		vi.mocked(expenseApi.deleteExpense).mockRejectedValueOnce(new ApiError('down', 500));
+		scheduleDelete(expense());
+		await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS);
+		expect(isDeleteHidden(expense())).toBe(false);
+
+		scheduleDelete(expense());
+		expect(isDeleteHidden(expense())).toBe(true);
+		expect(lastAction().label).toBe('Undo');
+		await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS);
+		expect(expenseApi.deleteExpense).toHaveBeenCalledTimes(2);
+	});
+
 	test('a split hides every vehicle portion and is deleted as one group', async () => {
 		scheduleDelete(expense({ id: 'a', groupId: 'g' }));
 		expect(isDeleteHidden(expense({ id: 'b', groupId: 'g' }))).toBe(true);

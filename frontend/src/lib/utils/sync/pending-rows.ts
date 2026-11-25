@@ -4,7 +4,6 @@ import { toDateInputValue } from '#lib/utils/formatters.ts';
 
 export interface PendingRowState {
 	status: 'saving' | 'failed';
-	// A failed delete of a server row, retried in place rather than through the offline queue.
 	kind?: 'delete';
 	error?: string;
 	editable?: boolean;
@@ -73,7 +72,6 @@ export function matchesFilters(expense: Expense, filters: PendingRowFilters): bo
 	);
 }
 
-// sign -1 takes rows out instead, for deletes still inside their Undo window.
 export function withPendingInSummary(
 	summary: ExpenseSummary | null,
 	rows: readonly Expense[],
@@ -107,11 +105,51 @@ export function withPendingByMonth(
 	return merged;
 }
 
+export function withoutRowsInBreakdowns(
+	summary: ExpenseSummary | null,
+	rows: readonly Expense[]
+): ExpenseSummary | null {
+	if (!summary || rows.length === 0) return summary;
+	const byMonth = totalsBy(rows, row => monthKey(row.date));
+	const byCategory = totalsBy(rows, row => row.category);
+	const less = <T extends { amount: number; count: number }>(
+		item: T,
+		taken = { amount: 0, count: 0 }
+	) => ({
+		...item,
+		amount: item.amount - taken.amount,
+		count: item.count - taken.count
+	});
+	return {
+		...summary,
+		monthlyTrend: summary.monthlyTrend.map(item => less(item, byMonth.get(item.period))),
+		categoryBreakdown: summary.categoryBreakdown
+			.map(item => less(item, byCategory.get(item.category)))
+			.filter(item => item.count > 0)
+	};
+}
+
+function totalsBy(
+	rows: readonly Expense[],
+	keyOf: (row: Expense) => string
+): Map<string, { amount: number; count: number }> {
+	const totals = new Map<string, { amount: number; count: number }>();
+	for (const row of rows) {
+		const seen = totals.get(keyOf(row)) ?? { amount: 0, count: 0 };
+		totals.set(keyOf(row), { amount: seen.amount + row.amount, count: seen.count + 1 });
+	}
+	return totals;
+}
+
+function monthKey(value: string): string {
+	const date = new Date(value);
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export function pendingAmountsByMonth(rows: readonly Expense[]): Map<string, number> {
 	const months = new Map<string, number>();
 	for (const row of rows) {
-		const date = new Date(row.date);
-		const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+		const month = monthKey(row.date);
 		months.set(month, (months.get(month) ?? 0) + row.amount);
 	}
 	return months;

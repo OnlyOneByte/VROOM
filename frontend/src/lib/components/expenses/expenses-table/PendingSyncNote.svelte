@@ -34,7 +34,10 @@
 			size="sm"
 			class="h-7"
 			aria-label="Retry deleting {label}"
-			onclick={() => retryDelete(deleteKey)}
+			onclick={event => {
+				event.stopPropagation();
+				retryDelete(deleteKey);
+			}}
 		>
 			Retry
 		</Button>

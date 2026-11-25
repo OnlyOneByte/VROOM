@@ -137,7 +137,6 @@
 	});
 	let pendingMatching = $derived(pending.rows.filter(row => matchesFilters(row, pendingFilters)));
 	let pendingListRows = $derived(currentOffset === 0 ? pendingMatching : []);
-	// shortcut: only rows on the loaded page leave the totals; a split's other pages stay until the refresh.
 	let deletingRows = $derived(expenses.filter(isDeleteHidden));
 	let shownSummary = $derived(
 		withPendingInSummary(
