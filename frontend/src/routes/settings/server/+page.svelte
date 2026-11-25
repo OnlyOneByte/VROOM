@@ -2,13 +2,14 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { ArrowLeft, CircleAlert, LoaderCircle } from '@lucide/svelte';
+	import { ArrowLeft, LoaderCircle } from '@lucide/svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import SignupModeCard from '#lib/components/settings/server/SignupModeCard.svelte';
-	import ServerInvitesCard from '#lib/components/settings/server/ServerInvitesCard.svelte';
-	import PendingAccountsCard from '#lib/components/settings/server/PendingAccountsCard.svelte';
+	import SignupModeCard from '#lib/components/settings/who-can-join/SignupModeCard.svelte';
+	import ServerInvitesCard from '#lib/components/settings/who-can-join/ServerInvitesCard.svelte';
+	import PendingAccountsCard from '#lib/components/settings/who-can-join/PendingAccountsCard.svelte';
 	import { signupApi, type SignupSettings } from '#lib/services/signup-api.ts';
 	import { routes } from '#lib/routes.ts';
 	import { can } from '#lib/utils/permissions.ts';
@@ -24,7 +25,7 @@
 			allowed = can(await signupApi.serverRules(), 'server.signup.manage');
 			if (allowed) settings = await signupApi.getSettings();
 		} catch (e) {
-			loadError = `Couldn't load the server settings. ${userFacingErrorMessage(e)}`;
+			loadError = userFacingErrorMessage(e);
 		}
 	}
 
@@ -54,13 +55,7 @@
 	</div>
 
 	{#if loadError}
-		<div class="rounded-lg border bg-card p-6">
-			<div class="mb-4 flex items-center gap-3 text-destructive">
-				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium" role="alert">{loadError}</p>
-			</div>
-			<Button onclick={load}>Retry</Button>
-		</div>
+		<LoadErrorCard title="Couldn't load the server settings" message={loadError} onRetry={load} />
 	{:else if allowed === false}
 		<p class="rounded-lg border bg-card p-6 text-sm text-muted-foreground" data-testid="not-admin">
 			Only a server admin can change who can join.

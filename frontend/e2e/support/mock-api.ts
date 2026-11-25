@@ -119,6 +119,43 @@ const EXPENSE_SUMMARY = {
 	monthlyTrend: [{ period: '2024-03', amount: 135.49, count: 2 }]
 };
 
+const SIGNUP_SETTINGS = {
+	mode: 'approval',
+	modeLocked: false,
+	allowedDomains: ['example.com'],
+	domainsLocked: false
+};
+
+const SERVER_INVITES = [
+	{
+		id: 'invite-open',
+		email: 'sam@example.org',
+		status: 'active',
+		createdAt: '2024-03-10T12:00:00.000Z',
+		expiresAt: '2099-03-17T12:00:00.000Z',
+		usedAt: null,
+		revokedAt: null
+	},
+	{
+		id: 'invite-used',
+		email: 'lee@example.com',
+		status: 'used',
+		createdAt: '2024-03-01T12:00:00.000Z',
+		expiresAt: '2024-03-08T12:00:00.000Z',
+		usedAt: '2024-03-02T09:30:00.000Z',
+		revokedAt: null
+	}
+];
+
+const PENDING_ACCOUNTS = [
+	{
+		id: 'pending-kim',
+		email: 'kim@example.com',
+		displayName: 'Kim Park',
+		pendingSince: '2024-03-14T08:00:00.000Z'
+	}
+];
+
 const SETTINGS = {
 	id: 'settings-1',
 	userId: E2E_USER.id,
@@ -232,6 +269,15 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 			]);
 		}
 		if (path === '/auth/accounts') return fulfillData(route, []);
+		if (path === '/auth/capabilities') {
+			return fulfillData(route, { rules: [['server.signup.manage', 'all']] });
+		}
+		if (path === '/admin/signup') {
+			const change = method === 'PUT' ? (request.postDataJSON() ?? {}) : {};
+			return fulfillData(route, { ...SIGNUP_SETTINGS, ...change });
+		}
+		if (path === '/admin/invites') return fulfillData(route, SERVER_INVITES);
+		if (path === '/admin/pending-accounts') return fulfillData(route, PENDING_ACCOUNTS);
 		if (path === '/auth/logout') return fulfillData(route, { success: true });
 
 		if (path === '/settings') return fulfillData(route, SETTINGS);

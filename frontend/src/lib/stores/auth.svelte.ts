@@ -127,7 +127,7 @@ function createAuthStore() {
 					session: { expiresAt: string };
 					pendingApproval?: boolean;
 				}>('/auth/me');
-				signIn({ ...result.user, pendingApproval: result.pendingApproval === true });
+				signIn(result.pendingApproval ? { ...result.user, pendingApproval: true } : result.user);
 			} catch (err) {
 				const cached = isSignedOutResponse(err) ? null : (user ?? lastKnownUser());
 				if (!cached) {
