@@ -45,7 +45,6 @@
 				providerApi.getProviders('llm'),
 				settingsApi.getSettings().catch(() => null)
 			]);
-			// Same pick as the backend's resolveProvider: the saved default, else the oldest.
 			const usable = providers
 				.filter(p => p.status !== 'disabled')
 				.sort(
