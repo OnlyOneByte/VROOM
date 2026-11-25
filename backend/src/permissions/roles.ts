@@ -88,9 +88,15 @@ const EDITOR_PERMISSIONS: readonly PermissionId[] = [
   'vehicle.photo.delete_own',
   'vehicle.share.read',
   'vehicle.community.read',
+  'vehicle.driver.record',
+  'vehicle.driver_stats.read_own',
 ];
 
-const VIEWER_HIDDEN: readonly PermissionId[] = ['vehicle.financing.read', 'vehicle.insurance.read'];
+const VIEWER_HIDDEN: readonly PermissionId[] = [
+  'vehicle.financing.read',
+  'vehicle.insurance.read',
+  'vehicle.driver_stats.read',
+];
 
 function buildRoleTemplates(
   registry: PermissionRegistry<PermissionId>
@@ -129,9 +135,10 @@ function buildRoleTemplates(
       key: 'viewer',
       name: 'Viewer',
       scope: 'vehicle',
-      permissions: select(
-        (d) => d.scope === 'vehicle' && isRead(d) && !VIEWER_HIDDEN.includes(d.id)
-      ),
+      permissions: [
+        ...select((d) => d.scope === 'vehicle' && isRead(d) && !VIEWER_HIDDEN.includes(d.id)),
+        'vehicle.driver_stats.read_own',
+      ],
     },
   ];
 }

@@ -14,9 +14,10 @@ An id is `<scope>.<resource>.<action>`, or `<scope>.<action>` for the scope itse
 - **Scopes** (`PERMISSION_SCOPES` in `src/permissions/vocabulary.ts`): `server`, `account` and
   `vehicle`.
 - **Actions**: `read`, `write` (create and update), `delete`, `delete_own` (entries the actor
-  added), `manage` (change who can do things), `run` (trigger a job) and `use` (spend a shared
-  resource). A few verbs that read badly as one of these are listed in `NAMED_ACTIONS`
-  (`vehicle.transfer`, `account.backup.restore`). Add to that list only when no core action fits.
+  added), `read_own` (only the actor's own share of the data), `manage` (change who can do
+  things), `run` (trigger a job) and `use` (spend a shared resource). A few verbs that read badly
+  as one of these are listed in `NAMED_ACTIONS` (`vehicle.transfer`, `account.backup.restore`,
+  `vehicle.driver.record`). Add to that list only when no core action fits.
 - Segments are lower-case `snake_case`.
 
 ## Declaring them

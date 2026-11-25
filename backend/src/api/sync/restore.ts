@@ -20,6 +20,7 @@ import {
   userPreferences,
   userProviders,
   users,
+  vehicleDrivers,
   vehicleFinancing,
   vehicleShares,
   vehicles,
@@ -84,6 +85,7 @@ export interface ImportSummary {
   syncState: number;
   trips: number;
   vehicleShares: number;
+  vehicleDrivers: number;
 }
 
 export interface RestoreResponse {
@@ -125,6 +127,7 @@ function summarizeBackup(data: ParsedBackupData): ImportSummary {
     syncState: data.syncState?.length ?? 0,
     trips: data.trips?.length ?? 0,
     vehicleShares: data.vehicleShares?.length ?? 0,
+    vehicleDrivers: data.vehicleDrivers?.length ?? 0,
   };
 }
 
@@ -305,6 +308,7 @@ class RestoreService {
       ),
       trips: coerceRows(sheet.trips, TABLE_SCHEMA_MAP.trips),
       vehicleShares: coerceRows(sheet.vehicleShares, TABLE_SCHEMA_MAP.vehicleShares),
+      vehicleDrivers: coerceRows(sheet.vehicleDrivers, TABLE_SCHEMA_MAP.vehicleDrivers),
     });
 
     const validation = backupService.validateBackupData(sheetData, 'sheets');
@@ -409,6 +413,14 @@ class RestoreService {
         name: 'trips',
         scope: eq(trips.userId, userId),
         idColumn: trips.id,
+        idField: 'id' as const,
+      },
+      {
+        data: data.vehicleDrivers ?? [],
+        table: vehicleDrivers,
+        name: 'vehicle_drivers',
+        scope: inArray(vehicleDrivers.vehicleId, userVehicleIds),
+        idColumn: vehicleDrivers.id,
         idField: 'id' as const,
       },
       {
@@ -549,6 +561,16 @@ class RestoreService {
     );
   }
 
+  private memberDriverId(
+    driver: Record<string, unknown>,
+    ownerId: string,
+    consentedShares: Set<string>
+  ): string | null {
+    const userId = driver.userId == null ? null : String(driver.userId);
+    if (userId === null || userId === ownerId) return userId;
+    return consentedShares.has(shareConsentKey(String(driver.vehicleId), userId)) ? userId : null;
+  }
+
   private insertRows<TTable extends SQLiteTable>(
     tx: DrizzleTransaction,
     table: TTable,
@@ -590,6 +612,15 @@ class RestoreService {
             ? row.catalogModelId
             : null,
         vehicleKind: isVehicleKind(row.vehicleKind) ? row.vehicleKind : 'car',
+      }))
+    );
+    this.insertRows(
+      tx,
+      vehicleDrivers,
+      (data.vehicleDrivers ?? []).map((driver) => ({
+        ...driver,
+        userId: this.memberDriverId(driver, userId, consentedShares),
+        createdBy: knownUserIds.has(String(driver.createdBy)) ? driver.createdBy : null,
       }))
     );
     this.insertRows(tx, vehicleFinancing, data.financing ?? []);

@@ -143,6 +143,7 @@ export interface BackupData {
   reminderNotifications?: import('./db/schema').ReminderNotification[];
   trips?: import('./db/schema').Trip[];
   vehicleShares?: import('./db/schema').VehicleShare[];
+  vehicleDrivers?: import('./db/schema').VehicleDriver[];
 }
 
 export interface ParsedBackupData {
@@ -164,6 +165,7 @@ export interface ParsedBackupData {
   reminderNotifications?: Record<string, unknown>[];
   trips?: Record<string, unknown>[];
   vehicleShares?: Record<string, unknown>[];
+  vehicleDrivers?: Record<string, unknown>[];
 }
 
 export interface ProviderBackupSettings {
