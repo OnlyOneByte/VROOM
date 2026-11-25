@@ -61,6 +61,7 @@ describe('sonner toasts in app.css', () => {
 			r => r.selectors.includes('[data-sonner-toast] [data-button]') && /font-weight/.test(r.body)
 		);
 		expect(title?.body).toMatch(/font-weight:\s*650\s*!important/);
+		expect(title?.body).toMatch(/line-height:\s*1\.25rem\s*!important/);
 		expect(action?.body).toMatch(/font-weight:\s*650\s*!important/);
 		expect(action?.body).toMatch(/font-size:\s*0\.875rem\s*!important/);
 	});
@@ -71,6 +72,13 @@ describe('sonner toasts in app.css', () => {
 		);
 		expect(focus?.selectors).toContain('[data-sonner-toast] [data-close-button]:focus-visible');
 		expect(focus?.body).toMatch(/outline:\s*2px solid var\(--bar-on\)/);
+	});
+
+	test('only a toast without an action pads its text for the close badge', () => {
+		const padded = toastRules.find(r => /padding-right:\s*1\.5rem/.test(r.body));
+		expect(padded?.selectors).toEqual([
+			'[data-sonner-toast]:not(:has([data-button])) [data-content]'
+		]);
 	});
 
 	test('the toast keeps the C3 radius and the single pop shadow, with no border', () => {
