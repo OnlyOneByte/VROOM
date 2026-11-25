@@ -1,6 +1,7 @@
 import { and, eq, ne } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { userProviders } from '../../db/schema';
@@ -22,7 +23,6 @@ import { backupService } from './backup';
 import { backupOrchestrator } from './backup-orchestrator';
 import { hasSheetsSync, hasZipBackup, isSyncEnabled } from './backup-strategy';
 import './init';
-import { repos } from '../../app-context';
 import { type RestoreResponse, restoreService } from './restore';
 
 const routes = new Hono();

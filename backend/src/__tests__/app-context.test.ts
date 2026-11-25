@@ -24,7 +24,11 @@ function isolatedDb() {
 }
 
 describe('the app context', () => {
-  test('importing the app opens no database', () => {
+  test('importing any production module opens no database', () => {
+    const modules = [...new Bun.Glob('src/**/*.ts').scanSync(join(import.meta.dir, '../..'))]
+      .filter((f) => !/__tests__|test-helpers|\/scripts\/|\.d\.ts$|^src\/index\.ts$/.test(f))
+      .map((f) => `./${f}`);
+    expect(modules).toContain('./src/api/providers/sync-worker.ts');
     const dir = mkdtempSync(join(tmpdir(), 'vroom-import-'));
     try {
       const file = join(dir, 'never-opened.db');
@@ -33,9 +37,12 @@ describe('the app context', () => {
           process.execPath,
           '--env-file=/dev/null',
           '-e',
-          "await import('./src/app.ts'); process.exit(0)",
+          'for (const m of JSON.parse(process.env.MODULES)) await import(m); process.exit(0)',
         ],
-        { cwd: join(import.meta.dir, '../..'), env: { ...process.env, DATABASE_URL: file } }
+        {
+          cwd: join(import.meta.dir, '../..'),
+          env: { ...process.env, DATABASE_URL: file, MODULES: JSON.stringify(modules) },
+        }
       );
       expect(run.exitCode, run.stderr.toString()).toBe(0);
       expect(existsSync(file)).toBe(false);
