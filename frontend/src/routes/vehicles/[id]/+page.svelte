@@ -1061,7 +1061,6 @@
 											yAxisFormat={v => String(v)}
 											xAxisProps={{ format: formatCurrencyAxis }}
 											tooltipFormat={formatCurrencyTooltip}
-											valueLabels
 											isLoading={isLoadingStats}
 										/>
 									{/if}
