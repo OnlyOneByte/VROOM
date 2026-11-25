@@ -40,16 +40,65 @@ describe('editing an expense updates the row while the PUT runs', () => {
 	beforeEach(() => vi.clearAllMocks());
 	afterEach(() => resetPendingEdits());
 
-	test('the row shows the new values at once, before the PUT answers', () => {
+	function notices(): Record<string, unknown>[] {
+		return appStore.addNotification.mock.calls.map(([notice]) => notice as Record<string, unknown>);
+	}
+
+	test('the row shows the new values at once, with one success toast, before the PUT answers', async () => {
 		const put = deferred();
 		vi.mocked(expenseApi.updateExpense).mockReturnValue(put.promise);
 
 		scheduleEdit(saved, changed, payload);
 
-		expect(expenseApi.updateExpense).toHaveBeenCalledWith('e1', payload);
 		expect(shownExpense(saved)).toMatchObject({ amount: 55, description: 'Shell' });
 		expect(editedRows([saved])).toEqual({ before: [saved], after: [changed] });
-		expect(appStore.addNotification).not.toHaveBeenCalled();
+		expect(notices()).toEqual([
+			expect.objectContaining({ type: 'success', toastId: 'expense-edit-e1' })
+		]);
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledWith('e1', payload));
+	});
+
+	test('a failure replaces the success toast under the same id instead of adding a second', async () => {
+		vi.mocked(expenseApi.updateExpense).mockRejectedValueOnce(new ApiError('down', 500));
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(notices()).toHaveLength(2));
+
+		const [success, failure] = notices();
+		expect(success?.['toastId']).toBe(failure?.['toastId']);
+		expect(failure?.['type']).toBe('error');
+		expect(appStore.dismissToast).not.toHaveBeenCalled();
+	});
+
+	test('a second save waits for the first, and a late failure of the first cannot undo it', async () => {
+		const first = deferred();
+		const second = deferred();
+		vi.mocked(expenseApi.updateExpense)
+			.mockReturnValueOnce(first.promise)
+			.mockReturnValueOnce(second.promise);
+		const again = { ...changed, amount: 70 };
+		const againPayload = { vehicleId: 'v1', category: 'fuel', amount: 70 } as never;
+
+		scheduleEdit(saved, changed, payload);
+		scheduleEdit(saved, again, againPayload);
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1));
+
+		first.reject(new ApiError('down', 500));
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
+		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith('e1', againPayload);
+		expect(shownExpense(saved)).toMatchObject({ amount: 70 });
+		expect(editFailureStates([saved])).toEqual([]);
+
+		second.resolve(again);
+		await vi.waitFor(() => expect(shownExpense(saved)).toMatchObject({ amount: 70 }));
+		expect(notices().filter(n => n['type'] === 'error')).toEqual([]);
+	});
+
+	test('a failure note is dropped once the list holds a newer server copy', async () => {
+		vi.mocked(expenseApi.updateExpense).mockRejectedValueOnce(new ApiError('down', 500));
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(editFailureStates([saved])).toHaveLength(1));
+
+		expect(editFailureStates([{ ...saved, updatedAt: '2026-11-25T09:00:00.000Z' }])).toEqual([]);
 	});
 
 	test('a list refreshed after the save shows the server copy, not the overlay', async () => {
@@ -65,7 +114,7 @@ describe('editing an expense updates the row while the PUT runs', () => {
 	test('a failed PUT reverts the row, keeps its reason, and offers Retry once', async () => {
 		vi.mocked(expenseApi.updateExpense).mockRejectedValueOnce(new ApiError('SQLITE_BUSY', 500));
 		scheduleEdit(saved, changed, payload);
-		await vi.waitFor(() => expect(appStore.addNotification).toHaveBeenCalledTimes(1));
+		await vi.waitFor(() => expect(appStore.addNotification).toHaveBeenCalledTimes(2));
 
 		expect(shownExpense(saved)).toBe(saved);
 		expect(editedRows([saved])).toEqual({ before: [], after: [] });
@@ -73,7 +122,7 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		expect(id).toBe('e1');
 		expect(state).toMatchObject({ status: 'failed', kind: 'edit' });
 		expect(state?.error).not.toContain('SQLITE_BUSY');
-		const [notice] = appStore.addNotification.mock.calls[0] as [Record<string, unknown>];
+		const notice = notices()[1] ?? {};
 		expect(notice['type']).toBe('error');
 		expect((notice['action'] as { label: string }).label).toBe('Retry');
 

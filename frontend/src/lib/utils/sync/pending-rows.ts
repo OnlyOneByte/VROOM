@@ -144,9 +144,16 @@ export function withRowsInBreakdowns(
 	const newCategories = [...byCategory]
 		.filter(([category]) => !listed.has(category))
 		.map(([category, totals]) => ({ category, ...totals }));
+	const listedMonths = new Set(summary.monthlyTrend.map(item => item.period));
+	const newMonths = [...byMonth]
+		.filter(([period]) => !listedMonths.has(period))
+		.map(([period, totals]) => ({ period, ...totals }));
 	return {
 		...summary,
-		monthlyTrend: summary.monthlyTrend.map(item => more(item, byMonth.get(item.period))),
+		monthlyTrend: [
+			...summary.monthlyTrend.map(item => more(item, byMonth.get(item.period))),
+			...newMonths
+		].sort((a, b) => a.period.localeCompare(b.period)),
 		categoryBreakdown: [
 			...summary.categoryBreakdown.map(item => more(item, byCategory.get(item.category))),
 			...newCategories

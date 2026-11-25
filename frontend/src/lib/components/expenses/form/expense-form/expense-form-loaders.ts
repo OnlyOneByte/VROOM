@@ -23,6 +23,7 @@ import { parsePreselectedTags } from './expense-navigation';
 import { splitStateFromGroup } from './split-config';
 import { readQuickAddMemory } from './quick-add-memory';
 import type { ExpenseFormState } from './expense-form-state.svelte';
+import { shownExpense } from '#lib/utils/pending-edits.svelte.ts';
 
 interface PreselectedValues {
 	vehicleId: string | null;
@@ -122,7 +123,8 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 	state.isLoading = true;
 	state.expenseError = null;
 	try {
-		const expense = await expenseApi.getExpense(expenseId!);
+		const loaded = await expenseApi.getExpense(expenseId!);
+		const expense = loaded && shownExpense(loaded);
 		if (!expense) {
 			leaveGoneRecord(state, 'expense');
 			return;

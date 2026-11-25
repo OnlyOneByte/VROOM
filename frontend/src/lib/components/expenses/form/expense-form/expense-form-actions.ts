@@ -116,12 +116,8 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 				scheduleEdit(before, { ...before, ...expenseData, ...paidBy }, payload);
 			} else {
 				await expenseApi.updateExpense(expenseId!, payload);
+				appStore.addNotification({ type: 'success', message: 'Expense updated successfully' });
 			}
-
-			appStore.addNotification({
-				type: 'success',
-				message: 'Expense updated successfully'
-			});
 			gotoDynamic(returnTo);
 		} else if (isSplitCreate) {
 			const splitConfig = buildSplitConfig(

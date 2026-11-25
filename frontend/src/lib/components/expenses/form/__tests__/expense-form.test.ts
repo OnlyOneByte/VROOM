@@ -86,7 +86,7 @@ const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
 const { loadOfflineExpenses } = await import('#lib/utils/offline-storage.ts');
 const { isDeleteHidden, resetPendingDeletes } =
 	await import('#lib/utils/pending-deletes.svelte.ts');
-const { resetPendingEdits } = await import('#lib/utils/pending-edits.svelte.ts');
+const { resetPendingEdits, scheduleEdit } = await import('#lib/utils/pending-edits.svelte.ts');
 const queued = () => loadOfflineExpenses();
 const { FUEL_NEEDS_VEHICLE_MESSAGE } = await import('../expense-form/expense-form-state.svelte.ts');
 
@@ -662,6 +662,16 @@ describe('ExpenseForm edit mode', () => {
 		expect(createExpense).not.toHaveBeenCalled();
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/v1'));
 		expect(notificationMessages()).toContain('Expense updated successfully');
+	});
+
+	test('reopening an expense while its save is running starts from the new values', async () => {
+		updateExpense.mockReturnValue(new Promise(() => {}));
+		scheduleEdit(EXISTING, { ...EXISTING, amount: 85 }, {} as never);
+
+		await renderEdit();
+
+		await vi.waitFor(() => expect(field('amount').value).toBe('85'));
+		resetPendingEdits();
 	});
 
 	test('saving returns at once, and a refused update is reported once with its reason and Retry', async () => {

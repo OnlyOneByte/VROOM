@@ -52,7 +52,10 @@
 			size="sm"
 			class="h-7"
 			aria-label="Retry saving changes to {label}"
-			onclick={() => retryEdit(entryId)}
+			onclick={event => {
+				event.stopPropagation();
+				retryEdit(entryId);
+			}}
 		>
 			Retry
 		</Button>

@@ -60,18 +60,22 @@ describe('editing a financing payment', () => {
 		const kept = editState();
 		await loadExpense(kept);
 		await submitExpense(kept);
-		expect(expenseApiMock.updateExpense).toHaveBeenLastCalledWith(
-			'e1',
-			expect.objectContaining({ sourceType: undefined, sourceId: undefined })
+		await vi.waitFor(() =>
+			expect(expenseApiMock.updateExpense).toHaveBeenLastCalledWith(
+				'e1',
+				expect.objectContaining({ sourceType: undefined, sourceId: undefined })
+			)
 		);
 
 		const cleared = editState();
 		await loadExpense(cleared);
 		cleared.selectCategory('maintenance');
 		await submitExpense(cleared);
-		expect(expenseApiMock.updateExpense).toHaveBeenLastCalledWith(
-			'e1',
-			expect.objectContaining({ sourceType: null, sourceId: null })
+		await vi.waitFor(() =>
+			expect(expenseApiMock.updateExpense).toHaveBeenLastCalledWith(
+				'e1',
+				expect.objectContaining({ sourceType: null, sourceId: null })
+			)
 		);
 	});
 });
