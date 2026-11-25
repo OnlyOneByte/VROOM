@@ -32,6 +32,23 @@ test.describe('Fleet overview', () => {
 		);
 	});
 
+	test('the Garage tab lists the fleet and opens a vehicle', async ({ page }) => {
+		await mockApi(page);
+
+		await page.goto('/dashboard');
+		await page
+			.getByRole('navigation', { name: 'Main' })
+			.getByRole('link', { name: 'Garage' })
+			.click();
+
+		await expect(page).toHaveURL(/\/vehicles$/);
+		await expect(page.getByRole('heading', { level: 1, name: /vehicles?$/ })).toBeVisible();
+		const camry = page.getByRole('link', { name: VEHICLE_CAMRY.nickname });
+		await expect(camry).toHaveAttribute('href', `/vehicles/${VEHICLE_CAMRY.id}`);
+		await camry.click();
+		await expect(page).toHaveURL(new RegExp(`/vehicles/${VEHICLE_CAMRY.id}$`));
+	});
+
 	test('a financed vehicle is badged as financed', async ({ page }) => {
 		await mockApi(page, {
 			vehicles: [

@@ -4,6 +4,7 @@
 	"default": 100,
 	"routes": {
 		"/dashboard": 70,
+		"/vehicles": 80,
 		"/vehicles/[id]": 80,
 		"/expenses": 123,
 		"/expenses/new": 110,
