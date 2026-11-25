@@ -144,7 +144,7 @@
 {#snippet documentGrid()}
 	<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
 		{#each documents as doc (doc.id)}
-			<div class="group relative overflow-hidden rounded-md border border-border bg-muted/50">
+			<div class="group relative overflow-hidden rounded-md border border-border bg-muted">
 				{#if isImage(doc.mimeType)}
 					<img
 						src={insuranceApi.getEntityDocumentThumbnailUrl(entityType, entityId, doc.id)}

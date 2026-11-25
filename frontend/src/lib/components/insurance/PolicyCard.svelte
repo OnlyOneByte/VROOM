@@ -92,10 +92,8 @@
 <Card class="py-0" data-in-force={isPolicyInForce(policy)}>
 	<CardContent class="p-4">
 		<div class="flex items-center justify-between gap-2">
-			<div class="flex items-center gap-2.5 min-w-0">
-				<div class="flex-shrink-0 rounded-full bg-primary/10 p-2">
-					<Building2 class="h-4 w-4 text-primary" />
-				</div>
+			<div class="flex min-w-0 items-center gap-2.5">
+				<Building2 class="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
 				<div class="min-w-0">
 					<svelte:element
 						this={`h${level}`}

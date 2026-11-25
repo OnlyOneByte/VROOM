@@ -359,7 +359,9 @@ describe('ClaimsSection filing a claim', () => {
 		mount();
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));
-		await fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+		await fireEvent.click(
+			within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' })
+		);
 		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 		expect(screen.getByText('No claims filed.')).toBeInTheDocument();
 		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));

@@ -83,7 +83,7 @@
 
 	<dl
 		class={isCurrent
-			? 'grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3'
+			? 'grid grid-cols-3 gap-x-4 gap-y-3 sm:gap-x-6'
 			: 'grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs'}
 	>
 		{#if isCurrent}
