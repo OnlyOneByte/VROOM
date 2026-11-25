@@ -72,6 +72,7 @@ describe('ReminderRow status', () => {
 		);
 		expect(screen.getByText('At 40,000')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Mark serviced' })).toBeInTheDocument();
+		expect(screen.getByTestId('reminder-card-r1').textContent).not.toContain('on the odometer');
 	});
 
 	test('a paused reminder with a vehicle offers Resume; one without a vehicle explains why not', () => {

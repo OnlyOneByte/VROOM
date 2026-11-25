@@ -188,13 +188,16 @@
 	let headerDescription = $derived(
 		reminders.length === 0
 			? 'Recurring expenses and maintenance reminders'
-			: [
-					`${formatNumber(dueReminders.length, 0)} due now`,
-					`${formatNumber(upcomingReminders.length, 0)} coming up`,
-					...(inactiveReminders.length > 0
-						? [`${formatNumber(inactiveReminders.length, 0)} paused`]
-						: [])
-				].join(', ')
+			: (
+					[
+						[dueReminders.length, 'due now'],
+						[upcomingReminders.length, 'coming up'],
+						[inactiveReminders.length, 'paused']
+					] as const
+				)
+					.filter(([count]) => count > 0)
+					.map(([count, label]) => `${formatNumber(count, 0)} ${label}`)
+					.join(', ')
 	);
 
 	onMount(load);

@@ -71,7 +71,7 @@
 			parts.push(vehicleIds.map(id => vehicleNames.get(id) ?? 'Vehicle').join(', '));
 		}
 		if (reminder.nextDueDate !== null) parts.push(formatDate(reminder.nextDueDate));
-		else if (reminder.nextDueOdometer !== null) {
+		else if (reminder.nextDueOdometer !== null && group === 'paused') {
 			parts.push(`at ${formatNumber(reminder.nextDueOdometer, 0)} on the odometer`);
 		}
 		if (reminder.expenseAmount != null) parts.push(`~${formatCurrency(reminder.expenseAmount)}`);
