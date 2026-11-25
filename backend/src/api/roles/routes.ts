@@ -33,7 +33,7 @@ import {
 } from '../../permissions/grants';
 import { PERMISSION_REGISTRY } from '../../permissions/registry';
 import type { Resource } from '../../permissions/resolve';
-import type { RoleScope } from '../../permissions/roles';
+import { DEMO_ROLE_KEY, type RoleScope } from '../../permissions/roles';
 import { readJsonBody } from '../../utils/request-body';
 import { commonSchemas, zValidator } from '../../utils/validation';
 
@@ -210,6 +210,7 @@ roleRoutes.post('/', zValidator('json', createRoleSchema), (c) => {
   const { scope, name, color, copyFrom } = c.req.valid('json');
   const ownerUserId = scope === 'vehicle' ? requireLibrary(c) : requireRoleManager(c);
   const copied = copyFrom ? roleFor(c, copyFrom, false) : null;
+  if (copied) refuseDemoRole(copied);
   if (copied && copied.scope !== scope) {
     throw new ValidationError('A role can only be copied into a role of the same scope');
   }
@@ -292,8 +293,15 @@ const assignmentSchema = z.object({
   scopeId: z.string().min(1).nullish(),
 });
 
+function refuseDemoRole(role: Role): void {
+  if (role.builtIn && role.key === DEMO_ROLE_KEY) {
+    throw new ValidationError('The Demo role belongs to the demo garage and cannot be given out');
+  }
+}
+
 function assignable(c: Context, input: z.infer<typeof assignmentSchema>) {
   const role = findRole(input.roleId);
+  refuseDemoRole(role);
   const authority = authorityAt(c, role.scope, input.scopeId);
   if (role.scope === 'vehicle' && !role.builtIn && role.ownerUserId !== authority.ownerId) {
     throw new NotFoundError('Role');

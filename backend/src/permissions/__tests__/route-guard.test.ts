@@ -4,7 +4,7 @@ import { DEMO_USER_ID } from '../../api/auth/demo-account';
 import { app } from '../../app';
 import { getDb } from '../../db/connection';
 import type { AppError } from '../../errors';
-import { createTestApp } from '../../test-helpers/http-client';
+import { createTestApp, requestAs } from '../../test-helpers/http-client';
 import { assignServerRole, resolverFor } from '../grants';
 import { routeGuard } from '../route-guard';
 import { isPublicRule, ROUTE_PERMISSIONS } from '../route-map';
@@ -15,9 +15,9 @@ const SELF_CHECKED_ROUTES: Record<string, string> = {
   'POST /api/v1/auth/logout': 'must clear any session, expired ones included',
   'POST /api/v1/auth/refresh': 'reads the session cookie itself and answers 401 without one',
   'GET /api/v1/auth/callback/link/:authProvider':
-    'OAuth return: checks its stored state and session; the start route is authorized',
+    'OAuth return: checks its stored state, the session and the permission it started with',
   'GET /api/v1/auth/callback/provider/google':
-    'OAuth return: checks its stored state and session; the start route is authorized',
+    'OAuth return: checks its stored state, the session and the permission it started with',
   'GET /api/v1/overrides':
     'anyone reads their own overrides; reading another person’s is checked inside',
   'GET /api/v1/roles': 'server roles need server.roles.manage, vehicle roles the owner’s library',
@@ -27,6 +27,54 @@ const SELF_CHECKED_ROUTES: Record<string, string> = {
   'GET /api/v1/roles/:id/permissions': 'checked by the role’s scope inside',
   'PUT /api/v1/roles/:id/permissions': 'checked by the role’s scope inside',
 };
+
+type Probe = [method: string, path: string, body?: unknown];
+
+const PROBE_ROLE = 'probe-server-role';
+
+const SELF_CHECK_PROBES: Record<string, Probe> = {
+  'GET /api/v1/overrides': ['GET', '/api/v1/overrides?userId=OWNER&scope=server'],
+  'GET /api/v1/roles': ['GET', '/api/v1/roles?scope=server'],
+  'POST /api/v1/roles': ['POST', '/api/v1/roles', { scope: 'server', name: 'Probe' }],
+  'PATCH /api/v1/roles/:id': ['PATCH', `/api/v1/roles/${PROBE_ROLE}`, { name: 'Renamed' }],
+  'DELETE /api/v1/roles/:id': ['DELETE', `/api/v1/roles/${PROBE_ROLE}`],
+  'GET /api/v1/roles/:id/permissions': ['GET', `/api/v1/roles/${PROBE_ROLE}/permissions`],
+  'PUT /api/v1/roles/:id/permissions': [
+    'PUT',
+    `/api/v1/roles/${PROBE_ROLE}/permissions`,
+    { permissions: [] },
+  ],
+};
+
+describe('routes that check inside really refuse', () => {
+  test('every self-checked route outside the session flow has a probe', () => {
+    const unprobed = Object.keys(SELF_CHECKED_ROUTES).filter(
+      (key) => !key.includes(' /api/v1/auth/') && !(key in SELF_CHECK_PROBES)
+    );
+    expect(unprobed).toEqual([]);
+  });
+
+  test('an account without a server role is refused by each of them', async () => {
+    const ctx = await createTestApp();
+    try {
+      ctx.sqlite.run(
+        `INSERT INTO roles (id, scope, name, built_in) VALUES ('${PROBE_ROLE}', 'server', 'Probe', 0)`
+      );
+      ctx.sqlite.run(
+        "INSERT INTO users (id, email, display_name) VALUES ('no-role', 'n@x.test', 'N')"
+      );
+      const caller = await requestAs(ctx, 'no-role');
+      const answered: string[] = [];
+      for (const [key, [method, path, body]] of Object.entries(SELF_CHECK_PROBES)) {
+        const res = await caller.request(method, path.replace('OWNER', ctx.user.id), body);
+        if (res.status !== 403 && res.status !== 404) answered.push(`${key} -> ${res.status}`);
+      }
+      expect(answered).toEqual([]);
+    } finally {
+      ctx.close();
+    }
+  });
+});
 
 describe('every mapped route enforces its permission', () => {
   test('each non-public route runs authorize(), apart from the routes that check inside', () => {
@@ -141,6 +189,50 @@ describe('the roles routes check by scope', () => {
         [ctx.user.id]
       );
       expect((await ctx.authed('GET', '/api/v1/roles?scope=server')).status).toBe(200);
+    } finally {
+      ctx.close();
+    }
+  });
+});
+
+describe('the Demo role stays with the demo garage', () => {
+  test('it cannot be assigned or copied through the roles API', async () => {
+    const ctx = await createTestApp();
+    try {
+      const other = 'demo-target';
+      ctx.sqlite.run("INSERT INTO users (id, email, display_name) VALUES (?, 't@x.test', 'T')", [
+        other,
+      ]);
+      ctx.sqlite.run(
+        "INSERT INTO role_assignments (id, user_id, role_id) VALUES ('ra-admin', ?, 'builtin_admin')",
+        [ctx.user.id]
+      );
+      const assign = await ctx.authed('POST', '/api/v1/role-assignments', {
+        userId: other,
+        roleId: 'builtin_demo',
+      });
+      expect(assign.status).toBe(400);
+      const copy = await ctx.authed('POST', '/api/v1/roles', {
+        scope: 'server',
+        name: 'Copy',
+        copyFrom: 'builtin_demo',
+      });
+      expect(copy.status).toBe(400);
+    } finally {
+      ctx.close();
+    }
+  });
+});
+
+describe('unversioned API paths', () => {
+  test('redirect to v1, including paths that start with a v', async () => {
+    const ctx = await createTestApp();
+    try {
+      for (const path of ['/api/vehicles', '/api/vehicles/abc', '/api/settings']) {
+        const res = await ctx.authed('GET', path);
+        expect(`${path} ${res.status}`).toBe(`${path} 308`);
+      }
+      expect((await ctx.authed('GET', '/api/v1/vehicles')).status).toBe(200);
     } finally {
       ctx.close();
     }

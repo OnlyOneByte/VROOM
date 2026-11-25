@@ -76,7 +76,8 @@ edited or deleted; the built-in keys are reserved, and a role's scope never chan
 
 - `role_assignments` gives a person a role: at server scope (`scope_id` null), or on one vehicle.
   Everyone holds Member, and the demo user Demo, except an account waiting for approval, which
-  holds no server role until an admin approves it. Accepting a share clears anything left over for
+  holds no server role until an admin approves it. Only the demo bootstrap assigns Demo: the roles
+  API refuses to assign it or copy it. Accepting a share clears anything left over for
   that person on that car and assigns Editor or Viewer from its level; changing the level swaps
   it; revoking or leaving deletes that person's vehicle assignments and overrides. Each of these
   re-reads the share in its transaction and answers 409 if it changed underneath. `vehicle_shares` stays the membership and invite record.
@@ -155,8 +156,8 @@ resource from the database (`fromExpense` reads the expense's vehicle and author
 the caller claims; identity always comes from the session. A route with no map entry is refused at runtime by the route guard.
 Not visible → 404; visible but not allowed → 403. A few routes check inside instead: the session
 routes that read the cookie themselves (`GET /auth/me`, `/auth/capabilities`, logout and refresh),
-the two OAuth returns (they check their stored state and the session; the route that starts the
-flow is authorized), `GET /overrides`, where anyone reads their own overrides, and the `/roles`
+the two OAuth returns (they check their stored state, the session and, again, the permission the
+flow started with), `GET /overrides`, where anyone reads their own overrides, and the `/roles`
 routes, which pick `server.roles.manage` or the owner's library by the role's scope;
 `src/permissions/__tests__/route-guard.test.ts` lists them and fails when any other mapped route
 lacks `authorize()`.

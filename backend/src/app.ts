@@ -180,7 +180,7 @@ app.route('/api/v1/admin', signupRoutes);
 app.use('/api/*', async (c, next) => {
   const path = c.req.path;
 
-  if (path.startsWith('/api/v') || path === '/api') {
+  if (/^\/api\/v\d+(\/|$)/.test(path) || path === '/api') {
     return next();
   }
 
