@@ -9,7 +9,7 @@ import PaginationControls from '../pagination-controls.svelte';
 const COMPONENTS = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CAROUSEL_ARROW_TAG = /<Carousel\.(?:Previous|Next)\b[^>]*>/g;
 const BREAKPOINT_SHRINK = /\b(h|size)-1\d (?:sm|md):\1-[1-9]\b/;
-const SMALL_SIZE =/(?:^|[\s"'])(?:size|h|w)-[1-9](?=[\s"'])|\bsize="(?:icon|icon-sm|sm|default)"/;
+const SMALL_SIZE = /(?:^|[\s"'])(?:size|h|w)-[1-9](?=[\s"'])|\bsize="(?:icon|icon-sm|sm|default)"/;
 
 describe('shared controls meet the 40px tap target', () => {
 	test('pagination Previous and Next are 40px tall', () => {
@@ -50,7 +50,7 @@ describe('shared controls meet the 40px tap target', () => {
 		expect(BREAKPOINT_SHRINK.test(attrs)).toBe(flagged);
 	});
 
-	test('no control drops below 40px at a wider breakpoint', () => {
+	test('no 40px control is shrunk by an sm: or md: height right after it', () => {
 		const offenders = collectSvelteFiles(join(COMPONENTS, '..', '..')).filter(file =>
 			BREAKPOINT_SHRINK.test(readFileSync(file, 'utf8'))
 		);
