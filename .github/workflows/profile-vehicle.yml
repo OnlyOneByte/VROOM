@@ -1,0 +1,67 @@
+name: Throwaway vehicle-page profile (#1656)
+
+on:
+  push:
+    branches: [crew/vroom-bot/profile-vehicle]
+
+jobs:
+  profile:
+    name: Profile (${{ matrix.runner }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [1, 2]
+    permissions:
+      contents: read
+    env:
+      DATABASE_URL: ./data/web-vitals.db
+      PORT: 3001
+      HOST: 127.0.0.1
+      FRONTEND_URL: http://127.0.0.1:4173
+      CORS_ORIGINS: http://127.0.0.1:4173
+      DISABLE_RATE_LIMIT: "true"
+      LOG_LEVEL: warn
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.5"
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Install dependencies
+        run: |
+          (cd backend && bun install --frozen-lockfile)
+          (cd frontend && npm ci)
+      - name: Seed the database
+        working-directory: ./backend
+        run: |
+          bun run db:seed
+          bun ../frontend/scripts/web-vitals-seed.mjs > "$RUNNER_TEMP/seed.json"
+          echo "VITALS_SESSION=$(jq -r .session "$RUNNER_TEMP/seed.json")" >> "$GITHUB_ENV"
+          echo "VITALS_VEHICLE_ID=$(jq -r .vehicleId "$RUNNER_TEMP/seed.json")" >> "$GITHUB_ENV"
+      - name: Build with sourcemaps
+        working-directory: ./frontend
+        run: |
+          sed -i 's/^export default defineConfig({$/export default defineConfig({\n\tbuild: { sourcemap: true },/' vite.config.ts
+          grep -n "sourcemap" vite.config.ts
+          npm run build
+      - name: Start the backend and the frontend
+        run: |
+          (cd backend && nohup bun src/index.ts > "$RUNNER_TEMP/backend.log" 2>&1 &)
+          (cd frontend && PORT=4173 PUBLIC_API_URL=http://127.0.0.1:3001 nohup node build > "$RUNNER_TEMP/fe.log" 2>&1 &)
+          curl --retry 30 --retry-delay 1 --retry-all-errors -fsS -o /dev/null http://127.0.0.1:3001/api/v1/auth/me -b "auth_session=$VITALS_SESSION"
+          curl --retry 30 --retry-delay 1 --retry-all-errors -fsS -o /dev/null http://127.0.0.1:4173/auth
+      - name: Install Playwright browsers
+        working-directory: ./frontend
+        run: npx playwright install --with-deps chromium
+      - name: Profile the vehicle page
+        working-directory: ./frontend
+        run: PROFILE_PATH="/vehicles/$VITALS_VEHICLE_ID" node scripts/profile-route.mjs
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: profile-${{ matrix.runner }}
+          path: frontend/profile.md
+          retention-days: 7
