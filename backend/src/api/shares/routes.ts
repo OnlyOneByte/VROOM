@@ -33,6 +33,7 @@ import {
 import type { Resource } from '../../permissions/resolve';
 import { ROLE_TEMPLATES } from '../../permissions/roles';
 import { commonSchemas, zValidator } from '../../utils/validation';
+import { carShareEnabled, ensureMemberDriver } from '../drivers/repository';
 import { vehicleRepository } from '../vehicles/repository';
 import {
   ACTIVE_SHARE_STATUSES,
@@ -330,6 +331,7 @@ routes.post(
         level: row.level,
         grantedBy: row.ownerId,
       });
+      if (carShareEnabled(tx, row.vehicleId)) ensureMemberDriver(tx, row.vehicleId, user.id);
     });
     return c.json({ success: true, data: updated, message: 'Invitation accepted' });
   }

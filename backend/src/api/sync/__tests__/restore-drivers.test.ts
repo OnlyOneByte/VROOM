@@ -58,6 +58,7 @@ describe('restoring car-share drivers', () => {
     seedDriver('d-owner', vehicleId, ctx.user.id, 'Owner');
     seedDriver('d-member', vehicleId, member.id, 'Member');
     seedDriver('d-guest', vehicleId, null, 'Riley');
+    ctx.sqlite.run("UPDATE vehicle_drivers SET created_by = ? WHERE id = 'd-guest'", [member.id]);
     ctx.sqlite.run(
       "INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date, driver_id) VALUES ('t1', ?, ?, 100, 150, 'personal', 1700000000, 'd-member')",
       [vehicleId, ctx.user.id]
@@ -77,6 +78,9 @@ describe('restoring car-share drivers', () => {
     expect(ctx.sqlite.query("SELECT driver_id FROM trips WHERE id = 't1'").get()).toEqual({
       driver_id: 'd-member',
     });
+    expect(
+      ctx.sqlite.query("SELECT created_by FROM vehicle_drivers WHERE id = 'd-guest'").get()
+    ).toEqual({ created_by: member.id });
   });
 
   test("a driver linked to someone who isn't a member comes back as a guest", async () => {

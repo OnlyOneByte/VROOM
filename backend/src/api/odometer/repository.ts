@@ -112,6 +112,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       note?: string;
       timeZone?: string;
       createdBy?: string | null;
+      driverId?: string | null;
     },
     db: AppDatabase | DrizzleTransaction = this.db
   ): OdometerEntry | null {
@@ -141,6 +142,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
         vehicleId: entry.vehicleId,
         userId: entry.userId,
         createdBy: entry.createdBy ?? null,
+        driverId: entry.driverId ?? null,
         odometer: entry.odometer,
         recordedAt: entry.recordedAt,
         note: entry.note ?? OdometerRepository.TRIP_PROVENANCE_NOTE,

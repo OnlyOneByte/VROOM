@@ -23,6 +23,7 @@ import {
   zValidator,
 } from '../../utils/validation';
 import { requireVehicleAccess, seesFinancials } from '../../utils/vehicle-access';
+import { attributedDriver, hideDriverFields } from '../drivers/attribution';
 import { assertOdometerInOrder } from '../expenses/repository';
 import type { OdometerCheck } from '../expenses/validation';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
@@ -45,7 +46,10 @@ export const odometerCreateSchema = z.object({
 
 const timeZoneSchema = z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional();
 
-const createBodySchema = odometerCreateSchema.extend({ timeZone: timeZoneSchema });
+const createBodySchema = odometerCreateSchema.extend({
+  timeZone: timeZoneSchema,
+  driverId: z.string().min(1).max(64).nullish(),
+});
 
 const updateSchema = createBodySchema.partial();
 
@@ -87,7 +91,8 @@ routes.get(
       offset
     );
 
-    return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
+    const rows = data.map((entry) => hideDriverFields(c, vehicleId, entry));
+    return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
   }
 );
 
@@ -115,7 +120,8 @@ routes.get(
       }).allow,
     });
 
-    return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
+    const rows = data.map((row) => hideDriverFields(c, vehicleId, row));
+    return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
   }
 );
 
@@ -129,7 +135,7 @@ routes.get(
     const entry = await odometerRepository.findById(id);
     if (!entry) throw new NotFoundError('Odometer entry');
 
-    return c.json({ success: true, data: entry });
+    return c.json({ success: true, data: hideDriverFields(c, entry.vehicleId, entry) });
   }
 );
 
@@ -144,6 +150,7 @@ routes.post(
     const data = c.req.valid('json');
 
     const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'read');
+    const driverId = attributedDriver(c, vehicleId, data.driverId);
 
     const entry = await odometerRepository.createChecked(
       {
@@ -152,6 +159,7 @@ routes.post(
         odometer: data.odometer,
         recordedAt: data.recordedAt,
         note: data.note ?? null,
+        driverId,
         createdBy: ownerId === user.id ? null : user.id,
       },
       inOrder(await readingCheck(vehicleId, data.odometer, data.recordedAt, data.timeZone))
@@ -159,7 +167,14 @@ routes.post(
 
     await reminderTriggerService.recheckMileageReminders(ownerId, vehicleId);
 
-    return c.json({ success: true, data: entry, message: 'Odometer reading created' }, 201);
+    return c.json(
+      {
+        success: true,
+        data: hideDriverFields(c, vehicleId, entry),
+        message: 'Odometer reading created',
+      },
+      201
+    );
   }
 );
 
@@ -175,7 +190,9 @@ routes.put(
     const existing = await odometerRepository.findById(id);
     if (!existing) throw new NotFoundError('Odometer entry');
 
-    const { timeZone, ...changes } = data;
+    const { timeZone, driverId: requested, ...rest } = data;
+    const driverId = attributedDriver(c, existing.vehicleId, requested, existing.driverId);
+    const changes = driverId === undefined ? rest : { ...rest, driverId };
     const odometer = changes.odometer ?? existing.odometer;
     const recordedAt = changes.recordedAt ?? existing.recordedAt;
     const dayOf = (at: Date) => zonedDayWindow(at, timeZone ?? 'UTC').dayStart.getTime();
@@ -191,7 +208,11 @@ routes.put(
 
     await reminderTriggerService.recheckMileageReminders(existing.userId, updated.vehicleId);
 
-    return c.json({ success: true, data: updated, message: 'Odometer reading updated' });
+    return c.json({
+      success: true,
+      data: hideDriverFields(c, updated.vehicleId, updated),
+      message: 'Odometer reading updated',
+    });
   }
 );
 

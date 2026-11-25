@@ -16,6 +16,7 @@ import { buildTripSummary } from '../../utils/trip-summary';
 import { convertDistance } from '../../utils/unit-conversions';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
+import { attributedDriver, hideDriverFields } from '../drivers/attribution';
 import { preferencesRepository } from '../settings/repository';
 import { tripRepository } from './repository';
 import { createTrip, deleteTrip, updateTrip } from './service';
@@ -79,9 +80,17 @@ routes.post('/', zValidator('json', createTripSchema), authorize(fromBodyVehicle
   const data = c.req.valid('json');
 
   const ownerId = await ownerOf(data.vehicleId, user.id);
-  const trip = await createTrip(ownerId, data, ownerId === user.id ? null : user.id);
+  const driverId = attributedDriver(c, data.vehicleId, data.driverId);
+  const trip = await createTrip(
+    ownerId,
+    { ...data, driverId },
+    ownerId === user.id ? null : user.id
+  );
 
-  return c.json({ success: true, data: trip, message: 'Trip created' }, 201);
+  return c.json(
+    { success: true, data: hideDriverFields(c, trip.vehicleId, trip), message: 'Trip created' },
+    201
+  );
 });
 
 routes.get('/', zValidator('query', listQuerySchema), authorize(fromQueryVehicle), async (c) => {
@@ -95,7 +104,10 @@ routes.get('/', zValidator('query', listQuerySchema), authorize(fromQueryVehicle
     purpose: query.purpose,
   });
 
-  return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
+  const rows = query.vehicleId
+    ? data.map((trip) => hideDriverFields(c, trip.vehicleId, trip))
+    : data;
+  return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
 });
 
 routes.get(
@@ -136,9 +148,20 @@ routes.put(
     const { timeZone, ...data } = c.req.valid('json');
 
     const existing = await tripOf(id);
+    const { driverId: requested, ...changes } = data;
+    const driverId = attributedDriver(c, existing.vehicleId, requested, existing.driverId);
 
-    const updated = await updateTrip(existing.userId, existing, data, timeZone);
-    return c.json({ success: true, data: updated, message: 'Trip updated' });
+    const updated = await updateTrip(
+      existing.userId,
+      existing,
+      driverId === undefined ? changes : { ...changes, driverId },
+      timeZone
+    );
+    return c.json({
+      success: true,
+      data: hideDriverFields(c, updated.vehicleId, updated),
+      message: 'Trip updated',
+    });
   }
 );
 
