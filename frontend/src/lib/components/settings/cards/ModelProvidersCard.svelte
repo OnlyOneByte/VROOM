@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
-	import { focusFirstButton, focusFirstProblem } from '#lib/utils/focus.ts';
+	import { onDestroy, onMount, tick } from 'svelte';
+	import { focusFirstButton, focusFirstProblem, landOn } from '#lib/utils/focus.ts';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
 	import HowItWorks from '#lib/components/common/how-it-works.svelte';
@@ -24,6 +24,7 @@
 	import ProviderStatusBadge from '#lib/components/settings/ProviderStatusBadge.svelte';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { oldestFirst } from '#lib/utils/provider-order.ts';
 	import ProviderFields, {
 		fieldConfig,
 		fieldErrorsFrom,
@@ -54,7 +55,8 @@
 			useFor: 'receipt scanning',
 			useForTitle: 'Receipt Scanning',
 			loadError: "Couldn't load your receipt-scanning providers.",
-			capability: 'ai.vision'
+			capability: 'ai.vision',
+			anchor: 'receipt-scanning'
 		},
 		llm: {
 			icon: Bot,
@@ -71,7 +73,8 @@
 			useFor: 'the assistant',
 			useForTitle: 'the Assistant',
 			loadError: "Couldn't load your assistant providers.",
-			capability: 'ai.llm'
+			capability: 'ai.llm',
+			anchor: 'assistant-providers'
 		}
 	} as const;
 
@@ -118,9 +121,7 @@
 	let defaultId = $derived(
 		builtins.map(builtinId).find(id => id === savedDefaultId) ??
 			usable.find(p => p.id === savedDefaultId)?.id ??
-			[...usable].sort(
-				(a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.id.localeCompare(b.id)
-			)[0]?.id ??
+			[...usable].sort(oldestFirst)[0]?.id ??
 			(builtins[0] ? builtinId(builtins[0]) : null)
 	);
 
@@ -165,7 +166,15 @@
 		}
 	}
 
-	onMount(loadData);
+	let stopLanding: (() => void) | undefined;
+	onDestroy(() => stopLanding?.());
+	onMount(async () => {
+		await loadData();
+		if (location.hash !== `#${copy.anchor}`) return;
+		await tick();
+		const card = document.getElementById(copy.anchor);
+		if (card) stopLanding = landOn(card);
+	});
 
 	async function retryLoad() {
 		await loadData();
@@ -290,7 +299,7 @@
 	{/if}
 {/snippet}
 
-<Card>
+<Card id={copy.anchor} tabindex={-1}>
 	<CardHeader>
 		<div class="flex items-center gap-2">
 			<Icon class="h-5 w-5 text-muted-foreground" />

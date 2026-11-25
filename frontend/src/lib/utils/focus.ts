@@ -23,6 +23,24 @@ export function focusInView(target: HTMLElement | null | undefined): void {
 	target?.focus({ preventScroll: true });
 }
 
+const USER_SCROLL_EVENTS = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
+
+export function landOn(target: HTMLElement, settleMs = 5000): () => void {
+	const pin = () => target.scrollIntoView({ block: 'start' });
+	const observer = new ResizeObserver(pin);
+	const stop = () => {
+		observer.disconnect();
+		clearTimeout(timer);
+		for (const type of USER_SCROLL_EVENTS) window.removeEventListener(type, stop);
+	};
+	const timer = setTimeout(stop, settleMs);
+	for (const type of USER_SCROLL_EVENTS) window.addEventListener(type, stop, { passive: true });
+	pin();
+	target.focus({ preventScroll: true });
+	observer.observe(document.body);
+	return stop;
+}
+
 export async function focusFirstProblem(form: Element | null | undefined): Promise<void> {
 	await tick();
 	focusInView(
