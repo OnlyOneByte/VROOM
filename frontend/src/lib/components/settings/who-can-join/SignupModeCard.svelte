@@ -54,6 +54,8 @@
 		try {
 			onChange(await signupApi.updateSettings({ mode }));
 			appStore.showSuccess('Sign-up mode saved');
+			await tick();
+			document.getElementById(`signup-mode-${mode}`)?.focus();
 		} catch (e) {
 			appStore.showError(`Couldn't save the sign-up mode. ${userFacingErrorMessage(e)}`);
 		} finally {
@@ -77,11 +79,11 @@
 			appStore.showSuccess('Allowed domains saved');
 		} catch (e) {
 			domainsError = userFacingErrorMessage(e);
-			await tick();
-			domainsInput?.focus();
 		} finally {
 			savingDomains = false;
 		}
+		await tick();
+		domainsInput?.focus();
 	}
 </script>
 
