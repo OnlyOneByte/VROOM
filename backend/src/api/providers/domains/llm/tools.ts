@@ -19,8 +19,6 @@ import {
   fuelStatsToApi,
   insuranceToApi,
 } from '../../../analytics/api-transform';
-import { expenseRepository } from '../../../expenses/repository';
-import { vehicleRepository } from '../../../vehicles/repository';
 import type { ToolDefinition } from './llm-provider';
 
 export const RANGE_VALUES = ['30d', '90d', 'ytd', '12mo', 'all'] as const;
@@ -126,7 +124,7 @@ const TOOL_LIST: AssistantTool[] = [
     description:
       "List the user's vehicles (make, model, year, nickname) with any financing summary.",
     schema: emptyArgs,
-    read: async (_args, userId) => vehicleRepository.findByUserId(userId),
+    read: async (_args, userId) => repos().vehicles.findByUserId(userId),
     toApi: (rows) => rows.map(vehicleRowToApi),
   }),
   defineTool({
@@ -137,7 +135,7 @@ const TOOL_LIST: AssistantTool[] = [
     schema: rangeVehicleArgs,
     read: async (args, userId) => {
       requireExpenseRead(args.vehicleId, userId);
-      return expenseRepository.getSummary({
+      return repos().expenses.getSummary({
         ...(await resolveExpenseReadScope(args.vehicleId, userId)),
         period: toExpensePeriod(args.range),
         ...(args.vehicleId ? { vehicleId: args.vehicleId } : {}),

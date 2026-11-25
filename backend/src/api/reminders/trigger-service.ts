@@ -13,7 +13,6 @@ import { zonedParts, zoneOffsetMs } from '../../utils/time-zone';
 import { DISTANCE_UNIT_SHORT_LABELS } from '../../utils/unit-conversions';
 import { expenseSplitService } from '../expenses/split-service';
 import { notifyUser, type PushPayload } from '../push/push-service';
-import { vehicleRepository } from '../vehicles/repository';
 import type { ReminderWithVehicles } from './repository';
 
 export interface TriggerResult {
@@ -72,7 +71,7 @@ async function firePushForNotification(
 }
 
 async function vehicleDistanceUnit(vehicleId: string): Promise<DistanceUnit> {
-  const vehicle = await vehicleRepository.findById(vehicleId);
+  const vehicle = await repos().vehicles.findById(vehicleId);
   return (
     parseUnitPreferences(vehicle?.unitPreferences)?.distanceUnit ??
     DEFAULT_UNIT_PREFERENCES.distanceUnit

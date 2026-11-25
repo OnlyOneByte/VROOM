@@ -1,6 +1,5 @@
 import { eq, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import { jsonMergePatch } from '../../db/dialect';
 import type { NewUserPreferences, SyncState, UserPreferences } from '../../db/schema';
 import { syncState, userPreferences } from '../../db/schema';
@@ -189,6 +188,3 @@ export class SyncStateRepository {
     }
   }
 }
-
-export const preferencesRepository = new PreferencesRepository(getDb());
-export const syncStateRepository = new SyncStateRepository(getDb());

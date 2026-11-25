@@ -1,5 +1,6 @@
 import { and, eq, ne } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import type { UserProvider } from '../../db/schema';
@@ -8,7 +9,6 @@ import { AppError, ValidationError } from '../../errors';
 import { concurrencyLimiter, rateLimiter, requireAuth } from '../../middleware';
 import { authorize, ownAccount } from '../../permissions/authorize';
 import { logger } from '../../utils/logger';
-import { expenseRepository } from '../expenses/repository';
 import { decryptRefreshToken } from '../providers/domains/storage/registry';
 import { parseExtraction } from '../providers/domains/vlm/prompt';
 import { getVlmProvider } from '../providers/domains/vlm/registry';
@@ -89,7 +89,7 @@ routes.get(
       parseImage: async (bytes, mimeType) =>
         parseExtraction(await vlmProvider.extractReceipt({ data: bytes, mimeType })),
       isAlreadyImported: async (photoId) =>
-        (await expenseRepository.findByClientId(`photos:${photoId}`, user.id)) !== null,
+        (await repos().expenses.findByClientId(`photos:${photoId}`, user.id)) !== null,
     };
 
     try {

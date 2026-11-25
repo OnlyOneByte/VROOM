@@ -1,15 +1,11 @@
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { AppError, ValidationError } from '../../errors';
 import { termBillingMonths } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { dollarsToCents, formatNumberForMessage } from '../../utils/money';
-import { expenseRepository } from '../expenses/repository';
 import { deletePhotosForEntities } from '../photos/photo-service';
-import {
-  insurancePolicyRepository,
-  type MonthlyPricedTerm,
-  type TermCoverageRow,
-} from './repository';
+import type { MonthlyPricedTerm, TermCoverageRow } from './repository';
 
 export function vehicleIdsForTerm(
   termVehicleCoverage: readonly TermCoverageRow[],
@@ -44,19 +40,19 @@ async function recalculateTermPremium(term: MonthlyPricedTerm): Promise<boolean>
   const corrected = monthlyCost * termBillingMonths(term.startDate, term.endDate);
   if (overcounted === corrected) return false;
 
-  const linked = await expenseRepository.findBySource('insurance_term', term.id, term.userId);
+  const linked = await repos().expenses.findBySource('insurance_term', term.id, term.userId);
   const groupIds = new Set(linked.map((expense) => expense.groupId));
   const first = linked[0];
   if (!first?.groupId || groupIds.size !== 1 || first.splitMethod !== 'even') return false;
   const rowsTotal = linked.reduce((sum, expense) => sum + expense.expenseAmount, 0);
   if (first.groupTotal !== overcounted || rowsTotal !== overcounted) return false;
 
-  const policy = await insurancePolicyRepository.findById(term.policyId);
+  const policy = await repos().insurancePolicies.findById(term.policyId);
   const vehicleIds = vehicleIdsForTerm(policy?.termVehicleCoverage ?? [], term.id);
   const linkedVehicleIds = linked.map((expense) => expense.vehicleId).sort();
   if ([...vehicleIds].sort().join(',') !== linkedVehicleIds.join(',')) return false;
 
-  await expenseRepository.updateSplitExpense(
+  await repos().expenses.updateSplitExpense(
     first.groupId,
     {
       splitConfig: { method: 'even', vehicleIds },
@@ -68,7 +64,7 @@ async function recalculateTermPremium(term: MonthlyPricedTerm): Promise<boolean>
 }
 
 export async function recalculateOvercountedMonthlyPremiums(): Promise<number> {
-  const terms = await insurancePolicyRepository.findMonthlyPricedTerms();
+  const terms = await repos().insurancePolicies.findMonthlyPricedTerms();
   let recalculated = 0;
 
   for (const term of terms) {
@@ -119,7 +115,7 @@ async function materializeTermExpenses(
   const { termId, vehicleIds, startDate, policyNumber, userId } = params;
   const description = policyNumber ? `Insurance premium — ${policyNumber}` : 'Insurance premium';
 
-  await expenseRepository.createSplitExpense(
+  await repos().expenses.createSplitExpense(
     {
       splitConfig: { method: 'even', vehicleIds },
       category: 'financial',
@@ -162,13 +158,13 @@ export async function createTermExpenses(params: TermExpenseParams): Promise<voi
 
 export async function deleteTermExpenses(termId: string, userId: string): Promise<number> {
   // Photo files must be removed first: deleteBySource drops photo rows with raw SQL and orphans the files.
-  const linked = await expenseRepository.findBySource('insurance_term', termId, userId);
+  const linked = await repos().expenses.findBySource('insurance_term', termId, userId);
   await deletePhotosForEntities(
     'expense',
     linked.map((expense) => expense.id),
     userId
   );
-  return expenseRepository.deleteBySource('insurance_term', termId, userId);
+  return repos().expenses.deleteBySource('insurance_term', termId, userId);
 }
 
 function sameTime(a: Date | null | undefined, b: Date | null | undefined): boolean {
@@ -187,7 +183,7 @@ function termExpenseInputsChanged(previous: TermExpenseParams, next: TermExpense
 
 async function termExpensesInSync(params: TermExpenseParams): Promise<boolean> {
   const expectsExpenses = effectiveTermCost(params) > 0 && params.vehicleIds.length > 0;
-  const linked = await expenseRepository.findBySource(
+  const linked = await repos().expenses.findBySource(
     'insurance_term',
     params.termId,
     params.userId

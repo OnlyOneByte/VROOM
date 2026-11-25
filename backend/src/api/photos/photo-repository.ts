@@ -1,6 +1,5 @@
 import { and, asc, eq, inArray, notExists, or } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import { countNum } from '../../db/dialect';
 import {
   expenses,
@@ -173,5 +172,3 @@ export class PhotoRepository {
     }
   }
 }
-
-export const photoRepository = new PhotoRepository(getDb());

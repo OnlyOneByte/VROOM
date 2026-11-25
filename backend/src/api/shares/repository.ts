@@ -2,7 +2,6 @@
 
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import type { NewVehicleShare, VehicleShare } from '../../db/schema';
 import { users, vehicleShares, vehicles } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
@@ -85,8 +84,8 @@ export function attachPendingInvites(
     .run();
 }
 
-class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehicleShare> {
-  constructor(db: AppDatabase = getDb()) {
+export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehicleShare> {
+  constructor(db: AppDatabase) {
     super(db, vehicleShares);
   }
 
@@ -174,5 +173,3 @@ class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehicleShar
     return row ?? null;
   }
 }
-
-export const vehicleShareRepository = new VehicleShareRepository(getDb());

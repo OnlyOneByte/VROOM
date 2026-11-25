@@ -1,6 +1,5 @@
 import { and, desc, eq } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import type { InsuranceClaim } from '../../db/schema';
 import { insuranceClaims, insurancePolicies } from '../../db/schema';
 import { DatabaseError, NotFoundError } from '../../errors';
@@ -28,7 +27,7 @@ interface UpdateClaimInput {
   vehicleId?: string | null;
 }
 
-class InsuranceClaimRepository {
+export class InsuranceClaimRepository {
   private db: AppDatabase;
 
   constructor(db: AppDatabase) {
@@ -152,5 +151,3 @@ class InsuranceClaimRepository {
     }
   }
 }
-
-export const insuranceClaimRepository = new InsuranceClaimRepository(getDb());

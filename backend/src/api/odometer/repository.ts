@@ -1,4 +1,5 @@
 import { and, count, desc, eq, gte, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { repos } from '../../app-context';
 import type { AppDatabase } from '../../db/connection';
 import { rawAll, sqlFalse } from '../../db/dialect';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
@@ -10,7 +11,6 @@ import { BaseRepository } from '../../utils/repository';
 import { zonedDayWindow } from '../../utils/time-zone';
 import { hiddenFinancialsScope } from '../../utils/vehicle-access';
 import type { OdometerCheck } from '../expenses/validation';
-import { vehicleRepository } from '../vehicles/repository';
 
 interface OdometerHistoryEntry {
   odometer: number;
@@ -53,7 +53,7 @@ export async function readingCheck(
   timeZone: string | undefined,
   excludeId?: string
 ): Promise<OdometerCheck> {
-  const vehicle = await vehicleRepository.findById(vehicleId);
+  const vehicle = await repos().vehicles.findById(vehicleId);
   return {
     vehicleId,
     mileage: odometer,

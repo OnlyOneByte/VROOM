@@ -28,7 +28,6 @@ import { calendarDayIn, isValidTimeZone } from '../../utils/time-zone';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { requireVehicleAccess, requireVehiclesAccess } from '../../utils/vehicle-access';
 import { hideDriverFields } from '../drivers/attribution';
-import { expenseRepository } from '../expenses/repository';
 import { recurringCostSummary } from './reminder-cost';
 import type { ReminderWithVehicles } from './repository';
 import {
@@ -408,7 +407,7 @@ routes.get(
     const existing = await repos().reminders.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
     const resolver = requestResolver(c, getDb());
-    const materialized = await expenseRepository.findBySource(
+    const materialized = await repos().expenses.findBySource(
       'reminder',
       id,
       existing.reminder.userId
@@ -510,7 +509,7 @@ routes.delete(
     const { ownerId } = await requireExistingReminderWrite(existing, user.id);
 
     // clearSource must run before the delete: a dangling sourceId fails backup validation on restore.
-    await expenseRepository.clearSource('reminder', id, ownerId);
+    await repos().expenses.clearSource('reminder', id, ownerId);
 
     await repos().reminders.deleteOwned(id, ownerId);
     return c.json({ success: true, message: 'Reminder deleted successfully' });

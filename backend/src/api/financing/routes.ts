@@ -20,7 +20,6 @@ import {
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
-import { vehicleRepository } from '../vehicles/repository';
 import { deactivateFinancing } from './hooks';
 import { withComputedBalance } from './repository';
 
@@ -118,7 +117,7 @@ const fromFinancing: ResourceOf = async (c) => {
 async function financingOwner(financingId: string): Promise<string> {
   const financing = await repos().financing.findById(financingId);
   if (!financing) throw new NotFoundError('Financing');
-  const owner = await vehicleRepository.findById(financing.vehicleId);
+  const owner = await repos().vehicles.findById(financing.vehicleId);
   if (!owner) throw new NotFoundError('Financing');
   return owner.userId;
 }

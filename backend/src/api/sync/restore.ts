@@ -1,5 +1,6 @@
 import { and, eq, getTableColumns, inArray, ne, type Table } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
+import { repos } from '../../app-context';
 import { TABLE_SCHEMA_MAP } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
@@ -49,7 +50,6 @@ import { catalogModelMatchesMake } from '../../utils/vehicle-catalog';
 import { DRIVER_COLORS } from '../drivers/repository';
 import { LOCAL_OCR_PROVIDER_ID } from '../providers/domains/vlm/registry';
 import { CAPABILITY_DOMAIN } from '../providers/resolve';
-import { preferencesRepository } from '../settings/repository';
 import { isKnownRegion } from '../settings/validation';
 import {
   backupService,
@@ -137,7 +137,9 @@ function coerceRows(rows: Record<string, unknown>[], table: Table): Record<strin
 }
 
 class RestoreService {
-  private db = getDb();
+  private get db() {
+    return getDb();
+  }
 
   async restoreFromBackup(
     userId: string,
@@ -250,7 +252,7 @@ class RestoreService {
     mode: RestoreMode,
     signal?: AbortSignal
   ): Promise<RestoreResponse> {
-    const prefs = await preferencesRepository.getOrCreate(userId);
+    const prefs = await repos().preferences.getOrCreate(userId);
     const backupConfig = prefs?.backupConfig as BackupConfig | null;
     const providerConfig = backupConfig?.providers?.[providerId];
     const sheetsSpreadsheetId = providerConfig?.sheetsSpreadsheetId;
@@ -262,7 +264,7 @@ class RestoreService {
     try {
       return await this.readSheetsAndRestore(userId, providerId, sheetsSpreadsheetId, mode, signal);
     } catch (error) {
-      await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
+      await repos().preferences.mergeJsonField(userId, 'backupConfig', {
         providers: { [providerId]: { sheetsAutoPausedAt: new Date().toISOString() } },
       });
       throw error;

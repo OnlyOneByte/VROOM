@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import type { AppContext } from '../../../app-context';
+import { repos } from '../../../app-context';
 import {
   createTestApp,
   type DataEnvelope,
@@ -44,9 +46,8 @@ function attachPhoto(expenseId: string, id: string): void {
 describe('expense deletes that also drop photos are atomic', () => {
   test('deleteBySource: a failing expense delete leaves the photo rows intact', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    const { expenseRepository } = await import('../repository');
 
-    const created = await expenseRepository.create({
+    const created = await repos().expenses.create({
       vehicleId,
       userId: ctx.user.id,
       category: 'insurance',
@@ -54,7 +55,7 @@ describe('expense deletes that also drop photos are atomic', () => {
       expenseAmount: 42_000,
       sourceType: 'insurance_term',
       sourceId: 'term-1',
-    } as Parameters<typeof expenseRepository.create>[0]);
+    } as Parameters<AppContext['repos']['expenses']['create']>[0]);
     attachPhoto(created.id, 'photo-source-1');
 
     expect(photoCount()).toBe(1);
@@ -62,7 +63,7 @@ describe('expense deletes that also drop photos are atomic', () => {
     blockExpenseDeletes();
     let threw = false;
     try {
-      await expenseRepository.deleteBySource('insurance_term', 'term-1', ctx.user.id);
+      await repos().expenses.deleteBySource('insurance_term', 'term-1', ctx.user.id);
     } catch {
       threw = true;
     } finally {
@@ -77,7 +78,6 @@ describe('expense deletes that also drop photos are atomic', () => {
   test('deleteSplitExpense: a failing sibling delete leaves the photo rows intact', async () => {
     const v1 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const v2 = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    const { expenseRepository } = await import('../repository');
 
     const res = await ctx.authed('POST', '/api/v1/expenses/split', {
       splitConfig: { method: 'even', vehicleIds: [v1, v2] },
@@ -97,7 +97,7 @@ describe('expense deletes that also drop photos are atomic', () => {
     blockExpenseDeletes();
     let threw = false;
     try {
-      await expenseRepository.deleteSplitExpense(groupId, ctx.user.id);
+      await repos().expenses.deleteSplitExpense(groupId, ctx.user.id);
     } catch {
       threw = true;
     } finally {
