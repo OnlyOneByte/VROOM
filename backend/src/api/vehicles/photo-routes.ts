@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
 import { NotFoundError } from '../../errors';
+import { authorize, vehicleParam } from '../../permissions/authorize';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas, zValidator } from '../../utils/validation';
-import { parseUploadedPhoto, photoThumbnailResponse } from '../photos/helpers';
+import { parseUploadedPhoto, photoThumbnailResponse, withPhotoAuthor } from '../photos/helpers';
 import {
   deletePhotoForEntity,
   getPhotoServeMetadataForEntity,
@@ -16,7 +17,9 @@ import {
 // Auth is applied by the parent vehicles router, not here.
 const photoRoutes = new Hono();
 
-photoRoutes.post('/', async (c) => {
+const ofVehicle = vehicleParam('vehicleId');
+
+photoRoutes.post('/', authorize(ofVehicle), async (c) => {
   const vehicleId = c.req.param('vehicleId');
   if (!vehicleId) throw new NotFoundError('Vehicle');
 
@@ -27,17 +30,22 @@ photoRoutes.post('/', async (c) => {
   return c.json({ success: true, data: photo }, 201);
 });
 
-photoRoutes.get('/', zValidator('query', commonSchemas.pagination), async (c) => {
-  const vehicleId = c.req.param('vehicleId');
-  if (!vehicleId) throw new NotFoundError('Vehicle');
+photoRoutes.get(
+  '/',
+  zValidator('query', commonSchemas.pagination),
+  authorize(ofVehicle),
+  async (c) => {
+    const vehicleId = c.req.param('vehicleId');
+    if (!vehicleId) throw new NotFoundError('Vehicle');
 
-  const { limit, offset } = c.req.valid('query');
-  const user = c.get('user');
-  const result = await listPhotosForEntity('vehicle', vehicleId, user.id, { limit, offset });
-  return c.json(buildPaginatedResponse(result.data, result.totalCount, limit, offset));
-});
+    const { limit, offset } = c.req.valid('query');
+    const user = c.get('user');
+    const result = await listPhotosForEntity('vehicle', vehicleId, user.id, { limit, offset });
+    return c.json(buildPaginatedResponse(result.data, result.totalCount, limit, offset));
+  }
+);
 
-photoRoutes.get('/:photoId/thumbnail', async (c) => {
+photoRoutes.get('/:photoId/thumbnail', authorize(ofVehicle), async (c) => {
   const vehicleId = c.req.param('vehicleId');
   const photoId = c.req.param('photoId');
   if (!vehicleId || !photoId) throw new NotFoundError('Photo');
@@ -69,7 +77,7 @@ photoRoutes.get('/:photoId/thumbnail', async (c) => {
   return response;
 });
 
-photoRoutes.put('/:photoId/cover', async (c) => {
+photoRoutes.put('/:photoId/cover', authorize(ofVehicle), async (c) => {
   const vehicleId = c.req.param('vehicleId');
   const photoId = c.req.param('photoId');
   if (!vehicleId || !photoId) throw new NotFoundError('Photo');
@@ -79,7 +87,7 @@ photoRoutes.put('/:photoId/cover', async (c) => {
   return c.json({ success: true, data: photo });
 });
 
-photoRoutes.delete('/:photoId', async (c) => {
+photoRoutes.delete('/:photoId', authorize(withPhotoAuthor(ofVehicle)), async (c) => {
   const vehicleId = c.req.param('vehicleId');
   const photoId = c.req.param('photoId');
   if (!vehicleId || !photoId) throw new NotFoundError('Photo');

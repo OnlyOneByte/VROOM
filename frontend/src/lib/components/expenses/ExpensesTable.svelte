@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import type { Expense, Vehicle } from '#lib/types/index.ts';
@@ -45,6 +46,7 @@
 		activeCategory?: string;
 		onCategoryChange?: (_category: string) => void;
 		monthTotals?: ReadonlyMap<string, number>;
+		pendingStates?: ReadonlyMap<string, PendingRowState> | undefined;
 	}
 
 	let {
@@ -71,7 +73,8 @@
 		onSortChange,
 		activeCategory,
 		onCategoryChange,
-		monthTotals
+		monthTotals,
+		pendingStates
 	}: Props = $props();
 
 	let onDelete = $derived(canWrite ? onDeleteProp : undefined);
@@ -196,6 +199,7 @@
 		onDeleteExpense={confirmDelete}
 		onDeleteGroup={requestGroupDelete}
 		{monthTotals}
+		{pendingStates}
 	/>
 {:else}
 	<ExpensesDesktopTable
@@ -215,6 +219,7 @@
 		onDeleteExpense={confirmDelete}
 		onDeleteGroup={requestGroupDelete}
 		{monthTotals}
+		{pendingStates}
 	/>
 {/if}
 

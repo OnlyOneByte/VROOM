@@ -4,11 +4,13 @@ import { CONFIG } from '../../../config';
 import { db } from '../../../db/connection';
 import { calendarFeeds, reminders, reminderVehicles, users, vehicles } from '../../../db/schema';
 import { seedGarage } from '../../../db/seed';
+import { assignServerRole } from '../../../permissions/grants';
 import {
   createTestApp,
   type DataEnvelope,
   json,
   requestAs,
+  socketFrom,
   type TestApp,
 } from '../../../test-helpers/http-client';
 
@@ -48,7 +50,7 @@ async function ownGarage(userId: string): Promise<void> {
 
 async function fetchFeed(path: string, ip = `198.51.100.${++visitor}`): Promise<Response> {
   const url = path.startsWith('/api/') ? path : `/api/v1${path}`;
-  return await ctx.app.request(url, { headers: { 'X-Forwarded-For': ip } });
+  return await ctx.app.request(url, {}, socketFrom(ip));
 }
 
 async function createFeed(options?: Record<string, boolean | string>): Promise<string> {
@@ -143,6 +145,7 @@ describe('the calendar feed link', () => {
     await db
       .insert(users)
       .values({ id: otherId, email: 'other@example.com', displayName: 'Other' });
+    assignServerRole(db, otherId, 'member');
     await ownGarage(otherId);
     await db.update(reminders).set({ name: 'Secret service' }).where(eq(reminders.userId, otherId));
     const [theirCar] = await db.select().from(vehicles).where(eq(vehicles.userId, otherId));

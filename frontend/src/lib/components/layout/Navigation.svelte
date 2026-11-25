@@ -121,7 +121,12 @@
 				<OfflineIndicator floating={false} />
 				{#snippet mobileStatusIcon()}
 					{@const StatusIcon = syncStatusInfo.icon}
-					<div class="{syncStatusInfo.color} relative" role="status" aria-label="Sync status">
+					<div
+						class="{syncStatusInfo.color} relative"
+						role="status"
+						aria-live="off"
+						aria-label="Sync status"
+					>
 						<StatusIcon class="h-5 w-5 {syncState.current === 'syncing' ? 'animate-spin' : ''}" />
 						{#if pendingCount > 0}
 							<Badge

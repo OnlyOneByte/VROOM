@@ -7,6 +7,9 @@ export interface Notification {
 	duration?: number;
 	timestamp?: number;
 	urgent?: boolean;
+	toastId?: string;
+	description?: string;
+	action?: { label: string; onClick: () => void };
 }
 
 export interface AppState {
@@ -38,7 +41,7 @@ export interface Photo {
 }
 
 export type ProviderStatus = 'active' | 'needs_reauth' | 'error' | 'disabled';
-export type ProviderHealthCode = 'auth' | 'permission' | 'unreachable' | 'config';
+export type ProviderHealthCode = 'auth' | 'permission' | 'unreachable' | 'config' | 'endpoint';
 
 export interface ProviderHealthResult {
 	ok: boolean;

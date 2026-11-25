@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { ApiError } from '#lib/utils/error-handling.ts';
-import { makeExpense } from './expense-form-fixtures';
 
 const { expenseApiMock, addNotification, gotoDynamic, addOfflineExpense, online } = vi.hoisted(
 	() => ({
@@ -28,6 +27,9 @@ vi.mock('#lib/utils/offline-storage.ts', () => ({
 	currentOfflineQueueOwner: () => 'alice'
 }));
 vi.mock('#lib/stores/offline.svelte.ts', () => ({ onlineStatus: online }));
+vi.mock('#lib/utils/sync/sync-manager.ts', () => ({
+	syncManager: { syncSoon: vi.fn(), requestAutoSync: vi.fn() }
+}));
 
 const { ExpenseFormState } = await import('../expense-form-state.svelte');
 const { submitExpense } = await import('../expense-form-actions');
@@ -50,7 +52,8 @@ beforeEach(() => {
 });
 
 describe('submitExpense — one clientId per save', () => {
-	test('a create that fails after reaching the server is re-queued under the same clientId', async () => {
+	test('a direct create that fails after reaching the server is re-queued under the same clientId', async () => {
+		addOfflineExpense.mockReturnValueOnce(false);
 		expenseApiMock.createExpense.mockRejectedValueOnce(new ApiError('gateway timeout', 504));
 		const state = createState();
 
@@ -62,12 +65,11 @@ describe('submitExpense — one clientId per save', () => {
 	});
 
 	test('each save gets its own clientId', async () => {
-		expenseApiMock.createExpense.mockResolvedValue(makeExpense('e1'));
-
 		await submitExpense(createState());
 		await submitExpense(createState());
 
-		const [first, second] = expenseApiMock.createExpense.mock.calls.map(call => call[1]);
+		const [first, second] = addOfflineExpense.mock.calls.map(call => (call as unknown[])[2]);
+		expect(first).toEqual(expect.any(String));
 		expect(first).not.toBe(second);
 	});
 });

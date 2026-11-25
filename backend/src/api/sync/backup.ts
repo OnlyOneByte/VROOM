@@ -31,6 +31,7 @@ import {
   trips,
   userPreferences,
   userProviders,
+  vehicleDrivers,
   vehicleFinancing,
   vehicleShares,
   vehicles,
@@ -422,25 +423,38 @@ class BackupService {
 
   async createBackup(userId: string): Promise<BackupData> {
     const db = getDb();
-    const [userVehicles, userExpenses, userFinancing, userInsurance, userOdometer, userTrips] =
-      await Promise.all([
-        db.select().from(vehicles).where(ownedVehiclesScope(userId)),
-        db.select().from(expenses).where(eq(expenses.userId, userId)),
-        db
-          .select()
-          .from(vehicleFinancing)
-          .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-          .where(ownedVehiclesScope(userId))
-          .then((r) => r.map((x) => x.vehicle_financing)),
-        db.select().from(insurancePolicies).where(eq(insurancePolicies.userId, userId)),
-        db
-          .select()
-          .from(odometerEntries)
-          .innerJoin(vehicles, eq(odometerEntries.vehicleId, vehicles.id))
-          .where(ownedVehiclesScope(userId))
-          .then((r) => r.map((x) => x.odometer_entries)),
-        db.select().from(trips).where(eq(trips.userId, userId)),
-      ]);
+    const [
+      userVehicles,
+      userExpenses,
+      userFinancing,
+      userInsurance,
+      userOdometer,
+      userTrips,
+      userDrivers,
+    ] = await Promise.all([
+      db.select().from(vehicles).where(ownedVehiclesScope(userId)),
+      db.select().from(expenses).where(eq(expenses.userId, userId)),
+      db
+        .select()
+        .from(vehicleFinancing)
+        .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
+        .where(ownedVehiclesScope(userId))
+        .then((r) => r.map((x) => x.vehicle_financing)),
+      db.select().from(insurancePolicies).where(eq(insurancePolicies.userId, userId)),
+      db
+        .select()
+        .from(odometerEntries)
+        .innerJoin(vehicles, eq(odometerEntries.vehicleId, vehicles.id))
+        .where(ownedVehiclesScope(userId))
+        .then((r) => r.map((x) => x.odometer_entries)),
+      db.select().from(trips).where(eq(trips.userId, userId)),
+      db
+        .select()
+        .from(vehicleDrivers)
+        .innerJoin(vehicles, eq(vehicleDrivers.vehicleId, vehicles.id))
+        .where(ownedVehiclesScope(userId))
+        .then((r) => r.map((x) => x.vehicle_drivers)),
+    ]);
 
     const policyIds = userInsurance.map((p) => p.id);
     const userInsuranceTerms =
@@ -531,6 +545,7 @@ class BackupService {
       reminderNotifications: userReminderNotifications,
       trips: userTrips,
       vehicleShares: userVehicleShares,
+      vehicleDrivers: userDrivers,
     };
   }
 
@@ -777,6 +792,8 @@ class BackupService {
       ...this.validateVehicleFkRefs(backup.odometer ?? [], vehicleIds, 'Odometer entry'),
       ...this.validateVehicleFkRefs(backup.trips ?? [], vehicleIds, 'Trip'),
       ...this.validateShareRefs(backup.vehicleShares ?? [], vehicleIds, userIds),
+      ...this.validateVehicleFkRefs(backup.vehicleDrivers ?? [], vehicleIds, 'Driver'),
+      ...this.validateDriverRefs(backup),
       ...this.validatePhotoRefs(backup.photos ?? [], this.photoEntityIdsByType(backup)),
       ...this.validatePhotoRefEntries(backup.photoRefs ?? [], photoIds),
       ...this.validateReminderRefs(backup.reminders ?? [], userIds),
@@ -830,6 +847,7 @@ class BackupService {
       'reminderNotification reminder+dueOdometer'
     );
     dupCheck(backup.vehicleShares, ['vehicleId', 'sharedWithId'], 'vehicleShare vehicle+invitee');
+    dupCheck(backup.vehicleDrivers, ['vehicleId', 'userId'], 'driver vehicle+user');
     dupCheck(
       backup.vehicleShares,
       ['vehicleId', 'invitedEmail'],
@@ -857,6 +875,24 @@ class BackupService {
       }
     }
     return errors;
+  }
+
+  private validateDriverRefs(backup: ParsedBackupData): string[] {
+    const driverVehicle = new Map(
+      (backup.vehicleDrivers ?? []).map((d) => [String(d.id), String(d.vehicleId)])
+    );
+    const check = (rows: Record<string, unknown>[] | undefined, field: string, label: string) =>
+      (rows ?? [])
+        .filter(
+          (row) =>
+            Boolean(row[field]) && driverVehicle.get(String(row[field])) !== String(row.vehicleId)
+        )
+        .map((row) => `${label} ${row.id} names a driver who doesn't drive its vehicle`);
+    return [
+      ...check(backup.trips, 'driverId', 'Trip'),
+      ...check(backup.odometer, 'driverId', 'Odometer entry'),
+      ...check(backup.expenses, 'paidByDriverId', 'Expense'),
+    ];
   }
 
   private validateVehicleFkRefs(

@@ -27,8 +27,9 @@ afterEach(() => {
 const TEST_YEAR = 2024;
 
 function resetDb(): void {
-  testDb.sqlite.close();
-  testDb = createTestDb();
+  testDb.sqlite.run('DELETE FROM expenses');
+  testDb.sqlite.run('DELETE FROM vehicles');
+  testDb.sqlite.run('DELETE FROM users');
   repo = new AnalyticsRepository(testDb.drizzle);
 }
 

@@ -99,7 +99,7 @@ describe('photo access on owner-stamped rows of a shared vehicle', () => {
     expect(res.status, 'odometer readings are owner-stamped the same way').toBe(200);
   });
 
-  test('a VIEWER is still denied both the read and the write (existence-hiding 404)', async () => {
+  test('a VIEWER can see the receipts but not upload one (403)', async () => {
     const vehicleId = await shareAccepted('viewer');
     const own = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
@@ -109,8 +109,8 @@ describe('photo access on owner-stamped rows of a shared vehicle', () => {
     });
     const expenseId = (await json<DataEnvelope<{ id: string }>>(own)).data.id;
 
-    expect((await asB('GET', `/api/v1/photos/expense/${expenseId}`)).status).toBe(404);
-    expect((await uploadAsB('expense', expenseId)).status).toBe(404);
+    expect((await asB('GET', `/api/v1/photos/expense/${expenseId}`)).status).toBe(200);
+    expect((await uploadAsB('expense', expenseId)).status).toBe(403);
   });
 
   test('a user with NO share is denied (the widening is per-vehicle, not a blanket grant)', async () => {

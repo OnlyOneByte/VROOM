@@ -18,7 +18,16 @@ export default defineConfig({
 			{
 				preprocess: vitePreprocess(),
 				adapter: adapter(),
-				serviceWorker: { register: false }
+				serviceWorker: { register: false },
+				csp: {
+					mode: 'auto',
+					directives: {
+						'script-src': ['self'],
+						'object-src': ['none'],
+						'base-uri': ['self'],
+						'frame-ancestors': ['none']
+					}
+				}
 			},
 			{
 				strategies: 'buildSW',
@@ -95,7 +104,13 @@ export default defineConfig({
 	},
 	// Vitest's default conditions omit 'browser'; without it inlined svelte loads its server entry, where mount() throws.
 	resolve: {
-		conditions: ['browser']
+		conditions: ['browser'],
+		// shortcut: LayerChart needs only geoPath (for map projections VROOM never draws) and one colour scheme, so these stand-ins keep 14 KB of d3-geo and d3-scale-chromatic off the charts; drop an alias before using geo charts or another scheme.
+		alias: {
+			'd3-geo': new URL('./src/lib/vendor/d3-geo.ts', import.meta.url).pathname,
+			'd3-scale-chromatic': new URL('./src/lib/vendor/d3-scale-chromatic.ts', import.meta.url)
+				.pathname
+		}
 	},
 	server: {
 		proxy: apiProxy

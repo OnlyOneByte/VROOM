@@ -10,7 +10,7 @@
 				destructive:
 					'bg-due-tint text-destructive focus-visible:ring-destructive/40 [a&]:hover:bg-due-tint/70',
 				outline:
-					'text-muted-foreground shadow-[inset_0_0_0_1px_var(--border-strong)] [a&]:hover:bg-sunk [a&]:hover:text-foreground',
+					'border-border-strong text-muted-foreground [a&]:hover:bg-sunk [a&]:hover:text-foreground',
 				due: 'bg-due-tint text-destructive',
 				soon: 'bg-soon-tint text-warning',
 				ok: 'bg-ok-tint text-success',

@@ -1,12 +1,12 @@
 import { stringify } from 'csv-stringify/sync';
 import { createInsertSchema } from 'drizzle-zod';
-import { Hono } from 'hono';
+import { type Context, Hono, type Next } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { type Expense, expenses as expensesTable, type NewExpense } from '../../db/schema';
 import { EXPENSE_CATEGORIES } from '../../db/types';
 import { NotFoundError, ValidationError } from '../../errors';
-import { changeTracker, requireAuth } from '../../middleware';
+import { changeTracker, heavyJobLimiter, rateLimiter, requireAuth } from '../../middleware';
 import {
   authorize,
   ownAccount,
@@ -42,6 +42,7 @@ import {
   seesFinancials,
   writesFinancials,
 } from '../../utils/vehicle-access';
+import { attributedDriver, hideDriverFields } from '../drivers/attribution';
 import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
@@ -418,7 +419,7 @@ routes.post(
       {
         success: true,
         data: {
-          siblings: siblings.map(expenseToApi),
+          siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
           groupId: first.groupId,
           groupTotal: centsToDollars(first.groupTotal),
           splitMethod: first.splitMethod,
@@ -477,7 +478,7 @@ routes.put(
     return c.json({
       success: true,
       data: {
-        siblings: siblings.map(expenseToApi),
+        siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
         groupId: first.groupId,
         groupTotal: centsToDollars(first.groupTotal),
         splitMethod: first.splitMethod,
@@ -511,7 +512,7 @@ routes.get(
     return c.json({
       success: true,
       data: {
-        siblings: siblings.map(expenseToApi),
+        siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
         groupId: first.groupId,
         groupTotal: centsToDollars(first.groupTotal),
         splitMethod: first.splitMethod,
@@ -692,73 +693,97 @@ function targetUnitsResolver(
   };
 }
 
-routes.post('/import', zValidator('json', importBodySchema), authorize(ownAccount), async (c) => {
-  const user = c.get('user');
-  const { csv, dryRun, mapping, timeZone } = c.req.valid('json');
+const expenseImportLimiter = rateLimiter({
+  ...CONFIG.rateLimit.expenseImport,
+  keyGenerator: (c) => `expenseImport:${c.get('user').id}`,
+});
+const importPreviewLimiter = rateLimiter({
+  ...CONFIG.rateLimit.importPreview,
+  keyGenerator: (c) => `importPreview:${c.get('user').id}`,
+});
 
-  const vehicles = await vehicleRepository.findByUserId(user.id);
-  if (vehicles.length === 0) {
-    throw new ValidationError('Add a vehicle before importing expenses');
-  }
-  const { currencyUnit: accountCurrency } = await preferencesRepository.getOrCreate(user.id);
+async function importLimits(c: Context, next: Next) {
+  const { dryRun } = await c.req.json<{ dryRun?: boolean }>();
+  if (dryRun) return importPreviewLimiter(c, next);
+  return expenseImportLimiter(c, async () => {
+    const refused = await heavyJobLimiter(c, next);
+    if (refused) c.res = refused;
+  });
+}
 
-  let importCsv = csv;
-  let unmappedCategories: string[] = [];
-  let rowErrors = new Map<number, string>();
-  if (mapping) {
-    const targetUnitsFor = targetUnitsResolver(vehicles);
-    try {
-      const format = findImportFormat(mapping.source);
-      const result = format
-        ? format.toNativeCsv(csv, { mapping, targetUnitsFor, timeZone })
-        : applyMapping(csv, mapping, targetUnitsFor, timeZone);
-      importCsv = result.csv;
-      unmappedCategories = result.unmappedCategories;
-      rowErrors = result.rowErrors;
-    } catch (err) {
-      if (err instanceof CsvMappingError) {
-        throw new ValidationError(err.message);
+routes.post(
+  '/import',
+  zValidator('json', importBodySchema),
+  authorize(ownAccount),
+  importLimits,
+  async (c) => {
+    const user = c.get('user');
+    const { csv, dryRun, mapping, timeZone } = c.req.valid('json');
+
+    const vehicles = await vehicleRepository.findByUserId(user.id);
+    if (vehicles.length === 0) {
+      throw new ValidationError('Add a vehicle before importing expenses');
+    }
+    const { currencyUnit: accountCurrency } = await preferencesRepository.getOrCreate(user.id);
+
+    let importCsv = csv;
+    let unmappedCategories: string[] = [];
+    let rowErrors = new Map<number, string>();
+    if (mapping) {
+      const targetUnitsFor = targetUnitsResolver(vehicles);
+      try {
+        const format = findImportFormat(mapping.source);
+        const result = format
+          ? format.toNativeCsv(csv, { mapping, targetUnitsFor, timeZone })
+          : applyMapping(csv, mapping, targetUnitsFor, timeZone);
+        importCsv = result.csv;
+        unmappedCategories = result.unmappedCategories;
+        rowErrors = result.rowErrors;
+      } catch (err) {
+        if (err instanceof CsvMappingError) {
+          throw new ValidationError(err.message);
+        }
+        throw err;
       }
+    }
+
+    let plan: ReturnType<typeof buildImportPlan>;
+    try {
+      plan = buildImportPlan(importCsv, vehicles, rowErrors, timeZone);
+    } catch (err) {
+      if (err instanceof CsvImportError) throw new ValidationError(err.message);
       throw err;
     }
-  }
 
-  let plan: ReturnType<typeof buildImportPlan>;
-  try {
-    plan = buildImportPlan(importCsv, vehicles, rowErrors, timeZone);
-  } catch (err) {
-    if (err instanceof CsvImportError) throw new ValidationError(err.message);
-    throw err;
-  }
+    if (dryRun) {
+      return c.json({
+        success: true,
+        data: {
+          dryRun: true,
+          imported: 0,
+          unmappedCategories,
+          ...summarizeImportPlan(plan, accountCurrency),
+        },
+      });
+    }
 
-  if (dryRun) {
+    const readyRows = plan.rows
+      .filter((row) => row.status === 'ready' && row.expense)
+      .map((row) => ({ ...row.expense, userId: user.id }) as NewExpense);
+    const { imported, duplicates } = await expenseRepository.importExpenses(readyRows, user.id);
+
     return c.json({
       success: true,
       data: {
-        dryRun: true,
-        imported: 0,
+        dryRun: false,
+        imported,
+        duplicates,
         unmappedCategories,
         ...summarizeImportPlan(plan, accountCurrency),
       },
     });
   }
-
-  const readyRows = plan.rows
-    .filter((row) => row.status === 'ready' && row.expense)
-    .map((row) => ({ ...row.expense, userId: user.id }) as NewExpense);
-  const { imported, duplicates } = await expenseRepository.importExpenses(readyRows, user.id);
-
-  return c.json({
-    success: true,
-    data: {
-      dryRun: false,
-      imported,
-      duplicates,
-      unmappedCategories,
-      ...summarizeImportPlan(plan, accountCurrency),
-    },
-  });
-});
+);
 
 const detectSourceSchema = z.object({
   sample: z.string().min(1).max(IMPORT_DETECT_SAMPLE_LENGTH),
@@ -791,6 +816,7 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
   const access = await requireVehicleAccess(expenseData.vehicleId, user.id, 'read');
   const { ownerId } = access;
   const createdBy = ownerId === user.id ? null : user.id;
+  const paidByDriverId = attributedDriver(c, expenseData.vehicleId, expenseData.paidByDriverId);
   assertMayTouchFinancialExpense(writesFinancials(access), expenseData.sourceType);
 
   let createdExpense = expenseData.clientId
@@ -812,7 +838,7 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
     );
 
     createdExpense = await expenseRepository.createIdempotent(
-      { ...expenseData, userId: ownerId, createdBy },
+      { ...expenseData, paidByDriverId, userId: ownerId, createdBy },
       await odometerCheck({ ...expenseData, timeZone })
     );
   }
@@ -825,7 +851,7 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
   return c.json(
     {
       success: true,
-      data: expenseToApi(createdExpense),
+      data: hideDriverFields(c, createdExpense.vehicleId, expenseToApi(createdExpense)),
       message: 'Expense created successfully',
     },
     201
@@ -854,7 +880,12 @@ routes.get('/', zValidator('query', expenseQuerySchema), authorize(fromQueryVehi
 
   const { limit, offset } = clampPagination(query);
 
-  return c.json(buildPaginatedResponse(data.map(expenseToApi), totalCount, limit, offset));
+  const rows = data.map((expense) =>
+    query.vehicleId
+      ? hideDriverFields(c, expense.vehicleId, expenseToApi(expense))
+      : expenseToApi(expense)
+  );
+  return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
 });
 
 routes.get(
@@ -895,9 +926,28 @@ routes.get(
     if (!expense) throw new NotFoundError('Expense');
     const access = await requireVehicleAccess(expense.vehicleId, user.id, 'read');
     assertMayTouchFinancialExpense(seesFinancials(access), expense.sourceType);
-    return c.json({ success: true, data: expenseToApi(expense) });
+    return c.json({
+      success: true,
+      data: hideDriverFields(c, expense.vehicleId, expenseToApi(expense)),
+    });
   }
 );
+
+function payerChange(
+  c: Context,
+  existing: Expense,
+  vehicleId: string | undefined,
+  requested: string | null | undefined
+): { paidByDriverId?: string | null } {
+  const target = vehicleId ?? existing.vehicleId;
+  const movedCar = target !== existing.vehicleId;
+  if (movedCar && existing.paidByDriverId) {
+    attributedDriver(c, existing.vehicleId, null, existing.paidByDriverId);
+  }
+  const paidBy = attributedDriver(c, target, requested, movedCar ? null : existing.paidByDriverId);
+  if (paidBy !== undefined) return { paidByDriverId: paidBy };
+  return movedCar ? { paidByDriverId: null } : {};
+}
 
 routes.put(
   '/:id',
@@ -951,7 +1001,11 @@ routes.put(
 
     validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalFuelType);
 
-    const normalizedUpdate = clearFuelFieldsIfNotFuel(updateData, finalCategory);
+    const { paidByDriverId: requestedPayer, ...withoutPayer } = updateData;
+    const normalizedUpdate = clearFuelFieldsIfNotFuel(
+      { ...withoutPayer, ...payerChange(c, existingExpense, updateData.vehicleId, requestedPayer) },
+      finalCategory
+    );
     const odometer = await editedOdometerCheck(existingExpense, {
       vehicleId: updateData.vehicleId ?? existingExpense.vehicleId,
       date: updateData.date ?? existingExpense.date,
@@ -970,7 +1024,7 @@ routes.put(
 
     return c.json({
       success: true,
-      data: expenseToApi(updatedExpense),
+      data: hideDriverFields(c, updatedExpense.vehicleId, expenseToApi(updatedExpense)),
       message: 'Expense updated successfully',
     });
   }

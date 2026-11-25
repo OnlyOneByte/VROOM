@@ -1,18 +1,18 @@
 @keyframes chart-grow-up {
 	from {
-		clip-path: inset(100% 0 0 0);
+		clip-path: inset(100% 0 0 0) view-box;
 	}
 	to {
-		clip-path: inset(0 0 0 0);
+		clip-path: inset(0 0 0 0) view-box;
 	}
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	.chart-bar-animate-ready .lc-bars-g {
-		clip-path: inset(100% 0 0 0);
+	.chart-bar-animate-ready :is(.lc-bars, [data-current-period]) {
+		clip-path: inset(100% 0 0 0) view-box;
 	}
 
-	.chart-bar-animate-ready.chart-bar-animated .lc-bars-g {
+	.chart-bar-animate-ready.chart-bar-animated :is(.lc-bars, [data-current-period]) {
 		animation: chart-grow-up 400ms ease-out forwards;
 	}
 }

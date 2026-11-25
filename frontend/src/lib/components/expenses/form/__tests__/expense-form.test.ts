@@ -77,7 +77,14 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 const parseReceipt = vi.fn<(image: File) => Promise<ReceiptDraft>>();
 vi.mock('#lib/services/vlm-api.ts', () => ({ vlmApi: { parseReceipt } }));
 
+const syncSoon = vi.fn();
+vi.mock('#lib/utils/sync/sync-manager.ts', () => ({
+	syncManager: { syncSoon, requestAutoSync: vi.fn(), syncAll: vi.fn(() => Promise.resolve({})) }
+}));
+
 const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
+const { loadOfflineExpenses } = await import('#lib/utils/offline-storage.ts');
+const queued = () => loadOfflineExpenses();
 const { FUEL_NEEDS_VEHICLE_MESSAGE } = await import('../expense-form/expense-form-state.svelte.ts');
 
 const EXISTING: Expense = {
@@ -405,24 +412,21 @@ describe('ExpenseForm create mode', () => {
 
 		await save();
 
-		await vi.waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1));
-		expect(createExpense.mock.calls[0]?.[0]).toEqual({
+		await vi.waitFor(() => expect(queued()).toHaveLength(1));
+		expect(queued()[0]).toMatchObject({
 			vehicleId: 'v1',
 			tags: [],
 			category: 'maintenance',
 			amount: 120.5,
 			date: dateOnlyToISO('2026-06-15'),
 			mileage: 30500,
-			volume: undefined,
-			charge: undefined,
-			fuelType: undefined,
 			description: 'Brake pads',
 			location: 'Main St Garage',
-			currency: 'USD',
-			sourceType: undefined,
-			sourceId: undefined,
-			missedFillup: false
+			missedFillup: false,
+			synced: false
 		});
+		expect(createExpense).not.toHaveBeenCalled();
+		expect(syncSoon).toHaveBeenCalledOnce();
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/v1'));
 		expect(notificationMessages()).toContain('Expense added successfully');
 	});
@@ -437,8 +441,8 @@ describe('ExpenseForm create mode', () => {
 		expect(getExpensesByVehicle).toHaveBeenCalledWith('v2', { limit: 100 });
 		expect(vehicleTriggerText()).toBe('2022 Nissan Leaf');
 		await save();
-		await vi.waitFor(() => expect(createExpense).toHaveBeenCalled());
-		expect(createExpense.mock.calls[0]?.[0]).toMatchObject({ vehicleId: 'v2', amount: 9.99 });
+		await vi.waitFor(() => expect(queued()).toHaveLength(1));
+		expect(queued()[0]).toMatchObject({ vehicleId: 'v2', amount: 9.99 });
 	});
 
 	test.each([
@@ -476,7 +480,7 @@ describe('ExpenseForm quick add', () => {
 		await fireEvent.click(categoryButton('Misc'));
 		await type('amount', '12');
 		await save();
-		await vi.waitFor(() => expect(createExpense).toHaveBeenCalled());
+		await vi.waitFor(() => expect(goto).toHaveBeenCalled());
 		cleanup();
 		getVehicle.mockClear();
 	}
@@ -1058,8 +1062,8 @@ describe('ExpenseForm financing and insurance links', () => {
 		await vi.waitFor(() => expect(screen.getByText('Financing payment')).toBeTruthy());
 		await save();
 
-		await vi.waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1));
-		expect(createExpense.mock.calls[0]?.[0]).toMatchObject({
+		await vi.waitFor(() => expect(queued()).toHaveLength(1));
+		expect(queued()[0]).toMatchObject({
 			sourceType: 'financing',
 			sourceId: 'fin-1'
 		});

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { UserProviderInfo, UserSettings } from '#lib/types/index.ts';
 
@@ -45,13 +45,16 @@ function provider(id: string, displayName: string, createdAt: string, status = '
 const OLDER = provider('llm-old', 'Work Claude', '2026-01-01T00:00:00.000Z');
 const NEWER = provider('llm-new', 'Home Claude', '2026-02-01T00:00:00.000Z');
 
-async function settle() {
-	for (let i = 0; i < 10; i++) await new Promise(r => setTimeout(r, 0));
+async function mount(domain: 'llm' | 'vlm' = 'llm') {
+	render(ModelProvidersCard, { props: { domain } });
+	await screen.findByTestId(`${domain}-add-provider`);
 }
 
-async function mount() {
-	render(ModelProvidersCard, { props: { domain: 'llm' } });
-	await settle();
+async function rowWith(name: string, testId = 'llm-provider-row') {
+	const rows = await screen.findAllByTestId(testId);
+	const row = rows.find(candidate => candidate.textContent?.includes(name));
+	if (!row) throw new Error(`no ${testId} contains ${name}`);
+	return row;
 }
 
 beforeEach(() => {
@@ -71,9 +74,7 @@ describe('choosing which assistant provider is used', () => {
 	test('without a saved choice the oldest provider is the one used', async () => {
 		getProviders.mockResolvedValue([NEWER, OLDER]);
 		await mount();
-		const rows = screen.getAllByTestId('llm-provider-row');
-		const used = rows.find(row => row.textContent?.includes('Work Claude'));
-		expect(used?.textContent).toContain('Used for the assistant');
+		expect(await rowWith('Work Claude')).toHaveTextContent('Used for the assistant');
 		expect(screen.getAllByRole('button', { name: 'Use for the Assistant' })).toHaveLength(1);
 	});
 
@@ -81,18 +82,15 @@ describe('choosing which assistant provider is used', () => {
 		getProviders.mockResolvedValue([OLDER, NEWER]);
 		getSettings.mockResolvedValue({ providerDefaults: { 'ai.llm': 'llm-new' } } as UserSettings);
 		await mount();
-		const rows = screen.getAllByTestId('llm-provider-row');
-		expect(rows.find(row => row.textContent?.includes('Home Claude'))?.textContent).toContain(
-			'Used for the assistant'
-		);
+		expect(await rowWith('Home Claude')).toHaveTextContent('Used for the assistant');
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Use for the Assistant' }));
-		await settle();
+		await waitFor(() =>
+			expect(showSuccess).toHaveBeenCalledWith('The assistant now uses Work Claude.')
+		);
 		expect(updateSettings).toHaveBeenCalledWith({ providerDefaults: { 'ai.llm': 'llm-old' } });
-		expect(showSuccess).toHaveBeenCalledWith('The assistant now uses Work Claude.');
-		const after = screen.getAllByTestId('llm-provider-row');
-		expect(after.find(row => row.textContent?.includes('Work Claude'))?.textContent).toContain(
-			'Used for the assistant'
+		await waitFor(async () =>
+			expect(await rowWith('Work Claude')).toHaveTextContent('Used for the assistant')
 		);
 	});
 
@@ -120,20 +118,14 @@ describe('choosing which assistant provider is used', () => {
 			provider('llm-a', 'First', '2026-01-01T00:00:00.000Z')
 		]);
 		await mount();
-		const rows = screen.getAllByTestId('llm-provider-row');
-		expect(rows.find(row => row.textContent?.includes('First'))?.textContent).toContain(
-			'Used for the assistant'
-		);
+		expect(await rowWith('First')).toHaveTextContent('Used for the assistant');
 	});
 });
 
 describe('the built-in text reader in receipt scanning', () => {
 	const VISION = { ...OLDER, id: 'vlm-1', domain: 'vlm', displayName: 'My GPT' };
 
-	async function mountVision() {
-		render(ModelProvidersCard, { props: { domain: 'vlm' } });
-		await settle();
-	}
+	const mountVision = () => mount('vlm');
 
 	test('with no AI provider it is listed and used, with nothing to pick', async () => {
 		getProviders.mockResolvedValue([]);
@@ -148,11 +140,12 @@ describe('the built-in text reader in receipt scanning', () => {
 		await mountVision();
 		expect(screen.getByTestId('vlm-provider-row')).toHaveTextContent('Used for receipt scanning');
 		await fireEvent.click(screen.getByRole('button', { name: 'Use for Receipt Scanning' }));
-		await settle();
+		await waitFor(() =>
+			expect(screen.getByTestId('vlm-builtin-row')).toHaveTextContent('Used for receipt scanning')
+		);
 		expect(updateSettings).toHaveBeenCalledWith({
 			providerDefaults: { 'ai.vision': 'builtin:local-ocr' }
 		});
-		expect(screen.getByTestId('vlm-builtin-row')).toHaveTextContent('Used for receipt scanning');
 	});
 
 	test('a saved built-in choice is shown as the one used', async () => {
@@ -169,10 +162,8 @@ describe('the built-in text reader in receipt scanning', () => {
 		getProviders.mockResolvedValue([]);
 		await mountVision();
 		await fireEvent.click(screen.getByTestId('vlm-add-provider'));
-		await settle();
-		await fireEvent.click(screen.getByTestId('vlm-type-trigger'));
-		await settle();
+		await fireEvent.click(await screen.findByTestId('vlm-type-trigger'));
+		expect(await screen.findByRole('option', { name: 'OpenAI-compatible' })).toBeInTheDocument();
 		expect(screen.queryByRole('option', { name: 'Built-in text reader' })).toBeNull();
-		expect(screen.getByRole('option', { name: 'OpenAI-compatible' })).toBeInTheDocument();
 	});
 });

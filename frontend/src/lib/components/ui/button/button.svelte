@@ -16,7 +16,7 @@
 				outline:
 					'border border-border-strong bg-background hover:bg-sunk aria-invalid:border-2 aria-disabled:border-border/50 aria-disabled:bg-background/50',
 				secondary: 'bg-sunk text-foreground hover:bg-sunk/70 aria-disabled:bg-sunk/50',
-				ghost: 'text-accent-ink hover:bg-sunk',
+				ghost: 'hover:bg-sunk',
 				link: 'text-accent-ink underline-offset-4 hover:underline'
 			},
 			size: {
@@ -28,13 +28,6 @@
 				'icon-lg': 'size-10'
 			}
 		},
-		compoundVariants: [
-			{
-				variant: 'ghost',
-				size: ['icon', 'icon-sm', 'icon-lg'],
-				class: 'text-muted-foreground hover:text-foreground'
-			}
-		],
 		defaultVariants: {
 			variant: 'default',
 			size: 'default'

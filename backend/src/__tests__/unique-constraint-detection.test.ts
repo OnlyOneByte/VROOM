@@ -1,11 +1,11 @@
 import { Database } from 'bun:sqlite';
 import { describe, expect, test } from 'bun:test';
 import { transaction } from '../db/connection';
+import { isDriverError } from '../db/dialect';
 import {
   ConflictError,
   DatabaseError,
   handleDatabaseError,
-  isSqliteError,
   isUniqueConstraintError,
   NotFoundError,
 } from '../errors';
@@ -54,12 +54,12 @@ describe('handleDatabaseError', () => {
   });
 });
 
-describe('isSqliteError', () => {
+describe('isDriverError', () => {
   test('recognizes a driver error by code, including through a cause chain', () => {
     const driverError = sqliteError("INSERT INTO t VALUES ('b', 'a@x')");
-    expect(isSqliteError(driverError)).toBe(true);
-    expect(isSqliteError(new Error('wrapped', { cause: driverError }))).toBe(true);
-    expect(isSqliteError(new Error('plain failure'))).toBe(false);
+    expect(isDriverError(driverError)).toBe(true);
+    expect(isDriverError(new Error('wrapped', { cause: driverError }))).toBe(true);
+    expect(isDriverError(new Error('plain failure'))).toBe(false);
   });
 });
 

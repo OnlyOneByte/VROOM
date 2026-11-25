@@ -1,5 +1,6 @@
 // X-Forwarded-For is client-controlled: honor it only from trusted proxy sockets, or a limiter keyed on it is bypassable.
 
+import { BlockList, isIP } from 'node:net';
 import type { Context } from 'hono';
 import { getConnInfo } from 'hono/bun';
 import { CONFIG } from '../config';
@@ -12,22 +13,111 @@ function getSocketIp(c: Context): string | undefined {
   }
 }
 
-function clientFromForwardedFor(xff: string): string | undefined {
-  const first = xff.split(',')[0]?.trim();
-  return first || undefined;
+function familyOf(address: string): 'ipv4' | 'ipv6' {
+  return isIP(address) === 6 ? 'ipv6' : 'ipv4';
 }
 
-export function getClientIp(c: Context, trustedProxyIps?: readonly string[]): string {
-  const socketIp = getSocketIp(c);
-  const trusted = trustedProxyIps ?? CONFIG.rateLimit.trustedProxyIps;
-
-  if (socketIp && trusted.includes(socketIp)) {
-    const xff = c.req.header('x-forwarded-for');
-    const forwarded = xff ? clientFromForwardedFor(xff) : undefined;
-    if (forwarded) return forwarded;
+export function parseTrustedProxies(entries: readonly string[]): BlockList {
+  const list = new BlockList();
+  for (const entry of entries) {
+    const [address = '', prefix] = entry.split('/');
+    const family = isIP(address);
+    const bits = prefix === undefined ? undefined : Number(prefix);
+    const width = family === 6 ? 128 : 32;
+    if (
+      family === 0 ||
+      (bits !== undefined && (!/^\d+$/.test(prefix ?? '') || bits < 0 || bits > width))
+    ) {
+      throw new Error(`TRUSTED_PROXY_IPS entry "${entry}" must be an IP address or CIDR range`);
+    }
+    if (bits === undefined) list.addAddress(address, familyOf(address));
+    else list.addSubnet(address, bits, familyOf(address));
   }
+  return list;
+}
 
-  if (socketIp) return socketIp;
+let cachedTrusted: { key: string; list: BlockList } | null = null;
 
-  return c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+function trustedProxies(entries: readonly string[]): BlockList {
+  const key = entries.join(',');
+  if (cachedTrusted?.key !== key) cachedTrusted = { key, list: parseTrustedProxies(entries) };
+  return cachedTrusted.list;
+}
+
+export function validateTrustedProxies(): void {
+  trustedProxies(CONFIG.rateLimit.trustedProxyIps);
+}
+
+function isTrusted(list: BlockList, address: string): boolean {
+  return isIP(address) !== 0 && list.check(address, familyOf(address));
+}
+
+function nearestUntrustedHop(xff: string, list: BlockList, socketIp: string): string {
+  const hops = xff
+    .split(',')
+    .map((hop) => hop.trim())
+    .filter(Boolean);
+  let client = socketIp;
+  for (let i = hops.length - 1; i >= 0; i--) {
+    const hop = hops[i] ?? '';
+    if (isIP(hop) === 0) return client;
+    client = hop;
+    if (!isTrusted(list, hop)) return hop;
+  }
+  return client;
+}
+
+export function getClientIp(
+  c: Context,
+  trustedProxyIps: readonly string[] = CONFIG.rateLimit.trustedProxyIps,
+  clientIpHeader: string | undefined = CONFIG.rateLimit.trustedClientIpHeader
+): string {
+  const socketIp = getSocketIp(c);
+  if (!socketIp) return 'unknown';
+  const list = trustedProxies(trustedProxyIps);
+  if (!isTrusted(list, socketIp)) return socketIp;
+
+  if (clientIpHeader) {
+    const named = c.req.header(clientIpHeader)?.trim();
+    if (named && isIP(named) !== 0) return named;
+  }
+  const xff = c.req.header('x-forwarded-for');
+  return xff ? nearestUntrustedHop(xff, list, socketIp) : socketIp;
+}
+
+function ipv4ToGroups(address: string): number[] {
+  const [a = 0, b = 0, c = 0, d = 0] = address.split('.').map(Number);
+  return [(a << 8) | b, (c << 8) | d];
+}
+
+function ipv6Groups(address: string): number[] {
+  const parse = (part: string) =>
+    part === ''
+      ? []
+      : part
+          .split(':')
+          .flatMap((group) => (group.includes('.') ? ipv4ToGroups(group) : [parseInt(group, 16)]));
+  const [head = '', tail] = address.split('::');
+  const start = parse(head);
+  if (tail === undefined) return start;
+  const end = parse(tail);
+  return [...start, ...new Array<number>(8 - start.length - end.length).fill(0), ...end];
+}
+
+export function rateLimitKeyOf(ip: string): string {
+  const address = ip.split('%')[0] ?? ip;
+  if (isIP(address) !== 6) return ip;
+  const groups = ipv6Groups(address);
+  const [, , , , , mapped = 0, high = 0, low = 0] = groups;
+  if (groups.slice(0, 5).every((group) => group === 0) && mapped === 0xffff) {
+    return `${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`;
+  }
+  return `${groups
+    .slice(0, 4)
+    .map((group) => group.toString(16))
+    .join(':')}::/64`;
+}
+
+export function getClientRateKey(c: Context): string {
+  return rateLimitKeyOf(getClientIp(c));
 }

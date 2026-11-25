@@ -144,6 +144,12 @@ describe('Explore chart data', () => {
 		expect(series[0]?.color).toMatch(/^var\(--/);
 	});
 
+	test('a vehicle missing from the colour map falls back to the vehicle palette', () => {
+		const byVehicle = { ...response, groupBy: 'vehicle' } as AnalyticsQueryResponse;
+		const series = seriesFor(byVehicle, { fuel: 'var(--chart-1)' });
+		expect(series.map(s => s.color)).toEqual(['var(--chart-1)', 'var(--chart-3)']);
+	});
+
 	test('hiding a series updates the additive KPIs', () => {
 		const all = kpis(DEFAULT_EXPLORE, response, new Set(['fuel', 'misc']));
 		expect(all).toEqual({ total: 200, perBucket: 100, previousPerBucket: 40, perDistance: 0.5 });

@@ -11,7 +11,6 @@
 		formatMonthLabel,
 		type TooltipValueFormat,
 		CHART_PADDING,
-		distinctYTicks,
 		TIME_X_PADDING,
 		insetTimeTicks,
 		getTrendLineProps,
@@ -24,6 +23,8 @@
 	import type { ChartState } from 'layerchart';
 	import { buildChartA11y, type ChartSelectHandler } from './chart-a11y.ts';
 	import type { ChartAnnotations } from './types.ts';
+	import { guideTicks } from './guides.ts';
+	import { curveLinear } from 'd3-shape';
 
 	interface LegendItem {
 		key: string;
@@ -64,6 +65,7 @@
 		referenceLines?: ReferenceLine[];
 		summary?: Snippet;
 		footer?: Snippet;
+		insight?: string;
 		class?: string;
 	}
 
@@ -103,6 +105,7 @@
 		referenceLines = [],
 		summary,
 		footer,
+		insight,
 		class: className
 	}: Props = $props();
 
@@ -143,9 +146,11 @@
 		else context?.tooltip.hide();
 	}
 	let resolvedXAxisProps = $derived(xAxisProps ?? monthlyXAxisProps(data.length));
-	let yTicks = $derived(
-		distinctYTicks(yAxisFormat, height - CHART_PADDING.top - CHART_PADDING.bottom)
-	);
+	let yTicks = $derived(guideTicks(yAxisFormat));
+	let trendProps = $derived.by(() => {
+		const base = getTrendLineProps(data.length);
+		return data.length > 1 ? { ...base, spline: { curve: curveLinear, strokeWidth: 2.4 } } : base;
+	});
 	let isolatedValues = $derived(series.flatMap(s => isolatedValueRows(s.data ?? data, [s.key])));
 </script>
 
@@ -181,6 +186,7 @@
 	events={annotations}
 	{summary}
 	{footer}
+	{insight}
 	class={className}
 >
 	{#if annotations}{#await import('./AnnotationLane.svelte')}<div
@@ -207,7 +213,7 @@
 					padding={CHART_PADDING}
 					xPadding={TIME_X_PADDING}
 					props={{
-						...getTrendLineProps(data.length),
+						...trendProps,
 						...lineProps,
 						xAxis: { ...resolvedXAxisProps, ticks: insetTimeTicks(resolvedXAxisProps['ticks']) },
 						yAxis: { format: yAxisFormat, ticks: yTicks },

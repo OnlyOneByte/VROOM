@@ -91,7 +91,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 ### Primitives — `#lib/components/ui/*` (barrel imports)
 | Need | Import | Notes |
 |---|---|---|
-| Action | `import { Button } from '#lib/components/ui/button'` | Pill buttons. variants: `default` (the ink pill; one per view) / `accent` (the C3 accent fill, Add expense only) / `destructive` (final delete only) / `outline` / `secondary` / `ghost` (accent-ink text; muted on icon sizes) / `link` · sizes: default/sm/lg/icon/icon-sm/icon-lg · `href` renders an `<a>` |
+| Action | `import { Button } from '#lib/components/ui/button'` | Pill buttons. variants: `default` (the ink pill; one per view) / `accent` (the C3 accent fill, Add expense only) / `destructive` (final delete only) / `outline` / `secondary` / `ghost` (keeps the surrounding text colour, hovers on `sunk`) / `link` (accent-ink text) · sizes: default/sm/lg/icon/icon-sm/icon-lg · `href` renders an `<a>` |
 | Text input | `import { Input } from '#lib/components/ui/input'` | `bind:value`, `aria-invalid`, `aria-describedby` |
 | Multiline | `import { Textarea } from '#lib/components/ui/textarea'` | |
 | Toggle | `import { Switch } from '#lib/components/ui/switch'` / `{ Checkbox }` | `bind:checked`, or `checked` + `onCheckedChange` |

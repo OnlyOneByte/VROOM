@@ -7,7 +7,8 @@ import { getDb } from '../../db/connection';
 import { type CalendarFeed, type CalendarFeedOptions, calendarFeeds } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
-import { getClientIp } from '../../utils/client-ip';
+import { authorize, ownAccount } from '../../permissions/authorize';
+import { getClientRateKey } from '../../utils/client-ip';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { zValidator } from '../../utils/validation';
 import { buildFeedEvents } from './feed-events';
@@ -45,7 +46,7 @@ const optionsSchema = z
 
 const feedRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.calendar,
-  keyGenerator: (c) => `calendar:${getClientIp(c)}`,
+  keyGenerator: (c) => `calendar:${getClientRateKey(c)}`,
 });
 
 export function hashFeedToken(token: string): string {
@@ -83,7 +84,7 @@ routes.get('/feed/:file', feedRateLimiter, async (c) => {
   });
 });
 
-routes.get('/feed', requireAuth, async (c) => {
+routes.get('/feed', requireAuth, authorize(ownAccount), async (c) => {
   return c.json({ success: true, data: { feed: describe(await feedOf(c.get('user').id)) } });
 });
 
@@ -91,6 +92,7 @@ routes.post(
   '/feed',
   requireAuth,
   zValidator('json', z.object({ options: optionsSchema.optional() }).strict()),
+  authorize(ownAccount),
   async (c) => {
     const userId = c.get('user').id;
     const existing = await feedOf(userId);
@@ -118,6 +120,7 @@ routes.put(
   '/feed',
   requireAuth,
   zValidator('json', z.object({ options: optionsSchema }).strict()),
+  authorize(ownAccount),
   async (c) => {
     const userId = c.get('user').id;
     const existing = await feedOf(userId);
@@ -130,7 +133,7 @@ routes.put(
   }
 );
 
-routes.delete('/feed', requireAuth, async (c) => {
+routes.delete('/feed', requireAuth, authorize(ownAccount), async (c) => {
   await getDb()
     .delete(calendarFeeds)
     .where(eq(calendarFeeds.userId, c.get('user').id));

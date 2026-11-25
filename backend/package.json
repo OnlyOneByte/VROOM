@@ -26,6 +26,7 @@
     "providers:rotate-key": "bun src/scripts/rotate-provider-keys.ts",
     "test": "bun test --timeout 30000 && bun run test:tz",
     "test:tz": "TZ=Pacific/Auckland bun test --timeout 30000 src/api/trips src/api/odometer src/api/expenses",
+    "test:postgres": "PG_PORTABILITY=1 bun test --timeout 120000 src/db/__tests__/postgres-portability.test.ts",
     "lint": "biome lint src/",
     "lint:fix": "biome lint --write src/",
     "format": "biome format src/",
@@ -70,6 +71,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.8",
+    "@electric-sql/pglite": "^0.6.0",
     "@libsql/client": "^0.18.0",
     "@types/adm-zip": "^0.6.0",
     "@types/web-push": "^3.6.4",

@@ -91,11 +91,13 @@ describe('Button aria-disabled focus ring', () => {
 		expect(busy).toEqual({ color: normal!.color, alpha: normal!.alpha * 2 });
 	});
 
-	test('ghost icon buttons stay muted while ghost text buttons use the accent ink', () => {
-		expect(buttonVariants({ variant: 'ghost', size: 'icon' }).split(/\s+/)).toContain(
-			'text-muted-foreground'
-		);
-		expect(buttonVariants({ variant: 'ghost' }).split(/\s+/)).toContain('text-accent-ink');
+	test('ghost keeps the text colour it sits on; only link uses the accent ink', () => {
+		expect(
+			buttonVariants({ variant: 'ghost' })
+				.split(/\s+/)
+				.filter(cls => /^text-(?!\[|sm|xs|base|lg)/.test(cls))
+		).toEqual([]);
+		expect(buttonVariants({ variant: 'link' }).split(/\s+/)).toContain('text-accent-ink');
 	});
 
 	test('the enabled focus ring stays the half-strength ring token', () => {

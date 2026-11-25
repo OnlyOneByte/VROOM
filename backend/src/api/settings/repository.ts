@@ -1,6 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
+import { jsonMergePatch } from '../../db/dialect';
 import type { NewUserPreferences, SyncState, UserPreferences } from '../../db/schema';
 import { syncState, userPreferences } from '../../db/schema';
 import { DatabaseError } from '../../errors';
@@ -86,7 +87,7 @@ export class PreferencesRepository {
       const result = await this.db
         .update(userPreferences)
         .set({
-          [column]: sql`json_patch(coalesce(${sql.raw(sqlColumn)}, '{}'), ${JSON.stringify(patch)})`,
+          [column]: jsonMergePatch(sql.raw(sqlColumn), patch),
           updatedAt: new Date(),
         })
         .where(eq(userPreferences.userId, userId))

@@ -19,6 +19,7 @@ import {
   trips,
   userPreferences,
   userProviders,
+  vehicleDrivers,
   vehicleFinancing,
   vehicleShares,
   vehicles,
@@ -49,6 +50,8 @@ export const SHEET_HEADERS = {
     'unitPreferences',
     'catalogModelId',
     'vehicleKind',
+    'carShareEnabled',
+    'carShareRules',
     'createdAt',
     'updatedAt',
   ],
@@ -73,6 +76,7 @@ export const SHEET_HEADERS = {
     'splitMethod',
     'sourceType',
     'sourceId',
+    'paidByDriverId',
     'createdAt',
     'updatedAt',
   ],
@@ -96,7 +100,7 @@ export const SHEET_HEADERS = {
     'createdAt',
     'updatedAt',
   ],
-  insuranceTermVehicles: ['termId', 'vehicleId'],
+  insuranceTermVehicles: ['termId', 'vehicleId', 'position'],
   insuranceClaims: [
     'id',
     'policyId',
@@ -140,6 +144,7 @@ export const SHEET_HEADERS = {
     'recordedAt',
     'note',
     'sourceTripId',
+    'driverId',
     'createdBy',
     'createdAt',
     'updatedAt',
@@ -154,6 +159,7 @@ export const SHEET_HEADERS = {
     'fileSize',
     'isCover',
     'sortOrder',
+    'createdBy',
     'createdAt',
   ],
   photoRefs: [
@@ -238,6 +244,8 @@ export const SHEET_HEADERS = {
     'startLocation',
     'endLocation',
     'note',
+    'driverId',
+    'createdBy',
     'createdAt',
     'updatedAt',
   ],
@@ -251,6 +259,16 @@ export const SHEET_HEADERS = {
     'invitedEmail',
     'createdAt',
     'updatedAt',
+  ],
+  vehicleDrivers: [
+    'id',
+    'vehicleId',
+    'userId',
+    'name',
+    'color',
+    'archivedAt',
+    'createdBy',
+    'createdAt',
   ],
 } as const satisfies Record<string, readonly string[]>;
 
@@ -272,6 +290,7 @@ export const SHEET_TABS = {
   reminderNotifications: 'Reminder Notifications',
   trips: 'Trips',
   vehicleShares: 'Vehicle Shares',
+  vehicleDrivers: 'Vehicle Drivers',
 } as const satisfies Record<keyof typeof SHEET_HEADERS, string>;
 
 type SheetTableKey = keyof typeof SHEET_TABS;
@@ -545,6 +564,12 @@ export class GoogleSheetsService {
       .from(vehicleShares)
       .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')));
 
+    const userDrivers = await db
+      .select()
+      .from(vehicleDrivers)
+      .innerJoin(vehicles, eq(vehicleDrivers.vehicleId, vehicles.id))
+      .where(ownedVehiclesScope(userId));
+
     const rowsByTable: Record<SheetTableKey, Record<string, unknown>[]> = {
       vehicles: userVehicles,
       expenses: userExpenses,
@@ -563,6 +588,7 @@ export class GoogleSheetsService {
       reminderNotifications: userReminderNotifications,
       trips: userTrips,
       vehicleShares: userVehicleShares,
+      vehicleDrivers: userDrivers.map((d) => d.vehicle_drivers),
     };
 
     const tables = (Object.keys(SHEET_TABS) as SheetTableKey[]).map((key) => ({

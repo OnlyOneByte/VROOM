@@ -141,8 +141,9 @@
 			const average = `${formatCurrency(value)} avg`;
 			if (!stats) return average;
 			const count = `${stats.count} ${noun}${stats.count === 1 ? '' : 's'}`;
-			if (stats.count === 1) return `${average} · ${count}`;
-			return `${average} · ${count} · ${formatCurrency(stats.min)}–${formatCurrency(stats.max)}`;
+			const [low, high] = [formatCurrency(stats.min), formatCurrency(stats.max)];
+			if (stats.count === 1 || low === high) return `${average} · ${count}`;
+			return `${average} · ${count} · ${low}–${high}`;
 		};
 	}
 

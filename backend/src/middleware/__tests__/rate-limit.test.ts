@@ -1,7 +1,7 @@
 import { describe, expect, setSystemTime, test } from 'bun:test';
 import { type Context, Hono } from 'hono';
 import { CONFIG } from '../../config';
-import { rateLimiter } from '../rate-limit';
+import { concurrencyLimiter, rateLimiter, trackedRateLimitKeys } from '../rate-limit';
 
 interface RateLimitErrorBody {
   success: boolean;
@@ -72,5 +72,75 @@ describe('rate-limit middleware — window + limit', () => {
     } finally {
       setSystemTime();
     }
+  });
+});
+
+describe('rate-limit middleware — bounded store', () => {
+  test('the store never holds more than maxTrackedKeys keys, evicting the oldest first', async () => {
+    const limits = CONFIG.rateLimit as { maxTrackedKeys: number };
+    const previous = limits.maxTrackedKeys;
+    limits.maxTrackedKeys = 3;
+    try {
+      let key = '';
+      const app = new Hono();
+      app.use('*', rateLimiter({ windowMs: 60_000, limit: 1, keyGenerator: () => key }));
+      app.get('/ping', (c: Context) => c.json({ ok: true }));
+      for (const next of ['cap-a', 'cap-b', 'cap-c', 'cap-d', 'cap-e']) {
+        key = next;
+        expect((await app.request('/ping')).status).toBe(200);
+      }
+      expect(trackedRateLimitKeys()).toBe(limits.maxTrackedKeys);
+      key = 'cap-e';
+      expect((await app.request('/ping')).status).toBe(429);
+      key = 'cap-a';
+      expect((await app.request('/ping')).status).toBe(200);
+    } finally {
+      limits.maxTrackedKeys = previous;
+    }
+  });
+});
+
+describe('concurrency limiter', () => {
+  function gatedApp(limit: number) {
+    const gates: (() => void)[] = [];
+    const app = new Hono();
+    app.use(
+      '*',
+      concurrencyLimiter({ limit, keyGenerator: () => 'k', message: 'busy', status: 503 })
+    );
+    app.get('/slow', async (c) => {
+      await new Promise<void>((release) => gates.push(release));
+      return c.json({ ok: true });
+    });
+    app.get('/fail', () => {
+      throw new Error('boom');
+    });
+    const releaseAll = () => {
+      for (const release of gates.splice(0)) release();
+    };
+    return { app, releaseAll };
+  }
+
+  test('a request over the in-flight limit is refused until one finishes', async () => {
+    const { app, releaseAll } = gatedApp(2);
+    const first = app.request('/slow');
+    const second = app.request('/slow');
+    await Bun.sleep(5);
+    const third = await app.request('/slow');
+    expect(third.status).toBe(503);
+    expect(third.headers.get('Retry-After')).toBe('5');
+    releaseAll();
+    expect((await first).status).toBe(200);
+    expect((await second).status).toBe(200);
+    const fourth = app.request('/slow');
+    await Bun.sleep(5);
+    releaseAll();
+    expect((await fourth).status).toBe(200);
+  });
+
+  test('a request that fails still frees its slot', async () => {
+    const { app } = gatedApp(1);
+    expect((await app.request('/fail')).status).toBe(500);
+    expect((await app.request('/fail')).status).toBe(500);
   });
 });

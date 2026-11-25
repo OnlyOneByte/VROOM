@@ -6,9 +6,11 @@ import './api/sync/init';
 import { prepareDemoGarage } from './api/auth/demo';
 import { discoverOidc } from './api/auth/providers/oidc';
 import { CONFIG } from './config';
-import { checkpointWAL, forceCheckpointWAL, runMigrations } from './db/connection';
+import { runMigrations, startWalCheckpoints } from './db/connection';
+import { validateTrustedProxies } from './utils/client-ip';
 import { extractErrorMessage } from './utils/error-handling';
 import { logger } from './utils/logger';
+import { adminEmailWarnings, parsePrivateEndpointPolicy } from './utils/outbound-url';
 
 logger.startup(`VROOM Backend starting on ${CONFIG.server.host}:${CONFIG.server.port}`);
 logger.startup(`Environment: ${CONFIG.env}`);
@@ -30,6 +32,17 @@ try {
   process.exit(1);
 }
 
+try {
+  validateTrustedProxies();
+  parsePrivateEndpointPolicy(
+    CONFIG.privateProviderEndpoints.allow,
+    CONFIG.privateProviderEndpoints.block
+  );
+} catch (error) {
+  logger.error(extractErrorMessage(error));
+  process.exit(1);
+}
+
 // A db:push-bootstrapped database fails here with 'already exists'; see DatabaseMigrations.md.
 try {
   await runMigrations();
@@ -40,6 +53,8 @@ try {
   });
   process.exit(1);
 }
+
+for (const warning of adminEmailWarnings(CONFIG.adminEmails)) logger.warn(warning);
 
 await discoverOidc();
 
@@ -57,16 +72,11 @@ try {
   });
 }
 
-const checkpointInterval = setInterval(
-  () => {
-    checkpointWAL();
-  },
+const stopWalCheckpoints = startWalCheckpoints(
   CONFIG.env === 'development'
     ? CONFIG.database.checkpointIntervalDev
     : CONFIG.database.checkpointIntervalProd
 );
-
-forceCheckpointWAL();
 
 startSyncWorker();
 
@@ -82,9 +92,7 @@ const shutdown = (signal: string) => {
   stopSyncWorker();
   stopCommunityStatsJob();
 
-  clearInterval(checkpointInterval);
-
-  forceCheckpointWAL();
+  stopWalCheckpoints?.();
 
   process.exit(0);
 };

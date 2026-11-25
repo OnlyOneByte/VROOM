@@ -7,7 +7,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const baseUrl = process.env.VITALS_BASE_URL ?? 'http://127.0.0.1:4173';
 const session = process.env.VITALS_SESSION;
 const vehicleId = process.env.VITALS_VEHICLE_ID;
-const runs = Number(process.env.VITALS_RUNS ?? 5);
+const runs = Number(process.env.VITALS_RUNS ?? 7);
 const cpuRate = 4;
 const metrics = ['lcp', 'tbt', 'cls'];
 

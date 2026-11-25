@@ -1,14 +1,19 @@
-import { and, eq, ne } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { getDb } from '../../db/connection';
-import { userProviders } from '../../db/schema';
+import { CONFIG } from '../../config';
 import {
   AppError,
   PayloadTooLargeError,
   UnprocessableEntityError,
   ValidationError,
 } from '../../errors';
-import { bodyLimit, changeTracker, requireAuth } from '../../middleware';
+import {
+  bodyLimit,
+  changeTracker,
+  concurrencyLimiter,
+  rateLimiter,
+  requireAuth,
+} from '../../middleware';
+import { authorize, ownAccount } from '../../permissions/authorize';
 import { logger } from '../../utils/logger';
 import { OcrUnavailableError } from './domains/vlm/local-ocr';
 import { parseExtraction } from './domains/vlm/prompt';
@@ -27,7 +32,18 @@ routes.use(
   bodyLimit({ maxSize: MAX_IMAGE_BYTES, message: 'Receipt image exceeds the 8MB limit' })
 );
 
-routes.post('/parse', async (c) => {
+const receiptScanLimiter = rateLimiter({
+  ...CONFIG.rateLimit.receiptScan,
+  keyGenerator: (c) => `receiptScan:${c.get('user').id}`,
+});
+const scansAtOnce = concurrencyLimiter({
+  limit: CONFIG.rateLimit.receiptScansAtOnce,
+  keyGenerator: (c) => `receipt-scans:${c.get('user').id}`,
+  message: 'Wait for your other receipt scans to finish',
+  status: 429,
+});
+
+routes.post('/parse', receiptScanLimiter, scansAtOnce, authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const providerRow = await resolveProvider(user.id, 'ai.vision');
 

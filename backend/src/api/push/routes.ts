@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { ValidationError } from '../../errors';
 import { requireAuth } from '../../middleware';
+import { authorize, ownAccount } from '../../permissions/authorize';
 import { zValidator } from '../../utils/validation';
 import { isAllowedPushEndpoint } from './push-endpoint';
 import { pushSubscriptionRepository } from './repository';
@@ -28,7 +29,7 @@ const unsubscribeSchema = z.object({
   endpoint: z.string().min(1, 'endpoint is required').max(MAX_ENDPOINT_CHARS),
 });
 
-routes.get('/vapid-public-key', (c) => {
+routes.get('/vapid-public-key', authorize(ownAccount), (c) => {
   if (!CONFIG.push.enabled) {
     return c.json({ success: true, data: { enabled: false, publicKey: null } });
   }
@@ -39,7 +40,7 @@ routes.get('/vapid-public-key', (c) => {
   });
 });
 
-routes.post('/subscribe', zValidator('json', subscribeSchema), async (c) => {
+routes.post('/subscribe', zValidator('json', subscribeSchema), authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const body = c.req.valid('json');
   // The server later POSTs to this URL; reject anything off the push-vendor allowlist.
@@ -55,11 +56,16 @@ routes.post('/subscribe', zValidator('json', subscribeSchema), async (c) => {
   return c.json({ success: true, data: { id: stored.id } }, 201);
 });
 
-routes.delete('/subscribe', zValidator('json', unsubscribeSchema), async (c) => {
-  const user = c.get('user');
-  const { endpoint } = c.req.valid('json');
-  const removed = await pushSubscriptionRepository.deleteByEndpoint(user.id, endpoint);
-  return c.json({ success: true, data: { removed } });
-});
+routes.delete(
+  '/subscribe',
+  zValidator('json', unsubscribeSchema),
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const { endpoint } = c.req.valid('json');
+    const removed = await pushSubscriptionRepository.deleteByEndpoint(user.id, endpoint);
+    return c.json({ success: true, data: { removed } });
+  }
+);
 
 export { routes };

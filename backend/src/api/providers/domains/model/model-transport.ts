@@ -1,6 +1,6 @@
 import { ValidationError } from '../../../../errors';
 import { logger } from '../../../../utils/logger';
-import { fetchOutbound } from '../../../../utils/outbound-url';
+import { fetchOutbound, type PrivateEndpointPolicy } from '../../../../utils/outbound-url';
 
 export type ModelDomainLabel = 'LLM' | 'VLM';
 
@@ -12,6 +12,7 @@ interface ModelRequest {
   headers?: Record<string, string>;
   body: unknown;
   timeoutMs: number;
+  outbound?: PrivateEndpointPolicy;
 }
 
 export function trimBaseUrl(url: string): string {
@@ -32,7 +33,8 @@ export async function postModelJson<T>(req: ModelRequest): Promise<T | null> {
         body: JSON.stringify(req.body),
         signal: AbortSignal.timeout(req.timeoutMs),
       },
-      `${req.domain} provider URL`
+      `${req.domain} provider URL`,
+      req.outbound
     );
   } catch (err) {
     if (err instanceof ValidationError) throw err;

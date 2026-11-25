@@ -6,7 +6,7 @@
 |---|---|---|---|
 | Backend unit/integration | `bun:test` | `bun run test` (`bun test --timeout 30000`, then the trips, odometer and expense tests again under `TZ=Pacific/Auckland`) | `backend/src/**/__tests__/` |
 | Frontend unit/component | Vitest + `@testing-library/svelte` | `npm run test` (`vitest --run`, then the date-sensitive suites again under `TZ=Pacific/Auckland`) | `frontend/src/**/__tests__/` |
-| Frontend coverage floor | Vitest v8 coverage | `npm run test:coverage` (CI runs it in place of `vitest --run`; fails below `coverage.thresholds` in `vite.config.ts`) | all `frontend/src/**/*.{ts,svelte}` except `ui/` |
+| Frontend coverage floor | Vitest v8 coverage | `npm run test:coverage` (CI runs the same tests in two shards and checks the merged coverage in the `Frontend Tests` job; fails below `coverage.thresholds` in `vite.config.ts`) | all `frontend/src/**/*.{ts,svelte}` except `ui/` |
 | Frontend e2e | Playwright | `npm run test:e2e` | `frontend/e2e/` (config `frontend/playwright.config.ts`) |
 
 Backend runs on `bun test` — never Vitest. Frontend runs on Vitest — never bun.
@@ -117,6 +117,9 @@ Full pattern in `DatabaseMigrations.md`. Key points:
   than the production build.
 
 ## Rules
+
+- A test that fails with no code cause is a flake. Fix it or quarantine it the same day, as
+  `Flaky-Tests.md` describes. Never add retries or a longer timeout to hide it.
 
 - Mocks must match current types. If `Expense` changes, update them — no stale field names.
 - Type what you assert against: import the real type or declare the shape inline (`json<T>()` is

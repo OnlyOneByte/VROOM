@@ -2,7 +2,12 @@ import { z } from 'zod';
 import type { UserProvider } from '../../../../db/schema';
 import { ValidationError } from '../../../../errors';
 import { decrypt, secretContextOf } from '../../../../utils/encryption';
-import { assertSafeOutboundUrl } from '../../../../utils/outbound-url';
+import {
+  ALLOW_PRIVATE,
+  assertSafeOutboundUrl,
+  type PrivateEndpointPolicy,
+  privateEndpointPolicyFor,
+} from '../../../../utils/outbound-url';
 import {
   alwaysAvailable,
   type FieldSpec,
@@ -15,6 +20,7 @@ export interface ModelProviderSettings {
   apiKey?: string;
   model: string;
   baseUrl?: string;
+  outbound?: PrivateEndpointPolicy;
 }
 
 export type ModelCapability = 'ai.llm' | 'ai.vision';
@@ -58,7 +64,7 @@ function modelConfigSchema(domain: ModelDomainLabel, needsBaseUrl: boolean) {
     .superRefine((config, ctx) => {
       if (typeof config.baseUrl !== 'string') return;
       try {
-        assertSafeOutboundUrl(config.baseUrl, `${domain} base URL`);
+        assertSafeOutboundUrl(config.baseUrl, `${domain} base URL`, ALLOW_PRIVATE);
       } catch (error) {
         ctx.addIssue({ code: 'custom', message: (error as Error).message, path: ['baseUrl'] });
       }
@@ -126,7 +132,8 @@ export function resolveModelSettings(
     throw new ValidationError(`${domain} provider config is missing a model name`);
   }
   const baseUrl = typeof config.baseUrl === 'string' ? config.baseUrl : undefined;
-  if (baseUrl) assertSafeOutboundUrl(baseUrl, `${domain} base URL`);
+  const outbound = privateEndpointPolicyFor(row.userId);
+  if (baseUrl) assertSafeOutboundUrl(baseUrl, `${domain} base URL`, outbound);
 
   const credentials = JSON.parse(decrypt(row.credentials, secretContextOf(row))) as Record<
     string,
@@ -134,7 +141,7 @@ export function resolveModelSettings(
   >;
   const apiKey = typeof credentials.apiKey === 'string' ? credentials.apiKey : undefined;
 
-  return { apiKey, model, baseUrl };
+  return { apiKey, model, baseUrl, outbound };
 }
 
 export function createModelProviderResolver<Cap extends ModelCapability, P>(
