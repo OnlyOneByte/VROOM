@@ -67,7 +67,11 @@
 	</span>
 {/snippet}
 
-<PageHeader title={displayName} {description}>
+<PageHeader
+	title={displayName}
+	{description}
+	titleClass="font-(family-name:--font-fig) text-4xl leading-none uppercase lg:text-5xl"
+>
 	{#snippet back()}
 		<Button
 			variant="outline"

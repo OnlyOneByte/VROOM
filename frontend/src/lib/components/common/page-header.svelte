@@ -6,9 +6,16 @@
 		description?: string | Snippet | undefined;
 		back?: Snippet;
 		actions?: Snippet;
+		titleClass?: string;
 	}
 
-	let { title, description, back, actions }: Props = $props();
+	let {
+		title,
+		description,
+		back,
+		actions,
+		titleClass = 'text-3xl tracking-tight'
+	}: Props = $props();
 </script>
 
 <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-4">
@@ -19,7 +26,7 @@
 		<div class="min-w-0">
 			<h1
 				tabindex="-1"
-				class="text-3xl font-bold tracking-tight break-words rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+				class="{titleClass} font-bold break-words rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 			>
 				{title}
 			</h1>

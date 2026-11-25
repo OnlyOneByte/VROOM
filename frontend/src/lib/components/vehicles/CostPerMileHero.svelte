@@ -1,17 +1,19 @@
+<script lang="ts" module>
+	const instruments = Promise.all([
+		import('#lib/components/charts/Dial.svelte'),
+		import('#lib/components/common/Drums.svelte')
+	]);
+</script>
+
 <script lang="ts">
-	import HeroFigure from '#lib/components/common/hero-figure.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
-	import type { ExpenseSummary, Vehicle } from '#lib/types/index.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import type { ExpenseSummary } from '#lib/types/index.ts';
 	import type { DistanceUnit } from '#lib/types/settings.ts';
-	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
-	import {
-		bucketAmounts,
-		COST_BUCKETS,
-		COST_BUCKET_COLOR_TOKENS,
-		type CostBucket
-	} from '#lib/utils/cost-bucket.ts';
+	import { formatCurrency, formatNumber, formatNumberUpTo } from '#lib/utils/formatters.ts';
+	import { costBucketColor } from '#lib/utils/cost-bucket.ts';
 	import { costPerDistance } from '#lib/utils/cost-per-distance.ts';
 
 	interface Props {
@@ -20,7 +22,7 @@
 		distanceLoading?: boolean;
 		distanceError?: string | null;
 		distanceUnit: DistanceUnit;
-		vehicleType: Vehicle['vehicleType'];
+		name?: string;
 		logMileageHref?: string | undefined;
 		onRetryDistance?: (() => unknown) | undefined;
 	}
@@ -31,113 +33,158 @@
 		distanceLoading = false,
 		distanceError = null,
 		distanceUnit,
-		vehicleType,
+		name = 'This car',
 		logMileageHref,
 		onRetryDistance
 	}: Props = $props();
 
-	const BG_BY_TOKEN: Record<(typeof COST_BUCKET_COLOR_TOKENS)[CostBucket], string> = {
-		'chart-1': 'bg-chart-1',
-		'chart-2': 'bg-chart-2',
-		'chart-3': 'bg-chart-3',
-		'chart-4': 'bg-chart-4',
-		'chart-5': 'bg-chart-5'
-	};
-	const bucketBg = (bucket: CostBucket) => BG_BY_TOKEN[COST_BUCKET_COLOR_TOKENS[bucket]];
+	const CENT_CURRENCIES = new Set(['USD', 'CAD', 'AUD', 'NZD']);
+	const DIAL_STEPS = [1, 1.6, 2, 4, 8];
 
 	let section = $state<HTMLElement | null>(null);
 
-	let unitName = $derived(distanceUnit === 'kilometers' ? 'km' : 'mile');
+	let km = $derived(distanceUnit === 'kilometers');
+	let unitName = $derived(km ? 'km' : 'mile');
+	let unitPlural = $derived(km ? 'km' : 'miles');
+	let currency = $derived(settingsStore.settings?.currencyUnit || 'USD');
+	let cents = $derived(CENT_CURRENCIES.has(currency));
 	let perDistance = $derived(summary ? costPerDistance(summary.costBuckets, distance) : null);
-	let buckets = $derived(summary ? bucketAmounts(summary.categoryBreakdown) : null);
-	let bucketTotal = $derived(
-		buckets ? COST_BUCKETS.reduce((sum, bucket) => sum + buckets[bucket], 0) : 0
-	);
-	let bucketLabels = $derived<Record<CostBucket, string>>({
-		ownership: 'Ownership',
-		energy: vehicleType === 'electric' ? 'Charging' : vehicleType === 'hybrid' ? 'Energy' : 'Fuel',
-		upkeep: 'Upkeep'
+
+	function rate(value: number): string {
+		return cents ? `${formatNumberUpTo(value * 100, 0)}¢` : formatCurrency(value);
+	}
+
+	function dialMax(value: number, floor: number): number {
+		if (!(value > floor)) return floor;
+		const magnitude = 10 ** Math.floor(Math.log10(value));
+		const step = DIAL_STEPS.find(s => s * magnitude >= value) ?? 10;
+		return step * magnitude;
+	}
+
+	let dial = $derived.by(() => {
+		if (!perDistance) return null;
+		const factor = cents ? 100 : 1;
+		const running = perDistance.running * factor;
+		const ownership = perDistance.ownership * factor;
+		return {
+			running,
+			ownership,
+			max: dialMax(running + Math.max(ownership, 0), cents ? 80 : 0.8),
+			caption: `ALL-IN ${cents ? '¢' : currency} / ${km ? 'KM' : 'MI'}`
+		};
 	});
-	let shownBuckets = $derived(buckets ? COST_BUCKETS.filter(bucket => buckets[bucket] > 0) : []);
+
+	let over = $derived(`over ${formatNumber(distance ?? 0, 0)} ${unitPlural}`);
+
+	let figures = $derived(
+		summary
+			? [
+					{ label: 'Last 30 days', amount: summary.recentAmount },
+					{ label: 'Per month', amount: summary.monthlyAverage },
+					{ label: 'All time', amount: summary.totalAmount }
+				]
+			: []
+	);
 </script>
 
+{#snippet drumsPlaceholder()}
+	<Skeleton class="h-10 w-24 lg:h-12" aria-hidden="true" />
+{/snippet}
+
 <section
-	class="space-y-4 rounded-xl border bg-card p-4 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:p-6"
+	class="grid gap-6 rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center lg:gap-10"
 	aria-label="True cost per {unitName}"
 	data-testid="cost-per-mile-hero"
 	tabindex="-1"
 	bind:this={section}
 >
 	{#if !summary || distanceLoading}
-		<div class="space-y-1">
-			<div class="flex min-h-7 items-center" aria-hidden="true">
+		<Skeleton
+			class="aspect-square w-full max-w-50 justify-self-center rounded-full lg:max-w-80"
+			aria-hidden="true"
+		/>
+		<div class="space-y-4">
+			<div class="space-y-2" aria-hidden="true">
 				<Skeleton class="h-4 w-44" />
-			</div>
-			<Skeleton class="h-[2.8125rem] w-32 lg:h-[3.75rem]" aria-hidden="true" />
-			<div class="flex flex-wrap gap-y-1" aria-hidden="true">
-				<Skeleton class="h-4 w-56" />
-				<Skeleton class="h-4 w-24 basis-full sm:hidden" />
+				<Skeleton class="h-7 w-full max-w-md" />
+				<Skeleton class="h-7 w-3/4 max-w-sm" />
 			</div>
 			<span class="sr-only">Loading cost per {unitName}</span>
-		</div>
-		<div class="space-y-2" aria-hidden="true">
-			<Skeleton class="h-2 w-full" />
-			<div class="grid grid-cols-3 gap-3">
+			<div class="flex flex-wrap gap-4" aria-hidden="true">
 				{#each Array(3) as _, i (i)}
-					<div class="space-y-0.5">
-						<Skeleton class="h-4 w-14" />
-						<Skeleton class="h-4 w-16" />
-					</div>
+					{@render drumsPlaceholder()}
 				{/each}
 			</div>
 		</div>
-		<div class="grid grid-cols-3 gap-3" aria-hidden="true">
-			{#each Array(3) as _, i (i)}
-				<div>
-					<Skeleton class="h-4 w-16" />
-					<Skeleton class="mt-0.5 h-7 w-20" />
-				</div>
-			{/each}
-		</div>
 	{:else}
-		{#if perDistance}
-			<HeroFigure
-				label="True cost per {unitName}, all time"
-				value={formatCurrency(perDistance.total)}
-			>
-				{#snippet meta()}
-					<span>
-						{formatCurrency(perDistance.running)} running
-						{#if perDistance.ownership > 0}
-							+ {formatCurrency(perDistance.ownership)} ownership
-						{:else}
-							· no ownership costs logged
-						{/if}
-					</span>
-					<span class="max-sm:hidden" aria-hidden="true">·</span>
-					<span class="whitespace-nowrap max-sm:basis-full">
-						over {formatNumber(distance ?? 0, 0)}
-						{distanceUnit === 'kilometers' ? 'km' : 'mi'}
-					</span>
-				{/snippet}
-			</HeroFigure>
-		{:else}
-			<div class="space-y-1">
-				<p class="text-sm text-muted-foreground">True cost per {unitName}, all time</p>
-				{#if distanceError && onRetryDistance}
-					<LoadErrorCard
-						compact
-						title="Cost per {unitName} isn't available right now"
-						message={distanceError}
-						onRetry={onRetryDistance}
-						onRecovered={() => section?.focus()}
-						data-testid="cost-per-mile-error"
+		{#if dial}
+			<div class="flex justify-center">
+				{#await instruments}
+					<Skeleton
+						class="aspect-square w-full max-w-50 rounded-full lg:max-w-80"
+						aria-hidden="true"
 					/>
-				{:else}
+				{:then [{ default: Dial }]}
+					<Dial
+						running={dial.running}
+						ownership={dial.ownership}
+						max={dial.max}
+						valueLabel={rate(perDistance?.total ?? 0)}
+						caption={dial.caption}
+						label="True cost per {unitName}, all in: {rate(perDistance?.total ?? 0)}"
+					/>
+				{/await}
+			</div>
+		{/if}
+
+		<div class="min-w-0 space-y-4 {dial ? '' : 'sm:col-span-2'}">
+			<p class="text-sm text-muted-foreground">What a {unitName} really costs, all in</p>
+			{#if perDistance}
+				<p class="max-w-xl text-xl leading-snug lg:text-2xl" data-testid="cost-sentence">
+					{#if perDistance.ownership > 0}
+						{name} costs <strong>{rate(perDistance.total)}</strong> a {unitName}
+						{over}: <strong>{rate(perDistance.running)}</strong> to run it and
+						<strong>{rate(perDistance.ownership)}</strong> to own it.
+					{:else}
+						{name} costs <strong>{rate(perDistance.total)}</strong> a {unitName} to run
+						{over}. No ownership costs logged yet.
+					{/if}
+				</p>
+				<ul class="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
+					<li class="flex items-center gap-1.5">
+						<span
+							class="h-2 w-2 shrink-0 rounded-full"
+							style:background-color={costBucketColor('upkeep')}
+							aria-hidden="true"
+						></span>
+						Running {rate(perDistance.running)}
+					</li>
+					{#if perDistance.ownership > 0}
+						<li class="flex items-center gap-1.5">
+							<span
+								class="h-2 w-2 shrink-0 rounded-full"
+								style:background-color={costBucketColor('ownership')}
+								aria-hidden="true"
+							></span>
+							Ownership {rate(perDistance.ownership)}
+						</li>
+					{/if}
+				</ul>
+			{:else if distanceError && onRetryDistance}
+				<LoadErrorCard
+					compact
+					title="Cost per {unitName} isn't available right now"
+					message={distanceError}
+					onRetry={onRetryDistance}
+					onRecovered={() => section?.focus()}
+					data-testid="cost-per-mile-error"
+				/>
+			{:else}
+				<div class="space-y-1">
 					<p class="text-lg font-semibold">
 						Log a newer odometer reading to see cost per {unitName}
 					</p>
-					<p class="text-xs text-muted-foreground">
+					<p class="text-sm text-muted-foreground">
 						It divides every cost so far by the distance since you added this vehicle.
 					</p>
 					{#if logMileageHref}
@@ -145,60 +192,23 @@
 							Add an odometer reading
 						</Button>
 					{/if}
-				{/if}
-			</div>
-		{/if}
-
-		{#if buckets && bucketTotal > 0}
-			<div class="space-y-2">
-				<div class="flex h-2 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-					{#each shownBuckets as bucket (bucket)}
-						<div
-							class={bucketBg(bucket)}
-							style:width="{(buckets[bucket] / bucketTotal) * 100}%"
-							data-bucket={bucket}
-						></div>
-					{/each}
 				</div>
-				<ul class="grid grid-cols-3 gap-3 text-xs text-muted-foreground">
-					{#each shownBuckets as bucket (bucket)}
-						<li class="min-w-0 space-y-0.5">
-							<span class="flex items-center gap-1.5">
-								<span class="h-2 w-2 shrink-0 rounded-full {bucketBg(bucket)}" aria-hidden="true"
-								></span>
-								<span class="truncate">{bucketLabels[bucket]}</span>
-							</span>
-							<span
-								class="block truncate tabular-nums text-foreground"
-								title={formatCurrency(buckets[bucket])}
-							>
-								{formatCurrency(buckets[bucket])}
-							</span>
-						</li>
-					{/each}
-				</ul>
-			</div>
-		{/if}
+			{/if}
 
-		<dl class="grid grid-cols-3 gap-3">
-			<div class="min-w-0">
-				<dt class="text-xs text-muted-foreground">Last 30 days</dt>
-				<dd class="mt-0.5 truncate text-lg font-semibold tabular-nums">
-					{formatCurrency(summary.recentAmount)}
-				</dd>
-			</div>
-			<div class="min-w-0">
-				<dt class="text-xs text-muted-foreground">Per month</dt>
-				<dd class="mt-0.5 truncate text-lg font-semibold tabular-nums">
-					{formatCurrency(summary.monthlyAverage, undefined, 0)}
-				</dd>
-			</div>
-			<div class="min-w-0">
-				<dt class="text-xs text-muted-foreground">All time</dt>
-				<dd class="mt-0.5 truncate text-lg font-semibold tabular-nums">
-					{formatCurrency(summary.totalAmount, undefined, 0)}
-				</dd>
-			</div>
-		</dl>
+			<dl class="flex flex-wrap gap-x-6 gap-y-4 [container-type:inline-size]">
+				{#each figures as figure (figure.label)}
+					<div class="min-w-0">
+						<dt class="mb-1.5 text-sm text-muted-foreground">{figure.label}</dt>
+						<dd>
+							{#await instruments}
+								{@render drumsPlaceholder()}
+							{:then [, { default: Drums }]}
+								<Drums amount={figure.amount} {currency} />
+							{/await}
+						</dd>
+					</div>
+				{/each}
+			</dl>
+		</div>
 	{/if}
 </section>

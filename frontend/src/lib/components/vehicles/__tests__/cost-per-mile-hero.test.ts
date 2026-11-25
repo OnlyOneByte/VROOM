@@ -27,28 +27,32 @@ afterEach(() => {
 });
 
 describe('CostPerMileHero', () => {
-	test('leads with the true cost per mile and its running and ownership parts', () => {
-		const { container } = render(CostPerMileHero, {
+	test('reads the true cost per mile as one sentence, with the dial, the legend and three drums', async () => {
+		render(CostPerMileHero, {
 			summary: summary(),
 			distance: 22360,
 			distanceUnit: 'miles',
-			vehicleType: 'gas'
+			name: 'Daily Driver'
 		});
 
-		expect(screen.getByText('True cost per mile, all time')).toBeInTheDocument();
-		expect(screen.getByText('$0.58')).toBeInTheDocument();
-		expect(screen.getByText(/\$0\.13 running\s*\+ \$0\.45 ownership/)).toBeInTheDocument();
-		expect(screen.getByText(/over 22,360\s*mi/)).toBeInTheDocument();
-		expect(screen.getByRole('list')).toHaveTextContent(
-			/Ownership\s*\$10,154\.00.*Fuel\s*\$1,900\.00.*Upkeep\s*\$1,007\.00/
+		expect(screen.getByText('What a mile really costs, all in')).toBeInTheDocument();
+		expect(screen.getByTestId('cost-sentence')).toHaveTextContent(
+			'Daily Driver costs 58¢ a mile over 22,360 miles: 13¢ to run it and 45¢ to own it.'
 		);
-		const figures = container.querySelector('dl') as HTMLElement;
-		expect(figures).toHaveTextContent(/Last 30 days\s*\$500\.79/);
-		expect(figures).toHaveTextContent(/Per month\s*\$544/);
-		expect(figures).toHaveTextContent(/All time\s*\$13,061/);
+		expect(screen.getByRole('list')).toHaveTextContent(/Running 13¢\s*Ownership 45¢/);
+		const dial = await screen.findByRole('img', { name: 'True cost per mile, all in: 58¢' });
+		expect(dial).toHaveTextContent('ALL-IN ¢ / MI');
+		expect(screen.getByRole('img', { name: '$501' })).toBeInTheDocument();
+		expect(screen.getByRole('img', { name: '$544' })).toBeInTheDocument();
+		expect(screen.getByRole('img', { name: '$13,061' })).toBeInTheDocument();
+		expect(screen.getAllByRole('term').map(t => t.textContent)).toEqual([
+			'Last 30 days',
+			'Per month',
+			'All time'
+		]);
 	});
 
-	test('uses the vehicle distance unit and the user currency', () => {
+	test('a currency without cents and a km car use the currency on the dial and in the sentence', async () => {
 		vi.spyOn(settingsStore, 'settings', 'get').mockReturnValue({
 			currencyUnit: 'EUR'
 		} as NonNullable<typeof settingsStore.settings>);
@@ -57,55 +61,55 @@ describe('CostPerMileHero', () => {
 				costBuckets: { ownershipTotal: 0, runningTotal: 300, previous: null, byVehicle: [] }
 			}),
 			distance: 1500,
-			distanceUnit: 'kilometers',
-			vehicleType: 'gas'
+			distanceUnit: 'kilometers'
 		});
 
-		expect(screen.getByText('True cost per km, all time')).toBeInTheDocument();
-		expect(screen.getByText('€0.20')).toBeInTheDocument();
-		expect(screen.getByText(/no ownership costs logged/)).toBeInTheDocument();
-		expect(screen.getByText(/over 1,500\s*km/)).toBeInTheDocument();
+		expect(screen.getByTestId('cost-sentence')).toHaveTextContent(
+			'This car costs €0.20 a km to run over 1,500 km. No ownership costs logged yet.'
+		);
+		const dial = await screen.findByRole('img', { name: 'True cost per km, all in: €0.20' });
+		expect(dial).toHaveTextContent('ALL-IN EUR / KM');
+		expect(screen.getByRole('list')).not.toHaveTextContent('Ownership');
 	});
 
-	test('with no distance yet it says what is missing instead of $0.00', () => {
+	test('a cost past 80¢ widens the dial instead of pegging it', async () => {
+		const { container } = render(CostPerMileHero, {
+			summary: summary({
+				costBuckets: { ownershipTotal: 9000, runningTotal: 3000, previous: null, byVehicle: [] }
+			}),
+			distance: 10000,
+			distanceUnit: 'miles'
+		});
+
+		await screen.findByRole('img', { name: /all in: 120¢/ });
+		const labels = [...container.querySelectorAll('text.dial-figure')].map(t => t.textContent);
+		expect(labels).toEqual(['0', '40', '80', '120', '160']);
+	});
+
+	test('with no distance yet it says what is missing, with no dial', async () => {
 		render(CostPerMileHero, {
 			summary: summary(),
 			distance: null,
 			distanceUnit: 'miles',
-			vehicleType: 'gas',
 			logMileageHref: '/vehicles/v1/odometer/new'
 		});
 
 		expect(
 			screen.getByText('Log a newer odometer reading to see cost per mile')
 		).toBeInTheDocument();
-		expect(screen.queryByText('$0.00')).toBeNull();
 		expect(screen.getByRole('link', { name: 'Add an odometer reading' })).toHaveAttribute(
 			'href',
 			'/vehicles/v1/odometer/new'
 		);
+		expect(await screen.findByRole('img', { name: '$13,061' })).toBeInTheDocument();
+		expect(screen.queryByRole('img', { name: /all in/ })).toBeNull();
 	});
 
-	test.each([
-		['electric', 'Charging'],
-		['hybrid', 'Energy']
-	] as const)('names the energy bucket for a %s vehicle', (vehicleType, label) => {
-		render(CostPerMileHero, {
-			summary: summary(),
-			distance: 22360,
-			distanceUnit: 'miles',
-			vehicleType
-		});
-
-		expect(screen.getByRole('list')).toHaveTextContent(label);
-	});
-
-	test('reserves its lines while loading', () => {
+	test('reserves the dial and drums while loading', () => {
 		const { container } = render(CostPerMileHero, {
 			summary: null,
 			distance: null,
-			distanceUnit: 'miles',
-			vehicleType: 'gas'
+			distanceUnit: 'miles'
 		});
 
 		expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThanOrEqual(7);
@@ -118,7 +122,6 @@ describe('CostPerMileHero', () => {
 			distance: null,
 			distanceLoading: true,
 			distanceUnit: 'miles',
-			vehicleType: 'gas',
 			logMileageHref: '/vehicles/v1/odometer/new'
 		});
 
@@ -134,7 +137,6 @@ describe('CostPerMileHero', () => {
 			distanceError: 'Check your connection and try again.',
 			onRetryDistance,
 			distanceUnit: 'miles',
-			vehicleType: 'gas',
 			logMileageHref: '/vehicles/v1/odometer/new'
 		});
 
