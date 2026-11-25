@@ -44,10 +44,19 @@
 		void load(vehicleId, from, to);
 	});
 
-	const miles = (n: number) => `${formatNumber(n, 0)} ${unit}`;
+	const distanceText = (n: number) => `${formatNumber(n, 0)} ${unit}`;
 	const percent = (share: number | null) => (share === null ? '' : `${Math.round(share * 100)}%`);
 	let summary = $derived(
-		shown.map(d => `${d.name}: ${miles(d.distance.total)} ${percent(d.share)}`).join('; ')
+		[
+			...shown.map(d => ({ name: d.name, distance: d.distance.total })),
+			{ name: 'Unattributed', distance: stats?.distance?.unattributed ?? 0 }
+		]
+			.filter(part => part.distance > 0)
+			.map(
+				part =>
+					`${part.name}: ${distanceText(part.distance)}, ${percent(part.distance / total)} of the bar`
+			)
+			.join('; ')
 	);
 </script>
 
@@ -104,7 +113,7 @@
 										<span class="font-normal text-muted-foreground">(you)</span>
 									{/if}
 								</span>
-								<span class="tabular-nums">{miles(driver.distance.total)}</span>
+								<span class="tabular-nums">{distanceText(driver.distance.total)}</span>
 							</div>
 							<p class="pl-4.5 text-xs text-muted-foreground tabular-nums">
 								{[
@@ -122,7 +131,7 @@
 					{#if stats.distance && stats.distance.unattributed > 0}
 						<li class="flex items-center gap-2 py-2 text-muted-foreground">
 							<span class="flex-1 pl-4.5">Unattributed</span>
-							<span class="tabular-nums">{miles(stats.distance.unattributed)}</span>
+							<span class="tabular-nums">{distanceText(stats.distance.unattributed)}</span>
 						</li>
 					{/if}
 				</ul>
