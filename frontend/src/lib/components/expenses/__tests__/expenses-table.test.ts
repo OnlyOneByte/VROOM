@@ -9,14 +9,18 @@ import {
 	scheduleDelete
 } from '#lib/utils/pending-deletes.svelte.ts';
 
-const { deleteExpense, deleteSplitExpense } = vi.hoisted(() => ({
+import { resetPendingEdits, scheduleEdit } from '#lib/utils/pending-edits.svelte.ts';
+
+const { deleteExpense, deleteSplitExpense, updateExpense } = vi.hoisted(() => ({
 	deleteExpense: vi.fn<(id: string) => Promise<void>>(),
-	deleteSplitExpense: vi.fn<(groupId: string) => Promise<void>>()
+	deleteSplitExpense: vi.fn<(groupId: string) => Promise<void>>(),
+	updateExpense: vi.fn<(id: string, payload: unknown) => Promise<unknown>>()
 }));
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		deleteExpense: (id: string) => deleteExpense(id),
-		deleteSplitExpense: (groupId: string) => deleteSplitExpense(groupId)
+		deleteSplitExpense: (groupId: string) => deleteSplitExpense(groupId),
+		updateExpense: (id: string, payload: unknown) => updateExpense(id, payload)
 	}
 }));
 
@@ -116,6 +120,7 @@ function notificationMessages(): string[] {
 beforeEach(() => {
 	vi.clearAllMocks();
 	resetPendingDeletes();
+	resetPendingEdits();
 	appStore.clearNotifications();
 	deleteExpense.mockResolvedValue();
 	deleteSplitExpense.mockResolvedValue();
@@ -323,6 +328,35 @@ describe('ExpensesTable deleting', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /^Retry deleting/ }));
 		await waitFor(() => expect(deleteSplitExpense).toHaveBeenCalledTimes(2));
 		expect(deleteSplitExpense).toHaveBeenLastCalledWith('g1');
+	});
+
+	test('an edit shows its new values while the PUT is still running', () => {
+		updateExpense.mockReturnValue(new Promise(() => {}));
+		scheduleEdit(NEW_MEDIUM, { ...NEW_MEDIUM, amount: 99 }, {} as never);
+
+		const { container } = mountTable();
+
+		expect(desktopAmounts(container)).toEqual(['$99.00', '$300.00', '$15.00']);
+	});
+
+	test('a failed edit shows the saved values with its reason, Retry and Edit', async () => {
+		updateExpense.mockRejectedValueOnce('offline').mockResolvedValueOnce({});
+		scheduleEdit(NEW_MEDIUM, { ...NEW_MEDIUM, amount: 99 }, {} as never);
+		await waitFor(() => expect(appStore.notifications).toHaveLength(1));
+
+		const { container } = mountTable();
+
+		expect(desktopAmounts(container)).toEqual(['$75.00', '$300.00', '$15.00']);
+		expect(
+			screen.getByText(`Changes not saved: ${UNEXPECTED_FAILURE_MESSAGE}`)
+		).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: /^Edit \$75\.00/ })).toHaveAttribute(
+			'href',
+			'/expenses/new/edit?returnTo=/expenses'
+		);
+		await fireEvent.click(screen.getByRole('button', { name: /^Retry saving changes/ }));
+		await waitFor(() => expect(desktopAmounts(container)[0]).toBe('$99.00'));
+		expect(updateExpense).toHaveBeenCalledTimes(2);
 	});
 
 	test('a failed delete shows the row again with its reason and Retry', async () => {

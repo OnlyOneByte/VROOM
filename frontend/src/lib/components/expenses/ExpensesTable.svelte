@@ -18,6 +18,7 @@
 		isDeleteHidden,
 		scheduleDelete
 	} from '#lib/utils/pending-deletes.svelte.ts';
+	import { editFailureStates, shownExpense } from '#lib/utils/pending-edits.svelte.ts';
 	import {
 		buildDisplayRows,
 		visibleExpenses,
@@ -81,9 +82,15 @@
 		pendingStates: queuedStates
 	}: Props = $props();
 
-	let expenses = $derived(allExpenses.filter(expense => !isDeleteHidden(expense)));
+	let expenses = $derived(
+		allExpenses.filter(expense => !isDeleteHidden(expense)).map(shownExpense)
+	);
 	let pendingStates = $derived(
-		new Map([...(queuedStates ?? []), ...deleteFailureStates(expenses)])
+		new Map([
+			...(queuedStates ?? []),
+			...deleteFailureStates(expenses),
+			...editFailureStates(expenses)
+		])
 	);
 
 	let onDelete = $derived(canWrite ? onDeleteProp : undefined);

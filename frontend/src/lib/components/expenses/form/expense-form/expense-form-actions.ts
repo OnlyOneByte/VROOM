@@ -8,6 +8,7 @@ import { syncManager } from '#lib/utils/sync/sync-manager.ts';
 import { buildSplitConfig } from '#lib/utils/expense-helpers.ts';
 import { gotoDynamic } from '#lib/utils/navigation.ts';
 import { scheduleDelete } from '#lib/utils/pending-deletes.svelte.ts';
+import { scheduleEdit } from '#lib/utils/pending-edits.svelte.ts';
 import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 import type { ExpenseCategory } from '#lib/types/index.ts';
 import { toOfflineExpense } from '../offline-expense';
@@ -103,17 +104,20 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			gotoDynamic(returnTo);
 		} else if (state.isEditMode) {
 			const payerChanged = state.paidByDriverId !== (state.originalExpense?.paidByDriverId ?? null);
-			await expenseApi.updateExpense(expenseId!, {
+			const payload = {
 				...expenseData,
 				...(payerChanged && { paidByDriverId: state.paidByDriverId }),
 				sourceType: state.clearsFinancingLink ? null : undefined,
 				sourceId: state.clearsFinancingLink ? null : undefined
-			});
-
-			appStore.addNotification({
-				type: 'success',
-				message: 'Expense updated successfully'
-			});
+			};
+			const before = state.originalExpense;
+			if (before) {
+				const paidBy = payerChanged ? { paidByDriverId: state.paidByDriverId } : {};
+				scheduleEdit(before, { ...before, ...expenseData, ...paidBy }, payload);
+			} else {
+				await expenseApi.updateExpense(expenseId!, payload);
+				appStore.addNotification({ type: 'success', message: 'Expense updated successfully' });
+			}
 			gotoDynamic(returnTo);
 		} else if (isSplitCreate) {
 			const splitConfig = buildSplitConfig(

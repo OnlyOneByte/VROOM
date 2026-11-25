@@ -10,6 +10,7 @@ import {
 	pendingRowState,
 	withPendingByMonth,
 	withPendingInSummary,
+	withRowsInBreakdowns,
 	withoutRowsInBreakdowns
 } from '../pending-rows.ts';
 import { usePendingRows } from '../pending-rows.svelte.ts';
@@ -100,6 +101,36 @@ describe('totals with rows that are still saving', () => {
 			expenseCount: 6,
 			recentAmount: 70
 		});
+	});
+
+	test('edited rows go back into the trend and breakdown, adding a category it lacked', () => {
+		const summary = {
+			monthlyTrend: [{ period: '2026-11', amount: 100, count: 1 }],
+			categoryBreakdown: [{ category: 'fuel', amount: 100, count: 1 }]
+		} as ExpenseSummary;
+		const misc = pendingExpenseRow(entry('c', { category: 'misc', amount: 30 }));
+		const result = withRowsInBreakdowns(summary, [rows[0]!, misc]);
+		expect(result?.monthlyTrend).toEqual([{ period: '2026-11', amount: 170, count: 3 }]);
+		expect(result?.categoryBreakdown).toEqual([
+			{ category: 'fuel', amount: 140, count: 2 },
+			{ category: 'misc', amount: 30, count: 1 }
+		]);
+	});
+
+	test('an edit moved into a month the trend lacked adds that month, in order', () => {
+		const summary = {
+			monthlyTrend: [
+				{ period: '2026-09', amount: 20, count: 1 },
+				{ period: '2026-11', amount: 100, count: 1 }
+			],
+			categoryBreakdown: [{ category: 'fuel', amount: 120, count: 2 }]
+		} as ExpenseSummary;
+		const moved = pendingExpenseRow(entry('m', { date: dateOnlyToISO('2026-10-05') }));
+		expect(withRowsInBreakdowns(summary, [moved])?.monthlyTrend).toEqual([
+			{ period: '2026-09', amount: 20, count: 1 },
+			{ period: '2026-10', amount: 40, count: 1 },
+			{ period: '2026-11', amount: 100, count: 1 }
+		]);
 	});
 
 	test('rows being deleted leave the monthly trend and the category breakdown', () => {

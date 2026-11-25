@@ -6,6 +6,8 @@
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 	import { retryDelete } from '#lib/utils/pending-deletes.svelte.ts';
+	import { retryEdit } from '#lib/utils/pending-edits.svelte.ts';
+	import { expenseEditHref } from './expense-table-actions';
 
 	interface Props {
 		pending: PendingRowState;
@@ -40,6 +42,31 @@
 			}}
 		>
 			Retry
+		</Button>
+	</div>
+{:else if pending.kind === 'edit'}
+	<div class="flex flex-wrap items-center gap-2 whitespace-normal" data-testid="edit-failed-note">
+		<span class="text-xs text-destructive">Changes not saved: {pending.error}</span>
+		<Button
+			variant="outline"
+			size="sm"
+			class="h-7"
+			aria-label="Retry saving changes to {label}"
+			onclick={event => {
+				event.stopPropagation();
+				retryEdit(entryId);
+			}}
+		>
+			Retry
+		</Button>
+		<Button
+			variant="ghost"
+			size="sm"
+			class="h-7"
+			aria-label="Edit {label}"
+			href={expenseEditHref(entryId, returnTo)}
+		>
+			Edit
 		</Button>
 	</div>
 {:else}

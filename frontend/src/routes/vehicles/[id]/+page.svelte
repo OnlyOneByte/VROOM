@@ -43,7 +43,12 @@
 	import FuelEfficiencyStatsCard from '#lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
 	import type { AttentionItem } from '#lib/components/dashboard/dashboard-data.ts';
 	import { formatDate } from '#lib/utils/formatters.ts';
-	import { matchesFilters, withoutRowsInBreakdowns } from '#lib/utils/sync/pending-rows.ts';
+	import {
+		matchesFilters,
+		withRowsInBreakdowns,
+		withoutRowsInBreakdowns
+	} from '#lib/utils/sync/pending-rows.ts';
+	import { editedRows } from '#lib/utils/pending-edits.svelte.ts';
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
@@ -173,7 +178,11 @@
 	let filters = $state<ExpenseFilters>({});
 	let expenseCategoryFilter = $state<string>('');
 
-	let chartSummary = $derived(withoutRowsInBreakdowns(summary, expenses.filter(isDeleteHidden)));
+	let chartSummary = $derived.by(() => {
+		const edited = editedRows(expenses.filter(expense => !isDeleteHidden(expense)));
+		const removed = [...expenses.filter(isDeleteHidden), ...edited.before];
+		return withRowsInBreakdowns(withoutRowsInBreakdowns(summary, removed), edited.after);
+	});
 
 	let expenseTrendData = $derived.by(() => {
 		if (!chartSummary?.monthlyTrend.length) return [];
