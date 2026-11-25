@@ -8,6 +8,7 @@ const initialState: AppState = {
 
 function createAppStore() {
 	let state = $state<AppState>({ ...initialState });
+	let toastDismissals = $state<string[]>([]);
 	let errorsMutedUntil = 0;
 
 	return {
@@ -19,6 +20,18 @@ function createAppStore() {
 		},
 		get notifications() {
 			return state.notifications;
+		},
+
+		get toastDismissals() {
+			return toastDismissals;
+		},
+
+		dismissToast(toastId: string) {
+			toastDismissals = [...toastDismissals, toastId];
+		},
+
+		clearToastDismissals() {
+			toastDismissals = [];
 		},
 
 		setVehicles(vehicles: Vehicle[]) {

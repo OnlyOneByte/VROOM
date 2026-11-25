@@ -68,10 +68,13 @@ function submitError(): string | null {
 	return document.querySelector('[data-testid="submit-error"]')?.textContent?.trim() ?? null;
 }
 
-describe('ExpenseForm — a failed create is classified before anything is queued', () => {
+describe('ExpenseForm — when the queue cannot be written, a direct create is classified before anything is queued', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		localStorageMock.clear();
+		localStorageMock.setItem.mockImplementationOnce(() => {
+			throw new DOMException('Quota exceeded', 'QuotaExceededError');
+		});
 	});
 
 	test('a 400 is shown on the form and queues NOTHING', async () => {

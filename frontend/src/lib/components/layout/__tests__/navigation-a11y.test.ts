@@ -129,6 +129,15 @@ describe('pending badge', () => {
 
 		expect(screen.getByLabelText('1 pending items')).toBeInTheDocument();
 	});
+
+	it('sits in a status region that does not announce every change', () => {
+		offlineExpenseQueue.current = [row({ id: 'pending' })];
+		render(Navigation);
+
+		const status = screen.getByRole('status', { name: 'Sync status' });
+		expect(status).toHaveAttribute('aria-live', 'off');
+		expect(status).toContainElement(screen.getByLabelText('1 pending items'));
+	});
 });
 
 describe('fixed chrome on short viewports and at high zoom', () => {

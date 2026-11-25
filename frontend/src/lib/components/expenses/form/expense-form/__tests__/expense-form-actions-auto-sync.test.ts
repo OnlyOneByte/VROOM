@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { ApiError } from '#lib/utils/error-handling.ts';
 
-const { createExpense, requestAutoSync, addOfflineExpense } = vi.hoisted(() => ({
+const { createExpense, requestAutoSync, syncSoon, addOfflineExpense } = vi.hoisted(() => ({
 	createExpense: vi.fn(),
 	requestAutoSync: vi.fn(),
+	syncSoon: vi.fn(),
 	addOfflineExpense: vi.fn(async () => true)
 }));
 
@@ -17,7 +18,9 @@ vi.mock('#lib/utils/offline-storage.ts', () => ({
 	currentOfflineQueueOwner: () => null
 }));
 vi.mock('#lib/stores/offline.svelte.ts', () => ({ onlineStatus: { current: true } }));
-vi.mock('#lib/utils/sync/sync-manager.ts', () => ({ syncManager: { requestAutoSync } }));
+vi.mock('#lib/utils/sync/sync-manager.ts', () => ({
+	syncManager: { requestAutoSync, syncSoon }
+}));
 
 const { ExpenseFormState } = await import('../expense-form-state.svelte');
 const { submitExpense } = await import('../expense-form-actions');
@@ -31,22 +34,32 @@ function createState() {
 	return state;
 }
 
-describe('submitExpense — a failed save that is queued gets retried', () => {
+describe('submitExpense — a queued save is synced', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 	});
 
-	test('asks the sync manager to retry once the save is queued', async () => {
+	test('an online save asks the sync manager to send it at once, without posting directly', async () => {
+		await submitExpense(createState());
+
+		expect(addOfflineExpense).toHaveBeenCalledTimes(1);
+		expect(syncSoon).toHaveBeenCalledTimes(1);
+		expect(createExpense).not.toHaveBeenCalled();
+	});
+
+	test('a direct save that fails after the queue could not be written asks for a retry once queued', async () => {
+		addOfflineExpense.mockResolvedValueOnce(false);
 		createExpense.mockRejectedValueOnce(new ApiError('gateway timeout', 504));
 
 		await submitExpense(createState());
 
-		expect(addOfflineExpense).toHaveBeenCalledTimes(1);
+		expect(addOfflineExpense).toHaveBeenCalledTimes(2);
 		expect(requestAutoSync).toHaveBeenCalledTimes(1);
 	});
 
-	test('does not ask when the failure is not queued', async () => {
+	test('a direct save the server refuses is not queued and asks for nothing', async () => {
+		addOfflineExpense.mockResolvedValueOnce(false);
 		createExpense.mockRejectedValueOnce(new ApiError('Amount must be greater than 0', 400));
 
 		await submitExpense(createState());
