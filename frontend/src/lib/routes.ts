@@ -9,6 +9,7 @@ export const routes = {
 	analytics: '/analytics',
 	settings: '/settings',
 	settingsProviderNew: '/settings/providers/new',
+	settingsServer: '/settings/server',
 	profile: '/profile',
 	trips: '/trips',
 	privacyPolicy: '/privacypolicy',

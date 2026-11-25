@@ -8,7 +8,7 @@
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { routes } from '#lib/routes.ts';
-	import { LoaderCircle, ChevronRight, CircleAlert } from '@lucide/svelte';
+	import { LoaderCircle, ChevronRight, CircleAlert, Server } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
 	import { Avatar, AvatarFallback } from '#lib/components/ui/avatar/index.ts';
@@ -23,6 +23,8 @@
 	import ModelProvidersCard from '#lib/components/settings/cards/ModelProvidersCard.svelte';
 	import { fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
 	import { providerApi } from '#lib/services/provider-api.ts';
+	import { signupApi } from '#lib/services/signup-api.ts';
+	import { can } from '#lib/utils/permissions.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import { toast } from 'svelte-sonner';
 	import type {
@@ -116,6 +118,16 @@
 			// Leave the list empty; the page already renders its empty state.
 		}
 	}
+
+	let managesServer = $state(false);
+
+	onMount(async () => {
+		try {
+			managesServer = can(await signupApi.serverRules(), 'server.signup.manage');
+		} catch {
+			managesServer = false;
+		}
+	});
 
 	$effect(() => {
 		if (settings && !isInitialized) {
@@ -372,6 +384,25 @@
 					</CardContent>
 				</Card>
 			</a>
+
+			{#if managesServer}
+				<a
+					href={resolve(routes.settingsServer)}
+					class="block w-full text-left"
+					data-testid="settings-server-link"
+				>
+					<Card class="hover:bg-accent/50 transition-colors cursor-pointer">
+						<CardContent class="flex items-center gap-4 py-5">
+							<Server class="h-5 w-5 shrink-0 text-muted-foreground" />
+							<div class="flex-1 min-w-0">
+								<p class="text-sm font-semibold text-foreground">Server</p>
+								<p class="text-xs text-muted-foreground">Who can join, invites and new accounts</p>
+							</div>
+							<ChevronRight class="h-5 w-5 text-muted-foreground flex-shrink-0" />
+						</CardContent>
+					</Card>
+				</a>
+			{/if}
 
 			<ThemeCard />
 			<ThemePickerCard />

@@ -5,6 +5,7 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { handleRouteProtection, isPublicRoute } from '#lib/utils/auth.js';
 	import Navigation from '#lib/components/layout/Navigation.svelte';
+	import AccountPending from '#lib/components/layout/AccountPending.svelte';
 	import { Toaster } from '#lib/components/ui/sonner/index.ts';
 	import { toast } from 'svelte-sonner';
 	import OfflineIndicator from '#lib/components/sync/OfflineIndicator.svelte';
@@ -99,8 +100,10 @@
 			(!isPublicRoute(currentPath) || ((isAuthPage || isHomePage) && mayBeSignedIn))
 	);
 
+	let isPending = $derived(authState.isAuthenticated && authState.user?.pendingApproval === true);
+
 	$effect(() => {
-		if (authState.isAuthenticated && !authState.isLoading) {
+		if (authState.isAuthenticated && !authState.isLoading && !isPending) {
 			loadUserSettings();
 			maybeTriggerRecurring();
 		}
@@ -164,6 +167,10 @@
 			<p class="text-muted-foreground">Loading VROOM...</p>
 		</div>
 	</div>
+{:else if isPending && !isPublicRoute(currentPath)}
+	<main class="min-h-screen bg-background">
+		<AccountPending />
+	</main>
 {:else if isAuthPage || isHomePage}
 	<main class="min-h-screen bg-background">
 		{@render children?.()}

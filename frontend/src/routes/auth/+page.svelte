@@ -22,7 +22,13 @@
 		no_email:
 			"We couldn't retrieve your email from this provider. Please check your provider's privacy settings.",
 		unknown_provider: 'This sign-in method is not supported.',
-		cancelled: 'Sign-in was cancelled.'
+		cancelled: 'Sign-in was cancelled.',
+		signup_closed:
+			"This server isn't taking new accounts. Ask its admin if you think you should have one.",
+		signup_invite_required:
+			'This server is invite only. Ask its admin for an invite, then sign in with the email they invited.',
+		signup_domain_not_allowed:
+			"This server only takes accounts from certain email domains, and yours isn't one of them. Try another account, or ask its admin."
 	};
 
 	let providers = $state<{ id: string; displayName: string }[]>([]);
