@@ -102,9 +102,7 @@ describe('vehicle page draws as soon as the vehicle loads', () => {
 		);
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 		vehicleCall.release(VEHICLE);
-		await fireEvent.click(
-			await screen.findByRole('button', { name: 'Details, insurance and photos' })
-		);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Details and photos' }));
 
 		await waitFor(() => expect(carouselProps.value?.['isLoading']).toBe(true));
 		releasePhotos({ data: [] });

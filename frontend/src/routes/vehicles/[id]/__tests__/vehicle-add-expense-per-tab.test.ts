@@ -60,7 +60,7 @@ import Page from '../+page.svelte';
 
 function headerAddExpense(): HTMLElement[] {
 	return screen
-		.queryAllByRole('link', { name: 'Add Expense' })
+		.queryAllByRole('link', { name: 'Add expense' })
 		.filter(link => link.classList.contains('max-sm:w-10'));
 }
 

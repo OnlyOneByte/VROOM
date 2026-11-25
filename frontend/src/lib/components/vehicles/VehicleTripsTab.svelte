@@ -1,0 +1,118 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
+	import { MapPin } from '@lucide/svelte';
+	import { routes } from '#lib/routes.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { tripApi } from '#lib/services/trip-api.ts';
+	import { formatDate, formatNumber } from '#lib/utils/formatters.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import type { Trip } from '#lib/types/index.ts';
+	import type { DistanceUnit } from '#lib/types/settings.ts';
+
+	interface Props {
+		vehicleId: string;
+		distanceUnit: DistanceUnit;
+	}
+
+	let { vehicleId, distanceUnit }: Props = $props();
+
+	const TRIP_LIMIT = 100;
+
+	let trips = $state<Trip[]>([]);
+	let totalCount = $state(0);
+	let isLoading = $state(true);
+	let loadError = $state<string | null>(null);
+
+	let unit = $derived(getDistanceUnitLabel(distanceUnit, true));
+
+	async function load() {
+		isLoading = true;
+		loadError = null;
+		try {
+			const page = await tripApi.list({ vehicleId, limit: TRIP_LIMIT });
+			trips = page.data;
+			totalCount = page.pagination.totalCount;
+		} catch (error) {
+			loadError = userFacingErrorMessage(error);
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	onMount(load);
+
+	function route(trip: Trip): string {
+		if (trip.startLocation && trip.endLocation)
+			return `${trip.startLocation} → ${trip.endLocation}`;
+		return trip.startLocation || trip.endLocation || 'Trip';
+	}
+</script>
+
+{#if isLoading}
+	<div class="space-y-3" aria-hidden="true">
+		{#each [0, 1, 2] as i (i)}
+			<Skeleton class="h-14 w-full" />
+		{/each}
+	</div>
+{:else if loadError}
+	<LoadErrorCard title="Couldn't load this car's trips" message={loadError} onRetry={load} />
+{:else if trips.length === 0}
+	<EmptyState level={2}>
+		{#snippet icon()}
+			<MapPin class="mb-4 h-12 w-12 text-muted-foreground" />
+		{/snippet}
+		{#snippet title()}
+			No trips for this car yet
+		{/snippet}
+		{#snippet description()}
+			Log business miles on the Trips page and they show here too.
+		{/snippet}
+		{#snippet action()}
+			<a
+				href={resolve(routes.trips)}
+				class="text-sm font-semibold text-accent-ink underline-offset-4 hover:underline"
+			>
+				Go to Trips
+			</a>
+		{/snippet}
+	</EmptyState>
+{:else}
+	<Card.Root variant="section" data-testid="vehicle-trips">
+		<Card.Header class="flex flex-row items-center justify-between gap-3">
+			<Card.Title level={2} class="text-base">
+				{totalCount} trip{totalCount === 1 ? '' : 's'}
+			</Card.Title>
+			<a
+				href={resolve(routes.trips)}
+				class="rounded-sm text-sm font-semibold text-accent-ink outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+			>
+				All trips
+			</a>
+		</Card.Header>
+		<Card.Content>
+			<ul class="divide-y divide-border" role="list">
+				{#each trips as trip (trip.id)}
+					<li class="flex items-center justify-between gap-4 py-3">
+						<div class="min-w-0">
+							<p class="truncate font-semibold">{route(trip)}</p>
+							<p class="text-sm text-muted-foreground">
+								{formatDate(trip.tripDate)} · {trip.purpose === 'business'
+									? 'Business'
+									: 'Personal'}
+							</p>
+						</div>
+						<p class="shrink-0 font-semibold tabular-nums">
+							{formatNumber(Math.max(0, trip.endOdometer - trip.startOdometer), 0)}
+							{unit}
+						</p>
+					</li>
+				{/each}
+			</ul>
+		</Card.Content>
+	</Card.Root>
+{/if}

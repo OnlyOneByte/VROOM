@@ -159,9 +159,9 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 	'/vehicles/new': { debt: [], ready: pageHeading('Add Vehicle') },
 	'/vehicles/vehicle-camry': {
 		debt: [],
-		ready: page => page.getByRole('button', { name: 'Details, insurance and photos' }),
+		ready: page => page.getByRole('tab', { name: 'Insurance' }),
 		open: async page => {
-			await page.getByRole('button', { name: 'Details, insurance and photos' }).click();
+			await page.getByRole('tab', { name: 'Insurance' }).click();
 			await expect(expiredPolicy(page)).toBeVisible();
 		}
 	},
