@@ -30,8 +30,15 @@ interface FuelEfficiencyResponse {
 	fuelEfficiencyTrend: FuelEfficiencyPoint[];
 }
 
+let zoneFormat:
+	{ format: Intl.DateTimeFormat; offset: number; make: typeof Intl.DateTimeFormat } | undefined;
+
 export function userTimeZone(): string {
-	return Intl.DateTimeFormat().resolvedOptions().timeZone;
+	const offset = new Date().getTimezoneOffset();
+	if (zoneFormat?.offset !== offset || zoneFormat.make !== Intl.DateTimeFormat) {
+		zoneFormat = { format: Intl.DateTimeFormat(), offset, make: Intl.DateTimeFormat };
+	}
+	return zoneFormat.format.resolvedOptions().timeZone;
 }
 
 export function getDefaultDateRange(now: Date = new Date()): {

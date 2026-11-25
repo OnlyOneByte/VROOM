@@ -11,7 +11,7 @@ function userCurrency(currency?: string): string {
 const numberFormats = new Map<string, Intl.NumberFormat>();
 const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
 
-function numberFormat(options: Intl.NumberFormatOptions): Intl.NumberFormat {
+export function numberFormat(options: Intl.NumberFormatOptions): Intl.NumberFormat {
 	const locale = currentLocale();
 	const key = `${locale}|${JSON.stringify(options)}`;
 	let format = numberFormats.get(key);
