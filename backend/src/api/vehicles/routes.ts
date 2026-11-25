@@ -47,6 +47,7 @@ import {
 } from '../../utils/vehicle-access';
 import { catalogModelMatchesMake, isCatalogModel } from '../../utils/vehicle-catalog';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
+import { carShareAccess } from '../drivers/attribution';
 import { carShareRoutes, driverRoutes } from '../drivers/routes';
 import { withComputedBalance } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
@@ -314,7 +315,10 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
     return v;
   });
 
-  const apiVehicles = enrichedVehicles.map(vehicleRowToApi);
+  const apiVehicles = enrichedVehicles.map((v) => ({
+    ...vehicleRowToApi(v),
+    carShare: carShareAccess(c, v.id, v.carShareEnabled),
+  }));
   const response: ApiResponse<typeof apiVehicles> = {
     success: true,
     data: apiVehicles,
@@ -402,13 +406,7 @@ routes.get(
     if (sharedAccess) {
       responseData = { ...responseData, sharedAccess };
     }
-    const carShare = {
-      enabled: vehicle.carShareEnabled,
-      manage: requestResolver(c, appContext().db).can('vehicle.driver.manage', {
-        kind: 'vehicle',
-        vehicleId: id,
-      }).allow,
-    };
+    const carShare = carShareAccess(c, id, vehicle.carShareEnabled);
 
     const response: ApiResponse<typeof responseData & { carShare: typeof carShare }> = {
       success: true,

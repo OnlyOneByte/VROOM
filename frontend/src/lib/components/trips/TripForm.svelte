@@ -10,6 +10,7 @@
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import DriverChip from '#lib/components/drivers/DriverChip.svelte';
+	import { showsDriverChip } from '#lib/utils/driver-helpers.ts';
 	import { LoaderCircle } from '@lucide/svelte';
 	import { tripApi } from '#lib/services/trip-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
@@ -266,7 +267,7 @@
 				id="trip-driver"
 				{vehicleId}
 				bind:value={driverId}
-				sharing={vehicles.find(v => v.id === vehicleId)?.carShareEnabled ?? false}
+				sharing={showsDriverChip(vehicles.find(v => v.id === vehicleId)) ?? false}
 				entry={tripEntry}
 			/>
 

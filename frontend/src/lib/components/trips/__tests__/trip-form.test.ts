@@ -428,7 +428,11 @@ describe('TripForm edit mode', () => {
 });
 
 describe('TripForm driver chip', () => {
-	const SHARED = { ...CIVIC, carShareEnabled: true } as Vehicle;
+	const SHARED = {
+		...CIVIC,
+		carShareEnabled: true,
+		carShare: { enabled: true, manage: false, record: true }
+	} as Vehicle;
 	const DRIVERS: Driver[] = [
 		{ id: 'd-sam', userId: 'u-sam', name: 'Sam', color: 'chart-2', archived: false },
 		{ id: 'd-riley', userId: null, name: 'Riley', color: null, archived: false }
@@ -445,8 +449,14 @@ describe('TripForm driver chip', () => {
 		expect(update.mock.calls[0]?.[1]).not.toHaveProperty('driverId');
 	});
 
-	test('a car without car sharing shows no chip and asks for no drivers', async () => {
-		mount({ vehicles: [CAMRY, CIVIC], trip: trip() });
+	test.each([
+		['a car without car sharing', CIVIC],
+		[
+			'someone who may not record drivers',
+			{ ...SHARED, carShare: { enabled: true, manage: false, record: false } } as Vehicle
+		]
+	])('%s gets no chip and no drivers request', async (_case, vehicle) => {
+		mount({ vehicles: [CAMRY, vehicle], trip: trip() });
 		await settle();
 		expect(listDrivers).not.toHaveBeenCalled();
 		expect(document.getElementById('trip-driver')).toBeNull();

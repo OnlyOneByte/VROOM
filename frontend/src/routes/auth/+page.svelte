@@ -38,6 +38,18 @@
 		cancelled: {
 			title: 'Sign-in was cancelled',
 			body: 'The provider didn’t finish signing you in. Try again, or pick another option.'
+		},
+		signup_closed: {
+			title: "This server isn't taking new accounts",
+			body: 'Ask its admin if you think you should have one.'
+		},
+		signup_invite_required: {
+			title: 'This server is invite only',
+			body: 'Ask its admin for an invite, then sign in with the email they invited.'
+		},
+		signup_domain_not_allowed: {
+			title: "Your email domain can't join this server",
+			body: 'This server only takes accounts from certain email domains. Try another account, or ask its admin.'
 		}
 	};
 

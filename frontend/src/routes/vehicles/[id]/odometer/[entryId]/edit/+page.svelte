@@ -12,7 +12,7 @@
 		validateOdometerForm,
 		type OdometerFormErrors
 	} from '#lib/utils/odometer-form-validation.ts';
-	import { ArrowLeft, Info, LoaderCircle, Trash2, WifiOff, X } from '@lucide/svelte';
+	import { ArrowLeft, Info, LoaderCircle, Trash2, WifiOff } from '@lucide/svelte';
 	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
@@ -157,12 +157,12 @@
 
 <FormLayout>
 	<div class="mb-6">
-		<PageHeader title="Edit Odometer Reading">
+		<PageHeader variant="display" title="Edit odometer reading">
 			{#snippet back()}
 				<Button
-					variant="ghost"
+					variant="outline"
 					size="icon-lg"
-					class="shrink-0"
+					class="shrink-0 rounded-full"
 					aria-label="Back"
 					onclick={() => gotoDynamic(returnTo)}
 				>
@@ -191,14 +191,14 @@
 	{:else}
 		<form
 			bind:this={formElement}
-			class="space-y-6 rounded-lg border bg-card p-6"
+			class="space-y-6"
 			onsubmit={e => {
 				e.preventDefault();
 				handleSubmit();
 			}}
 		>
 			<div class="space-y-2">
-				<Label for="odometer">Odometer Reading *</Label>
+				<Label for="odometer">Odometer reading</Label>
 				<Input
 					id="odometer"
 					type="number"
@@ -224,7 +224,7 @@
 			</div>
 
 			<div class="space-y-2">
-				<Label for="date">Date *</Label>
+				<Label for="date">Date</Label>
 				<DatePicker
 					id="date"
 					bind:value={
@@ -256,7 +256,9 @@
 			{/if}
 
 			<div class="space-y-2">
-				<Label for="note">Note (Optional)</Label>
+				<Label for="note">
+					Note <span class="font-normal text-muted-foreground">(optional)</span>
+				</Label>
 				<Textarea
 					id="note"
 					placeholder="e.g. Oil change visit"
@@ -281,33 +283,32 @@
 				</FormFieldError>
 			{/if}
 
-			<div class="flex gap-3">
+			<div class="flex flex-wrap gap-3 border-t border-border pt-6">
 				<Button
 					type="button"
-					variant="destructive"
+					variant="outline"
 					size="lg"
 					onclick={() => (deleteDialogOpen = true)}
-					class="flex-shrink-0"
+					class="rounded-full text-destructive"
 				>
-					<Trash2 class="h-4 w-4 sm:mr-2" />
-					<span class="max-sm:sr-only">Delete</span>
+					<Trash2 class="size-4" />
+					Delete
 				</Button>
-				<div class="flex flex-1 gap-3">
+				<div class="ml-auto flex gap-3">
 					<Button
 						type="button"
 						variant="outline"
 						size="lg"
 						onclick={() => gotoDynamic(returnTo)}
-						class="flex-shrink-0 sm:flex-1"
+						class="rounded-full"
 					>
-						<X class="h-4 w-4 sm:mr-2" />
-						<span class="max-sm:sr-only">Cancel</span>
+						Cancel
 					</Button>
-					<Button type="submit" size="lg" disabled={isSubmitting} class="flex-1">
+					<Button type="submit" size="lg" disabled={isSubmitting} class="rounded-full">
 						{#if isSubmitting}
 							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 						{/if}
-						<span>Save <span class="max-[359px]:sr-only">Reading</span></span>
+						<span>Save <span class="max-[359px]:sr-only">reading</span></span>
 					</Button>
 				</div>
 			</div>
@@ -318,7 +319,7 @@
 <Dialog.Root bind:open={deleteDialogOpen}>
 	<Dialog.Content class="sm:max-w-sm">
 		<Dialog.Header>
-			<Dialog.Title>Delete Reading</Dialog.Title>
+			<Dialog.Title>Delete reading</Dialog.Title>
 			<Dialog.Description>
 				Are you sure you want to delete this odometer reading? This action cannot be undone.
 			</Dialog.Description>

@@ -22,6 +22,16 @@ export function maySeeDrivers(c: Context, vehicleId: string): boolean {
   );
 }
 
+export function carShareAccess(c: Context, vehicleId: string, enabled: boolean) {
+  const resolver = requestResolver(c, appContext().db);
+  const vehicle = { kind: 'vehicle' as const, vehicleId };
+  return {
+    enabled,
+    manage: resolver.can('vehicle.driver.manage', vehicle).allow,
+    record: resolver.can('vehicle.driver.record', vehicle).allow,
+  };
+}
+
 function assertActiveDriver(vehicleId: string, driverId: string): void {
   const driver = findDriver(appContext().db, vehicleId, driverId);
   if (!driver || driver.archivedAt !== null) {

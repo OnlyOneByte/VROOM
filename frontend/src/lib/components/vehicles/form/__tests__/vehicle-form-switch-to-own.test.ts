@@ -65,9 +65,9 @@ async function renderEditAndSwitchToOwn(financingType: 'loan' | 'lease' = 'loan'
 	getVehicle.mockResolvedValue(VEHICLE);
 	getFinancing.mockResolvedValue(financing(financingType));
 	render(VehicleForm, { props: { vehicleId: VEHICLE.id } });
-	await screen.findByRole('button', { name: /update vehicle/i });
+	await screen.findByRole('button', { name: /save changes/i });
 	await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
-	await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+	await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 }
 
 beforeEach(() => {
@@ -140,8 +140,8 @@ describe('VehicleForm switching a financed vehicle to Own', () => {
 		getVehicle.mockResolvedValue(VEHICLE);
 		getFinancing.mockResolvedValue(null);
 		render(VehicleForm, { props: { vehicleId: VEHICLE.id } });
-		await screen.findByRole('button', { name: /update vehicle/i });
-		await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+		await screen.findByRole('button', { name: /save changes/i });
+		await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
 		await waitFor(() => expect(updateVehicle).toHaveBeenCalledTimes(1));
 		expect(screen.queryByRole('alertdialog')).toBeNull();

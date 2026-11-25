@@ -78,6 +78,19 @@ describe('LoanHero', () => {
 		);
 	});
 
+	test('a loan paid off in a single payment says "1 payment made"', () => {
+		render(LoanHero, {
+			financing: makeLoan({ computedBalance: 0 }),
+			payments: [makeEntry({ paymentNumber: 1 })],
+			paymentsLoaded: true,
+			payoffDate: PAYOFF
+		});
+
+		expect(screen.getByTestId('loan-sentence')).toHaveTextContent(
+			'1 payment made. The loan is paid off.'
+		);
+	});
+
 	test('when the payment history could not load, it skips the count, the interest and the split', () => {
 		mount({}, false);
 

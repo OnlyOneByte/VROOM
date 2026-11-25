@@ -349,6 +349,13 @@
 		visitedTabs[activeTab] = true;
 	});
 
+	let belowFold = $state(false);
+	$effect(() => {
+		if (isLoading || belowFold) return;
+		const frame = requestAnimationFrame(() => setTimeout(() => (belowFold = true)));
+		return () => cancelAnimationFrame(frame);
+	});
+
 	let hasPrefetchedTabs = false;
 	$effect(() => {
 		if (isLoading || !vehicle || hasPrefetchedTabs) return;
@@ -953,90 +960,95 @@
 						</FuelEfficiencyStatsCard>
 					{/if}
 
-					{#if overviewCards}
-						{@const [{ default: NeedsAttentionCard }, { default: RecentActivityCard }] =
-							overviewCards}
-						{#if attentionSettled}
-							<NeedsAttentionCard title="Next up" items={nextUp} />
-						{/if}
-						{#if showOverviewBody && recentSettled && recentExpenses.length > 0}
-							<RecentActivityCard
-								title="Recent expenses"
-								expenses={recentExpenses}
-								totalCount={recentTotal + pending.saving.length}
-								onSeeAll={seeAllExpenses}
-							/>
-						{/if}
-					{/if}
-					{#if overviewCardsFailed}
-						<p class="text-sm text-muted-foreground" data-testid="overview-cards-load-error">
-							Couldn't load Next up and recent expenses. Reload the page to try again.
-						</p>
-					{:else if showOverviewBody && recentFailed}
-						<p class="text-sm text-muted-foreground" data-testid="recent-expenses-load-error">
-							Couldn't load recent expenses. They're on the Expenses tab.
-						</p>
-					{/if}
-
-					{#if showOverviewBody}
-						{#if !showingCachedVehicle}
-							{#await loadCompareCard() then { default: CommunityCompareCard }}
-								<CommunityCompareCard
-									{vehicle}
-									{isOwner}
-									onVehicleUpdated={updated => {
-										if (vehicle) vehicle = { ...vehicle, catalogModelId: updated.catalogModelId };
-									}}
-								/>
-							{:catch}
-								<p class="text-sm text-muted-foreground" data-testid="community-compare-load-error">
-									Couldn't load community comparisons. Reload the page to try again.
-								</p>
-							{/await}
-						{/if}
-					{/if}
-
-					{#if vehicle.carShare?.manage}
-						{@const enabled = vehicle.carShare.enabled}
-						{#await import('#lib/components/drivers/CarSharingCard.svelte') then { default: CarSharingCard }}
-							<CarSharingCard {vehicleId} {enabled} />
-						{/await}
-					{/if}
-
-					<Collapsible
-						bind:open={detailsOpen}
-						onOpenChange={open => {
-							if (open) hasOpenedDetails = true;
-						}}
-						class="rounded-xl border bg-card"
-					>
-						<CollapsibleTrigger
-							class="flex min-h-12 w-full items-center gap-2 rounded-xl px-4 text-left text-sm font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:px-6"
-						>
-							<ChevronRight
-								class="h-4 w-4 shrink-0 transition-transform {detailsOpen ? 'rotate-90' : ''}"
-								aria-hidden="true"
-							/>
-							Details and photos
-						</CollapsibleTrigger>
-						<CollapsibleContent class="space-y-6 border-t p-4 sm:p-6">
-							{#if hasOpenedDetails}
-								<VehicleInfoCard {vehicle} {isOwner} />
-								<VehiclePhotoCarousel
-									{vehicleId}
-									photos={vehiclePhotos}
-									{isOwner}
-									isLoading={isLoadingPhotos}
-									onUpload={() => {
-										hasOpenedUpload = true;
-										showUploadDialog = true;
-									}}
-									onDelete={handleDeletePhoto}
-									onSetCover={handleSetCover}
+					{#if belowFold}
+						{#if overviewCards}
+							{@const [{ default: NeedsAttentionCard }, { default: RecentActivityCard }] =
+								overviewCards}
+							{#if attentionSettled}
+								<NeedsAttentionCard title="Next up" items={nextUp} />
+							{/if}
+							{#if showOverviewBody && recentSettled && recentExpenses.length > 0}
+								<RecentActivityCard
+									title="Recent expenses"
+									expenses={recentExpenses}
+									totalCount={recentTotal + pending.saving.length}
+									onSeeAll={seeAllExpenses}
 								/>
 							{/if}
-						</CollapsibleContent>
-					</Collapsible>
+						{/if}
+						{#if overviewCardsFailed}
+							<p class="text-sm text-muted-foreground" data-testid="overview-cards-load-error">
+								Couldn't load Next up and recent expenses. Reload the page to try again.
+							</p>
+						{:else if showOverviewBody && recentFailed}
+							<p class="text-sm text-muted-foreground" data-testid="recent-expenses-load-error">
+								Couldn't load recent expenses. They're on the Expenses tab.
+							</p>
+						{/if}
+
+						{#if showOverviewBody}
+							{#if !showingCachedVehicle}
+								{#await loadCompareCard() then { default: CommunityCompareCard }}
+									<CommunityCompareCard
+										{vehicle}
+										{isOwner}
+										onVehicleUpdated={updated => {
+											if (vehicle) vehicle = { ...vehicle, catalogModelId: updated.catalogModelId };
+										}}
+									/>
+								{:catch}
+									<p
+										class="text-sm text-muted-foreground"
+										data-testid="community-compare-load-error"
+									>
+										Couldn't load community comparisons. Reload the page to try again.
+									</p>
+								{/await}
+							{/if}
+						{/if}
+
+						{#if vehicle.carShare?.manage}
+							{@const enabled = vehicle.carShare.enabled}
+							{#await import('#lib/components/drivers/CarSharingCard.svelte') then { default: CarSharingCard }}
+								<CarSharingCard {vehicleId} {enabled} />
+							{/await}
+						{/if}
+
+						<Collapsible
+							bind:open={detailsOpen}
+							onOpenChange={open => {
+								if (open) hasOpenedDetails = true;
+							}}
+							class="rounded-xl border bg-card"
+						>
+							<CollapsibleTrigger
+								class="flex min-h-12 w-full items-center gap-2 rounded-xl px-4 text-left text-sm font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:px-6"
+							>
+								<ChevronRight
+									class="h-4 w-4 shrink-0 transition-transform {detailsOpen ? 'rotate-90' : ''}"
+									aria-hidden="true"
+								/>
+								Details and photos
+							</CollapsibleTrigger>
+							<CollapsibleContent class="space-y-6 border-t p-4 sm:p-6">
+								{#if hasOpenedDetails}
+									<VehicleInfoCard {vehicle} {isOwner} />
+									<VehiclePhotoCarousel
+										{vehicleId}
+										photos={vehiclePhotos}
+										{isOwner}
+										isLoading={isLoadingPhotos}
+										onUpload={() => {
+											hasOpenedUpload = true;
+											showUploadDialog = true;
+										}}
+										onDelete={handleDeletePhoto}
+										onSetCover={handleSetCover}
+									/>
+								{/if}
+							</CollapsibleContent>
+						</Collapsible>
+					{/if}
 				</TabsContent>
 
 				<TabsContent value="expenses" class="space-y-6">

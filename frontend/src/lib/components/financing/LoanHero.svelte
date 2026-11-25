@@ -79,7 +79,8 @@
 		{#if !paymentsLoading}
 			<p class="max-w-xl text-base leading-relaxed lg:text-lg" data-testid="loan-sentence">
 				{#if balance === 0}
-					{#if paymentsLoaded}<strong>{made}</strong> payments made.{/if} The loan is paid off.
+					{#if paymentsLoaded}<strong>{made}</strong> payment{made === 1 ? '' : 's'} made.{/if} The loan
+					is paid off.
 				{:else}
 					{#if paymentsLoaded}<strong>{made} of {financing.termMonths}</strong> payments made.{/if} At
 					{formatCurrency(financing.paymentAmount)}

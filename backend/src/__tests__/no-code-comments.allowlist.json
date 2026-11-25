@@ -272,7 +272,6 @@
   "frontend/src/lib/components/ui/popover/popover-trigger.svelte: Pass child to the primitive's own prop; a button nested in the bits-ui trigger breaks accessible names.",
   "frontend/src/lib/components/ui/sonner/__tests__/toaster-theme.test.ts: sonner mounts its themed list only once a toast exists.",
   "frontend/src/lib/components/ui/sonner/sonner.svelte: sonner takes its theme from the theme prop, not the .dark class.",
-  "frontend/src/lib/components/vehicles/form/VehicleForm.svelte: Clip, not hidden, below sm: sr-only would outrank sm:not-sr-only at every width.",
   "frontend/src/lib/components/vehicles/form/VehicleForm.svelte: JSON drops undefined; send null to clear an emptied optional.",
   "frontend/src/lib/services/api-client.ts: Dynamic import: the stores import this module, so a static import is circular.",
   "frontend/src/lib/services/api-client.ts: Non-JSON error body: keep the status-based message.",
