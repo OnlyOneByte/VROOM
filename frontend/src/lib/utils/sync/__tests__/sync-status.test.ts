@@ -1,11 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { Wifi, WifiOff, RefreshCw, CircleCheck, CircleAlert, Clock } from '@lucide/svelte';
-import {
-	backupProviderNeedsAttention,
-	getSyncStatusInfo,
-	type SyncStatusParams
-} from '#lib/utils/sync/sync-status.ts';
-import type { BackupConfig } from '#lib/types/settings.ts';
+import { getSyncStatusInfo, type SyncStatusParams } from '#lib/utils/sync/sync-status.ts';
 
 function params(overrides: Partial<SyncStatusParams> = {}): SyncStatusParams {
 	return {
@@ -133,38 +128,5 @@ describe('a backup provider that needs attention', () => {
 		expect(getSyncStatusInfo(params({ ...attention, syncStatus: 'error' })).text).toBe(
 			'Sync failed'
 		);
-	});
-
-	const config = (providers: BackupConfig['providers']): BackupConfig => ({ providers });
-	const on = { enabled: true, folderPath: '/', retentionCount: 5 };
-	const off = { enabled: false, folderPath: '/', retentionCount: 5 };
-
-	test.each(['needs_reauth', 'error'] as const)(
-		'%s on a provider with backups on counts',
-		status => {
-			expect(backupProviderNeedsAttention([{ id: 'a', status }], config({ a: on }))).toBe(true);
-		}
-	);
-
-	test('Sheets sync alone counts', () => {
-		expect(
-			backupProviderNeedsAttention(
-				[{ id: 'a', status: 'error' }],
-				config({ a: { ...off, sheetsSyncEnabled: true } })
-			)
-		).toBe(true);
-	});
-
-	test('a healthy or disabled provider, or one with backups and Sheets off, does not', () => {
-		expect(backupProviderNeedsAttention([{ id: 'a', status: 'active' }], config({ a: on }))).toBe(
-			false
-		);
-		expect(backupProviderNeedsAttention([{ id: 'a', status: 'disabled' }], config({ a: on }))).toBe(
-			false
-		);
-		expect(backupProviderNeedsAttention([{ id: 'a', status: 'error' }], config({ a: off }))).toBe(
-			false
-		);
-		expect(backupProviderNeedsAttention([{ id: 'a', status: 'error' }], undefined)).toBe(false);
 	});
 });

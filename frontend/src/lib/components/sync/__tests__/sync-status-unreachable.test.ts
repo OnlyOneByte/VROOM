@@ -18,7 +18,8 @@ vi.mock('#lib/utils/sync/sync-manager.ts', () => {
 		lastSheetsSync: store<Date | null>(null),
 		lastDataChangeTime: store<Date | null>(null),
 		backupEnabled: store(false),
-		sheetsSyncEnabled: store(false)
+		sheetsSyncEnabled: store(false),
+		providerNeedsAttention: store(false)
 	};
 });
 

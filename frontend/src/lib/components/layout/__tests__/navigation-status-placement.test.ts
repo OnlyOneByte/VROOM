@@ -1,11 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { offlineExpenseQueue, onlineStatus, syncState } from '#lib/stores/offline.svelte.ts';
 import { authStore } from '#lib/stores/auth.svelte.ts';
 import type { User } from '#lib/types/index.ts';
-import type { UserSettings } from '#lib/types/settings.ts';
-import { settingsStore } from '#lib/stores/settings.svelte.ts';
 import { onWideScreen } from './wide-screen.ts';
 
 vi.mock('$app/state', () => ({
@@ -13,6 +11,8 @@ vi.mock('$app/state', () => ({
 		return { url: new URL('http://localhost/dashboard') };
 	}
 }));
+
+const attention = { current: false };
 
 vi.mock('#lib/utils/sync/sync-manager.ts', () => {
 	const store = <T>(value: T) => ({
@@ -28,12 +28,10 @@ vi.mock('#lib/utils/sync/sync-manager.ts', () => {
 		lastSheetsSync: store<Date | null>(null),
 		lastDataChangeTime: store<Date | null>(null),
 		backupEnabled: store(true),
-		sheetsSyncEnabled: store(false)
+		sheetsSyncEnabled: store(false),
+		providerNeedsAttention: attention
 	};
 });
-
-const getProviders = vi.fn();
-vi.mock('#lib/services/provider-api.ts', () => ({ providerApi: { getProviders } }));
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -75,8 +73,7 @@ function mobileHeader(): HTMLElement {
 describe('the sync status indicator lives in the navigation, never floating over a page', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		getProviders.mockResolvedValue([]);
-		settingsStore.reset();
+		attention.current = false;
 		authStore.clearUser();
 		onlineStatus.current = true;
 		syncState.current = 'idle';
@@ -151,29 +148,19 @@ describe('the sync status indicator lives in the navigation, never floating over
 	describe('a backup provider that needs reconnecting', () => {
 		onWideScreen();
 
-		beforeEach(() => {
-			authStore.setUser(alice);
-			vi.spyOn(settingsStore, 'settings', 'get').mockReturnValue({
-				backupConfig: {
-					providers: {
-						drive: { enabled: true, folderPath: '/VROOM', retentionCount: 10 },
-						spare: { enabled: false, folderPath: '/VROOM', retentionCount: 10 }
-					}
-				}
-			} as unknown as UserSettings);
-		});
-
-		afterEach(() => vi.restoreAllMocks());
+		beforeEach(() => authStore.setUser(alice));
 
 		it('is never reported as Up to date, and the panel links to Storage Providers', async () => {
-			getProviders.mockResolvedValue([{ id: 'drive', status: 'needs_reauth' }]);
+			attention.current = true;
 			render(Navigation);
 
-			const trigger = await screen.findByRole('button', {
+			const trigger = screen.getByRole('button', {
 				name: 'Sync status: A backup provider needs attention'
 			});
 			expect(screen.queryByText('Up to date')).toBeNull();
-			expect(getProviders).toHaveBeenCalledWith('storage');
+			expect(screen.getByTestId('sync-status-announcement')).toHaveTextContent(
+				'A backup provider needs attention'
+			);
 
 			await fireEvent.click(trigger);
 			const panel = await screen.findByRole('dialog', { name: 'Sync status' });
@@ -182,17 +169,10 @@ describe('the sync status indicator lives in the navigation, never floating over
 			).toHaveAttribute('href', '/settings#settings-connections');
 		});
 
-		it('ignores an unhealthy provider that has backups and Sheets sync off', async () => {
-			getProviders.mockResolvedValue([
-				{ id: 'drive', status: 'active' },
-				{ id: 'spare', status: 'error' }
-			]);
+		it('reads Up to date when /sync/status reports no provider needing attention', () => {
 			render(Navigation);
 
-			await waitFor(() => expect(getProviders).toHaveBeenCalled());
-			expect(
-				await screen.findByRole('button', { name: 'Sync status: Up to date' })
-			).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Sync status: Up to date' })).toBeInTheDocument();
 		});
 	});
 

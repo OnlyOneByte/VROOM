@@ -25,7 +25,8 @@ vi.mock('#lib/utils/sync/sync-manager.ts', () => {
 		lastSheetsSync: store<Date | null>(null),
 		lastDataChangeTime: store<Date | null>(null),
 		backupEnabled: store(false),
-		sheetsSyncEnabled: store(false)
+		sheetsSyncEnabled: store(false),
+		providerNeedsAttention: store(false)
 	};
 });
 
@@ -196,9 +197,8 @@ describe('pending badge', () => {
 		offlineExpenseQueue.current = [row({ id: 'pending' })];
 		render(Navigation);
 
-		const status = screen.getByRole('status');
+		const status = screen.getAllByRole('status').find(region => region.textContent === '1 pending');
 		expect(status).toHaveAttribute('aria-live', 'off');
-		expect(status).toHaveTextContent('1 pending');
 		const spoken = screen.getByTestId('sync-status-announcement');
 		expect(spoken).toHaveAttribute('aria-live', 'polite');
 		expect(spoken).toHaveTextContent('Up to date');

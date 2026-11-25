@@ -8,8 +8,6 @@ import {
 	ServerOff,
 	TriangleAlert
 } from '@lucide/svelte';
-import type { ProviderStatus, UserProviderInfo } from '#lib/types/common.ts';
-import type { BackupConfig } from '#lib/types/settings.ts';
 
 type LucideIcon = typeof Wifi;
 
@@ -76,17 +74,4 @@ export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
 	}
 
 	return { color: 'text-success', icon: Wifi, text: 'Up to date' };
-}
-
-const UNHEALTHY: ReadonlySet<ProviderStatus> = new Set(['needs_reauth', 'error']);
-
-export function backupProviderNeedsAttention(
-	providers: Pick<UserProviderInfo, 'id' | 'status'>[],
-	backupConfig: BackupConfig | null | undefined
-): boolean {
-	const settings = backupConfig?.providers ?? {};
-	return providers.some(provider => {
-		const backup = settings[provider.id];
-		return UNHEALTHY.has(provider.status) && !!(backup?.enabled || backup?.sheetsSyncEnabled);
-	});
 }

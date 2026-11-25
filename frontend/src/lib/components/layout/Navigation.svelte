@@ -5,7 +5,6 @@
 	import { resolve } from '$app/paths';
 	import { Dialog as DialogPrimitive } from 'bits-ui';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
-	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { routes, isFormRoute } from '#lib/routes.ts';
 	import {
 		House,
@@ -31,12 +30,10 @@
 		syncConflicts,
 		syncManager,
 		fetchLastSyncTime,
-		backupEnabled,
-		sheetsSyncEnabled
+		providerNeedsAttention
 	} from '#lib/utils/sync/sync-manager.ts';
-	import { getSyncStatusInfo, backupProviderNeedsAttention } from '#lib/utils/sync/sync-status.ts';
+	import { getSyncStatusInfo } from '#lib/utils/sync/sync-status.ts';
 	import { countPendingSync } from '#lib/utils/sync/pending-expenses.ts';
-	import { providerApi } from '#lib/services/provider-api.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Sheet, SheetContent, SheetHeader, SheetTitle } from '#lib/components/ui/sheet/index.ts';
 	import { cn } from '#lib/utils.ts';
@@ -99,30 +96,6 @@
 
 	let pendingCount = $derived(countPendingSync(offlineExpenseQueue.current));
 
-	let providerNeedsAttention = $state(false);
-	let onSettings = $derived(currentPath.startsWith(routes.settings));
-
-	$effect(() => {
-		if (onSettings || !(backupEnabled.current || sheetsSyncEnabled.current)) {
-			providerNeedsAttention = false;
-			return;
-		}
-		let stale = false;
-		providerApi
-			.getProviders('storage')
-			.then(providers => {
-				if (stale) return;
-				providerNeedsAttention = backupProviderNeedsAttention(
-					providers,
-					settingsStore.settings?.backupConfig
-				);
-			})
-			.catch(() => {});
-		return () => {
-			stale = true;
-		};
-	});
-
 	let syncStatusInfo = $derived(
 		getSyncStatusInfo({
 			isOnline: onlineStatus.current,
@@ -130,7 +103,7 @@
 			pendingCount,
 			conflictsCount: syncConflicts.current.length,
 			serverReachable: !authStore.sessionUnverified,
-			providerNeedsAttention
+			providerNeedsAttention: providerNeedsAttention.current
 		})
 	);
 
@@ -141,7 +114,7 @@
 			pendingCount: 0,
 			conflictsCount: syncConflicts.current.length,
 			serverReachable: !authStore.sessionUnverified,
-			providerNeedsAttention
+			providerNeedsAttention: providerNeedsAttention.current
 		}).text
 	);
 
@@ -196,7 +169,7 @@
 			</DialogPrimitive.Trigger>
 			<DialogPrimitive.Content class={panelClass} trapFocus preventScroll={false}>
 				<DialogPrimitive.Title class="sr-only">Sync status</DialogPrimitive.Title>
-				<SyncStatusInline {providerNeedsAttention} />
+				<SyncStatusInline />
 			</DialogPrimitive.Content>
 		</DialogPrimitive.Root>
 	</div>
