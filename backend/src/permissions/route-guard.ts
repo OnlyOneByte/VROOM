@@ -2,11 +2,14 @@ import type { Context, MiddlewareHandler } from 'hono';
 import { matchedRoutes } from 'hono/route';
 import { DEMO_USER_ID } from '../api/auth/demo-account';
 import { DemoReadOnlyError, ForbiddenError } from '../errors';
+import { withImplied } from './resolve';
 import { DEMO_ROLE_KEY, ROLE_TEMPLATES } from './roles';
 import { isPublicRule, ROUTE_PERMISSIONS, rulePermissions } from './route-map';
 
 const DEMO_PERMISSIONS: ReadonlySet<string> = new Set(
-  ROLE_TEMPLATES.find((template) => template.key === DEMO_ROLE_KEY)?.permissions ?? []
+  (ROLE_TEMPLATES.find((template) => template.key === DEMO_ROLE_KEY)?.permissions ?? []).flatMap(
+    (permission) => [...withImplied(permission)]
+  )
 );
 
 function matchedRouteKey(c: Context): string | null {

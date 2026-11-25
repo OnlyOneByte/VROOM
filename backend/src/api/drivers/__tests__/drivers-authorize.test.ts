@@ -256,17 +256,30 @@ describe('recording who drove or paid', () => {
     ).toBe(403);
   });
 
-  test('the car tells the app whether sharing is on and who may change it', async () => {
+  test('the car and the car list tell the app whether sharing is on and what you may do', async () => {
     const carShare = async (request: RequestFn) =>
       (
         await json<DataEnvelope<{ carShare: unknown }>>(
           await request('GET', `/api/v1/vehicles/${CAR}`)
         )
       ).data.carShare;
-    expect(await carShare(ctx.authed)).toEqual({ enabled: false, manage: true });
+    const listed = async (request: RequestFn) =>
+      (
+        await json<DataEnvelope<{ id: string; carShare: unknown }[]>>(
+          await request('GET', '/api/v1/vehicles?include=shared')
+        )
+      ).data.find((v) => v.id === CAR)?.carShare;
+    const access = (enabled: boolean, manage: boolean, record: boolean) => ({
+      enabled,
+      manage,
+      record,
+    });
+    expect(await carShare(ctx.authed)).toEqual(access(false, true, true));
     await ctx.authed('PUT', sharing, { enabled: true });
-    expect(await carShare(m.coOwner.request)).toEqual({ enabled: true, manage: true });
-    expect(await carShare(m.editor.request)).toEqual({ enabled: true, manage: false });
+    expect(await carShare(m.coOwner.request)).toEqual(access(true, true, true));
+    expect(await carShare(m.editor.request)).toEqual(access(true, false, true));
+    expect(await listed(m.viewer.request)).toEqual(access(true, false, false));
+    expect(await listed(ctx.authed)).toEqual(access(true, true, true));
   });
 
   function seedCarShared(): void {

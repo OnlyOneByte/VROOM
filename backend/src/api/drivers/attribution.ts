@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { appContext } from '../../app-context';
 import { getDb } from '../../db/connection';
 import { ForbiddenError, ValidationError } from '../../errors';
 import { requestResolver } from '../../permissions/grants';
@@ -18,6 +19,16 @@ export function maySeeDrivers(c: Context, vehicleId: string): boolean {
     resolver.can('vehicle.driver.record', vehicle).allow ||
     resolver.can('vehicle.driver_stats.read', vehicle).allow
   );
+}
+
+export function carShareAccess(c: Context, vehicleId: string, enabled: boolean) {
+  const resolver = requestResolver(c, appContext().db);
+  const vehicle = { kind: 'vehicle' as const, vehicleId };
+  return {
+    enabled,
+    manage: resolver.can('vehicle.driver.manage', vehicle).allow,
+    record: resolver.can('vehicle.driver.record', vehicle).allow,
+  };
 }
 
 function assertActiveDriver(vehicleId: string, driverId: string): void {

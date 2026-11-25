@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { appContext } from '../../app-context';
 import { getDb } from '../../db/connection';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, vehicleParam } from '../../permissions/authorize';
+import { requestResolver } from '../../permissions/grants';
 import { zValidator } from '../../utils/validation';
 import {
   addGuestDriver,
@@ -14,6 +16,7 @@ import {
   setCarShare,
   updateDriver,
 } from './repository';
+import { driverStats } from './stats';
 
 const vehicleIdParam = z.object({ vehicleId: z.string().min(1).max(64) });
 const driverParam = vehicleIdParam.extend({ driverId: z.string().min(1).max(64) });
@@ -43,6 +46,45 @@ driverRoutes.get(
     const { vehicleId } = c.req.valid('param');
     requireCarShare(vehicleId);
     return c.json({ success: true, data: listDrivers(getDb(), vehicleId) });
+  }
+);
+
+const DAY = 24 * 60 * 60 * 1000;
+const statsQuery = z
+  .object({
+    from: z.iso.datetime({ offset: true }).optional(),
+    to: z.iso.datetime({ offset: true }).optional(),
+    estimates: z.enum(['true', 'false']).default('true'),
+  })
+  .refine((q) => !q.from || !q.to || Date.parse(q.from) <= Date.parse(q.to), {
+    message: 'The period must start before it ends',
+    path: ['from'],
+  });
+
+driverRoutes.get(
+  '/stats',
+  zValidator('param', vehicleIdParam),
+  zValidator('query', statsQuery),
+  authorize(vehicleParam('vehicleId')),
+  (c) => {
+    const { vehicleId } = c.req.valid('param');
+    const query = c.req.valid('query');
+    const { db } = appContext();
+    if (!carShareEnabled(db, vehicleId)) throw new NotFoundError('Car sharing');
+    const to = query.to ? Date.parse(query.to) : Date.now();
+    const from = query.from ? Date.parse(query.from) : to - 30 * DAY;
+    const resolver = requestResolver(c, db);
+    const vehicle = { kind: 'vehicle' as const, vehicleId };
+    return c.json({
+      success: true,
+      data: driverStats(db, vehicleId, {
+        period: { from, to },
+        withEstimates: query.estimates === 'true',
+        viewerUserId: c.get('user').id,
+        everyone: resolver.can('vehicle.driver_stats.read', vehicle).allow,
+        includeCarCosts: resolver.can('vehicle.expense.read', vehicle).allow,
+      }),
+    });
   }
 );
 
