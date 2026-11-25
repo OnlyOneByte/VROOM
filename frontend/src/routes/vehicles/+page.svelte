@@ -18,6 +18,8 @@
 	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { resolveCurrentOdometer } from '#lib/utils/financing-calculations.ts';
+	import { latest } from '#lib/utils/latest-request.ts';
 	import type { ReceivedShare, Vehicle } from '#lib/types/index.ts';
 
 	let vehicles = $state<Vehicle[]>([]);
@@ -53,15 +55,29 @@
 		}
 	}
 
+	const nextOdometerRequest = latest();
+
 	async function loadOdometers(list: Vehicle[]) {
+		const isCurrent = nextOdometerRequest();
 		const readings = await Promise.all(
 			list.map(v =>
 				vehicleApi
 					.getVehicleStats(v.id, '30d')
-					.then(stats => [v.id, stats.currentOdometer] as const)
-					.catch(() => [v.id, null] as const)
+					.then(
+						stats =>
+							[
+								v.id,
+								resolveCurrentOdometer(
+									stats.currentOdometer,
+									stats.currentMileage,
+									v.initialMileage
+								)
+							] as const
+					)
+					.catch(() => [v.id, v.initialMileage ?? null] as const)
 			)
 		);
+		if (!isCurrent()) return;
 		odometers = new Map(
 			readings.filter((r): r is readonly [string, number] => typeof r[1] === 'number')
 		);
@@ -91,24 +107,29 @@
 
 	onMount(load);
 
+	function odometerUnit(v: Vehicle): string {
+		return getDistanceUnitLabel(
+			v.unitPreferences?.distanceUnit ?? settingsStore.unitPreferences.distanceUnit,
+			true
+		);
+	}
+
 	function meta(v: Vehicle): string {
 		const odometer = odometers.get(v.id);
 		return [
 			v.nickname ? `${v.year} ${v.make} ${v.model}` : null,
 			v.vehicleType === 'electric' ? 'electric' : null,
 			v.licensePlate || null,
-			odometer !== undefined ? `${formatNumber(odometer, 0)} ${distanceLabel}` : null,
+			odometer !== undefined ? `${formatNumber(odometer, 0)} ${odometerUnit(v)}` : null,
 			v.sharedAccess ? `Shared by ${v.sharedAccess.sharedBy}` : null
 		]
 			.filter(Boolean)
 			.join(' · ');
 	}
 
-	function running(v: Vehicle): string {
+	function running(v: Vehicle): number | null {
 		const value = perDistance.get(v.id);
-		return typeof value === 'number'
-			? `30 days · ${formatCurrency(value, undefined, 2)}/${distanceLabel}`
-			: '30 days';
+		return typeof value === 'number' ? value : null;
 	}
 </script>
 
@@ -137,7 +158,15 @@
 			<p class="font-(family-name:--font-fig) text-[30px] leading-none font-bold tabular-nums">
 				{formatCurrency(spend.byVehicle.get(v.id) ?? 0, undefined, 0)}
 			</p>
-			<p class="mt-1 text-xs font-semibold text-muted-foreground tabular-nums">{running(v)}</p>
+			<p class="mt-1 text-xs font-semibold text-muted-foreground tabular-nums">
+				30 days ·
+				{#if running(v) === null}
+					<span aria-hidden="true">—</span>
+					<span class="sr-only">no running cost per {distanceLabel}</span>
+				{:else}
+					{formatCurrency(running(v) ?? 0, undefined, 2)}/{distanceLabel}
+				{/if}
+			</p>
 		</div>
 	</li>
 {/snippet}
