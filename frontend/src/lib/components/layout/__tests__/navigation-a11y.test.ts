@@ -1,8 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/svelte';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/svelte';
 import { offlineExpenseQueue, onlineStatus, syncState } from '#lib/stores/offline.svelte.ts';
 import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 import { onWideScreen } from './wide-screen.ts';
@@ -28,7 +25,8 @@ vi.mock('#lib/utils/sync/sync-manager.ts', () => {
 		lastSheetsSync: store<Date | null>(null),
 		lastDataChangeTime: store<Date | null>(null),
 		backupEnabled: store(false),
-		sheetsSyncEnabled: store(false)
+		sheetsSyncEnabled: store(false),
+		providerNeedsAttention: store(false)
 	};
 });
 
@@ -56,62 +54,128 @@ beforeEach(() => {
 });
 
 describe('active page is announced, not just coloured', () => {
-	onWideScreen();
+	describe.each([
+		['at lg and up', true],
+		['on a phone', false]
+	])('%s', (_where, isWide) => {
+		if (isWide) onWideScreen();
 
-	it('marks the current route with aria-current and nothing else', () => {
-		render(Navigation);
+		it('marks the current route with aria-current and nothing else', () => {
+			render(Navigation);
+			const nav = screen.getByRole('navigation', { name: 'Main' });
 
-		expect(screen.getByRole('link', { name: 'Expenses' })).toHaveAttribute('aria-current', 'page');
-		expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current');
-		expect(screen.getByRole('link', { name: 'Settings' })).not.toHaveAttribute('aria-current');
+			expect(within(nav).getByRole('link', { name: 'Log' })).toHaveAttribute(
+				'aria-current',
+				'page'
+			);
+			expect(within(nav).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
+			expect(nav.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+		});
 	});
 
-	it('follows the active route', () => {
+	it('lights More on a page that lives under it', () => {
 		currentUrl = new URL('http://localhost/settings');
 		render(Navigation);
 
-		expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
-		expect(screen.getByRole('link', { name: 'Expenses' })).not.toHaveAttribute('aria-current');
+		expect(screen.getByRole('button', { name: 'More' })).toHaveClass('text-bar-on');
+		expect(screen.getByRole('link', { name: 'Log' })).not.toHaveAttribute('aria-current');
 	});
 });
 
-describe('one navigation landmark', () => {
-	onWideScreen();
+describe('one navigation landmark, every item labelled in text', () => {
+	describe('at lg and up', () => {
+		onWideScreen();
 
-	it('exposes exactly one, and it is the <nav>', () => {
+		it('at lg and up: Home, Log, Garage, Explore, Reminders and More in a pill nav', () => {
+			const { container } = render(Navigation);
+
+			const landmarks = container.querySelectorAll('nav, [role="navigation"]');
+			expect(landmarks).toHaveLength(1);
+			const nav = landmarks[0] as HTMLElement;
+			expect([...nav.querySelectorAll('a, button')].map(item => item.textContent?.trim())).toEqual([
+				'Home',
+				'Log',
+				'Garage',
+				'Explore',
+				'Reminders',
+				'More'
+			]);
+			expect(screen.getByRole('link', { name: 'Add expense' })).toHaveAttribute(
+				'href',
+				'/expenses/new'
+			);
+		});
+	});
+
+	it('on a phone: Home, Log, the raised Add, Garage and More in the bottom bar', () => {
 		const { container } = render(Navigation);
 
 		const landmarks = container.querySelectorAll('nav, [role="navigation"]');
 		expect(landmarks).toHaveLength(1);
-		expect(landmarks[0]?.tagName).toBe('NAV');
+		const bar = landmarks[0] as HTMLElement;
+		expect([...bar.querySelectorAll('a, button')].map(item => item.textContent?.trim())).toEqual([
+			'Home',
+			'Log',
+			'Add',
+			'Garage',
+			'More'
+		]);
+		const add = within(bar).getByRole('link', { name: 'Add expense' });
+		expect(add).toHaveAttribute('href', '/expenses/new');
+		expect(bar).toHaveClass('bg-bar', 'text-bar-fg');
+	});
+
+	it('on a phone, a form hides the bar: the form carries its own Save', () => {
+		currentUrl = new URL('http://localhost/expenses/new');
+		const { container } = render(Navigation);
+
+		expect(container.querySelector('nav')).toBeNull();
+		expect(screen.getByRole('link', { name: /Profile$/ })).toBeInTheDocument();
 	});
 });
 
-describe('labels reveal on keyboard focus, not only on hover', () => {
-	onWideScreen();
+describe('More opens a focus-trapping layer that Escape closes', () => {
+	describe('at lg and up', () => {
+		onWideScreen();
 
-	it('expands when focus enters the sidebar and collapses when it leaves', async () => {
-		render(Navigation);
-		const expensesLink = screen.getByRole('link', { name: 'Expenses' });
+		it('at lg and up, a menu of Insurance, Trips, Assistant, Settings, Profile and Sign out', async () => {
+			render(Navigation);
+			const trigger = screen.getByRole('button', { name: 'More' });
 
-		expect(screen.queryByText('Expenses')).toBeNull();
+			await fireEvent.click(trigger);
+			const menu = await screen.findByRole('dialog', { name: 'More' });
+			expect([...menu.querySelectorAll('a, button')].map(item => item.textContent?.trim())).toEqual(
+				['Insurance', 'Trips', 'Assistant', 'Settings', 'Profile', 'Sign out']
+			);
+			await waitFor(() => expect(menu.contains(document.activeElement)).toBe(true));
 
-		await fireEvent.focusIn(expensesLink);
-		expect(screen.getByText('Expenses')).toBeInTheDocument();
-
-		await fireEvent.focusOut(expensesLink, { relatedTarget: null });
-		expect(screen.queryByText('Expenses')).toBeNull();
+			await fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+			await waitFor(() => expect(screen.queryByRole('dialog', { name: 'More' })).toBeNull());
+			await waitFor(() => expect(document.activeElement).toBe(trigger));
+		});
 	});
 
-	it('stays expanded while focus moves between its own children', async () => {
+	it('on a phone, a bottom sheet of everything the bar does not hold', async () => {
 		render(Navigation);
-		const expensesLink = screen.getByRole('link', { name: 'Expenses' });
 
-		await fireEvent.focusIn(expensesLink);
-		const settingsLink = screen.getByRole('link', { name: 'Settings' });
-		await fireEvent.focusOut(expensesLink, { relatedTarget: settingsLink });
+		await fireEvent.click(screen.getByRole('button', { name: 'More' }));
+		const sheet = await screen.findByRole('dialog', { name: 'More' });
+		expect(
+			[...sheet.querySelectorAll('li a, li button')].map(item => item.textContent?.trim())
+		).toEqual([
+			'Explore',
+			'Reminders',
+			'Insurance',
+			'Trips',
+			'Assistant',
+			'Settings',
+			'Profile',
+			'Sign out'
+		]);
+		await waitFor(() => expect(sheet.contains(document.activeElement)).toBe(true));
 
-		expect(screen.getByText('Expenses')).toBeInTheDocument();
+		await fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+		await waitFor(() => expect(screen.queryByRole('dialog', { name: 'More' })).toBeNull());
 	});
 });
 
@@ -129,32 +193,26 @@ describe('pending badge', () => {
 
 		expect(screen.getByLabelText('1 pending items')).toBeInTheDocument();
 	});
-});
 
-describe('fixed chrome on short viewports and at high zoom', () => {
-	it('keeps focus clear of the fixed header and bars below lg, and lets the header scroll away on short screens', async () => {
-		const css = readFileSync(
-			join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', 'app.css'),
-			'utf8'
-		);
-		expect(css).toMatch(/@custom-variant short \(@media \(max-height: 500px\)\);/);
-		expect(css).toMatch(
-			/html \{\s*@variant max-lg \{\s*scroll-padding-top: calc\(4rem \+ env\(safe-area-inset-top\)\);\s*scroll-padding-bottom: 6rem;\s*\}\s*@variant short \{\s*scroll-padding-top: 0;/
-		);
+	it('sits in a status region that does not announce every change', () => {
+		offlineExpenseQueue.current = [row({ id: 'pending' })];
+		render(Navigation);
 
-		const { container } = render(Navigation);
-		const header = container.querySelector('.fixed.top-0');
-		expect(header).toHaveClass('lg:hidden', 'short:static');
-		expect(container.querySelector('.h-16')).toHaveClass('lg:hidden', 'short:hidden');
+		const status = screen.getAllByRole('status').find(region => region.textContent === '1 pending');
+		expect(status).toHaveAttribute('aria-live', 'off');
+		const spoken = screen.getByTestId('sync-status-announcement');
+		expect(spoken).toHaveAttribute('aria-live', 'polite');
+		expect(spoken).toHaveTextContent('Up to date');
 	});
 });
 
 describe('only the navigation for the screen width is rendered', () => {
-	it('below lg, the mobile header without the desktop sidebar', () => {
+	it('below lg, the phone top bar and bottom bar, with no pill nav', () => {
 		const { container } = render(Navigation);
 
-		expect(container.querySelector('div.fixed.top-0')).not.toBeNull();
-		expect(container.querySelector('div.lg\\:inset-y-0')).toBeNull();
+		expect(container.querySelector('header.fixed.top-0')).toHaveClass('short:static');
+		expect(container.querySelector('nav.fixed.bottom-0')).not.toBeNull();
+		expect(container.querySelector('nav.rounded-full')).toBeNull();
 	});
 
 	it('below lg, auto-sync still starts on its own, with no menu opened', async () => {
@@ -170,11 +228,12 @@ describe('only the navigation for the screen width is rendered', () => {
 	describe('at lg and up', () => {
 		onWideScreen();
 
-		it('the desktop sidebar without the mobile header', () => {
+		it('the pill nav in a header that scrolls with the page, with no bottom bar', () => {
 			const { container } = render(Navigation);
 
-			expect(container.querySelector('div.lg\\:inset-y-0')).not.toBeNull();
-			expect(container.querySelector('div.fixed.top-0')).toBeNull();
+			expect(container.querySelector('nav.rounded-full')).not.toBeNull();
+			expect(container.querySelector('header')).not.toHaveClass('fixed');
+			expect(container.querySelector('nav.fixed.bottom-0')).toBeNull();
 		});
 	});
 });

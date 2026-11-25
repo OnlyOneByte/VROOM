@@ -1,6 +1,5 @@
 import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import { rawAll, rawJsonValue } from '../../db/dialect';
 import { userPreferences, vehicles } from '../../db/schema';
 import { ELECTRIC_FUEL_TYPES } from '../../db/types';
@@ -13,7 +12,6 @@ import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import {
   type AnalyticsQuery,
   type AnalyticsQueryRepository,
-  analyticsQueryRepository,
   buildBuckets,
   type QueryEnergy,
   RUNNING_CATEGORIES,
@@ -526,8 +524,3 @@ export class AnalyticsInsightsRepository {
     };
   }
 }
-
-export const analyticsInsightsRepository = new AnalyticsInsightsRepository(
-  getDb(),
-  analyticsQueryRepository
-);

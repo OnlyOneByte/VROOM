@@ -7,6 +7,9 @@ export interface Notification {
 	duration?: number;
 	timestamp?: number;
 	urgent?: boolean;
+	toastId?: string;
+	description?: string;
+	action?: { label: string; onClick: () => void };
 }
 
 export interface AppState {

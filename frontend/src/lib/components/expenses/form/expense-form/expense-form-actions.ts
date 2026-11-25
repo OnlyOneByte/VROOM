@@ -139,6 +139,19 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 				message: 'Split expense created successfully'
 			});
 			gotoDynamic(returnTo);
+		} else if (
+			onlineStatus.current &&
+			(await addOfflineExpense(
+				toOfflineExpense(expenseData),
+				[...state.pendingFiles],
+				clientId,
+				queueOwner
+			))
+		) {
+			rememberEntry();
+			appStore.addNotification({ type: 'success', message: 'Expense added successfully' });
+			syncManager.syncSoon();
+			gotoDynamic(returnTo);
 		} else if (onlineStatus.current) {
 			const created = await expenseApi.createExpense(
 				{ ...expenseData, paidByDriverId: state.paidByDriverId },

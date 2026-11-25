@@ -2,6 +2,7 @@ import { stringify } from 'csv-stringify/sync';
 import { createInsertSchema } from 'drizzle-zod';
 import { type Context, Hono, type Next } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { type Expense, expenses as expensesTable, type NewExpense } from '../../db/schema';
 import { EXPENSE_CATEGORIES } from '../../db/types';
@@ -43,7 +44,6 @@ import {
   writesFinancials,
 } from '../../utils/vehicle-access';
 import { assertMayClearDriver, attributedDriver, hideDriverFields } from '../drivers/attribution';
-import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
 import { preferencesRepository } from '../settings/repository';
@@ -279,7 +279,7 @@ async function assertFinancingSourceValid(
   vehicleId: string
 ): Promise<void> {
   if (sourceType !== 'financing') return;
-  const financing = await financingRepository.findByVehicleId(vehicleId);
+  const financing = await repos().financing.findByVehicleId(vehicleId);
   if (!financing?.isActive) {
     throw new ValidationError('Vehicle has no active financing');
   }

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES } from '../../db/types';
 import { requireAuth } from '../../middleware';
@@ -28,9 +29,7 @@ import {
   vehicleTcoToApi,
   yearEndToApi,
 } from './api-transform';
-import { analyticsInsightsRepository } from './insights';
 import {
-  analyticsQueryRepository,
   isValidQueryCombination,
   QUERY_COMPARES,
   QUERY_ENERGIES,
@@ -39,7 +38,6 @@ import {
   QUERY_INTERVALS,
   QUERY_METRICS,
 } from './query-repository';
-import { analyticsRepository } from './repository';
 
 const routes = new Hono();
 
@@ -226,7 +224,7 @@ routes.get(
   authorize(ownAccount),
   async (c) => {
     const user = c.get('user');
-    const data = await analyticsQueryRepository.items(user.id, c.req.valid('query'));
+    const data = await repos().analyticsQuery.items(user.id, c.req.valid('query'));
     return c.json({ success: true, data: bucketItemsToApi(data) });
   }
 );
@@ -238,7 +236,7 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { start, end, vehicleIds: ids, timeZone: zone } = c.req.valid('query');
-    const data = await analyticsInsightsRepository.insights(user.id, {
+    const data = await repos().analyticsInsights.insights(user.id, {
       start,
       end,
       vehicleIds: ids,
@@ -254,7 +252,7 @@ routes.get(
   authorize(ownAccount),
   async (c) => {
     const user = c.get('user');
-    const data = await analyticsQueryRepository.query(user.id, c.req.valid('query'));
+    const data = await repos().analyticsQuery.query(user.id, c.req.valid('query'));
     return c.json({ success: true, data: analyticsQueryToApi(data) });
   }
 );
@@ -266,7 +264,7 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { startDate, endDate, ytdStart, timeZone, vehicleIds } = c.req.valid('query');
-    const data = await analyticsRepository.getSummary(
+    const data = await repos().analytics.getSummary(
       user.id,
       { start: startDate, end: endDate },
       ytdStart,
@@ -284,7 +282,7 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { startDate, endDate, ytdStart, timeZone } = c.req.valid('query');
-    const data = await analyticsRepository.getQuickStats(
+    const data = await repos().analytics.getQuickStats(
       user.id,
       { start: startDate, end: endDate },
       ytdStart,
@@ -306,7 +304,7 @@ routes.get(
       ? (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId
       : user.id;
 
-    const data = await analyticsRepository.getFuelStats(
+    const data = await repos().analytics.getFuelStats(
       scopeId,
       { start: startDate, end: endDate },
       vehicleId ?? vehicleIds,
@@ -323,7 +321,7 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { startDate, endDate, timeZone, vehicleIds } = c.req.valid('query');
-    const data = await analyticsRepository.getCrossVehicle(
+    const data = await repos().analytics.getCrossVehicle(
       user.id,
       { start: startDate, end: endDate },
       timeZone,
@@ -340,7 +338,7 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { timeZone, vehicleIds } = c.req.valid('query');
-    const data = await analyticsRepository.getFinancing(user.id, timeZone, vehicleIds);
+    const data = await repos().analytics.getFinancing(user.id, timeZone, vehicleIds);
     return c.json({ success: true, data: financingToApi(data) });
   }
 );
@@ -352,7 +350,7 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { timeZone, vehicleIds } = c.req.valid('query');
-    const data = await analyticsRepository.getInsurance(user.id, timeZone, vehicleIds);
+    const data = await repos().analytics.getInsurance(user.id, timeZone, vehicleIds);
     return c.json({ success: true, data: insuranceToApi(data) });
   }
 );
@@ -369,7 +367,7 @@ routes.get(
       ? (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId
       : user.id;
 
-    const data = await analyticsRepository.getFuelAdvanced(
+    const data = await repos().analytics.getFuelAdvanced(
       scopeId,
       { start: startDate, end: endDate },
       vehicleId ?? vehicleIds,
@@ -387,7 +385,7 @@ routes.get(
     const user = c.get('user');
     const { vehicleId, timeZone } = c.req.valid('query');
     const scopeId = (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId;
-    const data = await analyticsRepository.getVehicleHealth(scopeId, vehicleId, timeZone);
+    const data = await repos().analytics.getVehicleHealth(scopeId, vehicleId, timeZone);
     return c.json({ success: true, data });
   }
 );
@@ -400,7 +398,7 @@ routes.get(
     const user = c.get('user');
     const { vehicleId, year, timeZone } = c.req.valid('query');
     const access = await requireVehicleAccess(vehicleId, user.id, 'read');
-    const data = await analyticsRepository.getVehicleTCO(
+    const data = await repos().analytics.getVehicleTCO(
       access.ownerId,
       vehicleId,
       year,
@@ -419,7 +417,7 @@ routes.get(
     const user = c.get('user');
     const { vehicleId, startDate, endDate, timeZone } = c.req.valid('query');
     const access = await requireVehicleAccess(vehicleId, user.id, 'read');
-    const data = await analyticsRepository.getVehicleExpenses(
+    const data = await repos().analytics.getVehicleExpenses(
       access.ownerId,
       vehicleId,
       { start: startDate, end: endDate },
@@ -434,7 +432,7 @@ routes.get('/year-end', zValidator('query', yearQuerySchema), authorize(ownAccou
   const user = c.get('user');
   const { year, timeZone } = c.req.valid('query');
   const currentYear = year ?? calendarParts(new Date(), zonedCalendar(timeZone)).year;
-  const data = await analyticsRepository.getYearEnd(user.id, currentYear, timeZone);
+  const data = await repos().analytics.getYearEnd(user.id, currentYear, timeZone);
   return c.json({ success: true, data: yearEndToApi(data) });
 });
 
@@ -450,10 +448,7 @@ routes.get(
       ? (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId
       : user.id;
 
-    const fuelEfficiencyTrend = await analyticsRepository.getFuelEfficiencyTrend(
-      scopeId,
-      vehicleId
-    );
+    const fuelEfficiencyTrend = await repos().analytics.getFuelEfficiencyTrend(scopeId, vehicleId);
 
     return c.json({ success: true, data: { fuelEfficiencyTrend } });
   }

@@ -4,11 +4,11 @@ import {
   WebPushError,
   type PushSubscription as WebPushSubscription,
 } from 'web-push';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import type { PushSubscription } from '../../db/schema';
 import { logger } from '../../utils/logger';
 import { isAllowedPushEndpoint } from './push-endpoint';
-import { pushSubscriptionRepository } from './repository';
 
 export interface PushPayload {
   title: string;
@@ -75,19 +75,19 @@ async function sendToSubscription(
 ): Promise<void> {
   const result = await activeSender.send(sub, payload);
   if (result.kind === 'ok') {
-    await pushSubscriptionRepository.markSuccess(sub.id);
+    await repos().pushSubscriptions.markSuccess(sub.id);
     summary.sent += 1;
     return;
   }
   if (result.kind === 'gone') {
-    await pushSubscriptionRepository.prune(sub.id);
+    await repos().pushSubscriptions.prune(sub.id);
     summary.pruned += 1;
     return;
   }
-  const failures = await pushSubscriptionRepository.incrementFailure(sub.id);
+  const failures = await repos().pushSubscriptions.incrementFailure(sub.id);
   summary.failed += 1;
   if (failures >= CONFIG.validation.push.maxConsecutiveFailures) {
-    await pushSubscriptionRepository.prune(sub.id);
+    await repos().pushSubscriptions.prune(sub.id);
     summary.pruned += 1;
   }
 }
@@ -97,7 +97,7 @@ export async function notifyUser(userId: string, payload: PushPayload): Promise<
   try {
     if (activeSender === webPushSender && !CONFIG.push.enabled) return summary;
 
-    const subscriptions = await pushSubscriptionRepository.findByUser(userId);
+    const subscriptions = await repos().pushSubscriptions.findByUser(userId);
     for (const sub of subscriptions) {
       try {
         await sendToSubscription(sub, payload, summary);

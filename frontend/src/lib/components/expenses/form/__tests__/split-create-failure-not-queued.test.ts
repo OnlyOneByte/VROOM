@@ -89,7 +89,7 @@ describe('ExpenseForm — a failed split create is never queued', () => {
 		await vi.waitFor(() => expect(screen.getByDisplayValue('100')).toBeTruthy());
 
 		await fireEvent.click(screen.getByRole('button', { name: /save expense/i }));
-		await vi.waitFor(() => expect(createExpense).toHaveBeenCalled());
+		await vi.waitFor(() => expect(loadOfflineExpenses()).toHaveLength(1));
 		expect(hasPendingSave()).toBe(false);
 		cleanup();
 

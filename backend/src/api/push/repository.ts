@@ -1,7 +1,6 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { CONFIG } from '../../config';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import type { NewPushSubscription, PushSubscription } from '../../db/schema';
 import { pushSubscriptions } from '../../db/schema';
 import { DatabaseError } from '../../errors';
@@ -108,5 +107,3 @@ export class PushSubscriptionRepository extends BaseRepository<
     await this.db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, id));
   }
 }
-
-export const pushSubscriptionRepository = new PushSubscriptionRepository(getDb());

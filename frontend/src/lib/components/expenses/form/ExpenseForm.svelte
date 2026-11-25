@@ -528,7 +528,7 @@
 							placeholder="Select date"
 							label={dateLabel}
 							disabled={form.isGroupEditMode}
-							class="w-auto rounded-full px-3.5"
+							class="h-10 w-auto rounded-full px-3.5"
 							aria-invalid={!!dateError}
 							aria-describedby={dateError ? 'date-error' : undefined}
 						/>

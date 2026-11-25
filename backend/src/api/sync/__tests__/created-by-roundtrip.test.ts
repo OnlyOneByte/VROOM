@@ -32,7 +32,7 @@ async function roundTrip(): Promise<void> {
 
 describe('backup → restore round-trip preserves expenses.created_by', () => {
   test('an editor-authored shared expense keeps userId=OWNER AND created_by=editor (still a member) across the round-trip', async () => {
-    const { db } = await import('../../../db/connection');
+    const db = (await import('../../../db/connection')).getDb();
     const schema = await import('../../../db/schema');
     const editorId = 'editor-author-rt';
     await db

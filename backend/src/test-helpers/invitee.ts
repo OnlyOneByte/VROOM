@@ -16,7 +16,7 @@ export async function createInvitee(
   idPrefix: string,
   displayName?: string
 ): Promise<Invitee> {
-  const { db } = await import('../db/connection');
+  const db = (await import('../db/connection')).getDb();
   const schema = await import('../db/schema');
   const { assignServerRole } = await import('../permissions/grants');
 

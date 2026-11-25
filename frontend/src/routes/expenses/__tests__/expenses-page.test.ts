@@ -371,7 +371,7 @@ describe('/expenses loading states', () => {
 		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeTruthy();
 	});
 
-	test('splits the offline queue into pending, needs attention and synced', async () => {
+	test('pending and refused entries show as rows in the list, and the cards keep only synced', async () => {
 		const pending = offlineExpense('p', {});
 		const stuck = offlineExpense('n', { needsAttention: true });
 		const done = offlineExpense('s', { synced: true });
@@ -379,8 +379,13 @@ describe('/expenses loading states', () => {
 
 		await mountLoaded();
 
-		expect(captured.offlineCards['pendingExpenses']).toEqual([pending]);
-		expect(captured.offlineCards['needsAttentionExpenses']).toEqual([stuck]);
+		expect(captured.offlineCards['pendingExpenses']).toEqual([]);
+		const rows = captured.table['expenses'] as Array<{ id: string }>;
+		expect(rows.map(row => row.id).slice(0, 2)).toEqual(['p', 'n']);
+		const states = captured.table['pendingStates'] as ReadonlyMap<string, { status: string }>;
+		expect(states.get('p')?.status).toBe('saving');
+		expect(states.get('n')?.status).toBe('failed');
+		expect(captured.offlineCards['needsAttentionExpenses']).toEqual([]);
 		expect(captured.offlineCards['syncedExpenses']).toEqual([done]);
 	});
 });

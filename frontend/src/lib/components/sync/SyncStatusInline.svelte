@@ -9,7 +9,8 @@
 		lastDataChangeTime,
 		backupEnabled,
 		sheetsSyncEnabled,
-		syncConflicts
+		syncConflicts,
+		providerNeedsAttention
 	} from '#lib/utils/sync/sync-manager.ts';
 	import { RefreshCw, CircleAlert, Clock, Wifi, WifiOff, TriangleAlert } from '@lucide/svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -39,8 +40,20 @@
 			syncStatus: syncState.current,
 			pendingCount,
 			conflictsCount: syncConflicts.current.length,
-			serverReachable: !authStore.sessionUnverified
+			serverReachable: !authStore.sessionUnverified,
+			providerNeedsAttention: providerNeedsAttention.current
 		})
+	);
+
+	let announcedStatus = $derived(
+		getSyncStatusInfo({
+			isOnline: onlineStatus.current,
+			syncStatus: 'idle',
+			pendingCount: 0,
+			conflictsCount: syncConflicts.current.length,
+			serverReachable: !authStore.sessionUnverified,
+			providerNeedsAttention: providerNeedsAttention.current
+		}).text
 	);
 
 	let statusPanel = $state<HTMLElement | null>(null);
@@ -121,9 +134,12 @@
 	tabindex="-1"
 	role="group"
 	aria-label="Sync status"
-	class="border-t border-border pt-3 space-y-2 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50"
+	class="py-1 space-y-2 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50"
 >
-	<span class="sr-only" role="status">{statusInfo.text}</span>
+	<span class="sr-only" role="status" aria-live="off">{statusInfo.text}</span>
+	<span class="sr-only" aria-live="polite" data-testid="sync-status-announcement">
+		{announcedStatus}
+	</span>
 	{#if isExpanded}
 		<div class="px-3 space-y-2">
 			<div class="flex items-center justify-between">
@@ -195,6 +211,15 @@
 						{formatCompactRelativeTime(lastBackupTime.current ?? lastSheetsSync.current)}
 					</span>
 				</div>
+			{/if}
+
+			{#if providerNeedsAttention.current}
+				<a
+					href="{resolve(routes.settings)}#settings-connections"
+					class="block rounded-sm text-xs font-medium text-accent-ink underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					Fix it in Settings → Storage Providers
+				</a>
 			{/if}
 
 			{#if lastDataChangeTime.current}

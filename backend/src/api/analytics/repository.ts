@@ -13,7 +13,6 @@ import {
   sql,
 } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import { countNum, sqlFalse, sumNum } from '../../db/dialect';
 import {
   expenses,
@@ -2330,5 +2329,3 @@ export class AnalyticsRepository {
     }
   }
 }
-
-export const analyticsRepository = new AnalyticsRepository(getDb());

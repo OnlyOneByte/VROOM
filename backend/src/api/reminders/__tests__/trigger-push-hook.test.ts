@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import {
   createTestApp,
   type DataEnvelope,
@@ -12,7 +13,6 @@ import {
   type PushSender,
   setPushSenderForTest,
 } from '../../push/push-service';
-import { pushSubscriptionRepository } from '../../push/repository';
 import { addOdometerReading, seedMileageReminder } from './_helpers';
 
 let ctx: TestApp;
@@ -41,7 +41,7 @@ function recordingSender(opts: { throwOnSend?: boolean } = {}): PushSender & {
 }
 
 async function subscribe(endpoint = 'ep-hook'): Promise<void> {
-  await pushSubscriptionRepository.upsertByEndpoint(ctx.user.id, {
+  await repos().pushSubscriptions.upsertByEndpoint(ctx.user.id, {
     endpoint,
     p256dh: 'k',
     auth: 'a',

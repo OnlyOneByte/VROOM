@@ -9,7 +9,7 @@ test.describe('skip link', () => {
 		await mockApi(page);
 	});
 
-	test('the first Tab shows "Skip to content", and Enter moves the next Tab past the rail', async ({
+	test('the first Tab shows "Skip to content", and Enter moves the next Tab past the nav', async ({
 		page
 	}) => {
 		await page.goto('/dashboard');

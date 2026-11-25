@@ -15,6 +15,8 @@
 		MOBILE_ROW_ACTIONS_CONTAINER_CLASS,
 		MOBILE_ROW_SUMMARY_CLASS
 	} from './compact-row-classes';
+	import PendingSyncNote from './PendingSyncNote.svelte';
+	import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 
 	interface Props {
 		expense: Expense;
@@ -26,6 +28,7 @@
 		isSelected: boolean;
 		onSelect: (_id: string) => void;
 		onDelete: (_expense: Expense) => void;
+		pending?: PendingRowState | undefined;
 	}
 
 	let {
@@ -37,7 +40,8 @@
 		returnTo,
 		isSelected,
 		onSelect,
-		onDelete
+		onDelete,
+		pending
 	}: Props = $props();
 	let shownTags = $derived(tagsBesideCategory(expense.tags, expense.category));
 
@@ -85,8 +89,12 @@
 	</div>
 {/snippet}
 
-<div class="transition-colors {isSelected ? 'bg-muted/50' : ''}">
-	{#if canWrite}
+<div
+	class="transition-colors {isSelected ? 'bg-muted/50' : ''} {pending
+		? 'motion-safe:animate-[row-arrive_200ms_ease-out]'
+		: ''}"
+>
+	{#if canWrite && !pending}
 		<!-- A button cannot contain interactive content, so actions sit beside the summary, not inside it. -->
 		<button
 			type="button"
@@ -101,7 +109,17 @@
 			{@render summary()}
 		</div>
 	{/if}
-	{#if isSelected && canWrite}
+	{#if pending}
+		<div class="pr-3 pb-3 pl-[3.25rem]">
+			<PendingSyncNote
+				{pending}
+				entryId={expense.id}
+				{returnTo}
+				label="{formatCurrency(expense.amount)} {heading.title}"
+			/>
+		</div>
+	{/if}
+	{#if isSelected && canWrite && !pending}
 		<div class={MOBILE_ROW_ACTIONS_CONTAINER_CLASS}>
 			<Button
 				variant="ghost"

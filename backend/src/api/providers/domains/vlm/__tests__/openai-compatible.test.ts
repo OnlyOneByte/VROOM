@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { ALLOW_PRIVATE } from '../../../../../utils/outbound-url';
 import { OpenAiCompatibleVlmProvider } from '../openai-compatible';
 import { RECEIPT_EXTRACTION_PROMPT } from '../prompt';
 import type { ReceiptImage } from '../vlm-provider';
@@ -46,6 +47,7 @@ describe('OpenAiCompatibleVlmProvider — request shaping', () => {
   test('POSTs to {baseUrl}/chat/completions with the fixed prompt + an image data-URL part', async () => {
     stubFetch(() => okResponse('{"amount": 12.5}'));
     const provider = new OpenAiCompatibleVlmProvider({
+      outbound: ALLOW_PRIVATE,
       apiKey: 'sk-key',
       model: 'gpt-4o-mini',
       baseUrl: 'https://api.openai.com/v1',
@@ -74,6 +76,7 @@ describe('OpenAiCompatibleVlmProvider — request shaping', () => {
   test('sends a Bearer Authorization header when an api key is set', async () => {
     stubFetch(() => okResponse('{}'));
     const provider = new OpenAiCompatibleVlmProvider({
+      outbound: ALLOW_PRIVATE,
       apiKey: 'sk-secret',
       model: 'gpt-4o',
       baseUrl: 'https://api.openai.com/v1',
@@ -85,6 +88,7 @@ describe('OpenAiCompatibleVlmProvider — request shaping', () => {
   test('OMITS the Authorization header for keyless self-hosted (Ollama)', async () => {
     stubFetch(() => okResponse('{}'));
     const provider = new OpenAiCompatibleVlmProvider({
+      outbound: ALLOW_PRIVATE,
       model: 'llava',
       baseUrl: 'http://localhost:11434/v1',
     });
@@ -96,6 +100,7 @@ describe('OpenAiCompatibleVlmProvider — request shaping', () => {
   test('strips a trailing slash from the base URL', async () => {
     stubFetch(() => okResponse('{}'));
     const provider = new OpenAiCompatibleVlmProvider({
+      outbound: ALLOW_PRIVATE,
       apiKey: 'k',
       model: 'm',
       baseUrl: 'https://gateway.example.com/v1/',
@@ -109,6 +114,7 @@ describe('OpenAiCompatibleVlmProvider failures', () => {
   test('THROWS on a non-2xx response (route maps to 502, never a faked success)', async () => {
     stubFetch(() => new Response('rate limited', { status: 429 }));
     const provider = new OpenAiCompatibleVlmProvider({
+      outbound: ALLOW_PRIVATE,
       apiKey: 'k',
       model: 'm',
       baseUrl: 'https://api.openai.com/v1',
@@ -121,6 +127,7 @@ describe('OpenAiCompatibleVlmProvider failures', () => {
       throw new Error('ECONNREFUSED');
     });
     const provider = new OpenAiCompatibleVlmProvider({
+      outbound: ALLOW_PRIVATE,
       apiKey: 'k',
       model: 'm',
       baseUrl: 'https://api.openai.com/v1',
@@ -131,6 +138,7 @@ describe('OpenAiCompatibleVlmProvider failures', () => {
   test('returns an empty string when the response has no usable content (→ empty draft, no throw)', async () => {
     stubFetch(() => okResponse(null));
     const provider = new OpenAiCompatibleVlmProvider({
+      outbound: ALLOW_PRIVATE,
       apiKey: 'k',
       model: 'm',
       baseUrl: 'https://api.openai.com/v1',
@@ -141,6 +149,7 @@ describe('OpenAiCompatibleVlmProvider failures', () => {
   test('returns an empty string when the JSON body is malformed (no throw)', async () => {
     stubFetch(() => new Response('not json', { status: 200 }));
     const provider = new OpenAiCompatibleVlmProvider({
+      outbound: ALLOW_PRIVATE,
       apiKey: 'k',
       model: 'm',
       baseUrl: 'https://api.openai.com/v1',
@@ -151,6 +160,8 @@ describe('OpenAiCompatibleVlmProvider failures', () => {
 
 describe('OpenAiCompatibleVlmProvider — construction', () => {
   test('throws without a base URL (defense-in-depth)', () => {
-    expect(() => new OpenAiCompatibleVlmProvider({ apiKey: 'k', model: 'm' })).toThrow(/base URL/);
+    expect(
+      () => new OpenAiCompatibleVlmProvider({ outbound: ALLOW_PRIVATE, apiKey: 'k', model: 'm' })
+    ).toThrow(/base URL/);
   });
 });

@@ -38,9 +38,10 @@ let counter = 0;
 let migrated = false;
 
 export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<TestApp> {
-  const { db, runMigrations } = await import('../db/connection');
+  const { getDb, runMigrations } = await import('../db/connection');
+  const db = getDb();
   const schema = await import('../db/schema');
-  const { lucia } = await import('../api/auth/lucia');
+  const { appContext } = await import('../app-context');
   const { app } = await import('../app');
   const { assignServerRole, syncBuiltInRoles } = await import('../permissions/grants');
 
@@ -64,8 +65,8 @@ export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<T
     .onConflictDoNothing()
     .run();
 
-  const session = await lucia.createSession(id, {});
-  const sessionCookie = lucia.createSessionCookie(session.id);
+  const session = await appContext().lucia.createSession(id, {});
+  const sessionCookie = appContext().lucia.createSessionCookie(session.id);
   const cookie = `${sessionCookie.name}=${sessionCookie.value}`;
 
   return {
@@ -99,8 +100,10 @@ export async function requestAs(
   ctx: TestApp,
   userId: string
 ): Promise<{ cookie: string; request: RequestFn }> {
-  const { lucia } = await import('../api/auth/lucia');
-  const sessionCookie = lucia.createSessionCookie((await lucia.createSession(userId, {})).id);
+  const { appContext } = await import('../app-context');
+  const sessionCookie = appContext().lucia.createSessionCookie(
+    (await appContext().lucia.createSession(userId, {})).id
+  );
   const cookie = `${sessionCookie.name}=${sessionCookie.value}`;
   return {
     cookie,

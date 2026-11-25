@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, spyOn, test } from 'bun:test';
-import { odometerRepository } from '../../odometer/repository';
-import { type ReminderWithVehicles, reminderRepository } from '../repository';
+import { repos } from '../../../app-context';
+import type { ReminderWithVehicles } from '../repository';
 import { reminderTriggerService } from '../trigger-service';
 
 afterEach(() => {
-  spyOn(reminderRepository, 'findMileageTracking').mockRestore?.();
+  spyOn(repos().reminders, 'findMileageTracking').mockRestore?.();
 });
 
 describe('recheckMileageReminders on a query failure', () => {
   test('a findMileageTracking failure resolves to a skip', async () => {
-    const spy = spyOn(reminderRepository, 'findMileageTracking').mockRejectedValue(
+    const spy = spyOn(repos().reminders, 'findMileageTracking').mockRejectedValue(
       new Error('connection lost')
     );
 
@@ -36,10 +36,10 @@ describe('a reminder that fails mid-trigger', () => {
       userId: 'u1',
       nextDueOdometer: 1000,
     } as ReminderWithVehicles['reminder'];
-    const list = spyOn(reminderRepository, 'findMileageTracking').mockResolvedValue([
+    const list = spyOn(repos().reminders, 'findMileageTracking').mockResolvedValue([
       { reminder, vehicleIds: ['v1'] },
     ]);
-    const odometer = spyOn(odometerRepository, 'getCurrentOdometer').mockRejectedValue(
+    const odometer = spyOn(repos().odometer, 'getCurrentOdometer').mockRejectedValue(
       new Error('SQLITE_BUSY: database is locked')
     );
 

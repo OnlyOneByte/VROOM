@@ -4,7 +4,7 @@ import VehicleSelectField from '../VehicleSelectField.svelte';
 import { makeVehicle } from './expense-form-fixtures';
 
 describe('VehicleSelectField height', () => {
-	test('the vehicle chip matches the split button: 40px below sm, 36px from sm', () => {
+	test('the vehicle chip matches the split button: 40px at every width', () => {
 		const { container } = render(VehicleSelectField, {
 			props: {
 				vehicles: [makeVehicle('v1'), makeVehicle('v2')],
@@ -16,9 +16,9 @@ describe('VehicleSelectField height', () => {
 		});
 		const trigger = container.querySelector('#vehicle') as HTMLElement;
 		expect(trigger.classList.contains('data-[size=default]:h-10')).toBe(true);
-		expect(trigger.classList.contains('sm:data-[size=default]:h-9')).toBe(true);
+		expect([...trigger.classList].some(c => c.startsWith('sm:data-[size=default]:h-'))).toBe(false);
 		const split = container.querySelector('button[aria-label="Split cost across vehicles"]');
 		expect(split?.classList.contains('size-10')).toBe(true);
-		expect(split?.classList.contains('sm:size-9')).toBe(true);
+		expect([...(split?.classList ?? [])].some(c => c.startsWith('sm:size-'))).toBe(false);
 	});
 });

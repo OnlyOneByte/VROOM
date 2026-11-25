@@ -10,39 +10,47 @@ function source(rel: string): string {
 	return readFileSync(join(COMPONENTS, rel), 'utf8');
 }
 
-describe('form controls meet the 40px tap target on mobile', () => {
-	test('Input is 40px below sm and 36px from sm up', () => {
+describe('form fields are the 46px C3 field at every width', () => {
+	test('Input is 46px tall and never shrinks from sm up', () => {
 		const input = source('ui/input/input.svelte');
-		expect(input.match(/\bh-10 w-full sm:h-9\b/g)).toHaveLength(2);
-		expect(input).not.toMatch(/flex h-9 w-full/);
+		expect(input.match(/\bh-11\.5 w-full\b/g)).toHaveLength(2);
+		expect(input).not.toMatch(/\bsm:h-\d/);
 	});
 
-	test('Select trigger is 40px below sm and 36px from sm up', () => {
+	test('Select trigger matches the 46px Input', () => {
 		const trigger = source('ui/select/select-trigger.svelte');
-		expect(trigger).toContain('data-[size=default]:h-10 sm:data-[size=default]:h-9');
+		expect(trigger).toContain('data-[size=default]:h-11.5');
+		expect(trigger).not.toMatch(/sm:data-\[size=default\]:h-/);
 	});
 
-	test('DateRangePicker trigger is 40px below sm and 36px from sm up', () => {
-		expect(source('common/date-range-picker.svelte')).toContain(
-			"'h-10 w-full justify-start text-left font-normal sm:h-9'"
-		);
-	});
+	test.each(['common/date-picker.svelte', 'common/date-range-picker.svelte'])(
+		'%s trigger matches the 46px Input and truncates a long date inside its field',
+		file => {
+			const picker = source(file);
+			expect(picker).toMatch(/\bh-11\.5 w-full min-w-0 justify-start\b/);
+			expect(picker).not.toMatch(/\bsm:h-\d/);
+			expect(picker).toMatch(/<span[^>]*class=[^>]*min-w-0 truncate/);
+		}
+	);
 
 	test('compact expense list sort buttons match the category select, 8px apart', () => {
 		const list = source('expenses/expenses-table/ExpensesCompactList.svelte');
 		expect(list.match(/class="h-10 px-2 text-xs sm:h-9"/g)).toHaveLength(2);
 		expect(list).toContain('<div class="ml-auto flex items-center gap-2">');
+		expect(source('expenses/expenses-table/ExpenseCategoryFilter.svelte')).toContain(
+			'data-[size=default]:h-10 sm:data-[size=default]:h-9'
+		);
+	});
+
+	test('the calendar link Copy button matches the 46px link field beside it', () => {
+		expect(source('settings/cards/CalendarFeedCard.svelte')).toMatch(
+			/<Button variant="outline" class="h-11\.5 shrink-0"/
+		);
 	});
 
 	test('the compact category filter carries no height that the select overrides', () => {
 		const filter = source('expenses/expenses-table/ExpenseCategoryFilter.svelte');
 		expect(filter).not.toMatch(/'h-8 px-2 border-none[^']*text-xs'/);
-	});
-
-	test('DatePicker trigger is 40px below sm and 36px from sm up', () => {
-		expect(source('common/date-picker.svelte')).toContain(
-			"'h-10 w-full justify-start text-left font-normal sm:h-9'"
-		);
 	});
 });
 

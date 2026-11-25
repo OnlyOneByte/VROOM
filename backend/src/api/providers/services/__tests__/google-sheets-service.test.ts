@@ -23,7 +23,7 @@ beforeEach(async () => {
 });
 
 async function seedVehicle(make = 'Toyota', model = 'Camry', year = 2020): Promise<void> {
-  const { db } = await import('../../../../db/connection');
+  const db = (await import('../../../../db/connection')).getDb();
   const schema = await import('../../../../db/schema');
   await db.insert(schema.vehicles).values({ userId: ctx.user.id, make, model, year });
 }
@@ -102,7 +102,7 @@ describe('GoogleSheetsService.createOrUpdateVroomSpreadsheet', () => {
   });
 
   test('only the owner’s data is written (user-scoping)', async () => {
-    const { db } = await import('../../../../db/connection');
+    const db = (await import('../../../../db/connection')).getDb();
     const schema = await import('../../../../db/schema');
     await db
       .insert(schema.users)
@@ -121,7 +121,7 @@ describe('GoogleSheetsService.createOrUpdateVroomSpreadsheet', () => {
   });
 
   test('a vehicle shared with the user stays out of their export', async () => {
-    const { db } = await import('../../../../db/connection');
+    const db = (await import('../../../../db/connection')).getDb();
     const schema = await import('../../../../db/schema');
     await db
       .insert(schema.users)
@@ -172,7 +172,7 @@ describe('GoogleSheetsService.readSpreadsheetData', () => {
   });
 
   test('a vehicle kind survives the Sheets export→read round-trip', async () => {
-    const { db } = await import('../../../../db/connection');
+    const db = (await import('../../../../db/connection')).getDb();
     const schema = await import('../../../../db/schema');
     await db.insert(schema.vehicles).values({
       userId: ctx.user.id,
@@ -196,7 +196,7 @@ describe('GoogleSheetsService.readSpreadsheetData', () => {
 
   test('a non-default themePreference survives the Sheets export→read round-trip', async () => {
     await seedVehicle('Honda', 'Civic', 2019);
-    const { db } = await import('../../../../db/connection');
+    const db = (await import('../../../../db/connection')).getDb();
     const schema = await import('../../../../db/schema');
     await db.insert(schema.userPreferences).values({
       userId: ctx.user.id,
@@ -224,7 +224,7 @@ describe('GoogleSheetsService.readSpreadsheetData', () => {
   });
 
   test('a trip (with a non-midnight tripDate) survives the Sheets export→read round-trip', async () => {
-    const { db } = await import('../../../../db/connection');
+    const db = (await import('../../../../db/connection')).getDb();
     const schema = await import('../../../../db/schema');
     const [veh] = await db
       .insert(schema.vehicles)
@@ -337,7 +337,7 @@ describe('GoogleSheetsService — atomic backup swap', () => {
     expect(before.vehicles).toHaveLength(1);
     expect(before.vehicles[0].make).toBe('Toyota');
 
-    const { db } = await import('../../../../db/connection');
+    const db = (await import('../../../../db/connection')).getDb();
     const schema = await import('../../../../db/schema');
     await db.insert(schema.vehicles).values({
       userId: ctx.user.id,
@@ -369,7 +369,7 @@ describe('GoogleSheetsService — atomic backup swap', () => {
     );
     const firstTitles = (await svc.getSpreadsheetInfo(info.id)).sheets.map((s) => s.title);
 
-    const { db } = await import('../../../../db/connection');
+    const db = (await import('../../../../db/connection')).getDb();
     const schema = await import('../../../../db/schema');
     await db.insert(schema.vehicles).values({
       userId: ctx.user.id,
@@ -391,7 +391,7 @@ describe('GoogleSheetsService — atomic backup swap', () => {
 
 describe('GoogleSheetsService.readSpreadsheetData — restore integrity', () => {
   async function seedPolicyWithText(values: Record<string, string>): Promise<void> {
-    const { db } = await import('../../../../db/connection');
+    const db = (await import('../../../../db/connection')).getDb();
     const schema = await import('../../../../db/schema');
     const [vehicle] = await db
       .insert(schema.vehicles)

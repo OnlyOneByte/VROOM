@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import {
   createTestApp,
   type DataEnvelope,
@@ -7,7 +8,6 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee } from '../../../test-helpers/invitee';
-import { pushSubscriptionRepository } from '../repository';
 
 let ctx: TestApp;
 let asB: RequestFn;
@@ -38,7 +38,7 @@ describe('POST /api/v1/push/subscribe', () => {
     expect(raw.includes(SUB.keys.p256dh)).toBe(false);
     expect(raw.includes(SUB.keys.auth)).toBe(false);
 
-    const stored = await pushSubscriptionRepository.findByUser(ctx.user.id);
+    const stored = await repos().pushSubscriptions.findByUser(ctx.user.id);
     expect(stored).toHaveLength(1);
     expect(stored[0].endpoint).toBe(SUB.endpoint);
     expect(stored[0].p256dh).toBe(SUB.keys.p256dh);
@@ -50,7 +50,7 @@ describe('POST /api/v1/push/subscribe', () => {
       ...SUB,
       keys: { p256dh: 'BProtated', auth: 'authRotated' },
     });
-    const stored = await pushSubscriptionRepository.findByUser(ctx.user.id);
+    const stored = await repos().pushSubscriptions.findByUser(ctx.user.id);
     expect(stored).toHaveLength(1);
     expect(stored[0].p256dh).toBe('BProtated');
   });
@@ -74,7 +74,7 @@ describe('DELETE /api/v1/push/subscribe', () => {
     expect(res.status).toBe(200);
     const body = await json<DataEnvelope<{ removed: boolean }>>(res);
     expect(body.data.removed).toBe(true);
-    expect(await pushSubscriptionRepository.findByUser(ctx.user.id)).toHaveLength(0);
+    expect(await repos().pushSubscriptions.findByUser(ctx.user.id)).toHaveLength(0);
 
     const again = await ctx.authed('DELETE', '/api/v1/push/subscribe', { endpoint: SUB.endpoint });
     expect(again.status).toBe(200);
@@ -87,18 +87,18 @@ describe('DELETE /api/v1/push/subscribe', () => {
     const res = await asB('DELETE', '/api/v1/push/subscribe', { endpoint: SUB.endpoint });
     expect(res.status).toBe(200);
     expect((await json<DataEnvelope<{ removed: boolean }>>(res)).data.removed).toBe(false);
-    expect(await pushSubscriptionRepository.findByUser(ctx.user.id)).toHaveLength(1);
+    expect(await repos().pushSubscriptions.findByUser(ctx.user.id)).toHaveLength(1);
   });
 
   test('the same endpoint is per-user — A and B each own their own row', async () => {
     await ctx.authed('POST', '/api/v1/push/subscribe', SUB);
     await asB('POST', '/api/v1/push/subscribe', SUB);
 
-    expect(await pushSubscriptionRepository.findByUser(ctx.user.id)).toHaveLength(1);
-    expect(await pushSubscriptionRepository.findByUser(bId)).toHaveLength(1);
+    expect(await repos().pushSubscriptions.findByUser(ctx.user.id)).toHaveLength(1);
+    expect(await repos().pushSubscriptions.findByUser(bId)).toHaveLength(1);
 
     await ctx.authed('DELETE', '/api/v1/push/subscribe', { endpoint: SUB.endpoint });
-    expect(await pushSubscriptionRepository.findByUser(ctx.user.id)).toHaveLength(0);
-    expect(await pushSubscriptionRepository.findByUser(bId)).toHaveLength(1);
+    expect(await repos().pushSubscriptions.findByUser(ctx.user.id)).toHaveLength(0);
+    expect(await repos().pushSubscriptions.findByUser(bId)).toHaveLength(1);
   });
 });

@@ -111,6 +111,26 @@ describe('restoring car-share drivers', () => {
     ]);
   });
 
+  test('a driver colour outside the chart palette is dropped', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+    const crafted = await editCsv(
+      await backupService.exportAsZip(ctx.user.id),
+      'vehicle_drivers.csv',
+      () => [
+        { id: 'd-ok', vehicleId, userId: '', name: 'Riley', color: 'chart-2' },
+        { id: 'd-bad', vehicleId, userId: '', name: 'Sam', color: 'red;background:url(x)' },
+      ]
+    );
+    const result = await restoreService.restoreFromBackup(ctx.user.id, crafted, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(ctx.sqlite.query('SELECT id, color FROM vehicle_drivers ORDER BY id').all()).toEqual([
+      { id: 'd-bad', color: null },
+      { id: 'd-ok', color: 'chart-2' },
+    ]);
+  });
+
   test.each([
     ['odometer_entries.csv', 'driverId'],
     ['expenses.csv', 'paidByDriverId'],

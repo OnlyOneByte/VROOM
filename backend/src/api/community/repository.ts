@@ -1,7 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq, getTableColumns, gte, inArray, lte, min, or } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import {
   type CommunityStat,
   communityNoiseKeys,
@@ -314,5 +313,3 @@ export class CommunityStatsRepository {
     });
   }
 }
-
-export const communityStatsRepository = new CommunityStatsRepository(getDb());
