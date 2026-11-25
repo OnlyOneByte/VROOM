@@ -72,7 +72,7 @@
 		<Button
 			variant="outline"
 			size="icon-lg"
-			class="shrink-0 sm:size-9"
+			class="shrink-0"
 			onclick={() => goto(resolve(routes.vehicles))}
 			aria-label="Back to garage"
 		>
