@@ -265,8 +265,13 @@ describe('the root layout paints the app shell without waiting on /auth/me', () 
 		render(Layout, { children: pageContent });
 
 		await waitFor(() => expect(authStore.user?.pendingApproval).toBe(true));
+		if (showsPage) {
+			expect(screen.getByText('Page content')).toBeInTheDocument();
+		} else {
+			expect(await screen.findByTestId('account-pending')).toBeInTheDocument();
+			expect(screen.queryByText('Page content')).toBeNull();
+		}
 		expect(screen.queryByRole('link', { name: 'Skip to content' })).toBeNull();
-		expect(screen.queryByText('Page content') !== null).toBe(showsPage);
 		expect(screen.queryByTestId('account-pending') !== null).toBe(!showsPage);
 		expect(mockFetch.mock.calls.map(([url]) => String(url))).not.toContainEqual(
 			expect.stringContaining('/settings')
