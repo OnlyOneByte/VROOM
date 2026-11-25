@@ -18,10 +18,14 @@
 	import RecurringCostCard from '#lib/components/dashboard/RecurringCostCard.svelte';
 	import SharedWithMeCard from '#lib/components/dashboard/SharedWithMeCard.svelte';
 	import {
+		loadPeriodSpend,
+		sharedSummaries,
+		type PeriodData
+	} from '#lib/components/dashboard/period-spend.ts';
+	import {
 		attentionItems,
 		combinePeriodSpend,
 		highestMonth,
-		periodStartSeconds,
 		PERIOD_PHRASES,
 		RUNNING_CATEGORIES,
 		type VehicleRow
@@ -67,11 +71,6 @@
 
 	const chartModules = import('#lib/components/charts/index.ts');
 	chartModules.catch(() => undefined);
-
-	interface PeriodData {
-		summaries: ExpenseSummary[];
-		perDistance: AnalyticsQueryResponse | null;
-	}
 
 	let isLoading = $state(true);
 	let isUpdatingPeriod = $state(false);
@@ -217,34 +216,6 @@
 		return Math.floor(new Date(now.getFullYear(), now.getMonth() - months, 1).getTime() / 1000);
 	}
 
-	function sharedSummaries(selected: TimePeriod, shared: Vehicle[]): Promise<ExpenseSummary[]> {
-		return Promise.all(
-			shared.map(v =>
-				expenseApi.getExpenseSummary({ vehicleId: v.id, period: selected }).catch(() => null)
-			)
-		).then(rows => rows.filter((row): row is ExpenseSummary => row !== null));
-	}
-
-	async function loadPeriod(selected: TimePeriod, shared: Vehicle[]): Promise<PeriodData> {
-		const nowSec = Math.floor(Date.now() / 1000);
-		const [owned, perDistance, sharedRows] = await Promise.all([
-			expenseApi.getExpenseSummary({ period: selected }),
-			analyticsApi
-				.query({
-					metric: 'costPerDistance',
-					interval: 'none',
-					groupBy: 'vehicle',
-					include: 'all',
-					categories: RUNNING_CATEGORIES,
-					start: periodStartSeconds(selected, Date.now()),
-					end: nowSec
-				})
-				.catch(() => null),
-			sharedSummaries(selected, shared)
-		]);
-		return { summaries: [owned, ...sharedRows], perDistance };
-	}
-
 	async function fetchInvitations(): Promise<{ list: ReceivedShare[]; error: string | null }> {
 		try {
 			return { list: await shareApi.listReceived(), error: null };
@@ -290,7 +261,7 @@
 				reminderApi.getRecurringCost().catch(() => ({ count: 0, monthlyTotal: 0 })),
 				insuranceApi.getAllPolicies().catch(() => [] as InsurancePolicy[]),
 				fetchInvitations(),
-				loadPeriod(selected, []),
+				loadPeriodSpend(selected, []),
 				analyticsApi
 					.query({
 						metric: 'cost',
@@ -353,7 +324,7 @@
 		isUpdatingPeriod = true;
 		const isCurrent = nextPeriodRequest();
 		try {
-			const data = await loadPeriod(next, sharedVehicles);
+			const data = await loadPeriodSpend(next, sharedVehicles);
 			if (isCurrent()) {
 				periodData = data;
 				shownPeriod = next;

@@ -59,7 +59,7 @@
 
 	const home = { name: 'Home', href: routes.dashboard, icon: House } as const;
 	const log = { name: 'Log', href: routes.expenses, icon: List } as const;
-	const garage = { name: 'Garage', href: '/vehicles', icon: Car } as const;
+	const garage = { name: 'Garage', href: routes.vehicles, icon: Car } as const;
 	const explore = { name: 'Explore', href: routes.analytics, icon: ChartColumn } as const;
 	const reminders = { name: 'Reminders', href: routes.reminders, icon: Bell } as const;
 	const primary = [home, log, garage, explore, reminders] as const;

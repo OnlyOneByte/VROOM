@@ -151,6 +151,7 @@ describe('More opens a focus-trapping layer that Escape closes', () => {
 
 			await fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
 			await waitFor(() => expect(screen.queryByRole('dialog', { name: 'More' })).toBeNull());
+			await waitFor(() => expect(document.activeElement).toBe(trigger));
 		});
 	});
 

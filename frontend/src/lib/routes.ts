@@ -13,6 +13,7 @@ export const routes = {
 	trips: '/trips',
 	privacyPolicy: '/privacypolicy',
 	termsOfService: '/termsofservice',
+	vehicles: '/vehicles',
 	vehicleNew: '/vehicles/new',
 	reminders: '/reminders',
 	assistant: '/assistant'
