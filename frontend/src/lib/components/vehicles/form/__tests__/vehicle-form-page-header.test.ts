@@ -22,12 +22,12 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 
 const VehicleForm = (await import('../VehicleForm.svelte')).default;
 
-function expectSharedPageTitle(name: string): HTMLElement {
+function expectSharedPageTitle(name: string, backLabel: string): HTMLElement {
 	const headings = screen.getAllByRole('heading', { level: 1 });
 	expect(headings).toHaveLength(1);
 	expect(headings[0]).toHaveTextContent(name);
-	expect(headings[0]).toHaveClass('text-3xl', 'font-bold', 'tracking-tight', 'break-words');
-	const back = screen.getByRole('button', { name: 'Go back' });
+	expect(headings[0]).toHaveClass('uppercase', 'font-bold', 'break-words');
+	const back = screen.getByRole('button', { name: backLabel });
 	expect(
 		back.compareDocumentPosition(headings[0]!) & Node.DOCUMENT_POSITION_FOLLOWING
 	).toBeTruthy();
@@ -37,12 +37,10 @@ function expectSharedPageTitle(name: string): HTMLElement {
 describe('VehicleForm page title', () => {
 	test('create mode renders the one PageHeader title with its description and a back button', async () => {
 		render(VehicleForm, { props: {} });
-		await screen.findByRole('heading', { name: 'Add Vehicle' });
+		await screen.findByRole('heading', { name: 'Add a vehicle' });
 
-		expectSharedPageTitle('Add Vehicle');
-		expect(
-			screen.getByText('Enter your vehicle information and optional financing details')
-		).toBeTruthy();
+		expectSharedPageTitle('Add a vehicle', 'Back to garage');
+		expect(screen.getByText('You can change any of this later.')).toBeTruthy();
 	});
 
 	test('edit mode shows a form-shaped skeleton under the title while the vehicle loads', async () => {
@@ -50,24 +48,23 @@ describe('VehicleForm page title', () => {
 		const { container } = render(VehicleForm, { props: { vehicleId: 'veh-1' } });
 
 		const loading = await screen.findByRole('status', { name: 'Loading vehicle' });
-		expectSharedPageTitle('Edit Vehicle');
+		expectSharedPageTitle('Edit vehicle', 'Back to the vehicle');
 		expect(loading).toHaveTextContent('Loading vehicle');
 		expect(loading.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThanOrEqual(10);
 		expect(container.querySelector('.animate-spin')).toBeNull();
 
 		const actions = screen.getByTestId('vehicle-form-loading-actions');
 		expect(actions).toHaveAttribute('aria-hidden', 'true');
-		expect(actions).toHaveClass('fixed', 'bottom-4', 'sm:bottom-8');
-		expect(actions.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(3);
+		expect(actions.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(2);
 	});
 
-	test('the save bar is fixed below lg and a normal row from lg or on a short viewport, with a plain primary Save button', async () => {
+	test('Cancel and Save vehicle sit in a plain row at the end of the form, not a floating bar', async () => {
 		render(VehicleForm, { props: {} });
-		const save = await screen.findByRole('button', { name: 'Add Vehicle' });
+		const save = await screen.findByRole('button', { name: 'Save vehicle' });
+		const cancel = screen.getByRole('button', { name: 'Cancel' });
 
-		expect(save.closest('.fixed')).toHaveClass('lg:static', 'short:static');
-		expect(save).toHaveClass('shadow-sm', 'transition-colors');
-		expect(save.className).not.toMatch(/shadow-2xl|bg-foreground|hover:scale/);
+		expect(save.closest('.fixed')).toBeNull();
+		expect(save.parentElement).toBe(cancel.parentElement);
 	});
 
 	test('edit mode names the vehicle under the title', async () => {
@@ -84,9 +81,9 @@ describe('VehicleForm page title', () => {
 			updatedAt: '2024-01-01T00:00:00.000Z'
 		});
 		render(VehicleForm, { props: { vehicleId: 'veh-1' } });
-		await screen.findByRole('button', { name: /update vehicle/i });
+		await screen.findByRole('button', { name: /save changes/i });
 
-		expectSharedPageTitle('Edit Vehicle');
+		expectSharedPageTitle('Edit vehicle', 'Back to the vehicle');
 		expect(screen.getByText('Weekend Car')).toBeTruthy();
 	});
 });

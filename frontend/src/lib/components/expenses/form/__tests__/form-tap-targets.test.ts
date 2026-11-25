@@ -55,9 +55,9 @@ describe('expense and vehicle form controls meet the 40px tap target on mobile',
 		);
 	});
 
-	test('the unit preferences toggle is 40px below sm and 36px from sm up', () => {
+	test('the units Change button is 40px tall at every width', () => {
 		expect(source('vehicles/form/VehicleForm.svelte')).toMatch(
-			/<Collapsible\.Trigger\s+class="[^"]*\bsize-10 shrink-0 sm:size-9"/
+			/<Collapsible\.Trigger\s+class="h-10 shrink-0 rounded-full\b/
 		);
 	});
 });
