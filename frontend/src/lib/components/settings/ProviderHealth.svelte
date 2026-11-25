@@ -98,7 +98,7 @@
 {#snippet testButton()}
 	<Button
 		variant="outline"
-		class="h-10 min-w-36 text-foreground sm:h-9"
+		class="h-10 min-w-36 text-foreground"
 		data-test-connection
 		aria-disabled={isTesting}
 		aria-label="Test Connection to {provider.displayName}"

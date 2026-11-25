@@ -419,7 +419,7 @@
 					</p>
 					<Button
 						variant="outline"
-						class="h-10 shrink-0 sm:h-9"
+						class="h-10 shrink-0"
 						onclick={() => (orphanConfirmOpen = true)}
 					>
 						{orphanCount === 1 ? 'Remove it' : 'Remove them'}

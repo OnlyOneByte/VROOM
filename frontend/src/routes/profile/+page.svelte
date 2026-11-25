@@ -241,7 +241,7 @@
 								<Input
 									bind:value={nameDraft}
 									maxlength={100}
-									class="h-10 max-w-[200px] sm:h-8"
+									class="max-w-[200px]"
 									disabled={isSavingName}
 									aria-label="Display name"
 									onkeydown={(e: KeyboardEvent) => {
@@ -387,7 +387,7 @@
 									<Button
 										variant="outline"
 										size="sm"
-										class="h-10 w-full justify-start sm:h-8"
+										class="h-10 w-full justify-start"
 										disabled={linkingProvider !== null}
 										onclick={() => handleLink(provider.id)}
 									>

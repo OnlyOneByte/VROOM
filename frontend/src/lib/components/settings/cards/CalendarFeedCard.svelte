@@ -204,7 +204,7 @@
 					</Button>
 					<Button
 						variant="outline"
-						class="h-10 text-destructive sm:h-9"
+						class="h-10 text-destructive"
 						onclick={() => (confirmOff = true)}
 						disabled={busy}
 						data-testid="calendar-off"

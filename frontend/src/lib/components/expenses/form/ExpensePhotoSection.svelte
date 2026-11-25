@@ -100,7 +100,7 @@
 			bind:ref={uploadButton}
 			variant="outline"
 			size="sm"
-			class="h-10 text-xs sm:h-7"
+			class="h-10 text-xs"
 			onclick={openUploadDialog}
 		>
 			<Upload class="mr-1 h-3 w-3" />

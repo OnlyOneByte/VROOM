@@ -99,7 +99,7 @@
 					type="button"
 					variant={splitMethod === m.value ? 'default' : 'ghost'}
 					size="sm"
-					class="h-10 flex-1 rounded-md text-xs sm:h-8 {splitMethod === m.value
+					class="h-10 flex-1 rounded-md text-xs {splitMethod === m.value
 						? ''
 						: 'text-muted-foreground'}"
 					onclick={() => onMethodChange(m.value)}
@@ -134,7 +134,7 @@
 								const target = e.currentTarget as HTMLInputElement;
 								updateAllocation(vehicle.id, 'amount', parseFloat(target.value) || 0);
 							}}
-							class="h-10 text-sm sm:h-8 {absoluteError ? 'border-destructive' : ''}"
+							class="text-sm {absoluteError ? 'border-destructive' : ''}"
 							aria-label="Amount for {vehicleLabel(vehicle)}"
 						/>
 					</div>
@@ -151,7 +151,7 @@
 								const target = e.currentTarget as HTMLInputElement;
 								updateAllocation(vehicle.id, 'percentage', parseFloat(target.value) || 0);
 							}}
-							class="h-10 text-sm sm:h-8 {percentageError ? 'border-destructive' : ''}"
+							class="text-sm {percentageError ? 'border-destructive' : ''}"
 							aria-label="Percentage for {vehicleLabel(vehicle)}"
 						/>
 						<span class="text-xs text-muted-foreground">%</span>

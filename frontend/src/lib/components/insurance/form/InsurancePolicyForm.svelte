@@ -591,8 +591,8 @@
 						disabled={isDeleting || isSubmitting}
 						class="rounded-full text-destructive"
 					>
-						<Trash2 class="size-4" />
-						Delete
+						<Trash2 class="size-4" aria-hidden="true" />
+						<span class="max-sm:sr-only">Delete</span>
 					</Button>
 				{/if}
 				<div class="ml-auto flex items-center gap-3">
