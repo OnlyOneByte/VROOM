@@ -1,0 +1,87 @@
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import type { Expense } from '#lib/types/index.ts';
+
+const appStore = vi.hoisted(() => ({ addNotification: vi.fn(), dismissToast: vi.fn() }));
+vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore }));
+vi.mock('#lib/services/expense-api.ts', () => ({ expenseApi: { updateExpense: vi.fn() } }));
+
+import { expenseApi } from '#lib/services/expense-api.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
+import {
+	editFailureStates,
+	editedRows,
+	resetPendingEdits,
+	retryEdit,
+	scheduleEdit,
+	shownExpense
+} from '../pending-edits.svelte.ts';
+
+const saved = {
+	id: 'e1',
+	vehicleId: 'v1',
+	tags: [],
+	category: 'fuel',
+	amount: 40,
+	date: '2026-11-20T12:00:00.000Z',
+	description: 'Arco',
+	updatedAt: '2026-11-20T12:00:00.000Z'
+} as unknown as Expense;
+const changed = { ...saved, amount: 55, description: 'Shell' };
+const payload = { vehicleId: 'v1', category: 'fuel', amount: 55 } as never;
+
+function deferred() {
+	let resolve: (value: Expense) => void = () => {};
+	let reject: (reason: unknown) => void = () => {};
+	const promise = new Promise<Expense>((res, rej) => ((resolve = res), (reject = rej)));
+	return { promise, resolve, reject };
+}
+
+describe('editing an expense updates the row while the PUT runs', () => {
+	beforeEach(() => vi.clearAllMocks());
+	afterEach(() => resetPendingEdits());
+
+	test('the row shows the new values at once, before the PUT answers', () => {
+		const put = deferred();
+		vi.mocked(expenseApi.updateExpense).mockReturnValue(put.promise);
+
+		scheduleEdit(saved, changed, payload);
+
+		expect(expenseApi.updateExpense).toHaveBeenCalledWith('e1', payload);
+		expect(shownExpense(saved)).toMatchObject({ amount: 55, description: 'Shell' });
+		expect(editedRows([saved])).toEqual({ before: [saved], after: [changed] });
+		expect(appStore.addNotification).not.toHaveBeenCalled();
+	});
+
+	test('a list refreshed after the save shows the server copy, not the overlay', async () => {
+		vi.mocked(expenseApi.updateExpense).mockResolvedValue(changed);
+		scheduleEdit(saved, changed, payload);
+		await Promise.resolve();
+
+		const fresh = { ...saved, amount: 60, updatedAt: '2026-11-25T09:00:00.000Z' };
+		expect(shownExpense(fresh)).toBe(fresh);
+		expect(shownExpense(saved)).toMatchObject({ amount: 55 });
+	});
+
+	test('a failed PUT reverts the row, keeps its reason, and offers Retry once', async () => {
+		vi.mocked(expenseApi.updateExpense).mockRejectedValueOnce(new ApiError('SQLITE_BUSY', 500));
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(appStore.addNotification).toHaveBeenCalledTimes(1));
+
+		expect(shownExpense(saved)).toBe(saved);
+		expect(editedRows([saved])).toEqual({ before: [], after: [] });
+		const [[id, state] = []] = editFailureStates([saved]);
+		expect(id).toBe('e1');
+		expect(state).toMatchObject({ status: 'failed', kind: 'edit' });
+		expect(state?.error).not.toContain('SQLITE_BUSY');
+		const [notice] = appStore.addNotification.mock.calls[0] as [Record<string, unknown>];
+		expect(notice['type']).toBe('error');
+		expect((notice['action'] as { label: string }).label).toBe('Retry');
+
+		vi.mocked(expenseApi.updateExpense).mockResolvedValueOnce(changed);
+		retryEdit('e1');
+		expect(appStore.dismissToast).toHaveBeenCalledWith('expense-edit-e1');
+		expect(shownExpense(saved)).toMatchObject({ amount: 55 });
+		await vi.waitFor(() => expect(editFailureStates([saved])).toEqual([]));
+		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2);
+	});
+});

@@ -86,6 +86,7 @@ const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
 const { loadOfflineExpenses } = await import('#lib/utils/offline-storage.ts');
 const { isDeleteHidden, resetPendingDeletes } =
 	await import('#lib/utils/pending-deletes.svelte.ts');
+const { resetPendingEdits } = await import('#lib/utils/pending-edits.svelte.ts');
 const queued = () => loadOfflineExpenses();
 const { FUEL_NEEDS_VEHICLE_MESSAGE } = await import('../expense-form/expense-form-state.svelte.ts');
 
@@ -663,24 +664,7 @@ describe('ExpenseForm edit mode', () => {
 		expect(notificationMessages()).toContain('Expense updated successfully');
 	});
 
-	test('a rejected update shows the server message on the form and stays put', async () => {
-		updateExpense.mockRejectedValue(new ApiError('Amount exceeds the allowed maximum', 400));
-		await renderEdit();
-
-		await save();
-
-		await vi.waitFor(() =>
-			expect(document.querySelector('[data-testid="submit-error"]')?.textContent?.trim()).toBe(
-				"Couldn't save this expense. Amount exceeds the allowed maximum."
-			)
-		);
-		expect(goto).not.toHaveBeenCalled();
-		expect(screen.getByRole('button', { name: /update expense/i }).hasAttribute('disabled')).toBe(
-			false
-		);
-	});
-
-	test('an out-of-order update refusal lands on the Mileage field and focuses it', async () => {
+	test('saving returns at once, and a refused update is reported once with its reason and Retry', async () => {
 		updateExpense.mockRejectedValue(
 			new ApiError('Mileage must be less than 30,500 (from later entry)', 400)
 		);
@@ -688,13 +672,14 @@ describe('ExpenseForm edit mode', () => {
 
 		await save();
 
-		const mileage = field('mileage');
-		await vi.waitFor(() => expect(document.activeElement).toBe(mileage));
-		expect(mileage).toHaveAttribute('aria-invalid', 'true');
-		expect(errorText('mileage')).toBe('Mileage must be less than 30,500 (from later entry).');
-		expect(document.getElementById('mileage-error')).toHaveAttribute('role', 'alert');
-		expect(document.querySelector('[data-testid="submit-error"]')).toBeNull();
-		expect(goto).not.toHaveBeenCalled();
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/expenses'));
+		await vi.waitFor(() =>
+			expect(notificationMessages()).toContain("Your changes to the expense weren't saved")
+		);
+		const refusal = appStore.notifications.find(n => n.type === 'error');
+		expect(refusal?.description).toBe('Mileage must be less than 30,500 (from later entry).');
+		expect(refusal?.action?.label).toBe('Retry');
+		resetPendingEdits();
 	});
 
 	test('validation guards updates too', async () => {

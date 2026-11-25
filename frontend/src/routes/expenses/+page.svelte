@@ -63,6 +63,7 @@
 	} from '#lib/utils/sync/pending-rows.ts';
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
+	import { editedRows } from '#lib/utils/pending-edits.svelte.ts';
 	import ExpenseOverviewSection from '#lib/components/expenses/ExpenseOverviewSection.svelte';
 	import ImportExpensesDialog from '#lib/components/expenses/ImportExpensesDialog.svelte';
 	import ImportFromPhotosDialog from '#lib/components/expenses/ImportFromPhotosDialog.svelte';
@@ -137,14 +138,18 @@
 	let pendingMatching = $derived(pending.rows.filter(row => matchesFilters(row, pendingFilters)));
 	let pendingListRows = $derived(currentOffset === 0 ? pendingMatching : []);
 	let deletingRows = $derived(expenses.filter(isDeleteHidden));
-	let shownSummary = $derived(
-		withPendingInSummary(
-			withPendingInSummary(summary, pending.saving),
-			deletingRows,
-			Date.now(),
+	let edited = $derived(editedRows(expenses.filter(expense => !isDeleteHidden(expense))));
+	let shownSummary = $derived.by(() => {
+		const now = Date.now();
+		const withQueued = withPendingInSummary(summary, pending.saving, now);
+		const withoutRemoved = withPendingInSummary(
+			withQueued,
+			[...deletingRows, ...edited.before],
+			now,
 			-1
-		)
-	);
+		);
+		return withPendingInSummary(withoutRemoved, edited.after, now);
+	});
 	const statCards = $derived([
 		{
 			label: EXPENSE_MESSAGES.TOTAL_EXPENSES,
@@ -524,16 +529,14 @@
 	}
 
 	let vehicleById = $derived(new Map(vehicles.map(v => [v.id, v])));
-	let shownMonthTotals = $derived(
-		withPendingByMonth(
-			withPendingByMonth(
-				monthTotals,
-				pending.saving.filter(row => matchesFilters(row, pendingFilters))
-			),
-			deletingRows,
-			-1
-		)
-	);
+	let shownMonthTotals = $derived.by(() => {
+		const withQueued = withPendingByMonth(
+			monthTotals,
+			pending.saving.filter(row => matchesFilters(row, pendingFilters))
+		);
+		const withoutRemoved = withPendingByMonth(withQueued, [...deletingRows, ...edited.before], -1);
+		return withPendingByMonth(withoutRemoved, edited.after);
+	});
 	let displayExpenses = $derived<ExpenseWithVehicle[]>(
 		[...pendingListRows, ...expenses].map(expense => ({
 			...expense,

@@ -12,7 +12,9 @@ const { expenseApiMock } = vi.hoisted(() => ({
 
 vi.mock('#lib/services/expense-api.ts', () => ({ expenseApi: expenseApiMock }));
 vi.mock('#lib/services/vehicle-api.ts', () => ({ vehicleApi: {} }));
-vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore: { addNotification: vi.fn() } }));
+vi.mock('#lib/stores/app.svelte.ts', () => ({
+	appStore: { addNotification: vi.fn(), dismissToast: vi.fn() }
+}));
 vi.mock('#lib/utils/navigation.ts', () => ({ gotoDynamic: vi.fn(() => Promise.resolve()) }));
 
 const { ExpenseFormState } = await import('../expense-form-state.svelte');

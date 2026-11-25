@@ -4,7 +4,7 @@ import { toDateInputValue } from '#lib/utils/formatters.ts';
 
 export interface PendingRowState {
 	status: 'saving' | 'failed';
-	kind?: 'delete';
+	kind?: 'delete' | 'edit';
 	error?: string;
 	editable?: boolean;
 	reachedServer?: boolean;
@@ -126,6 +126,31 @@ export function withoutRowsInBreakdowns(
 		categoryBreakdown: summary.categoryBreakdown
 			.map(item => less(item, byCategory.get(item.category)))
 			.filter(item => item.count > 0)
+	};
+}
+
+export function withRowsInBreakdowns(
+	summary: ExpenseSummary | null,
+	rows: readonly Expense[]
+): ExpenseSummary | null {
+	if (!summary || rows.length === 0) return summary;
+	const byMonth = totalsBy(rows, row => monthKey(row.date));
+	const byCategory = totalsBy(rows, row => row.category);
+	const more = <T extends { amount: number; count: number }>(
+		item: T,
+		added = { amount: 0, count: 0 }
+	) => ({ ...item, amount: item.amount + added.amount, count: item.count + added.count });
+	const listed = new Set(summary.categoryBreakdown.map(item => item.category));
+	const newCategories = [...byCategory]
+		.filter(([category]) => !listed.has(category))
+		.map(([category, totals]) => ({ category, ...totals }));
+	return {
+		...summary,
+		monthlyTrend: summary.monthlyTrend.map(item => more(item, byMonth.get(item.period))),
+		categoryBreakdown: [
+			...summary.categoryBreakdown.map(item => more(item, byCategory.get(item.category))),
+			...newCategories
+		]
 	};
 }
 
