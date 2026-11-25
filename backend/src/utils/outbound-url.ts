@@ -414,7 +414,7 @@ export async function fetchOutbound(
   raw: string,
   init: RequestInit & { headers?: Record<string, string> },
   label: string,
-  policy: PrivateEndpointPolicy = privateEndpointPolicy()
+  policy: PrivateEndpointPolicy
 ): Promise<Response> {
   const { url, addresses } = await resolveSafeOutboundTarget(raw, label, policy);
   if (literalAddress(url.hostname)) return fetch(url, { ...init, redirect: 'manual' });
