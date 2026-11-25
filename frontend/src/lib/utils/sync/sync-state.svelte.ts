@@ -111,3 +111,14 @@ export const sheetsSyncEnabled = {
 		_sheetsSyncEnabled = value;
 	}
 };
+
+let _providerNeedsAttention = $state(false);
+
+export const providerNeedsAttention = {
+	get current() {
+		return _providerNeedsAttention;
+	},
+	set current(value: boolean) {
+		_providerNeedsAttention = value;
+	}
+};

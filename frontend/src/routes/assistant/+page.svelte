@@ -11,6 +11,7 @@
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import { providerApi } from '#lib/services/provider-api.ts';
+	import { settingsApi } from '#lib/services/settings-api.ts';
 	import { assistantApi, type AssistantTurn } from '#lib/services/assistant-api.ts';
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
@@ -27,6 +28,7 @@
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
 	let hasProvider = $state(false);
+	let providerName = $state<string | null>(null);
 
 	let messages = $state<ChatMessage[]>([]);
 	let input = $state('');
@@ -39,8 +41,19 @@
 	async function loadProviders() {
 		isLoading = true;
 		try {
-			const providers = await providerApi.getProviders('llm');
-			hasProvider = providers.length > 0;
+			const [providers, settings] = await Promise.all([
+				providerApi.getProviders('llm'),
+				settingsApi.getSettings().catch(() => null)
+			]);
+			// Same pick as the backend's resolveProvider: the saved default, else the oldest.
+			const usable = providers
+				.filter(p => p.status !== 'disabled')
+				.sort(
+					(a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.id.localeCompare(b.id)
+				);
+			const savedId = settings?.providerDefaults?.['ai.llm'];
+			hasProvider = usable.length > 0;
+			providerName = (usable.find(p => p.id === savedId) ?? usable[0])?.displayName ?? null;
 			loadError = null;
 		} catch (e) {
 			loadError = userFacingErrorMessage(e);
@@ -181,11 +194,22 @@
 				key — the assistant is read-only and can never change your data.
 			{/snippet}
 			{#snippet action()}
-				<Button href={resolve(routes.settings)} class="h-10 sm:h-9">Go to Settings</Button>
+				<Button href="{resolve(routes.settings)}#assistant-providers" class="h-10 sm:h-9">Go to Settings</Button>
 			{/snippet}
 		</EmptyState>
 	{:else}
 		<div class="flex flex-col gap-4" data-testid="assistant-chat">
+			{#if providerName}
+				<p class="text-sm text-muted-foreground" data-testid="assistant-provider">
+					Using <span class="font-medium text-foreground">{providerName}</span> ·
+					<a
+						href="{resolve(routes.settings)}#assistant-providers"
+						aria-label="Change the assistant provider"
+						class="underline underline-offset-2 hover:text-foreground rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						>Change</a
+					>
+				</p>
+			{/if}
 			<div
 				bind:this={scrollEl}
 				class="min-h-[40vh] max-h-[60vh] overflow-y-auto rounded-lg border bg-card p-4 space-y-4"

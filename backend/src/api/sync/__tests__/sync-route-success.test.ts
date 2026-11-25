@@ -29,6 +29,7 @@ interface StatusBody {
   data: {
     backupEnabled: boolean;
     sheetsSyncEnabled: boolean;
+    providerNeedsAttention: boolean;
     syncOnInactivity: boolean;
     lastSyncDate: string | null;
   };
@@ -68,6 +69,30 @@ describe('GET /api/v1/sync/status — derived flags from backupConfig', () => {
     const body = await json<StatusBody>(res);
     expect(body.data.backupEnabled).toBe(false);
     expect(body.data.sheetsSyncEnabled).toBe(true);
+  });
+
+  test('providerNeedsAttention is true only when a provider in use needs reconnecting or failed', async () => {
+    seedStorageProvider('p1');
+    seedStorageProvider('p2', 'Old Drive');
+    seedBackupConfig({
+      providers: {
+        p1: { enabled: true, folderPath: 'B', retentionCount: 5 },
+        p2: { enabled: false, folderPath: 'B', retentionCount: 5 },
+      },
+    });
+    const status = async () =>
+      (await json<StatusBody>(await ctx.authed('GET', '/api/v1/sync/status'))).data
+        .providerNeedsAttention;
+    const setStatus = (id: string, value: string) =>
+      ctx.sqlite.run('UPDATE user_providers SET status = ? WHERE id = ?', [value, id]);
+
+    expect(await status()).toBe(false);
+    setStatus('p2', 'needs_reauth');
+    expect(await status()).toBe(false);
+    setStatus('p1', 'needs_reauth');
+    expect(await status()).toBe(true);
+    setStatus('p1', 'error');
+    expect(await status()).toBe(true);
   });
 });
 

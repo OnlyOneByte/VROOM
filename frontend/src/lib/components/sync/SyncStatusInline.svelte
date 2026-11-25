@@ -9,6 +9,7 @@
 		lastDataChangeTime,
 		backupEnabled,
 		sheetsSyncEnabled,
+		providerNeedsAttention,
 		syncConflicts
 	} from '#lib/utils/sync/sync-manager.ts';
 	import { RefreshCw, CircleAlert, Clock, Wifi, WifiOff, TriangleAlert } from '@lucide/svelte';
@@ -39,7 +40,8 @@
 			syncStatus: syncState.current,
 			pendingCount,
 			conflictsCount: syncConflicts.current.length,
-			serverReachable: !authStore.sessionUnverified
+			serverReachable: !authStore.sessionUnverified,
+			providerNeedsAttention: providerNeedsAttention.current
 		})
 	);
 
@@ -194,6 +196,18 @@
 					<span class="text-foreground">
 						{formatCompactRelativeTime(lastBackupTime.current ?? lastSheetsSync.current)}
 					</span>
+				</div>
+			{/if}
+
+			{#if providerNeedsAttention.current}
+				<div class="flex items-center justify-between text-xs">
+					<span class="text-muted-foreground">Backup provider</span>
+					<a
+						href="{resolve(routes.settings)}#storage-providers"
+						class="font-medium text-foreground underline underline-offset-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					>
+						Fix in Settings
+					</a>
 				</div>
 			{/if}
 

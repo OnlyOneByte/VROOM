@@ -296,7 +296,7 @@
 	}
 </script>
 
-<Card>
+<Card id="storage-providers">
 	<CardHeader>
 		<div class="flex items-center gap-2">
 			<HardDrive class="h-5 w-5 text-muted-foreground" />

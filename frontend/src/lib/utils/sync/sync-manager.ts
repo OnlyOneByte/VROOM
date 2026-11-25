@@ -8,6 +8,7 @@ import {
 	lastDataChangeTime,
 	backupEnabled,
 	sheetsSyncEnabled,
+	providerNeedsAttention,
 	type SyncConflict,
 	type SyncConfig
 } from './sync-state.svelte';
@@ -43,7 +44,8 @@ export {
 	lastSheetsSync,
 	lastDataChangeTime,
 	backupEnabled,
-	sheetsSyncEnabled
+	sheetsSyncEnabled,
+	providerNeedsAttention
 };
 
 interface SyncResult {
@@ -63,6 +65,7 @@ export async function fetchLastSyncTime(): Promise<void> {
 			lastDataChangeDate?: string;
 			sheetsSyncEnabled?: boolean;
 			backupEnabled?: boolean;
+			providerNeedsAttention?: boolean;
 		}>('/sync/status');
 
 		if (result) {
@@ -75,6 +78,7 @@ export async function fetchLastSyncTime(): Promise<void> {
 			lastDataChangeTime.current = changeDate;
 			sheetsSyncEnabled.current = result.sheetsSyncEnabled || false;
 			backupEnabled.current = result.backupEnabled || false;
+			providerNeedsAttention.current = result.providerNeedsAttention || false;
 
 			let mostRecentSync: Date | null = null;
 			if (syncDate && backupDate) {

@@ -20,7 +20,7 @@ import { zValidator } from '../../utils/validation';
 import { preferencesRepository, syncStateRepository } from '../settings/repository';
 import { activityTracker } from './activity-tracker';
 import { backupService } from './backup';
-import { backupOrchestrator, loadProviderTypes } from './backup-orchestrator';
+import { backupOrchestrator } from './backup-orchestrator';
 import { hasSheetsSync, hasZipBackup } from './backup-strategy';
 import './init';
 import { type RestoreResponse, restoreService } from './restore';
@@ -138,16 +138,30 @@ routes.get('/status', authorize(ownAccount), async (c) => {
 
   const config = settings.backupConfig as BackupConfig | null;
   const providers = config?.providers;
-  const providerTypes = providers ? await loadProviderTypes(user.id) : new Map<string, string>();
-  const backupEnabled = providers
-    ? Object.entries(providers).some(([id, s]) => hasZipBackup(s, providerTypes.get(id)))
-    : false;
-  const sheetsSyncEnabled = providers ? Object.values(providers).some(hasSheetsSync) : false;
+  const rows = providers
+    ? await getDb()
+        .select({
+          id: userProviders.id,
+          providerType: userProviders.providerType,
+          status: userProviders.status,
+        })
+        .from(userProviders)
+        .where(eq(userProviders.userId, user.id))
+    : [];
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const enabled = providers ? Object.entries(providers) : [];
+  const backupEnabled = enabled.some(([id, s]) => hasZipBackup(s, byId.get(id)?.providerType));
+  const sheetsSyncEnabled = enabled.some(([, s]) => hasSheetsSync(s));
+  const providerNeedsAttention = enabled.some(([id, s]) => {
+    const status = byId.get(id)?.status;
+    return (s.enabled || hasSheetsSync(s)) && (status === 'needs_reauth' || status === 'error');
+  });
 
   return c.json(
     createSuccessResponse({
       backupEnabled,
       sheetsSyncEnabled,
+      providerNeedsAttention,
       syncOnInactivity: settings.syncOnInactivity,
       syncInactivityMinutes: settings.syncInactivityMinutes,
       lastSyncDate: syncStateData.lastSyncDate,
