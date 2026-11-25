@@ -54,7 +54,7 @@
 		vehicleDistLabels.get(vehicleId) ?? distLabel;
 
 	function route(trip: Trip): string {
-		if (!trip.startLocation && !trip.endLocation) return `${capitalize(trip.purpose)} trip`;
+		if (!trip.startLocation && !trip.endLocation) return 'Trip';
 		return `${trip.startLocation ?? '—'} → ${trip.endLocation ?? '—'}`;
 	}
 
@@ -176,7 +176,7 @@
 {#snippet tripRow(trip: Trip)}
 	<li class="flex items-center gap-3 py-3 sm:gap-4" data-testid="trip-card-{trip.id}">
 		<div class="min-w-0 flex-1 space-y-1">
-			<p class="truncate font-semibold">{route(trip)}</p>
+			<p class="line-clamp-2 font-semibold break-words">{route(trip)}</p>
 			<p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
 				<Badge variant={trip.purpose === 'business' ? 'info' : 'secondary'}>
 					{capitalize(trip.purpose)}
@@ -199,7 +199,7 @@
 				{formatNumber(trip.startOdometer, 0)} → {formatNumber(trip.endOdometer, 0)}
 			</p>
 		</div>
-		<div class="flex shrink-0 items-center">
+		<div class="flex shrink-0 items-center gap-2">
 			<Button variant="ghost" size="icon" aria-label="Edit trip" onclick={() => openEdit(trip)}>
 				<Pencil class="h-4 w-4" />
 			</Button>

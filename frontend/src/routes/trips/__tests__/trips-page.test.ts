@@ -230,7 +230,7 @@ describe('trips page list', () => {
 		render(Page);
 		await settle();
 
-		expect(cardText('t1')).toBe('Business trip Business Nov 10, 2026 Daily 42 mi 1,000 → 1,042');
+		expect(cardText('t1')).toBe('Trip Business Nov 10, 2026 Daily 42 mi 1,000 → 1,042');
 	});
 
 	test('the distance unit follows the trip vehicle preferences', async () => {
@@ -353,6 +353,7 @@ describe('trips page delete', () => {
 				message: "Couldn't delete the trip. Trip not found."
 			})
 		);
+		expect(notify).toHaveBeenCalledTimes(1);
 		expect(screen.getByRole('alertdialog')).toBeInTheDocument();
 		expect(list).toHaveBeenCalledTimes(1);
 	});
