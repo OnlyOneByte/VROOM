@@ -10,3 +10,4 @@ export * from './reminder.js';
 export * from './import-mapping.js';
 export * from './trip.js';
 export * from './share.js';
+export * from './driver.js';

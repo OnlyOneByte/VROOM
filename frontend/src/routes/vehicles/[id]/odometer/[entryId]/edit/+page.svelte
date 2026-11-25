@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { focusFirstProblem } from '#lib/utils/focus.ts';
 	import DatePicker from '#lib/components/common/date-picker.svelte';
+	import DriverChip from '#lib/components/drivers/DriverChip.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { page } from '$app/state';
 	import PageHeader from '#lib/components/common/page-header.svelte';
@@ -34,6 +35,8 @@
 	let odometer = $state<string | number | null>('');
 	let date = $state('');
 	let note = $state('');
+	let driverId = $state<string | null | undefined>(undefined);
+	let entryDriverId = $state<string | null | undefined>(undefined);
 
 	let isLoadingEntry = $state(true);
 	let isSubmitting = $state(false);
@@ -88,6 +91,7 @@
 			odometer = String(entry.odometer);
 			date = toDateInputValue(entry.recordedAt);
 			note = entry.note ?? '';
+			entryDriverId = driverId = entry.driverId ?? null;
 
 			const newest = latestResponse.data[0];
 			if (newest && newest.id !== entryId) {
@@ -119,7 +123,8 @@
 			await odometerApi.update(entryId, {
 				odometer: Number(odometer),
 				recordedAt: dateOnlyToISO(date),
-				note: note || undefined
+				note: note || undefined,
+				...(driverId !== entryDriverId && { driverId })
 			});
 			await gotoDynamic(returnTo);
 		} catch (e) {
@@ -239,6 +244,10 @@
 					<FormFieldError id="date-error">{fieldErrors.date}</FormFieldError>
 				{/if}
 			</div>
+
+			{#if entryDriverId !== undefined}
+				<DriverChip id="odometer-driver" {vehicleId} bind:value={driverId} editing />
+			{/if}
 
 			<div class="space-y-2">
 				<Label for="note">Note (Optional)</Label>

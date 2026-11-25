@@ -408,10 +408,17 @@ routes.get(
     if (sharedAccess) {
       responseData = { ...responseData, sharedAccess };
     }
+    const carShare = {
+      enabled: vehicle.carShareEnabled,
+      manage: requestResolver(c, getDb()).can('vehicle.driver.manage', {
+        kind: 'vehicle',
+        vehicleId: id,
+      }).allow,
+    };
 
-    const response: ApiResponse<typeof responseData> = {
+    const response: ApiResponse<typeof responseData & { carShare: typeof carShare }> = {
       success: true,
-      data: vehicleRowToApi(responseData),
+      data: { ...vehicleRowToApi(responseData), carShare },
     };
 
     return c.json(response);

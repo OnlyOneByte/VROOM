@@ -43,6 +43,10 @@ function assertMayAttribute(
   }
 }
 
+export function assertMayClearDriver(c: Context, vehicleId: string, current: string | null): void {
+  if (current) assertMayAttribute(c, vehicleId, null, current);
+}
+
 export function attributedDriver(
   c: Context,
   vehicleId: string,

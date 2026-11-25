@@ -18,6 +18,7 @@
 	} from '@lucide/svelte';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.ts';
+	import CarSharingCard from '#lib/components/drivers/CarSharingCard.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
@@ -939,6 +940,10 @@
 								</p>
 							{/await}
 						{/if}
+					{/if}
+
+					{#if vehicle.carShare?.manage}
+						<CarSharingCard {vehicleId} enabled={vehicle.carShare.enabled} />
 					{/if}
 
 					<Collapsible

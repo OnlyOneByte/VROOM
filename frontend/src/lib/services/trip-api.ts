@@ -19,6 +19,7 @@ interface CreateTripRequest {
 	startLocation?: string;
 	endLocation?: string;
 	note?: string;
+	driverId?: string | null;
 }
 
 type UpdateTripRequest = Partial<Omit<CreateTripRequest, 'vehicleId'>>;

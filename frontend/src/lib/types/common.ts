@@ -66,6 +66,7 @@ export interface OdometerEntry {
 	odometer: number;
 	recordedAt: string;
 	note?: string;
+	driverId?: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

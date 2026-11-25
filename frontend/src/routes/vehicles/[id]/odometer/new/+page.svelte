@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { focusFirstProblem } from '#lib/utils/focus.ts';
 	import DatePicker from '#lib/components/common/date-picker.svelte';
+	import DriverChip from '#lib/components/drivers/DriverChip.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { page } from '$app/state';
 	import PageHeader from '#lib/components/common/page-header.svelte';
@@ -30,6 +31,7 @@
 	let odometer = $state<string | number | null>('');
 	let date = $state(toDateInputValue(new Date()));
 	let note = $state('');
+	let driverId = $state<string | null | undefined>(undefined);
 	let pendingFiles = $state<File[]>([]);
 
 	let isSubmitting = $state(false);
@@ -84,7 +86,8 @@
 			const entry = await odometerApi.create(vehicleId, {
 				odometer: Number(odometer),
 				recordedAt: dateOnlyToISO(date),
-				note: note || undefined
+				note: note || undefined,
+				...(driverId !== undefined && { driverId })
 			});
 
 			if (pendingFiles.length > 0) {
@@ -189,6 +192,8 @@
 				<FormFieldError id="date-error">{fieldErrors.date}</FormFieldError>
 			{/if}
 		</div>
+
+		<DriverChip id="odometer-driver" {vehicleId} bind:value={driverId} />
 
 		<div class="space-y-2">
 			<Label for="note">Note (Optional)</Label>
