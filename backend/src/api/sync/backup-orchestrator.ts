@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm';
+import { repos } from '../../app-context';
 import { getDb } from '../../db/connection';
 import { userProviders } from '../../db/schema';
 import type { BackupConfig, ProviderBackupSettings } from '../../types';
@@ -132,8 +133,7 @@ export class BackupOrchestrator {
         }
       }
 
-      const { preferencesRepository } = await import('../settings/repository');
-      const settings = await preferencesRepository.getOrCreate(userId);
+      const settings = await repos().preferences.getOrCreate(userId);
       const config: BackupConfig = (settings.backupConfig as BackupConfig | null) ?? {
         providers: {},
       };
@@ -300,14 +300,13 @@ export class BackupOrchestrator {
       }
 
       if (Object.keys(configPatch).length > 0) {
-        await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
+        await repos().preferences.mergeJsonField(userId, 'backupConfig', {
           providers: configPatch,
         });
       }
       if (runOutcome === 'success') {
-        const { syncStateRepository } = await import('../settings/repository');
-        await syncStateRepository.updateSyncDate(userId, new Date(timestamp));
-        await syncStateRepository.updateBackupDate(userId);
+        await repos().syncState.updateSyncDate(userId, new Date(timestamp));
+        await repos().syncState.updateBackupDate(userId);
       }
 
       return { timestamp, outcome: runOutcome, failedProviders, results };

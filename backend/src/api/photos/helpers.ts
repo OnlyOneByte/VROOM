@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { repos } from '../../app-context';
 import { NotFoundError, ValidationError } from '../../errors';
 import type { ResourceOf } from '../../permissions/authorize';
 import type { Resource } from '../../permissions/resolve';
@@ -7,12 +8,7 @@ import {
   requireVehicleAccess,
   seesFinancials,
 } from '../../utils/vehicle-access';
-import { expenseRepository } from '../expenses/repository';
 import { policyDocumentResources } from '../insurance/access';
-import { insuranceClaimRepository } from '../insurance/claims-repository';
-import { insurancePolicyRepository } from '../insurance/repository';
-import { odometerRepository } from '../odometer/repository';
-import { photoRepository } from './photo-repository';
 
 export async function validateEntityOwnership(
   entityType: string,
@@ -23,24 +19,24 @@ export async function validateEntityOwnership(
     case 'vehicle':
       return (await requireVehicleAccess(entityId, userId, 'read')).ownerId;
     case 'insurance_policy': {
-      const policy = await insurancePolicyRepository.findById(entityId);
+      const policy = await repos().insurancePolicies.findById(entityId);
       if (!policy) throw new NotFoundError('Insurance policy');
       return policy.userId;
     }
     case 'insurance_claim': {
-      const ownerId = await insuranceClaimRepository.findOwnerUserId(entityId);
+      const ownerId = await repos().insuranceClaims.findOwnerUserId(entityId);
       if (!ownerId) throw new NotFoundError('Insurance claim');
       return ownerId;
     }
     case 'expense': {
-      const expense = await expenseRepository.findById(entityId);
+      const expense = await repos().expenses.findById(entityId);
       if (!expense) throw new NotFoundError('Expense');
       const access = await requireVehicleAccess(expense.vehicleId, userId, 'read');
       assertMayTouchFinancialExpense(seesFinancials(access), expense.sourceType);
       return access.ownerId;
     }
     case 'odometer_entry': {
-      const entry = await odometerRepository.findById(entityId);
+      const entry = await repos().odometer.findById(entityId);
       if (!entry) throw new NotFoundError('Odometer entry');
       return (await requireVehicleAccess(entry.vehicleId, userId, 'read')).ownerId;
     }
@@ -55,7 +51,7 @@ async function insuranceDocumentResources(
   entityId: string
 ): Promise<Resource | Resource[]> {
   if (entityType === 'insurance_policy') return policyDocumentResources(c, entityId);
-  const claim = await insuranceClaimRepository.findAccessTarget(entityId);
+  const claim = await repos().insuranceClaims.findAccessTarget(entityId);
   if (!claim) throw new NotFoundError('Insurance claim');
   return claim.vehicleId && c.req.method === 'GET'
     ? { kind: 'vehicle', vehicleId: claim.vehicleId }
@@ -74,12 +70,12 @@ export async function photoEntityResource(
     case 'insurance_claim':
       return insuranceDocumentResources(c, entityType, entityId);
     case 'expense': {
-      const expense = await expenseRepository.findById(entityId);
+      const expense = await repos().expenses.findById(entityId);
       if (!expense) throw new NotFoundError('Expense');
       return { kind: 'vehicle', vehicleId: expense.vehicleId };
     }
     case 'odometer_entry': {
-      const entry = await odometerRepository.findById(entityId);
+      const entry = await repos().odometer.findById(entityId);
       if (!entry) throw new NotFoundError('Odometer entry');
       return { kind: 'vehicle', vehicleId: entry.vehicleId };
     }
@@ -94,7 +90,7 @@ export const fromPhotoEntity: ResourceOf = (c) =>
 export function withPhotoAuthor(resourceOf: ResourceOf): ResourceOf {
   return async (c) => {
     const resource = await resourceOf(c);
-    const photo = await photoRepository.findById(c.req.param('photoId') ?? '');
+    const photo = await repos().photos.findById(c.req.param('photoId') ?? '');
     const entityType = c.req.param('entityType') ?? 'vehicle';
     const entityId = c.req.param('entityId') ?? c.req.param('vehicleId');
     if (!photo || photo.entityType !== entityType || photo.entityId !== entityId) {

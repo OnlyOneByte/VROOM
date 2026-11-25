@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import { ValidationError } from '../../../errors';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { logger } from '../../../utils/logger';
 import { FULL_CRUD, type StorageRef } from '../../providers/domains/storage/storage-provider';
-import { photoRefRepository } from '../photo-ref-repository';
 import { uploadPhotoForEntity } from '../photo-service';
 import { type FakePhotoStorage, installFakePhotoStorage } from './fake-photo-storage';
 
@@ -36,7 +36,7 @@ describe('upload compensates when the DB write fails after the provider upload',
   test('a failed photo_refs insert removes the photo row and the uploaded object, then rethrows', async () => {
     const dbError = new Error('disk I/O error');
     const uploadSpy = spyOn(storage.provider, 'upload');
-    const refSpy = spyOn(photoRefRepository, 'create').mockRejectedValueOnce(dbError);
+    const refSpy = spyOn(repos().photoRefs, 'create').mockRejectedValueOnce(dbError);
 
     await expect(uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, jpeg())).rejects.toBe(
       dbError
@@ -52,7 +52,7 @@ describe('upload compensates when the DB write fails after the provider upload',
 
   test('a failed compensating delete is logged and the original DB error still reaches the caller', async () => {
     const dbError = new Error('disk I/O error');
-    const refSpy = spyOn(photoRefRepository, 'create').mockRejectedValueOnce(dbError);
+    const refSpy = spyOn(repos().photoRefs, 'create').mockRejectedValueOnce(dbError);
     const deleteSpy = spyOn(storage.provider, 'delete').mockRejectedValueOnce(
       new Error('network down')
     );

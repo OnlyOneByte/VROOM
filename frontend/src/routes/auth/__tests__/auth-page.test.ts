@@ -44,6 +44,40 @@ describe('sign-in page', () => {
 		expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load the sign-in options");
 	});
 
+	test('a returning sign-in error shows its title and what to do, as an alert', async () => {
+		page.url = new URL('https://app.example/auth?auth_error=cancelled');
+		authApi.getProviders.mockResolvedValue([{ id: 'google', displayName: 'Google' }]);
+		render(AuthPage);
+
+		const alert = screen.getByRole('alert');
+		expect(alert).toHaveTextContent('Sign-in was cancelled');
+		expect(alert).toHaveTextContent('Try again, or pick another option.');
+		expect(await screen.findByRole('button', { name: 'Continue with Google' })).toBeEnabled();
+		page.url = new URL('https://app.example/auth');
+	});
+
+	test('an unknown sign-in error code shows no error card', async () => {
+		page.url = new URL('https://app.example/auth?auth_error=something_new');
+		authApi.getProviders.mockResolvedValue([{ id: 'google', displayName: 'Google' }]);
+		render(AuthPage);
+
+		await screen.findByRole('button', { name: 'Continue with Google' });
+		expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+		page.url = new URL('https://app.example/auth');
+	});
+
+	test.each([
+		['signup_closed', "This server isn't taking new accounts"],
+		['signup_invite_required', 'This server is invite only'],
+		['signup_domain_not_allowed', 'only takes accounts from certain email domains']
+	])('a refused sign-up (%s) says why', async (code, message) => {
+		authApi.getProviders.mockResolvedValue([]);
+		page.url = new URL(`https://app.example/auth?auth_error=${code}`);
+		render(AuthPage);
+		expect(await screen.findByRole('alert')).toHaveTextContent(message);
+		page.url = new URL('https://app.example/auth');
+	});
+
 	test('a Retry that finds no enabled providers announces that sign-in is unavailable', async () => {
 		authApi.getProviders
 			.mockRejectedValueOnce(new ApiError('Network error', 0))

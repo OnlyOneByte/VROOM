@@ -12,19 +12,15 @@ const ROWS = [
 		id: 'v1',
 		name: 'Daily Driver',
 		detail: '2020 Toyota Camry · Financed',
-		isElectric: false,
 		spend: 500.79,
-		runningPerDistance: 0.13,
-		trend: [100, 120, 90, 300, 80, 110]
+		runningPerDistance: 0.13
 	},
 	{
 		id: 'v2',
 		name: 'Sparky',
 		detail: '2023 Tesla Model 3 · Shared by Sam',
-		isElectric: true,
 		spend: 20.26,
-		runningPerDistance: null,
-		trend: null
+		runningPerDistance: null
 	}
 ];
 
@@ -41,6 +37,7 @@ describe('VehicleRowsCard', () => {
 			'/vehicles/v1'
 		);
 		expect(screen.getByRole('link', { name: 'Sparky' })).toHaveAttribute('href', '/vehicles/v2');
+		expect(screen.getByRole('link', { name: 'All vehicles' })).toHaveAttribute('href', '/vehicles');
 	});
 
 	test('a row shows its spend and running cost per distance, or says there is no distance', () => {
@@ -50,8 +47,7 @@ describe('VehicleRowsCard', () => {
 		const [first, second] = screen.getAllByRole('listitem');
 
 		expect(first?.textContent).toContain('$500.79');
-		expect(first?.textContent).toContain('$0.13/mi');
+		expect(first?.textContent).toContain('$0.13/mi, 30 days');
 		expect(second?.textContent).toContain('No running cost per mi for this period');
-		expect(screen.getAllByTestId('vehicle-sparkline')).toHaveLength(1);
 	});
 });

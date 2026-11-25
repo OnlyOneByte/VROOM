@@ -2,6 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import {
@@ -22,7 +23,6 @@ import {
 } from '../../utils/unit-preferences-schema';
 import { LOCAL_OCR_PROVIDER_ID, localOcrEnabled } from '../providers/domains/vlm/registry';
 import { CAPABILITY_DOMAIN } from '../providers/resolve';
-import { preferencesRepository } from './repository';
 import {
   type BackupConfigUpdate,
   backupConfigSchema,
@@ -211,7 +211,7 @@ const updateSettingsSchema = baseSettingsSchema
 routes.get('/', authorize(ownAccount), async (c) => {
   const user = c.get('user');
 
-  const prefs = await preferencesRepository.getOrCreate(user.id);
+  const prefs = await repos().preferences.getOrCreate(user.id);
 
   return c.json({
     success: true,
@@ -224,7 +224,7 @@ routes.put('/', authorize(ownAccount), async (c) => {
   const body = await readJsonBody(c);
   const updates = updateSettingsSchema.parse(body);
 
-  const existingSettings = await preferencesRepository.getOrCreate(user.id);
+  const existingSettings = await repos().preferences.getOrCreate(user.id);
 
   const {
     unitPreferences: partialUnitPrefs,
@@ -252,7 +252,7 @@ routes.put('/', authorize(ownAccount), async (c) => {
     await assertDefaultsOwned(providerDefaults, user.id);
   }
 
-  let updatedSettings = await preferencesRepository.update(user.id, {
+  let updatedSettings = await repos().preferences.update(user.id, {
     ...restUpdates,
     ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
     ...(mergedStorageConfig && { storageConfig: mergedStorageConfig }),
@@ -260,12 +260,12 @@ routes.put('/', authorize(ownAccount), async (c) => {
   });
   if (providerDefaults) {
     updatedSettings =
-      (await preferencesRepository.mergeJsonField(user.id, 'providerDefaults', providerDefaults)) ??
+      (await repos().preferences.mergeJsonField(user.id, 'providerDefaults', providerDefaults)) ??
       updatedSettings;
   }
   if (backupConfig) {
     updatedSettings =
-      (await preferencesRepository.mergeJsonField(
+      (await repos().preferences.mergeJsonField(
         user.id,
         'backupConfig',
         clientBackupConfigPatch(existingSettings.backupConfig, backupConfig)

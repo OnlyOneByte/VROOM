@@ -46,7 +46,11 @@
 		{/if}
 		<span class="block min-h-6 truncate sm:min-h-0 sm:shrink-0">
 			{#if vehicle.licensePlate}
-				<span class="whitespace-nowrap">{vehicle.licensePlate}</span>
+				<span
+					class="whitespace-nowrap rounded-full px-2 py-px text-xs font-semibold ring-1 ring-inset ring-border-strong"
+				>
+					{vehicle.licensePlate}
+				</span>
 			{/if}
 			{#if vehicle.licensePlate && (odometerLoading || odometer !== null)}
 				<span aria-hidden="true">·</span>
@@ -63,14 +67,14 @@
 	</span>
 {/snippet}
 
-<PageHeader title={displayName} {description}>
+<PageHeader title={displayName} {description} variant="display">
 	{#snippet back()}
 		<Button
 			variant="outline"
 			size="icon-lg"
 			class="shrink-0 sm:size-9"
-			onclick={() => goto(resolve(routes.dashboard))}
-			aria-label="Back to dashboard"
+			onclick={() => goto(resolve(routes.vehicles))}
+			aria-label="Back to garage"
 		>
 			<ArrowLeft class="h-4 w-4" />
 		</Button>

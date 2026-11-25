@@ -2,6 +2,7 @@ import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import {
@@ -47,16 +48,12 @@ import {
 } from '../../utils/vehicle-access';
 import { catalogModelMatchesMake, isCatalogModel } from '../../utils/vehicle-catalog';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
-import { expenseRepository } from '../expenses/repository';
-import { financingRepository, withComputedBalance } from '../financing/repository';
-import { odometerRepository } from '../odometer/repository';
+import { carShareAccess } from '../drivers/attribution';
+import { carShareRoutes, driverRoutes } from '../drivers/routes';
+import { withComputedBalance } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
-import { reminderRepository } from '../reminders/repository';
 import { vehiclePeople } from '../roles/routes';
-import { preferencesRepository } from '../settings/repository';
-import { vehicleShareRepository } from '../shares/repository';
 import { photoRoutes } from './photo-routes';
-import { vehicleRepository } from './repository';
 
 const routes = new Hono();
 
@@ -175,6 +172,8 @@ routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
 routes.route('/:vehicleId/photos', photoRoutes);
+routes.route('/:vehicleId/drivers', driverRoutes);
+routes.route('/:vehicleId/car-share', carShareRoutes);
 
 function changedUnits(existing: UnitPreferences, merged: UnitPreferences | undefined): string[] {
   if (!merged) return [];
@@ -258,7 +257,7 @@ async function assertLicensePlateAvailable(
   userId: string,
   excludeId?: string
 ): Promise<void> {
-  const existing = await vehicleRepository.findByLicensePlate(licensePlate, userId);
+  const existing = await repos().vehicles.findByLicensePlate(licensePlate, userId);
   if (existing && existing.id !== excludeId) {
     throw new ConflictError('A vehicle with this license plate already exists');
   }
@@ -274,7 +273,7 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
   const user = c.get('user');
   const { include, timeZone } = c.req.valid('query');
 
-  const userVehicles = await vehicleRepository.findByUserId(user.id);
+  const userVehicles = await repos().vehicles.findByUserId(user.id);
 
   let sharedRows: Array<
     (typeof userVehicles)[number] & {
@@ -282,11 +281,11 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
     }
   > = [];
   if (include === 'shared') {
-    const grants = await vehicleShareRepository.findAcceptedAccessForUser(user.id);
+    const grants = await repos().vehicleShares.findAcceptedAccessForUser(user.id);
     if (grants.length > 0) {
       const byVehicleId = new Map(grants.map((g) => [g.vehicleId, g]));
       const resolver = requestResolver(c, getDb());
-      const sharedVehicles = (await vehicleRepository.findByIds([...byVehicleId.keys()])).filter(
+      const sharedVehicles = (await repos().vehicles.findByIds([...byVehicleId.keys()])).filter(
         (v) => resolver.can('vehicle.read', { kind: 'vehicle', vehicleId: v.id }).allow
       );
       sharedRows = await Promise.all(
@@ -307,7 +306,7 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
   const financingIds = allVehicles
     .map((v) => v.financing?.id)
     .filter((id): id is string => id !== undefined);
-  const balances = await financingRepository.computeBalances(financingIds, timeZone);
+  const balances = await repos().financing.computeBalances(financingIds, timeZone);
 
   const enrichedVehicles = allVehicles.map((v) => {
     if (v.financing) {
@@ -317,7 +316,10 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
     return v;
   });
 
-  const apiVehicles = enrichedVehicles.map(vehicleRowToApi);
+  const apiVehicles = enrichedVehicles.map((v) => ({
+    ...vehicleRowToApi(v),
+    carShare: carShareAccess(c, v.id, v.carShareEnabled),
+  }));
   const response: ApiResponse<typeof apiVehicles> = {
     success: true,
     data: apiVehicles,
@@ -338,11 +340,11 @@ routes.post('/', zValidator('json', createVehicleSchema), authorize(ownAccount),
 
   let { unitPreferences } = vehicleData;
   if (!unitPreferences) {
-    const userSettings = await preferencesRepository.getOrCreate(user.id);
+    const userSettings = await repos().preferences.getOrCreate(user.id);
     unitPreferences = userSettings.unitPreferences;
   }
 
-  const createdVehicle = await vehicleRepository.create({
+  const createdVehicle = await repos().vehicles.create({
     ...vehicleData,
     unitPreferences,
     userId: user.id,
@@ -368,7 +370,7 @@ routes.get(
     const { timeZone } = c.req.valid('query');
 
     const access = await requireVehicleAccess(id, user.id, 'read');
-    const vehicle = (await vehicleRepository.findByIds([id]))[0] ?? null;
+    const vehicle = (await repos().vehicles.findByIds([id]))[0] ?? null;
 
     if (!vehicle) {
       throw new NotFoundError('Vehicle');
@@ -376,7 +378,7 @@ routes.get(
 
     let sharedAccess: SharedAccess | undefined;
     if (access.role !== 'owner') {
-      const grants = await vehicleShareRepository.findAcceptedAccessForUser(user.id);
+      const grants = await repos().vehicleShares.findAcceptedAccessForUser(user.id);
       const grant = grants.find((g) => g.vehicleId === id);
       sharedAccess = {
         level: grant?.level ?? access.role,
@@ -393,7 +395,7 @@ routes.get(
       sharedAccess?: SharedAccess;
     } = seesFinancials(access) ? vehicle : sharedVehicleView(vehicle);
     if (responseData.financing) {
-      const computedBalance = await financingRepository.computeBalance(
+      const computedBalance = await repos().financing.computeBalance(
         responseData.financing.id,
         timeZone
       );
@@ -405,10 +407,11 @@ routes.get(
     if (sharedAccess) {
       responseData = { ...responseData, sharedAccess };
     }
+    const carShare = carShareAccess(c, id, vehicle.carShareEnabled);
 
-    const response: ApiResponse<typeof responseData> = {
+    const response: ApiResponse<typeof responseData & { carShare: typeof carShare }> = {
       success: true,
-      data: vehicleRowToApi(responseData),
+      data: { ...vehicleRowToApi(responseData), carShare },
     };
 
     return c.json(response);
@@ -425,7 +428,7 @@ routes.put(
     const { id } = c.req.valid('param');
     const updateData = c.req.valid('json');
 
-    const existingVehicle = (await vehicleRepository.findByIds([id]))[0] ?? null;
+    const existingVehicle = (await repos().vehicles.findByIds([id]))[0] ?? null;
     if (!existingVehicle) {
       throw new NotFoundError('Vehicle');
     }
@@ -452,7 +455,7 @@ routes.put(
     );
     await assertUnitChangeConfirmed(existingVehicle, mergedUnitPreferences, confirmUnitChange);
 
-    const updatedVehicle = await vehicleRepository.update(id, {
+    const updatedVehicle = await repos().vehicles.update(id, {
       ...restUpdateData,
       ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
       ...(renamedWithoutCatalogModel(existingVehicle, updateData) && { catalogModelId: null }),
@@ -508,22 +511,22 @@ routes.delete(
 
     // Photos have no FK: the vehicle cascade would orphan them, so delete them before the row goes.
     const [expenseIds, odometerIds, splitGroupIds] = await Promise.all([
-      expenseRepository.findIdsByVehicleId(id),
-      odometerRepository.findIdsByVehicleId(id),
+      repos().expenses.findIdsByVehicleId(id),
+      repos().odometer.findIdsByVehicleId(id),
       splitGroupIdsForVehicle(id, user.id),
     ]);
     await deleteAllPhotosForEntity('vehicle', id, user.id);
     await deletePhotosForEntities('expense', expenseIds, user.id);
     await deletePhotosForEntities('odometer_entry', odometerIds, user.id);
 
-    await vehicleRepository.delete(id);
+    await repos().vehicles.delete(id);
 
     // Errors are logged, not thrown: the delete has already committed, and a retry would 404.
     try {
       await shrinkSplitGroupsToSurvivingLegs(user.id, splitGroupIds);
       // Split configs are JSON with no FK: prune deleted legs or reminders will target them.
-      await reminderRepository.pruneSplitConfigsForDeletedVehicle(user.id, id);
-      await reminderRepository.deactivateVehicleless(user.id);
+      await repos().reminders.pruneSplitConfigsForDeletedVehicle(user.id, id);
+      await repos().reminders.deactivateVehicleless(user.id);
     } catch (error) {
       logger.error('Post-delete vehicle cleanup failed (vehicle already deleted)', {
         vehicleId: id,
@@ -566,13 +569,13 @@ routes.get(
     const { id } = c.req.valid('param');
     const { period } = c.req.valid('query');
 
-    const vehicle = (await vehicleRepository.findByIds([id]))[0] ?? null;
+    const vehicle = (await repos().vehicles.findByIds([id]))[0] ?? null;
     if (!vehicle) {
       throw new NotFoundError('Vehicle');
     }
     const ownerId = vehicle.userId;
 
-    const fuelExpenses = await expenseRepository.findAll({
+    const fuelExpenses = await repos().expenses.findAll({
       vehicleId: id,
       userId: ownerId,
       category: 'fuel',
@@ -594,7 +597,7 @@ routes.get(
       canonicalScale(parseUnitPreferences(vehicle.unitPreferences) ?? DEFAULT_UNIT_PREFERENCES)
     );
 
-    const currentOdometer = await odometerRepository.getCurrentOdometer(id, ownerId);
+    const currentOdometer = await repos().odometer.getCurrentOdometer(id, ownerId);
 
     return c.json({
       success: true,

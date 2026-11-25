@@ -9,10 +9,12 @@ export const routes = {
 	analytics: '/analytics',
 	settings: '/settings',
 	settingsProviderNew: '/settings/providers/new',
+	settingsServer: '/settings/server',
 	profile: '/profile',
 	trips: '/trips',
 	privacyPolicy: '/privacypolicy',
 	termsOfService: '/termsofservice',
+	vehicles: '/vehicles',
 	vehicleNew: '/vehicles/new',
 	reminders: '/reminders',
 	assistant: '/assistant'
@@ -29,3 +31,7 @@ export const paramRoutes = {
 	vehicleOdometerEntryEdit: '/vehicles/[id]/odometer/[entryId]/edit',
 	settingsProviderEdit: '/settings/providers/[id]/edit'
 } as const;
+
+export function isFormRoute(pathname: string): boolean {
+	return /\/(new|edit)\/?$/.test(pathname);
+}

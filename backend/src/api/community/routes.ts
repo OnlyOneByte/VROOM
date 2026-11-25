@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import type { CommunityStat } from '../../db/schema';
 import { NotFoundError } from '../../errors';
@@ -19,7 +20,6 @@ import {
   publishedCount,
   vehicleSamples,
 } from './aggregator';
-import { communityStatsRepository } from './repository';
 
 export const GIVE_TO_GET = true;
 export const MAX_NOISE_SHARE = 0.25;
@@ -125,7 +125,7 @@ routes.get(
         data: { currency: null, metrics: emptyMetrics('feature_off') },
       });
     }
-    const contribution = await communityStatsRepository.contribution(user.id, LOCAL_SCOPE);
+    const contribution = await repos().communityStats.contribution(user.id, LOCAL_SCOPE);
     if (GIVE_TO_GET && contribution !== 'included') {
       return c.json({
         success: true,
@@ -139,7 +139,7 @@ routes.get(
     }
 
     const now = new Date();
-    const vehicle = await communityStatsRepository.loadVehicle(
+    const vehicle = await repos().communityStats.loadVehicle(
       vehicleId,
       new Date(now.getTime() - COMMUNITY_WINDOW_MS),
       now
@@ -148,7 +148,7 @@ routes.get(
 
     const samples = vehicleSamples(vehicle, now);
     const smallestPublished = publishedCount(CONFIG.communityStats.minGroup);
-    const rows = await communityStatsRepository.publishedBuckets(
+    const rows = await repos().communityStats.publishedBuckets(
       LOCAL_SCOPE,
       samples.map((sample) => sample.bucketKey),
       smallestPublished

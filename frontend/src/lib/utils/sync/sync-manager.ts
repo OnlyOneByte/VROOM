@@ -8,16 +8,19 @@ import {
 	lastDataChangeTime,
 	backupEnabled,
 	sheetsSyncEnabled,
+	providerNeedsAttention,
 	type SyncConflict,
 	type SyncConfig
 } from './sync-state.svelte';
 import {
 	clearNeedsAttention,
+	noteSyncError,
 	clearSyncedExpenses,
 	getNeedsAttentionExpenses,
 	getPendingExpenses,
 	INCOMPLETE_FUEL_REASON,
 	isIncompleteFuelExpense,
+	loadOfflineExpenses,
 	loadPendingPhotos,
 	markExpenseAsSynced,
 	markExpenseNeedsAttention,
@@ -25,7 +28,11 @@ import {
 	savePendingPhotos,
 	type OfflineExpense
 } from '../offline-storage';
-import { ApiError, extractErrorMessage } from '#lib/utils/error-handling.ts';
+import {
+	ApiError,
+	extractErrorMessage,
+	userFacingErrorMessage
+} from '#lib/utils/error-handling.ts';
 import { classifySyncFailure, type SyncFailureKind } from './classify-failure';
 import { apiClient } from '#lib/services/api-client.ts';
 import { expenseApi } from '#lib/services/expense-api.ts';
@@ -33,6 +40,7 @@ import { userTimeZone } from '#lib/services/analytics-api.ts';
 import { fromBackendExpense } from '#lib/services/api-transformer.ts';
 import type { BackendExpenseResponse } from '#lib/types/index.ts';
 import { browser } from '$app/env';
+import { announceSaveFailure, clearSaveFailure } from './announce-failure';
 
 export type { SyncConflict, SyncConfig };
 export {
@@ -43,7 +51,8 @@ export {
 	lastSheetsSync,
 	lastDataChangeTime,
 	backupEnabled,
-	sheetsSyncEnabled
+	sheetsSyncEnabled,
+	providerNeedsAttention
 };
 
 interface SyncResult {
@@ -62,6 +71,7 @@ export async function fetchLastSyncTime(): Promise<void> {
 			lastBackupDate?: string;
 			lastDataChangeDate?: string;
 			sheetsSyncEnabled?: boolean;
+			providerNeedsAttention?: boolean;
 			backupEnabled?: boolean;
 		}>('/sync/status');
 
@@ -74,6 +84,7 @@ export async function fetchLastSyncTime(): Promise<void> {
 			lastBackupTime.current = backupDate;
 			lastDataChangeTime.current = changeDate;
 			sheetsSyncEnabled.current = result.sheetsSyncEnabled || false;
+			providerNeedsAttention.current = result.providerNeedsAttention === true;
 			backupEnabled.current = result.backupEnabled || false;
 
 			let mostRecentSync: Date | null = null;
@@ -143,6 +154,7 @@ type SingleSyncResult = {
 	error?: string;
 	failureKind?: SyncFailureKind;
 	serverId?: string;
+	userMessage?: string;
 };
 
 function conflictWith(local: OfflineExpense, server: BackendExpenseResponse): SyncConflict {
@@ -272,22 +284,28 @@ class SyncManager {
 
 			if (syncResult.success) {
 				result.synced++;
-				markExpenseAsSynced(expense.id);
+				markExpenseAsSynced(expense.id, syncResult.serverId);
+				clearSaveFailure(expense.id);
 				this.retryCount.delete(expense.id);
 			} else if (syncResult.conflict) {
 				result.conflicts.push(syncResult.conflict);
 			} else if (syncResult.failureKind === 'terminal') {
 				const reason = syncResult.error || 'Entry needs attention';
-				markExpenseNeedsAttention(expense.id, reason, syncResult.serverId);
+				this.recordFailure(expense.id, reason, { park: true, serverId: syncResult.serverId });
 				this.retryCount.delete(expense.id);
 				result.needsAttention++;
 				result.errors.push(reason);
 			} else if (syncResult.failureKind === 'auth') {
 				result.failed++;
 				result.errors.push(syncResult.error || SIGN_IN_TO_SYNC);
+				this.recordFailure(expense.id, SIGN_IN_TO_SYNC);
 			} else {
 				result.failed++;
 				result.errors.push(syncResult.error || 'Unknown error');
+				this.recordFailure(
+					expense.id,
+					syncResult.userMessage || syncResult.error || 'Unknown error'
+				);
 
 				const retries = this.retryCount.get(expense.id) || 0;
 				if (retries < config.maxRetries) {
@@ -328,7 +346,8 @@ class SyncManager {
 			return {
 				success: false,
 				failureKind: classifySyncFailure(error),
-				error: extractErrorMessage(error, 'Unknown error')
+				error: extractErrorMessage(error, 'Unknown error'),
+				userMessage: userFacingErrorMessage(error)
 			};
 		}
 	}
@@ -339,7 +358,7 @@ class SyncManager {
 	): Promise<SingleSyncResult> {
 		try {
 			await this.uploadQueuedPhotos(expense, serverId);
-			return { success: true };
+			return { success: true, serverId };
 		} catch (error) {
 			if (classifySyncFailure(error) !== 'terminal') throw error;
 			return {
@@ -398,7 +417,8 @@ class SyncManager {
 		try {
 			const result = await this.syncSingleExpense(expense);
 			if (result.success) {
-				markExpenseAsSynced(expense.id);
+				markExpenseAsSynced(expense.id, result.serverId);
+				clearSaveFailure(expense.id);
 				this.retryCount.delete(expense.id);
 				const currentExpenses = offlineExpenseQueue.current;
 
@@ -417,12 +437,13 @@ class SyncManager {
 					syncState.current = 'error';
 				}
 			} else if (result.failureKind === 'terminal') {
-				markExpenseNeedsAttention(
-					expense.id,
-					result.error || 'Entry needs attention',
-					result.serverId
-				);
+				this.recordFailure(expense.id, result.error || 'Entry needs attention', {
+					park: true,
+					serverId: result.serverId
+				});
 				this.retryCount.delete(expense.id);
+			} else {
+				this.recordFailure(expense.id, result.userMessage || result.error || 'Unknown error');
 			}
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Retry failed for expense:', expense.id, error);
@@ -489,6 +510,40 @@ class SyncManager {
 
 	requestAutoSync(): void {
 		this.continueAutoSync();
+	}
+
+	syncSoon(): void {
+		if (!onlineStatus.current) return;
+		if (this.syncInProgress) {
+			this.scheduleAutoSync(AUTO_SYNC_DELAY_MS);
+			return;
+		}
+		this.syncAll({ skipConflicted: true }).catch(error => {
+			if (import.meta.env.DEV) console.error('Sync failed:', error);
+		});
+	}
+
+	private recordFailure(
+		id: string,
+		reason: string,
+		options: { park?: boolean; serverId?: string | undefined } = {}
+	): void {
+		const before = loadOfflineExpenses().find(entry => entry.id === id);
+		if (options.park) markExpenseNeedsAttention(id, reason, options.serverId);
+		else noteSyncError(id, reason);
+		const after = loadOfflineExpenses().find(entry => entry.id === id);
+		const firstFailure = !before?.lastError && !before?.needsAttention;
+		const nowRefused = !!options.park && !before?.needsAttention;
+		if (before && after && (firstFailure || nowRefused)) {
+			announceSaveFailure(after, reason, () => this.retryEntry(id));
+		}
+	}
+
+	retryEntry(id: string): void {
+		clearSaveFailure(id);
+		clearNeedsAttention(id);
+		this.retryCount.delete(id);
+		this.syncSoon();
 	}
 
 	private continueAutoSync(): void {

@@ -1,5 +1,6 @@
 import { and, eq, getTableColumns, inArray, ne, type Table } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
+import { repos } from '../../app-context';
 import { TABLE_SCHEMA_MAP } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
@@ -20,6 +21,7 @@ import {
   userPreferences,
   userProviders,
   users,
+  vehicleDrivers,
   vehicleFinancing,
   vehicleShares,
   vehicles,
@@ -45,9 +47,9 @@ import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { catalogModelMatchesMake } from '../../utils/vehicle-catalog';
+import { DRIVER_COLORS } from '../drivers/repository';
 import { LOCAL_OCR_PROVIDER_ID } from '../providers/domains/vlm/registry';
 import { CAPABILITY_DOMAIN } from '../providers/resolve';
-import { preferencesRepository } from '../settings/repository';
 import { isKnownRegion } from '../settings/validation';
 import {
   backupService,
@@ -84,6 +86,7 @@ export interface ImportSummary {
   syncState: number;
   trips: number;
   vehicleShares: number;
+  vehicleDrivers: number;
 }
 
 export interface RestoreResponse {
@@ -125,6 +128,7 @@ function summarizeBackup(data: ParsedBackupData): ImportSummary {
     syncState: data.syncState?.length ?? 0,
     trips: data.trips?.length ?? 0,
     vehicleShares: data.vehicleShares?.length ?? 0,
+    vehicleDrivers: data.vehicleDrivers?.length ?? 0,
   };
 }
 
@@ -133,7 +137,9 @@ function coerceRows(rows: Record<string, unknown>[], table: Table): Record<strin
 }
 
 class RestoreService {
-  private db = getDb();
+  private get db() {
+    return getDb();
+  }
 
   async restoreFromBackup(
     userId: string,
@@ -246,7 +252,7 @@ class RestoreService {
     mode: RestoreMode,
     signal?: AbortSignal
   ): Promise<RestoreResponse> {
-    const prefs = await preferencesRepository.getOrCreate(userId);
+    const prefs = await repos().preferences.getOrCreate(userId);
     const backupConfig = prefs?.backupConfig as BackupConfig | null;
     const providerConfig = backupConfig?.providers?.[providerId];
     const sheetsSpreadsheetId = providerConfig?.sheetsSpreadsheetId;
@@ -258,7 +264,7 @@ class RestoreService {
     try {
       return await this.readSheetsAndRestore(userId, providerId, sheetsSpreadsheetId, mode, signal);
     } catch (error) {
-      await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
+      await repos().preferences.mergeJsonField(userId, 'backupConfig', {
         providers: { [providerId]: { sheetsAutoPausedAt: new Date().toISOString() } },
       });
       throw error;
@@ -305,6 +311,7 @@ class RestoreService {
       ),
       trips: coerceRows(sheet.trips, TABLE_SCHEMA_MAP.trips),
       vehicleShares: coerceRows(sheet.vehicleShares, TABLE_SCHEMA_MAP.vehicleShares),
+      vehicleDrivers: coerceRows(sheet.vehicleDrivers, TABLE_SCHEMA_MAP.vehicleDrivers),
     });
 
     const validation = backupService.validateBackupData(sheetData, 'sheets');
@@ -409,6 +416,14 @@ class RestoreService {
         name: 'trips',
         scope: eq(trips.userId, userId),
         idColumn: trips.id,
+        idField: 'id' as const,
+      },
+      {
+        data: data.vehicleDrivers ?? [],
+        table: vehicleDrivers,
+        name: 'vehicle_drivers',
+        scope: inArray(vehicleDrivers.vehicleId, userVehicleIds),
+        idColumn: vehicleDrivers.id,
         idField: 'id' as const,
       },
       {
@@ -549,6 +564,17 @@ class RestoreService {
     );
   }
 
+  private memberOfCar(
+    candidate: unknown,
+    vehicleId: unknown,
+    ownerId: string,
+    consentedShares: Set<string>
+  ): string | null {
+    const userId = candidate == null || candidate === '' ? null : String(candidate);
+    if (userId === null || userId === ownerId) return userId;
+    return consentedShares.has(shareConsentKey(String(vehicleId), userId)) ? userId : null;
+  }
+
   private insertRows<TTable extends SQLiteTable>(
     tx: DrizzleTransaction,
     table: TTable,
@@ -590,6 +616,16 @@ class RestoreService {
             ? row.catalogModelId
             : null,
         vehicleKind: isVehicleKind(row.vehicleKind) ? row.vehicleKind : 'car',
+      }))
+    );
+    this.insertRows(
+      tx,
+      vehicleDrivers,
+      (data.vehicleDrivers ?? []).map((driver) => ({
+        ...driver,
+        userId: this.memberOfCar(driver.userId, driver.vehicleId, userId, consentedShares),
+        color: (DRIVER_COLORS as readonly unknown[]).includes(driver.color) ? driver.color : null,
+        createdBy: this.memberOfCar(driver.createdBy, driver.vehicleId, userId, consentedShares),
       }))
     );
     this.insertRows(tx, vehicleFinancing, data.financing ?? []);

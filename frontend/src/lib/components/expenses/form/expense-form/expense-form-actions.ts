@@ -7,7 +7,8 @@ import { classifySyncFailure } from '#lib/utils/sync/classify-failure.ts';
 import { syncManager } from '#lib/utils/sync/sync-manager.ts';
 import { buildSplitConfig } from '#lib/utils/expense-helpers.ts';
 import { gotoDynamic } from '#lib/utils/navigation.ts';
-import { handleErrorWithNotification, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+import { scheduleDelete } from '#lib/utils/pending-deletes.svelte.ts';
+import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 import type { ExpenseCategory } from '#lib/types/index.ts';
 import { toOfflineExpense } from '../offline-expense';
 import { buildExpenseData } from './expense-payload';
@@ -101,8 +102,10 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			});
 			gotoDynamic(returnTo);
 		} else if (state.isEditMode) {
+			const payerChanged = state.paidByDriverId !== (state.originalExpense?.paidByDriverId ?? null);
 			await expenseApi.updateExpense(expenseId!, {
 				...expenseData,
+				...(payerChanged && { paidByDriverId: state.paidByDriverId }),
 				sourceType: state.clearsFinancingLink ? null : undefined,
 				sourceId: state.clearsFinancingLink ? null : undefined
 			});
@@ -137,8 +140,24 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 				message: 'Split expense created successfully'
 			});
 			gotoDynamic(returnTo);
+		} else if (
+			onlineStatus.current &&
+			(await addOfflineExpense(
+				toOfflineExpense(expenseData),
+				[...state.pendingFiles],
+				clientId,
+				queueOwner
+			))
+		) {
+			rememberEntry();
+			appStore.addNotification({ type: 'success', message: 'Expense added successfully' });
+			syncManager.syncSoon();
+			gotoDynamic(returnTo);
 		} else if (onlineStatus.current) {
-			const created = await expenseApi.createExpense(expenseData, clientId);
+			const created = await expenseApi.createExpense(
+				{ ...expenseData, paidByDriverId: state.paidByDriverId },
+				clientId
+			);
 
 			await uploadPendingPhotos(state, created.id);
 			rememberEntry();
@@ -205,29 +224,12 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 	}
 }
 
-export async function deleteExpense(state: ExpenseFormState): Promise<void> {
-	const { expenseId, returnTo } = state.ctx;
-	if (!expenseId) return;
-
-	state.isDeleting = true;
-
-	try {
-		if (state.groupId) {
-			await expenseApi.deleteSplitExpense(state.groupId);
-		} else {
-			await expenseApi.deleteExpense(expenseId);
-		}
-
-		appStore.addNotification({
-			type: 'success',
-			message: 'Expense deleted successfully'
-		});
+export function deleteExpense(state: ExpenseFormState): Promise<void> {
+	const expense = state.originalExpense;
+	if (state.ctx.expenseId && expense) {
+		scheduleDelete(state.groupId ? { ...expense, groupId: state.groupId } : expense);
 		state.showDeleteConfirm = false;
-		gotoDynamic(returnTo);
-	} catch (error) {
-		handleErrorWithNotification(error, "Couldn't delete this expense");
-		throw error;
-	} finally {
-		state.isDeleting = false;
+		gotoDynamic(state.ctx.returnTo);
 	}
+	return Promise.resolve();
 }

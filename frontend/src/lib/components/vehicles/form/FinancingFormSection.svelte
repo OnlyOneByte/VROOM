@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { DollarSign, Calculator } from '@lucide/svelte';
+	import { Calculator } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import Input from '#lib/components/ui/input/input.svelte';
 	import Label from '#lib/components/ui/label/label.svelte';
@@ -71,12 +71,9 @@
 	}
 </script>
 
-<Card>
+<Card variant="section">
 	<CardHeader>
-		<div class="flex items-center gap-2">
-			<DollarSign class="h-5 w-5 text-primary" />
-			<CardTitle>Financing Information</CardTitle>
-		</div>
+		<CardTitle level={2} class="text-base">Ownership</CardTitle>
 		<CardDescription>
 			{ownershipType === 'own'
 				? 'This vehicle is owned outright'
@@ -87,7 +84,7 @@
 	</CardHeader>
 	<CardContent>
 		<div class="mb-6">
-			<Label class="mb-3 block">How do you own this vehicle? *</Label>
+			<Label class="mb-3 block">How do you own this vehicle?</Label>
 			<div class="grid grid-cols-3 gap-3">
 				<Button
 					type="button"

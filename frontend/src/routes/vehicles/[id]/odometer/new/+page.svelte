@@ -30,6 +30,7 @@
 	let odometer = $state<string | number | null>('');
 	let date = $state(toDateInputValue(new Date()));
 	let note = $state('');
+	let driverId = $state<string | null | undefined>(undefined);
 	let pendingFiles = $state<File[]>([]);
 
 	let isSubmitting = $state(false);
@@ -84,7 +85,8 @@
 			const entry = await odometerApi.create(vehicleId, {
 				odometer: Number(odometer),
 				recordedAt: dateOnlyToISO(date),
-				note: note || undefined
+				note: note || undefined,
+				...(driverId !== undefined && { driverId })
 			});
 
 			if (pendingFiles.length > 0) {
@@ -120,12 +122,12 @@
 
 <FormLayout>
 	<div class="mb-6">
-		<PageHeader title="Add Odometer Reading">
+		<PageHeader variant="display" title="Add odometer reading">
 			{#snippet back()}
 				<Button
-					variant="ghost"
+					variant="outline"
 					size="icon-lg"
-					class="shrink-0"
+					class="shrink-0 rounded-full"
 					aria-label="Back"
 					onclick={() => gotoDynamic(returnTo)}
 				>
@@ -137,14 +139,14 @@
 
 	<form
 		bind:this={formElement}
-		class="space-y-6 rounded-lg border bg-card p-6"
+		class="space-y-6"
 		onsubmit={e => {
 			e.preventDefault();
 			handleSubmit();
 		}}
 	>
 		<div class="space-y-2">
-			<Label for="odometer">Odometer Reading *</Label>
+			<Label for="odometer">Odometer reading</Label>
 			<Input
 				id="odometer"
 				type="number"
@@ -170,7 +172,7 @@
 		</div>
 
 		<div class="space-y-2">
-			<Label for="date">Date *</Label>
+			<Label for="date">Date</Label>
 			<DatePicker
 				id="date"
 				bind:value={
@@ -190,8 +192,14 @@
 			{/if}
 		</div>
 
+		{#await import('#lib/components/drivers/DriverChip.svelte') then { default: DriverChip }}
+			<DriverChip id="odometer-driver" {vehicleId} bind:value={driverId} />
+		{/await}
+
 		<div class="space-y-2">
-			<Label for="note">Note (Optional)</Label>
+			<Label for="note">
+				Note <span class="font-normal text-muted-foreground">(optional)</span>
+			</Label>
 			<Textarea
 				id="note"
 				placeholder="e.g. Oil change visit"
@@ -221,21 +229,21 @@
 			</FormFieldError>
 		{/if}
 
-		<div class="flex gap-3">
+		<div class="flex flex-wrap gap-3 border-t border-border pt-6">
 			<Button
 				type="button"
 				variant="outline"
 				size="lg"
 				onclick={() => gotoDynamic(returnTo)}
-				class="flex-1"
+				class="ml-auto rounded-full"
 			>
 				Cancel
 			</Button>
-			<Button type="submit" size="lg" disabled={isSubmitting} class="flex-1">
+			<Button type="submit" size="lg" disabled={isSubmitting} class="rounded-full">
 				{#if isSubmitting}
 					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 				{/if}
-				Save Reading
+				Save reading
 			</Button>
 		</div>
 	</form>

@@ -187,6 +187,7 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 		state.formData.description = expense.description || '';
 		state.formData.location = expense.location || '';
 		state.formData.missedFillup = expense.missedFillup ?? false;
+		state.paidByDriverId = expense.paidByDriverId ?? null;
 	} catch (error) {
 		reportExpenseLoadFailure(state, error, 'expense');
 	} finally {

@@ -62,10 +62,10 @@ async function choose(id: string, name: string): Promise<void> {
 async function renderEditAndSwitchToKilometers(): Promise<void> {
 	getVehicle.mockResolvedValue(EXISTING);
 	render(VehicleForm, { props: { vehicleId: EXISTING.id } });
-	await screen.findByRole('button', { name: /update vehicle/i });
-	await fireEvent.click(screen.getByRole('button', { name: 'Toggle unit preferences' }));
+	await screen.findByRole('button', { name: /save changes/i });
+	await fireEvent.click(screen.getByRole('button', { name: 'Change units' }));
 	await choose('distanceUnit', 'Kilometers');
-	await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+	await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 }
 
 beforeEach(() => {
@@ -96,11 +96,11 @@ async function renderFinancedEditOwnAndKilometers(): Promise<void> {
 	getFinancing.mockResolvedValue(LOAN);
 	payOffFinancing.mockResolvedValue({ ...LOAN, isActive: false });
 	render(VehicleForm, { props: { vehicleId: EXISTING.id } });
-	await screen.findByRole('button', { name: /update vehicle/i });
-	await fireEvent.click(screen.getByRole('button', { name: 'Toggle unit preferences' }));
+	await screen.findByRole('button', { name: /save changes/i });
+	await fireEvent.click(screen.getByRole('button', { name: 'Change units' }));
 	await choose('distanceUnit', 'Kilometers');
 	await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
-	await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+	await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 	const payoff = await screen.findByRole('alertdialog');
 	await fireEvent.click(within(payoff).getByRole('button', { name: 'Mark Paid Off' }));
 	await waitFor(() =>
@@ -128,7 +128,7 @@ describe('VehicleForm unit change together with paying off the loan', () => {
 			within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' })
 		);
 		await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
-		await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
 		const dialog = await screen.findByRole('alertdialog');
 		expect(dialog.textContent).toContain('Change units for this vehicle?');

@@ -1,6 +1,7 @@
 import { and, eq, ne } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { userProviders } from '../../db/schema';
@@ -17,15 +18,16 @@ import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { readJsonBody } from '../../utils/request-body';
 import { OPERATION_TIMEOUTS, withDeadline, withTimeout } from '../../utils/timeout';
 import { zValidator } from '../../utils/validation';
-import { preferencesRepository, syncStateRepository } from '../settings/repository';
 import { activityTracker } from './activity-tracker';
 import { backupService } from './backup';
-import { backupOrchestrator, loadProviderTypes } from './backup-orchestrator';
-import { hasSheetsSync, hasZipBackup } from './backup-strategy';
+import { backupOrchestrator } from './backup-orchestrator';
+import { hasSheetsSync, hasZipBackup, isSyncEnabled } from './backup-strategy';
 import './init';
 import { type RestoreResponse, restoreService } from './restore';
 
 const routes = new Hono();
+
+const UNHEALTHY_PROVIDER_STATUSES: ReadonlySet<string> = new Set(['needs_reauth', 'error']);
 
 routes.use('*', requireAuth);
 
@@ -119,10 +121,10 @@ routes.post(
   async (c) => {
     const userId = c.get('user').id;
     const { providerId } = c.req.valid('param');
-    const prefs = await preferencesRepository.getOrCreate(userId);
+    const prefs = await repos().preferences.getOrCreate(userId);
     const config = prefs?.backupConfig as BackupConfig | null;
     if (config?.providers?.[providerId]?.sheetsAutoPausedAt) {
-      await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
+      await repos().preferences.mergeJsonField(userId, 'backupConfig', {
         providers: { [providerId]: { sheetsAutoPausedAt: null } },
       });
     }
@@ -132,22 +134,41 @@ routes.post(
 
 routes.get('/status', authorize(ownAccount), async (c) => {
   const user = c.get('user');
-  const settings = await preferencesRepository.getOrCreate(user.id);
+  const settings = await repos().preferences.getOrCreate(user.id);
   const syncStatus = activityTracker.getSyncStatus(user.id);
-  const syncStateData = await syncStateRepository.getOrCreate(user.id);
+  const syncStateData = await repos().syncState.getOrCreate(user.id);
 
   const config = settings.backupConfig as BackupConfig | null;
   const providers = config?.providers;
-  const providerTypes = providers ? await loadProviderTypes(user.id) : new Map<string, string>();
+  const providerRows = providers
+    ? await getDb()
+        .select({
+          id: userProviders.id,
+          providerType: userProviders.providerType,
+          status: userProviders.status,
+        })
+        .from(userProviders)
+        .where(eq(userProviders.userId, user.id))
+    : [];
+  const providerTypes = new Map(providerRows.map((row) => [row.id, row.providerType]));
   const backupEnabled = providers
     ? Object.entries(providers).some(([id, s]) => hasZipBackup(s, providerTypes.get(id)))
     : false;
   const sheetsSyncEnabled = providers ? Object.values(providers).some(hasSheetsSync) : false;
+  const providerNeedsAttention = providerRows.some((row) => {
+    const backup = providers?.[row.id];
+    return (
+      backup !== undefined &&
+      UNHEALTHY_PROVIDER_STATUSES.has(row.status) &&
+      isSyncEnabled(backup, row.providerType)
+    );
+  });
 
   return c.json(
     createSuccessResponse({
       backupEnabled,
       sheetsSyncEnabled,
+      providerNeedsAttention,
       syncOnInactivity: settings.syncOnInactivity,
       syncInactivityMinutes: settings.syncInactivityMinutes,
       lastSyncDate: syncStateData.lastSyncDate,
@@ -309,7 +330,7 @@ routes.get('/restore/providers', syncRateLimiter, authorize(ownAccount), async (
       )
     );
 
-  const settings = await preferencesRepository.getOrCreate(user.id);
+  const settings = await repos().preferences.getOrCreate(user.id);
   const config: BackupConfig = (settings.backupConfig as BackupConfig | null) ?? {
     providers: {},
   };

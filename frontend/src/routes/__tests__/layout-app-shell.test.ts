@@ -28,7 +28,8 @@ vi.mock('#lib/utils/sync/sync-manager.ts', () => {
 		lastSheetsSync: store<Date | null>(null),
 		lastDataChangeTime: store<Date | null>(null),
 		backupEnabled: store(false),
-		sheetsSyncEnabled: store(false)
+		sheetsSyncEnabled: store(false),
+		providerNeedsAttention: store(false)
 	};
 });
 
@@ -244,6 +245,37 @@ describe('the root layout paints the app shell without waiting on /auth/me', () 
 		expect(screen.getByText('Page content')).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: 'Skip to content' })).toBeInTheDocument();
 		expect(offlineExpenseQueue.current.map(e => e.id)).toEqual(['alice-1']);
+	});
+
+	it.each([
+		['/dashboard', false],
+		['/privacypolicy', true]
+	])('a waiting account on %s never gets the app shell', async (path, showsPage) => {
+		location.path = path;
+		mockFetch.mockResolvedValue(
+			new Response(
+				JSON.stringify({
+					success: true,
+					data: { user: alice, session: { expiresAt: '2099-01-01' }, pendingApproval: true }
+				}),
+				{ status: 200, headers: { 'content-type': 'application/json' } }
+			)
+		);
+
+		render(Layout, { children: pageContent });
+
+		await waitFor(() => expect(authStore.user?.pendingApproval).toBe(true));
+		if (showsPage) {
+			expect(screen.getByText('Page content')).toBeInTheDocument();
+		} else {
+			expect(await screen.findByTestId('account-pending')).toBeInTheDocument();
+			expect(screen.queryByText('Page content')).toBeNull();
+		}
+		expect(screen.queryByRole('link', { name: 'Skip to content' })).toBeNull();
+		expect(screen.queryByTestId('account-pending') !== null).toBe(!showsPage);
+		expect(mockFetch.mock.calls.map(([url]) => String(url))).not.toContainEqual(
+			expect.stringContaining('/settings')
+		);
 	});
 
 	it('keeps the branded splash on a protected route when nobody signed in on this device', () => {

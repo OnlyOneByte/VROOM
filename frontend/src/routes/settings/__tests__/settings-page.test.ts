@@ -5,6 +5,8 @@ import type { User, UserProviderInfo, UserSettings } from '#lib/types/index.ts';
 import { fakeSettingsState, settingsStoreFake } from './settings-store-fake.svelte.ts';
 import { toast } from 'svelte-sonner';
 import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
+import { packRules } from '@casl/ability/extra';
+import type { PackedRules } from '#lib/utils/permissions.ts';
 
 const { showError, showSuccess, getProviders, fetchLastSyncTime } = vi.hoisted(() => ({
 	showError: vi.fn<(message: string) => void>(),
@@ -26,6 +28,10 @@ vi.mock('#lib/stores/app.svelte.ts', () => ({
 vi.mock('#lib/services/provider-api.ts', () => ({
 	providerApi: { getProviders: (domain?: string) => getProviders(domain) }
 }));
+const { serverRules } = vi.hoisted(() => ({
+	serverRules: vi.fn<() => Promise<PackedRules>>(async () => [])
+}));
+vi.mock('#lib/services/signup-api.ts', () => ({ signupApi: { serverRules } }));
 vi.mock('#lib/utils/sync/sync-manager.ts', () => ({
 	fetchLastSyncTime: () => fetchLastSyncTime()
 }));
@@ -209,6 +215,18 @@ describe('Settings page loading', () => {
 		expect(link).toHaveTextContent('AL');
 		expect(link).toHaveTextContent('Ada Lovelace');
 		expect(link).toHaveTextContent('ada@example.com');
+	});
+
+	test('only someone who manages sign-up sees the Server link', async () => {
+		await mount();
+		expect(screen.queryByTestId('settings-server-link')).toBeNull();
+		cleanup();
+
+		serverRules.mockResolvedValueOnce(
+			packRules([{ action: 'server.signup.manage', subject: 'all' }]) as PackedRules
+		);
+		await mount();
+		expect(screen.getByTestId('settings-server-link')).toHaveAttribute('href', '/settings/server');
 	});
 
 	test('the profile link falls back to generic text without a user', async () => {

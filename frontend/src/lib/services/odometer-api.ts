@@ -19,13 +19,10 @@ interface CreateOdometerRequest {
 	odometer: number;
 	recordedAt: string;
 	note?: string;
+	driverId?: string | null;
 }
 
-interface UpdateOdometerRequest {
-	odometer?: number;
-	recordedAt?: string;
-	note?: string;
-}
+type UpdateOdometerRequest = Partial<CreateOdometerRequest>;
 
 export const odometerApi = {
 	async getEntries(

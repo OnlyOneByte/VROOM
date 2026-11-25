@@ -13,7 +13,7 @@ test.describe('Fleet overview', () => {
 
 		await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 		await expect(page.getByRole('heading', { name: 'Add your first vehicle' })).toBeVisible();
-		await expect(page.getByRole('link', { name: 'Add Vehicle' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Add vehicle' })).toBeVisible();
 	});
 
 	test('the dashboard lists the fleet and links each vehicle to its page', async ({ page }) => {
@@ -30,6 +30,23 @@ test.describe('Fleet overview', () => {
 			'href',
 			`/vehicles/${VEHICLE_CIVIC.id}`
 		);
+	});
+
+	test('the Garage tab lists the fleet and opens a vehicle', async ({ page }) => {
+		await mockApi(page);
+
+		await page.goto('/dashboard');
+		await page
+			.getByRole('navigation', { name: 'Main' })
+			.getByRole('link', { name: 'Garage' })
+			.click();
+
+		await expect(page).toHaveURL(/\/vehicles$/);
+		await expect(page.getByRole('heading', { level: 1, name: /vehicles?$/ })).toBeVisible();
+		const camry = page.getByRole('link', { name: VEHICLE_CAMRY.nickname });
+		await expect(camry).toHaveAttribute('href', `/vehicles/${VEHICLE_CAMRY.id}`);
+		await camry.click();
+		await expect(page).toHaveURL(new RegExp(`/vehicles/${VEHICLE_CAMRY.id}$`));
 	});
 
 	test('a financed vehicle is badged as financed', async ({ page }) => {
@@ -73,15 +90,15 @@ test.describe('Adding a vehicle', () => {
 
 		await expect(async () => {
 			if (!/\/vehicles\/new$/.test(page.url())) {
-				await page.getByRole('link', { name: 'Add Vehicle' }).click();
+				await page.getByRole('link', { name: 'Add vehicle' }).click();
 			}
 			expect(page.url()).toMatch(/\/vehicles\/new$/);
 		}).toPass({ timeout: 20_000, intervals: [300, 1000, 2000] });
 
-		await expect(page.getByRole('heading', { name: 'Add Vehicle' })).toBeVisible();
-		await expect(page.getByLabel('Make *')).toBeVisible();
-		await expect(page.getByLabel('Model *')).toBeVisible();
-		await expect(page.getByLabel('Year *')).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Add a vehicle' })).toBeVisible();
+		await expect(page.getByLabel('Make', { exact: true })).toBeVisible();
+		await expect(page.getByLabel('Model', { exact: true })).toBeVisible();
+		await expect(page.getByLabel('Year', { exact: true })).toBeVisible();
 	});
 
 	test('submitting an empty form reports the missing required fields', async ({ page }) => {
@@ -95,7 +112,7 @@ test.describe('Adding a vehicle', () => {
 		);
 
 		await page.goto('/vehicles/new');
-		await page.getByRole('button', { name: 'Add Vehicle' }).click();
+		await page.getByRole('button', { name: 'Save vehicle' }).click();
 
 		await expect(page.getByText('Make is required')).toBeVisible();
 		await expect(page.getByText('Model is required')).toBeVisible();
@@ -105,21 +122,21 @@ test.describe('Adding a vehicle', () => {
 	test('a filled form POSTs the vehicle and returns to the dashboard', async ({ page }) => {
 		await page.goto('/vehicles/new');
 
-		await page.getByLabel('Make *').fill('Tesla');
-		await page.getByLabel('Model *').fill('Model 3');
-		await page.getByLabel('Year *').fill('2023');
-		await page.getByLabel('License Plate').fill('TESLA1');
+		await page.getByLabel('Make', { exact: true }).fill('Tesla');
+		await page.getByLabel('Model', { exact: true }).fill('Model 3');
+		await page.getByLabel('Year', { exact: true }).fill('2023');
+		await page.getByLabel('Plate (optional)').fill('TESLA1');
 
 		const postRequest = page.waitForRequest(
 			request =>
 				new URL(request.url()).pathname === '/api/v1/vehicles' && request.method() === 'POST'
 		);
-		await page.getByRole('button', { name: 'Add Vehicle' }).click();
+		await page.getByRole('button', { name: 'Save vehicle' }).click();
 
 		const body = (await postRequest).postDataJSON();
 		expect(body).toMatchObject({ make: 'Tesla', model: 'Model 3', year: 2023 });
 
 		await expect(page.getByText('Vehicle added successfully!')).toBeVisible();
-		await expect(page).toHaveURL(/\/dashboard$/);
+		await expect(page).toHaveURL(/\/vehicles$/);
 	});
 });

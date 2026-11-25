@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { onMount } from 'svelte';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -9,20 +10,47 @@
 	import { authApi } from '#lib/services/auth-api.ts';
 	import { routes } from '#lib/routes.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import * as Card from '#lib/components/ui/card/index.ts';
-	import { LoaderCircle, ArrowLeft, CircleAlert } from '@lucide/svelte';
-	import BrandMark from '#lib/components/common/BrandMark.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { LoaderCircle, TriangleAlert } from '@lucide/svelte';
 	import { authProviderIcon } from '#lib/constants/auth-providers.ts';
 
-	const authErrorMessages: Record<string, string> = {
-		invalid_state: 'Your sign-in session expired. Please try again.',
-		email_exists:
-			'An account with this email already exists. Sign in with your existing account and link this provider from settings.',
-		provider_unavailable: 'Sign-in provider is temporarily unavailable. Please try again.',
-		no_email:
-			"We couldn't retrieve your email from this provider. Please check your provider's privacy settings.",
-		unknown_provider: 'This sign-in method is not supported.',
-		cancelled: 'Sign-in was cancelled.'
+	const authErrorMessages: Record<string, { title: string; body: string }> = {
+		invalid_state: {
+			title: 'Your sign-in expired',
+			body: 'It took too long to come back from the provider. Please try again.'
+		},
+		email_exists: {
+			title: 'That email already has an account',
+			body: 'Sign in with your existing account and link this provider from settings.'
+		},
+		provider_unavailable: {
+			title: 'That sign-in option is unavailable',
+			body: 'The provider is temporarily unavailable. Please try again.'
+		},
+		no_email: {
+			title: "We couldn't get your email",
+			body: "Check your provider's privacy settings, then try again."
+		},
+		unknown_provider: {
+			title: 'That sign-in option isn’t supported',
+			body: 'Pick one of the options below.'
+		},
+		cancelled: {
+			title: 'Sign-in was cancelled',
+			body: 'The provider didn’t finish signing you in. Try again, or pick another option.'
+		},
+		signup_closed: {
+			title: "This server isn't taking new accounts",
+			body: 'Ask its admin if you think you should have one.'
+		},
+		signup_invite_required: {
+			title: 'This server is invite only',
+			body: 'Ask its admin for an invite, then sign in with the email they invited.'
+		},
+		signup_domain_not_allowed: {
+			title: "Your email domain can't join this server",
+			body: 'This server only takes accounts from certain email domains. Try another account, or ask its admin.'
+		}
 	};
 
 	let providers = $state<{ id: string; displayName: string }[]>([]);
@@ -48,19 +76,13 @@
 		try {
 			providers = await authApi.getProviders();
 		} catch (err) {
-			fetchError = `Couldn't load the sign-in options. ${userFacingErrorMessage(err)}`;
+			fetchError = userFacingErrorMessage(err);
 		} finally {
 			isLoadingProviders = false;
 		}
 	}
 
 	onMount(loadProviders);
-
-	async function retryProviders() {
-		await loadProviders();
-		await tick();
-		focusFirstButton(optionsCard);
-	}
 
 	function handleLogin(providerId: string) {
 		signingInProvider = providerId;
@@ -73,86 +95,76 @@
 	<meta name="description" content="Sign in to track your vehicle expenses" />
 </svelte:head>
 
-<div
-	class="min-h-screen flex items-center justify-center bg-gradient-to-br from-muted to-muted/50 p-4"
->
-	<div class="w-full max-w-md space-y-6">
-		<Button
-			variant="ghost"
-			size="sm"
-			class="h-10 text-muted-foreground sm:h-8"
-			onclick={() => goto(resolve(routes.home))}
-		>
-			<ArrowLeft class="mr-1 h-4 w-4" />
-			Back to home
-		</Button>
+<div class="min-h-screen bg-background px-[18px] pt-4 pb-10 lg:px-10">
+	<a
+		href={resolve(routes.home)}
+		class="inline-block rounded-md font-(family-name:--font-fig) text-[22px] font-bold tracking-[0.3em] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+		aria-label="VROOM home"
+	>
+		VR<span class="text-accent-ink">O</span>OM
+	</a>
 
-		<div class="text-center space-y-2">
-			<div
-				class="inline-flex items-center justify-center w-20 h-20 bg-primary rounded-3xl shadow-lg mb-4"
-			>
-				<BrandMark class="h-12 w-12 text-primary-foreground" />
-			</div>
-			<h1 class="text-3xl font-bold tracking-tight text-foreground">Welcome back</h1>
-			<p class="text-muted-foreground">Sign in to continue to your dashboard</p>
-		</div>
-
+	<div class="mx-auto mt-[8vh] grid w-full max-w-[420px] gap-3">
 		{#if authErrorMessage}
 			<div
-				class="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4"
+				class="mb-4 grid grid-cols-[28px_1fr] items-center gap-3.5 rounded-[var(--r-lg)] bg-due-tint px-5 py-[18px]"
+				role="alert"
 			>
-				<CircleAlert class="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-				<p class="text-sm text-destructive">{authErrorMessage}</p>
+				<TriangleAlert class="size-6 text-destructive" aria-hidden="true" />
+				<div class="min-w-0">
+					<p class="font-[650]">{authErrorMessage.title}</p>
+					<p class="text-sm">{authErrorMessage.body}</p>
+				</div>
 			</div>
 		{/if}
 
-		<Card.Root class="border-2">
-			<Card.Content bind:ref={optionsCard} class="pt-6 space-y-4">
-				{#if isLoadingProviders}
-					<div class="flex items-center justify-center py-6">
-						<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
-					</div>
-				{:else if fetchError}
-					<div class="text-center py-6 space-y-2">
-						<CircleAlert class="h-8 w-8 text-destructive mx-auto" />
-						<p class="text-sm text-destructive" role="alert">{fetchError}</p>
-						<Button variant="outline" size="lg" onclick={retryProviders}>Retry</Button>
-					</div>
-				{:else if providers.length === 0}
-					<div class="text-center py-6">
-						<p class="text-sm text-muted-foreground" role="status">
-							Sign-in is currently unavailable. No providers are enabled.
-						</p>
-					</div>
-				{:else}
-					{#each providers as provider (provider.id)}
-						{@const IconComponent = authProviderIcon(provider.id)}
-						<Button
-							variant="outline"
-							size="lg"
-							class="w-full h-12 text-base"
-							disabled={signingInProvider !== null}
-							onclick={() => handleLogin(provider.id)}
-						>
-							{#if signingInProvider === provider.id}
-								<LoaderCircle class="mr-2 h-5 w-5 animate-spin" />
-								Signing in...
-							{:else}
-								<IconComponent class="mr-2 h-5 w-5" />
-								Continue with {provider.displayName}
-							{/if}
-						</Button>
-					{/each}
-				{/if}
-
-				<p class="text-xs text-muted-foreground text-center">
-					Secure OAuth authentication. We only store your email and display name.
-				</p>
-			</Card.Content>
-		</Card.Root>
-
-		<p class="text-center text-sm text-muted-foreground">
-			No account needed · Sign in with a provider to get started
+		<p class="text-[13px] font-medium text-muted-foreground">Sign in</p>
+		<h1
+			class="font-(family-name:--font-fig) text-5xl leading-[0.9] font-bold uppercase sm:text-[64px]"
+		>
+			Welcome back
+		</h1>
+		<p class="text-muted-foreground">
+			Use the account you signed up with. VROOM never sees your password.
 		</p>
+
+		<div bind:this={optionsCard} class="mt-3 grid gap-3">
+			{#if isLoadingProviders}
+				<Skeleton class="h-13 w-full rounded-full" />
+				<Skeleton class="h-13 w-full rounded-full" />
+			{:else if fetchError}
+				<LoadErrorCard
+					compact
+					title="Couldn't load the sign-in options"
+					message={fetchError}
+					onRetry={loadProviders}
+					onRecovered={() => focusFirstButton(optionsCard)}
+				/>
+			{:else if providers.length === 0}
+				<p class="text-sm text-muted-foreground" role="status">
+					Sign-in is currently unavailable. No providers are enabled.
+				</p>
+			{:else}
+				{#each providers as provider (provider.id)}
+					{@const IconComponent = authProviderIcon(provider.id)}
+					<Button
+						variant="outline"
+						class="h-13 w-full text-base"
+						disabled={signingInProvider !== null}
+						onclick={() => handleLogin(provider.id)}
+					>
+						{#if signingInProvider === provider.id}
+							<LoaderCircle class="size-5 motion-safe:animate-spin" aria-hidden="true" />
+							Signing in...
+						{:else}
+							<IconComponent class="size-5" />
+							Continue with {provider.displayName}
+						{/if}
+					</Button>
+				{/each}
+			{/if}
+		</div>
+
+		<p class="mt-2 text-[13px] text-muted-foreground">New here? Signing in creates your garage.</p>
 	</div>
 </div>

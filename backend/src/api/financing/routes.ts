@@ -1,6 +1,7 @@
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { type AppContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { vehicleFinancing } from '../../db/schema';
 import { NotFoundError } from '../../errors';
@@ -19,9 +20,8 @@ import {
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
-import { vehicleRepository } from '../vehicles/repository';
 import { deactivateFinancing } from './hooks';
-import { financingRepository, withComputedBalance } from './repository';
+import { withComputedBalance } from './repository';
 
 const routes = new Hono();
 
@@ -109,15 +109,15 @@ const financingParamsSchema = z.object({
 });
 
 const fromFinancing: ResourceOf = async (c) => {
-  const financing = await financingRepository.findById(c.req.param('financingId') ?? '');
+  const financing = await repos().financing.findById(c.req.param('financingId') ?? '');
   if (!financing) throw new NotFoundError('Financing');
   return { kind: 'vehicle', vehicleId: financing.vehicleId };
 };
 
 async function financingOwner(financingId: string): Promise<string> {
-  const financing = await financingRepository.findById(financingId);
+  const financing = await repos().financing.findById(financingId);
   if (!financing) throw new NotFoundError('Financing');
-  const owner = await vehicleRepository.findById(financing.vehicleId);
+  const owner = await repos().vehicles.findById(financing.vehicleId);
   if (!owner) throw new NotFoundError('Financing');
   return owner.userId;
 }
@@ -126,10 +126,10 @@ routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
 async function enrichWithBalance(
-  financing: NonNullable<Awaited<ReturnType<typeof financingRepository.findByVehicleId>>>,
+  financing: NonNullable<Awaited<ReturnType<AppContext['repos']['financing']['findByVehicleId']>>>,
   timeZone?: string
 ) {
-  const computedBalance = await financingRepository.computeBalance(financing.id, timeZone);
+  const computedBalance = await repos().financing.computeBalance(financing.id, timeZone);
   return withComputedBalance(financing, computedBalance);
 }
 
@@ -144,7 +144,7 @@ routes.get(
     const { vehicleId } = c.req.valid('param');
     const { timeZone } = c.req.valid('query');
 
-    const financingData = await financingRepository.findByVehicleId(vehicleId);
+    const financingData = await repos().financing.findByVehicleId(vehicleId);
     if (!financingData) {
       return c.json({
         success: true,
@@ -167,11 +167,11 @@ routes.post(
     const { vehicleId } = c.req.valid('param');
     const financingData = c.req.valid('json');
 
-    const existingFinancing = await financingRepository.findByVehicleId(vehicleId);
+    const existingFinancing = await repos().financing.findByVehicleId(vehicleId);
 
     if (existingFinancing) {
       // update() skips undefined keys, so every reset field must be set to null explicitly.
-      const updatedFinancing = await financingRepository.update(existingFinancing.id, {
+      const updatedFinancing = await repos().financing.update(existingFinancing.id, {
         ...financingData,
         apr: financingData.apr ?? null,
         paymentDayOfMonth: financingData.paymentDayOfMonth ?? null,
@@ -189,7 +189,7 @@ routes.post(
       });
     }
 
-    const createdFinancing = await financingRepository.create({
+    const createdFinancing = await repos().financing.create({
       ...financingData,
       vehicleId,
     });
@@ -218,7 +218,7 @@ routes.patch(
     const { financingId } = c.req.valid('param');
     const { paymentAmount } = c.req.valid('json');
 
-    const updated = await financingRepository.update(financingId, {
+    const updated = await repos().financing.update(financingId, {
       paymentAmount,
       updatedAt: new Date(),
     });

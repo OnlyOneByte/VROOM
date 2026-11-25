@@ -2,6 +2,7 @@ import { stringify } from 'csv-stringify/sync';
 import { createInsertSchema } from 'drizzle-zod';
 import { type Context, Hono, type Next } from 'hono';
 import { z } from 'zod';
+import { type AppContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { type Expense, expenses as expensesTable, type NewExpense } from '../../db/schema';
 import { EXPENSE_CATEGORIES } from '../../db/types';
@@ -42,11 +43,9 @@ import {
   seesFinancials,
   writesFinancials,
 } from '../../utils/vehicle-access';
-import { financingRepository } from '../financing/repository';
+import { assertMayClearDriver, attributedDriver, hideDriverFields } from '../drivers/attribution';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
-import { preferencesRepository } from '../settings/repository';
-import { vehicleRepository } from '../vehicles/repository';
 import {
   buildImportPlan,
   CsvImportError,
@@ -66,7 +65,6 @@ import {
   IMPORT_DETECT_SAMPLE_LENGTH,
   importFormatList,
 } from './import-mapping-presets';
-import { expenseRepository } from './repository';
 import {
   clearFuelFieldsIfNotFuel,
   createSplitExpenseSchema,
@@ -94,7 +92,7 @@ async function odometerCheck(
   excludeId?: string
 ): Promise<OdometerCheck | null> {
   if (mileage == null) return null;
-  const vehicle = await vehicleRepository.findById(vehicleId);
+  const vehicle = await repos().vehicles.findById(vehicleId);
   return {
     vehicleId,
     mileage,
@@ -278,7 +276,7 @@ async function assertFinancingSourceValid(
   vehicleId: string
 ): Promise<void> {
   if (sourceType !== 'financing') return;
-  const financing = await financingRepository.findByVehicleId(vehicleId);
+  const financing = await repos().financing.findByVehicleId(vehicleId);
   if (!financing?.isActive) {
     throw new ValidationError('Vehicle has no active financing');
   }
@@ -329,7 +327,7 @@ const fromBodyVehicle: ResourceOf = async (c) =>
   vehicleResource((await readJsonBody<{ vehicleId: string }>(c)).vehicleId);
 
 const fromExpense: ResourceOf = async (c) => {
-  const expense = await expenseRepository.findById(c.req.param('id') ?? '');
+  const expense = await repos().expenses.findById(c.req.param('id') ?? '');
   if (!expense) throw new NotFoundError('Expense');
   return vehicleResource(expense.vehicleId, expense.createdBy ?? expense.userId);
 };
@@ -340,7 +338,7 @@ const fromSplitBody: ResourceOf = async (c) => {
 };
 
 const fromSplitGroup: ResourceOf = async (c) => {
-  const group = await expenseRepository.getSplitGroupAccessInfo(c.req.param('id') ?? '');
+  const group = await repos().expenses.getSplitGroupAccessInfo(c.req.param('id') ?? '');
   if (!group) throw new NotFoundError('Split expense');
   const [only, ...others] = group.authors;
   const author = others.length === 0 ? (only ?? group.ownerId) : null;
@@ -408,7 +406,12 @@ routes.post(
     assertMayTouchFinancialExpense(mayTouch, data.sourceType);
     await assertSplitFinancingSourceValid(data.sourceType, data.sourceId, data.splitConfig);
 
-    const siblings = await expenseRepository.createSplitExpense(data, { ownerId, createdBy });
+    const payerFor = (vehicleId: string) => attributedDriver(c, vehicleId, undefined) ?? null;
+    const siblings = await repos().expenses.createSplitExpense(data, {
+      ownerId,
+      createdBy,
+      payerFor,
+    });
     const first = siblings[0];
     if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
       throw new ValidationError('Split expense creation returned invalid data');
@@ -418,7 +421,7 @@ routes.post(
       {
         success: true,
         data: {
-          siblings: siblings.map(expenseToApi),
+          siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
           groupId: first.groupId,
           groupTotal: centsToDollars(first.groupTotal),
           splitMethod: first.splitMethod,
@@ -440,7 +443,7 @@ routes.put(
     const { id } = c.req.valid('param');
     const data = c.req.valid('json');
 
-    const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
+    const groupInfo = await repos().expenses.getSplitGroupAccessInfo(id);
     if (!groupInfo) throw new NotFoundError('Split expense');
     const existingConfig: SplitConfig = { method: 'even', vehicleIds: groupInfo.vehicleIds };
     await requireSplitWriteAccess(existingConfig, user.id);
@@ -453,7 +456,7 @@ routes.put(
     }
     assertMayTouchFinancialExpense(mayTouch, groupInfo.sourceType);
 
-    const existing = await expenseRepository.getSplitExpense(id, groupInfo.ownerId);
+    const existing = await repos().expenses.getSplitExpense(id, groupInfo.ownerId);
     const kept = new Set(splitConfigVehicleIds(data.splitConfig));
     for (const leg of existing.filter((row) => !kept.has(row.vehicleId))) {
       requireCan(
@@ -468,7 +471,7 @@ routes.put(
       data.splitConfig
     );
 
-    const siblings = await expenseRepository.updateSplitExpense(id, data, groupInfo.ownerId);
+    const siblings = await repos().expenses.updateSplitExpense(id, data, groupInfo.ownerId);
     const first = siblings[0];
     if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
       throw new ValidationError('Split expense update returned invalid data');
@@ -477,7 +480,7 @@ routes.put(
     return c.json({
       success: true,
       data: {
-        siblings: siblings.map(expenseToApi),
+        siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
         groupId: first.groupId,
         groupTotal: centsToDollars(first.groupTotal),
         splitMethod: first.splitMethod,
@@ -495,14 +498,14 @@ routes.get(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
+    const groupInfo = await repos().expenses.getSplitGroupAccessInfo(id);
     if (!groupInfo) throw new NotFoundError('Split expense');
     for (const vehicleId of groupInfo.vehicleIds) {
       const access = await requireVehicleAccess(vehicleId, user.id, 'read');
       assertMayTouchFinancialExpense(seesFinancials(access), groupInfo.sourceType);
     }
 
-    const siblings = await expenseRepository.getSplitExpense(id, groupInfo.ownerId);
+    const siblings = await repos().expenses.getSplitExpense(id, groupInfo.ownerId);
     const first = siblings[0];
     if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
       throw new ValidationError('Split expense data is invalid');
@@ -511,7 +514,7 @@ routes.get(
     return c.json({
       success: true,
       data: {
-        siblings: siblings.map(expenseToApi),
+        siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
         groupId: first.groupId,
         groupTotal: centsToDollars(first.groupTotal),
         splitMethod: first.splitMethod,
@@ -528,7 +531,7 @@ routes.delete(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
+    const groupInfo = await repos().expenses.getSplitGroupAccessInfo(id);
     if (!groupInfo) throw new NotFoundError('Split expense');
     const { writesFinancials: mayTouch } = await requireSplitWriteAccess(
       { method: 'even', vehicleIds: groupInfo.vehicleIds },
@@ -536,10 +539,10 @@ routes.delete(
     );
     assertMayTouchFinancialExpense(mayTouch, groupInfo.sourceType);
 
-    const siblingIds = await expenseRepository.findIdsByGroupId(id, groupInfo.ownerId);
+    const siblingIds = await repos().expenses.findIdsByGroupId(id, groupInfo.ownerId);
     await deletePhotosForEntities('expense', siblingIds, groupInfo.ownerId);
 
-    await expenseRepository.deleteSplitExpense(id, groupInfo.ownerId);
+    await repos().expenses.deleteSplitExpense(id, groupInfo.ownerId);
 
     return c.json({ success: true, message: 'Split expense deleted successfully' });
   }
@@ -559,7 +562,7 @@ routes.get(
     const user = c.get('user');
     const { vehicleId, period, timeZone } = c.req.valid('query');
 
-    const summary = await expenseRepository.getSummary({
+    const summary = await repos().expenses.getSummary({
       ...(await resolveExpenseReadScope(vehicleId, user.id)),
       vehicleId,
       period,
@@ -612,7 +615,7 @@ routes.get(
     const scope = await resolveExpenseReadScope(vehicleId, user.id);
     const isSharedExport = scope.userId !== user.id;
     const [rows, vehicles, sharedVehicles, prefs] = await Promise.all([
-      expenseRepository.findAll({
+      repos().expenses.findAll({
         ...scope,
         vehicleId,
         category,
@@ -623,9 +626,9 @@ routes.get(
         search,
         tags,
       }),
-      vehicleRepository.findByUserId(user.id),
-      isSharedExport && vehicleId ? vehicleRepository.findByIds([vehicleId]) : Promise.resolve([]),
-      preferencesRepository.getByUserId(user.id),
+      repos().vehicles.findByUserId(user.id),
+      isSharedExport && vehicleId ? repos().vehicles.findByIds([vehicleId]) : Promise.resolve([]),
+      repos().preferences.getByUserId(user.id),
     ]);
 
     const currency = prefs?.currencyUnit || 'USD';
@@ -675,7 +678,7 @@ const importBodySchema = importCsvSchema.extend({
 });
 
 function targetUnitsResolver(
-  vehicles: Awaited<ReturnType<typeof vehicleRepository.findByUserId>>
+  vehicles: Awaited<ReturnType<AppContext['repos']['vehicles']['findByUserId']>>
 ): TargetUnitsResolver {
   return (vehicleName) => {
     const wanted = vehicleNameKey(vehicleName);
@@ -719,11 +722,11 @@ routes.post(
     const user = c.get('user');
     const { csv, dryRun, mapping, timeZone } = c.req.valid('json');
 
-    const vehicles = await vehicleRepository.findByUserId(user.id);
+    const vehicles = await repos().vehicles.findByUserId(user.id);
     if (vehicles.length === 0) {
       throw new ValidationError('Add a vehicle before importing expenses');
     }
-    const { currencyUnit: accountCurrency } = await preferencesRepository.getOrCreate(user.id);
+    const { currencyUnit: accountCurrency } = await repos().preferences.getOrCreate(user.id);
 
     let importCsv = csv;
     let unmappedCategories: string[] = [];
@@ -769,7 +772,7 @@ routes.post(
     const readyRows = plan.rows
       .filter((row) => row.status === 'ready' && row.expense)
       .map((row) => ({ ...row.expense, userId: user.id }) as NewExpense);
-    const { imported, duplicates } = await expenseRepository.importExpenses(readyRows, user.id);
+    const { imported, duplicates } = await repos().expenses.importExpenses(readyRows, user.id);
 
     return c.json({
       success: true,
@@ -815,10 +818,11 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
   const access = await requireVehicleAccess(expenseData.vehicleId, user.id, 'read');
   const { ownerId } = access;
   const createdBy = ownerId === user.id ? null : user.id;
+  const paidByDriverId = attributedDriver(c, expenseData.vehicleId, expenseData.paidByDriverId);
   assertMayTouchFinancialExpense(writesFinancials(access), expenseData.sourceType);
 
   let createdExpense = expenseData.clientId
-    ? await expenseRepository.findReplay(expenseData.clientId, ownerId, expenseData.vehicleId)
+    ? await repos().expenses.findReplay(expenseData.clientId, ownerId, expenseData.vehicleId)
     : null;
 
   if (!createdExpense) {
@@ -835,8 +839,8 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
       expenseData.fuelType
     );
 
-    createdExpense = await expenseRepository.createIdempotent(
-      { ...expenseData, userId: ownerId, createdBy },
+    createdExpense = await repos().expenses.createIdempotent(
+      { ...expenseData, paidByDriverId, userId: ownerId, createdBy },
       await odometerCheck({ ...expenseData, timeZone })
     );
   }
@@ -849,7 +853,7 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
   return c.json(
     {
       success: true,
-      data: expenseToApi(createdExpense),
+      data: hideDriverFields(c, createdExpense.vehicleId, expenseToApi(createdExpense)),
       message: 'Expense created successfully',
     },
     201
@@ -860,7 +864,7 @@ routes.get('/', zValidator('query', expenseQuerySchema), authorize(fromQueryVehi
   const user = c.get('user');
   const query = c.req.valid('query');
 
-  const { data, totalCount } = await expenseRepository.findPaginated({
+  const { data, totalCount } = await repos().expenses.findPaginated({
     ...(await resolveExpenseReadScope(query.vehicleId, user.id)),
     vehicleId: query.vehicleId,
     category: query.category,
@@ -878,7 +882,12 @@ routes.get('/', zValidator('query', expenseQuerySchema), authorize(fromQueryVehi
 
   const { limit, offset } = clampPagination(query);
 
-  return c.json(buildPaginatedResponse(data.map(expenseToApi), totalCount, limit, offset));
+  const rows = data.map((expense) =>
+    query.vehicleId
+      ? hideDriverFields(c, expense.vehicleId, expenseToApi(expense))
+      : expenseToApi(expense)
+  );
+  return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
 });
 
 routes.get(
@@ -889,7 +898,7 @@ routes.get(
     const user = c.get('user');
     const query = c.req.valid('query');
 
-    const months = await expenseRepository.getMonthlyTotals({
+    const months = await repos().expenses.getMonthlyTotals({
       ...(await resolveExpenseReadScope(query.vehicleId, user.id)),
       vehicleId: query.vehicleId,
       category: query.category,
@@ -915,13 +924,30 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
-    const expense = await expenseRepository.findById(id);
+    const expense = await repos().expenses.findById(id);
     if (!expense) throw new NotFoundError('Expense');
     const access = await requireVehicleAccess(expense.vehicleId, user.id, 'read');
     assertMayTouchFinancialExpense(seesFinancials(access), expense.sourceType);
-    return c.json({ success: true, data: expenseToApi(expense) });
+    return c.json({
+      success: true,
+      data: hideDriverFields(c, expense.vehicleId, expenseToApi(expense)),
+    });
   }
 );
+
+function payerChange(
+  c: Context,
+  existing: Expense,
+  vehicleId: string | undefined,
+  requested: string | null | undefined
+): { paidByDriverId?: string | null } {
+  const target = vehicleId ?? existing.vehicleId;
+  const movedCar = target !== existing.vehicleId;
+  if (movedCar) assertMayClearDriver(c, existing.vehicleId, existing.paidByDriverId);
+  const paidBy = attributedDriver(c, target, requested, movedCar ? null : existing.paidByDriverId);
+  if (paidBy !== undefined) return { paidByDriverId: paidBy };
+  return movedCar ? { paidByDriverId: null } : {};
+}
 
 routes.put(
   '/:id',
@@ -933,7 +959,7 @@ routes.put(
     const { id } = c.req.valid('param');
     const { timeZone, ...updateData } = c.req.valid('json');
 
-    const existingExpense = await expenseRepository.findById(id);
+    const existingExpense = await repos().expenses.findById(id);
     if (!existingExpense) throw new NotFoundError('Expense');
     const access = await requireVehicleAccess(existingExpense.vehicleId, user.id, 'read');
     assertMayTouchFinancialExpense(
@@ -975,7 +1001,11 @@ routes.put(
 
     validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalFuelType);
 
-    const normalizedUpdate = clearFuelFieldsIfNotFuel(updateData, finalCategory);
+    const { paidByDriverId: requestedPayer, ...withoutPayer } = updateData;
+    const normalizedUpdate = clearFuelFieldsIfNotFuel(
+      { ...withoutPayer, ...payerChange(c, existingExpense, updateData.vehicleId, requestedPayer) },
+      finalCategory
+    );
     const odometer = await editedOdometerCheck(existingExpense, {
       vehicleId: updateData.vehicleId ?? existingExpense.vehicleId,
       date: updateData.date ?? existingExpense.date,
@@ -983,7 +1013,7 @@ routes.put(
       timeZone,
     });
 
-    const updatedExpense = await expenseRepository.update(id, normalizedUpdate, odometer);
+    const updatedExpense = await repos().expenses.update(id, normalizedUpdate, odometer);
 
     if (updatedExpense.mileage != null) {
       await reminderTriggerService.recheckMileageReminders(
@@ -994,7 +1024,7 @@ routes.put(
 
     return c.json({
       success: true,
-      data: expenseToApi(updatedExpense),
+      data: hideDriverFields(c, updatedExpense.vehicleId, expenseToApi(updatedExpense)),
       message: 'Expense updated successfully',
     });
   }
@@ -1008,7 +1038,7 @@ routes.delete(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const existingExpense = await expenseRepository.findById(id);
+    const existingExpense = await repos().expenses.findById(id);
     if (!existingExpense) throw new NotFoundError('Expense');
     const access = await requireVehicleAccess(existingExpense.vehicleId, user.id, 'read');
     assertMayTouchFinancialExpense(writesFinancials(access), existingExpense.sourceType);
@@ -1020,7 +1050,7 @@ routes.delete(
 
     await deleteAllPhotosForEntity('expense', id, existingExpense.userId);
 
-    await expenseRepository.delete(id);
+    await repos().expenses.delete(id);
     return c.json({ success: true, message: 'Expense deleted successfully' });
   }
 );

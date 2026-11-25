@@ -5,7 +5,8 @@ import {
 	CircleCheck,
 	CircleAlert,
 	Clock,
-	ServerOff
+	ServerOff,
+	TriangleAlert
 } from '@lucide/svelte';
 
 type LucideIcon = typeof Wifi;
@@ -22,6 +23,7 @@ export interface SyncStatusParams {
 	pendingCount: number;
 	conflictsCount: number;
 	serverReachable: boolean;
+	providerNeedsAttention?: boolean;
 }
 
 export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
@@ -49,6 +51,14 @@ export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
 
 	if (syncStatus === 'error') {
 		return { color: 'text-destructive', icon: CircleAlert, text: 'Sync failed' };
+	}
+
+	if (params.providerNeedsAttention) {
+		return {
+			color: 'text-warning',
+			icon: TriangleAlert,
+			text: 'A backup provider needs attention'
+		};
 	}
 
 	if (syncStatus === 'success') {

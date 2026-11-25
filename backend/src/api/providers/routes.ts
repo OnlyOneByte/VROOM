@@ -2,6 +2,7 @@ import { createId } from '@paralleldrive/cuid2';
 import { and, eq, inArray, notExists, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { countNum } from '../../db/dialect';
@@ -18,8 +19,6 @@ import { consumePending, getPendingEmail } from '../../utils/pending-credentials
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { AUTH_PROVIDERS } from '../auth/providers/registry';
 import { IMPORT_PROVIDERS } from '../expenses/import-mapping-presets';
-import { photoRefRepository } from '../photos/photo-ref-repository';
-import { preferencesRepository } from '../settings/repository';
 import {
   type AnyProviderDescriptor,
   assertSecretsReentered,
@@ -340,7 +339,7 @@ routes.post('/', zValidator('json', createProviderSchema), authorize(ownAccount)
   });
 
   if (body.domain === 'storage') {
-    const prefs = await preferencesRepository.getOrCreate(user.id);
+    const prefs = await repos().preferences.getOrCreate(user.id);
 
     const storageConfig: StorageConfig = prefs.storageConfig
       ? { ...prefs.storageConfig }
@@ -353,7 +352,7 @@ routes.post('/', zValidator('json', createProviderSchema), authorize(ownAccount)
       storageConfig.providerCategories[created.id] = defaultCategorySettings(descriptor);
     }
 
-    await preferencesRepository.update(user.id, { storageConfig });
+    await repos().preferences.update(user.id, { storageConfig });
   }
 
   return c.json({ success: true, data: formatProviderResponse(created) }, 201);
@@ -431,7 +430,7 @@ routes.put(
 );
 
 async function cleanupStorageConfig(userId: string, providerId: string): Promise<void> {
-  const prefs = await preferencesRepository.getOrCreate(userId);
+  const prefs = await repos().preferences.getOrCreate(userId);
 
   if (!prefs.storageConfig) return;
 
@@ -447,23 +446,23 @@ async function cleanupStorageConfig(userId: string, providerId: string): Promise
     }
   }
 
-  await preferencesRepository.update(userId, { storageConfig });
+  await repos().preferences.update(userId, { storageConfig });
 }
 
 // JSON merge patch, not read-modify-write, so concurrent writes to sibling providers are not clobbered.
 async function cleanupBackupConfig(userId: string, providerId: string): Promise<void> {
-  const prefs = await preferencesRepository.getOrCreate(userId);
+  const prefs = await repos().preferences.getOrCreate(userId);
   if (!prefs.backupConfig?.providers?.[providerId]) return;
-  await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
+  await repos().preferences.mergeJsonField(userId, 'backupConfig', {
     providers: { [providerId]: null },
   });
 }
 
 async function cleanupProviderDefaults(userId: string, providerId: string): Promise<void> {
-  const prefs = await preferencesRepository.getOrCreate(userId);
+  const prefs = await repos().preferences.getOrCreate(userId);
   const defaults = prefs.providerDefaults ?? {};
   if (!Object.values(defaults).includes(providerId)) return;
-  await preferencesRepository.mergeJsonField(
+  await repos().preferences.mergeJsonField(
     userId,
     'providerDefaults',
     Object.fromEntries(
@@ -476,7 +475,7 @@ async function cleanupProviderDefaults(userId: string, providerId: string): Prom
 
 async function assertNoPhotosOnlyHere(providerId: string, force: boolean): Promise<void> {
   if (force) return;
-  const photosOnlyHere = await photoRefRepository.countPhotosOnlyOnProvider(providerId);
+  const photosOnlyHere = await repos().photoRefs.countPhotosOnlyOnProvider(providerId);
   if (photosOnlyHere === 0) return;
   const one = photosOnlyHere === 1;
   throw new AppError(
@@ -515,7 +514,7 @@ routes.delete(
       await cleanupBackupConfig(user.id, id);
 
       try {
-        await photoRefRepository.deleteByProvider(id);
+        await repos().photoRefs.deleteByProvider(id);
       } catch (err) {
         logger.warn('Failed to delete photo refs during provider cleanup', {
           providerId: id,
@@ -580,9 +579,9 @@ routes.post(
     const db = getDb();
 
     await findOwnedProviderOrThrow(db, id, user.id);
-    await photoRefRepository.resetFailedForProvider(id);
+    await repos().photoRefs.resetFailedForProvider(id);
 
-    const prefs = await preferencesRepository.getOrCreate(user.id);
+    const prefs = await repos().preferences.getOrCreate(user.id);
     const storageConfig = prefs.storageConfig as StorageConfig | null;
     const providerCategories = storageConfig?.providerCategories?.[id];
     if (!providerCategories) {

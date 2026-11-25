@@ -1,9 +1,8 @@
 import { eq } from 'drizzle-orm';
+import { repos } from '../../app-context';
 import { getDb } from '../../db/connection';
 import { users as usersTable } from '../../db/schema';
 import { logger } from '../../utils/logger';
-import { syncStateRepository } from '../settings/repository';
-
 import { backupOrchestrator } from './backup-orchestrator';
 
 interface UserActivity {
@@ -106,7 +105,7 @@ export class UserActivityTracker {
 
   async markDataChanged(userId: string): Promise<void> {
     try {
-      await syncStateRepository.markDataChanged(userId);
+      await repos().syncState.markDataChanged(userId);
     } catch (error) {
       logger.error('Failed to mark data change', { userId, error });
     }
@@ -114,7 +113,7 @@ export class UserActivityTracker {
 
   async hasChangesSinceLastSync(userId: string): Promise<boolean> {
     try {
-      return await syncStateRepository.hasChangesSinceLastSync(userId);
+      return await repos().syncState.hasChangesSinceLastSync(userId);
     } catch (error) {
       logger.error('Failed to check changes', { userId, error });
       return true;

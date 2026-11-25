@@ -1,4 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { transaction } from '../../db/connection';
 import type { Expense, Reminder, ReminderNotification } from '../../db/schema';
@@ -11,11 +12,8 @@ import { formatNumberForMessage } from '../../utils/money';
 import { zonedParts, zoneOffsetMs } from '../../utils/time-zone';
 import { DISTANCE_UNIT_SHORT_LABELS } from '../../utils/unit-conversions';
 import { expenseSplitService } from '../expenses/split-service';
-import { odometerRepository } from '../odometer/repository';
 import { notifyUser, type PushPayload } from '../push/push-service';
-import { vehicleRepository } from '../vehicles/repository';
 import type { ReminderWithVehicles } from './repository';
-import { reminderRepository } from './repository';
 
 export interface TriggerResult {
   createdExpenses: Expense[];
@@ -73,7 +71,7 @@ async function firePushForNotification(
 }
 
 async function vehicleDistanceUnit(vehicleId: string): Promise<DistanceUnit> {
-  const vehicle = await vehicleRepository.findById(vehicleId);
+  const vehicle = await repos().vehicles.findById(vehicleId);
   return (
     parseUnitPreferences(vehicle?.unitPreferences)?.distanceUnit ??
     DEFAULT_UNIT_PREFERENCES.distanceUnit
@@ -319,7 +317,7 @@ async function processExpensePeriod(
 ): Promise<{ created: Expense[]; advancedDue: Date } | null> {
   const advancedDue = advanceReminderDueDate(reminder, nextDue, timeZone);
   return transaction((tx) => {
-    if (!reminderRepository.claimPeriodSync(tx, reminder.id, nextDue, advancedDue, now)) {
+    if (!repos().reminders.claimPeriodSync(tx, reminder.id, nextDue, advancedDue, now)) {
       return null;
     }
     return {
@@ -337,7 +335,7 @@ async function processNotificationPeriod(
 ): Promise<{ created: ReminderNotification; advancedDue: Date } | null> {
   const advancedDue = advanceReminderDueDate(reminder, nextDue, timeZone);
   return transaction((tx) => {
-    if (!reminderRepository.claimPeriodSync(tx, reminder.id, nextDue, advancedDue, now)) {
+    if (!repos().reminders.claimPeriodSync(tx, reminder.id, nextDue, advancedDue, now)) {
       return null;
     }
     const created = tx
@@ -387,7 +385,7 @@ async function fastForwardPastNow(
   let nextDue = currentDue;
   while (isTimeDue(nextDue, now)) {
     if (hasReminderEndedBy(reminder, nextDue)) {
-      await reminderRepository.deactivate(reminder.id, reminder.userId);
+      await repos().reminders.deactivate(reminder.id, reminder.userId);
       return;
     }
     const advanced = advanceReminderDueDate(reminder, nextDue, timeZone);
@@ -399,10 +397,10 @@ async function fastForwardPastNow(
     nextDue = advanced;
   }
   if (hasReminderEndedBy(reminder, nextDue)) {
-    await reminderRepository.deactivate(reminder.id, reminder.userId);
+    await repos().reminders.deactivate(reminder.id, reminder.userId);
     return;
   }
-  await reminderRepository.advanceNextDueDate(reminder.id, previousDue, nextDue);
+  await repos().reminders.advanceNextDueDate(reminder.id, previousDue, nextDue);
 }
 
 class ReminderTriggerService {
@@ -410,7 +408,7 @@ class ReminderTriggerService {
     const now = new Date();
     const result: TriggerResult = { createdExpenses: [], notifications: [], skipped: [] };
 
-    const overdueReminders = await reminderRepository.findOverdue(userId, now);
+    const overdueReminders = await repos().reminders.findOverdue(userId, now);
     for (const { reminder, vehicleIds } of overdueReminders) {
       try {
         await this.processReminder(reminder, vehicleIds, now, result, timeZone);
@@ -419,7 +417,7 @@ class ReminderTriggerService {
       }
     }
 
-    const mileageReminders = await reminderRepository.findMileageTracking(userId);
+    const mileageReminders = await repos().reminders.findMileageTracking(userId);
     await this.processMileageReminders(mileageReminders, result);
 
     return result;
@@ -429,7 +427,7 @@ class ReminderTriggerService {
     const result: TriggerResult = { createdExpenses: [], notifications: [], skipped: [] };
     let mileageReminders: ReminderWithVehicles[];
     try {
-      mileageReminders = await reminderRepository.findMileageTracking(userId);
+      mileageReminders = await repos().reminders.findMileageTracking(userId);
     } catch (error) {
       pushSkipError(result, 'all', 'recheck_query_failed', error);
       return result;
@@ -449,7 +447,7 @@ class ReminderTriggerService {
     const currentOdometer = (vehicleId: string, userId: string): Promise<number | null> => {
       let reading = odometerByVehicle.get(vehicleId);
       if (!reading) {
-        reading = odometerRepository.getCurrentOdometer(vehicleId, userId);
+        reading = repos().odometer.getCurrentOdometer(vehicleId, userId);
         odometerByVehicle.set(vehicleId, reading);
       }
       return reading;
@@ -483,7 +481,7 @@ class ReminderTriggerService {
     }
 
     const distanceUnit = await vehicleDistanceUnit(vehicleId);
-    const created = await reminderRepository.createMileageNotification(
+    const created = await repos().reminders.createMileageNotification(
       reminder.id,
       reminder.userId,
       reminder.nextDueOdometer
@@ -530,7 +528,7 @@ class ReminderTriggerService {
     }
 
     if (hasReminderEndedBy(reminder, nextDue)) {
-      await reminderRepository.deactivate(reminder.id, reminder.userId);
+      await repos().reminders.deactivate(reminder.id, reminder.userId);
       return;
     }
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 	import { ScrollArea } from '#lib/components/ui/scroll-area/index.ts';
 	import {
 		Table,
@@ -40,6 +41,7 @@
 		onDeleteExpense: (_expense: Expense) => void;
 		onDeleteGroup: (_row: GroupRow) => void;
 		monthTotals?: ReadonlyMap<string, number> | undefined;
+		pendingStates?: ReadonlyMap<string, PendingRowState> | undefined;
 	}
 
 	let {
@@ -58,7 +60,8 @@
 		onCategoryChange,
 		onDeleteExpense,
 		onDeleteGroup,
-		monthTotals
+		monthTotals,
+		pendingStates
 	}: Props = $props();
 
 	let columnCount = $derived(showVehicleColumn ? 7 : 6);
@@ -147,6 +150,7 @@
 									{canDelete}
 									{returnTo}
 									onDelete={onDeleteExpense}
+									pending={pendingStates?.get(row.expense.id)}
 								/>
 							{:else}
 								<DesktopGroupRow
@@ -159,6 +163,7 @@
 									isExpanded={expandedGroups.has(row.groupId)}
 									onToggle={onToggleGroup}
 									onDelete={onDeleteGroup}
+									pending={pendingStates?.get(row.children[0]?.id ?? '')}
 								/>
 							{/if}
 						{/each}

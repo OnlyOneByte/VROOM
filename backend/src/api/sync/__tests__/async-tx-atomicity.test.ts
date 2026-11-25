@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { type AppContext, repos } from '../../../app-context';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 
@@ -21,20 +22,19 @@ function insuranceTermCount(): number {
 describe('async-tx atomicity', () => {
   test('reminders.createWithVehicles rolls back the reminder when a junction insert fails', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    const { reminderRepository } = await import('../../reminders/repository');
 
     expect(reminderCount()).toBe(0);
 
     let threw = false;
     try {
-      await reminderRepository.createWithVehicles(
+      await repos().reminders.createWithVehicles(
         {
           userId: ctx.user.id,
           name: 'Registration',
           type: 'notification',
           frequency: 'yearly',
           startDate: new Date('2024-02-01T00:00:00.000Z'),
-        } as Parameters<typeof reminderRepository.createWithVehicles>[0],
+        } as Parameters<AppContext['repos']['reminders']['createWithVehicles']>[0],
         [vehicleId, 'nonexistent-vehicle-id']
       );
     } catch {
@@ -47,7 +47,6 @@ describe('async-tx atomicity', () => {
 
   test('insurance.create rolls back the policy and terms when a term junction insert fails', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    const { insurancePolicyRepository } = await import('../../insurance/repository');
 
     expect(insuranceTermCount()).toBe(0);
     const policiesBefore = (
@@ -56,7 +55,7 @@ describe('async-tx atomicity', () => {
 
     let threw = false;
     try {
-      await insurancePolicyRepository.create(
+      await repos().insurancePolicies.create(
         {
           company: 'Acme',
           terms: [
@@ -66,7 +65,7 @@ describe('async-tx atomicity', () => {
               vehicleCoverage: { vehicleIds: [vehicleId, 'nonexistent-vehicle-id'] },
             },
           ],
-        } as Parameters<typeof insurancePolicyRepository.create>[0],
+        } as Parameters<AppContext['repos']['insurancePolicies']['create']>[0],
         ctx.user.id
       );
     } catch {

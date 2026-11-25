@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { UserProvider } from '../../../../../db/schema';
 import { encrypt } from '../../../../../utils/encryption';
+import { ALLOW_PRIVATE } from '../../../../../utils/outbound-url';
 import { type ModelProviderSettings, resolveModelSettings } from '../../model/model-registry';
 import type { ChatMessage, ToolDefinition } from '../llm-provider';
 import { OpenAiCompatibleLlmProvider } from '../openai-compatible';
@@ -46,11 +47,16 @@ function toolCallResponse(name: string, args: string): Response {
 }
 
 const KEYED: ModelProviderSettings = {
+  outbound: ALLOW_PRIVATE,
   apiKey: 'sk-assistant-key',
   model: 'gpt-4o',
   baseUrl: 'https://api.openai.com/v1',
 };
-const KEYLESS: ModelProviderSettings = { model: 'llama3.1', baseUrl: 'http://localhost:11434/v1' };
+const KEYLESS: ModelProviderSettings = {
+  outbound: ALLOW_PRIVATE,
+  model: 'llama3.1',
+  baseUrl: 'http://localhost:11434/v1',
+};
 
 const MESSAGES: ChatMessage[] = [
   { role: 'system', content: 'You are a car-data assistant.' },
@@ -258,7 +264,9 @@ describe('OpenAiCompatibleLlmProvider.chat failures', () => {
   });
 
   test('the constructor requires a base URL', () => {
-    expect(() => new OpenAiCompatibleLlmProvider({ model: 'gpt-4o' })).toThrow(/base URL/);
+    expect(
+      () => new OpenAiCompatibleLlmProvider({ outbound: ALLOW_PRIVATE, model: 'gpt-4o' })
+    ).toThrow(/base URL/);
   });
 });
 

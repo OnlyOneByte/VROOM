@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import { getDb } from '../../db/connection';
 import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
@@ -10,7 +11,6 @@ import { validateInsuranceOwnership, zValidator } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { fromPolicyOwner, fromPolicyReaders } from './access';
-import { insuranceClaimRepository } from './claims-repository';
 import { createClaimSchema, updateClaimSchema } from './claims-validation';
 import {
   assertTermPremiumWithinCap,
@@ -19,7 +19,6 @@ import {
   updateTermExpenses,
   vehicleIdsForTerm,
 } from './hooks';
-import { insurancePolicyRepository } from './repository';
 import {
   addTermSchema,
   createPolicySchema,
@@ -114,7 +113,7 @@ async function validateClaimRefs(
     await requireVehicleAccess(data.vehicleId, userId, 'owner');
   }
   if (data.termId) {
-    const policy = await insurancePolicyRepository.findById(policyId);
+    const policy = await repos().insurancePolicies.findById(policyId);
     const onThisPolicy = policy?.terms.some((t) => t.id === data.termId);
     if (!onThisPolicy) {
       throw new ValidationError('Claim termId does not belong to this policy');
@@ -131,7 +130,7 @@ routes.use('*', changeTracker);
 
 routes.get('/', authorize(ownAccount), async (c) => {
   const user = c.get('user');
-  const policies = await insurancePolicyRepository.findByUserId(user.id);
+  const policies = await repos().insurancePolicies.findByUserId(user.id);
   return c.json({ success: true, data: policies.map(policyToApi), count: policies.length });
 });
 
@@ -147,7 +146,7 @@ routes.get(
       kind: 'vehicle',
       vehicleId,
     }).allow;
-    const policies = await insurancePolicyRepository.findByVehicleId(vehicleId);
+    const policies = await repos().insurancePolicies.findByVehicleId(vehicleId);
     const scoped =
       access.role === 'owner'
         ? policies
@@ -162,7 +161,7 @@ routes.post('/', zValidator('json', createPolicySchema), authorize(ownAccount), 
   for (const term of data.terms) {
     assertTermPremiumWithinCap({ ...term, totalCost: term.totalCost ?? 0 });
   }
-  const policy = await insurancePolicyRepository.create(data, user.id);
+  const policy = await repos().insurancePolicies.create(data, user.id);
 
   try {
     for (const term of policy.terms) {
@@ -172,7 +171,7 @@ routes.post('/', zValidator('json', createPolicySchema), authorize(ownAccount), 
     for (const term of policy.terms) {
       await deleteTermExpenses(term.id, user.id);
     }
-    await insurancePolicyRepository.delete(policy.id, user.id);
+    await repos().insurancePolicies.delete(policy.id, user.id);
     throw error;
   }
 
@@ -199,7 +198,7 @@ routes.put(
     const { id } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
     const data = c.req.valid('json');
-    const policy = await insurancePolicyRepository.update(id, data, user.id);
+    const policy = await repos().insurancePolicies.update(id, data, user.id);
     return c.json({
       success: true,
       data: policyToApi(policy),
@@ -214,18 +213,18 @@ routes.delete('/:id', zValidator('param', idParamSchema), authorize(fromPolicyOw
   await validateInsuranceOwnership(id, user.id);
 
   // Photos have no FK, so they must be removed before the policy cascade orphans them.
-  const claims = await insuranceClaimRepository.findByPolicyId(id);
+  const claims = await repos().insuranceClaims.findByPolicyId(id);
   const claimIds = claims.map((claim) => claim.id);
   await deleteAllPhotosForEntity('insurance_policy', id, user.id);
   await deletePhotosForEntities('insurance_claim', claimIds, user.id);
 
   // Premium expenses link to terms by text, not FK, so they must be deleted explicitly before the cascade.
-  const policyToDelete = await insurancePolicyRepository.findById(id);
+  const policyToDelete = await repos().insurancePolicies.findById(id);
   for (const term of policyToDelete?.terms ?? []) {
     await deleteTermExpenses(term.id, user.id);
   }
 
-  await insurancePolicyRepository.delete(id, user.id);
+  await repos().insurancePolicies.delete(id, user.id);
   return c.json({ success: true, message: 'Insurance policy deleted successfully' });
 });
 
@@ -240,7 +239,7 @@ routes.post(
     await validateInsuranceOwnership(id, user.id);
     const termData = c.req.valid('json');
     assertTermPremiumWithinCap({ ...termData, totalCost: termData.totalCost ?? 0 });
-    const policy = await insurancePolicyRepository.addTerm(id, termData, user.id);
+    const policy = await repos().insurancePolicies.addTerm(id, termData, user.id);
 
     const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, policy.newTermId);
     try {
@@ -255,7 +254,7 @@ routes.post(
         userId: user.id,
       });
     } catch (error) {
-      await insurancePolicyRepository.deleteTerm(id, policy.newTermId, user.id);
+      await repos().insurancePolicies.deleteTerm(id, policy.newTermId, user.id);
       throw error;
     }
 
@@ -276,7 +275,7 @@ routes.put(
     const { id, termId } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
     const updates = c.req.valid('json');
-    const existing = await insurancePolicyRepository.findById(id);
+    const existing = await repos().insurancePolicies.findById(id);
     const previousTerm = existing?.terms.find((t) => t.id === termId);
     const previous =
       existing && previousTerm ? termExpenseParams(existing, previousTerm, user.id) : undefined;
@@ -288,7 +287,7 @@ routes.put(
         endDate: updates.endDate ?? previous.endDate,
       });
     }
-    const policy = await insurancePolicyRepository.updateTerm(id, termId, updates, user.id);
+    const policy = await repos().insurancePolicies.updateTerm(id, termId, updates, user.id);
 
     const updatedTerm = policy.terms.find((t) => t.id === termId);
     if (updatedTerm) {
@@ -315,7 +314,7 @@ routes.delete(
     // Premium expenses link to terms by text, not FK, so they must be deleted explicitly.
     await deleteTermExpenses(termId, user.id);
 
-    const policy = await insurancePolicyRepository.deleteTerm(id, termId, user.id);
+    const policy = await repos().insurancePolicies.deleteTerm(id, termId, user.id);
     return c.json({
       success: true,
       data: policyToApi(policy),
@@ -330,8 +329,8 @@ routes.get(
   authorize(fromPolicyReaders),
   async (c) => {
     const { id } = c.req.valid('param');
-    const policy = await insurancePolicyRepository.findById(id);
-    const claims = await insuranceClaimRepository.findByPolicyId(id);
+    const policy = await repos().insurancePolicies.findById(id);
+    const claims = await repos().insuranceClaims.findByPolicyId(id);
     const resolver = requestResolver(c, getDb());
     const scoped =
       policy?.userId === c.get('user').id
@@ -361,7 +360,7 @@ routes.post(
     await validateInsuranceOwnership(id, user.id);
     const data = c.req.valid('json');
     await validateClaimRefs(data, id, user.id);
-    const claim = await insuranceClaimRepository.create(id, data);
+    const claim = await repos().insuranceClaims.create(id, data);
     return c.json(
       { success: true, data: insuranceClaimToApi(claim), message: 'Claim filed successfully' },
       201
@@ -380,7 +379,7 @@ routes.put(
     await validateInsuranceOwnership(id, user.id);
     const updates = c.req.valid('json');
     await validateClaimRefs(updates, id, user.id);
-    const claim = await insuranceClaimRepository.update(id, claimId, updates);
+    const claim = await repos().insuranceClaims.update(id, claimId, updates);
     return c.json({
       success: true,
       data: insuranceClaimToApi(claim),
@@ -398,7 +397,7 @@ routes.delete(
     const { id, claimId } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
     await deleteAllPhotosForEntity('insurance_claim', claimId, user.id);
-    await insuranceClaimRepository.delete(id, claimId);
+    await repos().insuranceClaims.delete(id, claimId);
     return c.json({ success: true, message: 'Claim deleted successfully' });
   }
 );

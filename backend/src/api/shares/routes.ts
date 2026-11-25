@@ -1,6 +1,7 @@
 import { and, eq, notInArray } from 'drizzle-orm';
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import { getDb } from '../../db/connection';
 import {
   permissionOverrides,
@@ -33,7 +34,7 @@ import {
 import type { Resource } from '../../permissions/resolve';
 import { ROLE_TEMPLATES } from '../../permissions/roles';
 import { commonSchemas, zValidator } from '../../utils/validation';
-import { vehicleRepository } from '../vehicles/repository';
+import { carShareEnabled, ensureMemberDriver } from '../drivers/repository';
 import {
   ACTIVE_SHARE_STATUSES,
   findInviteeId,
@@ -41,7 +42,6 @@ import {
   isActiveShareStatus,
   type ReceivedShare,
   toOwnerView,
-  vehicleShareRepository,
 } from './repository';
 
 const routes = new Hono();
@@ -89,7 +89,7 @@ const fromInviteVehicle: ResourceOf = (c) => ({
 });
 
 const fromShare: ResourceOf = async (c) => {
-  const share = await vehicleShareRepository.findById(c.req.param('id') ?? '');
+  const share = await repos().vehicleShares.findById(c.req.param('id') ?? '');
   if (!share) throw new NotFoundError('Share');
   const vehicle: Resource = { kind: 'vehicle', vehicleId: share.vehicleId };
   const decision = requestResolver(c, getDb()).can('vehicle.read', vehicle);
@@ -176,7 +176,7 @@ routes.post('/', zValidator('json', inviteSchema), authorize(fromInviteVehicle),
   const { vehicleId, level } = c.req.valid('json');
   const email = c.req.valid('json').email.trim().toLowerCase();
 
-  const vehicle = await vehicleRepository.findById(vehicleId);
+  const vehicle = await repos().vehicles.findById(vehicleId);
   if (!vehicle) throw new NotFoundError('Vehicle');
   const owner = getDb()
     .select({ email: users.email })
@@ -195,12 +195,12 @@ routes.post('/', zValidator('json', inviteSchema), authorize(fromInviteVehicle),
   const inviteeId = await findInviteeId(getDb(), email);
 
   const alreadyShared = new ConflictError('This vehicle is already shared with that email');
-  if (await vehicleShareRepository.findActiveInvite(vehicleId, email, inviteeId)) {
+  if (await repos().vehicleShares.findActiveInvite(vehicleId, email, inviteeId)) {
     throw alreadyShared;
   }
 
-  const created = await vehicleShareRepository
-    .create({
+  const created = await repos()
+    .vehicleShares.create({
       vehicleId,
       ownerId: vehicle.userId,
       sharedWithId: inviteeId,
@@ -223,7 +223,7 @@ routes.post('/', zValidator('json', inviteSchema), authorize(fromInviteVehicle),
 
 routes.get('/granted', authorize(ownAccount), async (c) => {
   const user = c.get('user');
-  const shares = await vehicleShareRepository.findByOwner(user.id);
+  const shares = await repos().vehicleShares.findByOwner(user.id);
   const response: ApiResponse<GrantedShare[]> = {
     success: true,
     data: shares,
@@ -242,7 +242,7 @@ routes.put(
     const { id } = c.req.valid('param');
     const { level } = c.req.valid('json');
 
-    const share = await vehicleShareRepository.findById(id);
+    const share = await repos().vehicleShares.findById(id);
     if (!share) {
       throw new NotFoundError('Share');
     }
@@ -277,7 +277,7 @@ routes.delete(
   async (c) => {
     const { id } = c.req.valid('param');
 
-    const share = await vehicleShareRepository.findById(id);
+    const share = await repos().vehicleShares.findById(id);
     if (!share) {
       throw new NotFoundError('Share');
     }
@@ -297,7 +297,7 @@ routes.delete(
 
 routes.get('/received', authorize(ownAccount), async (c) => {
   const user = c.get('user');
-  const shares = await vehicleShareRepository.findReceivedByUser(user.id);
+  const shares = await repos().vehicleShares.findReceivedByUser(user.id);
   const response: ApiResponse<ReceivedShare[]> = {
     success: true,
     data: shares,
@@ -314,7 +314,7 @@ routes.post(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const share = await vehicleShareRepository.findByIdAndSharedWith(id, user.id);
+    const share = await repos().vehicleShares.findByIdAndSharedWith(id, user.id);
     if (!share) {
       throw new NotFoundError('Share');
     }
@@ -330,6 +330,7 @@ routes.post(
         level: row.level,
         grantedBy: row.ownerId,
       });
+      if (carShareEnabled(tx, row.vehicleId)) ensureMemberDriver(tx, row.vehicleId, user.id);
     });
     return c.json({ success: true, data: updated, message: 'Invitation accepted' });
   }
@@ -343,7 +344,7 @@ routes.post(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const share = await vehicleShareRepository.findByIdAndSharedWith(id, user.id);
+    const share = await repos().vehicleShares.findByIdAndSharedWith(id, user.id);
     if (!share) {
       throw new NotFoundError('Share');
     }

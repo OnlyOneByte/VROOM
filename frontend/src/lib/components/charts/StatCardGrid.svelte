@@ -36,7 +36,7 @@
 
 	let gridClass = $derived.by(() => {
 		if (joined) {
-			return 'max-sm:grid-cols-1 sm:grid-cols-3 max-sm:gap-0 max-sm:rounded-xl max-sm:border max-sm:bg-card max-sm:shadow-sm max-sm:[&_[data-stat-icon]]:hidden max-sm:[&_[data-slot=card-content]]:grid max-sm:[&_[data-slot=card-content]]:grid-cols-[minmax(0,1fr)_auto] max-sm:[&_[data-slot=card-content]]:items-center max-sm:[&_[data-slot=card-content]]:gap-x-3 max-sm:[&_[data-slot=card-content]]:py-3 max-sm:[&_[data-stat-value]]:col-start-2 max-sm:[&_[data-stat-value]]:row-start-1 max-sm:[&_[data-slot=card-content]:has(>:nth-child(3))_[data-stat-value]]:row-[1/span_3] max-sm:[&_[data-stat-value]]:mt-0 max-sm:[&_[data-stat-value]]:whitespace-nowrap max-sm:[&_[data-stat-unit-bar]]:h-4';
+			return 'max-sm:grid-cols-1 sm:grid-cols-3 max-sm:gap-0 max-sm:rounded-[var(--r-lg)] max-sm:border max-sm:bg-card max-sm:[&_[data-stat-icon]]:hidden max-sm:[&_[data-slot=card-content]]:grid max-sm:[&_[data-slot=card-content]]:grid-cols-[minmax(0,1fr)_auto] max-sm:[&_[data-slot=card-content]]:items-center max-sm:[&_[data-slot=card-content]]:gap-x-3 max-sm:[&_[data-slot=card-content]]:py-3 max-sm:[&_[data-stat-value]]:col-start-2 max-sm:[&_[data-stat-value]]:row-start-1 max-sm:[&_[data-slot=card-content]:has(>:nth-child(3))_[data-stat-value]]:row-[1/span_3] max-sm:[&_[data-stat-value]]:mt-0 max-sm:[&_[data-stat-value]]:whitespace-nowrap max-sm:[&_[data-stat-unit-bar]]:h-4';
 		}
 		return `${hasDual ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2'} ${gridCols}`;
 	});
@@ -44,8 +44,8 @@
 	function tileClass(index: number): string {
 		if (joined) {
 			return index === 0
-				? 'min-w-0 max-sm:rounded-none max-sm:border-0 max-sm:shadow-none max-sm:bg-transparent'
-				: 'min-w-0 max-sm:rounded-none max-sm:border-0 max-sm:border-t max-sm:shadow-none max-sm:bg-transparent';
+				? 'min-w-0 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent'
+				: 'min-w-0 max-sm:rounded-none max-sm:border-0 max-sm:border-t max-sm:bg-transparent';
 		}
 		if (items.length % 2 === 0 || index !== items.length - 1) return 'min-w-0';
 		if (hasDual)

@@ -7,6 +7,9 @@ export interface Notification {
 	duration?: number;
 	timestamp?: number;
 	urgent?: boolean;
+	toastId?: string;
+	description?: string;
+	action?: { label: string; onClick: () => void };
 }
 
 export interface AppState {
@@ -66,6 +69,7 @@ export interface OdometerEntry {
 	odometer: number;
 	recordedAt: string;
 	note?: string;
+	driverId?: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

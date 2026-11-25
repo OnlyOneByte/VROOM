@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import type { Photo, PhotoRef } from '../../../db/schema';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
-import { photoRefRepository } from '../../photos/photo-ref-repository';
 import { processBatch, type SyncWorkerDeps } from '../sync-worker';
 
 let ctx: TestApp;
@@ -33,7 +33,7 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 async function queuedIds(): Promise<string[]> {
-  return (await photoRefRepository.findPendingOrFailed(50)).map((ref) => ref.id);
+  return (await repos().photoRefs.findPendingOrFailed(50)).map((ref) => ref.id);
 }
 
 describe('photo refs that ran out of retries come back after a reconnect', () => {

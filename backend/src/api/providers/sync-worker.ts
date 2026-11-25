@@ -1,11 +1,10 @@
+import { type AppContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import type { PhotoRef } from '../../db/schema';
 import { isSyncError, SyncErrorCode } from '../../errors';
 import { extractErrorMessage } from '../../utils/error-handling';
 import { logger } from '../../utils/logger';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
-import { photoRefRepository } from '../photos/photo-ref-repository';
-import { photoRepository } from '../photos/photo-repository';
 import { storageProviderRegistry } from './domains/storage/registry';
 import type { PhotoCategory, StorageProvider } from './domains/storage/storage-provider';
 import { ENTITY_TO_CATEGORY } from './domains/storage/storage-provider';
@@ -19,21 +18,23 @@ import {
 // bun mock.module leaks across test files, so tests inject fakes through deps instead.
 export interface SyncWorkerDeps {
   photoRefRepository: Pick<
-    typeof photoRefRepository,
+    AppContext['repos']['photoRefs'],
     'findPendingOrFailed' | 'findActiveByPhoto' | 'updateStatus'
   >;
-  photoRepository: Pick<typeof photoRepository, 'findById'>;
+  photoRepository: Pick<AppContext['repos']['photos'], 'findById'>;
   registry: Pick<
     typeof storageProviderRegistry,
     'getProviderInternal' | 'resolveProviderFolderPath'
   >;
 }
 
-const defaultDeps: SyncWorkerDeps = {
-  photoRefRepository,
-  photoRepository,
-  registry: storageProviderRegistry,
-};
+function defaultDeps(): SyncWorkerDeps {
+  return {
+    photoRefRepository: repos().photoRefs,
+    photoRepository: repos().photos,
+    registry: storageProviderRegistry,
+  };
+}
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let processingSince: number | null = null;
@@ -134,7 +135,7 @@ async function processRefs(
   }
 }
 
-export async function processBatch(deps: SyncWorkerDeps = defaultDeps): Promise<void> {
+export async function processBatch(deps: SyncWorkerDeps = defaultDeps()): Promise<void> {
   const startedAt = Date.now();
   if (previousBatchBlocks(startedAt)) return;
   processingSince = startedAt;

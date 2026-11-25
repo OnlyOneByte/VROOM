@@ -1,5 +1,6 @@
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import type { NewReminder, Reminder } from '../../db/schema';
@@ -26,10 +27,9 @@ import { readJsonBody } from '../../utils/request-body';
 import { calendarDayIn, isValidTimeZone } from '../../utils/time-zone';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { requireVehicleAccess, requireVehiclesAccess } from '../../utils/vehicle-access';
-import { expenseRepository } from '../expenses/repository';
-import { odometerRepository } from '../odometer/repository';
+import { hideDriverFields } from '../drivers/attribution';
 import { recurringCostSummary } from './reminder-cost';
-import { type ReminderWithVehicles, reminderRepository } from './repository';
+import type { ReminderWithVehicles } from './repository';
 import {
   advanceReminderDueDate,
   firstDueOnOrAfter,
@@ -64,7 +64,7 @@ async function resolveMileageFields(
   const intervalMileage = data.intervalMileage ?? 0;
   const lastServiceOdometer =
     data.lastServiceOdometer ??
-    (await odometerRepository.getCurrentOdometer(vehicleIds[0], userId)) ??
+    (await repos().odometer.getCurrentOdometer(vehicleIds[0], userId)) ??
     0;
   return {
     intervalMileage,
@@ -109,7 +109,7 @@ const fromBodyVehicles: ResourceOf = async (c) =>
   (await readJsonBody<{ vehicleIds: string[] }>(c)).vehicleIds.map(vehicleResource);
 
 async function reminderResources(c: Context): Promise<Resource[]> {
-  const existing = await reminderRepository.findByIdWithVehicles(c.req.param('id') ?? '');
+  const existing = await repos().reminders.findByIdWithVehicles(c.req.param('id') ?? '');
   if (!existing) throw new NotFoundError('Reminder');
   const { reminder, vehicleIds } = existing;
   if (vehicleIds.length > 0) {
@@ -273,7 +273,7 @@ routes.post(
 
 routes.get('/recurring-cost', authorize(ownAccount), async (c) => {
   const user = c.get('user');
-  const expenseReminders = await reminderRepository.findByUserId(user.id, { type: 'expense' });
+  const expenseReminders = await repos().reminders.findByUserId(user.id, { type: 'expense' });
   const summary = recurringCostSummary(expenseReminders.map((r) => r.reminder));
   return c.json({
     success: true,
@@ -292,7 +292,7 @@ routes.post(
     const { id } = c.req.valid('param');
     const { timeZone } = c.req.valid('query');
 
-    const existing = await reminderRepository.findByIdWithVehicles(id);
+    const existing = await repos().reminders.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
     const { reminder, vehicleIds } = existing;
     const { ownerId } = await requireExistingReminderWrite(existing, user.id);
@@ -304,7 +304,7 @@ routes.post(
       // Shared-vehicle odometer rows are owner-stamped, so reads must use ownerId, not the actor.
       const vehicleId = vehicleIds[0];
       const current = vehicleId
-        ? await odometerRepository.getCurrentOdometer(vehicleId, ownerId)
+        ? await repos().odometer.getCurrentOdometer(vehicleId, ownerId)
         : null;
       const lastServiceOdometer = current ?? reminder.lastServiceOdometer ?? 0;
       fields.lastServiceOdometer = lastServiceOdometer;
@@ -317,13 +317,13 @@ routes.post(
     ) {
       const nextDue = nextDueAfterService(reminder, reminder.nextDueDate, new Date(), timeZone);
       if (reminder.endDate && nextDue > reminder.endDate) {
-        await reminderRepository.deactivate(id, ownerId);
+        await repos().reminders.deactivate(id, ownerId);
         return c.json({ success: true, data: reminderToApi({ ...reminder, isActive: false }) });
       }
       fields.nextDueDate = nextDue;
     }
 
-    const updated = await reminderRepository.markServiced(id, ownerId, fields);
+    const updated = await repos().reminders.markServiced(id, ownerId, fields);
     return c.json({ success: true, data: reminderToApi(updated) });
   }
 );
@@ -331,7 +331,7 @@ routes.post(
 routes.get('/notifications', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const unreadOnly = c.req.query('unreadOnly') === 'true';
-  const notifications = await reminderRepository.findNotifications(user.id, unreadOnly);
+  const notifications = await repos().reminders.findNotifications(user.id, unreadOnly);
   return c.json({ success: true, data: notifications });
 });
 
@@ -342,7 +342,7 @@ routes.put(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
-    await reminderRepository.markNotificationRead(id, user.id);
+    await repos().reminders.markNotificationRead(id, user.id);
     return c.json({ success: true, message: 'Notification marked as read' });
   }
 );
@@ -358,7 +358,7 @@ routes.post(
     const { vehicleIds, timeZone: _createTimeZone, ...reminderData } = data;
     const { ownerId } = await requireReminderVehiclesWrite(vehicleIds, user.id);
     const mileage = await resolveMileageFields(reminderData, vehicleIds, ownerId);
-    const result = await reminderRepository.createWithVehicles(
+    const result = await repos().reminders.createWithVehicles(
       {
         ...reminderData,
         userId: ownerId,
@@ -390,7 +390,7 @@ routes.get('/', authorize(fromQueryVehicle), async (c) => {
     listUserId = ownerId;
   }
 
-  const reminders = await reminderRepository.findByUserId(listUserId, filters);
+  const reminders = await repos().reminders.findByUserId(listUserId, filters);
   const visible =
     listUserId === user.id
       ? reminders
@@ -404,10 +404,10 @@ routes.get(
   authorize(fromReminderReadable),
   async (c) => {
     const { id } = c.req.valid('param');
-    const existing = await reminderRepository.findByIdWithVehicles(id);
+    const existing = await repos().reminders.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
     const resolver = requestResolver(c, getDb());
-    const materialized = await expenseRepository.findBySource(
+    const materialized = await repos().expenses.findBySource(
       'reminder',
       id,
       existing.reminder.userId
@@ -415,7 +415,12 @@ routes.get(
     const readable = materialized.filter(
       (expense) => resolver.can('vehicle.expense.read', vehicleResource(expense.vehicleId)).allow
     );
-    return c.json({ success: true, data: readable.map(expenseToApi) });
+    return c.json({
+      success: true,
+      data: readable.map((expense) =>
+        hideDriverFields(c, expense.vehicleId, expenseToApi(expense))
+      ),
+    });
   }
 );
 
@@ -428,7 +433,7 @@ routes.put(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const existing = await reminderRepository.findByIdWithVehicles(id);
+    const existing = await repos().reminders.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
     const { ownerId } = await requireExistingReminderWrite(existing, user.id);
     const partialUpdate = keepStoredDatesOnSameDay(c.req.valid('json'), existing.reminder);
@@ -480,7 +485,7 @@ routes.put(
       rescheduledFields(existing.reminder, reminderFields, merged, timeZone)
     );
 
-    const result = await reminderRepository.updateWithVehicles(
+    const result = await repos().reminders.updateWithVehicles(
       id,
       ownerId,
       updateFields,
@@ -499,14 +504,14 @@ routes.delete(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const existing = await reminderRepository.findByIdWithVehicles(id);
+    const existing = await repos().reminders.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
     const { ownerId } = await requireExistingReminderWrite(existing, user.id);
 
     // clearSource must run before the delete: a dangling sourceId fails backup validation on restore.
-    await expenseRepository.clearSource('reminder', id, ownerId);
+    await repos().expenses.clearSource('reminder', id, ownerId);
 
-    await reminderRepository.deleteOwned(id, ownerId);
+    await repos().reminders.deleteOwned(id, ownerId);
     return c.json({ success: true, message: 'Reminder deleted successfully' });
   }
 );

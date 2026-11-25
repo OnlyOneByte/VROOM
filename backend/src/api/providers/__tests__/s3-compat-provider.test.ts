@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
-import { S3CompatProvider, s3RequestHandler } from '../domains/storage/s3-compat-provider';
+import { ALLOW_PRIVATE, BLOCK_PRIVATE, EndpointNotAllowedError } from '../../../utils/outbound-url';
+import { S3CompatProvider } from '../domains/storage/s3-compat-provider';
 import type { StorageRef } from '../domains/storage/storage-provider';
 
 const mockSend = mock<(command: unknown) => Promise<unknown>>(() => Promise.resolve({}));
@@ -21,7 +22,7 @@ describe('S3CompatProvider', () => {
   let provider: S3CompatProvider;
 
   beforeEach(() => {
-    provider = withStubbedSend(new S3CompatProvider(credentials, config));
+    provider = withStubbedSend(new S3CompatProvider(credentials, config, ALLOW_PRIVATE));
     mockSend.mockReset();
   });
 
@@ -29,10 +30,13 @@ describe('S3CompatProvider', () => {
     expect(provider.type).toBe('s3');
   });
 
-  test('sends every request through the outbound request handler', () => {
-    const client = (provider as unknown as { client: { config: { requestHandler: unknown } } })
-      .client;
-    expect(client.config.requestHandler).toBe(s3RequestHandler);
+  test("sends every request through the outbound request handler, under the provider's own policy", async () => {
+    const blocked = new S3CompatProvider(
+      credentials,
+      { ...config, endpoint: 'http://192.168.1.20:9000' },
+      BLOCK_PRIVATE
+    );
+    await expect(blocked.healthCheck()).rejects.toThrow(EndpointNotAllowedError);
   });
 
   describe('upload', () => {
@@ -266,7 +270,7 @@ describe('S3CompatProvider list', () => {
 
   let provider: S3CompatProvider;
   beforeEach(() => {
-    provider = withStubbedSend(new S3CompatProvider(credentials, config));
+    provider = withStubbedSend(new S3CompatProvider(credentials, config, ALLOW_PRIVATE));
     mockSend.mockReset();
     mockSend.mockImplementation(listLikeS3);
   });

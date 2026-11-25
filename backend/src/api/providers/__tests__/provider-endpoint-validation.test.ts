@@ -21,12 +21,13 @@ import { encrypt } from '../../../utils/encryption';
 import {
   EndpointNotAllowedError,
   outboundResolver,
+  privateEndpointPolicy,
   privateEndpointPolicyFor,
   urlForAddress,
 } from '../../../utils/outbound-url';
 import { resolveModelSettings } from '../domains/model/model-registry';
 import { postModelJson } from '../domains/model/model-transport';
-import { s3RequestHandler, s3RequestHandlerFor } from '../domains/storage/s3-compat-provider';
+import { s3RequestHandlerFor } from '../domains/storage/s3-compat-provider';
 import { healthCodeOf } from '../provider-status';
 
 let ctx: TestApp;
@@ -65,7 +66,7 @@ function modelBody(baseUrl: string) {
 }
 
 function sendS3(request: Record<string, unknown>) {
-  const handler = s3RequestHandler as unknown as {
+  const handler = s3RequestHandlerFor(privateEndpointPolicy()) as unknown as {
     handle: (request: unknown) => Promise<{
       response: {
         statusCode: number;
@@ -278,6 +279,7 @@ describe('model transport', () => {
     }) as unknown as typeof fetch;
     await expect(
       postModelJson({
+        outbound: privateEndpointPolicy(),
         domain: 'LLM',
         providerType: 'openai-compatible',
         model: 'm',
@@ -297,6 +299,7 @@ describe('model transport', () => {
     }) as unknown as typeof fetch;
     await expect(
       postModelJson({
+        outbound: privateEndpointPolicy(),
         domain: 'LLM',
         providerType: 'openai-compatible',
         model: 'm',
@@ -397,6 +400,7 @@ describe('outbound requests connect to the validated address', () => {
     outboundResolver.connectUrl = urlForAddress;
     try {
       const body = await postModelJson<{ ok: boolean }>({
+        outbound: privateEndpointPolicy(),
         domain: 'LLM',
         providerType: 'openai-compatible',
         model: 'm',

@@ -1,15 +1,15 @@
 <script lang="ts">
+	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { Car, Plus, Check, ListChecks } from '@lucide/svelte';
+	import { Plus, Check, ListChecks } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
-	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
-	import PageHeader from '#lib/components/common/page-header.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import PageHeader from '#lib/components/common/page-header.svelte';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
 	import DashboardHero from '#lib/components/dashboard/DashboardHero.svelte';
 	import NeedsAttentionCard from '#lib/components/dashboard/NeedsAttentionCard.svelte';
@@ -18,10 +18,14 @@
 	import RecurringCostCard from '#lib/components/dashboard/RecurringCostCard.svelte';
 	import SharedWithMeCard from '#lib/components/dashboard/SharedWithMeCard.svelte';
 	import {
+		loadPeriodSpend,
+		sharedSummaries,
+		type PeriodData
+	} from '#lib/components/dashboard/period-spend.ts';
+	import {
 		attentionItems,
 		combinePeriodSpend,
 		highestMonth,
-		periodStartSeconds,
 		PERIOD_PHRASES,
 		RUNNING_CATEGORIES,
 		type VehicleRow
@@ -60,18 +64,12 @@
 	} from '#lib/types/index.ts';
 	import type { TimePeriod } from '#lib/constants/time-periods.ts';
 
-	const TREND_TITLE = 'Last 12 months';
-	const TREND_DESCRIPTION = 'Running costs by month';
+	const TREND_TITLE = 'Running cost by month';
+	const TREND_DESCRIPTION = 'Last 12 months';
 	const RECENT_COUNT = 4;
-	const TREND_MONTHS = 6;
 
 	const chartModules = import('#lib/components/charts/index.ts');
 	chartModules.catch(() => undefined);
-
-	interface PeriodData {
-		summaries: ExpenseSummary[];
-		perDistance: AnalyticsQueryResponse | null;
-	}
 
 	let isLoading = $state(true);
 	let isUpdatingPeriod = $state(false);
@@ -89,7 +87,6 @@
 	let invitationsError = $state<string | null>(null);
 	let pendingInvitations = $derived(invitations.filter(share => share.status === 'pending'));
 	let recurringCost = $state<RecurringCostSummary>({ count: 0, monthlyTotal: 0 });
-	let spendTrend = $state<AnalyticsQueryResponse | null>(null);
 	let runningByMonth = $state<AnalyticsQueryResponse | null>(null);
 	let trendFailed = $state(false);
 
@@ -97,8 +94,8 @@
 	let sharedVehicles = $derived(vehicles.filter(v => v.sharedAccess));
 	let hasLoaded = $state(false);
 	const isNarrow = new IsMobile(1024);
-	let showFab = $derived(hasLoaded && !loadError);
-	let canLogFillup = $derived(showFab && ownedVehicles.length > 0);
+	let showActions = $derived(hasLoaded && !loadError);
+	let canLogFillup = $derived(showActions && ownedVehicles.length > 0);
 	let noVehicles = $derived(hasLoaded && !loadError && vehicles.length === 0);
 	let needsFirstExpense = $derived(
 		hasLoaded && !loadError && ownedVehicles.length > 0 && (allTimeSummary?.expenseCount ?? 0) === 0
@@ -110,13 +107,6 @@
 	]);
 	let currentStep = $derived(onboardingSteps.findIndex(step => !step.done));
 
-	let pageDescription = $derived.by(() => {
-		if (loadError || (isLoading && !hasLoaded)) return 'Overview of your vehicles';
-		if (vehicles.length === 0) return 'Welcome to VROOM';
-		const count = `${vehicles.length} vehicle${vehicles.length === 1 ? '' : 's'}`;
-		return sharedVehicles.length > 0 ? `${count}, incl. ${sharedVehicles.length} shared` : count;
-	});
-
 	let spend = $derived(combinePeriodSpend(periodData.summaries));
 	let distanceUnit = $derived<DistanceUnit>(settingsStore.unitPreferences.distanceUnit);
 	let distanceLabel = $derived(getDistanceUnitLabel(distanceUnit, true));
@@ -125,14 +115,12 @@
 		const perVehicle = new Map(
 			(periodData.perDistance?.series ?? []).map(series => [series.key, series.values[0] ?? null])
 		);
-		const trends = new Map(
-			(spendTrend?.series ?? []).map(series => [series.key, series.values.map(v => v ?? 0)])
-		);
 		return vehicles.map(v => {
 			const model = `${v.year} ${v.make} ${v.model}`;
 			const notes = [
 				vehicleKindNote(v.vehicleKind),
 				v.nickname ? model : null,
+				v.vehicleType === 'electric' ? 'electric' : null,
 				v.financing?.isActive ? 'Financed' : null,
 				v.sharedAccess ? `Shared by ${v.sharedAccess.sharedBy}` : null
 			].filter(Boolean);
@@ -140,11 +128,8 @@
 				id: v.id,
 				name: v.nickname || model,
 				detail: notes.join(' · '),
-				kind: v.vehicleKind,
-				isElectric: v.vehicleType === 'electric',
 				spend: spend.byVehicle.get(v.id) ?? 0,
-				runningPerDistance: perVehicle.get(v.id) ?? null,
-				trend: trends.get(v.id) ?? null
+				runningPerDistance: perVehicle.get(v.id) ?? null
 			};
 		});
 	});
@@ -173,17 +158,34 @@
 			: ''
 	);
 
+	const pending = usePendingRows({
+		match: () => true,
+		refresh: () =>
+			expenseApi.getAllExpenses({ limit: RECENT_COUNT }).then(
+				response => {
+					recentExpensesList = response.data;
+				},
+				error => logLoadFailure(error, "Couldn't refresh recent expenses")
+			),
+		listedIds: () => listedExpenseIds
+	});
+	let listedExpenseIds = $derived(new Set(recentExpensesList.map(expense => expense.id)));
+
 	let recentExpenses = $derived.by(() => {
 		const names = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
-		return recentExpensesList.map(e => ({
-			id: e.id,
-			amount: e.amount,
-			category: e.category,
-			date: new Date(e.date),
-			description: e.description,
-			location: e.location,
-			vehicleName: names.get(e.vehicleId) || 'Unknown Vehicle'
-		}));
+		return [...pending.rows, ...recentExpensesList].slice(0, 4).map(e => {
+			const sync = pending.states.get(e.id);
+			return {
+				id: e.id,
+				amount: e.amount,
+				category: e.category,
+				date: new Date(e.date),
+				description: e.description,
+				location: e.location,
+				vehicleName: names.get(e.vehicleId) || 'Unknown vehicle',
+				...(sync && { syncNote: sync.status === 'failed' ? 'Not saved' : 'Unsynced' })
+			};
+		});
 	});
 
 	let attention = $derived.by(() => {
@@ -198,34 +200,6 @@
 	function monthsAgoSeconds(months: number): number {
 		const now = new Date();
 		return Math.floor(new Date(now.getFullYear(), now.getMonth() - months, 1).getTime() / 1000);
-	}
-
-	function sharedSummaries(selected: TimePeriod, shared: Vehicle[]): Promise<ExpenseSummary[]> {
-		return Promise.all(
-			shared.map(v =>
-				expenseApi.getExpenseSummary({ vehicleId: v.id, period: selected }).catch(() => null)
-			)
-		).then(rows => rows.filter((row): row is ExpenseSummary => row !== null));
-	}
-
-	async function loadPeriod(selected: TimePeriod, shared: Vehicle[]): Promise<PeriodData> {
-		const nowSec = Math.floor(Date.now() / 1000);
-		const [owned, perDistance, sharedRows] = await Promise.all([
-			expenseApi.getExpenseSummary({ period: selected }),
-			analyticsApi
-				.query({
-					metric: 'costPerDistance',
-					interval: 'none',
-					groupBy: 'vehicle',
-					include: 'all',
-					categories: RUNNING_CATEGORIES,
-					start: periodStartSeconds(selected, Date.now()),
-					end: nowSec
-				})
-				.catch(() => null),
-			sharedSummaries(selected, shared)
-		]);
-		return { summaries: [owned, ...sharedRows], perDistance };
 	}
 
 	async function fetchInvitations(): Promise<{ list: ReceivedShare[]; error: string | null }> {
@@ -263,7 +237,6 @@
 				loadedPolicies,
 				loadedInvitations,
 				ownedPeriod,
-				loadedSpendTrend,
 				loadedRunningByMonth
 			] = await Promise.all([
 				vehicleApi.getVehicles({ includeShared: true }),
@@ -273,16 +246,7 @@
 				reminderApi.getRecurringCost().catch(() => ({ count: 0, monthlyTotal: 0 })),
 				insuranceApi.getAllPolicies().catch(() => [] as InsurancePolicy[]),
 				fetchInvitations(),
-				loadPeriod(selected, []),
-				analyticsApi
-					.query({
-						metric: 'cost',
-						interval: 'month',
-						groupBy: 'vehicle',
-						include: 'all',
-						start: monthsAgoSeconds(TREND_MONTHS - 1)
-					})
-					.catch(() => null),
+				loadPeriodSpend(selected, []),
 				analyticsApi
 					.query({
 						metric: 'cost',
@@ -311,7 +275,6 @@
 			policies = loadedPolicies;
 			invitations = loadedInvitations.list;
 			invitationsError = loadedInvitations.error;
-			spendTrend = loadedSpendTrend;
 			runningByMonth = loadedRunningByMonth;
 			trendFailed = loadedRunningByMonth === null;
 			hasLoaded = true;
@@ -336,7 +299,7 @@
 		isUpdatingPeriod = true;
 		const isCurrent = nextPeriodRequest();
 		try {
-			const data = await loadPeriod(next, sharedVehicles);
+			const data = await loadPeriodSpend(next, sharedVehicles);
 			if (isCurrent()) {
 				periodData = data;
 				shownPeriod = next;
@@ -373,7 +336,27 @@
 		isLoading={!hasLoaded}
 		isUpdating={isUpdatingPeriod}
 		onPeriodChange={handlePeriodChange}
-	/>
+	>
+		{#snippet actions()}
+			{@render primaryAction()}
+		{/snippet}
+	</DashboardHero>
+{/snippet}
+
+{#snippet primaryAction()}
+	{#if canLogFillup}
+		<Button size="lg" variant="outline" onclick={handleLogFillup}>
+			<Plus class="mr-2 h-4 w-4" />
+			Log fill-up
+		</Button>
+	{:else if showActions && !noVehicles}
+		<Button size="lg" variant="outline" href={resolve(routes.vehicleNew)}>
+			<Plus class="mr-2 h-4 w-4" />
+			Add vehicle
+		</Button>
+	{:else if isLoading && !hasLoaded}
+		<Skeleton class="h-10 w-36" data-testid="primary-action-placeholder" />
+	{/if}
 {/snippet}
 
 {#snippet vehiclesSection()}
@@ -421,7 +404,7 @@
 
 {#snippet attentionSection()}
 	{#if attention.length > 0}
-		<NeedsAttentionCard items={attention} />
+		<NeedsAttentionCard items={attention} showAll />
 	{/if}
 	{#if invitationsError || pendingInvitations.length > 0}
 		{@render invitationsCard()}
@@ -482,7 +465,7 @@
 			{#if ownedVehicles.length === 0}
 				<Button size="lg" class="mt-6" href={resolve(routes.vehicleNew)}>
 					<Plus class="mr-2 h-4 w-4" />
-					Add Vehicle
+					Add vehicle
 				</Button>
 			{/if}
 		{/snippet}
@@ -494,37 +477,8 @@
 	<meta name="description" content="Your vehicle expense dashboard" />
 </svelte:head>
 
-<div class="space-y-6 pb-24 short:pb-0">
-	<PageHeader title="Dashboard" description={pageDescription}>
-		{#snippet actions()}
-			{#if canLogFillup}
-				<Button
-					variant="outline"
-					size="lg"
-					class="hidden lg:inline-flex"
-					href={resolve(routes.vehicleNew)}
-				>
-					<Car class="mr-2 h-4 w-4" />
-					Add Vehicle
-				</Button>
-				<Button size="lg" class="hidden lg:inline-flex short:inline-flex" onclick={handleLogFillup}>
-					<Plus class="mr-2 h-4 w-4" />
-					Log Fill-up
-				</Button>
-			{:else if showFab && !noVehicles}
-				<Button
-					size="lg"
-					class="hidden lg:inline-flex short:inline-flex"
-					href={resolve(routes.vehicleNew)}
-				>
-					<Plus class="mr-2 h-4 w-4" />
-					Add Vehicle
-				</Button>
-			{:else if isLoading && !hasLoaded}
-				<Skeleton class="hidden h-10 lg:block lg:w-36" />
-			{/if}
-		{/snippet}
-	</PageHeader>
+<div class="mx-auto max-w-6xl space-y-10">
+	<div class="sr-only"><PageHeader title="Dashboard" /></div>
 
 	{#if loadError && !isLoading}
 		<LoadErrorCard
@@ -537,17 +491,18 @@
 
 		{@render invitationsCard()}
 	{:else if needsFirstExpense}
+		<div class="flex justify-end">{@render primaryAction()}</div>
 		{@render checklist()}
 
 		{@render invitationsCard()}
-		<NeedsAttentionCard items={attention} />
+		<NeedsAttentionCard items={attention} showAll />
 		<VehicleRowsCard rows={vehicleRows} periodLabel={PERIOD_PHRASES[period].chip} {distanceLabel} />
 		{#if recurringCost.count > 0}
 			<RecurringCostCard count={recurringCost.count} monthlyTotal={recurringCost.monthlyTotal} />
 		{/if}
 	{:else}
 		{#if isNarrow.current}
-			<div class="space-y-6">
+			<div class="space-y-10">
 				{@render heroSection()}
 				{#if hasLoaded}
 					{@render attentionSection()}
@@ -558,28 +513,20 @@
 				{/if}
 			</div>
 		{:else}
-			<div class="grid grid-cols-3 items-start gap-6">
-				<div class="col-span-2 space-y-6">
-					{@render heroSection()}
-					{#if hasLoaded}
-						{@render vehiclesSection()}
-						{@render chartSection()}
-					{/if}
-				</div>
-				{#if hasLoaded}
-					<div class="space-y-6">
+			{@render heroSection()}
+			{#if hasLoaded}
+				<div class="grid grid-cols-2 items-start gap-x-12 gap-y-10">
+					<div class="space-y-10">
 						{@render attentionSection()}
+						{@render vehiclesSection()}
+					</div>
+					<div class="space-y-10">
+						{@render chartSection()}
 						{@render recentSection()}
 						{@render recurringSection()}
 					</div>
-				{/if}
-			</div>
+				</div>
+			{/if}
 		{/if}
 	{/if}
 </div>
-
-{#if canLogFillup}
-	<FloatingActionButton label="Log Fill-up" onclick={handleLogFillup} />
-{:else if showFab && !noVehicles}
-	<FloatingActionButton href={resolve(routes.vehicleNew)} label="Add Vehicle" />
-{/if}

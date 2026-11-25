@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
@@ -98,8 +99,7 @@ describe('PUT /settings never overwrites server-owned backup fields', () => {
     await ctx.authed('PUT', '/api/v1/settings', {
       backupConfig: { providers: { 'drive-s': providerSettings('drive-s') } },
     });
-    const { preferencesRepository } = await import('../repository');
-    await preferencesRepository.mergeJsonField(ctx.user.id, 'backupConfig', {
+    await repos().preferences.mergeJsonField(ctx.user.id, 'backupConfig', {
       providers: {
         'drive-s': { lastBackupAt: '2026-11-20T10:00:00.000Z', sheetsSpreadsheetId: 'sheet-live' },
       },

@@ -7,6 +7,7 @@ import {
   rolePermissions,
   roles,
   users,
+  vehicleDrivers,
   vehicleShares,
   vehicles,
 } from '../db/schema';
@@ -139,6 +140,16 @@ export function changeShareRole(
 }
 
 export function endVehicleMembership(db: Db, vehicleId: string, userId: string): void {
+  db.update(vehicleDrivers)
+    .set({ archivedAt: new Date() })
+    .where(
+      and(
+        eq(vehicleDrivers.vehicleId, vehicleId),
+        eq(vehicleDrivers.userId, userId),
+        isNull(vehicleDrivers.archivedAt)
+      )
+    )
+    .run();
   db.delete(roleAssignments)
     .where(and(eq(roleAssignments.userId, userId), eq(roleAssignments.scopeId, vehicleId)))
     .run();

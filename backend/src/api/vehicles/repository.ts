@@ -1,6 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import type { NewVehicle, Vehicle, VehicleWithFinancing } from '../../db/schema';
 import { vehicleFinancing, vehicles } from '../../db/schema';
 import { DatabaseError } from '../../errors';
@@ -8,7 +7,7 @@ import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
 
-class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
+export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
   constructor(db: AppDatabase) {
     super(db, vehicles);
   }
@@ -62,5 +61,3 @@ class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
     return result[0] || null;
   }
 }
-
-export const vehicleRepository = new VehicleRepository(getDb());

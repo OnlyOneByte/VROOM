@@ -123,6 +123,7 @@ export class ExpenseSplitService {
       sourceType?: string;
       sourceId?: string;
       createdBy?: string | null;
+      payerFor?: (vehicleId: string) => string | null;
     }
   ): Expense[] {
     const siblings: Expense[] = [];
@@ -144,6 +145,7 @@ export class ExpenseSplitService {
         missedFillup: false,
         sourceType: params.sourceType ?? null,
         sourceId: params.sourceId ?? null,
+        paidByDriverId: params.payerFor?.(allocation.vehicleId) ?? null,
       };
 
       const inserted = tx.insert(expenses).values(newExpense).returning().get();

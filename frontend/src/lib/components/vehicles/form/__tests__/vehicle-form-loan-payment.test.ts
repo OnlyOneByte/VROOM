@@ -56,7 +56,7 @@ async function saveEditedVehicle(edit?: () => Promise<void>) {
 	render(VehicleForm, { props: { vehicleId: 'v1' } });
 	await screen.findByDisplayValue('Bank of America');
 	await edit?.();
-	await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+	await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 	await waitFor(() => expect(createFinancing).toHaveBeenCalledTimes(1));
 	return createFinancing.mock.calls[0]?.[1] as Partial<VehicleFinancing>;
 }
@@ -68,7 +68,7 @@ describe('VehicleForm loan payment on edit', () => {
 
 	test('keeps the saved payment when the loan terms are unchanged', async () => {
 		const saved = await saveEditedVehicle(async () => {
-			await fireEvent.input(screen.getByLabelText('Nickname'), {
+			await fireEvent.input(screen.getByLabelText('Nickname (optional)'), {
 				target: { value: 'Commuter' }
 			});
 		});

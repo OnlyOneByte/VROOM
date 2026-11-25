@@ -1,6 +1,6 @@
 import { and, count, desc, eq, gte, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { repos } from '../../app-context';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import { rawAll, sqlFalse } from '../../db/dialect';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
 import { odometerEntries } from '../../db/schema';
@@ -11,7 +11,6 @@ import { BaseRepository } from '../../utils/repository';
 import { zonedDayWindow } from '../../utils/time-zone';
 import { hiddenFinancialsScope } from '../../utils/vehicle-access';
 import type { OdometerCheck } from '../expenses/validation';
-import { vehicleRepository } from '../vehicles/repository';
 
 interface OdometerHistoryEntry {
   odometer: number;
@@ -54,7 +53,7 @@ export async function readingCheck(
   timeZone: string | undefined,
   excludeId?: string
 ): Promise<OdometerCheck> {
-  const vehicle = await vehicleRepository.findById(vehicleId);
+  const vehicle = await repos().vehicles.findById(vehicleId);
   return {
     vehicleId,
     mileage: odometer,
@@ -112,6 +111,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       note?: string;
       timeZone?: string;
       createdBy?: string | null;
+      driverId?: string | null;
     },
     db: AppDatabase | DrizzleTransaction = this.db
   ): OdometerEntry | null {
@@ -141,6 +141,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
         vehicleId: entry.vehicleId,
         userId: entry.userId,
         createdBy: entry.createdBy ?? null,
+        driverId: entry.driverId ?? null,
         odometer: entry.odometer,
         recordedAt: entry.recordedAt,
         note: entry.note ?? OdometerRepository.TRIP_PROVENANCE_NOTE,
@@ -350,5 +351,3 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     }
   }
 }
-
-export const odometerRepository = new OdometerRepository(getDb());

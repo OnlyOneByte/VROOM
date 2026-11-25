@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 
 async function countRmwUpdates(relPath: string): Promise<number> {
   const src = await Bun.file(`${import.meta.dir}/../../../${relPath}`).text();
-  return (src.match(/preferencesRepository\.update\(/g) ?? []).length;
+  return (src.match(/repos\(\)\.preferences\.update\(/g) ?? []).length;
 }
 
 describe('userPreferences RMW inventory', () => {
@@ -24,6 +24,6 @@ describe('userPreferences RMW inventory', () => {
     expect(start).toBeGreaterThan(-1);
     const body = src.slice(start, start + 600);
     expect(body).toContain("mergeJsonField(userId, 'backupConfig'");
-    expect(body).not.toMatch(/preferencesRepository\.update\([^)]*backupConfig/);
+    expect(body).not.toMatch(/repos\(\)\.preferences\.update\([^)]*backupConfig/);
   });
 });

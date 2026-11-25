@@ -110,19 +110,19 @@ function mount() {
 }
 
 function odometerInput(): HTMLInputElement {
-	return screen.getByLabelText('Odometer Reading *') as HTMLInputElement;
+	return screen.getByLabelText('Odometer reading') as HTMLInputElement;
 }
 
 function dateInput(): HTMLInputElement {
-	return screen.getByLabelText('Date *') as HTMLInputElement;
+	return screen.getByLabelText('Date') as HTMLInputElement;
 }
 
 function noteInput(): HTMLTextAreaElement {
-	return screen.getByLabelText('Note (Optional)') as HTMLTextAreaElement;
+	return screen.getByLabelText('Note (optional)') as HTMLTextAreaElement;
 }
 
 async function save(): Promise<void> {
-	await fireEvent.click(screen.getByRole('button', { name: 'Save Reading' }));
+	await fireEvent.click(screen.getByRole('button', { name: 'Save reading' }));
 	await settle();
 }
 
@@ -222,7 +222,7 @@ describe('edit odometer reading offline', () => {
 			'Editing a reading needs a connection.'
 		);
 		expect(screen.queryByText(/Couldn't load the reading/)).toBeNull();
-		expect(screen.queryByLabelText('Odometer Reading *')).toBeNull();
+		expect(screen.queryByLabelText('Odometer reading')).toBeNull();
 	});
 
 	test('loads the form once the connection comes back', async () => {
@@ -396,7 +396,7 @@ describe('edit odometer reading save', () => {
 		mount();
 		await settle();
 
-		for (const name of ['Delete', 'Cancel', 'Save Reading']) {
+		for (const name of ['Delete', 'Cancel', 'Save reading']) {
 			expect(screen.getByRole('button', { name })).toHaveClass('h-10');
 		}
 	});
@@ -487,14 +487,14 @@ describe('edit odometer reading save', () => {
 		).toBeInTheDocument();
 	});
 
-	test('Save Reading is disabled while saving', async () => {
+	test('Save reading is disabled while saving', async () => {
 		update.mockReturnValue(new Promise(() => {}));
 		mount();
 		await settle();
 
 		await save();
 
-		expect(screen.getByRole('button', { name: 'Save Reading' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Save reading' })).toBeDisabled();
 	});
 
 	test('Cancel and Back return without saving', async () => {

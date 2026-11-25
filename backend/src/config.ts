@@ -16,6 +16,7 @@ import {
   syncState,
   trips,
   userPreferences,
+  vehicleDrivers,
   vehicleFinancing,
   vehicleShares,
   vehicles,
@@ -390,6 +391,7 @@ export const TABLE_SCHEMA_MAP: Record<string, Table> = {
   reminderNotifications: reminderNotifications,
   trips: trips,
   vehicleShares: vehicleShares,
+  vehicleDrivers: vehicleDrivers,
 };
 
 export const TABLE_FILENAME_MAP: Record<string, string> = {
@@ -410,6 +412,7 @@ export const TABLE_FILENAME_MAP: Record<string, string> = {
   reminderNotifications: 'reminder_notifications.csv',
   trips: 'trips.csv',
   vehicleShares: 'vehicle_shares.csv',
+  vehicleDrivers: 'vehicle_drivers.csv',
 };
 
 export function getBackupTableKeys(): string[] {
@@ -430,6 +433,7 @@ export const OPTIONAL_BACKUP_FILES = new Set([
   'reminder_notifications.csv',
   'trips.csv',
   'vehicle_shares.csv',
+  'vehicle_drivers.csv',
 ]);
 
 export function getRequiredBackupFiles(): string[] {

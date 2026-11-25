@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import type { BackupStrategy, BackupStrategyResult } from '../backup-strategy';
 
@@ -85,11 +86,10 @@ function strategyThatEditsConfig(duringRun: () => Promise<void>): BackupStrategy
 
 describe('a backup run patches backupConfig instead of rewriting it', () => {
   test('a provider switched OFF mid-run stays off', async () => {
-    const { preferencesRepository } = await import('../../settings/repository');
     register(
       'fake-self-disable',
       strategyThatEditsConfig(async () => {
-        await preferencesRepository.mergeJsonField(ctx.user.id, 'backupConfig', {
+        await repos().preferences.mergeJsonField(ctx.user.id, 'backupConfig', {
           providers: { p1: { enabled: false } },
         });
       })
@@ -114,12 +114,11 @@ describe('a backup run patches backupConfig instead of rewriting it', () => {
   });
 
   test('a provider disconnected mid-run is not resurrected as a ghost entry', async () => {
-    const { preferencesRepository } = await import('../../settings/repository');
     register(
       'fake-sibling-remover',
       strategyThatEditsConfig(async () => {
         ctx.sqlite.run('DELETE FROM user_providers WHERE id = ?', ['p-gone']);
-        await preferencesRepository.mergeJsonField(ctx.user.id, 'backupConfig', {
+        await repos().preferences.mergeJsonField(ctx.user.id, 'backupConfig', {
           providers: { 'p-gone': null },
         });
       })

@@ -2,7 +2,7 @@ import { zValidator as honoZValidator } from '@hono/zod-validator';
 import type { ValidationTargets } from 'hono';
 import type { ZodError, ZodType } from 'zod';
 import { z } from 'zod';
-import { insurancePolicyRepository } from '../api/insurance/repository';
+import { repos } from '../app-context';
 import { CONFIG } from '../config';
 import type { InsurancePolicy } from '../db/schema';
 import { isElectricFuelType } from '../db/types';
@@ -91,7 +91,7 @@ export async function validateInsuranceOwnership(
   insuranceId: string,
   userId: string
 ): Promise<InsurancePolicy> {
-  const insurance = await insurancePolicyRepository.findById(insuranceId);
+  const insurance = await repos().insurancePolicies.findById(insuranceId);
   if (!insurance) {
     throw new NotFoundError('Insurance policy');
   }

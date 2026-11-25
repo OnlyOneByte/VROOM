@@ -2,6 +2,7 @@ import { ASSISTANT_PERMISSIONS } from '../api/assistant/capabilities';
 import { ACCOUNT_PERMISSIONS } from '../api/auth/capabilities';
 import { CALENDAR_PERMISSIONS } from '../api/calendar/capabilities';
 import { COMMUNITY_PERMISSIONS } from '../api/community/capabilities';
+import { DRIVER_PERMISSIONS } from '../api/drivers/capabilities';
 import { EXPENSE_PERMISSIONS } from '../api/expenses/capabilities';
 import { FINANCING_PERMISSIONS } from '../api/financing/capabilities';
 import { INSURANCE_PERMISSIONS } from '../api/insurance/capabilities';
@@ -24,6 +25,7 @@ const DECLARED_PERMISSIONS = [
   ...EXPENSE_PERMISSIONS,
   ...ODOMETER_PERMISSIONS,
   ...TRIP_PERMISSIONS,
+  ...DRIVER_PERMISSIONS,
   ...REMINDER_PERMISSIONS,
   ...PHOTO_PERMISSIONS,
   ...FINANCING_PERMISSIONS,

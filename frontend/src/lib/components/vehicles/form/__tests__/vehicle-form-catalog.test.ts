@@ -65,7 +65,7 @@ function sentCatalogModelId(): string | null | undefined {
 
 async function renderCreate(): Promise<void> {
 	render(VehicleForm, { props: {} });
-	await screen.findByRole('heading', { name: 'Add Vehicle' });
+	await screen.findByRole('heading', { name: 'Add a vehicle' });
 }
 
 beforeEach(() => {
@@ -160,13 +160,13 @@ describe('vehicle form catalogue picker', () => {
 	test('an existing vehicle keeps its confirmed id when its text is not edited', async () => {
 		getVehicle.mockResolvedValue(EXISTING);
 		render(VehicleForm, { props: { vehicleId: EXISTING.id } });
-		await screen.findByRole('button', { name: /update vehicle/i });
+		await screen.findByRole('button', { name: /save changes/i });
 		await fireEvent.focus(field('make'));
 		await fireEvent.focus(field('model'));
 		await fireEvent.input(document.getElementById('nickname') as HTMLInputElement, {
 			target: { value: 'Daily' }
 		});
-		await submit(/update vehicle/i);
+		await submit(/save changes/i);
 		await vi.waitFor(() => expect(updateVehicle).toHaveBeenCalledTimes(1));
 		expect(sentCatalogModelId()).toBe('honda-civic');
 	});

@@ -1,13 +1,13 @@
 import type { Context } from 'hono';
+import { repos } from '../../app-context';
 import { getDb } from '../../db/connection';
 import { NotFoundError } from '../../errors';
 import type { ResourceOf } from '../../permissions/authorize';
 import { requestResolver } from '../../permissions/grants';
 import type { Resource } from '../../permissions/resolve';
-import { insurancePolicyRepository } from './repository';
 
 async function findPolicy(policyId: string) {
-  const policy = await insurancePolicyRepository.findById(policyId);
+  const policy = await repos().insurancePolicies.findById(policyId);
   if (!policy) throw new NotFoundError('Insurance policy');
   return policy;
 }

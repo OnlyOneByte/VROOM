@@ -1,7 +1,7 @@
 import { DrizzleSQLiteAdapter } from '@lucia-auth/adapter-drizzle';
 import { type DatabaseSession, type DatabaseUser, Lucia, TimeSpan } from 'lucia';
 import { CONFIG } from '../../config';
-import { getDb } from '../../db/connection';
+import type { AppDatabase } from '../../db/connection';
 import type { User } from '../../db/schema';
 import { sessions, users } from '../../db/schema';
 import { demoSessionExpiresAt } from './utils';
@@ -33,32 +33,31 @@ class SessionAdapter extends DrizzleSQLiteAdapter {
   }
 }
 
-const db = getDb();
-const adapter = new SessionAdapter(db, sessions, users);
-
-export const lucia = new Lucia(adapter, {
-  sessionCookie: {
-    attributes: {
-      secure: CONFIG.env === 'production',
-      sameSite: 'lax',
+export function createLucia(db: AppDatabase) {
+  return new Lucia(new SessionAdapter(db, sessions, users), {
+    sessionCookie: {
+      attributes: {
+        secure: CONFIG.env === 'production',
+        sameSite: 'lax',
+      },
     },
-  },
-  sessionExpiresIn: new TimeSpan(30, 'd'),
-  getUserAttributes: (attributes) => {
-    return {
-      id: attributes.id,
-      email: attributes.email,
-      displayName: attributes.displayName,
-      pendingApprovalAt: attributes.pendingApprovalAt,
-      createdAt: attributes.createdAt,
-      updatedAt: attributes.updatedAt,
-    };
-  },
-});
+    sessionExpiresIn: new TimeSpan(30, 'd'),
+    getUserAttributes: (attributes) => {
+      return {
+        id: attributes.id,
+        email: attributes.email,
+        displayName: attributes.displayName,
+        pendingApprovalAt: attributes.pendingApprovalAt,
+        createdAt: attributes.createdAt,
+        updatedAt: attributes.updatedAt,
+      };
+    },
+  });
+}
 
 declare module 'lucia' {
   interface Register {
-    Lucia: typeof lucia;
+    Lucia: ReturnType<typeof createLucia>;
     DatabaseUserAttributes: DatabaseUserAttributes;
   }
 

@@ -16,7 +16,6 @@ import {
   sql,
 } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import {
   countNum,
   formatYearMonth,
@@ -840,7 +839,15 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       sourceType?: string;
       sourceId?: string;
     },
-    { ownerId, createdBy }: { ownerId: string; createdBy: string | null }
+    {
+      ownerId,
+      createdBy,
+      payerFor,
+    }: {
+      ownerId: string;
+      createdBy: string | null;
+      payerFor?: (vehicleId: string) => string | null;
+    }
   ): Promise<Expense[]> {
     try {
       const allocations = expenseSplitService.computeAllocations(
@@ -866,6 +873,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           description: data.description,
           sourceType: data.sourceType,
           sourceId: data.sourceId,
+          payerFor,
         });
       });
     } catch (error) {
@@ -962,5 +970,3 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     }
   }
 }
-
-export const expenseRepository = new ExpenseRepository(getDb());

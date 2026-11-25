@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import {
   notifyUser,
@@ -6,7 +7,6 @@ import {
   type PushSender,
   setPushSenderForTest,
 } from '../push-service';
-import { pushSubscriptionRepository } from '../repository';
 
 let ctx: TestApp;
 let userA: string;
@@ -29,7 +29,7 @@ function scriptedSender(
 beforeEach(async () => {
   ctx = await createTestApp();
   userA = ctx.user.id;
-  const { db } = await import('../../../db/connection');
+  const db = (await import('../../../db/connection')).getDb();
   const schema = await import('../../../db/schema');
   userB = `push-svc-b-${++bCounter}`;
   await db
@@ -45,7 +45,7 @@ afterEach(() => {
 const PAYLOAD = { title: 'Oil change due', body: 'Due now', tag: 'rem-1', url: '/reminders' };
 
 async function sub(userId: string, endpoint: string): Promise<void> {
-  await pushSubscriptionRepository.upsertByEndpoint(userId, { endpoint, p256dh: 'k', auth: 'a' });
+  await repos().pushSubscriptions.upsertByEndpoint(userId, { endpoint, p256dh: 'k', auth: 'a' });
 }
 
 describe('notifyUser lifecycle', () => {
@@ -56,7 +56,7 @@ describe('notifyUser lifecycle', () => {
     const summary = await notifyUser(userA, PAYLOAD);
     expect(summary).toEqual({ sent: 1, pruned: 0, failed: 0 });
 
-    const rows = await pushSubscriptionRepository.findByUser(userA);
+    const rows = await repos().pushSubscriptions.findByUser(userA);
     expect(rows).toHaveLength(1);
     expect(rows[0].failureCount).toBe(0);
     expect(rows[0].lastSuccessAt).toBeInstanceOf(Date);
@@ -68,7 +68,7 @@ describe('notifyUser lifecycle', () => {
 
     const summary = await notifyUser(userA, PAYLOAD);
     expect(summary).toEqual({ sent: 0, pruned: 1, failed: 0 });
-    expect(await pushSubscriptionRepository.findByUser(userA)).toHaveLength(0);
+    expect(await repos().pushSubscriptions.findByUser(userA)).toHaveLength(0);
   });
 
   test('transientError increments the streak but does NOT prune before the cap', async () => {
@@ -76,7 +76,7 @@ describe('notifyUser lifecycle', () => {
     setPushSenderForTest(scriptedSender({ 'ep-flaky': { kind: 'transientError' } }));
 
     await notifyUser(userA, PAYLOAD);
-    const rows = await pushSubscriptionRepository.findByUser(userA);
+    const rows = await repos().pushSubscriptions.findByUser(userA);
     expect(rows).toHaveLength(1);
     expect(rows[0].failureCount).toBe(1);
   });
@@ -87,7 +87,7 @@ describe('notifyUser lifecycle', () => {
 
     const cap = 5;
     for (let i = 0; i < cap; i++) await notifyUser(userA, PAYLOAD);
-    expect(await pushSubscriptionRepository.findByUser(userA)).toHaveLength(0);
+    expect(await repos().pushSubscriptions.findByUser(userA)).toHaveLength(0);
   });
 
   test('fans out over many devices; the summary counts each outcome', async () => {
@@ -119,7 +119,7 @@ describe('notifyUser lifecycle', () => {
     const summary = await notifyUser(userA, PAYLOAD);
     expect(calls).toBe(2);
     expect(summary.failed).toBe(2);
-    expect(await pushSubscriptionRepository.findByUser(userA)).toHaveLength(2);
+    expect(await repos().pushSubscriptions.findByUser(userA)).toHaveLength(2);
   });
 
   test('scope: only the target user subscriptions are sent to', async () => {

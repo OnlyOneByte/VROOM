@@ -35,12 +35,57 @@ describe('sonner toasts in app.css', () => {
 		expect(base?.body).toMatch(/max-width:\s*min\(32rem,\s*calc\(100vw - 2rem\)\)/);
 	});
 
-	test.each(TOAST_TYPES)('a %s toast paints the themed card surface', type => {
-		const rule = toastRules.find(r =>
-			r.selectors.includes(`[data-sonner-toast][data-type='${type}']`)
+	test.each(TOAST_TYPES)('a %s toast is the charcoal C3 bar with its light text', type => {
+		const rule = toastRules.find(
+			r =>
+				r.selectors.includes(`[data-sonner-toast][data-type='${type}']`) &&
+				/background-color/.test(r.body)
 		);
-		expect(rule, `no rule for data-type='${type}'`).toBeDefined();
-		expect(rule?.body).toMatch(/background-color:\s*var\(--card\)/);
+		expect(rule, `no surface rule for data-type='${type}'`).toBeDefined();
+		expect(rule?.body).toMatch(/background-color:\s*var\(--bar\)/);
+		expect(rule?.body).toMatch(/color:\s*var\(--bar-on\)/);
+	});
+
+	test.each(['success', 'error', 'warning'])('a %s toast colours its glyph by type', type => {
+		const rule = toastRules.find(
+			r =>
+				r.selectors.includes(`[data-sonner-toast][data-type='${type}']`) &&
+				/--toast-glyph/.test(r.body)
+		);
+		expect(rule?.body).toMatch(/--toast-glyph:\s*oklch\(/);
+	});
+
+	test('title and action weights are important, so they beat sonner’s unlayered defaults', () => {
+		const title = toastRules.find(r => r.selectors.includes('[data-sonner-toast] [data-title]'));
+		const action = toastRules.find(
+			r => r.selectors.includes('[data-sonner-toast] [data-button]') && /font-weight/.test(r.body)
+		);
+		expect(title?.body).toMatch(/font-weight:\s*650\s*!important/);
+		expect(title?.body).toMatch(/line-height:\s*1\.25rem\s*!important/);
+		expect(action?.body).toMatch(/font-weight:\s*650\s*!important/);
+		expect(action?.body).toMatch(/font-size:\s*0\.875rem\s*!important/);
+	});
+
+	test('the action and close button show a light focus ring on the charcoal card', () => {
+		const focus = toastRules.find(r =>
+			r.selectors.includes('[data-sonner-toast] [data-button]:focus-visible')
+		);
+		expect(focus?.selectors).toContain('[data-sonner-toast] [data-close-button]:focus-visible');
+		expect(focus?.body).toMatch(/outline:\s*2px solid var\(--bar-on\)/);
+	});
+
+	test('only a toast without an action pads its text for the close badge', () => {
+		const padded = toastRules.find(r => /padding-right:\s*1\.5rem/.test(r.body));
+		expect(padded?.selectors).toEqual([
+			'[data-sonner-toast]:not(:has([data-button])) [data-content]'
+		]);
+	});
+
+	test('the toast keeps the C3 radius and the single pop shadow, with no border', () => {
+		const base = toastRules.find(r => r.selectors.includes('[data-sonner-toast]'));
+		expect(base?.body).toMatch(/border-radius:\s*var\(--r-lg\)/);
+		expect(base?.body).toMatch(/box-shadow:\s*var\(--shadow-pop\)/);
+		expect(base?.body).toMatch(/border:\s*0/);
 	});
 
 	test('the rule parser is non-vacuous', () => {

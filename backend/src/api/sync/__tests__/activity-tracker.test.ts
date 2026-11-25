@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import { UserActivityTracker } from '../activity-tracker';
 
 describe('Activity tracker', () => {
@@ -51,12 +52,11 @@ describe('Activity tracker', () => {
   });
 
   describe('hasChangesSinceLastSync — fails open on a repo error', () => {
-    test('a throwing syncStateRepository.hasChangesSinceLastSync returns true', async () => {
+    test('a throwing repos().syncState.hasChangesSinceLastSync returns true', async () => {
       const tracker = UserActivityTracker.getInstance();
-      const repoModule = await import('../../settings/repository');
-      const original = repoModule.syncStateRepository.hasChangesSinceLastSync;
+      const original = repos().syncState.hasChangesSinceLastSync;
       (
-        repoModule.syncStateRepository as unknown as {
+        repos().syncState as unknown as {
           hasChangesSinceLastSync: (userId: string) => Promise<boolean>;
         }
       ).hasChangesSinceLastSync = () => Promise.reject(new Error('db down'));
@@ -67,7 +67,7 @@ describe('Activity tracker', () => {
         );
       } finally {
         (
-          repoModule.syncStateRepository as unknown as {
+          repos().syncState as unknown as {
             hasChangesSinceLastSync: typeof original;
           }
         ).hasChangesSinceLastSync = original;

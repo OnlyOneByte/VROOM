@@ -55,126 +55,80 @@ function controls(name: string) {
 	return [...screen.queryAllByRole('button', { name }), ...screen.queryAllByRole('link', { name })];
 }
 
-function belowLg(name: string) {
-	return controls(name).filter(control => !control.classList.contains('hidden'));
-}
-
-function fromLg(name: string) {
-	return controls(name).filter(control => !control.classList.contains('lg:hidden'));
-}
-
 beforeEach(() => {
 	getVehicles.mockReset();
 });
 
+function heroPlaceholder() {
+	return screen.queryByTestId('primary-action-placeholder');
+}
+
 describe('dashboard primary action', () => {
-	test('with a vehicle, Log Fill-up is the single floating primary and Add Vehicle is secondary', async () => {
+	test('with a vehicle, Log fill-up is the single primary, in the hero, at every width', async () => {
 		getVehicles.mockImplementation(() => Promise.resolve([OWNED]));
 		render(Page);
 
-		await waitFor(() => expect(belowLg('Log Fill-up')).toHaveLength(1));
-		expect(belowLg('Log Fill-up')[0]).toHaveClass('fixed');
-		expect(belowLg('Add Vehicle')).toHaveLength(0);
-		expect(fromLg('Add Vehicle')).toHaveLength(1);
-		expect(fromLg('Add Vehicle')[0]).toHaveClass('border', 'bg-background');
+		await waitFor(() => expect(controls('Log fill-up')).toHaveLength(1));
+		const logFillup = controls('Log fill-up')[0]!;
+		expect(screen.getByTestId('dashboard-hero')).toContainElement(logFillup);
+		expect(logFillup.className).not.toMatch(/\bhidden\b|max-sm:hidden|\bfixed\b/);
+		expect(controls('Add vehicle')).toHaveLength(0);
 	});
 
-	test('from lg: up, Log Fill-up moves from the floating button to the header', async () => {
-		getVehicles.mockImplementation(() => Promise.resolve([OWNED]));
-		render(Page);
-
-		await waitFor(() => expect(fromLg('Log Fill-up')).toHaveLength(1));
-		const header = screen
-			.getByRole('heading', { level: 1, name: 'Dashboard' })
-			.closest('.flex-col');
-		expect(fromLg('Log Fill-up')[0]).not.toHaveClass('fixed');
-		expect(header).toContainElement(fromLg('Log Fill-up')[0] ?? null);
-	});
-
-	test('with no vehicles, the getting-started card holds the only Add Vehicle and nothing floats', async () => {
+	test('with no vehicles, the getting-started card holds the only Add vehicle', async () => {
 		getVehicles.mockImplementation(() => Promise.resolve([]));
 		render(Page);
 
 		await screen.findByRole('heading', { name: 'Add your first vehicle' });
-		expect(controls('Add Vehicle')).toHaveLength(1);
-		expect(controls('Add Vehicle')[0]).not.toHaveClass('fixed');
-		expect(controls('Add Vehicle')[0]).toHaveAttribute('href', '/vehicles/new');
-		expect(controls('Log Fill-up')).toHaveLength(0);
+		expect(controls('Add vehicle')).toHaveLength(1);
+		expect(controls('Add vehicle')[0]).toHaveAttribute('href', '/vehicles/new');
+		expect(controls('Log fill-up')).toHaveLength(0);
 	});
 
-	test('with only vehicles shared with me, Add Vehicle is the floating primary and there is no Log Fill-up', async () => {
+	test('with only vehicles shared with me, Add vehicle is the primary and there is no Log fill-up', async () => {
 		getVehicles.mockImplementation(() =>
 			Promise.resolve([{ ...OWNED, sharedAccess: { sharedBy: 'Sam' } } as unknown as Vehicle])
 		);
 		render(Page);
 
-		await waitFor(() => expect(belowLg('Add Vehicle')).toHaveLength(1));
-		expect(belowLg('Add Vehicle')[0]).toHaveClass('fixed');
-		expect(fromLg('Add Vehicle')).toHaveLength(1);
-		expect(fromLg('Add Vehicle')[0]).not.toHaveClass('fixed');
-		expect(controls('Log Fill-up')).toHaveLength(0);
+		await waitFor(() => expect(controls('Add vehicle')).toHaveLength(1));
+		expect(screen.getByTestId('dashboard-hero')).toContainElement(controls('Add vehicle')[0]!);
+		expect(controls('Log fill-up')).toHaveLength(0);
 	});
 
-	test('no floating action while the first load is in flight', async () => {
-		getVehicles.mockImplementation(() => new Promise<Vehicle[]>(() => {}));
-		render(Page);
-		await new Promise(resolve => setTimeout(resolve, 0));
-
-		expect(controls('Add Vehicle')).toHaveLength(0);
-		expect(controls('Log Fill-up')).toHaveLength(0);
-	});
-
-	test('from lg the header holds a 40px placeholder for Add Vehicle until the first load settles', async () => {
+	test('no primary action while the first load is in flight, but a 40px placeholder holds its place', async () => {
 		let settle: (vehicles: Vehicle[]) => void = () => {};
 		getVehicles.mockImplementation(() => new Promise<Vehicle[]>(r => (settle = r)));
 		render(Page);
 		await new Promise(resolve => setTimeout(resolve, 0));
 
-		const header = screen
-			.getByRole('heading', { level: 1, name: 'Dashboard' })
-			.closest('.flex-col');
-		const placeholder = header?.querySelector('[data-slot="skeleton"]');
-		expect(placeholder).toHaveClass('h-10');
-
-		expect(placeholder).toHaveClass('hidden', 'lg:block');
+		expect(controls('Add vehicle')).toHaveLength(0);
+		expect(controls('Log fill-up')).toHaveLength(0);
+		expect(heroPlaceholder()).toHaveClass('h-10');
+		expect(heroPlaceholder()).not.toHaveClass('hidden');
 
 		settle([OWNED]);
-		await waitFor(() => expect(fromLg('Add Vehicle')).toHaveLength(1));
-		expect(header?.querySelector('[data-slot="skeleton"]')).toBeNull();
-		expect(fromLg('Add Vehicle')[0]).toHaveClass('h-10');
+		await waitFor(() => expect(controls('Log fill-up')).toHaveLength(1));
+		expect(heroPlaceholder()).toBeNull();
+		expect(controls('Log fill-up')[0]).toHaveClass('h-10');
 	});
 
-	function headerPlaceholder() {
-		const header = screen
-			.getByRole('heading', { level: 1, name: 'Dashboard' })
-			.closest('.flex-col');
-		return header?.querySelector('[data-slot="skeleton"]') ?? null;
-	}
-
-	test('with no owned vehicles the header placeholder is gone once the load settles', async () => {
-		getVehicles.mockImplementation(() => Promise.resolve([]));
-		render(Page);
-
-		await screen.findByRole('heading', { name: 'Add your first vehicle' });
-		expect(headerPlaceholder()).toBeNull();
-	});
-
-	test('a failed load leaves no header placeholder beside the Retry', async () => {
+	test('a failed load leaves no placeholder beside the Retry', async () => {
 		getVehicles.mockImplementation(() => Promise.reject(new Error('Server down')));
 		render(Page);
 
 		await screen.findByRole('button', { name: 'Retry' });
-		expect(headerPlaceholder()).toBeNull();
-		expect(controls('Add Vehicle')).toHaveLength(0);
+		expect(heroPlaceholder()).toBeNull();
+		expect(controls('Add vehicle')).toHaveLength(0);
 	});
 
-	test('with nothing due or recurring, there is no Needs attention card and the hero holds the period', async () => {
+	test('with nothing due or recurring, there is no Needs you section and the hero holds the period', async () => {
 		getVehicles.mockImplementation(() => Promise.resolve([OWNED]));
 		render(Page);
 
 		const hero = await screen.findByTestId('dashboard-hero');
-		expect(screen.queryByRole('heading', { name: 'Needs attention' })).toBeNull();
-		expect(screen.queryByText('Recurring Costs')).toBeNull();
+		expect(screen.queryByRole('heading', { name: 'Needs you' })).toBeNull();
+		expect(screen.queryByText('Recurring costs')).toBeNull();
 		await waitFor(() =>
 			expect(within(hero).getByRole('combobox', { name: 'Period: 30 days' })).toBeInTheDocument()
 		);
@@ -190,13 +144,13 @@ describe('dashboard primary action', () => {
 		expect(appStore.notifications.filter(n => n.type === 'error')).toEqual([]);
 	});
 
-	test('a failed load offers only a 40px Retry, with no floating action', async () => {
+	test('a failed load offers only a 40px Retry, with no primary action', async () => {
 		getVehicles.mockImplementation(() => Promise.reject(new Error('Server down')));
 		render(Page);
 
 		const retry = await screen.findByRole('button', { name: 'Retry' });
 		expect(retry).toHaveClass('h-10');
-		expect(controls('Add Vehicle')).toHaveLength(0);
-		expect(controls('Log Fill-up')).toHaveLength(0);
+		expect(controls('Add vehicle')).toHaveLength(0);
+		expect(controls('Log fill-up')).toHaveLength(0);
 	});
 });

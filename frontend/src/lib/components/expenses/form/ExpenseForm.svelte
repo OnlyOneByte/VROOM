@@ -30,6 +30,8 @@
 		CollapsibleTrigger
 	} from '#lib/components/ui/collapsible/index.ts';
 	import DatePicker from '#lib/components/common/date-picker.svelte';
+	import DriverChip from '#lib/components/drivers/DriverChip.svelte';
+	import { showsDriverChip } from '#lib/utils/driver-helpers.ts';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
@@ -193,6 +195,14 @@
 	let detailsOpen = $state(false);
 
 	const quickActions = $derived(!form.isEditMode);
+	const payerEntry = $derived(
+		form.originalExpense
+			? {
+					vehicleId: form.originalExpense.vehicleId,
+					driverId: form.originalExpense.paidByDriverId ?? null
+				}
+			: undefined
+	);
 	const showsSubtitle = $derived(form.isEditMode || !!form.queuedExpense || !onlineStatus.current);
 	const dateLabel = $derived(
 		form.formData.date === toDateInputValue(new Date())
@@ -519,10 +529,22 @@
 							placeholder="Select date"
 							label={dateLabel}
 							disabled={form.isGroupEditMode}
-							class="w-auto rounded-full px-3.5"
+							class="h-10 w-auto rounded-full px-3.5"
 							aria-invalid={!!dateError}
 							aria-describedby={dateError ? 'date-error' : undefined}
 						/>
+						{#if !form.isSplit && !form.isLoading && form.formData.vehicleId}
+							<DriverChip
+								id="expense-paid-by"
+								label="Paid by"
+								vehicleId={form.formData.vehicleId}
+								bind:value={form.paidByDriverId}
+								sharing={showsDriverChip(
+									form.vehicles.find(v => v.id === form.formData.vehicleId)
+								) ?? false}
+								entry={payerEntry}
+							/>
+						{/if}
 						{#if canScanReceipt}
 							<ReceiptScanButton onDraft={handleReceiptDraft} />
 						{/if}

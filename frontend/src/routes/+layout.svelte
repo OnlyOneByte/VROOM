@@ -5,6 +5,8 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { handleRouteProtection, isPublicRoute } from '#lib/utils/auth.js';
 	import Navigation from '#lib/components/layout/Navigation.svelte';
+	import { isFormRoute, routes } from '#lib/routes.ts';
+	import { cn } from '#lib/utils.ts';
 	import { Toaster } from '#lib/components/ui/sonner/index.ts';
 	import { toast } from 'svelte-sonner';
 	import OfflineIndicator from '#lib/components/sync/OfflineIndicator.svelte';
@@ -25,8 +27,19 @@
 	import { themeStore } from '#lib/stores/theme.svelte.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import BrandMark from '#lib/components/common/BrandMark.svelte';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { resolve } from '$app/paths';
 
 	let { children } = $props();
+
+	async function signOutWaiting() {
+		try {
+			await authStore.logout();
+		} finally {
+			location.assign(resolve(routes.auth));
+		}
+	}
 
 	let settingsLoaded = $state(false);
 	let recurringTriggered = $state(false);
@@ -84,7 +97,8 @@
 		notifications: appStore.notifications
 	});
 	let currentPath = $derived(page.url.pathname);
-	let showNavigation = $derived(authState.isAuthenticated && !authState.isLoading);
+	let isPending = $derived(authState.isAuthenticated && authState.user?.pendingApproval === true);
+	let showNavigation = $derived(authState.isAuthenticated && !authState.isLoading && !isPending);
 	let mainEl = $state<HTMLElement | null>(null);
 
 	function skipToContent(event: MouseEvent) {
@@ -100,7 +114,7 @@
 	);
 
 	$effect(() => {
-		if (authState.isAuthenticated && !authState.isLoading) {
+		if (authState.isAuthenticated && !authState.isLoading && !isPending) {
 			loadUserSettings();
 			maybeTriggerRecurring();
 		}
@@ -130,7 +144,10 @@
 
 			const options = {
 				duration: notification.duration || 5000,
-				style: `--toast-duration: ${notification.duration || 5000}ms;`
+				style: `--toast-duration: ${notification.duration || 5000}ms;`,
+				...(notification.toastId && { id: notification.toastId }),
+				...(notification.description && { description: notification.description }),
+				...(notification.action && { action: notification.action })
 			};
 
 			const toastFn = {
@@ -143,6 +160,13 @@
 			toastFn(notification.message, options);
 			appStore.removeNotification(notification.id);
 		});
+	});
+
+	$effect(() => {
+		const dismissals = appStore.toastDismissals;
+		if (dismissals.length === 0) return;
+		for (const id of dismissals) toast.dismiss(id);
+		appStore.clearToastDismissals();
 	});
 
 	$effect(() => {
@@ -164,6 +188,27 @@
 			<p class="text-muted-foreground">Loading VROOM...</p>
 		</div>
 	</div>
+{:else if isPending && !isPublicRoute(currentPath)}
+	<main class="min-h-screen bg-background">
+		{#await import('#lib/components/layout/AccountPending.svelte')}
+			<div class="flex min-h-screen items-center justify-center" aria-busy="true">
+				<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+			</div>
+		{:then { default: AccountPending }}
+			<AccountPending />
+		{:catch}
+			<div class="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-3 p-4">
+				<LoadErrorCard
+					title="Couldn't load this page"
+					message="Your account is waiting for an admin to approve it. Check your connection, then reload the page."
+					onRetry={() => location.reload()}
+				/>
+				<Button variant="ghost" class="h-10 self-center" onclick={() => void signOutWaiting()}>
+					Sign Out
+				</Button>
+			</div>
+		{/await}
+	</main>
 {:else if isAuthPage || isHomePage}
 	<main class="min-h-screen bg-background">
 		{@render children?.()}
@@ -183,9 +228,13 @@
 			bind:this={mainEl}
 			id="main"
 			tabindex="-1"
-			class="lg:pl-20 transition-all duration-300 outline-none"
+			class={cn(
+				'outline-none',
+				!isFormRoute(currentPath) &&
+					'pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0 short:pb-0'
+			)}
 		>
-			<div class="px-4 sm:px-6 lg:px-8 py-6">
+			<div class="px-4 sm:px-6 lg:px-10 py-6">
 				{@render children?.()}
 			</div>
 		</main>
