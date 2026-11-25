@@ -98,7 +98,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 | Dropdown | `import * as Select from '#lib/components/ui/select'` | compound; `Select.Root` takes `type="single"` + `onValueChange` |
 | Label | `import { Label } from '#lib/components/ui/label'` | `for=` ties to input id |
 | Field error | `import { FormFieldError } from '#lib/components/ui/form-field'` | renders `role="alert"`; wire via `aria-describedby` (`FormFieldDescription` for hints) |
-| Card | `import * as Card from '#lib/components/ui/card'` | Root/Header/Title/Description/Action/Content/Footer. `Title` takes `level?` (`2`/`3`/`4`) to render a heading; without it, it renders a `div` |
+| Card | `import * as Card from '#lib/components/ui/card'` | Root/Header/Title/Description/Action/Content/Footer. `Title` takes `level?` (`2`/`3`/`4`) to render a heading; without it, it renders a `div`. C3 uses cards rarely: `Root` takes `variant="section"` for a ruled section with no fill |
 | Badge | `import { Badge } from '#lib/components/ui/badge'` | Pill tags. variants: default/secondary/destructive/outline, plus the status tints `due` / `soon` / `ok` / `info` (always beside a word, never colour alone) |
 | Alert | `import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert'` | `variant`: `default` / `destructive` / `warning` / `success`, all themed; `role?`: `'alert'` (default, announced at once) or `'status'` (polite, for non-urgent notices such as the restore dialog's skipped-photos note) |
 | Skeleton | `import { Skeleton } from '#lib/components/ui/skeleton'` | loading placeholder |
