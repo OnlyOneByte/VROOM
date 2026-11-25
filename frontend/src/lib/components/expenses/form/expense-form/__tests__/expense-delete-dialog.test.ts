@@ -49,7 +49,7 @@ describe('ExpenseDeleteDialog: warning text', () => {
 		renderDialog();
 
 		expect(await description()).toBe(
-			'Are you sure you want to delete this expense? This action cannot be undone.'
+			'Are you sure you want to delete this expense? You can undo it for 5 seconds.'
 		);
 	});
 

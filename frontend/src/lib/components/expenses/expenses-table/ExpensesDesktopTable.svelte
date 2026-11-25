@@ -163,6 +163,7 @@
 									isExpanded={expandedGroups.has(row.groupId)}
 									onToggle={onToggleGroup}
 									onDelete={onDeleteGroup}
+									pending={pendingStates?.get(row.children[0]?.id ?? '')}
 								/>
 							{/if}
 						{/each}

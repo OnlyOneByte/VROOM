@@ -9,7 +9,8 @@ import {
 	pendingExpenseRow,
 	pendingRowState,
 	withPendingByMonth,
-	withPendingInSummary
+	withPendingInSummary,
+	withoutRowsInBreakdowns
 } from '../pending-rows.ts';
 import { usePendingRows } from '../pending-rows.svelte.ts';
 
@@ -99,6 +100,26 @@ describe('totals with rows that are still saving', () => {
 			expenseCount: 6,
 			recentAmount: 70
 		});
+	});
+
+	test('rows being deleted leave the monthly trend and the category breakdown', () => {
+		const summary = {
+			monthlyTrend: [
+				{ period: '2026-11', amount: 200, count: 4 },
+				{ period: '2026-10', amount: 80, count: 1 }
+			],
+			categoryBreakdown: [
+				{ category: 'fuel', amount: 150, count: 3 },
+				{ category: 'misc', amount: 50, count: 1 }
+			]
+		} as ExpenseSummary;
+		const misc = pendingExpenseRow(entry('c', { category: 'misc', amount: 50 }));
+		const result = withoutRowsInBreakdowns(summary, [...rows, misc]);
+		expect(result?.monthlyTrend).toEqual([
+			{ period: '2026-11', amount: 100, count: 1 },
+			{ period: '2026-10', amount: 80, count: 1 }
+		]);
+		expect(result?.categoryBreakdown).toEqual([{ category: 'fuel', amount: 100, count: 1 }]);
 	});
 
 	test('their month total grows, and other months stay', () => {

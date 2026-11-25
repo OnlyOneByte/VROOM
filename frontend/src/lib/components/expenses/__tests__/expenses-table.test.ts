@@ -3,6 +3,11 @@ import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Expense, Vehicle } from '#lib/types/index.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
+import {
+	UNDO_WINDOW_MS,
+	resetPendingDeletes,
+	scheduleDelete
+} from '#lib/utils/pending-deletes.svelte.ts';
 
 const { deleteExpense, deleteSplitExpense } = vi.hoisted(() => ({
 	deleteExpense: vi.fn<(id: string) => Promise<void>>(),
@@ -110,6 +115,7 @@ function notificationMessages(): string[] {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	resetPendingDeletes();
 	appStore.clearNotifications();
 	deleteExpense.mockResolvedValue();
 	deleteSplitExpense.mockResolvedValue();
@@ -269,80 +275,68 @@ describe('ExpensesTable paging', () => {
 });
 
 describe('ExpensesTable deleting', () => {
-	test('a confirmed delete removes the expense and reports success', async () => {
+	test('a confirmed delete hides the row at once and offers Undo, with no DELETE sent yet', async () => {
 		const onDelete = vi.fn(async () => {});
-		mountTable({ onDelete });
+		const { container } = mountTable({ onDelete });
 
 		await fireEvent.click(screen.getAllByRole('button', { name: 'Delete expense' })[0]!);
 		await confirmDeleteIn();
 
-		await waitFor(() => expect(onDelete).toHaveBeenCalledWith(NEW_MEDIUM));
-		expect(deleteExpense).toHaveBeenCalledWith('new');
-		expect(deleteSplitExpense).not.toHaveBeenCalled();
-		expect(notificationMessages()).toContain('Expense deleted successfully');
+		await waitFor(() => expect(desktopAmounts(container)).toEqual(['$300.00', '$15.00']));
+		expect(notificationMessages()).toEqual(['Expense deleted']);
+		expect(deleteExpense).not.toHaveBeenCalled();
+		expect(onDelete).not.toHaveBeenCalled();
 		await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
 	});
 
-	test('deleting a split group removes the whole group', async () => {
-		const onDelete = vi.fn(async () => {});
-		mountTable({ expenses: SPLIT, onDelete });
-
-		await fireEvent.click(screen.getByRole('button', { name: 'Delete expense' }));
+	test('Undo puts the row back and no DELETE is ever sent', async () => {
+		const { container } = mountTable();
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Delete expense' })[0]!);
 		await confirmDeleteIn();
+		await waitFor(() => expect(desktopAmounts(container)).toHaveLength(2));
 
-		await waitFor(() => expect(deleteSplitExpense).toHaveBeenCalledWith('g1'));
-		expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ groupId: 'g1' }));
+		appStore.notifications.at(-1)?.action?.onClick();
+
+		await waitFor(() => expect(desktopAmounts(container)).toHaveLength(3));
 		expect(deleteExpense).not.toHaveBeenCalled();
 	});
 
-	test('a failed delete reports the server reason as a sentence and does not notify the parent', async () => {
-		deleteExpense.mockRejectedValue(new Error('Expense is locked'));
-		const onDelete = vi.fn(async () => {});
-		mountTable({ onDelete });
+	test('deleting a split group hides every portion of it', async () => {
+		const { container } = mountTable({ expenses: [...SPLIT, NEW_MEDIUM] });
 
-		await fireEvent.click(screen.getAllByRole('button', { name: 'Delete expense' })[0]!);
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Delete expense' }).at(-1)!);
 		await confirmDeleteIn();
 
-		await waitFor(() =>
-			expect(notificationMessages()).toContain("Couldn't delete the expense. Expense is locked.")
-		);
-		expect(onDelete).not.toHaveBeenCalled();
+		await waitFor(() => expect(desktopAmounts(container)).toEqual(['$75.00']));
 	});
 
-	test('a failed delete keeps the dialog open with focus on Delete so the user can retry', async () => {
-		let reject: (reason: unknown) => void = () => {};
-		deleteExpense.mockReturnValue(new Promise((_, r) => (reject = r)));
-		mountTable();
+	test('a failed split delete shows the group row again with its reason and Retry', async () => {
+		deleteSplitExpense.mockRejectedValue('offline');
+		vi.useFakeTimers();
+		scheduleDelete(SPLIT[0]!);
+		await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS);
+		vi.useRealTimers();
 
-		await fireEvent.click(screen.getAllByRole('button', { name: 'Delete expense' })[0]!);
-		const dialog = await screen.findByRole('alertdialog');
-		const confirm = within(dialog).getByRole('button', { name: 'Delete' });
-		confirm.focus();
-		await fireEvent.click(confirm);
-		expect(confirm).toHaveAttribute('aria-disabled', 'true');
-		expect(confirm).not.toBeDisabled();
-		reject(new Error('Expense is locked'));
+		mountTable({ expenses: SPLIT });
 
-		await waitFor(() =>
-			expect(notificationMessages()).toContain("Couldn't delete the expense. Expense is locked.")
-		);
-		expect(screen.getByRole('alertdialog')).toBeInTheDocument();
-		expect(within(dialog).getByRole('button', { name: 'Delete' })).toBe(confirm);
-		expect(document.activeElement).toBe(confirm);
+		expect(screen.getByText(`Not deleted: ${UNEXPECTED_FAILURE_MESSAGE}`)).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole('button', { name: /^Retry deleting/ }));
+		await waitFor(() => expect(deleteSplitExpense).toHaveBeenCalledTimes(2));
+		expect(deleteSplitExpense).toHaveBeenLastCalledWith('g1');
 	});
 
-	test('a failed delete with a non-Error reason shows the generic message', async () => {
+	test('a failed delete shows the row again with its reason and Retry', async () => {
 		deleteExpense.mockRejectedValue('offline');
-		mountTable();
+		vi.useFakeTimers();
+		scheduleDelete(NEW_MEDIUM);
+		await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS);
+		vi.useRealTimers();
 
-		await fireEvent.click(screen.getAllByRole('button', { name: 'Delete expense' })[0]!);
-		await confirmDeleteIn();
+		const { container } = mountTable();
 
-		await waitFor(() =>
-			expect(notificationMessages()).toContain(
-				`Couldn't delete the expense. ${UNEXPECTED_FAILURE_MESSAGE}`
-			)
-		);
+		expect(desktopAmounts(container)).toHaveLength(3);
+		expect(screen.getByText(`Not deleted: ${UNEXPECTED_FAILURE_MESSAGE}`)).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /^Retry deleting/ })).toBeInTheDocument();
 	});
 
 	test('read-only viewers get no delete controls even when a handler is passed', () => {
@@ -369,14 +363,14 @@ describe('ExpensesTable compact rows', () => {
 		expect(screen.queryByRole('link', { name: /Edit/ })).toBeNull();
 	});
 
-	test('a split group delete from the compact list removes the whole group', async () => {
+	test('a split group delete from the compact list hides the whole group', async () => {
 		mountTable({ expenses: SPLIT });
 
 		await fireEvent.click(screen.getByRole('button', { name: /Maintenance/ }));
 		await fireEvent.click(screen.getByRole('button', { name: /^Delete/ }));
 		await confirmDeleteIn();
 
-		await waitFor(() => expect(deleteSplitExpense).toHaveBeenCalledWith('g1'));
+		await waitFor(() => expect(screen.queryByRole('button', { name: /Maintenance/ })).toBeNull());
 	});
 });
 
