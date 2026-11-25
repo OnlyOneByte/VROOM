@@ -191,10 +191,27 @@ describe('trips page list', () => {
 		await settle();
 
 		const card = screen.getByTestId('trip-summary-card');
+		const text = card.textContent?.replace(/\s+/g, ' ');
 		expect(within(card).getByText('Mileage Summary')).toBeInTheDocument();
-		expect(card.textContent?.replace(/\s+/g, ' ')).toContain('Total 1,234 mi');
-		expect(card.textContent?.replace(/\s+/g, ' ')).toContain('Business 900 mi');
-		expect(card.textContent?.replace(/\s+/g, ' ')).toContain('Avg / trip 617 mi');
+		expect(within(card).getByText('Business mileage value')).toBeInTheDocument();
+		expect(text).toContain('$603.00');
+		expect(text).toContain('900 mi business at $0.67/mi');
+		expect(text).toContain('Trips 2');
+		expect(text).toContain('Total 1,234 mi');
+		expect(text).toContain('Avg / trip 617 mi');
+	});
+
+	test('with no mileage rate the hero shows the business distance instead of a value', async () => {
+		getSummary.mockResolvedValue({ ...SUMMARY, rate: 0, businessMileageValue: 0 });
+		list.mockResolvedValue(tripPage([trip()]));
+		render(Page);
+		await settle();
+
+		const card = screen.getByTestId('trip-summary-card');
+		expect(within(card).getByText('Business distance')).toBeInTheDocument();
+		expect(within(card).queryByText('Business mileage value')).toBeNull();
+		expect(card.textContent?.replace(/\s+/g, ' ')).toContain('900 mi');
+		expect(card.textContent).not.toContain('$');
 	});
 
 	test('a mixed-unit fleet keeps the fraction of its converted totals', async () => {
@@ -205,7 +222,7 @@ describe('trips page list', () => {
 
 		const text = screen.getByTestId('trip-summary-card').textContent?.replace(/\s+/g, ' ');
 		expect(text).toContain('Total 1,234.6 mi');
-		expect(text).toContain('Business 900.4 mi');
+		expect(text).toContain('900.4 mi business');
 	});
 
 	test('each trip shows purpose, date, distance from the odometer span and vehicle', async () => {
@@ -213,7 +230,7 @@ describe('trips page list', () => {
 		render(Page);
 		await settle();
 
-		expect(cardText('t1')).toBe('Business Nov 10, 2026 42 mi (1,000 → 1,042) Daily');
+		expect(cardText('t1')).toBe('Trip Business Nov 10, 2026 Daily 42 mi 1,000 → 1,042');
 	});
 
 	test('the distance unit follows the trip vehicle preferences', async () => {
@@ -336,17 +353,22 @@ describe('trips page delete', () => {
 				message: "Couldn't delete the trip. Trip not found."
 			})
 		);
+		expect(notify).toHaveBeenCalledTimes(1);
 		expect(screen.getByRole('alertdialog')).toBeInTheDocument();
 		expect(list).toHaveBeenCalledTimes(1);
 	});
 
-	test('the confirm button reads Deleting… while the delete is in flight', async () => {
+	test('the confirm button shows it is working, and Cancel is disabled, while the delete is in flight', async () => {
 		deleteTrip.mockReturnValue(new Promise(() => {}));
 		const dialog = await openDelete();
 
 		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Trip' }));
 		await settle();
 
-		expect(screen.getByRole('button', { name: 'Deleting…' })).toBeDisabled();
+		expect(within(dialog).getByRole('button', { name: 'Working…' })).toHaveAttribute(
+			'aria-disabled',
+			'true'
+		);
+		expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled();
 	});
 });
