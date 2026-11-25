@@ -5,7 +5,7 @@
 	import { resolve } from '$app/paths';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { ApiError, logLoadFailure, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { routes } from '#lib/routes.ts';
 	import { LoaderCircle, ChevronRight, CircleAlert, Server } from '@lucide/svelte';
@@ -124,7 +124,8 @@
 	onMount(async () => {
 		try {
 			managesServer = can(await signupApi.serverRules(), 'server.signup.manage');
-		} catch {
+		} catch (error) {
+			logLoadFailure(error, "Couldn't check server permissions");
 			managesServer = false;
 		}
 	});

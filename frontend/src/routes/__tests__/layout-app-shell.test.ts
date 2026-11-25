@@ -246,6 +246,32 @@ describe('the root layout paints the app shell without waiting on /auth/me', () 
 		expect(offlineExpenseQueue.current.map(e => e.id)).toEqual(['alice-1']);
 	});
 
+	it.each([
+		['/dashboard', false],
+		['/privacypolicy', true]
+	])('a waiting account on %s never gets the app shell', async (path, showsPage) => {
+		location.path = path;
+		mockFetch.mockResolvedValue(
+			new Response(
+				JSON.stringify({
+					success: true,
+					data: { user: alice, session: { expiresAt: '2099-01-01' }, pendingApproval: true }
+				}),
+				{ status: 200, headers: { 'content-type': 'application/json' } }
+			)
+		);
+
+		render(Layout, { children: pageContent });
+
+		await waitFor(() => expect(authStore.user?.pendingApproval).toBe(true));
+		expect(screen.queryByRole('link', { name: 'Skip to content' })).toBeNull();
+		expect(screen.queryByText('Page content') !== null).toBe(showsPage);
+		expect(screen.queryByTestId('account-pending') !== null).toBe(!showsPage);
+		expect(mockFetch.mock.calls.map(([url]) => String(url))).not.toContainEqual(
+			expect.stringContaining('/settings')
+		);
+	});
+
 	it('keeps the branded splash on a protected route when nobody signed in on this device', () => {
 		deferredMe();
 

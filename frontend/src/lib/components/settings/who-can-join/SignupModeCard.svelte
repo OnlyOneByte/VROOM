@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { DoorOpen, LoaderCircle, Lock } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import * as RadioGroup from '#lib/components/ui/radio-group/index.ts';
 	import {
 		Card,
@@ -43,18 +44,17 @@
 	let savingMode = $state(false);
 	let savingDomains = $state(false);
 	let domainsError = $state<string | null>(null);
+	let domainsInput = $state<HTMLInputElement | null>(null);
 
+	let modeChanged = $derived(mode !== settings.mode);
 	let domainsChanged = $derived(domains.trim() !== settings.allowedDomains.join(', '));
 
-	async function saveMode(next: string) {
-		const previous = mode;
-		mode = next as SignupMode;
+	async function saveMode() {
 		savingMode = true;
 		try {
-			onChange(await signupApi.updateSettings({ mode: mode }));
+			onChange(await signupApi.updateSettings({ mode }));
 			appStore.showSuccess('Sign-up mode saved');
 		} catch (e) {
-			mode = previous;
 			appStore.showError(`Couldn't save the sign-up mode. ${userFacingErrorMessage(e)}`);
 		} finally {
 			savingMode = false;
@@ -63,6 +63,7 @@
 
 	async function saveDomains(event: SubmitEvent) {
 		event.preventDefault();
+		if (savingDomains) return;
 		domainsError = null;
 		savingDomains = true;
 		const allowedDomains = domains
@@ -76,6 +77,8 @@
 			appStore.showSuccess('Allowed domains saved');
 		} catch (e) {
 			domainsError = userFacingErrorMessage(e);
+			await tick();
+			domainsInput?.focus();
 		} finally {
 			savingDomains = false;
 		}
@@ -86,21 +89,21 @@
 	<CardHeader>
 		<div class="flex items-center gap-2">
 			<DoorOpen class="h-5 w-5 text-muted-foreground" />
-			<CardTitle level={2}>Who can join</CardTitle>
+			<CardTitle level={2}>Who Can Join</CardTitle>
 		</div>
 		<CardDescription>The first account on a server is always its admin.</CardDescription>
 	</CardHeader>
 	<CardContent class="space-y-6">
-		<fieldset class="space-y-3" disabled={settings.modeLocked || savingMode}>
+		<fieldset class="space-y-3" disabled={settings.modeLocked}>
 			<legend class="sr-only">Sign-up mode</legend>
-			<RadioGroup.Root value={mode} onValueChange={v => void saveMode(v)}>
+			<RadioGroup.Root bind:value={mode}>
 				{#each MODES as option (option.value)}
 					<div class="flex items-start gap-3 py-1">
 						<RadioGroup.Item
 							value={option.value}
 							id="signup-mode-{option.value}"
 							class="mt-0.5"
-							disabled={settings.modeLocked || savingMode}
+							disabled={settings.modeLocked}
 							data-testid="signup-mode-{option.value}"
 						/>
 						<Label for="signup-mode-{option.value}" class="block font-normal">
@@ -118,36 +121,48 @@
 					<Lock class="h-4 w-4 shrink-0" />
 					Set by <code class="font-mono text-xs">SIGNUP_MODE</code> on the server.
 				</p>
+			{:else}
+				<Button
+					variant="outline"
+					class="h-10 sm:h-9"
+					disabled={!modeChanged || savingMode}
+					onclick={() => void saveMode()}
+				>
+					{#if savingMode}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
+					Save Mode
+				</Button>
 			{/if}
 		</fieldset>
 
 		<form class="space-y-2" onsubmit={saveDomains} novalidate>
-			<Label for="signup-domains">Allowed email domains</Label>
+			<Label for="signup-domains">Allowed email domains (Optional)</Label>
 			<div class="flex flex-col gap-2 sm:flex-row">
 				<Input
 					id="signup-domains"
+					bind:ref={domainsInput}
 					bind:value={domains}
 					placeholder="example.com, example.org"
 					autocomplete="off"
-					disabled={settings.domainsLocked || savingDomains}
+					readonly={settings.domainsLocked}
 					aria-invalid={domainsError ? 'true' : undefined}
 					aria-describedby="signup-domains-help{domainsError ? ' signup-domains-error' : ''}"
 					class="min-w-0"
 				/>
-				<Button
-					type="submit"
-					variant="outline"
-					class="h-10 shrink-0 sm:h-9"
-					disabled={settings.domainsLocked || savingDomains || !domainsChanged}
-				>
-					{#if savingDomains}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
-					Save Domains
-				</Button>
+				{#if !settings.domainsLocked}
+					<Button
+						type="submit"
+						variant="outline"
+						class="h-10 shrink-0 sm:h-9"
+						disabled={!domainsChanged}
+						aria-busy={savingDomains}
+					>
+						{#if savingDomains}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
+						Save Domains
+					</Button>
+				{/if}
 			</div>
 			{#if domainsError}
-				<p id="signup-domains-error" class="text-sm text-destructive" role="alert">
-					{domainsError}
-				</p>
+				<FormFieldError id="signup-domains-error">{domainsError}</FormFieldError>
 			{/if}
 			<p id="signup-domains-help" class="text-xs text-muted-foreground">
 				{#if settings.domainsLocked}

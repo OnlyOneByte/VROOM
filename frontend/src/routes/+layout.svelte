@@ -85,7 +85,8 @@
 		notifications: appStore.notifications
 	});
 	let currentPath = $derived(page.url.pathname);
-	let showNavigation = $derived(authState.isAuthenticated && !authState.isLoading);
+	let isPending = $derived(authState.isAuthenticated && authState.user?.pendingApproval === true);
+	let showNavigation = $derived(authState.isAuthenticated && !authState.isLoading && !isPending);
 	let mainEl = $state<HTMLElement | null>(null);
 
 	function skipToContent(event: MouseEvent) {
@@ -99,8 +100,6 @@
 		authState.isLoading &&
 			(!isPublicRoute(currentPath) || ((isAuthPage || isHomePage) && mayBeSignedIn))
 	);
-
-	let isPending = $derived(authState.isAuthenticated && authState.user?.pendingApproval === true);
 
 	$effect(() => {
 		if (authState.isAuthenticated && !authState.isLoading && !isPending) {

@@ -14,8 +14,13 @@
 	let signingOut = $state(false);
 
 	async function checkAgain() {
+		if (authStore.recheckingSession) return;
 		await authStore.recheckSession();
-		if (authStore.user?.pendingApproval) appStore.showInfo('Still waiting for an admin.');
+		if (authStore.sessionUnverified) {
+			appStore.showError("Couldn't check with the server. Try again in a moment.");
+		} else if (authStore.user?.pendingApproval) {
+			appStore.showInfo('Still waiting for an admin.');
+		}
 	}
 
 	async function signOut() {
@@ -32,7 +37,7 @@
 </script>
 
 <svelte:head>
-	<title>Waiting for approval - VROOM Car Tracker</title>
+	<title>Waiting for Approval - VROOM Car Tracker</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center p-4">
@@ -41,7 +46,7 @@
 		<Card.Root>
 			<Card.Content class="space-y-5 pt-6">
 				<Hourglass class="h-8 w-8 text-muted-foreground" />
-				<PageHeader title="Waiting for approval">
+				<PageHeader title="Waiting for Approval">
 					{#snippet description()}
 						An admin of this server needs to approve
 						<span class="font-medium text-foreground">
@@ -54,12 +59,13 @@
 					<Button
 						class="h-10"
 						onclick={() => void checkAgain()}
-						disabled={authStore.recheckingSession}
+						aria-busy={authStore.recheckingSession}
 					>
 						{#if authStore.recheckingSession}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
 						Check Again
 					</Button>
 					<Button variant="outline" class="h-10" onclick={signOut} disabled={signingOut}>
+						{#if signingOut}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
 						Sign Out
 					</Button>
 				</div>

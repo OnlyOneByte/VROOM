@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { ArrowLeft, LoaderCircle } from '@lucide/svelte';
+	import { ArrowLeft } from '@lucide/svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
@@ -46,7 +46,7 @@
 					size="icon-lg"
 					class="shrink-0"
 					aria-label="Back to Settings"
-					onclick={() => goto(resolve(routes.settings))}
+					href={resolve(routes.settings)}
 				>
 					<ArrowLeft class="size-5" />
 				</Button>
@@ -61,8 +61,10 @@
 			Only a server admin can change who can join.
 		</p>
 	{:else if !settings}
-		<div class="flex items-center justify-center py-12">
-			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
+		<div class="space-y-6" data-testid="server-loading">
+			<Skeleton class="h-[26rem] w-full rounded-xl" />
+			<Skeleton class="h-40 w-full rounded-xl" />
+			<Skeleton class="h-64 w-full rounded-xl" />
 		</div>
 	{:else}
 		<div class="space-y-6">

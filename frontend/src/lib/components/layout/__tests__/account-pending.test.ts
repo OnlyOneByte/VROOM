@@ -25,7 +25,7 @@ afterEach(cleanup);
 describe('AccountPending', () => {
 	test('names the waiting email, rechecks, and signs out to the sign-in page', async () => {
 		render(AccountPending);
-		expect(screen.getByRole('heading', { name: 'Waiting for approval' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Waiting for Approval' })).toBeInTheDocument();
 		expect(screen.getByText('kim@example.com')).toBeInTheDocument();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Check Again' }));

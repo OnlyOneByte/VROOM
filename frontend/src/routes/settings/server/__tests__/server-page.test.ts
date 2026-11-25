@@ -59,11 +59,36 @@ describe('Server settings page', () => {
 		expect(api.getSettings).not.toHaveBeenCalled();
 	});
 
-	test('choosing a mode saves it', async () => {
+	test('choosing a mode saves nothing until Save Mode', async () => {
 		render(ServerPage);
-		await fireEvent.click(await screen.findByTestId('signup-mode-approval'));
+		const save = await screen.findByRole('button', { name: 'Save Mode' });
+		expect(save).toBeDisabled();
+		await fireEvent.click(screen.getByTestId('signup-mode-approval'));
+		expect(api.updateSettings).not.toHaveBeenCalled();
+		await fireEvent.click(save);
 		await waitFor(() => expect(api.updateSettings).toHaveBeenCalledWith({ mode: 'approval' }));
 		expect(showSuccess).toHaveBeenCalledWith('Sign-up mode saved');
+	});
+
+	test('a list that fails to load offers Retry', async () => {
+		api.listInvites.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce([INVITE]);
+		render(ServerPage);
+		const card = (await screen.findByText("Couldn't load invites")).closest('[role="alert"]');
+		expect(card).not.toBeNull();
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		expect(await screen.findByTestId('invite-list')).toBeInTheDocument();
+	});
+
+	test('an out-of-range expiry is refused on the days field', async () => {
+		render(ServerPage);
+		await fireEvent.input(await screen.findByLabelText(/^Email/), {
+			target: { value: 'sam@example.com' }
+		});
+		await fireEvent.input(screen.getByLabelText('Expires in (days)'), { target: { value: '91' } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
+		expect(await screen.findByRole('alert')).toHaveTextContent('from 1 to 90');
+		expect(screen.getByLabelText('Expires in (days)')).toHaveFocus();
+		expect(api.createInvite).not.toHaveBeenCalled();
 	});
 
 	test('a mode set by SIGNUP_MODE is locked', async () => {
@@ -80,9 +105,9 @@ describe('Server settings page', () => {
 		const invite = await screen.findByRole('button', { name: 'Invite' });
 		await fireEvent.click(invite);
 		expect(await screen.findByRole('alert')).toHaveTextContent('Enter the email to invite.');
-		expect(screen.getByLabelText('Email')).toHaveFocus();
+		expect(screen.getByLabelText(/^Email/)).toHaveFocus();
 
-		await fireEvent.input(screen.getByLabelText('Email'), {
+		await fireEvent.input(screen.getByLabelText(/^Email/), {
 			target: { value: 'sam@example.com' }
 		});
 		await fireEvent.click(invite);
