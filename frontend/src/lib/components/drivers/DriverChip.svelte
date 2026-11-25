@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import { driverApi } from '#lib/services/driver-api.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import type { Driver } from '#lib/types/index.ts';
 	import { defaultDriverId, driverColor, rememberDriver } from '#lib/utils/driver-helpers.ts';
@@ -11,10 +11,11 @@
 		value: string | null | undefined;
 		id: string;
 		label?: string;
-		editing?: boolean;
+		sharing?: boolean;
+		entry?: { vehicleId: string; driverId: string | null };
 	}
 
-	let { vehicleId, value = $bindable(), id, label = 'Driver', editing = false }: Props = $props();
+	let { vehicleId, value = $bindable(), id, label = 'Driver', sharing, entry }: Props = $props();
 
 	const NONE = 'none';
 	let drivers = $state<Driver[] | null>(null);
@@ -22,25 +23,27 @@
 	let options = $derived((drivers ?? []).filter(d => !d.archived || d.id === value));
 	let selected = $derived(options.find(d => d.id === value));
 
-	const entryCar = untrack(() => vehicleId);
+	async function loadDrivers(car: string, known: boolean | undefined): Promise<Driver[] | null> {
+		try {
+			const on = known ?? (await vehicleApi.getVehicle(car)).carShareEnabled;
+			return on ? await driverApi.list(car) : null;
+		} catch {
+			return null;
+		}
+	}
 
 	$effect(() => {
 		const car = vehicleId;
-		const fresh = !editing || car !== entryCar;
+		const onEntryCar = !!entry && car === entry.vehicleId;
 		drivers = null;
-		if (fresh) value = undefined;
+		value = onEntryCar && entry ? entry.driverId : undefined;
 		if (!car) return;
 		let stale = false;
-		driverApi
-			.list(car)
-			.then(list => {
-				if (stale) return;
-				drivers = list;
-				if (list && fresh) value = defaultDriverId(car, list, authStore.user?.id);
-			})
-			.catch(() => {
-				drivers = null;
-			});
+		void loadDrivers(car, sharing).then(list => {
+			if (stale) return;
+			drivers = list;
+			if (list && !onEntryCar) value = defaultDriverId(car, list, authStore.user?.id);
+		});
 		return () => {
 			stale = true;
 		};
@@ -48,7 +51,7 @@
 
 	function pick(next: string) {
 		value = next === NONE ? null : next;
-		if (!editing) rememberDriver(vehicleId, value);
+		if (!entry) rememberDriver(vehicleId, value);
 	}
 </script>
 

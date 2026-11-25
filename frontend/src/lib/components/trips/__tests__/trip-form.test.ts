@@ -2,12 +2,18 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
-import type { Trip, Vehicle } from '#lib/types/index.ts';
+import type { Driver, Trip, Vehicle } from '#lib/types/index.ts';
 import type { CreateTripRequest, UpdateTripRequest } from '#lib/services/trip-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 
 const create = vi.fn<(data: CreateTripRequest) => Promise<Trip>>();
 const update = vi.fn<(id: string, data: UpdateTripRequest) => Promise<Trip>>();
+
+const listDrivers = vi.fn<(vehicleId: string) => Promise<Driver[] | null>>();
+
+vi.mock('#lib/services/driver-api.ts', () => ({
+	driverApi: { list: (vehicleId: string) => listDrivers(vehicleId) }
+}));
 
 vi.mock('#lib/services/trip-api.ts', () => ({
 	tripApi: {
@@ -111,6 +117,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	create.mockResolvedValue(trip());
 	update.mockResolvedValue(trip());
+	listDrivers.mockResolvedValue(null);
 	notify = vi.spyOn(appStore, 'addNotification').mockImplementation(() => {});
 });
 
@@ -417,5 +424,31 @@ describe('TripForm edit mode', () => {
 		expect(hasPendingSave()).toBe(true);
 		unmount();
 		expect(hasPendingSave()).toBe(false);
+	});
+});
+
+describe('TripForm driver chip', () => {
+	const SHARED = { ...CIVIC, carShareEnabled: true } as Vehicle;
+	const DRIVERS: Driver[] = [
+		{ id: 'd-sam', userId: 'u-sam', name: 'Sam', color: 'chart-2', archived: false },
+		{ id: 'd-riley', userId: null, name: 'Riley', color: null, archived: false }
+	];
+
+	test('an unchanged edit keeps the trip credited to its driver', async () => {
+		listDrivers.mockResolvedValue(DRIVERS);
+		mount({ vehicles: [CAMRY, SHARED], trip: trip({ driverId: 'd-sam' }) });
+		await settle();
+		expect(screen.getByRole('combobox', { name: 'Driver: Sam' })).toBeTruthy();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Save Trip' }));
+		await settle();
+		expect(update.mock.calls[0]?.[1]).not.toHaveProperty('driverId');
+	});
+
+	test('a car without car sharing shows no chip and asks for no drivers', async () => {
+		mount({ vehicles: [CAMRY, CIVIC], trip: trip() });
+		await settle();
+		expect(listDrivers).not.toHaveBeenCalled();
+		expect(document.getElementById('trip-driver')).toBeNull();
 	});
 });

@@ -246,7 +246,12 @@
 			</div>
 
 			{#if entryDriverId !== undefined}
-				<DriverChip id="odometer-driver" {vehicleId} bind:value={driverId} editing />
+				<DriverChip
+					id="odometer-driver"
+					{vehicleId}
+					bind:value={driverId}
+					entry={{ vehicleId, driverId: entryDriverId ?? null }}
+				/>
 			{/if}
 
 			<div class="space-y-2">

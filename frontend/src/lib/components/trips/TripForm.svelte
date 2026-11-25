@@ -47,6 +47,9 @@
 	let endLocation = $state('');
 	let note = $state('');
 	let driverId = $state<string | null | undefined>(undefined);
+	let tripEntry = $derived(
+		trip ? { vehicleId: trip.vehicleId, driverId: trip.driverId ?? null } : undefined
+	);
 
 	let isSubmitting = $state(false);
 
@@ -76,7 +79,6 @@
 			startLocation = trip.startLocation ?? '';
 			endLocation = trip.endLocation ?? '';
 			note = trip.note ?? '';
-			driverId = trip.driverId ?? null;
 		} else {
 			vehicleId = vehicles.length === 1 && vehicles[0] ? vehicles[0].id : '';
 			startOdometer = '';
@@ -260,7 +262,13 @@
 				</div>
 			</div>
 
-			<DriverChip id="trip-driver" {vehicleId} bind:value={driverId} editing={isEdit} />
+			<DriverChip
+				id="trip-driver"
+				{vehicleId}
+				bind:value={driverId}
+				sharing={vehicles.find(v => v.id === vehicleId)?.carShareEnabled ?? false}
+				entry={tripEntry}
+			/>
 
 			<div class="grid grid-cols-2 gap-3">
 				<div class="space-y-2">

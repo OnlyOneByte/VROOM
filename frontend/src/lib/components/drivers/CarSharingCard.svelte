@@ -1,5 +1,8 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
+	import { LoaderCircle } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import {
 		Card,
 		CardContent,
@@ -26,6 +29,7 @@
 	let enabled = $state(false);
 	let drivers = $state<Driver[]>([]);
 	let busy = $state(false);
+	let listState = $state<'loading' | 'ready' | 'error'>('loading');
 	let guestName = $state('');
 	let renaming = $state<{ id: string; name: string } | null>(null);
 
@@ -34,11 +38,17 @@
 
 	$effect(() => {
 		enabled = initiallyEnabled;
-		if (initiallyEnabled) void reload();
+		if (initiallyEnabled) untrack(() => void reload());
 	});
 
 	async function reload() {
-		drivers = (await driverApi.list(vehicleId).catch(() => null)) ?? [];
+		if (drivers.length === 0) listState = 'loading';
+		try {
+			drivers = (await driverApi.list(vehicleId)) ?? [];
+			listState = 'ready';
+		} catch {
+			listState = 'error';
+		}
 	}
 
 	async function run(action: () => Promise<unknown>, failure: string) {
@@ -93,6 +103,12 @@
 	<CardHeader>
 		<div class="flex items-center justify-between gap-4">
 			<CardTitle id="car-sharing-title">Car sharing</CardTitle>
+			{#if busy}
+				<LoaderCircle
+					class="ml-auto size-4 animate-spin text-muted-foreground"
+					aria-label="Saving"
+				/>
+			{/if}
 			<Switch
 				aria-labelledby="car-sharing-title"
 				checked={enabled}
@@ -104,6 +120,17 @@
 	</CardHeader>
 	{#if enabled}
 		<CardContent class="space-y-4">
+			{#if listState === 'loading'}
+				<div class="space-y-3" aria-label="Loading drivers">
+					<Skeleton class="h-6 w-40" />
+					<Skeleton class="h-6 w-32" />
+				</div>
+			{:else if listState === 'error'}
+				<div class="flex items-center justify-between gap-3 text-sm" role="alert">
+					<span>Couldn't load the drivers.</span>
+					<Button size="lg" variant="outline" onclick={() => void reload()}>Retry</Button>
+				</div>
+			{/if}
 			<ul class="space-y-1" aria-label="Drivers">
 				{#each active as driver (driver.id)}
 					<li class="flex min-h-10 items-center gap-3">
@@ -119,8 +146,8 @@
 									bind:value={renaming.name}
 									maxlength={50}
 								/>
-								<Button type="submit" size="sm" disabled={busy}>Save</Button>
-								<Button type="button" size="sm" variant="ghost" onclick={() => (renaming = null)}>
+								<Button type="submit" size="lg" disabled={busy}>Save</Button>
+								<Button type="button" size="lg" variant="ghost" onclick={() => (renaming = null)}>
 									Cancel
 								</Button>
 							</form>
@@ -133,7 +160,8 @@
 							</span>
 							{#if !driver.userId}
 								<Button
-									size="sm"
+									size="lg"
+									class="px-3"
 									variant="ghost"
 									disabled={busy}
 									aria-label="Rename {driver.name}"
@@ -142,7 +170,8 @@
 									Rename
 								</Button>
 								<Button
-									size="sm"
+									size="lg"
+									class="px-3"
 									variant="ghost"
 									disabled={busy}
 									aria-label="Archive {driver.name}"
@@ -167,7 +196,9 @@
 					bind:value={guestName}
 					maxlength={50}
 				/>
-				<Button type="submit" variant="outline" disabled={busy || !guestName.trim()}>Add</Button>
+				<Button type="submit" size="lg" variant="outline" disabled={busy || !guestName.trim()}>
+					Add
+				</Button>
 			</form>
 
 			{#if archivedGuests.length > 0}
@@ -177,7 +208,8 @@
 						<div class="flex min-h-10 items-center justify-between gap-3 text-muted-foreground">
 							<span class="truncate">{driver.name}</span>
 							<Button
-								size="sm"
+								size="lg"
+								class="px-3"
 								variant="ghost"
 								disabled={busy}
 								aria-label="Restore {driver.name}"

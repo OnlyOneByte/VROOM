@@ -194,6 +194,14 @@
 	let detailsOpen = $state(false);
 
 	const quickActions = $derived(!form.isEditMode);
+	const payerEntry = $derived(
+		form.originalExpense
+			? {
+					vehicleId: form.originalExpense.vehicleId,
+					driverId: form.originalExpense.paidByDriverId ?? null
+				}
+			: undefined
+	);
 	const showsSubtitle = $derived(form.isEditMode || !!form.queuedExpense || !onlineStatus.current);
 	const dateLabel = $derived(
 		form.formData.date === toDateInputValue(new Date())
@@ -530,7 +538,9 @@
 								label="Paid by"
 								vehicleId={form.formData.vehicleId}
 								bind:value={form.paidByDriverId}
-								editing={form.isEditMode}
+								sharing={form.vehicles.find(v => v.id === form.formData.vehicleId)
+									?.carShareEnabled ?? false}
+								entry={payerEntry}
 							/>
 						{/if}
 						{#if canScanReceipt}
