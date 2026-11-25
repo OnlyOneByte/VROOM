@@ -177,12 +177,11 @@
 	<li class="flex items-center gap-3 py-3 sm:gap-4" data-testid="trip-card-{trip.id}">
 		<div class="min-w-0 flex-1 space-y-1">
 			<p class="truncate font-semibold">{route(trip)}</p>
-			<p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+			<p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
 				<Badge variant={trip.purpose === 'business' ? 'info' : 'secondary'}>
 					{capitalize(trip.purpose)}
 				</Badge>
-				<span>{formatDate(trip.tripDate)}</span>
-				<span aria-hidden="true">·</span>
+				<span class="whitespace-nowrap">{formatDate(trip.tripDate)}</span>
 				<span class="max-w-40 truncate">{vehicleNames.get(trip.vehicleId) ?? 'Vehicle'}</span>
 			</p>
 			{#if trip.note}

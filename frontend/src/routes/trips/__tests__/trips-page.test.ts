@@ -230,7 +230,7 @@ describe('trips page list', () => {
 		render(Page);
 		await settle();
 
-		expect(cardText('t1')).toBe('Business trip Business Nov 10, 2026 · Daily 42 mi 1,000 → 1,042');
+		expect(cardText('t1')).toBe('Business trip Business Nov 10, 2026 Daily 42 mi 1,000 → 1,042');
 	});
 
 	test('the distance unit follows the trip vehicle preferences', async () => {
