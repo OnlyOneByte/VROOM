@@ -28,7 +28,7 @@ describe('restore merge conflict detection is tenant-scoped (cross-tenant read g
     const AdmZip = (await import('adm-zip')).default;
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    const { db } = await import('../../../db/connection');
+    const db = (await import('../../../db/connection')).getDb();
     const schema = await import('../../../db/schema');
     const victimId = 'victim-user-1';
     const victimVehicleId = 'victim-vehicle-secret-1';

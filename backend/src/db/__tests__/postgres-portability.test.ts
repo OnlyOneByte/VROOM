@@ -15,9 +15,11 @@ import {
 } from '../../api/analytics/query-repository';
 import { OdometerRepository } from '../../api/odometer/repository';
 import { createTestApp } from '../../test-helpers/http-client';
-import { db } from '../connection';
+import { getDb } from '../connection';
 import * as schema from '../schema';
 import { seedGarage } from '../seed';
+
+const db = getDb();
 
 const ENABLED = process.env.PG_PORTABILITY === '1';
 

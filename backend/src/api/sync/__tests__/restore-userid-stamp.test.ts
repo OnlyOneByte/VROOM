@@ -64,7 +64,7 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
 
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    const { db } = await import('../../../db/connection');
+    const db = (await import('../../../db/connection')).getDb();
     const schema = await import('../../../db/schema');
     const foreignId = 'victim-user-1';
     await db
@@ -121,7 +121,7 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     const AdmZip = (await import('adm-zip')).default;
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    const { db } = await import('../../../db/connection');
+    const db = (await import('../../../db/connection')).getDb();
     const schema = await import('../../../db/schema');
     const foreignId = 'victim-user-2';
     await db
@@ -169,7 +169,7 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     const AdmZip = (await import('adm-zip')).default;
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    const { db } = await import('../../../db/connection');
+    const db = (await import('../../../db/connection')).getDb();
     const schema = await import('../../../db/schema');
     const foreignId = 'victim-user-3';
     await db

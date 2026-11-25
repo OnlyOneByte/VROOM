@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import {
   createTestApp,
   type DataEnvelope,
@@ -6,7 +7,6 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
-import { odometerRepository } from '../../odometer/repository';
 import { addOdometerReading, seedMileageReminder } from './_helpers';
 
 let ctx: TestApp;
@@ -158,7 +158,7 @@ describe('mileage trigger reads each vehicle’s odometer once', () => {
     await addOdometerReading(ctx, vehicleId, 36000);
     for (const id of ['ro1', 'ro2', 'ro3']) seedMileageReminder(ctx, id, vehicleId, 35000);
 
-    const lookup = spyOn(odometerRepository, 'getCurrentOdometer');
+    const lookup = spyOn(repos().odometer, 'getCurrentOdometer');
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
     expect(res.status, await res.text()).toBe(200);
     expect(lookup).toHaveBeenCalledTimes(1);
