@@ -1,4 +1,11 @@
-import type { Driver } from '#lib/types/index.ts';
+import type { Driver, Vehicle } from '#lib/types/index.ts';
+
+export function showsDriverChip(
+	vehicle: Pick<Vehicle, 'carShare' | 'carShareEnabled'> | undefined
+): boolean | undefined {
+	if (vehicle?.carShare) return vehicle.carShare.enabled && vehicle.carShare.record;
+	return vehicle?.carShareEnabled === false ? false : undefined;
+}
 
 const PALETTE_SLOT = /^chart-[1-8]$/;
 const memoryKey = (vehicleId: string) => `vroom.lastDriver.${vehicleId}`;

@@ -1,6 +1,18 @@
 import { afterEach, describe, expect, test } from 'vitest';
 import type { Driver } from '#lib/types/index.ts';
-import { defaultDriverId, driverColor, rememberDriver } from '../driver-helpers';
+import { defaultDriverId, driverColor, rememberDriver, showsDriverChip } from '../driver-helpers';
+
+test('the chip shows only when the car shares and you may record drivers', () => {
+	const share = (enabled: boolean, record: boolean) => ({
+		carShare: { enabled, manage: false, record }
+	});
+	expect(showsDriverChip(share(true, true))).toBe(true);
+	expect(showsDriverChip(share(true, false))).toBe(false);
+	expect(showsDriverChip(share(false, true))).toBe(false);
+	expect(showsDriverChip({ carShareEnabled: false })).toBe(false);
+	expect(showsDriverChip({ carShareEnabled: true })).toBeUndefined();
+	expect(showsDriverChip(undefined)).toBeUndefined();
+});
 
 const driver = (id: string, extra: Partial<Driver> = {}): Driver => ({
 	id,

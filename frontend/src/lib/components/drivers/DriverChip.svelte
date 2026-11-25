@@ -4,7 +4,13 @@
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import type { Driver } from '#lib/types/index.ts';
-	import { defaultDriverId, driverColor, rememberDriver } from '#lib/utils/driver-helpers.ts';
+	import {
+		defaultDriverId,
+		driverColor,
+		rememberDriver,
+		showsDriverChip
+	} from '#lib/utils/driver-helpers.ts';
+	import { loadCachedVehicles } from '#lib/utils/offline-storage.ts';
 
 	interface Props {
 		vehicleId: string;
@@ -25,7 +31,8 @@
 
 	async function loadDrivers(car: string, known: boolean | undefined): Promise<Driver[] | null> {
 		try {
-			const on = known ?? (await vehicleApi.getVehicle(car)).carShareEnabled;
+			const cached = showsDriverChip(loadCachedVehicles().find(v => v.id === car));
+			const on = known ?? cached ?? showsDriverChip(await vehicleApi.getVehicle(car));
 			return on ? await driverApi.list(car) : null;
 		} catch {
 			return null;

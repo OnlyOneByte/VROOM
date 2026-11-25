@@ -31,6 +31,7 @@
 	} from '#lib/components/ui/collapsible/index.ts';
 	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import DriverChip from '#lib/components/drivers/DriverChip.svelte';
+	import { showsDriverChip } from '#lib/utils/driver-helpers.ts';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
@@ -538,8 +539,9 @@
 								label="Paid by"
 								vehicleId={form.formData.vehicleId}
 								bind:value={form.paidByDriverId}
-								sharing={form.vehicles.find(v => v.id === form.formData.vehicleId)
-									?.carShareEnabled ?? false}
+								sharing={showsDriverChip(
+									form.vehicles.find(v => v.id === form.formData.vehicleId)
+								) ?? false}
 								entry={payerEntry}
 							/>
 						{/if}
