@@ -275,7 +275,10 @@
 				href={resolve(routes.expenseNew)}
 				class="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full bg-accent-fill py-0 pl-1.5 pr-4 text-sm font-semibold text-accent-fill-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 			>
-				<span class="grid size-7 place-items-center rounded-full bg-accent-fill-foreground/15" aria-hidden="true">
+				<span
+					class="grid size-7 place-items-center rounded-full bg-accent-fill-foreground/15"
+					aria-hidden="true"
+				>
 					<Plus class="h-4 w-4" />
 				</span>
 				Add expense
