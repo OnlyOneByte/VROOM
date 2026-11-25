@@ -15,6 +15,7 @@
 	import PaymentHistory from '#lib/components/financing/PaymentHistory.svelte';
 	import NextPaymentCard from '#lib/components/financing/NextPaymentCard.svelte';
 	import LeaseMetricsCard from '#lib/components/financing/LeaseMetricsCard.svelte';
+	import LoanHero from '#lib/components/financing/LoanHero.svelte';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { expenseApi } from '#lib/services/expense-api.ts';
 	import {
@@ -158,6 +159,17 @@
 {#if vehicle.financing?.isActive}
 	<h2 class="sr-only">Financing</h2>
 	{#if vehicle.financing.originalAmount && vehicle.financing.originalAmount > 0}
+		{#if vehicle.financing.financingType === 'loan' && vehicle.financing.paymentAmount > 0}
+			<LoanHero
+				financing={vehicle.financing}
+				{payments}
+				{paymentsLoaded}
+				paymentsLoading={isLoadingPayments || !hasAttemptedPaymentLoad}
+				{amortizationSchedule}
+				payoffDate={estimatedPayoffDate}
+			/>
+		{/if}
+
 		{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
 			<NextPaymentCard
 				financing={vehicle.financing}
@@ -170,7 +182,7 @@
 			/>
 		{/if}
 
-		{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
+		{#if vehicle.financing.financingType !== 'loan' && vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
 			<PaymentMetricsGrid
 				financing={vehicle.financing}
 				{totalInterestPaid}

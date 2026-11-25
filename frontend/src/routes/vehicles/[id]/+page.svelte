@@ -3,7 +3,11 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
-	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import {
+		formatCurrencyAxis,
+		formatCurrencyTooltip,
+		parseMonthToDate
+	} from '#lib/utils/chart-formatters.ts';
 	import { onMount, tick, untrack } from 'svelte';
 	import {
 		Plus,
@@ -45,7 +49,11 @@
 	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
 	import { getFuelEfficiencyLabel, getElectricEfficiencyLabel } from '#lib/utils/units.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
-	import { getCategoryChartColor } from '#lib/utils/chart-colors.ts';
+	import {
+		buildChartConfig,
+		CHART_COLORS,
+		getCategoryChartColor
+	} from '#lib/utils/chart-colors.ts';
 	import { hasActiveFilters as checkActiveFilters } from '#lib/utils/expense-filters.ts';
 	import { COMMON_MESSAGES, VEHICLE_MESSAGES } from '#lib/constants/messages.ts';
 	import { type TimePeriod } from '#lib/constants/time-periods.ts';
@@ -128,7 +136,9 @@
 	let hasOpenedDetails = $state(false);
 	let hasOpenedUpload = $state(false);
 
-	const CATEGORY_CHART_TITLE = 'Expense by Category';
+	const CATEGORY_CHART_TITLE = 'Spending by category';
+	const CATEGORY_SERIES = [{ key: 'value', label: 'Spent', color: CHART_COLORS[0] as string }];
+	const CATEGORY_CONFIG = buildChartConfig(CATEGORY_SERIES);
 	const CATEGORY_CHART_DESCRIPTION = 'Distribution for this vehicle';
 	const CHARTS_LOAD_ERROR = "Charts couldn't be loaded. Check your connection and reload.";
 	const fuelChartLoading = import('#lib/components/charts/FuelEfficiencyTrendChart.svelte');
@@ -1031,7 +1041,7 @@
 						{#if hasExpenseData}
 							{#await loadSpendCharts()}
 								{@render spendChartPlaceholders(null)}
-							{:then [{ default: ExpenseTrendChart }, { AppPieChart }]}
+							{:then [{ default: ExpenseTrendChart }, { AppBarChart }]}
 								<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 									<ExpenseTrendChart
 										data={expenseTrendData}
@@ -1039,10 +1049,19 @@
 										isLoading={isLoadingStats}
 									/>
 									{#if categoryChartData.length > 0 || summary === null}
-										<AppPieChart
+										<AppBarChart
 											title={CATEGORY_CHART_TITLE}
 											description={CATEGORY_CHART_DESCRIPTION}
 											data={categoryChartData}
+											x="value"
+											y="label"
+											orientation="horizontal"
+											series={CATEGORY_SERIES}
+											config={CATEGORY_CONFIG}
+											yAxisFormat={v => String(v)}
+											xAxisProps={{ format: formatCurrencyAxis }}
+											tooltipFormat={formatCurrencyTooltip}
+											valueLabels
 											isLoading={isLoadingStats}
 										/>
 									{/if}

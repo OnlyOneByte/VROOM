@@ -8,7 +8,7 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 vi.mock('#lib/components/expenses/ExpensesTable.svelte', () => ({ default: () => {} }));
-vi.mock('#lib/components/charts/index.ts', () => ({ AppPieChart: () => {} }));
+vi.mock('#lib/components/charts/index.ts', () => ({ AppBarChart: () => {} }));
 vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/charts/FuelEfficiencyTrendChart.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/vehicles/VehiclePhotoCarousel.svelte', () => ({ default: () => {} }));

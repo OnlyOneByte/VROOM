@@ -190,10 +190,12 @@ describe('FinanceTab payment history', () => {
 	test('totals principal and interest paid across the loaded payments', async () => {
 		mount(makeVehicle(makeLoan()));
 		await screen.findByText(/2 payments recorded/);
-		expect(screen.getByText('$601.50')).toBeTruthy();
-		expect(screen.getByText('+ $198.50 interest')).toBeTruthy();
-		expect(screen.getByText('of 60 scheduled')).toBeTruthy();
-		expect(screen.getByText('58 months remaining')).toBeTruthy();
+		const hero = screen.getByTestId('loan-hero');
+		expect(within(hero).getByTestId('loan-sentence')).toHaveTextContent(/^2 of 60 payments made\./);
+		expect(within(hero).getByRole('list')).toHaveTextContent(
+			/Principal paid\s*\$602.*Interest paid\s*\$199/
+		);
+		expect(screen.queryByText('of 60 scheduled')).toBeNull();
 	});
 
 	test('shows a loading placeholder until the payments arrive', async () => {

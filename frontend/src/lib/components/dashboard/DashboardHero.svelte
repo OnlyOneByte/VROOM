@@ -120,47 +120,49 @@
 		</HeroFigure>
 	</div>
 
-	<div>
-		{#if isLoading}
-			<div class="space-y-2" data-testid="dashboard-hero-skeleton">
-				<Skeleton class="h-2.5 w-full rounded-full" />
-				<div class="grid grid-cols-1 gap-y-1 sm:flex sm:gap-x-4">
-					<Skeleton class="h-4 w-36" />
-					<Skeleton class="h-4 w-36" />
-					<Skeleton class="h-4 w-28" />
+	{#if isLoading || bucketTotal > 0}
+		<div>
+			{#if isLoading}
+				<div class="space-y-2" data-testid="dashboard-hero-skeleton">
+					<Skeleton class="h-2.5 w-full rounded-full" />
+					<div class="grid grid-cols-1 gap-y-1 sm:flex sm:gap-x-4">
+						<Skeleton class="h-4 w-36" />
+						<Skeleton class="h-4 w-36" />
+						<Skeleton class="h-4 w-28" />
+					</div>
 				</div>
-			</div>
-		{:else if bucketTotal > 0}
-			<div class="space-y-3">
-				<ul class="flex flex-wrap justify-between gap-x-6 gap-y-3" role="list">
-					{#each COST_BUCKETS as bucket (bucket)}
-						<li class="flex flex-col gap-1">
-							<span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-								<span
-									class="size-2 shrink-0 rounded-full"
-									style:background-color={costBucketColor(bucket)}
-									aria-hidden="true"
-								></span>
-								{BUCKET_LABELS[bucket]}
-							</span>
-							<span class="text-xl font-semibold text-foreground tabular-nums">
-								{formatCurrency(buckets[bucket], undefined, 0)}
-							</span>
-						</li>
-					{/each}
-				</ul>
-				<div class="flex h-2 w-full gap-1" aria-hidden="true" data-testid="dashboard-split-bar">
-					{#each segments as segment (segment.bucket)}
-						<span
-							class="h-full rounded-full"
-							style:width="{segment.share}%"
-							style:background-color={costBucketColor(segment.bucket)}
-						></span>
-					{/each}
+			{:else if bucketTotal > 0}
+				<div class="space-y-3">
+					<ul class="flex flex-wrap justify-between gap-x-6 gap-y-3" role="list">
+						{#each COST_BUCKETS as bucket (bucket)}
+							<li class="flex flex-col gap-1">
+								<span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+									<span
+										class="size-2 shrink-0 rounded-full"
+										style:background-color={costBucketColor(bucket)}
+										aria-hidden="true"
+									></span>
+									{BUCKET_LABELS[bucket]}
+								</span>
+								<span class="text-xl font-semibold text-foreground tabular-nums">
+									{formatCurrency(buckets[bucket], undefined, 0)}
+								</span>
+							</li>
+						{/each}
+					</ul>
+					<div class="flex h-2 w-full gap-1" aria-hidden="true" data-testid="dashboard-split-bar">
+						{#each segments as segment (segment.bucket)}
+							<span
+								class="h-full rounded-full"
+								style:width="{segment.share}%"
+								style:background-color={costBucketColor(segment.bucket)}
+							></span>
+						{/each}
+					</div>
 				</div>
-			</div>
-		{/if}
-	</div>
+			{/if}
+		</div>
+	{/if}
 
 	{#if actions}
 		<div class="lg:col-start-1">{@render actions()}</div>
