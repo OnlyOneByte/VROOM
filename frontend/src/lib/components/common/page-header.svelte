@@ -6,16 +6,10 @@
 		description?: string | Snippet | undefined;
 		back?: Snippet;
 		actions?: Snippet;
-		titleClass?: string;
+		variant?: 'default' | 'display';
 	}
 
-	let {
-		title,
-		description,
-		back,
-		actions,
-		titleClass = 'text-3xl tracking-tight'
-	}: Props = $props();
+	let { title, description, back, actions, variant = 'default' }: Props = $props();
 </script>
 
 <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-4">
@@ -26,7 +20,9 @@
 		<div class="min-w-0">
 			<h1
 				tabindex="-1"
-				class="{titleClass} font-bold break-words rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+				class="{variant === 'display'
+					? 'font-(family-name:--font-fig) text-4xl leading-none uppercase lg:text-5xl'
+					: 'text-3xl tracking-tight'} font-bold break-words rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 			>
 				{title}
 			</h1>
