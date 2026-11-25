@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { focusFirstProblem } from '#lib/utils/focus.ts';
 	import DatePicker from '#lib/components/common/date-picker.svelte';
-	import DriverChip from '#lib/components/drivers/DriverChip.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { page } from '$app/state';
 	import PageHeader from '#lib/components/common/page-header.svelte';
@@ -246,12 +245,14 @@
 			</div>
 
 			{#if entryDriverId !== undefined}
-				<DriverChip
-					id="odometer-driver"
-					{vehicleId}
-					bind:value={driverId}
-					entry={{ vehicleId, driverId: entryDriverId ?? null }}
-				/>
+				{#await import('#lib/components/drivers/DriverChip.svelte') then { default: DriverChip }}
+					<DriverChip
+						id="odometer-driver"
+						{vehicleId}
+						bind:value={driverId}
+						entry={{ vehicleId, driverId: entryDriverId ?? null }}
+					/>
+				{/await}
 			{/if}
 
 			<div class="space-y-2">
