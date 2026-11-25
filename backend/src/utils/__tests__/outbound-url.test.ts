@@ -9,6 +9,7 @@ import {
   fetchOutbound,
   outboundResolver,
   parsePrivateEndpointPolicy,
+  privateEndpointPolicy,
   resolveSafeOutboundTarget,
   urlForAddress,
 } from '../outbound-url';
@@ -209,7 +210,8 @@ describe('fetchOutbound', () => {
     await fetchOutbound(
       'https://models.example.com/v1/chat',
       { method: 'POST', headers: { a: 'b' } },
-      'LLM'
+      'LLM',
+      privateEndpointPolicy()
     );
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toBe('https://93.184.215.14/v1/chat');
@@ -222,7 +224,12 @@ describe('fetchOutbound', () => {
     outboundResolver.lookup = async () => ['2606:4700::1111'];
     outboundResolver.connectUrl = urlForAddress;
     const calls = captureFetch();
-    await fetchOutbound('https://s3.example.com:9000/photos', { method: 'GET' }, 'S3 endpoint');
+    await fetchOutbound(
+      'https://s3.example.com:9000/photos',
+      { method: 'GET' },
+      'S3 endpoint',
+      privateEndpointPolicy()
+    );
     expect(calls[0]?.url).toBe('https://[2606:4700::1111]:9000/photos');
     expect(calls[0]?.init.tls?.serverName).toBe('s3.example.com');
     expect(calls[0]?.init.headers?.host).toBe('s3.example.com:9000');
@@ -230,7 +237,12 @@ describe('fetchOutbound', () => {
 
   test('an IP-literal URL is fetched as is, without a TLS name override', async () => {
     const calls = captureFetch();
-    await fetchOutbound('https://93.184.215.14/v1', { method: 'GET' }, 'LLM');
+    await fetchOutbound(
+      'https://93.184.215.14/v1',
+      { method: 'GET' },
+      'LLM',
+      privateEndpointPolicy()
+    );
     expect(calls[0]?.url).toBe('https://93.184.215.14/v1');
     expect(calls[0]?.init.tls).toBeUndefined();
   });
@@ -250,7 +262,12 @@ describe('fetchOutbound', () => {
     outboundResolver.lookup = async () => ['93.184.215.14', '93.184.215.15'];
     outboundResolver.connectUrl = urlForAddress;
     const urls = failingFetch(['ConnectionRefused', null]);
-    const res = await fetchOutbound('https://s3.example.com/b', { method: 'GET' }, 'S3');
+    const res = await fetchOutbound(
+      'https://s3.example.com/b',
+      { method: 'GET' },
+      'S3',
+      privateEndpointPolicy()
+    );
     expect(await res.text()).toBe('ok');
     expect(urls).toEqual(['https://93.184.215.14/b', 'https://93.184.215.15/b']);
   });
@@ -260,7 +277,12 @@ describe('fetchOutbound', () => {
     outboundResolver.connectUrl = urlForAddress;
     const urls = failingFetch(['ECONNRESET', null]);
     await expect(
-      fetchOutbound('https://models.example.com/v1', { method: 'POST' }, 'LLM')
+      fetchOutbound(
+        'https://models.example.com/v1',
+        { method: 'POST' },
+        'LLM',
+        privateEndpointPolicy()
+      )
     ).rejects.toThrow('ECONNRESET');
     expect(urls).toHaveLength(1);
   });
@@ -269,18 +291,18 @@ describe('fetchOutbound', () => {
     outboundResolver.lookup = async () => ['93.184.215.14', '93.184.215.15'];
     outboundResolver.connectUrl = urlForAddress;
     const urls = failingFetch(['FailedToOpenSocket', 'ConnectionRefused']);
-    await expect(fetchOutbound('https://s3.example.com/', { method: 'GET' }, 'S3')).rejects.toThrow(
-      'ConnectionRefused'
-    );
+    await expect(
+      fetchOutbound('https://s3.example.com/', { method: 'GET' }, 'S3', privateEndpointPolicy())
+    ).rejects.toThrow('ConnectionRefused');
     expect(urls).toHaveLength(2);
   });
 
   test('an IPv6 metadata address is refused before any request', async () => {
     outboundResolver.lookup = async () => ['fd00:ec2::254'];
     const calls = captureFetch();
-    await expect(fetchOutbound('https://s3.example.com/', { method: 'GET' }, 'S3')).rejects.toThrow(
-      ValidationError
-    );
+    await expect(
+      fetchOutbound('https://s3.example.com/', { method: 'GET' }, 'S3', privateEndpointPolicy())
+    ).rejects.toThrow(ValidationError);
     expect(calls).toHaveLength(0);
   });
 });
@@ -375,7 +397,12 @@ describe('private endpoint policy', () => {
         resolveSafeOutboundTarget('https://files.example.com', 'S3', policy)
       ).resolves.toBeDefined();
       await expect(
-        fetchOutbound('https://files.example.com/', { method: 'GET' }, 'S3')
+        fetchOutbound(
+          'https://files.example.com/',
+          { method: 'GET' },
+          'S3',
+          privateEndpointPolicy()
+        )
       ).rejects.toThrow(ValidationError);
     });
   });
@@ -387,7 +414,12 @@ describe('private endpoint policy', () => {
       seen.push(`${String(input)} ${init?.redirect}`);
       return new Response(null, { status: 302, headers: { location: 'http://10.0.0.7/' } });
     }) as typeof fetch;
-    const res = await fetchOutbound('https://files.example.com/', { method: 'GET' }, 'S3');
+    const res = await fetchOutbound(
+      'https://files.example.com/',
+      { method: 'GET' },
+      'S3',
+      privateEndpointPolicy()
+    );
     expect(res.status).toBe(302);
     expect(seen).toHaveLength(1);
     expect(seen[0]).toEndWith(' manual');

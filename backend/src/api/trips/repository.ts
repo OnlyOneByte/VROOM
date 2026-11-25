@@ -1,6 +1,5 @@
 import { and, asc, count, desc, eq, gte, lt, ne } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import type { NewTrip, Trip } from '../../db/schema';
 import { trips, vehicles } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
@@ -123,5 +122,3 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
     return { data, totalCount: result?.count ?? 0 };
   }
 }
-
-export const tripRepository = new TripRepository(getDb());

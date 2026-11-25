@@ -25,7 +25,7 @@ function expenseRow(id: string): ExpenseRow | null {
 
 describe('restore of a backup whose created_by names a user absent from this instance', () => {
   test('restores every row, dropping only the unknown provenance to NULL', async () => {
-    const { db } = await import('../../../db/connection');
+    const db = (await import('../../../db/connection')).getDb();
     const schema = await import('../../../db/schema');
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
@@ -72,7 +72,7 @@ describe('restore of a backup whose created_by names a user absent from this ins
   });
 
   test('a created_by naming a current member of the car still round-trips byte-for-byte', async () => {
-    const { db } = await import('../../../db/connection');
+    const db = (await import('../../../db/connection')).getDb();
     const schema = await import('../../../db/schema');
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');

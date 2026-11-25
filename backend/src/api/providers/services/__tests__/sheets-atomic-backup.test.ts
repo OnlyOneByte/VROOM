@@ -27,7 +27,7 @@ function backup() {
 }
 
 async function seedVehicle(make: string): Promise<void> {
-  const { db } = await import('../../../../db/connection');
+  const db = (await import('../../../../db/connection')).getDb();
   const schema = await import('../../../../db/schema');
   await db
     .insert(schema.vehicles)

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import {
   createTestApp,
   type DataEnvelope,
@@ -6,8 +7,6 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
-import { odometerRepository } from '../../odometer/repository';
-import { tripRepository } from '../repository';
 
 let ctx: TestApp;
 
@@ -45,7 +44,7 @@ describe('a trip delete and its reading change commit or roll back together', ()
   test('a failed reading delete keeps the trip and its reading', async () => {
     const vehicleId = await seedVehicle(ctx);
     const tripId = await createTrip(vehicleId);
-    const spy = spyOn(odometerRepository, 'deleteLinkedTripEntry').mockImplementation(() => {
+    const spy = spyOn(repos().odometer, 'deleteLinkedTripEntry').mockImplementation(() => {
       throw new Error('disk I/O error');
     });
     try {
@@ -63,7 +62,7 @@ describe('a trip delete and its reading change commit or roll back together', ()
     const vehicleId = await seedVehicle(ctx);
     const first = await createTrip(vehicleId);
     const second = await createTrip(vehicleId);
-    const spy = spyOn(odometerRepository, 'handOverLinkedTripEntry').mockImplementation(() => {
+    const spy = spyOn(repos().odometer, 'handOverLinkedTripEntry').mockImplementation(() => {
       throw new Error('disk I/O error');
     });
     try {
@@ -93,8 +92,8 @@ describe('a trip delete and its reading change commit or roll back together', ()
 describe('the shared-reading lookup runs inside the reading change transaction', () => {
   function spyInTransaction(): { inTransaction: boolean[]; restore: () => void } {
     const inTransaction: boolean[] = [];
-    const real = tripRepository.findOtherAtOdometerKey.bind(tripRepository);
-    const spy = spyOn(tripRepository, 'findOtherAtOdometerKey').mockImplementation((args, db) => {
+    const real = repos().trips.findOtherAtOdometerKey.bind(repos().trips);
+    const spy = spyOn(repos().trips, 'findOtherAtOdometerKey').mockImplementation((args, db) => {
       inTransaction.push(ctx.sqlite.inTransaction);
       return real(args, db);
     });

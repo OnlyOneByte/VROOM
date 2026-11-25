@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import {
   createTestApp,
   type DataEnvelope,
@@ -368,9 +369,8 @@ describe('vehicle delete handles photos for every photo-bearing entity type', ()
 describe('a post-delete reminder-cleanup throw does NOT fail the vehicle delete', () => {
   test('deactivateVehicleless throwing still returns 200 and the vehicle is deleted', async () => {
     const vehicleId = await seedVehicle(ctx);
-    const { reminderRepository } = await import('../../reminders/repository');
-    const original = reminderRepository.deactivateVehicleless.bind(reminderRepository);
-    reminderRepository.deactivateVehicleless = async () => {
+    const original = repos().reminders.deactivateVehicleless.bind(repos().reminders);
+    repos().reminders.deactivateVehicleless = async () => {
       throw new Error('simulated cleanup hiccup');
     };
     try {
@@ -383,7 +383,7 @@ describe('a post-delete reminder-cleanup throw does NOT fail the vehicle delete'
       ).n;
       expect(n).toBe(0);
     } finally {
-      reminderRepository.deactivateVehicleless = original;
+      repos().reminders.deactivateVehicleless = original;
     }
   });
 });

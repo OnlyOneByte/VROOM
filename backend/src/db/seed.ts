@@ -3,7 +3,7 @@ import { createTermExpenses } from '../api/insurance/hooks';
 import { assignServerRole } from '../permissions/grants';
 import { logger } from '../utils/logger';
 import { dollarsToCents } from '../utils/money';
-import { db } from './connection.js';
+import { getDb } from './connection.js';
 import {
   expenses,
   insuranceClaims,
@@ -129,6 +129,7 @@ function loanPayments(loan: VehicleFinancing, pattern: DrivingPattern): NewExpen
 }
 
 export async function seedDatabase() {
+  const db = getDb();
   try {
     logger.info('Seeding database with sample data...');
 
@@ -162,6 +163,7 @@ export async function seedDatabase() {
 }
 
 export async function seedGarage(userId: string) {
+  const db = getDb();
   try {
     await db.insert(userPreferences).values({
       userId,
