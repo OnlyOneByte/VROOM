@@ -46,7 +46,7 @@ function checkRule(c: Context, rule: RouteRule, resource: Resource): void {
 }
 
 export function authorize(resourceOf: ResourceOf): MiddlewareHandler {
-  return async (c, next) => {
+  return async function authorized(c, next) {
     const rule = routeRuleOf(c);
     if (!rule || isPublicRule(rule)) throw new ForbiddenError();
     const found = await resourceOf(c);

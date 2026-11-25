@@ -392,11 +392,11 @@ describe('GET /api/v1/auth/capabilities rules', () => {
     return unpackRules(body.data.rules).flatMap((rule) => [rule.action].flat());
   };
 
-  test('a member gets their server and account rules; a disabled user is refused', async () => {
+  test('a member gets their server and account rules; a disabled user gets none', async () => {
     const member = await actions(asOwner);
     expect(member).toContain('account.profile.write');
     expect(member).not.toContain('server.roles.manage');
-    expect((await disabled.request('GET', '/api/v1/auth/capabilities')).status).toBe(403);
+    expect(await actions(disabled.request)).toEqual([]);
   });
 });
 

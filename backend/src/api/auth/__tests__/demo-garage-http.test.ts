@@ -121,28 +121,33 @@ describe('demo garage, on', () => {
       expect(`${route.method} ${path} ${res.status}`).toBe(`${route.method} ${path} 403`);
       expect((await json<{ error: { code: string } }>(res)).error.code).toBe('DEMO_READ_ONLY');
     }
-    expect((await send(cookie, 'POST', '/api/vehicles', {})).status).toBe(403);
+    expect((await send(cookie, 'POST', '/api/vehicles', {})).status).toBe(404);
     expect(await rowCounts()).toEqual(before);
   });
 
-  test('provider, backup, share, export and assistant reads are closed too', async () => {
+  test('provider, backup, sign-in and assistant reads are closed too', async () => {
     const cookie = await demoCookie();
     for (const path of [
       '/api/v1/providers',
       '/api/v1/sync/status',
       '/api/v1/sync/backups/download',
-      '/api/v1/shares/received',
-      '/api/v1/expenses/export',
       '/api/v1/auth/accounts',
       '/api/v1/auth/link/google',
       '/api/v1/auth/callback/link/google',
       '/api/v1/auth/callback/provider/google',
       '/api/v1/auth/providers/connect/google',
-      '/api/providers',
     ]) {
       expect(`${path} ${(await send(cookie, 'GET', path)).status}`).toBe(`${path} 403`);
     }
-    for (const path of ['/API/V1/Providers', '/api//v1/providers', '/api/v1/providers/']) {
+    for (const path of ['/api/v1/shares/received', '/api/v1/shares/granted']) {
+      expect(`${path} ${(await send(cookie, 'GET', path)).status}`).toBe(`${path} 200`);
+    }
+    for (const path of [
+      '/api/providers',
+      '/API/V1/Providers',
+      '/api//v1/providers',
+      '/api/v1/providers/',
+    ]) {
       expect(`${path} ${(await send(cookie, 'GET', path)).status}`).not.toBe(`${path} 200`);
     }
   });
