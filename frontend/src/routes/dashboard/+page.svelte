@@ -524,7 +524,7 @@
 					<Car class="mr-2 h-4 w-4" />
 					Add Vehicle
 				</Button>
-				<Button size="lg" onclick={handleLogFillup}>
+				<Button size="lg" class="max-sm:hidden" onclick={handleLogFillup}>
 					<Plus class="mr-2 h-4 w-4" />
 					Log Fill-up
 				</Button>
@@ -534,7 +534,7 @@
 					Add Vehicle
 				</Button>
 			{:else if isLoading && !hasLoaded}
-				<Skeleton class="h-10 w-full sm:w-36" />
+				<Skeleton class="hidden h-10 sm:block sm:w-36" />
 			{/if}
 		{/snippet}
 	</PageHeader>

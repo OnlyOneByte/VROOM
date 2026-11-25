@@ -161,7 +161,10 @@ test.describe('Expense form', () => {
 		expect(posted).toEqual([]);
 
 		await page.evaluate(() => window.dispatchEvent(new Event('online')));
-		const syncButton = page.getByRole('button', { name: 'Sync Now' });
+		await page.getByRole('button', { name: /^Sync status:/ }).click();
+		const syncButton = page
+			.getByRole('dialog', { name: 'Sync status' })
+			.getByRole('button', { name: 'Sync Now' });
 		await expect(syncButton).toBeVisible();
 
 		await syncButton.click();

@@ -179,13 +179,13 @@
 	<a
 		href={resolve(routes.profile)}
 		class="grid size-9 place-items-center rounded-full bg-surface text-[13px] font-semibold text-foreground ring-1 ring-inset ring-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-		aria-label="Profile"
 		title="Profile"
 	>
 		{#if initials}
-			<span aria-hidden="true">{initials}</span>
+			{initials}<span class="sr-only"> Profile</span>
 		{:else}
 			<User class="h-4 w-4" aria-hidden="true" />
+			<span class="sr-only">Profile</span>
 		{/if}
 	</a>
 {/snippet}

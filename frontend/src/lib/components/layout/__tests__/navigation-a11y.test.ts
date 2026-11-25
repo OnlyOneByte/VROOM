@@ -130,7 +130,7 @@ describe('one navigation landmark, every item labelled in text', () => {
 		const { container } = render(Navigation);
 
 		expect(container.querySelector('nav')).toBeNull();
-		expect(screen.getByRole('link', { name: 'Profile' })).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: /Profile$/ })).toBeInTheDocument();
 	});
 });
 

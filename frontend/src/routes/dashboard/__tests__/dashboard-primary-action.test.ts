@@ -68,13 +68,14 @@ beforeEach(() => {
 });
 
 describe('dashboard primary action', () => {
-	test('with a vehicle, Log Fill-up is the single primary at every width and Add Vehicle is secondary', async () => {
+	test("with a vehicle, Log Fill-up is the single header primary from sm up, and phones use the bar's raised +", async () => {
 		getVehicles.mockImplementation(() => Promise.resolve([OWNED]));
 		render(Page);
 
 		await waitFor(() => expect(belowLg('Log Fill-up')).toHaveLength(1));
 		expect(controls('Log Fill-up')).toHaveLength(1);
-		expect(belowLg('Log Fill-up')[0]).not.toHaveClass('fixed');
+		expect(controls('Log Fill-up')[0]).toHaveClass('max-sm:hidden');
+		expect(controls('Log Fill-up')[0]).not.toHaveClass('fixed');
 		expect(belowLg('Add Vehicle')).toHaveLength(0);
 		expect(fromLg('Add Vehicle')).toHaveLength(1);
 		expect(fromLg('Add Vehicle')[0]).toHaveClass('border', 'bg-background');
@@ -123,7 +124,7 @@ describe('dashboard primary action', () => {
 		expect(controls('Log Fill-up')).toHaveLength(0);
 	});
 
-	test('the header holds a 40px placeholder at every width until the first load settles', async () => {
+	test('from sm the header holds a 40px placeholder until the first load settles', async () => {
 		let settle: (vehicles: Vehicle[]) => void = () => {};
 		getVehicles.mockImplementation(() => new Promise<Vehicle[]>(r => (settle = r)));
 		render(Page);
@@ -135,7 +136,7 @@ describe('dashboard primary action', () => {
 		const placeholder = header?.querySelector('[data-slot="skeleton"]');
 		expect(placeholder).toHaveClass('h-10');
 
-		expect(placeholder).not.toHaveClass('hidden');
+		expect(placeholder).toHaveClass('hidden', 'sm:block');
 
 		settle([OWNED]);
 		await waitFor(() => expect(fromLg('Add Vehicle')).toHaveLength(1));
