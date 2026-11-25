@@ -43,8 +43,8 @@ function captureWithMarker(name: string) {
 
 vi.mock('#lib/components/expenses/ExpensesTable.svelte', () => capture('table'));
 vi.mock('#lib/components/charts/index.ts', () => ({
-	AppPieChart: (_anchor: unknown, props: Record<string, unknown>) => {
-		captured['pie'] = props;
+	AppBarChart: (_anchor: unknown, props: Record<string, unknown>) => {
+		captured['categories'] = props;
 	}
 }));
 vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => captureWithMarker('trend'));
@@ -441,17 +441,21 @@ describe('vehicle detail page overview', () => {
 		expect(captured['fuelStats']?.['trend']).toHaveLength(1);
 		expect(captured['fuelStats']?.['chart']).toBeTypeOf('function');
 		expect(captured['trend']).toBeUndefined();
-		expect(captured['pie']).toBeUndefined();
+		expect(captured['categories']).toBeUndefined();
 
 		await openTab('Expenses');
-		await waitFor(() => expect(captured['pie']).toBeDefined());
+		await waitFor(() => expect(captured['categories']).toBeDefined());
 		expect(captured['trend']?.['description']).toBe('All Time');
 		expect(captured['trend']?.['data']).toHaveLength(1);
-		const pie = captured['pie']?.['data'] as { key: string }[];
-		expect(pie.map(slice => slice.key)).toEqual(['maintenance', 'fuel']);
+		const bars = captured['categories'];
+		expect(bars?.['title']).toBe('Spending by category');
+		expect(bars?.['orientation']).toBe('horizontal');
+		expect([bars?.['x'], bars?.['y']]).toEqual(['value', 'label']);
+		const rows = bars?.['data'] as { key: string }[];
+		expect(rows.map(row => row.key)).toEqual(['maintenance', 'fuel']);
 	});
 
-	test('a category breakdown that totals zero draws no pie chart', async () => {
+	test('a category breakdown that totals zero draws no category chart', async () => {
 		getExpenseSummary.mockResolvedValue({
 			...DATA_SUMMARY,
 			categoryBreakdown: [{ category: 'fuel', amount: 0 }]
@@ -459,7 +463,7 @@ describe('vehicle detail page overview', () => {
 		await mount();
 
 		expect(screen.getByTestId('cost-per-mile-hero')).toBeInTheDocument();
-		expect(captured['pie']).toBeUndefined();
+		expect(captured['categories']).toBeUndefined();
 	});
 
 	test('fuel efficiency, stats and photo failures are reported without blocking the page', async () => {

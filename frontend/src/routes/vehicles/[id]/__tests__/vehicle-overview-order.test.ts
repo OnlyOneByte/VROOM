@@ -14,10 +14,10 @@ vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () 
 vi.mock('#lib/components/charts/FuelEfficiencyTrendChart.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/vehicles/FuelEfficiencyStatsCard.svelte', () => ({ default: () => {} }));
 
-const pieProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
+const categoryProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
 vi.mock('#lib/components/charts/index.ts', () => ({
-	AppPieChart: (_anchor: unknown, props: Record<string, unknown>) => {
-		pieProps.value = props;
+	AppBarChart: (_anchor: unknown, props: Record<string, unknown>) => {
+		categoryProps.value = props;
 	}
 }));
 
@@ -123,9 +123,9 @@ describe('vehicle Overview puts the numbers first', () => {
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 
 		const expensesTab = await screen.findByRole('tab', { name: 'Expenses' });
-		expect(pieProps.value).toBeNull();
+		expect(categoryProps.value).toBeNull();
 		await fireEvent.click(expensesTab);
-		await vi.waitFor(() => expect(pieProps.value).not.toBeNull());
-		expect(pieProps.value?.['description']).toBe('Distribution for this vehicle');
+		await vi.waitFor(() => expect(categoryProps.value).not.toBeNull());
+		expect(categoryProps.value?.['description']).toBe('All time, largest first');
 	});
 });

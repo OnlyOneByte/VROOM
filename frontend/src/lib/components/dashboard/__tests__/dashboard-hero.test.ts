@@ -52,6 +52,7 @@ describe('DashboardHero', () => {
 
 		expect(screen.getByText('Spent all time')).toBeInTheDocument();
 		expect(screen.queryByTestId('dashboard-split-bar')).toBeNull();
+		expect(container.querySelector('section')?.children).toHaveLength(1);
 		expect(container.textContent).not.toMatch(/than|running cost/);
 	});
 
