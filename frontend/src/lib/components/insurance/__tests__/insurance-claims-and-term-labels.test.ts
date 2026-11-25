@@ -15,7 +15,11 @@ vi.mock('#lib/services/insurance-api.ts', () => ({
 		deleteEntityDocument: vi.fn()
 	}
 }));
-vi.mock('#lib/utils/error-handling.ts', () => ({ handleErrorWithNotification: vi.fn() }));
+vi.mock('#lib/utils/error-handling.ts', () => ({
+	handleErrorWithNotification: vi.fn(),
+	logLoadFailure: vi.fn(),
+	userFacingErrorMessage: () => 'Something went wrong.'
+}));
 vi.mock('#lib/services/provider-api.ts', () => ({
 	providerApi: { getProviders: vi.fn(() => Promise.resolve([])) }
 }));

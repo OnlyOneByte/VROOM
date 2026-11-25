@@ -14,8 +14,6 @@ const NOT_A_LOAD_CARD: Record<string, number> = {
 
 const NOT_YET_MOVED: Record<string, number> = {
 	'lib/components/expenses/ImportFromPhotosDialog.svelte': 1,
-	'lib/components/insurance/InsuranceTab.svelte': 1,
-	'lib/components/insurance/form/InsurancePolicyForm.svelte': 1,
 	'lib/components/settings/cards/StorageProvidersCard.svelte': 1,
 	'lib/components/vehicles/FinanceTab.svelte': 1,
 	'lib/components/vehicles/form/VehicleForm.svelte': 1,

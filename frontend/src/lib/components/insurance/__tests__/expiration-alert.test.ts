@@ -32,7 +32,7 @@ describe('ExpirationAlert thresholds', () => {
 	test('a term that ended yesterday shows an Expired badge in destructive colours', () => {
 		const badge = badgeFor(-1);
 		expect(badge).toHaveTextContent('Expired');
-		expect(badge).toHaveClass('text-destructive', 'border-destructive');
+		expect(badge).toHaveClass('bg-due-tint', 'text-destructive');
 	});
 
 	test('a term that ended late yesterday evening is expired, not due today', () => {
@@ -66,13 +66,13 @@ describe('ExpirationAlert thresholds', () => {
 	test('seven days left is still urgent', () => {
 		const badge = badgeFor(7);
 		expect(badge).toHaveTextContent('7 days left');
-		expect(badge).toHaveClass('text-destructive', 'border-destructive');
+		expect(badge).toHaveClass('bg-due-tint', 'text-destructive');
 	});
 
 	test('eight days left switches to the warning colour', () => {
 		const badge = badgeFor(8);
 		expect(badge).toHaveTextContent('8 days left');
-		expect(badge).toHaveClass('text-warning', 'border-warning');
+		expect(badge).toHaveClass('bg-soon-tint', 'text-warning');
 		expect(badge).not.toHaveClass('text-destructive');
 	});
 

@@ -46,6 +46,7 @@ const handleErrorWithNotification = vi.fn<(error: unknown, context?: string) => 
 vi.mock('#lib/utils/error-handling.ts', () => ({
 	handleErrorWithNotification: (error: unknown, context?: string) =>
 		handleErrorWithNotification(error, context),
+	logLoadFailure: vi.fn(),
 	userFacingErrorMessage: () => 'Something went wrong.'
 }));
 
@@ -128,19 +129,19 @@ describe('PolicyCard header', () => {
 	test.each([
 		['an inactive', 'Inactive', makePolicy({ isActive: false, terms: [CURRENT] })],
 		['an expired', 'Expired', makePolicy({ terms: [PAST] })]
-	])('%s policy is badged on a muted surface without fading its text', async (_, badge, policy) => {
+	])('%s policy is badged, not tinted or faded', async (_, badge, policy) => {
 		const { container } = mount({ policy });
 		await settle();
 		expect(screen.getByText(badge)).toBeInTheDocument();
 		const card = container.querySelector('[data-slot="card"]');
-		expect(card).toHaveClass('bg-muted/30');
-		expect(card?.className).not.toMatch(/opacity-/);
+		expect(card).toHaveAttribute('data-in-force', 'false');
+		expect(card?.className).not.toMatch(/opacity-|bg-muted/);
 	});
 
 	test('a policy in force keeps the plain card surface', async () => {
 		const { container } = mount();
 		await settle();
-		expect(container.querySelector('[data-slot="card"]')).not.toHaveClass('bg-muted/30');
+		expect(container.querySelector('[data-slot="card"]')).toHaveAttribute('data-in-force', 'true');
 		expect(container.querySelector('[data-slot="card"]')).toHaveClass('py-0');
 	});
 
@@ -191,15 +192,22 @@ describe('PolicyCard child sections', () => {
 		expect(screen.getByRole('heading', { name: 'Claims' })).toBeInTheDocument();
 	});
 
-	test('File Claim in the footer opens the claim form and hides itself', async () => {
+	test('File Claim in the footer opens the claim dialog and gets focus back when it closes', async () => {
 		mount();
 		await settle();
-		await fireEvent.click(screen.getByRole('button', { name: 'File Claim' }));
+		const trigger = screen.getByRole('button', { name: 'File Claim' });
+		trigger.focus();
+		await fireEvent.click(trigger);
 		await settle();
-		expect(screen.getByText('File a claim')).toBeInTheDocument();
-		const fileClaim = screen.getAllByRole('button', { name: 'File Claim' });
-		expect(fileClaim).toHaveLength(1);
-		expect(fileClaim[0]).toHaveAttribute('type', 'submit');
+		const dialog = screen.getByRole('dialog', { name: 'File a claim' });
+		expect(within(dialog).getByRole('button', { name: 'File Claim' })).toHaveAttribute(
+			'type',
+			'submit'
+		);
+		expect(trigger).toBeInTheDocument();
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+		await waitFor(() => expect(document.activeElement).toBe(trigger));
 	});
 
 	test('Upload in the footer opens the document capture dialog', async () => {
@@ -214,18 +222,18 @@ describe('PolicyCard child sections', () => {
 		getEntityDocuments.mockRejectedValueOnce(new Error('offline'));
 		mount();
 		await settle();
-		expect(screen.getByText("Couldn't load the documents.")).toBeInTheDocument();
+		expect(screen.getByText("Couldn't load the documents")).toBeInTheDocument();
 		expect(screen.getByTestId('policy-attachments')).toHaveTextContent(/^0 claims$/);
 
 		getEntityDocuments.mockResolvedValue(photoPage([makePhoto()]));
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
-		expect(screen.queryByText("Couldn't load the documents.")).toBeNull();
+		expect(screen.queryByText("Couldn't load the documents")).toBeNull();
 		expect(screen.getByTestId('policy-attachments')).toHaveTextContent('1 document · 0 claims');
 	});
 
 	test.each([
-		['documents', "Couldn't load the documents."],
+		['documents', "Couldn't load the documents"],
 		['claims', 'Something went wrong.']
 	])(
 		'Retry on a failed %s load stays on screen and focusable while it runs',

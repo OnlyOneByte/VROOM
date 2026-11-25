@@ -28,7 +28,9 @@ vi.mock('#lib/services/insurance-api.ts', () => ({
 const handleErrorWithNotification = vi.fn<(error: unknown, context?: string) => void>();
 vi.mock('#lib/utils/error-handling.ts', () => ({
 	handleErrorWithNotification: (error: unknown, context?: string) =>
-		handleErrorWithNotification(error, context)
+		handleErrorWithNotification(error, context),
+	logLoadFailure: vi.fn(),
+	userFacingErrorMessage: () => 'Something went wrong.'
 }));
 
 interface CaptureDialogProps {
