@@ -116,16 +116,35 @@ describe('the Garage', () => {
 			expect(daily.getByText('2020 Toyota Camry · ABC123 · 40,360 mi')).toBeInTheDocument()
 		);
 		expect(daily.getByText('$501')).toBeInTheDocument();
-		expect(daily.getByText('30 days · $0.20/mi')).toBeInTheDocument();
+		expect(rows[0]!.textContent).toMatch(/30 days ·\s*\$0\.20\/mi/);
 
 		const tesla = within(rows[1]!);
 		expect(tesla.getByRole('link', { name: '2023 Tesla Model 3' })).toBeInTheDocument();
 		expect(tesla.getByText('electric')).toBeInTheDocument();
-		expect(tesla.getByText('30 days')).toBeInTheDocument();
+		expect(tesla.getByText('no running cost per mi')).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: /Add vehicle/ })).toHaveAttribute(
 			'href',
 			'/vehicles/new'
 		);
+	});
+
+	test("labels each odometer in the car's own unit and falls back to its other readings", async () => {
+		const metric = {
+			...TESLA,
+			unitPreferences: { distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }
+		} as Vehicle;
+		getVehicles.mockResolvedValue([CAMRY, metric]);
+		getVehicleStats.mockImplementation(id =>
+			Promise.resolve(
+				(id === 'v1'
+					? { currentOdometer: null, currentMileage: 40100 }
+					: { currentOdometer: 64950, currentMileage: null }) as VehicleStats
+			)
+		);
+		render(Page);
+
+		expect(await screen.findByText('2020 Toyota Camry · ABC123 · 40,100 mi')).toBeInTheDocument();
+		expect(await screen.findByText('electric · 64,950 km')).toBeInTheDocument();
 	});
 
 	test('puts vehicles shared with me under Shared with you, and says so when there are none', async () => {
