@@ -89,7 +89,7 @@
 	}
 </script>
 
-<Card class={isPolicyInForce(policy) ? 'py-0' : 'bg-muted/30 py-0'}>
+<Card class="py-0" data-in-force={isPolicyInForce(policy)}>
 	<CardContent class="p-4">
 		<div class="flex items-center justify-between gap-2">
 			<div class="flex items-center gap-2.5 min-w-0">
@@ -97,7 +97,10 @@
 					<Building2 class="h-4 w-4 text-primary" />
 				</div>
 				<div class="min-w-0">
-					<svelte:element this={`h${level}`} class="text-sm font-semibold text-foreground truncate">
+					<svelte:element
+						this={`h${level}`}
+						class="truncate text-base font-semibold text-foreground"
+					>
 						{policy.company}
 					</svelte:element>
 					{#if latestTerm?.policyNumber}

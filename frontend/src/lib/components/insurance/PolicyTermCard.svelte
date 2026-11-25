@@ -21,10 +21,12 @@
 	let confirmOpen = $state(false);
 	let menuOpen = $state(false);
 	let ended = $derived(hasTermEnded(term));
+	const figure =
+		'font-(family-name:--font-fig) text-lg leading-tight font-semibold text-foreground tabular-nums';
 	let termLabel = $derived(isCurrent ? (ended ? 'Latest Term' : 'Current Term') : 'Past Term');
 </script>
 
-<div class={isCurrent ? 'space-y-2' : 'space-y-2 rounded-lg border bg-background p-3'}>
+<div class={isCurrent ? 'space-y-3' : 'space-y-2 border-t border-border pt-3'}>
 	<div class="flex items-center justify-between">
 		<Badge variant="secondary" class="text-xs">
 			{termLabel}
@@ -79,31 +81,57 @@
 		</div>
 	</div>
 
-	<dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs">
+	<dl
+		class={isCurrent
+			? 'grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3'
+			: 'grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs'}
+	>
 		{#if isCurrent}
-			<dt class="text-muted-foreground">{ended ? 'Ended' : 'Expires'}</dt>
-			<dd class="font-medium text-foreground">{formatDate(term.endDate)}</dd>
+			<div>
+				<dt class="text-xs text-muted-foreground">{ended ? 'Ended' : 'Expires'}</dt>
+				<dd class={figure}>{formatDate(term.endDate)}</dd>
+			</div>
+			{#if term.totalCost !== undefined}
+				<div>
+					<dt class="text-xs text-muted-foreground">Total Cost</dt>
+					<dd class={figure}>{formatCurrency(term.totalCost)}</dd>
+				</div>
+			{/if}
+			{#if term.monthlyCost !== undefined}
+				<div>
+					<dt class="text-xs text-muted-foreground">Monthly</dt>
+					<dd class={figure}>{formatCurrency(term.monthlyCost)}/mo</dd>
+				</div>
+			{/if}
+			{#if vehicleNames.length > 0}
+				<div class="col-span-full">
+					<dt class="text-xs text-muted-foreground">Vehicles</dt>
+					<dd class="text-sm font-medium break-words text-foreground">
+						{vehicleNames.join(', ')}
+					</dd>
+				</div>
+			{/if}
 		{:else}
 			<dt class="text-muted-foreground">Start</dt>
 			<dd class="font-medium text-foreground">{formatDate(term.startDate)}</dd>
 			<dt class="text-muted-foreground">End</dt>
 			<dd class="font-medium text-foreground">{formatDate(term.endDate)}</dd>
-		{/if}
-		{#if term.totalCost !== undefined}
-			<dt class="text-muted-foreground">Total Cost</dt>
-			<dd class="font-semibold text-foreground">
-				{formatCurrency(term.totalCost)}
-			</dd>
-		{/if}
-		{#if term.monthlyCost !== undefined}
-			<dt class="text-muted-foreground">Monthly</dt>
-			<dd class="font-medium text-foreground">
-				{formatCurrency(term.monthlyCost)}/mo
-			</dd>
-		{/if}
-		{#if vehicleNames.length > 0}
-			<dt class="text-muted-foreground">Vehicles</dt>
-			<dd class="font-medium text-foreground">{vehicleNames.join(', ')}</dd>
+			{#if term.totalCost !== undefined}
+				<dt class="text-muted-foreground">Total Cost</dt>
+				<dd class="font-semibold text-foreground tabular-nums">
+					{formatCurrency(term.totalCost)}
+				</dd>
+			{/if}
+			{#if term.monthlyCost !== undefined}
+				<dt class="text-muted-foreground">Monthly</dt>
+				<dd class="font-medium text-foreground tabular-nums">
+					{formatCurrency(term.monthlyCost)}/mo
+				</dd>
+			{/if}
+			{#if vehicleNames.length > 0}
+				<dt class="text-muted-foreground">Vehicles</dt>
+				<dd class="font-medium break-words text-foreground">{vehicleNames.join(', ')}</dd>
+			{/if}
 		{/if}
 	</dl>
 

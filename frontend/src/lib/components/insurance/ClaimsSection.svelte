@@ -2,8 +2,11 @@
 	import { onMount } from 'svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { Plus, Trash2, Pencil, LoaderCircle, ShieldAlert, X, Paperclip } from '@lucide/svelte';
+	import { Plus, Trash2, Pencil, LoaderCircle, ShieldAlert, Paperclip } from '@lucide/svelte';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import DocumentViewer from './DocumentViewer.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -15,6 +18,7 @@
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
 	import {
 		handleErrorWithNotification,
+		logLoadFailure,
 		userFacingErrorMessage
 	} from '#lib/utils/error-handling.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
@@ -96,12 +100,11 @@
 		not_at_fault: 'Not at fault',
 		shared: 'Shared fault'
 	};
-	// Token colours pass WCAG AA; text-chart-* on a chart tint fails for some palette entries.
-	const STATUS_VARIANT: Record<ClaimStatus, 'secondary' | 'outline' | 'destructive'> = {
-		filed: 'outline',
-		in_progress: 'secondary',
-		settled: 'secondary',
-		denied: 'destructive'
+	const STATUS_VARIANT: Record<ClaimStatus, 'info' | 'soon' | 'ok' | 'due'> = {
+		filed: 'info',
+		in_progress: 'soon',
+		settled: 'ok',
+		denied: 'due'
 	};
 
 	onMount(loadClaims);
@@ -118,14 +121,10 @@
 			loadError = null;
 		} catch (err) {
 			loadError = userFacingErrorMessage(err);
-			handleErrorWithNotification(err, "Couldn't load claims");
+			logLoadFailure(err, "Couldn't load claims");
 		} finally {
 			isLoading = false;
 		}
-	}
-
-	function retryClaims() {
-		if (!isLoading) loadClaims();
 	}
 
 	function resetForm() {
@@ -221,13 +220,13 @@
 	}
 </script>
 
-{#if !compact || loadError || formOpen || (hasLoaded && claims.length > 0)}
+{#if !compact || loadError || (hasLoaded && claims.length > 0)}
 	<div class={compact ? 'mt-3 space-y-3' : 'space-y-3'}>
 		<div class="flex items-center justify-between">
 			<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground">
 				Claims
 			</svelte:element>
-			{#if !formOpen && !readOnly && !compact}
+			{#if !readOnly && !compact}
 				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={openNew}>
 					<Plus />
 					File Claim
@@ -236,35 +235,26 @@
 		</div>
 
 		{#if loadError}
-			<div class="rounded-md border border-destructive/40 bg-destructive/10 p-3">
-				<p class="text-xs text-destructive">{loadError}</p>
-				<Button
-					variant="outline"
-					size="sm"
-					class="mt-2 h-10 sm:h-8"
-					aria-disabled={isLoading}
-					onclick={retryClaims}
-				>
-					{#if isLoading}
-						<LoaderCircle class="animate-spin" />
-					{/if}
-					Retry
-				</Button>
-			</div>
+			<LoadErrorCard
+				compact
+				title="Couldn't load the claims"
+				message={loadError}
+				onRetry={loadClaims}
+			/>
 		{:else if isLoading && !hasLoaded}
-			<div class="flex items-center justify-center py-4">
-				<LoaderCircle class="h-5 w-5 animate-spin text-muted-foreground" />
+			<div class="space-y-2" aria-hidden="true" data-testid="claims-loading">
+				<Skeleton class="h-12 w-full" />
 			</div>
 		{:else}
-			{#if claims.length === 0 && !formOpen}
+			{#if claims.length === 0}
 				<div class="flex flex-col items-center py-4 text-center">
 					<ShieldAlert class="mb-2 h-6 w-6 text-muted-foreground" />
 					<p class="text-xs text-muted-foreground">No claims filed.</p>
 				</div>
 			{:else if claims.length > 0}
-				<div class="space-y-2">
+				<ul class="divide-y divide-border border-y border-border">
 					{#each claims as claim (claim.id)}
-						<div class="rounded-md border border-border p-3">
+						<li class="py-3">
 							<div class="flex items-start justify-between gap-3">
 								<div class="min-w-0 flex-1">
 									<div class="flex flex-wrap items-center gap-2">
@@ -285,14 +275,16 @@
 									>
 										<span>{formatDate(claim.claimDate)}</span>
 										{#if claim.payoutAmount != null}
-											<span>Payout: {formatCurrency(claim.payoutAmount)}</span>
+											<span class="tabular-nums">Payout: {formatCurrency(claim.payoutAmount)}</span>
 										{/if}
 										{#if claim.vehicleId && vehicleNameMap.has(claim.vehicleId)}
 											<span>{vehicleNameMap.get(claim.vehicleId)}</span>
 										{/if}
 									</div>
 									{#if claim.description}
-										<p class="mt-1 truncate text-xs text-muted-foreground">{claim.description}</p>
+										<p class="mt-1 line-clamp-2 text-xs break-words text-muted-foreground">
+											{claim.description}
+										</p>
 									{/if}
 								</div>
 								<div class="flex shrink-0 items-center gap-2">
@@ -338,159 +330,10 @@
 									/>
 								</div>
 							{/if}
-						</div>
+						</li>
 					{/each}
-				</div>
+				</ul>
 			{/if}
-		{/if}
-
-		{#if formOpen}
-			<form
-				class="space-y-3 rounded-md border border-border p-3"
-				onsubmit={e => {
-					e.preventDefault();
-					handleSubmit();
-				}}
-			>
-				<div class="flex items-center justify-between">
-					<p class="text-sm font-medium">{editingId ? 'Edit claim' : 'File a claim'}</p>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						class="size-10 sm:size-9"
-						aria-label="Cancel"
-						onclick={closeForm}
-					>
-						<X />
-					</Button>
-				</div>
-
-				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-					<div class="space-y-1">
-						<Label for={`claim-date-${policyId}`}>Date *</Label>
-						<DatePicker
-							id={`claim-date-${policyId}`}
-							bind:value={claimDate}
-							placeholder="Claim date"
-						/>
-					</div>
-					<div class="space-y-1">
-						<Label for={`claim-type-${policyId}`}>Type</Label>
-						<Select.Root
-							type="single"
-							value={claimType}
-							onValueChange={v => (claimType = v as ClaimType)}
-						>
-							<Select.Trigger id={`claim-type-${policyId}`} class="w-full">
-								{capitalize(claimType)}
-							</Select.Trigger>
-							<Select.Content>
-								{#each CLAIM_TYPES as t (t)}
-									<Select.Item value={t} label={capitalize(t)}>{capitalize(t)}</Select.Item>
-								{/each}
-							</Select.Content>
-						</Select.Root>
-					</div>
-					<div class="space-y-1">
-						<Label for={`claim-status-${policyId}`}>Status</Label>
-						<Select.Root
-							type="single"
-							value={status}
-							onValueChange={v => (status = v as ClaimStatus)}
-						>
-							<Select.Trigger id={`claim-status-${policyId}`} class="w-full">
-								{STATUS_LABELS[status]}
-							</Select.Trigger>
-							<Select.Content>
-								{#each CLAIM_STATUSES as s (s)}
-									<Select.Item value={s} label={STATUS_LABELS[s]}>{STATUS_LABELS[s]}</Select.Item>
-								{/each}
-							</Select.Content>
-						</Select.Root>
-					</div>
-					<div class="space-y-1">
-						<Label for={`claim-payout-${policyId}`}>Payout amount</Label>
-						<Input
-							id={`claim-payout-${policyId}`}
-							type="number"
-							step={amountStep()}
-							min="0"
-							bind:value={payoutAmount}
-							placeholder={amountPlaceholder()}
-						/>
-					</div>
-					<div class="space-y-1 sm:col-span-2">
-						<Label for={`claim-fault-${policyId}`}>Fault</Label>
-						<Select.Root
-							type="single"
-							value={faultDesignation}
-							onValueChange={v => (faultDesignation = (v ?? '') as FaultDesignation | '')}
-						>
-							<Select.Trigger id={`claim-fault-${policyId}`} class="w-full">
-								{faultDesignation ? FAULT_LABELS[faultDesignation] : 'Not specified'}
-							</Select.Trigger>
-							<Select.Content>
-								{#each FAULT_DESIGNATIONS as f (f)}
-									<Select.Item value={f} label={FAULT_LABELS[f]}>{FAULT_LABELS[f]}</Select.Item>
-								{/each}
-							</Select.Content>
-						</Select.Root>
-					</div>
-					{#if vehicles.length > 0}
-						<div class="space-y-1 sm:col-span-2">
-							<Label for={`claim-vehicle-${policyId}`}>Vehicle (optional)</Label>
-							<Select.Root
-								type="single"
-								value={vehicleId}
-								onValueChange={v => (vehicleId = v ?? '')}
-							>
-								<Select.Trigger id={`claim-vehicle-${policyId}`} class="w-full">
-									{vehicleId && vehicleNameMap.has(vehicleId)
-										? vehicleNameMap.get(vehicleId)
-										: 'Not specified'}
-								</Select.Trigger>
-								<Select.Content>
-									{#each vehicles as v (v.id)}
-										<Select.Item value={v.id} label={getVehicleDisplayName(v)}>
-											{getVehicleDisplayName(v)}
-										</Select.Item>
-									{/each}
-								</Select.Content>
-							</Select.Root>
-						</div>
-					{/if}
-				</div>
-
-				<div class="space-y-1">
-					<Label for={`claim-desc-${policyId}`}>Description</Label>
-					<Textarea
-						id={`claim-desc-${policyId}`}
-						bind:value={description}
-						rows={2}
-						placeholder="What happened?"
-					/>
-				</div>
-
-				<div class="flex justify-end gap-2">
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						class="h-10 sm:h-8"
-						onclick={closeForm}
-						disabled={isSaving}
-					>
-						Cancel
-					</Button>
-					<Button type="submit" size="sm" class="h-10 sm:h-8" disabled={isSaving}>
-						{#if isSaving}
-							<LoaderCircle class="mr-1 h-3.5 w-3.5 animate-spin" />
-						{/if}
-						{editingId ? 'Save' : 'File Claim'}
-					</Button>
-				</div>
-			</form>
 		{/if}
 	</div>
 {/if}
@@ -501,3 +344,138 @@
 	description="This permanently removes the claim and its linked documents. This cannot be undone."
 	onConfirm={performDelete}
 />
+
+<Dialog.Root
+	bind:open={formOpen}
+	onOpenChange={open => {
+		if (!open) resetForm();
+	}}
+>
+	<Dialog.Content class="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+		<Dialog.Header>
+			<Dialog.Title>{editingId ? 'Edit claim' : 'File a claim'}</Dialog.Title>
+			<Dialog.Description>Record what happened and where the claim stands.</Dialog.Description>
+		</Dialog.Header>
+		<form
+			class="space-y-4"
+			onsubmit={e => {
+				e.preventDefault();
+				handleSubmit();
+			}}
+		>
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+				<div class="space-y-1">
+					<Label for={`claim-date-${policyId}`}>Date *</Label>
+					<DatePicker
+						id={`claim-date-${policyId}`}
+						bind:value={claimDate}
+						placeholder="Claim date"
+					/>
+				</div>
+				<div class="space-y-1">
+					<Label for={`claim-type-${policyId}`}>Type</Label>
+					<Select.Root
+						type="single"
+						value={claimType}
+						onValueChange={v => (claimType = v as ClaimType)}
+					>
+						<Select.Trigger id={`claim-type-${policyId}`} class="w-full">
+							{capitalize(claimType)}
+						</Select.Trigger>
+						<Select.Content>
+							{#each CLAIM_TYPES as t (t)}
+								<Select.Item value={t} label={capitalize(t)}>{capitalize(t)}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</div>
+				<div class="space-y-1">
+					<Label for={`claim-status-${policyId}`}>Status</Label>
+					<Select.Root
+						type="single"
+						value={status}
+						onValueChange={v => (status = v as ClaimStatus)}
+					>
+						<Select.Trigger id={`claim-status-${policyId}`} class="w-full">
+							{STATUS_LABELS[status]}
+						</Select.Trigger>
+						<Select.Content>
+							{#each CLAIM_STATUSES as s (s)}
+								<Select.Item value={s} label={STATUS_LABELS[s]}>{STATUS_LABELS[s]}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</div>
+				<div class="space-y-1">
+					<Label for={`claim-payout-${policyId}`}>Payout amount</Label>
+					<Input
+						id={`claim-payout-${policyId}`}
+						type="number"
+						step={amountStep()}
+						min="0"
+						bind:value={payoutAmount}
+						placeholder={amountPlaceholder()}
+					/>
+				</div>
+				<div class="space-y-1 sm:col-span-2">
+					<Label for={`claim-fault-${policyId}`}>Fault</Label>
+					<Select.Root
+						type="single"
+						value={faultDesignation}
+						onValueChange={v => (faultDesignation = (v ?? '') as FaultDesignation | '')}
+					>
+						<Select.Trigger id={`claim-fault-${policyId}`} class="w-full">
+							{faultDesignation ? FAULT_LABELS[faultDesignation] : 'Not specified'}
+						</Select.Trigger>
+						<Select.Content>
+							{#each FAULT_DESIGNATIONS as f (f)}
+								<Select.Item value={f} label={FAULT_LABELS[f]}>{FAULT_LABELS[f]}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</div>
+				{#if vehicles.length > 0}
+					<div class="space-y-1 sm:col-span-2">
+						<Label for={`claim-vehicle-${policyId}`}>Vehicle (optional)</Label>
+						<Select.Root type="single" value={vehicleId} onValueChange={v => (vehicleId = v ?? '')}>
+							<Select.Trigger id={`claim-vehicle-${policyId}`} class="w-full">
+								{vehicleId && vehicleNameMap.has(vehicleId)
+									? vehicleNameMap.get(vehicleId)
+									: 'Not specified'}
+							</Select.Trigger>
+							<Select.Content>
+								{#each vehicles as v (v.id)}
+									<Select.Item value={v.id} label={getVehicleDisplayName(v)}>
+										{getVehicleDisplayName(v)}
+									</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
+					</div>
+				{/if}
+			</div>
+
+			<div class="space-y-1">
+				<Label for={`claim-desc-${policyId}`}>Description</Label>
+				<Textarea
+					id={`claim-desc-${policyId}`}
+					bind:value={description}
+					rows={2}
+					placeholder="What happened?"
+				/>
+			</div>
+
+			<Dialog.Footer>
+				<Button type="button" variant="outline" onclick={closeForm} disabled={isSaving}>
+					Cancel
+				</Button>
+				<Button type="submit" disabled={isSaving}>
+					{#if isSaving}
+						<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+					{/if}
+					{editingId ? 'Save' : 'File Claim'}
+				</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>

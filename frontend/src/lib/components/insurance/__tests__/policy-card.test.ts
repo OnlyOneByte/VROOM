@@ -46,6 +46,7 @@ const handleErrorWithNotification = vi.fn<(error: unknown, context?: string) => 
 vi.mock('#lib/utils/error-handling.ts', () => ({
 	handleErrorWithNotification: (error: unknown, context?: string) =>
 		handleErrorWithNotification(error, context),
+	logLoadFailure: vi.fn(),
 	userFacingErrorMessage: () => 'Something went wrong.'
 }));
 
@@ -128,19 +129,19 @@ describe('PolicyCard header', () => {
 	test.each([
 		['an inactive', 'Inactive', makePolicy({ isActive: false, terms: [CURRENT] })],
 		['an expired', 'Expired', makePolicy({ terms: [PAST] })]
-	])('%s policy is badged on a muted surface without fading its text', async (_, badge, policy) => {
+	])('%s policy is badged, not tinted or faded', async (_, badge, policy) => {
 		const { container } = mount({ policy });
 		await settle();
 		expect(screen.getByText(badge)).toBeInTheDocument();
 		const card = container.querySelector('[data-slot="card"]');
-		expect(card).toHaveClass('bg-muted/30');
-		expect(card?.className).not.toMatch(/opacity-/);
+		expect(card).toHaveAttribute('data-in-force', 'false');
+		expect(card?.className).not.toMatch(/opacity-|bg-muted/);
 	});
 
 	test('a policy in force keeps the plain card surface', async () => {
 		const { container } = mount();
 		await settle();
-		expect(container.querySelector('[data-slot="card"]')).not.toHaveClass('bg-muted/30');
+		expect(container.querySelector('[data-slot="card"]')).toHaveAttribute('data-in-force', 'true');
 		expect(container.querySelector('[data-slot="card"]')).toHaveClass('py-0');
 	});
 
@@ -214,18 +215,18 @@ describe('PolicyCard child sections', () => {
 		getEntityDocuments.mockRejectedValueOnce(new Error('offline'));
 		mount();
 		await settle();
-		expect(screen.getByText("Couldn't load the documents.")).toBeInTheDocument();
+		expect(screen.getByText("Couldn't load the documents")).toBeInTheDocument();
 		expect(screen.getByTestId('policy-attachments')).toHaveTextContent(/^0 claims$/);
 
 		getEntityDocuments.mockResolvedValue(photoPage([makePhoto()]));
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
-		expect(screen.queryByText("Couldn't load the documents.")).toBeNull();
+		expect(screen.queryByText("Couldn't load the documents")).toBeNull();
 		expect(screen.getByTestId('policy-attachments')).toHaveTextContent('1 document · 0 claims');
 	});
 
 	test.each([
-		['documents', "Couldn't load the documents."],
+		['documents', "Couldn't load the documents"],
 		['claims', 'Something went wrong.']
 	])(
 		'Retry on a failed %s load stays on screen and focusable while it runs',

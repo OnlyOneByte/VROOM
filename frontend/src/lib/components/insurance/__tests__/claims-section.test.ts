@@ -103,11 +103,11 @@ afterEach(() => {
 });
 
 describe('ClaimsSection load states', () => {
-	test('shows a spinner and no list while claims are still loading', async () => {
+	test('shows a skeleton and no list while claims are still loading', async () => {
 		getClaims.mockReturnValue(new Promise(() => {}));
-		const { container } = mount();
+		mount();
 		await settle();
-		expect(container.querySelector('.animate-spin')).not.toBeNull();
+		expect(screen.getByTestId('claims-loading')).toBeInTheDocument();
 		expect(screen.queryByText('No claims filed.')).toBeNull();
 		expect(getClaims).toHaveBeenCalledWith('p1');
 	});
@@ -118,14 +118,15 @@ describe('ClaimsSection load states', () => {
 		expect(screen.getByText('No claims filed.')).toBeInTheDocument();
 	});
 
-	test('shows the error message and notifies when loading fails', async () => {
+	test('shows the error inline, with no toast, when loading fails', async () => {
 		const failure = new ApiError('Network down', 503);
 		getClaims.mockRejectedValueOnce(failure);
 		mount();
 		await settle();
 		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText('Network down')).toBeNull();
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't load claims");
+		expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load the claims");
+		expect(handleErrorWithNotification).not.toHaveBeenCalled();
 	});
 
 	test('falls back to a generic message when the rejection is not an Error', async () => {
@@ -221,8 +222,7 @@ describe('ClaimsSection filing a claim', () => {
 		mount();
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));
-		expect(screen.getByText('File a claim')).toBeInTheDocument();
-		expect(screen.queryByText('No claims filed.')).toBeNull();
+		expect(screen.getByRole('dialog', { name: 'File a claim' })).toBeInTheDocument();
 		await fireEvent.submit(document.querySelector('form') as HTMLFormElement);
 		await settle();
 		expect(showError).toHaveBeenCalledWith('Enter a claim date.');
@@ -320,7 +320,9 @@ describe('ClaimsSection filing a claim', () => {
 		const submitButton = screen.getAllByRole('button', { name: /file claim/i }).at(-1);
 		expect(submitButton).toBeDisabled();
 		expect(submitButton?.querySelector('.animate-spin')).not.toBeNull();
-		expect(screen.getAllByRole('button', { name: 'Cancel' })[1]).toBeDisabled();
+		expect(
+			within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' })
+		).toBeDisabled();
 	});
 
 	test('a claim save in flight counts as unsaved changes until the section closes', async () => {
@@ -353,16 +355,18 @@ describe('ClaimsSection filing a claim', () => {
 		expect(getClaims).toHaveBeenCalledTimes(1);
 	});
 
-	test('both the close icon and the Cancel button dismiss the form', async () => {
+	test('both the close icon and the Cancel button dismiss the dialog', async () => {
 		mount();
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));
-		await fireEvent.click(screen.getAllByRole('button', { name: 'Cancel' })[0]!);
-		expect(screen.queryByText('File a claim')).toBeNull();
+		await fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 		expect(screen.getByText('No claims filed.')).toBeInTheDocument();
 		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));
-		await fireEvent.click(screen.getAllByRole('button', { name: 'Cancel' })[1]!);
-		expect(screen.queryByText('File a claim')).toBeNull();
+		await fireEvent.click(
+			within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' })
+		);
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 	});
 });
 
@@ -450,7 +454,10 @@ describe('ClaimsSection editing a claim', () => {
 		mount();
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: 'Edit claim' }));
-		await fireEvent.click(screen.getAllByRole('button', { name: 'Cancel' })[0]!);
+		await fireEvent.click(
+			within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' })
+		);
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));
 		expect(screen.getByText('File a claim')).toBeInTheDocument();
 		expect(document.getElementById('claim-type-p1')).toHaveTextContent('Collision');

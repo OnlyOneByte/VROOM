@@ -77,12 +77,12 @@ afterEach(() => {
 });
 
 describe('InsuranceTab load states', () => {
-	test('shows a spinner while policies load', async () => {
+	test('shows a skeleton while policies load', async () => {
 		getPoliciesForVehicle.mockReturnValue(new Promise(() => {}));
-		const { container } = mount();
+		mount();
 		await settle();
 		expect(getPoliciesForVehicle).toHaveBeenCalledWith('v1');
-		expect(container.querySelector('.animate-spin')).not.toBeNull();
+		expect(screen.getByTestId('insurance-tab-loading')).toBeInTheDocument();
 		expect(screen.queryByText('No insurance policies')).toBeNull();
 	});
 
@@ -94,10 +94,8 @@ describe('InsuranceTab load states', () => {
 		await settle();
 		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText('Server unavailable')).toBeNull();
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(
-			failure,
-			"Couldn't load insurance policies"
-		);
+		expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load this car's insurance");
+		expect(handleErrorWithNotification).not.toHaveBeenCalled();
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
 		expect(getPoliciesForVehicle).toHaveBeenCalledTimes(2);
