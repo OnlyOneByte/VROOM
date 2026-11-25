@@ -12,6 +12,8 @@ vi.mock('$app/state', () => ({
 	}
 }));
 
+const attention = { current: false };
+
 vi.mock('#lib/utils/sync/sync-manager.ts', () => {
 	const store = <T>(value: T) => ({
 		get current() {
@@ -25,8 +27,9 @@ vi.mock('#lib/utils/sync/sync-manager.ts', () => {
 		lastBackupTime: store<Date | null>(null),
 		lastSheetsSync: store<Date | null>(null),
 		lastDataChangeTime: store<Date | null>(null),
-		backupEnabled: store(false),
-		sheetsSyncEnabled: store(false)
+		backupEnabled: store(true),
+		sheetsSyncEnabled: store(false),
+		providerNeedsAttention: attention
 	};
 });
 
@@ -62,7 +65,7 @@ async function startWithUnreachableServer(): Promise<void> {
 }
 
 function mobileHeader(): HTMLElement {
-	const header = document.querySelector<HTMLElement>('div.fixed.top-0');
+	const header = document.querySelector<HTMLElement>('header.fixed.top-0');
 	if (!header) throw new Error('mobile header not rendered');
 	return header;
 }
@@ -70,6 +73,7 @@ function mobileHeader(): HTMLElement {
 describe('the sync status indicator lives in the navigation, never floating over a page', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		attention.current = false;
 		authStore.clearUser();
 		onlineStatus.current = true;
 		syncState.current = 'idle';
@@ -85,25 +89,30 @@ describe('the sync status indicator lives in the navigation, never floating over
 		expect(document.querySelector('div.fixed.top-4.right-4')).toBeNull();
 	});
 
-	describe('in the desktop sidebar', () => {
+	describe('at lg and up, behind the sync status in the header', () => {
 		onWideScreen();
 
-		it('offers Retry connection in the desktop sidebar, which re-checks the session', async () => {
+		async function openSyncPanel(): Promise<HTMLElement> {
+			await fireEvent.click(screen.getByRole('button', { name: /^Sync status:/ }));
+			return screen.findByRole('dialog', { name: 'Sync status' });
+		}
+
+		it('offers Retry connection, which re-checks the session', async () => {
 			await startWithUnreachableServer();
 			render(Navigation);
 
-			const sidebarRetry = screen.getByRole('button', { name: 'Retry connection' });
-			expect(document.querySelector('div.fixed.top-0')).toBeNull();
+			const panel = await openSyncPanel();
+			const retry = within(panel).getByRole('button', { name: 'Retry connection' });
 
 			mockFetch.mockReset();
 			mockFetch.mockResolvedValue(me());
-			await waitFor(() => expect(sidebarRetry).not.toHaveAttribute('aria-disabled', 'true'));
-			await fireEvent.click(sidebarRetry);
+			await waitFor(() => expect(retry).not.toHaveAttribute('aria-disabled', 'true'));
+			await fireEvent.click(retry);
 
 			await waitFor(() => expect(authStore.sessionUnverified).toBe(false));
 		});
 
-		it('the collapsed sidebar offers Sync Now, with the pending count only on the status badge', async () => {
+		it('offers Sync Now, with the pending count on the status badge', async () => {
 			authStore.setUser(alice);
 			offlineExpenseQueue.current = [
 				{
@@ -120,46 +129,50 @@ describe('the sync status indicator lives in the navigation, never floating over
 			];
 			render(Navigation);
 
-			expect(screen.getByRole('button', { name: 'Sync Now' })).toBeInTheDocument();
-			const panel = screen.getByRole('group', { name: 'Sync status' });
-			expect(within(panel).getByRole('status')).toHaveTextContent('1 pending');
-			expect(panel.querySelector('[data-slot="badge"]')).toHaveTextContent('1');
-		});
-
-		it('the sidebar action under the pointer survives the hover that expands the sidebar', async () => {
-			authStore.setUser(alice);
-			offlineExpenseQueue.current = [
-				{
-					id: 'p1',
-					vehicleId: 'v1',
-					tags: [],
-					category: 'misc',
-					amount: 1,
-					date: '2024-06-01',
-					timestamp: 0,
-					synced: false,
-					version: '3.0'
-				}
-			];
-			render(Navigation);
-			const sidebar = document.querySelector<HTMLElement>('div.lg\\:inset-y-0');
-			const sync = screen.getByRole('button', { name: 'Sync Now' });
-
-			await fireEvent.mouseEnter(sidebar!);
-
-			expect(sync.isConnected).toBe(true);
-			expect(sync).toHaveTextContent('Sync Now');
-			await fireEvent.click(sync);
+			expect(screen.getByLabelText('1 pending items')).toHaveTextContent('1');
+			const panel = await openSyncPanel();
+			await fireEvent.click(within(panel).getByRole('button', { name: 'Sync Now' }));
 			const { syncManager } = await import('#lib/utils/sync/sync-manager.ts');
 			expect(syncManager.syncAll).toHaveBeenCalled();
 		});
 
-		it('the sidebar status is announced as a status with its text', async () => {
+		it('announces the status as a status with its text', async () => {
 			await startWithUnreachableServer();
 			render(Navigation);
 
 			const statuses = screen.getAllByRole('status');
 			expect(statuses.some(status => status.textContent === "Can't reach VROOM")).toBe(true);
+		});
+	});
+
+	describe('a backup provider that needs reconnecting', () => {
+		onWideScreen();
+
+		beforeEach(() => authStore.setUser(alice));
+
+		it('is never reported as Up to date, and the panel links to Storage Providers', async () => {
+			attention.current = true;
+			render(Navigation);
+
+			const trigger = screen.getByRole('button', {
+				name: 'Sync status: A backup provider needs attention'
+			});
+			expect(screen.queryByText('Up to date')).toBeNull();
+			expect(screen.getByTestId('sync-status-announcement')).toHaveTextContent(
+				'A backup provider needs attention'
+			);
+
+			await fireEvent.click(trigger);
+			const panel = await screen.findByRole('dialog', { name: 'Sync status' });
+			expect(
+				within(panel).getByRole('link', { name: 'Fix it in Settings → Storage Providers' })
+			).toHaveAttribute('href', '/settings#settings-connections');
+		});
+
+		it('reads Up to date when /sync/status reports no provider needing attention', () => {
+			render(Navigation);
+
+			expect(screen.getByRole('button', { name: 'Sync status: Up to date' })).toBeInTheDocument();
 		});
 	});
 

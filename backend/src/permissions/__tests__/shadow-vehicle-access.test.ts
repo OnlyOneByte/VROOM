@@ -46,6 +46,10 @@ const TODAY_MODE: Record<string, VehicleAccessMode> = {
   'vehicle.community.read': 'read',
   'vehicle.community.manage': 'owner',
   'vehicle.assistant.use': 'read',
+  'vehicle.driver.record': 'owner',
+  'vehicle.driver.manage': 'owner',
+  'vehicle.driver_stats.read': 'owner',
+  'vehicle.driver_stats.read_own': 'owner',
 };
 
 const INTENDED_DIFFERENCES = [
@@ -63,6 +67,18 @@ const INTENDED_DIFFERENCES = [
   })),
   { role: 'viewer', permission: 'vehicle.trip.read', today: false, why: 'Viewers see trips' },
   { role: 'viewer', permission: 'vehicle.photo.read', today: false, why: 'Viewers see photos' },
+  {
+    role: 'editor',
+    permission: 'vehicle.driver.record',
+    today: false,
+    why: 'Editors record who drove or paid once car sharing is on',
+  },
+  ...['editor', 'viewer'].map((role) => ({
+    role,
+    permission: 'vehicle.driver_stats.read_own',
+    today: false,
+    why: 'Every driver sees their own figures once car sharing is on',
+  })),
   ...['editor', 'viewer'].flatMap((role) => [
     { role, permission: 'vehicle.share.read', today: false, why: 'Members see who has access' },
     {

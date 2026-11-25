@@ -27,6 +27,7 @@ function makeChargeExpense(overrides: {
     missedFillup: overrides.missedFillup ?? false,
     userId: 'test-user',
     createdBy: null,
+    paidByDriverId: null,
     groupId: null,
     groupTotal: null,
     splitMethod: null,

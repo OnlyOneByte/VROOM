@@ -10,8 +10,9 @@ import { getDb } from '../../db/connection';
 import { userProviders, users } from '../../db/schema';
 import { createErrorResponse, isUniqueConstraintError, NotFoundError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
-import { assignServerRole, requestResolver } from '../../permissions/grants';
-import { PERMISSION_REGISTRY } from '../../permissions/registry';
+import { authorize, ownAccount } from '../../permissions/authorize';
+import { assignServerRole, requestResolver, resolverFor } from '../../permissions/grants';
+import { PERMISSION_REGISTRY, type PermissionId } from '../../permissions/registry';
 import { ROLE_TEMPLATES } from '../../permissions/roles';
 import { getClientRateKey } from '../../utils/client-ip';
 import { encrypt } from '../../utils/encryption';
@@ -202,29 +203,35 @@ routes.get('/login/:authProvider', authRateLimiter, async (c) => {
   return c.redirect(url.toString());
 });
 
-routes.get('/link/:authProvider', authRateLimiter, requireAuth, async (c) => {
-  const user = c.get('user');
-  const authProviderId = c.req.param('authProvider') ?? '';
-  const providerConfig = getEnabledProvider(authProviderId);
+routes.get(
+  '/link/:authProvider',
+  authRateLimiter,
+  requireAuth,
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const authProviderId = c.req.param('authProvider') ?? '';
+    const providerConfig = getEnabledProvider(authProviderId);
 
-  if (!providerConfig) {
-    return c.redirect(`${CONFIG.frontend.url}/profile?link_error=unknown_provider`);
+    if (!providerConfig) {
+      return c.redirect(`${CONFIG.frontend.url}/profile?link_error=unknown_provider`);
+    }
+
+    const state = generateState();
+    const codeVerifier = providerConfig.supportsPKCE ? generateCodeVerifier() : undefined;
+
+    oauthStateStore.set(state, {
+      codeVerifier,
+      createdAt: Date.now(),
+      userId: user.id,
+      flowType: 'auth-link',
+    });
+
+    const url = providerConfig.createAuthorizationURL(state, codeVerifier, 'link');
+    cleanupExpiredStates();
+    return c.redirect(url.toString());
   }
-
-  const state = generateState();
-  const codeVerifier = providerConfig.supportsPKCE ? generateCodeVerifier() : undefined;
-
-  oauthStateStore.set(state, {
-    codeVerifier,
-    createdAt: Date.now(),
-    userId: user.id,
-    flowType: 'auth-link',
-  });
-
-  const url = providerConfig.createAuthorizationURL(state, codeVerifier, 'link');
-  cleanupExpiredStates();
-  return c.redirect(url.toString());
-});
+);
 
 async function exchangeAuthTokens(
   providerConfig: ReturnType<typeof getProvider> & object,
@@ -421,6 +428,10 @@ export async function checkLinkConflicts(
   return 'account_conflict';
 }
 
+function holdsOnOwnAccount(userId: string, permission: PermissionId): boolean {
+  return resolverFor(getDb(), userId).can(permission, { kind: 'account', userId }).allow;
+}
+
 // Register before the generic /callback/:authProvider route, which would shadow it.
 routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
   const authProviderId = c.req.param('authProvider') ?? '';
@@ -448,6 +459,9 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
       stateUserId: storedData.userId,
     });
     return c.redirect(profileRedirect('link_error=session_mismatch'));
+  }
+  if (!holdsOnOwnAccount(authResult.user.id, 'account.signin.manage')) {
+    return c.redirect(profileRedirect('link_error=forbidden'));
   }
 
   const providerConfig = getProvider(authProviderId);
@@ -589,7 +603,7 @@ routes.get('/me', async (c) => {
   });
 });
 
-routes.patch('/me', requireAuth, async (c) => {
+routes.patch('/me', requireAuth, authorize(ownAccount), async (c) => {
   const user = c.get('user');
 
   const body = await readJsonBody<{ displayName?: unknown }>(c);
@@ -683,7 +697,7 @@ routes.post('/refresh', async (c) => {
   });
 });
 
-routes.get('/accounts', requireAuth, async (c) => {
+routes.get('/accounts', requireAuth, authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const rows = await repos().authProviders.findByUserId(user.id);
 
@@ -702,7 +716,7 @@ routes.get('/accounts', requireAuth, async (c) => {
   return c.json({ success: true, data });
 });
 
-routes.delete('/accounts/:id', requireAuth, async (c) => {
+routes.delete('/accounts/:id', requireAuth, authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const accountId = c.req.param('id');
   const db = getDb();
@@ -754,7 +768,7 @@ export function isSafeReturnPath(value: string | undefined): value is string {
   return value !== undefined && /^\/(?![/\\])[^?#\\\s]*$/.test(value);
 }
 
-routes.get('/providers/connect/google', requireAuth, async (c) => {
+routes.get('/providers/connect/google', requireAuth, authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const returnTo = c.req.query('returnTo');
   const nonce = c.req.query('nonce');
@@ -954,6 +968,9 @@ routes.get('/callback/provider/google', async (c) => {
       stateUserId: state.userId,
     });
     return c.redirect(frontendRedirect(`${state.returnTo}?provider_error=session_mismatch`));
+  }
+  if (!holdsOnOwnAccount(state.userId, 'account.provider.manage')) {
+    return c.redirect(frontendRedirect(`${state.returnTo}?provider_error=forbidden`));
   }
 
   let result: Awaited<ReturnType<typeof exchangeProviderTokens>>;

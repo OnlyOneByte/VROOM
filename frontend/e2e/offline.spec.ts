@@ -71,11 +71,9 @@ test.describe('Offline expense entry', () => {
 		);
 
 		await page.goto('/expenses');
-		await expect(
-			page.getByText("The server didn't accept this entry: Amount must be 1,000,000 or less")
-		).toBeVisible();
-		await page.mouse.move(1000, 400);
-		await page.getByRole('link', { name: /^Edit .*1,000,001/ }).click();
+		const row = page.getByRole('row', { name: /Bridge toll/ });
+		await expect(row.getByText('Not saved: Amount must be 1,000,000 or less')).toBeVisible();
+		await row.getByRole('link', { name: /^Edit .*1,000,001/ }).click();
 
 		await expect(page.getByRole('heading', { name: 'Edit Queued Expense' })).toBeVisible();
 		await expect(page.getByLabel('Amount *')).toHaveValue('1000001');

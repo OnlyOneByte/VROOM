@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
@@ -7,7 +8,6 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
-	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
@@ -97,8 +97,8 @@
 	let sharedVehicles = $derived(vehicles.filter(v => v.sharedAccess));
 	let hasLoaded = $state(false);
 	const isNarrow = new IsMobile(1024);
-	let showFab = $derived(hasLoaded && !loadError);
-	let canLogFillup = $derived(showFab && ownedVehicles.length > 0);
+	let showActions = $derived(hasLoaded && !loadError);
+	let canLogFillup = $derived(showActions && ownedVehicles.length > 0);
 	let noVehicles = $derived(hasLoaded && !loadError && vehicles.length === 0);
 	let needsFirstExpense = $derived(
 		hasLoaded && !loadError && ownedVehicles.length > 0 && (allTimeSummary?.expenseCount ?? 0) === 0
@@ -173,17 +173,34 @@
 			: ''
 	);
 
+	const pending = usePendingRows({
+		match: () => true,
+		refresh: () =>
+			expenseApi.getAllExpenses({ limit: RECENT_COUNT }).then(
+				response => {
+					recentExpensesList = response.data;
+				},
+				error => logLoadFailure(error, "Couldn't refresh recent expenses")
+			),
+		listedIds: () => listedExpenseIds
+	});
+	let listedExpenseIds = $derived(new Set(recentExpensesList.map(expense => expense.id)));
+
 	let recentExpenses = $derived.by(() => {
 		const names = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
-		return recentExpensesList.map(e => ({
-			id: e.id,
-			amount: e.amount,
-			category: e.category,
-			date: new Date(e.date),
-			description: e.description,
-			location: e.location,
-			vehicleName: names.get(e.vehicleId) || 'Unknown Vehicle'
-		}));
+		return [...pending.rows, ...recentExpensesList].slice(0, 4).map(e => {
+			const sync = pending.states.get(e.id);
+			return {
+				id: e.id,
+				amount: e.amount,
+				category: e.category,
+				date: new Date(e.date),
+				description: e.description,
+				location: e.location,
+				vehicleName: names.get(e.vehicleId) || 'Unknown Vehicle',
+				...(sync && { syncNote: sync.status === 'failed' ? 'Not saved' : 'Unsynced' })
+			};
+		});
 	});
 
 	let attention = $derived.by(() => {
@@ -494,7 +511,7 @@
 	<meta name="description" content="Your vehicle expense dashboard" />
 </svelte:head>
 
-<div class="space-y-6 pb-24 short:pb-0">
+<div class="space-y-6">
 	<PageHeader title="Dashboard" description={pageDescription}>
 		{#snippet actions()}
 			{#if canLogFillup}
@@ -507,21 +524,17 @@
 					<Car class="mr-2 h-4 w-4" />
 					Add Vehicle
 				</Button>
-				<Button size="lg" class="hidden lg:inline-flex short:inline-flex" onclick={handleLogFillup}>
+				<Button size="lg" class="max-sm:hidden" onclick={handleLogFillup}>
 					<Plus class="mr-2 h-4 w-4" />
 					Log Fill-up
 				</Button>
-			{:else if showFab && !noVehicles}
-				<Button
-					size="lg"
-					class="hidden lg:inline-flex short:inline-flex"
-					href={resolve(routes.vehicleNew)}
-				>
+			{:else if showActions && !noVehicles}
+				<Button size="lg" href={resolve(routes.vehicleNew)}>
 					<Plus class="mr-2 h-4 w-4" />
 					Add Vehicle
 				</Button>
 			{:else if isLoading && !hasLoaded}
-				<Skeleton class="hidden h-10 lg:block lg:w-36" />
+				<Skeleton class="hidden h-10 sm:block sm:w-36" />
 			{/if}
 		{/snippet}
 	</PageHeader>
@@ -577,9 +590,3 @@
 		{/if}
 	{/if}
 </div>
-
-{#if canLogFillup}
-	<FloatingActionButton label="Log Fill-up" onclick={handleLogFillup} />
-{:else if showFab && !noVehicles}
-	<FloatingActionButton href={resolve(routes.vehicleNew)} label="Add Vehicle" />
-{/if}

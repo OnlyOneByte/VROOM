@@ -4,6 +4,7 @@ import { CONFIG } from '../../../config';
 import { getDb } from '../../../db/connection';
 import { calendarFeeds, reminders, reminderVehicles, users, vehicles } from '../../../db/schema';
 import { seedGarage } from '../../../db/seed';
+import { assignServerRole } from '../../../permissions/grants';
 import {
   createTestApp,
   type DataEnvelope,
@@ -146,6 +147,7 @@ describe('the calendar feed link', () => {
     await db
       .insert(users)
       .values({ id: otherId, email: 'other@example.com', displayName: 'Other' });
+    assignServerRole(db, otherId, 'member');
     await ownGarage(otherId);
     await db.update(reminders).set({ name: 'Secret service' }).where(eq(reminders.userId, otherId));
     const [theirCar] = await db.select().from(vehicles).where(eq(vehicles.userId, otherId));

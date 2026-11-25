@@ -43,6 +43,7 @@ import {
   seesFinancials,
   writesFinancials,
 } from '../../utils/vehicle-access';
+import { attributedDriver, hideDriverFields } from '../drivers/attribution';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
 import { preferencesRepository } from '../settings/repository';
@@ -418,7 +419,7 @@ routes.post(
       {
         success: true,
         data: {
-          siblings: siblings.map(expenseToApi),
+          siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
           groupId: first.groupId,
           groupTotal: centsToDollars(first.groupTotal),
           splitMethod: first.splitMethod,
@@ -477,7 +478,7 @@ routes.put(
     return c.json({
       success: true,
       data: {
-        siblings: siblings.map(expenseToApi),
+        siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
         groupId: first.groupId,
         groupTotal: centsToDollars(first.groupTotal),
         splitMethod: first.splitMethod,
@@ -511,7 +512,7 @@ routes.get(
     return c.json({
       success: true,
       data: {
-        siblings: siblings.map(expenseToApi),
+        siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
         groupId: first.groupId,
         groupTotal: centsToDollars(first.groupTotal),
         splitMethod: first.splitMethod,
@@ -815,6 +816,7 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
   const access = await requireVehicleAccess(expenseData.vehicleId, user.id, 'read');
   const { ownerId } = access;
   const createdBy = ownerId === user.id ? null : user.id;
+  const paidByDriverId = attributedDriver(c, expenseData.vehicleId, expenseData.paidByDriverId);
   assertMayTouchFinancialExpense(writesFinancials(access), expenseData.sourceType);
 
   let createdExpense = expenseData.clientId
@@ -836,7 +838,7 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
     );
 
     createdExpense = await expenseRepository.createIdempotent(
-      { ...expenseData, userId: ownerId, createdBy },
+      { ...expenseData, paidByDriverId, userId: ownerId, createdBy },
       await odometerCheck({ ...expenseData, timeZone })
     );
   }
@@ -849,7 +851,7 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
   return c.json(
     {
       success: true,
-      data: expenseToApi(createdExpense),
+      data: hideDriverFields(c, createdExpense.vehicleId, expenseToApi(createdExpense)),
       message: 'Expense created successfully',
     },
     201
@@ -878,7 +880,12 @@ routes.get('/', zValidator('query', expenseQuerySchema), authorize(fromQueryVehi
 
   const { limit, offset } = clampPagination(query);
 
-  return c.json(buildPaginatedResponse(data.map(expenseToApi), totalCount, limit, offset));
+  const rows = data.map((expense) =>
+    query.vehicleId
+      ? hideDriverFields(c, expense.vehicleId, expenseToApi(expense))
+      : expenseToApi(expense)
+  );
+  return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
 });
 
 routes.get(
@@ -919,9 +926,28 @@ routes.get(
     if (!expense) throw new NotFoundError('Expense');
     const access = await requireVehicleAccess(expense.vehicleId, user.id, 'read');
     assertMayTouchFinancialExpense(seesFinancials(access), expense.sourceType);
-    return c.json({ success: true, data: expenseToApi(expense) });
+    return c.json({
+      success: true,
+      data: hideDriverFields(c, expense.vehicleId, expenseToApi(expense)),
+    });
   }
 );
+
+function payerChange(
+  c: Context,
+  existing: Expense,
+  vehicleId: string | undefined,
+  requested: string | null | undefined
+): { paidByDriverId?: string | null } {
+  const target = vehicleId ?? existing.vehicleId;
+  const movedCar = target !== existing.vehicleId;
+  if (movedCar && existing.paidByDriverId) {
+    attributedDriver(c, existing.vehicleId, null, existing.paidByDriverId);
+  }
+  const paidBy = attributedDriver(c, target, requested, movedCar ? null : existing.paidByDriverId);
+  if (paidBy !== undefined) return { paidByDriverId: paidBy };
+  return movedCar ? { paidByDriverId: null } : {};
+}
 
 routes.put(
   '/:id',
@@ -975,7 +1001,11 @@ routes.put(
 
     validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalFuelType);
 
-    const normalizedUpdate = clearFuelFieldsIfNotFuel(updateData, finalCategory);
+    const { paidByDriverId: requestedPayer, ...withoutPayer } = updateData;
+    const normalizedUpdate = clearFuelFieldsIfNotFuel(
+      { ...withoutPayer, ...payerChange(c, existingExpense, updateData.vehicleId, requestedPayer) },
+      finalCategory
+    );
     const odometer = await editedOdometerCheck(existingExpense, {
       vehicleId: updateData.vehicleId ?? existingExpense.vehicleId,
       date: updateData.date ?? existingExpense.date,
@@ -994,7 +1024,7 @@ routes.put(
 
     return c.json({
       success: true,
-      data: expenseToApi(updatedExpense),
+      data: hideDriverFields(c, updatedExpense.vehicleId, expenseToApi(updatedExpense)),
       message: 'Expense updated successfully',
     });
   }

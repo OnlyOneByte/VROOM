@@ -27,6 +27,7 @@ import { readJsonBody } from '../../utils/request-body';
 import { calendarDayIn, isValidTimeZone } from '../../utils/time-zone';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { requireVehicleAccess, requireVehiclesAccess } from '../../utils/vehicle-access';
+import { hideDriverFields } from '../drivers/attribution';
 import { expenseRepository } from '../expenses/repository';
 import { recurringCostSummary } from './reminder-cost';
 import type { ReminderWithVehicles } from './repository';
@@ -415,7 +416,12 @@ routes.get(
     const readable = materialized.filter(
       (expense) => resolver.can('vehicle.expense.read', vehicleResource(expense.vehicleId)).allow
     );
-    return c.json({ success: true, data: readable.map(expenseToApi) });
+    return c.json({
+      success: true,
+      data: readable.map((expense) =>
+        hideDriverFields(c, expense.vehicleId, expenseToApi(expense))
+      ),
+    });
   }
 );
 

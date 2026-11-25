@@ -7,7 +7,7 @@ import { prettyJSON } from 'hono/pretty-json';
 import { secureHeaders } from 'hono/secure-headers';
 import { routes as analyticsRoutes } from './api/analytics/routes';
 import { routes as assistantRoutes } from './api/assistant/routes';
-import { DEMO_USER_ID, demoGuard } from './api/auth/demo';
+import { DEMO_USER_ID } from './api/auth/demo';
 import { routes as authRoutes } from './api/auth/routes';
 import { routes as calendarRoutes, redactFeedTokens } from './api/calendar/routes';
 import { routes as communityRoutes } from './api/community/routes';
@@ -32,6 +32,7 @@ import { CONFIG } from './config';
 import { checkDatabaseHealth } from './db/connection';
 import { createErrorResponse, NotFoundError } from './errors';
 import { activityTracker, bodyLimit, errorHandler, optionalAuth, rateLimiter } from './middleware';
+import { routeGuard } from './permissions/route-guard';
 import { getClientRateKey } from './utils/client-ip';
 import { logger } from './utils/logger';
 
@@ -106,7 +107,7 @@ const globalRateLimiter = rateLimiter({
 
 app.use('/api/*', optionalAuth);
 
-app.use('/api/*', demoGuard);
+app.use('/api/*', routeGuard);
 
 app.use('*', globalRateLimiter);
 
@@ -179,7 +180,7 @@ app.route('/api/v1/admin', signupRoutes);
 app.use('/api/*', async (c, next) => {
   const path = c.req.path;
 
-  if (path.startsWith('/api/v') || path === '/api') {
+  if (/^\/api\/v\d+(\/|$)/.test(path) || path === '/api') {
     return next();
   }
 

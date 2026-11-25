@@ -113,17 +113,24 @@ test.describe('Responsive layout', () => {
 		});
 	}
 
-	test('the authenticated shell exposes a mobile navigation menu', async ({ page, context }) => {
+	test('the authenticated shell has a phone bottom bar, and More opens the rest', async ({
+		page,
+		context
+	}) => {
 		await addSessionCookie(context);
 		await mockApi(page);
 		await page.setViewportSize({ width: 375, height: 667 });
 
 		await page.goto('/dashboard');
 
-		const hamburger = page.getByRole('button', { name: 'Open navigation menu' });
-		await expect(hamburger).toBeVisible();
-		await hamburger.click();
-		await expect(page.getByRole('link', { name: 'Expenses', exact: true })).toBeVisible();
+		const bar = page.getByRole('navigation', { name: 'Main' });
+		await expect(bar.getByRole('link', { name: 'Log', exact: true })).toBeVisible();
+		await expect(bar.getByRole('link', { name: 'Add expense' })).toBeInViewport();
+		await bar.getByRole('button', { name: 'More' }).click();
+		const more = page.getByRole('dialog', { name: 'More' });
+		await expect(more.getByRole('link', { name: 'Insurance' })).toBeVisible();
+		await page.keyboard.press('Escape');
+		await expect(more).toBeHidden();
 	});
 });
 

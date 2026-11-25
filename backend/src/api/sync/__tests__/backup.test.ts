@@ -29,6 +29,8 @@ const COLUMN_TYPE_DEFAULTS: Record<string, string> = {
 
 const COLUMN_NAME_DEFAULTS: Record<string, string> = {
   unitPreferences: JSON.stringify(DEFAULT_UNIT_PREFERENCES),
+  driverId: '',
+  paidByDriverId: '',
 };
 
 function buildMinimalStringRow(
@@ -43,8 +45,8 @@ function buildMinimalStringRow(
     const c = col as any;
     if (overrides[name] !== undefined) {
       row[name] = overrides[name];
-    } else if (COLUMN_NAME_DEFAULTS[name]) {
-      row[name] = COLUMN_NAME_DEFAULTS[name];
+    } else if (name in COLUMN_NAME_DEFAULTS) {
+      row[name] = COLUMN_NAME_DEFAULTS[name] ?? '';
     } else if (COLUMN_TYPE_DEFAULTS[c.columnType]) {
       row[name] = COLUMN_TYPE_DEFAULTS[c.columnType];
     } else if (c.enumValues && c.enumValues.length > 0) {

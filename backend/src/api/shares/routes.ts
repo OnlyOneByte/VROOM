@@ -3,6 +3,7 @@ import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { getDb } from '../../db/connection';
 import {
+  permissionOverrides,
   roleAssignments,
   rolePermissions,
   users,
@@ -32,6 +33,7 @@ import {
 import type { Resource } from '../../permissions/resolve';
 import { ROLE_TEMPLATES } from '../../permissions/roles';
 import { commonSchemas, zValidator } from '../../utils/validation';
+import { carShareEnabled, ensureMemberDriver } from '../drivers/repository';
 import { vehicleRepository } from '../vehicles/repository';
 import {
   ACTIVE_SHARE_STATUSES,
@@ -116,7 +118,12 @@ function refuseUnheldLevel(c: Context, vehicleId: string, level: string): void {
   refuseUnheld(granted, holdsOn(c, vehicleId));
 }
 
-function refuseOverSharee(c: Context, share: VehicleShare, ownerId: string | null): void {
+function refuseOverSharee(
+  c: Context,
+  share: VehicleShare,
+  ownerId: string | null,
+  removesOverrides: boolean
+): void {
   if (!share.sharedWithId || !ownerId || c.get('user').id === ownerId) return;
   const held = getDb()
     .select({ permission: rolePermissions.permission })
@@ -144,6 +151,25 @@ function refuseOverSharee(c: Context, share: VehicleShare, ownerId: string | nul
     )
     .get();
   if (ownerSet) throw new ForbiddenError('Only the owner can change what the owner set');
+  if (!removesOverrides) return;
+  const overrides = getDb()
+    .select({ permission: permissionOverrides.permission, setBy: permissionOverrides.setBy })
+    .from(permissionOverrides)
+    .where(
+      and(
+        eq(permissionOverrides.userId, share.sharedWithId),
+        eq(permissionOverrides.scope, 'vehicle'),
+        eq(permissionOverrides.scopeId, share.vehicleId)
+      )
+    )
+    .all();
+  refuseUnheld(
+    [...new Set(overrides.map((override) => override.permission))],
+    holdsOn(c, share.vehicleId)
+  );
+  if (overrides.some((override) => override.setBy === ownerId)) {
+    throw new ForbiddenError('Only the owner can change what the owner set');
+  }
 }
 
 routes.post('/', zValidator('json', inviteSchema), authorize(fromInviteVehicle), async (c) => {
@@ -229,7 +255,7 @@ routes.put(
     }
     const ownerId = vehicleOwnerId(share.vehicleId);
     refuseUnheldLevel(c, share.vehicleId, level);
-    refuseOverSharee(c, share, ownerId);
+    refuseOverSharee(c, share, ownerId, false);
 
     const updated = transitionShare(id, ACTIVE_SHARE_STATUSES, { level }, (tx, _, row) => {
       if (row.status === 'accepted' && row.sharedWithId) {
@@ -259,7 +285,7 @@ routes.delete(
     if (share.sharedWithId === c.get('user').id) {
       throw new ForbiddenError('To leave this vehicle, decline the share');
     }
-    refuseOverSharee(c, share, vehicleOwnerId(share.vehicleId));
+    refuseOverSharee(c, share, vehicleOwnerId(share.vehicleId), true);
 
     transitionShare(id, ANY_STATUS, { status: 'revoked' }, (tx, before) => {
       if (before.status === 'accepted' && before.sharedWithId) {
@@ -305,6 +331,7 @@ routes.post(
         level: row.level,
         grantedBy: row.ownerId,
       });
+      if (carShareEnabled(tx, row.vehicleId)) ensureMemberDriver(tx, row.vehicleId, user.id);
     });
     return c.json({ success: true, data: updated, message: 'Invitation accepted' });
   }

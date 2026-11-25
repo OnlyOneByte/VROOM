@@ -1,11 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 import { E2E_USER, addSessionCookie, mockApi } from './support/mock-api';
 
-async function openNavigationForNarrowViewports(page: Page) {
-	const hamburger = page.getByRole('button', { name: 'Open navigation menu' });
-	if (await hamburger.isVisible()) {
-		await hamburger.click();
-	}
+async function openMore(page: Page) {
+	await page.getByRole('button', { name: 'More' }).click();
+	await expect(page.getByRole('dialog', { name: 'More' })).toBeVisible();
 }
 
 test.describe('Signed out', () => {
@@ -91,7 +89,7 @@ test.describe('Signed in', () => {
 			request => request.url().includes('/api/v1/auth/logout') && request.method() === 'POST'
 		);
 
-		await openNavigationForNarrowViewports(page);
+		await openMore(page);
 		await page.getByRole('button', { name: 'Sign out' }).click();
 
 		await logoutRequest;

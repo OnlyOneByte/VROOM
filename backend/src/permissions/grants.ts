@@ -7,6 +7,7 @@ import {
   rolePermissions,
   roles,
   users,
+  vehicleDrivers,
   vehicleShares,
   vehicles,
 } from '../db/schema';
@@ -139,6 +140,16 @@ export function changeShareRole(
 }
 
 export function endVehicleMembership(db: Db, vehicleId: string, userId: string): void {
+  db.update(vehicleDrivers)
+    .set({ archivedAt: new Date() })
+    .where(
+      and(
+        eq(vehicleDrivers.vehicleId, vehicleId),
+        eq(vehicleDrivers.userId, userId),
+        isNull(vehicleDrivers.archivedAt)
+      )
+    )
+    .run();
   db.delete(roleAssignments)
     .where(and(eq(roleAssignments.userId, userId), eq(roleAssignments.scopeId, vehicleId)))
     .run();
@@ -270,11 +281,19 @@ export function dbGrantSource(db: Db): GrantSource {
 
 export function actorFor(db: Db, userId: string): Actor {
   const row = db
-    .select({ disabledAt: users.disabledAt })
+    .select({ disabledAt: users.disabledAt, demoRole: roleAssignments.id })
     .from(users)
+    .leftJoin(
+      roleAssignments,
+      and(
+        eq(roleAssignments.userId, users.id),
+        isNull(roleAssignments.scopeId),
+        eq(roleAssignments.roleId, builtInRoleId(DEMO_ROLE_KEY))
+      )
+    )
     .where(eq(users.id, userId))
     .get();
-  return { userId, disabled: !row || row.disabledAt !== null };
+  return { userId, disabled: !row || row.disabledAt !== null, demo: Boolean(row?.demoRole) };
 }
 
 export function resolverFor(db: Db, userId: string): Resolver {
