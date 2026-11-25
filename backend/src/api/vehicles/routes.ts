@@ -2,9 +2,8 @@ import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { repos } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
-import { getDb } from '../../db/connection';
 import {
   expenses,
   odometerEntries,
@@ -199,7 +198,7 @@ function renamedWithoutCatalogModel(
 }
 
 async function vehicleHasMeasuredHistory(vehicleId: string): Promise<boolean> {
-  const db = getDb();
+  const db = appContext().db;
   const [expense, odometer, trip, mileageReminder, leaseLimit] = await Promise.all([
     db
       .select({ id: expenses.id })
@@ -284,7 +283,7 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
     const grants = await repos().vehicleShares.findAcceptedAccessForUser(user.id);
     if (grants.length > 0) {
       const byVehicleId = new Map(grants.map((g) => [g.vehicleId, g]));
-      const resolver = requestResolver(c, getDb());
+      const resolver = requestResolver(c, appContext().db);
       const sharedVehicles = (await repos().vehicles.findByIds([...byVehicleId.keys()])).filter(
         (v) => resolver.can('vehicle.read', { kind: 'vehicle', vehicleId: v.id }).allow
       );
@@ -473,8 +472,8 @@ routes.put(
 
 // Must run before the vehicle delete: the FK cascade removes the legs.
 async function splitGroupIdsForVehicle(vehicleId: string, userId: string): Promise<string[]> {
-  const rows = await getDb()
-    .selectDistinct({ groupId: expenses.groupId })
+  const rows = await appContext()
+    .db.selectDistinct({ groupId: expenses.groupId })
     .from(expenses)
     .where(
       and(
@@ -487,7 +486,7 @@ async function splitGroupIdsForVehicle(vehicleId: string, userId: string): Promi
 }
 
 async function shrinkSplitGroupsToSurvivingLegs(userId: string, groupIds: string[]): Promise<void> {
-  const db = getDb();
+  const db = appContext().db;
   // SQLite caps bound parameters, and inArray binds one per id: keep batches small.
   for (const batch of chunk(groupIds)) {
     await db

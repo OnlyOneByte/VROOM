@@ -1,8 +1,7 @@
 // userId always comes from the session, never from model arguments.
 
 import { z } from 'zod';
-import { repos } from '../../../../app-context';
-import { getDb } from '../../../../db/connection';
+import { appContext, repos } from '../../../../app-context';
 import { enforce } from '../../../../permissions/authorize';
 import { resolverFor } from '../../../../permissions/grants';
 import { calendarParts, zonedCalendar } from '../../../../utils/analytics-charts';
@@ -104,7 +103,7 @@ function defineTool<A, R>(spec: AssistantToolSpec<A, R>): AssistantTool<A> {
 
 function requireExpenseRead(vehicleId: string | undefined, userId: string): void {
   if (!vehicleId) return;
-  const decision = resolverFor(getDb(), userId).can('vehicle.expense.read', {
+  const decision = resolverFor(appContext().db, userId).can('vehicle.expense.read', {
     kind: 'vehicle',
     vehicleId,
   });

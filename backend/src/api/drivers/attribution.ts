@@ -1,6 +1,5 @@
 import type { Context } from 'hono';
 import { appContext } from '../../app-context';
-import { getDb } from '../../db/connection';
 import { ForbiddenError, ValidationError } from '../../errors';
 import { requestResolver } from '../../permissions/grants';
 import { carShareEnabled, findDriver, ownDriverId } from './repository';
@@ -8,12 +7,14 @@ import { carShareEnabled, findDriver, ownDriverId } from './repository';
 type DriverField = 'driverId' | 'paidByDriverId';
 
 function mayRecordOthers(c: Context, vehicleId: string): boolean {
-  return requestResolver(c, getDb()).can('vehicle.driver.record', { kind: 'vehicle', vehicleId })
-    .allow;
+  return requestResolver(c, appContext().db).can('vehicle.driver.record', {
+    kind: 'vehicle',
+    vehicleId,
+  }).allow;
 }
 
 export function maySeeDrivers(c: Context, vehicleId: string): boolean {
-  const resolver = requestResolver(c, getDb());
+  const resolver = requestResolver(c, appContext().db);
   const vehicle = { kind: 'vehicle' as const, vehicleId };
   return (
     resolver.can('vehicle.driver.record', vehicle).allow ||
@@ -32,7 +33,7 @@ export function carShareAccess(c: Context, vehicleId: string, enabled: boolean) 
 }
 
 function assertActiveDriver(vehicleId: string, driverId: string): void {
-  const driver = findDriver(getDb(), vehicleId, driverId);
+  const driver = findDriver(appContext().db, vehicleId, driverId);
   if (!driver || driver.archivedAt !== null) {
     throw new ValidationError("That driver doesn't drive this vehicle");
   }
@@ -45,7 +46,7 @@ function assertMayAttribute(
   current: string | null | undefined
 ): void {
   if (mayRecordOthers(c, vehicleId)) return;
-  const own = ownDriverId(getDb(), vehicleId, c.get('user').id);
+  const own = ownDriverId(appContext().db, vehicleId, c.get('user').id);
   if (current && current !== own) {
     throw new ForbiddenError("Only people who record drivers can change someone else's entry");
   }
@@ -64,7 +65,7 @@ export function attributedDriver(
   requested: string | null | undefined,
   current?: string | null
 ): string | null | undefined {
-  const db = getDb();
+  const db = appContext().db;
   const userId = c.get('user').id;
   const creating = current === undefined;
   if (!carShareEnabled(db, vehicleId)) {

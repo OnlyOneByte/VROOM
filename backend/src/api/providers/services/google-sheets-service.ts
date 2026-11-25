@@ -1,7 +1,7 @@
 import { and, eq, inArray, ne } from 'drizzle-orm';
 import { google, type sheets_v4 } from 'googleapis';
+import { appContext } from '../../../app-context';
 import { CONFIG } from '../../../config';
-import { getDb } from '../../../db/connection';
 import {
   expenses,
   insuranceClaims,
@@ -491,7 +491,7 @@ export class GoogleSheetsService {
     userId: string
   ): Promise<void> {
     await this.ensureRequiredSheets(spreadsheetId);
-    const db = getDb();
+    const db = appContext().db;
 
     const [userVehicles, userExpenses, userInsurance, userFinancing, userOdometer] =
       await Promise.all([
@@ -787,7 +787,7 @@ export async function createSheetsServiceForProvider(
   providerId: string,
   userId: string
 ): Promise<GoogleSheetsService> {
-  const db = getDb();
+  const db = appContext().db;
   const providerRow = await db
     .select()
     .from(userProviders)

@@ -1,8 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
-import { repos } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import { type Trip, trips } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { logger } from '../../utils/logger';
@@ -66,7 +65,7 @@ export async function createTrip(
   userId: string,
   data: CreateTripInput,
   createdBy: string | null = null,
-  db: AppDatabase = getDb()
+  db: AppDatabase = appContext().db
 ): Promise<Trip> {
   await requireVehicleAccess(data.vehicleId, userId, 'owner');
   const check = await readingCheck(data.vehicleId, data.endOdometer, data.tripDate, data.timeZone);
@@ -114,7 +113,7 @@ export async function updateTrip(
   existing: Trip,
   data: UpdateTripInput,
   timeZone: string | undefined,
-  db: AppDatabase = getDb()
+  db: AppDatabase = appContext().db
 ): Promise<Trip> {
   // The schema refine sees both odometers only when the body sends both, so check the merged pair here.
   const start = data.startOdometer ?? existing.startOdometer;
@@ -193,7 +192,7 @@ export async function deleteTrip(
   userId: string,
   existing: Trip,
   options: { keepOdometer: boolean; timeZone: string | undefined },
-  db: AppDatabase = getDb()
+  db: AppDatabase = appContext().db
 ): Promise<void> {
   const { id, vehicleId } = existing;
   const key = {

@@ -5,7 +5,7 @@ import type { Table } from 'drizzle-orm';
 import { and, eq, getTableColumns, getTableName, inArray } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import type { z } from 'zod';
-import { repos } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import {
   CONFIG,
   getBackupTableKeys,
@@ -13,7 +13,6 @@ import {
   TABLE_FILENAME_MAP,
   TABLE_SCHEMA_MAP,
 } from '../../config';
-import { getDb } from '../../db/connection';
 import type { UserProvider } from '../../db/schema';
 import {
   expenses,
@@ -300,7 +299,7 @@ class BackupService {
     const { storageProviderRegistry } = await import('../providers/domains/storage/registry');
     const provider = await storageProviderRegistry.getProvider(providerId, userId);
 
-    const db = getDb();
+    const db = appContext().db;
     const { userProviders } = await import('../../db/schema');
     const providerRow = await db
       .select()
@@ -341,7 +340,7 @@ class BackupService {
     const { storageProviderRegistry } = await import('../providers/domains/storage/registry');
     const provider = await storageProviderRegistry.getProvider(providerId, userId);
 
-    const db = getDb();
+    const db = appContext().db;
     const { userProviders } = await import('../../db/schema');
     const providerRow = await db
       .select()
@@ -379,8 +378,8 @@ class BackupService {
     const results: ProviderBackupList[] = [];
     if (Object.keys(config.providers).length === 0) return results;
 
-    const providerRows = await getDb()
-      .select()
+    const providerRows = await appContext()
+      .db.select()
       .from(userProviders)
       .where(eq(userProviders.userId, userId));
     const providersById = new Map(providerRows.map((row) => [row.id, row]));
@@ -422,7 +421,7 @@ class BackupService {
   }
 
   async createBackup(userId: string): Promise<BackupData> {
-    const db = getDb();
+    const db = appContext().db;
     const [
       userVehicles,
       userExpenses,
@@ -556,8 +555,8 @@ class BackupService {
     const { userProviders } = await import('../../db/schema');
     const identities: Record<string, string> = {};
     for (const batch of chunk([...new Set(providerIds)])) {
-      const rows = await getDb()
-        .select()
+      const rows = await appContext()
+        .db.select()
         .from(userProviders)
         .where(and(inArray(userProviders.id, batch), eq(userProviders.userId, userId)));
       for (const row of rows) {

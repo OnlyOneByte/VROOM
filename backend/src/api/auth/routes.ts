@@ -6,7 +6,6 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { HTTPException } from 'hono/http-exception';
 import { type AppContext, appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
-import { getDb } from '../../db/connection';
 import { userProviders, users } from '../../db/schema';
 import { createErrorResponse, isUniqueConstraintError, NotFoundError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
@@ -97,8 +96,8 @@ function lacksRequiredScope(
 }
 
 async function ownedProviderType(providerId: string, userId: string): Promise<string> {
-  const row = await getDb()
-    .select({ providerType: userProviders.providerType })
+  const row = await appContext()
+    .db.select({ providerType: userProviders.providerType })
     .from(userProviders)
     .where(and(eq(userProviders.id, providerId), eq(userProviders.userId, userId)))
     .limit(1);
@@ -250,7 +249,7 @@ export async function updateExistingUserProfile(
   authRowId: string,
   userInfo: { email: string; displayName: string; avatarUrl?: string }
 ) {
-  const db = getDb();
+  const db = appContext().db;
   await repos().authProviders.updateProfile(authRowId, userId, {
     email: userInfo.email,
     displayName: userInfo.displayName,
@@ -299,7 +298,7 @@ export async function updateExistingUserProfile(
 }
 
 export async function attachPendingInvitesOnSignIn(userId: string): Promise<void> {
-  const db = getDb();
+  const db = appContext().db;
   try {
     const [account] = await db
       .select({ email: users.email, pendingApprovalAt: users.pendingApprovalAt })
@@ -318,7 +317,7 @@ export async function resolveNewUser(
   authProviderId: string,
   userInfo: { providerAccountId: string; email: string; displayName: string; avatarUrl?: string }
 ): Promise<{ userId: string } | { redirect: string }> {
-  const db = getDb();
+  const db = appContext().db;
   const email = userInfo.email.toLowerCase();
   const existingByEmail = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
@@ -429,7 +428,7 @@ export async function checkLinkConflicts(
 }
 
 function holdsOnOwnAccount(userId: string, permission: PermissionId): boolean {
-  return resolverFor(getDb(), userId).can(permission, { kind: 'account', userId }).allow;
+  return resolverFor(appContext().db, userId).can(permission, { kind: 'account', userId }).allow;
 }
 
 // Register before the generic /callback/:authProvider route, which would shadow it.
@@ -619,7 +618,7 @@ routes.patch('/me', requireAuth, authorize(ownAccount), async (c) => {
     });
   }
 
-  const db = getDb();
+  const db = appContext().db;
   const [updated] = await db
     .update(users)
     .set({ displayName, updatedAt: new Date() })
@@ -655,7 +654,7 @@ routes.get('/capabilities', requireAuth, (c) =>
         scope,
         permissions,
       })),
-      rules: requestResolver(c, getDb()).packedRulesFor({ kind: 'server' }),
+      rules: requestResolver(c, appContext().db).packedRulesFor({ kind: 'server' }),
     },
   })
 );
@@ -719,7 +718,7 @@ routes.get('/accounts', requireAuth, authorize(ownAccount), async (c) => {
 routes.delete('/accounts/:id', requireAuth, authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const accountId = c.req.param('id');
-  const db = getDb();
+  const db = appContext().db;
 
   // No awaits between the count and the delete: the last-sign-in guard is read-then-write.
   const result = db.transaction((tx) => {
@@ -851,7 +850,7 @@ async function updateExistingProvider(
   refreshToken: string,
   email: string
 ): Promise<void> {
-  const db = getDb();
+  const db = appContext().db;
   const existing = await db
     .select()
     .from(userProviders)

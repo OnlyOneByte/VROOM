@@ -1,5 +1,5 @@
 import { and, eq, ne, sql } from 'drizzle-orm';
-import { getDb } from '../../db/connection';
+import { appContext } from '../../app-context';
 import { type UserProvider, userProviders } from '../../db/schema';
 import { isSyncError, SyncErrorCode, ValidationError } from '../../errors';
 import { decrypt, secretContextOf } from '../../utils/encryption';
@@ -27,8 +27,8 @@ export async function recordProviderHealth(
   const now = new Date();
   const notTurnedOff = and(eq(userProviders.id, providerId), ne(userProviders.status, 'disabled'));
   if (result.ok) {
-    await getDb()
-      .update(userProviders)
+    await appContext()
+      .db.update(userProviders)
       .set({
         status: 'active',
         lastErrorCode: null,
@@ -45,8 +45,8 @@ export async function recordProviderHealth(
     code === 'auth' || code === 'permission'
       ? sql`'needs_reauth'`
       : sql`CASE WHEN ${userProviders.status} = 'needs_reauth' THEN 'needs_reauth' WHEN ${failures} >= ${FAILURES_BEFORE_ERROR} THEN 'error' ELSE ${userProviders.status} END`;
-  await getDb()
-    .update(userProviders)
+  await appContext()
+    .db.update(userProviders)
     .set({ status, lastErrorCode: code, failureCount: failures, lastCheckedAt: now })
     .where(notTurnedOff);
 }

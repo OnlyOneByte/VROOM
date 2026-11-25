@@ -1,9 +1,8 @@
 import { and, eq, ne } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { repos } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
-import { getDb } from '../../db/connection';
 import { userProviders } from '../../db/schema';
 import { createErrorResponse, createSuccessResponse, ValidationError } from '../../errors';
 import {
@@ -141,8 +140,8 @@ routes.get('/status', authorize(ownAccount), async (c) => {
   const config = settings.backupConfig as BackupConfig | null;
   const providers = config?.providers;
   const providerRows = providers
-    ? await getDb()
-        .select({
+    ? await appContext()
+        .db.select({
           id: userProviders.id,
           providerType: userProviders.providerType,
           status: userProviders.status,
@@ -219,7 +218,7 @@ routes.post(
     const user = c.get('user');
     const body = restoreFromProviderSchema.parse(await readJsonBody(c));
 
-    const db = getDb();
+    const db = appContext().db;
     const providerRow = await db
       .select()
       .from(userProviders)
@@ -318,7 +317,7 @@ export interface RestoreProviderInfo {
 
 routes.get('/restore/providers', syncRateLimiter, authorize(ownAccount), async (c) => {
   const user = c.get('user');
-  const db = getDb();
+  const db = appContext().db;
   const providers = await db
     .select()
     .from(userProviders)

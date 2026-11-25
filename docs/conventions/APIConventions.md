@@ -67,10 +67,11 @@ export class EntityRepository extends BaseRepository<Entity, NewEntity> {
 
 Don't export an instance. Register the repository in `createAppContext` (`backend/src/app-context.ts`)
 and call it as `repos().entity.findByUserId(...)`; tests build `createAppContext(db)` on their own
-database. Only the context factory and the DB tooling call `getDb()`, which opens the database on
-first call rather than at import; keep it out of module scope. `db-access-ratchet.test.ts` holds the remaining
-module-level instances and `getDb()` calls while #974 moves them over. Inside a repository, pass
-`this.db` to `transaction(fn, this.db)` so the transaction runs on the injected database.
+database. Code outside a repository that needs the database itself uses `appContext().db`, inside
+a function, never at module scope. Only the context factory and the DB tooling call `getDb()`, which
+opens the database on first call; `db-access-ratchet.test.ts` fails on any other call and on any
+module-level repository instance. Inside a repository, pass `this.db` to `transaction(fn, this.db)`
+so the transaction runs on the injected database.
 
 `BaseRepository` supplies `findById`/`create`/`update`/`delete` (the last two throw
 `NotFoundError` on a missing row). Take `AppDatabase`, never `BunSQLiteDatabase` — the alias

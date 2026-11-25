@@ -2,9 +2,8 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { repos } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
-import { getDb } from '../../db/connection';
 import {
   type NewUserPreferences,
   type UserPreferences,
@@ -35,8 +34,8 @@ import {
 async function assertProvidersOwned(providerIds: string[], userId: string): Promise<void> {
   if (providerIds.length === 0) return;
 
-  const ownedProviders = await getDb()
-    .select({ id: userProviders.id })
+  const ownedProviders = await appContext()
+    .db.select({ id: userProviders.id })
     .from(userProviders)
     .where(and(inArray(userProviders.id, providerIds), eq(userProviders.userId, userId)));
 
@@ -60,8 +59,8 @@ async function assertDefaultsOwned(
       if (localOcrEnabled()) continue;
       throw new ValidationError('The built-in text reader is turned off on this server');
     }
-    const owned = await getDb()
-      .select({ id: userProviders.id })
+    const owned = await appContext()
+      .db.select({ id: userProviders.id })
       .from(userProviders)
       .where(
         and(

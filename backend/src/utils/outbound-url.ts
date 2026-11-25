@@ -2,8 +2,8 @@ import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
 import { and, count, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { DEMO_USER_ID } from '../api/auth/demo-account';
+import { appContext } from '../app-context';
 import { CONFIG } from '../config';
-import { getDb } from '../db/connection';
 import { users } from '../db/schema';
 import { ValidationError } from '../errors';
 import { resolverFor } from '../permissions/grants';
@@ -205,8 +205,8 @@ export function parsePrivateEndpointPolicy(allow: string, block: boolean): Priva
 let cachedPolicy: { key: string; policy: PrivateEndpointPolicy } | null = null;
 
 function hasSecondAccount(): boolean {
-  const row = getDb()
-    .select({ accounts: count() })
+  const row = appContext()
+    .db.select({ accounts: count() })
     .from(users)
     .where(ne(users.id, DEMO_USER_ID))
     .get();
@@ -226,7 +226,7 @@ export function privateEndpointPolicy(): PrivateEndpointPolicy {
 export const PRIVATE_NETWORK_PERMISSION = 'server.private_network.use';
 
 export function isNetworkAdmin(userId: string): boolean {
-  const db = getDb();
+  const db = appContext().db;
   const email = db
     .select({ email: users.email })
     .from(users)
@@ -243,8 +243,8 @@ export function adminEmailWarnings(adminEmails: readonly string[]): string[] {
   const warnings = adminEmails
     .filter((email) => !EMAIL_SHAPE.test(email))
     .map((email) => `ADMIN_EMAILS entry "${email}" is not an email address, so it matches nobody`);
-  const listedAccount = getDb()
-    .select({ id: users.id })
+  const listedAccount = appContext()
+    .db.select({ id: users.id })
     .from(users)
     .where(
       and(
