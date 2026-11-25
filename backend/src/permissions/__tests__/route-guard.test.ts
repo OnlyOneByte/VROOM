@@ -122,9 +122,9 @@ describe('routes that check inside really refuse', () => {
       const answered: string[] = [];
       for (const [method, path, body] of [
         ['PATCH', `/api/v1/roles/${LIBRARY_ROLE}`, { name: 'Taken' }],
-        ['DELETE', `/api/v1/roles/${LIBRARY_ROLE}`],
         ['GET', `/api/v1/roles/${LIBRARY_ROLE}/permissions`],
         ['PUT', `/api/v1/roles/${LIBRARY_ROLE}/permissions`, { permissions: [] }],
+        ['DELETE', `/api/v1/roles/${LIBRARY_ROLE}`],
       ] as Probe[]) {
         const res = await member.request(method, path, body);
         if (res.status !== 404) answered.push(`${method} ${path} -> ${res.status}`);
