@@ -4,6 +4,7 @@ import { CONFIG } from '../../config';
 import type { CommunityStat } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { requireAuth } from '../../middleware';
+import { authorize } from '../../permissions/authorize';
 import { DistanceUnit, type UnitPreferences, VolumeUnit } from '../../types';
 import { convertDistance, convertEfficiency } from '../../utils/unit-conversions';
 import { zValidator } from '../../utils/validation';
@@ -109,78 +110,83 @@ const routes = new Hono();
 
 routes.use('*', requireAuth);
 
-routes.get('/compare', zValidator('query', compareQuerySchema), async (c) => {
-  const user = c.get('user');
-  const { vehicleId } = c.req.valid('query');
-  const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'read');
+routes.get(
+  '/compare',
+  zValidator('query', compareQuerySchema),
+  authorize((c) => ({ kind: 'vehicle', vehicleId: c.req.query('vehicleId') ?? '' })),
+  async (c) => {
+    const user = c.get('user');
+    const { vehicleId } = c.req.valid('query');
+    const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'read');
 
-  if (CONFIG.communityStats.mode === 'off') {
+    if (CONFIG.communityStats.mode === 'off') {
+      return c.json({
+        success: true,
+        data: { currency: null, metrics: emptyMetrics('feature_off') },
+      });
+    }
+    const contribution = await communityStatsRepository.contribution(user.id, LOCAL_SCOPE);
+    if (GIVE_TO_GET && contribution !== 'included') {
+      return c.json({
+        success: true,
+        data: {
+          currency: null,
+          metrics: emptyMetrics(
+            contribution === 'opted_out' ? 'opt_in_required' : 'awaiting_refresh'
+          ),
+        },
+      });
+    }
+
+    const now = new Date();
+    const vehicle = await communityStatsRepository.loadVehicle(
+      vehicleId,
+      new Date(now.getTime() - COMMUNITY_WINDOW_MS),
+      now
+    );
+    if (!vehicle) throw new NotFoundError('Vehicle');
+
+    const samples = vehicleSamples(vehicle, now);
+    const smallestPublished = publishedCount(CONFIG.communityStats.minGroup);
+    const rows = await communityStatsRepository.publishedBuckets(
+      LOCAL_SCOPE,
+      samples.map((sample) => sample.bucketKey),
+      smallestPublished
+    );
+    const rowByKey = new Map(
+      rows.filter((row) => row.nPublished >= smallestPublished).map((row) => [row.bucketKey, row])
+    );
+
+    const metrics = METRICS.map((metric): CompareMetric => {
+      if (ownerId !== user.id && OWNER_REGION_METRICS.has(metric)) {
+        return { metric, status: 'no_data', unit: null, yours: null, bucket: null };
+      }
+      if (metric === 'efficiency' && !vehicle.catalogModelId) {
+        return { metric, status: 'needs_model', unit: null, yours: null, bucket: null };
+      }
+      const sample = samples.find((candidate) => candidate.metric === metric);
+      if (!sample) return { metric, status: 'no_data', unit: null, yours: null, bucket: null };
+      const unit = DISPLAY_UNIT[sample.unit];
+      const yours = toDisplayUnits(sample.value, sample.unit, vehicle.unitPreferences);
+      const row = rowByKey.get(sample.bucketKey);
+      if (!row) return { metric, status: 'too_few', unit, yours, bucket: null };
+      if (!usefulEnough(row, sample.metric, sample.unit)) {
+        return { metric, status: 'not_enough_data', unit, yours, bucket: null };
+      }
+      return {
+        metric,
+        status: 'ok',
+        unit,
+        yours,
+        bucket: bucketView(row, sample.unit, vehicle.unitPreferences),
+      };
+    });
+
     return c.json({
       success: true,
-      data: { currency: null, metrics: emptyMetrics('feature_off') },
+      data: { currency: vehicle.currency, units: vehicle.unitPreferences, metrics },
     });
   }
-  const contribution = await communityStatsRepository.contribution(user.id, LOCAL_SCOPE);
-  if (GIVE_TO_GET && contribution !== 'included') {
-    return c.json({
-      success: true,
-      data: {
-        currency: null,
-        metrics: emptyMetrics(
-          contribution === 'opted_out' ? 'opt_in_required' : 'awaiting_refresh'
-        ),
-      },
-    });
-  }
-
-  const now = new Date();
-  const vehicle = await communityStatsRepository.loadVehicle(
-    vehicleId,
-    new Date(now.getTime() - COMMUNITY_WINDOW_MS),
-    now
-  );
-  if (!vehicle) throw new NotFoundError('Vehicle');
-
-  const samples = vehicleSamples(vehicle, now);
-  const smallestPublished = publishedCount(CONFIG.communityStats.minGroup);
-  const rows = await communityStatsRepository.publishedBuckets(
-    LOCAL_SCOPE,
-    samples.map((sample) => sample.bucketKey),
-    smallestPublished
-  );
-  const rowByKey = new Map(
-    rows.filter((row) => row.nPublished >= smallestPublished).map((row) => [row.bucketKey, row])
-  );
-
-  const metrics = METRICS.map((metric): CompareMetric => {
-    if (ownerId !== user.id && OWNER_REGION_METRICS.has(metric)) {
-      return { metric, status: 'no_data', unit: null, yours: null, bucket: null };
-    }
-    if (metric === 'efficiency' && !vehicle.catalogModelId) {
-      return { metric, status: 'needs_model', unit: null, yours: null, bucket: null };
-    }
-    const sample = samples.find((candidate) => candidate.metric === metric);
-    if (!sample) return { metric, status: 'no_data', unit: null, yours: null, bucket: null };
-    const unit = DISPLAY_UNIT[sample.unit];
-    const yours = toDisplayUnits(sample.value, sample.unit, vehicle.unitPreferences);
-    const row = rowByKey.get(sample.bucketKey);
-    if (!row) return { metric, status: 'too_few', unit, yours, bucket: null };
-    if (!usefulEnough(row, sample.metric, sample.unit)) {
-      return { metric, status: 'not_enough_data', unit, yours, bucket: null };
-    }
-    return {
-      metric,
-      status: 'ok',
-      unit,
-      yours,
-      bucket: bucketView(row, sample.unit, vehicle.unitPreferences),
-    };
-  });
-
-  return c.json({
-    success: true,
-    data: { currency: vehicle.currency, units: vehicle.unitPreferences, metrics },
-  });
-});
+);
 
 export { routes };

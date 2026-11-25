@@ -110,6 +110,7 @@ const envSchema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().optional(),
   COMMUNITY_STATS: z.enum(['off', 'local']).default('local'),
+  LOCAL_OCR: z.enum(['on', 'off']).default('on'),
   COMMUNITY_STATS_MIN_GROUP: z
     .string()
     .default(String(COMMUNITY_STATS_MIN_GROUP_DEFAULT))
@@ -121,6 +122,14 @@ const envSchema = z.object({
         );
       return minGroup;
     }),
+  SIGNUP_MODE: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.enum(['open', 'approval', 'invite', 'closed']).optional()
+  ),
+  SIGNUP_ALLOWED_DOMAINS: z
+    .string()
+    .optional()
+    .transform((val) => (val?.trim() ? val : undefined)),
 });
 
 const parseEnv = () => {
@@ -236,6 +245,13 @@ export const CONFIG = {
     enabled: Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT),
   },
   pagination: { defaultPageSize: 20, maxPageSize: 100, minPageSize: 1 },
+  signup: {
+    mode: env.SIGNUP_MODE,
+    allowedDomains: env.SIGNUP_ALLOWED_DOMAINS,
+    inviteTtlDays: 7,
+    maxInviteTtlDays: 90,
+  },
+  localOcr: { enabled: env.LOCAL_OCR === 'on' },
   communityStats: {
     mode: env.COMMUNITY_STATS,
     enabled: env.COMMUNITY_STATS !== 'off' && env.NODE_ENV !== 'test',
@@ -271,6 +287,7 @@ export const CONFIG = {
     expenseImport: { windowMs: 15 * 60 * 1000, limit: 20, message: 'Too many imports' },
     importPreview: { windowMs: 15 * 60 * 1000, limit: 300, message: 'Too many import previews' },
     photoUpload: { windowMs: 15 * 60 * 1000, limit: 120, message: 'Too many photo uploads' },
+    providerTest: { windowMs: 15 * 60 * 1000, limit: 30, message: 'Too many provider tests' },
     receiptScansAtOnce: 2,
     heavyJobsAtOnce: 2,
   },

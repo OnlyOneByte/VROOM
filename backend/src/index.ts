@@ -10,7 +10,7 @@ import { runMigrations, startWalCheckpoints } from './db/connection';
 import { validateTrustedProxies } from './utils/client-ip';
 import { extractErrorMessage } from './utils/error-handling';
 import { logger } from './utils/logger';
-import { parsePrivateEndpointPolicy } from './utils/outbound-url';
+import { adminEmailWarnings, parsePrivateEndpointPolicy } from './utils/outbound-url';
 
 logger.startup(`VROOM Backend starting on ${CONFIG.server.host}:${CONFIG.server.port}`);
 logger.startup(`Environment: ${CONFIG.env}`);
@@ -53,6 +53,8 @@ try {
   });
   process.exit(1);
 }
+
+for (const warning of adminEmailWarnings(CONFIG.adminEmails)) logger.warn(warning);
 
 await discoverOidc();
 

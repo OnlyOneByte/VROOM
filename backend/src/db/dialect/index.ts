@@ -14,11 +14,11 @@ export function toDateTimeString(column: Column): SQL<string> {
 }
 
 export function sqlTrue(): SQL {
-  return sql`1`;
+  return sql`TRUE`;
 }
 
 export function sqlFalse(): SQL {
-  return sql`0`;
+  return sql`FALSE`;
 }
 
 export function jsonArraySome(array: SQLWrapper, test: (element: SQL) => SQL): SQL {

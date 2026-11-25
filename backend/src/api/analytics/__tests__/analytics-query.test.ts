@@ -1156,3 +1156,13 @@ describe('bucketed queries read expenses by date range, never the whole history'
     for (const step of expenseSteps) expect(step).toMatch(/date>\?/);
   });
 });
+
+describe('bucket boundaries must be whole seconds', () => {
+  test('a fractional boundary in a later bucket row is refused, not truncated', async () => {
+    seedFleet();
+    await expect(
+      repo.query(OWNER.id, baseQuery({ interval: 'month', end: RANGE.end + 0.5 }))
+    ).rejects.toThrow();
+    expect(await repo.query(OWNER.id, baseQuery({ interval: 'month' }))).toBeDefined();
+  });
+});

@@ -30,6 +30,22 @@ updates:
       - "dependencies"
       - "backend"
 
+  # The base images (oven/bun, node). Their tags float within a major, so every build already
+  # pulls the latest patch; this opens a PR when a new major (bun 2, node 24) comes out.
+  - package-ecosystem: "docker"
+    directories:
+      - "/backend"
+      - "/frontend"
+    ignore:
+      # Odd Node majors never become LTS.
+      - dependency-name: "node"
+        versions: ["~> 23.0", "~> 25.0", "~> 27.0"]
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

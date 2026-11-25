@@ -9,8 +9,11 @@
 		"/expenses/new": 110,
 		"/expenses/[id]/edit": 110,
 		"/dev/gallery": 200,
-		"/analytics": 186,
+		"/analytics": 200,
 		"/vehicles/[id]/odometer/new": 65,
 		"/vehicles/[id]/odometer/[entryId]/edit": 65
+	},
+	"firstView": {
+		"/analytics": ["src/lib/components/analytics/explore/ExploreTab.svelte"]
 	}
 }

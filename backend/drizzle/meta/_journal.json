@@ -155,6 +155,34 @@
       "when": 1795553115719,
       "tag": "0021_trip_photo_authors",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1795554617154,
+      "tag": "0022_term_vehicle_position",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1795554618154,
+      "tag": "0023_backfill_term_vehicle_position",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1795556719738,
+      "tag": "0024_signup_modes",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1795561074458,
+      "tag": "0025_term_vehicle_position_index",
+      "breakpoints": true
     }
   ]
 }

@@ -18,6 +18,8 @@ const EXCLUDED_BY_DESIGN = [
   'role_permissions',
   'role_assignments',
   'permission_overrides',
+  'server_settings',
+  'server_invites',
 ] as const;
 
 function allSchemaTableNames(): string[] {

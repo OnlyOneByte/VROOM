@@ -142,7 +142,6 @@
   "backend/src/api/shares/repository.ts: Must match the partial unique index vehicle_shares_active_idx in db/schema.ts; changing either requires a migration.",
   "backend/src/api/shares/repository.ts: Only a share the invitee accepted identifies them to the owner; every other status stays anonymous.",
   "backend/src/api/shares/repository.ts: vehicle_shares.ownerId is a denormalized copy for listing only; never use it as the access gate.",
-  "backend/src/api/shares/routes.ts: Non-owners and non-invitees get 404, not 403, so share existence is not revealed.",
   "backend/src/api/sync/__tests__/backup-table-coverage.test.ts: Never exported: account identity, encrypted credentials, live sessions and per-device push endpoints.",
   "backend/src/api/sync/backup.ts: A null in a NOT NULL column aborts the restore, so blanks take the static default.",
   "backend/src/api/sync/backup.ts: CSV round-trips present booleans as true, 1, '1' or 'true'.",
@@ -307,6 +306,7 @@
   "frontend/src/routes/settings/+page.svelte: Leave the list empty; the page already renders its empty state.",
   "frontend/src/routes/vehicles/[id]/odometer/new/+page.svelte: The soft warning is optional; ignore failures.",
   "frontend/src/service-worker/index.ts: No sync listener: the offline outbox lives in localStorage, which workers cannot read.",
+  "frontend/vite.config.ts: shortcut: LayerChart needs only geoPath (for map projections VROOM never draws) and one colour scheme, so these stand-ins keep 14 KB of d3-geo and d3-scale-chromatic off the charts; drop an alias before using geo charts or another scheme.",
   "frontend/vite.config.ts: Vitest's default conditions omit 'browser'; without it inlined svelte loads its server entry, where mount() throws.",
   "frontend/vite.config.ts: Without strictPort a busy port silently shifts, leaving callers waiting on the pinned one.",
   "frontend/vite.config.ts: withPwa appends a prerendered/ pattern that this app never matches; strict globbing would fail the build."

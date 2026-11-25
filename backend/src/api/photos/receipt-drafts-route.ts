@@ -6,6 +6,7 @@ import type { UserProvider } from '../../db/schema';
 import { userProviders } from '../../db/schema';
 import { AppError, ValidationError } from '../../errors';
 import { concurrencyLimiter, rateLimiter, requireAuth } from '../../middleware';
+import { authorize, ownAccount } from '../../permissions/authorize';
 import { logger } from '../../utils/logger';
 import { expenseRepository } from '../expenses/repository';
 import { decryptRefreshToken } from '../providers/domains/storage/registry';
@@ -62,41 +63,47 @@ const draftsAtOnce = concurrencyLimiter({
   status: 429,
 });
 
-routes.get('/receipt-drafts', receiptDraftsLimiter, draftsAtOnce, async (c) => {
-  const user = c.get('user');
-  const db = getDb();
+routes.get(
+  '/receipt-drafts',
+  receiptDraftsLimiter,
+  draftsAtOnce,
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const db = getDb();
 
-  const photosRow = await findPhotosProvider(db, user.id);
-  if (!photosRow) {
-    throw new ValidationError(
-      'Connect Google Photos in Settings to import receipts from your VROOM photo album.'
-    );
+    const photosRow = await findPhotosProvider(db, user.id);
+    if (!photosRow) {
+      throw new ValidationError(
+        'Connect Google Photos in Settings to import receipts from your VROOM photo album.'
+      );
+    }
+    const vlmRow = await resolveProvider(user.id, 'ai.vision');
+
+    const photosService = photosServiceBuilder(photosRow);
+    const vlmProvider = getVlmProvider(vlmRow);
+    const deps: StageDeps = {
+      listReceiptPhotos: (max) => photosService.listReceiptPhotos(max),
+      downloadPhoto: (id) => photosService.download(id),
+      freshUrl: (id) => photosService.getFreshUrl(id),
+      parseImage: async (bytes, mimeType) =>
+        parseExtraction(await vlmProvider.extractReceipt({ data: bytes, mimeType })),
+      isAlreadyImported: async (photoId) =>
+        (await expenseRepository.findByClientId(`photos:${photoId}`, user.id)) !== null,
+    };
+
+    try {
+      const drafts = await stageReceiptDrafts(deps);
+      return c.json({ success: true, data: { drafts } });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Google Photos error';
+      logger.warn('Photos receipt-draft stage failed', { error: message });
+      throw new AppError(
+        'Could not read your Google Photos receipts right now. Check the connection and try again.',
+        502
+      );
+    }
   }
-  const vlmRow = await resolveProvider(user.id, 'ai.vision');
-
-  const photosService = photosServiceBuilder(photosRow);
-  const vlmProvider = getVlmProvider(vlmRow);
-  const deps: StageDeps = {
-    listReceiptPhotos: (max) => photosService.listReceiptPhotos(max),
-    downloadPhoto: (id) => photosService.download(id),
-    freshUrl: (id) => photosService.getFreshUrl(id),
-    parseImage: async (bytes, mimeType) =>
-      parseExtraction(await vlmProvider.extractReceipt({ data: bytes, mimeType })),
-    isAlreadyImported: async (photoId) =>
-      (await expenseRepository.findByClientId(`photos:${photoId}`, user.id)) !== null,
-  };
-
-  try {
-    const drafts = await stageReceiptDrafts(deps);
-    return c.json({ success: true, data: { drafts } });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Google Photos error';
-    logger.warn('Photos receipt-draft stage failed', { error: message });
-    throw new AppError(
-      'Could not read your Google Photos receipts right now. Check the connection and try again.',
-      502
-    );
-  }
-});
+);
 
 export { routes };

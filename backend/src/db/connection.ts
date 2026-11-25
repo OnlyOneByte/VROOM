@@ -4,6 +4,7 @@ import { dirname } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
+import { ensureServerAdmin } from '../api/signup/store';
 import { CONFIG } from '../config';
 import { handleDatabaseError, isAppError, isSyncError } from '../errors';
 import { syncBuiltInRoles } from '../permissions/grants';
@@ -89,6 +90,8 @@ export function runMigrations(): void {
     migrate(db, { migrationsFolder: './drizzle' });
     foldUserEmailCase(db);
     syncBuiltInRoles(db);
+    const admin = ensureServerAdmin(db);
+    if (admin) logger.info('Made the oldest eligible account the server admin', { userId: admin });
     logger.info('Database migrations completed successfully');
   } catch (error) {
     const message = extractErrorMessage(error);

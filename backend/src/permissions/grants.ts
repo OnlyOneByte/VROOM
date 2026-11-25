@@ -270,11 +270,19 @@ export function dbGrantSource(db: Db): GrantSource {
 
 export function actorFor(db: Db, userId: string): Actor {
   const row = db
-    .select({ disabledAt: users.disabledAt })
+    .select({ disabledAt: users.disabledAt, demoRole: roleAssignments.id })
     .from(users)
+    .leftJoin(
+      roleAssignments,
+      and(
+        eq(roleAssignments.userId, users.id),
+        isNull(roleAssignments.scopeId),
+        eq(roleAssignments.roleId, builtInRoleId(DEMO_ROLE_KEY))
+      )
+    )
     .where(eq(users.id, userId))
     .get();
-  return { userId, disabled: !row || row.disabledAt !== null };
+  return { userId, disabled: !row || row.disabledAt !== null, demo: Boolean(row?.demoRole) };
 }
 
 export function resolverFor(db: Db, userId: string): Resolver {
