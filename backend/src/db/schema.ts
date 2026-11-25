@@ -890,4 +890,3 @@ export type CalendarFeed = typeof calendarFeeds.$inferSelect;
 export type Role = typeof roles.$inferSelect;
 
 export type VehicleDriver = typeof vehicleDrivers.$inferSelect;
-export type NewVehicleDriver = typeof vehicleDrivers.$inferInsert;

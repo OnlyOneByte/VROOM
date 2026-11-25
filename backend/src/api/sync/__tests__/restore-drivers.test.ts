@@ -87,14 +87,49 @@ describe('restoring car-share drivers', () => {
     const crafted = await editCsv(
       await backupService.exportAsZip(ctx.user.id),
       'vehicle_drivers.csv',
-      () => [{ id: 'd-x', vehicleId, userId: outsider.id, name: 'Outsider' }]
+      () => [
+        { id: 'd-x', vehicleId, userId: outsider.id, name: 'Outsider', createdBy: outsider.id },
+        { id: 'd-y', vehicleId, userId: '', name: 'Guest', createdBy: ctx.user.id },
+      ]
     );
 
     const result = await restoreService.restoreFromBackup(ctx.user.id, crafted, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
     expect(drivers()).toEqual([
       { id: 'd-x', vehicle_id: vehicleId, user_id: null, name: 'Outsider' },
+      { id: 'd-y', vehicle_id: vehicleId, user_id: null, name: 'Guest' },
     ]);
+    expect(
+      ctx.sqlite.query('SELECT id, created_by FROM vehicle_drivers ORDER BY id').all()
+    ).toEqual([
+      { id: 'd-x', created_by: null },
+      { id: 'd-y', created_by: ctx.user.id },
+    ]);
+  });
+
+  test.each([
+    ['odometer_entries.csv', 'driverId'],
+    ['expenses.csv', 'paidByDriverId'],
+  ])("a %s row can't name a driver of another car", async (file, column) => {
+    const carA = await seedVehicle(ctx, { make: 'Kia', model: 'Rio', year: 2020 });
+    const carB = await seedVehicle(ctx, { make: 'Kia', model: 'Soul', year: 2021 });
+    seedDriver('d-b', carB, ctx.user.id, 'Owner');
+    ctx.sqlite.run(
+      "INSERT INTO odometer_entries (id, vehicle_id, user_id, odometer, recorded_at) VALUES ('o1', ?, ?, 1000, 1700000000)",
+      [carA, ctx.user.id]
+    );
+    ctx.sqlite.run(
+      "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount) VALUES ('e1', ?, ?, 'fuel', 1700000000, 4550)",
+      [carA, ctx.user.id]
+    );
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+    const crafted = await editCsv(await backupService.exportAsZip(ctx.user.id), file, (rows) =>
+      rows.map((row) => ({ ...row, [column]: 'd-b' }))
+    );
+    await expect(restoreService.restoreFromBackup(ctx.user.id, crafted, 'replace')).rejects.toThrow(
+      'Backup validation failed'
+    );
   });
 
   test("an entry can't name a driver of another car", async () => {

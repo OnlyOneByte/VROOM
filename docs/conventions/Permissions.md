@@ -43,7 +43,7 @@ Each descriptor carries:
 | `scope` | required | Must match the first segment of the id |
 | `grantable` | `true` | `false` for permissions only the vehicle owner holds (`vehicle.delete`, `vehicle.transfer`). No role or override can grant them |
 | `implies` | `[]` | Permissions this one includes. Every `write` implies the `read` on the same resource |
-| `sensitive` | `false` | `true` for data people expect to stay private (`vehicle.financing.read`, `vehicle.insurance.read`) |
+| `sensitive` | `false` | `true` for data people expect to stay private (`vehicle.financing.read`, `vehicle.insurance.read`, `vehicle.driver_stats.read`) |
 
 Then spread the export into `DECLARED_PERMISSIONS` in `src/permissions/registry.ts`. The registry
 validates every declaration when it loads and throws on a duplicate id, a malformed id, a scope
@@ -57,7 +57,8 @@ sign-up admin routes (`/api/v1/admin/...`) check `server.signup.manage` against 
 
 The built-in roles (Admin, Member, Demo, Co-owner, Editor and Viewer) are permission sets in
 `src/permissions/roles.ts`. Most are derived from the registry (Co-owner is every grantable
-vehicle permission, Viewer every vehicle read except the two sensitive ones), so a new vehicle
+vehicle permission, Viewer every vehicle read except the sensitive ones, plus
+`vehicle.driver_stats.read_own`), so a new vehicle
 permission reaches them without an edit. Editor is listed by hand; keep it a superset of Viewer.
 Check that the result is what you want; the role tests pin the rules, including
 Viewer ⊆ Editor ⊆ Co-owner.

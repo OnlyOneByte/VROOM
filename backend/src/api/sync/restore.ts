@@ -561,14 +561,15 @@ class RestoreService {
     );
   }
 
-  private memberDriverId(
-    driver: Record<string, unknown>,
+  private memberOfCar(
+    candidate: unknown,
+    vehicleId: unknown,
     ownerId: string,
     consentedShares: Set<string>
   ): string | null {
-    const userId = driver.userId == null ? null : String(driver.userId);
+    const userId = candidate == null || candidate === '' ? null : String(candidate);
     if (userId === null || userId === ownerId) return userId;
-    return consentedShares.has(shareConsentKey(String(driver.vehicleId), userId)) ? userId : null;
+    return consentedShares.has(shareConsentKey(String(vehicleId), userId)) ? userId : null;
   }
 
   private insertRows<TTable extends SQLiteTable>(
@@ -619,8 +620,8 @@ class RestoreService {
       vehicleDrivers,
       (data.vehicleDrivers ?? []).map((driver) => ({
         ...driver,
-        userId: this.memberDriverId(driver, userId, consentedShares),
-        createdBy: knownUserIds.has(String(driver.createdBy)) ? driver.createdBy : null,
+        userId: this.memberOfCar(driver.userId, driver.vehicleId, userId, consentedShares),
+        createdBy: this.memberOfCar(driver.createdBy, driver.vehicleId, userId, consentedShares),
       }))
     );
     this.insertRows(tx, vehicleFinancing, data.financing ?? []);
