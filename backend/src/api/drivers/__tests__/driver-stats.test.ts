@@ -105,6 +105,27 @@ describe('per-driver figures', () => {
     expect(data.costPerDistance).toBe(0.2857);
   });
 
+  test('charging is reported apart from liquid fuel, never added to it', async () => {
+    const charge = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId: CAR,
+      category: 'fuel',
+      fuelType: 'Level 2 (AC)',
+      date: '2024-03-05',
+      expenseAmount: 9,
+      volume: 20,
+      mileage: 1400,
+    });
+    expect(charge.status).toBe(201);
+    const data = await read(ctx.authed);
+    const mine = data.drivers.find((d) => d.you) as Figures & {
+      chargeBought: number;
+      chargeUsed: number;
+    };
+    expect(mine).toMatchObject({ fuelBought: 0, chargeBought: 20 });
+    expect(data.drivers.reduce((n, d) => n + d.fuelBought, 0)).toBe(10);
+    expect(mine.chargeUsed).toBe(Math.round((20 / 400) * mine.distance.total * 100) / 100);
+  });
+
   test('without estimates only trips count', async () => {
     const data = await read(ctx.authed, `${stats}&estimates=false`);
     expect(data.distance.total).toBe(100);

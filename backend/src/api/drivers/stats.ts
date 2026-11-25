@@ -1,6 +1,7 @@
 import { and, eq, gte, isNotNull, lte } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { expenses, odometerEntries, trips } from '../../db/schema';
+import { isElectricFuelType } from '../../db/types';
 import { centsToDollars } from '../../utils/money';
 import { attributeDistance, type Period } from './distance';
 import { listDrivers } from './repository';
@@ -25,6 +26,8 @@ export interface DriverFigures {
   share: number | null;
   fuelBought: number;
   fuelUsed: number | null;
+  chargeBought: number;
+  chargeUsed: number | null;
   runningCostsPaid: number;
 }
 
@@ -71,6 +74,7 @@ function loadEntries(db: AppDatabase, vehicleId: string, period: Period) {
       category: expenses.category,
       cents: expenses.expenseAmount,
       volume: expenses.volume,
+      fuelType: expenses.fuelType,
       payer: expenses.paidByDriverId,
     })
     .from(expenses)
@@ -101,17 +105,22 @@ export function driverStats(db: AppDatabase, vehicleId: string, options: StatsOp
     .filter((key) => !drivers.some((d) => d.id === key))
     .reduce((sum, key) => sum + totalOf(key), 0);
   const totalDistance = attributed + unattributed;
-  const fuelOf = (payer?: string) =>
-    spending.reduce(
-      (sum, e) =>
-        sum + (e.category === 'fuel' && (!payer || e.payer === payer) ? (e.volume ?? 0) : 0),
-      0
-    );
+  const boughtOf = (electric: boolean, payer?: string) =>
+    spending.reduce((sum, e) => {
+      const counts =
+        e.category === 'fuel' &&
+        isElectricFuelType(e.fuelType) === electric &&
+        (!payer || e.payer === payer);
+      return sum + (counts ? (e.volume ?? 0) : 0);
+    }, 0);
   const centsPaidBy = (payer: string) =>
     spending.reduce((sum, e) => sum + (e.payer === payer ? e.cents : 0), 0);
   const runningCents = spending.reduce((sum, e) => sum + e.cents, 0);
   const perDistance = (amount: number) => (totalDistance > 0 ? amount / totalDistance : null);
-  const fuelRate = perDistance(fuelOf());
+  const fuelRate = perDistance(boughtOf(false));
+  const chargeRate = perDistance(boughtOf(true));
+  const used = (rate: number | null, distance: number) =>
+    rate === null ? null : round(rate * distance);
 
   const figures: DriverFigures[] = drivers
     .filter((d) => options.everyone || d.userId === options.viewerUserId)
@@ -127,8 +136,10 @@ export function driverStats(db: AppDatabase, vehicleId: string, options: StatsOp
         you: d.userId === options.viewerUserId,
         distance: { trips: row.trips, estimated: row.estimated, total },
         share: attributed > 0 ? round(total / attributed, 4) : null,
-        fuelBought: round(fuelOf(d.id)),
-        fuelUsed: fuelRate === null ? null : round(fuelRate * total),
+        fuelBought: round(boughtOf(false, d.id)),
+        fuelUsed: used(fuelRate, total),
+        chargeBought: round(boughtOf(true, d.id)),
+        chargeUsed: used(chargeRate, total),
         runningCostsPaid: centsToDollars(centsPaidBy(d.id)),
       };
     });
