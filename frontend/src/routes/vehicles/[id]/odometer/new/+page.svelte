@@ -30,6 +30,7 @@
 	let odometer = $state<string | number | null>('');
 	let date = $state(toDateInputValue(new Date()));
 	let note = $state('');
+	let driverId = $state<string | null | undefined>(undefined);
 	let pendingFiles = $state<File[]>([]);
 
 	let isSubmitting = $state(false);
@@ -84,7 +85,8 @@
 			const entry = await odometerApi.create(vehicleId, {
 				odometer: Number(odometer),
 				recordedAt: dateOnlyToISO(date),
-				note: note || undefined
+				note: note || undefined,
+				...(driverId !== undefined && { driverId })
 			});
 
 			if (pendingFiles.length > 0) {
@@ -189,6 +191,10 @@
 				<FormFieldError id="date-error">{fieldErrors.date}</FormFieldError>
 			{/if}
 		</div>
+
+		{#await import('#lib/components/drivers/DriverChip.svelte') then { default: DriverChip }}
+			<DriverChip id="odometer-driver" {vehicleId} bind:value={driverId} />
+		{/await}
 
 		<div class="space-y-2">
 			<Label for="note">Note (Optional)</Label>

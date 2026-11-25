@@ -161,7 +161,10 @@ test.describe('Expense form', () => {
 		expect(posted).toEqual([]);
 
 		await page.evaluate(() => window.dispatchEvent(new Event('online')));
-		const syncButton = page.getByRole('button', { name: 'Sync Now' });
+		await page.getByRole('button', { name: /^Sync status:/ }).click();
+		const syncButton = page
+			.getByRole('dialog', { name: 'Sync status' })
+			.getByRole('button', { name: 'Sync Now' });
 		await expect(syncButton).toBeVisible();
 
 		await syncButton.click();
@@ -256,36 +259,69 @@ test.describe('Expense list', () => {
 		await filtered;
 	});
 
-	test('deleting an expense confirms first, then DELETEs that row', async ({ page }) => {
+	async function deleteFirstExpense(page: Page, failWith?: number) {
 		await page.setViewportSize({ width: 1280, height: 800 });
-
 		const deleted: string[] = [];
 		await page.route(
 			url => /^\/api\/v1\/expenses\/[^/]+$/.test(url.pathname),
 			async route => {
-				if (route.request().method() === 'DELETE') {
-					deleted.push(new URL(route.request().url()).pathname);
-				}
-				await route.fallback();
+				if (route.request().method() !== 'DELETE') return route.fallback();
+				deleted.push(new URL(route.request().url()).pathname);
+				if (!failWith) return route.fallback();
+				return route.fulfill({
+					status: failWith,
+					json: { success: false, message: 'Database unavailable' }
+				});
 			}
 		);
 
 		await page.goto('/expenses');
 		await expect(visibleText(page, '$89.99')).toBeVisible();
-
 		await page.getByRole('button', { name: 'Delete expense' }).first().click();
 
 		const dialog = page.getByRole('alertdialog', { name: 'Delete Expense' });
-		await expect(dialog.getByText('This action cannot be undone.')).toBeVisible();
-		expect(deleted).toEqual([]);
-
-		const described = await dialog.getByText(/Costco fill-up|Oil change/).textContent();
-		const expectedId = described?.trim() === 'Costco fill-up' ? 'expense-fuel' : 'expense-maint';
-
+		await expect(dialog.getByText('You can undo it for 5 seconds.')).toBeVisible();
+		const described = (await dialog.getByText(/Costco fill-up|Oil change/).textContent())?.trim();
 		await dialog.getByRole('button', { name: 'Delete' }).click();
 
-		await expect(page.getByText('Expense deleted successfully')).toBeVisible();
-		expect(deleted).toEqual([`/api/v1/expenses/${expectedId}`]);
+		const name = described === 'Costco fill-up' ? 'Costco fill-up' : 'Oil change';
+		const row = page.getByRole('row').filter({ hasText: name });
+		const id = described === 'Costco fill-up' ? 'expense-fuel' : 'expense-maint';
+		return { deleted, row, path: `/api/v1/expenses/${id}` };
+	}
+
+	test('a deleted row goes at once, and Undo brings it back with no DELETE sent', async ({
+		page
+	}) => {
+		const { deleted, row } = await deleteFirstExpense(page);
+
+		await expect(row).toHaveCount(0);
+		await page.getByRole('button', { name: 'Undo' }).click();
+		await expect(row).toHaveCount(1);
+
+		await page.waitForTimeout(6000);
+		expect(deleted).toEqual([]);
+		await expect(row).toHaveCount(1);
+	});
+
+	test('without Undo the DELETE goes out once the 5 s are up', async ({ page }) => {
+		const { deleted, row, path } = await deleteFirstExpense(page);
+
+		await expect(row).toHaveCount(0);
+		expect(deleted).toEqual([]);
+		await expect.poll(() => deleted, { timeout: 10_000 }).toEqual([path]);
+		await expect(row).toHaveCount(0);
+	});
+
+	test('a failed DELETE brings the row back with its error and Retry', async ({ page }) => {
+		const { deleted, row, path } = await deleteFirstExpense(page, 500);
+
+		await expect.poll(() => deleted, { timeout: 10_000 }).toEqual([path]);
+		await expect(row).toHaveCount(1);
+		await expect(row.getByText(/^Not deleted:/)).toBeVisible();
+
+		await row.getByRole('button', { name: /^Retry deleting/ }).click();
+		await expect.poll(() => deleted.length).toBe(2);
 	});
 });
 

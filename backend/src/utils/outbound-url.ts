@@ -351,7 +351,7 @@ export const outboundResolver = {
 export function assertSafeOutboundUrl(
   raw: string,
   label: string,
-  policy: PrivateEndpointPolicy = privateEndpointPolicy()
+  policy: PrivateEndpointPolicy
 ): URL {
   let url: URL;
   try {
@@ -384,7 +384,7 @@ interface SafeOutboundTarget {
 export async function resolveSafeOutboundTarget(
   raw: string,
   label: string,
-  policy: PrivateEndpointPolicy = privateEndpointPolicy()
+  policy: PrivateEndpointPolicy
 ): Promise<SafeOutboundTarget> {
   const url = assertSafeOutboundUrl(raw, label, policy);
   const literal = literalAddress(url.hostname);
@@ -414,7 +414,7 @@ export async function fetchOutbound(
   raw: string,
   init: RequestInit & { headers?: Record<string, string> },
   label: string,
-  policy: PrivateEndpointPolicy = privateEndpointPolicy()
+  policy: PrivateEndpointPolicy
 ): Promise<Response> {
   const { url, addresses } = await resolveSafeOutboundTarget(raw, label, policy);
   if (literalAddress(url.hostname)) return fetch(url, { ...init, redirect: 'manual' });

@@ -2,6 +2,7 @@ import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import {
@@ -47,11 +48,10 @@ import {
 } from '../../utils/vehicle-access';
 import { catalogModelMatchesMake, isCatalogModel } from '../../utils/vehicle-catalog';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
+import { carShareRoutes, driverRoutes } from '../drivers/routes';
 import { expenseRepository } from '../expenses/repository';
-import { financingRepository, withComputedBalance } from '../financing/repository';
-import { odometerRepository } from '../odometer/repository';
+import { withComputedBalance } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
-import { reminderRepository } from '../reminders/repository';
 import { vehiclePeople } from '../roles/routes';
 import { preferencesRepository } from '../settings/repository';
 import { vehicleShareRepository } from '../shares/repository';
@@ -175,6 +175,8 @@ routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
 routes.route('/:vehicleId/photos', photoRoutes);
+routes.route('/:vehicleId/drivers', driverRoutes);
+routes.route('/:vehicleId/car-share', carShareRoutes);
 
 function changedUnits(existing: UnitPreferences, merged: UnitPreferences | undefined): string[] {
   if (!merged) return [];
@@ -307,7 +309,7 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
   const financingIds = allVehicles
     .map((v) => v.financing?.id)
     .filter((id): id is string => id !== undefined);
-  const balances = await financingRepository.computeBalances(financingIds, timeZone);
+  const balances = await repos().financing.computeBalances(financingIds, timeZone);
 
   const enrichedVehicles = allVehicles.map((v) => {
     if (v.financing) {
@@ -393,7 +395,7 @@ routes.get(
       sharedAccess?: SharedAccess;
     } = seesFinancials(access) ? vehicle : sharedVehicleView(vehicle);
     if (responseData.financing) {
-      const computedBalance = await financingRepository.computeBalance(
+      const computedBalance = await repos().financing.computeBalance(
         responseData.financing.id,
         timeZone
       );
@@ -405,10 +407,17 @@ routes.get(
     if (sharedAccess) {
       responseData = { ...responseData, sharedAccess };
     }
+    const carShare = {
+      enabled: vehicle.carShareEnabled,
+      manage: requestResolver(c, appContext().db).can('vehicle.driver.manage', {
+        kind: 'vehicle',
+        vehicleId: id,
+      }).allow,
+    };
 
-    const response: ApiResponse<typeof responseData> = {
+    const response: ApiResponse<typeof responseData & { carShare: typeof carShare }> = {
       success: true,
-      data: vehicleRowToApi(responseData),
+      data: { ...vehicleRowToApi(responseData), carShare },
     };
 
     return c.json(response);
@@ -509,7 +518,7 @@ routes.delete(
     // Photos have no FK: the vehicle cascade would orphan them, so delete them before the row goes.
     const [expenseIds, odometerIds, splitGroupIds] = await Promise.all([
       expenseRepository.findIdsByVehicleId(id),
-      odometerRepository.findIdsByVehicleId(id),
+      repos().odometer.findIdsByVehicleId(id),
       splitGroupIdsForVehicle(id, user.id),
     ]);
     await deleteAllPhotosForEntity('vehicle', id, user.id);
@@ -522,8 +531,8 @@ routes.delete(
     try {
       await shrinkSplitGroupsToSurvivingLegs(user.id, splitGroupIds);
       // Split configs are JSON with no FK: prune deleted legs or reminders will target them.
-      await reminderRepository.pruneSplitConfigsForDeletedVehicle(user.id, id);
-      await reminderRepository.deactivateVehicleless(user.id);
+      await repos().reminders.pruneSplitConfigsForDeletedVehicle(user.id, id);
+      await repos().reminders.deactivateVehicleless(user.id);
     } catch (error) {
       logger.error('Post-delete vehicle cleanup failed (vehicle already deleted)', {
         vehicleId: id,
@@ -594,7 +603,7 @@ routes.get(
       canonicalScale(parseUnitPreferences(vehicle.unitPreferences) ?? DEFAULT_UNIT_PREFERENCES)
     );
 
-    const currentOdometer = await odometerRepository.getCurrentOdometer(id, ownerId);
+    const currentOdometer = await repos().odometer.getCurrentOdometer(id, ownerId);
 
     return c.json({
       success: true,

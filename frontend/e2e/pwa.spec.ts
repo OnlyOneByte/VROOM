@@ -113,17 +113,24 @@ test.describe('Responsive layout', () => {
 		});
 	}
 
-	test('the authenticated shell exposes a mobile navigation menu', async ({ page, context }) => {
+	test('the authenticated shell has a phone bottom bar, and More opens the rest', async ({
+		page,
+		context
+	}) => {
 		await addSessionCookie(context);
 		await mockApi(page);
 		await page.setViewportSize({ width: 375, height: 667 });
 
 		await page.goto('/dashboard');
 
-		const hamburger = page.getByRole('button', { name: 'Open navigation menu' });
-		await expect(hamburger).toBeVisible();
-		await hamburger.click();
-		await expect(page.getByRole('link', { name: 'Expenses', exact: true })).toBeVisible();
+		const bar = page.getByRole('navigation', { name: 'Main' });
+		await expect(bar.getByRole('link', { name: 'Log', exact: true })).toBeVisible();
+		await expect(bar.getByRole('link', { name: 'Add expense' })).toBeInViewport();
+		await bar.getByRole('button', { name: 'More' }).click();
+		const more = page.getByRole('dialog', { name: 'More' });
+		await expect(more.getByRole('link', { name: 'Insurance' })).toBeVisible();
+		await page.keyboard.press('Escape');
+		await expect(more).toBeHidden();
 	});
 });
 
@@ -148,12 +155,13 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 		ready: page => page.getByText('$45.50').filter({ visible: true }).first()
 	},
 	'/expenses/new': { debt: [], ready: pageHeading('Add Expense') },
+	'/vehicles': { debt: [], ready: page => page.getByTestId('garage-row').first() },
 	'/vehicles/new': { debt: [], ready: pageHeading('Add Vehicle') },
 	'/vehicles/vehicle-camry': {
 		debt: [],
-		ready: page => page.getByRole('button', { name: 'Details, insurance and photos' }),
+		ready: page => page.getByRole('tab', { name: 'Insurance' }),
 		open: async page => {
-			await page.getByRole('button', { name: 'Details, insurance and photos' }).click();
+			await page.getByRole('tab', { name: 'Insurance' }).click();
 			await expect(expiredPolicy(page)).toBeVisible();
 		}
 	},
@@ -163,7 +171,7 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 	'/trips': { debt: [], ready: pageHeading('Trips') },
 	'/settings': { debt: [], ready: pageHeading('Settings') },
 	'/profile': { debt: [], ready: pageHeading('Profile') },
-	'/no-such-page': { debt: [], ready: pageHeading('Page Not Found') }
+	'/no-such-page': { debt: [], ready: pageHeading('Wrong turn') }
 };
 
 const attachmentLabel = (route: string) => route.replace(/^\//, '').replace(/\//g, '-') || 'root';

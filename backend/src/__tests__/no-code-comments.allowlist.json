@@ -258,8 +258,6 @@
   "frontend/src/lib/components/insurance/ClaimsSection.svelte: Token colours pass WCAG AA; text-chart-* on a chart tint fails for some palette entries.",
   "frontend/src/lib/components/insurance/form/InsurancePolicyForm.svelte: JSON drops undefined; send null to clear the notes.",
   "frontend/src/lib/components/insurance/form/InsuranceTermForm.svelte: JSON drops undefined; send null to clear an emptied field.",
-  "frontend/src/lib/components/layout/Navigation.svelte: Presentational wrapper: a role here would duplicate the nav landmark.",
-  "frontend/src/lib/components/layout/Navigation.svelte: relatedTarget is null when focus leaves the document; collapse then too.",
   "frontend/src/lib/components/settings/cards/MigrateFromTrackerCard.svelte: Clear so re-picking the same file after a cancel still fires change.",
   "frontend/src/lib/components/settings/cards/PushNotificationsCard.svelte: Storage may be unavailable (private mode); the disclosure is re-asked next time.",
   "frontend/src/lib/components/settings/cards/ThemePickerCard.svelte: Index-keyed: swatch colours can repeat, and duplicate keys throw.",
@@ -306,7 +304,7 @@
   "frontend/src/routes/settings/+page.svelte: Leave the list empty; the page already renders its empty state.",
   "frontend/src/routes/vehicles/[id]/odometer/new/+page.svelte: The soft warning is optional; ignore failures.",
   "frontend/src/service-worker/index.ts: No sync listener: the offline outbox lives in localStorage, which workers cannot read.",
-  "frontend/vite.config.ts: shortcut: LayerChart needs only geoPath (for map projections VROOM never draws) and one colour scheme, so these stand-ins keep 14 KB of d3-geo and d3-scale-chromatic off the charts; drop an alias before using geo charts or another scheme.",
+  "frontend/vite.config.ts: shortcut: LayerChart calls d3-geo only when a chart has a map projection, which VROOM never sets, and takes one colour list from d3-scale-chromatic, so these stand-ins keep about 15 KB off the charts; drop an alias before using geo charts or another scheme.",
   "frontend/vite.config.ts: Vitest's default conditions omit 'browser'; without it inlined svelte loads its server entry, where mount() throws.",
   "frontend/vite.config.ts: Without strictPort a busy port silently shifts, leaving callers waiting on the pinned one.",
   "frontend/vite.config.ts: withPwa appends a prerendered/ pattern that this app never matches; strict globbing would fail the build."

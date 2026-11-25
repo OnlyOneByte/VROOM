@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import type { Expense, Vehicle } from '#lib/types/index.ts';
@@ -10,9 +11,13 @@
 	import ExpenseDeleteDialog from './expenses-table/ExpenseDeleteDialog.svelte';
 	import {
 		INSURANCE_DELETE_BLOCKED,
-		deleteAndRefresh,
 		isInsuranceLinked
 	} from './expenses-table/expense-table-actions';
+	import {
+		deleteFailureStates,
+		isDeleteHidden,
+		scheduleDelete
+	} from '#lib/utils/pending-deletes.svelte.ts';
 	import {
 		buildDisplayRows,
 		visibleExpenses,
@@ -45,10 +50,11 @@
 		activeCategory?: string;
 		onCategoryChange?: (_category: string) => void;
 		monthTotals?: ReadonlyMap<string, number>;
+		pendingStates?: ReadonlyMap<string, PendingRowState> | undefined;
 	}
 
 	let {
-		expenses = [],
+		expenses: allExpenses = [],
 		vehicles = [],
 		showVehicleColumn = true,
 		canWrite = true,
@@ -71,8 +77,14 @@
 		onSortChange,
 		activeCategory,
 		onCategoryChange,
-		monthTotals
+		monthTotals,
+		pendingStates: queuedStates
 	}: Props = $props();
+
+	let expenses = $derived(allExpenses.filter(expense => !isDeleteHidden(expense)));
+	let pendingStates = $derived(
+		new Map([...(queuedStates ?? []), ...deleteFailureStates(expenses)])
+	);
 
 	let onDelete = $derived(canWrite ? onDeleteProp : undefined);
 
@@ -162,11 +174,11 @@
 		showDeleteModal = true;
 	}
 
-	async function deleteExpense() {
-		if (!expenseToDelete || !onDelete) return;
-		const notice = await deleteAndRefresh(expenseToDelete, onDelete);
-		appStore.addNotification(notice);
-		if (notice.type === 'error') throw new Error(notice.message);
+	function deleteExpense(): Promise<void> {
+		const expense = expenseToDelete;
+		const refresh = onDelete;
+		if (expense && refresh) scheduleDelete(expense, () => refresh(expense));
+		return Promise.resolve();
 	}
 </script>
 
@@ -196,6 +208,7 @@
 		onDeleteExpense={confirmDelete}
 		onDeleteGroup={requestGroupDelete}
 		{monthTotals}
+		{pendingStates}
 	/>
 {:else}
 	<ExpensesDesktopTable
@@ -215,6 +228,7 @@
 		onDeleteExpense={confirmDelete}
 		onDeleteGroup={requestGroupDelete}
 		{monthTotals}
+		{pendingStates}
 	/>
 {/if}
 

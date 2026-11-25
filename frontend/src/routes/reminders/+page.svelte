@@ -38,7 +38,6 @@
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
-	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import ReminderForm from '#lib/components/reminders/ReminderForm.svelte';
 	import MaterializedExpensesDialog from '#lib/components/reminders/MaterializedExpensesDialog.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
@@ -213,7 +212,7 @@
 	<meta name="description" content="Recurring expenses and maintenance reminders" />
 </svelte:head>
 
-<div class="space-y-6 pb-24 short:pb-0">
+<div class="space-y-6">
 	<PageHeader title="Reminders" description="Recurring expenses and maintenance reminders">
 		{#snippet actions()}
 			{#if dueReminders.length > 0 && vehicles.length > 0}
@@ -223,10 +222,12 @@
 				</Button>
 			{/if}
 			{#if !isLoading && !loadError && reminders.length > 0 && vehicles.length > 0}
-				<Button size="lg" class="hidden lg:inline-flex short:inline-flex" onclick={openCreate}>
+				<Button size="lg" onclick={openCreate}>
 					<Plus class="mr-2 h-4 w-4" />
 					New Reminder
 				</Button>
+			{:else if isLoading}
+				<Skeleton class="h-10 w-full sm:w-36" />
 			{/if}
 		{/snippet}
 	</PageHeader>
@@ -493,10 +494,6 @@
 				</CardNs.CardContent>
 			</CardNs.Card>
 		</section>
-	{/if}
-
-	{#if !isLoading && !loadError && reminders.length > 0 && vehicles.length > 0}
-		<FloatingActionButton label="New Reminder" onclick={openCreate} />
 	{/if}
 
 	<ReminderForm bind:open={formOpen} reminder={editingReminder} {vehicles} onSaved={load} />

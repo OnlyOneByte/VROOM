@@ -8,9 +8,11 @@ import {
   type RequestFn,
   requestAs,
 } from '../../test-helpers/http-client';
-import { db } from '../connection';
+import { getDb } from '../connection';
 import { expenses, insuranceClaims, insurancePolicies, trips, users, vehicles } from '../schema';
 import { seedDatabase } from '../seed';
+
+const db = getDb();
 
 let demoUserId: string;
 let asDemo: RequestFn;

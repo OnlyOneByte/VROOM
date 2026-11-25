@@ -205,15 +205,13 @@ describe('insurance page with policies', () => {
 		expect(screen.queryByRole('button', { name: 'Add Policy' })).toBeNull();
 	});
 
-	test('both Add Policy buttons open the new-policy form', async () => {
+	test('the header Add Policy button opens the new-policy form at every width', async () => {
 		await mount();
-		const buttons = screen.getAllByRole('button', { name: 'Add Policy' });
-		expect(buttons).toHaveLength(2);
+		const button = screen.getByRole('button', { name: 'Add Policy' });
+		expect(button).not.toHaveClass('hidden');
 
-		for (const button of buttons) await fireEvent.click(button);
+		await fireEvent.click(button);
 
-		expect(goto).toHaveBeenCalledTimes(2);
-		expect(goto).toHaveBeenNthCalledWith(1, '/insurance/new');
-		expect(goto).toHaveBeenNthCalledWith(2, '/insurance/new');
+		expect(goto).toHaveBeenCalledExactlyOnceWith('/insurance/new');
 	});
 });

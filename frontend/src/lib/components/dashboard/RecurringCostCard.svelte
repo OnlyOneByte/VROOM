@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { Repeat, ArrowRight, CalendarClock } from '@lucide/svelte';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import { Button } from '#lib/components/ui/button/index.ts';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
 
 	interface Props {
@@ -14,32 +12,23 @@
 	let { count, monthlyTotal }: Props = $props();
 </script>
 
-<Card.Root>
-	<Card.Header>
-		<div class="flex items-center justify-between">
-			<div>
-				<Card.Title>Recurring Costs</Card.Title>
-				<Card.Description>Monthly run-rate from your recurring expenses</Card.Description>
-			</div>
-			<div class="p-2 rounded-lg bg-accent">
-				<Repeat class="h-5 w-5 text-accent-foreground" />
-			</div>
-		</div>
+<Card.Root variant="section">
+	<Card.Header class="flex flex-row items-center justify-between gap-3">
+		<Card.Title level={2} class="text-base">Recurring costs</Card.Title>
+		<a
+			href={resolve(routes.reminders)}
+			class="rounded-sm text-sm font-semibold text-accent-ink outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+		>
+			All<span class="sr-only"> recurring expenses</span>
+		</a>
 	</Card.Header>
 	<Card.Content>
-		<div class="flex items-baseline gap-2">
-			<span class="text-3xl font-bold">{formatCurrency(monthlyTotal)}</span>
-			<span class="text-sm text-muted-foreground">/ month</span>
-		</div>
-		<p class="mt-1 text-sm text-muted-foreground inline-flex items-center gap-1">
-			<CalendarClock class="h-3.5 w-3.5" />
-			across {count} recurring expense{count !== 1 ? 's' : ''}
+		<p class="flex items-baseline gap-2">
+			<span class="text-3xl font-bold tabular-nums">{formatCurrency(monthlyTotal)}</span>
+			<span class="text-sm text-muted-foreground">a month</span>
 		</p>
-		<div class="mt-4 pt-4 border-t">
-			<Button href={resolve(routes.reminders)} variant="outline" class="w-full">
-				View Recurring Expenses
-				<ArrowRight class="h-4 w-4 ml-2" />
-			</Button>
-		</div>
+		<p class="mt-1 text-sm text-muted-foreground">
+			Across {count} recurring expense{count !== 1 ? 's' : ''}.
+		</p>
 	</Card.Content>
 </Card.Root>

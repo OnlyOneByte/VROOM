@@ -9,6 +9,7 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import DatePicker from '#lib/components/common/date-picker.svelte';
+	import DriverChip from '#lib/components/drivers/DriverChip.svelte';
 	import { LoaderCircle } from '@lucide/svelte';
 	import { tripApi } from '#lib/services/trip-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
@@ -45,6 +46,10 @@
 	let startLocation = $state('');
 	let endLocation = $state('');
 	let note = $state('');
+	let driverId = $state<string | null | undefined>(undefined);
+	let tripEntry = $derived(
+		trip ? { vehicleId: trip.vehicleId, driverId: trip.driverId ?? null } : undefined
+	);
 
 	let isSubmitting = $state(false);
 
@@ -118,10 +123,15 @@
 				note: note.trim() || undefined
 			};
 			if (trip) {
-				await tripApi.update(trip.id, payload);
+				const changedDriver = driverId !== (trip.driverId ?? null);
+				await tripApi.update(trip.id, { ...payload, ...(changedDriver && { driverId }) });
 				appStore.addNotification({ type: 'success', message: 'Trip updated' });
 			} else {
-				await tripApi.create({ vehicleId, ...payload });
+				await tripApi.create({
+					vehicleId,
+					...payload,
+					...(driverId !== undefined && { driverId })
+				});
 				appStore.addNotification({ type: 'success', message: 'Trip logged' });
 			}
 			open = false;
@@ -251,6 +261,14 @@
 						</FormFieldError>{/if}
 				</div>
 			</div>
+
+			<DriverChip
+				id="trip-driver"
+				{vehicleId}
+				bind:value={driverId}
+				sharing={vehicles.find(v => v.id === vehicleId)?.carShareEnabled ?? false}
+				entry={tripEntry}
+			/>
 
 			<div class="grid grid-cols-2 gap-3">
 				<div class="space-y-2">

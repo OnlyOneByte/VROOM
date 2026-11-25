@@ -14,7 +14,7 @@ vi.mock('#lib/components/vehicles/FinanceTab.svelte', () => ({ default: () => {}
 vi.mock('#lib/components/vehicles/OdometerTab.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/common/MediaCaptureDialog.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/expenses/ExpensesTable.svelte', () => ({ default: () => {} }));
-vi.mock('#lib/components/charts/index.ts', () => ({ AppPieChart: () => {} }));
+vi.mock('#lib/components/charts/index.ts', () => ({ AppBarChart: () => {} }));
 vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/charts/FuelEfficiencyTrendChart.svelte', () => ({ default: () => {} }));
 const carouselProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
@@ -102,9 +102,7 @@ describe('vehicle page draws as soon as the vehicle loads', () => {
 		);
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 		vehicleCall.release(VEHICLE);
-		await fireEvent.click(
-			await screen.findByRole('button', { name: 'Details, insurance and photos' })
-		);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Details and photos' }));
 
 		await waitFor(() => expect(carouselProps.value?.['isLoading']).toBe(true));
 		releasePhotos({ data: [] });

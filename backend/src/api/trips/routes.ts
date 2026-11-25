@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import type { Trip } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
@@ -16,8 +17,8 @@ import { buildTripSummary } from '../../utils/trip-summary';
 import { convertDistance } from '../../utils/unit-conversions';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
+import { attributedDriver, hideDriverFields } from '../drivers/attribution';
 import { preferencesRepository } from '../settings/repository';
-import { tripRepository } from './repository';
 import { createTrip, deleteTrip, updateTrip } from './service';
 import {
   createTripSchema,
@@ -59,7 +60,7 @@ const fromBodyVehicle: ResourceOf = async (c) => ({
 const fromQueryVehicle: ResourceOf = (c) => vehicleOrOwnAccount(c.req.query('vehicleId'), c);
 
 const fromTrip: ResourceOf = async (c) => {
-  const trip = await tripRepository.findById(c.req.param('id') ?? '');
+  const trip = await repos().trips.findById(c.req.param('id') ?? '');
   if (!trip) throw new NotFoundError('Trip');
   return vehicleEntry(trip.vehicleId, trip.userId, trip.createdBy);
 };
@@ -69,7 +70,7 @@ async function ownerOf(vehicleId: string | undefined, userId: string): Promise<s
 }
 
 async function tripOf(id: string): Promise<Trip> {
-  const trip = await tripRepository.findById(id);
+  const trip = await repos().trips.findById(id);
   if (!trip) throw new NotFoundError('Trip');
   return trip;
 }
@@ -79,9 +80,17 @@ routes.post('/', zValidator('json', createTripSchema), authorize(fromBodyVehicle
   const data = c.req.valid('json');
 
   const ownerId = await ownerOf(data.vehicleId, user.id);
-  const trip = await createTrip(ownerId, data, ownerId === user.id ? null : user.id);
+  const driverId = attributedDriver(c, data.vehicleId, data.driverId);
+  const trip = await createTrip(
+    ownerId,
+    { ...data, driverId },
+    ownerId === user.id ? null : user.id
+  );
 
-  return c.json({ success: true, data: trip, message: 'Trip created' }, 201);
+  return c.json(
+    { success: true, data: hideDriverFields(c, trip.vehicleId, trip), message: 'Trip created' },
+    201
+  );
 });
 
 routes.get('/', zValidator('query', listQuerySchema), authorize(fromQueryVehicle), async (c) => {
@@ -90,12 +99,15 @@ routes.get('/', zValidator('query', listQuerySchema), authorize(fromQueryVehicle
   const { limit, offset } = clampPagination(query);
 
   const ownerId = await ownerOf(query.vehicleId, user.id);
-  const { data, totalCount } = await tripRepository.findByUserIdPaginated(ownerId, limit, offset, {
+  const { data, totalCount } = await repos().trips.findByUserIdPaginated(ownerId, limit, offset, {
     vehicleId: query.vehicleId,
     purpose: query.purpose,
   });
 
-  return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
+  const rows = query.vehicleId
+    ? data.map((trip) => hideDriverFields(c, trip.vehicleId, trip))
+    : data;
+  return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
 });
 
 routes.get(
@@ -108,13 +120,13 @@ routes.get(
 
     const ownerId = await ownerOf(vehicleId, user.id);
     const trips = vehicleId
-      ? await tripRepository.findByVehicle(vehicleId, ownerId)
-      : await tripRepository.findByUserId(user.id);
+      ? await repos().trips.findByVehicle(vehicleId, ownerId)
+      : await repos().trips.findByUserId(user.id);
 
     const prefs = await preferencesRepository.getOrCreate(user.id);
     const userUnit = (parseUnitPreferences(prefs.unitPreferences) ?? DEFAULT_UNIT_PREFERENCES)
       .distanceUnit;
-    const vehicleUnits = await tripRepository.findVehicleDistanceUnits(ownerId);
+    const vehicleUnits = await repos().trips.findVehicleDistanceUnits(ownerId);
 
     const summary = buildTripSummary(
       trips,
@@ -136,9 +148,20 @@ routes.put(
     const { timeZone, ...data } = c.req.valid('json');
 
     const existing = await tripOf(id);
+    const { driverId: requested, ...changes } = data;
+    const driverId = attributedDriver(c, existing.vehicleId, requested, existing.driverId);
 
-    const updated = await updateTrip(existing.userId, existing, data, timeZone);
-    return c.json({ success: true, data: updated, message: 'Trip updated' });
+    const updated = await updateTrip(
+      existing.userId,
+      existing,
+      driverId === undefined ? changes : { ...changes, driverId },
+      timeZone
+    );
+    return c.json({
+      success: true,
+      data: hideDriverFields(c, updated.vehicleId, updated),
+      message: 'Trip updated',
+    });
   }
 );
 

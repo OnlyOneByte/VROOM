@@ -12,6 +12,7 @@ export interface Trip {
 	startLocation?: string | null;
 	endLocation?: string | null;
 	note?: string | null;
+	driverId?: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import {
   createTestApp,
   type DataEnvelope,
@@ -236,8 +237,7 @@ describe('POST /api/v1/trips (create)', () => {
       .all(vehicleId) as { odometer: number }[];
     expect(odoRows.map((r) => r.odometer)).toContain(5000);
 
-    const { odometerRepository } = await import('../../odometer/repository');
-    expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(5000);
+    expect(await repos().odometer.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(5000);
   });
 
   test('a second trip on the same day at the same end reading does not double-log the odometer', async () => {
@@ -266,9 +266,8 @@ describe('POST /api/v1/trips (create)', () => {
 
   test('a failing odometer write rolls the trip back, so a retry cannot duplicate it', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    const { odometerRepository } = await import('../../odometer/repository');
-    const original = odometerRepository.createFromTrip;
-    odometerRepository.createFromTrip = () => {
+    const original = repos().odometer.createFromTrip;
+    repos().odometer.createFromTrip = () => {
       throw new Error('simulated DB hiccup in createFromTrip');
     };
     try {
@@ -285,7 +284,7 @@ describe('POST /api/v1/trips (create)', () => {
       ).n;
       expect(n).toBe(0);
     } finally {
-      odometerRepository.createFromTrip = original;
+      repos().odometer.createFromTrip = original;
     }
   });
 });
@@ -497,9 +496,8 @@ describe('trip edit and delete keep the linked odometer entry in sync', () => {
     const del = await ctx.authed('DELETE', `/api/v1/trips/${data.id}`);
     expect(del.status).toBe(200);
 
-    const { odometerRepository } = await import('../../odometer/repository');
     expect(odoCount(ctx, vehicleId)).toBe(1);
-    expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(5000);
+    expect(await repos().odometer.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(5000);
   });
 });
 
@@ -980,8 +978,7 @@ describe('trip-linked odometer lifecycle', () => {
     expect(res.status).toBe(200);
     expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
 
-    const { odometerRepository } = await import('../../odometer/repository');
-    expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(1080);
+    expect(await repos().odometer.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(1080);
   });
 
   test('deleting the last trip that shares an odometer entry removes the entry', async () => {

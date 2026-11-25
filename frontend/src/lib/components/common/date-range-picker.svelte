@@ -83,7 +83,7 @@
 			<Button
 				variant="outline"
 				class={cn(
-					'h-10 w-full justify-start text-left font-normal sm:h-9',
+					'h-11.5 w-full min-w-0 justify-start rounded-[var(--r-md)] border-[1.5px] bg-surface text-left font-normal',
 					!rangeValue && 'text-muted-foreground',
 					className
 				)}
@@ -92,7 +92,7 @@
 				{...props}
 			>
 				<CalendarIcon class="mr-2 size-4" />
-				<span class="truncate">{displayValue}</span>
+				<span class="min-w-0 truncate">{displayValue}</span>
 			</Button>
 		{/snippet}
 	</Popover.Trigger>

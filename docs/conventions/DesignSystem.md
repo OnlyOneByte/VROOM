@@ -91,15 +91,15 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 ### Primitives — `#lib/components/ui/*` (barrel imports)
 | Need | Import | Notes |
 |---|---|---|
-| Action | `import { Button } from '#lib/components/ui/button'` | variants: default/destructive/outline/secondary/ghost/link · sizes: default/sm/lg/icon/icon-sm/icon-lg · `href` renders an `<a>` |
-| Text input | `import { Input } from '#lib/components/ui/input'` | `bind:value`, `aria-invalid`, `aria-describedby` |
+| Action | `import { Button } from '#lib/components/ui/button'` | Pill buttons. variants: `default` (the ink pill; one per view) / `accent` (the C3 accent fill, Add expense only) / `destructive` (final delete only) / `outline` / `secondary` / `ghost` (keeps the surrounding text colour, hovers on `sunk`) / `link` (accent-ink text) · sizes: default and `lg` are 40px at every width (`lg` has larger text), `sm` 32px, `icon`/`icon-lg` 40px, `icon-sm` 32px · `href` renders an `<a>` |
+| Text input | `import { Input } from '#lib/components/ui/input'` | The 46px C3 field at every width (Select's trigger and the date pickers match). `bind:value`, `aria-invalid`, `aria-describedby` |
 | Multiline | `import { Textarea } from '#lib/components/ui/textarea'` | |
 | Toggle | `import { Switch } from '#lib/components/ui/switch'` / `{ Checkbox }` | `bind:checked`, or `checked` + `onCheckedChange` |
 | Dropdown | `import * as Select from '#lib/components/ui/select'` | compound; `Select.Root` takes `type="single"` + `onValueChange` |
 | Label | `import { Label } from '#lib/components/ui/label'` | `for=` ties to input id |
 | Field error | `import { FormFieldError } from '#lib/components/ui/form-field'` | renders `role="alert"`; wire via `aria-describedby` (`FormFieldDescription` for hints) |
-| Card | `import * as Card from '#lib/components/ui/card'` | Root/Header/Title/Description/Action/Content/Footer. `Title` takes `level?` (`2`/`3`/`4`) to render a heading; without it, it renders a `div` |
-| Badge | `import { Badge } from '#lib/components/ui/badge'` | variants: default/secondary/destructive/outline |
+| Card | `import * as Card from '#lib/components/ui/card'` | Root/Header/Title/Description/Action/Content/Footer. `Title` takes `level?` (`2`/`3`/`4`) to render a heading; without it, it renders a `div`. C3 uses cards rarely: `Root` takes `variant="section"` for a ruled section with no fill |
+| Badge | `import { Badge } from '#lib/components/ui/badge'` | Pill tags. variants: default/secondary/destructive/outline, plus the status tints `due` / `soon` / `ok` / `info` (always beside a word, never colour alone) |
 | Alert | `import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert'` | `variant`: `default` / `destructive` / `warning` / `success`, all themed; `role?`: `'alert'` (default, announced at once) or `'status'` (polite, for non-urgent notices such as the restore dialog's skipped-photos note) |
 | Skeleton | `import { Skeleton } from '#lib/components/ui/skeleton'` | loading placeholder |
 | Tabs | `import * as Tabs from '#lib/components/ui/tabs'` | |
@@ -115,7 +115,6 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 | Empty state | `common/empty-state.svelte` | `icon?`, `title`, `description`, `action?` (all Snippets), `level?` (`2`/`3`/`4`, default `2`): the title's heading level. Use `3` inside a card whose `Card.Title` is the `h2` |
 | Destructive confirm | `common/ConfirmDialog.svelte` | `bind:open`, `title`, `description`, `onConfirm` (may be async), `destructive?`, `confirmLabel?`, `cancelLabel?`, `children?` (a snippet under the description, for a summary of what the action affects, such as the expense a delete removes) — native `confirm()`/`alert()` are banned (`no-native-dialogs.test.ts`) |
 | Pagination | `common/pagination-controls.svelte` | `currentOffset`, `pageSize`, `totalCount`, `isLoading?`, `onPageChange` |
-| Mobile primary action | `common/floating-action-button.svelte` | `href`/`onclick`, `label` (the visible text is the accessible name) |
 | Date | `common/date-picker.svelte` | `bind:value` — a date-only `YYYY-MM-DD` string (convert with `dateOnlyToISO` / `toDateInputValue`, never a UTC `.slice(0,10)`) |
 | Date range | `common/date-range-picker.svelte` | `bind:startValue`, `bind:endValue` (same `YYYY-MM-DD` form) |
 | Time period | `common/period-selector.svelte` | `selectedPeriod`, `isLoading`, `onPeriodChange` |

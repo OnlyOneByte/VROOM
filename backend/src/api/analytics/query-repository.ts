@@ -1,6 +1,5 @@
 import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import {
   jsonArrayIsEmpty,
   jsonArraySome,
@@ -1063,5 +1062,3 @@ export class AnalyticsQueryRepository {
     }
   }
 }
-
-export const analyticsQueryRepository = new AnalyticsQueryRepository(getDb());

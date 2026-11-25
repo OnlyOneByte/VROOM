@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { ALLOW_PRIVATE } from '../../../../../utils/outbound-url';
 import type { ModelProviderSettings } from '../../model/model-registry';
 import { AnthropicLlmProvider } from '../anthropic';
 import { GeminiLlmProvider } from '../gemini';
@@ -26,8 +27,16 @@ function stubFetch(responder: () => Response | Promise<Response>): void {
   }) as any;
 }
 
-const SETTINGS: ModelProviderSettings = { apiKey: 'sk-assistant-key', model: 'claude-3-5-sonnet' };
-const GEMINI_SETTINGS: ModelProviderSettings = { apiKey: 'gm-key-123', model: 'gemini-1.5-pro' };
+const SETTINGS: ModelProviderSettings = {
+  outbound: ALLOW_PRIVATE,
+  apiKey: 'sk-assistant-key',
+  model: 'claude-3-5-sonnet',
+};
+const GEMINI_SETTINGS: ModelProviderSettings = {
+  outbound: ALLOW_PRIVATE,
+  apiKey: 'gm-key-123',
+  model: 'gemini-1.5-pro',
+};
 
 const MESSAGES: ChatMessage[] = [
   { role: 'system', content: 'You are a car-data assistant.' },
@@ -200,7 +209,9 @@ describe('AnthropicLlmProvider.chat', () => {
   });
 
   test('the constructor requires an API key', () => {
-    expect(() => new AnthropicLlmProvider({ model: 'claude-3-5-sonnet' })).toThrow(/API key/);
+    expect(
+      () => new AnthropicLlmProvider({ outbound: ALLOW_PRIVATE, model: 'claude-3-5-sonnet' })
+    ).toThrow(/API key/);
   });
 
   const THINKING = { type: 'thinking', thinking: '', signature: 'sig-123' };
@@ -369,6 +380,8 @@ describe('GeminiLlmProvider.chat', () => {
   });
 
   test('the constructor requires an API key', () => {
-    expect(() => new GeminiLlmProvider({ model: 'gemini-1.5-pro' })).toThrow(/API key/);
+    expect(
+      () => new GeminiLlmProvider({ outbound: ALLOW_PRIVATE, model: 'gemini-1.5-pro' })
+    ).toThrow(/API key/);
   });
 });

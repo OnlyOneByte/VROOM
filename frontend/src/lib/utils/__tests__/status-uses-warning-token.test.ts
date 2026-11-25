@@ -9,7 +9,6 @@ const CHART_5 =
 	/\b(?:text|bg|border|fill|stroke|ring|outline|from|via|to|decoration|accent)-chart-5\b|var\(--chart-5\)/g;
 
 const CATEGORY_USES: Record<string, number> = {
-	'lib/components/vehicles/CostPerMileHero.svelte': 1,
 	'lib/utils/expense-helpers.ts': 2,
 	'lib/utils/chart-colors.ts': 2,
 	'routes/+page.svelte': 2

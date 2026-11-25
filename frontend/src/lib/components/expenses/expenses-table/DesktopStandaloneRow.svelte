@@ -14,6 +14,8 @@
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { expenseEditHref } from './expense-table-actions';
 	import { rowTitle, tagsBesideCategory } from './expense-table-rows';
+	import PendingSyncNote from './PendingSyncNote.svelte';
+	import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 
 	interface Props {
 		expense: Expense;
@@ -23,10 +25,19 @@
 		canDelete: boolean;
 		returnTo: string;
 		onDelete: (_expense: Expense) => void;
+		pending?: PendingRowState | undefined;
 	}
 
-	let { expense, vehicleMap, showVehicleColumn, canWrite, canDelete, returnTo, onDelete }: Props =
-		$props();
+	let {
+		expense,
+		vehicleMap,
+		showVehicleColumn,
+		canWrite,
+		canDelete,
+		returnTo,
+		onDelete,
+		pending
+	}: Props = $props();
 	let shownTags = $derived(tagsBesideCategory(expense.tags, expense.category));
 
 	let vehicle: Vehicle | undefined = $derived(vehicleMap.get(expense.vehicleId));
@@ -34,7 +45,7 @@
 	let heading = $derived(rowTitle(expense.description, expense.category));
 </script>
 
-<TableRow class="group">
+<TableRow class="group {pending ? 'motion-safe:animate-[row-arrive_200ms_ease-out]' : ''}">
 	<TableCell class="max-w-[240px]">
 		<div class="truncate font-medium text-foreground" title={heading.title}>{heading.title}</div>
 		{#if expense.location}
@@ -44,6 +55,16 @@
 			>
 				<MapPin class="h-3 w-3 shrink-0" aria-hidden="true" />
 				<span class="truncate">{expense.location}</span>
+			</div>
+		{/if}
+		{#if pending}
+			<div class="mt-1">
+				<PendingSyncNote
+					{pending}
+					entryId={expense.id}
+					{returnTo}
+					label="{formatCurrency(expense.amount)} {heading.title}"
+				/>
 			</div>
 		{/if}
 	</TableCell>
@@ -86,7 +107,7 @@
 		<div
 			class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
 		>
-			{#if canWrite}
+			{#if canWrite && !pending}
 				<Button
 					variant="ghost"
 					size="icon"
@@ -98,7 +119,7 @@
 					<Pencil class="h-4 w-4" />
 				</Button>
 			{/if}
-			{#if canDelete}
+			{#if canDelete && !pending}
 				<Button
 					variant="ghost"
 					size="icon"

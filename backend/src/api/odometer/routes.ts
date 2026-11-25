@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import { getDb } from '../../db/connection';
 import type { DrizzleTransaction } from '../../db/types';
 import { NotFoundError } from '../../errors';
@@ -23,11 +24,12 @@ import {
   zValidator,
 } from '../../utils/validation';
 import { requireVehicleAccess, seesFinancials } from '../../utils/vehicle-access';
+import { attributedDriver, hideDriverFields } from '../drivers/attribution';
 import { assertOdometerInOrder } from '../expenses/repository';
 import type { OdometerCheck } from '../expenses/validation';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
-import { odometerRepository, readingCheck } from './repository';
+import { readingCheck } from './repository';
 
 const routes = new Hono();
 
@@ -45,7 +47,10 @@ export const odometerCreateSchema = z.object({
 
 const timeZoneSchema = z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional();
 
-const createBodySchema = odometerCreateSchema.extend({ timeZone: timeZoneSchema });
+const createBodySchema = odometerCreateSchema.extend({
+  timeZone: timeZoneSchema,
+  driverId: z.string().min(1).max(64).nullish(),
+});
 
 const updateSchema = createBodySchema.partial();
 
@@ -54,7 +59,7 @@ function inOrder(check: OdometerCheck | null) {
 }
 
 const fromEntry: ResourceOf = async (c) => {
-  const entry = await odometerRepository.findById(c.req.param('id') ?? '');
+  const entry = await repos().odometer.findById(c.req.param('id') ?? '');
   if (!entry) throw new NotFoundError('Odometer entry');
   return vehicleEntry(entry.vehicleId, entry.userId, entry.createdBy);
 };
@@ -80,14 +85,15 @@ routes.get(
 
     const { limit, offset } = clampPagination(query);
 
-    const { data, totalCount } = await odometerRepository.findByVehicleIdPaginated(
+    const { data, totalCount } = await repos().odometer.findByVehicleIdPaginated(
       vehicleId,
       ownerId,
       limit,
       offset
     );
 
-    return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
+    const rows = data.map((entry) => hideDriverFields(c, vehicleId, entry));
+    return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
   }
 );
 
@@ -105,7 +111,7 @@ routes.get(
 
     const { limit, offset } = clampPagination(query);
 
-    const { data, totalCount } = await odometerRepository.getHistory(vehicleId, access.ownerId, {
+    const { data, totalCount } = await repos().odometer.getHistory(vehicleId, access.ownerId, {
       limit,
       offset,
       hideFinancials: !seesFinancials(access),
@@ -115,7 +121,8 @@ routes.get(
       }).allow,
     });
 
-    return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
+    const rows = data.map((row) => hideDriverFields(c, vehicleId, row));
+    return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
   }
 );
 
@@ -126,10 +133,10 @@ routes.get(
   async (c) => {
     const { id } = c.req.valid('param');
 
-    const entry = await odometerRepository.findById(id);
+    const entry = await repos().odometer.findById(id);
     if (!entry) throw new NotFoundError('Odometer entry');
 
-    return c.json({ success: true, data: entry });
+    return c.json({ success: true, data: hideDriverFields(c, entry.vehicleId, entry) });
   }
 );
 
@@ -144,14 +151,16 @@ routes.post(
     const data = c.req.valid('json');
 
     const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'read');
+    const driverId = attributedDriver(c, vehicleId, data.driverId);
 
-    const entry = await odometerRepository.createChecked(
+    const entry = await repos().odometer.createChecked(
       {
         vehicleId,
         userId: ownerId,
         odometer: data.odometer,
         recordedAt: data.recordedAt,
         note: data.note ?? null,
+        driverId,
         createdBy: ownerId === user.id ? null : user.id,
       },
       inOrder(await readingCheck(vehicleId, data.odometer, data.recordedAt, data.timeZone))
@@ -159,7 +168,14 @@ routes.post(
 
     await reminderTriggerService.recheckMileageReminders(ownerId, vehicleId);
 
-    return c.json({ success: true, data: entry, message: 'Odometer reading created' }, 201);
+    return c.json(
+      {
+        success: true,
+        data: hideDriverFields(c, vehicleId, entry),
+        message: 'Odometer reading created',
+      },
+      201
+    );
   }
 );
 
@@ -172,16 +188,18 @@ routes.put(
     const { id } = c.req.valid('param');
     const data = c.req.valid('json');
 
-    const existing = await odometerRepository.findById(id);
+    const existing = await repos().odometer.findById(id);
     if (!existing) throw new NotFoundError('Odometer entry');
 
-    const { timeZone, ...changes } = data;
+    const { timeZone, driverId: requested, ...rest } = data;
+    const driverId = attributedDriver(c, existing.vehicleId, requested, existing.driverId);
+    const changes = driverId === undefined ? rest : { ...rest, driverId };
     const odometer = changes.odometer ?? existing.odometer;
     const recordedAt = changes.recordedAt ?? existing.recordedAt;
     const dayOf = (at: Date) => zonedDayWindow(at, timeZone ?? 'UTC').dayStart.getTime();
     const moved =
       odometer !== existing.odometer || dayOf(recordedAt) !== dayOf(existing.recordedAt);
-    const updated = await odometerRepository.updateChecked(
+    const updated = await repos().odometer.updateChecked(
       id,
       changes,
       inOrder(
@@ -191,7 +209,11 @@ routes.put(
 
     await reminderTriggerService.recheckMileageReminders(existing.userId, updated.vehicleId);
 
-    return c.json({ success: true, data: updated, message: 'Odometer reading updated' });
+    return c.json({
+      success: true,
+      data: hideDriverFields(c, updated.vehicleId, updated),
+      message: 'Odometer reading updated',
+    });
   }
 );
 
@@ -202,11 +224,11 @@ routes.delete(
   async (c) => {
     const { id } = c.req.valid('param');
 
-    const existing = await odometerRepository.findById(id);
+    const existing = await repos().odometer.findById(id);
     if (!existing) throw new NotFoundError('Odometer entry');
 
     await deleteAllPhotosForEntity('odometer_entry', id, existing.userId);
-    await odometerRepository.delete(id);
+    await repos().odometer.delete(id);
 
     return c.json({ success: true, message: 'Odometer reading deleted' });
   }

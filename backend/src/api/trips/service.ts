@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
+import { repos } from '../../app-context';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import { type Trip, trips } from '../../db/schema';
@@ -7,10 +8,9 @@ import { NotFoundError, ValidationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
 import { assertOdometerInOrder } from '../expenses/repository';
-import { odometerRepository, readingCheck } from '../odometer/repository';
+import { readingCheck } from '../odometer/repository';
 import { deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
-import { tripRepository } from './repository';
 import type { createTripSchema, updateTripSchema } from './validation';
 
 export type CreateTripInput = z.infer<typeof createTripSchema>;
@@ -84,11 +84,12 @@ export async function createTrip(
         startLocation: data.startLocation ?? null,
         endLocation: data.endLocation ?? null,
         note: data.note ?? null,
+        driverId: data.driverId ?? null,
         createdBy,
       })
       .returning()
       .get();
-    odometerRepository.createFromTrip(
+    repos().odometer.createFromTrip(
       {
         tripId: created.id,
         vehicleId: data.vehicleId,
@@ -96,6 +97,7 @@ export async function createTrip(
         odometer: data.endOdometer,
         recordedAt: data.tripDate,
         timeZone: data.timeZone,
+        driverId: data.driverId ?? null,
         createdBy,
       },
       tx
@@ -137,7 +139,7 @@ export async function updateTrip(
       .get();
     if (!row) throw new NotFoundError('Trip');
     if (!resync) return { updated: row, removedEntryIds: [] };
-    const otherAtOld = tripRepository.findOtherAtOdometerKey(
+    const otherAtOld = repos().trips.findOtherAtOdometerKey(
       {
         excludeTripId: id,
         vehicleId,
@@ -158,16 +160,16 @@ export async function updateTrip(
     };
     const movedId = otherAtOld
       ? null
-      : odometerRepository.moveLinkedTripEntry(oldKey, { odometer: end, recordedAt: tripDate }, tx);
+      : repos().odometer.moveLinkedTripEntry(oldKey, { odometer: end, recordedAt: tripDate }, tx);
     if (movedId) {
       assertOdometerInOrder(tx, check && { ...check, excludeId: movedId });
       return { updated: row, removedEntryIds: [] };
     }
     let removed: string[] = [];
-    if (otherAtOld) odometerRepository.handOverLinkedTripEntry(oldKey, otherAtOld, tx);
-    else removed = odometerRepository.deleteLinkedTripEntry(oldKey, tx);
+    if (otherAtOld) repos().odometer.handOverLinkedTripEntry(oldKey, otherAtOld, tx);
+    else removed = repos().odometer.deleteLinkedTripEntry(oldKey, tx);
     assertOdometerInOrder(tx, check);
-    odometerRepository.createFromTrip(
+    repos().odometer.createFromTrip(
       {
         tripId: id,
         vehicleId,
@@ -175,6 +177,7 @@ export async function updateTrip(
         odometer: end,
         recordedAt: tripDate,
         timeZone,
+        driverId: row.driverId,
         createdBy: existing.createdBy,
       },
       tx
@@ -209,7 +212,7 @@ export async function deleteTrip(
       .returning({ id: trips.id })
       .get();
     if (!row) throw new NotFoundError('Trip');
-    const other = tripRepository.findOtherAtOdometerKey(
+    const other = repos().trips.findOtherAtOdometerKey(
       {
         excludeTripId: id,
         vehicleId,
@@ -221,13 +224,11 @@ export async function deleteTrip(
       tx
     );
     if (other) {
-      odometerRepository.handOverLinkedTripEntry(key, other, tx);
+      repos().odometer.handOverLinkedTripEntry(key, other, tx);
       return { removedEntryIds: [], handedOver: true };
     }
     return {
-      removedEntryIds: options.keepOdometer
-        ? []
-        : odometerRepository.deleteLinkedTripEntry(key, tx),
+      removedEntryIds: options.keepOdometer ? [] : repos().odometer.deleteLinkedTripEntry(key, tx),
       handedOver: false,
     };
   });

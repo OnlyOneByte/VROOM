@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import type { NewCommunityStat } from '../../db/schema';
 import { isElectricFuelType } from '../../db/types';
@@ -11,7 +12,7 @@ import {
 import { logger } from '../../utils/logger';
 import { canonicalScale, convertDistance, convertVolume } from '../../utils/unit-conversions';
 import FUEL_ECONOMY from './fuel-economy-ratings.json';
-import { type CommunityStatsRepository, communityStatsRepository } from './repository';
+import type { CommunityStatsRepository } from './repository';
 
 export type CommunityMetric = 'efficiency' | 'running_cost' | 'maintenance' | 'insurance';
 export type CommunityUnit = 'km_per_l' | 'km_per_kwh' | 'cents_per_km' | 'cents_per_year';
@@ -361,7 +362,7 @@ export function aggregate(
 }
 
 export async function refreshCommunityStats(
-  repository: CommunityStatsRepository = communityStatsRepository,
+  repository: CommunityStatsRepository = repos().communityStats,
   now: Date = new Date(),
   uniform?: NoiseSource
 ): Promise<AggregateResult> {
@@ -393,7 +394,7 @@ export function refreshFailureSummary(error: unknown): string {
 }
 
 export async function refreshSafely(
-  repository: CommunityStatsRepository = communityStatsRepository
+  repository: CommunityStatsRepository = repos().communityStats
 ): Promise<void> {
   try {
     await refreshCommunityStats(repository);
@@ -420,7 +421,7 @@ export function firstRunDelayMs(newest: Date | null, now: Date): number {
 
 export async function startCommunityStatsJob(): Promise<void> {
   if (!CONFIG.communityStats.enabled || timer) return;
-  const newest = await communityStatsRepository.lastRefreshedAt(LOCAL_SCOPE);
+  const newest = await repos().communityStats.lastRefreshedAt(LOCAL_SCOPE);
   scheduleNext(firstRunDelayMs(newest, new Date()));
 }
 

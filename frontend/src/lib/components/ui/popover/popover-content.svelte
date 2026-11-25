@@ -24,7 +24,7 @@
 	{align}
 	{sideOffset}
 	class={cn(
-		'z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none',
+		'z-50 w-72 rounded-[var(--r-lg)] border bg-popover p-4 text-popover-foreground shadow-[var(--shadow-pop)] outline-none',
 		className
 	)}
 	{...restProps}

@@ -60,19 +60,16 @@ describe('RecentActivityCard', () => {
 		expect(list.querySelector('.border.rounded-lg')).toBeNull();
 	});
 
-	test('See all links to the expenses page and names where it goes', () => {
+	test('All expenses links to the expenses page and names where it goes', () => {
 		render(RecentActivityCard, { props: { expenses: [ARCO] } });
-		expect(screen.getByRole('link', { name: 'See all expenses' })).toHaveAttribute(
-			'href',
-			'/expenses'
-		);
+		expect(screen.getByRole('link', { name: 'All expenses' })).toHaveAttribute('href', '/expenses');
 	});
 
 	test('with no expenses it says so, under one card heading', () => {
 		render(RecentActivityCard, { props: { expenses: [] } });
 		expect(screen.getByRole('heading', { level: 2, name: 'Recent' })).toBeInTheDocument();
 		expect(screen.getByRole('heading', { level: 3, name: 'No expenses yet' })).toBeInTheDocument();
-		expect(screen.queryByRole('link', { name: 'See all expenses' })).toBeNull();
+		expect(screen.queryByRole('link', { name: 'All expenses' })).toBeNull();
 	});
 
 	test('on a vehicle page it drops the vehicle name, and See all with the count runs its handler', async () => {

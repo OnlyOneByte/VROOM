@@ -6,8 +6,8 @@ import {
 } from '../expense-submit-outcome';
 import { makeExpense, makeSplitGroup, makeVehicle } from './expense-form-fixtures';
 
-const { expenseApiMock, addNotification, gotoDynamic, addOfflineExpense, online } = vi.hoisted(
-	() => ({
+const { expenseApiMock, addNotification, gotoDynamic, addOfflineExpense, online, syncSoon } =
+	vi.hoisted(() => ({
 		expenseApiMock: {
 			createExpense: vi.fn(),
 			updateExpense: vi.fn(),
@@ -20,18 +20,23 @@ const { expenseApiMock, addNotification, gotoDynamic, addOfflineExpense, online 
 		addNotification: vi.fn(),
 		gotoDynamic: vi.fn(() => Promise.resolve()),
 		addOfflineExpense: vi.fn(() => true),
-		online: { current: true }
-	})
-);
+		online: { current: true },
+		syncSoon: vi.fn()
+	}));
 
 vi.mock('#lib/services/expense-api.ts', () => ({ expenseApi: expenseApiMock }));
 vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore: { addNotification } }));
 vi.mock('#lib/utils/navigation.ts', () => ({ gotoDynamic }));
+const scheduleDelete = vi.hoisted(() => vi.fn());
+vi.mock('#lib/utils/pending-deletes.svelte.ts', () => ({ scheduleDelete }));
 vi.mock('#lib/utils/offline-storage.ts', () => ({
 	addOfflineExpense,
 	currentOfflineQueueOwner: () => 'alice'
 }));
 vi.mock('#lib/stores/offline.svelte.ts', () => ({ onlineStatus: online }));
+vi.mock('#lib/utils/sync/sync-manager.ts', () => ({
+	syncManager: { syncSoon, requestAutoSync: vi.fn() }
+}));
 
 const { ExpenseFormState } = await import('../expense-form-state.svelte');
 const { submitExpense, deleteExpense } = await import('../expense-form-actions');
@@ -96,7 +101,36 @@ describe('submitExpense — validation', () => {
 	});
 });
 
-describe('submitExpense — online create', () => {
+describe('submitExpense — online create goes through the queue', () => {
+	test('queues the expense with its photos, says it was added, syncs at once and returns without waiting for the server', async () => {
+		const state = createState();
+		const photo = new File(['x'], 'receipt.jpg', { type: 'image/jpeg' });
+		state.pendingFiles = [photo];
+		await submitExpense(state);
+		expect(addOfflineExpense).toHaveBeenCalledWith(
+			expect.objectContaining({
+				vehicleId: 'v1',
+				category: 'maintenance',
+				amount: 120.5,
+				description: 'Brakes'
+			}),
+			[photo],
+			expect.any(String),
+			'alice'
+		);
+		expect(expenseApiMock.createExpense).not.toHaveBeenCalled();
+		notified('success', 'Expense added successfully');
+		expect(syncSoon).toHaveBeenCalledOnce();
+		expect(gotoDynamic).toHaveBeenCalledWith('/expenses');
+		expect(state.submitError).toBeNull();
+	});
+});
+
+describe('submitExpense — online create when the queue cannot be stored', () => {
+	beforeEach(() => {
+		addOfflineExpense.mockReturnValueOnce(false);
+	});
+
 	test('creates the expense, notifies success and navigates back', async () => {
 		expenseApiMock.createExpense.mockResolvedValue(makeExpense('new-1'));
 		const state = createState();
@@ -255,13 +289,17 @@ describe('submitExpense — split create', () => {
 	});
 
 	test('a split with only one vehicle selected is saved as a regular expense', async () => {
-		expenseApiMock.createExpense.mockResolvedValue(makeExpense('single'));
 		const state = createState();
 		state.isSplit = true;
 		state.selectedVehicleIds = ['v1'];
 		await submitExpense(state);
 		expect(expenseApiMock.createSplitExpense).not.toHaveBeenCalled();
-		expect(expenseApiMock.createExpense).toHaveBeenCalled();
+		expect(addOfflineExpense).toHaveBeenCalledWith(
+			expect.objectContaining({ vehicleId: 'v1' }),
+			[],
+			expect.any(String),
+			'alice'
+		);
 	});
 });
 
@@ -308,16 +346,18 @@ describe('submitExpense — offline and failure queuing', () => {
 		expect(state.isSubmitting).toBe(false);
 	});
 
-	test('a transient create failure is queued with a connection warning', async () => {
+	test('a direct save that fails transiently is queued with a connection warning', async () => {
+		addOfflineExpense.mockReturnValueOnce(false);
 		expenseApiMock.createExpense.mockRejectedValue(new ApiError('Unavailable', 503));
 		const state = createState();
 		await submitExpense(state);
-		expect(addOfflineExpense).toHaveBeenCalledTimes(1);
+		expect(addOfflineExpense).toHaveBeenCalledTimes(2);
 		notified('warning', 'Saved offline due to connection issue. Will sync when online.');
 		expect(gotoDynamic).toHaveBeenCalledWith('/expenses');
 	});
 
-	test('an auth create failure is queued with a sign-in warning', async () => {
+	test('a direct save refused for auth is queued with a sign-in warning', async () => {
+		addOfflineExpense.mockReturnValueOnce(false);
 		expenseApiMock.createExpense.mockRejectedValue(
 			new ApiError('Unauthorized', 401, undefined, 'AuthenticationError')
 		);
@@ -352,11 +392,12 @@ describe('submitExpense — offline and failure queuing', () => {
 		expect(gotoDynamic).not.toHaveBeenCalled();
 	});
 
-	test('a terminal create failure is not queued and surfaces the server message', async () => {
+	test('a direct save refused by the server is not queued again and surfaces the server message', async () => {
+		addOfflineExpense.mockReturnValueOnce(false);
 		expenseApiMock.createExpense.mockRejectedValue(new ApiError('Invalid category', 422));
 		const state = createState();
 		await submitExpense(state);
-		expect(addOfflineExpense).not.toHaveBeenCalled();
+		expect(addOfflineExpense).toHaveBeenCalledTimes(1);
 		expect(state.submitError).toBe("Couldn't save this expense. Invalid category.");
 		expect(addNotification).not.toHaveBeenCalled();
 	});
@@ -375,48 +416,30 @@ describe('submitExpense — offline and failure queuing', () => {
 });
 
 describe('deleteExpense', () => {
+	const loaded = makeExpense('e1');
+
 	test('does nothing without an expense id', async () => {
 		const state = createState();
 		await deleteExpense(state);
-		expect(expenseApiMock.deleteExpense).not.toHaveBeenCalled();
-		expect(expenseApiMock.deleteSplitExpense).not.toHaveBeenCalled();
+		expect(scheduleDelete).not.toHaveBeenCalled();
 	});
 
-	test('deletes a single expense and navigates back', async () => {
-		expenseApiMock.deleteExpense.mockResolvedValue(undefined);
+	test('hands the expense to the Undo window and returns to the list straight away', async () => {
 		const state = createState('e1');
+		state.originalExpense = loaded;
 		state.showDeleteConfirm = true;
 		await deleteExpense(state);
-		expect(expenseApiMock.deleteExpense).toHaveBeenCalledWith('e1');
-		notified('success', 'Expense deleted successfully');
+		expect(scheduleDelete).toHaveBeenCalledWith(loaded);
+		expect(expenseApiMock.deleteExpense).not.toHaveBeenCalled();
 		expect(gotoDynamic).toHaveBeenCalledWith('/expenses');
-		expect(state.isDeleting).toBe(false);
 		expect(state.showDeleteConfirm).toBe(false);
 	});
 
-	test('deletes the whole split group when the expense belongs to one', async () => {
-		expenseApiMock.deleteSplitExpense.mockResolvedValue(undefined);
+	test('a split expense is scheduled as its whole group', async () => {
 		const state = createState('e1');
+		state.originalExpense = loaded;
 		state.groupId = 'g1';
 		await deleteExpense(state);
-		expect(expenseApiMock.deleteSplitExpense).toHaveBeenCalledWith('g1');
-		expect(expenseApiMock.deleteExpense).not.toHaveBeenCalled();
-	});
-
-	test('a delete failure notifies, stays on the page and keeps the confirm dialog open to retry', async () => {
-		expenseApiMock.deleteExpense.mockRejectedValue(new ApiError('Internal server error', 500));
-		const state = createState('e1');
-		state.showDeleteConfirm = true;
-		await expect(deleteExpense(state)).rejects.toThrow();
-		expect(addNotification).toHaveBeenCalledWith(
-			expect.objectContaining({
-				type: 'error',
-				message:
-					"Couldn't delete this expense. Something went wrong on our side. Try again in a moment."
-			})
-		);
-		expect(gotoDynamic).not.toHaveBeenCalled();
-		expect(state.isDeleting).toBe(false);
-		expect(state.showDeleteConfirm).toBe(true);
+		expect(scheduleDelete).toHaveBeenCalledWith({ ...loaded, groupId: 'g1' });
 	});
 });

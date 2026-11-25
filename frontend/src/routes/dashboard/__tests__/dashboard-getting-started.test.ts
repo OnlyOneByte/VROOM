@@ -89,12 +89,12 @@ describe('dashboard getting started', () => {
 				?.textContent
 		).toContain('Add a vehicle');
 		expect(screen.queryByRole('link', { name: 'Add a vehicle' })).toBeNull();
-		expect(controls('Add Vehicle')).toHaveLength(1);
+		expect(controls('Add vehicle')).toHaveLength(1);
 		expect(screen.queryByText('Total Vehicles')).toBeNull();
 		expect(screen.queryByRole('heading', { name: 'Spending' })).toBeNull();
 	});
 
-	test('with a vehicle but no expenses, step 1 is ticked and Log Fill-up stays the only action', async () => {
+	test('with a vehicle but no expenses, step 1 is ticked and Log fill-up stays the only action', async () => {
 		getVehicles.mockResolvedValue([OWNED]);
 		render(Page);
 
@@ -105,7 +105,7 @@ describe('dashboard getting started', () => {
 			'/analytics'
 		);
 		expect(controls('Add Expense')).toHaveLength(0);
-		expect(controls('Log Fill-up').length).toBeGreaterThan(0);
+		expect(controls('Log fill-up').length).toBeGreaterThan(0);
 		expect(screen.queryByText('Total Expenses')).toBeNull();
 		expect(screen.queryByRole('heading', { name: 'Spending' })).toBeNull();
 	});
@@ -129,7 +129,7 @@ describe('dashboard getting started', () => {
 
 		await screen.findByRole('heading', { name: 'Log your first expense' });
 		expect(await screen.findByText(/^Oil change/)).toBeInTheDocument();
-		expect(screen.getByText('Recurring Costs')).toBeInTheDocument();
+		expect(screen.getByText('Recurring costs')).toBeInTheDocument();
 	});
 
 	test('with a vehicle but no expenses, recurring costs alone get a full-width row', async () => {
@@ -137,7 +137,7 @@ describe('dashboard getting started', () => {
 		reminders.recurring = { count: 2, monthlyTotal: 40 };
 		const { container } = render(Page);
 
-		const title = await screen.findByText('Recurring Costs');
+		const title = await screen.findByText('Recurring costs');
 		expect(screen.queryByTestId('coming-up-empty')).toBeNull();
 		expect(screen.queryByText('Upcoming Reminders')).toBeNull();
 		expect(title.closest('.lg\\:grid-cols-2')).toBeNull();
@@ -150,14 +150,14 @@ describe('dashboard getting started', () => {
 
 		await screen.findByRole('heading', { name: 'Log your first expense' });
 		expect(screen.queryByTestId('coming-up-empty')).toBeNull();
-		expect(screen.queryByText('Recurring Costs')).toBeNull();
+		expect(screen.queryByText('Recurring costs')).toBeNull();
 	});
 
 	test('vehicles shared with me never show the checklist', async () => {
 		getVehicles.mockResolvedValue([{ ...OWNED, sharedAccess: { sharedBy: 'Sam' } }]);
 		render(Page);
 
-		await screen.findByText('1 vehicle, incl. 1 shared');
+		await screen.findByRole('combobox', { name: /Period:/ });
 		expect(screen.queryByRole('list', { name: 'Getting started' })).toBeNull();
 	});
 

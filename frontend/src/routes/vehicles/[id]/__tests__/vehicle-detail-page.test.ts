@@ -43,8 +43,8 @@ function captureWithMarker(name: string) {
 
 vi.mock('#lib/components/expenses/ExpensesTable.svelte', () => capture('table'));
 vi.mock('#lib/components/charts/index.ts', () => ({
-	AppPieChart: (_anchor: unknown, props: Record<string, unknown>) => {
-		captured['pie'] = props;
+	AppBarChart: (_anchor: unknown, props: Record<string, unknown>) => {
+		captured['categories'] = props;
 	}
 }));
 vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => captureWithMarker('trend'));
@@ -178,7 +178,7 @@ async function mount() {
 }
 
 async function openDetails() {
-	await fireEvent.click(screen.getByRole('button', { name: 'Details, insurance and photos' }));
+	await fireEvent.click(screen.getByRole('button', { name: 'Details and photos' }));
 	await settle();
 }
 
@@ -276,7 +276,7 @@ describe('vehicle detail page overview', () => {
 		expect(screen.getByRole('button', { name: 'Share' })).toHaveClass('hidden', 'lg:inline-flex');
 		expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument();
 		expect(captured['share']?.['vehicleName']).toBe('Daily Driver');
-		expect(screen.getAllByRole('link', { name: /Add Expense/ })[0]).toHaveAttribute(
+		expect(screen.getAllByRole('link', { name: /Add expense/ })[0]).toHaveAttribute(
 			'href',
 			'/expenses/new?vehicleId=v1&returnTo=/vehicles/v1'
 		);
@@ -341,7 +341,7 @@ describe('vehicle detail page overview', () => {
 
 		expect(screen.getByText('No expenses yet')).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: 'Share' })).toBeNull();
-		expect(screen.queryByRole('link', { name: /Add Expense/ })).toBeNull();
+		expect(screen.queryByRole('link', { name: /Add expense/ })).toBeNull();
 		expect(captured['share']).toBeUndefined();
 		await openDetails();
 		expect(getPhotos).not.toHaveBeenCalled();
@@ -353,7 +353,7 @@ describe('vehicle detail page overview', () => {
 		await mount();
 
 		expect(screen.queryByRole('button', { name: 'Share' })).toBeNull();
-		expect(screen.getAllByRole('link', { name: /Add Expense/ }).length).toBeGreaterThan(0);
+		expect(screen.getAllByRole('link', { name: /Add expense/ }).length).toBeGreaterThan(0);
 	});
 
 	test('the cover photo becomes the header image', async () => {
@@ -370,25 +370,28 @@ describe('vehicle detail page overview', () => {
 		expect(captured['photos']?.['photos']).toHaveLength(2);
 	});
 
-	test('the insurance section is loaded lazily on the overview', async () => {
+	test('insurance is its own tab, loaded only when opened', async () => {
 		await mount();
-		await openDetails();
+		expect(captured['insurance']).toBeUndefined();
+
+		await fireEvent.click(screen.getByRole('tab', { name: 'Insurance' }));
 
 		await waitFor(() => expect(captured['insurance']).toBeDefined());
 		expect(captured['insurance']?.['vehicleId']).toBe('v1');
 		expect(captured['insurance']?.['readOnly']).toBe(false);
 	});
 
-	test('details, insurance and photos sit behind one disclosure, closed at first', async () => {
+	test('details and photos sit behind one disclosure, closed at first', async () => {
 		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
 		const { container } = await mount();
-		const trigger = screen.getByRole('button', { name: 'Details, insurance and photos' });
+		const trigger = screen.getByRole('button', { name: 'Details and photos' });
 		expect(trigger).toHaveAttribute('aria-expanded', 'false');
 		expect(captured['photos']).toBeUndefined();
 		expect(screen.queryByRole('heading', { name: /Vehicle Information/ })).toBeNull();
 
 		await fireEvent.click(trigger);
-		await waitFor(() => expect(container.querySelector('[data-mock="insurance"]')).not.toBeNull());
+		await waitFor(() => expect(captured['photos']).toBeDefined());
+		expect(container.querySelector('[data-mock="insurance"]')).toBeNull();
 
 		expect(trigger).toHaveAttribute('aria-expanded', 'true');
 		expect(screen.getByRole('heading', { level: 2, name: /Vehicle Information/ })).toBeVisible();
@@ -438,17 +441,21 @@ describe('vehicle detail page overview', () => {
 		expect(captured['fuelStats']?.['trend']).toHaveLength(1);
 		expect(captured['fuelStats']?.['chart']).toBeTypeOf('function');
 		expect(captured['trend']).toBeUndefined();
-		expect(captured['pie']).toBeUndefined();
+		expect(captured['categories']).toBeUndefined();
 
 		await openTab('Expenses');
-		await waitFor(() => expect(captured['pie']).toBeDefined());
+		await waitFor(() => expect(captured['categories']).toBeDefined());
 		expect(captured['trend']?.['description']).toBe('All Time');
 		expect(captured['trend']?.['data']).toHaveLength(1);
-		const pie = captured['pie']?.['data'] as { key: string }[];
-		expect(pie.map(slice => slice.key)).toEqual(['maintenance', 'fuel']);
+		const bars = captured['categories'];
+		expect(bars?.['title']).toBe('Spending by category');
+		expect(bars?.['orientation']).toBe('horizontal');
+		expect([bars?.['x'], bars?.['y']]).toEqual(['value', 'label']);
+		const rows = bars?.['data'] as { key: string }[];
+		expect(rows.map(row => row.key)).toEqual(['maintenance', 'fuel']);
 	});
 
-	test('a category breakdown that totals zero draws no pie chart', async () => {
+	test('a category breakdown that totals zero draws no category chart', async () => {
 		getExpenseSummary.mockResolvedValue({
 			...DATA_SUMMARY,
 			categoryBreakdown: [{ category: 'fuel', amount: 0 }]
@@ -456,7 +463,7 @@ describe('vehicle detail page overview', () => {
 		await mount();
 
 		expect(screen.getByTestId('cost-per-mile-hero')).toBeInTheDocument();
-		expect(captured['pie']).toBeUndefined();
+		expect(captured['categories']).toBeUndefined();
 	});
 
 	test('fuel efficiency, stats and photo failures are reported without blocking the page', async () => {

@@ -100,8 +100,12 @@ describe('the app registry', () => {
     expect(ids((d) => !d.grantable)).toEqual(['vehicle.delete', 'vehicle.transfer']);
   });
 
-  test('exactly the loan and insurance reads are sensitive', () => {
-    expect(ids((d) => d.sensitive)).toEqual(['vehicle.financing.read', 'vehicle.insurance.read']);
+  test('exactly the loan, insurance and all-driver reads are sensitive', () => {
+    expect(ids((d) => d.sensitive).sort()).toEqual([
+      'vehicle.driver_stats.read',
+      'vehicle.financing.read',
+      'vehicle.insurance.read',
+    ]);
   });
 
   test('every write implies the read on the same resource when one exists', () => {

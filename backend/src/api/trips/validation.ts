@@ -49,6 +49,7 @@ export const createTripSchema = z
     startLocation: z.string().max(200).optional(),
     endLocation: z.string().max(200).optional(),
     note: z.string().max(CONFIG.validation.trip.noteMaxLength).optional(),
+    driverId: z.string().min(1).max(64).nullish(),
     timeZone: tripTimeZoneSchema,
   })
   .refine(startEndRefine, REFINE_MSG);
@@ -62,6 +63,7 @@ export const updateTripSchema = z
     startLocation: z.string().max(200).nullish(),
     endLocation: z.string().max(200).nullish(),
     note: z.string().max(CONFIG.validation.trip.noteMaxLength).nullish(),
+    driverId: z.string().min(1).max(64).nullish(),
     timeZone: tripTimeZoneSchema,
   })
   .refine(startEndRefine, REFINE_MSG);

@@ -37,6 +37,9 @@
 	const df = new DateFormatter(currentLocale(), {
 		dateStyle: 'long'
 	});
+	const shortDf = new DateFormatter(currentLocale(), {
+		dateStyle: 'medium'
+	});
 
 	let calendarValue = $state<DateValue>();
 	let open = $state(false);
@@ -67,6 +70,9 @@
 
 	let displayValue = $derived(
 		calendarValue ? (label ?? df.format(calendarValue.toDate(getLocalTimeZone()))) : placeholder
+	);
+	let shortValue = $derived(
+		calendarValue && !label ? shortDf.format(calendarValue.toDate(getLocalTimeZone())) : null
 	);
 
 	let content = $state<HTMLElement | null>(null);
@@ -108,7 +114,8 @@
 			<Button
 				variant="outline"
 				class={cn(
-					'h-10 w-full justify-start text-left font-normal sm:h-9',
+					'h-11.5 w-full min-w-0 justify-start rounded-[var(--r-md)] border-[1.5px] bg-surface px-3 text-left font-normal has-[>svg]:px-3',
+					shortValue && '@container',
 					!value && 'text-muted-foreground',
 					className
 				)}
@@ -116,8 +123,15 @@
 				aria-describedby={describedBy}
 				{...props}
 			>
-				<CalendarIcon class="mr-2 size-4" />
-				<span id={valueId}>{displayValue}</span>
+				<CalendarIcon class="size-4" />
+				<span id={valueId} class={cn('min-w-0 truncate', shortValue && '@max-[10rem]:hidden')}>
+					{displayValue}
+				</span>
+				{#if shortValue}
+					<span class="hidden min-w-0 truncate @max-[10rem]:inline" aria-hidden="true">
+						{shortValue}
+					</span>
+				{/if}
 			</Button>
 		{/snippet}
 	</Popover.Trigger>
