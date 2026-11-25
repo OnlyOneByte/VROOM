@@ -76,6 +76,7 @@
 		calculatePayoffDateFromStart
 	} from '#lib/utils/financing-calculations.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import FormActionBar from '#lib/components/common/form-action-bar.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
@@ -1026,7 +1027,7 @@
 				/>
 			</form>
 
-			<div class="flex flex-wrap items-center gap-3 border-t border-border pt-6">
+			<FormActionBar>
 				{#if isEditMode}
 					<Button
 						type="button"
@@ -1066,7 +1067,7 @@
 						{/if}
 					</Button>
 				</div>
-			</div>
+			</FormActionBar>
 		</div>
 
 		<AlertDialog bind:open={showDeleteConfirm}>

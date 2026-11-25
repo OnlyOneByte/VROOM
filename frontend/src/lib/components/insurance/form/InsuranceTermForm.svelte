@@ -5,6 +5,7 @@
 	import { onMount } from 'svelte';
 	import { addVehicleFirstTo } from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
+	import FormActionBar from '#lib/components/common/form-action-bar.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
@@ -545,32 +546,34 @@
 				</Card>
 			</form>
 
-			<div class="flex items-center justify-end gap-3 border-t border-border pt-6">
-				<Button
-					type="button"
-					variant="outline"
-					size="lg"
-					onclick={handleBack}
-					disabled={isSubmitting}
-					class="rounded-full"
-				>
-					Cancel
-				</Button>
-				<Button
-					type="button"
-					size="lg"
-					onclick={handleSubmit}
-					disabled={isSubmitting}
-					class="rounded-full"
-				>
-					{#if isSubmitting}
-						<LoaderCircle class="size-4 animate-spin" />
-						Saving…
-					{:else}
-						{isEditMode ? 'Update' : 'Save'} Term
-					{/if}
-				</Button>
-			</div>
+			<FormActionBar>
+				<div class="ml-auto flex items-center gap-3">
+					<Button
+						type="button"
+						variant="outline"
+						size="lg"
+						onclick={handleBack}
+						disabled={isSubmitting}
+						class="rounded-full"
+					>
+						Cancel
+					</Button>
+					<Button
+						type="button"
+						size="lg"
+						onclick={handleSubmit}
+						disabled={isSubmitting}
+						class="rounded-full"
+					>
+						{#if isSubmitting}
+							<LoaderCircle class="size-4 animate-spin" />
+							Saving…
+						{:else}
+							{isEditMode ? 'Update' : 'Save'} Term
+						{/if}
+					</Button>
+				</div>
+			</FormActionBar>
 		</div>
 	{/if}
 </FormLayout>

@@ -150,12 +150,13 @@ describe('InsuranceTermForm amount inputs follow the currency', () => {
 });
 
 describe('InsuranceTermForm add mode', () => {
-	test('the actions sit in a ruled row under the form, with Cancel and a plain Save Term', async () => {
+	test('Save and Cancel sit in a sticky bar on phones and a plain row from lg, with a plain Save Term', async () => {
 		await mount();
 		const save = screen.getByRole('button', { name: /Save Term/ });
 		expect(save.closest('.fixed')).toBeNull();
 		expect(save.closest('form')).toBeNull();
-		expect(save.parentElement).toHaveClass('border-t');
+		const bar = save.closest('[data-slot="form-action-bar"]');
+		expect(bar).toHaveClass('sticky', 'bottom-0', 'border-t', 'lg:static', 'short:static');
 		expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
 		expect(save.className).not.toMatch(/shadow-lg|shadow-2xl|hover:scale/);
 	});

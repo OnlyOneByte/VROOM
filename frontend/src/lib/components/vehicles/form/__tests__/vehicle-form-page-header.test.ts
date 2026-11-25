@@ -65,6 +65,8 @@ describe('VehicleForm page title', () => {
 
 		expect(save.closest('.fixed')).toBeNull();
 		expect(save.parentElement).toBe(cancel.parentElement);
+		const bar = save.closest('[data-slot="form-action-bar"]');
+		expect(bar).toHaveClass('sticky', 'bottom-0', 'border-t', 'lg:static', 'short:static');
 	});
 
 	test('edit mode names the vehicle under the title', async () => {
