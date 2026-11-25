@@ -9,9 +9,9 @@
 		lastDataChangeTime,
 		backupEnabled,
 		sheetsSyncEnabled,
-		providerNeedsAttention,
 		syncConflicts
 	} from '#lib/utils/sync/sync-manager.ts';
+	import { providerNeedsAttention } from '#lib/utils/sync/sync-state.svelte.ts';
 	import { RefreshCw, CircleAlert, Clock, Wifi, WifiOff, TriangleAlert } from '@lucide/svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';

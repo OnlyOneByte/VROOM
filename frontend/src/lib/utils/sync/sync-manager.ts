@@ -44,8 +44,7 @@ export {
 	lastSheetsSync,
 	lastDataChangeTime,
 	backupEnabled,
-	sheetsSyncEnabled,
-	providerNeedsAttention
+	sheetsSyncEnabled
 };
 
 interface SyncResult {
