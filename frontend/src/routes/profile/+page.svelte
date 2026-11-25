@@ -56,6 +56,7 @@
 		session_mismatch:
 			'You were signed in as someone else when linking finished. Sign in again and retry.',
 		unknown_provider: 'This sign-in method is not supported.',
+		forbidden: "You don't have permission to link sign-in methods.",
 		no_email:
 			"We couldn't retrieve your email from this provider. Please check your provider's privacy settings.",
 		provider_unavailable: 'The sign-in provider is temporarily unavailable. Please try again.'

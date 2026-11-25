@@ -10,8 +10,8 @@ import { userProviders, users } from '../../db/schema';
 import { createErrorResponse, isUniqueConstraintError, NotFoundError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
 import { authorize, ownAccount } from '../../permissions/authorize';
-import { assignServerRole, requestResolver } from '../../permissions/grants';
-import { PERMISSION_REGISTRY } from '../../permissions/registry';
+import { assignServerRole, requestResolver, resolverFor } from '../../permissions/grants';
+import { PERMISSION_REGISTRY, type PermissionId } from '../../permissions/registry';
 import { ROLE_TEMPLATES } from '../../permissions/roles';
 import { getClientRateKey } from '../../utils/client-ip';
 import { encrypt } from '../../utils/encryption';
@@ -428,6 +428,10 @@ export async function checkLinkConflicts(
   return 'account_conflict';
 }
 
+function holdsOnOwnAccount(userId: string, permission: PermissionId): boolean {
+  return resolverFor(getDb(), userId).can(permission, { kind: 'account', userId }).allow;
+}
+
 // Register before the generic /callback/:authProvider route, which would shadow it.
 routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
   const authProviderId = c.req.param('authProvider') ?? '';
@@ -455,6 +459,9 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
       stateUserId: storedData.userId,
     });
     return c.redirect(profileRedirect('link_error=session_mismatch'));
+  }
+  if (!holdsOnOwnAccount(authResult.user.id, 'account.signin.manage')) {
+    return c.redirect(profileRedirect('link_error=forbidden'));
   }
 
   const providerConfig = getProvider(authProviderId);
@@ -961,6 +968,9 @@ routes.get('/callback/provider/google', async (c) => {
       stateUserId: state.userId,
     });
     return c.redirect(frontendRedirect(`${state.returnTo}?provider_error=session_mismatch`));
+  }
+  if (!holdsOnOwnAccount(state.userId, 'account.provider.manage')) {
+    return c.redirect(frontendRedirect(`${state.returnTo}?provider_error=forbidden`));
   }
 
   let result: Awaited<ReturnType<typeof exchangeProviderTokens>>;
