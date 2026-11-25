@@ -351,7 +351,7 @@ export const outboundResolver = {
 export function assertSafeOutboundUrl(
   raw: string,
   label: string,
-  policy: PrivateEndpointPolicy = privateEndpointPolicy()
+  policy: PrivateEndpointPolicy
 ): URL {
   let url: URL;
   try {
@@ -384,7 +384,7 @@ interface SafeOutboundTarget {
 export async function resolveSafeOutboundTarget(
   raw: string,
   label: string,
-  policy: PrivateEndpointPolicy = privateEndpointPolicy()
+  policy: PrivateEndpointPolicy
 ): Promise<SafeOutboundTarget> {
   const url = assertSafeOutboundUrl(raw, label, policy);
   const literal = literalAddress(url.hostname);
