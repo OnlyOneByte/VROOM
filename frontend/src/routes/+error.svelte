@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { CircleAlert, Map } from '@lucide/svelte';
+	import { CircleAlert, Map as MapIcon } from '@lucide/svelte';
 	import { routes } from '#lib/routes.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 
@@ -19,7 +19,7 @@
 		aria-hidden="true"
 	>
 		{#if notFound}
-			<Map class="size-[52px]" />
+			<MapIcon class="size-[52px]" />
 		{:else}
 			<CircleAlert class="size-[52px]" />
 		{/if}
