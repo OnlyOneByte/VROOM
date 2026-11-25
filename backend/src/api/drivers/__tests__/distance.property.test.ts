@@ -79,6 +79,15 @@ describe('attributeDistance', () => {
     );
   });
 
+  test('a reading lower than an earlier one never counts the same distance twice', () => {
+    const points: OdometerPoint[] = [1000, 2000, 1500, 2100].map((odometer, at) => ({
+      odometer,
+      at,
+      driverId: 'a',
+    }));
+    expect(sum(attributeDistance(points, [], EVERYTHING, true))).toBe(1100);
+  });
+
   test('a gap goes to the driver on the reading that closes it, once the period holds that reading', () => {
     const points: OdometerPoint[] = [
       { odometer: 100, at: 1, driverId: 'a' },

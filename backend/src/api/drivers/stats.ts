@@ -135,11 +135,11 @@ export function driverStats(db: AppDatabase, vehicleId: string, options: StatsOp
         archived: d.archived,
         you: d.userId === options.viewerUserId,
         distance: { trips: row.trips, estimated: row.estimated, total },
-        share: attributed > 0 ? round(total / attributed, 4) : null,
+        share: options.everyone && attributed > 0 ? round(total / attributed, 4) : null,
         fuelBought: round(boughtOf(false, d.id)),
-        fuelUsed: used(fuelRate, total),
+        fuelUsed: options.includeCarCosts ? used(fuelRate, total) : null,
         chargeBought: round(boughtOf(true, d.id)),
-        chargeUsed: used(chargeRate, total),
+        chargeUsed: options.includeCarCosts ? used(chargeRate, total) : null,
         runningCostsPaid: centsToDollars(centsPaidBy(d.id)),
       };
     });
@@ -152,11 +152,7 @@ export function driverStats(db: AppDatabase, vehicleId: string, options: StatsOp
     },
     estimates: options.withEstimates,
     scope: options.everyone ? ('everyone' as const) : ('own' as const),
-    distance: {
-      total: totalDistance,
-      attributed,
-      unattributed: options.everyone ? unattributed : null,
-    },
+    distance: options.everyone ? { total: totalDistance, attributed, unattributed } : null,
     runningCosts: options.includeCarCosts ? centsToDollars(runningCents) : null,
     costPerDistance:
       options.includeCarCosts && costRate !== null ? round(centsToDollars(costRate), 4) : null,

@@ -74,12 +74,12 @@ export function attributeDistance(
 
   const cover = merged(trips);
   const ordered = sequence(points, period);
-  for (let i = 1; i < ordered.length; i++) {
-    const opening = ordered[i - 1];
-    const closing = ordered[i];
-    if (!opening || !closing || closing.odometer <= opening.odometer) continue;
-    const gap = uncovered(opening.odometer, closing.odometer, cover);
+  let highest = ordered[0]?.odometer ?? 0;
+  for (const closing of ordered.slice(1)) {
+    if (closing.odometer <= highest) continue;
+    const gap = uncovered(highest, closing.odometer, cover);
     if (gap > 0) add(closing.driverId, 'estimated', gap);
+    highest = closing.odometer;
   }
   return totals;
 }

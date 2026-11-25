@@ -6,7 +6,7 @@ import {
   type RequestFn,
   type TestApp,
 } from '../../../test-helpers/http-client';
-import { type Members, seedCar, seedMembers } from '../../../test-helpers/members';
+import { type Members, overrideOn, seedCar, seedMembers } from '../../../test-helpers/members';
 
 let ctx: TestApp;
 let m: Members;
@@ -26,7 +26,7 @@ interface Figures {
 
 interface Stats {
   scope: 'everyone' | 'own';
-  distance: { total: number; attributed: number; unattributed: number | null };
+  distance: { total: number; attributed: number; unattributed: number } | null;
   runningCosts: number | null;
   costPerDistance: number | null;
   drivers: Figures[];
@@ -128,18 +128,32 @@ describe('per-driver figures', () => {
 
   test('without estimates only trips count', async () => {
     const data = await read(ctx.authed, `${stats}&estimates=false`);
-    expect(data.distance.total).toBe(100);
+    expect(data.distance?.total).toBe(100);
     expect(data.drivers.every((d) => d.distance.estimated === 0)).toBe(true);
   });
 
-  test('editors and viewers see only their own figures and no unattributed distance', async () => {
+  test('editors and viewers see only their own figures, with nothing that adds up to anyone else', async () => {
     for (const member of [m.editor, m.viewer]) {
       const data = await read(member.request);
       expect(data.scope).toBe('own');
-      expect(data.distance.unattributed).toBeNull();
+      expect(data.distance).toBeNull();
       expect(data.drivers.map((d) => d.driverId)).toEqual([await driverOf(member.id)]);
+      expect(data.drivers[0]?.share).toBeNull();
     }
     expect((await read(m.editor.request)).drivers[0]?.distance.total).toBe(150);
+  });
+
+  test('without expense.read there are no car-wide costs or fuel used', async () => {
+    overrideOn(ctx, CAR, m.editor, 'vehicle.expense.read', 'deny');
+    const data = await read(m.editor.request);
+    expect(data.runningCosts).toBeNull();
+    expect(data.costPerDistance).toBeNull();
+    expect(data.drivers[0]).toMatchObject({ fuelUsed: null, fuelBought: 10 });
+  });
+
+  test('a read_own deny refuses the figures', async () => {
+    overrideOn(ctx, CAR, m.viewer, 'vehicle.driver_stats.read_own', 'deny');
+    expect((await m.viewer.request('GET', stats)).status).toBe(403);
   });
 
   test('strangers, cars without sharing and backwards periods are refused', async () => {
