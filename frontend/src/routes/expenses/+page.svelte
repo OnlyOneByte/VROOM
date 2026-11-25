@@ -619,6 +619,17 @@
 			<Skeleton class="h-8 w-48 mb-2" />
 			<Skeleton class="h-5 w-72" />
 		</div>
+		{#if pendingListRows.length > 0}
+			<div data-testid="pending-rows-while-loading">
+				<ExpensesTable
+					expenses={pendingListRows}
+					showVehicleColumn={false}
+					canWrite={false}
+					returnTo={resolve(routes.expenses)}
+					pendingStates={pending.states}
+				/>
+			</div>
+		{/if}
 		<Skeleton class="h-40 w-full" />
 		<Skeleton class="h-64 w-full" />
 	</div>

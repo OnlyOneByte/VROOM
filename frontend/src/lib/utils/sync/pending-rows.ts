@@ -191,6 +191,7 @@ export interface PendingItem {
 	row: Expense;
 	state: PendingRowState;
 	serverId?: string | undefined;
+	synced?: boolean;
 }
 
 export function rowsLeft(previousIds: readonly string[], current: readonly PendingItem[]): boolean {
@@ -201,21 +202,19 @@ export function rowsLeft(previousIds: readonly string[], current: readonly Pendi
 export function keepLeftRows(
 	shown: readonly PendingItem[],
 	current: readonly PendingItem[],
-	syncedServerIds: ReadonlyArray<readonly [string, string]> = []
+	syncedServerIds: ReadonlyArray<readonly [string, string | undefined]> = []
 ): PendingItem[] {
 	const byId = new Map(current.map(item => [item.row.id, item]));
 	const serverIdOf = new Map(syncedServerIds);
 	const shownIds = new Set(shown.map(({ row }) => row.id));
-	return [
-		...current.filter(({ row }) => !shownIds.has(row.id)),
-		...shown.map(
-			item =>
-				byId.get(item.row.id) ?? {
-					...item,
-					serverId: item.serverId ?? serverIdOf.get(item.row.id)
-				}
-		)
-	];
+	const kept = shown.flatMap(item => {
+		const live = byId.get(item.row.id);
+		if (live) return [live];
+		if (!item.synced && !serverIdOf.has(item.row.id)) return [];
+		const serverId = item.serverId ?? serverIdOf.get(item.row.id);
+		return [{ ...item, serverId, synced: true }];
+	});
+	return [...current.filter(({ row }) => !shownIds.has(row.id)), ...kept];
 }
 
 export function withoutListed(

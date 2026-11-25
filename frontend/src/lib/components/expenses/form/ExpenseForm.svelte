@@ -8,7 +8,7 @@
 	} from '#lib/utils/focus.ts';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { gotoDynamic, gotoWithQuery } from '#lib/utils/navigation.ts';
+	import { gotoDynamic, gotoWithQuery, preloadDynamic } from '#lib/utils/navigation.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
@@ -146,6 +146,8 @@
 				(form.isEditMode || (form.isSplit && form.selectedVehicleIds.length >= 2))
 		)
 	);
+
+	onMount(() => preloadDynamic(returnTo));
 
 	onMount(async () => {
 		await settingsStore.load();
