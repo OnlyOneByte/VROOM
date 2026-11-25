@@ -107,9 +107,9 @@ describe('vehicle Overview puts the numbers first', () => {
 	test('the hero comes first, then Next up and Recent expenses, then the details disclosure', async () => {
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 
-		const recent = await screen.findByText('Last 30 days');
-		const hero = screen.getByTestId('cost-per-mile-hero');
 		const nextUp = await screen.findByRole('heading', { name: 'Next up' });
+		const recent = screen.getByText('Last 30 days');
+		const hero = screen.getByTestId('cost-per-mile-hero');
 		const recentExpenses = screen.getByRole('heading', { name: 'Recent expenses' });
 		const details = screen.getByRole('button', { name: 'Details and photos' });
 
@@ -122,9 +122,9 @@ describe('vehicle Overview puts the numbers first', () => {
 	test('the category chart moved to the Expenses tab and still describes this vehicle', async () => {
 		render(Page, { props: { data: { vehicleId: 'v1' } } });
 
-		await screen.findByText('Last 30 days');
+		const expensesTab = await screen.findByRole('tab', { name: 'Expenses' });
 		expect(categoryProps.value).toBeNull();
-		await fireEvent.click(screen.getByRole('tab', { name: 'Expenses' }));
+		await fireEvent.click(expensesTab);
 		await vi.waitFor(() => expect(categoryProps.value).not.toBeNull());
 		expect(categoryProps.value?.['description']).toBe('All time, largest first');
 	});
