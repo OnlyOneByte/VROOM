@@ -25,7 +25,7 @@ jobs:
       CORS_ORIGINS: http://127.0.0.1:4173,http://127.0.0.1:4174
       DISABLE_RATE_LIMIT: "true"
       LOG_LEVEL: warn
-      B_REF: origin/crew/vroom-bot/vehicle-staged
+      B_REF: origin/crew/vroom-bot/vehicle-tbt-2
     steps:
       - uses: actions/checkout@v7
         with:
@@ -75,7 +75,7 @@ jobs:
           AB_PAIRS: "7"
           AB_LATENCY: ${{ matrix.latency }}
           AB_SERVERS: A:4173,B:4174
-          AB_LABEL: A = main, B = vehicle overview below the fuel card drawn in a later task.
+          AB_LABEL: A = main, B = cached time-zone and drum formatters.
         run: |
           cp "$RUNNER_TEMP/ab-vitals.mjs" scripts/ab-vitals.mjs
           node scripts/ab-vitals.mjs
