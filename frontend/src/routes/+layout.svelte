@@ -5,7 +5,7 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { handleRouteProtection, isPublicRoute } from '#lib/utils/auth.js';
 	import Navigation from '#lib/components/layout/Navigation.svelte';
-	import { isFormRoute } from '#lib/routes.ts';
+	import { isFormRoute, routes } from '#lib/routes.ts';
 	import { cn } from '#lib/utils.ts';
 	import { Toaster } from '#lib/components/ui/sonner/index.ts';
 	import { toast } from 'svelte-sonner';
@@ -27,8 +27,19 @@
 	import { themeStore } from '#lib/stores/theme.svelte.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import BrandMark from '#lib/components/common/BrandMark.svelte';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { resolve } from '$app/paths';
 
 	let { children } = $props();
+
+	async function signOutWaiting() {
+		try {
+			await authStore.logout();
+		} finally {
+			location.assign(resolve(routes.auth));
+		}
+	}
 
 	let settingsLoaded = $state(false);
 	let recurringTriggered = $state(false);
@@ -179,8 +190,23 @@
 	</div>
 {:else if isPending && !isPublicRoute(currentPath)}
 	<main class="min-h-screen bg-background">
-		{#await import('#lib/components/layout/AccountPending.svelte') then { default: AccountPending }}
+		{#await import('#lib/components/layout/AccountPending.svelte')}
+			<div class="flex min-h-screen items-center justify-center" aria-busy="true">
+				<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+			</div>
+		{:then { default: AccountPending }}
 			<AccountPending />
+		{:catch}
+			<div class="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-3 p-4">
+				<LoadErrorCard
+					title="Couldn't load this page"
+					message="Your account is waiting for an admin to approve it. Check your connection, then reload the page."
+					onRetry={() => location.reload()}
+				/>
+				<Button variant="ghost" class="h-10 self-center" onclick={() => void signOutWaiting()}>
+					Sign Out
+				</Button>
+			</div>
 		{/await}
 	</main>
 {:else if isAuthPage || isHomePage}
