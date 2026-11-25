@@ -171,7 +171,7 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 	'/trips': { debt: [], ready: pageHeading('Trips') },
 	'/settings': { debt: [], ready: pageHeading('Settings') },
 	'/profile': { debt: [], ready: pageHeading('Profile') },
-	'/no-such-page': { debt: [], ready: pageHeading('Page Not Found') }
+	'/no-such-page': { debt: [], ready: pageHeading('Wrong turn') }
 };
 
 const attachmentLabel = (route: string) => route.replace(/^\//, '').replace(/\//g, '-') || 'root';

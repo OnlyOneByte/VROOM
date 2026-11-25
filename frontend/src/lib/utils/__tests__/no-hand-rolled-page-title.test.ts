@@ -17,6 +17,7 @@ ratchet({
 	kind: 'exclusion',
 	tolerated: [
 		'lib/components/common/page-header.svelte',
+		'routes/+error.svelte',
 		'routes/+page.svelte',
 		'routes/auth/+page.svelte',
 		'routes/privacypolicy/+page.svelte',

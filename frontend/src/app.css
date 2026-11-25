@@ -230,7 +230,7 @@
 		font-size: 0.84375rem !important;
 	}
 
-	[data-sonner-toast] [data-content] {
+	[data-sonner-toast]:not(:has([data-button])) [data-content] {
 		padding-right: 1.5rem;
 	}
 
@@ -259,7 +259,7 @@
 	[data-sonner-toast] [data-title] {
 		font-size: 0.9375rem !important;
 		font-weight: 650 !important;
-		line-height: 1.25rem;
+		line-height: 1.25rem !important;
 	}
 
 	[data-sonner-toast]::after {
