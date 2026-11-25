@@ -20,6 +20,7 @@
 	import TermHistory from './TermHistory.svelte';
 	import DocumentViewer from './DocumentViewer.svelte';
 	import ClaimsSection from './ClaimsSection.svelte';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { getLatestTerm, isPolicyInForce } from '#lib/utils/insurance.ts';
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
 	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
@@ -53,6 +54,25 @@
 	let claimCount = $state<number | null>(null);
 	let uploadOpen = $state(false);
 	let claimFormOpen = $state(false);
+	let documentViewer = $state<ReturnType<typeof DocumentViewer>>();
+	let claimsSection = $state<ReturnType<typeof ClaimsSection>>();
+	let documentsError = $state<string | null>(null);
+	let claimsError = $state<string | null>(null);
+
+	let attachmentsErrorTitle = $derived(
+		documentsError && claimsError
+			? "Couldn't load the documents and claims"
+			: documentsError
+				? "Couldn't load the documents"
+				: "Couldn't load the claims"
+	);
+
+	function retryAttachments() {
+		return Promise.all([
+			documentsError ? documentViewer?.reload() : undefined,
+			claimsError ? claimsSection?.reload() : undefined
+		]);
+	}
 
 	let attachmentSummary = $derived(
 		[
@@ -191,21 +211,11 @@
 				</p>
 				{#if !readOnly}
 					<div class="flex flex-wrap items-center gap-2">
-						<Button
-							variant="outline"
-							size="sm"
-							class="h-10"
-							onclick={() => (uploadOpen = true)}
-						>
+						<Button variant="outline" size="sm" class="h-10" onclick={() => (uploadOpen = true)}>
 							<Upload />
 							Upload
 						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							class="h-10"
-							onclick={() => (claimFormOpen = true)}
-						>
+						<Button variant="outline" size="sm" class="h-10" onclick={() => (claimFormOpen = true)}>
 							<Plus />
 							File Claim
 						</Button>
@@ -219,17 +229,32 @@
 				{/if}
 			</div>
 
+			{#if documentsError || claimsError}
+				<div class="mt-3">
+					<LoadErrorCard
+						compact
+						title={attachmentsErrorTitle}
+						message={documentsError ?? claimsError ?? ''}
+						onRetry={retryAttachments}
+					/>
+				</div>
+			{/if}
+
 			{#if !readOnly}
 				<DocumentViewer
+					bind:this={documentViewer}
 					entityType="insurance_policy"
 					entityId={policy.id}
 					level={childLevel}
 					compact
 					bind:count={documentCount}
 					bind:uploadOpen
+					bind:loadError={documentsError}
+					inlineError={false}
 				/>
 			{/if}
 			<ClaimsSection
+				bind:this={claimsSection}
 				policyId={policy.id}
 				{vehicles}
 				{readOnly}
@@ -237,6 +262,8 @@
 				compact
 				bind:count={claimCount}
 				bind:formOpen={claimFormOpen}
+				bind:loadError={claimsError}
+				inlineError={false}
 			/>
 		</div>
 	</CardContent>

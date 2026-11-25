@@ -285,6 +285,36 @@ describe('PolicyCard child sections', () => {
 		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 	});
 
+	test('when documents and claims both fail, the card shows one Retry that reloads both', async () => {
+		getEntityDocuments.mockRejectedValueOnce(new Error('offline'));
+		getClaims.mockRejectedValueOnce(new Error('offline'));
+		mount();
+		await settle();
+
+		expect(screen.getByText("Couldn't load the documents and claims")).toBeInTheDocument();
+		expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(1);
+
+		getEntityDocuments.mockResolvedValue(photoPage([makePhoto()]));
+		getClaims.mockResolvedValue([makeClaim()]);
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await settle();
+
+		expect(getEntityDocuments).toHaveBeenCalledTimes(2);
+		expect(getClaims).toHaveBeenCalledTimes(2);
+		expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+		expect(screen.getByTestId('policy-attachments')).toHaveTextContent('1 document · 1 claim');
+	});
+
+	test('Retry after one failed section reloads only that section', async () => {
+		getClaims.mockRejectedValueOnce(new Error('offline'));
+		mount();
+		await settle();
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await settle();
+		expect(getClaims).toHaveBeenCalledTimes(2);
+		expect(getEntityDocuments).toHaveBeenCalledTimes(1);
+	});
+
 	test('read-only hides settings, term actions and documents but keeps claims', async () => {
 		mount({ readOnly: true });
 		await settle();
