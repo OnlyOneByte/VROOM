@@ -1,12 +1,18 @@
 <script lang="ts">
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { onMount } from 'svelte';
-	import { Car, MapPin, Pencil, Plus, Route, Trash2 } from '@lucide/svelte';
+	import { MapPin, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { tripApi } from '#lib/services/trip-api.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import type { Trip, TripSummary, Vehicle } from '#lib/types/index.ts';
 	import { tripDistance } from '#lib/types/index.ts';
-	import { capitalize, formatDate, formatNumber, formatNumberUpTo } from '#lib/utils/formatters.ts';
+	import {
+		capitalize,
+		formatCurrency,
+		formatDate,
+		formatNumber,
+		formatNumberUpTo
+	} from '#lib/utils/formatters.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
@@ -14,11 +20,12 @@
 	import { logLoadFailure, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import * as CardNs from '#lib/components/ui/card/index.ts';
-	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import HeroFigure from '#lib/components/common/hero-figure.svelte';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import TripForm from '#lib/components/trips/TripForm.svelte';
@@ -46,6 +53,11 @@
 	const tripDistLabel = (vehicleId: string): string =>
 		vehicleDistLabels.get(vehicleId) ?? distLabel;
 
+	function route(trip: Trip): string {
+		if (!trip.startLocation && !trip.endLocation) return `${capitalize(trip.purpose)} trip`;
+		return `${trip.startLocation ?? '—'} → ${trip.endLocation ?? '—'}`;
+	}
+
 	let formOpen = $state(false);
 	let editingTrip = $state<Trip | null>(null);
 
@@ -60,29 +72,28 @@
 	}
 
 	let deleteTarget = $state<Trip | null>(null);
+	let deleteOpen = $state(false);
 	let keepOdometer = $state(true);
-	let isDeleting = $state(false);
 
 	function openDelete(trip: Trip) {
 		deleteTarget = trip;
 		keepOdometer = true;
+		deleteOpen = true;
 	}
 
 	async function confirmDelete() {
 		const target = deleteTarget;
 		if (!target) return;
-		isDeleting = true;
 		try {
 			await tripApi.delete(target.id, keepOdometer);
-			appStore.addNotification({ type: 'success', message: 'Trip deleted' });
-			deleteTarget = null;
-			await load();
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to delete trip:', error);
 			appStore.showError(`Couldn't delete the trip. ${userFacingErrorMessage(error)}`);
-		} finally {
-			isDeleting = false;
+			throw error;
 		}
+		appStore.addNotification({ type: 'success', message: 'Trip deleted' });
+		deleteTarget = null;
+		await load();
 	}
 
 	async function load() {
@@ -115,7 +126,98 @@
 	<meta name="description" content="Track and manage your vehicle trips" />
 </svelte:head>
 
-<div class="space-y-6">
+{#snippet summarySection(s: TripSummary)}
+	<Card.Root variant="section" data-testid="trip-summary-card">
+		<Card.Header>
+			<Card.Title level={2} class="sr-only">Mileage Summary</Card.Title>
+		</Card.Header>
+		<Card.Content class="space-y-5">
+			{#if s.rate > 0}
+				<HeroFigure label="Business mileage value" value={formatCurrency(s.businessMileageValue)}>
+					{#snippet meta()}
+						<span class="tabular-nums">
+							{formatNumberUpTo(s.businessDistance, 1)}
+							{distLabel} business at {formatCurrency(s.rate, undefined, 2)}/{distLabel}
+						</span>
+					{/snippet}
+				</HeroFigure>
+			{:else}
+				<HeroFigure
+					label="Business distance"
+					value="{formatNumberUpTo(s.businessDistance, 1)} {distLabel}"
+				/>
+			{/if}
+			<dl class="grid grid-cols-3 gap-4">
+				<div>
+					<dt class="text-xs text-muted-foreground">Trips</dt>
+					<dd class="font-(family-name:--font-fig) text-2xl leading-tight font-bold tabular-nums">
+						{formatNumber(s.tripCount, 0)}
+					</dd>
+				</div>
+				<div>
+					<dt class="text-xs text-muted-foreground">Total</dt>
+					<dd class="font-(family-name:--font-fig) text-2xl leading-tight font-bold tabular-nums">
+						{formatNumberUpTo(s.totalDistance, 1)}
+						<span class="text-sm font-semibold text-muted-foreground">{distLabel}</span>
+					</dd>
+				</div>
+				<div>
+					<dt class="text-xs text-muted-foreground">Avg / trip</dt>
+					<dd class="font-(family-name:--font-fig) text-2xl leading-tight font-bold tabular-nums">
+						{formatNumber(s.averageTripDistance, 0)}
+						<span class="text-sm font-semibold text-muted-foreground">{distLabel}</span>
+					</dd>
+				</div>
+			</dl>
+		</Card.Content>
+	</Card.Root>
+{/snippet}
+
+{#snippet tripRow(trip: Trip)}
+	<li class="flex items-center gap-3 py-3 sm:gap-4" data-testid="trip-card-{trip.id}">
+		<div class="min-w-0 flex-1 space-y-1">
+			<p class="truncate font-semibold">{route(trip)}</p>
+			<p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+				<Badge variant={trip.purpose === 'business' ? 'info' : 'secondary'}>
+					{capitalize(trip.purpose)}
+				</Badge>
+				<span>{formatDate(trip.tripDate)}</span>
+				<span aria-hidden="true">·</span>
+				<span class="max-w-40 truncate">{vehicleNames.get(trip.vehicleId) ?? 'Vehicle'}</span>
+			</p>
+			{#if trip.note}
+				<p class="text-sm text-muted-foreground">{trip.note}</p>
+			{/if}
+		</div>
+		<div class="shrink-0 text-right">
+			<p class="font-(family-name:--font-fig) text-2xl leading-none font-bold tabular-nums">
+				{formatNumber(tripDistance(trip), 0)}
+				<span class="text-sm font-semibold text-muted-foreground">
+					{tripDistLabel(trip.vehicleId)}
+				</span>
+			</p>
+			<p class="mt-1 text-xs text-muted-foreground tabular-nums">
+				{formatNumber(trip.startOdometer, 0)} → {formatNumber(trip.endOdometer, 0)}
+			</p>
+		</div>
+		<div class="flex shrink-0 items-center">
+			<Button variant="ghost" size="icon" aria-label="Edit trip" onclick={() => openEdit(trip)}>
+				<Pencil class="h-4 w-4" />
+			</Button>
+			<Button
+				variant="ghost"
+				size="icon"
+				class="text-destructive hover:text-destructive"
+				aria-label="Delete trip"
+				onclick={() => openDelete(trip)}
+			>
+				<Trash2 class="h-4 w-4" />
+			</Button>
+		</div>
+	</li>
+{/snippet}
+
+<div class="mx-auto max-w-5xl space-y-6">
 	<PageHeader title="Trips" description="Track mileage and trips across your vehicles">
 		{#snippet actions()}
 			{#if !isLoading && !loadError && trips.length > 0 && vehicles.length > 0}
@@ -130,10 +232,10 @@
 	</PageHeader>
 
 	{#if isLoading}
-		<div class="space-y-3">
-			<Skeleton class="h-28 w-full" />
+		<div class="space-y-3" aria-hidden="true">
+			<Skeleton class="h-32 w-full" />
 			{#each Array(3) as _, i (i)}
-				<Skeleton class="h-24 w-full" />
+				<Skeleton class="h-16 w-full" />
 			{/each}
 		</div>
 	{:else if loadError}
@@ -145,7 +247,7 @@
 	{:else if trips.length === 0}
 		<EmptyState>
 			{#snippet icon()}
-				<MapPin class="h-12 w-12 text-muted-foreground mb-4" />
+				<MapPin class="mb-4 h-12 w-12 text-muted-foreground" />
 			{/snippet}
 			{#snippet title()}
 				No trips yet
@@ -163,140 +265,51 @@
 		</EmptyState>
 	{:else}
 		{#if summary}
-			<CardNs.Card data-testid="trip-summary-card">
-				<CardNs.CardHeader class="p-4 sm:p-6">
-					<CardNs.CardTitle class="flex items-center gap-2 text-base sm:text-lg">
-						<Route class="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-						Mileage Summary
-					</CardNs.CardTitle>
-				</CardNs.CardHeader>
-				<CardNs.CardContent class="grid grid-cols-2 gap-4 p-4 pt-0 sm:grid-cols-4 sm:p-6 sm:pt-0">
-					<div>
-						<p class="text-xs text-muted-foreground">Total</p>
-						<p class="text-lg font-semibold">
-							{formatNumberUpTo(summary.totalDistance, 1)}
-							<span class="text-sm font-normal">{distLabel}</span>
-						</p>
-					</div>
-					<div>
-						<p class="text-xs text-muted-foreground">Trips</p>
-						<p class="text-lg font-semibold">{summary.tripCount}</p>
-					</div>
-					<div>
-						<p class="text-xs text-muted-foreground">Business</p>
-						<p class="text-lg font-semibold">
-							{formatNumberUpTo(summary.businessDistance, 1)}
-							<span class="text-sm font-normal">{distLabel}</span>
-						</p>
-					</div>
-					<div>
-						<p class="text-xs text-muted-foreground">Avg / trip</p>
-						<p class="text-lg font-semibold">
-							{formatNumber(summary.averageTripDistance, 0)}
-							<span class="text-sm font-normal">{distLabel}</span>
-						</p>
-					</div>
-				</CardNs.CardContent>
-			</CardNs.Card>
+			{@render summarySection(summary)}
 		{/if}
 
-		<div class="space-y-3">
-			{#each trips as trip (trip.id)}
-				<CardNs.Card data-testid="trip-card-{trip.id}">
-					<CardNs.CardContent class="flex items-start justify-between gap-4 py-4">
-						<div class="min-w-0 space-y-1">
-							<div class="flex items-center gap-2">
-								<Badge variant="secondary">{capitalize(trip.purpose)}</Badge>
-								<span class="text-sm text-muted-foreground">{formatDate(trip.tripDate)}</span>
-							</div>
-							<p class="font-medium">
-								{formatNumber(tripDistance(trip), 0)}
-								{tripDistLabel(trip.vehicleId)}
-								<span class="text-sm font-normal text-muted-foreground">
-									({formatNumber(trip.startOdometer, 0)} → {formatNumber(trip.endOdometer, 0)})
-								</span>
-							</p>
-							{#if trip.startLocation || trip.endLocation}
-								<p class="flex items-center gap-1 text-sm text-muted-foreground">
-									<MapPin class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-									{trip.startLocation ?? '—'} → {trip.endLocation ?? '—'}
-								</p>
-							{/if}
-							{#if trip.note}
-								<p class="text-sm text-muted-foreground">{trip.note}</p>
-							{/if}
-						</div>
-						<div class="flex shrink-0 flex-col items-end gap-2">
-							<div class="flex items-center gap-1 text-sm text-muted-foreground">
-								<Car class="h-4 w-4" aria-hidden="true" />
-								<span class="max-w-32 truncate">
-									{vehicleNames.get(trip.vehicleId) ?? 'Vehicle'}
-								</span>
-							</div>
-							<div class="flex items-center gap-1">
-								<Button
-									variant="ghost"
-									size="icon"
-									class="h-8 w-8"
-									aria-label="Edit trip"
-									onclick={() => openEdit(trip)}
-								>
-									<Pencil class="h-4 w-4" />
-								</Button>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="h-8 w-8 text-destructive hover:text-destructive"
-									aria-label="Delete trip"
-									onclick={() => openDelete(trip)}
-								>
-									<Trash2 class="h-4 w-4" />
-								</Button>
-							</div>
-						</div>
-					</CardNs.CardContent>
-				</CardNs.Card>
-			{/each}
-		</div>
-
-		{#if trips.length < totalCount}
-			<p class="text-center text-sm text-muted-foreground" data-testid="trip-list-truncation">
-				Showing {formatNumber(trips.length, 0)} of {formatNumber(totalCount, 0)} trips
-			</p>
-		{/if}
+		<Card.Root variant="section">
+			<Card.Header>
+				<Card.Title level={2} class="text-base">
+					{formatNumber(totalCount, 0)} trip{totalCount === 1 ? '' : 's'}
+				</Card.Title>
+			</Card.Header>
+			<Card.Content>
+				<ul class="divide-y divide-border" role="list">
+					{#each trips as trip (trip.id)}
+						{@render tripRow(trip)}
+					{/each}
+				</ul>
+				{#if trips.length < totalCount}
+					<p
+						class="pt-3 text-center text-sm text-muted-foreground"
+						data-testid="trip-list-truncation"
+					>
+						Showing {formatNumber(trips.length, 0)} of {formatNumber(totalCount, 0)} trips
+					</p>
+				{/if}
+			</Card.Content>
+		</Card.Root>
 	{/if}
 
 	<TripForm bind:open={formOpen} {vehicles} trip={editingTrip} onSaved={load} />
 
-	<AlertDialog.Root
-		open={deleteTarget !== null}
-		onOpenChange={o => {
-			if (!o) deleteTarget = null;
-		}}
+	<ConfirmDialog
+		bind:open={deleteOpen}
+		title="Delete this trip?"
+		description="This removes the trip from your mileage log. This cannot be undone."
+		confirmLabel="Delete Trip"
+		onConfirm={confirmDelete}
 	>
-		<AlertDialog.Content>
-			<AlertDialog.Header>
-				<AlertDialog.Title>Delete this trip?</AlertDialog.Title>
-				<AlertDialog.Description>
-					This removes the trip from your mileage log. This cannot be undone.
-				</AlertDialog.Description>
-			</AlertDialog.Header>
-			<label class="flex items-start gap-3 rounded-md border p-3 text-sm">
-				<Checkbox bind:checked={keepOdometer} aria-label="Keep the linked odometer reading" />
-				<span>
-					<span class="font-medium">Keep the linked odometer reading</span>
-					<span class="block text-muted-foreground">
-						This trip added a reading to the vehicle's odometer history. Leave this checked to keep
-						it, or uncheck to remove that reading too.
-					</span>
+		<label class="flex items-start gap-3 rounded-md border border-border-strong p-3 text-sm">
+			<Checkbox bind:checked={keepOdometer} aria-label="Keep the linked odometer reading" />
+			<span>
+				<span class="font-medium">Keep the linked odometer reading</span>
+				<span class="block text-muted-foreground">
+					This trip added a reading to the vehicle's odometer history. Leave this checked to keep
+					it, or uncheck to remove that reading too.
 				</span>
-			</label>
-			<AlertDialog.Footer>
-				<AlertDialog.Cancel disabled={isDeleting}>Cancel</AlertDialog.Cancel>
-				<Button variant="destructive" disabled={isDeleting} onclick={confirmDelete}>
-					{isDeleting ? 'Deleting…' : 'Delete Trip'}
-				</Button>
-			</AlertDialog.Footer>
-		</AlertDialog.Content>
-	</AlertDialog.Root>
+			</span>
+		</label>
+	</ConfirmDialog>
 </div>
