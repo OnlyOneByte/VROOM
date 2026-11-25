@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/svelte';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import type { Vehicle } from '#lib/types/index.ts';
-import { appStore } from '#lib/stores/app.svelte.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
