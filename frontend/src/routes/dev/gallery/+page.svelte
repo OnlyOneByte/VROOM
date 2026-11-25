@@ -26,6 +26,21 @@
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
 	import { Inbox, DollarSign, TrendingUp, Car, Plus } from '@lucide/svelte';
+	import { toast } from 'svelte-sonner';
+
+	function showSavedToast() {
+		toast.success('Saved $38.20 for Daily Driver', {
+			description: '31.1 mpg since the last fill-up',
+			action: { label: 'Undo', onClick: () => {} }
+		});
+	}
+
+	function showFailedToast() {
+		toast.error('Couldn’t delete "Car wash"', {
+			description: 'Check your connection and try again.',
+			action: { label: 'Retry', onClick: () => {} }
+		});
+	}
 
 	const buttonVariants = [
 		'default',
@@ -227,6 +242,17 @@
 		</section>
 
 		<section class="space-y-3">
+			<h2 class="text-lg font-semibold">Toasts</h2>
+			<p class="text-sm text-muted-foreground">
+				A charcoal card above the bottom bar: a glyph, a title, one line, and at most one action.
+			</p>
+			<div class="flex flex-wrap gap-2">
+				<Button variant="outline" onclick={showSavedToast}>Show saved</Button>
+				<Button variant="outline" onclick={showFailedToast}>Show failed</Button>
+			</div>
+		</section>
+
+		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Hero figure</h2>
 			<p class="text-sm text-muted-foreground">
 				At most one per screen: the answer to the screen's question, with its comparison in the meta
@@ -261,7 +287,7 @@
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Tabs</h2>
 			<p class="text-sm text-muted-foreground">
-				Triggers are 40px tall below <code>sm</code> so they clear the mobile tap target.
+				Triggers are 40px tall, so they clear the tap target at every width.
 			</p>
 			<Tabs value="overview">
 				<TabsList class="grid w-full grid-cols-3">

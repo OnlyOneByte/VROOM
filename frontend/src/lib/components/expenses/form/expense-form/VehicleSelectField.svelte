@@ -35,7 +35,7 @@
 	<Select.Trigger
 		id="vehicle"
 		aria-labelledby="vehicle-label vehicle"
-		class="max-w-[14rem] min-w-0 gap-1.5 rounded-full border-primary bg-primary px-3.5 font-medium text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90 [&_svg:not([class*='text-'])]:text-primary-foreground {error
+		class="max-w-[14rem] min-w-0 gap-1.5 rounded-full data-[size=default]:h-10 border-primary bg-primary px-3.5 font-medium text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90 [&_svg:not([class*='text-'])]:text-primary-foreground {error
 			? 'border-destructive'
 			: ''}"
 		aria-invalid={!!error}
@@ -61,7 +61,7 @@
 		type="button"
 		variant="outline"
 		size="icon-lg"
-		class="shrink-0 rounded-full sm:size-9"
+		class="shrink-0 rounded-full"
 		onclick={onSplit}
 		aria-label="Split cost across vehicles"
 	>
