@@ -226,6 +226,8 @@
 					<Plus class="mr-2 h-4 w-4" />
 					New Reminder
 				</Button>
+			{:else if isLoading}
+				<Skeleton class="h-10 w-full sm:w-36" />
 			{/if}
 		{/snippet}
 	</PageHeader>

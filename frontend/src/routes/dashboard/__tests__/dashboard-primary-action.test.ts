@@ -123,7 +123,7 @@ describe('dashboard primary action', () => {
 		expect(controls('Log Fill-up')).toHaveLength(0);
 	});
 
-	test('from lg the header holds a 40px placeholder for Add Vehicle until the first load settles', async () => {
+	test('the header holds a 40px placeholder at every width until the first load settles', async () => {
 		let settle: (vehicles: Vehicle[]) => void = () => {};
 		getVehicles.mockImplementation(() => new Promise<Vehicle[]>(r => (settle = r)));
 		render(Page);
@@ -135,7 +135,7 @@ describe('dashboard primary action', () => {
 		const placeholder = header?.querySelector('[data-slot="skeleton"]');
 		expect(placeholder).toHaveClass('h-10');
 
-		expect(placeholder).toHaveClass('hidden', 'lg:block');
+		expect(placeholder).not.toHaveClass('hidden');
 
 		settle([OWNED]);
 		await waitFor(() => expect(fromLg('Add Vehicle')).toHaveLength(1));

@@ -534,7 +534,7 @@
 					Add Vehicle
 				</Button>
 			{:else if isLoading && !hasLoaded}
-				<Skeleton class="hidden h-10 lg:block lg:w-36" />
+				<Skeleton class="h-10 w-full sm:w-36" />
 			{/if}
 		{/snippet}
 	</PageHeader>
