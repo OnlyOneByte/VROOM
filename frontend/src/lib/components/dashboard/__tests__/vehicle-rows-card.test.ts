@@ -50,8 +50,7 @@ describe('VehicleRowsCard', () => {
 		const [first, second] = screen.getAllByRole('listitem');
 
 		expect(first?.textContent).toContain('$500.79');
-		expect(first?.textContent).toContain('$0.13/mi');
+		expect(first?.textContent).toContain('$0.13/mi, 30 days');
 		expect(second?.textContent).toContain('No running cost per mi for this period');
-		expect(screen.getAllByTestId('vehicle-sparkline')).toHaveLength(1);
 	});
 });

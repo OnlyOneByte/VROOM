@@ -34,7 +34,7 @@ describe('DashboardHero', () => {
 		const widths = [...bar.children].map(seg => (seg as HTMLElement).style.width);
 		expect(widths).toEqual(['75%', '25%']);
 		expect(screen.getByRole('list').textContent?.replace(/\s+/g, ' ').trim()).toBe(
-			'Ownership $300.00 Fuel & charging $100.00 Upkeep $0.00'
+			'Ownership $300 Fuel & charging $100 Upkeep $0'
 		);
 	});
 

@@ -1,11 +1,6 @@
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '#lib/constants/expense-categories.ts';
 import type { TimePeriod } from '#lib/constants/time-periods.ts';
-import type {
-	ExpenseSummary,
-	InsurancePolicy,
-	ReminderWithVehicles,
-	VehicleKind
-} from '#lib/types/index.ts';
+import type { ExpenseSummary, InsurancePolicy, ReminderWithVehicles } from '#lib/types/index.ts';
 import {
 	bucketAmounts,
 	costBucket,
@@ -46,11 +41,8 @@ export interface VehicleRow {
 	id: string;
 	name: string;
 	detail: string;
-	kind?: VehicleKind;
-	isElectric: boolean;
 	spend: number;
 	runningPerDistance: number | null;
-	trend: number[] | null;
 }
 
 export interface PeriodSpend {

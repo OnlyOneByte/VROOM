@@ -10,15 +10,32 @@
 		title?: string;
 	}
 
-	let { items, title = 'Needs attention' }: Props = $props();
+	let { items, title = 'Needs you' }: Props = $props();
+
+	let dueCount = $derived(items.filter(item => item.status === 'overdue').length);
+	let soonCount = $derived(items.length - dueCount);
+	let summary = $derived(
+		[dueCount > 0 ? `${dueCount} due` : null, soonCount > 0 ? `${soonCount} soon` : null]
+			.filter(Boolean)
+			.join(', ')
+	);
 </script>
 
 {#if items.length > 0}
-	<Card.Root class="gap-3 py-5" data-testid="needs-attention">
-		<Card.Header class="px-5">
-			<Card.Title level={2} class="text-lg">{title}</Card.Title>
+	<Card.Root variant="section" data-testid="needs-attention">
+		<Card.Header class="flex flex-row items-center justify-between gap-3">
+			<p class="flex items-baseline gap-1.5">
+				<Card.Title level={2} class="text-base">{title}</Card.Title>
+				<span class="text-sm text-muted-foreground">· {summary}</span>
+			</p>
+			<a
+				href={resolve(routes.reminders)}
+				class="rounded-sm text-sm font-semibold text-accent-ink outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+			>
+				All<span class="sr-only"> reminders</span>
+			</a>
 		</Card.Header>
-		<Card.Content class="px-5">
+		<Card.Content>
 			<ul class="divide-y" role="list">
 				{#each items as item (item.id)}
 					<li class="relative flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">

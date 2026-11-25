@@ -13,7 +13,7 @@ test.describe('Fleet overview', () => {
 
 		await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 		await expect(page.getByRole('heading', { name: 'Add your first vehicle' })).toBeVisible();
-		await expect(page.getByRole('link', { name: 'Add Vehicle' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Add vehicle' })).toBeVisible();
 	});
 
 	test('the dashboard lists the fleet and links each vehicle to its page', async ({ page }) => {
@@ -90,7 +90,7 @@ test.describe('Adding a vehicle', () => {
 
 		await expect(async () => {
 			if (!/\/vehicles\/new$/.test(page.url())) {
-				await page.getByRole('link', { name: 'Add Vehicle' }).click();
+				await page.getByRole('link', { name: 'Add vehicle' }).click();
 			}
 			expect(page.url()).toMatch(/\/vehicles\/new$/);
 		}).toPass({ timeout: 20_000, intervals: [300, 1000, 2000] });
