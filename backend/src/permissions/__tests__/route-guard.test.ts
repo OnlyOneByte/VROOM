@@ -106,6 +106,37 @@ describe('routes that check inside really refuse', () => {
       ctx.close();
     }
   });
+
+  test("a member can't reach another owner's vehicle roles", async () => {
+    const ctx = await createTestApp();
+    try {
+      ctx.sqlite.run(
+        `INSERT INTO roles (id, scope, name, built_in, owner_user_id) VALUES ('${LIBRARY_ROLE}', 'vehicle', 'Probe', 0, ?)`,
+        [ctx.user.id]
+      );
+      ctx.sqlite.run(
+        "INSERT INTO users (id, email, display_name) VALUES ('other-owner', 'o@x.test', 'O')"
+      );
+      assignServerRole(getDb(), 'other-owner', 'member');
+      const member = await requestAs(ctx, 'other-owner');
+      const answered: string[] = [];
+      for (const [method, path, body] of [
+        ['PATCH', `/api/v1/roles/${LIBRARY_ROLE}`, { name: 'Taken' }],
+        ['GET', `/api/v1/roles/${LIBRARY_ROLE}/permissions`],
+        ['PUT', `/api/v1/roles/${LIBRARY_ROLE}/permissions`, { permissions: [] }],
+        ['DELETE', `/api/v1/roles/${LIBRARY_ROLE}`],
+      ] as Probe[]) {
+        const res = await member.request(method, path, body);
+        if (res.status !== 404) answered.push(`${method} ${path} -> ${res.status}`);
+      }
+      expect(answered).toEqual([]);
+      expect((await ctx.authed('GET', `/api/v1/roles/${LIBRARY_ROLE}/permissions`)).status).toBe(
+        200
+      );
+    } finally {
+      ctx.close();
+    }
+  });
 });
 
 describe('every mapped route enforces its permission', () => {
