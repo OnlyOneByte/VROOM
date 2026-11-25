@@ -27,9 +27,9 @@ describe('form fields are the 46px C3 field at every width', () => {
 		'%s trigger matches the 46px Input and truncates a long date inside its field',
 		file => {
 			const picker = source(file);
-			expect(picker).toMatch(/'h-11\.5 w-full min-w-0 justify-start/);
+			expect(picker).toMatch(/\bh-11\.5 w-full min-w-0 justify-start\b/);
 			expect(picker).not.toMatch(/\bsm:h-\d/);
-			expect(picker).toMatch(/<span[^>]*class="min-w-0 truncate"/);
+			expect(picker).toMatch(/<span[^>]*class=[^>]*min-w-0 truncate/);
 		}
 	);
 

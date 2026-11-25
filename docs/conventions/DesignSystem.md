@@ -91,8 +91,8 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 ### Primitives — `#lib/components/ui/*` (barrel imports)
 | Need | Import | Notes |
 |---|---|---|
-| Action | `import { Button } from '#lib/components/ui/button'` | Pill buttons. variants: `default` (the ink pill; one per view) / `accent` (the C3 accent fill, Add expense only) / `destructive` (final delete only) / `outline` / `secondary` / `ghost` (keeps the surrounding text colour, hovers on `sunk`) / `link` (accent-ink text) · sizes: default/sm/lg/icon/icon-sm/icon-lg · `href` renders an `<a>` |
-| Text input | `import { Input } from '#lib/components/ui/input'` | `bind:value`, `aria-invalid`, `aria-describedby` |
+| Action | `import { Button } from '#lib/components/ui/button'` | Pill buttons. variants: `default` (the ink pill; one per view) / `accent` (the C3 accent fill, Add expense only) / `destructive` (final delete only) / `outline` / `secondary` / `ghost` (keeps the surrounding text colour, hovers on `sunk`) / `link` (accent-ink text) · sizes: default and `lg` are 40px at every width (`lg` has larger text), `sm` 32px, `icon`/`icon-lg` 40px, `icon-sm` 32px · `href` renders an `<a>` |
+| Text input | `import { Input } from '#lib/components/ui/input'` | The 46px C3 field at every width (Select's trigger and the date pickers match). `bind:value`, `aria-invalid`, `aria-describedby` |
 | Multiline | `import { Textarea } from '#lib/components/ui/textarea'` | |
 | Toggle | `import { Switch } from '#lib/components/ui/switch'` / `{ Checkbox }` | `bind:checked`, or `checked` + `onCheckedChange` |
 | Dropdown | `import * as Select from '#lib/components/ui/select'` | compound; `Select.Root` takes `type="single"` + `onValueChange` |

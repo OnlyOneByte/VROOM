@@ -261,7 +261,7 @@
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Tabs</h2>
 			<p class="text-sm text-muted-foreground">
-				Triggers are 40px tall below <code>sm</code> so they clear the mobile tap target.
+				Triggers are 40px tall, so they clear the tap target at every width.
 			</p>
 			<Tabs value="overview">
 				<TabsList class="grid w-full grid-cols-3">
