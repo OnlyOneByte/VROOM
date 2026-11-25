@@ -30,44 +30,76 @@ const SELF_CHECKED_ROUTES: Record<string, string> = {
 
 type Probe = [method: string, path: string, body?: unknown];
 
-const PROBE_ROLE = 'probe-server-role';
+const SERVER_ROLE = 'probe-server-role';
+const LIBRARY_ROLE = 'probe-library-role';
 
-const SELF_CHECK_PROBES: Record<string, Probe> = {
-  'GET /api/v1/overrides': ['GET', '/api/v1/overrides?userId=OWNER&scope=server'],
-  'GET /api/v1/roles': ['GET', '/api/v1/roles?scope=server'],
-  'POST /api/v1/roles': ['POST', '/api/v1/roles', { scope: 'server', name: 'Probe' }],
-  'PATCH /api/v1/roles/:id': ['PATCH', `/api/v1/roles/${PROBE_ROLE}`, { name: 'Renamed' }],
-  'DELETE /api/v1/roles/:id': ['DELETE', `/api/v1/roles/${PROBE_ROLE}`],
-  'GET /api/v1/roles/:id/permissions': ['GET', `/api/v1/roles/${PROBE_ROLE}/permissions`],
-  'PUT /api/v1/roles/:id/permissions': [
-    'PUT',
-    `/api/v1/roles/${PROBE_ROLE}/permissions`,
-    { permissions: [] },
+const SESSION_FLOW = new Set([
+  'GET /api/v1/auth/me',
+  'GET /api/v1/auth/capabilities',
+  'POST /api/v1/auth/logout',
+  'POST /api/v1/auth/refresh',
+  'GET /api/v1/auth/callback/link/:authProvider',
+  'GET /api/v1/auth/callback/provider/google',
+]);
+
+const SELF_CHECK_PROBES: Record<string, Probe[]> = {
+  'GET /api/v1/overrides': [['GET', '/api/v1/overrides?userId=OWNER&scope=server']],
+  'GET /api/v1/roles': [
+    ['GET', '/api/v1/roles?scope=server'],
+    ['GET', '/api/v1/roles?scope=vehicle'],
   ],
+  'POST /api/v1/roles': [
+    ['POST', '/api/v1/roles', { scope: 'server', name: 'Probe' }],
+    ['POST', '/api/v1/roles', { scope: 'vehicle', name: 'Probe' }],
+  ],
+  'PATCH /api/v1/roles/:id': [SERVER_ROLE, LIBRARY_ROLE].map((id) => [
+    'PATCH',
+    `/api/v1/roles/${id}`,
+    { name: 'Renamed' },
+  ]),
+  'DELETE /api/v1/roles/:id': [SERVER_ROLE, LIBRARY_ROLE].map((id) => [
+    'DELETE',
+    `/api/v1/roles/${id}`,
+  ]),
+  'GET /api/v1/roles/:id/permissions': [SERVER_ROLE, LIBRARY_ROLE].map((id) => [
+    'GET',
+    `/api/v1/roles/${id}/permissions`,
+  ]),
+  'PUT /api/v1/roles/:id/permissions': [SERVER_ROLE, LIBRARY_ROLE].map((id) => [
+    'PUT',
+    `/api/v1/roles/${id}/permissions`,
+    { permissions: [] },
+  ]),
 };
 
 describe('routes that check inside really refuse', () => {
-  test('every self-checked route outside the session flow has a probe', () => {
+  test('every self-checked route is either in the session flow or has a probe', () => {
     const unprobed = Object.keys(SELF_CHECKED_ROUTES).filter(
-      (key) => !key.includes(' /api/v1/auth/') && !(key in SELF_CHECK_PROBES)
+      (key) => !SESSION_FLOW.has(key) && !(key in SELF_CHECK_PROBES)
     );
     expect(unprobed).toEqual([]);
   });
 
-  test('an account without a server role is refused by each of them', async () => {
+  test('an account without a server role gets 403 from each of them', async () => {
     const ctx = await createTestApp();
     try {
       ctx.sqlite.run(
-        `INSERT INTO roles (id, scope, name, built_in) VALUES ('${PROBE_ROLE}', 'server', 'Probe', 0)`
+        `INSERT INTO roles (id, scope, name, built_in) VALUES ('${SERVER_ROLE}', 'server', 'Probe', 0)`
+      );
+      ctx.sqlite.run(
+        `INSERT INTO roles (id, scope, name, built_in, owner_user_id) VALUES ('${LIBRARY_ROLE}', 'vehicle', 'Probe', 0, ?)`,
+        [ctx.user.id]
       );
       ctx.sqlite.run(
         "INSERT INTO users (id, email, display_name) VALUES ('no-role', 'n@x.test', 'N')"
       );
       const caller = await requestAs(ctx, 'no-role');
       const answered: string[] = [];
-      for (const [key, [method, path, body]] of Object.entries(SELF_CHECK_PROBES)) {
-        const res = await caller.request(method, path.replace('OWNER', ctx.user.id), body);
-        if (res.status !== 403 && res.status !== 404) answered.push(`${key} -> ${res.status}`);
+      for (const [key, probes] of Object.entries(SELF_CHECK_PROBES)) {
+        for (const [method, path, body] of probes) {
+          const res = await caller.request(method, path.replace('OWNER', ctx.user.id), body);
+          if (res.status !== 403) answered.push(`${key} ${path} -> ${res.status}`);
+        }
       }
       expect(answered).toEqual([]);
     } finally {

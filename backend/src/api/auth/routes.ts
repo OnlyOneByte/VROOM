@@ -11,7 +11,7 @@ import { createErrorResponse, isUniqueConstraintError, NotFoundError } from '../
 import { rateLimiter, requireAuth } from '../../middleware';
 import { authorize, ownAccount } from '../../permissions/authorize';
 import { assignServerRole, requestResolver, resolverFor } from '../../permissions/grants';
-import { PERMISSION_REGISTRY } from '../../permissions/registry';
+import { PERMISSION_REGISTRY, type PermissionId } from '../../permissions/registry';
 import { ROLE_TEMPLATES } from '../../permissions/roles';
 import { getClientRateKey } from '../../utils/client-ip';
 import { encrypt } from '../../utils/encryption';
@@ -428,11 +428,11 @@ export async function checkLinkConflicts(
   return 'account_conflict';
 }
 
-// Register before the generic /callback/:authProvider route, which would shadow it.
-function holdsOnOwnAccount(userId: string, permission: string): boolean {
+function holdsOnOwnAccount(userId: string, permission: PermissionId): boolean {
   return resolverFor(getDb(), userId).can(permission, { kind: 'account', userId }).allow;
 }
 
+// Register before the generic /callback/:authProvider route, which would shadow it.
 routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
   const authProviderId = c.req.param('authProvider') ?? '';
   const url = new URL(c.req.url);

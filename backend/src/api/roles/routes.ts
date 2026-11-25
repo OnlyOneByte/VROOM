@@ -301,7 +301,6 @@ function refuseDemoRole(role: Role): void {
 
 function assignable(c: Context, input: z.infer<typeof assignmentSchema>) {
   const role = findRole(input.roleId);
-  refuseDemoRole(role);
   const authority = authorityAt(c, role.scope, input.scopeId);
   if (role.scope === 'vehicle' && !role.builtIn && role.ownerUserId !== authority.ownerId) {
     throw new NotFoundError('Role');
@@ -321,6 +320,7 @@ assignmentRoutes.post(
   authorize(assignmentResource),
   (c) => {
     const input = c.req.valid('json');
+    refuseDemoRole(findRole(input.roleId));
     const { role, scopeId } = assignable(c, input);
     try {
       const created = getDb()

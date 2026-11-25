@@ -77,7 +77,7 @@ edited or deleted; the built-in keys are reserved, and a role's scope never chan
 - `role_assignments` gives a person a role: at server scope (`scope_id` null), or on one vehicle.
   Everyone holds Member, and the demo user Demo, except an account waiting for approval, which
   holds no server role until an admin approves it. Only the demo bootstrap assigns Demo: the roles
-  API refuses to assign it or copy it. Accepting a share clears anything left over for
+  API refuses to assign it or copy it (removing a Demo assignment stays an ordinary removal). Accepting a share clears anything left over for
   that person on that car and assigns Editor or Viewer from its level; changing the level swaps
   it; revoking or leaving deletes that person's vehicle assignments and overrides. Each of these
   re-reads the share in its transaction and answers 409 if it changed underneath. `vehicle_shares` stays the membership and invite record.
