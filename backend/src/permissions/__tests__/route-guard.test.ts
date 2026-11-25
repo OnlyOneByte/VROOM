@@ -175,6 +175,7 @@ describe('the route guard', () => {
     probe.get('/api/v1/settings', (c) => c.text('reached'));
     probe.put('/api/v1/settings', (c) => c.text('reached'));
     probe.post('/api/v1/auth/demo', (c) => c.text('reached'));
+    probe.get('/api/v1/vehicles/:vehicleId/drivers/stats', (c) => c.text('reached'));
     return probe;
   }
 
@@ -191,6 +192,7 @@ describe('the route guard', () => {
     expect(write.status).toBe(403);
     expect(((await write.json()) as { code: string }).code).toBe('DEMO_READ_ONLY');
     expect((await demo.request('/api/v1/auth/demo', { method: 'POST' })).status).toBe(403);
+    expect((await demo.request('/api/v1/vehicles/car/drivers/stats')).status).toBe(200);
     expect((await guarded('someone').request('/api/v1/settings', { method: 'PUT' })).status).toBe(
       200
     );
