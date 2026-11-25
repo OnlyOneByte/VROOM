@@ -9,6 +9,7 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import PageHeader from '#lib/components/common/page-header.svelte';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
 	import DashboardHero from '#lib/components/dashboard/DashboardHero.svelte';
 	import NeedsAttentionCard from '#lib/components/dashboard/NeedsAttentionCard.svelte';
@@ -477,7 +478,7 @@
 </svelte:head>
 
 <div class="mx-auto max-w-6xl space-y-10">
-	<h1 tabindex="-1" class="sr-only outline-none">Dashboard</h1>
+	<div class="sr-only"><PageHeader title="Dashboard" /></div>
 
 	{#if loadError && !isLoading}
 		<LoadErrorCard
