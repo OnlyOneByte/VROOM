@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { focusFirstButton, focusFirstProblem, focusLeftOn } from '../focus.ts';
+import { focusFirstButton, focusFirstProblem, focusLeftOn, landOn } from '../focus.ts';
 
 afterEach(() => {
 	document.body.innerHTML = '';
@@ -127,5 +127,72 @@ describe('focusFirstProblem', () => {
 		await focusFirstProblem(null);
 
 		expect(document.activeElement).toBe(origin);
+	});
+});
+
+describe('landOn', () => {
+	let resized: () => void = () => {};
+	const disconnect = vi.fn();
+
+	function card(): HTMLElement {
+		const el = document.createElement('section');
+		el.tabIndex = -1;
+		el.scrollIntoView = vi.fn();
+		document.body.append(el);
+		return el;
+	}
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.useRealTimers();
+		disconnect.mockClear();
+	});
+
+	function stubResizeObserver() {
+		vi.stubGlobal(
+			'ResizeObserver',
+			class {
+				constructor(callback: () => void) {
+					resized = callback;
+				}
+				observe() {}
+				disconnect = disconnect;
+			}
+		);
+	}
+
+	test('scrolls to and focuses the target, and keeps it in view while the page above grows', () => {
+		stubResizeObserver();
+		const target = card();
+
+		landOn(target);
+		expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
+		expect(target).toHaveFocus();
+
+		resized();
+		expect(target.scrollIntoView).toHaveBeenCalledTimes(2);
+	});
+
+	test('lets go once the user scrolls or presses a key', () => {
+		stubResizeObserver();
+		const added = vi.mocked(window.addEventListener);
+		added.mockClear();
+		landOn(card());
+
+		const onWheel = added.mock.calls.find(([type]) => type === 'wheel')?.[1];
+		expect(onWheel).toBeTypeOf('function');
+		(onWheel as () => void)();
+
+		expect(disconnect).toHaveBeenCalledTimes(1);
+	});
+
+	test('lets go once the page has settled', () => {
+		vi.useFakeTimers();
+		stubResizeObserver();
+		landOn(card(), 1000);
+
+		vi.advanceTimersByTime(1000);
+
+		expect(disconnect).toHaveBeenCalledTimes(1);
 	});
 });

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
-	import { focusFirstButton, focusFirstProblem } from '#lib/utils/focus.ts';
+	import { onDestroy, onMount, tick } from 'svelte';
+	import { focusFirstButton, focusFirstProblem, landOn } from '#lib/utils/focus.ts';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
 	import HowItWorks from '#lib/components/common/how-it-works.svelte';
@@ -166,13 +166,14 @@
 		}
 	}
 
+	let stopLanding: (() => void) | undefined;
+	onDestroy(() => stopLanding?.());
 	onMount(async () => {
 		await loadData();
 		if (location.hash !== `#${copy.anchor}`) return;
 		await tick();
 		const card = document.getElementById(copy.anchor);
-		card?.scrollIntoView({ block: 'start' });
-		card?.focus({ preventScroll: true });
+		if (card) stopLanding = landOn(card);
 	});
 
 	async function retryLoad() {

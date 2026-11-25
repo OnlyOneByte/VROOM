@@ -100,9 +100,17 @@ describe('ModelProvidersCard', () => {
 
 		beforeEach(() => {
 			Element.prototype.scrollIntoView = scrollIntoView;
+			vi.stubGlobal(
+				'ResizeObserver',
+				class {
+					observe() {}
+					disconnect() {}
+				}
+			);
 		});
 
 		afterEach(() => {
+			vi.unstubAllGlobals();
 			Element.prototype.scrollIntoView = realScrollIntoView;
 			history.replaceState(null, '', location.pathname);
 		});
