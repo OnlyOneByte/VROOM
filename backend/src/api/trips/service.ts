@@ -84,6 +84,7 @@ export async function createTrip(
         startLocation: data.startLocation ?? null,
         endLocation: data.endLocation ?? null,
         note: data.note ?? null,
+        driverId: data.driverId ?? null,
         createdBy,
       })
       .returning()
@@ -96,6 +97,7 @@ export async function createTrip(
         odometer: data.endOdometer,
         recordedAt: data.tripDate,
         timeZone: data.timeZone,
+        driverId: data.driverId ?? null,
         createdBy,
       },
       tx
@@ -175,6 +177,7 @@ export async function updateTrip(
         odometer: end,
         recordedAt: tripDate,
         timeZone,
+        driverId: row.driverId,
         createdBy: existing.createdBy,
       },
       tx

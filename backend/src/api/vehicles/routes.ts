@@ -47,6 +47,7 @@ import {
 } from '../../utils/vehicle-access';
 import { catalogModelMatchesMake, isCatalogModel } from '../../utils/vehicle-catalog';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
+import { carShareRoutes, driverRoutes } from '../drivers/routes';
 import { expenseRepository } from '../expenses/repository';
 import { financingRepository, withComputedBalance } from '../financing/repository';
 import { odometerRepository } from '../odometer/repository';
@@ -175,6 +176,8 @@ routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
 routes.route('/:vehicleId/photos', photoRoutes);
+routes.route('/:vehicleId/drivers', driverRoutes);
+routes.route('/:vehicleId/car-share', carShareRoutes);
 
 function changedUnits(existing: UnitPreferences, merged: UnitPreferences | undefined): string[] {
   if (!merged) return [];
