@@ -8,7 +8,7 @@ import PaginationControls from '../pagination-controls.svelte';
 
 const COMPONENTS = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CAROUSEL_ARROW_TAG = /<Carousel\.(?:Previous|Next)\b[^>]*>/g;
-const BREAKPOINT_SHRINK = /\b(?:h|size)-1\d\b[^"'`{}\n]*?\b(?:sm|md):(?:h|size)-[1-9]\b/g;
+const BREAKPOINT_SHRINK = /\b(?:h|size)-1\d\b[^"'`{}\n]*?\b(?:sm|md):(?:h|w|size)-[1-9]\b/g;
 const SIZED_BUTTON_SHRINK =
 	/size="(?:icon-lg|lg|icon|default)"[^<]*?class="[^"]*\b(?:sm|md):(?:h|size)-[1-9]\b|class="[^"]*\b(?:sm|md):(?:h|size)-[1-9]\b[^"]*"[^<]*?size="(?:icon-lg|lg|icon|default)"/;
 const SHRINK_EXCEPTIONS: Record<string, number> = {
@@ -68,6 +68,8 @@ describe('shared controls meet the 40px tap target', () => {
 		['class="h-10 text-destructive sm:h-9"', true],
 		['class="h-10 text-xs sm:h-7"', true],
 		['class="size-10 text-xs sm:h-7 sm:w-auto"', true],
+		['class="size-10 sm:w-9"', true],
+		['class="h-10 w-10 sm:w-auto"', false],
 		['class="h-10 sm:w-auto"', false],
 		['class="h-12 sm:h-10"', false],
 		['class="h-10" /> <Button class="sm:h-8"', false]
