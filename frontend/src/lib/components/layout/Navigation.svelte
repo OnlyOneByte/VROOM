@@ -275,7 +275,7 @@
 				href={resolve(routes.expenseNew)}
 				class="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full bg-accent-fill py-0 pl-1.5 pr-4 text-sm font-semibold text-accent-fill-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 			>
-				<span class="grid size-7 place-items-center rounded-full bg-black/10" aria-hidden="true">
+				<span class="grid size-7 place-items-center rounded-full bg-accent-fill-foreground/15" aria-hidden="true">
 					<Plus class="h-4 w-4" />
 				</span>
 				Add expense
@@ -308,7 +308,7 @@
 				<a
 					href={resolve(item.href)}
 					class={cn(
-						'flex min-h-12 flex-col items-center justify-end gap-0.5 rounded-md font-(family-name:--font-fig) text-[11px] font-bold uppercase tracking-[0.12em]',
+						'flex min-h-12 flex-col items-center justify-end gap-0.5 rounded-md font-(family-name:--font-fig) text-xs font-bold uppercase tracking-[0.12em]',
 						'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bar-on',
 						isActive(item.href) && 'text-bar-on'
 					)}
@@ -322,11 +322,11 @@
 			{@render tab(log)}
 			<a
 				href={resolve(routes.expenseNew)}
-				class="group flex min-h-12 flex-col items-center justify-end gap-0.5 rounded-md font-(family-name:--font-fig) text-[11px] font-bold uppercase tracking-[0.12em] focus-visible:outline-none"
+				class="group flex min-h-12 flex-col items-center justify-end gap-0.5 rounded-md font-(family-name:--font-fig) text-xs font-bold uppercase tracking-[0.12em] focus-visible:outline-none"
 				aria-label="Add expense"
 			>
 				<span
-					class="-mt-[26px] grid size-[58px] place-items-center rounded-full bg-accent-fill text-accent-fill-foreground shadow-[0_0_0_4px_var(--bar),var(--shadow-pop)] group-focus-visible:ring-2 group-focus-visible:ring-bar-on group-focus-visible:ring-offset-4 group-focus-visible:ring-offset-bar"
+					class="-mt-[26px] grid size-[58px] place-items-center short:mt-0 short:size-11 rounded-full bg-accent-fill text-accent-fill-foreground shadow-[0_0_0_4px_var(--bar),var(--shadow-pop)] group-focus-visible:ring-2 group-focus-visible:ring-bar-on group-focus-visible:ring-offset-4 group-focus-visible:ring-offset-bar"
 					aria-hidden="true"
 				>
 					<Plus class="h-[26px] w-[26px]" />
@@ -337,7 +337,7 @@
 			<button
 				type="button"
 				class={cn(
-					'flex min-h-12 flex-col items-center justify-end gap-0.5 rounded-md font-(family-name:--font-fig) text-[11px] font-bold uppercase tracking-[0.12em]',
+					'flex min-h-12 flex-col items-center justify-end gap-0.5 rounded-md font-(family-name:--font-fig) text-xs font-bold uppercase tracking-[0.12em]',
 					'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bar-on',
 					sheetActive && 'text-bar-on'
 				)}
