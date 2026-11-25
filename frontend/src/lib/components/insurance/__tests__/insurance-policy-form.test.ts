@@ -119,12 +119,13 @@ describe('InsurancePolicyForm create mode', () => {
 		expect(screen.getByRole('heading', { level: 3, name: 'Policy Details' })).toBeInTheDocument();
 	});
 
-	test('the actions sit in a ruled row under the form, with Cancel and a plain Create Policy', async () => {
+	test('Save and Cancel sit in a sticky bar on phones and a plain row from lg, with a plain Create Policy', async () => {
 		await mount();
 		const save = screen.getByRole('button', { name: 'Create Policy' });
 
 		expect(save.closest('.fixed')).toBeNull();
-		expect(save.parentElement?.parentElement).toHaveClass('border-t');
+		const bar = save.closest('[data-slot="form-action-bar"]');
+		expect(bar).toHaveClass('sticky', 'bottom-0', 'border-t', 'lg:static', 'short:static');
 		expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
 		expect(save.className).not.toMatch(/shadow-lg|shadow-2xl|hover:scale/);
 	});

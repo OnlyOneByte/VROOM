@@ -210,7 +210,6 @@
 								<Button
 									variant="ghost"
 									size="icon-lg"
-									class="sm:size-9"
 									onclick={() => confirmRevoke(share)}
 									aria-label="Revoke access for {personLabel(share)}"
 								>

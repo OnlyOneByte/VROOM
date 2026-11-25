@@ -24,6 +24,8 @@
 		compact?: boolean;
 		count?: number | null;
 		uploadOpen?: boolean;
+		loadError?: string | null;
+		inlineError?: boolean;
 	}
 
 	let {
@@ -33,31 +35,34 @@
 		level = 4,
 		compact = false,
 		count = $bindable(null),
-		uploadOpen = $bindable(false)
+		uploadOpen = $bindable(false),
+		loadError = $bindable(null),
+		inlineError = true
 	}: Props = $props();
 
 	let documents = $state<Photo[]>([]);
 	let isLoading = $state(true);
-	let loadFailed = $state(false);
-	let loadMessage = $state('');
 
 	$effect(() => {
-		count = isLoading || loadFailed ? null : documents.length;
+		count = isLoading || loadError ? null : documents.length;
 	});
 
 	onMount(async () => {
 		await loadDocuments();
 	});
 
+	export function reload() {
+		return loadDocuments();
+	}
+
 	async function loadDocuments() {
 		isLoading = true;
 		try {
 			const docsResult = await insuranceApi.getEntityDocuments(entityType, entityId);
 			documents = docsResult.data;
-			loadFailed = false;
+			loadError = null;
 		} catch (err) {
-			loadFailed = true;
-			loadMessage = userFacingErrorMessage(err);
+			loadError = userFacingErrorMessage(err);
 			if (compact) logLoadFailure(err, "Couldn't load the documents");
 			else handleErrorWithNotification(err, "Couldn't load the documents");
 		} finally {
@@ -95,15 +100,17 @@
 </script>
 
 {#if compact}
-	{#if loadFailed}
-		<div class="mt-3">
-			<LoadErrorCard
-				compact
-				title="Couldn't load the documents"
-				message={loadMessage}
-				onRetry={loadDocuments}
-			/>
-		</div>
+	{#if loadError}
+		{#if inlineError}
+			<div class="mt-3">
+				<LoadErrorCard
+					compact
+					title="Couldn't load the documents"
+					message={loadError}
+					onRetry={loadDocuments}
+				/>
+			</div>
+		{/if}
 	{:else if !isLoading && documents.length > 0}
 		<div class="mt-3 space-y-3">
 			<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground">
@@ -119,7 +126,7 @@
 				Documents
 			</svelte:element>
 			{#if !readOnly}
-				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={() => (uploadOpen = true)}>
+				<Button variant="outline" size="sm" class="h-10" onclick={() => (uploadOpen = true)}>
 					<Upload />
 					Upload
 				</Button>

@@ -10,12 +10,12 @@ function source(rel: string): string {
 }
 
 describe('expense and vehicle form controls meet the 40px tap target on mobile', () => {
-	test('the photo Upload and Add buttons are 40px below sm', () => {
+	test('the photo Upload and Add buttons are 40px at every width', () => {
 		for (const file of [
 			'expenses/form/ExpensePhotoSection.svelte',
 			'expenses/form/PendingPhotoPreview.svelte'
 		]) {
-			expect(source(file)).toContain('class="h-10 text-xs sm:h-7"');
+			expect(source(file)).toContain('class="h-10 text-xs"');
 		}
 	});
 
@@ -44,7 +44,7 @@ describe('expense and vehicle form controls meet the 40px tap target on mobile',
 			source('expenses/form/FuelFieldsSection.svelte').match(/class="h-10 flex-1 gap-1\.5 sm:h-8"/g)
 		).toHaveLength(2);
 		const scan = source('expenses/form/ReceiptScanButton.svelte');
-		expect(scan).toContain('class="ml-auto h-10 rounded-full px-3 sm:h-9"');
+		expect(scan).toContain('class="ml-auto h-10 rounded-full px-3"');
 		expect(scan).toContain('inline-flex min-h-10 items-center self-start');
 		expect(source('expenses/form/CategorySelector.svelte')).toContain(
 			'inline-flex h-10 items-center'

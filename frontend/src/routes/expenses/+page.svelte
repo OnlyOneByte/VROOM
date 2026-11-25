@@ -756,7 +756,7 @@
 						<p class="min-w-0 text-sm text-muted-foreground" data-testid="active-filter-summary">
 							{activeFilterSummary}
 						</p>
-						<Button variant="outline" size="sm" class="h-10 shrink-0 sm:h-8" onclick={clearFilters}>
+						<Button variant="outline" size="sm" class="h-10 shrink-0" onclick={clearFilters}>
 							<X class="h-4 w-4 mr-2" />
 							{COMMON_MESSAGES.CLEAR_FILTERS}
 						</Button>

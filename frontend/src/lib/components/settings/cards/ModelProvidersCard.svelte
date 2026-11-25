@@ -287,7 +287,7 @@
 	{:else}
 		<Button
 			variant="outline"
-			class="h-10 sm:h-9"
+			class="h-10"
 			aria-disabled={savingDefaultId !== null}
 			onclick={() => useAsDefault(provider)}
 		>
@@ -318,7 +318,7 @@
 		{:else if error}
 			<div class="space-y-3" data-testid="{domain}-provider-error">
 				<p class="text-sm text-destructive" role="alert">{error}</p>
-				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={retryLoad}>Retry</Button>
+				<Button variant="outline" size="sm" class="h-10" onclick={retryLoad}>Retry</Button>
 			</div>
 		{:else}
 			<div class="space-y-3">
@@ -331,7 +331,7 @@
 					<Button
 						variant="outline"
 						size="sm"
-						class="h-10 sm:h-8"
+						class="h-10"
 						onclick={openCreate}
 						data-testid="{domain}-add-provider"
 					>
@@ -378,7 +378,7 @@
 										<Button
 											variant="ghost"
 											size="icon"
-											class="size-10 sm:size-9"
+											class="size-10"
 											aria-label="Edit {provider.displayName}"
 											onclick={() => openEdit(provider)}
 										>
@@ -387,7 +387,7 @@
 										<Button
 											variant="ghost"
 											size="icon"
-											class="size-10 sm:size-9"
+											class="size-10"
 											aria-label="Delete {provider.displayName}"
 											onclick={() => confirmDelete(provider)}
 										>

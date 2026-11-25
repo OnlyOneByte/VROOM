@@ -116,10 +116,12 @@ describe('InsuranceManagedView', () => {
 		expect(screen.getByRole('button', { name: 'Force Delete' })).toBeDisabled();
 	});
 
-	test('Back to Expenses and Force Delete are 40px tall below sm and 36px from sm up', () => {
+	test('Back to Expenses and Force Delete are 40px tall at every width', () => {
 		render(InsuranceManagedView, { props: props() });
 		for (const name of ['Back to Expenses', 'Force Delete']) {
-			expect(screen.getByRole('button', { name })).toHaveClass('h-10', 'sm:h-9');
+			const button = screen.getByRole('button', { name });
+			expect(button).toHaveClass('h-10');
+			expect(button.className).not.toMatch(/\bsm:h-/);
 		}
 	});
 });

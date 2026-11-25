@@ -2,6 +2,7 @@
 	import { focusFirstProblem } from '#lib/utils/focus.ts';
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { goto } from '$app/navigation';
+	import FormActionBar from '#lib/components/common/form-action-bar.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
@@ -580,7 +581,7 @@
 				{/if}
 			</form>
 
-			<div class="flex flex-wrap items-center gap-3 border-t border-border pt-6">
+			<FormActionBar>
 				{#if isEditMode}
 					<Button
 						type="button"
@@ -590,8 +591,8 @@
 						disabled={isDeleting || isSubmitting}
 						class="rounded-full text-destructive"
 					>
-						<Trash2 class="size-4" />
-						Delete
+						<Trash2 class="size-4" aria-hidden="true" />
+						<span class="max-sm:sr-only">Delete</span>
 					</Button>
 				{/if}
 				<div class="ml-auto flex items-center gap-3">
@@ -620,7 +621,7 @@
 						{/if}
 					</Button>
 				</div>
-			</div>
+			</FormActionBar>
 		</div>
 
 		<AlertDialog bind:open={showDeleteConfirm}>

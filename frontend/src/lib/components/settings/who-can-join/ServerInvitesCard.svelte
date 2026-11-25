@@ -171,7 +171,7 @@
 						<FormFieldError id="invite-days-error">{daysError}</FormFieldError>
 					{/if}
 				</div>
-				<Button type="submit" class="h-10 sm:mt-[1.375rem] sm:h-9" aria-busy={creating}>
+				<Button type="submit" class="h-10 sm:mt-[1.375rem]" aria-busy={creating}>
 					{#if creating}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
 					Invite
 				</Button>
@@ -221,7 +221,7 @@
 						{#if invite.status === 'active'}
 							<Button
 								variant="ghost"
-								class="h-10 text-destructive sm:h-9"
+								class="h-10 text-destructive"
 								onclick={() => askRevoke(invite)}
 								aria-label="Revoke the invite for {invite.email}"
 							>

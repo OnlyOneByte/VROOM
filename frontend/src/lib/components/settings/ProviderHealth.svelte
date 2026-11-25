@@ -98,7 +98,7 @@
 {#snippet testButton()}
 	<Button
 		variant="outline"
-		class="h-10 min-w-36 text-foreground sm:h-9"
+		class="h-10 min-w-36 text-foreground"
 		data-test-connection
 		aria-disabled={isTesting}
 		aria-label="Test Connection to {provider.displayName}"
@@ -126,7 +126,7 @@
 				<p>{problem.detail}</p>
 				<div class="mt-2 flex flex-wrap gap-2">
 					<Button
-						class="h-10 sm:h-9"
+						class="h-10"
 						onclick={() =>
 							onFix(provider, provider.status === 'needs_reauth' ? 'reconnect' : 'edit')}
 					>

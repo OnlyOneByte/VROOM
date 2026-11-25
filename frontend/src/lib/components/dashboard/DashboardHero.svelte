@@ -63,7 +63,7 @@
 		}}
 	>
 		<Select.Trigger
-			class="h-10 gap-1.5 rounded-full px-3.5 sm:h-8"
+			class="h-10 gap-1.5 rounded-full px-3.5"
 			aria-label="Period: {phrases.chip}"
 			disabled={isUpdating || isLoading}
 		>

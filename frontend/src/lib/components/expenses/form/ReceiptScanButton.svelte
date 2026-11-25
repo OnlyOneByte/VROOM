@@ -91,7 +91,7 @@
 	<Button
 		type="button"
 		variant="outline"
-		class="ml-auto h-10 rounded-full px-3 sm:h-9"
+		class="ml-auto h-10 rounded-full px-3"
 		onclick={onScanClick}
 		disabled={isScanning}
 		data-testid="receipt-scan-button"

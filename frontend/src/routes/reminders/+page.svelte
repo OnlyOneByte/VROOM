@@ -341,12 +341,7 @@
 					{/if}
 				</Card.Title>
 				{#if unreadNotifications.length > 0}
-					<Button
-						variant="ghost"
-						size="sm"
-						class="ml-auto h-10 sm:h-8"
-						onclick={markAllNotificationsRead}
-					>
+					<Button variant="ghost" size="sm" class="ml-auto h-10" onclick={markAllNotificationsRead}>
 						<Check class="mr-2 h-4 w-4" />
 						Mark All Read
 					</Button>

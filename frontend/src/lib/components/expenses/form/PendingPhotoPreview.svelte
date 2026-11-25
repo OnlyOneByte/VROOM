@@ -50,7 +50,7 @@
 <div class="space-y-3">
 	<div class="flex items-center justify-between">
 		<h2 class="text-sm font-medium text-foreground">Photos & Receipts</h2>
-		<Button variant="outline" size="sm" class="h-10 text-xs sm:h-7" onclick={openUploadDialog}>
+		<Button variant="outline" size="sm" class="h-10 text-xs" onclick={openUploadDialog}>
 			<Upload class="mr-1 h-3 w-3" />
 			Add
 		</Button>

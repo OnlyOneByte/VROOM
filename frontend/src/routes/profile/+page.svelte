@@ -241,7 +241,7 @@
 								<Input
 									bind:value={nameDraft}
 									maxlength={100}
-									class="h-10 max-w-[200px] sm:h-8"
+									class="max-w-[200px]"
 									disabled={isSavingName}
 									aria-label="Display name"
 									onkeydown={(e: KeyboardEvent) => {
@@ -251,7 +251,6 @@
 								/>
 								<Button
 									size="icon-lg"
-									class="sm:h-8 sm:w-9"
 									variant="ghost"
 									onclick={saveDisplayName}
 									disabled={isSavingName}
@@ -265,7 +264,6 @@
 								</Button>
 								<Button
 									size="icon-lg"
-									class="sm:h-8 sm:w-9"
 									variant="ghost"
 									onclick={cancelEditName}
 									disabled={isSavingName}
@@ -279,7 +277,6 @@
 								<span class="text-sm">{user?.displayName ?? '—'}</span>
 								<Button
 									size="icon-lg"
-									class="sm:h-8 sm:w-9"
 									variant="ghost"
 									onclick={startEditName}
 									aria-label="Edit display name"
@@ -364,7 +361,6 @@
 								<Button
 									variant="ghost"
 									size="icon-lg"
-									class="sm:h-8 sm:w-9"
 									aria-label="Unlink {account.displayName}"
 									disabled={accounts.length <= 1 || unlinkingId !== null}
 									onclick={() => confirmUnlink(account)}
@@ -387,7 +383,7 @@
 									<Button
 										variant="outline"
 										size="sm"
-										class="h-10 w-full justify-start sm:h-8"
+										class="h-10 w-full justify-start"
 										disabled={linkingProvider !== null}
 										onclick={() => handleLink(provider.id)}
 									>
@@ -440,7 +436,7 @@
 					<Button
 						variant="outline"
 						size="sm"
-						class="h-10 sm:h-8"
+						class="h-10"
 						onclick={handleExportData}
 						disabled={isExporting}
 					>

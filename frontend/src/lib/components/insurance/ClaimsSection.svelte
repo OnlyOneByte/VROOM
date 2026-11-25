@@ -52,6 +52,8 @@
 		compact?: boolean;
 		count?: number | null;
 		formOpen?: boolean;
+		loadError?: string | null;
+		inlineError?: boolean;
 	}
 
 	let {
@@ -61,7 +63,9 @@
 		level = 4,
 		compact = false,
 		count = $bindable(null),
-		formOpen = $bindable(false)
+		formOpen = $bindable(false),
+		loadError = $bindable(null),
+		inlineError = true
 	}: Props = $props();
 
 	let vehicleNameMap = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
@@ -69,7 +73,6 @@
 	let claims = $state<InsuranceClaim[]>([]);
 	let isLoading = $state(true);
 	let hasLoaded = $state(false);
-	let loadError = $state<string | null>(null);
 	const expandedDocs = new SvelteSet<string>();
 
 	function toggleDocs(claimId: string) {
@@ -112,6 +115,10 @@
 	$effect(() => {
 		count = !hasLoaded || loadError ? null : claims.length;
 	});
+
+	export function reload() {
+		return loadClaims();
+	}
 
 	async function loadClaims() {
 		isLoading = true;
@@ -225,21 +232,21 @@
 	}
 </script>
 
-{#if !compact || loadError || (hasLoaded && claims.length > 0)}
+{#if !compact || (loadError && inlineError) || (hasLoaded && claims.length > 0)}
 	<div class={compact ? 'mt-3 space-y-3' : 'space-y-3'}>
 		<div class="flex items-center justify-between">
 			<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground">
 				Claims
 			</svelte:element>
 			{#if !readOnly && !compact}
-				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={openNew}>
+				<Button variant="outline" size="sm" class="h-10" onclick={openNew}>
 					<Plus />
 					File Claim
 				</Button>
 			{/if}
 		</div>
 
-		{#if loadError}
+		{#if loadError && inlineError}
 			<LoadErrorCard
 				compact
 				title="Couldn't load the claims"
@@ -297,7 +304,7 @@
 										<Button
 											variant="ghost"
 											size="icon"
-											class="size-10 sm:size-9"
+											class="size-10"
 											aria-label="Claim documents"
 											aria-expanded={expandedDocs.has(claim.id)}
 											onclick={() => toggleDocs(claim.id)}
@@ -307,7 +314,7 @@
 										<Button
 											variant="ghost"
 											size="icon"
-											class="size-10 sm:size-9"
+											class="size-10"
 											aria-label="Edit claim"
 											onclick={() => openEdit(claim)}
 										>
@@ -316,7 +323,7 @@
 										<Button
 											variant="ghost"
 											size="icon"
-											class="size-10 sm:size-9"
+											class="size-10"
 											aria-label="Delete claim"
 											onclick={() => requestDelete(claim.id)}
 										>

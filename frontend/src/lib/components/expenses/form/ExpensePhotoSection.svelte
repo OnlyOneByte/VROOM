@@ -100,7 +100,7 @@
 			bind:ref={uploadButton}
 			variant="outline"
 			size="sm"
-			class="h-10 text-xs sm:h-7"
+			class="h-10 text-xs"
 			onclick={openUploadDialog}
 		>
 			<Upload class="mr-1 h-3 w-3" />
@@ -145,7 +145,7 @@
 						<Button
 							variant="outline"
 							size="sm"
-							class="size-10 text-xs sm:h-7 sm:w-auto dark:bg-background dark:hover:bg-accent"
+							class="size-10 text-xs dark:bg-background dark:hover:bg-accent"
 							aria-label="Delete {photo.fileName}"
 							onclick={() => requestDelete(photo.id)}
 						>
