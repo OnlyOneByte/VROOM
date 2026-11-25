@@ -167,7 +167,12 @@
 		}
 	}
 
-	onMount(loadData);
+	onMount(async () => {
+		await loadData();
+		if (location.hash !== `#${copy.anchor}`) return;
+		await tick();
+		document.getElementById(copy.anchor)?.scrollIntoView({ block: 'start' });
+	});
 
 	async function retryLoad() {
 		await loadData();

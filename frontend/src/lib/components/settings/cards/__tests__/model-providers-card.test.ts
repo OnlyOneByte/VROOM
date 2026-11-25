@@ -94,6 +94,19 @@ afterEach(() => {
 });
 
 describe('ModelProvidersCard', () => {
+	test('the Assistant page link scrolls to the assistant card once its providers load', async () => {
+		const scrollIntoView = vi.fn();
+		Element.prototype.scrollIntoView = scrollIntoView;
+		history.replaceState(null, '', '#assistant-providers');
+		render(ModelProvidersCard, { props: { domain: 'vlm' } });
+		render(ModelProvidersCard, { props: { domain: 'llm' } });
+		await settle();
+
+		expect(scrollIntoView).toHaveBeenCalledTimes(1);
+		expect(scrollIntoView.mock.contexts[0]).toBe(document.getElementById('assistant-providers'));
+		history.replaceState(null, '', '#');
+	});
+
 	test.each([
 		['vlm', 'Receipt Scanning', 'Built-in text reader'],
 		['llm', 'Assistant (AI)', 'No assistant provider connected']
