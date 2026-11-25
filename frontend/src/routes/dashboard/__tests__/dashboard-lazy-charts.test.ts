@@ -88,7 +88,7 @@ describe('dashboard chart row', () => {
 		render(Page);
 
 		await waitFor(() => expect(barRendered).toBe(true));
-		expect(barProps['title']).toBe('Last 12 months');
+		expect(barProps['title']).toBe('Running cost by month');
 		expect(screen.queryByText("Charts couldn't be loaded", { exact: false })).toBeNull();
 	});
 });

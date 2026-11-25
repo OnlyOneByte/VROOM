@@ -91,14 +91,14 @@ describe('dashboard initial load', () => {
 		await waitFor(() => {
 			expect(getExpenseSummary).toHaveBeenCalledWith({ period: '30d' });
 			expect(getAllPolicies).toHaveBeenCalled();
-			expect(analyticsQuery).toHaveBeenCalledTimes(3);
+			expect(analyticsQuery).toHaveBeenCalledTimes(2);
 		});
 	});
 
 	test('every opening read is issued exactly once, with nothing per shared vehicle when none is shared', async () => {
 		render(Page);
 
-		await waitFor(() => expect(analyticsQuery).toHaveBeenCalledTimes(3));
+		await waitFor(() => expect(analyticsQuery).toHaveBeenCalledTimes(2));
 		for (const [name, spy] of [
 			['vehicles', getVehicles],
 			['recent expenses', getAllExpenses],

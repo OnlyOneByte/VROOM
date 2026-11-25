@@ -4,12 +4,12 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { Car, Plus, Check, ListChecks } from '@lucide/svelte';
+	import { Plus, Check, ListChecks } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
-	import PageHeader from '#lib/components/common/page-header.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import PageHeader from '#lib/components/common/page-header.svelte';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
 	import DashboardHero from '#lib/components/dashboard/DashboardHero.svelte';
 	import NeedsAttentionCard from '#lib/components/dashboard/NeedsAttentionCard.svelte';
@@ -64,10 +64,9 @@
 	} from '#lib/types/index.ts';
 	import type { TimePeriod } from '#lib/constants/time-periods.ts';
 
-	const TREND_TITLE = 'Last 12 months';
-	const TREND_DESCRIPTION = 'Running costs by month';
+	const TREND_TITLE = 'Running cost by month';
+	const TREND_DESCRIPTION = 'Last 12 months';
 	const RECENT_COUNT = 4;
-	const TREND_MONTHS = 6;
 
 	const chartModules = import('#lib/components/charts/index.ts');
 	chartModules.catch(() => undefined);
@@ -88,7 +87,6 @@
 	let invitationsError = $state<string | null>(null);
 	let pendingInvitations = $derived(invitations.filter(share => share.status === 'pending'));
 	let recurringCost = $state<RecurringCostSummary>({ count: 0, monthlyTotal: 0 });
-	let spendTrend = $state<AnalyticsQueryResponse | null>(null);
 	let runningByMonth = $state<AnalyticsQueryResponse | null>(null);
 	let trendFailed = $state(false);
 
@@ -109,13 +107,6 @@
 	]);
 	let currentStep = $derived(onboardingSteps.findIndex(step => !step.done));
 
-	let pageDescription = $derived.by(() => {
-		if (loadError || (isLoading && !hasLoaded)) return 'Overview of your vehicles';
-		if (vehicles.length === 0) return 'Welcome to VROOM';
-		const count = `${vehicles.length} vehicle${vehicles.length === 1 ? '' : 's'}`;
-		return sharedVehicles.length > 0 ? `${count}, incl. ${sharedVehicles.length} shared` : count;
-	});
-
 	let spend = $derived(combinePeriodSpend(periodData.summaries));
 	let distanceUnit = $derived<DistanceUnit>(settingsStore.unitPreferences.distanceUnit);
 	let distanceLabel = $derived(getDistanceUnitLabel(distanceUnit, true));
@@ -124,14 +115,12 @@
 		const perVehicle = new Map(
 			(periodData.perDistance?.series ?? []).map(series => [series.key, series.values[0] ?? null])
 		);
-		const trends = new Map(
-			(spendTrend?.series ?? []).map(series => [series.key, series.values.map(v => v ?? 0)])
-		);
 		return vehicles.map(v => {
 			const model = `${v.year} ${v.make} ${v.model}`;
 			const notes = [
 				vehicleKindNote(v.vehicleKind),
 				v.nickname ? model : null,
+				v.vehicleType === 'electric' ? 'electric' : null,
 				v.financing?.isActive ? 'Financed' : null,
 				v.sharedAccess ? `Shared by ${v.sharedAccess.sharedBy}` : null
 			].filter(Boolean);
@@ -139,11 +128,8 @@
 				id: v.id,
 				name: v.nickname || model,
 				detail: notes.join(' · '),
-				kind: v.vehicleKind,
-				isElectric: v.vehicleType === 'electric',
 				spend: spend.byVehicle.get(v.id) ?? 0,
-				runningPerDistance: perVehicle.get(v.id) ?? null,
-				trend: trends.get(v.id) ?? null
+				runningPerDistance: perVehicle.get(v.id) ?? null
 			};
 		});
 	});
@@ -196,7 +182,7 @@
 				date: new Date(e.date),
 				description: e.description,
 				location: e.location,
-				vehicleName: names.get(e.vehicleId) || 'Unknown Vehicle',
+				vehicleName: names.get(e.vehicleId) || 'Unknown vehicle',
 				...(sync && { syncNote: sync.status === 'failed' ? 'Not saved' : 'Unsynced' })
 			};
 		});
@@ -251,7 +237,6 @@
 				loadedPolicies,
 				loadedInvitations,
 				ownedPeriod,
-				loadedSpendTrend,
 				loadedRunningByMonth
 			] = await Promise.all([
 				vehicleApi.getVehicles({ includeShared: true }),
@@ -262,15 +247,6 @@
 				insuranceApi.getAllPolicies().catch(() => [] as InsurancePolicy[]),
 				fetchInvitations(),
 				loadPeriodSpend(selected, []),
-				analyticsApi
-					.query({
-						metric: 'cost',
-						interval: 'month',
-						groupBy: 'vehicle',
-						include: 'all',
-						start: monthsAgoSeconds(TREND_MONTHS - 1)
-					})
-					.catch(() => null),
 				analyticsApi
 					.query({
 						metric: 'cost',
@@ -299,7 +275,6 @@
 			policies = loadedPolicies;
 			invitations = loadedInvitations.list;
 			invitationsError = loadedInvitations.error;
-			spendTrend = loadedSpendTrend;
 			runningByMonth = loadedRunningByMonth;
 			trendFailed = loadedRunningByMonth === null;
 			hasLoaded = true;
@@ -361,7 +336,27 @@
 		isLoading={!hasLoaded}
 		isUpdating={isUpdatingPeriod}
 		onPeriodChange={handlePeriodChange}
-	/>
+	>
+		{#snippet actions()}
+			{@render primaryAction()}
+		{/snippet}
+	</DashboardHero>
+{/snippet}
+
+{#snippet primaryAction()}
+	{#if canLogFillup}
+		<Button size="lg" variant="outline" onclick={handleLogFillup}>
+			<Plus class="mr-2 h-4 w-4" />
+			Log fill-up
+		</Button>
+	{:else if showActions && !noVehicles}
+		<Button size="lg" variant="outline" href={resolve(routes.vehicleNew)}>
+			<Plus class="mr-2 h-4 w-4" />
+			Add vehicle
+		</Button>
+	{:else if isLoading && !hasLoaded}
+		<Skeleton class="h-10 w-36" data-testid="primary-action-placeholder" />
+	{/if}
 {/snippet}
 
 {#snippet vehiclesSection()}
@@ -409,7 +404,7 @@
 
 {#snippet attentionSection()}
 	{#if attention.length > 0}
-		<NeedsAttentionCard items={attention} />
+		<NeedsAttentionCard items={attention} showAll />
 	{/if}
 	{#if invitationsError || pendingInvitations.length > 0}
 		{@render invitationsCard()}
@@ -470,7 +465,7 @@
 			{#if ownedVehicles.length === 0}
 				<Button size="lg" class="mt-6" href={resolve(routes.vehicleNew)}>
 					<Plus class="mr-2 h-4 w-4" />
-					Add Vehicle
+					Add vehicle
 				</Button>
 			{/if}
 		{/snippet}
@@ -482,33 +477,8 @@
 	<meta name="description" content="Your vehicle expense dashboard" />
 </svelte:head>
 
-<div class="space-y-6">
-	<PageHeader title="Dashboard" description={pageDescription}>
-		{#snippet actions()}
-			{#if canLogFillup}
-				<Button
-					variant="outline"
-					size="lg"
-					class="hidden lg:inline-flex"
-					href={resolve(routes.vehicleNew)}
-				>
-					<Car class="mr-2 h-4 w-4" />
-					Add Vehicle
-				</Button>
-				<Button size="lg" class="max-sm:hidden" onclick={handleLogFillup}>
-					<Plus class="mr-2 h-4 w-4" />
-					Log Fill-up
-				</Button>
-			{:else if showActions && !noVehicles}
-				<Button size="lg" href={resolve(routes.vehicleNew)}>
-					<Plus class="mr-2 h-4 w-4" />
-					Add Vehicle
-				</Button>
-			{:else if isLoading && !hasLoaded}
-				<Skeleton class="hidden h-10 sm:block sm:w-36" />
-			{/if}
-		{/snippet}
-	</PageHeader>
+<div class="mx-auto max-w-6xl space-y-10">
+	<div class="sr-only"><PageHeader title="Dashboard" /></div>
 
 	{#if loadError && !isLoading}
 		<LoadErrorCard
@@ -521,17 +491,18 @@
 
 		{@render invitationsCard()}
 	{:else if needsFirstExpense}
+		<div class="flex justify-end">{@render primaryAction()}</div>
 		{@render checklist()}
 
 		{@render invitationsCard()}
-		<NeedsAttentionCard items={attention} />
+		<NeedsAttentionCard items={attention} showAll />
 		<VehicleRowsCard rows={vehicleRows} periodLabel={PERIOD_PHRASES[period].chip} {distanceLabel} />
 		{#if recurringCost.count > 0}
 			<RecurringCostCard count={recurringCost.count} monthlyTotal={recurringCost.monthlyTotal} />
 		{/if}
 	{:else}
 		{#if isNarrow.current}
-			<div class="space-y-6">
+			<div class="space-y-10">
 				{@render heroSection()}
 				{#if hasLoaded}
 					{@render attentionSection()}
@@ -542,22 +513,20 @@
 				{/if}
 			</div>
 		{:else}
-			<div class="grid grid-cols-3 items-start gap-6">
-				<div class="col-span-2 space-y-6">
-					{@render heroSection()}
-					{#if hasLoaded}
-						{@render vehiclesSection()}
-						{@render chartSection()}
-					{/if}
-				</div>
-				{#if hasLoaded}
-					<div class="space-y-6">
+			{@render heroSection()}
+			{#if hasLoaded}
+				<div class="grid grid-cols-2 items-start gap-x-12 gap-y-10">
+					<div class="space-y-10">
 						{@render attentionSection()}
+						{@render vehiclesSection()}
+					</div>
+					<div class="space-y-10">
+						{@render chartSection()}
 						{@render recentSection()}
 						{@render recurringSection()}
 					</div>
-				{/if}
-			</div>
+				</div>
+			{/if}
 		{/if}
 	{/if}
 </div>

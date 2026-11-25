@@ -95,8 +95,8 @@ describe('dashboard invitations', () => {
 	});
 
 	test.each([
-		{ narrow: true, order: ['Shared with you', 'Your vehicles', 'Recent'] },
-		{ narrow: false, order: ['Your vehicles', 'Shared with you', 'Recent'] }
+		{ narrow: true, order: ['Shared with you', 'Your garage', 'Recent'] },
+		{ narrow: false, order: ['Shared with you', 'Your garage', 'Recent'] }
 	])('sections are read in screen order (narrow: $narrow)', async ({ narrow, order }) => {
 		vi.mocked(window.matchMedia).mockReturnValue({
 			matches: narrow,

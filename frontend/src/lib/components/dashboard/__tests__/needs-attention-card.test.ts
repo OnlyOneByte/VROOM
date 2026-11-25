@@ -70,4 +70,45 @@ describe('NeedsAttentionCard', () => {
 			'/expenses/new?vehicleId=v1'
 		);
 	});
+
+	test('with showAll, says how many are due and soon and links to all reminders; without it, neither', () => {
+		const items = [
+			{
+				id: 'a',
+				title: 'Oil change',
+				detail: '',
+				status: 'overdue' as const,
+				dueAt: 1,
+				href: 'reminders' as const
+			},
+			{
+				id: 'b',
+				title: 'Tires',
+				detail: '',
+				status: 'soon' as const,
+				dueAt: 2,
+				href: 'reminders' as const
+			},
+			{
+				id: 'c',
+				title: 'Plates',
+				detail: '',
+				status: 'soon' as const,
+				dueAt: 3,
+				href: 'reminders' as const
+			}
+		];
+		const { unmount } = render(NeedsAttentionCard, { props: { items, showAll: true } });
+		expect(screen.getByRole('heading', { name: 'Needs you' })).toBeInTheDocument();
+		expect(screen.getByText('· 1 due, 2 soon')).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'All reminders' })).toHaveAttribute(
+			'href',
+			'/reminders'
+		);
+		unmount();
+
+		render(NeedsAttentionCard, { props: { items, title: 'Next up' } });
+		expect(screen.queryByText(/1 due/)).toBeNull();
+		expect(screen.queryByRole('link', { name: 'All reminders' })).toBeNull();
+	});
 });

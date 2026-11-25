@@ -1,5 +1,5 @@
 <script lang="ts">
-	import * as Card from '#lib/components/ui/card/index.ts';
+	import type { Snippet } from 'svelte';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import HeroFigure from '#lib/components/common/hero-figure.svelte';
@@ -20,6 +20,7 @@
 		isLoading: boolean;
 		isUpdating?: boolean;
 		onPeriodChange: (_period: TimePeriod) => void;
+		actions?: Snippet;
 	}
 
 	let {
@@ -32,7 +33,8 @@
 		distanceLabel,
 		isLoading,
 		isUpdating = false,
-		onPeriodChange
+		onPeriodChange,
+		actions
 	}: Props = $props();
 
 	const BUCKET_LABELS: Record<CostBucket, string> = {
@@ -77,8 +79,13 @@
 	</Select.Root>
 {/snippet}
 
-<Card.Root class="gap-4 py-5" data-testid="dashboard-hero" aria-busy={isLoading}>
-	<Card.Content class="space-y-4 px-5">
+<section
+	class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:items-end lg:gap-12"
+	data-testid="dashboard-hero"
+	aria-label={phrases.label}
+	aria-busy={isLoading}
+>
+	<div class="space-y-4">
 		<HeroFigure label={phrases.label} value={isLoading ? '\u00a0' : formatCurrency(total)}>
 			{#snippet action()}
 				{@render periodChip()}
@@ -111,7 +118,9 @@
 				</div>
 			{/snippet}
 		</HeroFigure>
+	</div>
 
+	<div>
 		{#if isLoading}
 			<div class="space-y-2" data-testid="dashboard-hero-skeleton">
 				<Skeleton class="h-2.5 w-full rounded-full" />
@@ -122,39 +131,38 @@
 				</div>
 			</div>
 		{:else if bucketTotal > 0}
-			<div class="space-y-2">
-				<div
-					class="flex h-2.5 w-full overflow-hidden rounded-full bg-muted"
-					aria-hidden="true"
-					data-testid="dashboard-split-bar"
-				>
+			<div class="space-y-3">
+				<ul class="flex flex-wrap justify-between gap-x-6 gap-y-3" role="list">
+					{#each COST_BUCKETS as bucket (bucket)}
+						<li class="flex flex-col gap-1">
+							<span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+								<span
+									class="size-2 shrink-0 rounded-full"
+									style:background-color={costBucketColor(bucket)}
+									aria-hidden="true"
+								></span>
+								{BUCKET_LABELS[bucket]}
+							</span>
+							<span class="text-xl font-semibold text-foreground tabular-nums">
+								{formatCurrency(buckets[bucket], undefined, 0)}
+							</span>
+						</li>
+					{/each}
+				</ul>
+				<div class="flex h-2 w-full gap-1" aria-hidden="true" data-testid="dashboard-split-bar">
 					{#each segments as segment (segment.bucket)}
 						<span
-							class="h-full"
+							class="h-full rounded-full"
 							style:width="{segment.share}%"
 							style:background-color={costBucketColor(segment.bucket)}
 						></span>
 					{/each}
 				</div>
-				<ul
-					class="grid grid-cols-1 gap-y-1 text-xs text-muted-foreground sm:flex sm:flex-wrap sm:gap-x-4"
-					role="list"
-				>
-					{#each COST_BUCKETS as bucket (bucket)}
-						<li class="inline-flex items-center gap-1.5">
-							<span
-								class="size-2 shrink-0 rounded-full"
-								style:background-color={costBucketColor(bucket)}
-								aria-hidden="true"
-							></span>
-							{BUCKET_LABELS[bucket]}
-							<span class="font-medium text-foreground tabular-nums">
-								{formatCurrency(buckets[bucket])}
-							</span>
-						</li>
-					{/each}
-				</ul>
 			</div>
 		{/if}
-	</Card.Content>
-</Card.Root>
+	</div>
+
+	{#if actions}
+		<div class="lg:col-start-1">{@render actions()}</div>
+	{/if}
+</section>
