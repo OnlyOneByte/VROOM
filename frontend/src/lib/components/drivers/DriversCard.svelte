@@ -89,53 +89,43 @@
 						{/each}
 					</div>
 				{/if}
-				<table class="w-full text-sm">
-					<caption class="sr-only">Distance and running costs paid by each driver</caption>
-					<thead class="sr-only">
-						<tr><th>Driver</th><th>Distance</th><th>Share</th><th>Paid</th></tr>
-					</thead>
-					<tbody>
-						{#each shown as driver (driver.driverId)}
-							<tr class="h-10">
-								<th scope="row" class="text-left font-normal">
-									<span class="inline-flex items-center gap-2">
-										<span
-											class="size-2.5 shrink-0 rounded-full"
-											style:background-color={driverColor(driver)}
-											aria-hidden="true"
-										></span>
-										{driver.name}
-										{#if driver.you && stats.scope === 'everyone'}
-											<span class="text-muted-foreground">(you)</span>
-										{/if}
-									</span>
-								</th>
-								<td class="text-right tabular-nums">
-									{miles(driver.distance.total)}
-									{#if driver.distance.estimated > 0}
-										<span class="block text-xs text-muted-foreground">
-											{formatNumber(driver.distance.estimated, 0)} estimated
-										</span>
+				<ul class="divide-y text-sm" aria-label="Distance and running costs paid by each driver">
+					{#each shown as driver (driver.driverId)}
+						<li class="py-2">
+							<div class="flex items-center gap-2">
+								<span
+									class="size-2.5 shrink-0 rounded-full"
+									style:background-color={driverColor(driver)}
+									aria-hidden="true"
+								></span>
+								<span class="min-w-0 flex-1 truncate font-medium">
+									{driver.name}
+									{#if driver.you && stats.scope === 'everyone'}
+										<span class="font-normal text-muted-foreground">(you)</span>
 									{/if}
-								</td>
-								<td class="text-right tabular-nums text-muted-foreground">
-									{percent(driver.share)}
-								</td>
-								<td class="text-right tabular-nums">
-									{formatCurrency(driver.runningCostsPaid)} paid
-								</td>
-							</tr>
-						{/each}
-						{#if stats.distance && stats.distance.unattributed > 0}
-							<tr class="h-10 text-muted-foreground">
-								<th scope="row" class="text-left font-normal">Unattributed</th>
-								<td class="text-right tabular-nums">{miles(stats.distance.unattributed)}</td>
-								<td></td>
-								<td></td>
-							</tr>
-						{/if}
-					</tbody>
-				</table>
+								</span>
+								<span class="tabular-nums">{miles(driver.distance.total)}</span>
+							</div>
+							<p class="pl-4.5 text-xs text-muted-foreground tabular-nums">
+								{[
+									driver.share === null ? '' : `${percent(driver.share)} of the distance`,
+									driver.distance.estimated > 0
+										? `${formatNumber(driver.distance.estimated, 0)} estimated`
+										: '',
+									`${formatCurrency(driver.runningCostsPaid)} paid`
+								]
+									.filter(Boolean)
+									.join(' · ')}
+							</p>
+						</li>
+					{/each}
+					{#if stats.distance && stats.distance.unattributed > 0}
+						<li class="flex items-center gap-2 py-2 text-muted-foreground">
+							<span class="flex-1 pl-4.5">Unattributed</span>
+							<span class="tabular-nums">{miles(stats.distance.unattributed)}</span>
+						</li>
+					{/if}
+				</ul>
 				{#if stats.costPerDistance !== null}
 					<p class="text-xs text-muted-foreground">
 						Running costs come to {formatCurrency(stats.costPerDistance, undefined, 2)} per {unit}.

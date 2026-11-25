@@ -57,7 +57,8 @@ describe('DriversCard', () => {
 		await settle();
 		expect(screen.getByText('Drivers')).toBeTruthy();
 		expect(screen.getByRole('img').getAttribute('aria-label')).toContain('Alex: 600 mi 67%');
-		expect(screen.getByRole('row', { name: /Unattributed/ })).toBeTruthy();
+		expect(screen.getByText('Unattributed')).toBeTruthy();
+		expect(screen.getByText(/67% of the distance · \$84\.00 paid/)).toBeTruthy();
 		expect(screen.getByText('(you)')).toBeTruthy();
 	});
 
