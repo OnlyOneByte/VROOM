@@ -69,6 +69,31 @@ describe('VehicleTripsTab', () => {
 		);
 	});
 
+	test('shows commute and other trips by their own purpose', async () => {
+		list.mockResolvedValue(
+			page([trip({ id: 't1', purpose: 'commute' }), trip({ id: 't2', purpose: 'other' })])
+		);
+		render(VehicleTripsTab, { props: { vehicleId: 'v1', distanceUnit: 'miles' } });
+
+		const [first, second] = within(await screen.findByTestId('vehicle-trips')).getAllByRole(
+			'listitem'
+		);
+		expect(first?.textContent).toContain('Commute');
+		expect(second?.textContent).toContain('Other');
+		expect(first?.textContent).not.toContain('Personal');
+	});
+
+	test('says when the list shows only the latest trips', async () => {
+		list.mockResolvedValue({
+			...page([trip({ id: 't1' })]),
+			pagination: { totalCount: 140, limit: 100, offset: 0 }
+		} as PaginatedResponse<Trip>);
+		render(VehicleTripsTab, { props: { vehicleId: 'v1', distanceUnit: 'miles' } });
+
+		const heading = await screen.findByRole('heading', { level: 2 });
+		expect(heading.textContent?.replace(/\s+/g, ' ').trim()).toBe('140 trips · latest 1');
+	});
+
 	test('with no trips, points to the Trips page', async () => {
 		list.mockResolvedValue(page([]));
 		render(VehicleTripsTab, { props: { vehicleId: 'v1', distanceUnit: 'miles' } });

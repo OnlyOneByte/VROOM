@@ -8,10 +8,11 @@
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { tripApi } from '#lib/services/trip-api.ts';
-	import { formatDate, formatNumber } from '#lib/utils/formatters.ts';
+	import { capitalize, formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import type { Trip } from '#lib/types/index.ts';
+	import { tripDistance } from '#lib/types/trip.ts';
 	import type { DistanceUnit } from '#lib/types/settings.ts';
 
 	interface Props {
@@ -86,6 +87,9 @@
 		<Card.Header class="flex flex-row items-center justify-between gap-3">
 			<Card.Title level={2} class="text-base">
 				{totalCount} trip{totalCount === 1 ? '' : 's'}
+				{#if totalCount > trips.length}
+					<span class="font-normal text-muted-foreground"> · latest {trips.length}</span>
+				{/if}
 			</Card.Title>
 			<a
 				href={resolve(routes.trips)}
@@ -101,13 +105,11 @@
 						<div class="min-w-0">
 							<p class="truncate font-semibold">{route(trip)}</p>
 							<p class="text-sm text-muted-foreground">
-								{formatDate(trip.tripDate)} · {trip.purpose === 'business'
-									? 'Business'
-									: 'Personal'}
+								{formatDate(trip.tripDate)} · {capitalize(trip.purpose)}
 							</p>
 						</div>
 						<p class="shrink-0 font-semibold tabular-nums">
-							{formatNumber(Math.max(0, trip.endOdometer - trip.startOdometer), 0)}
+							{formatNumber(tripDistance(trip), 0)}
 							{unit}
 						</p>
 					</li>
