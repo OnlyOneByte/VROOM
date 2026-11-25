@@ -218,6 +218,8 @@
 			.sort((a, b) => b.value - a.value);
 	});
 
+	const lastMonth = { from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), to: new Date() };
+
 	let distanceUnit = $derived(
 		vehicle?.unitPreferences?.distanceUnit ?? settingsStore.unitPreferences.distanceUnit
 	);
@@ -1014,6 +1016,12 @@
 									</p>
 								{/await}
 							{/if}
+						{/if}
+
+						{#if vehicle.carShare?.enabled}
+							{#await import('#lib/components/drivers/DriversCard.svelte') then { default: DriversCard }}
+								<DriversCard {vehicleId} {distanceUnit} from={lastMonth.from} to={lastMonth.to} />
+							{/await}
 						{/if}
 
 						{#if vehicle.carShare?.manage}
