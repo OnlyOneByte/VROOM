@@ -419,7 +419,7 @@ routes.post(
       {
         success: true,
         data: {
-          siblings: siblings.map(expenseToApi),
+          siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
           groupId: first.groupId,
           groupTotal: centsToDollars(first.groupTotal),
           splitMethod: first.splitMethod,
@@ -478,7 +478,7 @@ routes.put(
     return c.json({
       success: true,
       data: {
-        siblings: siblings.map(expenseToApi),
+        siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
         groupId: first.groupId,
         groupTotal: centsToDollars(first.groupTotal),
         splitMethod: first.splitMethod,
@@ -512,7 +512,7 @@ routes.get(
     return c.json({
       success: true,
       data: {
-        siblings: siblings.map(expenseToApi),
+        siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
         groupId: first.groupId,
         groupTotal: centsToDollars(first.groupTotal),
         splitMethod: first.splitMethod,
@@ -941,6 +941,9 @@ function payerChange(
 ): { paidByDriverId?: string | null } {
   const target = vehicleId ?? existing.vehicleId;
   const movedCar = target !== existing.vehicleId;
+  if (movedCar && existing.paidByDriverId) {
+    attributedDriver(c, existing.vehicleId, null, existing.paidByDriverId);
+  }
   const paidBy = attributedDriver(c, target, requested, movedCar ? null : existing.paidByDriverId);
   if (paidBy !== undefined) return { paidByDriverId: paidBy };
   return movedCar ? { paidByDriverId: null } : {};

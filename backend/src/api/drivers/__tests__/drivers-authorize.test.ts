@@ -179,4 +179,59 @@ describe('recording who drove or paid', () => {
     expect((await rows(m.editor.request))[0]).toHaveProperty('driverId');
     expect((await rows(m.viewer.request))[0]).not.toHaveProperty('driverId');
   });
+
+  test('split expenses keep the payer hidden from people who cannot see drivers', async () => {
+    await ctx.authed('PUT', sharing, { enabled: true });
+    const res = await ctx.authed('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [CAR] },
+      category: 'maintenance',
+      totalAmount: 60,
+      date: '2024-06-01T00:00:00.000Z',
+    });
+    const { groupId } = (await json<DataEnvelope<{ groupId: string }>>(res)).data;
+    const own = driverOf(await listDrivers(), ctx.user.id);
+    ctx.sqlite.run('UPDATE expenses SET paid_by_driver_id = ? WHERE group_id = ?', [
+      own?.id ?? null,
+      groupId,
+    ]);
+    const legs = async (request: RequestFn) =>
+      (
+        await json<DataEnvelope<{ siblings: Record<string, unknown>[] }>>(
+          await request('GET', `/api/v1/expenses/split/${groupId}`)
+        )
+      ).data.siblings;
+    expect((await legs(m.editor.request))[0]?.paidByDriverId).toBe(own?.id);
+    expect((await legs(m.viewer.request))[0]).not.toHaveProperty('paidByDriverId');
+  });
+
+  test("moving an expense to another car can't clear someone else's payer without driver.record", async () => {
+    await ctx.authed('PUT', sharing, { enabled: true });
+    seedCarShared();
+    const own = driverOf(await listDrivers(), ctx.user.id);
+    const created = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId: CAR,
+      category: 'maintenance',
+      date: '2024-03-01',
+      expenseAmount: 40,
+    });
+    const expense = (await json<DataEnvelope<{ id: string }>>(created)).data;
+    overrideOn(ctx, CAR, m.editor, 'vehicle.driver.record', 'deny');
+    expect(
+      await status(m.editor.request, 'PUT', `/api/v1/expenses/${expense.id}`, { vehicleId: OTHER })
+    ).toBe(403);
+    expect(
+      ctx.sqlite.query('SELECT paid_by_driver_id FROM expenses WHERE id = ?').get(expense.id)
+    ).toEqual({ paid_by_driver_id: own?.id });
+  });
+
+  function seedCarShared(): void {
+    ctx.sqlite.run(
+      "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status) VALUES ('other-share', ?, ?, ?, 'editor', 'accepted')",
+      [OTHER, ctx.user.id, m.editor.id]
+    );
+    ctx.sqlite.run(
+      "INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES ('other-ra', ?, 'builtin_editor', ?, ?)",
+      [m.editor.id, OTHER, ctx.user.id]
+    );
+  }
 });

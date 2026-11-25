@@ -32,12 +32,8 @@ export interface DriverView {
 }
 
 function memberName(db: Db, userId: string): string {
-  const row = db
-    .select({ name: users.displayName, email: users.email })
-    .from(users)
-    .where(eq(users.id, userId))
-    .get();
-  return row?.name || row?.email || 'Driver';
+  const row = db.select({ name: users.displayName }).from(users).where(eq(users.id, userId)).get();
+  return row?.name || 'Driver';
 }
 
 function nextColor(db: Db, vehicleId: string): string {
@@ -122,19 +118,6 @@ export function ensureMemberDriver(db: Db, vehicleId: string, userId: string): v
       color: nextColor(db, vehicleId),
       createdBy: userId,
     })
-    .run();
-}
-
-export function archiveMemberDriver(db: Db, vehicleId: string, userId: string): void {
-  db.update(vehicleDrivers)
-    .set({ archivedAt: new Date() })
-    .where(
-      and(
-        eq(vehicleDrivers.vehicleId, vehicleId),
-        eq(vehicleDrivers.userId, userId),
-        isNull(vehicleDrivers.archivedAt)
-      )
-    )
     .run();
 }
 
