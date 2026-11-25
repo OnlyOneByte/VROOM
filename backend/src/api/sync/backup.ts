@@ -5,6 +5,7 @@ import type { Table } from 'drizzle-orm';
 import { and, eq, getTableColumns, getTableName, inArray } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import type { z } from 'zod';
+import { repos } from '../../app-context';
 import {
   CONFIG,
   getBackupTableKeys,
@@ -287,8 +288,7 @@ export function resolveBackupFolderPath(
 
 class BackupService {
   async loadBackupConfig(userId: string): Promise<BackupConfig> {
-    const { preferencesRepository } = await import('../settings/repository');
-    const prefs = await preferencesRepository.getOrCreate(userId);
+    const prefs = await repos().preferences.getOrCreate(userId);
     return prefs.backupConfig ?? { providers: {} };
   }
 

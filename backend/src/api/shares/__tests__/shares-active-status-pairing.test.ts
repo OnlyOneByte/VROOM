@@ -1,6 +1,7 @@
 // createTestApp() must run before any DB-bound import: import only the harness and bun:test.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
@@ -66,8 +67,6 @@ describe('active-share status pairing', () => {
   });
 
   test('the dup-invite gate admits exactly the statuses the index reserves a slot for', async () => {
-    const { vehicleShareRepository } = await import('../repository');
-
     const slotHolders = indexActiveStatuses();
 
     seedVehicle('veh-1');
@@ -76,7 +75,7 @@ describe('active-share status pairing', () => {
       seedInvitee(invitee);
       seedShare(`share-${status}`, status, 'veh-1', invitee);
 
-      const found = await vehicleShareRepository.findActiveInvite(
+      const found = await repos().vehicleShares.findActiveInvite(
         'veh-1',
         `${invitee}@example.com`,
         invitee
@@ -86,15 +85,13 @@ describe('active-share status pairing', () => {
   });
 
   test('"shared with me" surfaces exactly the active statuses', async () => {
-    const { vehicleShareRepository } = await import('../repository');
-
     seedInvitee('invitee-multi');
     for (const status of ['pending', 'accepted', 'declined', 'revoked']) {
       seedVehicle(`veh-${status}`);
       seedShare(`recv-${status}`, status, `veh-${status}`, 'invitee-multi');
     }
 
-    const received = await vehicleShareRepository.findReceivedByUser('invitee-multi');
+    const received = await repos().vehicleShares.findReceivedByUser('invitee-multi');
     expect(received.map((s) => s.status).sort()).toEqual(['accepted', 'pending']);
   });
 });

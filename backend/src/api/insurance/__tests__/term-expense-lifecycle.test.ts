@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import {
   createTestApp,
   type DataEnvelope,
@@ -89,8 +90,7 @@ async function seedCostedTerm(): Promise<{ policyId: string; termId: string; exp
 describe('insurance term premium expense lifecycle', () => {
   test('a failed premium create rolls the new policy back instead of answering 201', async () => {
     const vehicleId = await seedVehicle(ctx);
-    const { expenseRepository } = await import('../../expenses/repository');
-    const spy = spyOn(expenseRepository, 'createSplitExpense').mockImplementation(() => {
+    const spy = spyOn(repos().expenses, 'createSplitExpense').mockImplementation(() => {
       throw new Error('forced create failure');
     });
 
@@ -111,8 +111,7 @@ describe('insurance term premium expense lifecycle', () => {
   test('a failed premium create on an added term removes that term', async () => {
     const { policyId } = await seedCostedTerm();
     const vehicleId = await seedVehicle(ctx, { nickname: 'Second' });
-    const { expenseRepository } = await import('../../expenses/repository');
-    const spy = spyOn(expenseRepository, 'createSplitExpense').mockImplementation(() => {
+    const spy = spyOn(repos().expenses, 'createSplitExpense').mockImplementation(() => {
       throw new Error('forced create failure');
     });
 

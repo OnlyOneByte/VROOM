@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
@@ -29,13 +30,11 @@ describe('lazy row creation under concurrency', () => {
     expect(rowCount('user_preferences')).toBe(1);
   });
 
-  test('concurrent preferencesRepository.getOrCreate returns one shared row', async () => {
-    const { preferencesRepository } = await import('../repository');
-
+  test('concurrent repos().preferences.getOrCreate returns one shared row', async () => {
     const rows = await Promise.all([
-      preferencesRepository.getOrCreate(ctx.user.id),
-      preferencesRepository.getOrCreate(ctx.user.id),
-      preferencesRepository.getOrCreate(ctx.user.id),
+      repos().preferences.getOrCreate(ctx.user.id),
+      repos().preferences.getOrCreate(ctx.user.id),
+      repos().preferences.getOrCreate(ctx.user.id),
     ]);
 
     expect(rowCount('user_preferences')).toBe(1);
@@ -45,13 +44,11 @@ describe('lazy row creation under concurrency', () => {
     }
   });
 
-  test('concurrent syncStateRepository.getOrCreate returns one shared row', async () => {
-    const { syncStateRepository } = await import('../repository');
-
+  test('concurrent repos().syncState.getOrCreate returns one shared row', async () => {
     const rows = await Promise.all([
-      syncStateRepository.getOrCreate(ctx.user.id),
-      syncStateRepository.getOrCreate(ctx.user.id),
-      syncStateRepository.getOrCreate(ctx.user.id),
+      repos().syncState.getOrCreate(ctx.user.id),
+      repos().syncState.getOrCreate(ctx.user.id),
+      repos().syncState.getOrCreate(ctx.user.id),
     ]);
 
     expect(rowCount('sync_state')).toBe(1);
@@ -61,15 +58,13 @@ describe('lazy row creation under concurrency', () => {
   });
 
   test('concurrent first-time markDataChanged stamps the sync-state row without erroring', async () => {
-    const { syncStateRepository } = await import('../repository');
-
     await Promise.all([
-      syncStateRepository.markDataChanged(ctx.user.id),
-      syncStateRepository.markDataChanged(ctx.user.id),
+      repos().syncState.markDataChanged(ctx.user.id),
+      repos().syncState.markDataChanged(ctx.user.id),
     ]);
 
     expect(rowCount('sync_state')).toBe(1);
-    const state = await syncStateRepository.getOrCreate(ctx.user.id);
+    const state = await repos().syncState.getOrCreate(ctx.user.id);
     expect(state.lastDataChangeDate).not.toBeNull();
   });
 });

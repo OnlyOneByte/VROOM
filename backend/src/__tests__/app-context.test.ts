@@ -1,5 +1,8 @@
 import { Database } from 'bun:sqlite';
 import { describe, expect, test } from 'bun:test';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { appContext, createAppContext } from '../app-context';
 import { applyMigrationsUpTo, loadMigrations } from '../db/__tests__/migration-helpers';
@@ -21,6 +24,26 @@ function isolatedDb() {
 }
 
 describe('the app context', () => {
+  test('importing the app opens no database', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vroom-import-'));
+    try {
+      const file = join(dir, 'never-opened.db');
+      const run = Bun.spawnSync(
+        [
+          process.execPath,
+          '--env-file=/dev/null',
+          '-e',
+          "await import('./src/app.ts'); process.exit(0)",
+        ],
+        { cwd: join(import.meta.dir, '../..'), env: { ...process.env, DATABASE_URL: file } }
+      );
+      expect(run.exitCode, run.stderr.toString()).toBe(0);
+      expect(existsSync(file)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   test('is built once, on the configured database', () => {
     expect(appContext()).toBe(appContext());
     expect(appContext().db).toBe(getDb());

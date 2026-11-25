@@ -16,7 +16,6 @@ import {
   sql,
 } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import {
   countNum,
   formatYearMonth,
@@ -971,5 +970,3 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     }
   }
 }
-
-export const expenseRepository = new ExpenseRepository(getDb());

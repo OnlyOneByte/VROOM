@@ -3,10 +3,10 @@ import { describe, expect, test } from 'bun:test';
 const ROUTES_SRC = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
 
 const PERSIST_CALLS = [
-  'expenseRepository.createIdempotent(',
-  'expenseRepository.update(',
-  'expenseRepository.createSplitExpense(',
-  'expenseRepository.updateSplitExpense(',
+  'repos().expenses.createIdempotent(',
+  'repos().expenses.update(',
+  'repos().expenses.createSplitExpense(',
+  'repos().expenses.updateSplitExpense(',
 ] as const;
 
 const VALIDATOR_RE = /await assert(Split)?FinancingSourceValid\(/g;
@@ -27,7 +27,7 @@ describe('expense source-link validation coverage', () => {
       const n = ROUTES_SRC.split(call).length - 1;
       expect(n, `${call} should appear exactly once`).toBe(1);
     }
-    expect(ROUTES_SRC).toContain('expenseRepository.importExpenses(');
+    expect(ROUTES_SRC).toContain('repos().expenses.importExpenses(');
   });
 
   test('every expense-persist call is preceded WITHIN ITS HANDLER by a financing-source validator', () => {

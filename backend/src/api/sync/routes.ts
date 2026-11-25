@@ -17,12 +17,12 @@ import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { readJsonBody } from '../../utils/request-body';
 import { OPERATION_TIMEOUTS, withDeadline, withTimeout } from '../../utils/timeout';
 import { zValidator } from '../../utils/validation';
-import { preferencesRepository, syncStateRepository } from '../settings/repository';
 import { activityTracker } from './activity-tracker';
 import { backupService } from './backup';
 import { backupOrchestrator } from './backup-orchestrator';
 import { hasSheetsSync, hasZipBackup, isSyncEnabled } from './backup-strategy';
 import './init';
+import { repos } from '../../app-context';
 import { type RestoreResponse, restoreService } from './restore';
 
 const routes = new Hono();
@@ -121,10 +121,10 @@ routes.post(
   async (c) => {
     const userId = c.get('user').id;
     const { providerId } = c.req.valid('param');
-    const prefs = await preferencesRepository.getOrCreate(userId);
+    const prefs = await repos().preferences.getOrCreate(userId);
     const config = prefs?.backupConfig as BackupConfig | null;
     if (config?.providers?.[providerId]?.sheetsAutoPausedAt) {
-      await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
+      await repos().preferences.mergeJsonField(userId, 'backupConfig', {
         providers: { [providerId]: { sheetsAutoPausedAt: null } },
       });
     }
@@ -134,9 +134,9 @@ routes.post(
 
 routes.get('/status', authorize(ownAccount), async (c) => {
   const user = c.get('user');
-  const settings = await preferencesRepository.getOrCreate(user.id);
+  const settings = await repos().preferences.getOrCreate(user.id);
   const syncStatus = activityTracker.getSyncStatus(user.id);
-  const syncStateData = await syncStateRepository.getOrCreate(user.id);
+  const syncStateData = await repos().syncState.getOrCreate(user.id);
 
   const config = settings.backupConfig as BackupConfig | null;
   const providers = config?.providers;
@@ -330,7 +330,7 @@ routes.get('/restore/providers', syncRateLimiter, authorize(ownAccount), async (
       )
     );
 
-  const settings = await preferencesRepository.getOrCreate(user.id);
+  const settings = await repos().preferences.getOrCreate(user.id);
   const config: BackupConfig = (settings.backupConfig as BackupConfig | null) ?? {
     providers: {},
   };

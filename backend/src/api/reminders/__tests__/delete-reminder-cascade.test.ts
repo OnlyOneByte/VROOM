@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import {
   createTestApp,
   type DataEnvelope,
@@ -103,10 +104,9 @@ describe('reminder delete cascade', () => {
   });
 
   test('a failure clearing the source link fails the delete and keeps the reminder', async () => {
-    const { expenseRepository } = await import('../../expenses/repository');
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const reminderId = await createOverdueExpenseReminder(vehicleId);
-    const spy = spyOn(expenseRepository, 'clearSource').mockRejectedValue(
+    const spy = spyOn(repos().expenses, 'clearSource').mockRejectedValue(
       new Error('connection lost')
     );
 

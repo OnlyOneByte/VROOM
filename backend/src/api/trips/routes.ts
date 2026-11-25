@@ -18,7 +18,6 @@ import { convertDistance } from '../../utils/unit-conversions';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
 import { attributedDriver, hideDriverFields } from '../drivers/attribution';
-import { preferencesRepository } from '../settings/repository';
 import { createTrip, deleteTrip, updateTrip } from './service';
 import {
   createTripSchema,
@@ -123,7 +122,7 @@ routes.get(
       ? await repos().trips.findByVehicle(vehicleId, ownerId)
       : await repos().trips.findByUserId(user.id);
 
-    const prefs = await preferencesRepository.getOrCreate(user.id);
+    const prefs = await repos().preferences.getOrCreate(user.id);
     const userUnit = (parseUnitPreferences(prefs.unitPreferences) ?? DEFAULT_UNIT_PREFERENCES)
       .distanceUnit;
     const vehicleUnits = await repos().trips.findVehicleDistanceUnits(ownerId);

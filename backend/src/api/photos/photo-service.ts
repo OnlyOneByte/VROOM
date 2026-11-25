@@ -1,3 +1,4 @@
+import { repos } from '../../app-context';
 import type { Photo, PhotoRef } from '../../db/schema';
 import {
   NotFoundError,
@@ -17,8 +18,6 @@ import {
   type StorageRef,
 } from '../providers/domains/storage/storage-provider';
 import { validateEntityOwnership } from './helpers';
-import { photoRefRepository } from './photo-ref-repository';
-import { photoRepository } from './photo-repository';
 
 export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
@@ -32,7 +31,7 @@ async function removeFailedUpload(
 ): Promise<void> {
   if (photoId) {
     try {
-      await photoRepository.delete(photoId);
+      await repos().photos.delete(photoId);
     } catch (cleanupError) {
       logger.warn('Failed to remove photo row after a DB write error', {
         photoId,
@@ -67,14 +66,14 @@ async function persistUploadedPhotoOrCleanup(
 ): Promise<Photo> {
   let photoId: string | undefined;
   try {
-    const photo = await photoRepository.create({
+    const photo = await repos().photos.create({
       ...meta,
       isCover: false,
       sortOrder: 0,
     });
     photoId = photo.id;
 
-    await photoRefRepository.create({
+    await repos().photoRefs.create({
       photoId: photo.id,
       providerId,
       storageRef: storageRef.externalId,
@@ -164,7 +163,7 @@ export async function uploadPhotoForEntity(
     if (!capabilitiesOf(backup.provider).arbitraryFiles && !isImageMimeType(file.type)) {
       continue;
     }
-    await photoRefRepository.create({
+    await repos().photoRefs.create({
       photoId: photo.id,
       providerId: backup.providerId,
       storageRef: '',
@@ -172,9 +171,9 @@ export async function uploadPhotoForEntity(
     });
   }
 
-  const existingPhotos = await photoRepository.findByEntity(entityType, entityId);
+  const existingPhotos = await repos().photos.findByEntity(entityType, entityId);
   if (existingPhotos.length === 1) {
-    return await photoRepository.setCoverPhoto(entityType, entityId, photo.id);
+    return await repos().photos.setCoverPhoto(entityType, entityId, photo.id);
   }
 
   return photo;
@@ -187,7 +186,7 @@ export async function listPhotosForEntity(
   pagination: { limit: number; offset: number }
 ): Promise<PaginatedResult<Photo>> {
   const ownerId = await validateEntityOwnership(entityType, entityId, userId);
-  return photoRepository.findByEntityPaginated(
+  return repos().photos.findByEntityPaginated(
     entityType,
     entityId,
     [...new Set([ownerId, userId])],
@@ -200,7 +199,7 @@ export async function listPhotosByEntityType(
   entityType: string,
   userId: string
 ): Promise<Record<string, Photo[]>> {
-  const all = await photoRepository.findByUser(userId, entityType);
+  const all = await repos().photos.findByUser(userId, entityType);
   const grouped: Record<string, Photo[]> = {};
   for (const photo of all) {
     const bucket = grouped[photo.entityId];
@@ -221,7 +220,7 @@ async function requireEntityPhoto(
 ): Promise<Photo> {
   const ownerId = await validateEntityOwnership(entityType, entityId, userId);
 
-  const photo = await photoRepository.findById(photoId);
+  const photo = await repos().photos.findById(photoId);
   if (
     !photo ||
     photo.entityType !== entityType ||
@@ -281,7 +280,7 @@ export async function getPhotoThumbnailForEntity(
         photo.userId,
         category
       );
-      ref = await photoRefRepository.findActiveByPhotoAndProvider(photoId, defaultProviderId);
+      ref = await repos().photoRefs.findActiveByPhotoAndProvider(photoId, defaultProviderId);
     } catch (error) {
       if (!(error instanceof ValidationError) && !(error instanceof NotFoundError)) {
         throw error;
@@ -290,7 +289,7 @@ export async function getPhotoThumbnailForEntity(
   }
 
   if (!ref) {
-    ref = await photoRefRepository.findActiveByPhoto(photoId);
+    ref = await repos().photoRefs.findActiveByPhoto(photoId);
   }
 
   if (!ref) {
@@ -316,7 +315,7 @@ export async function setCoverPhotoForEntity(
 ): Promise<Photo> {
   await requireEntityPhoto(entityType, entityId, photoId, userId);
 
-  return photoRepository.setCoverPhoto(entityType, entityId, photoId);
+  return repos().photos.setCoverPhoto(entityType, entityId, photoId);
 }
 
 export async function deletePhotoForEntity(
@@ -330,12 +329,12 @@ export async function deletePhotoForEntity(
   const wasCover = photo.isCover;
 
   await deletePhotoRowsAndObjects([photoId], photo.userId);
-  await photoRepository.delete(photoId);
+  await repos().photos.delete(photoId);
 
   if (wasCover) {
-    const remaining = await photoRepository.findByEntity(entityType, entityId);
+    const remaining = await repos().photos.findByEntity(entityType, entityId);
     if (remaining.length > 0) {
-      await photoRepository.setCoverPhoto(entityType, entityId, remaining[0].id);
+      await repos().photos.setCoverPhoto(entityType, entityId, remaining[0].id);
     }
   }
 }
@@ -343,12 +342,12 @@ export async function deletePhotoForEntity(
 async function deletePhotoRowsAndObjects(photoIds: string[], userId: string): Promise<void> {
   if (photoIds.length === 0) return;
 
-  const refs = await photoRefRepository.findAllByPhotos(photoIds);
+  const refs = await repos().photoRefs.findAllByPhotos(photoIds);
   for (const [providerId, providerRefs] of groupActiveRefsByProvider(refs)) {
     await deleteObjectsFromProvider(providerId, providerRefs, userId);
   }
 
-  await photoRefRepository.deleteByPhotos(photoIds);
+  await repos().photoRefs.deleteByPhotos(photoIds);
 }
 
 function groupActiveRefsByProvider(refs: PhotoRef[]): Map<string, PhotoRef[]> {
@@ -402,18 +401,18 @@ export async function deleteAllPhotosForEntity(
 ): Promise<void> {
   await validateEntityOwnership(entityType, entityId, userId);
 
-  const entityPhotos = await photoRepository.findByEntity(entityType, entityId);
+  const entityPhotos = await repos().photos.findByEntity(entityType, entityId);
   if (entityPhotos.length === 0) return;
 
   await deletePhotoRowsAndObjects(
     entityPhotos.map((p) => p.id),
     userId
   );
-  await photoRepository.deleteByEntity(entityType, entityId);
+  await repos().photos.deleteByEntity(entityType, entityId);
 }
 
 export async function countOrphanedPhotos(userId: string): Promise<number> {
-  return (await photoRepository.findOrphanedByUser(userId)).length;
+  return (await repos().photos.findOrphanedByUser(userId)).length;
 }
 
 interface OrphanRemoval {
@@ -422,10 +421,10 @@ interface OrphanRemoval {
 }
 
 export async function removeOrphanedPhotos(userId: string): Promise<OrphanRemoval> {
-  const orphanIds = (await photoRepository.findOrphanedByUser(userId)).map((p) => p.id);
+  const orphanIds = (await repos().photos.findOrphanedByUser(userId)).map((p) => p.id);
   if (orphanIds.length === 0) return { removed: 0, failed: 0 };
 
-  const refs = await photoRefRepository.findAllByPhotos(orphanIds);
+  const refs = await repos().photoRefs.findAllByPhotos(orphanIds);
   const failedRefs: PhotoRef[] = [];
   for (const [providerId, providerRefs] of groupActiveRefsByProvider(refs)) {
     failedRefs.push(...(await deleteObjectsFromProvider(providerId, providerRefs, userId)));
@@ -434,10 +433,10 @@ export async function removeOrphanedPhotos(userId: string): Promise<OrphanRemova
   const keptPhotoIds = new Set(failedRefs.map((ref) => ref.photoId));
   const removedIds = orphanIds.filter((id) => !keptPhotoIds.has(id));
 
-  await photoRefRepository.deleteByIds(
+  await repos().photoRefs.deleteByIds(
     refs.filter((ref) => !failedRefIds.has(ref.id)).map((ref) => ref.id)
   );
-  await photoRepository.deleteByIds(removedIds);
+  await repos().photos.deleteByIds(removedIds);
   return { removed: removedIds.length, failed: keptPhotoIds.size };
 }
 
@@ -449,12 +448,12 @@ export async function deletePhotosForEntities(
 ): Promise<void> {
   if (entityIds.length === 0) return;
 
-  const entityPhotos = await photoRepository.findByEntities(entityType, entityIds);
+  const entityPhotos = await repos().photos.findByEntities(entityType, entityIds);
   if (entityPhotos.length === 0) return;
 
   await deletePhotoRowsAndObjects(
     entityPhotos.map((p) => p.id),
     userId
   );
-  await photoRepository.deleteByEntities(entityType, entityIds);
+  await repos().photos.deleteByEntities(entityType, entityIds);
 }

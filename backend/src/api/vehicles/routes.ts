@@ -49,14 +49,10 @@ import {
 import { catalogModelMatchesMake, isCatalogModel } from '../../utils/vehicle-catalog';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { carShareRoutes, driverRoutes } from '../drivers/routes';
-import { expenseRepository } from '../expenses/repository';
 import { withComputedBalance } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { vehiclePeople } from '../roles/routes';
-import { preferencesRepository } from '../settings/repository';
-import { vehicleShareRepository } from '../shares/repository';
 import { photoRoutes } from './photo-routes';
-import { vehicleRepository } from './repository';
 
 const routes = new Hono();
 
@@ -260,7 +256,7 @@ async function assertLicensePlateAvailable(
   userId: string,
   excludeId?: string
 ): Promise<void> {
-  const existing = await vehicleRepository.findByLicensePlate(licensePlate, userId);
+  const existing = await repos().vehicles.findByLicensePlate(licensePlate, userId);
   if (existing && existing.id !== excludeId) {
     throw new ConflictError('A vehicle with this license plate already exists');
   }
@@ -276,7 +272,7 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
   const user = c.get('user');
   const { include, timeZone } = c.req.valid('query');
 
-  const userVehicles = await vehicleRepository.findByUserId(user.id);
+  const userVehicles = await repos().vehicles.findByUserId(user.id);
 
   let sharedRows: Array<
     (typeof userVehicles)[number] & {
@@ -284,11 +280,11 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
     }
   > = [];
   if (include === 'shared') {
-    const grants = await vehicleShareRepository.findAcceptedAccessForUser(user.id);
+    const grants = await repos().vehicleShares.findAcceptedAccessForUser(user.id);
     if (grants.length > 0) {
       const byVehicleId = new Map(grants.map((g) => [g.vehicleId, g]));
       const resolver = requestResolver(c, getDb());
-      const sharedVehicles = (await vehicleRepository.findByIds([...byVehicleId.keys()])).filter(
+      const sharedVehicles = (await repos().vehicles.findByIds([...byVehicleId.keys()])).filter(
         (v) => resolver.can('vehicle.read', { kind: 'vehicle', vehicleId: v.id }).allow
       );
       sharedRows = await Promise.all(
@@ -340,11 +336,11 @@ routes.post('/', zValidator('json', createVehicleSchema), authorize(ownAccount),
 
   let { unitPreferences } = vehicleData;
   if (!unitPreferences) {
-    const userSettings = await preferencesRepository.getOrCreate(user.id);
+    const userSettings = await repos().preferences.getOrCreate(user.id);
     unitPreferences = userSettings.unitPreferences;
   }
 
-  const createdVehicle = await vehicleRepository.create({
+  const createdVehicle = await repos().vehicles.create({
     ...vehicleData,
     unitPreferences,
     userId: user.id,
@@ -370,7 +366,7 @@ routes.get(
     const { timeZone } = c.req.valid('query');
 
     const access = await requireVehicleAccess(id, user.id, 'read');
-    const vehicle = (await vehicleRepository.findByIds([id]))[0] ?? null;
+    const vehicle = (await repos().vehicles.findByIds([id]))[0] ?? null;
 
     if (!vehicle) {
       throw new NotFoundError('Vehicle');
@@ -378,7 +374,7 @@ routes.get(
 
     let sharedAccess: SharedAccess | undefined;
     if (access.role !== 'owner') {
-      const grants = await vehicleShareRepository.findAcceptedAccessForUser(user.id);
+      const grants = await repos().vehicleShares.findAcceptedAccessForUser(user.id);
       const grant = grants.find((g) => g.vehicleId === id);
       sharedAccess = {
         level: grant?.level ?? access.role,
@@ -434,7 +430,7 @@ routes.put(
     const { id } = c.req.valid('param');
     const updateData = c.req.valid('json');
 
-    const existingVehicle = (await vehicleRepository.findByIds([id]))[0] ?? null;
+    const existingVehicle = (await repos().vehicles.findByIds([id]))[0] ?? null;
     if (!existingVehicle) {
       throw new NotFoundError('Vehicle');
     }
@@ -461,7 +457,7 @@ routes.put(
     );
     await assertUnitChangeConfirmed(existingVehicle, mergedUnitPreferences, confirmUnitChange);
 
-    const updatedVehicle = await vehicleRepository.update(id, {
+    const updatedVehicle = await repos().vehicles.update(id, {
       ...restUpdateData,
       ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
       ...(renamedWithoutCatalogModel(existingVehicle, updateData) && { catalogModelId: null }),
@@ -517,7 +513,7 @@ routes.delete(
 
     // Photos have no FK: the vehicle cascade would orphan them, so delete them before the row goes.
     const [expenseIds, odometerIds, splitGroupIds] = await Promise.all([
-      expenseRepository.findIdsByVehicleId(id),
+      repos().expenses.findIdsByVehicleId(id),
       repos().odometer.findIdsByVehicleId(id),
       splitGroupIdsForVehicle(id, user.id),
     ]);
@@ -525,7 +521,7 @@ routes.delete(
     await deletePhotosForEntities('expense', expenseIds, user.id);
     await deletePhotosForEntities('odometer_entry', odometerIds, user.id);
 
-    await vehicleRepository.delete(id);
+    await repos().vehicles.delete(id);
 
     // Errors are logged, not thrown: the delete has already committed, and a retry would 404.
     try {
@@ -575,13 +571,13 @@ routes.get(
     const { id } = c.req.valid('param');
     const { period } = c.req.valid('query');
 
-    const vehicle = (await vehicleRepository.findByIds([id]))[0] ?? null;
+    const vehicle = (await repos().vehicles.findByIds([id]))[0] ?? null;
     if (!vehicle) {
       throw new NotFoundError('Vehicle');
     }
     const ownerId = vehicle.userId;
 
-    const fuelExpenses = await expenseRepository.findAll({
+    const fuelExpenses = await repos().expenses.findAll({
       vehicleId: id,
       userId: ownerId,
       category: 'fuel',

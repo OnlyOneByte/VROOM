@@ -22,6 +22,7 @@ const RECEIPTS: { file: string; expected: ReceiptDraft; quarantined?: string }[]
   },
   {
     file: 'receipt-fuel-eu.png',
+    quarantined: '#1695',
     expected: {
       amount: 75.44,
       date: '2026-11-03',

@@ -1,7 +1,6 @@
 import { createId } from '@paralleldrive/cuid2';
 import { and, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import type { InsurancePolicy, InsuranceTerm } from '../../db/schema';
 import {
   insurancePolicies,
@@ -597,5 +596,3 @@ export class InsurancePolicyRepository {
     return rows.map((r) => ({ ...r.term, userId: r.userId }));
   }
 }
-
-export const insurancePolicyRepository = new InsurancePolicyRepository(getDb());

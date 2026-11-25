@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import type { AppContext } from '../../../app-context';
+import { repos } from '../../../app-context';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 
@@ -17,8 +19,7 @@ function expenseCount(): number {
 describe('importExpenses atomicity', () => {
   test('a mid-batch FK failure rolls back the rows that already inserted', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    const { expenseRepository } = await import('../repository');
-    type ImportRows = Parameters<typeof expenseRepository.importExpenses>[0];
+    type ImportRows = Parameters<AppContext['repos']['expenses']['importExpenses']>[0];
 
     const good = [0, 1, 2, 3].map((i) => ({
       vehicleId,
@@ -42,7 +43,7 @@ describe('importExpenses atomicity', () => {
 
     let threw = false;
     try {
-      await expenseRepository.importExpenses(rows, ctx.user.id);
+      await repos().expenses.importExpenses(rows, ctx.user.id);
     } catch {
       threw = true;
     }
@@ -53,8 +54,7 @@ describe('importExpenses atomicity', () => {
 
   test('a clientId repeated WITHIN one file is counted as a duplicate, not inserted twice', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    const { expenseRepository } = await import('../repository');
-    type ImportRows = Parameters<typeof expenseRepository.importExpenses>[0];
+    type ImportRows = Parameters<AppContext['repos']['expenses']['importExpenses']>[0];
 
     const rows = [
       {
@@ -73,11 +73,11 @@ describe('importExpenses atomicity', () => {
       },
     ] as ImportRows;
 
-    const first = await expenseRepository.importExpenses(rows, ctx.user.id);
+    const first = await repos().expenses.importExpenses(rows, ctx.user.id);
     expect(first).toEqual({ imported: 1, duplicates: 1 });
     expect(expenseCount()).toBe(1);
 
-    const second = await expenseRepository.importExpenses(rows, ctx.user.id);
+    const second = await repos().expenses.importExpenses(rows, ctx.user.id);
     expect(second).toEqual({ imported: 0, duplicates: 2 });
     expect(expenseCount()).toBe(1);
   });
