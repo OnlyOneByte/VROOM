@@ -41,6 +41,7 @@
 	import { formatDate } from '#lib/utils/formatters.ts';
 	import { matchesFilters } from '#lib/utils/sync/pending-rows.ts';
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
+	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	let InsuranceTab = $state<Component<{ vehicleId: string; readOnly?: boolean }> | null>(null);
 	let hasLoadedInsurance = $state(false);
@@ -1057,7 +1058,8 @@
 									<CardFull.Title>
 										All Expenses ({totalCount +
 											pendingTabRows.filter(row => pending.states.get(row.id)?.status === 'saving')
-												.length})
+												.length -
+											expenses.filter(isDeleteHidden).length})
 									</CardFull.Title>
 									{#if totalCount > 0 && isOwner}
 										<Button

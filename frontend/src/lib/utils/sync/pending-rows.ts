@@ -4,6 +4,8 @@ import { toDateInputValue } from '#lib/utils/formatters.ts';
 
 export interface PendingRowState {
 	status: 'saving' | 'failed';
+	// A failed delete of a server row, retried in place rather than through the offline queue.
+	kind?: 'delete';
 	error?: string;
 	editable?: boolean;
 	reachedServer?: boolean;
@@ -71,10 +73,12 @@ export function matchesFilters(expense: Expense, filters: PendingRowFilters): bo
 	);
 }
 
+// sign -1 takes rows out instead, for deletes still inside their Undo window.
 export function withPendingInSummary(
 	summary: ExpenseSummary | null,
 	rows: readonly Expense[],
-	now = Date.now()
+	now = Date.now(),
+	sign: 1 | -1 = 1
 ): ExpenseSummary | null {
 	if (!summary || rows.length === 0) return summary;
 	const recentSince = now - 30 * 24 * 60 * 60 * 1000;
@@ -84,20 +88,21 @@ export function withPendingInSummary(
 		.reduce((sum, row) => sum + row.amount, 0);
 	return {
 		...summary,
-		totalAmount: summary.totalAmount + total,
-		expenseCount: summary.expenseCount + rows.length,
-		recentAmount: summary.recentAmount + recent
+		totalAmount: summary.totalAmount + sign * total,
+		expenseCount: summary.expenseCount + sign * rows.length,
+		recentAmount: summary.recentAmount + sign * recent
 	};
 }
 
 export function withPendingByMonth(
 	totals: ReadonlyMap<string, number>,
-	rows: readonly Expense[]
+	rows: readonly Expense[],
+	sign: 1 | -1 = 1
 ): ReadonlyMap<string, number> {
 	if (totals.size === 0 || rows.length === 0) return totals;
 	const merged = new Map(totals);
 	for (const [month, amount] of pendingAmountsByMonth(rows)) {
-		merged.set(month, (merged.get(month) ?? 0) + amount);
+		merged.set(month, (merged.get(month) ?? 0) + sign * amount);
 	}
 	return merged;
 }

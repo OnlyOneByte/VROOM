@@ -24,10 +24,10 @@
 
 	let description = $derived(
 		isInsuranceManaged && groupId
-			? 'This will delete the insurance expense group and all its child expenses. This action cannot be undone.'
+			? 'This will delete the insurance expense group and all its child expenses. You can undo it for 5 seconds.'
 			: isGroupEditMode && groupId
-				? "This is a split expense shared across multiple vehicles. Deleting it removes the entire split — every vehicle's portion — not just one. This action cannot be undone."
-				: 'Are you sure you want to delete this expense? This action cannot be undone.'
+				? "This is a split expense shared across multiple vehicles. Deleting it removes the entire split — every vehicle's portion — not just one. You can undo it for 5 seconds."
+				: 'Are you sure you want to delete this expense? You can undo it for 5 seconds.'
 	);
 </script>
 
