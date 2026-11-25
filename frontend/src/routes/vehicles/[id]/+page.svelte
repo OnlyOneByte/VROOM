@@ -16,7 +16,6 @@
 		Ellipsis,
 		ChevronRight
 	} from '@lucide/svelte';
-	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
@@ -772,7 +771,7 @@
 {:else if vehicleLoadError}
 	<LoadErrorCard title="Couldn't load this vehicle" message={vehicleLoadError} onRetry={loadPage} />
 {:else if vehicle}
-	<div class="space-y-6 pb-24 short:pb-0">
+	<div class="space-y-6">
 		<div class="flex items-start justify-between gap-4 sm:flex-wrap">
 			<div class="min-w-0 grow basis-[min-content]">
 				<VehicleHeader
@@ -823,7 +822,7 @@
 				{#if showAddExpenseAction}
 					<Button
 						size="lg"
-						class="hidden lg:inline-flex short:inline-flex max-sm:w-10 max-sm:has-[>svg]:px-0"
+						class="max-sm:w-10 max-sm:has-[>svg]:px-0"
 						href={addExpenseHref}
 						aria-label={COMMON_MESSAGES.ADD_EXPENSE}
 					>
@@ -1170,8 +1169,4 @@
 			</Button>
 		{/snippet}
 	</EmptyState>
-{/if}
-
-{#if vehicle && showAddExpenseAction}
-	<FloatingActionButton href={addExpenseHref} label={COMMON_MESSAGES.ADD_EXPENSE} />
 {/if}

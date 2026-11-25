@@ -51,7 +51,6 @@
 	import * as CardNs from '#lib/components/ui/card/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import ExpensesTable from '#lib/components/expenses/ExpensesTable.svelte';
-	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
@@ -586,11 +585,7 @@
 {/snippet}
 
 {#snippet addExpenseHeaderAction()}
-	<Button
-		size="lg"
-		class="hidden lg:inline-flex short:inline-flex"
-		href={resolve(routes.expenseNew)}
-	>
+	<Button size="lg" href={resolve(routes.expenseNew)}>
 		<Plus class="mr-2 h-4 w-4" />
 		{COMMON_MESSAGES.ADD_EXPENSE}
 	</Button>
@@ -625,7 +620,7 @@
 		/>
 	</div>
 {:else if offlineLoad}
-	<div class="space-y-6 pb-24 short:pb-0">
+	<div class="space-y-6">
 		<PageHeader
 			title="All Expenses"
 			description="Track and categorize expenses across all vehicles"
@@ -650,8 +645,6 @@
 			onRemoveNeedsAttention={removeOfflineExpense}
 		/>
 	</div>
-
-	<FloatingActionButton href={resolve(routes.expenseNew)} label={COMMON_MESSAGES.ADD_EXPENSE} />
 {:else if vehicles.length === 0 && (shownSummary?.expenseCount ?? 0) === 0}
 	<div class="space-y-6">
 		<PageHeader
@@ -663,7 +656,7 @@
 		/>
 	</div>
 {:else}
-	<div class="space-y-6 pb-24 short:pb-0">
+	<div class="space-y-6">
 		<div class="flex items-start justify-between gap-3">
 			<div class="min-w-0 flex-1">
 				<PageHeader title="All Expenses" description={countLine}>
@@ -818,8 +811,6 @@
 			</CardNs.Content>
 		</CardNs.Root>
 	</div>
-
-	<FloatingActionButton href={resolve(routes.expenseNew)} label={COMMON_MESSAGES.ADD_EXPENSE} />
 
 	<Sheet.Root bind:open={filtersSheetOpen}>
 		<Sheet.Content side="bottom" class="max-h-[85vh] overflow-y-auto">

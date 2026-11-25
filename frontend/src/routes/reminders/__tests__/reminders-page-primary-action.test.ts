@@ -45,14 +45,6 @@ function controls(name: string) {
 	return [...screen.queryAllByRole('button', { name }), ...screen.queryAllByRole('link', { name })];
 }
 
-function belowLg(name: string) {
-	return controls(name).filter(control => !control.classList.contains('hidden'));
-}
-
-function fromLg(name: string) {
-	return controls(name).filter(control => !control.classList.contains('lg:hidden'));
-}
-
 beforeEach(() => {
 	vi.clearAllMocks();
 	getVehicles.mockImplementation(() => Promise.resolve([VEHICLE]));
@@ -137,10 +129,8 @@ describe('/reminders primary action', () => {
 		render(Page);
 
 		await waitFor(() => expect(screen.getByText('Oil change')).toBeInTheDocument());
-		expect(belowLg('New Reminder')).toHaveLength(1);
-		expect(belowLg('New Reminder')[0]).toHaveClass('fixed');
-		expect(fromLg('New Reminder')).toHaveLength(1);
-		expect(fromLg('New Reminder')[0]).not.toHaveClass('fixed');
+		expect(controls('New Reminder')).toHaveLength(1);
+		expect(controls('New Reminder')[0]).not.toHaveClass('fixed', 'hidden');
 		expect(controls('Run Due Reminders')).toHaveLength(0);
 	});
 
@@ -149,8 +139,7 @@ describe('/reminders primary action', () => {
 		render(Page);
 
 		await waitFor(() => expect(controls('Run Due Reminders')).toHaveLength(1));
-		expect(belowLg('New Reminder')).toHaveLength(1);
-		expect(fromLg('New Reminder')).toHaveLength(1);
+		expect(controls('New Reminder')).toHaveLength(1);
 	});
 });
 
