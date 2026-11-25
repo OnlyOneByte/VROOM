@@ -200,17 +200,15 @@
 							<Upload />
 							Upload
 						</Button>
-						{#if !claimFormOpen}
-							<Button
-								variant="outline"
-								size="sm"
-								class="h-10 sm:h-8"
-								onclick={() => (claimFormOpen = true)}
-							>
-								<Plus />
-								File Claim
-							</Button>
-						{/if}
+						<Button
+							variant="outline"
+							size="sm"
+							class="h-10 sm:h-8"
+							onclick={() => (claimFormOpen = true)}
+						>
+							<Plus />
+							File Claim
+						</Button>
 						{#if latestTerm}
 							<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={handleRenew}>
 								<RefreshCw />

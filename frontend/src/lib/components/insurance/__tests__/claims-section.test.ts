@@ -325,6 +325,22 @@ describe('ClaimsSection filing a claim', () => {
 		).toBeDisabled();
 	});
 
+	test('the dialog stays open, with its fields, if dismissed while a save runs', async () => {
+		createClaim.mockReturnValue(new Promise(() => {}));
+		mount();
+		await settle();
+		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));
+		await pickClaimDate('2026-03-10');
+		await fireEvent.submit(document.querySelector('form') as HTMLFormElement);
+		await settle();
+		const dialog = screen.getByRole('dialog', { name: 'File a claim' });
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+		await fireEvent.keyDown(dialog, { key: 'Escape' });
+		await settle();
+		expect(screen.getByRole('dialog', { name: 'File a claim' })).toBeInTheDocument();
+		expect(claimDateTrigger()).not.toHaveTextContent('Claim date');
+	});
+
 	test('a claim save in flight counts as unsaved changes until the section closes', async () => {
 		createClaim.mockReturnValue(new Promise(() => {}));
 		const { unmount } = mount();

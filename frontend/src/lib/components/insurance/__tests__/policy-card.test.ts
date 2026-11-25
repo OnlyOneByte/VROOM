@@ -192,15 +192,22 @@ describe('PolicyCard child sections', () => {
 		expect(screen.getByRole('heading', { name: 'Claims' })).toBeInTheDocument();
 	});
 
-	test('File Claim in the footer opens the claim form and hides itself', async () => {
+	test('File Claim in the footer opens the claim dialog and gets focus back when it closes', async () => {
 		mount();
 		await settle();
-		await fireEvent.click(screen.getByRole('button', { name: 'File Claim' }));
+		const trigger = screen.getByRole('button', { name: 'File Claim' });
+		trigger.focus();
+		await fireEvent.click(trigger);
 		await settle();
-		expect(screen.getByText('File a claim')).toBeInTheDocument();
-		const fileClaim = screen.getAllByRole('button', { name: 'File Claim' });
-		expect(fileClaim).toHaveLength(1);
-		expect(fileClaim[0]).toHaveAttribute('type', 'submit');
+		const dialog = screen.getByRole('dialog', { name: 'File a claim' });
+		expect(within(dialog).getByRole('button', { name: 'File Claim' })).toHaveAttribute(
+			'type',
+			'submit'
+		);
+		expect(trigger).toBeInTheDocument();
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+		await waitFor(() => expect(document.activeElement).toBe(trigger));
 	});
 
 	test('Upload in the footer opens the document capture dialog', async () => {

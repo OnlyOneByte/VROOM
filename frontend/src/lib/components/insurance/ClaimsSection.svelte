@@ -160,6 +160,11 @@
 		resetForm();
 	}
 
+	function setDialogOpen(open: boolean) {
+		if (open) formOpen = true;
+		else if (!isSaving) closeForm();
+	}
+
 	async function handleSubmit() {
 		if (!claimDate) {
 			appStore.showError('Enter a claim date.');
@@ -345,12 +350,7 @@
 	onConfirm={performDelete}
 />
 
-<Dialog.Root
-	bind:open={formOpen}
-	onOpenChange={open => {
-		if (!open) resetForm();
-	}}
->
+<Dialog.Root bind:open={() => formOpen, setDialogOpen}>
 	<Dialog.Content class="max-h-[90vh] overflow-y-auto sm:max-w-lg">
 		<Dialog.Header>
 			<Dialog.Title>{editingId ? 'Edit claim' : 'File a claim'}</Dialog.Title>
