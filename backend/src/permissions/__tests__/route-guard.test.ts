@@ -14,10 +14,18 @@ const SELF_CHECKED_ROUTES: Record<string, string> = {
   'GET /api/v1/auth/capabilities': 'reports the caller’s own rules, pending accounts included',
   'POST /api/v1/auth/logout': 'must clear any session, expired ones included',
   'POST /api/v1/auth/refresh': 'reads the session cookie itself and answers 401 without one',
-  'GET /api/v1/auth/callback/link/:authProvider': 'OAuth return that validates its own session',
-  'GET /api/v1/auth/callback/provider/google': 'OAuth return that validates its own session',
+  'GET /api/v1/auth/callback/link/:authProvider':
+    'OAuth return: checks its stored state and session; the start route is authorized',
+  'GET /api/v1/auth/callback/provider/google':
+    'OAuth return: checks its stored state and session; the start route is authorized',
   'GET /api/v1/overrides':
     'anyone reads their own overrides; reading another person’s is checked inside',
+  'GET /api/v1/roles': 'server roles need server.roles.manage, vehicle roles the owner’s library',
+  'POST /api/v1/roles': 'server roles need server.roles.manage, vehicle roles the owner’s library',
+  'PATCH /api/v1/roles/:id': 'checked by the role’s scope inside',
+  'DELETE /api/v1/roles/:id': 'checked by the role’s scope inside',
+  'GET /api/v1/roles/:id/permissions': 'checked by the role’s scope inside',
+  'PUT /api/v1/roles/:id/permissions': 'checked by the role’s scope inside',
 };
 
 describe('every mapped route enforces its permission', () => {
@@ -100,6 +108,39 @@ describe('the Demo role on its own garage', () => {
       expect(resolver.can('vehicle.expense.read', own).allow).toBe(true);
       expect(resolver.can('vehicle.expense.write', own).allow).toBe(false);
       expect(resolverFor(getDb(), ctx.user.id).can('vehicle.read', car).allow).toBe(false);
+      ctx.sqlite.run(
+        "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('own-car', ?, 'Kia', 'Rio', 2020)",
+        [ctx.user.id]
+      );
+      const owner = resolverFor(getDb(), ctx.user.id);
+      expect(owner.can('vehicle.write', { kind: 'vehicle', vehicleId: 'own-car' }).allow).toBe(
+        true
+      );
+      expect(owner.can('vehicle.delete', { kind: 'vehicle', vehicleId: 'own-car' }).allow).toBe(
+        true
+      );
+    } finally {
+      ctx.close();
+    }
+  });
+});
+
+describe('the roles routes check by scope', () => {
+  test('a custom server role with only server.roles.manage lists server roles', async () => {
+    const ctx = await createTestApp();
+    try {
+      ctx.sqlite.run(
+        "INSERT INTO roles (id, scope, name, built_in) VALUES ('role-managers', 'server', 'Role managers', 0)"
+      );
+      ctx.sqlite.run(
+        "INSERT INTO role_permissions (role_id, permission) VALUES ('role-managers', 'server.roles.manage')"
+      );
+      ctx.sqlite.run('DELETE FROM role_assignments WHERE user_id = ?', [ctx.user.id]);
+      ctx.sqlite.run(
+        "INSERT INTO role_assignments (id, user_id, role_id) VALUES ('ra-managers', ?, 'role-managers')",
+        [ctx.user.id]
+      );
+      expect((await ctx.authed('GET', '/api/v1/roles?scope=server')).status).toBe(200);
     } finally {
       ctx.close();
     }

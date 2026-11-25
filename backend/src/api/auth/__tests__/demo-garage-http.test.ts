@@ -121,7 +121,7 @@ describe('demo garage, on', () => {
       expect(`${route.method} ${path} ${res.status}`).toBe(`${route.method} ${path} 403`);
       expect((await json<{ error: { code: string } }>(res)).error.code).toBe('DEMO_READ_ONLY');
     }
-    expect((await send(cookie, 'POST', '/api/vehicles', {})).status).toBeGreaterThanOrEqual(300);
+    expect((await send(cookie, 'POST', '/api/vehicles', {})).status).toBe(404);
     expect(await rowCounts()).toEqual(before);
   });
 

@@ -3,8 +3,8 @@
 Every action in VROOM is a permission: a string such as `vehicle.expense.write` or
 `account.backup.run`. A feature declares its permissions in one `capabilities.ts` next to its
 routes, and maps each of its routes to one of them. Every route is enforced from the route map
-at runtime: each non-public route runs `authorize()`, and the app-wide route guard refuses any
-route the map doesn't list.
+at runtime: the app-wide route guard refuses any route the map doesn't list, and each non-public
+route runs `authorize()`, apart from the few listed below that check inside.
 
 ## Permission ids
 
@@ -153,9 +153,11 @@ To enforce a route, add `authorize(resourceOf)` after its validators and rate li
 before idempotency and body limits, so a refused caller costs no stored response or body read. `resourceOf` loads the
 resource from the database (`fromExpense` reads the expense's vehicle and author), never from what
 the caller claims; identity always comes from the session. A route with no map entry is refused at runtime by the route guard.
-Not visible → 404; visible but not allowed → 403. The few session routes that read the cookie
-themselves (`GET /auth/me`, `/auth/capabilities`, logout, refresh and the two OAuth returns) and
-`GET /overrides`, where anyone reads their own overrides, check inside instead;
+Not visible → 404; visible but not allowed → 403. A few routes check inside instead: the session
+routes that read the cookie themselves (`GET /auth/me`, `/auth/capabilities`, logout and refresh),
+the two OAuth returns (they check their stored state and the session; the route that starts the
+flow is authorized), `GET /overrides`, where anyone reads their own overrides, and the `/roles`
+routes, which pick `server.roles.manage` or the owner's library by the role's scope;
 `src/permissions/__tests__/route-guard.test.ts` lists them and fails when any other mapped route
 lacks `authorize()`.
 - Use `{ public: '<reason>' }` only for routes a signed-out visitor must reach: health, the

@@ -21,7 +21,7 @@ import {
   ValidationError,
 } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
-import { authorize, enforce, ownAccount, type ResourceOf } from '../../permissions/authorize';
+import { authorize, enforce, type ResourceOf } from '../../permissions/authorize';
 import {
   isVehicleMember,
   keepingARoleManager,
@@ -195,23 +195,18 @@ export const roleRoutes = new Hono();
 roleRoutes.use('*', requireAuth);
 roleRoutes.use('*', changeTracker);
 
-roleRoutes.get(
-  '/',
-  zValidator('query', z.object({ scope: z.enum(SCOPES) })),
-  authorize(ownAccount),
-  (c) => {
-    const { scope } = c.req.valid('query');
-    const rows = getDb()
-      .select()
-      .from(roles)
-      .where(visibleRoles(c, scope))
-      .orderBy(roles.createdAt)
-      .all();
-    return c.json({ success: true, data: rows.map(roleView) });
-  }
-);
+roleRoutes.get('/', zValidator('query', z.object({ scope: z.enum(SCOPES) })), (c) => {
+  const { scope } = c.req.valid('query');
+  const rows = getDb()
+    .select()
+    .from(roles)
+    .where(visibleRoles(c, scope))
+    .orderBy(roles.createdAt)
+    .all();
+  return c.json({ success: true, data: rows.map(roleView) });
+});
 
-roleRoutes.post('/', zValidator('json', createRoleSchema), authorize(ownAccount), (c) => {
+roleRoutes.post('/', zValidator('json', createRoleSchema), (c) => {
   const { scope, name, color, copyFrom } = c.req.valid('json');
   const ownerUserId = scope === 'vehicle' ? requireLibrary(c) : requireRoleManager(c);
   const copied = copyFrom ? roleFor(c, copyFrom, false) : null;
@@ -243,7 +238,6 @@ roleRoutes.patch(
   '/:id',
   zValidator('param', commonSchemas.idParam),
   zValidator('json', updateRoleSchema),
-  authorize(ownAccount),
   (c) => {
     const role = roleFor(c, c.req.valid('param').id, true);
     const updated = getDb()
@@ -256,32 +250,21 @@ roleRoutes.patch(
   }
 );
 
-roleRoutes.delete(
-  '/:id',
-  zValidator('param', commonSchemas.idParam),
-  authorize(ownAccount),
-  (c) => {
-    const role = roleFor(c, c.req.valid('param').id, true);
-    writeAt(role.scope, (tx) => tx.delete(roles).where(eq(roles.id, role.id)).run());
-    return c.json({ success: true, message: 'Role deleted' });
-  }
-);
+roleRoutes.delete('/:id', zValidator('param', commonSchemas.idParam), (c) => {
+  const role = roleFor(c, c.req.valid('param').id, true);
+  writeAt(role.scope, (tx) => tx.delete(roles).where(eq(roles.id, role.id)).run());
+  return c.json({ success: true, message: 'Role deleted' });
+});
 
-roleRoutes.get(
-  '/:id/permissions',
-  zValidator('param', commonSchemas.idParam),
-  authorize(ownAccount),
-  (c) => {
-    const role = roleFor(c, c.req.valid('param').id, false);
-    return c.json({ success: true, data: { permissions: permissionsOf(role.id) } });
-  }
-);
+roleRoutes.get('/:id/permissions', zValidator('param', commonSchemas.idParam), (c) => {
+  const role = roleFor(c, c.req.valid('param').id, false);
+  return c.json({ success: true, data: { permissions: permissionsOf(role.id) } });
+});
 
 roleRoutes.put(
   '/:id/permissions',
   zValidator('param', commonSchemas.idParam),
   zValidator('json', z.strictObject({ permissions: permissionList })),
-  authorize(ownAccount),
   (c) => {
     const role = roleFor(c, c.req.valid('param').id, true);
     const permissions = [...new Set(c.req.valid('json').permissions)];
