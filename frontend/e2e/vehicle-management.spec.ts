@@ -96,9 +96,9 @@ test.describe('Adding a vehicle', () => {
 		}).toPass({ timeout: 20_000, intervals: [300, 1000, 2000] });
 
 		await expect(page.getByRole('heading', { name: 'Add a vehicle' })).toBeVisible();
-		await expect(page.getByLabel('Make')).toBeVisible();
-		await expect(page.getByLabel('Model')).toBeVisible();
-		await expect(page.getByLabel('Year')).toBeVisible();
+		await expect(page.getByLabel('Make', { exact: true })).toBeVisible();
+		await expect(page.getByLabel('Model', { exact: true })).toBeVisible();
+		await expect(page.getByLabel('Year', { exact: true })).toBeVisible();
 	});
 
 	test('submitting an empty form reports the missing required fields', async ({ page }) => {
@@ -112,7 +112,7 @@ test.describe('Adding a vehicle', () => {
 		);
 
 		await page.goto('/vehicles/new');
-		await page.getByRole('button', { name: 'Add a vehicle' }).click();
+		await page.getByRole('button', { name: 'Save vehicle' }).click();
 
 		await expect(page.getByText('Make is required')).toBeVisible();
 		await expect(page.getByText('Model is required')).toBeVisible();
@@ -122,16 +122,16 @@ test.describe('Adding a vehicle', () => {
 	test('a filled form POSTs the vehicle and returns to the dashboard', async ({ page }) => {
 		await page.goto('/vehicles/new');
 
-		await page.getByLabel('Make').fill('Tesla');
-		await page.getByLabel('Model').fill('Model 3');
-		await page.getByLabel('Year').fill('2023');
+		await page.getByLabel('Make', { exact: true }).fill('Tesla');
+		await page.getByLabel('Model', { exact: true }).fill('Model 3');
+		await page.getByLabel('Year', { exact: true }).fill('2023');
 		await page.getByLabel('Plate (optional)').fill('TESLA1');
 
 		const postRequest = page.waitForRequest(
 			request =>
 				new URL(request.url()).pathname === '/api/v1/vehicles' && request.method() === 'POST'
 		);
-		await page.getByRole('button', { name: 'Add a vehicle' }).click();
+		await page.getByRole('button', { name: 'Save vehicle' }).click();
 
 		const body = (await postRequest).postDataJSON();
 		expect(body).toMatchObject({ make: 'Tesla', model: 'Model 3', year: 2023 });
