@@ -117,7 +117,6 @@ export function s3RequestHandlerFor(policy: PrivateEndpointPolicy) {
   } as unknown as S3ClientConfig['requestHandler'];
 }
 
-
 export class S3CompatProvider implements StorageProvider {
   readonly type = 's3';
   private client: S3Client;

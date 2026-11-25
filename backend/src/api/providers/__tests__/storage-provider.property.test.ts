@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import fc from 'fast-check';
+import { ALLOW_PRIVATE } from '../../../utils/outbound-url';
 import { coalesceGoogleDriveFile } from '../domains/storage/drive-file-utils';
 import type { DriveFile } from '../services/google-drive-service';
 
@@ -136,7 +137,8 @@ describe('Property 11: rawPath key routing', () => {
           capturedKeys = [];
           const provider = new S3CompatProvider(
             { accessKeyId: 'key', secretAccessKey: 'secret' },
-            { endpoint: 'https://s3.example.com', bucket: 'bucket', region: 'us-east-1' }
+            { endpoint: 'https://s3.example.com', bucket: 'bucket', region: 'us-east-1' },
+            ALLOW_PRIVATE
           );
           (provider as unknown as { client: { send: typeof send } }).client.send = send;
 
@@ -167,7 +169,8 @@ describe('Property 11: rawPath key routing', () => {
           capturedKeys = [];
           const provider = new S3CompatProvider(
             { accessKeyId: 'key', secretAccessKey: 'secret' },
-            { endpoint: 'https://s3.example.com', bucket: 'bucket', region: 'us-east-1' }
+            { endpoint: 'https://s3.example.com', bucket: 'bucket', region: 'us-east-1' },
+            ALLOW_PRIVATE
           );
           (provider as unknown as { client: { send: typeof send } }).client.send = send;
 

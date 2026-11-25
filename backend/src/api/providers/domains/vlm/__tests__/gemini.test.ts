@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { ALLOW_PRIVATE } from '../../../../../utils/outbound-url';
 import { GeminiVlmProvider } from '../gemini';
 import { RECEIPT_EXTRACTION_PROMPT } from '../prompt';
 import type { ReceiptImage } from '../vlm-provider';
@@ -43,7 +44,11 @@ afterEach(() => {
 describe('GeminiVlmProvider — request shaping', () => {
   test('POSTs to generateContent with the fixed prompt + an inline_data image part', async () => {
     stubFetch(() => okResponse('{"amount": 12.5}'));
-    const provider = new GeminiVlmProvider({ apiKey: 'g-key', model: 'gemini-1.5-flash' });
+    const provider = new GeminiVlmProvider({
+      outbound: ALLOW_PRIVATE,
+      apiKey: 'g-key',
+      model: 'gemini-1.5-flash',
+    });
 
     const raw = await provider.extractReceipt(IMAGE);
     expect(raw).toBe('{"amount": 12.5}');
@@ -70,7 +75,11 @@ describe('GeminiVlmProvider — request shaping', () => {
 
   test('url-encodes the api key in the query param', async () => {
     stubFetch(() => okResponse('{}'));
-    const provider = new GeminiVlmProvider({ apiKey: 'a/b+c', model: 'gemini-1.5-flash' });
+    const provider = new GeminiVlmProvider({
+      outbound: ALLOW_PRIVATE,
+      apiKey: 'a/b+c',
+      model: 'gemini-1.5-flash',
+    });
     await provider.extractReceipt(IMAGE);
     expect(captured?.url).toContain('key=a%2Fb%2Bc');
   });
@@ -78,6 +87,7 @@ describe('GeminiVlmProvider — request shaping', () => {
   test('a custom baseUrl overrides the default endpoint (trailing slash stripped)', async () => {
     stubFetch(() => okResponse('{}'));
     const provider = new GeminiVlmProvider({
+      outbound: ALLOW_PRIVATE,
       apiKey: 'k',
       model: 'gemini-1.5-flash',
       baseUrl: 'https://proxy.example.com/',
@@ -90,7 +100,7 @@ describe('GeminiVlmProvider — request shaping', () => {
 describe('GeminiVlmProvider failures', () => {
   test('THROWS on a non-2xx response', async () => {
     stubFetch(() => new Response('quota', { status: 429 }));
-    const provider = new GeminiVlmProvider({ apiKey: 'k', model: 'm' });
+    const provider = new GeminiVlmProvider({ outbound: ALLOW_PRIVATE, apiKey: 'k', model: 'm' });
     await expect(provider.extractReceipt(IMAGE)).rejects.toThrow(/HTTP 429/);
   });
 
@@ -98,25 +108,25 @@ describe('GeminiVlmProvider failures', () => {
     stubFetch(() => {
       throw new Error('ECONNREFUSED');
     });
-    const provider = new GeminiVlmProvider({ apiKey: 'k', model: 'm' });
+    const provider = new GeminiVlmProvider({ outbound: ALLOW_PRIVATE, apiKey: 'k', model: 'm' });
     await expect(provider.extractReceipt(IMAGE)).rejects.toThrow(/VLM request failed/);
   });
 
   test('returns an empty string when there is no candidate text (→ empty draft, no throw)', async () => {
     stubFetch(() => new Response(JSON.stringify({ candidates: [] }), { status: 200 }));
-    const provider = new GeminiVlmProvider({ apiKey: 'k', model: 'm' });
+    const provider = new GeminiVlmProvider({ outbound: ALLOW_PRIVATE, apiKey: 'k', model: 'm' });
     expect(await provider.extractReceipt(IMAGE)).toBe('');
   });
 
   test('returns an empty string when the JSON body is malformed (no throw)', async () => {
     stubFetch(() => new Response('not json', { status: 200 }));
-    const provider = new GeminiVlmProvider({ apiKey: 'k', model: 'm' });
+    const provider = new GeminiVlmProvider({ outbound: ALLOW_PRIVATE, apiKey: 'k', model: 'm' });
     expect(await provider.extractReceipt(IMAGE)).toBe('');
   });
 });
 
 describe('GeminiVlmProvider — construction', () => {
   test('throws without an api key (defense-in-depth)', () => {
-    expect(() => new GeminiVlmProvider({ model: 'm' })).toThrow(/API key/);
+    expect(() => new GeminiVlmProvider({ outbound: ALLOW_PRIVATE, model: 'm' })).toThrow(/API key/);
   });
 });
