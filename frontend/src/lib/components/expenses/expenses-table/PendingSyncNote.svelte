@@ -5,15 +5,17 @@
 	import { removeOfflineExpense } from '#lib/utils/offline-storage.ts';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
+	import { retryDelete } from '#lib/utils/pending-deletes.svelte.ts';
 
 	interface Props {
 		pending: PendingRowState;
 		entryId: string;
 		returnTo: string;
 		label: string;
+		deleteKey?: string;
 	}
 
-	let { pending, entryId, returnTo, label }: Props = $props();
+	let { pending, entryId, returnTo, label, deleteKey = entryId }: Props = $props();
 	let confirmDiscard = $state(false);
 </script>
 
@@ -24,6 +26,22 @@
 	>
 		Unsynced
 	</span>
+{:else if pending.kind === 'delete'}
+	<div class="flex flex-wrap items-center gap-2 whitespace-normal" data-testid="delete-failed-note">
+		<span class="text-xs text-destructive">Not deleted: {pending.error}</span>
+		<Button
+			variant="outline"
+			size="sm"
+			class="h-7"
+			aria-label="Retry deleting {label}"
+			onclick={event => {
+				event.stopPropagation();
+				retryDelete(deleteKey);
+			}}
+		>
+			Retry
+		</Button>
+	</div>
 {:else}
 	<div class="flex flex-wrap items-center gap-2 whitespace-normal" data-testid="pending-sync-error">
 		<span class="text-xs text-destructive">Not saved: {pending.error}</span>

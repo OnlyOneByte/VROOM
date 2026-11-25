@@ -67,7 +67,7 @@
 	</span>
 {/snippet}
 
-<PageHeader title={displayName} {description}>
+<PageHeader title={displayName} {description} variant="display">
 	{#snippet back()}
 		<Button
 			variant="outline"

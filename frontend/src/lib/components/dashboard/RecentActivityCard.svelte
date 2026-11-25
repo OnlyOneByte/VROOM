@@ -47,9 +47,7 @@
 					See all{totalCount ? ` ${totalCount}` : ''}<span class="sr-only"> expenses</span>
 				</button>
 			{:else}
-				<a href={resolve(routes.expenses)} class={seeAllClass}>
-					See all{totalCount ? ` ${totalCount}` : ''}<span class="sr-only"> expenses</span>
-				</a>
+				<a href={resolve(routes.expenses)} class={seeAllClass}>All expenses</a>
 			{/if}
 		{/if}
 	</Card.Header>

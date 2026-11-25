@@ -27,6 +27,8 @@ const { expenseApiMock, addNotification, gotoDynamic, addOfflineExpense, online,
 vi.mock('#lib/services/expense-api.ts', () => ({ expenseApi: expenseApiMock }));
 vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore: { addNotification } }));
 vi.mock('#lib/utils/navigation.ts', () => ({ gotoDynamic }));
+const scheduleDelete = vi.hoisted(() => vi.fn());
+vi.mock('#lib/utils/pending-deletes.svelte.ts', () => ({ scheduleDelete }));
 vi.mock('#lib/utils/offline-storage.ts', () => ({
 	addOfflineExpense,
 	currentOfflineQueueOwner: () => 'alice'
@@ -414,48 +416,30 @@ describe('submitExpense — offline and failure queuing', () => {
 });
 
 describe('deleteExpense', () => {
+	const loaded = makeExpense('e1');
+
 	test('does nothing without an expense id', async () => {
 		const state = createState();
 		await deleteExpense(state);
-		expect(expenseApiMock.deleteExpense).not.toHaveBeenCalled();
-		expect(expenseApiMock.deleteSplitExpense).not.toHaveBeenCalled();
+		expect(scheduleDelete).not.toHaveBeenCalled();
 	});
 
-	test('deletes a single expense and navigates back', async () => {
-		expenseApiMock.deleteExpense.mockResolvedValue(undefined);
+	test('hands the expense to the Undo window and returns to the list straight away', async () => {
 		const state = createState('e1');
+		state.originalExpense = loaded;
 		state.showDeleteConfirm = true;
 		await deleteExpense(state);
-		expect(expenseApiMock.deleteExpense).toHaveBeenCalledWith('e1');
-		notified('success', 'Expense deleted successfully');
+		expect(scheduleDelete).toHaveBeenCalledWith(loaded);
+		expect(expenseApiMock.deleteExpense).not.toHaveBeenCalled();
 		expect(gotoDynamic).toHaveBeenCalledWith('/expenses');
-		expect(state.isDeleting).toBe(false);
 		expect(state.showDeleteConfirm).toBe(false);
 	});
 
-	test('deletes the whole split group when the expense belongs to one', async () => {
-		expenseApiMock.deleteSplitExpense.mockResolvedValue(undefined);
+	test('a split expense is scheduled as its whole group', async () => {
 		const state = createState('e1');
+		state.originalExpense = loaded;
 		state.groupId = 'g1';
 		await deleteExpense(state);
-		expect(expenseApiMock.deleteSplitExpense).toHaveBeenCalledWith('g1');
-		expect(expenseApiMock.deleteExpense).not.toHaveBeenCalled();
-	});
-
-	test('a delete failure notifies, stays on the page and keeps the confirm dialog open to retry', async () => {
-		expenseApiMock.deleteExpense.mockRejectedValue(new ApiError('Internal server error', 500));
-		const state = createState('e1');
-		state.showDeleteConfirm = true;
-		await expect(deleteExpense(state)).rejects.toThrow();
-		expect(addNotification).toHaveBeenCalledWith(
-			expect.objectContaining({
-				type: 'error',
-				message:
-					"Couldn't delete this expense. Something went wrong on our side. Try again in a moment."
-			})
-		);
-		expect(gotoDynamic).not.toHaveBeenCalled();
-		expect(state.isDeleting).toBe(false);
-		expect(state.showDeleteConfirm).toBe(true);
+		expect(scheduleDelete).toHaveBeenCalledWith({ ...loaded, groupId: 'g1' });
 	});
 });

@@ -3,7 +3,11 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
-	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import {
+		formatCurrencyAxis,
+		formatCurrencyTooltip,
+		parseMonthToDate
+	} from '#lib/utils/chart-formatters.ts';
 	import { onMount, tick, untrack } from 'svelte';
 	import {
 		Plus,
@@ -39,13 +43,18 @@
 	import FuelEfficiencyStatsCard from '#lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
 	import type { AttentionItem } from '#lib/components/dashboard/dashboard-data.ts';
 	import { formatDate } from '#lib/utils/formatters.ts';
-	import { matchesFilters } from '#lib/utils/sync/pending-rows.ts';
+	import { matchesFilters, withoutRowsInBreakdowns } from '#lib/utils/sync/pending-rows.ts';
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
+	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
 	import { getFuelEfficiencyLabel, getElectricEfficiencyLabel } from '#lib/utils/units.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
-	import { getCategoryChartColor } from '#lib/utils/chart-colors.ts';
+	import {
+		buildChartConfig,
+		CHART_COLORS,
+		getCategoryChartColor
+	} from '#lib/utils/chart-colors.ts';
 	import { hasActiveFilters as checkActiveFilters } from '#lib/utils/expense-filters.ts';
 	import { COMMON_MESSAGES, VEHICLE_MESSAGES } from '#lib/constants/messages.ts';
 	import { type TimePeriod } from '#lib/constants/time-periods.ts';
@@ -128,8 +137,11 @@
 	let hasOpenedDetails = $state(false);
 	let hasOpenedUpload = $state(false);
 
-	const CATEGORY_CHART_TITLE = 'Expense by Category';
-	const CATEGORY_CHART_DESCRIPTION = 'Distribution for this vehicle';
+	const CATEGORY_CHART_TITLE = 'Spending by category';
+	const CATEGORY_SERIES = [{ key: 'value', label: 'Spent', color: CHART_COLORS[0] as string }];
+	const CATEGORY_CONFIG = buildChartConfig(CATEGORY_SERIES);
+	const CATEGORY_CHART_DESCRIPTION = 'All time, largest first';
+	const CATEGORY_PADDING = { top: 4, left: 120, bottom: 24, right: 16 };
 	const CHARTS_LOAD_ERROR = "Charts couldn't be loaded. Check your connection and reload.";
 	const fuelChartLoading = import('#lib/components/charts/FuelEfficiencyTrendChart.svelte');
 	const loadSpendCharts = () =>
@@ -161,9 +173,11 @@
 	let filters = $state<ExpenseFilters>({});
 	let expenseCategoryFilter = $state<string>('');
 
+	let chartSummary = $derived(withoutRowsInBreakdowns(summary, expenses.filter(isDeleteHidden)));
+
 	let expenseTrendData = $derived.by(() => {
-		if (!summary?.monthlyTrend.length) return [];
-		return summary.monthlyTrend.map(item => ({
+		if (!chartSummary?.monthlyTrend.length) return [];
+		return chartSummary.monthlyTrend.map(item => ({
 			date: parseMonthToDate(item.period),
 			amount: item.amount,
 			count: item.count
@@ -181,10 +195,10 @@
 	let recentFuelEfficiency = $derived(lastTwelveMonths(fuelEfficiencyData));
 
 	let categoryChartData = $derived.by(() => {
-		if (!summary?.categoryBreakdown.length) return [];
-		const total = summary.categoryBreakdown.reduce((sum, item) => sum + item.amount, 0);
+		if (!chartSummary?.categoryBreakdown.length) return [];
+		const total = chartSummary.categoryBreakdown.reduce((sum, item) => sum + item.amount, 0);
 		if (total === 0) return [];
-		return summary.categoryBreakdown
+		return chartSummary.categoryBreakdown
 			.map(item => ({
 				key: item.category,
 				label: categoryLabels[item.category as ExpenseCategory] || item.category,
@@ -727,7 +741,7 @@
 		<div class="flex items-center gap-3">
 			<Skeleton class="h-10 w-10 shrink-0 rounded-md" />
 			<div class="min-w-0">
-				<div class="flex h-9 flex-col justify-center gap-1 max-sm:short:h-[4.5rem]">
+				<div class="flex h-9 flex-col justify-center gap-1 lg:h-12 max-sm:short:h-[4.5rem]">
 					<Skeleton class="h-8 w-48" />
 					<Skeleton class="hidden h-8 w-24 max-sm:short:block" />
 				</div>
@@ -742,7 +756,6 @@
 			summary={null}
 			distance={null}
 			distanceUnit={settingsStore.unitPreferences.distanceUnit}
-			vehicleType="gas"
 		/>
 		<div class="divide-y rounded-xl border bg-card">
 			{#each Array(3) as _, i (i)}
@@ -901,7 +914,7 @@
 							distanceError={vehicleStatsData === null ? statsError : null}
 							onRetryDistance={loadVehicleStats}
 							{distanceUnit}
-							vehicleType={vehicle.vehicleType}
+							name={vehicleDisplayName}
 							logMileageHref={canWrite
 								? resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })
 								: undefined}
@@ -1031,7 +1044,7 @@
 						{#if hasExpenseData}
 							{#await loadSpendCharts()}
 								{@render spendChartPlaceholders(null)}
-							{:then [{ default: ExpenseTrendChart }, { AppPieChart }]}
+							{:then [{ default: ExpenseTrendChart }, { AppBarChart }]}
 								<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 									<ExpenseTrendChart
 										data={expenseTrendData}
@@ -1039,10 +1052,19 @@
 										isLoading={isLoadingStats}
 									/>
 									{#if categoryChartData.length > 0 || summary === null}
-										<AppPieChart
+										<AppBarChart
 											title={CATEGORY_CHART_TITLE}
 											description={CATEGORY_CHART_DESCRIPTION}
 											data={categoryChartData}
+											x="value"
+											y="label"
+											orientation="horizontal"
+											padding={CATEGORY_PADDING}
+											series={CATEGORY_SERIES}
+											config={CATEGORY_CONFIG}
+											yAxisFormat={v => String(v)}
+											xAxisProps={{ format: formatCurrencyAxis }}
+											tooltipFormat={formatCurrencyTooltip}
 											isLoading={isLoadingStats}
 										/>
 									{/if}
@@ -1067,7 +1089,8 @@
 									<CardFull.Title>
 										All Expenses ({totalCount +
 											pendingTabRows.filter(row => pending.states.get(row.id)?.status === 'saving')
-												.length})
+												.length -
+											expenses.filter(isDeleteHidden).length})
 									</CardFull.Title>
 									{#if totalCount > 0 && isOwner}
 										<Button

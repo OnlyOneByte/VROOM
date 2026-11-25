@@ -20,8 +20,11 @@
 		MOBILE_ROW_SUMMARY_CLASS
 	} from './compact-row-classes';
 	import { rowTitle, tagsBesideCategory, type GroupRow } from './expense-table-rows';
+	import PendingSyncNote from './PendingSyncNote.svelte';
+	import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 
 	interface Props {
+		pending?: PendingRowState | undefined;
 		row: GroupRow;
 		vehicleMap: ReadonlyMap<string, Vehicle>;
 		showVehicleColumn: boolean;
@@ -42,7 +45,8 @@
 		returnTo,
 		isSelected,
 		onSelect,
-		onDelete
+		onDelete,
+		pending
 	}: Props = $props();
 	let shownTags = $derived(tagsBesideCategory(row.tags, row.category));
 
@@ -93,6 +97,17 @@
 			{/if}
 		</div>
 	</button>
+	{#if pending}
+		<div class="pr-3 pb-3 pl-[3.25rem]">
+			<PendingSyncNote
+				{pending}
+				entryId={row.children[0]?.id ?? row.groupId}
+				deleteKey={row.groupId}
+				{returnTo}
+				label="{formatCurrency(row.totalAmount)} {heading.title}"
+			/>
+		</div>
+	{/if}
 	{#if isSelected && canWrite}
 		<div class={MOBILE_ROW_ACTIONS_CONTAINER_CLASS}>
 			<Button

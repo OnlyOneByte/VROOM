@@ -84,6 +84,8 @@ vi.mock('#lib/utils/sync/sync-manager.ts', () => ({
 
 const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
 const { loadOfflineExpenses } = await import('#lib/utils/offline-storage.ts');
+const { isDeleteHidden, resetPendingDeletes } =
+	await import('#lib/utils/pending-deletes.svelte.ts');
 const queued = () => loadOfflineExpenses();
 const { FUEL_NEEDS_VEHICLE_MESSAGE } = await import('../expense-form/expense-form-state.svelte.ts');
 
@@ -724,36 +726,20 @@ describe('ExpenseForm edit mode', () => {
 		});
 	});
 
-	test('delete asks for confirmation, then deletes the expense and returns', async () => {
-		deleteExpense.mockResolvedValue(undefined);
+	test('delete asks for confirmation, then returns at once and offers Undo before any DELETE', async () => {
 		await renderEdit();
 
 		await fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
 		const dialog = await screen.findByRole('alertdialog');
 		expect(dialog.textContent).toContain('Oil change');
-		expect(deleteExpense).not.toHaveBeenCalled();
 
 		await fireEvent.click(screen.getByRole('button', { name: /delete expense/i }));
 
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/expenses'));
-		expect(deleteExpense).toHaveBeenCalledWith('exp-1');
-		expect(notificationMessages()).toContain('Expense deleted successfully');
-	});
-
-	test('a failed delete is reported and the user stays on the form', async () => {
-		deleteExpense.mockRejectedValue(new ApiError('Internal server error', 500));
-		await renderEdit();
-
-		await fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
-		await screen.findByRole('alertdialog');
-		await fireEvent.click(screen.getByRole('button', { name: /delete expense/i }));
-
-		await vi.waitFor(() =>
-			expect(notificationMessages()).toContain(
-				"Couldn't delete this expense. Something went wrong on our side. Try again in a moment."
-			)
-		);
-		expect(goto).not.toHaveBeenCalled();
+		expect(notificationMessages()).toContain('Expense deleted');
+		expect(isDeleteHidden({ id: 'exp-1' })).toBe(true);
+		expect(deleteExpense).not.toHaveBeenCalled();
+		resetPendingDeletes();
 	});
 });
 
