@@ -94,17 +94,45 @@ afterEach(() => {
 });
 
 describe('ModelProvidersCard', () => {
-	test('the Assistant page link scrolls to the assistant card once its providers load', async () => {
+	describe('the #assistant-providers link', () => {
+		const realScrollIntoView = Element.prototype.scrollIntoView;
 		const scrollIntoView = vi.fn();
-		Element.prototype.scrollIntoView = scrollIntoView;
-		history.replaceState(null, '', '#assistant-providers');
-		render(ModelProvidersCard, { props: { domain: 'vlm' } });
-		render(ModelProvidersCard, { props: { domain: 'llm' } });
-		await settle();
 
-		expect(scrollIntoView).toHaveBeenCalledTimes(1);
-		expect(scrollIntoView.mock.contexts[0]).toBe(document.getElementById('assistant-providers'));
-		history.replaceState(null, '', '#');
+		beforeEach(() => {
+			Element.prototype.scrollIntoView = scrollIntoView;
+		});
+
+		afterEach(() => {
+			Element.prototype.scrollIntoView = realScrollIntoView;
+			history.replaceState(null, '', location.pathname);
+		});
+
+		test('scrolls to and focuses the assistant card only after its providers load', async () => {
+			let finish: (list: UserProviderInfo[]) => void = () => {};
+			getProviders.mockImplementation(domain =>
+				domain === 'llm' ? new Promise(r => (finish = r)) : Promise.resolve([])
+			);
+			history.replaceState(null, '', '#assistant-providers');
+			render(ModelProvidersCard, { props: { domain: 'vlm' } });
+			render(ModelProvidersCard, { props: { domain: 'llm' } });
+			await settle();
+			expect(scrollIntoView).not.toHaveBeenCalled();
+
+			finish([]);
+			await settle();
+
+			const card = document.getElementById('assistant-providers');
+			expect(scrollIntoView).toHaveBeenCalledTimes(1);
+			expect(scrollIntoView.mock.contexts[0]).toBe(card);
+			expect(card).toHaveFocus();
+		});
+
+		test('without the hash, nothing scrolls', async () => {
+			render(ModelProvidersCard, { props: { domain: 'llm' } });
+			await settle();
+
+			expect(scrollIntoView).not.toHaveBeenCalled();
+		});
 	});
 
 	test.each([

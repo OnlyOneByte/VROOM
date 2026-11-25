@@ -24,6 +24,7 @@
 	import ProviderStatusBadge from '#lib/components/settings/ProviderStatusBadge.svelte';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { oldestFirst } from '#lib/utils/provider-order.ts';
 	import ProviderFields, {
 		fieldConfig,
 		fieldErrorsFrom,
@@ -120,9 +121,7 @@
 	let defaultId = $derived(
 		builtins.map(builtinId).find(id => id === savedDefaultId) ??
 			usable.find(p => p.id === savedDefaultId)?.id ??
-			[...usable].sort(
-				(a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.id.localeCompare(b.id)
-			)[0]?.id ??
+			[...usable].sort(oldestFirst)[0]?.id ??
 			(builtins[0] ? builtinId(builtins[0]) : null)
 	);
 
@@ -171,7 +170,9 @@
 		await loadData();
 		if (location.hash !== `#${copy.anchor}`) return;
 		await tick();
-		document.getElementById(copy.anchor)?.scrollIntoView({ block: 'start' });
+		const card = document.getElementById(copy.anchor);
+		card?.scrollIntoView({ block: 'start' });
+		card?.focus({ preventScroll: true });
 	});
 
 	async function retryLoad() {
@@ -297,7 +298,7 @@
 	{/if}
 {/snippet}
 
-<Card id={copy.anchor}>
+<Card id={copy.anchor} tabindex={-1}>
 	<CardHeader>
 		<div class="flex items-center gap-2">
 			<Icon class="h-5 w-5 text-muted-foreground" />

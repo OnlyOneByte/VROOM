@@ -55,6 +55,14 @@ describe('assistant page names its provider', () => {
 		expect(await screen.findByTestId('assistant-provider')).toHaveTextContent('Using Work Claude');
 	});
 
+	test('names no provider when Settings fail to load, since the chosen one is unknown', async () => {
+		getSettings.mockRejectedValue(new Error('offline'));
+		render(Page);
+
+		expect(await screen.findByTestId('assistant-chat')).toBeInTheDocument();
+		expect(screen.queryByTestId('assistant-provider')).not.toBeInTheDocument();
+	});
+
 	test('a turned-off provider does not count as connected', async () => {
 		getProviders.mockResolvedValue([
 			provider('off', 'Old Ollama', '2025-01-01T00:00:00Z', 'disabled')

@@ -14,6 +14,7 @@
 	import { settingsApi } from '#lib/services/settings-api.ts';
 	import { assistantApi, type AssistantTurn } from '#lib/services/assistant-api.ts';
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { oldestFirst } from '#lib/utils/provider-order.ts';
 
 	const DISCLOSURE_KEY = 'vroom.llm.assistant-disclosed';
 	const MAX_HISTORY_TURNS = 12;
@@ -45,14 +46,12 @@
 				providerApi.getProviders('llm'),
 				settingsApi.getSettings().catch(() => null)
 			]);
-			const usable = providers
-				.filter(p => p.status !== 'disabled')
-				.sort(
-					(a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.id.localeCompare(b.id)
-				);
+			const usable = providers.filter(p => p.status !== 'disabled').sort(oldestFirst);
 			const savedId = settings?.providerDefaults?.['ai.llm'];
 			hasProvider = usable.length > 0;
-			providerName = (usable.find(p => p.id === savedId) ?? usable[0])?.displayName ?? null;
+			providerName = settings
+				? ((usable.find(p => p.id === savedId) ?? usable[0])?.displayName ?? null)
+				: null;
 			loadError = null;
 		} catch (e) {
 			loadError = userFacingErrorMessage(e);
