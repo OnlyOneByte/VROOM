@@ -105,3 +105,28 @@ describe('getSyncStatusInfo — precedence cascade (the load-bearing part)', () 
 		expect(info.text).toBe('Synced');
 	});
 });
+
+describe('a backup provider that needs attention', () => {
+	test('replaces Up to date, Synced and pending', () => {
+		for (const overrides of [{}, { syncStatus: 'success' as const }, { pendingCount: 2 }]) {
+			const info = getSyncStatusInfo(params({ ...overrides, providerNeedsAttention: true }));
+			expect(info.text).toBe('A backup provider needs attention');
+			expect(info.color).toBe('text-warning');
+		}
+	});
+
+	test('gives way to offline, unreachable, conflicts, syncing and a failed sync', () => {
+		const attention = { providerNeedsAttention: true };
+		expect(getSyncStatusInfo(params({ ...attention, isOnline: false })).text).toBe('Offline');
+		expect(getSyncStatusInfo(params({ ...attention, serverReachable: false })).text).toBe(
+			"Can't reach VROOM"
+		);
+		expect(getSyncStatusInfo(params({ ...attention, conflictsCount: 1 })).text).toBe('1 conflict');
+		expect(getSyncStatusInfo(params({ ...attention, syncStatus: 'syncing' })).text).toBe(
+			'Syncing...'
+		);
+		expect(getSyncStatusInfo(params({ ...attention, syncStatus: 'error' })).text).toBe(
+			'Sync failed'
+		);
+	});
+});

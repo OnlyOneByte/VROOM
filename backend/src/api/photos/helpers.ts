@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { repos } from '../../app-context';
 import { NotFoundError, ValidationError } from '../../errors';
 import type { ResourceOf } from '../../permissions/authorize';
 import type { Resource } from '../../permissions/resolve';
@@ -11,7 +12,6 @@ import { expenseRepository } from '../expenses/repository';
 import { policyDocumentResources } from '../insurance/access';
 import { insuranceClaimRepository } from '../insurance/claims-repository';
 import { insurancePolicyRepository } from '../insurance/repository';
-import { odometerRepository } from '../odometer/repository';
 import { photoRepository } from './photo-repository';
 
 export async function validateEntityOwnership(
@@ -40,7 +40,7 @@ export async function validateEntityOwnership(
       return access.ownerId;
     }
     case 'odometer_entry': {
-      const entry = await odometerRepository.findById(entityId);
+      const entry = await repos().odometer.findById(entityId);
       if (!entry) throw new NotFoundError('Odometer entry');
       return (await requireVehicleAccess(entry.vehicleId, userId, 'read')).ownerId;
     }
@@ -79,7 +79,7 @@ export async function photoEntityResource(
       return { kind: 'vehicle', vehicleId: expense.vehicleId };
     }
     case 'odometer_entry': {
-      const entry = await odometerRepository.findById(entityId);
+      const entry = await repos().odometer.findById(entityId);
       if (!entry) throw new NotFoundError('Odometer entry');
       return { kind: 'vehicle', vehicleId: entry.vehicleId };
     }

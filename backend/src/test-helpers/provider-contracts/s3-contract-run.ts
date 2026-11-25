@@ -1,5 +1,5 @@
 import { S3CompatProvider } from '../../api/providers/domains/storage/s3-compat-provider';
-import { outboundResolver } from '../../utils/outbound-url';
+import { ALLOW_PRIVATE, outboundResolver } from '../../utils/outbound-url';
 import { STORAGE_CHECKS } from './storage-checks';
 
 const objects = new Map<string, Uint8Array>();
@@ -48,7 +48,8 @@ outboundResolver.lookup = async () => ['127.0.0.1'];
 const make = () =>
   new S3CompatProvider(
     { accessKeyId: 'AKIDEXAMPLE', secretAccessKey: 'secret' },
-    { endpoint: `http://s3.test:${server.port}`, bucket: 'bucket', region: 'us-east-1' }
+    { endpoint: `http://s3.test:${server.port}`, bucket: 'bucket', region: 'us-east-1' },
+    ALLOW_PRIVATE
   );
 
 const results: { name: string; error: string | null }[] = [];

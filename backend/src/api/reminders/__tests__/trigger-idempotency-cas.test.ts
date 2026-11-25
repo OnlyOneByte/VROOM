@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import {
   createTestApp,
   type DataEnvelope,
@@ -58,11 +59,9 @@ describe('reminder-trigger idempotency (CAS on nextDueDate)', () => {
       .query('SELECT next_due_date FROM reminders WHERE id = ?')
       .get(reminderId) as { next_due_date: number };
 
-    const { reminderRepository } = await import('../repository');
-
     const staleExpected = new Date(before.next_due_date * 1000 - 86_400_000);
     const newDate = new Date(before.next_due_date * 1000 + 999 * 86_400_000);
-    await reminderRepository.advanceNextDueDate(reminderId, staleExpected, newDate);
+    await repos().reminders.advanceNextDueDate(reminderId, staleExpected, newDate);
 
     const after = ctx.sqlite
       .query('SELECT next_due_date FROM reminders WHERE id = ?')
@@ -70,7 +69,7 @@ describe('reminder-trigger idempotency (CAS on nextDueDate)', () => {
     expect(after.next_due_date).toBe(before.next_due_date);
 
     const correctExpected = new Date(before.next_due_date * 1000);
-    await reminderRepository.advanceNextDueDate(reminderId, correctExpected, newDate);
+    await repos().reminders.advanceNextDueDate(reminderId, correctExpected, newDate);
     const advanced = ctx.sqlite
       .query('SELECT next_due_date FROM reminders WHERE id = ?')
       .get(reminderId) as { next_due_date: number };

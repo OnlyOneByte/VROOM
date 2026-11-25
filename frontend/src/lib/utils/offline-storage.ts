@@ -35,6 +35,7 @@ export interface OfflineExpense {
 	synced: boolean;
 	needsAttention?: boolean;
 	attentionReason?: string;
+	lastError?: string;
 	serverId?: string;
 	version?: string;
 }
@@ -424,6 +425,7 @@ export function markExpenseNeedsAttention(id: string, reason?: string, serverId?
 			? {
 					...expense,
 					needsAttention: true,
+					lastError: undefined,
 					...(reason !== undefined && { attentionReason: reason }),
 					...(serverId !== undefined && { serverId })
 				}
@@ -440,7 +442,8 @@ export function clearNeedsAttention(id: string): void {
 			? {
 					...expense,
 					needsAttention: false,
-					attentionReason: undefined
+					attentionReason: undefined,
+					lastError: undefined
 				}
 			: expense
 	);
@@ -448,10 +451,20 @@ export function clearNeedsAttention(id: string): void {
 	saveOfflineExpenses(updatedExpenses);
 }
 
-export function markExpenseAsSynced(id: string): void {
+export function noteSyncError(id: string, message: string): void {
+	saveOfflineExpenses(
+		loadOfflineExpenses().map(expense =>
+			expense.id === id ? { ...expense, lastError: message } : expense
+		)
+	);
+}
+
+export function markExpenseAsSynced(id: string, serverId?: string): void {
 	const currentExpenses = loadOfflineExpenses();
 	const updatedExpenses = currentExpenses.map(expense =>
-		expense.id === id ? { ...expense, synced: true } : expense
+		expense.id === id
+			? { ...expense, synced: true, ...(serverId !== undefined && { serverId }) }
+			: expense
 	);
 
 	saveOfflineExpenses(updatedExpenses);

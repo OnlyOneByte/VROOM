@@ -6,7 +6,7 @@
 	import HowItWorks from '#lib/components/common/how-it-works.svelte';
 	import HeroFigure from '#lib/components/common/hero-figure.svelte';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
-	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Button, buttonVariants as buttonClass } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
@@ -18,6 +18,10 @@
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
+	import * as Sheet from '#lib/components/ui/sheet/index.ts';
+	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import { AppLineChart } from '#lib/components/charts/index.ts';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
@@ -157,6 +161,72 @@
 		</section>
 
 		<section class="space-y-3">
+			<h2 class="text-lg font-semibold">Surfaces</h2>
+			<p class="text-sm text-muted-foreground">
+				Cards are rare; a <code>variant="section"</code> card is a ruled section with no fill.
+			</p>
+			<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+				<Card.Root>
+					<Card.Header><Card.Title level={3}>Card</Card.Title></Card.Header>
+					<Card.Content class="text-sm text-muted-foreground">
+						Surface fill, hairline edge.
+					</Card.Content>
+				</Card.Root>
+				<Card.Root variant="section">
+					<Card.Header><Card.Title level={3}>Section</Card.Title></Card.Header>
+					<Card.Content class="text-sm text-muted-foreground">A rule above, no fill.</Card.Content>
+				</Card.Root>
+			</div>
+			<div class="flex flex-wrap gap-2">
+				<Dialog.Root>
+					<Dialog.Trigger class={buttonClass({ variant: 'outline' })}>Open dialog</Dialog.Trigger>
+					<Dialog.Content>
+						<Dialog.Header>
+							<Dialog.Title>Import expenses</Dialog.Title>
+							<Dialog.Description>Pick a CSV exported from another tracker.</Dialog.Description>
+						</Dialog.Header>
+						<Dialog.Footer>
+							<Button variant="outline">Cancel</Button>
+							<Button>Import</Button>
+						</Dialog.Footer>
+					</Dialog.Content>
+				</Dialog.Root>
+				<AlertDialog.Root>
+					<AlertDialog.Trigger class={buttonClass({ variant: 'outline' })}>
+						Open confirm
+					</AlertDialog.Trigger>
+					<AlertDialog.Content>
+						<AlertDialog.Header>
+							<AlertDialog.Title>Delete "Car wash"?</AlertDialog.Title>
+							<AlertDialog.Description>This can't be undone.</AlertDialog.Description>
+						</AlertDialog.Header>
+						<AlertDialog.Footer>
+							<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+							<AlertDialog.Action>Delete</AlertDialog.Action>
+						</AlertDialog.Footer>
+					</AlertDialog.Content>
+				</AlertDialog.Root>
+				<Sheet.Root>
+					<Sheet.Trigger class={buttonClass({ variant: 'outline' })}>Open sheet</Sheet.Trigger>
+					<Sheet.Content>
+						<Sheet.Header>
+							<Sheet.Title>Filters</Sheet.Title>
+							<Sheet.Description>Narrow the list by vehicle and category.</Sheet.Description>
+						</Sheet.Header>
+					</Sheet.Content>
+				</Sheet.Root>
+				<Popover.Root>
+					<Popover.Trigger class={buttonClass({ variant: 'outline' })}>
+						Open popover
+					</Popover.Trigger>
+					<Popover.Content>
+						<p class="text-sm">A popover sits on the surface with the pop shadow.</p>
+					</Popover.Content>
+				</Popover.Root>
+			</div>
+		</section>
+
+		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Hero figure</h2>
 			<p class="text-sm text-muted-foreground">
 				At most one per screen: the answer to the screen's question, with its comparison in the meta
@@ -191,7 +261,7 @@
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Tabs</h2>
 			<p class="text-sm text-muted-foreground">
-				Triggers are 40px tall below <code>sm</code> so they clear the mobile tap target.
+				Triggers are 40px tall, so they clear the tap target at every width.
 			</p>
 			<Tabs value="overview">
 				<TabsList class="grid w-full grid-cols-3">

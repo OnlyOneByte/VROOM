@@ -5,7 +5,6 @@
 	import { onMount } from 'svelte';
 	import { Shield, Plus } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
@@ -79,15 +78,11 @@
 		<LoadErrorCard title="Couldn't load insurance" message={error} onRetry={loadData} />
 	</div>
 {:else}
-	<div class="space-y-6 pb-24 short:pb-0">
+	<div class="space-y-6">
 		<PageHeader title="Insurance" description="Manage your insurance policies across all vehicles">
 			{#snippet actions()}
 				{#if policies.length > 0 && vehicles.length > 0}
-					<Button
-						size="lg"
-						class="hidden lg:inline-flex short:inline-flex"
-						onclick={handleAddPolicy}
-					>
+					<Button size="lg" onclick={handleAddPolicy}>
 						<Plus class="mr-2 h-4 w-4" />
 						Add Policy
 					</Button>
@@ -128,8 +123,4 @@
 			/>
 		{/if}
 	</div>
-
-	{#if policies.length > 0 && vehicles.length > 0}
-		<FloatingActionButton onclick={handleAddPolicy} label="Add Policy" />
-	{/if}
 {/if}

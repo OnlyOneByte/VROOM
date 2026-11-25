@@ -25,7 +25,7 @@
 	<Select.Trigger
 		aria-label="Category filter"
 		class={isCompact
-			? 'px-2 border-none shadow-none hover:bg-muted font-medium text-muted-foreground text-xs'
+			? 'px-2 border-none shadow-none hover:bg-muted font-medium text-muted-foreground text-xs data-[size=default]:h-10 sm:data-[size=default]:h-9'
 			: 'h-8 px-2 -ml-2 border-none shadow-none hover:bg-muted font-medium text-muted-foreground'}
 	>
 		<div class="flex items-center gap-1">

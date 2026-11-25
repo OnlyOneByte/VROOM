@@ -4,8 +4,9 @@
 	"default": 100,
 	"routes": {
 		"/dashboard": 70,
+		"/vehicles": 80,
 		"/vehicles/[id]": 80,
-		"/expenses": 116,
+		"/expenses": 123,
 		"/expenses/new": 110,
 		"/expenses/[id]/edit": 110,
 		"/dev/gallery": 200,

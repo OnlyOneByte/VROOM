@@ -127,7 +127,7 @@ describe('trips page load states', () => {
 		const { container } = render(Page);
 		await settle();
 
-		expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(4);
+		expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(5);
 		expect(list).toHaveBeenCalledWith({ limit: 100 });
 	});
 

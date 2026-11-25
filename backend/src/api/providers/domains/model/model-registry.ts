@@ -20,7 +20,7 @@ export interface ModelProviderSettings {
   apiKey?: string;
   model: string;
   baseUrl?: string;
-  outbound?: PrivateEndpointPolicy;
+  outbound: PrivateEndpointPolicy;
 }
 
 export type ModelCapability = 'ai.llm' | 'ai.vision';

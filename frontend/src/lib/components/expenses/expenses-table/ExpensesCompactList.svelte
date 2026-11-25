@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 	import type { Expense, Vehicle } from '#lib/types/index.ts';
 	import ExpenseCategoryFilter from './ExpenseCategoryFilter.svelte';
 	import ExpenseSortButton from './ExpenseSortButton.svelte';
@@ -30,6 +31,7 @@
 		onDeleteExpense: (_expense: Expense) => void;
 		onDeleteGroup: (_row: GroupRow) => void;
 		monthTotals?: ReadonlyMap<string, number> | undefined;
+		pendingStates?: ReadonlyMap<string, PendingRowState> | undefined;
 	}
 
 	let {
@@ -47,7 +49,8 @@
 		onCategoryChange,
 		onDeleteExpense,
 		onDeleteGroup,
-		monthTotals
+		monthTotals,
+		pendingStates
 	}: Props = $props();
 
 	let sections = $derived(
@@ -67,6 +70,7 @@
 			isSelected={selectedRowId === row.expense.id}
 			{onSelect}
 			onDelete={onDeleteExpense}
+			pending={pendingStates?.get(row.expense.id)}
 		/>
 	{:else}
 		<CompactGroupRow

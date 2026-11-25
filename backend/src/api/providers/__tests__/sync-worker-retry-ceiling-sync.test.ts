@@ -9,7 +9,7 @@ beforeEach(async () => {
 
 describe('sync-worker retry ceiling matches the repository query', () => {
   test('the repository hands the worker refs below MAX_RETRY_COUNT and withholds refs at it', async () => {
-    const { db } = await import('../../../db/connection');
+    const db = (await import('../../../db/connection')).getDb();
     const schema = await import('../../../db/schema');
     const { photoRefRepository } = await import('../../photos/photo-ref-repository');
     const { MAX_RETRY_COUNT } = await import('../sync-worker');

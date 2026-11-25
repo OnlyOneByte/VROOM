@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { ALLOW_PRIVATE } from '../../../../../utils/outbound-url';
 import { AnthropicVlmProvider } from '../anthropic';
 import { RECEIPT_EXTRACTION_PROMPT } from '../prompt';
 import type { ReceiptImage } from '../vlm-provider';
@@ -45,7 +46,11 @@ afterEach(() => {
 describe('AnthropicVlmProvider — request shaping', () => {
   test('POSTs to the messages endpoint with the fixed prompt + a base64 image source block', async () => {
     stubFetch(() => okResponse('{"amount": 12.5}'));
-    const provider = new AnthropicVlmProvider({ apiKey: 'sk-ant', model: 'claude-3-5-sonnet' });
+    const provider = new AnthropicVlmProvider({
+      outbound: ALLOW_PRIVATE,
+      apiKey: 'sk-ant',
+      model: 'claude-3-5-sonnet',
+    });
 
     const raw = await provider.extractReceipt(IMAGE);
     expect(raw).toBe('{"amount": 12.5}');
@@ -69,7 +74,11 @@ describe('AnthropicVlmProvider — request shaping', () => {
 
   test('authenticates via x-api-key + anthropic-version headers (NOT Bearer)', async () => {
     stubFetch(() => okResponse('{}'));
-    const provider = new AnthropicVlmProvider({ apiKey: 'sk-secret', model: 'claude-3-5-sonnet' });
+    const provider = new AnthropicVlmProvider({
+      outbound: ALLOW_PRIVATE,
+      apiKey: 'sk-secret',
+      model: 'claude-3-5-sonnet',
+    });
     await provider.extractReceipt(IMAGE);
     expect(captured?.headers['x-api-key']).toBe('sk-secret');
     expect(captured?.headers['anthropic-version']).toBeTruthy();
@@ -79,6 +88,7 @@ describe('AnthropicVlmProvider — request shaping', () => {
   test('a custom baseUrl overrides the default endpoint (trailing slash stripped)', async () => {
     stubFetch(() => okResponse('{}'));
     const provider = new AnthropicVlmProvider({
+      outbound: ALLOW_PRIVATE,
       apiKey: 'k',
       model: 'm',
       baseUrl: 'https://proxy.example.com/',
@@ -91,7 +101,7 @@ describe('AnthropicVlmProvider — request shaping', () => {
 describe('AnthropicVlmProvider failures', () => {
   test('THROWS on a non-2xx response', async () => {
     stubFetch(() => new Response('overloaded', { status: 529 }));
-    const provider = new AnthropicVlmProvider({ apiKey: 'k', model: 'm' });
+    const provider = new AnthropicVlmProvider({ outbound: ALLOW_PRIVATE, apiKey: 'k', model: 'm' });
     await expect(provider.extractReceipt(IMAGE)).rejects.toThrow(/HTTP 529/);
   });
 
@@ -99,7 +109,7 @@ describe('AnthropicVlmProvider failures', () => {
     stubFetch(() => {
       throw new Error('ECONNREFUSED');
     });
-    const provider = new AnthropicVlmProvider({ apiKey: 'k', model: 'm' });
+    const provider = new AnthropicVlmProvider({ outbound: ALLOW_PRIVATE, apiKey: 'k', model: 'm' });
     await expect(provider.extractReceipt(IMAGE)).rejects.toThrow(/VLM request failed/);
   });
 
@@ -107,19 +117,21 @@ describe('AnthropicVlmProvider failures', () => {
     stubFetch(
       () => new Response(JSON.stringify({ content: [{ type: 'tool_use' }] }), { status: 200 })
     );
-    const provider = new AnthropicVlmProvider({ apiKey: 'k', model: 'm' });
+    const provider = new AnthropicVlmProvider({ outbound: ALLOW_PRIVATE, apiKey: 'k', model: 'm' });
     expect(await provider.extractReceipt(IMAGE)).toBe('');
   });
 
   test('returns an empty string when the JSON body is malformed (no throw)', async () => {
     stubFetch(() => new Response('not json', { status: 200 }));
-    const provider = new AnthropicVlmProvider({ apiKey: 'k', model: 'm' });
+    const provider = new AnthropicVlmProvider({ outbound: ALLOW_PRIVATE, apiKey: 'k', model: 'm' });
     expect(await provider.extractReceipt(IMAGE)).toBe('');
   });
 });
 
 describe('AnthropicVlmProvider — construction', () => {
   test('throws without an api key (defense-in-depth)', () => {
-    expect(() => new AnthropicVlmProvider({ model: 'm' })).toThrow(/API key/);
+    expect(() => new AnthropicVlmProvider({ outbound: ALLOW_PRIVATE, model: 'm' })).toThrow(
+      /API key/
+    );
   });
 });

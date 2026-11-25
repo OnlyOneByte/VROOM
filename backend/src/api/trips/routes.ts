@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { repos } from '../../app-context';
 import type { Trip } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
@@ -18,7 +19,6 @@ import { commonSchemas, zValidator } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
 import { attributedDriver, hideDriverFields } from '../drivers/attribution';
 import { preferencesRepository } from '../settings/repository';
-import { tripRepository } from './repository';
 import { createTrip, deleteTrip, updateTrip } from './service';
 import {
   createTripSchema,
@@ -60,7 +60,7 @@ const fromBodyVehicle: ResourceOf = async (c) => ({
 const fromQueryVehicle: ResourceOf = (c) => vehicleOrOwnAccount(c.req.query('vehicleId'), c);
 
 const fromTrip: ResourceOf = async (c) => {
-  const trip = await tripRepository.findById(c.req.param('id') ?? '');
+  const trip = await repos().trips.findById(c.req.param('id') ?? '');
   if (!trip) throw new NotFoundError('Trip');
   return vehicleEntry(trip.vehicleId, trip.userId, trip.createdBy);
 };
@@ -70,7 +70,7 @@ async function ownerOf(vehicleId: string | undefined, userId: string): Promise<s
 }
 
 async function tripOf(id: string): Promise<Trip> {
-  const trip = await tripRepository.findById(id);
+  const trip = await repos().trips.findById(id);
   if (!trip) throw new NotFoundError('Trip');
   return trip;
 }
@@ -99,7 +99,7 @@ routes.get('/', zValidator('query', listQuerySchema), authorize(fromQueryVehicle
   const { limit, offset } = clampPagination(query);
 
   const ownerId = await ownerOf(query.vehicleId, user.id);
-  const { data, totalCount } = await tripRepository.findByUserIdPaginated(ownerId, limit, offset, {
+  const { data, totalCount } = await repos().trips.findByUserIdPaginated(ownerId, limit, offset, {
     vehicleId: query.vehicleId,
     purpose: query.purpose,
   });
@@ -120,13 +120,13 @@ routes.get(
 
     const ownerId = await ownerOf(vehicleId, user.id);
     const trips = vehicleId
-      ? await tripRepository.findByVehicle(vehicleId, ownerId)
-      : await tripRepository.findByUserId(user.id);
+      ? await repos().trips.findByVehicle(vehicleId, ownerId)
+      : await repos().trips.findByUserId(user.id);
 
     const prefs = await preferencesRepository.getOrCreate(user.id);
     const userUnit = (parseUnitPreferences(prefs.unitPreferences) ?? DEFAULT_UNIT_PREFERENCES)
       .distanceUnit;
-    const vehicleUnits = await tripRepository.findVehicleDistanceUnits(ownerId);
+    const vehicleUnits = await repos().trips.findVehicleDistanceUnits(ownerId);
 
     const summary = buildTripSummary(
       trips,

@@ -1,6 +1,5 @@
 import { and, count, desc, eq, gte, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import { rawAll, sqlFalse } from '../../db/dialect';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
 import { odometerEntries } from '../../db/schema';
@@ -352,5 +351,3 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     }
   }
 }
-
-export const odometerRepository = new OdometerRepository(getDb());

@@ -1,6 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import { isRedirect } from '@sveltejs/kit';
 
 const pageState = vi.hoisted(() => ({ status: 404 }));
 
@@ -8,7 +7,6 @@ vi.mock('$app/state', () => ({ page: pageState }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 const { default: ErrorPage } = await import('../+error.svelte');
-const { load: vehiclesIndexLoad } = await import('../vehicles/+page.ts');
 
 describe('the app error page', () => {
 	test('a missing page gets a titled h1, a document title and a way back to the dashboard', () => {
@@ -30,18 +28,5 @@ describe('the app error page', () => {
 		expect(screen.getByRole('heading', { level: 1, name: 'Page Unavailable' })).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: 'Go to Dashboard' })).toBeInTheDocument();
-	});
-});
-
-describe('the vehicles index', () => {
-	test('redirects to the dashboard, which lists the fleet', () => {
-		let thrown: unknown;
-		try {
-			vehiclesIndexLoad({} as Parameters<typeof vehiclesIndexLoad>[0]);
-		} catch (error) {
-			thrown = error;
-		}
-		expect(isRedirect(thrown)).toBe(true);
-		expect(thrown).toMatchObject({ status: 307, location: '/dashboard' });
 	});
 });

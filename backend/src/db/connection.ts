@@ -12,40 +12,46 @@ import { extractErrorMessage } from '../utils/error-handling';
 import { logger } from '../utils/logger';
 import * as schema from './schema.js';
 
-const DATABASE_URL = CONFIG.database.url;
+function openDatabase(url: string) {
+  const dbDir = dirname(url);
+  if (!existsSync(dbDir)) {
+    mkdirSync(dbDir, { recursive: true });
+  }
 
-const dbDir = dirname(DATABASE_URL);
-if (!existsSync(dbDir)) {
-  mkdirSync(dbDir, { recursive: true });
+  const sqlite = new Database(url);
+
+  sqlite.run('PRAGMA journal_mode = WAL');
+  sqlite.run('PRAGMA synchronous = NORMAL');
+  sqlite.run(`PRAGMA cache_size = ${CONFIG.database.cacheSize}`);
+  sqlite.run('PRAGMA foreign_keys = ON');
+  sqlite.run('PRAGMA temp_store = MEMORY');
+  sqlite.run(`PRAGMA busy_timeout = ${CONFIG.database.queryTimeout}`);
+
+  sqlite.run(`PRAGMA wal_autocheckpoint = ${CONFIG.database.walCheckpointPages}`);
+
+  return drizzle(sqlite, { schema });
 }
 
-const sqlite = new Database(DATABASE_URL);
+export type AppDatabase = ReturnType<typeof openDatabase>;
 
-sqlite.run('PRAGMA journal_mode = WAL');
-sqlite.run('PRAGMA synchronous = NORMAL');
-sqlite.run(`PRAGMA cache_size = ${CONFIG.database.cacheSize}`);
-sqlite.run('PRAGMA foreign_keys = ON');
-sqlite.run('PRAGMA temp_store = MEMORY');
-sqlite.run(`PRAGMA busy_timeout = ${CONFIG.database.queryTimeout}`);
+let opened: AppDatabase | null = null;
 
-sqlite.run(`PRAGMA wal_autocheckpoint = ${CONFIG.database.walCheckpointPages}`);
-
-export const db = drizzle(sqlite, { schema });
-
-export type AppDatabase = typeof db;
-
-export function getDb(): typeof db {
-  return db;
+export function getDb(): AppDatabase {
+  opened ??= openDatabase(CONFIG.database.url);
+  return opened;
 }
+
+type AppTransaction = Parameters<AppDatabase['transaction']>[0] extends (tx: infer U) => unknown
+  ? U
+  : never;
 
 // bun:sqlite transactions must use a synchronous callback: an awaited statement autocommits on its own.
 export async function transaction<T>(
-  callback: (
-    tx: Parameters<typeof db.transaction>[0] extends (tx: infer U) => unknown ? U : never
-  ) => T | Promise<T>
+  callback: (tx: AppTransaction) => T | Promise<T>,
+  database: AppDatabase = getDb()
 ): Promise<T> {
   try {
-    return (await getDb().transaction(callback as Parameters<typeof db.transaction>[0])) as T;
+    return (await database.transaction(callback as Parameters<AppDatabase['transaction']>[0])) as T;
   } catch (error) {
     if (isAppError(error) || isSyncError(error)) throw error;
     logger.error('Transaction failed', { error });
@@ -87,6 +93,7 @@ export function foldUserEmailCase(database: AppDatabase): void {
 export function runMigrations(): void {
   try {
     logger.info('Running database migrations...');
+    const db = getDb();
     migrate(db, { migrationsFolder: './drizzle' });
     foldUserEmailCase(db);
     syncBuiltInRoles(db);
@@ -103,7 +110,7 @@ export function runMigrations(): void {
 
 export function checkDatabaseHealth(): boolean {
   try {
-    const result = sqlite.query('SELECT 1 as health').get() as { health: number } | null;
+    const result = getDb().$client.query('SELECT 1 as health').get() as { health: number } | null;
     return result?.health === 1;
   } catch (error) {
     logger.error('Database health check failed', { error });
@@ -113,7 +120,7 @@ export function checkDatabaseHealth(): boolean {
 
 export function checkpointWAL(): void {
   try {
-    const result = sqlite.query('PRAGMA wal_checkpoint(TRUNCATE)').get() as {
+    const result = getDb().$client.query('PRAGMA wal_checkpoint(TRUNCATE)').get() as {
       busy: number;
       log: number;
       checkpointed: number;
@@ -131,7 +138,7 @@ export function checkpointWAL(): void {
 
 export function forceCheckpointWAL(): void {
   try {
-    const result = sqlite.query('PRAGMA wal_checkpoint(RESTART)').get() as {
+    const result = getDb().$client.query('PRAGMA wal_checkpoint(RESTART)').get() as {
       busy: number;
       log: number;
       checkpointed: number;

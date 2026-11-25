@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import { createTestApp } from '../../../test-helpers/http-client';
 import { isAllowedPushEndpoint } from '../push-endpoint';
-import { pushSubscriptionRepository } from '../repository';
 
 describe('isAllowedPushEndpoint allowlist', () => {
   test('accepts real browser-vendor push endpoints (https, known host + subdomains)', () => {
@@ -48,7 +48,7 @@ describe('POST /api/v1/push/subscribe SSRF rejection', () => {
       keys: { p256dh: 'k', auth: 'a' },
     });
     expect(res.status).toBe(400);
-    expect(await pushSubscriptionRepository.findByUser(ctx.user.id)).toHaveLength(0);
+    expect(await repos().pushSubscriptions.findByUser(ctx.user.id)).toHaveLength(0);
     ctx.close();
   });
 
@@ -59,7 +59,7 @@ describe('POST /api/v1/push/subscribe SSRF rejection', () => {
       keys: { p256dh: 'k', auth: 'a' },
     });
     expect(res.status).toBe(201);
-    expect(await pushSubscriptionRepository.findByUser(ctx.user.id)).toHaveLength(1);
+    expect(await repos().pushSubscriptions.findByUser(ctx.user.id)).toHaveLength(1);
     ctx.close();
   });
 });

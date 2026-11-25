@@ -20,12 +20,14 @@ import { zValidator } from '../../utils/validation';
 import { preferencesRepository, syncStateRepository } from '../settings/repository';
 import { activityTracker } from './activity-tracker';
 import { backupService } from './backup';
-import { backupOrchestrator, loadProviderTypes } from './backup-orchestrator';
-import { hasSheetsSync, hasZipBackup } from './backup-strategy';
+import { backupOrchestrator } from './backup-orchestrator';
+import { hasSheetsSync, hasZipBackup, isSyncEnabled } from './backup-strategy';
 import './init';
 import { type RestoreResponse, restoreService } from './restore';
 
 const routes = new Hono();
+
+const UNHEALTHY_PROVIDER_STATUSES: ReadonlySet<string> = new Set(['needs_reauth', 'error']);
 
 routes.use('*', requireAuth);
 
@@ -138,16 +140,35 @@ routes.get('/status', authorize(ownAccount), async (c) => {
 
   const config = settings.backupConfig as BackupConfig | null;
   const providers = config?.providers;
-  const providerTypes = providers ? await loadProviderTypes(user.id) : new Map<string, string>();
+  const providerRows = providers
+    ? await getDb()
+        .select({
+          id: userProviders.id,
+          providerType: userProviders.providerType,
+          status: userProviders.status,
+        })
+        .from(userProviders)
+        .where(eq(userProviders.userId, user.id))
+    : [];
+  const providerTypes = new Map(providerRows.map((row) => [row.id, row.providerType]));
   const backupEnabled = providers
     ? Object.entries(providers).some(([id, s]) => hasZipBackup(s, providerTypes.get(id)))
     : false;
   const sheetsSyncEnabled = providers ? Object.values(providers).some(hasSheetsSync) : false;
+  const providerNeedsAttention = providerRows.some((row) => {
+    const backup = providers?.[row.id];
+    return (
+      backup !== undefined &&
+      UNHEALTHY_PROVIDER_STATUSES.has(row.status) &&
+      isSyncEnabled(backup, row.providerType)
+    );
+  });
 
   return c.json(
     createSuccessResponse({
       backupEnabled,
       sheetsSyncEnabled,
+      providerNeedsAttention,
       syncOnInactivity: settings.syncOnInactivity,
       syncInactivityMinutes: settings.syncInactivityMinutes,
       lastSyncDate: syncStateData.lastSyncDate,

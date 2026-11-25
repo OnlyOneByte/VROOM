@@ -192,11 +192,12 @@
 	html {
 		@variant max-lg {
 			scroll-padding-top: calc(4rem + env(safe-area-inset-top));
-			scroll-padding-bottom: 6rem;
+			scroll-padding-bottom: calc(6rem + env(safe-area-inset-bottom));
 		}
 
 		@variant short {
 			scroll-padding-top: 0;
+			scroll-padding-bottom: 0;
 		}
 	}
 
@@ -305,6 +306,12 @@
 
 		to {
 			width: 0%;
+		}
+	}
+
+	@keyframes row-arrive {
+		from {
+			background-color: var(--accent);
 		}
 	}
 }

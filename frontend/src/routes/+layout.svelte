@@ -5,6 +5,8 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { handleRouteProtection, isPublicRoute } from '#lib/utils/auth.js';
 	import Navigation from '#lib/components/layout/Navigation.svelte';
+	import { isFormRoute } from '#lib/routes.ts';
+	import { cn } from '#lib/utils.ts';
 	import { Toaster } from '#lib/components/ui/sonner/index.ts';
 	import { toast } from 'svelte-sonner';
 	import OfflineIndicator from '#lib/components/sync/OfflineIndicator.svelte';
@@ -131,7 +133,10 @@
 
 			const options = {
 				duration: notification.duration || 5000,
-				style: `--toast-duration: ${notification.duration || 5000}ms;`
+				style: `--toast-duration: ${notification.duration || 5000}ms;`,
+				...(notification.toastId && { id: notification.toastId }),
+				...(notification.description && { description: notification.description }),
+				...(notification.action && { action: notification.action })
 			};
 
 			const toastFn = {
@@ -144,6 +149,13 @@
 			toastFn(notification.message, options);
 			appStore.removeNotification(notification.id);
 		});
+	});
+
+	$effect(() => {
+		const dismissals = appStore.toastDismissals;
+		if (dismissals.length === 0) return;
+		for (const id of dismissals) toast.dismiss(id);
+		appStore.clearToastDismissals();
 	});
 
 	$effect(() => {
@@ -190,9 +202,13 @@
 			bind:this={mainEl}
 			id="main"
 			tabindex="-1"
-			class="lg:pl-20 transition-all duration-300 outline-none"
+			class={cn(
+				'outline-none',
+				!isFormRoute(currentPath) &&
+					'pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0 short:pb-0'
+			)}
 		>
-			<div class="px-4 sm:px-6 lg:px-8 py-6">
+			<div class="px-4 sm:px-6 lg:px-10 py-6">
 				{@render children?.()}
 			</div>
 		</main>

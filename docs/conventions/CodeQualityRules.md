@@ -6,7 +6,7 @@ Overview.md carries the shared rules, under three headings:
   `@lucide/svelte` imports, `FormLayout` on form pages.
 - **"Frontend Architecture" → "Rules"** — no `any`, no raw `fetch`, domain API services over
   `apiClient`, one canonical utility/type per concept.
-- **"Code Hygiene"** — SSR guards on browser APIs, FAB paint and clearance, `undefined` on array
+- **"Code Hygiene"** — SSR guards on browser APIs, `undefined` on array
   index access, keyed `{#each}`, `svelte/reactivity` collections, and branching on enum values
   rather than display labels.
 
@@ -47,7 +47,6 @@ working around a failure.
 | `no-utc-month-parse` | `new Date(month + '-01')` | `parseMonthToDate` (`utils/chart-formatters`) |
 | `no-native-dialogs` | a `confirm()` / `alert()` call | `common/ConfirmDialog.svelte` |
 | `no-interpolated-arbitrary-class` | an interpolated arbitrary value (`h-[{height}px]`) — Tailwind scans source text, so no CSS is generated and the utility is silently dead | a literal arbitrary value, or inline `style=` |
-| `fab-bottom-clearance` | a page importing `FloatingActionButton` without `pb-16` or larger | `pb-24` on the content wrapper (the FAB is `position: fixed` and would occlude the last row) |
 | `expense-category-maps` | a label/icon/badge lookup in `expense-helpers.ts` missing a key of the `ExpenseCategory` union (`fuel`, `maintenance`, `financial`, `regulatory`, `enhancement`, `misc`), or an extra key | add the category to `EXPENSE_CATEGORY_INFO` (`constants/expense-categories`); the maps in `chart-colors` and `expense-helpers` derive from it |
 | `category-color-label-convergence` | a second category → color, label, or icon map anywhere under `src`; a badge/chart/icon rendering that stops resolving to the one assignment; a component printing a category as the bare enum value instead of its label; a `--chart-N` token in `app.css` that `StatCard`'s icon map and type don't both list | assign each category's color, label, and icon once, in `EXPENSE_CATEGORY_INFO` (`constants/expense-categories`), and derive every rendering from it; the ordered list must match `EXPENSE_CATEGORIES` in `backend/src/db/types.ts` |
 | `no-small-or-faded-text` | an arbitrary text size below 12px (`text-[10px]`, `text-[0.7rem]`), or a text token faded with an opacity suffix (`text-muted-foreground/60`, `text-primary/80`) | `text-xs` or larger, and the plain token (`text-muted-foreground`) |

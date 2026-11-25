@@ -12,7 +12,7 @@ interface ModelRequest {
   headers?: Record<string, string>;
   body: unknown;
   timeoutMs: number;
-  outbound?: PrivateEndpointPolicy;
+  outbound: PrivateEndpointPolicy;
 }
 
 export function trimBaseUrl(url: string): string {

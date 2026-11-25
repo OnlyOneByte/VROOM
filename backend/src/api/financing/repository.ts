@@ -1,6 +1,5 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import type { NewVehicleFinancing, VehicleFinancing } from '../../db/schema';
 import { expenses, vehicleFinancing } from '../../db/schema';
 import { DatabaseError } from '../../errors';
@@ -160,5 +159,3 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
     }
   }
 }
-
-export const financingRepository = new FinancingRepository(getDb());
