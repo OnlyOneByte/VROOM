@@ -43,7 +43,7 @@ import {
   seesFinancials,
   writesFinancials,
 } from '../../utils/vehicle-access';
-import { attributedDriver, hideDriverFields } from '../drivers/attribution';
+import { assertMayClearDriver, attributedDriver, hideDriverFields } from '../drivers/attribution';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
 import { preferencesRepository } from '../settings/repository';
@@ -409,7 +409,12 @@ routes.post(
     assertMayTouchFinancialExpense(mayTouch, data.sourceType);
     await assertSplitFinancingSourceValid(data.sourceType, data.sourceId, data.splitConfig);
 
-    const siblings = await expenseRepository.createSplitExpense(data, { ownerId, createdBy });
+    const payerFor = (vehicleId: string) => attributedDriver(c, vehicleId, undefined) ?? null;
+    const siblings = await expenseRepository.createSplitExpense(data, {
+      ownerId,
+      createdBy,
+      payerFor,
+    });
     const first = siblings[0];
     if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
       throw new ValidationError('Split expense creation returned invalid data');
@@ -941,9 +946,7 @@ function payerChange(
 ): { paidByDriverId?: string | null } {
   const target = vehicleId ?? existing.vehicleId;
   const movedCar = target !== existing.vehicleId;
-  if (movedCar && existing.paidByDriverId) {
-    attributedDriver(c, existing.vehicleId, null, existing.paidByDriverId);
-  }
+  if (movedCar) assertMayClearDriver(c, existing.vehicleId, existing.paidByDriverId);
   const paidBy = attributedDriver(c, target, requested, movedCar ? null : existing.paidByDriverId);
   if (paidBy !== undefined) return { paidByDriverId: paidBy };
   return movedCar ? { paidByDriverId: null } : {};

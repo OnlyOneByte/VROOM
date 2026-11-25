@@ -9,7 +9,7 @@ vi.mock('#lib/components/vehicles/FinanceTab.svelte', () => ({ default: () => {}
 vi.mock('#lib/components/vehicles/OdometerTab.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/common/MediaCaptureDialog.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/expenses/ExpensesTable.svelte', () => ({ default: () => {} }));
-vi.mock('#lib/components/charts/index.ts', () => ({ AppPieChart: () => {} }));
+vi.mock('#lib/components/charts/index.ts', () => ({ AppBarChart: () => {} }));
 vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/charts/FuelEfficiencyTrendChart.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/vehicles/VehiclePhotoCarousel.svelte', () => ({ default: () => {} }));
@@ -60,7 +60,7 @@ import Page from '../+page.svelte';
 
 function headerAddExpense(): HTMLElement[] {
 	return screen
-		.queryAllByRole('link', { name: 'Add Expense' })
+		.queryAllByRole('link', { name: 'Add expense' })
 		.filter(link => link.classList.contains('max-sm:w-10'));
 }
 

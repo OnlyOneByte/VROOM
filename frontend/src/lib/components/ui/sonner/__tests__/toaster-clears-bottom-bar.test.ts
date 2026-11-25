@@ -15,7 +15,7 @@ async function mountedToasterStyle(): Promise<string> {
 	return list.getAttribute('style') ?? '';
 }
 
-describe('Toaster clears the floating Save bar and FAB', () => {
+describe('Toaster clears the floating Save bar and the bottom bar', () => {
 	test('toasts sit above the bottom action area on desktop and mobile', async () => {
 		render(Toaster, { props: { position: 'bottom-right' } });
 		const style = await mountedToasterStyle();

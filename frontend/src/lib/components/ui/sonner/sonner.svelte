@@ -2,11 +2,11 @@
 	import { themeStore } from '#lib/stores/theme.svelte.ts';
 	import { Toaster as Sonner, type ToasterProps as SonnerProps } from 'svelte-sonner';
 
-	const FLOATING_ACTION_CLEARANCE = '6.5rem';
+	const BOTTOM_BAR_CLEARANCE = '6.5rem';
 
 	let {
-		offset = { bottom: FLOATING_ACTION_CLEARANCE },
-		mobileOffset = { bottom: FLOATING_ACTION_CLEARANCE },
+		offset = { bottom: BOTTOM_BAR_CLEARANCE },
+		mobileOffset = { bottom: BOTTOM_BAR_CLEARANCE },
 		...restProps
 	}: SonnerProps = $props();
 </script>

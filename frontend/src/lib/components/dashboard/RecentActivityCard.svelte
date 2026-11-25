@@ -29,7 +29,7 @@
 	let { expenses, title = 'Recent', totalCount, onSeeAll }: Props = $props();
 
 	const seeAllClass =
-		'inline-flex min-h-10 items-center rounded-sm text-sm font-semibold text-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:min-h-0';
+		'inline-flex min-h-10 items-center rounded-sm text-sm font-semibold text-accent-ink underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:min-h-0';
 
 	function headline(expense: RecentExpense): string {
 		return (
@@ -38,22 +38,20 @@
 	}
 </script>
 
-<Card.Root class="gap-3 py-5">
-	<Card.Header class="flex flex-row items-center justify-between gap-3 px-5">
-		<Card.Title level={2} class="text-lg">{title}</Card.Title>
+<Card.Root variant="section">
+	<Card.Header class="flex flex-row items-center justify-between gap-3">
+		<Card.Title level={2} class="text-base">{title}</Card.Title>
 		{#if expenses.length > 0}
 			{#if onSeeAll}
 				<button type="button" class={seeAllClass} onclick={onSeeAll}>
 					See all{totalCount ? ` ${totalCount}` : ''}<span class="sr-only"> expenses</span>
 				</button>
 			{:else}
-				<a href={resolve(routes.expenses)} class={seeAllClass}>
-					See all{totalCount ? ` ${totalCount}` : ''}<span class="sr-only"> expenses</span>
-				</a>
+				<a href={resolve(routes.expenses)} class={seeAllClass}>All expenses</a>
 			{/if}
 		{/if}
 	</Card.Header>
-	<Card.Content class="px-5">
+	<Card.Content>
 		{#if expenses.length > 0}
 			<ul class="divide-y" role="list">
 				{#each expenses as expense (expense.id)}

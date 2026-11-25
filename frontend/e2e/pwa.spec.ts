@@ -159,9 +159,9 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 	'/vehicles/new': { debt: [], ready: pageHeading('Add Vehicle') },
 	'/vehicles/vehicle-camry': {
 		debt: [],
-		ready: page => page.getByRole('button', { name: 'Details, insurance and photos' }),
+		ready: page => page.getByRole('tab', { name: 'Insurance' }),
 		open: async page => {
-			await page.getByRole('button', { name: 'Details, insurance and photos' }).click();
+			await page.getByRole('tab', { name: 'Insurance' }).click();
 			await expect(expiredPolicy(page)).toBeVisible();
 		}
 	},
@@ -172,7 +172,7 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 	'/settings': { debt: [], ready: pageHeading('Settings') },
 	'/settings/server': { debt: [], ready: page => page.getByText('kim@example.com') },
 	'/profile': { debt: [], ready: pageHeading('Profile') },
-	'/no-such-page': { debt: [], ready: pageHeading('Page Not Found') }
+	'/no-such-page': { debt: [], ready: pageHeading('Wrong turn') }
 };
 
 const attachmentLabel = (route: string) => route.replace(/^\//, '').replace(/\//g, '-') || 'root';

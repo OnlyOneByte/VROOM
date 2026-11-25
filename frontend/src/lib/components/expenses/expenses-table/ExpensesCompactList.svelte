@@ -83,6 +83,7 @@
 			isSelected={selectedRowId === row.groupId}
 			{onSelect}
 			onDelete={onDeleteGroup}
+			pending={pendingStates?.get(row.children[0]?.id ?? '')}
 		/>
 	{/if}
 {/snippet}

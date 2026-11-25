@@ -52,6 +52,7 @@ export interface Expense {
 	groupId?: string;
 	groupTotal?: number;
 	splitMethod?: string;
+	paidByDriverId?: string | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -97,6 +98,7 @@ export interface BackendExpenseResponse {
 	description?: string | null;
 	location?: string | null;
 	missedFillup?: boolean;
+	paidByDriverId?: string | null;
 	sourceType?: string | null;
 	sourceId?: string | null;
 	groupId?: string;

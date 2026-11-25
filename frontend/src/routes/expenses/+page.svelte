@@ -62,6 +62,7 @@
 		withPendingInSummary
 	} from '#lib/utils/sync/pending-rows.ts';
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
+	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
 	import ExpenseOverviewSection from '#lib/components/expenses/ExpenseOverviewSection.svelte';
 	import ImportExpensesDialog from '#lib/components/expenses/ImportExpensesDialog.svelte';
 	import ImportFromPhotosDialog from '#lib/components/expenses/ImportFromPhotosDialog.svelte';
@@ -135,7 +136,15 @@
 	});
 	let pendingMatching = $derived(pending.rows.filter(row => matchesFilters(row, pendingFilters)));
 	let pendingListRows = $derived(currentOffset === 0 ? pendingMatching : []);
-	let shownSummary = $derived(withPendingInSummary(summary, pending.saving));
+	let deletingRows = $derived(expenses.filter(isDeleteHidden));
+	let shownSummary = $derived(
+		withPendingInSummary(
+			withPendingInSummary(summary, pending.saving),
+			deletingRows,
+			Date.now(),
+			-1
+		)
+	);
 	const statCards = $derived([
 		{
 			label: EXPENSE_MESSAGES.TOTAL_EXPENSES,
@@ -185,7 +194,8 @@
 	let countLine = $derived.by(() => {
 		const count =
 			totalCount +
-			pendingMatching.filter(row => pending.states.get(row.id)?.status === 'saving').length;
+			pendingMatching.filter(row => pending.states.get(row.id)?.status === 'saving').length -
+			deletingRows.length;
 		const expenses = `${formatNumber(count, 0)} ${count === 1 ? 'expense' : 'expenses'}`;
 		if (totalCountFiltered) {
 			return `${expenses} ${count === 1 ? 'matches' : 'match'} your filters`;
@@ -516,8 +526,12 @@
 	let vehicleById = $derived(new Map(vehicles.map(v => [v.id, v])));
 	let shownMonthTotals = $derived(
 		withPendingByMonth(
-			monthTotals,
-			pending.saving.filter(row => matchesFilters(row, pendingFilters))
+			withPendingByMonth(
+				monthTotals,
+				pending.saving.filter(row => matchesFilters(row, pendingFilters))
+			),
+			deletingRows,
+			-1
 		)
 	);
 	let displayExpenses = $derived<ExpenseWithVehicle[]>(

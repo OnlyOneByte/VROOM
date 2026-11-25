@@ -11,9 +11,13 @@
 	import ExpenseDeleteDialog from './expenses-table/ExpenseDeleteDialog.svelte';
 	import {
 		INSURANCE_DELETE_BLOCKED,
-		deleteAndRefresh,
 		isInsuranceLinked
 	} from './expenses-table/expense-table-actions';
+	import {
+		deleteFailureStates,
+		isDeleteHidden,
+		scheduleDelete
+	} from '#lib/utils/pending-deletes.svelte.ts';
 	import {
 		buildDisplayRows,
 		visibleExpenses,
@@ -50,7 +54,7 @@
 	}
 
 	let {
-		expenses = [],
+		expenses: allExpenses = [],
 		vehicles = [],
 		showVehicleColumn = true,
 		canWrite = true,
@@ -74,8 +78,13 @@
 		activeCategory,
 		onCategoryChange,
 		monthTotals,
-		pendingStates
+		pendingStates: queuedStates
 	}: Props = $props();
+
+	let expenses = $derived(allExpenses.filter(expense => !isDeleteHidden(expense)));
+	let pendingStates = $derived(
+		new Map([...(queuedStates ?? []), ...deleteFailureStates(expenses)])
+	);
 
 	let onDelete = $derived(canWrite ? onDeleteProp : undefined);
 
@@ -165,11 +174,11 @@
 		showDeleteModal = true;
 	}
 
-	async function deleteExpense() {
-		if (!expenseToDelete || !onDelete) return;
-		const notice = await deleteAndRefresh(expenseToDelete, onDelete);
-		appStore.addNotification(notice);
-		if (notice.type === 'error') throw new Error(notice.message);
+	function deleteExpense(): Promise<void> {
+		const expense = expenseToDelete;
+		const refresh = onDelete;
+		if (expense && refresh) scheduleDelete(expense, () => refresh(expense));
+		return Promise.resolve();
 	}
 </script>
 
