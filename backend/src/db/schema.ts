@@ -58,6 +58,8 @@ export const vehicles = sqliteTable(
       .notNull()
       .default(DEFAULT_UNIT_PREFERENCES),
     catalogModelId: text('catalog_model_id'),
+    carShareEnabled: integer('car_share_enabled', { mode: 'boolean' }).notNull().default(false),
+    carShareRules: text('car_share_rules', { mode: 'json' }).$type<Record<string, unknown>>(),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
@@ -66,6 +68,30 @@ export const vehicles = sqliteTable(
     userLicensePlateIdx: uniqueIndex('vehicles_user_license_plate_idx')
       .on(table.userId, table.licensePlate)
       .where(sql`${table.licensePlate} IS NOT NULL`),
+  })
+);
+
+export const vehicleDrivers = sqliteTable(
+  'vehicle_drivers',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    vehicleId: text('vehicle_id')
+      .notNull()
+      .references(() => vehicles.id, { onDelete: 'cascade' }),
+    userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+    name: text('name').notNull(),
+    color: text('color'),
+    archivedAt: integer('archived_at', { mode: 'timestamp' }),
+    createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    vehicleIdx: index('vehicle_drivers_vehicle_idx').on(table.vehicleId),
+    vehicleUserIdx: uniqueIndex('vehicle_drivers_vehicle_user_idx')
+      .on(table.vehicleId, table.userId)
+      .where(sql`${table.userId} IS NOT NULL`),
   })
 );
 
@@ -231,6 +257,9 @@ export const expenses = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+    paidByDriverId: text('paid_by_driver_id').references(() => vehicleDrivers.id, {
+      onDelete: 'set null',
+    }),
     groupId: text('group_id'),
     groupTotal: integer('group_total'),
     splitMethod: text('split_method'),
@@ -364,6 +393,7 @@ export const odometerEntries = sqliteTable(
     recordedAt: integer('recorded_at', { mode: 'timestamp' }).notNull(),
     note: text('note'),
     sourceTripId: text('source_trip_id'),
+    driverId: text('driver_id').references(() => vehicleDrivers.id, { onDelete: 'set null' }),
     createdBy: text('created_by'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -393,6 +423,7 @@ export const trips = sqliteTable(
     startLocation: text('start_location'),
     endLocation: text('end_location'),
     note: text('note'),
+    driverId: text('driver_id').references(() => vehicleDrivers.id, { onDelete: 'set null' }),
     createdBy: text('created_by'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -857,3 +888,5 @@ export type NewCommunityStat = typeof communityStats.$inferInsert;
 export type CalendarFeed = typeof calendarFeeds.$inferSelect;
 
 export type Role = typeof roles.$inferSelect;
+
+export type VehicleDriver = typeof vehicleDrivers.$inferSelect;
