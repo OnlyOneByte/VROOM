@@ -66,6 +66,18 @@ describe('sign-in page', () => {
 		page.url = new URL('https://app.example/auth');
 	});
 
+	test.each([
+		['signup_closed', "This server isn't taking new accounts"],
+		['signup_invite_required', 'This server is invite only'],
+		['signup_domain_not_allowed', 'only takes accounts from certain email domains']
+	])('a refused sign-up (%s) says why', async (code, message) => {
+		authApi.getProviders.mockResolvedValue([]);
+		page.url = new URL(`https://app.example/auth?auth_error=${code}`);
+		render(AuthPage);
+		expect(await screen.findByRole('alert')).toHaveTextContent(message);
+		page.url = new URL('https://app.example/auth');
+	});
+
 	test('a Retry that finds no enabled providers announces that sign-in is unavailable', async () => {
 		authApi.getProviders
 			.mockRejectedValueOnce(new ApiError('Network error', 0))
