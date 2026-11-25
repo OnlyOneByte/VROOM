@@ -104,7 +104,7 @@ test.describe('Responsive layout', () => {
 		test(`the landing page has no horizontal overflow on ${name}`, async ({ page }) => {
 			await page.setViewportSize(viewport);
 			await page.goto('/');
-			await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
+			await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
 
 			const overflow = await page.evaluate(
 				() => document.documentElement.scrollWidth - window.innerWidth
@@ -147,7 +147,7 @@ const pageHeading = (name: string) => (page: Page) => page.getByRole('heading', 
 const expiredPolicy = (page: Page) => page.getByText('Policy #SF-1001').first();
 
 const A11Y_ROUTES: Record<string, A11yRoute> = {
-	'/': { anonymous: true, debt: [], ready: signInControl },
+	'/': { anonymous: true, debt: [], ready: pageHeading('What your car really costs.') },
 	'/auth': { anonymous: true, debt: [], ready: signInControl },
 	'/dashboard': { debt: [], ready: pageHeading('Dashboard') },
 	'/expenses': {

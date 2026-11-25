@@ -15,7 +15,7 @@ test.describe('Signed out', () => {
 		await page.goto('/');
 
 		await expect(page).toHaveURL(/\/$/);
-		await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/auth');
 	});
 
 	test('sign-in page lists the providers the backend reports', async ({ page }) => {

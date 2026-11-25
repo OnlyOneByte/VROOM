@@ -6,6 +6,14 @@ export const authApi = {
 		return apiClient.get<{ id: string; displayName: string }[]>('/auth/providers');
 	},
 
+	async isDemoAvailable(): Promise<boolean> {
+		return (await apiClient.get<{ available: boolean }>('/auth/demo')).available;
+	},
+
+	startDemo(): Promise<{ session: { expiresAt: string } }> {
+		return apiClient.post<{ session: { expiresAt: string } }>('/auth/demo');
+	},
+
 	updateProfile(data: { displayName: string }): Promise<{ user: User }> {
 		return apiClient.patch<{ user: User }>('/auth/me', data);
 	},
