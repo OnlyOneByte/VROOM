@@ -9,8 +9,6 @@ const ROW = readFileSync(
 	'utf8'
 );
 
-// The old card layout let a row of five buttons cover the reminder's text at 375px. A row now
-// keeps its text in a shrinking column and puts every secondary action in one menu button.
 describe('reminder row mobile layout (occlusion guard)', () => {
 	test('the text column shrinks and truncates instead of being pushed under the actions', () => {
 		expect(ROW).toMatch(/class="min-w-0 flex-1"/);

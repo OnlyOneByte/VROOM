@@ -49,7 +49,6 @@
 		return new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
 	}
 
-	// Calendar days in the user's zone, so a reminder due later today reads Today, not Tomorrow.
 	let daysLeft = $derived(
 		reminder.nextDueDate === null
 			? null

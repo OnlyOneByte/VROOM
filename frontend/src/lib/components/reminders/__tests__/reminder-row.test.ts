@@ -3,7 +3,6 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ReminderWithVehicles } from '#lib/types/index.ts';
 import ReminderRow from '../ReminderRow.svelte';
 
-// Local times, like the reminder form's local-noon due dates, so the day counts hold in any zone.
 const localNoon = (year: number, month: number, day: number) =>
 	new Date(year, month - 1, day, 12).toISOString();
 const NOW = new Date(2026, 10, 25, 9).getTime();
