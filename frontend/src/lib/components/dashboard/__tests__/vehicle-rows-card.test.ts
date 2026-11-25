@@ -37,6 +37,7 @@ describe('VehicleRowsCard', () => {
 			'/vehicles/v1'
 		);
 		expect(screen.getByRole('link', { name: 'Sparky' })).toHaveAttribute('href', '/vehicles/v2');
+		expect(screen.getByRole('link', { name: 'All vehicles' })).toHaveAttribute('href', '/vehicles');
 	});
 
 	test('a row shows its spend and running cost per distance, or says there is no distance', () => {

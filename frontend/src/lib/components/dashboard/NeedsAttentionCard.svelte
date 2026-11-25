@@ -8,9 +8,10 @@
 	interface Props {
 		items: AttentionItem[];
 		title?: string;
+		showAll?: boolean;
 	}
 
-	let { items, title = 'Needs you' }: Props = $props();
+	let { items, title = 'Needs you', showAll = false }: Props = $props();
 
 	let dueCount = $derived(items.filter(item => item.status === 'overdue').length);
 	let soonCount = $derived(items.length - dueCount);
@@ -24,16 +25,20 @@
 {#if items.length > 0}
 	<Card.Root variant="section" data-testid="needs-attention">
 		<Card.Header class="flex flex-row items-center justify-between gap-3">
-			<p class="flex items-baseline gap-1.5">
+			<div class="flex items-baseline gap-1.5">
 				<Card.Title level={2} class="text-base">{title}</Card.Title>
-				<span class="text-sm text-muted-foreground">· {summary}</span>
-			</p>
-			<a
-				href={resolve(routes.reminders)}
-				class="rounded-sm text-sm font-semibold text-accent-ink outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-			>
-				All<span class="sr-only"> reminders</span>
-			</a>
+				{#if showAll}
+					<span class="text-sm text-muted-foreground">· {summary}</span>
+				{/if}
+			</div>
+			{#if showAll}
+				<a
+					href={resolve(routes.reminders)}
+					class="rounded-sm text-sm font-semibold text-accent-ink outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+				>
+					All<span class="sr-only"> reminders</span>
+				</a>
+			{/if}
 		</Card.Header>
 		<Card.Content>
 			<ul class="divide-y" role="list">

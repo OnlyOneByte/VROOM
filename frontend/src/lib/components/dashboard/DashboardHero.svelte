@@ -118,7 +118,6 @@
 				</div>
 			{/snippet}
 		</HeroFigure>
-		{@render actions?.()}
 	</div>
 
 	<div>
@@ -162,4 +161,8 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if actions}
+		<div class="lg:col-start-1">{@render actions()}</div>
+	{/if}
 </section>

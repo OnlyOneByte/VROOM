@@ -19,10 +19,10 @@
 
 <Card.Root variant="section" data-testid="vehicle-rows">
 	<Card.Header class="flex flex-row items-center justify-between gap-3">
-		<p class="flex items-baseline gap-1.5">
+		<div class="flex items-baseline gap-1.5">
 			<Card.Title level={2} class="text-base">Your garage</Card.Title>
 			<span class="text-sm text-muted-foreground">· {periodLabel}</span>
-		</p>
+		</div>
 		<a
 			href={resolve(routes.vehicles)}
 			class="rounded-sm text-sm font-semibold text-accent-ink outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"

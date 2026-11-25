@@ -63,8 +63,8 @@
 	} from '#lib/types/index.ts';
 	import type { TimePeriod } from '#lib/constants/time-periods.ts';
 
-	const TREND_TITLE = 'Last 12 months';
-	const TREND_DESCRIPTION = 'Running costs by month';
+	const TREND_TITLE = 'Running cost by month';
+	const TREND_DESCRIPTION = 'Last 12 months';
 	const RECENT_COUNT = 4;
 
 	const chartModules = import('#lib/components/charts/index.ts');
@@ -181,7 +181,7 @@
 				date: new Date(e.date),
 				description: e.description,
 				location: e.location,
-				vehicleName: names.get(e.vehicleId) || 'Unknown Vehicle',
+				vehicleName: names.get(e.vehicleId) || 'Unknown vehicle',
 				...(sync && { syncNote: sync.status === 'failed' ? 'Not saved' : 'Unsynced' })
 			};
 		});
@@ -403,7 +403,7 @@
 
 {#snippet attentionSection()}
 	{#if attention.length > 0}
-		<NeedsAttentionCard items={attention} />
+		<NeedsAttentionCard items={attention} showAll />
 	{/if}
 	{#if invitationsError || pendingInvitations.length > 0}
 		{@render invitationsCard()}
@@ -494,7 +494,7 @@
 		{@render checklist()}
 
 		{@render invitationsCard()}
-		<NeedsAttentionCard items={attention} />
+		<NeedsAttentionCard items={attention} showAll />
 		<VehicleRowsCard rows={vehicleRows} periodLabel={PERIOD_PHRASES[period].chip} {distanceLabel} />
 		{#if recurringCost.count > 0}
 			<RecurringCostCard count={recurringCost.count} monthlyTotal={recurringCost.monthlyTotal} />
