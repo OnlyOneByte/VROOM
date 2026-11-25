@@ -34,6 +34,8 @@
 	let odometer = $state<string | number | null>('');
 	let date = $state('');
 	let note = $state('');
+	let driverId = $state<string | null | undefined>(undefined);
+	let entryDriverId = $state<string | null | undefined>(undefined);
 
 	let isLoadingEntry = $state(true);
 	let isSubmitting = $state(false);
@@ -88,6 +90,7 @@
 			odometer = String(entry.odometer);
 			date = toDateInputValue(entry.recordedAt);
 			note = entry.note ?? '';
+			entryDriverId = driverId = entry.driverId ?? null;
 
 			const newest = latestResponse.data[0];
 			if (newest && newest.id !== entryId) {
@@ -119,7 +122,8 @@
 			await odometerApi.update(entryId, {
 				odometer: Number(odometer),
 				recordedAt: dateOnlyToISO(date),
-				note: note || undefined
+				note: note || undefined,
+				...(driverId !== entryDriverId && { driverId })
 			});
 			await gotoDynamic(returnTo);
 		} catch (e) {
@@ -239,6 +243,17 @@
 					<FormFieldError id="date-error">{fieldErrors.date}</FormFieldError>
 				{/if}
 			</div>
+
+			{#if entryDriverId !== undefined}
+				{#await import('#lib/components/drivers/DriverChip.svelte') then { default: DriverChip }}
+					<DriverChip
+						id="odometer-driver"
+						{vehicleId}
+						bind:value={driverId}
+						entry={{ vehicleId, driverId: entryDriverId ?? null }}
+					/>
+				{/await}
+			{/if}
 
 			<div class="space-y-2">
 				<Label for="note">Note (Optional)</Label>

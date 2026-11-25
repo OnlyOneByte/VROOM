@@ -224,6 +224,51 @@ describe('recording who drove or paid', () => {
     ).toEqual({ paid_by_driver_id: own?.id });
   });
 
+  test('each split leg defaults its payer to the person logging it', async () => {
+    await ctx.authed('PUT', sharing, { enabled: true });
+    const res = await ctx.authed('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [CAR, OTHER] },
+      category: 'maintenance',
+      totalAmount: 60,
+      date: '2024-06-01T00:00:00.000Z',
+    });
+    const legs = (await json<DataEnvelope<{ siblings: Record<string, unknown>[] }>>(res)).data
+      .siblings;
+    const own = driverOf(await listDrivers(), ctx.user.id);
+    expect(legs.find((leg) => leg.vehicleId === CAR)?.paidByDriverId).toBe(own?.id);
+    expect(legs.find((leg) => leg.vehicleId === OTHER)?.paidByDriverId).toBeNull();
+  });
+
+  test('moving an expense still needs driver.record after car sharing is turned off', async () => {
+    await ctx.authed('PUT', sharing, { enabled: true });
+    seedCarShared();
+    const created = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId: CAR,
+      category: 'maintenance',
+      date: '2024-03-01',
+      expenseAmount: 40,
+    });
+    const expense = (await json<DataEnvelope<{ id: string }>>(created)).data;
+    await ctx.authed('PUT', sharing, { enabled: false });
+    overrideOn(ctx, CAR, m.editor, 'vehicle.driver.record', 'deny');
+    expect(
+      await status(m.editor.request, 'PUT', `/api/v1/expenses/${expense.id}`, { vehicleId: OTHER })
+    ).toBe(403);
+  });
+
+  test('the car tells the app whether sharing is on and who may change it', async () => {
+    const carShare = async (request: RequestFn) =>
+      (
+        await json<DataEnvelope<{ carShare: unknown }>>(
+          await request('GET', `/api/v1/vehicles/${CAR}`)
+        )
+      ).data.carShare;
+    expect(await carShare(ctx.authed)).toEqual({ enabled: false, manage: true });
+    await ctx.authed('PUT', sharing, { enabled: true });
+    expect(await carShare(m.coOwner.request)).toEqual({ enabled: true, manage: true });
+    expect(await carShare(m.editor.request)).toEqual({ enabled: true, manage: false });
+  });
+
   function seedCarShared(): void {
     ctx.sqlite.run(
       "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status) VALUES ('other-share', ?, ?, ?, 'editor', 'accepted')",

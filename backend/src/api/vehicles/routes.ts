@@ -2,7 +2,7 @@ import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { repos } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import {
@@ -407,10 +407,17 @@ routes.get(
     if (sharedAccess) {
       responseData = { ...responseData, sharedAccess };
     }
+    const carShare = {
+      enabled: vehicle.carShareEnabled,
+      manage: requestResolver(c, appContext().db).can('vehicle.driver.manage', {
+        kind: 'vehicle',
+        vehicleId: id,
+      }).allow,
+    };
 
-    const response: ApiResponse<typeof responseData> = {
+    const response: ApiResponse<typeof responseData & { carShare: typeof carShare }> = {
       success: true,
-      data: vehicleRowToApi(responseData),
+      data: { ...vehicleRowToApi(responseData), carShare },
     };
 
     return c.json(response);

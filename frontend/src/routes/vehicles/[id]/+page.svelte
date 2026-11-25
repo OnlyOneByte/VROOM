@@ -974,6 +974,13 @@
 						{/if}
 					{/if}
 
+					{#if vehicle.carShare?.manage}
+						{@const enabled = vehicle.carShare.enabled}
+						{#await import('#lib/components/drivers/CarSharingCard.svelte') then { default: CarSharingCard }}
+							<CarSharingCard {vehicleId} {enabled} />
+						{/await}
+					{/if}
+
 					<Collapsible
 						bind:open={detailsOpen}
 						onOpenChange={open => {

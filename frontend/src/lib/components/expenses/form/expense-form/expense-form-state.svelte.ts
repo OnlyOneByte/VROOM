@@ -43,6 +43,7 @@ export class ExpenseFormState {
 	submitError = $state<string | null>(null);
 	touched = $state<Record<string, boolean>>({});
 	originalExpense = $state<Expense | null>(null);
+	paidByDriverId = $state<string | null | undefined>(undefined);
 	vehicle = $state<Vehicle | null>(null);
 	lastFuelExpense = $state<Expense | null>(null);
 	allVehicleExpenses = $state<Expense[]>([]);

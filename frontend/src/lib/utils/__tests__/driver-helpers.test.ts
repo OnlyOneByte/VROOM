@@ -1,0 +1,42 @@
+import { afterEach, describe, expect, test } from 'vitest';
+import type { Driver } from '#lib/types/index.ts';
+import { defaultDriverId, driverColor, rememberDriver } from '../driver-helpers';
+
+const driver = (id: string, extra: Partial<Driver> = {}): Driver => ({
+	id,
+	userId: null,
+	name: id,
+	color: null,
+	archived: false,
+	...extra
+});
+
+const drivers = [
+	driver('me', { userId: 'u-me' }),
+	driver('sam', { userId: 'u-sam' }),
+	driver('riley'),
+	driver('gone', { archived: true })
+];
+
+afterEach(() => localStorage.clear());
+
+describe('defaultDriverId', () => {
+	test('defaults to the person logging, then to the last pick on this device', () => {
+		expect(defaultDriverId('car', drivers, 'u-me')).toBe('me');
+		rememberDriver('car', 'riley');
+		expect(defaultDriverId('car', drivers, 'u-me')).toBe('riley');
+		expect(defaultDriverId('other-car', drivers, 'u-me')).toBe('me');
+	});
+
+	test('ignores a remembered driver who was archived, and someone who is not a driver', () => {
+		rememberDriver('car', 'gone');
+		expect(defaultDriverId('car', drivers, 'u-me')).toBe('me');
+		expect(defaultDriverId('car', drivers, 'u-stranger')).toBeNull();
+	});
+});
+
+test('driverColor only trusts the chart palette slots', () => {
+	expect(driverColor({ color: 'chart-3' })).toBe('var(--chart-3)');
+	expect(driverColor({ color: 'red;background:url(x)' })).toBe('var(--muted-foreground)');
+	expect(driverColor({ color: null })).toBe('var(--muted-foreground)');
+});

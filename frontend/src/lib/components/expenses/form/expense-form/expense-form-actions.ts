@@ -101,8 +101,10 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			});
 			gotoDynamic(returnTo);
 		} else if (state.isEditMode) {
+			const payerChanged = state.paidByDriverId !== (state.originalExpense?.paidByDriverId ?? null);
 			await expenseApi.updateExpense(expenseId!, {
 				...expenseData,
+				...(payerChanged && { paidByDriverId: state.paidByDriverId }),
 				sourceType: state.clearsFinancingLink ? null : undefined,
 				sourceId: state.clearsFinancingLink ? null : undefined
 			});
@@ -151,7 +153,10 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			syncManager.syncSoon();
 			gotoDynamic(returnTo);
 		} else if (onlineStatus.current) {
-			const created = await expenseApi.createExpense(expenseData, clientId);
+			const created = await expenseApi.createExpense(
+				{ ...expenseData, paidByDriverId: state.paidByDriverId },
+				clientId
+			);
 
 			await uploadPendingPhotos(state, created.id);
 			rememberEntry();

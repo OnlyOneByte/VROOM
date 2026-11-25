@@ -15,6 +15,7 @@ interface BackendExpenseRequest {
 	missedFillup?: boolean;
 	sourceType?: string | null;
 	sourceId?: string | null;
+	paidByDriverId?: string | null;
 }
 
 interface ToBackendOptions {
@@ -80,6 +81,9 @@ export function toBackendExpense(
 	if (frontendExpense.missedFillup !== undefined) {
 		backendExpense.missedFillup = frontendExpense.missedFillup;
 	}
+	if (frontendExpense.paidByDriverId !== undefined) {
+		backendExpense.paidByDriverId = frontendExpense.paidByDriverId;
+	}
 
 	return backendExpense;
 }
@@ -126,6 +130,9 @@ export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expe
 	}
 	if (backendExpense.splitMethod) {
 		frontendExpense.splitMethod = backendExpense.splitMethod;
+	}
+	if (backendExpense.paidByDriverId !== undefined) {
+		frontendExpense.paidByDriverId = backendExpense.paidByDriverId;
 	}
 	if (backendExpense.sourceType) {
 		frontendExpense.sourceType = backendExpense.sourceType;
