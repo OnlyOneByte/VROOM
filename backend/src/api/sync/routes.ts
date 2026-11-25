@@ -12,9 +12,10 @@ import {
   rateLimiter,
   requireAuth,
 } from '../../middleware';
+import { authorize, ownAccount } from '../../permissions/authorize';
 import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { readJsonBody } from '../../utils/request-body';
-import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
+import { OPERATION_TIMEOUTS, withDeadline, withTimeout } from '../../utils/timeout';
 import { zValidator } from '../../utils/validation';
 import { preferencesRepository, syncStateRepository } from '../settings/repository';
 import { activityTracker } from './activity-tracker';
@@ -69,45 +70,52 @@ function validateSyncTypes(syncTypes: unknown): string[] {
   return syncTypes as string[];
 }
 
-routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) => {
-  const user = c.get('user');
-  const userId = user.id;
+routes.post(
+  '/',
+  syncRateLimiter,
+  authorize(ownAccount),
+  idempotency({ required: false }),
+  async (c) => {
+    const user = c.get('user');
+    const userId = user.id;
 
-  // null parses as valid JSON, so the parsed body can be null and must be optional-chained.
-  const body = await readJsonBody<{ syncTypes?: unknown; force?: unknown } | null>(c);
-  validateSyncTypes(body?.syncTypes);
-  const force = body?.force === true;
+    // null parses as valid JSON, so the parsed body can be null and must be optional-chained.
+    const body = await readJsonBody<{ syncTypes?: unknown; force?: unknown } | null>(c);
+    validateSyncTypes(body?.syncTypes);
+    const force = body?.force === true;
 
-  const result = await backupOrchestrator.execute(userId, user.displayName, force);
+    const result = await backupOrchestrator.execute(userId, user.displayName, force);
 
-  if (result.status === 'in_progress') {
-    return c.json(
-      createErrorResponse('BACKUP_IN_PROGRESS', 'A backup is already in progress'),
-      409
-    );
+    if (result.status === 'in_progress') {
+      return c.json(
+        createErrorResponse('BACKUP_IN_PROGRESS', 'A backup is already in progress'),
+        409
+      );
+    }
+
+    if (result.outcome === 'failed') {
+      return c.json(
+        createErrorResponse('BACKUP_FAILED', 'All backup providers failed', {
+          failedProviders: result.failedProviders,
+          results: result.results,
+        }),
+        502
+      );
+    }
+
+    const message =
+      result.outcome === 'partial'
+        ? `Backup partially failed (${result.failedProviders.join(', ')})`
+        : 'Sync completed';
+    return c.json(createSuccessResponse(result, message), result.outcome === 'partial' ? 207 : 200);
   }
-
-  if (result.outcome === 'failed') {
-    return c.json(
-      createErrorResponse('BACKUP_FAILED', 'All backup providers failed', {
-        failedProviders: result.failedProviders,
-        results: result.results,
-      }),
-      502
-    );
-  }
-
-  const message =
-    result.outcome === 'partial'
-      ? `Backup partially failed (${result.failedProviders.join(', ')})`
-      : 'Sync completed';
-  return c.json(createSuccessResponse(result, message), result.outcome === 'partial' ? 207 : 200);
-});
+);
 
 routes.post(
   '/sheets/:providerId/resume',
   syncRateLimiter,
   zValidator('param', z.object({ providerId: z.string().min(1).max(64) })),
+  authorize(ownAccount),
   async (c) => {
     const userId = c.get('user').id;
     const { providerId } = c.req.valid('param');
@@ -122,7 +130,7 @@ routes.post(
   }
 );
 
-routes.get('/status', async (c) => {
+routes.get('/status', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const settings = await preferencesRepository.getOrCreate(user.id);
   const syncStatus = activityTracker.getSyncStatus(user.id);
@@ -150,7 +158,7 @@ routes.get('/status', async (c) => {
   );
 });
 
-routes.get('/backups/providers', async (c) => {
+routes.get('/backups/providers', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const providerId = c.req.query('providerId');
 
@@ -163,7 +171,7 @@ routes.get('/backups/providers', async (c) => {
   return c.json(createSuccessResponse(allBackups));
 });
 
-routes.get('/backups/download', backupRateLimiter, async (c) => {
+routes.get('/backups/download', backupRateLimiter, authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const zipBuffer = await withTimeout(
     backupService.exportAsZip(user.id),
@@ -184,6 +192,7 @@ routes.post(
   '/restore/from-provider',
   restoreRateLimiter,
   heavyJobLimiter,
+  authorize(ownAccount),
   idempotency({ required: true }),
   async (c) => {
     const user = c.get('user');
@@ -213,14 +222,14 @@ routes.post(
         OPERATION_TIMEOUTS.RESTORE,
         'Download backup from provider'
       );
-      result = await withTimeout(
-        restoreService.restoreFromBackup(user.id, zipBuffer, body.mode),
+      result = await withDeadline(
+        (signal) => restoreService.restoreFromBackup(user.id, zipBuffer, body.mode, signal),
         OPERATION_TIMEOUTS.RESTORE,
         'Restore from provider backup'
       );
     } else {
-      result = await withTimeout(
-        restoreService.restoreFromSheets(user.id, body.providerId, body.mode),
+      result = await withDeadline(
+        (signal) => restoreService.restoreFromSheets(user.id, body.providerId, body.mode, signal),
         OPERATION_TIMEOUTS.RESTORE,
         'Restore from provider sheets'
       );
@@ -235,6 +244,7 @@ routes.post(
   '/restore/from-backup',
   restoreRateLimiter,
   heavyJobLimiter,
+  authorize(ownAccount),
   bodyLimit({ maxSize: CONFIG.backup.maxFileSize }),
   idempotency({ required: true }),
   async (c) => {
@@ -262,12 +272,14 @@ routes.post(
       throw new ValidationError(sizeValidation.errors[0]);
     }
 
-    const result = await withTimeout(
-      restoreService.restoreFromBackup(
-        user.id,
-        fileBuffer,
-        mode as 'preview' | 'merge' | 'replace'
-      ),
+    const result = await withDeadline(
+      (signal) =>
+        restoreService.restoreFromBackup(
+          user.id,
+          fileBuffer,
+          mode as 'preview' | 'merge' | 'replace',
+          signal
+        ),
       OPERATION_TIMEOUTS.RESTORE,
       'Restore from backup'
     );
@@ -283,7 +295,7 @@ export interface RestoreProviderInfo {
   sourceTypes: ('zip' | 'sheets')[];
 }
 
-routes.get('/restore/providers', syncRateLimiter, async (c) => {
+routes.get('/restore/providers', syncRateLimiter, authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const db = getDb();
   const providers = await db

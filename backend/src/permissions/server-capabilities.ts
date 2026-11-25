@@ -23,4 +23,8 @@ export const SERVER_PERMISSIONS = definePermissions({
   'server.audit.read': { label: 'See the audit log', scope: 'server' },
   'server.health.read': { label: 'See server health', scope: 'server' },
   'server.ai.use': { label: "Use the server's shared AI key", scope: 'server' },
+  'server.private_network.use': {
+    label: 'Connect providers to addresses on the private network',
+    scope: 'server',
+  },
 });

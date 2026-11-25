@@ -6,7 +6,7 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 
-const SYNC_STATUS_MAX_STATEMENTS = 7;
+const SYNC_STATUS_MAX_STATEMENTS = 11;
 
 let ctx: TestApp;
 

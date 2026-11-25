@@ -12,6 +12,7 @@ import {
 } from '../../db/schema';
 import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import { authorize, ownAccount } from '../../permissions/authorize';
 import SHARED_CURRENCIES from '../../shared-currencies.json';
 import type { BackupConfig, DefaultProviderCapability, StorageConfig } from '../../types';
 import { readJsonBody } from '../../utils/request-body';
@@ -19,7 +20,7 @@ import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
 } from '../../utils/unit-preferences-schema';
-import { LOCAL_OCR_PROVIDER_ID } from '../providers/domains/vlm/registry';
+import { LOCAL_OCR_PROVIDER_ID, localOcrEnabled } from '../providers/domains/vlm/registry';
 import { CAPABILITY_DOMAIN } from '../providers/resolve';
 import { preferencesRepository } from './repository';
 import {
@@ -55,7 +56,10 @@ async function assertDefaultsOwned(
 ): Promise<void> {
   for (const [capability, providerId] of Object.entries(defaults)) {
     if (providerId === null || providerId === undefined) continue;
-    if (capability === 'ai.vision' && providerId === LOCAL_OCR_PROVIDER_ID) continue;
+    if (capability === 'ai.vision' && providerId === LOCAL_OCR_PROVIDER_ID) {
+      if (localOcrEnabled()) continue;
+      throw new ValidationError('The built-in text reader is turned off on this server');
+    }
     const owned = await getDb()
       .select({ id: userProviders.id })
       .from(userProviders)
@@ -155,7 +159,11 @@ function consentUpdate(
 }
 
 function withServerSettings<T extends object>(prefs: T) {
-  return { ...prefs, communityStatsMode: CONFIG.communityStats.mode };
+  return {
+    ...prefs,
+    communityStatsMode: CONFIG.communityStats.mode,
+    communityStatsMinGroup: CONFIG.communityStats.minGroup,
+  };
 }
 
 const routes = new Hono();
@@ -200,7 +208,7 @@ const updateSettingsSchema = baseSettingsSchema
   })
   .partial();
 
-routes.get('/', async (c) => {
+routes.get('/', authorize(ownAccount), async (c) => {
   const user = c.get('user');
 
   const prefs = await preferencesRepository.getOrCreate(user.id);
@@ -211,7 +219,7 @@ routes.get('/', async (c) => {
   });
 });
 
-routes.put('/', async (c) => {
+routes.put('/', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const body = await readJsonBody(c);
   const updates = updateSettingsSchema.parse(body);

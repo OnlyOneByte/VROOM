@@ -28,19 +28,22 @@ async function loadConfig(env: Record<string, string>) {
 }
 
 describe('community stats server settings', () => {
-  test.each(['5', '9', '0', '10.5', 'ten'])(
+  test.each(['5', '10', '19', '0', '20.5', 'twenty'])(
     'COMMUNITY_STATS_MIN_GROUP=%p stops startup with a clear message',
     async (value) => {
       const { code, output } = await loadConfig({ COMMUNITY_STATS_MIN_GROUP: value });
       expect(code).not.toBe(0);
-      expect(output).toContain('COMMUNITY_STATS_MIN_GROUP must be a whole number of at least 10');
+      expect(output).toContain('COMMUNITY_STATS_MIN_GROUP must be a whole number of at least 20');
     }
   );
 
-  test('a raised minimum group is accepted', async () => {
-    const { code, config } = await loadConfig({ COMMUNITY_STATS_MIN_GROUP: '25' });
+  test.each([
+    ['20', 20],
+    ['45', 45],
+  ])('a threshold of %p is accepted', async (value, expected) => {
+    const { code, config } = await loadConfig({ COMMUNITY_STATS_MIN_GROUP: value });
     expect(code).toBe(0);
-    expect(config()).toMatchObject({ minGroup: 25 });
+    expect(config()).toMatchObject({ minGroup: expected });
   });
 
   test('an unknown mode stops startup naming the variable', async () => {
@@ -49,12 +52,12 @@ describe('community stats server settings', () => {
     expect(output).toContain('COMMUNITY_STATS');
   });
 
-  test('defaults are local with a minimum group of 10', async () => {
+  test('defaults are local with a publication threshold of 30', async () => {
     const { code, config } = await loadConfig({});
     expect(code).toBe(0);
     expect(config()).toMatchObject({
       mode: 'local',
-      minGroup: 10,
+      minGroup: 30,
       enabled: false,
     });
   });
@@ -91,5 +94,17 @@ describe('settings response carries the server mode', () => {
     const res = await ctx.authed('PUT', '/api/v1/settings', { communityStatsMode: 'off' });
     expect(res.status).toBe(200);
     expect(await mode()).toBe(originalMode);
+  });
+
+  test('the response carries the server publication threshold, which a client cannot write', async () => {
+    const minGroup = async () =>
+      (
+        await json<{ data: { communityStatsMinGroup?: number } }>(
+          await ctx.authed('GET', '/api/v1/settings')
+        )
+      ).data.communityStatsMinGroup;
+    expect(await minGroup()).toBe(CONFIG.communityStats.minGroup);
+    await ctx.authed('PUT', '/api/v1/settings', { communityStatsMinGroup: 2 });
+    expect(await minGroup()).toBe(CONFIG.communityStats.minGroup);
   });
 });

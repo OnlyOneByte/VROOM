@@ -13,8 +13,13 @@ export function toDateTimeString(column: Column): SQL<string> {
   return sql<string>`datetime(${column}, 'unixepoch')`;
 }
 
-export const sqlTrue: SQL = sql`1`;
-export const sqlFalse: SQL = sql`0`;
+export function sqlTrue(): SQL {
+  return sql`TRUE`;
+}
+
+export function sqlFalse(): SQL {
+  return sql`FALSE`;
+}
 
 export function jsonArraySome(array: SQLWrapper, test: (element: SQL) => SQL): SQL {
   return sql`EXISTS (SELECT 1 FROM json_each(${array}) AS je WHERE ${test(sql`je.value`)})`;
@@ -22,6 +27,39 @@ export function jsonArraySome(array: SQLWrapper, test: (element: SQL) => SQL): S
 
 export function jsonArrayIsEmpty(array: SQLWrapper): SQL {
   return sql`NOT EXISTS (SELECT 1 FROM json_each(${array}))`;
+}
+
+export function leftJoinJsonArrayElements(
+  array: SQLWrapper,
+  alias: string
+): { join: SQL; element: SQL } {
+  const name = sql.identifier(alias);
+  return {
+    join: sql`LEFT JOIN json_each(${array}) AS ${name} ON ${sqlTrue()}`,
+    element: sql`${name}.value`,
+  };
+}
+
+export function rawJsonValue<T>(value: unknown): T | null {
+  if (value == null || value === '') return null;
+  return (typeof value === 'string' ? JSON.parse(value) : value) as T;
+}
+
+const SQL_TYPES = { bigint: 'INTEGER', real: 'REAL', text: 'TEXT' } as const;
+
+export function typedParam(value: string | number, type: keyof typeof SQL_TYPES): SQL {
+  if (type === 'bigint' && !Number.isSafeInteger(value)) {
+    throw new TypeError(`typedParam: ${String(value)} is not a whole number`);
+  }
+  return sql`CAST(${value} AS ${sql.raw(SQL_TYPES[type])})`;
+}
+
+export interface RawQueryable {
+  all<T>(query: SQL): T[];
+}
+
+export function rawAll<T>(db: RawQueryable, query: SQL): T[] {
+  return db.all<T>(query);
 }
 
 export function jsonMergePatch(object: SQLWrapper, patch: Record<string, unknown>): SQL {

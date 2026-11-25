@@ -22,6 +22,7 @@ export const users = sqliteTable(
     email: text('email').notNull().unique(),
     displayName: text('display_name').notNull(),
     disabledAt: integer('disabled_at', { mode: 'timestamp' }),
+    pendingApprovalAt: integer('pending_approval_at', { mode: 'timestamp' }),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
@@ -163,14 +164,17 @@ export const insuranceTermVehicles = sqliteTable(
     vehicleId: text('vehicle_id')
       .notNull()
       .references(() => vehicles.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull().default(0),
   },
   (table) => ({
     pk: primaryKey({ columns: [table.termId, table.vehicleId] }),
     vehicleIdx: index('itv_vehicle_idx').on(table.vehicleId),
+    positionIdx: index('itv_position_idx').on(table.position),
   })
 );
 
-export const insuranceTermVehicleSelectionOrder = sql`${insuranceTermVehicles}.rowid`;
+export const insuranceTermVehicleSelectionOrder = insuranceTermVehicles.position;
+export const nextInsuranceTermVehiclePosition = sql<number>`(SELECT COALESCE(MAX(${insuranceTermVehicles.position}), 0) + 1 FROM ${insuranceTermVehicles})`;
 
 export const insuranceClaims = sqliteTable(
   'insurance_claims',
@@ -389,6 +393,7 @@ export const trips = sqliteTable(
     startLocation: text('start_location'),
     endLocation: text('end_location'),
     note: text('note'),
+    createdBy: text('created_by'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
@@ -414,6 +419,7 @@ export const photos = sqliteTable(
     fileSize: integer('file_size').notNull(),
     isCover: integer('is_cover', { mode: 'boolean' }).notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
+    createdBy: text('created_by'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
   (table) => ({
@@ -752,6 +758,39 @@ export const communityRefreshes = sqliteTable('community_refreshes', {
   scope: text('scope').primaryKey(),
   refreshedAt: integer('refreshed_at', { mode: 'timestamp' }).notNull(),
 });
+
+export const communityNoiseKeys = sqliteTable('community_noise_keys', {
+  scope: text('scope').primaryKey(),
+  noiseKey: text('noise_key').notNull(),
+});
+
+export const serverSettings = sqliteTable('server_settings', {
+  id: integer('id').primaryKey(),
+  signupMode: text('signup_mode').notNull().default('invite'),
+  allowedEmailDomains: text('allowed_email_domains').notNull().default(''),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  adminAssignedAt: integer('admin_assigned_at', { mode: 'timestamp' }),
+});
+
+export const serverInvites = sqliteTable(
+  'server_invites',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    email: text('email').notNull(),
+    createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+    usedAt: integer('used_at', { mode: 'timestamp' }),
+    usedBy: text('used_by').references(() => users.id, { onDelete: 'set null' }),
+    revokedAt: integer('revoked_at', { mode: 'timestamp' }),
+  },
+  (table) => ({
+    emailIdx: index('server_invites_email_idx').on(table.email),
+  })
+);
 
 export type User = typeof users.$inferSelect;
 

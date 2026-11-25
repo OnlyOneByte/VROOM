@@ -11,7 +11,7 @@ import {
 } from '../../analytics/__tests__/analytics-test-generators';
 import { firstRunDelayMs, refreshCommunityStats, refreshSafely } from '../aggregator';
 import { CommunityStatsRepository } from '../repository';
-import { NOW } from './community-fixtures';
+import { NO_NOISE, NOW } from './community-fixtures';
 
 const DAY = 86_400_000;
 let db: TestDb;
@@ -68,36 +68,60 @@ afterEach(() => {
 
 describe('community stats refresh against the database', () => {
   test('owners who have not opted in are never counted', async () => {
-    for (let i = 0; i < 9; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    for (let i = 0; i < 29; i++) seedOwner(db.sqlite, `in-${i}`, true);
     for (let i = 0; i < 5; i++) seedOwner(db.sqlite, `out-${i}`, false);
 
-    const result = await refreshCommunityStats(repository, NOW);
+    const result = await refreshCommunityStats(repository, NOW, NO_NOISE);
 
     expect(efficiencyRows()).toEqual([]);
     expect(result.suppressed).toBeGreaterThan(0);
   });
 
   test('opting in shows up on the next run, and a withdrawal drops out on the next run', async () => {
-    for (let i = 0; i < 9; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    for (let i = 0; i < 29; i++) seedOwner(db.sqlite, `in-${i}`, true);
     seedOwner(db.sqlite, 'late', false);
-    await refreshCommunityStats(repository, NOW);
+    await refreshCommunityStats(repository, NOW, NO_NOISE);
     expect(efficiencyRows()).toEqual([]);
 
     setOptIn('late', true);
     expect(efficiencyRows()).toEqual([]);
-    await refreshCommunityStats(repository, NOW);
-    expect(efficiencyRows()).toEqual([{ n_published: 10 }]);
+    await refreshCommunityStats(repository, NOW, NO_NOISE);
+    expect(efficiencyRows()).toEqual([{ n_published: 30 }]);
 
     setOptIn('in-0', false);
-    expect(efficiencyRows()).toEqual([{ n_published: 10 }]);
-    await refreshCommunityStats(repository, NOW);
+    expect(efficiencyRows()).toEqual([{ n_published: 30 }]);
+    await refreshCommunityStats(repository, NOW, NO_NOISE);
     expect(efficiencyRows()).toEqual([]);
   });
 
-  test('each run replaces the local rows and never stores identifiers', async () => {
-    for (let i = 0; i < 10; i++) seedOwner(db.sqlite, `in-${i}`, true);
+  test('the noise key is made once per scope, kept across runs, and never stored with the stats', async () => {
+    const first = repository.noiseKey('local');
+    expect(first).toMatch(/^[0-9a-f]{64}$/);
+    for (let i = 0; i < 30; i++) seedOwner(db.sqlite, `in-${i}`, true);
     await refreshCommunityStats(repository, NOW);
-    await refreshCommunityStats(repository, new Date(NOW.getTime() + DAY));
+    expect(repository.noiseKey('local')).toBe(first);
+    expect(repository.noiseKey('other')).not.toBe(first);
+    expect(JSON.stringify(db.sqlite.query('SELECT * FROM community_stats').all())).not.toContain(
+      first
+    );
+  });
+
+  test('a rerun over unchanged data publishes the same numbers', async () => {
+    for (let i = 0; i < 40; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    const snapshot = () =>
+      db.sqlite
+        .query('SELECT bucket_key, n_published, mean FROM community_stats ORDER BY bucket_key')
+        .all();
+    await refreshCommunityStats(repository, NOW);
+    const first = snapshot();
+    await refreshCommunityStats(repository, NOW);
+    expect(snapshot()).toEqual(first);
+  });
+
+  test('each run replaces the local rows and never stores identifiers', async () => {
+    for (let i = 0; i < 30; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    await refreshCommunityStats(repository, NOW, NO_NOISE);
+    await refreshCommunityStats(repository, new Date(NOW.getTime() + DAY), NO_NOISE);
 
     const rows = db.sqlite.query('SELECT * FROM community_stats').all() as Record<
       string,
@@ -112,15 +136,15 @@ describe('community stats refresh against the database', () => {
   });
 
   test('records from before the window let maintenance count, read end to end', async () => {
-    for (let i = 0; i < 10; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    for (let i = 0; i < 30; i++) seedOwner(db.sqlite, `in-${i}`, true);
     const maintenance = () =>
       db.sqlite
         .query("SELECT n_published FROM community_stats WHERE metric = 'maintenance'")
         .all() as { n_published: number }[];
-    await refreshCommunityStats(repository, NOW);
+    await refreshCommunityStats(repository, NOW, NO_NOISE);
     expect(maintenance()).toEqual([]);
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 30; i++) {
       seedExpense(db.sqlite, {
         id: `in-${i}-old`,
         vehicleId: `in-${i}-car`,
@@ -133,8 +157,8 @@ describe('community stats refresh against the database', () => {
         missedFillup: false,
       });
     }
-    await refreshCommunityStats(repository, NOW);
-    expect(maintenance()).toEqual([{ n_published: 10 }]);
+    await refreshCommunityStats(repository, NOW, NO_NOISE);
+    expect(maintenance()).toEqual([{ n_published: 30 }]);
   });
 
   test('publishedBuckets filters out rows below the minimum group in the query itself', async () => {

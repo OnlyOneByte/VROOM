@@ -1,8 +1,10 @@
+import { randomBytes } from 'node:crypto';
 import { and, eq, getTableColumns, gte, inArray, lte, min, or } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import {
   type CommunityStat,
+  communityNoiseKeys,
   communityRefreshes,
   communityStats,
   expenses,
@@ -272,6 +274,21 @@ export class CommunityStatsRepository {
       byVehicle.set(vehicleId, [...(byVehicle.get(vehicleId) ?? []), premium]);
     }
     return byVehicle;
+  }
+
+  noiseKey(scope: string): string {
+    const fresh = randomBytes(32).toString('hex');
+    this.db
+      .insert(communityNoiseKeys)
+      .values({ scope, noiseKey: fresh })
+      .onConflictDoNothing()
+      .run();
+    const row = this.db
+      .select({ noiseKey: communityNoiseKeys.noiseKey })
+      .from(communityNoiseKeys)
+      .where(eq(communityNoiseKeys.scope, scope))
+      .get();
+    return row?.noiseKey ?? fresh;
   }
 
   async lastRefreshedAt(scope: string): Promise<Date | null> {

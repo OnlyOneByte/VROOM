@@ -113,42 +113,13 @@ describe('Property 11: rawPath key routing', () => {
     let capturedKeys: string[];
     const mockSend = mock<(cmd: unknown) => Promise<unknown>>(() => Promise.resolve({}));
 
-    mock.module('@aws-sdk/client-s3', () => {
-      class MockS3Client {
-        send = (command: unknown) => {
-          const cmd = command as { input?: Record<string, unknown> };
-          if (cmd.input && 'Key' in cmd.input) {
-            capturedKeys.push(cmd.input.Key as string);
-          }
-          return mockSend(command);
-        };
+    const send = (command: unknown) => {
+      const cmd = command as { input?: Record<string, unknown> };
+      if (cmd.input && 'Key' in cmd.input) {
+        capturedKeys.push(cmd.input.Key as string);
       }
-      return {
-        S3Client: MockS3Client,
-        PutObjectCommand: class {
-          input: unknown;
-          constructor(input: unknown) {
-            this.input = input;
-          }
-        },
-        GetObjectCommand: class {
-          constructor(public input: unknown) {}
-        },
-        DeleteObjectCommand: class {
-          constructor(public input: unknown) {}
-        },
-        HeadBucketCommand: class {
-          constructor(public input: unknown) {}
-        },
-        ListObjectsV2Command: class {
-          constructor(public input: unknown) {}
-        },
-      };
-    });
-
-    mock.module('@aws-sdk/s3-request-presigner', () => ({
-      getSignedUrl: () => Promise.resolve('https://example.com/signed'),
-    }));
+      return mockSend(command);
+    };
 
     let S3CompatProvider: typeof import('../domains/storage/s3-compat-provider').S3CompatProvider;
 
@@ -167,6 +138,7 @@ describe('Property 11: rawPath key routing', () => {
             { accessKeyId: 'key', secretAccessKey: 'secret' },
             { endpoint: 'https://s3.example.com', bucket: 'bucket', region: 'us-east-1' }
           );
+          (provider as unknown as { client: { send: typeof send } }).client.send = send;
 
           await provider.upload({
             fileName,
@@ -197,6 +169,7 @@ describe('Property 11: rawPath key routing', () => {
             { accessKeyId: 'key', secretAccessKey: 'secret' },
             { endpoint: 'https://s3.example.com', bucket: 'bucket', region: 'us-east-1' }
           );
+          (provider as unknown as { client: { send: typeof send } }).client.send = send;
 
           await provider.upload({
             fileName,

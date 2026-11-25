@@ -1,4 +1,4 @@
-import { classifyDbError, isDriverError } from './db/dialect';
+import { classifyDbError } from './db/dialect';
 
 export class AppError extends Error {
   public readonly statusCode: number;
@@ -48,6 +48,16 @@ export class DemoReadOnlyError extends AppError {
 export class ForbiddenError extends AppError {
   constructor(message: string = "You don't have permission to do that") {
     super(message, 403, true);
+  }
+}
+
+export class AccountPendingError extends AppError {
+  constructor() {
+    super('Your account is waiting for an admin to approve it', 403, true);
+  }
+
+  override get code(): string {
+    return 'ACCOUNT_PENDING';
   }
 }
 
@@ -185,8 +195,6 @@ const ERROR_STATUS_MAP: Record<string, number> = {
 export function isUniqueConstraintError(err: unknown): boolean {
   return classifyDbError(err) === 'unique';
 }
-
-export const isSqliteError = (err: unknown): boolean => isDriverError(err);
 
 export const handleDatabaseError = (error: unknown): AppError => {
   switch (classifyDbError(error)) {

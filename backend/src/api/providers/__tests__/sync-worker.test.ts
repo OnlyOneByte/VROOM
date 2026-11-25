@@ -95,6 +95,7 @@ function makePhoto(overrides: Partial<Photo> = {}): Photo {
     fileSize: 1024,
     isCover: false,
     sortOrder: 0,
+    createdBy: null,
     createdAt: new Date('2025-01-01T00:00:00Z'),
     ...overrides,
   };

@@ -22,6 +22,7 @@ import {
   sqlTrue,
   sumNum,
   toDateTimeString,
+  typedParam,
 } from '..';
 
 let testDb: TestDb;
@@ -128,10 +129,10 @@ describe('portable fragments over real SQLite', () => {
     return rows.map((r) => r.id).sort();
   }
 
-  test('sqlTrue and sqlFalse keep or drop every row', async () => {
+  test('sqlTrue() and sqlFalse() keep or drop every row', async () => {
     seedAt('e-1', new Date(2024, 0, 1));
-    expect(await idsWhere(sqlTrue)).toEqual(['e-1']);
-    expect(await idsWhere(sqlFalse)).toEqual([]);
+    expect(await idsWhere(sqlTrue())).toEqual(['e-1']);
+    expect(await idsWhere(sqlFalse())).toEqual([]);
   });
 
   test('jsonArraySome and jsonArrayIsEmpty read a JSON array column', async () => {
@@ -167,7 +168,7 @@ describe('portable fragments over real SQLite', () => {
     const [none] = await testDb.drizzle
       .select({ n: countNum(), total: sumNum(expenses.expenseAmount) })
       .from(expenses)
-      .where(sqlFalse);
+      .where(sqlFalse());
     expect(none).toEqual({ n: 0, total: 0 });
   });
 });
@@ -212,5 +213,15 @@ describe('classifyDbError over real SQLite errors', () => {
       )
     ).toBe(true);
     expect(looksLikeDriverError(new Error('SQLITE_BUSY: database is locked'))).toBe(true);
+  });
+});
+
+describe('typedParam', () => {
+  test('casts a bound value, and refuses a fractional bigint rather than truncating it', () => {
+    const [row] = testDb.drizzle.all<{ n: number; r: number; t: string }>(
+      sql`SELECT ${typedParam(1795000000, 'bigint')} AS n, ${typedParam(1, 'real')} AS r, ${typedParam(7, 'text')} AS t`
+    );
+    expect(row).toEqual({ n: 1795000000, r: 1, t: '7' });
+    expect(() => typedParam(1.5, 'bigint')).toThrow(TypeError);
   });
 });

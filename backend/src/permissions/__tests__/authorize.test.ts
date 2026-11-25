@@ -14,7 +14,7 @@ afterEach(() => ctx.close());
 function probe(path: string, mount: string): Hono {
   const child = new Hono();
   child.use('*', async (c, next) => {
-    c.set('user', { ...ctx.user, createdAt: null, updatedAt: null });
+    c.set('user', { ...ctx.user, pendingApprovalAt: null, createdAt: null, updatedAt: null });
     await next();
   });
   child.get(path, authorize(ownAccount), (c) => c.text('ok'));

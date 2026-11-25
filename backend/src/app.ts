@@ -7,7 +7,7 @@ import { prettyJSON } from 'hono/pretty-json';
 import { secureHeaders } from 'hono/secure-headers';
 import { routes as analyticsRoutes } from './api/analytics/routes';
 import { routes as assistantRoutes } from './api/assistant/routes';
-import { DEMO_USER_ID, demoGuard } from './api/auth/demo';
+import { DEMO_USER_ID } from './api/auth/demo';
 import { routes as authRoutes } from './api/auth/routes';
 import { routes as calendarRoutes, redactFeedTokens } from './api/calendar/routes';
 import { routes as communityRoutes } from './api/community/routes';
@@ -24,13 +24,16 @@ import { routes as reminderRoutes } from './api/reminders/routes';
 import { assignmentRoutes, overrideRoutes, roleRoutes } from './api/roles/routes';
 import { routes as settingsRoutes } from './api/settings/routes';
 import { routes as shareRoutes } from './api/shares/routes';
+import { signupRoutes } from './api/signup/routes';
 import { routes as syncRoutes } from './api/sync/routes';
 import { routes as tripRoutes } from './api/trips/routes';
 import { routes as vehicleRoutes } from './api/vehicles/routes';
 import { CONFIG } from './config';
+import { checkDatabaseHealth } from './db/connection';
 import { createErrorResponse, NotFoundError } from './errors';
 import { activityTracker, bodyLimit, errorHandler, optionalAuth, rateLimiter } from './middleware';
-import { getClientIp } from './utils/client-ip';
+import { routeGuard } from './permissions/route-guard';
+import { getClientRateKey } from './utils/client-ip';
 import { logger } from './utils/logger';
 
 const app = new Hono();
@@ -97,14 +100,14 @@ const globalRateLimiter = rateLimiter({
   keyGenerator: (c) => {
     // Keys by trusted client IP: the raw X-Forwarded-For header is spoofable.
     const user = c.get('user');
-    if (user?.id === DEMO_USER_ID) return `global:demo:${getClientIp(c)}`;
-    return `global:${user?.id || getClientIp(c)}`;
+    if (user?.id === DEMO_USER_ID) return `global:demo:${getClientRateKey(c)}`;
+    return `global:${user?.id || getClientRateKey(c)}`;
   },
 });
 
 app.use('/api/*', optionalAuth);
 
-app.use('/api/*', demoGuard);
+app.use('/api/*', routeGuard);
 
 app.use('*', globalRateLimiter);
 
@@ -137,11 +140,15 @@ if (CONFIG.env === 'development') {
 app.use('*', activityTracker);
 
 app.get('/health', (c) => {
-  return c.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    version: CONFIG.version,
-  });
+  const healthy = checkDatabaseHealth();
+  return c.json(
+    {
+      status: healthy ? 'ok' : 'unavailable',
+      timestamp: new Date().toISOString(),
+      version: CONFIG.version,
+    },
+    healthy ? 200 : 503
+  );
 });
 
 app.route('/api/v1/auth', authRoutes);
@@ -168,11 +175,12 @@ app.route('/api/v1/role-assignments', assignmentRoutes);
 app.route('/api/v1/overrides', overrideRoutes);
 app.route('/api/v1/push', pushRoutes);
 app.route('/api/v1/calendar', calendarRoutes);
+app.route('/api/v1/admin', signupRoutes);
 
 app.use('/api/*', async (c, next) => {
   const path = c.req.path;
 
-  if (path.startsWith('/api/v') || path === '/api') {
+  if (/^\/api\/v\d+(\/|$)/.test(path) || path === '/api') {
     return next();
   }
 

@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gte, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
+import { rawAll, sqlFalse } from '../../db/dialect';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
 import { odometerEntries } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
@@ -110,6 +111,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       recordedAt: Date;
       note?: string;
       timeZone?: string;
+      createdBy?: string | null;
     },
     db: AppDatabase | DrizzleTransaction = this.db
   ): OdometerEntry | null {
@@ -138,6 +140,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       .values({
         vehicleId: entry.vehicleId,
         userId: entry.userId,
+        createdBy: entry.createdBy ?? null,
         odometer: entry.odometer,
         recordedAt: entry.recordedAt,
         note: entry.note ?? OdometerRepository.TRIP_PROVENANCE_NOTE,
@@ -270,16 +273,19 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     const limit = options?.limit ?? 50;
     const offset = options?.offset ?? 0;
     const financials = options?.hideFinancials ? sql`AND ${hiddenFinancialsScope()}` : sql``;
-    const visibleExpenses = options?.includeExpenses === false ? sql`AND 0` : financials;
+    const visibleExpenses =
+      options?.includeExpenses === false ? sql`AND ${sqlFalse()}` : financials;
 
     try {
-      const rows = await this.db.all<{
+      const rows = await rawAll<{
         odometer: number;
         recorded_at: number;
         source: string;
         source_id: string;
         note: string | null;
-      }>(sql`
+      }>(
+        this.db,
+        sql`
         SELECT mileage AS odometer, date AS recorded_at, 'expense' AS source, id AS source_id, NULL AS note
         FROM expenses WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL ${visibleExpenses}
         UNION ALL
@@ -287,14 +293,18 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
         FROM odometer_entries WHERE ${this.vehicleScope(vehicleId, userId)}
         ORDER BY recorded_at DESC
         LIMIT ${limit} OFFSET ${offset}
-      `);
+      `
+      );
 
-      const [countResult] = await this.db.all<{ total: number }>(sql`
+      const [countResult] = await rawAll<{ total: number }>(
+        this.db,
+        sql`
         SELECT (
           (SELECT COUNT(*) FROM expenses WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL ${visibleExpenses}) +
           (SELECT COUNT(*) FROM odometer_entries WHERE ${this.vehicleScope(vehicleId, userId)})
         ) AS total
-      `);
+      `
+      );
 
       const totalCount = countResult?.total ?? 0;
 
@@ -318,14 +328,17 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
 
   async getCurrentOdometer(vehicleId: string, userId: string): Promise<number | null> {
     try {
-      const [row] = await this.db.all<{ current: number | null }>(sql`
+      const [row] = await rawAll<{ current: number | null }>(
+        this.db,
+        sql`
         SELECT MAX(odometer) AS current FROM (
           SELECT mileage AS odometer FROM expenses
             WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL
           UNION ALL
           SELECT odometer FROM odometer_entries WHERE ${this.vehicleScope(vehicleId, userId)}
-        )
-      `);
+        ) AS readings
+      `
+      );
 
       return row?.current == null ? null : Number(row.current);
     } catch (error) {

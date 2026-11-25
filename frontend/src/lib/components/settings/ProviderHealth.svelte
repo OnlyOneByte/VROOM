@@ -34,6 +34,10 @@
 		config: {
 			title: 'The settings for this provider are incomplete or invalid.',
 			detail: 'Edit them, then test again.'
+		},
+		endpoint: {
+			title: 'This server only lets providers reach public https:// addresses.',
+			detail: "Change the provider's address to a public https:// one, then test again."
 		}
 	};
 
@@ -45,7 +49,9 @@
 
 	let needsAction = $derived(provider.status === 'needs_reauth' || provider.status === 'error');
 	let problem = $derived(
-		PROBLEM[provider.lastErrorCode ?? (provider.status === 'needs_reauth' ? 'auth' : 'unreachable')]
+		PROBLEM[
+			provider.lastErrorCode ?? (provider.status === 'needs_reauth' ? 'auth' : 'unreachable')
+		] ?? PROBLEM.unreachable
 	);
 	let checkedText = $derived(
 		provider.lastCheckedAt

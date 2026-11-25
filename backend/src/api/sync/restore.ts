@@ -138,7 +138,8 @@ class RestoreService {
   async restoreFromBackup(
     userId: string,
     file: Buffer,
-    mode: RestoreMode
+    mode: RestoreMode,
+    signal?: AbortSignal
   ): Promise<RestoreResponse> {
     const { data: parsedBackup, skippedPhotos } = this.withoutOrphanPhotos(
       await this.parseOrReject(file)
@@ -149,7 +150,7 @@ class RestoreService {
       throw new ValidationError('Backup validation failed', validation.errors);
     }
 
-    return this.applyRestore(userId, parsedBackup, mode, skippedPhotos);
+    return this.applyRestore(userId, parsedBackup, mode, skippedPhotos, signal);
   }
 
   private withoutOrphanPhotos(data: ParsedBackupData): {
@@ -167,7 +168,8 @@ class RestoreService {
     userId: string,
     data: ParsedBackupData,
     mode: RestoreMode,
-    skippedPhotos: number
+    skippedPhotos: number,
+    signal?: AbortSignal
   ): Promise<RestoreResponse> {
     const summary = summarizeBackup(data);
     const skipped = skippedPhotos > 0 ? { skipped: { photos: skippedPhotos } } : {};
@@ -190,6 +192,7 @@ class RestoreService {
       );
     }
 
+    signal?.throwIfAborted();
     // bun:sqlite transactions must be synchronous: an async callback autocommits each statement.
     try {
       this.db.transaction((tx) => {
@@ -240,7 +243,8 @@ class RestoreService {
   async restoreFromSheets(
     userId: string,
     providerId: string,
-    mode: RestoreMode
+    mode: RestoreMode,
+    signal?: AbortSignal
   ): Promise<RestoreResponse> {
     const prefs = await preferencesRepository.getOrCreate(userId);
     const backupConfig = prefs?.backupConfig as BackupConfig | null;
@@ -252,7 +256,7 @@ class RestoreService {
     }
 
     try {
-      return await this.readSheetsAndRestore(userId, providerId, sheetsSpreadsheetId, mode);
+      return await this.readSheetsAndRestore(userId, providerId, sheetsSpreadsheetId, mode, signal);
     } catch (error) {
       await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
         providers: { [providerId]: { sheetsAutoPausedAt: new Date().toISOString() } },
@@ -265,7 +269,8 @@ class RestoreService {
     userId: string,
     providerId: string,
     sheetsSpreadsheetId: string,
-    mode: RestoreMode
+    mode: RestoreMode,
+    signal?: AbortSignal
   ): Promise<RestoreResponse> {
     const { createSheetsServiceForProvider } = await import(
       '../providers/services/google-sheets-service'
@@ -307,7 +312,7 @@ class RestoreService {
       throw new ValidationError('Sheet data validation failed', validation.errors);
     }
 
-    return this.applyRestore(userId, sheetData, mode, skippedPhotos);
+    return this.applyRestore(userId, sheetData, mode, skippedPhotos, signal);
   }
 
   private async detectConflicts(data: ParsedBackupData, userId: string): Promise<Conflict[]> {
@@ -590,7 +595,11 @@ class RestoreService {
     this.insertRows(tx, vehicleFinancing, data.financing ?? []);
     this.insertRows(tx, insurancePolicies, this.stampUserId(data.insurance, userId));
     this.insertRows(tx, insuranceTerms, data.insuranceTerms ?? []);
-    this.insertRows(tx, insuranceTermVehicles, data.insuranceTermVehicles ?? []);
+    this.insertRows(
+      tx,
+      insuranceTermVehicles,
+      (data.insuranceTermVehicles ?? []).map((row, index) => ({ ...row, position: index + 1 }))
+    );
     this.insertRows(tx, insuranceClaims, data.insuranceClaims ?? []);
     const reminderVehicleIds = new Map<string, string[]>();
     for (const link of data.reminderVehicles ?? []) {
@@ -626,7 +635,13 @@ class RestoreService {
         String(row.vehicleId),
       ])
     );
-    this.insertRows(tx, trips, this.stampUserId(data.trips, userId));
+    this.insertRows(
+      tx,
+      trips,
+      this.keepMemberAuthors(this.stampUserId(data.trips, userId), consentedShares, (row) => [
+        String(row.vehicleId),
+      ])
+    );
     this.insertRows(
       tx,
       vehicleShares,
@@ -651,7 +666,23 @@ class RestoreService {
       )
     );
     this.insertRows(tx, syncState, this.stampUserId(data.syncState, userId));
-    this.insertRows(tx, photos, this.stampUserId(data.photos, userId));
+    const entryVehicle = new Map<string, string>(
+      [...(data.expenses ?? []), ...(data.odometer ?? [])].map((row) => [
+        String(row.id),
+        String(row.vehicleId),
+      ])
+    );
+    const photoVehicle = (row: Record<string, unknown>): string =>
+      row.entityType === 'vehicle'
+        ? String(row.entityId)
+        : (entryVehicle.get(String(row.entityId)) ?? '');
+    this.insertRows(
+      tx,
+      photos,
+      this.keepMemberAuthors(this.stampUserId(data.photos, userId), consentedShares, (row) => [
+        photoVehicle(row),
+      ])
+    );
     const refRows = this.relinkPhotoRefs(
       tx,
       (data.photoRefs ?? []) as Record<string, unknown>[],

@@ -1,6 +1,8 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import type { SQL } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
+import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import * as schema from '../../../db/schema';
 import { EXPENSE_CATEGORIES } from '../../../db/types';
@@ -1115,5 +1117,52 @@ describe('bucket items for drill-down', () => {
       keys: ['financial'],
     });
     expect(none.count).toBe(0);
+  });
+});
+
+describe('bucketed queries read expenses by date range, never the whole history', () => {
+  async function plansFor(run: () => Promise<unknown>): Promise<string[]> {
+    const db = testDb.drizzle as unknown as { all: (query: SQL) => unknown[] };
+    const original = db.all.bind(db);
+    const queries: SQL[] = [];
+    db.all = (query: SQL) => {
+      queries.push(query);
+      return original(query);
+    };
+    try {
+      await run();
+    } finally {
+      db.all = original;
+    }
+    return queries.flatMap((query) => {
+      const { sql: text, params } = new SQLiteSyncDialect().sqlToQuery(query);
+      const rows = testDb.sqlite
+        .query(`EXPLAIN QUERY PLAN ${text}`)
+        .all(...(params as never[])) as { detail: string }[];
+      return rows.map((r) => r.detail);
+    });
+  }
+
+  test.each([
+    ['cost by category', baseQuery({ groupBy: 'category', interval: 'week' })],
+    ['cost by tag', baseQuery({ groupBy: 'tag' })],
+    ['fuel volume', baseQuery({ metric: 'volume', interval: 'week' })],
+    ['distance', baseQuery({ metric: 'distance', interval: 'week' })],
+  ])('%s', async (_name, query) => {
+    seedFleet();
+    const plans = await plansFor(() => repo.query(OWNER.id, query));
+    const expenseSteps = plans.filter((detail) => /^(SCAN|SEARCH) e\b/.test(detail));
+    expect(expenseSteps.length).toBeGreaterThan(0);
+    for (const step of expenseSteps) expect(step).toMatch(/date>\?/);
+  });
+});
+
+describe('bucket boundaries must be whole seconds', () => {
+  test('a fractional boundary in a later bucket row is refused, not truncated', async () => {
+    seedFleet();
+    await expect(
+      repo.query(OWNER.id, baseQuery({ interval: 'month', end: RANGE.end + 0.5 }))
+    ).rejects.toThrow();
+    expect(await repo.query(OWNER.id, baseQuery({ interval: 'month' }))).toBeDefined();
   });
 });

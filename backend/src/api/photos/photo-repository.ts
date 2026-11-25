@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, notExists, or } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import { countNum } from '../../db/dialect';

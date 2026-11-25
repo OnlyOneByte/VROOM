@@ -3,7 +3,9 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { vehicleFinancing } from '../../db/schema';
+import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import { authorize, type ResourceOf, vehicleParam } from '../../permissions/authorize';
 import {
   boundedDollarsToCents,
   financingWithBalanceToApi,
@@ -14,11 +16,10 @@ import {
   commonSchemas,
   dateInput,
   MAX_ODOMETER_READING,
-  validateFinancingOwnership,
   WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
-import { requireVehicleAccess } from '../../utils/vehicle-access';
+import { vehicleRepository } from '../vehicles/repository';
 import { deactivateFinancing } from './hooks';
 import { financingRepository, withComputedBalance } from './repository';
 
@@ -107,6 +108,20 @@ const financingParamsSchema = z.object({
   financingId: z.string().min(1, 'Financing ID is required'),
 });
 
+const fromFinancing: ResourceOf = async (c) => {
+  const financing = await financingRepository.findById(c.req.param('financingId') ?? '');
+  if (!financing) throw new NotFoundError('Financing');
+  return { kind: 'vehicle', vehicleId: financing.vehicleId };
+};
+
+async function financingOwner(financingId: string): Promise<string> {
+  const financing = await financingRepository.findById(financingId);
+  if (!financing) throw new NotFoundError('Financing');
+  const owner = await vehicleRepository.findById(financing.vehicleId);
+  if (!owner) throw new NotFoundError('Financing');
+  return owner.userId;
+}
+
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
@@ -124,11 +139,10 @@ routes.get(
   '/vehicles/:vehicleId/financing',
   zValidator('param', commonSchemas.vehicleIdParam),
   zValidator('query', timeZoneQuerySchema),
+  authorize(vehicleParam('vehicleId')),
   async (c) => {
-    const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
     const { timeZone } = c.req.valid('query');
-    await requireVehicleAccess(vehicleId, user.id, 'owner');
 
     const financingData = await financingRepository.findByVehicleId(vehicleId);
     if (!financingData) {
@@ -148,12 +162,10 @@ routes.post(
   '/vehicles/:vehicleId/financing',
   zValidator('param', commonSchemas.vehicleIdParam),
   zValidator('json', createFinancingSchema.omit({ vehicleId: true })),
+  authorize(vehicleParam('vehicleId')),
   async (c) => {
-    const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
     const financingData = c.req.valid('json');
-
-    await requireVehicleAccess(vehicleId, user.id, 'owner');
 
     const existingFinancing = await financingRepository.findByVehicleId(vehicleId);
 
@@ -201,11 +213,10 @@ routes.patch(
       paymentAmount: paymentAmountSchema,
     })
   ),
+  authorize(fromFinancing),
   async (c) => {
-    const user = c.get('user');
     const { financingId } = c.req.valid('param');
     const { paymentAmount } = c.req.valid('json');
-    await validateFinancingOwnership(financingId, user.id);
 
     const updated = await financingRepository.update(financingId, {
       paymentAmount,
@@ -219,28 +230,34 @@ routes.patch(
   }
 );
 
-routes.put('/:financingId/payoff', zValidator('param', financingParamsSchema), async (c) => {
-  const user = c.get('user');
-  const { financingId } = c.req.valid('param');
-  await validateFinancingOwnership(financingId, user.id);
+routes.put(
+  '/:financingId/payoff',
+  zValidator('param', financingParamsSchema),
+  authorize(fromFinancing),
+  async (c) => {
+    const { financingId } = c.req.valid('param');
 
-  const updated = await deactivateFinancing(financingId, user.id);
+    const updated = await deactivateFinancing(financingId, await financingOwner(financingId));
 
-  return c.json({
-    success: true,
-    data: financingRowToApi(updated),
-    message: 'Financing marked as paid off',
-  });
-});
+    return c.json({
+      success: true,
+      data: financingRowToApi(updated),
+      message: 'Financing marked as paid off',
+    });
+  }
+);
 
-routes.delete('/:financingId', zValidator('param', financingParamsSchema), async (c) => {
-  const user = c.get('user');
-  const { financingId } = c.req.valid('param');
-  await validateFinancingOwnership(financingId, user.id);
+routes.delete(
+  '/:financingId',
+  zValidator('param', financingParamsSchema),
+  authorize(fromFinancing),
+  async (c) => {
+    const { financingId } = c.req.valid('param');
 
-  await deactivateFinancing(financingId, user.id);
+    await deactivateFinancing(financingId, await financingOwner(financingId));
 
-  return c.json({ success: true, message: 'Financing marked as completed successfully' });
-});
+    return c.json({ success: true, message: 'Financing marked as completed successfully' });
+  }
+);
 
 export { routes };

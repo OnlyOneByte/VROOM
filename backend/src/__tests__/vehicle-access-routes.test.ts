@@ -83,16 +83,19 @@ const ROUTES: RouteCase[] = [
   {
     name: 'PUT /vehicles/:id',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['PUT', `/vehicles/${fx.vehicleId}`, { nickname: 'Renamed' }],
   },
   {
     name: 'DELETE /vehicles/:id',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['DELETE', `/vehicles/${fx.vehicleId}`],
   },
   {
     name: 'POST /shares',
     mode: 'owner',
+    authorized: true,
     request: (fx) => [
       'POST',
       '/shares',
@@ -148,17 +151,20 @@ const ROUTES: RouteCase[] = [
   {
     name: 'GET /financing/vehicles/:id/financing',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['GET', `/financing/vehicles/${fx.vehicleId}/financing`],
     expectInBody: (fx) => fx.financingId,
   },
   {
     name: 'POST /financing/vehicles/:id/financing',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['POST', `/financing/vehicles/${fx.vehicleId}/financing`, FINANCING_BODY],
   },
   {
     name: 'PATCH /financing/:id/payment-amount',
     mode: 'owner',
+    authorized: true,
     request: (fx) => [
       'PATCH',
       `/financing/${fx.financingId}/payment-amount`,
@@ -168,11 +174,13 @@ const ROUTES: RouteCase[] = [
   {
     name: 'PUT /financing/:id/payoff',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['PUT', `/financing/${fx.financingId}/payoff`],
   },
   {
     name: 'DELETE /financing/:id',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['DELETE', `/financing/${fx.financingId}`],
   },
   {
@@ -283,7 +291,8 @@ const ROUTES: RouteCase[] = [
   },
   {
     name: 'POST /trips',
-    mode: 'owner',
+    mode: 'write',
+    authorized: true,
     request: (fx) => [
       'POST',
       '/trips',
@@ -298,13 +307,15 @@ const ROUTES: RouteCase[] = [
   },
   {
     name: 'GET /trips?vehicleId',
-    mode: 'owner',
+    mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/trips?vehicleId=${fx.vehicleId}`],
     expectInBody: (fx) => fx.tripId,
   },
   {
     name: 'GET /trips/summary?vehicleId',
-    mode: 'owner',
+    mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/trips/summary?vehicleId=${fx.vehicleId}`],
     expectInBody: () => '"tripCount":1',
   },

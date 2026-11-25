@@ -7,11 +7,13 @@ import { getDb } from '../../db/connection';
 import { countNum } from '../../db/dialect';
 import { photoRefs, photos, type UserProvider, userProviders } from '../../db/schema';
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../errors';
-import { changeTracker, requireAuth } from '../../middleware';
+import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
+import { authorize, ownAccount } from '../../permissions/authorize';
 import type { CategorySetting, PhotoCategory, StorageConfig } from '../../types';
 import { DEFAULT_STORAGE_CONFIG, PHOTO_CATEGORIES } from '../../types';
 import { decrypt, encrypt, secretContextOf } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
+import { assertSafeOutboundUrl, privateEndpointPolicyFor } from '../../utils/outbound-url';
 import { consumePending, getPendingEmail } from '../../utils/pending-credentials';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { AUTH_PROVIDERS } from '../auth/providers/registry';
@@ -38,6 +40,7 @@ import { BUILTIN_VISION_PROVIDERS, VISION_PROVIDERS } from './domains/vlm/regist
 import {
   checkProviderHealth,
   type HealthResult,
+  healthCodeOf,
   healthFailure,
   recordProviderHealth,
 } from './provider-status';
@@ -102,7 +105,7 @@ function formatProviderResponse(row: UserProvider) {
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
-routes.get('/pending/:nonce', async (c) => {
+routes.get('/pending/:nonce', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const nonce = c.req.param('nonce');
 
@@ -167,7 +170,7 @@ function defaultCategorySettings(
   ) as Record<PhotoCategory, CategorySetting>;
 }
 
-routes.get('/catalog', (c) =>
+routes.get('/catalog', authorize(ownAccount), (c) =>
   c.json({
     success: true,
     data: [
@@ -181,7 +184,7 @@ routes.get('/catalog', (c) =>
   })
 );
 
-routes.get('/', async (c) => {
+routes.get('/', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const domain = c.req.query('domain');
 
@@ -238,7 +241,25 @@ function resolveProviderCredentials(
   };
 }
 
-routes.post('/', zValidator('json', createProviderSchema), async (c) => {
+const TARGET_FIELD_LABELS: Record<string, [field: string, label: string]> = {
+  storage: ['endpoint', 'S3 endpoint'],
+  llm: ['baseUrl', 'LLM base URL'],
+  vlm: ['baseUrl', 'VLM base URL'],
+};
+
+function assertOwnerMayReach(
+  ownerId: string,
+  domain: string,
+  config: Record<string, unknown> | null | undefined
+): void {
+  const entry = TARGET_FIELD_LABELS[domain];
+  const target = entry ? config?.[entry[0]] : undefined;
+  if (entry && typeof target === 'string') {
+    assertSafeOutboundUrl(target, entry[1], privateEndpointPolicyFor(ownerId));
+  }
+}
+
+routes.post('/', zValidator('json', createProviderSchema), authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const body = c.req.valid('json');
 
@@ -270,6 +291,7 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
     body.config ? withoutServerState(descriptor, body.config) : null,
     body.nonce
   );
+  assertOwnerMayReach(user.id, body.domain, resolvedConfig);
 
   // bun:sqlite transactions must be synchronous.
   const created = db.transaction((tx) => {
@@ -341,6 +363,7 @@ routes.put(
   '/:id',
   zValidator('param', commonSchemas.idParam),
   zValidator('json', updateProviderSchema),
+  authorize(ownAccount),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -373,6 +396,7 @@ routes.put(
         validateProviderConfig(descriptor, merged, unchanged);
         assertSecretsReentered(descriptor, stored, clientConfig, body.credentials);
       }
+      assertOwnerMayReach(existing.userId, existing.domain, merged);
       updates.config = merged;
     }
     if (body.credentials !== undefined) {
@@ -471,6 +495,7 @@ routes.delete(
   '/:id',
   zValidator('param', commonSchemas.idParam),
   zValidator('query', deleteProviderQuerySchema),
+  authorize(ownAccount),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -508,128 +533,149 @@ routes.delete(
   }
 );
 
-routes.post('/:id/test', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
-
-  const db = getDb();
-
-  const existing = await findOwnedProviderOrThrow(db, id, user.id);
-  if (existing.domain === 'auth') {
-    throw new ValidationError('Sign-in providers cannot be tested through this endpoint');
-  }
-
-  let result: HealthResult;
-  try {
-    result = await checkProviderHealth(existing);
-  } catch (error) {
-    if (error instanceof ValidationError) {
-      await recordProviderHealth(existing.id, healthFailure('config'));
-    }
-    throw error;
-  }
-  await recordProviderHealth(existing.id, result);
-
-  return c.json({ success: true, data: result });
+const providerTestLimiter = rateLimiter({
+  ...CONFIG.rateLimit.providerTest,
+  keyGenerator: (c) => `providerTest:${c.get('user').id}`,
 });
 
-routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
+routes.post(
+  '/:id/test',
+  providerTestLimiter,
+  zValidator('param', commonSchemas.idParam),
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
 
-  const db = getDb();
+    const db = getDb();
 
-  await findOwnedProviderOrThrow(db, id, user.id);
-  await photoRefRepository.resetFailedForProvider(id);
+    const existing = await findOwnedProviderOrThrow(db, id, user.id);
+    if (existing.domain === 'auth') {
+      throw new ValidationError('Sign-in providers cannot be tested through this endpoint');
+    }
 
-  const prefs = await preferencesRepository.getOrCreate(user.id);
-  const storageConfig = prefs.storageConfig as StorageConfig | null;
-  const providerCategories = storageConfig?.providerCategories?.[id];
-  if (!providerCategories) {
-    return c.json({ success: true, data: { created: 0 } });
+    let result: HealthResult;
+    try {
+      result = await checkProviderHealth(existing);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        await recordProviderHealth(existing.id, healthFailure(healthCodeOf(error)));
+      }
+      throw error;
+    }
+    await recordProviderHealth(existing.id, result);
+
+    return c.json({ success: true, data: result });
   }
+);
 
-  let created = 0;
-  // bun:sqlite transactions must be synchronous.
-  db.transaction((tx) => {
-    for (const [category, setting] of Object.entries(providerCategories)) {
-      if (!setting?.enabled || !isPhotoCategory(category)) continue;
-      const entityTypes = CATEGORY_TO_ENTITY_TYPES[category];
+routes.post(
+  '/:id/backfill',
+  zValidator('param', commonSchemas.idParam),
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
 
-      for (const entityType of entityTypes) {
-        const notExistsClause = notExists(
-          tx
-            .select({ one: sql`1` })
-            .from(photoRefs)
-            .where(and(eq(photoRefs.photoId, photos.id), eq(photoRefs.providerId, id)))
-        );
+    const db = getDb();
 
-        const missingPhotos = tx
-          .select({ id: photos.id })
-          .from(photos)
-          .where(
-            and(eq(photos.entityType, entityType), eq(photos.userId, user.id), notExistsClause)
-          )
-          .all();
+    await findOwnedProviderOrThrow(db, id, user.id);
+    await photoRefRepository.resetFailedForProvider(id);
 
-        for (const photo of missingPhotos) {
-          tx.insert(photoRefs)
-            .values({
-              photoId: photo.id,
-              providerId: id,
-              storageRef: '',
-              status: 'pending',
-            })
-            .run();
-          created++;
+    const prefs = await preferencesRepository.getOrCreate(user.id);
+    const storageConfig = prefs.storageConfig as StorageConfig | null;
+    const providerCategories = storageConfig?.providerCategories?.[id];
+    if (!providerCategories) {
+      return c.json({ success: true, data: { created: 0 } });
+    }
+
+    let created = 0;
+    // bun:sqlite transactions must be synchronous.
+    db.transaction((tx) => {
+      for (const [category, setting] of Object.entries(providerCategories)) {
+        if (!setting?.enabled || !isPhotoCategory(category)) continue;
+        const entityTypes = CATEGORY_TO_ENTITY_TYPES[category];
+
+        for (const entityType of entityTypes) {
+          const notExistsClause = notExists(
+            tx
+              .select({ one: sql`1` })
+              .from(photoRefs)
+              .where(and(eq(photoRefs.photoId, photos.id), eq(photoRefs.providerId, id)))
+          );
+
+          const missingPhotos = tx
+            .select({ id: photos.id })
+            .from(photos)
+            .where(
+              and(eq(photos.entityType, entityType), eq(photos.userId, user.id), notExistsClause)
+            )
+            .all();
+
+          for (const photo of missingPhotos) {
+            tx.insert(photoRefs)
+              .values({
+                photoId: photo.id,
+                providerId: id,
+                storageRef: '',
+                status: 'pending',
+              })
+              .run();
+            created++;
+          }
         }
       }
+    });
+
+    return c.json({ success: true, data: { created } });
+  }
+);
+
+routes.get(
+  '/:id/sync-status',
+  zValidator('param', commonSchemas.idParam),
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+
+    const db = getDb();
+
+    await findOwnedProviderOrThrow(db, id, user.id);
+
+    const result = Object.fromEntries(
+      PHOTO_CATEGORIES.map((category) => [category, { total: 0, synced: 0, failed: 0 }])
+    ) as Record<PhotoCategory, { total: number; synced: number; failed: number }>;
+
+    const photoTotals = await db
+      .select({ entityType: photos.entityType, count: countNum() })
+      .from(photos)
+      .where(eq(photos.userId, user.id))
+      .groupBy(photos.entityType);
+    for (const row of photoTotals) {
+      const category = ENTITY_TO_CATEGORY[row.entityType];
+      if (category) result[category].total += row.count;
     }
-  });
 
-  return c.json({ success: true, data: { created } });
-});
+    const refCounts = await db
+      .select({
+        entityType: photos.entityType,
+        status: photoRefs.status,
+        count: countNum(),
+      })
+      .from(photoRefs)
+      .innerJoin(photos, eq(photoRefs.photoId, photos.id))
+      .where(and(eq(photoRefs.providerId, id), inArray(photoRefs.status, ['active', 'failed'])))
+      .groupBy(photos.entityType, photoRefs.status);
+    for (const row of refCounts) {
+      const category = ENTITY_TO_CATEGORY[row.entityType];
+      if (!category) continue;
+      if (row.status === 'active') result[category].synced += row.count;
+      else result[category].failed += row.count;
+    }
 
-routes.get('/:id/sync-status', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
-
-  const db = getDb();
-
-  await findOwnedProviderOrThrow(db, id, user.id);
-
-  const result = Object.fromEntries(
-    PHOTO_CATEGORIES.map((category) => [category, { total: 0, synced: 0, failed: 0 }])
-  ) as Record<PhotoCategory, { total: number; synced: number; failed: number }>;
-
-  const photoTotals = await db
-    .select({ entityType: photos.entityType, count: countNum() })
-    .from(photos)
-    .where(eq(photos.userId, user.id))
-    .groupBy(photos.entityType);
-  for (const row of photoTotals) {
-    const category = ENTITY_TO_CATEGORY[row.entityType];
-    if (category) result[category].total += row.count;
+    return c.json({ success: true, data: result });
   }
-
-  const refCounts = await db
-    .select({
-      entityType: photos.entityType,
-      status: photoRefs.status,
-      count: countNum(),
-    })
-    .from(photoRefs)
-    .innerJoin(photos, eq(photoRefs.photoId, photos.id))
-    .where(and(eq(photoRefs.providerId, id), inArray(photoRefs.status, ['active', 'failed'])))
-    .groupBy(photos.entityType, photoRefs.status);
-  for (const row of refCounts) {
-    const category = ENTITY_TO_CATEGORY[row.entityType];
-    if (!category) continue;
-    if (row.status === 'active') result[category].synced += row.count;
-    else result[category].failed += row.count;
-  }
-
-  return c.json({ success: true, data: result });
-});
+);
 
 export { routes };

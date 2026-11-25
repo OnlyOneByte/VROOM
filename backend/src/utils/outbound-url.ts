@@ -1,7 +1,12 @@
 import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
+import { and, count, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { DEMO_USER_ID } from '../api/auth/demo-account';
 import { CONFIG } from '../config';
+import { getDb } from '../db/connection';
+import { users } from '../db/schema';
 import { ValidationError } from '../errors';
+import { resolverFor } from '../permissions/grants';
 
 type AddressClass = 'public' | 'private' | 'forbidden';
 
@@ -199,13 +204,71 @@ export function parsePrivateEndpointPolicy(allow: string, block: boolean): Priva
 
 let cachedPolicy: { key: string; policy: PrivateEndpointPolicy } | null = null;
 
+function hasSecondAccount(): boolean {
+  const row = getDb()
+    .select({ accounts: count() })
+    .from(users)
+    .where(ne(users.id, DEMO_USER_ID))
+    .get();
+  return (row?.accounts ?? 0) > 1;
+}
+
 export function privateEndpointPolicy(): PrivateEndpointPolicy {
   const { allow, block } = CONFIG.privateProviderEndpoints;
+  if (!block && allow.trim() === '') return hasSecondAccount() ? BLOCK_PRIVATE : ALLOW_PRIVATE;
   const key = `${block}|${allow}`;
   if (cachedPolicy?.key !== key) {
     cachedPolicy = { key, policy: parsePrivateEndpointPolicy(allow, block) };
   }
   return cachedPolicy.policy;
+}
+
+export const PRIVATE_NETWORK_PERMISSION = 'server.private_network.use';
+
+export function isNetworkAdmin(userId: string): boolean {
+  const db = getDb();
+  const email = db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .get()?.email;
+  if (email && CONFIG.adminEmails.includes(email.toLowerCase())) return true;
+  return resolverFor(db, userId).can(PRIVATE_NETWORK_PERMISSION, { kind: 'server' }).allow;
+}
+
+const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+export function adminEmailWarnings(adminEmails: readonly string[]): string[] {
+  if (adminEmails.length === 0) return [];
+  const warnings = adminEmails
+    .filter((email) => !EMAIL_SHAPE.test(email))
+    .map((email) => `ADMIN_EMAILS entry "${email}" is not an email address, so it matches nobody`);
+  const listedAccount = getDb()
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      and(
+        inArray(sql`lower(${users.email})`, [...adminEmails]),
+        isNull(users.disabledAt),
+        ne(users.id, DEMO_USER_ID)
+      )
+    )
+    .limit(1)
+    .get();
+  if (!listedAccount) {
+    warnings.push(
+      'No active account uses an ADMIN_EMAILS address yet: until that person signs in, only users whose role grants private network access can use private network targets'
+    );
+  }
+  return warnings;
+}
+
+export function privateEndpointPolicyFor(ownerId: string): PrivateEndpointPolicy {
+  const { allow, block } = CONFIG.privateProviderEndpoints;
+  if (block) return BLOCK_PRIVATE;
+  if (CONFIG.adminEmails.length === 0) return privateEndpointPolicy();
+  if (!isNetworkAdmin(ownerId)) return BLOCK_PRIVATE;
+  return allow.trim() === '' ? ALLOW_PRIVATE : privateEndpointPolicy();
 }
 
 function normalizedHost(hostname: string): string {
@@ -247,6 +310,8 @@ function mayReachPrivateByName(policy: PrivateEndpointPolicy, url: URL): boolean
   );
 }
 
+export class EndpointNotAllowedError extends ValidationError {}
+
 function assertTargetAllowed(
   kind: AddressClass,
   url: URL,
@@ -254,14 +319,15 @@ function assertTargetAllowed(
   label: string,
   policy: PrivateEndpointPolicy
 ): void {
-  if (kind === 'forbidden') throw new ValidationError(`${label} must point to a public host`);
+  if (kind === 'forbidden')
+    throw new EndpointNotAllowedError(`${label} must point to a public host`);
   if (kind === 'private' && !privateTargetAllowed(policy, url, address)) {
-    throw new ValidationError(
+    throw new EndpointNotAllowedError(
       `${label} must point to a public host: this server doesn't allow private network addresses`
     );
   }
   if (kind === 'public' && url.protocol !== 'https:') {
-    throw new ValidationError(`${label} must use https`);
+    throw new EndpointNotAllowedError(`${label} must use https`);
   }
 }
 
@@ -305,7 +371,7 @@ export function assertSafeOutboundUrl(
     const address = literalAddress(host) ?? (isLocalhostName(host) ? '127.0.0.1' : null);
     assertTargetAllowed(kind, url, address, label, policy);
   } else if (url.protocol !== 'https:' && !mayReachPrivateByName(policy, url)) {
-    throw new ValidationError(`${label} must use https`);
+    throw new EndpointNotAllowedError(`${label} must use https`);
   }
   return url;
 }
@@ -347,9 +413,10 @@ function isConnectFailure(err: unknown): boolean {
 export async function fetchOutbound(
   raw: string,
   init: RequestInit & { headers?: Record<string, string> },
-  label: string
+  label: string,
+  policy: PrivateEndpointPolicy = privateEndpointPolicy()
 ): Promise<Response> {
-  const { url, addresses } = await resolveSafeOutboundTarget(raw, label);
+  const { url, addresses } = await resolveSafeOutboundTarget(raw, label, policy);
   if (literalAddress(url.hostname)) return fetch(url, { ...init, redirect: 'manual' });
   let lastError: unknown;
   for (const address of addresses) {

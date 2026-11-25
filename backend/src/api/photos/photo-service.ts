@@ -57,6 +57,7 @@ async function persistUploadedPhotoOrCleanup(
   storageRef: StorageRef,
   meta: {
     userId: string;
+    createdBy: string | null;
     entityType: string;
     entityId: string;
     fileName: string;
@@ -150,6 +151,7 @@ export async function uploadPhotoForEntity(
 
   const photo = await persistUploadedPhotoOrCleanup(provider, providerId, storageRef, {
     userId: ownerId,
+    createdBy: ownerId === userId ? null : userId,
     entityType,
     entityId,
     fileName: file.name,

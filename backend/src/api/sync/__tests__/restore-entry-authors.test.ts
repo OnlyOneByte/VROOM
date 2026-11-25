@@ -77,4 +77,23 @@ describe('restore keeps an entry author only while they are a member of the car'
     expect(authorOf('odometer_entries', id)).toBe(editor.id);
     expect((await editor.request('DELETE', `/api/v1/odometer/${id}`)).status).toBe(200);
   });
+
+  test('trips and photos keep a member author and drop a non-member one', async () => {
+    const editor = await createInvitee(ctx, 'authors-trip-editor');
+    const outsider = await createInvitee(ctx, 'authors-photo-outsider');
+    shareCar(ctx, CAR, editor, 'editor');
+    ctx.sqlite.run(
+      "INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date, created_by) VALUES ('editors-trip', ?, ?, 10, 20, 'business', 1717200000, ?)",
+      [CAR, ctx.user.id, editor.id]
+    );
+    ctx.sqlite.run(
+      "INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size, created_by) VALUES ('forged-photo', ?, 'vehicle', ?, 'a.jpg', 'image/jpeg', 10, ?)",
+      [ctx.user.id, CAR, outsider.id]
+    );
+
+    await restore((await exportZip()).toBuffer());
+
+    expect(authorOf('trips', 'editors-trip')).toBe(editor.id);
+    expect(authorOf('photos', 'forged-photo')).toBeNull();
+  });
 });

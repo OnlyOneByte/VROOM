@@ -5,10 +5,17 @@ import CommunityStatsCard from '../CommunityStatsCard.svelte';
 
 type Save = (updates: CommunityStatsUpdate) => Promise<void>;
 
-function mount(props: { optIn?: boolean; region?: string | null; onSave?: Save } = {}) {
+function mount(
+	props: { optIn?: boolean; region?: string | null; minGroup?: number; onSave?: Save } = {}
+) {
 	const onSave = vi.fn<Save>(props.onSave ?? (() => Promise.resolve()));
 	const result = render(CommunityStatsCard, {
-		props: { optIn: props.optIn ?? false, region: props.region ?? null, onSave }
+		props: {
+			optIn: props.optIn ?? false,
+			region: props.region ?? null,
+			minGroup: props.minGroup,
+			onSave
+		}
 	});
 	return { ...result, onSave };
 }
@@ -39,13 +46,18 @@ afterEach(() => {
 });
 
 describe('CommunityStatsCard', () => {
+	test("names the server's publication threshold when it is raised", () => {
+		mount({ minGroup: 45 });
+		expect(screen.getByText(/groups of about 45 or more people/)).toBeInTheDocument();
+	});
+
 	test('shows the consent copy, off by default and with no region', () => {
 		mount();
 		expect(screen.getByText('Community comparisons')).toBeInTheDocument();
 		expect(screen.getByText('Compare with other owners')).toBeInTheDocument();
 		expect(
 			screen.getByText(
-				'Only averages and rounded group sizes for groups of 10 or more people are ever shown — never your own numbers.'
+				'Only averages and rounded group sizes for groups of about 30 or more people are ever shown, both with random noise added — never your own numbers.'
 			)
 		).toBeInTheDocument();
 		expect(
