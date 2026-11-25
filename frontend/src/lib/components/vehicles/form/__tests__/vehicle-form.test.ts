@@ -311,7 +311,7 @@ describe('VehicleForm create mode', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
-		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles'));
 		expect(appStore.vehicles).toContainEqual(saved);
 		expect(notificationMessages()).toContain('Vehicle added successfully!');
 		expect(refreshAll).not.toHaveBeenCalled();
@@ -456,7 +456,7 @@ describe('VehicleForm edit mode', () => {
 		getVehicle.mockRejectedValue(new ApiError('Vehicle not found', 404));
 		render(VehicleForm, { props: { vehicleId: 'gone' } });
 
-		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles'));
 		expect(notificationMessages()).toContain('That vehicle no longer exists.');
 	});
 
@@ -576,7 +576,7 @@ describe('VehicleForm edit mode', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: /delete vehicle/i }));
 
-		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles'));
 		expect(deleteVehicle).toHaveBeenCalledWith('veh-1');
 		expect(appStore.vehicles).toEqual([]);
 		expect(notificationMessages()).toContain('Vehicle deleted successfully');
@@ -689,7 +689,7 @@ describe('VehicleForm financing on create', () => {
 			paymentFrequency: 'monthly',
 			paymentDayOfMonth: 1
 		});
-		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles'));
 	});
 
 	test('a new 0% APR loan saves the principal split evenly over the term', async () => {
@@ -751,7 +751,7 @@ describe('VehicleForm financing on create', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
-		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles'));
 		expect(notificationMessages()).toEqual(
 			expect.arrayContaining([
 				`The vehicle was saved, but its financing couldn't be saved. ${SERVER_FAILURE_MESSAGE}`,
@@ -775,7 +775,7 @@ describe('VehicleForm financing on create', () => {
 
 		await fireEvent.click(within(dialog).getByRole('button', { name: 'Change Units' }));
 
-		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles'));
 		expect(createVehicle).toHaveBeenCalledTimes(2);
 		expect(createdPayload()).not.toHaveProperty('confirmUnitChange');
 	});

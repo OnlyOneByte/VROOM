@@ -487,7 +487,7 @@ describe('edit odometer reading save', () => {
 		).toBeInTheDocument();
 	});
 
-	test('Save Reading is disabled while saving', async () => {
+	test('Save reading is disabled while saving', async () => {
 		update.mockReturnValue(new Promise(() => {}));
 		mount();
 		await settle();

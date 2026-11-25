@@ -266,7 +266,7 @@
 		} catch (error) {
 			if (error instanceof ApiError && error.statusCode === 404) {
 				appStore.addNotification({ type: 'error', message: 'That vehicle no longer exists.' });
-				goto(resolve(routes.dashboard));
+				goto(resolve(routes.vehicles));
 				return;
 			}
 			loadError = userFacingErrorMessage(error);
@@ -597,7 +597,7 @@
 					type: 'success',
 					message: 'Vehicle added successfully!'
 				});
-				goto(resolve(routes.dashboard));
+				goto(resolve(routes.vehicles));
 			}
 		} catch (error) {
 			if (!confirmUnitChange && needsUnitChangeConfirmation(error)) {
@@ -629,7 +629,7 @@
 				type: 'success',
 				message: 'Vehicle deleted successfully'
 			});
-			goto(resolve(routes.dashboard));
+			goto(resolve(routes.vehicles));
 		} catch (error) {
 			appStore.addNotification({
 				type: 'error',
@@ -941,7 +941,7 @@
 						<Collapsible.Trigger
 							class="h-10 shrink-0 rounded-full border border-border-strong px-4 text-sm font-semibold outline-none hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50"
 						>
-							{unitPrefsOpen ? 'Done' : 'Change'}<span class="sr-only"> units</span>
+							{#if unitPrefsOpen}Done{:else}Change<span class="sr-only"> units</span>{/if}
 						</Collapsible.Trigger>
 					</div>
 					<Collapsible.Content>

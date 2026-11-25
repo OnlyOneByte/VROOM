@@ -137,6 +137,6 @@ test.describe('Adding a vehicle', () => {
 		expect(body).toMatchObject({ make: 'Tesla', model: 'Model 3', year: 2023 });
 
 		await expect(page.getByText('Vehicle added successfully!')).toBeVisible();
-		await expect(page).toHaveURL(/\/dashboard$/);
+		await expect(page).toHaveURL(/\/vehicles$/);
 	});
 });
