@@ -111,7 +111,7 @@ describe('vehicle Overview puts the numbers first', () => {
 		const hero = screen.getByTestId('cost-per-mile-hero');
 		const nextUp = await screen.findByRole('heading', { name: 'Next up' });
 		const recentExpenses = screen.getByRole('heading', { name: 'Recent expenses' });
-		const details = screen.getByRole('button', { name: 'Details, insurance and photos' });
+		const details = screen.getByRole('button', { name: 'Details and photos' });
 
 		expect(follows(recent, hero) || hero.contains(recent)).toBe(true);
 		expect(follows(nextUp, hero)).toBe(true);

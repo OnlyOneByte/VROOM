@@ -100,6 +100,10 @@ describe('vehicle page offline', () => {
 		expect(screen.queryByText("Couldn't load this vehicle")).not.toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
 		expect(screen.queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument();
+		expect(screen.getByTestId('vehicle-offline-notice')).toHaveTextContent(
+			'Expenses you add while offline sync when you reconnect.'
+		);
+		expect(screen.queryByRole('link', { name: /Edit/ })).not.toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument();
 		await new Promise(resolve => setTimeout(resolve, 0));
 		expect(appStore.notifications.filter(n => n.type === 'error')).toEqual([]);

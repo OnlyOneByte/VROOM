@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
-	import { onMount, tick, untrack, type Component } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import {
 		Plus,
 		FileText,
@@ -14,7 +14,8 @@
 		LoaderCircle,
 		WifiOff,
 		Ellipsis,
-		ChevronRight
+		ChevronRight,
+		Pencil
 	} from '@lucide/svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -41,8 +42,6 @@
 	import { matchesFilters } from '#lib/utils/sync/pending-rows.ts';
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
-	let InsuranceTab = $state<Component<{ vehicleId: string; readOnly?: boolean }> | null>(null);
-	let hasLoadedInsurance = $state(false);
 	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
 	import { getFuelEfficiencyLabel, getElectricEfficiencyLabel } from '#lib/utils/units.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
@@ -145,6 +144,8 @@
 		]);
 	const loadOdometerTab = () => import('#lib/components/vehicles/OdometerTab.svelte');
 	const loadFinanceTab = () => import('#lib/components/vehicles/FinanceTab.svelte');
+	const loadInsuranceTab = () => import('#lib/components/insurance/InsuranceTab.svelte');
+	const loadTripsTab = () => import('#lib/components/vehicles/VehicleTripsTab.svelte');
 	const loadCompareCard = () => import('#lib/components/vehicles/CommunityCompareCard.svelte');
 	const loadUploadDialog = () => import('#lib/components/common/MediaCaptureDialog.svelte');
 	const loadOverviewModules = () =>
@@ -308,19 +309,6 @@
 		if (!cover) return null;
 		return vehicleApi.getPhotoThumbnailUrl(vehicleId, cover.id);
 	});
-
-	function loadInsuranceTab() {
-		if (hasLoadedInsurance) return Promise.resolve();
-		hasLoadedInsurance = true;
-		return import('#lib/components/insurance/InsuranceTab.svelte').then(
-			m => {
-				InsuranceTab = m.default;
-			},
-			() => {
-				hasLoadedInsurance = false;
-			}
-		);
-	}
 
 	async function loadPage() {
 		isLoading = true;
@@ -788,6 +776,15 @@
 					<Button
 						variant="outline"
 						size="sm"
+						href={resolve(paramRoutes.vehicleEdit, { id: vehicleId })}
+						class="hidden h-10 shrink-0 lg:inline-flex"
+					>
+						<Pencil class="mr-2 h-4 w-4" aria-hidden="true" />
+						Edit
+					</Button>
+					<Button
+						variant="outline"
+						size="sm"
 						onclick={() => (shareOpen = true)}
 						class="hidden h-10 shrink-0 lg:inline-flex"
 					>
@@ -804,6 +801,14 @@
 								{/snippet}
 							</Popover.Trigger>
 							<Popover.Content align="end" class="flex w-48 flex-col p-1">
+								<Button
+									variant="ghost"
+									class="h-10 w-full justify-start"
+									href={resolve(paramRoutes.vehicleEdit, { id: vehicleId })}
+								>
+									<Pencil class="mr-2 h-4 w-4" aria-hidden="true" />
+									Edit
+								</Button>
 								<Button
 									variant="ghost"
 									class="h-10 w-full justify-start"
@@ -824,10 +829,10 @@
 						size="lg"
 						class="max-sm:w-10 max-sm:has-[>svg]:px-0"
 						href={addExpenseHref}
-						aria-label={COMMON_MESSAGES.ADD_EXPENSE}
+						aria-label="Add expense"
 					>
 						<Plus class="h-4 w-4 sm:mr-2" aria-hidden="true" />
-						<span class="hidden sm:inline">{COMMON_MESSAGES.ADD_EXPENSE}</span>
+						<span class="hidden sm:inline">Add expense</span>
 					</Button>
 				{/if}
 			</div>
@@ -844,17 +849,21 @@
 				<AlertTitle>You're offline</AlertTitle>
 				<AlertDescription>
 					These are the details saved on this device. Costs, charts and history load when you
-					reconnect. Expenses you add now sync automatically.
+					reconnect. Expenses you add while offline sync when you reconnect.
 				</AlertDescription>
 			</Alert>
-			<VehicleInfoCard {vehicle} {isOwner} />
+			<VehicleInfoCard {vehicle} isOwner={false} />
 		{:else}
 			<Tabs bind:value={activeTab} class="space-y-6">
-				<TabsList class="grid w-full grid-cols-4">
-					<TabsTrigger value="overview">Overview</TabsTrigger>
-					<TabsTrigger value="expenses" id="vehicle-tab-expenses">Expenses</TabsTrigger>
-					<TabsTrigger value="loan">Finance</TabsTrigger>
-					<TabsTrigger value="odometer">Odometer</TabsTrigger>
+				<TabsList class="flex w-full max-w-full justify-start overflow-x-auto sm:w-fit">
+					<TabsTrigger value="overview" class="shrink-0">Overview</TabsTrigger>
+					<TabsTrigger value="expenses" id="vehicle-tab-expenses" class="shrink-0">
+						Expenses
+					</TabsTrigger>
+					<TabsTrigger value="loan" class="shrink-0">Finance</TabsTrigger>
+					<TabsTrigger value="odometer" class="shrink-0">Odometer</TabsTrigger>
+					<TabsTrigger value="insurance" class="shrink-0">Insurance</TabsTrigger>
+					<TabsTrigger value="trips" class="shrink-0">Trips</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="overview" class="space-y-6">
@@ -879,7 +888,7 @@
 								{#if canWrite}
 									<Button href={addExpenseHref}>
 										<Plus class="h-4 w-4 mr-2" />
-										{COMMON_MESSAGES.ADD_EXPENSE}
+										Add expense
 									</Button>
 								{/if}
 							{/snippet}
@@ -984,9 +993,7 @@
 					<Collapsible
 						bind:open={detailsOpen}
 						onOpenChange={open => {
-							if (!open) return;
-							hasOpenedDetails = true;
-							void loadInsuranceTab();
+							if (open) hasOpenedDetails = true;
 						}}
 						class="rounded-xl border bg-card"
 					>
@@ -997,14 +1004,11 @@
 								class="h-4 w-4 shrink-0 transition-transform {detailsOpen ? 'rotate-90' : ''}"
 								aria-hidden="true"
 							/>
-							Details, insurance and photos
+							Details and photos
 						</CollapsibleTrigger>
 						<CollapsibleContent class="space-y-6 border-t p-4 sm:p-6">
 							{#if hasOpenedDetails}
 								<VehicleInfoCard {vehicle} {isOwner} />
-								{#if InsuranceTab}
-									<InsuranceTab {vehicleId} readOnly={!isOwner} />
-								{/if}
 								<VehiclePhotoCarousel
 									{vehicleId}
 									photos={vehiclePhotos}
@@ -1095,7 +1099,7 @@
 											onDelete={handleDeleteExpense}
 											emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
 											emptyDescription="Start tracking expenses for this vehicle"
-											emptyActionLabel={COMMON_MESSAGES.ADD_EXPENSE}
+											emptyActionLabel="Add expense"
 											emptyActionHref={addExpenseHref}
 											scrollHeight={SCROLL_HEIGHTS.TABLE_DEFAULT}
 											onClearFilters={clearFilters}
@@ -1126,6 +1130,30 @@
 							{@render tabLoading()}
 						{:then { default: OdometerTab }}
 							<OdometerTab {vehicleId} {canWrite} unitPreferences={vehicle?.unitPreferences} />
+						{:catch}
+							{@render tabLoadError()}
+						{/await}
+					{/if}
+				</TabsContent>
+
+				<TabsContent value="insurance" class="space-y-6">
+					{#if visitedTabs['insurance']}
+						{#await loadInsuranceTab()}
+							{@render tabLoading()}
+						{:then { default: InsuranceTab }}
+							<InsuranceTab {vehicleId} readOnly={!isOwner} />
+						{:catch}
+							{@render tabLoadError()}
+						{/await}
+					{/if}
+				</TabsContent>
+
+				<TabsContent value="trips" class="space-y-6">
+					{#if visitedTabs['trips']}
+						{#await loadTripsTab()}
+							{@render tabLoading()}
+						{:then { default: VehicleTripsTab }}
+							<VehicleTripsTab {vehicleId} {distanceUnit} />
 						{:catch}
 							{@render tabLoadError()}
 						{/await}
