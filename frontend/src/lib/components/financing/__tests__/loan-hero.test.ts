@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/svelte';
-import { calculateAmortizationSchedule } from '#lib/utils/financing-calculations.ts';
 import LoanHero from '../LoanHero.svelte';
 import { makeEntry, makeLoan } from './financing-fixtures.ts';
 
@@ -17,7 +16,6 @@ function mount(overrides: Partial<Parameters<typeof makeLoan>[0]> = {}, loaded =
 		financing,
 		payments: loaded ? payments : [],
 		paymentsLoaded: loaded,
-		amortizationSchedule: calculateAmortizationSchedule(financing, loaded ? payments.length : 0),
 		payoffDate: PAYOFF
 	});
 }
@@ -32,7 +30,7 @@ describe('LoanHero', () => {
 		expect(document.querySelector('[data-slot="hero-figure"]')).toHaveTextContent('$15,000');
 		const sentence = screen.getByTestId('loan-sentence');
 		expect(sentence).toHaveTextContent(
-			/^2 of 60 payments made\. At \$400\.00 a month it's paid off in Nov 2029, with \$[\d,]+ of interest still to go\.$/
+			/^3 of 60 payments made\. At \$400\.00 a month it's paid off in Nov 2029, with \$[\d,]+ of interest still to go\.$/
 		);
 		expect(screen.getByRole('list')).toHaveTextContent(
 			/Principal paid\s*\$1,100.*Interest paid\s*\$200.*Left to pay\s*\$15,000/
@@ -43,14 +41,41 @@ describe('LoanHero', () => {
 		mount({ apr: undefined });
 
 		expect(screen.getByTestId('loan-sentence')).toHaveTextContent(
-			"2 of 60 payments made. At $400.00 a month it's paid off in Nov 2029."
+			"3 of 60 payments made. At $400.00 a month it's paid off in Nov 2029."
 		);
 	});
 
-	test('names the period for other payment frequencies', () => {
-		mount({ paymentFrequency: 'bi-weekly' });
+	test('an extra or larger payment still counts as a payment made', () => {
+		mount();
 
-		expect(screen.getByTestId('loan-sentence')).toHaveTextContent('$400.00 every two weeks');
+		expect(screen.getByTestId('loan-sentence')).toHaveTextContent(/^3 of 60 payments made/);
+	});
+
+	test('interest still to go follows the live balance at the monthly payment', () => {
+		mount({ computedBalance: 1000, apr: 12, paymentAmount: 510 });
+
+		expect(screen.getByTestId('loan-sentence')).toHaveTextContent(
+			'with $15 of interest still to go.'
+		);
+	});
+
+	test.each([
+		['bi-weekly', '$400.00 every two weeks'],
+		['custom', '$400.00 per payment']
+	] as const)('names the period for a %s loan, with no interest estimate', (frequency, text) => {
+		mount({ paymentFrequency: frequency });
+
+		const sentence = screen.getByTestId('loan-sentence');
+		expect(sentence).toHaveTextContent(text);
+		expect(sentence).not.toHaveTextContent('interest still to go');
+	});
+
+	test('a loan with nothing left says it is paid off', () => {
+		mount({ computedBalance: 0 });
+
+		expect(screen.getByTestId('loan-sentence')).toHaveTextContent(
+			'3 payments made. The loan is paid off.'
+		);
 	});
 
 	test('when the payment history could not load, it skips the count, the interest and the split', () => {
@@ -70,7 +95,6 @@ describe('LoanHero', () => {
 			payments: [],
 			paymentsLoaded: false,
 			paymentsLoading: true,
-			amortizationSchedule: [],
 			payoffDate: PAYOFF
 		});
 

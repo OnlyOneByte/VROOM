@@ -126,6 +126,6 @@ describe('vehicle Overview puts the numbers first', () => {
 		expect(categoryProps.value).toBeNull();
 		await fireEvent.click(screen.getByRole('tab', { name: 'Expenses' }));
 		await vi.waitFor(() => expect(categoryProps.value).not.toBeNull());
-		expect(categoryProps.value?.['description']).toBe('Distribution for this vehicle');
+		expect(categoryProps.value?.['description']).toBe('All time, largest first');
 	});
 });

@@ -3,14 +3,13 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import type { DerivedPaymentEntry, VehicleFinancing } from '#lib/types/index.ts';
 	import { currentLocale, formatCurrency } from '#lib/utils/formatters.ts';
-	import { remainingBalance, type AmortizationEntry } from '#lib/utils/financing-calculations.ts';
+	import { remainingBalance } from '#lib/utils/financing-calculations.ts';
 
 	interface Props {
 		financing: VehicleFinancing;
 		payments: DerivedPaymentEntry[];
 		paymentsLoaded: boolean;
 		paymentsLoading?: boolean;
-		amortizationSchedule: AmortizationEntry[];
 		payoffDate: Date;
 	}
 
@@ -19,7 +18,6 @@
 		payments,
 		paymentsLoaded,
 		paymentsLoading = false,
-		amortizationSchedule,
 		payoffDate
 	}: Props = $props();
 
@@ -27,18 +25,31 @@
 		monthly: 'a month',
 		'bi-weekly': 'every two weeks',
 		weekly: 'a week',
-		custom: 'a payment'
+		custom: 'per payment'
 	};
 
 	let balance = $derived(Math.max(0, remainingBalance(financing)));
 	let principalPaid = $derived(payments.reduce((sum, p) => sum + (p.principalAmount || 0), 0));
 	let interestPaid = $derived(payments.reduce((sum, p) => sum + (p.interestAmount || 0), 0));
-	let made = $derived(payments.filter(p => p.paymentType === 'standard').length);
+	let made = $derived(payments.length);
+	const MAX_MONTHS = 1200;
+
+	function monthlyInterestLeft(principal: number, apr: number, payment: number): number | null {
+		const rate = apr / 1200;
+		let left = principal;
+		let total = 0;
+		for (let month = 0; left > 0.005 && month < MAX_MONTHS; month++) {
+			const interest = left * rate;
+			if (payment <= interest) return null;
+			total += interest;
+			left -= Math.min(payment - interest, left);
+		}
+		return left > 0.005 ? null : total;
+	}
+
 	let interestLeft = $derived(
-		paymentsLoaded && financing.apr && financing.apr > 0
-			? amortizationSchedule
-					.filter(entry => !entry.isPaid)
-					.reduce((sum, entry) => sum + entry.interestAmount, 0)
+		paymentsLoaded && financing.paymentFrequency === 'monthly' && (financing.apr ?? 0) > 0
+			? monthlyInterestLeft(balance, financing.apr ?? 0, financing.paymentAmount)
 			: null
 	);
 	let payoff = $derived(
@@ -67,12 +78,16 @@
 		/>
 		{#if !paymentsLoading}
 			<p class="max-w-xl text-base leading-relaxed lg:text-lg" data-testid="loan-sentence">
-				{#if paymentsLoaded}<strong>{made} of {financing.termMonths}</strong> payments made.{/if} At
-				{formatCurrency(financing.paymentAmount)}
-				{PERIOD[financing.paymentFrequency]} it's paid off in
-				<strong>{payoff}</strong>{#if interestLeft !== null}, with <strong>
-						{formatCurrency(interestLeft, undefined, 0)}
-					</strong> of interest still to go{/if}.
+				{#if balance === 0}
+					{#if paymentsLoaded}<strong>{made}</strong> payments made.{/if} The loan is paid off.
+				{:else}
+					{#if paymentsLoaded}<strong>{made} of {financing.termMonths}</strong> payments made.{/if} At
+					{formatCurrency(financing.paymentAmount)}
+					{PERIOD[financing.paymentFrequency]} it's paid off in
+					<strong>{payoff}</strong>{#if interestLeft !== null}, with <strong>
+							{formatCurrency(interestLeft, undefined, 0)}
+						</strong> of interest still to go{/if}.
+				{/if}
 			</p>
 		{:else}
 			<div class="space-y-2" aria-hidden="true">

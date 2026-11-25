@@ -139,7 +139,8 @@
 	const CATEGORY_CHART_TITLE = 'Spending by category';
 	const CATEGORY_SERIES = [{ key: 'value', label: 'Spent', color: CHART_COLORS[0] as string }];
 	const CATEGORY_CONFIG = buildChartConfig(CATEGORY_SERIES);
-	const CATEGORY_CHART_DESCRIPTION = 'Distribution for this vehicle';
+	const CATEGORY_CHART_DESCRIPTION = 'All time, largest first';
+	const CATEGORY_PADDING = { top: 4, left: 120, bottom: 24, right: 16 };
 	const CHARTS_LOAD_ERROR = "Charts couldn't be loaded. Check your connection and reload.";
 	const fuelChartLoading = import('#lib/components/charts/FuelEfficiencyTrendChart.svelte');
 	const loadSpendCharts = () =>
@@ -1056,6 +1057,7 @@
 											x="value"
 											y="label"
 											orientation="horizontal"
+											padding={CATEGORY_PADDING}
 											series={CATEGORY_SERIES}
 											config={CATEGORY_CONFIG}
 											yAxisFormat={v => String(v)}

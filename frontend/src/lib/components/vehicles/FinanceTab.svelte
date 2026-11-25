@@ -165,7 +165,6 @@
 				{payments}
 				{paymentsLoaded}
 				paymentsLoading={isLoadingPayments || !hasAttemptedPaymentLoad}
-				{amortizationSchedule}
 				payoffDate={estimatedPayoffDate}
 			/>
 		{/if}
