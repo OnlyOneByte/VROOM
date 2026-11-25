@@ -1,6 +1,6 @@
 import { and, eq, isNull, notInArray, type SQL, sql } from 'drizzle-orm';
+import { appContext } from '../app-context';
 import type { AppDatabase } from '../db/connection';
-import { getDb } from '../db/connection';
 import { expenses, vehicleShares, vehicles } from '../db/schema';
 import type { DrizzleTransaction } from '../db/types';
 import { NotFoundError } from '../errors';
@@ -39,7 +39,7 @@ const ROLES_FOR_MODE: Record<VehicleAccessMode, readonly VehicleRole[]> = {
 export async function resolveVehicleAccess(
   vehicleId: string,
   userId: string,
-  db: AppDatabase | DrizzleTransaction = getDb()
+  db: AppDatabase | DrizzleTransaction = appContext().db
 ): Promise<VehicleAccess | null> {
   const rows = await db
     .select({ ownerId: vehicles.userId, level: vehicleShares.level })
@@ -78,7 +78,7 @@ export async function requireVehicleAccess(
   vehicleId: string,
   userId: string,
   mode: VehicleAccessMode,
-  db: AppDatabase | DrizzleTransaction = getDb()
+  db: AppDatabase | DrizzleTransaction = appContext().db
 ): Promise<VehicleAccess> {
   const access = await resolveVehicleAccess(vehicleId, userId, db);
   // 404, not 403, so a non-member cannot learn that the vehicle exists.
@@ -90,7 +90,7 @@ export async function requireVehiclesAccess(
   vehicleIds: readonly string[],
   userId: string,
   mode: VehicleAccessMode,
-  db: AppDatabase | DrizzleTransaction = getDb()
+  db: AppDatabase | DrizzleTransaction = appContext().db
 ): Promise<Set<string>> {
   const ownerIds = new Set<string>();
   for (const vehicleId of new Set(vehicleIds)) {

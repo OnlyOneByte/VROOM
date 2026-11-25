@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { repos } from '../../app-context';
-import { getDb } from '../../db/connection';
+import { appContext, repos } from '../../app-context';
 import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, ownAccount, vehicleParam } from '../../permissions/authorize';
@@ -142,7 +141,7 @@ routes.get(
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
     const access = await requireVehicleAccess(vehicleId, user.id, 'read');
-    const seesCosts = requestResolver(c, getDb()).can('vehicle.insurance.read', {
+    const seesCosts = requestResolver(c, appContext().db).can('vehicle.insurance.read', {
       kind: 'vehicle',
       vehicleId,
     }).allow;
@@ -331,7 +330,7 @@ routes.get(
     const { id } = c.req.valid('param');
     const policy = await repos().insurancePolicies.findById(id);
     const claims = await repos().insuranceClaims.findByPolicyId(id);
-    const resolver = requestResolver(c, getDb());
+    const resolver = requestResolver(c, appContext().db);
     const scoped =
       policy?.userId === c.get('user').id
         ? claims

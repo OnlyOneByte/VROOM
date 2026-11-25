@@ -1,9 +1,8 @@
 import { and, eq, getTableColumns, inArray, ne, type Table } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
-import { repos } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import { TABLE_SCHEMA_MAP } from '../../config';
 import type { AppDatabase } from '../../db/connection';
-import { getDb } from '../../db/connection';
 import {
   expenses,
   insuranceClaims,
@@ -138,7 +137,7 @@ function coerceRows(rows: Record<string, unknown>[], table: Table): Record<strin
 
 class RestoreService {
   private get db() {
-    return getDb();
+    return appContext().db;
   }
 
   async restoreFromBackup(

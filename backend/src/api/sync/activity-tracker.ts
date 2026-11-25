@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { repos } from '../../app-context';
-import { getDb } from '../../db/connection';
+import { appContext, repos } from '../../app-context';
 import { users as usersTable } from '../../db/schema';
 import { logger } from '../../utils/logger';
 import { backupOrchestrator } from './backup-orchestrator';
@@ -72,7 +71,7 @@ export class UserActivityTracker {
 
   private async performAutoBackup(userId: string): Promise<void> {
     try {
-      const db = getDb();
+      const db = appContext().db;
 
       const userResult = await db
         .select()

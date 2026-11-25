@@ -1,8 +1,8 @@
 import { and, eq, ne } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { repos } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
-import { getDb } from '../../db/connection';
+import type { AppDatabase } from '../../db/connection';
 import type { UserProvider } from '../../db/schema';
 import { userProviders } from '../../db/schema';
 import { AppError, ValidationError } from '../../errors';
@@ -20,10 +20,7 @@ const routes = new Hono();
 
 routes.use('*', requireAuth);
 
-async function findPhotosProvider(
-  db: ReturnType<typeof getDb>,
-  userId: string
-): Promise<UserProvider | null> {
+async function findPhotosProvider(db: AppDatabase, userId: string): Promise<UserProvider | null> {
   const rows = await db
     .select()
     .from(userProviders)
@@ -70,7 +67,7 @@ routes.get(
   authorize(ownAccount),
   async (c) => {
     const user = c.get('user');
-    const db = getDb();
+    const db = appContext().db;
 
     const photosRow = await findPhotosProvider(db, user.id);
     if (!photosRow) {

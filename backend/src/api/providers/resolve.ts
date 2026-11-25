@@ -1,5 +1,5 @@
 import { and, asc, eq, ne } from 'drizzle-orm';
-import { getDb } from '../../db/connection';
+import { appContext } from '../../app-context';
 import { type UserProvider, userPreferences, userProviders } from '../../db/schema';
 import { NoProviderError } from '../../errors';
 import type { DefaultProviderCapability } from '../../types';
@@ -19,8 +19,8 @@ export async function resolveProvider(
   userId: string,
   capability: DefaultProviderCapability
 ): Promise<UserProvider> {
-  const rows = await getDb()
-    .select()
+  const rows = await appContext()
+    .db.select()
     .from(userProviders)
     .where(
       and(
@@ -30,8 +30,8 @@ export async function resolveProvider(
       )
     )
     .orderBy(asc(userProviders.createdAt), asc(userProviders.id));
-  const prefs = await getDb()
-    .select({ providerDefaults: userPreferences.providerDefaults })
+  const prefs = await appContext()
+    .db.select({ providerDefaults: userPreferences.providerDefaults })
     .from(userPreferences)
     .where(eq(userPreferences.userId, userId))
     .get();

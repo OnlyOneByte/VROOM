@@ -1,8 +1,7 @@
 import { and, eq, notInArray } from 'drizzle-orm';
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
-import { repos } from '../../app-context';
-import { getDb } from '../../db/connection';
+import { appContext, repos } from '../../app-context';
 import {
   permissionOverrides,
   roleAssignments,
@@ -59,7 +58,7 @@ function transitionShare(
   change: { status?: string; level?: string },
   then: (tx: DrizzleTransaction, before: VehicleShare, after: VehicleShare) => void
 ): VehicleShare {
-  return getDb().transaction((tx) => {
+  return appContext().db.transaction((tx) => {
     const before = tx.select().from(vehicleShares).where(eq(vehicleShares.id, id)).get();
     if (!before || !from.includes(before.status)) {
       throw new ConflictError('This share changed in the meantime. Reload and try again');
@@ -92,14 +91,14 @@ const fromShare: ResourceOf = async (c) => {
   const share = await repos().vehicleShares.findById(c.req.param('id') ?? '');
   if (!share) throw new NotFoundError('Share');
   const vehicle: Resource = { kind: 'vehicle', vehicleId: share.vehicleId };
-  const decision = requestResolver(c, getDb()).can('vehicle.read', vehicle);
+  const decision = requestResolver(c, appContext().db).can('vehicle.read', vehicle);
   if (!decision.allow && decision.reason === 'not_found') throw new NotFoundError('Share');
   return vehicle;
 };
 
 function vehicleOwnerId(vehicleId: string): string | null {
-  const row = getDb()
-    .select({ userId: vehicles.userId })
+  const row = appContext()
+    .db.select({ userId: vehicles.userId })
     .from(vehicles)
     .where(eq(vehicles.id, vehicleId))
     .get();
@@ -107,7 +106,7 @@ function vehicleOwnerId(vehicleId: string): string | null {
 }
 
 function holdsOn(c: Context, vehicleId: string): (permission: string) => boolean {
-  const resolver = requestResolver(c, getDb());
+  const resolver = requestResolver(c, appContext().db);
   const vehicle: Resource = { kind: 'vehicle', vehicleId };
   return (permission) => resolver.can(permission, vehicle).allow;
 }
@@ -124,8 +123,8 @@ function refuseOverSharee(
   removesOverrides: boolean
 ): void {
   if (!share.sharedWithId || !ownerId || c.get('user').id === ownerId) return;
-  const held = getDb()
-    .select({ permission: rolePermissions.permission })
+  const held = appContext()
+    .db.select({ permission: rolePermissions.permission })
     .from(roleAssignments)
     .innerJoin(rolePermissions, eq(rolePermissions.roleId, roleAssignments.roleId))
     .where(
@@ -137,8 +136,8 @@ function refuseOverSharee(
     .all()
     .map((row) => row.permission);
   refuseUnheld([...new Set(held)], holdsOn(c, share.vehicleId));
-  const ownerSet = getDb()
-    .select({ id: roleAssignments.id })
+  const ownerSet = appContext()
+    .db.select({ id: roleAssignments.id })
     .from(roleAssignments)
     .where(
       and(
@@ -151,8 +150,8 @@ function refuseOverSharee(
     .get();
   if (ownerSet) throw new ForbiddenError('Only the owner can change what the owner set');
   if (!removesOverrides) return;
-  const overrides = getDb()
-    .select({ permission: permissionOverrides.permission, setBy: permissionOverrides.setBy })
+  const overrides = appContext()
+    .db.select({ permission: permissionOverrides.permission, setBy: permissionOverrides.setBy })
     .from(permissionOverrides)
     .where(
       and(
@@ -178,8 +177,8 @@ routes.post('/', zValidator('json', inviteSchema), authorize(fromInviteVehicle),
 
   const vehicle = await repos().vehicles.findById(vehicleId);
   if (!vehicle) throw new NotFoundError('Vehicle');
-  const owner = getDb()
-    .select({ email: users.email })
+  const owner = appContext()
+    .db.select({ email: users.email })
     .from(users)
     .where(eq(users.id, vehicle.userId))
     .get();
@@ -192,7 +191,7 @@ routes.post('/', zValidator('json', inviteSchema), authorize(fromInviteVehicle),
   }
   refuseUnheldLevel(c, vehicleId, level);
 
-  const inviteeId = await findInviteeId(getDb(), email);
+  const inviteeId = await findInviteeId(appContext().db, email);
 
   const alreadyShared = new ConflictError('This vehicle is already shared with that email');
   if (await repos().vehicleShares.findActiveInvite(vehicleId, email, inviteeId)) {

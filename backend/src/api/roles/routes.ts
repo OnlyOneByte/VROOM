@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
-import { getDb } from '../../db/connection';
+import { appContext } from '../../app-context';
 import {
   permissionOverrides,
   type Role,
@@ -61,13 +61,13 @@ const overrideResource: ResourceOf = async (c) => {
 };
 
 function writeAt<T>(scope: RoleScope, change: (tx: DrizzleTransaction) => T): T {
-  const db = getDb();
+  const db = appContext().db;
   return scope === 'server' ? keepingARoleManager(db, change) : db.transaction(change);
 }
 
 function permissionsOf(roleId: string): string[] {
-  return getDb()
-    .select({ permission: rolePermissions.permission })
+  return appContext()
+    .db.select({ permission: rolePermissions.permission })
     .from(rolePermissions)
     .where(eq(rolePermissions.roleId, roleId))
     .all()
@@ -80,7 +80,7 @@ function roleView(role: Role) {
 }
 
 function findRole(id: string): Role {
-  const role = getDb().select().from(roles).where(eq(roles.id, id)).get();
+  const role = appContext().db.select().from(roles).where(eq(roles.id, id)).get();
   if (!role) throw new NotFoundError('Role');
   return role;
 }
@@ -92,7 +92,7 @@ interface Authority {
 }
 
 function authorityAt(c: Context, scope: RoleScope, scopeId: string | null | undefined): Authority {
-  const resolver = requestResolver(c, getDb());
+  const resolver = requestResolver(c, appContext().db);
   if (scope === 'server') {
     if (scopeId) throw new ValidationError('A server role or override takes no scopeId');
     enforce(resolver.can(ROLE_MANAGE_PERMISSION, SERVER), 'Role');
@@ -101,8 +101,8 @@ function authorityAt(c: Context, scope: RoleScope, scopeId: string | null | unde
   if (!scopeId) throw new ValidationError('A vehicle role or override needs the vehicle id');
   const vehicle: Resource = { kind: 'vehicle', vehicleId: scopeId };
   enforce(resolver.can('vehicle.share.manage', vehicle), 'Vehicle');
-  const owner = getDb()
-    .select({ id: vehicles.userId })
+  const owner = appContext()
+    .db.select({ id: vehicles.userId })
     .from(vehicles)
     .where(eq(vehicles.id, scopeId))
     .get();
@@ -121,22 +121,27 @@ function refuseOverOwner(c: Context, authority: Authority, setBy: string | null 
 
 function requireTarget(authority: Authority, userId: string): void {
   if (authority.scopeId) {
-    if (!isVehicleMember(getDb(), authority.scopeId, userId)) throw new NotFoundError('Member');
+    if (!isVehicleMember(appContext().db, authority.scopeId, userId))
+      throw new NotFoundError('Member');
     return;
   }
-  const user = getDb().select({ id: users.id }).from(users).where(eq(users.id, userId)).get();
+  const user = appContext()
+    .db.select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, userId))
+    .get();
   if (!user) throw new NotFoundError('User');
 }
 
 function requireRoleManager(c: Context): null {
-  enforce(requestResolver(c, getDb()).can(ROLE_MANAGE_PERMISSION, SERVER), 'Role');
+  enforce(requestResolver(c, appContext().db).can(ROLE_MANAGE_PERMISSION, SERVER), 'Role');
   return null;
 }
 
 function requireLibrary(c: Context): string {
   const userId = c.get('user').id;
   enforce(
-    requestResolver(c, getDb()).can('account.roles.manage', { kind: 'account', userId }),
+    requestResolver(c, appContext().db).can('account.roles.manage', { kind: 'account', userId }),
     'Role'
   );
   return userId;
@@ -168,7 +173,7 @@ function visibleRoles(c: Context, scope: RoleScope) {
 
 function holdsForRole(c: Context, scope: RoleScope): (permission: string) => boolean {
   if (scope === 'vehicle') return () => true;
-  const resolver = requestResolver(c, getDb());
+  const resolver = requestResolver(c, appContext().db);
   return (p) => resolver.can(p, SERVER).allow;
 }
 
@@ -197,8 +202,8 @@ roleRoutes.use('*', changeTracker);
 
 roleRoutes.get('/', zValidator('query', z.object({ scope: z.enum(SCOPES) })), (c) => {
   const { scope } = c.req.valid('query');
-  const rows = getDb()
-    .select()
+  const rows = appContext()
+    .db.select()
     .from(roles)
     .where(visibleRoles(c, scope))
     .orderBy(roles.createdAt)
@@ -219,7 +224,7 @@ roleRoutes.post('/', zValidator('json', createRoleSchema), (c) => {
   ];
   refuseUngrantable(scope, permissions);
   refuseUnheld(permissions, holdsForRole(c, scope));
-  const role = getDb().transaction((tx) => {
+  const role = appContext().db.transaction((tx) => {
     const created = tx
       .insert(roles)
       .values({ scope, name, color: color ?? null, ownerUserId })
@@ -241,8 +246,8 @@ roleRoutes.patch(
   zValidator('json', updateRoleSchema),
   (c) => {
     const role = roleFor(c, c.req.valid('param').id, true);
-    const updated = getDb()
-      .update(roles)
+    const updated = appContext()
+      .db.update(roles)
       .set({ ...c.req.valid('json'), updatedAt: new Date() })
       .where(eq(roles.id, role.id))
       .returning()
@@ -323,8 +328,8 @@ assignmentRoutes.post(
     refuseDemoRole(findRole(input.roleId));
     const { role, scopeId } = assignable(c, input);
     try {
-      const created = getDb()
-        .insert(roleAssignments)
+      const created = appContext()
+        .db.insert(roleAssignments)
         .values({ userId: input.userId, roleId: role.id, scopeId, grantedBy: c.get('user').id })
         .returning()
         .get();
@@ -348,7 +353,7 @@ assignmentRoutes.delete(
       eq(roleAssignments.roleId, role.id),
       scopeId ? eq(roleAssignments.scopeId, scopeId) : isNull(roleAssignments.scopeId)
     );
-    const existing = getDb().select().from(roleAssignments).where(where).get();
+    const existing = appContext().db.select().from(roleAssignments).where(where).get();
     if (!existing) throw new NotFoundError('Role assignment');
     refuseOverOwner(c, authority, existing.grantedBy);
     writeAt(role.scope, (tx) => tx.delete(roleAssignments).where(where).run());
@@ -377,8 +382,8 @@ overrideRoutes.use('*', changeTracker);
 overrideRoutes.get('/', zValidator('query', overrideTargetSchema), (c) => {
   const { userId, scope, scopeId } = c.req.valid('query');
   if (userId !== c.get('user').id) requireTarget(authorityAt(c, scope, scopeId), userId);
-  const rows = getDb()
-    .select()
+  const rows = appContext()
+    .db.select()
     .from(permissionOverrides)
     .where(overrideWhere(scope, userId, scope === 'server' ? null : (scopeId ?? null)))
     .all();
@@ -408,7 +413,7 @@ overrideRoutes.put(
     refuseOverOwner(
       c,
       authority,
-      getDb().select().from(permissionOverrides).where(where).get()?.setBy
+      appContext().db.select().from(permissionOverrides).where(where).get()?.setBy
     );
     const saved = writeAt(scope, (tx) => {
       tx.delete(permissionOverrides).where(where).run();
@@ -441,7 +446,7 @@ overrideRoutes.delete(
       overrideWhere(scope, userId, authority.scopeId),
       eq(permissionOverrides.permission, permission)
     );
-    const existing = getDb().select().from(permissionOverrides).where(where).get();
+    const existing = appContext().db.select().from(permissionOverrides).where(where).get();
     if (!existing) throw new NotFoundError('Override');
     refuseOverOwner(c, authority, existing.setBy);
     writeAt(scope, (tx) => tx.delete(permissionOverrides).where(where).run());
@@ -452,10 +457,10 @@ overrideRoutes.delete(
 export function vehiclePeople(c: Context) {
   const vehicleId = c.req.param('id') ?? '';
   const vehicle: Resource = { kind: 'vehicle', vehicleId };
-  const caller = requestResolver(c, getDb());
+  const caller = requestResolver(c, appContext().db);
   enforce(caller.can('vehicle.share.read', vehicle), 'Vehicle');
   const detailed = caller.can('vehicle.share.manage', vehicle).allow;
-  const db = getDb();
+  const db = appContext().db;
   const owner = db
     .select({ id: vehicles.userId })
     .from(vehicles)
