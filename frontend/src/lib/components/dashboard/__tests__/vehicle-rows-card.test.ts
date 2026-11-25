@@ -12,19 +12,15 @@ const ROWS = [
 		id: 'v1',
 		name: 'Daily Driver',
 		detail: '2020 Toyota Camry · Financed',
-		isElectric: false,
 		spend: 500.79,
-		runningPerDistance: 0.13,
-		trend: [100, 120, 90, 300, 80, 110]
+		runningPerDistance: 0.13
 	},
 	{
 		id: 'v2',
 		name: 'Sparky',
 		detail: '2023 Tesla Model 3 · Shared by Sam',
-		isElectric: true,
 		spend: 20.26,
-		runningPerDistance: null,
-		trend: null
+		runningPerDistance: null
 	}
 ];
 
