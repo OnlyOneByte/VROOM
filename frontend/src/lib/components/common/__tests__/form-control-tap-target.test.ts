@@ -37,6 +37,15 @@ describe('form fields are the 46px C3 field at every width', () => {
 		const list = source('expenses/expenses-table/ExpensesCompactList.svelte');
 		expect(list.match(/class="h-10 px-2 text-xs sm:h-9"/g)).toHaveLength(2);
 		expect(list).toContain('<div class="ml-auto flex items-center gap-2">');
+		expect(source('expenses/expenses-table/ExpenseCategoryFilter.svelte')).toContain(
+			'data-[size=default]:h-10 sm:data-[size=default]:h-9'
+		);
+	});
+
+	test('the calendar link Copy button matches the 46px link field beside it', () => {
+		expect(source('settings/cards/CalendarFeedCard.svelte')).toMatch(
+			/<Button variant="outline" class="h-11\.5 shrink-0"/
+		);
 	});
 
 	test('the compact category filter carries no height that the select overrides', () => {
