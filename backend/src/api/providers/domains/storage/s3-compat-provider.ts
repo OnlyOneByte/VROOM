@@ -87,7 +87,7 @@ async function requestBody(body: unknown): Promise<RequestInit['body'] | undefin
   return body as RequestInit['body'];
 }
 
-export function s3RequestHandlerFor(policy?: PrivateEndpointPolicy) {
+export function s3RequestHandlerFor(policy: PrivateEndpointPolicy) {
   return {
     async handle(request: S3WireRequest, options?: { abortSignal?: unknown }) {
       const port = request.port ? `:${request.port}` : '';
@@ -117,14 +117,12 @@ export function s3RequestHandlerFor(policy?: PrivateEndpointPolicy) {
   } as unknown as S3ClientConfig['requestHandler'];
 }
 
-export const s3RequestHandler = s3RequestHandlerFor();
-
 export class S3CompatProvider implements StorageProvider {
   readonly type = 's3';
   private client: S3Client;
   private bucket: string;
 
-  constructor(credentials: S3Credentials, config: S3Config, outbound?: PrivateEndpointPolicy) {
+  constructor(credentials: S3Credentials, config: S3Config, outbound: PrivateEndpointPolicy) {
     this.bucket = config.bucket;
     this.client = new S3Client({
       endpoint: config.endpoint,
@@ -134,7 +132,7 @@ export class S3CompatProvider implements StorageProvider {
         secretAccessKey: credentials.secretAccessKey,
       },
       forcePathStyle: true,
-      requestHandler: outbound ? s3RequestHandlerFor(outbound) : s3RequestHandler,
+      requestHandler: s3RequestHandlerFor(outbound),
     });
   }
 

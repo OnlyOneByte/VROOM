@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import type { ModelProviderSettings } from '../../api/providers/domains/model/model-registry';
-import { outboundResolver, urlForAddress } from '../../utils/outbound-url';
+import { ALLOW_PRIVATE, outboundResolver, urlForAddress } from '../../utils/outbound-url';
 
 export interface ModelContractSubject<P> {
   create: (settings: ModelProviderSettings) => P;
@@ -69,6 +69,7 @@ export function describeModelContract<P>(name: string, subject: ModelContractSub
 
     const instance = () =>
       subject.create({
+        outbound: ALLOW_PRIVATE,
         apiKey: API_KEY,
         model: MODEL,
         baseUrl: `http://model.test:${server.port}`,
