@@ -42,6 +42,29 @@ describe('DatePicker id', () => {
 	});
 });
 
+describe('DatePicker in a narrow field', () => {
+	test('a short date stands in when the field is narrow, hidden from screen readers', () => {
+		render(DatePicker, { props: { value: '2026-11-25', id: 'trip-date' } });
+		const trigger = document.getElementById('trip-date');
+		const long = document.getElementById('trip-date-value');
+		const short = trigger?.querySelector('[aria-hidden="true"].truncate');
+
+		expect(long?.textContent?.trim()).toBe('November 25, 2026');
+		expect(long).toHaveClass('@max-[10rem]:hidden');
+		expect(short?.textContent?.trim()).toBe('Nov 25, 2026');
+		expect(short).toHaveClass('hidden', '@max-[10rem]:inline');
+		expect(trigger).toHaveClass('@container', 'min-w-0');
+		expect(screen.getByRole('button', { name: /November 25, 2026/ })).toBe(trigger);
+	});
+
+	test('a caller label shows as-is, with no short form and no size containment', () => {
+		render(DatePicker, { props: { value: '2026-11-25', id: 'trip-date', label: 'Today' } });
+		const trigger = document.getElementById('trip-date');
+		expect(trigger?.querySelector('[aria-hidden="true"].truncate')).toBeNull();
+		expect(trigger).not.toHaveClass('@container');
+	});
+});
+
 describe('DatePicker opening focus', () => {
 	test('opening the calendar focuses the selected day, not Previous month', async () => {
 		render(DatePicker, { props: { value: '2026-05-10' } });
