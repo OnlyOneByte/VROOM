@@ -4,20 +4,26 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(HERE, '..', '+page.svelte'), 'utf8');
+const ROW = readFileSync(
+	join(HERE, '..', '..', '..', 'lib', 'components', 'reminders', 'ReminderRow.svelte'),
+	'utf8'
+);
 
-describe('reminder card mobile stack (occlusion guard)', () => {
-	test('the card CardContent stacks flex-col on mobile, flex-row only at sm:', () => {
-		expect(SRC).toMatch(/CardContent[\s\S]{0,120}flex flex-col/);
-		expect(SRC).toMatch(/sm:flex-row/);
-		expect(SRC).toMatch(/sm:justify-between/);
+describe('reminder row mobile layout (occlusion guard)', () => {
+	test('the text column shrinks and truncates instead of being pushed under the actions', () => {
+		expect(ROW).toMatch(/class="min-w-0 flex-1"/);
+		expect(ROW).toMatch(/class="truncate font-semibold"/);
 	});
 
-	test('does NOT use an unconditional single-row justify-between on the card (the occluding layout)', () => {
-		expect(SRC).not.toMatch(/CardContent class="flex items-start justify-between/);
+	test('the status column and the menu button never shrink', () => {
+		expect(ROW).toMatch(/class="flex shrink-0 flex-col items-end"/);
+		expect(ROW).toMatch(/aria-label="More actions for \{reminder\.name\}"/);
 	});
 
-	test('the action cluster wraps on mobile (flex-wrap), nowrap only at sm:', () => {
-		expect(SRC).toMatch(/flex-wrap sm:flex-nowrap/);
+	test('Edit, Pause and Delete live in the menu, not as inline buttons', () => {
+		const menu = ROW.slice(ROW.indexOf('<Popover.Content'));
+		expect(menu).toContain('Edit');
+		expect(menu).toContain('Pause');
+		expect(menu).toContain('Delete');
 	});
 });
