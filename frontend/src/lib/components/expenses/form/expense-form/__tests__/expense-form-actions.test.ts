@@ -416,7 +416,7 @@ describe('submitExpense — offline and failure queuing', () => {
 });
 
 describe('deleteExpense', () => {
-	const loaded = makeExpense({ id: 'e1' });
+	const loaded = makeExpense('e1');
 
 	test('does nothing without an expense id', async () => {
 		const state = createState();
