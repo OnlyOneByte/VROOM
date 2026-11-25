@@ -727,7 +727,7 @@
 		<div class="flex items-center gap-3">
 			<Skeleton class="h-10 w-10 shrink-0 rounded-md" />
 			<div class="min-w-0">
-				<div class="flex h-9 flex-col justify-center gap-1 max-sm:short:h-[4.5rem]">
+				<div class="flex h-9 flex-col justify-center gap-1 lg:h-12 max-sm:short:h-[4.5rem]">
 					<Skeleton class="h-8 w-48" />
 					<Skeleton class="hidden h-8 w-24 max-sm:short:block" />
 				</div>
@@ -742,7 +742,6 @@
 			summary={null}
 			distance={null}
 			distanceUnit={settingsStore.unitPreferences.distanceUnit}
-			vehicleType="gas"
 		/>
 		<div class="divide-y rounded-xl border bg-card">
 			{#each Array(3) as _, i (i)}
@@ -901,7 +900,7 @@
 							distanceError={vehicleStatsData === null ? statsError : null}
 							onRetryDistance={loadVehicleStats}
 							{distanceUnit}
-							vehicleType={vehicle.vehicleType}
+							name={vehicleDisplayName}
 							logMileageHref={canWrite
 								? resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })
 								: undefined}
