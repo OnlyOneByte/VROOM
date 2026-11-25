@@ -3,7 +3,10 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ReminderWithVehicles } from '#lib/types/index.ts';
 import ReminderRow from '../ReminderRow.svelte';
 
-const NOW = Date.parse('2026-11-25T12:00:00.000Z');
+// Local times, like the reminder form's local-noon due dates, so the day counts hold in any zone.
+const localNoon = (year: number, month: number, day: number) =>
+	new Date(year, month - 1, day, 12).toISOString();
+const NOW = new Date(2026, 10, 25, 9).getTime();
 
 function item(overrides: Partial<ReminderWithVehicles['reminder']> = {}, vehicleIds = ['v1']) {
 	return {
@@ -16,7 +19,7 @@ function item(overrides: Partial<ReminderWithVehicles['reminder']> = {}, vehicle
 			frequency: 'monthly',
 			intervalValue: null,
 			intervalUnit: null,
-			nextDueDate: '2026-12-03T12:00:00.000Z',
+			nextDueDate: localNoon(2026, 12, 3),
 			nextDueOdometer: null,
 			expenseAmount: null,
 			description: null,
@@ -47,21 +50,33 @@ function renderRow(row: ReminderWithVehicles, group: 'due' | 'upcoming' | 'pause
 	return handlers;
 }
 
+const rowText = () =>
+	screen.getByTestId('reminder-card-r1').textContent?.replace(/\u00a0/g, ' ') ?? '';
+
 afterEach(cleanup);
 
 describe('ReminderRow status', () => {
 	test('a due reminder says Due now', () => {
-		renderRow(item({ nextDueDate: '2026-11-20T12:00:00.000Z' }), 'due');
+		renderRow(item({ nextDueDate: localNoon(2026, 11, 20) }), 'due');
 		expect(screen.getByText('Due now')).toHaveClass('text-warning');
 	});
 
-	test('an upcoming date counts the days left, in the warning colour within 30 days', () => {
+	test('in the morning, an upcoming date counts calendar days, in the warning colour within 30 days', () => {
 		renderRow(item(), 'upcoming');
 		expect(screen.getByText('In 8 days')).toHaveClass('text-warning');
 	});
 
+	test('a reminder due at noon today reads Today in the morning, and tomorrow’s reads Tomorrow', () => {
+		renderRow(item({ nextDueDate: localNoon(2026, 11, 25) }), 'upcoming');
+		expect(screen.getByText('Today')).toBeInTheDocument();
+		cleanup();
+
+		renderRow(item({ nextDueDate: localNoon(2026, 11, 26) }), 'upcoming');
+		expect(screen.getByText('Tomorrow')).toBeInTheDocument();
+	});
+
 	test('a date further out than 30 days is muted', () => {
-		renderRow(item({ nextDueDate: '2027-02-01T12:00:00.000Z' }), 'upcoming');
+		renderRow(item({ nextDueDate: localNoon(2027, 2, 1) }), 'upcoming');
 		expect(screen.getByText('In 68 days')).toHaveClass('text-muted-foreground');
 	});
 
@@ -72,7 +87,7 @@ describe('ReminderRow status', () => {
 		);
 		expect(screen.getByText('At 40,000')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Mark serviced' })).toBeInTheDocument();
-		expect(screen.getByTestId('reminder-card-r1').textContent).not.toContain('on the odometer');
+		expect(rowText()).not.toContain('on the odometer');
 	});
 
 	test('a paused reminder with a vehicle offers Resume; one without a vehicle explains why not', () => {
@@ -88,7 +103,8 @@ describe('ReminderRow status', () => {
 
 	test('the meta line joins the vehicle, the date, the amount and the frequency', () => {
 		renderRow(item({ type: 'expense', expenseAmount: 312 }), 'upcoming');
-		expect(screen.getByTestId('reminder-card-r1').textContent).toContain('Daily Driver · ');
-		expect(screen.getByTestId('reminder-card-r1').textContent).toContain('~$312.00 · monthly');
+		expect(rowText()).toContain('Daily Driver · ');
+		expect(rowText()).toContain('~$312.00 · monthly');
+		expect(screen.getByTestId('reminder-card-r1').textContent).toContain('Dec\u00a03,\u00a02026');
 	});
 });

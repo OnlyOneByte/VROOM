@@ -324,7 +324,7 @@
 			<section class="border-t border-border pt-4" aria-labelledby="reminders-how">
 				<h2 id="reminders-how" class="text-base font-semibold">How reminders work</h2>
 				<p class="mt-2 text-sm text-muted-foreground">
-					A reminder can fire on a date, on miles driven, or both. An expense reminder adds the
+					A reminder can fire on a date, on distance driven, or both. An expense reminder adds the
 					expense for you, like a monthly loan payment; a notification only tells you.
 				</p>
 			</section>

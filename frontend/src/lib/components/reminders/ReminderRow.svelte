@@ -44,10 +44,16 @@
 	let reminder = $derived(item.reminder);
 	let vehicleIds = $derived(item.vehicleIds ?? []);
 	let mileage = $derived(isMileageTracking(reminder));
+	function localMidnight(at: number | string): number {
+		const day = new Date(at);
+		return new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+	}
+
+	// Calendar days in the user's zone, so a reminder due later today reads Today, not Tomorrow.
 	let daysLeft = $derived(
 		reminder.nextDueDate === null
 			? null
-			: Math.ceil((new Date(reminder.nextDueDate).getTime() - now) / DAY_MS)
+			: Math.round((localMidnight(reminder.nextDueDate) - localMidnight(now)) / DAY_MS)
 	);
 
 	let status = $derived.by((): { text: string; tone: 'warning' | 'muted' } => {
@@ -77,7 +83,7 @@
 		if (reminder.expenseAmount != null) parts.push(`~${formatCurrency(reminder.expenseAmount)}`);
 		const every = frequencyLabel(reminder);
 		if (every) parts.push(every.toLowerCase());
-		return parts.join(' · ');
+		return parts.map(part => part.replaceAll(' ', '\u00a0')).join(' · ');
 	});
 
 	let canResume = $derived(group === 'paused' && vehicleIds.length > 0);
@@ -108,7 +114,7 @@
 
 	<div class="min-w-0 flex-1">
 		<p class="truncate font-semibold">{reminder.name}</p>
-		{#if meta}
+		{#if meta.length > 0}
 			<p class="text-sm text-muted-foreground">{meta}</p>
 		{/if}
 		{#if vehicleIds.length === 0 && group === 'paused'}
