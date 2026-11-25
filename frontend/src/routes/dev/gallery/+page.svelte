@@ -15,6 +15,9 @@
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.ts';
+	import { Switch } from '#lib/components/ui/switch/index.ts';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
 	import { AppLineChart } from '#lib/components/charts/index.ts';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
@@ -22,6 +25,7 @@
 
 	const buttonVariants = [
 		'default',
+		'accent',
 		'destructive',
 		'outline',
 		'secondary',
@@ -29,7 +33,16 @@
 		'link'
 	] as const;
 	const buttonSizes = ['default', 'sm', 'lg'] as const;
-	const badgeVariants = ['default', 'secondary', 'destructive', 'outline'] as const;
+	const badgeVariants = [
+		'default',
+		'secondary',
+		'destructive',
+		'outline',
+		'due',
+		'soon',
+		'ok',
+		'info'
+	] as const;
 	const alertVariants = ['default', 'destructive', 'warning', 'success'] as const;
 
 	const trend = [
@@ -114,6 +127,32 @@
 					<Button size={s}>size: {s}</Button>
 				{/each}
 				<Button disabled>disabled</Button>
+				<Button variant="ghost" size="icon" aria-label="Add"><Plus /></Button>
+			</div>
+		</section>
+
+		<section class="space-y-3">
+			<h2 class="text-lg font-semibold">Controls</h2>
+			<div class="flex flex-wrap items-center gap-6">
+				<label class="flex min-h-10 items-center gap-3 text-sm">
+					<Switch checked aria-label="Backups on" />
+					On
+				</label>
+				<label class="flex min-h-10 items-center gap-3 text-sm">
+					<Switch aria-label="Backups off" />
+					Off
+				</label>
+				<label class="flex min-h-10 items-center gap-3 text-sm">
+					<Checkbox checked aria-label="Missed fill-up" />
+					Missed the previous fill-up
+				</label>
+				<Select.Root type="single" value="daily">
+					<Select.Trigger class="w-48" aria-label="Vehicle">Daily Driver</Select.Trigger>
+					<Select.Content>
+						<Select.Item value="daily" label="Daily Driver" />
+						<Select.Item value="weekend" label="Weekend Car" />
+					</Select.Content>
+				</Select.Root>
 			</div>
 		</section>
 

@@ -46,8 +46,6 @@ ratchet({
 	name: 'no theme-clashing hardcoded colors in components',
 	kind: 'exclusion',
 	tolerated: [
-		'lib/components/ui/button/button.svelte',
-		'lib/components/ui/badge/badge.svelte',
 		'lib/components/ui/dialog/dialog-overlay.svelte',
 		'lib/components/ui/alert-dialog/alert-dialog-overlay.svelte',
 		'lib/components/ui/sheet/sheet-overlay.svelte'
