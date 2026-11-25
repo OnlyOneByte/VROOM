@@ -71,7 +71,7 @@
 						<div class="flex shrink-0 items-center gap-2">
 							<Button
 								size="sm"
-								class="h-10 sm:h-8"
+								class="h-10"
 								onclick={() => accept(share)}
 								disabled={acting === share.id}
 								aria-label="Accept access to {share.vehicleName}"
@@ -82,7 +82,7 @@
 							<Button
 								size="sm"
 								variant="outline"
-								class="h-10 sm:h-8"
+								class="h-10"
 								onclick={() => decline(share)}
 								disabled={acting === share.id}
 								aria-label="Decline the invitation to {share.vehicleName}"

@@ -232,7 +232,7 @@
 				Claims
 			</svelte:element>
 			{#if !readOnly && !compact}
-				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={openNew}>
+				<Button variant="outline" size="sm" class="h-10" onclick={openNew}>
 					<Plus />
 					File Claim
 				</Button>
@@ -297,7 +297,7 @@
 										<Button
 											variant="ghost"
 											size="icon"
-											class="size-10 sm:size-9"
+											class="size-10"
 											aria-label="Claim documents"
 											aria-expanded={expandedDocs.has(claim.id)}
 											onclick={() => toggleDocs(claim.id)}
@@ -307,7 +307,7 @@
 										<Button
 											variant="ghost"
 											size="icon"
-											class="size-10 sm:size-9"
+											class="size-10"
 											aria-label="Edit claim"
 											onclick={() => openEdit(claim)}
 										>
@@ -316,7 +316,7 @@
 										<Button
 											variant="ghost"
 											size="icon"
-											class="size-10 sm:size-9"
+											class="size-10"
 											aria-label="Delete claim"
 											onclick={() => requestDelete(claim.id)}
 										>

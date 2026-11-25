@@ -146,7 +146,7 @@
 								</Button>
 								<Button
 									variant="outline"
-									class="h-10 sm:h-9"
+									class="h-10"
 									data-approve
 									aria-busy={busyId === account.id}
 									disabled={busyId !== null && busyId !== account.id}

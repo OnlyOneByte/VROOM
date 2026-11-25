@@ -119,7 +119,7 @@
 					<Button
 						variant="ghost"
 						size="icon"
-						class="size-10 sm:size-9"
+						class="size-10"
 						onclick={() => onEdit(policy)}
 						title="Policy settings"
 						aria-label="Policy settings"
@@ -147,7 +147,7 @@
 				<Button
 					variant="ghost"
 					size="sm"
-					class="h-10 sm:h-8 text-muted-foreground"
+					class="h-10 text-muted-foreground"
 					aria-expanded={expanded}
 					onclick={() => (expanded = !expanded)}
 				>
@@ -194,7 +194,7 @@
 						<Button
 							variant="outline"
 							size="sm"
-							class="h-10 sm:h-8"
+							class="h-10"
 							onclick={() => (uploadOpen = true)}
 						>
 							<Upload />
@@ -203,14 +203,14 @@
 						<Button
 							variant="outline"
 							size="sm"
-							class="h-10 sm:h-8"
+							class="h-10"
 							onclick={() => (claimFormOpen = true)}
 						>
 							<Plus />
 							File Claim
 						</Button>
 						{#if latestTerm}
-							<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={handleRenew}>
+							<Button variant="outline" size="sm" class="h-10" onclick={handleRenew}>
 								<RefreshCw />
 								Renew
 							</Button>

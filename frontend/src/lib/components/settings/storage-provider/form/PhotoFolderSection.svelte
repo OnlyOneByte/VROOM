@@ -134,7 +134,7 @@
 							{/if}
 						</div>
 						<div
-							class="flex items-center h-10 sm:h-8 min-w-0 basis-full sm:basis-0 rounded-md border border-input bg-background text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 flex-1 {!setting?.enabled
+							class="flex items-center h-10 min-w-0 basis-full sm:basis-0 rounded-md border border-input bg-background text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 flex-1 {!setting?.enabled
 								? 'opacity-50'
 								: ''}"
 						>

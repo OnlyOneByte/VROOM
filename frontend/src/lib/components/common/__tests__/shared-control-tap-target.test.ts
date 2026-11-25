@@ -8,7 +8,8 @@ import PaginationControls from '../pagination-controls.svelte';
 
 const COMPONENTS = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CAROUSEL_ARROW_TAG = /<Carousel\.(?:Previous|Next)\b[^>]*>/g;
-const SMALL_SIZE = /(?:^|[\s"'])(?:size|h|w)-[1-9](?=[\s"'])|\bsize="(?:icon|icon-sm|sm|default)"/;
+const BREAKPOINT_SHRINK = /\b(h|size)-1\d (?:sm|md):\1-[1-9]\b/;
+const SMALL_SIZE =/(?:^|[\s"'])(?:size|h|w)-[1-9](?=[\s"'])|\bsize="(?:icon|icon-sm|sm|default)"/;
 
 describe('shared controls meet the 40px tap target', () => {
 	test('pagination Previous and Next are 40px tall', () => {
@@ -37,6 +38,23 @@ describe('shared controls meet the 40px tap target', () => {
 		const source = readFileSync(join(COMPONENTS, `ui/carousel/carousel-${arrow}.svelte`), 'utf8');
 		expect(source).toMatch(/\bsize\s*=\s*'icon-lg'/);
 		expect(source).toMatch(/'absolute\b[^']*\bsize-10\b/);
+	});
+
+	test.each([
+		['class="h-10 sm:h-8"', true],
+		['class="size-10 sm:size-9"', true],
+		['class="h-10 md:h-9"', true],
+		['class="h-10 sm:w-auto"', false],
+		['class="h-12 sm:h-10"', false]
+	])('the breakpoint-shrink check flags %s: %s', (attrs, flagged) => {
+		expect(BREAKPOINT_SHRINK.test(attrs)).toBe(flagged);
+	});
+
+	test('no control drops below 40px at a wider breakpoint', () => {
+		const offenders = collectSvelteFiles(join(COMPONENTS, '..', '..')).filter(file =>
+			BREAKPOINT_SHRINK.test(readFileSync(file, 'utf8'))
+		);
+		expect(offenders).toEqual([]);
 	});
 
 	test('no page shrinks a carousel arrow below 40px', () => {

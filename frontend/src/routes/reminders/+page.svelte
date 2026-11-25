@@ -344,7 +344,7 @@
 					<Button
 						variant="ghost"
 						size="sm"
-						class="ml-auto h-10 sm:h-8"
+						class="ml-auto h-10"
 						onclick={markAllNotificationsRead}
 					>
 						<Check class="mr-2 h-4 w-4" />

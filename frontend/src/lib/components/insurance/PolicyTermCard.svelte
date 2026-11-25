@@ -40,7 +40,7 @@
 								{...props}
 								variant="ghost"
 								size="icon"
-								class="size-10 sm:size-9"
+								class="size-10"
 								title="Term actions"
 								aria-label="Term actions"
 							>

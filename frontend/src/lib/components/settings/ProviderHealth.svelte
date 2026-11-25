@@ -126,7 +126,7 @@
 				<p>{problem.detail}</p>
 				<div class="mt-2 flex flex-wrap gap-2">
 					<Button
-						class="h-10 sm:h-9"
+						class="h-10"
 						onclick={() =>
 							onFix(provider, provider.status === 'needs_reauth' ? 'reconnect' : 'edit')}
 					>

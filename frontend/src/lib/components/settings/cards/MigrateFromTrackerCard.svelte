@@ -106,7 +106,7 @@
 		{:else if loadError}
 			<div class="space-y-3" data-testid="migrate-error">
 				<p class="text-sm text-destructive" role="alert">{loadError}</p>
-				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={retryVehicles}>
+				<Button variant="outline" size="sm" class="h-10" onclick={retryVehicles}>
 					Retry
 				</Button>
 			</div>
@@ -118,7 +118,7 @@
 			<div data-testid="migrate-card">
 				<Button
 					variant="outline"
-					class="h-10 sm:h-9"
+					class="h-10"
 					onclick={openDialog}
 					data-testid="migrate-open"
 				>

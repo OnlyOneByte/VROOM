@@ -119,7 +119,7 @@
 				Documents
 			</svelte:element>
 			{#if !readOnly}
-				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={() => (uploadOpen = true)}>
+				<Button variant="outline" size="sm" class="h-10" onclick={() => (uploadOpen = true)}>
 					<Upload />
 					Upload
 				</Button>

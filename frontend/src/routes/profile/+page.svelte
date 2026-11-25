@@ -440,7 +440,7 @@
 					<Button
 						variant="outline"
 						size="sm"
-						class="h-10 sm:h-8"
+						class="h-10"
 						onclick={handleExportData}
 						disabled={isExporting}
 					>
