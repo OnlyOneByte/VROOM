@@ -55,6 +55,24 @@ describe('sonner toasts in app.css', () => {
 		expect(rule?.body).toMatch(/--toast-glyph:\s*oklch\(/);
 	});
 
+	test('title and action weights are important, so they beat sonner’s unlayered defaults', () => {
+		const title = toastRules.find(r => r.selectors.includes('[data-sonner-toast] [data-title]'));
+		const action = toastRules.find(
+			r => r.selectors.includes('[data-sonner-toast] [data-button]') && /font-weight/.test(r.body)
+		);
+		expect(title?.body).toMatch(/font-weight:\s*650\s*!important/);
+		expect(action?.body).toMatch(/font-weight:\s*650\s*!important/);
+		expect(action?.body).toMatch(/font-size:\s*0\.875rem\s*!important/);
+	});
+
+	test('the action and close button show a light focus ring on the charcoal card', () => {
+		const focus = toastRules.find(r =>
+			r.selectors.includes('[data-sonner-toast] [data-button]:focus-visible')
+		);
+		expect(focus?.selectors).toContain('[data-sonner-toast] [data-close-button]:focus-visible');
+		expect(focus?.body).toMatch(/outline:\s*2px solid var\(--bar-on\)/);
+	});
+
 	test('the toast keeps the C3 radius and the single pop shadow, with no border', () => {
 		const base = toastRules.find(r => r.selectors.includes('[data-sonner-toast]'));
 		expect(base?.body).toMatch(/border-radius:\s*var\(--r-lg\)/);

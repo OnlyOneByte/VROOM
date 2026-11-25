@@ -227,13 +227,25 @@
 
 	[data-sonner-toast] [data-description] {
 		color: var(--bar-fg) !important;
-		font-size: 0.84375rem;
+		font-size: 0.84375rem !important;
+	}
+
+	[data-sonner-toast] [data-content] {
+		padding-right: 1.5rem;
 	}
 
 	[data-sonner-toast] [data-button] {
 		background: transparent !important;
 		color: oklch(0.82 0.15 72) !important;
-		font-weight: 650;
+		font-size: 0.875rem !important;
+		font-weight: 650 !important;
+		margin-right: 1.5rem !important;
+	}
+
+	[data-sonner-toast] [data-button]:focus-visible,
+	[data-sonner-toast] [data-close-button]:focus-visible {
+		outline: 2px solid var(--bar-on) !important;
+		outline-offset: 2px;
 	}
 
 	[data-sonner-toast] [data-close-button] {
@@ -245,8 +257,8 @@
 	}
 
 	[data-sonner-toast] [data-title] {
-		font-size: 0.9375rem;
-		font-weight: 650;
+		font-size: 0.9375rem !important;
+		font-weight: 650 !important;
 		line-height: 1.25rem;
 	}
 
