@@ -54,7 +54,8 @@
 			useFor: 'receipt scanning',
 			useForTitle: 'Receipt Scanning',
 			loadError: "Couldn't load your receipt-scanning providers.",
-			capability: 'ai.vision'
+			capability: 'ai.vision',
+			anchor: 'receipt-scanning'
 		},
 		llm: {
 			icon: Bot,
@@ -71,7 +72,8 @@
 			useFor: 'the assistant',
 			useForTitle: 'the Assistant',
 			loadError: "Couldn't load your assistant providers.",
-			capability: 'ai.llm'
+			capability: 'ai.llm',
+			anchor: 'assistant-providers'
 		}
 	} as const;
 
@@ -290,7 +292,7 @@
 	{/if}
 {/snippet}
 
-<Card>
+<Card id={copy.anchor}>
 	<CardHeader>
 		<div class="flex items-center gap-2">
 			<Icon class="h-5 w-5 text-muted-foreground" />
