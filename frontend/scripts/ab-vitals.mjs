@@ -7,7 +7,9 @@ const pairs = Number(process.env.AB_PAIRS ?? 5);
 const latency = Number(process.env.AB_LATENCY ?? 0);
 const session = process.env.VITALS_SESSION;
 const vid = process.env.VITALS_VEHICLE_ID;
-const servers = { A: 4173, B: 4174, C: 4175 };
+const servers = Object.fromEntries(
+	(process.env.AB_SERVERS ?? 'A:4173,B:4174,C:4175').split(',').map(s => [s.split(':')[0], Number(s.split(':')[1])])
+);
 const variants = Object.keys(servers);
 
 function observe() {
@@ -112,10 +114,10 @@ const cases = [
 
 const median = a => a.toSorted((x, y) => x - y)[Math.floor(a.length / 2)];
 const lines = [
-	`A/B/C, ${pairs} interleaved rounds per case, 375×812, 4× CPU, ${latency} ms added latency, service worker blocked. A = main, B = modulePreload false, C = preload only for route navigation. Medians in ms; navigation and tab times run from the click to the last network response.`,
+	`${variants.join('/')}, ${pairs} interleaved rounds per case, 375×812, 4× CPU, ${latency} ms added latency, service worker blocked. ${process.env.AB_LABEL ?? ''} Medians in ms; navigation and tab times run from the click to the last network response.`,
 	'',
-	'| Case | Metric | A | B | C |',
-	'|---|---|---|---|---|'
+	`| Case | Metric | ${variants.join(' | ')} |`,
+	`|---|---|${variants.map(() => '---').join('|')}|`
 ];
 const raw = {};
 for (const [name, run, metrics] of cases) {
