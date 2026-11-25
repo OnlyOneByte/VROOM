@@ -56,6 +56,12 @@
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import ExpenseTagFilter from '#lib/components/expenses/ExpenseTagFilter.svelte';
 	import OfflineExpenseCards from '#lib/components/expenses/OfflineExpenseCards.svelte';
+	import {
+		matchesFilters,
+		withPendingByMonth,
+		withPendingInSummary
+	} from '#lib/utils/sync/pending-rows.ts';
+	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import ExpenseOverviewSection from '#lib/components/expenses/ExpenseOverviewSection.svelte';
 	import ImportExpensesDialog from '#lib/components/expenses/ImportExpensesDialog.svelte';
 	import ImportFromPhotosDialog from '#lib/components/expenses/ImportFromPhotosDialog.svelte';
@@ -103,7 +109,7 @@
 
 	let categoryFilter = $state<string>(urlFilters.category ?? '');
 
-	let pendingExpenses = $derived(
+	let queuedExpenses = $derived(
 		offlineExpenseQueue.current.filter(expense => !expense.synced && !expense.needsAttention)
 	);
 	let needsAttentionExpenses = $derived(
@@ -113,16 +119,33 @@
 
 	let allTags = $derived(extractUniqueTags(expenses));
 
+	const pending = usePendingRows({
+		match: expense => !selectedVehicleId || expense.vehicleId === selectedVehicleId,
+		refresh: () => fetchPageAndSummary(currentOffset, { keepMonthTotals: true }),
+		listedIds: () => listedExpenseIds
+	});
+	let listedExpenseIds = $derived(new Set(expenses.map(expense => expense.id)));
+	let pendingFilters = $derived({
+		vehicleId: selectedVehicleId,
+		categories: expenseCategoryList(categoryFilter),
+		startDate,
+		endDate,
+		search: searchTerm,
+		tags: selectedTags
+	});
+	let pendingMatching = $derived(pending.rows.filter(row => matchesFilters(row, pendingFilters)));
+	let pendingListRows = $derived(currentOffset === 0 ? pendingMatching : []);
+	let shownSummary = $derived(withPendingInSummary(summary, pending.saving));
 	const statCards = $derived([
 		{
 			label: EXPENSE_MESSAGES.TOTAL_EXPENSES,
-			value: formatCurrency(summary?.totalAmount ?? 0),
+			value: formatCurrency(shownSummary?.totalAmount ?? 0),
 			icon: DollarSign,
 			iconColor: 'primary'
 		},
 		{
 			label: EXPENSE_MESSAGES.TOTAL_COUNT,
-			value: (summary?.expenseCount ?? 0).toString(),
+			value: (shownSummary?.expenseCount ?? 0).toString(),
 			icon: FileText,
 			iconColor: 'chart-1'
 		},
@@ -134,7 +157,7 @@
 		},
 		{
 			label: EXPENSE_MESSAGES.LAST_30_DAYS,
-			value: formatCurrency(summary?.recentAmount ?? 0),
+			value: formatCurrency(shownSummary?.recentAmount ?? 0),
 			icon: Calendar,
 			iconColor: 'chart-5'
 		}
@@ -160,9 +183,12 @@
 		)
 	);
 	let countLine = $derived.by(() => {
-		const expenses = `${formatNumber(totalCount, 0)} ${totalCount === 1 ? 'expense' : 'expenses'}`;
+		const count =
+			totalCount +
+			pendingMatching.filter(row => pending.states.get(row.id)?.status === 'saving').length;
+		const expenses = `${formatNumber(count, 0)} ${count === 1 ? 'expense' : 'expenses'}`;
 		if (totalCountFiltered) {
-			return `${expenses} ${totalCount === 1 ? 'matches' : 'match'} your filters`;
+			return `${expenses} ${count === 1 ? 'matches' : 'match'} your filters`;
 		}
 		if (vehicles.length === 0) return expenses;
 		return `${expenses} across ${formatNumber(vehicles.length, 0)} ${vehicles.length === 1 ? 'vehicle' : 'vehicles'}`;
@@ -296,9 +322,9 @@
 	const nextMonthTotalsRequest = latest();
 	let monthTotals = $state<ReadonlyMap<string, number>>(new Map());
 
-	async function loadMonthTotals() {
+	async function loadMonthTotals(keepShown = false) {
 		const isCurrent = nextMonthTotalsRequest();
-		monthTotals = new Map();
+		if (!keepShown) monthTotals = new Map();
 		const {
 			limit: _limit,
 			offset: _offset,
@@ -333,12 +359,15 @@
 		logLoadFailure(error, "Couldn't load expenses");
 	}
 
-	async function fetchPageAndSummary(offset = 0, { throwOnFailure = false } = {}) {
+	async function fetchPageAndSummary(
+		offset = 0,
+		{ throwOnFailure = false, keepMonthTotals = false } = {}
+	) {
 		const isCurrentList = nextListRequest();
 		const isCurrentSummary = nextSummaryRequest();
 		const filtered = filtersActive;
 		isLoadingPage = true;
-		void loadMonthTotals();
+		void loadMonthTotals(keepMonthTotals);
 		try {
 			const [pageResult, summaryResult] = await Promise.allSettled([
 				expenseApi.getAllExpenses(buildListParams(offset)),
@@ -485,8 +514,17 @@
 	}
 
 	let vehicleById = $derived(new Map(vehicles.map(v => [v.id, v])));
+	let shownMonthTotals = $derived(
+		withPendingByMonth(
+			monthTotals,
+			pending.saving.filter(row => matchesFilters(row, pendingFilters))
+		)
+	);
 	let displayExpenses = $derived<ExpenseWithVehicle[]>(
-		expenses.map(expense => ({ ...expense, vehicle: vehicleById.get(expense.vehicleId) }))
+		[...pendingListRows, ...expenses].map(expense => ({
+			...expense,
+			vehicle: vehicleById.get(expense.vehicleId)
+		}))
 	);
 </script>
 
@@ -600,14 +638,14 @@
 			</AlertDescription>
 		</Alert>
 		<OfflineExpenseCards
-			{pendingExpenses}
+			pendingExpenses={queuedExpenses}
 			{needsAttentionExpenses}
 			{syncedExpenses}
 			onRemovePending={removeOfflineExpense}
 			onRemoveNeedsAttention={removeOfflineExpense}
 		/>
 	</div>
-{:else if vehicles.length === 0 && (summary?.expenseCount ?? 0) === 0}
+{:else if vehicles.length === 0 && (shownSummary?.expenseCount ?? 0) === 0}
 	<div class="space-y-6">
 		<PageHeader
 			title="All Expenses"
@@ -710,11 +748,16 @@
 			</CardNs.Content>
 		</CardNs.Root>
 
-		<ExpenseOverviewSection {summary} {statCards} error={summaryError} onRetry={retrySummary} />
+		<ExpenseOverviewSection
+			summary={shownSummary}
+			{statCards}
+			error={summaryError}
+			onRetry={retrySummary}
+		/>
 
 		<OfflineExpenseCards
-			{pendingExpenses}
-			{needsAttentionExpenses}
+			pendingExpenses={[]}
+			needsAttentionExpenses={[]}
 			{syncedExpenses}
 			onRemovePending={removeOfflineExpense}
 			onRemoveNeedsAttention={removeOfflineExpense}
@@ -761,7 +804,8 @@
 						onSortChange={handleSortChange}
 						activeCategory={categoryFilter}
 						onCategoryChange={handleCategoryChange}
-						{monthTotals}
+						monthTotals={shownMonthTotals}
+						pendingStates={pending.states}
 					/>
 				{/if}
 			</CardNs.Content>

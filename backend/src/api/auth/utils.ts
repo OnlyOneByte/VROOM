@@ -36,9 +36,12 @@ export function setSessionCookie(
   cookieName: string,
   session: Pick<Session, 'id' | 'expiresAt'>
 ): void {
-  const options = { ...sessionCookieOptions(), expires: session.expiresAt };
-  if (demoSessionExpiresAt(session.id)) {
-    options.maxAge = Math.max(0, Math.floor((session.expiresAt.getTime() - Date.now()) / 1000));
+  const demoExpiresAt = demoSessionExpiresAt(session.id);
+  const expires =
+    demoExpiresAt && demoExpiresAt < session.expiresAt ? demoExpiresAt : session.expiresAt;
+  const options = { ...sessionCookieOptions(), expires };
+  if (demoExpiresAt) {
+    options.maxAge = Math.max(0, Math.floor((expires.getTime() - Date.now()) / 1000));
   }
   setCookie(c, cookieName, session.id, options);
 }
@@ -78,11 +81,6 @@ export async function validateAndRefreshSession(
   c?: Context
 ): Promise<SessionRefreshResult | null> {
   const demoExpiresAt = demoSessionExpiresAt(sessionId);
-  if (demoExpiresAt && demoExpiresAt <= new Date()) {
-    await lucia.invalidateSession(sessionId);
-    return null;
-  }
-
   const { session, user } = await lucia.validateSession(sessionId);
 
   if (!session || !user) {

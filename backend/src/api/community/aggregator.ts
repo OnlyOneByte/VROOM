@@ -1,3 +1,4 @@
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { CONFIG } from '../../config';
 import type { NewCommunityStat } from '../../db/schema';
 import { isElectricFuelType } from '../../db/types';
@@ -9,6 +10,7 @@ import {
 } from '../../utils/analytics-charts';
 import { logger } from '../../utils/logger';
 import { canonicalScale, convertDistance, convertVolume } from '../../utils/unit-conversions';
+import FUEL_ECONOMY from './fuel-economy-ratings.json';
 import { type CommunityStatsRepository, communityStatsRepository } from './repository';
 
 export type CommunityMetric = 'efficiency' | 'running_cost' | 'maintenance' | 'insurance';
@@ -21,7 +23,8 @@ const MIN_EFFICIENCY_INTERVALS = 3;
 const MIN_RUNNING_COST_KM = 500;
 const RECENT_ACTIVITY_MS = 90 * 24 * 60 * 60 * 1000;
 const PUBLISHED_N_STEP = 5;
-const EPSILON = 1;
+export const EPSILON_COUNT = 0.5;
+export const EPSILON_SUM = 0.5;
 const AGE_BANDS: [maxAge: number, band: string][] = [
   [2, '0-2'],
   [5, '3-5'],
@@ -37,6 +40,8 @@ export const PLAUSIBLE_BANDS: Record<CommunityUnit, { lo: number; hi: number; st
 };
 
 const INSURANCE_BAND = { lo: 5000, hi: 2_000_000, step: 1000 };
+export const RATED_MARGIN = 0.2;
+const RATINGS: Record<string, number[]> = FUEL_ECONOMY.ratings;
 
 export interface CommunityExpense {
   date: Date;
@@ -55,6 +60,7 @@ export interface CommunityVehicle {
   catalogModelId: string | null;
   modelYear: number;
   vehicleType: string;
+  vehicleKind: string;
   unitPreferences: UnitPreferences;
   currency: string;
   region: string | null;
@@ -82,10 +88,13 @@ export interface VehicleSample {
   >;
 }
 
+export type NoiseSource = (label: string) => number;
+
 export interface AggregateOptions {
   now: Date;
   minGroup: number;
-  uniform?: () => number;
+  noiseKey?: string;
+  uniform?: NoiseSource;
 }
 
 export interface AggregateResult {
@@ -164,7 +173,7 @@ const isRunningCost = (expense: CommunityExpense) =>
 
 export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSample[] {
   const samples: VehicleSample[] = [];
-  const { vehicleType, currency, region, modelYear, catalogModelId } = vehicle;
+  const { vehicleType, vehicleKind, currency, region, modelYear, catalogModelId } = vehicle;
   const band = ageBand(modelYear, now);
   const ownedWholeWindow =
     vehicle.firstRecordAt !== null &&
@@ -187,7 +196,7 @@ export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSam
   if (km >= MIN_RUNNING_COST_KM) {
     samples.push({
       metric: 'running_cost',
-      bucketKey: `running_cost|${vehicleType}|${currency}|${region ?? '-'}`,
+      bucketKey: `running_cost|${vehicleType}|${vehicleKind}|${currency}|${region ?? '-'}`,
       unit: 'cents_per_km',
       value: sumCents(vehicle, isRunningCost) / km,
       fields: { vehicleType, currency, region },
@@ -197,7 +206,7 @@ export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSam
   if (ownedWholeWindow) {
     samples.push({
       metric: 'maintenance',
-      bucketKey: `maintenance|${band}|${vehicleType}|${currency}`,
+      bucketKey: `maintenance|${band}|${vehicleType}|${vehicleKind}|${currency}`,
       unit: 'cents_per_year',
       value: sumCents(vehicle, isMaintenance),
       fields: { ageBand: band, vehicleType, currency },
@@ -217,8 +226,23 @@ export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSam
   return samples;
 }
 
-export function bandFor(metric: CommunityMetric, unit: CommunityUnit) {
-  return metric === 'insurance' ? INSURANCE_BAND : PLAUSIBLE_BANDS[unit];
+type BandFields = Pick<VehicleSample['fields'], 'catalogModelId' | 'modelYear' | 'vehicleType'>;
+
+export function ratedEfficiencyBand(fields: BandFields, unit: CommunityUnit) {
+  const [min, max] =
+    RATINGS[`${fields.catalogModelId}|${fields.modelYear}|${fields.vehicleType}`] ?? [];
+  if (min === undefined || max === undefined) return null;
+  const plausible = PLAUSIBLE_BANDS[unit];
+  return {
+    lo: Math.max(plausible.lo, Math.round(min * (1 - RATED_MARGIN) * 10) / 10),
+    hi: Math.min(plausible.hi, Math.round(max * (1 + RATED_MARGIN) * 10) / 10),
+    step: plausible.step,
+  };
+}
+
+export function bandFor(metric: CommunityMetric, unit: CommunityUnit, fields: BandFields = {}) {
+  if (metric === 'insurance') return INSURANCE_BAND;
+  return (metric === 'efficiency' && ratedEfficiencyBand(fields, unit)) || PLAUSIBLE_BANDS[unit];
 }
 
 export function median(values: number[]): number {
@@ -237,31 +261,34 @@ function quantile(sorted: number[], q: number): number {
   return low + (high - low) * (position - lower);
 }
 
-function cryptoUniform(): number {
-  return crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
+export function keyedUniform(noiseKey: string): NoiseSource {
+  return (label) => {
+    const digest = createHmac('sha256', noiseKey).update(label).digest();
+    const high = digest.readUInt32BE(0) >>> 6;
+    const low = digest.readUInt32BE(4) >>> 6;
+    return (high * 2 ** 26 + low + 0.5) / 2 ** 52;
+  };
 }
 
-function laplace(scale: number, uniform: () => number): number {
-  const u = Math.min(Math.max(uniform() - 0.5, -0.4999999), 0.4999999);
-  return -scale * Math.sign(u) * Math.log(1 - 2 * Math.abs(u));
+function laplace(scale: number, u: number): number {
+  const centred = u - 0.5;
+  return -scale * Math.sign(centred) * Math.log(1 - 2 * Math.abs(centred));
 }
 
-function publish(
-  value: number,
-  band: { lo: number; hi: number; step: number },
-  noiseScale: number,
-  uniform: () => number
-): number {
-  const noisy = Math.min(Math.max(value + laplace(noiseScale, uniform), band.lo), band.hi);
-  return Math.round(Math.round(noisy / band.step) * band.step * 1000) / 1000;
+function roundToStep(value: number, step: number): number {
+  return Math.round(Math.round(value / step) * step * 1000) / 1000;
 }
 
 export function noiseScaleFor(band: { lo: number; hi: number }, nPublished: number): number {
-  return (band.hi - band.lo) / (nPublished * EPSILON);
+  return (band.hi - band.lo) / (nPublished * EPSILON_SUM);
 }
 
-function publishedCount(n: number): number {
-  return Math.floor(n / PUBLISHED_N_STEP) * PUBLISHED_N_STEP;
+export function publishedCount(n: number): number {
+  return Math.max(0, Math.floor(n / PUBLISHED_N_STEP) * PUBLISHED_N_STEP);
+}
+
+function dataDigest(values: number[]): string {
+  return createHash('sha256').update(JSON.stringify(values)).digest('hex');
 }
 
 interface Bucket {
@@ -273,7 +300,7 @@ function collectBuckets(vehicles: CommunityVehicle[], now: Date): Bucket[] {
   const buckets = new Map<string, Bucket>();
   for (const vehicle of vehicles) {
     for (const sample of vehicleSamples(vehicle, now)) {
-      const band = bandFor(sample.metric, sample.unit);
+      const band = bandFor(sample.metric, sample.unit, sample.fields);
       if (sample.value < band.lo || sample.value > band.hi) continue;
       const bucket = buckets.get(sample.bucketKey) ?? { sample, byOwner: new Map() };
       const ownerValues = bucket.byOwner.get(vehicle.ownerId) ?? [];
@@ -288,13 +315,21 @@ function collectBuckets(vehicles: CommunityVehicle[], now: Date): Bucket[] {
 function publishBucket(
   { sample, byOwner }: Bucket,
   options: AggregateOptions,
-  uniform: () => number
-): NewCommunityStat {
-  const n = byOwner.size;
-  const nPublished = publishedCount(n);
-  const ownerValues = [...byOwner.values()].map(median);
-  const band = bandFor(sample.metric, sample.unit);
-  const noiseScale = noiseScaleFor(band, nPublished);
+  uniform: NoiseSource
+): NewCommunityStat | null {
+  const band = bandFor(sample.metric, sample.unit, sample.fields);
+  const ownerValues = [...byOwner.values()]
+    .map((values) => Math.min(Math.max(roundToStep(median(values), band.step), band.lo), band.hi))
+    .sort((a, b) => a - b);
+  const release = `${COMMUNITY_SCHEMA_VERSION}|${band.lo}|${band.hi}|${EPSILON_COUNT}|${EPSILON_SUM}`;
+  const draw = (label: string) =>
+    uniform(`${sample.bucketKey}|${release}|${dataDigest(ownerValues)}|${label}`);
+  const noisyCount = byOwner.size + laplace(1 / EPSILON_COUNT, draw('count'));
+  if (noisyCount < options.minGroup) return null;
+  const noisySum =
+    ownerValues.reduce((sum, value) => sum + (value - band.lo), 0) +
+    laplace((band.hi - band.lo) / EPSILON_SUM, draw('sum'));
+  const mean = Math.min(Math.max(band.lo + noisySum / noisyCount, band.lo), band.hi);
   const { fields } = sample;
   return {
     scope: LOCAL_SCOPE,
@@ -307,13 +342,8 @@ function publishBucket(
     region: fields.region ?? null,
     currency: fields.currency ?? null,
     unit: sample.unit,
-    nPublished,
-    mean: publish(
-      ownerValues.reduce((sum, value) => sum + value, 0) / n,
-      band,
-      noiseScale,
-      uniform
-    ),
+    nPublished: publishedCount(noisyCount),
+    mean: roundToStep(mean, band.step),
     computedAt: options.now,
     schemaVersion: COMMUNITY_SCHEMA_VERSION,
   };
@@ -323,28 +353,30 @@ export function aggregate(
   vehicles: CommunityVehicle[],
   options: AggregateOptions
 ): AggregateResult {
-  const uniform = options.uniform ?? cryptoUniform;
+  const uniform =
+    options.uniform ?? keyedUniform(options.noiseKey ?? randomBytes(32).toString('hex'));
   const buckets = collectBuckets(vehicles, options.now);
-  const rows = buckets
-    .filter((bucket) => publishedCount(bucket.byOwner.size) >= options.minGroup)
-    .map((bucket) => publishBucket(bucket, options, uniform));
+  const rows = buckets.flatMap((bucket) => publishBucket(bucket, options, uniform) ?? []);
   return { rows, published: rows.length, suppressed: buckets.length - rows.length };
 }
 
 export async function refreshCommunityStats(
   repository: CommunityStatsRepository = communityStatsRepository,
-  now: Date = new Date()
+  now: Date = new Date(),
+  uniform?: NoiseSource
 ): Promise<AggregateResult> {
   const started = performance.now();
   const input = await repository.loadOptedIn(new Date(now.getTime() - COMMUNITY_WINDOW_MS), now);
   const result = aggregate(input.vehicles, {
     now,
     minGroup: CONFIG.communityStats.minGroup,
+    noiseKey: repository.noiseKey(LOCAL_SCOPE),
+    uniform,
   });
   repository.replaceScope(LOCAL_SCOPE, result.rows, now);
   const ms = Math.round(performance.now() - started);
   logger.info(
-    `community stats refreshed: ${result.published} buckets published, ${result.suppressed} suppressed (n<K), ${input.optedInOwners} opted-in owners, ${ms} ms`
+    `community stats refreshed: ${result.published} buckets published, ${result.suppressed} below the threshold, ${input.optedInOwners} opted-in owners, ${ms} ms`
   );
   if (ms > CONFIG.communityStats.slowRunWarnMs) {
     logger.warn(`community stats refresh took ${ms} ms`);

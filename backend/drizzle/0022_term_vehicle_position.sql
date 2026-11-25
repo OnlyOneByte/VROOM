@@ -1,0 +1,1 @@
+ALTER TABLE `insurance_term_vehicles` ADD `position` integer DEFAULT 0 NOT NULL;

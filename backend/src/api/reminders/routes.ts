@@ -1,9 +1,20 @@
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
+import { getDb } from '../../db/connection';
 import type { NewReminder, Reminder } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
+import {
+  authorize,
+  ownAccount,
+  type ResourceOf,
+  requireCan,
+  vehicleEntry,
+  vehicleOrOwnAccount,
+} from '../../permissions/authorize';
+import { requestResolver } from '../../permissions/grants';
+import type { Resource } from '../../permissions/resolve';
 import { logger } from '../../utils/logger';
 import {
   centsToDollars,
@@ -11,9 +22,11 @@ import {
   reminderToApi,
   reminderWithVehiclesToApi,
 } from '../../utils/money';
+import { readJsonBody } from '../../utils/request-body';
 import { calendarDayIn, isValidTimeZone } from '../../utils/time-zone';
-import { commonSchemas, validateReminderOwnership, zValidator } from '../../utils/validation';
+import { commonSchemas, zValidator } from '../../utils/validation';
 import { requireVehicleAccess, requireVehiclesAccess } from '../../utils/vehicle-access';
+import { hideDriverFields } from '../drivers/attribution';
 import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
 import { recurringCostSummary } from './reminder-cost';
@@ -65,7 +78,7 @@ async function requireReminderVehiclesWrite(
   vehicleIds: readonly string[],
   actingUserId: string
 ): Promise<{ ownerId: string }> {
-  const [ownerId, ...otherOwners] = await requireVehiclesAccess(vehicleIds, actingUserId, 'write');
+  const [ownerId, ...otherOwners] = await requireVehiclesAccess(vehicleIds, actingUserId, 'read');
   if (ownerId === undefined) {
     throw new ValidationError('A reminder needs at least one vehicle');
   }
@@ -87,6 +100,42 @@ async function requireExistingReminderWrite(
   const { ownerId } = await requireReminderVehiclesWrite(vehicleIds, actingUserId);
   if (ownerId !== reminder.userId) throw new NotFoundError('Reminder');
   return { ownerId };
+}
+
+const vehicleResource = (vehicleId: string): Resource => ({ kind: 'vehicle', vehicleId });
+
+const fromQueryVehicle: ResourceOf = (c) => vehicleOrOwnAccount(c.req.query('vehicleId'), c);
+
+const fromBodyVehicles: ResourceOf = async (c) =>
+  (await readJsonBody<{ vehicleIds: string[] }>(c)).vehicleIds.map(vehicleResource);
+
+async function reminderResources(c: Context): Promise<Resource[]> {
+  const existing = await reminderRepository.findByIdWithVehicles(c.req.param('id') ?? '');
+  if (!existing) throw new NotFoundError('Reminder');
+  const { reminder, vehicleIds } = existing;
+  if (vehicleIds.length > 0) {
+    return vehicleIds.map((vehicleId) =>
+      vehicleEntry(vehicleId, reminder.userId, reminder.createdBy)
+    );
+  }
+  if (reminder.userId !== c.get('user').id) throw new NotFoundError('Reminder');
+  return [{ kind: 'account', userId: reminder.userId }];
+}
+
+const fromReminder: ResourceOf = reminderResources;
+
+const fromReminderReadable: ResourceOf = async (c) => {
+  const all = await reminderResources(c);
+  const resolver = requestResolver(c, getDb());
+  const readable = all.filter((r) => resolver.can('vehicle.reminder.read', r).allow);
+  return readable.length > 0 ? readable : all.slice(0, 1);
+};
+
+function visibleVehicleIds(c: Context, vehicleIds: readonly string[]): string[] {
+  const resolver = requestResolver(c, getDb());
+  return vehicleIds.filter(
+    (vehicleId) => resolver.can('vehicle.reminder.read', vehicleResource(vehicleId)).allow
+  );
 }
 
 const timeZoneQuerySchema = z.object({
@@ -207,17 +256,23 @@ const triggerRateLimiter = rateLimiter({
 });
 
 // Static segments must be registered before /:id.
-routes.post('/trigger', triggerRateLimiter, zValidator('query', timeZoneQuerySchema), async (c) => {
-  const user = c.get('user');
-  const { timeZone } = c.req.valid('query');
-  const result = await reminderTriggerService.processOverdueReminders(user.id, timeZone);
-  return c.json({
-    success: true,
-    data: { ...result, createdExpenses: result.createdExpenses.map(expenseToApi) },
-  });
-});
+routes.post(
+  '/trigger',
+  triggerRateLimiter,
+  zValidator('query', timeZoneQuerySchema),
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const { timeZone } = c.req.valid('query');
+    const result = await reminderTriggerService.processOverdueReminders(user.id, timeZone);
+    return c.json({
+      success: true,
+      data: { ...result, createdExpenses: result.createdExpenses.map(expenseToApi) },
+    });
+  }
+);
 
-routes.get('/recurring-cost', async (c) => {
+routes.get('/recurring-cost', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const expenseReminders = await reminderRepository.findByUserId(user.id, { type: 'expense' });
   const summary = recurringCostSummary(expenseReminders.map((r) => r.reminder));
@@ -232,6 +287,7 @@ routes.post(
   triggerRateLimiter,
   zValidator('param', commonSchemas.idParam),
   zValidator('query', timeZoneQuerySchema),
+  authorize(fromReminder),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -273,41 +329,52 @@ routes.post(
   }
 );
 
-routes.get('/notifications', async (c) => {
+routes.get('/notifications', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const unreadOnly = c.req.query('unreadOnly') === 'true';
   const notifications = await reminderRepository.findNotifications(user.id, unreadOnly);
   return c.json({ success: true, data: notifications });
 });
 
-routes.put('/notifications/:id/read', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
-  await reminderRepository.markNotificationRead(id, user.id);
-  return c.json({ success: true, message: 'Notification marked as read' });
-});
+routes.put(
+  '/notifications/:id/read',
+  zValidator('param', commonSchemas.idParam),
+  authorize(ownAccount),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    await reminderRepository.markNotificationRead(id, user.id);
+    return c.json({ success: true, message: 'Notification marked as read' });
+  }
+);
 
-routes.post('/', zValidator('json', createReminderSchema), async (c) => {
-  const user = c.get('user');
-  const data = c.req.valid('json');
+routes.post(
+  '/',
+  zValidator('json', createReminderSchema),
+  authorize(fromBodyVehicles),
+  async (c) => {
+    const user = c.get('user');
+    const data = c.req.valid('json');
 
-  const { vehicleIds, timeZone: _createTimeZone, ...reminderData } = data;
-  const { ownerId } = await requireReminderVehiclesWrite(vehicleIds, user.id);
-  const mileage = await resolveMileageFields(reminderData, vehicleIds, ownerId);
-  const result = await reminderRepository.createWithVehicles(
-    {
-      ...reminderData,
-      userId: ownerId,
-      nextDueDate: reminderData.triggerMode === 'mileage' ? null : reminderData.startDate,
-      ...mileage,
-    },
-    vehicleIds
-  );
+    const { vehicleIds, timeZone: _createTimeZone, ...reminderData } = data;
+    const { ownerId } = await requireReminderVehiclesWrite(vehicleIds, user.id);
+    const mileage = await resolveMileageFields(reminderData, vehicleIds, ownerId);
+    const result = await reminderRepository.createWithVehicles(
+      {
+        ...reminderData,
+        userId: ownerId,
+        createdBy: ownerId === user.id ? null : user.id,
+        nextDueDate: reminderData.triggerMode === 'mileage' ? null : reminderData.startDate,
+        ...mileage,
+      },
+      vehicleIds
+    );
 
-  return c.json({ success: true, data: reminderWithVehiclesToApi(result) }, 201);
-});
+    return c.json({ success: true, data: reminderWithVehiclesToApi(result) }, 201);
+  }
+);
 
-routes.get('/', async (c) => {
+routes.get('/', authorize(fromQueryVehicle), async (c) => {
   const user = c.get('user');
   const vehicleId = c.req.query('vehicleId');
   const type = c.req.query('type');
@@ -325,23 +392,44 @@ routes.get('/', async (c) => {
   }
 
   const reminders = await reminderRepository.findByUserId(listUserId, filters);
-  return c.json({ success: true, data: reminders.map(reminderWithVehiclesToApi) });
+  const visible =
+    listUserId === user.id
+      ? reminders
+      : reminders.map((row) => ({ ...row, vehicleIds: visibleVehicleIds(c, row.vehicleIds) }));
+  return c.json({ success: true, data: visible.map(reminderWithVehiclesToApi) });
 });
 
-routes.get('/:id/expenses', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
-
-  await validateReminderOwnership(id, user.id);
-
-  const materialized = await expenseRepository.findBySource('reminder', id, user.id);
-  return c.json({ success: true, data: materialized.map(expenseToApi) });
-});
+routes.get(
+  '/:id/expenses',
+  zValidator('param', commonSchemas.idParam),
+  authorize(fromReminderReadable),
+  async (c) => {
+    const { id } = c.req.valid('param');
+    const existing = await reminderRepository.findByIdWithVehicles(id);
+    if (!existing) throw new NotFoundError('Reminder');
+    const resolver = requestResolver(c, getDb());
+    const materialized = await expenseRepository.findBySource(
+      'reminder',
+      id,
+      existing.reminder.userId
+    );
+    const readable = materialized.filter(
+      (expense) => resolver.can('vehicle.expense.read', vehicleResource(expense.vehicleId)).allow
+    );
+    return c.json({
+      success: true,
+      data: readable.map((expense) =>
+        hideDriverFields(c, expense.vehicleId, expenseToApi(expense))
+      ),
+    });
+  }
+);
 
 routes.put(
   '/:id',
   zValidator('param', commonSchemas.idParam),
   zValidator('json', updateReminderSchema),
+  authorize(fromReminder),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -352,6 +440,9 @@ routes.put(
     const partialUpdate = keepStoredDatesOnSameDay(c.req.valid('json'), existing.reminder);
 
     if (partialUpdate.vehicleIds) {
+      for (const vehicleId of partialUpdate.vehicleIds) {
+        requireCan(c, 'vehicle.reminder.write', vehicleResource(vehicleId));
+      }
       const { ownerId: newOwnerId } = await requireReminderVehiclesWrite(
         partialUpdate.vehicleIds,
         user.id
@@ -406,19 +497,24 @@ routes.put(
   }
 );
 
-routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
+routes.delete(
+  '/:id',
+  zValidator('param', commonSchemas.idParam),
+  authorize(fromReminder),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
 
-  const existing = await reminderRepository.findByIdWithVehicles(id);
-  if (!existing) throw new NotFoundError('Reminder');
-  const { ownerId } = await requireExistingReminderWrite(existing, user.id);
+    const existing = await reminderRepository.findByIdWithVehicles(id);
+    if (!existing) throw new NotFoundError('Reminder');
+    const { ownerId } = await requireExistingReminderWrite(existing, user.id);
 
-  // clearSource must run before the delete: a dangling sourceId fails backup validation on restore.
-  await expenseRepository.clearSource('reminder', id, ownerId);
+    // clearSource must run before the delete: a dangling sourceId fails backup validation on restore.
+    await expenseRepository.clearSource('reminder', id, ownerId);
 
-  await reminderRepository.deleteOwned(id, ownerId);
-  return c.json({ success: true, message: 'Reminder deleted successfully' });
-});
+    await reminderRepository.deleteOwned(id, ownerId);
+    return c.json({ success: true, message: 'Reminder deleted successfully' });
+  }
+);
 
 export { routes };

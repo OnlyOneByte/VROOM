@@ -84,7 +84,7 @@ describe('odometer reads and writes on shared vehicles stamp the owner', () => {
     expect((await json<DataEnvelope<OdoRow>>(single)).data.id).toBe(entryId);
   });
 
-  test('an editor can PUT and DELETE a shared-vehicle reading; userId stays the owner', async () => {
+  test('an editor can PUT any shared-vehicle reading and DELETE only their own; userId stays the owner', async () => {
     const vehicleId = await shareAccepted('editor');
     const created = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
       odometer: 10000,
@@ -98,14 +98,21 @@ describe('odometer reads and writes on shared vehicles stamp the owner', () => {
     expect(putBody.data.odometer).toBe(10500);
     expect(storedUserId(entryId)).toBe(ctx.user.id);
 
-    const del = await asB('DELETE', `/api/v1/odometer/${entryId}`);
-    expect(del.status, 'editor can delete a shared-vehicle reading').toBe(200);
-    expect(
-      ctx.sqlite.query('SELECT id FROM odometer_entries WHERE id = ?').get(entryId)
-    ).toBeNull();
+    const owners = await asB('DELETE', `/api/v1/odometer/${entryId}`);
+    expect(owners.status, "editor cannot delete the owner's reading").toBe(403);
+
+    const mine = await asB('POST', `/api/v1/odometer/${vehicleId}`, {
+      odometer: 11000,
+      recordedAt: '2024-06-04T00:00:00.000Z',
+    });
+    const mineId = (await json<DataEnvelope<{ id: string }>>(mine)).data.id;
+    expect(storedUserId(mineId)).toBe(ctx.user.id);
+    const del = await asB('DELETE', `/api/v1/odometer/${mineId}`);
+    expect(del.status, 'editor can delete a reading they added').toBe(200);
+    expect(ctx.sqlite.query('SELECT id FROM odometer_entries WHERE id = ?').get(mineId)).toBeNull();
   });
 
-  test('a VIEWER cannot create/update/delete on the shared vehicle (404, never 403)', async () => {
+  test('a VIEWER cannot create/update/delete on the shared vehicle it can see (403)', async () => {
     const vehicleId = await shareAccepted('viewer');
     const created = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
       odometer: 5000,
@@ -121,9 +128,9 @@ describe('odometer reads and writes on shared vehicles stamp the owner', () => {
         })
       ).status,
       'viewer create denied'
-    ).toBe(404);
-    expect((await asB('PUT', `/api/v1/odometer/${entryId}`, { odometer: 1 })).status).toBe(404);
-    expect((await asB('DELETE', `/api/v1/odometer/${entryId}`)).status).toBe(404);
+    ).toBe(403);
+    expect((await asB('PUT', `/api/v1/odometer/${entryId}`, { odometer: 1 })).status).toBe(403);
+    expect((await asB('DELETE', `/api/v1/odometer/${entryId}`)).status).toBe(403);
 
     const stillThere = ctx.sqlite
       .query('SELECT odometer FROM odometer_entries WHERE id = ?')

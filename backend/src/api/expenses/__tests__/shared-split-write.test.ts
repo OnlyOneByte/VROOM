@@ -132,7 +132,7 @@ describe('shared split writes stamp the owner and createdBy', () => {
     expect(leaked.length).toBe(0);
   });
 
-  test('a VIEWER cannot create a split on the shared vehicle (404, never 403)', async () => {
+  test('a VIEWER cannot create a split on the shared vehicle it can see (403)', async () => {
     const vehicleId = await shareAccepted('viewer');
     const res = await asB('POST', '/api/v1/expenses/split', {
       splitConfig: { method: 'even', vehicleIds: [vehicleId] },
@@ -140,10 +140,10 @@ describe('shared split writes stamp the owner and createdBy', () => {
       totalAmount: 20,
       date: '2024-06-05T00:00:00.000Z',
     });
-    expect(res.status, 'viewer split create denied').toBe(404);
+    expect(res.status, 'viewer split create denied').toBe(403);
   });
 
-  test('an EDITOR can PUT and DELETE a split group on the shared vehicle (owner and author preserved)', async () => {
+  test('an EDITOR can PUT a split group on the shared vehicle and DELETE only their own (owner and author preserved)', async () => {
     const vehicleId = await shareAccepted('editor');
     const created = await ctx.authed('POST', '/api/v1/expenses/split', {
       splitConfig: { method: 'even', vehicleIds: [vehicleId] },
@@ -165,9 +165,19 @@ describe('shared split writes stamp the owner and createdBy', () => {
       );
     }
 
-    const del = await asB('DELETE', `/api/v1/expenses/split/${gid}`);
-    expect(del.status, 'editor can delete a shared split').toBe(200);
-    expect(ctx.sqlite.query('SELECT id FROM expenses WHERE group_id = ?').get(gid)).toBeNull();
+    const ownersSplit = await asB('DELETE', `/api/v1/expenses/split/${gid}`);
+    expect(ownersSplit.status, "editor cannot delete the owner's split").toBe(403);
+
+    const mine = await asB('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [vehicleId] },
+      category: 'misc',
+      totalAmount: 10,
+      date: '2024-06-07T00:00:00.000Z',
+    });
+    const mineId = (await json<DataEnvelope<SplitData>>(mine)).data.groupId;
+    const del = await asB('DELETE', `/api/v1/expenses/split/${mineId}`);
+    expect(del.status, 'editor can delete a split they added').toBe(200);
+    expect(ctx.sqlite.query('SELECT id FROM expenses WHERE group_id = ?').get(mineId)).toBeNull();
   });
 
   test('an EDITOR cannot PUT a shared split onto their own vehicle (owner of the group must not change)', async () => {

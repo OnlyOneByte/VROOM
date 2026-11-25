@@ -28,6 +28,8 @@ interface RouteCase {
   mode: VehicleAccessMode;
   request: (fx: Fixture) => [method: string, path: string, body?: unknown];
   expectInBody?: (fx: Fixture) => string;
+  authorized?: boolean;
+  allowed?: readonly Actor[];
 }
 
 const ALLOWED: Record<VehicleAccessMode, readonly Actor[]> = {
@@ -81,16 +83,19 @@ const ROUTES: RouteCase[] = [
   {
     name: 'PUT /vehicles/:id',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['PUT', `/vehicles/${fx.vehicleId}`, { nickname: 'Renamed' }],
   },
   {
     name: 'DELETE /vehicles/:id',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['DELETE', `/vehicles/${fx.vehicleId}`],
   },
   {
     name: 'POST /shares',
     mode: 'owner',
+    authorized: true,
     request: (fx) => [
       'POST',
       '/shares',
@@ -100,55 +105,66 @@ const ROUTES: RouteCase[] = [
   {
     name: 'GET /expenses?vehicleId',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/expenses?vehicleId=${fx.vehicleId}`],
     expectInBody: (fx) => fx.expenseId,
   },
   {
     name: 'GET /expenses/summary?vehicleId',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/expenses/summary?vehicleId=${fx.vehicleId}`],
   },
   {
     name: 'GET /expenses/export?vehicleId',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/expenses/export?vehicleId=${fx.vehicleId}`],
     expectInBody: () => 'access-table expense',
   },
   {
     name: 'GET /expenses/:id',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/expenses/${fx.expenseId}`],
     expectInBody: (fx) => fx.expenseId,
   },
   {
     name: 'POST /expenses',
     mode: 'write',
+    authorized: true,
     request: (fx) => ['POST', '/expenses', { ...EXPENSE_BODY, vehicleId: fx.vehicleId }],
   },
   {
     name: 'PUT /expenses/:id',
     mode: 'write',
+    authorized: true,
     request: (fx) => ['PUT', `/expenses/${fx.expenseId}`, { description: 'edited' }],
   },
   {
     name: 'DELETE /expenses/:id',
     mode: 'write',
+    authorized: true,
+    allowed: ['owner'],
     request: (fx) => ['DELETE', `/expenses/${fx.expenseId}`],
   },
   {
     name: 'GET /financing/vehicles/:id/financing',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['GET', `/financing/vehicles/${fx.vehicleId}/financing`],
     expectInBody: (fx) => fx.financingId,
   },
   {
     name: 'POST /financing/vehicles/:id/financing',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['POST', `/financing/vehicles/${fx.vehicleId}/financing`, FINANCING_BODY],
   },
   {
     name: 'PATCH /financing/:id/payment-amount',
     mode: 'owner',
+    authorized: true,
     request: (fx) => [
       'PATCH',
       `/financing/${fx.financingId}/payment-amount`,
@@ -158,11 +174,13 @@ const ROUTES: RouteCase[] = [
   {
     name: 'PUT /financing/:id/payoff',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['PUT', `/financing/${fx.financingId}/payoff`],
   },
   {
     name: 'DELETE /financing/:id',
     mode: 'owner',
+    authorized: true,
     request: (fx) => ['DELETE', `/financing/${fx.financingId}`],
   },
   {
@@ -206,12 +224,14 @@ const ROUTES: RouteCase[] = [
   {
     name: 'GET /reminders?vehicleId',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/reminders?vehicleId=${fx.vehicleId}`],
     expectInBody: (fx) => fx.reminderId,
   },
   {
     name: 'POST /reminders',
     mode: 'write',
+    authorized: true,
     request: (fx) => [
       'POST',
       '/reminders',
@@ -229,23 +249,27 @@ const ROUTES: RouteCase[] = [
   {
     name: 'GET /odometer/:vehicleId',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/odometer/${fx.vehicleId}`],
   },
   {
     name: 'GET /odometer/:vehicleId/history',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/odometer/${fx.vehicleId}/history`],
     expectInBody: (fx) => fx.odometerId,
   },
   {
     name: 'GET /odometer/entry/:id',
     mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/odometer/entry/${fx.odometerId}`],
     expectInBody: (fx) => fx.odometerId,
   },
   {
     name: 'POST /odometer/:vehicleId',
     mode: 'write',
+    authorized: true,
     request: (fx) => [
       'POST',
       `/odometer/${fx.vehicleId}`,
@@ -255,16 +279,20 @@ const ROUTES: RouteCase[] = [
   {
     name: 'PUT /odometer/:id',
     mode: 'write',
+    authorized: true,
     request: (fx) => ['PUT', `/odometer/${fx.odometerId}`, { odometer: 31500 }],
   },
   {
     name: 'DELETE /odometer/:id',
     mode: 'write',
+    authorized: true,
+    allowed: ['owner'],
     request: (fx) => ['DELETE', `/odometer/${fx.odometerId}`],
   },
   {
     name: 'POST /trips',
-    mode: 'owner',
+    mode: 'write',
+    authorized: true,
     request: (fx) => [
       'POST',
       '/trips',
@@ -279,13 +307,15 @@ const ROUTES: RouteCase[] = [
   },
   {
     name: 'GET /trips?vehicleId',
-    mode: 'owner',
+    mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/trips?vehicleId=${fx.vehicleId}`],
     expectInBody: (fx) => fx.tripId,
   },
   {
     name: 'GET /trips/summary?vehicleId',
-    mode: 'owner',
+    mode: 'read',
+    authorized: true,
     request: (fx) => ['GET', `/trips/summary?vehicleId=${fx.vehicleId}`],
     expectInBody: () => '"tripCount":1',
   },
@@ -395,8 +425,9 @@ afterEach(() => ctx.close());
 describe('every vehicle-scoped route enforces owner / editor / viewer / stranger access', () => {
   for (const route of ROUTES) {
     for (const actor of ['owner', 'editor', 'viewer', 'stranger'] as const) {
-      const allowed = ALLOWED[route.mode].includes(actor);
-      test(`${route.name} as ${actor} → ${allowed ? 'allowed' : '404'}`, async () => {
+      const allowed = (route.allowed ?? ALLOWED[route.mode]).includes(actor);
+      const denied = route.authorized && actor !== 'stranger' ? 403 : 404;
+      test(`${route.name} as ${actor} → ${allowed ? 'allowed' : denied}`, async () => {
         const [method, path, body] = route.request(fx);
         const res = await as[actor](method, `/api/v1${path}`, body);
         if (allowed) {
@@ -404,7 +435,7 @@ describe('every vehicle-scoped route enforces owner / editor / viewer / stranger
           expect(res.status, text).toBeLessThan(300);
           if (route.expectInBody) expect(text).toContain(route.expectInBody(fx));
         } else {
-          expect(res.status).toBe(404);
+          expect(res.status).toBe(denied);
         }
       });
     }

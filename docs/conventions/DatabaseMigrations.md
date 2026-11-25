@@ -107,6 +107,28 @@ so most new columns need no mapping. Two cases to confirm with a round-trip test
 Round-trip tests live in `backend/src/api/sync/__tests__/`. See `BackupRestore.md`
 for the coercion and validation pipeline in detail.
 
+## SQLite-only SQL
+
+SQLite stays the default database, but a second dialect (Postgres, #964) has to be able to replace
+every SQLite-only construct in one place: `backend/src/db/dialect/`. Write these there, as a
+helper, never inline in a repository or route:
+
+- functions: `json_each`, `json_patch`, `strftime`, `unixepoch`, `julianday`, `randomblob`;
+- `rowid`, `INSERT OR …`, `PRAGMA`, `sqlite_master`, and `SQLITE_*` error codes;
+- `CROSS JOIN … ON` (Postgres rejects it; write `JOIN … ON`);
+- `` sql`0` `` / `` sql`1` `` as a boolean;
+- raw driver calls such as `db.all(sql…)`.
+
+`backend/src/__tests__/sqlite-only-sql.test.ts` enforces this. Its `BASELINE` holds today's count
+per file and construct. A new site, or a higher count, fails with the file named. When you move a
+site into the dialect layer, the test asks you to lower or delete its baseline entry.
+
+`bun run test:postgres` (CI: `Backend Tests (Postgres, optional)`, never a required check) runs
+the raw analytics, insights and odometer SQL on Postgres. It captures each query on the seeded
+SQLite garage, copies the tables into an in-process Postgres (PGlite), and compares the rows.
+A query that fails is listed in `EXPECTED_FAILURES` with the issue that fixes it. A new failure,
+or a listed one that now passes, fails the run.
+
 ## Production
 
 - Prod runs `runMigrations()` on startup, so migrations deploy with the next container build.

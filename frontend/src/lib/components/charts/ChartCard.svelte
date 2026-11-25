@@ -27,6 +27,7 @@
 		legend?: Snippet;
 		summary?: Snippet | undefined;
 		footer?: Snippet | undefined;
+		insight?: string | undefined;
 		animationClass?: 'chart-line-animated' | 'chart-bar-animated';
 		table?: ChartA11y | undefined;
 		textAlternative?: string | undefined;
@@ -50,6 +51,7 @@
 		legend,
 		summary,
 		footer,
+		insight,
 		animationClass,
 		table,
 		textAlternative,
@@ -197,7 +199,7 @@
 							<Table.Row>
 								<Table.Head scope="row" class="font-normal">{row.label}</Table.Head>
 								{#each row.cells as cell, c (c)}
-									<Table.Cell class="text-right tabular-nums">{cell}</Table.Cell>
+									<Table.Cell class="text-right whitespace-normal tabular-nums">{cell}</Table.Cell>
 								{/each}
 							</Table.Row>
 						{/each}
@@ -233,6 +235,9 @@
 			{#if legend}
 				{@render legend()}
 			{/if}
+		{/if}
+		{#if insight && !isLoading && !error && !isEmpty}
+			<p class="mt-4 text-sm" data-chart-insight>{insight}</p>
 		{/if}
 		{#if footer}
 			<div class="mt-4">{@render footer()}</div>

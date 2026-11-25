@@ -1,0 +1,13 @@
+# Litestream replication for VROOM's SQLite database. Used by docker-compose.litestream.yml.
+# The access keys come from LITESTREAM_ACCESS_KEY_ID and LITESTREAM_SECRET_ACCESS_KEY.
+dbs:
+  - path: /data/vroom.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: vroom
+        endpoint: ${LITESTREAM_ENDPOINT}
+        region: auto
+        sync-interval: 10s
+        snapshot-interval: 24h
+        retention: 720h

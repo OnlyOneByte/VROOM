@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { ValidationError } from '../../errors';
+import { blockPrivateProviderEndpoints } from '../../test-helpers/outbound';
 import {
+  ALLOW_PRIVATE,
   assertSafeOutboundUrl,
+  BLOCK_PRIVATE,
   classifyAddress,
   fetchOutbound,
   outboundResolver,
+  parsePrivateEndpointPolicy,
   resolveSafeOutboundTarget,
   urlForAddress,
 } from '../outbound-url';
@@ -58,9 +62,9 @@ describe('classifyAddress', () => {
 
 describe('assertSafeOutboundUrl', () => {
   test('accepts a public https URL', () => {
-    expect(assertSafeOutboundUrl('https://s3.example.com', 'S3 endpoint', false).hostname).toBe(
-      's3.example.com'
-    );
+    expect(
+      assertSafeOutboundUrl('https://s3.example.com', 'S3 endpoint', BLOCK_PRIVATE).hostname
+    ).toBe('s3.example.com');
   });
 
   test.each([
@@ -80,36 +84,56 @@ describe('assertSafeOutboundUrl', () => {
     'https://metadata.google.internal',
     'not a url',
   ])('rejects %s when private hosts are blocked', (raw) => {
-    expect(() => assertSafeOutboundUrl(raw, 'S3 endpoint', false)).toThrow(ValidationError);
+    expect(() => assertSafeOutboundUrl(raw, 'S3 endpoint', BLOCK_PRIVATE)).toThrow(ValidationError);
   });
 
-  test('by default, http and LAN or loopback hosts are allowed', () => {
-    expect(() => assertSafeOutboundUrl('http://localhost:11434/v1', 'LLM')).not.toThrow();
-    expect(() => assertSafeOutboundUrl('http://192.168.1.20:9000', 'S3')).not.toThrow();
+  test('by default, LAN and loopback hosts are refused', () => {
+    const defaults = parsePrivateEndpointPolicy('', false);
+    for (const raw of ['http://localhost:11434/v1', 'https://192.168.1.20:9000', 'https://[::1]']) {
+      expect(() => assertSafeOutboundUrl(raw, 'LLM', defaults)).toThrow(
+        "LLM must point to a public host: this server doesn't allow private network addresses"
+      );
+    }
   });
 
   test('by default, metadata and link-local hosts are rejected', () => {
-    expect(() => assertSafeOutboundUrl('http://169.254.169.254', 'S3')).toThrow(ValidationError);
-    expect(() => assertSafeOutboundUrl('http://metadata.google.internal', 'S3')).toThrow(
+    const defaults = parsePrivateEndpointPolicy('', false);
+    expect(() => assertSafeOutboundUrl('http://169.254.169.254', 'S3', defaults)).toThrow(
       ValidationError
     );
+    expect(() => assertSafeOutboundUrl('http://metadata.google.internal', 'S3', defaults)).toThrow(
+      ValidationError
+    );
+  });
+
+  test('a public host must use https even when private hosts are allowed', () => {
+    expect(() => assertSafeOutboundUrl('http://93.184.215.14', 'LLM', ALLOW_PRIVATE)).toThrow(
+      'LLM must use https'
+    );
+    expect(() =>
+      assertSafeOutboundUrl('http://api.example.com', 'LLM', parsePrivateEndpointPolicy('', false))
+    ).toThrow('LLM must use https');
   });
 
   test('allowing private hosts permits http and LAN hosts', () => {
-    expect(() => assertSafeOutboundUrl('http://localhost:11434/v1', 'LLM', true)).not.toThrow();
-    expect(() => assertSafeOutboundUrl('http://192.168.1.20:9000', 'S3', true)).not.toThrow();
+    expect(() =>
+      assertSafeOutboundUrl('http://localhost:11434/v1', 'LLM', ALLOW_PRIVATE)
+    ).not.toThrow();
+    expect(() =>
+      assertSafeOutboundUrl('http://192.168.1.20:9000', 'S3', ALLOW_PRIVATE)
+    ).not.toThrow();
   });
 
   test('allowing private hosts still rejects metadata and link-local hosts', () => {
-    expect(() => assertSafeOutboundUrl('http://169.254.169.254', 'S3', true)).toThrow(
+    expect(() => assertSafeOutboundUrl('http://169.254.169.254', 'S3', ALLOW_PRIVATE)).toThrow(
       ValidationError
     );
-    expect(() => assertSafeOutboundUrl('http://[fd00:ec2::254]', 'S3', true)).toThrow(
+    expect(() => assertSafeOutboundUrl('http://[fd00:ec2::254]', 'S3', ALLOW_PRIVATE)).toThrow(
       ValidationError
     );
-    expect(() => assertSafeOutboundUrl('http://metadata.google.internal', 'S3', true)).toThrow(
-      ValidationError
-    );
+    expect(() =>
+      assertSafeOutboundUrl('http://metadata.google.internal', 'S3', ALLOW_PRIVATE)
+    ).toThrow(ValidationError);
   });
 });
 
@@ -117,14 +141,14 @@ describe('resolveSafeOutboundTarget', () => {
   test('rejects a public-looking name that resolves to a private address', async () => {
     outboundResolver.lookup = async () => ['10.0.0.7'];
     await expect(
-      resolveSafeOutboundTarget('https://files.example.com', 'S3 endpoint', false)
+      resolveSafeOutboundTarget('https://files.example.com', 'S3 endpoint', BLOCK_PRIVATE)
     ).rejects.toThrow(ValidationError);
   });
 
   test('rejects when any resolved address is disallowed', async () => {
     outboundResolver.lookup = async () => ['93.184.215.14', '169.254.169.254'];
     await expect(
-      resolveSafeOutboundTarget('https://files.example.com', 'S3 endpoint', true)
+      resolveSafeOutboundTarget('https://files.example.com', 'S3 endpoint', ALLOW_PRIVATE)
     ).rejects.toThrow(ValidationError);
   });
 
@@ -133,7 +157,7 @@ describe('resolveSafeOutboundTarget', () => {
       throw new Error('ENOTFOUND');
     };
     await expect(
-      resolveSafeOutboundTarget('https://files.example.com', 'S3 endpoint', false)
+      resolveSafeOutboundTarget('https://files.example.com', 'S3 endpoint', BLOCK_PRIVATE)
     ).rejects.toThrow(ValidationError);
   });
 
@@ -142,7 +166,7 @@ describe('resolveSafeOutboundTarget', () => {
     const target = await resolveSafeOutboundTarget(
       'https://files.example.com',
       'S3 endpoint',
-      false
+      BLOCK_PRIVATE
     );
     expect(target.url.hostname).toBe('files.example.com');
     expect(target.addresses).toEqual(['93.184.215.14', '2606:4700::1111']);
@@ -258,5 +282,114 @@ describe('fetchOutbound', () => {
       ValidationError
     );
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('private endpoint policy', () => {
+  const allowOllama = parsePrivateEndpointPolicy('192.168.1.10:11434, nas.lan, fd00:1::/64', false);
+
+  test('"allow" permits every private target, and the block switch wins over it', () => {
+    expect(parsePrivateEndpointPolicy('allow', false)).toEqual(ALLOW_PRIVATE);
+    expect(parsePrivateEndpointPolicy('allow', true)).toEqual(BLOCK_PRIVATE);
+    expect(parsePrivateEndpointPolicy('', false).allowAll).toBe(false);
+  });
+
+  test.each(['http://192.168.1.10:11434/v1', 'http://nas.lan:9000', 'https://[fd00:1::5]:9000'])(
+    'an allowlisted target %s is allowed',
+    (raw) => {
+      expect(() => assertSafeOutboundUrl(raw, 'LLM', allowOllama)).not.toThrow();
+    }
+  );
+
+  test.each([
+    'http://192.168.1.10:80',
+    'http://192.168.1.11:11434',
+    'http://localhost:11434',
+    'https://[fd00:2::5]',
+    'https://10.0.0.1',
+  ])('a private target outside the allowlist, %s, is refused', (raw) => {
+    expect(() => assertSafeOutboundUrl(raw, 'LLM', allowOllama)).toThrow(ValidationError);
+  });
+
+  test('an allowlist never permits metadata or link-local addresses', () => {
+    const wide = parsePrivateEndpointPolicy('128.0.0.0/1', false);
+    expect(() => assertSafeOutboundUrl('http://169.254.169.254', 'S3', wide)).toThrow(
+      'S3 must point to a public host'
+    );
+  });
+
+  test('an IPv4 rule does not match a 6to4 address that embeds it', () => {
+    const one = parsePrivateEndpointPolicy('192.168.1.20', false);
+    expect(() => assertSafeOutboundUrl('http://192.168.1.20', 'S3', one)).not.toThrow();
+    expect(() => assertSafeOutboundUrl('http://[2002:c0a8:114::]', 'S3', one)).toThrow(
+      ValidationError
+    );
+  });
+
+  test.each([
+    '10.0.0.0/33',
+    '10.0.0.0/',
+    '10.0.0.0/ 8',
+    '10.0.0.0/0x8',
+    '10.0.0.0/1e1',
+    '10.0.0.0/8/9',
+    '0.0.0.0/0',
+    '::/0',
+    '[fd00::1',
+    '[fd00::1]junk',
+    '[fd00::]/8:9000',
+    'allow,10.0.0.1',
+    'not a host!',
+    '192.168.1.10:0',
+    'nas.lan:99999',
+    'fd00::/129',
+  ])('a malformed entry %s is refused at parse time', (entry) => {
+    expect(() => parsePrivateEndpointPolicy(entry, false)).toThrow(
+      'PRIVATE_PROVIDER_ENDPOINTS entry'
+    );
+  });
+
+  test('a name that resolves to a non-allowlisted private address is refused', async () => {
+    outboundResolver.lookup = async () => ['192.168.1.99'];
+    await expect(
+      resolveSafeOutboundTarget('https://files.example.com', 'S3', allowOllama)
+    ).rejects.toThrow(ValidationError);
+  });
+
+  test('an http name that resolves to a public address is refused', async () => {
+    outboundResolver.lookup = async () => ['93.184.215.14'];
+    await expect(resolveSafeOutboundTarget('http://nas.lan', 'S3', allowOllama)).rejects.toThrow(
+      'S3 must use https'
+    );
+  });
+
+  describe('with the default policy', () => {
+    blockPrivateProviderEndpoints();
+
+    test('every request re-resolves, so a name rebound to a private address is refused', async () => {
+      const answers = [['93.184.215.14'], ['10.0.0.7']];
+      outboundResolver.lookup = async () => answers.shift() ?? [];
+      globalThis.fetch = (async () => new Response('{}')) as unknown as typeof fetch;
+      const policy = parsePrivateEndpointPolicy('', false);
+      await expect(
+        resolveSafeOutboundTarget('https://files.example.com', 'S3', policy)
+      ).resolves.toBeDefined();
+      await expect(
+        fetchOutbound('https://files.example.com/', { method: 'GET' }, 'S3')
+      ).rejects.toThrow(ValidationError);
+    });
+  });
+
+  test('a redirect to a private address is returned, never followed', async () => {
+    outboundResolver.lookup = async () => ['93.184.215.14'];
+    const seen: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      seen.push(`${String(input)} ${init?.redirect}`);
+      return new Response(null, { status: 302, headers: { location: 'http://10.0.0.7/' } });
+    }) as typeof fetch;
+    const res = await fetchOutbound('https://files.example.com/', { method: 'GET' }, 'S3');
+    expect(res.status).toBe(302);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toEndWith(' manual');
   });
 });

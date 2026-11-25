@@ -1,6 +1,38 @@
 import type { PermissionId } from './registry';
 
-export type RouteRule = PermissionId | { public: string };
+export type RoleScopeRule = { byScope: { server: PermissionId; vehicle: PermissionId } };
+export type EntityRule = { byEntity: Record<string, readonly PermissionId[]> };
+export type RouteRule = PermissionId | { public: string } | RoleScopeRule | EntityRule;
+
+export function isPublicRule(rule: RouteRule): rule is { public: string } {
+  return typeof rule === 'object' && 'public' in rule;
+}
+
+export function rulePermissions(rule: RouteRule): PermissionId[] {
+  if (typeof rule === 'string') return [rule];
+  if ('byScope' in rule) return Object.values(rule.byScope);
+  if ('byEntity' in rule) return Object.values(rule.byEntity).flat();
+  return [];
+}
+
+function photoRule(action: 'read' | 'write' | 'delete'): EntityRule {
+  const photo: PermissionId = `vehicle.photo.${action}`;
+  const access = action === 'read' ? 'read' : 'write';
+  const insurance: PermissionId = `vehicle.insurance.${access}`;
+  return {
+    byEntity: {
+      vehicle: [photo],
+      expense: [photo, `vehicle.expense.${access}`],
+      odometer_entry: [photo, `vehicle.odometer.${access}`],
+      insurance_policy: [photo, insurance],
+      insurance_claim: [photo, insurance],
+    },
+  };
+}
+
+const ROLE_SCOPED: RoleScopeRule = {
+  byScope: { server: 'server.roles.manage', vehicle: 'vehicle.share.manage' },
+};
 
 export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   'GET /health': { public: 'Liveness probe for containers and load balancers' },
@@ -28,12 +60,16 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   'GET /api/v1/vehicles/:id': 'vehicle.read',
   'PUT /api/v1/vehicles/:id': 'vehicle.write',
   'DELETE /api/v1/vehicles/:id': 'vehicle.delete',
-  'GET /api/v1/vehicles/:id/stats': 'vehicle.read',
+  'GET /api/v1/vehicles/:id/stats': 'vehicle.expense.read',
   'GET /api/v1/vehicles/:vehicleId/photos': 'vehicle.photo.read',
   'POST /api/v1/vehicles/:vehicleId/photos': 'vehicle.photo.write',
   'GET /api/v1/vehicles/:vehicleId/photos/:photoId/thumbnail': 'vehicle.photo.read',
   'PUT /api/v1/vehicles/:vehicleId/photos/:photoId/cover': 'vehicle.photo.write',
   'DELETE /api/v1/vehicles/:vehicleId/photos/:photoId': 'vehicle.photo.delete',
+  'GET /api/v1/vehicles/:vehicleId/drivers': 'vehicle.driver.record',
+  'POST /api/v1/vehicles/:vehicleId/drivers': 'vehicle.driver.manage',
+  'PATCH /api/v1/vehicles/:vehicleId/drivers/:driverId': 'vehicle.driver.manage',
+  'PUT /api/v1/vehicles/:vehicleId/car-share': 'vehicle.driver.manage',
 
   'GET /api/v1/financing/vehicles/:vehicleId/financing': 'vehicle.financing.read',
   'POST /api/v1/financing/vehicles/:vehicleId/financing': 'vehicle.financing.write',
@@ -59,14 +95,14 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
 
   'GET /api/v1/insurance': 'vehicle.insurance.read',
   'POST /api/v1/insurance': 'vehicle.insurance.write',
-  'GET /api/v1/insurance/vehicles/:vehicleId/policies': 'vehicle.insurance.read',
+  'GET /api/v1/insurance/vehicles/:vehicleId/policies': 'vehicle.read',
   'GET /api/v1/insurance/:id': 'vehicle.insurance.read',
   'PUT /api/v1/insurance/:id': 'vehicle.insurance.write',
   'DELETE /api/v1/insurance/:id': 'vehicle.insurance.write',
   'POST /api/v1/insurance/:id/terms': 'vehicle.insurance.write',
   'PUT /api/v1/insurance/:id/terms/:termId': 'vehicle.insurance.write',
   'DELETE /api/v1/insurance/:id/terms/:termId': 'vehicle.insurance.write',
-  'GET /api/v1/insurance/:id/claims': 'vehicle.insurance.read',
+  'GET /api/v1/insurance/:id/claims': 'vehicle.read',
   'POST /api/v1/insurance/:id/claims': 'vehicle.insurance.write',
   'PUT /api/v1/insurance/:id/claims/:claimId': 'vehicle.insurance.write',
   'DELETE /api/v1/insurance/:id/claims/:claimId': 'vehicle.insurance.write',
@@ -82,10 +118,10 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   'GET /api/v1/photos': 'vehicle.photo.read',
   'GET /api/v1/photos/orphans': 'vehicle.photo.read',
   'DELETE /api/v1/photos/orphans': 'vehicle.photo.delete',
-  'GET /api/v1/photos/:entityType/:entityId': 'vehicle.photo.read',
-  'POST /api/v1/photos/:entityType/:entityId': 'vehicle.photo.write',
-  'GET /api/v1/photos/:entityType/:entityId/:photoId/thumbnail': 'vehicle.photo.read',
-  'DELETE /api/v1/photos/:entityType/:entityId/:photoId': 'vehicle.photo.delete',
+  'GET /api/v1/photos/:entityType/:entityId': photoRule('read'),
+  'POST /api/v1/photos/:entityType/:entityId': photoRule('write'),
+  'GET /api/v1/photos/:entityType/:entityId/:photoId/thumbnail': photoRule('read'),
+  'DELETE /api/v1/photos/:entityType/:entityId/:photoId': photoRule('delete'),
 
   'GET /api/v1/providers': 'account.provider.manage',
   'POST /api/v1/providers': 'account.provider.manage',
@@ -123,7 +159,7 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   'GET /api/v1/analytics/insurance': 'vehicle.insurance.read',
   'GET /api/v1/analytics/fuel-advanced': 'vehicle.expense.read',
   'GET /api/v1/analytics/vehicle-health': 'vehicle.read',
-  'GET /api/v1/analytics/vehicle-tco': 'vehicle.read',
+  'GET /api/v1/analytics/vehicle-tco': 'vehicle.expense.read',
   'GET /api/v1/analytics/vehicle-expenses': 'vehicle.expense.read',
   'GET /api/v1/analytics/year-end': 'vehicle.expense.read',
   'GET /api/v1/analytics/fuel-efficiency': 'vehicle.expense.read',
@@ -162,11 +198,20 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   'DELETE /api/v1/roles/:id': 'account.roles.manage',
   'GET /api/v1/roles/:id/permissions': 'account.roles.manage',
   'PUT /api/v1/roles/:id/permissions': 'account.roles.manage',
-  'POST /api/v1/role-assignments': 'vehicle.share.manage',
-  'DELETE /api/v1/role-assignments': 'vehicle.share.manage',
-  'GET /api/v1/overrides': 'vehicle.share.manage',
-  'PUT /api/v1/overrides': 'vehicle.share.manage',
-  'DELETE /api/v1/overrides': 'vehicle.share.manage',
+  'POST /api/v1/role-assignments': ROLE_SCOPED,
+  'DELETE /api/v1/role-assignments': ROLE_SCOPED,
+  'GET /api/v1/overrides': ROLE_SCOPED,
+  'PUT /api/v1/overrides': ROLE_SCOPED,
+  'DELETE /api/v1/overrides': ROLE_SCOPED,
+
+  'GET /api/v1/admin/signup': 'server.signup.manage',
+  'PUT /api/v1/admin/signup': 'server.signup.manage',
+  'GET /api/v1/admin/invites': 'server.signup.manage',
+  'POST /api/v1/admin/invites': 'server.signup.manage',
+  'DELETE /api/v1/admin/invites/:id': 'server.signup.manage',
+  'GET /api/v1/admin/pending-accounts': 'server.signup.manage',
+  'POST /api/v1/admin/pending-accounts/:id/approve': 'server.signup.manage',
+  'DELETE /api/v1/admin/pending-accounts/:id': 'server.signup.manage',
 
   'GET /api/v1/push/vapid-public-key': 'account.push.read',
   'POST /api/v1/push/subscribe': 'account.push.write',

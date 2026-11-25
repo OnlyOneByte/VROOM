@@ -62,4 +62,27 @@ describe('SyncStatusInline — server unreachable', () => {
 
 		expect(screen.getByRole('status')).toHaveTextContent('Up to date');
 	});
+
+	it('reads the full status but only speaks connection changes, not the steps of a background sync', async () => {
+		authStore.setUser(alice);
+		render(SyncStatusInline);
+		const status = screen.getByRole('status');
+		const spoken = screen.getByTestId('sync-status-announcement');
+
+		expect(status).toHaveAttribute('aria-live', 'off');
+		expect(spoken).toHaveAttribute('aria-live', 'polite');
+		for (const [step, text] of [
+			['syncing', 'Syncing...'],
+			['success', 'Synced'],
+			['error', 'Sync failed']
+		] as const) {
+			syncState.current = step;
+			await Promise.resolve();
+			expect(status).toHaveTextContent(text);
+			expect(spoken).toHaveTextContent('Up to date');
+		}
+		onlineStatus.current = false;
+		await Promise.resolve();
+		expect(spoken).toHaveTextContent('Offline');
+	});
 });

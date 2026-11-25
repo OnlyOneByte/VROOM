@@ -4,7 +4,12 @@ import type {
 	AnalyticsQueryResponse,
 	UnitPreferences
 } from '#lib/types/index.ts';
-import { CHART_COLORS, getCategoryChartColor, getCategoryLabel } from '#lib/utils/chart-colors.ts';
+import {
+	CHART_COLORS,
+	VEHICLE_COLORS,
+	getCategoryChartColor,
+	getCategoryLabel
+} from '#lib/utils/chart-colors.ts';
 import { formatCurrency, formatDateWith, formatNumber } from '#lib/utils/formatters.ts';
 import {
 	getChargeUnitLabel,
@@ -47,7 +52,8 @@ export function seriesFor(
 	vehicleColors: Record<string, string> = {}
 ): ExploreSeries[] {
 	return response.series.map((s, i) => {
-		const fallback = CHART_COLORS[i % CHART_COLORS.length] as string;
+		const palette = response.groupBy === 'vehicle' ? VEHICLE_COLORS : CHART_COLORS;
+		const fallback = palette[i % palette.length] as string;
 		const color =
 			response.groupBy === 'category'
 				? getCategoryChartColor(s.key)
@@ -70,6 +76,16 @@ function sum(values: Array<number | null>): number {
 
 export function bucketTotals(series: Array<{ values: Array<number | null> }>, length: number) {
 	return Array.from({ length }, (_, i) => sum(series.map(s => s.values[i] ?? null)));
+}
+
+export function emptyBuckets(
+	series: Array<{ values: Array<number | null> }>,
+	length: number,
+	additive = true
+): boolean[] {
+	return Array.from({ length }, (_, i) =>
+		series.every(s => s.values[i] == null || (additive && s.values[i] === 0))
+	);
 }
 
 export interface ExploreKpis {
@@ -95,13 +111,19 @@ export function kpis(
 			perDistance: response.totals.perDistance
 		};
 	}
+	const filled = (period: AnalyticsQueryPeriod) =>
+		emptyBuckets(
+			period.series.filter(s => visible.has(s.key)),
+			period.buckets.length
+		).filter(empty => !empty).length;
+	const perFilled = (value: number, count: number) => (count > 0 ? value / count : null);
 	const total = visibleTotal(response);
-	const buckets = response.buckets.length || 1;
-	const previous = response.compare ? visibleTotal(response.compare) : null;
 	return {
 		total,
-		perBucket: total / buckets,
-		previousPerBucket: previous == null ? null : previous / buckets,
+		perBucket: perFilled(total, filled(response)),
+		previousPerBucket: response.compare
+			? perFilled(visibleTotal(response.compare), filled(response.compare))
+			: null,
 		perDistance:
 			query.split !== 'vehicle' &&
 			response.totals.perDistance != null &&
@@ -225,9 +247,11 @@ function mean(values: ReadonlyArray<number | null>): number | null {
 
 export function carPanels(
 	series: readonly ExploreSeries[],
-	pooled?: { fleet: number | null; cars: Record<string, number | null> }
+	pooled?: { fleet: number | null; cars: Record<string, number | null> },
+	empty: readonly boolean[] = []
 ) {
-	const all = series.flatMap(s => s.values);
+	const known = (s: ExploreSeries) => s.values.map((v, i) => (empty[i] ? null : v));
+	const all = series.flatMap(known);
 	const fleetMean = pooled ? pooled.fleet : mean(all);
 	const max = Math.max(0, fleetMean ?? 0, ...all.filter((v): v is number => v != null));
 	return {
@@ -235,7 +259,7 @@ export function carPanels(
 		fleetMean,
 		panels: series.map(s => ({
 			series: s,
-			mean: pooled ? (pooled.cars[s.sourceKey] ?? null) : mean(s.values)
+			mean: pooled ? (pooled.cars[s.sourceKey] ?? null) : mean(known(s))
 		}))
 	};
 }

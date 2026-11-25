@@ -27,6 +27,7 @@ function reminder(overrides: Partial<Reminder> = {}): Reminder {
     expenseSplitConfig: null,
     isActive: true,
     lastTriggeredAt: null,
+    createdBy: null,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     updatedAt: new Date('2024-01-01T00:00:00Z'),
   };

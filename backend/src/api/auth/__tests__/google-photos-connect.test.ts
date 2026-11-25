@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { CONFIG } from '../../../config';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { consumePending, getPendingEmail } from '../../../utils/pending-credentials';
 
@@ -110,5 +111,38 @@ describe('connecting Google storage asks only for what the provider needs', () =
     const location = await callback(await connect('&providerType=google-photos'));
     expect(location.searchParams.get('provider_connected')).toBe('true');
     expect(getPendingEmail(ctx.user.id, 'n-1')).toBe('me@example.com');
+  });
+});
+
+describe('an OAuth return re-checks the permission that started it', () => {
+  const denyOnServer = (permission: string) =>
+    ctx.sqlite.run(
+      "INSERT INTO permission_overrides (id, user_id, scope, scope_id, permission, effect) VALUES (?, ?, 'server', NULL, ?, 'deny')",
+      [`po-${permission}`, ctx.user.id, permission]
+    );
+
+  test('connecting a provider stops when the permission was taken away meanwhile', async () => {
+    const url = await connect('&providerType=google-photos');
+    denyOnServer('account.provider.manage');
+    expect((await callback(url)).searchParams.get('provider_error')).toBe('forbidden');
+  });
+
+  test('linking a sign-in method stops when the permission was taken away meanwhile', async () => {
+    const auth = CONFIG.auth as { googleClientId?: string; googleClientSecret?: string };
+    const previous = { ...auth };
+    auth.googleClientId = 'test-client';
+    auth.googleClientSecret = 'test-secret';
+    spies.push({ mockRestore: () => Object.assign(auth, previous) });
+    const start = await ctx.authed('GET', '/api/v1/auth/link/google');
+    expect(start.status).toBe(302);
+    const state = new URL(start.headers.get('location') ?? '').searchParams.get('state') ?? '';
+    denyOnServer('account.signin.manage');
+    const res = await ctx.authed(
+      'GET',
+      `/api/v1/auth/callback/link/google?code=c&state=${encodeURIComponent(state)}`
+    );
+    expect(new URL(res.headers.get('location') ?? '').searchParams.get('link_error')).toBe(
+      'forbidden'
+    );
   });
 });

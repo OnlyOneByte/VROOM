@@ -12,11 +12,14 @@ const EXCLUDED_BY_DESIGN = [
   'push_subscriptions',
   'community_stats',
   'community_refreshes',
+  'community_noise_keys',
   'calendar_feeds',
   'roles',
   'role_permissions',
   'role_assignments',
   'permission_overrides',
+  'server_settings',
+  'server_invites',
 ] as const;
 
 function allSchemaTableNames(): string[] {

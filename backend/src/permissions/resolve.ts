@@ -6,6 +6,7 @@ import { type PermissionScope, parsePermissionId } from './vocabulary';
 export interface Actor {
   userId: string;
   disabled: boolean;
+  demo?: boolean;
 }
 
 export type Resource =
@@ -124,6 +125,14 @@ const OWNER_RULES: Rule[] = PERMISSION_REGISTRY.list
   .filter((d) => d.scope === 'vehicle')
   .map((d) => rule(d.id, 'owner'));
 
+const OWN_ACCOUNT_RULES: Rule[] = PERMISSION_REGISTRY.list
+  .filter((d) => d.scope === 'vehicle' && d.grantable)
+  .map((d) => rule(d.id, 'owner'));
+
+const DEMO_OWN_ACCOUNT_RULES: Rule[] = OWN_ACCOUNT_RULES.filter(
+  (r) => parsePermissionId(String(r.action))?.action === 'read'
+);
+
 function denyTargets(permission: string): Set<string> {
   const own = ownDeleteOf(permission);
   return own ? new Set([...targets(permission), ...targets(own)]) : targets(permission);
@@ -132,7 +141,18 @@ function denyTargets(permission: string): Set<string> {
 function servesResource(permission: string, resource: Resource): boolean {
   const scope = PERMISSION_REGISTRY.get(permission)?.scope;
   if (!scope) return false;
+  if (resource.kind === 'account') return true;
   return resource.kind === 'vehicle' ? scope === 'vehicle' : scope !== 'vehicle';
+}
+
+function isOwnVehicleData(permission: string, resource: Resource): boolean {
+  const descriptor = PERMISSION_REGISTRY.get(permission);
+  return resource.kind === 'account' && descriptor?.scope === 'vehicle' && descriptor.grantable;
+}
+
+function ownVehicleDataFor(actor: Actor, permission: string, resource: Resource): boolean {
+  if (!isOwnVehicleData(permission, resource)) return false;
+  return !actor.demo || parsePermissionId(permission)?.action === 'read';
 }
 
 function ownDeleteOf(permission: string): string | null {
@@ -190,13 +210,14 @@ export function createResolver(actor: Actor, source: GrantSource): Resolver {
   const vehicleState = (vehicleId: string): ScopeState => {
     const facts = source.vehicleFacts(actor.userId, vehicleId);
     if (!facts) return { kind: 'hidden' };
-    if (facts.owner) return { kind: 'owner', rules: OWNER_RULES };
+    if (facts.owner && !actor.demo) return { kind: 'owner', rules: OWNER_RULES };
     if (facts.member) {
       return rulesState(buildRules(facts.grants, VEHICLE_REACH), facts.grants.roles);
     }
-    const demoRoles = facts.demoGarage
-      ? source.serverGrants(actor.userId).roles.filter((role) => role.builtInDemo)
-      : [];
+    const demoRoles =
+      facts.demoGarage || facts.owner
+        ? source.serverGrants(actor.userId).roles.filter((role) => role.builtInDemo)
+        : [];
     if (demoRoles.length === 0) return { kind: 'hidden' };
     const demoReads = demoRoles.map((role) => ({
       ...role,
@@ -221,7 +242,9 @@ export function createResolver(actor: Actor, source: GrantSource): Resolver {
     if (actor.disabled) return { allow: false, reason: 'disabled' };
     const state = stateFor(resource);
     if (state.kind === 'hidden') return { allow: false, reason: 'not_found' };
-    if (state.kind === 'owner') return { allow: true, via: 'owner', roleIds: [] };
+    if (state.kind === 'owner' || ownVehicleDataFor(actor, permission, resource)) {
+      return { allow: true, via: 'owner', roleIds: [] };
+    }
     if (!PERMISSION_REGISTRY.get(permission)?.grantable) {
       return { allow: false, reason: 'forbidden' };
     }
@@ -232,7 +255,9 @@ export function createResolver(actor: Actor, source: GrantSource): Resolver {
   const rulesFor = (resource: Resource): Rule[] => {
     if (actor.disabled) return [];
     const state = stateFor(resource);
-    return state.kind === 'hidden' ? [] : state.rules;
+    if (state.kind === 'hidden') return [];
+    if (resource.kind !== 'account') return state.rules;
+    return [...state.rules, ...(actor.demo ? DEMO_OWN_ACCOUNT_RULES : OWN_ACCOUNT_RULES)];
   };
 
   return { can, rulesFor, packedRulesFor: (resource) => packRules(rulesFor(resource)) };

@@ -2,16 +2,12 @@ import { zValidator as honoZValidator } from '@hono/zod-validator';
 import type { ValidationTargets } from 'hono';
 import type { ZodError, ZodType } from 'zod';
 import { z } from 'zod';
-import { financingRepository } from '../api/financing/repository';
 import { insurancePolicyRepository } from '../api/insurance/repository';
-import { type ReminderWithVehicles, reminderRepository } from '../api/reminders/repository';
-import { tripRepository } from '../api/trips/repository';
 import { CONFIG } from '../config';
-import type { InsurancePolicy, Trip, VehicleFinancing } from '../db/schema';
+import type { InsurancePolicy } from '../db/schema';
 import { isElectricFuelType } from '../db/types';
 import { createErrorResponse, NotFoundError, ValidationError } from '../errors';
 import { formatNumberForMessage } from './money';
-import { allowsMode, resolveVehicleAccess } from './vehicle-access';
 
 export const MAX_ODOMETER_READING = CONFIG.validation.vehicle.maxOdometerReading;
 export const ODOMETER_TOO_HIGH_MESSAGE = `Odometer must be ${formatNumberForMessage(MAX_ODOMETER_READING)} or less`;
@@ -91,22 +87,6 @@ export const commonSchemas = {
   }),
 };
 
-export async function validateFinancingOwnership(
-  financingId: string,
-  userId: string
-): Promise<VehicleFinancing> {
-  const financing = await financingRepository.findById(financingId);
-  if (!financing) {
-    throw new NotFoundError('Financing');
-  }
-
-  if (!allowsMode(await resolveVehicleAccess(financing.vehicleId, userId), 'owner')) {
-    throw new NotFoundError('Financing');
-  }
-
-  return financing;
-}
-
 export async function validateInsuranceOwnership(
   insuranceId: string,
   userId: string
@@ -121,25 +101,6 @@ export async function validateInsuranceOwnership(
   }
 
   return insurance;
-}
-
-export async function validateReminderOwnership(
-  reminderId: string,
-  userId: string
-): Promise<ReminderWithVehicles> {
-  const reminder = await reminderRepository.findByIdAndUserId(reminderId, userId);
-  if (!reminder) {
-    throw new NotFoundError('Reminder');
-  }
-  return reminder;
-}
-
-export async function validateTripOwnership(tripId: string, userId: string): Promise<Trip> {
-  const trip = await tripRepository.findByIdAndUserId(tripId, userId);
-  if (!trip) {
-    throw new NotFoundError('Trip');
-  }
-  return trip;
 }
 
 export function validateFuelExpenseData(

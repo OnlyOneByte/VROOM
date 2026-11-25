@@ -17,9 +17,16 @@ import {
 } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
+import {
+  countNum,
+  formatYearMonth,
+  jsonArraySome,
+  sqlFalse,
+  sqlTrue,
+  sumNum,
+} from '../../db/dialect';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, odometerEntries, photos, vehicles } from '../../db/schema';
-import { formatYearMonth } from '../../db/sql-helpers';
 import type { DrizzleTransaction } from '../../db/types';
 import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '../../errors';
 import { zonedCalendar } from '../../utils/analytics-charts';
@@ -223,9 +230,7 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
   }
   if (filters.tags?.length) {
     for (const tag of filters.tags) {
-      conditions.push(
-        sql`EXISTS (SELECT 1 FROM json_each(${expenses.tags}) WHERE json_each.value = ${tag})`
-      );
+      conditions.push(jsonArraySome(expenses.tags, (element) => sql`${element} = ${tag}`));
     }
   }
   const search = filters.search?.trim();
@@ -275,7 +280,7 @@ function searchCondition(search: string): SQL {
   return sql`(${like(sql`${expenses.description}`)}
     OR ${like(sql`${expenses.category}`)}
     OR ${like(sql`${expenses.location}`)}
-    OR EXISTS (SELECT 1 FROM json_each(${expenses.tags}) WHERE ${like(sql`json_each.value`)})
+    OR ${jsonArraySome(expenses.tags, like)}
     OR EXISTS (SELECT 1 FROM ${vehicles} WHERE ${vehicles.id} = ${expenses.vehicleId}
       AND (${like(sql`${vehicles.nickname}`)} OR ${like(sql`${vehicles.make}`)} OR ${like(sql`${vehicles.model}`)}))
     ${amount ? sql`OR ${amount}` : sql``})`;
@@ -402,13 +407,17 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return rows.map((r) => r.id);
   }
 
-  async getSplitGroupAccessInfo(
-    groupId: string
-  ): Promise<{ vehicleIds: string[]; ownerId: string; sourceType: string | null } | null> {
+  async getSplitGroupAccessInfo(groupId: string): Promise<{
+    vehicleIds: string[];
+    ownerId: string;
+    authors: (string | null)[];
+    sourceType: string | null;
+  } | null> {
     const rows = await this.db
       .select({
         vehicleId: expenses.vehicleId,
         userId: expenses.userId,
+        createdBy: expenses.createdBy,
         sourceType: expenses.sourceType,
       })
       .from(expenses)
@@ -417,6 +426,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return {
       vehicleIds: [...new Set(rows.map((r) => r.vehicleId))],
       ownerId: rows[0].userId,
+      authors: [...new Set(rows.map((r) => r.createdBy))],
       sourceType: rows[0].sourceType,
     };
   }
@@ -531,7 +541,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       const baseWhere = and(eq(expenses.userId, filters.userId ?? ''), ...conditions);
 
       const [countResult] = await this.db
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: countNum() })
         .from(expenses)
         .where(baseWhere);
 
@@ -649,8 +659,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         await Promise.all([
           this.db
             .select({
-              totalAmount: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
-              expenseCount: sql<number>`count(*)`,
+              totalAmount: sumNum(expenses.expenseAmount),
+              expenseCount: countNum(),
             })
             .from(expenses)
             .where(periodWhere),
@@ -658,8 +668,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           this.db
             .select({
               category: expenses.category,
-              amount: sql<number>`SUM(${expenses.expenseAmount})`,
-              count: sql<number>`count(*)`,
+              amount: sumNum(expenses.expenseAmount),
+              count: countNum(),
             })
             .from(expenses)
             .where(periodWhere)
@@ -670,8 +680,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
             : this.db
                 .select({
                   period: formatYearMonth(expenses.date).as('period'),
-                  amount: sql<number>`SUM(${expenses.expenseAmount})`,
-                  count: sql<number>`count(*)`,
+                  amount: sumNum(expenses.expenseAmount),
+                  count: countNum(),
                 })
                 .from(expenses)
                 .where(periodWhere)
@@ -680,7 +690,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
           this.db
             .select({
-              amount: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
+              amount: sumNum(expenses.expenseAmount),
             })
             .from(expenses)
             .where(recentWhere),
@@ -731,10 +741,10 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     if (previousStart) conditions.push(gte(expenses.date, previousStart));
 
     const isOwnership = inArray(expenses.category, [...OWNERSHIP_CATEGORIES]);
-    const inCurrent = start ? gte(expenses.date, start) : sql`1`;
-    const inPrevious = start ? lt(expenses.date, start) : sql`0`;
+    const inCurrent = start ? gte(expenses.date, start) : sqlTrue();
+    const inPrevious = start ? lt(expenses.date, start) : sqlFalse();
     const bucketSum = (when: SQL) =>
-      sql<number>`COALESCE(SUM(CASE WHEN ${when} THEN ${expenses.expenseAmount} ELSE 0 END), 0)`;
+      sumNum(sql`CASE WHEN ${when} THEN ${expenses.expenseAmount} ELSE 0 END`);
 
     const rows = await this.db
       .select({
@@ -913,8 +923,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   async updateSplitExpense(
     groupId: string,
     data: { splitConfig: SplitConfig; totalAmount?: number },
-    userId: string,
-    createdBy: string | null = null
+    userId: string
   ): Promise<Expense[]> {
     try {
       // bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.
@@ -937,7 +946,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         return expenseSplitService.updateSiblingsSync(tx, {
           groupId,
           existing: [firstOld, ...restOld],
-          createdBy,
+          createdBy: firstOld.createdBy,
           splitMethod: data.splitConfig.method,
           groupTotal: totalAmount,
           allocations: expenseSplitService.computeAllocations(data.splitConfig, totalAmount),

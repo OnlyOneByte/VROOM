@@ -38,6 +38,8 @@
 	import FuelEfficiencyStatsCard from '#lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
 	import type { AttentionItem } from '#lib/components/dashboard/dashboard-data.ts';
 	import { formatDate } from '#lib/utils/formatters.ts';
+	import { matchesFilters } from '#lib/utils/sync/pending-rows.ts';
+	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	let InsuranceTab = $state<Component<{ vehicleId: string; readOnly?: boolean }> | null>(null);
 	let hasLoadedInsurance = $state(false);
@@ -258,15 +260,47 @@
 		})
 	);
 
+	const pending = usePendingRows({
+		match: expense => expense.vehicleId === vehicleId,
+		refresh: () =>
+			Promise.all([
+				hasLoadedExpensesTab ? fetchExpensesPage(currentOffset) : undefined,
+				loadSummary(),
+				loadOverviewLists()
+			]),
+		listedIds: () => listedExpenseIds
+	});
+	let listedExpenseIds = $derived.by(() => {
+		const inRecent = new Set(recentList.map(expense => expense.id));
+		if (!hasLoadedExpensesTab) return inRecent;
+		return new Set(expenses.map(expense => expense.id).filter(id => inRecent.has(id)));
+	});
+	let pendingTabRows = $derived(
+		pending.rows.filter(row =>
+			matchesFilters(row, {
+				categories: expenseCategoryFilter.split(',').filter(Boolean),
+				startDate: filters.startDate,
+				endDate: filters.endDate,
+				search: searchTerm,
+				tags: filters.tags ?? []
+			})
+		)
+	);
+	let tabExpenses = $derived(currentOffset === 0 ? [...pendingTabRows, ...expenses] : expenses);
+
 	let recentExpenses = $derived(
-		recentList.map(expense => ({
-			id: expense.id,
-			amount: expense.amount,
-			category: expense.category,
-			date: new Date(expense.date),
-			description: expense.description,
-			location: expense.location
-		}))
+		[...pending.rows, ...recentList].slice(0, 3).map(expense => {
+			const sync = pending.states.get(expense.id);
+			return {
+				id: expense.id,
+				amount: expense.amount,
+				category: expense.category,
+				date: new Date(expense.date),
+				description: expense.description,
+				location: expense.location,
+				...(sync && { syncNote: sync.status === 'failed' ? 'Not saved' : 'Unsynced' })
+			};
+		})
 	);
 
 	let coverPhotoUrl = $derived.by(() => {
@@ -907,7 +941,7 @@
 							<RecentActivityCard
 								title="Recent expenses"
 								expenses={recentExpenses}
-								totalCount={recentTotal}
+								totalCount={recentTotal + pending.saving.length}
 								onSeeAll={seeAllExpenses}
 							/>
 						{/if}
@@ -1019,7 +1053,11 @@
 
 							<CardFull.Root>
 								<CardFull.Header class="flex flex-row items-center justify-between gap-2 space-y-0">
-									<CardFull.Title>All Expenses ({totalCount})</CardFull.Title>
+									<CardFull.Title>
+										All Expenses ({totalCount +
+											pendingTabRows.filter(row => pending.states.get(row.id)?.status === 'saving')
+												.length})
+									</CardFull.Title>
 									{#if totalCount > 0 && isOwner}
 										<Button
 											variant="outline"
@@ -1042,7 +1080,8 @@
 										/>
 									{:else}
 										<ExpensesTable
-											{expenses}
+											expenses={tabExpenses}
+											pendingStates={pending.states}
 											showVehicleColumn={false}
 											{canWrite}
 											returnTo={resolve(paramRoutes.vehicle, { id: vehicleId })}

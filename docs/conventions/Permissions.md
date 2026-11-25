@@ -2,10 +2,9 @@
 
 Every action in VROOM is a permission: a string such as `vehicle.expense.write` or
 `account.backup.run`. A feature declares its permissions in one `capabilities.ts` next to its
-routes, and maps each of its routes to one of them. The registry and the route map are in
-**report mode** today: they describe what each route needs, and the contract test keeps them
-complete, but nothing at runtime reads them yet. Requests are still authorized by
-`requireAuth` and `requireVehicleAccess`.
+routes, and maps each of its routes to one of them. Every route is enforced from the route map
+at runtime: the app-wide route guard refuses any route the map doesn't list, and each non-public
+route runs `authorize()`, apart from the few listed below that check inside.
 
 ## Permission ids
 
@@ -15,9 +14,10 @@ An id is `<scope>.<resource>.<action>`, or `<scope>.<action>` for the scope itse
 - **Scopes** (`PERMISSION_SCOPES` in `src/permissions/vocabulary.ts`): `server`, `account` and
   `vehicle`.
 - **Actions**: `read`, `write` (create and update), `delete`, `delete_own` (entries the actor
-  added), `manage` (change who can do things), `run` (trigger a job) and `use` (spend a shared
-  resource). A few verbs that read badly as one of these are listed in `NAMED_ACTIONS`
-  (`vehicle.transfer`, `account.backup.restore`). Add to that list only when no core action fits.
+  added), `read_own` (only the actor's own share of the data), `manage` (change who can do
+  things), `run` (trigger a job) and `use` (spend a shared resource). A few verbs that read badly
+  as one of these are listed in `NAMED_ACTIONS` (`vehicle.transfer`, `account.backup.restore`,
+  `vehicle.driver.record`). Add to that list only when no core action fits.
 - Segments are lower-case `snake_case`.
 
 ## Declaring them
@@ -43,21 +43,22 @@ Each descriptor carries:
 | `scope` | required | Must match the first segment of the id |
 | `grantable` | `true` | `false` for permissions only the vehicle owner holds (`vehicle.delete`, `vehicle.transfer`). No role or override can grant them |
 | `implies` | `[]` | Permissions this one includes. Every `write` implies the `read` on the same resource |
-| `sensitive` | `false` | `true` for data people expect to stay private (`vehicle.financing.read`, `vehicle.insurance.read`) |
+| `sensitive` | `false` | `true` for data people expect to stay private (`vehicle.financing.read`, `vehicle.insurance.read`, `vehicle.driver_stats.read`) |
 
 Then spread the export into `DECLARED_PERMISSIONS` in `src/permissions/registry.ts`. The registry
 validates every declaration when it loads and throws on a duplicate id, a malformed id, a scope
 that doesn't match the id, or an `implies` target that isn't declared. `PermissionId` is the
 union of every declared id, so a typo in the route map or a role template fails type-check.
 
-The `server` scope has no routes yet, so it declares its permissions in
-`src/permissions/server-capabilities.ts`.
+The `server` scope declares its permissions in `src/permissions/server-capabilities.ts`. The
+sign-up admin routes (`/api/v1/admin/...`) check `server.signup.manage` against the server.
 
 ## Role templates
 
 The built-in roles (Admin, Member, Demo, Co-owner, Editor and Viewer) are permission sets in
 `src/permissions/roles.ts`. Most are derived from the registry (Co-owner is every grantable
-vehicle permission, Viewer every vehicle read except the two sensitive ones), so a new vehicle
+vehicle permission, Viewer every vehicle read except the sensitive ones, plus
+`vehicle.driver_stats.read_own`), so a new vehicle
 permission reaches them without an edit. Editor is listed by hand; keep it a superset of Viewer.
 Check that the result is what you want; the role tests pin the rules, including
 Viewer ⊆ Editor ⊆ Co-owner.
@@ -76,12 +77,18 @@ library, assignable only on that owner's cars. Built-in roles can be copied (`co
 edited or deleted; the built-in keys are reserved, and a role's scope never changes.
 
 - `role_assignments` gives a person a role: at server scope (`scope_id` null), or on one vehicle.
-  Everyone holds Member, and the demo user Demo. Accepting a share clears anything left over for
+  Everyone holds Member, and the demo user Demo, except an account waiting for approval, which
+  holds no server role until an admin approves it. Only the demo bootstrap assigns Demo: the roles
+  API refuses to assign it or copy it, and nobody holds the vehicle reads it carries at server
+  scope, so the API can't remove it either. Accepting a share clears anything left over for
   that person on that car and assigns Editor or Viewer from its level; changing the level swaps
   it; revoking or leaving deletes that person's vehicle assignments and overrides. Each of these
   re-reads the share in its transaction and answers 409 if it changed underneath. `vehicle_shares` stays the membership and invite record.
 - `permission_overrides` allows or denies one permission for one person, at server or vehicle scope.
   A deny on `delete_own` does not stop someone who also holds `delete`; deny `delete` for that.
+  A deny on `X.write` doesn't block `X.delete_own` either; deny `X.delete` to stop deletes.
+- A co-owner can't remove the Co-owner role the owner gave them, but can leave the car by declining
+  the share.
 - A full restore is refused (409) while the account's vehicles carry overrides or custom-role
   assignments, since the restore re-creates the vehicles and would drop them. Merge mode is fine.
 
@@ -98,9 +105,22 @@ edited or deleted; the built-in keys are reserved, and a role's scope never chan
    and a deny on `delete` also blocks `delete_own`. A non-grantable permission in a role row or
    an override grants nothing, not even what it implies.
 5. A `delete` check also passes on `delete_own` when the entry's `createdBy` is the actor.
+6. A grantable vehicle permission checked on the actor's own account means "on my own vehicles":
+   allowed unless the actor is disabled (never `vehicle.delete` or `vehicle.transfer`). Routes with
+   no vehicle (an unfiltered list, orphan photos, the notifications inbox, fleet analytics) resolve
+   this way, so any route mapped to the account scope must scope its query to the caller's own
+   vehicles.
+
+A redaction that used to ask "is owner" asks for permissions instead: loan and insurance details
+show to whoever holds both `vehicle.financing.read` and `vehicle.insurance.read` (the owner, a
+co-owner, or a person with allow overrides), and loan-linked or premium expenses can be changed by
+whoever holds both `.write` permissions.
 
 The Demo role's vehicle reads count only for the built-in Demo row (built-in flag plus key), and
-only on the demo garage: vehicles whose owner holds that row. `GET /auth/capabilities` returns the
+only on the demo garage: vehicles whose owner holds that row. An actor holding the Demo role never
+resolves as an owner, not even of its own garage, so it gets reads only. The route guard in
+`src/permissions/route-guard.ts` lets the demo user call a route only when the Demo template holds
+every permission the route maps to, and no public route except a read. `GET /auth/capabilities` returns the
 caller's packed server and account rules, and the frontend `can()` in
 `src/lib/utils/permissions.ts` reads them.
 
@@ -125,6 +145,25 @@ Every route mounted in `src/app.ts` has one entry in `ROUTE_PERMISSIONS`
 
 - Pick the permission the handler needs today. A handler that calls
   `requireVehicleAccess(id, user.id, 'write')` on an expense maps to `vehicle.expense.write`.
+- A delete route maps to `<resource>.delete`; when its resource resolver supplies the entry's
+  author, `delete_own` covers the actor's own entries. Expenses, odometer readings, reminders,
+  trips and photos record `created_by` (null when the owner added it) for this, and a restore
+  keeps it only while that person is a member of every car the entry covers.
+- `{ byScope: { server, vehicle } }` picks the permission by the request's scope (role
+  assignments and overrides), and `{ byEntity: { <entityType>: [...] } }` requires every listed
+  permission for that entity type (photos of policies and claims also need insurance access).
+
+To enforce a route, add `authorize(resourceOf)` after its validators and rate limiters, and
+before idempotency and body limits, so a refused caller costs no stored response or body read. `resourceOf` loads the
+resource from the database (`fromExpense` reads the expense's vehicle and author), never from what
+the caller claims; identity always comes from the session. A route with no map entry is refused at runtime by the route guard.
+Not visible → 404; visible but not allowed → 403. A few routes check inside instead: the session
+routes that read the cookie themselves (`GET /auth/me`, `/auth/capabilities`, logout and refresh),
+the two OAuth returns (they check their stored state, the session and, again, the permission the
+flow started with), `GET /overrides`, where anyone reads their own overrides, and the `/roles`
+routes, which pick `server.roles.manage` or the owner's library by the role's scope;
+`src/permissions/__tests__/route-guard.test.ts` lists them and fails when any other mapped route
+lacks `authorize()`.
 - Use `{ public: '<reason>' }` only for routes a signed-out visitor must reach: health, the
   sign-in flow. The reason says why.
 

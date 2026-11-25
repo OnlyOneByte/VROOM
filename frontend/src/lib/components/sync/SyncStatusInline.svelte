@@ -44,6 +44,17 @@
 		})
 	);
 
+	let announcedStatus = $derived(
+		getSyncStatusInfo({
+			isOnline: onlineStatus.current,
+			syncStatus: 'idle',
+			pendingCount: 0,
+			conflictsCount: syncConflicts.current.length,
+			serverReachable: !authStore.sessionUnverified,
+			providerNeedsAttention
+		}).text
+	);
+
 	let statusPanel = $state<HTMLElement | null>(null);
 
 	async function retrySession() {
@@ -124,7 +135,10 @@
 	aria-label="Sync status"
 	class="py-1 space-y-2 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50"
 >
-	<span class="sr-only" role="status">{statusInfo.text}</span>
+	<span class="sr-only" role="status" aria-live="off">{statusInfo.text}</span>
+	<span class="sr-only" aria-live="polite" data-testid="sync-status-announcement">
+		{announcedStatus}
+	</span>
 	{#if isExpanded}
 		<div class="px-3 space-y-2">
 			<div class="flex items-center justify-between">

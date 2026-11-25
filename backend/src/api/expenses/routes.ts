@@ -1,12 +1,20 @@
 import { stringify } from 'csv-stringify/sync';
 import { createInsertSchema } from 'drizzle-zod';
-import { Hono } from 'hono';
+import { type Context, Hono, type Next } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { type Expense, expenses as expensesTable, type NewExpense } from '../../db/schema';
 import { EXPENSE_CATEGORIES } from '../../db/types';
 import { NotFoundError, ValidationError } from '../../errors';
-import { changeTracker, requireAuth } from '../../middleware';
+import { changeTracker, heavyJobLimiter, rateLimiter, requireAuth } from '../../middleware';
+import {
+  authorize,
+  ownAccount,
+  type ResourceOf,
+  requireCan,
+  vehicleOrOwnAccount,
+} from '../../permissions/authorize';
+import type { Resource } from '../../permissions/resolve';
 import { neutralizeCsvRow } from '../../utils/csv-safety';
 import {
   centsToDollars,
@@ -15,6 +23,7 @@ import {
   expenseToApi,
 } from '../../utils/money';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
+import { readJsonBody } from '../../utils/request-body';
 import { isValidTimeZone } from '../../utils/time-zone';
 import {
   commonSchemas,
@@ -29,10 +38,11 @@ import {
 import {
   assertMayTouchFinancialExpense,
   requireVehicleAccess,
-  requireVehiclesAccess,
   resolveExpenseReadScope,
   seesFinancials,
+  writesFinancials,
 } from '../../utils/vehicle-access';
+import { attributedDriver, hideDriverFields } from '../drivers/attribution';
 import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
@@ -292,18 +302,56 @@ async function assertSplitFinancingSourceValid(
 async function requireSplitWriteAccess(
   splitConfig: SplitConfig,
   actingUserId: string
-): Promise<{ ownerId: string; createdBy: string | null }> {
-  const [ownerId, ...otherOwners] = await requireVehiclesAccess(
-    splitConfigVehicleIds(splitConfig),
-    actingUserId,
-    'write'
+): Promise<{ ownerId: string; createdBy: string | null; writesFinancials: boolean }> {
+  const accesses = await Promise.all(
+    [...new Set(splitConfigVehicleIds(splitConfig))].map((vehicleId) =>
+      requireVehicleAccess(vehicleId, actingUserId, 'read')
+    )
   );
+  const [ownerId, ...otherOwners] = [...new Set(accesses.map((access) => access.ownerId))];
   if (ownerId === undefined) throw new ValidationError('Split has no vehicles');
   if (otherOwners.length > 0) {
     throw new ValidationError('A split cannot span vehicles owned by different users');
   }
-  return { ownerId, createdBy: ownerId === actingUserId ? null : actingUserId };
+  return {
+    ownerId,
+    createdBy: ownerId === actingUserId ? null : actingUserId,
+    writesFinancials: accesses.every(writesFinancials),
+  };
 }
+
+function vehicleResource(vehicleId: string, entryCreatedBy?: string | null): Resource {
+  return { kind: 'vehicle', vehicleId, entryCreatedBy };
+}
+
+const fromQueryVehicle: ResourceOf = (c) => vehicleOrOwnAccount(c.req.query('vehicleId'), c);
+
+const fromBodyVehicle: ResourceOf = async (c) =>
+  vehicleResource((await readJsonBody<{ vehicleId: string }>(c)).vehicleId);
+
+const fromExpense: ResourceOf = async (c) => {
+  const expense = await expenseRepository.findById(c.req.param('id') ?? '');
+  if (!expense) throw new NotFoundError('Expense');
+  return vehicleResource(expense.vehicleId, expense.createdBy ?? expense.userId);
+};
+
+const fromSplitBody: ResourceOf = async (c) => {
+  const { splitConfig } = await readJsonBody<{ splitConfig: SplitConfig }>(c);
+  return splitConfigVehicleIds(splitConfig).map((vehicleId) => vehicleResource(vehicleId));
+};
+
+const fromSplitGroup: ResourceOf = async (c) => {
+  const group = await expenseRepository.getSplitGroupAccessInfo(c.req.param('id') ?? '');
+  if (!group) throw new NotFoundError('Split expense');
+  const [only, ...others] = group.authors;
+  const author = others.length === 0 ? (only ?? group.ownerId) : null;
+  return group.vehicleIds.map((vehicleId) => vehicleResource(vehicleId, author));
+};
+
+const fromSplitGroupAndBody: ResourceOf = async (c) => [
+  ...((await fromSplitGroup(c)) as Resource[]),
+  ...((await fromSplitBody(c)) as Resource[]),
+];
 
 const PLAIN_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -345,39 +393,49 @@ export const expenseQuerySchema = z.object({
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
-routes.post('/split', zValidator('json', createSplitExpenseSchema), async (c) => {
-  const user = c.get('user');
-  const data = c.req.valid('json');
+routes.post(
+  '/split',
+  zValidator('json', createSplitExpenseSchema),
+  authorize(fromSplitBody),
+  async (c) => {
+    const user = c.get('user');
+    const data = c.req.valid('json');
 
-  const { ownerId, createdBy } = await requireSplitWriteAccess(data.splitConfig, user.id);
-  assertMayTouchFinancialExpense(createdBy === null, data.sourceType);
-  await assertSplitFinancingSourceValid(data.sourceType, data.sourceId, data.splitConfig);
+    const {
+      ownerId,
+      createdBy,
+      writesFinancials: mayTouch,
+    } = await requireSplitWriteAccess(data.splitConfig, user.id);
+    assertMayTouchFinancialExpense(mayTouch, data.sourceType);
+    await assertSplitFinancingSourceValid(data.sourceType, data.sourceId, data.splitConfig);
 
-  const siblings = await expenseRepository.createSplitExpense(data, { ownerId, createdBy });
-  const first = siblings[0];
-  if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
-    throw new ValidationError('Split expense creation returned invalid data');
-  }
+    const siblings = await expenseRepository.createSplitExpense(data, { ownerId, createdBy });
+    const first = siblings[0];
+    if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
+      throw new ValidationError('Split expense creation returned invalid data');
+    }
 
-  return c.json(
-    {
-      success: true,
-      data: {
-        siblings: siblings.map(expenseToApi),
-        groupId: first.groupId,
-        groupTotal: centsToDollars(first.groupTotal),
-        splitMethod: first.splitMethod,
+    return c.json(
+      {
+        success: true,
+        data: {
+          siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
+          groupId: first.groupId,
+          groupTotal: centsToDollars(first.groupTotal),
+          splitMethod: first.splitMethod,
+        },
+        message: 'Split expense created successfully',
       },
-      message: 'Split expense created successfully',
-    },
-    201
-  );
-});
+      201
+    );
+  }
+);
 
 routes.put(
   '/split/:id',
   zValidator('param', commonSchemas.idParam),
   zValidator('json', updateSplitSchema),
+  authorize(fromSplitGroupAndBody),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -387,28 +445,31 @@ routes.put(
     if (!groupInfo) throw new NotFoundError('Split expense');
     const existingConfig: SplitConfig = { method: 'even', vehicleIds: groupInfo.vehicleIds };
     await requireSplitWriteAccess(existingConfig, user.id);
-    const { ownerId: newOwnerId, createdBy } = await requireSplitWriteAccess(
+    const { ownerId: newOwnerId, writesFinancials: mayTouch } = await requireSplitWriteAccess(
       data.splitConfig,
       user.id
     );
     if (newOwnerId !== groupInfo.ownerId) {
       throw new ValidationError('A split cannot be moved to a vehicle owned by a different user');
     }
-    assertMayTouchFinancialExpense(createdBy === null, groupInfo.sourceType);
+    assertMayTouchFinancialExpense(mayTouch, groupInfo.sourceType);
 
     const existing = await expenseRepository.getSplitExpense(id, groupInfo.ownerId);
+    const kept = new Set(splitConfigVehicleIds(data.splitConfig));
+    for (const leg of existing.filter((row) => !kept.has(row.vehicleId))) {
+      requireCan(
+        c,
+        'vehicle.expense.delete',
+        vehicleResource(leg.vehicleId, leg.createdBy ?? groupInfo.ownerId)
+      );
+    }
     await assertSplitFinancingSourceValid(
       existing[0]?.sourceType ?? undefined,
       existing[0]?.sourceId ?? undefined,
       data.splitConfig
     );
 
-    const siblings = await expenseRepository.updateSplitExpense(
-      id,
-      data,
-      groupInfo.ownerId,
-      createdBy
-    );
+    const siblings = await expenseRepository.updateSplitExpense(id, data, groupInfo.ownerId);
     const first = siblings[0];
     if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
       throw new ValidationError('Split expense update returned invalid data');
@@ -417,7 +478,7 @@ routes.put(
     return c.json({
       success: true,
       data: {
-        siblings: siblings.map(expenseToApi),
+        siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
         groupId: first.groupId,
         groupTotal: centsToDollars(first.groupTotal),
         splitMethod: first.splitMethod,
@@ -427,53 +488,63 @@ routes.put(
   }
 );
 
-routes.get('/split/:id', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
+routes.get(
+  '/split/:id',
+  zValidator('param', commonSchemas.idParam),
+  authorize(fromSplitGroup),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
 
-  const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
-  if (!groupInfo) throw new NotFoundError('Split expense');
-  for (const vehicleId of groupInfo.vehicleIds) {
-    const access = await requireVehicleAccess(vehicleId, user.id, 'read');
-    assertMayTouchFinancialExpense(seesFinancials(access), groupInfo.sourceType);
+    const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
+    if (!groupInfo) throw new NotFoundError('Split expense');
+    for (const vehicleId of groupInfo.vehicleIds) {
+      const access = await requireVehicleAccess(vehicleId, user.id, 'read');
+      assertMayTouchFinancialExpense(seesFinancials(access), groupInfo.sourceType);
+    }
+
+    const siblings = await expenseRepository.getSplitExpense(id, groupInfo.ownerId);
+    const first = siblings[0];
+    if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
+      throw new ValidationError('Split expense data is invalid');
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
+        groupId: first.groupId,
+        groupTotal: centsToDollars(first.groupTotal),
+        splitMethod: first.splitMethod,
+      },
+    });
   }
+);
 
-  const siblings = await expenseRepository.getSplitExpense(id, groupInfo.ownerId);
-  const first = siblings[0];
-  if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
-    throw new ValidationError('Split expense data is invalid');
+routes.delete(
+  '/split/:id',
+  zValidator('param', commonSchemas.idParam),
+  authorize(fromSplitGroup),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+
+    const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
+    if (!groupInfo) throw new NotFoundError('Split expense');
+    const { writesFinancials: mayTouch } = await requireSplitWriteAccess(
+      { method: 'even', vehicleIds: groupInfo.vehicleIds },
+      user.id
+    );
+    assertMayTouchFinancialExpense(mayTouch, groupInfo.sourceType);
+
+    const siblingIds = await expenseRepository.findIdsByGroupId(id, groupInfo.ownerId);
+    await deletePhotosForEntities('expense', siblingIds, groupInfo.ownerId);
+
+    await expenseRepository.deleteSplitExpense(id, groupInfo.ownerId);
+
+    return c.json({ success: true, message: 'Split expense deleted successfully' });
   }
-
-  return c.json({
-    success: true,
-    data: {
-      siblings: siblings.map(expenseToApi),
-      groupId: first.groupId,
-      groupTotal: centsToDollars(first.groupTotal),
-      splitMethod: first.splitMethod,
-    },
-  });
-});
-
-routes.delete('/split/:id', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
-
-  const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
-  if (!groupInfo) throw new NotFoundError('Split expense');
-  const { createdBy } = await requireSplitWriteAccess(
-    { method: 'even', vehicleIds: groupInfo.vehicleIds },
-    user.id
-  );
-  assertMayTouchFinancialExpense(createdBy === null, groupInfo.sourceType);
-
-  const siblingIds = await expenseRepository.findIdsByGroupId(id, groupInfo.ownerId);
-  await deletePhotosForEntities('expense', siblingIds, groupInfo.ownerId);
-
-  await expenseRepository.deleteSplitExpense(id, groupInfo.ownerId);
-
-  return c.json({ success: true, message: 'Split expense deleted successfully' });
-});
+);
 
 const summaryQuerySchema = z.object({
   vehicleId: z.string().optional(),
@@ -481,19 +552,24 @@ const summaryQuerySchema = z.object({
   timeZone: timeZoneSchema,
 });
 
-routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
-  const user = c.get('user');
-  const { vehicleId, period, timeZone } = c.req.valid('query');
+routes.get(
+  '/summary',
+  zValidator('query', summaryQuerySchema),
+  authorize(fromQueryVehicle),
+  async (c) => {
+    const user = c.get('user');
+    const { vehicleId, period, timeZone } = c.req.valid('query');
 
-  const summary = await expenseRepository.getSummary({
-    ...(await resolveExpenseReadScope(vehicleId, user.id)),
-    vehicleId,
-    period,
-    timeZone,
-  });
+    const summary = await expenseRepository.getSummary({
+      ...(await resolveExpenseReadScope(vehicleId, user.id)),
+      vehicleId,
+      period,
+      timeZone,
+    });
 
-  return c.json({ success: true, data: expenseSummaryToApi(summary) });
-});
+    return c.json({ success: true, data: expenseSummaryToApi(summary) });
+  }
+);
 
 const exportQuerySchema = z.object({
   vehicleId: z.string().optional(),
@@ -524,70 +600,76 @@ export const EXPORT_COLUMNS = [
   'createdAt',
 ] as const;
 
-routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
-  const user = c.get('user');
-  const { vehicleId, category, startDate, endDate, timeZone, search, tags } = c.req.valid('query');
-  const plainDays = plainDayFilters(c.req.query('startDate'), c.req.query('endDate'));
+routes.get(
+  '/export',
+  zValidator('query', exportQuerySchema),
+  authorize(fromQueryVehicle),
+  async (c) => {
+    const user = c.get('user');
+    const { vehicleId, category, startDate, endDate, timeZone, search, tags } =
+      c.req.valid('query');
+    const plainDays = plainDayFilters(c.req.query('startDate'), c.req.query('endDate'));
 
-  const scope = await resolveExpenseReadScope(vehicleId, user.id);
-  const isSharedExport = scope.userId !== user.id;
-  const [rows, vehicles, sharedVehicles, prefs] = await Promise.all([
-    expenseRepository.findAll({
-      ...scope,
-      vehicleId,
-      category,
-      startDate,
-      endDate,
-      timeZone,
-      ...plainDays,
-      search,
-      tags,
-    }),
-    vehicleRepository.findByUserId(user.id),
-    isSharedExport && vehicleId ? vehicleRepository.findByIds([vehicleId]) : Promise.resolve([]),
-    preferencesRepository.getByUserId(user.id),
-  ]);
+    const scope = await resolveExpenseReadScope(vehicleId, user.id);
+    const isSharedExport = scope.userId !== user.id;
+    const [rows, vehicles, sharedVehicles, prefs] = await Promise.all([
+      expenseRepository.findAll({
+        ...scope,
+        vehicleId,
+        category,
+        startDate,
+        endDate,
+        timeZone,
+        ...plainDays,
+        search,
+        tags,
+      }),
+      vehicleRepository.findByUserId(user.id),
+      isSharedExport && vehicleId ? vehicleRepository.findByIds([vehicleId]) : Promise.resolve([]),
+      preferencesRepository.getByUserId(user.id),
+    ]);
 
-  const currency = prefs?.currencyUnit || 'USD';
+    const currency = prefs?.currencyUnit || 'USD';
 
-  const vehicleName = new Map(
-    [...vehicles, ...sharedVehicles].map((v) => [
-      v.id,
-      v.nickname || `${v.year} ${v.make} ${v.model}`,
-    ])
-  );
+    const vehicleName = new Map(
+      [...vehicles, ...sharedVehicles].map((v) => [
+        v.id,
+        v.nickname || `${v.year} ${v.make} ${v.model}`,
+      ])
+    );
 
-  // Safe to prefix formula characters only because nothing re-parses this export.
-  const records = rows.map((e) =>
-    neutralizeCsvRow({
-      date: e.date instanceof Date ? e.date.toISOString() : e.date,
-      vehicle: vehicleName.get(e.vehicleId) ?? 'Unknown Vehicle',
-      category: e.category,
-      amount: centsToDollars(e.expenseAmount),
-      currency,
-      mileage: e.mileage || '',
-      volume: e.volume ?? '',
-      fuelType: e.fuelType ?? '',
-      description: e.description ?? '',
-      location: e.location ?? '',
-      tags: Array.isArray(e.tags) ? e.tags.join('; ') : '',
-      missedFillup: e.missedFillup ? 'true' : 'false',
-      createdAt: e.createdAt instanceof Date ? e.createdAt.toISOString() : (e.createdAt ?? ''),
-    })
-  );
+    // Safe to prefix formula characters only because nothing re-parses this export.
+    const records = rows.map((e) =>
+      neutralizeCsvRow({
+        date: e.date instanceof Date ? e.date.toISOString() : e.date,
+        vehicle: vehicleName.get(e.vehicleId) ?? 'Unknown Vehicle',
+        category: e.category,
+        amount: centsToDollars(e.expenseAmount),
+        currency,
+        mileage: e.mileage || '',
+        volume: e.volume ?? '',
+        fuelType: e.fuelType ?? '',
+        description: e.description ?? '',
+        location: e.location ?? '',
+        tags: Array.isArray(e.tags) ? e.tags.join('; ') : '',
+        missedFillup: e.missedFillup ? 'true' : 'false',
+        createdAt: e.createdAt instanceof Date ? e.createdAt.toISOString() : (e.createdAt ?? ''),
+      })
+    );
 
-  const csv = stringify(records, {
-    header: true,
-    columns: EXPORT_COLUMNS as unknown as string[],
-    quoted: true,
-    quoted_empty: false,
-  });
+    const csv = stringify(records, {
+      header: true,
+      columns: EXPORT_COLUMNS as unknown as string[],
+      quoted: true,
+      quoted_empty: false,
+    });
 
-  const stamp = new Date().toISOString().slice(0, 10);
-  c.header('Content-Type', 'text/csv; charset=utf-8');
-  c.header('Content-Disposition', `attachment; filename="vroom-expenses-${stamp}.csv"`);
-  return c.body(csv);
-});
+    const stamp = new Date().toISOString().slice(0, 10);
+    c.header('Content-Type', 'text/csv; charset=utf-8');
+    c.header('Content-Disposition', `attachment; filename="vroom-expenses-${stamp}.csv"`);
+    return c.body(csv);
+  }
+);
 
 const importBodySchema = importCsvSchema.extend({
   mapping: columnMappingSchema.optional(),
@@ -611,86 +693,117 @@ function targetUnitsResolver(
   };
 }
 
-routes.post('/import', zValidator('json', importBodySchema), async (c) => {
-  const user = c.get('user');
-  const { csv, dryRun, mapping, timeZone } = c.req.valid('json');
+const expenseImportLimiter = rateLimiter({
+  ...CONFIG.rateLimit.expenseImport,
+  keyGenerator: (c) => `expenseImport:${c.get('user').id}`,
+});
+const importPreviewLimiter = rateLimiter({
+  ...CONFIG.rateLimit.importPreview,
+  keyGenerator: (c) => `importPreview:${c.get('user').id}`,
+});
 
-  const vehicles = await vehicleRepository.findByUserId(user.id);
-  if (vehicles.length === 0) {
-    throw new ValidationError('Add a vehicle before importing expenses');
-  }
-  const { currencyUnit: accountCurrency } = await preferencesRepository.getOrCreate(user.id);
+async function importLimits(c: Context, next: Next) {
+  const { dryRun } = await c.req.json<{ dryRun?: boolean }>();
+  if (dryRun) return importPreviewLimiter(c, next);
+  return expenseImportLimiter(c, async () => {
+    const refused = await heavyJobLimiter(c, next);
+    if (refused) c.res = refused;
+  });
+}
 
-  let importCsv = csv;
-  let unmappedCategories: string[] = [];
-  let rowErrors = new Map<number, string>();
-  if (mapping) {
-    const targetUnitsFor = targetUnitsResolver(vehicles);
-    try {
-      const format = findImportFormat(mapping.source);
-      const result = format
-        ? format.toNativeCsv(csv, { mapping, targetUnitsFor, timeZone })
-        : applyMapping(csv, mapping, targetUnitsFor, timeZone);
-      importCsv = result.csv;
-      unmappedCategories = result.unmappedCategories;
-      rowErrors = result.rowErrors;
-    } catch (err) {
-      if (err instanceof CsvMappingError) {
-        throw new ValidationError(err.message);
+routes.post(
+  '/import',
+  zValidator('json', importBodySchema),
+  authorize(ownAccount),
+  importLimits,
+  async (c) => {
+    const user = c.get('user');
+    const { csv, dryRun, mapping, timeZone } = c.req.valid('json');
+
+    const vehicles = await vehicleRepository.findByUserId(user.id);
+    if (vehicles.length === 0) {
+      throw new ValidationError('Add a vehicle before importing expenses');
+    }
+    const { currencyUnit: accountCurrency } = await preferencesRepository.getOrCreate(user.id);
+
+    let importCsv = csv;
+    let unmappedCategories: string[] = [];
+    let rowErrors = new Map<number, string>();
+    if (mapping) {
+      const targetUnitsFor = targetUnitsResolver(vehicles);
+      try {
+        const format = findImportFormat(mapping.source);
+        const result = format
+          ? format.toNativeCsv(csv, { mapping, targetUnitsFor, timeZone })
+          : applyMapping(csv, mapping, targetUnitsFor, timeZone);
+        importCsv = result.csv;
+        unmappedCategories = result.unmappedCategories;
+        rowErrors = result.rowErrors;
+      } catch (err) {
+        if (err instanceof CsvMappingError) {
+          throw new ValidationError(err.message);
+        }
+        throw err;
       }
+    }
+
+    let plan: ReturnType<typeof buildImportPlan>;
+    try {
+      plan = buildImportPlan(importCsv, vehicles, rowErrors, timeZone);
+    } catch (err) {
+      if (err instanceof CsvImportError) throw new ValidationError(err.message);
       throw err;
     }
-  }
 
-  let plan: ReturnType<typeof buildImportPlan>;
-  try {
-    plan = buildImportPlan(importCsv, vehicles, rowErrors, timeZone);
-  } catch (err) {
-    if (err instanceof CsvImportError) throw new ValidationError(err.message);
-    throw err;
-  }
+    if (dryRun) {
+      return c.json({
+        success: true,
+        data: {
+          dryRun: true,
+          imported: 0,
+          unmappedCategories,
+          ...summarizeImportPlan(plan, accountCurrency),
+        },
+      });
+    }
 
-  if (dryRun) {
+    const readyRows = plan.rows
+      .filter((row) => row.status === 'ready' && row.expense)
+      .map((row) => ({ ...row.expense, userId: user.id }) as NewExpense);
+    const { imported, duplicates } = await expenseRepository.importExpenses(readyRows, user.id);
+
     return c.json({
       success: true,
       data: {
-        dryRun: true,
-        imported: 0,
+        dryRun: false,
+        imported,
+        duplicates,
         unmappedCategories,
         ...summarizeImportPlan(plan, accountCurrency),
       },
     });
   }
-
-  const readyRows = plan.rows
-    .filter((row) => row.status === 'ready' && row.expense)
-    .map((row) => ({ ...row.expense, userId: user.id }) as NewExpense);
-  const { imported, duplicates } = await expenseRepository.importExpenses(readyRows, user.id);
-
-  return c.json({
-    success: true,
-    data: {
-      dryRun: false,
-      imported,
-      duplicates,
-      unmappedCategories,
-      ...summarizeImportPlan(plan, accountCurrency),
-    },
-  });
-});
+);
 
 const detectSourceSchema = z.object({
   sample: z.string().min(1).max(IMPORT_DETECT_SAMPLE_LENGTH),
 });
-routes.get('/import/formats', (c) => c.json({ success: true, data: importFormatList() }));
+routes.get('/import/formats', authorize(ownAccount), (c) =>
+  c.json({ success: true, data: importFormatList() })
+);
 
-routes.post('/import/detect', zValidator('json', detectSourceSchema), (c) => {
-  const { sample } = c.req.valid('json');
-  const format = detectImportFormat(sample);
-  return c.json({ success: true, data: format ? { id: format.id, label: format.label } : null });
-});
+routes.post(
+  '/import/detect',
+  zValidator('json', detectSourceSchema),
+  authorize(ownAccount),
+  (c) => {
+    const { sample } = c.req.valid('json');
+    const format = detectImportFormat(sample);
+    return c.json({ success: true, data: format ? { id: format.id, label: format.label } : null });
+  }
+);
 
-routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
+routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehicle), async (c) => {
   const user = c.get('user');
   const { forceOverwrite, timeZone, ...body } = c.req.valid('json');
   if (forceOverwrite) {
@@ -700,10 +813,11 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   }
   const expenseData = clearFuelFieldsIfNotFuel(body);
 
-  const access = await requireVehicleAccess(expenseData.vehicleId, user.id, 'write');
+  const access = await requireVehicleAccess(expenseData.vehicleId, user.id, 'read');
   const { ownerId } = access;
   const createdBy = ownerId === user.id ? null : user.id;
-  assertMayTouchFinancialExpense(seesFinancials(access), expenseData.sourceType);
+  const paidByDriverId = attributedDriver(c, expenseData.vehicleId, expenseData.paidByDriverId);
+  assertMayTouchFinancialExpense(writesFinancials(access), expenseData.sourceType);
 
   let createdExpense = expenseData.clientId
     ? await expenseRepository.findReplay(expenseData.clientId, ownerId, expenseData.vehicleId)
@@ -724,11 +838,11 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
     );
 
     createdExpense = await expenseRepository.createIdempotent(
-      { ...expenseData, userId: ownerId, createdBy },
+      { ...expenseData, paidByDriverId, userId: ownerId, createdBy },
       await odometerCheck({ ...expenseData, timeZone })
     );
   }
-  assertMayTouchFinancialExpense(seesFinancials(access), createdExpense.sourceType);
+  assertMayTouchFinancialExpense(writesFinancials(access), createdExpense.sourceType);
 
   if (createdExpense.mileage != null) {
     await reminderTriggerService.recheckMileageReminders(ownerId, createdExpense.vehicleId);
@@ -737,14 +851,14 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   return c.json(
     {
       success: true,
-      data: expenseToApi(createdExpense),
+      data: hideDriverFields(c, createdExpense.vehicleId, expenseToApi(createdExpense)),
       message: 'Expense created successfully',
     },
     201
   );
 });
 
-routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
+routes.get('/', zValidator('query', expenseQuerySchema), authorize(fromQueryVehicle), async (c) => {
   const user = c.get('user');
   const query = c.req.valid('query');
 
@@ -766,45 +880,80 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
 
   const { limit, offset } = clampPagination(query);
 
-  return c.json(buildPaginatedResponse(data.map(expenseToApi), totalCount, limit, offset));
+  const rows = data.map((expense) =>
+    query.vehicleId
+      ? hideDriverFields(c, expense.vehicleId, expenseToApi(expense))
+      : expenseToApi(expense)
+  );
+  return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
 });
 
-routes.get('/monthly-totals', zValidator('query', expenseQuerySchema), async (c) => {
-  const user = c.get('user');
-  const query = c.req.valid('query');
+routes.get(
+  '/monthly-totals',
+  zValidator('query', expenseQuerySchema),
+  authorize(fromQueryVehicle),
+  async (c) => {
+    const user = c.get('user');
+    const query = c.req.valid('query');
 
-  const months = await expenseRepository.getMonthlyTotals({
-    ...(await resolveExpenseReadScope(query.vehicleId, user.id)),
-    vehicleId: query.vehicleId,
-    category: query.category,
-    startDate: query.startDate,
-    endDate: query.endDate,
-    timeZone: query.timeZone,
-    ...plainDayFilters(c.req.query('startDate'), c.req.query('endDate')),
-    tags: query.tags,
-    search: query.search,
-  });
+    const months = await expenseRepository.getMonthlyTotals({
+      ...(await resolveExpenseReadScope(query.vehicleId, user.id)),
+      vehicleId: query.vehicleId,
+      category: query.category,
+      startDate: query.startDate,
+      endDate: query.endDate,
+      timeZone: query.timeZone,
+      ...plainDayFilters(c.req.query('startDate'), c.req.query('endDate')),
+      tags: query.tags,
+      search: query.search,
+    });
 
-  return c.json({
-    success: true,
-    data: months.map((m) => ({ ...m, amount: centsToDollars(m.amount) })),
-  });
-});
+    return c.json({
+      success: true,
+      data: months.map((m) => ({ ...m, amount: centsToDollars(m.amount) })),
+    });
+  }
+);
 
-routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
-  const expense = await expenseRepository.findById(id);
-  if (!expense) throw new NotFoundError('Expense');
-  const access = await requireVehicleAccess(expense.vehicleId, user.id, 'read');
-  assertMayTouchFinancialExpense(seesFinancials(access), expense.sourceType);
-  return c.json({ success: true, data: expenseToApi(expense) });
-});
+routes.get(
+  '/:id',
+  zValidator('param', commonSchemas.idParam),
+  authorize(fromExpense),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    const expense = await expenseRepository.findById(id);
+    if (!expense) throw new NotFoundError('Expense');
+    const access = await requireVehicleAccess(expense.vehicleId, user.id, 'read');
+    assertMayTouchFinancialExpense(seesFinancials(access), expense.sourceType);
+    return c.json({
+      success: true,
+      data: hideDriverFields(c, expense.vehicleId, expenseToApi(expense)),
+    });
+  }
+);
+
+function payerChange(
+  c: Context,
+  existing: Expense,
+  vehicleId: string | undefined,
+  requested: string | null | undefined
+): { paidByDriverId?: string | null } {
+  const target = vehicleId ?? existing.vehicleId;
+  const movedCar = target !== existing.vehicleId;
+  if (movedCar && existing.paidByDriverId) {
+    attributedDriver(c, existing.vehicleId, null, existing.paidByDriverId);
+  }
+  const paidBy = attributedDriver(c, target, requested, movedCar ? null : existing.paidByDriverId);
+  if (paidBy !== undefined) return { paidByDriverId: paidBy };
+  return movedCar ? { paidByDriverId: null } : {};
+}
 
 routes.put(
   '/:id',
   zValidator('param', commonSchemas.idParam),
   zValidator('json', updateExpenseSchema),
+  authorize(fromExpense),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -812,9 +961,9 @@ routes.put(
 
     const existingExpense = await expenseRepository.findById(id);
     if (!existingExpense) throw new NotFoundError('Expense');
-    const access = await requireVehicleAccess(existingExpense.vehicleId, user.id, 'write');
+    const access = await requireVehicleAccess(existingExpense.vehicleId, user.id, 'read');
     assertMayTouchFinancialExpense(
-      seesFinancials(access),
+      writesFinancials(access),
       existingExpense.sourceType,
       updateData.sourceType
     );
@@ -828,7 +977,8 @@ routes.put(
     }
 
     if (updateData.vehicleId && updateData.vehicleId !== existingExpense.vehicleId) {
-      const target = await requireVehicleAccess(updateData.vehicleId, user.id, 'write');
+      requireCan(c, 'vehicle.expense.write', vehicleResource(updateData.vehicleId));
+      const target = await requireVehicleAccess(updateData.vehicleId, user.id, 'read');
       if (target.ownerId !== existingExpense.userId) {
         throw new ValidationError('Cannot move an expense to a vehicle owned by a different user');
       }
@@ -851,7 +1001,11 @@ routes.put(
 
     validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalFuelType);
 
-    const normalizedUpdate = clearFuelFieldsIfNotFuel(updateData, finalCategory);
+    const { paidByDriverId: requestedPayer, ...withoutPayer } = updateData;
+    const normalizedUpdate = clearFuelFieldsIfNotFuel(
+      { ...withoutPayer, ...payerChange(c, existingExpense, updateData.vehicleId, requestedPayer) },
+      finalCategory
+    );
     const odometer = await editedOdometerCheck(existingExpense, {
       vehicleId: updateData.vehicleId ?? existingExpense.vehicleId,
       date: updateData.date ?? existingExpense.date,
@@ -870,30 +1024,35 @@ routes.put(
 
     return c.json({
       success: true,
-      data: expenseToApi(updatedExpense),
+      data: hideDriverFields(c, updatedExpense.vehicleId, expenseToApi(updatedExpense)),
       message: 'Expense updated successfully',
     });
   }
 );
 
-routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
+routes.delete(
+  '/:id',
+  zValidator('param', commonSchemas.idParam),
+  authorize(fromExpense),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
 
-  const existingExpense = await expenseRepository.findById(id);
-  if (!existingExpense) throw new NotFoundError('Expense');
-  const access = await requireVehicleAccess(existingExpense.vehicleId, user.id, 'write');
-  assertMayTouchFinancialExpense(seesFinancials(access), existingExpense.sourceType);
-  if (existingExpense.groupId) {
-    throw new ValidationError(
-      "This expense is part of a split. Delete the whole split instead of one vehicle's share."
-    );
+    const existingExpense = await expenseRepository.findById(id);
+    if (!existingExpense) throw new NotFoundError('Expense');
+    const access = await requireVehicleAccess(existingExpense.vehicleId, user.id, 'read');
+    assertMayTouchFinancialExpense(writesFinancials(access), existingExpense.sourceType);
+    if (existingExpense.groupId) {
+      throw new ValidationError(
+        "This expense is part of a split. Delete the whole split instead of one vehicle's share."
+      );
+    }
+
+    await deleteAllPhotosForEntity('expense', id, existingExpense.userId);
+
+    await expenseRepository.delete(id);
+    return c.json({ success: true, message: 'Expense deleted successfully' });
   }
-
-  await deleteAllPhotosForEntity('expense', id, existingExpense.userId);
-
-  await expenseRepository.delete(id);
-  return c.json({ success: true, message: 'Expense deleted successfully' });
-});
+);
 
 export { routes };

@@ -21,6 +21,7 @@ import {
 	bucketDate,
 	bucketLabel,
 	carPanels,
+	emptyBuckets,
 	exploreAnnotations,
 	expensesNote,
 	expensesQuery,
@@ -143,6 +144,12 @@ describe('Explore chart data', () => {
 		expect(series[0]?.color).toMatch(/^var\(--/);
 	});
 
+	test('a vehicle missing from the colour map falls back to the vehicle palette', () => {
+		const byVehicle = { ...response, groupBy: 'vehicle' } as AnalyticsQueryResponse;
+		const series = seriesFor(byVehicle, { fuel: 'var(--chart-1)' });
+		expect(series.map(s => s.color)).toEqual(['var(--chart-1)', 'var(--chart-3)']);
+	});
+
 	test('hiding a series updates the additive KPIs', () => {
 		const all = kpis(DEFAULT_EXPLORE, response, new Set(['fuel', 'misc']));
 		expect(all).toEqual({ total: 200, perBucket: 100, previousPerBucket: 40, perDistance: 0.5 });
@@ -155,6 +162,30 @@ describe('Explore chart data', () => {
 		});
 		const ratio = kpis(applyPreset({ metric: 'mpg' }), response, new Set(['fuel']));
 		expect(ratio.total).toBe(200);
+	});
+
+	test('a month with no data is empty, and the averages skip it', () => {
+		const gappy = {
+			...response,
+			buckets: ['2025-01', '2025-02', '2025-03'],
+			series: [
+				{ key: 'fuel', label: 'Fuel', values: [100, 0, 50] },
+				{ key: 'misc', label: 'Misc', values: [20, null, 0] }
+			],
+			compare: {
+				...response.compare,
+				buckets: ['2024-01', '2024-02', '2024-03'],
+				series: [{ key: 'fuel', label: 'Fuel', values: [0, 0, 60] }]
+			}
+		} as AnalyticsQueryResponse;
+		expect(emptyBuckets(gappy.series, 3)).toEqual([false, true, false]);
+		expect(emptyBuckets([{ values: [0, null] }], 2, false)).toEqual([false, true]);
+		expect(kpis(DEFAULT_EXPLORE, gappy, new Set(['fuel']))).toMatchObject({
+			total: 150,
+			perBucket: 75,
+			previousPerBucket: 60
+		});
+		expect(kpis(DEFAULT_EXPLORE, gappy, new Set(['misc'])).perBucket).toBe(20);
 	});
 
 	test('percent change needs a non-zero previous value', () => {
@@ -304,6 +335,22 @@ describe('each car on its own', () => {
 		expect(fleetMean).toBe(20);
 		expect(panels.map(p => p.mean)).toEqual([20, 20]);
 		expect(carPanels([series('empty', [null])]).yDomain).toEqual([0, 1]);
+	});
+
+	test('a month no car has data for is left out of every average', () => {
+		const series = (key: string, values: Array<number | null>) => ({
+			key,
+			sourceKey: key,
+			label: key,
+			color: 'red',
+			values
+		});
+		const cars = [series('a', [100, 0, 50]), series('b', [20, 0, 0])];
+		const empty = emptyBuckets(cars, 3);
+		expect(empty).toEqual([false, true, false]);
+		const { fleetMean, panels } = carPanels(cars, undefined, empty);
+		expect(panels.map(p => p.mean)).toEqual([75, 10]);
+		expect(fleetMean).toBe(42.5);
 	});
 
 	test('ratio panels use each car pooled over the range, and the scale fits the fleet line', () => {

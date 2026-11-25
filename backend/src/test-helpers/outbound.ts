@@ -1,13 +1,23 @@
 import { afterAll, beforeAll } from 'bun:test';
 import { CONFIG } from '../config';
 
-export function blockPrivateProviderEndpoints(): void {
-  const config = CONFIG as { blockPrivateProviderEndpoints: boolean };
-  const previous = config.blockPrivateProviderEndpoints;
+type PrivateEndpointSettings = { block: boolean; allow: string };
+
+export function usePrivateProviderEndpoints(settings: PrivateEndpointSettings): void {
+  const config = CONFIG as { privateProviderEndpoints: PrivateEndpointSettings };
+  const previous = config.privateProviderEndpoints;
   beforeAll(() => {
-    config.blockPrivateProviderEndpoints = true;
+    config.privateProviderEndpoints = settings;
   });
   afterAll(() => {
-    config.blockPrivateProviderEndpoints = previous;
+    config.privateProviderEndpoints = previous;
   });
+}
+
+export function blockPrivateProviderEndpoints(): void {
+  usePrivateProviderEndpoints({ block: true, allow: '' });
+}
+
+export function defaultPrivateProviderEndpoints(): void {
+  usePrivateProviderEndpoints({ block: false, allow: '' });
 }

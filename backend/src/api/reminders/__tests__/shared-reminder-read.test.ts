@@ -115,6 +115,6 @@ describe('shared reminder reads', () => {
       startDate: '2024-06-02T00:00:00.000Z',
       vehicleIds: [viewerVehicleId],
     });
-    expect(viewerRes.status, 'viewer create denied').toBe(404);
+    expect(viewerRes.status, 'viewer create denied').toBe(403);
   });
 });

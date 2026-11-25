@@ -17,11 +17,22 @@ export const CHART_COLORS = [
 	'var(--chart-8)'
 ] as const;
 
+export const VEHICLE_COLORS = [
+	'var(--chart-1)',
+	'var(--chart-3)',
+	'var(--chart-4)',
+	'var(--chart-2)',
+	'var(--chart-6)',
+	'var(--chart-7)',
+	'var(--chart-8)',
+	'var(--chart-5)'
+] as const;
+
 export function buildVehicleColorMap(vehicleIds: readonly string[]): Record<string, string> {
 	return Object.fromEntries(
 		[...new Set(vehicleIds)]
 			.sort()
-			.map((id, i) => [id, CHART_COLORS[i % CHART_COLORS.length] as string])
+			.map((id, i) => [id, VEHICLE_COLORS[i % VEHICLE_COLORS.length] as string])
 	);
 }
 

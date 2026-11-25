@@ -1,5 +1,10 @@
 import type { Hono } from 'hono';
 
+export function socketFrom(address: string) {
+  const family = address.includes(':') ? 'IPv6' : 'IPv4';
+  return { requestIP: () => ({ address, family, port: 40000 }) };
+}
+
 export async function json<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
@@ -54,6 +59,10 @@ export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<T
   const displayName = seedUser.displayName ?? 'Test User';
   await db.insert(schema.users).values({ id, email, displayName });
   assignServerRole(db, id, 'member');
+  db.insert(schema.serverSettings)
+    .values({ id: 1, signupMode: 'open' })
+    .onConflictDoNothing()
+    .run();
 
   const session = await lucia.createSession(id, {});
   const sessionCookie = lucia.createSessionCookie(session.id);

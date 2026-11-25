@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { SyncError, SyncErrorCode } from '../../errors';
-import { OPERATION_TIMEOUTS, withTimeout } from '../timeout';
+import { OPERATION_TIMEOUTS, withDeadline, withTimeout } from '../timeout';
 
 function resolveAfter<T>(ms: number, value: T): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
@@ -51,5 +51,43 @@ describe('OPERATION_TIMEOUTS', () => {
     expect(OPERATION_TIMEOUTS.RESTORE).toBe(10 * 60 * 1000);
     expect(OPERATION_TIMEOUTS.DRIVE_INIT).toBe(2 * 60 * 1000);
     expect(OPERATION_TIMEOUTS.DOWNLOAD).toBe(5 * 60 * 1000);
+  });
+});
+
+describe('withDeadline', () => {
+  test('returns the value when the work finishes in time, and leaves its signal alone', async () => {
+    let seen: AbortSignal | undefined;
+    const result = await withDeadline(
+      (signal) => {
+        seen = signal;
+        return resolveAfter(5, 'done');
+      },
+      200,
+      'fast op'
+    );
+    expect(result).toBe('done');
+    expect(seen?.aborted).toBe(false);
+  });
+
+  test('at the deadline it rejects and aborts the signal, so the work can stop before it writes', async () => {
+    let seen: AbortSignal | undefined;
+    let thrown: unknown;
+    try {
+      await withDeadline(
+        (signal) => {
+          seen = signal;
+          return new Promise<never>(() => {});
+        },
+        20,
+        'slow op'
+      );
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(SyncError);
+    expect((thrown as SyncError).code).toBe(SyncErrorCode.NETWORK_ERROR);
+    expect((thrown as Error).message).toContain('slow op timed out after 20ms');
+    expect(seen?.aborted).toBe(true);
+    expect(seen?.reason).toBe(thrown);
   });
 });

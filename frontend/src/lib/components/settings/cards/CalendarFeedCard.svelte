@@ -53,6 +53,12 @@
 		typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
 	const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+	function withTimeZone<T>(send: (_zone: { timeZone?: string }) => Promise<T>): Promise<T> {
+		return send({ timeZone }).catch(e =>
+			e instanceof ApiError && e.statusCode === 400 ? send({}) : Promise.reject(e)
+		);
+	}
+
 	onMount(async () => {
 		try {
 			feed = await calendarApi.getFeed();
@@ -67,13 +73,7 @@
 	async function createLink() {
 		busy = true;
 		try {
-			const created = await calendarApi
-				.createFeed({ ...options, timeZone })
-				.catch(e =>
-					e instanceof ApiError && e.statusCode === 400
-						? calendarApi.createFeed(options)
-						: Promise.reject(e)
-				);
+			const created = await withTimeZone(zone => calendarApi.createFeed({ ...options, ...zone }));
 			feed = created.feed;
 			link = absoluteApiUrl(created.path);
 		} catch (e) {
@@ -89,7 +89,7 @@
 		options = { ...options, [key]: value };
 		if (!feed) return;
 		try {
-			feed = await calendarApi.updateOptions({ [key]: value, timeZone });
+			feed = await withTimeZone(zone => calendarApi.updateOptions({ [key]: value, ...zone }));
 		} catch (e) {
 			options = { ...options, [key]: previous };
 			appStore.showError(`Couldn't save that. ${userFacingErrorMessage(e)}`);

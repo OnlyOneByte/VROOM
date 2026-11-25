@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { ChartColumn, RotateCcw, SearchX } from '@lucide/svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
@@ -36,6 +36,7 @@
 		bucketDate,
 		bucketLabel,
 		bucketTotals,
+		emptyBuckets,
 		carPanels,
 		exploreAnnotations,
 		hasData,
@@ -192,50 +193,72 @@
 	let tickStep = $derived(Math.max(1, Math.ceil(labels.length / maxTicks)));
 	let bandTicks = $derived(labels.filter((_, i) => i % tickStep === 0));
 
+	let empty = $derived(emptyBuckets(allSeries, labels.length, isAdditive(shown)));
+
 	let barRows = $derived(
 		labels.map((label, i) => {
-			const row: Record<string, string | number> = { label };
-			for (const s of allSeries) row[s.key] = s.values[i] ?? 0;
+			const row: Record<string, string | number | null> = { label };
+			for (const s of allSeries) row[s.key] = empty[i] ? null : (s.values[i] ?? 0);
 			return row;
 		})
 	);
 
 	let carTotals = $state<Record<string, number | null> | null>(null);
+	let carTotalsError = $state<string | null>(null);
+	let carTotalsAttempt = $state(0);
+	let carTotalsRequest: Promise<unknown> = Promise.resolve();
+	let carTotalsKey = '';
 
 	$effect(() => {
+		void carTotalsAttempt;
 		if (chartForm(query) !== 'panels' || isAdditive(query)) {
 			carTotals = null;
+			carTotalsError = null;
+			carTotalsKey = '';
 			return;
 		}
 		const params = { ...request, interval: 'none' as const, compare: 'none' as const };
 		const key = JSON.stringify(params);
+		if (key !== carTotalsKey) {
+			carTotalsKey = key;
+			carTotalsError = null;
+		}
 		const totalsOf = (r: AnalyticsQueryResponse) =>
 			Object.fromEntries(r.series.map(s => [s.key, s.values[0] ?? null]));
 		const cached = queryCache.get(key);
 		if (cached) {
 			carTotals = totalsOf(cached);
+			carTotalsError = null;
 			return;
 		}
 		const totalsController = new AbortController();
 		carTotals = null;
-		analyticsApi
+		carTotalsRequest = analyticsApi
 			.query(params, { signal: totalsController.signal })
 			.then(result => {
 				queryCache.set(key, result);
 				carTotals = totalsOf(result);
+				carTotalsError = null;
 			})
-			.catch(() => {
-				if (!totalsController.signal.aborted) carTotals = {};
+			.catch(e => {
+				if (!totalsController.signal.aborted) carTotalsError = userFacingErrorMessage(e);
 			});
 		return () => totalsController.abort();
 	});
+
+	async function retryCarTotals() {
+		carTotalsAttempt += 1;
+		await tick();
+		await carTotalsRequest;
+	}
 
 	let panels = $derived(
 		carPanels(
 			allSeries,
 			isAdditive(shown)
 				? undefined
-				: { fleet: response?.totals.value ?? null, cars: carTotals ?? {} }
+				: { fleet: response?.totals.value ?? null, cars: carTotals ?? {} },
+			empty
 		)
 	);
 	let panelPer = $derived(isAdditive(shown) ? ` per ${intervalLabel}` : '');
@@ -243,7 +266,7 @@
 	let lineRows = $derived(
 		(response?.buckets ?? []).map((bucket, i) => {
 			const row: Record<string, Date | number | null> = { date: bucketDate(bucket) };
-			for (const s of allSeries) row[s.key] = s.values[i] ?? null;
+			for (const s of allSeries) row[s.key] = empty[i] ? null : (s.values[i] ?? null);
 			return row;
 		})
 	);
@@ -263,17 +286,27 @@
 	let compareRows = $derived.by(() => {
 		if (!response) return [];
 		const length = response.buckets.length;
+		const previousSeries = (response.compare?.series ?? []).filter(s => visibleKeys.has(s.key));
 		const current = bucketTotals(visibleSeries, length);
-		const previous = bucketTotals(
-			(response.compare?.series ?? []).filter(s => visibleKeys.has(s.key)),
-			length
-		);
+		const previous = bucketTotals(previousSeries, length);
+		const currentEmpty = emptyBuckets(visibleSeries, length, isAdditive(shown));
+		const previousEmpty = emptyBuckets(previousSeries, length, isAdditive(shown));
 		return response.buckets.map((bucket, i) => ({
 			date: bucketDate(bucket),
-			current: current[i] ?? 0,
-			previous: hasPrevious ? (previous[i] ?? 0) : null
+			current: currentEmpty[i] ? null : (current[i] ?? 0),
+			previous: !hasPrevious || previousEmpty[i] ? null : (previous[i] ?? 0)
 		}));
 	});
+
+	function compareTooltip(value: number, key: string, row?: Record<string, unknown>): string {
+		const text = format.full(value);
+		const previous = row?.['previous'];
+		if (key !== 'current' || typeof previous !== 'number') return text;
+		const change = percentChange(value, previous);
+		return change == null
+			? text
+			: `${text} (${change > 0 ? '▲' : change < 0 ? '▼' : '='}\u00a0${Math.abs(change)}%)`;
+	}
 
 	let rankingRows = $derived(
 		allSeries
@@ -619,19 +652,31 @@
 					y={compareSeries.map(c => c.key)}
 					series={compareSeries}
 					config={buildChartConfig(compareSeries)}
+					band={hasPrevious ? { from: 'previous', to: 'current' } : undefined}
 					xAxisProps={lineXAxis}
 					yAxisFormat={format.axis}
-					tooltipFormat={format.full}
+					tooltipFormat={compareTooltip}
 					tooltipLabelFormat={v => (v instanceof Date ? bucketLabel(keyFor(v), shown.per) : '')}
 				/>
 			{:else if form === 'panels'}
 				<section aria-labelledby="explore-panels-title" class="space-y-3">
-					<h2 id="explore-panels-title" class="text-lg font-semibold">{chartTitle}</h2>
+					<h2 id="explore-panels-title" tabindex="-1" class="text-lg font-semibold outline-none">
+						{chartTitle}
+					</h2>
 					<p class="text-sm text-muted-foreground">
 						One scale for every car. The dashed line is the fleet average{panels.fleetMean != null
 							? ` (${format.full(panels.fleetMean)}${panelPer})`
 							: ''}.
 					</p>
+					{#if carTotalsError}
+						<LoadErrorCard
+							compact
+							title="Couldn't work out each car's average"
+							message={carTotalsError}
+							onRetry={retryCarTotals}
+							onRecovered={() => document.getElementById('explore-panels-title')?.focus()}
+						/>
+					{/if}
 					<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 						{#each panels.panels as panel (panel.series.key)}
 							<AppLineChart
@@ -640,9 +685,11 @@
 								title={panel.series.label}
 								description={panel.mean != null
 									? `Average ${format.full(panel.mean)}${panelPer}`
-									: !isAdditive(shown) && carTotals === null
-										? 'Working out the average'
-										: 'No data in this range'}
+									: carTotalsError
+										? 'Average not available'
+										: !isAdditive(shown) && carTotals === null
+											? 'Working out the average'
+											: 'No data in this range'}
 								onSelect={row => selectPanel(row, panel.series.sourceKey)}
 								data={lineRows}
 								x="date"

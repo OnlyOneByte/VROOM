@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
+import { countNum } from '../../db/dialect';
 import { type NewPhotoRef, type PhotoRef, photoRefs, userProviders } from '../../db/schema';
 import { chunk } from '../../utils/chunk';
 
@@ -113,7 +114,7 @@ export class PhotoRefRepository {
 
   async countPhotosOnlyOnProvider(providerId: string): Promise<number> {
     const [row] = await this.db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: countNum() })
       .from(photoRefs)
       .where(
         and(

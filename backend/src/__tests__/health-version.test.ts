@@ -1,8 +1,9 @@
-import { beforeAll, describe, expect, test } from 'bun:test';
+import { beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import packageJson from '../../package.json';
+import * as connection from '../db/connection';
 import { createTestApp, type TestApp } from '../test-helpers/http-client';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -43,5 +44,27 @@ describe('reported version comes from the package, not a literal', () => {
         'string that no release process updates.'
     ).toEqual([]);
     expect(src).toContain('version: CONFIG.version');
+  });
+});
+
+describe('GET /health checks the database', () => {
+  let ctx: TestApp;
+
+  beforeAll(async () => {
+    ctx = await createTestApp();
+  });
+
+  test('a database that cannot answer makes /health 503, keeping the version', async () => {
+    const probe = spyOn(connection, 'checkDatabaseHealth').mockReturnValue(false);
+    try {
+      const res = await ctx.app.request('/health');
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as { status: string; version: string };
+      expect(body.status).toBe('unavailable');
+      expect(body.version).toBe(packageJson.version);
+    } finally {
+      probe.mockRestore();
+    }
+    expect((await ctx.app.request('/health')).status).toBe(200);
   });
 });

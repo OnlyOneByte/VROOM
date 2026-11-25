@@ -139,4 +139,17 @@ describe('CalendarFeedCard', () => {
 		expect(createFeed).toHaveBeenNthCalledWith(1, { ...OPTIONS, timeZone: TIME_ZONE });
 		expect(createFeed).toHaveBeenNthCalledWith(2, OPTIONS);
 	});
+
+	test('a time zone the server rejects falls back to saving an option without one', async () => {
+		const { ApiError } = await import('#lib/utils/error-handling.ts');
+		getFeed.mockResolvedValue(FEED);
+		updateOptions.mockRejectedValueOnce(new ApiError('Unknown time zone', 400));
+		render(CalendarFeedCard);
+		const amounts = await screen.findByTestId('calendar-amounts');
+		await fireEvent.click(amounts);
+		await waitFor(() => expect(updateOptions).toHaveBeenNthCalledWith(2, { amounts: true }));
+		expect(updateOptions).toHaveBeenNthCalledWith(1, { amounts: true, timeZone: TIME_ZONE });
+		expect(showError).not.toHaveBeenCalled();
+		expect(amounts).toHaveAttribute('aria-checked', 'true');
+	});
 });

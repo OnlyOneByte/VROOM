@@ -4,6 +4,7 @@ import { getDb } from '../db/connection';
 import { expenses, vehicleShares, vehicles } from '../db/schema';
 import type { DrizzleTransaction } from '../db/types';
 import { NotFoundError } from '../errors';
+import { resolverFor } from '../permissions/grants';
 
 export type VehicleRole = 'owner' | 'editor' | 'viewer';
 export type VehicleAccessMode = 'read' | 'write' | 'owner';
@@ -11,6 +12,21 @@ export type VehicleAccessMode = 'read' | 'write' | 'owner';
 export interface VehicleAccess {
   role: VehicleRole;
   ownerId: string;
+  financials: { read: boolean; write: boolean };
+}
+
+const FINANCIAL_READS = ['vehicle.financing.read', 'vehicle.insurance.read'] as const;
+const FINANCIAL_WRITES = ['vehicle.financing.write', 'vehicle.insurance.write'] as const;
+
+function memberFinancials(
+  db: AppDatabase | DrizzleTransaction,
+  vehicleId: string,
+  userId: string
+): VehicleAccess['financials'] {
+  const resolver = resolverFor(db, userId);
+  const holdsAll = (permissions: readonly string[]) =>
+    permissions.every((p) => resolver.can(p, { kind: 'vehicle', vehicleId }).allow);
+  return { read: holdsAll(FINANCIAL_READS), write: holdsAll(FINANCIAL_WRITES) };
 }
 
 const ROLES_FOR_MODE: Record<VehicleAccessMode, readonly VehicleRole[]> = {
@@ -40,9 +56,15 @@ export async function resolveVehicleAccess(
     .limit(1);
   const row = rows[0];
   if (!row) return null;
-  if (row.ownerId === userId) return { role: 'owner', ownerId: row.ownerId };
+  if (row.ownerId === userId) {
+    return { role: 'owner', ownerId: row.ownerId, financials: { read: true, write: true } };
+  }
   if (row.level === null) return null;
-  return { role: row.level === 'editor' ? 'editor' : 'viewer', ownerId: row.ownerId };
+  return {
+    role: row.level === 'editor' ? 'editor' : 'viewer',
+    ownerId: row.ownerId,
+    financials: memberFinancials(db, vehicleId, userId),
+  };
 }
 
 export function allowsMode(
@@ -84,7 +106,11 @@ export function ownedVehiclesScope(userId: string): SQL {
 const FINANCIAL_SOURCE_TYPES = ['financing', 'insurance_term'] as const;
 
 export function seesFinancials(access: VehicleAccess): boolean {
-  return access.role === 'owner';
+  return access.financials.read;
+}
+
+export function writesFinancials(access: VehicleAccess): boolean {
+  return access.financials.write;
 }
 
 export async function resolveExpenseReadScope(

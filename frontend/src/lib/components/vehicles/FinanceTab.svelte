@@ -37,6 +37,8 @@
 
 	let { vehicle, vehicleId, vehicleStatsData, isOwner = true }: Props = $props();
 
+	let loanHidden = $derived(!!vehicle.sharedAccess && vehicle.sharedAccess.seesFinancials !== true);
+
 	let payments = $state<DerivedPaymentEntry[]>([]);
 	let paymentsLoaded = $state(false);
 	let isLoadingPayments = $state(false);
@@ -275,6 +277,18 @@
 	{:else}
 		<PaymentHistory {payments} financing={vehicle.financing} />
 	{/if}
+{:else if loanHidden}
+	<EmptyState>
+		{#snippet icon()}
+			<CreditCard class="h-12 w-12 text-muted-foreground mb-4" />
+		{/snippet}
+		{#snippet title()}
+			Loan details are private
+		{/snippet}
+		{#snippet description()}
+			Only the owner can see this vehicle's loan or lease, unless they share it with you
+		{/snippet}
+	</EmptyState>
 {:else}
 	<EmptyState>
 		{#snippet icon()}

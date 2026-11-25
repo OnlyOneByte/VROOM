@@ -29,6 +29,7 @@ interface GeminiContent {
 export class GeminiLlmProvider implements LlmProvider {
   private readonly apiKey: string;
   private readonly model: string;
+  private readonly outbound: ModelProviderSettings['outbound'];
   private readonly baseUrl: string;
 
   constructor(settings: ModelProviderSettings) {
@@ -37,6 +38,7 @@ export class GeminiLlmProvider implements LlmProvider {
     }
     this.apiKey = settings.apiKey;
     this.model = settings.model;
+    this.outbound = settings.outbound;
     this.baseUrl = trimBaseUrl(settings.baseUrl ?? DEFAULT_BASE_URL);
   }
 
@@ -52,6 +54,7 @@ export class GeminiLlmProvider implements LlmProvider {
       model: this.model,
       url: `${this.baseUrl}/v1beta/models/${this.model}:generateContent?key=${encodeURIComponent(this.apiKey)}`,
       timeoutMs: REQUEST_TIMEOUT_MS,
+      outbound: this.outbound,
       body: {
         contents: toGeminiContents(request.messages),
         ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),

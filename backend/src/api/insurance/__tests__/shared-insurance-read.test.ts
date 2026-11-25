@@ -6,6 +6,7 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee, type Invitee } from '../../../test-helpers/invitee';
+import { overrideOn } from '../../../test-helpers/members';
 import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
@@ -171,7 +172,7 @@ async function fileClaim(policyId: string, claimType: string, vehicleId?: string
 }
 
 describe('insurance claim reads for shared vehicles', () => {
-  test('a viewer sees only claims attributed to the shared vehicle', async () => {
+  test('a viewer with insurance read sees only claims attributed to the shared vehicle', async () => {
     const vehicleA = await seedVehicle(ctx, { make: 'Shared', model: 'CarA', year: 2021 });
     const vehicleB = await seedVehicle(ctx, { make: 'Private', model: 'CarB', year: 2022 });
     const policyId = await createTwoVehiclePolicy(vehicleA, vehicleB);
@@ -179,6 +180,11 @@ describe('insurance claim reads for shared vehicles', () => {
     await fileClaim(policyId, 'theft', vehicleB);
     await fileClaim(policyId, 'weather');
     await b.acceptShare(vehicleA, 'viewer');
+    const without = await json<DataEnvelope<ClaimRow[]>>(
+      await b.request('GET', `/api/v1/insurance/${policyId}/claims`)
+    );
+    expect(without.data).toEqual([]);
+    overrideOn(ctx, vehicleA, b, 'vehicle.insurance.read', 'allow');
 
     const res = await b.request('GET', `/api/v1/insurance/${policyId}/claims`);
     const body = await json<DataEnvelope<ClaimRow[]>>(res);
@@ -202,13 +208,14 @@ describe('insurance claim reads for shared vehicles', () => {
     expect(body.data.length).toBe(3);
   });
 
-  test('an editor can also read the shared vehicle claims', async () => {
+  test('an editor with insurance read can also read the shared vehicle claims', async () => {
     const vehicleA = await seedVehicle(ctx, { make: 'Shared', model: 'CarA', year: 2021 });
     const vehicleB = await seedVehicle(ctx, { make: 'Private', model: 'CarB', year: 2022 });
     const policyId = await createTwoVehiclePolicy(vehicleA, vehicleB);
     const claimA = await fileClaim(policyId, 'collision', vehicleA);
     await fileClaim(policyId, 'theft', vehicleB);
     await b.acceptShare(vehicleA, 'editor');
+    overrideOn(ctx, vehicleA, b, 'vehicle.insurance.read', 'allow');
 
     const body = await json<DataEnvelope<ClaimRow[]>>(
       await b.request('GET', `/api/v1/insurance/${policyId}/claims`)

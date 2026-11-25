@@ -15,8 +15,10 @@ import {
 } from '../../db/schema';
 import { VEHICLE_KINDS, VEHICLE_TYPES } from '../../db/types';
 import type { ApiResponse } from '../../errors';
-import { ConflictError, NotFoundError, ValidationError } from '../../errors';
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import { authorize, ownAccount, vehicleParam } from '../../permissions/authorize';
+import { requestResolver } from '../../permissions/grants';
 import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } from '../../types';
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { chunk } from '../../utils/chunk';
@@ -39,11 +41,13 @@ import {
 } from '../../utils/validation';
 import {
   requireVehicleAccess,
+  resolveVehicleAccess,
   seesFinancials,
   sharedVehicleView,
 } from '../../utils/vehicle-access';
 import { catalogModelMatchesMake, isCatalogModel } from '../../utils/vehicle-catalog';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
+import { carShareRoutes, driverRoutes } from '../drivers/routes';
 import { expenseRepository } from '../expenses/repository';
 import { financingRepository, withComputedBalance } from '../financing/repository';
 import { odometerRepository } from '../odometer/repository';
@@ -56,6 +60,12 @@ import { photoRoutes } from './photo-routes';
 import { vehicleRepository } from './repository';
 
 const routes = new Hono();
+
+interface SharedAccess {
+  level: string;
+  sharedBy: string;
+  seesFinancials: boolean;
+}
 
 const VIN_PATTERN = new RegExp(
   `^[A-Z0-9]{${CONFIG.validation.vehicle.vinMinLength},${CONFIG.validation.vehicle.vinMaxLength}}$`,
@@ -166,6 +176,8 @@ routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
 routes.route('/:vehicleId/photos', photoRoutes);
+routes.route('/:vehicleId/drivers', driverRoutes);
+routes.route('/:vehicleId/car-share', carShareRoutes);
 
 function changedUnits(existing: UnitPreferences, merged: UnitPreferences | undefined): string[] {
   if (!merged) return [];
@@ -261,7 +273,7 @@ const listVehiclesQuerySchema = z.object({
   include: z.enum(['shared']).optional(),
   timeZone: timeZoneSchema,
 });
-routes.get('/', zValidator('query', listVehiclesQuerySchema), async (c) => {
+routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const { include, timeZone } = c.req.valid('query');
 
@@ -276,14 +288,20 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), async (c) => {
     const grants = await vehicleShareRepository.findAcceptedAccessForUser(user.id);
     if (grants.length > 0) {
       const byVehicleId = new Map(grants.map((g) => [g.vehicleId, g]));
-      const sharedVehicles = await vehicleRepository.findByIds([...byVehicleId.keys()]);
-      sharedRows = sharedVehicles.map((v) => {
-        const g = byVehicleId.get(v.id);
-        return {
-          ...sharedVehicleView(v),
-          sharedAccess: { level: g?.level ?? 'viewer', sharedBy: g?.ownerName ?? 'Unknown' },
-        };
-      });
+      const resolver = requestResolver(c, getDb());
+      const sharedVehicles = (await vehicleRepository.findByIds([...byVehicleId.keys()])).filter(
+        (v) => resolver.can('vehicle.read', { kind: 'vehicle', vehicleId: v.id }).allow
+      );
+      sharedRows = await Promise.all(
+        sharedVehicles.map(async (v) => {
+          const g = byVehicleId.get(v.id);
+          const access = await resolveVehicleAccess(v.id, user.id);
+          return {
+            ...(access && seesFinancials(access) ? v : sharedVehicleView(v)),
+            sharedAccess: { level: g?.level ?? 'viewer', sharedBy: g?.ownerName ?? 'Unknown' },
+          };
+        })
+      );
     }
   }
 
@@ -312,7 +330,7 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), async (c) => {
   return c.json(response);
 });
 
-routes.post('/', zValidator('json', createVehicleSchema), async (c) => {
+routes.post('/', zValidator('json', createVehicleSchema), authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const vehicleData = c.req.valid('json');
 
@@ -346,6 +364,7 @@ routes.get(
   '/:id',
   zValidator('param', commonSchemas.idParam),
   zValidator('query', z.object({ timeZone: timeZoneSchema })),
+  authorize(vehicleParam('id')),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -358,13 +377,14 @@ routes.get(
       throw new NotFoundError('Vehicle');
     }
 
-    let sharedAccess: { level: string; sharedBy: string } | undefined;
+    let sharedAccess: SharedAccess | undefined;
     if (access.role !== 'owner') {
       const grants = await vehicleShareRepository.findAcceptedAccessForUser(user.id);
       const grant = grants.find((g) => g.vehicleId === id);
       sharedAccess = {
         level: grant?.level ?? access.role,
         sharedBy: grant?.ownerName ?? 'Unknown',
+        seesFinancials: seesFinancials(access),
       };
     }
 
@@ -373,7 +393,7 @@ routes.get(
         computedBalance?: number;
         eligibleForPayoff?: boolean;
       };
-      sharedAccess?: { level: string; sharedBy: string };
+      sharedAccess?: SharedAccess;
     } = seesFinancials(access) ? vehicle : sharedVehicleView(vehicle);
     if (responseData.financing) {
       const computedBalance = await financingRepository.computeBalance(
@@ -402,19 +422,26 @@ routes.put(
   '/:id',
   zValidator('param', commonSchemas.idParam),
   zValidator('json', updateVehicleSchema),
+  authorize(vehicleParam('id')),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const updateData = c.req.valid('json');
 
-    await requireVehicleAccess(id, user.id, 'owner');
     const existingVehicle = (await vehicleRepository.findByIds([id]))[0] ?? null;
     if (!existingVehicle) {
       throw new NotFoundError('Vehicle');
     }
+    const access = await requireVehicleAccess(id, user.id, 'read');
+    if (
+      !seesFinancials(access) &&
+      (updateData.purchasePrice !== undefined || updateData.vin !== undefined)
+    ) {
+      throw new ForbiddenError('Only people who can see loan details can change the price or VIN');
+    }
 
     if (updateData.licensePlate && updateData.licensePlate !== existingVehicle.licensePlate) {
-      await assertLicensePlateAvailable(updateData.licensePlate, user.id, id);
+      await assertLicensePlateAvailable(updateData.licensePlate, existingVehicle.userId, id);
     }
     assertCatalogModelMatchesMake(
       updateData.catalogModelId,
@@ -436,7 +463,9 @@ routes.put(
 
     return c.json({
       success: true,
-      data: vehicleRowToApi(updatedVehicle),
+      data: vehicleRowToApi(
+        seesFinancials(access) ? updatedVehicle : sharedVehicleView(updatedVehicle)
+      ),
       message: 'Vehicle updated successfully',
     });
   }
@@ -472,42 +501,45 @@ async function shrinkSplitGroupsToSurvivingLegs(userId: string, groupIds: string
   }
 }
 
-routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
+routes.delete(
+  '/:id',
+  zValidator('param', commonSchemas.idParam),
+  authorize(vehicleParam('id')),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
 
-  await requireVehicleAccess(id, user.id, 'owner');
+    // Photos have no FK: the vehicle cascade would orphan them, so delete them before the row goes.
+    const [expenseIds, odometerIds, splitGroupIds] = await Promise.all([
+      expenseRepository.findIdsByVehicleId(id),
+      odometerRepository.findIdsByVehicleId(id),
+      splitGroupIdsForVehicle(id, user.id),
+    ]);
+    await deleteAllPhotosForEntity('vehicle', id, user.id);
+    await deletePhotosForEntities('expense', expenseIds, user.id);
+    await deletePhotosForEntities('odometer_entry', odometerIds, user.id);
 
-  // Photos have no FK: the vehicle cascade would orphan them, so delete them before the row goes.
-  const [expenseIds, odometerIds, splitGroupIds] = await Promise.all([
-    expenseRepository.findIdsByVehicleId(id),
-    odometerRepository.findIdsByVehicleId(id),
-    splitGroupIdsForVehicle(id, user.id),
-  ]);
-  await deleteAllPhotosForEntity('vehicle', id, user.id);
-  await deletePhotosForEntities('expense', expenseIds, user.id);
-  await deletePhotosForEntities('odometer_entry', odometerIds, user.id);
+    await vehicleRepository.delete(id);
 
-  await vehicleRepository.delete(id);
+    // Errors are logged, not thrown: the delete has already committed, and a retry would 404.
+    try {
+      await shrinkSplitGroupsToSurvivingLegs(user.id, splitGroupIds);
+      // Split configs are JSON with no FK: prune deleted legs or reminders will target them.
+      await reminderRepository.pruneSplitConfigsForDeletedVehicle(user.id, id);
+      await reminderRepository.deactivateVehicleless(user.id);
+    } catch (error) {
+      logger.error('Post-delete vehicle cleanup failed (vehicle already deleted)', {
+        vehicleId: id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
-  // Errors are logged, not thrown: the delete has already committed, and a retry would 404.
-  try {
-    await shrinkSplitGroupsToSurvivingLegs(user.id, splitGroupIds);
-    // Split configs are JSON with no FK: prune deleted legs or reminders will target them.
-    await reminderRepository.pruneSplitConfigsForDeletedVehicle(user.id, id);
-    await reminderRepository.deactivateVehicleless(user.id);
-  } catch (error) {
-    logger.error('Post-delete vehicle cleanup failed (vehicle already deleted)', {
-      vehicleId: id,
-      error: error instanceof Error ? error.message : String(error),
+    return c.json({
+      success: true,
+      message: 'Vehicle deleted successfully',
     });
   }
-
-  return c.json({
-    success: true,
-    message: 'Vehicle deleted successfully',
-  });
-});
+);
 
 function periodBaselineMileage(
   fuelExpenses: { date: Date | string; mileage: number | null }[],
@@ -532,16 +564,16 @@ routes.get(
   '/:id/stats',
   zValidator('param', commonSchemas.idParam),
   zValidator('query', statsQuerySchema),
+  authorize(vehicleParam('id')),
   async (c) => {
-    const user = c.get('user');
     const { id } = c.req.valid('param');
     const { period } = c.req.valid('query');
 
-    const { ownerId } = await requireVehicleAccess(id, user.id, 'read');
     const vehicle = (await vehicleRepository.findByIds([id]))[0] ?? null;
     if (!vehicle) {
       throw new NotFoundError('Vehicle');
     }
+    const ownerId = vehicle.userId;
 
     const fuelExpenses = await expenseRepository.findAll({
       vehicleId: id,
@@ -581,6 +613,11 @@ routes.get(
   }
 );
 
-routes.get('/:id/people', zValidator('param', commonSchemas.idParam), vehiclePeople);
+routes.get(
+  '/:id/people',
+  zValidator('param', commonSchemas.idParam),
+  authorize(vehicleParam('id')),
+  vehiclePeople
+);
 
 export { routes };

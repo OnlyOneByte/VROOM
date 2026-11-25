@@ -134,6 +134,17 @@
 		})
 	);
 
+	let announcedStatus = $derived(
+		getSyncStatusInfo({
+			isOnline: onlineStatus.current,
+			syncStatus: 'idle',
+			pendingCount: 0,
+			conflictsCount: syncConflicts.current.length,
+			serverReachable: !authStore.sessionUnverified,
+			providerNeedsAttention
+		}).text
+	);
+
 	let initials = $derived(
 		(authStore.user?.displayName ?? authStore.user?.email ?? '')
 			.split(/\s+/)
@@ -160,7 +171,10 @@
 {#snippet syncStatus()}
 	{@const StatusIcon = syncStatusInfo.icon}
 	<div class="relative">
-		<span class="sr-only" role="status">{syncStatusInfo.text}</span>
+		<span class="sr-only" role="status" aria-live="off">{syncStatusInfo.text}</span>
+		<span class="sr-only" aria-live="polite" data-testid="sync-status-announcement">
+			{announcedStatus}
+		</span>
 		<DialogPrimitive.Root bind:open={syncOpen}>
 			<DialogPrimitive.Trigger
 				class="inline-flex min-h-10 items-center gap-1.5 rounded-full px-2 text-[13px] font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

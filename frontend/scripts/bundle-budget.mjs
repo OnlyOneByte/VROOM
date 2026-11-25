@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -13,6 +13,11 @@ if (!existsSync(join(output, 'server/manifest-full.js'))) {
 }
 
 const budgets = JSON.parse(readFileSync(budgetsFile, 'utf8'));
+const missing = ['shared', 'fonts', 'default'].filter(key => typeof budgets[key] !== 'number');
+if (missing.length > 0) {
+	console.error(`bundle-budget: bundle-budgets.json has no number for ${missing.join(', ')}.`);
+	process.exit(1);
+}
 const { manifest } = await import(pathToFileURL(join(output, 'server/manifest-full.js')).href);
 
 const sizeCache = new Map();
@@ -35,14 +40,42 @@ function nodeImports(index) {
 	return JSON.parse(match[1]);
 }
 
+const viteManifest = JSON.parse(readFileSync(join(output, 'client/.vite/manifest.json'), 'utf8'));
+
+function chunkGraph(source) {
+	if (!viteManifest[source]) {
+		console.error(
+			`bundle-budget: firstView names ${source}, which is not a chunk in this build. Update bundle-budgets.json.`
+		);
+		process.exit(1);
+	}
+	const files = new Set();
+	const visit = key => {
+		const entry = viteManifest[key];
+		if (!entry || files.has(entry.file)) return;
+		files.add(entry.file);
+		for (const dependency of entry.imports ?? []) visit(dependency);
+	};
+	visit(source);
+	return files;
+}
+
 const total = files => [...files].reduce((sum, file) => sum + gzipSize(file), 0);
 const kb = bytes => bytes / 1024;
 
 const shared = new Set(manifest.client.imports);
 for (const file of nodeImports(0)) shared.add(file);
 
+const fontsDir = join(root, 'static/fonts');
+const fontBytes = existsSync(fontsDir)
+	? readdirSync(fontsDir)
+			.filter(name => name.endsWith('.woff2'))
+			.reduce((sum, name) => sum + statSync(join(fontsDir, name)).size, 0)
+	: 0;
+
 const rows = [
-	{ route: 'shared entry + root layout', size: kb(total(shared)), budget: budgets.shared }
+	{ route: 'shared entry + root layout', size: kb(total(shared)), budget: budgets.shared },
+	{ route: 'fonts (woff2, as served)', size: kb(fontBytes), budget: budgets.fonts }
 ];
 for (const route of manifest.routes) {
 	if (!route.page) continue;
@@ -50,6 +83,9 @@ for (const route of manifest.routes) {
 	for (const index of [...route.page.layouts, route.page.leaf]) {
 		if (index === undefined) continue;
 		for (const file of nodeImports(index)) if (!shared.has(file)) files.add(file);
+	}
+	for (const source of budgets.firstView?.[route.id] ?? []) {
+		for (const file of chunkGraph(source)) if (!shared.has(file)) files.add(file);
 	}
 	rows.push({
 		route: route.id,

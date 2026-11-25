@@ -7,12 +7,13 @@ export const CORE_ACTIONS = [
   'write',
   'delete',
   'delete_own',
+  'read_own',
   'manage',
   'run',
   'use',
 ] as const;
 
-export const NAMED_ACTIONS = ['transfer', 'restore'] as const;
+export const NAMED_ACTIONS = ['transfer', 'restore', 'record'] as const;
 
 export const PERMISSION_ACTIONS = [...CORE_ACTIONS, ...NAMED_ACTIONS] as const;
 

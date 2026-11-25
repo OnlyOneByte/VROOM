@@ -1,3 +1,5 @@
+import { classifyDbError } from './db/dialect';
+
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly isOperational: boolean;
@@ -46,6 +48,16 @@ export class DemoReadOnlyError extends AppError {
 export class ForbiddenError extends AppError {
   constructor(message: string = "You don't have permission to do that") {
     super(message, 403, true);
+  }
+}
+
+export class AccountPendingError extends AppError {
+  constructor() {
+    super('Your account is waiting for an admin to approve it', 403, true);
+  }
+
+  override get code(): string {
+    return 'ACCOUNT_PENDING';
   }
 }
 
@@ -180,37 +192,21 @@ const ERROR_STATUS_MAP: Record<string, number> = {
   [SyncErrorCode.SYNC_IN_PROGRESS]: 409,
 };
 
-// bun:sqlite sets `code`; drizzle may wrap the driver error, so the cause chain is walked too.
-const UNIQUE_VIOLATION_CODES = new Set([
-  'SQLITE_CONSTRAINT_UNIQUE',
-  'SQLITE_CONSTRAINT_PRIMARYKEY',
-]);
-
-function sqliteErrorCode(err: unknown): string | undefined {
-  for (let e: unknown = err; e instanceof Error; e = e.cause) {
-    const code = (e as Error & { code?: unknown }).code;
-    if (typeof code === 'string' && code.startsWith('SQLITE_')) return code;
-  }
-  return undefined;
-}
-
 export function isUniqueConstraintError(err: unknown): boolean {
-  const code = sqliteErrorCode(err);
-  return code !== undefined && UNIQUE_VIOLATION_CODES.has(code);
+  return classifyDbError(err) === 'unique';
 }
-
-export const isSqliteError = (err: unknown): boolean => sqliteErrorCode(err) !== undefined;
 
 export const handleDatabaseError = (error: unknown): AppError => {
-  if (isUniqueConstraintError(error)) return new ConflictError('Resource already exists');
-  if (error instanceof Error) {
-    if (error.message.includes('FOREIGN KEY constraint failed'))
+  switch (classifyDbError(error)) {
+    case 'unique':
+      return new ConflictError('Resource already exists');
+    case 'foreign_key':
       return new ValidationError('Invalid reference to related resource');
-    if (error.message.includes('NOT NULL constraint failed'))
+    case 'not_null':
       return new ValidationError('Required field is missing');
-    return new DatabaseError('A database error occurred');
+    default:
+      return new DatabaseError('A database error occurred');
   }
-  return new DatabaseError('A database error occurred');
 };
 
 export function syncErrorResponse(error: SyncError): { body: ErrorResponse; status: number } {

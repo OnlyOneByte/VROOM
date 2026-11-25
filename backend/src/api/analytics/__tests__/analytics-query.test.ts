@@ -1,6 +1,8 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import type { SQL } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
+import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import * as schema from '../../../db/schema';
 import { EXPENSE_CATEGORIES } from '../../../db/types';
@@ -202,6 +204,32 @@ describe('a start before any data', () => {
     expect(result.range.start).toBeGreaterThanOrEqual(RANGE.start);
     const later = await repo.query(OWNER.id, baseQuery({ start: seconds('2024-06-01T00:00:00Z') }));
     expect(later.buckets[0]).toBe('2024-06');
+  });
+
+  test('a range that ends before the first expense keeps the range that was asked for', async () => {
+    seedFleet();
+    const range = { start: seconds('2023-01-01T00:00:00Z'), end: seconds('2023-04-01T00:00:00Z') };
+    const result = await repo.query(OWNER.id, baseQuery(range));
+    expect(result.buckets).toEqual(['2023-01', '2023-02', '2023-03']);
+    expect(result.range).toEqual(range);
+    expect(result.series).toEqual([]);
+  });
+
+  test('All time with no expenses falls back to the year before the end', async () => {
+    for (const interval of ['month', 'week'] as const) {
+      const result = await repo.query(OWNER.id, baseQuery({ interval, start: 1 }));
+      expect(result.range).toEqual({ start: RANGE.end - 365 * 86_400, end: RANGE.end });
+      expect(result.buckets.length).toBeLessThanOrEqual(interval === 'month' ? 13 : 54);
+      expect(result.series).toEqual([]);
+    }
+  });
+
+  test('All time when every expense is after the end falls back to the year before the end', async () => {
+    seedFleet();
+    const end = seconds('2023-06-01T00:00:00Z');
+    const result = await repo.query(OWNER.id, baseQuery({ interval: 'week', start: 1, end }));
+    expect(result.range).toEqual({ start: end - 365 * 86_400, end });
+    expect(result.series).toEqual([]);
   });
 });
 
@@ -516,7 +544,14 @@ describe('annotations', () => {
         [`trip-${i}`, CAMRY.id, OWNER.id, 1_000, 1_100, 'personal', seconds(`${day}T12:00:00Z`)]
       );
     }
-    const result = await repo.query(OWNER.id, baseQuery({ annotations: ['trips'] }));
+    const result = await repo.query(
+      OWNER.id,
+      baseQuery({
+        annotations: ['trips'],
+        start: seconds('2024-01-01T00:00:00Z'),
+        end: seconds('2024-07-01T00:00:00Z'),
+      })
+    );
     const at = (key: string) => result.buckets.indexOf(key);
     expect(result.trips?.count[at('2024-02')]).toBe(2);
     expect(result.trips?.count[at('2024-04')]).toBe(1);
@@ -782,10 +817,65 @@ describe('splits, compare and shape', () => {
     expect(result.totals.perBucket).toBeNull();
   });
 
+  test('over the whole range, each car uses the same distance as the fleet total', async () => {
+    seedFleet();
+    const whole = (overrides: Partial<AnalyticsQuery>) =>
+      repo.query(
+        OWNER.id,
+        baseQuery({
+          interval: 'none',
+          groupBy: 'vehicle',
+          start: seconds('2024-06-01T00:00:00Z'),
+          ...overrides,
+        })
+      );
+    const distance = await whole({ metric: 'distance' });
+    const cost = await whole({ metric: 'cost' });
+    const perDistance = await whole({ metric: 'costPerDistance' });
+    const byCar = (r: typeof distance) =>
+      Object.fromEntries(r.series.map((s) => [s.key, s.values[0] ?? 0]));
+    const miles = byCar(distance);
+    const dollars = byCar(cost);
+    const carTotal = Object.values(miles).reduce((a, b) => a + b, 0);
+    expect(carTotal).toBeCloseTo(distance.totals.distance, 9);
+    for (const [car, value] of Object.entries(byCar(perDistance))) {
+      expect(value).toBeCloseTo((dollars[car] ?? 0) / (miles[car] ?? 1), 9);
+    }
+    const fleetCost = Object.values(dollars).reduce((a, b) => a + b, 0);
+    expect(perDistance.totals.value).toBeCloseTo(fleetCost / carTotal, 9);
+  });
+
+  test('the average per bucket skips buckets with no data', async () => {
+    for (const [id, iso, amount] of [
+      ['jan', '2025-01-10T12:00:00Z', 10_000],
+      ['mar', '2025-03-10T12:00:00Z', 30_000],
+    ] as const) {
+      seedExpense(testDb.sqlite, {
+        id,
+        vehicleId: CAMRY.id,
+        category: 'maintenance',
+        expenseAmount: amount,
+        date: new Date(iso),
+        mileage: null,
+        volume: null,
+        fuelType: null,
+        missedFillup: false,
+      });
+    }
+    const result = await repo.query(
+      OWNER.id,
+      baseQuery({ start: seconds('2025-01-01T00:00:00Z'), end: seconds('2025-04-01T00:00:00Z') })
+    );
+    expect(result.buckets).toEqual(['2025-01', '2025-02', '2025-03']);
+    expect(result.series[0]?.values).toEqual([10_000, 0, 30_000]);
+    expect(result.totals.value).toBe(40_000);
+    expect(result.totals.perBucket).toBe(20_000);
+  });
+
   test('an empty account answers with zero totals and no series', async () => {
     const result = await repo.query(STRANGER.id, baseQuery({ groupBy: 'category' }));
     expect(result.series).toEqual([]);
-    expect(result.totals).toEqual({ value: 0, perBucket: 0, perDistance: null, distance: 0 });
+    expect(result.totals).toEqual({ value: 0, perBucket: null, perDistance: null, distance: 0 });
     const noRange = await repo.query(STRANGER.id, {
       ...baseQuery(),
       start: undefined,
@@ -1027,5 +1117,52 @@ describe('bucket items for drill-down', () => {
       keys: ['financial'],
     });
     expect(none.count).toBe(0);
+  });
+});
+
+describe('bucketed queries read expenses by date range, never the whole history', () => {
+  async function plansFor(run: () => Promise<unknown>): Promise<string[]> {
+    const db = testDb.drizzle as unknown as { all: (query: SQL) => unknown[] };
+    const original = db.all.bind(db);
+    const queries: SQL[] = [];
+    db.all = (query: SQL) => {
+      queries.push(query);
+      return original(query);
+    };
+    try {
+      await run();
+    } finally {
+      db.all = original;
+    }
+    return queries.flatMap((query) => {
+      const { sql: text, params } = new SQLiteSyncDialect().sqlToQuery(query);
+      const rows = testDb.sqlite
+        .query(`EXPLAIN QUERY PLAN ${text}`)
+        .all(...(params as never[])) as { detail: string }[];
+      return rows.map((r) => r.detail);
+    });
+  }
+
+  test.each([
+    ['cost by category', baseQuery({ groupBy: 'category', interval: 'week' })],
+    ['cost by tag', baseQuery({ groupBy: 'tag' })],
+    ['fuel volume', baseQuery({ metric: 'volume', interval: 'week' })],
+    ['distance', baseQuery({ metric: 'distance', interval: 'week' })],
+  ])('%s', async (_name, query) => {
+    seedFleet();
+    const plans = await plansFor(() => repo.query(OWNER.id, query));
+    const expenseSteps = plans.filter((detail) => /^(SCAN|SEARCH) e\b/.test(detail));
+    expect(expenseSteps.length).toBeGreaterThan(0);
+    for (const step of expenseSteps) expect(step).toMatch(/date>\?/);
+  });
+});
+
+describe('bucket boundaries must be whole seconds', () => {
+  test('a fractional boundary in a later bucket row is refused, not truncated', async () => {
+    seedFleet();
+    await expect(
+      repo.query(OWNER.id, baseQuery({ interval: 'month', end: RANGE.end + 0.5 }))
+    ).rejects.toThrow();
+    expect(await repo.query(OWNER.id, baseQuery({ interval: 'month' }))).toBeDefined();
   });
 });

@@ -2,6 +2,7 @@
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = ':memory:';
 process.env.PROVIDER_ENCRYPTION_KEY ||= '0'.repeat(64);
+process.env.PRIVATE_PROVIDER_ENDPOINTS = 'allow';
 
 const { outboundResolver } = await import('../utils/outbound-url');
 outboundResolver.lookup = async () => ['93.184.215.14'];

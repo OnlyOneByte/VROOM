@@ -16,6 +16,7 @@ import {
   syncState,
   trips,
   userPreferences,
+  vehicleDrivers,
   vehicleFinancing,
   vehicleShares,
   vehicles,
@@ -23,7 +24,8 @@ import {
 import SHARED_LIMITS from './shared-limits.json';
 import type { Environment } from './types';
 
-const COMMUNITY_STATS_MIN_GROUP_FLOOR = 10;
+const COMMUNITY_STATS_MIN_GROUP_FLOOR = 20;
+const COMMUNITY_STATS_MIN_GROUP_DEFAULT = 30;
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -39,6 +41,7 @@ const envSchema = z.object({
   // Unset HOST binds every interface, and 'localhost' can resolve to ::1 only, so keep the IPv4 literal.
   HOST: z.string().default('127.0.0.1'),
   DATABASE_URL: z.string().default('./data/vroom.db'),
+  WAL_CHECKPOINTS: z.enum(['on', 'off']).default('on'),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/google'),
@@ -70,6 +73,13 @@ const envSchema = z.object({
         .map((ip) => ip.trim())
         .filter(Boolean)
     ),
+  TRUSTED_CLIENT_IP_HEADER: z
+    .string()
+    .optional()
+    .transform((val) => val?.trim().toLowerCase() || undefined)
+    .refine((val) => val === undefined || /^[!#$%&'*+.^_`|~0-9a-z-]+$/.test(val), {
+      message: 'TRUSTED_CLIENT_IP_HEADER must be a header name, e.g. CF-Connecting-IP',
+    }),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   ALLOW_FAKE_STORAGE: z
     .string()
@@ -79,6 +89,16 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((val) => val === '1' || val === 'true'),
+  PRIVATE_PROVIDER_ENDPOINTS: z.string().optional(),
+  ADMIN_EMAILS: z
+    .string()
+    .optional()
+    .transform((val) =>
+      (val ?? '')
+        .split(',')
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean)
+    ),
   DISABLE_RATE_LIMIT: z
     .string()
     .optional()
@@ -91,9 +111,10 @@ const envSchema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().optional(),
   COMMUNITY_STATS: z.enum(['off', 'local']).default('local'),
+  LOCAL_OCR: z.enum(['on', 'off']).default('on'),
   COMMUNITY_STATS_MIN_GROUP: z
     .string()
-    .default(String(COMMUNITY_STATS_MIN_GROUP_FLOOR))
+    .default(String(COMMUNITY_STATS_MIN_GROUP_DEFAULT))
     .transform((val) => {
       const minGroup = Number(val);
       if (!Number.isInteger(minGroup) || minGroup < COMMUNITY_STATS_MIN_GROUP_FLOOR)
@@ -102,6 +123,14 @@ const envSchema = z.object({
         );
       return minGroup;
     }),
+  SIGNUP_MODE: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.enum(['open', 'approval', 'invite', 'closed']).optional()
+  ),
+  SIGNUP_ALLOWED_DOMAINS: z
+    .string()
+    .optional()
+    .transform((val) => (val?.trim() ? val : undefined)),
 });
 
 const parseEnv = () => {
@@ -153,7 +182,11 @@ export const CONFIG = {
   version: packageJson.version,
   allowFakeStorageProvider:
     env.ALLOW_FAKE_STORAGE && (env.NODE_ENV as Environment) !== 'production',
-  blockPrivateProviderEndpoints: env.BLOCK_PRIVATE_PROVIDER_ENDPOINTS,
+  privateProviderEndpoints: {
+    block: env.BLOCK_PRIVATE_PROVIDER_ENDPOINTS,
+    allow: env.PRIVATE_PROVIDER_ENDPOINTS ?? '',
+  },
+  adminEmails: env.ADMIN_EMAILS,
   disableRateLimit: env.DISABLE_RATE_LIMIT && (env.NODE_ENV as Environment) !== 'production',
   demo: { enabled: env.DEMO_MODE, sessionDuration: 60 * 60 * 1000 },
   server: { port: env.PORT, host: env.HOST },
@@ -163,6 +196,7 @@ export const CONFIG = {
   },
   database: {
     url: env.DATABASE_URL,
+    appCheckpoints: env.WAL_CHECKPOINTS === 'on',
     cacheSize: 1_000_000,
     walCheckpointPages: 1000,
     checkpointIntervalDev: 5 * 60 * 1000,
@@ -212,6 +246,13 @@ export const CONFIG = {
     enabled: Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT),
   },
   pagination: { defaultPageSize: 20, maxPageSize: 100, minPageSize: 1 },
+  signup: {
+    mode: env.SIGNUP_MODE,
+    allowedDomains: env.SIGNUP_ALLOWED_DOMAINS,
+    inviteTtlDays: 7,
+    maxInviteTtlDays: 90,
+  },
+  localOcr: { enabled: env.LOCAL_OCR === 'on' },
   communityStats: {
     mode: env.COMMUNITY_STATS,
     enabled: env.COMMUNITY_STATS !== 'off' && env.NODE_ENV !== 'test',
@@ -228,6 +269,8 @@ export const CONFIG = {
   rateLimit: {
     cleanupInterval: 60_000,
     trustedProxyIps: env.TRUSTED_PROXY_IPS,
+    trustedClientIpHeader: env.TRUSTED_CLIENT_IP_HEADER,
+    maxTrackedKeys: 100_000,
     global: { windowMs: 15 * 60 * 1000, limit: 1000, message: 'Too many requests' },
     auth: { windowMs: 15 * 60 * 1000, limit: 30 },
     calendar: { windowMs: 15 * 60 * 1000, limit: 120, message: 'Too many calendar requests' },
@@ -235,6 +278,19 @@ export const CONFIG = {
     backup: { windowMs: 5 * 60 * 1000, limit: 20, message: 'Too many backup requests' },
     restore: { windowMs: 10 * 60 * 1000, limit: 10, message: 'Too many restore requests' },
     trigger: { windowMs: 15 * 60 * 1000, limit: 10, message: 'Too many trigger requests' },
+    receiptScan: { windowMs: 15 * 60 * 1000, limit: 30, message: 'Too many receipt scans' },
+    receiptDrafts: {
+      windowMs: 15 * 60 * 1000,
+      limit: 10,
+      message: 'Too many receipt imports from photos',
+    },
+    assistant: { windowMs: 15 * 60 * 1000, limit: 60, message: 'Too many assistant messages' },
+    expenseImport: { windowMs: 15 * 60 * 1000, limit: 20, message: 'Too many imports' },
+    importPreview: { windowMs: 15 * 60 * 1000, limit: 300, message: 'Too many import previews' },
+    photoUpload: { windowMs: 15 * 60 * 1000, limit: 120, message: 'Too many photo uploads' },
+    providerTest: { windowMs: 15 * 60 * 1000, limit: 30, message: 'Too many provider tests' },
+    receiptScansAtOnce: 2,
+    heavyJobsAtOnce: 2,
   },
   backup: {
     maxFileSize: 50 * 1024 * 1024,
@@ -335,6 +391,7 @@ export const TABLE_SCHEMA_MAP: Record<string, Table> = {
   reminderNotifications: reminderNotifications,
   trips: trips,
   vehicleShares: vehicleShares,
+  vehicleDrivers: vehicleDrivers,
 };
 
 export const TABLE_FILENAME_MAP: Record<string, string> = {
@@ -355,6 +412,7 @@ export const TABLE_FILENAME_MAP: Record<string, string> = {
   reminderNotifications: 'reminder_notifications.csv',
   trips: 'trips.csv',
   vehicleShares: 'vehicle_shares.csv',
+  vehicleDrivers: 'vehicle_drivers.csv',
 };
 
 export function getBackupTableKeys(): string[] {
@@ -375,6 +433,7 @@ export const OPTIONAL_BACKUP_FILES = new Set([
   'reminder_notifications.csv',
   'trips.csv',
   'vehicle_shares.csv',
+  'vehicle_drivers.csv',
 ]);
 
 export function getRequiredBackupFiles(): string[] {

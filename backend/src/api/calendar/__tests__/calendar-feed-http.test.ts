@@ -4,11 +4,13 @@ import { CONFIG } from '../../../config';
 import { db } from '../../../db/connection';
 import { calendarFeeds, reminders, reminderVehicles, users, vehicles } from '../../../db/schema';
 import { seedGarage } from '../../../db/seed';
+import { assignServerRole } from '../../../permissions/grants';
 import {
   createTestApp,
   type DataEnvelope,
   json,
   requestAs,
+  socketFrom,
   type TestApp,
 } from '../../../test-helpers/http-client';
 
@@ -48,7 +50,7 @@ async function ownGarage(userId: string): Promise<void> {
 
 async function fetchFeed(path: string, ip = `198.51.100.${++visitor}`): Promise<Response> {
   const url = path.startsWith('/api/') ? path : `/api/v1${path}`;
-  return await ctx.app.request(url, { headers: { 'X-Forwarded-For': ip } });
+  return await ctx.app.request(url, {}, socketFrom(ip));
 }
 
 async function createFeed(options?: Record<string, boolean | string>): Promise<string> {
@@ -143,6 +145,7 @@ describe('the calendar feed link', () => {
     await db
       .insert(users)
       .values({ id: otherId, email: 'other@example.com', displayName: 'Other' });
+    assignServerRole(db, otherId, 'member');
     await ownGarage(otherId);
     await db.update(reminders).set({ name: 'Secret service' }).where(eq(reminders.userId, otherId));
     const [theirCar] = await db.select().from(vehicles).where(eq(vehicles.userId, otherId));
@@ -265,6 +268,38 @@ describe('the calendar feed link', () => {
       expect(lines.some((line) => line.includes('/calendar/feed/[redacted]'))).toBe(true);
       expect(lines.some((line) => line.includes(token))).toBe(false);
       expect(lines.some((line) => line.toLowerCase().includes(token.toLowerCase()))).toBe(false);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  test('a percent-escaped link is a 404 and never reaches the log', async () => {
+    const path = await createFeed();
+    const token = path.match(/feed\/(.+)\.ics$/)?.[1] ?? '';
+    const hex = (char: string) => `%${char.charCodeAt(0).toString(16)}`;
+    const log = spyOn(console, 'log');
+    try {
+      for (const variant of [
+        path.replace('/calendar/', '/%63alendar/'),
+        path.replace('/calendar/', '/%2563alendar/'),
+        `/api${path}`,
+        `/api${path.replace('/calendar/', '/%63alendar/')}`,
+        `/api${path.replace('.ics', '%0A.ics')}`,
+        `/api${path.replace('/calendar/', '/cal%09endar/')}`,
+        ...['%09', '%0A', '%20', '%2F'].flatMap((split) => {
+          const broken = path.replace(token, `${token.slice(0, 21)}${split}${token.slice(21)}`);
+          return [broken, `/api${broken}`];
+        }),
+        path.replace(token, `${token.slice(0, 21)}${hex(token[21])}${token.slice(22)}`),
+        path.replace(token, `${token.slice(0, 21)}%25${hex(token[21]).slice(1)}${token.slice(22)}`),
+      ]) {
+        const res = await fetchFeed(variant);
+        expect(`${variant.length} ${res.status}`).toBe(`${variant.length} 404`);
+      }
+      const lines = log.mock.calls.map((call) => call.join(' '));
+      for (const piece of [token.slice(0, 20), token.slice(12, 32), token.slice(-20)]) {
+        expect(lines.some((line) => line.includes(piece))).toBe(false);
+      }
     } finally {
       log.mockRestore();
     }

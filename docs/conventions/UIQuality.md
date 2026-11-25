@@ -441,6 +441,11 @@ failed step; nits can be follow-up issues.
 - [ ] The screen's question is answered in the first 300px at 375, and a new route fits a bundle
       budget in `frontend/bundle-budgets.json` (its own entry, or the default; the PR that raises
       one says why).
+- [ ] Web Vitals: every route you touched stays about 20% under its budget in
+      `frontend/web-vitals-budgets.json` (LCP, TBT and CLS at 375px with 4× CPU), measured locally
+      as in `docs/development.md`. The required Web Vitals check takes the median of 7 cold loads,
+      but a route right at its budget still fails on a noisy runner. So keep the margin. A change
+      that has to go over raises that route's budget in the same PR and says why.
 - [ ] Every state handled (loading / empty / error / populated / success feedback).
 - [ ] No overflow at 375px; tap targets ≥ 40px; primary action in thumb reach.
 - [ ] Tokens only; AA contrast checked in Amber plus two other accents, light and dark.

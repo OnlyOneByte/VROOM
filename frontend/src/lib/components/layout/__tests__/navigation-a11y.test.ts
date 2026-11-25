@@ -191,6 +191,18 @@ describe('pending badge', () => {
 
 		expect(screen.getByLabelText('1 pending items')).toBeInTheDocument();
 	});
+
+	it('sits in a status region that does not announce every change', () => {
+		offlineExpenseQueue.current = [row({ id: 'pending' })];
+		render(Navigation);
+
+		const status = screen.getByRole('status');
+		expect(status).toHaveAttribute('aria-live', 'off');
+		expect(status).toHaveTextContent('1 pending');
+		const spoken = screen.getByTestId('sync-status-announcement');
+		expect(spoken).toHaveAttribute('aria-live', 'polite');
+		expect(spoken).toHaveTextContent('Up to date');
+	});
 });
 
 describe('only the navigation for the screen width is rendered', () => {
