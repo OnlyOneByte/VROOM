@@ -35,12 +35,31 @@ describe('sonner toasts in app.css', () => {
 		expect(base?.body).toMatch(/max-width:\s*min\(32rem,\s*calc\(100vw - 2rem\)\)/);
 	});
 
-	test.each(TOAST_TYPES)('a %s toast paints the themed card surface', type => {
-		const rule = toastRules.find(r =>
-			r.selectors.includes(`[data-sonner-toast][data-type='${type}']`)
+	test.each(TOAST_TYPES)('a %s toast is the charcoal C3 bar with its light text', type => {
+		const rule = toastRules.find(
+			r =>
+				r.selectors.includes(`[data-sonner-toast][data-type='${type}']`) &&
+				/background-color/.test(r.body)
 		);
-		expect(rule, `no rule for data-type='${type}'`).toBeDefined();
-		expect(rule?.body).toMatch(/background-color:\s*var\(--card\)/);
+		expect(rule, `no surface rule for data-type='${type}'`).toBeDefined();
+		expect(rule?.body).toMatch(/background-color:\s*var\(--bar\)/);
+		expect(rule?.body).toMatch(/color:\s*var\(--bar-on\)/);
+	});
+
+	test.each(['success', 'error', 'warning'])('a %s toast colours its glyph by type', type => {
+		const rule = toastRules.find(
+			r =>
+				r.selectors.includes(`[data-sonner-toast][data-type='${type}']`) &&
+				/--toast-glyph/.test(r.body)
+		);
+		expect(rule?.body).toMatch(/--toast-glyph:\s*oklch\(/);
+	});
+
+	test('the toast keeps the C3 radius and the single pop shadow, with no border', () => {
+		const base = toastRules.find(r => r.selectors.includes('[data-sonner-toast]'));
+		expect(base?.body).toMatch(/border-radius:\s*var\(--r-lg\)/);
+		expect(base?.body).toMatch(/box-shadow:\s*var\(--shadow-pop\)/);
+		expect(base?.body).toMatch(/border:\s*0/);
 	});
 
 	test('the rule parser is non-vacuous', () => {
