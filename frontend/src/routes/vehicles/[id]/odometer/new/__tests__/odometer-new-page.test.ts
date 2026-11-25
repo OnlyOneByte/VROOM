@@ -78,19 +78,19 @@ function mount() {
 }
 
 function odometerInput(): HTMLInputElement {
-	return screen.getByLabelText('Odometer Reading *') as HTMLInputElement;
+	return screen.getByLabelText('Odometer reading') as HTMLInputElement;
 }
 
 function dateInput(): HTMLInputElement {
-	return screen.getByLabelText('Date *') as HTMLInputElement;
+	return screen.getByLabelText('Date') as HTMLInputElement;
 }
 
 function noteInput(): HTMLTextAreaElement {
-	return screen.getByLabelText('Note (Optional)') as HTMLTextAreaElement;
+	return screen.getByLabelText('Note (optional)') as HTMLTextAreaElement;
 }
 
 async function save(): Promise<void> {
-	await fireEvent.click(screen.getByRole('button', { name: 'Save Reading' }));
+	await fireEvent.click(screen.getByRole('button', { name: 'Save reading' }));
 	await settle();
 }
 
@@ -124,7 +124,7 @@ describe('new odometer reading page defaults', () => {
 		expect(odometerInput()).toHaveAttribute('inputmode', 'numeric');
 		expect(screen.getByText('0/500')).toBeInTheDocument();
 		expect(getEntries).toHaveBeenCalledWith('v1', { limit: 1, offset: 0 });
-		for (const name of ['Cancel', 'Save Reading']) {
+		for (const name of ['Cancel', 'Save reading']) {
 			expect(screen.getByRole('button', { name })).toHaveClass('h-10');
 		}
 	});
@@ -453,7 +453,7 @@ describe('new odometer reading submit', () => {
 		expect(error).toHaveAttribute('role', 'alert');
 		expect(document.activeElement).toBe(error);
 		expect(goto).not.toHaveBeenCalled();
-		expect(screen.getByRole('button', { name: 'Save Reading' })).toBeEnabled();
+		expect(screen.getByRole('button', { name: 'Save reading' })).toBeEnabled();
 	});
 
 	test('an out-of-order refusal is shown on the odometer field and focuses it', async () => {
@@ -512,7 +512,7 @@ describe('new odometer reading submit', () => {
 		await fireEvent.input(odometerInput(), { target: { value: '100' } });
 		await save();
 
-		expect(screen.getByRole('button', { name: 'Save Reading' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Save reading' })).toBeDisabled();
 	});
 });
 

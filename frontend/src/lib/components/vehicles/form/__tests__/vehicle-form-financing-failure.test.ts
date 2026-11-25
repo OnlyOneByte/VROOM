@@ -60,7 +60,7 @@ describe('VehicleForm when the vehicle saves but its financing does not', () => 
 		render(VehicleForm, { props: { vehicleId: 'v1' } });
 		await screen.findByDisplayValue('Bank of America');
 
-		await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
 		await waitFor(() =>
 			expect(appStore.notifications.map(n => n.message)).toContain(

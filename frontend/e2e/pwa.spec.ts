@@ -156,7 +156,7 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 	},
 	'/expenses/new': { debt: [], ready: pageHeading('Add Expense') },
 	'/vehicles': { debt: [], ready: page => page.getByTestId('garage-row').first() },
-	'/vehicles/new': { debt: [], ready: pageHeading('Add Vehicle') },
+	'/vehicles/new': { debt: [], ready: pageHeading('Add a vehicle') },
 	'/vehicles/vehicle-camry': {
 		debt: [],
 		ready: page => page.getByRole('tab', { name: 'Insurance' }),

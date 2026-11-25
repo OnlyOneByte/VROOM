@@ -113,13 +113,13 @@ function notificationMessages(): string[] {
 
 async function renderCreate(): Promise<void> {
 	render(VehicleForm, { props: {} });
-	await screen.findByRole('heading', { name: 'Add Vehicle' });
+	await screen.findByRole('heading', { name: 'Add a vehicle' });
 }
 
 async function renderEdit(vehicle: Vehicle = EXISTING): Promise<void> {
 	getVehicle.mockResolvedValue(vehicle);
 	render(VehicleForm, { props: { vehicleId: vehicle.id } });
-	await screen.findByRole('button', { name: /update vehicle/i });
+	await screen.findByRole('button', { name: /save changes/i });
 }
 
 async function fillRequired(): Promise<void> {
@@ -147,28 +147,24 @@ describe('VehicleForm create mode', () => {
 		expect(input('make').value).toBe('');
 		expect(input('model').value).toBe('');
 		expect(input('year').value).toBe('2026');
-		expect(document.getElementById('vehicleType')?.textContent?.trim()).toBe('Gas');
+		expect(screen.getByRole('radio', { name: 'Gas' })).toBeChecked();
 		expect(switchState('trackFuel')).toBe('checked');
 		expect(switchState('trackCharging')).toBe('unchecked');
-		expect(screen.getByRole('button', { name: /add vehicle/i })).toBeTruthy();
+		expect(screen.getByRole('button', { name: /save vehicle/i })).toBeTruthy();
 		expect(screen.queryByRole('button', { name: /delete/i })).toBeNull();
 	});
 
-	test('asks for the kind and the powertrain right after make, model and year', async () => {
+	test('asks for the kind right after make, model and year, with the fuel as chips', async () => {
 		await renderCreate();
 		const order = [...document.querySelectorAll('label[for]')].map(l => l.getAttribute('for'));
-		expect(order.slice(0, 6)).toEqual([
-			'make',
-			'model',
-			'year',
-			'vehicleKind',
-			'vehicleType',
-			'licensePlate'
-		]);
+		expect(order.slice(0, 4)).toEqual(['make', 'model', 'year', 'vehicleKind']);
 		expect(document.querySelector('label[for="vehicleKind"]')?.textContent?.trim()).toBe('Kind');
-		expect(document.querySelector('label[for="vehicleType"]')?.textContent?.trim()).toBe(
-			'Powertrain'
-		);
+		const fuel = screen.getByRole('group', { name: 'Fuel' });
+		expect(
+			within(fuel)
+				.getAllByRole('radio')
+				.map(r => r.getAttribute('value'))
+		).toEqual(['gas', 'electric', 'hybrid']);
 	});
 
 	test('a new vehicle is a car unless another kind is picked, and the kind is saved', async () => {
@@ -179,7 +175,7 @@ describe('VehicleForm create mode', () => {
 
 		await choose('vehicleKind', 'Motorcycle');
 		expect(document.getElementById('vehicleKind')?.textContent?.trim()).toBe('Motorcycle');
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		await vi.waitFor(() => expect(createVehicle).toHaveBeenCalledTimes(1));
 		expect(createdPayload().vehicleKind).toBe('motorcycle');
@@ -195,7 +191,7 @@ describe('VehicleForm create mode', () => {
 	test('blocks submit and flags make and model when both are blank', async () => {
 		await renderCreate();
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		expect(errorText('make')).toBe('Make is required');
 		expect(errorText('model')).toBe('Model is required');
@@ -207,7 +203,7 @@ describe('VehicleForm create mode', () => {
 	test('a blocked submit moves focus to the first invalid field', async () => {
 		await renderCreate();
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		await vi.waitFor(() => expect(document.activeElement).toBe(input('make')));
 	});
@@ -217,7 +213,7 @@ describe('VehicleForm create mode', () => {
 		await type('make', '   ');
 		await type('model', 'Camry');
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		expect(errorText('make')).toBe('Make is required');
 		expect(errorText('model')).toBeNull();
@@ -232,7 +228,7 @@ describe('VehicleForm create mode', () => {
 		await fillRequired();
 		await type('year', year);
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		expect(errorText('year')).toBe('Please enter a valid year');
 		expect(createVehicle).not.toHaveBeenCalled();
@@ -247,7 +243,7 @@ describe('VehicleForm create mode', () => {
 		await fillRequired();
 		await type('vin', vin);
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		expect(errorText('vin')).toBe(message);
 		expect(createVehicle).not.toHaveBeenCalled();
@@ -257,7 +253,7 @@ describe('VehicleForm create mode', () => {
 		await renderCreate();
 		await fillRequired();
 		await type('vin', 'BAD!');
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 		expect(errorText('vin')).not.toBeNull();
 
 		await type('vin', '1HGBH41JXMN109186');
@@ -270,7 +266,7 @@ describe('VehicleForm create mode', () => {
 		await fillRequired();
 		await type('initialMileage', '-5');
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		expect(errorText('initialMileage')).toBe('Mileage cannot be negative');
 		expect(createVehicle).not.toHaveBeenCalled();
@@ -285,7 +281,7 @@ describe('VehicleForm create mode', () => {
 		await type('licensePlate', 'XYZ-987');
 		await type('initialMileage', '1500');
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		await vi.waitFor(() => expect(createVehicle).toHaveBeenCalledTimes(1));
 		expect(createdPayload()).toEqual({
@@ -313,7 +309,7 @@ describe('VehicleForm create mode', () => {
 		await renderCreate();
 		await fillRequired();
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
 		expect(appStore.vehicles).toContainEqual(saved);
@@ -326,7 +322,7 @@ describe('VehicleForm create mode', () => {
 		await renderCreate();
 		await fillRequired();
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		await vi.waitFor(() =>
 			expect(notificationMessages()).toContain(
@@ -336,7 +332,7 @@ describe('VehicleForm create mode', () => {
 		expect(goto).not.toHaveBeenCalled();
 		expect(appStore.vehicles).toEqual([]);
 		expect(input('make').value).toBe('Toyota');
-		expect(screen.getByRole('button', { name: /add vehicle/i }).hasAttribute('disabled')).toBe(
+		expect(screen.getByRole('button', { name: /save vehicle/i }).hasAttribute('disabled')).toBe(
 			false
 		);
 	});
@@ -347,9 +343,9 @@ describe('VehicleForm create mode', () => {
 		await renderCreate();
 		await fillRequired();
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
-		const busy = await screen.findByRole('button', { name: /adding\.\.\./i });
+		const busy = await screen.findByRole('button', { name: /saving…/i });
 		expect(busy.hasAttribute('disabled')).toBe(true);
 		expect(screen.getByRole('button', { name: /cancel/i }).hasAttribute('disabled')).toBe(true);
 		release({ ...EXISTING, id: 'new-1' });
@@ -366,14 +362,15 @@ describe('VehicleForm create mode', () => {
 			createVehicle.mockResolvedValue({ ...EXISTING, id: 'new-1' });
 			await renderCreate();
 			await fillRequired();
-			if (vehicleType === 'gas') await choose('vehicleType', 'Electric');
+			if (vehicleType === 'gas')
+				await fireEvent.click(screen.getByRole('radio', { name: 'Electric' }));
 
-			await choose('vehicleType', label);
+			await fireEvent.click(screen.getByRole('radio', { name: label }));
 
-			expect(document.getElementById('vehicleType')?.textContent?.trim()).toBe(label);
+			expect(screen.getByRole('radio', { name: label })).toBeChecked();
 			expect(switchState('trackFuel')).toBe(trackFuel ? 'checked' : 'unchecked');
 			expect(switchState('trackCharging')).toBe(trackCharging ? 'checked' : 'unchecked');
-			await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+			await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 			await vi.waitFor(() => expect(createVehicle).toHaveBeenCalled());
 			expect(createdPayload()).toMatchObject({ vehicleType, trackFuel, trackCharging });
 		}
@@ -387,7 +384,7 @@ describe('VehicleForm create mode', () => {
 		await fireEvent.click(document.getElementById('trackCharging') as HTMLElement);
 
 		expect(switchState('trackCharging')).toBe('checked');
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 		await vi.waitFor(() => expect(createVehicle).toHaveBeenCalled());
 		expect(createdPayload()).toMatchObject({
 			vehicleType: 'gas',
@@ -400,13 +397,13 @@ describe('VehicleForm create mode', () => {
 		createVehicle.mockResolvedValue({ ...EXISTING, id: 'new-1' });
 		await renderCreate();
 		await fillRequired();
-		await fireEvent.click(screen.getByRole('button', { name: /toggle unit preferences/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /change units/i }));
 
 		await choose('distanceUnit', 'Kilometers');
 		await choose('volumeUnit', 'Liters');
 
 		expect(document.getElementById('distanceUnit')?.textContent?.trim()).toBe('Kilometers');
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 		await vi.waitFor(() => expect(createVehicle).toHaveBeenCalled());
 		expect(createdPayload().unitPreferences).toEqual({
 			distanceUnit: 'kilometers',
@@ -415,15 +412,15 @@ describe('VehicleForm create mode', () => {
 		});
 	});
 
-	test('cancel and the back arrow both return to the dashboard without saving', async () => {
+	test('cancel and the back arrow both return to the Garage without saving', async () => {
 		await renderCreate();
 
 		await fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
-		await fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Back to garage' }));
 
 		expect(goto).toHaveBeenCalledTimes(2);
-		expect(goto).toHaveBeenNthCalledWith(1, '/dashboard');
-		expect(goto).toHaveBeenNthCalledWith(2, '/dashboard');
+		expect(goto).toHaveBeenNthCalledWith(1, '/vehicles');
+		expect(goto).toHaveBeenNthCalledWith(2, '/vehicles');
 		expect(createVehicle).not.toHaveBeenCalled();
 	});
 });
@@ -441,7 +438,7 @@ describe('VehicleForm edit mode', () => {
 		expect(input('vin').value).toBe('1HGBH41JXMN109186');
 		expect(input('initialMileage').value).toBe('42000');
 		expect(input('purchasePrice').value).toBe('18500');
-		expect(document.getElementById('vehicleType')?.textContent?.trim()).toBe('Hybrid');
+		expect(screen.getByRole('radio', { name: 'Hybrid' })).toBeChecked();
 		expect(switchState('trackFuel')).toBe('checked');
 		expect(switchState('trackCharging')).toBe('checked');
 		expect(screen.getByText('Daily Driver', { selector: 'p' })).toBeTruthy();
@@ -470,8 +467,8 @@ describe('VehicleForm edit mode', () => {
 
 		await screen.findByText("Couldn't load this vehicle");
 		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeTruthy();
-		expect(screen.getByRole('heading', { level: 1, name: 'Edit Vehicle' })).toBeTruthy();
-		expect(screen.getByRole('button', { name: 'Go back' })).toBeTruthy();
+		expect(screen.getByRole('heading', { level: 1, name: 'Edit vehicle' })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Back to the vehicle' })).toBeTruthy();
 		expect(goto).not.toHaveBeenCalled();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
@@ -484,7 +481,7 @@ describe('VehicleForm edit mode', () => {
 		getVehicle.mockReturnValueOnce(new Promise(() => {}));
 		render(VehicleForm, { props: { vehicleId: EXISTING.id } });
 
-		expect(await screen.findByRole('heading', { level: 1, name: 'Edit Vehicle' })).toBeTruthy();
+		expect(await screen.findByRole('heading', { level: 1, name: 'Edit vehicle' })).toBeTruthy();
 		expect(document.getElementById('make')).toBeNull();
 	});
 
@@ -495,7 +492,7 @@ describe('VehicleForm edit mode', () => {
 		await type('licensePlate', '');
 		await type('nickname', '');
 
-		await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
 		await vi.waitFor(() => expect(updateVehicle).toHaveBeenCalledTimes(1));
 		expect(updateVehicle.mock.calls[0]?.[0]).toBe('veh-1');
@@ -525,7 +522,7 @@ describe('VehicleForm edit mode', () => {
 		appStore.setVehicles([EXISTING]);
 		await renderEdit();
 
-		await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/veh-1'));
 		expect(refreshAll).toHaveBeenCalledTimes(1);
@@ -537,7 +534,7 @@ describe('VehicleForm edit mode', () => {
 		updateVehicle.mockRejectedValue(new ApiError('Internal server error', 500));
 		await renderEdit();
 
-		await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
 		await vi.waitFor(() =>
 			expect(notificationMessages()).toContain(
@@ -552,7 +549,7 @@ describe('VehicleForm edit mode', () => {
 		await renderEdit();
 		await type('make', '');
 
-		await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
 		expect(errorText('make')).toBe('Make is required');
 		expect(updateVehicle).not.toHaveBeenCalled();
@@ -649,7 +646,7 @@ async function renderEditWithFinancing(
 }
 
 async function submitUpdate(): Promise<void> {
-	await fireEvent.click(screen.getByRole('button', { name: /update vehicle/i }));
+	await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 }
 
 async function pickStartDate(dateValue: string): Promise<void> {
@@ -677,7 +674,7 @@ describe('VehicleForm financing on create', () => {
 		await type('apr', '6');
 		await pickStartDate('2026-06-01');
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		await vi.waitFor(() => expect(createFinancing).toHaveBeenCalledTimes(1));
 		expect(createFinancing.mock.calls[0]?.[0]).toBe('new-1');
@@ -706,7 +703,7 @@ describe('VehicleForm financing on create', () => {
 		await type('apr', '0');
 		await pickStartDate('2026-06-01');
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		await vi.waitFor(() => expect(createFinancing).toHaveBeenCalledTimes(1));
 		expect(createdFinancing()).toMatchObject({ apr: 0, paymentAmount: 500 });
@@ -721,7 +718,7 @@ describe('VehicleForm financing on create', () => {
 		await type('apr', '');
 		await pickStartDate('2026-06-01');
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		expect(errorText('apr')).toBe('APR is required');
 		expect(createVehicle).not.toHaveBeenCalled();
@@ -734,7 +731,7 @@ describe('VehicleForm financing on create', () => {
 		await type('originalAmount', '30000');
 		await type('apr', '6');
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		expect(errorText('provider')).toBe('Provider is required');
 		expect(errorText('startDate')).toBe('Start date is required');
@@ -752,7 +749,7 @@ describe('VehicleForm financing on create', () => {
 		await type('apr', '6');
 		await pickStartDate('2026-06-01');
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
 		expect(notificationMessages()).toEqual(
@@ -770,7 +767,7 @@ describe('VehicleForm financing on create', () => {
 		await renderCreate();
 		await fillRequired();
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 		const dialog = await screen.findByRole('alertdialog');
 		expect(dialog.textContent).toContain('Change units for this vehicle?');
 		expect(dialog.textContent).not.toContain("You're changing");
@@ -788,7 +785,7 @@ describe('VehicleForm financing on create', () => {
 		await fillRequired();
 		await type('purchasePrice', '-1');
 
-		await fireEvent.click(screen.getByRole('button', { name: /add vehicle/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		expect(errorText('purchasePrice')).toBe('Purchase price cannot be negative');
 		expect(input('purchasePrice').getAttribute('aria-describedby')).toBe('purchasePrice-error');
