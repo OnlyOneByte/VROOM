@@ -355,7 +355,7 @@ test.describe('Analytics', () => {
 		await numbers.getByRole('button', { name: 'Download CSV' }).click();
 		const file = await download;
 		expect(file.suggestedFilename()).toMatch(
-			/^vroom-total-cost-by-month-\d{4}-\d{2}-\d{2}-to-\d{4}-\d{2}-\d{2}\.csv$/
+			/^vroom-total-cost-by-month-\d{4}-\d{2}-to-\d{4}-\d{2}\.csv$/
 		);
 		const csv = await readFile((await file.path()) as string, 'utf8');
 		expect(csv.startsWith('\uFEFFMonth,')).toBe(true);

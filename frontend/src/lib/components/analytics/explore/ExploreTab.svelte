@@ -41,6 +41,7 @@
 		heroSentence,
 		isAdditive,
 		numbersTable,
+		plainDay,
 		kpis,
 		bucketBounds,
 		expensesNote,
@@ -335,15 +336,13 @@
 			isAdditive(shown) && shown.split !== 'tag'
 		);
 	});
-	let numbersFile = $derived(
-		`vroom-${metricLabel(shown.metric, distanceWord).toLowerCase().replaceAll(' ', '-')}-by-${shown.per}-${isoDay(dateRange.startDate)}-to-${isoDay(dateRange.endDate)}.csv`
-	);
-
-	function isoDay(seconds: number): string {
-		const d = new Date(seconds * 1000);
-		const pad = (n: number) => String(n).padStart(2, '0');
-		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-	}
+	let numbersFile = $derived.by(() => {
+		const metric = metricLabel(shown.metric, distanceWord).toLowerCase().replaceAll(' ', '-');
+		const range = response
+			? `${response.buckets[0] ?? ''}-to-${response.buckets.at(-1) ?? ''}`
+			: `to-${plainDay(dateRange.endDate - 1)}`;
+		return `vroom-${metric}-by-${shown.per}-${range}.csv`;
+	});
 	let rankingGutter = $derived(isMobile.current ? 112 : 232);
 
 	function fitLabel(label: string): string {

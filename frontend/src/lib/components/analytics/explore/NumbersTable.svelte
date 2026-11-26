@@ -40,7 +40,9 @@
 			</Table.Caption>
 			<Table.Header>
 				<Table.Row>
-					<Table.Head scope="col" class="sticky left-0 bg-background">{firstColumn}</Table.Head>
+					<Table.Head scope="col" class="sticky left-0 bg-background! z-10">
+						{firstColumn}
+					</Table.Head>
 					{#each table.columns as column, c (c)}
 						<Table.Head scope="col" class="text-right">{column}</Table.Head>
 					{/each}
@@ -49,7 +51,7 @@
 			<Table.Body>
 				{#each table.rows as row, r (r)}
 					<Table.Row>
-						<Table.Head scope="row" class="sticky left-0 bg-background font-normal">
+						<Table.Head scope="row" class="sticky left-0 bg-background! z-10 font-normal">
 							{row.label}
 						</Table.Head>
 						{#each row.values as value, i (i)}
