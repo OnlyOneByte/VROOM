@@ -25,7 +25,7 @@
     "vapid:gen": "bun src/scripts/gen-vapid-keys.ts",
     "providers:rotate-key": "bun src/scripts/rotate-provider-keys.ts",
     "test": "bun test --timeout 30000 && bun run test:tz",
-    "test:tz": "TZ=Pacific/Auckland bun test --timeout 30000 src/api/trips src/api/odometer src/api/expenses",
+    "test:tz": "TZ=Pacific/Auckland bun test --timeout 30000 src/api/trips src/api/odometer src/api/expenses src/utils/__tests__/money-capture.test.ts",
     "test:postgres": "PG_PORTABILITY=1 bun test --timeout 120000 src/db/__tests__/postgres-portability.test.ts",
     "lint": "biome lint src/",
     "lint:fix": "biome lint --write src/",

@@ -56,10 +56,8 @@ async function get(ctx: TestApp, path: string): Promise<unknown> {
     : text.replace(/\b[a-z0-9]{24,}\b/g, '<id>');
 }
 
-async function vehicleIds(ctx: TestApp): Promise<string[]> {
-  const rows = ctx.sqlite
-    .query('SELECT id FROM vehicles WHERE user_id = ? ORDER BY make, model, year')
-    .all(ctx.user.id) as { id: string }[];
+function idsOf(ctx: TestApp, sql: string): string[] {
+  const rows = ctx.sqlite.query(sql).all(ctx.user.id) as { id: string }[];
   return rows.map((row) => row.id);
 }
 
@@ -95,7 +93,18 @@ async function captureGarage(ctx: TestApp): Promise<Record<string, unknown>> {
   ];
   const out: Record<string, unknown> = {};
   for (const path of paths) out[path] = await get(ctx, path);
-  for (const [index, id] of (await vehicleIds(ctx)).entries()) {
+  const policies = idsOf(
+    ctx,
+    'SELECT id FROM insurance_policies WHERE user_id = ? ORDER BY company'
+  );
+  for (const [index, id] of policies.entries()) {
+    out[`policy ${index} claims`] = await get(ctx, `/insurance/${id}/claims`);
+  }
+  const vehicles = idsOf(
+    ctx,
+    'SELECT id FROM vehicles WHERE user_id = ? ORDER BY make, model, year'
+  );
+  for (const [index, id] of vehicles.entries()) {
     const routes = {
       stats: `/vehicles/${id}/stats?period=all`,
       financing: `/financing/vehicles/${id}/financing?timeZone=UTC`,
@@ -122,8 +131,10 @@ function toWholeYen(ctx: TestApp): void {
 }
 
 let captured: Record<string, Record<string, unknown>>;
+const zone = process.env.TZ;
 
 beforeAll(async () => {
+  process.env.TZ = 'UTC';
   setSystemTime(NOW);
   captured = {};
   const usd = await createTestApp();
@@ -143,7 +154,10 @@ beforeAll(async () => {
   }
 }, 120_000);
 
-afterAll(() => setSystemTime());
+afterAll(() => {
+  setSystemTime();
+  process.env.TZ = zone;
+});
 
 describe('money shown by the API on the sample garage', () => {
   test.each(['USD', 'JPY'])('%s matches the committed capture', (currency) => {
@@ -156,7 +170,7 @@ describe('money shown by the API on the sample garage', () => {
     expect(captured[currency]).toEqual(fixture);
   });
 
-  test('the capture covers money on every route', () => {
+  test('the capture holds real amounts for every currency', () => {
     for (const currency of ['USD', 'JPY']) {
       const text = JSON.stringify(captured[currency]);
       expect(Object.keys(captured[currency] ?? {}).length).toBeGreaterThan(30);
