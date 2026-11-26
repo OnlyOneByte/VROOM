@@ -63,6 +63,22 @@ describe('buildVehicleRadar fuel efficiency', () => {
     expect(score('gas-b')).toBe(10);
   });
 
+  test('the raw value is the economy itself, unit-converted, beside the score', () => {
+    const raw = (r: typeof radar, id: string) =>
+      r.find((v) => v.vehicleId === id)?.fuelEfficiencyValue;
+    expect(raw(radar, 'gas-a')).toBe(30);
+    expect(raw(radar, 'gas-b')).toBe(20);
+    expect(raw(radar, 'ev')).toBeNull();
+    const kmPerLitre = (mpg: number) => mpg * 0.425144;
+    const converted = buildVehicleRadar([], fuelRows, names, {
+      efficiency: (value) => kmPerLitre(value),
+      distance: (value) => value * 1.609344,
+    });
+    expect(raw(converted, 'gas-a')).toBeCloseTo(kmPerLitre(30));
+    expect(raw(converted, 'gas-b')).toBeCloseTo(kmPerLitre(20));
+    expect(converted.find((v) => v.vehicleId === 'gas-a')?.fuelEfficiency).toBe(100);
+  });
+
   test('a single vehicle with data gets the midpoint', () => {
     const solo = buildVehicleRadar([], fuelRows.slice(0, 2), names);
     expect(solo.find((r) => r.vehicleId === 'gas-a')?.fuelEfficiency).toBe(50);

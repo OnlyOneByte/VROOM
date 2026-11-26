@@ -307,6 +307,7 @@ export interface FuelAdvancedData {
     vehicleId: string;
     vehicleName: string;
     fuelEfficiency: number | null;
+    fuelEfficiencyValue: number | null;
     maintenanceCost: number;
     reliability: number;
     annualCost: number;

@@ -123,6 +123,7 @@ export interface FuelAdvancedResponse {
 		vehicleId: string;
 		vehicleName: string;
 		fuelEfficiency: number | null;
+		fuelEfficiencyValue?: number | null;
 		maintenanceCost: number;
 		reliability: number;
 		annualCost: number;

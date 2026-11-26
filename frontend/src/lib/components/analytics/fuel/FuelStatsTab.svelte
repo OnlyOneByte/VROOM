@@ -38,6 +38,7 @@
 	import FuelCharts from './FuelCharts.svelte';
 	import AdvancedCharts from './AdvancedCharts.svelte';
 	import ChartGroup from './ChartGroup.svelte';
+	import FuelOverview from './FuelOverview.svelte';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import type { StatCardChange } from '#lib/components/charts/StatCard.svelte';
 	import { buildVehicleColorMap } from '#lib/utils/chart-colors.ts';
@@ -51,8 +52,10 @@
 		onClearFilters,
 		previousPeriodLabel = 'vs the 12 months before',
 		dateRange,
-		vehicleIds
+		vehicleIds,
+		rangeText = 'Last 12 months'
 	}: {
+		rangeText?: string;
 		fuelStats?: FuelStatsResponse | null;
 		fuelAdvanced?: FuelAdvancedResponse | null;
 		vehicleColors?: Record<string, string>;
@@ -366,6 +369,17 @@
 	</EmptyState>
 {:else if fuelStats}
 	<div class="space-y-6">
+		<FuelOverview
+			{fuelStats}
+			{fuelAdvanced}
+			{vehicleColors}
+			{rangeText}
+			volumeUnit={volLabelShort}
+			chargeUnit={chargeLabel}
+			efficiencyUnit={effLabel}
+			electricEfficiencyUnit={electricEffLabel}
+			showCharging={hasChargeData}
+		/>
 		<StatCardGrid items={summaryItems} columns={3} />
 
 		<FuelCharts
