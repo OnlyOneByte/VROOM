@@ -1031,6 +1031,9 @@
 							{#await import('#lib/components/drivers/DriversCard.svelte') then { default: DriversCard }}
 								<DriversCard {vehicleId} {distanceUnit} from={lastMonth.from} to={lastMonth.to} />
 							{/await}
+							{#await import('#lib/components/drivers/BalancesCard.svelte') then { default: BalancesCard }}
+								<BalancesCard {vehicleId} from={lastMonth.from} to={lastMonth.to} />
+							{/await}
 						{/if}
 
 						{#if vehicle.carShare?.manage}

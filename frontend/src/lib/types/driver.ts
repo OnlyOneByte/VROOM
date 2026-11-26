@@ -30,6 +30,42 @@ export interface DriverStats {
 	drivers: DriverFigures[];
 }
 
+export type GroupRule =
+	| { kind: 'distance' }
+	| { kind: 'equal' }
+	| { kind: 'payer' }
+	| { kind: 'fixed'; shares: Record<string, number> };
+
+export interface SplitRules {
+	running: GroupRule;
+	ownership: Extract<GroupRule, { kind: 'payer' } | { kind: 'fixed' }>;
+}
+
+export interface DriverBalances {
+	scope: 'everyone' | 'own';
+	rules: SplitRules;
+	drivers: {
+		driverId: string;
+		name: string;
+		color: string | null;
+		guest: boolean;
+		you: boolean;
+		owed: number;
+		paid: number;
+		balance: number;
+	}[];
+	transfers: {
+		fromDriverId: string;
+		fromName: string;
+		toDriverId: string;
+		toName: string;
+		amount: number;
+	}[];
+	total: number | null;
+	unassigned: number | null;
+	unpaid: number | null;
+}
+
 export type BackfillRequest =
 	{ mode: 'logged' } | { mode: 'range'; driverId: string; from: string; to: string };
 

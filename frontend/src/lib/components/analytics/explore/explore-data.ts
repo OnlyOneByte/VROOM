@@ -236,7 +236,7 @@ export function numbersTable(
 
 const FORMULA_START = /^'*[=+\-@\t\r]/;
 
-function csvText(value: string): string {
+export function csvText(value: string): string {
 	const safe = FORMULA_START.test(value) ? `'${value}` : value;
 	return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
