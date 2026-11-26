@@ -1,49 +1,33 @@
 <script lang="ts">
-	import { Sun, Moon, Monitor } from '@lucide/svelte';
-	import { Label } from '#lib/components/ui/label/index.ts';
-	import {
-		Card,
-		CardContent,
-		CardDescription,
-		CardHeader,
-		CardTitle
-	} from '#lib/components/ui/card/index.ts';
+	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
+	import Segmented from '#lib/components/common/Segmented.svelte';
 	import { themeStore, type ThemePreference } from '#lib/stores/theme.svelte.ts';
-	import { cn } from '#lib/utils.ts';
 
-	let currentTheme = $derived(themeStore.current);
-
-	const options: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
-		{ value: 'light', label: 'Light', icon: Sun },
-		{ value: 'dark', label: 'Dark', icon: Moon },
-		{ value: 'system', label: 'System', icon: Monitor }
+	const options: { value: ThemePreference; label: string }[] = [
+		{ value: 'light', label: 'Light' },
+		{ value: 'dark', label: 'Dark' },
+		{ value: 'system', label: 'Auto' }
 	];
 </script>
 
-<Card>
+<Card variant="section">
 	<CardHeader>
-		<CardTitle>Appearance</CardTitle>
-		<CardDescription>Choose how VROOM looks to you. Changes apply right away.</CardDescription>
+		<CardTitle level={2} class="text-base">Appearance</CardTitle>
 	</CardHeader>
 	<CardContent>
-		<Label class="mb-3 block">Mode</Label>
-		<div class="grid grid-cols-3 gap-3">
-			{#each options as option (option.value)}
-				{@const Icon = option.icon}
-				<button
-					type="button"
-					class={cn(
-						'flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors',
-						currentTheme === option.value
-							? 'border-primary bg-primary/10 text-primary'
-							: 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-					)}
-					onclick={() => themeStore.setPreference(option.value)}
-				>
-					<Icon class="h-5 w-5" />
-					<span class="text-sm font-medium">{option.label}</span>
-				</button>
-			{/each}
+		<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-1">
+			<div class="min-w-0">
+				<p class="font-medium">Light or dark</p>
+				<p class="text-sm text-muted-foreground">
+					Auto follows your device. Changes apply right away.
+				</p>
+			</div>
+			<Segmented
+				label="Light or dark"
+				value={themeStore.current}
+				{options}
+				onValueChange={v => themeStore.setPreference(v)}
+			/>
 		</div>
 	</CardContent>
 </Card>
