@@ -6,9 +6,11 @@
 		isSubmitting: boolean;
 		onCancel: () => void;
 		quick?: boolean;
+		edit?: boolean;
+		disabled?: boolean;
 	}
 
-	let { isSubmitting, onCancel, quick = false }: Props = $props();
+	let { isSubmitting, onCancel, quick = false, edit = false, disabled = false }: Props = $props();
 
 	function keepFieldFocus(event: MouseEvent) {
 		event.preventDefault();
@@ -20,7 +22,7 @@
 		<LoaderCircle class="h-5 w-5 animate-spin" />
 		Saving...
 	{:else}
-		Save Expense
+		{edit ? 'Save changes' : 'Save Expense'}
 	{/if}
 {/snippet}
 
@@ -56,7 +58,7 @@
 			onmousedown={keepFieldFocus}
 			variant="outline"
 			onclick={onCancel}
-			disabled={isSubmitting}
+			disabled={isSubmitting || disabled}
 			class="hidden h-10 px-5 sm:inline-flex"
 		>
 			Cancel
@@ -64,7 +66,7 @@
 		<Button
 			type="submit"
 			onmousedown={keepFieldFocus}
-			disabled={isSubmitting}
+			disabled={isSubmitting || disabled}
 			class="h-12 w-full text-base sm:h-10 sm:w-auto sm:px-5 sm:text-sm"
 		>
 			{@render saveLabel()}

@@ -152,11 +152,11 @@ async function renderCreate(props: Record<string, string> = {}): Promise<void> {
 async function renderEdit(expense: Expense = EXISTING, returnTo = '/expenses'): Promise<void> {
 	getExpense.mockResolvedValue(expense);
 	render(ExpenseForm, { props: { expenseId: expense.id, returnTo } });
-	await screen.findByRole('heading', { name: 'Edit Expense' });
+	await screen.findByTestId('expense-edit-header');
 }
 
 function save(): Promise<boolean> {
-	return fireEvent.click(screen.getByRole('button', { name: /(save|update) expense/i }));
+	return fireEvent.click(screen.getByRole('button', { name: /save (expense|changes)/i }));
 }
 
 beforeEach(() => {
@@ -578,38 +578,57 @@ describe('ExpenseForm quick add', () => {
 		await vi.waitFor(() => expect(document.activeElement).toBe(field('mileage')));
 	});
 
-	test('editing opens More details so every saved value shows', async () => {
+	test('editing shows every saved value with no More details toggle', async () => {
 		await renderEdit();
 
-		expect(screen.getByRole('button', { name: /More details/ })).toHaveAttribute(
-			'aria-expanded',
-			'true'
-		);
+		expect(screen.queryByRole('button', { name: /More details/ })).toBeNull();
 		expect(field('description').value).toBe('Oil change');
 	});
 });
 
 describe('ExpenseForm edit mode', () => {
-	test('keeps the full form: its title, a back button and no quick-add figure', async () => {
+	test('titles the page with the expense, links back to Expenses and shows no quick-add figure', async () => {
 		await renderEdit();
 
-		expect(screen.getByRole('button', { name: 'Go back' })).toBeTruthy();
+		expect(screen.getByRole('heading', { level: 1, name: 'Oil change' })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Expenses' })).toBeTruthy();
 		expect(screen.queryByRole('heading', { name: 'New expense' })).toBeNull();
 		expect(field('amount')).not.toHaveClass('text-7xl');
+	});
+
+	test('the back link names where it goes, and the title falls back to the category', async () => {
+		await renderEdit({ ...EXISTING, description: '' }, '/vehicles/v1');
+
+		expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+		expect(screen.getByRole('heading', { level: 1, name: 'Maintenance' })).toBeTruthy();
+	});
+
+	test('lays out the fields in labelled pairs with category and vehicle as selects', async () => {
+		await renderEdit();
+
+		const grid = screen.getByTestId('expense-edit-grid');
+		expect(grid).toHaveClass('sm:grid-cols-2');
+		expect(within(grid).getByLabelText('Amount *')).toBe(field('amount'));
+		expect(within(grid).getByText('Date *')).toBeTruthy();
+		expect(within(grid).getByRole('combobox', { name: /Category/ })).toHaveTextContent(
+			'Maintenance'
+		);
+		expect(within(grid).getByRole('combobox', { name: /Vehicle/ })).toBeTruthy();
+		expect(screen.queryByRole('radiogroup', { name: 'Category *' })).toBeNull();
 	});
 
 	test('prefills the form from the loaded expense and offers delete and duplicate', async () => {
 		await renderEdit();
 
 		expect(getExpense).toHaveBeenCalledWith('exp-1');
-		await vi.waitFor(() => expect(screen.getByText('2020 Toyota Camry', { selector: 'p' })));
-		expect(categoryButton('Maintenance').getAttribute('aria-checked')).toBe('true');
+		await vi.waitFor(() => expect(screen.getByText(/2020 Toyota Camry/, { selector: 'p' })));
+		expect(screen.getByRole('combobox', { name: /Category/ })).toHaveTextContent('Maintenance');
 		expect(field('amount').value).toBe('79.99');
 		expect(field('mileage').value).toBe('31000');
 		expect(field('description').value).toBe('Oil change');
 		expect(field('location').value).toBe('Quick Lube');
 		expect(screen.getByText('oil')).toBeTruthy();
-		expect(screen.getByRole('button', { name: /update expense/i })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Save changes' })).toBeTruthy();
 		expect(screen.getByRole('button', { name: /^delete$/i })).toBeTruthy();
 		expect(screen.getByRole('button', { name: /duplicate/i })).toBeTruthy();
 	});
@@ -887,7 +906,7 @@ describe('ExpenseForm loading and load failures', () => {
 
 		await vi.waitFor(() => expect(getExpense).toHaveBeenCalled());
 		expect(container.querySelector('.animate-spin')).not.toBeNull();
-		expect(screen.queryByRole('heading', { name: 'Edit Expense' })).toBeNull();
+		expect(screen.queryByTestId('expense-edit-header')).toBeNull();
 	});
 
 	test('a vehicle detail failure names the server reason next to Retry', async () => {
@@ -1080,7 +1099,7 @@ describe('ExpenseForm financing and insurance links', () => {
 
 		await screen.findByRole('heading', { name: 'Insurance Expense' });
 		expect(screen.getByText('Managed by insurance policy')).toBeTruthy();
-		expect(screen.queryByRole('button', { name: /update expense/i })).toBeNull();
+		expect(screen.queryByRole('button', { name: /save changes/i })).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: /Force Delete/ }));
 		expect(await screen.findByRole('alertdialog')).toBeTruthy();

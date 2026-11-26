@@ -24,7 +24,7 @@ async function editOilChangeAmount(page: Page) {
 	await page.setViewportSize({ width: 1280, height: 800 });
 	await page.goto('/expenses/expense-maint/edit?returnTo=/expenses');
 	await page.getByLabel('Amount *').fill('120.00');
-	await page.getByRole('button', { name: /update expense/i }).click();
+	await page.getByRole('button', { name: 'Save changes' }).click();
 }
 
 test.describe('Editing an expense does not wait for the server', () => {

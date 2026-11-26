@@ -25,7 +25,7 @@
 		'[appearance:textfield] rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent aria-invalid:ring-0 aria-invalid:border-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
 </script>
 
-<div class="space-y-1 {quick ? 'text-center' : ''}">
+<div class="min-w-0 {quick ? 'space-y-1 text-center' : 'space-y-2'}">
 	<Label for="amount" class={quick ? 'sr-only' : ''}>Amount *</Label>
 	{#if quick}
 		<div
@@ -57,13 +57,9 @@
 			/>
 		</div>
 	{:else}
-		<div
-			class="flex items-baseline gap-1 border-b-2 transition-colors focus-within:border-primary {amountError
-				? 'border-destructive'
-				: 'border-input'}"
-		>
+		<div class="relative">
 			<span
-				class="text-4xl font-bold tracking-tight lg:text-5xl {amount
+				class="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-base md:text-sm {amount
 					? 'text-foreground'
 					: 'text-muted-foreground'}"
 				aria-hidden="true"
@@ -79,7 +75,8 @@
 				min="0"
 				bind:value={amount}
 				placeholder={amountPlaceholder()}
-				class="h-auto py-1 text-4xl font-bold tracking-tight tabular-nums sm:h-auto md:text-4xl lg:text-5xl {numberClass}"
+				style="padding-left: calc(1.125rem + {currencySymbol.length}ch)"
+				class="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 				onblur={onAmountBlur}
 				aria-invalid={!!amountError}
 				aria-describedby={amountError ? 'amount-error' : undefined}
