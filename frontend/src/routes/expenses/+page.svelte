@@ -38,7 +38,6 @@
 	import DateRangePicker from '#lib/components/common/date-range-picker.svelte';
 	import Input from '#lib/components/ui/input/input.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import * as CardNs from '#lib/components/ui/card/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import ExpensesTable from '#lib/components/expenses/ExpensesTable.svelte';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
@@ -507,6 +506,16 @@
 		value: category,
 		label: EXPENSE_CATEGORY_INFO[category].shortLabel
 	}));
+	const sortOptions = [
+		{ value: 'date-desc', label: 'Newest' },
+		{ value: 'date-asc', label: 'Oldest' },
+		{ value: 'amount-desc', label: 'Highest' },
+		{ value: 'amount-asc', label: 'Lowest' }
+	];
+	function chooseSort(value: string) {
+		const [by, dir] = value.split('-') as ['date' | 'amount', 'asc' | 'desc'];
+		handleSortChange(by, dir);
+	}
 	function toggleCategory(category: string) {
 		const current = expenseCategoryList(categoryFilter);
 		const next = current.includes(category)
@@ -740,53 +749,52 @@
 			onRemoveNeedsAttention={removeOfflineExpense}
 		/>
 
-		<CardNs.Root
-			bind:ref={expensesList}
+		<div
+			bind:this={expensesList}
 			role="region"
 			aria-label="Expenses"
 			tabindex={-1}
-			class="outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 max-sm:border-0 max-sm:bg-transparent max-sm:py-0 max-sm:shadow-none"
+			class="rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 		>
-			<CardNs.Content class="max-sm:px-0">
-				{#if pageError}
-					<LoadErrorCard
-						compact
-						data-testid="expenses-page-error"
-						title="Couldn't load expenses"
-						message={pageError.message}
-						onRetry={() => fetchPageAndSummary(pageError?.offset ?? currentOffset)}
-						onRecovered={() => expensesList?.focus()}
-					/>
-				{:else}
-					<ExpensesTable
-						expenses={displayExpenses}
-						{vehicles}
-						showVehicleColumn={true}
-						returnTo={resolve(routes.expenses)}
-						onDelete={handleDeleteExpense}
-						emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
-						emptyDescription={EXPENSE_MESSAGES.NO_EXPENSES_DESC}
-						emptyActionLabel={COMMON_MESSAGES.ADD_FIRST_EXPENSE}
-						emptyActionHref={resolve(routes.expenseNew)}
-						scrollHeight="600px"
-						onClearFilters={clearFilters}
-						hasActiveFilters={totalCountFiltered}
-						{totalCount}
-						{currentOffset}
-						{pageSize}
-						{isLoadingPage}
-						onPageChange={handlePageChange}
-						activeSortBy={sortBy}
-						activeSortDir={sortDir}
-						onSortChange={handleSortChange}
-						activeCategory={categoryFilter}
-						onCategoryChange={handleCategoryChange}
-						monthTotals={shownMonthTotals}
-						pendingStates={pending.states}
-					/>
-				{/if}
-			</CardNs.Content>
-		</CardNs.Root>
+			{#if pageError}
+				<LoadErrorCard
+					compact
+					data-testid="expenses-page-error"
+					title="Couldn't load expenses"
+					message={pageError.message}
+					onRetry={() => fetchPageAndSummary(pageError?.offset ?? currentOffset)}
+					onRecovered={() => expensesList?.focus()}
+				/>
+			{:else}
+				<ExpensesTable
+					expenses={displayExpenses}
+					{vehicles}
+					showVehicleColumn={true}
+					returnTo={resolve(routes.expenses)}
+					onDelete={handleDeleteExpense}
+					emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
+					emptyDescription={EXPENSE_MESSAGES.NO_EXPENSES_DESC}
+					emptyActionLabel={COMMON_MESSAGES.ADD_FIRST_EXPENSE}
+					emptyActionHref={resolve(routes.expenseNew)}
+					scrollHeight="600px"
+					onClearFilters={clearFilters}
+					hasActiveFilters={totalCountFiltered}
+					{totalCount}
+					{currentOffset}
+					{pageSize}
+					{isLoadingPage}
+					onPageChange={handlePageChange}
+					activeSortBy={sortBy}
+					activeSortDir={sortDir}
+					onSortChange={handleSortChange}
+					activeCategory={categoryFilter}
+					onCategoryChange={handleCategoryChange}
+					monthTotals={shownMonthTotals}
+					pendingStates={pending.states}
+					ledger
+				/>
+			{/if}
+		</div>
 	</div>
 
 	<Sheet.Root bind:open={filtersSheetOpen}>
@@ -796,7 +804,9 @@
 		>
 			<Sheet.Header>
 				<Sheet.Title class="font-(family-name:--font-fig) text-3xl uppercase">Filters</Sheet.Title>
-				<Sheet.Description>Narrow the list by vehicle, category, date and tags.</Sheet.Description>
+				<Sheet.Description>
+					Narrow the list by vehicle, category, date and tags, and pick the order.
+				</Sheet.Description>
 			</Sheet.Header>
 			<div class="space-y-5 px-4">
 				<FilterPills
@@ -810,6 +820,12 @@
 					options={categoryOptions}
 					selected={expenseCategoryList(categoryFilter)}
 					onToggle={toggleCategory}
+				/>
+				<FilterPills
+					label="Sort"
+					options={sortOptions}
+					selected={[`${sortBy}-${sortDir}`]}
+					onToggle={chooseSort}
 				/>
 				<div class="space-y-2" role="group" aria-labelledby="expense-dates-label">
 					<p id="expense-dates-label" class="text-sm font-medium">Dates</p>

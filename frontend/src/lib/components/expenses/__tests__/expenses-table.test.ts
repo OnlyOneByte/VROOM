@@ -428,14 +428,15 @@ describe('ExpensesTable rows lead with what the user would call the expense', ()
 
 		const named = screen.getByText('Arco').closest('button') as HTMLElement;
 		expect(named.querySelector('p')).toHaveTextContent('Arco');
-		expect(named).toHaveTextContent(/Fuel\s*·\s*Mar 21, 2024\s*·\s*Daily Driver/);
+		expect(named).toHaveTextContent(/Fuel · Daily Driver · Mar 21, 2024/);
 
 		const unnamed = screen.getByText('Maintenance').closest('button') as HTMLElement;
 		expect(unnamed.querySelector('p')).toHaveTextContent('Maintenance');
+		expect(unnamed).not.toHaveTextContent(/Maintenance ·/);
 
 		const split = screen.getByText('Car wash').closest('button') as HTMLElement;
-		expect(split).toHaveTextContent(/Split/);
-		expect(split).toHaveTextContent(/Split\s*·\s*Fuel\s*·/);
+		expect(split.querySelector('div div')).toHaveTextContent(/^Car wash\s*Split$/);
+		expect(split).toHaveTextContent(/Fuel · .* · /);
 	});
 
 	test('the desktop table opens each row with the description, falling back to the category', () => {

@@ -106,10 +106,14 @@
 					<h2
 						class="sticky top-[calc(4rem+env(safe-area-inset-top))] short:top-0 z-10 flex items-baseline justify-between gap-3 border-b-2 border-foreground bg-background pt-2 pb-1.5"
 					>
-						<span class="font-(family-name:--font-fig) text-2xl leading-none font-bold uppercase lg:text-3xl">
+						<span
+							class="font-(family-name:--font-fig) text-2xl leading-none font-bold uppercase lg:text-3xl"
+						>
 							{monthLabel(section.month)}
 						</span>
-						<span class="text-base font-semibold tabular-nums">{@render monthTotal(section.month)}</span>
+						<span class="text-base font-semibold tabular-nums">
+							{@render monthTotal(section.month)}
+						</span>
 					</h2>
 				{/if}
 				<div class="divide-y border-b">
@@ -121,50 +125,52 @@
 		{/each}
 	</div>
 {:else}
-<div class="rounded-md border bg-card">
-	<div class="flex items-center gap-2 border-b px-3 py-2">
-		<ExpenseCategoryFilter density="compact" value={categoryFilter} onChange={onCategoryChange} />
+	<div class="rounded-md border bg-card">
+		<div class="flex items-center gap-2 border-b px-3 py-2">
+			<ExpenseCategoryFilter density="compact" value={categoryFilter} onChange={onCategoryChange} />
 
-		<div class="ml-auto flex items-center gap-2">
-			<ExpenseSortButton
-				label="Date"
-				field="date"
-				{sortBy}
-				{onSort}
-				class="h-10 px-2 text-xs sm:h-9"
-				iconClass="ml-1 h-3 w-3"
-			/>
-			<ExpenseSortButton
-				label="Amount"
-				field="amount"
-				{sortBy}
-				{onSort}
-				class="h-10 px-2 text-xs sm:h-9"
-				iconClass="ml-1 h-3 w-3"
-			/>
+			<div class="ml-auto flex items-center gap-2">
+				<ExpenseSortButton
+					label="Date"
+					field="date"
+					{sortBy}
+					{onSort}
+					class="h-10 px-2 text-xs sm:h-9"
+					iconClass="ml-1 h-3 w-3"
+				/>
+				<ExpenseSortButton
+					label="Amount"
+					field="amount"
+					{sortBy}
+					{onSort}
+					class="h-10 px-2 text-xs sm:h-9"
+					iconClass="ml-1 h-3 w-3"
+				/>
+			</div>
+		</div>
+
+		<div class="divide-y">
+			{#if rows.length === 0}
+				<div class="py-8 text-center">
+					<p class="text-muted-foreground text-sm">No expenses match this category filter.</p>
+				</div>
+			{:else}
+				{#each sections as section (section.month)}
+					{#if section.month}
+						<h2
+							class="sticky top-[calc(4rem+env(safe-area-inset-top))] short:top-0 z-10 flex items-baseline justify-between gap-3 bg-muted px-3 py-2 text-sm font-semibold text-foreground"
+						>
+							<span>{monthLabel(section.month)}</span>
+							<span class="tabular-nums text-muted-foreground">
+								{@render monthTotal(section.month)}
+							</span>
+						</h2>
+					{/if}
+					{#each section.rows as item (rowKey(item))}
+						{@render row(item)}
+					{/each}
+				{/each}
+			{/if}
 		</div>
 	</div>
-
-	<div class="divide-y">
-		{#if rows.length === 0}
-			<div class="py-8 text-center">
-				<p class="text-muted-foreground text-sm">No expenses match this category filter.</p>
-			</div>
-		{:else}
-			{#each sections as section (section.month)}
-				{#if section.month}
-					<h2
-						class="sticky top-[calc(4rem+env(safe-area-inset-top))] short:top-0 z-10 flex items-baseline justify-between gap-3 bg-muted px-3 py-2 text-sm font-semibold text-foreground"
-					>
-						<span>{monthLabel(section.month)}</span>
-						<span class="tabular-nums text-muted-foreground">{@render monthTotal(section.month)}</span>
-					</h2>
-				{/if}
-				{#each section.rows as item (rowKey(item))}
-					{@render row(item)}
-				{/each}
-			{/each}
-		{/if}
-	</div>
-</div>
 {/if}

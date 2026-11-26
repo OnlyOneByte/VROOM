@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import type { Expense, Vehicle } from '#lib/types/index.ts';
 import {
 	buildDisplayRows,
+	fillLabel,
 	monthLabel,
 	monthSections,
 	rowKey,
@@ -284,5 +285,21 @@ describe('rowTitle', () => {
 			categoryInMeta: false
 		});
 		expect(rowTitle(undefined, 'misc')).toEqual({ title: 'Misc', categoryInMeta: false });
+	});
+});
+
+describe('fillLabel', () => {
+	const litres = { unitPreferences: { volumeUnit: 'liters', chargeUnit: 'kwh' } } as Vehicle;
+
+	test('a fill-up shows its volume in the vehicle unit, defaulting to gallons', () => {
+		expect(fillLabel(expense({ id: 'a', volume: 8.123 }), undefined)).toBe('8.12 gal');
+		expect(fillLabel(expense({ id: 'b', volume: 40 }), litres)).toBe('40 L');
+	});
+
+	test('a charge shows kWh, and other categories or empty fills show nothing', () => {
+		const charge = expense({ id: 'c', fuelType: 'Level 2 (AC)', charge: 51.6 });
+		expect(fillLabel(charge, litres)).toBe('51.6 kWh');
+		expect(fillLabel(expense({ id: 'd' }), undefined)).toBeNull();
+		expect(fillLabel(expense({ id: 'e', category: 'misc', volume: 3 }), undefined)).toBeNull();
 	});
 });
