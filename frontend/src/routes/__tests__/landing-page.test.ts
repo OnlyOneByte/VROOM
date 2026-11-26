@@ -1,61 +1,126 @@
-import { describe, expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { ApiError } from '#lib/utils/error-handling.ts';
+
+const { authApi, authStore, showError } = vi.hoisted(() => ({
+	authApi: {
+		isDemoAvailable: vi.fn<() => Promise<boolean>>(),
+		startDemo: vi.fn<() => Promise<unknown>>()
+	},
+	authStore: {
+		isLoading: false,
+		isAuthenticated: false,
+		initialize: vi.fn(() => Promise.resolve())
+	},
+	showError: vi.fn<(message: string) => void>()
+}));
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
+vi.mock('#lib/services/auth-api.ts', () => ({ authApi }));
+vi.mock('#lib/stores/auth.svelte.ts', () => ({ authStore }));
+vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore: { showError } }));
 
 const Page = (await import('../+page.svelte')).default;
 
+beforeEach(() => {
+	vi.clearAllMocks();
+	authApi.isDemoAvailable.mockResolvedValue(false);
+	authApi.startDemo.mockResolvedValue({ session: { expiresAt: '2026-12-01T00:00:00Z' } });
+	authStore.isAuthenticated = false;
+	authStore.initialize.mockImplementation(async () => {
+		authStore.isAuthenticated = true;
+	});
+});
+
+async function demoButton() {
+	return screen.findByRole('button', { name: 'See a demo garage' });
+}
+
 describe('landing page', () => {
-	test('shows six feature cards, so the grid has no orphan', () => {
+	test('leads with what the car really costs, on the real dial', () => {
 		render(Page);
-		const features = screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent?.trim());
-		expect(features).toEqual([
-			'Multi-Vehicle Tracking',
-			'Cost Analytics',
-			'Your Own Storage',
-			'Privacy First',
-			'Install as an App',
-			'Open Source, Open Format'
+
+		expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+			'What your car really costs.'
+		);
+		expect(
+			screen.getByRole('img', { name: /^Example: true cost per mile, all in: 58¢/ })
+		).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute('href', '/auth');
+	});
+
+	test('names three things VROOM does', () => {
+		render(Page);
+
+		expect(screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent?.trim())).toEqual([
+			'Ten-second logging',
+			'Never miss a service',
+			'Your storage, your data'
 		]);
 	});
 
 	test('the copy does not assume a particular sign-in or storage provider', () => {
 		const { container } = render(Page);
-		expect(container.textContent).not.toMatch(/google/i);
-		expect(screen.getByText('Sign in to get started. No credit card required.')).toBeTruthy();
+
+		expect(container.textContent).not.toMatch(/google|drive\b|s3\b/i);
 	});
 
-	test('the product shot has a light and a dark variant with set dimensions', () => {
+	test.each([
+		['has it turned off', () => authApi.isDemoAvailable.mockResolvedValue(false)],
+		['cannot say', () => authApi.isDemoAvailable.mockRejectedValue(new Error('offline'))]
+	])('offers no demo garage when the server %s', async (_label, arrange) => {
+		arrange();
 		render(Page);
-		const shots = screen.getAllByRole('img', { name: /The VROOM Dashboard/ });
-		expect(shots.map(img => img.getAttribute('src'))).toEqual([
-			'/landing/dashboard-light.webp',
-			'/landing/dashboard-dark.webp'
-		]);
-		for (const img of shots) {
-			expect(img.getAttribute('width')).toBe('1280');
-			expect(img.getAttribute('height')).toBe('1180');
-		}
+
+		await waitFor(() => expect(authApi.isDemoAvailable).toHaveBeenCalled());
+		expect(screen.queryByRole('button', { name: 'See a demo garage' })).not.toBeInTheDocument();
 	});
 
-	test('below sm each variant swaps in a phone-width capture with its own dimensions', () => {
+	test('opens the demo garage once, however often it is clicked', async () => {
+		authApi.isDemoAvailable.mockResolvedValue(true);
 		render(Page);
-		const shots = screen.getAllByRole('img', { name: /The VROOM Dashboard/ });
-		const sources = shots.map(img => img.closest('picture')?.querySelector('source'));
-		expect(sources.map(source => source?.getAttribute('srcset'))).toEqual([
-			'/landing/dashboard-phone-light.webp',
-			'/landing/dashboard-phone-dark.webp'
-		]);
-		for (const source of sources) {
-			expect(source?.getAttribute('media')).toBe('(width < 40rem)');
-			expect(source?.getAttribute('width')).toBe('750');
-			expect(source?.getAttribute('height')).toBe('1400');
-		}
+		const button = await demoButton();
+
+		await fireEvent.click(button);
+		await fireEvent.click(button);
+
+		await waitFor(() => expect(authStore.initialize).toHaveBeenCalledTimes(1));
+		expect(authApi.startDemo).toHaveBeenCalledTimes(1);
+		expect(button).toHaveAttribute('aria-disabled', 'true');
+		expect(showError).not.toHaveBeenCalled();
 	});
 
-	test('the stacked footer links are 40px tap targets on phones', () => {
+	test('says so when the demo session cannot start, and keeps focus on the button', async () => {
+		authApi.isDemoAvailable.mockResolvedValue(true);
+		authApi.startDemo.mockRejectedValue(new ApiError('Too many requests', 429));
 		render(Page);
+		const button = await demoButton();
+		button.focus();
+
+		await fireEvent.click(button);
+
+		await waitFor(() => expect(showError).toHaveBeenCalledTimes(1));
+		expect(showError.mock.calls[0]?.[0]).toMatch(/^Couldn't open the demo garage\./);
+		expect(authStore.initialize).not.toHaveBeenCalled();
+		expect(button).toHaveAttribute('aria-disabled', 'false');
+		expect(button).toHaveFocus();
+	});
+
+	test('says so when the demo session starts but does not stick', async () => {
+		authApi.isDemoAvailable.mockResolvedValue(true);
+		authStore.initialize.mockResolvedValue(undefined);
+		render(Page);
+
+		await fireEvent.click(await demoButton());
+
+		await waitFor(() => expect(showError).toHaveBeenCalledTimes(1));
+		expect(showError).toHaveBeenCalledWith("Couldn't open the demo garage. Try again in a moment.");
+	});
+
+	test('the footer links are 40px tap targets', () => {
+		render(Page);
+
 		for (const name of ['Privacy Policy', 'Terms of Service']) {
 			expect(screen.getByRole('link', { name })).toHaveClass('min-h-10');
 		}

@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { ApiError } from '#lib/utils/error-handling.ts';
 
@@ -12,6 +12,10 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('#lib/services/auth-api.ts', () => ({ authApi }));
 
 const AuthPage = (await import('../+page.svelte')).default;
+
+afterEach(() => {
+	page.url = new URL('https://app.example/auth');
+});
 
 describe('sign-in page', () => {
 	test('a providers load failure offers a 40px Retry that loads the sign-in options', async () => {
@@ -53,7 +57,6 @@ describe('sign-in page', () => {
 		expect(alert).toHaveTextContent('Sign-in was cancelled');
 		expect(alert).toHaveTextContent('Try again, or pick another option.');
 		expect(await screen.findByRole('button', { name: 'Continue with Google' })).toBeEnabled();
-		page.url = new URL('https://app.example/auth');
 	});
 
 	test('an unknown sign-in error code shows no error card', async () => {
@@ -63,7 +66,6 @@ describe('sign-in page', () => {
 
 		await screen.findByRole('button', { name: 'Continue with Google' });
 		expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-		page.url = new URL('https://app.example/auth');
 	});
 
 	test.each([
@@ -75,7 +77,6 @@ describe('sign-in page', () => {
 		page.url = new URL(`https://app.example/auth?auth_error=${code}`);
 		render(AuthPage);
 		expect(await screen.findByRole('alert')).toHaveTextContent(message);
-		page.url = new URL('https://app.example/auth');
 	});
 
 	test('a Retry that finds no enabled providers announces that sign-in is unavailable', async () => {
