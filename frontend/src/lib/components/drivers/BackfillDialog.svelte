@@ -1,4 +1,14 @@
+<script lang="ts" module>
+	export function rangeBounds(from: string, to: string) {
+		return {
+			from: new Date(`${from}T00:00:00`).toISOString(),
+			to: new Date(`${to}T23:59:59.999`).toISOString()
+		};
+	}
+</script>
+
 <script lang="ts">
+	import { LoaderCircle } from '@lucide/svelte';
 	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
@@ -14,7 +24,7 @@
 		Driver
 	} from '#lib/types/index.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-	import { dateOnlyToISO, formatDate } from '#lib/utils/formatters.ts';
+	import { formatDate } from '#lib/utils/formatters.ts';
 
 	interface Props {
 		open: boolean;
@@ -31,18 +41,13 @@
 	let preview = $state<BackfillSummary | null>(null);
 	let batches = $state<BackfillBatch[]>([]);
 	let busy = $state(false);
+	let previewFailed = $state(false);
 	let latest = 0;
 
 	let request = $derived.by((): BackfillRequest | null => {
 		if (mode === 'logged') return { mode };
 		if (!driverId || !from || !to || from > to) return null;
-		const endOfDay = Date.parse(dateOnlyToISO(to)) + 24 * 60 * 60 * 1000 - 1;
-		return {
-			mode,
-			driverId,
-			from: dateOnlyToISO(from),
-			to: new Date(endOfDay).toISOString()
-		};
+		return { mode, driverId, ...rangeBounds(from, to) };
 	});
 	let chosen = $derived(drivers.find(d => d.id === driverId));
 
@@ -56,13 +61,16 @@
 		const wanted = request;
 		const mine = ++latest;
 		preview = null;
+		previewFailed = false;
 		if (!wanted) return;
 		driverApi
 			.previewBackfill(vehicleId, wanted)
 			.then(result => {
 				if (mine === latest) preview = result;
 			})
-			.catch(() => {});
+			.catch(() => {
+				if (mine === latest) previewFailed = true;
+			});
 	});
 
 	$effect(() => {
@@ -106,7 +114,8 @@
 	}
 
 	let summaryText = $derived.by(() => {
-		if (!preview) return '';
+		if (previewFailed) return "Couldn't work out what would change. Try again in a moment.";
+		if (!preview) return request ? 'Checking what would change…' : '';
 		if (preview.total === 0)
 			return 'Nothing to fill in: every matching entry already has a driver.';
 		const parts = [
@@ -207,6 +216,7 @@
 				Close
 			</Button>
 			<Button size="lg" disabled={busy || !preview || preview.total === 0} onclick={apply}>
+				{#if busy}<LoaderCircle class="size-4 animate-spin" aria-hidden="true" />{/if}
 				{preview && preview.total > 0 ? `Fill in ${preview.total}` : 'Fill in'}
 			</Button>
 		</Dialog.Footer>

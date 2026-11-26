@@ -16,7 +16,7 @@ vi.mock('#lib/services/driver-api.ts', () => ({
 	}
 }));
 
-import BackfillDialog from '../BackfillDialog.svelte';
+import BackfillDialog, { rangeBounds } from '../BackfillDialog.svelte';
 
 const settle = async () => {
 	for (let i = 0; i < 10; i++) await new Promise(resolve => setTimeout(resolve, 0));
@@ -67,6 +67,23 @@ describe('BackfillDialog', () => {
 		expect((screen.getByRole('button', { name: 'Fill in' }) as HTMLButtonElement).disabled).toBe(
 			true
 		);
+	});
+
+	test('says so when the preview fails, and keeps the button off', async () => {
+		previewBackfill.mockRejectedValue(new Error('offline'));
+		backfills.mockResolvedValue([]);
+		mount();
+		await settle();
+		expect(screen.getByRole('status').textContent).toContain("Couldn't work out");
+		expect((screen.getByRole('button', { name: 'Fill in' }) as HTMLButtonElement).disabled).toBe(
+			true
+		);
+	});
+
+	test('a date range covers whole local days, from midnight to the end of the last day', () => {
+		const { from, to } = rangeBounds('2024-03-01', '2024-03-31');
+		expect(new Date(from)).toEqual(new Date(2024, 2, 1, 0, 0, 0, 0));
+		expect(new Date(to)).toEqual(new Date(2024, 2, 31, 23, 59, 59, 999));
 	});
 
 	test('a recent fill-in can be undone', async () => {
