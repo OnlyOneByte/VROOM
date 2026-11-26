@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { CONFIG } from '../../config';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import type { NewPushSubscription, PushSubscription } from '../../db/schema';
 import { pushSubscriptions } from '../../db/schema';
 import { DatabaseError } from '../../errors';
@@ -12,7 +12,7 @@ export class PushSubscriptionRepository extends BaseRepository<
   PushSubscription,
   NewPushSubscription
 > {
-  constructor(db: AppDatabase) {
+  constructor(db: AsyncAppDatabase) {
     super(db, pushSubscriptions);
   }
 
