@@ -115,6 +115,42 @@ describe('demo garage, on', () => {
     expect(vehicles.data.map((v) => v.nickname).sort()).toEqual(['Daily Driver', 'Weekend Car']);
   });
 
+  test('a signed-in user who starts the demo keeps their own session', async () => {
+    const res = await ctx.app.request(
+      '/api/v1/auth/demo',
+      { method: 'POST', headers: { 'Sec-Fetch-Site': 'same-origin', Cookie: ctx.cookie } },
+      socketFrom('198.51.100.250')
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('set-cookie')).toBeNull();
+    const me = await json<{ data: { demo: boolean; user: { id: string } } }>(
+      await send(ctx.cookie, 'GET', '/api/v1/auth/me')
+    );
+    expect(me.data.demo).toBe(false);
+    expect(me.data.user.id).toBe(ctx.user.id);
+    expect(await db.select().from(sessions).where(eq(sessions.userId, DEMO_USER_ID))).toEqual([]);
+  });
+
+  test('a stale session cookie still gets a demo session', async () => {
+    const res = await ctx.app.request(
+      '/api/v1/auth/demo',
+      {
+        method: 'POST',
+        headers: {
+          'Sec-Fetch-Site': 'same-origin',
+          Cookie: `${appContext().lucia.sessionCookieName}=not-a-session`,
+        },
+      },
+      socketFrom('198.51.100.251')
+    );
+    expect(res.status).toBe(200);
+    const cookie = (res.headers.get('set-cookie') ?? '').split(';')[0];
+    const me = await json<{ data: { demo: boolean } }>(
+      await send(cookie, 'GET', '/api/v1/auth/me')
+    );
+    expect(me.data.demo).toBe(true);
+  });
+
   test('every mutating route refuses the demo user and nothing is written', async () => {
     const cookie = await demoCookie();
     const before = await rowCounts();

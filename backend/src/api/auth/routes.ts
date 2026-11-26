@@ -179,8 +179,19 @@ routes.get('/signup', (c) => {
 
 routes.get('/demo', (c) => c.json({ success: true, data: { available: isDemoAvailable() } }));
 
+async function signedInSession(c: Context) {
+  const sessionId = getCookie(c, appContext().lucia.sessionCookieName);
+  if (!sessionId) return null;
+  const { session, user } = await appContext().lucia.validateSession(sessionId);
+  return session && user.id !== DEMO_USER_ID ? session : null;
+}
+
 routes.post('/demo', authRateLimiter, async (c) => {
   if (!isDemoAvailable()) throw new NotFoundError('Demo garage');
+  const existing = await signedInSession(c);
+  if (existing) {
+    return c.json({ success: true, data: { session: { expiresAt: existing.expiresAt } } });
+  }
   const expiresAt = await startDemoSession(c);
   return c.json({ success: true, data: { session: { expiresAt } } });
 });
