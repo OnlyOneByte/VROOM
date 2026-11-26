@@ -16,6 +16,7 @@ const at = (day: string) => Math.floor(Date.parse(day) / 1000);
 
 interface Balances {
   scope: 'everyone' | 'own';
+  rules: unknown;
   drivers: { driverId: string; owed: number; paid: number; balance: number; you: boolean }[];
   transfers: { fromDriverId: string; toDriverId: string; amount: number }[];
   total: number | null;
@@ -97,6 +98,23 @@ describe('split rules and balances', () => {
     expect(data.drivers.map((d) => d.driverId)).toEqual([editor]);
     expect(data.drivers[0]).toMatchObject({ owed: 20, paid: 0, balance: 20, you: true });
     expect(data.total).toBeNull();
+  });
+
+  test("a driver without the full view sees only their own fixed share, not anyone else's", async () => {
+    const rules = {
+      running: { kind: 'distance' },
+      ownership: { kind: 'fixed', shares: { [owner]: 70, [editor]: 30 } },
+    };
+    await ctx.authed('PUT', `${base}/rules`, rules);
+    const own = {
+      running: { kind: 'distance' },
+      ownership: { kind: 'fixed', shares: { [editor]: 30 } },
+    };
+    const read = await json<DataEnvelope<unknown>>(await m.editor.request('GET', `${base}/rules`));
+    expect(read.data).toEqual(own);
+    expect((await balances(m.editor)).rules).toEqual(own);
+    const full = await json<DataEnvelope<unknown>>(await ctx.authed('GET', `${base}/rules`));
+    expect(full.data).toEqual(rules);
   });
 
   test('rules are checked: shares add up to 100 and name active drivers of this car', async () => {

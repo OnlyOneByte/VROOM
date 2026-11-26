@@ -59,6 +59,18 @@ export function amountPlaceholder(currency?: string): string {
 	return digits > 0 ? `0.${'0'.repeat(digits)}` : '0';
 }
 
+export function minorUnitScale(_currency?: string): number {
+	return 100;
+}
+
+export function toMinor(amount: number, currency?: string): number {
+	return Math.round(amount * minorUnitScale(currency));
+}
+
+export function fromMinor(minor: number, currency?: string): number {
+	return minor / minorUnitScale(currency);
+}
+
 export function formatBytes(bytes: number): string {
 	if (bytes < 1024) return `${formatNumber(bytes, 0)} B`;
 	if (bytes < 1024 * 1024) return `${formatNumber(bytes / 1024, 1)} KB`;

@@ -1,6 +1,7 @@
 import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 import { toBackendExpense } from '#lib/services/api-transformer.ts';
 import { browser } from '$app/env';
+import { fromMinor, toMinor } from '#lib/utils/formatters.ts';
 import type { Expense, ExpenseCategory, Vehicle } from '#lib/types/index.ts';
 
 const OFFLINE_STORAGE_KEY = 'vroom_offline_expenses';
@@ -71,8 +72,8 @@ export function isIncompleteFuelExpense(expense: OfflineExpense): boolean {
 	return expense.category === 'fuel' && ((!expense.volume && !expense.charge) || !expense.mileage);
 }
 
-function roundToCents(amount: number): number {
-	return Math.round(amount * 100) / 100;
+function roundToMinorUnit(amount: number, currency?: string): number {
+	return fromMinor(toMinor(amount, currency), currency);
 }
 
 export const INCOMPLETE_FUEL_REASON =
@@ -205,7 +206,7 @@ export function loadOfflineExpenses(owner: string | null = queueOwner): OfflineE
 		const expenses: OfflineExpense[] = JSON.parse(stored);
 
 		return expenses.map(expense => {
-			const amount = roundToCents(expense.amount);
+			const amount = roundToMinorUnit(expense.amount, expense.currency);
 			if (!expense.version || expense.version !== OFFLINE_STORAGE_VERSION) {
 				return {
 					...expense,
@@ -257,7 +258,7 @@ export async function addOfflineExpense(
 ): Promise<boolean> {
 	const offlineExpense: OfflineExpense = {
 		...expense,
-		amount: roundToCents(expense.amount),
+		amount: roundToMinorUnit(expense.amount, expense.currency),
 		id: `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
 		clientId,
 		timestamp: Date.now(),
@@ -323,7 +324,7 @@ export async function replaceParkedExpense(
 	}
 	const replaced: OfflineExpense = {
 		...expense,
-		amount: roundToCents(expense.amount),
+		amount: roundToMinorUnit(expense.amount, expense.currency),
 		id: existing.id,
 		...(clientId !== undefined && { clientId }),
 		timestamp: existing.timestamp,

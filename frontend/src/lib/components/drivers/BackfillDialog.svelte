@@ -42,6 +42,7 @@
 	let batches = $state<BackfillBatch[]>([]);
 	let busy = $state(false);
 	let previewFailed = $state(false);
+	let attempt = $state(0);
 	let latest = 0;
 
 	let request = $derived.by((): BackfillRequest | null => {
@@ -52,6 +53,12 @@
 	let chosen = $derived(drivers.find(d => d.id === driverId));
 
 	const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+	const describe = (batch: BackfillBatch) =>
+		[
+			batch.mode === 'logged' ? 'Who logged it' : 'Date range',
+			`${batch.total} ${batch.total === 1 ? 'entry' : 'entries'}`,
+			formatDate(batch.createdAt)
+		].join(' · ');
 
 	async function refresh() {
 		batches = await driverApi.backfills(vehicleId).catch(() => []);
@@ -59,6 +66,7 @@
 
 	$effect(() => {
 		const wanted = request;
+		void attempt;
 		const mine = ++latest;
 		preview = null;
 		previewFailed = false;
@@ -114,7 +122,7 @@
 	}
 
 	let summaryText = $derived.by(() => {
-		if (previewFailed) return "Couldn't work out what would change. Try again in a moment.";
+		if (previewFailed) return "Couldn't work out what would change.";
 		if (!preview) return request ? 'Checking what would change…' : '';
 		if (preview.total === 0)
 			return 'Nothing to fill in: every matching entry already has a driver.';
@@ -133,8 +141,8 @@
 		<Dialog.Header>
 			<Dialog.Title>Fill in drivers on past entries</Dialog.Title>
 			<Dialog.Description>
-				Only entries without a driver change. You'll see what changes before anything is saved, and
-				you can undo it later.
+				Only entries that have no driver yet will change. You'll see what changes before anything is
+				saved, and you can undo it later.
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -185,7 +193,12 @@
 			</div>
 		{/if}
 
-		<p class="min-h-10 text-sm" role="status">{summaryText}</p>
+		<div class="flex min-h-10 items-center justify-between gap-3">
+			<p class="text-sm" role="status">{summaryText}</p>
+			{#if previewFailed}
+				<Button size="lg" variant="outline" onclick={() => attempt++}>Retry</Button>
+			{/if}
+		</div>
 
 		{#if batches.length > 0}
 			<div class="space-y-1 border-t pt-3">
@@ -193,15 +206,14 @@
 				{#each batches as batch (batch.id)}
 					<div class="flex min-h-10 items-center justify-between gap-3 text-sm">
 						<span>
-							{batch.mode === 'logged' ? 'Who logged it' : 'Date range'} · {batch.total} · {formatDate(
-								batch.createdAt
-							)}
+							{describe(batch)}
 						</span>
 						<Button
 							size="lg"
 							variant="ghost"
 							class="px-3"
 							disabled={busy}
+							aria-label="Undo {describe(batch)}"
 							onclick={() => undo(batch)}
 						>
 							Undo

@@ -1,10 +1,8 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
 import fc from 'fast-check';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
-import type { AppDatabase } from '../../../db/connection';
-import * as schema from '../../../db/schema';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import {
   amortizedBalance,
   type DatedPayment,
@@ -15,7 +13,6 @@ import {
 } from '../repository';
 
 let sqliteDb: Database;
-let db: AppDatabase;
 let repo: FinancingRepository;
 
 const USER_ID = 'test-user-fin';
@@ -42,8 +39,7 @@ beforeEach(() => {
   for (const m of loadMigrations()) {
     applyMigration(sqliteDb, m);
   }
-  db = drizzle(sqliteDb, { schema });
-  repo = new FinancingRepository(db);
+  repo = new FinancingRepository(openAsyncDatabase(sqliteDb).db);
   seedTestData();
 });
 

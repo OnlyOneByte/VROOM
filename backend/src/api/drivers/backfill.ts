@@ -18,6 +18,7 @@ export type BackfillRequest =
   | { mode: 'range'; driverId: string; from: number; to: number };
 
 type Kind = BackfilledEntry['kind'];
+type Tx = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
 
 interface Candidate {
   kind: Kind;
@@ -118,7 +119,7 @@ export function summarize(db: AppDatabase, vehicleId: string, entries: Backfille
 }
 
 function setDriver(
-  tx: Parameters<Parameters<AppDatabase['transaction']>[0]>[0],
+  tx: Tx,
   entry: BackfilledEntry,
   from: string | null,
   to: string | null,
@@ -183,6 +184,15 @@ export function applyBackfill(
   });
 }
 
+function stillPaidBy(tx: Tx, entry: BackfilledEntry): boolean {
+  const row = tx
+    .select({ payer: expenses.paidByDriverId })
+    .from(expenses)
+    .where(eq(expenses.id, entry.id))
+    .get();
+  return row?.payer === entry.driverId;
+}
+
 export function undoBackfill(
   db: AppDatabase,
   vehicleId: string,
@@ -200,7 +210,8 @@ export function undoBackfill(
     let reverted = 0;
     for (const entry of batch.entries) {
       if (setDriver(tx, entry, entry.driverId, null, hideFinancials)) reverted++;
-      else if (hideFinancials && entry.kind === 'expense') kept.push(entry);
+      else if (hideFinancials && entry.kind === 'expense' && stillPaidBy(tx, entry))
+        kept.push(entry);
     }
     tx.update(driverBackfills)
       .set(kept.length > 0 ? { entries: kept } : { undoneAt: new Date() })

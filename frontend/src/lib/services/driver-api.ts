@@ -3,7 +3,9 @@ import type {
 	BackfillRequest,
 	BackfillSummary,
 	Driver,
-	DriverStats
+	DriverBalances,
+	DriverStats,
+	SplitRules
 } from '#lib/types/index.ts';
 import { ApiError } from '#lib/utils/error-handling.ts';
 import { apiClient } from './api-client';
@@ -24,6 +26,28 @@ export const driverApi = {
 		const qs = buildQueryString({ from: period.from.toISOString(), to: period.to.toISOString() });
 		try {
 			return await apiClient.get<DriverStats>(`/vehicles/${vehicleId}/drivers/stats${qs}`);
+		} catch (error) {
+			const status = error instanceof ApiError ? error.statusCode : undefined;
+			if (status === 403 || status === 404) return null;
+			throw error;
+		}
+	},
+
+	async rules(vehicleId: string): Promise<SplitRules> {
+		return apiClient.get<SplitRules>(`/vehicles/${vehicleId}/drivers/rules`);
+	},
+
+	async setRules(vehicleId: string, rules: SplitRules): Promise<SplitRules> {
+		return apiClient.put<SplitRules>(`/vehicles/${vehicleId}/drivers/rules`, rules);
+	},
+
+	async balances(
+		vehicleId: string,
+		period: { from: Date; to: Date }
+	): Promise<DriverBalances | null> {
+		const qs = buildQueryString({ from: period.from.toISOString(), to: period.to.toISOString() });
+		try {
+			return await apiClient.get<DriverBalances>(`/vehicles/${vehicleId}/drivers/balances${qs}`);
 		} catch (error) {
 			const status = error instanceof ApiError ? error.statusCode : undefined;
 			if (status === 403 || status === 404) return null;

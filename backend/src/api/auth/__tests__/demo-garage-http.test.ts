@@ -115,6 +115,36 @@ describe('demo garage, on', () => {
     expect(vehicles.data.map((v) => v.nickname).sort()).toEqual(['Daily Driver', 'Weekend Car']);
   });
 
+  test('the weekend car shows a two-driver car-share example, read-only', async () => {
+    const cookie = await demoCookie();
+    const vehicles = await json<{
+      data: { id: string; nickname: string; carShareEnabled: boolean }[];
+    }>(await send(cookie, 'GET', '/api/v1/vehicles'));
+    const weekend = vehicles.data.find((v) => v.nickname === 'Weekend Car');
+    expect(weekend?.carShareEnabled).toBe(true);
+    expect((weekend as unknown as { carShare: unknown }).carShare).toEqual({
+      enabled: true,
+      manage: false,
+      record: false,
+    });
+    const base = `/api/v1/vehicles/${weekend?.id}/drivers`;
+    const period = `?from=${new Date(Date.now() - 365 * 86_400_000).toISOString()}`;
+    const stats = await json<{
+      data: { drivers: { name: string; distance: { total: number } }[] };
+    }>(await send(cookie, 'GET', `${base}/stats${period}`));
+    expect(stats.data.drivers.map((d) => d.name).sort()).toEqual(['Demo Garage', 'Jamie']);
+    expect(stats.data.drivers.every((d) => d.distance.total > 0)).toBe(true);
+    const balances = await json<{
+      data: { drivers: { name: string; paid: number }[]; transfers: { fromName: string }[] };
+    }>(await send(cookie, 'GET', `${base}/balances${period}`));
+    expect(balances.data.drivers.every((d) => d.paid > 0)).toBe(true);
+    expect(balances.data.transfers.length).toBe(1);
+    const off = await send(cookie, 'PUT', `/api/v1/vehicles/${weekend?.id}/car-share`, {
+      enabled: false,
+    });
+    expect(off.status).toBe(403);
+  });
+
   test('a signed-in user who starts the demo keeps their own session', async () => {
     const res = await ctx.app.request(
       '/api/v1/auth/demo',

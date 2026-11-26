@@ -147,7 +147,7 @@ class RestoreService {
     signal?: AbortSignal
   ): Promise<RestoreResponse> {
     const { data: parsedBackup, skippedPhotos } = this.withoutOrphanPhotos(
-      await this.parseOrReject(file)
+      await this.parseOrReject(file, await this.accountCurrency(userId))
     );
 
     const validation = backupService.validateBackupData(parsedBackup);
@@ -220,9 +220,13 @@ class RestoreService {
     return { success: true, imported: summary, ...skipped };
   }
 
-  private async parseOrReject(file: Buffer): Promise<ParsedBackupData> {
+  private async accountCurrency(userId: string): Promise<string | undefined> {
+    return (await repos().preferences.getByUserId(userId))?.currencyUnit;
+  }
+
+  private async parseOrReject(file: Buffer, accountCurrency?: string): Promise<ParsedBackupData> {
     try {
-      return await backupService.parseZipBackup(file);
+      return await backupService.parseZipBackup(file, accountCurrency);
     } catch (error) {
       if (error instanceof AppError || error instanceof SyncError) throw error;
       throw new ValidationError(
@@ -283,7 +287,11 @@ class RestoreService {
     const sheetsService = await createSheetsServiceForProvider(providerId, userId);
     const { metadata, ...sheetTables } =
       await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
-    const sheet = upgradeBackupTables(metadata.version, sheetTables) as typeof sheetTables;
+    const sheet = upgradeBackupTables(
+      metadata.version,
+      sheetTables,
+      await this.accountCurrency(userId)
+    ) as typeof sheetTables;
 
     const { data: sheetData, skippedPhotos } = this.withoutOrphanPhotos({
       metadata,
