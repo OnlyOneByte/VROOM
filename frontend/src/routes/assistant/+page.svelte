@@ -251,13 +251,13 @@
 								</div>
 							{/if}
 							<div class="max-w-[80%] space-y-1">
+								<span class="sr-only">{message.role === 'user' ? 'You:' : 'Assistant:'}</span>
 								<div
 									class="px-3.5 py-2.5 text-sm whitespace-pre-wrap break-words {message.role ===
 									'user'
 										? 'rounded-(--r-lg) rounded-br-(--r-sm) bg-foreground text-background'
 										: 'rounded-(--r-lg) rounded-bl-(--r-sm) bg-sunk text-foreground'}"
 								>
-									<span class="sr-only">{message.role === 'user' ? 'You:' : 'Assistant:'}</span>
 									{message.content}
 								</div>
 								{#if message.role === 'assistant' && message.toolsUsed && message.toolsUsed.length > 0}
