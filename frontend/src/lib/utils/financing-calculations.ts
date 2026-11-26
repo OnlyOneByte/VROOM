@@ -1,5 +1,5 @@
 import type { DerivedPaymentEntry, Expense, VehicleFinancing } from '#lib/types/index.ts';
-import { dateOnlyToISO } from './formatters';
+import { dateOnlyToISO, fromMinor, toMinor } from './formatters';
 import { memoizeMulti } from './memoize';
 
 export interface AmortizationEntry {
@@ -536,7 +536,7 @@ export function calculateMinimumPayment(financing: VehicleFinancing): number | n
 		financing.termMonths
 	);
 
-	return Math.round(minimumPayment * 100) / 100;
+	return fromMinor(toMinor(minimumPayment));
 }
 
 export function annuityPayment(principal: number, apr: number, termMonths: number): number {
@@ -577,8 +577,6 @@ export function elapsedMonths(startDate: Date, date: Date): number {
 	return whole + Math.round((end - anchor) / MS_PER_DAY) / Math.round((next - anchor) / MS_PER_DAY);
 }
 
-const toCents = (dollars: number): number => Math.round(dollars * 100);
-
 export function derivePaymentEntries(
 	expenses: Expense[],
 	financing: VehicleFinancing
@@ -596,17 +594,17 @@ export function derivePaymentEntries(
 			? financing.apr / 100 / 12
 			: 0;
 
-	let balanceCents = toCents(financing.originalAmount);
+	let balanceMinor = toMinor(financing.originalAmount);
 	const first = sorted[0];
 	let accruedMonths = first ? Math.max(0, elapsedMonths(startDate, new Date(first.date)) - 1) : 0;
 
 	return sorted.map((expense, index) => {
-		const paymentCents = toCents(expense.amount);
+		const paymentMinor = toMinor(expense.amount);
 		const months = Math.max(accruedMonths, elapsedMonths(startDate, new Date(expense.date)));
-		const interestCents = Math.round(balanceCents * monthlyRate * (months - accruedMonths));
+		const interestMinor = Math.round(balanceMinor * monthlyRate * (months - accruedMonths));
 		accruedMonths = months;
-		const interestPaidCents = Math.min(paymentCents, interestCents);
-		balanceCents = Math.max(0, balanceCents + interestCents - paymentCents);
+		const interestPaidMinor = Math.min(paymentMinor, interestMinor);
+		balanceMinor = Math.max(0, balanceMinor + interestMinor - paymentMinor);
 
 		const paymentType: 'extra' | 'standard' =
 			expense.amount > financing.paymentAmount ? 'extra' : 'standard';
@@ -614,9 +612,9 @@ export function derivePaymentEntries(
 		return {
 			expense,
 			paymentNumber: index + 1,
-			remainingBalance: balanceCents / 100,
-			principalAmount: (paymentCents - interestPaidCents) / 100,
-			interestAmount: interestPaidCents / 100,
+			remainingBalance: fromMinor(balanceMinor),
+			principalAmount: fromMinor(paymentMinor - interestPaidMinor),
+			interestAmount: fromMinor(interestPaidMinor),
 			paymentType
 		};
 	});

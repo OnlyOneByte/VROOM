@@ -10,6 +10,9 @@ import {
 	formatCurrency,
 	formatDate,
 	formatBytes,
+	fromMinor,
+	minorUnitScale,
+	toMinor,
 	formatNumber,
 	formatNumberUpTo,
 	formatRelativeTime,
@@ -316,5 +319,15 @@ describe('formatNumberUpTo', () => {
 		expect(formatNumberUpTo(1234.56, 1)).toBe('1,234.6');
 		expect(formatNumberUpTo(16198, 1)).toBe('16,198');
 		expect(formatNumberUpTo(2.5, 2)).toBe('2.5');
+	});
+});
+
+describe('minor units', () => {
+	test('round-trip through the scale the backend stores at', () => {
+		expect(minorUnitScale('USD')).toBe(100);
+		expect(toMinor(12.34, 'USD')).toBe(1234);
+		expect(toMinor(0.1 + 0.2, 'USD')).toBe(30);
+		expect(fromMinor(1234, 'USD')).toBe(12.34);
+		expect(fromMinor(toMinor(19.999, 'USD'), 'USD')).toBe(20);
 	});
 });

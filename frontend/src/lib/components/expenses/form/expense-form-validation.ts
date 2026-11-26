@@ -1,12 +1,13 @@
 import { getVolumeUnitLabel, getChargeUnitLabel, isElectricFuelType } from '#lib/utils/units.ts';
-import { formatNumber, toDateInputValue } from '#lib/utils/formatters.ts';
+import { formatNumber, minorUnitScale, toDateInputValue } from '#lib/utils/formatters.ts';
 import type { Vehicle, VolumeUnit, ChargeUnit } from '#lib/types/index.ts';
 import { EXPENSE_LIMITS } from '#lib/constants/limits.ts';
 
-const CENT_TOLERANCE = 1e-6;
+const MINOR_UNIT_TOLERANCE = 1e-6;
 
-function hasAtMostTwoDecimals(amount: number): boolean {
-	return Math.abs(amount * 100 - Math.round(amount * 100)) < CENT_TOLERANCE;
+function fitsMinorUnit(amount: number): boolean {
+	const minor = amount * minorUnitScale();
+	return Math.abs(minor - Math.round(minor)) < MINOR_UNIT_TOLERANCE;
 }
 
 export function hasMileageEntry(value: unknown): boolean {
@@ -43,7 +44,9 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 			if (amount > EXPENSE_LIMITS.MAX_AMOUNT) {
 				return `Amount must be ${formatNumber(EXPENSE_LIMITS.MAX_AMOUNT, 0)} or less`;
 			}
-			if (!hasAtMostTwoDecimals(amount)) return 'Amount can have at most 2 decimal places';
+			if (!fitsMinorUnit(amount)) {
+				return `Amount can have at most ${Math.log10(minorUnitScale())} decimal places`;
+			}
 			break;
 		}
 		case 'date': {

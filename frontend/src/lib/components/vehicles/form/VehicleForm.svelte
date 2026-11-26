@@ -52,7 +52,9 @@
 		amountPlaceholder,
 		amountStep,
 		dateOnlyToISO,
-		toDateInputValue
+		fromMinor,
+		toDateInputValue,
+		toMinor
 	} from '#lib/utils/formatters.ts';
 	import type {
 		Vehicle,
@@ -368,9 +370,9 @@
 		const payoffDate = calculatePayoffDateFromStart(financingForm.startDate, numPayments);
 
 		amortizationPreview = {
-			monthlyPayment: Math.round(monthlyPayment * 100) / 100,
-			totalInterest: Math.round(totalInterest * 100) / 100,
-			totalPayments: Math.round(totalPayments * 100) / 100,
+			monthlyPayment: fromMinor(toMinor(monthlyPayment)),
+			totalInterest: fromMinor(toMinor(totalInterest)),
+			totalPayments: fromMinor(toMinor(totalPayments)),
 			payoffDate
 		};
 	}

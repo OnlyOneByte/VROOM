@@ -1,4 +1,12 @@
 <script module lang="ts">
+	import {
+		amountStep,
+		formatCurrency,
+		formatNumber,
+		fromMinor,
+		toMinor
+	} from '#lib/utils/formatters.ts';
+
 	interface Allocation {
 		vehicleId: string;
 		amount?: number;
@@ -15,14 +23,13 @@
 
 	export function splitAmountsMatchTotal(allocations: Allocation[], totalAmount: number): boolean {
 		const sum = allocations.reduce((s, a) => s + (a.amount ?? 0), 0);
-		return Math.round(sum * 100) === Math.round(totalAmount * 100);
+		return toMinor(sum) === toMinor(totalAmount);
 	}
 </script>
 
 <script lang="ts">
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { amountStep, formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 	import type { Vehicle } from '#lib/types/index.ts';
 
 	type SplitMethod = 'even' | 'absolute' | 'percentage';
@@ -52,12 +59,12 @@
 	let evenAmounts = $derived.by(() => {
 		const count = vehicles.length;
 		if (count === 0) return [];
-		const totalCents = Math.round(totalAmount * 100);
-		const baseCents = Math.floor(totalCents / count);
-		const remainderCents = totalCents - baseCents * count;
+		const total = toMinor(totalAmount);
+		const base = Math.floor(total / count);
+		const remainder = total - base * count;
 		return vehicles.map((v, i) => ({
 			vehicleId: v.id,
-			amount: (baseCents + (i < remainderCents ? 1 : 0)) / 100
+			amount: fromMinor(base + (i < remainder ? 1 : 0))
 		}));
 	});
 

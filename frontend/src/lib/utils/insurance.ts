@@ -1,5 +1,5 @@
 import type { InsurancePolicy, InsuranceTerm } from '#lib/types/index.ts';
-import { dateOnlyToISO } from '#lib/utils/formatters.ts';
+import { dateOnlyToISO, fromMinor, toMinor } from '#lib/utils/formatters.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
@@ -56,7 +56,7 @@ export function effectiveTermCost(term: {
 		new Date(dateOnlyToISO(term.startDate)),
 		new Date(dateOnlyToISO(term.endDate))
 	);
-	return (Math.round(monthlyCost * 100) * months) / 100;
+	return fromMinor(toMinor(monthlyCost) * months);
 }
 
 export function sortTermsByEndDateDesc(terms: InsuranceTerm[]): InsuranceTerm[] {
