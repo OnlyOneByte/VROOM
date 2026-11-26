@@ -4,10 +4,17 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy';
 import * as schema from './schema';
 
 const STATEMENT_CACHE_SIZE = 500;
-const TRANSACTION_CONTROL = /^\s*(commit|end|rollback|release)\b/i;
-const OPENING = /^\s*(begin|savepoint)\b/i;
-const BEGIN = /^\s*begin\b/i;
-const ROLLBACK = /^\s*rollback\b/i;
+const TRANSACTION_CONTROL = /^(commit|end|rollback|release)\b/i;
+const OPENING = /^(begin|savepoint)\b/i;
+const BEGIN = /^begin\b/i;
+const ROLLBACK = /^rollback\b/i;
+// Whitespace, empty statements and comments SQLite skips before the first keyword.
+const LEADING_NOISE = /^(?:[\s;]+|--[^\n]*(?:\n|$)|\/\*[\s\S]*?(?:\*\/|$))*/;
+
+/** The statement as SQLite sees it: leading whitespace, `;` and comments removed. */
+function statementHead(query: string): string {
+  return query.replace(LEADING_NOISE, '');
+}
 const GUARDED_METHODS = ['prepare', 'query', 'run', 'exec', 'transaction'] as const;
 const RAW_QUERY_METHODS = ['run', 'all', 'get', 'values'] as const;
 const UPKEEP_QUERIES = {
@@ -24,7 +31,9 @@ function refuseRawControl(target: object, dialect: Dialect): void {
     const original = (target as Record<string, (query: SqlSource) => unknown>)[name];
     Object.assign(target, {
       [name](query: SqlSource) {
-        const text = typeof query === 'string' ? query : dialect.sqlToQuery(query.getSQL()).sql;
+        const text = statementHead(
+          typeof query === 'string' ? query : dialect.sqlToQuery(query.getSQL()).sql
+        );
         if (OPENING.test(text) || TRANSACTION_CONTROL.test(text)) {
           throw new RawTransactionControlError();
         }
@@ -160,12 +169,13 @@ function createAsyncDatabase(sqlite: Database) {
 
   async function gated(query: string, params: unknown[], method: Method) {
     const scope = scopes.getStore();
-    checkControl(scope, query);
-    if (scope && ROLLBACK.test(query) && !sqlite.inTransaction) return { rows: [] };
-    if (hasEnded(scope, query)) throw new TransactionEndedError();
+    const head = statementHead(query);
+    checkControl(scope, head);
+    if (scope && ROLLBACK.test(head) && !sqlite.inTransaction) return { rows: [] };
+    if (hasEnded(scope, head)) throw new TransactionEndedError();
     while (open && scope?.root !== open) await closed;
     while (scope?.nested) await scope.nested.catch(() => undefined);
-    if (scope && !sqlite.inTransaction && !BEGIN.test(query)) {
+    if (scope && !sqlite.inTransaction && !BEGIN.test(head)) {
       scope.root.ended = true;
       throw new TransactionRolledBackError();
     }

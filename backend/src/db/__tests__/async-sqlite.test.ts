@@ -284,6 +284,11 @@ describe('async transactions over bun:sqlite', () => {
       sql`rollback`,
       sql`savepoint sp9`,
       sql`release sp0`,
+      sql`/* x */ commit`,
+      sql`-- x
+commit`,
+      sql`; /* a */ -- b
+ /* c */ end`,
     ];
     for (const raw of raws) {
       const error = await transaction(async (tx) => {
@@ -301,10 +306,33 @@ describe('async transactions over bun:sqlite', () => {
 
   test('raw transaction control outside any transaction is refused too', async () => {
     const { sqlite, db } = setup();
-    for (const raw of [sql`begin`, sql`commit`, sql`end`]) {
+    const raws = [
+      sql`begin`,
+      sql`commit`,
+      sql`end`,
+      sql`/* x */ begin`,
+      sql`-- x
+begin`,
+    ];
+    for (const raw of raws) {
       expect(() => db.run(raw)).toThrow(RawTransactionControlError);
       expect(sqlite.inTransaction).toBe(false);
     }
+  });
+
+  test('a commented COMMIT sent through the internal session is still refused before it runs', async () => {
+    const { db, transaction } = setup();
+    const error = await transaction(async (tx) => {
+      await tx.insert(users).values(user('a'));
+      const session = (tx as unknown as { session: { run(q: unknown): Promise<unknown> } }).session;
+      await session.run(sql`/* x */ commit`);
+      await tx.insert(users).values(user('b'));
+    }).then(
+      () => null,
+      (e) => e as { cause?: unknown }
+    );
+    expect(error?.cause ?? error).toBeInstanceOf(RawTransactionControlError);
+    expect(await db.select().from(users)).toEqual([]);
   });
 
   test('an un-awaited raw COMMIT is refused the moment it is called, so nothing commits early', async () => {

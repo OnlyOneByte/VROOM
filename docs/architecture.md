@@ -152,8 +152,15 @@ transaction, so a richer health query must not read data.
 
 Raw `BEGIN`, `COMMIT`/`END`, `ROLLBACK`, `SAVEPOINT` or `RELEASE` through the async session
 throws `RawTransactionControlError` at the moment `run`, `all`, `get` or `values` is called,
-inside a callback or outside one, awaited or not. Only `transaction()` opens and closes
-transactions.
+inside a callback or outside one, awaited or not. Leading whitespace, `;` and SQL comments
+are skipped before the check, as SQLite skips them. Only `transaction()` opens and closes
+transactions. Drizzle's internal `tx.session` is the one path past the call-time check, and
+app code must not use it. A query sent that way is still checked when it runs, but an
+un-awaited one could slip into the moment the callback settles.
+
+Await every query inside a callback, including the last one: `return await tx.select()…`,
+never `return tx.select()…`. Bun loses the transaction scope when an async callback resolves
+with a returned builder after an earlier `await`, and that transaction then hangs (#1786).
 
 **Expense-linked records use a polymorphic link.** Financing payments, insurance premiums,
 and reminder materializations are real rows in `expenses` tagged with `source_type` +
