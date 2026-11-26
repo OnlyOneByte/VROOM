@@ -80,7 +80,7 @@ export const UPKEEP_QUERIES = {
   forceCheckpoint: 'PRAGMA wal_checkpoint(RESTART)',
 } as const;
 
-export type DbErrorKind ='unique' | 'foreign_key' | 'not_null';
+export type DbErrorKind = 'unique' | 'foreign_key' | 'not_null';
 
 const UNIQUE_VIOLATION_CODES = new Set([
   'SQLITE_CONSTRAINT_UNIQUE',
