@@ -44,14 +44,13 @@
 		</div>
 	{/if}
 	{#if vehicle}
-		{#key `${vehicleId}:${dateRange.startDate}:${dateRange.endDate}`}
-			<DriversCard
-				{vehicleId}
-				distanceUnit={(vehicle.unitPreferences ?? settingsStore.unitPreferences).distanceUnit}
-				{from}
-				{to}
-				description={rangeText}
-			/>
-		{/key}
+		<DriversCard
+			{vehicleId}
+			distanceUnit={(vehicle.unitPreferences ?? settingsStore.unitPreferences).distanceUnit}
+			{from}
+			{to}
+			description={rangeText}
+			hiddenMessage="You can't see driver figures for this car. Ask its owner for access."
+		/>
 	{/if}
 </div>

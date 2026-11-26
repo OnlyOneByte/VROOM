@@ -23,6 +23,7 @@ import { logger } from '../../utils/logger';
 import { zonedMidnight, zonedParts, zoneOffsetMs } from '../../utils/time-zone';
 import { canonicalScale, convertDistance, convertVolume } from '../../utils/unit-conversions';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
+import { listDrivers } from '../drivers/repository';
 import { OWNERSHIP_CATEGORIES } from '../expenses/repository';
 import {
   type QueryAnnotation,
@@ -41,7 +42,14 @@ export const QUERY_METRICS = [
   'count',
 ] as const;
 export const QUERY_INTERVALS = ['week', 'month', 'quarter', 'year', 'none'] as const;
-export const QUERY_GROUP_BYS = ['none', 'category', 'vehicle', 'fuelType', 'tag'] as const;
+export const QUERY_GROUP_BYS = [
+  'none',
+  'category',
+  'vehicle',
+  'fuelType',
+  'tag',
+  'driver',
+] as const;
 export const QUERY_INCLUDES = ['running', 'all'] as const;
 export const QUERY_COMPARES = ['none', 'prevPeriod', 'prevYear'] as const;
 export const QUERY_ENERGIES = ['fuel', 'electric'] as const;
@@ -186,6 +194,7 @@ interface QueryContext {
   vehicleInfo: Map<string, VehicleInfo>;
   userUnits: UnitPreferences;
   periods: Bucket[][];
+  driverNames: Map<string, string>;
 }
 
 export function isValidQueryCombination(metric: QueryMetric, groupBy: QueryGroupBy): boolean {
@@ -433,6 +442,8 @@ function keyExpression(groupBy: QueryGroupBy): SQL {
       return sql`e.category`;
     case 'vehicle':
       return sql`e.vehicle_id`;
+    case 'driver':
+      return sql`COALESCE(e.paid_by_driver_id, '')`;
     default:
       return typedParam(TOTAL_KEY, 'text');
   }
@@ -522,6 +533,27 @@ function collectDistances(ctx: QueryContext, result: PeriodRows[], rows: Distanc
   }
 }
 
+function tagFilter(keys: string[]): SQL {
+  const tagged = keys.filter(Boolean);
+  const parts: SQL[] = [];
+  if (tagged.length) {
+    parts.push(jsonArraySome(sql`e.tags`, (element) => sql`${element} IN (${inList(tagged)})`));
+  }
+  if (keys.includes('')) parts.push(jsonArrayIsEmpty(sql`e.tags`));
+  return parts.length ? sql`(${sql.join(parts, sql` OR `)})` : sqlFalse();
+}
+
+function keyFilter(groupBy: QueryGroupBy, keys: string[]): SQL | null {
+  const column =
+    groupBy === 'fuelType'
+      ? sql`e.fuel_type`
+      : groupBy === 'driver'
+        ? sql`e.paid_by_driver_id`
+        : null;
+  if (column) return keys.length ? sql`COALESCE(${column}, '') IN (${inList(keys)})` : sqlFalse();
+  return groupBy === 'tag' ? tagFilter(keys) : null;
+}
+
 function itemsWhere(
   userId: string,
   vehicleIds: string[],
@@ -536,19 +568,8 @@ function itemsWhere(
     sql`e.date >= ${query.start}`,
     sql`e.date < ${query.end}`,
   ];
-  const keys = query.keys;
-  if (groupBy === 'fuelType' && keys) {
-    conditions.push(keys.length ? sql`COALESCE(e.fuel_type, '') IN (${inList(keys)})` : sqlFalse());
-  }
-  if (groupBy === 'tag' && keys) {
-    const tagged = keys.filter(Boolean);
-    const parts: SQL[] = [];
-    if (tagged.length) {
-      parts.push(jsonArraySome(sql`e.tags`, (element) => sql`${element} IN (${inList(tagged)})`));
-    }
-    if (keys.includes('')) parts.push(jsonArrayIsEmpty(sql`e.tags`));
-    conditions.push(parts.length ? sql`(${sql.join(parts, sql` OR `)})` : sqlFalse());
-  }
+  const keyed = query.keys ? keyFilter(groupBy, query.keys) : null;
+  if (keyed) conditions.push(keyed);
   if (query.metric === 'volume' || query.metric === 'efficiency') {
     conditions.push(electricFilter(query.energy ?? 'fuel'));
   }
@@ -662,8 +683,21 @@ export class AnalyticsQueryRepository {
       vehicleInfo,
       userUnits,
       periods,
+      driverNames: query.groupBy === 'driver' ? this.driverNames(vehicleInfo) : new Map(),
     };
     return { ctx, currency: prefs?.currency ?? 'USD', range, prior };
+  }
+
+  private driverNames(vehicleInfo: Map<string, VehicleInfo>): Map<string, string> {
+    const many = vehicleInfo.size > 1;
+    const names = new Map<string, string>();
+    for (const [vehicleId, info] of vehicleInfo) {
+      for (const driver of listDrivers(this.db, vehicleId)) {
+        const car = many ? ` (${info.name})` : '';
+        names.set(driver.id, `${driver.name}${car}`);
+      }
+    }
+    return names;
   }
 
   private selectVehicles(userId: string, vehicleIds: string[] | undefined) {
@@ -947,6 +981,8 @@ export class AnalyticsQueryRepository {
         return key || 'Unspecified';
       case 'tag':
         return key || 'Untagged';
+      case 'driver':
+        return ctx.driverNames.get(key) ?? 'No one recorded';
       default:
         return METRIC_LABELS[ctx.query.metric];
     }

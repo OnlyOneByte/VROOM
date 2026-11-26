@@ -20,9 +20,20 @@
 		from: Date;
 		to: Date;
 		description?: string;
+		hiddenMessage?: string;
 	}
 
-	let { vehicleId, distanceUnit, from, to, description = 'Last 30 days' }: Props = $props();
+	let {
+		vehicleId,
+		distanceUnit,
+		from,
+		to,
+		description = 'Last 30 days',
+		hiddenMessage
+	}: Props = $props();
+
+	let fromTime = $derived(from.getTime());
+	let toTime = $derived(to.getTime());
 
 	let stats = $state<DriverStats | null>(null);
 	let phase = $state<'loading' | 'ready' | 'hidden' | 'error'>('loading');
@@ -30,18 +41,23 @@
 	let shown = $derived((stats?.drivers ?? []).filter(d => d.distance.total > 0));
 	let total = $derived(stats?.distance?.total ?? 0);
 
-	async function load(car: string, start: Date, end: Date) {
+	let latest = 0;
+
+	async function load(car: string, start: number, end: number) {
+		const request = ++latest;
 		phase = 'loading';
 		try {
-			stats = await driverApi.stats(car, { from: start, to: end });
-			phase = stats ? 'ready' : 'hidden';
+			const result = await driverApi.stats(car, { from: new Date(start), to: new Date(end) });
+			if (request !== latest) return;
+			stats = result;
+			phase = result ? 'ready' : 'hidden';
 		} catch {
-			phase = 'error';
+			if (request === latest) phase = 'error';
 		}
 	}
 
 	$effect(() => {
-		void load(vehicleId, from, to);
+		void load(vehicleId, fromTime, toTime);
 	});
 
 	const distanceText = (n: number) => `${formatNumber(n, 0)} ${unit}`;
@@ -76,7 +92,7 @@
 			{:else if phase === 'error'}
 				<div class="flex items-center justify-between gap-3 text-sm" role="alert">
 					<span>Couldn't load the driver figures.</span>
-					<Button size="lg" variant="outline" onclick={() => load(vehicleId, from, to)}>
+					<Button size="lg" variant="outline" onclick={() => load(vehicleId, fromTime, toTime)}>
 						Retry
 					</Button>
 				</div>
@@ -96,6 +112,12 @@
 								style:background-color={driverColor(driver)}
 							></span>
 						{/each}
+						{#if stats.distance && stats.distance.unattributed > 0}
+							<span
+								class="h-full bg-muted-foreground/40"
+								style:width="{(stats.distance.unattributed / total) * 100}%"
+							></span>
+						{/if}
 					</div>
 				{/if}
 				<ul class="divide-y text-sm" aria-label="Distance and running costs paid by each driver">
@@ -135,14 +157,18 @@
 						</li>
 					{/if}
 				</ul>
-				{#if stats.costPerDistance !== null}
-					<p class="text-xs text-muted-foreground">
+				<p class="text-xs text-muted-foreground">
+					{#if stats.costPerDistance !== null}
 						Running costs come to {formatCurrency(stats.costPerDistance, undefined, 2)} per {unit}.
-						Estimated distance is the gap between readings, credited to whoever logged the reading
-						that closes it.
-					</p>
-				{/if}
+					{/if}
+					Estimated distance is the gap between readings, credited to whoever logged the reading, or paid
+					for the fill-up, that closes it.
+				</p>
 			{/if}
 		</CardContent>
+	</Card>
+{:else if hiddenMessage}
+	<Card>
+		<CardContent class="py-6 text-sm text-muted-foreground">{hiddenMessage}</CardContent>
 	</Card>
 {/if}

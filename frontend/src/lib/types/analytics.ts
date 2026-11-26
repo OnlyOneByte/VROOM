@@ -280,7 +280,7 @@ export interface YearEndResponse {
 export type AnalyticsQueryMetric =
 	'cost' | 'costPerDistance' | 'distance' | 'volume' | 'efficiency' | 'count';
 export type AnalyticsQueryInterval = 'week' | 'month' | 'quarter' | 'year' | 'none';
-export type AnalyticsQueryGroupBy = 'none' | 'category' | 'vehicle' | 'fuelType' | 'tag';
+export type AnalyticsQueryGroupBy = 'none' | 'category' | 'vehicle' | 'fuelType' | 'tag' | 'driver';
 export type AnalyticsQueryInclude = 'running' | 'all';
 export type AnalyticsQueryCompare = 'none' | 'prevPeriod' | 'prevYear';
 export type AnalyticsQueryEnergy = 'fuel' | 'electric';
