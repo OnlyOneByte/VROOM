@@ -20,7 +20,7 @@ const user = (id: string) => ({ id, email: `${id}@test.com`, displayName: id });
 const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
 
 function gate() {
-  let open = () => undefined as void;
+  let open: () => void = () => undefined;
   const opened = new Promise<void>((resolve) => {
     open = resolve;
   });
@@ -117,6 +117,66 @@ describe('async transactions over bun:sqlite', () => {
       'a',
       'b',
     ]);
+  });
+
+  test('nested transactions running at once take turns, so a failed one only undoes its own writes', async () => {
+    const { db, transaction } = setup();
+    await transaction(async () => {
+      const results = await Promise.allSettled([
+        transaction(async (tx) => {
+          await tx.insert(users).values(user('x1'));
+          await tick();
+          throw new Error('x fails');
+        }),
+        transaction(async (tx) => {
+          await tx.insert(users).values(user('y1'));
+          await tick();
+          await tx.insert(users).values(user('y2'));
+        }),
+      ]);
+      expect(results.map((r) => r.status)).toEqual(['rejected', 'fulfilled']);
+    });
+    expect((await db.select({ id: users.id }).from(users)).map((r) => r.id).sort()).toEqual([
+      'y1',
+      'y2',
+    ]);
+  });
+
+  test("the parent's own writes wait while a nested transaction is open", async () => {
+    const { db, transaction } = setup();
+    await transaction(async (tx) => {
+      await Promise.all([
+        transaction(async (inner) => {
+          await inner.insert(users).values(user('inner'));
+          await tick();
+          throw new Error('inner fails');
+        }).catch(() => undefined),
+        tx.insert(users).values(user('parent')),
+      ]);
+    });
+    expect((await db.select({ id: users.id }).from(users)).map((r) => r.id)).toEqual(['parent']);
+  });
+
+  test('work started with outsideTransaction keeps running after the transaction ends', async () => {
+    const { db, transaction, outsideTransaction } = setup();
+    let later: Promise<unknown> = Promise.resolve();
+    await transaction(async (tx) => {
+      await tx.insert(users).values(user('a'));
+      later = outsideTransaction(() => tick().then(() => db.insert(users).values(user('b'))));
+    });
+    await later;
+    expect((await db.select({ id: users.id }).from(users)).map((r) => r.id).sort()).toEqual([
+      'a',
+      'b',
+    ]);
+  });
+
+  test('a batch outside a transaction is atomic', async () => {
+    const { db } = setup();
+    await expect(
+      db.batch([db.insert(users).values(user('a')), db.insert(users).values(user('a'))])
+    ).rejects.toThrow();
+    expect(await db.select().from(users)).toEqual([]);
   });
 
   test('db.transaction on the returned handle is the gated transaction', async () => {
