@@ -9,8 +9,10 @@ import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, type ResourceOf, vehicleParam } from '../../permissions/authorize';
 import {
   boundedDollarsToCents,
+  financingFromApi,
   financingWithBalanceToApi,
   formatNumberForMessage,
+  parsedToMinor,
 } from '../../utils/money';
 import { isValidTimeZone } from '../../utils/time-zone';
 import {
@@ -169,7 +171,12 @@ routes.post(
   authorize(vehicleParam('vehicleId')),
   async (c) => {
     const { vehicleId } = c.req.valid('param');
-    const financingData = c.req.valid('json');
+    const vehicle = await repos().vehicles.findById(vehicleId);
+    if (!vehicle) throw new NotFoundError('Vehicle');
+    const financingData = financingFromApi(
+      c.req.valid('json'),
+      await repos().preferences.moneyScale(vehicle.userId)
+    );
 
     const existingFinancing = await repos().financing.findByVehicleId(vehicleId);
 
@@ -221,9 +228,10 @@ routes.patch(
   async (c) => {
     const { financingId } = c.req.valid('param');
     const { paymentAmount } = c.req.valid('json');
+    const scale = await repos().preferences.moneyScale(await financingOwner(financingId));
 
     const updated = await repos().financing.update(financingId, {
-      paymentAmount,
+      paymentAmount: parsedToMinor(paymentAmount, scale),
       updatedAt: new Date(),
     });
     return c.json({
