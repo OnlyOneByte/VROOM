@@ -3,6 +3,7 @@
 	import Input from '#lib/components/ui/input/input.svelte';
 	import Label from '#lib/components/ui/label/label.svelte';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import { QUICK_FIGURE_INPUT } from './quick-classes';
 
 	interface Props {
 		value?: string;
@@ -13,6 +14,7 @@
 		describedBy?: string;
 		onInput: () => void;
 		onBlur: () => void;
+		quick?: boolean;
 	}
 
 	let {
@@ -23,7 +25,8 @@
 		distanceLabel,
 		describedBy,
 		onInput,
-		onBlur
+		onBlur,
+		quick = false
 	}: Props = $props();
 
 	const lastReading = $derived(previousFuelMileage ? formatNumber(previousFuelMileage, 0) : null);
@@ -41,9 +44,9 @@
 			min="0"
 			bind:value
 			placeholder={lastReading ? undefined : '123456'}
-			class="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none {lastReading
-				? 'pr-24'
-				: ''}"
+			class={quick
+				? QUICK_FIGURE_INPUT
+				: `[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${lastReading ? 'pr-24' : ''}`}
 			oninput={onInput}
 			onblur={onBlur}
 			aria-invalid={!!error}
@@ -56,18 +59,25 @@
 				.join(' ') || undefined}
 		/>
 		{#if lastReading}
-			<span
-				class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground tabular-nums"
-				aria-hidden="true"
-			>
-				last {lastReading}
-			</span>
+			{#if !quick}
+				<span
+					class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground tabular-nums"
+					aria-hidden="true"
+				>
+					last {lastReading}
+				</span>
+			{/if}
 			<span id="mileage-last" class="sr-only">
 				Previous fuel entry: {lastReading}
 				{distanceLabel.toLowerCase()}
 			</span>
 		{/if}
 	</div>
+	{#if quick && lastReading}
+		<p class="text-xs text-muted-foreground tabular-nums" aria-hidden="true">
+			Last time: {lastReading}
+		</p>
+	{/if}
 	{#if error}
 		<FormFieldError id="mileage-error">{error}</FormFieldError>
 	{/if}

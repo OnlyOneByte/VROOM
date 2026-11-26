@@ -76,9 +76,12 @@
 		getVolumeUnitLabel,
 		getChargeUnitLabel,
 		getFuelEfficiencyLabel,
-		getElectricEfficiencyLabel
+		getElectricEfficiencyLabel,
+		getDistanceUnitLabel,
+		getVolumeUnitName
 	} from '#lib/utils/units.ts';
-	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
+	import { QUICK_FIGURE_INPUT } from './expense-form/quick-classes';
 	import type { VolumeUnit, ChargeUnit, DistanceUnit } from '#lib/types/index.ts';
 	import { rateChargeEfficiency, rateFuelEfficiency } from './expense-form/mileage-efficiency';
 
@@ -101,6 +104,8 @@
 		onBlur: (_field: string) => void;
 		onMileageChange: () => void;
 		odometer?: Snippet;
+		quick?: boolean;
+		distanceSinceLast?: number | null;
 	}
 
 	let {
@@ -121,8 +126,33 @@
 		touched,
 		onBlur,
 		onMileageChange,
-		odometer
+		odometer,
+		quick = false,
+		distanceSinceLast = null
 	}: Props = $props();
+
+	let quickReadout = $derived.by(() => {
+		const parts: Array<{ figure: string; words: string }> = [];
+		const quantity = parseFloat(charging ? charge : volume);
+		const total = parseFloat(amount);
+		if (quantity > 0 && total > 0) {
+			const per = charging
+				? `per ${getChargeUnitLabel(chargeUnit, true)}`
+				: `a ${getVolumeUnitName(volumeUnit).replace(/ \(.*\)$/, '')}`;
+			parts.push({ figure: formatCurrency(total / quantity), words: per });
+		}
+		if (efficiency) {
+			const [figure, ...unit] = efficiency.text.split(' ');
+			parts.push({ figure: figure ?? '', words: unit.join(' ') });
+		}
+		if (distanceSinceLast) {
+			parts.push({
+				figure: formatNumber(distanceSinceLast, 0),
+				words: `${getDistanceUnitLabel(distanceUnit, true)} since last fill`
+			});
+		}
+		return parts;
+	});
 
 	let seenCapabilities: EnergyCapabilities | null = null;
 
@@ -168,7 +198,7 @@
 
 	function describedBy(field: 'volume' | 'charge'): string | undefined {
 		const ids = [touched[field] && errors[field] ? `${field}-error` : null];
-		if (readout) ids.push('energy-readout');
+		if (quick ? quickReadout.length > 0 : readout) ids.push('energy-readout');
 		return ids.filter(Boolean).join(' ') || undefined;
 	}
 
@@ -206,7 +236,7 @@
 	});
 </script>
 
-<div class="space-y-3">
+<div class={quick ? 'space-y-5' : 'space-y-3'}>
 	<h2 class="sr-only">{charging ? 'Charging Details' : 'Fuel Details'}</h2>
 	{#if showToggle}
 		<div class="flex gap-1 rounded-lg bg-muted p-1">
@@ -233,7 +263,7 @@
 		</div>
 	{/if}
 
-	<div class="grid grid-cols-2 gap-3">
+	<div class={quick ? 'grid gap-6 sm:grid-cols-2' : 'grid grid-cols-2 gap-3'}>
 		{#if charging}
 			<div class="min-w-0 space-y-2">
 				<Label for="charge">{getChargeUnitLabel(chargeUnit)} *</Label>
@@ -245,6 +275,7 @@
 					min="0"
 					bind:value={charge}
 					placeholder="0.00"
+					class={quick ? QUICK_FIGURE_INPUT : undefined}
 					oninput={onMileageChange}
 					onblur={() => onBlur('charge')}
 					aria-invalid={!!(touched['charge'] && errors['charge'])}
@@ -265,6 +296,7 @@
 					min="0"
 					bind:value={volume}
 					placeholder="0.000"
+					class={quick ? QUICK_FIGURE_INPUT : undefined}
 					oninput={onMileageChange}
 					onblur={() => onBlur('volume')}
 					aria-invalid={!!(touched['volume'] && errors['volume'])}
@@ -278,7 +310,25 @@
 		{@render odometer?.()}
 	</div>
 
-	{#if readout}
+	{#if quick && quickReadout.length > 0}
+		<div id="energy-readout" class="space-y-1 text-center" data-testid="energy-readout">
+			<p class="text-muted-foreground tabular-nums">
+				{#each quickReadout as part, i (part.words)}
+					{#if i > 0}<span class="mx-1.5" aria-hidden="true">·</span>{/if}<span
+						class="whitespace-nowrap"
+					>
+						<strong class="font-semibold text-foreground">{part.figure}</strong>
+						{part.words}
+					</span>
+				{/each}
+			</p>
+			{#if efficiency?.rating === 'low'}
+				<p class="text-sm text-foreground">{efficiency.low}</p>
+			{:else if efficiency?.rating === 'excellent'}
+				<p class="text-sm text-foreground">{efficiency.excellent}</p>
+			{/if}
+		</div>
+	{:else if !quick && readout}
 		<div
 			id="energy-readout"
 			class="space-y-1 text-xs text-muted-foreground"

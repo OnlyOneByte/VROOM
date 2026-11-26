@@ -8,44 +8,82 @@
 		amount: string;
 		amountError?: string;
 		ref?: HTMLInputElement | null;
+		quick?: boolean;
 		onAmountBlur: () => void;
 	}
 
-	let { amount = $bindable(), amountError, ref = $bindable(null), onAmountBlur }: Props = $props();
+	let {
+		amount = $bindable(),
+		amountError,
+		ref = $bindable(null),
+		quick = false,
+		onAmountBlur
+	}: Props = $props();
 
 	const currencySymbol = $derived(getCurrencySymbol());
+	const numberClass =
+		'[appearance:textfield] rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent aria-invalid:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
 </script>
 
-<div class="space-y-1">
-	<Label for="amount">Amount *</Label>
-	<div
-		class="flex items-baseline gap-1 border-b-2 transition-colors focus-within:border-primary {amountError
-			? 'border-destructive'
-			: 'border-input'}"
-	>
-		<span
-			class="text-4xl font-bold tracking-tight lg:text-5xl {amount
-				? 'text-foreground'
-				: 'text-muted-foreground'}"
-			aria-hidden="true"
+<div class="space-y-1 {quick ? 'text-center' : ''}">
+	<Label for="amount" class={quick ? 'sr-only' : ''}>Amount *</Label>
+	{#if quick}
+		<div
+			class="inline-flex max-w-full items-start justify-center gap-1 font-(family-name:--font-fig) font-bold {amountError
+				? 'text-destructive'
+				: 'text-foreground'}"
 		>
-			{currencySymbol}
-		</span>
-		<Input
-			bind:ref
-			id="amount"
-			type="number"
-			inputmode="decimal"
-			step={amountStep()}
-			min="0"
-			bind:value={amount}
-			placeholder={amountPlaceholder()}
-			class="h-auto [appearance:textfield] rounded-none border-0 bg-transparent px-0 py-1 text-4xl font-bold tracking-tight tabular-nums shadow-none focus-visible:ring-0 sm:h-auto md:text-4xl lg:text-5xl dark:bg-transparent aria-invalid:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-			onblur={onAmountBlur}
-			aria-invalid={!!amountError}
-			aria-describedby={amountError ? 'amount-error' : undefined}
-		/>
-	</div>
+			<span
+				class="mt-2 text-4xl leading-none sm:text-5xl {amount ? '' : 'text-muted-foreground'}"
+				aria-hidden="true"
+			>
+				{currencySymbol}
+			</span>
+			<Input
+				bind:ref
+				id="amount"
+				type="number"
+				inputmode="decimal"
+				step={amountStep()}
+				min="0"
+				bind:value={amount}
+				placeholder={amountPlaceholder()}
+				class="h-auto min-w-[3ch] py-0 text-center text-8xl leading-none tabular-nums caret-needle placeholder:text-muted-foreground/60 [field-sizing:content] sm:h-auto md:text-8xl {numberClass}"
+				onblur={onAmountBlur}
+				aria-invalid={!!amountError}
+				aria-describedby={amountError ? 'amount-error' : undefined}
+			/>
+		</div>
+	{:else}
+		<div
+			class="flex items-baseline gap-1 border-b-2 transition-colors focus-within:border-primary {amountError
+				? 'border-destructive'
+				: 'border-input'}"
+		>
+			<span
+				class="text-4xl font-bold tracking-tight lg:text-5xl {amount
+					? 'text-foreground'
+					: 'text-muted-foreground'}"
+				aria-hidden="true"
+			>
+				{currencySymbol}
+			</span>
+			<Input
+				bind:ref
+				id="amount"
+				type="number"
+				inputmode="decimal"
+				step={amountStep()}
+				min="0"
+				bind:value={amount}
+				placeholder={amountPlaceholder()}
+				class="h-auto py-1 text-4xl font-bold tracking-tight tabular-nums sm:h-auto md:text-4xl lg:text-5xl {numberClass}"
+				onblur={onAmountBlur}
+				aria-invalid={!!amountError}
+				aria-describedby={amountError ? 'amount-error' : undefined}
+			/>
+		</div>
+	{/if}
 	{#if amountError}
 		<FormFieldError id="amount-error">{amountError}</FormFieldError>
 	{/if}

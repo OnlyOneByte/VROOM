@@ -154,7 +154,7 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 		debt: [],
 		ready: page => page.getByText('$45.50').filter({ visible: true }).first()
 	},
-	'/expenses/new': { debt: [], ready: pageHeading('Add Expense') },
+	'/expenses/new': { debt: [], ready: pageHeading('New expense') },
 	'/vehicles': { debt: [], ready: page => page.getByTestId('garage-row').first() },
 	'/vehicles/new': { debt: [], ready: pageHeading('Add a vehicle') },
 	'/vehicles/vehicle-camry': {

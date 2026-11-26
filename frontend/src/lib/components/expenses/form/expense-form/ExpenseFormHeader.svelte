@@ -8,15 +8,30 @@
 		title: string;
 		onBack: () => void;
 		subtitle?: Snippet;
+		quick?: boolean;
 	}
 
-	let { title, onBack, subtitle }: Props = $props();
+	let { title, onBack, subtitle, quick = false }: Props = $props();
 </script>
 
-<PageHeader {title} description={subtitle}>
-	{#snippet back()}
-		<Button variant="ghost" size="icon-lg" aria-label="Go back" onclick={onBack} class="shrink-0">
-			<ArrowLeft class="size-5" />
-		</Button>
-	{/snippet}
-</PageHeader>
+{#if quick}
+	<div class="text-center">
+		<h1
+			tabindex="-1"
+			class="rounded-md text-sm font-medium text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+		>
+			{title}
+		</h1>
+		{#if subtitle}
+			<p class="mt-1 text-sm text-muted-foreground">{@render subtitle()}</p>
+		{/if}
+	</div>
+{:else}
+	<PageHeader {title} description={subtitle}>
+		{#snippet back()}
+			<Button variant="ghost" size="icon-lg" aria-label="Go back" onclick={onBack} class="shrink-0">
+				<ArrowLeft class="size-5" />
+			</Button>
+		{/snippet}
+	</PageHeader>
+{/if}

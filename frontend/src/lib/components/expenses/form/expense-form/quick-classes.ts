@@ -1,0 +1,2 @@
+export const QUICK_FIGURE_INPUT =
+	'h-auto rounded-none border-0 border-b-[1.5px] border-foreground/70 bg-transparent px-0 py-1 font-(family-name:--font-fig) text-4xl leading-none font-bold shadow-none caret-needle focus-visible:border-foreground focus-visible:ring-0 aria-invalid:ring-0 aria-invalid:border-0 aria-invalid:border-b-2 aria-invalid:border-destructive md:text-4xl dark:bg-transparent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';

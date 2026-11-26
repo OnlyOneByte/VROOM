@@ -12,7 +12,7 @@ test.describe('Expense form', () => {
 	test('renders the required fields', async ({ page }) => {
 		await page.goto('/expenses/new');
 
-		await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'New expense' })).toBeVisible();
 		await expect(page.getByText('Category *', { exact: true })).toBeVisible();
 		await expect(page.getByLabel('Amount *')).toBeVisible();
 		await expect(page.getByLabel('Date *')).toHaveText(/Today/);

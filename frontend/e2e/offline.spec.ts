@@ -18,7 +18,7 @@ test.describe('Offline expense entry', () => {
 			.getByRole('link', { name: /Add expense/i })
 			.first()
 			.click();
-		await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'New expense' })).toBeVisible();
 		await expect(page.getByLabel('Vehicle *')).toHaveText(VEHICLE_CAMRY.nickname);
 
 		await page.route('**/api/v1/**', route => route.abort('internetdisconnected'));
@@ -44,7 +44,7 @@ test.describe('Offline expense entry', () => {
 			.getByRole('link', { name: /Add expense/i })
 			.first()
 			.click();
-		await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'New expense' })).toBeVisible();
 		await expect(page.getByText("This page couldn't load")).toHaveCount(0);
 		await expect(page.getByLabel('Vehicle *')).toHaveText(VEHICLE_CAMRY.nickname);
 		await expect(page.getByText("Couldn't load your vehicles")).toHaveCount(0);
@@ -156,7 +156,7 @@ test.describe('Opening the app offline', () => {
 
 		const coldStart = await context.newPage();
 		await coldStart.goto('/expenses/new');
-		await expect(coldStart.getByRole('heading', { name: 'Add Expense' })).toBeVisible();
+		await expect(coldStart.getByRole('heading', { name: 'New expense' })).toBeVisible();
 		await expect(coldStart.getByLabel('Vehicle *')).toHaveText(VEHICLE_CAMRY.nickname);
 		await expect(coldStart.getByText("Couldn't load your vehicles")).toHaveCount(0);
 

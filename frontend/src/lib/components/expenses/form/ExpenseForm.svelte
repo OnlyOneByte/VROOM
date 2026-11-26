@@ -197,6 +197,12 @@
 	let detailsOpen = $state(false);
 
 	const quickActions = $derived(!form.isEditMode);
+	const quickAdd = $derived(!form.isEditMode && !form.queuedExpense);
+	const distanceSinceLast = $derived.by(() => {
+		const reading = parseFloat(form.formData.mileage);
+		const last = form.previousFuelHint;
+		return last && reading > last ? reading - last : null;
+	});
 	const payerEntry = $derived(
 		form.originalExpense
 			? {
@@ -261,7 +267,7 @@
 				? 'Edit Expense'
 				: form.queuedExpense
 					? 'Edit Queued Expense'
-					: 'Add Expense'
+					: 'New expense'
 	);
 
 	async function save() {
@@ -358,6 +364,7 @@
 		error={form.touched['mileage'] ? form.errors['mileage'] : undefined}
 		previousFuelMileage={form.previousFuelHint}
 		distanceLabel={form.distLabel}
+		quick={quickAdd && form.showFuelFields}
 		describedBy={showsOdometerCheckDeferred ? 'odometer-check-deferred' : undefined}
 		onInput={form.handleMileageChange}
 		onBlur={() => form.handleBlur('mileage')}
@@ -383,6 +390,17 @@
 		title={formTitle}
 		onBack={handleBack}
 		subtitle={showsSubtitle ? formSubtitle : undefined}
+		quick={quickAdd}
+	/>
+{/snippet}
+
+{#snippet amountField()}
+	<ExpenseAmountField
+		bind:ref={amountInput}
+		bind:amount={form.formData.amount}
+		amountError={form.touched['amount'] ? form.errors['amount'] : undefined}
+		quick={quickAdd}
+		onAmountBlur={handleAmountBlur}
 	/>
 {/snippet}
 
@@ -454,12 +472,12 @@
 			/>
 		</div>
 	{:else}
-		<div class="space-y-6 {quickActions ? '' : 'pb-32 sm:pb-24 lg:pb-0 short:pb-0'}">
-			<ExpenseFormHeader
-				title={formTitle}
-				onBack={handleBack}
-				subtitle={showsSubtitle ? formSubtitle : undefined}
-			/>
+		<div
+			class="space-y-6 {quickActions ? '' : 'pb-32 sm:pb-24 lg:pb-0 short:pb-0'} {quickAdd
+				? 'mx-auto max-w-[34rem]'
+				: ''}"
+		>
+			{@render createHeader()}
 
 			<form
 				bind:this={formEl}
@@ -468,8 +486,11 @@
 					e.preventDefault();
 					save();
 				}}
-				class="space-y-5 sm:rounded-lg sm:border sm:bg-card sm:p-6"
+				class={quickAdd ? 'space-y-6' : 'space-y-5 sm:rounded-lg sm:border sm:bg-card sm:p-6'}
 			>
+				{#if quickAdd}
+					{@render amountField()}
+				{/if}
 				{#if form.queuedExpense}
 					<div
 						class="flex items-start gap-3 rounded-lg border bg-muted/50 p-4"
@@ -511,8 +532,8 @@
 					/>
 				{/if}
 
-				<div class="space-y-2">
-					<div class="flex flex-wrap items-center gap-2">
+				<div class="space-y-2 {quickAdd ? '-mt-2 text-center' : ''}">
+					<div class="flex flex-wrap items-center gap-2 {quickAdd ? 'justify-center' : ''}">
 						{#if !form.isSplit}
 							<VehicleSelectField
 								vehicles={form.vehicles}
@@ -604,12 +625,9 @@
 					{/if}
 				</div>
 
-				<ExpenseAmountField
-					bind:ref={amountInput}
-					bind:amount={form.formData.amount}
-					amountError={form.touched['amount'] ? form.errors['amount'] : undefined}
-					onAmountBlur={handleAmountBlur}
-				/>
+				{#if !quickAdd}
+					{@render amountField()}
+				{/if}
 
 				{#if form.isSplit && form.selectedVehicleIds.length >= 2 && form.parsedTotalAmount > 0}
 					<ExpenseSplitBreakdown
@@ -633,6 +651,7 @@
 						disabledValues={form.isSplit && !form.isGroupEditMode ? ['fuel'] : []}
 						error={form.errors['category']}
 						touched={form.touched['category']}
+						quick={quickAdd}
 						onSelect={form.selectCategory}
 					/>
 
@@ -664,6 +683,8 @@
 							touched={form.touched}
 							onBlur={form.handleBlur}
 							onMileageChange={form.handleMileageChange}
+							quick={quickAdd}
+							{distanceSinceLast}
 						>
 							{#snippet odometer()}
 								{#if form.asksForMileage}
@@ -678,7 +699,9 @@
 
 				<Collapsible bind:open={detailsOpen}>
 					<CollapsibleTrigger
-						class="flex min-h-12 w-full items-center justify-between gap-3 rounded-md border bg-background px-3 text-left text-sm font-medium outline-none transition-colors hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50"
+						class="flex min-h-12 w-full items-center justify-between gap-3 text-left font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 {quickAdd
+							? 'border-y px-0 hover:text-foreground/80'
+							: 'rounded-md border bg-background px-3 text-sm hover:bg-muted'}"
 					>
 						<span class="shrink-0">More details</span>
 						<span class="flex min-w-0 items-center gap-1 text-xs font-normal text-muted-foreground">
