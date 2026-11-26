@@ -66,7 +66,7 @@ async function renderEditAndSwitchToOwn(financingType: 'loan' | 'lease' = 'loan'
 	getFinancing.mockResolvedValue(financing(financingType));
 	render(VehicleForm, { props: { vehicleId: VEHICLE.id } });
 	await screen.findByRole('button', { name: /save changes/i });
-	await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
+	await fireEvent.click(screen.getByRole('switch', { name: 'This car has a loan or lease' }));
 	await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 }
 

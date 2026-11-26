@@ -28,7 +28,6 @@
 	import * as CardFull from '#lib/components/ui/card/index.ts';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
 	import VehicleHeader from '#lib/components/vehicles/VehicleHeader.svelte';
-	import VehiclePhotoCarousel from '#lib/components/vehicles/VehiclePhotoCarousel.svelte';
 	import VehicleInfoCard from '#lib/components/vehicles/VehicleInfoCard.svelte';
 	import CostPerMileHero from '#lib/components/vehicles/CostPerMileHero.svelte';
 	import * as Popover from '#lib/components/ui/popover/index.ts';
@@ -164,6 +163,7 @@
 	const loadInsuranceTab = () => import('#lib/components/insurance/InsuranceTab.svelte');
 	const loadTripsTab = () => import('#lib/components/vehicles/VehicleTripsTab.svelte');
 	const loadCompareCard = () => import('#lib/components/vehicles/CommunityCompareCard.svelte');
+	const loadPhotoCarousel = () => import('#lib/components/vehicles/VehiclePhotoCarousel.svelte');
 	const loadUploadDialog = () => import('#lib/components/common/MediaCaptureDialog.svelte');
 	const loadOverviewModules = () =>
 		Promise.all([
@@ -1050,18 +1050,26 @@
 							<CollapsibleContent class="space-y-6 border-t p-4 sm:p-6">
 								{#if hasOpenedDetails}
 									<VehicleInfoCard {vehicle} {isOwner} />
-									<VehiclePhotoCarousel
-										{vehicleId}
-										photos={vehiclePhotos}
-										{isOwner}
-										isLoading={isLoadingPhotos}
-										onUpload={() => {
-											hasOpenedUpload = true;
-											showUploadDialog = true;
-										}}
-										onDelete={handleDeletePhoto}
-										onSetCover={handleSetCover}
-									/>
+									{#await loadPhotoCarousel()}
+										<Skeleton class="h-48 w-full rounded-xl" />
+									{:then { default: VehiclePhotoCarousel }}
+										<VehiclePhotoCarousel
+											{vehicleId}
+											photos={vehiclePhotos}
+											{isOwner}
+											isLoading={isLoadingPhotos}
+											onUpload={() => {
+												hasOpenedUpload = true;
+												showUploadDialog = true;
+											}}
+											onDelete={handleDeletePhoto}
+											onSetCover={handleSetCover}
+										/>
+									{:catch}
+										<p class="text-sm text-muted-foreground" role="alert">
+											Photos couldn't be loaded. Check your connection and reload.
+										</p>
+									{/await}
 								{/if}
 							</CollapsibleContent>
 						</Collapsible>

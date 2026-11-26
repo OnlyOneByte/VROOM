@@ -102,36 +102,43 @@ afterEach(() => {
 describe('FinancingFormSection ownership', () => {
 	test('an owned vehicle shows no financing fields', () => {
 		mount({ ownershipType: 'own' });
-		expect(screen.getByText('This vehicle is owned outright')).toBeTruthy();
-		expect(screen.getByText(/owned outright with no financing or lease/)).toBeTruthy();
-		expect(screen.queryByLabelText(/Lender|Leasing Company/)).toBeNull();
+		expect(screen.getByRole('switch', { name: 'This car has a loan or lease' })).toHaveAttribute(
+			'aria-checked',
+			'false'
+		);
+		expect(screen.queryByRole('group', { name: 'Which one?' })).toBeNull();
+		expect(screen.queryByLabelText(/Lender|Leasing company/)).toBeNull();
 	});
 
 	test('a financed vehicle asks for the lender, loan amount and APR but no lease terms', () => {
 		mount({ ownershipType: 'finance' });
-		expect(screen.getByText('Loan details and payment information')).toBeTruthy();
+		expect(screen.getByRole('switch', { name: 'This car has a loan or lease' })).toHaveAttribute(
+			'aria-checked',
+			'true'
+		);
+		expect(screen.getByRole('radio', { name: 'Loan' })).toBeChecked();
 		expect(screen.getByLabelText(/Lender/)).toBeTruthy();
-		expect(screen.getByLabelText(/^Loan Amount/)).toBeTruthy();
+		expect(screen.getByLabelText(/^Loan amount/)).toBeTruthy();
 		expect(screen.getByLabelText(/APR/)).toBeTruthy();
-		expect(screen.queryByLabelText(/Monthly Payment/)).toBeNull();
-		expect(screen.queryByLabelText(/Residual Value/)).toBeNull();
-		expect(screen.queryByLabelText(/Mileage Limit/)).toBeNull();
+		expect(screen.queryByLabelText(/Monthly payment/)).toBeNull();
+		expect(screen.queryByLabelText(/Residual value/)).toBeNull();
+		expect(screen.queryByLabelText(/mileage limit/)).toBeNull();
 	});
 
 	test('the start date label points at the date picker button', () => {
 		mount({ ownershipType: 'finance' });
-		expect(screen.getByLabelText(/Start Date/).tagName).toBe('BUTTON');
+		expect(screen.getByLabelText(/Start date/).tagName).toBe('BUTTON');
 	});
 
 	test('a leased vehicle asks for the payment, residual and mileage terms but no APR', () => {
 		mount({ ownershipType: 'lease' });
-		expect(screen.getByText('Lease details and payment information')).toBeTruthy();
-		expect(screen.getByLabelText(/Leasing Company/)).toBeTruthy();
-		expect(screen.getByLabelText(/^Total Lease Obligation/)).toBeTruthy();
-		expect(screen.getByLabelText(/Monthly Payment/)).toBeTruthy();
-		expect(screen.getByLabelText(/Residual Value/)).toBeTruthy();
-		expect(screen.getByLabelText(/Annual Mileage Limit/)).toBeTruthy();
-		expect(screen.getByLabelText(/Excess Mileage Fee/)).toBeTruthy();
+		expect(screen.getByRole('radio', { name: 'Lease' })).toBeChecked();
+		expect(screen.getByLabelText(/Leasing company/)).toBeTruthy();
+		expect(screen.getByLabelText(/^Total lease obligation/)).toBeTruthy();
+		expect(screen.getByLabelText(/Monthly payment/)).toBeTruthy();
+		expect(screen.getByLabelText(/Residual value/)).toBeTruthy();
+		expect(screen.getByLabelText(/Yearly mileage limit/)).toBeTruthy();
+		expect(screen.getByLabelText(/Fee per extra/)).toBeTruthy();
 		expect(screen.queryByLabelText(/APR/)).toBeNull();
 	});
 
@@ -142,22 +149,24 @@ describe('FinancingFormSection ownership', () => {
 		'a %s vehicle labels the lease distance terms in %s',
 		(distanceUnit, short, example) => {
 			mount({ ownershipType: 'lease', distanceUnit });
-			const limit = screen.getByLabelText(`Annual Mileage Limit (${short})`);
+			const limit = screen.getByLabelText(`Yearly mileage limit (${short}) (optional)`);
 			expect(limit.getAttribute('placeholder')).toBe(example);
-			expect(screen.getByLabelText(`Excess Mileage Fee (per ${short})`)).toBeTruthy();
+			expect(screen.getByLabelText(`Fee per extra ${short} (optional)`)).toBeTruthy();
 			expect(screen.queryByText(/per mile\b/)).toBeNull();
 		}
 	);
 
-	test('switching ownership swaps the fields shown', async () => {
+	test('the switch reveals Loan or Lease, and turning it back on keeps the last choice', async () => {
 		mount({ ownershipType: 'own' });
-		await fireEvent.click(screen.getByRole('button', { name: 'Lease' }));
-		expect(screen.getByLabelText(/Leasing Company/)).toBeTruthy();
-		await fireEvent.click(screen.getByRole('button', { name: 'Finance' }));
+		await fireEvent.click(screen.getByRole('switch', { name: 'This car has a loan or lease' }));
 		expect(screen.getByLabelText(/Lender/)).toBeTruthy();
-		expect(screen.queryByLabelText(/Residual Value/)).toBeNull();
-		await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
-		expect(screen.queryByLabelText(/Lender/)).toBeNull();
+		await fireEvent.click(screen.getByRole('radio', { name: 'Lease' }));
+		expect(screen.getByLabelText(/Leasing company/)).toBeTruthy();
+		expect(screen.queryByLabelText(/APR/)).toBeNull();
+		await fireEvent.click(screen.getByRole('switch', { name: 'This car has a loan or lease' }));
+		expect(screen.queryByLabelText(/Leasing company/)).toBeNull();
+		await fireEvent.click(screen.getByRole('switch', { name: 'This car has a loan or lease' }));
+		expect(screen.getByRole('radio', { name: 'Lease' })).toBeChecked();
 	});
 
 	test('prefills the inputs from the form values', () => {
@@ -172,13 +181,13 @@ describe('FinancingFormSection ownership', () => {
 				excessMileageFee: 0.25
 			})
 		});
-		expect((screen.getByLabelText(/Leasing Company/) as HTMLInputElement).value).toBe(
+		expect((screen.getByLabelText(/Leasing company/) as HTMLInputElement).value).toBe(
 			'Toyota Financial'
 		);
-		expect((screen.getByLabelText(/Monthly Payment/) as HTMLInputElement).value).toBe('400');
-		expect((screen.getByLabelText(/Residual Value/) as HTMLInputElement).value).toBe('18500');
-		expect((screen.getByLabelText(/Annual Mileage Limit/) as HTMLInputElement).value).toBe('12000');
-		expect((screen.getByLabelText(/Excess Mileage Fee/) as HTMLInputElement).value).toBe('0.25');
+		expect((screen.getByLabelText(/Monthly payment/) as HTMLInputElement).value).toBe('400');
+		expect((screen.getByLabelText(/Residual value/) as HTMLInputElement).value).toBe('18500');
+		expect((screen.getByLabelText(/Yearly mileage limit/) as HTMLInputElement).value).toBe('12000');
+		expect((screen.getByLabelText(/Fee per extra/) as HTMLInputElement).value).toBe('0.25');
 	});
 });
 
@@ -250,10 +259,10 @@ describe('FinancingFormSection validation errors', () => {
 		expect(screen.getByText('Pick a term')).toBeTruthy();
 		expect(screen.getByText('Start date is required')).toBeTruthy();
 		expect(screen.getByText('Payment must be at least $0.01')).toBeTruthy();
-		const payment = screen.getByLabelText(/Monthly Payment/);
+		const payment = screen.getByLabelText(/Monthly payment/);
 		expect(payment.getAttribute('aria-invalid')).toBe('true');
 		expect(payment.getAttribute('aria-describedby')).toBe('paymentAmount-error');
-		expect(screen.getByLabelText(/Leasing Company/).getAttribute('aria-invalid')).toBe('true');
+		expect(screen.getByLabelText(/Leasing company/).getAttribute('aria-invalid')).toBe('true');
 	});
 
 	test('each invalid field is described by its own error', () => {
@@ -267,12 +276,12 @@ describe('FinancingFormSection validation errors', () => {
 			}
 		});
 		expect(screen.getByLabelText(/Lender/)).toHaveAccessibleDescription('Provider is required');
-		expect(screen.getByLabelText(/^Loan Amount/)).toHaveAccessibleDescription(
+		expect(screen.getByLabelText(/^Loan amount/)).toHaveAccessibleDescription(
 			'Amount must be positive'
 		);
 		expect(screen.getByLabelText(/APR/)).toHaveAccessibleDescription('APR is required');
 		expect(document.getElementById('termMonths')).toHaveAccessibleDescription('Pick a term');
-		const startDate = screen.getByLabelText(/Start Date/);
+		const startDate = screen.getByLabelText(/Start date/);
 		expect(startDate).toHaveAccessibleDescription('January 15, 2025 Start date is required');
 		expect(startDate.getAttribute('aria-invalid')).toBe('true');
 	});
@@ -285,7 +294,7 @@ describe('FinancingFormSection validation errors', () => {
 
 	test('inputs without errors are not marked invalid', () => {
 		mount({ ownershipType: 'lease' });
-		const payment = screen.getByLabelText(/Monthly Payment/);
+		const payment = screen.getByLabelText(/Monthly payment/);
 		expect(payment.getAttribute('aria-invalid')).toBe('false');
 		expect(payment.getAttribute('aria-describedby')).toBeNull();
 	});
@@ -304,7 +313,7 @@ describe('FinancingFormSection loan preview', () => {
 	test('labels the preview as updated when editing', () => {
 		mount({ amortizationPreview: PREVIEW, isEditMode: true });
 		expect(screen.getByText('Updated Loan Calculation Preview')).toBeTruthy();
-		expect(screen.getByLabelText(/^Original Loan Amount/)).toBeTruthy();
+		expect(screen.getByLabelText(/^Original loan amount/)).toBeTruthy();
 	});
 
 	test('a lease never shows the loan preview', () => {
@@ -323,7 +332,7 @@ describe('FinancingFormSection loan preview', () => {
 describe('FinancingFormSection current status when editing', () => {
 	test('shows the current balance, original amount and principal paid', () => {
 		mount({ isEditMode: true, vehicle: vehicleWith(makeLoan({ computedBalance: 15_000 })) });
-		expect(screen.getByText('Current Status')).toBeTruthy();
+		expect(screen.getByText('Current status')).toBeTruthy();
 		expect(screen.getByText('$15,000.00')).toBeTruthy();
 		expect(screen.getByText('$20,000.00')).toBeTruthy();
 		expect(screen.getByText('$5,000.00')).toBeTruthy();
@@ -343,9 +352,9 @@ describe('FinancingFormSection current status when editing', () => {
 
 	test('is hidden when creating a vehicle or when no balance is known', () => {
 		mount({ isEditMode: false, vehicle: vehicleWith(makeLoan()) });
-		expect(screen.queryByText('Current Status')).toBeNull();
+		expect(screen.queryByText('Current status')).toBeNull();
 		cleanup();
 		mount({ isEditMode: true, vehicle: vehicleWith(makeLoan({ computedBalance: undefined })) });
-		expect(screen.queryByText('Current Status')).toBeNull();
+		expect(screen.queryByText('Current status')).toBeNull();
 	});
 });

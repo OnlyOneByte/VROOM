@@ -119,7 +119,7 @@ test.describe('Adding a vehicle', () => {
 		expect(posted).toBe(false);
 	});
 
-	test('a filled form POSTs the vehicle and returns to the dashboard', async ({ page }) => {
+	test('a filled form POSTs the vehicle and returns to the Garage', async ({ page }) => {
 		await page.goto('/vehicles/new');
 
 		await page.getByLabel('Make', { exact: true }).fill('Tesla');

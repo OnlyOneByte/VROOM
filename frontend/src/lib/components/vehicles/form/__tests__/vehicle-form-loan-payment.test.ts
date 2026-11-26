@@ -83,7 +83,7 @@ describe('VehicleForm loan payment on edit', () => {
 
 	test('recomputes the payment when the loan terms change', async () => {
 		const saved = await saveEditedVehicle(async () => {
-			await fireEvent.input(screen.getByLabelText(/Original Loan Amount/), {
+			await fireEvent.input(screen.getByLabelText(/Original loan amount/), {
 				target: { value: '30000' }
 			});
 			await screen.findByText('Updated Loan Calculation Preview');
