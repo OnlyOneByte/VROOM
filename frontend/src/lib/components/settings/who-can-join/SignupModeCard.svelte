@@ -151,12 +151,7 @@
 					class="min-w-0"
 				/>
 				{#if !settings.domainsLocked && (domainsChanged || savingDomains)}
-					<Button
-						type="submit"
-						variant="outline"
-						class="h-10 shrink-0"
-						aria-busy={savingDomains}
-					>
+					<Button type="submit" variant="outline" class="h-10 shrink-0" aria-busy={savingDomains}>
 						{#if savingDomains}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
 						Save Domains
 					</Button>

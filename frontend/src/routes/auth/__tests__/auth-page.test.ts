@@ -106,12 +106,15 @@ describe('sign-in page', () => {
 		['approval', false, 'New here? Sign in to ask for an account. An admin approves it first.'],
 		['invite', false, 'New here? This server is invite only. Ask its admin for an invite.'],
 		['closed', false, 'This server isn’t taking new accounts.']
-	])('the new-here line follows the %s mode (domains limited: %s)', async (mode, domainRestricted, line) => {
-		authApi.getProviders.mockResolvedValue([{ id: 'google', displayName: 'Google' }]);
-		authApi.getSignupInfo.mockResolvedValue({ mode, domainRestricted });
-		render(AuthPage);
-		expect(await screen.findByTestId('signup-mode-line')).toHaveTextContent(line);
-	});
+	])(
+		'the new-here line follows the %s mode (domains limited: %s)',
+		async (mode, domainRestricted, line) => {
+			authApi.getProviders.mockResolvedValue([{ id: 'google', displayName: 'Google' }]);
+			authApi.getSignupInfo.mockResolvedValue({ mode, domainRestricted });
+			render(AuthPage);
+			expect(await screen.findByTestId('signup-mode-line')).toHaveTextContent(line);
+		}
+	);
 
 	test('when the sign-up mode cannot load, the page makes no promise about new accounts', async () => {
 		authApi.getProviders.mockResolvedValue([{ id: 'google', displayName: 'Google' }]);
@@ -124,7 +127,10 @@ describe('sign-in page', () => {
 
 	test('the sign-in error map uses curly apostrophes only', () => {
 		const source = readFileSync(`${process.cwd()}/src/routes/auth/+page.svelte`, 'utf8');
-		const map = source.slice(source.indexOf('const authErrorMessages'), source.indexOf('let providers'));
+		const map = source.slice(
+			source.indexOf('const authErrorMessages'),
+			source.indexOf('let providers')
+		);
 		expect(map).not.toMatch(/[a-z]'[a-z]/i);
 	});
 });

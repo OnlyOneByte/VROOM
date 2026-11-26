@@ -20,29 +20,29 @@ vi.mock('#lib/components/layout/AccountPending.svelte', () => {
 
 let logoutFails = false;
 
-global.fetch = vi.fn(async (input: RequestInfo | URL) =>
+global.fetch = vi.fn(async (input: Parameters<typeof fetch>[0]) =>
 	String(input).includes('/auth/logout') && logoutFails
 		? new Response(JSON.stringify({ success: false, error: { message: 'Server unavailable' } }), {
 				status: 503,
 				headers: { 'content-type': 'application/json' }
 			})
 		: new Response(
-			JSON.stringify({
-				success: true,
-				data: {
-					user: {
-						id: 'kim',
-						email: 'kim@example.com',
-						displayName: 'Kim',
-						createdAt: '2024-01-01T00:00:00Z',
-						updatedAt: '2024-01-01T00:00:00Z'
-					},
-					session: { expiresAt: '2099-01-01' },
-					pendingApproval: true
-				}
-			}),
-			{ status: 200, headers: { 'content-type': 'application/json' } }
-		)
+				JSON.stringify({
+					success: true,
+					data: {
+						user: {
+							id: 'kim',
+							email: 'kim@example.com',
+							displayName: 'Kim',
+							createdAt: '2024-01-01T00:00:00Z',
+							updatedAt: '2024-01-01T00:00:00Z'
+						},
+						session: { expiresAt: '2099-01-01' },
+						pendingApproval: true
+					}
+				}),
+				{ status: 200, headers: { 'content-type': 'application/json' } }
+			)
 );
 
 const Layout = (await import('../+layout.svelte')).default;
@@ -88,7 +88,9 @@ describe('a waiting account whose waiting page fails to load', () => {
 
 		await fireEvent.click(await screen.findByRole('button', { name: 'Sign Out' }));
 
-		await waitFor(() => expect(showError).toHaveBeenCalledWith(expect.stringMatching(/^Couldn’t sign out\./)));
+		await waitFor(() =>
+			expect(showError).toHaveBeenCalledWith(expect.stringMatching(/^Couldn’t sign out\./))
+		);
 		expect(assign).not.toHaveBeenCalled();
 		expect(screen.getByRole('button', { name: 'Sign Out' })).toBeEnabled();
 	});
