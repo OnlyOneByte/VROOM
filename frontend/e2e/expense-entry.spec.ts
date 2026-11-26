@@ -73,7 +73,8 @@ test.describe('Expense form', () => {
 		await expect(group.getByRole('radio')).toHaveCount(6);
 
 		await page.getByLabel('Amount *').fill('30');
-		await page.getByLabel('Amount *').press('Tab');
+		await page.getByTestId('receipt-scan-button').focus();
+		await page.keyboard.press('Tab');
 		await expect(group.getByRole('radio', { name: 'Fuel' })).toBeFocused();
 
 		await page.keyboard.press('ArrowRight');
