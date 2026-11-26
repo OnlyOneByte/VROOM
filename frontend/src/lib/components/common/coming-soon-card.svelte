@@ -25,28 +25,28 @@
 	let { icon: Icon, title, description, items }: Props = $props();
 </script>
 
-<Card>
+<Card variant="section">
 	<CardHeader>
-		<div class="flex items-center justify-between">
+		<div class="flex items-center justify-between gap-3">
 			<div class="flex items-center gap-2">
-				<Icon class="h-5 w-5 text-muted-foreground" />
-				<CardTitle>{title}</CardTitle>
+				<Icon class="size-4 text-muted-foreground" aria-hidden="true" />
+				<CardTitle level={2} class="text-base">{title}</CardTitle>
 			</div>
-			<Badge variant="secondary">Coming Soon</Badge>
+			<Badge variant="outline">Coming soon</Badge>
 		</div>
 		<CardDescription>{description}</CardDescription>
 	</CardHeader>
 	<CardContent>
-		<div class="space-y-3" aria-hidden="true">
+		<ul class="divide-y" aria-hidden="true">
 			{#each items as item (item.label)}
-				<div class="flex items-center justify-between">
+				<li class="flex min-h-12 items-center justify-between gap-3 py-2">
 					<div class="flex items-center gap-2 text-sm text-muted-foreground">
-						<item.icon class="h-4 w-4" />
+						<item.icon class="size-4" />
 						<span>{item.label}</span>
 					</div>
 					<span class="text-sm text-muted-foreground">{item.value ?? '—'}</span>
-				</div>
+				</li>
 			{/each}
-		</div>
+		</ul>
 	</CardContent>
 </Card>

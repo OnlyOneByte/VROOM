@@ -13,7 +13,6 @@
 	import {
 		Monitor,
 		Users,
-		Bell,
 		LogOut,
 		UserPlus,
 		Clock,
@@ -238,12 +237,12 @@
 				<dl class="divide-y">
 					<div class="flex min-h-14 items-center justify-between gap-3 py-2">
 						<dt class="shrink-0 text-sm font-medium">Display name</dt>
-						<dd class="flex min-w-0 items-center justify-end gap-2">
+						<dd class="flex min-w-0 items-center justify-end gap-2 {isEditingName ? 'flex-1' : ''}">
 							{#if isEditingName}
 								<Input
 									bind:value={nameDraft}
 									maxlength={100}
-									class="max-w-[220px]"
+									class="min-w-0 flex-1 sm:max-w-[280px]"
 									disabled={isSavingName}
 									aria-label="Display name"
 									onkeydown={(e: KeyboardEvent) => {
@@ -305,12 +304,14 @@
 						<p class="text-sm">{unlinkError}</p>
 					</div>
 				{/if}
+				<span class="sr-only" role="status">
+					{isLoadingAccounts ? 'Loading sign-in methods' : ''}
+				</span>
 				{#if isLoadingAccounts}
 					<div class="space-y-2" aria-hidden="true">
 						<Skeleton class="h-14 w-full" />
 						<Skeleton class="h-14 w-full" />
 					</div>
-					<span class="sr-only" role="status">Loading sign-in methods</span>
 				{:else}
 					<ul class="divide-y">
 						{#each accounts as account (account.id)}
@@ -429,17 +430,6 @@
 			items={[
 				{ icon: UserPlus, label: 'Invite household member' },
 				{ icon: Users, label: 'Manage shared access' }
-			]}
-		/>
-
-		<ComingSoonCard
-			icon={Bell}
-			title="Notifications"
-			description="Reminders and alert preferences"
-			items={[
-				{ icon: Bell, label: 'Payment reminders' },
-				{ icon: Bell, label: 'Maintenance reminders' },
-				{ icon: Bell, label: 'Backup failure alerts' }
 			]}
 		/>
 	</div>
