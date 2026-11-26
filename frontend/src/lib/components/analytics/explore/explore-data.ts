@@ -152,9 +152,6 @@ function rangePhrase(range: string): string {
 	return to ? `from ${from} to ${to}` : `in ${range}`;
 }
 
-/** The sentence beside the Explore hero figure, e.g. "in running costs over the last 12 months
- * for all your cars. Fuel & Charging was 62% of it. That's $223 a month, 4% more than the period
- * before." */
 export function heroSentence(opts: {
 	query: ExploreQuery;
 	summary: ExploreKpis;

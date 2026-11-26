@@ -20,7 +20,6 @@
 		query: ExploreQuery;
 		onChange: (_query: ExploreQuery) => void;
 		driverSplit?: boolean;
-		/** The page's Range and Cars chips, placed after Split by. */
 		filters?: Snippet;
 	}
 
@@ -83,7 +82,6 @@
 			open = null;
 			return;
 		}
-		// 256 px menu plus a 16 px margin: right-align when it would run off the viewport.
 		alignEnd = button.getBoundingClientRect().left + 272 > window.innerWidth;
 		open = menu;
 		await tick();
@@ -135,8 +133,7 @@
 {/snippet}
 
 {#snippet chip(menu: Menu, prefix: string, text: string, body: Snippet)}
-	<!-- shortcut: a plain disclosure instead of the kit Popover, whose floating-ui would add
-	     ~13 KB to the /analytics first view; move to Popover if that cost moves off the route. -->
+	<!-- shortcut: a plain disclosure, not the kit Popover, whose floating-ui adds ~13 KB to the /analytics first view; switch once that cost leaves the route. -->
 	<div
 		class="relative max-w-full"
 		data-chip-menu

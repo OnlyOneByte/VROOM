@@ -61,7 +61,6 @@
 		onAllCars?: () => void;
 		onApplyInsight?: (_query: Record<string, string>) => void;
 		driverSplit?: boolean;
-		/** The page's Range and Cars chips, shown in the chart options row. */
 		filters?: Snippet;
 	}
 
@@ -529,7 +528,6 @@
 			<p class="max-w-md text-base text-muted-foreground md:text-lg">{heroText}</p>
 		</div>
 	{:else if !response && !error}
-		<!-- Holds the hero's height so the chips don't move when the figure arrives. -->
 		<Skeleton class="h-40 w-full max-w-xl md:h-28" />
 	{/if}
 

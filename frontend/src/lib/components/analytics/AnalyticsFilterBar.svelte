@@ -19,7 +19,6 @@
 		onChange: (_filters: AnalyticsFilters) => void;
 		vehiclesError?: string | null;
 		onRetryVehicles?: () => void;
-		/** Flow the chips into a parent row (Explore's chart options) instead of a row of their own. */
 		inline?: boolean;
 	}
 
