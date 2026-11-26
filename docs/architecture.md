@@ -135,7 +135,10 @@ own pooled transaction, so call sites won't change again.
 
 **Moving the app across (#1378).** `appContext().asyncDb` is the async session over the same
 connection as `appContext().db`, and repositories move to it area by area. The settings,
-auth-provider, photo-ref and insurance-claim repositories are on it so far. One ordering
+auth-provider, photo-ref, insurance-claim, financing, push, vehicle, trip and share
+repositories are on it so far. `BaseRepository`'s shared methods run on it for every
+subclass. Expenses, odometer and reminders keep their own queries on a `syncDb` handle,
+because they open sync transactions. Those move in part C, with the transactions. One ordering
 rule holds the migration together: sync queries must be gone before the first async
 transaction ships, because a sync query issued while an async transaction is open runs
 inside it. The async module enforces this. It wraps the

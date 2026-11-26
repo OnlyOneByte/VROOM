@@ -1,5 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import type { NewVehicle, Vehicle, VehicleWithFinancing } from '../../db/schema';
 import { vehicleFinancing, vehicles } from '../../db/schema';
 import { DatabaseError } from '../../errors';
@@ -8,7 +8,7 @@ import { BaseRepository } from '../../utils/repository';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
 
 export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
-  constructor(db: AppDatabase) {
+  constructor(db: AsyncAppDatabase) {
     super(db, vehicles);
   }
 

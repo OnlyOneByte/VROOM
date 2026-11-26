@@ -1,0 +1,2 @@
+"id","vehicleId","financingType","provider","originalAmount","apr","termMonths","startDate","paymentAmount","paymentFrequency","paymentDayOfMonth","paymentDayOfWeek","residualValue","mileageLimit","excessMileageFee","isActive","endDate","createdAt","updatedAt"
+"swza301ecu07ic25ygu0u1s7","gdgnpth0a218vh5ja5f996sy","loan","Bank of America","20000","4.5","60","2024-11-23T12:00:00.000Z","373","monthly","15",,,,,"1",,"2026-11-23T00:58:58.000Z","2026-11-23T00:58:58.000Z"

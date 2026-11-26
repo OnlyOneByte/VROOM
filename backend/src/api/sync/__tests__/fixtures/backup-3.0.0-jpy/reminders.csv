@@ -1,0 +1,2 @@
+"id","userId","name","description","type","actionMode","frequency","intervalValue","intervalUnit","triggerMode","intervalMileage","lastServiceOdometer","nextDueOdometer","startDate","endDate","nextDueDate","expenseCategory","expenseTags","expenseAmount","expenseDescription","expenseSplitConfig","isActive","lastTriggeredAt","createdBy","createdAt","updatedAt"
+"fx_rem_1","test-user-1","Car wash",,"expense","automatic","custom","1","month","time",,,,"2024-10-27T03:33:20.000Z",,,"misc",,"15",,,"1",,,,

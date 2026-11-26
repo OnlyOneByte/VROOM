@@ -1,13 +1,10 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
-import type { AppDatabase } from '../../../db/connection';
-import * as schema from '../../../db/schema';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { PushSubscriptionRepository } from '../repository';
 
 let sqliteDb: Database;
-let db: AppDatabase;
 let repo: PushSubscriptionRepository;
 
 const USER_A = 'user-a';
@@ -26,8 +23,7 @@ beforeEach(() => {
   sqliteDb = new Database(':memory:');
   sqliteDb.run('PRAGMA foreign_keys = ON');
   for (const m of loadMigrations()) applyMigration(sqliteDb, m);
-  db = drizzle(sqliteDb, { schema });
-  repo = new PushSubscriptionRepository(db);
+  repo = new PushSubscriptionRepository(openAsyncDatabase(sqliteDb).db);
   seed();
 });
 
