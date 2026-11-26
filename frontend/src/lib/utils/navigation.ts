@@ -1,5 +1,5 @@
 import { goto, preloadCode } from '$app/navigation';
-import { resolve } from '$app/paths';
+import { match, resolve } from '$app/paths';
 import { routes } from '#lib/routes.ts';
 
 export async function gotoDynamic(path: string): Promise<void> {
@@ -12,12 +12,9 @@ export async function gotoDynamic(path: string): Promise<void> {
 }
 
 export function preloadDynamic(path: string): void {
-	const pathname = path.split('?')[0] ?? path;
-	try {
-		void preloadCode(resolve(...([pathname] as Parameters<typeof resolve>))).catch(() => {});
-	} catch {
-		return;
-	}
+	void match(path)
+		.then(route => (route ? preloadCode(route.id) : undefined))
+		.catch(() => {});
 }
 
 export function gotoWithQuery(

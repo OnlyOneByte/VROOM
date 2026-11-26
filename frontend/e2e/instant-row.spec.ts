@@ -69,4 +69,39 @@ test.describe('A new expense shows on the list before the list has loaded', () =
 		releaseList();
 		await expect(page.getByRole('row', { name: /Car wash on Elm/ })).toBeVisible();
 	});
+
+	test('a save the server answers at once still shows on the list while the list is held', async ({
+		page
+	}) => {
+		await page.setViewportSize({ width: 1280, height: 800 });
+		let releaseList: () => void = () => {};
+		const listHeld = new Promise<void>(resolve => (releaseList = resolve));
+		let saved = false;
+		await page.route(
+			url => url.pathname === '/api/v1/expenses',
+			async route => {
+				if (route.request().method() === 'POST') {
+					saved = true;
+					return route.fallback();
+				}
+				if (saved) await listHeld;
+				return route.fallback();
+			}
+		);
+
+		await page.goto('/expenses/new');
+		await page.getByRole('radio', { name: 'Misc' }).click();
+		await page.getByLabel('Amount *').fill('12.34');
+		await page.getByRole('button', { name: /More details/ }).click();
+		await page.getByLabel('Description (Optional)').fill('Car wash on Elm');
+		await page.getByRole('button', { name: 'Save Expense' }).click();
+
+		await expect.poll(() => saved).toBe(true);
+		const early = page.getByTestId('pending-rows-while-loading');
+		await expect(early.getByText('Car wash on Elm')).toBeVisible();
+		await expect(early.getByText('Unsynced')).toHaveCount(0);
+
+		releaseList();
+		await expect(early).toHaveCount(0);
+	});
 });
