@@ -1,18 +1,12 @@
 <script lang="ts">
 	import { Calculator } from '@lucide/svelte';
-	import { Button } from '#lib/components/ui/button/index.ts';
 	import Input from '#lib/components/ui/input/input.svelte';
 	import Label from '#lib/components/ui/label/label.svelte';
+	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
-	import {
-		Card,
-		CardContent,
-		CardDescription,
-		CardHeader,
-		CardTitle
-	} from '#lib/components/ui/card/index.ts';
+	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
 	import {
 		amountPlaceholder,
 		amountStep,
@@ -63,6 +57,19 @@
 
 	const distanceShort = $derived(getDistanceUnitLabel(distanceUnit, true));
 
+	const KINDS = [
+		{ value: 'finance', label: 'Loan' },
+		{ value: 'lease', label: 'Lease' }
+	] as const;
+
+	let lastKind = $state<'finance' | 'lease'>(ownershipType === 'lease' ? 'lease' : 'finance');
+	let financed = $derived(ownershipType !== 'own');
+
+	function setFinanced(on: boolean) {
+		if (!on && ownershipType !== 'own') lastKind = ownershipType;
+		ownershipType = on ? lastKind : 'own';
+	}
+
 	function formatPayoffDate(date: Date): string {
 		return formatDateWith(new Date(date), {
 			year: 'numeric',
@@ -74,51 +81,52 @@
 <Card variant="section">
 	<CardHeader>
 		<CardTitle level={2} class="text-base">Ownership</CardTitle>
-		<CardDescription>
-			{ownershipType === 'own'
-				? 'This vehicle is owned outright'
-				: ownershipType === 'lease'
-					? 'Lease details and payment information'
-					: 'Loan details and payment information'}
-		</CardDescription>
 	</CardHeader>
 	<CardContent>
-		<div class="mb-6">
-			<Label class="mb-3 block">How do you own this vehicle?</Label>
-			<div class="grid grid-cols-3 gap-3">
-				<Button
-					type="button"
-					variant={ownershipType === 'own' ? 'default' : 'outline'}
-					onclick={() => (ownershipType = 'own')}
-					class="h-auto py-3"
-				>
-					Own
-				</Button>
-				<Button
-					type="button"
-					variant={ownershipType === 'lease' ? 'default' : 'outline'}
-					onclick={() => (ownershipType = 'lease')}
-					class="h-auto py-3"
-				>
-					Lease
-				</Button>
-				<Button
-					type="button"
-					variant={ownershipType === 'finance' ? 'default' : 'outline'}
-					onclick={() => (ownershipType = 'finance')}
-					class="h-auto py-3"
-				>
-					Finance
-				</Button>
+		<div class="mb-6 flex items-start justify-between gap-4 border-b border-border pb-6">
+			<div class="min-w-0">
+				<Label for="financed" class="text-base font-semibold">This car has a loan or lease</Label>
+				<p id="financed-hint" class="mt-1 text-sm text-muted-foreground">
+					Adds the Finance tab and counts payments as ownership costs
+				</p>
 			</div>
+			<Switch
+				id="financed"
+				checked={financed}
+				onCheckedChange={setFinanced}
+				aria-describedby="financed-hint"
+			/>
 		</div>
+
+		{#if financed}
+			<fieldset class="mb-6">
+				<legend class="mb-2 text-sm font-medium">Which one?</legend>
+				<div class="flex flex-wrap gap-2">
+					{#each KINDS as kind (kind.value)}
+						<label
+							class="inline-flex h-10 cursor-pointer items-center rounded-full border border-border-strong bg-surface px-4 text-sm font-semibold transition-colors has-checked:border-foreground has-checked:bg-foreground has-checked:text-background has-focus-visible:ring-[3px] has-focus-visible:ring-ring/50"
+						>
+							<input
+								type="radio"
+								name="financingKind"
+								class="sr-only"
+								value={kind.value}
+								checked={ownershipType === kind.value}
+								onchange={() => (ownershipType = kind.value)}
+							/>
+							{kind.label}
+						</label>
+					{/each}
+				</div>
+			</fieldset>
+		{/if}
 
 		{#if ownershipType !== 'own'}
 			<div class="space-y-6">
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 					<div class="space-y-2">
 						<Label for="provider">
-							{ownershipType === 'finance' ? 'Lender' : 'Leasing Company'} *
+							{ownershipType === 'finance' ? 'Lender' : 'Leasing company'}
 						</Label>
 						<Input
 							id="provider"
@@ -136,9 +144,11 @@
 
 					<div class="space-y-2">
 						<Label for="originalAmount">
-							{isEditMode ? 'Original ' : ''}{ownershipType === 'lease'
-								? 'Total Lease Obligation'
-								: 'Loan Amount'} *
+							{ownershipType === 'lease'
+								? 'Total lease obligation'
+								: isEditMode
+									? 'Original loan amount'
+									: 'Loan amount'}
 						</Label>
 						<Input
 							id="originalAmount"
@@ -158,7 +168,7 @@
 
 					{#if ownershipType === 'finance'}
 						<div class="space-y-2">
-							<Label for="apr">APR (%) *</Label>
+							<Label for="apr">APR (%)</Label>
 							<Input
 								id="apr"
 								type="number"
@@ -178,7 +188,7 @@
 					{/if}
 
 					<div class="space-y-2">
-						<Label for="termMonths">Term (Months) *</Label>
+						<Label for="termMonths">Term</Label>
 						<Select.Root
 							type="single"
 							value={String(financingForm.termMonths)}
@@ -208,7 +218,7 @@
 					</div>
 
 					<div class="space-y-2">
-						<Label for="startDate">Start Date *</Label>
+						<Label for="startDate">Start date</Label>
 						<DatePicker
 							id="startDate"
 							bind:value={financingForm.startDate}
@@ -222,7 +232,7 @@
 					</div>
 
 					<div class="space-y-2">
-						<Label for="dayOfMonth">Payment Day of Month</Label>
+						<Label for="dayOfMonth">Payment day of the month</Label>
 						<Select.Root
 							type="single"
 							value={String(financingForm.dayOfMonth)}
@@ -243,7 +253,7 @@
 
 					{#if ownershipType === 'lease'}
 						<div class="space-y-2">
-							<Label for="paymentAmount">Monthly Payment *</Label>
+							<Label for="paymentAmount">Monthly payment</Label>
 							<Input
 								id="paymentAmount"
 								type="number"
@@ -263,7 +273,11 @@
 
 					{#if ownershipType === 'lease'}
 						<div class="space-y-2">
-							<Label for="residualValue">Residual Value (Buyout Price)</Label>
+							<Label for="residualValue">
+								Residual value (buyout price) <span class="font-normal text-muted-foreground">
+									(optional)
+								</span>
+							</Label>
 							<Input
 								id="residualValue"
 								type="number"
@@ -274,7 +288,10 @@
 							/>
 						</div>
 						<div class="space-y-2">
-							<Label for="mileageLimit">Annual Mileage Limit ({distanceShort})</Label>
+							<Label for="mileageLimit">
+								Yearly mileage limit ({distanceShort})
+								<span class="font-normal text-muted-foreground">(optional)</span>
+							</Label>
 							<Input
 								id="mileageLimit"
 								type="number"
@@ -284,7 +301,10 @@
 							/>
 						</div>
 						<div class="space-y-2">
-							<Label for="excessMileageFee">Excess Mileage Fee (per {distanceShort})</Label>
+							<Label for="excessMileageFee">
+								Fee per extra {distanceShort}
+								<span class="font-normal text-muted-foreground">(optional)</span>
+							</Label>
 							<Input
 								id="excessMileageFee"
 								type="number"
@@ -300,7 +320,7 @@
 				{#if isEditMode && vehicle?.financing?.computedBalance !== undefined}
 					<Card class="bg-muted/50">
 						<CardHeader>
-							<CardTitle class="text-base">Current Status</CardTitle>
+							<CardTitle class="text-base">Current status</CardTitle>
 						</CardHeader>
 						<CardContent>
 							<div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">

@@ -99,7 +99,7 @@ async function renderFinancedEditOwnAndKilometers(): Promise<void> {
 	await screen.findByRole('button', { name: /save changes/i });
 	await fireEvent.click(screen.getByRole('button', { name: 'Change units' }));
 	await choose('distanceUnit', 'Kilometers');
-	await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
+	await fireEvent.click(screen.getByRole('switch', { name: 'This car has a loan or lease' }));
 	await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 	const payoff = await screen.findByRole('alertdialog');
 	await fireEvent.click(within(payoff).getByRole('button', { name: 'Mark Paid Off' }));

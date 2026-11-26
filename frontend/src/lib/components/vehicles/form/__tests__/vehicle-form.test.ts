@@ -303,7 +303,7 @@ describe('VehicleForm create mode', () => {
 		});
 	});
 
-	test('a successful create adds the vehicle, announces it and returns to the dashboard', async () => {
+	test('a successful create adds the vehicle, announces it and returns to the Garage', async () => {
 		const saved: Vehicle = { ...EXISTING, id: 'new-1', make: 'Toyota', model: 'Camry' };
 		createVehicle.mockResolvedValue(saved);
 		await renderCreate();
@@ -564,7 +564,7 @@ describe('VehicleForm edit mode', () => {
 		expect(updateVehicle).not.toHaveBeenCalled();
 	});
 
-	test('delete asks for confirmation, then removes the vehicle and returns to the dashboard', async () => {
+	test('delete asks for confirmation, then removes the vehicle and returns to the Garage', async () => {
 		deleteVehicle.mockResolvedValue(undefined);
 		appStore.setVehicles([EXISTING]);
 		await renderEdit();
@@ -668,7 +668,7 @@ describe('VehicleForm financing on create', () => {
 		createFinancing.mockResolvedValue({ ...LOAN, vehicleId: 'new-1' });
 		await renderCreate();
 		await fillRequired();
-		await fireEvent.click(screen.getByRole('button', { name: 'Finance' }));
+		await fireEvent.click(screen.getByRole('switch', { name: 'This car has a loan or lease' }));
 		await type('provider', 'Chase');
 		await type('originalAmount', '30000');
 		await type('apr', '6');
@@ -697,7 +697,7 @@ describe('VehicleForm financing on create', () => {
 		createFinancing.mockResolvedValue({ ...LOAN, vehicleId: 'new-1' });
 		await renderCreate();
 		await fillRequired();
-		await fireEvent.click(screen.getByRole('button', { name: 'Finance' }));
+		await fireEvent.click(screen.getByRole('switch', { name: 'This car has a loan or lease' }));
 		await type('provider', 'Honda Financial');
 		await type('originalAmount', '30000');
 		await type('apr', '0');
@@ -712,7 +712,7 @@ describe('VehicleForm financing on create', () => {
 	test('a loan with the APR cleared is not saved', async () => {
 		await renderCreate();
 		await fillRequired();
-		await fireEvent.click(screen.getByRole('button', { name: 'Finance' }));
+		await fireEvent.click(screen.getByRole('switch', { name: 'This car has a loan or lease' }));
 		await type('provider', 'Chase');
 		await type('originalAmount', '30000');
 		await type('apr', '');
@@ -727,7 +727,7 @@ describe('VehicleForm financing on create', () => {
 	test('a financed vehicle missing lender and start date is not saved', async () => {
 		await renderCreate();
 		await fillRequired();
-		await fireEvent.click(screen.getByRole('button', { name: 'Finance' }));
+		await fireEvent.click(screen.getByRole('switch', { name: 'This car has a loan or lease' }));
 		await type('originalAmount', '30000');
 		await type('apr', '6');
 
@@ -743,7 +743,7 @@ describe('VehicleForm financing on create', () => {
 		createFinancing.mockRejectedValue(new ApiError('lender rejected', 500));
 		await renderCreate();
 		await fillRequired();
-		await fireEvent.click(screen.getByRole('button', { name: 'Finance' }));
+		await fireEvent.click(screen.getByRole('switch', { name: 'This car has a loan or lease' }));
 		await type('provider', 'Chase');
 		await type('originalAmount', '30000');
 		await type('apr', '6');
@@ -807,7 +807,7 @@ describe('VehicleForm financing on edit', () => {
 			excessMileageFee: 0.25
 		});
 
-		expect(screen.getByText('Lease details and payment information')).toBeTruthy();
+		expect(screen.getByRole('radio', { name: 'Lease' }).matches(':checked')).toBeTruthy();
 		expect(input('residualValue').value).toBe('15000');
 		await submitUpdate();
 
@@ -866,7 +866,11 @@ describe('VehicleForm financing on edit', () => {
 	test('an inactive loan opens as Own and saves no financing', async () => {
 		await renderEditWithFinancing({ ...LOAN, isActive: false });
 
-		expect(screen.getByText('This vehicle is owned outright')).toBeTruthy();
+		expect(
+			screen
+				.getByRole('switch', { name: 'This car has a loan or lease' })
+				.getAttribute('aria-checked') === 'false'
+		).toBeTruthy();
 		expect(document.getElementById('provider')).toBeNull();
 		await submitUpdate();
 
@@ -878,13 +882,17 @@ describe('VehicleForm financing on edit', () => {
 	test('an active record of type own opens as Own', async () => {
 		await renderEditWithFinancing({ ...LOAN, financingType: 'own' });
 
-		expect(screen.getByText('This vehicle is owned outright')).toBeTruthy();
+		expect(
+			screen
+				.getByRole('switch', { name: 'This car has a loan or lease' })
+				.getAttribute('aria-checked') === 'false'
+		).toBeTruthy();
 		expect(document.getElementById('provider')).toBeNull();
 	});
 
 	test('the payoff prompt omits the lender when the loan has none', async () => {
 		await renderEditWithFinancing({ ...LOAN, provider: '' });
-		await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
+		await fireEvent.click(screen.getByRole('switch', { name: 'This car has a loan or lease' }));
 		await submitUpdate();
 
 		const dialog = await screen.findByRole('alertdialog');
@@ -894,7 +902,7 @@ describe('VehicleForm financing on edit', () => {
 	test('a failed lease ending names the lease and falls back to the generic sentence', async () => {
 		payOffFinancing.mockRejectedValue('offline');
 		await renderEditWithFinancing(LEASE);
-		await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
+		await fireEvent.click(screen.getByRole('switch', { name: 'This car has a loan or lease' }));
 		await submitUpdate();
 
 		const dialog = await screen.findByRole('alertdialog');
@@ -990,7 +998,7 @@ describe('VehicleForm edit mode delete dialog', () => {
 	test('ending a lease before the update counts as unsaved changes', async () => {
 		payOffFinancing.mockReturnValue(new Promise(() => {}));
 		await renderEditWithFinancing(LEASE);
-		await fireEvent.click(screen.getByRole('button', { name: 'Own' }));
+		await fireEvent.click(screen.getByRole('switch', { name: 'This car has a loan or lease' }));
 		await submitUpdate();
 		const dialog = await screen.findByRole('alertdialog');
 
