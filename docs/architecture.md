@@ -76,6 +76,64 @@ checkpoints the WAL periodically, plus forced checkpoints on startup and shutdow
 `vroom.db` taken while the backend runs must include its `-wal` and `-shm` files, or it can miss
 recent writes.
 
+**Async transactions (#1378): one connection, one transaction at a time.** The `bun:sqlite`
+driver needs a synchronous transaction callback: an awaited statement inside it commits on its
+own. Postgres and MySQL drivers are async only. The chosen path, prototyped in
+`src/db/async-sqlite.ts`, keeps the single `bun:sqlite` connection and drives it through
+Drizzle's async `sqlite-proxy` session:
+
+- A transaction runs `BEGIN IMMEDIATE`, awaits its callback, then commits, or rolls back if the
+  callback throws. Writes on both sides of an `await` are atomic.
+- While a transaction is open, a query from any other async context waits until it ends, so
+  nothing can join it or read its uncommitted rows. Code inside the transaction is recognised
+  through `AsyncLocalStorage` and never waits.
+- Transactions from different requests queue: SQLite has a single writer anyway. A
+  `transaction()` (or `db.transaction()`) started inside an open one joins it through a
+  savepoint. Nested transactions that run at once take turns, and the parent's own queries wait
+  while one is open, so a failed savepoint only undoes its own writes. `db.batch` runs as a
+  transaction, or as a savepoint inside one, so a failed batch leaves none of its rows.
+- A query that still carries a transaction's context after it ended throws
+  `TransactionEndedError` instead of committing on its own. Examples are an un-awaited write, or
+  a `Promise.all` branch that outlives a failed sibling, or a nested transaction still queued
+  when the callback returns. A transaction is sealed the moment its callback settles. Await
+  every query inside the callback. Work that should outlive the transaction, such as a timer or
+  a background job armed from inside it, starts through `outsideTransaction(fn)`. That includes
+  a lazy query builder: it runs after the transaction ends, so never await it inside the
+  transaction.
+- SQLite rolls a transaction back by itself on some errors, such as disk full, I/O errors and
+  `OR ROLLBACK`. The caller then gets that original error. If the callback catches it and carries
+  on, every later statement throws `TransactionRolledBackError` instead of committing on its own.
+- Keep awaits inside a transaction to database work. A slow `fetch` there makes every other
+  query wait. Two waits deadlock:
+  - awaiting a promise that another request started (such as a shared in-flight cache), when
+    that request then needs the database;
+  - a nested transaction awaiting a query its parent issued after the nested one opened, since
+    the parent's queries wait for the nested transaction.
+
+`src/db/__tests__/async-sqlite.test.ts` proves each of these properties, and removing either
+the wait or the queue fails a test. Rows map the same as with the sync driver, Drizzle's
+relational queries included. The exception is raw `db.all(sql…)`, which returns positional
+arrays and must move to the dialect helpers. The module keeps its own cache of 500 prepared
+statements, because `bun:sqlite`'s `query()` cache holds only 20 and the app has hundreds of
+distinct statements. Over 20,000 single-row selects cycling through 200 statement shapes, a
+query took 32 µs through the proxy against 44 µs through the sync driver.
+
+Two alternatives were rejected:
+
+- **A second connection for each transaction:** `bun:sqlite` waits for a lock synchronously.
+  While one connection holds the write lock, a write on the other freezes the event loop for up
+  to `busy_timeout`, and with it the transaction it is waiting for, before failing with
+  `SQLITE_BUSY`. The tests' plain `:memory:` database can't be shared either. A shared-cache
+  memory database can be, but it locks per table and fails with `SQLITE_LOCKED` instead of
+  waiting.
+- **libsql:** this means a new native dependency and a driver swap for every query, for the
+  same single-writer result. Reconsider it only if serialising transactions becomes a
+  bottleneck.
+
+On Postgres (#1635) the same `transaction(async (tx) => …)` signature maps onto the driver's
+own pooled transaction, so call sites won't change again. The next #1378 steps move
+the app onto this session, then convert each domain's transaction sites and sync terminals.
+
 **Expense-linked records use a polymorphic link.** Financing payments, insurance premiums,
 and reminder materializations are real rows in `expenses` tagged with `source_type` +
 `source_id` rather than per-feature boolean columns or separate tables. One query path serves

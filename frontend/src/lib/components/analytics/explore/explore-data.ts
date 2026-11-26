@@ -133,6 +133,71 @@ export function kpis(
 	};
 }
 
+const HERO_LEAD: Record<ExploreQuery['metric'], string> = {
+	cost: 'in running costs',
+	costPerDistance: 'on average',
+	distance: 'driven',
+	fuel: 'of fuel bought',
+	charge: 'of energy charged',
+	mpg: 'on average',
+	evEfficiency: 'on average',
+	count: 'expenses logged'
+};
+
+function rangePhrase(range: string): string {
+	if (range === 'Year to date') return 'so far this year';
+	if (range === 'All time') return 'since you started logging';
+	if (range.startsWith('Last ')) return `over the ${range.toLowerCase()}`;
+	const [from, to] = range.split(' – ');
+	return to ? `from ${from} to ${to}` : `in ${range}`;
+}
+
+export function heroSentence(opts: {
+	query: ExploreQuery;
+	summary: ExploreKpis;
+	series: Array<{ label: string; values: Array<number | null> }>;
+	format: (_v: number) => string;
+	rangeText: string;
+	carsText: string;
+	interval: string;
+	compareLabel: string;
+	distanceWord: string;
+}): string {
+	const { query, summary, series } = opts;
+	const lead =
+		query.metric === 'cost' && query.inc === 'all'
+			? 'in all costs'
+			: query.metric === 'count' && summary.total === 1
+				? 'expense logged'
+				: HERO_LEAD[query.metric];
+	const cars = opts.carsText === 'All cars' ? 'all your cars' : opts.carsText;
+	const parts = [`${lead} ${rangePhrase(opts.rangeText)} for ${cars}.`];
+	if (!isAdditive(query)) return parts[0] as string;
+	const total = summary.total ?? 0;
+	if (query.split !== 'none' && query.split !== 'tag' && series.length > 1 && total > 0) {
+		const top = series
+			.map(s => ({ label: s.label, value: sum(s.values) }))
+			.reduce((a, b) => (b.value > a.value ? b : a));
+		parts.push(`${top.label} was ${Math.round((top.value / total) * 100)}% of it.`);
+	}
+	if (query.per !== 'none' && summary.perBucket != null) {
+		const change = percentChange(summary.perBucket, summary.previousPerBucket);
+		const versus =
+			change == null
+				? ''
+				: change === 0
+					? `, the same as ${opts.compareLabel}`
+					: `, ${Math.abs(change)}% ${change > 0 ? 'more' : 'less'} than ${opts.compareLabel}`;
+		const amount = opts.format(summary.perBucket);
+		const noun = query.metric === 'count' ? (amount === '1' ? ' expense' : ' expenses') : '';
+		parts.push(`That's ${amount}${noun} a ${opts.interval}${versus}.`);
+	}
+	if (query.metric === 'cost' && summary.perDistance != null) {
+		parts.push(`About ${opts.format(summary.perDistance)} a ${opts.distanceWord}.`);
+	}
+	return parts.join(' ');
+}
+
 export function percentChange(current: number | null, previous: number | null): number | null {
 	if (current == null || previous == null || previous === 0) return null;
 	return Math.round(((current - previous) / Math.abs(previous)) * 100);

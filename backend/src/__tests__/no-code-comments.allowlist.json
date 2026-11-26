@@ -305,5 +305,6 @@
   "frontend/vite.config.ts: shortcut: LayerChart calls d3-geo only when a chart has a map projection, which VROOM never sets, and takes one colour list from d3-scale-chromatic, so these stand-ins keep about 15 KB off the charts; drop an alias before using geo charts or another scheme.",
   "frontend/vite.config.ts: Vitest's default conditions omit 'browser'; without it inlined svelte loads its server entry, where mount() throws.",
   "frontend/vite.config.ts: Without strictPort a busy port silently shifts, leaving callers waiting on the pinned one.",
-  "frontend/vite.config.ts: withPwa appends a prerendered/ pattern that this app never matches; strict globbing would fail the build."
+  "frontend/vite.config.ts: withPwa appends a prerendered/ pattern that this app never matches; strict globbing would fail the build.",
+  "frontend/src/lib/components/analytics/explore/QueryBar.svelte: shortcut: a plain disclosure, not the kit Popover, whose floating-ui adds ~13 KB to the /analytics first view; switch once that cost leaves the route."
 ]
