@@ -8,7 +8,9 @@ const getSummary = vi.hoisted(() => vi.fn());
 vi.mock('$app/state', () => ({ page }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('#lib/components/analytics/explore/ExploreTab.svelte', () => ({ default: () => {} }));
-vi.mock('#lib/services/vehicle-api.ts', () => ({ vehicleApi: { getVehicles: () => Promise.resolve([]) } }));
+vi.mock('#lib/services/vehicle-api.ts', () => ({
+	vehicleApi: { getVehicles: () => Promise.resolve([]) }
+}));
 vi.mock('#lib/services/analytics-api.ts', () => ({
 	analyticsApi: { getSummary },
 	getDefaultDateRange: () => ({ startDate: 1, endDate: 2, ytdStart: 1 })
