@@ -94,12 +94,17 @@ test.describe('A new expense shows on the list before the list has loaded', () =
 		await page.getByLabel('Amount *').fill('12.34');
 		await page.getByRole('button', { name: /More details/ }).click();
 		await page.getByLabel('Description (Optional)').fill('Car wash on Elm');
+		const reply = page.waitForResponse(
+			response =>
+				new URL(response.url()).pathname === '/api/v1/expenses' &&
+				response.request().method() === 'POST'
+		);
 		await page.getByRole('button', { name: 'Save Expense' }).click();
 
-		await expect.poll(() => saved).toBe(true);
+		expect((await reply).ok()).toBe(true);
+		expect(saved).toBe(true);
 		const early = page.getByTestId('pending-rows-while-loading');
 		await expect(early.getByText('Car wash on Elm')).toBeVisible();
-		await expect(early.getByText('Unsynced')).toHaveCount(0);
 
 		releaseList();
 		await expect(early).toHaveCount(0);

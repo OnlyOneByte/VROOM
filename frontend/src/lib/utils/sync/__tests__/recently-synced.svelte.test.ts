@@ -27,6 +27,15 @@ describe('rows synced before the list page has loaded', () => {
 		expect(recentlySynced()).toEqual([]);
 	});
 
+	test('stop showing once they are older than 30 s', () => {
+		rememberSynced(entry('old'), 1_000);
+		rememberSynced(entry('new'), 20_000);
+
+		expect(recentlySynced(31_000).map(row => row.id)).toEqual(['new', 'old']);
+		expect(recentlySynced(31_001).map(row => row.id)).toEqual(['new']);
+		expect(recentlySynced(50_001)).toEqual([]);
+	});
+
 	test('keep only the newest 20', () => {
 		for (let i = 0; i < 25; i++) rememberSynced(entry(`e${i}`));
 		const ids = recentlySynced().map(row => row.id);

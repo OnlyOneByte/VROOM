@@ -66,8 +66,7 @@
 	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
 	import { editedRows } from '#lib/utils/pending-edits.svelte.ts';
 	import ExpenseOverviewSection from '#lib/components/expenses/ExpenseOverviewSection.svelte';
-	import ImportExpensesDialog from '#lib/components/expenses/ImportExpensesDialog.svelte';
-	import ImportFromPhotosDialog from '#lib/components/expenses/ImportFromPhotosDialog.svelte';
+	import { appStore } from '#lib/stores/app.svelte.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
@@ -509,6 +508,37 @@
 
 	let importOpen = $state(false);
 	let photosImportOpen = $state(false);
+
+	type ImportDialogModule = typeof import('#lib/components/expenses/ImportExpensesDialog.svelte');
+	type PhotosDialogModule = typeof import('#lib/components/expenses/ImportFromPhotosDialog.svelte');
+	let importDialog = $state<Promise<ImportDialogModule | null> | null>(null);
+	let photosDialog = $state<Promise<PhotosDialogModule | null> | null>(null);
+
+	function dialogLoadFailed(error: unknown) {
+		appStore.showError(`Couldn't open this dialog. ${userFacingErrorMessage(error)}`);
+	}
+
+	function openImport() {
+		importDialog ??= import('#lib/components/expenses/ImportExpensesDialog.svelte').catch(error => {
+			importDialog = null;
+			importOpen = false;
+			dialogLoadFailed(error);
+			return null;
+		});
+		importOpen = true;
+	}
+
+	function openPhotosImport() {
+		photosDialog ??= import('#lib/components/expenses/ImportFromPhotosDialog.svelte').catch(
+			error => {
+				photosDialog = null;
+				photosImportOpen = false;
+				dialogLoadFailed(error);
+				return null;
+			}
+		);
+		photosImportOpen = true;
+	}
 	let toolsMenuOpen = $state(false);
 	let filtersSheetOpen = $state(false);
 	let sheetFilterCount = $derived(
@@ -593,11 +623,11 @@
 {/snippet}
 
 {#snippet importExportActions(variant: 'outline' | 'ghost', buttonClass: string)}
-	<Button {variant} class={buttonClass} onclick={() => openTool(() => (photosImportOpen = true))}>
+	<Button {variant} class={buttonClass} onclick={() => openTool(openPhotosImport)}>
 		<Images class="mr-2 h-4 w-4" />
 		Import from Photos
 	</Button>
-	<Button {variant} class={buttonClass} onclick={() => openTool(() => (importOpen = true))}>
+	<Button {variant} class={buttonClass} onclick={() => openTool(openImport)}>
 		<Upload class="mr-2 h-4 w-4" />
 		Import CSV
 	</Button>
@@ -868,6 +898,14 @@
 		</Sheet.Content>
 	</Sheet.Root>
 
-	<ImportExpensesDialog bind:open={importOpen} {vehicles} onImported={handleImported} />
-	<ImportFromPhotosDialog bind:open={photosImportOpen} {vehicles} onImported={handleImported} />
+	{#await importDialog then module}
+		{#if module}
+			<module.default bind:open={importOpen} {vehicles} onImported={handleImported} />
+		{/if}
+	{/await}
+	{#await photosDialog then module}
+		{#if module}
+			<module.default bind:open={photosImportOpen} {vehicles} onImported={handleImported} />
+		{/if}
+	{/await}
 {/if}

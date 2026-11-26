@@ -2,6 +2,7 @@ import type { User } from '../types/index.js';
 import { apiClient, getApiBaseUrl } from '#lib/services/api-client.ts';
 import { ApiError, extractErrorMessage } from '#lib/utils/error-handling.ts';
 import { clearOfflineCaches, setOfflineQueueOwner } from '#lib/utils/offline-storage.ts';
+import { forgetRecentlySynced } from '#lib/utils/sync/recently-synced.svelte.ts';
 import { browser } from '$app/env';
 
 const LAST_USER_KEY = 'vroom_last_user';
@@ -58,6 +59,7 @@ function createAuthStore() {
 		sessionUnverified = false;
 		rememberUser(null);
 		setOfflineQueueOwner(null);
+		forgetRecentlySynced();
 	}
 
 	return {

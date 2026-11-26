@@ -533,6 +533,27 @@ function collectDistances(ctx: QueryContext, result: PeriodRows[], rows: Distanc
   }
 }
 
+function tagFilter(keys: string[]): SQL {
+  const tagged = keys.filter(Boolean);
+  const parts: SQL[] = [];
+  if (tagged.length) {
+    parts.push(jsonArraySome(sql`e.tags`, (element) => sql`${element} IN (${inList(tagged)})`));
+  }
+  if (keys.includes('')) parts.push(jsonArrayIsEmpty(sql`e.tags`));
+  return parts.length ? sql`(${sql.join(parts, sql` OR `)})` : sqlFalse();
+}
+
+function keyFilter(groupBy: QueryGroupBy, keys: string[]): SQL | null {
+  const column =
+    groupBy === 'fuelType'
+      ? sql`e.fuel_type`
+      : groupBy === 'driver'
+        ? sql`e.paid_by_driver_id`
+        : null;
+  if (column) return keys.length ? sql`COALESCE(${column}, '') IN (${inList(keys)})` : sqlFalse();
+  return groupBy === 'tag' ? tagFilter(keys) : null;
+}
+
 function itemsWhere(
   userId: string,
   vehicleIds: string[],
@@ -547,24 +568,8 @@ function itemsWhere(
     sql`e.date >= ${query.start}`,
     sql`e.date < ${query.end}`,
   ];
-  const keys = query.keys;
-  if (groupBy === 'fuelType' && keys) {
-    conditions.push(keys.length ? sql`COALESCE(e.fuel_type, '') IN (${inList(keys)})` : sqlFalse());
-  }
-  if (groupBy === 'driver' && keys) {
-    conditions.push(
-      keys.length ? sql`COALESCE(e.paid_by_driver_id, '') IN (${inList(keys)})` : sqlFalse()
-    );
-  }
-  if (groupBy === 'tag' && keys) {
-    const tagged = keys.filter(Boolean);
-    const parts: SQL[] = [];
-    if (tagged.length) {
-      parts.push(jsonArraySome(sql`e.tags`, (element) => sql`${element} IN (${inList(tagged)})`));
-    }
-    if (keys.includes('')) parts.push(jsonArrayIsEmpty(sql`e.tags`));
-    conditions.push(parts.length ? sql`(${sql.join(parts, sql` OR `)})` : sqlFalse());
-  }
+  const keyed = query.keys ? keyFilter(groupBy, query.keys) : null;
+  if (keyed) conditions.push(keyed);
   if (query.metric === 'volume' || query.metric === 'efficiency') {
     conditions.push(electricFilter(query.energy ?? 'fuel'));
   }
