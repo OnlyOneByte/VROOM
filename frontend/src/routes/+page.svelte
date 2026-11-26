@@ -43,15 +43,17 @@
 	});
 
 	async function openDemo() {
+		if (startingDemo) return;
 		startingDemo = true;
 		try {
 			await authApi.startDemo();
 			await authStore.initialize();
+			if (authStore.isAuthenticated) return;
+			appStore.showError("Couldn't open the demo garage. Try again in a moment.");
 		} catch (e) {
 			appStore.showError(`Couldn't open the demo garage. ${userFacingErrorMessage(e)}`);
-		} finally {
-			startingDemo = false;
 		}
+		startingDemo = false;
 	}
 </script>
 
@@ -79,7 +81,7 @@
 		<div class="space-y-5">
 			<p class="text-[13px] font-medium text-muted-foreground">Open source · self-hosted · yours</p>
 			<h1
-				class="font-(family-name:--font-fig) text-[64px] leading-[0.9] font-bold uppercase sm:text-[88px]"
+				class="max-w-[10ch] font-(family-name:--font-fig) text-[64px] leading-[0.9] font-bold uppercase sm:text-[88px]"
 			>
 				What your car <span class="text-accent-ink">really</span> costs.
 			</h1>
@@ -90,16 +92,20 @@
 			<div class="flex flex-wrap gap-3 pt-2">
 				<Button size="lg" href={resolve(routes.auth)}>Get started</Button>
 				{#if demoAvailable}
-					<Button size="lg" variant="outline" disabled={startingDemo} onclick={openDemo}>
+					<Button
+						size="lg"
+						variant="outline"
+						aria-disabled={startingDemo}
+						aria-busy={startingDemo}
+						onclick={openDemo}
+					>
 						See a demo garage
 					</Button>
 				{/if}
 			</div>
 		</div>
 
-		<figure
-			class="grid justify-items-center gap-4 rounded-(--r-xl) border bg-surface px-6 py-8 shadow-pop"
-		>
+		<figure class="grid justify-items-center gap-4 rounded-(--r-xl) border bg-surface px-6 py-8">
 			<div class="w-60 sm:w-72">
 				<Dial
 					running={46}

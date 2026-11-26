@@ -77,7 +77,6 @@ describe('sign-in page', () => {
 		page.url = new URL(`https://app.example/auth?auth_error=${code}`);
 		render(AuthPage);
 		expect(await screen.findByRole('alert')).toHaveTextContent(message);
-		page.url = new URL('https://app.example/auth');
 	});
 
 	test('a Retry that finds no enabled providers announces that sign-in is unavailable', async () => {

@@ -27,7 +27,15 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	authApi.isDemoAvailable.mockResolvedValue(false);
 	authApi.startDemo.mockResolvedValue({ session: { expiresAt: '2026-12-01T00:00:00Z' } });
+	authStore.isAuthenticated = false;
+	authStore.initialize.mockImplementation(async () => {
+		authStore.isAuthenticated = true;
+	});
 });
+
+async function demoButton() {
+	return screen.findByRole('button', { name: 'See a demo garage' });
+}
 
 describe('landing page', () => {
 	test('leads with what the car really costs, on the real dial', () => {
@@ -37,7 +45,7 @@ describe('landing page', () => {
 			'What your car really costs.'
 		);
 		expect(
-			screen.getByRole('img', { name: /true cost per mile, all in: 58¢/ })
+			screen.getByRole('img', { name: /^Example: true cost per mile, all in: 58¢/ })
 		).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute('href', '/auth');
 	});
@@ -58,35 +66,56 @@ describe('landing page', () => {
 		expect(container.textContent).not.toMatch(/google|drive\b|s3\b/i);
 	});
 
-	test('offers no demo garage when the server has it turned off', async () => {
+	test.each([
+		['has it turned off', () => authApi.isDemoAvailable.mockResolvedValue(false)],
+		['cannot say', () => authApi.isDemoAvailable.mockRejectedValue(new Error('offline'))]
+	])('offers no demo garage when the server %s', async (_label, arrange) => {
+		arrange();
 		render(Page);
 
 		await waitFor(() => expect(authApi.isDemoAvailable).toHaveBeenCalled());
 		expect(screen.queryByRole('button', { name: 'See a demo garage' })).not.toBeInTheDocument();
 	});
 
-	test('opens the demo garage when the server offers one', async () => {
+	test('opens the demo garage once, however often it is clicked', async () => {
 		authApi.isDemoAvailable.mockResolvedValue(true);
 		render(Page);
+		const button = await demoButton();
 
-		await fireEvent.click(await screen.findByRole('button', { name: 'See a demo garage' }));
+		await fireEvent.click(button);
+		await fireEvent.click(button);
 
-		await waitFor(() => expect(authStore.initialize).toHaveBeenCalled());
+		await waitFor(() => expect(authStore.initialize).toHaveBeenCalledTimes(1));
 		expect(authApi.startDemo).toHaveBeenCalledTimes(1);
+		expect(button).toHaveAttribute('aria-disabled', 'true');
 		expect(showError).not.toHaveBeenCalled();
 	});
 
-	test('says so when the demo garage cannot open', async () => {
+	test('says so when the demo session cannot start, and keeps focus on the button', async () => {
 		authApi.isDemoAvailable.mockResolvedValue(true);
 		authApi.startDemo.mockRejectedValue(new ApiError('Too many requests', 429));
 		render(Page);
+		const button = await demoButton();
+		button.focus();
 
-		await fireEvent.click(await screen.findByRole('button', { name: 'See a demo garage' }));
+		await fireEvent.click(button);
 
 		await waitFor(() => expect(showError).toHaveBeenCalledTimes(1));
 		expect(showError.mock.calls[0]?.[0]).toMatch(/^Couldn't open the demo garage\./);
 		expect(authStore.initialize).not.toHaveBeenCalled();
-		expect(screen.getByRole('button', { name: 'See a demo garage' })).toBeEnabled();
+		expect(button).toHaveAttribute('aria-disabled', 'false');
+		expect(button).toHaveFocus();
+	});
+
+	test('says so when the demo session starts but does not stick', async () => {
+		authApi.isDemoAvailable.mockResolvedValue(true);
+		authStore.initialize.mockResolvedValue(undefined);
+		render(Page);
+
+		await fireEvent.click(await demoButton());
+
+		await waitFor(() => expect(showError).toHaveBeenCalledTimes(1));
+		expect(showError).toHaveBeenCalledWith("Couldn't open the demo garage. Try again in a moment.");
 	});
 
 	test('the footer links are 40px tap targets', () => {
