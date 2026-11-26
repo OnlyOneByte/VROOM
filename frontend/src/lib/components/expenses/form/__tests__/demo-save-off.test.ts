@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import { authStore } from '#lib/stores/auth.svelte.ts';
 import { loadOfflineExpenses } from '#lib/utils/offline-storage.ts';
 
@@ -19,7 +19,7 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 }));
 
 const createExpense = vi.fn(() => Promise.resolve({ id: 'e1' }));
-const deletePhoto = vi.fn();
+const deletePhoto = vi.fn(() => Promise.resolve());
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		createExpense,
@@ -117,41 +117,46 @@ describe('expense form in the demo garage', () => {
 		expect(handlers.onCancel).toHaveBeenCalledOnce();
 	});
 
-	test.each([
-		[true, 'disabled'],
-		[false, 'enabled']
-	])('with demo=%s, photo Upload and delete are %s', async (demo, state) => {
-		authStore.setUser({ ...user, demo });
-		render(ExpensePhotoSection, { props: { entityType: 'expense', entityId: 'e1' } });
-		const remove = await screen.findByRole('button', { name: 'Delete r.pdf' });
-		const upload = screen.getByRole('button', { name: 'Upload' });
-		for (const button of [remove, upload]) {
-			if (state === 'disabled') expect(button).toBeDisabled();
-			else expect(button).toBeEnabled();
-		}
-	});
-
-	test.each([
-		[true, 'disabled'],
-		[false, 'enabled']
-	])('Force Delete on an insurance-managed expense in demo=%s is %s', (demo, state) => {
-		authStore.setUser({ ...user, demo });
-		const onForceDelete = vi.fn();
-		render(InsuranceManagedView, {
-			props: {
-				category: 'financial',
-				amount: '100',
-				date: '2026-01-01',
-				description: '',
-				tags: [],
-				photoEntityId: null,
-				isDeleting: false,
-				onBack: vi.fn(),
-				onForceDelete
+	test.each([true, false])(
+		'with demo=%s, deleting a photo sends a request only for a real user',
+		async demo => {
+			authStore.setUser({ ...user, demo });
+			render(ExpensePhotoSection, { props: { entityType: 'expense', entityId: 'e1' } });
+			const remove = await screen.findByRole('button', { name: 'Delete r.pdf' });
+			const upload = screen.getByRole('button', { name: 'Upload' });
+			expect(upload.hasAttribute('disabled')).toBe(demo);
+			await fireEvent.click(remove);
+			if (demo) {
+				expect(screen.queryByRole('alertdialog')).toBeNull();
+				expect(deletePhoto).not.toHaveBeenCalled();
+				return;
 			}
-		});
-		const force = screen.getByRole('button', { name: 'Force Delete' });
-		if (state === 'disabled') expect(force).toBeDisabled();
-		else expect(force).toBeEnabled();
-	});
+			const dialog = await screen.findByRole('alertdialog');
+			await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+			await vi.waitFor(() => expect(deletePhoto).toHaveBeenCalledWith('expense', 'e1', 'p1'));
+		}
+	);
+
+	test.each([true, false])(
+		'with demo=%s, Force Delete reaches its handler only for a real user',
+		async demo => {
+			authStore.setUser({ ...user, demo });
+			const onForceDelete = vi.fn();
+			render(InsuranceManagedView, {
+				props: {
+					category: 'financial',
+					amount: '100',
+					date: '2026-01-01',
+					description: '',
+					tags: [],
+					photoEntityId: null,
+					isDeleting: false,
+					onBack: vi.fn(),
+					onForceDelete
+				}
+			});
+			await fireEvent.click(screen.getByRole('button', { name: 'Force Delete' }));
+			expect(onForceDelete).toHaveBeenCalledTimes(demo ? 0 : 1);
+		}
+	);
 });

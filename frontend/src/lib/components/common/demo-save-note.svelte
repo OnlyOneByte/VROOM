@@ -7,13 +7,14 @@
 
 	interface Props {
 		class?: string;
+		id?: string | null;
 	}
 
-	let { class: className }: Props = $props();
+	let { class: className, id = DEMO_SAVE_NOTE_ID }: Props = $props();
 </script>
 
 <p
-	id={DEMO_SAVE_NOTE_ID}
+	id={id ?? undefined}
 	data-slot="demo-save-note"
 	class={cn('basis-full text-sm text-muted-foreground', className)}
 >
