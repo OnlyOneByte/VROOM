@@ -82,10 +82,12 @@ export const UPKEEP_QUERIES = {
 
 export type DbErrorKind = 'unique' | 'foreign_key' | 'not_null';
 
-const UNIQUE_VIOLATION_CODES = new Set([
-  'SQLITE_CONSTRAINT_UNIQUE',
-  'SQLITE_CONSTRAINT_PRIMARYKEY',
-]);
+const DRIVER_CODE_KINDS: Record<string, DbErrorKind> = {
+  SQLITE_CONSTRAINT_UNIQUE: 'unique',
+  SQLITE_CONSTRAINT_PRIMARYKEY: 'unique',
+  SQLITE_CONSTRAINT_FOREIGNKEY: 'foreign_key',
+  SQLITE_CONSTRAINT_NOTNULL: 'not_null',
+};
 
 // bun:sqlite sets `code`; drizzle may wrap the driver error, so the cause chain is walked too.
 function driverErrorCode(err: unknown): string | undefined {
@@ -106,10 +108,9 @@ export function looksLikeDriverError(err: unknown): boolean {
 
 export function classifyDbError(err: unknown): DbErrorKind | null {
   const code = driverErrorCode(err);
-  if (code !== undefined && UNIQUE_VIOLATION_CODES.has(code)) return 'unique';
-  for (let e: unknown = err; e instanceof Error; e = e.cause) {
-    if (e.message.includes('FOREIGN KEY constraint failed')) return 'foreign_key';
-    if (e.message.includes('NOT NULL constraint failed')) return 'not_null';
-  }
+  if (code !== undefined) return DRIVER_CODE_KINDS[code] ?? null;
+  if (!(err instanceof Error) || err.cause !== undefined) return null;
+  if (err.message.includes('FOREIGN KEY constraint failed')) return 'foreign_key';
+  if (err.message.includes('NOT NULL constraint failed')) return 'not_null';
   return null;
 }

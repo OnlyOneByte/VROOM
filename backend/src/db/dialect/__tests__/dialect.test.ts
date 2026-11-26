@@ -225,6 +225,23 @@ describe('classifyDbError over real SQLite errors', () => {
     ).toBe('not_null');
   });
 
+  test('a bound value that quotes a constraint message does not change the classification', async () => {
+    const asyncDb = openAsyncDatabase(testDb.sqlite).db;
+    const quoted = 'NOT NULL constraint failed';
+    const error = await asyncDb
+      .run(
+        sql`INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v4', 'nobody', ${quoted}, 'B', 2020)`
+      )
+      .then(
+        () => null,
+        (e) => e
+      );
+    expect(classifyDbError(error)).toBe('foreign_key');
+    expect(
+      classifyDbError(new Error(`Failed query: ${quoted}`, { cause: new Error('x') }))
+    ).toBeNull();
+  });
+
   test('anything else is not a classified database error', () => {
     expect(classifyDbError(new Error('plain failure'))).toBeNull();
     expect(classifyDbError('a string')).toBeNull();
