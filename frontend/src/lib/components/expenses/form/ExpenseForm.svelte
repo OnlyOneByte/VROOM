@@ -77,6 +77,7 @@
 	import MileageField from './expense-form/MileageField.svelte';
 	import ExpenseFormHeader from './expense-form/ExpenseFormHeader.svelte';
 	import ExpenseSaveRow from './expense-form/ExpenseSaveRow.svelte';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import ExpenseDeleteDialog from './expense-form/ExpenseDeleteDialog.svelte';
 	import ExpenseAmountField from './expense-form/ExpenseAmountField.svelte';
 	import ExpenseSplitBreakdown from './expense-form/ExpenseSplitBreakdown.svelte';
@@ -291,7 +292,10 @@
 	);
 	const backLabel = $derived(returnTo.startsWith('/expenses') ? 'Expenses' : 'Back');
 
+	const demo = $derived(authStore.user?.demo === true);
+
 	async function save() {
+		if (demo) return;
 		await (form.queuedExpense ? saveQueuedExpense(form) : submitExpense(form));
 		if (form.errors['vehicleDetails']) {
 			focusInView(retryButton);
@@ -549,7 +553,7 @@
 			class="text-destructive hover:text-destructive"
 			onmousedown={keepFieldFocus}
 			onclick={confirmDelete}
-			disabled={form.isSubmitting || form.isDeleting}
+			disabled={demo || form.isSubmitting || form.isDeleting}
 		>
 			<Trash2 aria-hidden="true" />
 			Delete
@@ -945,6 +949,6 @@
 		isGroupEditMode={form.isGroupEditMode}
 		groupId={form.groupId}
 		originalExpense={form.originalExpense}
-		onConfirm={() => deleteExpense(form)}
+		onConfirm={() => (demo ? Promise.resolve() : deleteExpense(form))}
 	/>
 </FormLayout>
