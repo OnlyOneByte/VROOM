@@ -88,6 +88,17 @@ describe('attributeDistance', () => {
     expect(sum(attributeDistance(points, [], EVERYTHING, true))).toBe(1100);
   });
 
+  test("a trip dated outside the period doesn't hide distance inside it", () => {
+    const points: OdometerPoint[] = [
+      { odometer: 1000, at: 1, driverId: 'a' },
+      { odometer: 1500, at: 5, driverId: 'b' },
+    ];
+    const elsewhere: TripSpan[] = [{ start: 1100, end: 1400, at: 99, driverId: 'c' }];
+    const totals = attributeDistance(points, elsewhere, { from: 0, to: 10 }, true);
+    expect(totals.get('b')).toEqual({ trips: 0, estimated: 500 });
+    expect(totals.has('c')).toBe(false);
+  });
+
   test('a gap goes to the driver on the reading that closes it, once the period holds that reading', () => {
     const points: OdometerPoint[] = [
       { odometer: 100, at: 1, driverId: 'a' },

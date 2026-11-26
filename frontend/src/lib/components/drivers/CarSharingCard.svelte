@@ -18,6 +18,11 @@
 	import type { Driver } from '#lib/types/index.ts';
 	import { driverColor } from '#lib/utils/driver-helpers.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import {
+		currentOfflineQueueOwner,
+		loadCachedVehicles,
+		updateCachedVehicle
+	} from '#lib/utils/offline-storage.ts';
 
 	interface Props {
 		vehicleId: string;
@@ -63,11 +68,21 @@
 		}
 	}
 
+	function refreshCachedCar(on: boolean) {
+		const car = loadCachedVehicles().find(v => v.id === vehicleId);
+		if (!car) return;
+		const carShare = car.carShare
+			? { ...car.carShare, enabled: on }
+			: { enabled: on, manage: true, record: true };
+		updateCachedVehicle({ ...car, carShareEnabled: on, carShare }, currentOfflineQueueOwner());
+	}
+
 	function toggle(next: boolean) {
 		void run(
 			async () => {
 				await driverApi.setCarShare(vehicleId, next);
 				enabled = next;
+				refreshCachedCar(next);
 			},
 			`Couldn't turn car sharing ${next ? 'on' : 'off'}.`
 		);

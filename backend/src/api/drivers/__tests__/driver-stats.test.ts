@@ -126,6 +126,15 @@ describe('per-driver figures', () => {
     expect(mine.chargeUsed).toBe(Math.round((20 / 400) * mine.distance.total * 100) / 100);
   });
 
+  test('a reading before the period opens the first gap, which counts in full', async () => {
+    const late = `/api/v1/vehicles/${CAR}/drivers/stats?from=2024-03-02T12:00:00.000Z&to=2024-03-10T00:00:00.000Z`;
+    const data = await read(ctx.authed, late);
+    const byId = new Map(data.drivers.map((d) => [d.driverId, d.distance]));
+    expect(byId.get(await driverOf(ctx.user.id))).toEqual({ trips: 0, estimated: 200, total: 200 });
+    expect(byId.get(await driverOf(m.editor.id))).toEqual({ trips: 0, estimated: 50, total: 50 });
+    expect(data.distance?.total).toBe(250);
+  });
+
   test('without estimates only trips count', async () => {
     const data = await read(ctx.authed, `${stats}&estimates=false`);
     expect(data.distance?.total).toBe(100);
