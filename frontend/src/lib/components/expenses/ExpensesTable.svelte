@@ -52,6 +52,7 @@
 		onCategoryChange?: (_category: string) => void;
 		monthTotals?: ReadonlyMap<string, number>;
 		pendingStates?: ReadonlyMap<string, PendingRowState> | undefined;
+		ledger?: boolean;
 	}
 
 	let {
@@ -79,7 +80,8 @@
 		activeCategory,
 		onCategoryChange,
 		monthTotals,
-		pendingStates: queuedStates
+		pendingStates: queuedStates,
+		ledger = false
 	}: Props = $props();
 
 	let expenses = $derived(
@@ -198,8 +200,9 @@
 		{emptyActionHref}
 		{onClearFilters}
 	/>
-{:else if isMobile.current}
+{:else if ledger || isMobile.current}
 	<ExpensesCompactList
+		{ledger}
 		rows={tableRows}
 		{vehicleMap}
 		{showVehicleColumn}

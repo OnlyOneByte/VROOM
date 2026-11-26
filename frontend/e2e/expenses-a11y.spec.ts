@@ -105,26 +105,28 @@ test.describe('Expense list accessibility — wide layout', () => {
 
 		expect(await axeViolationIds(page, testInfo, 'wide-collapsed')).toEqual([]);
 
-		const disclosure = page.getByRole('button', { name: 'Split expense portions' }).first();
+		const disclosure = page.getByRole('button', { name: /Shared detailing/ });
+		const portion = page.getByText('$100.00').filter({ visible: true });
 		await disclosure.focus();
 		await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
 		await page.keyboard.press('Enter');
 
 		await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-		await expect(page.getByRole('cell', { name: '$100.00' })).toBeVisible();
+		await expect(portion).toBeVisible();
 
 		expect(await axeViolationIds(page, testInfo, 'wide-expanded')).toEqual([]);
 
 		await page.keyboard.press('Enter');
 		await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
-		await expect(page.getByRole('cell', { name: '$100.00' })).toHaveCount(0);
+		await expect(portion).toHaveCount(0);
 	});
 
-	test('the disclosure does not make a split row taller than a plain one', async ({ page }) => {
+	test('the Split badge does not make a split row taller than a plain one', async ({ page }) => {
 		await openExpenses(page);
 
-		const plain = await page.getByRole('row', { name: /Costco fill-up/ }).boundingBox();
-		const split = await page.getByRole('row', { name: /Shared detailing/ }).boundingBox();
+		const rows = page.getByTestId('expense-row');
+		const plain = await rows.filter({ hasText: 'Costco fill-up' }).boundingBox();
+		const split = await rows.filter({ hasText: 'Shared detailing' }).boundingBox();
 
 		expect(split?.height).toBe(plain?.height);
 	});
@@ -134,9 +136,9 @@ test.describe('Expense list accessibility — wide layout', () => {
 	}) => {
 		await openExpenses(page);
 
-		const premiumRow = page.getByRole('row', { name: /Policy premium/ });
-		await premiumRow.hover();
-		const blockedDelete = premiumRow.getByRole('button', { name: 'Delete expense' });
+		const premiumRow = page.getByTestId('expense-row').filter({ hasText: 'Policy premium' });
+		await premiumRow.getByRole('button', { name: /Policy premium/ }).click();
+		const blockedDelete = premiumRow.getByRole('button', { name: 'Delete', exact: true });
 
 		await expect(blockedDelete).toHaveAttribute('aria-disabled', 'true');
 		await expect(blockedDelete).toHaveAccessibleDescription(INSURANCE_REASON);

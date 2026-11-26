@@ -5,11 +5,12 @@
 	import RecurringExpenseBadge from '../RecurringExpenseBadge.svelte';
 	import type { Expense, Vehicle } from '#lib/types/index.ts';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
-	import { getCategoryBadgeClasses, getCategoryIcon } from '#lib/utils/expense-helpers.ts';
+	import { getCategoryIcon } from '#lib/utils/expense-helpers.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { EXPENSE_CATEGORY_INFO } from '#lib/constants/expense-categories.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { expenseEditHref } from './expense-table-actions';
-	import { rowTitle, tagsBesideCategory } from './expense-table-rows';
+	import { fillLabel, rowTitle, tagsBesideCategory } from './expense-table-rows';
 	import {
 		MOBILE_ROW_ACTION_CLASS,
 		MOBILE_ROW_ACTIONS_CONTAINER_CLASS,
@@ -48,32 +49,25 @@
 	let vehicle: Vehicle | undefined = $derived(vehicleMap.get(expense.vehicleId));
 	let IconComponent = $derived(getCategoryIcon(expense.category));
 	let heading = $derived(rowTitle(expense.description, expense.category));
+	let meta = $derived(
+		[
+			heading.categoryInMeta ? EXPENSE_CATEGORY_INFO[expense.category].shortLabel : null,
+			showVehicleColumn && vehicle ? getVehicleDisplayName(vehicle) : null,
+			formatDate(new Date(expense.date)),
+			fillLabel(expense, vehicle?.unitPreferences ?? settingsStore.unitPreferences)
+		].filter(part => part !== null)
+	);
 </script>
 
 {#snippet summary()}
-	<div class="mt-0.5 p-1.5 rounded-lg {getCategoryBadgeClasses(expense.category)} flex-shrink-0">
-		<IconComponent class="h-4 w-4" />
-	</div>
+	<IconComponent class="h-5 w-5 shrink-0 self-center text-muted-foreground" aria-hidden="true" />
 	<div class="flex-1 min-w-0">
-		<div class="flex items-start justify-between gap-2">
-			<p class="text-sm font-medium text-foreground truncate">
-				{heading.title}
-			</p>
-			<span class="text-sm font-semibold text-foreground whitespace-nowrap">
-				{formatCurrency(expense.amount)}
-			</span>
-		</div>
-		<div class="flex min-w-0 items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
-			{#if heading.categoryInMeta}
-				<span class="shrink-0">{EXPENSE_CATEGORY_INFO[expense.category].shortLabel}</span>
-				<span>·</span>
-			{/if}
-			<span class="shrink-0 whitespace-nowrap">{formatDate(new Date(expense.date))}</span>
-			{#if showVehicleColumn && vehicle}
-				<span>·</span>
-				<span class="min-w-0 truncate">{getVehicleDisplayName(vehicle)}</span>
-			{/if}
-		</div>
+		<p class="truncate font-medium text-foreground">
+			{heading.title}
+		</p>
+		<p class="mt-0.5 text-sm text-muted-foreground">
+			{meta.join(' · ')}
+		</p>
 		{#if expense.sourceType === 'reminder'}
 			<div class="mt-1.5">
 				<RecurringExpenseBadge />
@@ -87,9 +81,13 @@
 			</div>
 		{/if}
 	</div>
+	<span class="self-center whitespace-nowrap font-semibold tabular-nums text-foreground">
+		{formatCurrency(expense.amount)}
+	</span>
 {/snippet}
 
 <div
+	data-testid="expense-row"
 	class="transition-colors {isSelected ? 'bg-muted/50' : ''} {pending
 		? 'motion-safe:animate-[row-arrive_200ms_ease-out]'
 		: ''}"
@@ -110,7 +108,7 @@
 		</div>
 	{/if}
 	{#if pending}
-		<div class="pr-3 pb-3 pl-[3.25rem]">
+		<div class="pr-3 pb-3 pl-[2.75rem]">
 			<PendingSyncNote
 				{pending}
 				entryId={expense.id}

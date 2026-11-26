@@ -253,8 +253,11 @@ test.describe('Expense list', () => {
 			);
 		});
 
-		await page.getByRole('combobox', { name: /Category/ }).click();
-		await page.getByRole('option', { name: 'Maintenance' }).click();
+		await page.getByRole('button', { name: /^Filters/ }).click();
+		await page
+			.getByRole('dialog', { name: 'Filters' })
+			.getByRole('button', { name: 'Maintenance' })
+			.click();
 
 		await filtered;
 	});
@@ -277,7 +280,9 @@ test.describe('Expense list', () => {
 
 		await page.goto('/expenses');
 		await expect(visibleText(page, '$89.99')).toBeVisible();
-		await page.getByRole('button', { name: 'Delete expense' }).first().click();
+		const first = page.getByTestId('expense-row').first();
+		await first.getByRole('button', { name: /Costco fill-up|Oil change/ }).click();
+		await first.getByRole('button', { name: 'Delete', exact: true }).click();
 
 		const dialog = page.getByRole('alertdialog', { name: 'Delete Expense' });
 		await expect(dialog.getByText('You can undo it for 5 seconds.')).toBeVisible();
@@ -285,7 +290,7 @@ test.describe('Expense list', () => {
 		await dialog.getByRole('button', { name: 'Delete' }).click();
 
 		const name = described === 'Costco fill-up' ? 'Costco fill-up' : 'Oil change';
-		const row = page.getByRole('row').filter({ hasText: name });
+		const row = page.getByTestId('expense-row').filter({ hasText: name });
 		const id = described === 'Costco fill-up' ? 'expense-fuel' : 'expense-maint';
 		return { deleted, row, path: `/api/v1/expenses/${id}` };
 	}
