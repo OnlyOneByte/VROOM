@@ -6,7 +6,20 @@ import {
 	type SortableRow
 } from '#lib/utils/expense-helpers.ts';
 import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
-import { formatDateWith } from '#lib/utils/formatters.ts';
+import { formatDateWith, formatNumberUpTo } from '#lib/utils/formatters.ts';
+import { getChargeUnitLabel, getVolumeUnitLabel, isElectricFuelType } from '#lib/utils/units.ts';
+
+export function fillLabel(expense: Expense, vehicle: Vehicle | undefined): string | null {
+	if (expense.category !== 'fuel') return null;
+	const units = vehicle?.unitPreferences;
+	if (isElectricFuelType(expense.fuelType) && expense.charge) {
+		return `${formatNumberUpTo(expense.charge, 2)} ${getChargeUnitLabel(units?.chargeUnit ?? 'kwh', true)}`;
+	}
+	if (expense.volume) {
+		return `${formatNumberUpTo(expense.volume, 2)} ${getVolumeUnitLabel(units?.volumeUnit ?? 'gallons_us', true)}`;
+	}
+	return null;
+}
 
 export interface ExpenseRow {
 	type: 'standalone';
