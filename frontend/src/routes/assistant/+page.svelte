@@ -1,13 +1,16 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { Bot, Send, LoaderCircle, CircleAlert, User } from '@lucide/svelte';
+	import { Bot, Send, LoaderCircle, TriangleAlert } from '@lucide/svelte';
 	import { routes } from '#lib/routes.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Textarea } from '#lib/components/ui/textarea/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
+	import { focusMainHeading } from '#lib/utils/focus.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import { providerApi } from '#lib/services/provider-api.ts';
@@ -36,6 +39,7 @@
 	let isSending = $state(false);
 	let sendError = $state<string | null>(null);
 	let scrollEl = $state<HTMLDivElement | null>(null);
+	let inputEl = $state<HTMLTextAreaElement | null>(null);
 
 	let showDisclosure = $state(false);
 
@@ -171,18 +175,19 @@
 	<PageHeader title="Assistant" description="Ask about your vehicles, costs, and reminders." />
 
 	{#if isLoading}
-		<div class="flex items-center justify-center py-12">
-			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
+		<div class="flex flex-col gap-4" aria-hidden="true">
+			<Skeleton class="h-5 w-48" />
+			<Skeleton class="h-[40vh] w-full rounded-(--r-lg)" />
+			<Skeleton class="h-10 w-full rounded-(--r-md)" />
 		</div>
+		<span class="sr-only" role="status">Loading the assistant</span>
 	{:else if loadError}
-		<div class="rounded-lg border bg-card p-6">
-			<div class="mb-4 flex items-center gap-3 text-destructive">
-				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Couldn't load the assistant</p>
-			</div>
-			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
-			<Button onclick={loadProviders}>Retry</Button>
-		</div>
+		<LoadErrorCard
+			title="Couldn't load the assistant"
+			message={loadError}
+			onRetry={loadProviders}
+			onRecovered={() => (inputEl ? inputEl.focus() : focusMainHeading())}
+		/>
 	{:else if !hasProvider}
 		<EmptyState>
 			{#snippet icon()}<Bot class="h-12 w-12 text-muted-foreground mb-4" />{/snippet}
@@ -213,14 +218,19 @@
 			{/if}
 			<div
 				bind:this={scrollEl}
-				class="min-h-[40vh] max-h-[60vh] overflow-y-auto rounded-lg border bg-card p-4 space-y-4"
+				class="min-h-[40vh] max-h-[60vh] space-y-4 overflow-y-auto rounded-(--r-lg) border bg-surface p-4"
 				data-testid="assistant-transcript"
 			>
 				{#if messages.length === 0}
 					<div class="flex h-full flex-col items-center justify-center py-12 text-center">
-						<Bot class="h-10 w-10 text-muted-foreground mb-2" />
-						<p class="text-sm font-medium">Ask me anything about your cars</p>
-						<p class="text-xs text-muted-foreground mt-1 max-w-sm">
+						<div
+							class="mb-3 grid size-14 place-items-center rounded-full bg-sunk text-muted-foreground"
+							aria-hidden="true"
+						>
+							<Bot class="size-7" />
+						</div>
+						<p class="font-semibold">Ask me anything about your cars</p>
+						<p class="mt-1 max-w-sm text-sm text-muted-foreground">
 							Try “How much did I spend on fuel this year?” or “What is my loan balance?” I read
 							your data to answer — I never change it.
 						</p>
@@ -234,48 +244,46 @@
 						>
 							{#if message.role === 'assistant'}
 								<div
-									class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10"
+									class="grid size-8 shrink-0 place-items-center rounded-full bg-sunk text-accent-ink"
+									aria-hidden="true"
 								>
-									<Bot class="h-4 w-4 text-primary" />
+									<Bot class="size-4" />
 								</div>
 							{/if}
 							<div class="max-w-[80%] space-y-1">
 								<div
-									class="rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words {message.role ===
+									class="px-3.5 py-2.5 text-sm whitespace-pre-wrap break-words {message.role ===
 									'user'
-										? 'bg-primary text-primary-foreground'
-										: 'bg-muted text-foreground'}"
+										? 'rounded-(--r-lg) rounded-br-(--r-sm) bg-foreground text-background'
+										: 'rounded-(--r-lg) rounded-bl-(--r-sm) bg-sunk text-foreground'}"
 								>
+									<span class="sr-only">{message.role === 'user' ? 'You:' : 'Assistant:'}</span>
 									{message.content}
 								</div>
 								{#if message.role === 'assistant' && message.toolsUsed && message.toolsUsed.length > 0}
 									<div class="flex flex-wrap gap-1" data-testid="assistant-tools-used">
+										<span class="sr-only">Looked at:</span>
 										{#each message.toolsUsed as tool (tool)}
-											<Badge variant="secondary" class="text-xs font-normal">{tool}</Badge>
+											<Badge variant="outline" class="font-normal">{tool}</Badge>
 										{/each}
 									</div>
 								{/if}
 							</div>
-							{#if message.role === 'user'}
-								<div
-									class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted"
-								>
-									<User class="h-4 w-4 text-muted-foreground" />
-								</div>
-							{/if}
 						</div>
 					{/each}
 				{/if}
 
 				{#if isSending}
-					<div class="flex gap-2 justify-start" data-testid="assistant-pending">
+					<div class="flex justify-start gap-2" data-testid="assistant-pending">
 						<div
-							class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10"
+							class="grid size-8 shrink-0 place-items-center rounded-full bg-sunk text-accent-ink"
+							aria-hidden="true"
 						>
-							<Bot class="h-4 w-4 text-primary" />
+							<Bot class="size-4" />
 						</div>
-						<div class="rounded-lg bg-muted px-3 py-2">
-							<LoaderCircle class="h-4 w-4 animate-spin text-muted-foreground" />
+						<div class="rounded-(--r-lg) rounded-bl-(--r-sm) bg-sunk px-3.5 py-2.5" role="status">
+							<LoaderCircle class="size-4 animate-spin text-muted-foreground" aria-hidden="true" />
+							<span class="sr-only">The assistant is answering</span>
 						</div>
 					</div>
 				{/if}
@@ -283,27 +291,27 @@
 
 			{#if sendError}
 				<div
-					class="flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+					class="flex flex-wrap items-center justify-between gap-3 rounded-(--r-md) bg-due-tint p-3"
+					role="alert"
 					data-testid="assistant-error"
 				>
-					<p class="text-destructive">{sendError}</p>
-					<button
-						type="button"
-						class="self-start text-xs underline hover:text-foreground"
-						onclick={retry}
-					>
-						Retry
-					</button>
+					<p class="flex min-w-0 items-start gap-2 text-sm">
+						<TriangleAlert class="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
+						{sendError}
+					</p>
+					<Button variant="outline" onclick={retry}>Retry</Button>
 				</div>
 			{/if}
 
 			<div class="flex items-end gap-2">
 				<Textarea
+					bind:ref={inputEl}
 					bind:value={input}
 					placeholder="Ask about your vehicles and costs…"
+					aria-label="Your question"
 					rows={1}
 					maxlength={MAX_MESSAGE_CHARS}
-					class="min-h-[2.5rem] resize-none"
+					class="min-h-10 resize-none rounded-(--r-md) bg-surface"
 					disabled={isSending}
 					onkeydown={onKeydown}
 					data-testid="assistant-input"
@@ -311,15 +319,15 @@
 				<Button
 					onclick={send}
 					disabled={isSending || input.trim().length === 0}
-					size="icon"
-					class="shrink-0"
+					size="icon-lg"
+					class="shrink-0 rounded-full"
 					aria-label="Send message"
 					data-testid="assistant-send"
 				>
 					{#if isSending}
-						<LoaderCircle class="h-4 w-4 animate-spin" />
+						<LoaderCircle class="size-4 animate-spin" />
 					{:else}
-						<Send class="h-4 w-4" />
+						<Send class="size-4" />
 					{/if}
 				</Button>
 			</div>

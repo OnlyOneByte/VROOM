@@ -17,7 +17,6 @@ const NOT_YET_MOVED: Record<string, number> = {
 	'lib/components/settings/cards/StorageProvidersCard.svelte': 1,
 	'lib/components/vehicles/FinanceTab.svelte': 1,
 	'lib/components/vehicles/form/VehicleForm.svelte': 1,
-	'routes/assistant/+page.svelte': 1,
 	'routes/settings/+page.svelte': 1,
 	'routes/settings/providers/[id]/edit/+page.svelte': 1
 };

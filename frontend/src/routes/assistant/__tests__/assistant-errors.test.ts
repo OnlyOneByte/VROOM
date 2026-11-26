@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import {
 	ApiError,
 	SERVER_FAILURE_MESSAGE,
@@ -49,6 +49,41 @@ describe('assistant page errors', () => {
 		expect(await screen.findByText("Couldn't load the assistant")).toBeInTheDocument();
 		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText(/SQLITE_BUSY/)).toBeNull();
+	});
+
+	test('announces the assistant while it loads', async () => {
+		getProviders.mockReturnValue(new Promise(() => {}));
+		render(Page);
+
+		expect(screen.getByRole('status')).toHaveTextContent('Loading the assistant');
+	});
+
+	test('Retry after a failed load opens the chat and puts focus in the question box', async () => {
+		getProviders
+			.mockRejectedValueOnce(new ApiError('Network error', 0))
+			.mockResolvedValueOnce([{ id: 'p1' }]);
+		render(Page);
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+		const box = await screen.findByRole('textbox', { name: 'Your question' });
+		await waitFor(() => expect(box).toHaveFocus());
+	});
+
+	test('a failed send is announced, and Retry sends the same question again', async () => {
+		sendMessage
+			.mockRejectedValueOnce(new ApiError('upstream 502', 502))
+			.mockResolvedValueOnce({ reply: 'You spent $120.', toolsUsed: [] });
+		await ask('How much did I spend?');
+
+		expect(await screen.findByRole('alert')).toHaveTextContent(
+			"The AI provider couldn't be reached."
+		);
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+		expect(await screen.findByText('You spent $120.')).toBeInTheDocument();
+		expect(screen.queryByRole('alert')).toBeNull();
+		expect(sendMessage).toHaveBeenLastCalledWith('How much did I spend?', []);
 	});
 
 	test('an unreachable provider says so', async () => {
