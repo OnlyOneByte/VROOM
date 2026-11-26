@@ -1,5 +1,6 @@
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { ApiError } from '#lib/utils/error-handling.ts';
 
 const { page, authApi } = vi.hoisted(() => ({
@@ -23,6 +24,12 @@ beforeEach(() => {
 afterEach(() => {
 	page.url = new URL('https://app.example/auth');
 });
+
+async function signupInfoSettled() {
+	await waitFor(() => expect(authApi.getSignupInfo).toHaveBeenCalled());
+	await Promise.allSettled(authApi.getSignupInfo.mock.results.map(r => r.value));
+	await tick();
+}
 
 describe('sign-in page', () => {
 	test('a providers load failure offers a 40px Retry that loads the sign-in options', async () => {
@@ -128,6 +135,7 @@ describe('sign-in page', () => {
 		authApi.getSignupInfo.mockRejectedValue(new ApiError('Network error', 0));
 		render(AuthPage);
 		await screen.findByRole('button', { name: 'Continue with Google' });
+		await signupInfoSettled();
 		expect(screen.queryByTestId('signup-mode-line')).not.toBeInTheDocument();
 		expect(screen.queryByText(/New here/)).not.toBeInTheDocument();
 	});
@@ -138,7 +146,25 @@ describe('sign-in page', () => {
 		render(AuthPage);
 		await screen.findByRole('button', { name: 'Continue with Google' });
 		expect(screen.getByRole('alert')).toHaveTextContent('This server is invite only');
+		await signupInfoSettled();
 		expect(screen.queryByTestId('signup-mode-line')).not.toBeInTheDocument();
+	});
+
+	test('a sign-up code with no message shows no alert, so the new-here line stays', async () => {
+		page.url = new URL('https://app.example/auth?auth_error=signup_something_new');
+		authApi.getProviders.mockResolvedValue([{ id: 'google', displayName: 'Google' }]);
+		render(AuthPage);
+		expect(await screen.findByTestId('signup-mode-line')).toBeInTheDocument();
+		expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+	});
+
+	test('the invite-only refusal names both kinds of invite', async () => {
+		page.url = new URL('https://app.example/auth?auth_error=signup_invite_required');
+		authApi.getProviders.mockResolvedValue([]);
+		render(AuthPage);
+		expect(await screen.findByRole('alert')).toHaveTextContent(
+			'Ask its admin for an invite, or someone with a vehicle to share it with you.'
+		);
 	});
 
 	test('a non-sign-up error keeps the new-here line', async () => {
@@ -152,12 +178,14 @@ describe('sign-in page', () => {
 		authApi.getProviders.mockResolvedValueOnce([]);
 		const { unmount } = render(AuthPage);
 		await screen.findByText('Sign-in is currently unavailable. No providers are enabled.');
+		await signupInfoSettled();
 		expect(screen.queryByTestId('signup-mode-line')).not.toBeInTheDocument();
 		unmount();
 
 		authApi.getProviders.mockRejectedValueOnce(new ApiError('Network error', 0));
 		render(AuthPage);
 		await screen.findByRole('button', { name: 'Retry' });
+		await signupInfoSettled();
 		expect(screen.queryByTestId('signup-mode-line')).not.toBeInTheDocument();
 	});
 
