@@ -278,6 +278,34 @@ describe('the root layout paints the app shell without waiting on /auth/me', () 
 		);
 	});
 
+	it.each([
+		[true, 'shows'],
+		[false, 'does not show']
+	])('a demo session (%s) %s the “changes aren’t saved” banner', async (demo, _label) => {
+		mockFetch.mockImplementation(
+			async () =>
+				new Response(
+					JSON.stringify({
+						success: true,
+						data: { user: alice, session: { expiresAt: '2099-01-01' }, demo }
+					}),
+					{ status: 200, headers: { 'content-type': 'application/json' } }
+				)
+		);
+
+		render(Layout, { children: pageContent });
+
+		await waitFor(() => expect(authStore.user?.id).toBe('alice'));
+		expect(await screen.findByText('Page content')).toBeInTheDocument();
+		if (demo) {
+			const banner = await screen.findByRole('complementary', { name: 'Demo garage' });
+			expect(banner).toHaveTextContent('Demo garage. Look around: changes aren’t saved.');
+		} else {
+			expect(authStore.user?.demo).toBeUndefined();
+			expect(screen.queryByTestId('demo-banner')).toBeNull();
+		}
+	});
+
 	it('keeps the branded splash on a protected route when nobody signed in on this device', () => {
 		deferredMe();
 

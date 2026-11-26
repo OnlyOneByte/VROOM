@@ -5,6 +5,7 @@ export interface User {
 	createdAt: string;
 	updatedAt: string;
 	pendingApproval?: boolean;
+	demo?: boolean;
 }
 
 export interface LinkedAuthProvider {

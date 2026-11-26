@@ -238,6 +238,11 @@
 			Skip to content
 		</a>
 		<Navigation />
+		{#if authStore.user?.demo}
+			{#await import('#lib/components/layout/DemoBanner.svelte') then { default: DemoBanner }}
+				<DemoBanner />
+			{/await}
+		{/if}
 
 		<main
 			bind:this={mainEl}
