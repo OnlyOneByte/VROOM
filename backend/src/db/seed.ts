@@ -1,4 +1,6 @@
 import { createId } from '@paralleldrive/cuid2';
+import { and, eq, isNull } from 'drizzle-orm';
+import { addGuestDriver, ownDriverId, setCarShare } from '../api/drivers/repository';
 import { createTermExpenses } from '../api/insurance/hooks';
 import { assignServerRole } from '../permissions/grants';
 import { logger } from '../utils/logger';
@@ -126,6 +128,24 @@ function loanPayments(loan: VehicleFinancing, pattern: DrivingPattern): NewExpen
     });
   }
   return rows;
+}
+
+async function shareWeekendCar(vehicleId: string, ownerId: string): Promise<void> {
+  const db = getDb();
+  setCarShare(db, vehicleId, true);
+  const owner = ownDriverId(db, vehicleId, ownerId);
+  const jamie = addGuestDriver(db, vehicleId, { name: 'Jamie', color: 'chart-3' }, ownerId);
+  const rows = await db
+    .select({ id: expenses.id, category: expenses.category })
+    .from(expenses)
+    .where(and(eq(expenses.vehicleId, vehicleId), isNull(expenses.groupId)))
+    .orderBy(expenses.date);
+  let fillUp = 0;
+  for (const row of rows) {
+    const payer = row.category === 'fuel' && fillUp++ % 3 !== 0 ? jamie : owner;
+    await db.update(expenses).set({ paidByDriverId: payer }).where(eq(expenses.id, row.id));
+  }
+  await db.update(trips).set({ driverId: jamie }).where(eq(trips.vehicleId, vehicleId));
 }
 
 export async function seedDatabase() {
@@ -363,6 +383,8 @@ export async function seedGarage(userId: string) {
         splitMethod: 'even',
       },
     ]);
+
+    await shareWeekendCar(vehicle2.id, userId);
 
     logger.info('Database seeding completed successfully', {
       standaloneExpenses: sampleExpenses.length,
