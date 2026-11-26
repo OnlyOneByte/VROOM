@@ -158,14 +158,22 @@ transactions. Drizzle's internal `tx.session` is the one path past the call-time
 app code must not use it. A query sent that way is still checked when it runs, but an
 un-awaited one could slip into the moment the callback settles.
 
-A query belongs to the transaction scope it was built in, not only the one it runs in. Bun
-drops the `AsyncLocalStorage` context when an async callback returns an un-awaited builder
-after an earlier `await` (#1786), so each scope hands its builders a session whose client
-re-enters that scope when the context is gone. `return tx.select()…` therefore works, and a
-query built inside a transaction but run after it ended is refused with
-`TransactionEndedError` rather than committing on its own. Don't cache a builder or a
-`.prepare()`d query made inside a transaction for later use. `outsideTransaction` marks its
-work explicitly, so a query handed to it still runs outside.
+A query runs in the scope that is current when it runs. When Bun has dropped that context,
+it falls back to the scope it was built in. Bun drops the `AsyncLocalStorage` context when an
+async callback returns an un-awaited query after an earlier `await` (#1786). So each scope
+hands its builders, and the raw `run`/`all`/`get`/`values`, a session whose client re-enters
+that scope when the context is gone.
+
+What this means in practice:
+- `return tx.select()…` and `return tx.all(sql…)` work.
+- A query built inside a transaction but run after it ended is refused with
+  `TransactionEndedError`, rather than committing on its own.
+- Await any query you didn't build in the current callback. One built outside any
+  transaction, or in a parent transaction, and returned un-awaited from a nested callback
+  still waits on the transaction that is waiting for it.
+- Don't cache a builder or a `.prepare()`d query made inside a transaction. It stays bound to
+  that transaction and is refused once the transaction ends.
+- `outsideTransaction` marks its work explicitly, so a query handed to it still runs outside.
 
 **Expense-linked records use a polymorphic link.** Financing payments, insurance premiums,
 and reminder materializations are real rows in `expenses` tagged with `source_type` +

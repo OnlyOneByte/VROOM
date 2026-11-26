@@ -21,7 +21,7 @@ const RAW_QUERY_METHODS = ['run', 'all', 'get', 'values'] as const;
 type SqlSource = string | { getSQL(): unknown };
 type Dialect = { sqlToQuery(sql: unknown): { sql: string } };
 
-function refuseRawControl(target: object, dialect: Dialect): void {
+function refuseRawControl(target: object, dialect: Dialect, currentSession: () => object): void {
   for (const name of RAW_QUERY_METHODS) {
     const original = (target as Record<string, (query: SqlSource) => unknown>)[name];
     Object.assign(target, {
@@ -32,7 +32,8 @@ function refuseRawControl(target: object, dialect: Dialect): void {
         if (OPENING.test(text) || TRANSACTION_CONTROL.test(text)) {
           throw new RawTransactionControlError();
         }
-        return original.call(target, query);
+        const pinned = Object.create(target, { session: { value: currentSession() } });
+        return original.call(pinned, query);
       },
     });
   }
@@ -204,7 +205,8 @@ function createAsyncDatabase(sqlite: Database) {
   const begin = db.transaction.bind(db);
   const dialect = (db as unknown as { dialect: Dialect }).dialect;
   const baseSession = (db as unknown as { session: Session }).session;
-  refuseRawControl(db, dialect);
+  const currentSession = () => sessionFor(scopes.getStore());
+  refuseRawControl(db, dialect, currentSession);
   bindBuildersToScope(db);
 
   function sessionFor(scope: Scope | undefined): Session {
@@ -226,7 +228,7 @@ function createAsyncDatabase(sqlite: Database) {
     for (const holder of [target, ...relational]) {
       Object.defineProperty(holder, 'session', {
         configurable: true,
-        get: () => sessionFor(scopes.getStore()),
+        get: currentSession,
       });
     }
   }
@@ -252,7 +254,7 @@ function createAsyncDatabase(sqlite: Database) {
       } as Scope;
       const savepoint = scopes.run(child, () =>
         parent.tx.transaction((tx) => {
-          refuseRawControl(tx, dialect);
+          refuseRawControl(tx, dialect, currentSession);
           bindBuildersToScope(tx);
           child.tx = tx;
           return sealWhenSettled(child, () => callback(tx));
@@ -293,7 +295,7 @@ function createAsyncDatabase(sqlite: Database) {
       return await scopes.run(scope, () =>
         begin(
           (tx) => {
-            refuseRawControl(tx, dialect);
+            refuseRawControl(tx, dialect, currentSession);
             bindBuildersToScope(tx);
             scope.tx = tx;
             return sealWhenSettled(scope, () => callback(tx));

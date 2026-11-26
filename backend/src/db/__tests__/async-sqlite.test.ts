@@ -437,17 +437,32 @@ begin`,
       });
     });
     expect(nested).toEqual([{ id: 'c' }]);
+    const raw = await transaction(async (tx) => {
+      await tx.select().from(users);
+      return tx.all(sql`select count(*) as n from users`);
+    });
+    expect(raw).toEqual([[3]]);
+    const rawOuter = await transaction(async (tx) => {
+      await tx.select().from(users);
+      return db.get(sql`select count(*) as n from users`);
+    });
+    expect(rawOuter).toEqual([3]);
   });
 
   test('a query built inside a transaction and run after it ended is refused', async () => {
     const { db, transaction } = setup();
-    let late: PromiseLike<unknown> = Promise.resolve();
+    const late: PromiseLike<unknown>[] = [];
     await transaction(async (tx) => {
       await tx.insert(users).values(user('a'));
-      late = db.insert(users).values(user('late'));
+      late.push(db.insert(users).values(user('late')));
+      late.push(
+        db.run(sql`insert into users (id, email, display_name) values ('raw', 'r@test.com', 'r')`)
+      );
     });
-    const error = (await Promise.resolve(late).catch((e) => e)) as { cause?: unknown };
-    expect(error.cause ?? error).toBeInstanceOf(TransactionEndedError);
+    for (const query of late) {
+      const error = (await Promise.resolve(query).catch((e) => e)) as { cause?: unknown };
+      expect(error.cause ?? error).toBeInstanceOf(TransactionEndedError);
+    }
     expect((await db.select({ id: users.id }).from(users)).map((r) => r.id)).toEqual(['a']);
   });
 
