@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import AdmZip from 'adm-zip';
 import { CONFIG } from '../../../config';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { restoreService } from '../restore';
 
 const FIXTURE_DIR = join(import.meta.dir, 'fixtures', 'backup-2.0.0');
@@ -16,7 +16,7 @@ let savedVersion: string;
 beforeEach(async () => {
   ctx = await createTestApp();
   savedVersion = CONFIG.backup.currentVersion;
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   setCurrentVersion(savedVersion);

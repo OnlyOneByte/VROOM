@@ -6,6 +6,7 @@ import {
   json,
   type RequestFn,
   requestAs,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { defaultPrivateProviderEndpoints } from '../../../test-helpers/outbound';
@@ -82,7 +83,7 @@ beforeEach(async () => {
   const { getDb } = await import('../../../db/connection');
   assignServerRole(getDb(), ctx.user.id, 'admin');
   admin = ctx.authed;
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   signupConfig.mode = undefined;

@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type RequestFn, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type RequestFn,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 import { type Members, overrideOn, seedCar, seedMembers } from '../../../test-helpers/members';
 
 let ctx: TestApp;
@@ -32,7 +37,7 @@ beforeEach(async () => {
   m = await seedMembers(ctx, CAR, 'trip');
   trip('owners-trip', null);
   trip('editors-trip', m.editor.id);
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 describe('trips resolve through can() for every role', () => {

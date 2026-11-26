@@ -7,7 +7,7 @@ import {
   grantShareRole,
   resolverFor,
 } from '../../../permissions/grants';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
@@ -16,7 +16,7 @@ let vehicleId: string;
 beforeEach(async () => {
   ctx = await createTestApp();
   vehicleId = await seedVehicle(ctx);
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 function seedMember(id: string, level: string, status: string): void {

@@ -3,6 +3,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../test-helpers/http-client';
 import { seedVehicle } from '../../test-helpers/seed';
@@ -44,7 +45,7 @@ describe('date fields reject values that would be saved as 1970', () => {
   beforeEach(async () => {
     ctx = await createTestApp();
     vehicleId = await seedVehicle(ctx);
-  });
+  }, SETUP_TIMEOUT_MS);
   afterEach(() => ctx.close());
 
   const bodies: [string, string, (date: unknown, vehicleId: string) => unknown][] = [

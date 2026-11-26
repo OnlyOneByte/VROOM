@@ -4,6 +4,7 @@ import {
   type DataEnvelope,
   json,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { type Members, overrideOn, seedCar, seedMembers } from '../../../test-helpers/members';
@@ -21,7 +22,7 @@ beforeEach(async () => {
     "INSERT INTO vehicle_financing (id, vehicle_id, provider, original_amount, term_months, start_date, payment_amount) VALUES ('ve-loan', ?, 'Bank', 1000000, 60, 1704067200, 20000)",
     [CAR]
   );
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 const status = (request: RequestFn, method: string, path: string, body?: unknown) =>

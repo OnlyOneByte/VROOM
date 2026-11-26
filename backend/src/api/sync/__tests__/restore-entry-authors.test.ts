@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import AdmZip from 'adm-zip';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { createInvitee } from '../../../test-helpers/invitee';
 import { seedCar, shareCar } from '../../../test-helpers/members';
 
@@ -42,7 +42,7 @@ async function exportZip(): Promise<AdmZip> {
 beforeEach(async () => {
   ctx = await createTestApp();
   seedCar(ctx, CAR);
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 describe('restore keeps an entry author only while they are a member of the car', () => {

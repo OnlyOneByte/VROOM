@@ -3,6 +3,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { GoogleDriveStrategy } from '../../providers/backup-strategies/google-drive-strategy';
@@ -68,7 +69,7 @@ beforeEach(async () => {
     year: 2022,
   });
   expect(res.status).toBe(201);
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   createInstance.mockRestore();

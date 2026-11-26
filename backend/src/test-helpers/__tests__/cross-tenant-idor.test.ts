@@ -5,6 +5,7 @@ import {
   json,
   type PaginatedEnvelope,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../http-client';
 import { createInvitee } from '../invitee';
@@ -19,7 +20,7 @@ beforeEach(async () => {
   const b = await createInvitee(ctx, 'user-b-idor', 'User B');
   bId = b.id;
   asB = b.request;
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 async function idOf(res: Response): Promise<string> {

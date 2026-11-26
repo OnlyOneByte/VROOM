@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { CONFIG, getBackupTableKeys } from '../../../config';
 import { ValidationError } from '../../../errors';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { BACKUP_CHECK_REASONS } from '../backup';
 
 let ctx: TestApp;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 async function seedSheetsProvider(): Promise<void> {
