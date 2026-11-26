@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy';
 import * as schema from './schema';
 
 const STATEMENT_CACHE_SIZE = 500;
-const TRANSACTION_CONTROL = /^\s*(commit|rollback|release savepoint)\b/i;
+const TRANSACTION_CONTROL = /^\s*(commit|end|rollback|release)\b/i;
 const OPENING = /^\s*(begin|savepoint)\b/i;
 const BEGIN = /^\s*begin\b/i;
 const ROLLBACK = /^\s*rollback\b/i;
@@ -93,6 +93,16 @@ function createAsyncDatabase(sqlite: Database) {
     return statement;
   }
 
+  function connectionMaintenance<T>(fn: () => T): T {
+    const was = executing;
+    executing = true;
+    try {
+      return fn();
+    } finally {
+      executing = was;
+    }
+  }
+
   function execute(query: string, params: unknown[], method: Method) {
     executing = true;
     try {
@@ -105,8 +115,12 @@ function createAsyncDatabase(sqlite: Database) {
     }
   }
 
-  function checkControl(scope: Scope, query: string): void {
-    if (OPENING.test(query)) {
+  function checkControl(scope: Scope | undefined, query: string): void {
+    if (!scope) {
+      if (OPENING.test(query) || TRANSACTION_CONTROL.test(query)) {
+        throw new RawTransactionControlError();
+      }
+    } else if (OPENING.test(query)) {
       if (scope.begun) throw new RawTransactionControlError();
       scope.begun = true;
     } else if (TRANSACTION_CONTROL.test(query) && !scope.sealed) {
@@ -122,7 +136,7 @@ function createAsyncDatabase(sqlite: Database) {
 
   async function gated(query: string, params: unknown[], method: Method) {
     const scope = scopes.getStore();
-    if (scope) checkControl(scope, query);
+    checkControl(scope, query);
     if (scope && ROLLBACK.test(query) && !sqlite.inTransaction) return { rows: [] };
     if (hasEnded(scope, query)) throw new TransactionEndedError();
     while (open && scope?.root !== open) await closed;
@@ -238,5 +252,6 @@ function createAsyncDatabase(sqlite: Database) {
     db: db as typeof db & { transaction: typeof transaction },
     transaction,
     outsideTransaction,
+    connectionMaintenance,
   };
 }

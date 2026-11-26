@@ -277,7 +277,15 @@ describe('async transactions over bun:sqlite', () => {
 
   test('raw BEGIN, COMMIT, ROLLBACK or SAVEPOINT inside a transaction is refused and nothing commits', async () => {
     const { db, transaction } = setup();
-    for (const raw of [sql`commit`, sql`begin`, sql`rollback`, sql`savepoint sp9`]) {
+    const raws = [
+      sql`commit`,
+      sql`end`,
+      sql`begin`,
+      sql`rollback`,
+      sql`savepoint sp9`,
+      sql`release sp0`,
+    ];
+    for (const raw of raws) {
       const error = await transaction(async (tx) => {
         await tx.insert(users).values(user('a'));
         await tx.run(raw);
@@ -289,6 +297,26 @@ describe('async transactions over bun:sqlite', () => {
       expect(error?.cause ?? error).toBeInstanceOf(RawTransactionControlError);
       expect(await db.select().from(users)).toEqual([]);
     }
+  });
+
+  test('raw transaction control outside any transaction is refused too', async () => {
+    const { sqlite, db } = setup();
+    for (const raw of [sql`begin`, sql`commit`, sql`end`]) {
+      const error = await db.run(raw).then(
+        () => null,
+        (e) => e as { cause?: unknown }
+      );
+      expect(error?.cause ?? error).toBeInstanceOf(RawTransactionControlError);
+      expect(sqlite.inTransaction).toBe(false);
+    }
+  });
+
+  test('connection maintenance still runs while an async transaction is open', async () => {
+    const { sqlite, transaction, connectionMaintenance } = setup();
+    await transaction(async (tx) => {
+      await tx.insert(users).values(user('a'));
+      expect(connectionMaintenance(() => sqlite.query('SELECT 1 AS ok').get())).toEqual({ ok: 1 });
+    });
   });
 
   test('the same connection always gets the same async database', () => {
