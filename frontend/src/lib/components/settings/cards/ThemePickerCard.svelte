@@ -1,13 +1,5 @@
 <script lang="ts">
-	import { Check } from '@lucide/svelte';
-	import { Button } from '#lib/components/ui/button/index.ts';
-	import {
-		Card,
-		CardContent,
-		CardDescription,
-		CardHeader,
-		CardTitle
-	} from '#lib/components/ui/card/index.ts';
+	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
 	import { getSystemTheme, themeStore } from '#lib/stores/theme.svelte.ts';
 	import { THEME_REGISTRY } from '#lib/theme/theme-registry.ts';
 	import { resolveVariant } from '#lib/theme/resolve-theme.ts';
@@ -16,15 +8,10 @@
 
 	const themes: ThemeDefinition[] = Object.values(THEME_REGISTRY);
 	const uid = $props.id();
-	const gridId = `${uid}-themes`;
-
-	let showAll = $state(false);
 
 	let activeId = $derived(themeStore.themeId);
 	let mode = $derived(themeStore.current);
-
 	let variant = $derived(resolveVariant(mode, getSystemTheme()));
-	let activeTheme = $derived(themes.find(theme => theme.id === activeId) ?? themes[0]);
 
 	function swatchColors(theme: ThemeDefinition): string[] {
 		const tokens = theme[variant];
@@ -32,76 +19,33 @@
 	}
 </script>
 
-<Card>
-	<CardHeader>
-		<CardTitle>Accent</CardTitle>
-		<CardDescription>
-			Pick an accent colour. It applies right away, in the mode you chose above.
-		</CardDescription>
-	</CardHeader>
-	<CardContent>
-		{#if activeTheme}
-			<div class="mb-3 flex items-center gap-3 lg:hidden" data-testid="current-theme">
-				{@render swatches(activeTheme)}
-				<div class="min-w-0">
-					<div class="text-xs text-muted-foreground">Current accent</div>
-					<div class="text-sm font-medium">{activeTheme.label}</div>
-					<div class="text-xs text-muted-foreground">{activeTheme.description}</div>
-				</div>
-			</div>
-		{/if}
-		<Button
-			variant="outline"
-			class="h-10 w-full lg:hidden"
-			aria-expanded={showAll}
-			aria-controls={gridId}
-			onclick={() => (showAll = !showAll)}
-		>
-			{showAll ? 'Show fewer accents' : `Show all ${themes.length} accents`}
-		</Button>
-		<div
-			id={gridId}
-			class={cn(
-				'grid-cols-2 gap-3 sm:grid-cols-3 lg:grid',
-				showAll ? 'mt-3 grid lg:mt-0' : 'hidden'
-			)}
-		>
+<Card variant="section" aria-labelledby="{uid}-accent">
+	<CardContent class="space-y-3">
+		<div>
+			<p id="{uid}-accent" class="font-medium">Accent</p>
+			<p class="text-sm text-muted-foreground">Used for highlights and the add button.</p>
+		</div>
+		<div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
 			{#each themes as theme (theme.id)}
 				{@const selected = activeId === theme.id}
 				<button
 					type="button"
 					aria-pressed={selected}
 					class={cn(
-						'relative flex flex-col gap-2 rounded-lg border p-3 text-left transition-colors',
-						selected
-							? 'border-primary ring-2 ring-primary'
-							: 'border-border hover:bg-accent hover:text-accent-foreground'
+						'flex min-h-10 flex-col gap-2 rounded-(--r-md) border bg-surface p-2.5 text-left outline-none transition-colors hover:bg-sunk focus-visible:ring-[3px] focus-visible:ring-ring/50',
+						selected && 'border-foreground shadow-[inset_0_0_0_1px_var(--foreground)]'
 					)}
 					onclick={() => themeStore.setTheme(theme.id)}
 				>
-					{#if selected}
-						<span
-							class="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground"
-						>
-							<Check class="h-3 w-3" />
-						</span>
-					{/if}
-					{@render swatches(theme)}
-					<div>
-						<div class="text-sm font-medium">{theme.label}</div>
-						<div class="text-xs text-muted-foreground">{theme.description}</div>
-					</div>
+					<span class="flex h-8 overflow-hidden rounded-(--r-sm)" aria-hidden="true">
+						<!-- Index-keyed: swatch colours can repeat, and duplicate keys throw. -->
+						{#each swatchColors(theme) as color, i (i)}
+							<span class="flex-1" style={`background:${color}`}></span>
+						{/each}
+					</span>
+					<span class="text-sm font-semibold">{theme.label}</span>
 				</button>
 			{/each}
 		</div>
 	</CardContent>
 </Card>
-
-{#snippet swatches(theme: ThemeDefinition)}
-	<div class="flex shrink-0 gap-1" aria-hidden="true">
-		<!-- Index-keyed: swatch colours can repeat, and duplicate keys throw. -->
-		{#each swatchColors(theme) as color, i (i)}
-			<span class="h-6 w-6 rounded-md border border-border/50" style={`background:${color}`}></span>
-		{/each}
-	</div>
-{/snippet}
