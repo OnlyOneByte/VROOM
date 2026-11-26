@@ -35,6 +35,7 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
 const ExpenseActionBar = (await import('../expense-form/ExpenseActionBar.svelte')).default;
 const ExpensePhotoSection = (await import('../ExpensePhotoSection.svelte')).default;
+const InsuranceManagedView = (await import('../expense-form/InsuranceManagedView.svelte')).default;
 
 const NOTE = 'Saving is off in the demo garage.';
 const user = {
@@ -116,12 +117,41 @@ describe('expense form in the demo garage', () => {
 		expect(handlers.onCancel).toHaveBeenCalledOnce();
 	});
 
-	test('photos can be viewed but not uploaded or deleted', async () => {
-		authStore.setUser({ ...user, demo: true });
+	test.each([
+		[true, 'disabled'],
+		[false, 'enabled']
+	])('with demo=%s, photo Upload and delete are %s', async (demo, state) => {
+		authStore.setUser({ ...user, demo });
 		render(ExpensePhotoSection, { props: { entityType: 'expense', entityId: 'e1' } });
 		const remove = await screen.findByRole('button', { name: 'Delete r.pdf' });
-		expect(remove).toBeDisabled();
-		expect(screen.getByRole('button', { name: 'Upload' })).toBeDisabled();
-		expect(deletePhoto).not.toHaveBeenCalled();
+		const upload = screen.getByRole('button', { name: 'Upload' });
+		for (const button of [remove, upload]) {
+			if (state === 'disabled') expect(button).toBeDisabled();
+			else expect(button).toBeEnabled();
+		}
+	});
+
+	test.each([
+		[true, 'disabled'],
+		[false, 'enabled']
+	])('Force Delete on an insurance-managed expense in demo=%s is %s', (demo, state) => {
+		authStore.setUser({ ...user, demo });
+		const onForceDelete = vi.fn();
+		render(InsuranceManagedView, {
+			props: {
+				category: 'financial',
+				amount: '100',
+				date: '2026-01-01',
+				description: '',
+				tags: [],
+				photoEntityId: null,
+				isDeleting: false,
+				onBack: vi.fn(),
+				onForceDelete
+			}
+		});
+		const force = screen.getByRole('button', { name: 'Force Delete' });
+		if (state === 'disabled') expect(force).toBeDisabled();
+		else expect(force).toBeEnabled();
 	});
 });
