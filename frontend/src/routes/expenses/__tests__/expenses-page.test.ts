@@ -566,6 +566,26 @@ describe('/expenses filters', () => {
 		expect(screen.getByRole('button', { name: 'Filters' })).toBeTruthy();
 	});
 
+	test('the Sort pills reorder the list and show the order in use', async () => {
+		await mountLoaded();
+		const sheet = await filtersSheet();
+		expect(within(sheet).getByRole('button', { name: 'Newest' })).toHaveAttribute(
+			'aria-pressed',
+			'true'
+		);
+
+		await fireEvent.click(within(sheet).getByRole('button', { name: 'Lowest' }));
+
+		await waitFor(() =>
+			expect(lastListParams()).toMatchObject({ sortBy: 'amount', sortDir: 'asc', offset: 0 })
+		);
+		expect(within(sheet).getByRole('button', { name: 'Lowest' })).toHaveAttribute(
+			'aria-pressed',
+			'true'
+		);
+		expect(screen.getByRole('button', { name: 'Filters' })).toBeTruthy();
+	});
+
 	test('pressing the picked vehicle again goes back to All', async () => {
 		await mountLoaded();
 		await chooseVehicle('Daily Driver');

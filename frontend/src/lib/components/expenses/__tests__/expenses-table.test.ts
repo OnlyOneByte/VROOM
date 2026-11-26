@@ -472,6 +472,20 @@ describe('ExpensesTable month groups', () => {
 		}
 	);
 
+	test('ledger: a wide screen gets the row list and month headings, with no table or toolbar', () => {
+		useLayout('wide');
+		mountTable({ monthTotals: TOTALS, ledger: true });
+
+		expect(screen.queryByRole('table')).toBeNull();
+		expect(screen.queryByRole('combobox', { name: /Category/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: /^Amount/ })).toBeNull();
+		expect(screen.getByTestId('expense-ledger')).toBeTruthy();
+		const headings = screen.getAllByRole('heading', { level: 2 });
+		expect(headings[0]?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+			'March 2024 total $1,234.50'
+		);
+	});
+
 	test.each(['compact', 'wide'] as const)(
 		'%s: sorting by amount drops the month headings',
 		async layout => {
