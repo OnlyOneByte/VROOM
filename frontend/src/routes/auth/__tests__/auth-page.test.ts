@@ -18,6 +18,7 @@ vi.mock('#lib/services/auth-api.ts', () => ({ authApi }));
 const AuthPage = (await import('../+page.svelte')).default;
 
 beforeEach(() => {
+	vi.clearAllMocks();
 	authApi.getSignupInfo.mockResolvedValue({ mode: 'invite', domainRestricted: false });
 });
 
@@ -117,7 +118,7 @@ describe('sign-in page', () => {
 		[
 			'invite',
 			false,
-			'New here? You need an invite, from this server’s admin or from someone sharing a vehicle with you.'
+			'New here? You need an invite, from this server’s admin or from someone who wants to share a vehicle with you.'
 		],
 		['closed', false, 'This server isn’t taking new accounts.']
 	])(
@@ -163,7 +164,7 @@ describe('sign-in page', () => {
 		authApi.getProviders.mockResolvedValue([]);
 		render(AuthPage);
 		expect(await screen.findByRole('alert')).toHaveTextContent(
-			'Ask its admin for an invite, or someone with a vehicle to share it with you.'
+			'Ask its admin for an invite, or someone who wants to share a vehicle with you.'
 		);
 	});
 
