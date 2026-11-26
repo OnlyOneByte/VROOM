@@ -197,6 +197,25 @@ describe('usePendingRows', () => {
 		offlineExpenseQueue.current = [];
 	});
 
+	test('a discarded row goes at once, even while a refresh is still loading', () => {
+		offlineExpenseQueue.current = [entry('a'), entry('b', { timestamp: 2000 })];
+		let pending!: ReturnType<typeof usePendingRows>;
+		const stop = $effect.root(() => {
+			pending = usePendingRows({ match: () => true, refresh: () => new Promise<void>(() => {}) });
+		});
+		flushSync();
+
+		offlineExpenseQueue.current = [entry('a'), entry('b', { timestamp: 2000, synced: true })];
+		flushSync();
+		expect(pending.rows.map(row => row.id)).toEqual(['b', 'a']);
+
+		offlineExpenseQueue.current = [entry('b', { timestamp: 2000, synced: true })];
+		flushSync();
+		expect(pending.rows.map(row => row.id)).toEqual(['b']);
+		stop();
+		offlineExpenseQueue.current = [];
+	});
+
 	test('a synced row survives the queue being cleared while the refresh is still loading', async () => {
 		let release: () => void = () => {};
 		offlineExpenseQueue.current = [entry('a')];

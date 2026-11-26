@@ -1,5 +1,5 @@
-import { goto } from '$app/navigation';
-import { resolve } from '$app/paths';
+import { goto, preloadCode } from '$app/navigation';
+import { match, resolve } from '$app/paths';
 import { routes } from '#lib/routes.ts';
 
 export async function gotoDynamic(path: string): Promise<void> {
@@ -9,6 +9,12 @@ export async function gotoDynamic(path: string): Promise<void> {
 	} catch {
 		await goto(resolve(routes.dashboard));
 	}
+}
+
+export function preloadDynamic(path: string): void {
+	void match(path)
+		.then(route => (route ? preloadCode(route.id) : undefined))
+		.catch(() => {});
 }
 
 export function gotoWithQuery(

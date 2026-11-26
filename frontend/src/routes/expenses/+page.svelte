@@ -62,6 +62,7 @@
 		withPendingInSummary
 	} from '#lib/utils/sync/pending-rows.ts';
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
+	import { forgetRecentlySynced, recentlySynced } from '#lib/utils/sync/recently-synced.svelte.ts';
 	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
 	import { editedRows } from '#lib/utils/pending-edits.svelte.ts';
 	import ExpenseOverviewSection from '#lib/components/expenses/ExpenseOverviewSection.svelte';
@@ -137,6 +138,12 @@
 	});
 	let pendingMatching = $derived(pending.rows.filter(row => matchesFilters(row, pendingFilters)));
 	let pendingListRows = $derived(currentOffset === 0 ? pendingMatching : []);
+	let loadingRows = $derived([
+		...pendingListRows,
+		...recentlySynced().filter(
+			row => matchesFilters(row, pendingFilters) && !pendingListRows.some(p => p.id === row.id)
+		)
+	]);
 	let deletingRows = $derived(expenses.filter(isDeleteHidden));
 	let edited = $derived(editedRows(expenses.filter(expense => !isDeleteHidden(expense))));
 	let shownSummary = $derived.by(() => {
@@ -308,6 +315,7 @@
 			}
 		} finally {
 			isLoading = false;
+			forgetRecentlySynced();
 		}
 	}
 
@@ -619,6 +627,18 @@
 			<Skeleton class="h-8 w-48 mb-2" />
 			<Skeleton class="h-5 w-72" />
 		</div>
+		{#if loadingRows.length > 0}
+			<div data-testid="pending-rows-while-loading">
+				<ExpensesTable
+					expenses={loadingRows}
+					showVehicleColumn={false}
+					scrollHeight="auto"
+					canWrite={false}
+					returnTo={resolve(routes.expenses)}
+					pendingStates={pending.states}
+				/>
+			</div>
+		{/if}
 		<Skeleton class="h-40 w-full" />
 		<Skeleton class="h-64 w-full" />
 	</div>

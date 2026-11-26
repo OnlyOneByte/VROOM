@@ -385,7 +385,7 @@ async function runPhotoStore<T>(
 
 export async function savePendingPhotos(clientId: string, photos: File[]): Promise<boolean> {
 	if (photos.length === 0) {
-		if (hasPhotoStore()) await deletePendingPhotos(clientId).catch(() => undefined);
+		if (hasPhotoStore()) void deletePendingPhotos(clientId).catch(() => undefined);
 		return true;
 	}
 	if (!hasPhotoStore()) return false;

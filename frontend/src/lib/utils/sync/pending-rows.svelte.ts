@@ -26,7 +26,7 @@ export function usePendingRows(options: {
 	);
 	const syncedServerIds = $derived(
 		offlineExpenseQueue.current.flatMap(entry =>
-			entry.synced && entry.serverId ? [[entry.id, entry.serverId] as const] : []
+			entry.synced ? [[entry.id, entry.serverId] as const] : []
 		)
 	);
 	let shown = $state<PendingItem[]>([]);

@@ -889,6 +889,7 @@ describe('pending photo store', () => {
 		vi.stubGlobal('indexedDB', db);
 
 		expect(await savePendingPhotos('cid-1', [])).toBe(true);
+		expect(await loadPendingPhotos('cid-1')).toEqual([]);
 		expect(db.photos.has('cid-1')).toBe(false);
 	});
 

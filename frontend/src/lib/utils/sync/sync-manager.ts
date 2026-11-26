@@ -41,6 +41,7 @@ import { fromBackendExpense } from '#lib/services/api-transformer.ts';
 import type { BackendExpenseResponse } from '#lib/types/index.ts';
 import { browser } from '$app/env';
 import { announceSaveFailure, clearSaveFailure } from './announce-failure';
+import { rememberSynced } from './recently-synced.svelte';
 
 export type { SyncConflict, SyncConfig };
 export {
@@ -285,6 +286,7 @@ class SyncManager {
 			if (syncResult.success) {
 				result.synced++;
 				markExpenseAsSynced(expense.id, syncResult.serverId);
+				rememberSynced(expense);
 				clearSaveFailure(expense.id);
 				this.retryCount.delete(expense.id);
 			} else if (syncResult.conflict) {
@@ -418,6 +420,7 @@ class SyncManager {
 			const result = await this.syncSingleExpense(expense);
 			if (result.success) {
 				markExpenseAsSynced(expense.id, result.serverId);
+				rememberSynced(expense);
 				clearSaveFailure(expense.id);
 				this.retryCount.delete(expense.id);
 				const currentExpenses = offlineExpenseQueue.current;
