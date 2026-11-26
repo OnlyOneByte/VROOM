@@ -153,7 +153,7 @@ function rangePhrase(range: string): string {
 }
 
 /** The sentence beside the Explore hero figure, e.g. "in running costs over the last 12 months
- * for all your cars. Fuel & charging was 62% of it. That's $223 a month, 4% more than the period
+ * for all your cars. Fuel & Charging was 62% of it. That's $223 a month, 4% more than the period
  * before." */
 export function heroSentence(opts: {
 	query: ExploreQuery;
@@ -188,7 +188,7 @@ export function heroSentence(opts: {
 					? `, the same as ${opts.compareLabel}`
 					: `, ${Math.abs(change)}% ${change > 0 ? 'more' : 'less'} than ${opts.compareLabel}`;
 		const amount = opts.format(summary.perBucket);
-		const noun = query.metric === 'count' ? ' expenses' : '';
+		const noun = query.metric === 'count' ? (amount === '1' ? ' expense' : ' expenses') : '';
 		parts.push(`That's ${amount}${noun} a ${opts.interval}${versus}.`);
 	}
 	if (query.metric === 'cost' && summary.perDistance != null) {

@@ -51,6 +51,17 @@ describe('QueryBar chips', () => {
 		expect(document.activeElement).toBe(chip);
 	});
 
+	test('picking the value already chosen only closes the menu', async () => {
+		const onChange = vi.fn();
+		render(QueryBar, { props: { query: DEFAULT_EXPLORE, onChange } });
+		await fireEvent.click(screen.getByRole('button', { name: 'By Month' }));
+		await settle();
+		await fireEvent.click(screen.getByRole('button', { name: 'Month' }));
+		await settle();
+		expect(onChange).not.toHaveBeenCalled();
+		expect(screen.queryByRole('button', { name: 'Quarter' })).toBeNull();
+	});
+
 	test('Copy link copies the page address', async () => {
 		const writeText = vi.fn(() => Promise.resolve());
 		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });

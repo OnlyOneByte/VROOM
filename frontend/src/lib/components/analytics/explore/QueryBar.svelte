@@ -63,6 +63,8 @@
 			open && document.querySelector<HTMLElement>(`[aria-controls="explore-menu-${open}"]`);
 		open = null;
 		chipButton?.focus();
+		const keys = Object.keys(patch) as Array<keyof ExploreQuery>;
+		if (keys.every(key => patch[key] === query[key])) return;
 		onChange(
 			normalizeExplore({
 				...query,
