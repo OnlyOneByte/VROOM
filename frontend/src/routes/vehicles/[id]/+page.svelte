@@ -838,27 +838,27 @@
 								{/snippet}
 							</Popover.Trigger>
 							{#if moreMenuOpen}
-							<Popover.Content align="end" class="flex w-48 flex-col p-1">
-								<Button
-									variant="ghost"
-									class="h-10 w-full justify-start"
-									href={resolve(paramRoutes.vehicleEdit, { id: vehicleId })}
-								>
-									<Pencil class="mr-2 h-4 w-4" aria-hidden="true" />
-									Edit
-								</Button>
-								<Button
-									variant="ghost"
-									class="h-10 w-full justify-start"
-									onclick={() => {
-										moreMenuOpen = false;
-										openShare();
-									}}
-								>
-									<Users class="mr-2 h-4 w-4" aria-hidden="true" />
-									Share
-								</Button>
-							</Popover.Content>
+								<Popover.Content align="end" class="flex w-48 flex-col p-1">
+									<Button
+										variant="ghost"
+										class="h-10 w-full justify-start"
+										href={resolve(paramRoutes.vehicleEdit, { id: vehicleId })}
+									>
+										<Pencil class="mr-2 h-4 w-4" aria-hidden="true" />
+										Edit
+									</Button>
+									<Button
+										variant="ghost"
+										class="h-10 w-full justify-start"
+										onclick={() => {
+											moreMenuOpen = false;
+											openShare();
+										}}
+									>
+										<Users class="mr-2 h-4 w-4" aria-hidden="true" />
+										Share
+									</Button>
+								</Popover.Content>
 							{/if}
 						</Popover.Root>
 					</div>

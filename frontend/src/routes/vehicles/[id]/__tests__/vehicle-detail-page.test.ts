@@ -275,7 +275,6 @@ describe('vehicle detail page overview', () => {
 		expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
 		expect(screen.getByRole('button', { name: 'Share' })).toHaveClass('hidden', 'lg:inline-flex');
 		expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument();
-		expect(captured['share']?.['vehicleName']).toBe('Daily Driver');
 		expect(screen.getAllByRole('link', { name: /Add expense/ })[0]).toHaveAttribute(
 			'href',
 			'/expenses/new?vehicleId=v1&returnTo=/vehicles/v1'
@@ -305,14 +304,15 @@ describe('vehicle detail page overview', () => {
 		expect(document.title).toBe('2020 Toyota Camry - VROOM Car Tracker');
 	});
 
-	test('Share opens the share dialog for this vehicle', async () => {
+	test('the first Share tap mounts the share dialog open for this vehicle', async () => {
 		await mount();
-		expect(captured['share']?.['open']).toBe(false);
+		expect(captured['share']).toBeUndefined();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Share' }));
 
-		expect(captured['share']?.['open']).toBe(true);
+		await vi.waitFor(() => expect(captured['share']?.['open']).toBe(true));
 		expect(captured['share']?.['vehicleId']).toBe('v1');
+		expect(captured['share']?.['vehicleName']).toBe('Daily Driver');
 	});
 
 	test('the first Upload Photos tap mounts the upload dialog open', async () => {
