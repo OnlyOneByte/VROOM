@@ -99,6 +99,29 @@ describe('attributeDistance', () => {
     expect(totals.has('c')).toBe(false);
   });
 
+  test('a trip dated before the period still covers the gap it was driven in, so periods add up', () => {
+    const points: OdometerPoint[] = [
+      { odometer: 1000, at: 1, driverId: 'a' },
+      { odometer: 1500, at: 10, driverId: 'b' },
+    ];
+    const trips: TripSpan[] = [{ start: 1000, end: 1300, at: 5, driverId: 't' }];
+    const early = sum(attributeDistance(points, trips, { from: 0, to: 6 }, true));
+    const late = attributeDistance(points, trips, { from: 7, to: 12 }, true);
+    expect(late.get('b')).toEqual({ trips: 0, estimated: 200 });
+    expect(early + sum(late)).toBe(500);
+  });
+
+  test('adjacent periods add up to the whole, whatever the readings and trips', () => {
+    fc.assert(
+      fc.property(journey, fc.integer({ min: 0, max: 31_000 }), ({ points, trips }, cut) => {
+        const whole = sum(attributeDistance(points, trips, EVERYTHING, true));
+        const before = sum(attributeDistance(points, trips, { from: 0, to: cut }, true));
+        const after = attributeDistance(points, trips, { from: cut + 1, to: EVERYTHING.to }, true);
+        expect(before + sum(after)).toBe(whole);
+      })
+    );
+  });
+
   test('a gap goes to the driver on the reading that closes it, once the period holds that reading', () => {
     const points: OdometerPoint[] = [
       { odometer: 100, at: 1, driverId: 'a' },
