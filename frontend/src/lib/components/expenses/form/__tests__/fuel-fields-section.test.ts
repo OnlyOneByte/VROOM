@@ -293,12 +293,22 @@ describe('quick add readout', () => {
 			amount: '38.20',
 			volume: '10.42',
 			showMpgCalculation: true,
-			calculatedMpg: 31.1,
+			calculatedMpg: 31.09,
 			distanceSinceLast: 324
 		});
 		expect(screen.getByTestId('energy-readout')).toHaveTextContent(
 			'$3.67 a gallon·31.1 mi/gal·324 mi since last fill'
 		);
+		expect(document.querySelector('#volume')).toHaveAttribute('aria-describedby', 'energy-readout');
+	});
+
+	test('a UK gallon says so, and a charge counts since the last charge', () => {
+		mount({ quick: true, amount: '45', volume: '10', volumeUnit: 'gallons_uk' });
+		expect(screen.getByTestId('energy-readout')).toHaveTextContent('$4.50 a UK gallon');
+		cleanup();
+
+		mount({ ...EV, quick: true, charge: '20', fuelType: 'Electric', distanceSinceLast: 80 });
+		expect(screen.getByTestId('energy-readout')).toHaveTextContent('80 mi since last charge');
 	});
 
 	test('a litre car reads per litre, a charge reads per kWh, and an empty fill shows nothing', () => {

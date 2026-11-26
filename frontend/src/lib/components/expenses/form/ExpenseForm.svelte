@@ -42,7 +42,7 @@
 	import ExpensePhotoSection from './ExpensePhotoSection.svelte';
 	import PendingPhotoPreview from './PendingPhotoPreview.svelte';
 	import ReceiptScanButton from './ReceiptScanButton.svelte';
-	import { convertVolume } from './expense-form/mileage-efficiency';
+	import { convertVolume, distanceSinceLast } from './expense-form/mileage-efficiency';
 	import type { ReceiptDraft } from '#lib/services/vlm-api.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import {
@@ -198,11 +198,7 @@
 
 	const quickActions = $derived(!form.isEditMode);
 	const quickAdd = $derived(!form.isEditMode && !form.queuedExpense);
-	const distanceSinceLast = $derived.by(() => {
-		const reading = parseFloat(form.formData.mileage);
-		const last = form.previousFuelHint;
-		return last && reading > last ? reading - last : null;
-	});
+	const sinceLast = $derived(distanceSinceLast(form.formData.mileage, form.previousFuelHint));
 	const payerEntry = $derived(
 		form.originalExpense
 			? {
@@ -686,7 +682,7 @@
 							onBlur={form.handleBlur}
 							onMileageChange={form.handleMileageChange}
 							quick={quickAdd}
-							{distanceSinceLast}
+							distanceSinceLast={sinceLast}
 						>
 							{#snippet odometer()}
 								{#if form.asksForMileage}
@@ -796,7 +792,7 @@
 				{/if}
 
 				{#if quickActions}
-					<ExpenseSaveRow isSubmitting={form.isSubmitting} onCancel={handleBack} />
+					<ExpenseSaveRow isSubmitting={form.isSubmitting} onCancel={handleBack} quick={quickAdd} />
 				{/if}
 			</form>
 

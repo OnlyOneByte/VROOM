@@ -22,14 +22,14 @@
 
 	const currencySymbol = $derived(getCurrencySymbol());
 	const numberClass =
-		'[appearance:textfield] rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent aria-invalid:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
+		'[appearance:textfield] rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent aria-invalid:ring-0 aria-invalid:border-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
 </script>
 
 <div class="space-y-1 {quick ? 'text-center' : ''}">
 	<Label for="amount" class={quick ? 'sr-only' : ''}>Amount *</Label>
 	{#if quick}
 		<div
-			class="inline-flex max-w-full items-start justify-center gap-1 font-(family-name:--font-fig) font-bold {amountError
+			class="inline-flex max-w-full items-start justify-center gap-1 border-b-2 border-transparent font-(family-name:--font-fig) font-bold transition-colors focus-within:border-needle {amountError
 				? 'text-destructive'
 				: 'text-foreground'}"
 		>
@@ -50,7 +50,7 @@
 				min="0"
 				bind:value={amount}
 				placeholder={amountPlaceholder()}
-				class="h-auto min-w-[3ch] py-0 text-center text-7xl leading-none tabular-nums caret-needle placeholder:text-muted-foreground/60 [field-sizing:content] sm:h-auto sm:text-8xl md:text-8xl {numberClass}"
+				class="h-auto min-w-[3ch] py-0 text-center text-7xl leading-none tabular-nums caret-needle placeholder:text-muted-foreground [field-sizing:content] sm:h-auto sm:text-8xl md:text-8xl {numberClass}"
 				onblur={onAmountBlur}
 				aria-invalid={!!amountError}
 				aria-describedby={amountError ? 'amount-error' : undefined}

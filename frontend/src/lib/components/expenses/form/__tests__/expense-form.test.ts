@@ -586,6 +586,14 @@ describe('ExpenseForm quick add', () => {
 });
 
 describe('ExpenseForm edit mode', () => {
+	test('keeps the full form: its title, a back button and no quick-add figure', async () => {
+		await renderEdit();
+
+		expect(screen.getByRole('button', { name: 'Go back' })).toBeTruthy();
+		expect(screen.queryByRole('heading', { name: 'New expense' })).toBeNull();
+		expect(field('amount')).not.toHaveClass('text-7xl');
+	});
+
 	test('prefills the form from the loaded expense and offers delete and duplicate', async () => {
 		await renderEdit();
 

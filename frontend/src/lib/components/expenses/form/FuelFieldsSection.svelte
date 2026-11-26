@@ -80,7 +80,7 @@
 		getDistanceUnitLabel,
 		getVolumeUnitName
 	} from '#lib/utils/units.ts';
-	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatNumber, formatNumberUpTo } from '#lib/utils/formatters.ts';
 	import { QUICK_FIGURE_INPUT } from './expense-form/quick-classes';
 	import type { VolumeUnit, ChargeUnit, DistanceUnit } from '#lib/types/index.ts';
 	import { rateChargeEfficiency, rateFuelEfficiency } from './expense-form/mileage-efficiency';
@@ -138,17 +138,22 @@
 		if (quantity > 0 && total > 0) {
 			const per = charging
 				? `per ${getChargeUnitLabel(chargeUnit, true)}`
-				: `a ${getVolumeUnitName(volumeUnit).replace(/ \(.*\)$/, '')}`;
+				: volumeUnit === 'gallons_uk'
+					? 'a UK gallon'
+					: `a ${getVolumeUnitName(volumeUnit).replace(/ \(.*\)$/, '')}`;
 			parts.push({ figure: formatCurrency(total / quantity), words: per });
 		}
-		if (efficiency) {
-			const [figure, ...unit] = efficiency.text.split(' ');
-			parts.push({ figure: figure ?? '', words: unit.join(' ') });
+		const ratio = charging ? calculatedEfficiency : calculatedMpg;
+		if (efficiency && ratio) {
+			parts.push({
+				figure: formatNumberUpTo(ratio, 1),
+				words: efficiency.text.split(' ').slice(1).join(' ')
+			});
 		}
 		if (distanceSinceLast) {
 			parts.push({
 				figure: formatNumber(distanceSinceLast, 0),
-				words: `${getDistanceUnitLabel(distanceUnit, true)} since last fill`
+				words: `${getDistanceUnitLabel(distanceUnit, true)} since last ${charging ? 'charge' : 'fill'}`
 			});
 		}
 		return parts;
