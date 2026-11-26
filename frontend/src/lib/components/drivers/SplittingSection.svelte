@@ -98,7 +98,9 @@
 			const current = rules[group];
 			draft[group] =
 				current.kind === 'fixed'
-					? Object.fromEntries(Object.entries(current.shares).map(([id, v]) => [id, String(v)]))
+					? Object.fromEntries(
+							drivers.map(d => [d.id, current.shares[d.id] ? String(current.shares[d.id]) : ''])
+						)
 					: evenShares();
 			editing[group] = true;
 			return;
@@ -165,6 +167,7 @@
 								<div class="flex items-center gap-1">
 									<Input
 										id="share-{group.key}-{driver.id}"
+										aria-label="{driver.name}'s share, in percent"
 										class="h-10 w-20 text-right tabular-nums"
 										type="number"
 										inputmode="numeric"

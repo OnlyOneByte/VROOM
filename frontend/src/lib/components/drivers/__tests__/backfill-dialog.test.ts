@@ -98,7 +98,7 @@ describe('BackfillDialog', () => {
 		undoBackfill.mockResolvedValue({ reverted: 4 });
 		mount();
 		await settle();
-		await fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+		await fireEvent.click(screen.getByRole('button', { name: /^Undo Who logged it · 4 entries/ }));
 		await settle();
 		expect(undoBackfill).toHaveBeenCalledTimes(1);
 	});

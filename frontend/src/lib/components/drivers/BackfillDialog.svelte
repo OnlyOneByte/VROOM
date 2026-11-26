@@ -53,6 +53,12 @@
 	let chosen = $derived(drivers.find(d => d.id === driverId));
 
 	const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+	const describe = (batch: BackfillBatch) =>
+		[
+			batch.mode === 'logged' ? 'Who logged it' : 'Date range',
+			`${batch.total} ${batch.total === 1 ? 'entry' : 'entries'}`,
+			formatDate(batch.createdAt)
+		].join(' · ');
 
 	async function refresh() {
 		batches = await driverApi.backfills(vehicleId).catch(() => []);
@@ -200,15 +206,14 @@
 				{#each batches as batch (batch.id)}
 					<div class="flex min-h-10 items-center justify-between gap-3 text-sm">
 						<span>
-							{batch.mode === 'logged' ? 'Who logged it' : 'Date range'} · {batch.total} · {formatDate(
-								batch.createdAt
-							)}
+							{describe(batch)}
 						</span>
 						<Button
 							size="lg"
 							variant="ghost"
 							class="px-3"
 							disabled={busy}
+							aria-label="Undo {describe(batch)}"
 							onclick={() => undo(batch)}
 						>
 							Undo

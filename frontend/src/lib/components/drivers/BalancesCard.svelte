@@ -56,7 +56,8 @@
 			: balance > 0
 				? `Owes ${money(balance)}`
 				: `Is owed ${money(-balance)}`;
-	let gap = $derived((data?.unassigned ?? 0) + (data?.unpaid ?? 0));
+	let unassigned = $derived(data?.unassigned ?? 0);
+	let unpaid = $derived(data?.unpaid ?? 0);
 	let colorOf = $derived(new Map((data?.drivers ?? []).map(d => [d.driverId, d])));
 
 	async function copyText() {
@@ -147,10 +148,16 @@
 					{/if}
 				</div>
 
-				{#if gap > 0.005}
+				{#if unassigned > 0.005 || unpaid > 0.005}
 					<p class="text-xs text-muted-foreground">
-						{money(gap)} isn't anyone's yet: distance no one is credited with, or costs with no payer.
-						Fill in drivers to include it.
+						{[
+							unassigned > 0.005
+								? `${money(unassigned)} of costs isn't shared out to anyone yet`
+								: '',
+							unpaid > 0.005 ? `${money(unpaid)} of costs has no payer recorded` : ''
+						]
+							.filter(Boolean)
+							.join(', and ')}. Fill in drivers to include it.
 					</p>
 				{/if}
 				<p class="text-xs text-muted-foreground">

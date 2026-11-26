@@ -72,14 +72,18 @@ describe('balances', () => {
 		const list = screen.getByRole('list', { name: 'Who pays whom' });
 		expect(list.textContent).toContain('=Sam');
 		expect(list.textContent).toContain('$20.00');
-		expect(screen.queryByText(/isn't anyone's yet/)).toBeNull();
+		expect(screen.queryByText(/Fill in drivers to include it/)).toBeNull();
 	});
 
 	test("says how much isn't anyone's when distance or payers are missing", async () => {
 		balances.mockResolvedValue(data({ unassigned: 12.5, unpaid: 2.5 }));
 		mount();
 		await settle();
-		expect(screen.getByText(/\$15\.00 isn't anyone's yet/)).toBeTruthy();
+		expect(
+			screen.getByText(
+				/\$12\.50 of costs isn't shared out to anyone yet, and \$2\.50 of costs has no payer/
+			)
+		).toBeTruthy();
 	});
 
 	test('hides itself when the person cannot see balances', async () => {
