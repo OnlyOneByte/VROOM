@@ -18,7 +18,7 @@ vi.mock('#lib/services/analytics-api.ts', () => ({
 const { default: Page } = await import('../+page.svelte');
 
 describe('a tab whose code fails to load', () => {
-	test.each(['Explore', 'Fuel & Stats', 'Cross-Vehicle', 'Per-Vehicle', 'Year-End'])(
+	test.each(['Explore', 'Fuel & charging', 'Cross-vehicle', 'Per-vehicle', 'Year in review'])(
 		'%s says so and offers a reload',
 		async tab => {
 			render(Page);

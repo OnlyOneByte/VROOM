@@ -4,11 +4,11 @@
 	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { LoaderCircle, Car, DollarSign, Route, TrendingUp } from '@lucide/svelte';
+	import { LoaderCircle } from '@lucide/svelte';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import * as Tabs from '#lib/components/ui/tabs/index.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
-	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import AnalyticsFilterBar from '#lib/components/analytics/AnalyticsFilterBar.svelte';
 	import {
 		DEFAULT_RANGE,
@@ -27,15 +27,21 @@
 		type ExploreQuery
 	} from '#lib/components/analytics/explore/query-state.ts';
 	import { analyticsApi } from '#lib/services/analytics-api.ts';
-	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
-	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { formatDate } from '#lib/utils/formatters.ts';
 	import { buildVehicleColorMap } from '#lib/utils/chart-colors.ts';
-	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import type { AnalyticsSummaryResponse, Vehicle } from '#lib/types/index.ts';
 
 	let summary = $state<AnalyticsSummaryResponse | null>(null);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
+	const TAB_TITLES: Record<string, string> = {
+		explore: 'Explore',
+		'fuel-stats': 'Fuel & charging',
+		'cross-vehicle': 'Cross-vehicle',
+		'per-vehicle': 'Per-vehicle',
+		'year-end': 'Year in review',
+		drivers: 'Drivers'
+	};
 	let activeTab = $state('explore');
 	let tabList = $state<HTMLElement | null>(null);
 	let vehicles = $state<Vehicle[]>([]);
@@ -203,55 +209,6 @@
 	let fuelStats = $derived(summary?.fuelStats ?? null);
 	let fuelAdvanced = $derived(summary?.fuelAdvanced ?? null);
 
-	let units = $derived(quickStats?.units ?? settingsStore.unitPreferences);
-	let costPerDistanceLabel = $derived(`Cost per ${getDistanceUnitLabel(units.distanceUnit, true)}`);
-
-	const FLEET_HEALTH_SUBTITLE = 'Service regularity, service mileage and insurance cover';
-
-	let quickStatsItems = $derived(
-		quickStats
-			? [
-					{
-						label: 'Total Vehicles',
-						value: quickStats.vehicleCount,
-						icon: Car,
-						iconColor: 'primary'
-					},
-					{
-						label: nonDefaultRange ? 'Spending' : 'YTD Spending',
-						value: formatCurrency(quickStats.ytdSpending),
-						subtitle: nonDefaultRange ? rangeLabel(filters, d => formatDate(d)) : undefined,
-						icon: DollarSign,
-						iconColor: 'chart-1'
-					},
-					{
-						label: costPerDistanceLabel,
-						value:
-							quickStats.costPerDistance != null
-								? formatCurrency(quickStats.costPerDistance)
-								: 'N/A',
-						icon: Route,
-						iconColor: 'chart-2'
-					},
-					{
-						label: 'Fleet Health',
-						value: quickStats.vehicleCount > 0 ? `${quickStats.fleetHealthScore} / 100` : '—',
-						subtitle:
-							quickStats.vehicleCount > 0 ? FLEET_HEALTH_SUBTITLE : 'Add a vehicle to get a score',
-						icon: TrendingUp,
-						iconColor: 'chart-5'
-					}
-				]
-			: []
-	);
-
-	const QUICK_STAT_SKELETONS = [
-		{ label: 'vehicles', value: '', icon: Car },
-		{ label: 'spending', value: '', icon: DollarSign },
-		{ label: 'cost', value: '', icon: Route },
-		{ label: 'health', value: '', subtitle: FLEET_HEALTH_SUBTITLE, icon: TrendingUp }
-	];
-
 	onMount(() => {
 		void loadVehicles();
 	});
@@ -271,10 +228,14 @@
 {/snippet}
 
 <div class="min-h-screen space-y-4 md:space-y-6">
-	<PageHeader
-		title="Analytics Dashboard"
-		description="Comprehensive insights into your vehicle spending patterns and trends"
-	/>
+	<div>
+		{#if noVehicles}
+			<PageHeader title="Analytics" variant="display" />
+		{:else}
+			<p class="text-sm text-muted-foreground">Analytics</p>
+			<PageHeader title={TAB_TITLES[activeTab] ?? 'Explore'} variant="display" />
+		{/if}
+	</div>
 
 	{#if !noVehicles}
 		<AnalyticsFilterBar
@@ -286,16 +247,14 @@
 		/>
 	{/if}
 
-	{#if isLoading && !error}
-		<StatCardGrid items={QUICK_STAT_SKELETONS} columns={4} isLoading />
+	{#if isLoading && !error && !summary}
+		<Skeleton class="h-10 w-full rounded-full" />
 	{:else if error}
 		<LoadErrorCard title="Couldn't load analytics" message={error} onRetry={loadSummary} />
 	{:else if noVehicles}
 		<NoVehiclesEmptyState
 			description="Analytics compare what your vehicles cost over time. Add one and log a few expenses to see them."
 		/>
-	{:else if quickStats}
-		<StatCardGrid items={quickStatsItems} columns={4} />
 	{/if}
 
 	{#if showTabs}
@@ -312,16 +271,16 @@
 					Explore
 				</Tabs.Trigger>
 				<Tabs.Trigger value="fuel-stats" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
-					Fuel & Stats
+					Fuel & charging
 				</Tabs.Trigger>
 				<Tabs.Trigger value="cross-vehicle" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
-					Cross-Vehicle
+					Cross-vehicle
 				</Tabs.Trigger>
 				<Tabs.Trigger value="per-vehicle" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
-					Per-Vehicle
+					Per-vehicle
 				</Tabs.Trigger>
 				<Tabs.Trigger value="year-end" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
-					Year-End
+					Year in review
 				</Tabs.Trigger>
 				{#if sharedCars.length > 0}
 					<Tabs.Trigger value="drivers" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
@@ -373,7 +332,7 @@
 							onClearFilters={filtered ? clearFilters : undefined}
 						/>
 					{:catch}
-						{@render tabLoadError('Fuel & Stats')}
+						{@render tabLoadError('Fuel & charging')}
 					{/await}
 				</Tabs.Content>
 			{:else if activeTab === 'cross-vehicle'}
@@ -391,7 +350,7 @@
 							onClearFilters={filtered ? clearFilters : undefined}
 						/>
 					{:catch}
-						{@render tabLoadError('Cross-Vehicle')}
+						{@render tabLoadError('Cross-vehicle')}
 					{/await}
 				</Tabs.Content>
 			{:else if activeTab === 'per-vehicle'}
@@ -408,7 +367,7 @@
 							onClearFilters={filtered ? clearFilters : undefined}
 						/>
 					{:catch}
-						{@render tabLoadError('Per-Vehicle')}
+						{@render tabLoadError('Per-vehicle')}
 					{/await}
 				</Tabs.Content>
 			{:else if activeTab === 'year-end'}
@@ -420,7 +379,7 @@
 					{:then { default: YearEndTab }}
 						<YearEndTab />
 					{:catch}
-						{@render tabLoadError('Year-End')}
+						{@render tabLoadError('Year in review')}
 					{/await}
 				</Tabs.Content>
 			{:else if activeTab === 'drivers'}
