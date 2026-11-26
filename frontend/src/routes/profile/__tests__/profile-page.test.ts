@@ -320,11 +320,11 @@ describe('Profile connected accounts', () => {
 		expect(screen.queryByText('Link another account')).toBeNull();
 	});
 
-	test('shows a spinner while accounts load', async () => {
+	test('announces the sign-in methods while they load', async () => {
 		authApi.getLinkedAccounts.mockReturnValue(new Promise(() => {}));
 		await mount();
 		expect(screen.queryByText('Link another account')).toBeNull();
-		expect(document.querySelector('.animate-spin')).not.toBeNull();
+		expect(screen.getByRole('status')).toHaveTextContent('Loading sign-in methods');
 	});
 });
 
@@ -347,7 +347,7 @@ describe('Profile link callback banners', () => {
 	])('link_error=%s shows its message', async (code, message) => {
 		page.url = new URL(`https://app.example/profile?link_error=${code}`);
 		await mount();
-		expect(screen.getByText(message)).toBeInTheDocument();
+		expect(screen.getByRole('alert')).toHaveTextContent(message);
 	});
 
 	test('an unknown link_error shows no banner', async () => {
@@ -359,6 +359,6 @@ describe('Profile link callback banners', () => {
 	test('success=linked confirms the link', async () => {
 		page.url = new URL('https://app.example/profile?success=linked');
 		await mount();
-		expect(screen.getByText('Account linked successfully.')).toBeInTheDocument();
+		expect(screen.getByRole('status')).toHaveTextContent('Account linked successfully.');
 	});
 });

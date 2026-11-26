@@ -11,23 +11,17 @@
 	import { getApiBaseUrl } from '#lib/services/api-client.ts';
 	import type { LinkedAuthProvider } from '#lib/types/index.ts';
 	import {
-		CircleUser,
-		Link2,
 		Monitor,
-		Shield,
 		Users,
 		Bell,
-		Mail,
-		Calendar,
 		LogOut,
-		Download,
-		Trash2,
 		UserPlus,
 		Clock,
 		LoaderCircle,
-		Unlink,
-		CircleAlert,
-		CircleCheck
+		TriangleAlert,
+		CircleCheck,
+		Check,
+		X
 	} from '@lucide/svelte';
 	import {
 		Card,
@@ -36,13 +30,12 @@
 		CardHeader,
 		CardTitle
 	} from '#lib/components/ui/card/index.ts';
-	import { Avatar, AvatarFallback } from '#lib/components/ui/avatar/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import Input from '#lib/components/ui/input/input.svelte';
-	import { Separator } from '#lib/components/ui/separator/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
-	import { Pencil, Check, X } from '@lucide/svelte';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import ComingSoonCard from '#lib/components/common/coming-soon-card.svelte';
@@ -208,40 +201,49 @@
 </svelte:head>
 
 <FormLayout>
-	<div class="space-y-6">
-		<PageHeader title="Profile" description="Manage your account and personal preferences" />
+	<div class="space-y-8">
+		<PageHeader title="Profile" description="Your name, how you sign in, and your data." />
 
-		<Card>
+		<div class="flex items-center gap-4">
+			<div
+				class="grid size-16 shrink-0 place-items-center rounded-full bg-sunk font-(family-name:--font-fig) text-2xl font-bold shadow-[inset_0_0_0_1px_var(--border)]"
+				aria-hidden="true"
+			>
+				{initials}
+			</div>
+			<div class="min-w-0">
+				<p class="truncate text-lg font-semibold">{user?.displayName ?? 'Unknown'}</p>
+				<p class="truncate text-sm text-muted-foreground">{user?.email ?? ''}</p>
+			</div>
+		</div>
+
+		{#if linkErrorMessage}
+			<div class="flex items-start gap-3 rounded-(--r-md) bg-due-tint p-4" role="alert">
+				<TriangleAlert class="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden="true" />
+				<p class="text-sm">{linkErrorMessage}</p>
+			</div>
+		{/if}
+		{#if successMessage}
+			<div class="flex items-start gap-3 rounded-(--r-md) bg-ok-tint p-4" role="status">
+				<CircleCheck class="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+				<p class="text-sm">{successMessage}</p>
+			</div>
+		{/if}
+
+		<Card variant="section">
 			<CardHeader>
-				<div class="flex items-center gap-2">
-					<CircleUser class="h-5 w-5 text-muted-foreground" />
-					<CardTitle>Identity</CardTitle>
-				</div>
-				<CardDescription>Your account details and personal information</CardDescription>
+				<CardTitle level={2} class="text-base">You</CardTitle>
 			</CardHeader>
 			<CardContent>
-				<div class="flex items-center gap-4 mb-6">
-					<Avatar class="h-16 w-16">
-						<AvatarFallback class="text-lg">{initials}</AvatarFallback>
-					</Avatar>
-					<div>
-						<p class="text-lg font-semibold">{user?.displayName ?? 'Unknown'}</p>
-						<p class="text-sm text-muted-foreground">{user?.email ?? ''}</p>
-					</div>
-				</div>
-				<Separator class="mb-4" />
-				<div class="space-y-3">
-					<div class="flex items-center justify-between gap-3">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
-							<CircleUser class="h-4 w-4" />
-							<span>Display Name</span>
-						</div>
-						{#if isEditingName}
-							<div class="flex items-center gap-2 flex-1 justify-end">
+				<dl class="divide-y">
+					<div class="flex min-h-14 items-center justify-between gap-3 py-2">
+						<dt class="shrink-0 text-sm font-medium">Display name</dt>
+						<dd class="flex min-w-0 items-center justify-end gap-2">
+							{#if isEditingName}
 								<Input
 									bind:value={nameDraft}
 									maxlength={100}
-									class="max-w-[200px]"
+									class="max-w-[220px]"
 									disabled={isSavingName}
 									aria-label="Display name"
 									onkeydown={(e: KeyboardEvent) => {
@@ -257,9 +259,9 @@
 									aria-label="Save display name"
 								>
 									{#if isSavingName}
-										<LoaderCircle class="h-4 w-4 animate-spin" />
+										<LoaderCircle class="size-4 animate-spin" />
 									{:else}
-										<Check class="h-4 w-4" />
+										<Check class="size-4" />
 									{/if}
 								</Button>
 								<Button
@@ -269,137 +271,143 @@
 									disabled={isSavingName}
 									aria-label="Cancel editing"
 								>
-									<X class="h-4 w-4" />
+									<X class="size-4" />
 								</Button>
-							</div>
-						{:else}
-							<div class="flex items-center gap-2">
-								<span class="text-sm">{user?.displayName ?? '—'}</span>
-								<Button
-									size="icon-lg"
-									variant="ghost"
-									onclick={startEditName}
-									aria-label="Edit display name"
-								>
-									<Pencil class="h-3.5 w-3.5" />
+							{:else}
+								<span class="truncate text-sm">{user?.displayName ?? '—'}</span>
+								<Button variant="outline" onclick={startEditName} aria-label="Edit display name">
+									Edit
 								</Button>
-							</div>
-						{/if}
+							{/if}
+						</dd>
 					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground">
-							<Mail class="h-4 w-4" />
-							<span>Email</span>
-						</div>
-						<span class="text-sm">{user?.email ?? '—'}</span>
+					<div class="flex min-h-14 items-center justify-between gap-3 py-2">
+						<dt class="text-sm font-medium">Email</dt>
+						<dd class="truncate text-sm text-muted-foreground">{user?.email ?? '—'}</dd>
 					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground">
-							<Calendar class="h-4 w-4" />
-							<span>Member Since</span>
-						</div>
-						<span class="text-sm">{memberSince || '—'}</span>
+					<div class="flex min-h-14 items-center justify-between gap-3 py-2">
+						<dt class="text-sm font-medium">Member since</dt>
+						<dd class="text-sm text-muted-foreground">{memberSince || '—'}</dd>
 					</div>
-				</div>
+				</dl>
 			</CardContent>
 		</Card>
 
-		{#if linkErrorMessage}
-			<div
-				class="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4"
-			>
-				<CircleAlert class="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-				<p class="text-sm text-destructive">{linkErrorMessage}</p>
-			</div>
-		{/if}
-		{#if successMessage}
-			<div class="flex items-start gap-3 rounded-lg border border-chart-2/50 bg-chart-2/10 p-4">
-				<CircleCheck class="h-5 w-5 text-chart-2 shrink-0 mt-0.5" />
-				<p class="text-sm text-foreground">{successMessage}</p>
-			</div>
-		{/if}
-
-		<Card>
+		<Card variant="section">
 			<CardHeader>
-				<div class="flex items-center gap-2">
-					<Link2 class="h-5 w-5 text-muted-foreground" />
-					<CardTitle>Connected Accounts</CardTitle>
-				</div>
-				<CardDescription>Manage your linked sign-in methods</CardDescription>
+				<CardTitle level={2} class="text-base">Sign-in methods</CardTitle>
+				<CardDescription>The accounts you can sign in to VROOM with.</CardDescription>
 			</CardHeader>
-			<CardContent>
+			<CardContent class="space-y-3">
 				{#if unlinkError}
-					<div
-						class="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-3 mb-3"
-					>
-						<CircleAlert class="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-						<p class="text-sm text-destructive">{unlinkError}</p>
+					<div class="flex items-start gap-3 rounded-(--r-md) bg-due-tint p-3" role="alert">
+						<TriangleAlert class="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
+						<p class="text-sm">{unlinkError}</p>
 					</div>
 				{/if}
 				{#if isLoadingAccounts}
-					<div class="flex items-center justify-center py-6">
-						<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
+					<div class="space-y-2" aria-hidden="true">
+						<Skeleton class="h-14 w-full" />
+						<Skeleton class="h-14 w-full" />
 					</div>
+					<span class="sr-only" role="status">Loading sign-in methods</span>
 				{:else}
-					<div class="space-y-3">
+					<ul class="divide-y">
 						{#each accounts as account (account.id)}
 							{@const IconComponent = authProviderIcon(account.providerType)}
-							<div class="flex items-center justify-between">
-								<div class="flex items-center gap-3">
-									<div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+							<li class="flex min-h-14 items-center justify-between gap-3 py-2">
+								<div class="flex min-w-0 items-center gap-3">
+									<div class="grid size-9 shrink-0 place-items-center rounded-full bg-sunk">
 										<IconComponent
-											class="h-5 w-5 {authProviderHasLogo(account.providerType)
+											class="size-5 {authProviderHasLogo(account.providerType)
 												? ''
 												: 'text-muted-foreground'}"
 										/>
 									</div>
-									<div>
-										<p class="text-sm font-medium">{account.displayName}</p>
-										<p class="text-xs text-muted-foreground">{account.email}</p>
+									<div class="min-w-0">
+										<p class="truncate text-sm font-medium">{account.displayName}</p>
+										<p class="truncate text-sm text-muted-foreground">{account.email}</p>
 									</div>
 								</div>
 								<Button
-									variant="ghost"
-									size="icon-lg"
+									variant="outline"
 									aria-label="Unlink {account.displayName}"
 									disabled={accounts.length <= 1 || unlinkingId !== null}
 									onclick={() => confirmUnlink(account)}
 								>
 									{#if unlinkingId === account.id}
-										<LoaderCircle class="h-4 w-4 animate-spin" />
-									{:else}
-										<Unlink class="h-4 w-4" />
+										<LoaderCircle class="size-4 animate-spin" />
 									{/if}
+									Unlink
 								</Button>
-							</div>
+							</li>
 						{/each}
+					</ul>
 
-						{#if unlinkableProviders.length > 0}
-							<Separator />
-							<div class="space-y-2">
-								<p class="text-sm text-muted-foreground">Link another account</p>
+					{#if unlinkableProviders.length > 0}
+						<div class="space-y-1 pt-2">
+							<p class="text-sm font-medium">Link another account</p>
+							<ul class="divide-y">
 								{#each unlinkableProviders as provider (provider.id)}
 									{@const ProviderIcon = authProviderIcon(provider.id)}
-									<Button
-										variant="outline"
-										size="sm"
-										class="h-10 w-full justify-start"
-										disabled={linkingProvider !== null}
-										onclick={() => handleLink(provider.id)}
-									>
-										{#if linkingProvider === provider.id}
-											<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-											Linking...
-										{:else}
-											<ProviderIcon class="mr-2 h-4 w-4" />
-											Link {provider.displayName}
-										{/if}
-									</Button>
+									<li class="flex min-h-14 items-center justify-between gap-3 py-2">
+										<div class="flex min-w-0 items-center gap-3">
+											<div class="grid size-9 shrink-0 place-items-center rounded-full bg-sunk">
+												<ProviderIcon class="size-5" />
+											</div>
+											<p class="truncate text-sm font-medium">{provider.displayName}</p>
+										</div>
+										<Button
+											variant="outline"
+											aria-label="{linkingProvider === provider.id
+												? 'Linking'
+												: 'Link'} {provider.displayName}"
+											disabled={linkingProvider !== null}
+											onclick={() => handleLink(provider.id)}
+										>
+											{#if linkingProvider === provider.id}
+												<LoaderCircle class="size-4 animate-spin" />
+												Linking…
+											{:else}
+												Link
+											{/if}
+										</Button>
+									</li>
 								{/each}
-							</div>
-						{/if}
-					</div>
+							</ul>
+						</div>
+					{/if}
 				{/if}
+			</CardContent>
+		</Card>
+
+		<Card variant="section">
+			<CardHeader>
+				<CardTitle level={2} class="text-base">Your data</CardTitle>
+			</CardHeader>
+			<CardContent>
+				<ul class="divide-y">
+					<li class="flex min-h-14 items-center justify-between gap-3 py-2">
+						<div class="min-w-0">
+							<p class="text-sm font-medium">Export everything</p>
+							<p class="text-sm text-muted-foreground">
+								A ZIP of your data as CSV. Photos aren't included.
+							</p>
+						</div>
+						<Button variant="outline" onclick={handleExportData} disabled={isExporting}>
+							{#if isExporting}
+								<LoaderCircle class="size-4 animate-spin" />
+								Exporting…
+							{:else}
+								Export
+							{/if}
+						</Button>
+					</li>
+					<li class="flex min-h-14 items-center justify-between gap-3 py-2">
+						<p class="text-sm font-medium">Delete account</p>
+						<Badge variant="outline">Coming soon</Badge>
+					</li>
+				</ul>
 			</CardContent>
 		</Card>
 
@@ -413,52 +421,6 @@
 				{ icon: LogOut, label: 'Sign out other devices' }
 			]}
 		/>
-
-		<Card>
-			<CardHeader>
-				<div class="flex items-center gap-2">
-					<Shield class="h-5 w-5 text-muted-foreground" />
-					<CardTitle>Data & Privacy</CardTitle>
-				</div>
-				<CardDescription>Control your data and privacy preferences</CardDescription>
-			</CardHeader>
-			<CardContent class="space-y-4">
-				<div class="flex items-center justify-between gap-3">
-					<div class="flex items-center gap-2 text-sm">
-						<Download class="h-4 w-4 text-muted-foreground" />
-						<div>
-							<p>Export all data</p>
-							<p class="text-xs text-muted-foreground">
-								Download a ZIP of your data. Images and photos are not included.
-							</p>
-						</div>
-					</div>
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-10"
-						onclick={handleExportData}
-						disabled={isExporting}
-					>
-						{#if isExporting}
-							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-							Exporting...
-						{:else}
-							<Download class="mr-2 h-4 w-4" />
-							Export
-						{/if}
-					</Button>
-				</div>
-				<Separator />
-				<div class="flex items-center justify-between gap-3">
-					<div class="flex items-center gap-2 text-sm text-muted-foreground">
-						<Trash2 class="h-4 w-4" />
-						<span>Delete account</span>
-					</div>
-					<span class="text-xs text-muted-foreground">Coming soon</span>
-				</div>
-			</CardContent>
-		</Card>
 
 		<ComingSoonCard
 			icon={Users}
