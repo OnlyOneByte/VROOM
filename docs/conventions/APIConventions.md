@@ -70,7 +70,9 @@ and call it as `repos().entity.findByUserId(...)`; tests build `createAppContext
 database. Code outside a repository that needs the database itself uses `appContext().db`, inside
 a function, never at module scope. Only the context factory and the DB tooling call `getDb()`, which
 opens the database on first call; `db-access-ratchet.test.ts` fails on any other call and on any
-module-level repository instance. Inside a repository, pass `this.db` to `transaction(fn, this.db)`
+module-level repository instance: a top-level `const`/`let` holding one, `export default new
+…Repository(...)`, or one inside a top-level object literal (`export const repos = { … }`).
+Inside a repository, pass `this.db` to `transaction(fn, this.db)`
 so the transaction runs on the injected database.
 
 `BaseRepository` supplies `findById`/`create`/`update`/`delete` (the last two throw
