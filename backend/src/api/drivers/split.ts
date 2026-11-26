@@ -100,10 +100,13 @@ export function splitGroup(
   rule: GroupRule,
   input: GroupInput
 ): { owed: Map<string, number>; unassigned: number } {
-  const shares =
-    rule.kind === 'payer'
-      ? new Map([...input.paidBy].map(([id, cents]) => [id ?? UNASSIGNED, cents]))
-      : allocate(input.total, weightsFor(rule, input));
+  if (rule.kind === 'payer') {
+    const owed = new Map(
+      [...input.paidBy].flatMap(([id, cents]) => (id === null ? [] : [[id, cents] as const]))
+    );
+    return { owed, unassigned: 0 };
+  }
+  const shares = allocate(input.total, weightsFor(rule, input));
   const allocated = [...shares.values()].reduce((a, b) => a + b, 0);
   const owed = new Map([...shares].filter(([id]) => id !== UNASSIGNED));
   const unassigned = (shares.get(UNASSIGNED) ?? 0) + (input.total - allocated);
