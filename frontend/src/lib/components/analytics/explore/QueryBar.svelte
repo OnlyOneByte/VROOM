@@ -43,12 +43,13 @@
 		)
 	);
 	let moneyMetric = $derived(['cost', 'costPerDistance'].includes(metricInfo(query.metric).metric));
+	let costsApply = $derived(moneyMetric || query.metric === 'count');
 	const COSTS = [
 		{ value: 'running', label: 'Running costs' },
 		{ value: 'all', label: 'All costs' }
 	];
 	let metricText = $derived(
-		`${metricLabel(query.metric, distanceWord)}${moneyMetric && query.inc === 'all' ? ', all costs' : ''}`
+		`${metricLabel(query.metric, distanceWord)}${costsApply && query.inc === 'all' ? ', all costs' : ''}`
 	);
 	let isDefault = $derived(
 		JSON.stringify({ ...query, hide: [] }) === JSON.stringify({ ...DEFAULT_EXPLORE, hide: [] })
@@ -91,6 +92,14 @@
 	function closeMenu(wrapper: HTMLElement) {
 		open = null;
 		wrapper.querySelector<HTMLElement>('button')?.focus();
+	}
+
+	let bar = $state<HTMLElement | null>(null);
+
+	async function reset() {
+		onChange(DEFAULT_EXPLORE);
+		await tick();
+		bar?.querySelector<HTMLElement>('button')?.focus();
 	}
 
 	let copyTimer: ReturnType<typeof setTimeout> | undefined;
@@ -171,7 +180,7 @@
 	{@render radios('Metric', query.metric, metrics, v =>
 		update({ metric: v as ExploreQuery['metric'] })
 	)}
-	{#if moneyMetric}
+	{#if costsApply}
 		{@render radios('Costs', query.inc, COSTS, v => update({ inc: v as ExploreQuery['inc'] }))}
 		<p class="text-xs text-muted-foreground">
 			{query.inc === 'all'
@@ -214,7 +223,12 @@
 	}}
 />
 
-<div class="flex flex-wrap items-center gap-2" role="group" aria-label="Chart options">
+<div
+	bind:this={bar}
+	class="flex flex-wrap items-center gap-2"
+	role="group"
+	aria-label="Chart options"
+>
 	{@render chip('metric', 'Metric', metricText, metricMenu)}
 	{@render chip('per', 'By', labelOf(EXPLORE_INTERVALS, query.per), perMenu)}
 	{@render chip('split', 'Split by', labelOf(EXPLORE_SPLITS, query.split), splitMenu)}
@@ -234,7 +248,7 @@
 		{copied === 'done' ? 'Link copied' : copied === 'failed' ? "Couldn't copy" : 'Copy link'}
 	</Button>
 	{#if !isDefault}
-		<Button variant="ghost" class="h-10 rounded-full" onclick={() => onChange(DEFAULT_EXPLORE)}>
+		<Button variant="ghost" class="h-10 rounded-full" onclick={reset}>
 			<RotateCcw class="mr-1 h-4 w-4" aria-hidden="true" />
 			Reset
 		</Button>

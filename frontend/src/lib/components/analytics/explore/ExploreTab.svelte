@@ -90,6 +90,7 @@
 
 	let response = $state<AnalyticsQueryResponse | null>(null);
 	let shown = $state<ExploreQuery>(untrack(() => query));
+	let shownScope = $state(untrack(() => ({ range: rangeText, cars: carsText })));
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 	let controller: AbortController | null = null;
@@ -106,11 +107,13 @@
 	let requestKey = $derived(JSON.stringify(request));
 
 	async function load(params: typeof request, key: string, asked: ExploreQuery) {
+		const scope = untrack(() => ({ range: rangeText, cars: carsText }));
 		controller?.abort();
 		const cached = queryCache.get(key);
 		if (cached) {
 			response = cached;
 			shown = asked;
+			shownScope = scope;
 			isLoading = false;
 			error = null;
 			return;
@@ -124,6 +127,7 @@
 			queryCache.set(key, result);
 			response = result;
 			shown = asked;
+			shownScope = scope;
 			error = null;
 		} catch (e) {
 			if (current.signal.aborted) return;
@@ -173,8 +177,8 @@
 					summary,
 					series: visibleSeries,
 					format: v => (shown.metric === 'cost' && v >= 100 ? format.axis(v) : format.full(v)),
-					rangeText,
-					carsText,
+					rangeText: shownScope.range,
+					carsText: shownScope.cars,
 					interval: intervalLabel,
 					compareLabel,
 					distanceWord
@@ -516,7 +520,7 @@
 <div class="space-y-4 md:space-y-6" bind:this={root}>
 	{#if response && hasData(response)}
 		<div
-			class="flex min-h-40 flex-col gap-2 transition-opacity md:min-h-28 md:flex-row md:items-center md:gap-5"
+			class="flex min-h-48 flex-col gap-2 transition-opacity md:min-h-28 md:flex-row md:items-center md:gap-5"
 			class:opacity-60={isLoading || !!error}
 			aria-live="polite"
 		>
@@ -528,7 +532,7 @@
 			<p class="max-w-md text-base text-muted-foreground md:text-lg">{heroText}</p>
 		</div>
 	{:else if !response && !error}
-		<Skeleton class="h-40 w-full max-w-xl md:h-28" />
+		<Skeleton class="h-48 w-full max-w-xl md:h-28" />
 	{/if}
 
 	<QueryBar {query} onChange={onQueryChange} {driverSplit} {filters} />

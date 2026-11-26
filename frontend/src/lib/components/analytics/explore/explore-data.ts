@@ -165,7 +165,11 @@ export function heroSentence(opts: {
 }): string {
 	const { query, summary, series } = opts;
 	const lead =
-		query.metric === 'cost' && query.inc === 'all' ? 'in all costs' : HERO_LEAD[query.metric];
+		query.metric === 'cost' && query.inc === 'all'
+			? 'in all costs'
+			: query.metric === 'count' && summary.total === 1
+				? 'expense logged'
+				: HERO_LEAD[query.metric];
 	const cars = opts.carsText === 'All cars' ? 'all your cars' : opts.carsText;
 	const parts = [`${lead} ${rangePhrase(opts.rangeText)} for ${cars}.`];
 	if (!isAdditive(query)) return parts[0] as string;

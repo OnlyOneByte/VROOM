@@ -62,6 +62,15 @@ describe('QueryBar chips', () => {
 		expect(screen.queryByRole('button', { name: 'Quarter' })).toBeNull();
 	});
 
+	test('a count keeps the running or all costs choice', async () => {
+		render(QueryBar, {
+			props: { query: { ...DEFAULT_EXPLORE, metric: 'count' }, onChange: () => {} }
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Metric Number of expenses' }));
+		await settle();
+		expect(screen.getByRole('button', { name: 'All costs' })).toBeTruthy();
+	});
+
 	test('Copy link copies the page address', async () => {
 		const writeText = vi.fn(() => Promise.resolve());
 		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });

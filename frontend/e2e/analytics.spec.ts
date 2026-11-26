@@ -359,25 +359,32 @@ test.describe('Analytics', () => {
 
 	test('the hero and chips follow the view in the URL', async ({ page }) => {
 		await mockAnalytics(page);
-		const views: Array<[string, string, string]> = [
-			['', 'Total cost per month by category', 'Metric Total cost'],
+		const views: Array<[string, string, string, RegExp]> = [
+			['', 'Total cost per month by category', 'Metric Total cost', /^in running costs over/],
 			[
 				'?split=fuelType&inc=all',
 				'Total cost per month by fuel type',
-				'Metric Total cost, all costs'
+				'Metric Total cost, all costs',
+				/^in all costs over/
 			],
 			[
 				'?split=none&compare=prevYear',
 				'Total cost per month, against the year before',
-				'Compare The year before'
+				'Compare The year before',
+				/^in running costs over/
 			],
-			['?metric=mpg&per=quarter&split=vehicle', 'Fuel efficiency per quarter by car', 'By Quarter']
+			[
+				'?metric=mpg&per=quarter&split=vehicle',
+				'Fuel efficiency per quarter by car',
+				'By Quarter',
+				/^on average over the last 12 months for all your cars\.$/
+			]
 		];
-		for (const [search, heading, chip] of views) {
+		for (const [search, heading, chip, sentence] of views) {
 			await page.goto(`/analytics${search}`);
 			await expect(page.getByRole('heading', { name: heading })).toBeVisible();
 			await expect(page.getByRole('button', { name: chip })).toBeVisible();
-			await expect(page.getByText(/for all your cars\./)).toBeVisible();
+			await expect(page.getByText(sentence)).toBeVisible();
 		}
 	});
 
