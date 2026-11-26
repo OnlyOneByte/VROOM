@@ -3,6 +3,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../test-helpers/http-client';
 import { seedVehicle } from '../../test-helpers/seed';
@@ -14,7 +15,7 @@ let vehicleId: string;
 beforeEach(async () => {
   ctx = await createTestApp();
   vehicleId = await seedVehicle(ctx);
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 function splitBody(splitConfig: unknown): unknown {

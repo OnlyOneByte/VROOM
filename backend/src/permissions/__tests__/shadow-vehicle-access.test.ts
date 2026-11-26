@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { getDb } from '../../db/connection';
-import { createTestApp, type TestApp } from '../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../test-helpers/http-client';
 import { createInvitee } from '../../test-helpers/invitee';
 import { seedVehicle } from '../../test-helpers/seed';
 import {
@@ -113,7 +113,7 @@ beforeEach(async () => {
   await editor.acceptShare(vehicleId, 'editor');
   await viewer.acceptShare(vehicleId, 'viewer');
   people = { owner: ctx.user.id, editor: editor.id, viewer: viewer.id, stranger: stranger.id };
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => ctx.close());
 

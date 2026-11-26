@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import fc from 'fast-check';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import type { StorageFileInfo } from '../../providers/domains/storage/storage-provider';
 
 const PROVIDER_ID = 'prov-listing';
@@ -22,7 +22,7 @@ beforeEach(async () => {
      VALUES (?, ?, 'storage', 'google-drive', 'Drive', 'enc', '{}', 'active')`,
     [PROVIDER_ID, ctx.user.id]
   );
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => {
   storageSpy?.mockRestore();
   storageSpy = undefined;

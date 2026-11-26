@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { repos } from '../../../app-context';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import type { BackupStrategy, BackupStrategyResult } from '../backup-strategy';
 
 interface ProviderConfigEntry {
@@ -27,7 +27,7 @@ beforeEach(async () => {
         return { success: true, capabilities: {} };
       },
     });
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 function readProviders(): Record<string, ProviderConfigEntry> {

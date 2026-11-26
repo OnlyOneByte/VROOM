@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 
 const RESTORE_PATH = '/api/v1/sync/restore/from-backup';
 const TEST_ORIGIN = 'http://localhost:3000';
@@ -14,7 +14,7 @@ let keyCounter = 0;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 async function upload(bytes: Buffer, fileName = 'backup.zip'): Promise<Response> {

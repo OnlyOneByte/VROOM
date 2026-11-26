@@ -2,7 +2,6 @@ import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
 import { SETUP_TIMEOUT_MS, useTestApp } from '../test-helpers/http-client';
 import { scanSetupHooks, setupHooksWithoutTimeout } from '../test-helpers/setup-hook-scan';
-import allowlist from './setup-hook-timeout.allowlist.json';
 
 const EACH = ['before', 'Each'].join('');
 const ALL = ['before', 'All'].join('');
@@ -18,10 +17,8 @@ describe('test app setup hooks carry an explicit timeout', () => {
     expect(setupHooksWithoutTimeout(source)).toBe(expected);
   });
 
-  test('only the listed files still run setup on the 5 s default, and the list only shrinks', () => {
-    expect(scanSetupHooks(join(import.meta.dir, '..'))).toEqual(
-      allowlist as Record<string, number>
-    );
+  test('no test app setup hook runs on the 5 s default', () => {
+    expect(scanSetupHooks(join(import.meta.dir, '..'))).toEqual({});
   });
 });
 

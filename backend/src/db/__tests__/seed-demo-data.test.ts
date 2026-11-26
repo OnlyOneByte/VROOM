@@ -7,6 +7,7 @@ import {
   type PaginatedEnvelope,
   type RequestFn,
   requestAs,
+  SETUP_TIMEOUT_MS,
 } from '../../test-helpers/http-client';
 import { getDb } from '../connection';
 import { expenses, insuranceClaims, insurancePolicies, trips, users, vehicles } from '../schema';
@@ -23,7 +24,7 @@ beforeAll(async () => {
   const [demo] = await db.select().from(users).where(eq(users.email, 'demo@example.com'));
   demoUserId = demo.id;
   asDemo = (await requestAs(ctx, demoUserId)).request;
-});
+}, SETUP_TIMEOUT_MS);
 
 describe('db:init --seed', () => {
   test('gives the demo user the four trips the C3 mocks show', async () => {

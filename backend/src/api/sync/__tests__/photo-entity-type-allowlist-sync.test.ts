@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { getTableColumns } from 'drizzle-orm';
 import { photos, vehicles } from '../../../db/schema';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import type { ParsedBackupData } from '../../../types';
 import { validateEntityOwnership } from '../../photos/helpers';
 import { ENTITY_TO_CATEGORY } from '../../providers/domains/storage/storage-provider';
@@ -119,7 +119,7 @@ describe('photo entity-type allowlist sync (drift guard)', () => {
     let ctx: TestApp;
     beforeEach(async () => {
       ctx = await createTestApp();
-    });
+    }, SETUP_TIMEOUT_MS);
     afterEach(() => ctx.close());
 
     for (const entityType of PHOTO_ENTITY_TYPES) {

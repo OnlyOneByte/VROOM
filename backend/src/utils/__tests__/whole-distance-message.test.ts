@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../test-helpers/http-client';
 import { seedVehicle } from '../../test-helpers/seed';
 import { WHOLE_DISTANCE_MESSAGE } from '../validation';
 
@@ -9,7 +9,7 @@ let vehicleId: string;
 beforeEach(async () => {
   ctx = await createTestApp();
   vehicleId = await seedVehicle(ctx);
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 describe('a decimal distance gets a readable message', () => {

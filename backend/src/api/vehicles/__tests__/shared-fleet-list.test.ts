@@ -4,6 +4,7 @@ import {
   type DataEnvelope,
   json,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee } from '../../../test-helpers/invitee';
@@ -18,7 +19,7 @@ beforeEach(async () => {
   const b = await createInvitee(ctx, 'fleet-invitee', 'Invitee B');
   bEmail = b.email;
   asB = b.request;
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 interface VehicleRow {

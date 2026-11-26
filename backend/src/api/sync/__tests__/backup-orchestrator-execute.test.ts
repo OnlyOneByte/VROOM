@@ -3,6 +3,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import type { BackupStrategyResult } from '../backup-strategy';
@@ -11,7 +12,7 @@ let ctx: TestApp;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 interface OrchestratorResult {

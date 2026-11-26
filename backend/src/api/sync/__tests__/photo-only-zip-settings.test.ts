@@ -3,6 +3,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { activityTracker } from '../activity-tracker';
@@ -43,7 +44,7 @@ beforeEach(async () => {
   ctx = await createTestApp();
   seedProvider('p-photos', 'google-photos');
   setBackupConfig({ 'p-photos': zipOn });
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => ctx.close());
 

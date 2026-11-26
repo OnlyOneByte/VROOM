@@ -3,7 +3,7 @@ import { createCipheriv, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CONFIG } from '../../config';
-import { createTestApp, type TestApp } from '../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../test-helpers/http-client';
 
 const OLD_KEY = '1'.repeat(64);
 const NEW_KEY = '2'.repeat(64);
@@ -47,7 +47,7 @@ beforeEach(async () => {
   original = { providerKey: encryption.providerKey, providerKeys: encryption.providerKeys };
   ctx = await createTestApp();
   await useKeys(OLD_KEY);
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(async () => {
   await useKeys(original.providerKey, original.providerKeys);

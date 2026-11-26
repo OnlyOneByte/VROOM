@@ -2,13 +2,18 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createTestApp, json, type TestApp } from '../../test-helpers/http-client';
+import {
+  createTestApp,
+  json,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../test-helpers/http-client';
 
 let ctx: TestApp;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 interface ErrorBody {

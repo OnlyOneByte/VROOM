@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import type { BackupStrategyResult } from '../backup-strategy';
 
 let ctx: TestApp;
@@ -41,7 +41,7 @@ beforeEach(async () => {
       Promise.race([work, Promise.reject(new Error('timed out'))]) as Promise<T>
   );
   restoreTimeout = () => spy.mockRestore();
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   restoreTimeout();

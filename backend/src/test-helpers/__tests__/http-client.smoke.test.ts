@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../http-client';
 
 let ctx: TestApp;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   ctx.close();
