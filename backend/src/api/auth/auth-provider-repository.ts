@@ -1,6 +1,6 @@
 import { createId } from '@paralleldrive/cuid2';
 import { and, asc, count, eq } from 'drizzle-orm';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import type { UserProvider } from '../../db/schema';
 import { userProviders } from '../../db/schema';
 
@@ -13,7 +13,7 @@ export function buildAuthProviderConfig(
 }
 
 export class AuthProviderRepository {
-  constructor(private db: AppDatabase) {}
+  constructor(private db: AsyncAppDatabase) {}
 
   async findByProviderIdentity(
     authProvider: string,

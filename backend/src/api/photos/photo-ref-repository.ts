@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { countNum } from '../../db/dialect';
 import { type NewPhotoRef, type PhotoRef, photoRefs, userProviders } from '../../db/schema';
 import { chunk } from '../../utils/chunk';
@@ -14,7 +14,7 @@ export interface UpdateStatusOptions {
 }
 
 export class PhotoRefRepository {
-  constructor(private db: AppDatabase) {}
+  constructor(private db: AsyncAppDatabase) {}
 
   async findActiveByPhotoAndProvider(
     photoId: string,

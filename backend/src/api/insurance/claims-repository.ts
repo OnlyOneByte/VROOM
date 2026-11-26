@@ -1,5 +1,5 @@
 import { and, desc, eq } from 'drizzle-orm';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import type { InsuranceClaim } from '../../db/schema';
 import { insuranceClaims, insurancePolicies } from '../../db/schema';
 import { DatabaseError, NotFoundError } from '../../errors';
@@ -28,11 +28,7 @@ interface UpdateClaimInput {
 }
 
 export class InsuranceClaimRepository {
-  private db: AppDatabase;
-
-  constructor(db: AppDatabase) {
-    this.db = db;
-  }
+  constructor(private db: AsyncAppDatabase) {}
 
   async findByPolicyId(policyId: string): Promise<InsuranceClaim[]> {
     try {

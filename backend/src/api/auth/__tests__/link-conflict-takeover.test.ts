@@ -1,14 +1,11 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
-import type { AppDatabase } from '../../../db/connection';
-import * as schema from '../../../db/schema';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AuthProviderRepository } from '../auth-provider-repository';
 import { checkLinkConflicts } from '../routes';
 
 let sqliteDb: Database;
-let db: AppDatabase;
 let repo: AuthProviderRepository;
 
 const USER_A = 'user-a';
@@ -18,8 +15,7 @@ beforeEach(() => {
   sqliteDb = new Database(':memory:');
   sqliteDb.run('PRAGMA foreign_keys = ON');
   for (const m of loadMigrations()) applyMigration(sqliteDb, m);
-  db = drizzle(sqliteDb, { schema });
-  repo = new AuthProviderRepository(db);
+  repo = new AuthProviderRepository(openAsyncDatabase(sqliteDb).db);
   sqliteDb.run(
     `INSERT INTO users (id, email, display_name) VALUES ('${USER_A}', 'a@test.com', 'A')`
   );

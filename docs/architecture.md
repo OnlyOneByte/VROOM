@@ -134,10 +134,11 @@ On Postgres (#1635) the same `transaction(async (tx) => …)` signature maps ont
 own pooled transaction, so call sites won't change again.
 
 **Moving the app across (#1378).** `appContext().asyncDb` is the async session over the same
-connection as `appContext().db`, and repositories move to it area by area. The settings
-repositories are first. One ordering rule holds the migration together: sync queries must
-be gone before the first async transaction ships, because a sync query issued while an async
-transaction is open runs inside it. The async module enforces this. It wraps the
+connection as `appContext().db`, and repositories move to it area by area. The settings,
+auth-provider, photo-ref and insurance-claim repositories are on it so far. One ordering
+rule holds the migration together: sync queries must be gone before the first async
+transaction ships, because a sync query issued while an async transaction is open runs
+inside it. The async module enforces this. It wraps the
 connection's `prepare`, `query`, `run`, `exec` and `transaction`, and any call that doesn't
 come from the async session while an async transaction is open throws
 `SyncQueryInAsyncTransactionError`. The guard can't see a statement prepared before the
