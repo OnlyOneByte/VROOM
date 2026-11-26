@@ -17,12 +17,7 @@ import {
 } from '../../permissions/authorize';
 import type { Resource } from '../../permissions/resolve';
 import { neutralizeCsvRow } from '../../utils/csv-safety';
-import {
-  centsToDollars,
-  expenseDollarsToCents,
-  expenseSummaryToApi,
-  expenseToApi,
-} from '../../utils/money';
+import { expenseDollarsToCents, expenseSummaryToApi, expenseToApi } from '../../utils/money';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import { readJsonBody } from '../../utils/request-body';
 import { isValidTimeZone } from '../../utils/time-zone';
@@ -407,6 +402,7 @@ routes.post(
     await assertSplitFinancingSourceValid(data.sourceType, data.sourceId, data.splitConfig);
 
     const payerFor = (vehicleId: string) => attributedDriver(c, vehicleId, undefined) ?? null;
+    const scale = await repos().preferences.moneyScale(ownerId);
     const siblings = await repos().expenses.createSplitExpense(data, {
       ownerId,
       createdBy,
@@ -421,9 +417,11 @@ routes.post(
       {
         success: true,
         data: {
-          siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
+          siblings: siblings.map((leg) =>
+            hideDriverFields(c, leg.vehicleId, expenseToApi(leg, scale))
+          ),
           groupId: first.groupId,
-          groupTotal: centsToDollars(first.groupTotal),
+          groupTotal: first.groupTotal / scale,
           splitMethod: first.splitMethod,
         },
         message: 'Split expense created successfully',
@@ -471,6 +469,7 @@ routes.put(
       data.splitConfig
     );
 
+    const scale = await repos().preferences.moneyScale(groupInfo.ownerId);
     const siblings = await repos().expenses.updateSplitExpense(id, data, groupInfo.ownerId);
     const first = siblings[0];
     if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
@@ -480,9 +479,11 @@ routes.put(
     return c.json({
       success: true,
       data: {
-        siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
+        siblings: siblings.map((leg) =>
+          hideDriverFields(c, leg.vehicleId, expenseToApi(leg, scale))
+        ),
         groupId: first.groupId,
-        groupTotal: centsToDollars(first.groupTotal),
+        groupTotal: first.groupTotal / scale,
         splitMethod: first.splitMethod,
       },
       message: 'Split expense updated successfully',
@@ -505,6 +506,7 @@ routes.get(
       assertMayTouchFinancialExpense(seesFinancials(access), groupInfo.sourceType);
     }
 
+    const scale = await repos().preferences.moneyScale(groupInfo.ownerId);
     const siblings = await repos().expenses.getSplitExpense(id, groupInfo.ownerId);
     const first = siblings[0];
     if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
@@ -514,9 +516,11 @@ routes.get(
     return c.json({
       success: true,
       data: {
-        siblings: siblings.map((leg) => hideDriverFields(c, leg.vehicleId, expenseToApi(leg))),
+        siblings: siblings.map((leg) =>
+          hideDriverFields(c, leg.vehicleId, expenseToApi(leg, scale))
+        ),
         groupId: first.groupId,
-        groupTotal: centsToDollars(first.groupTotal),
+        groupTotal: first.groupTotal / scale,
         splitMethod: first.splitMethod,
       },
     });
@@ -562,14 +566,18 @@ routes.get(
     const user = c.get('user');
     const { vehicleId, period, timeZone } = c.req.valid('query');
 
+    const scope = await resolveExpenseReadScope(vehicleId, user.id);
     const summary = await repos().expenses.getSummary({
-      ...(await resolveExpenseReadScope(vehicleId, user.id)),
+      ...scope,
       vehicleId,
       period,
       timeZone,
     });
 
-    return c.json({ success: true, data: expenseSummaryToApi(summary) });
+    return c.json({
+      success: true,
+      data: expenseSummaryToApi(summary, await repos().preferences.moneyScale(scope.userId)),
+    });
   }
 );
 
@@ -632,6 +640,7 @@ routes.get(
     ]);
 
     const currency = prefs?.currencyUnit || 'USD';
+    const scale = await repos().preferences.moneyScale(scope.userId);
 
     const vehicleName = new Map(
       [...vehicles, ...sharedVehicles].map((v) => [
@@ -646,7 +655,7 @@ routes.get(
         date: e.date instanceof Date ? e.date.toISOString() : e.date,
         vehicle: vehicleName.get(e.vehicleId) ?? 'Unknown Vehicle',
         category: e.category,
-        amount: centsToDollars(e.expenseAmount),
+        amount: e.expenseAmount / scale,
         currency,
         mileage: e.mileage || '',
         volume: e.volume ?? '',
@@ -853,7 +862,11 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
   return c.json(
     {
       success: true,
-      data: hideDriverFields(c, createdExpense.vehicleId, expenseToApi(createdExpense)),
+      data: hideDriverFields(
+        c,
+        createdExpense.vehicleId,
+        expenseToApi(createdExpense, await repos().preferences.moneyScale(ownerId))
+      ),
       message: 'Expense created successfully',
     },
     201
@@ -864,8 +877,9 @@ routes.get('/', zValidator('query', expenseQuerySchema), authorize(fromQueryVehi
   const user = c.get('user');
   const query = c.req.valid('query');
 
+  const scope = await resolveExpenseReadScope(query.vehicleId, user.id);
   const { data, totalCount } = await repos().expenses.findPaginated({
-    ...(await resolveExpenseReadScope(query.vehicleId, user.id)),
+    ...scope,
     vehicleId: query.vehicleId,
     category: query.category,
     startDate: query.startDate,
@@ -882,10 +896,11 @@ routes.get('/', zValidator('query', expenseQuerySchema), authorize(fromQueryVehi
 
   const { limit, offset } = clampPagination(query);
 
+  const scale = await repos().preferences.moneyScale(scope.userId);
   const rows = data.map((expense) =>
     query.vehicleId
-      ? hideDriverFields(c, expense.vehicleId, expenseToApi(expense))
-      : expenseToApi(expense)
+      ? hideDriverFields(c, expense.vehicleId, expenseToApi(expense, scale))
+      : expenseToApi(expense, scale)
   );
   return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
 });
@@ -898,8 +913,9 @@ routes.get(
     const user = c.get('user');
     const query = c.req.valid('query');
 
+    const scope = await resolveExpenseReadScope(query.vehicleId, user.id);
     const months = await repos().expenses.getMonthlyTotals({
-      ...(await resolveExpenseReadScope(query.vehicleId, user.id)),
+      ...scope,
       vehicleId: query.vehicleId,
       category: query.category,
       startDate: query.startDate,
@@ -910,9 +926,10 @@ routes.get(
       search: query.search,
     });
 
+    const scale = await repos().preferences.moneyScale(scope.userId);
     return c.json({
       success: true,
-      data: months.map((m) => ({ ...m, amount: centsToDollars(m.amount) })),
+      data: months.map((m) => ({ ...m, amount: m.amount / scale })),
     });
   }
 );
@@ -930,7 +947,11 @@ routes.get(
     assertMayTouchFinancialExpense(seesFinancials(access), expense.sourceType);
     return c.json({
       success: true,
-      data: hideDriverFields(c, expense.vehicleId, expenseToApi(expense)),
+      data: hideDriverFields(
+        c,
+        expense.vehicleId,
+        expenseToApi(expense, await repos().preferences.moneyScale(expense.userId))
+      ),
     });
   }
 );
@@ -1024,7 +1045,11 @@ routes.put(
 
     return c.json({
       success: true,
-      data: hideDriverFields(c, updatedExpense.vehicleId, expenseToApi(updatedExpense)),
+      data: hideDriverFields(
+        c,
+        updatedExpense.vehicleId,
+        expenseToApi(updatedExpense, await repos().preferences.moneyScale(updatedExpense.userId))
+      ),
       message: 'Expense updated successfully',
     });
   }

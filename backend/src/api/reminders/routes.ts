@@ -16,12 +16,7 @@ import {
 import { requestResolver } from '../../permissions/grants';
 import type { Resource } from '../../permissions/resolve';
 import { logger } from '../../utils/logger';
-import {
-  centsToDollars,
-  expenseToApi,
-  reminderToApi,
-  reminderWithVehiclesToApi,
-} from '../../utils/money';
+import { expenseToApi, reminderToApi, reminderWithVehiclesToApi } from '../../utils/money';
 import { readJsonBody } from '../../utils/request-body';
 import { calendarDayIn, isValidTimeZone } from '../../utils/time-zone';
 import { commonSchemas, zValidator } from '../../utils/validation';
@@ -263,9 +258,15 @@ routes.post(
     const user = c.get('user');
     const { timeZone } = c.req.valid('query');
     const result = await reminderTriggerService.processOverdueReminders(user.id, timeZone);
+    const scaleOf = await repos().preferences.moneyScales(
+      result.createdExpenses.map((e) => e.userId)
+    );
     return c.json({
       success: true,
-      data: { ...result, createdExpenses: result.createdExpenses.map(expenseToApi) },
+      data: {
+        ...result,
+        createdExpenses: result.createdExpenses.map((e) => expenseToApi(e, scaleOf(e.userId))),
+      },
     });
   }
 );
@@ -276,7 +277,10 @@ routes.get('/recurring-cost', authorize(ownAccount), async (c) => {
   const summary = recurringCostSummary(expenseReminders.map((r) => r.reminder));
   return c.json({
     success: true,
-    data: { ...summary, monthlyTotal: centsToDollars(summary.monthlyTotal) },
+    data: {
+      ...summary,
+      monthlyTotal: summary.monthlyTotal / (await repos().preferences.moneyScale(user.id)),
+    },
   });
 });
 
@@ -317,13 +321,22 @@ routes.post(
       const nextDue = nextDueAfterService(reminder, reminder.nextDueDate, new Date(), timeZone);
       if (reminder.endDate && nextDue > reminder.endDate) {
         await repos().reminders.deactivate(id, ownerId);
-        return c.json({ success: true, data: reminderToApi({ ...reminder, isActive: false }) });
+        return c.json({
+          success: true,
+          data: reminderToApi(
+            { ...reminder, isActive: false },
+            await repos().preferences.moneyScale(ownerId)
+          ),
+        });
       }
       fields.nextDueDate = nextDue;
     }
 
     const updated = await repos().reminders.markServiced(id, ownerId, fields);
-    return c.json({ success: true, data: reminderToApi(updated) });
+    return c.json({
+      success: true,
+      data: reminderToApi(updated, await repos().preferences.moneyScale(ownerId)),
+    });
   }
 );
 
@@ -368,7 +381,13 @@ routes.post(
       vehicleIds
     );
 
-    return c.json({ success: true, data: reminderWithVehiclesToApi(result) }, 201);
+    return c.json(
+      {
+        success: true,
+        data: reminderWithVehiclesToApi(result, await repos().preferences.moneyScale(ownerId)),
+      },
+      201
+    );
   }
 );
 
@@ -394,7 +413,8 @@ routes.get('/', authorize(fromQueryVehicle), async (c) => {
     listUserId === user.id
       ? reminders
       : reminders.map((row) => ({ ...row, vehicleIds: visibleVehicleIds(c, row.vehicleIds) }));
-  return c.json({ success: true, data: visible.map(reminderWithVehiclesToApi) });
+  const scale = await repos().preferences.moneyScale(listUserId);
+  return c.json({ success: true, data: visible.map((r) => reminderWithVehiclesToApi(r, scale)) });
 });
 
 routes.get(
@@ -414,10 +434,11 @@ routes.get(
     const readable = materialized.filter(
       (expense) => resolver.can('vehicle.expense.read', vehicleResource(expense.vehicleId)).allow
     );
+    const scale = await repos().preferences.moneyScale(existing.reminder.userId);
     return c.json({
       success: true,
       data: readable.map((expense) =>
-        hideDriverFields(c, expense.vehicleId, expenseToApi(expense))
+        hideDriverFields(c, expense.vehicleId, expenseToApi(expense, scale))
       ),
     });
   }
@@ -491,7 +512,10 @@ routes.put(
       mergedVehicleIds
     );
 
-    return c.json({ success: true, data: reminderWithVehiclesToApi(result) });
+    return c.json({
+      success: true,
+      data: reminderWithVehiclesToApi(result, await repos().preferences.moneyScale(ownerId)),
+    });
   }
 );
 

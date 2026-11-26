@@ -2,7 +2,6 @@ import { and, eq, gte, isNotNull, lte } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { expenses, odometerEntries, trips } from '../../db/schema';
 import { isElectricFuelType } from '../../db/types';
-import { centsToDollars } from '../../utils/money';
 import { attributeDistance, type Period } from './distance';
 import { listDrivers } from './repository';
 
@@ -14,6 +13,7 @@ export interface StatsOptions {
   viewerUserId: string;
   everyone: boolean;
   includeCarCosts: boolean;
+  scale: number;
 }
 
 export interface DriverFigures {
@@ -140,7 +140,7 @@ export function driverStats(db: AppDatabase, vehicleId: string, options: StatsOp
         fuelUsed: options.includeCarCosts ? used(fuelRate, total) : null,
         chargeBought: round(boughtOf(true, d.id)),
         chargeUsed: options.includeCarCosts ? used(chargeRate, total) : null,
-        runningCostsPaid: centsToDollars(centsPaidBy(d.id)),
+        runningCostsPaid: centsPaidBy(d.id) / options.scale,
       };
     });
 
@@ -153,9 +153,9 @@ export function driverStats(db: AppDatabase, vehicleId: string, options: StatsOp
     estimates: options.withEstimates,
     scope: options.everyone ? ('everyone' as const) : ('own' as const),
     distance: options.everyone ? { total: totalDistance, attributed, unattributed } : null,
-    runningCosts: options.includeCarCosts ? centsToDollars(runningCents) : null,
+    runningCosts: options.includeCarCosts ? runningCents / options.scale : null,
     costPerDistance:
-      options.includeCarCosts && costRate !== null ? round(centsToDollars(costRate), 4) : null,
+      options.includeCarCosts && costRate !== null ? round(costRate / options.scale, 4) : null,
     drivers: figures,
   };
 }

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { appContext } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, vehicleParam } from '../../permissions/authorize';
@@ -74,7 +74,7 @@ driverRoutes.get(
   zValidator('param', vehicleIdParam),
   zValidator('query', statsQuery),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId } = c.req.valid('param');
     const query = c.req.valid('query');
     const { db } = appContext();
@@ -83,6 +83,9 @@ driverRoutes.get(
     const from = query.from ? Date.parse(query.from) : to - 30 * DAY;
     const resolver = requestResolver(c, db);
     const vehicle = { kind: 'vehicle' as const, vehicleId };
+    const owner = await repos().vehicles.findById(vehicleId);
+    if (!owner) throw new NotFoundError('Vehicle');
+    const scale = await repos().preferences.moneyScale(owner.userId);
     return c.json({
       success: true,
       data: driverStats(db, vehicleId, {
@@ -91,6 +94,7 @@ driverRoutes.get(
         viewerUserId: c.get('user').id,
         everyone: resolver.can('vehicle.driver_stats.read', vehicle).allow,
         includeCarCosts: resolver.can('vehicle.expense.read', vehicle).allow,
+        scale,
       }),
     });
   }
