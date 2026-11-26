@@ -100,6 +100,9 @@ Drizzle's async `sqlite-proxy` session:
   a background job armed from inside it, starts through `outsideTransaction(fn)`. That includes
   a lazy query builder: it runs after the transaction ends, so never await it inside the
   transaction.
+- SQLite rolls a transaction back by itself on some errors, such as disk full, I/O errors and
+  `OR ROLLBACK`. The caller then gets that original error. If the callback catches it and carries
+  on, every later statement throws `TransactionRolledBackError` instead of committing on its own.
 - Keep awaits inside a transaction to database work. A slow `fetch` there makes every other
   query wait. Two waits deadlock:
   - awaiting a promise that another request started (such as a shared in-flight cache), when

@@ -5,12 +5,20 @@ import * as schema from './schema';
 
 const STATEMENT_CACHE_SIZE = 500;
 const TRANSACTION_CONTROL = /^\s*(commit|rollback|release savepoint)\b/i;
+const BEGIN = /^\s*begin\b/i;
+const ROLLBACK = /^\s*rollback\b/i;
 
 type Method = 'run' | 'all' | 'values' | 'get';
 
 export class TransactionEndedError extends Error {
   constructor() {
     super('A query ran after its transaction had ended; await every query inside the callback');
+  }
+}
+
+export class TransactionRolledBackError extends Error {
+  constructor() {
+    super('SQLite rolled this transaction back after an earlier error, so the rest was refused');
   }
 }
 
@@ -59,9 +67,14 @@ export function openAsyncDatabase(sqlite: Database) {
 
   async function gated(query: string, params: unknown[], method: Method) {
     const scope = scopes.getStore();
+    if (scope && ROLLBACK.test(query) && !sqlite.inTransaction) return { rows: [] };
     if (hasEnded(scope, query)) throw new TransactionEndedError();
     while (open && scope?.root !== open) await closed;
     while (scope?.nested) await scope.nested.catch(() => undefined);
+    if (scope && !sqlite.inTransaction && !BEGIN.test(query)) {
+      scope.root.ended = true;
+      throw new TransactionRolledBackError();
+    }
     return execute(query, params, method);
   }
 

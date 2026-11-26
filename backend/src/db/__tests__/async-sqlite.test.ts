@@ -1,8 +1,12 @@
 import { Database } from 'bun:sqlite';
 import { describe, expect, test } from 'bun:test';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
-import { openAsyncDatabase, TransactionEndedError } from '../async-sqlite';
+import {
+  openAsyncDatabase,
+  TransactionEndedError,
+  TransactionRolledBackError,
+} from '../async-sqlite';
 import * as schema from '../schema';
 import { applyMigrationsUpTo, loadMigrations } from './migration-helpers';
 
@@ -213,6 +217,47 @@ describe('async transactions over bun:sqlite', () => {
       })
     ).rejects.toThrow('roll back');
     expect(await seen).toEqual([]);
+  });
+
+  test('when SQLite rolls the transaction back itself, the original error reaches the caller', async () => {
+    const { db, transaction } = setup();
+    await db.insert(users).values(user('dup'));
+    const error = await transaction(async (tx) => {
+      await tx.insert(users).values(user('t1'));
+      await tx.run(
+        sql`insert or rollback into users (id, email, display_name) values ('dup', 'x@test.com', 'x')`
+      );
+    }).then(
+      () => new Error('resolved') as Error & { cause?: Error },
+      (e) => e as Error & { cause?: Error }
+    );
+    expect(String(error.cause ?? error)).toMatch(/UNIQUE constraint failed/);
+    expect((await db.select({ id: users.id }).from(users)).map((r) => r.id)).toEqual(['dup']);
+  });
+
+  test('after SQLite rolls the transaction back, later writes are refused, not committed one by one', async () => {
+    const { db, transaction } = setup();
+    await db.insert(users).values(user('dup'));
+    const error = await transaction(async (tx) => {
+      await tx.insert(users).values(user('t1'));
+      await tx
+        .run(
+          sql`insert or rollback into users (id, email, display_name) values ('dup', 'x@test.com', 'x')`
+        )
+        .catch(() => undefined);
+      await tx.insert(users).values(user('t2'));
+      await transaction(async (inner) => {
+        await inner.insert(users).values(user('t3'));
+      });
+    }).then(
+      () => new Error('resolved') as Error & { cause?: unknown },
+      (e) => e as Error & { cause?: unknown }
+    );
+    expect(
+      error instanceof TransactionRolledBackError ||
+        error.cause instanceof TransactionRolledBackError
+    ).toBe(true);
+    expect((await db.select({ id: users.id }).from(users)).map((r) => r.id)).toEqual(['dup']);
   });
 
   test('a batch outside a transaction is atomic', async () => {
