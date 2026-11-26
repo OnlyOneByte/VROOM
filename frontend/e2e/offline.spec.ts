@@ -13,8 +13,11 @@ test.describe('Offline expense entry', () => {
 		page
 	}) => {
 		await page.goto('/expenses');
-		await expect(page.getByRole('heading', { name: 'All Expenses' })).toBeVisible();
-		await page.getByRole('link', { name: /Add Expense/ }).click();
+		await expect(page.getByRole('heading', { name: 'Expenses', exact: true })).toBeVisible();
+		await page
+			.getByRole('link', { name: /Add expense/i })
+			.first()
+			.click();
 		await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible();
 		await expect(page.getByLabel('Vehicle *')).toHaveText(VEHICLE_CAMRY.nickname);
 
@@ -37,7 +40,10 @@ test.describe('Offline expense entry', () => {
 		await expect(page.getByText('$12.34')).toBeVisible();
 		await expect(page.getByText("Couldn't load expenses")).toHaveCount(0);
 
-		await page.getByRole('link', { name: /Add Expense/ }).click();
+		await page
+			.getByRole('link', { name: /Add expense/i })
+			.first()
+			.click();
 		await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible();
 		await expect(page.getByText("This page couldn't load")).toHaveCount(0);
 		await expect(page.getByLabel('Vehicle *')).toHaveText(VEHICLE_CAMRY.nickname);

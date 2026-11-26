@@ -144,22 +144,26 @@ function offlineExpense(id: string, overrides: Partial<OfflineExpense>): Offline
 
 async function mountLoaded() {
 	const result = render(Page);
-	await screen.findByRole('heading', { name: 'All Expenses' });
+	await screen.findByRole('heading', { name: 'Expenses' });
 	await waitFor(() => expect(captured.table['expenses']).toBeDefined());
 	return result;
 }
 
+async function filtersSheet(): Promise<HTMLElement> {
+	const open = screen.queryByRole('dialog', { name: 'Filters' });
+	if (open) return open;
+	await fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
+	return screen.findByRole('dialog', { name: 'Filters' });
+}
+
 async function chooseVehicle(name: string) {
-	const trigger = screen.getByRole('combobox', { name: 'Vehicle filter' });
-	await fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' });
-	await fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' });
-	const option = await screen.findByRole('option', { name });
-	await fireEvent.pointerUp(option, { button: 0, pointerType: 'mouse' });
-	await fireEvent.click(option);
+	const sheet = await filtersSheet();
+	await fireEvent.click(within(sheet).getByRole('button', { name }));
 }
 
 async function addTagFilter(tag: string) {
-	const input = screen.getByRole('combobox', { name: 'Search tags' });
+	const sheet = await filtersSheet();
+	const input = within(sheet).getByRole('combobox', { name: 'Search tags' });
 	await fireEvent.input(input, { target: { value: tag } });
 	await fireEvent.keyDown(input, { key: 'Enter' });
 }
@@ -338,7 +342,7 @@ describe('/expenses loading states', () => {
 
 		await waitFor(() => expect(getAllExpenses).toHaveBeenCalled());
 		expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
-		expect(screen.queryByRole('heading', { name: 'All Expenses' })).toBeNull();
+		expect(screen.queryByRole('heading', { name: 'Expenses' })).toBeNull();
 	});
 
 	test('a failed first load shows the reason, and Retry loads the page', async () => {
@@ -400,8 +404,10 @@ describe('/expenses filters', () => {
 
 		await waitFor(() => expect(lastListParams()).toMatchObject({ vehicleId: 'v2', offset: 0 }));
 		expect(getExpenseSummary).toHaveBeenLastCalledWith({ vehicleId: 'v2' });
-		expect(screen.getByRole('combobox', { name: 'Vehicle filter' }).textContent?.trim()).toContain(
-			'2020 Nissan Leaf'
+		const sheet = await filtersSheet();
+		expect(within(sheet).getByRole('button', { name: '2020 Nissan Leaf' })).toHaveAttribute(
+			'aria-pressed',
+			'true'
 		);
 		expect(screen.getByRole('button', { name: /Clear Filters/ })).toBeTruthy();
 		expect(captured.table['hasActiveFilters']).toBe(true);
@@ -412,7 +418,7 @@ describe('/expenses filters', () => {
 		await chooseVehicle('Daily Driver');
 		await waitFor(() => expect(lastListParams()).toMatchObject({ vehicleId: 'v1' }));
 
-		await chooseVehicle('All Vehicles');
+		await chooseVehicle('All');
 
 		await waitFor(() => expect(lastListParams()).not.toHaveProperty('vehicleId'));
 		expect(getExpenseSummary).toHaveBeenLastCalledWith({});
@@ -453,8 +459,9 @@ describe('/expenses filters', () => {
 		vi.setSystemTime(new Date(2026, 5, 15, 12));
 		try {
 			await mountLoaded();
+			const sheet = await filtersSheet();
 
-			await fireEvent.click(screen.getByRole('button', { name: /Date range/ }));
+			await fireEvent.click(within(sheet).getByRole('button', { name: /Date range/ }));
 			const day = (value: string) =>
 				document.querySelector(`[data-bits-day][data-value="${value}"]`) as HTMLElement;
 			await waitFor(() => expect(day('2026-06-01')).not.toBeNull());
@@ -509,51 +516,36 @@ describe('/expenses filters', () => {
 		expect(captured.table['activeSortDir']).toBe('asc');
 	});
 
-	test('the mobile Filters button counts the sheet filters and opens them in a sheet', async () => {
+	test('every filter lives in the Filters sheet, and the button counts the ones in use', async () => {
 		await mountLoaded();
-		expect(screen.getByRole('button', { name: 'Filters' })).toBeTruthy();
+		expect(screen.queryByRole('combobox', { name: 'Search tags' })).toBeNull();
 
 		await chooseVehicle('2020 Nissan Leaf');
 		await addTagFilter('commute');
-		await waitFor(() => expect(screen.getByRole('button', { name: 'Filters · 2' })).toBeTruthy());
-
-		await fireEvent.click(screen.getByRole('button', { name: 'Filters · 2' }));
-		const sheet = await screen.findByRole('dialog', { name: 'Filters' });
-		expect(within(sheet).getByRole('combobox', { name: 'Vehicle filter' })).toBeTruthy();
-		expect(within(sheet).getByRole('combobox', { name: 'Search tags' })).toBeTruthy();
+		const sheet = await filtersSheet();
+		await fireEvent.click(within(sheet).getByRole('button', { name: 'Fuel' }));
+		await waitFor(() => expect(lastListParams()).toMatchObject({ category: 'fuel' }));
+		expect(within(sheet).getByRole('button', { name: 'Fuel' })).toHaveAttribute(
+			'aria-pressed',
+			'true'
+		);
 
 		expect(within(sheet).getByRole('button', { name: 'Close' })).toHaveClass('size-11');
-		expect(
-			within(sheet).getByRole('button', { name: 'Show results' }).parentElement?.className
-		).toContain('env(safe-area-inset-bottom)');
-
-		await fireEvent.click(within(sheet).getByRole('button', { name: 'Show results' }));
+		const show = within(sheet).getByRole('button', { name: /^Show \d+ results?$/ });
+		expect(show.parentElement?.className).toContain('env(safe-area-inset-bottom)');
+		await fireEvent.click(show);
 		await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Filters' })).toBeNull());
+		expect(screen.getByRole('button', { name: 'Filters · 3' })).toBeTruthy();
 	});
 
-	test('on a phone the desktop filters are not rendered, only the Filters sheet', async () => {
-		const desktop = vi.mocked(window.matchMedia).getMockImplementation();
-		onTestFinished(() => {
-			if (desktop) vi.mocked(window.matchMedia).mockImplementation(desktop);
-		});
-		vi.mocked(window.matchMedia).mockImplementation(
-			query =>
-				({
-					matches: query.includes('40rem'),
-					addEventListener: vi.fn(),
-					removeEventListener: vi.fn()
-				}) as unknown as MediaQueryList
-		);
+	test('two category pills filter by both categories', async () => {
 		await mountLoaded();
+		const sheet = await filtersSheet();
 
-		expect(screen.queryByText('Search & Filters')).toBeNull();
-		expect(screen.queryByRole('combobox', { name: 'Vehicle filter' })).toBeNull();
-		expect(screen.queryByRole('combobox', { name: 'Search tags' })).toBeNull();
+		await fireEvent.click(within(sheet).getByRole('button', { name: 'Fuel' }));
+		await fireEvent.click(within(sheet).getByRole('button', { name: 'Maintenance' }));
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
-		const sheet = await screen.findByRole('dialog', { name: 'Filters' });
-		expect(within(sheet).getByRole('combobox', { name: 'Vehicle filter' })).toBeTruthy();
-		expect(within(sheet).getByRole('combobox', { name: 'Search tags' })).toBeTruthy();
+		await waitFor(() => expect(lastListParams()).toMatchObject({ category: 'fuel,maintenance' }));
 	});
 
 	test('clearing filters resets every filter and reloads once', async () => {
@@ -586,7 +578,7 @@ describe('/expenses filters', () => {
 });
 
 describe('/expenses reloads and failures after the first load', () => {
-	test('a summary failure on a filter change shows inline in the overview, with no toast, and Retry recovers', async () => {
+	test('a summary failure on a filter change leaves the list working, with no toast', async () => {
 		await mountLoaded();
 		getAllExpenses.mockResolvedValue(pageOf([], 0));
 		getExpenseSummary.mockRejectedValueOnce(new Error('Summary down'));
@@ -594,17 +586,8 @@ describe('/expenses reloads and failures after the first load', () => {
 		await chooseVehicle('2020 Nissan Leaf');
 
 		await waitFor(() => expect(captured.table['totalCount']).toBe(0));
-		const card = await screen.findByTestId('expense-summary-error');
-		expect(card).toHaveTextContent("Couldn't load the expense summary");
-		expect(card).toHaveTextContent('Summary down.');
-		expect(screen.queryByText('Expense Overview')).toBeNull();
+		expect(screen.queryByTestId('expenses-page-error')).toBeNull();
 		expect(notificationMessages()).toEqual([]);
-
-		await fireEvent.click(within(card).getByRole('button', { name: 'Retry' }));
-
-		await waitFor(() => expect(screen.queryByTestId('expense-summary-error')).toBeNull());
-		expect(screen.getByText('Expense Overview')).toBeInTheDocument();
-		expect(getExpenseSummary).toHaveBeenLastCalledWith({ vehicleId: 'v2' });
 	});
 
 	test('when list and summary both fail only the inline list error shows, with no toast', async () => {

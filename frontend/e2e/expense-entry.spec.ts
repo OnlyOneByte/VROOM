@@ -212,7 +212,7 @@ test.describe('Expense list', () => {
 	test('lists the stored expenses with their amounts', async ({ page }) => {
 		await page.goto('/expenses');
 
-		await expect(page.getByRole('heading', { name: 'All Expenses' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Expenses', exact: true })).toBeVisible();
 		await expect(visibleText(page, '$45.50')).toBeVisible();
 		await expect(visibleText(page, '$89.99')).toBeVisible();
 		await expect(visibleText(page, 'Maintenance')).toBeVisible();
