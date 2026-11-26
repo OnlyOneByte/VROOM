@@ -20,6 +20,7 @@ const EXCLUDED_BY_DESIGN = [
   'permission_overrides',
   'server_settings',
   'server_invites',
+  'driver_backfills',
 ] as const;
 
 function allSchemaTableNames(): string[] {

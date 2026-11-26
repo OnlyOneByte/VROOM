@@ -7,6 +7,14 @@ import { authorize, vehicleParam } from '../../permissions/authorize';
 import { requestResolver } from '../../permissions/grants';
 import { zValidator } from '../../utils/validation';
 import {
+  applyBackfill,
+  type BackfillRequest,
+  planBackfill,
+  recentBackfills,
+  summarize,
+  undoBackfill,
+} from './backfill';
+import {
   addGuestDriver,
   carShareEnabled,
   DRIVER_COLORS,
@@ -98,6 +106,83 @@ driverRoutes.post(
     const id = addGuestDriver(appContext().db, vehicleId, c.req.valid('json'), c.get('user').id);
     const created = listDrivers(appContext().db, vehicleId).find((d) => d.id === id);
     return c.json({ success: true, data: created }, 201);
+  }
+);
+
+const backfillSchema = z.discriminatedUnion('mode', [
+  z.strictObject({ mode: z.literal('logged') }),
+  z
+    .strictObject({
+      mode: z.literal('range'),
+      driverId: z.string().min(1).max(64),
+      from: z.iso.datetime({ offset: true }),
+      to: z.iso.datetime({ offset: true }),
+    })
+    .refine((q) => Date.parse(q.from) <= Date.parse(q.to), {
+      message: 'The range must start before it ends',
+      path: ['from'],
+    }),
+]);
+
+function backfillRequest(vehicleId: string, body: z.infer<typeof backfillSchema>): BackfillRequest {
+  if (body.mode === 'logged') return body;
+  const driver = findDriver(appContext().db, vehicleId, body.driverId);
+  if (!driver || driver.archivedAt !== null) {
+    throw new ValidationError("That driver doesn't drive this vehicle");
+  }
+  return { ...body, from: Date.parse(body.from), to: Date.parse(body.to) };
+}
+
+driverRoutes.get(
+  '/backfill',
+  zValidator('param', vehicleIdParam),
+  authorize(vehicleParam('vehicleId')),
+  (c) => {
+    const { vehicleId } = c.req.valid('param');
+    requireCarShare(vehicleId);
+    return c.json({ success: true, data: recentBackfills(appContext().db, vehicleId) });
+  }
+);
+
+driverRoutes.post(
+  '/backfill/preview',
+  zValidator('param', vehicleIdParam),
+  zValidator('json', backfillSchema),
+  authorize(vehicleParam('vehicleId')),
+  (c) => {
+    const { vehicleId } = c.req.valid('param');
+    requireCarShare(vehicleId);
+    const { db } = appContext();
+    const planned = planBackfill(db, vehicleId, backfillRequest(vehicleId, c.req.valid('json')));
+    return c.json({ success: true, data: summarize(db, vehicleId, planned) });
+  }
+);
+
+driverRoutes.post(
+  '/backfill',
+  zValidator('param', vehicleIdParam),
+  zValidator('json', backfillSchema),
+  authorize(vehicleParam('vehicleId')),
+  (c) => {
+    const { vehicleId } = c.req.valid('param');
+    requireCarShare(vehicleId);
+    const { db } = appContext();
+    const body = c.req.valid('json');
+    const planned = planBackfill(db, vehicleId, backfillRequest(vehicleId, body));
+    const { batchId, entries } = applyBackfill(db, vehicleId, body.mode, planned, c.get('user').id);
+    return c.json({ success: true, data: { batchId, ...summarize(db, vehicleId, entries) } }, 201);
+  }
+);
+
+driverRoutes.post(
+  '/backfill/:batchId/undo',
+  zValidator('param', vehicleIdParam.extend({ batchId: z.string().min(1).max(64) })),
+  authorize(vehicleParam('vehicleId')),
+  (c) => {
+    const { vehicleId, batchId } = c.req.valid('param');
+    requireCarShare(vehicleId);
+    const reverted = undoBackfill(appContext().db, vehicleId, batchId);
+    return c.json({ success: true, data: { reverted } });
   }
 );
 
