@@ -70,6 +70,10 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   'GET /api/v1/vehicles/:vehicleId/drivers/stats': 'vehicle.driver_stats.read_own',
   'POST /api/v1/vehicles/:vehicleId/drivers': 'vehicle.driver.manage',
   'PATCH /api/v1/vehicles/:vehicleId/drivers/:driverId': 'vehicle.driver.manage',
+  'GET /api/v1/vehicles/:vehicleId/drivers/backfill': 'vehicle.driver.manage',
+  'POST /api/v1/vehicles/:vehicleId/drivers/backfill/preview': 'vehicle.driver.manage',
+  'POST /api/v1/vehicles/:vehicleId/drivers/backfill': 'vehicle.driver.manage',
+  'POST /api/v1/vehicles/:vehicleId/drivers/backfill/:batchId/undo': 'vehicle.driver.manage',
   'PUT /api/v1/vehicles/:vehicleId/car-share': 'vehicle.driver.manage',
 
   'GET /api/v1/financing/vehicles/:vehicleId/financing': 'vehicle.financing.read',

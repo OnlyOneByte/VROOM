@@ -95,6 +95,32 @@ export const vehicleDrivers = sqliteTable(
   })
 );
 
+export interface BackfilledEntry {
+  kind: 'trip' | 'reading' | 'expense';
+  id: string;
+  driverId: string;
+}
+
+export const driverBackfills = sqliteTable(
+  'driver_backfills',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    vehicleId: text('vehicle_id')
+      .notNull()
+      .references(() => vehicles.id, { onDelete: 'cascade' }),
+    mode: text('mode').notNull(),
+    entries: text('entries', { mode: 'json' }).$type<BackfilledEntry[]>().notNull(),
+    createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    undoneAt: integer('undone_at', { mode: 'timestamp' }),
+  },
+  (table) => ({
+    vehicleIdx: index('driver_backfills_vehicle_idx').on(table.vehicleId, table.createdAt),
+  })
+);
+
 export const vehicleFinancing = sqliteTable(
   'vehicle_financing',
   {
