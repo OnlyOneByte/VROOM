@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import { CalendarRange, Car, ChevronDown, X } from '@lucide/svelte';
+	import { ChevronDown, X } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
 	import { formatDate } from '#lib/utils/formatters.ts';
@@ -19,9 +19,18 @@
 		onChange: (_filters: AnalyticsFilters) => void;
 		vehiclesError?: string | null;
 		onRetryVehicles?: () => void;
+		/** Flow the chips into a parent row (Explore's chart options) instead of a row of their own. */
+		inline?: boolean;
 	}
 
-	let { filters, vehicles, onChange, vehiclesError, onRetryVehicles }: Props = $props();
+	let {
+		filters,
+		vehicles,
+		onChange,
+		vehiclesError,
+		onRetryVehicles,
+		inline = false
+	}: Props = $props();
 	let group = $state<HTMLElement | null>(null);
 
 	const isMobile = new IsMobile();
@@ -49,34 +58,30 @@
 	}
 </script>
 
-{#snippet trigger(target: FilterMenu, Icon: typeof Car, prefix: string, label: string)}
+{#snippet trigger(target: FilterMenu, prefix: string, label: string)}
 	<Button
 		variant="outline"
-		class={isMobile.current ? 'min-w-0 flex-1 gap-1.5 px-3' : 'max-w-xs gap-1.5'}
+		class="h-10 max-w-xs gap-1.5 rounded-full px-4"
 		aria-haspopup="dialog"
 		aria-expanded={menu === target}
 		onclick={() => openMenu(target)}
 		onpointerenter={prefetch}
 		onfocus={prefetch}
 	>
-		<Icon
-			class="hidden h-4 w-4 shrink-0 text-muted-foreground min-[400px]:block"
-			aria-hidden="true"
-		/>
-		<span class="sr-only">{prefix}:</span>
-		<span class="min-w-0 flex-1 truncate text-left">{label}</span>
-		<ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+		<span class="text-muted-foreground">{prefix}</span>
+		<span class="min-w-0 truncate font-medium">{label}</span>
+		<ChevronDown class="h-4 w-4 shrink-0" aria-hidden="true" />
 	</Button>
 {/snippet}
 
 <div
 	bind:this={group}
-	class="flex items-center gap-2 sm:flex-wrap"
+	class={inline ? 'contents' : 'flex flex-wrap items-center gap-2'}
 	role="group"
 	aria-label="Analytics filters"
 >
-	{@render trigger('range', CalendarRange, 'Date range', currentRangeLabel)}
-	{@render trigger('cars', Car, 'Cars', currentCarsLabel)}
+	{@render trigger('range', 'Range', currentRangeLabel)}
+	{@render trigger('cars', 'Cars', currentCarsLabel)}
 
 	{#if !isDefaultFilters(filters)}
 		{#if isMobile.current}

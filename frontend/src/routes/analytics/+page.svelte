@@ -219,6 +219,21 @@
 	<meta name="description" content="Analyze your vehicle expenses and trends" />
 </svelte:head>
 
+{#snippet filterChips(inline: boolean)}
+	<AnalyticsFilterBar
+		{filters}
+		vehicles={vehicleOptions}
+		onChange={setFilters}
+		{vehiclesError}
+		onRetryVehicles={loadVehicles}
+		{inline}
+	/>
+{/snippet}
+
+{#snippet exploreFilterChips()}
+	{@render filterChips(true)}
+{/snippet}
+
 {#snippet tabLoadError(name: string)}
 	<LoadErrorCard
 		title="Couldn't load {name}"
@@ -237,14 +252,8 @@
 		{/if}
 	</div>
 
-	{#if !noVehicles}
-		<AnalyticsFilterBar
-			{filters}
-			vehicles={vehicleOptions}
-			onChange={setFilters}
-			{vehiclesError}
-			onRetryVehicles={loadVehicles}
-		/>
+	{#if !noVehicles && activeTab !== 'explore'}
+		{@render filterChips(false)}
 	{/if}
 
 	{#if isLoading && !error && !summary}
@@ -310,6 +319,7 @@
 							onClearFilters={filtered ? clearFilters : undefined}
 							onApplyInsight={applyInsight}
 							driverSplit={sharedCars.some(v => !v.sharedAccess)}
+							filters={exploreFilterChips}
 						/>
 					{:catch}
 						{@render tabLoadError('Explore')}
