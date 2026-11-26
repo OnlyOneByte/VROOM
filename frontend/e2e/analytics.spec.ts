@@ -453,7 +453,9 @@ test.describe('Analytics', () => {
 			.click();
 		await expect(page).not.toHaveURL(/seg=/);
 		await expect(page).toHaveURL(/sel=/);
-		await page.getByRole('dialog').getByRole('button', { name: 'Show only' }).first().click();
+		const showOnly = page.getByRole('dialog').getByRole('button', { name: 'Show only' }).first();
+		await expect(showOnly).toBeFocused();
+		await showOnly.click();
 		await expect(page).toHaveURL(/cars=vehicle-/);
 		await expect(page).not.toHaveURL(/sel=/);
 	});

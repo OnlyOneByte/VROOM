@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { ArrowRight, Car, Fuel } from '@lucide/svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
@@ -57,6 +58,13 @@
 	}: Props = $props();
 
 	const isMobile = new IsMobile();
+	let splitList = $state<HTMLElement | null>(null);
+
+	async function showAllCars() {
+		allCars?.run();
+		await tick();
+		splitList?.querySelector<HTMLElement>('button')?.focus();
+	}
 	let items = $state<AnalyticsBucketItems | null>(null);
 	let error = $state<string | null>(null);
 	let request = 0;
@@ -176,7 +184,11 @@
 			{/if}
 
 			{#if parts.length > 1}
-				<ul class="divide-y rounded-md border" aria-label="Split of this period">
+				<ul
+					class="divide-y rounded-md border"
+					aria-label="Split of this period"
+					bind:this={splitList}
+				>
 					{#each parts as part (part.key)}
 						<li class="flex items-center justify-between gap-3 p-2 pl-3">
 							<span class="flex min-w-0 items-center gap-2">
@@ -205,7 +217,7 @@
 				</Button>
 			{/if}
 			{#if allCars}
-				<Button variant="outline" class="h-10 w-full" onclick={allCars.run}>
+				<Button variant="outline" class="h-10 w-full" onclick={showAllCars}>
 					{allCars.label}
 				</Button>
 			{/if}
