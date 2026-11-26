@@ -21,7 +21,7 @@ const RAW_QUERY_METHODS = ['run', 'all', 'get', 'values'] as const;
 type SqlSource = string | { getSQL(): unknown };
 type Dialect = { sqlToQuery(sql: unknown): { sql: string } };
 
-function refuseRawControl(target: object, dialect: Dialect): void {
+function refuseRawControl(target: object, dialect: Dialect, currentSession: () => object): void {
   for (const name of RAW_QUERY_METHODS) {
     const original = (target as Record<string, (query: SqlSource) => unknown>)[name];
     Object.assign(target, {
@@ -32,7 +32,8 @@ function refuseRawControl(target: object, dialect: Dialect): void {
         if (OPENING.test(text) || TRANSACTION_CONTROL.test(text)) {
           throw new RawTransactionControlError();
         }
-        return original.call(target, query);
+        const pinned = Object.create(target, { session: { value: currentSession() } });
+        return original.call(pinned, query);
       },
     });
   }
@@ -90,6 +91,10 @@ function createAsyncDatabase(sqlite: Database) {
     nested: Promise<unknown> | null;
   };
   const scopes = new AsyncLocalStorage<Scope>();
+  const outside = new AsyncLocalStorage<true>();
+  type Client = (query: string, params: unknown[], method: Method) => Promise<unknown>;
+  type Session = { client: Client };
+  const scopedSessions = new WeakMap<Scope, Session>();
   let open: Scope | null = null;
   let closed: Promise<void> = Promise.resolve();
   const statements = new Map<string, Statement>();
@@ -199,7 +204,34 @@ function createAsyncDatabase(sqlite: Database) {
   type Behavior = 'deferred' | 'immediate' | 'exclusive';
   const begin = db.transaction.bind(db);
   const dialect = (db as unknown as { dialect: Dialect }).dialect;
-  refuseRawControl(db, dialect);
+  const baseSession = (db as unknown as { session: Session }).session;
+  const currentSession = () => sessionFor(scopes.getStore());
+  refuseRawControl(db, dialect, currentSession);
+  bindBuildersToScope(db);
+
+  function sessionFor(scope: Scope | undefined): Session {
+    if (!scope) return baseSession;
+    let session = scopedSessions.get(scope);
+    if (!session) {
+      const client: Client = (query, params, method) =>
+        scopes.getStore() || outside.getStore()
+          ? baseSession.client(query, params, method)
+          : scopes.run(scope, () => baseSession.client(query, params, method));
+      session = Object.create(baseSession, { client: { value: client } }) as Session;
+      scopedSessions.set(scope, session);
+    }
+    return session;
+  }
+
+  function bindBuildersToScope(target: object): void {
+    const relational = Object.values((target as { query: object }).query);
+    for (const holder of [target, ...relational]) {
+      Object.defineProperty(holder, 'session', {
+        configurable: true,
+        get: currentSession,
+      });
+    }
+  }
 
   async function sealWhenSettled<T>(scope: Scope, run: () => Promise<T>): Promise<T> {
     try {
@@ -222,7 +254,8 @@ function createAsyncDatabase(sqlite: Database) {
       } as Scope;
       const savepoint = scopes.run(child, () =>
         parent.tx.transaction((tx) => {
-          refuseRawControl(tx, dialect);
+          refuseRawControl(tx, dialect, currentSession);
+          bindBuildersToScope(tx);
           child.tx = tx;
           return sealWhenSettled(child, () => callback(tx));
         })
@@ -262,7 +295,8 @@ function createAsyncDatabase(sqlite: Database) {
       return await scopes.run(scope, () =>
         begin(
           (tx) => {
-            refuseRawControl(tx, dialect);
+            refuseRawControl(tx, dialect, currentSession);
+            bindBuildersToScope(tx);
             scope.tx = tx;
             return sealWhenSettled(scope, () => callback(tx));
           },
@@ -277,7 +311,7 @@ function createAsyncDatabase(sqlite: Database) {
   }
 
   function outsideTransaction<T>(fn: () => T | PromiseLike<T>): Promise<T> {
-    return scopes.exit(() => Promise.resolve().then(fn));
+    return scopes.exit(() => outside.run(true, () => Promise.resolve().then(fn)));
   }
 
   Object.assign(db, { transaction });

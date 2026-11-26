@@ -416,6 +416,70 @@ begin`,
     expect((await db.select().from(users).where(eq(users.id, 'b')))[0]?.displayName).toBe('B');
   });
 
+  test('a callback may return an un-awaited query after an earlier await', async () => {
+    const { db, transaction } = setup();
+    await db.insert(users).values(user('a'));
+    const selected = await transaction(async (tx) => {
+      await tx.insert(users).values(user('b'));
+      return tx.select({ id: users.id }).from(users).orderBy(users.id);
+    });
+    expect(selected).toEqual([{ id: 'a' }, { id: 'b' }]);
+    const found = await transaction(async (tx) => {
+      await tx.select().from(users);
+      return db.query.users.findFirst({ where: eq(users.id, 'b') });
+    });
+    expect(found?.id).toBe('b');
+    const nested = await transaction(async () => {
+      await tick();
+      return transaction(async (inner) => {
+        await inner.insert(users).values(user('c'));
+        return inner.select({ id: users.id }).from(users).where(eq(users.id, 'c'));
+      });
+    });
+    expect(nested).toEqual([{ id: 'c' }]);
+    const raw = await transaction(async (tx) => {
+      await tx.select().from(users);
+      return tx.all(sql`select count(*) as n from users`);
+    });
+    expect(raw).toEqual([[3]]);
+    const rawOuter = await transaction(async (tx) => {
+      await tx.select().from(users);
+      return db.get(sql`select count(*) as n from users`);
+    });
+    expect(rawOuter).toEqual([3]);
+  });
+
+  test('a query built inside a transaction and run after it ended is refused', async () => {
+    const { db, transaction } = setup();
+    const late: PromiseLike<unknown>[] = [];
+    await transaction(async (tx) => {
+      await tx.insert(users).values(user('a'));
+      late.push(db.insert(users).values(user('late')));
+      late.push(
+        db.run(sql`insert into users (id, email, display_name) values ('raw', 'r@test.com', 'r')`)
+      );
+    });
+    for (const query of late) {
+      const error = (await Promise.resolve(query).catch((e) => e)) as { cause?: unknown };
+      expect(error.cause ?? error).toBeInstanceOf(TransactionEndedError);
+    }
+    expect((await db.select({ id: users.id }).from(users)).map((r) => r.id)).toEqual(['a']);
+  });
+
+  test('a query built inside a transaction but handed to outsideTransaction runs outside it', async () => {
+    const { db, transaction, outsideTransaction } = setup();
+    let seen: Promise<unknown> = Promise.resolve();
+    await expect(
+      transaction(async (tx) => {
+        await tx.insert(users).values(user('a'));
+        const query = db.select({ id: users.id }).from(users);
+        seen = outsideTransaction(() => query);
+        throw new Error('roll back');
+      })
+    ).rejects.toThrow('roll back');
+    expect(await seen).toEqual([]);
+  });
+
   test('rows map exactly as the bun:sqlite driver maps them', async () => {
     const { sqlite, db } = setup();
     await db.insert(users).values(user('a'));
