@@ -1,8 +1,8 @@
 import { csvText } from '#lib/components/analytics/explore/explore-data';
 import type { DriverBalances } from '#lib/types/index.ts';
-import { formatCurrency } from '#lib/utils/formatters.ts';
+import { formatCurrency, fromMinor, toMinor } from '#lib/utils/formatters.ts';
 
-const amount = (n: number) => String(Math.round(n * 100) / 100);
+const amount = (n: number) => String(fromMinor(toMinor(n)));
 
 export function balancesCsv(data: DriverBalances): string {
 	const lines = [

@@ -6,7 +6,7 @@ import {
 	type SortableRow
 } from '#lib/utils/expense-helpers.ts';
 import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
-import { formatDateWith, formatNumberUpTo } from '#lib/utils/formatters.ts';
+import { formatDateWith, formatNumberUpTo, fromMinor, toMinor } from '#lib/utils/formatters.ts';
 import { getChargeUnitLabel, getVolumeUnitLabel, isElectricFuelType } from '#lib/utils/units.ts';
 
 export function fillLabel(expense: Expense, units: UnitPreferences): string | null {
@@ -99,7 +99,7 @@ export function buildDisplayRows(
 	for (const [groupId, children] of grouped) {
 		const first = children[0];
 		if (!first) continue;
-		const totalAmount = Math.round(children.reduce((sum, c) => sum + c.amount, 0) * 100) / 100;
+		const totalAmount = fromMinor(children.reduce((sum, c) => sum + toMinor(c.amount), 0));
 
 		const vehicleNameSet = new Set<string>();
 		for (const child of children) {
