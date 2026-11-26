@@ -624,6 +624,7 @@
 				<ExpensesTable
 					expenses={pendingListRows}
 					showVehicleColumn={false}
+					scrollHeight="auto"
 					canWrite={false}
 					returnTo={resolve(routes.expenses)}
 					pendingStates={pending.states}
