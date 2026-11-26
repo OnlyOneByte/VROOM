@@ -53,6 +53,20 @@ export function readRules(db: AppDatabase, vehicleId: string): SplitRules {
   return parsed.success ? parsed.data : DEFAULT_RULES;
 }
 
+export function rulesFor(rules: SplitRules, everyone: boolean, ownDriver: string | null) {
+  if (everyone) return rules;
+  const own = <R extends GroupRule>(rule: R): R =>
+    rule.kind === 'fixed'
+      ? {
+          ...rule,
+          shares: Object.fromEntries(
+            Object.entries(rule.shares).filter(([id]) => id === ownDriver)
+          ),
+        }
+      : rule;
+  return { running: own(rules.running), ownership: own(rules.ownership) };
+}
+
 export function writeRules(db: AppDatabase, vehicleId: string, rules: SplitRules): void {
   db.update(vehicles)
     .set({ carShareRules: rules, updatedAt: new Date() })
@@ -230,7 +244,7 @@ export function balancesView(
   const managers = <T>(value: T) => (options.everyone ? value : null);
   return {
     scope: options.everyone ? ('everyone' as const) : ('own' as const),
-    rules: result.rules,
+    rules: rulesFor(result.rules, options.everyone, options.ownDriver),
     drivers: [...result.balances]
       .filter(([id]) => sees(id))
       .map(([id, balance]) => ({

@@ -25,7 +25,14 @@ import {
   setCarShare,
   updateDriver,
 } from './repository';
-import { balancesView, computeBalances, readRules, rulesSchema, writeRules } from './split';
+import {
+  balancesView,
+  computeBalances,
+  readRules,
+  rulesFor,
+  rulesSchema,
+  writeRules,
+} from './split';
 import { driverStats } from './stats';
 
 const vehicleIdParam = z.object({ vehicleId: z.string().min(1).max(64) });
@@ -109,7 +116,13 @@ driverRoutes.get(
   (c) => {
     const { vehicleId } = c.req.valid('param');
     requireCarShare(vehicleId);
-    return c.json({ success: true, data: readRules(appContext().db, vehicleId) });
+    const { db } = appContext();
+    const everyone = requestResolver(c, db).can('vehicle.driver_stats.read', {
+      kind: 'vehicle',
+      vehicleId,
+    }).allow;
+    const own = ownDriverId(db, vehicleId, c.get('user').id);
+    return c.json({ success: true, data: rulesFor(readRules(db, vehicleId), everyone, own) });
   }
 );
 
