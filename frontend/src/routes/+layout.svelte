@@ -79,8 +79,12 @@
 
 	let webManifestLink = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
 
+	onMount(() => {
+		const timeZoneTimer = setTimeout(userTimeZone);
+		return () => clearTimeout(timeZoneTimer);
+	});
+
 	onMount(async () => {
-		setTimeout(userTimeZone);
 		themeStore.initialize();
 		mayBeSignedIn = authStore.remembersUser();
 		authStore.initialize({ fromCache: !isPublicRoute(page.url.pathname) });

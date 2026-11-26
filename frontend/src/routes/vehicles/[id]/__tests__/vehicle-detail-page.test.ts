@@ -315,6 +315,20 @@ describe('vehicle detail page overview', () => {
 		expect(captured['share']?.['vehicleName']).toBe('Daily Driver');
 	});
 
+	test('the More menu mounts its items only while open, and its Share closes it and opens the dialog', async () => {
+		await mount();
+		expect(screen.getAllByRole('button', { name: 'Share' })).toHaveLength(1);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+		const menuShare = (await screen.findAllByRole('button', { name: 'Share' }))[1];
+		expect(menuShare).toBeDefined();
+
+		await fireEvent.click(menuShare as HTMLElement);
+
+		await vi.waitFor(() => expect(captured['share']?.['open']).toBe(true));
+		expect(screen.getAllByRole('button', { name: 'Share' })).toHaveLength(1);
+	});
+
 	test('the first Upload Photos tap mounts the upload dialog open', async () => {
 		await mount();
 		await openDetails();
