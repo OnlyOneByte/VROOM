@@ -52,5 +52,8 @@
 			description={rangeText}
 			hiddenMessage="You can't see driver figures for this car. Ask its owner for access."
 		/>
+		{#await import('#lib/components/drivers/BalancesCard.svelte') then { default: BalancesCard }}
+			<BalancesCard {vehicleId} {from} {to} description={rangeText} />
+		{/await}
 	{/if}
 </div>

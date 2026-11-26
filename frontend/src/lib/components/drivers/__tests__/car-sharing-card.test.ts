@@ -14,7 +14,8 @@ const setCarShare = vi.fn<(vehicleId: string, enabled: boolean) => Promise<unkno
 vi.mock('#lib/services/driver-api.ts', () => ({
 	driverApi: {
 		list: (vehicleId: string) => list(vehicleId),
-		setCarShare: (vehicleId: string, enabled: boolean) => setCarShare(vehicleId, enabled)
+		setCarShare: (vehicleId: string, enabled: boolean) => setCarShare(vehicleId, enabled),
+		rules: async () => ({ running: { kind: 'distance' }, ownership: { kind: 'payer' } })
 	}
 }));
 
