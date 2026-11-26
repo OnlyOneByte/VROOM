@@ -36,6 +36,7 @@ import {
   vehicleShares,
   vehicles,
 } from '../../db/schema';
+import type { SplitConfig } from '../../db/types';
 import { ValidationError } from '../../errors';
 import type {
   BackupConfig,
@@ -49,6 +50,7 @@ import type {
 } from '../../types';
 import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
+import { minorUnitScale } from '../../utils/money';
 import { joinStoragePath, storagePathSchema } from '../../utils/paths';
 import { unitPreferencesSchema } from '../../utils/unit-preferences-schema';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
@@ -156,7 +158,65 @@ function dollarsToCents(tables: BackupTables): BackupTables {
   return upgraded;
 }
 
-const BACKUP_UPGRADE_STEPS: BackupUpgradeStep[] = [{ to: '2.0.0', upgrade: dollarsToCents }];
+function rescaleSplitConfig(value: unknown, rescale: (cents: number) => number): unknown {
+  const parsed = typeof value === 'string' && value !== '' ? JSON.parse(value) : value;
+  if (!parsed || typeof parsed !== 'object' || (parsed as SplitConfig).method !== 'absolute') {
+    return value;
+  }
+  const split = parsed as Extract<SplitConfig, { method: 'absolute' }>;
+  const out = {
+    ...split,
+    allocations: split.allocations.map((a) => ({ ...a, amount: rescale(Number(a.amount)) })),
+  };
+  return typeof value === 'string' ? JSON.stringify(out) : out;
+}
+
+function balanceSplitGroups(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  const legsByGroup = new Map<string, Record<string, unknown>[]>();
+  for (const row of rows) {
+    if (row.groupId)
+      legsByGroup.set(String(row.groupId), [...(legsByGroup.get(String(row.groupId)) ?? []), row]);
+  }
+  for (const legs of legsByGroup.values()) {
+    const total = toNumberOrNull(legs[0]?.groupTotal);
+    if (total === null) continue;
+    const first = [...legs].sort((a, b) => String(a.id).localeCompare(String(b.id)))[0];
+    const sum = legs.reduce((acc, leg) => acc + (toNumberOrNull(leg.expenseAmount) ?? 0), 0);
+    if (first) first.expenseAmount = (toNumberOrNull(first.expenseAmount) ?? 0) + total - sum;
+  }
+  return rows;
+}
+
+export function centsToMinorUnits(tables: BackupTables): BackupTables {
+  const scale = minorUnitScale(String(tables.userPreferences?.[0]?.currencyUnit ?? 'USD'));
+  if (scale === 100) return tables;
+  const rescale = (cents: number) => Math.round((cents * scale) / 100);
+  const upgraded: BackupTables = { ...tables };
+  for (const [key, rows] of Object.entries(tables)) {
+    const table = TABLE_SCHEMA_MAP[key];
+    if (!table) continue;
+    const columns = Object.keys(getTableColumns(table));
+    const moneyColumns = columns.filter((name) => MONEY_CENTS_FIELDS.has(name));
+    const rescaled = rows.map((row) => {
+      const out = { ...row };
+      for (const column of moneyColumns) {
+        const cents = toNumberOrNull(row[column]);
+        if (cents !== null) out[column] = rescale(cents);
+      }
+      if (columns.includes('expenseSplitConfig')) {
+        out.expenseSplitConfig = rescaleSplitConfig(row.expenseSplitConfig, rescale);
+      }
+      return out;
+    });
+    upgraded[key] = key === 'expenses' ? balanceSplitGroups(rescaled) : rescaled;
+  }
+  return upgraded;
+}
+
+const BACKUP_UPGRADE_STEPS: BackupUpgradeStep[] = [
+  { to: '2.0.0', upgrade: dollarsToCents },
+  { to: '3.0.0', upgrade: centsToMinorUnits },
+];
 
 export function upgradeBackupTables(
   version: string | undefined,

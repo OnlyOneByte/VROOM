@@ -1,0 +1,2 @@
+"id","vehicleId","userId","startOdometer","endOdometer","purpose","tripDate","startLocation","endLocation","note","driverId","createdBy","createdAt","updatedAt"
+"fx_trip_1","evtj17rpyo44eouwicufcrk1","test-user-1","15200","15342","business","2024-10-28T03:33:20.000Z",,,,,,,

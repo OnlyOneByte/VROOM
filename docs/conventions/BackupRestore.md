@@ -25,7 +25,7 @@ Branches key on Drizzle's runtime `columnType`, each set listing both SQLite and
 ## Backup Versions
 
 `metadata.version` records the format a backup was written in (`CONFIG.backup.currentVersion`,
-`2.0.0` today), and restore keeps it as written. `backupVersionError` in `backup.ts` accepts any
+`3.0.0` today), and restore keeps it as written. `backupVersionError` in `backup.ts` accepts any
 older version, and the current major with a minor at or below the current one. It refuses a newer
 major or minor with a message telling the user to update VROOM, and a version that isn't a number.
 
@@ -34,15 +34,35 @@ An older backup reaches the current shape through `BACKUP_UPGRADE_STEPS`, an ord
 backup, on the raw rows, before `coerceRow`. Both restore paths call it: `parseZipBackup`, and
 `restoreFromSheets` with the mirror's version.
 
-The one step today is the move to cents: money columns are integer cents, and a pre-2.0.0
-backup stored dollar floats, so the `2.0.0` step multiplies the `MONEY_CENTS_FIELDS` columns by
-100. `coerceRow` then rounds them, since float products such as 12.34 × 100 land just below the
-integer.
+There are two steps:
+
+- **`2.0.0`, to cents:** a pre-2.0.0 backup stored dollar floats, so this step multiplies the
+  `MONEY_CENTS_FIELDS` columns by 100. `coerceRow` then rounds them, since float products such as
+  12.34 × 100 land just below the integer.
+- **`3.0.0`, to the minor unit of the backup's own currency** (`userPreferences.currencyUnit`, scale
+  `minorUnitScale`):
+  - A 2.0.0 backup holds cents, so `centsToMinorUnits` rescales the money columns and absolute
+    reminder split allocations, rounding half away from zero.
+  - It then puts any rounding remainder of a split group on the group's first leg (by `id`), so the
+    legs still add up to `groupTotal`.
+  - A two-decimal currency is left as it is.
+
+### Rollback and old backups
+
+- **Restoring an older backup:** a backup taken before the minor-unit migration is a 2.0.0 backup
+  in cents. Restoring it on a newer build runs the `3.0.0` step once and gives the same amounts the
+  migration would have stored.
+- **Rescaling can't run twice:** a 3.0.0 backup is never rescaled again, and an export after a
+  restore is 3.0.0.
+- **Rolling back the build:** a build older than 3.0.0 refuses 3.0.0 backups with its "newer
+  version" message. To roll back, reinstall that build and restore a backup it made.
+- **Tests:** `backup-minor-units.test.ts` covers each case, and pins the frozen
+  `fixtures/backup-3.0.0-jpy/` fixture.
 
 A Sheets mirror records its version in a `Metadata` tab, written last on every sync. A mirror
 without the tab was last synced by an older build: it counts as 1.x dollars only when its
 Expenses header row is present and lacks `createdBy` (added in the same release as cents), and as
-cents otherwise. Never infer the unit from cell values: one hand-edited `45.50` would rescale
+2.0.0 cents otherwise, which the `3.0.0` step then rescales. Never infer the unit from cell values: one hand-edited `45.50` would rescale
 every amount.
 
 ### Changing the format

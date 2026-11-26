@@ -91,7 +91,7 @@ describe('backup version bump and restore shim', () => {
 
   test('a future-version backup is rejected', async () => {
     const { restoreService } = await import('../restore');
-    const zip = buildBackupZip('3.0.0', '12.34');
+    const zip = buildBackupZip('4.0.0', '12.34');
     let thrown: unknown;
     try {
       await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
@@ -110,8 +110,11 @@ describe('backup version bump and restore shim', () => {
     expect(backupVersionError('1.5.2')).toBeNull();
     expect(backupVersionError('2.0.0')).toBeNull();
     expect(backupVersionError('2.0.7')).toBeNull();
-    expect(backupVersionError('2.1.0')).toMatch(/newer version of VROOM/);
-    expect(backupVersionError('3.0.0')).toMatch(/newer version of VROOM/);
+    expect(backupVersionError('2.1.0')).toBeNull();
+    expect(backupVersionError('3.0.0')).toBeNull();
+    expect(backupVersionError('3.0.9')).toBeNull();
+    expect(backupVersionError('3.1.0')).toMatch(/newer version of VROOM/);
+    expect(backupVersionError('4.0.0')).toMatch(/newer version of VROOM/);
     expect(backupVersionError(undefined)).toMatch(/not a version number/);
     expect(backupVersionError('latest')).toMatch(/not a version number/);
   });
