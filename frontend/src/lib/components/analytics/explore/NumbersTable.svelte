@@ -15,7 +15,7 @@
 	let { table, firstColumn, format, filename }: Props = $props();
 
 	function download() {
-		const csv = numbersCsv(table, firstColumn);
+		const csv = '\uFEFF' + numbersCsv(table, firstColumn);
 		triggerBlobDownload(new Blob([csv], { type: 'text/csv;charset=utf-8' }), filename);
 	}
 </script>
@@ -28,11 +28,19 @@
 			Download CSV
 		</Button>
 	</div>
-	<div class="overflow-x-auto">
+	<div
+		class="overflow-x-auto rounded-md focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none [&>[data-slot=table-container]]:overflow-visible"
+		role="region"
+		aria-label="The numbers table"
+		tabindex="0"
+	>
 		<Table.Root>
+			<Table.Caption class="sr-only">
+				The numbers, one row per {firstColumn.toLowerCase()}
+			</Table.Caption>
 			<Table.Header>
 				<Table.Row>
-					<Table.Head scope="col">{firstColumn}</Table.Head>
+					<Table.Head scope="col" class="sticky left-0 bg-background">{firstColumn}</Table.Head>
 					{#each table.columns as column, c (c)}
 						<Table.Head scope="col" class="text-right">{column}</Table.Head>
 					{/each}
@@ -41,7 +49,9 @@
 			<Table.Body>
 				{#each table.rows as row, r (r)}
 					<Table.Row>
-						<Table.Head scope="row" class="font-normal">{row.label}</Table.Head>
+						<Table.Head scope="row" class="sticky left-0 bg-background font-normal">
+							{row.label}
+						</Table.Head>
 						{#each row.values as value, i (i)}
 							<Table.Cell class="text-right tabular-nums">
 								{value == null ? '–' : format(value)}

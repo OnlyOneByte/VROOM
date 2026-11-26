@@ -539,19 +539,35 @@ describe('Explore numbers table', () => {
 		{ label: 'Sparky, "EV"', values: [225.456, 19] }
 	];
 
+	const buckets = [
+		{ key: '2026-06', label: 'Jun ’26' },
+		{ key: '2026-07', label: 'Jul ’26' }
+	];
+
 	test('one row per bucket, with a total for additive splits', () => {
-		const table = numbersTable(['Jun', 'Jul'], series, true);
+		const table = numbersTable(buckets, series, true);
 		expect(table.columns).toEqual(['Daily Driver', 'Sparky, "EV"', 'Total']);
+		expect(table.rows[0]).toMatchObject({ key: '2026-06', label: 'Jun ’26' });
 		expect(table.rows[0]?.values).toEqual([751, 225.456, 976.456]);
 		expect(table.rows[1]?.values).toEqual([null, 19, 19]);
-		expect(numbersTable(['Jun'], series.slice(0, 1), true).columns).toEqual(['Daily Driver']);
-		expect(numbersTable(['Jun'], series, false).columns).toHaveLength(2);
+		expect(numbersTable(buckets, series.slice(0, 1), true).columns).toEqual(['Daily Driver']);
+		expect(numbersTable(buckets, series, false).columns).toHaveLength(2);
 	});
 
-	test('the CSV keeps raw numbers, blanks gaps and quotes awkward labels', () => {
-		const csv = numbersCsv(numbersTable(['Jun', 'Jul'], series, true), 'Month');
+	test('the CSV uses bucket keys, keeps raw numbers, blanks gaps and quotes awkward labels', () => {
+		const csv = numbersCsv(numbersTable(buckets, series, true), 'Month');
 		expect(csv).toBe(
-			'Month,Daily Driver,"Sparky, ""EV""",Total\nJun,751,225.46,976.46\nJul,,19,19\n'
+			'Month,Daily Driver,"Sparky, ""EV""",Total\r\n2026-06,751,225.456,976.456\r\n2026-07,,19,19\r\n'
 		);
+	});
+
+	test('a label that starts like a formula is neutralised, numbers are not', () => {
+		const risky = [
+			{ label: '=HYPERLINK("x")', values: [-5] },
+			{ label: '@me', values: [1] }
+		];
+		const csv = numbersCsv(numbersTable(buckets.slice(0, 1), risky, false), 'Month');
+		expect(csv.split('\r\n')[0]).toBe(`Month,"'=HYPERLINK(""x"")",'@me`);
+		expect(csv.split('\r\n')[1]).toBe('2026-06,-5,1');
 	});
 });

@@ -27,6 +27,7 @@
 		chartForm,
 		describeQuery,
 		metricInfo,
+		metricLabel,
 		type ExploreQuery
 	} from './query-state';
 	import {
@@ -322,18 +323,27 @@
 	]);
 
 	let chartTitle = $derived(describeQuery(shown, distanceWord));
-	let numbers = $derived(
-		['bars', 'stacked', 'grouped', 'line', 'panels'].includes(form) && labels.length > 0
-			? numbersTable(
-					labels,
-					visibleSeries.map(s => ({
-						label: s.label,
-						values: s.values.map((v, i) => (empty[i] ? null : v))
-					})),
-					isAdditive(shown) && shown.split !== 'tag'
-				)
-			: null
+	let numbers = $derived.by(() => {
+		if (!response || !['bars', 'stacked', 'grouped', 'line', 'panels'].includes(form)) return null;
+		const gaps = emptyBuckets(visibleSeries, labels.length, isAdditive(shown));
+		return numbersTable(
+			response.buckets.map((key, i) => ({ key, label: labels[i] ?? key })),
+			visibleSeries.map(s => ({
+				label: s.label,
+				values: s.values.map((v, i) => (gaps[i] ? null : v))
+			})),
+			isAdditive(shown) && shown.split !== 'tag'
+		);
+	});
+	let numbersFile = $derived(
+		`vroom-${metricLabel(shown.metric, distanceWord).toLowerCase().replaceAll(' ', '-')}-by-${shown.per}-${isoDay(dateRange.startDate)}-to-${isoDay(dateRange.endDate)}.csv`
 	);
+
+	function isoDay(seconds: number): string {
+		const d = new Date(seconds * 1000);
+		const pad = (n: number) => String(n).padStart(2, '0');
+		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+	}
 	let rankingGutter = $derived(isMobile.current ? 112 : 232);
 
 	function fitLabel(label: string): string {
@@ -807,8 +817,8 @@
 				<NumbersTable
 					table={numbers}
 					firstColumn={intervalLabel.replace(/^./, c => c.toUpperCase())}
-					format={format.full}
-					filename="vroom-{shown.metric}-by-{shown.per}.csv"
+					format={shown.metric === 'cost' ? format.axis : format.full}
+					filename={numbersFile}
 				/>
 			{/if}
 		</div>
