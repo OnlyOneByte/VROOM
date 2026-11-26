@@ -1,5 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { addGuestDriver, ownDriverId, setCarShare } from '../api/drivers/repository';
 import { createTermExpenses } from '../api/insurance/hooks';
 import { assignServerRole } from '../permissions/grants';
@@ -140,15 +140,13 @@ async function shareWeekendCar(pattern: DrivingPattern): Promise<void> {
     .select({ id: expenses.id, category: expenses.category })
     .from(expenses)
     .where(eq(expenses.vehicleId, vehicleId))
-    .orderBy(expenses.date);
+    .orderBy(desc(expenses.date));
   let fillUp = 0;
   for (const row of rows) {
     const payer = row.category === 'fuel' && fillUp++ % 3 !== 0 ? jamie : owner;
     await db.update(expenses).set({ paidByDriverId: payer }).where(eq(expenses.id, row.id));
   }
   await db.update(trips).set({ driverId: jamie }).where(eq(trips.vehicleId, vehicleId));
-  const errand = tripAroundFillUp(pattern, 6, 120, 'personal', 'Home', 'Half Moon Bay');
-  await db.insert(trips).values({ ...errand, driverId: owner });
 }
 
 export async function seedDatabase() {
