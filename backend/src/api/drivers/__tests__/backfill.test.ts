@@ -146,16 +146,41 @@ describe('backfilling past entries', () => {
     expect(tripDrivers()).toEqual([await driverOf(ctx.user.id), editor, null]);
   });
 
-  test('a fill-in that changes nothing saves no batch', async () => {
+  test('a fill-in that changes nothing saves no batch and creates nothing', async () => {
     await post(`${base}/backfill`, { mode: 'logged' }, 201);
     const again = await post<{ batchId: string | null; total: number }>(
       `${base}/backfill`,
       { mode: 'logged' },
-      201
+      200
     );
     expect(again).toMatchObject({ batchId: null, total: 0 });
     const recent = await ctx.authed('GET', `${base}/backfill`);
     expect((await json<DataEnvelope<unknown[]>>(recent)).data).toHaveLength(1);
+  });
+
+  test("an undo that skips expenses you can't read leaves the batch open for someone who can", async () => {
+    insuranceExpense();
+    const { batchId } = await post<{ batchId: string }>(
+      `${base}/backfill`,
+      { mode: 'logged' },
+      201
+    );
+    expect(payerOf('bf-ins')).not.toBeNull();
+    overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
+
+    const partial = await m.coOwner.request('POST', `${base}/backfill/${batchId}/undo`);
+    expect(partial.status).toBe(200);
+    expect(payerOf('bf-ins')).not.toBeNull();
+    expect(tripDrivers()).toEqual([null, null]);
+    const left = await json<DataEnvelope<{ id: string; total: number }[]>>(
+      await ctx.authed('GET', `${base}/backfill`)
+    );
+    expect(left.data).toEqual([expect.objectContaining({ id: batchId, total: 1 })]);
+
+    await post(`${base}/backfill/${batchId}/undo`);
+    expect(payerOf('bf-ins')).toBeNull();
+    const after = await json<DataEnvelope<unknown[]>>(await ctx.authed('GET', `${base}/backfill`));
+    expect(after.data).toHaveLength(0);
   });
 
   test("skips expenses the manager can't read", async () => {

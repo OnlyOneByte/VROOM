@@ -196,14 +196,17 @@ export function undoBackfill(
       .where(and(eq(driverBackfills.id, batchId), eq(driverBackfills.vehicleId, vehicleId)))
       .get();
     if (!batch || batch.undoneAt) throw new NotFoundError('Backfill');
-    const reverted = batch.entries.filter((entry) =>
-      setDriver(tx, entry, entry.driverId, null, hideFinancials)
-    );
+    const kept: BackfilledEntry[] = [];
+    let reverted = 0;
+    for (const entry of batch.entries) {
+      if (setDriver(tx, entry, entry.driverId, null, hideFinancials)) reverted++;
+      else if (hideFinancials && entry.kind === 'expense') kept.push(entry);
+    }
     tx.update(driverBackfills)
-      .set({ undoneAt: new Date() })
+      .set(kept.length > 0 ? { entries: kept } : { undoneAt: new Date() })
       .where(eq(driverBackfills.id, batchId))
       .run();
-    return reverted.length;
+    return reverted;
   });
 }
 
