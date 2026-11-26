@@ -75,6 +75,7 @@
 	import ExpenseActionBar from './expense-form/ExpenseActionBar.svelte';
 	import ExpenseSaveRow from './expense-form/ExpenseSaveRow.svelte';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import DemoSaveNote from '#lib/components/common/demo-save-note.svelte';
 	import ExpenseDeleteDialog from './expense-form/ExpenseDeleteDialog.svelte';
 	import ExpenseAmountField from './expense-form/ExpenseAmountField.svelte';
 	import ExpenseSplitBreakdown from './expense-form/ExpenseSplitBreakdown.svelte';
@@ -273,8 +274,10 @@
 					: 'New expense'
 	);
 
+	const demo = $derived(authStore.user?.demo === true);
+
 	async function save() {
-		if (authStore.user?.demo) return;
+		if (demo) return;
 		await (form.queuedExpense ? saveQueuedExpense(form) : submitExpense(form));
 		if (form.errors['vehicleDetails']) {
 			focusInView(retryButton);
@@ -825,6 +828,9 @@
 			</form>
 
 			{#if !quickActions}
+				{#if demo}
+					<DemoSaveNote class="mt-6 text-center sm:text-right" />
+				{/if}
 				<ExpenseActionBar
 					isEditMode={form.isEditMode}
 					canDuplicate={form.canDuplicate}
@@ -845,6 +851,6 @@
 		isGroupEditMode={form.isGroupEditMode}
 		groupId={form.groupId}
 		originalExpense={form.originalExpense}
-		onConfirm={() => deleteExpense(form)}
+		onConfirm={() => (demo ? undefined : deleteExpense(form))}
 	/>
 </FormLayout>

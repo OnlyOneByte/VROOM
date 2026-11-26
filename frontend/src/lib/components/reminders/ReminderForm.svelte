@@ -8,7 +8,7 @@
 	import { reminderApi } from '#lib/services/reminder-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
-	import DemoSaveNote from '#lib/components/common/demo-save-note.svelte';
+	import DemoSaveNote, { DEMO_SAVE_NOTE_ID } from '#lib/components/common/demo-save-note.svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import type { ReminderWithVehicles, Vehicle } from '#lib/types/index.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
@@ -132,7 +132,12 @@
 				>
 					Cancel
 				</Button>
-				<Button type="submit" disabled={demo || form.isSubmitting || vehicles.length === 0}>
+				<Button
+					type="submit"
+					disabled={form.isSubmitting || vehicles.length === 0}
+					aria-disabled={demo || undefined}
+					aria-describedby={demo ? DEMO_SAVE_NOTE_ID : undefined}
+				>
 					{#if form.isSubmitting}
 						<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 						{isEdit ? 'Saving…' : 'Creating…'}

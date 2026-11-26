@@ -77,7 +77,7 @@
 	} from '#lib/utils/financing-calculations.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import FormActionBar from '#lib/components/common/form-action-bar.svelte';
-	import DemoSaveNote from '#lib/components/common/demo-save-note.svelte';
+	import DemoSaveNote, { DEMO_SAVE_NOTE_ID } from '#lib/components/common/demo-save-note.svelte';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
@@ -624,6 +624,7 @@
 	}
 
 	async function handleDelete() {
+		if (demo) return;
 		isDeleting = true;
 
 		try {
@@ -1063,7 +1064,9 @@
 						type="button"
 						size="lg"
 						onclick={handleSubmit}
-						disabled={demo || isSubmitting || isDeleting}
+						disabled={isSubmitting || isDeleting}
+						aria-disabled={demo || undefined}
+						aria-describedby={demo ? DEMO_SAVE_NOTE_ID : undefined}
 						class="rounded-full"
 					>
 						{#if isSubmitting}

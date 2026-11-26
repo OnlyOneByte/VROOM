@@ -1,0 +1,127 @@
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { authStore } from '#lib/stores/auth.svelte.ts';
+import { loadOfflineExpenses } from '#lib/utils/offline-storage.ts';
+
+vi.mock('$app/navigation', () => ({
+	goto: vi.fn(() => Promise.resolve()),
+	beforeNavigate: vi.fn(),
+	afterNavigate: vi.fn(),
+	refreshAll: vi.fn()
+}));
+
+const VEHICLE = { id: 'v1', make: 'Toyota', model: 'Camry', year: 2020 };
+vi.mock('#lib/services/vehicle-api.ts', () => ({
+	vehicleApi: {
+		getVehicles: vi.fn(() => Promise.resolve([VEHICLE])),
+		getVehicle: vi.fn(() => Promise.resolve(VEHICLE))
+	}
+}));
+
+const createExpense = vi.fn(() => Promise.resolve({ id: 'e1' }));
+const deletePhoto = vi.fn();
+vi.mock('#lib/services/expense-api.ts', () => ({
+	expenseApi: {
+		createExpense,
+		deletePhoto,
+		getExpensesByVehicle: vi.fn(() => Promise.resolve({ data: [] })),
+		getPhotos: vi.fn(() =>
+			Promise.resolve({ data: [{ id: 'p1', fileName: 'r.pdf', mimeType: 'application/pdf' }] })
+		),
+		getPhotoThumbnailUrl: vi.fn(() => '')
+	}
+}));
+
+const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
+const ExpenseActionBar = (await import('../expense-form/ExpenseActionBar.svelte')).default;
+const ExpensePhotoSection = (await import('../ExpensePhotoSection.svelte')).default;
+
+const NOTE = 'Saving is off in the demo garage.';
+const user = {
+	id: 'user-1',
+	email: 'a@example.com',
+	displayName: 'A',
+	createdAt: '2026-01-01T00:00:00Z',
+	updatedAt: '2026-01-01T00:00:00Z'
+};
+
+async function renderForm(): Promise<HTMLElement> {
+	render(ExpenseForm, {
+		props: { preselectedVehicleId: 'v1', preselectedCategory: 'misc', preselectedAmount: '42.50' }
+	});
+	await vi.waitFor(() => expect(screen.getByDisplayValue('42.50')).toBeTruthy());
+	return screen.getByRole('button', { name: /save expense/i });
+}
+
+const sent = () => createExpense.mock.calls.length + loadOfflineExpenses().length;
+
+beforeEach(() => {
+	vi.clearAllMocks();
+	window.localStorage.clear();
+});
+
+afterEach(() => {
+	cleanup();
+	authStore.clearUser();
+});
+
+describe('expense form in the demo garage', () => {
+	test('Save stays focusable, says why it is off, and neither a click nor a submit sends anything', async () => {
+		authStore.setUser({ ...user, demo: true });
+		const save = await renderForm();
+		expect(save).toHaveAttribute('aria-disabled', 'true');
+		expect(save).toHaveAccessibleDescription(NOTE);
+		save.focus();
+		expect(document.activeElement).toBe(save);
+		await fireEvent.click(save);
+		await fireEvent.submit(save.closest('form') as HTMLFormElement);
+		await new Promise(resolve => setTimeout(resolve, 50));
+		expect(sent()).toBe(0);
+	});
+
+	test('a real user saves as before, with no demo note', async () => {
+		authStore.setUser(user);
+		const save = await renderForm();
+		expect(save).not.toHaveAttribute('aria-disabled');
+		expect(screen.queryByText(NOTE)).toBeNull();
+		await fireEvent.click(save);
+		await vi.waitFor(() => expect(sent()).toBe(1));
+	});
+
+	test('on the edit bar Delete is off and Save is marked off, while Duplicate and Cancel still work', async () => {
+		authStore.setUser({ ...user, demo: true });
+		const handlers = {
+			onDelete: vi.fn(),
+			onDuplicate: vi.fn(),
+			onCancel: vi.fn(),
+			onSave: vi.fn()
+		};
+		render(ExpenseActionBar, {
+			props: {
+				isEditMode: true,
+				canDuplicate: true,
+				isSubmitting: false,
+				isDeleting: false,
+				...handlers
+			}
+		});
+		expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Update Expense' })).toHaveAttribute(
+			'aria-disabled',
+			'true'
+		);
+		await fireEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+		expect(handlers.onDuplicate).toHaveBeenCalledOnce();
+		expect(handlers.onCancel).toHaveBeenCalledOnce();
+	});
+
+	test('photos can be viewed but not uploaded or deleted', async () => {
+		authStore.setUser({ ...user, demo: true });
+		render(ExpensePhotoSection, { props: { entityType: 'expense', entityId: 'e1' } });
+		const remove = await screen.findByRole('button', { name: 'Delete r.pdf' });
+		expect(remove).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Upload' })).toBeDisabled();
+		expect(deletePhoto).not.toHaveBeenCalled();
+	});
+});

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Check, Copy, LoaderCircle, Trash2, X } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import DemoSaveNote from '#lib/components/common/demo-save-note.svelte';
+	import { DEMO_SAVE_NOTE_ID } from '#lib/components/common/demo-save-note.svelte';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 
 	interface Props {
@@ -35,9 +35,6 @@
 <div
 	class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto z-50 lg:static lg:z-auto lg:mt-6 short:static short:z-auto short:mt-6"
 >
-	{#if demo}
-		<DemoSaveNote class="mb-2 rounded-md bg-background px-3 py-1 text-center sm:text-right" />
-	{/if}
 	<div
 		class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none short:bg-transparent short:p-0 short:rounded-none short:shadow-none"
 	>
@@ -61,7 +58,7 @@
 				onmousedown={keepFieldFocus}
 				variant="outline"
 				onclick={onDuplicate}
-				disabled={demo || isSubmitting || isDeleting}
+				disabled={isSubmitting || isDeleting}
 				class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 flex-shrink-0"
 			>
 				<Copy class="h-5 w-5 sm:mr-2" />
@@ -85,7 +82,9 @@
 			type="button"
 			onmousedown={keepFieldFocus}
 			onclick={onSave}
-			disabled={demo || isSubmitting || isDeleting}
+			disabled={isSubmitting || isDeleting}
+			aria-disabled={demo || undefined}
+			aria-describedby={demo ? DEMO_SAVE_NOTE_ID : undefined}
 			class="rounded-full shadow-sm transition-colors h-14 px-6 flex-1 sm:flex-initial"
 		>
 			{#if isSubmitting}

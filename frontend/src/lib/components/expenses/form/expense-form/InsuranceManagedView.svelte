@@ -5,6 +5,7 @@
 	import { formatCurrency, formatDate, dateOnlyToISO } from '#lib/utils/formatters.ts';
 	import ExpensePhotoSection from '../ExpensePhotoSection.svelte';
 	import ExpenseFormHeader from './ExpenseFormHeader.svelte';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 
 	interface Props {
 		category: string;
@@ -97,7 +98,12 @@
 			<ArrowLeft class="mr-2 h-4 w-4" />
 			Back to Expenses
 		</Button>
-		<Button variant="outline" class="h-10" onclick={onForceDelete} disabled={isDeleting}>
+		<Button
+			variant="outline"
+			class="h-10"
+			onclick={onForceDelete}
+			disabled={isDeleting || authStore.user?.demo === true}
+		>
 			<Trash2 class="mr-2 h-4 w-4 text-destructive" />
 			Force Delete
 		</Button>

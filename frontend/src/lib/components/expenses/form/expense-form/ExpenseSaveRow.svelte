@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { LoaderCircle } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import DemoSaveNote from '#lib/components/common/demo-save-note.svelte';
+	import DemoSaveNote, { DEMO_SAVE_NOTE_ID } from '#lib/components/common/demo-save-note.svelte';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 
 	interface Props {
@@ -37,7 +37,9 @@
 		<Button
 			type="submit"
 			onmousedown={keepFieldFocus}
-			disabled={demo || isSubmitting}
+			disabled={isSubmitting}
+			aria-disabled={demo || undefined}
+			aria-describedby={demo ? DEMO_SAVE_NOTE_ID : undefined}
 			class="h-12 w-full rounded-full text-base"
 		>
 			{@render saveLabel()}
@@ -70,7 +72,9 @@
 		<Button
 			type="submit"
 			onmousedown={keepFieldFocus}
-			disabled={demo || isSubmitting}
+			disabled={isSubmitting}
+			aria-disabled={demo || undefined}
+			aria-describedby={demo ? DEMO_SAVE_NOTE_ID : undefined}
 			class="h-12 w-full text-base sm:h-10 sm:w-auto sm:px-5 sm:text-sm"
 		>
 			{@render saveLabel()}

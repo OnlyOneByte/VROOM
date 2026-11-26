@@ -6,7 +6,7 @@
 	import { addVehicleFirstTo } from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import FormActionBar from '#lib/components/common/form-action-bar.svelte';
-	import DemoSaveNote from '#lib/components/common/demo-save-note.svelte';
+	import DemoSaveNote, { DEMO_SAVE_NOTE_ID } from '#lib/components/common/demo-save-note.svelte';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
@@ -568,7 +568,9 @@
 						type="button"
 						size="lg"
 						onclick={handleSubmit}
-						disabled={demo || isSubmitting}
+						disabled={isSubmitting}
+						aria-disabled={demo || undefined}
+						aria-describedby={demo ? DEMO_SAVE_NOTE_ID : undefined}
 						class="rounded-full"
 					>
 						{#if isSubmitting}
