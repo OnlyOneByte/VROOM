@@ -67,7 +67,9 @@ test.describe('A new expense shows on the list before the list has loaded', () =
 		expect(ms).toBeGreaterThan(0);
 
 		releaseList();
-		await expect(page.getByRole('row', { name: /Car wash on Elm/ })).toBeVisible();
+		await expect(
+			page.getByTestId('expense-row').filter({ hasText: 'Car wash on Elm' })
+		).toBeVisible();
 	});
 
 	test('a save the server answers at once still shows on the list while the list is held', async ({

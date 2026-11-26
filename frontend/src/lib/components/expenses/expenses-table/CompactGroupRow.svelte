@@ -63,7 +63,7 @@
 	let blockedId = $derived(blockedReasonId(row.groupId));
 </script>
 
-<div class="transition-colors {isSelected ? 'bg-muted/50' : ''}">
+<div data-testid="expense-row" class="transition-colors {isSelected ? 'bg-muted/50' : ''}">
 	<button
 		type="button"
 		class="{MOBILE_ROW_SUMMARY_CLASS} cursor-pointer"

@@ -33,7 +33,7 @@ test.describe('Adding an expense does not wait for the server', () => {
 		await addCarWash(page);
 
 		await expect(page).toHaveURL(/\/expenses$/);
-		const row = page.getByRole('row', { name: /Car wash on Elm/ });
+		const row = page.getByTestId('expense-row').filter({ hasText: 'Car wash on Elm' });
 		await expect(row).toBeVisible();
 		await expect(row.getByText('Unsynced')).toBeVisible();
 		expect(answered).toBe(false);
@@ -56,7 +56,7 @@ test.describe('Adding an expense does not wait for the server', () => {
 
 		await addCarWash(page);
 
-		const row = page.getByRole('row', { name: /Car wash on Elm/ });
+		const row = page.getByTestId('expense-row').filter({ hasText: 'Car wash on Elm' });
 		await expect(row.getByText('Not saved: That vehicle was archived')).toBeVisible();
 		await expect(page.getByText(/wasn't saved/)).toBeVisible();
 

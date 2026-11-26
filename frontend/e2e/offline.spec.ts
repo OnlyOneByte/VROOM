@@ -77,7 +77,7 @@ test.describe('Offline expense entry', () => {
 		);
 
 		await page.goto('/expenses');
-		const row = page.getByRole('row', { name: /Bridge toll/ });
+		const row = page.getByTestId('expense-row').filter({ hasText: 'Bridge toll' });
 		await expect(row.getByText('Not saved: Amount must be 1,000,000 or less')).toBeVisible();
 		await row.getByRole('link', { name: /^Edit .*1,000,001/ }).click();
 

@@ -613,6 +613,7 @@
 					showVehicleColumn={false}
 					scrollHeight="auto"
 					canWrite={false}
+					ledger
 					returnTo={resolve(routes.expenses)}
 					pendingStates={pending.states}
 				/>

@@ -86,6 +86,7 @@
 {/snippet}
 
 <div
+	data-testid="expense-row"
 	class="transition-colors {isSelected ? 'bg-muted/50' : ''} {pending
 		? 'motion-safe:animate-[row-arrive_200ms_ease-out]'
 		: ''}"
