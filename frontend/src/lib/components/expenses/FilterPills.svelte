@@ -12,7 +12,7 @@
 	}
 
 	let { label, options, selected, onToggle }: Props = $props();
-	const labelId = `filter-pills-${label.toLowerCase().replace(/\W+/g, '-')}`;
+	const labelId = $props.id();
 </script>
 
 <div class="space-y-2">
