@@ -343,6 +343,19 @@ test.describe('Analytics', () => {
 		await expect(page).not.toHaveURL(/hide=vehicle-camry/);
 	});
 
+	test('The numbers lists each month and downloads as CSV', async ({ page }) => {
+		await mockAnalytics(page);
+		await page.goto('/analytics');
+		const numbers = page.getByRole('region', { name: 'The numbers' });
+		await numbers.scrollIntoViewIfNeeded();
+		await expect(numbers.getByRole('columnheader', { name: 'Month' })).toBeVisible();
+		await expect(numbers.getByRole('columnheader', { name: 'Total' })).toBeVisible();
+		const download = page.waitForEvent('download');
+		await numbers.getByRole('button', { name: 'Download CSV' }).click();
+		const file = await download;
+		expect(file.suggestedFilename()).toBe('vroom-cost-by-month.csv');
+	});
+
 	test('a comparison lists each bucket’s change in Table view', async ({ page }) => {
 		await mockAnalytics(page);
 		await page.goto('/analytics?split=none&compare=prevPeriod');

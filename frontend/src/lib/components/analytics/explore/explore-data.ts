@@ -213,6 +213,43 @@ export function heroSentence(opts: {
 	return parts.join(' ');
 }
 
+export interface NumbersTable {
+	columns: string[];
+	rows: Array<{ label: string; values: Array<number | null> }>;
+}
+
+export function numbersTable(
+	labels: readonly string[],
+	series: ReadonlyArray<{ label: string; values: Array<number | null> }>,
+	withTotal: boolean
+): NumbersTable {
+	const total = withTotal && series.length > 1;
+	return {
+		columns: [...series.map(s => s.label), ...(total ? ['Total'] : [])],
+		rows: labels.map((label, i) => {
+			const values = series.map(s => s.values[i] ?? null);
+			const sumOf = values.some(v => v != null) ? sum(values) : null;
+			return { label, values: total ? [...values, sumOf] : values };
+		})
+	};
+}
+
+function csvCell(value: string): string {
+	return /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
+
+export function numbersCsv(table: NumbersTable, firstColumn: string): string {
+	const lines = [
+		[firstColumn, ...table.columns],
+		...table.rows.map(r => [r.label, ...r.values.map(v => (v == null ? '' : String(round2(v))))])
+	];
+	return lines.map(line => line.map(csvCell).join(',')).join('\n') + '\n';
+}
+
+function round2(value: number): number {
+	return Math.round(value * 100) / 100;
+}
+
 export function percentChange(current: number | null, previous: number | null): number | null {
 	if (current == null || previous == null || previous === 0) return null;
 	return Math.round(((current - previous) / Math.abs(previous)) * 100);

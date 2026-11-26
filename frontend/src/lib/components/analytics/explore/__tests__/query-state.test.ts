@@ -26,6 +26,8 @@ import {
 	expensesQuery,
 	heroSentence,
 	kpis,
+	numbersCsv,
+	numbersTable,
 	percentChange,
 	seriesFor
 } from '../explore-data';
@@ -528,5 +530,28 @@ describe('Explore hero sentence', () => {
 			carCount: 3
 		});
 		expect(text).toMatch(/ for your three cars\. 75% of it has no driver recorded\. /);
+	});
+});
+
+describe('Explore numbers table', () => {
+	const series = [
+		{ label: 'Daily Driver', values: [751, null] },
+		{ label: 'Sparky, "EV"', values: [225.456, 19] }
+	];
+
+	test('one row per bucket, with a total for additive splits', () => {
+		const table = numbersTable(['Jun', 'Jul'], series, true);
+		expect(table.columns).toEqual(['Daily Driver', 'Sparky, "EV"', 'Total']);
+		expect(table.rows[0]?.values).toEqual([751, 225.456, 976.456]);
+		expect(table.rows[1]?.values).toEqual([null, 19, 19]);
+		expect(numbersTable(['Jun'], series.slice(0, 1), true).columns).toEqual(['Daily Driver']);
+		expect(numbersTable(['Jun'], series, false).columns).toHaveLength(2);
+	});
+
+	test('the CSV keeps raw numbers, blanks gaps and quotes awkward labels', () => {
+		const csv = numbersCsv(numbersTable(['Jun', 'Jul'], series, true), 'Month');
+		expect(csv).toBe(
+			'Month,Daily Driver,"Sparky, ""EV""",Total\nJun,751,225.46,976.46\nJul,,19,19\n'
+		);
 	});
 });

@@ -16,6 +16,7 @@
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import type { AnalyticsDateRange } from '../analytics-filters';
 	import InsightCards from './InsightCards.svelte';
+	import NumbersTable from './NumbersTable.svelte';
 	import QueryBar from './QueryBar.svelte';
 	import DrillPanel from './DrillPanel.svelte';
 	import {
@@ -38,6 +39,7 @@
 		hasData,
 		heroSentence,
 		isAdditive,
+		numbersTable,
 		kpis,
 		bucketBounds,
 		expensesNote,
@@ -320,6 +322,18 @@
 	]);
 
 	let chartTitle = $derived(describeQuery(shown, distanceWord));
+	let numbers = $derived(
+		['bars', 'stacked', 'grouped', 'line', 'panels'].includes(form) && labels.length > 0
+			? numbersTable(
+					labels,
+					visibleSeries.map(s => ({
+						label: s.label,
+						values: s.values.map((v, i) => (empty[i] ? null : v))
+					})),
+					isAdditive(shown) && shown.split !== 'tag'
+				)
+			: null
+	);
 	let rankingGutter = $derived(isMobile.current ? 112 : 232);
 
 	function fitLabel(label: string): string {
@@ -567,7 +581,7 @@
 					<SearchX class="h-8 w-8 text-muted-foreground" aria-hidden="true" />
 				</div>
 			{/snippet}
-			{#snippet title()}Nothing to chart yet{/snippet}
+			{#snippet title()}Not enough data yet{/snippet}
 			{#snippet description()}
 				No data for {chartTitle.toLowerCase()}{filterLabel ? `, ${filterLabel}` : ''}. Try another
 				measure, a longer date range or more cars.
@@ -789,6 +803,14 @@
 					{#snippet icon()}<ChartColumn class="h-5 w-5 text-primary" />{/snippet}
 				</AppBarChart>
 			{/if}
+			{#if numbers}
+				<NumbersTable
+					table={numbers}
+					firstColumn={intervalLabel.replace(/^./, c => c.toUpperCase())}
+					format={format.full}
+					filename="vroom-{shown.metric}-by-{shown.per}.csv"
+				/>
+			{/if}
 		</div>
 	{/if}
 	<DrillPanel
@@ -806,7 +828,7 @@
 		{onOnlyCar}
 		allCars={selectedSeries && form === 'panels' && query.sel && query.sel !== 'total'
 			? {
-					label: `All cars in ${bucketLabel(query.sel, shown.per)}`,
+					label: `${vehicleIds?.length ? 'All selected cars' : 'All cars'} in ${bucketLabel(query.sel, shown.per)}`,
 					run: () => onQueryChange({ ...query, seg: undefined })
 				}
 			: null}
