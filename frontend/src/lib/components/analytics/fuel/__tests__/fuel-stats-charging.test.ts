@@ -124,7 +124,10 @@ describe('FuelStatsTab charging series', () => {
 		expect(screen.getByText('Worst mi/kWh')).toBeTruthy();
 		expect(screen.getByText('Charging Details')).toBeTruthy();
 		expect(screen.getByText('18.0 kWh')).toBeTruthy();
-		expect(screen.getByText('$0.467')).toBeTruthy();
+		expect(screen.getAllByText('$0.467')).toHaveLength(2);
+		expect(screen.getByRole('region', { name: 'Fuel and charging overview' }).textContent).toMatch(
+			/\$0\.467\s+per kWh on average\s+across/
+		);
 		expect(screen.getByText('Average Cost')).toBeTruthy();
 		expect(screen.getByText('Per Session')).toBeTruthy();
 		expect(screen.queryByText('Per Fill-up')).toBeNull();

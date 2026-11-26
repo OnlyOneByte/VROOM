@@ -339,6 +339,7 @@
 							{fuelAdvanced}
 							{vehicleColors}
 							previousPeriodLabel={previousPeriodLabel(filters)}
+							rangeText={rangeLabel(filters, d => formatDate(d))}
 							{dateRange}
 							{vehicleIds}
 							filterLabel={filtered ? filterLabel : undefined}
