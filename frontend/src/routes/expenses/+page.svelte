@@ -427,6 +427,10 @@
 
 	function clearFilters() {
 		searchTerm = '';
+		clearSheetFilters();
+	}
+
+	function clearSheetFilters() {
 		selectedVehicleId = undefined;
 		selectedTags = [];
 		startDate = undefined;
@@ -707,6 +711,7 @@
 					variant="outline"
 					class="h-12 shrink-0 rounded-full px-4 sm:h-11"
 					aria-haspopup="dialog"
+					aria-expanded={filtersSheetOpen}
 					onclick={() => (filtersSheetOpen = true)}
 				>
 					<SlidersHorizontal class="h-4 w-4" />
@@ -798,7 +803,7 @@
 					label="Vehicle"
 					options={vehicleOptions}
 					selected={[selectedVehicleId ?? '']}
-					onToggle={handleVehicleChange}
+					onToggle={value => handleVehicleChange(value === selectedVehicleId ? '' : value)}
 				/>
 				<FilterPills
 					label="Category"
@@ -806,14 +811,19 @@
 					selected={expenseCategoryList(categoryFilter)}
 					onToggle={toggleCategory}
 				/>
-				<div class="space-y-2">
-					<p class="text-sm font-medium">Dates</p>
+				<div class="space-y-2" role="group" aria-labelledby="expense-dates-label">
+					<p id="expense-dates-label" class="text-sm font-medium">Dates</p>
 					{@render dateFilter('w-full')}
 				</div>
 				<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={handleTagsChange} />
 			</div>
 			<Sheet.Footer class="flex-row justify-end gap-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
-				<Button variant="outline" size="lg" onclick={clearFilters} disabled={!filtersActive}>
+				<Button
+					variant="outline"
+					size="lg"
+					onclick={clearSheetFilters}
+					disabled={sheetFilterCount === 0}
+				>
 					Clear
 				</Button>
 				<Button size="lg" onclick={() => (filtersSheetOpen = false)}>

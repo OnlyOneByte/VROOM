@@ -548,6 +548,83 @@ describe('/expenses filters', () => {
 		await waitFor(() => expect(lastListParams()).toMatchObject({ category: 'fuel,maintenance' }));
 	});
 
+	test('pressing a picked category again drops it, and dropping the last clears the filter', async () => {
+		await mountLoaded();
+		const sheet = await filtersSheet();
+		const pill = (name: string) => within(sheet).getByRole('button', { name });
+
+		await fireEvent.click(pill('Fuel'));
+		await fireEvent.click(pill('Maintenance'));
+		await waitFor(() => expect(lastListParams()).toMatchObject({ category: 'fuel,maintenance' }));
+
+		await fireEvent.click(pill('Fuel'));
+		await waitFor(() => expect(lastListParams()).toMatchObject({ category: 'maintenance' }));
+		expect(pill('Fuel')).toHaveAttribute('aria-pressed', 'false');
+
+		await fireEvent.click(pill('Maintenance'));
+		await waitFor(() => expect(lastListParams()).not.toHaveProperty('category'));
+		expect(screen.getByRole('button', { name: 'Filters' })).toBeTruthy();
+	});
+
+	test('pressing the picked vehicle again goes back to All', async () => {
+		await mountLoaded();
+		await chooseVehicle('Daily Driver');
+		await waitFor(() => expect(lastListParams()).toMatchObject({ vehicleId: 'v1' }));
+
+		await chooseVehicle('Daily Driver');
+
+		await waitFor(() => expect(lastListParams()).not.toHaveProperty('vehicleId'));
+		const sheet = await filtersSheet();
+		expect(within(sheet).getByRole('button', { name: 'All' })).toHaveAttribute(
+			'aria-pressed',
+			'true'
+		);
+	});
+
+	test("the sheet's Clear resets the sheet's filters, keeps the search, and is off when none are on", async () => {
+		await mountLoaded();
+		await fireEvent.input(screen.getByRole('textbox', { name: 'Search expenses and vehicles' }), {
+			target: { value: 'shell' }
+		});
+		await waitFor(
+			() => expect(lastListParams()).toMatchObject({ search: 'shell' }),
+			SEARCH_DEBOUNCE_WAIT
+		);
+		const sheet = await filtersSheet();
+		const clear = () => within(sheet).getByRole('button', { name: 'Clear' });
+		expect(clear()).toBeDisabled();
+
+		await chooseVehicle('Daily Driver');
+		await fireEvent.click(within(sheet).getByRole('button', { name: 'Fuel' }));
+		await waitFor(() =>
+			expect(lastListParams()).toMatchObject({ vehicleId: 'v1', category: 'fuel' })
+		);
+		expect(clear()).toBeEnabled();
+
+		await fireEvent.click(clear());
+
+		await waitFor(() => expect(lastListParams()).not.toHaveProperty('vehicleId'));
+		const params = lastListParams();
+		expect(params).not.toHaveProperty('category');
+		expect(params).toMatchObject({ search: 'shell' });
+		expect(screen.getByRole('textbox', { name: 'Search expenses and vehicles' })).toHaveValue(
+			'shell'
+		);
+		expect(clear()).toBeDisabled();
+	});
+
+	test('Show N results names the matching count, in the singular for one', async () => {
+		getAllExpenses.mockResolvedValue(pageOf(ROWS, 1234));
+		await mountLoaded();
+		const sheet = await filtersSheet();
+		expect(within(sheet).getByRole('button', { name: 'Show 1,234 results' })).toBeTruthy();
+
+		getAllExpenses.mockResolvedValue(pageOf(ROWS.slice(0, 1), 1));
+		await chooseVehicle('Daily Driver');
+
+		expect(await within(sheet).findByRole('button', { name: 'Show 1 result' })).toBeTruthy();
+	});
+
 	test('clearing filters resets every filter and reloads once', async () => {
 		await mountLoaded();
 		await chooseVehicle('Daily Driver');
