@@ -1,6 +1,7 @@
 // vehicle_shares.ownerId is a denormalized copy for listing only; never use it as the access gate.
 
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import type { AppDatabase } from '../../db/connection';
 import type { NewVehicleShare, VehicleShare } from '../../db/schema';
 import { users, vehicleShares, vehicles } from '../../db/schema';
@@ -85,7 +86,7 @@ export function attachPendingInvites(
 }
 
 export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehicleShare> {
-  constructor(db: AppDatabase) {
+  constructor(db: AsyncAppDatabase) {
     super(db, vehicleShares);
   }
 

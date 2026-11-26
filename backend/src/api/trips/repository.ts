@@ -1,4 +1,5 @@
 import { and, asc, count, desc, eq, gte, lt, ne } from 'drizzle-orm';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import type { AppDatabase } from '../../db/connection';
 import type { NewTrip, Trip } from '../../db/schema';
 import { trips, vehicles } from '../../db/schema';
@@ -18,7 +19,7 @@ interface TripFilters {
 }
 
 export class TripRepository extends BaseRepository<Trip, NewTrip> {
-  constructor(db: AppDatabase) {
+  constructor(db: AsyncAppDatabase) {
     super(db, trips);
   }
 
@@ -46,7 +47,7 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
       tripDate: Date;
       timeZone?: string;
     },
-    db: AppDatabase | DrizzleTransaction = this.db
+    db: AppDatabase | DrizzleTransaction
   ): string | null {
     const { dayStart, nextDay } = localDayWindow(args.tripDate, args.timeZone);
     const result = db

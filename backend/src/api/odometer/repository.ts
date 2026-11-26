@@ -1,5 +1,6 @@
 import { and, count, desc, eq, gte, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { repos } from '../../app-context';
+import { openAsyncDatabase } from '../../db/async-sqlite';
 import type { AppDatabase } from '../../db/connection';
 import { rawAll, sqlFalse } from '../../db/dialect';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
@@ -65,15 +66,15 @@ export async function readingCheck(
 }
 
 export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdometerEntry> {
-  constructor(db: AppDatabase) {
-    super(db, odometerEntries);
+  constructor(private syncDb: AppDatabase) {
+    super(openAsyncDatabase(syncDb.$client).db, odometerEntries);
   }
 
   async createChecked(
     data: NewOdometerEntry,
     check: (tx: DrizzleTransaction) => void
   ): Promise<OdometerEntry> {
-    return this.db.transaction((tx) => {
+    return this.syncDb.transaction((tx) => {
       check(tx);
       return tx.insert(odometerEntries).values(data).returning().get();
     });
@@ -84,7 +85,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     data: Partial<NewOdometerEntry>,
     check: (tx: DrizzleTransaction) => void
   ): Promise<OdometerEntry> {
-    return this.db.transaction((tx) => {
+    return this.syncDb.transaction((tx) => {
       check(tx);
       const updated = tx
         .update(odometerEntries)
@@ -113,7 +114,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       createdBy?: string | null;
       driverId?: string | null;
     },
-    db: AppDatabase | DrizzleTransaction = this.db
+    db: AppDatabase | DrizzleTransaction = this.syncDb
   ): OdometerEntry | null {
     const sameReading = this.sameReadingWhere(entry);
     const existing = db
@@ -155,7 +156,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
 
   deleteLinkedTripEntry(
     entry: LinkedTripEntryKey,
-    db: AppDatabase | DrizzleTransaction = this.db
+    db: AppDatabase | DrizzleTransaction = this.syncDb
   ): string[] {
     const removed = db
       .delete(odometerEntries)
@@ -168,7 +169,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   moveLinkedTripEntry(
     from: LinkedTripEntryKey,
     to: { odometer: number; recordedAt: Date },
-    db: AppDatabase | DrizzleTransaction = this.db
+    db: AppDatabase | DrizzleTransaction = this.syncDb
   ): string | null {
     const linked = db
       .select({ id: odometerEntries.id })
@@ -198,7 +199,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   handOverLinkedTripEntry(
     entry: LinkedTripEntryKey,
     toTripId: string,
-    db: AppDatabase | DrizzleTransaction = this.db
+    db: AppDatabase | DrizzleTransaction = this.syncDb
   ): void {
     db.update(odometerEntries)
       .set({ sourceTripId: toTripId })
@@ -248,7 +249,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   ): Promise<{ data: OdometerEntry[]; totalCount: number }> {
     const where = and(eq(odometerEntries.vehicleId, vehicleId), eq(odometerEntries.userId, userId));
 
-    const data = await this.db
+    const data = await this.syncDb
       .select()
       .from(odometerEntries)
       .where(where)
@@ -256,7 +257,10 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       .limit(limit)
       .offset(offset);
 
-    const [result] = await this.db.select({ count: count() }).from(odometerEntries).where(where);
+    const [result] = await this.syncDb
+      .select({ count: count() })
+      .from(odometerEntries)
+      .where(where);
 
     return { data, totalCount: result?.count ?? 0 };
   }
@@ -285,7 +289,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
         source_id: string;
         note: string | null;
       }>(
-        this.db,
+        this.syncDb,
         sql`
         SELECT mileage AS odometer, date AS recorded_at, 'expense' AS source, id AS source_id, NULL AS note
         FROM expenses WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL ${visibleExpenses}
@@ -298,7 +302,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       );
 
       const [countResult] = await rawAll<{ total: number }>(
-        this.db,
+        this.syncDb,
         sql`
         SELECT (
           (SELECT COUNT(*) FROM expenses WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL ${visibleExpenses}) +
@@ -330,7 +334,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   async getCurrentOdometer(vehicleId: string, userId: string): Promise<number | null> {
     try {
       const [row] = await rawAll<{ current: number | null }>(
-        this.db,
+        this.syncDb,
         sql`
         SELECT MAX(odometer) AS current FROM (
           SELECT mileage AS odometer FROM expenses

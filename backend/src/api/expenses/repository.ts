@@ -15,6 +15,7 @@ import {
   type SQL,
   sql,
 } from 'drizzle-orm';
+import { openAsyncDatabase } from '../../db/async-sqlite';
 import type { AppDatabase } from '../../db/connection';
 import {
   countNum,
@@ -361,12 +362,12 @@ function replayFor(existing: Expense, vehicleId: string): Expense {
 }
 
 export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
-  constructor(db: AppDatabase) {
-    super(db, expenses);
+  constructor(private syncDb: AppDatabase) {
+    super(openAsyncDatabase(syncDb.$client).db, expenses);
   }
 
   async findByIdAndUserId(id: string, userId: string): Promise<Expense | null> {
-    const result = await this.db
+    const result = await this.syncDb
       .select()
       .from(expenses)
       .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
@@ -383,7 +384,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   async findBySource(sourceType: string, sourceId: string, userId: string): Promise<Expense[]> {
-    return this.db
+    return this.syncDb
       .select()
       .from(expenses)
       .where(this.sourceScope(sourceType, sourceId, userId))
@@ -399,7 +400,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   async findIdsByGroupId(groupId: string, userId: string): Promise<string[]> {
-    const rows = await this.db
+    const rows = await this.syncDb
       .select({ id: expenses.id })
       .from(expenses)
       .where(this.groupOwnedBy(groupId, userId));
@@ -412,7 +413,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     authors: (string | null)[];
     sourceType: string | null;
   } | null> {
-    const rows = await this.db
+    const rows = await this.syncDb
       .select({
         vehicleId: expenses.vehicleId,
         userId: expenses.userId,
@@ -431,7 +432,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   async findByClientId(clientId: string, userId: string): Promise<Expense | null> {
-    const result = await this.db
+    const result = await this.syncDb
       .select()
       .from(expenses)
       .where(and(eq(expenses.clientId, clientId), eq(expenses.userId, userId)))
@@ -450,7 +451,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   ): Promise<Expense> {
     const { clientId, userId } = data;
     try {
-      return this.db.transaction((tx) => {
+      return this.syncDb.transaction((tx) => {
         if (clientId) {
           const existing = tx
             .select()
@@ -476,7 +477,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     data: Partial<NewExpense>,
     odometer: OdometerCheck | null = null
   ): Promise<Expense> {
-    return this.db.transaction((tx) => {
+    return this.syncDb.transaction((tx) => {
       assertOdometerInOrder(tx, odometer);
       const updated = tx
         .update(expenses)
@@ -496,7 +497,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   ): Promise<{ imported: number; duplicates: number }> {
     if (rows.length === 0) return { imported: 0, duplicates: 0 };
     try {
-      const present = await this.db
+      const present = await this.syncDb
         .select({ clientId: expenses.clientId })
         .from(expenses)
         .where(and(eq(expenses.userId, userId), isNotNull(expenses.clientId)));
@@ -505,7 +506,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         if (row.clientId) seenClientIds.add(row.clientId);
       }
 
-      return this.db.transaction((tx) => {
+      return this.syncDb.transaction((tx) => {
         let imported = 0;
         let duplicates = 0;
         for (const row of rows) {
@@ -539,7 +540,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
       const baseWhere = and(eq(expenses.userId, filters.userId ?? ''), ...conditions);
 
-      const [countResult] = await this.db
+      const [countResult] = await this.syncDb
         .select({ count: countNum() })
         .from(expenses)
         .where(baseWhere);
@@ -548,7 +549,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
       const sortColumn = EXPENSE_SORT_COLUMNS[filters.sortBy ?? 'date'];
       const dir = filters.sortDir === 'asc' ? asc : desc;
-      const data = await this.db
+      const data = await this.syncDb
         .select()
         .from(expenses)
         .where(baseWhere)
@@ -573,7 +574,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     try {
       const conditions = buildExpenseConditions(filters);
 
-      const result = await this.db
+      const result = await this.syncDb
         .select()
         .from(expenses)
         .where(and(eq(expenses.userId, filters.userId ?? ''), ...conditions))
@@ -592,7 +593,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   async getMonthlyTotals(
     filters: ExpenseFilters
   ): Promise<Array<{ month: string; amount: number; count: number }>> {
-    const rows = await this.db
+    const rows = await this.syncDb
       .select({ date: expenses.date, amount: expenses.expenseAmount })
       .from(expenses)
       .where(and(eq(expenses.userId, filters.userId ?? ''), ...buildExpenseConditions(filters)));
@@ -614,7 +615,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     where: SQL | undefined,
     timeZone: string
   ): Promise<Array<{ period: string; amount: number; count: number }>> {
-    const rows = await this.db
+    const rows = await this.syncDb
       .select({ date: expenses.date, amount: expenses.expenseAmount })
       .from(expenses)
       .where(where);
@@ -656,7 +657,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
       const [totals, categoryBreakdown, monthlyTrend, recentTotals, costBuckets] =
         await Promise.all([
-          this.db
+          this.syncDb
             .select({
               totalAmount: sumNum(expenses.expenseAmount),
               expenseCount: countNum(),
@@ -664,7 +665,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
             .from(expenses)
             .where(periodWhere),
 
-          this.db
+          this.syncDb
             .select({
               category: expenses.category,
               amount: sumNum(expenses.expenseAmount),
@@ -676,7 +677,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
           filters.timeZone
             ? this.zonedMonthlyTrend(periodWhere, filters.timeZone)
-            : this.db
+            : this.syncDb
                 .select({
                   period: formatYearMonth(expenses.date).as('period'),
                   amount: sumNum(expenses.expenseAmount),
@@ -687,7 +688,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
                 .groupBy(formatYearMonth(expenses.date))
                 .orderBy(formatYearMonth(expenses.date)),
 
-          this.db
+          this.syncDb
             .select({
               amount: sumNum(expenses.expenseAmount),
             })
@@ -745,7 +746,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     const bucketSum = (when: SQL) =>
       sumNum(sql`CASE WHEN ${when} THEN ${expenses.expenseAmount} ELSE 0 END`);
 
-    const rows = await this.db
+    const rows = await this.syncDb
       .select({
         vehicleId: expenses.vehicleId,
         ownershipTotal: bucketSum(sql`${inCurrent} AND ${isOwnership}`),
@@ -780,7 +781,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   // photo-service imports this module, so receipt file removal has to stay with the caller.
   async deleteBySource(sourceType: string, sourceId: string, userId: string): Promise<number> {
     try {
-      const linked = await this.db
+      const linked = await this.syncDb
         .select({ id: expenses.id })
         .from(expenses)
         .where(this.sourceScope(sourceType, sourceId, userId));
@@ -789,7 +790,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
       const linkedIds = linked.map((e) => e.id);
 
-      this.db.transaction((tx) => {
+      this.syncDb.transaction((tx) => {
         tx.delete(photos)
           .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, linkedIds)))
           .run();
@@ -811,7 +812,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
   async clearSource(sourceType: string, sourceId: string, userId: string): Promise<number> {
     try {
-      const result = await this.db
+      const result = await this.syncDb
         .update(expenses)
         .set({ sourceType: null, sourceId: null })
         .where(this.sourceScope(sourceType, sourceId, userId))
@@ -857,7 +858,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       const splitMethod: SplitMethod = data.splitConfig.method;
 
       // bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.
-      return this.db.transaction((tx) => {
+      return this.syncDb.transaction((tx) => {
         const groupId = createId();
 
         return expenseSplitService.createSiblingsSync(tx, {
@@ -887,7 +888,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   async getSplitExpense(groupId: string, userId: string): Promise<Expense[]> {
-    const siblings = await this.db
+    const siblings = await this.syncDb
       .select()
       .from(expenses)
       .where(this.groupOwnedBy(groupId, userId));
@@ -900,7 +901,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   async deleteSplitExpense(groupId: string, userId: string): Promise<void> {
-    const siblings = await this.db
+    const siblings = await this.syncDb
       .select({ id: expenses.id })
       .from(expenses)
       .where(this.groupOwnedBy(groupId, userId));
@@ -912,7 +913,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     const siblingIds = siblings.map((s) => s.id);
 
     try {
-      this.db.transaction((tx) => {
+      this.syncDb.transaction((tx) => {
         tx.delete(photos)
           .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, siblingIds)))
           .run();
@@ -935,7 +936,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   ): Promise<Expense[]> {
     try {
       // bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.
-      return this.db.transaction((tx) => {
+      return this.syncDb.transaction((tx) => {
         const [firstOld, ...restOld] = tx
           .select()
           .from(expenses)

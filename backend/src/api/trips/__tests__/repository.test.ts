@@ -1,10 +1,8 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migration-helpers';
-import type { AppDatabase } from '../../../db/connection';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import type { NewTrip } from '../../../db/schema';
-import * as schema from '../../../db/schema';
 import { TripRepository, tripDistance } from '../repository';
 
 const USER_ID = 'u-trip';
@@ -13,7 +11,6 @@ const VEHICLE_ID = 'v-trip';
 const OTHER_VEHICLE = 'v-trip-2';
 
 let sqliteDb: Database;
-let db: AppDatabase;
 let repo: TripRepository;
 let counter = 0;
 
@@ -49,8 +46,7 @@ describe('TripRepository', () => {
     sqliteDb.run(
       `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('${OTHER_VEHICLE}', '${USER_ID}', 'Honda', 'Civic', 2021)`
     );
-    db = drizzle(sqliteDb, { schema });
-    repo = new TripRepository(db);
+    repo = new TripRepository(openAsyncDatabase(sqliteDb).db);
     counter = 0;
   });
 

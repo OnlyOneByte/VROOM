@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import type { NewVehicleFinancing, VehicleFinancing } from '../../db/schema';
 import { expenses, vehicleFinancing } from '../../db/schema';
 import { DatabaseError } from '../../errors';
@@ -88,7 +88,7 @@ export function amortizedBalance(
 }
 
 export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVehicleFinancing> {
-  constructor(db: AppDatabase) {
+  constructor(db: AsyncAppDatabase) {
     super(db, vehicleFinancing);
   }
 

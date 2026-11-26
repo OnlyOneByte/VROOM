@@ -1,11 +1,11 @@
 import type { Column, Table } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
-import type { AppDatabase } from '../db/connection';
+import type { AsyncAppDatabase } from '../db/async-sqlite';
 import { NotFoundError } from '../errors';
 
 export abstract class BaseRepository<T, TNew extends Record<string, unknown>> {
   constructor(
-    protected db: AppDatabase,
+    protected db: AsyncAppDatabase,
     protected table: Table & { id: Column }
   ) {}
 
