@@ -128,8 +128,13 @@ function createAuthStore() {
 					user: User;
 					session: { expiresAt: string };
 					pendingApproval?: boolean;
+					demo?: boolean;
 				}>('/auth/me');
-				signIn(result.pendingApproval ? { ...result.user, pendingApproval: true } : result.user);
+				signIn({
+					...result.user,
+					...(result.pendingApproval ? { pendingApproval: true } : {}),
+					...(result.demo ? { demo: true } : {})
+				});
 			} catch (err) {
 				const cached = isSignedOutResponse(err) ? null : (user ?? lastKnownUser());
 				if (!cached) {
