@@ -36,13 +36,12 @@
 	let request = $derived.by((): BackfillRequest | null => {
 		if (mode === 'logged') return { mode };
 		if (!driverId || !from || !to || from > to) return null;
-		const end = new Date(dateOnlyToISO(to));
-		end.setDate(end.getDate() + 1);
+		const endOfDay = Date.parse(dateOnlyToISO(to)) + 24 * 60 * 60 * 1000 - 1;
 		return {
 			mode,
 			driverId,
 			from: dateOnlyToISO(from),
-			to: new Date(end.getTime() - 1).toISOString()
+			to: new Date(endOfDay).toISOString()
 		};
 	});
 	let chosen = $derived(drivers.find(d => d.id === driverId));
