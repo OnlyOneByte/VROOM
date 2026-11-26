@@ -1,14 +1,11 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
 import fc from 'fast-check';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
-import type { AppDatabase } from '../../../db/connection';
-import * as schema from '../../../db/schema';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AuthProviderRepository, buildAuthProviderConfig } from '../auth-provider-repository';
 
 let sqliteDb: Database;
-let db: AppDatabase;
 let repo: AuthProviderRepository;
 
 const USER_ID = 'test-user-1';
@@ -30,8 +27,7 @@ beforeEach(() => {
   for (const m of migrations) {
     applyMigration(sqliteDb, m);
   }
-  db = drizzle(sqliteDb, { schema });
-  repo = new AuthProviderRepository(db);
+  repo = new AuthProviderRepository(openAsyncDatabase(sqliteDb).db);
   seedTestData();
 });
 
