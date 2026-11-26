@@ -76,6 +76,42 @@ checkpoints the WAL periodically, plus forced checkpoints on startup and shutdow
 `vroom.db` taken while the backend runs must include its `-wal` and `-shm` files, or it can miss
 recent writes.
 
+**Async transactions (#1378): one connection, one transaction at a time.** The `bun:sqlite`
+driver needs a synchronous transaction callback: an awaited statement inside it commits on its
+own. Postgres and MySQL drivers are async only. The chosen path, prototyped in
+`src/db/async-sqlite.ts`, keeps the single `bun:sqlite` connection and drives it through
+Drizzle's async `sqlite-proxy` session:
+
+- A transaction runs `BEGIN IMMEDIATE`, awaits its callback, then commits, or rolls back if the
+  callback throws. Writes on both sides of an `await` are atomic.
+- While a transaction is open, a query from any other async context waits until it ends, so
+  nothing can join it or read its uncommitted rows. Code inside the transaction is recognised
+  through `AsyncLocalStorage` and never waits.
+- Transactions queue rather than nest across requests: SQLite has a single writer anyway.
+  Keep awaits inside a transaction to database work, because a slow `fetch` there makes every
+  other query wait.
+
+`src/db/__tests__/async-sqlite.test.ts` proves each of these properties, and removing either
+the wait or the queue fails a test. Rows map the same as with the sync driver, Drizzle's
+relational queries included. The exception is raw `db.all(sql…)`, which returns positional
+arrays and must move to the dialect helpers. In a micro-benchmark of 20,000 single-row selects
+on this schema, a query through the proxy took 57 µs against 109 µs through the sync driver,
+because `sqlite.query()` caches its prepared statements.
+
+Two alternatives were rejected:
+
+- **A second connection for each transaction:** `bun:sqlite` waits for a lock synchronously.
+  While one connection holds the write lock, a write on the other freezes the event loop for up
+  to `busy_timeout`, and with it the transaction it is waiting for, before failing with
+  `SQLITE_BUSY`. It also cannot work on the `:memory:` database the tests use.
+- **libsql:** this means a new native dependency and a driver swap for every query, for the
+  same single-writer result. Reconsider it only if serialising transactions becomes a
+  bottleneck.
+
+On Postgres (#1635) the same transaction signature maps onto the driver's own pooled
+`db.transaction(async (tx) => …)`, so call sites won't change again. The next #1378 steps move
+the app onto this session, then convert each domain's transaction sites and sync terminals.
+
 **Expense-linked records use a polymorphic link.** Financing payments, insurance premiums,
 and reminder materializations are real rows in `expenses` tagged with `source_type` +
 `source_id` rather than per-feature boolean columns or separate tables. One query path serves
