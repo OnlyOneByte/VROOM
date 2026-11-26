@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { tick, untrack } from 'svelte';
+	import { tick, untrack, type Snippet } from 'svelte';
 	import { ChartColumn, RotateCcw, SearchX } from '@lucide/svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
-	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import { AppBarChart, AppLineChart } from '#lib/components/charts/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
@@ -23,10 +22,7 @@
 		DEFAULT_EXPLORE,
 		EXPLORE_COMPARES,
 		EXPLORE_INTERVALS,
-		EXPLORE_PRESETS,
-		activePreset,
 		apiQuery,
-		applyPreset,
 		chartForm,
 		describeQuery,
 		metricInfo,
@@ -40,6 +36,7 @@
 		carPanels,
 		exploreAnnotations,
 		hasData,
+		heroSentence,
 		isAdditive,
 		kpis,
 		bucketBounds,
@@ -64,6 +61,7 @@
 		onAllCars?: () => void;
 		onApplyInsight?: (_query: Record<string, string>) => void;
 		driverSplit?: boolean;
+		filters?: Snippet;
 	}
 
 	let {
@@ -79,7 +77,8 @@
 		onOnlyCar,
 		onAllCars,
 		onApplyInsight,
-		driverSplit = false
+		driverSplit = false,
+		filters
 	}: Props = $props();
 
 	let root = $state<HTMLElement | null>(null);
@@ -91,6 +90,7 @@
 
 	let response = $state<AnalyticsQueryResponse | null>(null);
 	let shown = $state<ExploreQuery>(untrack(() => query));
+	let shownScope = $state(untrack(() => ({ range: rangeText, cars: carsText })));
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 	let controller: AbortController | null = null;
@@ -107,11 +107,13 @@
 	let requestKey = $derived(JSON.stringify(request));
 
 	async function load(params: typeof request, key: string, asked: ExploreQuery) {
+		const scope = untrack(() => ({ range: rangeText, cars: carsText }));
 		controller?.abort();
 		const cached = queryCache.get(key);
 		if (cached) {
 			response = cached;
 			shown = asked;
+			shownScope = scope;
 			isLoading = false;
 			error = null;
 			return;
@@ -125,6 +127,7 @@
 			queryCache.set(key, result);
 			response = result;
 			shown = asked;
+			shownScope = scope;
 			error = null;
 		} catch (e) {
 			if (current.signal.aborted) return;
@@ -144,7 +147,6 @@
 	let distanceWord = $derived(units.distanceUnit === 'kilometers' ? 'km' : 'mile');
 	let format = $derived(valueFormatter(shown, units));
 	let form = $derived(chartForm(shown));
-	let preset = $derived(activePreset(query));
 	let hidden = $derived(new Set(query.hide));
 
 	let allSeries = $derived(response ? seriesFor(response, vehicleColors) : []);
@@ -161,33 +163,28 @@
 		shown.compare === 'prevYear' ? 'the year before' : 'the period before'
 	);
 
-	let kpiItems = $derived.by(() => {
-		if (!summary) return [];
-		const items: Array<{ label: string; value: string; subtitle?: string }> = [
-			{
-				label: isAdditive(shown) ? 'Total' : 'Average',
-				value: summary.total != null ? format.full(summary.total) : 'N/A'
-			}
-		];
-		if (shown.per !== 'none' && summary.perBucket != null) {
-			const change = percentChange(summary.perBucket, summary.previousPerBucket);
-			items.push({
-				label: `Per ${intervalLabel}`,
-				value: format.full(summary.perBucket),
-				subtitle:
-					change == null
-						? undefined
-						: `${change > 0 ? '▲' : change < 0 ? '▼' : '='} ${Math.abs(change)}% vs ${compareLabel}`
-			});
-		}
-		if (summary.perDistance != null && shown.metric !== 'costPerDistance') {
-			items.push({
-				label: `Per ${distanceWord}`,
-				value: format.full(summary.perDistance)
-			});
-		}
-		return items;
-	});
+	let heroValue = $derived(
+		summary?.total == null
+			? 'N/A'
+			: shown.metric === 'cost'
+				? format.axis(summary.total)
+				: format.full(summary.total)
+	);
+	let heroText = $derived(
+		summary
+			? heroSentence({
+					query: shown,
+					summary,
+					series: visibleSeries,
+					format: v => (shown.metric === 'cost' && v >= 100 ? format.axis(v) : format.full(v)),
+					rangeText: shownScope.range,
+					carsText: shownScope.cars,
+					interval: intervalLabel,
+					compareLabel,
+					distanceWord
+				})
+			: ''
+	);
 
 	let labels = $derived(response ? response.buckets.map(b => bucketLabel(b, shown.per)) : []);
 	const isMobile = new IsMobile();
@@ -521,21 +518,24 @@
 </script>
 
 <div class="space-y-4 md:space-y-6" bind:this={root}>
-	<QueryBar {query} onChange={onQueryChange} {driverSplit} />
-
-	<div class="flex flex-wrap gap-2" role="group" aria-label="Presets">
-		{#each EXPLORE_PRESETS as p (p.id)}
-			<Button
-				size="sm"
-				variant={preset === p.id ? 'default' : 'outline'}
-				aria-pressed={preset === p.id}
-				class="rounded-full"
-				onclick={() => onQueryChange(applyPreset(p.query))}
+	{#if response && hasData(response)}
+		<div
+			class="flex min-h-48 flex-col gap-2 transition-opacity md:min-h-28 md:flex-row md:items-center md:gap-5"
+			class:opacity-60={isLoading || !!error}
+			aria-live="polite"
+		>
+			<p
+				class="shrink-0 font-(family-name:--font-fig) text-6xl leading-none font-bold tabular-nums lg:text-7xl"
 			>
-				{p.label}
-			</Button>
-		{/each}
-	</div>
+				{heroValue}
+			</p>
+			<p class="max-w-md text-base text-muted-foreground md:text-lg">{heroText}</p>
+		</div>
+	{:else if !response && !error}
+		<Skeleton class="h-48 w-full max-w-xl md:h-28" />
+	{/if}
+
+	<QueryBar {query} onChange={onQueryChange} {driverSplit} {filters} />
 
 	{#if error && !response}
 		<LoadErrorCard
@@ -544,8 +544,7 @@
 			onRetry={() => load(request, requestKey, query)}
 		/>
 	{:else if !response}
-		<div class="space-y-4" aria-busy="true" aria-label="Loading the chart">
-			<Skeleton class="h-24 w-full" />
+		<div aria-busy="true" aria-label="Loading the chart">
 			<Skeleton class="h-[300px] w-full" />
 		</div>
 	{:else if !hasData(response)}
@@ -585,8 +584,6 @@
 			class:opacity-60={isLoading || !!error}
 			aria-busy={isLoading}
 		>
-			<StatCardGrid items={kpiItems} columns={3} />
-
 			<nav aria-label="Drill path" class="flex flex-wrap items-center gap-x-1 text-sm">
 				{#if onAllCars && carsText !== 'All cars'}
 					<button

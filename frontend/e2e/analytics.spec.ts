@@ -298,17 +298,19 @@ test.describe('Analytics', () => {
 		const { ids } = await scanA11y(page, testInfo, 'explore');
 		expect(ids).toEqual([]);
 
+		await page.getByRole('button', { name: 'Metric Total cost' }).click();
 		await page.getByRole('button', { name: 'Cost per mile' }).click();
 		await expect(page).toHaveURL(/metric=costPerDistance/);
+		await page.getByRole('button', { name: /^Split by/ }).click();
+		await page.getByRole('button', { name: 'Car', exact: true }).click();
 		await expect(page).toHaveURL(/split=vehicle/);
 		await expect(
 			page.getByRole('heading', { name: 'Cost per mile per month by car' })
 		).toBeVisible();
 		await expect.poll(() => requests.at(-1)?.get('metric')).toBe('costPerDistance');
 
-		await page.getByRole('button', { name: 'Edit' }).click();
-		await page.getByRole('radio', { name: 'Quarter', exact: true }).click();
-		await page.getByRole('button', { name: 'Done' }).click();
+		await page.getByRole('button', { name: 'By Month' }).click();
+		await page.getByRole('button', { name: 'Quarter', exact: true }).click();
 		await expect(page).toHaveURL(/per=quarter/);
 		await expect.poll(() => requests.at(-1)?.get('interval')).toBe('quarter');
 
@@ -355,28 +357,34 @@ test.describe('Analytics', () => {
 		await expect(table.getByRole('cell', { name: '$100.00 (= 0%)' })).toBeVisible();
 	});
 
-	test('every Explore preset renders and round-trips through the URL', async ({ page }) => {
+	test('the hero and chips follow the view in the URL', async ({ page }) => {
 		await mockAnalytics(page);
-		await page.goto('/analytics');
-		const presets: Array<[string, string]> = [
-			['Where the money goes', 'Total cost per month by category'],
-			['Cost per mile', 'Cost per mile per month by car'],
-			['Fuel vs charging', 'Total cost per month by fuel type'],
-			['This year vs last', 'Total cost per month, against the year before'],
-			['Seasons', 'Fuel efficiency per quarter by car']
+		const views: Array<[string, string, string, RegExp]> = [
+			['', 'Total cost per month by category', 'Metric Total cost', /^in running costs over/],
+			[
+				'?split=fuelType&inc=all',
+				'Total cost per month by fuel type',
+				'Metric Total cost, all costs',
+				/^in all costs over/
+			],
+			[
+				'?split=none&compare=prevYear',
+				'Total cost per month, against the year before',
+				'Compare The year before',
+				/^in running costs over/
+			],
+			[
+				'?metric=mpg&per=quarter&split=vehicle',
+				'Fuel efficiency per quarter by car',
+				'By Quarter',
+				/^on average over the last 12 months for all your cars\.$/
+			]
 		];
-		for (const [preset, heading] of presets) {
-			await page.mouse.move(640, 600);
-			await page.getByRole('button', { name: preset }).click();
+		for (const [search, heading, chip, sentence] of views) {
+			await page.goto(`/analytics${search}`);
 			await expect(page.getByRole('heading', { name: heading })).toBeVisible();
-			const url = page.url();
-			await page.reload();
-			await expect(page).toHaveURL(url);
-			await expect(page.getByRole('heading', { name: heading })).toBeVisible();
-			await expect(page.getByRole('button', { name: preset })).toHaveAttribute(
-				'aria-pressed',
-				'true'
-			);
+			await expect(page.getByRole('button', { name: chip })).toBeVisible();
+			await expect(page.getByText(sentence)).toBeVisible();
 		}
 	});
 
