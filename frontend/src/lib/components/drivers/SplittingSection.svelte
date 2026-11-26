@@ -168,7 +168,7 @@
 									<Input
 										id="share-{group.key}-{driver.id}"
 										aria-label="{driver.name}'s share, in percent"
-										class="h-10 w-20 text-right tabular-nums"
+										class="w-20 text-right tabular-nums"
 										type="number"
 										inputmode="numeric"
 										min="0"
