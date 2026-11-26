@@ -62,6 +62,7 @@
 		onApplyInsight?: (_query: Record<string, string>) => void;
 		driverSplit?: boolean;
 		filters?: Snippet;
+		carCount?: number;
 	}
 
 	let {
@@ -78,7 +79,8 @@
 		onAllCars,
 		onApplyInsight,
 		driverSplit = false,
-		filters
+		filters,
+		carCount
 	}: Props = $props();
 
 	let root = $state<HTMLElement | null>(null);
@@ -181,7 +183,8 @@
 					carsText: shownScope.cars,
 					interval: intervalLabel,
 					compareLabel,
-					distanceWord
+					distanceWord,
+					carCount
 				})
 			: ''
 	);
@@ -500,6 +503,16 @@
 		if (date instanceof Date) onQueryChange({ ...query, sel: keyFor(date), seg: car });
 	}
 
+	function selectBarPanel(row: Record<string, unknown>, car: string) {
+		const bucket = response?.buckets[labels.indexOf(String(row['label']))];
+		if (bucket) onQueryChange({ ...query, sel: bucket, seg: car });
+	}
+
+	function panelTotalText(series: { values: Array<number | null> }): string {
+		const total = series.values.reduce<number>((sum, v) => sum + (v ?? 0), 0);
+		return `${format.axis(total)} in all`;
+	}
+
 	function selectRanking(row: Record<string, unknown>) {
 		const series = allSeries.find(s => s.label === row['label']);
 		if (series) onQueryChange({ ...query, sel: 'total', seg: series.sourceKey });
@@ -663,7 +676,8 @@
 						{chartTitle}
 					</h2>
 					<p class="text-sm text-muted-foreground">
-						One scale for every car. The dashed line is the fleet average{panels.fleetMean != null
+						One {format.axis(panels.yDomain[0])} – {format.axis(panels.yDomain[1])} scale for every car.
+						The dashed line is the fleet average{panels.fleetMean != null
 							? ` (${format.full(panels.fleetMean)}${panelPer})`
 							: ''}.
 					</p>
@@ -676,36 +690,63 @@
 							onRecovered={() => document.getElementById('explore-panels-title')?.focus()}
 						/>
 					{/if}
-					<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+					<div
+						class="grid grid-cols-1 gap-4 {isAdditive(shown)
+							? 'lg:grid-cols-2 xl:grid-cols-3'
+							: 'lg:grid-cols-2'}"
+					>
 						{#each panels.panels as panel (panel.series.key)}
-							<AppLineChart
-								class="min-w-0"
-								level={3}
-								title={panel.series.label}
-								description={panel.mean != null
-									? `Average ${format.full(panel.mean)}${panelPer}`
-									: carTotalsError
-										? 'Average not available'
-										: !isAdditive(shown) && carTotals === null
-											? 'Working out the average'
-											: 'No data in this range'}
-								onSelect={row => selectPanel(row, panel.series.sourceKey)}
-								data={lineRows}
-								x="date"
-								y={[panel.series.key]}
-								series={[panel.series]}
-								config={buildChartConfig([panel.series])}
-								height={200}
-								yDomain={panels.yDomain}
-								referenceLines={panels.fleetMean != null
-									? [{ value: panels.fleetMean, label: 'Fleet average' }]
-									: []}
-								xAxisProps={lineXAxis}
-								yAxisFormat={format.axis}
-								tooltipFormat={format.full}
-								tooltipLabelFormat={v =>
-									v instanceof Date ? bucketLabel(keyFor(v), shown.per) : ''}
-							/>
+							{#if isAdditive(shown)}
+								<AppBarChart
+									class="min-w-0"
+									level={3}
+									title={panel.series.label}
+									description={panelTotalText(panel.series)}
+									onSelect={row => selectBarPanel(row, panel.series.sourceKey)}
+									data={barRows}
+									x="label"
+									series={[panel.series]}
+									config={buildChartConfig([panel.series])}
+									height={200}
+									yDomain={panels.yDomain}
+									referenceLines={panels.fleetMean != null
+										? [{ value: panels.fleetMean, label: 'Fleet average' }]
+										: []}
+									xAxisProps={{ ticks: bandTicks }}
+									yAxisFormat={format.axis}
+									tooltipFormat={format.full}
+									tooltipLabelFormat={v => String(v)}
+								/>
+							{:else}
+								<AppLineChart
+									class="min-w-0"
+									level={3}
+									title={panel.series.label}
+									description={panel.mean != null
+										? `Average ${format.full(panel.mean)}${panelPer}`
+										: carTotalsError
+											? 'Average not available'
+											: !isAdditive(shown) && carTotals === null
+												? 'Working out the average'
+												: 'No data in this range'}
+									onSelect={row => selectPanel(row, panel.series.sourceKey)}
+									data={lineRows}
+									x="date"
+									y={[panel.series.key]}
+									series={[panel.series]}
+									config={buildChartConfig([panel.series])}
+									height={200}
+									yDomain={panels.yDomain}
+									referenceLines={panels.fleetMean != null
+										? [{ value: panels.fleetMean, label: 'Fleet average' }]
+										: []}
+									xAxisProps={lineXAxis}
+									yAxisFormat={format.axis}
+									tooltipFormat={format.full}
+									tooltipLabelFormat={v =>
+										v instanceof Date ? bucketLabel(keyFor(v), shown.per) : ''}
+								/>
+							{/if}
 						{/each}
 					</div>
 				</section>
@@ -763,6 +804,12 @@
 		car={selectionCar}
 		parts={selectionParts}
 		{onOnlyCar}
+		allCars={selectedSeries && form === 'panels' && query.sel && query.sel !== 'total'
+			? {
+					label: `All cars in ${bucketLabel(query.sel, shown.per)}`,
+					run: () => onQueryChange({ ...query, seg: undefined })
+				}
+			: null}
 		onClose={closeSelection}
 	/>
 

@@ -144,6 +144,15 @@ const HERO_LEAD: Record<ExploreQuery['metric'], string> = {
 	count: 'expenses logged'
 };
 
+const UNRECORDED_DRIVER = 'No one recorded';
+const COUNT_WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+
+function fleetPhrase(count?: number): string {
+	if (count === 1) return 'your car';
+	const word = count ? COUNT_WORDS[count] : undefined;
+	return word ? `your ${word} cars` : 'all your cars';
+}
+
 function rangePhrase(range: string): string {
 	if (range === 'Year to date') return 'so far this year';
 	if (range === 'All time') return 'since you started logging';
@@ -162,6 +171,7 @@ export function heroSentence(opts: {
 	interval: string;
 	compareLabel: string;
 	distanceWord: string;
+	carCount?: number;
 }): string {
 	const { query, summary, series } = opts;
 	const lead =
@@ -170,7 +180,7 @@ export function heroSentence(opts: {
 			: query.metric === 'count' && summary.total === 1
 				? 'expense logged'
 				: HERO_LEAD[query.metric];
-	const cars = opts.carsText === 'All cars' ? 'all your cars' : opts.carsText;
+	const cars = opts.carsText === 'All cars' ? fleetPhrase(opts.carCount) : opts.carsText;
 	const parts = [`${lead} ${rangePhrase(opts.rangeText)} for ${cars}.`];
 	if (!isAdditive(query)) return parts[0] as string;
 	const total = summary.total ?? 0;
@@ -178,7 +188,12 @@ export function heroSentence(opts: {
 		const top = series
 			.map(s => ({ label: s.label, value: sum(s.values) }))
 			.reduce((a, b) => (b.value > a.value ? b : a));
-		parts.push(`${top.label} was ${Math.round((top.value / total) * 100)}% of it.`);
+		const share = Math.round((top.value / total) * 100);
+		parts.push(
+			top.label === UNRECORDED_DRIVER
+				? `${share}% of it has no driver recorded.`
+				: `${top.label} was ${share}% of it.`
+		);
 	}
 	if (query.per !== 'none' && summary.perBucket != null) {
 		const change = percentChange(summary.perBucket, summary.previousPerBucket);

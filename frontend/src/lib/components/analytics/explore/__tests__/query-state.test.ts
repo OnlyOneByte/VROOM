@@ -105,6 +105,8 @@ describe('Explore query in the URL', () => {
 		expect(chartForm(DEFAULT_EXPLORE)).toBe('stacked');
 		expect(chartForm(applyPreset({ split: 'none' }))).toBe('bars');
 		expect(chartForm(applyPreset({ metric: 'costPerDistance', split: 'vehicle' }))).toBe('line');
+		expect(chartForm(applyPreset({ split: 'vehicle' }))).toBe('panels');
+		expect(chartForm(applyPreset({ metric: 'distance', split: 'vehicle' }))).toBe('panels');
 		expect(chartForm(applyPreset({ per: 'none' }))).toBe('ranking');
 		expect(chartForm(applyPreset({ compare: 'prevYear' }))).toBe('compare');
 	});
@@ -243,8 +245,11 @@ describe('Explore chart data', () => {
 	test('Whole range shows every series, so hidden series are cleared', () => {
 		const byCar = { ...applyPreset({ split: 'vehicle' }), hide: ['camry'] };
 		expect(normalizeExplore({ ...byCar, per: 'none' }).hide).toEqual([]);
-		expect(normalizeExplore(byCar).hide).toEqual(['camry']);
+		expect(normalizeExplore(byCar).hide).toEqual([]);
+		const byCategory = { ...DEFAULT_EXPLORE, hide: ['fuel'] };
+		expect(normalizeExplore(byCategory).hide).toEqual(['fuel']);
 		expect(parseExplore(params('per=none&split=vehicle&hide=camry')).hide).toEqual([]);
+		expect(parseExplore(params('split=vehicle&hide=camry')).hide).toEqual([]);
 	});
 });
 
@@ -507,5 +512,21 @@ describe('Explore hero sentence', () => {
 			rangeText: 'Year to date'
 		});
 		expect(text).toBe('in all costs so far this year for all your cars. About $0.25 a mile.');
+	});
+
+	test('names the fleet by size, and an unrecorded driver reads as such', () => {
+		const one = heroSentence({ ...base, query: DEFAULT_EXPLORE, summary, series: [], carCount: 1 });
+		expect(one).toMatch(/ for your car\. /);
+		const text = heroSentence({
+			...base,
+			query: applyPreset({ split: 'driver' }),
+			summary,
+			series: [
+				{ label: 'No one recorded', values: [300] },
+				{ label: 'Sam', values: [100] }
+			],
+			carCount: 3
+		});
+		expect(text).toMatch(/ for your three cars\. 75% of it has no driver recorded\. /);
 	});
 });

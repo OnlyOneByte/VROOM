@@ -111,7 +111,7 @@ export function normalizeExplore(query: ExploreQuery): ExploreQuery {
 	const next: ExploreQuery = splits.includes(query.split)
 		? query
 		: { ...query, split: splits[0] ?? 'none', hide: [] };
-	const clear = next.per === 'none' || next.compare === 'cars';
+	const clear = ['ranking', 'panels'].includes(chartForm(next));
 	return clear && next.hide.length > 0 ? { ...next, hide: [] } : next;
 }
 
@@ -170,6 +170,7 @@ export function chartForm(query: ExploreQuery): ChartForm {
 	if (query.compare === 'cars') return 'panels';
 	if (query.compare !== 'none') return 'compare';
 	if (ratio) return 'line';
+	if (query.split === 'vehicle') return 'panels';
 	if (query.split === 'tag') return 'grouped';
 	return query.split === 'none' ? 'bars' : 'stacked';
 }

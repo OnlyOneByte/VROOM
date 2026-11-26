@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { ArrowRight, Car, Fuel } from '@lucide/svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
@@ -35,6 +36,7 @@
 			run: () => void;
 		}>;
 		onOnlyCar?: (_id: string) => void;
+		allCars?: { label: string; run: () => void } | null;
 		onClose: () => void;
 	}
 
@@ -51,10 +53,18 @@
 		car,
 		parts = [],
 		onOnlyCar,
+		allCars,
 		onClose
 	}: Props = $props();
 
 	const isMobile = new IsMobile();
+	let splitList = $state<HTMLElement | null>(null);
+
+	async function showAllCars() {
+		allCars?.run();
+		await tick();
+		splitList?.querySelector<HTMLElement>('button')?.focus();
+	}
 	let items = $state<AnalyticsBucketItems | null>(null);
 	let error = $state<string | null>(null);
 	let request = 0;
@@ -174,7 +184,11 @@
 			{/if}
 
 			{#if parts.length > 1}
-				<ul class="divide-y rounded-md border" aria-label="Split of this period">
+				<ul
+					class="divide-y rounded-md border"
+					aria-label="Split of this period"
+					bind:this={splitList}
+				>
 					{#each parts as part (part.key)}
 						<li class="flex items-center justify-between gap-3 p-2 pl-3">
 							<span class="flex min-w-0 items-center gap-2">
@@ -200,6 +214,11 @@
 				<Button variant="outline" class="h-10 w-full" onclick={() => onOnlyCar(car.id)}>
 					<Car class="mr-2 h-4 w-4" aria-hidden="true" />
 					Show only {car.name}
+				</Button>
+			{/if}
+			{#if allCars}
+				<Button variant="outline" class="h-10 w-full" onclick={showAllCars}>
+					{allCars.label}
 				</Button>
 			{/if}
 		</div>
