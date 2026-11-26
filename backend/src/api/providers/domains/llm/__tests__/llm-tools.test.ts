@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../../../../test-helpers/http-client';
+import {
+  createTestApp,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../../../../test-helpers/http-client';
 
 let ctx: TestApp;
 const OTHER_USER = 'other-owner-llm';
@@ -16,7 +20,7 @@ beforeEach(async () => {
     `INSERT INTO users (id, email, display_name) VALUES (?, 'other-llm@test.com', 'Other Owner')`,
     [OTHER_USER]
   );
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 function seedVehicle(id: string, userId: string): void {

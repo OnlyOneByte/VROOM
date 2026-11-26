@@ -5,7 +5,11 @@ import {
   FakeGoogleStore,
   makeFakeSheetsClients,
 } from '../../../../test-helpers/fake-google-clients';
-import { createTestApp, type TestApp } from '../../../../test-helpers/http-client';
+import {
+  createTestApp,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../../../test-helpers/http-client';
 import {
   GoogleSheetsService,
   SHEET_HEADERS,
@@ -81,7 +85,7 @@ describe('Google Sheets backup writes every tab (populate coverage)', () => {
 
   beforeEach(async () => {
     ctx = await createTestApp();
-  });
+  }, SETUP_TIMEOUT_MS);
 
   test('a backup writes a header row to every table tab', async () => {
     const store = new FakeGoogleStore();

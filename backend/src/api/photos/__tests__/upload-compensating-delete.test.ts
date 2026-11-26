@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { repos } from '../../../app-context';
 import { ValidationError } from '../../../errors';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { logger } from '../../../utils/logger';
 import { FULL_CRUD, type StorageRef } from '../../providers/domains/storage/storage-provider';
 import { uploadPhotoForEntity } from '../photo-service';
@@ -17,7 +17,7 @@ beforeEach(async () => {
     [ctx.user.id]
   );
   storage = installFakePhotoStorage(ctx);
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   storage.restore();

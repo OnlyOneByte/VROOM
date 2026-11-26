@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import type {
   StorageFileInfo,
   StorageProvider,
@@ -91,7 +91,7 @@ beforeEach(async () => {
   downloads = 0;
   await installCountingProvider();
   seedServablePhoto();
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   restoreRegistry();

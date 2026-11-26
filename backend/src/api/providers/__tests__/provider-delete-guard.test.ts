@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  json,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -21,7 +26,7 @@ beforeEach(async () => {
      VALUES ('photo-d', ?, 'vehicle', 'veh-d', 'a.jpg', 'image/jpeg', 1)`,
     [ctx.user.id]
   );
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 function addRef(id: string, providerId: string, status = 'active'): void {

@@ -3,6 +3,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
@@ -41,7 +42,7 @@ describe('PUT /reminders/:id fuel and split', () => {
   let ctx: TestApp;
   beforeEach(async () => {
     ctx = await createTestApp();
-  });
+  }, SETUP_TIMEOUT_MS);
   afterEach(() => ctx.close());
 
   test('rejects adding a split to an existing fuel reminder', async () => {

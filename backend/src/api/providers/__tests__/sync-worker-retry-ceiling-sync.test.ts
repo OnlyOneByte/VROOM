@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { repos } from '../../../app-context';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 
 describe('sync-worker retry ceiling matches the repository query', () => {
   test('the repository hands the worker refs below MAX_RETRY_COUNT and withholds refs at it', async () => {

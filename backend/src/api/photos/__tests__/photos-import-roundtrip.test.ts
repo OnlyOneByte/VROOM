@@ -7,6 +7,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
@@ -25,7 +26,7 @@ beforeEach(async () => {
   setPhotosServiceBuilderForTest(
     () => new GooglePhotosService('fake-token', makeFakePhotosClient(store), 'album-vroom')
   );
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => {
   setPhotosServiceBuilderForTest(null);
   globalThis.fetch = realFetch;

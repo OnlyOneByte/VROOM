@@ -10,6 +10,7 @@ import {
   type DataEnvelope,
   json,
   requestAs,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import {
@@ -37,7 +38,7 @@ const realFetch = globalThis.fetch;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => {
   outboundResolver.lookup = stubLookup;
   outboundResolver.connectUrl = stubConnectUrl;

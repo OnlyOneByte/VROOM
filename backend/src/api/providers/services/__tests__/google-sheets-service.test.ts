@@ -5,7 +5,11 @@ import {
   idOf,
   makeFakeSheetsClients,
 } from '../../../../test-helpers/fake-google-clients';
-import { createTestApp, type TestApp } from '../../../../test-helpers/http-client';
+import {
+  createTestApp,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../../../test-helpers/http-client';
 
 type GoogleSheetsServiceCtor = typeof import('../google-sheets-service').GoogleSheetsService;
 
@@ -20,7 +24,7 @@ beforeEach(async () => {
   store = new FakeGoogleStore();
   ({ GoogleSheetsService, SHEET_NAMES } = await import('../google-sheets-service'));
   makeSvc = () => new GoogleSheetsService('fake-refresh-token', makeFakeSheetsClients(store));
-});
+}, SETUP_TIMEOUT_MS);
 
 async function seedVehicle(make = 'Toyota', model = 'Camry', year = 2020): Promise<void> {
   const db = (await import('../../../../db/connection')).getDb();

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { repos } from '../../../app-context';
 import type { Photo, PhotoRef } from '../../../db/schema';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { processBatch, type SyncWorkerDeps } from '../sync-worker';
 
 let ctx: TestApp;
@@ -29,7 +29,7 @@ beforeEach(async () => {
      VALUES ('ref-source', 'photo-r', 'prov-source', 'file-1', 'active', 0, 900, 900),
             ('ref-dead', 'photo-r', 'prov-target', '', 'failed', 3, 2000, 900)`
   );
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 async function queuedIds(): Promise<string[]> {

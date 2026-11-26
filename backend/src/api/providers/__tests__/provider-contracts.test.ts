@@ -8,7 +8,7 @@ import {
   FakePhotosStore,
   makeFakePhotosClient,
 } from '../../../test-helpers/fake-google-photos-client';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { describeDescriptorContract } from '../../../test-helpers/provider-contracts/descriptor';
 import {
   describeModelContract,
@@ -123,7 +123,7 @@ describe('storage descriptor features hold for every type', () => {
   let app: TestApp;
   beforeEach(async () => {
     app = await createTestApp();
-  });
+  }, SETUP_TIMEOUT_MS);
   afterEach(() => app.close());
 
   function backupContext(type: string, enabled: boolean) {

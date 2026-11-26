@@ -4,6 +4,7 @@ import {
   type DataEnvelope,
   json,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee, type Invitee } from '../../../test-helpers/invitee';
@@ -31,7 +32,7 @@ beforeEach(async () => {
   editor = await createInvitee(ctx, 'fin-editor');
   viewer = await createInvitee(ctx, 'fin-viewer');
   stranger = await createInvitee(ctx, 'fin-stranger');
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 async function created<T>(res: Response): Promise<T> {

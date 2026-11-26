@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { activityTracker } from '../../sync/activity-tracker';
 
 let ctx: TestApp;
@@ -17,7 +17,7 @@ beforeEach(async () => {
     [ctx.user.id]
   );
   markSpy = spyOn(activityTracker, 'markDataChanged').mockResolvedValue(undefined);
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   markSpy?.mockRestore();

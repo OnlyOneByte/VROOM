@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../../../../test-helpers/http-client';
+import {
+  createTestApp,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../../../../test-helpers/http-client';
 import type { ChatMessage, ChatRequest, ChatResult, LlmProvider, ToolCall } from '../llm-provider';
 
 type OrchestratorModule = typeof import('../orchestrator');
@@ -11,7 +15,7 @@ const NOW_MS = 1_900_000_000_000;
 beforeEach(async () => {
   ctx = await createTestApp();
   orchestrator = await import('../orchestrator');
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 function scriptedProvider(results: ChatResult[]): { provider: LlmProvider; sent: ChatMessage[][] } {

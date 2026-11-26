@@ -13,6 +13,7 @@ import {
   type DataEnvelope,
   json,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee, type Invitee } from '../../../test-helpers/invitee';
@@ -101,7 +102,7 @@ beforeEach(async () => {
     'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?)',
     [`ra-${coOwner.id}`, coOwner.id, CO_OWNER, vehicleId, ctx.user.id]
   );
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => ctx.close());
 
