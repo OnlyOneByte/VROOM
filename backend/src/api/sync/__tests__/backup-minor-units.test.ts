@@ -122,6 +122,60 @@ describe('backup 3.0.0 stores minor units of the backup currency', () => {
     expect(loanPayment()).toBe(373);
   });
 
+  test('rounding never pushes a leg below zero, and the legs keep their total', () => {
+    wholeYen();
+    const legs = ['a', 'b', 'c', 'd'].map((id) => ({
+      id,
+      groupId: 'g',
+      groupTotal: '200',
+      expenseAmount: '50',
+    }));
+    const { expenses = [] } = centsToMinorUnits({
+      userPreferences: [{ currencyUnit: 'JPY' }],
+      expenses: legs,
+    });
+    const amounts = expenses.map((leg) => Number(leg.expenseAmount));
+    expect(amounts.every((amount) => amount >= 0)).toBe(true);
+    expect(amounts.reduce((a, b) => a + b, 0)).toBe(2);
+  });
+
+  test('absolute reminder allocations keep adding up to the amount', () => {
+    wholeYen();
+    const split = {
+      method: 'absolute',
+      allocations: ['a', 'b', 'c'].map((vehicleId, i) => ({
+        vehicleId,
+        amount: i === 0 ? 3334 : 3333,
+      })),
+    };
+    const { reminders = [] } = centsToMinorUnits({
+      userPreferences: [{ currencyUnit: 'JPY' }],
+      reminders: [{ expenseAmount: '10000', expenseSplitConfig: split }],
+    });
+    const out = reminders[0]?.expenseSplitConfig as typeof split;
+    expect(reminders[0]?.expenseAmount).toBe(100);
+    expect(out.allocations.map((a) => a.amount)).toEqual([34, 33, 33]);
+  });
+
+  test('restoring a backup without preferences into a yen account rescales it', async () => {
+    wholeYen();
+    app().sqlite.run(
+      'INSERT OR REPLACE INTO user_preferences (user_id, currency_unit) VALUES (?, ?)',
+      [app().user.id, 'JPY']
+    );
+    const zip = new AdmZip(fixtureZip('USD'));
+    zip.deleteFile('user_preferences.csv');
+    const result = await restoreService.restoreFromBackup(app().user.id, zip.toBuffer(), 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(loanPayment()).toBe(373);
+  });
+
+  test('a backup without preferences is rescaled with the account currency', () => {
+    wholeYen();
+    const { expenses = [] } = centsToMinorUnits({ expenses: [{ expenseAmount: '120000' }] }, 'JPY');
+    expect(expenses[0]?.expenseAmount).toBe(1200);
+  });
+
   test('two-decimal currencies pass through untouched', () => {
     const tables = {
       userPreferences: [{ currencyUnit: 'EUR' }],

@@ -39,12 +39,10 @@ There are two steps:
 - **`2.0.0`, to cents:** a pre-2.0.0 backup stored dollar floats, so this step multiplies the
   `MONEY_CENTS_FIELDS` columns by 100. `coerceRow` then rounds them, since float products such as
   12.34 × 100 land just below the integer.
-- **`3.0.0`, to the minor unit of the backup's own currency** (`userPreferences.currencyUnit`, scale
-  `minorUnitScale`):
-  - A 2.0.0 backup holds cents, so `centsToMinorUnits` rescales the money columns and absolute
-    reminder split allocations, rounding half away from zero.
-  - It then puts any rounding remainder of a split group on the group's first leg (by `id`), so the
-    legs still add up to `groupTotal`.
+- **`3.0.0`, to the minor unit of the backup's own currency** (scale `minorUnitScale`):
+  - The currency is the backup's `userPreferences.currencyUnit`. A backup without preferences (restore keeps the account's own in that case) uses the account's currency.
+  - A 2.0.0 backup holds cents, so `centsToMinorUnits` rescales each money column, rounding halves up.
+  - The legs of a split group and the absolute allocations of a reminder split are rescaled together with `rescaleParts`: each part is floored, and the units left are handed out by largest remainder (first by `id` on a tie). So the parts still add up to the rounded total, and none goes below zero.
   - A two-decimal currency is left as it is.
 
 ### Rollback and old backups
@@ -53,9 +51,10 @@ There are two steps:
   in cents. Restoring it on a newer build runs the `3.0.0` step once and gives the same amounts the
   migration would have stored.
 - **Rescaling can't run twice:** a 3.0.0 backup is never rescaled again, and an export after a
-  restore is 3.0.0.
+  restore is 3.0.0. For a Sheets mirror this relies on its `Metadata` tab: a mirror whose tab was deleted is read as 2.0.0 and rescaled again.
+- **Merging into another currency:** a merge restore into an account whose currency differs in decimals from the backup's mixes two scales, as it already mixed two currencies before 3.0.0.
 - **Rolling back the build:** a build older than 3.0.0 refuses 3.0.0 backups with its "newer
-  version" message. To roll back, reinstall that build and restore a backup it made.
+  version" message. To roll back, reinstall that build and restore a backup it made. Once the minor-unit database migration has run, rolling back the build also needs the database from before it (that backup, or a copy of the database file), because the older build reads stored amounts as cents.
 - **Tests:** `backup-minor-units.test.ts` covers each case, and pins the frozen
   `fixtures/backup-3.0.0-jpy/` fixture.
 

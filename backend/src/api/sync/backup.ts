@@ -112,7 +112,7 @@ export type BackupTables = Record<string, Record<string, unknown>[]>;
 
 interface BackupUpgradeStep {
   to: string;
-  upgrade: (tables: BackupTables) => BackupTables;
+  upgrade: (tables: BackupTables, accountCurrency?: string) => BackupTables;
 }
 
 type Version = [major: number, minor: number, patch: number];
@@ -158,37 +158,87 @@ function dollarsToCents(tables: BackupTables): BackupTables {
   return upgraded;
 }
 
-function rescaleSplitConfig(value: unknown, rescale: (cents: number) => number): unknown {
-  const parsed = typeof value === 'string' && value !== '' ? JSON.parse(value) : value;
-  if (!parsed || typeof parsed !== 'object' || (parsed as SplitConfig).method !== 'absolute') {
-    return value;
+export function rescaleParts(totalCents: number, partsCents: number[], scale: number) {
+  const total = Math.round((totalCents * scale) / 100);
+  const exact = partsCents.map((cents) => (cents * scale) / 100);
+  const parts = exact.map(Math.floor);
+  const byRemainder = exact
+    .map((value, index) => ({ index, remainder: value - Math.floor(value) }))
+    .sort((a, b) => b.remainder - a.remainder || a.index - b.index);
+  let left = total - parts.reduce((sum, part) => sum + part, 0);
+  for (const { index } of byRemainder) {
+    if (left <= 0) break;
+    parts[index] = (parts[index] ?? 0) + 1;
+    left--;
   }
-  const split = parsed as Extract<SplitConfig, { method: 'absolute' }>;
-  const out = {
-    ...split,
-    allocations: split.allocations.map((a) => ({ ...a, amount: rescale(Number(a.amount)) })),
-  };
-  return typeof value === 'string' ? JSON.stringify(out) : out;
+  return { total, parts };
 }
 
-function balanceSplitGroups(rows: Record<string, unknown>[]): Record<string, unknown>[] {
-  const legsByGroup = new Map<string, Record<string, unknown>[]>();
-  for (const row of rows) {
-    if (row.groupId)
-      legsByGroup.set(String(row.groupId), [...(legsByGroup.get(String(row.groupId)) ?? []), row]);
+function parseSplitConfig(value: unknown): unknown {
+  if (typeof value !== 'string' || value === '') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
   }
-  for (const legs of legsByGroup.values()) {
-    const total = toNumberOrNull(legs[0]?.groupTotal);
+}
+
+function rescaleReminder(
+  row: Record<string, unknown>,
+  totalCents: number | null,
+  scale: number
+): Record<string, unknown> {
+  const parsed = parseSplitConfig(row.expenseSplitConfig);
+  if (!parsed || typeof parsed !== 'object' || (parsed as SplitConfig).method !== 'absolute') {
+    return row;
+  }
+  const split = parsed as Extract<SplitConfig, { method: 'absolute' }>;
+  const cents = split.allocations.map((a) => Number(a.amount));
+  const rescaled = rescaleParts(totalCents ?? cents.reduce((a, b) => a + b, 0), cents, scale);
+  const out = {
+    ...split,
+    allocations: split.allocations.map((a, i) => ({ ...a, amount: rescaled.parts[i] })),
+  };
+  return {
+    ...row,
+    expenseSplitConfig: typeof row.expenseSplitConfig === 'string' ? JSON.stringify(out) : out,
+  };
+}
+
+function rescaleSplitGroups(
+  rows: Record<string, unknown>[],
+  centsRows: Record<string, unknown>[],
+  scale: number
+) {
+  const legsByGroup = new Map<string, number[]>();
+  centsRows.forEach((row, index) => {
+    if (row.groupId) {
+      const group = String(row.groupId);
+      legsByGroup.set(group, [...(legsByGroup.get(group) ?? []), index]);
+    }
+  });
+  for (const indexes of legsByGroup.values()) {
+    const total = toNumberOrNull(centsRows[indexes[0] ?? -1]?.groupTotal);
     if (total === null) continue;
-    const first = [...legs].sort((a, b) => String(a.id).localeCompare(String(b.id)))[0];
-    const sum = legs.reduce((acc, leg) => acc + (toNumberOrNull(leg.expenseAmount) ?? 0), 0);
-    if (first) first.expenseAmount = (toNumberOrNull(first.expenseAmount) ?? 0) + total - sum;
+    const ordered = [...indexes].sort((a, b) =>
+      String(centsRows[a]?.id).localeCompare(String(centsRows[b]?.id))
+    );
+    const { parts } = rescaleParts(
+      total,
+      ordered.map((i) => toNumberOrNull(centsRows[i]?.expenseAmount) ?? 0),
+      scale
+    );
+    ordered.forEach((rowIndex, i) => {
+      const row = rows[rowIndex];
+      if (row) row.expenseAmount = parts[i];
+    });
   }
   return rows;
 }
 
-export function centsToMinorUnits(tables: BackupTables): BackupTables {
-  const scale = minorUnitScale(String(tables.userPreferences?.[0]?.currencyUnit ?? 'USD'));
+export function centsToMinorUnits(tables: BackupTables, accountCurrency = 'USD'): BackupTables {
+  const currency = tables.userPreferences?.[0]?.currencyUnit ?? accountCurrency;
+  const scale = minorUnitScale(String(currency));
   if (scale === 100) return tables;
   const rescale = (cents: number) => Math.round((cents * scale) / 100);
   const upgraded: BackupTables = { ...tables };
@@ -203,12 +253,11 @@ export function centsToMinorUnits(tables: BackupTables): BackupTables {
         const cents = toNumberOrNull(row[column]);
         if (cents !== null) out[column] = rescale(cents);
       }
-      if (columns.includes('expenseSplitConfig')) {
-        out.expenseSplitConfig = rescaleSplitConfig(row.expenseSplitConfig, rescale);
-      }
-      return out;
+      return columns.includes('expenseSplitConfig')
+        ? rescaleReminder(out, toNumberOrNull(row.expenseAmount), scale)
+        : out;
     });
-    upgraded[key] = key === 'expenses' ? balanceSplitGroups(rescaled) : rescaled;
+    upgraded[key] = key === 'expenses' ? rescaleSplitGroups(rescaled, rows, scale) : rescaled;
   }
   return upgraded;
 }
@@ -220,14 +269,15 @@ const BACKUP_UPGRADE_STEPS: BackupUpgradeStep[] = [
 
 export function upgradeBackupTables(
   version: string | undefined,
-  tables: BackupTables
+  tables: BackupTables,
+  accountCurrency?: string
 ): BackupTables {
   const from = parseVersion(version);
   if (!from) return tables;
   return BACKUP_UPGRADE_STEPS.filter((step) => {
     const to = parseVersion(step.to);
     return to !== null && isOlderThan(from, to);
-  }).reduce((current, step) => step.upgrade(current), tables);
+  }).reduce((current, step) => step.upgrade(current, accountCurrency), tables);
 }
 
 const RESTORABLE = 'Only a backup that VROOM made, without edits, can be restored.';
@@ -671,7 +721,7 @@ class BackupService {
     return stringify(formattedData, { header: true, columns, quoted: true, quoted_empty: false });
   }
 
-  async parseZipBackup(file: Buffer): Promise<ParsedBackupData> {
+  async parseZipBackup(file: Buffer, accountCurrency?: string): Promise<ParsedBackupData> {
     const zip = new AdmZip(file);
     const zipEntries = zip.getEntries();
 
@@ -718,7 +768,8 @@ class BackupService {
       metadata.version,
       Object.fromEntries(
         Object.entries(TABLE_FILENAME_MAP).map(([key, filename]) => [key, getCSVData(filename)])
-      )
+      ),
+      accountCurrency
     );
 
     const parsedData: ParsedBackupData = { metadata } as ParsedBackupData;
