@@ -325,19 +325,19 @@
 						<CardContent>
 							<div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
 								<div>
-									<p class="text-muted-foreground">Current Balance</p>
+									<p class="text-muted-foreground">Current balance</p>
 									<p class="font-semibold text-lg">
 										{formatCurrency(vehicle.financing.computedBalance ?? 0)}
 									</p>
 								</div>
 								<div>
-									<p class="text-muted-foreground">Original Amount</p>
+									<p class="text-muted-foreground">Original amount</p>
 									<p class="font-semibold text-lg">
 										{formatCurrency(vehicle.financing.originalAmount)}
 									</p>
 								</div>
 								<div>
-									<p class="text-muted-foreground">Principal Paid</p>
+									<p class="text-muted-foreground">Principal paid</p>
 									<p class="font-semibold text-lg">
 										{formatCurrency(
 											Math.max(
