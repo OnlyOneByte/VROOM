@@ -17,6 +17,7 @@ interface PendingEdit {
 	seq: number;
 	savedAt?: string;
 	undo?: boolean;
+	undoneAt?: string;
 }
 
 const toastId = (id: string) => `expense-edit-${id}`;
@@ -37,11 +38,12 @@ async function put(id: string, seq: number, payload: EditPayload): Promise<void>
 		const saved: Expense | undefined = await expenseApi.updateExpense(id, payload);
 		const entry = edits.get(id);
 		if (!entry) return;
-		edits.set(id, {
-			...entry,
-			...(saved?.updatedAt && { savedAt: saved.updatedAt }),
-			...(entry.seq === seq && { status: 'saved' as const })
-		});
+		const stamp = saved?.updatedAt;
+		if (entry.seq === seq) {
+			edits.set(id, { ...entry, status: 'saved', ...(!entry.undo && stamp && { savedAt: stamp }) });
+		} else if (entry.undo && !entry.undoneAt && stamp) {
+			edits.set(id, { ...entry, undoneAt: stamp });
+		}
 	} catch (error) {
 		const reason = userFacingErrorMessage(error);
 		if (!settle(id, seq, { status: 'failed', error: reason })) return;
@@ -122,7 +124,7 @@ export function undoEdit(id: string): void {
 		status: 'saving',
 		seq: ++nextSeq,
 		undo: true,
-		...(entry.savedAt && { savedAt: entry.savedAt })
+		...(entry.savedAt && { undoneAt: entry.savedAt })
 	});
 	send(id);
 }
@@ -135,12 +137,15 @@ export function retryEdit(id: string): void {
 	send(id);
 }
 
+function covers(entry: PendingEdit, expense: Expense): boolean {
+	if (expense.updatedAt === entry.before.updatedAt) return true;
+	return entry.undo === true && expense.updatedAt === entry.undoneAt;
+}
+
 function overlay(expense: Expense): PendingEdit | undefined {
 	const entry = edits.get(expense.id);
 	if (!entry || entry.status === 'failed') return undefined;
-	const current = expense.updatedAt === entry.before.updatedAt;
-	const undone = entry.undo === true && expense.updatedAt === entry.savedAt;
-	return current || undone ? entry : undefined;
+	return covers(entry, expense) ? entry : undefined;
 }
 
 export function shownExpense<T extends Expense>(expense: T): T {
@@ -165,7 +170,7 @@ export function editFailureStates(expenses: readonly Expense[]): [string, Pendin
 	const states: [string, PendingRowState][] = [];
 	for (const expense of expenses) {
 		const entry = edits.get(expense.id);
-		if (entry?.status === 'failed' && entry.before.updatedAt === expense.updatedAt) {
+		if (entry?.status === 'failed' && covers(entry, expense)) {
 			states.push([expense.id, { status: 'failed', kind: 'edit', error: entry.error ?? '' }]);
 		}
 	}

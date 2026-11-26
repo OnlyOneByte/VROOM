@@ -143,7 +143,11 @@ describe('editing an expense updates the row while the PUT runs', () => {
 
 	test('Undo after the edit landed shows the old values on a row the list reloaded', async () => {
 		const landed = { ...changed, updatedAt: '2026-11-26T10:00:00.000Z' };
-		vi.mocked(expenseApi.updateExpense).mockResolvedValueOnce(landed).mockResolvedValueOnce(saved);
+		const restored = { ...saved, updatedAt: '2026-11-26T10:00:05.000Z' };
+		const restore = deferred();
+		vi.mocked(expenseApi.updateExpense)
+			.mockResolvedValueOnce(landed)
+			.mockReturnValueOnce(restore.promise);
 		scheduleEdit(saved, changed, payload);
 		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1));
 		await Promise.resolve();
@@ -152,6 +156,24 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		pressUndo();
 		expect(shownExpense(landed)).toMatchObject({ amount: 40, description: 'Arco' });
 		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
+
+		restore.resolve(restored);
+		await new Promise(resolve => setTimeout(resolve, 0));
+		expect(shownExpense(landed)).toMatchObject({ amount: 40, description: 'Arco' });
+		expect(editedRows([landed]).after).toEqual([expect.objectContaining({ amount: 40 })]);
+		expect(shownExpense(restored)).toBe(restored);
+	});
+
+	test('a failed Undo on a reloaded row marks that row as failed', async () => {
+		const landed = { ...changed, updatedAt: '2026-11-26T10:00:00.000Z' };
+		vi.mocked(expenseApi.updateExpense)
+			.mockResolvedValueOnce(landed)
+			.mockRejectedValueOnce(new ApiError('down', 500));
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1));
+		await Promise.resolve();
+		pressUndo();
+		await vi.waitFor(() => expect(editFailureStates([landed])).toHaveLength(1));
 	});
 
 	test('Undo restores a cleared financing link but never resends another kind of link', async () => {
