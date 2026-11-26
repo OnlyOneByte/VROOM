@@ -7,6 +7,7 @@
 	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
 	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import type { Photo } from '#lib/types/index.ts';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 
 	interface Props {
 		entityType: PhotoSectionEntityType;
@@ -19,6 +20,7 @@
 	};
 
 	let { entityType, entityId }: Props = $props();
+	const demo = $derived(authStore.user?.demo === true);
 
 	let photos = $state<Photo[]>([]);
 	let isLoading = $state(true);
@@ -70,7 +72,7 @@
 	}
 
 	async function performDelete() {
-		if (!pendingDeleteId) return;
+		if (demo || !pendingDeleteId) return;
 		const photoId = pendingDeleteId;
 		try {
 			await expenseApi.deletePhoto(entityType, entityId, photoId);
@@ -102,6 +104,7 @@
 			size="sm"
 			class="h-10 text-xs"
 			onclick={openUploadDialog}
+			disabled={demo}
 		>
 			<Upload class="mr-1 h-3 w-3" />
 			Upload
@@ -148,6 +151,7 @@
 							class="size-10 text-xs dark:bg-background dark:hover:bg-accent"
 							aria-label="Delete {photo.fileName}"
 							onclick={() => requestDelete(photo.id)}
+							disabled={demo}
 						>
 							<Trash2 class="h-3 w-3 text-destructive" />
 						</Button>

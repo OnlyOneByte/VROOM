@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { Check, Copy, LoaderCircle, Trash2, X } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import { DEMO_SAVE_NOTE_ID } from '#lib/components/common/demo-save-note.svelte';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 
 	interface Props {
 		isEditMode: boolean;
@@ -23,6 +25,7 @@
 		onCancel,
 		onSave
 	}: Props = $props();
+	const demo = $derived(authStore.user?.demo === true);
 
 	function keepFieldFocus(event: MouseEvent) {
 		event.preventDefault();
@@ -41,7 +44,7 @@
 				onmousedown={keepFieldFocus}
 				variant="outline"
 				onclick={onDelete}
-				disabled={isDeleting || isSubmitting}
+				disabled={demo || isDeleting || isSubmitting}
 				class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 flex-shrink-0"
 			>
 				<Trash2 class="h-5 w-5 sm:mr-2 text-destructive" />
@@ -80,6 +83,8 @@
 			onmousedown={keepFieldFocus}
 			onclick={onSave}
 			disabled={isSubmitting || isDeleting}
+			aria-disabled={demo || undefined}
+			aria-describedby={demo ? DEMO_SAVE_NOTE_ID : undefined}
 			class="rounded-full shadow-sm transition-colors h-14 px-6 flex-1 sm:flex-initial"
 		>
 			{#if isSubmitting}
