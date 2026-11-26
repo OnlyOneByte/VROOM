@@ -97,6 +97,11 @@ export function rateChargeEfficiency(
 	return rate(distancePerKwh * MILES_PER_UNIT[distanceUnit], LOW_MI_KWH, EXCELLENT_MI_KWH);
 }
 
+export function distanceSinceLast(reading: string, last: number | null): number | null {
+	const value = parseFloat(reading);
+	return last && value > last ? value - last : null;
+}
+
 function rate(value: number, low: number, excellent: number): EfficiencyRating {
 	if (value < low) return 'low';
 	if (value > excellent) return 'excellent';

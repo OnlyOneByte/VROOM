@@ -145,7 +145,7 @@ async function chooseVehicle(name: string): Promise<void> {
 
 async function renderCreate(props: Record<string, string> = {}): Promise<void> {
 	render(ExpenseForm, { props });
-	await screen.findByRole('heading', { name: 'Add Expense' });
+	await screen.findByRole('heading', { name: 'New expense' });
 	await vi.waitFor(() => expect(getVehicle).toHaveBeenCalled());
 }
 
@@ -233,8 +233,12 @@ describe('ExpenseForm create mode', () => {
 			render(ExpenseForm);
 			await tick();
 
-			expect(screen.getByRole('heading', { name: 'Add Expense' })).toBeTruthy();
-			expect(screen.getByTestId('expense-form-skeleton').getAttribute('aria-busy')).toBe('true');
+			expect(screen.getByRole('heading', { name: 'New expense' })).toBeTruthy();
+			const skeleton = screen.getByTestId('expense-form-skeleton');
+			expect(skeleton.getAttribute('aria-busy')).toBe('true');
+			const figure = skeleton.querySelector('p[aria-hidden="true"]');
+			expect(figure).toHaveTextContent(/^\$\s*0\.00$/);
+			expect(figure).toHaveClass('font-(family-name:--font-fig)');
 			expect(screen.queryByRole('button', { name: /save expense/i })).toBeNull();
 			expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
 
@@ -251,7 +255,7 @@ describe('ExpenseForm create mode', () => {
 
 		await screen.findByRole('heading', { name: 'Add a vehicle first' });
 
-		expect(screen.getByRole('heading', { name: 'Add Expense' })).toBeTruthy();
+		expect(screen.getByRole('heading', { name: 'New expense' })).toBeTruthy();
 		expect(screen.getByRole('link', { name: 'Add Vehicle' }).getAttribute('href')).toBe(
 			'/vehicles/new'
 		);
@@ -462,15 +466,14 @@ describe('ExpenseForm create mode', () => {
 		expect(getExpensesByVehicle).toHaveBeenCalledWith(loaded, { limit: 100 });
 	});
 
-	test('cancel and the back button return to returnTo without saving', async () => {
+	test('Cancel returns to returnTo without saving, and quick add has no separate back button', async () => {
 		await renderCreate({ returnTo: '/vehicles/v1' });
+		expect(screen.queryByRole('button', { name: 'Go back' })).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
-		await fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
 
-		await vi.waitFor(() => expect(goto).toHaveBeenCalledTimes(2));
-		expect(goto).toHaveBeenNthCalledWith(1, '/vehicles/v1');
-		expect(goto).toHaveBeenNthCalledWith(2, '/vehicles/v1');
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledTimes(1));
+		expect(goto).toHaveBeenCalledWith('/vehicles/v1');
 		expect(createExpense).not.toHaveBeenCalled();
 	});
 });
@@ -587,6 +590,14 @@ describe('ExpenseForm quick add', () => {
 });
 
 describe('ExpenseForm edit mode', () => {
+	test('keeps the full form: its title, a back button and no quick-add figure', async () => {
+		await renderEdit();
+
+		expect(screen.getByRole('button', { name: 'Go back' })).toBeTruthy();
+		expect(screen.queryByRole('heading', { name: 'New expense' })).toBeNull();
+		expect(field('amount')).not.toHaveClass('text-7xl');
+	});
+
 	test('prefills the form from the loaded expense and offers delete and duplicate', async () => {
 		await renderEdit();
 

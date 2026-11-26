@@ -12,7 +12,7 @@ test.describe('Expense form', () => {
 	test('renders the required fields', async ({ page }) => {
 		await page.goto('/expenses/new');
 
-		await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'New expense' })).toBeVisible();
 		await expect(page.getByText('Category *', { exact: true })).toBeVisible();
 		await expect(page.getByLabel('Amount *')).toBeVisible();
 		await expect(page.getByLabel('Date *')).toHaveText(/Today/);
@@ -73,7 +73,8 @@ test.describe('Expense form', () => {
 		await expect(group.getByRole('radio')).toHaveCount(6);
 
 		await page.getByLabel('Amount *').fill('30');
-		await page.getByLabel('Amount *').press('Tab');
+		await page.getByTestId('receipt-scan-button').focus();
+		await page.keyboard.press('Tab');
 		await expect(group.getByRole('radio', { name: 'Fuel' })).toBeFocused();
 
 		await page.keyboard.press('ArrowRight');

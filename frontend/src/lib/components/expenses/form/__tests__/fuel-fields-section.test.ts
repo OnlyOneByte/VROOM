@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import { reactiveState } from '../../../../../test-utils/reactive-state.svelte';
 import FuelFieldsSection, { type EnergyMode } from '../FuelFieldsSection.svelte';
 import FuelTypeFields from '../FuelTypeFields.svelte';
@@ -19,6 +19,8 @@ interface Options {
 	showMpgCalculation?: boolean;
 	errors?: Record<string, string | undefined>;
 	touched?: Record<string, boolean>;
+	quick?: boolean;
+	distanceSinceLast?: number | null;
 }
 
 function mount(options: Options = {}) {
@@ -67,6 +69,8 @@ function mount(options: Options = {}) {
 		showMpgCalculation: options.showMpgCalculation ?? false,
 		errors: options.errors ?? {},
 		touched: options.touched ?? {},
+		quick: options.quick ?? false,
+		distanceSinceLast: options.distanceSinceLast ?? null,
 		onBlur,
 		onMileageChange
 	});
@@ -279,6 +283,45 @@ describe('hybrid toggle', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Fuel' }));
 		expect(section.form).toMatchObject({ volume: '12', fuelType: '87 (Regular)' });
 		expect(screen.getByText('Fuel Details')).toBeInTheDocument();
+	});
+});
+
+describe('quick add readout', () => {
+	test('reads price, efficiency and distance since the last fill as one line', () => {
+		mount({
+			quick: true,
+			amount: '38.20',
+			volume: '10.42',
+			showMpgCalculation: true,
+			calculatedMpg: 31.09,
+			distanceSinceLast: 324
+		});
+		expect(screen.getByTestId('energy-readout')).toHaveTextContent(
+			'$3.67 a gallon·31.1 mi/gal·324 mi since last fill'
+		);
+		expect(document.querySelector('#volume')).toHaveAttribute('aria-describedby', 'energy-readout');
+	});
+
+	test('a UK gallon says so, and a charge counts since the last charge', () => {
+		mount({ quick: true, amount: '45', volume: '10', volumeUnit: 'gallons_uk' });
+		expect(screen.getByTestId('energy-readout')).toHaveTextContent('$4.50 a UK gallon');
+		cleanup();
+
+		mount({ ...EV, quick: true, charge: '20', fuelType: 'Electric', distanceSinceLast: 80 });
+		expect(screen.getByTestId('energy-readout')).toHaveTextContent('80 mi since last charge');
+	});
+
+	test('a litre car reads per litre, a charge reads per kWh, and an empty fill shows nothing', () => {
+		mount({ quick: true, amount: '60', volume: '40', volumeUnit: 'liters' });
+		expect(screen.getByTestId('energy-readout')).toHaveTextContent('$1.50 a liter');
+		cleanup();
+
+		mount({ ...EV, quick: true, amount: '5', charge: '20', fuelType: 'Electric' });
+		expect(screen.getByTestId('energy-readout')).toHaveTextContent('$0.25 per kWh');
+
+		cleanup();
+		mount({ quick: true });
+		expect(screen.queryByTestId('energy-readout')).toBeNull();
 	});
 });
 

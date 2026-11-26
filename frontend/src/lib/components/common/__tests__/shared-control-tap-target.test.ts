@@ -13,7 +13,6 @@ const SIZED_BUTTON_SHRINK =
 	/size="(?:icon-lg|lg|icon|default)"[^<]*?class="[^"]*\b(?:sm|md):(?:h|size)-[1-9]\b|class="[^"]*\b(?:sm|md):(?:h|size)-[1-9]\b[^"]*"[^<]*?size="(?:icon-lg|lg|icon|default)"/;
 const SHRINK_EXCEPTIONS: Record<string, number> = {
 	'expenses/expenses-table/ExpensesCompactList.svelte': 2,
-	'expenses/form/CategorySelector.svelte': 1,
 	'expenses/form/FuelFieldsSection.svelte': 2,
 	'expenses/form/ExpenseForm.svelte': 1,
 	'routes/vehicles/[id]/+page.svelte': 1

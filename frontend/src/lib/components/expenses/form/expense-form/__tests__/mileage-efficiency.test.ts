@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
 	calculateMileageEfficiency,
+	distanceSinceLast,
 	rateChargeEfficiency,
 	rateFuelEfficiency,
 	type MileageEfficiencyInput
@@ -140,5 +141,17 @@ describe('efficiency hints', () => {
 		[3, 'kilometers', 'low']
 	] as const)('%s per kWh in %s rates %s', (value, distance, rating) => {
 		expect(rateChargeEfficiency(value, distance)).toBe(rating);
+	});
+});
+
+describe('distanceSinceLast', () => {
+	test.each([
+		['45324', 45000, 324],
+		['45000', 45000, null],
+		['44000', 45000, null],
+		['', 45000, null],
+		['45324', null, null]
+	] as const)('reading %s after %s is %s', (reading, last, expected) => {
+		expect(distanceSinceLast(reading, last)).toBe(expected);
 	});
 });
