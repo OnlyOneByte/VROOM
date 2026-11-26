@@ -36,7 +36,7 @@ afterEach(() => {
 describe('ThemePickerCard', () => {
 	test('shows every accent as a tile, in a section named Accent', () => {
 		render(ThemePickerCard);
-		expect(screen.getByLabelText('Accent')).toBeInTheDocument();
+		expect(screen.getByRole('group', { name: 'Accent' })).toBeInTheDocument();
 		for (const theme of Object.values(THEME_REGISTRY)) {
 			expect(themeButton(theme.label)).toBeInTheDocument();
 		}

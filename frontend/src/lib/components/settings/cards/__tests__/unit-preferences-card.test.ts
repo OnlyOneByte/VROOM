@@ -80,6 +80,7 @@ describe('UnitPreferencesCard', () => {
 	test.each([
 		['EUR', 'EUR – Euro (€)'],
 		['GBP', 'GBP – British Pound (£)'],
+		['CAD', 'CAD – Canadian Dollar (CA$)'],
 		['JPY', 'JPY – Japanese Yen (¥)'],
 		['CHF', 'CHF – Swiss Franc']
 	])('currency %s is labelled %s', (code, label) => {
@@ -98,14 +99,25 @@ describe('UnitPreferencesCard', () => {
 		await settle();
 		const names = screen.getAllByRole('option').map(o => o.textContent?.trim());
 		expect(names).toHaveLength(CURRENCIES.length);
+		expect(names).toContain('JPY – Japanese Yen (¥)');
 		expect(names).toContain('INR – Indian Rupee (₹)');
+		for (const dropped of ['BHD', 'KWD', 'IQD', 'HRK', 'BGN', 'XDR', 'SLL']) {
+			expect(
+				names.some(n => n?.startsWith(dropped)),
+				dropped
+			).toBe(false);
+		}
 	});
 
-	test('a saved currency outside the list still shows and stays selectable', async () => {
-		mount({ currencyUnit: 'BHD' });
-		expect(currency()).toHaveTextContent('BHD – Bahraini Dinar');
+	test.each([
+		['BHD', 'BHD – Bahraini Dinar'],
+		['HRK', 'HRK – Croatian Kuna']
+	])('a saved %s outside the list still shows and stays selectable', async (code, label) => {
+		mount({ currencyUnit: code });
+		expect(currency()).toHaveTextContent(label);
 		await fireEvent.click(currency());
 		await settle();
+		expect(screen.getByRole('option', { name: label })).toBeTruthy();
 		expect(screen.getAllByRole('option')).toHaveLength(CURRENCIES.length + 1);
 	});
 

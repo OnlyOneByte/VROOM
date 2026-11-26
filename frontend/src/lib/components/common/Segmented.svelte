@@ -14,12 +14,14 @@
 </script>
 
 <RadioGroup.Root
-	{value}
+	bind:value={
+		() => value,
+		v => {
+			if (v && v !== value) onValueChange?.(v as T);
+		}
+	}
 	orientation="horizontal"
 	aria-label={label}
-	onValueChange={v => {
-		if (v && v !== value) onValueChange?.(v as T);
-	}}
 	class={cn('inline-flex shrink-0 gap-0.5 rounded-full bg-sunk p-0.5', className)}
 	data-slot="segmented"
 >

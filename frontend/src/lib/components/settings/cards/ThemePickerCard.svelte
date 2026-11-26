@@ -19,7 +19,7 @@
 	}
 </script>
 
-<Card variant="section" aria-labelledby="{uid}-accent">
+<Card variant="section" role="group" aria-labelledby="{uid}-accent">
 	<CardContent class="space-y-3">
 		<div>
 			<p id="{uid}-accent" class="font-medium">Accent</p>
