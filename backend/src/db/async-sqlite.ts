@@ -54,7 +54,7 @@ export class TransactionRolledBackError extends Error {
 
 export class RawTransactionControlError extends Error {
   constructor() {
-    super('Raw BEGIN, COMMIT, ROLLBACK or SAVEPOINT inside a transaction; use transaction()');
+    super('Raw BEGIN, COMMIT, END, ROLLBACK, SAVEPOINT or RELEASE is refused; use transaction()');
   }
 }
 

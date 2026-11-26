@@ -11,6 +11,7 @@ import { syncBuiltInRoles } from '../permissions/grants';
 import { extractErrorMessage } from '../utils/error-handling';
 import { logger } from '../utils/logger';
 import { openAsyncDatabase } from './async-sqlite';
+import type { UPKEEP_QUERIES } from './dialect';
 import * as schema from './schema.js';
 
 function openDatabase(url: string) {
@@ -109,7 +110,7 @@ export function runMigrations(): void {
   }
 }
 
-function upkeep(kind: 'health' | 'checkpoint' | 'forceCheckpoint'): unknown {
+function upkeep(kind: keyof typeof UPKEEP_QUERIES): unknown {
   return openAsyncDatabase(getDb().$client).upkeep(kind);
 }
 
@@ -128,8 +129,8 @@ export function checkDatabaseHealth(): boolean {
 }
 
 export function checkpointWAL(): void {
-  if (!checkpointPossible()) return;
   try {
+    if (!checkpointPossible()) return;
     const result = upkeep('checkpoint') as {
       busy: number;
       log: number;
@@ -147,8 +148,8 @@ export function checkpointWAL(): void {
 }
 
 export function forceCheckpointWAL(): void {
-  if (!checkpointPossible()) return;
   try {
+    if (!checkpointPossible()) return;
     const result = upkeep('forceCheckpoint') as {
       busy: number;
       log: number;
