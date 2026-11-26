@@ -7,7 +7,7 @@
 	import { page } from '$app/state';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-	import { authApi } from '#lib/services/auth-api.ts';
+	import { authApi, type PublicSignupInfo } from '#lib/services/auth-api.ts';
 	import { routes } from '#lib/routes.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
@@ -28,8 +28,8 @@
 			body: 'The provider is temporarily unavailable. Please try again.'
 		},
 		no_email: {
-			title: "We couldn't get your email",
-			body: "Check your provider's privacy settings, then try again."
+			title: 'We couldn’t get your email',
+			body: 'Check your provider’s privacy settings, then try again.'
 		},
 		unknown_provider: {
 			title: 'That sign-in option isn’t supported',
@@ -40,7 +40,7 @@
 			body: 'The provider didn’t finish signing you in. Try again, or pick another option.'
 		},
 		signup_closed: {
-			title: "This server isn't taking new accounts",
+			title: 'This server isn’t taking new accounts',
 			body: 'Ask its admin if you think you should have one.'
 		},
 		signup_invite_required: {
@@ -48,7 +48,7 @@
 			body: 'Ask its admin for an invite, then sign in with the email they invited.'
 		},
 		signup_domain_not_allowed: {
-			title: "Your email domain can't join this server",
+			title: 'Your email domain can’t join this server',
 			body: 'This server only takes accounts from certain email domains. Try another account, or ask its admin.'
 		}
 	};
@@ -58,6 +58,22 @@
 	let fetchError = $state<string | null>(null);
 	let signingInProvider = $state<string | null>(null);
 	let optionsCard = $state<HTMLElement | null>(null);
+	let signupInfo = $state<PublicSignupInfo | null>(null);
+
+	const newHereLine = $derived.by(() => {
+		if (!signupInfo) return null;
+		const allowedEmail = signupInfo.domainRestricted ? ' with an allowed email' : '';
+		switch (signupInfo.mode) {
+			case 'open':
+				return `New here? Signing in${allowedEmail} creates your garage.`;
+			case 'approval':
+				return `New here? Sign in${allowedEmail} to ask for an account. An admin approves it first.`;
+			case 'invite':
+				return 'New here? This server is invite only. Ask its admin for an invite.';
+			case 'closed':
+				return 'This server isn’t taking new accounts.';
+		}
+	});
 
 	const authError = $derived(page.url.searchParams.get('auth_error'));
 	const authErrorMessage = $derived(authError ? (authErrorMessages[authError] ?? null) : null);
@@ -82,7 +98,18 @@
 		}
 	}
 
-	onMount(loadProviders);
+	async function loadSignupInfo() {
+		try {
+			signupInfo = await authApi.getSignupInfo();
+		} catch {
+			signupInfo = null;
+		}
+	}
+
+	onMount(() => {
+		loadProviders();
+		loadSignupInfo();
+	});
 
 	function handleLogin(providerId: string) {
 		signingInProvider = providerId;
@@ -165,6 +192,10 @@
 			{/if}
 		</div>
 
-		<p class="mt-2 text-[13px] text-muted-foreground">New here? Signing in creates your garage.</p>
+		{#if newHereLine}
+			<p class="mt-2 text-[13px] text-muted-foreground" data-testid="signup-mode-line">
+				{newHereLine}
+			</p>
+		{/if}
 	</div>
 </div>

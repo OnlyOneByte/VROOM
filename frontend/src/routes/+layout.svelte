@@ -30,14 +30,20 @@
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { resolve } from '$app/paths';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
 	let { children } = $props();
 
+	let signingOutWaiting = $state(false);
+
 	async function signOutWaiting() {
+		signingOutWaiting = true;
 		try {
 			await authStore.logout();
-		} finally {
 			location.assign(resolve(routes.auth));
+		} catch (e) {
+			appStore.showError(`Couldn’t sign out. ${userFacingErrorMessage(e)}`);
+			signingOutWaiting = false;
 		}
 	}
 
@@ -191,8 +197,9 @@
 {:else if isPending && !isPublicRoute(currentPath)}
 	<main class="min-h-screen bg-background">
 		{#await import('#lib/components/layout/AccountPending.svelte')}
-			<div class="flex min-h-screen items-center justify-center" aria-busy="true">
-				<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+			<div class="flex min-h-screen items-center justify-center" aria-busy="true" role="status">
+				<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" aria-hidden="true" />
+				<span class="sr-only">Loading</span>
 			</div>
 		{:then { default: AccountPending }}
 			<AccountPending />
@@ -203,7 +210,15 @@
 					message="Your account is waiting for an admin to approve it. Check your connection, then reload the page."
 					onRetry={() => location.reload()}
 				/>
-				<Button variant="ghost" class="h-10 self-center" onclick={() => void signOutWaiting()}>
+				<Button
+					variant="ghost"
+					class="h-10 self-center"
+					disabled={signingOutWaiting}
+					onclick={() => void signOutWaiting()}
+				>
+					{#if signingOutWaiting}
+						<LoaderCircle class="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+					{/if}
 					Sign Out
 				</Button>
 			</div>

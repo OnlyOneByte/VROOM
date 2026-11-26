@@ -136,6 +136,20 @@ describe('sign-up modes', () => {
     expect(await signUp('late@example.com')).toHaveProperty('redirect');
   });
 
+  test('a signed-out visitor can read the mode and whether domains are limited, not the domains', async () => {
+    setMode('approval', 'example.com,corp.example');
+    const res = await ctx.anon('GET', '/api/v1/auth/signup');
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(JSON.parse(body).data).toEqual({ mode: 'approval', domainRestricted: true });
+    expect(body).not.toContain('example.com');
+
+    setMode('invite');
+    signupConfig.mode = 'closed';
+    const locked = await json<DataEnvelope<unknown>>(await ctx.anon('GET', '/api/v1/auth/signup'));
+    expect(locked.data).toEqual({ mode: 'closed', domainRestricted: false });
+  });
+
   test('SIGNUP_MODE wins over the stored mode and locks it', async () => {
     setMode('open');
     signupConfig.mode = 'closed';

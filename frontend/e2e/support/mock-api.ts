@@ -268,6 +268,9 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 				{ id: 'github', displayName: 'GitHub' }
 			]);
 		}
+		if (path === '/auth/signup') {
+			return fulfillData(route, { mode: 'invite', domainRestricted: false });
+		}
 		if (path === '/auth/accounts') return fulfillData(route, []);
 		if (path === '/auth/capabilities') {
 			return fulfillData(route, { rules: [['server.signup.manage', 'all']] });
