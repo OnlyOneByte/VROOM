@@ -13,7 +13,13 @@
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { onlineStatus } from '#lib/stores/offline.svelte.ts';
-	import { dateOnlyToISO, formatDate, toDateInputValue } from '#lib/utils/formatters.ts';
+	import {
+		amountPlaceholder,
+		dateOnlyToISO,
+		formatDate,
+		getCurrencySymbol,
+		toDateInputValue
+	} from '#lib/utils/formatters.ts';
 	import {
 		LoaderCircle,
 		CreditCard,
@@ -405,6 +411,26 @@
 		<div class="flex items-center justify-center py-12">
 			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
 		</div>
+	{:else if !vehiclesLoaded && !expenseId && !queuedExpenseId}
+		<div
+			class="mx-auto max-w-[34rem] space-y-2 sm:space-y-6"
+			aria-busy="true"
+			data-testid="expense-form-skeleton"
+		>
+			{@render createHeader()}
+			<p
+				class="flex items-start justify-center gap-1 border-b-2 border-transparent font-(family-name:--font-fig) leading-none font-bold text-muted-foreground"
+				aria-hidden="true"
+			>
+				<span class="mt-1.5 text-3xl sm:mt-2 sm:text-5xl">{getCurrencySymbol()}</span>
+				<span class="text-7xl tabular-nums sm:text-8xl">{amountPlaceholder()}</span>
+			</p>
+			<div class="space-y-4 sm:space-y-6">
+				<Skeleton class="mx-auto h-10 w-64 rounded-full" />
+				<Skeleton class="mx-auto h-24 w-full max-w-md" />
+				<Skeleton class="h-16 w-full" />
+			</div>
+		</div>
 	{:else if !vehiclesLoaded}
 		<div class="space-y-6" aria-busy="true" data-testid="expense-form-skeleton">
 			{@render createHeader()}
@@ -698,7 +724,7 @@
 				<Collapsible bind:open={detailsOpen}>
 					<CollapsibleTrigger
 						class="flex min-h-12 w-full items-center justify-between gap-3 text-left font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 {quickAdd
-							? 'border-y px-0 hover:text-foreground/80'
+							? 'border-y px-0 hover:underline'
 							: 'rounded-md border bg-background px-3 text-sm hover:bg-muted'}"
 					>
 						<span class="shrink-0">More details</span>

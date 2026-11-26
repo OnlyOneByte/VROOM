@@ -234,7 +234,11 @@ describe('ExpenseForm create mode', () => {
 			await tick();
 
 			expect(screen.getByRole('heading', { name: 'New expense' })).toBeTruthy();
-			expect(screen.getByTestId('expense-form-skeleton').getAttribute('aria-busy')).toBe('true');
+			const skeleton = screen.getByTestId('expense-form-skeleton');
+			expect(skeleton.getAttribute('aria-busy')).toBe('true');
+			const figure = skeleton.querySelector('p[aria-hidden="true"]');
+			expect(figure).toHaveTextContent(/^\$\s*0\.00$/);
+			expect(figure).toHaveClass('font-(family-name:--font-fig)');
 			expect(screen.queryByRole('button', { name: /save expense/i })).toBeNull();
 			expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
 

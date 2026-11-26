@@ -15,16 +15,11 @@
 </script>
 
 {#if quick}
-	<div class="text-center">
-		<h1
-			tabindex="-1"
-			class="rounded-md text-sm font-medium text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-		>
-			{title}
-		</h1>
-		{#if subtitle}
-			<p class="mt-1 text-sm text-muted-foreground">{@render subtitle()}</p>
-		{/if}
+	<div
+		class="text-center [&_h1]:text-sm [&_h1]:font-medium [&_h1]:tracking-normal [&_h1]:text-muted-foreground [&>div>div]:justify-center [&_p]:text-sm"
+		data-testid="quick-add-header"
+	>
+		<PageHeader {title} description={subtitle} />
 	</div>
 {:else}
 	<PageHeader {title} description={subtitle}>
