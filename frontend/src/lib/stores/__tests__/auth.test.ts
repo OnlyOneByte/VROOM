@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { authStore } from '../auth.svelte';
+import { recentlySynced, rememberSynced } from '#lib/utils/sync/recently-synced.svelte.ts';
 import type { User } from '../../types/index.js';
 
 const mockFetch = vi.fn();
@@ -199,6 +200,27 @@ describe('Auth Store', () => {
 			expect(authStore.isLoading).toBe(false);
 			expect(authStore.error).toBe(null);
 			expect(authStore.token).toBe(null);
+		});
+
+		it('forgets rows that were just synced, so the next person on the device never sees them', async () => {
+			authStore.setUser(mockUser, 'test-token');
+			rememberSynced({
+				id: 'e1',
+				clientId: 'c1',
+				vehicleId: 'v1',
+				tags: [],
+				category: 'misc',
+				amount: 5,
+				date: '2026-11-26T12:00:00.000Z',
+				timestamp: 1,
+				synced: true,
+				version: '3.0'
+			});
+			mockFetch.mockResolvedValueOnce(mockApiResponse(null));
+
+			await authStore.logout();
+
+			expect(recentlySynced()).toEqual([]);
 		});
 
 		it("clears the user's cached vehicles and history but keeps their unsynced queue", async () => {
