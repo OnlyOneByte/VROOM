@@ -19,7 +19,9 @@ describe('test app setup hooks carry an explicit timeout', () => {
   });
 
   test('only the listed files still run setup on the 5 s default, and the list only shrinks', () => {
-    expect(scanSetupHooks(join(import.meta.dir, '..'))).toEqual(allowlist as Record<string, number>);
+    expect(scanSetupHooks(join(import.meta.dir, '..'))).toEqual(
+      allowlist as Record<string, number>
+    );
   });
 });
 

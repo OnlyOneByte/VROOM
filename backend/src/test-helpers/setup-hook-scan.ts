@@ -3,6 +3,16 @@ import { join } from 'node:path';
 
 const OPEN = '([{';
 const CLOSE = ')]}';
+const QUOTES = '\'"`';
+
+function skipString(source: string, at: number): number {
+  const quote = source[at];
+  let i = at + 1;
+  while (i < source.length && source[i] !== quote) {
+    i += source[i] === '\\' ? 2 : 1;
+  }
+  return i;
+}
 
 function topLevelArgs(source: string, start: number): string[] {
   const args: string[] = [];
@@ -10,21 +20,15 @@ function topLevelArgs(source: string, start: number): string[] {
   let from = start;
   for (let i = start; i < source.length; i++) {
     const ch = source[i] as string;
-    if (ch === "'" || ch === '"' || ch === '`') {
-      i++;
-      while (i < source.length && source[i] !== ch) {
-        if (source[i] === '\\') i++;
-        i++;
-      }
-      continue;
-    }
-    if (OPEN.includes(ch)) depth++;
-    else if (CLOSE.includes(ch)) {
-      if (depth === 0) {
-        args.push(source.slice(from, i));
-        return args.filter((arg) => arg.trim() !== '');
-      }
+    if (QUOTES.includes(ch)) {
+      i = skipString(source, i);
+    } else if (OPEN.includes(ch)) {
+      depth++;
+    } else if (CLOSE.includes(ch) && depth > 0) {
       depth--;
+    } else if (CLOSE.includes(ch)) {
+      args.push(source.slice(from, i));
+      return args.filter((arg) => arg.trim() !== '');
     } else if (ch === ',' && depth === 0) {
       args.push(source.slice(from, i));
       from = i + 1;
