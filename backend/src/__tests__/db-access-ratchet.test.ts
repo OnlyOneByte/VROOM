@@ -7,10 +7,37 @@ const SRC_ROOT = join(import.meta.dir, '..');
 
 const OWNERS = new Set(['app-context.ts', 'db/connection.ts', 'db/seed.ts']);
 
-const PATTERNS: Record<string, RegExp> = {
-  'getDb()': /(?<!function )\bgetDb\(\)/g,
-  'repository singleton':
-    /^(?:export )?(?:const|let) \w+(?:\s*:[^=\n]+)?\s*=\s*new \w+Repository\(/gm,
+const DECLARED_INSTANCE =
+  /^(?:export )?(?:const|let) \w+(?:\s*:[^=\n]+)?\s*=\s*new \w+Repository\(/gm;
+const DEFAULT_EXPORTED_INSTANCE = /^export default new \w+Repository\(/gm;
+const TOP_LEVEL_OBJECT_START =
+  /^(?:(?:export )?(?:const|let) \w+(?:\s*:[^=\n]+)?\s*=|export default)\s*\{/gm;
+const NEW_REPOSITORY = /\bnew \w+Repository\(/g;
+
+const count = (code: string, pattern: RegExp) => code.match(pattern)?.length ?? 0;
+
+function closingBrace(code: string, open: number): number {
+  let depth = 0;
+  for (let i = open; i < code.length; i++) {
+    if (code[i] === '{') depth++;
+    else if (code[i] === '}' && --depth === 0) return i;
+  }
+  return code.length;
+}
+
+function topLevelObjects(code: string): string[] {
+  return [...code.matchAll(TOP_LEVEL_OBJECT_START)].map((match) => {
+    const open = match.index + match[0].length - 1;
+    return code.slice(open, closingBrace(code, open) + 1);
+  });
+}
+
+const COUNTERS: Record<string, (code: string) => number> = {
+  'getDb()': (code) => count(code, /(?<!function )\bgetDb\(\)/g),
+  'repository singleton': (code) =>
+    count(code, DECLARED_INSTANCE) +
+    count(code, DEFAULT_EXPORTED_INSTANCE) +
+    topLevelObjects(code).reduce((total, literal) => total + count(literal, NEW_REPOSITORY), 0),
 };
 
 const BASELINE: Record<string, number> = {};
@@ -32,8 +59,8 @@ function productionSources(dir: string = SRC_ROOT): string[] {
 function countConstructs(src: string): Map<string, number> {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
   const counts = new Map<string, number>();
-  for (const [name, pattern] of Object.entries(PATTERNS)) {
-    const n = code.match(pattern)?.length ?? 0;
+  for (const [name, counter] of Object.entries(COUNTERS)) {
+    const n = counter(code);
     if (n > 0) counts.set(name, n);
   }
   return counts;
@@ -81,6 +108,43 @@ countRatchet({
       )
     ).toBe(1);
     expect(one('  const repo = new TripRepository(db);', 'repository singleton')).toBe(0);
+    expect(one('export default new FooRepository(getDb());', 'repository singleton')).toBe(1);
+    expect(
+      one(
+        'export const repos = {\n  foo: new FooRepository(db),\n  bar: new BarRepository(db),\n};',
+        'repository singleton'
+      )
+    ).toBe(2);
+    expect(
+      one('const repos = {\n  foo: new FooRepository(db),\n} as const;', 'repository singleton')
+    ).toBe(1);
+    expect(one('export default {\n  foo: new FooRepository(db),\n};', 'repository singleton')).toBe(
+      1
+    );
+    expect(
+      one(
+        'export function make(db: Db) {\n  return { foo: new FooRepository(db) };\n}',
+        'repository singleton'
+      )
+    ).toBe(0);
+    expect(
+      one('export const limits = {\n  max: 3,\n};\nconst x = 1;', 'repository singleton')
+    ).toBe(0);
+    expect(
+      one('export const repos = { foo: new FooRepository(db) };', 'repository singleton')
+    ).toBe(1);
+    expect(
+      one(
+        'const L = { a: 1 };\nclass X {\n  make(db: Db) {\n    return new XRepository(db);\n  }\n}',
+        'repository singleton'
+      )
+    ).toBe(0);
+    expect(
+      one(
+        'export const repos = {\n  nested: { a: 1 },\n  foo: new FooRepository(db),\n};',
+        'repository singleton'
+      )
+    ).toBe(1);
     expect(productionSources().length).toBeGreaterThan(100);
   },
 });

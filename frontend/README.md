@@ -4,7 +4,11 @@ SvelteKit PWA (Svelte 5 runes, Tailwind v4, shadcn-svelte). It talks to the Hono
 `../backend` through `/api/v1`.
 
 Setup, environment, and the backend side are in the [Development Guide](../docs/development.md).
-Run `npm ci`, not `npm install`.
+Use the Node version in [`../.nvmrc`](../.nvmrc) (`nvm use`, or your version manager's equivalent),
+and run `npm ci`, not `npm install`. `package.json` accepts Node 22.23.3 or newer in 22.x,
+24.15 or newer in 24.x, or 26+, and `.npmrc` sets `engine-strict`, so `npm ci` on any other
+Node stops with an `EBADENGINE` error instead of installing a tree whose tests fail for
+unrelated-looking reasons.
 
 ## Commands
 
