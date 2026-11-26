@@ -1,10 +1,13 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { jsonMergePatch } from '../../db/dialect';
 import type { NewUserPreferences, SyncState, UserPreferences } from '../../db/schema';
 import { syncState, userPreferences } from '../../db/schema';
 import { DatabaseError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES } from '../../types';
+import { minorUnitScale } from '../../utils/money';
+
+const DEFAULT_CURRENCY = 'USD';
 
 const JSON_FIELD_COLUMNS = {
   storageConfig: 'storage_config',
@@ -28,6 +31,23 @@ export class PreferencesRepository {
     }
   }
 
+  async moneyScale(userId: string): Promise<number> {
+    const prefs = await this.getByUserId(userId);
+    return minorUnitScale(prefs?.currencyUnit ?? DEFAULT_CURRENCY);
+  }
+
+  async moneyScales(userIds: Iterable<string>): Promise<(userId: string) => number> {
+    const ids = [...new Set(userIds)];
+    const rows = ids.length
+      ? await this.db
+          .select({ userId: userPreferences.userId, currency: userPreferences.currencyUnit })
+          .from(userPreferences)
+          .where(inArray(userPreferences.userId, ids))
+      : [];
+    const currencies = new Map(rows.map((row) => [row.userId, row.currency]));
+    return (userId) => minorUnitScale(currencies.get(userId) ?? DEFAULT_CURRENCY);
+  }
+
   async getOrCreate(userId: string): Promise<UserPreferences> {
     const existing = await this.getByUserId(userId);
     if (existing) return existing;
@@ -36,7 +56,7 @@ export class PreferencesRepository {
       const newPrefs: NewUserPreferences = {
         userId,
         unitPreferences: DEFAULT_UNIT_PREFERENCES,
-        currencyUnit: 'USD',
+        currencyUnit: DEFAULT_CURRENCY,
         autoBackupEnabled: false,
         backupFrequency: 'weekly',
         syncOnInactivity: true,

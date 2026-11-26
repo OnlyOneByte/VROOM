@@ -6,7 +6,7 @@ import { ELECTRIC_FUEL_TYPES } from '../../db/types';
 import { DatabaseError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } from '../../types';
 import { logger } from '../../utils/logger';
-import { formatDateForMessage, formatMoneyForMessage } from '../../utils/money';
+import { formatDateForMessage, formatMoneyForMessage, minorUnitScale } from '../../utils/money';
 import { convertDistance, convertVolume } from '../../utils/unit-conversions';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import {
@@ -53,7 +53,8 @@ interface Context {
   query: InsightsQuery;
   cars: Car[];
   userUnits: UnitPreferences;
-  money: (cents: number) => string;
+  money: (minor: number) => string;
+  scale: number;
 }
 
 const DAY = 86_400;
@@ -271,7 +272,8 @@ export class AnalyticsInsightsRepository {
         type: r.type,
         units: parseUnitPreferences(r.units) ?? { ...DEFAULT_UNIT_PREFERENCES },
       })),
-      money: (cents) => formatMoneyForMessage(cents, currency),
+      money: (minor) => formatMoneyForMessage(minor, currency),
+      scale: minorUnitScale(currency),
     };
   }
 
@@ -328,7 +330,7 @@ export class AnalyticsInsightsRepository {
     return {
       id: 'recordMonth',
       title: 'Record month',
-      value: best.v / 100,
+      value: best.v / ctx.scale,
       unit: 'money',
       sentence: `${monthName(key)} had the highest running costs in this period.${what}`,
       query: { metric: 'cost', per: 'month', split: 'category', sel: key },
@@ -478,7 +480,7 @@ export class AnalyticsInsightsRepository {
     return {
       id: 'costPerTrip',
       title: 'Cost per trip',
-      value: round(cost) / 100,
+      value: round(cost) / ctx.scale,
       unit: 'money',
       sentence: `Your average trip is ${round(average)} ${short}, at ${ctx.money(perDistance)} per ${DISTANCE_WORD[user] ?? 'mile'} in running costs.${share > 0 ? ` ${share}% of trip distance was for business.` : ''}`,
       query: { metric: 'costPerDistance', per: 'month', split: 'vehicle' },
@@ -517,7 +519,7 @@ export class AnalyticsInsightsRepository {
     return {
       id: 'cheapestStation',
       title: 'Cheapest station',
-      value: round(price) / 100,
+      value: round(price) / ctx.scale,
       unit: 'moneyPerVolume',
       sentence: `${station.name} averaged ${ctx.money(price)} per ${unit}${grade ? ` of ${grade}` : ''} over ${station.n} fill-ups, ${ctx.money(otherPrice - price)} less than your other stations.`,
       query: { metric: 'cost', per: 'month', split: 'fuelType' },

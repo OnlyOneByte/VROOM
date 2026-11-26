@@ -87,7 +87,8 @@ interface AssistantToolSpec<A, R> {
   description: string;
   schema: z.ZodType<A>;
   read(args: A, userId: string, nowMs: number, timeZone?: string): Promise<R>;
-  toApi(data: R): unknown;
+  owner?(args: A, userId: string): Promise<string>;
+  toApi(data: R, scale: number): unknown;
 }
 
 function defineTool<A, R>(spec: AssistantToolSpec<A, R>): AssistantTool<A> {
@@ -96,8 +97,11 @@ function defineTool<A, R>(spec: AssistantToolSpec<A, R>): AssistantTool<A> {
     description: spec.description,
     schema: spec.schema,
     parameters: toToolParameters(spec.schema),
-    run: async (args, userId, nowMs, timeZone) =>
-      spec.toApi(await spec.read(args, userId, nowMs, timeZone)),
+    run: async (args, userId, nowMs, timeZone) => {
+      const data = await spec.read(args, userId, nowMs, timeZone);
+      const owner = spec.owner ? await spec.owner(args, userId) : userId;
+      return spec.toApi(data, await repos().preferences.moneyScale(owner));
+    },
   };
 }
 
@@ -124,7 +128,7 @@ const TOOL_LIST: AssistantTool[] = [
       "List the user's vehicles (make, model, year, nickname) with any financing summary.",
     schema: emptyArgs,
     read: async (_args, userId) => repos().vehicles.findByUserId(userId),
-    toApi: (rows) => rows.map(vehicleRowToApi),
+    toApi: (rows, scale) => rows.map((row) => vehicleRowToApi(row, scale)),
   }),
   defineTool({
     name: 'getExpenseSummary',
@@ -140,6 +144,7 @@ const TOOL_LIST: AssistantTool[] = [
         ...(args.vehicleId ? { vehicleId: args.vehicleId } : {}),
       });
     },
+    owner: (args, userId) => resolveScope(args.vehicleId, userId),
     toApi: expenseSummaryToApi,
   }),
   defineTool({
@@ -157,6 +162,7 @@ const TOOL_LIST: AssistantTool[] = [
         timeZone
       );
     },
+    owner: (args, userId) => resolveScope(args.vehicleId, userId),
     toApi: fuelStatsToApi,
   }),
   defineTool({
@@ -208,7 +214,7 @@ const TOOL_LIST: AssistantTool[] = [
       'Active reminders (service intervals, registration, etc.) and when they are next due.',
     schema: emptyArgs,
     read: async (_args, userId) => repos().reminders.findByUserId(userId, { isActive: true }),
-    toApi: (rows) => rows.map(reminderWithVehiclesToApi),
+    toApi: (rows, scale) => rows.map((row) => reminderWithVehiclesToApi(row, scale)),
   }),
 ];
 

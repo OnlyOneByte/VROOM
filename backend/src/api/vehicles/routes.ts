@@ -23,7 +23,7 @@ import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } 
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
-import { boundedDollarsToCents, centsToDollars, vehicleRowToApi } from '../../utils/money';
+import { boundedDollarsToCents, toMajor, vehicleRowToApi } from '../../utils/money';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { canonicalScale } from '../../utils/unit-conversions';
 import {
@@ -315,8 +315,9 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
     return v;
   });
 
+  const scaleOf = await repos().preferences.moneyScales(allVehicles.map((v) => v.userId));
   const apiVehicles = enrichedVehicles.map((v) => ({
-    ...vehicleRowToApi(v),
+    ...vehicleRowToApi(v, scaleOf(v.userId)),
     carShare: carShareAccess(c, v.id, v.carShareEnabled),
   }));
   const response: ApiResponse<typeof apiVehicles> = {
@@ -351,7 +352,7 @@ routes.post('/', zValidator('json', createVehicleSchema), authorize(ownAccount),
 
   const response: ApiResponse<typeof createdVehicle> = {
     success: true,
-    data: vehicleRowToApi(createdVehicle),
+    data: vehicleRowToApi(createdVehicle, await repos().preferences.moneyScale(user.id)),
     message: 'Vehicle created successfully',
   };
 
@@ -410,7 +411,10 @@ routes.get(
 
     const response: ApiResponse<typeof responseData & { carShare: typeof carShare }> = {
       success: true,
-      data: { ...vehicleRowToApi(responseData), carShare },
+      data: {
+        ...vehicleRowToApi(responseData, await repos().preferences.moneyScale(vehicle.userId)),
+        carShare,
+      },
     };
 
     return c.json(response);
@@ -463,7 +467,8 @@ routes.put(
     return c.json({
       success: true,
       data: vehicleRowToApi(
-        seesFinancials(access) ? updatedVehicle : sharedVehicleView(updatedVehicle)
+        seesFinancials(access) ? updatedVehicle : sharedVehicleView(updatedVehicle),
+        await repos().preferences.moneyScale(existingVehicle.userId)
       ),
       message: 'Vehicle updated successfully',
     });
@@ -597,15 +602,16 @@ routes.get(
     );
 
     const currentOdometer = await repos().odometer.getCurrentOdometer(id, ownerId);
+    const { major, majorOrNull } = toMajor(await repos().preferences.moneyScale(ownerId));
 
     return c.json({
       success: true,
       data: {
         period,
         ...stats,
-        totalFuelCost: centsToDollars(stats.totalFuelCost),
-        totalChargeCost: centsToDollars(stats.totalChargeCost),
-        costPerMile: stats.costPerMile === null ? null : centsToDollars(stats.costPerMile),
+        totalFuelCost: major(stats.totalFuelCost),
+        totalChargeCost: major(stats.totalChargeCost),
+        costPerMile: majorOrNull(stats.costPerMile),
         currentOdometer,
       },
     });

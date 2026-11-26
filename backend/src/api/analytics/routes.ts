@@ -225,7 +225,10 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const data = await repos().analyticsQuery.items(user.id, c.req.valid('query'));
-    return c.json({ success: true, data: bucketItemsToApi(data) });
+    return c.json({
+      success: true,
+      data: bucketItemsToApi(data, await repos().preferences.moneyScale(user.id)),
+    });
   }
 );
 
@@ -253,7 +256,10 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const data = await repos().analyticsQuery.query(user.id, c.req.valid('query'));
-    return c.json({ success: true, data: analyticsQueryToApi(data) });
+    return c.json({
+      success: true,
+      data: analyticsQueryToApi(data, await repos().preferences.moneyScale(user.id)),
+    });
   }
 );
 
@@ -271,7 +277,10 @@ routes.get(
       timeZone,
       vehicleIds
     );
-    return c.json({ success: true, data: analyticsSummaryToApi(data) });
+    return c.json({
+      success: true,
+      data: analyticsSummaryToApi(data, await repos().preferences.moneyScale(user.id)),
+    });
   }
 );
 
@@ -288,7 +297,10 @@ routes.get(
       ytdStart,
       timeZone
     );
-    return c.json({ success: true, data: quickStatsToApi(data) });
+    return c.json({
+      success: true,
+      data: quickStatsToApi(data, await repos().preferences.moneyScale(user.id)),
+    });
   }
 );
 
@@ -310,7 +322,10 @@ routes.get(
       vehicleId ?? vehicleIds,
       timeZone
     );
-    return c.json({ success: true, data: fuelStatsToApi(data) });
+    return c.json({
+      success: true,
+      data: fuelStatsToApi(data, await repos().preferences.moneyScale(scopeId)),
+    });
   }
 );
 
@@ -327,7 +342,10 @@ routes.get(
       timeZone,
       vehicleIds
     );
-    return c.json({ success: true, data: crossVehicleToApi(data) });
+    return c.json({
+      success: true,
+      data: crossVehicleToApi(data, await repos().preferences.moneyScale(user.id)),
+    });
   }
 );
 
@@ -339,7 +357,10 @@ routes.get(
     const user = c.get('user');
     const { timeZone, vehicleIds } = c.req.valid('query');
     const data = await repos().analytics.getFinancing(user.id, timeZone, vehicleIds);
-    return c.json({ success: true, data: financingToApi(data) });
+    return c.json({
+      success: true,
+      data: financingToApi(data, await repos().preferences.moneyScale(user.id)),
+    });
   }
 );
 
@@ -351,7 +372,10 @@ routes.get(
     const user = c.get('user');
     const { timeZone, vehicleIds } = c.req.valid('query');
     const data = await repos().analytics.getInsurance(user.id, timeZone, vehicleIds);
-    return c.json({ success: true, data: insuranceToApi(data) });
+    return c.json({
+      success: true,
+      data: insuranceToApi(data, await repos().preferences.moneyScale(user.id)),
+    });
   }
 );
 
@@ -373,7 +397,10 @@ routes.get(
       vehicleId ?? vehicleIds,
       timeZone
     );
-    return c.json({ success: true, data: fuelAdvancedToApi(data) });
+    return c.json({
+      success: true,
+      data: fuelAdvancedToApi(data, await repos().preferences.moneyScale(scopeId)),
+    });
   }
 );
 
@@ -405,7 +432,10 @@ routes.get(
       timeZone,
       !seesFinancials(access)
     );
-    return c.json({ success: true, data: vehicleTcoToApi(data) });
+    return c.json({
+      success: true,
+      data: vehicleTcoToApi(data, await repos().preferences.moneyScale(access.ownerId)),
+    });
   }
 );
 
@@ -424,7 +454,10 @@ routes.get(
       timeZone,
       !seesFinancials(access)
     );
-    return c.json({ success: true, data: vehicleExpensesToApi(data) });
+    return c.json({
+      success: true,
+      data: vehicleExpensesToApi(data, await repos().preferences.moneyScale(access.ownerId)),
+    });
   }
 );
 
@@ -433,7 +466,10 @@ routes.get('/year-end', zValidator('query', yearQuerySchema), authorize(ownAccou
   const { year, timeZone } = c.req.valid('query');
   const currentYear = year ?? calendarParts(new Date(), zonedCalendar(timeZone)).year;
   const data = await repos().analytics.getYearEnd(user.id, currentYear, timeZone);
-  return c.json({ success: true, data: yearEndToApi(data) });
+  return c.json({
+    success: true,
+    data: yearEndToApi(data, await repos().preferences.moneyScale(user.id)),
+  });
 });
 
 routes.get(

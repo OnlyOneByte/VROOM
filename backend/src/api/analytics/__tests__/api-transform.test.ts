@@ -26,7 +26,7 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
       fleetHealthScore: 87,
       units: { distanceUnit: 'mi', volumeUnit: 'gal', chargeUnit: 'kWh' },
     };
-    const r = quickStatsToApi(d);
+    const r = quickStatsToApi(d, 100);
     expect(r.ytdSpending).toBe(1234.56);
     expect(r.costPerDistance).toBe(0.21);
     expect(r.vehicleCount).toBe(3);
@@ -63,7 +63,7 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
       ],
       fillupIntervals: [{ intervalLabel: '0-7d', count: 3 }],
     } as FuelAdvancedData;
-    const r = fuelAdvancedToApi(d);
+    const r = fuelAdvancedToApi(d, 100);
     expect(r.vehicleRadar[0].maintenanceCost).toBe(80);
     expect(r.vehicleRadar[0].annualCost).toBe(60);
     expect(r.vehicleRadar[0].fuelEfficiency).toBe(75);
@@ -120,7 +120,7 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
         ],
       },
     } as FuelStatsData;
-    const r = fuelStatsToApi(d);
+    const r = fuelStatsToApi(d, 100);
     expect(r.averageCost.perFillup).toBe(45);
     expect(r.averageCost.bestCostPerDistance).toBe(0.12);
     expect(r.averageCost.costPerDistance).toBe(0.13);
@@ -176,7 +176,7 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
       typeDistribution: [{ type: 'loan', value: 50000, count: 1 }],
       loanBreakdown: [{ month: '2024-01', interest: 8333, principal: 41667 }],
     } as FinancingData;
-    const r = financingToApi(d);
+    const r = financingToApi(d, 100);
     expect(r.summary.totalMonthlyPayments).toBe(500);
     expect(r.summary.remainingBalance).toBe(20000);
     expect(r.vehicleDetails[0].monthlyPayment).toBe(500);
@@ -200,7 +200,7 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
       ],
       units: { distanceUnit: 'mi', volumeUnit: 'gal', chargeUnit: 'kWh' },
     } as CrossVehicleData;
-    const r = crossVehicleToApi(d);
+    const r = crossVehicleToApi(d, 100);
     expect(r.monthlyExpenseTrends[0].amount).toBe(123.45);
     expect(r.expenseByCategory[0].amount).toBe(500);
     expect(r.expenseByCategory[0].percentage).toBe(42.5);
@@ -225,7 +225,7 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
       costPerDistance: 9,
       costPerMonth: 8750,
     } as VehicleTCOData;
-    const r = vehicleTcoToApi(d);
+    const r = vehicleTcoToApi(d, 100);
     expect(r.purchasePrice).toBeNull();
     expect(r.totalCost).toBe(1050);
     expect(r.costPerMonth).toBe(87.5);
