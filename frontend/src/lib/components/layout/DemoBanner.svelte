@@ -38,4 +38,5 @@
 		{/if}
 		Leave the demo
 	</Button>
+	<span class="sr-only" role="status">{leaving ? 'Leaving the demo…' : ''}</span>
 </aside>

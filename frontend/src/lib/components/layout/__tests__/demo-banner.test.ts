@@ -51,6 +51,18 @@ describe('demo banner', () => {
 
 		await fireEvent.click(leave);
 		expect(logout).toHaveBeenCalledTimes(2);
+		await waitFor(() => expect(assign).toHaveBeenCalledWith('/'));
+	});
+
+	test('announces that it is leaving, in a status that is always there', async () => {
+		logout.mockReturnValue(new Promise(() => {}));
+		render(DemoBanner);
+		const status = screen.getByRole('status');
+		expect(status).toHaveTextContent('');
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Leave the demo' }));
+
+		expect(status).toHaveTextContent('Leaving the demo…');
 	});
 
 	test('after signing out, the visitor lands back on the landing page', async () => {

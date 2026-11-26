@@ -306,6 +306,20 @@ describe('the root layout paints the app shell without waiting on /auth/me', () 
 		}
 	});
 
+	it('a remembered demo session keeps the banner offline, and signing out removes it', async () => {
+		localStorage.setItem('vroom_last_user', JSON.stringify({ ...alice, demo: true }));
+		mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+
+		render(Layout, { children: pageContent });
+
+		await waitFor(() => expect(authStore.sessionUnverified).toBe(true));
+		expect(await screen.findByTestId('demo-banner')).toBeInTheDocument();
+
+		authStore.clearUser();
+
+		await waitFor(() => expect(screen.queryByTestId('demo-banner')).toBeNull());
+	});
+
 	it('keeps the branded splash on a protected route when nobody signed in on this device', () => {
 		deferredMe();
 
