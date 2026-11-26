@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { readFileSync } from 'node:fs';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
 
 vi.mock('$app/state', () => ({
@@ -17,9 +18,15 @@ vi.mock('#lib/components/layout/AccountPending.svelte', () => {
 	throw new Error('Failed to fetch dynamically imported module');
 });
 
-global.fetch = vi.fn(
-	async () =>
-		new Response(
+let logoutFails = false;
+
+global.fetch = vi.fn(async (input: RequestInfo | URL) =>
+	String(input).includes('/auth/logout') && logoutFails
+		? new Response(JSON.stringify({ success: false, error: { message: 'Server unavailable' } }), {
+				status: 503,
+				headers: { 'content-type': 'application/json' }
+			})
+		: new Response(
 			JSON.stringify({
 				success: true,
 				data: {
@@ -39,6 +46,18 @@ global.fetch = vi.fn(
 );
 
 const Layout = (await import('../+layout.svelte')).default;
+const { appStore } = await import('#lib/stores/app.svelte.ts');
+
+afterEach(() => {
+	logoutFails = false;
+	vi.restoreAllMocks();
+});
+
+function stubLocation() {
+	const assign = vi.fn();
+	vi.spyOn(window, 'location', 'get').mockReturnValue({ ...window.location, assign } as Location);
+	return assign;
+}
 const pageContent = createRawSnippet(() => ({ render: () => '<p>Page content</p>' }));
 
 describe('a waiting account whose waiting page fails to load', () => {
@@ -50,5 +69,36 @@ describe('a waiting account whose waiting page fails to load', () => {
 		expect(screen.getByRole('button', { name: 'Sign Out' })).toBeInTheDocument();
 		expect(screen.queryByText('Page content')).toBeNull();
 		expect(screen.queryByRole('link', { name: 'Skip to content' })).toBeNull();
+	});
+
+	it('names its loading spinner for screen readers', () => {
+		const source = readFileSync(`${process.cwd()}/src/routes/+layout.svelte`, 'utf8');
+		const start = source.indexOf("{#await import('#lib/components/layout/AccountPending.svelte')}");
+		const loading = source.slice(start, source.indexOf('{:then', start));
+		expect(loading).toContain('aria-busy="true"');
+		expect(loading).toContain('role="status"');
+		expect(loading).toMatch(/<span class="sr-only">Loading<\/span>/);
+	});
+
+	it('a failed Sign Out says so and stays on the page, with the button usable again', async () => {
+		logoutFails = true;
+		const assign = stubLocation();
+		const showError = vi.spyOn(appStore, 'showError');
+		render(Layout, { children: pageContent });
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Sign Out' }));
+
+		await waitFor(() => expect(showError).toHaveBeenCalledWith(expect.stringMatching(/^Couldn’t sign out\./)));
+		expect(assign).not.toHaveBeenCalled();
+		expect(screen.getByRole('button', { name: 'Sign Out' })).toBeEnabled();
+	});
+
+	it('a Sign Out that works goes to the sign-in page', async () => {
+		const assign = stubLocation();
+		render(Layout, { children: pageContent });
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Sign Out' }));
+
+		await waitFor(() => expect(assign).toHaveBeenCalledWith('/auth'));
 	});
 });
