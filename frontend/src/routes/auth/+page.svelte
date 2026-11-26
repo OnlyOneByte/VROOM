@@ -45,7 +45,7 @@
 		},
 		signup_invite_required: {
 			title: 'This server is invite only',
-			body: 'Ask its admin for an invite, or someone with a vehicle to share it with you. Then sign in with the email they invited.'
+			body: 'Ask its admin for an invite, or someone who wants to share a vehicle with you. Then sign in with the email they invited.'
 		},
 		signup_domain_not_allowed: {
 			title: 'Your email domain can’t join this server',
@@ -69,7 +69,7 @@
 			case 'approval':
 				return `New here? Sign in${allowedEmail} to ask for an account. An admin approves it first, unless they invited you.`;
 			case 'invite':
-				return 'New here? You need an invite, from this server’s admin or from someone sharing a vehicle with you.';
+				return 'New here? You need an invite, from this server’s admin or from someone who wants to share a vehicle with you.';
 			case 'closed':
 				return 'This server isn’t taking new accounts.';
 		}
