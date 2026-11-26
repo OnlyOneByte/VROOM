@@ -90,6 +90,10 @@ function createAsyncDatabase(sqlite: Database) {
     nested: Promise<unknown> | null;
   };
   const scopes = new AsyncLocalStorage<Scope>();
+  const outside = new AsyncLocalStorage<true>();
+  type Client = (query: string, params: unknown[], method: Method) => Promise<unknown>;
+  type Session = { client: Client };
+  const scopedSessions = new WeakMap<Scope, Session>();
   let open: Scope | null = null;
   let closed: Promise<void> = Promise.resolve();
   const statements = new Map<string, Statement>();
@@ -199,7 +203,33 @@ function createAsyncDatabase(sqlite: Database) {
   type Behavior = 'deferred' | 'immediate' | 'exclusive';
   const begin = db.transaction.bind(db);
   const dialect = (db as unknown as { dialect: Dialect }).dialect;
+  const baseSession = (db as unknown as { session: Session }).session;
   refuseRawControl(db, dialect);
+  bindBuildersToScope(db);
+
+  function sessionFor(scope: Scope | undefined): Session {
+    if (!scope) return baseSession;
+    let session = scopedSessions.get(scope);
+    if (!session) {
+      const client: Client = (query, params, method) =>
+        scopes.getStore() || outside.getStore()
+          ? baseSession.client(query, params, method)
+          : scopes.run(scope, () => baseSession.client(query, params, method));
+      session = Object.create(baseSession, { client: { value: client } }) as Session;
+      scopedSessions.set(scope, session);
+    }
+    return session;
+  }
+
+  function bindBuildersToScope(target: object): void {
+    const relational = Object.values((target as { query: object }).query);
+    for (const holder of [target, ...relational]) {
+      Object.defineProperty(holder, 'session', {
+        configurable: true,
+        get: () => sessionFor(scopes.getStore()),
+      });
+    }
+  }
 
   async function sealWhenSettled<T>(scope: Scope, run: () => Promise<T>): Promise<T> {
     try {
@@ -223,6 +253,7 @@ function createAsyncDatabase(sqlite: Database) {
       const savepoint = scopes.run(child, () =>
         parent.tx.transaction((tx) => {
           refuseRawControl(tx, dialect);
+          bindBuildersToScope(tx);
           child.tx = tx;
           return sealWhenSettled(child, () => callback(tx));
         })
@@ -263,6 +294,7 @@ function createAsyncDatabase(sqlite: Database) {
         begin(
           (tx) => {
             refuseRawControl(tx, dialect);
+            bindBuildersToScope(tx);
             scope.tx = tx;
             return sealWhenSettled(scope, () => callback(tx));
           },
@@ -277,7 +309,7 @@ function createAsyncDatabase(sqlite: Database) {
   }
 
   function outsideTransaction<T>(fn: () => T | PromiseLike<T>): Promise<T> {
-    return scopes.exit(() => Promise.resolve().then(fn));
+    return scopes.exit(() => outside.run(true, () => Promise.resolve().then(fn)));
   }
 
   Object.assign(db, { transaction });
