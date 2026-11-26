@@ -45,7 +45,7 @@
 		},
 		signup_invite_required: {
 			title: 'This server is invite only',
-			body: 'Ask its admin for an invite, then sign in with the email they invited.'
+			body: 'Ask its admin for an invite, or someone with a vehicle to share it with you. Then sign in with the email they invited.'
 		},
 		signup_domain_not_allowed: {
 			title: 'Your email domain can’t join this server',
@@ -79,7 +79,7 @@
 	const authErrorMessage = $derived(authError ? (authErrorMessages[authError] ?? null) : null);
 	const showNewHereLine = $derived(
 		newHereLine !== null &&
-			!authError?.startsWith('signup_') &&
+			!(authError?.startsWith('signup_') && authErrorMessage) &&
 			!isLoadingProviders &&
 			!fetchError &&
 			providers.length > 0
