@@ -600,7 +600,7 @@ describe('ExpenseForm edit mode', () => {
 		await renderEdit();
 
 		expect(screen.getByRole('heading', { level: 1, name: 'Oil change' })).toBeTruthy();
-		expect(screen.getByRole('button', { name: 'Expenses' })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Back to Expenses' })).toBeTruthy();
 		expect(screen.queryByRole('heading', { name: 'New expense' })).toBeNull();
 		expect(field('amount')).not.toHaveClass('text-7xl');
 	});

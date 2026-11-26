@@ -60,6 +60,7 @@
 						disabled={disabledValues.includes(category.value)}
 					>
 						{category.shortLabel}
+						<span class="sr-only">: {category.description}</span>
 					</Select.Item>
 				{/each}
 			</Select.Content>

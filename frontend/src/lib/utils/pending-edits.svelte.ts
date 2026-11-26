@@ -15,6 +15,8 @@ interface PendingEdit {
 	status: 'saving' | 'saved' | 'failed';
 	error?: string;
 	seq: number;
+	savedAt?: string;
+	undo?: boolean;
 }
 
 const toastId = (id: string) => `expense-edit-${id}`;
@@ -32,14 +34,22 @@ function settle(id: string, seq: number, change: Partial<PendingEdit>): boolean 
 
 async function put(id: string, seq: number, payload: EditPayload): Promise<void> {
 	try {
-		await expenseApi.updateExpense(id, payload);
-		settle(id, seq, { status: 'saved' });
+		const saved: Expense | undefined = await expenseApi.updateExpense(id, payload);
+		const entry = edits.get(id);
+		if (!entry) return;
+		edits.set(id, {
+			...entry,
+			...(saved?.updatedAt && { savedAt: saved.updatedAt }),
+			...(entry.seq === seq && { status: 'saved' as const })
+		});
 	} catch (error) {
 		const reason = userFacingErrorMessage(error);
 		if (!settle(id, seq, { status: 'failed', error: reason })) return;
 		appStore.addNotification({
 			type: 'error',
-			message: "Your changes to the expense weren't saved",
+			message: edits.get(id)?.undo
+				? "Couldn't undo your changes to the expense"
+				: "Your changes to the expense weren't saved",
 			description: reason,
 			toastId: toastId(id),
 			duration: Number.POSITIVE_INFINITY,
@@ -94,9 +104,9 @@ function restorePayload({ before, payload }: PendingEdit): EditPayload {
 		location: before.location,
 		currency: before.currency,
 		missedFillup: before.missedFillup,
-		...(before.sourceType && before.sourceId
-			? { sourceType: before.sourceType, sourceId: before.sourceId }
-			: {}),
+		...(payload.sourceType === null &&
+			before.sourceType === 'financing' &&
+			before.sourceId && { sourceType: before.sourceType, sourceId: before.sourceId }),
 		...('paidByDriverId' in payload && { paidByDriverId: before.paidByDriverId ?? null })
 	};
 }
@@ -110,7 +120,9 @@ export function undoEdit(id: string): void {
 		after: entry.before,
 		payload: restorePayload(entry),
 		status: 'saving',
-		seq: ++nextSeq
+		seq: ++nextSeq,
+		undo: true,
+		...(entry.savedAt && { savedAt: entry.savedAt })
 	});
 	send(id);
 }
@@ -126,7 +138,9 @@ export function retryEdit(id: string): void {
 function overlay(expense: Expense): PendingEdit | undefined {
 	const entry = edits.get(expense.id);
 	if (!entry || entry.status === 'failed') return undefined;
-	return entry.before.updatedAt === expense.updatedAt ? entry : undefined;
+	const current = expense.updatedAt === entry.before.updatedAt;
+	const undone = entry.undo === true && expense.updatedAt === entry.savedAt;
+	return current || undone ? entry : undefined;
 }
 
 export function shownExpense<T extends Expense>(expense: T): T {

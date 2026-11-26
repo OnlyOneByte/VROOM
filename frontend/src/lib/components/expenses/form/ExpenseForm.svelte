@@ -739,7 +739,7 @@
 				{/if}
 
 				{#if form.isEditMode}
-					<div class="grid gap-x-4 gap-y-5 sm:grid-cols-2" data-testid="expense-edit-grid">
+					<div class="grid gap-x-3 gap-y-5 sm:grid-cols-2" data-testid="expense-edit-grid">
 						{@render amountField()}
 						<div class="min-w-0 space-y-2">
 							<Label for="date">Date *</Label>

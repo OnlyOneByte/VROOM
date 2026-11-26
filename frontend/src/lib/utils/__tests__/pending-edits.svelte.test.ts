@@ -136,6 +136,59 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		expect(notices().filter(n => n['type'] === 'error')).toEqual([]);
 	});
 
+	function pressUndo(): void {
+		const toast = notices().find(n => (n['action'] as { label?: string })?.label === 'Undo');
+		(toast?.['action'] as { onClick: () => void }).onClick();
+	}
+
+	test('Undo after the edit landed shows the old values on a row the list reloaded', async () => {
+		const landed = { ...changed, updatedAt: '2026-11-26T10:00:00.000Z' };
+		vi.mocked(expenseApi.updateExpense).mockResolvedValueOnce(landed).mockResolvedValueOnce(saved);
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1));
+		await Promise.resolve();
+		expect(shownExpense(landed)).toBe(landed);
+
+		pressUndo();
+		expect(shownExpense(landed)).toMatchObject({ amount: 40, description: 'Arco' });
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
+	});
+
+	test('Undo restores a cleared financing link but never resends another kind of link', async () => {
+		vi.mocked(expenseApi.updateExpense).mockResolvedValue(changed);
+		const financed = { ...saved, sourceType: 'financing', sourceId: 'loan-1' };
+		const unlinked = { vehicleId: 'v1', category: 'fuel', amount: 55, sourceType: null };
+		scheduleEdit(financed, changed, unlinked as never);
+		pressUndo();
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
+		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith(
+			'e1',
+			expect.objectContaining({ sourceType: 'financing', sourceId: 'loan-1' })
+		);
+
+		resetPendingEdits();
+		vi.mocked(expenseApi.updateExpense).mockClear();
+		const reminder = { ...saved, sourceType: 'reminder', sourceId: 'rem-1' };
+		scheduleEdit(reminder, changed, payload);
+		pressUndo();
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
+		const [, restore] = vi.mocked(expenseApi.updateExpense).mock.calls[1] ?? [];
+		expect(restore).not.toHaveProperty('sourceType');
+	});
+
+	test('a failed Undo says the undo failed, not the edit', async () => {
+		vi.mocked(expenseApi.updateExpense)
+			.mockResolvedValueOnce(changed)
+			.mockRejectedValueOnce(new ApiError('down', 500));
+		scheduleEdit(saved, changed, payload);
+		pressUndo();
+		await vi.waitFor(() =>
+			expect(
+				notices().some(n => n['message'] === "Couldn't undo your changes to the expense")
+			).toBe(true)
+		);
+	});
+
 	test('a failed PUT reverts the row, keeps its reason, and offers Retry once', async () => {
 		vi.mocked(expenseApi.updateExpense).mockRejectedValueOnce(new ApiError('SQLITE_BUSY', 500));
 		scheduleEdit(saved, changed, payload);

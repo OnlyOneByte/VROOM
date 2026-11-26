@@ -36,6 +36,7 @@
 	<div class="space-y-1" data-testid="expense-edit-header">
 		<button
 			type="button"
+			aria-label={backLabel === 'Back' ? undefined : `Back to ${backLabel}`}
 			onclick={onBack}
 			class="-ml-1 inline-flex min-h-11 items-center gap-1 rounded-[var(--r-sm)] px-1 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
 		>
