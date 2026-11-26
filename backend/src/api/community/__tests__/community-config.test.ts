@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONFIG } from '../../../config';
-import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  json,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 const BACKEND_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 const communityConfig = CONFIG.communityStats as { mode: 'off' | 'local' };
@@ -68,7 +73,7 @@ describe('settings response carries the server mode', () => {
 
   beforeEach(async () => {
     ctx = await createTestApp();
-  });
+  }, SETUP_TIMEOUT_MS);
   const originalMode = CONFIG.communityStats.mode;
   afterEach(() => {
     communityConfig.mode = originalMode;

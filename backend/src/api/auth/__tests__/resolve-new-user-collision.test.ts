@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 let resolveNewUser: typeof import('../routes').resolveNewUser;
@@ -11,7 +11,7 @@ beforeEach(async () => {
   ({ resolveNewUser } = await import('../routes'));
   const { CONFIG } = await import('../../../config');
   emailExists = `${CONFIG.frontend.url}/auth?auth_error=email_exists`;
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 function seedAuthUser(userId: string, email: string, provider: string, accountId: string): void {

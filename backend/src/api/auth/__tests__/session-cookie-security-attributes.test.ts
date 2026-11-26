@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 let config: { env: string };
@@ -9,7 +9,7 @@ beforeEach(async () => {
   ctx = await createTestApp();
   config = (await import('../../../config')).CONFIG as unknown as { env: string };
   originalEnv = config.env;
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => {
   config.env = originalEnv;
   ctx.close();

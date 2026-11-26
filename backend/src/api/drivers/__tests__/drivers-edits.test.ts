@@ -4,6 +4,7 @@ import {
   type DataEnvelope,
   json,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee } from '../../../test-helpers/invitee';
@@ -27,7 +28,7 @@ beforeEach(async () => {
   seedCar(ctx, OTHER);
   m = await seedMembers(ctx, CAR, 'de');
   await ctx.authed('PUT', sharing, { enabled: true });
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 const status = (request: RequestFn, method: string, path: string, body?: unknown) =>

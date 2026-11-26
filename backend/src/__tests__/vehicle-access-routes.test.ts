@@ -4,6 +4,7 @@ import {
   type DataEnvelope,
   json,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../test-helpers/http-client';
 import { createInvitee } from '../test-helpers/invitee';
@@ -419,7 +420,7 @@ beforeEach(async () => {
     viewer: viewer.request,
     stranger: stranger.request,
   };
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 describe('every vehicle-scoped route enforces owner / editor / viewer / stranger access', () => {

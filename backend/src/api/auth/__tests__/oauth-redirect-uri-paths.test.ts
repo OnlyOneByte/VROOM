@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // Read defaults from the config source, not CONFIG: a developer's .env would replace them.
@@ -25,7 +25,7 @@ describe('OAuth redirect-URI defaults resolve to mounted routes', () => {
 
   beforeAll(async () => {
     ctx = await createTestApp();
-  });
+  }, SETUP_TIMEOUT_MS);
 
   async function statusFor(uri: string): Promise<number> {
     const res = await ctx.app.request(new URL(uri).pathname);

@@ -4,6 +4,7 @@ import {
   type DataEnvelope,
   json,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { type Members, overrideOn, seedCar, seedMembers } from '../../../test-helpers/members';
@@ -44,7 +45,7 @@ beforeEach(async () => {
     "INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size) VALUES ('pol-doc', ?, 'insurance_policy', 'pol-1', 'p.pdf', 'application/pdf', 10)",
     [ctx.user.id]
   );
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 const status = (request: RequestFn, method: string, path: string, body?: unknown) =>

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 let googleAuthProvider: typeof import('../providers/google').googleAuthProvider;
@@ -11,7 +11,7 @@ beforeEach(async () => {
   ctx = await createTestApp();
   ({ googleAuthProvider, googleStorageClient } = await import('../providers/google'));
   ({ NoVerifiedEmailError } = await import('../providers/types'));
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   for (const spy of spies.splice(0)) spy.mockRestore();

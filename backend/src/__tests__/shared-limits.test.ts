@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { CONFIG } from '../config';
 import SHARED_LIMITS from '../shared-limits.json';
-import { createTestApp, type TestApp } from '../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../test-helpers/http-client';
 
 describe('shared input limits', () => {
   test('CONFIG.validation reads every shared limit from shared-limits.json', () => {
@@ -19,7 +19,7 @@ describe('vehicle year cap', () => {
 
   beforeEach(async () => {
     ctx = await createTestApp();
-  });
+  }, SETUP_TIMEOUT_MS);
 
   afterEach(() => {
     ctx.close();

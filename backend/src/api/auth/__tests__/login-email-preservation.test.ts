@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 let updateExistingUserProfile: typeof import('../routes').updateExistingUserProfile;
@@ -8,7 +8,7 @@ beforeEach(async () => {
   ctx = await createTestApp();
   // App modules must be imported after createTestApp, or they bind the wrong database.
   ({ updateExistingUserProfile } = await import('../routes'));
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 function seedAuthUser(userId: string, email: string): string {

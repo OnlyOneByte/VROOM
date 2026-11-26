@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { CONFIG } from '../../../config';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { consumePending, getPendingEmail } from '../../../utils/pending-credentials';
 
 let ctx: TestApp;
@@ -13,7 +13,7 @@ const DRIVE_FILE = 'https://www.googleapis.com/auth/drive.file';
 beforeEach(async () => {
   ctx = await createTestApp();
   ({ googleStorageClient } = await import('../providers/google'));
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   for (const spy of spies.splice(0)) spy.mockRestore();

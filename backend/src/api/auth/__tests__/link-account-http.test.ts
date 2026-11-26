@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { createInvitee } from '../../../test-helpers/invitee';
 import type { OAuthProviderConfig, OAuthUserInfo } from '../providers/types';
 
@@ -48,7 +48,7 @@ beforeEach(async () => {
     }),
   };
   spies.push(exchanges.github, exchanges.google);
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   for (const spy of spies.splice(0)) spy.mockRestore();
