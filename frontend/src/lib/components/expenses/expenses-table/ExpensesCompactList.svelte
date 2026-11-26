@@ -104,7 +104,7 @@
 			<section>
 				{#if section.month}
 					<h2
-						class="sticky top-[calc(4rem+env(safe-area-inset-top))] short:top-0 z-10 flex items-baseline justify-between gap-3 border-b-2 border-foreground bg-background pt-2 pb-1.5"
+						class="sticky top-[calc(4rem+env(safe-area-inset-top))] short:top-0 lg:top-0 z-10 flex items-baseline justify-between gap-3 border-b-2 border-foreground bg-background pt-2 pb-1.5"
 					>
 						<span
 							class="font-(family-name:--font-fig) text-2xl leading-none font-bold uppercase lg:text-3xl"

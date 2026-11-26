@@ -610,6 +610,7 @@
 			<div data-testid="pending-rows-while-loading">
 				<ExpensesTable
 					expenses={loadingRows}
+					{vehicles}
 					showVehicleColumn={false}
 					scrollHeight="auto"
 					canWrite={false}

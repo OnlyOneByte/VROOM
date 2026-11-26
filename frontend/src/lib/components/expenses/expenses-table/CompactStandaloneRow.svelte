@@ -8,6 +8,7 @@
 	import { getCategoryIcon } from '#lib/utils/expense-helpers.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { EXPENSE_CATEGORY_INFO } from '#lib/constants/expense-categories.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { expenseEditHref } from './expense-table-actions';
 	import { fillLabel, rowTitle, tagsBesideCategory } from './expense-table-rows';
 	import {
@@ -53,7 +54,7 @@
 			heading.categoryInMeta ? EXPENSE_CATEGORY_INFO[expense.category].shortLabel : null,
 			showVehicleColumn && vehicle ? getVehicleDisplayName(vehicle) : null,
 			formatDate(new Date(expense.date)),
-			fillLabel(expense, vehicle)
+			fillLabel(expense, vehicle?.unitPreferences ?? settingsStore.unitPreferences)
 		].filter(part => part !== null)
 	);
 </script>

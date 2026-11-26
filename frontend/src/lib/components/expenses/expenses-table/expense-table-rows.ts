@@ -1,4 +1,4 @@
-import type { Expense, ExpenseCategory, Vehicle } from '#lib/types/index.ts';
+import type { Expense, ExpenseCategory, UnitPreferences, Vehicle } from '#lib/types/index.ts';
 import {
 	categoryLabels,
 	compareExpenseRows,
@@ -9,14 +9,13 @@ import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 import { formatDateWith, formatNumberUpTo } from '#lib/utils/formatters.ts';
 import { getChargeUnitLabel, getVolumeUnitLabel, isElectricFuelType } from '#lib/utils/units.ts';
 
-export function fillLabel(expense: Expense, vehicle: Vehicle | undefined): string | null {
+export function fillLabel(expense: Expense, units: UnitPreferences): string | null {
 	if (expense.category !== 'fuel') return null;
-	const units = vehicle?.unitPreferences;
 	if (isElectricFuelType(expense.fuelType) && expense.charge) {
-		return `${formatNumberUpTo(expense.charge, 2)} ${getChargeUnitLabel(units?.chargeUnit ?? 'kwh', true)}`;
+		return `${formatNumberUpTo(expense.charge, 2)} ${getChargeUnitLabel(units.chargeUnit, true)}`;
 	}
 	if (expense.volume) {
-		return `${formatNumberUpTo(expense.volume, 2)} ${getVolumeUnitLabel(units?.volumeUnit ?? 'gallons_us', true)}`;
+		return `${formatNumberUpTo(expense.volume, 2)} ${getVolumeUnitLabel(units.volumeUnit, true)}`;
 	}
 	return null;
 }
