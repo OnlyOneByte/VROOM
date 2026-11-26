@@ -2,8 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { appContext } from '../../app-context';
 import { CONFIG } from '../../config';
-import { getDb } from '../../db/connection';
 import { type CalendarFeed, type CalendarFeedOptions, calendarFeeds } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
@@ -59,22 +59,22 @@ function describe(feed: CalendarFeed | undefined) {
 }
 
 async function feedOf(userId: string): Promise<CalendarFeed | undefined> {
-  return getDb().select().from(calendarFeeds).where(eq(calendarFeeds.userId, userId)).get();
+  return appContext().db.select().from(calendarFeeds).where(eq(calendarFeeds.userId, userId)).get();
 }
 
 routes.get('/feed/:file', feedRateLimiter, async (c) => {
   const escaped = new URL(c.req.url).pathname.includes('%');
   const token = escaped ? undefined : TOKEN_FILE.exec(c.req.param('file') ?? '')?.[1];
   const feed = token
-    ? await getDb()
-        .select()
+    ? await appContext()
+        .db.select()
         .from(calendarFeeds)
         .where(eq(calendarFeeds.tokenHash, hashFeedToken(token)))
         .get()
     : undefined;
   if (!feed) throw new NotFoundError('Calendar feed');
-  await getDb()
-    .update(calendarFeeds)
+  await appContext()
+    .db.update(calendarFeeds)
     .set({ lastUsedAt: new Date() })
     .where(eq(calendarFeeds.id, feed.id));
   const body = toIcs(await buildFeedEvents(feed.userId, { ...DEFAULT_OPTIONS, ...feed.options }));
@@ -99,8 +99,8 @@ routes.post(
     const options = { ...DEFAULT_OPTIONS, ...existing?.options, ...c.req.valid('json').options };
     const token = randomBytes(32).toString('base64url');
     const tokenHash = hashFeedToken(token);
-    await getDb()
-      .insert(calendarFeeds)
+    await appContext()
+      .db.insert(calendarFeeds)
       .values({ userId, tokenHash, options })
       .onConflictDoUpdate({
         target: calendarFeeds.userId,
@@ -125,8 +125,8 @@ routes.put(
     const userId = c.get('user').id;
     const existing = await feedOf(userId);
     if (!existing) throw new NotFoundError('Calendar feed');
-    await getDb()
-      .update(calendarFeeds)
+    await appContext()
+      .db.update(calendarFeeds)
       .set({ options: { ...DEFAULT_OPTIONS, ...existing.options, ...c.req.valid('json').options } })
       .where(eq(calendarFeeds.id, existing.id));
     return c.json({ success: true, data: { feed: describe(await feedOf(userId)) } });
@@ -134,8 +134,8 @@ routes.put(
 );
 
 routes.delete('/feed', requireAuth, authorize(ownAccount), async (c) => {
-  await getDb()
-    .delete(calendarFeeds)
+  await appContext()
+    .db.delete(calendarFeeds)
     .where(eq(calendarFeeds.userId, c.get('user').id));
   return c.json({ success: true, data: { feed: null } });
 });

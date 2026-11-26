@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { getDb } from '../../db/connection';
+import { appContext } from '../../app-context';
 import { expenses, type VehicleFinancing, vehicleFinancing } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
@@ -9,7 +9,7 @@ export async function deactivateFinancing(
   userId: string
 ): Promise<VehicleFinancing> {
   const now = new Date();
-  const { updated, cleared } = getDb().transaction((tx) => {
+  const { updated, cleared } = appContext().db.transaction((tx) => {
     const row = tx
       .update(vehicleFinancing)
       .set({ isActive: false, endDate: now, updatedAt: now })

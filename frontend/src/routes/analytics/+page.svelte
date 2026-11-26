@@ -51,6 +51,7 @@
 		const known = filters.cars.filter(id => vehicles.some(v => v.id === id));
 		return known.length > 0 ? known : undefined;
 	});
+	let sharedCars = $derived(vehicles.filter(v => v.carShare?.enabled));
 	let filtered = $derived(!isDefaultFilters(filters));
 	let nonDefaultRange = $derived(filters.range !== DEFAULT_RANGE);
 	let vehicleOptions = $derived(
@@ -301,7 +302,9 @@
 		<Tabs.Root bind:value={activeTab} class="space-y-4 md:space-y-6">
 			<Tabs.List
 				bind:ref={tabList}
-				class="w-full justify-start overflow-x-auto lg:grid lg:grid-cols-5"
+				class="w-full justify-start overflow-x-auto lg:grid {sharedCars.length > 0
+					? 'lg:grid-cols-6'
+					: 'lg:grid-cols-5'}"
 				style={tabMask}
 				onscroll={updateTabFade}
 			>
@@ -320,6 +323,11 @@
 				<Tabs.Trigger value="year-end" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
 					Year-End
 				</Tabs.Trigger>
+				{#if sharedCars.length > 0}
+					<Tabs.Trigger value="drivers" class="shrink-0 px-1.5 text-xs sm:px-3 sm:text-sm">
+						Drivers
+					</Tabs.Trigger>
+				{/if}
 			</Tabs.List>
 
 			{#if activeTab === 'explore'}
@@ -413,6 +421,23 @@
 						<YearEndTab />
 					{:catch}
 						{@render tabLoadError('Year-End')}
+					{/await}
+				</Tabs.Content>
+			{:else if activeTab === 'drivers'}
+				<Tabs.Content value="drivers">
+					{#await import('#lib/components/analytics/DriversTab.svelte')}
+						<div class="flex justify-center p-8">
+							<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+						</div>
+					{:then { default: DriversTab }}
+						<DriversTab
+							vehicles={sharedCars}
+							{dateRange}
+							rangeText={rangeLabel(filters, d => formatDate(d))}
+							preferredVehicleId={vehicleIds?.[0]}
+						/>
+					{:catch}
+						{@render tabLoadError('Drivers')}
 					{/await}
 				</Tabs.Content>
 			{/if}

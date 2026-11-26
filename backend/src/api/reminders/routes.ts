@@ -1,8 +1,7 @@
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
-import { repos } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
-import { getDb } from '../../db/connection';
 import type { NewReminder, Reminder } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
@@ -125,13 +124,13 @@ const fromReminder: ResourceOf = reminderResources;
 
 const fromReminderReadable: ResourceOf = async (c) => {
   const all = await reminderResources(c);
-  const resolver = requestResolver(c, getDb());
+  const resolver = requestResolver(c, appContext().db);
   const readable = all.filter((r) => resolver.can('vehicle.reminder.read', r).allow);
   return readable.length > 0 ? readable : all.slice(0, 1);
 };
 
 function visibleVehicleIds(c: Context, vehicleIds: readonly string[]): string[] {
-  const resolver = requestResolver(c, getDb());
+  const resolver = requestResolver(c, appContext().db);
   return vehicleIds.filter(
     (vehicleId) => resolver.can('vehicle.reminder.read', vehicleResource(vehicleId)).allow
   );
@@ -406,7 +405,7 @@ routes.get(
     const { id } = c.req.valid('param');
     const existing = await repos().reminders.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
-    const resolver = requestResolver(c, getDb());
+    const resolver = requestResolver(c, appContext().db);
     const materialized = await repos().expenses.findBySource(
       'reminder',
       id,

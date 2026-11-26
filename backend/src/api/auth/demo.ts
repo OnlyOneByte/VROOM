@@ -3,7 +3,6 @@ import type { Context } from 'hono';
 import { generateIdFromEntropySize } from 'lucia';
 import { appContext } from '../../app-context';
 import { CONFIG } from '../../config';
-import { getDb } from '../../db/connection';
 import { sessions, users } from '../../db/schema';
 import { seedGarage } from '../../db/seed';
 import { assignServerRole } from '../../permissions/grants';
@@ -24,7 +23,7 @@ export function isDemoAvailable(): boolean {
 }
 
 export async function prepareDemoGarage(): Promise<void> {
-  const db = getDb();
+  const db = appContext().db;
   demoReady = false;
   await db.delete(users).where(eq(users.id, DEMO_USER_ID));
   if (!CONFIG.demo.enabled) return;
@@ -51,8 +50,8 @@ export async function prepareDemoGarage(): Promise<void> {
 
 export async function startDemoSession(c: Context): Promise<Date> {
   const now = Date.now();
-  await getDb()
-    .delete(sessions)
+  await appContext()
+    .db.delete(sessions)
     .where(and(eq(sessions.userId, DEMO_USER_ID), lte(sessions.expiresAt, Math.floor(now / 1000))));
   const sessionId = `${DEMO_SESSION_PREFIX}${now}_${generateIdFromEntropySize(25)}`;
   await appContext().lucia.createSession(DEMO_USER_ID, {}, { sessionId });

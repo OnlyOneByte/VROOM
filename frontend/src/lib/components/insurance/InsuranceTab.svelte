@@ -3,15 +3,14 @@
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
-	import { Shield, Plus, LoaderCircle, CircleAlert } from '@lucide/svelte';
+	import { Shield, Plus } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import PolicyList from './PolicyList.svelte';
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
-	import {
-		handleErrorWithNotification,
-		userFacingErrorMessage
-	} from '#lib/utils/error-handling.ts';
+	import { logLoadFailure, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import type { InsurancePolicy } from '#lib/types/index.ts';
 
 	interface Props {
@@ -36,7 +35,7 @@
 			policies = await insuranceApi.getPoliciesForVehicle(vehicleId);
 		} catch (err) {
 			error = userFacingErrorMessage(err);
-			handleErrorWithNotification(err, "Couldn't load insurance policies");
+			logLoadFailure(err, "Couldn't load insurance policies");
 		} finally {
 			isLoading = false;
 		}
@@ -57,23 +56,16 @@
 </script>
 
 {#if isLoading}
-	<div class="flex items-center justify-center py-12">
-		<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
+	<div class="space-y-3" aria-hidden="true" data-testid="insurance-tab-loading">
+		<Skeleton class="h-5 w-40" />
+		<Skeleton class="h-32 w-full" />
 	</div>
 {:else if error}
-	<div class="rounded-lg border border-destructive bg-destructive/10 p-4">
-		<div class="flex items-center gap-2 text-sm text-destructive">
-			<CircleAlert class="h-4 w-4 shrink-0" />
-			<span>{error}</span>
-		</div>
-		<Button variant="outline" size="sm" class="mt-3" onclick={loadData}>Retry</Button>
-	</div>
+	<LoadErrorCard title="Couldn't load this car's insurance" message={error} onRetry={loadData} />
 {:else if policies.length === 0}
-	<EmptyState>
+	<EmptyState level={2}>
 		{#snippet icon()}
-			<div class="mb-4 rounded-full bg-muted p-4">
-				<Shield class="h-8 w-8 text-muted-foreground" />
-			</div>
+			<Shield class="mb-4 h-12 w-12 text-muted-foreground" />
 		{/snippet}
 		{#snippet title()}No insurance policies{/snippet}
 		{#snippet description()}
@@ -94,10 +86,10 @@
 	</EmptyState>
 {:else}
 	<div class="space-y-4">
-		<div class="flex items-center justify-between">
+		<div class="flex items-center justify-between gap-3">
 			<h2 class="text-lg font-semibold text-foreground">Insurance Policies</h2>
 			{#if !readOnly}
-				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={handleAddPolicy}>
+				<Button variant="outline" onclick={handleAddPolicy}>
 					<Plus class="mr-2 h-4 w-4" />
 					Add Policy
 				</Button>

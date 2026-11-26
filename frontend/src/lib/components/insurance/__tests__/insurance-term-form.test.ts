@@ -150,15 +150,15 @@ describe('InsuranceTermForm amount inputs follow the currency', () => {
 });
 
 describe('InsuranceTermForm add mode', () => {
-	test('the save bar is fixed below lg and a normal row from lg or on a short viewport, with a plain primary Save button', async () => {
+	test('Save and Cancel sit in a sticky bar on phones and a plain row from lg, with a plain Save Term', async () => {
 		await mount();
 		const save = screen.getByRole('button', { name: /Save Term/ });
-		const bar = save.closest('.fixed');
-		expect(bar).toHaveClass('lg:static', 'short:static');
+		expect(save.closest('.fixed')).toBeNull();
 		expect(save.closest('form')).toBeNull();
-		expect(document.querySelector('form')).toHaveClass('lg:pb-0', 'short:pb-0');
-		expect(save).toHaveClass('shadow-sm', 'transition-colors');
-		expect(save.className).not.toMatch(/shadow-2xl|bg-foreground|hover:scale/);
+		const bar = save.closest('[data-slot="form-action-bar"]');
+		expect(bar).toHaveClass('sticky', 'bottom-0', 'border-t', 'lg:static', 'short:static');
+		expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+		expect(save.className).not.toMatch(/shadow-lg|shadow-2xl|hover:scale/);
 	});
 
 	test('shows the add title with the policy company and empty fields', async () => {
@@ -403,11 +403,12 @@ describe('InsuranceTermForm add mode', () => {
 		expect(screen.queryByText("Couldn't load this policy")).toBeNull();
 	});
 
-	test('shows a spinner while the policy loads', async () => {
+	test('keeps the header and shows field skeletons while the policy loads', async () => {
 		getPolicy.mockReturnValue(new Promise(() => {}));
-		const { container } = await mount();
-		expect(container.querySelector('.animate-spin')).not.toBeNull();
-		expect(screen.queryByRole('heading')).toBeNull();
+		await mount();
+		expect(screen.getByRole('status', { name: 'Loading policy' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+		expect(screen.queryByLabelText(/Start Date/)).toBeNull();
 	});
 });
 

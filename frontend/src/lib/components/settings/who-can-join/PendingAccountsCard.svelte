@@ -137,7 +137,7 @@
 							<div class="flex w-full justify-end gap-2 sm:w-auto">
 								<Button
 									variant="ghost"
-									class="h-10 text-destructive sm:h-9"
+									class="h-10 text-destructive"
 									disabled={busyId !== null}
 									onclick={() => askReject(account)}
 									aria-label="Reject {account.email}"
@@ -146,7 +146,7 @@
 								</Button>
 								<Button
 									variant="outline"
-									class="h-10 sm:h-9"
+									class="h-10"
 									data-approve
 									aria-busy={busyId === account.id}
 									disabled={busyId !== null && busyId !== account.id}

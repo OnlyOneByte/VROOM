@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { appContext } from '../../app-context';
-import { getDb } from '../../db/connection';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, vehicleParam } from '../../permissions/authorize';
@@ -31,7 +30,7 @@ const updateSchema = z.strictObject({
 });
 
 function requireCarShare(vehicleId: string): void {
-  if (!carShareEnabled(getDb(), vehicleId)) throw new NotFoundError('Car sharing');
+  if (!carShareEnabled(appContext().db, vehicleId)) throw new NotFoundError('Car sharing');
 }
 
 export const driverRoutes = new Hono();
@@ -45,7 +44,7 @@ driverRoutes.get(
   (c) => {
     const { vehicleId } = c.req.valid('param');
     requireCarShare(vehicleId);
-    return c.json({ success: true, data: listDrivers(getDb(), vehicleId) });
+    return c.json({ success: true, data: listDrivers(appContext().db, vehicleId) });
   }
 );
 
@@ -96,8 +95,8 @@ driverRoutes.post(
   (c) => {
     const { vehicleId } = c.req.valid('param');
     requireCarShare(vehicleId);
-    const id = addGuestDriver(getDb(), vehicleId, c.req.valid('json'), c.get('user').id);
-    const created = listDrivers(getDb(), vehicleId).find((d) => d.id === id);
+    const id = addGuestDriver(appContext().db, vehicleId, c.req.valid('json'), c.get('user').id);
+    const created = listDrivers(appContext().db, vehicleId).find((d) => d.id === id);
     return c.json({ success: true, data: created }, 201);
   }
 );
@@ -110,7 +109,7 @@ driverRoutes.patch(
   (c) => {
     const { vehicleId, driverId } = c.req.valid('param');
     requireCarShare(vehicleId);
-    const driver = findDriver(getDb(), vehicleId, driverId);
+    const driver = findDriver(appContext().db, vehicleId, driverId);
     if (!driver) throw new NotFoundError('Driver');
     const { name: newName, color: newColor, archived } = c.req.valid('json');
     if (driver.userId && (newName !== undefined || archived !== undefined)) {
@@ -118,12 +117,12 @@ driverRoutes.patch(
         "A member's name and access follow their account and share, so only the colour can change"
       );
     }
-    updateDriver(getDb(), driverId, {
+    updateDriver(appContext().db, driverId, {
       ...(newName !== undefined && { name: newName }),
       ...(newColor !== undefined && { color: newColor }),
       ...(archived !== undefined && { archivedAt: archived ? new Date() : null }),
     });
-    const updated = listDrivers(getDb(), vehicleId).find((d) => d.id === driverId);
+    const updated = listDrivers(appContext().db, vehicleId).find((d) => d.id === driverId);
     return c.json({ success: true, data: updated });
   }
 );
@@ -140,10 +139,10 @@ carShareRoutes.put(
   (c) => {
     const { vehicleId } = c.req.valid('param');
     const { enabled } = c.req.valid('json');
-    setCarShare(getDb(), vehicleId, enabled);
+    setCarShare(appContext().db, vehicleId, enabled);
     return c.json({
       success: true,
-      data: { enabled, drivers: enabled ? listDrivers(getDb(), vehicleId) : [] },
+      data: { enabled, drivers: enabled ? listDrivers(appContext().db, vehicleId) : [] },
     });
   }
 );

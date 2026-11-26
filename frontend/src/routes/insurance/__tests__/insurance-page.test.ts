@@ -98,12 +98,13 @@ afterEach(() => {
 });
 
 describe('insurance page loading and errors', () => {
-	test('shows skeletons and no header while data loads', async () => {
+	test('keeps the header and shows skeletons, with no Add Policy, while data loads', async () => {
 		getAllPolicies.mockReturnValue(new Promise(() => {}));
 		await mount();
 
 		expect(document.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
-		expect(screen.queryByRole('heading', { name: 'Insurance' })).toBeNull();
+		expect(screen.getByRole('heading', { name: 'Insurance' })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Add Policy' })).toBeNull();
 	});
 
 	test('a load failure shows one inline error with no toast, and Retry recovers', async () => {
@@ -176,6 +177,18 @@ describe('insurance page with policies', () => {
 		expect(props?.vehicles.map(v => v.id)).toEqual(['v1', 'v2']);
 		expect(props?.vehicleNameMap.get('v1')).toBe('2021 Honda Civic');
 		expect(props?.vehicleNameMap.get('v2')).toBe('Beater');
+	});
+
+	test('the header counts policies in force and inactive ones', async () => {
+		const { makeTerm } = await import('#lib/components/insurance/__tests__/insurance-fixtures.ts');
+		const terms = [makeTerm({ endDate: '2099-01-01' })];
+		getAllPolicies.mockResolvedValue([
+			policy({ terms }),
+			policy({ id: 'p2', isActive: false, terms }),
+			policy({ id: 'p3', terms })
+		]);
+		await mount();
+		expect(screen.getByText('2 in force · 1 inactive')).toBeInTheDocument();
 	});
 
 	test('editing a policy navigates to its edit page', async () => {

@@ -116,6 +116,9 @@ describe('/reminders error copy', () => {
 		api.update.mockImplementation(failure);
 		render(Page);
 
+		await fireEvent.click(
+			await screen.findByRole('button', { name: 'More actions for Oil change' })
+		);
 		await fireEvent.click(await screen.findByRole('button', { name: 'Pause' }));
 		await expectToast("Couldn't pause the reminder.");
 	});
@@ -132,7 +135,7 @@ describe('/reminders error copy', () => {
 		api.markServiced.mockImplementation(failure);
 		render(Page);
 
-		await fireEvent.click(await screen.findByRole('button', { name: 'Mark Serviced' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Mark serviced' }));
 		await expectToast("Couldn't mark the reminder as serviced.");
 	});
 
@@ -140,7 +143,10 @@ describe('/reminders error copy', () => {
 		api.delete.mockImplementation(failure);
 		render(Page);
 
-		await fireEvent.click(await screen.findByRole('button', { name: 'Delete reminder' }));
+		await fireEvent.click(
+			await screen.findByRole('button', { name: 'More actions for Oil change' })
+		);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
 		const dialog = await screen.findByRole('alertdialog');
 		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 		await expectToast("Couldn't delete the reminder.");

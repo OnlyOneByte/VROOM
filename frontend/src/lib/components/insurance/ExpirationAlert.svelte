@@ -16,12 +16,9 @@
 </script>
 
 {#if daysRemaining < 0}
-	<Badge variant="outline" class="text-destructive border-destructive">Expired</Badge>
+	<Badge variant="due">Expired</Badge>
 {:else if daysRemaining <= EXPIRING_SOON_DAYS}
-	<Badge
-		variant="outline"
-		class={isUrgent ? 'text-destructive border-destructive' : 'text-warning border-warning'}
-	>
+	<Badge variant={isUrgent ? 'due' : 'soon'}>
 		{#if daysRemaining === 0}
 			Expires today
 		{:else if daysRemaining === 1}

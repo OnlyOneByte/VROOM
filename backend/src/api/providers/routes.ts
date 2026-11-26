@@ -2,9 +2,9 @@ import { createId } from '@paralleldrive/cuid2';
 import { and, eq, inArray, notExists, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { repos } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
-import { getDb } from '../../db/connection';
+import type { AppDatabase } from '../../db/connection';
 import { countNum } from '../../db/dialect';
 import { photoRefs, photos, type UserProvider, userProviders } from '../../db/schema';
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../errors';
@@ -50,9 +50,7 @@ function isPhotoCategory(value: string): value is PhotoCategory {
 
 const routes = new Hono();
 
-type DbInstance =
-  | ReturnType<typeof getDb>
-  | Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0];
+type DbInstance = AppDatabase | Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
 
 // Another user's provider must look missing, so ids cannot be probed.
 async function findOwnedProviderOrThrow(
@@ -187,7 +185,7 @@ routes.get('/', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const domain = c.req.query('domain');
 
-  const db = getDb();
+  const db = appContext().db;
 
   const baseCondition = eq(userProviders.userId, user.id);
   const rows = await db
@@ -262,7 +260,7 @@ routes.post('/', zValidator('json', createProviderSchema), authorize(ownAccount)
   const user = c.get('user');
   const body = c.req.valid('json');
 
-  const db = getDb();
+  const db = appContext().db;
 
   if (body.domain === 'auth') {
     throw new ValidationError('Auth providers cannot be created through this endpoint');
@@ -368,7 +366,7 @@ routes.put(
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
 
-    const db = getDb();
+    const db = appContext().db;
 
     const existing = await findOwnedProviderOrThrow(db, id, user.id);
 
@@ -500,7 +498,7 @@ routes.delete(
     const { id } = c.req.valid('param');
     const force = c.req.valid('query').force === 'true';
 
-    const db = getDb();
+    const db = appContext().db;
 
     const existing = await findOwnedProviderOrThrow(db, id, user.id);
 
@@ -546,7 +544,7 @@ routes.post(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const db = getDb();
+    const db = appContext().db;
 
     const existing = await findOwnedProviderOrThrow(db, id, user.id);
     if (existing.domain === 'auth') {
@@ -576,7 +574,7 @@ routes.post(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const db = getDb();
+    const db = appContext().db;
 
     await findOwnedProviderOrThrow(db, id, user.id);
     await repos().photoRefs.resetFailedForProvider(id);
@@ -638,7 +636,7 @@ routes.get(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const db = getDb();
+    const db = appContext().db;
 
     await findOwnedProviderOrThrow(db, id, user.id);
 

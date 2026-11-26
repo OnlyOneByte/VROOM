@@ -261,7 +261,7 @@
 						{suggestion.model.name}?
 					</p>
 					<div class="flex flex-wrap gap-2">
-						<Button size="sm" class="h-10 sm:h-8" onclick={confirmModel} disabled={confirming}>
+						<Button size="sm" class="h-10" onclick={confirmModel} disabled={confirming}>
 							{#if confirming}
 								<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 							{/if}
@@ -270,7 +270,7 @@
 						<Button
 							size="sm"
 							variant="outline"
-							class="h-10 sm:h-8"
+							class="h-10"
 							onclick={dismissModel}
 							disabled={confirming}
 						>

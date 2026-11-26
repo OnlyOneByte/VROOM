@@ -5,7 +5,12 @@
 	import MediaCaptureDialog from '#lib/components/common/MediaCaptureDialog.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
-	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
+	import {
+		handleErrorWithNotification,
+		logLoadFailure,
+		userFacingErrorMessage
+	} from '#lib/utils/error-handling.ts';
 	import type { Photo } from '#lib/types/index.ts';
 
 	const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -19,6 +24,8 @@
 		compact?: boolean;
 		count?: number | null;
 		uploadOpen?: boolean;
+		loadError?: string | null;
+		inlineError?: boolean;
 	}
 
 	let {
@@ -28,37 +35,39 @@
 		level = 4,
 		compact = false,
 		count = $bindable(null),
-		uploadOpen = $bindable(false)
+		uploadOpen = $bindable(false),
+		loadError = $bindable(null),
+		inlineError = true
 	}: Props = $props();
 
 	let documents = $state<Photo[]>([]);
 	let isLoading = $state(true);
-	let loadFailed = $state(false);
 
 	$effect(() => {
-		count = isLoading || loadFailed ? null : documents.length;
+		count = isLoading || loadError ? null : documents.length;
 	});
 
 	onMount(async () => {
 		await loadDocuments();
 	});
 
+	export function reload() {
+		return loadDocuments();
+	}
+
 	async function loadDocuments() {
 		isLoading = true;
 		try {
 			const docsResult = await insuranceApi.getEntityDocuments(entityType, entityId);
 			documents = docsResult.data;
-			loadFailed = false;
+			loadError = null;
 		} catch (err) {
-			loadFailed = true;
-			handleErrorWithNotification(err, "Couldn't load the documents");
+			loadError = userFacingErrorMessage(err);
+			if (compact) logLoadFailure(err, "Couldn't load the documents");
+			else handleErrorWithNotification(err, "Couldn't load the documents");
 		} finally {
 			isLoading = false;
 		}
-	}
-
-	function retryDocuments() {
-		if (!isLoading) loadDocuments();
 	}
 
 	function isImage(mimeType: string): boolean {
@@ -91,22 +100,17 @@
 </script>
 
 {#if compact}
-	{#if loadFailed}
-		<div class="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3">
-			<p class="text-xs text-destructive">Couldn't load the documents.</p>
-			<Button
-				variant="outline"
-				size="sm"
-				class="mt-2 h-10 sm:h-8"
-				aria-disabled={isLoading}
-				onclick={retryDocuments}
-			>
-				{#if isLoading}
-					<LoaderCircle class="animate-spin" />
-				{/if}
-				Retry
-			</Button>
-		</div>
+	{#if loadError}
+		{#if inlineError}
+			<div class="mt-3">
+				<LoadErrorCard
+					compact
+					title="Couldn't load the documents"
+					message={loadError}
+					onRetry={loadDocuments}
+				/>
+			</div>
+		{/if}
 	{:else if !isLoading && documents.length > 0}
 		<div class="mt-3 space-y-3">
 			<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground">
@@ -122,7 +126,7 @@
 				Documents
 			</svelte:element>
 			{#if !readOnly}
-				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={() => (uploadOpen = true)}>
+				<Button variant="outline" size="sm" class="h-10" onclick={() => (uploadOpen = true)}>
 					<Upload />
 					Upload
 				</Button>
@@ -147,7 +151,7 @@
 {#snippet documentGrid()}
 	<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
 		{#each documents as doc (doc.id)}
-			<div class="group relative overflow-hidden rounded-md border border-border bg-muted/50">
+			<div class="group relative overflow-hidden rounded-md border border-border bg-muted">
 				{#if isImage(doc.mimeType)}
 					<img
 						src={insuranceApi.getEntityDocumentThumbnailUrl(entityType, entityId, doc.id)}

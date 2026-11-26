@@ -1,6 +1,5 @@
 import type { Context } from 'hono';
-import { repos } from '../../app-context';
-import { getDb } from '../../db/connection';
+import { appContext, repos } from '../../app-context';
 import { NotFoundError } from '../../errors';
 import type { ResourceOf } from '../../permissions/authorize';
 import { requestResolver } from '../../permissions/grants';
@@ -39,6 +38,6 @@ export const fromPolicyReaders: ResourceOf = async (c) => {
   if (policy.userId === c.get('user').id || !first) {
     return { kind: 'account', userId: policy.userId };
   }
-  const resolver = requestResolver(c, getDb());
+  const resolver = requestResolver(c, appContext().db);
   return vehicles.find((resource) => resolver.can('vehicle.read', resource).allow) ?? first;
 };

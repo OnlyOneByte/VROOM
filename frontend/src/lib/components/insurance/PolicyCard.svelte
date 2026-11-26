@@ -20,6 +20,7 @@
 	import TermHistory from './TermHistory.svelte';
 	import DocumentViewer from './DocumentViewer.svelte';
 	import ClaimsSection from './ClaimsSection.svelte';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { getLatestTerm, isPolicyInForce } from '#lib/utils/insurance.ts';
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
 	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
@@ -53,6 +54,25 @@
 	let claimCount = $state<number | null>(null);
 	let uploadOpen = $state(false);
 	let claimFormOpen = $state(false);
+	let documentViewer = $state<ReturnType<typeof DocumentViewer>>();
+	let claimsSection = $state<ReturnType<typeof ClaimsSection>>();
+	let documentsError = $state<string | null>(null);
+	let claimsError = $state<string | null>(null);
+
+	let attachmentsErrorTitle = $derived(
+		documentsError && claimsError
+			? "Couldn't load the documents and claims"
+			: documentsError
+				? "Couldn't load the documents"
+				: "Couldn't load the claims"
+	);
+
+	function retryAttachments() {
+		return Promise.all([
+			documentsError ? documentViewer?.reload() : undefined,
+			claimsError ? claimsSection?.reload() : undefined
+		]);
+	}
 
 	let attachmentSummary = $derived(
 		[
@@ -89,15 +109,16 @@
 	}
 </script>
 
-<Card class={isPolicyInForce(policy) ? 'py-0' : 'bg-muted/30 py-0'}>
+<Card class="py-0" data-in-force={isPolicyInForce(policy)}>
 	<CardContent class="p-4">
 		<div class="flex items-center justify-between gap-2">
-			<div class="flex items-center gap-2.5 min-w-0">
-				<div class="flex-shrink-0 rounded-full bg-primary/10 p-2">
-					<Building2 class="h-4 w-4 text-primary" />
-				</div>
+			<div class="flex min-w-0 items-center gap-2.5">
+				<Building2 class="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
 				<div class="min-w-0">
-					<svelte:element this={`h${level}`} class="text-sm font-semibold text-foreground truncate">
+					<svelte:element
+						this={`h${level}`}
+						class="truncate text-base font-semibold text-foreground"
+					>
 						{policy.company}
 					</svelte:element>
 					{#if latestTerm?.policyNumber}
@@ -118,7 +139,7 @@
 					<Button
 						variant="ghost"
 						size="icon"
-						class="size-10 sm:size-9"
+						class="size-10"
 						onclick={() => onEdit(policy)}
 						title="Policy settings"
 						aria-label="Policy settings"
@@ -146,7 +167,7 @@
 				<Button
 					variant="ghost"
 					size="sm"
-					class="h-10 sm:h-8 text-muted-foreground"
+					class="h-10 text-muted-foreground"
 					aria-expanded={expanded}
 					onclick={() => (expanded = !expanded)}
 				>
@@ -190,28 +211,16 @@
 				</p>
 				{#if !readOnly}
 					<div class="flex flex-wrap items-center gap-2">
-						<Button
-							variant="outline"
-							size="sm"
-							class="h-10 sm:h-8"
-							onclick={() => (uploadOpen = true)}
-						>
+						<Button variant="outline" size="sm" class="h-10" onclick={() => (uploadOpen = true)}>
 							<Upload />
 							Upload
 						</Button>
-						{#if !claimFormOpen}
-							<Button
-								variant="outline"
-								size="sm"
-								class="h-10 sm:h-8"
-								onclick={() => (claimFormOpen = true)}
-							>
-								<Plus />
-								File Claim
-							</Button>
-						{/if}
+						<Button variant="outline" size="sm" class="h-10" onclick={() => (claimFormOpen = true)}>
+							<Plus />
+							File Claim
+						</Button>
 						{#if latestTerm}
-							<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={handleRenew}>
+							<Button variant="outline" size="sm" class="h-10" onclick={handleRenew}>
 								<RefreshCw />
 								Renew
 							</Button>
@@ -220,17 +229,32 @@
 				{/if}
 			</div>
 
+			{#if documentsError || claimsError}
+				<div class="mt-3">
+					<LoadErrorCard
+						compact
+						title={attachmentsErrorTitle}
+						message={documentsError ?? claimsError ?? ''}
+						onRetry={retryAttachments}
+					/>
+				</div>
+			{/if}
+
 			{#if !readOnly}
 				<DocumentViewer
+					bind:this={documentViewer}
 					entityType="insurance_policy"
 					entityId={policy.id}
 					level={childLevel}
 					compact
 					bind:count={documentCount}
 					bind:uploadOpen
+					bind:loadError={documentsError}
+					inlineError={false}
 				/>
 			{/if}
 			<ClaimsSection
+				bind:this={claimsSection}
 				policyId={policy.id}
 				{vehicles}
 				{readOnly}
@@ -238,6 +262,8 @@
 				compact
 				bind:count={claimCount}
 				bind:formOpen={claimFormOpen}
+				bind:loadError={claimsError}
+				inlineError={false}
 			/>
 		</div>
 	</CardContent>

@@ -1,8 +1,8 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { appContext } from '../../app-context';
 import { CONFIG } from '../../config';
-import { getDb } from '../../db/connection';
 import { type serverInvites, users } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
@@ -60,8 +60,8 @@ function inviteView(invite: typeof serverInvites.$inferSelect, now: Date) {
 }
 
 function pendingUser(id: string) {
-  const user = getDb()
-    .select({ id: users.id, email: users.email })
+  const user = appContext()
+    .db.select({ id: users.id, email: users.email })
     .from(users)
     .where(and(eq(users.id, id), isNotNull(users.pendingApprovalAt)))
     .get();
@@ -74,11 +74,11 @@ signupRoutes.use('*', requireAuth);
 signupRoutes.use('*', changeTracker);
 
 signupRoutes.get('/signup', authorize(SERVER), (c) =>
-  c.json({ success: true, data: signupSettings(getDb()) })
+  c.json({ success: true, data: signupSettings(appContext().db) })
 );
 
 signupRoutes.put('/signup', authorize(SERVER), zValidator('json', settingsSchema), (c) => {
-  const settings = updateSignupSettings(getDb(), c.req.valid('json'), c.get('user').id);
+  const settings = updateSignupSettings(appContext().db, c.req.valid('json'), c.get('user').id);
   return c.json({ success: true, data: settings });
 });
 
@@ -86,7 +86,7 @@ signupRoutes.get('/invites', authorize(SERVER), (c) => {
   const now = new Date();
   return c.json({
     success: true,
-    data: listInvites(getDb()).map((invite) => inviteView(invite, now)),
+    data: listInvites(appContext().db).map((invite) => inviteView(invite, now)),
   });
 });
 
@@ -94,7 +94,7 @@ signupRoutes.post('/invites', authorize(SERVER), zValidator('json', inviteSchema
   const { email, expiresInDays } = c.req.valid('json');
   const now = new Date();
   const invite = createInvite(
-    getDb(),
+    appContext().db,
     {
       email,
       expiresInDays: expiresInDays ?? CONFIG.signup.inviteTtlDays,
@@ -111,7 +111,7 @@ signupRoutes.delete(
   zValidator('param', commonSchemas.idParam),
   (c) => {
     const now = new Date();
-    const invite = revokeInvite(getDb(), c.req.valid('param').id, now);
+    const invite = revokeInvite(appContext().db, c.req.valid('param').id, now);
     return c.json({ success: true, data: inviteView(invite, now) });
   }
 );
@@ -119,7 +119,7 @@ signupRoutes.delete(
 signupRoutes.get('/pending-accounts', authorize(SERVER), (c) =>
   c.json({
     success: true,
-    data: pendingAccounts(getDb()).map((account) => ({
+    data: pendingAccounts(appContext().db).map((account) => ({
       ...account,
       pendingSince: account.pendingSince?.toISOString() ?? null,
     })),
@@ -132,7 +132,7 @@ signupRoutes.post(
   zValidator('param', commonSchemas.idParam),
   (c) => {
     const { id, email } = pendingUser(c.req.valid('param').id);
-    getDb().transaction((tx) => {
+    appContext().db.transaction((tx) => {
       tx.update(users)
         .set({ pendingApprovalAt: null, updatedAt: new Date() })
         .where(eq(users.id, id))
@@ -150,8 +150,8 @@ signupRoutes.delete(
   zValidator('param', commonSchemas.idParam),
   (c) => {
     const { id } = pendingUser(c.req.valid('param').id);
-    getDb()
-      .delete(users)
+    appContext()
+      .db.delete(users)
       .where(and(eq(users.id, id), isNotNull(users.pendingApprovalAt)))
       .run();
     return c.json({ success: true, data: { id } });

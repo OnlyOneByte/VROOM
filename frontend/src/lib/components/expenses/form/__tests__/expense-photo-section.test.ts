@@ -98,11 +98,13 @@ describe('ExpensePhotoSection: loading', () => {
 		expect(screen.queryByAltText('receipt.pdf')).toBeNull();
 	});
 
-	test('each photo delete button is 40px square below sm and keeps its 28px-tall size from sm up', async () => {
+	test('each photo delete button is 40px square at every width', async () => {
 		mocks.getPhotos.mockResolvedValue(page([photo('p1')]));
 		mount();
 		await screen.findByAltText('p1.jpg');
-		expect(deleteButtons()[0]).toHaveClass('size-10', 'sm:h-7', 'sm:w-auto');
+		const button = deleteButtons()[0];
+		expect(button).toHaveClass('size-10');
+		expect(button?.className).not.toMatch(/\b(?:sm|md):(?:h|w|size)-/);
 	});
 
 	test('a failed load notifies the user and falls back to the empty state', async () => {

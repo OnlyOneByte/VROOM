@@ -172,7 +172,7 @@
 				<Button
 					variant="ghost"
 					size="icon"
-					class="size-10 sm:size-8"
+					class="size-10"
 					aria-label="Edit {provider.displayName}"
 					onclick={() => onEdit(provider)}
 				>
@@ -181,7 +181,7 @@
 				<Button
 					variant="ghost"
 					size="icon"
-					class="size-10 sm:size-8"
+					class="size-10"
 					aria-label="Delete {provider.displayName}"
 					onclick={() => onDelete(provider)}
 				>
@@ -190,7 +190,7 @@
 				<Button
 					variant="ghost"
 					size="icon"
-					class="size-10 sm:size-8"
+					class="size-10"
 					aria-label={expanded ? 'Collapse provider details' : 'Expand provider details'}
 					aria-expanded={expanded}
 					onclick={() => (expanded = !expanded)}
@@ -267,7 +267,7 @@
 							<Button
 								variant="outline"
 								size="sm"
-								class="h-10 sm:h-8"
+								class="h-10"
 								onclick={resumeSheetsBackups}
 								disabled={isResuming}
 							>
@@ -316,7 +316,7 @@
 					<Button
 						variant="outline"
 						size="sm"
-						class="h-10 sm:h-8"
+						class="h-10"
 						onclick={handleBackfill}
 						disabled={isBackfilling}
 					>

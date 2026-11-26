@@ -1,5 +1,5 @@
 import type { Context, MiddlewareHandler } from 'hono';
-import { getDb } from '../db/connection';
+import { appContext } from '../app-context';
 import { ForbiddenError, NotFoundError } from '../errors';
 import { requestResolver } from './grants';
 import type { Decision, Resource } from './resolve';
@@ -18,7 +18,7 @@ function labelOf(resource: Resource): string {
 }
 
 export function requireCan(c: Context, permission: string, resource: Resource): void {
-  enforce(requestResolver(c, getDb()).can(permission, resource), labelOf(resource));
+  enforce(requestResolver(c, appContext().db).can(permission, resource), labelOf(resource));
 }
 
 function requiredFor(rule: RouteRule, resource: Resource, entityType: string | undefined) {

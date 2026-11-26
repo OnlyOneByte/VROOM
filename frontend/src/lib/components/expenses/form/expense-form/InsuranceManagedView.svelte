@@ -93,11 +93,11 @@
 	{/if}
 
 	<div class="flex justify-center gap-3">
-		<Button variant="outline" class="h-10 sm:h-9" onclick={onBack}>
+		<Button variant="outline" class="h-10" onclick={onBack}>
 			<ArrowLeft class="mr-2 h-4 w-4" />
 			Back to Expenses
 		</Button>
-		<Button variant="outline" class="h-10 sm:h-9" onclick={onForceDelete} disabled={isDeleting}>
+		<Button variant="outline" class="h-10" onclick={onForceDelete} disabled={isDeleting}>
 			<Trash2 class="mr-2 h-4 w-4 text-destructive" />
 			Force Delete
 		</Button>

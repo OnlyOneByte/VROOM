@@ -119,13 +119,15 @@ describe('InsurancePolicyForm create mode', () => {
 		expect(screen.getByRole('heading', { level: 3, name: 'Policy Details' })).toBeInTheDocument();
 	});
 
-	test('the save bar is fixed below lg and a normal row from lg or on a short viewport, with a plain primary Save button', async () => {
+	test('Save and Cancel sit in a sticky bar on phones and a plain row from lg, with a plain Create Policy', async () => {
 		await mount();
 		const save = screen.getByRole('button', { name: 'Create Policy' });
 
-		expect(save.closest('.fixed')).toHaveClass('lg:static', 'short:static');
-		expect(save).toHaveClass('shadow-sm', 'transition-colors');
-		expect(save.className).not.toMatch(/shadow-2xl|bg-foreground|hover:scale/);
+		expect(save.closest('.fixed')).toBeNull();
+		const bar = save.closest('[data-slot="form-action-bar"]');
+		expect(bar).toHaveClass('sticky', 'bottom-0', 'border-t', 'lg:static', 'short:static');
+		expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+		expect(save.className).not.toMatch(/shadow-lg|shadow-2xl|hover:scale/);
 	});
 
 	test('with no vehicles, shows the Add Vehicle empty state instead of the form', async () => {
@@ -344,11 +346,12 @@ describe('InsurancePolicyForm create mode', () => {
 		expect(screen.getByLabelText(/Insurance Company/)).toBeInTheDocument();
 	});
 
-	test('shows a spinner until vehicles load', async () => {
+	test('keeps the header and shows field skeletons until vehicles load', async () => {
 		getVehicles.mockReturnValue(new Promise(() => {}));
-		const { container } = await mount();
-		expect(container.querySelector('.animate-spin')).not.toBeNull();
-		expect(screen.queryByRole('heading')).toBeNull();
+		await mount();
+		expect(screen.getByRole('status', { name: 'Loading vehicles' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+		expect(screen.queryByLabelText(/Insurance Company/)).toBeNull();
 	});
 });
 

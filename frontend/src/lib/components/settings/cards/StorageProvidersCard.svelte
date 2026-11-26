@@ -316,7 +316,7 @@
 					<p class="font-medium">Couldn't load your storage providers</p>
 				</div>
 				<p class="mb-3 text-sm text-muted-foreground">{error}</p>
-				<Button class="h-10 sm:h-9" onclick={retryLoad}>Retry</Button>
+				<Button class="h-10" onclick={retryLoad}>Retry</Button>
 			</div>
 		{:else}
 			<div class="space-y-4">
@@ -377,7 +377,7 @@
 
 				<div class="flex flex-col sm:flex-row gap-2">
 					{#if backupProviderCount > 0}
-						<Button variant="outline" onclick={() => onBackupNow?.()} class="h-10 sm:h-9 sm:flex-1">
+						<Button variant="outline" onclick={() => onBackupNow?.()} class="h-10 sm:flex-1">
 							<RefreshCw class="mr-2 h-4 w-4" />
 							Back Up Now
 						</Button>
@@ -386,7 +386,7 @@
 						variant="outline"
 						onclick={() => onDownloadBackup?.()}
 						disabled={isBackingUp}
-						class="h-10 sm:h-9 sm:flex-1"
+						class="h-10 sm:flex-1"
 					>
 						{#if isBackingUp}
 							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
@@ -396,7 +396,7 @@
 							Download Backup
 						{/if}
 					</Button>
-					<Button variant="outline" onclick={() => onRestore?.()} class="h-10 sm:h-9 sm:flex-1">
+					<Button variant="outline" onclick={() => onRestore?.()} class="h-10 sm:flex-1">
 						<Upload class="mr-2 h-4 w-4" />
 						Restore
 					</Button>
@@ -419,7 +419,7 @@
 					</p>
 					<Button
 						variant="outline"
-						class="h-10 shrink-0 sm:h-9"
+						class="h-10 shrink-0"
 						onclick={() => (orphanConfirmOpen = true)}
 					>
 						{orphanCount === 1 ? 'Remove it' : 'Remove them'}
@@ -439,7 +439,7 @@
 					<Button
 						variant="outline"
 						size="sm"
-						class="h-10 sm:h-8"
+						class="h-10"
 						onclick={() => goto(resolve(routes.settingsProviderNew))}
 					>
 						<Plus class="h-4 w-4 mr-1" />

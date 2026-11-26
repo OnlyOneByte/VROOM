@@ -13,40 +13,7 @@ const PATTERNS: Record<string, RegExp> = {
     /^(?:export )?(?:const|let) \w+(?:\s*:[^=\n]+)?\s*=\s*new \w+Repository\(/gm,
 };
 
-const BASELINE: Record<string, number> = {
-  'api/auth/demo.ts · getDb()': 2,
-  'api/auth/routes.ts · getDb()': 9,
-  'api/calendar/feed-events.ts · getDb()': 7,
-  'api/calendar/routes.ts · getDb()': 6,
-  'api/drivers/attribution.ts · getDb()': 5,
-  'api/drivers/routes.ts · getDb()': 9,
-  'api/financing/hooks.ts · getDb()': 1,
-  'api/insurance/access.ts · getDb()': 1,
-  'api/insurance/routes.ts · getDb()': 2,
-  'api/odometer/routes.ts · getDb()': 1,
-  'api/photos/receipt-drafts-route.ts · getDb()': 1,
-  'api/providers/domains/llm/tools.ts · getDb()': 1,
-  'api/providers/domains/storage/registry.ts · getDb()': 1,
-  'api/providers/provider-status.ts · getDb()': 2,
-  'api/providers/resolve.ts · getDb()': 2,
-  'api/providers/routes.ts · getDb()': 7,
-  'api/providers/services/google-sheets-service.ts · getDb()': 2,
-  'api/reminders/routes.ts · getDb()': 3,
-  'api/roles/routes.ts · getDb()': 20,
-  'api/settings/routes.ts · getDb()': 2,
-  'api/shares/routes.ts · getDb()': 9,
-  'api/signup/routes.ts · getDb()': 9,
-  'api/sync/activity-tracker.ts · getDb()': 1,
-  'api/sync/backup-orchestrator.ts · getDb()': 2,
-  'api/sync/backup.ts · getDb()': 5,
-  'api/sync/restore.ts · getDb()': 1,
-  'api/sync/routes.ts · getDb()': 3,
-  'api/trips/service.ts · getDb()': 3,
-  'api/vehicles/routes.ts · getDb()': 4,
-  'permissions/authorize.ts · getDb()': 1,
-  'utils/outbound-url.ts · getDb()': 3,
-  'utils/vehicle-access.ts · getDb()': 3,
-};
+const BASELINE: Record<string, number> = {};
 
 function productionSources(dir: string = SRC_ROOT): string[] {
   const out: string[] = [];

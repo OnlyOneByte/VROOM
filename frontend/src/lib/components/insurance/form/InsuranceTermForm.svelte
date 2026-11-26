@@ -1,14 +1,16 @@
 <script lang="ts">
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
 	import { addVehicleFirstTo } from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
+	import FormActionBar from '#lib/components/common/form-action-bar.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import { ArrowLeft, Check, LoaderCircle, X, FileText } from '@lucide/svelte';
+	import { ArrowLeft, LoaderCircle, FileText } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -260,46 +262,55 @@
 	}
 </script>
 
+{#snippet header()}
+	<PageHeader
+		variant="display"
+		title={pageTitle}
+		description={isLoading || loadError ? undefined : policy?.company}
+	>
+		{#snippet back()}
+			<Button
+				variant="outline"
+				size="icon-lg"
+				class="shrink-0 rounded-full"
+				aria-label="Go back"
+				onclick={handleBack}
+			>
+				<ArrowLeft class="size-5" />
+			</Button>
+		{/snippet}
+	</PageHeader>
+{/snippet}
+
 <FormLayout>
 	{#if isLoading}
-		<div class="flex items-center justify-center py-12">
-			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
+		<div class="space-y-8">
+			{@render header()}
+			<div
+				class="grid grid-cols-1 gap-x-5 gap-y-6 md:grid-cols-2"
+				role="status"
+				aria-label="Loading policy"
+				data-testid="term-form-loading"
+			>
+				{#each Array(4) as _, i (i)}
+					<div class="space-y-2">
+						<Skeleton class="h-4 w-24" />
+						<Skeleton class="h-11 w-full" />
+					</div>
+				{/each}
+			</div>
 		</div>
 	{:else if loadError}
-		<div class="space-y-6">
-			<PageHeader title={pageTitle}>
-				{#snippet back()}
-					<Button
-						variant="ghost"
-						size="icon-lg"
-						class="shrink-0"
-						aria-label="Go back"
-						onclick={handleBack}
-					>
-						<ArrowLeft class="size-5" />
-					</Button>
-				{/snippet}
-			</PageHeader>
+		<div class="space-y-8">
+			{@render header()}
 			<LoadErrorCard title="Couldn't load this policy" message={loadError} onRetry={loadData} />
 		</div>
 	{:else}
-		<div class="space-y-6">
-			<PageHeader title={pageTitle} description={policy?.company}>
-				{#snippet back()}
-					<Button
-						variant="ghost"
-						size="icon-lg"
-						class="shrink-0"
-						aria-label="Go back"
-						onclick={handleBack}
-					>
-						<ArrowLeft class="size-5" />
-					</Button>
-				{/snippet}
-			</PageHeader>
+		<div class="space-y-8">
+			{@render header()}
 
-			<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24 lg:pb-0 short:pb-0">
-				<Card>
+			<form onsubmit={handleSubmit} class="space-y-8">
+				<Card variant="section">
 					<CardHeader>
 						<CardTitle>Coverage Period</CardTitle>
 						<CardDescription>Start and end dates for this term</CardDescription>
@@ -338,7 +349,7 @@
 					</CardContent>
 				</Card>
 
-				<Card>
+				<Card variant="section">
 					<CardHeader>
 						<CardTitle>Finance Details</CardTitle>
 						<CardDescription>Cost and payment information for this term</CardDescription>
@@ -415,7 +426,7 @@
 					</CardContent>
 				</Card>
 
-				<Card>
+				<Card variant="section">
 					<CardHeader>
 						<CardTitle>Covered Vehicles</CardTitle>
 						<CardDescription>Select which vehicles this term covers</CardDescription>
@@ -460,7 +471,7 @@
 					</CardContent>
 				</Card>
 
-				<Card>
+				<Card variant="section">
 					<CardHeader>
 						<div class="flex items-center gap-2">
 							<FileText class="h-5 w-5 text-primary" />
@@ -535,41 +546,34 @@
 				</Card>
 			</form>
 
-			<div
-				class="fixed bottom-4 left-4 right-4 z-50 sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto lg:static lg:z-auto lg:mt-6 short:static short:z-auto short:mt-6"
-			>
-				<div
-					class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none border sm:border-0 short:bg-transparent short:p-0 short:rounded-none short:shadow-none short:border-0"
-				>
+			<FormActionBar>
+				<div class="ml-auto flex items-center gap-3">
 					<Button
 						type="button"
 						variant="outline"
 						size="lg"
 						onclick={handleBack}
 						disabled={isSubmitting}
-						class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
+						class="rounded-full"
 					>
-						<X class="h-5 w-5 sm:mr-2" />
-						<span class="max-sm:sr-only font-semibold">Cancel</span>
+						Cancel
 					</Button>
-
 					<Button
 						type="button"
 						size="lg"
 						onclick={handleSubmit}
 						disabled={isSubmitting}
-						class="rounded-full shadow-sm transition-colors h-14 px-6 flex-1 sm:flex-initial"
+						class="rounded-full"
 					>
 						{#if isSubmitting}
-							<LoaderCircle class="h-5 w-5 animate-spin mr-2" />
-							<span class="font-bold">Saving...</span>
+							<LoaderCircle class="size-4 animate-spin" />
+							Saving…
 						{:else}
-							<Check class="h-5 w-5 mr-2" />
-							<span class="font-bold">{isEditMode ? 'Update' : 'Save'} Term</span>
+							{isEditMode ? 'Update' : 'Save'} Term
 						{/if}
 					</Button>
 				</div>
-			</div>
+			</FormActionBar>
 		</div>
 	{/if}
 </FormLayout>

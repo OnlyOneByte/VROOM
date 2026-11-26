@@ -53,7 +53,7 @@
 	{#if sortedTerms.length === 0}
 		<p class="text-sm text-muted-foreground">No past terms.</p>
 	{:else}
-		<div class="space-y-2">
+		<div class="space-y-3">
 			{#each sortedTerms as t (t.id)}
 				<InsuranceTermCard
 					term={t}

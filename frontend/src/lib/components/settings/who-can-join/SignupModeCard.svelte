@@ -126,7 +126,7 @@
 			{:else}
 				<Button
 					variant="outline"
-					class="h-10 sm:h-9"
+					class="h-10"
 					disabled={!modeChanged || savingMode}
 					onclick={() => void saveMode()}
 				>
@@ -154,7 +154,7 @@
 					<Button
 						type="submit"
 						variant="outline"
-						class="h-10 shrink-0 sm:h-9"
+						class="h-10 shrink-0"
 						disabled={!domainsChanged}
 						aria-busy={savingDomains}
 					>

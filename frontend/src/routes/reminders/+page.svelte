@@ -1,34 +1,19 @@
 <script lang="ts">
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { onMount } from 'svelte';
-	import {
-		Bell,
-		BellRing,
-		Calendar,
-		RefreshCw,
-		Trash2,
-		Car,
-		Plus,
-		Pencil,
-		Check,
-		History,
-		Receipt
-	} from '@lucide/svelte';
+	import { Bell, BellRing, RefreshCw, Car, Plus, Check } from '@lucide/svelte';
 	import { reminderApi } from '#lib/services/reminder-api.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import type { ReminderNotification, ReminderWithVehicles, Vehicle } from '#lib/types/index.ts';
-	import { formatCurrency, formatDate, formatNumber } from '#lib/utils/formatters.ts';
+	import { formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
-	import {
-		isReminderTimeDue,
-		isMileageTracking as isMileageTrackingReminder,
-		frequencyLabel as reminderFrequencyLabel
-	} from '#lib/utils/reminder-helpers.ts';
+	import { isReminderTimeDue } from '#lib/utils/reminder-helpers.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import * as CardNs from '#lib/components/ui/card/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import ReminderRow, { type ReminderRowGroup } from '#lib/components/reminders/ReminderRow.svelte';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import NoVehiclesEmptyState, {
@@ -200,9 +185,20 @@
 		}
 	}
 
-	const frequencyLabel = (r: ReminderWithVehicles) => reminderFrequencyLabel(r.reminder);
-
-	const isMileageTracking = (r: ReminderWithVehicles) => isMileageTrackingReminder(r.reminder);
+	let headerDescription = $derived(
+		reminders.length === 0
+			? 'Recurring expenses and maintenance reminders'
+			: (
+					[
+						[dueReminders.length, 'due now'],
+						[upcomingReminders.length, 'coming up'],
+						[inactiveReminders.length, 'paused']
+					] as const
+				)
+					.filter(([count]) => count > 0)
+					.map(([count, label]) => `${formatNumber(count, 0)} ${label}`)
+					.join(', ')
+	);
 
 	onMount(load);
 </script>
@@ -212,8 +208,8 @@
 	<meta name="description" content="Recurring expenses and maintenance reminders" />
 </svelte:head>
 
-<div class="space-y-6">
-	<PageHeader title="Reminders" description="Recurring expenses and maintenance reminders">
+<div class="mx-auto max-w-5xl space-y-6">
+	<PageHeader variant="display" title="Reminders" description={headerDescription}>
 		{#snippet actions()}
 			{#if dueReminders.length > 0 && vehicles.length > 0}
 				<Button variant="outline" size="lg" onclick={runDueReminders} disabled={isTriggering}>
@@ -233,9 +229,13 @@
 	</PageHeader>
 
 	{#if isLoading}
-		<div class="space-y-3">
-			{#each Array(3) as _, i (i)}
-				<Skeleton class="h-24 w-full" />
+		<div class="grid gap-6 lg:grid-cols-2" aria-hidden="true">
+			{#each Array(2) as _, i (i)}
+				<div class="space-y-3">
+					<Skeleton class="h-5 w-24" />
+					<Skeleton class="h-14 w-full" />
+					<Skeleton class="h-14 w-full" />
+				</div>
 			{/each}
 		</div>
 	{:else if loadError}
@@ -247,7 +247,7 @@
 	{:else if reminders.length === 0}
 		<EmptyState>
 			{#snippet icon()}
-				<Bell class="h-12 w-12 text-muted-foreground mb-4" />
+				<Bell class="mb-4 h-12 w-12 text-muted-foreground" />
 			{/snippet}
 			{#snippet title()}
 				No reminders yet
@@ -264,116 +264,33 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
-		{#snippet reminderCard(item: ReminderWithVehicles, due: boolean)}
-			<CardNs.Card data-testid="reminder-card-{item.reminder.id}">
-				<CardNs.CardContent
-					class="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
-				>
-					<div class="flex items-start gap-3 min-w-0">
-						<div class="mt-0.5 {due ? 'text-warning' : 'text-muted-foreground'}">
-							{#if due}
-								<BellRing class="h-5 w-5" />
-							{:else}
-								<Bell class="h-5 w-5" />
-							{/if}
-						</div>
-						<div class="min-w-0">
-							<div class="flex items-center gap-2 flex-wrap">
-								<span class="font-semibold truncate">{item.reminder.name}</span>
-								{#if frequencyLabel(item)}
-									<Badge variant="secondary">{frequencyLabel(item)}</Badge>
-								{/if}
-								{#if item.reminder.type === 'expense'}
-									<Badge variant="outline">Expense</Badge>
-								{:else}
-									<Badge variant="outline">Notification</Badge>
-								{/if}
-								{#if !item.reminder.isActive}
-									<Badge variant="outline">Paused</Badge>
-								{/if}
-							</div>
-							{#if item.reminder.description}
-								<p class="text-sm text-muted-foreground mt-1 truncate">
-									{item.reminder.description}
-								</p>
-							{/if}
-							<div class="flex items-center gap-4 mt-2 text-sm text-muted-foreground flex-wrap">
-								<span class="inline-flex items-center gap-1">
-									<Calendar class="h-3.5 w-3.5" />
-									{#if item.reminder.nextDueDate !== null}
-										{due ? 'Due' : 'Next'}: {formatDate(item.reminder.nextDueDate)}
-									{:else if item.reminder.nextDueOdometer !== null}
-										Next: {formatNumber(item.reminder.nextDueOdometer, 0)} (odometer)
-									{/if}
-								</span>
-								{#if item.reminder.expenseAmount != null}
-									<span>{formatCurrency(item.reminder.expenseAmount)}</span>
-								{/if}
-								{#if item.vehicleIds && item.vehicleIds.length > 0}
-									<span class="inline-flex items-center gap-1">
-										<Car class="h-3.5 w-3.5" />
-										{item.vehicleIds.map(id => vehicleNames.get(id) ?? 'Vehicle').join(', ')}
-									</span>
-								{:else if !item.reminder.isActive}
-									<span class="inline-flex items-center gap-1">
-										<Car class="h-3.5 w-3.5" />
-										No vehicle. Edit to choose one, then resume.
-									</span>
-								{/if}
-							</div>
-						</div>
-					</div>
-					<div class="flex items-center gap-1 flex-shrink-0 flex-wrap sm:flex-nowrap">
-						{#if item.reminder.type === 'expense'}
-							<Button
-								variant="ghost"
-								size="sm"
-								onclick={() => openMaterialized(item)}
-								aria-label="View materialized expenses"
-								title="View the expenses this recurring reminder has created"
-							>
-								<Receipt class="h-4 w-4" />
-							</Button>
-						{/if}
-						{#if item.reminder.isActive && isMileageTracking(item)}
-							<Button
-								variant="outline"
-								size="sm"
-								onclick={() => markServiced(item)}
-								disabled={servicingId === item.reminder.id}
-							>
-								{#if servicingId === item.reminder.id}
-									<RefreshCw class="mr-1.5 h-3.5 w-3.5 animate-spin" />
-								{:else}
-									<Check class="mr-1.5 h-3.5 w-3.5" />
-								{/if}
-								Mark Serviced
-							</Button>
-						{/if}
-						{#if item.reminder.isActive || (item.vehicleIds?.length ?? 0) > 0}
-							<Button variant="ghost" size="sm" onclick={() => toggleActive(item)}>
-								{item.reminder.isActive ? 'Pause' : 'Resume'}
-							</Button>
-						{/if}
-						<Button
-							variant="ghost"
-							size="sm"
-							onclick={() => openEdit(item)}
-							aria-label="Edit reminder"
-						>
-							<Pencil class="h-4 w-4" />
-						</Button>
-						<Button
-							variant="ghost"
-							size="sm"
-							onclick={() => requestDeleteReminder(item)}
-							aria-label="Delete reminder"
-						>
-							<Trash2 class="h-4 w-4 text-destructive" />
-						</Button>
-					</div>
-				</CardNs.CardContent>
-			</CardNs.Card>
+		{#snippet reminderSection(
+			title: string,
+			items: ReminderWithVehicles[],
+			group: ReminderRowGroup
+		)}
+			<Card.Root variant="section" data-testid="reminders-{group}">
+				<Card.Header>
+					<Card.Title level={2} class="text-base">{title}</Card.Title>
+				</Card.Header>
+				<Card.Content>
+					<ul class="divide-y divide-border" role="list">
+						{#each items as item (item.reminder.id)}
+							<ReminderRow
+								{item}
+								{group}
+								{vehicleNames}
+								servicing={servicingId === item.reminder.id}
+								onEdit={openEdit}
+								onDelete={requestDeleteReminder}
+								onToggleActive={toggleActive}
+								onMarkServiced={markServiced}
+								onViewExpenses={openMaterialized}
+							/>
+						{/each}
+					</ul>
+				</Card.Content>
+			</Card.Root>
 		{/snippet}
 
 		{#if vehicles.length === 0}
@@ -394,81 +311,66 @@
 			</Alert>
 		{/if}
 
-		{#if dueReminders.length > 0}
-			<section class="space-y-3">
-				<h2 class="text-lg font-semibold flex items-center gap-2">
-					<BellRing class="h-5 w-5 text-warning" />
-					Due now ({dueReminders.length})
-				</h2>
-				{#each dueReminders as item (item.reminder.id)}
-					{@render reminderCard(item, true)}
-				{/each}
+		<div class="grid gap-x-10 gap-y-6 lg:grid-cols-2">
+			{#if dueReminders.length > 0}
+				{@render reminderSection('Due now', dueReminders, 'due')}
+			{/if}
+			{#if upcomingReminders.length > 0}
+				{@render reminderSection('Coming up', upcomingReminders, 'upcoming')}
+			{/if}
+			{#if inactiveReminders.length > 0}
+				{@render reminderSection('Paused', inactiveReminders, 'paused')}
+			{/if}
+			<section class="border-t border-border pt-4" aria-labelledby="reminders-how">
+				<h2 id="reminders-how" class="text-base font-semibold">How reminders work</h2>
+				<p class="mt-2 text-sm text-muted-foreground">
+					A reminder can fire on a date, on distance driven, or both. An expense reminder adds the
+					expense for you, like a monthly loan payment; a notification only tells you.
+				</p>
 			</section>
-		{/if}
-
-		{#if upcomingReminders.length > 0}
-			<section class="space-y-3">
-				<h2 class="text-lg font-semibold">Upcoming ({upcomingReminders.length})</h2>
-				{#each upcomingReminders as item (item.reminder.id)}
-					{@render reminderCard(item, false)}
-				{/each}
-			</section>
-		{/if}
-
-		{#if inactiveReminders.length > 0}
-			<section class="space-y-3">
-				<h2 class="text-lg font-semibold text-muted-foreground">
-					Paused ({inactiveReminders.length})
-				</h2>
-				{#each inactiveReminders as item (item.reminder.id)}
-					{@render reminderCard(item, false)}
-				{/each}
-			</section>
-		{/if}
+		</div>
 	{/if}
 
 	{#if !isLoading && !loadError && notifications.length > 0}
-		<section class="space-y-3">
-			<div class="flex flex-wrap items-center justify-between gap-2">
-				<h2 class="text-lg font-semibold flex items-center gap-2">
-					<History class="h-5 w-5 text-muted-foreground" />
+		<Card.Root variant="section">
+			<Card.Header class="flex flex-row flex-wrap items-center justify-between gap-2">
+				<Card.Title level={2} class="flex items-center gap-2 text-base">
 					Notifications
 					{#if unreadNotifications.length > 0}
-						<Badge variant="secondary">{unreadNotifications.length} new</Badge>
+						<Badge variant="due">{unreadNotifications.length} new</Badge>
 					{/if}
-				</h2>
+				</Card.Title>
 				{#if unreadNotifications.length > 0}
-					<Button
-						variant="ghost"
-						size="sm"
-						class="ml-auto h-10 sm:h-8"
-						onclick={markAllNotificationsRead}
-					>
+					<Button variant="ghost" size="sm" class="ml-auto h-10" onclick={markAllNotificationsRead}>
 						<Check class="mr-2 h-4 w-4" />
 						Mark All Read
 					</Button>
 				{/if}
-			</div>
-			<CardNs.Card>
-				<CardNs.CardContent class="divide-y p-0">
+			</Card.Header>
+			<Card.Content>
+				<ul class="divide-y divide-border" role="list">
 					{#each notifications as n (n.id)}
-						<div
-							class="flex items-center justify-between gap-3 px-4 py-3 {n.isRead
-								? ''
-								: 'bg-muted/40'}"
+						<li
+							class="flex items-center justify-between gap-3 py-3"
 							data-testid="notification-{n.id}"
 						>
-							<div class="flex items-start gap-3 min-w-0">
-								<div class="mt-0.5 {n.isRead ? 'text-muted-foreground' : 'text-warning'}">
+							<div class="flex min-w-0 items-start gap-3">
+								<span
+									class="mt-0.5 {n.isRead ? 'text-muted-foreground' : 'text-warning'}"
+									aria-hidden="true"
+								>
 									{#if n.isRead}
 										<Bell class="h-4 w-4" />
 									{:else}
 										<BellRing class="h-4 w-4" />
 									{/if}
-								</div>
+								</span>
 								<div class="min-w-0">
-									<p class="text-sm font-medium truncate {n.isRead ? 'text-muted-foreground' : ''}">
+									<p
+										class="truncate text-sm {n.isRead ? 'text-muted-foreground' : 'font-semibold'}"
+									>
 										{reminderNames.get(n.reminderId) ?? 'Reminder'}
+										{#if !n.isRead}<span class="sr-only"> (unread)</span>{/if}
 									</p>
 									<p class="text-xs text-muted-foreground">
 										{#if n.dueDate !== null}
@@ -489,13 +391,12 @@
 									<Check class="h-4 w-4" />
 								</Button>
 							{/if}
-						</div>
+						</li>
 					{/each}
-				</CardNs.CardContent>
-			</CardNs.Card>
-		</section>
+				</ul>
+			</Card.Content>
+		</Card.Root>
 	{/if}
-
 	<ReminderForm bind:open={formOpen} reminder={editingReminder} {vehicles} onSaved={load} />
 
 	<MaterializedExpensesDialog
