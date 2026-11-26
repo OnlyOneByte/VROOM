@@ -25,13 +25,7 @@ import {
   setCarShare,
   updateDriver,
 } from './repository';
-import {
-  balancesView,
-  computeBalances,
-  readRules,
-  rulesSchema,
-  writeRules,
-} from './split';
+import { balancesView, computeBalances, readRules, rulesSchema, writeRules } from './split';
 import { driverStats } from './stats';
 
 const vehicleIdParam = z.object({ vehicleId: z.string().min(1).max(64) });

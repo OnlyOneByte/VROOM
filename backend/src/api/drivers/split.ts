@@ -38,7 +38,10 @@ export const rulesSchema = z.strictObject({
 export type SplitRules = z.infer<typeof rulesSchema>;
 export type GroupRule = SplitRules[Group];
 
-export const DEFAULT_RULES: SplitRules = { running: { kind: 'distance' }, ownership: { kind: 'payer' } };
+export const DEFAULT_RULES: SplitRules = {
+  running: { kind: 'distance' },
+  ownership: { kind: 'payer' },
+};
 
 export function readRules(db: AppDatabase, vehicleId: string): SplitRules {
   const row = db
@@ -142,7 +145,11 @@ export interface BalanceOptions {
 
 function spending(db: AppDatabase, vehicleId: string, options: BalanceOptions) {
   return db
-    .select({ category: expenses.category, cents: expenses.expenseAmount, payer: expenses.paidByDriverId })
+    .select({
+      category: expenses.category,
+      cents: expenses.expenseAmount,
+      payer: expenses.paidByDriverId,
+    })
     .from(expenses)
     .where(
       and(
@@ -197,7 +204,17 @@ export function computeBalances(db: AppDatabase, vehicleId: string, options: Bal
   }
   const ids = new Set([...owed.keys(), ...paid.keys()]);
   const balances = new Map([...ids].map((id) => [id, (owed.get(id) ?? 0) - (paid.get(id) ?? 0)]));
-  return { rules, drivers, owed, paid, balances, unassigned, unpaid, total, transfers: settle(balances) };
+  return {
+    rules,
+    drivers,
+    owed,
+    paid,
+    balances,
+    unassigned,
+    unpaid,
+    total,
+    transfers: settle(balances),
+  };
 }
 
 type Balances = ReturnType<typeof computeBalances>;
