@@ -474,7 +474,7 @@
 			selectedVehicleIds={form.selectedVehicleIds}
 			vehicles={form.vehicles}
 			vehicle={form.vehicle}
-		/>{#if editDate}<span> · {editDate}</span>{/if}
+		/>{#if editDate}<span>{` · ${editDate}`}</span>{/if}
 	{/if}
 {/snippet}
 
@@ -530,29 +530,31 @@
 {/snippet}
 
 {#snippet editActions()}
-	{#if form.canDuplicate}
+	<div class="flex flex-wrap gap-2">
+		{#if form.canDuplicate}
+			<Button
+				type="button"
+				variant="outline"
+				onmousedown={keepFieldFocus}
+				onclick={handleDuplicate}
+				disabled={form.isSubmitting || form.isDeleting}
+			>
+				<Copy aria-hidden="true" />
+				Duplicate
+			</Button>
+		{/if}
 		<Button
 			type="button"
 			variant="outline"
+			class="text-destructive hover:text-destructive"
 			onmousedown={keepFieldFocus}
-			onclick={handleDuplicate}
+			onclick={confirmDelete}
 			disabled={form.isSubmitting || form.isDeleting}
 		>
-			<Copy aria-hidden="true" />
-			Duplicate
+			<Trash2 aria-hidden="true" />
+			Delete
 		</Button>
-	{/if}
-	<Button
-		type="button"
-		variant="outline"
-		class="text-destructive hover:text-destructive"
-		onmousedown={keepFieldFocus}
-		onclick={confirmDelete}
-		disabled={form.isSubmitting || form.isDeleting}
-	>
-		<Trash2 aria-hidden="true" />
-		Delete
-	</Button>
+	</div>
 {/snippet}
 
 {#snippet createHeader()}
@@ -753,7 +755,7 @@
 						{/if}
 					</div>
 				{/if}
-				<div class="space-y-2 {quickAdd ? '-mt-2 text-center' : ''}">
+				<div class="space-y-2 empty:hidden {quickAdd ? '-mt-2 text-center' : ''}">
 					{#if !form.isEditMode}
 						<div class="flex flex-wrap items-center gap-2 {quickAdd ? 'justify-center' : ''}">
 							{#if !form.isSplit}
@@ -767,7 +769,7 @@
 							{/if}
 						</div>
 					{:else if showsPayer}
-						<div class="flex">{@render driverChip()}</div>
+						<div class="flex empty:hidden">{@render driverChip()}</div>
 					{/if}
 					{#if vehicleError}
 						<FormFieldError id="vehicleId-error">{vehicleError}</FormFieldError>
@@ -841,7 +843,7 @@
 
 				<fieldset
 					disabled={form.isGroupEditMode}
-					class="min-w-0 space-y-5 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50"
+					class="min-w-0 space-y-5 empty:hidden disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50"
 				>
 					{#if !form.isEditMode}
 						{@render categoryField(false)}
