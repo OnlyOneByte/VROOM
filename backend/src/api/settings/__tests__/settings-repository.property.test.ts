@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import fc from 'fast-check';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
 import { PreferencesRepository, SyncStateRepository } from '../repository';
@@ -33,8 +34,9 @@ beforeEach(() => {
     applyMigration(sqliteDb, m);
   }
   db = drizzle(sqliteDb, { schema });
-  prefsRepo = new PreferencesRepository(db);
-  syncRepo = new SyncStateRepository(db);
+  const asyncDb = openAsyncDatabase(sqliteDb).db;
+  prefsRepo = new PreferencesRepository(asyncDb);
+  syncRepo = new SyncStateRepository(asyncDb);
   seedUsers();
 });
 

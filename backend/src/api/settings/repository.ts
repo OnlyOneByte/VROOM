@@ -1,5 +1,5 @@
 import { eq, inArray, sql } from 'drizzle-orm';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { jsonMergePatch } from '../../db/dialect';
 import type { NewUserPreferences, SyncState, UserPreferences } from '../../db/schema';
 import { syncState, userPreferences } from '../../db/schema';
@@ -16,7 +16,7 @@ const JSON_FIELD_COLUMNS = {
 } as const;
 
 export class PreferencesRepository {
-  constructor(private db: AppDatabase) {}
+  constructor(private db: AsyncAppDatabase) {}
 
   async getByUserId(userId: string): Promise<UserPreferences | null> {
     try {
@@ -119,7 +119,7 @@ export class PreferencesRepository {
 }
 
 export class SyncStateRepository {
-  constructor(private db: AppDatabase) {}
+  constructor(private db: AsyncAppDatabase) {}
 
   async getOrCreate(userId: string): Promise<SyncState> {
     try {

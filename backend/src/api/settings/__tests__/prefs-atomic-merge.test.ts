@@ -1,8 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
-import * as schema from '../../../db/schema';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { PreferencesRepository } from '../repository';
 
 let sqlite: Database;
@@ -18,9 +17,7 @@ beforeEach(async () => {
     'u100@example.com',
     'U 100',
   ]);
-  // biome-ignore lint/suspicious/noExplicitAny: drizzle's bun-sqlite generic vs AppDatabase alias
-  const db = drizzle(sqlite, { schema }) as any;
-  repo = new PreferencesRepository(db);
+  repo = new PreferencesRepository(openAsyncDatabase(sqlite).db);
   await repo.getOrCreate(USER);
 });
 afterEach(() => sqlite.close());

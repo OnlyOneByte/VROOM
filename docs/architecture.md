@@ -131,8 +131,36 @@ Two alternatives were rejected:
   bottleneck.
 
 On Postgres (#1635) the same `transaction(async (tx) => …)` signature maps onto the driver's
-own pooled transaction, so call sites won't change again. The next #1378 steps move
-the app onto this session, then convert each domain's transaction sites and sync terminals.
+own pooled transaction, so call sites won't change again.
+
+**Moving the app across (#1378).** `appContext().asyncDb` is the async session over the same
+connection as `appContext().db`, and repositories move to it area by area. The settings
+repositories are first. One ordering rule holds the migration together: sync queries must
+be gone before the first async transaction ships, because a sync query issued while an async
+transaction is open runs inside it. The async module enforces this. It wraps the
+connection's `prepare`, `query`, `run`, `exec` and `transaction`, and any call that doesn't
+come from the async session while an async transaction is open throws
+`SyncQueryInAsyncTransactionError`. The guard can't see a statement prepared before the
+transaction opened and run during it, so sync code must not hold prepared statements
+(`sqlite.prepare`, Drizzle's `.prepare()`). Nothing in the app does today.
+
+Connection upkeep in `src/db/connection.ts` stays sync by design. The health check's
+`SELECT 1` and the two WAL checkpoints run through `upkeep(kind)`, a fixed list of three
+queries that the guard exempts, so it can't carry anything else. The checkpoints skip while
+a transaction is open. The health check still runs then and its `SELECT 1` reads inside that
+transaction, so a richer health query must not read data.
+
+Raw `BEGIN`, `COMMIT`/`END`, `ROLLBACK`, `SAVEPOINT` or `RELEASE` through the async session
+throws `RawTransactionControlError` at the moment `run`, `all`, `get` or `values` is called,
+inside a callback or outside one, awaited or not. Leading whitespace, `;` and SQL comments
+are skipped before the check, as SQLite skips them. Only `transaction()` opens and closes
+transactions. Drizzle's internal `tx.session` is the one path past the call-time check, and
+app code must not use it. A query sent that way is still checked when it runs, but an
+un-awaited one could slip into the moment the callback settles.
+
+Await every query inside a callback, including the last one: `return await tx.select()…`,
+never `return tx.select()…`. Bun loses the transaction scope when an async callback resolves
+with a returned builder after an earlier `await`, and that transaction then hangs (#1786).
 
 **Expense-linked records use a polymorphic link.** Financing payments, insurance premiums,
 and reminder materializations are real rows in `expenses` tagged with `source_type` +

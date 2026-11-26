@@ -10,6 +10,8 @@ import { handleDatabaseError, isAppError, isSyncError } from '../errors';
 import { syncBuiltInRoles } from '../permissions/grants';
 import { extractErrorMessage } from '../utils/error-handling';
 import { logger } from '../utils/logger';
+import { openAsyncDatabase } from './async-sqlite';
+import type { UPKEEP_QUERIES } from './dialect';
 import * as schema from './schema.js';
 
 function openDatabase(url: string) {
@@ -108,9 +110,17 @@ export function runMigrations(): void {
   }
 }
 
+function upkeep(kind: keyof typeof UPKEEP_QUERIES): unknown {
+  return openAsyncDatabase(getDb().$client).upkeep(kind);
+}
+
+function checkpointPossible(): boolean {
+  return !getDb().$client.inTransaction;
+}
+
 export function checkDatabaseHealth(): boolean {
   try {
-    const result = getDb().$client.query('SELECT 1 as health').get() as { health: number } | null;
+    const result = upkeep('health') as { health: number } | null;
     return result?.health === 1;
   } catch (error) {
     logger.error('Database health check failed', { error });
@@ -120,7 +130,8 @@ export function checkDatabaseHealth(): boolean {
 
 export function checkpointWAL(): void {
   try {
-    const result = getDb().$client.query('PRAGMA wal_checkpoint(TRUNCATE)').get() as {
+    if (!checkpointPossible()) return;
+    const result = upkeep('checkpoint') as {
       busy: number;
       log: number;
       checkpointed: number;
@@ -138,7 +149,8 @@ export function checkpointWAL(): void {
 
 export function forceCheckpointWAL(): void {
   try {
-    const result = getDb().$client.query('PRAGMA wal_checkpoint(RESTART)').get() as {
+    if (!checkpointPossible()) return;
+    const result = upkeep('forceCheckpoint') as {
       busy: number;
       log: number;
       checkpointed: number;
