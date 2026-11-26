@@ -29,7 +29,7 @@
 	<CardHeader>
 		<div class="flex items-center justify-between gap-3">
 			<div class="flex items-center gap-2">
-				<Icon class="size-4 text-muted-foreground" aria-hidden="true" />
+				<Icon class="size-4 text-muted-foreground" />
 				<CardTitle level={2} class="text-base">{title}</CardTitle>
 			</div>
 			<Badge variant="outline">Coming soon</Badge>

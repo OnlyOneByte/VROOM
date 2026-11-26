@@ -340,7 +340,7 @@ describe('Profile connected accounts', () => {
 		const titles = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent?.trim());
 		expect(titles).toEqual(expect.arrayContaining(['Sessions', 'Sharing']));
 		expect(titles).not.toContain('Notifications');
-		expect(screen.getAllByText('Coming soon').length).toBeGreaterThan(0);
+		expect(screen.getAllByText('Coming soon')).toHaveLength(3);
 		expect(screen.queryByText('Coming Soon')).toBeNull();
 	});
 });
