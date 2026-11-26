@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, onTestFinished, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Expense, ExpenseSummary, UserSettings, Vehicle } from '#lib/types/index.ts';
