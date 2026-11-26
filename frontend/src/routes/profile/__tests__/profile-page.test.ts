@@ -320,11 +320,28 @@ describe('Profile connected accounts', () => {
 		expect(screen.queryByText('Link another account')).toBeNull();
 	});
 
-	test('announces the sign-in methods while they load', async () => {
-		authApi.getLinkedAccounts.mockReturnValue(new Promise(() => {}));
+	test('announces the sign-in methods while they load, in a status that stays', async () => {
+		let finish: (list: LinkedAuthProvider[]) => void = () => {};
+		authApi.getLinkedAccounts.mockReturnValue(new Promise(r => (finish = r)));
 		await mount();
+		const status = screen.getByRole('status');
 		expect(screen.queryByText('Link another account')).toBeNull();
-		expect(screen.getByRole('status')).toHaveTextContent('Loading sign-in methods');
+		expect(status).toHaveTextContent('Loading sign-in methods');
+
+		finish([account()]);
+		await settle();
+
+		expect(status).toBeInTheDocument();
+		expect(status).toHaveTextContent('');
+	});
+
+	test('the coming-soon sections are headings, and Notifications is gone', async () => {
+		await mount();
+		const titles = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent?.trim());
+		expect(titles).toEqual(expect.arrayContaining(['Sessions', 'Sharing']));
+		expect(titles).not.toContain('Notifications');
+		expect(screen.getAllByText('Coming soon')).toHaveLength(3);
+		expect(screen.queryByText('Coming Soon')).toBeNull();
 	});
 });
 
@@ -359,6 +376,8 @@ describe('Profile link callback banners', () => {
 	test('success=linked confirms the link', async () => {
 		page.url = new URL('https://app.example/profile?success=linked');
 		await mount();
-		expect(screen.getByRole('status')).toHaveTextContent('Account linked successfully.');
+		expect(
+			screen.getByText('Account linked successfully.').closest('[role="status"]')
+		).not.toBeNull();
 	});
 });
