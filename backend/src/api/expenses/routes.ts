@@ -1005,10 +1005,14 @@ routes.put(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
-    const { timeZone, ...updateData } = c.req.valid('json');
+    const { timeZone, ...body } = c.req.valid('json');
 
     const existingExpense = await repos().expenses.findById(id);
     if (!existingExpense) throw new NotFoundError('Expense');
+    const updateData = expenseFromApi(
+      body,
+      await repos().preferences.moneyScale(existingExpense.userId)
+    );
     const access = await requireVehicleAccess(existingExpense.vehicleId, user.id, 'read');
     assertMayTouchFinancialExpense(
       writesFinancials(access),
@@ -1061,14 +1065,7 @@ routes.put(
       timeZone,
     });
 
-    const updatedExpense = await repos().expenses.update(
-      id,
-      expenseFromApi(
-        normalizedUpdate,
-        await repos().preferences.moneyScale(existingExpense.userId)
-      ),
-      odometer
-    );
+    const updatedExpense = await repos().expenses.update(id, normalizedUpdate, odometer);
 
     if (updatedExpense.mileage != null) {
       await reminderTriggerService.recheckMileageReminders(

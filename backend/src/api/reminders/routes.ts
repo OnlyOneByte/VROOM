@@ -462,7 +462,10 @@ routes.put(
     const existing = await repos().reminders.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
     const { ownerId } = await requireExistingReminderWrite(existing, user.id);
-    const partialUpdate = keepStoredDatesOnSameDay(c.req.valid('json'), existing.reminder);
+    const partialUpdate = reminderFromApi(
+      keepStoredDatesOnSameDay(c.req.valid('json'), existing.reminder),
+      await repos().preferences.moneyScale(ownerId)
+    );
 
     if (partialUpdate.vehicleIds) {
       for (const vehicleId of partialUpdate.vehicleIds) {
@@ -488,10 +491,7 @@ routes.put(
     assertMergedReminderValid(merged, partialUpdate);
 
     const { vehicleIds: mergedVehicleIds, timeZone, ...reminderFields } = partialUpdate;
-    const updateFields: Partial<NewReminder> = reminderFromApi(
-      reminderFields,
-      await repos().preferences.moneyScale(ownerId)
-    );
+    const updateFields: Partial<NewReminder> = { ...reminderFields };
 
     const touchesMileage =
       reminderFields.triggerMode !== undefined ||
