@@ -24,7 +24,7 @@
 				type="button"
 				aria-pressed={pressed}
 				onclick={() => onToggle(option.value)}
-				class="inline-flex h-10 items-center rounded-full border px-3.5 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:h-9 {pressed
+				class="inline-flex h-10 items-center rounded-full border px-3.5 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 {pressed
 					? 'border-primary bg-primary text-primary-foreground'
 					: 'border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground'}"
 			>
