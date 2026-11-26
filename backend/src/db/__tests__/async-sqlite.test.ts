@@ -171,6 +171,50 @@ describe('async transactions over bun:sqlite', () => {
     ]);
   });
 
+  test('a nested transaction that only starts after its root committed is refused', async () => {
+    const { db, transaction } = setup();
+    let queued: Promise<unknown> = Promise.resolve();
+    await transaction(async () => {
+      const first = transaction(async (tx) => {
+        await tick();
+        await tx.insert(users).values(user('first'));
+      });
+      queued = transaction(async (tx) => {
+        await tx.insert(users).values(user('late'));
+      });
+      await first;
+    });
+    const error = (await queued.catch((e) => e)) as { cause?: unknown };
+    expect(
+      error instanceof TransactionEndedError || error.cause instanceof TransactionEndedError
+    ).toBe(true);
+    expect((await db.select({ id: users.id }).from(users)).map((r) => r.id)).toEqual(['first']);
+  });
+
+  test('a failed batch inside a transaction leaves none of its rows', async () => {
+    const { db, transaction } = setup();
+    await transaction(async (tx) => {
+      await tx.insert(users).values(user('kept'));
+      await expect(
+        db.batch([db.insert(users).values(user('a')), db.insert(users).values(user('a'))])
+      ).rejects.toThrow();
+    });
+    expect((await db.select({ id: users.id }).from(users)).map((r) => r.id)).toEqual(['kept']);
+  });
+
+  test('a lazy query handed to outsideTransaction never sees the uncommitted rows', async () => {
+    const { db, transaction, outsideTransaction } = setup();
+    let seen: Promise<unknown> = Promise.resolve();
+    await expect(
+      transaction(async (tx) => {
+        await tx.insert(users).values(user('a'));
+        seen = outsideTransaction(() => db.select({ id: users.id }).from(users)).then((r) => r);
+        throw new Error('roll back');
+      })
+    ).rejects.toThrow('roll back');
+    expect(await seen).toEqual([]);
+  });
+
   test('a batch outside a transaction is atomic', async () => {
     const { db } = setup();
     await expect(

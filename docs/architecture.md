@@ -90,16 +90,22 @@ Drizzle's async `sqlite-proxy` session:
 - Transactions from different requests queue: SQLite has a single writer anyway. A
   `transaction()` (or `db.transaction()`) started inside an open one joins it through a
   savepoint. Nested transactions that run at once take turns, and the parent's own queries wait
-  while one is open, so a failed savepoint only undoes its own writes. `db.batch` outside a
-  transaction runs as one.
+  while one is open, so a failed savepoint only undoes its own writes. `db.batch` runs as a
+  transaction, or as a savepoint inside one, so a failed batch leaves none of its rows.
 - A query that still carries a transaction's context after it ended throws
   `TransactionEndedError` instead of committing on its own. Examples are an un-awaited write, or
-  a `Promise.all` branch that outlives a failed sibling. Await every query inside the callback.
-  Work that should outlive the transaction, such as a timer or a background job armed from
-  inside it, starts through `outsideTransaction(fn)`.
+  a `Promise.all` branch that outlives a failed sibling, or a nested transaction still queued
+  when the callback returns. A transaction is sealed the moment its callback settles. Await
+  every query inside the callback. Work that should outlive the transaction, such as a timer or
+  a background job armed from inside it, starts through `outsideTransaction(fn)`. That includes
+  a lazy query builder: it runs after the transaction ends, so never await it inside the
+  transaction.
 - Keep awaits inside a transaction to database work. A slow `fetch` there makes every other
-  query wait. Awaiting a promise that another request started, such as a shared in-flight
-  cache, deadlocks if that request then needs the database.
+  query wait. Two waits deadlock:
+  - awaiting a promise that another request started (such as a shared in-flight cache), when
+    that request then needs the database;
+  - a nested transaction awaiting a query its parent issued after the nested one opened, since
+    the parent's queries wait for the nested transaction.
 
 `src/db/__tests__/async-sqlite.test.ts` proves each of these properties, and removing either
 the wait or the queue fails a test. Rows map the same as with the sync driver, Drizzle's

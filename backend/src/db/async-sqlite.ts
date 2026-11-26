@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy';
 import * as schema from './schema';
 
 const STATEMENT_CACHE_SIZE = 500;
+const TRANSACTION_CONTROL = /^\s*(commit|rollback|release savepoint)\b/i;
 
 type Method = 'run' | 'all' | 'values' | 'get';
 
@@ -16,6 +17,7 @@ export class TransactionEndedError extends Error {
 export function openAsyncDatabase(sqlite: Database) {
   type Scope = {
     ended: boolean;
+    sealed: boolean;
     tx: Transaction;
     root: Scope;
     queue: Promise<unknown>;
@@ -49,9 +51,15 @@ export function openAsyncDatabase(sqlite: Database) {
     return { rows: method === 'get' ? rows[0] : rows };
   }
 
+  function hasEnded(scope: Scope | undefined, query = ''): boolean {
+    if (!scope) return false;
+    if (scope.ended || scope.root.ended) return true;
+    return (scope.sealed || scope.root.sealed) && !TRANSACTION_CONTROL.test(query);
+  }
+
   async function gated(query: string, params: unknown[], method: Method) {
     const scope = scopes.getStore();
-    if (scope?.ended) throw new TransactionEndedError();
+    if (hasEnded(scope, query)) throw new TransactionEndedError();
     while (open && scope?.root !== open) await closed;
     while (scope?.nested) await scope.nested.catch(() => undefined);
     return execute(query, params, method);
@@ -71,8 +79,7 @@ export function openAsyncDatabase(sqlite: Database) {
 
   const db = drizzle(
     (query, params, method) => gated(query, params, method),
-    (queries): Promise<Result[]> =>
-      scopes.getStore() ? runInOrder(queries) : transaction(() => runInOrder(queries)),
+    (queries): Promise<Result[]> => transaction(() => runInOrder(queries)),
     { schema }
   );
 
@@ -80,10 +87,20 @@ export function openAsyncDatabase(sqlite: Database) {
   type Behavior = 'deferred' | 'immediate' | 'exclusive';
   const begin = db.transaction.bind(db);
 
+  async function sealWhenSettled<T>(scope: Scope, run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } finally {
+      scope.sealed = true;
+    }
+  }
+
   function joinOpen<T>(parent: Scope, callback: (tx: Transaction) => Promise<T>): Promise<T> {
     const run = parent.queue.then(() => {
+      if (hasEnded(parent)) throw new TransactionEndedError();
       const child = {
         ended: false,
+        sealed: false,
         root: parent.root,
         queue: Promise.resolve(),
         nested: null,
@@ -91,7 +108,7 @@ export function openAsyncDatabase(sqlite: Database) {
       const savepoint = scopes.run(child, () =>
         parent.tx.transaction((tx) => {
           child.tx = tx;
-          return callback(tx);
+          return sealWhenSettled(child, () => callback(tx));
         })
       );
       parent.nested = savepoint;
@@ -109,14 +126,14 @@ export function openAsyncDatabase(sqlite: Database) {
     config: { behavior?: Behavior } = {}
   ): Promise<T> {
     const outer = scopes.getStore();
-    if (outer?.ended) throw new TransactionEndedError();
-    if (outer && outer.root === open) return joinOpen(outer, callback);
+    if (hasEnded(outer)) throw new TransactionEndedError();
+    if (outer) return joinOpen(outer, callback);
     while (open) await closed;
     let close: () => void = () => undefined;
     closed = new Promise((resolve) => {
       close = resolve;
     });
-    const scope = { ended: false, queue: Promise.resolve(), nested: null } as Scope;
+    const scope = { ended: false, sealed: false, queue: Promise.resolve(), nested: null } as Scope;
     scope.root = scope;
     open = scope;
     try {
@@ -124,7 +141,7 @@ export function openAsyncDatabase(sqlite: Database) {
         begin(
           (tx) => {
             scope.tx = tx;
-            return callback(tx);
+            return sealWhenSettled(scope, () => callback(tx));
           },
           { behavior: config.behavior ?? 'immediate' }
         )
@@ -136,8 +153,8 @@ export function openAsyncDatabase(sqlite: Database) {
     }
   }
 
-  function outsideTransaction<T>(fn: () => T): T {
-    return scopes.exit(fn);
+  function outsideTransaction<T>(fn: () => T | PromiseLike<T>): Promise<T> {
+    return scopes.exit(() => Promise.resolve().then(fn));
   }
 
   Object.assign(db, { transaction });
