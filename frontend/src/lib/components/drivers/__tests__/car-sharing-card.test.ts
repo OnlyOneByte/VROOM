@@ -1,11 +1,21 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
-import type { Driver } from '#lib/types/index.ts';
+import type { Driver, Vehicle } from '#lib/types/index.ts';
+import {
+	cacheVehicles,
+	currentOfflineQueueOwner,
+	loadCachedVehicles,
+	setOfflineQueueOwner
+} from '#lib/utils/offline-storage.ts';
 
 const list = vi.fn<(vehicleId: string) => Promise<Driver[] | null>>();
+const setCarShare = vi.fn<(vehicleId: string, enabled: boolean) => Promise<unknown>>();
 
 vi.mock('#lib/services/driver-api.ts', () => ({
-	driverApi: { list: (vehicleId: string) => list(vehicleId) }
+	driverApi: {
+		list: (vehicleId: string) => list(vehicleId),
+		setCarShare: (vehicleId: string, enabled: boolean) => setCarShare(vehicleId, enabled)
+	}
 }));
 
 import CarSharingCard from '../CarSharingCard.svelte';
@@ -17,6 +27,8 @@ const settle = async () => {
 afterEach(() => {
 	cleanup();
 	list.mockReset();
+	setOfflineQueueOwner(null);
+	localStorage.clear();
 });
 
 describe('CarSharingCard', () => {
@@ -40,6 +52,21 @@ describe('CarSharingCard', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
 		expect(screen.queryByRole('alert')).toBeNull();
+	});
+
+	test('turning car sharing on updates the cached car, so the driver chip appears at once', async () => {
+		list.mockResolvedValue([]);
+		setOfflineQueueOwner('u-owner');
+		cacheVehicles([{ id: 'car', carShareEnabled: false } as Vehicle], currentOfflineQueueOwner());
+		render(CarSharingCard, { props: { vehicleId: 'car', enabled: false } });
+		await settle();
+		await fireEvent.click(screen.getByRole('switch'));
+		await settle();
+		expect(setCarShare).toHaveBeenCalledWith('car', true);
+		expect(loadCachedVehicles().find(v => v.id === 'car')).toMatchObject({
+			carShareEnabled: true,
+			carShare: { enabled: true }
+		});
 	});
 
 	test('with car sharing off it asks for nothing', async () => {

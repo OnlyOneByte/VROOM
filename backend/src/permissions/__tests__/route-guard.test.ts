@@ -6,6 +6,8 @@ import { getDb } from '../../db/connection';
 import type { AppError } from '../../errors';
 import { createTestApp, requestAs } from '../../test-helpers/http-client';
 import { assignServerRole, resolverFor } from '../grants';
+import { withImplied } from '../resolve';
+import { DEMO_ROLE_KEY, ROLE_TEMPLATES } from '../roles';
 import { routeGuard } from '../route-guard';
 import { isPublicRule, ROUTE_PERMISSIONS } from '../route-map';
 
@@ -261,6 +263,16 @@ describe('the roles routes check by scope', () => {
 });
 
 describe('the Demo role stays with the demo garage', () => {
+  test('everything it holds, implied permissions included, is a read', () => {
+    const demo = ROLE_TEMPLATES.find((template) => template.key === DEMO_ROLE_KEY);
+    const held = (demo?.permissions ?? []).flatMap((permission) => [...withImplied(permission)]);
+    const writes = held.filter(
+      (id) => id !== 'account.session.manage' && !/\.read(_own)?$/.test(id)
+    );
+    expect(held.length).toBeGreaterThan(0);
+    expect(writes).toEqual([]);
+  });
+
   test('it cannot be assigned or copied through the roles API', async () => {
     const ctx = await createTestApp();
     try {

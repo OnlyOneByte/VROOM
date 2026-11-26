@@ -65,21 +65,21 @@ export function attributeDistance(
     totals.set(driverId, row);
   };
 
-  for (const trip of trips) {
-    if (trip.at >= period.from && trip.at <= period.to && trip.end > trip.start) {
-      add(trip.driverId, 'trips', trip.end - trip.start);
-    }
-  }
+  const counted = trips.filter(
+    (trip) => trip.at >= period.from && trip.at <= period.to && trip.end > trip.start
+  );
+  for (const trip of counted) add(trip.driverId, 'trips', trip.end - trip.start);
   if (!withEstimates) return totals;
 
-  const cover = merged(trips);
   const ordered = sequence(points, period);
-  let highest = ordered[0]?.odometer ?? 0;
+  let opening = ordered[0];
   for (const closing of ordered.slice(1)) {
-    if (closing.odometer <= highest) continue;
-    const gap = uncovered(highest, closing.odometer, cover);
+    if (!opening || closing.odometer <= opening.odometer) continue;
+    const from = opening.at;
+    const between = trips.filter((trip) => trip.at >= from && trip.at <= closing.at);
+    const gap = uncovered(opening.odometer, closing.odometer, merged(between));
     if (gap > 0) add(closing.driverId, 'estimated', gap);
-    highest = closing.odometer;
+    opening = closing;
   }
   return totals;
 }
