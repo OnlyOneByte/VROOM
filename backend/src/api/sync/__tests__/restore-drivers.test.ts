@@ -83,6 +83,37 @@ describe('restoring car-share drivers', () => {
     ).toEqual({ created_by: member.id });
   });
 
+  test('car sharing and its split rules survive a backup and restore', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    seedDriver('d-owner', vehicleId, ctx.user.id, 'Owner');
+    seedDriver('d-guest', vehicleId, null, 'Riley');
+    const rules = {
+      running: { kind: 'equal' },
+      ownership: { kind: 'fixed', shares: { 'd-owner': 70, 'd-guest': 30 } },
+    };
+    ctx.sqlite.run('UPDATE vehicles SET car_share_enabled = 1, car_share_rules = ? WHERE id = ?', [
+      JSON.stringify(rules),
+      vehicleId,
+    ]);
+
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+    const zip = await backupService.exportAsZip(ctx.user.id);
+    ctx.sqlite.run('UPDATE vehicles SET car_share_enabled = 0, car_share_rules = NULL');
+    const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    const row = ctx.sqlite
+      .query(
+        'SELECT car_share_enabled AS enabled, car_share_rules AS rules FROM vehicles WHERE id = ?'
+      )
+      .get(vehicleId) as { enabled: number; rules: string };
+    expect(row.enabled).toBe(1);
+    expect(JSON.parse(row.rules)).toEqual(rules);
+    const res = await ctx.authed('GET', `/api/v1/vehicles/${vehicleId}/drivers/rules`);
+    expect(((await res.json()) as { data: unknown }).data).toEqual(rules);
+  });
+
   test("a driver linked to someone who isn't a member comes back as a guest", async () => {
     const vehicleId = await seedVehicle(ctx);
     const outsider = await createInvitee(ctx, 'driver-outsider');
