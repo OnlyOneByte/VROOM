@@ -37,6 +37,20 @@
 	export type ButtonVariant = VariantProps<typeof buttonVariants>['variant'];
 	export type ButtonSize = VariantProps<typeof buttonVariants>['size'];
 
+	const buttonClassCache: Record<string, string> = Object.create(null);
+
+	function buttonClass(
+		variant: ButtonVariant,
+		size: ButtonSize,
+		className: ButtonProps['class']
+	): string {
+		if (className != null && typeof className !== 'string') {
+			return cn(buttonVariants({ variant, size }), className);
+		}
+		const key = `${variant}|${size}|${className ?? ''}`;
+		return (buttonClassCache[key] ??= cn(buttonVariants({ variant, size }), className));
+	}
+
 	export type ButtonProps = WithElementRef<HTMLButtonAttributes> &
 		WithElementRef<HTMLAnchorAttributes> & {
 			variant?: ButtonVariant;
@@ -62,7 +76,7 @@
 	<a
 		bind:this={ref}
 		data-slot="button"
-		class={cn(buttonVariants({ variant, size }), className)}
+		class={buttonClass(variant, size, className)}
 		href={disabled ? undefined : href}
 		aria-disabled={disabled}
 		role={disabled ? 'link' : undefined}
@@ -75,7 +89,7 @@
 	<button
 		bind:this={ref}
 		data-slot="button"
-		class={cn(buttonVariants({ variant, size }), className)}
+		class={buttonClass(variant, size, className)}
 		{type}
 		{disabled}
 		{...restProps}

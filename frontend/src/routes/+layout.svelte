@@ -22,6 +22,7 @@
 	import { LoaderCircle } from '@lucide/svelte';
 
 	import { reminderApi } from '#lib/services/reminder-api.ts';
+	import { userTimeZone } from '#lib/services/analytics-api.ts';
 	import { maybeTriggerRecurringExpenses } from '#lib/utils/reminder-helpers.ts';
 	import { onlineStatus } from '#lib/stores/offline.svelte.ts';
 	import { themeStore } from '#lib/stores/theme.svelte.ts';
@@ -79,6 +80,7 @@
 	let webManifestLink = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
 
 	onMount(async () => {
+		setTimeout(userTimeZone);
 		themeStore.initialize();
 		mayBeSignedIn = authStore.remembersUser();
 		authStore.initialize({ fromCache: !isPublicRoute(page.url.pathname) });

@@ -136,6 +136,12 @@
 	let showUploadDialog = $state(false);
 
 	let shareOpen = $state(false);
+	let hasOpenedShare = $state(false);
+
+	function openShare() {
+		hasOpenedShare = true;
+		shareOpen = true;
+	}
 	let moreMenuOpen = $state(false);
 	let detailsOpen = $state(false);
 	let hasOpenedDetails = $state(false);
@@ -816,7 +822,7 @@
 					<Button
 						variant="outline"
 						size="sm"
-						onclick={() => (shareOpen = true)}
+						onclick={openShare}
 						class="hidden h-10 shrink-0 lg:inline-flex"
 					>
 						<Users class="h-4 w-4 mr-2" aria-hidden="true" />
@@ -831,27 +837,29 @@
 									</Button>
 								{/snippet}
 							</Popover.Trigger>
-							<Popover.Content align="end" class="flex w-48 flex-col p-1">
-								<Button
-									variant="ghost"
-									class="h-10 w-full justify-start"
-									href={resolve(paramRoutes.vehicleEdit, { id: vehicleId })}
-								>
-									<Pencil class="mr-2 h-4 w-4" aria-hidden="true" />
-									Edit
-								</Button>
-								<Button
-									variant="ghost"
-									class="h-10 w-full justify-start"
-									onclick={() => {
-										moreMenuOpen = false;
-										shareOpen = true;
-									}}
-								>
-									<Users class="mr-2 h-4 w-4" aria-hidden="true" />
-									Share
-								</Button>
-							</Popover.Content>
+							{#if moreMenuOpen}
+								<Popover.Content align="end" class="flex w-48 flex-col p-1">
+									<Button
+										variant="ghost"
+										class="h-10 w-full justify-start"
+										href={resolve(paramRoutes.vehicleEdit, { id: vehicleId })}
+									>
+										<Pencil class="mr-2 h-4 w-4" aria-hidden="true" />
+										Edit
+									</Button>
+									<Button
+										variant="ghost"
+										class="h-10 w-full justify-start"
+										onclick={() => {
+											moreMenuOpen = false;
+											openShare();
+										}}
+									>
+										<Users class="mr-2 h-4 w-4" aria-hidden="true" />
+										Share
+									</Button>
+								</Popover.Content>
+							{/if}
 						</Popover.Root>
 					</div>
 				{/if}
@@ -868,7 +876,7 @@
 				{/if}
 			</div>
 		</div>
-		{#if isOwner && !showingCachedVehicle}
+		{#if isOwner && !showingCachedVehicle && hasOpenedShare}
 			{#await import('#lib/components/vehicles/ShareVehicleDialog.svelte') then { default: ShareVehicleDialog }}
 				<ShareVehicleDialog bind:open={shareOpen} {vehicleId} vehicleName={vehicleDisplayName} />
 			{/await}
