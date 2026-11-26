@@ -65,7 +65,7 @@
 
 	async function saveDomains(event: SubmitEvent) {
 		event.preventDefault();
-		if (savingDomains) return;
+		if (savingDomains || !domainsChanged) return;
 		domainsError = null;
 		savingDomains = true;
 		const allowedDomains = domains
@@ -123,11 +123,11 @@
 					<Lock class="h-4 w-4 shrink-0" />
 					Set by <code class="font-mono text-xs">SIGNUP_MODE</code> on the server.
 				</p>
-			{:else}
+			{:else if modeChanged || savingMode}
 				<Button
 					variant="outline"
 					class="h-10"
-					disabled={!modeChanged || savingMode}
+					disabled={savingMode}
 					onclick={() => void saveMode()}
 				>
 					{#if savingMode}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
@@ -150,12 +150,11 @@
 					aria-describedby="signup-domains-help{domainsError ? ' signup-domains-error' : ''}"
 					class="min-w-0"
 				/>
-				{#if !settings.domainsLocked}
+				{#if !settings.domainsLocked && (domainsChanged || savingDomains)}
 					<Button
 						type="submit"
 						variant="outline"
 						class="h-10 shrink-0"
-						disabled={!domainsChanged}
 						aria-busy={savingDomains}
 					>
 						{#if savingDomains}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
