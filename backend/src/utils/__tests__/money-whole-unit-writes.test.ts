@@ -1,36 +1,27 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import { PreferencesRepository } from '../../api/settings/repository';
-import {
-  createTestApp,
-  type DataEnvelope,
-  json,
-  type TestApp,
-} from '../../test-helpers/http-client';
+import { type DataEnvelope, json, useTestApp } from '../../test-helpers/http-client';
 import { seedVehicle } from '../../test-helpers/seed';
 
-let ctx: TestApp;
+const app = useTestApp();
 
-beforeEach(async () => {
-  ctx = await createTestApp();
+beforeEach(() => {
   spyOn(PreferencesRepository.prototype, 'moneyScale').mockResolvedValue(1);
 });
-afterEach(() => {
-  mock.restore();
-  ctx.close();
-});
+afterEach(() => mock.restore());
 
 describe('edits compare like units when the currency has no decimals', () => {
   test('a split leg keeps its amount and only its description changes', async () => {
-    const a = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    const b = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    const split = await ctx.authed('POST', '/api/v1/expenses/split', {
+    const a = await seedVehicle(app(), { make: 'Honda', model: 'Civic', year: 2021 });
+    const b = await seedVehicle(app(), { make: 'Toyota', model: 'Camry', year: 2022 });
+    const split = await app().authed('POST', '/api/v1/expenses/split', {
       splitConfig: { method: 'even', vehicleIds: [a, b] },
       category: 'maintenance',
       date: '2024-06-01T12:00:00.000Z',
       totalAmount: 1200,
     });
     const legs = (await json<DataEnvelope<{ siblings: { id: string }[] }>>(split)).data.siblings;
-    const res = await ctx.authed('PUT', `/api/v1/expenses/${legs[0]?.id}`, {
+    const res = await app().authed('PUT', `/api/v1/expenses/${legs[0]?.id}`, {
       expenseAmount: 600,
       description: 'new',
     });
@@ -38,9 +29,9 @@ describe('edits compare like units when the currency has no decimals', () => {
   });
 
   test('an absolute-split reminder accepts its unchanged amount', async () => {
-    const a = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    const b = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    const created = await ctx.authed('POST', '/api/v1/reminders', {
+    const a = await seedVehicle(app(), { make: 'Honda', model: 'Civic', year: 2021 });
+    const b = await seedVehicle(app(), { make: 'Toyota', model: 'Camry', year: 2022 });
+    const created = await app().authed('POST', '/api/v1/reminders', {
       name: 'Shared insurance',
       type: 'expense',
       expenseCategory: 'financial',
@@ -57,7 +48,7 @@ describe('edits compare like units when the currency has no decimals', () => {
       },
     });
     const id = (await json<DataEnvelope<{ reminder: { id: string } }>>(created)).data.reminder.id;
-    const res = await ctx.authed('PUT', `/api/v1/reminders/${id}`, { expenseAmount: 1200 });
+    const res = await app().authed('PUT', `/api/v1/reminders/${id}`, { expenseAmount: 1200 });
     expect(res.status, await res.text()).toBe(200);
   });
 });
