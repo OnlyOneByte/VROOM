@@ -87,29 +87,39 @@ Drizzle's async `sqlite-proxy` session:
 - While a transaction is open, a query from any other async context waits until it ends, so
   nothing can join it or read its uncommitted rows. Code inside the transaction is recognised
   through `AsyncLocalStorage` and never waits.
-- Transactions queue rather than nest across requests: SQLite has a single writer anyway.
-  Keep awaits inside a transaction to database work, because a slow `fetch` there makes every
-  other query wait.
+- Transactions from different requests queue: SQLite has a single writer anyway. A
+  `transaction()` (or `db.transaction()`) started inside an open one joins it through a
+  savepoint.
+- A query that still carries a transaction's context after it ended throws
+  `TransactionEndedError` instead of committing on its own. Examples are an un-awaited write, a
+  timer, or a `Promise.all` branch that outlives a failed sibling. Await every query inside the
+  callback.
+- Keep awaits inside a transaction to database work. A slow `fetch` there makes every other
+  query wait. Awaiting a promise that another request started, such as a shared in-flight
+  cache, deadlocks if that request then needs the database.
 
 `src/db/__tests__/async-sqlite.test.ts` proves each of these properties, and removing either
 the wait or the queue fails a test. Rows map the same as with the sync driver, Drizzle's
 relational queries included. The exception is raw `db.all(sql…)`, which returns positional
-arrays and must move to the dialect helpers. In a micro-benchmark of 20,000 single-row selects
-on this schema, a query through the proxy took 57 µs against 109 µs through the sync driver,
-because `sqlite.query()` caches its prepared statements.
+arrays and must move to the dialect helpers. The module keeps its own cache of 500 prepared
+statements, because `bun:sqlite`'s `query()` cache holds only 20 and the app has hundreds of
+distinct statements. Over 20,000 single-row selects cycling through 200 statement shapes, a
+query took 32 µs through the proxy against 44 µs through the sync driver.
 
 Two alternatives were rejected:
 
 - **A second connection for each transaction:** `bun:sqlite` waits for a lock synchronously.
   While one connection holds the write lock, a write on the other freezes the event loop for up
   to `busy_timeout`, and with it the transaction it is waiting for, before failing with
-  `SQLITE_BUSY`. It also cannot work on the `:memory:` database the tests use.
+  `SQLITE_BUSY`. The tests' plain `:memory:` database can't be shared either. A shared-cache
+  memory database can be, but it locks per table and fails with `SQLITE_LOCKED` instead of
+  waiting.
 - **libsql:** this means a new native dependency and a driver swap for every query, for the
   same single-writer result. Reconsider it only if serialising transactions becomes a
   bottleneck.
 
-On Postgres (#1635) the same transaction signature maps onto the driver's own pooled
-`db.transaction(async (tx) => …)`, so call sites won't change again. The next #1378 steps move
+On Postgres (#1635) the same `transaction(async (tx) => …)` signature maps onto the driver's
+own pooled transaction, so call sites won't change again. The next #1378 steps move
 the app onto this session, then convert each domain's transaction sites and sync terminals.
 
 **Expense-linked records use a polymorphic link.** Financing payments, insurance premiums,

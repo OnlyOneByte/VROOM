@@ -2,7 +2,7 @@ import { Database } from 'bun:sqlite';
 import { describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
-import { openAsyncDatabase } from '../async-sqlite';
+import { openAsyncDatabase, TransactionEndedError } from '../async-sqlite';
 import * as schema from '../schema';
 import { applyMigrationsUpTo, loadMigrations } from './migration-helpers';
 
@@ -103,6 +103,64 @@ describe('async transactions over bun:sqlite', () => {
       })
     ).rejects.toThrow('undo');
     expect(await db.select().from(users)).toEqual([]);
+  });
+
+  test('a transaction started inside a transaction joins it through a savepoint', async () => {
+    const { db, transaction } = setup();
+    await transaction(async (tx) => {
+      await tx.insert(users).values(user('a'));
+      await transaction(async (inner) => {
+        await inner.insert(users).values(user('b'));
+      });
+    });
+    expect((await db.select({ id: users.id }).from(users)).map((r) => r.id).sort()).toEqual([
+      'a',
+      'b',
+    ]);
+  });
+
+  test('db.transaction on the returned handle is the gated transaction', async () => {
+    const { db } = setup();
+    const hold = gate();
+    const inserted = gate();
+    const tx = db.transaction(async (t) => {
+      await t.insert(users).values(user('a'));
+      inserted.open();
+      await hold.opened;
+      throw new Error('roll back');
+    });
+    await inserted.opened;
+    const outside = db.select().from(users);
+    hold.open();
+    await expect(tx).rejects.toThrow('roll back');
+    expect(await outside).toEqual([]);
+  });
+
+  test('a write that outlives its transaction is refused, not committed on its own', async () => {
+    const { db, transaction } = setup();
+    let late: Promise<unknown> = Promise.resolve();
+    await expect(
+      transaction(async (tx) => {
+        late = tick().then(() => tx.insert(users).values(user('late')));
+        throw new Error('fail fast');
+      })
+    ).rejects.toThrow('fail fast');
+    const error = (await late.catch((e) => e)) as { cause?: unknown };
+    expect(error.cause).toBeInstanceOf(TransactionEndedError);
+    expect(await db.select().from(users)).toEqual([]);
+  });
+
+  test('run reports changes, and batch runs its statements in order', async () => {
+    const { db } = setup();
+    const result = (await db.insert(users).values(user('a')).run()) as unknown as {
+      changes: number;
+    };
+    expect(result.changes).toBe(1);
+    await db.batch([
+      db.insert(users).values(user('b')),
+      db.update(users).set({ displayName: 'B' }).where(eq(users.id, 'b')),
+    ]);
+    expect((await db.select().from(users).where(eq(users.id, 'b')))[0]?.displayName).toBe('B');
   });
 
   test('rows map exactly as the bun:sqlite driver maps them', async () => {
