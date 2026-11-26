@@ -1,6 +1,7 @@
 import type { FuelAdvancedResponse, FuelStatsResponse } from '#lib/types/index.ts';
 
 export interface PriceSummary {
+	fuelType: string;
 	average: number;
 	low: number;
 	high: number;
@@ -8,11 +9,23 @@ export interface PriceSummary {
 	months: number;
 }
 
+function mainFuelType(history: FuelStatsResponse['gasPriceHistory']): string | null {
+	const counts = new Map<string, number>();
+	for (const item of history) counts.set(item.fuelType, (counts.get(item.fuelType) ?? 0) + 1);
+	let best: string | null = null;
+	for (const [type, count] of counts) {
+		if (best == null || count > (counts.get(best) ?? 0)) best = type;
+	}
+	return best;
+}
+
 export function priceSummary(history: FuelStatsResponse['gasPriceHistory']): PriceSummary | null {
-	if (history.length === 0) return null;
+	const fuelType = mainFuelType(history);
+	if (fuelType == null) return null;
+	const fills = history.filter(item => item.fuelType === fuelType);
 	const byMonth = new Map<string, { sum: number; count: number }>();
 	let sum = 0;
-	for (const item of history) {
+	for (const item of fills) {
 		sum += item.pricePerVolume;
 		const month = byMonth.get(item.month) ?? { sum: 0, count: 0 };
 		month.sum += item.pricePerVolume;
@@ -22,7 +35,8 @@ export function priceSummary(history: FuelStatsResponse['gasPriceHistory']): Pri
 	const monthly = [...byMonth].map(([month, m]) => ({ month, avg: m.sum / m.count }));
 	const cheapest = monthly.reduce((a, b) => (b.avg < a.avg ? b : a));
 	return {
-		average: sum / history.length,
+		fuelType,
+		average: sum / fills.length,
 		low: cheapest.avg,
 		high: Math.max(...monthly.map(m => m.avg)),
 		cheapestMonth: cheapest.month,
@@ -39,13 +53,13 @@ export interface EconomyRow {
 
 export function economyRows(radar: FuelAdvancedResponse['vehicleRadar']): EconomyRow[] {
 	const rows = radar
-		.filter((v): v is typeof v & { fuelEfficiency: number } => v.fuelEfficiency != null)
-		.sort((a, b) => b.fuelEfficiency - a.fuelEfficiency);
-	const max = rows[0]?.fuelEfficiency ?? 0;
+		.flatMap(v => (v.fuelEfficiencyValue == null ? [] : [{ ...v, value: v.fuelEfficiencyValue }]))
+		.sort((a, b) => b.value - a.value);
+	const max = rows[0]?.value ?? 0;
 	return rows.map(v => ({
 		vehicleId: v.vehicleId,
 		label: v.vehicleName,
-		value: v.fuelEfficiency,
-		share: max > 0 ? v.fuelEfficiency / max : 0
+		value: v.value,
+		share: max > 0 ? v.value / max : 0
 	}));
 }

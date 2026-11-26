@@ -34,12 +34,16 @@
 	let money = (v: number) => formatCurrency(v, undefined, 2);
 	let monthName = (month: string) =>
 		formatDateWith(parseMonthToDate(month), { month: 'long', year: 'numeric' });
+	let rangePhrase = $derived(
+		/^(Last |Year to date|All time)/.test(rangeText) ? rangeText.toLowerCase() : rangeText
+	);
+	let sessions = $derived(charging?.sessions.currentYear ?? 0);
 </script>
 
 <section aria-label="Fuel and charging overview" class="grid gap-6 md:grid-cols-2 md:gap-10">
 	{#if price}
 		<div class="space-y-2">
-			<p class="text-sm text-muted-foreground">Fuel, {rangeText.toLowerCase()}</p>
+			<h2 class="text-sm font-normal text-muted-foreground">{price.fuelType}, {rangePhrase}</h2>
 			<p
 				class="font-(family-name:--font-fig) text-6xl leading-none font-bold tabular-nums lg:text-7xl"
 			>
@@ -62,21 +66,17 @@
 	<div class="min-w-0 space-y-6 md:self-end">
 		{#if charging && (charging.sessions.currentYear > 0 || charging.averageCost.perEnergyUnit != null)}
 			<div class="space-y-2">
-				<p class="text-sm text-muted-foreground">Charging</p>
+				<h2 class="text-sm font-normal text-muted-foreground">Charging</h2>
 				<p class="max-w-md text-base md:text-lg">
 					{#if charging.averageCost.perEnergyUnit != null}
-						<strong>{formatCurrency(charging.averageCost.perEnergyUnit, undefined, 3)}</strong>
-						per {chargeUnit} on average
-					{:else}
-						No charging costs recorded
+						<strong>{money(charging.averageCost.perEnergyUnit)}</strong>
+						per {chargeUnit} on average across
 					{/if}
-					across <strong>{formatNumber(charging.sessions.currentYear, 0)}</strong>
-					{charging.sessions.currentYear === 1
-						? 'session'
-						: 'sessions'}{#if charging.efficiency.avgEfficiency != null}, at <strong>
-							{formatNumber(charging.efficiency.avgEfficiency, 1)}
-						</strong>
-						{electricEfficiencyUnit}{/if}.
+					<strong>{formatNumber(sessions, 0)}</strong>
+					{sessions === 1 ? 'session' : 'sessions'}{#if charging.efficiency.avgEfficiency != null},
+						at <strong>{formatNumber(charging.efficiency.avgEfficiency, 1)}</strong>
+						{electricEfficiencyUnit}{/if}{#if charging.averageCost.perEnergyUnit == null}, with no
+						costs recorded{/if}.
 				</p>
 			</div>
 		{/if}
@@ -89,8 +89,8 @@
 						<li
 							class="grid grid-cols-[minmax(0,10rem)_minmax(4rem,1fr)_auto] items-center gap-3 text-sm"
 						>
-							<span class="truncate">{row.label}</span>
-							<span class="h-2.5 rounded-full bg-muted" aria-hidden="true">
+							<span class="break-words">{row.label}</span>
+							<span class="h-2.5 rounded-full bg-muted-foreground/15" aria-hidden="true">
 								<span
 									class="block h-full rounded-full"
 									style:width="{Math.max(2, row.share * 100)}%"
