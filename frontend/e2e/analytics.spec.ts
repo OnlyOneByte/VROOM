@@ -428,7 +428,7 @@ test.describe('Analytics', () => {
 		await page.mouse.move(640, 600);
 		const panels = page.getByRole('region', { name: 'Total cost per month by car' });
 		await expect(panels.getByRole('heading', { level: 3 })).toHaveCount(2);
-		await expect(panels).toContainText(/Same \$0 – \$[\d,]+ scale for all 2/);
+		await expect(panels).toContainText(/One \$0 – \$[\d,]+ scale for every car/);
 
 		await panels
 			.getByRole('heading', { level: 3 })
@@ -444,6 +444,15 @@ test.describe('Analytics', () => {
 		await expect(page.getByRole('dialog').getByRole('heading').first()).toContainText(
 			'2020 Toyota Camry'
 		);
+
+		await page
+			.getByRole('navigation', { name: 'Drill path' })
+			.getByRole('button', { name: /^All cars in / })
+			.click();
+		await expect(page).not.toHaveURL(/seg=/);
+		await page.getByRole('dialog').getByRole('button', { name: 'Show only' }).first().click();
+		await expect(page).toHaveURL(/cars=vehicle-/);
+		await expect(page).not.toHaveURL(/sel=/);
 	});
 
 	test('a tag bar takes its value from the expenses, counted once', async ({ page }) => {

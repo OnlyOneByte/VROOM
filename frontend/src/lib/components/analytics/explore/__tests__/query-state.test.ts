@@ -245,8 +245,11 @@ describe('Explore chart data', () => {
 	test('Whole range shows every series, so hidden series are cleared', () => {
 		const byCar = { ...applyPreset({ split: 'vehicle' }), hide: ['camry'] };
 		expect(normalizeExplore({ ...byCar, per: 'none' }).hide).toEqual([]);
-		expect(normalizeExplore(byCar).hide).toEqual(['camry']);
+		expect(normalizeExplore(byCar).hide).toEqual([]);
+		const byCategory = { ...DEFAULT_EXPLORE, hide: ['fuel'] };
+		expect(normalizeExplore(byCategory).hide).toEqual(['fuel']);
 		expect(parseExplore(params('per=none&split=vehicle&hide=camry')).hide).toEqual([]);
+		expect(parseExplore(params('split=vehicle&hide=camry')).hide).toEqual([]);
 	});
 });
 

@@ -510,9 +510,7 @@
 
 	function panelTotalText(series: { values: Array<number | null> }): string {
 		const total = series.values.reduce<number>((sum, v) => sum + (v ?? 0), 0);
-		const [low, high] = panels.yDomain;
-		const scale = `Same ${format.axis(low)} – ${format.axis(high)} scale for all ${panels.panels.length}`;
-		return `${format.axis(total)} in all. ${scale}`;
+		return `${format.axis(total)} in all`;
 	}
 
 	function selectRanking(row: Record<string, unknown>) {
@@ -621,6 +619,16 @@
 						{rangeText}
 					</button>
 					<span aria-hidden="true" class="text-muted-foreground">›</span>
+					{#if selectedSeries && form === 'panels' && query.sel !== 'total'}
+						<button
+							type="button"
+							class="inline-flex min-h-10 items-center px-1 underline underline-offset-2"
+							onclick={() => onQueryChange({ ...query, seg: undefined })}
+						>
+							All cars in {bucketLabel(query.sel ?? '', shown.per)}
+						</button>
+						<span aria-hidden="true" class="text-muted-foreground">›</span>
+					{/if}
 					<span aria-current="page" class="px-1 font-medium">{selectionTitle}</span>
 				{:else}
 					<span aria-current="page" class="inline-flex min-h-10 items-center px-1 font-medium">
@@ -678,7 +686,8 @@
 						{chartTitle}
 					</h2>
 					<p class="text-sm text-muted-foreground">
-						One scale for every car. The dashed line is the fleet average{panels.fleetMean != null
+						One {format.axis(panels.yDomain[0])} – {format.axis(panels.yDomain[1])} scale for every car.
+						The dashed line is the fleet average{panels.fleetMean != null
 							? ` (${format.full(panels.fleetMean)}${panelPer})`
 							: ''}.
 					</p>
@@ -693,7 +702,7 @@
 					{/if}
 					<div
 						class="grid grid-cols-1 gap-4 {isAdditive(shown)
-							? 'md:grid-cols-2 xl:grid-cols-3'
+							? 'lg:grid-cols-2 xl:grid-cols-3'
 							: 'lg:grid-cols-2'}"
 					>
 						{#each panels.panels as panel (panel.series.key)}

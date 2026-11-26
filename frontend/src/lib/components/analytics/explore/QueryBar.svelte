@@ -2,7 +2,6 @@
 	import { tick, type Snippet } from 'svelte';
 	import { Check, ChevronDown, RotateCcw, Share2 } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		DEFAULT_EXPLORE,
@@ -79,11 +78,13 @@
 
 	let alignEnd = $state(false);
 	let menuMax = $state(0);
-	const isMobile = new IsMobile();
-
 	function roomBelow(button: HTMLElement) {
-		const bottomNav = isMobile.current ? 96 : 16;
-		return window.innerHeight - button.getBoundingClientRect().bottom - bottomNav;
+		const nav = document.querySelector<HTMLElement>('nav[aria-label="Main"]');
+		const navTop =
+			nav && getComputedStyle(nav).position === 'fixed'
+				? nav.getBoundingClientRect().top
+				: window.innerHeight;
+		return navTop - button.getBoundingClientRect().bottom - 16;
 	}
 
 	async function toggle(menu: Menu, button: HTMLElement) {
@@ -164,7 +165,7 @@
 	>
 		<Button
 			variant="outline"
-			class="h-10 max-w-full scroll-mt-20 gap-1.5 rounded-full px-4"
+			class="h-10 max-w-full scroll-mt-4 gap-1.5 rounded-full px-4"
 			aria-expanded={open === menu}
 			aria-controls="explore-menu-{menu}"
 			onclick={e => toggle(menu, e.currentTarget)}

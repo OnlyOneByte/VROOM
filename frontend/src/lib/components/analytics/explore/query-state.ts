@@ -111,7 +111,7 @@ export function normalizeExplore(query: ExploreQuery): ExploreQuery {
 	const next: ExploreQuery = splits.includes(query.split)
 		? query
 		: { ...query, split: splits[0] ?? 'none', hide: [] };
-	const clear = next.per === 'none' || next.compare === 'cars';
+	const clear = ['ranking', 'panels'].includes(chartForm(next));
 	return clear && next.hide.length > 0 ? { ...next, hide: [] } : next;
 }
 
