@@ -109,9 +109,8 @@ export function runMigrations(): void {
   }
 }
 
-function maintenanceQuery(query: string): unknown {
-  const client = getDb().$client;
-  return openAsyncDatabase(client).connectionMaintenance(() => client.query(query).get());
+function upkeep(kind: 'health' | 'checkpoint' | 'forceCheckpoint'): unknown {
+  return openAsyncDatabase(getDb().$client).upkeep(kind);
 }
 
 function checkpointPossible(): boolean {
@@ -120,7 +119,7 @@ function checkpointPossible(): boolean {
 
 export function checkDatabaseHealth(): boolean {
   try {
-    const result = maintenanceQuery('SELECT 1 as health') as { health: number } | null;
+    const result = upkeep('health') as { health: number } | null;
     return result?.health === 1;
   } catch (error) {
     logger.error('Database health check failed', { error });
@@ -131,7 +130,7 @@ export function checkDatabaseHealth(): boolean {
 export function checkpointWAL(): void {
   if (!checkpointPossible()) return;
   try {
-    const result = maintenanceQuery('PRAGMA wal_checkpoint(TRUNCATE)') as {
+    const result = upkeep('checkpoint') as {
       busy: number;
       log: number;
       checkpointed: number;
@@ -150,7 +149,7 @@ export function checkpointWAL(): void {
 export function forceCheckpointWAL(): void {
   if (!checkpointPossible()) return;
   try {
-    const result = maintenanceQuery('PRAGMA wal_checkpoint(RESTART)') as {
+    const result = upkeep('forceCheckpoint') as {
       busy: number;
       log: number;
       checkpointed: number;

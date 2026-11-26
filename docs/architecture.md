@@ -144,12 +144,16 @@ come from the async session while an async transaction is open throws
 transaction opened and run during it, so sync code must not hold prepared statements
 (`sqlite.prepare`, Drizzle's `.prepare()`). Nothing in the app does today.
 
-Connection upkeep in `src/db/connection.ts` stays sync by design. That covers the health
-check's `SELECT 1` and the WAL checkpoints, which run through `connectionMaintenance` and so
-are exempt from the guard; the checkpoints skip while a transaction is open. Raw `BEGIN`,
-`COMMIT`/`END`, `ROLLBACK`, `SAVEPOINT` or `RELEASE` through the async session, inside a
-callback or outside one, throws `RawTransactionControlError`: only `transaction()` opens and
-closes transactions.
+Connection upkeep in `src/db/connection.ts` stays sync by design. The health check's
+`SELECT 1` and the two WAL checkpoints run through `upkeep(kind)`, a fixed list of three
+queries that the guard exempts, so it can't carry anything else. The checkpoints skip while
+a transaction is open. The health check still runs then and its `SELECT 1` reads inside that
+transaction, so a richer health query must not read data.
+
+Raw `BEGIN`, `COMMIT`/`END`, `ROLLBACK`, `SAVEPOINT` or `RELEASE` through the async session
+throws `RawTransactionControlError` at the moment `run`, `all`, `get` or `values` is called,
+inside a callback or outside one, awaited or not. Only `transaction()` opens and closes
+transactions.
 
 **Expense-linked records use a polymorphic link.** Financing payments, insurance premiums,
 and reminder materializations are real rows in `expenses` tagged with `source_type` +

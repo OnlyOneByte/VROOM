@@ -302,20 +302,32 @@ describe('async transactions over bun:sqlite', () => {
   test('raw transaction control outside any transaction is refused too', async () => {
     const { sqlite, db } = setup();
     for (const raw of [sql`begin`, sql`commit`, sql`end`]) {
-      const error = await db.run(raw).then(
-        () => null,
-        (e) => e as { cause?: unknown }
-      );
-      expect(error?.cause ?? error).toBeInstanceOf(RawTransactionControlError);
+      expect(() => db.run(raw)).toThrow(RawTransactionControlError);
       expect(sqlite.inTransaction).toBe(false);
     }
   });
 
-  test('connection maintenance still runs while an async transaction is open', async () => {
-    const { sqlite, transaction, connectionMaintenance } = setup();
+  test('an un-awaited raw COMMIT is refused the moment it is called, so nothing commits early', async () => {
+    const { db, transaction } = setup();
+    await expect(
+      transaction(async (tx) => {
+        await tx.insert(users).values(user('a'));
+        await transaction(async (inner) => {
+          expect(() => inner.run(sql`commit`)).toThrow(RawTransactionControlError);
+          expect(() => inner.all(sql`end`)).toThrow(RawTransactionControlError);
+        });
+        expect(() => tx.get(sql`commit`)).toThrow(RawTransactionControlError);
+        throw new Error('root fails');
+      })
+    ).rejects.toThrow('root fails');
+    expect(await db.select().from(users)).toEqual([]);
+  });
+
+  test('connection upkeep still runs while an async transaction is open', async () => {
+    const { transaction, upkeep } = setup();
     await transaction(async (tx) => {
       await tx.insert(users).values(user('a'));
-      expect(connectionMaintenance(() => sqlite.query('SELECT 1 AS ok').get())).toEqual({ ok: 1 });
+      expect(upkeep('health')).toEqual({ health: 1 });
     });
   });
 

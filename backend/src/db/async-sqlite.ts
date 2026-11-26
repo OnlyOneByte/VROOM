@@ -9,6 +9,30 @@ const OPENING = /^\s*(begin|savepoint)\b/i;
 const BEGIN = /^\s*begin\b/i;
 const ROLLBACK = /^\s*rollback\b/i;
 const GUARDED_METHODS = ['prepare', 'query', 'run', 'exec', 'transaction'] as const;
+const RAW_QUERY_METHODS = ['run', 'all', 'get', 'values'] as const;
+const UPKEEP_QUERIES = {
+  health: 'SELECT 1 as health',
+  checkpoint: 'PRAGMA wal_checkpoint(TRUNCATE)',
+  forceCheckpoint: 'PRAGMA wal_checkpoint(RESTART)',
+} as const;
+
+type SqlSource = string | { getSQL(): unknown };
+type Dialect = { sqlToQuery(sql: unknown): { sql: string } };
+
+function refuseRawControl(target: object, dialect: Dialect): void {
+  for (const name of RAW_QUERY_METHODS) {
+    const original = (target as Record<string, (query: SqlSource) => unknown>)[name];
+    Object.assign(target, {
+      [name](query: SqlSource) {
+        const text = typeof query === 'string' ? query : dialect.sqlToQuery(query.getSQL()).sql;
+        if (OPENING.test(text) || TRANSACTION_CONTROL.test(text)) {
+          throw new RawTransactionControlError();
+        }
+        return original.call(target, query);
+      },
+    });
+  }
+}
 
 type Method = 'run' | 'all' | 'values' | 'get';
 
@@ -93,11 +117,11 @@ function createAsyncDatabase(sqlite: Database) {
     return statement;
   }
 
-  function connectionMaintenance<T>(fn: () => T): T {
+  function upkeep(kind: keyof typeof UPKEEP_QUERIES): unknown {
     const was = executing;
     executing = true;
     try {
-      return fn();
+      return sqlite.query(UPKEEP_QUERIES[kind]).get();
     } finally {
       executing = was;
     }
@@ -169,6 +193,8 @@ function createAsyncDatabase(sqlite: Database) {
   type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
   type Behavior = 'deferred' | 'immediate' | 'exclusive';
   const begin = db.transaction.bind(db);
+  const dialect = (db as unknown as { dialect: Dialect }).dialect;
+  refuseRawControl(db, dialect);
 
   async function sealWhenSettled<T>(scope: Scope, run: () => Promise<T>): Promise<T> {
     try {
@@ -191,6 +217,7 @@ function createAsyncDatabase(sqlite: Database) {
       } as Scope;
       const savepoint = scopes.run(child, () =>
         parent.tx.transaction((tx) => {
+          refuseRawControl(tx, dialect);
           child.tx = tx;
           return sealWhenSettled(child, () => callback(tx));
         })
@@ -230,6 +257,7 @@ function createAsyncDatabase(sqlite: Database) {
       return await scopes.run(scope, () =>
         begin(
           (tx) => {
+            refuseRawControl(tx, dialect);
             scope.tx = tx;
             return sealWhenSettled(scope, () => callback(tx));
           },
@@ -252,6 +280,6 @@ function createAsyncDatabase(sqlite: Database) {
     db: db as typeof db & { transaction: typeof transaction },
     transaction,
     outsideTransaction,
-    connectionMaintenance,
+    upkeep,
   };
 }
