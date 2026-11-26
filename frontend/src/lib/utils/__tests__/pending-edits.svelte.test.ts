@@ -37,7 +37,7 @@ function deferred() {
 }
 
 describe('editing an expense updates the row while the PUT runs', () => {
-	beforeEach(() => vi.clearAllMocks());
+	beforeEach(() => vi.resetAllMocks());
 	afterEach(() => resetPendingEdits());
 
 	function notices(): Record<string, unknown>[] {
