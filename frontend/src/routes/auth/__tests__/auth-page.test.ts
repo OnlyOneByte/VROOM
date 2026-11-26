@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { ApiError } from '#lib/utils/error-handling.ts';
@@ -103,8 +102,16 @@ describe('sign-in page', () => {
 	test.each([
 		['open', false, 'New here? Signing in creates your garage.'],
 		['open', true, 'New here? Signing in with an allowed email creates your garage.'],
-		['approval', false, 'New here? Sign in to ask for an account. An admin approves it first.'],
-		['invite', false, 'New here? This server is invite only. Ask its admin for an invite.'],
+		[
+			'approval',
+			false,
+			'New here? Sign in to ask for an account. An admin approves it first, unless they invited you.'
+		],
+		[
+			'invite',
+			false,
+			'New here? You need an invite, from this server’s admin or from someone sharing a vehicle with you.'
+		],
 		['closed', false, 'This server isn’t taking new accounts.']
 	])(
 		'the new-here line follows the %s mode (domains limited: %s)',
@@ -125,12 +132,51 @@ describe('sign-in page', () => {
 		expect(screen.queryByText(/New here/)).not.toBeInTheDocument();
 	});
 
-	test('the sign-in error map uses curly apostrophes only', () => {
-		const source = readFileSync(`${process.cwd()}/src/routes/auth/+page.svelte`, 'utf8');
-		const map = source.slice(
-			source.indexOf('const authErrorMessages'),
-			source.indexOf('let providers')
-		);
-		expect(map).not.toMatch(/[a-z]'[a-z]/i);
+	test('a sign-up refusal is said once: the new-here line steps aside for the alert', async () => {
+		page.url = new URL('https://app.example/auth?auth_error=signup_invite_required');
+		authApi.getProviders.mockResolvedValue([{ id: 'google', displayName: 'Google' }]);
+		render(AuthPage);
+		await screen.findByRole('button', { name: 'Continue with Google' });
+		expect(screen.getByRole('alert')).toHaveTextContent('This server is invite only');
+		expect(screen.queryByTestId('signup-mode-line')).not.toBeInTheDocument();
+	});
+
+	test('a non-sign-up error keeps the new-here line', async () => {
+		page.url = new URL('https://app.example/auth?auth_error=cancelled');
+		authApi.getProviders.mockResolvedValue([{ id: 'google', displayName: 'Google' }]);
+		render(AuthPage);
+		expect(await screen.findByTestId('signup-mode-line')).toBeInTheDocument();
+	});
+
+	test('with no sign-in options, or while they fail to load, there is no new-here line', async () => {
+		authApi.getProviders.mockResolvedValueOnce([]);
+		const { unmount } = render(AuthPage);
+		await screen.findByText('Sign-in is currently unavailable. No providers are enabled.');
+		expect(screen.queryByTestId('signup-mode-line')).not.toBeInTheDocument();
+		unmount();
+
+		authApi.getProviders.mockRejectedValueOnce(new ApiError('Network error', 0));
+		render(AuthPage);
+		await screen.findByRole('button', { name: 'Retry' });
+		expect(screen.queryByTestId('signup-mode-line')).not.toBeInTheDocument();
+	});
+
+	test.each([
+		'invalid_state',
+		'email_exists',
+		'provider_unavailable',
+		'no_email',
+		'unknown_provider',
+		'cancelled',
+		'signup_closed',
+		'signup_invite_required',
+		'signup_domain_not_allowed'
+	])('the %s message uses curly apostrophes', async code => {
+		page.url = new URL(`https://app.example/auth?auth_error=${code}`);
+		authApi.getProviders.mockResolvedValue([]);
+		render(AuthPage);
+		const alert = await screen.findByRole('alert');
+		expect(alert.textContent?.trim()).not.toBe('');
+		expect(alert.textContent).not.toContain("'");
 	});
 });
