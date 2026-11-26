@@ -229,8 +229,12 @@
 
 <div class="min-h-screen space-y-4 md:space-y-6">
 	<div>
-		<p class="text-sm text-muted-foreground">Analytics</p>
-		<PageHeader title={TAB_TITLES[activeTab] ?? 'Explore'} variant="display" />
+		{#if noVehicles}
+			<PageHeader title="Analytics" variant="display" />
+		{:else}
+			<p class="text-sm text-muted-foreground">Analytics</p>
+			<PageHeader title={TAB_TITLES[activeTab] ?? 'Explore'} variant="display" />
+		{/if}
 	</div>
 
 	{#if !noVehicles}
@@ -243,8 +247,8 @@
 		/>
 	{/if}
 
-	{#if isLoading && !error}
-		<Skeleton class="h-10 w-full rounded-full sm:w-2/3" />
+	{#if isLoading && !error && !summary}
+		<Skeleton class="h-10 w-full rounded-full" />
 	{:else if error}
 		<LoadErrorCard title="Couldn't load analytics" message={error} onRetry={loadSummary} />
 	{:else if noVehicles}
