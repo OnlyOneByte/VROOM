@@ -198,6 +198,15 @@ describe('ExpenseForm create mode', () => {
 		expect(goto).not.toHaveBeenCalled();
 	});
 
+	test('an invalid amount keeps its error underline while focused', async () => {
+		await renderCreate();
+		await save();
+
+		const figure = screen.getByTestId('quick-amount-figure');
+		expect(figure).toHaveClass('border-destructive');
+		expect(figure.className).not.toContain('focus-within:border-needle');
+	});
+
 	test('a failed save moves focus from Save to the first invalid field', async () => {
 		await renderCreate();
 

@@ -29,9 +29,10 @@
 	<Label for="amount" class={quick ? 'sr-only' : ''}>Amount *</Label>
 	{#if quick}
 		<div
-			class="inline-flex max-w-full items-start justify-center gap-1 border-b-2 border-transparent font-(family-name:--font-fig) font-bold transition-colors focus-within:border-needle {amountError
-				? 'text-destructive'
-				: 'text-foreground'}"
+			class="inline-flex max-w-full items-start justify-center gap-1 border-b-2 font-(family-name:--font-fig) font-bold transition-colors {amountError
+				? 'border-destructive text-destructive'
+				: 'border-transparent text-foreground focus-within:border-needle'}"
+			data-testid="quick-amount-figure"
 		>
 			<span
 				class="mt-1.5 text-3xl leading-none sm:mt-2 sm:text-5xl {amount

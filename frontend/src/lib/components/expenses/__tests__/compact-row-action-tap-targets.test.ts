@@ -99,4 +99,12 @@ describe('the compact row action pair', () => {
 		expect(stripPadTop, 'the action strip does not pad for the hit area above it').not.toBeNull();
 		expect(stripPadTop!).toBeGreaterThanOrEqual(overhang!);
 	});
+
+	test('the row shows a solid focus ring, not a translucent one', async () => {
+		const { container } = render(ExpensesTable, { expenses: EXPENSES, onDelete: async () => {} });
+		const summary = container.querySelector<HTMLButtonElement>('.divide-y button[aria-expanded]');
+		const classes = (summary?.getAttribute('class') ?? '').split(' ');
+		expect(classes).toContain('focus-visible:ring-ring');
+		expect(classes.some(c => c.startsWith('focus-visible:ring-ring/'))).toBe(false);
+	});
 });
