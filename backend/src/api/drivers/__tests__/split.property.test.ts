@@ -56,7 +56,17 @@ describe('split rules', () => {
     fc.assert(
       fc.property(rule, input, (r, i) => {
         const { owed, unassigned } = splitGroup(r, i);
-        return sumOf(owed) + unassigned === i.total;
+        const unpaid = r.kind === 'payer' ? (i.paidBy.get(null) ?? 0) : 0;
+        return sumOf(owed) + unassigned + unpaid === i.total;
+      })
+    );
+  });
+
+  test('under Not split, a cost with no payer is never also counted as unassigned', () => {
+    fc.assert(
+      fc.property(input, (i) => {
+        const { owed, unassigned } = splitGroup({ kind: 'payer' }, i);
+        return unassigned === 0 && [...owed].every(([id, cents]) => cents === i.paidBy.get(id));
       })
     );
   });

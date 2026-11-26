@@ -1,20 +1,16 @@
 <script lang="ts">
-	import { Globe, Fuel, DollarSign } from '@lucide/svelte';
-	import { Label } from '#lib/components/ui/label/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
+	import Segmented from '#lib/components/common/Segmented.svelte';
 	import { CURRENCIES } from '#lib/constants/currencies.ts';
 	import { currencyLabel } from '#lib/utils/formatters.ts';
-	import {
-		Card,
-		CardContent,
-		CardDescription,
-		CardHeader,
-		CardTitle
-	} from '#lib/components/ui/card/index.ts';
+	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
+
+	type Distance = 'miles' | 'kilometers';
+	type Volume = 'gallons_us' | 'gallons_uk' | 'liters';
 
 	interface Props {
-		distanceUnit: 'miles' | 'kilometers';
-		volumeUnit: 'gallons_us' | 'gallons_uk' | 'liters';
+		distanceUnit: Distance;
+		volumeUnit: Volume;
 		chargeUnit: 'kwh';
 		currencyUnit: string;
 		onUnitsChange?: () => void;
@@ -30,14 +26,15 @@
 		onCurrencyChange
 	}: Props = $props();
 
-	function getDistanceLabel(unit: 'miles' | 'kilometers'): string {
-		return unit === 'miles' ? 'Miles' : 'Kilometers';
-	}
-
-	function getVolumeLabel(unit: 'gallons_us' | 'gallons_uk' | 'liters'): string {
-		const labels = { gallons_us: 'Gallons (US)', gallons_uk: 'Gallons (UK)', liters: 'Liters' };
-		return labels[unit];
-	}
+	const DISTANCES: { value: Distance; label: string }[] = [
+		{ value: 'miles', label: 'Miles' },
+		{ value: 'kilometers', label: 'Kilometers' }
+	];
+	const VOLUMES: { value: Volume; label: string }[] = [
+		{ value: 'gallons_us', label: 'US gal' },
+		{ value: 'gallons_uk', label: 'UK gal' },
+		{ value: 'liters', label: 'Liters' }
+	];
 
 	const currencyCodes: readonly string[] = $derived(
 		(CURRENCIES as readonly string[]).includes(currencyUnit)
@@ -46,115 +43,72 @@
 	);
 </script>
 
-<Card>
+<Card variant="section">
 	<CardHeader>
-		<CardTitle>Unit Preferences</CardTitle>
-		<CardDescription>
-			Choose your preferred units for measurements. Changes save right away.
-		</CardDescription>
-		<p class="text-sm text-muted-foreground mt-1">
-			These units are used as defaults when adding new vehicles and determine the display units for
-			cross-vehicle analytics.
-		</p>
+		<CardTitle level={2} class="text-base">Units and currency</CardTitle>
 	</CardHeader>
-	<CardContent class="space-y-6">
-		<div class="space-y-2">
-			<Label for="distance-unit" class="flex items-center gap-2">
-				<Globe class="h-4 w-4" />
-				Distance Unit
-			</Label>
-			<Select.Root
-				type="single"
-				value={distanceUnit}
-				onValueChange={v => {
-					if (!v || v === distanceUnit) return;
-					distanceUnit = v as 'miles' | 'kilometers';
-					onUnitsChange?.();
-				}}
-			>
-				<Select.Trigger id="distance-unit" class="w-full">
-					{getDistanceLabel(distanceUnit)}
-				</Select.Trigger>
-				<Select.Content>
-					<Select.Item value="miles" label="Miles">Miles</Select.Item>
-					<Select.Item value="kilometers" label="Kilometers">Kilometers</Select.Item>
-				</Select.Content>
-			</Select.Root>
-		</div>
-
-		<div class="space-y-2">
-			<Label for="volume-unit" class="flex items-center gap-2">
-				<Fuel class="h-4 w-4" />
-				Fuel Volume Unit
-			</Label>
-			<p class="text-xs text-muted-foreground">For gas and diesel vehicles</p>
-			<Select.Root
-				type="single"
-				value={volumeUnit}
-				onValueChange={v => {
-					if (!v || v === volumeUnit) return;
-					volumeUnit = v as 'gallons_us' | 'gallons_uk' | 'liters';
-					onUnitsChange?.();
-				}}
-			>
-				<Select.Trigger id="volume-unit" class="w-full">
-					{getVolumeLabel(volumeUnit)}
-				</Select.Trigger>
-				<Select.Content>
-					<Select.Item value="gallons_us" label="Gallons (US)">Gallons (US)</Select.Item>
-					<Select.Item value="gallons_uk" label="Gallons (UK)">Gallons (UK)</Select.Item>
-					<Select.Item value="liters" label="Liters">Liters</Select.Item>
-				</Select.Content>
-			</Select.Root>
-		</div>
-
-		<div class="space-y-2">
-			<Label for="charge-unit" class="flex items-center gap-2">
-				<Fuel class="h-4 w-4" />
-				Electric Charge Unit
-			</Label>
-			<p class="text-xs text-muted-foreground">For electric and hybrid vehicles</p>
-			<Select.Root
-				type="single"
-				value={chargeUnit}
-				onValueChange={v => {
-					if (!v || v === chargeUnit) return;
-					chargeUnit = v as 'kwh';
-					onUnitsChange?.();
-				}}
-			>
-				<Select.Trigger id="charge-unit" class="w-full">kWh</Select.Trigger>
-				<Select.Content>
-					<Select.Item value="kwh" label="kWh">kWh</Select.Item>
-				</Select.Content>
-			</Select.Root>
-		</div>
-
-		<div class="space-y-2">
-			<Label for="currency" class="flex items-center gap-2">
-				<DollarSign class="h-4 w-4" />
-				Currency
-			</Label>
-			<Select.Root
-				type="single"
-				value={currencyUnit}
-				onValueChange={v => {
-					if (!v || v === currencyUnit) return;
-					currencyUnit = v;
-					onCurrencyChange?.();
-				}}
-			>
-				<Select.Trigger id="currency" class="w-full">
-					{currencyLabel(currencyUnit)}
-				</Select.Trigger>
-				<Select.Content>
-					{#each currencyCodes as code (code)}
-						<Select.Item value={code} label={currencyLabel(code)}>
-							{currencyLabel(code)}
-						</Select.Item>
-					{/each}
-				</Select.Content>
-			</Select.Root>
+	<CardContent>
+		<p class="text-sm text-muted-foreground">
+			Defaults for new vehicles, and the units for totals across vehicles. Changes save right away.
+		</p>
+		<div class="divide-y">
+			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+				<p class="font-medium">Distance</p>
+				<Segmented
+					label="Distance"
+					value={distanceUnit}
+					options={DISTANCES}
+					onValueChange={v => {
+						distanceUnit = v;
+						onUnitsChange?.();
+					}}
+				/>
+			</div>
+			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+				<div>
+					<p class="font-medium">Fuel</p>
+					<p class="text-sm text-muted-foreground">For gas and diesel vehicles</p>
+				</div>
+				<Segmented
+					label="Fuel"
+					value={volumeUnit}
+					options={VOLUMES}
+					onValueChange={v => {
+						volumeUnit = v;
+						onUnitsChange?.();
+					}}
+				/>
+			</div>
+			<div class="flex items-center justify-between gap-4 py-3" data-testid="charge-unit">
+				<div>
+					<p class="font-medium">Charging</p>
+					<p class="text-sm text-muted-foreground">For electric and hybrid vehicles</p>
+				</div>
+				<span class="text-sm font-semibold">{chargeUnit === 'kwh' ? 'kWh' : chargeUnit}</span>
+			</div>
+			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+				<label for="currency" class="font-medium">Currency</label>
+				<Select.Root
+					type="single"
+					value={currencyUnit}
+					onValueChange={v => {
+						if (!v || v === currencyUnit) return;
+						currencyUnit = v;
+						onCurrencyChange?.();
+					}}
+				>
+					<Select.Trigger id="currency" class="w-full max-w-xs sm:w-auto">
+						{currencyLabel(currencyUnit)}
+					</Select.Trigger>
+					<Select.Content>
+						{#each currencyCodes as code (code)}
+							<Select.Item value={code} label={currencyLabel(code)}>
+								{currencyLabel(code)}
+							</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+			</div>
 		</div>
 	</CardContent>
 </Card>

@@ -28,17 +28,24 @@ async function settle() {
 	for (let i = 0; i < 10; i++) await new Promise(r => setTimeout(r, 0));
 }
 
-function trigger(id: string): HTMLElement {
-	const el = document.getElementById(id);
-	if (!el) throw new Error(`missing trigger ${id}`);
+function currency(): HTMLElement {
+	const el = document.getElementById('currency');
+	if (!el) throw new Error('missing currency trigger');
 	return el;
 }
 
-async function pickOption(id: string, name: string) {
-	await fireEvent.click(trigger(id));
+async function pickCurrency(name: string) {
+	await fireEvent.click(currency());
 	await settle();
 	await fireEvent.pointerUp(screen.getByRole('option', { name }));
 	await settle();
+}
+
+function checked(group: string): string | undefined {
+	const radios = screen
+		.getByRole('radiogroup', { name: group })
+		.querySelectorAll('[role="radio"][aria-checked="true"]');
+	return radios[0]?.textContent?.trim();
 }
 
 afterEach(() => {
@@ -46,28 +53,28 @@ afterEach(() => {
 });
 
 describe('UnitPreferencesCard', () => {
-	test('labels each trigger with the current unit', () => {
+	test('shows the current units and currency', () => {
 		mount();
-		expect(trigger('distance-unit')).toHaveTextContent('Miles');
-		expect(trigger('volume-unit')).toHaveTextContent('Gallons (US)');
-		expect(trigger('charge-unit')).toHaveTextContent('kWh');
-		expect(trigger('currency')).toHaveTextContent('USD – US Dollar ($)');
+		expect(checked('Distance')).toBe('Miles');
+		expect(checked('Fuel')).toBe('US gal');
+		expect(screen.getByTestId('charge-unit')).toHaveTextContent('kWh');
+		expect(currency()).toHaveTextContent('USD – US Dollar ($)');
 	});
 
 	test.each([
 		['kilometers', 'Kilometers'],
 		['miles', 'Miles']
-	] as const)('distance %s is labelled %s', (unit, label) => {
+	] as const)('distance %s is checked as %s', (unit, label) => {
 		mount({ distanceUnit: unit });
-		expect(trigger('distance-unit')).toHaveTextContent(label);
+		expect(checked('Distance')).toBe(label);
 	});
 
 	test.each([
-		['gallons_uk', 'Gallons (UK)'],
+		['gallons_uk', 'UK gal'],
 		['liters', 'Liters']
-	] as const)('volume %s is labelled %s', (unit, label) => {
+	] as const)('fuel %s is checked as %s', (unit, label) => {
 		mount({ volumeUnit: unit });
-		expect(trigger('volume-unit')).toHaveTextContent(label);
+		expect(checked('Fuel')).toBe(label);
 	});
 
 	test.each([
@@ -78,12 +85,17 @@ describe('UnitPreferencesCard', () => {
 		['CHF', 'CHF – Swiss Franc']
 	])('currency %s is labelled %s', (code, label) => {
 		mount({ currencyUnit: code });
-		expect(trigger('currency')).toHaveTextContent(label);
+		expect(currency()).toHaveTextContent(label);
+	});
+
+	test('the currency field is labelled', () => {
+		mount();
+		expect(screen.getByLabelText('Currency')).toBe(currency());
 	});
 
 	test('offers exactly the shared currency list', async () => {
 		mount();
-		await fireEvent.click(trigger('currency'));
+		await fireEvent.click(currency());
 		await settle();
 		const names = screen.getAllByRole('option').map(o => o.textContent?.trim());
 		expect(names).toHaveLength(CURRENCIES.length);
@@ -102,35 +114,11 @@ describe('UnitPreferencesCard', () => {
 		['HRK', 'HRK – Croatian Kuna']
 	])('a saved %s outside the list still shows and stays selectable', async (code, label) => {
 		mount({ currencyUnit: code });
-		expect(trigger('currency')).toHaveTextContent(label);
-		await fireEvent.click(trigger('currency'));
+		expect(currency()).toHaveTextContent(label);
+		await fireEvent.click(currency());
 		await settle();
 		expect(screen.getByRole('option', { name: label })).toBeTruthy();
 		expect(screen.getAllByRole('option')).toHaveLength(CURRENCIES.length + 1);
-	});
-
-	test('picking a distance unit updates the selection', async () => {
-		mount();
-		await pickOption('distance-unit', 'Kilometers');
-		expect(trigger('distance-unit')).toHaveTextContent('Kilometers');
-	});
-
-	test('picking a volume unit updates the selection', async () => {
-		mount();
-		await pickOption('volume-unit', 'Liters');
-		expect(trigger('volume-unit')).toHaveTextContent('Liters');
-	});
-
-	test('picking a currency updates the selection', async () => {
-		mount();
-		await pickOption('currency', 'GBP – British Pound (£)');
-		expect(trigger('currency')).toHaveTextContent('GBP – British Pound (£)');
-	});
-
-	test('the charge unit offers kWh', async () => {
-		mount();
-		await pickOption('charge-unit', 'kWh');
-		expect(trigger('charge-unit')).toHaveTextContent('kWh');
 	});
 
 	test('picking a different unit or currency asks the page to save it', async () => {
@@ -138,13 +126,16 @@ describe('UnitPreferencesCard', () => {
 		const onCurrencyChange = vi.fn();
 		mount({ onUnitsChange, onCurrencyChange });
 
-		await pickOption('distance-unit', 'Kilometers');
-		await pickOption('volume-unit', 'Liters');
+		await fireEvent.click(screen.getByRole('radio', { name: 'Kilometers' }));
+		await fireEvent.click(screen.getByRole('radio', { name: 'Liters' }));
 		expect(onUnitsChange).toHaveBeenCalledTimes(2);
+		expect(checked('Distance')).toBe('Kilometers');
+		expect(checked('Fuel')).toBe('Liters');
 		expect(onCurrencyChange).not.toHaveBeenCalled();
 
-		await pickOption('currency', 'GBP – British Pound (£)');
+		await pickCurrency('GBP – British Pound (£)');
 		expect(onCurrencyChange).toHaveBeenCalledOnce();
+		expect(currency()).toHaveTextContent('GBP – British Pound (£)');
 	});
 
 	test('picking the value already selected saves nothing', async () => {
@@ -152,8 +143,8 @@ describe('UnitPreferencesCard', () => {
 		const onCurrencyChange = vi.fn();
 		mount({ onUnitsChange, onCurrencyChange });
 
-		await pickOption('charge-unit', 'kWh');
-		await pickOption('currency', 'USD – US Dollar ($)');
+		await fireEvent.click(screen.getByRole('radio', { name: 'Miles' }));
+		await pickCurrency('USD – US Dollar ($)');
 		expect(onUnitsChange).not.toHaveBeenCalled();
 		expect(onCurrencyChange).not.toHaveBeenCalled();
 	});
