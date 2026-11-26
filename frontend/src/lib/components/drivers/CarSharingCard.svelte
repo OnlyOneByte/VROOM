@@ -37,6 +37,7 @@
 	let listState = $state<'loading' | 'ready' | 'error'>('loading');
 	let guestName = $state('');
 	let renaming = $state<{ id: string; name: string } | null>(null);
+	let backfillOpen = $state(false);
 
 	let active = $derived(drivers.filter(d => !d.archived));
 	let archivedGuests = $derived(drivers.filter(d => d.archived && !d.userId));
@@ -243,6 +244,23 @@
 			<p class="text-xs text-muted-foreground">
 				Members drive under their own name. Archived drivers keep their past entries.
 			</p>
+			<div class="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+				<div class="space-y-0.5">
+					<p class="text-sm font-medium">Past entries</p>
+					<p class="text-xs text-muted-foreground">
+						Nothing before car sharing has a driver yet. Fill it in, and undo it if needed.
+					</p>
+				</div>
+				<Button variant="outline" size="lg" onclick={() => (backfillOpen = true)}>
+					Fill in drivers
+				</Button>
+			</div>
 		</CardContent>
 	{/if}
 </Card>
+
+{#if backfillOpen}
+	{#await import('./BackfillDialog.svelte') then { default: BackfillDialog }}
+		<BackfillDialog bind:open={backfillOpen} {vehicleId} drivers={active} />
+	{/await}
+{/if}
