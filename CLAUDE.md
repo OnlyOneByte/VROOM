@@ -60,7 +60,8 @@ A green build is the floor, not "done".
    encrypted provider credentials, per-device push subscriptions, and the server-wide
    community stats aggregate and its refresh time, which are rebuilt daily and would import
    a foreign population if restored on another server, and the roles, role assignments and
-   overrides, since a restore must never grant access: restored shares re-create theirs),
+   overrides, since a restore must never grant access: restored shares re-create theirs, and
+   the driver fill-in batches, which only serve undo while entries keep their drivers),
    and those guards fail if
    a new table is silently omitted; destructive actions disclose their full cascade; offline
    writes never drop.
