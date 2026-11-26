@@ -53,6 +53,20 @@ export function readRules(db: AppDatabase, vehicleId: string): SplitRules {
   return parsed.success ? parsed.data : DEFAULT_RULES;
 }
 
+export function rulesFor(rules: SplitRules, everyone: boolean, ownDriver: string | null) {
+  if (everyone) return rules;
+  const own = <R extends GroupRule>(rule: R): R =>
+    rule.kind === 'fixed'
+      ? {
+          ...rule,
+          shares: Object.fromEntries(
+            Object.entries(rule.shares).filter(([id]) => id === ownDriver)
+          ),
+        }
+      : rule;
+  return { running: own(rules.running), ownership: own(rules.ownership) };
+}
+
 export function writeRules(db: AppDatabase, vehicleId: string, rules: SplitRules): void {
   db.update(vehicles)
     .set({ carShareRules: rules, updatedAt: new Date() })
@@ -100,10 +114,13 @@ export function splitGroup(
   rule: GroupRule,
   input: GroupInput
 ): { owed: Map<string, number>; unassigned: number } {
-  const shares =
-    rule.kind === 'payer'
-      ? new Map([...input.paidBy].map(([id, cents]) => [id ?? UNASSIGNED, cents]))
-      : allocate(input.total, weightsFor(rule, input));
+  if (rule.kind === 'payer') {
+    const owed = new Map(
+      [...input.paidBy].flatMap(([id, cents]) => (id === null ? [] : [[id, cents] as const]))
+    );
+    return { owed, unassigned: 0 };
+  }
+  const shares = allocate(input.total, weightsFor(rule, input));
   const allocated = [...shares.values()].reduce((a, b) => a + b, 0);
   const owed = new Map([...shares].filter(([id]) => id !== UNASSIGNED));
   const unassigned = (shares.get(UNASSIGNED) ?? 0) + (input.total - allocated);
@@ -230,7 +247,7 @@ export function balancesView(
   const managers = <T>(value: T) => (options.everyone ? value : null);
   return {
     scope: options.everyone ? ('everyone' as const) : ('own' as const),
-    rules: result.rules,
+    rules: rulesFor(result.rules, options.everyone, options.ownDriver),
     drivers: [...result.balances]
       .filter(([id]) => sees(id))
       .map(([id, balance]) => ({

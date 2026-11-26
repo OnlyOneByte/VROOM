@@ -56,7 +56,17 @@ describe('split rules', () => {
     fc.assert(
       fc.property(rule, input, (r, i) => {
         const { owed, unassigned } = splitGroup(r, i);
-        return sumOf(owed) + unassigned === i.total;
+        const unpaid = r.kind === 'payer' ? (i.paidBy.get(null) ?? 0) : 0;
+        return sumOf(owed) + unassigned + unpaid === i.total;
+      })
+    );
+  });
+
+  test('under Not split, a cost with no payer is never also counted as unassigned', () => {
+    fc.assert(
+      fc.property(input, (i) => {
+        const { owed, unassigned } = splitGroup({ kind: 'payer' }, i);
+        return unassigned === 0 && [...owed].every(([id, cents]) => cents === i.paidBy.get(id));
       })
     );
   });
@@ -77,6 +87,29 @@ describe('split rules', () => {
     );
     expect(Object.fromEntries(owed)).toEqual({ a: 6000, b: 2000 });
     expect(unassigned).toBe(2000);
+  });
+
+  test('when balances do not cancel out, transfers never overshoot and only one side is left over', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.integer({ min: -50_000, max: 50_000 }), { minLength: 1, maxLength: 8 }),
+        (values) => {
+          const balances = new Map(values.map((v, i) => [`d${i}`, v]));
+          const after = new Map(balances);
+          for (const t of settle(balances)) {
+            after.set(t.from, (after.get(t.from) ?? 0) - t.amount);
+            after.set(t.to, (after.get(t.to) ?? 0) + t.amount);
+          }
+          const sameSide = [...after].every(
+            ([id, v]) => v === 0 || Math.sign(v) === Math.sign(balances.get(id) ?? 0)
+          );
+          const left = [...after.values()].filter((v) => v !== 0);
+          const oneSide = left.every((v) => v > 0) || left.every((v) => v < 0);
+          const gap = values.reduce((n, v) => n + v, 0);
+          return sameSide && oneSide && left.reduce((n, v) => n + v, 0) === gap;
+        }
+      )
+    );
   });
 
   test('settling up zeroes every balance in at most n - 1 transfers', () => {

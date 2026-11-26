@@ -17,6 +17,7 @@
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import type { Driver } from '#lib/types/index.ts';
 	import { driverColor } from '#lib/utils/driver-helpers.ts';
+	import SplittingSection from './SplittingSection.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import {
 		currentOfflineQueueOwner,
@@ -244,6 +245,9 @@
 			<p class="text-xs text-muted-foreground">
 				Members drive under their own name. Archived drivers keep their past entries.
 			</p>
+			{#if listState === 'ready'}
+				<SplittingSection {vehicleId} drivers={active} />
+			{/if}
 			<div class="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
 				<div class="space-y-0.5">
 					<p class="text-sm font-medium">Past entries</p>
