@@ -2,7 +2,7 @@ import { csvText } from '#lib/components/analytics/explore/explore-data';
 import type { DriverBalances } from '#lib/types/index.ts';
 import { formatCurrency } from '#lib/utils/formatters.ts';
 
-const amount = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
+const amount = (n: number) => String(Math.round(n * 100) / 100);
 
 export function balancesCsv(data: DriverBalances): string {
 	const lines = [
@@ -18,6 +18,8 @@ export function balancesCsv(data: DriverBalances): string {
 export function balancesText(data: DriverBalances, period: string): string {
 	if (data.transfers.length === 0) return `Everyone is settled up for ${period}.`;
 	return data.transfers
-		.map(t => `${t.fromName} pays ${t.toName} ${formatCurrency(t.amount, undefined, 2)} for ${period}.`)
+		.map(
+			t => `${t.fromName} pays ${t.toName} ${formatCurrency(t.amount, undefined, 2)} for ${period}.`
+		)
 		.join('\n');
 }

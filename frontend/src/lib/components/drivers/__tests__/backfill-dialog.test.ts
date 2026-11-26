@@ -78,6 +78,10 @@ describe('BackfillDialog', () => {
 		expect((screen.getByRole('button', { name: 'Fill in' }) as HTMLButtonElement).disabled).toBe(
 			true
 		);
+		previewBackfill.mockResolvedValue(summary(2));
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await settle();
+		expect(screen.getByRole('status').textContent).toContain('2 trips');
 	});
 
 	test('a date range covers whole local days, from midnight to the end of the last day', () => {

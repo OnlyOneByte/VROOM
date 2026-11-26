@@ -132,7 +132,9 @@
 								<li class="flex min-h-10 items-center gap-2">
 									<span
 										class="size-2.5 shrink-0 rounded-full"
-										style:background-color={driverColor(colorOf.get(t.fromDriverId) ?? { color: null })}
+										style:background-color={driverColor(
+											colorOf.get(t.fromDriverId) ?? { color: null }
+										)}
 										aria-hidden="true"
 									></span>
 									<span class="truncate">{t.fromName}</span>

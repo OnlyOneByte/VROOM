@@ -17,29 +17,33 @@
 
 	type Group = keyof SplitRules;
 
-	const GROUPS: { key: Group; label: string; hint: string; options: [GroupRule['kind'], string][] }[] =
-		[
-			{
-				key: 'running',
-				label: 'Running costs',
-				hint: 'Fuel, charging, maintenance and other costs of driving.',
-				options: [
-					['distance', 'By distance driven'],
-					['equal', 'Equally'],
-					['fixed', 'Fixed percentages'],
-					['payer', 'Not split']
-				]
-			},
-			{
-				key: 'ownership',
-				label: 'Ownership costs',
-				hint: 'Loan, insurance, registration and tax.',
-				options: [
-					['payer', 'Not split'],
-					['fixed', 'Fixed percentages']
-				]
-			}
-		];
+	const GROUPS: {
+		key: Group;
+		label: string;
+		hint: string;
+		options: [GroupRule['kind'], string][];
+	}[] = [
+		{
+			key: 'running',
+			label: 'Running costs',
+			hint: 'Fuel, charging, maintenance and other costs of driving.',
+			options: [
+				['distance', 'By distance driven'],
+				['equal', 'Equally'],
+				['fixed', 'Fixed percentages'],
+				['payer', 'Not split']
+			]
+		},
+		{
+			key: 'ownership',
+			label: 'Ownership costs',
+			hint: 'Loan, insurance, registration and tax.',
+			options: [
+				['payer', 'Not split'],
+				['fixed', 'Fixed percentages']
+			]
+		}
+	];
 
 	let rules = $state<SplitRules | null>(null);
 	let draft = $state<Record<Group, Record<string, string>>>({ running: {}, ownership: {} });
@@ -174,7 +178,9 @@
 						{/each}
 						<div class="flex flex-wrap items-center justify-between gap-2 pt-1">
 							<p
-								class="text-sm tabular-nums {sum === 100 ? 'text-muted-foreground' : 'text-destructive'}"
+								class="text-sm tabular-nums {sum === 100
+									? 'text-muted-foreground'
+									: 'text-destructive'}"
 								role="status"
 							>
 								{sum === 100 ? 'Adds up to 100%' : `Adds up to ${sum}%. It needs to be 100%.`}
@@ -188,7 +194,11 @@
 								>
 									Cancel
 								</Button>
-								<Button size="lg" disabled={busy || sum !== 100} onclick={() => saveShares(group.key)}>
+								<Button
+									size="lg"
+									disabled={busy || sum !== 100}
+									onclick={() => saveShares(group.key)}
+								>
 									Save
 								</Button>
 							</div>
