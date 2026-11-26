@@ -7,6 +7,7 @@ import {
   seedVehicle,
   type TestDb,
 } from '../../../api/analytics/__tests__/analytics-test-generators';
+import { openAsyncDatabase } from '../../async-sqlite';
 import { expenses } from '../../schema';
 import {
   classifyDbError,
@@ -199,6 +200,27 @@ describe('classifyDbError over real SQLite errors', () => {
     expect(
       classifyDbError(
         errorOf("INSERT INTO users (id, email, display_name) VALUES ('u2', NULL, 'X')")
+      )
+    ).toBe('not_null');
+  });
+
+  test('the async session wraps the driver error, and it is still classified', async () => {
+    const asyncDb = openAsyncDatabase(testDb.sqlite).db;
+    const failure = (statement: string) =>
+      asyncDb.run(sql.raw(statement)).then(
+        () => null,
+        (e) => e
+      );
+    expect(
+      classifyDbError(
+        await failure(
+          "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v3', 'nobody', 'A', 'B', 2020)"
+        )
+      )
+    ).toBe('foreign_key');
+    expect(
+      classifyDbError(
+        await failure("INSERT INTO users (id, email, display_name) VALUES ('u3', NULL, 'X')")
       )
     ).toBe('not_null');
   });

@@ -107,8 +107,9 @@ export function looksLikeDriverError(err: unknown): boolean {
 export function classifyDbError(err: unknown): DbErrorKind | null {
   const code = driverErrorCode(err);
   if (code !== undefined && UNIQUE_VIOLATION_CODES.has(code)) return 'unique';
-  if (!(err instanceof Error)) return null;
-  if (err.message.includes('FOREIGN KEY constraint failed')) return 'foreign_key';
-  if (err.message.includes('NOT NULL constraint failed')) return 'not_null';
+  for (let e: unknown = err; e instanceof Error; e = e.cause) {
+    if (e.message.includes('FOREIGN KEY constraint failed')) return 'foreign_key';
+    if (e.message.includes('NOT NULL constraint failed')) return 'not_null';
+  }
   return null;
 }
