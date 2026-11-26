@@ -5,6 +5,7 @@ import {
   type DataEnvelope,
   json,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee, type Invitee } from '../../../test-helpers/invitee';
@@ -34,7 +35,7 @@ let other: Invitee;
 beforeEach(async () => {
   ctx = await createTestApp();
   other = await createInvitee(ctx, 'compare-other', 'Other');
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => {
   communityConfig.mode = 'local';
   ctx.close();

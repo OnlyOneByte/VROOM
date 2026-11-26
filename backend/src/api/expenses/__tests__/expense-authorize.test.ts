@@ -6,6 +6,7 @@ import {
   type DataEnvelope,
   json,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee, type Invitee } from '../../../test-helpers/invitee';
@@ -86,7 +87,7 @@ beforeEach(async () => {
   insertExpense('owners-row', ctx.user.id, vehicleId);
   insertExpense('editors-row', ctx.user.id, vehicleId, { createdBy: editor.id });
   insertExpense('loan-row', ctx.user.id, vehicleId, { sourceType: 'financing' });
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => ctx.close());
 

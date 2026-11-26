@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import packageJson from '../../package.json';
 import * as connection from '../db/connection';
-import { createTestApp, type TestApp } from '../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../test-helpers/http-client';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = join(HERE, '..', 'app.ts');
@@ -16,7 +16,7 @@ describe('reported version comes from the package, not a literal', () => {
 
   beforeAll(async () => {
     ctx = await createTestApp();
-  });
+  }, SETUP_TIMEOUT_MS);
 
   test('GET /health reports the package version', async () => {
     const res = await ctx.app.request('/health');
@@ -52,7 +52,7 @@ describe('GET /health checks the database', () => {
 
   beforeAll(async () => {
     ctx = await createTestApp();
-  });
+  }, SETUP_TIMEOUT_MS);
 
   test('a database that cannot answer makes /health 503, keeping the version', async () => {
     const probe = spyOn(connection, 'checkDatabaseHealth').mockReturnValue(false);

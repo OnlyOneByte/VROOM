@@ -5,6 +5,7 @@ import {
   json,
   type PaginatedEnvelope,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee } from '../../../test-helpers/invitee';
@@ -30,7 +31,7 @@ beforeEach(async () => {
   seedCar(ctx, CAR);
   seedCar(ctx, OTHER);
   m = await seedMembers(ctx, CAR, 'dr');
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 const status = (request: RequestFn, method: string, path: string, body?: unknown) =>

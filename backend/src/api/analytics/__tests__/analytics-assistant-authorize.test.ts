@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type RequestFn, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type RequestFn,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 import { type Members, overrideOn, seedCar, seedMembers } from '../../../test-helpers/members';
 import { ASSISTANT_TOOLS } from '../../providers/domains/llm/tools';
 
@@ -12,7 +17,7 @@ beforeEach(async () => {
   ctx = await createTestApp();
   seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'an');
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 const status = (request: RequestFn, path: string) => request('GET', path).then((res) => res.status);

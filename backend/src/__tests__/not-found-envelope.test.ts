@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { createTestApp, json, type TestApp } from '../test-helpers/http-client';
+import { createTestApp, json, SETUP_TIMEOUT_MS, type TestApp } from '../test-helpers/http-client';
 
 let ctx: TestApp;
 
 beforeAll(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 afterAll(() => ctx.close());
 
 interface ErrorBody {

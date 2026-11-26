@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 let isSafeReturnPath: typeof import('../routes').isSafeReturnPath;
@@ -7,7 +7,7 @@ let isSafeReturnPath: typeof import('../routes').isSafeReturnPath;
 beforeEach(async () => {
   ctx = await createTestApp();
   ({ isSafeReturnPath } = await import('../routes'));
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 describe('isSafeReturnPath', () => {

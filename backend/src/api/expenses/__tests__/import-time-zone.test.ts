@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  json,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 import { calendarDayIn, zonedParts } from '../../../utils/time-zone';
 import { normalizeForeignDate } from '../import-mapping';
@@ -69,7 +74,7 @@ let ctx: TestApp;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 async function importedDates(): Promise<string[]> {
