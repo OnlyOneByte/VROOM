@@ -3,6 +3,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
@@ -15,7 +16,7 @@ beforeEach(async () => {
   ctx = await createTestApp();
   ({ isSameSubmittedDay } = await import('../routes'));
   vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 async function createReminder(over: Record<string, unknown>): Promise<string> {

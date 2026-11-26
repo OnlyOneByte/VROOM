@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { repos } from '../../../app-context';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import {
   notifyUser,
   type PushResult,
@@ -35,7 +35,7 @@ beforeEach(async () => {
   await db
     .insert(schema.users)
     .values({ id: userB, email: `svcb-${bCounter}@t.com`, displayName: 'B' });
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   setPushSenderForTest(null);

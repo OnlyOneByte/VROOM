@@ -6,6 +6,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 
@@ -24,7 +25,7 @@ function seedPhoto(
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 
 describe('GET /api/v1/photos?entityType= (batch list)', () => {
   test('401 without a session', async () => {

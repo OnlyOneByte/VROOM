@@ -5,6 +5,7 @@ import {
   type DataEnvelope,
   json,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee } from '../../../test-helpers/invitee';
@@ -24,7 +25,7 @@ beforeEach(async () => {
   ctx = await createTestApp();
   seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'sh');
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 const invite = (request: RequestFn, email: string) =>

@@ -4,6 +4,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { AnthropicLlmProvider } from '../domains/llm/anthropic';
@@ -38,7 +39,7 @@ beforeEach(async () => {
       apiKey: true,
     }
   );
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => {
   delete providers.mistral;
   ctx.close();

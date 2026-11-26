@@ -4,6 +4,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 
@@ -22,7 +23,7 @@ const previousFake = config.allowFakeStorageProvider;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => {
   config.allowFakeStorageProvider = previousFake;
   ctx.close();

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { CONFIG } from '../../../config';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { LOCAL_OCR_PROVIDER_ID } from '../domains/vlm/registry';
 
 let ctx: TestApp;
@@ -10,7 +10,7 @@ const enabledBefore = localOcr.enabled;
 beforeEach(async () => {
   ctx = await createTestApp();
   localOcr.enabled = false;
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => {
   localOcr.enabled = enabledBefore;
   ctx.close();

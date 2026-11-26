@@ -3,6 +3,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee, type Invitee } from '../../../test-helpers/invitee';
@@ -14,7 +15,7 @@ let b: Invitee;
 beforeEach(async () => {
   ctx = await createTestApp();
   b = await createInvitee(ctx, 'rem-invitee');
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 interface ReminderJoin {

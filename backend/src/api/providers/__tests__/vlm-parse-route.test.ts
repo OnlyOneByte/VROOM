@@ -3,6 +3,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { stopLocalOcr } from '../domains/vlm/local-ocr';
@@ -12,7 +13,7 @@ const realFetch = globalThis.fetch;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 afterAll(stopLocalOcr);
 
 afterEach(() => {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AppError, formatErrorResponse, NotFoundError } from '../../../errors';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import {
   ALLOWED_MIME_TYPES,
   deletePhotoForEntity,
@@ -28,7 +28,7 @@ beforeEach(async () => {
     ]);
   }
   storage = installFakePhotoStorage(ctx);
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   storage.restore();

@@ -4,6 +4,7 @@ import {
   type DataEnvelope,
   json,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee } from '../../../test-helpers/invitee';
@@ -20,7 +21,7 @@ beforeEach(async () => {
   bEmail = b.email;
   bCookie = b.cookie;
   asB = b.request;
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 async function uploadAsB(entityType: string, entityId: string): Promise<Response> {

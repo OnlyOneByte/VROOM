@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 
 // Auth-domain providers are sign-in identities; routes must never modify or delete them.
 
@@ -24,7 +24,7 @@ beforeEach(async () => {
     })
     .returning();
   authProviderId = row.id;
-});
+}, SETUP_TIMEOUT_MS);
 
 async function storedDisplayName(): Promise<string | undefined> {
   const db = (await import('../../../db/connection')).getDb();

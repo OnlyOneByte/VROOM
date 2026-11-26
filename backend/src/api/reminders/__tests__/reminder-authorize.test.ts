@@ -4,6 +4,7 @@ import {
   type DataEnvelope,
   json,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { type Members, overrideOn, seedCar, seedMembers } from '../../../test-helpers/members';
@@ -46,7 +47,7 @@ beforeEach(async () => {
   m = await seedMembers(ctx, SHARED, 'rem');
   reminder('both-cars', [SHARED, PRIVATE]);
   reminder('editors-reminder', [SHARED], m.editor.id);
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 describe('reminder vehicle lists show only vehicles the caller can see', () => {

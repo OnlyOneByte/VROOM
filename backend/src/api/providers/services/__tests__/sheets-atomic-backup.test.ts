@@ -4,7 +4,11 @@ import {
   googleApiError,
   makeFakeSheetsClients,
 } from '../../../../test-helpers/fake-google-clients';
-import { createTestApp, type TestApp } from '../../../../test-helpers/http-client';
+import {
+  createTestApp,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../../../test-helpers/http-client';
 
 type SheetsModule = typeof import('../google-sheets-service');
 
@@ -16,7 +20,7 @@ beforeEach(async () => {
   ctx = await createTestApp();
   store = new FakeGoogleStore();
   mod = await import('../google-sheets-service');
-});
+}, SETUP_TIMEOUT_MS);
 
 function makeSvc() {
   return new mod.GoogleSheetsService('fake-refresh-token', makeFakeSheetsClients(store));

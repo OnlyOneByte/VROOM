@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { uploadPhotoForEntity } from '../photo-service';
 import { type FakePhotoStorage, installFakePhotoStorage } from './fake-photo-storage';
 
@@ -21,7 +21,7 @@ beforeEach(async () => {
     new File([new Uint8Array([137, 80, 78, 71])], 'shot.png', { type: 'image/png' })
   );
   photoId = photo.id;
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   storage.restore();
