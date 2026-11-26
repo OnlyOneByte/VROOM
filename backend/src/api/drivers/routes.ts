@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { appContext, repos } from '../../app-context';
-import { NotFoundError, ValidationError } from '../../errors';
+import { ForbiddenError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, vehicleParam } from '../../permissions/authorize';
 import { requestResolver } from '../../permissions/grants';
@@ -21,9 +21,17 @@ import {
   DRIVER_COLORS,
   findDriver,
   listDrivers,
+  ownDriverId,
   setCarShare,
   updateDriver,
 } from './repository';
+import {
+  balancesView,
+  computeBalances,
+  readRules,
+  rulesSchema,
+  writeRules,
+} from './split';
 import { driverStats } from './stats';
 
 const vehicleIdParam = z.object({ vehicleId: z.string().min(1).max(64) });
@@ -95,6 +103,76 @@ driverRoutes.get(
         everyone: resolver.can('vehicle.driver_stats.read', vehicle).allow,
         includeCarCosts: resolver.can('vehicle.expense.read', vehicle).allow,
         scale,
+      }),
+    });
+  }
+);
+
+driverRoutes.get(
+  '/rules',
+  zValidator('param', vehicleIdParam),
+  authorize(vehicleParam('vehicleId')),
+  (c) => {
+    const { vehicleId } = c.req.valid('param');
+    requireCarShare(vehicleId);
+    return c.json({ success: true, data: readRules(appContext().db, vehicleId) });
+  }
+);
+
+driverRoutes.put(
+  '/rules',
+  zValidator('param', vehicleIdParam),
+  zValidator('json', rulesSchema),
+  authorize(vehicleParam('vehicleId')),
+  (c) => {
+    const { vehicleId } = c.req.valid('param');
+    requireCarShare(vehicleId);
+    const { db } = appContext();
+    const rules = c.req.valid('json');
+    const active = new Set(
+      listDrivers(db, vehicleId)
+        .filter((d) => !d.archived)
+        .map((d) => d.id)
+    );
+    for (const rule of [rules.running, rules.ownership]) {
+      if (rule.kind === 'fixed' && Object.keys(rule.shares).some((id) => !active.has(id))) {
+        throw new ValidationError('Fixed shares can only name active drivers of this vehicle');
+      }
+    }
+    writeRules(db, vehicleId, rules);
+    return c.json({ success: true, data: rules });
+  }
+);
+
+driverRoutes.get(
+  '/balances',
+  zValidator('param', vehicleIdParam),
+  zValidator('query', statsQuery),
+  authorize(vehicleParam('vehicleId')),
+  async (c) => {
+    const { vehicleId } = c.req.valid('param');
+    const query = c.req.valid('query');
+    const { db } = appContext();
+    requireCarShare(vehicleId);
+    const resolver = requestResolver(c, db);
+    const vehicle = { kind: 'vehicle' as const, vehicleId };
+    if (!resolver.can('vehicle.expense.read', vehicle).allow) {
+      throw new ForbiddenError("You don't have permission to see this vehicle's costs");
+    }
+    const userId = c.get('user').id;
+    const access = await requireVehicleAccess(vehicleId, userId, 'read');
+    const to = query.to ? Date.parse(query.to) : Date.now();
+    const from = query.from ? Date.parse(query.from) : to - 30 * DAY;
+    const result = computeBalances(db, vehicleId, {
+      period: { from, to },
+      hideFinancials: !seesFinancials(access),
+    });
+    return c.json({
+      success: true,
+      data: balancesView(result, {
+        everyone: resolver.can('vehicle.driver_stats.read', vehicle).allow,
+        ownDriver: ownDriverId(db, vehicleId, userId),
+        scale: await repos().preferences.moneyScale(access.ownerId),
       }),
     });
   }
@@ -187,7 +265,8 @@ driverRoutes.post(
     const hide = await hidesFinancials(vehicleId, userId);
     const planned = planBackfill(db, vehicleId, backfillRequest(vehicleId, body), hide);
     const { batchId, entries } = applyBackfill(db, vehicleId, body.mode, planned, userId, hide);
-    return c.json({ success: true, data: { batchId, ...summarize(db, vehicleId, entries) } }, 201);
+    const data = { batchId, ...summarize(db, vehicleId, entries) };
+    return c.json({ success: true, data }, batchId ? 201 : 200);
   }
 );
 

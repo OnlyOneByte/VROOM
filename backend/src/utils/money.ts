@@ -160,7 +160,8 @@ export function financingWithBalanceToApi<T extends Record<string, unknown>>(
 }
 
 export function vehicleRowToApi<T extends Record<string, unknown>>(row: T, scale: number): T {
-  const v = vehicleToApi(row, scale);
+  const { carShareRules: _rules, ...rest } = vehicleToApi(row, scale);
+  const v = rest as T;
   const fin = v.financing as Record<string, unknown> | null | undefined;
   if (fin && typeof fin === 'object') {
     return { ...v, financing: financingWithBalanceToApi(fin, scale) };
