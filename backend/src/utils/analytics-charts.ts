@@ -642,6 +642,7 @@ export function buildVehicleRadar(
   vehicleId: string;
   vehicleName: string;
   fuelEfficiency: number | null;
+  fuelEfficiencyValue: number | null;
   maintenanceCost: number;
   reliability: number;
   annualCost: number;
@@ -698,6 +699,7 @@ export function buildVehicleRadar(
         m.fuelEfficiency == null
           ? null
           : normalizeScore(m.fuelEfficiency, minOf(fuelEffVals), maxOf(fuelEffVals), false),
+      fuelEfficiencyValue: m.fuelEfficiency,
       maintenanceCost: normalizeScore(
         m.maintenanceCost,
         minOf(maintCostVals),
