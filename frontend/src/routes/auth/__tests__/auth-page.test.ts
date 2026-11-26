@@ -1,10 +1,14 @@
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { ApiError } from '#lib/utils/error-handling.ts';
 
 const { page, authApi } = vi.hoisted(() => ({
 	page: { url: new URL('https://app.example/auth') },
-	authApi: { getProviders: vi.fn<() => Promise<{ id: string; displayName: string }[]>>() }
+	authApi: {
+		getProviders: vi.fn<() => Promise<{ id: string; displayName: string }[]>>(),
+		getSignupInfo: vi.fn<() => Promise<{ mode: string; domainRestricted: boolean }>>()
+	}
 }));
 
 vi.mock('$app/state', () => ({ page }));
@@ -12,6 +16,10 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('#lib/services/auth-api.ts', () => ({ authApi }));
 
 const AuthPage = (await import('../+page.svelte')).default;
+
+beforeEach(() => {
+	authApi.getSignupInfo.mockResolvedValue({ mode: 'invite', domainRestricted: false });
+});
 
 afterEach(() => {
 	page.url = new URL('https://app.example/auth');
@@ -69,7 +77,7 @@ describe('sign-in page', () => {
 	});
 
 	test.each([
-		['signup_closed', "This server isn't taking new accounts"],
+		['signup_closed', 'This server isn’t taking new accounts'],
 		['signup_invite_required', 'This server is invite only'],
 		['signup_domain_not_allowed', 'only takes accounts from certain email domains']
 	])('a refused sign-up (%s) says why', async (code, message) => {
@@ -90,5 +98,33 @@ describe('sign-in page', () => {
 		expect(await screen.findByRole('status')).toHaveTextContent(
 			'Sign-in is currently unavailable. No providers are enabled.'
 		);
+	});
+
+	test.each([
+		['open', false, 'New here? Signing in creates your garage.'],
+		['open', true, 'New here? Signing in with an allowed email creates your garage.'],
+		['approval', false, 'New here? Sign in to ask for an account. An admin approves it first.'],
+		['invite', false, 'New here? This server is invite only. Ask its admin for an invite.'],
+		['closed', false, 'This server isn’t taking new accounts.']
+	])('the new-here line follows the %s mode (domains limited: %s)', async (mode, domainRestricted, line) => {
+		authApi.getProviders.mockResolvedValue([{ id: 'google', displayName: 'Google' }]);
+		authApi.getSignupInfo.mockResolvedValue({ mode, domainRestricted });
+		render(AuthPage);
+		expect(await screen.findByTestId('signup-mode-line')).toHaveTextContent(line);
+	});
+
+	test('when the sign-up mode cannot load, the page makes no promise about new accounts', async () => {
+		authApi.getProviders.mockResolvedValue([{ id: 'google', displayName: 'Google' }]);
+		authApi.getSignupInfo.mockRejectedValue(new ApiError('Network error', 0));
+		render(AuthPage);
+		await screen.findByRole('button', { name: 'Continue with Google' });
+		expect(screen.queryByTestId('signup-mode-line')).not.toBeInTheDocument();
+		expect(screen.queryByText(/New here/)).not.toBeInTheDocument();
+	});
+
+	test('the sign-in error map uses curly apostrophes only', () => {
+		const source = readFileSync(`${process.cwd()}/src/routes/auth/+page.svelte`, 'utf8');
+		const map = source.slice(source.indexOf('const authErrorMessages'), source.indexOf('let providers'));
+		expect(map).not.toMatch(/[a-z]'[a-z]/i);
 	});
 });

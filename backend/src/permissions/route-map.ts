@@ -39,6 +39,9 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   'GET /api': { public: 'API version banner' },
 
   'GET /api/v1/auth/providers': { public: 'The sign-in page lists the enabled sign-in methods' },
+  'GET /api/v1/auth/signup': {
+    public: 'The sign-in page says who can join: the sign-up mode, never the domain list',
+  },
   'GET /api/v1/auth/demo': { public: 'The sign-in page asks whether the demo garage is on' },
   'POST /api/v1/auth/demo': { public: 'Starts a demo session for a signed-out visitor' },
   'GET /api/v1/auth/login/:authProvider': { public: 'Starts sign-in for a signed-out visitor' },

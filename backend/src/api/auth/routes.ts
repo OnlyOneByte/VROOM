@@ -172,6 +172,11 @@ routes.get('/providers', async (c) => {
   });
 });
 
+routes.get('/signup', (c) => {
+  const { mode, allowedDomains } = signupSettings(appContext().db);
+  return c.json({ success: true, data: { mode, domainRestricted: allowedDomains.length > 0 } });
+});
+
 routes.get('/demo', (c) => c.json({ success: true, data: { available: isDemoAvailable() } }));
 
 routes.post('/demo', authRateLimiter, async (c) => {
