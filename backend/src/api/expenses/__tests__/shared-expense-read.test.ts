@@ -147,6 +147,14 @@ describe('shared per-vehicle CSV export', () => {
     expect(csv).not.toContain('Unknown Vehicle');
   });
 
+  test("a viewer's export labels the amounts with the OWNER's currency, not the viewer's", async () => {
+    const [vehicleId] = await shareWithExpense('viewer');
+    expect((await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'EUR' })).status).toBe(200);
+
+    const csv = await (await asB('GET', `/api/v1/expenses/export?vehicleId=${vehicleId}`)).text();
+    expect(csv).toContain('"maintenance","75","EUR"');
+  });
+
   test('a STRANGER (no share) is denied the per-vehicle export (existence-hiding 404)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Private', model: 'Car', year: 2021 });
     await ctx.authed('POST', '/api/v1/expenses', {

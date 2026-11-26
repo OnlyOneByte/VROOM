@@ -1,11 +1,16 @@
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { appContext, repos } from '../../app-context';
-import { ValidationError } from '../../errors';
+import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, ownAccount, vehicleParam } from '../../permissions/authorize';
 import { requestResolver } from '../../permissions/grants';
-import { insuranceClaimToApi, insuranceTermToApi } from '../../utils/money';
+import {
+  insuranceClaimFromApi,
+  insuranceClaimToApi,
+  insuranceTermFromApi,
+  insuranceTermToApi,
+} from '../../utils/money';
 import { validateInsuranceOwnership, zValidator } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
@@ -168,9 +173,11 @@ routes.get(
 
 routes.post('/', zValidator('json', createPolicySchema), authorize(ownAccount), async (c) => {
   const user = c.get('user');
-  const data = c.req.valid('json');
+  const scale = await ownScale(c);
+  const body = c.req.valid('json');
+  const data = { ...body, terms: body.terms.map((t) => insuranceTermFromApi(t, scale)) };
   for (const term of data.terms) {
-    assertTermPremiumWithinCap({ ...term, totalCost: term.totalCost ?? 0 });
+    assertTermPremiumWithinCap({ ...term, totalCost: term.totalCost ?? 0 }, scale);
   }
   const policy = await repos().insurancePolicies.create(data, user.id);
 
@@ -189,7 +196,7 @@ routes.post('/', zValidator('json', createPolicySchema), authorize(ownAccount), 
   return c.json(
     {
       success: true,
-      data: policyToApi(policy, await ownScale(c)),
+      data: policyToApi(policy, scale),
       message: 'Insurance policy created successfully',
     },
     201
@@ -252,8 +259,9 @@ routes.post(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
-    const termData = c.req.valid('json');
-    assertTermPremiumWithinCap({ ...termData, totalCost: termData.totalCost ?? 0 });
+    const scale = await ownScale(c);
+    const termData = insuranceTermFromApi(c.req.valid('json'), scale);
+    assertTermPremiumWithinCap({ ...termData, totalCost: termData.totalCost ?? 0 }, scale);
     const policy = await repos().insurancePolicies.addTerm(id, termData, user.id);
 
     const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, policy.newTermId);
@@ -293,18 +301,24 @@ routes.put(
     const user = c.get('user');
     const { id, termId } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
-    const updates = c.req.valid('json');
+    const scale = await ownScale(c);
+    const updates = insuranceTermFromApi(c.req.valid('json'), scale);
     const existing = await repos().insurancePolicies.findById(id);
     const previousTerm = existing?.terms.find((t) => t.id === termId);
     const previous =
       existing && previousTerm ? termExpenseParams(existing, previousTerm, user.id) : undefined;
     if (previous) {
-      assertTermPremiumWithinCap({
-        totalCost: (updates.totalCost === undefined ? previous.totalCost : updates.totalCost) ?? 0,
-        monthlyCost: updates.monthlyCost === undefined ? previous.monthlyCost : updates.monthlyCost,
-        startDate: updates.startDate ?? previous.startDate,
-        endDate: updates.endDate ?? previous.endDate,
-      });
+      assertTermPremiumWithinCap(
+        {
+          totalCost:
+            (updates.totalCost === undefined ? previous.totalCost : updates.totalCost) ?? 0,
+          monthlyCost:
+            updates.monthlyCost === undefined ? previous.monthlyCost : updates.monthlyCost,
+          startDate: updates.startDate ?? previous.startDate,
+          endDate: updates.endDate ?? previous.endDate,
+        },
+        scale
+      );
     }
     const policy = await repos().insurancePolicies.updateTerm(id, termId, updates, user.id);
 
@@ -349,10 +363,11 @@ routes.get(
   async (c) => {
     const { id } = c.req.valid('param');
     const policy = await repos().insurancePolicies.findById(id);
+    if (!policy) throw new NotFoundError('Insurance policy');
     const claims = await repos().insuranceClaims.findByPolicyId(id);
     const resolver = requestResolver(c, appContext().db);
     const scoped =
-      policy?.userId === c.get('user').id
+      policy.userId === c.get('user').id
         ? claims
         : claims.filter(
             (cl) =>
@@ -360,7 +375,7 @@ routes.get(
               resolver.can('vehicle.insurance.read', { kind: 'vehicle', vehicleId: cl.vehicleId })
                 .allow
           );
-    const scale = await repos().preferences.moneyScale(policy?.userId ?? c.get('user').id);
+    const scale = await repos().preferences.moneyScale(policy.userId);
     return c.json({
       success: true,
       data: scoped.map((cl) => insuranceClaimToApi(cl, scale)),
@@ -380,7 +395,10 @@ routes.post(
     await validateInsuranceOwnership(id, user.id);
     const data = c.req.valid('json');
     await validateClaimRefs(data, id, user.id);
-    const claim = await repos().insuranceClaims.create(id, data);
+    const claim = await repos().insuranceClaims.create(
+      id,
+      insuranceClaimFromApi(data, await ownScale(c))
+    );
     return c.json(
       {
         success: true,
@@ -403,7 +421,11 @@ routes.put(
     await validateInsuranceOwnership(id, user.id);
     const updates = c.req.valid('json');
     await validateClaimRefs(updates, id, user.id);
-    const claim = await repos().insuranceClaims.update(id, claimId, updates);
+    const claim = await repos().insuranceClaims.update(
+      id,
+      claimId,
+      insuranceClaimFromApi(updates, await ownScale(c))
+    );
     return c.json({
       success: true,
       data: insuranceClaimToApi(claim, await ownScale(c)),

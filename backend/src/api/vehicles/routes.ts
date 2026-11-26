@@ -23,7 +23,7 @@ import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } 
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
-import { boundedDollarsToCents, toMajor, vehicleRowToApi } from '../../utils/money';
+import { boundedDollarsToCents, toMajor, vehicleFromApi, vehicleRowToApi } from '../../utils/money';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { canonicalScale } from '../../utils/unit-conversions';
 import {
@@ -273,6 +273,7 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
   const { include, timeZone } = c.req.valid('query');
 
   const userVehicles = await repos().vehicles.findByUserId(user.id);
+  const ownerOf = new Map(userVehicles.map((v) => [v.id, v.userId]));
 
   let sharedRows: Array<
     (typeof userVehicles)[number] & {
@@ -287,6 +288,7 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
       const sharedVehicles = (await repos().vehicles.findByIds([...byVehicleId.keys()])).filter(
         (v) => resolver.can('vehicle.read', { kind: 'vehicle', vehicleId: v.id }).allow
       );
+      for (const v of sharedVehicles) ownerOf.set(v.id, v.userId);
       sharedRows = await Promise.all(
         sharedVehicles.map(async (v) => {
           const g = byVehicleId.get(v.id);
@@ -315,9 +317,9 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
     return v;
   });
 
-  const scaleOf = await repos().preferences.moneyScales(allVehicles.map((v) => v.userId));
+  const scaleOf = await repos().preferences.moneyScales(ownerOf.values());
   const apiVehicles = enrichedVehicles.map((v) => ({
-    ...vehicleRowToApi(v, scaleOf(v.userId)),
+    ...vehicleRowToApi(v, scaleOf(ownerOf.get(v.id) ?? '')),
     carShare: carShareAccess(c, v.id, v.carShareEnabled),
   }));
   const response: ApiResponse<typeof apiVehicles> = {
@@ -345,7 +347,7 @@ routes.post('/', zValidator('json', createVehicleSchema), authorize(ownAccount),
   }
 
   const createdVehicle = await repos().vehicles.create({
-    ...vehicleData,
+    ...vehicleFromApi(vehicleData, await repos().preferences.moneyScale(user.id)),
     unitPreferences,
     userId: user.id,
   });
@@ -459,7 +461,10 @@ routes.put(
     await assertUnitChangeConfirmed(existingVehicle, mergedUnitPreferences, confirmUnitChange);
 
     const updatedVehicle = await repos().vehicles.update(id, {
-      ...restUpdateData,
+      ...vehicleFromApi(
+        restUpdateData,
+        await repos().preferences.moneyScale(existingVehicle.userId)
+      ),
       ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
       ...(renamedWithoutCatalogModel(existingVehicle, updateData) && { catalogModelId: null }),
     });

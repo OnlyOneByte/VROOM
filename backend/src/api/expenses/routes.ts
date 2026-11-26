@@ -17,7 +17,15 @@ import {
 } from '../../permissions/authorize';
 import type { Resource } from '../../permissions/resolve';
 import { neutralizeCsvRow } from '../../utils/csv-safety';
-import { expenseDollarsToCents, expenseSummaryToApi, expenseToApi } from '../../utils/money';
+import {
+  expenseDollarsToCents,
+  expenseFromApi,
+  expenseSummaryToApi,
+  expenseToApi,
+  minorUnitScale,
+  parsedToMinor,
+  splitConfigFromApi,
+} from '../../utils/money';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import { readJsonBody } from '../../utils/request-body';
 import { isValidTimeZone } from '../../utils/time-zone';
@@ -385,6 +393,17 @@ export const expenseQuerySchema = z.object({
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
+function splitFromApi<T extends { splitConfig: SplitConfig; totalAmount?: number }>(
+  data: T,
+  scale: number
+): T {
+  return {
+    ...data,
+    splitConfig: splitConfigFromApi(data.splitConfig, scale),
+    ...(data.totalAmount !== undefined && { totalAmount: parsedToMinor(data.totalAmount, scale) }),
+  };
+}
+
 routes.post(
   '/split',
   zValidator('json', createSplitExpenseSchema),
@@ -403,7 +422,7 @@ routes.post(
 
     const payerFor = (vehicleId: string) => attributedDriver(c, vehicleId, undefined) ?? null;
     const scale = await repos().preferences.moneyScale(ownerId);
-    const siblings = await repos().expenses.createSplitExpense(data, {
+    const siblings = await repos().expenses.createSplitExpense(splitFromApi(data, scale), {
       ownerId,
       createdBy,
       payerFor,
@@ -470,7 +489,11 @@ routes.put(
     );
 
     const scale = await repos().preferences.moneyScale(groupInfo.ownerId);
-    const siblings = await repos().expenses.updateSplitExpense(id, data, groupInfo.ownerId);
+    const siblings = await repos().expenses.updateSplitExpense(
+      id,
+      splitFromApi(data, scale),
+      groupInfo.ownerId
+    );
     const first = siblings[0];
     if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
       throw new ValidationError('Split expense update returned invalid data');
@@ -636,11 +659,11 @@ routes.get(
       }),
       repos().vehicles.findByUserId(user.id),
       isSharedExport && vehicleId ? repos().vehicles.findByIds([vehicleId]) : Promise.resolve([]),
-      repos().preferences.getByUserId(user.id),
+      repos().preferences.getByUserId(scope.userId),
     ]);
 
     const currency = prefs?.currencyUnit || 'USD';
-    const scale = await repos().preferences.moneyScale(scope.userId);
+    const scale = minorUnitScale(currency);
 
     const vehicleName = new Map(
       [...vehicles, ...sharedVehicles].map((v) => [
@@ -778,9 +801,12 @@ routes.post(
       });
     }
 
+    const scale = minorUnitScale(accountCurrency);
     const readyRows = plan.rows
       .filter((row) => row.status === 'ready' && row.expense)
-      .map((row) => ({ ...row.expense, userId: user.id }) as NewExpense);
+      .map(
+        (row) => ({ ...expenseFromApi(row.expense ?? {}, scale), userId: user.id }) as NewExpense
+      );
     const { imported, duplicates } = await repos().expenses.importExpenses(readyRows, user.id);
 
     return c.json({
@@ -848,8 +874,9 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
       expenseData.fuelType
     );
 
+    const scale = await repos().preferences.moneyScale(ownerId);
     createdExpense = await repos().expenses.createIdempotent(
-      { ...expenseData, paidByDriverId, userId: ownerId, createdBy },
+      { ...expenseFromApi(expenseData, scale), paidByDriverId, userId: ownerId, createdBy },
       await odometerCheck({ ...expenseData, timeZone })
     );
   }
@@ -1034,7 +1061,14 @@ routes.put(
       timeZone,
     });
 
-    const updatedExpense = await repos().expenses.update(id, normalizedUpdate, odometer);
+    const updatedExpense = await repos().expenses.update(
+      id,
+      expenseFromApi(
+        normalizedUpdate,
+        await repos().preferences.moneyScale(existingExpense.userId)
+      ),
+      odometer
+    );
 
     if (updatedExpense.mileage != null) {
       await reminderTriggerService.recheckMileageReminders(

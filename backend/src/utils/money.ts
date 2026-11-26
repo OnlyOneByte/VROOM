@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { CostBuckets, CostBucketTotals, ExpenseSummary } from '../api/expenses/repository';
 import { CONFIG } from '../config';
 import type { SplitConfig } from '../db/types';
+import { ValidationError } from '../errors';
 
 // Round before truncating: 12.34 * 100 is 1233.9999… in binary floating point.
 export function dollarsToCents(dollars: number): number {
@@ -17,6 +18,39 @@ export function toMajor(scale: number) {
   const majorOrNull = (minor: number | null): number | null =>
     minor == null ? minor : major(minor);
   return { major, majorOrNull };
+}
+
+const PARSED_SCALE = 100;
+
+export function parsedToMinor(cents: number, scale: number): number {
+  const minor = (cents * scale) / PARSED_SCALE;
+  if (!Number.isInteger(minor)) {
+    throw new ValidationError(
+      `Amounts in this currency can have at most ${Math.log10(scale)} decimal places`
+    );
+  }
+  return minor;
+}
+
+function parsedFieldsToMinor<T extends object>(
+  row: T,
+  fields: readonly string[],
+  scale: number
+): T {
+  const out = { ...row } as Record<string, unknown>;
+  for (const f of fields) {
+    const v = out[f];
+    if (typeof v === 'number') out[f] = parsedToMinor(v, scale);
+  }
+  return out as T;
+}
+
+export function splitConfigFromApi<T extends SplitConfig>(split: T, scale: number): T {
+  if (split.method !== 'absolute') return split;
+  return {
+    ...split,
+    allocations: split.allocations.map((a) => ({ ...a, amount: parsedToMinor(a.amount, scale) })),
+  };
 }
 
 function minorFieldsToMajor<T extends Record<string, unknown>>(
@@ -51,6 +85,27 @@ const INSURANCE_TERM_MONEY_FIELDS = [
 const INSURANCE_CLAIM_MONEY_FIELDS = ['payoutAmount'] as const;
 const VEHICLE_MONEY_FIELDS = ['purchasePrice'] as const;
 const REMINDER_MONEY_FIELDS = ['expenseAmount'] as const;
+
+export const expenseFromApi = <T extends object>(row: T, scale: number) =>
+  parsedFieldsToMinor(row, EXPENSE_MONEY_FIELDS, scale);
+export const financingFromApi = <T extends object>(row: T, scale: number) =>
+  parsedFieldsToMinor(row, FINANCING_MONEY_FIELDS, scale);
+export const insuranceTermFromApi = <T extends object>(row: T, scale: number) =>
+  parsedFieldsToMinor(row, INSURANCE_TERM_MONEY_FIELDS, scale);
+export const insuranceClaimFromApi = <T extends object>(row: T, scale: number) =>
+  parsedFieldsToMinor(row, INSURANCE_CLAIM_MONEY_FIELDS, scale);
+export const vehicleFromApi = <T extends object>(row: T, scale: number) =>
+  parsedFieldsToMinor(row, VEHICLE_MONEY_FIELDS, scale);
+
+export function reminderFromApi<T extends { expenseSplitConfig?: SplitConfig | null }>(
+  row: T,
+  scale: number
+): T {
+  const r = parsedFieldsToMinor(row, REMINDER_MONEY_FIELDS, scale);
+  return r.expenseSplitConfig
+    ? { ...r, expenseSplitConfig: splitConfigFromApi(r.expenseSplitConfig, scale) }
+    : r;
+}
 
 function mapMoney<T extends Record<string, unknown>>(
   row: T,

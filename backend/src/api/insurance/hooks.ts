@@ -3,7 +3,7 @@ import { CONFIG } from '../../config';
 import { AppError, ValidationError } from '../../errors';
 import { termBillingMonths } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
-import { dollarsToCents, formatNumberForMessage } from '../../utils/money';
+import { formatNumberForMessage } from '../../utils/money';
 import { deletePhotosForEntities } from '../photos/photo-service';
 import type { MonthlyPricedTerm, TermCoverageRow } from './repository';
 
@@ -99,8 +99,11 @@ export function effectiveTermCost(params: {
 
 const MAX_TERM_PREMIUM = CONFIG.validation.expense.maxAmount;
 
-export function assertTermPremiumWithinCap(params: Parameters<typeof effectiveTermCost>[0]): void {
-  if (effectiveTermCost(params) > dollarsToCents(MAX_TERM_PREMIUM)) {
+export function assertTermPremiumWithinCap(
+  params: Parameters<typeof effectiveTermCost>[0],
+  scale: number
+): void {
+  if (effectiveTermCost(params) > MAX_TERM_PREMIUM * scale) {
     throw new ValidationError(
       `A term's premium can be at most ${formatNumberForMessage(MAX_TERM_PREMIUM)}. ` +
         'Lower the monthly cost or shorten the term.'

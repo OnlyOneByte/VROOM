@@ -16,7 +16,12 @@ import {
 import { requestResolver } from '../../permissions/grants';
 import type { Resource } from '../../permissions/resolve';
 import { logger } from '../../utils/logger';
-import { expenseToApi, reminderToApi, reminderWithVehiclesToApi } from '../../utils/money';
+import {
+  expenseToApi,
+  reminderFromApi,
+  reminderToApi,
+  reminderWithVehiclesToApi,
+} from '../../utils/money';
 import { readJsonBody } from '../../utils/request-body';
 import { calendarDayIn, isValidTimeZone } from '../../utils/time-zone';
 import { commonSchemas, zValidator } from '../../utils/validation';
@@ -370,9 +375,10 @@ routes.post(
     const { vehicleIds, timeZone: _createTimeZone, ...reminderData } = data;
     const { ownerId } = await requireReminderVehiclesWrite(vehicleIds, user.id);
     const mileage = await resolveMileageFields(reminderData, vehicleIds, ownerId);
+    const scale = await repos().preferences.moneyScale(ownerId);
     const result = await repos().reminders.createWithVehicles(
       {
-        ...reminderData,
+        ...reminderFromApi(reminderData, scale),
         userId: ownerId,
         createdBy: ownerId === user.id ? null : user.id,
         nextDueDate: reminderData.triggerMode === 'mileage' ? null : reminderData.startDate,
@@ -384,7 +390,7 @@ routes.post(
     return c.json(
       {
         success: true,
-        data: reminderWithVehiclesToApi(result, await repos().preferences.moneyScale(ownerId)),
+        data: reminderWithVehiclesToApi(result, scale),
       },
       201
     );
@@ -482,7 +488,10 @@ routes.put(
     assertMergedReminderValid(merged, partialUpdate);
 
     const { vehicleIds: mergedVehicleIds, timeZone, ...reminderFields } = partialUpdate;
-    const updateFields: Partial<NewReminder> = { ...reminderFields };
+    const updateFields: Partial<NewReminder> = reminderFromApi(
+      reminderFields,
+      await repos().preferences.moneyScale(ownerId)
+    );
 
     const touchesMileage =
       reminderFields.triggerMode !== undefined ||
