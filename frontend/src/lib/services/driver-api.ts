@@ -1,4 +1,10 @@
-import type { Driver, DriverStats } from '#lib/types/index.ts';
+import type {
+	BackfillBatch,
+	BackfillRequest,
+	BackfillSummary,
+	Driver,
+	DriverStats
+} from '#lib/types/index.ts';
 import { ApiError } from '#lib/utils/error-handling.ts';
 import { apiClient } from './api-client';
 import { buildQueryString } from './api-utils';
@@ -39,5 +45,27 @@ export const driverApi = {
 		changes: { name?: string; archived?: boolean }
 	): Promise<Driver> {
 		return apiClient.patch<Driver>(`/vehicles/${vehicleId}/drivers/${driverId}`, changes);
+	},
+
+	async previewBackfill(vehicleId: string, request: BackfillRequest): Promise<BackfillSummary> {
+		return apiClient.post<BackfillSummary>(
+			`/vehicles/${vehicleId}/drivers/backfill/preview`,
+			request
+		);
+	},
+
+	async backfill(
+		vehicleId: string,
+		request: BackfillRequest
+	): Promise<BackfillSummary & { batchId: string }> {
+		return apiClient.post(`/vehicles/${vehicleId}/drivers/backfill`, request);
+	},
+
+	async backfills(vehicleId: string): Promise<BackfillBatch[]> {
+		return apiClient.get<BackfillBatch[]>(`/vehicles/${vehicleId}/drivers/backfill`);
+	},
+
+	async undoBackfill(vehicleId: string, batchId: string): Promise<{ reverted: number }> {
+		return apiClient.post(`/vehicles/${vehicleId}/drivers/backfill/${batchId}/undo`);
 	}
 };

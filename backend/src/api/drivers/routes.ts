@@ -6,6 +6,7 @@ import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, vehicleParam } from '../../permissions/authorize';
 import { requestResolver } from '../../permissions/grants';
 import { zValidator } from '../../utils/validation';
+import { requireVehicleAccess, seesFinancials } from '../../utils/vehicle-access';
 import {
   applyBackfill,
   type BackfillRequest,
@@ -133,6 +134,10 @@ function backfillRequest(vehicleId: string, body: z.infer<typeof backfillSchema>
   return { ...body, from: Date.parse(body.from), to: Date.parse(body.to) };
 }
 
+async function hidesFinancials(vehicleId: string, userId: string): Promise<boolean> {
+  return !seesFinancials(await requireVehicleAccess(vehicleId, userId, 'read'));
+}
+
 driverRoutes.get(
   '/backfill',
   zValidator('param', vehicleIdParam),
@@ -149,11 +154,17 @@ driverRoutes.post(
   zValidator('param', vehicleIdParam),
   zValidator('json', backfillSchema),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId } = c.req.valid('param');
     requireCarShare(vehicleId);
     const { db } = appContext();
-    const planned = planBackfill(db, vehicleId, backfillRequest(vehicleId, c.req.valid('json')));
+    const hide = await hidesFinancials(vehicleId, c.get('user').id);
+    const planned = planBackfill(
+      db,
+      vehicleId,
+      backfillRequest(vehicleId, c.req.valid('json')),
+      hide
+    );
     return c.json({ success: true, data: summarize(db, vehicleId, planned) });
   }
 );
@@ -163,13 +174,15 @@ driverRoutes.post(
   zValidator('param', vehicleIdParam),
   zValidator('json', backfillSchema),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId } = c.req.valid('param');
     requireCarShare(vehicleId);
     const { db } = appContext();
     const body = c.req.valid('json');
-    const planned = planBackfill(db, vehicleId, backfillRequest(vehicleId, body));
-    const { batchId, entries } = applyBackfill(db, vehicleId, body.mode, planned, c.get('user').id);
+    const userId = c.get('user').id;
+    const hide = await hidesFinancials(vehicleId, userId);
+    const planned = planBackfill(db, vehicleId, backfillRequest(vehicleId, body), hide);
+    const { batchId, entries } = applyBackfill(db, vehicleId, body.mode, planned, userId, hide);
     return c.json({ success: true, data: { batchId, ...summarize(db, vehicleId, entries) } }, 201);
   }
 );
@@ -178,10 +191,11 @@ driverRoutes.post(
   '/backfill/:batchId/undo',
   zValidator('param', vehicleIdParam.extend({ batchId: z.string().min(1).max(64) })),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId, batchId } = c.req.valid('param');
     requireCarShare(vehicleId);
-    const reverted = undoBackfill(appContext().db, vehicleId, batchId);
+    const hide = await hidesFinancials(vehicleId, c.get('user').id);
+    const reverted = undoBackfill(appContext().db, vehicleId, batchId, hide);
     return c.json({ success: true, data: { reverted } });
   }
 );

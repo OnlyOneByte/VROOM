@@ -5,7 +5,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
-import { type Members, seedCar, seedMembers } from '../../../test-helpers/members';
+import { type Members, overrideOn, seedCar, seedMembers } from '../../../test-helpers/members';
 
 let ctx: TestApp;
 let m: Members;
@@ -58,6 +58,19 @@ async function post<T>(path: string, body?: unknown, status = 200): Promise<T> {
   return (await json<DataEnvelope<T>>(res)).data;
 }
 
+const insuranceExpense = () =>
+  ctx.sqlite.run(
+    "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, source_type) VALUES ('bf-ins', ?, ?, 'financial', ?, 90, 'insurance_term')",
+    [CAR, ctx.user.id, Math.floor(Date.parse('2024-03-10') / 1000)]
+  );
+
+const payerOf = (id: string) =>
+  (
+    ctx.sqlite.query('SELECT paid_by_driver_id AS d FROM expenses WHERE id = ?').get(id) as {
+      d: string | null;
+    }
+  ).d;
+
 const tripDrivers = () =>
   (
     ctx.sqlite.query('SELECT driver_id AS d FROM trips ORDER BY start_odometer').all() as {
@@ -103,6 +116,8 @@ describe('backfilling past entries', () => {
   });
 
   test('a date range goes to one active driver, and only unattributed entries inside it change', async () => {
+    const owner = await driverOf(ctx.user.id);
+    ctx.sqlite.run('UPDATE trips SET driver_id = ? WHERE start_odometer = 1000', [owner]);
     const guest = await post<{ id: string }>(base, { name: 'Riley' }, 201);
     const range = {
       mode: 'range',
@@ -112,12 +127,75 @@ describe('backfilling past entries', () => {
     };
     const preview = await post<Summary>(`${base}/backfill/preview`, range);
     expect(preview.expenses).toBe(0);
-    expect(preview.trips).toBe(2);
+    expect(preview.trips).toBe(1);
     await post(`${base}/backfill`, range, 201);
-    expect(tripDrivers()).toEqual([guest.id, guest.id]);
+    expect(tripDrivers()).toEqual([owner, guest.id]);
 
     await ctx.authed('PATCH', `${base}/${guest.id}`, { archived: true });
     expect((await ctx.authed('POST', `${base}/backfill/preview`, range)).status).toBe(400);
+  });
+
+  test('"who logged it" credits archived drivers and skips people who never drove the car', async () => {
+    ctx.sqlite.run(
+      "INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date, created_by) VALUES ('bf-stranger', ?, ?, 1200, 1250, 'personal', ?, ?)",
+      [CAR, ctx.user.id, Math.floor(Date.parse('2024-03-09') / 1000), m.stranger.id]
+    );
+    const editor = await driverOf(m.editor.id);
+    ctx.sqlite.run('UPDATE vehicle_drivers SET archived_at = 1 WHERE id = ?', [editor]);
+    await post(`${base}/backfill`, { mode: 'logged' }, 201);
+    expect(tripDrivers()).toEqual([await driverOf(ctx.user.id), editor, null]);
+  });
+
+  test('a fill-in that changes nothing saves no batch', async () => {
+    await post(`${base}/backfill`, { mode: 'logged' }, 201);
+    const again = await post<{ batchId: string | null; total: number }>(
+      `${base}/backfill`,
+      { mode: 'logged' },
+      201
+    );
+    expect(again).toMatchObject({ batchId: null, total: 0 });
+    const recent = await ctx.authed('GET', `${base}/backfill`);
+    expect((await json<DataEnvelope<unknown[]>>(recent)).data).toHaveLength(1);
+  });
+
+  test("skips expenses the manager can't read", async () => {
+    insuranceExpense();
+    overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
+    const range = {
+      mode: 'range',
+      driverId: await driverOf(ctx.user.id),
+      from: '2024-01-01T00:00:00.000Z',
+      to: '2024-12-31T23:59:59.000Z',
+    };
+    const asCoOwner = async (path: string) =>
+      (await json<DataEnvelope<Summary>>(await m.coOwner.request('POST', path, range))).data;
+    expect((await asCoOwner(`${base}/backfill/preview`)).expenses).toBe(1);
+    expect((await post<Summary>(`${base}/backfill/preview`, range)).expenses).toBe(2);
+    await asCoOwner(`${base}/backfill`);
+    expect(payerOf('bf-ins')).toBeNull();
+  });
+
+  test('stays within the car and only works while car sharing is on', async () => {
+    const { batchId } = await post<{ batchId: string }>(
+      `${base}/backfill`,
+      { mode: 'logged' },
+      201
+    );
+    seedCar(ctx, 'bf-other');
+    const other = '/api/v1/vehicles/bf-other/drivers';
+    await ctx.authed('PUT', '/api/v1/vehicles/bf-other/car-share', { enabled: true });
+    expect((await ctx.authed('POST', `${other}/backfill/${batchId}/undo`)).status).toBe(404);
+    const foreign = {
+      mode: 'range',
+      driverId: await driverOf(ctx.user.id),
+      from: '2024-01-01T00:00:00.000Z',
+      to: '2024-12-31T23:59:59.000Z',
+    };
+    expect((await ctx.authed('POST', `${other}/backfill/preview`, foreign)).status).toBe(400);
+
+    await ctx.authed('PUT', `/api/v1/vehicles/${CAR}/car-share`, { enabled: false });
+    const off = await ctx.authed('POST', `${base}/backfill/preview`, { mode: 'logged' });
+    expect(off.status).toBe(404);
   });
 
   test('only people who manage drivers can backfill', async () => {

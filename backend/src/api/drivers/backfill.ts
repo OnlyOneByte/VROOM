@@ -10,6 +10,7 @@ import {
   vehicles,
 } from '../../db/schema';
 import { NotFoundError } from '../../errors';
+import { hiddenFinancialsScope } from '../../utils/vehicle-access';
 import { listDrivers } from './repository';
 
 export type BackfillRequest =
@@ -27,7 +28,11 @@ interface Candidate {
 
 const RECENT_BATCHES = 5;
 
-function unattributed(db: AppDatabase, vehicleId: string): Candidate[] {
+function visibleExpenses(hideFinancials: boolean) {
+  return hideFinancials ? hiddenFinancialsScope() : undefined;
+}
+
+function unattributed(db: AppDatabase, vehicleId: string, hideFinancials: boolean): Candidate[] {
   const tripRows = db
     .select({ id: trips.id, createdBy: trips.createdBy, at: trips.tripDate })
     .from(trips)
@@ -45,7 +50,13 @@ function unattributed(db: AppDatabase, vehicleId: string): Candidate[] {
   const expenseRows = db
     .select({ id: expenses.id, createdBy: expenses.createdBy, at: expenses.date })
     .from(expenses)
-    .where(and(eq(expenses.vehicleId, vehicleId), isNull(expenses.paidByDriverId)))
+    .where(
+      and(
+        eq(expenses.vehicleId, vehicleId),
+        isNull(expenses.paidByDriverId),
+        visibleExpenses(hideFinancials)
+      )
+    )
     .all();
   return [
     ...tripRows.map((r) => ({ ...r, kind: 'trip' as const })),
@@ -66,9 +77,10 @@ function memberDrivers(db: AppDatabase, vehicleId: string): Map<string, string> 
 export function planBackfill(
   db: AppDatabase,
   vehicleId: string,
-  request: BackfillRequest
+  request: BackfillRequest,
+  hideFinancials: boolean
 ): BackfilledEntry[] {
-  const candidates = unattributed(db, vehicleId);
+  const candidates = unattributed(db, vehicleId, hideFinancials);
   if (request.mode === 'range') {
     return candidates
       .filter((c) => c.at.getTime() >= request.from && c.at.getTime() <= request.to)
@@ -109,7 +121,8 @@ function setDriver(
   tx: Parameters<Parameters<AppDatabase['transaction']>[0]>[0],
   entry: BackfilledEntry,
   from: string | null,
-  to: string | null
+  to: string | null,
+  hideFinancials: boolean
 ): boolean {
   const match = (column: Column) => (from === null ? isNull(column) : eq(column, from));
   if (entry.kind === 'trip') {
@@ -136,7 +149,13 @@ function setDriver(
     tx
       .update(expenses)
       .set({ paidByDriverId: to })
-      .where(and(eq(expenses.id, entry.id), match(expenses.paidByDriverId)))
+      .where(
+        and(
+          eq(expenses.id, entry.id),
+          match(expenses.paidByDriverId),
+          visibleExpenses(hideFinancials)
+        )
+      )
       .returning({ id: expenses.id })
       .all().length > 0
   );
@@ -147,10 +166,14 @@ export function applyBackfill(
   vehicleId: string,
   mode: BackfillRequest['mode'],
   planned: BackfilledEntry[],
-  userId: string
-): { batchId: string; entries: BackfilledEntry[] } {
+  userId: string,
+  hideFinancials: boolean
+): { batchId: string | null; entries: BackfilledEntry[] } {
   return db.transaction((tx) => {
-    const applied = planned.filter((entry) => setDriver(tx, entry, null, entry.driverId));
+    const applied = planned.filter((entry) =>
+      setDriver(tx, entry, null, entry.driverId, hideFinancials)
+    );
+    if (applied.length === 0) return { batchId: null, entries: applied };
     const batch = tx
       .insert(driverBackfills)
       .values({ vehicleId, mode, entries: applied, createdBy: userId })
@@ -160,7 +183,12 @@ export function applyBackfill(
   });
 }
 
-export function undoBackfill(db: AppDatabase, vehicleId: string, batchId: string): number {
+export function undoBackfill(
+  db: AppDatabase,
+  vehicleId: string,
+  batchId: string,
+  hideFinancials: boolean
+): number {
   return db.transaction((tx) => {
     const batch = tx
       .select()
@@ -168,7 +196,9 @@ export function undoBackfill(db: AppDatabase, vehicleId: string, batchId: string
       .where(and(eq(driverBackfills.id, batchId), eq(driverBackfills.vehicleId, vehicleId)))
       .get();
     if (!batch || batch.undoneAt) throw new NotFoundError('Backfill');
-    const reverted = batch.entries.filter((entry) => setDriver(tx, entry, entry.driverId, null));
+    const reverted = batch.entries.filter((entry) =>
+      setDriver(tx, entry, entry.driverId, null, hideFinancials)
+    );
     tx.update(driverBackfills)
       .set({ undoneAt: new Date() })
       .where(eq(driverBackfills.id, batchId))
