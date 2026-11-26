@@ -131,8 +131,18 @@ Two alternatives were rejected:
   bottleneck.
 
 On Postgres (#1635) the same `transaction(async (tx) => …)` signature maps onto the driver's
-own pooled transaction, so call sites won't change again. The next #1378 steps move
-the app onto this session, then convert each domain's transaction sites and sync terminals.
+own pooled transaction, so call sites won't change again.
+
+**Moving the app across (#1378).** `appContext().asyncDb` is the async session over the same
+connection as `appContext().db`, and repositories move to it area by area. The settings
+repositories are first. One ordering rule holds the migration together: sync queries must
+be gone before the first async transaction ships, because a sync query issued while an async
+transaction is open runs inside it. The async module enforces this. It wraps the
+connection's `prepare`, `query`, `run`, `exec` and `transaction`, and any call that doesn't
+come from the async session while an async transaction is open throws
+`SyncQueryInAsyncTransactionError`. Raw `BEGIN`, `COMMIT`, `ROLLBACK` or `SAVEPOINT` inside a
+callback throws `RawTransactionControlError`: only `transaction()` opens and closes
+transactions.
 
 **Expense-linked records use a polymorphic link.** Financing payments, insurance premiums,
 and reminder materializations are real rows in `expenses` tagged with `source_type` +

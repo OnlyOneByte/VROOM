@@ -17,12 +17,15 @@ import { PreferencesRepository, SyncStateRepository } from './api/settings/repos
 import { VehicleShareRepository } from './api/shares/repository';
 import { TripRepository } from './api/trips/repository';
 import { VehicleRepository } from './api/vehicles/repository';
+import { openAsyncDatabase } from './db/async-sqlite';
 import { type AppDatabase, getDb } from './db/connection';
 
 export function createAppContext(db: AppDatabase) {
   const analyticsQuery = new AnalyticsQueryRepository(db);
+  const asyncDb = openAsyncDatabase(db.$client).db;
   return {
     db,
+    asyncDb,
     lucia: createLucia(db),
     repos: {
       analytics: new AnalyticsRepository(db),
@@ -37,10 +40,10 @@ export function createAppContext(db: AppDatabase) {
       odometer: new OdometerRepository(db),
       photoRefs: new PhotoRefRepository(db),
       photos: new PhotoRepository(db),
-      preferences: new PreferencesRepository(db),
+      preferences: new PreferencesRepository(asyncDb),
       pushSubscriptions: new PushSubscriptionRepository(db),
       reminders: new ReminderRepository(db),
-      syncState: new SyncStateRepository(db),
+      syncState: new SyncStateRepository(asyncDb),
       trips: new TripRepository(db),
       vehicles: new VehicleRepository(db),
       vehicleShares: new VehicleShareRepository(db),

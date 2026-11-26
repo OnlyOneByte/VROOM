@@ -5,8 +5,10 @@ import * as schema from './schema';
 
 const STATEMENT_CACHE_SIZE = 500;
 const TRANSACTION_CONTROL = /^\s*(commit|rollback|release savepoint)\b/i;
+const OPENING = /^\s*(begin|savepoint)\b/i;
 const BEGIN = /^\s*begin\b/i;
 const ROLLBACK = /^\s*rollback\b/i;
+const GUARDED_METHODS = ['prepare', 'query', 'run', 'exec', 'transaction'] as const;
 
 type Method = 'run' | 'all' | 'values' | 'get';
 
@@ -22,10 +24,38 @@ export class TransactionRolledBackError extends Error {
   }
 }
 
+export class RawTransactionControlError extends Error {
+  constructor() {
+    super('Raw BEGIN, COMMIT, ROLLBACK or SAVEPOINT inside a transaction; use transaction()');
+  }
+}
+
+export class SyncQueryInAsyncTransactionError extends Error {
+  constructor() {
+    super(
+      'A synchronous query ran on this connection while an async transaction was open; move it to the async database'
+    );
+  }
+}
+
+const opened = new WeakMap<Database, ReturnType<typeof createAsyncDatabase>>();
+
 export function openAsyncDatabase(sqlite: Database) {
+  let handle = opened.get(sqlite);
+  if (!handle) {
+    handle = createAsyncDatabase(sqlite);
+    opened.set(sqlite, handle);
+  }
+  return handle;
+}
+
+export type AsyncAppDatabase = ReturnType<typeof openAsyncDatabase>['db'];
+
+function createAsyncDatabase(sqlite: Database) {
   type Scope = {
     ended: boolean;
     sealed: boolean;
+    begun: boolean;
     tx: Transaction;
     root: Scope;
     queue: Promise<unknown>;
@@ -35,6 +65,17 @@ export function openAsyncDatabase(sqlite: Database) {
   let open: Scope | null = null;
   let closed: Promise<void> = Promise.resolve();
   const statements = new Map<string, Statement>();
+  let executing = false;
+
+  for (const name of GUARDED_METHODS) {
+    const original = (sqlite[name] as (...args: unknown[]) => unknown).bind(sqlite);
+    Object.assign(sqlite, {
+      [name]: (...args: unknown[]) => {
+        if (open && !executing) throw new SyncQueryInAsyncTransactionError();
+        return original(...args);
+      },
+    });
+  }
 
   function prepare(query: string): Statement {
     let statement = statements.get(query);
@@ -53,10 +94,24 @@ export function openAsyncDatabase(sqlite: Database) {
   }
 
   function execute(query: string, params: unknown[], method: Method) {
-    const statement = prepare(query);
-    if (method === 'run') return { rows: [], ...statement.run(...(params as never[])) };
-    const rows = statement.values(...(params as never[]));
-    return { rows: method === 'get' ? rows[0] : rows };
+    executing = true;
+    try {
+      const statement = prepare(query);
+      if (method === 'run') return { rows: [], ...statement.run(...(params as never[])) };
+      const rows = statement.values(...(params as never[]));
+      return { rows: method === 'get' ? rows[0] : rows };
+    } finally {
+      executing = false;
+    }
+  }
+
+  function checkControl(scope: Scope, query: string): void {
+    if (OPENING.test(query)) {
+      if (scope.begun) throw new RawTransactionControlError();
+      scope.begun = true;
+    } else if (TRANSACTION_CONTROL.test(query) && !scope.sealed) {
+      throw new RawTransactionControlError();
+    }
   }
 
   function hasEnded(scope: Scope | undefined, query = ''): boolean {
@@ -67,6 +122,7 @@ export function openAsyncDatabase(sqlite: Database) {
 
   async function gated(query: string, params: unknown[], method: Method) {
     const scope = scopes.getStore();
+    if (scope) checkControl(scope, query);
     if (scope && ROLLBACK.test(query) && !sqlite.inTransaction) return { rows: [] };
     if (hasEnded(scope, query)) throw new TransactionEndedError();
     while (open && scope?.root !== open) await closed;
@@ -114,6 +170,7 @@ export function openAsyncDatabase(sqlite: Database) {
       const child = {
         ended: false,
         sealed: false,
+        begun: false,
         root: parent.root,
         queue: Promise.resolve(),
         nested: null,
@@ -146,7 +203,13 @@ export function openAsyncDatabase(sqlite: Database) {
     closed = new Promise((resolve) => {
       close = resolve;
     });
-    const scope = { ended: false, sealed: false, queue: Promise.resolve(), nested: null } as Scope;
+    const scope = {
+      ended: false,
+      sealed: false,
+      begun: false,
+      queue: Promise.resolve(),
+      nested: null,
+    } as Scope;
     scope.root = scope;
     open = scope;
     try {

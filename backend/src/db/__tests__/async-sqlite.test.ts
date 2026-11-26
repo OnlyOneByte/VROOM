@@ -4,6 +4,8 @@ import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import {
   openAsyncDatabase,
+  RawTransactionControlError,
+  SyncQueryInAsyncTransactionError,
   TransactionEndedError,
   TransactionRolledBackError,
 } from '../async-sqlite';
@@ -258,6 +260,40 @@ describe('async transactions over bun:sqlite', () => {
         error.cause instanceof TransactionRolledBackError
     ).toBe(true);
     expect((await db.select({ id: users.id }).from(users)).map((r) => r.id)).toEqual(['dup']);
+  });
+
+  test('a sync query on the same connection during an open async transaction is refused', async () => {
+    const { sqlite, transaction } = setup();
+    const sync = drizzle(sqlite, { schema });
+    sync.insert(users).values(user('before')).run();
+    await expect(
+      transaction(async (tx) => {
+        await tx.insert(users).values(user('a'));
+        sync.select().from(users).all();
+      })
+    ).rejects.toBeInstanceOf(SyncQueryInAsyncTransactionError);
+    expect(sync.select({ id: users.id }).from(users).all()).toEqual([{ id: 'before' }]);
+  });
+
+  test('raw BEGIN, COMMIT, ROLLBACK or SAVEPOINT inside a transaction is refused and nothing commits', async () => {
+    const { db, transaction } = setup();
+    for (const raw of [sql`commit`, sql`begin`, sql`rollback`, sql`savepoint sp9`]) {
+      const error = await transaction(async (tx) => {
+        await tx.insert(users).values(user('a'));
+        await tx.run(raw);
+        await tx.insert(users).values(user('b'));
+      }).then(
+        () => null,
+        (e) => e as { cause?: unknown }
+      );
+      expect(error?.cause ?? error).toBeInstanceOf(RawTransactionControlError);
+      expect(await db.select().from(users)).toEqual([]);
+    }
+  });
+
+  test('the same connection always gets the same async database', () => {
+    const sqlite = new Database(':memory:');
+    expect(openAsyncDatabase(sqlite)).toBe(openAsyncDatabase(sqlite));
   });
 
   test('a batch outside a transaction is atomic', async () => {
