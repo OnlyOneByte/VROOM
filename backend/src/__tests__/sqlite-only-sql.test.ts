@@ -26,7 +26,7 @@ const PATTERNS: Record<string, RegExp> = {
 
 const BASELINE: Record<string, number> = {
   'api/providers/routes.ts · sql`0`/sql`1` predicate': 1,
-  'db/connection.ts · PRAGMA': 9,
+  'db/connection.ts · PRAGMA': 7,
   'utils/chunk.ts · SQLITE_': 5,
 };
 

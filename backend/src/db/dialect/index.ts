@@ -74,7 +74,13 @@ export function sumNum(expression: SQLWrapper): SQL<number> {
   return sql<number>`COALESCE(SUM(${expression}), 0)`.mapWith(Number);
 }
 
-export type DbErrorKind = 'unique' | 'foreign_key' | 'not_null';
+export const UPKEEP_QUERIES = {
+  health: 'SELECT 1 as health',
+  checkpoint: 'PRAGMA wal_checkpoint(TRUNCATE)',
+  forceCheckpoint: 'PRAGMA wal_checkpoint(RESTART)',
+} as const;
+
+export type DbErrorKind ='unique' | 'foreign_key' | 'not_null';
 
 const UNIQUE_VIOLATION_CODES = new Set([
   'SQLITE_CONSTRAINT_UNIQUE',

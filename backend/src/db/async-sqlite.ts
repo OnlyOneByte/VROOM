@@ -1,6 +1,7 @@
 import type { Database, Statement } from 'bun:sqlite';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { drizzle } from 'drizzle-orm/sqlite-proxy';
+import { UPKEEP_QUERIES } from './dialect';
 import * as schema from './schema';
 
 const STATEMENT_CACHE_SIZE = 500;
@@ -8,20 +9,14 @@ const TRANSACTION_CONTROL = /^(commit|end|rollback|release)\b/i;
 const OPENING = /^(begin|savepoint)\b/i;
 const BEGIN = /^begin\b/i;
 const ROLLBACK = /^rollback\b/i;
-// Whitespace, empty statements and comments SQLite skips before the first keyword.
-const LEADING_NOISE = /^(?:[\s;]+|--[^\n]*(?:\n|$)|\/\*[\s\S]*?(?:\*\/|$))*/;
+const LEADING_WHITESPACE_SEMICOLONS_AND_COMMENTS =
+  /^(?:[\s;]+|--[^\n]*(?:\n|$)|\/\*[\s\S]*?(?:\*\/|$))*/;
 
-/** The statement as SQLite sees it: leading whitespace, `;` and comments removed. */
 function statementHead(query: string): string {
-  return query.replace(LEADING_NOISE, '');
+  return query.replace(LEADING_WHITESPACE_SEMICOLONS_AND_COMMENTS, '');
 }
 const GUARDED_METHODS = ['prepare', 'query', 'run', 'exec', 'transaction'] as const;
 const RAW_QUERY_METHODS = ['run', 'all', 'get', 'values'] as const;
-const UPKEEP_QUERIES = {
-  health: 'SELECT 1 as health',
-  checkpoint: 'PRAGMA wal_checkpoint(TRUNCATE)',
-  forceCheckpoint: 'PRAGMA wal_checkpoint(RESTART)',
-} as const;
 
 type SqlSource = string | { getSQL(): unknown };
 type Dialect = { sqlToQuery(sql: unknown): { sql: string } };
