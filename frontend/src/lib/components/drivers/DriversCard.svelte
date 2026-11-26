@@ -20,9 +20,20 @@
 		from: Date;
 		to: Date;
 		description?: string;
+		hiddenMessage?: string;
 	}
 
-	let { vehicleId, distanceUnit, from, to, description = 'Last 30 days' }: Props = $props();
+	let {
+		vehicleId,
+		distanceUnit,
+		from,
+		to,
+		description = 'Last 30 days',
+		hiddenMessage
+	}: Props = $props();
+
+	let fromTime = $derived(from.getTime());
+	let toTime = $derived(to.getTime());
 
 	let stats = $state<DriverStats | null>(null);
 	let phase = $state<'loading' | 'ready' | 'hidden' | 'error'>('loading');
@@ -30,10 +41,10 @@
 	let shown = $derived((stats?.drivers ?? []).filter(d => d.distance.total > 0));
 	let total = $derived(stats?.distance?.total ?? 0);
 
-	async function load(car: string, start: Date, end: Date) {
+	async function load(car: string, start: number, end: number) {
 		phase = 'loading';
 		try {
-			stats = await driverApi.stats(car, { from: start, to: end });
+			stats = await driverApi.stats(car, { from: new Date(start), to: new Date(end) });
 			phase = stats ? 'ready' : 'hidden';
 		} catch {
 			phase = 'error';
@@ -41,7 +52,7 @@
 	}
 
 	$effect(() => {
-		void load(vehicleId, from, to);
+		void load(vehicleId, fromTime, toTime);
 	});
 
 	const distanceText = (n: number) => `${formatNumber(n, 0)} ${unit}`;
@@ -76,7 +87,7 @@
 			{:else if phase === 'error'}
 				<div class="flex items-center justify-between gap-3 text-sm" role="alert">
 					<span>Couldn't load the driver figures.</span>
-					<Button size="lg" variant="outline" onclick={() => load(vehicleId, from, to)}>
+					<Button size="lg" variant="outline" onclick={() => load(vehicleId, fromTime, toTime)}>
 						Retry
 					</Button>
 				</div>
@@ -135,14 +146,18 @@
 						</li>
 					{/if}
 				</ul>
-				{#if stats.costPerDistance !== null}
-					<p class="text-xs text-muted-foreground">
+				<p class="text-xs text-muted-foreground">
+					{#if stats.costPerDistance !== null}
 						Running costs come to {formatCurrency(stats.costPerDistance, undefined, 2)} per {unit}.
-						Estimated distance is the gap between readings, credited to whoever logged the reading
-						that closes it.
-					</p>
-				{/if}
+					{/if}
+					Estimated distance is the gap between readings, credited to whoever logged the reading, or paid
+					for the fill-up, that closes it.
+				</p>
 			{/if}
 		</CardContent>
+	</Card>
+{:else if hiddenMessage}
+	<Card>
+		<CardContent class="py-6 text-sm text-muted-foreground">{hiddenMessage}</CardContent>
 	</Card>
 {/if}

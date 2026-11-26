@@ -23,9 +23,10 @@
 	interface Props {
 		query: ExploreQuery;
 		onChange: (_query: ExploreQuery) => void;
+		driverSplit?: boolean;
 	}
 
-	let { query, onChange }: Props = $props();
+	let { query, onChange, driverSplit = false }: Props = $props();
 
 	const isMobile = new IsMobile();
 	let editing = $state(false);
@@ -37,7 +38,11 @@
 		EXPLORE_METRICS.map(m => ({ value: m.value, label: metricLabel(m.value, distanceWord) }))
 	);
 	let splits = $derived(
-		EXPLORE_SPLITS.filter(s => allowedSplits(query.metric, query.compare).includes(s.value))
+		EXPLORE_SPLITS.filter(
+			s =>
+				allowedSplits(query.metric, query.compare).includes(s.value) &&
+				(driverSplit || s.value !== 'driver' || query.split === 'driver')
+		)
 	);
 	let moneyMetric = $derived(['cost', 'costPerDistance'].includes(metricInfo(query.metric).metric));
 	const COSTS = [

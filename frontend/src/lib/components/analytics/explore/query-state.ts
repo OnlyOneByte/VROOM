@@ -36,7 +36,8 @@ export const EXPLORE_SPLITS = [
 	{ value: 'category', label: 'Category' },
 	{ value: 'vehicle', label: 'Car' },
 	{ value: 'fuelType', label: 'Fuel type' },
-	{ value: 'tag', label: 'Tag' }
+	{ value: 'tag', label: 'Tag' },
+	{ value: 'driver', label: 'Who paid' }
 ] as const satisfies ReadonlyArray<{ value: AnalyticsQueryGroupBy; label: string }>;
 
 export const EXPLORE_COMPARES = [
@@ -71,8 +72,8 @@ export const DEFAULT_EXPLORE: ExploreQuery = {
 };
 
 const SPLITS_FOR_METRIC: Record<AnalyticsQueryMetric, readonly AnalyticsQueryGroupBy[]> = {
-	cost: ['none', 'category', 'vehicle', 'fuelType', 'tag'],
-	count: ['none', 'category', 'vehicle', 'fuelType', 'tag'],
+	cost: ['none', 'category', 'vehicle', 'fuelType', 'tag', 'driver'],
+	count: ['none', 'category', 'vehicle', 'fuelType', 'tag', 'driver'],
 	costPerDistance: ['none', 'vehicle', 'category'],
 	distance: ['none', 'vehicle'],
 	volume: ['none', 'vehicle', 'fuelType'],

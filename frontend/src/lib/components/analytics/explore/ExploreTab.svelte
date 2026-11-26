@@ -63,6 +63,7 @@
 		onOnlyCar?: (_id: string) => void;
 		onAllCars?: () => void;
 		onApplyInsight?: (_query: Record<string, string>) => void;
+		driverSplit?: boolean;
 	}
 
 	let {
@@ -77,7 +78,8 @@
 		carsText = 'All cars',
 		onOnlyCar,
 		onAllCars,
-		onApplyInsight
+		onApplyInsight,
+		driverSplit = false
 	}: Props = $props();
 
 	let root = $state<HTMLElement | null>(null);
@@ -519,7 +521,7 @@
 </script>
 
 <div class="space-y-4 md:space-y-6" bind:this={root}>
-	<QueryBar {query} onChange={onQueryChange} />
+	<QueryBar {query} onChange={onQueryChange} {driverSplit} />
 
 	<div class="flex flex-wrap gap-2" role="group" aria-label="Presets">
 		{#each EXPLORE_PRESETS as p (p.id)}

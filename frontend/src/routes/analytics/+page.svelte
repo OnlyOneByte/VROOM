@@ -309,6 +309,7 @@
 							filterLabel={filtered ? filterLabel : undefined}
 							onClearFilters={filtered ? clearFilters : undefined}
 							onApplyInsight={applyInsight}
+							driverSplit={sharedCars.length > 0}
 						/>
 					{:catch}
 						{@render tabLoadError('Explore')}

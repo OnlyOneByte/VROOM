@@ -69,7 +69,15 @@ describe('Explore query in the URL', () => {
 	test('at least six measures and four splits are on offer', () => {
 		expect(EXPLORE_METRICS.length).toBeGreaterThanOrEqual(6);
 		expect(EXPLORE_SPLITS.filter(s => s.value !== 'none').length).toBeGreaterThanOrEqual(4);
-		expect(allowedSplits('cost')).toEqual(['none', 'category', 'vehicle', 'fuelType', 'tag']);
+		expect(allowedSplits('cost')).toEqual([
+			'none',
+			'category',
+			'vehicle',
+			'fuelType',
+			'tag',
+			'driver'
+		]);
+		expect(allowedSplits('distance')).not.toContain('driver');
 	});
 
 	test('the API request maps the measure and always asks for a comparison', () => {
