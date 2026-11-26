@@ -111,6 +111,31 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		expect(shownExpense(saved)).toMatchObject({ amount: 55 });
 	});
 
+	test('Undo on the saved toast shows the old values at once and saves them back after the edit', async () => {
+		const first = deferred();
+		vi.mocked(expenseApi.updateExpense)
+			.mockReturnValueOnce(first.promise)
+			.mockResolvedValueOnce(saved);
+		scheduleEdit(saved, changed, payload, { message: 'Saved $55.00 for Sparky' });
+		const toast = notices()[0] ?? {};
+		expect(toast).toMatchObject({ message: 'Saved $55.00 for Sparky', duration: 5000 });
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1));
+
+		(toast['action'] as { label: string; onClick: () => void }).onClick();
+		expect(appStore.dismissToast).toHaveBeenCalledWith('expense-edit-e1');
+		expect(shownExpense(saved)).toMatchObject({ amount: 40, description: 'Arco' });
+		await Promise.resolve();
+		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1);
+
+		first.resolve(changed);
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
+		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith(
+			'e1',
+			expect.objectContaining({ amount: 40, description: 'Arco', category: 'fuel' })
+		);
+		expect(notices().filter(n => n['type'] === 'error')).toEqual([]);
+	});
+
 	test('a failed PUT reverts the row, keeps its reason, and offers Retry once', async () => {
 		vi.mocked(expenseApi.updateExpense).mockRejectedValueOnce(new ApiError('SQLITE_BUSY', 500));
 		scheduleEdit(saved, changed, payload);

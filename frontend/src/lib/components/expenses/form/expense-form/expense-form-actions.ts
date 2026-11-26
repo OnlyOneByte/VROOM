@@ -14,6 +14,7 @@ import type { ExpenseCategory } from '#lib/types/index.ts';
 import { toOfflineExpense } from '../offline-expense';
 import { buildExpenseData } from './expense-payload';
 import { rememberQuickAdd } from './quick-add-memory';
+import { announceAdded, savedToast } from './saved-toast';
 import {
 	canQueueFailedSave,
 	offlineQueuedMessage,
@@ -80,6 +81,7 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 		sourceType: state.sourceType,
 		sourceId: state.sourceId
 	});
+	const createPayload = { ...expenseData, paidByDriverId: state.paidByDriverId };
 	const isSplitCreate = state.isSplit && state.selectedVehicleIds.length >= 2;
 	const clientId = saveClientId(state);
 	const queueOwner = currentOfflineQueueOwner();
@@ -113,7 +115,7 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			const before = state.originalExpense;
 			if (before) {
 				const paidBy = payerChanged ? { paidByDriverId: state.paidByDriverId } : {};
-				scheduleEdit(before, { ...before, ...expenseData, ...paidBy }, payload);
+				scheduleEdit(before, { ...before, ...expenseData, ...paidBy }, payload, savedToast(state));
 			} else {
 				await expenseApi.updateExpense(expenseId!, payload);
 				appStore.addNotification({ type: 'success', message: 'Expense updated successfully' });
@@ -154,22 +156,16 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 			))
 		) {
 			rememberEntry();
-			appStore.addNotification({ type: 'success', message: 'Expense added successfully' });
+			announceAdded(savedToast(state), { clientId, payload: createPayload });
 			syncManager.syncSoon();
 			gotoDynamic(returnTo);
 		} else if (onlineStatus.current) {
-			const created = await expenseApi.createExpense(
-				{ ...expenseData, paidByDriverId: state.paidByDriverId },
-				clientId
-			);
+			const created = await expenseApi.createExpense(createPayload, clientId);
 
 			await uploadPendingPhotos(state, created.id);
 			rememberEntry();
 
-			appStore.addNotification({
-				type: 'success',
-				message: 'Expense added successfully'
-			});
+			announceAdded(savedToast(state), { clientId, payload: createPayload, created });
 			gotoDynamic(returnTo);
 		} else {
 			const queued = await addOfflineExpense(

@@ -435,7 +435,7 @@ describe('ExpenseForm create mode', () => {
 		expect(createExpense).not.toHaveBeenCalled();
 		expect(syncSoon).toHaveBeenCalledOnce();
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/v1'));
-		expect(notificationMessages()).toContain('Expense added successfully');
+		expect(notificationMessages()).toContainEqual(expect.stringMatching(/^Saved \$120\.50 for /));
 	});
 
 	test('choosing another vehicle loads its context and files the expense against it', async () => {
@@ -691,7 +691,7 @@ describe('ExpenseForm edit mode', () => {
 		});
 		expect(createExpense).not.toHaveBeenCalled();
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/v1'));
-		expect(notificationMessages()).toContain('Expense updated successfully');
+		expect(notificationMessages()).toContainEqual(expect.stringMatching(/^Saved \$85\.00 for /));
 	});
 
 	test('reopening an expense while its save is running starts from the new values', async () => {

@@ -4,6 +4,7 @@ import { expenseApi } from '#lib/services/expense-api.ts';
 import type { Expense } from '#lib/types/index.ts';
 import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
+import { UNDO_WINDOW_MS } from '#lib/utils/pending-deletes.svelte.ts';
 
 type EditPayload = Parameters<typeof expenseApi.updateExpense>[1];
 
@@ -59,14 +60,59 @@ function send(id: string): void {
 	});
 }
 
-export function scheduleEdit(before: Expense, after: Expense, payload: EditPayload): void {
+export function scheduleEdit(
+	before: Expense,
+	after: Expense,
+	payload: EditPayload,
+	toast: { message: string; description?: string | undefined } = {
+		message: 'Expense updated successfully'
+	}
+): void {
 	edits.set(before.id, { before, after, payload, status: 'saving', seq: ++nextSeq });
 	appStore.addNotification({
 		type: 'success',
-		message: 'Expense updated successfully',
-		toastId: toastId(before.id)
+		...toast,
+		toastId: toastId(before.id),
+		duration: UNDO_WINDOW_MS,
+		action: { label: 'Undo', onClick: () => undoEdit(before.id) }
 	});
 	send(before.id);
+}
+
+function restorePayload({ before, payload }: PendingEdit): EditPayload {
+	return {
+		vehicleId: before.vehicleId,
+		tags: before.tags,
+		category: before.category,
+		amount: before.amount,
+		date: before.date,
+		mileage: before.mileage,
+		volume: before.volume,
+		charge: before.charge,
+		fuelType: before.fuelType,
+		description: before.description,
+		location: before.location,
+		currency: before.currency,
+		missedFillup: before.missedFillup,
+		...(before.sourceType && before.sourceId
+			? { sourceType: before.sourceType, sourceId: before.sourceId }
+			: {}),
+		...('paidByDriverId' in payload && { paidByDriverId: before.paidByDriverId ?? null })
+	};
+}
+
+export function undoEdit(id: string): void {
+	const entry = edits.get(id);
+	if (!entry) return;
+	appStore.dismissToast(toastId(id));
+	edits.set(id, {
+		before: entry.before,
+		after: entry.before,
+		payload: restorePayload(entry),
+		status: 'saving',
+		seq: ++nextSeq
+	});
+	send(id);
 }
 
 export function retryEdit(id: string): void {
