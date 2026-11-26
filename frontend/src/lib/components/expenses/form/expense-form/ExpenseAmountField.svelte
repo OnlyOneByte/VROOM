@@ -34,7 +34,9 @@
 				: 'text-foreground'}"
 		>
 			<span
-				class="mt-2 text-4xl leading-none sm:text-5xl {amount ? '' : 'text-muted-foreground'}"
+				class="mt-1.5 text-3xl leading-none sm:mt-2 sm:text-5xl {amount
+					? ''
+					: 'text-muted-foreground'}"
 				aria-hidden="true"
 			>
 				{currencySymbol}
@@ -48,7 +50,7 @@
 				min="0"
 				bind:value={amount}
 				placeholder={amountPlaceholder()}
-				class="h-auto min-w-[3ch] py-0 text-center text-8xl leading-none tabular-nums caret-needle placeholder:text-muted-foreground/60 [field-sizing:content] sm:h-auto md:text-8xl {numberClass}"
+				class="h-auto min-w-[3ch] py-0 text-center text-7xl leading-none tabular-nums caret-needle placeholder:text-muted-foreground/60 [field-sizing:content] sm:h-auto sm:text-8xl md:text-8xl {numberClass}"
 				onblur={onAmountBlur}
 				aria-invalid={!!amountError}
 				aria-describedby={amountError ? 'amount-error' : undefined}

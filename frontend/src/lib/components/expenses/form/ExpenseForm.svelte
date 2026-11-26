@@ -473,9 +473,9 @@
 		</div>
 	{:else}
 		<div
-			class="space-y-6 {quickActions ? '' : 'pb-32 sm:pb-24 lg:pb-0 short:pb-0'} {quickAdd
-				? 'mx-auto max-w-[34rem]'
-				: ''}"
+			class="{quickActions ? '' : 'pb-32 sm:pb-24 lg:pb-0 short:pb-0'} {quickAdd
+				? 'mx-auto max-w-[34rem] space-y-2 sm:space-y-6'
+				: 'space-y-6'}"
 		>
 			{@render createHeader()}
 
@@ -486,7 +486,9 @@
 					e.preventDefault();
 					save();
 				}}
-				class={quickAdd ? 'space-y-6' : 'space-y-5 sm:rounded-lg sm:border sm:bg-card sm:p-6'}
+				class={quickAdd
+					? 'space-y-4 sm:space-y-6'
+					: 'space-y-5 sm:rounded-lg sm:border sm:bg-card sm:p-6'}
 			>
 				{#if quickAdd}
 					{@render amountField()}

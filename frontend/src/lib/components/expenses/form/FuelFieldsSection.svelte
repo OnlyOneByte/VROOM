@@ -263,7 +263,7 @@
 		</div>
 	{/if}
 
-	<div class={quick ? 'grid gap-6 sm:grid-cols-2' : 'grid grid-cols-2 gap-3'}>
+	<div class={quick ? 'grid grid-cols-2 gap-4 sm:gap-6' : 'grid grid-cols-2 gap-3'}>
 		{#if charging}
 			<div class="min-w-0 space-y-2">
 				<Label for="charge">{getChargeUnitLabel(chargeUnit)} *</Label>
@@ -312,7 +312,7 @@
 
 	{#if quick && quickReadout.length > 0}
 		<div id="energy-readout" class="space-y-1 text-center" data-testid="energy-readout">
-			<p class="text-muted-foreground tabular-nums">
+			<p class="flex flex-wrap justify-center text-muted-foreground tabular-nums">
 				{#each quickReadout as part, i (part.words)}
 					{#if i > 0}<span class="mx-1.5" aria-hidden="true">·</span>{/if}<span
 						class="whitespace-nowrap"

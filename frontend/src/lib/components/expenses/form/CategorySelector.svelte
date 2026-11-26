@@ -53,7 +53,7 @@
 				disabled={disabledValues.includes(category.value)}
 				aria-describedby="category-{category.value}-description"
 				class="inline-flex h-10 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 {quick
-					? 'h-11'
+					? 'sm:h-11'
 					: ''} {checked
 					? 'border-primary bg-primary text-primary-foreground'
 					: 'border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground'} {showError
