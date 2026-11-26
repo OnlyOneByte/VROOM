@@ -165,7 +165,7 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 			await expect(expiredPolicy(page)).toBeVisible();
 		}
 	},
-	'/analytics': { debt: [], ready: pageHeading('Analytics Dashboard') },
+	'/analytics': { debt: [], ready: pageHeading('Explore') },
 	'/insurance': { debt: [], ready: expiredPolicy },
 	'/reminders': { debt: [], ready: pageHeading('Reminders') },
 	'/trips': { debt: [], ready: pageHeading('Trips') },

@@ -128,7 +128,7 @@ async function mockAnalytics(page: Page, requests: URLSearchParams[] = []) {
 }
 
 async function openFuelTab(page: Page) {
-	await page.getByRole('tab', { name: 'Fuel & Stats', exact: true }).click();
+	await page.getByRole('tab', { name: 'Fuel & charging', exact: true }).click();
 	await expect(page.getByText('Fuel spend per month')).toBeVisible();
 }
 
@@ -151,18 +151,16 @@ test.describe('Analytics', () => {
 		await page.goto('/analytics');
 
 		await expect(page).toHaveTitle(/Analytics/);
-		await expect(page.getByRole('heading', { name: 'Analytics Dashboard' })).toBeVisible();
+		await expect(page.getByRole('heading', { level: 1, name: 'Explore' })).toBeVisible();
+		await expect(page.getByText('Total Vehicles')).toHaveCount(0);
 
-		await expect(page.getByText('Total Vehicles')).toBeVisible();
-		await expect(page.getByText('YTD Spending')).toBeVisible();
-		await expect(page.getByText('Cost per mi', { exact: true })).toBeVisible();
-		await expect(page.getByText('Fleet Health')).toBeVisible();
-		await expect(
-			page.getByText(`${ANALYTICS_SUMMARY.quickStats.fleetHealthScore} / 100`)
-		).toBeVisible();
-		await expect(page.getByText('$5,000.00')).toBeVisible();
-
-		for (const tab of ['Explore', 'Fuel & Stats', 'Cross-Vehicle', 'Per-Vehicle', 'Year-End']) {
+		for (const tab of [
+			'Explore',
+			'Fuel & charging',
+			'Cross-vehicle',
+			'Per-vehicle',
+			'Year in review'
+		]) {
 			await expect(page.getByRole('tab', { name: tab, exact: true })).toBeVisible();
 			await expect(page.getByRole('tab', { name: tab, exact: true })).toBeInViewport({ ratio: 1 });
 		}
@@ -173,7 +171,7 @@ test.describe('Analytics', () => {
 		await mockAnalytics(page);
 
 		await page.goto('/analytics');
-		await expect(page.getByRole('tab', { name: 'Year-End', exact: true })).toBeAttached();
+		await expect(page.getByRole('tab', { name: 'Year in review', exact: true })).toBeAttached();
 		await expect(
 			page.getByRole('heading', { name: 'Total cost per month by category' })
 		).toBeAttached();
@@ -200,9 +198,9 @@ test.describe('Analytics', () => {
 		await openFillupDetails(page);
 		await expect(page.getByRole('heading', { name: 'Fill-ups', exact: true })).toBeVisible();
 
-		await page.getByRole('tab', { name: 'Cross-Vehicle', exact: true }).click();
+		await page.getByRole('tab', { name: 'Cross-vehicle', exact: true }).click();
 
-		await expect(page.getByRole('tab', { name: 'Cross-Vehicle', exact: true })).toHaveAttribute(
+		await expect(page.getByRole('tab', { name: 'Cross-vehicle', exact: true })).toHaveAttribute(
 			'aria-selected',
 			'true'
 		);

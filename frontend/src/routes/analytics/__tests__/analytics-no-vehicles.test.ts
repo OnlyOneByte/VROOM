@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 
 const vehicleCount = vi.hoisted(() => ({ value: 0 }));
 
@@ -41,12 +41,15 @@ describe('analytics with no vehicles', () => {
 		expect(container.querySelectorAll('[data-slot="card"]')).toHaveLength(1);
 	});
 
-	test('with a vehicle the tiles and tabs render as before', async () => {
+	test('with a vehicle the tabs render, and the page title follows the open tab', async () => {
 		vehicleCount.value = 1;
 		render(Page);
 
-		expect(await screen.findByText('Total Vehicles')).toBeTruthy();
-		expect(screen.getByRole('tablist')).toBeTruthy();
+		expect(await screen.findByRole('tablist')).toBeTruthy();
+		expect(screen.queryByText('Total Vehicles')).toBeNull();
+		expect(screen.getByRole('heading', { level: 1, name: 'Explore' })).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole('tab', { name: 'Year in review' }));
+		expect(screen.getByRole('heading', { level: 1, name: 'Year in review' })).toBeInTheDocument();
 		expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
 	});
 });
