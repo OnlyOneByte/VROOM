@@ -1,4 +1,7 @@
+import { afterEach, beforeEach } from 'bun:test';
 import type { Hono } from 'hono';
+
+export const SETUP_TIMEOUT_MS = 30_000;
 
 export function socketFrom(address: string) {
   const family = address.includes(':') ? 'IPv6' : 'IPv4';
@@ -32,6 +35,21 @@ export interface TestApp {
   authed: (method: string, path: string, body?: unknown) => Promise<Response>;
   anon: (method: string, path: string, body?: unknown) => Promise<Response>;
   close: () => void;
+}
+
+export function useTestApp(seedUser: Partial<TestUser> = {}): () => TestApp {
+  let current: TestApp | undefined;
+  beforeEach(async () => {
+    current = await createTestApp(seedUser);
+  }, SETUP_TIMEOUT_MS);
+  afterEach(() => {
+    current?.close();
+    current = undefined;
+  });
+  return () => {
+    if (!current) throw new Error('useTestApp: the test app is only available inside a test');
+    return current;
+  };
 }
 
 let counter = 0;

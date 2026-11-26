@@ -8,8 +8,7 @@ const { outboundResolver } = await import('../utils/outbound-url');
 outboundResolver.lookup = async () => ['93.184.215.14'];
 outboundResolver.connectUrl = (url) => url;
 
-const { beforeEach, setDefaultTimeout } = await import('bun:test');
-setDefaultTimeout(Number(process.env.TEST_TIMEOUT_MS) || 30_000);
+const { beforeEach } = await import('bun:test');
 const { setLocalOcrForTest } = await import('../api/providers/domains/vlm/local-ocr');
 const { fakeOcrWorker } = await import('./fake-ocr');
 beforeEach(() => setLocalOcrForTest({ createWorker: fakeOcrWorker }));

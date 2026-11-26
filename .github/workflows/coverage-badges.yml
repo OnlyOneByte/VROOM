@@ -65,7 +65,7 @@ jobs:
         # a run nobody was told had failed.
         shell: bash
         run: |
-          bun test --coverage 2>&1 | tee coverage-output.txt
+          bun test --coverage --timeout 30000 2>&1 | tee coverage-output.txt
 
       - name: Generate badge data
         run: |
