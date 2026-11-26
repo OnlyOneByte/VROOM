@@ -1,7 +1,12 @@
 import { render } from '@testing-library/svelte';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { cn } from '#lib/utils.js';
 import Button, { buttonVariants } from '../button.svelte';
+
+vi.mock('#lib/utils.js', async importOriginal => {
+	const actual = await importOriginal<typeof import('#lib/utils.js')>();
+	return { ...actual, cn: vi.fn(actual.cn) };
+});
 
 function classOf(props: Record<string, unknown>): string {
 	const { container, unmount } = render(Button, { props });
@@ -16,6 +21,24 @@ describe('Button class', () => {
 
 		expect(classOf({ variant: 'ghost', size: 'sm', class: 'px-1 h-6' })).toBe(expected);
 		expect(classOf({ variant: 'ghost', size: 'sm', class: 'px-1 h-6' })).toBe(expected);
+	});
+
+	test('a repeated string class is merged only once', () => {
+		classOf({ variant: 'secondary', class: 'cache-probe' });
+		const merges = vi.mocked(cn).mock.calls.length;
+
+		classOf({ variant: 'secondary', class: 'cache-probe' });
+
+		expect(vi.mocked(cn).mock.calls.length).toBe(merges);
+	});
+
+	test('an array class is merged on every render', () => {
+		classOf({ class: ['array-probe'] });
+		const merges = vi.mocked(cn).mock.calls.length;
+
+		classOf({ class: ['array-probe'] });
+
+		expect(vi.mocked(cn).mock.calls.length).toBe(merges + 1);
 	});
 
 	test('the same class on another variant merges against that variant', () => {

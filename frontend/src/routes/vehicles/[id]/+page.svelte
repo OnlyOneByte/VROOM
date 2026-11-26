@@ -171,6 +171,7 @@
 	const loadCompareCard = () => import('#lib/components/vehicles/CommunityCompareCard.svelte');
 	const loadPhotoCarousel = () => import('#lib/components/vehicles/VehiclePhotoCarousel.svelte');
 	const loadUploadDialog = () => import('#lib/components/common/MediaCaptureDialog.svelte');
+	const loadShareDialog = () => import('#lib/components/vehicles/ShareVehicleDialog.svelte');
 	const loadOverviewModules = () =>
 		Promise.all([
 			import('#lib/components/dashboard/NeedsAttentionCard.svelte'),
@@ -383,7 +384,7 @@
 			loadOdometerTab,
 			loadFinanceTab,
 			loadInsuranceTab,
-			...(isOwner ? [loadUploadDialog] : [])
+			...(isOwner ? [loadUploadDialog, loadShareDialog] : [])
 		]);
 	});
 
@@ -877,7 +878,7 @@
 			</div>
 		</div>
 		{#if isOwner && !showingCachedVehicle && hasOpenedShare}
-			{#await import('#lib/components/vehicles/ShareVehicleDialog.svelte') then { default: ShareVehicleDialog }}
+			{#await loadShareDialog() then { default: ShareVehicleDialog }}
 				<ShareVehicleDialog bind:open={shareOpen} {vehicleId} vehicleName={vehicleDisplayName} />
 			{/await}
 		{/if}
