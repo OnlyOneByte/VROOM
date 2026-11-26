@@ -67,9 +67,9 @@
 			case 'open':
 				return `New here? Signing in${allowedEmail} creates your garage.`;
 			case 'approval':
-				return `New here? Sign in${allowedEmail} to ask for an account. An admin approves it first.`;
+				return `New here? Sign in${allowedEmail} to ask for an account. An admin approves it first, unless they invited you.`;
 			case 'invite':
-				return 'New here? This server is invite only. Ask its admin for an invite.';
+				return 'New here? You need an invite, from this server’s admin or from someone sharing a vehicle with you.';
 			case 'closed':
 				return 'This server isn’t taking new accounts.';
 		}
@@ -77,6 +77,13 @@
 
 	const authError = $derived(page.url.searchParams.get('auth_error'));
 	const authErrorMessage = $derived(authError ? (authErrorMessages[authError] ?? null) : null);
+	const showNewHereLine = $derived(
+		newHereLine !== null &&
+			!authError?.startsWith('signup_') &&
+			!isLoadingProviders &&
+			!fetchError &&
+			providers.length > 0
+	);
 
 	const authState = authStore;
 
@@ -192,7 +199,7 @@
 			{/if}
 		</div>
 
-		{#if newHereLine}
+		{#if showNewHereLine}
 			<p class="mt-2 text-[13px] text-muted-foreground" data-testid="signup-mode-line">
 				{newHereLine}
 			</p>

@@ -57,7 +57,7 @@
 			await tick();
 			document.getElementById(`signup-mode-${mode}`)?.focus();
 		} catch (e) {
-			appStore.showError(`Couldn't save the sign-up mode. ${userFacingErrorMessage(e)}`);
+			appStore.showError(`Couldn’t save the sign-up mode. ${userFacingErrorMessage(e)}`);
 		} finally {
 			savingMode = false;
 		}

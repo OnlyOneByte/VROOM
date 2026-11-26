@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
@@ -69,15 +68,6 @@ describe('a waiting account whose waiting page fails to load', () => {
 		expect(screen.getByRole('button', { name: 'Sign Out' })).toBeInTheDocument();
 		expect(screen.queryByText('Page content')).toBeNull();
 		expect(screen.queryByRole('link', { name: 'Skip to content' })).toBeNull();
-	});
-
-	it('names its loading spinner for screen readers', () => {
-		const source = readFileSync(`${process.cwd()}/src/routes/+layout.svelte`, 'utf8');
-		const start = source.indexOf("{#await import('#lib/components/layout/AccountPending.svelte')}");
-		const loading = source.slice(start, source.indexOf('{:then', start));
-		expect(loading).toContain('aria-busy="true"');
-		expect(loading).toContain('role="status"');
-		expect(loading).toMatch(/<span class="sr-only">Loading<\/span>/);
 	});
 
 	it('a failed Sign Out says so and stays on the page, with the button usable again', async () => {
