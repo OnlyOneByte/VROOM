@@ -45,7 +45,10 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 				return `Amount must be ${formatNumber(EXPENSE_LIMITS.MAX_AMOUNT, 0)} or less`;
 			}
 			if (!fitsMinorUnit(amount)) {
-				return `Amount can have at most ${Math.log10(minorUnitScale())} decimal places`;
+				const digits = Math.log10(minorUnitScale());
+				return digits > 0
+					? `Amount can have at most ${digits} decimal places`
+					: 'Amount must be a whole number';
 			}
 			break;
 		}
