@@ -59,48 +59,52 @@
 		</div>
 	{/if}
 
-	{#if charging && (charging.sessions.currentYear > 0 || charging.averageCost.perEnergyUnit != null)}
-		<div class="space-y-2 md:self-end">
-			<p class="text-sm text-muted-foreground">Charging</p>
-			<p class="max-w-md text-base md:text-lg">
-				{#if charging.averageCost.perEnergyUnit != null}
-					<strong>{formatCurrency(charging.averageCost.perEnergyUnit, undefined, 3)}</strong>
-					per {chargeUnit} on average
-				{:else}
-					No charging costs recorded
-				{/if}
-				across <strong>{formatNumber(charging.sessions.currentYear, 0)}</strong>
-				{charging.sessions.currentYear === 1
-					? 'session'
-					: 'sessions'}{#if charging.efficiency.avgEfficiency != null}, at <strong>
-						{formatNumber(charging.efficiency.avgEfficiency, 1)}
-					</strong>
-					{electricEfficiencyUnit}{/if}.
-			</p>
-		</div>
-	{/if}
+	<div class="min-w-0 space-y-6 md:self-end">
+		{#if charging && (charging.sessions.currentYear > 0 || charging.averageCost.perEnergyUnit != null)}
+			<div class="space-y-2">
+				<p class="text-sm text-muted-foreground">Charging</p>
+				<p class="max-w-md text-base md:text-lg">
+					{#if charging.averageCost.perEnergyUnit != null}
+						<strong>{formatCurrency(charging.averageCost.perEnergyUnit, undefined, 3)}</strong>
+						per {chargeUnit} on average
+					{:else}
+						No charging costs recorded
+					{/if}
+					across <strong>{formatNumber(charging.sessions.currentYear, 0)}</strong>
+					{charging.sessions.currentYear === 1
+						? 'session'
+						: 'sessions'}{#if charging.efficiency.avgEfficiency != null}, at <strong>
+							{formatNumber(charging.efficiency.avgEfficiency, 1)}
+						</strong>
+						{electricEfficiencyUnit}{/if}.
+				</p>
+			</div>
+		{/if}
 
-	{#if economy.length > 0}
-		<div class="space-y-3 md:col-span-2 md:max-w-xl md:justify-self-end">
-			<h2 class="text-base font-semibold" id="fuel-economy-title">Fuel economy</h2>
-			<ul class="space-y-2" aria-labelledby="fuel-economy-title">
-				{#each economy as row (row.vehicleId)}
-					<li class="grid grid-cols-[minmax(0,8rem)_1fr_auto] items-center gap-3 text-sm">
-						<span class="truncate">{row.label}</span>
-						<span class="h-2.5 rounded-full bg-muted" aria-hidden="true">
-							<span
-								class="block h-full rounded-full"
-								style:width="{Math.max(2, row.share * 100)}%"
-								style:background-color={vehicleColors[row.vehicleId] ?? 'var(--chart-1)'}
-							></span>
-						</span>
-						<span class="font-semibold tabular-nums">
-							{formatNumber(row.value, 1)}
-							{efficiencyUnit}
-						</span>
-					</li>
-				{/each}
-			</ul>
-		</div>
-	{/if}
+		{#if economy.length > 0}
+			<div class="space-y-3">
+				<h2 class="text-base font-semibold" id="fuel-economy-title">Fuel economy</h2>
+				<ul class="space-y-2" aria-labelledby="fuel-economy-title">
+					{#each economy as row (row.vehicleId)}
+						<li
+							class="grid grid-cols-[minmax(0,10rem)_minmax(4rem,1fr)_auto] items-center gap-3 text-sm"
+						>
+							<span class="truncate">{row.label}</span>
+							<span class="h-2.5 rounded-full bg-muted" aria-hidden="true">
+								<span
+									class="block h-full rounded-full"
+									style:width="{Math.max(2, row.share * 100)}%"
+									style:background-color={vehicleColors[row.vehicleId] ?? 'var(--chart-1)'}
+								></span>
+							</span>
+							<span class="font-semibold tabular-nums">
+								{formatNumber(row.value, 1)}
+								{efficiencyUnit}
+							</span>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
+	</div>
 </section>
