@@ -10,6 +10,7 @@ import {
   type DataEnvelope,
   json,
   requestAs,
+  SETUP_TIMEOUT_MS,
   socketFrom,
   type TestApp,
 } from '../../../test-helpers/http-client';
@@ -63,7 +64,7 @@ async function createFeed(options?: Record<string, boolean | string>): Promise<s
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => ctx.close());
 

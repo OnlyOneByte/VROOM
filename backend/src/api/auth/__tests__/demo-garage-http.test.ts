@@ -6,7 +6,13 @@ import { appContext } from '../../../app-context';
 import { CONFIG } from '../../../config';
 import { getDb } from '../../../db/connection';
 import { sessions, users } from '../../../db/schema';
-import { createTestApp, json, socketFrom, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  json,
+  SETUP_TIMEOUT_MS,
+  socketFrom,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 import { DEMO_USER_ID, prepareDemoGarage } from '../demo';
 import { setSessionCookie } from '../utils';
@@ -62,7 +68,7 @@ async function rowCounts(): Promise<Record<string, number>> {
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   demoConfig.enabled = false;

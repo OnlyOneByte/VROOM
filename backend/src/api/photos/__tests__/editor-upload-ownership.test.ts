@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { createInvitee, type Invitee } from '../../../test-helpers/invitee';
 import {
   deletePhotoForEntity,
@@ -34,7 +34,7 @@ beforeEach(async () => {
   );
   editor = await createInvitee(ctx, 'editor');
   await editor.acceptShare('veh-shared', 'editor');
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   storage?.restore();

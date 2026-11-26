@@ -5,7 +5,13 @@ import {
   installFakePhotoStorage,
 } from '../api/photos/__tests__/fake-photo-storage';
 import { uploadPhotoForEntity } from '../api/photos/photo-service';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -17,7 +23,7 @@ beforeEach(async () => {
       [`veh-${i}`, ctx.user.id]
     );
   }
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(() => ctx.close());
 

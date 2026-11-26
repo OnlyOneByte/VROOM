@@ -5,6 +5,7 @@ import {
   json,
   type PaginatedEnvelope,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee } from '../../../test-helpers/invitee';
@@ -19,7 +20,7 @@ beforeEach(async () => {
   const b = await createInvitee(ctx, 'expr-invitee', 'Reader B');
   bEmail = b.email;
   asB = b.request;
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 interface ExpenseRow {

@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { createTestApp, type TestApp } from '../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../test-helpers/http-client';
 
 describe('API responses are never stored by a browser or a shared cache', () => {
   let ctx: TestApp;
 
   beforeAll(async () => {
     ctx = await createTestApp();
-  });
+  }, SETUP_TIMEOUT_MS);
   afterAll(() => ctx.close());
 
   test('a signed-in JSON response is private, no-store', async () => {

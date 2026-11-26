@@ -4,7 +4,7 @@ import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GLOBAL_MAX_BODY_SIZE } from '../app';
 import { CONFIG } from '../config';
-import { createTestApp, type TestApp } from '../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../test-helpers/http-client';
 import { parseTrustedProxies } from '../utils/client-ip';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -165,7 +165,7 @@ describe('documented deployment examples match the backend', () => {
 
     beforeAll(async () => {
       ctx = await createTestApp();
-    });
+    }, SETUP_TIMEOUT_MS);
 
     const statusFor = async (path: string) => (await ctx.app.request(path)).status;
 

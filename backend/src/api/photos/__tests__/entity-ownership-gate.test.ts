@@ -3,6 +3,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 
@@ -15,7 +16,7 @@ beforeEach(async () => {
   ctx.sqlite.run(
     `INSERT INTO users (id, email, display_name) VALUES ('${OTHER_USER}', 'other@test.com', 'Other Owner')`
   );
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 function seedVehicle(id: string, userId: string): void {

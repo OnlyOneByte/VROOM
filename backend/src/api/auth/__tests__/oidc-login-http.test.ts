@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { type FakeOidcIssuer, startFakeOidcIssuer } from '../../../test-helpers/fake-oidc-issuer';
-import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  json,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 type MutableConfig = {
   disableRateLimit: boolean;
@@ -55,7 +60,7 @@ beforeEach(async () => {
     displayName: 'Pocket ID',
   });
   await discoverOidc();
-});
+}, SETUP_TIMEOUT_MS);
 
 afterEach(async () => {
   config.disableRateLimit = saved.disableRateLimit;

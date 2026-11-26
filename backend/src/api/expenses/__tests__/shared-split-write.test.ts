@@ -4,6 +4,7 @@ import {
   type DataEnvelope,
   json,
   type RequestFn,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee } from '../../../test-helpers/invitee';
@@ -20,7 +21,7 @@ beforeEach(async () => {
   bId = b.id;
   bEmail = b.email;
   asB = b.request;
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
 interface SplitData {

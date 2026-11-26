@@ -3,6 +3,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
@@ -11,7 +12,7 @@ let ctx: TestApp;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, SETUP_TIMEOUT_MS);
 afterEach(() => {
   ctx.sqlite.run('DROP TRIGGER IF EXISTS test_block_expense_update');
   ctx.close();

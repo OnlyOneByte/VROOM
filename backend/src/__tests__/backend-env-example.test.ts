@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONFIG, validateProductionConfig } from '../config';
-import { createTestApp, type TestApp } from '../test-helpers/http-client';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../test-helpers/http-client';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC_ROOT = join(HERE, '..');
@@ -111,7 +111,7 @@ describe('backend/.env.example matches the backend', () => {
 
     beforeAll(async () => {
       ctx = await createTestApp();
-    });
+    }, SETUP_TIMEOUT_MS);
 
     const statusFor = async (path: string) => (await ctx.app.request(path)).status;
 
