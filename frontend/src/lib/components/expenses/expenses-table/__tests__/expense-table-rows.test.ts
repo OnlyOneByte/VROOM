@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import type { Expense, Vehicle } from '#lib/types/index.ts';
+import type { Expense, UnitPreferences, Vehicle } from '#lib/types/index.ts';
 import {
 	buildDisplayRows,
+	fillLabel,
 	monthLabel,
 	monthSections,
 	rowKey,
@@ -284,5 +285,26 @@ describe('rowTitle', () => {
 			categoryInMeta: false
 		});
 		expect(rowTitle(undefined, 'misc')).toEqual({ title: 'Misc', categoryInMeta: false });
+	});
+});
+
+describe('fillLabel', () => {
+	const gallons: UnitPreferences = {
+		distanceUnit: 'miles',
+		volumeUnit: 'gallons_us',
+		chargeUnit: 'kwh'
+	};
+	const litres: UnitPreferences = { ...gallons, distanceUnit: 'kilometers', volumeUnit: 'liters' };
+
+	test('a fill-up shows its volume in the given unit', () => {
+		expect(fillLabel(expense({ id: 'a', volume: 8.123 }), gallons)).toBe('8.12 gal');
+		expect(fillLabel(expense({ id: 'b', volume: 40 }), litres)).toBe('40 L');
+	});
+
+	test('a charge shows kWh, and other categories or empty fills show nothing', () => {
+		const charge = expense({ id: 'c', fuelType: 'Level 2 (AC)', charge: 51.6 });
+		expect(fillLabel(charge, litres)).toBe('51.6 kWh');
+		expect(fillLabel(expense({ id: 'd' }), gallons)).toBeNull();
+		expect(fillLabel(expense({ id: 'e', category: 'misc', volume: 3 }), gallons)).toBeNull();
 	});
 });

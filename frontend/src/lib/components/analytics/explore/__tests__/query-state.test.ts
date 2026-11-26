@@ -3,9 +3,7 @@ import type { AnalyticsQueryResponse } from '#lib/types/index.ts';
 import {
 	DEFAULT_EXPLORE,
 	EXPLORE_METRICS,
-	EXPLORE_PRESETS,
 	EXPLORE_SPLITS,
-	activePreset,
 	allowedSplits,
 	apiQuery,
 	applyPreset,
@@ -14,7 +12,8 @@ import {
 	metricLabel,
 	normalizeExplore,
 	parseExplore,
-	writeExplore
+	writeExplore,
+	type ExploreQuery
 } from '../query-state';
 import {
 	bucketBounds,
@@ -25,6 +24,7 @@ import {
 	exploreAnnotations,
 	expensesNote,
 	expensesQuery,
+	heroSentence,
 	kpis,
 	percentChange,
 	seriesFor
@@ -35,16 +35,21 @@ const params = (query: string) => new URLSearchParams(query);
 describe('Explore query in the URL', () => {
 	test('no params is "where the money goes"', () => {
 		expect(parseExplore(params(''))).toEqual(DEFAULT_EXPLORE);
-		expect(activePreset(DEFAULT_EXPLORE)).toBe('money');
 	});
 
-	test('every preset round-trips through the URL and is recognised', () => {
-		for (const preset of EXPLORE_PRESETS) {
-			const query = applyPreset(preset.query);
+	test('a chosen view round-trips through the URL', () => {
+		const views: Array<Partial<ExploreQuery>> = [
+			{},
+			{ metric: 'costPerDistance', split: 'vehicle' },
+			{ split: 'fuelType', inc: 'all' },
+			{ split: 'none', compare: 'prevYear' },
+			{ metric: 'mpg', per: 'quarter', split: 'vehicle' }
+		];
+		for (const view of views) {
+			const query = applyPreset(view);
 			const url = writeExplore(new URL('https://x.test/analytics?range=3m'), query);
 			expect(url.searchParams.get('range')).toBe('3m');
 			expect(parseExplore(url.searchParams)).toEqual(query);
-			expect(activePreset(query)).toBe(preset.id);
 		}
 	});
 
@@ -438,5 +443,69 @@ describe('services and trips on the time charts', () => {
 			trips: { count: [0, 0, 0], distance: [0, 0, 0] }
 		};
 		expect(exploreAnnotations(quiet, 'month', options)).toBeUndefined();
+	});
+});
+
+describe('Explore hero sentence', () => {
+	const base = {
+		format: (v: number) => `$${v}`,
+		rangeText: 'Last 12 months',
+		carsText: 'All cars',
+		interval: 'month',
+		compareLabel: 'the period before',
+		distanceWord: 'mile'
+	};
+	const summary = { total: 400, perBucket: 100, previousPerBucket: 80, perDistance: null };
+
+	test('names the range and cars, the biggest share, and the per-bucket change', () => {
+		const text = heroSentence({
+			...base,
+			query: DEFAULT_EXPLORE,
+			summary,
+			series: [
+				{ label: 'Fuel & charging', values: [100, 200] },
+				{ label: 'Maintenance', values: [50, 50] }
+			]
+		});
+		expect(text).toBe(
+			'in running costs over the last 12 months for all your cars. Fuel & charging was 75% of it. ' +
+				"That's $100 a month, 25% more than the period before."
+		);
+	});
+
+	test('an average metric gets only the lead, and a custom range reads from–to', () => {
+		const text = heroSentence({
+			...base,
+			query: applyPreset({ metric: 'mpg', split: 'vehicle' }),
+			summary,
+			series: [],
+			rangeText: 'Jun 1, 2026 – Nov 30, 2026',
+			carsText: '2019 Honda Civic'
+		});
+		expect(text).toBe('on average from Jun 1, 2026 to Nov 30, 2026 for 2019 Honda Civic.');
+	});
+
+	test('a count names its noun, and a drop reads "less than"', () => {
+		const text = heroSentence({
+			...base,
+			query: applyPreset({ metric: 'count', split: 'none' }),
+			format: (v: number) => String(v),
+			summary: { total: 12, perBucket: 4, previousPerBucket: 5, perDistance: null },
+			series: [{ label: 'Total', values: [12] }]
+		});
+		expect(text).toBe(
+			"expenses logged over the last 12 months for all your cars. That's 4 expenses a month, 20% less than the period before."
+		);
+	});
+
+	test('all costs over the whole range adds the cost per distance', () => {
+		const text = heroSentence({
+			...base,
+			query: applyPreset({ split: 'none', inc: 'all', per: 'none' }),
+			summary: { ...summary, perDistance: 0.25 },
+			series: [{ label: 'Total', values: [400] }],
+			rangeText: 'Year to date'
+		});
+		expect(text).toBe('in all costs so far this year for all your cars. About $0.25 a mile.');
 	});
 });

@@ -1,9 +1,19 @@
 import type { LinkedAuthProvider, User } from '#lib/types/index.ts';
 import { apiClient } from '#lib/services/api-client.ts';
+import type { SignupMode } from '#lib/services/signup-api.ts';
+
+export interface PublicSignupInfo {
+	mode: SignupMode;
+	domainRestricted: boolean;
+}
 
 export const authApi = {
 	getProviders(): Promise<{ id: string; displayName: string }[]> {
 		return apiClient.get<{ id: string; displayName: string }[]>('/auth/providers');
+	},
+
+	getSignupInfo(): Promise<PublicSignupInfo> {
+		return apiClient.get<PublicSignupInfo>('/auth/signup');
 	},
 
 	async isDemoAvailable(): Promise<boolean> {

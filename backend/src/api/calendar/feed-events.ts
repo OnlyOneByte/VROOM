@@ -11,6 +11,7 @@ import {
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
+import { minorUnitScale } from '../../utils/money';
 import { calendarDayIn, isValidTimeZone } from '../../utils/time-zone';
 import type { CalendarEvent } from './ics';
 
@@ -222,10 +223,8 @@ export async function buildFeedEvents(
     .from(userPreferences)
     .where(eq(userPreferences.userId, userId))
     .get();
-  const formatter = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: prefs?.currency ?? 'USD',
-  });
+  const currency = prefs?.currency ?? 'USD';
+  const formatter = new Intl.NumberFormat('en-US', { style: 'currency', currency });
   const timeZone = options.timeZone && isValidTimeZone(options.timeZone) ? options.timeZone : null;
   const day = (date: Date) => (timeZone ? calendarDayIn(date, timeZone) : isoDay(date));
   const today = new Date(`${day(now)}T00:00:00Z`);
@@ -233,7 +232,7 @@ export async function buildFeedEvents(
     userId,
     options,
     vehicleNames: new Map(owned.map((v) => [v.id, v.nickname || `${v.make} ${v.model}`])),
-    money: (cents) => formatter.format(cents / 100),
+    money: (minor) => formatter.format(minor / minorUnitScale(currency)),
     day,
     today,
     horizon: new Date(today.getTime() + HORIZON_DAYS * DAY_MS),

@@ -59,15 +59,25 @@ describe('Server settings page', () => {
 		expect(api.getSettings).not.toHaveBeenCalled();
 	});
 
-	test('choosing a mode saves nothing until Save Mode', async () => {
+	test('Save Mode shows only once a new mode is chosen, and saves nothing until pressed', async () => {
 		render(ServerPage);
-		const save = await screen.findByRole('button', { name: 'Save Mode' });
-		expect(save).toBeDisabled();
+		await screen.findByTestId('signup-mode-approval');
+		expect(screen.queryByRole('button', { name: 'Save Mode' })).toBeNull();
 		await fireEvent.click(screen.getByTestId('signup-mode-approval'));
 		expect(api.updateSettings).not.toHaveBeenCalled();
-		await fireEvent.click(save);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Save Mode' }));
 		await waitFor(() => expect(api.updateSettings).toHaveBeenCalledWith({ mode: 'approval' }));
 		expect(showSuccess).toHaveBeenCalledWith('Sign-up mode saved');
+	});
+
+	test('Save Domains shows only while the list differs, and Enter on an unchanged list saves nothing', async () => {
+		render(ServerPage);
+		const input = await screen.findByLabelText('Allowed email domains (Optional)');
+		expect(screen.queryByRole('button', { name: 'Save Domains' })).toBeNull();
+		await fireEvent.submit(input.closest('form') as HTMLFormElement);
+		expect(api.updateSettings).not.toHaveBeenCalled();
+		await fireEvent.input(input, { target: { value: 'example.com' } });
+		expect(screen.getByRole('button', { name: 'Save Domains' })).toBeInTheDocument();
 	});
 
 	test('a list that fails to load offers Retry', async () => {

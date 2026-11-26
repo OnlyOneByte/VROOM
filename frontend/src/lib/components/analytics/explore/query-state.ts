@@ -80,30 +80,6 @@ const SPLITS_FOR_METRIC: Record<AnalyticsQueryMetric, readonly AnalyticsQueryGro
 	efficiency: ['none', 'vehicle', 'fuelType']
 };
 
-export const EXPLORE_PRESETS = [
-	{ id: 'money', label: 'Where the money goes', query: {} },
-	{
-		id: 'per-distance',
-		label: 'Cost per mile',
-		query: { metric: 'costPerDistance', split: 'vehicle' }
-	},
-	{
-		id: 'fuel-vs-charging',
-		label: 'Fuel vs charging',
-		query: { split: 'fuelType' }
-	},
-	{
-		id: 'year-vs-year',
-		label: 'This year vs last',
-		query: { split: 'none', compare: 'prevYear' }
-	},
-	{
-		id: 'seasons',
-		label: 'Seasons',
-		query: { metric: 'mpg', per: 'quarter', split: 'vehicle' }
-	}
-] as const satisfies ReadonlyArray<{ id: string; label: string; query: Partial<ExploreQuery> }>;
-
 const PARAMS = ['metric', 'per', 'split', 'inc', 'compare', 'hide'] as const;
 
 function pick<T extends string>(
@@ -172,17 +148,6 @@ export function writeExplore(url: { href: string }, query: ExploreQuery): URL {
 
 export function applyPreset(query: Partial<ExploreQuery>): ExploreQuery {
 	return normalizeExplore({ ...DEFAULT_EXPLORE, ...query, hide: [] });
-}
-
-export function activePreset(query: ExploreQuery): string | null {
-	return (
-		EXPLORE_PRESETS.find(p => {
-			const preset = applyPreset(p.query);
-			return (Object.keys(DEFAULT_EXPLORE) as Array<keyof ExploreQuery>).every(key =>
-				key === 'hide' ? true : preset[key] === query[key]
-			);
-		})?.id ?? null
-	);
 }
 
 export function apiQuery(query: ExploreQuery) {

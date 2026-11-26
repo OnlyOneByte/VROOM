@@ -133,7 +133,11 @@ async function enrichWithBalance(
   return withComputedBalance(financing, computedBalance);
 }
 
-const financingRowToApi = financingWithBalanceToApi;
+async function financingRowToApi<T extends { vehicleId: string }>(row: T): Promise<T> {
+  const vehicle = await repos().vehicles.findById(row.vehicleId);
+  if (!vehicle) throw new NotFoundError('Financing');
+  return financingWithBalanceToApi(row, await repos().preferences.moneyScale(vehicle.userId));
+}
 
 routes.get(
   '/vehicles/:vehicleId/financing',
@@ -154,7 +158,7 @@ routes.get(
     }
 
     const enriched = await enrichWithBalance(financingData, timeZone);
-    return c.json({ success: true, data: financingRowToApi(enriched) });
+    return c.json({ success: true, data: await financingRowToApi(enriched) });
   }
 );
 
@@ -184,7 +188,7 @@ routes.post(
       });
       return c.json({
         success: true,
-        data: financingRowToApi(updatedFinancing),
+        data: await financingRowToApi(updatedFinancing),
         message: 'Financing updated successfully',
       });
     }
@@ -196,7 +200,7 @@ routes.post(
     return c.json(
       {
         success: true,
-        data: financingRowToApi(createdFinancing),
+        data: await financingRowToApi(createdFinancing),
         message: 'Financing created successfully',
       },
       201
@@ -224,7 +228,7 @@ routes.patch(
     });
     return c.json({
       success: true,
-      data: financingRowToApi(updated),
+      data: await financingRowToApi(updated),
       message: 'Payment amount updated successfully',
     });
   }
@@ -241,7 +245,7 @@ routes.put(
 
     return c.json({
       success: true,
-      data: financingRowToApi(updated),
+      data: await financingRowToApi(updated),
       message: 'Financing marked as paid off',
     });
   }

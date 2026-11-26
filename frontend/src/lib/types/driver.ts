@@ -29,3 +29,21 @@ export interface DriverStats {
 	costPerDistance: number | null;
 	drivers: DriverFigures[];
 }
+
+export type BackfillRequest =
+	{ mode: 'logged' } | { mode: 'range'; driverId: string; from: string; to: string };
+
+export interface BackfillSummary {
+	total: number;
+	trips: number;
+	readings: number;
+	expenses: number;
+	byDriver: { driverId: string; name: string; count: number }[];
+}
+
+export interface BackfillBatch {
+	id: string;
+	mode: 'logged' | 'range';
+	createdAt: string;
+	total: number;
+}

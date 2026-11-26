@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { appContext, repos } from '../../app-context';
 import { ValidationError } from '../../errors';
@@ -27,14 +27,16 @@ import {
 
 const routes = new Hono();
 
-function policyToApi<T extends Record<string, unknown>>(policy: T): T {
+function policyToApi<T extends Record<string, unknown>>(policy: T, scale: number): T {
   const terms = policy.terms;
   if (!Array.isArray(terms)) return policy;
   return {
     ...policy,
-    terms: terms.map((t) => insuranceTermToApi(t as Record<string, unknown>)),
+    terms: terms.map((t) => insuranceTermToApi(t as Record<string, unknown>, scale)),
   };
 }
+
+const ownScale = (c: Context) => repos().preferences.moneyScale(c.get('user').id);
 
 function sharedPolicyView<
   T extends {
@@ -130,7 +132,12 @@ routes.use('*', changeTracker);
 routes.get('/', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const policies = await repos().insurancePolicies.findByUserId(user.id);
-  return c.json({ success: true, data: policies.map(policyToApi), count: policies.length });
+  const scale = await ownScale(c);
+  return c.json({
+    success: true,
+    data: policies.map((p) => policyToApi(p, scale)),
+    count: policies.length,
+  });
 });
 
 routes.get(
@@ -150,7 +157,12 @@ routes.get(
       access.role === 'owner'
         ? policies
         : policies.map((p) => sharedPolicyView(p, vehicleId, seesCosts));
-    return c.json({ success: true, data: scoped.map(policyToApi), count: scoped.length });
+    const scale = await repos().preferences.moneyScale(access.ownerId);
+    return c.json({
+      success: true,
+      data: scoped.map((p) => policyToApi(p, scale)),
+      count: scoped.length,
+    });
   }
 );
 
@@ -175,7 +187,11 @@ routes.post('/', zValidator('json', createPolicySchema), authorize(ownAccount), 
   }
 
   return c.json(
-    { success: true, data: policyToApi(policy), message: 'Insurance policy created successfully' },
+    {
+      success: true,
+      data: policyToApi(policy, await ownScale(c)),
+      message: 'Insurance policy created successfully',
+    },
     201
   );
 });
@@ -184,7 +200,7 @@ routes.get('/:id', zValidator('param', idParamSchema), authorize(fromPolicyOwner
   const user = c.get('user');
   const { id } = c.req.valid('param');
   const policy = await validateInsuranceOwnership(id, user.id);
-  return c.json({ success: true, data: policyToApi(policy) });
+  return c.json({ success: true, data: policyToApi(policy, await ownScale(c)) });
 });
 
 routes.put(
@@ -200,7 +216,7 @@ routes.put(
     const policy = await repos().insurancePolicies.update(id, data, user.id);
     return c.json({
       success: true,
-      data: policyToApi(policy),
+      data: policyToApi(policy, await ownScale(c)),
       message: 'Insurance policy updated successfully',
     });
   }
@@ -258,7 +274,11 @@ routes.post(
     }
 
     return c.json(
-      { success: true, data: policyToApi(policy), message: 'Term added successfully' },
+      {
+        success: true,
+        data: policyToApi(policy, await ownScale(c)),
+        message: 'Term added successfully',
+      },
       201
     );
   }
@@ -295,7 +315,7 @@ routes.put(
 
     return c.json({
       success: true,
-      data: policyToApi(policy),
+      data: policyToApi(policy, await ownScale(c)),
       message: 'Term updated successfully',
     });
   }
@@ -316,7 +336,7 @@ routes.delete(
     const policy = await repos().insurancePolicies.deleteTerm(id, termId, user.id);
     return c.json({
       success: true,
-      data: policyToApi(policy),
+      data: policyToApi(policy, await ownScale(c)),
       message: 'Term deleted successfully',
     });
   }
@@ -340,9 +360,10 @@ routes.get(
               resolver.can('vehicle.insurance.read', { kind: 'vehicle', vehicleId: cl.vehicleId })
                 .allow
           );
+    const scale = await repos().preferences.moneyScale(policy?.userId ?? c.get('user').id);
     return c.json({
       success: true,
-      data: scoped.map((cl) => insuranceClaimToApi(cl)),
+      data: scoped.map((cl) => insuranceClaimToApi(cl, scale)),
       count: scoped.length,
     });
   }
@@ -361,7 +382,11 @@ routes.post(
     await validateClaimRefs(data, id, user.id);
     const claim = await repos().insuranceClaims.create(id, data);
     return c.json(
-      { success: true, data: insuranceClaimToApi(claim), message: 'Claim filed successfully' },
+      {
+        success: true,
+        data: insuranceClaimToApi(claim, await ownScale(c)),
+        message: 'Claim filed successfully',
+      },
       201
     );
   }
@@ -381,7 +406,7 @@ routes.put(
     const claim = await repos().insuranceClaims.update(id, claimId, updates);
     return c.json({
       success: true,
-      data: insuranceClaimToApi(claim),
+      data: insuranceClaimToApi(claim, await ownScale(c)),
       message: 'Claim updated successfully',
     });
   }

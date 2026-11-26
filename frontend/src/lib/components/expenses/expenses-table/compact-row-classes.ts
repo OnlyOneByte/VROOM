@@ -1,4 +1,5 @@
-export const MOBILE_ROW_SUMMARY_CLASS = 'flex w-full items-start gap-3 px-3 py-3 text-left';
+export const MOBILE_ROW_SUMMARY_CLASS =
+	'flex w-full items-start gap-3 px-3 py-3 text-left scroll-mt-28 lg:scroll-mt-14 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50';
 
 export const MOBILE_ROW_ACTION_CLASS =
 	"h-7 px-2 text-xs relative before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-['']";

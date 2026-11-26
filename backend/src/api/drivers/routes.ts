@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { appContext } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, vehicleParam } from '../../permissions/authorize';
 import { requestResolver } from '../../permissions/grants';
 import { zValidator } from '../../utils/validation';
+import { requireVehicleAccess, seesFinancials } from '../../utils/vehicle-access';
 import {
   applyBackfill,
   type BackfillRequest,
@@ -73,7 +74,7 @@ driverRoutes.get(
   zValidator('param', vehicleIdParam),
   zValidator('query', statsQuery),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId } = c.req.valid('param');
     const query = c.req.valid('query');
     const { db } = appContext();
@@ -82,6 +83,9 @@ driverRoutes.get(
     const from = query.from ? Date.parse(query.from) : to - 30 * DAY;
     const resolver = requestResolver(c, db);
     const vehicle = { kind: 'vehicle' as const, vehicleId };
+    const owner = await repos().vehicles.findById(vehicleId);
+    if (!owner) throw new NotFoundError('Vehicle');
+    const scale = await repos().preferences.moneyScale(owner.userId);
     return c.json({
       success: true,
       data: driverStats(db, vehicleId, {
@@ -90,6 +94,7 @@ driverRoutes.get(
         viewerUserId: c.get('user').id,
         everyone: resolver.can('vehicle.driver_stats.read', vehicle).allow,
         includeCarCosts: resolver.can('vehicle.expense.read', vehicle).allow,
+        scale,
       }),
     });
   }
@@ -133,6 +138,10 @@ function backfillRequest(vehicleId: string, body: z.infer<typeof backfillSchema>
   return { ...body, from: Date.parse(body.from), to: Date.parse(body.to) };
 }
 
+async function hidesFinancials(vehicleId: string, userId: string): Promise<boolean> {
+  return !seesFinancials(await requireVehicleAccess(vehicleId, userId, 'read'));
+}
+
 driverRoutes.get(
   '/backfill',
   zValidator('param', vehicleIdParam),
@@ -149,11 +158,17 @@ driverRoutes.post(
   zValidator('param', vehicleIdParam),
   zValidator('json', backfillSchema),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId } = c.req.valid('param');
     requireCarShare(vehicleId);
     const { db } = appContext();
-    const planned = planBackfill(db, vehicleId, backfillRequest(vehicleId, c.req.valid('json')));
+    const hide = await hidesFinancials(vehicleId, c.get('user').id);
+    const planned = planBackfill(
+      db,
+      vehicleId,
+      backfillRequest(vehicleId, c.req.valid('json')),
+      hide
+    );
     return c.json({ success: true, data: summarize(db, vehicleId, planned) });
   }
 );
@@ -163,13 +178,15 @@ driverRoutes.post(
   zValidator('param', vehicleIdParam),
   zValidator('json', backfillSchema),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId } = c.req.valid('param');
     requireCarShare(vehicleId);
     const { db } = appContext();
     const body = c.req.valid('json');
-    const planned = planBackfill(db, vehicleId, backfillRequest(vehicleId, body));
-    const { batchId, entries } = applyBackfill(db, vehicleId, body.mode, planned, c.get('user').id);
+    const userId = c.get('user').id;
+    const hide = await hidesFinancials(vehicleId, userId);
+    const planned = planBackfill(db, vehicleId, backfillRequest(vehicleId, body), hide);
+    const { batchId, entries } = applyBackfill(db, vehicleId, body.mode, planned, userId, hide);
     return c.json({ success: true, data: { batchId, ...summarize(db, vehicleId, entries) } }, 201);
   }
 );
@@ -178,10 +195,11 @@ driverRoutes.post(
   '/backfill/:batchId/undo',
   zValidator('param', vehicleIdParam.extend({ batchId: z.string().min(1).max(64) })),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId, batchId } = c.req.valid('param');
     requireCarShare(vehicleId);
-    const reverted = undoBackfill(appContext().db, vehicleId, batchId);
+    const hide = await hidesFinancials(vehicleId, c.get('user').id);
+    const reverted = undoBackfill(appContext().db, vehicleId, batchId, hide);
     return c.json({ success: true, data: { reverted } });
   }
 );

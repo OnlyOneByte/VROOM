@@ -1152,6 +1152,7 @@
 									{:else}
 										<ExpensesTable
 											expenses={tabExpenses}
+											vehicles={vehicle ? [vehicle] : []}
 											pendingStates={pending.states}
 											showVehicleColumn={false}
 											{canWrite}

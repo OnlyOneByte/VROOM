@@ -8,19 +8,27 @@ export function dollarsToCents(dollars: number): number {
   return Math.round(dollars * 100);
 }
 
-export function centsToDollars(cents: number): number {
-  return cents / 100;
+export function minorUnitScale(_currency: string): number {
+  return 100;
 }
 
-function centsFieldsToDollars<T extends Record<string, unknown>>(
+export function toMajor(scale: number) {
+  const major = (minor: number): number => minor / scale;
+  const majorOrNull = (minor: number | null): number | null =>
+    minor == null ? minor : major(minor);
+  return { major, majorOrNull };
+}
+
+function minorFieldsToMajor<T extends Record<string, unknown>>(
   row: T,
-  moneyFields: readonly (keyof T)[]
+  moneyFields: readonly (keyof T)[],
+  scale: number
 ): T {
   const out = { ...row };
   for (const f of moneyFields) {
     const v = out[f];
     if (typeof v === 'number') {
-      out[f] = centsToDollars(v) as T[keyof T];
+      out[f] = (v / scale) as T[keyof T];
     }
   }
   return out;
@@ -44,94 +52,102 @@ const INSURANCE_CLAIM_MONEY_FIELDS = ['payoutAmount'] as const;
 const VEHICLE_MONEY_FIELDS = ['purchasePrice'] as const;
 const REMINDER_MONEY_FIELDS = ['expenseAmount'] as const;
 
-function mapMoney<T extends Record<string, unknown>>(row: T, fields: readonly (keyof T)[]): T;
+function mapMoney<T extends Record<string, unknown>>(
+  row: T,
+  fields: readonly (keyof T)[],
+  scale: number
+): T;
 function mapMoney<T extends Record<string, unknown>>(
   row: T | null | undefined,
-  fields: readonly (keyof T)[]
+  fields: readonly (keyof T)[],
+  scale: number
 ): T | null | undefined;
 function mapMoney<T extends Record<string, unknown>>(
   row: T | null | undefined,
-  fields: readonly (keyof T)[]
+  fields: readonly (keyof T)[],
+  scale: number
 ): T | null | undefined {
-  return row == null ? row : centsFieldsToDollars(row, fields);
+  return row == null ? row : minorFieldsToMajor(row, fields, scale);
 }
 
-export const expenseToApi = <T extends Record<string, unknown>>(row: T) =>
-  mapMoney(row, EXPENSE_MONEY_FIELDS as readonly (keyof T)[]);
-export const financingToApi = <T extends Record<string, unknown>>(row: T) =>
-  mapMoney(row, FINANCING_MONEY_FIELDS as readonly (keyof T)[]);
-export const insuranceTermToApi = <T extends Record<string, unknown>>(row: T) =>
-  mapMoney(row, INSURANCE_TERM_MONEY_FIELDS as readonly (keyof T)[]);
-export const insuranceClaimToApi = <T extends Record<string, unknown>>(row: T) =>
-  mapMoney(row, INSURANCE_CLAIM_MONEY_FIELDS as readonly (keyof T)[]);
-const vehicleToApi = <T extends Record<string, unknown>>(row: T) =>
-  mapMoney(row, VEHICLE_MONEY_FIELDS as readonly (keyof T)[]);
-function splitConfigToApi(split: SplitConfig): SplitConfig {
+export const expenseToApi = <T extends Record<string, unknown>>(row: T, scale: number) =>
+  mapMoney(row, EXPENSE_MONEY_FIELDS as readonly (keyof T)[], scale);
+export const financingToApi = <T extends Record<string, unknown>>(row: T, scale: number) =>
+  mapMoney(row, FINANCING_MONEY_FIELDS as readonly (keyof T)[], scale);
+export const insuranceTermToApi = <T extends Record<string, unknown>>(row: T, scale: number) =>
+  mapMoney(row, INSURANCE_TERM_MONEY_FIELDS as readonly (keyof T)[], scale);
+export const insuranceClaimToApi = <T extends Record<string, unknown>>(row: T, scale: number) =>
+  mapMoney(row, INSURANCE_CLAIM_MONEY_FIELDS as readonly (keyof T)[], scale);
+const vehicleToApi = <T extends Record<string, unknown>>(row: T, scale: number) =>
+  mapMoney(row, VEHICLE_MONEY_FIELDS as readonly (keyof T)[], scale);
+function splitConfigToApi(split: SplitConfig, scale: number): SplitConfig {
   if (split.method !== 'absolute') return split;
   return {
     ...split,
-    allocations: split.allocations.map((a) => ({ ...a, amount: centsToDollars(a.amount) })),
+    allocations: split.allocations.map((a) => ({ ...a, amount: a.amount / scale })),
   };
 }
 
-export function reminderToApi<T extends Record<string, unknown>>(row: T): T {
-  const r = mapMoney(row, REMINDER_MONEY_FIELDS as readonly (keyof T)[]);
+export function reminderToApi<T extends Record<string, unknown>>(row: T, scale: number): T {
+  const r = mapMoney(row, REMINDER_MONEY_FIELDS as readonly (keyof T)[], scale);
   const split = r.expenseSplitConfig as SplitConfig | null | undefined;
-  return split ? { ...r, expenseSplitConfig: splitConfigToApi(split) } : r;
+  return split ? { ...r, expenseSplitConfig: splitConfigToApi(split, scale) } : r;
 }
 
-export function financingWithBalanceToApi<T extends Record<string, unknown>>(row: T): T {
-  const withMoney = financingToApi(row);
+export function financingWithBalanceToApi<T extends Record<string, unknown>>(
+  row: T,
+  scale: number
+): T {
+  const withMoney = financingToApi(row, scale);
   return typeof withMoney.computedBalance === 'number'
-    ? { ...withMoney, computedBalance: centsToDollars(withMoney.computedBalance) }
+    ? { ...withMoney, computedBalance: withMoney.computedBalance / scale }
     : withMoney;
 }
 
-export function vehicleRowToApi<T extends Record<string, unknown>>(row: T): T {
-  const v = vehicleToApi(row);
+export function vehicleRowToApi<T extends Record<string, unknown>>(row: T, scale: number): T {
+  const v = vehicleToApi(row, scale);
   const fin = v.financing as Record<string, unknown> | null | undefined;
   if (fin && typeof fin === 'object') {
-    return { ...v, financing: financingWithBalanceToApi(fin) };
+    return { ...v, financing: financingWithBalanceToApi(fin, scale) };
   }
   return v;
 }
 
 export function reminderWithVehiclesToApi<T extends { reminder: Record<string, unknown> }>(
-  row: T
+  row: T,
+  scale: number
 ): T {
-  return { ...row, reminder: reminderToApi(row.reminder) };
+  return { ...row, reminder: reminderToApi(row.reminder, scale) };
 }
 
-export function expenseSummaryToApi(summary: ExpenseSummary): ExpenseSummary {
+export function expenseSummaryToApi(summary: ExpenseSummary, scale: number): ExpenseSummary {
+  const { major } = toMajor(scale);
   return {
     ...summary,
-    totalAmount: centsToDollars(summary.totalAmount),
-    monthlyAverage: centsToDollars(summary.monthlyAverage),
-    recentAmount: centsToDollars(summary.recentAmount),
-    categoryBreakdown: summary.categoryBreakdown.map((r) => ({
-      ...r,
-      amount: centsToDollars(r.amount),
-    })),
-    monthlyTrend: summary.monthlyTrend.map((r) => ({ ...r, amount: centsToDollars(r.amount) })),
-    costBuckets: costBucketsToApi(summary.costBuckets),
+    totalAmount: major(summary.totalAmount),
+    monthlyAverage: major(summary.monthlyAverage),
+    recentAmount: major(summary.recentAmount),
+    categoryBreakdown: summary.categoryBreakdown.map((r) => ({ ...r, amount: major(r.amount) })),
+    monthlyTrend: summary.monthlyTrend.map((r) => ({ ...r, amount: major(r.amount) })),
+    costBuckets: costBucketsToApi(summary.costBuckets, scale),
   };
 }
 
-function bucketTotalsToApi<T extends CostBucketTotals>(totals: T): T {
+function bucketTotalsToApi<T extends CostBucketTotals>(totals: T, scale: number): T {
   return {
     ...totals,
-    ownershipTotal: centsToDollars(totals.ownershipTotal),
-    runningTotal: centsToDollars(totals.runningTotal),
+    ownershipTotal: totals.ownershipTotal / scale,
+    runningTotal: totals.runningTotal / scale,
   };
 }
 
-function costBucketsToApi(buckets: CostBuckets): CostBuckets {
+function costBucketsToApi(buckets: CostBuckets, scale: number): CostBuckets {
   return {
-    ...bucketTotalsToApi(buckets),
-    previous: buckets.previous && bucketTotalsToApi(buckets.previous),
+    ...bucketTotalsToApi(buckets, scale),
+    previous: buckets.previous && bucketTotalsToApi(buckets.previous, scale),
     byVehicle: buckets.byVehicle.map((row) => ({
-      ...bucketTotalsToApi(row),
-      previous: row.previous && bucketTotalsToApi(row.previous),
+      ...bucketTotalsToApi(row, scale),
+      previous: row.previous && bucketTotalsToApi(row.previous, scale),
     })),
   };
 }
@@ -145,8 +161,11 @@ export function formatNumberForMessage(value: number): string {
   return value.toLocaleString('en-US');
 }
 
-export function formatMoneyForMessage(cents: number, currency: string): string {
-  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency });
+export function formatMoneyForMessage(minor: number, currency: string): string {
+  return (minor / minorUnitScale(currency)).toLocaleString('en-US', {
+    style: 'currency',
+    currency,
+  });
 }
 
 export function formatDateForMessage(date: Date, options: Intl.DateTimeFormatOptions): string {

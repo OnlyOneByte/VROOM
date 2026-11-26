@@ -1,5 +1,5 @@
 import { EXPENSE_CATEGORIES } from '../../db/types';
-import { centsToDollars as c } from '../../utils/money';
+import { toMajor } from '../../utils/money';
 import type { AnalyticsQueryResult, BucketItems, QueryPeriod } from './query-repository';
 import type {
   AnalyticsSummaryData,
@@ -14,13 +14,13 @@ import type {
   YearEndData,
 } from './repository';
 
-const cn = (v: number | null): number | null => (v == null ? v : c(v));
-
-export function quickStatsToApi(d: QuickStatsData): QuickStatsData {
+export function quickStatsToApi(d: QuickStatsData, scale: number): QuickStatsData {
+  const { major: c, majorOrNull: cn } = toMajor(scale);
   return { ...d, ytdSpending: c(d.ytdSpending), costPerDistance: cn(d.costPerDistance) };
 }
 
-export function fuelStatsToApi(d: FuelStatsData): FuelStatsData {
+export function fuelStatsToApi(d: FuelStatsData, scale: number): FuelStatsData {
+  const { major: c, majorOrNull: cn } = toMajor(scale);
   return {
     ...d,
     averageCost: {
@@ -64,7 +64,8 @@ export function fuelStatsToApi(d: FuelStatsData): FuelStatsData {
   };
 }
 
-export function fuelAdvancedToApi(d: FuelAdvancedData): FuelAdvancedData {
+export function fuelAdvancedToApi(d: FuelAdvancedData, scale: number): FuelAdvancedData {
+  const { major: c } = toMajor(scale);
   return {
     ...d,
     // Do not convert vehicleRadar: its cost-named fields hold 0-100 scores, not money.
@@ -77,7 +78,8 @@ export function fuelAdvancedToApi(d: FuelAdvancedData): FuelAdvancedData {
   };
 }
 
-export function crossVehicleToApi(d: CrossVehicleData): CrossVehicleData {
+export function crossVehicleToApi(d: CrossVehicleData, scale: number): CrossVehicleData {
+  const { major: c, majorOrNull: cn } = toMajor(scale);
   return {
     ...d,
     monthlyExpenseTrends: d.monthlyExpenseTrends.map((t) => ({ ...t, amount: c(t.amount) })),
@@ -90,7 +92,8 @@ export function crossVehicleToApi(d: CrossVehicleData): CrossVehicleData {
   };
 }
 
-export function financingToApi(d: FinancingData): FinancingData {
+export function financingToApi(d: FinancingData, scale: number): FinancingData {
+  const { major: c } = toMajor(scale);
   return {
     summary: {
       ...d.summary,
@@ -117,7 +120,8 @@ export function financingToApi(d: FinancingData): FinancingData {
   };
 }
 
-export function insuranceToApi(d: InsuranceData): InsuranceData {
+export function insuranceToApi(d: InsuranceData, scale: number): InsuranceData {
+  const { major: c, majorOrNull: cn } = toMajor(scale);
   return {
     summary: {
       ...d.summary,
@@ -135,7 +139,8 @@ export function insuranceToApi(d: InsuranceData): InsuranceData {
   };
 }
 
-export function vehicleTcoToApi(d: VehicleTCOData): VehicleTCOData {
+export function vehicleTcoToApi(d: VehicleTCOData, scale: number): VehicleTCOData {
+  const { major: c, majorOrNull: cn } = toMajor(scale);
   return {
     ...d,
     purchasePrice: cn(d.purchasePrice),
@@ -150,7 +155,8 @@ export function vehicleTcoToApi(d: VehicleTCOData): VehicleTCOData {
   };
 }
 
-export function vehicleExpensesToApi(d: VehicleExpensesData): VehicleExpensesData {
+export function vehicleExpensesToApi(d: VehicleExpensesData, scale: number): VehicleExpensesData {
+  const { major: c } = toMajor(scale);
   return {
     maintenanceCosts: d.maintenanceCosts.map((m) => ({ ...m, cost: c(m.cost) })),
     fuelEfficiencyAndCost: d.fuelEfficiencyAndCost.map((f) => ({ ...f, cost: c(f.cost) })),
@@ -158,7 +164,8 @@ export function vehicleExpensesToApi(d: VehicleExpensesData): VehicleExpensesDat
   };
 }
 
-export function yearEndToApi(d: YearEndData): YearEndData {
+export function yearEndToApi(d: YearEndData, scale: number): YearEndData {
+  const { major: c, majorOrNull: cn } = toMajor(scale);
   return {
     ...d,
     totalSpent: c(d.totalSpent),
@@ -173,15 +180,19 @@ export function yearEndToApi(d: YearEndData): YearEndData {
   };
 }
 
-export function analyticsSummaryToApi(d: AnalyticsSummaryData): AnalyticsSummaryData {
+export function analyticsSummaryToApi(
+  d: AnalyticsSummaryData,
+  scale: number
+): AnalyticsSummaryData {
   return {
-    quickStats: quickStatsToApi(d.quickStats),
-    fuelStats: fuelStatsToApi(d.fuelStats),
-    fuelAdvanced: fuelAdvancedToApi(d.fuelAdvanced),
+    quickStats: quickStatsToApi(d.quickStats, scale),
+    fuelStats: fuelStatsToApi(d.fuelStats, scale),
+    fuelAdvanced: fuelAdvancedToApi(d.fuelAdvanced, scale),
   };
 }
 
-function queryPeriodToApi(d: QueryPeriod, money: boolean): QueryPeriod {
+function queryPeriodToApi(d: QueryPeriod, money: boolean, scale: number): QueryPeriod {
+  const { majorOrNull: cn } = toMajor(scale);
   const value = money ? cn : (v: number | null) => v;
   return {
     ...d,
@@ -195,19 +206,21 @@ function queryPeriodToApi(d: QueryPeriod, money: boolean): QueryPeriod {
   };
 }
 
-export function analyticsQueryToApi(d: AnalyticsQueryResult): AnalyticsQueryResult {
+export function analyticsQueryToApi(d: AnalyticsQueryResult, scale: number): AnalyticsQueryResult {
+  const { major: c } = toMajor(scale);
   const money = d.metric === 'cost' || d.metric === 'costPerDistance';
   return {
     ...d,
-    ...queryPeriodToApi(d, money),
-    compare: d.compare ? queryPeriodToApi(d.compare, money) : null,
+    ...queryPeriodToApi(d, money, scale),
+    compare: d.compare ? queryPeriodToApi(d.compare, money, scale) : null,
     ...(d.annotations && {
       annotations: d.annotations.map((a) => ({ ...a, amount: c(a.amount) })),
     }),
   };
 }
 
-export function bucketItemsToApi(d: BucketItems): BucketItems {
+export function bucketItemsToApi(d: BucketItems, scale: number): BucketItems {
+  const { major: c } = toMajor(scale);
   const part = (p: { total: number; count: number } | null) =>
     p ? { total: c(p.total), count: p.count } : null;
   return {

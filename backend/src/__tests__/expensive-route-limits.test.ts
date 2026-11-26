@@ -15,7 +15,7 @@ let ctx: TestApp;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-});
+}, 20_000);
 afterEach(() => ctx.close());
 
 async function statusesFor(

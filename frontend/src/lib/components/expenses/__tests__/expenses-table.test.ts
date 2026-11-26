@@ -3,6 +3,7 @@ import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Expense, Vehicle } from '#lib/types/index.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
+import { settingsStore } from '#lib/stores/settings.svelte.ts';
 import {
 	UNDO_WINDOW_MS,
 	resetPendingDeletes,
@@ -428,14 +429,41 @@ describe('ExpensesTable rows lead with what the user would call the expense', ()
 
 		const named = screen.getByText('Arco').closest('button') as HTMLElement;
 		expect(named.querySelector('p')).toHaveTextContent('Arco');
-		expect(named).toHaveTextContent(/Fuel\s*·\s*Mar 21, 2024\s*·\s*Daily Driver/);
+		expect(named).toHaveTextContent(/Fuel · Daily Driver · Mar 21, 2024/);
 
 		const unnamed = screen.getByText('Maintenance').closest('button') as HTMLElement;
 		expect(unnamed.querySelector('p')).toHaveTextContent('Maintenance');
+		expect(unnamed).not.toHaveTextContent(/Maintenance ·/);
 
 		const split = screen.getByText('Car wash').closest('button') as HTMLElement;
-		expect(split).toHaveTextContent(/Split/);
-		expect(split).toHaveTextContent(/Split\s*·\s*Fuel\s*·/);
+		expect(within(split).getByText('Car wash').parentElement).toHaveTextContent(
+			/^Car wash\s*Split$/
+		);
+		expect(split).toHaveTextContent(/Fuel · .* · /);
+	});
+
+	test("a fill shows the vehicle's unit, or the user's own unit when the vehicle isn't passed", () => {
+		useLayout('compact');
+		const units = vi.spyOn(settingsStore, 'unitPreferences', 'get').mockReturnValue({
+			distanceUnit: 'kilometers',
+			volumeUnit: 'liters',
+			chargeUnit: 'kwh'
+		});
+		const fill = expense({ id: 'fill', description: 'Shell', volume: 40 });
+		const gallonCar: Vehicle = {
+			...VEHICLE,
+			unitPreferences: { distanceUnit: 'miles', volumeUnit: 'gallons_us', chargeUnit: 'kwh' }
+		};
+		try {
+			const { unmount } = mountTable({ expenses: [fill], vehicles: [] });
+			expect(screen.getByText(/· 40 L$/)).toBeTruthy();
+			unmount();
+
+			mountTable({ expenses: [fill], vehicles: [gallonCar] });
+			expect(screen.getByText(/· 40 gal$/)).toBeTruthy();
+		} finally {
+			units.mockRestore();
+		}
 	});
 
 	test('the desktop table opens each row with the description, falling back to the category', () => {
@@ -470,6 +498,34 @@ describe('ExpensesTable month groups', () => {
 			]);
 		}
 	);
+
+	test('ledger: a wide screen gets the row list and month headings, with no table or toolbar', () => {
+		useLayout('wide');
+		mountTable({ monthTotals: TOTALS, ledger: true });
+
+		expect(screen.queryByRole('table')).toBeNull();
+		expect(screen.queryByRole('combobox', { name: /Category/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: /^Amount/ })).toBeNull();
+		expect(screen.getByTestId('expense-ledger')).toBeTruthy();
+		const headings = screen.getAllByRole('heading', { level: 2 });
+		expect(headings[0]?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+			'March 2024 total $1,234.50'
+		);
+	});
+
+	test('ledger: sorted by amount, the rows run in one list with no month headings', () => {
+		useLayout('wide');
+		mountTable({
+			monthTotals: TOTALS,
+			ledger: true,
+			activeSortBy: 'amount',
+			activeSortDir: 'desc',
+			onSortChange: vi.fn()
+		});
+
+		expect(screen.queryAllByRole('heading', { level: 2 })).toHaveLength(0);
+		expect(screen.getAllByTestId('expense-row')).toHaveLength(STANDALONE.length);
+	});
 
 	test.each(['compact', 'wide'] as const)(
 		'%s: sorting by amount drops the month headings',

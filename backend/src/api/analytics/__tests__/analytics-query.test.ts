@@ -904,12 +904,13 @@ describe('splits, compare and shape', () => {
   test('money values leave the API in dollars', async () => {
     seedFleet();
     const result = await repo.query(OWNER.id, baseQuery({ interval: 'none', compare: 'prevYear' }));
-    const api = analyticsQueryToApi(result);
+    const api = analyticsQueryToApi(result, 100);
     expect(api.series[0]?.values[0]).toBe((result.series[0]?.values[0] ?? 0) / 100);
     expect(api.totals.value).toBe((result.totals.value ?? 0) / 100);
     expect(api.compare?.totals.value).toBe((result.compare?.totals.value ?? 0) / 100);
     const count = analyticsQueryToApi(
-      await repo.query(OWNER.id, baseQuery({ metric: 'count', interval: 'none' }))
+      await repo.query(OWNER.id, baseQuery({ metric: 'count', interval: 'none' })),
+      100
     );
     expect(count.totals.value).toBe(72 * 3);
   });

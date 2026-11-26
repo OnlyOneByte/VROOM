@@ -6,13 +6,8 @@
 	import { page } from '$app/state';
 	import { routes } from '#lib/routes.ts';
 	import {
-		Calendar,
-		DollarSign,
 		Search,
-		FileText,
-		TrendingUp,
 		X,
-		Car,
 		Download,
 		Upload,
 		Images,
@@ -31,12 +26,7 @@
 	import { latest } from '#lib/utils/latest-request.ts';
 
 	type ExpenseWithVehicle = Expense & { vehicle?: Vehicle };
-	import {
-		dateOnlyToISO,
-		formatCurrency,
-		formatDate,
-		formatNumber
-	} from '#lib/utils/formatters.ts';
+	import { dateOnlyToISO, formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import {
 		handleErrorWithNotification,
 		logLoadFailure,
@@ -48,7 +38,6 @@
 	import DateRangePicker from '#lib/components/common/date-range-picker.svelte';
 	import Input from '#lib/components/ui/input/input.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import * as CardNs from '#lib/components/ui/card/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import ExpensesTable from '#lib/components/expenses/ExpensesTable.svelte';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
@@ -65,9 +54,8 @@
 	import { forgetRecentlySynced, recentlySynced } from '#lib/utils/sync/recently-synced.svelte.ts';
 	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
 	import { editedRows } from '#lib/utils/pending-edits.svelte.ts';
-	import ExpenseOverviewSection from '#lib/components/expenses/ExpenseOverviewSection.svelte';
+	import FilterPills from '#lib/components/expenses/FilterPills.svelte';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import * as Select from '#lib/components/ui/select/index.ts';
 	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
 	import { useExpenseListReload } from './expense-list-reload.svelte';
@@ -78,6 +66,7 @@
 		type ExpenseUrlFilters
 	} from './expense-url-filters.ts';
 	import {
+		EXPENSE_CATEGORIES,
 		EXPENSE_CATEGORY_INFO,
 		type ExpenseCategory
 	} from '#lib/constants/expense-categories.ts';
@@ -88,7 +77,6 @@
 	let expenses = $state<Expense[]>([]);
 	let vehicles = $state<Vehicle[]>([]);
 	let summary = $state<ExpenseSummary | null>(null);
-	let summaryError = $state<string | null>(null);
 
 	let currentOffset = $state(0);
 	let pageSize = $state(20);
@@ -156,33 +144,6 @@
 		);
 		return withPendingInSummary(withoutRemoved, edited.after, now);
 	});
-	const statCards = $derived([
-		{
-			label: EXPENSE_MESSAGES.TOTAL_EXPENSES,
-			value: formatCurrency(shownSummary?.totalAmount ?? 0),
-			icon: DollarSign,
-			iconColor: 'primary'
-		},
-		{
-			label: EXPENSE_MESSAGES.TOTAL_COUNT,
-			value: (shownSummary?.expenseCount ?? 0).toString(),
-			icon: FileText,
-			iconColor: 'chart-1'
-		},
-		{
-			label: EXPENSE_MESSAGES.MONTHLY_AVERAGE,
-			value: formatCurrency(summary?.monthlyAverage ?? 0),
-			icon: TrendingUp,
-			iconColor: 'chart-2'
-		},
-		{
-			label: EXPENSE_MESSAGES.LAST_30_DAYS,
-			value: formatCurrency(shownSummary?.recentAmount ?? 0),
-			icon: Calendar,
-			iconColor: 'chart-5'
-		}
-	]);
-
 	const expenseListReload = useExpenseListReload({
 		ready: () => !isLoading,
 		search: () => searchTerm,
@@ -408,7 +369,6 @@
 			if (isCurrentSummary()) {
 				if (summaryResult.status === 'fulfilled') {
 					summary = summaryResult.value;
-					summaryError = null;
 				} else if (!listReported || pageResult.status === 'fulfilled') {
 					failSummary(summaryResult.reason);
 				}
@@ -419,20 +379,7 @@
 	}
 
 	function failSummary(error: unknown) {
-		summaryError = userFacingErrorMessage(error);
 		logLoadFailure(error, "Couldn't load the expense summary");
-	}
-
-	async function retrySummary() {
-		const isCurrentSummary = nextSummaryRequest();
-		try {
-			const result = await expenseApi.getExpenseSummary(buildSummaryParams());
-			if (!isCurrentSummary()) return;
-			summary = result;
-			summaryError = null;
-		} catch (error) {
-			if (isCurrentSummary()) failSummary(error);
-		}
 	}
 
 	async function fetchPage(offset: number) {
@@ -479,6 +426,10 @@
 
 	function clearFilters() {
 		searchTerm = '';
+		clearSheetFilters();
+	}
+
+	function clearSheetFilters() {
 		selectedVehicleId = undefined;
 		selectedTags = [];
 		startDate = undefined;
@@ -542,8 +493,36 @@
 	let toolsMenuOpen = $state(false);
 	let filtersSheetOpen = $state(false);
 	let sheetFilterCount = $derived(
-		(selectedVehicleId ? 1 : 0) + (startDate || endDate ? 1 : 0) + selectedTags.length
+		(selectedVehicleId ? 1 : 0) +
+			(startDate || endDate ? 1 : 0) +
+			selectedTags.length +
+			expenseCategoryList(categoryFilter).length
 	);
+	let vehicleOptions = $derived([
+		{ value: '', label: 'All' },
+		...vehicles.map(vehicle => ({ value: vehicle.id, label: getVehicleDisplayName(vehicle) }))
+	]);
+	const categoryOptions = EXPENSE_CATEGORIES.map(category => ({
+		value: category,
+		label: EXPENSE_CATEGORY_INFO[category].shortLabel
+	}));
+	const sortOptions = [
+		{ value: 'date-desc', label: 'Newest' },
+		{ value: 'date-asc', label: 'Oldest' },
+		{ value: 'amount-desc', label: 'Highest' },
+		{ value: 'amount-asc', label: 'Lowest' }
+	];
+	function chooseSort(value: string) {
+		const [by, dir] = value.split('-') as ['date' | 'amount', 'asc' | 'desc'];
+		handleSortChange(by, dir);
+	}
+	function toggleCategory(category: string) {
+		const current = expenseCategoryList(categoryFilter);
+		const next = current.includes(category)
+			? current.filter(value => value !== category)
+			: [...current, category];
+		handleCategoryChange(next.join(','));
+	}
 	function openTool(open: () => void) {
 		toolsMenuOpen = false;
 		open();
@@ -582,36 +561,6 @@
 		}))
 	);
 </script>
-
-{#snippet vehicleFilter()}
-	<Select.Root type="single" value={selectedVehicleId ?? ''} onValueChange={handleVehicleChange}>
-		<Select.Trigger aria-label="Vehicle filter" class="w-full">
-			<div class="flex items-center gap-2">
-				<Car class="h-4 w-4 text-muted-foreground flex-shrink-0" />
-				<span class="truncate">
-					{#if selectedVehicleId}
-						{@const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId)}
-						{selectedVehicle
-							? getVehicleDisplayName(selectedVehicle)
-							: COMMON_MESSAGES.ALL_VEHICLES}
-					{:else}
-						{COMMON_MESSAGES.ALL_VEHICLES}
-					{/if}
-				</span>
-			</div>
-		</Select.Trigger>
-		<Select.Content>
-			<Select.Item value="" label={COMMON_MESSAGES.ALL_VEHICLES}>
-				{COMMON_MESSAGES.ALL_VEHICLES}
-			</Select.Item>
-			{#each vehicles as vehicle (vehicle.id)}
-				<Select.Item value={vehicle.id} label={getVehicleDisplayName(vehicle)}>
-					{getVehicleDisplayName(vehicle)}
-				</Select.Item>
-			{/each}
-		</Select.Content>
-	</Select.Root>
-{/snippet}
 
 {#snippet dateFilter(className: string)}
 	<DateRangePicker
@@ -661,9 +610,11 @@
 			<div data-testid="pending-rows-while-loading">
 				<ExpensesTable
 					expenses={loadingRows}
+					{vehicles}
 					showVehicleColumn={false}
 					scrollHeight="auto"
 					canWrite={false}
+					ledger
 					returnTo={resolve(routes.expenses)}
 					pendingStates={pending.states}
 				/>
@@ -675,7 +626,8 @@
 {:else if loadError}
 	<div class="space-y-6">
 		<PageHeader
-			title="All Expenses"
+			variant="display"
+			title="Expenses"
 			description="Track and categorize expenses across all vehicles"
 		/>
 		<LoadErrorCard
@@ -689,7 +641,8 @@
 {:else if offlineLoad}
 	<div class="space-y-6">
 		<PageHeader
-			title="All Expenses"
+			variant="display"
+			title="Expenses"
 			description="Track and categorize expenses across all vehicles"
 		>
 			{#snippet actions()}
@@ -715,7 +668,8 @@
 {:else if vehicles.length === 0 && (shownSummary?.expenseCount ?? 0) === 0}
 	<div class="space-y-6">
 		<PageHeader
-			title="All Expenses"
+			variant="display"
+			title="Expenses"
 			description="Track and categorize expenses across all vehicles"
 		/>
 		<NoVehiclesEmptyState
@@ -726,12 +680,11 @@
 	<div class="space-y-6">
 		<div class="flex items-start justify-between gap-3">
 			<div class="min-w-0 flex-1">
-				<PageHeader title="All Expenses" description={countLine}>
+				<PageHeader variant="display" title="Expenses" description={countLine}>
 					{#snippet actions()}
 						<div class="hidden sm:flex sm:items-center sm:gap-2 short:hidden">
 							{@render importExportActions('outline', '')}
 						</div>
-						{@render addExpenseHeaderAction()}
 					{/snippet}
 				</PageHeader>
 			</div>
@@ -751,76 +704,44 @@
 			</div>
 		</div>
 
-		<CardNs.Root class="max-sm:gap-0 max-sm:py-4">
-			{#if !phone.current}
-				<CardNs.Header class="max-sm:hidden">
-					<div class="flex items-center justify-between gap-3">
-						<div>
-							<CardNs.Title>Search & Filters</CardNs.Title>
-							<CardNs.Description>Find and filter your expenses</CardNs.Description>
-						</div>
-						<div class="flex items-center gap-2">
-							{@render dateFilter('w-auto')}
-						</div>
+		<div class="flex flex-col gap-3">
+			<div class="flex gap-3 sm:max-w-2xl">
+				<div class="flex-1 relative">
+					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+						<Search class="h-5 w-5 text-muted-foreground" />
 					</div>
-				</CardNs.Header>
-			{/if}
-			<CardNs.Content class="flex flex-col gap-4 max-sm:px-4">
-				<div class="flex gap-3">
-					<div class="flex-1 relative">
-						<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-							<Search class="h-5 w-5 text-muted-foreground" />
-						</div>
-						<Input
-							type="text"
-							bind:value={searchTerm}
-							placeholder="Search by name, place, tag, vehicle or amount"
-							class="pl-10 w-full"
-							aria-label="Search expenses and vehicles"
-						/>
-					</div>
-					{#if !phone.current}
-						<div class="hidden sm:block sm:w-56">
-							{@render vehicleFilter()}
-						</div>
-					{/if}
-					<Button
-						variant="outline"
-						class="h-10 shrink-0 sm:hidden"
-						aria-haspopup="dialog"
-						onclick={() => (filtersSheetOpen = true)}
-					>
-						<SlidersHorizontal class="h-4 w-4" />
-						{sheetFilterCount > 0 ? `Filters · ${sheetFilterCount}` : 'Filters'}
+					<Input
+						type="text"
+						bind:value={searchTerm}
+						placeholder="Search “Costco”, “tires” or “42.50”"
+						class="pl-10 w-full h-12 sm:h-11"
+						aria-label="Search expenses and vehicles"
+					/>
+				</div>
+				<Button
+					variant="outline"
+					class="h-12 shrink-0 rounded-full px-4 sm:h-11"
+					aria-haspopup="dialog"
+					aria-expanded={filtersSheetOpen}
+					onclick={() => (filtersSheetOpen = true)}
+				>
+					<SlidersHorizontal class="h-4 w-4" />
+					{sheetFilterCount > 0 ? `Filters · ${sheetFilterCount}` : 'Filters'}
+				</Button>
+			</div>
+
+			{#if filtersActive}
+				<div class="flex items-center justify-between gap-3">
+					<p class="min-w-0 text-sm text-muted-foreground" data-testid="active-filter-summary">
+						{activeFilterSummary}
+					</p>
+					<Button variant="outline" size="sm" class="h-10 shrink-0" onclick={clearFilters}>
+						<X class="h-4 w-4 mr-2" />
+						{COMMON_MESSAGES.CLEAR_FILTERS}
 					</Button>
 				</div>
-
-				{#if !phone.current}
-					<div class="hidden sm:block">
-						<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={handleTagsChange} />
-					</div>
-				{/if}
-
-				{#if filtersActive}
-					<div class="flex items-center justify-between gap-3 sm:pt-2">
-						<p class="min-w-0 text-sm text-muted-foreground" data-testid="active-filter-summary">
-							{activeFilterSummary}
-						</p>
-						<Button variant="outline" size="sm" class="h-10 shrink-0" onclick={clearFilters}>
-							<X class="h-4 w-4 mr-2" />
-							{COMMON_MESSAGES.CLEAR_FILTERS}
-						</Button>
-					</div>
-				{/if}
-			</CardNs.Content>
-		</CardNs.Root>
-
-		<ExpenseOverviewSection
-			summary={shownSummary}
-			{statCards}
-			error={summaryError}
-			onRetry={retrySummary}
-		/>
+			{/if}
+		</div>
 
 		<OfflineExpenseCards
 			pendingExpenses={[]}
@@ -830,69 +751,101 @@
 			onRemoveNeedsAttention={removeOfflineExpense}
 		/>
 
-		<CardNs.Root
-			bind:ref={expensesList}
+		<div
+			bind:this={expensesList}
 			role="region"
 			aria-label="Expenses"
 			tabindex={-1}
-			class="outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 max-sm:border-0 max-sm:bg-transparent max-sm:py-0 max-sm:shadow-none"
+			class="rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 		>
-			<CardNs.Content class="max-sm:px-0">
-				{#if pageError}
-					<LoadErrorCard
-						compact
-						data-testid="expenses-page-error"
-						title="Couldn't load expenses"
-						message={pageError.message}
-						onRetry={() => fetchPageAndSummary(pageError?.offset ?? currentOffset)}
-						onRecovered={() => expensesList?.focus()}
-					/>
-				{:else}
-					<ExpensesTable
-						expenses={displayExpenses}
-						{vehicles}
-						showVehicleColumn={true}
-						returnTo={resolve(routes.expenses)}
-						onDelete={handleDeleteExpense}
-						emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
-						emptyDescription={EXPENSE_MESSAGES.NO_EXPENSES_DESC}
-						emptyActionLabel={COMMON_MESSAGES.ADD_FIRST_EXPENSE}
-						emptyActionHref={resolve(routes.expenseNew)}
-						scrollHeight="600px"
-						onClearFilters={clearFilters}
-						hasActiveFilters={totalCountFiltered}
-						{totalCount}
-						{currentOffset}
-						{pageSize}
-						{isLoadingPage}
-						onPageChange={handlePageChange}
-						activeSortBy={sortBy}
-						activeSortDir={sortDir}
-						onSortChange={handleSortChange}
-						activeCategory={categoryFilter}
-						onCategoryChange={handleCategoryChange}
-						monthTotals={shownMonthTotals}
-						pendingStates={pending.states}
-					/>
-				{/if}
-			</CardNs.Content>
-		</CardNs.Root>
+			{#if pageError}
+				<LoadErrorCard
+					compact
+					data-testid="expenses-page-error"
+					title="Couldn't load expenses"
+					message={pageError.message}
+					onRetry={() => fetchPageAndSummary(pageError?.offset ?? currentOffset)}
+					onRecovered={() => expensesList?.focus()}
+				/>
+			{:else}
+				<ExpensesTable
+					expenses={displayExpenses}
+					{vehicles}
+					showVehicleColumn={true}
+					returnTo={resolve(routes.expenses)}
+					onDelete={handleDeleteExpense}
+					emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
+					emptyDescription={EXPENSE_MESSAGES.NO_EXPENSES_DESC}
+					emptyActionLabel={COMMON_MESSAGES.ADD_FIRST_EXPENSE}
+					emptyActionHref={resolve(routes.expenseNew)}
+					scrollHeight="600px"
+					onClearFilters={clearFilters}
+					hasActiveFilters={totalCountFiltered}
+					{totalCount}
+					{currentOffset}
+					{pageSize}
+					{isLoadingPage}
+					onPageChange={handlePageChange}
+					activeSortBy={sortBy}
+					activeSortDir={sortDir}
+					onSortChange={handleSortChange}
+					activeCategory={categoryFilter}
+					onCategoryChange={handleCategoryChange}
+					monthTotals={shownMonthTotals}
+					pendingStates={pending.states}
+					ledger
+				/>
+			{/if}
+		</div>
 	</div>
 
 	<Sheet.Root bind:open={filtersSheetOpen}>
-		<Sheet.Content side="bottom" class="max-h-[85vh] overflow-y-auto">
+		<Sheet.Content
+			side={phone.current ? 'bottom' : 'right'}
+			class="max-h-[85vh] overflow-y-auto sm:max-h-none sm:w-[26rem] sm:max-w-full"
+		>
 			<Sheet.Header>
-				<Sheet.Title>Filters</Sheet.Title>
-				<Sheet.Description>Narrow the list by vehicle, date and tags.</Sheet.Description>
+				<Sheet.Title class="font-(family-name:--font-fig) text-3xl uppercase">Filters</Sheet.Title>
+				<Sheet.Description>
+					Narrow the list by vehicle, category, date and tags, and pick the order.
+				</Sheet.Description>
 			</Sheet.Header>
-			<div class="space-y-4 px-4">
-				{@render vehicleFilter()}
-				{@render dateFilter('w-full')}
+			<div class="space-y-5 px-4">
+				<FilterPills
+					label="Vehicle"
+					options={vehicleOptions}
+					selected={[selectedVehicleId ?? '']}
+					onToggle={value => handleVehicleChange(value === selectedVehicleId ? '' : value)}
+				/>
+				<FilterPills
+					label="Category"
+					options={categoryOptions}
+					selected={expenseCategoryList(categoryFilter)}
+					onToggle={toggleCategory}
+				/>
+				<FilterPills
+					label="Sort"
+					options={sortOptions}
+					selected={[`${sortBy}-${sortDir}`]}
+					onToggle={chooseSort}
+				/>
+				<div class="space-y-2" role="group" aria-labelledby="expense-dates-label">
+					<p id="expense-dates-label" class="text-sm font-medium">Dates</p>
+					{@render dateFilter('w-full')}
+				</div>
 				<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={handleTagsChange} />
 			</div>
-			<Sheet.Footer class="pb-[max(1rem,env(safe-area-inset-bottom))]">
-				<Button size="lg" class="w-full" onclick={() => (filtersSheetOpen = false)}>
-					Show results
+			<Sheet.Footer class="flex-row justify-end gap-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
+				<Button
+					variant="outline"
+					size="lg"
+					onclick={clearSheetFilters}
+					disabled={sheetFilterCount === 0}
+				>
+					Clear
+				</Button>
+				<Button size="lg" onclick={() => (filtersSheetOpen = false)}>
+					{`Show ${formatNumber(totalCount, 0)} ${totalCount === 1 ? 'result' : 'results'}`}
 				</Button>
 			</Sheet.Footer>
 		</Sheet.Content>

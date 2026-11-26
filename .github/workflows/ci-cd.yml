@@ -277,9 +277,10 @@ jobs:
 
       - name: Run this shard with coverage
         # A shard covers half the code, so the thresholds are checked once, on the merged
-        # coverage, in Frontend Tests.
+        # coverage, in Frontend Tests. The dot reporter names any failing test in this log;
+        # the blob report feeds the merged coverage.
         run: >-
-          npx vitest run --shard=${{ matrix.shard }}/2 --reporter=blob --coverage
+          npx vitest run --shard=${{ matrix.shard }}/2 --reporter=dot --reporter=blob --coverage
           --coverage.reporter=text-summary
           --coverage.thresholds.lines=0 --coverage.thresholds.statements=0
           --coverage.thresholds.functions=0 --coverage.thresholds.branches=0

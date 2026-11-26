@@ -17,6 +17,9 @@ vi.mock('$app/state', () => ({
 	}
 }));
 vi.mock('#lib/components/analytics/fuel/FuelStatsTab.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/analytics/explore/ExploreTab.svelte', async () => ({
+	default: (await import('./ExploreStub.svelte')).default
+}));
 vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: {
 		getVehicles: () =>

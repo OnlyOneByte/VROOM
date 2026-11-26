@@ -39,7 +39,7 @@ test.describe('Editing an expense does not wait for the server', () => {
 		await editOilChangeAmount(page);
 
 		await expect(page).toHaveURL(/\/expenses$/);
-		const row = page.getByRole('row', { name: /Oil change/ });
+		const row = page.getByTestId('expense-row').filter({ hasText: 'Oil change' });
 		await expect(row.getByText('$120.00')).toBeVisible();
 		expect(put.answered).toBe(false);
 	});
@@ -51,7 +51,7 @@ test.describe('Editing an expense does not wait for the server', () => {
 
 		await editOilChangeAmount(page);
 
-		const row = page.getByRole('row', { name: /Oil change/ });
+		const row = page.getByTestId('expense-row').filter({ hasText: 'Oil change' });
 		await expect(row.getByText('$120.00')).toBeVisible();
 		await expect(row.getByText(/^Changes not saved:/)).toBeVisible({ timeout: 10_000 });
 		await expect(row.getByText('$89.99')).toBeVisible();

@@ -5,7 +5,7 @@
 	import SplitExpenseBadge from '../split/SplitExpenseBadge.svelte';
 	import type { Vehicle } from '#lib/types/index.ts';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
-	import { getCategoryBadgeClasses, getCategoryIcon } from '#lib/utils/expense-helpers.ts';
+	import { getCategoryIcon } from '#lib/utils/expense-helpers.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { EXPENSE_CATEGORY_INFO } from '#lib/constants/expense-categories.ts';
 	import {
@@ -52,42 +52,35 @@
 
 	let IconComponent = $derived(getCategoryIcon(row.category));
 	let heading = $derived(rowTitle(row.description, row.category));
+	let meta = $derived(
+		[
+			heading.categoryInMeta ? EXPENSE_CATEGORY_INFO[row.category].shortLabel : null,
+			showVehicleColumn && row.vehicleNames.length > 0 ? row.vehicleNames.join(', ') : null,
+			formatDate(new Date(row.date))
+		].filter(part => part !== null)
+	);
 	let insuranceLinked = $derived(isInsuranceLinked(row.tags));
 	let blockedId = $derived(blockedReasonId(row.groupId));
 </script>
 
-<div class="transition-colors {isSelected ? 'bg-muted/50' : ''}">
+<div data-testid="expense-row" class="transition-colors {isSelected ? 'bg-muted/50' : ''}">
 	<button
 		type="button"
 		class="{MOBILE_ROW_SUMMARY_CLASS} cursor-pointer"
 		aria-expanded={isSelected}
 		onclick={() => onSelect(row.groupId)}
 	>
-		<div class="mt-0.5 p-1.5 rounded-lg {getCategoryBadgeClasses(row.category)} flex-shrink-0">
-			<IconComponent class="h-4 w-4" />
-		</div>
+		<IconComponent class="h-5 w-5 shrink-0 self-center text-muted-foreground" aria-hidden="true" />
 		<div class="flex-1 min-w-0">
-			<div class="flex items-center justify-between gap-2">
-				<p class="text-sm font-medium text-foreground truncate">
+			<div class="flex min-w-0 items-center gap-1.5">
+				<p class="truncate font-medium text-foreground">
 					{heading.title}
 				</p>
-				<span class="text-sm font-semibold text-foreground whitespace-nowrap flex-shrink-0">
-					{formatCurrency(row.totalAmount)}
-				</span>
-			</div>
-			<div class="flex min-w-0 items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
 				<SplitExpenseBadge />
-				{#if heading.categoryInMeta}
-					<span>·</span>
-					<span class="shrink-0">{EXPENSE_CATEGORY_INFO[row.category].shortLabel}</span>
-				{/if}
-				<span>·</span>
-				<span class="shrink-0 whitespace-nowrap">{formatDate(new Date(row.date))}</span>
-				{#if showVehicleColumn && row.vehicleNames.length > 0}
-					<span>·</span>
-					<span class="min-w-0 truncate">{row.vehicleNames.join(', ')}</span>
-				{/if}
 			</div>
+			<p class="mt-0.5 text-sm text-muted-foreground">
+				{meta.join(' · ')}
+			</p>
 			{#if shownTags.length > 0}
 				<div class="flex flex-wrap gap-1 mt-1.5">
 					{#each shownTags as tag (tag)}
@@ -96,9 +89,12 @@
 				</div>
 			{/if}
 		</div>
+		<span class="self-center whitespace-nowrap font-semibold tabular-nums text-foreground">
+			{formatCurrency(row.totalAmount)}
+		</span>
 	</button>
 	{#if pending}
-		<div class="pr-3 pb-3 pl-[3.25rem]">
+		<div class="pr-3 pb-3 pl-[2.75rem]">
 			<PendingSyncNote
 				{pending}
 				entryId={row.children[0]?.id ?? row.groupId}

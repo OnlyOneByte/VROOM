@@ -1,10 +1,7 @@
 <script lang="ts">
-	import { RotateCcw, SlidersHorizontal } from '@lucide/svelte';
+	import { tick, type Snippet } from 'svelte';
+	import { Check, ChevronDown, RotateCcw, Share2 } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { Label } from '#lib/components/ui/label/index.ts';
-	import * as RadioGroup from '#lib/components/ui/radio-group/index.ts';
-	import * as Sheet from '#lib/components/ui/sheet/index.ts';
-	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		DEFAULT_EXPLORE,
@@ -13,7 +10,6 @@
 		EXPLORE_METRICS,
 		EXPLORE_SPLITS,
 		allowedSplits,
-		describeQuery,
 		metricInfo,
 		metricLabel,
 		normalizeExplore,
@@ -24,12 +20,14 @@
 		query: ExploreQuery;
 		onChange: (_query: ExploreQuery) => void;
 		driverSplit?: boolean;
+		filters?: Snippet;
 	}
 
-	let { query, onChange, driverSplit = false }: Props = $props();
+	let { query, onChange, driverSplit = false, filters }: Props = $props();
 
-	const isMobile = new IsMobile();
-	let editing = $state(false);
+	type Menu = 'metric' | 'per' | 'split' | 'compare';
+	let open = $state<Menu | null>(null);
+	let copied = $state<'done' | 'failed' | null>(null);
 
 	let distanceWord = $derived(
 		settingsStore.unitPreferences.distanceUnit === 'kilometers' ? 'km' : 'mile'
@@ -45,131 +43,217 @@
 		)
 	);
 	let moneyMetric = $derived(['cost', 'costPerDistance'].includes(metricInfo(query.metric).metric));
+	let costsApply = $derived(moneyMetric || query.metric === 'count');
 	const COSTS = [
 		{ value: 'running', label: 'Running costs' },
 		{ value: 'all', label: 'All costs' }
 	];
+	let metricText = $derived(
+		`${metricLabel(query.metric, distanceWord)}${costsApply && query.inc === 'all' ? ', all costs' : ''}`
+	);
 	let isDefault = $derived(
 		JSON.stringify({ ...query, hide: [] }) === JSON.stringify({ ...DEFAULT_EXPLORE, hide: [] })
 	);
 
+	const labelOf = (options: ReadonlyArray<{ value: string; label: string }>, value: string) =>
+		options.find(o => o.value === value)?.label ?? value;
+
 	function update(patch: Partial<ExploreQuery>) {
+		const chipButton =
+			open && document.querySelector<HTMLElement>(`[aria-controls="explore-menu-${open}"]`);
+		open = null;
+		chipButton?.focus();
+		const keys = Object.keys(patch) as Array<keyof ExploreQuery>;
+		if (keys.every(key => patch[key] === query[key])) return;
 		onChange(
 			normalizeExplore({
 				...query,
 				...patch,
-				hide: patch.split ? [] : query.hide,
+				hide: patch.split || patch.metric ? [] : query.hide,
 				sel: undefined,
 				seg: undefined
 			})
 		);
 	}
+
+	let alignEnd = $state(false);
+
+	async function toggle(menu: Menu, button: HTMLElement) {
+		if (open === menu) {
+			open = null;
+			return;
+		}
+		alignEnd = button.getBoundingClientRect().left + 272 > window.innerWidth;
+		open = menu;
+		await tick();
+		button.parentElement?.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus();
+	}
+
+	function closeMenu(wrapper: HTMLElement) {
+		open = null;
+		wrapper.querySelector<HTMLElement>('button')?.focus();
+	}
+
+	let bar = $state<HTMLElement | null>(null);
+
+	async function reset() {
+		onChange(DEFAULT_EXPLORE);
+		await tick();
+		bar?.querySelector<HTMLElement>('button')?.focus();
+	}
+
+	let copyTimer: ReturnType<typeof setTimeout> | undefined;
+
+	async function copyLink() {
+		clearTimeout(copyTimer);
+		try {
+			await navigator.clipboard.writeText(location.href);
+			copied = 'done';
+		} catch {
+			copied = 'failed';
+		}
+		copyTimer = setTimeout(() => (copied = null), 2000);
+	}
 </script>
 
-{#snippet field(
-	id: string,
+{#snippet radios(
 	label: string,
 	value: string,
 	options: ReadonlyArray<{ value: string; label: string }>,
 	onPick: (_value: string) => void
 )}
-	<fieldset class="space-y-1">
-		<legend class="mb-1 text-sm font-medium">{label}</legend>
-		<RadioGroup.Root
-			{value}
-			onValueChange={v => v && onPick(v)}
-			aria-label={label}
-			class="grid grid-cols-2 gap-1"
-		>
-			{#each options as option (option.value)}
-				<Label
-					for="{id}-{option.value}"
-					class="flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2 font-normal hover:bg-muted"
-				>
-					<RadioGroup.Item value={option.value} id="{id}-{option.value}" />
-					{option.label}
-				</Label>
-			{/each}
-		</RadioGroup.Root>
-	</fieldset>
+	<div class="space-y-1" role="group" aria-label={label}>
+		<p class="mb-1 text-sm font-medium" aria-hidden="true">{label}</p>
+		{#each options as option (option.value)}
+			<button
+				type="button"
+				aria-pressed={option.value === value}
+				class="flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+				onclick={() => onPick(option.value)}
+			>
+				<Check
+					class="h-4 w-4 shrink-0 {option.value === value ? '' : 'invisible'}"
+					aria-hidden="true"
+				/>
+				{option.label}
+			</button>
+		{/each}
+	</div>
 {/snippet}
 
-<div class="rounded-lg border bg-card p-3 md:p-4">
-	<div class="flex items-start justify-between gap-3">
-		<p class="min-w-0 text-sm md:text-base" aria-live="polite">
-			<span class="font-medium">{describeQuery(query, distanceWord)}</span>
-			{#if moneyMetric}
-				<span class="block text-xs text-muted-foreground md:text-sm">
-					{query.inc === 'all'
-						? 'All costs, including insurance and loan or lease payments.'
-						: 'Running costs only: everything except insurance and loan or lease payments.'}
-				</span>
-			{/if}
-		</p>
-		<div class="flex shrink-0 items-center gap-1">
-			{#if !isDefault && !isMobile.current}
-				<Button variant="ghost" size="sm" onclick={() => onChange(DEFAULT_EXPLORE)}>
-					<RotateCcw class="mr-1 h-4 w-4" aria-hidden="true" />
-					Reset
-				</Button>
-			{/if}
-			<Button
-				variant="outline"
-				size="sm"
-				aria-haspopup="dialog"
-				aria-expanded={editing}
-				onclick={() => (editing = true)}
-			>
-				<SlidersHorizontal class="mr-1 h-4 w-4" aria-hidden="true" />
-				Edit
-			</Button>
-		</div>
-	</div>
-</div>
-
-<Sheet.Root bind:open={editing}>
-	<Sheet.Content
-		side={isMobile.current ? 'bottom' : 'right'}
-		class={isMobile.current ? 'max-h-[85vh] overflow-y-auto' : 'overflow-y-auto sm:max-w-md'}
+{#snippet chip(menu: Menu, prefix: string, text: string, body: Snippet)}
+	<!-- shortcut: a plain disclosure, not the kit Popover, whose floating-ui adds ~13 KB to the /analytics first view; switch once that cost leaves the route. -->
+	<div
+		class="relative max-w-full"
+		data-chip-menu
+		role="presentation"
+		onkeydown={e => e.key === 'Escape' && open === menu && closeMenu(e.currentTarget)}
+		onfocusout={e => {
+			if (!e.currentTarget.contains(e.relatedTarget as Node | null) && e.relatedTarget) open = null;
+		}}
 	>
-		<Sheet.Header>
-			<Sheet.Title>Edit the chart</Sheet.Title>
-			<Sheet.Description>Pick what to measure and how to split it.</Sheet.Description>
-		</Sheet.Header>
-		<div class="space-y-5 px-4">
-			{@render field('explore-metric', 'Show', query.metric, metrics, v =>
-				update({ metric: v as ExploreQuery['metric'], hide: [] })
-			)}
-			{@render field('explore-per', 'Per', query.per, EXPLORE_INTERVALS, v =>
-				update({ per: v as ExploreQuery['per'] })
-			)}
-			{@render field('explore-split', 'Split by', query.split, splits, v =>
-				update({ split: v as ExploreQuery['split'] })
-			)}
-			{#if query.compare === 'cars'}
-				<p class="-mt-3 text-xs text-muted-foreground">
-					Each car gets its own chart on one shared scale, so the split is by car.
-				</p>
-			{:else if query.compare !== 'none'}
-				<p class="-mt-3 text-xs text-muted-foreground">
-					A comparison draws one total line, so the split is off while comparing.
-				</p>
-			{/if}
-			{@render field('explore-compare', 'Compare with', query.compare, EXPLORE_COMPARES, v =>
-				update({ compare: v as ExploreQuery['compare'] })
-			)}
-			{@render field('explore-include', 'Costs', query.inc, COSTS, v =>
-				update({ inc: v as ExploreQuery['inc'] })
-			)}
-		</div>
-		<Sheet.Footer class="pb-[max(1rem,env(safe-area-inset-bottom))]">
-			{#if !isDefault}
-				<Button variant="ghost" onclick={() => onChange(DEFAULT_EXPLORE)}>
-					<RotateCcw class="mr-1 h-4 w-4" aria-hidden="true" />
-					Reset
-				</Button>
-			{/if}
-			<Button size="lg" class="w-full" onclick={() => (editing = false)}>Done</Button>
-		</Sheet.Footer>
-	</Sheet.Content>
-</Sheet.Root>
+		<Button
+			variant="outline"
+			class="h-10 max-w-full gap-1.5 rounded-full px-4"
+			aria-expanded={open === menu}
+			aria-controls="explore-menu-{menu}"
+			onclick={e => toggle(menu, e.currentTarget)}
+		>
+			<span class="text-muted-foreground">{prefix}</span>
+			<span class="min-w-0 truncate font-medium">{text}</span>
+			<ChevronDown class="h-4 w-4 shrink-0" aria-hidden="true" />
+		</Button>
+		{#if open === menu}
+			<div
+				id="explore-menu-{menu}"
+				class="absolute top-full z-50 mt-1 max-h-[70vh] w-64 max-w-[calc(100vw-2rem)] space-y-4 overflow-y-auto rounded-[var(--r-lg)] border bg-popover p-3 text-popover-foreground shadow-[var(--shadow-pop)] {alignEnd
+					? 'right-0'
+					: 'left-0'}"
+			>
+				{@render body()}
+			</div>
+		{/if}
+	</div>
+{/snippet}
+
+{#snippet metricMenu()}
+	{@render radios('Metric', query.metric, metrics, v =>
+		update({ metric: v as ExploreQuery['metric'] })
+	)}
+	{#if costsApply}
+		{@render radios('Costs', query.inc, COSTS, v => update({ inc: v as ExploreQuery['inc'] }))}
+		<p class="text-xs text-muted-foreground">
+			{query.inc === 'all'
+				? 'All costs, including insurance and loan or lease payments.'
+				: 'Running costs: everything except insurance and loan or lease payments.'}
+		</p>
+	{/if}
+{/snippet}
+
+{#snippet perMenu()}
+	{@render radios('By', query.per, EXPLORE_INTERVALS, v =>
+		update({ per: v as ExploreQuery['per'] })
+	)}
+{/snippet}
+
+{#snippet splitMenu()}
+	{@render radios('Split by', query.split, splits, v =>
+		update({ split: v as ExploreQuery['split'] })
+	)}
+	{#if query.compare === 'cars'}
+		<p class="text-xs text-muted-foreground">
+			Each car gets its own chart on one shared scale, so the split is by car.
+		</p>
+	{:else if query.compare !== 'none'}
+		<p class="text-xs text-muted-foreground">
+			A comparison draws one total line, so the split is off while comparing.
+		</p>
+	{/if}
+{/snippet}
+
+{#snippet compareMenu()}
+	{@render radios('Compare with', query.compare, EXPLORE_COMPARES, v =>
+		update({ compare: v as ExploreQuery['compare'] })
+	)}
+{/snippet}
+
+<svelte:window
+	onpointerdown={e => {
+		if (open && !(e.target as Element | null)?.closest?.('[data-chip-menu]')) open = null;
+	}}
+/>
+
+<div
+	bind:this={bar}
+	class="flex flex-wrap items-center gap-2"
+	role="group"
+	aria-label="Chart options"
+>
+	{@render chip('metric', 'Metric', metricText, metricMenu)}
+	{@render chip('per', 'By', labelOf(EXPLORE_INTERVALS, query.per), perMenu)}
+	{@render chip('split', 'Split by', labelOf(EXPLORE_SPLITS, query.split), splitMenu)}
+	{@render chip(
+		'compare',
+		'Compare',
+		query.compare === 'none' ? 'None' : labelOf(EXPLORE_COMPARES, query.compare),
+		compareMenu
+	)}
+	{@render filters?.()}
+	<Button variant="outline" class="h-10 gap-1.5 rounded-full px-4" onclick={copyLink}>
+		{#if copied === 'done'}
+			<Check class="h-4 w-4" aria-hidden="true" />
+		{:else}
+			<Share2 class="h-4 w-4" aria-hidden="true" />
+		{/if}
+		{copied === 'done' ? 'Link copied' : copied === 'failed' ? "Couldn't copy" : 'Copy link'}
+	</Button>
+	{#if !isDefault}
+		<Button variant="ghost" class="h-10 rounded-full" onclick={reset}>
+			<RotateCcw class="mr-1 h-4 w-4" aria-hidden="true" />
+			Reset
+		</Button>
+	{/if}
+	<span class="sr-only" aria-live="polite">
+		{copied === 'done' ? 'Link copied' : copied === 'failed' ? "Couldn't copy the link" : ''}
+	</span>
+</div>
