@@ -213,6 +213,45 @@ export function heroSentence(opts: {
 	return parts.join(' ');
 }
 
+export interface NumbersTable {
+	columns: string[];
+	rows: Array<{ key: string; label: string; values: Array<number | null> }>;
+}
+
+export function numbersTable(
+	buckets: ReadonlyArray<{ key: string; label: string }>,
+	series: ReadonlyArray<{ label: string; values: Array<number | null> }>,
+	withTotal: boolean
+): NumbersTable {
+	const total = withTotal && series.length > 1;
+	return {
+		columns: [...series.map(s => s.label), ...(total ? ['Total'] : [])],
+		rows: buckets.map(({ key, label }, i) => {
+			const values = series.map(s => s.values[i] ?? null);
+			const sumOf = values.some(v => v != null) ? sum(values) : null;
+			return { key, label, values: total ? [...values, sumOf] : values };
+		})
+	};
+}
+
+const FORMULA_START = /^'*[=+\-@\t\r]/;
+
+function csvText(value: string): string {
+	const safe = FORMULA_START.test(value) ? `'${value}` : value;
+	return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
+}
+
+export function numbersCsv(table: NumbersTable, firstColumn: string): string {
+	const lines = [
+		[firstColumn, ...table.columns].map(csvText),
+		...table.rows.map(r => [
+			csvText(r.key),
+			...r.values.map(v => (v == null ? '' : String(Math.round(v * 10000) / 10000)))
+		])
+	];
+	return lines.map(line => line.join(',')).join('\r\n') + '\r\n';
+}
+
 export function percentChange(current: number | null, previous: number | null): number | null {
 	if (current == null || previous == null || previous === 0) return null;
 	return Math.round(((current - previous) / Math.abs(previous)) * 100);
@@ -277,7 +316,7 @@ export function bucketBounds(
 	return { start: Math.max(startSec, range.start), end: Math.min(endSec, range.end) };
 }
 
-function plainDay(seconds: number): string {
+export function plainDay(seconds: number): string {
 	const d = new Date(seconds * 1000);
 	const pad = (n: number) => String(n).padStart(2, '0');
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;

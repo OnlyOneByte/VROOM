@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { type Page, expect, test } from '@playwright/test';
 import { ANALYTICS_SUMMARY, addSessionCookie, mockApi } from './support/mock-api';
 import { scanA11y } from './support/axe';
@@ -341,6 +342,45 @@ test.describe('Analytics', () => {
 
 		await page.goBack();
 		await expect(page).not.toHaveURL(/hide=vehicle-camry/);
+	});
+
+	test('The numbers lists each month and downloads as CSV', async ({ page }) => {
+		await mockAnalytics(page);
+		await page.goto('/analytics');
+		const numbers = page.getByRole('region', { name: 'The numbers', exact: true });
+		await numbers.scrollIntoViewIfNeeded();
+		await expect(numbers.getByRole('columnheader', { name: 'Month' })).toBeVisible();
+		await expect(numbers.getByRole('columnheader', { name: 'Total' })).toBeVisible();
+		const download = page.waitForEvent('download');
+		await numbers.getByRole('button', { name: 'Download CSV' }).click();
+		const file = await download;
+		expect(file.suggestedFilename()).toMatch(
+			/^vroom-total-cost-by-month-\d{4}-\d{2}-to-\d{4}-\d{2}\.csv$/
+		);
+		const csv = await readFile((await file.path()) as string, 'utf8');
+		expect(csv.startsWith('\uFEFFMonth,')).toBe(true);
+		expect(csv).toContain(',Total\r\n');
+		expect(csv).toMatch(/\r\n\d{4}-\d{2},/);
+	});
+
+	test('under a Cars filter, the panel drill offers all selected cars', async ({ page }) => {
+		await mockAnalytics(page);
+		await page.goto('/analytics?split=vehicle&cars=vehicle-camry,vehicle-civic');
+		await page.mouse.move(640, 600);
+		const panels = page.getByRole('region', { name: 'Total cost per month by car' });
+		await panels
+			.getByRole('heading', { level: 3 })
+			.first()
+			.evaluate(e => e.scrollIntoView({ block: 'start' }));
+		const first = panels
+			.getByRole('img', { name: /^2020 Toyota Camry:/ })
+			.and(page.locator('[tabindex="0"]'));
+		await first.focus();
+		await page.keyboard.press('ArrowRight');
+		await page.keyboard.press('Enter');
+		await expect(
+			page.getByRole('dialog').getByRole('button', { name: /^All selected cars in / })
+		).toBeVisible();
 	});
 
 	test('a comparison lists each bucket’s change in Table view', async ({ page }) => {
