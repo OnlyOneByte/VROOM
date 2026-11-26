@@ -377,7 +377,7 @@ test.describe('Analytics', () => {
 				'?metric=mpg&per=quarter&split=vehicle',
 				'Fuel efficiency per quarter by car',
 				'By Quarter',
-				/^on average over the last 12 months for all your cars\.$/
+				/^on average over the last 12 months for your two cars\.$/
 			]
 		];
 		for (const [search, heading, chip, sentence] of views) {
@@ -388,16 +388,16 @@ test.describe('Analytics', () => {
 		}
 	});
 
-	test('drill down from a month to a car and on to its expenses', async ({ page }) => {
+	test('drill down from a month to its expenses', async ({ page }) => {
 		await mockAnalytics(page);
-		await page.goto('/analytics?split=vehicle');
+		await page.goto('/analytics');
 		await page.mouse.move(640, 600);
 
 		await page
-			.getByRole('heading', { name: 'Total cost per month by car' })
+			.getByRole('heading', { name: 'Total cost per month by category' })
 			.scrollIntoViewIfNeeded();
 		const chart = page
-			.getByRole('img', { name: /Total cost per month by car/ })
+			.getByRole('img', { name: /Total cost per month by category/ })
 			.and(page.locator('[tabindex="0"]'));
 		await chart.focus();
 		await page.keyboard.press('ArrowRight');
@@ -418,12 +418,32 @@ test.describe('Analytics', () => {
 		await expect(panel).toBeHidden();
 		await expect(page).not.toHaveURL(/sel=/);
 		await expect(chart).toBeFocused();
+	});
 
-		await chart.click({ position: { x: 300, y: 150 } });
-		await expect(page.getByRole('dialog')).toBeVisible();
-		await page.getByRole('dialog').getByRole('button', { name: 'Show only' }).first().click();
-		await expect(page).toHaveURL(/cars=vehicle-civic/);
-		await expect(page).not.toHaveURL(/sel=/);
+	test('split by car draws a bar panel per car, and a bar drills into that car', async ({
+		page
+	}) => {
+		await mockAnalytics(page);
+		await page.goto('/analytics?split=vehicle');
+		await page.mouse.move(640, 600);
+		const panels = page.getByRole('region', { name: 'Total cost per month by car' });
+		await expect(panels.getByRole('heading', { level: 3 })).toHaveCount(2);
+		await expect(panels).toContainText(/Same \$0 – \$[\d,]+ scale for all 2/);
+
+		await panels
+			.getByRole('heading', { level: 3 })
+			.first()
+			.evaluate(e => e.scrollIntoView({ block: 'start' }));
+		const first = panels
+			.getByRole('img', { name: /^2020 Toyota Camry:/ })
+			.and(page.locator('[tabindex="0"]'));
+		await first.focus();
+		await page.keyboard.press('ArrowRight');
+		await page.keyboard.press('Enter');
+		await expect(page).toHaveURL(/seg=vehicle-camry/);
+		await expect(page.getByRole('dialog').getByRole('heading').first()).toContainText(
+			'2020 Toyota Camry'
+		);
 	});
 
 	test('a tag bar takes its value from the expenses, counted once', async ({ page }) => {

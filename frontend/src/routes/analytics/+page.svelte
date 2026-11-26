@@ -320,6 +320,7 @@
 							onApplyInsight={applyInsight}
 							driverSplit={sharedCars.some(v => !v.sharedAccess)}
 							filters={exploreFilterChips}
+							carCount={vehiclesLoaded && !vehiclesError ? vehicles.length : undefined}
 						/>
 					{:catch}
 						{@render filterChips(false)}

@@ -170,6 +170,7 @@ export function chartForm(query: ExploreQuery): ChartForm {
 	if (query.compare === 'cars') return 'panels';
 	if (query.compare !== 'none') return 'compare';
 	if (ratio) return 'line';
+	if (query.split === 'vehicle') return 'panels';
 	if (query.split === 'tag') return 'grouped';
 	return query.split === 'none' ? 'bars' : 'stacked';
 }

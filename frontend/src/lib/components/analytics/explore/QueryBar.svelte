@@ -2,6 +2,7 @@
 	import { tick, type Snippet } from 'svelte';
 	import { Check, ChevronDown, RotateCcw, Share2 } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		DEFAULT_EXPLORE,
@@ -77,12 +78,21 @@
 	}
 
 	let alignEnd = $state(false);
+	let menuMax = $state(0);
+	const isMobile = new IsMobile();
+
+	function roomBelow(button: HTMLElement) {
+		const bottomNav = isMobile.current ? 96 : 16;
+		return window.innerHeight - button.getBoundingClientRect().bottom - bottomNav;
+	}
 
 	async function toggle(menu: Menu, button: HTMLElement) {
 		if (open === menu) {
 			open = null;
 			return;
 		}
+		if (roomBelow(button) < 280) button.scrollIntoView({ block: 'start' });
+		menuMax = Math.max(160, roomBelow(button));
 		alignEnd = button.getBoundingClientRect().left + 272 > window.innerWidth;
 		open = menu;
 		await tick();
@@ -154,7 +164,7 @@
 	>
 		<Button
 			variant="outline"
-			class="h-10 max-w-full gap-1.5 rounded-full px-4"
+			class="h-10 max-w-full scroll-mt-20 gap-1.5 rounded-full px-4"
 			aria-expanded={open === menu}
 			aria-controls="explore-menu-{menu}"
 			onclick={e => toggle(menu, e.currentTarget)}
@@ -166,7 +176,8 @@
 		{#if open === menu}
 			<div
 				id="explore-menu-{menu}"
-				class="absolute top-full z-50 mt-1 max-h-[70vh] w-64 max-w-[calc(100vw-2rem)] space-y-4 overflow-y-auto rounded-[var(--r-lg)] border bg-popover p-3 text-popover-foreground shadow-[var(--shadow-pop)] {alignEnd
+				style:max-height="{menuMax}px"
+				class="absolute top-full z-50 mt-1 w-64 max-w-[calc(100vw-2rem)] space-y-4 overflow-y-auto rounded-[var(--r-lg)] border bg-popover p-3 text-popover-foreground shadow-[var(--shadow-pop)] {alignEnd
 					? 'right-0'
 					: 'left-0'}"
 			>
