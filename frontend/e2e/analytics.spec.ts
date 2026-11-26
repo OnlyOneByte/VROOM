@@ -406,8 +406,10 @@ test.describe('Analytics', () => {
 		const panel = page.getByRole('dialog');
 		await expect(panel.getByRole('heading', { name: 'Aug ’26' })).toBeVisible();
 		await expect(page).toHaveURL(/sel=2026-08/);
-		await expect(panel.getByText('Brake pads')).toBeVisible();
-		await expect(panel.getByText('Fuel & charging')).toBeVisible();
+		const largest = panel.getByRole('list', { name: 'Largest expenses' });
+		await expect(largest.getByText('Brake pads')).toBeVisible();
+		await expect(largest.getByText('Fuel & charging')).toBeVisible();
+		await expect(panel.getByRole('list', { name: 'Split of this period' })).toBeVisible();
 		await expect(panel.getByRole('link', { name: /Open in Expenses/ })).toHaveAttribute(
 			'href',
 			/category=fuel%2Cmaintenance%2Cregulatory%2Cenhancement%2Cmisc&startDate=2026-08-01&endDate=2026-08-31/
@@ -446,10 +448,11 @@ test.describe('Analytics', () => {
 		);
 
 		await page
-			.getByRole('navigation', { name: 'Drill path' })
+			.getByRole('dialog')
 			.getByRole('button', { name: /^All cars in / })
 			.click();
 		await expect(page).not.toHaveURL(/seg=/);
+		await expect(page).toHaveURL(/sel=/);
 		await page.getByRole('dialog').getByRole('button', { name: 'Show only' }).first().click();
 		await expect(page).toHaveURL(/cars=vehicle-/);
 		await expect(page).not.toHaveURL(/sel=/);

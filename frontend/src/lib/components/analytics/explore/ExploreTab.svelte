@@ -619,16 +619,6 @@
 						{rangeText}
 					</button>
 					<span aria-hidden="true" class="text-muted-foreground">›</span>
-					{#if selectedSeries && form === 'panels' && query.sel !== 'total'}
-						<button
-							type="button"
-							class="inline-flex min-h-10 items-center px-1 underline underline-offset-2"
-							onclick={() => onQueryChange({ ...query, seg: undefined })}
-						>
-							All cars in {bucketLabel(query.sel ?? '', shown.per)}
-						</button>
-						<span aria-hidden="true" class="text-muted-foreground">›</span>
-					{/if}
 					<span aria-current="page" class="px-1 font-medium">{selectionTitle}</span>
 				{:else}
 					<span aria-current="page" class="inline-flex min-h-10 items-center px-1 font-medium">
@@ -814,6 +804,12 @@
 		car={selectionCar}
 		parts={selectionParts}
 		{onOnlyCar}
+		allCars={selectedSeries && form === 'panels' && query.sel && query.sel !== 'total'
+			? {
+					label: `All cars in ${bucketLabel(query.sel, shown.per)}`,
+					run: () => onQueryChange({ ...query, seg: undefined })
+				}
+			: null}
 		onClose={closeSelection}
 	/>
 

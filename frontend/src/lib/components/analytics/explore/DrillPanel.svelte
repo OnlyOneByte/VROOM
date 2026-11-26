@@ -35,6 +35,7 @@
 			run: () => void;
 		}>;
 		onOnlyCar?: (_id: string) => void;
+		allCars?: { label: string; run: () => void } | null;
 		onClose: () => void;
 	}
 
@@ -51,6 +52,7 @@
 		car,
 		parts = [],
 		onOnlyCar,
+		allCars,
 		onClose
 	}: Props = $props();
 
@@ -200,6 +202,11 @@
 				<Button variant="outline" class="h-10 w-full" onclick={() => onOnlyCar(car.id)}>
 					<Car class="mr-2 h-4 w-4" aria-hidden="true" />
 					Show only {car.name}
+				</Button>
+			{/if}
+			{#if allCars}
+				<Button variant="outline" class="h-10 w-full" onclick={allCars.run}>
+					{allCars.label}
 				</Button>
 			{/if}
 		</div>
