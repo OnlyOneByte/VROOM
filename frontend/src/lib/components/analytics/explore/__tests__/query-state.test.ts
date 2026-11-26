@@ -485,7 +485,20 @@ describe('Explore hero sentence', () => {
 		expect(text).toBe('on average from Jun 1, 2026 to Nov 30, 2026 for 2019 Honda Civic.');
 	});
 
-	test('all costs with no split adds the cost per distance', () => {
+	test('a count names its noun, and a drop reads "less than"', () => {
+		const text = heroSentence({
+			...base,
+			query: applyPreset({ metric: 'count', split: 'none' }),
+			format: (v: number) => String(v),
+			summary: { total: 12, perBucket: 4, previousPerBucket: 5, perDistance: null },
+			series: [{ label: 'Total', values: [12] }]
+		});
+		expect(text).toBe(
+			"expenses logged over the last 12 months for all your cars. That's 4 expenses a month, 20% less than the period before."
+		);
+	});
+
+	test('all costs over the whole range adds the cost per distance', () => {
 		const text = heroSentence({
 			...base,
 			query: applyPreset({ split: 'none', inc: 'all', per: 'none' }),

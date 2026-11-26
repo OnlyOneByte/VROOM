@@ -187,7 +187,9 @@ export function heroSentence(opts: {
 				: change === 0
 					? `, the same as ${opts.compareLabel}`
 					: `, ${Math.abs(change)}% ${change > 0 ? 'more' : 'less'} than ${opts.compareLabel}`;
-		parts.push(`That's ${opts.format(summary.perBucket)} a ${opts.interval}${versus}.`);
+		const amount = opts.format(summary.perBucket);
+		const noun = query.metric === 'count' ? ' expenses' : '';
+		parts.push(`That's ${amount}${noun} a ${opts.interval}${versus}.`);
 	}
 	if (query.metric === 'cost' && summary.perDistance != null) {
 		parts.push(`About ${opts.format(summary.perDistance)} a ${opts.distanceWord}.`);

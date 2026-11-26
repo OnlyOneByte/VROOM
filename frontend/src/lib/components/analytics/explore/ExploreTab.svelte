@@ -517,7 +517,7 @@
 <div class="space-y-4 md:space-y-6" bind:this={root}>
 	{#if response && hasData(response)}
 		<div
-			class="flex flex-col gap-2 transition-opacity md:flex-row md:items-center md:gap-5"
+			class="flex min-h-40 flex-col gap-2 transition-opacity md:min-h-28 md:flex-row md:items-center md:gap-5"
 			class:opacity-60={isLoading || !!error}
 			aria-live="polite"
 		>

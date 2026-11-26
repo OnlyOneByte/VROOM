@@ -298,11 +298,11 @@ test.describe('Analytics', () => {
 		const { ids } = await scanA11y(page, testInfo, 'explore');
 		expect(ids).toEqual([]);
 
-		await page.getByRole('button', { name: 'Metric Running cost' }).click();
-		await page.getByRole('radio', { name: 'Cost per mile' }).click();
+		await page.getByRole('button', { name: 'Metric Total cost' }).click();
+		await page.getByRole('button', { name: 'Cost per mile' }).click();
 		await expect(page).toHaveURL(/metric=costPerDistance/);
 		await page.getByRole('button', { name: /^Split by/ }).click();
-		await page.getByRole('radio', { name: 'Car', exact: true }).click();
+		await page.getByRole('button', { name: 'Car', exact: true }).click();
 		await expect(page).toHaveURL(/split=vehicle/);
 		await expect(
 			page.getByRole('heading', { name: 'Cost per mile per month by car' })
@@ -310,7 +310,7 @@ test.describe('Analytics', () => {
 		await expect.poll(() => requests.at(-1)?.get('metric')).toBe('costPerDistance');
 
 		await page.getByRole('button', { name: 'By Month' }).click();
-		await page.getByRole('radio', { name: 'Quarter', exact: true }).click();
+		await page.getByRole('button', { name: 'Quarter', exact: true }).click();
 		await expect(page).toHaveURL(/per=quarter/);
 		await expect.poll(() => requests.at(-1)?.get('interval')).toBe('quarter');
 
@@ -360,8 +360,12 @@ test.describe('Analytics', () => {
 	test('the hero and chips follow the view in the URL', async ({ page }) => {
 		await mockAnalytics(page);
 		const views: Array<[string, string, string]> = [
-			['', 'Total cost per month by category', 'Metric Running cost'],
-			['?split=fuelType&inc=all', 'Total cost per month by fuel type', 'Metric All costs'],
+			['', 'Total cost per month by category', 'Metric Total cost'],
+			[
+				'?split=fuelType&inc=all',
+				'Total cost per month by fuel type',
+				'Metric Total cost, all costs'
+			],
 			[
 				'?split=none&compare=prevYear',
 				'Total cost per month, against the year before',

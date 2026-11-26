@@ -18,33 +18,37 @@ afterEach(() => cleanup());
 describe('QueryBar driver split', () => {
 	test('"Who paid" is offered only when one of the cars shares', async () => {
 		await openSplits(true);
-		expect(screen.getByLabelText('Who paid')).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Who paid' })).toBeTruthy();
 	});
 
 	test('without a shared car there is no "Who paid" split', async () => {
 		await openSplits(false);
-		expect(screen.queryByLabelText('Who paid')).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Who paid' })).toBeNull();
 	});
 });
 
 describe('QueryBar chips', () => {
 	test('each chip names its setting and current value', () => {
 		render(QueryBar, { props: { query: DEFAULT_EXPLORE, onChange: () => {} } });
-		for (const name of ['Metric Running cost', 'By Month', 'Split by Category', 'Compare None']) {
+		for (const name of ['Metric Total cost', 'By Month', 'Split by Category', 'Compare None']) {
 			expect(screen.getByRole('button', { name })).toBeTruthy();
 		}
 		expect(screen.queryByRole('button', { name: /Reset/ })).toBeNull();
 	});
 
-	test('picking a value sends the new query and closes the menu', async () => {
+	test('picking a value sends the query once, closes the menu and returns focus to the chip', async () => {
 		const onChange = vi.fn();
 		render(QueryBar, { props: { query: DEFAULT_EXPLORE, onChange } });
 		await fireEvent.click(screen.getByRole('button', { name: 'By Month' }));
 		await settle();
-		await fireEvent.click(screen.getByLabelText('Quarter'));
+		const chip = screen.getByRole('button', { name: 'By Month' });
+		expect(screen.getByRole('button', { name: 'Month' })).toHaveAttribute('aria-pressed', 'true');
+		await fireEvent.click(screen.getByRole('button', { name: 'Quarter' }));
 		await settle();
+		expect(onChange).toHaveBeenCalledTimes(1);
 		expect(onChange).toHaveBeenCalledWith({ ...DEFAULT_EXPLORE, per: 'quarter' });
-		expect(screen.queryByLabelText('Quarter')).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Quarter' })).toBeNull();
+		expect(document.activeElement).toBe(chip);
 	});
 
 	test('Copy link copies the page address', async () => {

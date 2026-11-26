@@ -2,8 +2,6 @@
 	import { tick, type Snippet } from 'svelte';
 	import { Check, ChevronDown, RotateCcw, Share2 } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { Label } from '#lib/components/ui/label/index.ts';
-	import * as RadioGroup from '#lib/components/ui/radio-group/index.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		DEFAULT_EXPLORE,
@@ -30,7 +28,7 @@
 
 	type Menu = 'metric' | 'per' | 'split' | 'compare';
 	let open = $state<Menu | null>(null);
-	let copied = $state(false);
+	let copied = $state<'done' | 'failed' | null>(null);
 
 	let distanceWord = $derived(
 		settingsStore.unitPreferences.distanceUnit === 'kilometers' ? 'km' : 'mile'
@@ -51,11 +49,7 @@
 		{ value: 'all', label: 'All costs' }
 	];
 	let metricText = $derived(
-		query.metric === 'cost'
-			? query.inc === 'all'
-				? 'All costs'
-				: 'Running cost'
-			: metricLabel(query.metric, distanceWord)
+		`${metricLabel(query.metric, distanceWord)}${moneyMetric && query.inc === 'all' ? ', all costs' : ''}`
 	);
 	let isDefault = $derived(
 		JSON.stringify({ ...query, hide: [] }) === JSON.stringify({ ...DEFAULT_EXPLORE, hide: [] })
@@ -65,7 +59,10 @@
 		options.find(o => o.value === value)?.label ?? value;
 
 	function update(patch: Partial<ExploreQuery>) {
+		const chipButton =
+			open && document.querySelector<HTMLElement>(`[aria-controls="explore-menu-${open}"]`);
 		open = null;
+		chipButton?.focus();
 		onChange(
 			normalizeExplore({
 				...query,
@@ -84,10 +81,11 @@
 			open = null;
 			return;
 		}
-		alignEnd = button.getBoundingClientRect().left > window.innerWidth / 2;
+		// 256 px menu plus a 16 px margin: right-align when it would run off the viewport.
+		alignEnd = button.getBoundingClientRect().left + 272 > window.innerWidth;
 		open = menu;
 		await tick();
-		button.parentElement?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+		button.parentElement?.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus();
 	}
 
 	function closeMenu(wrapper: HTMLElement) {
@@ -95,38 +93,43 @@
 		wrapper.querySelector<HTMLElement>('button')?.focus();
 	}
 
+	let copyTimer: ReturnType<typeof setTimeout> | undefined;
+
 	async function copyLink() {
+		clearTimeout(copyTimer);
 		try {
 			await navigator.clipboard.writeText(location.href);
-			copied = true;
-			setTimeout(() => (copied = false), 2000);
+			copied = 'done';
 		} catch {
-			copied = false;
+			copied = 'failed';
 		}
+		copyTimer = setTimeout(() => (copied = null), 2000);
 	}
 </script>
 
 {#snippet radios(
-	id: string,
 	label: string,
 	value: string,
 	options: ReadonlyArray<{ value: string; label: string }>,
 	onPick: (_value: string) => void
 )}
-	<fieldset class="space-y-1">
-		<legend class="mb-1 text-sm font-medium">{label}</legend>
-		<RadioGroup.Root {value} onValueChange={v => v && onPick(v)} aria-label={label}>
-			{#each options as option (option.value)}
-				<Label
-					for="{id}-{option.value}"
-					class="flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2 font-normal hover:bg-muted"
-				>
-					<RadioGroup.Item value={option.value} id="{id}-{option.value}" />
-					{option.label}
-				</Label>
-			{/each}
-		</RadioGroup.Root>
-	</fieldset>
+	<div class="space-y-1" role="group" aria-label={label}>
+		<p class="mb-1 text-sm font-medium" aria-hidden="true">{label}</p>
+		{#each options as option (option.value)}
+			<button
+				type="button"
+				aria-pressed={option.value === value}
+				class="flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+				onclick={() => onPick(option.value)}
+			>
+				<Check
+					class="h-4 w-4 shrink-0 {option.value === value ? '' : 'invisible'}"
+					aria-hidden="true"
+				/>
+				{option.label}
+			</button>
+		{/each}
+	</div>
 {/snippet}
 
 {#snippet chip(menu: Menu, prefix: string, text: string, body: Snippet)}
@@ -166,13 +169,11 @@
 {/snippet}
 
 {#snippet metricMenu()}
-	{@render radios('explore-metric', 'Metric', query.metric, metrics, v =>
+	{@render radios('Metric', query.metric, metrics, v =>
 		update({ metric: v as ExploreQuery['metric'] })
 	)}
 	{#if moneyMetric}
-		{@render radios('explore-include', 'Costs', query.inc, COSTS, v =>
-			update({ inc: v as ExploreQuery['inc'] })
-		)}
+		{@render radios('Costs', query.inc, COSTS, v => update({ inc: v as ExploreQuery['inc'] }))}
 		<p class="text-xs text-muted-foreground">
 			{query.inc === 'all'
 				? 'All costs, including insurance and loan or lease payments.'
@@ -182,13 +183,13 @@
 {/snippet}
 
 {#snippet perMenu()}
-	{@render radios('explore-per', 'By', query.per, EXPLORE_INTERVALS, v =>
+	{@render radios('By', query.per, EXPLORE_INTERVALS, v =>
 		update({ per: v as ExploreQuery['per'] })
 	)}
 {/snippet}
 
 {#snippet splitMenu()}
-	{@render radios('explore-split', 'Split by', query.split, splits, v =>
+	{@render radios('Split by', query.split, splits, v =>
 		update({ split: v as ExploreQuery['split'] })
 	)}
 	{#if query.compare === 'cars'}
@@ -203,7 +204,7 @@
 {/snippet}
 
 {#snippet compareMenu()}
-	{@render radios('explore-compare', 'Compare with', query.compare, EXPLORE_COMPARES, v =>
+	{@render radios('Compare with', query.compare, EXPLORE_COMPARES, v =>
 		update({ compare: v as ExploreQuery['compare'] })
 	)}
 {/snippet}
@@ -226,12 +227,12 @@
 	)}
 	{@render filters?.()}
 	<Button variant="outline" class="h-10 gap-1.5 rounded-full px-4" onclick={copyLink}>
-		{#if copied}
+		{#if copied === 'done'}
 			<Check class="h-4 w-4" aria-hidden="true" />
 		{:else}
 			<Share2 class="h-4 w-4" aria-hidden="true" />
 		{/if}
-		{copied ? 'Link copied' : 'Copy link'}
+		{copied === 'done' ? 'Link copied' : copied === 'failed' ? "Couldn't copy" : 'Copy link'}
 	</Button>
 	{#if !isDefault}
 		<Button variant="ghost" class="h-10 rounded-full" onclick={() => onChange(DEFAULT_EXPLORE)}>
@@ -239,5 +240,7 @@
 			Reset
 		</Button>
 	{/if}
-	<span class="sr-only" aria-live="polite">{copied ? 'Link copied' : ''}</span>
+	<span class="sr-only" aria-live="polite">
+		{copied === 'done' ? 'Link copied' : copied === 'failed' ? "Couldn't copy the link" : ''}
+	</span>
 </div>

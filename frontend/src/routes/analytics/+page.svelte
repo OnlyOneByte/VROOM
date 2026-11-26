@@ -322,6 +322,7 @@
 							filters={exploreFilterChips}
 						/>
 					{:catch}
+						{@render filterChips(false)}
 						{@render tabLoadError('Explore')}
 					{/await}
 				</Tabs.Content>
