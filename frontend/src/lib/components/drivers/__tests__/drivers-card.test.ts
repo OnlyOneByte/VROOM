@@ -41,6 +41,28 @@ afterEach(() => {
 });
 
 describe('DriversCard', () => {
+	test("a slow answer for the previous car never replaces the current car's figures", async () => {
+		const own = (name: string) => ({
+			scope: 'own' as const,
+			estimates: true,
+			distance: null,
+			runningCosts: null,
+			costPerDistance: null,
+			drivers: [figures(name, 100, { you: true })]
+		});
+		let finishOld: (value: DriverStats) => void = () => {};
+		stats
+			.mockImplementationOnce(() => new Promise(resolve => (finishOld = resolve)))
+			.mockResolvedValueOnce(own('New car driver'));
+		const view = mount();
+		await view.rerender({ vehicleId: 'other' });
+		await settle();
+		finishOld(own('Old car driver'));
+		await settle();
+		expect(screen.getByText('New car driver')).toBeTruthy();
+		expect(screen.queryByText('Old car driver')).toBeNull();
+	});
+
 	test('a manager sees every driver, their share, the unattributed rest and a described bar', async () => {
 		stats.mockResolvedValue({
 			scope: 'everyone',

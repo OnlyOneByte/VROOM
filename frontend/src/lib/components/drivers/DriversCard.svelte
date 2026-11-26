@@ -41,13 +41,18 @@
 	let shown = $derived((stats?.drivers ?? []).filter(d => d.distance.total > 0));
 	let total = $derived(stats?.distance?.total ?? 0);
 
+	let latest = 0;
+
 	async function load(car: string, start: number, end: number) {
+		const request = ++latest;
 		phase = 'loading';
 		try {
-			stats = await driverApi.stats(car, { from: new Date(start), to: new Date(end) });
-			phase = stats ? 'ready' : 'hidden';
+			const result = await driverApi.stats(car, { from: new Date(start), to: new Date(end) });
+			if (request !== latest) return;
+			stats = result;
+			phase = result ? 'ready' : 'hidden';
 		} catch {
-			phase = 'error';
+			if (request === latest) phase = 'error';
 		}
 	}
 
@@ -107,6 +112,12 @@
 								style:background-color={driverColor(driver)}
 							></span>
 						{/each}
+						{#if stats.distance && stats.distance.unattributed > 0}
+							<span
+								class="h-full bg-muted-foreground/40"
+								style:width="{(stats.distance.unattributed / total) * 100}%"
+							></span>
+						{/if}
 					</div>
 				{/if}
 				<ul class="divide-y text-sm" aria-label="Distance and running costs paid by each driver">

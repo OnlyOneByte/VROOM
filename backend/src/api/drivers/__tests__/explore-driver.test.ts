@@ -48,3 +48,24 @@ test('explore splits cost by who paid, with unrecorded payers on their own line'
   expect(byLabel.get('No one recorded')).toBe(15);
   expect([...byLabel.values()].reduce((a, b) => (a ?? 0) + (b ?? 0), 0)).toBe(115);
 });
+
+const range = `start=${Date.parse('2024-03-01') / 1000}&end=${Date.parse('2024-03-10') / 1000}`;
+
+test('the drill-down lists the expenses behind a payer, and the unrecorded ones behind the empty key', async () => {
+  const items = async (keys: string[]) => {
+    const qs = `${range}&groupBy=driver&keys=${encodeURIComponent(JSON.stringify(keys))}`;
+    const res = await ctx.authed('GET', `/api/v1/analytics/query/items?${qs}`);
+    expect(res.status).toBe(200);
+    return (await json<DataEnvelope<{ total: number; count: number }>>(res)).data;
+  };
+  expect(await items([''])).toMatchObject({ total: 15, count: 1 });
+  expect(await items([])).toMatchObject({ total: 0, count: 0 });
+});
+
+test('only cost and count can be split by who paid', async () => {
+  const res = await ctx.authed(
+    'GET',
+    `/api/v1/analytics/query?metric=distance&groupBy=driver&${range}`
+  );
+  expect(res.status).toBe(400);
+});
