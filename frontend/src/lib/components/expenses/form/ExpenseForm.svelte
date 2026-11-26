@@ -74,6 +74,7 @@
 	import ExpenseFormHeader from './expense-form/ExpenseFormHeader.svelte';
 	import ExpenseActionBar from './expense-form/ExpenseActionBar.svelte';
 	import ExpenseSaveRow from './expense-form/ExpenseSaveRow.svelte';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import ExpenseDeleteDialog from './expense-form/ExpenseDeleteDialog.svelte';
 	import ExpenseAmountField from './expense-form/ExpenseAmountField.svelte';
 	import ExpenseSplitBreakdown from './expense-form/ExpenseSplitBreakdown.svelte';
@@ -273,6 +274,7 @@
 	);
 
 	async function save() {
+		if (authStore.user?.demo) return;
 		await (form.queuedExpense ? saveQueuedExpense(form) : submitExpense(form));
 		if (form.errors['vehicleDetails']) {
 			focusInView(retryButton);

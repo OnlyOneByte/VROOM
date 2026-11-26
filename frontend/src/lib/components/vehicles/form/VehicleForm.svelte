@@ -77,6 +77,8 @@
 	} from '#lib/utils/financing-calculations.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import FormActionBar from '#lib/components/common/form-action-bar.svelte';
+	import DemoSaveNote from '#lib/components/common/demo-save-note.svelte';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
@@ -91,6 +93,7 @@
 
 	let isLoading = $state(untrack(() => !!vehicleId));
 	let isSubmitting = $state(false);
+	const demo = $derived(authStore.user?.demo === true);
 
 	let isPayingOff = $state(false);
 
@@ -457,6 +460,7 @@
 
 	async function handleSubmit(event: Event) {
 		event.preventDefault();
+		if (demo) return;
 		if (!validateVehicleForm() || !validateFinancingForm()) {
 			await focusFirstProblem(formEl);
 			return;
@@ -1028,13 +1032,16 @@
 			</form>
 
 			<FormActionBar>
+				{#if demo}
+					<DemoSaveNote />
+				{/if}
 				{#if isEditMode}
 					<Button
 						type="button"
 						variant="outline"
 						size="lg"
 						onclick={confirmDelete}
-						disabled={isDeleting || isSubmitting}
+						disabled={demo || isDeleting || isSubmitting}
 						class="rounded-full text-destructive"
 					>
 						<Trash2 class="size-4" aria-hidden="true" />
@@ -1056,7 +1063,7 @@
 						type="button"
 						size="lg"
 						onclick={handleSubmit}
-						disabled={isSubmitting || isDeleting}
+						disabled={demo || isSubmitting || isDeleting}
 						class="rounded-full"
 					>
 						{#if isSubmitting}

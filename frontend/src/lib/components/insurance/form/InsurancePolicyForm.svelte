@@ -3,6 +3,8 @@
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { goto } from '$app/navigation';
 	import FormActionBar from '#lib/components/common/form-action-bar.svelte';
+	import DemoSaveNote from '#lib/components/common/demo-save-note.svelte';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
@@ -62,6 +64,7 @@
 
 	let isLoading = $state(true);
 	let isSubmitting = $state(false);
+	const demo = $derived(authStore.user?.demo === true);
 
 	onMount(() => trackPendingSave(() => isSubmitting));
 	let isDeleting = $state(false);
@@ -179,6 +182,7 @@
 
 	async function handleSubmit(event?: Event) {
 		event?.preventDefault();
+		if (demo) return;
 		if (!validate()) {
 			await focusFirstProblem(formEl);
 			return;
@@ -582,13 +586,16 @@
 			</form>
 
 			<FormActionBar>
+				{#if demo}
+					<DemoSaveNote />
+				{/if}
 				{#if isEditMode}
 					<Button
 						type="button"
 						variant="outline"
 						size="lg"
 						onclick={confirmDelete}
-						disabled={isDeleting || isSubmitting}
+						disabled={demo || isDeleting || isSubmitting}
 						class="rounded-full text-destructive"
 					>
 						<Trash2 class="size-4" aria-hidden="true" />
@@ -610,7 +617,7 @@
 						type="button"
 						size="lg"
 						onclick={handleSubmit}
-						disabled={isSubmitting || isDeleting}
+						disabled={demo || isSubmitting || isDeleting}
 						class="rounded-full"
 					>
 						{#if isSubmitting}

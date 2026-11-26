@@ -6,6 +6,8 @@
 	import { addVehicleFirstTo } from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import FormActionBar from '#lib/components/common/form-action-bar.svelte';
+	import DemoSaveNote from '#lib/components/common/demo-save-note.svelte';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
@@ -54,6 +56,7 @@
 
 	let isLoading = $state(true);
 	let isSubmitting = $state(false);
+	const demo = $derived(authStore.user?.demo === true);
 
 	onMount(() => trackPendingSave(() => isSubmitting));
 	let policy = $state<InsurancePolicy | null>(null);
@@ -224,7 +227,7 @@
 
 	async function handleSubmit(event?: Event) {
 		event?.preventDefault();
-		if (!validate()) return;
+		if (demo || !validate()) return;
 
 		isSubmitting = true;
 		try {
@@ -547,6 +550,9 @@
 			</form>
 
 			<FormActionBar>
+				{#if demo}
+					<DemoSaveNote />
+				{/if}
 				<div class="ml-auto flex items-center gap-3">
 					<Button
 						type="button"
@@ -562,7 +568,7 @@
 						type="button"
 						size="lg"
 						onclick={handleSubmit}
-						disabled={isSubmitting}
+						disabled={demo || isSubmitting}
 						class="rounded-full"
 					>
 						{#if isSubmitting}
