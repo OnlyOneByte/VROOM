@@ -38,6 +38,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	document.body.replaceChildren();
 	localStorage.clear();
 });
 
@@ -68,6 +69,25 @@ describe('assistant page errors', () => {
 
 		const box = await screen.findByRole('textbox', { name: 'Your question' });
 		await waitFor(() => expect(box).toHaveFocus());
+	});
+
+	test('a Retry that fails again keeps focus on the new Retry', async () => {
+		getProviders.mockRejectedValue(new ApiError('Network error', 0));
+		render(Page);
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+		await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus());
+	});
+
+	test('a Retry that finds no provider moves focus to the page title', async () => {
+		getProviders.mockRejectedValueOnce(new ApiError('Network error', 0)).mockResolvedValueOnce([]);
+		render(Page, { target: document.body.appendChild(document.createElement('main')) });
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+		expect(await screen.findByText('No assistant provider connected')).toBeInTheDocument();
+		await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveFocus());
 	});
 
 	test('a failed send is announced, and Retry sends the same question again', async () => {

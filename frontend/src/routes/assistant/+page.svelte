@@ -295,7 +295,7 @@
 					role="alert"
 					data-testid="assistant-error"
 				>
-					<p class="flex min-w-0 items-start gap-2 text-sm">
+					<p class="flex min-w-0 flex-1 items-start gap-2 text-sm">
 						<TriangleAlert class="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
 						{sendError}
 					</p>
@@ -311,7 +311,7 @@
 					aria-label="Your question"
 					rows={1}
 					maxlength={MAX_MESSAGE_CHARS}
-					class="min-h-10 resize-none rounded-(--r-md) bg-surface"
+					class="min-h-10 resize-none rounded-(--r-md) bg-surface dark:bg-surface"
 					disabled={isSending}
 					onkeydown={onKeydown}
 					data-testid="assistant-input"
@@ -319,8 +319,8 @@
 				<Button
 					onclick={send}
 					disabled={isSending || input.trim().length === 0}
-					size="icon-lg"
-					class="shrink-0 rounded-full"
+					size="icon"
+					class="shrink-0"
 					aria-label="Send message"
 					data-testid="assistant-send"
 				>
