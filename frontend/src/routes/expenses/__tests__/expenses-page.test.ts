@@ -707,14 +707,16 @@ describe('/expenses import and export', () => {
 
 	test('Import CSV opens its dialog and a finished import reloads from the first page', async () => {
 		getAllExpenses.mockResolvedValue(pageOf(ROWS, 45));
+		captured.csvDialog = {};
+		captured.photosDialog = {};
 		await mountLoaded();
 		callTable('onPageChange', 20);
 		await waitFor(() => expect(captured.table['currentOffset']).toBe(20));
-		expect(captured.csvDialog['open']).toBe(false);
+		expect(captured.csvDialog).toEqual({});
 
 		await fireEvent.click(screen.getAllByRole('button', { name: 'Import CSV' })[0]!);
-		expect(captured.csvDialog['open']).toBe(true);
-		expect(captured.photosDialog['open']).toBe(false);
+		await waitFor(() => expect(captured.csvDialog['open']).toBe(true));
+		expect(captured.photosDialog).toEqual({});
 
 		(captured.csvDialog['onImported'] as () => void)();
 
@@ -722,13 +724,16 @@ describe('/expenses import and export', () => {
 		expect(lastListParams()).toMatchObject({ offset: 0 });
 	});
 
-	test('Import from Photos opens the photos dialog', async () => {
+	test('Import from Photos loads and opens only the photos dialog', async () => {
+		captured.csvDialog = {};
+		captured.photosDialog = {};
 		await mountLoaded();
+		expect(captured.photosDialog).toEqual({});
 
 		await fireEvent.click(screen.getAllByRole('button', { name: 'Import from Photos' })[0]!);
 
-		expect(captured.photosDialog['open']).toBe(true);
-		expect(captured.csvDialog['open']).toBe(false);
+		await waitFor(() => expect(captured.photosDialog['open']).toBe(true));
+		expect(captured.csvDialog).toEqual({});
 	});
 
 	test('the mobile menu closes itself when a tool is picked', async () => {
@@ -740,7 +745,7 @@ describe('/expenses import and export', () => {
 		const menuImport = screen.getAllByRole('button', { name: 'Import CSV' }).at(-1)!;
 		await fireEvent.click(menuImport);
 
-		expect(captured.csvDialog['open']).toBe(true);
+		await waitFor(() => expect(captured.csvDialog['open']).toBe(true));
 		await waitFor(() => expect(trigger.getAttribute('aria-expanded')).toBe('false'));
 	});
 
