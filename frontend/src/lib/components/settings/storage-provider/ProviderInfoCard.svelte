@@ -158,7 +158,7 @@
 					<Icon class="size-5 text-foreground" />
 				</div>
 				<div class="min-w-0">
-					<div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 sm:flex-nowrap">
+					<div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
 						<p class="truncate min-w-0 font-medium">{provider.displayName}</p>
 						<ProviderStatusBadge status={provider.status} />
 						{#if lastBackupAt}
