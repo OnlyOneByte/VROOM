@@ -145,7 +145,6 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 					leaveGoneRecord(state, 'split expense');
 					return;
 				}
-				state.originalExpense = { ...expense, groupTotal: splitGroup.groupTotal };
 
 				const isInsurance = first.tags?.includes('insurance') ?? false;
 				if (isInsurance) {

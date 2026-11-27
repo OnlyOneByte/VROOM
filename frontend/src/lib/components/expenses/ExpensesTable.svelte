@@ -144,7 +144,7 @@
 			return;
 		}
 		const first = row.children[0];
-		if (first) confirmDelete({ ...first, groupTotal: row.totalAmount });
+		if (first) confirmDelete(first);
 	}
 
 	function selectRow(id: string) {

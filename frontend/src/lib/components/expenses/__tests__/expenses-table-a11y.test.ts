@@ -336,6 +336,17 @@ describe('compact layout: rows and their actions are operable by keyboard', () =
 		});
 	}
 
+	test("a split with only one car's share on screen still confirms the whole split's total", async () => {
+		const share = { ...EXPENSES[1]!, amount: 50, groupTotal: 100 };
+		const { container } = mountTable({ expenses: [share] });
+		await fireEvent.click(byText<HTMLElement>(container, 'button', 'Maintenance'));
+
+		await pressKey(byText<HTMLElement>(container, 'button', 'Delete'), 'Enter');
+
+		expect(confirmationDialog()?.textContent).toContain('$100.00');
+		expect(confirmationDialog()?.textContent).not.toContain('$50.00');
+	});
+
 	test("Enter on a standalone row's Delete opens the confirmation", async () => {
 		const { container } = mountTable();
 		await fireEvent.click(byText<HTMLElement>(container, 'button', 'Fuel & Charging'));
