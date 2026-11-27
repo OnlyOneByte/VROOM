@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { Vehicle } from '#lib/types/index.ts';
 import { ImportExpensesForm } from '../import-expenses-form.svelte';
 import ManualMappingPanel from '../ManualMappingPanel.svelte';
@@ -55,43 +55,55 @@ beforeEach(() => {
 	vi.clearAllMocks();
 });
 
-describe('ManualMappingPanel: field mapping', () => {
-	test('lists every mappable field, marking Date and Amount as required, all unmapped', () => {
-		render(ManualMappingPanel, { form: manualForm(), vehicles: [CAMRY] });
+describe('ManualMappingPanel: column mapping', () => {
+	test('lists every column in the file with its first value, none imported yet', () => {
+		const form = manualForm();
+		form.csvText = `${HEADERS.join(',')}\n2025-03-14,38.20,28410,9.82,Camry`;
+		render(ManualMappingPanel, { form, vehicles: [CAMRY] });
 
-		expect(screen.getByText('Date *')).toBeInTheDocument();
-		expect(screen.getByText('Amount *')).toBeInTheDocument();
-		for (const field of [
-			'date',
-			'amount',
-			'category',
-			'vehicle',
-			'mileage',
-			'volume',
-			'fuelType',
-			'description',
-			'tags'
-		]) {
-			expect(screen.getByTestId(`map-field-${field}`)).toHaveTextContent('— not mapped —');
-		}
+		const rows = within(screen.getByTestId('column-mapping')).getAllByRole('row').slice(1);
+		const cells = (row: HTMLElement) =>
+			[...row.querySelectorAll('th, td')].map(c => c.textContent?.trim());
+		expect(rows.map(cells)).toEqual([
+			['When', '2025-03-14', "Don't import"],
+			['Spent', '38.20', "Don't import"],
+			['Odo', '28410', "Don't import"],
+			['Litres', '9.82', "Don't import"],
+			['Car', 'Camry', "Don't import"]
+		]);
+		expect(screen.getByTestId('mapping-missing')).toHaveTextContent(
+			'Still needed: Date and Amount'
+		);
 	});
 
-	test('offers the file headers as columns and records the chosen one', async () => {
+	test('a column is named by its header and records the field chosen for it', async () => {
 		const form = manualForm();
 		render(ManualMappingPanel, { form, vehicles: [CAMRY] });
 
-		await pick(screen.getByTestId('map-field-amount'), 'Spent');
+		await pick(screen.getByLabelText('Spent'), 'Amount *');
 
 		expect(form.manualColumns.amount).toBe('Spent');
-		expect(screen.getByTestId('map-field-amount')).toHaveTextContent('Spent');
+		expect(screen.getByLabelText('Spent')).toHaveTextContent('Amount *');
+		expect(screen.getByTestId('mapping-missing')).toHaveTextContent('Still needed: Date');
 	});
 
-	test('choosing not mapped clears a field', async () => {
+	test('giving a field to another column moves it, and the first column goes back to not imported', async () => {
 		const form = manualForm();
 		form.manualColumns = { date: 'When' };
 		render(ManualMappingPanel, { form, vehicles: [CAMRY] });
 
-		await pick(screen.getByTestId('map-field-date'), '— not mapped —');
+		await pick(screen.getByLabelText('Odo'), 'Date *');
+
+		expect(form.manualColumns.date).toBe('Odo');
+		expect(screen.getByLabelText('When')).toHaveTextContent("Don't import");
+	});
+
+	test("choosing Don't import clears that column's field", async () => {
+		const form = manualForm();
+		form.manualColumns = { date: 'When' };
+		render(ManualMappingPanel, { form, vehicles: [CAMRY] });
+
+		await pick(screen.getByLabelText('When'), "Don't import");
 
 		expect(form.manualColumns.date).toBe('');
 	});

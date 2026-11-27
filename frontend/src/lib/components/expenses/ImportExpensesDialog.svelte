@@ -32,6 +32,13 @@
 			: ''
 	);
 
+	let rowCount = $derived(
+		form.csvText
+			.split('\n')
+			.slice(1)
+			.filter(line => line.trim()).length
+	);
+
 	async function handleCommit() {
 		if (await form.commit(onImported)) open = false;
 	}
@@ -40,10 +47,15 @@
 <Dialog.Root bind:open>
 	<Dialog.Content class="sm:max-w-lg max-h-[90vh] overflow-y-auto">
 		<Dialog.Header>
-			<Dialog.Title>Import expenses from CSV</Dialog.Title>
+			<Dialog.Title>Import from CSV</Dialog.Title>
 			<Dialog.Description>
-				Upload a VROOM CSV export, or a fuel log from another app{formatNames} — we'll detect the format
-				automatically. You'll see a preview before anything is saved.
+				{#if form.manualMapping}
+					{form.fileName ?? 'Your file'} · {rowCount}
+					{rowCount === 1 ? 'row' : 'rows'}. Match each column to a VROOM field.
+				{:else}
+					Upload a VROOM CSV export, or a fuel log from another app{formatNames} — we'll detect the format
+					automatically. You'll see a preview before anything is saved.
+				{/if}
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -103,7 +115,7 @@
 					{PREVIEW_UPDATING_LABEL}
 				{:else}
 					Import {form.preview?.readyCount ?? 0}
-					{(form.preview?.readyCount ?? 0) === 1 ? 'row' : 'rows'}
+					{(form.preview?.readyCount ?? 0) === 1 ? 'expense' : 'expenses'}
 				{/if}
 			</Button>
 		</Dialog.Footer>

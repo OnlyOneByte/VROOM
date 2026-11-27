@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as Select from '#lib/components/ui/select/index.ts';
-	import { FileText } from '@lucide/svelte';
+	import { parseCsvHeaders } from '#lib/utils/import-mapping-helpers.ts';
 	import type {
 		ImportDateFormat,
 		DistanceUnit,
@@ -38,51 +38,83 @@
 	];
 	const DISTANCE_UNITS: DistanceUnit[] = ['miles', 'kilometers'];
 	const VOLUME_UNITS: VolumeUnit[] = ['gallons_us', 'gallons_uk', 'liters'];
+	const SKIP = "Don't import";
+
+	const examples = $derived(
+		parseCsvHeaders(
+			form.csvText
+				.split('\n')
+				.slice(1)
+				.find(line => line.trim()) ?? ''
+		)
+	);
+	const missing = $derived(
+		MAPPABLE_FIELDS.filter(f => f.required && !form.manualColumns[f.field]).map(f => f.label)
+	);
+
+	function fieldFor(header: string) {
+		return MAPPABLE_FIELDS.find(f => form.manualColumns[f.field] === header);
+	}
 </script>
 
-<div class="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
-	<div class="flex items-center gap-2 text-sm font-medium text-foreground">
-		<FileText class="h-4 w-4 text-muted-foreground" />
-		Map your columns
-	</div>
-	<p class="text-xs text-muted-foreground">
-		We didn't recognize this format. Match each VROOM field to a column from your file.
+<div class="space-y-3">
+	<p class="text-sm text-muted-foreground">
+		We didn't recognize this format. Match each column in your file to a VROOM field.
 		<span class="text-foreground">Date</span> and
 		<span class="text-foreground">Amount</span>
 		are required.
 	</p>
 
-	<div class="space-y-2">
-		{#each MAPPABLE_FIELDS as f (f.field)}
-			<div class="flex items-center gap-2">
-				<label for="map-field-{f.field}" class="w-28 shrink-0 text-xs text-muted-foreground">
-					{f.label}{f.required ? ' *' : ''}
-				</label>
-				<Select.Root
-					type="single"
-					value={form.manualColumns[f.field] ?? ''}
-					onValueChange={v => form.setManualColumn(f.field, v)}
-				>
-					<Select.Trigger
-						id="map-field-{f.field}"
-						class="h-8 flex-1 text-xs"
-						data-testid="map-field-{f.field}"
-					>
-						{form.manualColumns[f.field] || '— not mapped —'}
-					</Select.Trigger>
-					<Select.Content>
-						<Select.Item value="" label="— not mapped —">— not mapped —</Select.Item>
-						{#each form.fileHeaders as h (h)}
-							<Select.Item value={h} label={h}>{h}</Select.Item>
-						{/each}
-					</Select.Content>
-				</Select.Root>
-			</div>
-		{/each}
-	</div>
+	<table class="w-full text-sm" data-testid="column-mapping">
+		<thead>
+			<tr class="border-b text-left text-xs text-muted-foreground">
+				<th scope="col" class="py-2 pr-3 font-medium">Column in your file</th>
+				<th scope="col" class="py-2 pr-3 font-medium">Example</th>
+				<th scope="col" class="py-2 font-medium">VROOM field</th>
+			</tr>
+		</thead>
+		<tbody>
+			{#each form.fileHeaders as header, i (i)}
+				{@const mapped = fieldFor(header)}
+				<tr class="border-b">
+					<th scope="row" class="py-2 pr-3 text-left font-normal break-words">
+						<label for="map-column-{i}">{header}</label>
+					</th>
+					<td class="py-2 pr-3 break-words text-muted-foreground tabular-nums">
+						{examples[i] ?? ''}
+					</td>
+					<td class="w-[45%] py-2">
+						<Select.Root
+							type="single"
+							value={mapped?.field ?? ''}
+							onValueChange={v => form.setColumnField(header, v as NativeImportField | '')}
+						>
+							<Select.Trigger id="map-column-{i}" class="w-full" data-testid="map-column-{i}">
+								{mapped ? `${mapped.label}${mapped.required ? ' *' : ''}` : SKIP}
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="" label={SKIP}>{SKIP}</Select.Item>
+								{#each MAPPABLE_FIELDS as f (f.field)}
+									<Select.Item value={f.field} label={f.label}>
+										{f.label}{f.required ? ' *' : ''}
+									</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
+					</td>
+				</tr>
+			{/each}
+		</tbody>
+	</table>
+
+	{#if missing.length > 0}
+		<p class="text-sm text-muted-foreground" role="status" data-testid="mapping-missing">
+			Still needed: {missing.join(' and ')}
+		</p>
+	{/if}
 
 	<div class="flex items-center gap-2">
-		<label for="manual-date-format" class="w-28 shrink-0 text-xs text-muted-foreground">
+		<label for="manual-date-format" class="w-32 shrink-0 text-sm text-muted-foreground">
 			Date format
 		</label>
 		<Select.Root
@@ -90,7 +122,7 @@
 			value={form.manualDateFormat}
 			onValueChange={v => form.setManualDateFormat(v as ImportDateFormat)}
 		>
-			<Select.Trigger id="manual-date-format" class="h-8 flex-1 text-xs">
+			<Select.Trigger id="manual-date-format" class="flex-1">
 				{DATE_FORMATS.find(d => d.value === form.manualDateFormat)?.label ?? form.manualDateFormat}
 			</Select.Trigger>
 			<Select.Content>
@@ -103,7 +135,7 @@
 
 	{#if form.manualColumns.mileage}
 		<div class="flex items-center gap-2">
-			<label for="manual-distance-unit" class="w-28 shrink-0 text-xs text-muted-foreground">
+			<label for="manual-distance-unit" class="w-32 shrink-0 text-sm text-muted-foreground">
 				Odometer unit
 			</label>
 			<Select.Root
@@ -111,11 +143,7 @@
 				value={form.manualDistanceUnit}
 				onValueChange={v => form.setManualDistanceUnit(v as DistanceUnit)}
 			>
-				<Select.Trigger
-					id="manual-distance-unit"
-					class="h-8 flex-1 text-xs"
-					data-testid="map-distance-unit"
-				>
+				<Select.Trigger id="manual-distance-unit" class="flex-1" data-testid="map-distance-unit">
 					{getDistanceUnitLabel(form.manualDistanceUnit)}
 				</Select.Trigger>
 				<Select.Content>
@@ -131,7 +159,7 @@
 
 	{#if form.manualColumns.volume}
 		<div class="flex items-center gap-2">
-			<label for="manual-volume-unit" class="w-28 shrink-0 text-xs text-muted-foreground">
+			<label for="manual-volume-unit" class="w-32 shrink-0 text-sm text-muted-foreground">
 				Volume unit
 			</label>
 			<Select.Root
@@ -139,11 +167,7 @@
 				value={form.manualVolumeUnit}
 				onValueChange={v => form.setManualVolumeUnit(v as VolumeUnit)}
 			>
-				<Select.Trigger
-					id="manual-volume-unit"
-					class="h-8 flex-1 text-xs"
-					data-testid="map-volume-unit"
-				>
+				<Select.Trigger id="manual-volume-unit" class="flex-1" data-testid="map-volume-unit">
 					{getVolumeUnitLabel(form.manualVolumeUnit)}
 				</Select.Trigger>
 				<Select.Content>
@@ -158,7 +182,7 @@
 	{/if}
 
 	{#if !form.manualColumns.vehicle}
-		<div class="space-y-1.5 border-t pt-3">
+		<div class="space-y-1.5">
 			<TargetVehiclePicker
 				{vehicles}
 				selectedId={form.targetVehicleId}

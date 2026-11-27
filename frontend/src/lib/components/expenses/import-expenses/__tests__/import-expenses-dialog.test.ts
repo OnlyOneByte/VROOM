@@ -76,7 +76,7 @@ async function chooseFile(content: string, name: string): Promise<void> {
 
 function importButton(): HTMLButtonElement {
 	return screen.getByRole('button', {
-		name: /^Import \d+ rows?$|Importing|Updating/
+		name: /^Import \d+ expenses?$|Importing|Updating/
 	}) as HTMLButtonElement;
 }
 
@@ -124,7 +124,7 @@ describe('ImportExpensesDialog', () => {
 				'Preview: 1 ready, 1 row needs attention.'
 			)
 		);
-		expect(importButton()).toHaveTextContent('Import 1 row');
+		expect(importButton()).toHaveTextContent('Import 1 expense');
 		expect(importButton()).toBeEnabled();
 	});
 
@@ -160,7 +160,7 @@ describe('ImportExpensesDialog', () => {
 		await new Promise(resolve => setTimeout(resolve, 50));
 		expect(announced.filter(text => text === 'Preview: 2 ready.')).toHaveLength(1);
 		expect(screen.queryByTestId('preview-updating')).toBeNull();
-		expect(importButton()).toHaveTextContent('Import 2 rows');
+		expect(importButton()).toHaveTextContent('Import 2 expenses');
 		expect(importButton()).toBeEnabled();
 	});
 
@@ -209,8 +209,8 @@ describe('ImportExpensesDialog', () => {
 	test('starts with nothing to import and the import button disabled', () => {
 		renderDialog();
 
-		expect(screen.getByText('Import expenses from CSV')).toBeInTheDocument();
-		expect(importButton()).toHaveTextContent('Import 0 rows');
+		expect(screen.getByText('Import from CSV')).toBeInTheDocument();
+		expect(importButton()).toHaveTextContent('Import 0 expenses');
 		expect(importButton()).toBeDisabled();
 	});
 
@@ -220,7 +220,7 @@ describe('ImportExpensesDialog', () => {
 
 		await chooseFile(FUEL_CSV, 'fuel.csv');
 
-		await waitFor(() => expect(importButton()).toHaveTextContent('Import 2 rows'));
+		await waitFor(() => expect(importButton()).toHaveTextContent('Import 2 expenses'));
 		expect(screen.getByText('Fuelly')).toBeInTheDocument();
 		expect(screen.getByText('2 ready')).toBeInTheDocument();
 		expect(importButton()).toBeEnabled();
@@ -234,7 +234,7 @@ describe('ImportExpensesDialog', () => {
 			false,
 			expect.objectContaining({ source: 'fuelly' })
 		);
-		await waitFor(() => expect(screen.queryByText('Import expenses from CSV')).toBeNull());
+		await waitFor(() => expect(screen.queryByText('Import from CSV')).toBeNull());
 	});
 
 	test('a single ready row is labelled in the singular', async () => {
@@ -243,7 +243,7 @@ describe('ImportExpensesDialog', () => {
 
 		await chooseFile('date,vehicle,category,amount\n2026-01-02,Camry,fuel,40', 'vroom.csv');
 
-		await waitFor(() => expect(importButton()).toHaveTextContent('Import 1 row'));
+		await waitFor(() => expect(importButton()).toHaveTextContent('Import 1 expense'));
 	});
 
 	test('an unrecognized file opens the manual column mapping panel', async () => {
@@ -251,8 +251,11 @@ describe('ImportExpensesDialog', () => {
 
 		await chooseFile(FOREIGN_CSV, 'bank.csv');
 
-		await waitFor(() => expect(screen.getByText('Map your columns')).toBeInTheDocument());
-		expect(screen.getByTestId('map-field-amount')).toHaveTextContent('Spent');
+		await waitFor(() => expect(screen.getByTestId('column-mapping')).toBeInTheDocument());
+		expect(
+			screen.getByText('bank.csv · 1 row. Match each column to a VROOM field.')
+		).toBeInTheDocument();
+		expect(screen.getByLabelText('Spent')).toHaveTextContent('Amount *');
 	});
 
 	test('a failed import keeps the dialog open and does not report success', async () => {
@@ -268,7 +271,7 @@ describe('ImportExpensesDialog', () => {
 			expect(mocks.addNotification).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
 		);
 		expect(onImported).not.toHaveBeenCalled();
-		expect(screen.getByText('Import expenses from CSV')).toBeInTheDocument();
+		expect(screen.getByText('Import from CSV')).toBeInTheDocument();
 	});
 
 	test('cancel closes the dialog and discards the loaded file', async () => {
@@ -278,11 +281,11 @@ describe('ImportExpensesDialog', () => {
 		await waitFor(() => expect(screen.getByText('fuel.csv')).toBeInTheDocument());
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-		await waitFor(() => expect(screen.queryByText('Import expenses from CSV')).toBeNull());
+		await waitFor(() => expect(screen.queryByText('Import from CSV')).toBeNull());
 
 		await rerender({ open: true });
 
 		await waitFor(() => expect(screen.getByText('Choose a .csv file')).toBeInTheDocument());
-		expect(importButton()).toHaveTextContent('Import 0 rows');
+		expect(importButton()).toHaveTextContent('Import 0 expenses');
 	});
 });
