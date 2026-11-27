@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { appContext, repos } from '../../app-context';
+import { repos } from '../../app-context';
 import type { DrizzleTransaction } from '../../db/types';
 import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';

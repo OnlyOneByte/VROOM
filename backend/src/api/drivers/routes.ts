@@ -86,7 +86,7 @@ driverRoutes.get(
   async (c) => {
     const { vehicleId } = c.req.valid('param');
     const query = c.req.valid('query');
-    const { db, asyncDb } = appContext();
+    const { asyncDb } = appContext();
     const car = await repos().vehicles.findById(vehicleId);
     if (!car?.carShareEnabled) throw new NotFoundError('Car sharing');
     const to = query.to ? Date.parse(query.to) : Date.now();
@@ -115,7 +115,7 @@ driverRoutes.get(
   async (c) => {
     const { vehicleId } = c.req.valid('param');
     await requireCarShare(vehicleId);
-    const { db, asyncDb } = appContext();
+    const { asyncDb } = appContext();
     const everyone = requestResolver(c).can('vehicle.driver_stats.read', {
       kind: 'vehicle',
       vehicleId,
@@ -157,7 +157,7 @@ driverRoutes.get(
   async (c) => {
     const { vehicleId } = c.req.valid('param');
     const query = c.req.valid('query');
-    const { db, asyncDb } = appContext();
+    const { asyncDb } = appContext();
     await requireCarShare(vehicleId);
     const resolver = requestResolver(c);
     const vehicle = { kind: 'vehicle' as const, vehicleId };

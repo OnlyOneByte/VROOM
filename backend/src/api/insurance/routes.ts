@@ -1,6 +1,6 @@
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
-import { appContext, repos } from '../../app-context';
+import { repos } from '../../app-context';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, ownAccount, vehicleParam } from '../../permissions/authorize';

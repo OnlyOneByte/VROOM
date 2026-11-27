@@ -1,6 +1,6 @@
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
-import { appContext, repos } from '../../app-context';
+import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import type { NewReminder, Reminder } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
