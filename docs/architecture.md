@@ -142,9 +142,9 @@ own pooled transaction, so call sites won't change again.
 Only `src/db/` holds the synchronous `bun:sqlite` handle: `getDb()` opens the connection,
 migrations and the boot-time email fold run on it before the async session is used, and
 connection upkeep runs through `upkeep(kind)`. `src/__tests__/sync-db-boundary.test.ts` fails
-when a production file outside `src/db/` imports the sync driver or a `bun:sqlite` value, names
-`AppDatabase`, calls `getDb()` or reads `$client` (the context factory excepted), or takes a
-`db` off the app context. Tests may still open their own sync handle for fixtures.
+when a production file outside `src/db/` imports the sync driver, loads a `bun:sqlite` value
+(statically or with a dynamic `import()` or `require()`), names `AppDatabase`, mentions `getDb`
+or reads `$client` (the context factory excepted), or takes a `db` off the app context. Tests may still open their own sync handle for fixtures.
 
 Inside a transaction callback, use the transaction handle `tx`; outside it, use the async
 session. Key rotation reads each batch and decrypts it before its write transaction opens, then
