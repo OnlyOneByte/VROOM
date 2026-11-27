@@ -43,11 +43,13 @@
 	import type { AttentionItem } from '#lib/components/dashboard/dashboard-data.ts';
 	import { formatDate } from '#lib/utils/formatters.ts';
 	import {
+		fitsFirstPage,
 		matchesFilters,
 		withRowsInBreakdowns,
-		withoutRowsInBreakdowns
+		withoutRowsInBreakdowns,
+		type ListedPage
 	} from '#lib/utils/sync/pending-rows.ts';
-	import { editedRows, movedBackRows, stillInView } from '#lib/utils/pending-edits.svelte.ts';
+	import { movedBackRows, stillInView, summaryEdits } from '#lib/utils/pending-edits.svelte.ts';
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import { recentlySynced } from '#lib/utils/sync/recently-synced.svelte.ts';
 	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
@@ -109,6 +111,10 @@
 	let summary = $state<ExpenseSummary | null>(null);
 	let summaryRequestedAt = $state<number | undefined>();
 	let listRequestedAt = $state<number | undefined>();
+	let listOrder = $state<Pick<ListedPage, 'sortBy' | 'sortDir'>>({
+		sortBy: 'date',
+		sortDir: 'desc'
+	});
 	let fuelEfficiencyPoints = $state<FuelEfficiencyPoint[]>([]);
 	let isLoadingFuelEfficiency = $state(true);
 	let yearStats = $state<VehicleStats | null>(null);
@@ -193,14 +199,19 @@
 	const onThisCar = (row: Expense) => row.vehicleId === vehicleId;
 	const backOnThisCar = (row: Expense) => !isDeleteHidden(row) && onThisCar(row);
 	let listedIds = $derived(new Set(expenses.map(expense => expense.id)));
-	let movedBackListed = $derived(movedBackRows(listedIds, backOnThisCar, listRequestedAt));
+	let movedBackListed = $derived(
+		movedBackRows(
+			listedIds,
+			row => backOnThisCar(row) && fitsFirstPage(row, { rows: expenses, totalCount, ...listOrder }),
+			listRequestedAt
+		)
+	);
 
 	let chartSummary = $derived.by(() => {
-		const edited = editedRows(expenses.filter(expense => !isDeleteHidden(expense)));
-		const removed = [...expenses.filter(isDeleteHidden), ...edited.before];
+		const edited = summaryEdits(summaryRequestedAt, expenses);
+		const removed = [...expenses.filter(isDeleteHidden), ...edited.before.filter(backOnThisCar)];
 		return withRowsInBreakdowns(withoutRowsInBreakdowns(summary, removed), [
-			...edited.after.filter(onThisCar),
-			...movedBackRows(listedIds, backOnThisCar, summaryRequestedAt),
+			...edited.after.filter(backOnThisCar),
 			...pending.saving
 		]);
 	});
@@ -626,13 +637,12 @@
 		isLoadingPage = true;
 		expensesLoadError = null;
 		const requestedAt = Date.now();
+		const params = buildExpenseListParams(offset);
 		try {
-			const result = await expenseApi.getExpensesByVehicle(
-				vehicleId,
-				buildExpenseListParams(offset)
-			);
+			const result = await expenseApi.getExpensesByVehicle(vehicleId, params);
 			expenses = result.data;
 			listRequestedAt = requestedAt;
+			listOrder = { sortBy: params.sortBy, sortDir: params.sortDir };
 			totalCount = result.pagination.totalCount;
 			currentOffset = offset;
 			expensesLoaded = true;
