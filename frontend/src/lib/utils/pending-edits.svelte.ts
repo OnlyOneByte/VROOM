@@ -40,6 +40,7 @@ const edits = new SvelteMap<string, PendingEdit>();
 const inFlight = new SvelteMap<string, Promise<void>>();
 const versions = new SvelteMap<string, string>();
 const latest = new SvelteMap<string, Expense>();
+const timedOut = new Map<string, EditPayload>();
 let nextSeq = 0;
 
 function noteVersion(id: string, updatedAt: string | undefined): void {
@@ -80,6 +81,57 @@ function reportConflict(id: string, seq: number, updatedAt: string | null): void
 	});
 }
 
+function landed(id: string, seq: number, saved: Expense | undefined): void {
+	const stamp = saved?.updatedAt;
+	noteVersion(id, stamp);
+	timedOut.delete(id);
+	const entry = edits.get(id);
+	if (!entry) return;
+	if (entry.seq === seq) {
+		edits.set(id, { ...entry, status: 'saved', ...(!entry.undo && stamp && { savedAt: stamp }) });
+		if (entry.retried && entry.undo) {
+			appStore.addNotification({
+				type: 'success',
+				message: 'Your changes to the expense were undone',
+				toastId: toastId(id)
+			});
+		} else if (entry.retried) {
+			appStore.addNotification({
+				type: 'success',
+				message: 'Expense updated successfully',
+				toastId: toastId(id),
+				duration: UNDO_WINDOW_MS,
+				action: { label: 'Undo', onClick: () => undoEdit(id) }
+			});
+		}
+	} else if (entry.undo && entry.undoSeq === seq && !entry.undoneAt && stamp) {
+		edits.set(id, { ...entry, undoneAt: stamp });
+	}
+}
+
+function sameValue(key: string, sent: unknown, stored: unknown): boolean {
+	const blank = (v: unknown) => v === null || v === undefined || v === '';
+	if (blank(sent) || blank(stored)) return blank(sent) && blank(stored);
+	if (key === 'date') return Date.parse(String(sent)) === Date.parse(String(stored));
+	return JSON.stringify(sent) === JSON.stringify(stored);
+}
+
+function sameEdit(stored: Expense, payload: EditPayload): boolean {
+	const row = stored as unknown as Record<string, unknown>;
+	return Object.entries(payload).every(([key, sent]) => sameValue(key, sent, row[key]));
+}
+
+async function ownTimedOutSave(id: string): Promise<Expense | undefined> {
+	const sent = timedOut.get(id);
+	if (!sent) return undefined;
+	try {
+		const stored = await expenseApi.getExpense(id);
+		return sameEdit(stored, sent) ? stored : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 async function put(id: string, seq: number, payload: EditPayload): Promise<void> {
 	const sending = edits.get(id);
 	const unchecked = sending?.seq === seq && sending.expected === null;
@@ -91,34 +143,21 @@ async function put(id: string, seq: number, payload: EditPayload): Promise<void>
 			expectedUpdatedAt,
 			signal: controller.signal
 		});
-		const stamp = saved?.updatedAt;
-		noteVersion(id, stamp);
-		const entry = edits.get(id);
-		if (!entry) return;
-		if (entry.seq === seq) {
-			edits.set(id, { ...entry, status: 'saved', ...(!entry.undo && stamp && { savedAt: stamp }) });
-			if (entry.retried && entry.undo) {
-				appStore.addNotification({
-					type: 'success',
-					message: 'Your changes to the expense were undone',
-					toastId: toastId(id)
-				});
-			} else if (entry.retried) {
-				appStore.addNotification({
-					type: 'success',
-					message: 'Expense updated successfully',
-					toastId: toastId(id),
-					duration: UNDO_WINDOW_MS,
-					action: { label: 'Undo', onClick: () => undoEdit(id) }
-				});
-			}
-		} else if (entry.undo && entry.undoSeq === seq && !entry.undoneAt && stamp) {
-			edits.set(id, { ...entry, undoneAt: stamp });
-		}
+		landed(id, seq, saved);
 	} catch (error) {
+		if (error instanceof RequestTimeoutError) timedOut.set(id, payload);
 		const conflict = changedElsewhere(error);
 		if (conflict) {
-			reportConflict(id, seq, conflict.updatedAt);
+			const own = await ownTimedOutSave(id);
+			if (!own) {
+				reportConflict(id, seq, conflict.updatedAt);
+			} else if (sameEdit(own, payload)) {
+				landed(id, seq, own);
+			} else {
+				noteVersion(id, own.updatedAt);
+				timedOut.delete(id);
+				if (edits.get(id)?.seq === seq) await put(id, seq, payload);
+			}
 			return;
 		}
 		const reason = userFacingErrorMessage(error);
@@ -242,6 +281,7 @@ export async function reloadLatest(id: string): Promise<void> {
 		if (edits.get(id) !== entry) return;
 		appStore.dismissToast(toastId(id));
 		edits.delete(id);
+		timedOut.delete(id);
 		latest.set(id, fresh);
 		noteVersion(id, fresh.updatedAt);
 	} catch (error) {
@@ -315,4 +355,5 @@ export function resetPendingEdits(): void {
 	inFlight.clear();
 	versions.clear();
 	latest.clear();
+	timedOut.clear();
 }

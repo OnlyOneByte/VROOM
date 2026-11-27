@@ -381,25 +381,39 @@ describe('a save that never answers times out', () => {
 
 	const server: { rows: Record<string, Expense>; applied: unknown[] } = { rows: {}, applied: [] };
 
-	function appliedButNeverAnswered(
-		...[id, body, options]: Parameters<typeof expenseApi.updateExpense>
-	) {
+	type PutArgs = Parameters<typeof expenseApi.updateExpense>;
+
+	function stale(id: string, options: PutArgs[2]): ApiError | undefined {
+		const current = server.rows[id]?.updatedAt ?? saved.updatedAt;
+		if (!options?.expectedUpdatedAt || options.expectedUpdatedAt === current) return undefined;
+		return new ApiError('changed', 409, { updatedAt: current }, 'EXPENSE_CHANGED');
+	}
+
+	function store(id: string, body: PutArgs[1], updatedAt: string): Expense {
 		server.applied.push(body);
-		server.rows[id] = { ...saved, ...changed, updatedAt: '2026-11-26T10:00:00.000Z' };
+		server.rows[id] = { ...saved, ...changed, ...body, updatedAt } as Expense;
+		return server.rows[id];
+	}
+
+	function appliedButNeverAnswered(...[id, body, options]: PutArgs) {
+		const refused = stale(id, options);
+		if (refused) return Promise.reject(refused);
+		store(id, body, '2026-11-26T10:00:00.000Z');
 		return new Promise<Expense>((_, reject) => {
 			options?.signal?.addEventListener('abort', () => reject(options.signal?.reason));
 		});
 	}
 
-	function appliedAndAnswered(...[id, body]: Parameters<typeof expenseApi.updateExpense>) {
-		server.applied.push(body);
-		server.rows[id] = { ...saved, ...changed, updatedAt: '2026-11-26T10:00:20.000Z' };
-		return Promise.resolve(server.rows[id]);
+	function appliedAndAnswered(...[id, body, options]: PutArgs) {
+		const refused = stale(id, options);
+		if (refused) return Promise.reject(refused);
+		return Promise.resolve(store(id, body, '2026-11-26T10:00:20.000Z'));
 	}
 
 	beforeEach(() => {
 		server.rows = {};
 		server.applied = [];
+		vi.mocked(expenseApi.getExpense).mockImplementation(async id => server.rows[id] ?? saved);
 	});
 
 	test('it fails into "Changes not saved" with Retry, and the next save of the expense goes out', async () => {
@@ -424,25 +438,49 @@ describe('a save that never answers times out', () => {
 		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2);
 	});
 
-	test('a save queued behind a hung one goes out when the hung one times out', async () => {
-		vi.mocked(expenseApi.updateExpense)
-			.mockImplementationOnce(appliedButNeverAnswered)
-			.mockImplementationOnce(appliedAndAnswered);
+	test('a save queued behind a hung one that landed goes out against the landed version', async () => {
+		vi.mocked(expenseApi.updateExpense).mockImplementation(appliedAndAnswered);
+		vi.mocked(expenseApi.updateExpense).mockImplementationOnce(appliedButNeverAnswered);
 		scheduleEdit(saved, changed, payload);
 		await vi.advanceTimersByTimeAsync(1000);
 		const again = { ...changed, amount: 70 };
-		scheduleEdit(saved, again, payload);
+		const againPayload = { ...(payload as object), amount: 70 } as never;
+		scheduleEdit(saved, again, againPayload);
 
 		await vi.advanceTimersByTimeAsync(EDIT_TIMEOUT_MS - 1001);
 		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1);
 
 		await vi.advanceTimersByTimeAsync(1);
-		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(3);
+		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith('e1', againPayload, {
+			...signal,
+			expectedUpdatedAt: '2026-11-26T10:00:00.000Z'
+		});
+		expect(server.applied).toEqual([payload, againPayload]);
+		expect(server.rows['e1']).toMatchObject({ amount: 70 });
 		expect(editFailureStates([saved])).toEqual([]);
 		expect(shownExpense(saved)).toMatchObject({ amount: 70 });
 	});
 
-	test('Retry after a timed-out save the server had applied sends the same values to the same expense, and the row settles on them', async () => {
+	test('after a timed-out save, a refusal for a change someone else made still shows the conflict', async () => {
+		vi.mocked(expenseApi.updateExpense)
+			.mockImplementationOnce(appliedButNeverAnswered)
+			.mockImplementationOnce(appliedAndAnswered);
+		scheduleEdit(saved, changed, payload);
+		await vi.advanceTimersByTimeAsync(EDIT_TIMEOUT_MS);
+		server.rows['e1'] = { ...saved, amount: 99, updatedAt: '2026-11-26T10:00:10.000Z' };
+
+		retryEdit('e1');
+		await vi.advanceTimersByTimeAsync(0);
+		expect(expenseApi.getExpense).toHaveBeenCalledWith('e1');
+		expect(server.applied).toEqual([payload]);
+		expect(editFailureStates([saved])).toEqual([
+			['e1', expect.objectContaining({ error: EXPENSE_CHANGED_MESSAGE, conflict: true })]
+		]);
+	});
+
+	test('Retry after a timed-out save the server had applied finds its own save, not a conflict, and the row settles on it', async () => {
 		vi.mocked(expenseApi.updateExpense)
 			.mockImplementationOnce(appliedButNeverAnswered)
 			.mockImplementationOnce(appliedAndAnswered);
@@ -455,7 +493,8 @@ describe('a save that never answers times out', () => {
 
 		const calls = vi.mocked(expenseApi.updateExpense).mock.calls;
 		expect(calls.map(([id]) => id)).toEqual(['e1', 'e1']);
-		expect(server.applied).toEqual([payload, payload]);
+		expect(server.applied).toEqual([payload]);
+		expect(expenseApi.getExpense).toHaveBeenCalledWith('e1');
 		expect(Object.keys(server.rows)).toEqual(['e1']);
 		expect(editFailureStates([saved])).toEqual([]);
 		expect(shownExpense(saved)).toMatchObject({ amount: 55, description: 'Shell' });
