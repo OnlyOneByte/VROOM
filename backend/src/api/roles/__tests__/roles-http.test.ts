@@ -377,6 +377,18 @@ describe('server roles', () => {
     expect((await admin('DELETE', `/api/v1/role-assignments?${query}`)).status).toBe(200);
   });
 
+  test('an account waiting for approval never counts as the last role manager', async () => {
+    ctx.sqlite.run(
+      "INSERT INTO users (id, email, display_name, pending_approval_at) VALUES ('waiting-1', 'w@x.test', 'W', 1)"
+    );
+    const grant = { userId: 'waiting-1', roleId: builtInRoleId('admin') };
+    expect((await admin('POST', '/api/v1/role-assignments', grant)).status).toBe(201);
+    const own = `userId=${editor.id}&roleId=${builtInRoleId('admin')}`;
+    expect((await admin('DELETE', `/api/v1/role-assignments?${own}`)).status).toBe(409);
+    expect((await admin('DELETE', '/api/v1/admin/pending-accounts/waiting-1')).status).toBe(200);
+    expect((await admin('GET', '/api/v1/roles?scope=server')).status).toBe(200);
+  });
+
   test('members cannot assign server roles', async () => {
     const res = await asOwner('POST', '/api/v1/role-assignments', {
       userId: viewer.id,

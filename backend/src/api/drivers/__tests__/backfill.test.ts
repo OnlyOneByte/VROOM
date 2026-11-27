@@ -78,6 +78,26 @@ const tripDrivers = () =>
     }[]
   ).map((r) => r.d);
 
+describe('applying a planned backfill', () => {
+  test('re-checks car sharing and the drivers inside its transaction', async () => {
+    const { applyBackfill } = await import('../backfill');
+    const { asyncDb } = (await import('../../../app-context')).appContext();
+    const tripId = (ctx.sqlite.query('SELECT id FROM trips LIMIT 1').get() as { id: string }).id;
+    const owner = await driverOf(ctx.user.id);
+    const planned = [
+      { kind: 'trip' as const, id: tripId, driverId: 'driver-of-another-car' },
+      { kind: 'trip' as const, id: tripId, driverId: owner },
+    ];
+    const applied = await applyBackfill(asyncDb, CAR, 'logged', planned, ctx.user.id, false);
+    expect(applied.entries.map((e) => e.driverId)).toEqual([owner]);
+
+    ctx.sqlite.run('UPDATE vehicles SET car_share_enabled = 0 WHERE id = ?', [CAR]);
+    await expect(
+      applyBackfill(asyncDb, CAR, 'logged', planned, ctx.user.id, false)
+    ).rejects.toThrow('Car sharing');
+  });
+});
+
 describe('backfilling past entries', () => {
   test('"who logged it" previews first, then credits each entry to the member who logged it', async () => {
     const preview = await post<Summary>(`${base}/backfill/preview`, { mode: 'logged' });

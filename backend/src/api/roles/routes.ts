@@ -485,12 +485,22 @@ overrideRoutes.delete(
 );
 
 export async function vehiclePeople(c: Context) {
-  const vehicleId = c.req.param('id') ?? '';
-  const vehicle: Resource = { kind: 'vehicle', vehicleId };
+  const vehicle = { kind: 'vehicle' as const, vehicleId: c.req.param('id') ?? '' };
   const caller = requestResolver(c);
   enforce(caller.can('vehicle.share.read', vehicle), 'Vehicle');
   const detailed = caller.can('vehicle.share.manage', vehicle).allow;
-  const db = appContext().asyncDb;
+  const people = await appContext().asyncDb.transaction((tx) => peopleOn(tx, vehicle, detailed), {
+    behavior: 'deferred',
+  });
+  return c.json({ success: true, data: people });
+}
+
+async function peopleOn(
+  db: AsyncHandle,
+  vehicle: Resource & { kind: 'vehicle' },
+  detailed: boolean
+) {
+  const { vehicleId } = vehicle;
   const owner = await db
     .select({ id: vehicles.userId })
     .from(vehicles)
@@ -540,5 +550,5 @@ export async function vehiclePeople(c: Context) {
       }),
     });
   }
-  return c.json({ success: true, data: people });
+  return people;
 }

@@ -29,7 +29,8 @@ function stripComments(src: string): string {
 }
 
 function countAsyncTransactions(src: string): number {
-  return (stripComments(src).match(/(?<!asyncDb)\.transaction\(\s*async\b/g) ?? []).length;
+  return (stripComments(src).match(/(?<!(?:^|[^\w$])asyncDb)\.transaction\(\s*async\b/g) ?? [])
+    .length;
 }
 
 countRatchet({
@@ -54,6 +55,8 @@ countRatchet({
     expect(countAsyncTransactions('appContext().asyncDb.transaction(async (tx) => 1);')).toBe(0);
     expect(countAsyncTransactions('asyncDb.transaction(\n  async (tx) => 1\n);')).toBe(0);
     expect(countAsyncTransactions('this.syncDb.transaction(async (tx) => 1);')).toBe(1);
+    expect(countAsyncTransactions('myasyncDb.transaction(async (tx) => 1);')).toBe(1);
+    expect(countAsyncTransactions('legacy_asyncDb.transaction(async (tx) => 1);')).toBe(1);
     expect(
       countAsyncTransactions('// never db.transaction(async (tx) => …\ndb.transaction(() => 1);')
     ).toBe(0);

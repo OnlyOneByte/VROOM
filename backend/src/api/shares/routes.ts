@@ -254,9 +254,6 @@ routes.put(
     if (!isActiveShareStatus(share.status)) {
       throw new ConflictError('This share is no longer active');
     }
-    if (share.sharedWithId === user.id) {
-      throw new ForbiddenError("You can't change your own access");
-    }
     refuseUnheldLevel(c, share.vehicleId, level);
 
     let ownerId: string | null = null;
@@ -266,6 +263,9 @@ routes.put(
       { level },
       {
         check: async (tx, before) => {
+          if (before.sharedWithId === user.id) {
+            throw new ForbiddenError("You can't change your own access");
+          }
           ownerId = await vehicleOwnerId(tx, before.vehicleId);
           await refuseOverSharee(c, tx, before, ownerId, false);
         },
@@ -291,21 +291,17 @@ routes.delete(
   authorize(fromShare),
   async (c) => {
     const { id } = c.req.valid('param');
-
-    const share = await repos().vehicleShares.findById(id);
-    if (!share) {
-      throw new NotFoundError('Share');
-    }
-    if (share.sharedWithId === c.get('user').id) {
-      throw new ForbiddenError('To leave this vehicle, decline the share');
-    }
     await transitionShare(
       id,
       ANY_STATUS,
       { status: 'revoked' },
       {
-        check: async (tx, before) =>
-          refuseOverSharee(c, tx, before, await vehicleOwnerId(tx, before.vehicleId), true),
+        check: async (tx, before) => {
+          if (before.sharedWithId === c.get('user').id) {
+            throw new ForbiddenError('To leave this vehicle, decline the share');
+          }
+          await refuseOverSharee(c, tx, before, await vehicleOwnerId(tx, before.vehicleId), true);
+        },
         afterwards: async (tx, before) => {
           if (before.status === 'accepted' && before.sharedWithId) {
             await endVehicleMembership(tx, before.vehicleId, before.sharedWithId);

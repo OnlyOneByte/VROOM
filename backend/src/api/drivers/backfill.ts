@@ -11,7 +11,7 @@ import {
 } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { hiddenFinancialsScope } from '../../utils/vehicle-access';
-import { listDrivers } from './repository';
+import { carShareEnabled, listDrivers } from './repository';
 
 export type BackfillRequest =
   | { mode: 'logged' }
@@ -160,6 +160,18 @@ async function setDriver(
   return rows.length > 0;
 }
 
+async function requireCarShareIn(tx: AsyncHandle, vehicleId: string): Promise<void> {
+  if (!(await carShareEnabled(tx, vehicleId))) throw new NotFoundError('Car sharing');
+}
+
+async function driverIds(tx: AsyncHandle, vehicleId: string): Promise<Set<string>> {
+  const rows = await tx
+    .select({ id: vehicleDrivers.id })
+    .from(vehicleDrivers)
+    .where(eq(vehicleDrivers.vehicleId, vehicleId));
+  return new Set(rows.map((row) => row.id));
+}
+
 export function applyBackfill(
   asyncDb: AsyncAppDatabase,
   vehicleId: string,
@@ -169,8 +181,10 @@ export function applyBackfill(
   hideFinancials: boolean
 ): Promise<{ batchId: string | null; entries: BackfilledEntry[] }> {
   return asyncDb.transaction(async (tx) => {
+    await requireCarShareIn(tx, vehicleId);
+    const drivers = await driverIds(tx, vehicleId);
     const applied: BackfilledEntry[] = [];
-    for (const entry of planned) {
+    for (const entry of planned.filter((e) => drivers.has(e.driverId))) {
       if (await setDriver(tx, entry, null, entry.driverId, hideFinancials)) applied.push(entry);
     }
     if (applied.length === 0) return { batchId: null, entries: applied };
@@ -199,6 +213,7 @@ export function undoBackfill(
   hideFinancials: boolean
 ): Promise<number> {
   return asyncDb.transaction(async (tx) => {
+    await requireCarShareIn(tx, vehicleId);
     const batch = await tx
       .select()
       .from(driverBackfills)

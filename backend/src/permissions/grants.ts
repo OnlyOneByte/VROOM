@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, notInArray, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, notInArray, type SQL } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { appContext } from '../app-context';
 import type { AsyncAppDatabase, AsyncHandle, AsyncTransaction } from '../db/async-sqlite';
@@ -490,9 +490,17 @@ async function roleManagerCount(tx: AsyncHandle): Promise<number> {
         eq(permissionOverrides.effect, 'allow')
       )
     );
+  const candidates = [...new Set([...viaRoles, ...viaOverrides].map((row) => row.userId))];
+  if (candidates.length === 0) return 0;
+  const waiting = await tx
+    .select({ id: users.id })
+    .from(users)
+    .where(and(inArray(users.id, candidates), isNotNull(users.pendingApprovalAt)));
+  const waitingIds = new Set(waiting.map((row) => row.id));
   const server: Resource = { kind: 'server' };
   let count = 0;
-  for (const userId of new Set([...viaRoles, ...viaOverrides].map((row) => row.userId))) {
+  for (const userId of candidates) {
+    if (waitingIds.has(userId)) continue;
     const resolver = await resolverFor(userId, [server], tx);
     if (resolver.can(ROLE_MANAGE_PERMISSION, server).allow) count++;
   }

@@ -8,7 +8,7 @@ import { type serverInvites, users } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, type ResourceOf } from '../../permissions/authorize';
-import { assignServerRole } from '../../permissions/grants';
+import { assignServerRole, keepingARoleManager } from '../../permissions/grants';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { DEMO_USER_ID } from '../auth/demo-account';
 import { attachPendingInvites } from '../shares/repository';
@@ -151,7 +151,7 @@ signupRoutes.delete(
   authorize(SERVER),
   zValidator('param', commonSchemas.idParam),
   async (c) => {
-    const id = await appContext().asyncDb.transaction(async (tx) => {
+    const id = await keepingARoleManager(appContext().asyncDb, async (tx) => {
       const user = await pendingUser(tx, c.req.valid('param').id);
       await tx.delete(users).where(and(eq(users.id, user.id), isNotNull(users.pendingApprovalAt)));
       return user.id;
