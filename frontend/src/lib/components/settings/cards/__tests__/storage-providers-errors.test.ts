@@ -98,7 +98,7 @@ describe('Storage Providers card errors read as plain sentences', () => {
 
 		await waitFor(() => expect(showError).toHaveBeenCalled());
 		const message = showError.mock.calls[0]?.[0] as string;
-		expect(message).toMatch(/^Couldn't remove the provider\. /);
+		expect(message).toMatch(/^Couldn't remove the storage\. /);
 		expect(message).not.toContain('boom');
 	});
 

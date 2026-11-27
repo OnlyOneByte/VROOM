@@ -36,7 +36,7 @@
 		<Label for="backup-folder-path" class="text-sm">Backup folder path</Label>
 		<div
 			class="flex h-11.5 items-center rounded-(--r-md) bg-surface text-base md:text-sm {folderPathError
-				? 'border-2 border-destructive focus-within:ring-[3px] focus-within:ring-destructive/20'
+				? 'border-2 border-destructive focus-within:ring-[3px] focus-within:ring-destructive/20 dark:focus-within:ring-destructive/40'
 				: 'border-[1.5px] border-border-strong focus-within:border-foreground focus-within:ring-[3px] focus-within:ring-ring/50'}"
 		>
 			{#if providerRootPrefix}

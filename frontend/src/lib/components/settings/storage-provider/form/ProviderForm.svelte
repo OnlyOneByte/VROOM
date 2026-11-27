@@ -573,7 +573,7 @@
 <ConfirmDialog
 	bind:open={deleteConfirmOpen}
 	title="Delete {displayName.trim() || 'storage'}?"
-	description="Backups here stop and its settings are removed from VROOM. Your files stay in the storage itself."
+	description="VROOM stops backing up here and removes this storage's settings. Your files stay in the storage itself."
 	onConfirm={() => handleDelete()}
 />
 
