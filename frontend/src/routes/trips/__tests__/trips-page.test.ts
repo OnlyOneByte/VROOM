@@ -213,6 +213,19 @@ describe('trips page list', () => {
 		expect(within(card).queryByText('Business mileage value')).toBeNull();
 		expect(card.textContent?.replace(/\s+/g, ' ')).toContain('900 mi');
 		expect(card.textContent).not.toContain('$');
+		expect(
+			within(card).getByRole('link', { name: 'Set a mileage rate to see what it’s worth' })
+		).toHaveAttribute('href', '/settings#business-mileage-rate');
+	});
+
+	test('with a mileage rate there is no prompt to set one', async () => {
+		list.mockResolvedValue(tripPage([trip()]));
+		render(Page);
+		await settle();
+
+		const card = screen.getByTestId('trip-summary-card');
+		expect(within(card).getByText('Business mileage value')).toBeInTheDocument();
+		expect(within(card).queryByRole('link', { name: /Set a mileage rate/ })).toBeNull();
 	});
 
 	test('a mixed-unit fleet keeps the fraction of its converted totals', async () => {

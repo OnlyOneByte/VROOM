@@ -8,8 +8,10 @@ interface CardProps {
 	volumeUnit: 'gallons_us' | 'gallons_uk' | 'liters';
 	chargeUnit: 'kwh';
 	currencyUnit: string;
+	businessMileageRate: number;
 	onUnitsChange: () => void;
 	onCurrencyChange: () => void;
+	onRateChange: () => void;
 }
 
 function mount(overrides: Partial<CardProps> = {}) {
@@ -183,6 +185,136 @@ describe('UnitPreferencesCard', () => {
 		await pickCurrency('EUR – Euro (€)');
 		expect(screen.queryByRole('alertdialog')).toBeNull();
 		expect(onCurrencyChange).toHaveBeenCalledTimes(2);
+	});
+
+	describe('business mileage rate', () => {
+		function rate(): HTMLInputElement {
+			return screen.getByRole('textbox', { name: 'Business mileage rate' }) as HTMLInputElement;
+		}
+
+		async function enter(value: string) {
+			await fireEvent.input(rate(), { target: { value } });
+			await fireEvent.change(rate());
+			await settle();
+		}
+
+		test('shows the saved rate, per the distance unit, in the currency', () => {
+			mount({ businessMileageRate: 0.67 });
+			expect(rate()).toHaveValue('0.67');
+			expect(rate()).toHaveAccessibleDescription(/\$ per mile/);
+		});
+
+		test('in kilometres and euros the hint says € per km', () => {
+			mount({ distanceUnit: 'kilometers', currencyUnit: 'EUR' });
+			expect(rate()).toHaveValue('');
+			expect(rate()).toHaveAccessibleDescription(/€ per km/);
+		});
+
+		test('a new rate is saved once, a decimal comma included', async () => {
+			const onRateChange = vi.fn();
+			mount({ onRateChange });
+
+			await enter('0,45');
+
+			expect(onRateChange).toHaveBeenCalledOnce();
+			expect(rate()).not.toHaveAttribute('aria-invalid');
+		});
+
+		test.each([
+			['USD', '-1', 'Use a number like 0.67'],
+			['USD', 'abc', 'Use a number like 0.67'],
+			['USD', '0x10', 'Use a number like 0.67'],
+			['USD', '1e3', 'Use a number like 0.67'],
+			['USD', '1000001', 'Use 1000000 or less'],
+			['KRW', '1,000', 'Leave out thousands separators'],
+			['KRW', '100.000', 'Leave out thousands separators']
+		])(
+			'in %s, "%s" is refused with "%s", announced and not saved',
+			async (currencyUnit, typed, message) => {
+				const onRateChange = vi.fn();
+				mount({ currencyUnit, onRateChange });
+
+				await enter(typed);
+
+				expect(rate()).toHaveAttribute('aria-invalid', 'true');
+				expect(rate()).toHaveAccessibleDescription(new RegExp(message));
+				expect(screen.getByRole('alert')).toHaveTextContent(message);
+				expect(rate()).toHaveValue(typed);
+				expect(onRateChange).not.toHaveBeenCalled();
+			}
+		);
+
+		test.each(['2.414', '4.828', '1,125', '.5', '5.', '0,670'])(
+			'in USD, "%s" is a plain decimal and saves',
+			async typed => {
+				const onRateChange = vi.fn();
+				mount({ onRateChange });
+
+				await enter(typed);
+
+				expect(rate()).not.toHaveAttribute('aria-invalid');
+				expect(onRateChange).toHaveBeenCalledOnce();
+			}
+		);
+
+		test('in KRW, a converted rate shown as 804.672 is accepted as it stands, not read as thousands', async () => {
+			const onRateChange = vi.fn();
+			mount({ currencyUnit: 'KRW', businessMileageRate: 804.672, onRateChange });
+			expect(rate()).toHaveValue('804.672');
+
+			await enter('804.672');
+
+			expect(rate()).not.toHaveAttribute('aria-invalid');
+			expect(screen.queryByRole('alert')).toBeNull();
+			expect(onRateChange).not.toHaveBeenCalled();
+		});
+
+		test('fixing a refused rate clears the error and saves it', async () => {
+			const onRateChange = vi.fn();
+			mount({ currencyUnit: 'KRW', onRateChange });
+
+			await enter('1,000');
+			await enter('300');
+
+			expect(onRateChange).toHaveBeenCalledOnce();
+			expect(rate()).not.toHaveAttribute('aria-invalid');
+			expect(screen.queryByRole('alert')).toBeNull();
+		});
+
+		test('the #business-mileage-rate link lands on the field and focuses it', () => {
+			const scrollIntoView = vi.fn();
+			const realScroll = Element.prototype.scrollIntoView;
+			Element.prototype.scrollIntoView = scrollIntoView;
+			vi.stubGlobal(
+				'ResizeObserver',
+				class {
+					observe() {}
+					disconnect() {}
+				}
+			);
+			history.replaceState(null, '', '#business-mileage-rate');
+			try {
+				mount();
+				expect(rate()).toHaveFocus();
+				expect(scrollIntoView.mock.contexts[0]).toBe(rate());
+			} finally {
+				cleanup();
+				history.replaceState(null, '', location.pathname);
+				vi.unstubAllGlobals();
+				Element.prototype.scrollIntoView = realScroll;
+			}
+		});
+
+		test('clearing the field turns the rate off; re-entering the same rate saves nothing', async () => {
+			const onRateChange = vi.fn();
+			mount({ businessMileageRate: 0.67, onRateChange });
+
+			await enter('0.67');
+			expect(onRateChange).not.toHaveBeenCalled();
+
+			await enter('');
+			expect(onRateChange).toHaveBeenCalledOnce();
+		});
 	});
 
 	test('picking the value already selected saves nothing', async () => {

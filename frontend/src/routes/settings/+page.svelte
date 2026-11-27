@@ -59,6 +59,7 @@
 	let volumeUnit = $state<'gallons_us' | 'gallons_uk' | 'liters'>('gallons_us');
 	let chargeUnit = $state<'kwh'>('kwh');
 	let currencyUnit = $state('USD');
+	let businessMileageRate = $state(0);
 
 	let storageProviders = $state<UserProviderInfo[] | null>(null);
 
@@ -118,6 +119,7 @@
 			volumeUnit = settings.unitPreferences.volumeUnit;
 			chargeUnit = settings.unitPreferences.chargeUnit;
 			currencyUnit = settings.currencyUnit;
+			businessMileageRate = settings.businessMileageRate ?? 0;
 			isInitialized = true;
 		}
 	});
@@ -174,6 +176,10 @@
 
 	function saveCurrency() {
 		void saveSettings({ currencyUnit }, 'Currency saved');
+	}
+
+	function saveRate() {
+		void saveSettings({ businessMileageRate }, 'Mileage rate saved');
 	}
 
 	async function saveCommunityStats(updates: CommunityStatsUpdate) {
@@ -238,8 +244,10 @@
 						bind:volumeUnit
 						bind:chargeUnit
 						bind:currencyUnit
+						bind:businessMileageRate
 						onUnitsChange={saveUnits}
 						onCurrencyChange={saveCurrency}
+						onRateChange={saveRate}
 					/>
 					{#if settings.communityStatsMode !== 'off'}
 						<CommunityStatsCard

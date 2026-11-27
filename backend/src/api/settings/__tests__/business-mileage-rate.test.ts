@@ -51,12 +51,101 @@ describe('PUT/GET /settings businessMileageRate', () => {
     expect(after.currencyUnit).toBe('GBP');
   });
 
-  test('rejects a negative rate and an absurd (>100) rate (the abuse bound)', async () => {
+  test('rejects a negative rate and keeps the stored one', async () => {
     const neg = await ctx.authed('PUT', '/api/v1/settings', { businessMileageRate: -1 });
     expect(neg.status).toBe(400);
-    const huge = await ctx.authed('PUT', '/api/v1/settings', { businessMileageRate: 500 });
-    expect(huge.status).toBe(400);
     expect((await getSettings()).businessMileageRate).toBe(0);
+  });
+
+  test('refuses a rate over 1,000,000 so the summary maths stays finite', async () => {
+    const res = await ctx.authed('PUT', '/api/v1/settings', { businessMileageRate: 1_000_001 });
+    expect(res.status).toBe(400);
+    expect((await getSettings()).businessMileageRate).toBe(0);
+  });
+
+  test('accepts a rate in a currency without cents (300 won per km)', async () => {
+    await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'KRW' });
+    const res = await ctx.authed('PUT', '/api/v1/settings', { businessMileageRate: 300 });
+    expect(res.status).toBe(200);
+    expect((await getSettings()).businessMileageRate).toBe(300);
+  });
+});
+
+describe('changing the distance unit converts the stored rate', () => {
+  interface WithUnits {
+    businessMileageRate: number;
+    unitPreferences: { distanceUnit: string };
+  }
+
+  async function read(): Promise<WithUnits> {
+    const res = await ctx.authed('GET', '/api/v1/settings');
+    return (await json<{ data: WithUnits }>(res)).data;
+  }
+
+  test('0.67 per mile becomes 0.4163 per km, and back to 0.67 per mile', async () => {
+    await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: 'miles' },
+      businessMileageRate: 0.67,
+    });
+
+    await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: 'kilometers' },
+    });
+    const perKm = await read();
+    expect(perKm.unitPreferences.distanceUnit).toBe('kilometers');
+    expect(perKm.businessMileageRate).toBe(0.4163);
+
+    await ctx.authed('PUT', '/api/v1/settings', { unitPreferences: { distanceUnit: 'miles' } });
+    expect((await read()).businessMileageRate).toBeCloseTo(0.67, 3);
+  });
+
+  test('a rate sent with the unit change is saved as given, not converted', async () => {
+    await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: 'miles' },
+      businessMileageRate: 0.67,
+    });
+    await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: 'kilometers' },
+      businessMileageRate: 0.5,
+    });
+    expect((await read()).businessMileageRate).toBe(0.5);
+  });
+
+  test('changing currency and distance in one request converts the rate once', async () => {
+    await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: 'miles' },
+      businessMileageRate: 0.67,
+    });
+    const res = await ctx.authed('PUT', '/api/v1/settings', {
+      currencyUnit: 'EUR',
+      unitPreferences: { distanceUnit: 'kilometers' },
+    });
+    expect(res.status).toBe(200);
+    const data = await read();
+    expect(data.unitPreferences.distanceUnit).toBe('kilometers');
+    expect(data.businessMileageRate).toBe(0.4163);
+  });
+
+  test('a converted rate never passes the 1,000,000 ceiling, so it can be saved again', async () => {
+    await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: 'kilometers' },
+      businessMileageRate: 1_000_000,
+    });
+    await ctx.authed('PUT', '/api/v1/settings', { unitPreferences: { distanceUnit: 'miles' } });
+    const perMile = (await read()).businessMileageRate;
+    expect(perMile).toBe(1_000_000);
+
+    const again = await ctx.authed('PUT', '/api/v1/settings', { businessMileageRate: perMile });
+    expect(again.status).toBe(200);
+  });
+
+  test('changing only the fuel unit leaves the rate alone', async () => {
+    await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: 'miles' },
+      businessMileageRate: 0.67,
+    });
+    await ctx.authed('PUT', '/api/v1/settings', { unitPreferences: { volumeUnit: 'liters' } });
+    expect((await read()).businessMileageRate).toBe(0.67);
   });
 });
 

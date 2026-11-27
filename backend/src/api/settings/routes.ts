@@ -14,8 +14,16 @@ import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, ownAccount } from '../../permissions/authorize';
 import SHARED_CURRENCIES from '../../shared-currencies.json';
-import type { BackupConfig, DefaultProviderCapability, StorageConfig } from '../../types';
+import {
+  type BackupConfig,
+  DEFAULT_UNIT_PREFERENCES,
+  type DefaultProviderCapability,
+  parseUnitPreferences,
+  type StorageConfig,
+  type UnitPreferences,
+} from '../../types';
 import { readJsonBody } from '../../utils/request-body';
+import { convertDistance } from '../../utils/unit-conversions';
 import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
@@ -172,6 +180,7 @@ routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
 const SUPPORTED_CURRENCIES = new Set(SHARED_CURRENCIES.currencies);
+const MAX_BUSINESS_MILEAGE_RATE = 1_000_000;
 
 const baseSettingsSchema = createInsertSchema(userPreferences, {
   currencyUnit: z
@@ -202,7 +211,7 @@ const updateSettingsSchema = baseSettingsSchema
     backupConfig: backupConfigSchema.optional(),
     providerDefaults: providerDefaultsSchema.optional(),
     themePreference: z.string().min(1).max(64).optional(),
-    businessMileageRate: z.number().min(0).max(100).optional(),
+    businessMileageRate: z.number().min(0).max(MAX_BUSINESS_MILEAGE_RATE).optional(),
     communityStatsOptIn: z.boolean().optional(),
     communityRegion: communityRegionSchema.nullable().optional(),
   })
@@ -218,6 +227,21 @@ routes.get('/', authorize(ownAccount), async (c) => {
     data: withServerSettings(prefs),
   });
 });
+
+function rateInNewDistanceUnit(
+  existing: { unitPreferences: unknown; businessMileageRate: number },
+  merged: UnitPreferences | undefined,
+  requestedRate: number | undefined
+): { businessMileageRate?: number } {
+  const to = merged?.distanceUnit;
+  if (requestedRate !== undefined || !to || existing.businessMileageRate <= 0) return {};
+  const from = (parseUnitPreferences(existing.unitPreferences) ?? DEFAULT_UNIT_PREFERENCES)
+    .distanceUnit;
+  if (to === from) return {};
+  const perNewUnit = existing.businessMileageRate * convertDistance(1, to, from);
+  const rounded = Math.round(perNewUnit * 10_000) / 10_000;
+  return { businessMileageRate: Math.min(rounded, MAX_BUSINESS_MILEAGE_RATE) };
+}
 
 routes.put('/', authorize(ownAccount), async (c) => {
   const user = c.get('user');
@@ -254,6 +278,11 @@ routes.put('/', authorize(ownAccount), async (c) => {
 
   const preferenceUpdates = {
     ...restUpdates,
+    ...rateInNewDistanceUnit(
+      existingSettings,
+      mergedUnitPreferences,
+      restUpdates.businessMileageRate
+    ),
     ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
     ...(mergedStorageConfig && { storageConfig: mergedStorageConfig }),
     ...consentUpdate(existingSettings, communityStatsOptIn),
