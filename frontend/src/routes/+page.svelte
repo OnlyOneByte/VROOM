@@ -10,6 +10,7 @@
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import Dial from '#lib/components/charts/Dial.svelte';
+	import Wordmark from '#lib/components/common/Wordmark.svelte';
 
 	const FEATURES = [
 		{
@@ -67,11 +68,7 @@
 
 <div class="mx-auto flex min-h-screen max-w-6xl flex-col px-5 sm:px-8">
 	<nav class="flex items-center justify-between py-6">
-		<span
-			class="font-(family-name:--font-fig) text-[22px] font-bold tracking-[0.3em] text-foreground"
-		>
-			VR<span class="text-accent-ink">O</span>OM
-		</span>
+		<Wordmark />
 		<Button variant="outline" href={resolve(routes.auth)}>Sign in</Button>
 	</nav>
 

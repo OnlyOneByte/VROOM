@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
+	import Wordmark from '#lib/components/common/Wordmark.svelte';
 	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -130,13 +131,7 @@
 </svelte:head>
 
 <div class="min-h-screen bg-background px-[18px] pt-4 pb-10 lg:px-10">
-	<a
-		href={resolve(routes.home)}
-		class="inline-block rounded-md font-(family-name:--font-fig) text-[22px] font-bold tracking-[0.3em] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-		aria-label="VROOM home"
-	>
-		VR<span class="text-accent-ink">O</span>OM
-	</a>
+	<Wordmark href={resolve(routes.home)} class="inline-block" />
 
 	<div class="mx-auto mt-[8vh] grid w-full max-w-[420px] gap-3">
 		{#if authErrorMessage}
