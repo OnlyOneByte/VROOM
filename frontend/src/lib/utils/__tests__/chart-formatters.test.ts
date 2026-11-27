@@ -247,6 +247,21 @@ describe('insetTimeTicks (no x label inside the inset under the y labels)', () =
 		expect(kept.every(t => scale(t) >= TIME_X_PADDING[0])).toBe(true);
 	});
 
+	test.each([3, 6, 12, 24])(
+		'over %i months, asking for 4 ticks gives at most 4, never closer than a quarter of the plot',
+		months => {
+			const phone = scaleTime()
+				.domain([new Date(2026, 0, 1), new Date(2026, months - 1, 1)])
+				.range([0, 295]);
+			const kept = (insetTimeTicks(4) as (s: typeof phone) => Date[])(phone);
+
+			expect(kept.length).toBeGreaterThan(0);
+			expect(kept.length).toBeLessThanOrEqual(4);
+			const gaps = kept.slice(1).map((t, i) => phone(t) - phone(kept[i] as Date));
+			expect(Math.min(...gaps)).toBeGreaterThanOrEqual(295 / 4 - 1);
+		}
+	);
+
 	test('explicit tick lists and missing counts pass through unchanged', () => {
 		const list = [new Date(2025, 0, 1)];
 		expect(insetTimeTicks(list)).toBe(list);
