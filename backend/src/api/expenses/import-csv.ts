@@ -192,6 +192,16 @@ function parseChargerType(cell: string): { value: ChargerType | null } | { error
     : { error: `Charger type must be one of ${CHARGER_TYPES.join(', ')}, or empty` };
 }
 
+function parseFuelCells(
+  get: (column: string) => string
+): { fuelType: string | null; chargerType: ChargerType | null } | { error: string } {
+  const fuelType = parseBoundedString(get('fuelType'), EXP.fuelTypeMaxLength, 'Fuel type');
+  if ('error' in fuelType) return fuelType;
+  const chargerType = parseChargerType(get('chargerType'));
+  if ('error' in chargerType) return chargerType;
+  return { fuelType: fuelType.value, chargerType: chargerType.value };
+}
+
 function parseRow(
   record: Record<string, string>,
   vehicleByName: Map<string, string | null>,
@@ -213,8 +223,8 @@ function parseRow(
   if ('error' in mileageResult) return mileageResult;
   const volumeResult = parseVolume(get('volume'));
   if ('error' in volumeResult) return volumeResult;
-  const fuelTypeResult = parseBoundedString(get('fuelType'), EXP.fuelTypeMaxLength, 'Fuel type');
-  if ('error' in fuelTypeResult) return fuelTypeResult;
+  const fuelCells = parseFuelCells(get);
+  if ('error' in fuelCells) return fuelCells;
   const descriptionResult = parseBoundedString(
     get('description'),
     EXP.descriptionMaxLength,
@@ -229,10 +239,7 @@ function parseRow(
   const category = categoryResult.value;
   const mileage = mileageResult.value;
   const volume = volumeResult.value;
-  const fuelType = fuelTypeResult.value;
-  const chargerResult = parseChargerType(get('chargerType'));
-  if ('error' in chargerResult) return chargerResult;
-  const chargerType = chargerResult.value;
+  const { fuelType, chargerType } = fuelCells;
   const missedFillup = /^(true|1|yes)$/i.test(get('missedFillup'));
 
   if (category === 'fuel' && (!volume || mileage === null)) {
