@@ -1,18 +1,11 @@
 <script lang="ts">
 	import { focusFirstButton } from '#lib/utils/focus.ts';
 	import { onMount, tick } from 'svelte';
-	import { Bell, LoaderCircle } from '@lucide/svelte';
+	import { LoaderCircle } from '@lucide/svelte';
 	import HowItWorks from '#lib/components/common/how-it-works.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
-	import {
-		Card,
-		CardContent,
-		CardDescription,
-		CardHeader,
-		CardTitle
-	} from '#lib/components/ui/card/index.ts';
 	import * as pushUtil from '#lib/utils/push.ts';
 	import { pushApi } from '#lib/services/push-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
@@ -127,56 +120,47 @@
 	}
 </script>
 
-<Card>
-	<CardHeader>
-		<div class="flex items-center gap-2">
-			<Bell class="h-5 w-5 text-muted-foreground" />
-			<CardTitle>Push Notifications</CardTitle>
+<div class="py-3 outline-none" bind:this={content} tabindex={-1}>
+	{#if isLoading}
+		<div class="flex items-center justify-between gap-4" data-testid="push-loading">
+			<p class="font-medium">Reminder notifications</p>
+			<LoaderCircle class="h-5 w-5 animate-spin text-muted-foreground" aria-hidden="true" />
 		</div>
-		<CardDescription>
-			Get a notification when a reminder comes due, even when VROOM isn't open.
-		</CardDescription>
-		<HowItWorks>
-			<p class="text-sm text-muted-foreground">
-				Delivery is best-effort: a notification fires when VROOM next runs a reminder check, not on
-				a fixed schedule.
-			</p>
-		</HowItWorks>
-	</CardHeader>
-	<CardContent bind:ref={content} tabindex={-1}>
-		{#if isLoading}
-			<div class="flex items-center justify-center py-6" data-testid="push-loading">
-				<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
+	{:else if status === 'error'}
+		<div class="space-y-2" data-testid="push-error">
+			<p class="font-medium">Reminder notifications</p>
+			<p class="text-sm text-destructive" role="alert">{loadError}</p>
+			<Button variant="outline" class="h-10 rounded-full" onclick={retryStatus}>Retry</Button>
+		</div>
+	{:else}
+		<div class="flex items-center justify-between gap-4" data-testid="push-card">
+			<div class="min-w-0">
+				<p class="font-medium">Reminder notifications</p>
+				<p class="text-sm text-muted-foreground" data-testid="push-status">{statusLine}</p>
 			</div>
-		{:else if status === 'error'}
-			<div class="space-y-3" data-testid="push-error">
-				<p class="text-sm text-destructive" role="alert">{loadError}</p>
-				<Button variant="outline" size="sm" class="h-10" onclick={retryStatus}>Retry</Button>
-			</div>
-		{:else}
-			<div class="flex items-center justify-between gap-4" data-testid="push-card">
-				<div class="min-w-0 space-y-0.5">
-					<p class="text-sm font-medium">Reminder alerts</p>
-					<p class="text-xs text-muted-foreground" data-testid="push-status">{statusLine}</p>
+			{#if toggleable}
+				<div class="flex shrink-0 items-center gap-2">
+					{#if isToggling}
+						<LoaderCircle class="h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />
+					{/if}
+					<Switch
+						checked={isOn}
+						onCheckedChange={onToggle}
+						disabled={isToggling}
+						aria-label="Reminder notifications"
+						data-testid="push-toggle"
+					/>
 				</div>
-				{#if toggleable}
-					<div class="flex items-center gap-2 shrink-0">
-						{#if isToggling}
-							<LoaderCircle class="h-4 w-4 animate-spin text-muted-foreground" />
-						{/if}
-						<Switch
-							checked={isOn}
-							onCheckedChange={onToggle}
-							disabled={isToggling}
-							aria-label="Toggle push notifications"
-							data-testid="push-toggle"
-						/>
-					</div>
-				{/if}
-			</div>
-		{/if}
-	</CardContent>
-</Card>
+			{/if}
+		</div>
+	{/if}
+	<HowItWorks class="mt-1">
+		<p class="text-sm text-muted-foreground">
+			A notification arrives when a reminder comes due, even when VROOM isn't open. Delivery is
+			best-effort: it fires when VROOM next runs a reminder check, not on a fixed schedule.
+		</p>
+	</HowItWorks>
+</div>
 
 <AlertDialog.Root bind:open={showDisclosure}>
 	<AlertDialog.Content>

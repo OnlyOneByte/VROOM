@@ -90,7 +90,7 @@ describe('CalendarFeedCard', () => {
 		await fireEvent.click(await screen.findByTestId('calendar-off'));
 		expect(turnOff).not.toHaveBeenCalled();
 		await fireEvent.click(
-			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Turn Off' })
+			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Turn off' })
 		);
 		await waitFor(() => expect(turnOff).toHaveBeenCalled());
 		expect(await screen.findByTestId('calendar-create')).toBeInTheDocument();
@@ -102,7 +102,7 @@ describe('CalendarFeedCard', () => {
 		await fireEvent.click(await screen.findByTestId('calendar-rotate'));
 		expect(createFeed).not.toHaveBeenCalled();
 		await fireEvent.click(
-			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Get a New Link' })
+			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Get a new link' })
 		);
 		await waitFor(() => expect(createFeed).toHaveBeenCalled());
 		expect(await screen.findByTestId('calendar-link')).toBeInTheDocument();
@@ -114,7 +114,7 @@ describe('CalendarFeedCard', () => {
 		render(CalendarFeedCard);
 		await fireEvent.click(await screen.findByTestId('calendar-rotate'));
 		await fireEvent.click(
-			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Get a New Link' })
+			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Get a new link' })
 		);
 		await waitFor(() => expect(showError).toHaveBeenCalled());
 		expect(screen.getByRole('alertdialog')).toBeInTheDocument();

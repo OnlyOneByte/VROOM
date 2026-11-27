@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { LoaderCircle, Users } from '@lucide/svelte';
+	import { LoaderCircle } from '@lucide/svelte';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
@@ -62,19 +62,15 @@
 	}
 </script>
 
-<Card id="community-comparisons">
+<Card variant="section" id="community-comparisons">
 	<CardHeader>
-		<div class="flex items-center gap-2">
-			<Users class="h-5 w-5 text-muted-foreground" />
-			<CardTitle>Community comparisons</CardTitle>
-		</div>
+		<CardTitle level={2} class="text-base">Community comparisons</CardTitle>
 		<CardDescription>
-			<span class="block font-semibold text-foreground">Compare with other owners</span>
-			Share anonymous averages from your vehicles so you and other people on this server can see how your
-			vehicle compares.
+			Share anonymous averages from your vehicles so you and other people on this server can see how
+			your vehicle compares.
 		</CardDescription>
 	</CardHeader>
-	<CardContent class="space-y-6">
+	<CardContent class="space-y-5">
 		<ul class="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
 			<li>
 				Only averages and rounded group sizes for groups of about {minGroup} or more people are ever shown,
