@@ -61,7 +61,6 @@ export function chosenProviders(
 
 type ConfigPatch = Record<string, Record<string, string | number | boolean | null>>;
 
-
 export function needsZipGeneration(
   enabledProviders: [string, ProviderBackupSettings][],
   providerTypes: ProviderTypes

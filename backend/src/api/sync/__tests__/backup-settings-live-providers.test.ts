@@ -1,5 +1,5 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
