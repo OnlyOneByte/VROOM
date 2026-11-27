@@ -84,6 +84,9 @@ const providerIdsSchema = z
   .optional();
 
 async function validateProviderIds(userId: string, raw: unknown): Promise<string[] | undefined> {
+  if (raw !== undefined && !Array.isArray(raw)) {
+    throw new ValidationError('providerIds must be a list of provider ids');
+  }
   const parsed = providerIdsSchema.safeParse(raw);
   if (!parsed.success) {
     throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid providerIds');

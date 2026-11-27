@@ -27,6 +27,7 @@
 	import { fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { routes, paramRoutes } from '#lib/routes.ts';
+	import { supportsZipBackup } from '#lib/constants/providers.ts';
 	import type {
 		PhotoCategory,
 		CategorySetting,
@@ -211,6 +212,7 @@
 	let backupProviderCount = $derived(
 		Object.values(backupConfig.providers).filter(p => p.enabled || p.sheetsSyncEnabled).length
 	);
+	let canBackUpNow = $derived(providers.some(p => supportsZipBackup(p.providerType)));
 
 	let lastBackupText = $derived.by(() => {
 		let latest: string | null = null;
@@ -395,6 +397,9 @@
 							<p class="text-sm text-muted-foreground">
 								{#if backupProviderCount > 0}
 									Sends a copy to every provider with backups on. Last backup: {lastBackupText}
+								{:else if canBackUpNow}
+									No provider has backups on. You can still send one backup to a provider you
+									choose.
 								{:else if providers.length > 0}
 									Turn on backups for a provider under Connected first.
 								{:else}
@@ -402,7 +407,7 @@
 								{/if}
 							</p>
 						</div>
-						{#if backupProviderCount > 0}
+						{#if backupProviderCount > 0 || canBackUpNow}
 							<Button onclick={() => onBackupNow?.()}>
 								<RefreshCw aria-hidden="true" />
 								Back up now

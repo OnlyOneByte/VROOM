@@ -7,7 +7,7 @@
 
 	interface Props {
 		open: boolean;
-		providers?: Array<{ id: string; displayName: string; savedOn: boolean }>;
+		providers?: Array<{ id: string; displayName: string; savedOn: boolean; status: string }>;
 		onSync: (_providerIds?: string[]) => void;
 	}
 
@@ -54,9 +54,7 @@
 					<li class="flex items-center justify-between gap-4 py-3">
 						<div class="min-w-0">
 							<p class="font-medium">{provider.displayName}</p>
-							<p class="text-sm text-muted-foreground">
-								{provider.savedOn ? 'Backups on' : 'Backups off'}
-							</p>
+							<p class="text-sm text-muted-foreground">{provider.status}</p>
 						</div>
 						<Switch
 							checked={isChosen(provider)}

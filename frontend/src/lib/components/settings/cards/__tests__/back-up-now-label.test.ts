@@ -12,6 +12,35 @@ const DRIVE: UserProviderInfo = {
 	createdAt: '2026-01-01T00:00:00.000Z'
 };
 
+const DRIVE_ENTRY = {
+	id: 'google-drive',
+	label: 'Google Drive',
+	shortLabel: 'Drive',
+	description: 'Google Drive',
+	scope: 'user',
+	connect: 'oauth',
+	fields: [],
+	secrets: [],
+	capability: 'storage',
+	features: {
+		photoOnly: false,
+		backupSheets: true,
+		defaultFolders: {
+			vehicle_photos: 'Vehicle',
+			expense_receipts: 'Receipts',
+			insurance_docs: 'Insurance',
+			odometer_readings: 'Odometer'
+		},
+		defaultPhotoRootPath: 'Photos'
+	}
+};
+
+const settingsState = vi.hoisted(() => ({
+	backupConfig: { providers: { 'prov-1': { enabled: true, folderPath: '/VROOM' } } } as {
+		providers: Record<string, { enabled: boolean; folderPath: string }>;
+	}
+}));
+
 vi.mock('#lib/services/photo-api.ts', () => ({
 	orphanedPhotosApi: { count: () => Promise.resolve(0), remove: vi.fn() }
 }));
@@ -21,6 +50,7 @@ vi.mock('#lib/services/provider-api.ts', async importOriginal => {
 		...actual,
 		providerApi: {
 			getProviders: () => Promise.resolve([DRIVE]),
+			getCatalog: () => Promise.resolve([DRIVE_ENTRY]),
 			getSyncStatus: () => Promise.resolve(null),
 			backfillProvider: vi.fn()
 		}
@@ -31,7 +61,7 @@ vi.mock('#lib/services/settings-api.ts', () => ({
 		getSettings: () =>
 			Promise.resolve({
 				storageConfig: null,
-				backupConfig: { providers: { 'prov-1': { enabled: true, folderPath: '/VROOM' } } }
+				backupConfig: settingsState.backupConfig
 			}),
 		updateSettings: vi.fn()
 	}
@@ -59,8 +89,8 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 			props: {
 				open: true,
 				providers: [
-					{ id: 'p1', displayName: 'Family Drive', savedOn: true },
-					{ id: 'p2', displayName: 'Office S3', savedOn: true }
+					{ id: 'p1', displayName: 'Family Drive', savedOn: true, status: 'Backups on' },
+					{ id: 'p2', displayName: 'Office S3', savedOn: true, status: 'Backups on' }
 				],
 				onSync
 			}
@@ -77,7 +107,7 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 		const { unmount } = render(BackupDialog, {
 			props: {
 				open: true,
-				providers: [{ id: 'p1', displayName: 'Family Drive', savedOn: true }],
+				providers: [{ id: 'p1', displayName: 'Family Drive', savedOn: true, status: 'Backups on' }],
 				onSync: vi.fn()
 			}
 		});
@@ -96,8 +126,8 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 			props: {
 				open: true,
 				providers: [
-					{ id: 'p1', displayName: 'Google Drive', savedOn: true },
-					{ id: 'p2', displayName: 'Google Drive', savedOn: true }
+					{ id: 'p1', displayName: 'Google Drive', savedOn: true, status: 'Backups on' },
+					{ id: 'p2', displayName: 'Google Drive', savedOn: true, status: 'Backups on' }
 				],
 				onSync: vi.fn()
 			}
@@ -113,8 +143,8 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 			props: {
 				open: true,
 				providers: [
-					{ id: 'p1', displayName: 'Family Drive', savedOn: true },
-					{ id: 'p2', displayName: 'Office S3', savedOn: false }
+					{ id: 'p1', displayName: 'Family Drive', savedOn: true, status: 'Backups on' },
+					{ id: 'p2', displayName: 'Office S3', savedOn: false, status: 'Backups off' }
 				],
 				onSync
 			}
@@ -136,12 +166,36 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 		render(BackupDialog, {
 			props: {
 				open: true,
-				providers: [{ id: 'p1', displayName: 'Family Drive', savedOn: true }],
+				providers: [{ id: 'p1', displayName: 'Family Drive', savedOn: true, status: 'Backups on' }],
 				onSync: vi.fn()
 			}
 		});
 
 		await fireEvent.click(await screen.findByRole('switch', { name: 'Back up to Family Drive' }));
 		expect(screen.getByRole('button', { name: 'Back up now' })).toBeDisabled();
+	});
+
+	test('with no provider backing up, Back up now still offers a one-off backup to a capable provider', async () => {
+		const { providerCatalog } = await import('#lib/stores/provider-catalog.svelte.ts');
+		const { settingsStore } = await import('#lib/stores/settings.svelte.ts');
+		settingsState.backupConfig = { providers: {} };
+		await providerCatalog.ensureLoaded();
+		await settingsStore.load();
+		try {
+			const onBackupNow = vi.fn();
+			render(StorageProvidersCard, { props: { onBackupNow } });
+
+			expect(
+				await screen.findByText(
+					'No provider has backups on. You can still send one backup to a provider you choose.'
+				)
+			).toBeInTheDocument();
+			await fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
+			expect(onBackupNow).toHaveBeenCalledOnce();
+		} finally {
+			settingsState.backupConfig = {
+				providers: { 'prov-1': { enabled: true, folderPath: '/VROOM' } }
+			};
+		}
 	});
 });

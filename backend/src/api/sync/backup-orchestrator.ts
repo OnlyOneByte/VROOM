@@ -51,7 +51,8 @@ export function chosenProviders(
 ): [string, ProviderBackupSettings][] {
   return providerIds.map((id) => {
     const saved = config.providers[id];
-    return [id, { ...NEW_PROVIDER_BACKUP_SETTINGS, ...saved, enabled: true }] as [
+    const sheetsOnly = saved?.enabled !== true && saved?.sheetsSyncEnabled === true;
+    return [id, { ...NEW_PROVIDER_BACKUP_SETTINGS, ...saved, enabled: !sheetsOnly }] as [
       string,
       ProviderBackupSettings,
     ];
@@ -251,7 +252,7 @@ export class BackupOrchestrator {
       const settled = await Promise.allSettled(strategyPromises);
 
       const results: Record<string, BackupStrategyResult> = {};
-      const configPatch: Record<string, Record<string, string | null>> = {};
+      const configPatch: Record<string, Record<string, string | number | boolean | null>> = {};
       let anySuccess = false;
       const failedProviders: string[] = [];
 
@@ -288,7 +289,9 @@ export class BackupOrchestrator {
 
         if (result.success) {
           anySuccess = true;
-          configPatch[providerId] = { lastBackupAt: timestamp };
+          configPatch[providerId] = config.providers[providerId]
+            ? { lastBackupAt: timestamp }
+            : { ...NEW_PROVIDER_BACKUP_SETTINGS, enabled: false, lastBackupAt: timestamp };
         } else {
           failedProviders.push(providerId);
         }
@@ -322,7 +325,10 @@ export class BackupOrchestrator {
           providers: configPatch,
         });
       }
-      if (runOutcome === 'success') {
+      const coveredEveryEnabled =
+        !providerIds ||
+        filterEnabledProviders(runConfig, providerTypes).every(([id]) => providerIds.includes(id));
+      if (runOutcome === 'success' && coveredEveryEnabled) {
         await repos().syncState.updateSyncDate(userId, new Date(timestamp));
         await repos().syncState.updateBackupDate(userId);
       }

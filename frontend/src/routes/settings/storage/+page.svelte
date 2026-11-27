@@ -45,11 +45,17 @@
 	let backupChoices = $derived(
 		storageProviders
 			.filter(p => supportsZipBackup(p.providerType))
-			.map(p => ({
-				id: p.id,
-				displayName: p.displayName,
-				savedOn: backupConfig.providers[p.id]?.enabled === true
-			}))
+			.map(p => {
+				const saved = backupConfig.providers[p.id];
+				const zip = saved?.enabled === true;
+				const sheets = saved?.sheetsSyncEnabled === true;
+				return {
+					id: p.id,
+					displayName: p.displayName,
+					savedOn: zip || sheets,
+					status: zip ? 'Backups on' : sheets ? 'Sheets backups on' : 'Backups off'
+				};
+			})
 	);
 
 	let showBackupDialog = $state(false);
@@ -174,7 +180,12 @@
 					{ id: toastId }
 				);
 			} else if (data.outcome === 'noop') {
-				toast.info('Nothing to back up: no provider has backups turned on', { id: toastId });
+				toast.info(
+					providerIds
+						? 'Nothing was backed up. Reload the page to see your storage, then try again.'
+						: 'Nothing to back up: no provider has backups turned on',
+					{ id: toastId }
+				);
 			} else {
 				toast.error(`Couldn't back up. ${backupProblem(data.failedProviders, data.results)}`, {
 					id: toastId
