@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { signInAsDemo } from '#lib/testing/demo-user.ts';
+import { signInAsDemo } from '../../../../test-utils/demo-user';
 import type { ReminderWithVehicles } from '#lib/types/index.ts';
 import ReminderRow from '../ReminderRow.svelte';
 

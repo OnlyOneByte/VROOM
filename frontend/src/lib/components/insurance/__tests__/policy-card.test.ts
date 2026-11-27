@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { signInAsDemo } from '#lib/testing/demo-user.ts';
+import { signInAsDemo } from '../../../../test-utils/demo-user';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type {
 	InsuranceClaim,
@@ -419,6 +419,22 @@ describe('PolicyCard in the demo', () => {
 			mount();
 			await settle();
 			await openTermActions();
+
+			expect(screen.getByRole('button', { name: 'Edit term' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Delete term' })).toBeNull();
+		} finally {
+			signOut();
+		}
+	});
+
+	test('a past term in the history keeps Edit but has no Delete', async () => {
+		const signOut = signInAsDemo();
+		try {
+			mount();
+			await settle();
+			await fireEvent.click(screen.getByRole('button', { name: '1 past term' }));
+			await settle();
+			await openTermActions(-1);
 
 			expect(screen.getByRole('button', { name: 'Edit term' })).toBeInTheDocument();
 			expect(screen.queryByRole('button', { name: 'Delete term' })).toBeNull();

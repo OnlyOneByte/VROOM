@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { signInAsDemo } from '#lib/testing/demo-user.ts';
+import { signInAsDemo } from '../../../../test-utils/demo-user';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import type {

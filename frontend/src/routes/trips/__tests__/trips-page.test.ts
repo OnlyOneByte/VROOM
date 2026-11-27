@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { signInAsDemo } from '#lib/testing/demo-user.ts';
+import { signInAsDemo } from '../../../test-utils/demo-user';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { PaginatedResponse, Trip, TripSummary, Vehicle } from '#lib/types/index.ts';
 import type { TripListFilters } from '#lib/services/trip-api.ts';

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { signInAsDemo } from '#lib/testing/demo-user.ts';
+import { signInAsDemo } from '../../../../test-utils/demo-user';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import { scaleTime } from 'd3-scale';
 import type { OdometerHistoryEntry, PaginatedResponse, UnitPreferences } from '#lib/types/index.ts';
