@@ -150,7 +150,7 @@ routes.post(
     const data = c.req.valid('json');
 
     const { ownerId } = await requireVehicleAccess(vehicleId, user.id, 'read');
-    const driverId = attributedDriver(c, vehicleId, data.driverId);
+    const driverId = await attributedDriver(c, vehicleId, data.driverId);
 
     const entry = await repos().odometer.createChecked(
       {
@@ -191,7 +191,7 @@ routes.put(
     if (!existing) throw new NotFoundError('Odometer entry');
 
     const { timeZone, driverId: requested, ...rest } = data;
-    const driverId = attributedDriver(c, existing.vehicleId, requested, existing.driverId);
+    const driverId = await attributedDriver(c, existing.vehicleId, requested, existing.driverId);
     const changes = driverId === undefined ? rest : { ...rest, driverId };
     const odometer = changes.odometer ?? existing.odometer;
     const recordedAt = changes.recordedAt ?? existing.recordedAt;

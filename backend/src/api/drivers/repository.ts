@@ -1,4 +1,5 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, count, eq, isNull } from 'drizzle-orm';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import type { AppDatabase } from '../../db/connection';
 import {
   users,
@@ -8,8 +9,6 @@ import {
   vehicles,
 } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
-
-type Db = AppDatabase | DrizzleTransaction;
 
 export const DRIVER_COLORS = [
   'chart-1',
@@ -31,22 +30,26 @@ export interface DriverView {
   archived: boolean;
 }
 
-function memberName(db: Db, userId: string): string {
-  const row = db.select({ name: users.displayName }).from(users).where(eq(users.id, userId)).get();
+function memberName(tx: DrizzleTransaction, userId: string): string {
+  const row = tx.select({ name: users.displayName }).from(users).where(eq(users.id, userId)).get();
   return row?.name || 'Driver';
 }
 
-function nextColor(db: Db, vehicleId: string): string {
-  const used = db
-    .select({ color: vehicleDrivers.color })
-    .from(vehicleDrivers)
-    .where(eq(vehicleDrivers.vehicleId, vehicleId))
-    .all().length;
+function colorAfter(used: number): string {
   return DRIVER_COLORS[used % DRIVER_COLORS.length] ?? 'chart-1';
 }
 
-export function carShareEnabled(db: Db, vehicleId: string): boolean {
-  const row = db
+function nextColor(tx: DrizzleTransaction, vehicleId: string): string {
+  const [row] = tx
+    .select({ used: count() })
+    .from(vehicleDrivers)
+    .where(eq(vehicleDrivers.vehicleId, vehicleId))
+    .all();
+  return colorAfter(row?.used ?? 0);
+}
+
+export function carShareEnabled(tx: DrizzleTransaction, vehicleId: string): boolean {
+  const row = tx
     .select({ enabled: vehicles.carShareEnabled })
     .from(vehicles)
     .where(eq(vehicles.id, vehicleId))
@@ -54,36 +57,42 @@ export function carShareEnabled(db: Db, vehicleId: string): boolean {
   return row?.enabled ?? false;
 }
 
-export function listDrivers(db: Db, vehicleId: string): DriverView[] {
-  return db
+export async function listDrivers(db: AsyncAppDatabase, vehicleId: string): Promise<DriverView[]> {
+  const rows = await db
     .select({ driver: vehicleDrivers, displayName: users.displayName })
     .from(vehicleDrivers)
     .leftJoin(users, eq(users.id, vehicleDrivers.userId))
     .where(eq(vehicleDrivers.vehicleId, vehicleId))
-    .orderBy(vehicleDrivers.createdAt)
-    .all()
-    .map(({ driver, displayName }) => ({
-      id: driver.id,
-      vehicleId: driver.vehicleId,
-      userId: driver.userId,
-      name: driver.userId && displayName ? displayName : driver.name,
-      color: driver.color,
-      archived: driver.archivedAt !== null,
-    }));
+    .orderBy(vehicleDrivers.createdAt);
+  return rows.map(({ driver, displayName }) => ({
+    id: driver.id,
+    vehicleId: driver.vehicleId,
+    userId: driver.userId,
+    name: driver.userId && displayName ? displayName : driver.name,
+    color: driver.color,
+    archived: driver.archivedAt !== null,
+  }));
 }
 
-export function findDriver(db: Db, vehicleId: string, driverId: string): VehicleDriver | null {
-  return (
-    db
-      .select()
-      .from(vehicleDrivers)
-      .where(and(eq(vehicleDrivers.id, driverId), eq(vehicleDrivers.vehicleId, vehicleId)))
-      .get() ?? null
-  );
+export async function findDriver(
+  db: AsyncAppDatabase,
+  vehicleId: string,
+  driverId: string
+): Promise<VehicleDriver | null> {
+  const row = await db
+    .select()
+    .from(vehicleDrivers)
+    .where(and(eq(vehicleDrivers.id, driverId), eq(vehicleDrivers.vehicleId, vehicleId)))
+    .get();
+  return row ?? null;
 }
 
-export function ownDriverId(db: Db, vehicleId: string, userId: string): string | null {
-  const row = db
+export async function ownDriverId(
+  db: AsyncAppDatabase,
+  vehicleId: string,
+  userId: string
+): Promise<string | null> {
+  const row = await db
     .select({ id: vehicleDrivers.id })
     .from(vehicleDrivers)
     .where(
@@ -97,25 +106,29 @@ export function ownDriverId(db: Db, vehicleId: string, userId: string): string |
   return row?.id ?? null;
 }
 
-export function ensureMemberDriver(db: Db, vehicleId: string, userId: string): void {
-  const existing = db
+export function ensureMemberDriver(
+  tx: DrizzleTransaction,
+  vehicleId: string,
+  userId: string
+): void {
+  const existing = tx
     .select({ id: vehicleDrivers.id })
     .from(vehicleDrivers)
     .where(and(eq(vehicleDrivers.vehicleId, vehicleId), eq(vehicleDrivers.userId, userId)))
     .get();
   if (existing) {
-    db.update(vehicleDrivers)
+    tx.update(vehicleDrivers)
       .set({ archivedAt: null })
       .where(eq(vehicleDrivers.id, existing.id))
       .run();
     return;
   }
-  db.insert(vehicleDrivers)
+  tx.insert(vehicleDrivers)
     .values({
       vehicleId,
       userId,
-      name: memberName(db, userId),
-      color: nextColor(db, vehicleId),
+      name: memberName(tx, userId),
+      color: nextColor(tx, vehicleId),
       createdBy: userId,
     })
     .run();
@@ -144,29 +157,32 @@ export function setCarShare(db: AppDatabase, vehicleId: string, enabled: boolean
   });
 }
 
-export function addGuestDriver(
-  db: Db,
+export async function addGuestDriver(
+  db: AsyncAppDatabase,
   vehicleId: string,
   input: { name: string; color?: string },
   createdBy: string
-): string {
-  const row = db
+): Promise<string> {
+  let color = input.color;
+  if (!color) {
+    const [row] = await db
+      .select({ used: count() })
+      .from(vehicleDrivers)
+      .where(eq(vehicleDrivers.vehicleId, vehicleId));
+    color = colorAfter(row?.used ?? 0);
+  }
+  const [row] = await db
     .insert(vehicleDrivers)
-    .values({
-      vehicleId,
-      name: input.name,
-      color: input.color ?? nextColor(db, vehicleId),
-      createdBy,
-    })
-    .returning({ id: vehicleDrivers.id })
-    .get();
+    .values({ vehicleId, name: input.name, color, createdBy })
+    .returning({ id: vehicleDrivers.id });
+  if (!row) throw new Error('Driver insert returned no row');
   return row.id;
 }
 
-export function updateDriver(
-  db: Db,
+export async function updateDriver(
+  db: AsyncAppDatabase,
   driverId: string,
   changes: { name?: string; color?: string; archivedAt?: Date | null }
-): void {
-  db.update(vehicleDrivers).set(changes).where(eq(vehicleDrivers.id, driverId)).run();
+): Promise<void> {
+  await db.update(vehicleDrivers).set(changes).where(eq(vehicleDrivers.id, driverId));
 }

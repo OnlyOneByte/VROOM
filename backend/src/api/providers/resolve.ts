@@ -20,7 +20,7 @@ export async function resolveProvider(
   capability: DefaultProviderCapability
 ): Promise<UserProvider> {
   const rows = await appContext()
-    .db.select()
+    .asyncDb.select()
     .from(userProviders)
     .where(
       and(
@@ -31,7 +31,7 @@ export async function resolveProvider(
     )
     .orderBy(asc(userProviders.createdAt), asc(userProviders.id));
   const prefs = await appContext()
-    .db.select({ providerDefaults: userPreferences.providerDefaults })
+    .asyncDb.select({ providerDefaults: userPreferences.providerDefaults })
     .from(userPreferences)
     .where(eq(userPreferences.userId, userId))
     .get();
