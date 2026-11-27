@@ -77,6 +77,7 @@
 	let expenses = $state<Expense[]>([]);
 	let vehicles = $state<Vehicle[]>([]);
 	let summary = $state<ExpenseSummary | null>(null);
+	let summaryRequestedAt = $state<number | undefined>();
 
 	let currentOffset = $state(0);
 	let pageSize = $state(20);
@@ -112,7 +113,8 @@
 	const pending = usePendingRows({
 		match: expense => !selectedVehicleId || expense.vehicleId === selectedVehicleId,
 		refresh: () => fetchPageAndSummary(currentOffset, { keepMonthTotals: true }),
-		listedIds: () => listedExpenseIds
+		listedIds: () => listedExpenseIds,
+		summaryRequestedAt: () => summaryRequestedAt
 	});
 	let listedExpenseIds = $derived(new Set(expenses.map(expense => expense.id)));
 	let pendingFilters = $derived({
@@ -349,6 +351,7 @@
 		const isCurrentList = nextListRequest();
 		const isCurrentSummary = nextSummaryRequest();
 		const filtered = filtersActive;
+		const requestedAt = Date.now();
 		isLoadingPage = true;
 		void loadMonthTotals(keepMonthTotals);
 		try {
@@ -369,6 +372,7 @@
 			if (isCurrentSummary()) {
 				if (summaryResult.status === 'fulfilled') {
 					summary = summaryResult.value;
+					summaryRequestedAt = requestedAt;
 				} else if (!listReported || pageResult.status === 'fulfilled') {
 					failSummary(summaryResult.reason);
 				}

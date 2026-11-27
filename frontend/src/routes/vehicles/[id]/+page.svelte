@@ -107,6 +107,7 @@
 	const selectedStatsPeriod: TimePeriod = 'all';
 
 	let summary = $state<ExpenseSummary | null>(null);
+	let summaryRequestedAt = $state<number | undefined>();
 	let fuelEfficiencyPoints = $state<FuelEfficiencyPoint[]>([]);
 	let isLoadingFuelEfficiency = $state(true);
 	let yearStats = $state<VehicleStats | null>(null);
@@ -307,7 +308,8 @@
 				loadSummary(),
 				loadOverviewLists()
 			]),
-		listedIds: () => listedExpenseIds
+		listedIds: () => listedExpenseIds,
+		summaryRequestedAt: () => summaryRequestedAt
 	});
 	let listedExpenseIds = $derived.by(() => {
 		const inRecent = new Set(recentList.map(expense => expense.id));
@@ -469,12 +471,16 @@
 		const isCurrent = nextSummaryRequest();
 		isLoadingSummary = true;
 		summaryLoadError = null;
+		const requestedAt = Date.now();
 		try {
 			const loaded = await expenseApi.getExpenseSummary({
 				vehicleId,
 				period: selectedStatsPeriod
 			});
-			if (isCurrent()) summary = loaded;
+			if (isCurrent()) {
+				summary = loaded;
+				summaryRequestedAt = requestedAt;
+			}
 		} catch (error) {
 			if (!isCurrent()) return;
 			logLoadFailure(error, "Couldn't load the expense summary");

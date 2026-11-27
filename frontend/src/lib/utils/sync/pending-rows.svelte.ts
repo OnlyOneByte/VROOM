@@ -12,10 +12,15 @@ import {
 	type PendingRowState
 } from './pending-rows.ts';
 
+function inSummary(syncedAt: number | undefined, summarySince: number | undefined): boolean {
+	return syncedAt !== undefined && summarySince !== undefined && summarySince >= syncedAt;
+}
+
 export function usePendingRows(options: {
 	match: (expense: Expense) => boolean;
 	refresh: () => Promise<unknown>;
 	listedIds?: () => ReadonlySet<string>;
+	summaryRequestedAt?: () => number | undefined;
 }) {
 	const live = $derived<PendingItem[]>(
 		offlineExpenseQueue.current
@@ -61,7 +66,11 @@ export function usePendingRows(options: {
 			return rowStates(visible);
 		},
 		get saving(): Expense[] {
-			return visible.filter(({ state }) => state.status === 'saving').map(({ row }) => row);
+			const summarySince = options.summaryRequestedAt?.();
+			return visible
+				.filter(({ state }) => state.status === 'saving')
+				.filter(({ syncedAt }) => !inSummary(syncedAt, summarySince))
+				.map(({ row }) => row);
 		}
 	};
 }
