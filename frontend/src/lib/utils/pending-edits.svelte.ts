@@ -40,7 +40,7 @@ const edits = new SvelteMap<string, PendingEdit>();
 const inFlight = new SvelteMap<string, Promise<void>>();
 const versions = new SvelteMap<string, string>();
 const latest = new SvelteMap<string, Expense>();
-const timedOut = new Map<string, EditPayload>();
+const timedOut = new SvelteMap<string, EditPayload>();
 let nextSeq = 0;
 
 function noteVersion(id: string, updatedAt: string | undefined): void {
