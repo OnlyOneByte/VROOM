@@ -45,7 +45,9 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+	<Dialog.Content
+		class="{form.manualMapping ? 'sm:max-w-2xl' : 'sm:max-w-lg'} max-h-[90vh] overflow-y-auto"
+	>
 		<Dialog.Header>
 			<Dialog.Title>Import from CSV</Dialog.Title>
 			<Dialog.Description>
