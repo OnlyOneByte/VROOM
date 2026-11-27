@@ -20,7 +20,7 @@ async function holdPut(page: Page, answer: 'ok' | 'fail') {
 	return state;
 }
 
-async function isOnTop(page: Page, target: Locator) {
+async function isOnTop(target: Locator) {
 	const box = await target.boundingBox();
 	if (!box) return false;
 	const x = box.x + box.width / 2;
@@ -94,10 +94,8 @@ test.describe('Editing an expense does not wait for the server', () => {
 		const pageEnd = (await page.locator('#main > div > :last-child').last().boundingBox())!;
 		expect(pageEnd.y + pageEnd.height).toBeLessThanOrEqual(addTop);
 
-		expect(await isOnTop(page, row.getByRole('link', { name: /^Edit / }))).toBe(true);
-		expect(await isOnTop(page, row.getByRole('button', { name: /^Retry saving changes/ }))).toBe(
-			true
-		);
+		expect(await isOnTop(row.getByRole('link', { name: /^Edit / }))).toBe(true);
+		expect(await isOnTop(row.getByRole('button', { name: /^Retry saving changes/ }))).toBe(true);
 	});
 });
 
