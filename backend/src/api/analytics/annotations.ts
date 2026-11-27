@@ -1,8 +1,10 @@
-import { type SQL, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { rawAll } from '../../db/dialect';
 import type { UnitPreferences } from '../../types';
 import { convertDistance } from '../../utils/unit-conversions';
+import type { ReadableVehicle } from '../../utils/vehicle-access';
+import { readableRowsOf } from './vehicle-scope';
 
 export const QUERY_ANNOTATIONS = ['services', 'trips'] as const;
 export type QueryAnnotation = (typeof QUERY_ANNOTATIONS)[number];
@@ -24,18 +26,11 @@ export interface TripLane {
 }
 
 interface Scope {
-  userId: string;
+  readable: ReadableVehicle[];
   vehicleIds: string[];
   names: Map<string, string>;
   start: number;
   end: number;
-}
-
-function inList(values: readonly string[]): SQL {
-  return sql.join(
-    values.map((v) => sql`${v}`),
-    sql`, `
-  );
 }
 
 export async function serviceAnnotations(
@@ -52,8 +47,7 @@ export async function serviceAnnotations(
     db,
     sql`
     SELECT e.date, e.vehicle_id, e.description, e.expense_amount AS amount FROM expenses e
-    WHERE e.user_id = ${scope.userId} AND e.category = 'maintenance'
-      AND e.vehicle_id IN (${inList(scope.vehicleIds)})
+    WHERE ${readableRowsOf('e', scope.readable, { expenses: true })} AND e.category = 'maintenance'
       AND e.date >= ${scope.start} AND e.date < ${scope.end}
     ORDER BY e.date DESC, e.id DESC LIMIT ${MAX_SERVICES + 1}
   `
@@ -85,7 +79,11 @@ export async function tripLane(
     db,
     sql`
     SELECT t.trip_date AS date, t.vehicle_id, t.end_odometer - t.start_odometer AS distance FROM trips t
-    WHERE t.user_id = ${scope.userId} AND t.vehicle_id IN (${inList(scope.vehicleIds)})
+    WHERE ${readableRowsOf(
+      't',
+      scope.readable.filter((v) => v.seesTrips),
+      { expenses: false }
+    )}
       AND t.trip_date >= ${scope.start} AND t.trip_date < ${scope.end}
   `
   );
