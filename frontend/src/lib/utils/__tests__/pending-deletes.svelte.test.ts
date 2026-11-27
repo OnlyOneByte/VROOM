@@ -38,7 +38,7 @@ function lastAction(): { label: string; onClick: () => void } {
 describe('deleting an expense waits 5 s for Undo', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
-		vi.clearAllMocks();
+		vi.resetAllMocks();
 		vi.mocked(expenseApi.deleteExpense).mockResolvedValue(undefined);
 	});
 	afterEach(() => {
