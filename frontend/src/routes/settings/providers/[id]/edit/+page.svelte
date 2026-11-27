@@ -94,7 +94,7 @@
 	}
 
 	function backToSettings() {
-		goto(resolve(routes.settings));
+		goto(resolve(routes.settingsStorage));
 	}
 </script>
 
@@ -110,7 +110,7 @@
 				variant="ghost"
 				size="icon-lg"
 				class="shrink-0"
-				aria-label="Back to Settings"
+				aria-label="Back to Backups and storage"
 				onclick={backToSettings}
 			>
 				<ArrowLeft class="size-5" />
@@ -139,12 +139,14 @@
 						</div>
 						<p class="mb-4 text-sm text-muted-foreground">
 							{notFound
-								? 'It may have been removed. Go back to Settings to see your storage providers.'
+								? 'It may have been removed. Go back to Backups and storage to see your storage providers.'
 								: error}
 						</p>
 					</div>
 					{#if notFound}
-						<Button size="lg" variant="outline" onclick={backToSettings}>Back to Settings</Button>
+						<Button size="lg" variant="outline" onclick={backToSettings}>
+							Back to Backups and storage
+						</Button>
 					{:else}
 						<Button size="lg" onclick={retryLoad}>Retry</Button>
 					{/if}

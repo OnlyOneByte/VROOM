@@ -91,7 +91,7 @@ describe('api client — global session expiry on 401', () => {
 		expect(expiryWarningShown()).toBe(false);
 		expect(goto).not.toHaveBeenCalled();
 		expect(appStore.notifications.map(n => n.message)).toEqual([
-			"Couldn't load the photos. Your storage account needs to be reconnected. Reconnect it in Settings."
+			"Couldn't load the photos. Your storage account needs to be reconnected. Reconnect it in Settings → Backups and storage."
 		]);
 	});
 
