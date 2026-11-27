@@ -66,6 +66,18 @@ export class TransactionEndedError extends Error {
   }
 }
 
+let lateQueryListener: ((error: TransactionEndedError) => void) | null = null;
+
+export function reportLateQueries(listener: ((error: TransactionEndedError) => void) | null): void {
+  lateQueryListener = listener;
+}
+
+function lateQuery(): TransactionEndedError {
+  const error = new TransactionEndedError();
+  lateQueryListener?.(error);
+  return error;
+}
+
 export class TransactionRolledBackError extends Error {
   constructor() {
     super('SQLite rolled this transaction back after an earlier error, so the rest was refused');
@@ -203,7 +215,7 @@ function createAsyncDatabase(sqlite: Database) {
     const head = statementHead(query);
     checkControl(scope, head);
     if (scope && ROLLBACK.test(head) && !sqlite.inTransaction) return { rows: [] };
-    if (hasEnded(scope, head)) throw new TransactionEndedError();
+    if (hasEnded(scope, head)) throw lateQuery();
     while (open && scope?.root !== open) await closed;
     while (scope?.nested) await scope.nested.catch(() => undefined);
     if (scope && !sqlite.inTransaction && !BEGIN.test(head)) {
@@ -274,7 +286,7 @@ function createAsyncDatabase(sqlite: Database) {
 
   function joinOpen<T>(parent: Scope, callback: (tx: Transaction) => Promise<T>): Promise<T> {
     const run = parent.queue.then(() => {
-      if (hasEnded(parent)) throw new TransactionEndedError();
+      if (hasEnded(parent)) throw lateQuery();
       const child = {
         ended: false,
         sealed: false,
@@ -306,7 +318,7 @@ function createAsyncDatabase(sqlite: Database) {
     config: { behavior?: Behavior } = {}
   ): Promise<T> {
     const outer = scopes.getStore();
-    if (hasEnded(outer)) throw new TransactionEndedError();
+    if (hasEnded(outer)) throw lateQuery();
     if (outer) return joinOpen(outer, callback);
     while (open) await closed;
     let close: () => void = () => undefined;

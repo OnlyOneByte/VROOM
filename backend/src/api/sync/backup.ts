@@ -13,6 +13,7 @@ import {
   TABLE_FILENAME_MAP,
   TABLE_SCHEMA_MAP,
 } from '../../config';
+import type { AsyncHandle } from '../../db/async-sqlite';
 import type { UserProvider } from '../../db/schema';
 import {
   expenses,
@@ -541,8 +542,13 @@ class BackupService {
     return provider.download({ providerType: provider.type, externalId: fileRef });
   }
 
-  async createBackup(userId: string): Promise<BackupData> {
-    const db = appContext().asyncDb;
+  createBackup(userId: string): Promise<BackupData> {
+    return appContext().asyncDb.transaction((tx) => this.readBackup(tx, userId), {
+      behavior: 'deferred',
+    });
+  }
+
+  private async readBackup(db: AsyncHandle, userId: string): Promise<BackupData> {
     const [
       userVehicles,
       userExpenses,
@@ -609,6 +615,7 @@ class BackupService {
       userPhotoRefs.push(...rows);
     }
     const storageProviders = await this.storageProviderIdentities(
+      db,
       userId,
       userPhotoRefs.map((ref) => ref.providerId)
     );
@@ -670,14 +677,14 @@ class BackupService {
   }
 
   private async storageProviderIdentities(
+    db: AsyncHandle,
     userId: string,
     providerIds: string[]
   ): Promise<Record<string, string>> {
-    const { userProviders } = await import('../../db/schema');
     const identities: Record<string, string> = {};
     for (const batch of chunk([...new Set(providerIds)])) {
-      const rows = await appContext()
-        .asyncDb.select()
+      const rows = await db
+        .select()
         .from(userProviders)
         .where(and(inArray(userProviders.id, batch), eq(userProviders.userId, userId)));
       for (const row of rows) {

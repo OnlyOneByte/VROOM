@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq, getTableColumns, gte, inArray, lte, min, or } from 'drizzle-orm';
+import { and, eq, getTableColumns, gte, inArray, lte, min } from 'drizzle-orm';
 import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import {
   type CommunityStat,

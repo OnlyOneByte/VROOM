@@ -148,8 +148,12 @@ transactions, and the boot-time role sync and first-admin check. Since C2, so ar
 split-expense, trip, odometer, reminder-trigger and financing transactions.
 `BaseRepository`'s shared methods run on it for every subclass.
 
-Since C3, every repository and every transaction outside the restore path runs on the async
-session. Inside a transaction callback, use the transaction handle `tx`; outside it, use the
+Every repository, every transaction, the key-rotation script and sample and demo seeding run
+on the async session. Key rotation reads each batch and decrypts it before its write
+transaction opens, then writes with a compare-and-set on the old ciphertext; a demo or sample
+garage is seeded in one transaction, so a failed seed leaves none of it. The analytics
+repositories already query through the async session; only their constructors still take the
+sync handle, until C5. Inside a transaction callback, use the transaction handle `tx`; outside it, use the
 async session. Insurance writes check vehicle ownership inside the transaction that writes,
 and a currency change rescales the owner's money and saves the new currency in one transaction.
 
@@ -174,22 +178,39 @@ fails the test even when the code catches the error. `inAsyncTransaction()` in
 `src/db/async-sqlite.ts` tells it when one is. Other slow awaits, such as file reads, are not
 checked. Use `outsideTransaction` for work that must start inside one and outlive it.
 
+Work started inside a transaction callback carries the transaction with it, because the
+session tracks the open transaction through the async context. A fire-and-forget call made
+there (a notification, activity tracking, a sync trigger) joins the transaction while it is
+open, and is refused with `TransactionEndedError` once it has closed. Start such work after
+the transaction returns, or hand it to `outsideTransaction`. Tests report every refused late
+query through `reportLateQueries` and fail the test even when the code swallows the error.
+Today the app's detached calls (the activity tracker in `changeTracker`, the sync worker and
+community refresh timers, and the backup lock release) all start outside any transaction.
+The guard has two limits. It cannot see detached work that runs while its transaction is still
+open: that work joins the transaction, and if the transaction rolls back the work is lost
+without a report. And its listener is process-wide, so a late query from a timer that fires
+after its own test has finished fails whichever test is running then.
+
 The role-manager count skips accounts still waiting for approval, so a role given to one can't
 stand in for the last real role manager.
 
-The same holds for reads that look like one snapshot: a backup (`createBackup` in
-`src/api/sync/backup.ts`) and the Sheets mirror await each table in turn, so a write can land
-between two of their reads on either handle. A true snapshot needs a read transaction, which
-part C can add.
+A backup reads one snapshot: `createBackup` in `src/api/sync/backup.ts` reads every table in one
+deferred read transaction, and the Sheets mirror uses `createBackup` too. While it is open every
+other query waits, so it holds only the reads; zipping, CSV writing and the Sheets upload happen
+after it closes. On the seeded garage it is held for about 5 ms (median of 20 runs, 10 ms worst),
+and with 10,000 extra expenses about 33 ms (82 ms worst).
 
 Provider construction resolves its private-network policy on the async session:
 `privateEndpointPolicyFor` in `src/utils/outbound-url.ts` is async, so building a storage
 provider (`createProviderInstance`) and resolving model settings (`resolveModelSettings`) are
 async too, and the provider create and photo backfill transactions run on the async session.
 
-What part C still has to move: the restore path, a read transaction for backups, the key-rotation script, and demo and sample seeding (C4).
-Restore keeps a sync copy of the share-role change, `changeShareRoleInSyncTransaction`, until
-C4 moves it.
+Restore runs its wipe and inserts in one async transaction (see
+`docs/conventions/BackupRestore.md`).
+
+What part C still has to move (C5): the sync `AppDatabase` and `syncDb` themselves, the
+analytics constructors' sync parameter, `syncResolverFor` and the tests that still use the sync
+handle.
 Connection upkeep in `src/db/connection.ts` stays sync by design.
 
 **Permissions load, then check.** A request's resolver reads its grants on the async session

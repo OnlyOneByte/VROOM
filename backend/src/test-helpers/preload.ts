@@ -6,6 +6,7 @@ process.env.PRIVATE_PROVIDER_ENDPOINTS = 'allow';
 
 const guard = await import('./transaction-guard');
 guard.guardProperty(globalThis, 'fetch', 'fetch');
+guard.recordLateQueries();
 
 const { outboundResolver } = await import('../utils/outbound-url');
 outboundResolver.lookup = async () => ['93.184.215.14'];
