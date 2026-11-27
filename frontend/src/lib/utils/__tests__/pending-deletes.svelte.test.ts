@@ -64,6 +64,19 @@ describe('deleting an expense waits 5 s for Undo', () => {
 		);
 	});
 
+	test('a delete the server refuses for lack of access offers no Retry, in the toast or on the row', async () => {
+		vi.mocked(expenseApi.deleteExpense).mockRejectedValueOnce(new ApiError('no access', 403));
+		scheduleDelete(expense());
+		await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS + 100);
+
+		const failure = appStore.addNotification.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+		expect(failure).toMatchObject({ type: 'error' });
+		expect(failure).not.toHaveProperty('action');
+		expect(deleteFailureStates([expense()])).toEqual([
+			['e1', expect.objectContaining({ status: 'failed', kind: 'delete', editable: false })]
+		]);
+	});
+
 	test('the row hides at once, and Undo brings it back without sending a DELETE', async () => {
 		scheduleDelete(expense());
 		expect(isDeleteHidden(expense())).toBe(true);

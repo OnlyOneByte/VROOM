@@ -302,6 +302,18 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2);
 	});
 
+	test('an edit the server refuses for lack of access offers no Retry, in the toast or on the row', async () => {
+		vi.mocked(expenseApi.updateExpense).mockRejectedValueOnce(new ApiError('no access', 403));
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(notices()).toHaveLength(2));
+
+		expect(notices()[1]).toMatchObject({ type: 'error' });
+		expect(notices()[1]).not.toHaveProperty('action');
+		expect(editFailureStates([saved])).toEqual([
+			['e1', expect.objectContaining({ status: 'failed', kind: 'edit', editable: false })]
+		]);
+	});
+
 	test('a Retry that succeeds says so in place of the error toast', async () => {
 		vi.mocked(expenseApi.updateExpense)
 			.mockRejectedValueOnce(new ApiError('down', 500))

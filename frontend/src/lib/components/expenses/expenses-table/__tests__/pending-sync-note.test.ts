@@ -68,6 +68,18 @@ describe('PendingSyncNote', () => {
 		expect(screen.queryByRole('button')).toBeNull();
 	});
 
+	test('a failed edit the server refused for lack of access offers no Retry or Edit', () => {
+		render(PendingSyncNote, {
+			props: {
+				...props,
+				pending: { status: 'failed', kind: 'edit', error: 'No access', editable: false }
+			}
+		});
+		expect(screen.getByText('Changes not saved: No access')).toBeInTheDocument();
+		expect(screen.queryByRole('button')).toBeNull();
+		expect(screen.queryByRole('link')).toBeNull();
+	});
+
 	test('Discard asks first, then removes the entry from this device', async () => {
 		render(PendingSyncNote, {
 			props: { ...props, pending: { status: 'failed', error: 'Mileage too low', editable: true } }

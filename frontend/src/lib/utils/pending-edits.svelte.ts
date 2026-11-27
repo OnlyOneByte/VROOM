@@ -2,7 +2,11 @@ import { SvelteMap } from 'svelte/reactivity';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { expenseApi } from '#lib/services/expense-api.ts';
 import type { Expense } from '#lib/types/index.ts';
-import { RequestTimeoutError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+import {
+	RequestTimeoutError,
+	isForbiddenError,
+	userFacingErrorMessage
+} from '#lib/utils/error-handling.ts';
 import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 import { UNDO_WINDOW_MS } from '#lib/utils/pending-deletes.svelte.ts';
 
@@ -20,6 +24,7 @@ interface PendingEdit {
 	undoneAt?: string;
 	undoSeq?: number;
 	retried?: boolean;
+	forbidden?: boolean;
 }
 
 export const EDIT_TIMEOUT_MS = 15_000;
@@ -63,7 +68,8 @@ async function put(id: string, seq: number, payload: EditPayload): Promise<void>
 		}
 	} catch (error) {
 		const reason = userFacingErrorMessage(error);
-		if (!settle(id, seq, { status: 'failed', error: reason })) return;
+		const forbidden = isForbiddenError(error);
+		if (!settle(id, seq, { status: 'failed', error: reason, forbidden })) return;
 		appStore.addNotification({
 			type: 'error',
 			message: edits.get(id)?.undo
@@ -72,7 +78,7 @@ async function put(id: string, seq: number, payload: EditPayload): Promise<void>
 			description: reason,
 			toastId: toastId(id),
 			duration: Number.POSITIVE_INFINITY,
-			action: { label: 'Retry', onClick: () => retryEdit(id) }
+			...(!forbidden && { action: { label: 'Retry', onClick: () => retryEdit(id) } })
 		});
 	} finally {
 		clearTimeout(timer);
@@ -192,7 +198,15 @@ export function editFailureStates(expenses: readonly Expense[]): [string, Pendin
 	for (const expense of expenses) {
 		const entry = edits.get(expense.id);
 		if (entry?.status === 'failed' && covers(entry, expense)) {
-			states.push([expense.id, { status: 'failed', kind: 'edit', error: entry.error ?? '' }]);
+			states.push([
+				expense.id,
+				{
+					status: 'failed',
+					kind: 'edit',
+					error: entry.error ?? '',
+					...(entry.forbidden && { editable: false })
+				}
+			]);
 		}
 	}
 	return states;

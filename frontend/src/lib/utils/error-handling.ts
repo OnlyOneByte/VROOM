@@ -68,6 +68,10 @@ function isVroomError(error: unknown): error is VroomError {
 	return error instanceof VroomError;
 }
 
+export function isForbiddenError(error: unknown): boolean {
+	return isVroomError(error) && error.statusCode === 403;
+}
+
 function isNetworkError(error: unknown): boolean {
 	return error instanceof NetworkError;
 }

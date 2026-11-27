@@ -20,6 +20,7 @@
 
 	let { pending, entryId, returnTo, label, deleteKey = entryId, canWrite = true }: Props = $props();
 	let confirmDiscard = $state(false);
+	let writable = $derived(canWrite && pending.editable !== false);
 </script>
 
 {#if pending.status === 'saving'}
@@ -32,7 +33,7 @@
 {:else if pending.kind === 'delete'}
 	<div class="flex flex-wrap items-center gap-2 whitespace-normal" data-testid="delete-failed-note">
 		<span class="text-xs text-destructive">Not deleted: {pending.error}</span>
-		{#if canWrite}
+		{#if writable}
 			<Button
 				variant="outline"
 				size="sm"
@@ -50,7 +51,7 @@
 {:else if pending.kind === 'edit'}
 	<div class="flex flex-wrap items-center gap-2 whitespace-normal" data-testid="edit-failed-note">
 		<span class="text-xs text-destructive">Changes not saved: {pending.error}</span>
-		{#if canWrite}
+		{#if writable}
 			<Button
 				variant="outline"
 				size="sm"
