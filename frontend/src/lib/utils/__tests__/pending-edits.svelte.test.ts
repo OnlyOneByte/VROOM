@@ -3,13 +3,15 @@ import type { Expense } from '#lib/types/index.ts';
 
 const appStore = vi.hoisted(() => ({ addNotification: vi.fn(), dismissToast: vi.fn() }));
 vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore }));
-vi.mock('#lib/services/expense-api.ts', () => ({ expenseApi: { updateExpense: vi.fn() } }));
+vi.mock('#lib/services/expense-api.ts', () => ({
+	expenseApi: { updateExpense: vi.fn(), getExpense: vi.fn() }
+}));
 
 import { expenseApi } from '#lib/services/expense-api.ts';
 import { ApiError } from '#lib/utils/error-handling.ts';
 import {
 	applyMyChanges,
-	discardForLatest,
+	reloadLatest,
 	EXPENSE_CHANGED_MESSAGE,
 	editFailureStates,
 	editedRows,
@@ -396,19 +398,59 @@ describe('an edit refused because the expense changed elsewhere', () => {
 		});
 	});
 
-	test('Reload drops the edit so the fresh copy shows', async () => {
-		await conflicted();
+	const reloaded = { ...saved, amount: 45, updatedAt: elsewhere };
 
-		discardForLatest('e1');
+	test('Reload shows the fresh copy on that row and drops only that edit', async () => {
+		const other = { ...saved, id: 'e2' };
+		vi.mocked(expenseApi.updateExpense).mockRejectedValueOnce(new ApiError('down', 500));
+		scheduleEdit(other, { ...other, amount: 99 }, payload);
+		await vi.waitFor(() => expect(editFailureStates([other])).toHaveLength(1));
+		await conflicted();
+		vi.mocked(expenseApi.getExpense).mockResolvedValueOnce(reloaded);
+
+		await reloadLatest('e1');
+		expect(expenseApi.getExpense).toHaveBeenCalledWith('e1');
 		expect(appStore.dismissToast).toHaveBeenCalledWith('expense-edit-e1');
-		expect(editFailureStates([saved])).toEqual([]);
-		expect(shownExpense(saved)).toBe(saved);
+		expect(shownExpense(saved)).toMatchObject({ amount: 45, updatedAt: elsewhere });
+		expect(editFailureStates([shownExpense(saved)])).toEqual([]);
+		expect(editFailureStates([other])).toHaveLength(1);
+	});
+
+	test('if the fresh copy cannot be loaded, the conflict and my edit stay', async () => {
+		await conflicted();
+		vi.mocked(expenseApi.getExpense).mockRejectedValueOnce(new ApiError('down', 500));
+
+		await reloadLatest('e1');
+		expect(editFailureStates([saved])).toEqual([
+			['e1', expect.objectContaining({ conflict: true })]
+		]);
+		expect(lastNotice()).toMatchObject({
+			type: 'error',
+			message: "Couldn't load the latest version of the expense"
+		});
+	});
+
+	test('a Retry after a timed-out save checks against the last known version', async () => {
+		vi.mocked(expenseApi.updateExpense).mockRejectedValueOnce(new ApiError('timeout', 408));
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(editFailureStates([saved])).toHaveLength(1));
+		vi.mocked(expenseApi.updateExpense).mockRejectedValueOnce(changedElsewhere());
+
+		retryEdit('e1');
+		await vi.waitFor(() =>
+			expect(editFailureStates([saved])).toEqual([
+				['e1', expect.objectContaining({ conflict: true })]
+			])
+		);
+		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith('e1', payload, {
+			expectedUpdatedAt: saved.updatedAt
+		});
 	});
 
 	test('a later edit after a reload checks against the reloaded version', async () => {
 		await conflicted();
-		discardForLatest('e1');
-		const reloaded = { ...saved, amount: 45, updatedAt: elsewhere };
+		vi.mocked(expenseApi.getExpense).mockResolvedValueOnce(reloaded);
+		await reloadLatest('e1');
 		vi.mocked(expenseApi.updateExpense).mockResolvedValueOnce(reloaded);
 
 		scheduleEdit(reloaded, { ...reloaded, amount: 50 }, payload);

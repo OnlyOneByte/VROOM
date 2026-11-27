@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 
 const edits = vi.hoisted(() => ({
 	applyMyChanges: vi.fn(),
-	discardForLatest: vi.fn(),
+	reloadLatest: vi.fn(() => Promise.resolve()),
 	retryEdit: vi.fn()
 }));
 vi.mock('#lib/utils/pending-edits.svelte.ts', () => edits);
@@ -50,12 +50,12 @@ describe('a row whose edit was refused because it changed elsewhere', () => {
 		expect(edits.applyMyChanges).toHaveBeenCalledWith('e1');
 	});
 
-	test('Reload drops the edit and reloads the page', async () => {
+	test('Reload refreshes only this expense, without reloading the page', async () => {
 		const reload = vi.fn();
 		vi.spyOn(window, 'location', 'get').mockReturnValue({ ...window.location, reload });
 		mount();
 		await fireEvent.click(screen.getByRole('button', { name: /^Reload/ }));
-		expect(edits.discardForLatest).toHaveBeenCalledWith('e1');
-		expect(reload).toHaveBeenCalled();
+		expect(edits.reloadLatest).toHaveBeenCalledWith('e1');
+		expect(reload).not.toHaveBeenCalled();
 	});
 });

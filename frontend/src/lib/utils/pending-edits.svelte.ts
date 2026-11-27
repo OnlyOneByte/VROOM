@@ -30,6 +30,7 @@ const toastId = (id: string) => `expense-edit-${id}`;
 const edits = new SvelteMap<string, PendingEdit>();
 const inFlight = new SvelteMap<string, Promise<void>>();
 const versions = new SvelteMap<string, string>();
+const latest = new SvelteMap<string, Expense>();
 let nextSeq = 0;
 
 function noteVersion(id: string, updatedAt: string | undefined): void {
@@ -62,7 +63,8 @@ function reportConflict(id: string, seq: number, updatedAt: string | null): void
 	appStore.addNotification({
 		type: 'error',
 		message: EXPENSE_CHANGED_MESSAGE,
-		description: 'Reload to see the latest version, or apply your changes on top of it.',
+		description:
+			'Apply your changes on top of the newer version, or use Reload on the expense to see it.',
 		toastId: toastId(id),
 		duration: Number.POSITIVE_INFINITY,
 		action: { label: 'Apply my changes', onClick: () => applyMyChanges(id) }
@@ -201,10 +203,29 @@ export function applyMyChanges(id: string): void {
 	send(id);
 }
 
-export function discardForLatest(id: string): void {
-	appStore.dismissToast(toastId(id));
-	edits.delete(id);
-	versions.delete(id);
+export async function reloadLatest(id: string): Promise<void> {
+	const entry = edits.get(id);
+	if (entry?.status !== 'conflict') return;
+	try {
+		const fresh = await expenseApi.getExpense(id);
+		if (edits.get(id) !== entry) return;
+		appStore.dismissToast(toastId(id));
+		edits.delete(id);
+		latest.set(id, fresh);
+		noteVersion(id, fresh.updatedAt);
+	} catch (error) {
+		appStore.addNotification({
+			type: 'error',
+			message: "Couldn't load the latest version of the expense",
+			description: userFacingErrorMessage(error)
+		});
+	}
+}
+
+function withLatest<T extends Expense>(expense: T): T {
+	const fresh = latest.get(expense.id);
+	if (!fresh || (expense.updatedAt && fresh.updatedAt < expense.updatedAt)) return expense;
+	return { ...expense, ...fresh };
 }
 
 function covers(entry: PendingEdit, expense: Expense): boolean {
@@ -219,7 +240,8 @@ function overlay(expense: Expense): PendingEdit | undefined {
 	return covers(entry, expense) ? entry : undefined;
 }
 
-export function shownExpense<T extends Expense>(expense: T): T {
+export function shownExpense<T extends Expense>(listed: T): T {
+	const expense = withLatest(listed);
 	const entry = overlay(expense);
 	return entry ? { ...expense, ...entry.after } : expense;
 }
@@ -260,4 +282,5 @@ export function resetPendingEdits(): void {
 	edits.clear();
 	inFlight.clear();
 	versions.clear();
+	latest.clear();
 }

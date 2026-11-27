@@ -6,7 +6,7 @@
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 	import { retryDelete } from '#lib/utils/pending-deletes.svelte.ts';
-	import { applyMyChanges, discardForLatest, retryEdit } from '#lib/utils/pending-edits.svelte.ts';
+	import { applyMyChanges, reloadLatest, retryEdit } from '#lib/utils/pending-edits.svelte.ts';
 	import { expenseEditHref } from './expense-table-actions';
 
 	interface Props {
@@ -66,8 +66,7 @@
 			aria-label="Reload {label} without my changes"
 			onclick={event => {
 				event.stopPropagation();
-				discardForLatest(entryId);
-				window.location.reload();
+				void reloadLatest(entryId);
 			}}
 		>
 			Reload
