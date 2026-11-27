@@ -4,7 +4,12 @@ import { render, waitFor } from '@testing-library/svelte';
 type Series = { key: string; label: string; color: string };
 
 const { api, lines } = vi.hoisted(() => ({
-	api: { getCrossVehicle: vi.fn(), getFinancing: vi.fn(), getInsurance: vi.fn() },
+	api: {
+		getCrossVehicle: vi.fn(),
+		getFinancing: vi.fn(),
+		getInsurance: vi.fn(),
+		query: vi.fn(() => Promise.resolve(null))
+	},
 	lines: [] as { title: string; series: Series[]; data: Record<string, unknown>[] }[]
 }));
 

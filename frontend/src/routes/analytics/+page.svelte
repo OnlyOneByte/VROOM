@@ -58,6 +58,9 @@
 		return known.length > 0 ? known : undefined;
 	});
 	let sharedCars = $derived(vehicles.filter(v => v.carShare?.enabled));
+	let hiddenFinancials = $derived(
+		new Set(vehicles.filter(v => v.sharedAccess && !v.sharedAccess.seesFinancials).map(v => v.id))
+	);
 	let filtered = $derived(!isDefaultFilters(filters));
 	let nonDefaultRange = $derived(filters.range !== DEFAULT_RANGE);
 	let vehicleOptions = $derived(
@@ -360,6 +363,8 @@
 							{dateRange}
 							{vehicleIds}
 							{vehicleColors}
+							{hiddenFinancials}
+							rangeText={rangeLabel(filters, d => formatDate(d))}
 							filterLabel={filtered ? filterLabel : undefined}
 							onClearFilters={filtered ? clearFilters : undefined}
 						/>

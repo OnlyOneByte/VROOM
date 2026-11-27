@@ -9,13 +9,14 @@
 	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
 	import type { AnalyticsDateRange } from './analytics-filters';
 	import ExpenseTrendChart from '#lib/components/charts/ExpenseTrendChart.svelte';
-	import { AppBarChart, AppLineChart, AppPieChart } from '#lib/components/charts/index.ts';
+	import { AppBarChart, AppLineChart } from '#lib/components/charts/index.ts';
 	import {
 		buildChartConfig,
 		buildCategoryPieData,
 		buildVehicleColorMap
 	} from '#lib/utils/chart-colors.ts';
 	import type {
+		AnalyticsQueryResponse,
 		CrossVehicleResponse,
 		FinancingResponse,
 		InsuranceResponse
@@ -26,6 +27,14 @@
 	import { getFuelEfficiencyLabel, getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import FinancingAnalytics from './cross-vehicle/FinancingAnalytics.svelte';
 	import InsuranceAnalytics from './cross-vehicle/InsuranceAnalytics.svelte';
+	import CrossVehicleOverview from './cross-vehicle/CrossVehicleOverview.svelte';
+	import ChartGroup from './fuel/ChartGroup.svelte';
+	import {
+		carValues,
+		categoryMatrix,
+		crossHero,
+		overviewRequests
+	} from './cross-vehicle/cross-overview';
 
 	interface Props {
 		dateRange?: AnalyticsDateRange;
@@ -33,6 +42,8 @@
 		vehicleColors?: Record<string, string>;
 		filterLabel?: string;
 		onClearFilters?: () => void;
+		rangeText?: string;
+		hiddenFinancials?: ReadonlySet<string>;
 	}
 
 	let {
@@ -40,8 +51,14 @@
 		vehicleIds,
 		vehicleColors,
 		filterLabel,
-		onClearFilters
+		onClearFilters,
+		rangeText = 'Last 12 months',
+		hiddenFinancials = new Set<string>()
 	}: Props = $props();
+
+	let runningCost = $state<AnalyticsQueryResponse | null>(null);
+	let allInCost = $state<AnalyticsQueryResponse | null>(null);
+	let byCategory = $state<Array<AnalyticsQueryResponse | null>>([]);
 
 	let crossVehicle = $state<CrossVehicleResponse | null>(null);
 	let request = 0;
@@ -58,15 +75,22 @@
 		const current = ++request;
 		try {
 			isLoading = true;
-			const [cv, fin, ins] = await Promise.all([
+			const overview = overviewRequests(dateRange, vehicleIds);
+			const [cv, fin, ins, running, allIn, ...categories] = await Promise.all([
 				analyticsApi.getCrossVehicle({ ...dateRange, vehicleIds }),
 				analyticsApi.getFinancing({ vehicleIds }),
-				analyticsApi.getInsurance({ vehicleIds })
+				analyticsApi.getInsurance({ vehicleIds }),
+				...[overview.running, overview.allIn, ...overview.categories].map(params =>
+					analyticsApi.query(params).catch(() => null)
+				)
 			]);
 			if (current !== request) return;
 			crossVehicle = cv;
 			financing = fin;
 			insurance = ins;
+			runningCost = running ?? null;
+			allInCost = allIn ?? null;
+			byCategory = categories;
 			error = null;
 		} catch (e) {
 			if (current !== request) return;
@@ -90,7 +114,16 @@
 		}))
 	);
 
-	let appPieData = $derived(buildCategoryPieData(crossVehicle?.expenseByCategory ?? []));
+	let running = $derived(carValues(runningCost));
+	let allIn = $derived(carValues(allInCost));
+	let matrix = $derived(categoryMatrix(byCategory, hiddenFinancials));
+	let hero = $derived(crossHero(running, allIn, byCategory, hiddenFinancials));
+
+	let categoryRows = $derived(
+		buildCategoryPieData(crossVehicle?.expenseByCategory ?? []).sort((a, b) => b.value - a.value)
+	);
+	const categorySeries = [{ key: 'value', label: 'Spent', color: 'var(--chart-1)' }];
+	const categoryConfig: Chart.ChartConfig = { value: { label: 'Spent', color: 'var(--chart-1)' } };
 
 	let costBarData = $derived(crossVehicle?.vehicleCostComparison ?? []);
 
@@ -176,67 +209,97 @@
 				{/snippet}
 			</EmptyState>
 		{/if}
-		{#if trendData.length > 0}
-			<ExpenseTrendChart data={trendData} title="Monthly Expense Trends">
-				{#snippet icon()}
-					<TrendingUp class="h-5 w-5 text-primary" />
-				{/snippet}
-			</ExpenseTrendChart>
-		{/if}
+		<CrossVehicleOverview
+			{hero}
+			{running}
+			{allIn}
+			{matrix}
+			{vehicleColors}
+			{rangeText}
+			distanceUnit={distShortLabel}
+		/>
 
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-			{#if appPieData.length > 0}
-				<AppPieChart
-					title="Expense by Category"
-					description="Distribution across all vehicles"
-					data={appPieData}
-				/>
-			{/if}
+		<ChartGroup
+			title="More detail"
+			description="Monthly spending, spending by category, totals per car and fuel economy"
+		>
+			<div class="space-y-4 md:space-y-6">
+				{#if trendData.length > 0}
+					<ExpenseTrendChart level={3} data={trendData} title="Monthly Expense Trends">
+						{#snippet icon()}
+							<TrendingUp class="h-5 w-5 text-primary" />
+						{/snippet}
+					</ExpenseTrendChart>
+				{/if}
 
-			{#if costBarData.length > 0 && hasExpenses}
-				<AppBarChart
-					title="Vehicle Cost Comparison"
-					description="Total costs by vehicle"
-					data={costBarData}
-					x="vehicleName"
-					y="totalCost"
-					series={costBarSeries}
-					config={costBarConfig}
-					padding={costBarPadding}
-					xAxisProps={{ ticks: costBarData.map(d => d.vehicleName), format: costBarTickFormat }}
-					bind:plotWidth={costBarWidth}
-				>
-					{#snippet footer()}
-						<div class="mt-4 space-y-2 border-t border-border pt-4">
-							{#each costBarData as vehicle (vehicle.vehicleId)}
-								<div class="flex items-center justify-between text-sm">
-									<span>{vehicle.vehicleName}</span>
-									<span class="font-semibold">
-										{vehicle.costPerDistance != null
-											? `${formatCurrency(vehicle.costPerDistance)}/${distShortLabel}`
-											: 'N/A'}
-									</span>
+				<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+					{#if categoryRows.length > 0}
+						<AppBarChart
+							level={3}
+							title="Expense by Category"
+							description="Spending across all vehicles"
+							data={categoryRows}
+							x="value"
+							y="label"
+							orientation="horizontal"
+							series={categorySeries}
+							config={categoryConfig}
+							height={Math.max(160, categoryRows.length * 44)}
+							padding={{ top: 4, left: 112, bottom: 24, right: 16 }}
+							xAxisProps={{ format: (v: number) => formatCurrency(v, undefined, 0), ticks: 4 }}
+							yAxisFormat={v => String(v)}
+							tooltipFormat={v => formatCurrency(Number(v))}
+						/>
+					{/if}
+
+					{#if costBarData.length > 0 && hasExpenses}
+						<AppBarChart
+							level={3}
+							title="Vehicle Cost Comparison"
+							description="Total costs by vehicle"
+							data={costBarData}
+							x="vehicleName"
+							y="totalCost"
+							series={costBarSeries}
+							config={costBarConfig}
+							padding={costBarPadding}
+							xAxisProps={{ ticks: costBarData.map(d => d.vehicleName), format: costBarTickFormat }}
+							bind:plotWidth={costBarWidth}
+						>
+							{#snippet footer()}
+								<div class="mt-4 space-y-2 border-t border-border pt-4">
+									{#each costBarData as vehicle (vehicle.vehicleId)}
+										<div class="flex items-center justify-between text-sm">
+											<span>{vehicle.vehicleName}</span>
+											<span class="font-semibold">
+												{vehicle.costPerDistance != null
+													? `${formatCurrency(vehicle.costPerDistance)}/${distShortLabel}`
+													: 'N/A'}
+											</span>
+										</div>
+									{/each}
 								</div>
-							{/each}
-						</div>
-					{/snippet}
-				</AppBarChart>
-			{/if}
-		</div>
+							{/snippet}
+						</AppBarChart>
+					{/if}
+				</div>
 
-		{#if fuelEffData.length > 0}
-			<AppLineChart
-				title="Fuel Efficiency Comparison"
-				description="{efficiencyLabel} trends across all vehicles"
-				data={fuelEffData}
-				x="date"
-				y={fuelEffVehicleIds}
-				series={fuelEffSeries}
-				config={fuelEffConfig}
-				yAxisFormat={v => `${formatNumber(v, 0)} ${efficiencyLabel}`}
-				tooltipFormat={unitTooltip(efficiencyLabel)}
-			/>
-		{/if}
+				{#if fuelEffData.length > 0}
+					<AppLineChart
+						level={3}
+						title="Fuel Efficiency Comparison"
+						description="{efficiencyLabel} trends across all vehicles"
+						data={fuelEffData}
+						x="date"
+						y={fuelEffVehicleIds}
+						series={fuelEffSeries}
+						config={fuelEffConfig}
+						yAxisFormat={v => `${formatNumber(v, 0)} ${efficiencyLabel}`}
+						tooltipFormat={unitTooltip(efficiencyLabel)}
+					/>
+				{/if}
+			</div>
+		</ChartGroup>
 
 		<FinancingAnalytics {financing} />
 
