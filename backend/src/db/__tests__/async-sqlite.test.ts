@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { alias } from 'drizzle-orm/sqlite-core';
+import { LATE_QUERY, takeTransactionViolations } from '../../test-helpers/transaction-guard';
 import {
   openAsyncDatabase,
   RawTransactionControlError,
@@ -196,6 +197,7 @@ describe('async transactions over bun:sqlite', () => {
       error instanceof TransactionEndedError || error.cause instanceof TransactionEndedError
     ).toBe(true);
     expect((await db.select({ id: users.id }).from(users)).map((r) => r.id)).toEqual(['first']);
+    expect(takeTransactionViolations()).toEqual([LATE_QUERY]);
   });
 
   test('a failed batch inside a transaction leaves none of its rows', async () => {
@@ -402,6 +404,7 @@ begin`,
     const error = (await late.catch((e) => e)) as { cause?: unknown };
     expect(error.cause).toBeInstanceOf(TransactionEndedError);
     expect(await db.select().from(users)).toEqual([]);
+    expect(takeTransactionViolations()).toEqual([LATE_QUERY]);
   });
 
   test('run reports changes, and batch runs its statements in order', async () => {
@@ -525,6 +528,7 @@ begin`,
       expect(error.cause ?? error).toBeInstanceOf(TransactionEndedError);
     }
     expect((await db.select({ id: users.id }).from(users)).map((r) => r.id)).toEqual(['a']);
+    expect(takeTransactionViolations()).toEqual([LATE_QUERY, LATE_QUERY]);
   });
 
   test('a query built inside a transaction but handed to outsideTransaction runs outside it', async () => {
@@ -547,5 +551,36 @@ begin`,
     const sync = drizzle(sqlite, { schema });
     expect(await db.select().from(users)).toEqual(sync.select().from(users).all());
     expect(await db.query.users.findFirst()).toEqual(sync.query.users.findFirst().sync());
+  });
+});
+
+describe('fire-and-forget work started inside a transaction callback', () => {
+  test('a detached write that runs after the callback returns is refused and reported, not committed', async () => {
+    const { db, transaction } = setup();
+    let detached: Promise<unknown> = Promise.resolve();
+    await transaction(async (tx) => {
+      await tx.insert(users).values(user('in-tx'));
+      detached = tick().then(() => db.insert(users).values(user('detached')));
+    });
+    const error = (await detached.catch((e) => e)) as { cause?: unknown };
+    expect(error.cause ?? error).toBeInstanceOf(TransactionEndedError);
+    expect(takeTransactionViolations()).toEqual([LATE_QUERY]);
+    expect((await db.select({ id: users.id }).from(users)).map((r) => r.id)).toEqual(['in-tx']);
+  });
+
+  test('the same call handed to outsideTransaction runs outside it and survives its rollback', async () => {
+    const { db, transaction, outsideTransaction } = setup();
+    let detached: Promise<unknown> = Promise.resolve();
+    await expect(
+      transaction(async (tx) => {
+        await tx.insert(users).values(user('rolled-back'));
+        detached = outsideTransaction(() =>
+          tick().then(() => db.insert(users).values(user('outside')))
+        );
+        throw new Error('roll back');
+      })
+    ).rejects.toThrow('roll back');
+    await detached;
+    expect((await db.select({ id: users.id }).from(users)).map((r) => r.id)).toEqual(['outside']);
   });
 });

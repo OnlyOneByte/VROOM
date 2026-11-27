@@ -1,5 +1,5 @@
 import { type Mock, mock } from 'bun:test';
-import { inAsyncTransaction } from '../db/async-sqlite';
+import { inAsyncTransaction, reportLateQueries } from '../db/async-sqlite';
 
 type Callable = (...args: unknown[]) => unknown;
 
@@ -15,6 +15,12 @@ export function refuseInsideTransaction(what: string): void {
   if (!inAsyncTransaction()) return;
   violations.push(what);
   throw new NetworkInsideTransactionError(what);
+}
+
+export const LATE_QUERY = 'A query after its transaction ended';
+
+export function recordLateQueries(): void {
+  reportLateQueries(() => violations.push(LATE_QUERY));
 }
 
 export function takeTransactionViolations(): string[] {

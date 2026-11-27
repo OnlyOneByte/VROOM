@@ -176,6 +176,15 @@ fails the test even when the code catches the error. `inAsyncTransaction()` in
 `src/db/async-sqlite.ts` tells it when one is. Other slow awaits, such as file reads, are not
 checked. Use `outsideTransaction` for work that must start inside one and outlive it.
 
+Work started inside a transaction callback carries the transaction with it, because the
+session tracks the open transaction through the async context. A fire-and-forget call made
+there (a notification, activity tracking, a sync trigger) joins the transaction while it is
+open, and is refused with `TransactionEndedError` once it has closed. Start such work after
+the transaction returns, or hand it to `outsideTransaction`. Tests report every refused late
+query through `reportLateQueries` and fail the test even when the code swallows the error.
+Today the app's detached calls (the activity tracker in `changeTracker`, the sync worker and
+community refresh timers, and the backup lock release) all start outside any transaction.
+
 The role-manager count skips accounts still waiting for approval, so a role given to one can't
 stand in for the last real role manager.
 
