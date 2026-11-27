@@ -1,6 +1,7 @@
 import type { Database, Statement } from 'bun:sqlite';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { drizzle } from 'drizzle-orm/sqlite-proxy';
+import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
+import { drizzle, type SqliteRemoteResult } from 'drizzle-orm/sqlite-proxy';
 import { UPKEEP_QUERIES } from './dialect';
 import * as schema from './schema';
 
@@ -85,6 +86,12 @@ export class SyncQueryInAsyncTransactionError extends Error {
   }
 }
 
+const insideAny = new AsyncLocalStorage<boolean>();
+
+export function inAsyncTransaction(): boolean {
+  return insideAny.getStore() === true;
+}
+
 const opened = new WeakMap<Database, ReturnType<typeof createAsyncDatabase>>();
 
 export function openAsyncDatabase(sqlite: Database) {
@@ -97,6 +104,8 @@ export function openAsyncDatabase(sqlite: Database) {
 }
 
 export type AsyncAppDatabase = ReturnType<typeof openAsyncDatabase>['db'];
+export type AsyncHandle = BaseSQLiteDatabase<'async', SqliteRemoteResult, typeof schema>;
+export type AsyncTransaction = Parameters<Parameters<AsyncAppDatabase['transaction']>[0]>[0];
 
 function createAsyncDatabase(sqlite: Database) {
   type Scope = {
@@ -314,15 +323,17 @@ function createAsyncDatabase(sqlite: Database) {
     scope.root = scope;
     open = scope;
     try {
-      return await scopes.run(scope, () =>
-        begin(
-          (tx) => {
-            refuseRawControl(tx, dialect, currentSession);
-            bindBuildersToScope(tx);
-            scope.tx = tx;
-            return sealWhenSettled(scope, () => callback(tx));
-          },
-          { behavior: config.behavior ?? 'immediate' }
+      return await insideAny.run(true, () =>
+        scopes.run(scope, () =>
+          begin(
+            (tx) => {
+              refuseRawControl(tx, dialect, currentSession);
+              bindBuildersToScope(tx);
+              scope.tx = tx;
+              return sealWhenSettled(scope, () => callback(tx));
+            },
+            { behavior: config.behavior ?? 'immediate' }
+          )
         )
       );
     } finally {
@@ -333,7 +344,9 @@ function createAsyncDatabase(sqlite: Database) {
   }
 
   function outsideTransaction<T>(fn: () => T | PromiseLike<T>): Promise<T> {
-    return scopes.exit(() => outside.run(true, () => Promise.resolve().then(fn)));
+    return insideAny.run(false, () =>
+      scopes.exit(() => outside.run(true, () => Promise.resolve().then(fn)))
+    );
   }
 
   Object.assign(db, { transaction });

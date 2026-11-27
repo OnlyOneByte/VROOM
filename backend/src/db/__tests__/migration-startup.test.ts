@@ -122,13 +122,13 @@ describe('startup email case fold', () => {
     const ctx = await createTestApp();
     try {
       addUser(ctx.sqlite, 'fold-a', 'ÉMILE@example.com');
-      runMigrations();
+      await runMigrations();
       expect(
         ctx.sqlite.query("SELECT email FROM users WHERE id = 'fold-a'").get() as { email: string }
       ).toEqual({ email: 'émile@example.com' });
 
       addUser(ctx.sqlite, 'fold-b', 'Émile@example.com');
-      expect(() => runMigrations()).toThrow(/differ only by letter case.*fold-a, fold-b/);
+      await expect(runMigrations()).rejects.toThrow(/differ only by letter case.*fold-a, fold-b/);
     } finally {
       ctx.sqlite.run("DELETE FROM users WHERE id IN ('fold-a', 'fold-b')");
       ctx.close();

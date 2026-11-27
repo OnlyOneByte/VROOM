@@ -135,7 +135,7 @@ async function shareWeekendCar(pattern: DrivingPattern): Promise<void> {
   const db = getDb();
   const { vehicleId, userId } = pattern;
   const asyncDb = openAsyncDatabase(db.$client).db;
-  setCarShare(db, vehicleId, true);
+  await setCarShare(asyncDb, vehicleId, true);
   const owner = await ownDriverId(asyncDb, vehicleId, userId);
   const jamie = await addGuestDriver(
     asyncDb,
@@ -169,7 +169,7 @@ export async function seedDatabase() {
       })
       .returning();
 
-    assignServerRole(db, sampleUser.id, 'member');
+    await assignServerRole(openAsyncDatabase(db.$client).db, sampleUser.id, 'member');
     logger.info('Created sample user', { userId: sampleUser.id });
 
     await db.insert(userProviders).values({

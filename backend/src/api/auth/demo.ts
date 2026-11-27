@@ -23,7 +23,7 @@ export function isDemoAvailable(): boolean {
 }
 
 export async function prepareDemoGarage(): Promise<void> {
-  const { db, asyncDb } = appContext();
+  const { asyncDb } = appContext();
   demoReady = false;
   await asyncDb.delete(users).where(eq(users.id, DEMO_USER_ID));
   if (!CONFIG.demo.enabled) return;
@@ -31,7 +31,7 @@ export async function prepareDemoGarage(): Promise<void> {
     await asyncDb
       .insert(users)
       .values({ id: DEMO_USER_ID, email: DEMO_USER_EMAIL, displayName: 'Demo Garage' });
-    assignServerRole(db, DEMO_USER_ID, DEMO_ROLE_KEY);
+    await assignServerRole(asyncDb, DEMO_USER_ID, DEMO_ROLE_KEY);
     await seedGarage(DEMO_USER_ID);
   } catch (error) {
     await asyncDb

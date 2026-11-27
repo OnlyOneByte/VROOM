@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { Readable } from 'node:stream';
+import { appContext } from '../../../app-context';
 import { CONFIG } from '../../../config';
-import { getDb } from '../../../db/connection';
 import type { UserProvider } from '../../../db/schema';
 import { ValidationError } from '../../../errors';
 import { assignServerRole, builtInRoleId } from '../../../permissions/grants';
@@ -579,7 +579,7 @@ describe('with ADMIN_EMAILS set, only admins reach private targets', () => {
       `${memberId}@example.com`,
       'Member',
     ]);
-    assignServerRole(getDb(), memberId, 'member');
+    await assignServerRole(appContext().asyncDb, memberId, 'member');
     member = await requestAs(ctx, memberId);
   });
   afterEach(() => {

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import AdmZip from 'adm-zip';
+import { appContext } from '../../../app-context';
 import { getDb } from '../../../db/connection';
 import {
   assignServerRole,
@@ -19,20 +20,25 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function seedMember(id: string, level: string, status: string): void {
+async function seedMember(id: string, level: string, status: string): Promise<void> {
   ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
     id,
     `${id}@test.com`,
     id,
   ]);
-  assignServerRole(getDb(), id, 'member');
+  await assignServerRole(appContext().asyncDb, id, 'member');
   ctx.sqlite.run(
     `INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, 0, 0)`,
     [`share-${id}`, vehicleId, ctx.user.id, id, level, status]
   );
   if (status === 'accepted') {
-    grantShareRole(getDb(), { vehicleId, sharedWithId: id, level, grantedBy: ctx.user.id });
+    await grantShareRole(appContext().asyncDb, {
+      vehicleId,
+      sharedWithId: id,
+      level,
+      grantedBy: ctx.user.id,
+    });
   }
 }
 
@@ -65,8 +71,8 @@ async function exportZip(): Promise<Buffer> {
 
 describe('restore re-creates role assignments from restored accepted shares only', () => {
   test('accepted editor and viewer shares come back with their role', async () => {
-    seedMember('editor-1', 'editor', 'accepted');
-    seedMember('viewer-1', 'viewer', 'accepted');
+    await seedMember('editor-1', 'editor', 'accepted');
+    await seedMember('viewer-1', 'viewer', 'accepted');
     const zip = await exportZip();
 
     await restore(zip);
@@ -76,8 +82,8 @@ describe('restore re-creates role assignments from restored accepted shares only
   });
 
   test('pending and declined shares grant no role', async () => {
-    seedMember('pending-1', 'editor', 'pending');
-    seedMember('declined-1', 'editor', 'declined');
+    await seedMember('pending-1', 'editor', 'pending');
+    await seedMember('declined-1', 'editor', 'declined');
 
     await restore(await exportZip());
 
@@ -86,7 +92,7 @@ describe('restore re-creates role assignments from restored accepted shares only
   });
 
   test('a crafted backup claiming an accepted share for someone who never accepted grants no role', async () => {
-    seedMember('never-accepted-1', 'editor', 'declined');
+    await seedMember('never-accepted-1', 'editor', 'declined');
     const zip = new AdmZip(await exportZip());
     const shares = zip.getEntry('vehicle_shares.csv')?.getData().toString('utf-8') ?? '';
     const [header = ''] = shares.split('\n');
@@ -116,7 +122,7 @@ describe('restore re-creates role assignments from restored accepted shares only
   });
 
   test('role, assignment and override rows in a crafted backup are ignored', async () => {
-    seedMember('stranger-1', 'viewer', 'declined');
+    await seedMember('stranger-1', 'viewer', 'declined');
     const zip = new AdmZip(await exportZip());
     zip.addFile(
       'roles.csv',

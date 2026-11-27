@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
 import { DEMO_USER_ID } from '../../api/auth/demo-account';
 import { app } from '../../app';
+import { appContext } from '../../app-context';
 import { getDb } from '../../db/connection';
 import type { AppError } from '../../errors';
 import { createTestApp, requestAs } from '../../test-helpers/http-client';
@@ -119,7 +120,7 @@ describe('routes that check inside really refuse', () => {
       ctx.sqlite.run(
         "INSERT INTO users (id, email, display_name) VALUES ('other-owner', 'o@x.test', 'O')"
       );
-      assignServerRole(getDb(), 'other-owner', 'member');
+      await assignServerRole(appContext().asyncDb, 'other-owner', 'member');
       const member = await requestAs(ctx, 'other-owner');
       const answered: string[] = [];
       for (const [method, path, body] of [
@@ -208,7 +209,7 @@ describe('the Demo role on its own garage', () => {
       ctx.sqlite.run(
         "INSERT INTO users (id, email, display_name) VALUES ('demo-probe', 'd@x.test', 'D')"
       );
-      assignServerRole(getDb(), 'demo-probe', 'demo');
+      await assignServerRole(appContext().asyncDb, 'demo-probe', 'demo');
       ctx.sqlite.run(
         "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('demo-car', 'demo-probe', 'Kia', 'Rio', 2020)"
       );

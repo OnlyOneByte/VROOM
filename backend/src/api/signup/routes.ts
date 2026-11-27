@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { appContext } from '../../app-context';
 import { CONFIG } from '../../config';
+import type { AsyncHandle } from '../../db/async-sqlite';
 import { type serverInvites, users } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
@@ -59,9 +60,9 @@ function inviteView(invite: typeof serverInvites.$inferSelect, now: Date) {
   };
 }
 
-function pendingUser(id: string) {
-  const user = appContext()
-    .db.select({ id: users.id, email: users.email })
+async function pendingUser(tx: AsyncHandle, id: string) {
+  const user = await tx
+    .select({ id: users.id, email: users.email })
     .from(users)
     .where(and(eq(users.id, id), isNotNull(users.pendingApprovalAt)))
     .get();
@@ -73,12 +74,15 @@ export const signupRoutes = new Hono();
 signupRoutes.use('*', requireAuth);
 signupRoutes.use('*', changeTracker);
 
-signupRoutes.get('/signup', authorize(SERVER), (c) =>
-  c.json({ success: true, data: signupSettings(appContext().db) })
+signupRoutes.get('/signup', authorize(SERVER), async (c) =>
+  c.json({ success: true, data: await signupSettings(appContext().asyncDb) })
 );
 
-signupRoutes.put('/signup', authorize(SERVER), zValidator('json', settingsSchema), (c) => {
-  const settings = updateSignupSettings(appContext().db, c.req.valid('json'), c.get('user').id);
+signupRoutes.put('/signup', authorize(SERVER), zValidator('json', settingsSchema), async (c) => {
+  const change = c.req.valid('json');
+  const settings = await appContext().asyncDb.transaction((tx) =>
+    updateSignupSettings(tx, change, c.get('user').id)
+  );
   return c.json({ success: true, data: settings });
 });
 
@@ -88,18 +92,15 @@ signupRoutes.get('/invites', authorize(SERVER), async (c) => {
   return c.json({ success: true, data: invites.map((invite) => inviteView(invite, now)) });
 });
 
-signupRoutes.post('/invites', authorize(SERVER), zValidator('json', inviteSchema), (c) => {
+signupRoutes.post('/invites', authorize(SERVER), zValidator('json', inviteSchema), async (c) => {
   const { email, expiresInDays } = c.req.valid('json');
   const now = new Date();
-  const invite = createInvite(
-    appContext().db,
-    {
-      email,
-      expiresInDays: expiresInDays ?? CONFIG.signup.inviteTtlDays,
-      createdBy: c.get('user').id,
-    },
-    now
-  );
+  const input = {
+    email,
+    expiresInDays: expiresInDays ?? CONFIG.signup.inviteTtlDays,
+    createdBy: c.get('user').id,
+  };
+  const invite = await appContext().asyncDb.transaction((tx) => createInvite(tx, input, now));
   return c.json({ success: true, data: inviteView(invite, now) }, 201);
 });
 
@@ -107,9 +108,10 @@ signupRoutes.delete(
   '/invites/:id',
   authorize(SERVER),
   zValidator('param', commonSchemas.idParam),
-  (c) => {
+  async (c) => {
     const now = new Date();
-    const invite = revokeInvite(appContext().db, c.req.valid('param').id, now);
+    const { id } = c.req.valid('param');
+    const invite = await appContext().asyncDb.transaction((tx) => revokeInvite(tx, id, now));
     return c.json({ success: true, data: inviteView(invite, now) });
   }
 );
@@ -129,15 +131,16 @@ signupRoutes.post(
   '/pending-accounts/:id/approve',
   authorize(SERVER),
   zValidator('param', commonSchemas.idParam),
-  (c) => {
-    const { id, email } = pendingUser(c.req.valid('param').id);
-    appContext().db.transaction((tx) => {
-      tx.update(users)
+  async (c) => {
+    const id = await appContext().asyncDb.transaction(async (tx) => {
+      const user = await pendingUser(tx, c.req.valid('param').id);
+      await tx
+        .update(users)
         .set({ pendingApprovalAt: null, updatedAt: new Date() })
-        .where(eq(users.id, id))
-        .run();
-      assignServerRole(tx, id, 'member');
-      attachPendingInvites(tx, id, email);
+        .where(eq(users.id, user.id));
+      await assignServerRole(tx, user.id, 'member');
+      await attachPendingInvites(tx, user.id, user.email);
+      return user.id;
     });
     return c.json({ success: true, data: { id } });
   }
@@ -147,12 +150,12 @@ signupRoutes.delete(
   '/pending-accounts/:id',
   authorize(SERVER),
   zValidator('param', commonSchemas.idParam),
-  (c) => {
-    const { id } = pendingUser(c.req.valid('param').id);
-    appContext()
-      .db.delete(users)
-      .where(and(eq(users.id, id), isNotNull(users.pendingApprovalAt)))
-      .run();
+  async (c) => {
+    const id = await appContext().asyncDb.transaction(async (tx) => {
+      const user = await pendingUser(tx, c.req.valid('param').id);
+      await tx.delete(users).where(and(eq(users.id, user.id), isNotNull(users.pendingApprovalAt)));
+      return user.id;
+    });
     return c.json({ success: true, data: { id } });
   }
 );

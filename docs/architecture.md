@@ -142,13 +142,10 @@ connection as `appContext().db`, and repositories move to it area by area. The s
 auth-provider, photo-ref, insurance-claim, financing, push, vehicle, trip and share
 repositories are on it so far, and so are analytics, community stats, insurance policies,
 photos, drivers, the calendar feed, the settings and providers routes, provider resolution,
-the storage provider registry and Lucia's session adapter. The auth, demo, signup, shares and
-vehicles routes have started: some of their reads and writes are on it, and the rest move with
-the permission resolver or in part C.
-`BaseRepository`'s shared methods run on it for every subclass. In `src/api/drivers/`,
-`carShareEnabled` and `ensureMemberDriver` take only a sync transaction handle, because the
-share-accept and car-share transactions call them; code outside a transaction reads a
-vehicle's car-share flag through `repos().vehicles`.
+the storage provider registry and Lucia's session adapter. Since part C1, so are the
+grants, roles, sign-up, share and driver transactions, the auth sign-up and unlink
+transactions, and the boot-time role sync and first-admin check.
+`BaseRepository`'s shared methods run on it for every subclass.
 
 Some repositories hold two handles on the same connection while the move is under way: the
 async session for ordinary queries, and `syncDb` for the sync transactions they still open.
@@ -158,28 +155,39 @@ of these, use the transaction handle `tx`
 inside a transaction callback and the async session outside it, and never pass `syncDb` to
 code that runs on the async session. The sync transactions and `syncDb` go in part C.
 
-A sync read that gates a later write in the same synchronous stretch stays sync until part C,
-even outside a transaction. With no `await` between them, nothing else runs between the read
-and the write; on the async session another request could, so the check could pass on data
-that has changed by the time the write lands. That covers the share guards in
-`src/api/shares/routes.ts`, `pendingUser` and the invite and signup-settings writes in
-`src/api/signup/`, and all of `src/api/roles/routes.ts`, whose reads share helpers with its
-guards and stay sync with them. In part C each such check moves inside the async transaction
-that does the write. Code that already awaits between its read and its write gains nothing
-from the sync handle, because every `await` lets other requests run, so outside the
-repositories that still hold `syncDb` it is on the async session already.
+A read that gates a write runs inside the async transaction that does the write. An async
+transaction opens with `BEGIN IMMEDIATE` and the session queues every other writer behind it,
+so nothing can change the checked rows between the check and the write. A check made before
+the transaction opens could pass on data that has changed by the time the write lands. The
+share transitions in `src/api/shares/routes.ts` read the share, the owner and any per-person
+grants inside their transaction; the role, assignment and override writes in
+`src/api/roles/routes.ts` read the role, the vehicle owner, the target member and the row they
+replace inside theirs; and `keepingARoleManager` counts role managers before and after the
+change in the same transaction. Each request's own permissions are still loaded once, before
+its transaction opens (see "Permissions load, then check").
+
+Inside an async transaction, await only database work. The transaction holds the write lock,
+so a network call there stalls every other writer for as long as the call takes. In tests,
+`src/test-helpers/transaction-guard.ts` refuses `fetch` and outbound DNS lookups while a
+transaction is open and fails the test even when the code catches the error;
+`inAsyncTransaction()` in `src/db/async-sqlite.ts` tells it when one is. Use
+`outsideTransaction` for work that must start inside one and outlive it.
+
+Expenses, trips, odometer, reminders and financing still guard some writes with a sync read
+in the same synchronous stretch; those move inside their async transactions in part C2.
 
 The same holds for reads that look like one snapshot: a backup (`createBackup` in
 `src/api/sync/backup.ts`) and the Sheets mirror await each table in turn, so a write can land
 between two of their reads on either handle. A true snapshot needs a read transaction, which
 part C can add.
 
-What part C still has to move, besides the transactions themselves: those guards, the helpers
-that sign-up, share and car-share transactions also call (`assignServerRole`, `signupSettings`,
-`attachPendingInvites`, the invite helpers, `carShareEnabled`, `ensureMemberDriver`), the
+What part C still has to move: the expense, trip, odometer, reminder and financing
+transactions (C2); the insurance, community and photo transactions, settings, and the
 synchronous checks that provider construction calls in `src/utils/outbound-url.ts`
-(`isNetworkAdmin`, `hasSecondAccount`, `adminEmailWarnings`), the three `syncResolverFor`
-callers below, the restore path, demo and sample seeding, and the key-rotation script.
+(`isNetworkAdmin`, `hasSecondAccount`, `adminEmailWarnings`) (C3); and the restore path, a
+read transaction for backups, the key-rotation script, and demo and sample seeding (C4).
+Restore keeps a sync copy of the share-role change, `changeShareRoleInSyncTransaction`, until
+C4 moves it.
 Connection upkeep in `src/db/connection.ts` stays sync by design.
 
 **Permissions load, then check.** A request's resolver reads its grants on the async session
@@ -195,12 +203,9 @@ request to every route in the permission route map as the owner, an editor, a vi
 stranger, and fails on any `ScopeNotLoadedError`. Its requests carry a placeholder id and a
 minimal body, so they reach `authorize()` and the code before validation; checks deeper in a
 handler are covered by that route's own tests, which fail on the same 500. The 500 response
-carries a generic message, and the unloaded scope goes only to the server log. Three places
-still use the synchronous
-resolver, `syncResolverFor`, until part C: the role-manager count inside
-`keepingARoleManager`'s transaction, `vehiclePeople` in the roles routes, and
-`isNetworkAdmin` in `src/utils/outbound-url.ts`, which provider construction calls
-synchronously.
+carries a generic message, and the unloaded scope goes only to the server log. One place
+still uses the synchronous resolver, `syncResolverFor`, until part C3: `isNetworkAdmin` in
+`src/utils/outbound-url.ts`, which provider construction calls synchronously.
 
 One ordering rule holds the migration together: sync queries must be gone before the first
 async transaction ships, because a sync query issued while an async transaction is open runs

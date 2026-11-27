@@ -92,14 +92,15 @@ export function foldUserEmailCase(database: AppDatabase): void {
   if (folded > 0) logger.info(`Lowercased ${folded} user email(s)`);
 }
 
-export function runMigrations(): void {
+export async function runMigrations(): Promise<void> {
   try {
     logger.info('Running database migrations...');
     const db = getDb();
     migrate(db, { migrationsFolder: './drizzle' });
     foldUserEmailCase(db);
-    syncBuiltInRoles(db);
-    const admin = ensureServerAdmin(db);
+    const asyncDb = openAsyncDatabase(db.$client).db;
+    await syncBuiltInRoles(asyncDb);
+    const admin = await asyncDb.transaction((tx) => ensureServerAdmin(tx));
     if (admin) logger.info('Made the oldest eligible account the server admin', { userId: admin });
     logger.info('Database migrations completed successfully');
   } catch (error) {
